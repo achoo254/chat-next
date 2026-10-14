@@ -64,7 +64,11 @@
 	<symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M9.3 5.2A2 2 0 0 1 14 5a7 7 0 0 1 4 6v3M17 17H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 1.4-4.2M9 17v1a3 3 0 0 0 6 0v-1M3 3l18 18"/></symbol>
 	<symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M18 13l-6 6M6 13l6 6"/></symbol>
 	<symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 7h1a2 2 0 0 0 2-2 1 1 0 0 1 1-1h6a1 1 0 0 1 1 1 2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2"/><circle cx="12" cy="13" r="3"/></symbol>
-	<symbol id="i-qrcode" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></symbol>`}</svg>`;
+	<symbol id="i-qrcode" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></symbol>
+	<symbol id="i-contacts" viewBox="0 0 24 24"><path d="M20 6v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2zM10 16h6M4 8h3M4 12h3M4 16h3"/><circle cx="13" cy="11" r="2"/></symbol>
+	<symbol id="i-user-check" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4M15 19l2 2 4-4"/></symbol>
+	<symbol id="i-user-minus" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4M16 19h6"/></symbol>
+	<symbol id="i-crown" viewBox="0 0 24 24"><path d="M12 6l4 6 5-4-2 10H5L3 8l5 4z"/></symbol>`}</svg>`;
 	document.body.insertAdjacentHTML("afterbegin", SPRITE);
 
 	const PAGES = [

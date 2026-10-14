@@ -269,4 +269,8 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Chủ channel hoặc nhóm chỉ chuyển quyền cho admin; chưa có admin thì không được rời. Xác suất 0.83.
   - Mock cập nhật các màn danh bạ, danh sách bị cấm, hộp thoại rời chat trước, sau đó mới sửa backend và UI.
 - Việc vận hành còn mở: cổng 443 của server `.65` đang mở cho mọi IP. Bộ lấy trang để xem trước link vì vậy có thể làm lộ IP gốc sau Cloudflare. Muốn giới hạn 443 cho dải Cloudflare thì phải đổi tường lửa chung của server, ảnh hưởng mọi app.
+- Giao diện web R1 lên prod sau cờ `VITE_FEATURE_MESSAGING`, mặc định tắt (commit `74f30fc`). Bật cờ khi đủ hai điều kiện: CSP cho phép worker SQLite (wasm) và các lỗi High của review đã được sửa.
+- Mock lên 105 màn, gồm danh bạ, danh sách bị cấm, chủ nhóm rời đi, thanh trả lời và sửa, bảng emoji, xác nhận mở link ngoài, màn hẹp. Jev quyết thêm:
+  - Xoá thành viên: hành động chính là "Xoá và cấm vào lại", hành động phụ là "Chỉ xoá" (người đó vẫn vào lại được bằng link). Xác suất 0.86.
+  - Người nhận chỉ cho Danh bạ nhắn tin: tắt "Gửi link mời" và đưa thêm "Sao chép link". Xác suất 0.97.
 

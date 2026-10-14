@@ -71,7 +71,7 @@
 
 	<!-- ============ Privacy ============ -->
 	<section class="shot" id="privacy">
-		<div class="shot-head"><h2>Quyền riêng tư</h2><span class="phase">Phase 12</span><p>Mỗi cài đặt áp dụng ở mọi chỗ lộ thông tin: hồ sơ, trạng thái online và đang gõ, tìm người, Bot API, webhook và tìm kiếm tin. Mặc định an toàn: không ai tìm được bạn bằng email, chỉ danh bạ thêm được bạn vào nhóm. Tìm bằng email chỉ khớp đúng cả địa chỉ.</p></div>
+		<div class="shot-head"><h2>Quyền riêng tư</h2><span class="phase">R1 · Phase 12</span><p>Mỗi cài đặt áp dụng ở mọi chỗ lộ thông tin: hồ sơ, trạng thái online và đang gõ, tìm người, Bot API, webhook và tìm kiếm tin. "Danh bạ" trong mọi lựa chọn là những người bạn đã tự thêm vào danh bạ của mình; chung nhóm, chung kênh hay đã nhắn tin với nhau không làm ai thành liên hệ. Mặc định an toàn: không ai tìm được bạn bằng email, chỉ người trong danh bạ của bạn thêm được bạn vào nhóm. Tìm bằng email chỉ khớp đúng cả địa chỉ; ai không được phép tìm sẽ thấy "Không tìm thấy" như khi không có tài khoản.</p></div>
 		<div class="frame tall"><div class="set">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<nav class="set-nav" data-active="privacy" aria-label="Danh mục cài đặt"></nav>
@@ -79,6 +79,11 @@
 				<header class="set-head"><h3>Quyền riêng tư</h3></header>
 				<div class="set-body">
 					<p class="lede"><svg class="icon icon-sm"><use href="#i-shield"/></svg>Áp dụng cho cả bot và tích hợp: bot cũng không thấy được những gì bạn đã ẩn.</p>
+						<div class="card pad contacts-def">
+							<svg class="icon"><use href="#i-contacts"/></svg>
+							<p><b>"Danh bạ" là những người bạn đã thêm vào danh bạ.</b> Chung nhóm, chung kênh hay đã nhắn tin với nhau không làm ai thành liên hệ của bạn. Bạn tự thêm hoặc xoá từng người.</p>
+							<a class="btn" href="chat.html#contacts">Mở danh bạ · 5 người</a>
+						</div>
 					<div class="card">
 						<h4 class="card-title">Ai thấy</h4>
 						<div class="row opt-row">
@@ -97,11 +102,11 @@
 							<div class="choice" role="group" aria-label="Ai tìm tôi bằng email"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="true">Không ai</button></div>
 						</div>
 						<div class="row opt-row">
-							<span class="grow">Tìm tôi bằng username</span>
+							<span class="grow">Tìm tôi bằng username<small>Người không được phép thấy "Không tìm thấy", không biết là bạn đã ẩn.</small></span>
 							<div class="choice" role="group" aria-label="Ai tìm tôi bằng username"><button type="button" aria-pressed="true">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
 						</div>
 						<div class="row opt-row">
-							<span class="grow">Thêm tôi vào nhóm<small>Mặc định: Danh bạ. Người khác vẫn gửi được link mời để bạn tự vào.</small></span>
+							<span class="grow">Thêm tôi vào nhóm<small>Mặc định: Danh bạ. Người không có trong danh bạ của bạn vẫn gửi được link mời để bạn tự vào.</small></span>
 							<div class="choice" role="group" aria-label="Ai thêm tôi vào nhóm"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="true">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
 						</div>
 						<div class="row opt-row">
@@ -479,6 +484,12 @@
 .callout .icon { margin-top: 2px; }
 .callout p { margin: 0; }
 .opt-row { flex-wrap: wrap; padding-left: var(--space-4); padding-right: var(--space-4); }
+/* What "Danh bạ" means in every option below: the explicit contacts list. */
+.contacts-def { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-3); font-size: 0.875rem; }
+.contacts-def > .icon { margin-top: 2px; color: var(--c-primary); }
+.contacts-def p { flex: 1 1 260px; margin: 0; color: var(--c-text-muted); }
+.contacts-def p b { color: var(--c-text); font-weight: 600; }
+.contacts-def .btn { margin-left: auto; }
 .opt-row .grow { min-width: 220px; }
 .tag-neutral { flex: none; font-size: 0.75rem; font-weight: 500; padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--c-bar-track); color: var(--c-text-muted); }
 .btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
@@ -672,6 +683,7 @@ a.btn { color: var(--c-text); text-decoration: none; }
 	const RAIL = `<span class="avatar sm av-violet" title="Đức Thắng">ĐT</span>
 		<a class="icon-btn" href="chat.html" aria-label="Chat">${icon("message")}</a>
 		<a class="icon-btn" href="search.html" aria-label="Tìm kiếm">${icon("search")}</a>
+		<a class="icon-btn" href="chat.html#contacts" aria-label="Danh bạ">${icon("contacts")}</a>
 		<span class="spacer"></span>
 		<a class="icon-btn" href="#profile" aria-current="page" aria-label="Cài đặt">${icon("settings")}</a>`;
 	const NAV = [
