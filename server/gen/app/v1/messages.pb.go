@@ -3848,9 +3848,11 @@ func (x *GetMessageReadersRequest) GetSeq() int64 {
 }
 
 type GetMessageReadersResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserIds       []int64                `protobuf:"varint,1,rep,packed,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
-	Users         []*User                `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	UserIds []int64                `protobuf:"varint,1,rep,packed,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	Users   []*User                `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	// The same readers, most recent first, with when each read the message.
+	Readers       []*MessageReader `protobuf:"bytes,3,rep,name=readers,proto3" json:"readers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3897,6 +3899,67 @@ func (x *GetMessageReadersResponse) GetUsers() []*User {
 		return x.Users
 	}
 	return nil
+}
+
+func (x *GetMessageReadersResponse) GetReaders() []*MessageReader {
+	if x != nil {
+		return x.Readers
+	}
+	return nil
+}
+
+type MessageReader struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Unix seconds when the reader's read position first reached the message
+	// (for reads before read dates were kept: when it last moved).
+	ReadAt        int64 `protobuf:"varint,2,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessageReader) Reset() {
+	*x = MessageReader{}
+	mi := &file_app_v1_messages_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessageReader) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageReader) ProtoMessage() {}
+
+func (x *MessageReader) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_messages_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageReader.ProtoReflect.Descriptor instead.
+func (*MessageReader) Descriptor() ([]byte, []int) {
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *MessageReader) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *MessageReader) GetReadAt() int64 {
+	if x != nil {
+		return x.ReadAt
+	}
+	return 0
 }
 
 var File_app_v1_messages_proto protoreflect.FileDescriptor
@@ -4158,10 +4221,14 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\apreview\x18\x01 \x01(\v2\x13.app.v1.LinkPreviewR\apreview\"M\n" +
 	"\x18GetMessageReadersRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
-	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\"^\n" +
+	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\"\x8f\x01\n" +
 	"\x19GetMessageReadersResponse\x12\x1d\n" +
 	"\buser_ids\x18\x01 \x03(\x03B\x020\x02R\auserIds\x12\"\n" +
-	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users*\x82\x03\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12/\n" +
+	"\areaders\x18\x03 \x03(\v2\x15.app.v1.MessageReaderR\areaders\"I\n" +
+	"\rMessageReader\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12\x1b\n" +
+	"\aread_at\x18\x02 \x01(\x03B\x020\x02R\x06readAt*\x82\x03\n" +
 	"\n" +
 	"EntityType\x12\x1b\n" +
 	"\x17ENTITY_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -4217,7 +4284,7 @@ func file_app_v1_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_app_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 57)
+var file_app_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 58)
 var file_app_v1_messages_proto_goTypes = []any{
 	(EntityType)(0),                        // 0: app.v1.EntityType
 	(HistoryDirection)(0),                  // 1: app.v1.HistoryDirection
@@ -4278,8 +4345,9 @@ var file_app_v1_messages_proto_goTypes = []any{
 	(*GetLinkPreviewResponse)(nil),         // 56: app.v1.GetLinkPreviewResponse
 	(*GetMessageReadersRequest)(nil),       // 57: app.v1.GetMessageReadersRequest
 	(*GetMessageReadersResponse)(nil),      // 58: app.v1.GetMessageReadersResponse
-	(*MediaRef)(nil),                       // 59: app.v1.MediaRef
-	(*User)(nil),                           // 60: app.v1.User
+	(*MessageReader)(nil),                  // 59: app.v1.MessageReader
+	(*MediaRef)(nil),                       // 60: app.v1.MediaRef
+	(*User)(nil),                           // 61: app.v1.User
 }
 var file_app_v1_messages_proto_depIdxs = []int32{
 	0,  // 0: app.v1.MessageEntity.type:type_name -> app.v1.EntityType
@@ -4290,7 +4358,7 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	5,  // 5: app.v1.ReplyMarkup.keyboard:type_name -> app.v1.ReplyKeyboard
 	8,  // 6: app.v1.ReplyMarkup.inline_keyboard:type_name -> app.v1.InlineKeyboard
 	9,  // 7: app.v1.ReplyMarkup.remove:type_name -> app.v1.ReplyKeyboardRemove
-	59, // 8: app.v1.ActionPhotoChanged.photo:type_name -> app.v1.MediaRef
+	60, // 8: app.v1.ActionPhotoChanged.photo:type_name -> app.v1.MediaRef
 	14, // 9: app.v1.MessageAction.chat_created:type_name -> app.v1.ActionChatCreated
 	15, // 10: app.v1.MessageAction.members_added:type_name -> app.v1.ActionMembersAdded
 	16, // 11: app.v1.MessageAction.member_left:type_name -> app.v1.ActionMemberLeft
@@ -4303,7 +4371,7 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	23, // 18: app.v1.MessageAction.chat_mode_changed:type_name -> app.v1.ActionChatModeChanged
 	24, // 19: app.v1.MessageAction.joined_by_invite:type_name -> app.v1.ActionJoinedByInvite
 	2,  // 20: app.v1.Message.entities:type_name -> app.v1.MessageEntity
-	59, // 21: app.v1.Message.media:type_name -> app.v1.MediaRef
+	60, // 21: app.v1.Message.media:type_name -> app.v1.MediaRef
 	12, // 22: app.v1.Message.forward_from:type_name -> app.v1.ForwardHeader
 	10, // 23: app.v1.Message.reply_markup:type_name -> app.v1.ReplyMarkup
 	13, // 24: app.v1.Message.reactions:type_name -> app.v1.ReactionCount
@@ -4335,44 +4403,45 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	27, // 50: app.v1.SetReactionResponse.ack:type_name -> app.v1.SyncAck
 	1,  // 51: app.v1.GetHistoryRequest.direction:type_name -> app.v1.HistoryDirection
 	26, // 52: app.v1.GetHistoryResponse.messages:type_name -> app.v1.Message
-	60, // 53: app.v1.GetHistoryResponse.users:type_name -> app.v1.User
+	61, // 53: app.v1.GetHistoryResponse.users:type_name -> app.v1.User
 	11, // 54: app.v1.GetLinkPreviewResponse.preview:type_name -> app.v1.LinkPreview
-	60, // 55: app.v1.GetMessageReadersResponse.users:type_name -> app.v1.User
-	28, // 56: app.v1.MessagesService.SendMessage:input_type -> app.v1.SendMessageRequest
-	30, // 57: app.v1.MessagesService.SendMedia:input_type -> app.v1.SendMediaRequest
-	33, // 58: app.v1.MessagesService.SendAlbum:input_type -> app.v1.SendAlbumRequest
-	35, // 59: app.v1.MessagesService.ForwardMessages:input_type -> app.v1.ForwardMessagesRequest
-	37, // 60: app.v1.MessagesService.CopyMessage:input_type -> app.v1.CopyMessageRequest
-	39, // 61: app.v1.MessagesService.EditMessage:input_type -> app.v1.EditMessageRequest
-	41, // 62: app.v1.MessagesService.DeleteMessages:input_type -> app.v1.DeleteMessagesRequest
-	43, // 63: app.v1.MessagesService.ReadHistory:input_type -> app.v1.ReadHistoryRequest
-	45, // 64: app.v1.MessagesService.PinMessage:input_type -> app.v1.PinMessageRequest
-	47, // 65: app.v1.MessagesService.UnpinMessage:input_type -> app.v1.UnpinMessageRequest
-	49, // 66: app.v1.MessagesService.SetReaction:input_type -> app.v1.SetReactionRequest
-	51, // 67: app.v1.MessagesService.GetHistory:input_type -> app.v1.GetHistoryRequest
-	53, // 68: app.v1.MessagesService.PressInlineButton:input_type -> app.v1.PressInlineButtonRequest
-	55, // 69: app.v1.MessagesService.GetLinkPreview:input_type -> app.v1.GetLinkPreviewRequest
-	57, // 70: app.v1.MessagesService.GetMessageReaders:input_type -> app.v1.GetMessageReadersRequest
-	29, // 71: app.v1.MessagesService.SendMessage:output_type -> app.v1.SendMessageResponse
-	31, // 72: app.v1.MessagesService.SendMedia:output_type -> app.v1.SendMediaResponse
-	34, // 73: app.v1.MessagesService.SendAlbum:output_type -> app.v1.SendAlbumResponse
-	36, // 74: app.v1.MessagesService.ForwardMessages:output_type -> app.v1.ForwardMessagesResponse
-	38, // 75: app.v1.MessagesService.CopyMessage:output_type -> app.v1.CopyMessageResponse
-	40, // 76: app.v1.MessagesService.EditMessage:output_type -> app.v1.EditMessageResponse
-	42, // 77: app.v1.MessagesService.DeleteMessages:output_type -> app.v1.DeleteMessagesResponse
-	44, // 78: app.v1.MessagesService.ReadHistory:output_type -> app.v1.ReadHistoryResponse
-	46, // 79: app.v1.MessagesService.PinMessage:output_type -> app.v1.PinMessageResponse
-	48, // 80: app.v1.MessagesService.UnpinMessage:output_type -> app.v1.UnpinMessageResponse
-	50, // 81: app.v1.MessagesService.SetReaction:output_type -> app.v1.SetReactionResponse
-	52, // 82: app.v1.MessagesService.GetHistory:output_type -> app.v1.GetHistoryResponse
-	54, // 83: app.v1.MessagesService.PressInlineButton:output_type -> app.v1.PressInlineButtonResponse
-	56, // 84: app.v1.MessagesService.GetLinkPreview:output_type -> app.v1.GetLinkPreviewResponse
-	58, // 85: app.v1.MessagesService.GetMessageReaders:output_type -> app.v1.GetMessageReadersResponse
-	71, // [71:86] is the sub-list for method output_type
-	56, // [56:71] is the sub-list for method input_type
-	56, // [56:56] is the sub-list for extension type_name
-	56, // [56:56] is the sub-list for extension extendee
-	0,  // [0:56] is the sub-list for field type_name
+	61, // 55: app.v1.GetMessageReadersResponse.users:type_name -> app.v1.User
+	59, // 56: app.v1.GetMessageReadersResponse.readers:type_name -> app.v1.MessageReader
+	28, // 57: app.v1.MessagesService.SendMessage:input_type -> app.v1.SendMessageRequest
+	30, // 58: app.v1.MessagesService.SendMedia:input_type -> app.v1.SendMediaRequest
+	33, // 59: app.v1.MessagesService.SendAlbum:input_type -> app.v1.SendAlbumRequest
+	35, // 60: app.v1.MessagesService.ForwardMessages:input_type -> app.v1.ForwardMessagesRequest
+	37, // 61: app.v1.MessagesService.CopyMessage:input_type -> app.v1.CopyMessageRequest
+	39, // 62: app.v1.MessagesService.EditMessage:input_type -> app.v1.EditMessageRequest
+	41, // 63: app.v1.MessagesService.DeleteMessages:input_type -> app.v1.DeleteMessagesRequest
+	43, // 64: app.v1.MessagesService.ReadHistory:input_type -> app.v1.ReadHistoryRequest
+	45, // 65: app.v1.MessagesService.PinMessage:input_type -> app.v1.PinMessageRequest
+	47, // 66: app.v1.MessagesService.UnpinMessage:input_type -> app.v1.UnpinMessageRequest
+	49, // 67: app.v1.MessagesService.SetReaction:input_type -> app.v1.SetReactionRequest
+	51, // 68: app.v1.MessagesService.GetHistory:input_type -> app.v1.GetHistoryRequest
+	53, // 69: app.v1.MessagesService.PressInlineButton:input_type -> app.v1.PressInlineButtonRequest
+	55, // 70: app.v1.MessagesService.GetLinkPreview:input_type -> app.v1.GetLinkPreviewRequest
+	57, // 71: app.v1.MessagesService.GetMessageReaders:input_type -> app.v1.GetMessageReadersRequest
+	29, // 72: app.v1.MessagesService.SendMessage:output_type -> app.v1.SendMessageResponse
+	31, // 73: app.v1.MessagesService.SendMedia:output_type -> app.v1.SendMediaResponse
+	34, // 74: app.v1.MessagesService.SendAlbum:output_type -> app.v1.SendAlbumResponse
+	36, // 75: app.v1.MessagesService.ForwardMessages:output_type -> app.v1.ForwardMessagesResponse
+	38, // 76: app.v1.MessagesService.CopyMessage:output_type -> app.v1.CopyMessageResponse
+	40, // 77: app.v1.MessagesService.EditMessage:output_type -> app.v1.EditMessageResponse
+	42, // 78: app.v1.MessagesService.DeleteMessages:output_type -> app.v1.DeleteMessagesResponse
+	44, // 79: app.v1.MessagesService.ReadHistory:output_type -> app.v1.ReadHistoryResponse
+	46, // 80: app.v1.MessagesService.PinMessage:output_type -> app.v1.PinMessageResponse
+	48, // 81: app.v1.MessagesService.UnpinMessage:output_type -> app.v1.UnpinMessageResponse
+	50, // 82: app.v1.MessagesService.SetReaction:output_type -> app.v1.SetReactionResponse
+	52, // 83: app.v1.MessagesService.GetHistory:output_type -> app.v1.GetHistoryResponse
+	54, // 84: app.v1.MessagesService.PressInlineButton:output_type -> app.v1.PressInlineButtonResponse
+	56, // 85: app.v1.MessagesService.GetLinkPreview:output_type -> app.v1.GetLinkPreviewResponse
+	58, // 86: app.v1.MessagesService.GetMessageReaders:output_type -> app.v1.GetMessageReadersResponse
+	72, // [72:87] is the sub-list for method output_type
+	57, // [57:72] is the sub-list for method input_type
+	57, // [57:57] is the sub-list for extension type_name
+	57, // [57:57] is the sub-list for extension extendee
+	0,  // [0:57] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_messages_proto_init() }
@@ -4414,7 +4483,7 @@ func file_app_v1_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_messages_proto_rawDesc), len(file_app_v1_messages_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   57,
+			NumMessages:   58,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

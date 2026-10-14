@@ -432,7 +432,10 @@ func (d *dispatcher) enqueue(ev *Event) {
 }
 
 func (d *dispatcher) run(ev *Event) {
-	d.delivered.add(ev.OutboxID)
+	// The sweeper may have delivered it already (this queue was slow).
+	if !d.delivered.addIfAbsent(ev.OutboxID) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), deliverTimeout)
 	defer cancel()
 	if err := d.s.deliver(ctx, ev); err != nil && !errors.Is(err, context.Canceled) {
@@ -465,7 +468,7 @@ func (s *Service) deliver(ctx context.Context, ev *Event) error {
 			}
 			jobs[e.UserID] = append(jobs[e.UserID], u)
 		}
-		frames, err := s.renderFrames(ctx, s.pool, order, jobs)
+		frames, err := s.renderFrames(ctx, s.pool, order, jobs, false)
 		if err != nil {
 			return err
 		}
@@ -482,12 +485,16 @@ func (s *Service) deliver(ctx context.Context, ev *Event) error {
 				u.ChatPts, u.ChatPtsCount, u.ChatId, u.ServerEpoch, u.Date = c.ChatPts, 1, c.ChatID, epoch, now
 				jobs[v] = []*appv1.Update{u}
 			}
-			frames, err := s.renderFrames(ctx, s.pool, viewers, jobs)
+			// Sockets may still show a chat their user just left: only
+			// current members get a frame.
+			frames, err := s.renderFrames(ctx, s.pool, viewers, jobs, true)
 			if err != nil {
 				return err
 			}
 			for _, v := range viewers {
-				sink.SendChatViewer(v, c.ChatID, &appv1.ServerFrame{Frame: &appv1.ServerFrame_Update{Update: frames[v]}})
+				if f, ok := frames[v]; ok {
+					sink.SendChatViewer(v, c.ChatID, &appv1.ServerFrame{Frame: &appv1.ServerFrame_Update{Update: f}})
+				}
 			}
 		}
 		sink.ChatActivity(c.ChatID, c.ChatPts, ev.TopSeq)

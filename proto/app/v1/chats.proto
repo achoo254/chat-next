@@ -22,16 +22,33 @@ service ChatsService {
   rpc CreateChannel(CreateChannelRequest) returns (CreateChannelResponse);
   rpc GetDialogs(GetDialogsRequest) returns (GetDialogsResponse);
   rpc GetChat(GetChatRequest) returns (GetChatResponse);
+  // Channels: admins only.
   rpc GetMembers(GetMembersRequest) returns (GetMembersResponse);
+  // Banned users (see RemoveMember) come back in failed_user_ids unless the
+  // caller is an admin; an admin adding them lifts the ban.
   rpc AddMembers(AddMembersRequest) returns (AddMembersResponse);
+  // Removes a member, by default also banning them (ban unset or true): a
+  // banned user cannot rejoin through any invite link, nor be added back by
+  // a non-admin, until an admin unbans them, and the invite links they
+  // created in the chat are revoked. ban = false only removes.
   rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
+  // The owner leaving hands ownership to the longest-serving admin. When
+  // other members remain but none is an admin, it fails with
+  // failed_precondition (message prefix "owner_needs_admin"); only this
+  // case returns failed_precondition here.
   rpc LeaveChat(LeaveChatRequest) returns (LeaveChatResponse);
+  // Lifts a ban (admins). The user is not added back.
+  rpc UnbanMember(UnbanMemberRequest) returns (UnbanMemberResponse);
+  // Users banned from the chat, by user id (admins).
+  rpc GetBannedMembers(GetBannedMembersRequest) returns (GetBannedMembersResponse);
   // Sets one member's permission bitmask.
   rpc SetMemberPermissions(SetMemberPermissionsRequest) returns (SetMemberPermissionsResponse);
   rpc SetAdmin(SetAdminRequest) returns (SetAdminResponse);
   // Creates an invite link (>= 128 bits of entropy).
   rpc ExportInviteLink(ExportInviteLinkRequest) returns (ExportInviteLinkResponse);
-  // Joins after the user confirmed in the client.
+  // Joins after the user confirmed in the client. A link works only while
+  // its creator is still a member allowed to invite; a banned user gets
+  // permission_denied.
   rpc JoinByInvite(JoinByInviteRequest) returns (JoinByInviteResponse);
   rpc SetHistoryVisibility(SetHistoryVisibilityRequest) returns (SetHistoryVisibilityResponse);
   rpc UpdateChatInfo(UpdateChatInfoRequest) returns (UpdateChatInfoResponse);
@@ -146,7 +163,10 @@ message Dialog {
   int64 read_inbox_max_seq = 3 [jstype = JS_NUMBER];
   // Highest seq of the caller's own messages read by others.
   int64 read_outbox_max_seq = 4 [jstype = JS_NUMBER];
+  // Counted up to 1000; clients show 1000 as "999+".
   int32 unread_count = 5;
+  // Unread messages that mention the caller (@username or a mention by
+  // id) or reply to them; counted up to 1000.
   int32 unread_mentions_count = 6;
   // sync_mode=large only: chat_pts to pass to GetChatDifference.
   int64 chat_pts = 7 [jstype = JS_NUMBER];
@@ -180,7 +200,23 @@ message ForumTopic {
   int64 top_seq = 10 [jstype = JS_NUMBER];
   // Caller-specific read state (GetForumTopics only; 0 in updates).
   int64 read_inbox_max_seq = 11 [jstype = JS_NUMBER];
+  // Counted up to 1000.
   int32 unread_count = 12;
+  // Name of the topic's icon glyph from the client's icon set (lowercase
+  // letters, digits and '-', at most 32); empty for the default.
+  string icon = 13;
+  // Messages in the topic that are not deleted, service messages included.
+  int32 message_count = 14;
+  // Caller-specific (GetForumTopics only): unread messages that mention the
+  // caller or reply to them, counted up to 1000.
+  int32 unread_mentions_count = 15;
+}
+
+// A user removed from a chat by an admin.
+message BannedMember {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  int64 banned_by = 2 [jstype = JS_NUMBER];
+  int64 banned_at = 3 [jstype = JS_NUMBER];
 }
 
 message CreatePrivateRequest {
@@ -270,6 +306,9 @@ message AddMembersResponse {
 message RemoveMemberRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   int64 user_id = 2 [jstype = JS_NUMBER];
+  // Unset or true: remove and ban (see RemoveMember). false: remove only;
+  // the user may rejoin through a valid invite link and keeps their links.
+  optional bool ban = 3;
 }
 
 message RemoveMemberResponse {
@@ -378,6 +417,11 @@ message CheckInviteResponse {
   int32 member_count = 4;
   // Set when the caller is already a member: open this chat instead.
   Chat chat = 5;
+  // Groups only: a few members to show (admins first), with their users.
+  repeated int64 member_ids = 6 [jstype = JS_NUMBER];
+  repeated User users = 7;
+  // Whether new members can read the history from before they join.
+  HistoryVisibility history_visibility = 8;
 }
 
 message GetInviteLinksRequest {
@@ -400,6 +444,10 @@ message RevokeInviteLinkResponse {
 
 message GetForumTopicsRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 2;
+  // Default 100, at most 500. A forum has at most 1000 topics.
+  int32 limit = 3;
 }
 
 message GetForumTopicsResponse {
@@ -409,12 +457,16 @@ message GetForumTopicsResponse {
   // Top message of each topic.
   repeated Message messages = 2;
   repeated User users = 3;
+  // Empty when there are no more topics.
+  string next_cursor = 4;
 }
 
 message CreateForumTopicRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   string title = 2;
   int32 icon_color = 3;
+  // See ForumTopic.icon.
+  string icon = 4;
 }
 
 message CreateForumTopicResponse {
@@ -430,6 +482,8 @@ message EditForumTopicRequest {
   optional int32 icon_color = 4;
   // Admins only.
   optional bool pinned = 5;
+  // See ForumTopic.icon.
+  optional string icon = 6;
 }
 
 message EditForumTopicResponse {
@@ -457,4 +511,25 @@ message HideForumTopicRequest {
 message HideForumTopicResponse {
   ForumTopic topic = 1;
   SyncAck ack = 2;
+}
+
+message UnbanMemberRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+}
+
+message UnbanMemberResponse {}
+
+message GetBannedMembersRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 2;
+  int32 limit = 3;
+}
+
+message GetBannedMembersResponse {
+  repeated BannedMember members = 1;
+  repeated User users = 2;
+  // Empty when there are no more banned users.
+  string next_cursor = 3;
 }

@@ -59,6 +59,14 @@ const (
 	UsersServiceSetPrivacyProcedure = "/app.v1.UsersService/SetPrivacy"
 	// UsersServiceReportProcedure is the fully-qualified name of the UsersService's Report RPC.
 	UsersServiceReportProcedure = "/app.v1.UsersService/Report"
+	// UsersServiceAddContactProcedure is the fully-qualified name of the UsersService's AddContact RPC.
+	UsersServiceAddContactProcedure = "/app.v1.UsersService/AddContact"
+	// UsersServiceDeleteContactProcedure is the fully-qualified name of the UsersService's
+	// DeleteContact RPC.
+	UsersServiceDeleteContactProcedure = "/app.v1.UsersService/DeleteContact"
+	// UsersServiceGetContactsProcedure is the fully-qualified name of the UsersService's GetContacts
+	// RPC.
+	UsersServiceGetContactsProcedure = "/app.v1.UsersService/GetContacts"
 )
 
 // UsersServiceClient is a client for the app.v1.UsersService service.
@@ -77,6 +85,12 @@ type UsersServiceClient interface {
 	SetPrivacy(context.Context, *connect.Request[v1.SetPrivacyRequest]) (*connect.Response[v1.SetPrivacyResponse], error)
 	// Reports a user, a chat or messages to the tenant's moderation queue.
 	Report(context.Context, *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error)
+	// Contacts: the caller's own list. A user's privacy audience CONTACTS
+	// means the users in that user's list (being in someone else's list, or
+	// sharing a chat, does not count).
+	AddContact(context.Context, *connect.Request[v1.AddContactRequest]) (*connect.Response[v1.AddContactResponse], error)
+	DeleteContact(context.Context, *connect.Request[v1.DeleteContactRequest]) (*connect.Response[v1.DeleteContactResponse], error)
+	GetContacts(context.Context, *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error)
 }
 
 // NewUsersServiceClient constructs a client for the app.v1.UsersService service. By default, it
@@ -156,6 +170,24 @@ func NewUsersServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(usersServiceMethods.ByName("Report")),
 			connect.WithClientOptions(opts...),
 		),
+		addContact: connect.NewClient[v1.AddContactRequest, v1.AddContactResponse](
+			httpClient,
+			baseURL+UsersServiceAddContactProcedure,
+			connect.WithSchema(usersServiceMethods.ByName("AddContact")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteContact: connect.NewClient[v1.DeleteContactRequest, v1.DeleteContactResponse](
+			httpClient,
+			baseURL+UsersServiceDeleteContactProcedure,
+			connect.WithSchema(usersServiceMethods.ByName("DeleteContact")),
+			connect.WithClientOptions(opts...),
+		),
+		getContacts: connect.NewClient[v1.GetContactsRequest, v1.GetContactsResponse](
+			httpClient,
+			baseURL+UsersServiceGetContactsProcedure,
+			connect.WithSchema(usersServiceMethods.ByName("GetContacts")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -172,6 +204,9 @@ type usersServiceClient struct {
 	getPrivacy      *connect.Client[v1.GetPrivacyRequest, v1.GetPrivacyResponse]
 	setPrivacy      *connect.Client[v1.SetPrivacyRequest, v1.SetPrivacyResponse]
 	report          *connect.Client[v1.ReportRequest, v1.ReportResponse]
+	addContact      *connect.Client[v1.AddContactRequest, v1.AddContactResponse]
+	deleteContact   *connect.Client[v1.DeleteContactRequest, v1.DeleteContactResponse]
+	getContacts     *connect.Client[v1.GetContactsRequest, v1.GetContactsResponse]
 }
 
 // GetSelf calls app.v1.UsersService.GetSelf.
@@ -229,6 +264,21 @@ func (c *usersServiceClient) Report(ctx context.Context, req *connect.Request[v1
 	return c.report.CallUnary(ctx, req)
 }
 
+// AddContact calls app.v1.UsersService.AddContact.
+func (c *usersServiceClient) AddContact(ctx context.Context, req *connect.Request[v1.AddContactRequest]) (*connect.Response[v1.AddContactResponse], error) {
+	return c.addContact.CallUnary(ctx, req)
+}
+
+// DeleteContact calls app.v1.UsersService.DeleteContact.
+func (c *usersServiceClient) DeleteContact(ctx context.Context, req *connect.Request[v1.DeleteContactRequest]) (*connect.Response[v1.DeleteContactResponse], error) {
+	return c.deleteContact.CallUnary(ctx, req)
+}
+
+// GetContacts calls app.v1.UsersService.GetContacts.
+func (c *usersServiceClient) GetContacts(ctx context.Context, req *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error) {
+	return c.getContacts.CallUnary(ctx, req)
+}
+
 // UsersServiceHandler is an implementation of the app.v1.UsersService service.
 type UsersServiceHandler interface {
 	// The caller's own user (profile, email from the IdP).
@@ -245,6 +295,12 @@ type UsersServiceHandler interface {
 	SetPrivacy(context.Context, *connect.Request[v1.SetPrivacyRequest]) (*connect.Response[v1.SetPrivacyResponse], error)
 	// Reports a user, a chat or messages to the tenant's moderation queue.
 	Report(context.Context, *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error)
+	// Contacts: the caller's own list. A user's privacy audience CONTACTS
+	// means the users in that user's list (being in someone else's list, or
+	// sharing a chat, does not count).
+	AddContact(context.Context, *connect.Request[v1.AddContactRequest]) (*connect.Response[v1.AddContactResponse], error)
+	DeleteContact(context.Context, *connect.Request[v1.DeleteContactRequest]) (*connect.Response[v1.DeleteContactResponse], error)
+	GetContacts(context.Context, *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error)
 }
 
 // NewUsersServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -320,6 +376,24 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(usersServiceMethods.ByName("Report")),
 		connect.WithHandlerOptions(opts...),
 	)
+	usersServiceAddContactHandler := connect.NewUnaryHandler(
+		UsersServiceAddContactProcedure,
+		svc.AddContact,
+		connect.WithSchema(usersServiceMethods.ByName("AddContact")),
+		connect.WithHandlerOptions(opts...),
+	)
+	usersServiceDeleteContactHandler := connect.NewUnaryHandler(
+		UsersServiceDeleteContactProcedure,
+		svc.DeleteContact,
+		connect.WithSchema(usersServiceMethods.ByName("DeleteContact")),
+		connect.WithHandlerOptions(opts...),
+	)
+	usersServiceGetContactsHandler := connect.NewUnaryHandler(
+		UsersServiceGetContactsProcedure,
+		svc.GetContacts,
+		connect.WithSchema(usersServiceMethods.ByName("GetContacts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.UsersService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UsersServiceGetSelfProcedure:
@@ -344,6 +418,12 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 			usersServiceSetPrivacyHandler.ServeHTTP(w, r)
 		case UsersServiceReportProcedure:
 			usersServiceReportHandler.ServeHTTP(w, r)
+		case UsersServiceAddContactProcedure:
+			usersServiceAddContactHandler.ServeHTTP(w, r)
+		case UsersServiceDeleteContactProcedure:
+			usersServiceDeleteContactHandler.ServeHTTP(w, r)
+		case UsersServiceGetContactsProcedure:
+			usersServiceGetContactsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -395,4 +475,16 @@ func (UnimplementedUsersServiceHandler) SetPrivacy(context.Context, *connect.Req
 
 func (UnimplementedUsersServiceHandler) Report(context.Context, *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.Report is not implemented"))
+}
+
+func (UnimplementedUsersServiceHandler) AddContact(context.Context, *connect.Request[v1.AddContactRequest]) (*connect.Response[v1.AddContactResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.AddContact is not implemented"))
+}
+
+func (UnimplementedUsersServiceHandler) DeleteContact(context.Context, *connect.Request[v1.DeleteContactRequest]) (*connect.Response[v1.DeleteContactResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.DeleteContact is not implemented"))
+}
+
+func (UnimplementedUsersServiceHandler) GetContacts(context.Context, *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.GetContacts is not implemented"))
 }

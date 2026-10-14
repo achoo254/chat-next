@@ -355,7 +355,7 @@ describe("server features", () => {
 		await userEvent.click(within(picker).getByRole("button", { name: "Thêm 1 người" }));
 
 		const failed = await screen.findByRole("dialog", { name: "Chưa thêm được 1 người" }, LONG);
-		await userEvent.click(within(failed).getByRole("button", { name: "Gửi link mời" }));
+		await userEvent.click(await within(failed).findByRole("button", { name: "Gửi link mời" }, LONG));
 		await waitFor(() => expect(demo.fixture.sent.some((m) => m.text.startsWith("https://chat.example.test/+"))).toBe(true), LONG);
 		expect(await within(failed).findByText("Đã gửi link mời cho Ngọc Mai")).toBeTruthy();
 	});

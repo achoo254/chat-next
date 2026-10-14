@@ -170,6 +170,10 @@ func TestNormalizeURL(t *testing.T) {
 	if _, err := NormalizeURL("https://example.com/" + strings.Repeat("a", MaxURLLength)); !errors.Is(err, ErrInvalidURL) {
 		t.Error("overlong URL accepted")
 	}
+	// Short enough as typed, too long once escaped (é is 2 bytes, 6 escaped).
+	if _, err := NormalizeURL("https://example.com/" + strings.Repeat("é", MaxURLLength/3)); !errors.Is(err, ErrInvalidURL) {
+		t.Error("URL whose canonical form is overlong accepted")
+	}
 }
 
 func TestPublicAddress(t *testing.T) {
@@ -193,6 +197,15 @@ func TestPublicAddress(t *testing.T) {
 		"255.255.255.255:80":        false,
 		"198.18.0.1:80":             false,
 		"[::ffff:93.184.216.34]:80": true,
+		"[::a00:1]:443":             false, // IPv4-compatible 10.0.0.1
+		"[::7f00:1]:443":            false, // IPv4-compatible 127.0.0.1
+		"[fec0::1]:443":             false,
+		"[100::1]:443":              false,
+		"[2001:2::1]:443":           false,
+		"[2001:0:4136:e378::1]:443": false,
+		"[3fff::1]:443":             false,
+		"[5f00::1]:443":             false,
+		"192.88.99.1:80":            false,
 	} {
 		if got := PublicAddress(netip.MustParseAddrPort(addr)); got != want {
 			t.Errorf("PublicAddress(%s) = %v, want %v", addr, got, want)

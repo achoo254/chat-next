@@ -147,6 +147,14 @@ Create:
 - Update trong nhật ký lưu tin dạng `(chat_id, seq)` và dựng lại khi đọc, nên tin đã xoá không bị phát lại qua `GetDifference`.
 - Chi tiết vận hành: [`server/README.md`](../../../server/README.md), [`docs/deployment-guide.md`](../../../docs/deployment-guide.md).
 
+### Sửa sau review R1 (2026-10-14, migration 0004)
+
+- "Danh bạ" đổi thành danh sách liên hệ riêng (`AddContact`/`DeleteContact`/`GetContacts`, theo Telegram): audience `CONTACTS` của một người là người trong danh sách của chính họ; có chung chat không còn tính. Dòng "danh bạ = có chung chat" ở trên đã thay. `ResolveUsername` áp `find_by_username`; `GetUsers` chỉ trả người có quan hệ.
+- Không lộ nội dung ngoài phạm vi thấy: `visible_from_seq` áp cho mọi update dựng lại (sửa, reaction, xem trước link, nhật ký chat lớn); người đã rời chỉ thấy tới `left_seq` và chưa đổi sau lúc rời.
+- Xoá thành viên mặc định kèm cấm (`ban`, `UnbanMember`, `GetBannedMembers`), thu hồi link của người bị cấm; link chỉ dùng được khi người tạo còn quyền mời. Chủ rời đi chỉ chuyển quyền cho admin, không có admin thì `failed_precondition` `owner_needs_admin`. Kênh: chỉ admin xem thành viên.
+- Đếm chưa đọc tới 1000, dialog tính theo lô, `GetForumTopics` phân trang, tối đa 1000 topic, `unread_mentions_count` có thật; topic có `icon`, `message_count`; `GetMessageReaders` có thời điểm đọc; `CheckInvite` có thành viên xem trước và `history_visibility`; lý do báo cáo `SCAM`, `SEXUAL`.
+- Partition: tạo và xoá tách transaction, xoá qua `DETACH … CONCURRENTLY`, cảnh báo khi còn dưới 7 ngày.
+
 ## Success Criteria
 
 - Mọi test ở bước 11 pass với `-race`.

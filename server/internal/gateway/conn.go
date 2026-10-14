@@ -26,10 +26,19 @@ const (
 	readLimitBytes = 64 << 10
 	visibleMax     = 200
 	touchEvery     = 10 * time.Minute
-	closeGrace     = 500 * time.Millisecond
+	// sessionCheckEvery: an open socket re-checks its session this often.
+	sessionCheckEvery = time.Minute
+	closeGrace        = 500 * time.Millisecond
+	// Sockets per session and per user; more are refused at the handshake.
+	maxSocketsPerSession = 10
+	maxSocketsPerUser    = 30
 )
 
-var typingRule = ratelimit.Rule{Rate: 1, Burst: 3}
+var (
+	typingRule = ratelimit.Rule{Rate: 1, Burst: 3}
+	// openChatRule bounds OpenChatFrame per session (one lookup each).
+	openChatRule = ratelimit.Rule{Rate: 5, Burst: 20}
+)
 
 type closeKind int
 
@@ -53,11 +62,20 @@ type conn struct {
 	closing sync.Once
 	kind    closeKind
 
-	mu         sync.Mutex
-	openChat   int64
-	openLarge  bool
+	mu        sync.Mutex
+	openChat  int64
+	openLarge bool
+	// mayType: the user may post in the open chat and no block stands
+	// between the private chat's participants (checked at OpenChat).
+	mayType    bool
 	visible    map[int64]bool
 	foreground bool
+}
+
+func (c *conn) openChatAccess() (int64, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.openChat, c.mayType
 }
 
 func (c *conn) isForeground() bool {
@@ -84,7 +102,7 @@ func (c *conn) forget(chatID int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.openChat == chatID {
-		c.openChat, c.openLarge = 0, false
+		c.openChat, c.openLarge, c.mayType = 0, false, false
 	}
 	delete(c.visible, chatID)
 }

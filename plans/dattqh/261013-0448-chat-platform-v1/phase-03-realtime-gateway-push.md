@@ -95,6 +95,7 @@ Create:
 - Gateway chạy trong process `api` ở `wss://chat.hoandat.com/ws` (cùng origin, nginx `location = /ws` có header upgrade), không thêm process hay cổng: giai đoạn 1 chỉ một server, pm2 một instance, nên hub trong bộ nhớ nhận update thẳng từ chat service sau commit. Handshake kiểm `Origin` và cookie phiên trước khi upgrade.
 - Backpressure: hàng đợi 256 frame mỗi socket, đầy thì `ResyncFrame(BACKPRESSURE)`; epoch đổi thì `EPOCH_CHANGED`; dừng server thì `SERVER_RESTART`.
 - Chưa làm trong R1: push (APNs/FCM/Web Push), làn ưu tiên, badge, metrics, token phiên native trong `ClientHelloFrame` (app native ở R7/R8), kiểm tenant theo Host (một tenant tĩnh), `wsbench`.
+- Sửa sau review R1 (2026-10-14): kiểm lại phiên ngay sau khi đăng ký socket và mỗi phút; tối đa 10 socket mỗi phiên, 30 mỗi user; `OpenChatFrame` 5/giây mỗi phiên; typing cần quyền gửi và không qua chặn; dispatcher và outbox sweeper không giao trùng; nhật ký chat lớn chỉ tới thành viên hiện tại; nginx `/ws` dùng zone riêng `chat_ws` (cần deploy bằng root một lần).
 
 ## Success Criteria
 

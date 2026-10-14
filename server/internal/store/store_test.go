@@ -153,8 +153,8 @@ func TestSessionsLifecycle(t *testing.T) {
 	if _, err := s.ActiveSession(ctx, "other", hashOf("one")); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("other tenant err = %v", err)
 	}
-	if err := s.TouchSession(ctx, id1, time.Minute); err != nil {
-		t.Fatal(err)
+	if st, err := s.TouchSession(ctx, id1, time.Minute); err != nil || !st.Active {
+		t.Fatalf("TouchSession of an active session = %+v, %v", st, err)
 	}
 
 	r, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil)
@@ -163,6 +163,13 @@ func TestSessionsLifecycle(t *testing.T) {
 	}
 	if _, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("second revoke err = %v", err)
+	}
+	// The realtime gateway learns of the revocation from TouchSession.
+	if st, err := s.TouchSession(ctx, id2, time.Minute); err != nil || st.Active || st.RevokeReason != 2 {
+		t.Fatalf("TouchSession of a revoked session = %+v, %v", st, err)
+	}
+	if st, err := s.TouchSession(ctx, 1<<40, time.Minute); err != nil || st.Active {
+		t.Fatalf("TouchSession of a missing session = %+v, %v", st, err)
 	}
 	others, err := s.RevokeOtherSessions(ctx, tenant, u.ID, id1)
 	if err != nil || len(others) != 1 || others[0].ID != id3 {
@@ -347,7 +354,7 @@ func TestCheckGrantHoldsNoLockAndKeepsRevocation(t *testing.T) {
 		// would block until the deadline if it were.
 		qctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
-		if err := s.TouchSession(qctx, id, 0); err != nil {
+		if _, err := s.TouchSession(qctx, id, 0); err != nil {
 			t.Errorf("TouchSession during check: %v", err)
 		}
 		if _, err := s.RevokeSession(qctx, tenant, u.ID, id, nil); err != nil {

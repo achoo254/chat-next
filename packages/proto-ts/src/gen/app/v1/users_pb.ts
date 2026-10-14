@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/users.proto.
  */
 export const file_app_v1_users: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIhAKDkdldFNlbGZSZXF1ZXN0Ii0KD0dldFNlbGZSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJwoPR2V0VXNlcnNSZXF1ZXN0EhQKCHVzZXJfaWRzGAEgAygDQgIwAiIvChBHZXRVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiegoUVXBkYXRlUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhAKA2JpbxgCIAEoCUgBiAEBEhoKDXBob3RvX2ZpbGVfaWQYAyABKAlIAogBAUIHCgVfbmFtZUIGCgRfYmlvQhAKDl9waG90b19maWxlX2lkIjMKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJgoSU2V0VXNlcm5hbWVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjEKE1NldFVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIioKFlJlc29sdmVVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiNQoXUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIjIKElNlYXJjaFVzZXJzUmVxdWVzdBINCgVxdWVyeRgBIAEoCRINCgVsaW1pdBgCIAEoBSIyChNTZWFyY2hVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiIwoMQmxvY2tSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIg8KDUJsb2NrUmVzcG9uc2UiJQoOVW5ibG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiEQoPVW5ibG9ja1Jlc3BvbnNlIs4CCg9Qcml2YWN5U2V0dGluZ3MSKgoJbGFzdF9zZWVuGAEgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIxChBmaW5kX2J5X3VzZXJuYW1lGAQgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIcChRub3RpZmljYXRpb25fcHJldmlldxgHIAEoCCITChFHZXRQcml2YWN5UmVxdWVzdCI/ChJHZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIvcDChFTZXRQcml2YWN5UmVxdWVzdBIvCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSACIAQESMwoNcHJvZmlsZV9waG90bxgCIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAYgBARIzCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgCiAEBEjYKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAOIAQESMwoNYWRkX3RvX2dyb3VwcxgFIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIBIgBARIzCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgFiAEBEiEKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgISAaIAQFCDAoKX2xhc3Rfc2VlbkIQCg5fcHJvZmlsZV9waG90b0IQCg5fZmluZF9ieV9lbWFpbEITChFfZmluZF9ieV91c2VybmFtZUIQCg5fYWRkX3RvX2dyb3Vwc0IQCg5fc2VuZF9tZXNzYWdlc0IXChVfbm90aWZpY2F0aW9uX3ByZXZpZXciPwoSU2V0UHJpdmFjeVJlc3BvbnNlEikKCHNldHRpbmdzGAEgASgLMhcuYXBwLnYxLlByaXZhY3lTZXR0aW5ncyI5ChBSZXBvcnRlZE1lc3NhZ2VzEhMKB2NoYXRfaWQYASABKANCAjACEhAKBHNlcXMYAiADKANCAjACIqwBCg1SZXBvcnRSZXF1ZXN0EhUKB3VzZXJfaWQYASABKANCAjACSAASFQoHY2hhdF9pZBgCIAEoA0ICMAJIABIsCghtZXNzYWdlcxgDIAEoCzIYLmFwcC52MS5SZXBvcnRlZE1lc3NhZ2VzSAASJAoGcmVhc29uGAQgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAUgASgJQggKBnRhcmdldCIQCg5SZXBvcnRSZXNwb25zZSrNAQoOVXNlclN0YXR1c0tpbmQSIAocVVNFUl9TVEFUVVNfS0lORF9VTlNQRUNJRklFRBAAEhsKF1VTRVJfU1RBVFVTX0tJTkRfT05MSU5FEAESHAoYVVNFUl9TVEFUVVNfS0lORF9PRkZMSU5FEAISHQoZVVNFUl9TVEFUVVNfS0lORF9SRUNFTlRMWRADEh4KGlVTRVJfU1RBVFVTX0tJTkRfTEFTVF9XRUVLEAQSHwobVVNFUl9TVEFUVVNfS0lORF9MQVNUX01PTlRIEAUqjgEKD1ByaXZhY3lBdWRpZW5jZRIgChxQUklWQUNZX0FVRElFTkNFX1VOU1BFQ0lGSUVEEAASHQoZUFJJVkFDWV9BVURJRU5DRV9FVkVSWU9ORRABEh0KGVBSSVZBQ1lfQVVESUVOQ0VfQ09OVEFDVFMQAhIbChdQUklWQUNZX0FVRElFTkNFX05PQk9EWRADKtUBCgxSZXBvcnRSZWFzb24SHQoZUkVQT1JUX1JFQVNPTl9VTlNQRUNJRklFRBAAEhYKElJFUE9SVF9SRUFTT05fU1BBTRABEhoKFlJFUE9SVF9SRUFTT05fVklPTEVOQ0UQAhIdChlSRVBPUlRfUkVBU09OX0NISUxEX0FCVVNFEAMSGQoVUkVQT1JUX1JFQVNPTl9JTExFR0FMEAQSHwobUkVQT1JUX1JFQVNPTl9QRVJTT05BTF9EQVRBEAUSFwoTUkVQT1JUX1JFQVNPTl9PVEhFUhAGMvAFCgxVc2Vyc1NlcnZpY2USOgoHR2V0U2VsZhIWLmFwcC52MS5HZXRTZWxmUmVxdWVzdBoXLmFwcC52MS5HZXRTZWxmUmVzcG9uc2USPQoIR2V0VXNlcnMSFy5hcHAudjEuR2V0VXNlcnNSZXF1ZXN0GhguYXBwLnYxLkdldFVzZXJzUmVzcG9uc2USTAoNVXBkYXRlUHJvZmlsZRIcLmFwcC52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBodLmFwcC52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2USRgoLU2V0VXNlcm5hbWUSGi5hcHAudjEuU2V0VXNlcm5hbWVSZXF1ZXN0GhsuYXBwLnYxLlNldFVzZXJuYW1lUmVzcG9uc2USUgoPUmVzb2x2ZVVzZXJuYW1lEh4uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlcXVlc3QaHy5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USRgoLU2VhcmNoVXNlcnMSGi5hcHAudjEuU2VhcmNoVXNlcnNSZXF1ZXN0GhsuYXBwLnYxLlNlYXJjaFVzZXJzUmVzcG9uc2USNAoFQmxvY2sSFC5hcHAudjEuQmxvY2tSZXF1ZXN0GhUuYXBwLnYxLkJsb2NrUmVzcG9uc2USOgoHVW5ibG9jaxIWLmFwcC52MS5VbmJsb2NrUmVxdWVzdBoXLmFwcC52MS5VbmJsb2NrUmVzcG9uc2USQwoKR2V0UHJpdmFjeRIZLmFwcC52MS5HZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5HZXRQcml2YWN5UmVzcG9uc2USQwoKU2V0UHJpdmFjeRIZLmFwcC52MS5TZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5TZXRQcml2YWN5UmVzcG9uc2USNwoGUmVwb3J0EhUuYXBwLnYxLlJlcG9ydFJlcXVlc3QaFi5hcHAudjEuUmVwb3J0UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media]);
+  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIhAKDkdldFNlbGZSZXF1ZXN0Ii0KD0dldFNlbGZSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJwoPR2V0VXNlcnNSZXF1ZXN0EhQKCHVzZXJfaWRzGAEgAygDQgIwAiIvChBHZXRVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiegoUVXBkYXRlUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhAKA2JpbxgCIAEoCUgBiAEBEhoKDXBob3RvX2ZpbGVfaWQYAyABKAlIAogBAUIHCgVfbmFtZUIGCgRfYmlvQhAKDl9waG90b19maWxlX2lkIjMKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJgoSU2V0VXNlcm5hbWVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjEKE1NldFVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIioKFlJlc29sdmVVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiNQoXUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIjIKElNlYXJjaFVzZXJzUmVxdWVzdBINCgVxdWVyeRgBIAEoCRINCgVsaW1pdBgCIAEoBSIyChNTZWFyY2hVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiIwoMQmxvY2tSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIg8KDUJsb2NrUmVzcG9uc2UiJQoOVW5ibG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiEQoPVW5ibG9ja1Jlc3BvbnNlIs4CCg9Qcml2YWN5U2V0dGluZ3MSKgoJbGFzdF9zZWVuGAEgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIxChBmaW5kX2J5X3VzZXJuYW1lGAQgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIcChRub3RpZmljYXRpb25fcHJldmlldxgHIAEoCCITChFHZXRQcml2YWN5UmVxdWVzdCI/ChJHZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIvcDChFTZXRQcml2YWN5UmVxdWVzdBIvCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSACIAQESMwoNcHJvZmlsZV9waG90bxgCIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAYgBARIzCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgCiAEBEjYKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAOIAQESMwoNYWRkX3RvX2dyb3VwcxgFIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIBIgBARIzCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgFiAEBEiEKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgISAaIAQFCDAoKX2xhc3Rfc2VlbkIQCg5fcHJvZmlsZV9waG90b0IQCg5fZmluZF9ieV9lbWFpbEITChFfZmluZF9ieV91c2VybmFtZUIQCg5fYWRkX3RvX2dyb3Vwc0IQCg5fc2VuZF9tZXNzYWdlc0IXChVfbm90aWZpY2F0aW9uX3ByZXZpZXciPwoSU2V0UHJpdmFjeVJlc3BvbnNlEikKCHNldHRpbmdzGAEgASgLMhcuYXBwLnYxLlByaXZhY3lTZXR0aW5ncyI5ChBSZXBvcnRlZE1lc3NhZ2VzEhMKB2NoYXRfaWQYASABKANCAjACEhAKBHNlcXMYAiADKANCAjACIqwBCg1SZXBvcnRSZXF1ZXN0EhUKB3VzZXJfaWQYASABKANCAjACSAASFQoHY2hhdF9pZBgCIAEoA0ICMAJIABIsCghtZXNzYWdlcxgDIAEoCzIYLmFwcC52MS5SZXBvcnRlZE1lc3NhZ2VzSAASJAoGcmVhc29uGAQgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAUgASgJQggKBnRhcmdldCIQCg5SZXBvcnRSZXNwb25zZSJZChFBZGRDb250YWN0UmVxdWVzdBIVCgd1c2VyX2lkGAEgASgDQgIwAkgAEhIKCHVzZXJuYW1lGAIgASgJSAASDwoFZW1haWwYAyABKAlIAEIICgZ0YXJnZXQiMAoSQWRkQ29udGFjdFJlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlciIrChREZWxldGVDb250YWN0UmVxdWVzdBITCgd1c2VyX2lkGAEgASgDQgIwAiIXChVEZWxldGVDb250YWN0UmVzcG9uc2UiMwoSR2V0Q29udGFjdHNSZXF1ZXN0Eg4KBmN1cnNvchgBIAEoCRINCgVsaW1pdBgCIAEoBSJHChNHZXRDb250YWN0c1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXISEwoLbmV4dF9jdXJzb3IYAiABKAkqzQEKDlVzZXJTdGF0dXNLaW5kEiAKHFVTRVJfU1RBVFVTX0tJTkRfVU5TUEVDSUZJRUQQABIbChdVU0VSX1NUQVRVU19LSU5EX09OTElORRABEhwKGFVTRVJfU1RBVFVTX0tJTkRfT0ZGTElORRACEh0KGVVTRVJfU1RBVFVTX0tJTkRfUkVDRU5UTFkQAxIeChpVU0VSX1NUQVRVU19LSU5EX0xBU1RfV0VFSxAEEh8KG1VTRVJfU1RBVFVTX0tJTkRfTEFTVF9NT05USBAFKo4BCg9Qcml2YWN5QXVkaWVuY2USIAocUFJJVkFDWV9BVURJRU5DRV9VTlNQRUNJRklFRBAAEh0KGVBSSVZBQ1lfQVVESUVOQ0VfRVZFUllPTkUQARIdChlQUklWQUNZX0FVRElFTkNFX0NPTlRBQ1RTEAISGwoXUFJJVkFDWV9BVURJRU5DRV9OT0JPRFkQAyqHAgoMUmVwb3J0UmVhc29uEh0KGVJFUE9SVF9SRUFTT05fVU5TUEVDSUZJRUQQABIWChJSRVBPUlRfUkVBU09OX1NQQU0QARIaChZSRVBPUlRfUkVBU09OX1ZJT0xFTkNFEAISHQoZUkVQT1JUX1JFQVNPTl9DSElMRF9BQlVTRRADEhkKFVJFUE9SVF9SRUFTT05fSUxMRUdBTBAEEh8KG1JFUE9SVF9SRUFTT05fUEVSU09OQUxfREFUQRAFEhcKE1JFUE9SVF9SRUFTT05fT1RIRVIQBhIWChJSRVBPUlRfUkVBU09OX1NDQU0QBxIYChRSRVBPUlRfUkVBU09OX1NFWFVBTBAIMssHCgxVc2Vyc1NlcnZpY2USOgoHR2V0U2VsZhIWLmFwcC52MS5HZXRTZWxmUmVxdWVzdBoXLmFwcC52MS5HZXRTZWxmUmVzcG9uc2USPQoIR2V0VXNlcnMSFy5hcHAudjEuR2V0VXNlcnNSZXF1ZXN0GhguYXBwLnYxLkdldFVzZXJzUmVzcG9uc2USTAoNVXBkYXRlUHJvZmlsZRIcLmFwcC52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBodLmFwcC52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2USRgoLU2V0VXNlcm5hbWUSGi5hcHAudjEuU2V0VXNlcm5hbWVSZXF1ZXN0GhsuYXBwLnYxLlNldFVzZXJuYW1lUmVzcG9uc2USUgoPUmVzb2x2ZVVzZXJuYW1lEh4uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlcXVlc3QaHy5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USRgoLU2VhcmNoVXNlcnMSGi5hcHAudjEuU2VhcmNoVXNlcnNSZXF1ZXN0GhsuYXBwLnYxLlNlYXJjaFVzZXJzUmVzcG9uc2USNAoFQmxvY2sSFC5hcHAudjEuQmxvY2tSZXF1ZXN0GhUuYXBwLnYxLkJsb2NrUmVzcG9uc2USOgoHVW5ibG9jaxIWLmFwcC52MS5VbmJsb2NrUmVxdWVzdBoXLmFwcC52MS5VbmJsb2NrUmVzcG9uc2USQwoKR2V0UHJpdmFjeRIZLmFwcC52MS5HZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5HZXRQcml2YWN5UmVzcG9uc2USQwoKU2V0UHJpdmFjeRIZLmFwcC52MS5TZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5TZXRQcml2YWN5UmVzcG9uc2USNwoGUmVwb3J0EhUuYXBwLnYxLlJlcG9ydFJlcXVlc3QaFi5hcHAudjEuUmVwb3J0UmVzcG9uc2USQwoKQWRkQ29udGFjdBIZLmFwcC52MS5BZGRDb250YWN0UmVxdWVzdBoaLmFwcC52MS5BZGRDb250YWN0UmVzcG9uc2USTAoNRGVsZXRlQ29udGFjdBIcLmFwcC52MS5EZWxldGVDb250YWN0UmVxdWVzdBodLmFwcC52MS5EZWxldGVDb250YWN0UmVzcG9uc2USRgoLR2V0Q29udGFjdHMSGi5hcHAudjEuR2V0Q29udGFjdHNSZXF1ZXN0GhsuYXBwLnYxLkdldENvbnRhY3RzUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media]);
 
 /**
  * @generated from message app.v1.UserStatus
@@ -175,7 +175,10 @@ export const GetUsersRequestSchema: GenMessage<GetUsersRequest> = /*@__PURE__*/
  */
 export type GetUsersResponse = Message<"app.v1.GetUsersResponse"> & {
   /**
-   * Unknown or invisible ids are omitted.
+   * Unknown or invisible ids are omitted. Visible: the caller, users who
+   * share a chat the caller is a member of (current or former members of
+   * it), users in the caller's contacts and users who have the caller in
+   * theirs.
    *
    * @generated from field: repeated app.v1.User users = 1;
    */
@@ -276,6 +279,9 @@ export const SetUsernameResponseSchema: GenMessage<SetUsernameResponse> = /*@__P
  */
 export type ResolveUsernameRequest = Message<"app.v1.ResolveUsernameRequest"> & {
   /**
+   * Found only when the user's find_by_username allows the caller;
+   * not_found otherwise.
+   *
    * @generated from field: string username = 1;
    */
   username: string;
@@ -632,6 +638,144 @@ export const ReportResponseSchema: GenMessage<ReportResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_users, 25);
 
 /**
+ * @generated from message app.v1.AddContactRequest
+ */
+export type AddContactRequest = Message<"app.v1.AddContactRequest"> & {
+  /**
+   * @generated from oneof app.v1.AddContactRequest.target
+   */
+  target: {
+    /**
+     * A user the caller can already see (GetUsers rules).
+     *
+     * @generated from field: int64 user_id = 1 [jstype = JS_NUMBER];
+     */
+    value: bigint;
+    case: "userId";
+  } | {
+    /**
+     * Exact username, with or without the leading @. Found only when the
+     * user's find_by_username allows the caller.
+     *
+     * @generated from field: string username = 2;
+     */
+    value: string;
+    case: "username";
+  } | {
+    /**
+     * Exact email. Found only when the user's find_by_email allows the
+     * caller.
+     *
+     * @generated from field: string email = 3;
+     */
+    value: string;
+    case: "email";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message app.v1.AddContactRequest.
+ * Use `create(AddContactRequestSchema)` to create a new message.
+ */
+export const AddContactRequestSchema: GenMessage<AddContactRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 26);
+
+/**
+ * @generated from message app.v1.AddContactResponse
+ */
+export type AddContactResponse = Message<"app.v1.AddContactResponse"> & {
+  /**
+   * @generated from field: app.v1.User user = 1;
+   */
+  user?: User | undefined;
+};
+
+/**
+ * Describes the message app.v1.AddContactResponse.
+ * Use `create(AddContactResponseSchema)` to create a new message.
+ */
+export const AddContactResponseSchema: GenMessage<AddContactResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 27);
+
+/**
+ * @generated from message app.v1.DeleteContactRequest
+ */
+export type DeleteContactRequest = Message<"app.v1.DeleteContactRequest"> & {
+  /**
+   * @generated from field: int64 user_id = 1 [jstype = JS_NUMBER];
+   */
+  userId: bigint;
+};
+
+/**
+ * Describes the message app.v1.DeleteContactRequest.
+ * Use `create(DeleteContactRequestSchema)` to create a new message.
+ */
+export const DeleteContactRequestSchema: GenMessage<DeleteContactRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 28);
+
+/**
+ * @generated from message app.v1.DeleteContactResponse
+ */
+export type DeleteContactResponse = Message<"app.v1.DeleteContactResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.DeleteContactResponse.
+ * Use `create(DeleteContactResponseSchema)` to create a new message.
+ */
+export const DeleteContactResponseSchema: GenMessage<DeleteContactResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 29);
+
+/**
+ * @generated from message app.v1.GetContactsRequest
+ */
+export type GetContactsRequest = Message<"app.v1.GetContactsRequest"> & {
+  /**
+   * Opaque cursor from a previous response; empty for the first page.
+   *
+   * @generated from field: string cursor = 1;
+   */
+  cursor: string;
+
+  /**
+   * @generated from field: int32 limit = 2;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message app.v1.GetContactsRequest.
+ * Use `create(GetContactsRequestSchema)` to create a new message.
+ */
+export const GetContactsRequestSchema: GenMessage<GetContactsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 30);
+
+/**
+ * @generated from message app.v1.GetContactsResponse
+ */
+export type GetContactsResponse = Message<"app.v1.GetContactsResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.User users = 1;
+   */
+  users: User[];
+
+  /**
+   * Empty when there are no more contacts.
+   *
+   * @generated from field: string next_cursor = 2;
+   */
+  nextCursor: string;
+};
+
+/**
+ * Describes the message app.v1.GetContactsResponse.
+ * Use `create(GetContactsResponseSchema)` to create a new message.
+ */
+export const GetContactsResponseSchema: GenMessage<GetContactsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 31);
+
+/**
  * Presence as visible to the caller after privacy rules are applied.
  *
  * @generated from enum app.v1.UserStatusKind
@@ -751,6 +895,16 @@ export enum ReportReason {
    * @generated from enum value: REPORT_REASON_OTHER = 6;
    */
   OTHER = 6,
+
+  /**
+   * @generated from enum value: REPORT_REASON_SCAM = 7;
+   */
+  SCAM = 7,
+
+  /**
+   * @generated from enum value: REPORT_REASON_SEXUAL = 8;
+   */
+  SEXUAL = 8,
 }
 
 /**
@@ -858,6 +1012,34 @@ export const UsersService: GenService<{
     methodKind: "unary";
     input: typeof ReportRequestSchema;
     output: typeof ReportResponseSchema;
+  },
+  /**
+   * Contacts: the caller's own list. A user's privacy audience CONTACTS
+   * means the users in that user's list (being in someone else's list, or
+   * sharing a chat, does not count).
+   *
+   * @generated from rpc app.v1.UsersService.AddContact
+   */
+  addContact: {
+    methodKind: "unary";
+    input: typeof AddContactRequestSchema;
+    output: typeof AddContactResponseSchema;
+  },
+  /**
+   * @generated from rpc app.v1.UsersService.DeleteContact
+   */
+  deleteContact: {
+    methodKind: "unary";
+    input: typeof DeleteContactRequestSchema;
+    output: typeof DeleteContactResponseSchema;
+  },
+  /**
+   * @generated from rpc app.v1.UsersService.GetContacts
+   */
+  getContacts: {
+    methodKind: "unary";
+    input: typeof GetContactsRequestSchema;
+    output: typeof GetContactsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_users, 0);

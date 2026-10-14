@@ -76,12 +76,25 @@ func (h *Hub) track() bool {
 	return true
 }
 
-// register adds a connection; false when the hub is shutting down.
-func (h *Hub) register(c *conn) bool {
+type registerResult int
+
+const (
+	registered registerResult = iota
+	registerClosing
+	registerTooMany
+)
+
+// register adds a connection, unless the hub is shutting down or the
+// session or user already has the most sockets allowed.
+func (h *Hub) register(c *conn) registerResult {
 	h.mu.Lock()
 	if h.closing {
 		h.mu.Unlock()
-		return false
+		return registerClosing
+	}
+	if len(h.bySession[c.sessionID]) >= maxSocketsPerSession || len(h.byUser[c.userID]) >= maxSocketsPerUser {
+		h.mu.Unlock()
+		return registerTooMany
 	}
 	wasOnline := h.onlineLocked(c.userID)
 	if h.byUser[c.userID] == nil {
@@ -97,7 +110,7 @@ func (h *Hub) register(c *conn) bool {
 	if wasOnline != nowOnline {
 		h.presenceChanged(c.userID, nowOnline)
 	}
-	return true
+	return registered
 }
 
 func (h *Hub) unregister(c *conn) {

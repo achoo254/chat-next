@@ -40,13 +40,13 @@ func TestPermissionsAndRoles(t *testing.T) {
 		t.Fatalf("restricted member sends: %v", err)
 	}
 	// Admins remove members, not the owner; members remove nobody.
-	if _, err := h.svc.RemoveMember(ctx, member, chatID, other); codeOf(err) != connect.CodePermissionDenied {
+	if _, err := h.svc.RemoveMember(ctx, member, chatID, other, true); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("member removes: %v", err)
 	}
-	if _, err := h.svc.RemoveMember(ctx, admin, chatID, owner); codeOf(err) != connect.CodePermissionDenied {
+	if _, err := h.svc.RemoveMember(ctx, admin, chatID, owner, true); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("admin removes the owner: %v", err)
 	}
-	if _, err := h.svc.RemoveMember(ctx, admin, chatID, other); err != nil {
+	if _, err := h.svc.RemoveMember(ctx, admin, chatID, other, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.svc.SendMessage(ctx, other, &appv1.SendMessageRequest{ChatId: chatID, Text: "x"}); codeOf(err) != connect.CodePermissionDenied {
@@ -331,7 +331,7 @@ func TestForumTopics(t *testing.T) {
 	if _, err := h.svc.UpdateChatInfo(ctx, admin, &appv1.UpdateChatInfoRequest{ChatId: chatID, Forum: &off}); codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("forum off: %v", err)
 	}
-	topic, _, err := h.svc.CreateForumTopic(ctx, member, chatID, "Alerts", 0xff0000)
+	topic, _, err := h.svc.CreateForumTopic(ctx, member, &appv1.CreateForumTopicRequest{ChatId: chatID, Title: "Alerts", IconColor: 0xff0000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestForumTopics(t *testing.T) {
 	if _, _, err := h.svc.EditForumTopic(ctx, member, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic.GetId(), Pinned: &pinned}); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("member pins a topic: %v", err)
 	}
-	list, err := h.svc.GetForumTopics(ctx, member, chatID)
+	list, err := h.svc.GetForumTopics(ctx, member, chatID, "", 0)
 	if err != nil || len(list.GetTopics()) != 2 {
 		t.Fatalf("topics = %v, %v", list, err)
 	}

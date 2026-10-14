@@ -26,20 +26,31 @@ const (
 	maxGap = 10000
 )
 
-// idSet is a concurrent set of outbox ids.
+// deliveredTTL is how long a delivered outbox id is remembered after the
+// sweeper's cursor passed it, so a dispatcher queue running that late
+// still sees it was delivered.
+const deliveredTTL = time.Minute
+
+// idSet is a concurrent set of outbox ids with when each was added.
 type idSet struct {
 	mu  sync.Mutex
-	ids map[int64]struct{}
+	ids map[int64]time.Time
 }
 
 func newIDSet() *idSet {
-	return &idSet{ids: map[int64]struct{}{}}
+	return &idSet{ids: map[int64]time.Time{}}
 }
 
-func (s *idSet) add(id int64) {
+// addIfAbsent adds id and reports whether it was absent: exactly one of
+// the dispatcher and the sweeper wins the right to deliver an event.
+func (s *idSet) addIfAbsent(id int64) bool {
 	s.mu.Lock()
-	s.ids[id] = struct{}{}
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+	if _, ok := s.ids[id]; ok {
+		return false
+	}
+	s.ids[id] = time.Now()
+	return true
 }
 
 func (s *idSet) has(id int64) bool {
@@ -49,12 +60,12 @@ func (s *idSet) has(id int64) bool {
 	return ok
 }
 
-// pruneBelow forgets ids below floor.
-func (s *idSet) pruneBelow(floor int64) {
+// prune forgets ids below floor that were added before cutoff.
+func (s *idSet) prune(floor int64, cutoff time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for id := range s.ids {
-		if id < floor {
+	for id, at := range s.ids {
+		if id < floor && at.Before(cutoff) {
 			delete(s.ids, id)
 		}
 	}
@@ -153,7 +164,9 @@ func (s *Service) sweep(ctx context.Context, st *sweepState) error {
 			st.pending[r.ID] = now
 			continue
 		}
-		s.dispatch.delivered.add(r.ID)
+		if !s.dispatch.delivered.addIfAbsent(r.ID) {
+			continue // the dispatcher got to it meanwhile
+		}
 		ev, err := s.rebuildEvent(ctx, r)
 		if err != nil {
 			return err
@@ -170,7 +183,7 @@ func (s *Service) sweep(ctx context.Context, st *sweepState) error {
 		}
 		floor = min(floor, id)
 	}
-	s.dispatch.delivered.pruneBelow(floor)
+	s.dispatch.delivered.prune(floor, now.Add(-deliveredTTL))
 	return nil
 }
 

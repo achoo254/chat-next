@@ -190,7 +190,7 @@ func (m *Sessions) Authenticate(ctx context.Context, token string) (store.Sessio
 	}
 	now := time.Now()
 	if now.Sub(s.LastSeenAt) >= touchInterval {
-		if err := m.store.TouchSession(ctx, s.ID, touchInterval); err != nil {
+		if _, err := m.store.TouchSession(ctx, s.ID, touchInterval); err != nil {
 			m.logger.Warn("touch session failed", "session_id", s.ID, "err", err)
 		}
 	}

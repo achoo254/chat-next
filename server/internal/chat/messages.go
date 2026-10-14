@@ -71,10 +71,13 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 		return nil, fmt.Errorf("chat: insert message: %w", err)
 	}
 	if c.Forum {
-		if _, err := t.tx.Exec(ctx, `UPDATE forum_topics SET top_seq = $3 WHERE chat_id = $1 AND id = $2`,
+		if _, err := t.tx.Exec(ctx, `UPDATE forum_topics SET top_seq = $3, message_count = message_count + 1 WHERE chat_id = $1 AND id = $2`,
 			c.ID, m.TopicID, m.Seq); err != nil {
 			return nil, fmt.Errorf("chat: topic top: %w", err)
 		}
+	}
+	if err := t.recordMentions(ctx, c, m, nm.content, false); err != nil {
+		return nil, err
 	}
 	c.LastSeq = m.Seq
 	ev.TopSeq = m.Seq
@@ -85,6 +88,48 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 		return nil, err
 	}
 	return m, nil
+}
+
+// recordMentions stores who a message mentions or replies to (current
+// members other than the author), the source of unread_mentions_count.
+// replace drops what an earlier version of the message recorded. Private
+// chats, service messages and forwards record nothing.
+func (t *txn) recordMentions(ctx context.Context, c *chatRow, m *messageRow, content *appv1.Message, replace bool) error {
+	if c.Type == typePrivate || content.GetAction() != nil || content.GetForwardFrom() != nil {
+		return nil
+	}
+	if replace {
+		if _, err := t.tx.Exec(ctx, `DELETE FROM message_mentions WHERE chat_id = $1 AND seq = $2`, m.ChatID, m.Seq); err != nil {
+			return fmt.Errorf("chat: clear mentions: %w", err)
+		}
+	}
+	var ids []int64
+	var names []string
+	for _, e := range content.GetEntities() {
+		switch e.GetType() {
+		case appv1.EntityType_ENTITY_TYPE_MENTION_NAME:
+			ids = append(ids, e.GetUserId())
+		case appv1.EntityType_ENTITY_TYPE_MENTION:
+			name := strings.ToLower(strings.TrimPrefix(utf16Slice(m.Text, int(e.GetOffset()), int(e.GetLength())), "@"))
+			if name != "" {
+				names = append(names, name)
+			}
+		default:
+		}
+	}
+	if len(ids) == 0 && len(names) == 0 && m.ReplyToSeq == 0 {
+		return nil
+	}
+	if _, err := t.tx.Exec(ctx, `
+		INSERT INTO message_mentions (user_id, chat_id, seq)
+		SELECT DISTINCT mem.user_id, $1::bigint, $2::bigint FROM chat_members mem JOIN users u ON u.id = mem.user_id
+		WHERE mem.chat_id = $1 AND mem.left_at IS NULL AND mem.user_id <> $3
+			AND (mem.user_id = ANY($4) OR u.username = ANY($5)
+				OR mem.user_id = (SELECT from_id FROM messages WHERE chat_id = $1 AND seq = $6 AND $6 <> 0))
+		ON CONFLICT DO NOTHING`, m.ChatID, m.Seq, m.FromID, ids, names, m.ReplyToSeq); err != nil {
+		return fmt.Errorf("chat: record mentions: %w", err)
+	}
+	return nil
 }
 
 // --------------------------------------------------------------- validation
@@ -214,21 +259,31 @@ func (s *Service) cachedPreview(ctx context.Context, url string) (*appv1.LinkPre
 
 // ------------------------------------------------------------------- send
 
+// peerBlockedMe reports whether the other participant of a private chat
+// blocked me (false for other chats).
+func peerBlockedMe(ctx context.Context, q querier, c *chatRow, me int64) (bool, error) {
+	if c.Type != typePrivate {
+		return false, nil
+	}
+	var blocked bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM blocks WHERE blocker_id = $1 AND blocked_id = $2)`,
+		c.peerOf(me), me).Scan(&blocked); err != nil {
+		return false, fmt.Errorf("chat: check block: %w", err)
+	}
+	return blocked, nil
+}
+
 // postable checks that me may post in the chat (and topic).
 func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64) (int64, error) {
 	if !c.can(m, permSend) {
 		return 0, errDenied("you cannot send messages in this chat")
 	}
-	if c.Type == typePrivate {
-		peer := c.peerOf(me)
-		var blocked bool
-		if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM blocks WHERE blocker_id = $1 AND blocked_id = $2)`,
-			peer, me).Scan(&blocked); err != nil {
-			return 0, fmt.Errorf("chat: check block: %w", err)
-		}
-		if blocked {
-			return 0, errDenied("this user does not accept your messages")
-		}
+	blocked, err := peerBlockedMe(ctx, q, c, me)
+	if err != nil {
+		return 0, err
+	}
+	if blocked {
+		return 0, errDenied("this user does not accept your messages")
 	}
 	if !c.Forum {
 		if topicID != 0 {
@@ -240,7 +295,7 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 		topicID = generalTopicID
 	}
 	var closed bool
-	err := q.QueryRow(ctx, `SELECT closed FROM forum_topics WHERE chat_id = $1 AND id = $2`, c.ID, topicID).Scan(&closed)
+	err = q.QueryRow(ctx, `SELECT closed FROM forum_topics WHERE chat_id = $1 AND id = $2`, c.ID, topicID).Scan(&closed)
 	if isNoRows(err) {
 		return 0, errNotFound("topic")
 	}
@@ -330,6 +385,25 @@ func (t *txn) fanoutMembers(ctx context.Context, c *chatRow) ([]int64, error) {
 		return nil, nil
 	}
 	return activeMembers(ctx, t.tx, c.ID)
+}
+
+// fanoutSeeing is fanoutMembers for an update about message seq: only the
+// members whose history visibility includes it.
+func (t *txn) fanoutSeeing(ctx context.Context, c *chatRow, seq int64) ([]int64, error) {
+	if c.SyncMode == syncLarge {
+		return nil, nil
+	}
+	rows, err := t.tx.Query(ctx, `
+		SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL AND visible_from_seq <= $2
+		ORDER BY user_id`, c.ID, seq)
+	if err != nil {
+		return nil, fmt.Errorf("chat: list members: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: list members: %w", err)
+	}
+	return ids, nil
 }
 
 func (s *Service) checkReply(ctx context.Context, q querier, chatID, replyTo int64) error {
@@ -493,13 +567,18 @@ func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *me
 	}
 	if err := t.tx.QueryRow(ctx, `
 		UPDATE messages SET text = $3, content = $4, edit_version = edit_version + 1,
-			edit_date = CASE WHEN $5 THEN now() ELSE edit_date END
-		WHERE chat_id = $1 AND seq = $2 RETURNING edit_version, edit_date`,
-		m.ChatID, m.Seq, text, raw, markEdited).Scan(&m.EditVersion, &m.EditDate); err != nil {
+			edit_date = CASE WHEN $5 THEN now() ELSE edit_date END, changed_at = now()
+		WHERE chat_id = $1 AND seq = $2 RETURNING edit_version, edit_date, changed_at`,
+		m.ChatID, m.Seq, text, raw, markEdited).Scan(&m.EditVersion, &m.EditDate, &m.ChangedAt); err != nil {
 		return fmt.Errorf("chat: edit message: %w", err)
 	}
 	m.Text, m.Content = text, raw
-	members, err := t.fanoutMembers(ctx, c)
+	if markEdited {
+		if err := t.recordMentions(ctx, c, m, content, true); err != nil {
+			return err
+		}
+	}
+	members, err := t.fanoutSeeing(ctx, c, m.Seq)
 	if err != nil {
 		return err
 	}
@@ -673,11 +752,12 @@ func (t *txn) deleteMessages(ctx context.Context, c *chatRow, m *memberRow, me i
 		}
 		return nil
 	}
-	var done []int64
+	var done, deletedTopics []int64
 	topics := map[int64]bool{}
 	for _, g := range deleted {
 		done = append(done, g.seq)
 		topics[g.topic] = true
+		deletedTopics = append(deletedTopics, g.topic)
 	}
 	slices.Sort(done)
 	if _, err := t.tx.Exec(ctx, `DELETE FROM message_reactions WHERE chat_id = $1 AND seq = ANY($2)`, c.ID, done); err != nil {
@@ -686,8 +766,9 @@ func (t *txn) deleteMessages(ctx context.Context, c *chatRow, m *memberRow, me i
 	if c.Forum {
 		if _, err := t.tx.Exec(ctx, `
 			UPDATE forum_topics t SET top_seq = coalesce((SELECT max(seq) FROM messages
-				WHERE chat_id = t.chat_id AND topic_id = t.id AND deleted_at IS NULL), 0)
-			WHERE t.chat_id = $1 AND t.id = ANY($2)`, c.ID, sortedKeys(topics)); err != nil {
+					WHERE chat_id = t.chat_id AND topic_id = t.id AND deleted_at IS NULL), 0),
+				message_count = greatest(t.message_count - (SELECT count(*) FROM unnest($3::bigint[]) d WHERE d = t.id), 0)
+			WHERE t.chat_id = $1 AND t.id = ANY($2)`, c.ID, sortedKeys(topics), deletedTopics); err != nil {
 			return fmt.Errorf("chat: topic tops: %w", err)
 		}
 	}
@@ -1098,7 +1179,13 @@ func (t *txn) read(ctx context.Context, c *chatRow, m *memberRow, maxSeq, topicI
 		}
 		topics = []int64{topicID}
 	case c.Forum:
-		rows, err := t.tx.Query(ctx, `SELECT id FROM forum_topics WHERE chat_id = $1 ORDER BY id`, c.ID)
+		// Only topics with something newer than their read position move,
+		// so a read of the whole forum writes one row per unread topic.
+		rows, err := t.tx.Query(ctx, `
+			SELECT t.id FROM forum_topics t
+			LEFT JOIN chat_read_states r ON r.chat_id = t.chat_id AND r.user_id = $2 AND r.topic_id = t.id
+			WHERE t.chat_id = $1 AND t.top_seq > greatest(coalesce(r.read_inbox_max_seq, 0), $3)
+			ORDER BY t.id`, c.ID, me, m.JoinedSeq)
 		if err != nil {
 			return fmt.Errorf("chat: list topics: %w", err)
 		}
@@ -1146,6 +1233,15 @@ func (t *txn) read(ctx context.Context, c *chatRow, m *memberRow, maxSeq, topicI
 			SET read_inbox_max_seq = greatest(chat_read_states.read_inbox_max_seq, excluded.read_inbox_max_seq), updated_at = now()`,
 		c.ID, me, uniqueSorted0(write), maxSeq); err != nil {
 		return fmt.Errorf("chat: move read position: %w", err)
+	}
+	// Read dates for GetMessageReaders, where read receipts are kept.
+	if c.Type == typeGroup && int(c.MemberCount) <= t.s.cfg.ReadReceiptsMemberMax {
+		if _, err := t.tx.Exec(ctx, `
+			INSERT INTO read_receipts (chat_id, topic_id, user_id, max_seq)
+			SELECT $1, x, $2, $4 FROM unnest($3::bigint[]) x ORDER BY x
+			ON CONFLICT DO NOTHING`, c.ID, me, moved, maxSeq); err != nil {
+			return fmt.Errorf("chat: read receipts: %w", err)
+		}
 	}
 	ev := t.event(kindRead, c.ID, me)
 	// Outbox reads: in small chats, the authors of messages just read.
@@ -1375,6 +1471,13 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 		if target.Seq < m.VisibleFrom || isService(target) {
 			return errNotFound("message")
 		}
+		blocked, err := peerBlockedMe(ctx, t.tx, c, me)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return errDenied("this user does not accept your reactions")
+		}
 		var tag interface{ RowsAffected() int64 }
 		if emoji == "" {
 			tag, err = t.tx.Exec(ctx, `DELETE FROM message_reactions WHERE chat_id = $1 AND seq = $2 AND user_id = $3`, chatID, seq, me)
@@ -1390,7 +1493,7 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 		if tag.RowsAffected() == 0 {
 			return nil
 		}
-		members, err := t.fanoutMembers(ctx, c)
+		members, err := t.fanoutSeeing(ctx, c, seq)
 		if err != nil {
 			return err
 		}
@@ -1415,7 +1518,7 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 // GetMessageReaders lists members who read a message, in small groups and
 // for recent messages only.
 func (s *Service) GetMessageReaders(ctx context.Context, me, chatID, seq int64) (*appv1.GetMessageReadersResponse, error) {
-	c, _, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
+	c, mem, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1426,6 +1529,13 @@ func (s *Service) GetMessageReaders(ctx context.Context, me, chatID, seq int64) 
 	if err != nil {
 		return nil, err
 	}
+	hidden, err := loadHidden(ctx, s.pool, []int64{me}, map[int64][]int64{chatID: {seq}})
+	if err != nil {
+		return nil, err
+	}
+	if !mem.sees(m) || hidden[hiddenKey{me, msgKey{chatID, seq}}] {
+		return nil, errNotFound("message")
+	}
 	if time.Since(m.Date) > s.cfg.ReadReceiptsMaxAge {
 		return nil, errPrecondition("read receipts are only kept for recent messages")
 	}
@@ -1434,17 +1544,30 @@ func (s *Service) GetMessageReaders(ctx context.Context, me, chatID, seq int64) 
 		topic = m.TopicID
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT mem.user_id FROM chat_members mem
-		JOIN chat_read_states r ON r.chat_id = mem.chat_id AND r.user_id = mem.user_id AND r.topic_id = $3
-		WHERE mem.chat_id = $1 AND mem.left_at IS NULL AND mem.user_id <> $4 AND r.read_inbox_max_seq >= $2
-			AND mem.joined_seq < $2
-		ORDER BY r.updated_at DESC LIMIT 200`, chatID, seq, topic, m.FromID)
+		SELECT x.user_id, x.read_at FROM (
+			SELECT mem.user_id, coalesce((SELECT min(rr.read_at) FROM read_receipts rr
+				WHERE rr.chat_id = $1 AND rr.topic_id = $3 AND rr.user_id = mem.user_id AND rr.max_seq >= $2), r.updated_at) AS read_at
+			FROM chat_members mem
+			JOIN chat_read_states r ON r.chat_id = mem.chat_id AND r.user_id = mem.user_id AND r.topic_id = $3
+			WHERE mem.chat_id = $1 AND mem.left_at IS NULL AND mem.user_id <> $4 AND r.read_inbox_max_seq >= $2
+				AND mem.joined_seq < $2) x
+		ORDER BY x.read_at DESC, x.user_id LIMIT 200`, chatID, seq, topic, m.FromID)
 	if err != nil {
 		return nil, fmt.Errorf("chat: readers: %w", err)
 	}
-	readers, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*appv1.MessageReader, error) {
+		var x appv1.MessageReader
+		var at time.Time
+		err := r.Scan(&x.UserId, &at)
+		x.ReadAt = at.Unix()
+		return &x, err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("chat: readers: %w", err)
+	}
+	readers := make([]int64, len(list))
+	for i, x := range list {
+		readers[i] = x.GetUserId()
 	}
 	ents := newEntitySet()
 	ents.addUsers(me, readers...)
@@ -1452,7 +1575,7 @@ func (s *Service) GetMessageReaders(ctx context.Context, me, chatID, seq int64) 
 	if err != nil {
 		return nil, err
 	}
-	return &appv1.GetMessageReadersResponse{UserIds: readers, Users: rendered.users[me]}, nil
+	return &appv1.GetMessageReadersResponse{UserIds: readers, Users: rendered.users[me], Readers: list}, nil
 }
 
 // ------------------------------------------------------------ link preview

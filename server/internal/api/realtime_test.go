@@ -193,10 +193,20 @@ func TestRealtimeEndToEnd(t *testing.T) {
 	}
 	start := rpcOK(t, bob.updates.GetState, &appv1.GetStateRequest{}).GetState()
 
-	// Default privacy lets only people who share a chat add bob to groups
-	// (add_to_groups = contacts); a private chat makes them contacts and
-	// writes no update until its first message.
+	// Default privacy lets only bob's contacts add him to groups
+	// (add_to_groups = contacts). A private chat writes no update until its
+	// first message, and lets bob find alice by id to add her.
 	rpcOK(t, alice.chats.CreatePrivate, &appv1.CreatePrivateRequest{UserId: bob.userID})
+	if early := rpcOK(t, alice.chats.CreateGroup, &appv1.CreateGroupRequest{
+		Title: "Too soon", UserIds: []int64{bob.userID},
+	}); len(early.GetFailedUserIds()) != 1 || early.GetFailedUserIds()[0] != bob.userID {
+		t.Fatalf("group with a non-contact = %v", early)
+	}
+	if u := rpcOK(t, bob.users.AddContact, &appv1.AddContactRequest{
+		Target: &appv1.AddContactRequest_UserId{UserId: alice.userID},
+	}).GetUser(); u.GetId() != alice.userID {
+		t.Fatalf("AddContact = %v", u)
+	}
 
 	// Each step waits for bob's update before the next mutation, as in a
 	// conversation; updates render the message as it is when delivered.
@@ -405,6 +415,9 @@ func TestRealtimeTypingAndPresence(t *testing.T) {
 	alice := e.member(t, "alice")
 	bob := e.member(t, "bob")
 	chat := rpcOK(t, alice.chats.CreatePrivate, &appv1.CreatePrivateRequest{UserId: bob.userID}).GetChat()
+	// Bob's last seen (default: contacts) is exact for alice once she is in
+	// his contacts.
+	rpcOK(t, bob.users.AddContact, &appv1.AddContactRequest{Target: &appv1.AddContactRequest_UserId{UserId: alice.userID}})
 	aliceWS := e.connect(t, alice)
 	open := func(s *socket) {
 		s.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_OpenChat{OpenChat: &appv1.OpenChatFrame{ChatId: chat.GetId()}}})

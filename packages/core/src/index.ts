@@ -18,7 +18,14 @@ export {
 	type RealtimeOptions,
 } from "./transport/realtime.ts";
 export { SyncEngine, type HistoryDirectionName, type SyncEngineOptions } from "./sync/engine.ts";
-export { Outbox, OutboxError, parseOperation, type OutboxOperation, type PendingMessage } from "./outbox/outbox.ts";
+export {
+	Outbox,
+	OutboxError,
+	parseOperation,
+	type OutboxOperation,
+	type PendingMessage,
+	type SendTextOptions,
+} from "./outbox/outbox.ts";
 export { buildSnapshot, parseSnapshot, SNAPSHOT_VERSION, type ScreenSnapshot, type SnapshotDialog } from "./snapshot/snapshot.ts";
 export { databaseName, signInUrl, SIGN_OUT_PATH, type SessionEndReason } from "./auth/web.ts";
 export {

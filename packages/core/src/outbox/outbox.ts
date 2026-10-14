@@ -28,10 +28,22 @@ export type OutboxOperation =
 			readonly entities: readonly MessageEntity[];
 			readonly replyToSeq: number;
 			readonly date: number;
+			/** The sender dropped the link preview of the message. */
+			readonly noLinkPreview: boolean;
 	  }
 	| { readonly kind: "edit"; readonly seq: number; readonly text: string; readonly entities: readonly MessageEntity[] }
 	| { readonly kind: "delete"; readonly seqs: readonly number[]; readonly forEveryone: boolean }
 	| { readonly kind: "read"; readonly maxSeq: number };
+
+/** Options of {@link Outbox.sendText}. */
+export interface SendTextOptions {
+	readonly entities?: readonly MessageEntity[];
+	readonly replyToSeq?: number;
+	/** Idempotency key for a caller that may repeat the request. */
+	readonly randomId?: number;
+	/** Send without a link preview (the sender dismissed it). */
+	readonly noLinkPreview?: boolean;
+}
 
 /** A message that is written locally and not yet confirmed by the server. */
 export interface PendingMessage {
@@ -96,7 +108,15 @@ export function parseOperation(kind: string, payload: string): OutboxOperation |
 			const entities = decodeEntities(value.entities);
 			if (typeof value.text !== "string" || entities === null) return null;
 			if (!isNumber(value.replyToSeq) || !isNumber(value.date)) return null;
-			return { kind, text: value.text, entities, replyToSeq: value.replyToSeq, date: value.date };
+			// Rows queued before noLinkPreview existed keep the preview.
+			return {
+				kind,
+				text: value.text,
+				entities,
+				replyToSeq: value.replyToSeq,
+				date: value.date,
+				noLinkPreview: value.noLinkPreview === true,
+			};
 		}
 		case "edit": {
 			const entities = decodeEntities(value.entities);
@@ -172,7 +192,7 @@ export class Outbox {
 	async sendText(
 		chatId: number,
 		text: string,
-		options: { entities?: readonly MessageEntity[]; replyToSeq?: number; randomId?: number } = {},
+		options: SendTextOptions = {},
 	): Promise<PendingMessage | null> {
 		assertSafeId(chatId);
 		const entities = options.entities ?? [];
@@ -181,7 +201,14 @@ export class Outbox {
 		const randomId = options.randomId === undefined ? this.options.randomId() : assertSafeId(options.randomId);
 		if (randomId === 0) throw new OutboxError("random_id must not be 0");
 		const date = Math.floor(this.options.timers.now() / 1000);
-		const operation: OutboxOperation = { kind: "send", text, entities, replyToSeq, date };
+		const operation: OutboxOperation = {
+			kind: "send",
+			text,
+			entities,
+			replyToSeq,
+			date,
+			noLinkPreview: options.noLinkPreview === true,
+		};
 		let confirmed = false;
 		await this.options.engine.commitLocal(async (w) => {
 			const seen = await this.options.repo.driver.query(
@@ -417,6 +444,7 @@ export class Outbox {
 					replyToSeq: toWireId(operation.replyToSeq),
 					randomId: toWireId(row.randomId),
 					silent: false,
+					noLinkPreview: operation.noLinkPreview,
 				});
 				if (response.message === undefined) throw new OutboxError("SendMessage returned no message");
 				const message = toMessage(response.message);

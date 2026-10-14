@@ -108,16 +108,22 @@ type memberRow struct {
 	VisibleFrom int64
 	ReadOutbox  int64
 	Left        bool
+	// Former members: when they left and the chat's last seq then.
+	LeftAt  *time.Time
+	LeftSeq int64
+	// Removed by an admin and not unbanned yet.
+	Banned bool
 }
 
 const memberColumns = `m.chat_id, m.user_id, m.role, m.permissions, m.inviter_id, m.joined_at, m.joined_seq,
-	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL`
+	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL, m.left_at, coalesce(m.left_seq, 0),
+	m.banned_at IS NOT NULL`
 
 func scanMember(row pgx.Row) (*memberRow, error) {
 	m := &memberRow{}
 	var perms *int32
 	err := row.Scan(&m.ChatID, &m.UserID, &m.Role, &perms, &m.InviterID, &m.JoinedAt, &m.JoinedSeq,
-		&m.VisibleFrom, &m.ReadOutbox, &m.Left)
+		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned)
 	if perms != nil {
 		p := uint32(*perms)
 		m.Perms = &p
@@ -127,6 +133,22 @@ func scanMember(row pgx.Row) (*memberRow, error) {
 
 func (m *memberRow) active() bool {
 	return m != nil && !m.Left
+}
+
+// sees reports whether the member (current or former) may see a message's
+// content: within history visibility, and for a former member only what
+// existed when they left, unchanged since.
+func (m *memberRow) sees(msg *messageRow) bool {
+	if m == nil || msg.Seq < m.VisibleFrom {
+		return false
+	}
+	if !m.Left {
+		return true
+	}
+	if msg.Seq > m.LeftSeq {
+		return false
+	}
+	return msg.ChangedAt == nil || m.LeftAt == nil || !msg.ChangedAt.After(*m.LeftAt)
 }
 
 func (m *memberRow) isAdmin() bool {
@@ -329,41 +351,57 @@ type messageRow struct {
 	GroupedID   int64
 	EditVersion int32
 	EditDate    *time.Time
-	Deleted     bool
+	// ChangedAt: the content last changed after posting (nil when never).
+	ChangedAt *time.Time
+	Deleted   bool
 }
 
 const messageColumns = `m.chat_id, m.seq, m.topic_id, m.from_id, m.random_id, m.date, m.text, m.content, m.reply_to_seq,
-	m.grouped_id, m.edit_version, m.edit_date, m.deleted_at IS NOT NULL`
+	m.grouped_id, m.edit_version, m.edit_date, m.changed_at, m.deleted_at IS NOT NULL`
 
 func scanMessage(row pgx.Row) (*messageRow, error) {
 	m := &messageRow{}
 	err := row.Scan(&m.ChatID, &m.Seq, &m.TopicID, &m.FromID, &m.RandomID, &m.Date, &m.Text, &m.Content, &m.ReplyToSeq,
-		&m.GroupedID, &m.EditVersion, &m.EditDate, &m.Deleted)
+		&m.GroupedID, &m.EditVersion, &m.EditDate, &m.ChangedAt, &m.Deleted)
 	return m, err
 }
 
-// loadMessages loads messages by key, one query per chat (hash partition
-// pruning).
+// flattenKeys turns chat -> seqs into the parallel arrays the batched
+// lookups unnest; each pair is one primary key probe (with run-time
+// partition pruning for messages).
+func flattenKeys(keys map[int64][]int64) (chats, seqs []int64) {
+	for chatID, list := range keys {
+		for _, seq := range list {
+			chats = append(chats, chatID)
+			seqs = append(seqs, seq)
+		}
+	}
+	return chats, seqs
+}
+
+// loadMessages loads messages by key in one query.
 func loadMessages(ctx context.Context, q querier, keys map[int64][]int64) (map[msgKey]*messageRow, error) {
 	out := map[msgKey]*messageRow{}
-	for chatID, seqs := range keys {
-		rows, err := q.Query(ctx, `SELECT `+messageColumns+` FROM messages m WHERE m.chat_id = $1 AND m.seq = ANY($2)`,
-			chatID, seqs)
+	chats, seqs := flattenKeys(keys)
+	if len(chats) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT `+messageColumns+` FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
+		JOIN messages m ON m.chat_id = x.chat_id AND m.seq = x.seq`, chats, seqs)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load messages: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		m, err := scanMessage(rows)
 		if err != nil {
 			return nil, fmt.Errorf("chat: load messages: %w", err)
 		}
-		for rows.Next() {
-			m, err := scanMessage(rows)
-			if err != nil {
-				rows.Close()
-				return nil, fmt.Errorf("chat: load messages: %w", err)
-			}
-			out[msgKey{m.ChatID, m.Seq}] = m
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("chat: load messages: %w", err)
-		}
+		out[msgKey{m.ChatID, m.Seq}] = m
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: load messages: %w", err)
 	}
 	return out, nil
 }
@@ -377,67 +415,71 @@ type reactionsOf struct {
 
 func loadReactions(ctx context.Context, q querier, keys map[int64][]int64, viewers []int64) (*reactionsOf, error) {
 	r := &reactionsOf{counts: map[msgKey][]*appv1.ReactionCount{}, mine: map[memberKey]map[int64]string{}}
-	for chatID, seqs := range keys {
-		rows, err := q.Query(ctx, `
-			SELECT seq, emoji, count(*), min(created_at) FROM message_reactions
-			WHERE chat_id = $1 AND seq = ANY($2) GROUP BY seq, emoji`, chatID, seqs)
-		if err != nil {
+	chats, seqs := flattenKeys(keys)
+	if len(chats) == 0 {
+		return r, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT r.chat_id, r.seq, r.emoji, count(*), min(r.created_at)
+		FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
+		JOIN message_reactions r ON r.chat_id = x.chat_id AND r.seq = x.seq
+		GROUP BY r.chat_id, r.seq, r.emoji`, chats, seqs)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load reactions: %w", err)
+	}
+	type agg struct {
+		emoji string
+		n     int32
+		first time.Time
+	}
+	byMsg := map[msgKey][]agg{}
+	for rows.Next() {
+		var k msgKey
+		var a agg
+		if err := rows.Scan(&k.chatID, &k.seq, &a.emoji, &a.n, &a.first); err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("chat: load reactions: %w", err)
 		}
-		type agg struct {
-			emoji string
-			n     int32
-			first time.Time
+		byMsg[k] = append(byMsg[k], a)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: load reactions: %w", err)
+	}
+	for k, list := range byMsg {
+		// Most used first; ties keep the order they were first used.
+		slices.SortFunc(list, func(a, b agg) int {
+			return cmp.Or(cmp.Compare(b.n, a.n), a.first.Compare(b.first), cmp.Compare(a.emoji, b.emoji))
+		})
+		for _, a := range list {
+			r.counts[k] = append(r.counts[k], &appv1.ReactionCount{Emoji: a.emoji, Count: a.n})
 		}
-		bySeq := map[int64][]agg{}
-		for rows.Next() {
-			var seq int64
-			var a agg
-			if err := rows.Scan(&seq, &a.emoji, &a.n, &a.first); err != nil {
-				rows.Close()
-				return nil, fmt.Errorf("chat: load reactions: %w", err)
-			}
-			bySeq[seq] = append(bySeq[seq], a)
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("chat: load reactions: %w", err)
-		}
-		for seq, list := range bySeq {
-			// Most used first; ties keep the order they were first used.
-			slices.SortFunc(list, func(a, b agg) int {
-				return cmp.Or(cmp.Compare(b.n, a.n), a.first.Compare(b.first), cmp.Compare(a.emoji, b.emoji))
-			})
-			for _, a := range list {
-				r.counts[msgKey{chatID, seq}] = append(r.counts[msgKey{chatID, seq}], &appv1.ReactionCount{Emoji: a.emoji, Count: a.n})
-			}
-		}
-		if len(bySeq) == 0 || len(viewers) == 0 {
-			continue
-		}
-		rows, err = q.Query(ctx, `
-			SELECT seq, user_id, emoji FROM message_reactions WHERE chat_id = $1 AND seq = ANY($2) AND user_id = ANY($3)`,
-			chatID, seqs, viewers)
-		if err != nil {
+	}
+	if len(byMsg) == 0 || len(viewers) == 0 {
+		return r, nil
+	}
+	rows, err = q.Query(ctx, `
+		SELECT r.chat_id, r.seq, r.user_id, r.emoji FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
+		JOIN message_reactions r ON r.chat_id = x.chat_id AND r.seq = x.seq
+		WHERE r.user_id = ANY($3)`, chats, seqs, viewers)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load own reactions: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var chatID, seq, user int64
+		var emoji string
+		if err := rows.Scan(&chatID, &seq, &user, &emoji); err != nil {
 			return nil, fmt.Errorf("chat: load own reactions: %w", err)
 		}
-		for rows.Next() {
-			var seq, user int64
-			var emoji string
-			if err := rows.Scan(&seq, &user, &emoji); err != nil {
-				rows.Close()
-				return nil, fmt.Errorf("chat: load own reactions: %w", err)
-			}
-			k := memberKey{chatID, user}
-			if r.mine[k] == nil {
-				r.mine[k] = map[int64]string{}
-			}
-			r.mine[k][seq] = emoji
+		k := memberKey{chatID, user}
+		if r.mine[k] == nil {
+			r.mine[k] = map[int64]string{}
 		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("chat: load own reactions: %w", err)
-		}
+		r.mine[k][seq] = emoji
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: load own reactions: %w", err)
 	}
 	return r, nil
 }
@@ -463,28 +505,28 @@ type hiddenKey struct {
 
 func loadHidden(ctx context.Context, q querier, viewers []int64, keys map[int64][]int64) (map[hiddenKey]bool, error) {
 	out := map[hiddenKey]bool{}
-	if len(viewers) == 0 {
+	chats, seqs := flattenKeys(keys)
+	if len(viewers) == 0 || len(chats) == 0 {
 		return out, nil
 	}
-	for chatID, seqs := range keys {
-		rows, err := q.Query(ctx, `
-			SELECT user_id, seq FROM user_hidden_messages WHERE user_id = ANY($1) AND chat_id = $2 AND seq = ANY($3)`,
-			viewers, chatID, seqs)
-		if err != nil {
+	rows, err := q.Query(ctx, `
+		SELECT h.user_id, h.chat_id, h.seq FROM unnest($2::bigint[], $3::bigint[]) AS x(chat_id, seq)
+		JOIN user_hidden_messages h ON h.chat_id = x.chat_id AND h.seq = x.seq
+		WHERE h.user_id = ANY($1)`, viewers, chats, seqs)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load hidden: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var user int64
+		var k msgKey
+		if err := rows.Scan(&user, &k.chatID, &k.seq); err != nil {
 			return nil, fmt.Errorf("chat: load hidden: %w", err)
 		}
-		for rows.Next() {
-			var user, seq int64
-			if err := rows.Scan(&user, &seq); err != nil {
-				rows.Close()
-				return nil, fmt.Errorf("chat: load hidden: %w", err)
-			}
-			out[hiddenKey{user, msgKey{chatID, seq}}] = true
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("chat: load hidden: %w", err)
-		}
+		out[hiddenKey{user, k}] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: load hidden: %w", err)
 	}
 	return out, nil
 }
@@ -644,11 +686,17 @@ func sortedKeys(set map[int64]bool) []int64 {
 }
 
 // renderFrames renders log updates for their viewers: messages come from
-// the messages table as each viewer sees them now (an update about a
-// deleted or hidden message loses its body but keeps its position), chats
-// and users referenced are attached. jobs' updates are edited in place.
-func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, jobs map[int64][]*appv1.Update) (map[int64]*appv1.UpdateFrame, error) {
+// the messages table as each viewer sees them now, and only what the
+// viewer's membership allows (history visibility; for a former member
+// nothing newer than when they left, nor changed since). An update about a
+// message the viewer may not see, or that is deleted or hidden, loses its
+// body but keeps its position; updates of a chat the viewer was never in
+// are emptied. Chats and users referenced are attached. With chatLog (a
+// large chat's own log) only current members get a frame. jobs' updates
+// are edited in place.
+func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, jobs map[int64][]*appv1.Update, chatLog bool) (map[int64]*appv1.UpdateFrame, error) {
 	keys := map[int64][]int64{}
+	chatSet := map[int64]bool{}
 	addKey := func(chatID, seq int64) {
 		if chatID != 0 && seq != 0 && !slices.Contains(keys[chatID], seq) {
 			keys[chatID] = append(keys[chatID], seq)
@@ -656,6 +704,9 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 	}
 	for _, list := range jobs {
 		for _, u := range list {
+			if chatID := updateChatID(u); chatID != 0 {
+				chatSet[chatID] = true
+			}
 			switch k := u.Kind.(type) {
 			case *appv1.Update_MessageNew:
 				addKey(k.MessageNew.GetMessage().GetChatId(), k.MessageNew.GetMessage().GetSeq())
@@ -666,6 +717,10 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 			default:
 			}
 		}
+	}
+	members, err := loadMembers(ctx, q, sortedKeys(chatSet), viewers)
+	if err != nil {
+		return nil, err
 	}
 	msgs, err := loadMessages(ctx, q, keys)
 	if err != nil {
@@ -679,50 +734,64 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 	if err != nil {
 		return nil, err
 	}
-	ents := newEntitySet()
-	renderMsg := func(viewer int64, ref *appv1.Message) (*appv1.Message, error) {
-		k := msgKey{ref.GetChatId(), ref.GetSeq()}
-		m, ok := msgs[k]
-		if !ok || m.Deleted || hidden[hiddenKey{viewer, k}] {
-			return nil, nil
+	// visible returns the message when viewer (membership m) may see it.
+	visible := func(viewer int64, m *memberRow, chatID, seq int64) *messageRow {
+		k := msgKey{chatID, seq}
+		msg, ok := msgs[k]
+		if !ok || msg.Deleted || hidden[hiddenKey{viewer, k}] || !m.sees(msg) {
+			return nil
 		}
-		return m.render(viewer, reactions.forViewer(k, viewer))
+		return msg
 	}
+	ents := newEntitySet()
+	var served []int64
 	for _, viewer := range viewers {
+		if chatLog && !activeInAll(members, viewer, jobs[viewer]) {
+			continue
+		}
+		served = append(served, viewer)
 		for _, u := range jobs[viewer] {
-			if chatID := updateChatID(u); chatID != 0 {
+			chatID := updateChatID(u)
+			var m *memberRow
+			if chatID != 0 {
+				if m = members[memberKey{chatID, viewer}]; m == nil {
+					u.Kind = nil
+					continue
+				}
 				ents.addChats(viewer, chatID)
 			}
 			switch k := u.Kind.(type) {
 			case *appv1.Update_MessageNew:
-				m, err := renderMsg(viewer, k.MessageNew.GetMessage())
-				if err != nil {
-					return nil, err
-				}
-				if m == nil {
+				msg := visible(viewer, m, chatID, k.MessageNew.GetMessage().GetSeq())
+				if msg == nil {
 					u.Kind = nil
 					continue
 				}
-				k.MessageNew.Message = m
-				ents.addUsers(viewer, referencedUsers(m)...)
+				rendered, err := msg.render(viewer, reactions.forViewer(msgKey{chatID, msg.Seq}, viewer))
+				if err != nil {
+					return nil, err
+				}
+				k.MessageNew.Message = rendered
+				ents.addUsers(viewer, referencedUsers(rendered)...)
 			case *appv1.Update_MessageEdit:
-				m, err := renderMsg(viewer, k.MessageEdit.GetMessage())
+				msg := visible(viewer, m, chatID, k.MessageEdit.GetMessage().GetSeq())
+				if msg == nil {
+					u.Kind = nil
+					continue
+				}
+				rendered, err := msg.render(viewer, reactions.forViewer(msgKey{chatID, msg.Seq}, viewer))
 				if err != nil {
 					return nil, err
 				}
-				if m == nil {
-					u.Kind = nil
-					continue
-				}
-				k.MessageEdit.Message = m
-				ents.addUsers(viewer, referencedUsers(m)...)
+				k.MessageEdit.Message = rendered
+				ents.addUsers(viewer, referencedUsers(rendered)...)
 			case *appv1.Update_Reaction:
-				key := msgKey{k.Reaction.GetChatId(), k.Reaction.GetSeq()}
-				if m, ok := msgs[key]; !ok || m.Deleted || hidden[hiddenKey{viewer, key}] {
+				// Reaction counts are current: a former member gets none.
+				if m.Left || visible(viewer, m, chatID, k.Reaction.GetSeq()) == nil {
 					u.Kind = nil
 					continue
 				}
-				k.Reaction.Reactions = reactions.forViewer(key, viewer)
+				k.Reaction.Reactions = reactions.forViewer(msgKey{chatID, k.Reaction.GetSeq()}, viewer)
 			case *appv1.Update_MemberAdded:
 				ents.addUsers(viewer, k.MemberAdded.GetUserIds()...)
 				ents.addUsers(viewer, k.MemberAdded.GetInviterId())
@@ -738,8 +807,8 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 	if err != nil {
 		return nil, err
 	}
-	frames := make(map[int64]*appv1.UpdateFrame, len(viewers))
-	for _, viewer := range viewers {
+	frames := make(map[int64]*appv1.UpdateFrame, len(served))
+	for _, viewer := range served {
 		chats := rendered.chats[viewer]
 		// chat_updated carries the chat as the viewer sees it now.
 		for _, u := range jobs[viewer] {
@@ -754,6 +823,17 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 		frames[viewer] = &appv1.UpdateFrame{Updates: jobs[viewer], Users: rendered.users[viewer], Chats: chats}
 	}
 	return frames, nil
+}
+
+// activeInAll reports whether viewer is a current member of every chat its
+// updates are about.
+func activeInAll(members map[memberKey]*memberRow, viewer int64, updates []*appv1.Update) bool {
+	for _, u := range updates {
+		if chatID := updateChatID(u); chatID != 0 && !members[memberKey{chatID, viewer}].active() {
+			return false
+		}
+	}
+	return true
 }
 
 // renderMessages renders history rows for one viewer, with their users.

@@ -178,3 +178,28 @@ func (s *usersService) Report(ctx context.Context, req *connect.Request[appv1.Re
 		return &appv1.ReportResponse{}, s.chat.Report(ctx, me, m)
 	})
 }
+
+// AddContact puts a user into the caller's contact list.
+func (s *usersService) AddContact(ctx context.Context, req *connect.Request[appv1.AddContactRequest]) (*connect.Response[appv1.AddContactResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.AddContactRequest) (*appv1.AddContactResponse, error) {
+		u, err := s.chat.AddContact(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.AddContactResponse{User: u}, nil
+	})
+}
+
+// DeleteContact removes a user from the caller's contact list.
+func (s *usersService) DeleteContact(ctx context.Context, req *connect.Request[appv1.DeleteContactRequest]) (*connect.Response[appv1.DeleteContactResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.DeleteContactRequest) (*appv1.DeleteContactResponse, error) {
+		return &appv1.DeleteContactResponse{}, s.chat.DeleteContact(ctx, me, m.GetUserId())
+	})
+}
+
+// GetContacts pages through the caller's contact list.
+func (s *usersService) GetContacts(ctx context.Context, req *connect.Request[appv1.GetContactsRequest]) (*connect.Response[appv1.GetContactsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetContactsRequest) (*appv1.GetContactsResponse, error) {
+		return s.chat.GetContacts(ctx, me, m.GetCursor(), m.GetLimit())
+	})
+}

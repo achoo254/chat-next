@@ -300,9 +300,9 @@ func (t *txn) insertMembers(ctx context.Context, c *chatRow, users []int64, invi
 	rows, err := t.tx.Query(ctx, `
 		INSERT INTO chat_members (chat_id, user_id, role, inviter_id, joined_seq, visible_from_seq)
 		SELECT $1, u, 'member', $3, $4, $5 FROM unnest($2::bigint[]) u ORDER BY u
-		ON CONFLICT (chat_id, user_id) DO UPDATE SET left_at = NULL, role = 'member', permissions = NULL,
-			inviter_id = excluded.inviter_id, joined_at = now(), joined_seq = excluded.joined_seq,
-			visible_from_seq = excluded.visible_from_seq, read_outbox_max_seq = 0
+		ON CONFLICT (chat_id, user_id) DO UPDATE SET left_at = NULL, left_seq = NULL, banned_at = NULL, banned_by = NULL,
+			role = 'member', permissions = NULL, inviter_id = excluded.inviter_id, joined_at = now(),
+			joined_seq = excluded.joined_seq, visible_from_seq = excluded.visible_from_seq, read_outbox_max_seq = 0
 		WHERE chat_members.left_at IS NOT NULL
 		RETURNING user_id`, c.ID, users, inviter, c.LastSeq, visibleFrom)
 	if err != nil {
@@ -338,8 +338,30 @@ func (t *txn) maybeGoLarge(ctx context.Context, ev *Event, c *chatRow, members [
 
 // ---------------------------------------------------------------- members
 
+// bannedAmong returns which of users are banned from the chat.
+func bannedAmong(ctx context.Context, q querier, chatID int64, users []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if len(users) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT user_id FROM chat_members WHERE chat_id = $1 AND user_id = ANY($2) AND banned_at IS NOT NULL`, chatID, users)
+	if err != nil {
+		return nil, fmt.Errorf("chat: banned members: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: banned members: %w", err)
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
 // AddMembers adds users to a group or channel; users whose privacy or
-// blocks refuse it come back in failed.
+// blocks refuse it come back in failed, and so do banned users unless an
+// admin adds them (which lifts the ban).
 func (s *Service) AddMembers(ctx context.Context, me, chatID int64, userIDs []int64) (failed []int64, ack *appv1.SyncAck, err error) {
 	if len(userIDs) == 0 || len(userIDs) > addMembersMax {
 		return nil, nil, errInvalid("user_ids must hold 1 to %d users", addMembersMax)
@@ -361,6 +383,19 @@ func (s *Service) AddMembers(ctx context.Context, me, chatID int64, userIDs []in
 		allowed, refused, err := s.filterAddable(ctx, t.tx, me, userIDs)
 		if err != nil {
 			return err
+		}
+		if !m.isAdmin() {
+			banned, err := bannedAmong(ctx, t.tx, c.ID, allowed)
+			if err != nil {
+				return err
+			}
+			allowed = slices.DeleteFunc(allowed, func(id int64) bool {
+				if banned[id] {
+					refused = append(refused, id)
+				}
+				return banned[id]
+			})
+			slices.Sort(refused)
 		}
 		failed = refused
 		_, err = t.addMembers(ctx, c, me, allowed, me, false)
@@ -434,8 +469,9 @@ func chatPtsIfLarge(c *chatRow) int64 {
 }
 
 // RemoveMember removes a member; admins remove members, the owner removes
-// admins too.
-func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64) (*appv1.SyncAck, error) {
+// admins too. With ban the user is also banned and the invite links they
+// created in the chat are revoked; without, they may rejoin by a valid link.
+func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64, ban bool) (*appv1.SyncAck, error) {
 	if userID == me {
 		return s.LeaveChat(ctx, me, chatID)
 	}
@@ -460,7 +496,14 @@ func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64) (*
 		if !m.isAdmin() || target.Role == roleOwner || (target.Role == roleAdmin && m.Role != roleOwner) {
 			return errDenied("you cannot remove this member")
 		}
-		return t.removeMember(ctx, c, me, userID)
+		if ban {
+			if _, err := t.tx.Exec(ctx, `
+				UPDATE invite_links SET revoked_at = now() WHERE chat_id = $1 AND creator_id = $2 AND revoked_at IS NULL`,
+				chatID, userID); err != nil {
+				return fmt.Errorf("chat: revoke the member's invite links: %w", err)
+			}
+		}
+		return t.removeMember(ctx, c, me, userID, ban)
 	})
 	if err != nil {
 		return nil, err
@@ -468,8 +511,17 @@ func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64) (*
 	return t.ack(me, chatID), nil
 }
 
+// errOwnerNeedsAdmin is LeaveChat's answer to an owner who would leave
+// members behind without an admin to take the chat over. Clients recognize
+// it by failed_precondition on LeaveChat (the only one it returns) and the
+// message prefix.
+func errOwnerNeedsAdmin() error {
+	return errPrecondition("owner_needs_admin: appoint an admin before leaving; ownership passes to the longest-serving admin")
+}
+
 // LeaveChat removes me from a group or channel. An owner who leaves hands
-// the chat to the longest-serving admin, or else the longest-serving member.
+// the chat to the longest-serving admin; with other members but no admin
+// the owner cannot leave.
 func (s *Service) LeaveChat(ctx context.Context, me, chatID int64) (*appv1.SyncAck, error) {
 	if err := s.allow(limitWrite, "write", me); err != nil {
 		return nil, err
@@ -482,21 +534,23 @@ func (s *Service) LeaveChat(ctx context.Context, me, chatID int64) (*appv1.SyncA
 		if c.Type == typePrivate {
 			return errInvalid("cannot leave a private chat")
 		}
-		if err := t.removeMember(ctx, c, me, me); err != nil {
+		var heir int64
+		if m.Role == roleOwner {
+			err := t.tx.QueryRow(ctx, `
+				SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL AND role = 'admin'
+				ORDER BY joined_at, user_id LIMIT 1`, chatID).Scan(&heir)
+			switch {
+			case isNoRows(err) && c.MemberCount > 1:
+				return errOwnerNeedsAdmin()
+			case err != nil && !isNoRows(err):
+				return fmt.Errorf("chat: pick new owner: %w", err)
+			}
+		}
+		if err := t.removeMember(ctx, c, me, me, false); err != nil {
 			return err
 		}
-		if m.Role != roleOwner {
+		if heir == 0 {
 			return nil
-		}
-		var heir int64
-		err = t.tx.QueryRow(ctx, `
-			SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL
-			ORDER BY (role = 'admin') DESC, joined_at, user_id LIMIT 1`, chatID).Scan(&heir)
-		if isNoRows(err) {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("chat: pick new owner: %w", err)
 		}
 		return t.setRole(ctx, c, me, heir, roleOwner)
 	})
@@ -519,9 +573,9 @@ func (s *Service) memberRow(ctx context.Context, q querier, chatID, userID int64
 }
 
 // removeMember posts the service message while the user is still a member,
-// then removes them and writes member_removed to the remaining members and
-// to the removed user.
-func (t *txn) removeMember(ctx context.Context, c *chatRow, actor, userID int64) error {
+// then removes them (banned when ban) and writes member_removed to the
+// remaining members and to the removed user.
+func (t *txn) removeMember(ctx context.Context, c *chatRow, actor, userID int64, ban bool) error {
 	members, err := activeMembers(ctx, t.tx, c.ID)
 	if err != nil {
 		return err
@@ -536,8 +590,10 @@ func (t *txn) removeMember(ctx context.Context, c *chatRow, actor, userID int64)
 			return err
 		}
 	}
-	if _, err := t.tx.Exec(ctx, `UPDATE chat_members SET left_at = now(), role = 'member', permissions = NULL
-		WHERE chat_id = $1 AND user_id = $2`, c.ID, userID); err != nil {
+	if _, err := t.tx.Exec(ctx, `
+		UPDATE chat_members SET left_at = now(), left_seq = $3, role = 'member', permissions = NULL,
+			banned_at = CASE WHEN $4 THEN now() END, banned_by = CASE WHEN $4 THEN $5::bigint END
+		WHERE chat_id = $1 AND user_id = $2`, c.ID, userID, c.LastSeq, ban, actor); err != nil {
 		return fmt.Errorf("chat: remove member: %w", err)
 	}
 	if err := t.tx.QueryRow(ctx, `UPDATE chats SET member_count = member_count - 1, updated_at = now() WHERE id = $1 RETURNING member_count`,
@@ -907,7 +963,8 @@ func (s *Service) GetPeerDialogs(ctx context.Context, me int64, chatIDs []int64)
 }
 
 // dialogs renders the caller's dialogs of chatIDs in that order, skipping
-// chats the caller is not a member of.
+// chats the caller is not a member of. Top messages and read states of
+// every chat come from one query each.
 func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv1.GetPeerDialogsResponse, error) {
 	out := &appv1.GetPeerDialogsResponse{}
 	if len(chatIDs) == 0 {
@@ -921,27 +978,45 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 	if err != nil {
 		return nil, err
 	}
-	ents := newEntitySet()
-	var tops []*messageRow
+	var list []*memberRow
+	seen := map[int64]bool{}
 	for _, id := range chatIDs {
-		c, m := chats[id], members[memberKey{id, me}]
-		if c == nil || !m.active() {
-			continue
+		if m := members[memberKey{id, me}]; chats[id] != nil && m.active() && !seen[id] {
+			seen[id] = true
+			list = append(list, m)
 		}
-		d, top, err := s.dialogOf(ctx, s.pool, c, m)
-		if err != nil {
-			return nil, err
+	}
+	tops, err := topMessages(ctx, s.pool, me, list)
+	if err != nil {
+		return nil, err
+	}
+	states, err := s.readStates(ctx, s.pool, chats, list)
+	if err != nil {
+		return nil, err
+	}
+	ents := newEntitySet()
+	var topRows []*messageRow
+	for _, m := range list {
+		c, rs := chats[m.ChatID], states[m.ChatID]
+		d := &appv1.Dialog{
+			ChatId:              c.ID,
+			ReadInboxMaxSeq:     rs.readInbox,
+			ReadOutboxMaxSeq:    m.ReadOutbox,
+			UnreadCount:         rs.unread,
+			UnreadMentionsCount: rs.mentions,
+			ChatPts:             chatPtsIfLarge(c),
+		}
+		if top := tops[c.ID]; top != nil {
+			d.TopSeq = top.Seq
+			topRows = append(topRows, top)
 		}
 		out.Dialogs = append(out.Dialogs, d)
-		if top != nil {
-			tops = append(tops, top)
-		}
-		ents.addChats(me, id)
+		ents.addChats(me, c.ID)
 		if peer := c.peerOf(me); peer != 0 {
 			ents.addUsers(me, peer)
 		}
 	}
-	msgs, users, err := s.renderMessages(ctx, s.pool, me, tops)
+	msgs, users, err := s.renderMessages(ctx, s.pool, me, topRows)
 	if err != nil {
 		return nil, err
 	}
@@ -955,66 +1030,144 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 	return out, nil
 }
 
-// dialogOf computes one dialog: its newest message visible to the member,
-// read positions and the unread count.
-func (s *Service) dialogOf(ctx context.Context, q querier, c *chatRow, m *memberRow) (*appv1.Dialog, *messageRow, error) {
-	top, err := scanMessage(q.QueryRow(ctx, `
-		SELECT `+messageColumns+` FROM messages m
-		WHERE m.chat_id = $1 AND m.deleted_at IS NULL AND m.seq >= $2
-			AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $3 AND h.chat_id = m.chat_id AND h.seq = m.seq)
-		ORDER BY m.seq DESC LIMIT 1`, c.ID, m.VisibleFrom, m.UserID))
-	if isNoRows(err) {
-		top = nil
-	} else if err != nil {
-		return nil, nil, fmt.Errorf("chat: top message: %w", err)
+// topMessages returns, per chat, the newest message visible to the member
+// (history visibility, not deleted, not hidden for them), in one query.
+func topMessages(ctx context.Context, q querier, me int64, members []*memberRow) (map[int64]*messageRow, error) {
+	out := map[int64]*messageRow{}
+	if len(members) == 0 {
+		return out, nil
 	}
-	rs, err := s.readState(ctx, q, c, m)
+	chatIDs := make([]int64, len(members))
+	visible := make([]int64, len(members))
+	for i, m := range members {
+		chatIDs[i], visible[i] = m.ChatID, m.VisibleFrom
+	}
+	rows, err := q.Query(ctx, `
+		SELECT newest.* FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, visible_from)
+		CROSS JOIN LATERAL (
+			SELECT `+messageColumns+` FROM messages m
+			WHERE m.chat_id = x.chat_id AND m.deleted_at IS NULL AND m.seq >= x.visible_from
+				AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $3 AND h.chat_id = m.chat_id AND h.seq = m.seq)
+			ORDER BY m.seq DESC LIMIT 1) newest`, chatIDs, visible, me)
 	if err != nil {
-		return nil, nil, err
+		return nil, fmt.Errorf("chat: top messages: %w", err)
 	}
-	d := &appv1.Dialog{
-		ChatId:           c.ID,
-		ReadInboxMaxSeq:  rs.readInbox,
-		ReadOutboxMaxSeq: m.ReadOutbox,
-		UnreadCount:      rs.unread,
-		ChatPts:          chatPtsIfLarge(c),
+	defer rows.Close()
+	for rows.Next() {
+		m, err := scanMessage(rows)
+		if err != nil {
+			return nil, fmt.Errorf("chat: top messages: %w", err)
+		}
+		out[m.ChatID] = m
 	}
-	if top != nil {
-		d.TopSeq = top.Seq
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: top messages: %w", err)
 	}
-	return d, top, nil
+	return out, nil
 }
+
+// unreadMax caps unread counts: counting stops there (clients show "999+"),
+// so a long unread history never costs a full scan.
+const unreadMax = 1000
 
 // readStateOf is the caller's read position of a chat and its unread count.
 type readStateOf struct {
 	readInbox int64
 	unread    int32
+	mentions  int32
 	topSeq    int64
 	chatPts   int64
 }
 
-// readState computes the chat-level read position and unread count. A
-// message is unread when it comes from someone else, is visible, not
-// deleted or hidden, and is above both the member's read position for its
-// topic (topic 0 outside forums) and the seq they joined at.
-func (s *Service) readState(ctx context.Context, q querier, c *chatRow, m *memberRow) (readStateOf, error) {
-	var rs readStateOf
-	err := q.QueryRow(ctx, `
-		SELECT
-			coalesce((SELECT read_inbox_max_seq FROM chat_read_states WHERE chat_id = $1 AND user_id = $2 AND topic_id = 0), 0),
-			(SELECT count(*) FROM messages msg
-				LEFT JOIN chat_read_states r ON r.chat_id = msg.chat_id AND r.user_id = $2
-					AND r.topic_id = CASE WHEN $3 THEN msg.topic_id ELSE 0 END
-				WHERE msg.chat_id = $1 AND msg.from_id <> $2 AND msg.deleted_at IS NULL
-					AND msg.seq > greatest(coalesce(r.read_inbox_max_seq, 0), $4, $5 - 1)
-					AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $2 AND h.chat_id = msg.chat_id AND h.seq = msg.seq)),
-			c.last_seq, c.chat_pts
-		FROM chats c WHERE c.id = $1`,
-		c.ID, m.UserID, c.Forum, m.JoinedSeq, m.VisibleFrom).Scan(&rs.readInbox, &rs.unread, &rs.topSeq, &rs.chatPts)
-	if err != nil {
-		return readStateOf{}, fmt.Errorf("chat: read state: %w", err)
+// unreadVisible is the condition of a message (alias msg) that counts as
+// unread for user $1 above position pos (an SQL expression): from someone
+// else, not deleted, not hidden for them.
+func unreadVisible(pos string) string {
+	return `msg.from_id <> $1 AND msg.deleted_at IS NULL AND msg.seq > ` + pos + `
+		AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $1 AND h.chat_id = msg.chat_id AND h.seq = msg.seq)`
+}
+
+// readStates computes the chat-level read position and unread count of
+// each membership (all of one user), in one query. A message is unread when
+// it is visible to the member and above both their read position for its
+// topic (topic 0 outside forums) and the seq they joined at. In a forum
+// only topics whose newest message is above that position are counted.
+func (s *Service) readStates(ctx context.Context, q querier, chats map[int64]*chatRow, members []*memberRow) (map[int64]readStateOf, error) {
+	out := map[int64]readStateOf{}
+	if len(members) == 0 {
+		return out, nil
 	}
-	rs.readInbox = max(rs.readInbox, m.JoinedSeq)
+	me := members[0].UserID
+	n := len(members)
+	chatIDs, forum, joined, visible := make([]int64, n), make([]bool, n), make([]int64, n), make([]int64, n)
+	for i, m := range members {
+		chatIDs[i], forum[i], joined[i], visible[i] = m.ChatID, chats[m.ChatID].Forum, m.JoinedSeq, m.VisibleFrom
+	}
+	topicPos := `greatest(coalesce(r.read_inbox_max_seq, 0), x.joined, x.visible - 1)`
+	chatPos := `greatest(coalesce(r0.read_inbox_max_seq, 0), x.joined, x.visible - 1)`
+	rows, err := q.Query(ctx, `
+		SELECT x.chat_id, coalesce(r0.read_inbox_max_seq, 0), c.last_seq, c.chat_pts,
+			CASE WHEN x.forum THEN (
+				SELECT count(*) FROM (
+					SELECT 1 FROM forum_topics t
+					LEFT JOIN chat_read_states r ON r.chat_id = t.chat_id AND r.user_id = $1 AND r.topic_id = t.id
+					CROSS JOIN LATERAL (
+						SELECT 1 FROM messages msg
+						WHERE msg.chat_id = t.chat_id AND msg.topic_id = t.id AND `+unreadVisible(topicPos)+`
+						LIMIT $6) u
+					WHERE t.chat_id = x.chat_id AND t.top_seq > `+topicPos+`
+					LIMIT $6) n)
+			ELSE (
+				SELECT count(*) FROM (
+					SELECT 1 FROM messages msg WHERE msg.chat_id = x.chat_id AND `+unreadVisible(chatPos)+`
+					LIMIT $6) n)
+			END,
+			(SELECT count(*) FROM (
+				SELECT 1 FROM message_mentions mm
+				JOIN messages msg ON msg.chat_id = mm.chat_id AND msg.seq = mm.seq
+				LEFT JOIN chat_read_states r ON r.chat_id = msg.chat_id AND r.user_id = $1
+					AND r.topic_id = CASE WHEN x.forum THEN msg.topic_id ELSE 0 END
+				WHERE mm.user_id = $1 AND mm.chat_id = x.chat_id AND `+unreadVisible(topicPos)+`
+				LIMIT $6) mn)
+		FROM unnest($2::bigint[], $3::bool[], $4::bigint[], $5::bigint[]) AS x(chat_id, forum, joined, visible)
+		JOIN chats c ON c.id = x.chat_id
+		LEFT JOIN chat_read_states r0 ON r0.chat_id = x.chat_id AND r0.user_id = $1 AND r0.topic_id = 0`,
+		me, chatIDs, forum, joined, visible, unreadMax)
+	if err != nil {
+		return nil, fmt.Errorf("chat: read states: %w", err)
+	}
+	defer rows.Close()
+	byChat := map[int64]*memberRow{}
+	for _, m := range members {
+		byChat[m.ChatID] = m
+	}
+	for rows.Next() {
+		var chatID int64
+		var rs readStateOf
+		var unread, mentions int64
+		if err := rows.Scan(&chatID, &rs.readInbox, &rs.topSeq, &rs.chatPts, &unread, &mentions); err != nil {
+			return nil, fmt.Errorf("chat: read states: %w", err)
+		}
+		rs.unread, rs.mentions = int32(min(unread, unreadMax)), int32(min(mentions, unreadMax))
+		rs.readInbox = max(rs.readInbox, byChat[chatID].JoinedSeq)
+		out[chatID] = rs
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: read states: %w", err)
+	}
+	return out, nil
+}
+
+// readState is readStates of one chat.
+func (s *Service) readState(ctx context.Context, q querier, c *chatRow, m *memberRow) (readStateOf, error) {
+	states, err := s.readStates(ctx, q, map[int64]*chatRow{c.ID: c}, []*memberRow{m})
+	if err != nil {
+		return readStateOf{}, err
+	}
+	rs, ok := states[c.ID]
+	if !ok {
+		return readStateOf{}, fmt.Errorf("chat: read state of chat %d missing", c.ID)
+	}
 	return rs, nil
 }
 
@@ -1033,11 +1186,15 @@ func mergeUsers(lists ...[]*appv1.User) []*appv1.User {
 }
 
 // GetMembers lists current members, optionally filtered by name or
-// username. The cursor is the last user id returned.
+// username (channels: admins only). The cursor is the last user id
+// returned.
 func (s *Service) GetMembers(ctx context.Context, me, chatID int64, query, cursor string, limit int32) (*appv1.GetMembersResponse, error) {
-	c, _, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
+	c, m, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
 	if err != nil {
 		return nil, err
+	}
+	if c.Type == typeChannel && !m.isAdmin() {
+		return nil, errDenied("only admins see the members of a channel")
 	}
 	if limit <= 0 || limit > membersPageMax {
 		limit = 100
@@ -1079,6 +1236,83 @@ func (s *Service) GetMembers(ctx context.Context, me, chatID int64, query, curso
 		return nil, err
 	}
 	resp.Users = rendered.users[me]
+	return resp, nil
+}
+
+// UnbanMember lifts a ban (admins). The user is not added back.
+func (s *Service) UnbanMember(ctx context.Context, me, chatID, userID int64) error {
+	if err := s.allow(limitWrite, "write", me); err != nil {
+		return err
+	}
+	c, m, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
+	if err != nil {
+		return err
+	}
+	if c.Type == typePrivate || !m.isAdmin() {
+		return errDenied("only admins unban members")
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE chat_members SET banned_at = NULL, banned_by = NULL WHERE chat_id = $1 AND user_id = $2 AND banned_at IS NOT NULL`,
+		chatID, userID)
+	if err != nil {
+		return fmt.Errorf("chat: unban: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return errNotFound("banned member")
+	}
+	return nil
+}
+
+// GetBannedMembers lists the chat's banned users by user id (admins). The
+// cursor is the last user id returned.
+func (s *Service) GetBannedMembers(ctx context.Context, me, chatID int64, cursor string, limit int32) (*appv1.GetBannedMembersResponse, error) {
+	c, m, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
+	if err != nil {
+		return nil, err
+	}
+	if c.Type == typePrivate || !m.isAdmin() {
+		return nil, errDenied("only admins see banned members")
+	}
+	if limit <= 0 || limit > membersPageMax {
+		limit = 100
+	}
+	after := int64(0)
+	if cursor != "" {
+		if _, err := fmt.Sscan(cursor, &after); err != nil || after < 0 {
+			return nil, errInvalid("invalid cursor")
+		}
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT user_id, coalesce(banned_by, 0), banned_at FROM chat_members
+		WHERE chat_id = $1 AND banned_at IS NOT NULL AND user_id > $2
+		ORDER BY user_id LIMIT $3`, c.ID, after, limit+1)
+	if err != nil {
+		return nil, fmt.Errorf("chat: list banned: %w", err)
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*appv1.BannedMember, error) {
+		b := &appv1.BannedMember{}
+		var at time.Time
+		err := r.Scan(&b.UserId, &b.BannedBy, &at)
+		b.BannedAt = at.Unix()
+		return b, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("chat: list banned: %w", err)
+	}
+	resp := &appv1.GetBannedMembersResponse{}
+	if len(list) > int(limit) {
+		list = list[:limit]
+		resp.NextCursor = fmt.Sprint(list[len(list)-1].GetUserId())
+	}
+	ents := newEntitySet()
+	for _, b := range list {
+		ents.addUsers(me, b.GetUserId(), b.GetBannedBy())
+	}
+	rendered, err := ents.render(ctx, s.pool, s.cfg.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	resp.Members, resp.Users = list, rendered.users[me]
 	return resp, nil
 }
 

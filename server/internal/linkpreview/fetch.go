@@ -73,12 +73,18 @@ var blockedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("198.18.0.0/15"),   // benchmarking
 	netip.MustParsePrefix("198.51.100.0/24"), // documentation
 	netip.MustParsePrefix("203.0.113.0/24"),  // documentation
+	netip.MustParsePrefix("192.88.99.0/24"),  // 6to4 relay anycast (deprecated)
 	netip.MustParsePrefix("240.0.0.0/4"),     // reserved, broadcast
+	netip.MustParsePrefix("::/96"),           // IPv4-compatible (embeds IPv4, deprecated)
 	netip.MustParsePrefix("64:ff9b::/96"),    // NAT64 (could reach private IPv4)
 	netip.MustParsePrefix("64:ff9b:1::/48"),  // local-use NAT64
+	netip.MustParsePrefix("100::/64"),        // discard-only
+	netip.MustParsePrefix("2001::/23"),       // IETF protocol assignments: Teredo, benchmarking, ORCHID
 	netip.MustParsePrefix("2001:db8::/32"),   // documentation
 	netip.MustParsePrefix("2002::/16"),       // 6to4 (embeds IPv4)
-	netip.MustParsePrefix("2001::/32"),       // Teredo (embeds IPv4)
+	netip.MustParsePrefix("3fff::/20"),       // documentation
+	netip.MustParsePrefix("5f00::/16"),       // SRv6 SIDs
+	netip.MustParsePrefix("fec0::/10"),       // site-local (deprecated)
 }
 
 // allowedPorts are the ports a preview may be fetched from.
@@ -198,7 +204,13 @@ func NormalizeURL(raw string) (string, error) {
 	if u.Path == "" {
 		u.Path = "/"
 	}
-	return u.String(), nil
+	// Escaping can make the canonical form longer than the input; it is the
+	// cache's primary key and must stay well under the btree entry limit.
+	out := u.String()
+	if len(out) > MaxURLLength {
+		return "", ErrInvalidURL
+	}
+	return out, nil
 }
 
 // Fetch downloads rawURL and returns its preview. The URL must already be

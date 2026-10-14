@@ -757,14 +757,16 @@ type UpdateRead struct {
 	// another device. true: others read the user's messages
 	// (read_outbox_max_seq).
 	Outbox bool `protobuf:"varint,3,opt,name=outbox,proto3" json:"outbox,omitempty"`
-	// Inbox only: unread messages left after this read, over the whole chat.
+	// Inbox only: unread messages left after this read, over the whole chat,
+	// counted up to 1000.
 	UnreadCount int32 `protobuf:"varint,4,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
 	// Forum groups: the topic read (0 = every topic).
 	TopicId int64 `protobuf:"varint,5,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
 	// Inbox only, sync_mode=large: position of the chat's own log when
 	// unread_count was computed. A client behind it pulls GetChatDifference.
 	ChatPts int64 `protobuf:"varint,6,opt,name=chat_pts,json=chatPts,proto3" json:"chat_pts,omitempty"`
-	// Inbox only, topic_id != 0: unread messages left in that topic.
+	// Inbox only, topic_id != 0: unread messages left in that topic, counted
+	// up to 1000.
 	TopicUnreadCount int32 `protobuf:"varint,7,opt,name=topic_unread_count,json=topicUnreadCount,proto3" json:"topic_unread_count,omitempty"`
 	// Inbox only: the chat's newest seq when unread_count was computed.
 	// unread_count covers incoming messages up to it; later ones are unread on

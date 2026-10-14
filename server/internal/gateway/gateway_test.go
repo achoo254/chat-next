@@ -25,6 +25,8 @@ type fakeBackend struct {
 	mu      sync.Mutex
 	members map[int64][]int64 // chat -> members
 	large   map[int64]bool
+	// readOnly: members who may not post in the chat.
+	readOnly map[int64]map[int64]bool
 }
 
 func (f *fakeBackend) MemberChats(_ context.Context, userID int64, chatIDs []int64) ([]chat.ChatAccess, error) {
@@ -34,7 +36,7 @@ func (f *fakeBackend) MemberChats(_ context.Context, userID int64, chatIDs []int
 	for _, id := range chatIDs {
 		for _, m := range f.members[id] {
 			if m == userID {
-				out = append(out, chat.ChatAccess{ChatID: id, Large: f.large[id]})
+				out = append(out, chat.ChatAccess{ChatID: id, Large: f.large[id], CanSend: !f.readOnly[id][userID]})
 			}
 		}
 	}
@@ -79,22 +81,42 @@ func (tokenSessions) Authenticate(_ context.Context, token string) (store.Sessio
 	return store.Session{ID: id * 100, UserID: id, CreatedAt: time.Now()}, nil
 }
 
-type noTouch struct{}
+// fakeToucher reports sessions active unless revoked.
+type fakeToucher struct {
+	mu      sync.Mutex
+	revoked map[int64]bool
+}
 
-func (noTouch) TouchSession(context.Context, int64, time.Duration) error { return nil }
+func (f *fakeToucher) TouchSession(_ context.Context, id int64, _ time.Duration) (store.SessionStatus, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.revoked[id] {
+		return store.SessionStatus{RevokeReason: int16(appv1.SessionRevokeReason_SESSION_REVOKE_REASON_REVOKED_BY_USER)}, nil
+	}
+	return store.SessionStatus{Active: true}, nil
+}
+
+func (f *fakeToucher) revoke(id int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revoked[id] = true
+}
 
 type testGateway struct {
-	srv *httptest.Server
-	hub *Hub
-	be  *fakeBackend
+	srv   *httptest.Server
+	hub   *Hub
+	be    *fakeBackend
+	touch *fakeToucher
 }
 
 func newTestGateway(t *testing.T) *testGateway {
 	t.Helper()
-	be := &fakeBackend{members: map[int64][]int64{}, large: map[int64]bool{}}
+	be := &fakeBackend{members: map[int64][]int64{}, large: map[int64]bool{}, readOnly: map[int64]map[int64]bool{}}
 	hub := NewHub(be, quiet)
 	srv := httptest.NewServer(nil)
-	g, err := New(Config{Hub: hub, Sessions: tokenSessions{}, Toucher: noTouch{}, Origins: auth.NewOrigins(srv.URL), Logger: quiet})
+	touch := &fakeToucher{revoked: map[int64]bool{}}
+	g, err := New(Config{Hub: hub, Sessions: tokenSessions{}, Toucher: touch, Origins: auth.NewOrigins(srv.URL), Logger: quiet,
+		SessionCheckInterval: 50 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,11 +127,43 @@ func newTestGateway(t *testing.T) *testGateway {
 		hub.Shutdown(ctx)
 		srv.Close()
 	})
-	return &testGateway{srv: srv, hub: hub, be: be}
+	return &testGateway{srv: srv, hub: hub, be: be, touch: touch}
 }
 
 type client struct {
 	ws *websocket.Conn
+}
+
+// dialHello opens a socket for the user and sends ClientHelloFrame without
+// waiting for the answer.
+func (tg *testGateway) dialHello(t *testing.T, userID int64) *client {
+	t.Helper()
+	h := http.Header{}
+	h.Set("Origin", tg.srv.URL)
+	h.Set("Cookie", auth.SessionCookieName+"=user-"+itoa(userID))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ws, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(tg.srv.URL, "http")+"/ws", &websocket.DialOptions{HTTPHeader: h})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ws.CloseNow() })
+	c := &client{ws: ws}
+	c.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_Hello{Hello: &appv1.ClientHelloFrame{}}})
+	return c
+}
+
+// closeStatus reads until the socket ends and returns its close status.
+func (c *client) closeStatus(t *testing.T) websocket.StatusCode {
+	t.Helper()
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, _, err := c.ws.Read(ctx)
+		cancel()
+		if err != nil {
+			return websocket.CloseStatus(err)
+		}
+	}
 }
 
 func (tg *testGateway) connect(t *testing.T, userID int64) *client {
@@ -264,5 +318,82 @@ func TestShutdownAsksClientsToReconnect(t *testing.T) {
 		if _, _, err := ws.Read(dctx); websocket.CloseStatus(err) != websocket.StatusTryAgainLater {
 			t.Fatalf("connection during shutdown: %v", err)
 		}
+	}
+}
+
+func TestSessionRevokedBeforeRegisterClosesSocket(t *testing.T) {
+	tg := newTestGateway(t)
+	// The handshake authenticated the session; it was revoked before the
+	// socket registered, so the outbox's session_revoked missed it.
+	tg.touch.revoke(500)
+	c := tg.dialHello(t, 5)
+	if f := c.read(t); f.GetSessionRevoked().GetReason() != appv1.SessionRevokeReason_SESSION_REVOKE_REASON_REVOKED_BY_USER {
+		t.Fatalf("first frame = %v, want SessionRevokedFrame", f)
+	}
+	if st := c.closeStatus(t); st != websocket.StatusPolicyViolation {
+		t.Fatalf("close status = %v", st)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for tg.hub.Connected() != 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := tg.hub.Connected(); n != 0 {
+		t.Fatalf("%d sockets still registered", n)
+	}
+}
+
+func TestPeriodicSessionCheckClosesRevokedSocket(t *testing.T) {
+	tg := newTestGateway(t)
+	c := tg.connect(t, 6)
+	tg.touch.revoke(600)
+	if f := c.read(t); f.GetSessionRevoked() == nil {
+		t.Fatalf("frame = %v, want SessionRevokedFrame", f)
+	}
+	if st := c.closeStatus(t); st != websocket.StatusPolicyViolation {
+		t.Fatalf("close status = %v", st)
+	}
+}
+
+func TestSocketsPerSessionAreCapped(t *testing.T) {
+	tg := newTestGateway(t)
+	for range maxSocketsPerSession {
+		tg.connect(t, 7)
+	}
+	extra := tg.dialHello(t, 7)
+	if st := extra.closeStatus(t); st != websocket.StatusPolicyViolation {
+		t.Fatalf("socket over the cap: close status %v", st)
+	}
+	if n := tg.hub.Connected(); n != maxSocketsPerSession {
+		t.Fatalf("%d sockets, want %d", n, maxSocketsPerSession)
+	}
+}
+
+func TestOpenChatFramesAreRateLimited(t *testing.T) {
+	tg := newTestGateway(t)
+	c := tg.connect(t, 8)
+	for i := range int(openChatRule.Burst) + 5 {
+		c.send(t, &appv1.ClientFrame{RequestId: int64(i + 1), Frame: &appv1.ClientFrame_OpenChat{OpenChat: &appv1.OpenChatFrame{}}})
+	}
+	if f := c.read(t); f.GetError().GetCode() != appv1.FrameErrorCode_FRAME_ERROR_CODE_RATE_LIMITED {
+		t.Fatalf("frame = %v, want RATE_LIMITED", f)
+	}
+}
+
+func TestTypingNeedsSendPermission(t *testing.T) {
+	tg := newTestGateway(t)
+	tg.be.members[60] = []int64{1, 2}
+	tg.be.readOnly[60] = map[int64]bool{2: true}
+	writer, reader := tg.connect(t, 1), tg.connect(t, 2)
+	for _, c := range []*client{writer, reader} {
+		c.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_OpenChat{OpenChat: &appv1.OpenChatFrame{ChatId: 60}}})
+	}
+	time.Sleep(50 * time.Millisecond)
+	reader.send(t, &appv1.ClientFrame{RequestId: 3, Frame: &appv1.ClientFrame_Typing{Typing: &appv1.TypingFrame{ChatId: 60}}})
+	if f := reader.read(t); f.GetError().GetCode() != appv1.FrameErrorCode_FRAME_ERROR_CODE_FORBIDDEN || f.GetError().GetRequestId() != 3 {
+		t.Fatalf("typing without send permission = %v", f)
+	}
+	writer.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_Typing{Typing: &appv1.TypingFrame{ChatId: 60}}})
+	if ty := reader.read(t).GetTyping(); ty.GetUserId() != 1 {
+		t.Fatalf("typing = %v", ty)
 	}
 }

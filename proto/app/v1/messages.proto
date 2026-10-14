@@ -498,4 +498,13 @@ message GetMessageReadersRequest {
 message GetMessageReadersResponse {
   repeated int64 user_ids = 1 [jstype = JS_NUMBER];
   repeated User users = 2;
+  // The same readers, most recent first, with when each read the message.
+  repeated MessageReader readers = 3;
+}
+
+message MessageReader {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // Unix seconds when the reader's read position first reached the message
+  // (for reads before read dates were kept: when it last moved).
+  int64 read_at = 2 [jstype = JS_NUMBER];
 }

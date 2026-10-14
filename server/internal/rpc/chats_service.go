@@ -94,7 +94,8 @@ func (s *chatsService) AddMembers(ctx context.Context, req *connect.Request[appv
 
 func (s *chatsService) RemoveMember(ctx context.Context, req *connect.Request[appv1.RemoveMemberRequest]) (*connect.Response[appv1.RemoveMemberResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.RemoveMemberRequest) (*appv1.RemoveMemberResponse, error) {
-		ack, err := s.chat.RemoveMember(ctx, me, m.GetChatId(), m.GetUserId())
+		// An unset ban means remove and ban.
+		ack, err := s.chat.RemoveMember(ctx, me, m.GetChatId(), m.GetUserId(), m.Ban == nil || m.GetBan())
 		if err != nil {
 			return nil, err
 		}
@@ -192,13 +193,13 @@ func (s *chatsService) UpdateChatInfo(ctx context.Context, req *connect.Request[
 
 func (s *chatsService) GetForumTopics(ctx context.Context, req *connect.Request[appv1.GetForumTopicsRequest]) (*connect.Response[appv1.GetForumTopicsResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetForumTopicsRequest) (*appv1.GetForumTopicsResponse, error) {
-		return s.chat.GetForumTopics(ctx, me, m.GetChatId())
+		return s.chat.GetForumTopics(ctx, me, m.GetChatId(), m.GetCursor(), m.GetLimit())
 	})
 }
 
 func (s *chatsService) CreateForumTopic(ctx context.Context, req *connect.Request[appv1.CreateForumTopicRequest]) (*connect.Response[appv1.CreateForumTopicResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.CreateForumTopicRequest) (*appv1.CreateForumTopicResponse, error) {
-		topic, ack, err := s.chat.CreateForumTopic(ctx, me, m.GetChatId(), m.GetTitle(), m.GetIconColor())
+		topic, ack, err := s.chat.CreateForumTopic(ctx, me, m)
 		if err != nil {
 			return nil, err
 		}
@@ -233,5 +234,17 @@ func (s *chatsService) HideForumTopic(ctx context.Context, req *connect.Request[
 			return nil, err
 		}
 		return &appv1.HideForumTopicResponse{Topic: topic, Ack: ack}, nil
+	})
+}
+
+func (s *chatsService) UnbanMember(ctx context.Context, req *connect.Request[appv1.UnbanMemberRequest]) (*connect.Response[appv1.UnbanMemberResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.UnbanMemberRequest) (*appv1.UnbanMemberResponse, error) {
+		return &appv1.UnbanMemberResponse{}, s.chat.UnbanMember(ctx, me, m.GetChatId(), m.GetUserId())
+	})
+}
+
+func (s *chatsService) GetBannedMembers(ctx context.Context, req *connect.Request[appv1.GetBannedMembersRequest]) (*connect.Response[appv1.GetBannedMembersResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetBannedMembersRequest) (*appv1.GetBannedMembersResponse, error) {
+		return s.chat.GetBannedMembers(ctx, me, m.GetChatId(), m.GetCursor(), m.GetLimit())
 	})
 }

@@ -109,20 +109,43 @@ func (s *Store) ActiveSession(ctx context.Context, tenantID string, tokenHash []
 	return x, err
 }
 
-// TouchSession moves last_seen_at to now when it is older than minInterval.
-// A session whose row is locked by a concurrent write is skipped rather than
-// waited on; the next request touches it.
-func (s *Store) TouchSession(ctx context.Context, id int64, minInterval time.Duration) error {
-	_, err := s.pool.Exec(ctx, `
-		UPDATE user_sessions SET last_seen_at = now()
-		WHERE id = (SELECT id FROM user_sessions
-			WHERE id = $1 AND last_seen_at < now() - $2::interval
-			FOR UPDATE SKIP LOCKED)`,
-		id, minInterval)
-	if err != nil {
-		return fmt.Errorf("store: touch session: %w", err)
+// SessionStatus is what TouchSession found out about a session.
+type SessionStatus struct {
+	// Active: not revoked, not idle past SessionIdleTimeout, younger than
+	// SessionMaxAge.
+	Active bool
+	// RevokeReason of a revoked session (user_sessions.revoke_reason, an
+	// app.v1.SessionRevokeReason); 0 when not revoked or unknown.
+	RevokeReason int16
+}
+
+// TouchSession moves last_seen_at of an active session to now when it is
+// older than minInterval, and reports whether the session is still active
+// (a missing session is inactive). A session whose row is locked by a
+// concurrent write is not touched rather than waited on; the next call
+// touches it.
+func (s *Store) TouchSession(ctx context.Context, id int64, minInterval time.Duration) (SessionStatus, error) {
+	var st SessionStatus
+	var reason *int16
+	err := s.pool.QueryRow(ctx, `
+		WITH touched AS (
+			UPDATE user_sessions SET last_seen_at = now()
+			WHERE id = (SELECT s.id FROM user_sessions s
+				WHERE s.id = $1 AND `+activeSession+` AND s.last_seen_at < now() - $2::interval
+				FOR UPDATE SKIP LOCKED)
+			RETURNING id)
+		SELECT `+activeSession+`, s.revoke_reason FROM user_sessions s WHERE s.id = $1`,
+		id, minInterval).Scan(&st.Active, &reason)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SessionStatus{}, nil
 	}
-	return nil
+	if err != nil {
+		return SessionStatus{}, fmt.Errorf("store: touch session: %w", err)
+	}
+	if reason != nil {
+		st.RevokeReason = *reason
+	}
+	return st, nil
 }
 
 // ListActiveSessions returns the usable sessions of a user, newest first.

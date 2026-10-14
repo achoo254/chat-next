@@ -18,6 +18,8 @@ const (
 	invitePath       = "/join/"
 	inviteUsageMax   = 100000
 	inviteMaxLife    = 366 * 24 * time.Hour
+	// invitePreviewMembers: members CheckInvite shows of a group.
+	invitePreviewMembers = 5
 )
 
 func newInviteToken() (string, error) {
@@ -187,14 +189,30 @@ func (s *Service) inviteByToken(ctx context.Context, q querier, token string) (*
 	return inv, nil
 }
 
-// isMember reports whether userID is a current member of chatID.
-func isMember(ctx context.Context, q querier, chatID, userID int64) (*memberRow, error) {
-	members, err := loadMembers(ctx, q, []int64{chatID}, []int64{userID})
+// errBanned answers a banned user who tries to rejoin.
+func errBanned() error {
+	return errDenied("you were removed from this chat by an admin")
+}
+
+// joinCheck looks at a link and the user behind it. It returns the user's
+// membership row when they are a current member (they just open the chat),
+// errBanned when an admin removed them, and NotFound when the link no longer
+// admits anyone: unusable, or its creator is no longer a member allowed to
+// invite. usable is the link's own state (expiry, usage, revocation).
+func (s *Service) joinCheck(ctx context.Context, q querier, c *chatRow, inv *inviteRow, me int64, usable bool) (*memberRow, error) {
+	members, err := loadMembers(ctx, q, []int64{c.ID}, []int64{me, inv.CreatorID})
 	if err != nil {
 		return nil, err
 	}
-	if m := members[memberKey{chatID, userID}]; m.active() {
+	m := members[memberKey{c.ID, me}]
+	switch {
+	case m.active():
 		return m, nil
+	case m != nil && m.Banned:
+		return nil, errBanned()
+	}
+	if creator := members[memberKey{c.ID, inv.CreatorID}]; !usable || !creator.active() || !canInvite(c, creator) {
+		return nil, errNotFound("invite link")
 	}
 	return nil, nil
 }
@@ -220,17 +238,34 @@ func (s *Service) CheckInvite(ctx context.Context, me int64, link string) (*appv
 	if c == nil {
 		return nil, errNotFound("invite link")
 	}
-	resp := &appv1.CheckInviteResponse{Title: c.Title, About: c.About, Type: chatTypes[c.Type], MemberCount: c.MemberCount}
-	m, err := isMember(ctx, s.pool, c.ID, me)
+	resp := &appv1.CheckInviteResponse{Title: c.Title, About: c.About, Type: chatTypes[c.Type], MemberCount: c.MemberCount,
+		HistoryVisibility: c.render(me, nil).GetHistoryVisibility()}
+	m, err := s.joinCheck(ctx, s.pool, c, inv, me, inv.usable(time.Now()))
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case m != nil:
+	if m != nil {
 		// Members open the chat whatever state the link is in.
 		resp.Chat = c.render(me, m)
-	case !inv.usable(time.Now()):
-		return nil, errNotFound("invite link")
+	}
+	// Groups show a few members (a channel's members are for admins only).
+	if c.Type == typeGroup {
+		rows, err := s.pool.Query(ctx, `
+			SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL
+			ORDER BY (role <> 'member') DESC, joined_at, user_id LIMIT $2`, c.ID, invitePreviewMembers)
+		if err != nil {
+			return nil, fmt.Errorf("chat: invite preview members: %w", err)
+		}
+		if resp.MemberIds, err = pgx.CollectRows(rows, pgx.RowTo[int64]); err != nil {
+			return nil, fmt.Errorf("chat: invite preview members: %w", err)
+		}
+		ents := newEntitySet()
+		ents.addUsers(me, resp.MemberIds...)
+		rendered, err := ents.render(ctx, s.pool, s.cfg.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		resp.Users = rendered.users[me]
 	}
 	return resp, nil
 }
@@ -259,7 +294,8 @@ func (s *Service) JoinByInvite(ctx context.Context, me int64, link string) (*app
 		if err != nil {
 			return fmt.Errorf("chat: load chat: %w", err)
 		}
-		if m, err := isMember(ctx, t.tx, chatID, me); err != nil || m != nil {
+		// The usage update below decides whether the link itself is usable.
+		if m, err := s.joinCheck(ctx, t.tx, c, inv, me, true); err != nil || m != nil {
 			return err
 		}
 		tag, err := t.tx.Exec(ctx, `

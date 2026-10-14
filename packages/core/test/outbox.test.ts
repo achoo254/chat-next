@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@connectrpc/connect";
 import { ChatType } from "@app/proto-ts/chats";
+import { parseOperation } from "../src/outbox/outbox.ts";
 import type { RemoteApi } from "../src/protocol/api.ts";
 import { FakeServer } from "./support/fake-server.ts";
 import { dbName, settle, startTestApp } from "./support/harness.ts";
@@ -211,6 +212,41 @@ describe("outbox idempotency", () => {
 		expect(await core.sendText(chat, "một", { randomId: 777 })).toBeNull();
 		await settle(core);
 		expect(server.expectedMessages(chat, self).map((m) => m.text)).toEqual(["một"]);
+		await core.close();
+	});
+});
+
+describe("outbox link previews", () => {
+	it("passes no_link_preview through, also for rows queued before it existed", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const a = server.addUser("An");
+		const chat = server.createChat(ChatType.GROUP, "G", [self, a]);
+		const seen: { text: string; noLinkPreview: boolean }[] = [];
+		const api = server.apiFor(self);
+		const sql = new MemorySqlFactory();
+		const { core } = await startTestApp(server, self, sql, {
+			api: {
+				...api,
+				messages: {
+					...api.messages,
+					sendMessage: (request) => {
+						seen.push({ text: request.text ?? "", noLinkPreview: request.noLinkPreview ?? false });
+						return api.messages.sendMessage(request);
+					},
+				},
+			},
+		});
+		await settle(core);
+		await core.sendText(chat, "https://example.com without preview", { noLinkPreview: true });
+		await core.sendText(chat, "https://example.com with preview");
+		await settle(core);
+		expect(seen).toEqual([
+			{ text: "https://example.com without preview", noLinkPreview: true },
+			{ text: "https://example.com with preview", noLinkPreview: false },
+		]);
+		const old = parseOperation("send", JSON.stringify({ text: "x", entities: [], replyToSeq: 0, date: 1 }));
+		expect(old).toEqual({ kind: "send", text: "x", entities: [], replyToSeq: 0, date: 1, noLinkPreview: false });
 		await core.close();
 	});
 });

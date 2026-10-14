@@ -7,7 +7,7 @@ import { databaseName, type SessionEndReason } from "../auth/web.ts";
 import { EventBus, EventKeys } from "../events/bus.ts";
 import { assertSafeId } from "../ids/index.ts";
 import type { Chat, Message, MessageEntity, User } from "../model/types.ts";
-import { Outbox, type PendingMessage } from "../outbox/outbox.ts";
+import { Outbox, type PendingMessage, type SendTextOptions } from "../outbox/outbox.ts";
 import { classifyFailure, SessionEndedError, type FailureKind, type RemoteApi } from "../protocol/api.ts";
 import { toUser } from "../protocol/map.ts";
 import { migrate } from "../repo/migrations.ts";
@@ -79,7 +79,7 @@ export interface ChatCore {
 	sendText(
 		chatId: number,
 		text: string,
-		options?: { entities?: readonly MessageEntity[]; replyToSeq?: number; randomId?: number },
+		options?: SendTextOptions,
 	): Promise<PendingMessage | null>;
 	editText(chatId: number, seq: number, text: string, entities?: readonly MessageEntity[]): Promise<void>;
 	deleteMessages(chatId: number, seqs: readonly number[], forEveryone: boolean): Promise<void>;

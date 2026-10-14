@@ -258,6 +258,7 @@ var (
 	limitSend    = ratelimit.Rule{Rate: 5, Burst: 30}
 	limitWrite   = ratelimit.Rule{Rate: 5, Burst: 30}
 	limitCreate  = ratelimit.Rule{Rate: 1.0 / 6, Burst: 10}
+	limitTopic   = ratelimit.Rule{Rate: 1.0 / 6, Burst: 10}
 	limitJoin    = ratelimit.Rule{Rate: 1.0 / 5, Burst: 10}
 	limitReport  = ratelimit.Rule{Rate: 1.0 / 360, Burst: 10}
 	limitPreview = ratelimit.Rule{Rate: 1, Burst: 20}

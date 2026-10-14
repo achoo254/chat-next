@@ -89,7 +89,7 @@ func (s *Service) GetDifference(ctx context.Context, me int64, req *appv1.GetDif
 		e.update.Pts, e.update.PtsCount, e.update.ServerEpoch, e.update.Date = e.pos, 1, state.GetServerEpoch(), e.at.Unix()
 		list[i] = e.update
 	}
-	diff, err := s.differenceBody(ctx, me, list)
+	diff, err := s.differenceBody(ctx, me, list, false)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +132,16 @@ func readLog(ctx context.Context, q querier, sql string, args ...any) ([]logEntr
 }
 
 // differenceBody renders log updates for me with the users and chats they
-// reference.
-func (s *Service) differenceBody(ctx context.Context, me int64, updates []*appv1.Update) (*appv1.DifferenceUpdates, error) {
-	frames, err := s.renderFrames(ctx, s.pool, []int64{me}, map[int64][]*appv1.Update{me: updates})
+// reference; chatLog as in renderFrames.
+func (s *Service) differenceBody(ctx context.Context, me int64, updates []*appv1.Update, chatLog bool) (*appv1.DifferenceUpdates, error) {
+	frames, err := s.renderFrames(ctx, s.pool, []int64{me}, map[int64][]*appv1.Update{me: updates}, chatLog)
 	if err != nil {
 		return nil, err
 	}
-	f := frames[me]
+	f, ok := frames[me]
+	if !ok {
+		return nil, errDenied("you are not a member of this chat")
+	}
 	return &appv1.DifferenceUpdates{Updates: f.GetUpdates(), Users: f.GetUsers(), Chats: f.GetChats()}, nil
 }
 
@@ -212,7 +215,7 @@ func (s *Service) GetChatDifference(ctx context.Context, me int64, req *appv1.Ge
 		e.update.ChatPts, e.update.ChatPtsCount, e.update.ChatId, e.update.ServerEpoch, e.update.Date = e.pos, 1, c.ID, epoch, e.at.Unix()
 		list[i] = e.update
 	}
-	diff, err := s.differenceBody(ctx, me, list)
+	diff, err := s.differenceBody(ctx, me, list, true)
 	if err != nil {
 		return nil, err
 	}

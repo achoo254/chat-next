@@ -14,8 +14,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Privacy audiences as stored (app.v1.PrivacyAudience). "Contacts" means
-// people who share a chat with the user: the app has no address book.
+// Privacy audiences as stored (app.v1.PrivacyAudience). "Contacts" of a
+// user means the users in that user's own contact list (table contacts):
+// sharing a chat does not count.
 const (
 	audEveryone = int16(appv1.PrivacyAudience_PRIVACY_AUDIENCE_EVERYONE)
 	audContacts = int16(appv1.PrivacyAudience_PRIVACY_AUDIENCE_CONTACTS)
@@ -27,6 +28,9 @@ const (
 	searchMax        = 50
 	reportCommentMax = 1000
 	onlineFor        = 5 * time.Minute
+	contactsMax      = 10000
+	contactsPageDef  = 100
+	contactsPageMax  = 500
 )
 
 type privacyRow struct {
@@ -75,21 +79,47 @@ func loadPrivacy(ctx context.Context, q querier, users []int64) (map[int64]priva
 	return out, rows.Err()
 }
 
-// contactsOf returns which of others share at least one chat with me.
-func contactsOf(ctx context.Context, q querier, me int64, others []int64) (map[int64]bool, error) {
+// listedBy returns which of owners have viewer in their contact list: for
+// each owner, whether viewer is in the owner's audience CONTACTS.
+func listedBy(ctx context.Context, q querier, viewer int64, owners []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if len(owners) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT owner_id FROM contacts WHERE contact_id = $1 AND owner_id = ANY($2)`, viewer, owners)
+	if err != nil {
+		return nil, fmt.Errorf("chat: contacts: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: contacts: %w", err)
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// relatedTo returns which of others me may look up by id: users who share
+// a chat me is a current member of (in any membership state, so authors of
+// past messages stay resolvable), users in me's contacts and users who have
+// me in theirs.
+func relatedTo(ctx context.Context, q querier, me int64, others []int64) (map[int64]bool, error) {
 	out := map[int64]bool{}
 	if len(others) == 0 {
 		return out, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT DISTINCT y.user_id FROM chat_members x JOIN chat_members y ON y.chat_id = x.chat_id
-		WHERE x.user_id = $1 AND x.left_at IS NULL AND y.user_id = ANY($2) AND y.left_at IS NULL`, me, others)
+		SELECT y.user_id FROM chat_members x JOIN chat_members y ON y.chat_id = x.chat_id AND y.user_id = ANY($2)
+		WHERE x.user_id = $1 AND x.left_at IS NULL
+		UNION SELECT contact_id FROM contacts WHERE owner_id = $1 AND contact_id = ANY($2)
+		UNION SELECT owner_id FROM contacts WHERE contact_id = $1 AND owner_id = ANY($2)`, me, others)
 	if err != nil {
-		return nil, fmt.Errorf("chat: shared chats: %w", err)
+		return nil, fmt.Errorf("chat: related users: %w", err)
 	}
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
 	if err != nil {
-		return nil, fmt.Errorf("chat: shared chats: %w", err)
+		return nil, fmt.Errorf("chat: related users: %w", err)
 	}
 	for _, id := range ids {
 		out[id] = true
@@ -122,7 +152,7 @@ func (s *Service) checkCanMessage(ctx context.Context, q querier, me, peer int64
 	if err != nil {
 		return err
 	}
-	contacts, err := contactsOf(ctx, q, me, []int64{peer})
+	contacts, err := listedBy(ctx, q, me, []int64{peer})
 	if err != nil {
 		return err
 	}
@@ -151,7 +181,7 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 	if err != nil {
 		return nil, nil, err
 	}
-	contacts, err := contactsOf(ctx, q, me, ids)
+	contacts, err := listedBy(ctx, q, me, ids)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -165,8 +195,12 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 	return allowed, failed, nil
 }
 
-// statusOf renders a user's presence for viewer after privacy rules.
-func statusOf(u *userRow, viewer int64, p privacyRow, contact, online bool, now time.Time) *appv1.UserStatus {
+// statusOf renders a user's presence for viewer after privacy rules; a
+// user who blocked the viewer shows nothing.
+func statusOf(u *userRow, viewer int64, p privacyRow, contact, blockedViewer, online bool, now time.Time) *appv1.UserStatus {
+	if blockedViewer && u.ID != viewer {
+		return &appv1.UserStatus{}
+	}
 	exact := u.ID == viewer || allowedBy(p.LastSeen, contact)
 	if online && exact {
 		return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_ONLINE, Expires: now.Add(onlineFor).Unix()}
@@ -205,11 +239,15 @@ func (s *Service) usersWithStatus(ctx context.Context, me int64, ids []int64) ([
 	if err != nil {
 		return nil, err
 	}
+	blockedMe, err := loadBlocks(ctx, s.pool, ids, []int64{me})
+	if err != nil {
+		return nil, err
+	}
 	privacy, err := loadPrivacy(ctx, s.pool, ids)
 	if err != nil {
 		return nil, err
 	}
-	contacts, err := contactsOf(ctx, s.pool, me, ids)
+	contacts, err := listedBy(ctx, s.pool, me, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +260,8 @@ func (s *Service) usersWithStatus(ctx context.Context, me int64, ids []int64) ([
 			continue
 		}
 		r := u.render(me, blocks[blockKey{me, id}])
-		r.Status = statusOf(u, me, privacy[id], contacts[id], presence != nil && presence.Online(id), now)
+		r.Status = statusOf(u, me, privacy[id], contacts[id], blockedMe[blockKey{id, me}],
+			presence != nil && presence.Online(id), now)
 		out = append(out, r)
 	}
 	return out, nil
@@ -243,11 +282,15 @@ func (s *Service) UserStatus(ctx context.Context, viewer, userID int64, online b
 	if err != nil {
 		return nil, err
 	}
-	contacts, err := contactsOf(ctx, s.pool, viewer, []int64{userID})
+	contacts, err := listedBy(ctx, s.pool, viewer, []int64{userID})
 	if err != nil {
 		return nil, err
 	}
-	return statusOf(u, viewer, privacy[userID], contacts[userID], online, time.Now()), nil
+	blocks, err := loadBlocks(ctx, s.pool, []int64{userID}, []int64{viewer})
+	if err != nil {
+		return nil, err
+	}
+	return statusOf(u, viewer, privacy[userID], contacts[userID], blocks[blockKey{userID, viewer}], online, time.Now()), nil
 }
 
 // SetLastSeen records when a user was last online.
@@ -258,28 +301,71 @@ func (s *Service) SetLastSeen(ctx context.Context, userID int64, at time.Time) e
 	return nil
 }
 
-// GetUsers returns users of the tenant; unknown ids are omitted.
+// GetUsers returns the users me is related to (relatedTo) and me; other
+// ids are omitted like unknown ones, so ids cannot be used to enumerate
+// the tenant's users.
 func (s *Service) GetUsers(ctx context.Context, me int64, ids []int64) ([]*appv1.User, error) {
 	ids = uniqueSorted(ids)
 	if len(ids) > getUsersMax {
 		return nil, errInvalid("at most %d users", getUsersMax)
 	}
+	related, err := relatedTo(ctx, s.pool, me, ids)
+	if err != nil {
+		return nil, err
+	}
+	ids = slices.DeleteFunc(ids, func(id int64) bool { return id != me && !related[id] })
 	return s.usersWithStatus(ctx, me, ids)
 }
 
-// ResolveUsername finds a user by exact username.
+// findable looks a user up by exact username or email and applies the
+// user's find_by_username or find_by_email audience to me: NotFound when
+// there is no such user or they do not allow it, so the answer never tells
+// the two apart.
+func (s *Service) findable(ctx context.Context, me int64, username, email string) (int64, error) {
+	var id int64
+	var audience int16
+	var err error
+	if email != "" {
+		err = s.pool.QueryRow(ctx, `
+			SELECT u.id, coalesce(p.find_by_email, $3) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
+			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2)`, s.cfg.TenantID, email, audNobody).Scan(&id, &audience)
+	} else {
+		err = s.pool.QueryRow(ctx, `
+			SELECT u.id, coalesce(p.find_by_username, $3) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
+			WHERE u.tenant_id = $1 AND u.username = $2`, s.cfg.TenantID, username, audEveryone).Scan(&id, &audience)
+	}
+	if isNoRows(err) {
+		return 0, errNotFound("user")
+	}
+	if err != nil {
+		return 0, fmt.Errorf("chat: find user: %w", err)
+	}
+	if id == me {
+		return id, nil
+	}
+	contacts, err := listedBy(ctx, s.pool, me, []int64{id})
+	if err != nil {
+		return 0, err
+	}
+	if !allowedBy(audience, contacts[id]) {
+		return 0, errNotFound("user")
+	}
+	return id, nil
+}
+
+// ResolveUsername finds a user by exact username when their
+// find_by_username allows me.
 func (s *Service) ResolveUsername(ctx context.Context, me int64, username string) (*appv1.User, error) {
 	name := profile.NormalizeUsername(username)
 	if !profile.ValidUsername(name) {
 		return nil, errInvalid("invalid username")
 	}
-	var id int64
-	err := s.pool.QueryRow(ctx, `SELECT id FROM users WHERE tenant_id = $1 AND username = $2`, s.cfg.TenantID, name).Scan(&id)
-	if isNoRows(err) {
-		return nil, errNotFound("user")
+	if err := s.allow(limitSearch, "search", me); err != nil {
+		return nil, err
 	}
+	id, err := s.findable(ctx, me, name, "")
 	if err != nil {
-		return nil, fmt.Errorf("chat: resolve username: %w", err)
+		return nil, err
 	}
 	users, err := s.usersWithStatus(ctx, me, []int64{id})
 	if err != nil {
@@ -338,7 +424,7 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	for i, h := range hits {
 		ids[i] = h.id
 	}
-	contacts, err := contactsOf(ctx, s.pool, me, ids)
+	contacts, err := listedBy(ctx, s.pool, me, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +435,131 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 		}
 	}
 	return s.usersWithStatus(ctx, me, found)
+}
+
+// ------------------------------------------------------------- contacts
+
+// AddContact puts a user into my contact list: by id (a user I can already
+// see, GetUsers rules), or by exact username or email when the user's
+// find_by_username or find_by_email allows me. NotFound otherwise, the same
+// as for an unknown user.
+func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContactRequest) (*appv1.User, error) {
+	var id int64
+	switch target := req.GetTarget().(type) {
+	case *appv1.AddContactRequest_UserId:
+		if target.UserId <= 0 {
+			return nil, errInvalid("user_id is required")
+		}
+		related, err := relatedTo(ctx, s.pool, me, []int64{target.UserId})
+		if err != nil {
+			return nil, err
+		}
+		if target.UserId != me && !related[target.UserId] {
+			return nil, errNotFound("user")
+		}
+		id = target.UserId
+	case *appv1.AddContactRequest_Username:
+		name := profile.NormalizeUsername(strings.TrimPrefix(strings.TrimSpace(target.Username), "@"))
+		if !profile.ValidUsername(name) {
+			return nil, errInvalid("invalid username")
+		}
+		if err := s.allow(limitSearch, "search", me); err != nil {
+			return nil, err
+		}
+		var err error
+		if id, err = s.findable(ctx, me, name, ""); err != nil {
+			return nil, err
+		}
+	case *appv1.AddContactRequest_Email:
+		email := strings.TrimSpace(target.Email)
+		if email == "" || len(email) > 320 || !strings.Contains(email, "@") {
+			return nil, errInvalid("invalid email")
+		}
+		if err := s.allow(limitSearch, "search", me); err != nil {
+			return nil, err
+		}
+		var err error
+		if id, err = s.findable(ctx, me, "", email); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errInvalid("a user_id, username or email is required")
+	}
+	if id == me {
+		return nil, errInvalid("you cannot add yourself")
+	}
+	if err := s.allow(limitWrite, "write", me); err != nil {
+		return nil, err
+	}
+	var count int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM contacts WHERE owner_id = $1`, me).Scan(&count); err != nil {
+		return nil, fmt.Errorf("chat: count contacts: %w", err)
+	}
+	if count >= contactsMax {
+		return nil, errPrecondition("a contact list holds at most %d users", contactsMax)
+	}
+	if _, err := s.pool.Exec(ctx, `
+		INSERT INTO contacts (tenant_id, owner_id, contact_id)
+		SELECT $1, $2, id FROM users WHERE id = $3 AND tenant_id = $1
+		ON CONFLICT DO NOTHING`, s.cfg.TenantID, me, id); err != nil {
+		return nil, fmt.Errorf("chat: add contact: %w", err)
+	}
+	users, err := s.usersWithStatus(ctx, me, []int64{id})
+	if err != nil {
+		return nil, err
+	}
+	if len(users) == 0 {
+		return nil, errNotFound("user")
+	}
+	return users[0], nil
+}
+
+// DeleteContact removes a user from my contact list (no error when absent).
+func (s *Service) DeleteContact(ctx context.Context, me, userID int64) error {
+	if userID <= 0 {
+		return errInvalid("user_id is required")
+	}
+	if err := s.allow(limitWrite, "write", me); err != nil {
+		return err
+	}
+	if _, err := s.pool.Exec(ctx, `DELETE FROM contacts WHERE owner_id = $1 AND contact_id = $2`, me, userID); err != nil {
+		return fmt.Errorf("chat: delete contact: %w", err)
+	}
+	return nil
+}
+
+// GetContacts pages through my contact list by user id. The cursor is the
+// last user id returned.
+func (s *Service) GetContacts(ctx context.Context, me int64, cursor string, limit int32) (*appv1.GetContactsResponse, error) {
+	if limit <= 0 {
+		limit = contactsPageDef
+	}
+	limit = min(limit, contactsPageMax)
+	after := int64(0)
+	if cursor != "" {
+		if _, err := fmt.Sscan(cursor, &after); err != nil || after < 0 {
+			return nil, errInvalid("invalid cursor")
+		}
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT c.contact_id FROM contacts c JOIN users u ON u.id = c.contact_id AND u.tenant_id = $2
+		WHERE c.owner_id = $1 AND c.contact_id > $3 ORDER BY c.contact_id LIMIT $4`, me, s.cfg.TenantID, after, limit+1)
+	if err != nil {
+		return nil, fmt.Errorf("chat: list contacts: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: list contacts: %w", err)
+	}
+	resp := &appv1.GetContactsResponse{}
+	if len(ids) > int(limit) {
+		ids = ids[:limit]
+		resp.NextCursor = fmt.Sprint(ids[len(ids)-1])
+	}
+	if resp.Users, err = s.usersWithStatus(ctx, me, ids); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // Block blocks a user of the tenant.

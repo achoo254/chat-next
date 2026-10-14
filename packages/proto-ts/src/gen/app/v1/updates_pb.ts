@@ -361,7 +361,8 @@ export type UpdateRead = Message<"app.v1.UpdateRead"> & {
   outbox: boolean;
 
   /**
-   * Inbox only: unread messages left after this read, over the whole chat.
+   * Inbox only: unread messages left after this read, over the whole chat,
+   * counted up to 1000.
    *
    * @generated from field: int32 unread_count = 4;
    */
@@ -383,7 +384,8 @@ export type UpdateRead = Message<"app.v1.UpdateRead"> & {
   chatPts: bigint;
 
   /**
-   * Inbox only, topic_id != 0: unread messages left in that topic.
+   * Inbox only, topic_id != 0: unread messages left in that topic, counted
+   * up to 1000.
    *
    * @generated from field: int32 topic_unread_count = 7;
    */

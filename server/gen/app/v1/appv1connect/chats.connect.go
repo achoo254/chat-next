@@ -55,6 +55,12 @@ const (
 	ChatsServiceRemoveMemberProcedure = "/app.v1.ChatsService/RemoveMember"
 	// ChatsServiceLeaveChatProcedure is the fully-qualified name of the ChatsService's LeaveChat RPC.
 	ChatsServiceLeaveChatProcedure = "/app.v1.ChatsService/LeaveChat"
+	// ChatsServiceUnbanMemberProcedure is the fully-qualified name of the ChatsService's UnbanMember
+	// RPC.
+	ChatsServiceUnbanMemberProcedure = "/app.v1.ChatsService/UnbanMember"
+	// ChatsServiceGetBannedMembersProcedure is the fully-qualified name of the ChatsService's
+	// GetBannedMembers RPC.
+	ChatsServiceGetBannedMembersProcedure = "/app.v1.ChatsService/GetBannedMembers"
 	// ChatsServiceSetMemberPermissionsProcedure is the fully-qualified name of the ChatsService's
 	// SetMemberPermissions RPC.
 	ChatsServiceSetMemberPermissionsProcedure = "/app.v1.ChatsService/SetMemberPermissions"
@@ -109,16 +115,33 @@ type ChatsServiceClient interface {
 	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.CreateChannelResponse], error)
 	GetDialogs(context.Context, *connect.Request[v1.GetDialogsRequest]) (*connect.Response[v1.GetDialogsResponse], error)
 	GetChat(context.Context, *connect.Request[v1.GetChatRequest]) (*connect.Response[v1.GetChatResponse], error)
+	// Channels: admins only.
 	GetMembers(context.Context, *connect.Request[v1.GetMembersRequest]) (*connect.Response[v1.GetMembersResponse], error)
+	// Banned users (see RemoveMember) come back in failed_user_ids unless the
+	// caller is an admin; an admin adding them lifts the ban.
 	AddMembers(context.Context, *connect.Request[v1.AddMembersRequest]) (*connect.Response[v1.AddMembersResponse], error)
+	// Removes a member, by default also banning them (ban unset or true): a
+	// banned user cannot rejoin through any invite link, nor be added back by
+	// a non-admin, until an admin unbans them, and the invite links they
+	// created in the chat are revoked. ban = false only removes.
 	RemoveMember(context.Context, *connect.Request[v1.RemoveMemberRequest]) (*connect.Response[v1.RemoveMemberResponse], error)
+	// The owner leaving hands ownership to the longest-serving admin. When
+	// other members remain but none is an admin, it fails with
+	// failed_precondition (message prefix "owner_needs_admin"); only this
+	// case returns failed_precondition here.
 	LeaveChat(context.Context, *connect.Request[v1.LeaveChatRequest]) (*connect.Response[v1.LeaveChatResponse], error)
+	// Lifts a ban (admins). The user is not added back.
+	UnbanMember(context.Context, *connect.Request[v1.UnbanMemberRequest]) (*connect.Response[v1.UnbanMemberResponse], error)
+	// Users banned from the chat, by user id (admins).
+	GetBannedMembers(context.Context, *connect.Request[v1.GetBannedMembersRequest]) (*connect.Response[v1.GetBannedMembersResponse], error)
 	// Sets one member's permission bitmask.
 	SetMemberPermissions(context.Context, *connect.Request[v1.SetMemberPermissionsRequest]) (*connect.Response[v1.SetMemberPermissionsResponse], error)
 	SetAdmin(context.Context, *connect.Request[v1.SetAdminRequest]) (*connect.Response[v1.SetAdminResponse], error)
 	// Creates an invite link (>= 128 bits of entropy).
 	ExportInviteLink(context.Context, *connect.Request[v1.ExportInviteLinkRequest]) (*connect.Response[v1.ExportInviteLinkResponse], error)
-	// Joins after the user confirmed in the client.
+	// Joins after the user confirmed in the client. A link works only while
+	// its creator is still a member allowed to invite; a banned user gets
+	// permission_denied.
 	JoinByInvite(context.Context, *connect.Request[v1.JoinByInviteRequest]) (*connect.Response[v1.JoinByInviteResponse], error)
 	SetHistoryVisibility(context.Context, *connect.Request[v1.SetHistoryVisibilityRequest]) (*connect.Response[v1.SetHistoryVisibilityResponse], error)
 	UpdateChatInfo(context.Context, *connect.Request[v1.UpdateChatInfoRequest]) (*connect.Response[v1.UpdateChatInfoResponse], error)
@@ -205,6 +228,18 @@ func NewChatsServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+ChatsServiceLeaveChatProcedure,
 			connect.WithSchema(chatsServiceMethods.ByName("LeaveChat")),
+			connect.WithClientOptions(opts...),
+		),
+		unbanMember: connect.NewClient[v1.UnbanMemberRequest, v1.UnbanMemberResponse](
+			httpClient,
+			baseURL+ChatsServiceUnbanMemberProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("UnbanMember")),
+			connect.WithClientOptions(opts...),
+		),
+		getBannedMembers: connect.NewClient[v1.GetBannedMembersRequest, v1.GetBannedMembersResponse](
+			httpClient,
+			baseURL+ChatsServiceGetBannedMembersProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetBannedMembers")),
 			connect.WithClientOptions(opts...),
 		),
 		setMemberPermissions: connect.NewClient[v1.SetMemberPermissionsRequest, v1.SetMemberPermissionsResponse](
@@ -311,6 +346,8 @@ type chatsServiceClient struct {
 	addMembers           *connect.Client[v1.AddMembersRequest, v1.AddMembersResponse]
 	removeMember         *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
 	leaveChat            *connect.Client[v1.LeaveChatRequest, v1.LeaveChatResponse]
+	unbanMember          *connect.Client[v1.UnbanMemberRequest, v1.UnbanMemberResponse]
+	getBannedMembers     *connect.Client[v1.GetBannedMembersRequest, v1.GetBannedMembersResponse]
 	setMemberPermissions *connect.Client[v1.SetMemberPermissionsRequest, v1.SetMemberPermissionsResponse]
 	setAdmin             *connect.Client[v1.SetAdminRequest, v1.SetAdminResponse]
 	exportInviteLink     *connect.Client[v1.ExportInviteLinkRequest, v1.ExportInviteLinkResponse]
@@ -371,6 +408,16 @@ func (c *chatsServiceClient) RemoveMember(ctx context.Context, req *connect.Requ
 // LeaveChat calls app.v1.ChatsService.LeaveChat.
 func (c *chatsServiceClient) LeaveChat(ctx context.Context, req *connect.Request[v1.LeaveChatRequest]) (*connect.Response[v1.LeaveChatResponse], error) {
 	return c.leaveChat.CallUnary(ctx, req)
+}
+
+// UnbanMember calls app.v1.ChatsService.UnbanMember.
+func (c *chatsServiceClient) UnbanMember(ctx context.Context, req *connect.Request[v1.UnbanMemberRequest]) (*connect.Response[v1.UnbanMemberResponse], error) {
+	return c.unbanMember.CallUnary(ctx, req)
+}
+
+// GetBannedMembers calls app.v1.ChatsService.GetBannedMembers.
+func (c *chatsServiceClient) GetBannedMembers(ctx context.Context, req *connect.Request[v1.GetBannedMembersRequest]) (*connect.Response[v1.GetBannedMembersResponse], error) {
+	return c.getBannedMembers.CallUnary(ctx, req)
 }
 
 // SetMemberPermissions calls app.v1.ChatsService.SetMemberPermissions.
@@ -456,16 +503,33 @@ type ChatsServiceHandler interface {
 	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.CreateChannelResponse], error)
 	GetDialogs(context.Context, *connect.Request[v1.GetDialogsRequest]) (*connect.Response[v1.GetDialogsResponse], error)
 	GetChat(context.Context, *connect.Request[v1.GetChatRequest]) (*connect.Response[v1.GetChatResponse], error)
+	// Channels: admins only.
 	GetMembers(context.Context, *connect.Request[v1.GetMembersRequest]) (*connect.Response[v1.GetMembersResponse], error)
+	// Banned users (see RemoveMember) come back in failed_user_ids unless the
+	// caller is an admin; an admin adding them lifts the ban.
 	AddMembers(context.Context, *connect.Request[v1.AddMembersRequest]) (*connect.Response[v1.AddMembersResponse], error)
+	// Removes a member, by default also banning them (ban unset or true): a
+	// banned user cannot rejoin through any invite link, nor be added back by
+	// a non-admin, until an admin unbans them, and the invite links they
+	// created in the chat are revoked. ban = false only removes.
 	RemoveMember(context.Context, *connect.Request[v1.RemoveMemberRequest]) (*connect.Response[v1.RemoveMemberResponse], error)
+	// The owner leaving hands ownership to the longest-serving admin. When
+	// other members remain but none is an admin, it fails with
+	// failed_precondition (message prefix "owner_needs_admin"); only this
+	// case returns failed_precondition here.
 	LeaveChat(context.Context, *connect.Request[v1.LeaveChatRequest]) (*connect.Response[v1.LeaveChatResponse], error)
+	// Lifts a ban (admins). The user is not added back.
+	UnbanMember(context.Context, *connect.Request[v1.UnbanMemberRequest]) (*connect.Response[v1.UnbanMemberResponse], error)
+	// Users banned from the chat, by user id (admins).
+	GetBannedMembers(context.Context, *connect.Request[v1.GetBannedMembersRequest]) (*connect.Response[v1.GetBannedMembersResponse], error)
 	// Sets one member's permission bitmask.
 	SetMemberPermissions(context.Context, *connect.Request[v1.SetMemberPermissionsRequest]) (*connect.Response[v1.SetMemberPermissionsResponse], error)
 	SetAdmin(context.Context, *connect.Request[v1.SetAdminRequest]) (*connect.Response[v1.SetAdminResponse], error)
 	// Creates an invite link (>= 128 bits of entropy).
 	ExportInviteLink(context.Context, *connect.Request[v1.ExportInviteLinkRequest]) (*connect.Response[v1.ExportInviteLinkResponse], error)
-	// Joins after the user confirmed in the client.
+	// Joins after the user confirmed in the client. A link works only while
+	// its creator is still a member allowed to invite; a banned user gets
+	// permission_denied.
 	JoinByInvite(context.Context, *connect.Request[v1.JoinByInviteRequest]) (*connect.Response[v1.JoinByInviteResponse], error)
 	SetHistoryVisibility(context.Context, *connect.Request[v1.SetHistoryVisibilityRequest]) (*connect.Response[v1.SetHistoryVisibilityResponse], error)
 	UpdateChatInfo(context.Context, *connect.Request[v1.UpdateChatInfoRequest]) (*connect.Response[v1.UpdateChatInfoResponse], error)
@@ -548,6 +612,18 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 		ChatsServiceLeaveChatProcedure,
 		svc.LeaveChat,
 		connect.WithSchema(chatsServiceMethods.ByName("LeaveChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceUnbanMemberHandler := connect.NewUnaryHandler(
+		ChatsServiceUnbanMemberProcedure,
+		svc.UnbanMember,
+		connect.WithSchema(chatsServiceMethods.ByName("UnbanMember")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceGetBannedMembersHandler := connect.NewUnaryHandler(
+		ChatsServiceGetBannedMembersProcedure,
+		svc.GetBannedMembers,
+		connect.WithSchema(chatsServiceMethods.ByName("GetBannedMembers")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatsServiceSetMemberPermissionsHandler := connect.NewUnaryHandler(
@@ -660,6 +736,10 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 			chatsServiceRemoveMemberHandler.ServeHTTP(w, r)
 		case ChatsServiceLeaveChatProcedure:
 			chatsServiceLeaveChatHandler.ServeHTTP(w, r)
+		case ChatsServiceUnbanMemberProcedure:
+			chatsServiceUnbanMemberHandler.ServeHTTP(w, r)
+		case ChatsServiceGetBannedMembersProcedure:
+			chatsServiceGetBannedMembersHandler.ServeHTTP(w, r)
 		case ChatsServiceSetMemberPermissionsProcedure:
 			chatsServiceSetMemberPermissionsHandler.ServeHTTP(w, r)
 		case ChatsServiceSetAdminProcedure:
@@ -733,6 +813,14 @@ func (UnimplementedChatsServiceHandler) RemoveMember(context.Context, *connect.R
 
 func (UnimplementedChatsServiceHandler) LeaveChat(context.Context, *connect.Request[v1.LeaveChatRequest]) (*connect.Response[v1.LeaveChatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.LeaveChat is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) UnbanMember(context.Context, *connect.Request[v1.UnbanMemberRequest]) (*connect.Response[v1.UnbanMemberResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.UnbanMember is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetBannedMembers(context.Context, *connect.Request[v1.GetBannedMembersRequest]) (*connect.Response[v1.GetBannedMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetBannedMembers is not implemented"))
 }
 
 func (UnimplementedChatsServiceHandler) SetMemberPermissions(context.Context, *connect.Request[v1.SetMemberPermissionsRequest]) (*connect.Response[v1.SetMemberPermissionsResponse], error) {

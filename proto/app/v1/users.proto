@@ -27,6 +27,12 @@ service UsersService {
   rpc SetPrivacy(SetPrivacyRequest) returns (SetPrivacyResponse);
   // Reports a user, a chat or messages to the tenant's moderation queue.
   rpc Report(ReportRequest) returns (ReportResponse);
+  // Contacts: the caller's own list. A user's privacy audience CONTACTS
+  // means the users in that user's list (being in someone else's list, or
+  // sharing a chat, does not count).
+  rpc AddContact(AddContactRequest) returns (AddContactResponse);
+  rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse);
+  rpc GetContacts(GetContactsRequest) returns (GetContactsResponse);
 }
 
 // Presence as visible to the caller after privacy rules are applied.
@@ -81,7 +87,10 @@ message GetUsersRequest {
 }
 
 message GetUsersResponse {
-  // Unknown or invisible ids are omitted.
+  // Unknown or invisible ids are omitted. Visible: the caller, users who
+  // share a chat the caller is a member of (current or former members of
+  // it), users in the caller's contacts and users who have the caller in
+  // theirs.
   repeated User users = 1;
 }
 
@@ -106,6 +115,8 @@ message SetUsernameResponse {
 }
 
 message ResolveUsernameRequest {
+  // Found only when the user's find_by_username allows the caller;
+  // not_found otherwise.
   string username = 1;
 }
 
@@ -182,6 +193,8 @@ enum ReportReason {
   REPORT_REASON_ILLEGAL = 4;
   REPORT_REASON_PERSONAL_DATA = 5;
   REPORT_REASON_OTHER = 6;
+  REPORT_REASON_SCAM = 7;
+  REPORT_REASON_SEXUAL = 8;
 }
 
 message ReportedMessages {
@@ -201,3 +214,38 @@ message ReportRequest {
 }
 
 message ReportResponse {}
+
+message AddContactRequest {
+  oneof target {
+    // A user the caller can already see (GetUsers rules).
+    int64 user_id = 1 [jstype = JS_NUMBER];
+    // Exact username, with or without the leading @. Found only when the
+    // user's find_by_username allows the caller.
+    string username = 2;
+    // Exact email. Found only when the user's find_by_email allows the
+    // caller.
+    string email = 3;
+  }
+}
+
+message AddContactResponse {
+  User user = 1;
+}
+
+message DeleteContactRequest {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+}
+
+message DeleteContactResponse {}
+
+message GetContactsRequest {
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 1;
+  int32 limit = 2;
+}
+
+message GetContactsResponse {
+  repeated User users = 1;
+  // Empty when there are no more contacts.
+  string next_cursor = 2;
+}
