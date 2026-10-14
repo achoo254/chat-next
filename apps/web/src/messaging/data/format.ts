@@ -18,6 +18,13 @@ export function toneOf(id: number): Tone {
 	return TONES[Math.abs(id) % TONES.length] ?? "violet";
 }
 
+/** Avatar colour of an incoming webhook, from its name: the same in the chat and in its settings. */
+export function integrationTone(label: string): Tone {
+	let hash = 0;
+	for (const char of label) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 1_000_003;
+	return toneOf(hash);
+}
+
 export function chatKind(chat: Chat | null, peer: User | null, forum: boolean): ChatKind {
 	switch (chat?.type) {
 		case "group":

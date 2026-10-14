@@ -27,6 +27,7 @@ import { ModerationAction, ModerationService, ReportStatus, ReportTargetKind } f
 import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
 import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
+import { FakeIntegrations } from "./fake-integrations.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
 import type { ChatSource } from "../../src/messaging/data/source.ts";
@@ -34,7 +35,7 @@ import type { ChatSource } from "../../src/messaging/data/source.ts";
 type MessageInit = Exclude<MessageInitShape<typeof MessageSchema>, { $typeName: string }>;
 type MessageExtras = Pick<
 	MessageInit,
-	"entities" | "replyToSeq" | "forwardFrom" | "editDate" | "editVersion" | "action" | "integrationLabel" | "topicId" | "linkPreview"
+	"entities" | "replyToSeq" | "forwardFrom" | "editDate" | "editVersion" | "action" | "integrationLabel" | "topicId" | "linkPreview" | "replyMarkup"
 >;
 type UserExtras = { isBot?: boolean; username?: string; bio?: string };
 type ChatExtras = {
@@ -84,6 +85,11 @@ export interface FixtureReport {
 	createdAt: number;
 	actions: ModerationAction[];
 	note: string;
+}
+
+/** Webhook messages come from user 0, which the real server never lists. */
+function withoutUserZero(users: WireUser[]): WireUser[] {
+	return users.filter((user) => user.id !== 0n);
 }
 
 /** A method FakeServer always offers (optional in RemoteApi only for older doubles). */
@@ -178,11 +184,28 @@ export class ChatFixture {
 	readonly restrictions = new Map<number, number>();
 	readonly lifted: number[] = [];
 	private pinnedChats: number[] = [];
+	/** Incoming webhooks of the fixture's chats (IntegrationsService). */
+	readonly integrations: FakeIntegrations;
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
 		this.selfUsername = selfUsername;
 		this.selfId = this.addUser(selfName, { username: selfUsername });
+		// Webhook messages have from_id 0. The real server never lists user 0
+		// with a message; the core's in-memory server looks it up and fails the
+		// whole GetHistory page. Answer user 0 with an empty user here and drop
+		// it from history responses (see api()), as the server would.
+		const wireUser = this.server.wireUser.bind(this.server);
+		this.server.wireUser = (id, viewer) => (id === 0 ? create(UserSchema, { id: 0n }) : wireUser(id, viewer));
+		this.integrations = new FakeIntegrations({
+			selfId: this.selfId,
+			roleOf: (chatId) => (this.members.get(chatId)?.includes(this.selfId) === true ? (this.chatExtras.get(chatId)?.myRole ?? MemberRole.MEMBER) : null),
+			isAdmin: (chatId, userId) => {
+				const role = userId === this.selfId ? this.chatExtras.get(chatId)?.myRole : this.roles.get(`${chatId}:${userId}`);
+				return role === MemberRole.ADMIN || role === MemberRole.OWNER;
+			},
+			wireUsers: (ids) => ids.filter((id) => this.names.has(id)).map((id) => this.wireUser(id)),
+		});
 	}
 
 	addUser(name: string, extras: UserExtras = {}): number {
@@ -210,6 +233,28 @@ export class ChatFixture {
 		const sent = this.server.sendMessage(from, chatId, text).seq;
 		if (sent !== seq) throw new Error(`fixture expected seq ${seq}, server gave ${sent}`);
 		return sent;
+	}
+
+	/** A message of an incoming webhook (from_id 0 under its label), with entities, URL buttons or silent. */
+	postIntegration(
+		chatId: number,
+		label: string,
+		text: string,
+		options: { entities?: MessageExtras["entities"]; silent?: boolean; buttons?: readonly (readonly { text: string; url: string }[])[] } = {},
+	): number {
+		const seq = this.peekSeq(chatId);
+		if (options.entities !== undefined) this.messageExtras.set(`${chatId}:${seq}`, { entities: options.entities });
+		const posted = this.server.postIntegration(chatId, label, text, { silent: options.silent ?? false, buttons: options.buttons ?? [] });
+		if (posted !== seq) throw new Error(`fixture expected seq ${seq}, server gave ${posted}`);
+		return posted;
+	}
+
+	/** The webhook updates its alert in place (same group key); `notify` when its state changed. */
+	editIntegration(chatId: number, seq: number, text: string, notify: boolean, entities?: MessageExtras["entities"]): void {
+		const key = `${chatId}:${seq}`;
+		if (entities === undefined) this.messageExtras.delete(key);
+		else this.messageExtras.set(key, { entities });
+		this.server.editIntegration(chatId, seq, text, notify);
 	}
 
 	private peekSeq(chatId: number): number {
@@ -306,6 +351,7 @@ export class ChatFixture {
 					const result = response.result;
 					if (result.case === "slice" || result.case === "full") {
 						this.patchUpdates(result.value.updates);
+						result.value.users = withoutUserZero(result.value.users);
 						users(result.value.users);
 						chats(result.value.chats);
 					}
@@ -316,6 +362,7 @@ export class ChatFixture {
 					const result = response.result;
 					if (result.case === "slice" || result.case === "full") {
 						this.patchUpdates(result.value.updates);
+						result.value.users = withoutUserZero(result.value.users);
 						users(result.value.users);
 						chats(result.value.chats);
 					}
@@ -358,6 +405,7 @@ export class ChatFixture {
 				getHistory: async (request) => {
 					const response = await base.messages.getHistory(request);
 					response.messages.forEach((m) => this.patchMessage(m));
+					response.users = withoutUserZero(response.users);
 					users(response.users);
 					return response;
 				},
@@ -365,6 +413,7 @@ export class ChatFixture {
 					this.pinnedRequests.push({ chatId: num(request.chatId ?? 0n), topicId: num(request.topicId ?? 0n) });
 					const response = await offered(base.messages.getPinnedMessages, "getPinnedMessages")(request);
 					response.messages.forEach((m) => this.patchMessage(m));
+					response.users = withoutUserZero(response.users);
 					users(response.users);
 					return response;
 				},
@@ -395,6 +444,7 @@ export class ChatFixture {
 					const frame = fromBinary(ServerFrameSchema, data);
 					if (frame.frame.case === "update") {
 						this.patchUpdates(frame.frame.value.updates);
+						frame.frame.value.users = withoutUserZero(frame.frame.value.users);
 						frame.frame.value.users.forEach((u) => this.patchUser(u));
 						frame.frame.value.chats.forEach((c) => this.patchChat(c));
 						handlers.onMessage(toBinary(ServerFrameSchema, frame));
@@ -452,6 +502,7 @@ export class ChatFixture {
 	routes(router: ConnectRouter): void {
 		this.userRoutes(router);
 		this.chatRoutes(router);
+		this.integrations.routes(router);
 	}
 
 	/** UsersService only: tests of the account screens bring their own. */

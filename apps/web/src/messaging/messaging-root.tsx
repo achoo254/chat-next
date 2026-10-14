@@ -17,6 +17,7 @@ import { Drafts } from "./data/drafts.ts";
 import type { PendingBackend } from "./data/pending-backend.ts";
 import { decideNotification, type NotificationInput } from "./data/notification-filter.ts";
 import { createRemote } from "./data/remote.ts";
+import { createIntegrations } from "./integrations/api.ts";
 import { ServicesContext, Toasts, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen } from "./ui/chat-screen.tsx";
@@ -99,6 +100,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					source: client.source,
 					store,
 					remote,
+					integrations: createIntegrations(transport, () => signedOut()),
 					backend,
 					toasts: new Toasts(),
 					drafts,

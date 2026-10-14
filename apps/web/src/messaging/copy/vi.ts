@@ -122,6 +122,11 @@ export const vi = {
 		media: "Bản app này chưa hiển thị được ảnh, video và file. Nội dung đi kèm ở bên dưới.",
 		mediaPreview: "Ảnh, video hoặc file",
 		integration: (label: string) => `Tích hợp: ${label}`,
+		/** An integration alert edited in place (firing → resolved), instead of "đã sửa". */
+		updated: "đã cập nhật",
+		alertFiring: "Firing",
+		alertResolved: "Resolved",
+		opensExternal: "(mở trang ngoài)",
 		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
 		/** Names of the latest reactors (up to 3), "và n người khác" for the rest. */
 		reactionBy: (emoji: string, names: readonly string[], count: number) =>

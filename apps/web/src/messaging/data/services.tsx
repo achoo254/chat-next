@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Chat, ConnectionState, DialogView, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
+import type { Integrations } from "../integrations/api.ts";
 import type { Drafts } from "./drafts.ts";
 import type { Folder } from "./format.ts";
 import type { PendingBackend, Topic } from "./pending-backend.ts";
@@ -48,6 +49,8 @@ export interface Services {
 	readonly source: ChatSource;
 	readonly store: ChatStore;
 	readonly remote: Remote;
+	/** Incoming webhooks of groups and channels (admins only). */
+	readonly integrations: Integrations;
 	readonly backend: PendingBackend;
 	readonly toasts: Toasts;
 	readonly drafts: Drafts;

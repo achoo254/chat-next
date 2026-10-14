@@ -3,18 +3,22 @@
 // text-only link preview, reactions and the send state of your own messages
 // ("Đã gửi", "Đã xem"). Hovering shows quick actions (Thả cảm xúc · Trả lời ·
 // Chuyển tiếp · …); a double click replies. Right click, a long press or the
-// menu key on a reaction lists who reacted with it.
+// menu key on a reaction lists who reacted with it. Messages of incoming
+// webhooks (mockups/integrations.html#alert-message, #alert-grouping) carry
+// the "Tích hợp: <tên>" label, a Firing/Resolved chip when their first line
+// starts with one, URL buttons, and "đã cập nhật" when edited in place.
 import { memo, type ReactNode } from "react";
-import type { Chat, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
+import type { Chat, MessageButton, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { actionText, clock, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
+import { actionText, clock, integrationTone, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
-import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
+import { splitAlert } from "./alert-text.ts";
+import { isAllowedLink, linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { useIntent, useUi } from "./ui-context.tsx";
 
 interface MessageItemProps {
@@ -81,12 +85,12 @@ function useRichContext(fromId: number): RichContext {
 	};
 }
 
-function Stamp({ date, edited, children }: { date: number; edited: boolean; children?: ReactNode }) {
-	const copy = useCopy();
+/** `edited`: "đã sửa" or "đã cập nhật" before the time; "" for none. */
+function Stamp({ date, edited, children }: { date: number; edited: string; children?: ReactNode }) {
 	const { locale } = useI18n();
 	return (
 		<span className="stamp">
-			{edited ? `${copy.message.edited} ${clock(date, locale)}` : clock(date, locale)}
+			{edited !== "" ? `${edited} ${clock(date, locale)}` : clock(date, locale)}
 			{children}
 		</span>
 	);
@@ -102,7 +106,7 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 	if (target === null) {
 		return <span className="reply">{copy.message.deleted}</span>;
 	}
-	const name = nameOf(target.fromId);
+	const name = target.integrationLabel !== "" ? target.integrationLabel : nameOf(target.fromId);
 	return (
 		<button
 			type="button"
@@ -226,6 +230,44 @@ function QuickActions({ chatId, itemKey, seq, label, canReply }: { chatId: numbe
 	);
 }
 
+/**
+ * URL buttons under a message (webhooks and bots), row by row. Only links
+ * the scheme allowlist accepts are shown; links off the tenant's sites ask
+ * before opening, like links in the text.
+ */
+function MessageButtons({ rows, ctx }: { rows: readonly (readonly MessageButton[])[]; ctx: RichContext }) {
+	const copy = useCopy();
+	const links = rows
+		.map((row) => row.flatMap((button) => (button.url !== null && isAllowedLink(button.url) ? [{ text: button.text, url: button.url }] : [])))
+		.filter((row) => row.length > 0);
+	if (links.length === 0) return null;
+	return (
+		<div className="keyboard">
+			{links.map((row, rowIndex) => (
+				<div className="kb-row" key={rowIndex}>
+					{row.map((button, index) => (
+						<a
+							key={index}
+							href={button.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							onClick={(event) => {
+								if (button.url.startsWith("mailto:")) return;
+								event.preventDefault();
+								ctx.openLink(button.url, button.text);
+							}}
+						>
+							<span>{button.text}</span>
+							<Icon name="external" small />
+							<span className="sr-only">{copy.message.opensExternal}</span>
+						</a>
+					))}
+				</div>
+			))}
+		</div>
+	);
+}
+
 function LinkPreviewCard({ preview, ctx }: { preview: LinkPreview; ctx: RichContext }) {
 	return (
 		<a
@@ -263,14 +305,16 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const ctx = useRichContext(message.fromId);
 	const intent = useIntent(chatId);
 	const preview = backend.features.has("linkPreview") ? backend.linkPreview(message) : null;
-	// With a preview card or reactions the time goes on its own line at the end (mock #rich-messages).
-	const trailingStamp = !message.recalled && (preview !== null || message.reactions.length > 0);
+	const integration = message.integrationLabel !== "";
+	const alert = integration ? splitAlert(message.text, message.entities) : null;
+	// With a preview card, buttons or reactions the time goes on its own line at the end (mock #rich-messages).
+	const trailingStamp = !message.recalled && (preview !== null || message.reactions.length > 0 || message.buttons.length > 0);
 	const trigger = useMenuTrigger(chatId, itemKey);
 	const mine = message.fromId === store.selfId;
 	const channel = chat?.type === "channel";
 	const group = chat?.type === "group";
 	const sender = useUser(mine || channel ? 0 : message.fromId);
-	const senderName = channel ? (chat?.title ?? "") : (sender?.name ?? copy.message.unknownUser);
+	const senderName = integration ? message.integrationLabel : channel ? (chat?.title ?? "") : (sender?.name ?? copy.message.unknownUser);
 	const tone = toneOf(message.fromId);
 	const atMe = !mine && mentionsSelf(message.text, message.entities, self.id, self.username);
 	const recalled = message.recalled;
@@ -282,8 +326,10 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
 	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : ""].filter(Boolean).join(" ");
+	const edited = message.editDate !== 0 && !recalled;
+	// Alerts edited in place by their webhook read "đã cập nhật", not "đã sửa".
 	const stamp = (
-		<Stamp date={message.editDate !== 0 && !recalled ? message.editDate : message.date} edited={message.editDate !== 0 && !recalled}>
+		<Stamp date={edited ? message.editDate : message.date} edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}>
 			{mine && !channel && !recalled && (
 				<LabelledIcon
 					name={read ? "checks" : "check"}
@@ -311,7 +357,12 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 						}
 			}
 		>
-			{group && !mine && (
+			{group && integration && (
+				<span className={`avatar sm av-${integrationTone(message.integrationLabel)}`} aria-hidden="true">
+					<Icon name="webhook" small />
+				</span>
+			)}
+			{group && !mine && !integration && (
 				<button
 					type="button"
 					className="avatar-btn"
@@ -342,18 +393,36 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 					</div>
 				</div>
 			) : (
-				<div className={message.integrationLabel !== "" ? "bubble integration" : "bubble"}>
-					{message.integrationLabel !== "" && (
+				<div className={integration ? `bubble integration${alert === null ? "" : ` ${alert.status}`}` : "bubble"}>
+					{integration && (
 						<span className="int-label">
 							<Icon name="webhook" />
 							{copy.message.integration(message.integrationLabel)}
 						</span>
 					)}
-					{showSender && message.integrationLabel === "" && <span className={`who s-${tone}`}>{senderName}</span>}
+					{showSender && !integration && <span className={`who s-${tone}`}>{senderName}</span>}
 					<ForwardLine message={message} />
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
 					{message.mediaKind !== null && <p className="via">{copy.message.media}</p>}
-					<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
+					{alert === null ? (
+						<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
+					) : (
+						<>
+							<div className="int-title">
+								<span className={`sev ${alert.status}`}>{alert.status === "firing" ? copy.message.alertFiring : copy.message.alertResolved}</span>
+								<RichText
+									text={alert.title.text}
+									entities={alert.title.entities}
+									ctx={ctx}
+									tail={trailingStamp || alert.body.text !== "" ? undefined : stamp}
+								/>
+							</div>
+							{alert.body.text !== "" && (
+								<RichText text={alert.body.text} entities={alert.body.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
+							)}
+						</>
+					)}
+					<MessageButtons rows={message.buttons} ctx={ctx} />
 					{preview !== null && <LinkPreviewCard preview={preview} ctx={ctx} />}
 					<Reactions message={message} />
 					{trailingStamp && <p>{stamp}</p>}
@@ -392,7 +461,7 @@ export function PendingBubble({ chatId, itemKey, pending, chat, tabbable, inert 
 	const icon = failed ? "alert" : "clock";
 	const label = failed ? copy.message.failed : waiting ? copy.message.queued : copy.message.sending;
 	const stamp = (
-		<Stamp date={pending.date} edited={false}>
+		<Stamp date={pending.date} edited="">
 			<LabelledIcon name={icon} label={label} className={failed ? "fail" : undefined} />
 		</Stamp>
 	);

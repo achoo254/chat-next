@@ -379,6 +379,11 @@ function GroupInfo({ chat }: { chat: Chat }) {
 						<span className="grow">{copy.info.manage(channel)}</span>
 						<Icon name="chevron-right" small />
 					</Link>
+					<Link to={paths.hooks(chat.id)} className="row link-row">
+						<Icon name="webhook" />
+						<span className="grow">{copy.info.hooks}</span>
+						<Icon name="chevron-right" small />
+					</Link>
 				</div>
 			)}
 			<div className="info-sec">

@@ -123,6 +123,10 @@ export const en: MessagingCopy = {
 		media: "This version of the app cannot show photos, videos and files. Any text that came with it is below.",
 		mediaPreview: "Photo, video or file",
 		integration: (label: string) => `Integration: ${label}`,
+		updated: "updated",
+		alertFiring: "Firing",
+		alertResolved: "Resolved",
+		opensExternal: "(opens another site)",
 		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
 		reactionBy: (emoji: string, names: readonly string[], count: number) =>
 			`${emoji} ${names.join(", ")}${count > names.length ? ` and ${count - names.length} more` : ""}`,

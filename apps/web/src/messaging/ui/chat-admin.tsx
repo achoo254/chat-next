@@ -2,7 +2,8 @@
 // permissions (a bitmask), history for new members, the leader and deputies
 // (channels: owner and admins), the member and banned lists, invite links,
 // leaving and, for the owner, deleting the chat. Channels name their people
-// subscribers and skip the member permissions and history cards.
+// subscribers and skip the member permissions and history cards. "Tích hợp"
+// leads to the incoming webhooks (mockups/integrations.html#hooks-list).
 import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
@@ -364,6 +365,47 @@ function LinksCard({ chat }: { chat: Chat }) {
 	);
 }
 
+/** "Tích hợp": the webhooks page, with how many run and their names (chat.html#chat-admin). */
+function IntegrationsCard({ chat }: { chat: Chat }) {
+	const copy = useScreensCopy();
+	const { integrations } = useServices();
+	const [summary, setSummary] = useState<{ total: number; running: readonly string[] } | null>(null);
+	const id = useDomId("integrations");
+	useEffect(() => {
+		let active = true;
+		integrations.hooks(chat.id).then(
+			({ hooks }) => {
+				if (active) setSummary({ total: hooks.length, running: hooks.filter((hook) => hook.state === "active").map((hook) => hook.name) });
+			},
+			() => undefined,
+		);
+		return () => {
+			active = false;
+		};
+	}, [integrations, chat.id]);
+	const sub =
+		summary === null
+			? ""
+			: summary.total === 0
+				? copy.admin.hooksNone
+				: summary.running.length === 0
+					? copy.admin.hooksStopped(summary.total)
+					: copy.admin.hooksRunning(summary.running.length, summary.running.slice(0, 3).join(", "));
+	return (
+		<section className="card" aria-labelledby={id}>
+			<h3 id={id}>{copy.admin.integrations}</h3>
+			<div className="row">
+				<Icon name="webhook" />
+				<Link to={paths.hooks(chat.id)} className="grow row-link">
+					{copy.admin.hooksRow}
+					{sub !== "" && <small>{sub}</small>}
+				</Link>
+				<Icon name="chevron-right" small />
+			</div>
+		</section>
+	);
+}
+
 /** Leaving (the leave dialog hands ownership over when the owner leaves) and, for the owner, deleting. */
 function LeaveCard({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
@@ -428,6 +470,7 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 					</div>
 					<div className="admin-col">
 						<LinksCard chat={chat} />
+						<IntegrationsCard chat={chat} />
 						{!chat.left && <LeaveCard chat={chat} />}
 					</div>
 				</div>

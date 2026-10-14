@@ -1,0 +1,121 @@
+/* Incoming webhook screens (mockups/integrations.html). Loaded with them
+   only; every rule is scoped to .hooks-page so nothing leaks into the rest
+   of the app once the chunk has loaded. Colours come only from tokens. */
+
+.hooks-page .hooks-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); width: 100%; max-width: 1200px; padding: var(--space-4); align-content: start; }
+.hooks-page .hooks-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.hooks-page .hooks-title h2 { flex: 1 1 12ch; min-width: 0; margin: 0; font-size: 1.125rem; font-weight: 600; overflow-wrap: anywhere; }
+.hooks-page .hook-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.hooks-page .hook-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.hooks-page .card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.hooks-page .card > h3 { margin: 0; }
+.hooks-page .card > p { margin: 0; }
+.hooks-page .card.empty { justify-items: center; }
+.hooks-page .card.empty .icon { width: 32px; height: 32px; }
+.hooks-page .card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.hooks-page .card-head h3 { margin: 0; }
+.hooks-page .card-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2); }
+.hooks-page .note.with-icon { display: flex; gap: var(--space-2); }
+.hooks-page .note.with-icon .icon { flex: none; margin-top: 2px; }
+.hooks-page .banner { align-items: flex-start; border: 1px solid var(--c-border-subtle); }
+.hooks-page .banner .icon { flex: none; margin-top: 2px; }
+.hooks-page .field-error { color: var(--c-error-text); }
+.hooks-page fieldset.field { margin: 0; padding: 0; border: 0; min-width: 0; }
+.hooks-page fieldset.field legend { padding: 0; margin-bottom: var(--space-1); }
+
+/* Status dot: running, rotating its secret, turned off by the server, turned off by an admin. */
+.hooks-page .dot { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; }
+.hooks-page .dot::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.hooks-page .dot.ok::before { background: var(--c-success); }
+.hooks-page .dot.warn::before { background: var(--c-warning); }
+.hooks-page .dot.err::before { background: var(--c-error); }
+.hooks-page .cell-sub { display: block; font-size: 0.8125rem; font-weight: 400; color: var(--c-text-muted); }
+
+/* Hook list: no fixed table width, cells wrap; below 1100px rows become labelled cards (messaging.css). */
+.hooks-page .card.table-card { padding: 0; overflow: hidden; }
+.hooks-page table.hook-table { min-width: 0; }
+.hooks-page .table-card table.hook-table th, .hooks-page .table-card table.hook-table td { padding-left: var(--space-4); padding-right: var(--space-4); }
+.hooks-page .hook-cell { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.hooks-page .hook-cell strong { font-weight: 600; overflow-wrap: anywhere; }
+.hooks-page .fmt { font-family: var(--font-mono); font-size: 0.8125rem; }
+.hooks-page .actions-cell { text-align: right; white-space: nowrap; }
+.hooks-page table.compact td, .hooks-page table.compact th { padding-left: 0; }
+
+/* Form: format cards are native radios, so arrow keys and screen readers work as usual. */
+.hooks-page .hook-form { gap: var(--space-4); }
+.hooks-page .radio-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.hooks-page .radio-card { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: var(--space-3); align-items: start; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); cursor: pointer; }
+.hooks-page .radio-card input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--c-primary-solid); }
+.hooks-page .radio-card:has(input:checked) { border-color: var(--c-primary); background: var(--c-selected); }
+.hooks-page .radio-card:has(input:focus-visible) { box-shadow: var(--shadow-focus-primary); }
+.hooks-page .radio-card > span { display: grid; gap: 2px; min-width: 0; }
+.hooks-page .radio-card b { font-weight: 600; font-size: 0.875rem; }
+.hooks-page .radio-card b + span { font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.hooks-page .setting { display: flex; align-items: center; gap: var(--space-3); }
+.hooks-page .setting > div { flex: 1; min-width: 0; }
+.hooks-page .setting strong { display: block; font-weight: 500; font-size: 0.875rem; }
+.hooks-page .setting small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.hooks-page .hook-preview { display: flex; align-items: flex-end; gap: var(--space-2); min-width: 0; }
+.hooks-page .hook-preview .bubble { min-width: 0; }
+
+/* Facts of a hook. */
+.hooks-page .facts { display: grid; margin: 0; }
+.hooks-page .facts > div { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--c-border-subtle); }
+.hooks-page .facts > div:first-child { border-top: 0; }
+.hooks-page .facts dt { font-size: 0.8125rem; color: var(--c-text-muted); }
+.hooks-page .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* Secret rows with the grace countdown. */
+.hooks-page .secret-rows { display: grid; }
+.hooks-page .secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--c-border-subtle); }
+.hooks-page .secret-row .progress { grid-column: 1 / -1; }
+.hooks-page .countdown { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.hooks-page .progress { height: 6px; border-radius: var(--radius-full); background: var(--c-bar-track); overflow: hidden; }
+.hooks-page .progress > span { display: block; height: 100%; border-radius: inherit; background: var(--c-warning); }
+.hooks-page .take-over { border-color: var(--c-primary); }
+
+/* Counters. */
+.hooks-page .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
+.hooks-page .stat { display: grid; gap: 2px; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); min-width: 0; }
+.hooks-page .stat b { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hooks-page .stat span { font-size: 0.8125rem; color: var(--c-text-muted); }
+.hooks-page .stat.bad b { color: var(--c-error-text); }
+
+/* Dead letters and the log. */
+.hooks-page .dead-list, .hooks-page .audit-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.hooks-page .dead-list li + li, .hooks-page .audit-list li + li { border-top: 1px solid var(--c-border-subtle); }
+.hooks-page .dead-list summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); min-height: 44px; padding: var(--space-2) 0; cursor: pointer; }
+.hooks-page .dead-list summary::-webkit-details-marker { display: none; }
+.hooks-page .dead-list summary .icon { flex: none; color: var(--c-icon-muted); transition: transform var(--dur-fast) var(--ease-standard); }
+.hooks-page .dead-list details[open] summary .icon { transform: rotate(90deg); }
+.hooks-page .dl-reason { flex: 1 1 12ch; min-width: 0; font-weight: 500; }
+.hooks-page .dl-meta { font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.hooks-page .dl-body { display: grid; gap: var(--space-2); padding-bottom: var(--space-3); }
+.hooks-page .dl-body p { margin: 0; overflow-wrap: anywhere; }
+.hooks-page .audit-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-3); padding: var(--space-2) 0; font-size: 0.875rem; }
+.hooks-page .audit-list li > span { flex: 1 1 20ch; min-width: 0; overflow-wrap: anywhere; }
+.hooks-page .audit-list time { flex: none; font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+
+/* URL shown once, code snippets and guides. */
+.hooks-page dialog.modal.wide { width: min(680px, calc(100vw - 2 * var(--space-4))); }
+.hooks-page .secret { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle); }
+.hooks-page .secret-url { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.8125rem; }
+.hooks-page .snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hooks-page .snippet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.875rem; font-weight: 500; }
+.hooks-page .saved-row { display: flex; flex: 1 1 200px; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+.hooks-page .saved-row strong { font-weight: 500; font-size: 0.875rem; }
+.hooks-page .guide-steps { display: grid; gap: var(--space-2); margin: 0; padding-left: var(--space-5); font-size: 0.875rem; }
+.hooks-page .guide-steps li { overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) {
+	.hooks-page .hook-grid { grid-template-columns: minmax(0, 1fr); }
+	.hooks-page .table-card table.hook-table td { padding-left: 0; padding-right: 0; }
+	.hooks-page .table-card table.hook-table tr { padding-left: var(--space-4); padding-right: var(--space-4); }
+	.hooks-page .actions-cell { text-align: left; }
+}
+@media (max-width: 760px) {
+	.hooks-page .hooks-body { padding: var(--space-3); }
+	.hooks-page .facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+	.hooks-page .secret-row { grid-template-columns: minmax(0, 1fr); }
+	.hooks-page .dlg-foot .btn { flex: 1 1 auto; }
+}

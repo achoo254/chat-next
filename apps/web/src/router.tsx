@@ -3,14 +3,18 @@ import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 
 export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts";
 
-/** What the chat column shows next to the conversation list. */
-export type ChatPanel = "chat" | "admin" | "banned";
+/**
+ * What the chat column shows next to the conversation list: the chat, its
+ * admin page, the banned list, or the incoming webhooks (list, new, one hook).
+ */
+export type ChatPanel = "chat" | "admin" | "banned" | "hooks" | "hook-new" | "hook";
 
 export type Route =
 	| { name: "home" }
 	| { name: "settings"; tab: SettingsTab }
 	/** topicId 0: the chat itself (or the default topic of a group with topics). */
-	| { name: "chat"; chatId: number; topicId: number; panel: ChatPanel }
+	/** hookId: set for the "hook" panel only. */
+	| { name: "chat"; chatId: number; topicId: number; panel: ChatPanel; hookId?: string }
 	| { name: "invite"; token: string }
 	/** userId 0: the list without a profile open. */
 	| { name: "contacts"; userId: number }
@@ -26,6 +30,9 @@ export const paths = {
 	topic: (chatId: number, topicId: number) => `/c/${chatId}/t/${topicId}`,
 	chatAdmin: (chatId: number) => `/c/${chatId}/admin`,
 	banned: (chatId: number) => `/c/${chatId}/admin/banned`,
+	hooks: (chatId: number) => `/c/${chatId}/admin/hooks`,
+	hookNew: (chatId: number) => `/c/${chatId}/admin/hooks/new`,
+	hook: (chatId: number, hookId: string) => `/c/${chatId}/admin/hooks/${hookId}`,
 	contacts: (userId = 0) => (userId === 0 ? "/contacts" : `/contacts/${userId}`),
 	/** The link the server hands out (…/join/<token>); "/+<token>" still opens. */
 	invite: (token: string) => `/join/${token}`,
@@ -36,6 +43,8 @@ export const paths = {
 const ID = /^[1-9][0-9]{0,15}$/;
 const INVITE = /^\/(?:join\/|\+)([A-Za-z0-9_-]{4,128})$/;
 const REPORT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** Public hook ids: "hk_" and letters or digits. */
+const HOOK_ID = /^hk_[A-Za-z0-9]{1,32}$/;
 
 function parseId(value: string | undefined): number | null {
 	if (value === undefined || !ID.test(value)) return null;
@@ -58,6 +67,12 @@ function matchMessaging(path: string): Route | null {
 		if (parts[2] === "admin") {
 			if (parts.length === 3) return { name: "chat", chatId, topicId: 0, panel: "admin" };
 			if (parts.length === 4 && parts[3] === "banned") return { name: "chat", chatId, topicId: 0, panel: "banned" };
+			if (parts[3] === "hooks") {
+				if (parts.length === 4) return { name: "chat", chatId, topicId: 0, panel: "hooks" };
+				const hookId = parts[4] ?? "";
+				if (parts.length === 5 && hookId === "new") return { name: "chat", chatId, topicId: 0, panel: "hook-new" };
+				if (parts.length === 5 && HOOK_ID.test(hookId)) return { name: "chat", chatId, topicId: 0, panel: "hook", hookId };
+			}
 			return null;
 		}
 		const topicId = parseId(parts[3]);

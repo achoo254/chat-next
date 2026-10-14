@@ -247,7 +247,24 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .r-avs { display: inline-flex; align-items: center; }
 .r-avs .avatar { width: 22px; height: 22px; font-size: 0.5625rem; letter-spacing: -0.02em; box-shadow: 0 0 0 1.5px var(--c-surface); }
 .r-avs .avatar + .avatar { margin-left: -4px; }
-.integration { border-left: 3px solid var(--c-error); }
+/* Incoming webhook messages (integrations.html#alert-message): the left edge shows the alert state. */
+.integration { border-left: 3px solid var(--c-border-strong); }
+.integration.firing { border-left-color: var(--c-error); }
+.integration.resolved { border-left-color: var(--c-success); }
+.int-title { display: flex; align-items: baseline; gap: var(--space-2); font-weight: 600; }
+.int-title > p { flex: 1; min-width: 0; }
+.sev { flex: none; padding: 0 var(--space-2); border-radius: var(--radius-full); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.sev.firing { background: color-mix(in srgb, var(--c-error) 14%, transparent); color: var(--c-error-text); }
+.sev.resolved { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
+.keyboard { display: grid; gap: var(--space-1); margin-top: var(--space-2); clear: both; }
+.kb-row { display: flex; gap: var(--space-1); }
+.kb-row a {
+	flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); min-height: 36px; padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-primary); font-size: 0.875rem; font-weight: 500; text-align: center; text-decoration: none;
+}
+.kb-row a > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.kb-row a .icon { flex: none; }
+.kb-row a:hover { background: var(--c-selected); }
 .int-label { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); margin-bottom: var(--space-1); }
 .int-label .icon { width: 14px; height: 14px; }
 .bubble.unsupported { display: flex; gap: var(--space-2); align-items: flex-start; border-style: dashed; }
@@ -819,7 +836,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 /* Touch: every control reaches 44px; the switch keeps its drawn track inside a transparent border. */
 @media (max-width: 760px), (pointer: coarse) {
 	.switch { width: 60px; height: 44px; margin: -10px; border: 10px solid transparent; background-clip: padding-box; }
-	.choice button, .menu button, .react-picker button, .reaction, .chip, .icon-btn, .see-all { min-height: 44px; }
+	.choice button, .menu button, .react-picker button, .reaction, .chip, .icon-btn, .see-all, .kb-row a { min-height: 44px; }
 	/* The sender's avatar keeps its drawn size; the padding makes the target 44px. */
 	.avatar-btn { padding: 6px; margin: -6px; }
 	.icon-btn { min-width: 44px; }

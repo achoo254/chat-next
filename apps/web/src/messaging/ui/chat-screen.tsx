@@ -24,6 +24,7 @@ const TopicListColumn = lazy(() => import("./topic-list.tsx").then((m) => ({ def
 const InfoPanel = lazy(() => import("./info-panel.tsx").then((m) => ({ default: m.InfoPanel })));
 const ChatAdmin = lazy(() => import("./chat-admin.tsx").then((m) => ({ default: m.ChatAdmin })));
 const BannedList = lazy(() => import("./banned-list.tsx").then((m) => ({ default: m.BannedList })));
+const IntegrationsPage = lazy(() => import("../integrations/integrations-page.tsx"));
 const InviteDialog = lazy(() => import("./invite-dialog.tsx").then((m) => ({ default: m.InviteDialog })));
 const ContactsView = lazy(() => import("./contacts.tsx").then((m) => ({ default: m.ContactsView })));
 const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
@@ -114,7 +115,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 		if (contacts) navigate(paths.home);
 	};
 	const open = chatId !== 0 || (contacts && route.userId !== 0);
-	const adminMode = panel === "admin" || panel === "banned";
+	const adminMode = panel !== "chat";
 	const classes = ["app", "folders", showInfo ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
 
 	return (
@@ -138,7 +139,13 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 							<EmptyConversation />
 						) : adminMode ? (
 							<Suspense fallback={<section className="admin-page" aria-busy="true" />}>
-								{panel === "banned" ? <BannedList chatId={chatId} /> : <ChatAdmin chatId={chatId} />}
+								{panel === "banned" ? (
+									<BannedList chatId={chatId} />
+								) : panel === "admin" ? (
+									<ChatAdmin chatId={chatId} />
+								) : (
+									<IntegrationsPage chatId={chatId} panel={panel} hookId={route.name === "chat" ? (route.hookId ?? "") : ""} />
+								)}
 							</Suspense>
 						) : (
 							<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />

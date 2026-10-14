@@ -141,7 +141,7 @@ function Preview({ view, kind, draft, topics }: PreviewProps) {
 	} else {
 		const text = messagePreview(top, nameOf, copy, kind === "channel");
 		const showFrom = top.action === null && (kind === "group" || kind === "forum" || top.fromId === store.selfId);
-		const from = nameOf(top.fromId);
+		const from = top.integrationLabel !== "" ? top.integrationLabel : nameOf(top.fromId);
 		line = showFrom ? (
 			<>
 				<span className="from">{from}:</span> {text}

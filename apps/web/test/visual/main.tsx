@@ -8,6 +8,7 @@
 // vite.config.ts), so render checks capture the finished state. Every page
 // then audits horizontal overflow (auditOverflow) and logs offenders as errors.
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
+import { IncomingHookAuditAction, IncomingHookFormat } from "@app/proto-ts/integrations";
 import { EntityType } from "@app/proto-ts/messages";
 import { createRouterTransport } from "@connectrpc/connect";
 import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.ts";
@@ -77,6 +78,59 @@ f.server.pin(demo.ids.ops, demo.ids.mineSeq, true);
 for (const user of [demo.ids.users.huy, demo.ids.users.lan, demo.ids.users.minh, demo.ids.users.ha]) f.react(user, demo.ids.ops, demo.ids.codeSeq, "🔥");
 const recalledSeq = f.send(demo.ids.users.minh, demo.ids.ops, "Tin gửi nhầm");
 f.server.deleteMessages(demo.ids.users.minh, demo.ids.ops, [recalledSeq]);
+// Incoming webhooks (integrations.html): a group you administer with alert
+// messages (fields, code blocks, URL buttons, one resolved in place) and its
+// hooks in every state, with counters, failed requests and a log.
+const alerts = f.createChat(ChatType.GROUP, "Cảnh báo hạ tầng", [f.selfId, demo.ids.users.minh, demo.ids.users.lan, demo.ids.users.huy], { myRole: MemberRole.ADMIN });
+f.setRole(alerts, f.selfId, MemberRole.ADMIN);
+f.send(demo.ids.users.lan, alerts, "Nhóm nhận cảnh báo tự động của hạ tầng.");
+const disk =
+	"Firing Ổ đĩa sắp đầy trên db-02.example.invalid\n🖥️ Máy chủ: db-02.example.invalid\n📊 Đã dùng: 94% (ngưỡng 90%)\n🕘 Bắt đầu: 09:42, 14/10\n🏷️ Nhãn: env=prod team=ops\ndf -h /var/lib/postgresql\npg_archivecleanup /var/lib/postgresql/wal \\\n  000000010000002A000000F3";
+f.postIntegration(alerts, "Giám sát máy chủ", disk, {
+	entities: [
+		entity(EntityType.BOLD, disk, "Firing"),
+		entity(EntityType.CODE, disk, "env=prod team=ops"),
+		entity(EntityType.PRE, disk, "df -h /var/lib/postgresql", { language: "Kiểm tra nhanh" }),
+		entity(EntityType.PRE, disk, "pg_archivecleanup /var/lib/postgresql/wal \\\n  000000010000002A000000F3", { language: "Dọn WAL đã lưu trữ" }),
+	],
+	buttons: [
+		[
+			{ text: "Mở runbook", url: "https://runbook.example.com/disk-full-with-a-rather-long-path-segment" },
+			{ text: "Dashboard", url: "https://grafana.example.com/d/db" },
+		],
+		[{ text: "Tắt tiếng 1 giờ trên Alertmanager", url: "https://alertmanager.example.com/#/silences/new" }],
+	],
+});
+const cpu = "Firing CPU cao trên lab-174\n📊 Giá trị: 93% trong 5 phút";
+const cpuSeq = f.postIntegration(alerts, "Alertmanager prod", cpu, { entities: [entity(EntityType.BOLD, cpu, "Firing")] });
+const cpuResolved = "Resolved CPU cao trên lab-174\n🕘 Thời gian: firing 09:42 → resolved 10:05";
+f.editIntegration(alerts, cpuSeq, cpuResolved, true, [entity(EntityType.BOLD, cpuResolved, "Resolved")]);
+f.postIntegration(alerts, "Jenkins build", "Build chat-server #318 thành công", { silent: true });
+
+const hooks = f.integrations;
+const grafana = hooks.seed(alerts, { name: "Grafana prod", format: IncomingHookFormat.GRAFANA, createdBy: demo.ids.users.huy, lastUsedAt: hooks.now - 300 });
+const rotating = hooks.seed(alerts, { name: "Alertmanager prod", format: IncomingHookFormat.ALERTMANAGER, createdBy: demo.ids.users.lan, lastUsedAt: hooks.now - 60, graceLeft: 6 * 86_400 + 23 * 3600 });
+const gitlab = hooks.seed(alerts, { name: "GitLab ops/deploy", format: IncomingHookFormat.GITLAB, createdBy: demo.ids.users.minh, lastUsedAt: hooks.now - 26 * 3600 });
+hooks.autoDisable(gitlab);
+hooks.seed(alerts, { name: "Jenkins build", format: IncomingHookFormat.NATIVE, silent: true, lastUsedAt: hooks.now - 120 });
+hooks.counters.set(grafana, {
+	accepted: 1284,
+	delivered: 1201,
+	failures: [
+		{ reason: "rate_limited", count: 3, lastAt: hooks.now - 900 },
+		{ reason: "payload_too_large", count: 2, lastAt: hooks.now - 5400 },
+		{ reason: "url_not_allowed", count: 1, lastAt: hooks.now - 30 * 3600 },
+		{ reason: "invalid_json", count: 1, lastAt: hooks.now - 34 * 3600 },
+	],
+});
+hooks.addDeadLetter(grafana, "invalid_json", "invalid character '}' looking for beginning of object key string", '{"status": "firing", "alerts": [}');
+hooks.addDeadLetter(grafana, "url_not_allowed", "button url uses a scheme that is not allowed: ftp", '{"text": "Xem log", "buttons": [{"text": "Log", "url": "ftp://logs.example.invalid/very/long/path/that/keeps/going/and/going/without/any/break/at/all"}]}');
+hooks.seedAudit(grafana, [
+	{ actorId: demo.ids.users.huy, action: IncomingHookAuditAction.CREATED, detail: "grafana", ago: 9 * 86_400 },
+	{ actorId: demo.ids.users.lan, action: IncomingHookAuditAction.SECRET_ROTATED, ago: 2 * 86_400 },
+]);
+hooks.seedAudit(rotating, [{ actorId: demo.ids.users.lan, action: IncomingHookAuditAction.SECRET_ROTATED, ago: 3600 }]);
+
 // ?at= names a screen whose path holds an id the seed assigns.
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
@@ -89,6 +143,12 @@ const SCREENS: Record<string, string> = {
 	channel: `/c/${announcements}`,
 	"channel-admin": `/c/${announcements}/admin`,
 	bot: `/c/${demo.ids.bot}`,
+	alerts: `/c/${alerts}`,
+	hooks: `/c/${alerts}/admin/hooks`,
+	"hook-new": `/c/${alerts}/admin/hooks/new`,
+	hook: `/c/${alerts}/admin/hooks/${grafana}`,
+	"hook-rotating": `/c/${alerts}/admin/hooks/${rotating}`,
+	"hook-disabled": `/c/${alerts}/admin/hooks/${gitlab}`,
 	report: "/moderation/20481",
 	"report-actions": "/moderation/20481/actions",
 };
@@ -157,6 +217,29 @@ async function openInfo(): Promise<void> {
 }
 
 const SCENARIOS: Record<string, () => Promise<void>> = {
+	// The one-time URL after creating a webhook (#hook-created).
+	"hook-created": async () => {
+		await type("#root form input.input", "Uptime Kuma");
+		await click("form button", "Tạo webhook");
+		await find(() => document.querySelector("dialog .snippet"));
+	},
+	// Rotating the secret, then its one-time URL (#rotate).
+	"hook-rotate": async () => {
+		await click("button", "Xoay secret");
+		await click("dialog button", "Xoay secret");
+		await find(() => byName("dialog h2", /^URL mới của /));
+	},
+	// The alert with fields, code blocks and buttons (#alert-message), scrolled to its top.
+	"alert-message": async () => {
+		const label = await find(() => byName(".messages .int-label", "Tích hợp: Giám sát máy chủ"));
+		label.scrollIntoView({ block: "start" });
+	},
+	// A failed request opened with its body (#hook-stats).
+	"dead-letter": async () => {
+		const summary = await find(() => document.querySelector<HTMLElement>(".dead-list summary"));
+		summary.click();
+		summary.scrollIntoView({ block: "center" });
+	},
 	// Opens the info column where it starts closed (below 1100px).
 	info: openInfo,
 	context: async () => {

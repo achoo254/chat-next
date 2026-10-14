@@ -42,6 +42,11 @@ export function entityTree(text: string, entities: readonly MessageEntity[]): No
 	return root;
 }
 
+/** Whether a link may be opened at all (ADR 0004 scheme allowlist, the app's own scheme included). */
+export function isAllowedLink(url: string): boolean {
+	return isAllowedUrl(url, APP_SCHEME);
+}
+
 export interface RichContext {
 	readonly selfId: number;
 	readonly selfUsername: string;
@@ -205,7 +210,10 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 	let inline: ReactNode[] = [];
 	let cursor = 0;
 	const flush = (last: boolean) => {
-		if (inline.length === 0 && !last) return;
+		// Line breaks alone between or after code blocks would show as an empty line.
+		const blank = inline.every((part) => typeof part === "string" && part.trim() === "");
+		if (blank) inline = [];
+		if (inline.length === 0 && (!last || tail === undefined)) return;
 		blocks.push(
 			<p key={`p${blocks.length}`}>
 				{inline}
