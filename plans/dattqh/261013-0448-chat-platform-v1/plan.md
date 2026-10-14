@@ -356,4 +356,5 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Kiểm tra: 698 test core, 141 test web, 14 test platform-web; JS khởi động 148/150 KiB.
 - R1 coi như xong phần nhắn tin. Còn lại cho R9: kiểm duyệt nâng cao, tenant theo Host. Tiếp theo: R2, incoming webhook (Phase 9).
 - Jev quyết đặt incoming webhook tại `https://chat.<d>/hook/{id}/{secret}` trên host chat đang được Cloudflare proxy (0.72). Phương án `hook.chat.<d>` không proxy được 0.27. Lý do: SSL Universal miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, nên host hai cấp được proxy sẽ lỗi TLS. `bot.chat.<d>` của R5 gặp cùng vấn đề, sẽ quyết khi làm R5.
+- Jev quyết ngưỡng mở chat riêng cho CI (0.98): trên runner GitHub dùng chung, p50 ≤ 75 ms và p99 ≤ 200 ms, khoảng gấp đôi ngưỡng laptop. Ngưỡng của plan (p50 ≤ 50 ms, p99 ≤ 100 ms) vẫn áp cho `pnpm perf` trên máy dev và cho kiểm tra trước phát hành. Lý do: cùng một code, máy dev đo ổn định 18/38 ms, còn CI dao động p99 từ 78 đến 142 ms, kể cả commit chỉ sửa tài liệu cũng đỏ.
 
