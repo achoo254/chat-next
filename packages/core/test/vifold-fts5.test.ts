@@ -97,6 +97,7 @@ if (sqlite === undefined) {
 			expect(separators).toEqual([]);
 			expect(counts.get(0x110000)).toBe(2);
 			db.close();
-		});
+			// Sweeps all of Unicode through SQLite: seconds on a shared CI runner.
+		}, 60_000);
 	});
 }
