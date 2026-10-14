@@ -302,3 +302,31 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - quay lại trang cũ sau đăng nhập khi đăng nhập ở tab khác (server luôn chuyển về `/`).
 - Tiếp theo: làm nốt các RPC còn thiếu của R1 và nối vào UI theo mock, rồi sang R2 (incoming webhook).
 
+### Session 12 — 2026-10-15
+- Phân tích tĩnh bằng REA Telegram Desktop 7.3.1 và Zalo 26.10.11, kết quả ở [báo cáo](../reports/rea-261014-2340-chat-ui-ux-telegram-zalo.md). Jev quyết chọn chuẩn tham khảo:
+  - Telegram là chuẩn chính: 0.94.
+  - Có lấy thêm mẫu từ Zalo: 0.78. Discord: 0.41, không lấy.
+- Jev quyết cách kết hợp: theo từng vùng màn hình, 0.96.
+  - Telegram cho bố cục, tốc độ, bàn phím, thư mục, topic, kênh.
+  - Zalo cho thuật ngữ tiếng Việt, danh bạ, tạo nhóm, thứ tự panel thông tin, chữ trạng thái.
+- Jev quyết từng điểm:
+  - Vai trò nhóm "Trưởng nhóm / Phó nhóm": 0.97; kênh giữ "Chủ kênh / Admin".
+  - Chính tả giữ kiểu "Huỷ, Xoá": 0.88.
+  - Tạo nhóm một màn, tên không bắt buộc: 1.00.
+  - Thao tác khi rê chuột lên tin và bấm đúp để trả lời: 0.92.
+  - Bộ lọc "Chưa đọc": 0.76. Thay quyết định bỏ trước đây, vì có bằng chứng mới là cả hai app đều có.
+  - Chữ trạng thái kiểu Zalo: 0.74.
+  - Danh sách phím tắt: 0.71.
+  - Panel thông tin theo thứ tự Zalo: 0.68.
+  - Tìm kiếm chia nhóm kết quả, mở bằng Ctrl/⌘+F: 0.57.
+  - Nút "@" nhảy tới tin nhắc tên: 0.52.
+  - Áp toàn bộ 7 mục P1 và 4 mục P3 của báo cáo (thu hồi, xoá ở phía tôi, tắt thông báo, đã xem, biểu cảm…).
+- Backend R1 phần còn lại lên prod (commit `79c0ca9`, migration 0005):
+  - tắt thông báo có thời hạn, ghim chat;
+  - danh sách người thả cảm xúc, danh sách đã chặn;
+  - xoá chat, chọn admin nhận quyền chủ;
+  - lý do không thêm được từng người;
+  - hàng đợi kiểm duyệt cho operator (`CHAT_OPERATOR_USER_IDS`);
+  - quay lại đúng trang sau khi đăng nhập.
+- Việc tiếp theo: sửa mock theo các quyết định trên, sau đó code UI theo mock.
+
