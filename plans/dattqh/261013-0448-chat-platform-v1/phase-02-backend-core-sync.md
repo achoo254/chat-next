@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Phase 2: Backend core — tài khoản, chat, tin nhắn, sync"
-status: pending
+status: in-progress
 priority: P1
 effort: "XL"
 dependencies: [1]

@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Phase 5: Client core — sync engine và lưu trữ local"
-status: pending
+status: in-progress
 priority: P1
 effort: "L"
 dependencies: [1, 2, 3]

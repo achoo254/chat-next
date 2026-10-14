@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Phase 1: Chốt contract và nền móng monorepo"
-status: in-progress
+status: completed
 priority: P1
 effort: "L"
 dependencies: []

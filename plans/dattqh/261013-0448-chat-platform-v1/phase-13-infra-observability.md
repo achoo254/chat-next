@@ -1,7 +1,7 @@
 ---
 phase: 13
 title: "Phase 13: Hạ tầng self-host Việt Nam và observability"
-status: pending
+status: in-progress
 priority: P1
 effort: "L"
 dependencies: [1, 2]
@@ -104,10 +104,10 @@ Giai đoạn 2 (bắt đầu khi chạm ngưỡng chuyển):
 ## Todo
 
 - [ ] GĐ1: staging trên `.65` + đo RAM nền
-- [ ] GĐ1: pm2/nginx + Postgres/WAL/PITR + Redis/Meilisearch loopback + S3 ngoài máy
+- [ ] GĐ1: pm2/nginx + Postgres/WAL/PITR + Redis/Meilisearch loopback + S3 ngoài máy (xong: pm2, nginx, TLS, Postgres dùng chung + pg_dump hằng ngày; còn WAL/PITR, Redis, Meilisearch, S3)
 - [ ] GĐ1: secret + credentials API nội bộ IdP + host/chứng chỉ theo tenant
 - [ ] GĐ1: tracing + RUM + dashboard/alert (gồm RAM)
-- [ ] GĐ1: canary + CI/CD + runbook
+- [ ] GĐ1: canary + CI/CD + runbook (xong: CI/CD tự deploy từ main qua user `chat-deploy`, smoke + tự rollback, runbook `docs/deployment-guide.md`; còn canary)
 - [ ] GĐ2: chart theo role + autoscale
 - [ ] GĐ2: Postgres HA quorum + Redis/Meilisearch/S3/CDN HA
 - [ ] GĐ2: kênh tới API nội bộ IdP + chuyển dữ liệu

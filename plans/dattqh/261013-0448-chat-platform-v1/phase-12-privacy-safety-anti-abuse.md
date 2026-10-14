@@ -1,7 +1,7 @@
 ---
 phase: 12
 title: "Phase 12: Quyền riêng tư, an toàn và chống lạm dụng"
-status: pending
+status: in-progress
 priority: P1
 effort: "L"
 dependencies: [2, 3, 7, 8, 9]
@@ -83,9 +83,9 @@ Create:
 ## Todo
 
 - [ ] Data inventory + đánh giá ND13
-- [ ] Cài đặt riêng tư + áp dụng toàn hệ thống
+- [ ] Cài đặt riêng tư + áp dụng toàn hệ thống (R1: danh bạ tường minh, ai thêm vào nhóm/last seen/nhắn tin; còn hoàn thiện ở R9)
 - [ ] Giới hạn dò tìm
-- [ ] Chặn/báo cáo/kiểm duyệt + công cụ vận hành
+- [ ] Chặn/báo cáo/kiểm duyệt + công cụ vận hành (R1: chặn, báo cáo, kick = cấm; còn hàng đợi kiểm duyệt có RPC)
 - [ ] Chống spam tài khoản/bot/webhook
 - [ ] Xoá/tự huỷ/xuất dữ liệu
 - [ ] Redact PII + secret trong log

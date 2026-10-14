@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Phase 6: Web UI React 19 và ngân sách tốc độ"
-status: pending
+status: in-progress
 priority: P1
 effort: "XL"
 dependencies: [5]
@@ -80,14 +80,14 @@ Create:
 
 ## Todo
 
-- [ ] React 19 + Compiler + Vite
-- [ ] Hook hạt mịn + scheduler
-- [ ] Virtual list message + chat list
-- [ ] Composer + optimistic send
-- [ ] Entities
-- [ ] UI bot
-- [ ] Theme/brand/i18n
-- [ ] Perf gate trong CI
+- [ ] React 19 + Compiler + Vite (React 19 + Vite xong; chưa bật React Compiler)
+- [x] Hook hạt mịn + scheduler (store ngoài React, `useSyncExternalStore` theo id, event bus gom theo frame)
+- [x] Virtual list message + chat list (cửa sổ trượt tin nhắn, hàng chat cao cố định định vị bằng translateY)
+- [x] Composer + optimistic send (trả lời, sửa, emoji, bỏ xem trước link)
+- [x] Entities
+- [ ] UI bot (R5)
+- [x] Theme/brand/i18n (vi/en, sáng/tối, brand.config)
+- [ ] Perf gate trong CI (đang đo tay: JS ban đầu khoảng 105 KB gzip)
 
 ## Success Criteria
 

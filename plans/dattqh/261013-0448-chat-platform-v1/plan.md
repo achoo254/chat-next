@@ -1,7 +1,7 @@
 ---
 title: "Nền tảng chat v1 — hiệu năng và kiến trúc học từ Telegram"
 description: "Sản phẩm app tiếp theo trong hệ sinh thái hoandat (đăng nhập qua IdP hoandat-auth). Ứng dụng chat tên cấu hình được, web-first, đóng gói Capacitor/Tauri, nhanh ngang Telegram, có nền tảng Bot riêng, tìm kiếm lịch sử và thông báo qua Bot/webhook cực nhanh."
-status: pending
+status: in-progress
 priority: P1
 effort: "XL"
 branch: main
@@ -76,12 +76,12 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 
 | # | Phase | Tier | Phụ thuộc | Nguyên tắc | Status |
 |---|---|---|---|---|---|
-| 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | In progress (còn chạy Docker Compose) |
-| 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | Pending |
-| 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | Pending |
+| 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | Done (Compose dev chưa chạy: máy không có Docker) |
+| 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | In progress (R1 lên prod; còn tenant theo Host, test hot user/failover) |
+| 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | In progress (WS gateway R1 lên prod; push ở R7) |
 | 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | Pending |
-| 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | Pending |
-| 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | Pending |
+| 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
+| 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI R1 lên prod; còn React Compiler, perf gate CI) |
 | 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | Pending |
 | 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | Pending |
 | 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | Pending |
@@ -89,8 +89,8 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | Pending |
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Pending |
 | 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Pending |
-| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | Pending |
-| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | Pending |
+| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (phần tối thiểu R1) |
+| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65: pm2, nginx, TLS, CI/CD) |
 | 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
 
 Phase là luồng việc kỹ thuật; thứ tự làm và đưa lên prod theo mục "Lộ trình phát hành" dưới đây. Mỗi release lấy đúng phần cần của các phase liên quan. Phase 15 mang số 15 vì được tách ra sau; về logic nó là 8b.
@@ -277,4 +277,28 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
 - Jev quyết cách bật nhắn tin (0.99): bản build vẫn tắt cờ; user tự bật trong trình duyệt của mình bằng `localStorage["feature:messaging"]="1"`. Khi chạy ổn trên trình duyệt thật thì bật cờ khi build cho mọi người.
 - Còn thiếu so với mock, chờ server bổ sung: chọn admin nhận quyền chủ, RPC xoá chat, tên nhóm trên màn bị cấm, lý do không thêm được của từng người, kiểm quyền riêng tư trước khi tạo nhóm, ngày thêm liên hệ, số nhóm chung; RPC tắt tiếng, ghim chat, danh sách người thả reaction, danh sách đã chặn, hàng đợi kiểm duyệt.
 - User quyết (2026-10-14): bỏ cờ nhắn tin, mặc định hiện luôn vì sản phẩm mới chưa có người dùng. Đã xoá cờ `VITE_FEATURE_MESSAGING`, cơ chế ghi đè bằng localStorage và trang chủ R0. Sau khi đăng nhập, app mở thẳng danh sách chat.
+
+### Trạng thái 2026-10-14 23:30
+- R1 đang chạy trên https://chat.hoandat.com (release `20261014-162220-549219c690e3`). Đã thử thật trên Windows Edge (zoom 150%) và iPhone. Gồm:
+  - nhắn tin chữ realtime;
+  - nhóm, nhóm có topic, kênh;
+  - trả lời, sửa, xoá, reaction, đã đọc, ghim;
+  - link mời `/join/`, danh bạ tường minh, cấm thành viên, chặn, báo cáo;
+  - xem trước link chỉ có chữ.
+- Đã sửa theo phản hồi khi thử trên prod:
+  - bỏ cờ tính năng;
+  - kênh không còn bị gọi là nhóm;
+  - link mời mở đúng;
+  - không còn cuộn ngang trên desktop và mobile;
+  - ẩn hẳn các chức năng chưa có, không để nút mờ.
+- R1 còn thiếu vì chưa có RPC:
+  - tắt tiếng, ghim chat;
+  - danh sách người thả reaction, danh sách người đã chặn, hàng đợi kiểm duyệt;
+  - xoá chat, chọn admin nhận quyền chủ;
+  - lý do không thêm được của từng người, ngày thêm liên hệ, số nhóm chung.
+- R1 còn thiếu về kỹ thuật:
+  - React Compiler và perf gate CI (Phase 6);
+  - test hot user và failover (Phase 2);
+  - quay lại trang cũ sau đăng nhập khi đăng nhập ở tab khác (server luôn chuyển về `/`).
+- Tiếp theo: làm nốt các RPC còn thiếu của R1 và nối vào UI theo mock, rồi sang R2 (incoming webhook).
 
