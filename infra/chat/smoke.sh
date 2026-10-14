@@ -11,11 +11,17 @@ fail() { echo "smoke: FAIL $*" >&2; exit 1; }
 code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"
 [ "$code" = 200 ] || fail "GET / -> $code"
 curl -fsS "$BASE/healthz" | grep -q '"db":"connected"' || fail "/healthz not connected"
-loc="$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/auth/login")"
-case "$loc" in
-https://auth.hoandat.com/*client_id=chat-web*) ;;
-*) fail "/auth/login does not redirect to the IdP with chat-web" ;;
-esac
+# Right after a restart the API discovers the IdP in the background and
+# answers 503 until then, so give sign-in a short grace period.
+login_ok=""
+for _ in $(seq 1 15); do
+	loc="$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/auth/login")"
+	case "$loc" in
+	https://auth.hoandat.com/*client_id=chat-web*) login_ok=1; break ;;
+	esac
+	sleep 2
+done
+[ -n "$login_ok" ] || fail "/auth/login does not redirect to the IdP with chat-web"
 code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/proto' -H 'Connect-Protocol-Version: 1' -X POST --data-binary '' -H "Origin: $BASE" "$BASE/rpc/app.v1.UsersService/GetSelf")"
 [ "$code" = 401 ] || fail "GetSelf without a session -> $code (want 401)"
 code="$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: $BASE" "$BASE/ws")"
