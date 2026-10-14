@@ -299,6 +299,15 @@ func TestShutdownAsksClientsToReconnect(t *testing.T) {
 	if f := c.read(t); f.GetResync().GetReason() != appv1.ResyncReason_RESYNC_REASON_SERVER_RESTART {
 		t.Fatalf("shutdown frame = %v", f)
 	}
+	// Keep reading like a real client, so the close handshake completes
+	// instead of waiting out the server's close timeout on a slow machine.
+	go func() {
+		for {
+			if _, _, err := c.ws.Read(context.Background()); err != nil {
+				return
+			}
+		}
+	}()
 	deadline := time.Now().Add(2 * time.Second)
 	for tg.hub.Connected() != 0 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)

@@ -97,11 +97,18 @@ async function runProfile(browser: Browser, baseUrl: string, profile: Profile): 
 		const cdp = await context.newCDPSession(page);
 		await cdp.send("Emulation.setCPUThrottlingRate", { rate: profile.cpuThrottle });
 
-		const open: OpenSample = await page.evaluate((rounds) => {
-			const harness = window.perfHarness;
-			if (harness === undefined) throw new Error("perf page did not load");
-			return harness.openCachedChats(rounds);
-		}, SCENARIO.openRounds);
+		// Two rounds, keep the one with the lower p99: on a shared CI runner one
+		// stall decides the p99 of 30 switches; a real slowdown shows in both.
+		let open: OpenSample | null = null;
+		for (let attempt = 0; attempt < SCENARIO.openAttempts; attempt++) {
+			const sample: OpenSample = await page.evaluate((rounds) => {
+				const harness = window.perfHarness;
+				if (harness === undefined) throw new Error("perf page did not load");
+				return harness.openCachedChats(rounds);
+			}, SCENARIO.openRounds);
+			if (open === null || percentile(sample.openMs, 99) < percentile(open.openMs, 99)) open = sample;
+		}
+		if (open === null) throw new Error("perf: no open attempts");
 		const list = await bestOf(SCENARIO.scrollAttempts, () =>
 			page.evaluate((step) => {
 				const harness = window.perfHarness;

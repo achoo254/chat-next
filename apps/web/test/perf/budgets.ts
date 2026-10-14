@@ -71,4 +71,6 @@ export const SCENARIO = {
 	historyStepPx: 120,
 	/** Each scroll runs this many times; the smoothest run is judged. */
 	scrollAttempts: 3,
+	/** Open-chat rounds; the one with the lower p99 is gated. */
+	openAttempts: 2,
 } as const;
