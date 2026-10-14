@@ -13,7 +13,6 @@ import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "../../src/app.tsx";
-import { MESSAGING_FLAG_KEY } from "../../src/features.ts";
 import "../../src/styles/fonts.css";
 import "../../src/styles/tokens.css";
 import "../../src/styles/app.css";
@@ -30,7 +29,6 @@ if (params.has("open")) {
 }
 const theme = params.get("theme");
 if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
-window.localStorage.setItem(MESSAGING_FLAG_KEY, "1");
 
 const demo = seedDemo();
 const f = demo.fixture;

@@ -36,17 +36,14 @@ describe("boot", () => {
 		expect(window.localStorage.getItem("locale")).toBe("en");
 	});
 
-	it("shows the shell with the user's name when signed in", async () => {
+	it("opens the chat list when signed in", async () => {
 		renderApp((router) => {
 			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
 		});
 
-		expect(await screen.findByRole("heading", { name: "Xin chào, Đức Thắng" })).toBeTruthy();
-		expect(screen.getByText("ĐT")).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "Chưa có cuộc trò chuyện" })).toBeTruthy();
-		const search = screen.getByRole("searchbox", { name: "Tìm trò chuyện và tin nhắn" });
-		expect((search as HTMLInputElement).disabled).toBe(true);
-		expect(screen.getByRole("link", { name: "Trò chuyện" }).getAttribute("aria-current")).toBe("page");
+		// Signed in, the app opens the (empty) chat list.
+		expect(await screen.findByText("Chưa có chat nào ở đây", {}, { timeout: 5000 })).toBeTruthy();
+		expect(screen.getAllByText("ĐT").length).toBeGreaterThan(0);
 	});
 
 	it("offers a retry when the server cannot be reached", async () => {
@@ -63,7 +60,7 @@ describe("boot", () => {
 
 		await userEvent.click(await screen.findByRole("button", { name: "Thử lại" }));
 
-		expect(await screen.findByRole("heading", { name: "Xin chào, Đức Thắng" })).toBeTruthy();
+		expect(await screen.findByText("Chưa có chat nào ở đây", {}, { timeout: 5000 })).toBeTruthy();
 		expect(calls).toBe(2);
 	});
 
@@ -72,7 +69,8 @@ describe("boot", () => {
 			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
 		});
 
-		await userEvent.click(await screen.findByRole("link", { name: "Cài đặt" }));
+		const links = await screen.findAllByRole("link", { name: "Cài đặt" }, { timeout: 5000 });
+		await userEvent.click(links[0] as HTMLElement);
 
 		expect(window.location.pathname).toBe("/settings/profile");
 		expect(await screen.findByRole("heading", { level: 1, name: "Hồ sơ" })).toBeTruthy();

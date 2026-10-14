@@ -350,6 +350,12 @@ export class ChatFixture {
 
 	/** Connect routes for the calls the UI makes outside the core. */
 	routes(router: ConnectRouter): void {
+		this.userRoutes(router);
+		this.chatRoutes(router);
+	}
+
+	/** UsersService only: tests of the account screens bring their own. */
+	userRoutes(router: ConnectRouter): void {
 		const self = () => this.wireUser(this.selfId);
 		router.service(UsersService, {
 			getSelf: () => ({ user: self() }),
@@ -427,6 +433,10 @@ export class ChatFixture {
 				},
 			}),
 		});
+	}
+
+	/** Every service except UsersService. */
+	chatRoutes(router: ConnectRouter): void {
 		router.service(ConfigService, {
 			getAppConfig: () => ({ result: { case: "config", value: { hash: "t", messageLengthMax: 4096, editTimeLimitSeconds: 172_800 } } }),
 		});

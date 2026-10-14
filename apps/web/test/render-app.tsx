@@ -1,13 +1,23 @@
 import { createRouterTransport, type ConnectRouter } from "@connectrpc/connect";
 import { render, type RenderResult } from "@testing-library/react";
+import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { App } from "../src/app.tsx";
+import { ChatFixture, fixtureConnector } from "./support/fake-chat.ts";
 
-/** Renders the app against an in-memory Connect server built from `routes`. */
+/**
+ * Renders the app against an in-memory Connect server built from `routes`
+ * (account services). Chats come from an empty in-memory chat server.
+ */
 export function renderApp(routes: (router: ConnectRouter) => void, path = "/"): RenderResult {
 	window.history.replaceState(null, "", path);
-	return render(<App transport={createRouterTransport(routes)} />);
+	const fixture = new ChatFixture();
+	const transport = createRouterTransport((router) => {
+		routes(router);
+		fixture.chatRoutes(router);
+	});
+	const connector = fixtureConnector(fixture, async () => new MemorySqlFactory());
+	return render(<App transport={transport} messagingConnector={connector} />);
 }
-
 export const SELF = {
 	id: 42n,
 	name: "Đức Thắng",

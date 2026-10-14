@@ -4,16 +4,12 @@ import type { SelfUser } from "./api/adapters.ts";
 import { ApiContext } from "./api/api-context.tsx";
 import { createApi, errorCode } from "./api/client.ts";
 import { Icon } from "./components/icon.tsx";
-import { messagingEnabled } from "./features.ts";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
 import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
-import { Home } from "./screens/home.tsx";
-import { Settings } from "./screens/settings/settings.tsx";
-import { Shell } from "./screens/shell.tsx";
 import { Welcome } from "./screens/welcome.tsx";
 import type { MessagingConnector } from "./messaging/data/connector.ts";
 
-// The messaging UI (release R1) is its own chunk: the R0 shell never loads it.
+// The signed-in app is its own chunk, so the welcome screen stays small.
 const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
 
 export interface AppProps {
@@ -95,9 +91,8 @@ interface SignedInProps {
 }
 
 function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnector }: SignedInProps) {
-	const [messaging] = useState(messagingEnabled);
 	const pathname = usePathname();
-	const route = matchRoute(pathname, messaging);
+	const route = matchRoute(pathname);
 	const known = route !== null;
 
 	useEffect(() => {
@@ -105,28 +100,17 @@ function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnect
 	}, [known]);
 
 	if (!route) return null;
-	if (messaging) {
-		return (
-			<Suspense fallback={<Loading />}>
-				<MessagingRoot
-					self={self}
-					route={route}
-					transport={transport}
-					onSelfChange={onSelfChange}
-					onSignedOut={onSignedOut}
-					{...(messagingConnector === undefined ? {} : { connector: messagingConnector })}
-				/>
-			</Suspense>
-		);
-	}
 	return (
-		<Shell self={self} route={route}>
-			{route.name === "settings" ? (
-				<Settings tab={route.tab} self={self} onSelfChange={onSelfChange} />
-			) : (
-				<Home self={self} />
-			)}
-		</Shell>
+		<Suspense fallback={<Loading />}>
+			<MessagingRoot
+				self={self}
+				route={route}
+				transport={transport}
+				onSelfChange={onSelfChange}
+				onSignedOut={onSignedOut}
+				{...(messagingConnector === undefined ? {} : { connector: messagingConnector })}
+			/>
+		</Suspense>
 	);
 }
 

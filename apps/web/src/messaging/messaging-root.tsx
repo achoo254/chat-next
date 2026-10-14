@@ -1,6 +1,7 @@
-// Entry of the messaging UI (release R1), loaded lazily when the feature flag
-// is on. It starts the client core once per signed-in session and keeps it
-// alive across the chat, settings and moderation screens.
+// Entry of the signed-in app (chat list, chats, contacts, settings), loaded
+// lazily after sign-in so the welcome screen stays small. It starts the client
+// core once per signed-in session and keeps it alive across the chat, settings
+// and moderation screens.
 import type { Transport } from "@connectrpc/connect";
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";

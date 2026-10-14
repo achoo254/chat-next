@@ -49,7 +49,7 @@ Chung cho cả hai giai đoạn:
 - CI/CD GitHub Actions, deploy prod liên tục (user cho phép ngày 2026-10-14 trong giai đoạn thiết kế và đưa lên prod):
   - Mỗi commit lên `main` qua đủ kiểm tra thì tự deploy prod `chat.hoandat.com`; không có cổng phê duyệt tay.
   - Smoke test tự động trên prod sau mỗi deploy (đăng nhập bằng tài khoản thử, gửi/nhận một tin, `/healthz`); đỏ thì tự rollback về bản trước.
-  - Tính năng chưa xong nằm sau feature flag theo tenant/người dùng, để code lên prod sớm mà người dùng thật chỉ thấy khi bật.
+  - Trước khi có người dùng thật (đến R9), tính năng hiện ngay khi deploy, không qua flag. Từ khi có người dùng thật, tính năng chưa xong nằm sau feature flag theo tenant hoặc người dùng.
   - Migration theo kiểu mở rộng rồi thu hẹp (expand/contract) để bản cũ và mới chạy song song khi deploy; backup Postgres trước mỗi migration.
   - Rollback một lệnh về bản trước.
 

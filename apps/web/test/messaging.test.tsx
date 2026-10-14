@@ -3,13 +3,11 @@
 // composer reply/edit, topics and the info panel.
 import { Code } from "@connectrpc/connect";
 import { ChatType } from "@app/proto-ts/chats";
-import { UsersService } from "@app/proto-ts/users";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { ChatFixture } from "./support/fake-chat.ts";
 import { seedDemo } from "./support/demo-data.ts";
-import { renderApp, SELF } from "./render-app.tsx";
 import { renderMessaging } from "./support/render-messaging.tsx";
 
 const LONG = { timeout: 8000 };
@@ -28,18 +26,6 @@ async function openOps(demo = seedDemo()) {
 	await within(log).findByText("Dashboard ổn định.", {}, LONG);
 	return { demo, log };
 }
-
-describe("feature flag", () => {
-	it("keeps the R0 shell when messaging is off", async () => {
-		renderApp((router) => {
-			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
-		}, "/c/5001");
-
-		expect(await screen.findByRole("heading", { name: "Xin chào, Đức Thắng" })).toBeTruthy();
-		expect(window.location.pathname).toBe("/");
-		expect(screen.queryByRole("navigation", { name: "Thư mục chat" })).toBeNull();
-	});
-});
 
 describe("chat list", () => {
 	it("lists chats with type icons, badges and the pinned group first", async () => {

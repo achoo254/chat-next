@@ -77,17 +77,16 @@ describe("entity tree", () => {
 
 describe("routes", () => {
 	it("adds chat, topic, admin, invite and moderation routes only with messaging on", () => {
-		expect(matchRoute("/c/5001")).toBeNull();
-		expect(matchRoute("/settings/privacy")).toBeNull();
-		expect(matchRoute("/c/5001", true)).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "chat" });
-		expect(matchRoute(paths.topic(5001, 12), true)).toEqual({ name: "chat", chatId: 5001, topicId: 12, panel: "chat" });
-		expect(matchRoute(paths.chatAdmin(5001), true)).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "admin" });
-		expect(matchRoute("/+q7XrN2bTabc", true)).toEqual({ name: "invite", token: "q7XrN2bTabc" });
-		expect(matchRoute("/settings/privacy", true)).toEqual({ name: "settings", tab: "privacy" });
-		expect(matchRoute(paths.moderation("R-1", true), true)).toEqual({ name: "moderation", reportId: "R-1", actions: true });
-		expect(matchRoute("/c/0", true)).toBeNull();
-		expect(matchRoute("/c/12345678901234567", true)).toBeNull();
-		expect(matchRoute("/moderation/%E0", true)).toBeNull();
+		expect(matchRoute("/settings/privacy")).toEqual({ name: "settings", tab: "privacy" });
+		expect(matchRoute("/c/5001")).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "chat" });
+		expect(matchRoute(paths.topic(5001, 12))).toEqual({ name: "chat", chatId: 5001, topicId: 12, panel: "chat" });
+		expect(matchRoute(paths.chatAdmin(5001))).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "admin" });
+		expect(matchRoute("/+q7XrN2bTabc")).toEqual({ name: "invite", token: "q7XrN2bTabc" });
+		expect(matchRoute("/settings/privacy")).toEqual({ name: "settings", tab: "privacy" });
+		expect(matchRoute(paths.moderation("R-1", true))).toEqual({ name: "moderation", reportId: "R-1", actions: true });
+		expect(matchRoute("/c/0")).toBeNull();
+		expect(matchRoute("/c/12345678901234567")).toBeNull();
+		expect(matchRoute("/moderation/%E0")).toBeNull();
 	});
 
 	it("maps a topic's icon colour to the nearest avatar tone", () => {

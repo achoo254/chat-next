@@ -17,8 +17,7 @@ export type Route =
 	| { name: "moderation"; reportId: string | null; actions: boolean };
 
 /** Tabs that exist before messaging ships (release R0). */
-const R0_SETTINGS: readonly SettingsTab[] = ["profile", "sessions"];
-const MESSAGING_SETTINGS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "sessions"];
+const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "sessions"];
 
 export const paths = {
 	home: "/",
@@ -80,17 +79,15 @@ function matchMessaging(path: string): Route | null {
  * Maps a pathname to a route; null for unknown paths. Messaging routes exist
  * only when the messaging UI is on, so the R0 shell keeps its exact routes.
  */
-export function matchRoute(pathname: string, messaging = false): Route | null {
+export function matchRoute(pathname: string): Route | null {
 	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 	if (path === "/") return { name: "home" };
 	if (path === "/settings") return { name: "settings", tab: "profile" };
 	if (path.startsWith("/settings/")) {
 		const tab = path.slice("/settings/".length);
-		const tabs = messaging ? MESSAGING_SETTINGS : R0_SETTINGS;
-		const found = tabs.find((candidate) => candidate === tab);
+		const found = SETTINGS_TABS.find((candidate) => candidate === tab);
 		return found === undefined ? null : { name: "settings", tab: found };
 	}
-	if (!messaging) return null;
 	try {
 		return matchMessaging(path);
 	} catch {

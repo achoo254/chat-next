@@ -102,7 +102,7 @@ User quyết định ngày 2026-10-14: review từng giai đoạn ngay trên pro
 Cách làm cho mọi release:
 - Mỗi release là một lát dọc chạy được từ đầu tới cuối, lên `https://chat.hoandat.com` (server `.65`, giai đoạn 1 của Phase 13), không phải bản nháp trên staging.
 - Commit lên `main` qua đủ kiểm tra thì tự deploy prod; smoke test tự động trên prod, đỏ thì tự rollback. Một release có thể gồm nhiều lần deploy.
-- Tính năng dở dang nằm sau feature flag; người dùng thật chỉ thấy khi bật.
+- Không dùng feature flag khi chưa có người dùng thật: tính năng hiện ngay khi deploy. Chỉ thêm flag theo tenant/người dùng khi đã có người dùng thật (từ R9).
 - Migration theo kiểu expand/contract, backup Postgres trước mỗi migration, để deploy liên tục không làm hỏng dữ liệu của người dùng thật.
 - Trước khi code UI của release: user duyệt các màn tương ứng trong [mock](./mockups/index.html). Sau khi lên prod: user và nhóm dùng thử test trên prod, phản hồi vào chính app chat (từ R1) để sửa ở các lần deploy sau.
 - Khi chuyển release: release trước phải chạy ổn trên prod với người dùng thật, không có lỗi chặn.
@@ -276,4 +276,5 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
 - Các bản sửa sau review (commit `ba0badc`, migration 0004) và CSP cho worker SQLite đã lên prod. UI đã nối danh bạ, xoá có cấm hoặc chỉ xoá, danh sách bị cấm, chủ nhóm rời đi, cùng các màn mock mới.
 - Jev quyết cách bật nhắn tin (0.99): bản build vẫn tắt cờ; user tự bật trong trình duyệt của mình bằng `localStorage["feature:messaging"]="1"`. Khi chạy ổn trên trình duyệt thật thì bật cờ khi build cho mọi người.
 - Còn thiếu so với mock, chờ server bổ sung: chọn admin nhận quyền chủ, RPC xoá chat, tên nhóm trên màn bị cấm, lý do không thêm được của từng người, kiểm quyền riêng tư trước khi tạo nhóm, ngày thêm liên hệ, số nhóm chung; RPC tắt tiếng, ghim chat, danh sách người thả reaction, danh sách đã chặn, hàng đợi kiểm duyệt.
+- User quyết (2026-10-14): bỏ cờ nhắn tin, mặc định hiện luôn vì sản phẩm mới chưa có người dùng. Đã xoá cờ `VITE_FEATURE_MESSAGING`, cơ chế ghi đè bằng localStorage và trang chủ R0. Sau khi đăng nhập, app mở thẳng danh sách chat.
 
