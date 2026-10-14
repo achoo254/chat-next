@@ -103,6 +103,8 @@ message TypingFrame {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   int64 user_id = 2 [jstype = JS_NUMBER];
   TypingAction action = 3;
+  // Forum groups: the topic being typed in.
+  int64 topic_id = 4 [jstype = JS_NUMBER];
 }
 
 // The client's own state: drives presence and push suppression.

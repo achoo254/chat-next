@@ -7,16 +7,18 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
+	"app.local/server/internal/chat"
 	"app.local/server/internal/profile"
 	"app.local/server/internal/store"
 	"connectrpc.com/connect"
 )
 
-// usersService implements the self-profile part of UsersService; the other
-// methods stay Unimplemented in this release.
+// usersService implements UsersService: the self profile on the store,
+// lookups, blocks, privacy and reports on the chat core.
 type usersService struct {
 	appv1connect.UnimplementedUsersServiceHandler
 	store    *store.Store
+	chat     *chat.Service
 	tenantID string
 	logger   *slog.Logger
 }
@@ -99,4 +101,80 @@ func (s *usersService) SetUsername(ctx context.Context, req *connect.Request[app
 		return nil, internal(s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.SetUsernameResponse{User: selfUser(u)}), nil
+}
+
+// GetUsers returns users of the tenant with their presence.
+func (s *usersService) GetUsers(ctx context.Context, req *connect.Request[appv1.GetUsersRequest]) (*connect.Response[appv1.GetUsersResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetUsersRequest) (*appv1.GetUsersResponse, error) {
+		users, err := s.chat.GetUsers(ctx, me, m.GetUserIds())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetUsersResponse{Users: users}, nil
+	})
+}
+
+// ResolveUsername finds a user by username.
+func (s *usersService) ResolveUsername(ctx context.Context, req *connect.Request[appv1.ResolveUsernameRequest]) (*connect.Response[appv1.ResolveUsernameResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ResolveUsernameRequest) (*appv1.ResolveUsernameResponse, error) {
+		u, err := s.chat.ResolveUsername(ctx, me, m.GetUsername())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.ResolveUsernameResponse{User: u}, nil
+	})
+}
+
+// SearchUsers searches the tenant's users.
+func (s *usersService) SearchUsers(ctx context.Context, req *connect.Request[appv1.SearchUsersRequest]) (*connect.Response[appv1.SearchUsersResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SearchUsersRequest) (*appv1.SearchUsersResponse, error) {
+		users, err := s.chat.SearchUsers(ctx, me, m.GetQuery(), m.GetLimit())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SearchUsersResponse{Users: users}, nil
+	})
+}
+
+// Block blocks a user.
+func (s *usersService) Block(ctx context.Context, req *connect.Request[appv1.BlockRequest]) (*connect.Response[appv1.BlockResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.BlockRequest) (*appv1.BlockResponse, error) {
+		return &appv1.BlockResponse{}, s.chat.Block(ctx, me, m.GetUserId())
+	})
+}
+
+// Unblock removes a block.
+func (s *usersService) Unblock(ctx context.Context, req *connect.Request[appv1.UnblockRequest]) (*connect.Response[appv1.UnblockResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.UnblockRequest) (*appv1.UnblockResponse, error) {
+		return &appv1.UnblockResponse{}, s.chat.Unblock(ctx, me, m.GetUserId())
+	})
+}
+
+// GetPrivacy returns the caller's privacy settings.
+func (s *usersService) GetPrivacy(ctx context.Context, req *connect.Request[appv1.GetPrivacyRequest]) (*connect.Response[appv1.GetPrivacyResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, _ *appv1.GetPrivacyRequest) (*appv1.GetPrivacyResponse, error) {
+		p, err := s.chat.GetPrivacy(ctx, me)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetPrivacyResponse{Settings: p}, nil
+	})
+}
+
+// SetPrivacy changes privacy settings.
+func (s *usersService) SetPrivacy(ctx context.Context, req *connect.Request[appv1.SetPrivacyRequest]) (*connect.Response[appv1.SetPrivacyResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetPrivacyRequest) (*appv1.SetPrivacyResponse, error) {
+		p, err := s.chat.SetPrivacy(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SetPrivacyResponse{Settings: p}, nil
+	})
+}
+
+// Report files a report into the moderation queue.
+func (s *usersService) Report(ctx context.Context, req *connect.Request[appv1.ReportRequest]) (*connect.Response[appv1.ReportResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ReportRequest) (*appv1.ReportResponse, error) {
+		return &appv1.ReportResponse{}, s.chat.Report(ctx, me, m)
+	})
 }

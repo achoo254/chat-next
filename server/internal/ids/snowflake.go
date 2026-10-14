@@ -131,3 +131,30 @@ func (g *Snowflake) elapsed() (int64, error) {
 	}
 	return ms, nil
 }
+
+// NewSnowflakeAfter is NewSnowflake for a leased worker whose previous
+// holder may have issued ids up to the Unix millisecond afterUnixMs: the new
+// generator only issues ids from later milliseconds.
+func NewSnowflakeAfter(worker, afterUnixMs int64) (*Snowflake, error) {
+	g, err := NewSnowflake(worker)
+	if err != nil {
+		return nil, err
+	}
+	if after := afterUnixMs - SnowflakeEpoch.UnixMilli(); after > g.lastMs {
+		g.lastMs = after
+		// Exhausted: the next id waits for a millisecond after afterUnixMs.
+		g.sequence = maxSnowflakeSequence
+	}
+	return g, nil
+}
+
+// LastUnixMs returns the Unix millisecond of the newest id issued (or of the
+// floor set by NewSnowflakeAfter); 0 before any.
+func (g *Snowflake) LastUnixMs() int64 {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.lastMs < 0 {
+		return 0
+	}
+	return g.lastMs + SnowflakeEpoch.UnixMilli()
+}

@@ -8,7 +8,15 @@ export { MIGRATIONS, SCHEMA_VERSION, migrate, type Migration, type MigrationOutc
 export { Repository, type DialogView, type OutboxRow, type StoredMessage } from "./repo/repository.ts";
 export { ftsQuery, searchLocal, type SearchOptions } from "./search/index.ts";
 export { backoffDelay, DEFAULT_BACKOFF, type BackoffPolicy } from "./transport/backoff.ts";
-export { RealtimeConnection, deadAfterMs, type ConnectionState, type RealtimeHandlers, type RealtimeOptions } from "./transport/realtime.ts";
+export {
+	RealtimeConnection,
+	deadAfterMs,
+	REALTIME_PATH,
+	realtimeUrlFor,
+	type ConnectionState,
+	type RealtimeHandlers,
+	type RealtimeOptions,
+} from "./transport/realtime.ts";
 export { SyncEngine, type HistoryDirectionName, type SyncEngineOptions } from "./sync/engine.ts";
 export { Outbox, OutboxError, parseOperation, type OutboxOperation, type PendingMessage } from "./outbox/outbox.ts";
 export { buildSnapshot, parseSnapshot, SNAPSHOT_VERSION, type ScreenSnapshot, type SnapshotDialog } from "./snapshot/snapshot.ts";

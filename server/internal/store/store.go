@@ -110,3 +110,9 @@ func migrate(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
 	}
 	return nil
 }
+
+// Pool returns the connection pool, for domain packages that run their own
+// queries and transactions (chats, messages, sync logs).
+func (s *Store) Pool() *pgxpool.Pool {
+	return s.pool
+}

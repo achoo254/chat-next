@@ -24,6 +24,8 @@ const (
 	DefaultListenAddr   = "127.0.0.1:4600"
 	DefaultTenantID     = "primary"
 	DefaultTenantDomain = "hoandat.com"
+	// DefaultAppURLScheme matches urlScheme in brand.config.json.
+	DefaultAppURLScheme = "com.hoandat.chat"
 )
 
 // SessionKeyMinLen is the minimum decoded length of SESSION_KEY.
@@ -41,6 +43,9 @@ type Config struct {
 	SessionKey       []byte
 	TenantID         string
 	TenantDomain     string
+	// AppURLScheme is the app's own scheme allowed in message links
+	// (ADR 0004).
+	AppURLScheme string
 	// DevOrigins is empty in production even when DEV_ORIGINS is set.
 	DevOrigins []string
 }
@@ -78,6 +83,7 @@ func invalid(name, reason string) error {
 
 var (
 	tenantIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
+	schemePattern   = regexp.MustCompile(`^[a-z][a-z0-9+.-]{0,62}$`)
 	domainPattern   = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 )
 
@@ -111,6 +117,7 @@ func Load(lookup Lookup) (Config, error) {
 		OIDCClientSecret: required("OIDC_CLIENT_SECRET"),
 		TenantID:         orDefault("TENANT_ID", DefaultTenantID),
 		TenantDomain:     strings.ToLower(orDefault("TENANT_DOMAIN", DefaultTenantDomain)),
+		AppURLScheme:     strings.ToLower(orDefault("APP_URL_SCHEME", DefaultAppURLScheme)),
 	}
 	if c.Env != "" && c.Env != EnvProduction && c.Env != EnvDevelopment {
 		errs = append(errs, invalid("CHAT_ENV", "must be production or development"))
@@ -159,6 +166,9 @@ func Load(lookup Lookup) (Config, error) {
 
 	if !tenantIDPattern.MatchString(c.TenantID) {
 		errs = append(errs, invalid("TENANT_ID", "must match "+tenantIDPattern.String()))
+	}
+	if !schemePattern.MatchString(c.AppURLScheme) || c.AppURLScheme == "http" || c.AppURLScheme == "https" {
+		errs = append(errs, invalid("APP_URL_SCHEME", "must be a URL scheme like com.example.chat"))
 	}
 	if !domainPattern.MatchString(c.TenantDomain) {
 		errs = append(errs, invalid("TENANT_DOMAIN", "must be a domain name"))

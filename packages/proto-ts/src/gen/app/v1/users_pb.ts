@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/users.proto.
  */
 export const file_app_v1_users: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIhAKDkdldFNlbGZSZXF1ZXN0Ii0KD0dldFNlbGZSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJwoPR2V0VXNlcnNSZXF1ZXN0EhQKCHVzZXJfaWRzGAEgAygDQgIwAiIvChBHZXRVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiegoUVXBkYXRlUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhAKA2JpbxgCIAEoCUgBiAEBEhoKDXBob3RvX2ZpbGVfaWQYAyABKAlIAogBAUIHCgVfbmFtZUIGCgRfYmlvQhAKDl9waG90b19maWxlX2lkIjMKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJgoSU2V0VXNlcm5hbWVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjEKE1NldFVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIioKFlJlc29sdmVVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiNQoXUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIjIKElNlYXJjaFVzZXJzUmVxdWVzdBINCgVxdWVyeRgBIAEoCRINCgVsaW1pdBgCIAEoBSIyChNTZWFyY2hVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiIwoMQmxvY2tSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIg8KDUJsb2NrUmVzcG9uc2UiJQoOVW5ibG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiEQoPVW5ibG9ja1Jlc3BvbnNlIs4CCg9Qcml2YWN5U2V0dGluZ3MSKgoJbGFzdF9zZWVuGAEgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIxChBmaW5kX2J5X3VzZXJuYW1lGAQgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIcChRub3RpZmljYXRpb25fcHJldmlldxgHIAEoCCITChFHZXRQcml2YWN5UmVxdWVzdCI/ChJHZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIvcDChFTZXRQcml2YWN5UmVxdWVzdBIvCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSACIAQESMwoNcHJvZmlsZV9waG90bxgCIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAYgBARIzCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgCiAEBEjYKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAOIAQESMwoNYWRkX3RvX2dyb3VwcxgFIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIBIgBARIzCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgFiAEBEiEKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgISAaIAQFCDAoKX2xhc3Rfc2VlbkIQCg5fcHJvZmlsZV9waG90b0IQCg5fZmluZF9ieV9lbWFpbEITChFfZmluZF9ieV91c2VybmFtZUIQCg5fYWRkX3RvX2dyb3Vwc0IQCg5fc2VuZF9tZXNzYWdlc0IXChVfbm90aWZpY2F0aW9uX3ByZXZpZXciPwoSU2V0UHJpdmFjeVJlc3BvbnNlEikKCHNldHRpbmdzGAEgASgLMhcuYXBwLnYxLlByaXZhY3lTZXR0aW5ncyrNAQoOVXNlclN0YXR1c0tpbmQSIAocVVNFUl9TVEFUVVNfS0lORF9VTlNQRUNJRklFRBAAEhsKF1VTRVJfU1RBVFVTX0tJTkRfT05MSU5FEAESHAoYVVNFUl9TVEFUVVNfS0lORF9PRkZMSU5FEAISHQoZVVNFUl9TVEFUVVNfS0lORF9SRUNFTlRMWRADEh4KGlVTRVJfU1RBVFVTX0tJTkRfTEFTVF9XRUVLEAQSHwobVVNFUl9TVEFUVVNfS0lORF9MQVNUX01PTlRIEAUqjgEKD1ByaXZhY3lBdWRpZW5jZRIgChxQUklWQUNZX0FVRElFTkNFX1VOU1BFQ0lGSUVEEAASHQoZUFJJVkFDWV9BVURJRU5DRV9FVkVSWU9ORRABEh0KGVBSSVZBQ1lfQVVESUVOQ0VfQ09OVEFDVFMQAhIbChdQUklWQUNZX0FVRElFTkNFX05PQk9EWRADMrcFCgxVc2Vyc1NlcnZpY2USOgoHR2V0U2VsZhIWLmFwcC52MS5HZXRTZWxmUmVxdWVzdBoXLmFwcC52MS5HZXRTZWxmUmVzcG9uc2USPQoIR2V0VXNlcnMSFy5hcHAudjEuR2V0VXNlcnNSZXF1ZXN0GhguYXBwLnYxLkdldFVzZXJzUmVzcG9uc2USTAoNVXBkYXRlUHJvZmlsZRIcLmFwcC52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBodLmFwcC52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2USRgoLU2V0VXNlcm5hbWUSGi5hcHAudjEuU2V0VXNlcm5hbWVSZXF1ZXN0GhsuYXBwLnYxLlNldFVzZXJuYW1lUmVzcG9uc2USUgoPUmVzb2x2ZVVzZXJuYW1lEh4uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlcXVlc3QaHy5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USRgoLU2VhcmNoVXNlcnMSGi5hcHAudjEuU2VhcmNoVXNlcnNSZXF1ZXN0GhsuYXBwLnYxLlNlYXJjaFVzZXJzUmVzcG9uc2USNAoFQmxvY2sSFC5hcHAudjEuQmxvY2tSZXF1ZXN0GhUuYXBwLnYxLkJsb2NrUmVzcG9uc2USOgoHVW5ibG9jaxIWLmFwcC52MS5VbmJsb2NrUmVxdWVzdBoXLmFwcC52MS5VbmJsb2NrUmVzcG9uc2USQwoKR2V0UHJpdmFjeRIZLmFwcC52MS5HZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5HZXRQcml2YWN5UmVzcG9uc2USQwoKU2V0UHJpdmFjeRIZLmFwcC52MS5TZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5TZXRQcml2YWN5UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media]);
+  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIhAKDkdldFNlbGZSZXF1ZXN0Ii0KD0dldFNlbGZSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJwoPR2V0VXNlcnNSZXF1ZXN0EhQKCHVzZXJfaWRzGAEgAygDQgIwAiIvChBHZXRVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiegoUVXBkYXRlUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhAKA2JpbxgCIAEoCUgBiAEBEhoKDXBob3RvX2ZpbGVfaWQYAyABKAlIAogBAUIHCgVfbmFtZUIGCgRfYmlvQhAKDl9waG90b19maWxlX2lkIjMKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJgoSU2V0VXNlcm5hbWVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjEKE1NldFVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIioKFlJlc29sdmVVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiNQoXUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIjIKElNlYXJjaFVzZXJzUmVxdWVzdBINCgVxdWVyeRgBIAEoCRINCgVsaW1pdBgCIAEoBSIyChNTZWFyY2hVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiIwoMQmxvY2tSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIg8KDUJsb2NrUmVzcG9uc2UiJQoOVW5ibG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiEQoPVW5ibG9ja1Jlc3BvbnNlIs4CCg9Qcml2YWN5U2V0dGluZ3MSKgoJbGFzdF9zZWVuGAEgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIxChBmaW5kX2J5X3VzZXJuYW1lGAQgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIcChRub3RpZmljYXRpb25fcHJldmlldxgHIAEoCCITChFHZXRQcml2YWN5UmVxdWVzdCI/ChJHZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIvcDChFTZXRQcml2YWN5UmVxdWVzdBIvCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSACIAQESMwoNcHJvZmlsZV9waG90bxgCIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAYgBARIzCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgCiAEBEjYKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAOIAQESMwoNYWRkX3RvX2dyb3VwcxgFIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIBIgBARIzCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgFiAEBEiEKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgISAaIAQFCDAoKX2xhc3Rfc2VlbkIQCg5fcHJvZmlsZV9waG90b0IQCg5fZmluZF9ieV9lbWFpbEITChFfZmluZF9ieV91c2VybmFtZUIQCg5fYWRkX3RvX2dyb3Vwc0IQCg5fc2VuZF9tZXNzYWdlc0IXChVfbm90aWZpY2F0aW9uX3ByZXZpZXciPwoSU2V0UHJpdmFjeVJlc3BvbnNlEikKCHNldHRpbmdzGAEgASgLMhcuYXBwLnYxLlByaXZhY3lTZXR0aW5ncyI5ChBSZXBvcnRlZE1lc3NhZ2VzEhMKB2NoYXRfaWQYASABKANCAjACEhAKBHNlcXMYAiADKANCAjACIqwBCg1SZXBvcnRSZXF1ZXN0EhUKB3VzZXJfaWQYASABKANCAjACSAASFQoHY2hhdF9pZBgCIAEoA0ICMAJIABIsCghtZXNzYWdlcxgDIAEoCzIYLmFwcC52MS5SZXBvcnRlZE1lc3NhZ2VzSAASJAoGcmVhc29uGAQgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAUgASgJQggKBnRhcmdldCIQCg5SZXBvcnRSZXNwb25zZSrNAQoOVXNlclN0YXR1c0tpbmQSIAocVVNFUl9TVEFUVVNfS0lORF9VTlNQRUNJRklFRBAAEhsKF1VTRVJfU1RBVFVTX0tJTkRfT05MSU5FEAESHAoYVVNFUl9TVEFUVVNfS0lORF9PRkZMSU5FEAISHQoZVVNFUl9TVEFUVVNfS0lORF9SRUNFTlRMWRADEh4KGlVTRVJfU1RBVFVTX0tJTkRfTEFTVF9XRUVLEAQSHwobVVNFUl9TVEFUVVNfS0lORF9MQVNUX01PTlRIEAUqjgEKD1ByaXZhY3lBdWRpZW5jZRIgChxQUklWQUNZX0FVRElFTkNFX1VOU1BFQ0lGSUVEEAASHQoZUFJJVkFDWV9BVURJRU5DRV9FVkVSWU9ORRABEh0KGVBSSVZBQ1lfQVVESUVOQ0VfQ09OVEFDVFMQAhIbChdQUklWQUNZX0FVRElFTkNFX05PQk9EWRADKtUBCgxSZXBvcnRSZWFzb24SHQoZUkVQT1JUX1JFQVNPTl9VTlNQRUNJRklFRBAAEhYKElJFUE9SVF9SRUFTT05fU1BBTRABEhoKFlJFUE9SVF9SRUFTT05fVklPTEVOQ0UQAhIdChlSRVBPUlRfUkVBU09OX0NISUxEX0FCVVNFEAMSGQoVUkVQT1JUX1JFQVNPTl9JTExFR0FMEAQSHwobUkVQT1JUX1JFQVNPTl9QRVJTT05BTF9EQVRBEAUSFwoTUkVQT1JUX1JFQVNPTl9PVEhFUhAGMvAFCgxVc2Vyc1NlcnZpY2USOgoHR2V0U2VsZhIWLmFwcC52MS5HZXRTZWxmUmVxdWVzdBoXLmFwcC52MS5HZXRTZWxmUmVzcG9uc2USPQoIR2V0VXNlcnMSFy5hcHAudjEuR2V0VXNlcnNSZXF1ZXN0GhguYXBwLnYxLkdldFVzZXJzUmVzcG9uc2USTAoNVXBkYXRlUHJvZmlsZRIcLmFwcC52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBodLmFwcC52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2USRgoLU2V0VXNlcm5hbWUSGi5hcHAudjEuU2V0VXNlcm5hbWVSZXF1ZXN0GhsuYXBwLnYxLlNldFVzZXJuYW1lUmVzcG9uc2USUgoPUmVzb2x2ZVVzZXJuYW1lEh4uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlcXVlc3QaHy5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USRgoLU2VhcmNoVXNlcnMSGi5hcHAudjEuU2VhcmNoVXNlcnNSZXF1ZXN0GhsuYXBwLnYxLlNlYXJjaFVzZXJzUmVzcG9uc2USNAoFQmxvY2sSFC5hcHAudjEuQmxvY2tSZXF1ZXN0GhUuYXBwLnYxLkJsb2NrUmVzcG9uc2USOgoHVW5ibG9jaxIWLmFwcC52MS5VbmJsb2NrUmVxdWVzdBoXLmFwcC52MS5VbmJsb2NrUmVzcG9uc2USQwoKR2V0UHJpdmFjeRIZLmFwcC52MS5HZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5HZXRQcml2YWN5UmVzcG9uc2USQwoKU2V0UHJpdmFjeRIZLmFwcC52MS5TZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5TZXRQcml2YWN5UmVzcG9uc2USNwoGUmVwb3J0EhUuYXBwLnYxLlJlcG9ydFJlcXVlc3QaFi5hcHAudjEuUmVwb3J0UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media]);
 
 /**
  * @generated from message app.v1.UserStatus
@@ -550,6 +550,88 @@ export const SetPrivacyResponseSchema: GenMessage<SetPrivacyResponse> = /*@__PUR
   messageDesc(file_app_v1_users, 22);
 
 /**
+ * @generated from message app.v1.ReportedMessages
+ */
+export type ReportedMessages = Message<"app.v1.ReportedMessages"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * @generated from field: repeated int64 seqs = 2 [jstype = JS_NUMBER];
+   */
+  seqs: bigint[];
+};
+
+/**
+ * Describes the message app.v1.ReportedMessages.
+ * Use `create(ReportedMessagesSchema)` to create a new message.
+ */
+export const ReportedMessagesSchema: GenMessage<ReportedMessages> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 23);
+
+/**
+ * @generated from message app.v1.ReportRequest
+ */
+export type ReportRequest = Message<"app.v1.ReportRequest"> & {
+  /**
+   * @generated from oneof app.v1.ReportRequest.target
+   */
+  target: {
+    /**
+     * @generated from field: int64 user_id = 1 [jstype = JS_NUMBER];
+     */
+    value: bigint;
+    case: "userId";
+  } | {
+    /**
+     * @generated from field: int64 chat_id = 2 [jstype = JS_NUMBER];
+     */
+    value: bigint;
+    case: "chatId";
+  } | {
+    /**
+     * @generated from field: app.v1.ReportedMessages messages = 3;
+     */
+    value: ReportedMessages;
+    case: "messages";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: app.v1.ReportReason reason = 4;
+   */
+  reason: ReportReason;
+
+  /**
+   * Free text from the reporter, up to 1000 code points.
+   *
+   * @generated from field: string comment = 5;
+   */
+  comment: string;
+};
+
+/**
+ * Describes the message app.v1.ReportRequest.
+ * Use `create(ReportRequestSchema)` to create a new message.
+ */
+export const ReportRequestSchema: GenMessage<ReportRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 24);
+
+/**
+ * @generated from message app.v1.ReportResponse
+ */
+export type ReportResponse = Message<"app.v1.ReportResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.ReportResponse.
+ * Use `create(ReportResponseSchema)` to create a new message.
+ */
+export const ReportResponseSchema: GenMessage<ReportResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 25);
+
+/**
  * Presence as visible to the caller after privacy rules are applied.
  *
  * @generated from enum app.v1.UserStatusKind
@@ -630,6 +712,52 @@ export enum PrivacyAudience {
  */
 export const PrivacyAudienceSchema: GenEnum<PrivacyAudience> = /*@__PURE__*/
   enumDesc(file_app_v1_users, 1);
+
+/**
+ * @generated from enum app.v1.ReportReason
+ */
+export enum ReportReason {
+  /**
+   * @generated from enum value: REPORT_REASON_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REPORT_REASON_SPAM = 1;
+   */
+  SPAM = 1,
+
+  /**
+   * @generated from enum value: REPORT_REASON_VIOLENCE = 2;
+   */
+  VIOLENCE = 2,
+
+  /**
+   * @generated from enum value: REPORT_REASON_CHILD_ABUSE = 3;
+   */
+  CHILD_ABUSE = 3,
+
+  /**
+   * @generated from enum value: REPORT_REASON_ILLEGAL = 4;
+   */
+  ILLEGAL = 4,
+
+  /**
+   * @generated from enum value: REPORT_REASON_PERSONAL_DATA = 5;
+   */
+  PERSONAL_DATA = 5,
+
+  /**
+   * @generated from enum value: REPORT_REASON_OTHER = 6;
+   */
+  OTHER = 6,
+}
+
+/**
+ * Describes the enum app.v1.ReportReason.
+ */
+export const ReportReasonSchema: GenEnum<ReportReason> = /*@__PURE__*/
+  enumDesc(file_app_v1_users, 2);
 
 /**
  * Profiles, usernames, blocking and privacy settings.
@@ -720,6 +848,16 @@ export const UsersService: GenService<{
     methodKind: "unary";
     input: typeof SetPrivacyRequestSchema;
     output: typeof SetPrivacyResponseSchema;
+  },
+  /**
+   * Reports a user, a chat or messages to the tenant's moderation queue.
+   *
+   * @generated from rpc app.v1.UsersService.Report
+   */
+  report: {
+    methodKind: "unary";
+    input: typeof ReportRequestSchema;
+    output: typeof ReportResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_users, 0);

@@ -57,6 +57,8 @@ const (
 	UsersServiceGetPrivacyProcedure = "/app.v1.UsersService/GetPrivacy"
 	// UsersServiceSetPrivacyProcedure is the fully-qualified name of the UsersService's SetPrivacy RPC.
 	UsersServiceSetPrivacyProcedure = "/app.v1.UsersService/SetPrivacy"
+	// UsersServiceReportProcedure is the fully-qualified name of the UsersService's Report RPC.
+	UsersServiceReportProcedure = "/app.v1.UsersService/Report"
 )
 
 // UsersServiceClient is a client for the app.v1.UsersService service.
@@ -73,6 +75,8 @@ type UsersServiceClient interface {
 	Unblock(context.Context, *connect.Request[v1.UnblockRequest]) (*connect.Response[v1.UnblockResponse], error)
 	GetPrivacy(context.Context, *connect.Request[v1.GetPrivacyRequest]) (*connect.Response[v1.GetPrivacyResponse], error)
 	SetPrivacy(context.Context, *connect.Request[v1.SetPrivacyRequest]) (*connect.Response[v1.SetPrivacyResponse], error)
+	// Reports a user, a chat or messages to the tenant's moderation queue.
+	Report(context.Context, *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error)
 }
 
 // NewUsersServiceClient constructs a client for the app.v1.UsersService service. By default, it
@@ -146,6 +150,12 @@ func NewUsersServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(usersServiceMethods.ByName("SetPrivacy")),
 			connect.WithClientOptions(opts...),
 		),
+		report: connect.NewClient[v1.ReportRequest, v1.ReportResponse](
+			httpClient,
+			baseURL+UsersServiceReportProcedure,
+			connect.WithSchema(usersServiceMethods.ByName("Report")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -161,6 +171,7 @@ type usersServiceClient struct {
 	unblock         *connect.Client[v1.UnblockRequest, v1.UnblockResponse]
 	getPrivacy      *connect.Client[v1.GetPrivacyRequest, v1.GetPrivacyResponse]
 	setPrivacy      *connect.Client[v1.SetPrivacyRequest, v1.SetPrivacyResponse]
+	report          *connect.Client[v1.ReportRequest, v1.ReportResponse]
 }
 
 // GetSelf calls app.v1.UsersService.GetSelf.
@@ -213,6 +224,11 @@ func (c *usersServiceClient) SetPrivacy(ctx context.Context, req *connect.Reques
 	return c.setPrivacy.CallUnary(ctx, req)
 }
 
+// Report calls app.v1.UsersService.Report.
+func (c *usersServiceClient) Report(ctx context.Context, req *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error) {
+	return c.report.CallUnary(ctx, req)
+}
+
 // UsersServiceHandler is an implementation of the app.v1.UsersService service.
 type UsersServiceHandler interface {
 	// The caller's own user (profile, email from the IdP).
@@ -227,6 +243,8 @@ type UsersServiceHandler interface {
 	Unblock(context.Context, *connect.Request[v1.UnblockRequest]) (*connect.Response[v1.UnblockResponse], error)
 	GetPrivacy(context.Context, *connect.Request[v1.GetPrivacyRequest]) (*connect.Response[v1.GetPrivacyResponse], error)
 	SetPrivacy(context.Context, *connect.Request[v1.SetPrivacyRequest]) (*connect.Response[v1.SetPrivacyResponse], error)
+	// Reports a user, a chat or messages to the tenant's moderation queue.
+	Report(context.Context, *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error)
 }
 
 // NewUsersServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -296,6 +314,12 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(usersServiceMethods.ByName("SetPrivacy")),
 		connect.WithHandlerOptions(opts...),
 	)
+	usersServiceReportHandler := connect.NewUnaryHandler(
+		UsersServiceReportProcedure,
+		svc.Report,
+		connect.WithSchema(usersServiceMethods.ByName("Report")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.UsersService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UsersServiceGetSelfProcedure:
@@ -318,6 +342,8 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 			usersServiceGetPrivacyHandler.ServeHTTP(w, r)
 		case UsersServiceSetPrivacyProcedure:
 			usersServiceSetPrivacyHandler.ServeHTTP(w, r)
+		case UsersServiceReportProcedure:
+			usersServiceReportHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -365,4 +391,8 @@ func (UnimplementedUsersServiceHandler) GetPrivacy(context.Context, *connect.Req
 
 func (UnimplementedUsersServiceHandler) SetPrivacy(context.Context, *connect.Request[v1.SetPrivacyRequest]) (*connect.Response[v1.SetPrivacyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.SetPrivacy is not implemented"))
+}
+
+func (UnimplementedUsersServiceHandler) Report(context.Context, *connect.Request[v1.ReportRequest]) (*connect.Response[v1.ReportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.Report is not implemented"))
 }

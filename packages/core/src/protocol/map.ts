@@ -2,13 +2,20 @@
 // protobuf-es decodes every int64 to bigint even with jstype = JS_NUMBER;
 // each one passes assertSafeId here and leaves as a number, so the rest of
 // the client never sees a bigint. toWireId is the reverse direction.
-import type { Chat as WireChat, Dialog as WireDialog, GetDialogsResponse } from "@app/proto-ts/chats";
+import type {
+	Chat as WireChat,
+	Dialog as WireDialog,
+	ForumTopic as WireForumTopic,
+	GetDialogsResponse,
+	GetPeerDialogsResponse,
+} from "@app/proto-ts/chats";
 import { ChatType as WireChatType, HistoryVisibility, MemberRole as WireRole, SyncMode as WireSyncMode } from "@app/proto-ts/chats";
 import { SessionRevokeReason as WireRevokeReason } from "@app/proto-ts/auth";
 import { MediaKind as WireMediaKind } from "@app/proto-ts/media";
 import type {
 	GetHistoryResponse,
 	ForwardHeader as WireForward,
+	LinkPreview as WireLinkPreview,
 	Message as WireMessage,
 	MessageAction as WireAction,
 	MessageEntity as WireEntity,
@@ -38,10 +45,12 @@ import type {
 	Difference,
 	DifferenceResult,
 	EntityType,
+	ForumTopic,
 	ForwardHeader,
 	Hello,
 	HistoryPage,
 	LargeChatState,
+	LinkPreview,
 	MediaKind,
 	MemberRole,
 	Message,
@@ -151,7 +160,28 @@ export function toChat(chat: WireChat): Chat {
 		myRole: ROLES[chat.myRole] ?? "unknown",
 		myPermissions: chat.myPermissions,
 		left: chat.left,
+		forum: chat.forum,
 	};
+}
+
+export function toForumTopic(topic: WireForumTopic): ForumTopic {
+	return {
+		chatId: id(topic.chatId),
+		id: id(topic.id),
+		title: topic.title,
+		iconColor: topic.iconColor,
+		creatorId: id(topic.creatorId),
+		createdAt: id(topic.createdAt),
+		pinned: topic.pinned,
+		closed: topic.closed,
+		hidden: topic.hidden,
+		topSeq: id(topic.topSeq),
+	};
+}
+
+function toLinkPreview(preview: WireLinkPreview | undefined): LinkPreview | null {
+	if (preview === undefined) return null;
+	return { url: preview.url, siteName: preview.siteName, title: preview.title, description: preview.description };
 }
 
 export function toDialog(dialog: WireDialog): Dialog {
@@ -264,6 +294,8 @@ export function toMessage(message: WireMessage): Message {
 		reactions: message.reactions.map(toReaction),
 		integrationLabel: message.integrationLabel,
 		action: toAction(message.action),
+		topicId: id(message.topicId),
+		linkPreview: toLinkPreview(message.linkPreview),
 	};
 }
 
@@ -297,6 +329,10 @@ function toBody(update: WireUpdate): UpdateBody {
 				maxSeq: id(kind.value.maxSeq),
 				outbox: kind.value.outbox,
 				unreadCount: kind.value.unreadCount,
+				topicId: id(kind.value.topicId),
+				topicUnreadCount: kind.value.topicUnreadCount,
+				topSeq: id(kind.value.topSeq),
+				chatPts: id(kind.value.chatPts),
 			};
 		case "pin":
 			return { kind: "pin", chatId: id(kind.value.chatId), seq: id(kind.value.seq), pinned: kind.value.pinned };
@@ -332,6 +368,10 @@ function toBody(update: WireUpdate): UpdateBody {
 		case "chatUpdated": {
 			const chat = kind.value.chat;
 			return chat === undefined ? { kind: "unknown" } : { kind: "chat_updated", chat: toChat(chat) };
+		}
+		case "topicChanged": {
+			const topic = kind.value.topic;
+			return topic === undefined ? { kind: "unknown" } : { kind: "topic_changed", topic: toForumTopic(topic) };
 		}
 		case "chatActivity":
 			return {
@@ -453,7 +493,20 @@ export function toHistoryPage(response: GetHistoryResponse): HistoryPage {
 	};
 }
 
-export function toDialogsPage(response: GetDialogsResponse): DialogsPage {
+/** GetPeerDialogs has the dialog page shape without a cursor. */
+export function toPeerDialogs(response: GetPeerDialogsResponse): DialogsPage {
+	return toDialogsPage({
+		dialogs: response.dialogs,
+		messages: response.messages,
+		chats: response.chats,
+		users: response.users,
+		nextCursor: "",
+	});
+}
+
+export function toDialogsPage(
+	response: Pick<GetDialogsResponse, "dialogs" | "messages" | "chats" | "users" | "nextCursor">,
+): DialogsPage {
 	return {
 		dialogs: response.dialogs.map(toDialog),
 		messages: response.messages.map(toMessage),

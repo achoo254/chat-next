@@ -853,10 +853,12 @@ func (x *OpenChatFrame) GetVisibleChatIds() []int64 {
 
 // Both directions. user_id is set by the server and ignored from clients.
 type TypingFrame struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Action        TypingAction           `protobuf:"varint,3,opt,name=action,proto3,enum=app.v1.TypingAction" json:"action,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	UserId int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Action TypingAction           `protobuf:"varint,3,opt,name=action,proto3,enum=app.v1.TypingAction" json:"action,omitempty"`
+	// Forum groups: the topic being typed in.
+	TopicId       int64 `protobuf:"varint,4,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -910,6 +912,13 @@ func (x *TypingFrame) GetAction() TypingAction {
 		return x.Action
 	}
 	return TypingAction_TYPING_ACTION_UNSPECIFIED
+}
+
+func (x *TypingFrame) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
 }
 
 // The client's own state: drives presence and push suppression.
@@ -1211,11 +1220,12 @@ const file_app_v1_realtime_proto_rawDesc = "" +
 	"\x05chats\x18\x03 \x03(\v2\f.app.v1.ChatR\x05chats\"Z\n" +
 	"\rOpenChatFrame\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12,\n" +
-	"\x10visible_chat_ids\x18\x02 \x03(\x03B\x020\x02R\x0evisibleChatIds\"u\n" +
+	"\x10visible_chat_ids\x18\x02 \x03(\x03B\x020\x02R\x0evisibleChatIds\"\x94\x01\n" +
 	"\vTypingFrame\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
 	"\auser_id\x18\x02 \x01(\x03B\x020\x02R\x06userId\x12,\n" +
-	"\x06action\x18\x03 \x01(\x0e2\x14.app.v1.TypingActionR\x06action\"5\n" +
+	"\x06action\x18\x03 \x01(\x0e2\x14.app.v1.TypingActionR\x06action\x12\x1d\n" +
+	"\btopic_id\x18\x04 \x01(\x03B\x020\x02R\atopicId\"5\n" +
 	"\x13ClientPresenceFrame\x12\x1e\n" +
 	"\n" +
 	"foreground\x18\x01 \x01(\bR\n" +

@@ -35,6 +35,24 @@ service ChatsService {
   rpc JoinByInvite(JoinByInviteRequest) returns (JoinByInviteResponse);
   rpc SetHistoryVisibility(SetHistoryVisibilityRequest) returns (SetHistoryVisibilityResponse);
   rpc UpdateChatInfo(UpdateChatInfoRequest) returns (UpdateChatInfoResponse);
+  // The caller's dialogs of the given chats (read state, top message), e.g.
+  // to refresh a few chats without reloading the whole list.
+  rpc GetPeerDialogs(GetPeerDialogsRequest) returns (GetPeerDialogsResponse);
+  // Previews the chat behind an invite link before the user confirms.
+  rpc CheckInvite(CheckInviteRequest) returns (CheckInviteResponse);
+  rpc GetInviteLinks(GetInviteLinksRequest) returns (GetInviteLinksResponse);
+  rpc RevokeInviteLink(RevokeInviteLinkRequest) returns (RevokeInviteLinkResponse);
+  // Forum topics of a group (Chat.forum). A topic is metadata of the group:
+  // its messages carry topic_id inside the group's single seq, and sync stays
+  // per chat.
+  rpc GetForumTopics(GetForumTopicsRequest) returns (GetForumTopicsResponse);
+  rpc CreateForumTopic(CreateForumTopicRequest) returns (CreateForumTopicResponse);
+  rpc EditForumTopic(EditForumTopicRequest) returns (EditForumTopicResponse);
+  // Only admins post in a closed topic.
+  rpc CloseForumTopic(CloseForumTopicRequest) returns (CloseForumTopicResponse);
+  // A hidden topic leaves the topic list; its messages stay readable and
+  // searchable by members.
+  rpc HideForumTopic(HideForumTopicRequest) returns (HideForumTopicResponse);
 }
 
 // Same name `type` and values in DB, proto and JSON.
@@ -80,6 +98,8 @@ enum ChatPermission {
   CHAT_PERMISSION_ADD_MEMBERS = 4;
   CHAT_PERMISSION_PIN_MESSAGES = 8;
   CHAT_PERMISSION_CHANGE_INFO = 16;
+  // Create forum topics and edit the ones the member created.
+  CHAT_PERMISSION_MANAGE_TOPICS = 32;
 }
 
 message Chat {
@@ -105,6 +125,9 @@ message Chat {
   uint32 my_permissions = 14;
   // The caller is no longer a member (left or removed).
   bool left = 15;
+  // GROUP only: messages are organised in forum topics (ForumTopic). Once on
+  // it stays on.
+  bool forum = 16;
 }
 
 message ChatMember {
@@ -140,6 +163,26 @@ message InviteLink {
   bool revoked = 6;
 }
 
+// Topic of a forum group. Topic 1 is the default "General" topic, created
+// when the forum is turned on; messages sent without a topic land there.
+message ForumTopic {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 id = 2 [jstype = JS_NUMBER];
+  string title = 3;
+  // 0xRRGGBB of the topic icon.
+  int32 icon_color = 4;
+  int64 creator_id = 5 [jstype = JS_NUMBER];
+  int64 created_at = 6 [jstype = JS_NUMBER];
+  bool pinned = 7;
+  bool closed = 8;
+  bool hidden = 9;
+  // Newest message of the topic; 0 when it has none.
+  int64 top_seq = 10 [jstype = JS_NUMBER];
+  // Caller-specific read state (GetForumTopics only; 0 in updates).
+  int64 read_inbox_max_seq = 11 [jstype = JS_NUMBER];
+  int32 unread_count = 12;
+}
+
 message CreatePrivateRequest {
   int64 user_id = 1 [jstype = JS_NUMBER];
 }
@@ -152,6 +195,8 @@ message CreatePrivateResponse {
 message CreateGroupRequest {
   string title = 1;
   repeated int64 user_ids = 2 [jstype = JS_NUMBER];
+  // Create the group with forum topics on.
+  bool forum = 3;
 }
 
 message CreateGroupResponse {
@@ -300,9 +345,116 @@ message UpdateChatInfoRequest {
   // Empty string removes the photo.
   optional string photo_file_id = 4;
   optional uint32 default_permissions = 5;
+  // GROUP only; true turns forum topics on (it cannot be turned off).
+  optional bool forum = 6;
 }
 
 message UpdateChatInfoResponse {
   Chat chat = 1;
+  SyncAck ack = 2;
+}
+
+message GetPeerDialogsRequest {
+  repeated int64 chat_ids = 1 [jstype = JS_NUMBER];
+}
+
+message GetPeerDialogsResponse {
+  // Only chats the caller is a member of; unknown ids are omitted.
+  repeated Dialog dialogs = 1;
+  repeated Message messages = 2;
+  repeated Chat chats = 3;
+  repeated User users = 4;
+}
+
+message CheckInviteRequest {
+  // The full link or its token part.
+  string link = 1;
+}
+
+message CheckInviteResponse {
+  string title = 1;
+  string about = 2;
+  ChatType type = 3;
+  int32 member_count = 4;
+  // Set when the caller is already a member: open this chat instead.
+  Chat chat = 5;
+}
+
+message GetInviteLinksRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetInviteLinksResponse {
+  // Active links first, newest first.
+  repeated InviteLink invites = 1;
+}
+
+message RevokeInviteLinkRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  string link = 2;
+}
+
+message RevokeInviteLinkResponse {
+  InviteLink invite = 1;
+}
+
+message GetForumTopicsRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetForumTopicsResponse {
+  // Pinned topics first, then by newest message. Hidden topics are included
+  // with hidden set; clients leave them out of the list.
+  repeated ForumTopic topics = 1;
+  // Top message of each topic.
+  repeated Message messages = 2;
+  repeated User users = 3;
+}
+
+message CreateForumTopicRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  string title = 2;
+  int32 icon_color = 3;
+}
+
+message CreateForumTopicResponse {
+  ForumTopic topic = 1;
+  SyncAck ack = 2;
+}
+
+message EditForumTopicRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+  // Unset fields are left unchanged.
+  optional string title = 3;
+  optional int32 icon_color = 4;
+  // Admins only.
+  optional bool pinned = 5;
+}
+
+message EditForumTopicResponse {
+  ForumTopic topic = 1;
+  SyncAck ack = 2;
+}
+
+message CloseForumTopicRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+  bool closed = 3;
+}
+
+message CloseForumTopicResponse {
+  ForumTopic topic = 1;
+  SyncAck ack = 2;
+}
+
+message HideForumTopicRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+  bool hidden = 3;
+}
+
+message HideForumTopicResponse {
+  ForumTopic topic = 1;
   SyncAck ack = 2;
 }

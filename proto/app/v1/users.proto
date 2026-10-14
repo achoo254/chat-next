@@ -25,6 +25,8 @@ service UsersService {
   rpc Unblock(UnblockRequest) returns (UnblockResponse);
   rpc GetPrivacy(GetPrivacyRequest) returns (GetPrivacyResponse);
   rpc SetPrivacy(SetPrivacyRequest) returns (SetPrivacyResponse);
+  // Reports a user, a chat or messages to the tenant's moderation queue.
+  rpc Report(ReportRequest) returns (ReportResponse);
 }
 
 // Presence as visible to the caller after privacy rules are applied.
@@ -171,3 +173,31 @@ message SetPrivacyRequest {
 message SetPrivacyResponse {
   PrivacySettings settings = 1;
 }
+
+enum ReportReason {
+  REPORT_REASON_UNSPECIFIED = 0;
+  REPORT_REASON_SPAM = 1;
+  REPORT_REASON_VIOLENCE = 2;
+  REPORT_REASON_CHILD_ABUSE = 3;
+  REPORT_REASON_ILLEGAL = 4;
+  REPORT_REASON_PERSONAL_DATA = 5;
+  REPORT_REASON_OTHER = 6;
+}
+
+message ReportedMessages {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 seqs = 2 [jstype = JS_NUMBER];
+}
+
+message ReportRequest {
+  oneof target {
+    int64 user_id = 1 [jstype = JS_NUMBER];
+    int64 chat_id = 2 [jstype = JS_NUMBER];
+    ReportedMessages messages = 3;
+  }
+  ReportReason reason = 4;
+  // Free text from the reporter, up to 1000 code points.
+  string comment = 5;
+}
+
+message ReportResponse {}

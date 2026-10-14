@@ -13,6 +13,7 @@ import {
 	DialogSchema,
 	GetChatResponseSchema,
 	GetDialogsResponseSchema,
+	GetPeerDialogsResponseSchema,
 	SyncMode,
 	type Chat as WireChat,
 	type Dialog as WireDialog,
@@ -469,7 +470,19 @@ export class FakeServer {
 		).length;
 		this.pushUser(
 			userId,
-			{ case: "read", value: { chatId: big(chatId), maxSeq: big(read.inbox), outbox: false, unreadCount: unread } },
+			{
+				case: "read",
+				value: {
+					chatId: big(chatId),
+					maxSeq: big(read.inbox),
+					outbox: false,
+					unreadCount: unread,
+					// The count covers every message up to the chat's newest seq,
+					// with the large chat's log at chatPts.
+					topSeq: big(chat.nextSeq - 1),
+					chatPts: big(chat.syncMode === SyncMode.LARGE ? chat.chatPts : 0),
+				},
+			},
 			chatId,
 		);
 		const ack = create(SyncAckSchema, { pts: big(this.user(userId).pts), ptsCount: 1, serverEpoch: big(this.epoch) });
@@ -836,6 +849,16 @@ export class FakeServer {
 							...entities,
 							nextCursor: offset + limit < dialogs.length ? String(offset + limit) : "",
 						});
+					}),
+				getPeerDialogs: (request) =>
+					this.rpc(userId, "getPeerDialogs", () => {
+						const ids = (request.chatIds ?? []).map(num).filter((id) => this.chats.get(id)?.members.has(userId) === true);
+						const dialogs = ids.map((id) => this.dialog(id, userId));
+						const messages = dialogs.flatMap((d) => {
+							const record = this.chat(num(d.chatId)).messages.get(num(d.topSeq));
+							return record === undefined || num(d.topSeq) === 0 ? [] : [this.view(record, userId)];
+						});
+						return create(GetPeerDialogsResponseSchema, { dialogs, messages, ...this.entitiesForChats(userId, ids) });
 					}),
 				getChat: (request) =>
 					this.rpc(userId, "getChat", () =>

@@ -28,7 +28,10 @@ const CLIENT_PLATFORMS: Record<ClientKind, ClientPlatform> = {
 
 export interface StartOptions {
 	readonly api: RemoteApi;
-	/** WebSocket endpoint of the realtime gateway. */
+	/**
+	 * WebSocket endpoint of the realtime gateway; on the web
+	 * realtimeUrlFor(location.origin), i.e. wss://<host>/ws.
+	 */
 	readonly realtimeUrl: string;
 	readonly appVersion: string;
 	readonly client: ClientKind;

@@ -8,7 +8,12 @@ import { UsersService } from "@app/proto-ts/users";
 
 export interface RemoteApi {
 	readonly updates: Pick<Client<typeof UpdatesService>, "getState" | "getDifference" | "getChatDifference">;
-	readonly chats: Pick<Client<typeof ChatsService>, "getDialogs" | "getChat">;
+	/**
+	 * getPeerDialogs is optional so test doubles written before it existed
+	 * still fit; createRemoteApi always provides it.
+	 */
+	readonly chats: Pick<Client<typeof ChatsService>, "getDialogs" | "getChat"> &
+		Partial<Pick<Client<typeof ChatsService>, "getPeerDialogs">>;
 	readonly messages: Pick<
 		Client<typeof MessagesService>,
 		"sendMessage" | "editMessage" | "deleteMessages" | "readHistory" | "getHistory"

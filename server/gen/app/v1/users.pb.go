@@ -136,6 +136,67 @@ func (PrivacyAudience) EnumDescriptor() ([]byte, []int) {
 	return file_app_v1_users_proto_rawDescGZIP(), []int{1}
 }
 
+type ReportReason int32
+
+const (
+	ReportReason_REPORT_REASON_UNSPECIFIED   ReportReason = 0
+	ReportReason_REPORT_REASON_SPAM          ReportReason = 1
+	ReportReason_REPORT_REASON_VIOLENCE      ReportReason = 2
+	ReportReason_REPORT_REASON_CHILD_ABUSE   ReportReason = 3
+	ReportReason_REPORT_REASON_ILLEGAL       ReportReason = 4
+	ReportReason_REPORT_REASON_PERSONAL_DATA ReportReason = 5
+	ReportReason_REPORT_REASON_OTHER         ReportReason = 6
+)
+
+// Enum value maps for ReportReason.
+var (
+	ReportReason_name = map[int32]string{
+		0: "REPORT_REASON_UNSPECIFIED",
+		1: "REPORT_REASON_SPAM",
+		2: "REPORT_REASON_VIOLENCE",
+		3: "REPORT_REASON_CHILD_ABUSE",
+		4: "REPORT_REASON_ILLEGAL",
+		5: "REPORT_REASON_PERSONAL_DATA",
+		6: "REPORT_REASON_OTHER",
+	}
+	ReportReason_value = map[string]int32{
+		"REPORT_REASON_UNSPECIFIED":   0,
+		"REPORT_REASON_SPAM":          1,
+		"REPORT_REASON_VIOLENCE":      2,
+		"REPORT_REASON_CHILD_ABUSE":   3,
+		"REPORT_REASON_ILLEGAL":       4,
+		"REPORT_REASON_PERSONAL_DATA": 5,
+		"REPORT_REASON_OTHER":         6,
+	}
+)
+
+func (x ReportReason) Enum() *ReportReason {
+	p := new(ReportReason)
+	*p = x
+	return p
+}
+
+func (x ReportReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ReportReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_app_v1_users_proto_enumTypes[2].Descriptor()
+}
+
+func (ReportReason) Type() protoreflect.EnumType {
+	return &file_app_v1_users_proto_enumTypes[2]
+}
+
+func (x ReportReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ReportReason.Descriptor instead.
+func (ReportReason) EnumDescriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{2}
+}
+
 type UserStatus struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  UserStatusKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=app.v1.UserStatusKind" json:"kind,omitempty"`
@@ -1345,6 +1406,209 @@ func (x *SetPrivacyResponse) GetSettings() *PrivacySettings {
 	return nil
 }
 
+type ReportedMessages struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	Seqs          []int64                `protobuf:"varint,2,rep,packed,name=seqs,proto3" json:"seqs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportedMessages) Reset() {
+	*x = ReportedMessages{}
+	mi := &file_app_v1_users_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportedMessages) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportedMessages) ProtoMessage() {}
+
+func (x *ReportedMessages) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportedMessages.ProtoReflect.Descriptor instead.
+func (*ReportedMessages) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ReportedMessages) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+func (x *ReportedMessages) GetSeqs() []int64 {
+	if x != nil {
+		return x.Seqs
+	}
+	return nil
+}
+
+type ReportRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Target:
+	//
+	//	*ReportRequest_UserId
+	//	*ReportRequest_ChatId
+	//	*ReportRequest_Messages
+	Target isReportRequest_Target `protobuf_oneof:"target"`
+	Reason ReportReason           `protobuf:"varint,4,opt,name=reason,proto3,enum=app.v1.ReportReason" json:"reason,omitempty"`
+	// Free text from the reporter, up to 1000 code points.
+	Comment       string `protobuf:"bytes,5,opt,name=comment,proto3" json:"comment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportRequest) Reset() {
+	*x = ReportRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportRequest) ProtoMessage() {}
+
+func (x *ReportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportRequest.ProtoReflect.Descriptor instead.
+func (*ReportRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ReportRequest) GetTarget() isReportRequest_Target {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *ReportRequest) GetUserId() int64 {
+	if x != nil {
+		if x, ok := x.Target.(*ReportRequest_UserId); ok {
+			return x.UserId
+		}
+	}
+	return 0
+}
+
+func (x *ReportRequest) GetChatId() int64 {
+	if x != nil {
+		if x, ok := x.Target.(*ReportRequest_ChatId); ok {
+			return x.ChatId
+		}
+	}
+	return 0
+}
+
+func (x *ReportRequest) GetMessages() *ReportedMessages {
+	if x != nil {
+		if x, ok := x.Target.(*ReportRequest_Messages); ok {
+			return x.Messages
+		}
+	}
+	return nil
+}
+
+func (x *ReportRequest) GetReason() ReportReason {
+	if x != nil {
+		return x.Reason
+	}
+	return ReportReason_REPORT_REASON_UNSPECIFIED
+}
+
+func (x *ReportRequest) GetComment() string {
+	if x != nil {
+		return x.Comment
+	}
+	return ""
+}
+
+type isReportRequest_Target interface {
+	isReportRequest_Target()
+}
+
+type ReportRequest_UserId struct {
+	UserId int64 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type ReportRequest_ChatId struct {
+	ChatId int64 `protobuf:"varint,2,opt,name=chat_id,json=chatId,proto3,oneof"`
+}
+
+type ReportRequest_Messages struct {
+	Messages *ReportedMessages `protobuf:"bytes,3,opt,name=messages,proto3,oneof"`
+}
+
+func (*ReportRequest_UserId) isReportRequest_Target() {}
+
+func (*ReportRequest_ChatId) isReportRequest_Target() {}
+
+func (*ReportRequest_Messages) isReportRequest_Target() {}
+
+type ReportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportResponse) Reset() {
+	*x = ReportResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportResponse) ProtoMessage() {}
+
+func (x *ReportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportResponse.ProtoReflect.Descriptor instead.
+func (*ReportResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{25}
+}
+
 var File_app_v1_users_proto protoreflect.FileDescriptor
 
 const file_app_v1_users_proto_rawDesc = "" +
@@ -1432,7 +1696,18 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x0e_send_messagesB\x17\n" +
 	"\x15_notification_preview\"I\n" +
 	"\x12SetPrivacyResponse\x123\n" +
-	"\bsettings\x18\x01 \x01(\v2\x17.app.v1.PrivacySettingsR\bsettings*\xcd\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2\x17.app.v1.PrivacySettingsR\bsettings\"G\n" +
+	"\x10ReportedMessages\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x16\n" +
+	"\x04seqs\x18\x02 \x03(\x03B\x020\x02R\x04seqs\"\xd7\x01\n" +
+	"\rReportRequest\x12\x1d\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02H\x00R\x06userId\x12\x1d\n" +
+	"\achat_id\x18\x02 \x01(\x03B\x020\x02H\x00R\x06chatId\x126\n" +
+	"\bmessages\x18\x03 \x01(\v2\x18.app.v1.ReportedMessagesH\x00R\bmessages\x12,\n" +
+	"\x06reason\x18\x04 \x01(\x0e2\x14.app.v1.ReportReasonR\x06reason\x12\x18\n" +
+	"\acomment\x18\x05 \x01(\tR\acommentB\b\n" +
+	"\x06target\"\x10\n" +
+	"\x0eReportResponse*\xcd\x01\n" +
 	"\x0eUserStatusKind\x12 \n" +
 	"\x1cUSER_STATUS_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17USER_STATUS_KIND_ONLINE\x10\x01\x12\x1c\n" +
@@ -1444,7 +1719,15 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x1cPRIVACY_AUDIENCE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19PRIVACY_AUDIENCE_EVERYONE\x10\x01\x12\x1d\n" +
 	"\x19PRIVACY_AUDIENCE_CONTACTS\x10\x02\x12\x1b\n" +
-	"\x17PRIVACY_AUDIENCE_NOBODY\x10\x032\xb7\x05\n" +
+	"\x17PRIVACY_AUDIENCE_NOBODY\x10\x03*\xd5\x01\n" +
+	"\fReportReason\x12\x1d\n" +
+	"\x19REPORT_REASON_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12REPORT_REASON_SPAM\x10\x01\x12\x1a\n" +
+	"\x16REPORT_REASON_VIOLENCE\x10\x02\x12\x1d\n" +
+	"\x19REPORT_REASON_CHILD_ABUSE\x10\x03\x12\x19\n" +
+	"\x15REPORT_REASON_ILLEGAL\x10\x04\x12\x1f\n" +
+	"\x1bREPORT_REASON_PERSONAL_DATA\x10\x05\x12\x17\n" +
+	"\x13REPORT_REASON_OTHER\x10\x062\xf0\x05\n" +
 	"\fUsersService\x12:\n" +
 	"\aGetSelf\x12\x16.app.v1.GetSelfRequest\x1a\x17.app.v1.GetSelfResponse\x12=\n" +
 	"\bGetUsers\x12\x17.app.v1.GetUsersRequest\x1a\x18.app.v1.GetUsersResponse\x12L\n" +
@@ -1457,7 +1740,8 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\n" +
 	"GetPrivacy\x12\x19.app.v1.GetPrivacyRequest\x1a\x1a.app.v1.GetPrivacyResponse\x12C\n" +
 	"\n" +
-	"SetPrivacy\x12\x19.app.v1.SetPrivacyRequest\x1a\x1a.app.v1.SetPrivacyResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"SetPrivacy\x12\x19.app.v1.SetPrivacyRequest\x1a\x1a.app.v1.SetPrivacyResponse\x127\n" +
+	"\x06Report\x12\x15.app.v1.ReportRequest\x1a\x16.app.v1.ReportResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_users_proto_rawDescOnce sync.Once
@@ -1471,85 +1755,93 @@ func file_app_v1_users_proto_rawDescGZIP() []byte {
 	return file_app_v1_users_proto_rawDescData
 }
 
-var file_app_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_app_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_app_v1_users_proto_goTypes = []any{
 	(UserStatusKind)(0),             // 0: app.v1.UserStatusKind
 	(PrivacyAudience)(0),            // 1: app.v1.PrivacyAudience
-	(*UserStatus)(nil),              // 2: app.v1.UserStatus
-	(*User)(nil),                    // 3: app.v1.User
-	(*GetSelfRequest)(nil),          // 4: app.v1.GetSelfRequest
-	(*GetSelfResponse)(nil),         // 5: app.v1.GetSelfResponse
-	(*GetUsersRequest)(nil),         // 6: app.v1.GetUsersRequest
-	(*GetUsersResponse)(nil),        // 7: app.v1.GetUsersResponse
-	(*UpdateProfileRequest)(nil),    // 8: app.v1.UpdateProfileRequest
-	(*UpdateProfileResponse)(nil),   // 9: app.v1.UpdateProfileResponse
-	(*SetUsernameRequest)(nil),      // 10: app.v1.SetUsernameRequest
-	(*SetUsernameResponse)(nil),     // 11: app.v1.SetUsernameResponse
-	(*ResolveUsernameRequest)(nil),  // 12: app.v1.ResolveUsernameRequest
-	(*ResolveUsernameResponse)(nil), // 13: app.v1.ResolveUsernameResponse
-	(*SearchUsersRequest)(nil),      // 14: app.v1.SearchUsersRequest
-	(*SearchUsersResponse)(nil),     // 15: app.v1.SearchUsersResponse
-	(*BlockRequest)(nil),            // 16: app.v1.BlockRequest
-	(*BlockResponse)(nil),           // 17: app.v1.BlockResponse
-	(*UnblockRequest)(nil),          // 18: app.v1.UnblockRequest
-	(*UnblockResponse)(nil),         // 19: app.v1.UnblockResponse
-	(*PrivacySettings)(nil),         // 20: app.v1.PrivacySettings
-	(*GetPrivacyRequest)(nil),       // 21: app.v1.GetPrivacyRequest
-	(*GetPrivacyResponse)(nil),      // 22: app.v1.GetPrivacyResponse
-	(*SetPrivacyRequest)(nil),       // 23: app.v1.SetPrivacyRequest
-	(*SetPrivacyResponse)(nil),      // 24: app.v1.SetPrivacyResponse
-	(*MediaRef)(nil),                // 25: app.v1.MediaRef
+	(ReportReason)(0),               // 2: app.v1.ReportReason
+	(*UserStatus)(nil),              // 3: app.v1.UserStatus
+	(*User)(nil),                    // 4: app.v1.User
+	(*GetSelfRequest)(nil),          // 5: app.v1.GetSelfRequest
+	(*GetSelfResponse)(nil),         // 6: app.v1.GetSelfResponse
+	(*GetUsersRequest)(nil),         // 7: app.v1.GetUsersRequest
+	(*GetUsersResponse)(nil),        // 8: app.v1.GetUsersResponse
+	(*UpdateProfileRequest)(nil),    // 9: app.v1.UpdateProfileRequest
+	(*UpdateProfileResponse)(nil),   // 10: app.v1.UpdateProfileResponse
+	(*SetUsernameRequest)(nil),      // 11: app.v1.SetUsernameRequest
+	(*SetUsernameResponse)(nil),     // 12: app.v1.SetUsernameResponse
+	(*ResolveUsernameRequest)(nil),  // 13: app.v1.ResolveUsernameRequest
+	(*ResolveUsernameResponse)(nil), // 14: app.v1.ResolveUsernameResponse
+	(*SearchUsersRequest)(nil),      // 15: app.v1.SearchUsersRequest
+	(*SearchUsersResponse)(nil),     // 16: app.v1.SearchUsersResponse
+	(*BlockRequest)(nil),            // 17: app.v1.BlockRequest
+	(*BlockResponse)(nil),           // 18: app.v1.BlockResponse
+	(*UnblockRequest)(nil),          // 19: app.v1.UnblockRequest
+	(*UnblockResponse)(nil),         // 20: app.v1.UnblockResponse
+	(*PrivacySettings)(nil),         // 21: app.v1.PrivacySettings
+	(*GetPrivacyRequest)(nil),       // 22: app.v1.GetPrivacyRequest
+	(*GetPrivacyResponse)(nil),      // 23: app.v1.GetPrivacyResponse
+	(*SetPrivacyRequest)(nil),       // 24: app.v1.SetPrivacyRequest
+	(*SetPrivacyResponse)(nil),      // 25: app.v1.SetPrivacyResponse
+	(*ReportedMessages)(nil),        // 26: app.v1.ReportedMessages
+	(*ReportRequest)(nil),           // 27: app.v1.ReportRequest
+	(*ReportResponse)(nil),          // 28: app.v1.ReportResponse
+	(*MediaRef)(nil),                // 29: app.v1.MediaRef
 }
 var file_app_v1_users_proto_depIdxs = []int32{
 	0,  // 0: app.v1.UserStatus.kind:type_name -> app.v1.UserStatusKind
-	25, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
-	2,  // 2: app.v1.User.status:type_name -> app.v1.UserStatus
-	3,  // 3: app.v1.GetSelfResponse.user:type_name -> app.v1.User
-	3,  // 4: app.v1.GetUsersResponse.users:type_name -> app.v1.User
-	3,  // 5: app.v1.UpdateProfileResponse.user:type_name -> app.v1.User
-	3,  // 6: app.v1.SetUsernameResponse.user:type_name -> app.v1.User
-	3,  // 7: app.v1.ResolveUsernameResponse.user:type_name -> app.v1.User
-	3,  // 8: app.v1.SearchUsersResponse.users:type_name -> app.v1.User
+	29, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
+	3,  // 2: app.v1.User.status:type_name -> app.v1.UserStatus
+	4,  // 3: app.v1.GetSelfResponse.user:type_name -> app.v1.User
+	4,  // 4: app.v1.GetUsersResponse.users:type_name -> app.v1.User
+	4,  // 5: app.v1.UpdateProfileResponse.user:type_name -> app.v1.User
+	4,  // 6: app.v1.SetUsernameResponse.user:type_name -> app.v1.User
+	4,  // 7: app.v1.ResolveUsernameResponse.user:type_name -> app.v1.User
+	4,  // 8: app.v1.SearchUsersResponse.users:type_name -> app.v1.User
 	1,  // 9: app.v1.PrivacySettings.last_seen:type_name -> app.v1.PrivacyAudience
 	1,  // 10: app.v1.PrivacySettings.profile_photo:type_name -> app.v1.PrivacyAudience
 	1,  // 11: app.v1.PrivacySettings.find_by_email:type_name -> app.v1.PrivacyAudience
 	1,  // 12: app.v1.PrivacySettings.find_by_username:type_name -> app.v1.PrivacyAudience
 	1,  // 13: app.v1.PrivacySettings.add_to_groups:type_name -> app.v1.PrivacyAudience
 	1,  // 14: app.v1.PrivacySettings.send_messages:type_name -> app.v1.PrivacyAudience
-	20, // 15: app.v1.GetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
+	21, // 15: app.v1.GetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
 	1,  // 16: app.v1.SetPrivacyRequest.last_seen:type_name -> app.v1.PrivacyAudience
 	1,  // 17: app.v1.SetPrivacyRequest.profile_photo:type_name -> app.v1.PrivacyAudience
 	1,  // 18: app.v1.SetPrivacyRequest.find_by_email:type_name -> app.v1.PrivacyAudience
 	1,  // 19: app.v1.SetPrivacyRequest.find_by_username:type_name -> app.v1.PrivacyAudience
 	1,  // 20: app.v1.SetPrivacyRequest.add_to_groups:type_name -> app.v1.PrivacyAudience
 	1,  // 21: app.v1.SetPrivacyRequest.send_messages:type_name -> app.v1.PrivacyAudience
-	20, // 22: app.v1.SetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
-	4,  // 23: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
-	6,  // 24: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
-	8,  // 25: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
-	10, // 26: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
-	12, // 27: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
-	14, // 28: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
-	16, // 29: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
-	18, // 30: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
-	21, // 31: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
-	23, // 32: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
-	5,  // 33: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
-	7,  // 34: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
-	9,  // 35: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
-	11, // 36: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
-	13, // 37: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
-	15, // 38: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
-	17, // 39: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
-	19, // 40: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
-	22, // 41: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
-	24, // 42: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
-	33, // [33:43] is the sub-list for method output_type
-	23, // [23:33] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	21, // 22: app.v1.SetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
+	26, // 23: app.v1.ReportRequest.messages:type_name -> app.v1.ReportedMessages
+	2,  // 24: app.v1.ReportRequest.reason:type_name -> app.v1.ReportReason
+	5,  // 25: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
+	7,  // 26: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
+	9,  // 27: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
+	11, // 28: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
+	13, // 29: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
+	15, // 30: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
+	17, // 31: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
+	19, // 32: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
+	22, // 33: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
+	24, // 34: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
+	27, // 35: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
+	6,  // 36: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
+	8,  // 37: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
+	10, // 38: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
+	12, // 39: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
+	14, // 40: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
+	16, // 41: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
+	18, // 42: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
+	20, // 43: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
+	23, // 44: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
+	25, // 45: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
+	28, // 46: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
+	36, // [36:47] is the sub-list for method output_type
+	25, // [25:36] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_users_proto_init() }
@@ -1560,13 +1852,18 @@ func file_app_v1_users_proto_init() {
 	file_app_v1_media_proto_init()
 	file_app_v1_users_proto_msgTypes[6].OneofWrappers = []any{}
 	file_app_v1_users_proto_msgTypes[21].OneofWrappers = []any{}
+	file_app_v1_users_proto_msgTypes[24].OneofWrappers = []any{
+		(*ReportRequest_UserId)(nil),
+		(*ReportRequest_ChatId)(nil),
+		(*ReportRequest_Messages)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_users_proto_rawDesc), len(file_app_v1_users_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   23,
+			NumEnums:      3,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

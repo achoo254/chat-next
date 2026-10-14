@@ -43,6 +43,19 @@ export interface RealtimeOptions {
 	readonly defaultHeartbeatMs?: number;
 }
 
+/** Path of the realtime gateway on the tenant's own origin (same site as /rpc). */
+export const REALTIME_PATH = "/ws";
+
+/**
+ * WebSocket URL of the gateway for an app origin such as
+ * https://chat.hoandat.com: wss://chat.hoandat.com/ws (ws:// for http).
+ */
+export function realtimeUrlFor(origin: string): string {
+	const url = new URL(REALTIME_PATH, origin);
+	url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
+	return url.toString();
+}
+
 /** Extra wait past the heartbeat interval before a silent socket is declared dead. */
 export function deadAfterMs(heartbeatMs: number): number {
 	return heartbeatMs + Math.max(5_000, Math.round(heartbeatMs / 2));

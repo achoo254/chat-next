@@ -1,5 +1,7 @@
 // pm2 process of the chat API on the shared server. One instance (stage 1),
 // running as the system user `chat`; the binary reads /opt/chat/.env itself.
+// The realtime WebSocket gateway (/ws) runs inside this process, so there is
+// no separate gateway process to manage.
 module.exports = {
 	apps: [
 		{
@@ -13,8 +15,8 @@ module.exports = {
 			instances: 1,
 			exec_mode: "fork",
 			max_memory_restart: "300M",
-			// Above the server's graceful shutdown budget (50 s, server/README.md).
-			kill_timeout: 60000,
+			// Above the server's graceful shutdown budget (62 s, server/README.md).
+			kill_timeout: 70000,
 			out_file: "/var/log/chat/api.out.log",
 			error_file: "/var/log/chat/api.err.log",
 			merge_logs: true,

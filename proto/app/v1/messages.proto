@@ -37,6 +37,13 @@ service MessagesService {
   rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
   // Sends an inline keyboard callback to the bot and waits for its answer.
   rpc PressInlineButton(PressInlineButtonRequest) returns (PressInlineButtonResponse);
+  // Text-only preview of a web page for the composer; empty preview when the
+  // page has none or cannot be fetched.
+  rpc GetLinkPreview(GetLinkPreviewRequest) returns (GetLinkPreviewResponse);
+  // Members who read a message. Only in groups up to
+  // AppConfig.read_receipts_member_max members and for messages younger than
+  // read_receipts_max_age_seconds; FAILED_PRECONDITION otherwise.
+  rpc GetMessageReaders(GetMessageReadersRequest) returns (GetMessageReadersResponse);
 }
 
 enum EntityType {
@@ -127,6 +134,15 @@ message ReplyMarkup {
     InlineKeyboard inline_keyboard = 2;
     ReplyKeyboardRemove remove = 3;
   }
+}
+
+// Text-only preview of the first web link of a message, fetched by the
+// server (Open Graph). Thumbnails come with media.
+message LinkPreview {
+  string url = 1;
+  string site_name = 2;
+  string title = 3;
+  string description = 4;
 }
 
 message ForwardHeader {
@@ -244,6 +260,9 @@ message Message {
   string integration_label = 17;
   // Set on system messages only; content fields are then empty.
   MessageAction action = 18;
+  // Forum topic of the message in a forum group; 0 elsewhere.
+  int64 topic_id = 19 [jstype = JS_NUMBER];
+  LinkPreview link_preview = 20;
 }
 
 // Position of the caller's update logs right after a mutation, so the client
@@ -268,6 +287,10 @@ message SendMessageRequest {
   int64 random_id = 5 [jstype = JS_NUMBER];
   // Deliver without a notification sound.
   bool silent = 6;
+  // Forum groups: topic to post in; 0 = General.
+  int64 topic_id = 7 [jstype = JS_NUMBER];
+  // The sender dropped the link preview.
+  bool no_link_preview = 8;
 }
 
 message SendMessageResponse {
@@ -319,6 +342,8 @@ message ForwardMessagesRequest {
   // One per seq, same order.
   repeated int64 random_ids = 4 [jstype = JS_NUMBER];
   bool silent = 5;
+  // Forum groups: topic in to_chat_id; 0 = General.
+  int64 to_topic_id = 6 [jstype = JS_NUMBER];
 }
 
 message ForwardMessagesResponse {
@@ -336,6 +361,8 @@ message CopyMessageRequest {
   optional string text = 6;
   repeated MessageEntity entities = 7;
   bool silent = 8;
+  // Forum groups: topic in to_chat_id; 0 = General.
+  int64 to_topic_id = 9 [jstype = JS_NUMBER];
 }
 
 message CopyMessageResponse {
@@ -348,6 +375,8 @@ message EditMessageRequest {
   int64 seq = 2 [jstype = JS_NUMBER];
   string text = 3;
   repeated MessageEntity entities = 4;
+  // The sender dropped the link preview.
+  bool no_link_preview = 5;
 }
 
 message EditMessageResponse {
@@ -370,6 +399,8 @@ message ReadHistoryRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   // Highest seq the user has seen.
   int64 max_seq = 2 [jstype = JS_NUMBER];
+  // Forum groups: the topic read; 0 reads every topic up to max_seq.
+  int64 topic_id = 3 [jstype = JS_NUMBER];
 }
 
 message ReadHistoryResponse {
@@ -422,6 +453,8 @@ message GetHistoryRequest {
   int64 offset_seq = 2 [jstype = JS_NUMBER];
   HistoryDirection direction = 3;
   int32 limit = 4;
+  // Forum groups: only messages of this topic; 0 = the whole chat.
+  int64 topic_id = 5 [jstype = JS_NUMBER];
 }
 
 message GetHistoryResponse {
@@ -445,4 +478,24 @@ message PressInlineButtonResponse {
   bool show_alert = 2;
   // URL the bot asks the client to open (scheme allowlist applies).
   string url = 3;
+}
+
+message GetLinkPreviewRequest {
+  // http or https URL.
+  string url = 1;
+}
+
+message GetLinkPreviewResponse {
+  // Unset when the page has no usable preview.
+  LinkPreview preview = 1;
+}
+
+message GetMessageReadersRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+message GetMessageReadersResponse {
+  repeated int64 user_ids = 1 [jstype = JS_NUMBER];
+  repeated User users = 2;
 }

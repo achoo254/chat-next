@@ -225,3 +225,29 @@ func TestMonotonicMillisAdvancesFromItsAnchor(t *testing.T) {
 		t.Errorf("clock advanced from %d to %d, want at least 2 ms", first, second)
 	}
 }
+
+func TestNewSnowflakeAfterStartsLater(t *testing.T) {
+	now := time.Now().UnixMilli()
+	g, err := NewSnowflakeAfter(3, now+20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := g.LastUnixMs(); got != now+20 {
+		t.Fatalf("LastUnixMs = %d, want %d", got, now+20)
+	}
+	id, err := g.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms := id>>(snowflakeWorkerBits+snowflakeSequenceBits) + SnowflakeEpoch.UnixMilli()
+	if ms <= now+20 {
+		t.Fatalf("first id at ms %d, want after %d", ms, now+20)
+	}
+	fresh, err := NewSnowflake(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.LastUnixMs() != 0 {
+		t.Fatalf("fresh LastUnixMs = %d", fresh.LastUnixMs())
+	}
+}

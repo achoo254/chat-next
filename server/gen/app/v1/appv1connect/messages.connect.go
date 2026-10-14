@@ -72,6 +72,12 @@ const (
 	// MessagesServicePressInlineButtonProcedure is the fully-qualified name of the MessagesService's
 	// PressInlineButton RPC.
 	MessagesServicePressInlineButtonProcedure = "/app.v1.MessagesService/PressInlineButton"
+	// MessagesServiceGetLinkPreviewProcedure is the fully-qualified name of the MessagesService's
+	// GetLinkPreview RPC.
+	MessagesServiceGetLinkPreviewProcedure = "/app.v1.MessagesService/GetLinkPreview"
+	// MessagesServiceGetMessageReadersProcedure is the fully-qualified name of the MessagesService's
+	// GetMessageReaders RPC.
+	MessagesServiceGetMessageReadersProcedure = "/app.v1.MessagesService/GetMessageReaders"
 )
 
 // MessagesServiceClient is a client for the app.v1.MessagesService service.
@@ -94,6 +100,13 @@ type MessagesServiceClient interface {
 	GetHistory(context.Context, *connect.Request[v1.GetHistoryRequest]) (*connect.Response[v1.GetHistoryResponse], error)
 	// Sends an inline keyboard callback to the bot and waits for its answer.
 	PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error)
+	// Text-only preview of a web page for the composer; empty preview when the
+	// page has none or cannot be fetched.
+	GetLinkPreview(context.Context, *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error)
+	// Members who read a message. Only in groups up to
+	// AppConfig.read_receipts_member_max members and for messages younger than
+	// read_receipts_max_age_seconds; FAILED_PRECONDITION otherwise.
+	GetMessageReaders(context.Context, *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error)
 }
 
 // NewMessagesServiceClient constructs a client for the app.v1.MessagesService service. By default,
@@ -185,6 +198,18 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("PressInlineButton")),
 			connect.WithClientOptions(opts...),
 		),
+		getLinkPreview: connect.NewClient[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse](
+			httpClient,
+			baseURL+MessagesServiceGetLinkPreviewProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("GetLinkPreview")),
+			connect.WithClientOptions(opts...),
+		),
+		getMessageReaders: connect.NewClient[v1.GetMessageReadersRequest, v1.GetMessageReadersResponse](
+			httpClient,
+			baseURL+MessagesServiceGetMessageReadersProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("GetMessageReaders")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -203,6 +228,8 @@ type messagesServiceClient struct {
 	setReaction       *connect.Client[v1.SetReactionRequest, v1.SetReactionResponse]
 	getHistory        *connect.Client[v1.GetHistoryRequest, v1.GetHistoryResponse]
 	pressInlineButton *connect.Client[v1.PressInlineButtonRequest, v1.PressInlineButtonResponse]
+	getLinkPreview    *connect.Client[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse]
+	getMessageReaders *connect.Client[v1.GetMessageReadersRequest, v1.GetMessageReadersResponse]
 }
 
 // SendMessage calls app.v1.MessagesService.SendMessage.
@@ -270,6 +297,16 @@ func (c *messagesServiceClient) PressInlineButton(ctx context.Context, req *conn
 	return c.pressInlineButton.CallUnary(ctx, req)
 }
 
+// GetLinkPreview calls app.v1.MessagesService.GetLinkPreview.
+func (c *messagesServiceClient) GetLinkPreview(ctx context.Context, req *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error) {
+	return c.getLinkPreview.CallUnary(ctx, req)
+}
+
+// GetMessageReaders calls app.v1.MessagesService.GetMessageReaders.
+func (c *messagesServiceClient) GetMessageReaders(ctx context.Context, req *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error) {
+	return c.getMessageReaders.CallUnary(ctx, req)
+}
+
 // MessagesServiceHandler is an implementation of the app.v1.MessagesService service.
 type MessagesServiceHandler interface {
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
@@ -290,6 +327,13 @@ type MessagesServiceHandler interface {
 	GetHistory(context.Context, *connect.Request[v1.GetHistoryRequest]) (*connect.Response[v1.GetHistoryResponse], error)
 	// Sends an inline keyboard callback to the bot and waits for its answer.
 	PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error)
+	// Text-only preview of a web page for the composer; empty preview when the
+	// page has none or cannot be fetched.
+	GetLinkPreview(context.Context, *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error)
+	// Members who read a message. Only in groups up to
+	// AppConfig.read_receipts_member_max members and for messages younger than
+	// read_receipts_max_age_seconds; FAILED_PRECONDITION otherwise.
+	GetMessageReaders(context.Context, *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error)
 }
 
 // NewMessagesServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -377,6 +421,18 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("PressInlineButton")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceGetLinkPreviewHandler := connect.NewUnaryHandler(
+		MessagesServiceGetLinkPreviewProcedure,
+		svc.GetLinkPreview,
+		connect.WithSchema(messagesServiceMethods.ByName("GetLinkPreview")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagesServiceGetMessageReadersHandler := connect.NewUnaryHandler(
+		MessagesServiceGetMessageReadersProcedure,
+		svc.GetMessageReaders,
+		connect.WithSchema(messagesServiceMethods.ByName("GetMessageReaders")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.MessagesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MessagesServiceSendMessageProcedure:
@@ -405,6 +461,10 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServiceGetHistoryHandler.ServeHTTP(w, r)
 		case MessagesServicePressInlineButtonProcedure:
 			messagesServicePressInlineButtonHandler.ServeHTTP(w, r)
+		case MessagesServiceGetLinkPreviewProcedure:
+			messagesServiceGetLinkPreviewHandler.ServeHTTP(w, r)
+		case MessagesServiceGetMessageReadersProcedure:
+			messagesServiceGetMessageReadersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -464,4 +524,12 @@ func (UnimplementedMessagesServiceHandler) GetHistory(context.Context, *connect.
 
 func (UnimplementedMessagesServiceHandler) PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.PressInlineButton is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) GetLinkPreview(context.Context, *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetLinkPreview is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) GetMessageReaders(context.Context, *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetMessageReaders is not implemented"))
 }

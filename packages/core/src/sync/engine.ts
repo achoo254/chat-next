@@ -35,6 +35,7 @@ import {
 	toDialogsPage,
 	toDifference,
 	toHistoryPage,
+	toPeerDialogs,
 	toState,
 	toUser,
 	toWireId,
@@ -50,7 +51,6 @@ import {
 	putDialog,
 	putMessage,
 	putNewMessage,
-	putReadState,
 	putSyncState,
 	putUser,
 	raiseTop,
@@ -88,8 +88,6 @@ export interface SyncEngineOptions {
 const MAX_DIALOG_PAGES = 100;
 const DIALOG_PAGE_SIZE = 100;
 const MAX_TOO_LONG_IN_A_ROW = 3;
-/** Debounce before re-reading unread counts of large chats. */
-const RECONCILE_DELAY_MS = 1_000;
 
 /** Inclusive range of seqs a history response speaks for. */
 function coveredRange(
@@ -158,10 +156,6 @@ export class SyncEngine {
 	private readonly chatAttempts = new Map<number, number>();
 	private readonly chatRetries = new Map<number, unknown>();
 
-	private readonly unreadToReconcile = new Set<number>();
-	private reconcileTimer: unknown = null;
-	private reconciling = false;
-
 	private openChat = { chatId: 0, anchorSeq: 0 };
 	private stopped = false;
 
@@ -198,9 +192,7 @@ export class SyncEngine {
 			this.gapTimer !== null ||
 			this.chatGapTimers.size > 0 ||
 			this.differenceRetry !== null ||
-			this.chatRetries.size > 0 ||
-			this.reconcileTimer !== null ||
-			this.reconciling
+			this.chatRetries.size > 0
 		);
 	}
 
@@ -212,8 +204,6 @@ export class SyncEngine {
 		this.differenceRetry = null;
 		for (const handle of this.chatRetries.values()) this.options.timers.clearTimeout(handle);
 		this.chatRetries.clear();
-		if (this.reconcileTimer !== null) this.options.timers.clearTimeout(this.reconcileTimer);
-		this.reconcileTimer = null;
 		this.accountBuffer = [];
 	}
 
@@ -475,22 +465,32 @@ export class SyncEngine {
 		if (realtime && effects.incoming.length > 0) this.options.onIncoming?.(effects.incoming);
 		if (effects.readChats.size > 0) this.options.onReadElsewhere?.([...effects.readChats]);
 		for (const chatId of effects.refreshChats) void this.refreshChat(chatId);
-		if (effects.unreadToReconcile.size > 0) {
-			for (const chatId of effects.unreadToReconcile) this.unreadToReconcile.add(chatId);
-			this.armReconcile();
-		}
 		for (const chatId of effects.chatDifferences) this.requestChatDifference(chatId);
 	}
 
+	/**
+	 * Reloads a chat and its dialog (read state, top message) with
+	 * GetPeerDialogs, e.g. after an unpin or for a large chat first seen in a
+	 * difference.
+	 */
 	private async refreshChat(chatId: number): Promise<void> {
 		try {
-			const response = await this.options.api.chats.getChat({ chatId: toWireId(chatId) });
-			const chat = response.chat;
-			if (chat === undefined) return;
+			const getPeerDialogs = this.options.api.chats.getPeerDialogs;
+			if (getPeerDialogs === undefined) {
+				await this.refreshChatEntity(chatId);
+				return;
+			}
+			const page = toPeerDialogs(await getPeerDialogs({ chatIds: [toWireId(chatId)] }));
 			await this.queue.run(async () => {
 				const w = new WriteBatch();
 				const effects = newEffects();
-				this.putEntities({ users: response.users.map(toUser), chats: [toChat(chat)] }, w, effects);
+				this.putEntities(page, w, effects);
+				const topDates = new Map<number, number>();
+				for (const message of page.messages) {
+					putMessage(w, message);
+					topDates.set(message.chatId, message.date);
+				}
+				for (const dialog of page.dialogs) putDialog(w, dialog, topDates.get(dialog.chatId) ?? 0, this.options.selfId);
 				await this.commit(w);
 			});
 		} catch (err) {
@@ -499,59 +499,16 @@ export class SyncEngine {
 		}
 	}
 
-	// ------------------------------------------------- unread reconciliation
-
-	private armReconcile(): void {
-		if (this.reconcileTimer !== null || this.stopped) return;
-		this.reconcileTimer = this.options.timers.setTimeout(() => {
-			this.reconcileTimer = null;
-			void this.reconcileUnread();
-		}, RECONCILE_DELAY_MS);
-	}
-
-	/**
-	 * Re-reads the dialogs of large chats whose unread_count raced their own
-	 * log, once that log has caught up, and takes the server's count.
-	 */
-	private async reconcileUnread(): Promise<void> {
-		const chats = [...this.unreadToReconcile].filter((chatId) => this.chatPts.has(chatId));
-		if (chats.length === 0) {
-			this.unreadToReconcile.clear();
-			return;
-		}
-		const behind = chats.some(
-			(chatId) =>
-				this.chatDiffRunning.has(chatId) ||
-				this.chatGapTimers.has(chatId) ||
-				this.chatHeld.has(chatId) ||
-				(this.chatPending.get(chatId)?.size ?? 0) > 0,
-		);
-		if (behind || this.reconciling) {
-			this.armReconcile();
-			return;
-		}
-		this.reconciling = true;
-		try {
-			const snapshot = await this.fetchDialogs();
-			const wanted = new Set(chats);
-			await this.queue.run(async () => {
-				const w = new WriteBatch();
-				for (const dialog of snapshot.dialogs) {
-					if (wanted.has(dialog.chatId)) putReadState(w, dialog, this.options.selfId);
-				}
-				await this.commit(w);
-			});
-			for (const chatId of chats) this.unreadToReconcile.delete(chatId);
-		} catch (err) {
-			if (classifyFailure(err) === "unauthenticated") {
-				this.options.onSessionEnded("unknown");
-				return;
-			}
-			this.report(err, "reconcile unread counts");
-			this.armReconcile();
-		} finally {
-			this.reconciling = false;
-		}
+	/** refreshChat for an API without GetPeerDialogs: the chat entity only. */
+	private async refreshChatEntity(chatId: number): Promise<void> {
+		const response = await this.options.api.chats.getChat({ chatId: toWireId(chatId) });
+		const chat = response.chat;
+		if (chat === undefined) return;
+		await this.queue.run(async () => {
+			const w = new WriteBatch();
+			this.putEntities({ users: response.users.map(toUser), chats: [toChat(chat)] }, w, newEffects());
+			await this.commit(w);
+		});
 	}
 
 	// ------------------------------------------------------------ gap timers

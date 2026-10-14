@@ -1,5 +1,7 @@
 // Package api assembles the HTTP server of the api role: /healthz, the web
-// sign-in routes under /auth and the Connect services under /rpc.
+// sign-in routes under /auth, the Connect services under /rpc and the
+// realtime WebSocket at /ws (the gateway runs inside the api process in
+// stage 1).
 package api
 
 import (
@@ -9,12 +11,18 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"app.local/server/internal/auth"
+	"app.local/server/internal/chat"
 	"app.local/server/internal/config"
+	"app.local/server/internal/gateway"
+	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/rpc"
 	"app.local/server/internal/store"
 )
@@ -22,6 +30,8 @@ import (
 const (
 	healthTimeout   = 2 * time.Second
 	shutdownTimeout = 20 * time.Second
+	// socketsTimeout bounds closing the realtime sockets at shutdown.
+	socketsTimeout = 5 * time.Second
 )
 
 // App is the wired api role.
@@ -29,11 +39,26 @@ type App struct {
 	Handler  http.Handler
 	IdP      *auth.IdP
 	Sessions *auth.Sessions
+	Chat     *chat.Service
+	Hub      *gateway.Hub
+
+	cancel   context.CancelFunc
+	loops    sync.WaitGroup
+	shutdown sync.Once
 }
 
-// New wires the api role on an open store. The IdP is not discovered yet:
-// call IdP.RunDiscovery (or IdP.Discover) before sign-in can work.
-func New(cfg config.Config, st *store.Store, httpClient *http.Client, logger *slog.Logger) (*App, error) {
+// Options adjust New for tests.
+type Options struct {
+	// LinkPreviewAllow replaces the public-address policy of the link
+	// preview fetcher (tests reach a local page with it).
+	LinkPreviewAllow func(netip.AddrPort) bool
+}
+
+// New wires the api role on an open store and starts its background loops
+// (Snowflake lease, outbox sweeper, maintenance, chat activity hints); stop
+// them with Shutdown. The IdP is not discovered yet: call IdP.RunDiscovery
+// (or IdP.Discover) before sign-in can work.
+func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *http.Client, logger *slog.Logger, opts Options) (*App, error) {
 	publicOrigin := cfg.PublicOrigin()
 	idp := auth.NewIdP(auth.IdPConfig{
 		Issuer:       cfg.OIDCIssuer,
@@ -55,11 +80,32 @@ func New(cfg config.Config, st *store.Store, httpClient *http.Client, logger *sl
 	if err != nil {
 		return nil, err
 	}
+	ids, err := chat.LeaseIDs(ctx, st, logger)
+	if err != nil {
+		return nil, err
+	}
+	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{Allow: opts.LinkPreviewAllow}), logger)
+	limiter := ratelimit.NewMemory()
+	chatSvc, err := chat.New(chat.Config{
+		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme,
+	}, chat.Deps{Pool: st.Pool(), IDs: ids, Previews: previews, Limiter: limiter, Logger: logger})
+	if err != nil {
+		return nil, err
+	}
+	hub := gateway.NewHub(chatSvc, logger)
+	chatSvc.SetRealtime(hub, hub)
+	ws, err := gateway.New(gateway.Config{Hub: hub, Sessions: sessions, Toucher: st, Origins: origins, Logger: logger})
+	if err != nil {
+		return nil, err
+	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
-		Store: st, IdP: idp, Sessions: sessions, Origins: origins,
+		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc,
 		TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := chatSvc.Start(ctx); err != nil {
 		return nil, err
 	}
 
@@ -67,7 +113,50 @@ func New(cfg config.Config, st *store.Store, httpClient *http.Client, logger *sl
 	mux.HandleFunc("GET /healthz", healthz(st))
 	routes.Register(mux)
 	mux.Handle("/rpc/", http.StripPrefix("/rpc", rpcHandler))
-	return &App{Handler: mux, IdP: idp, Sessions: sessions}, nil
+	mux.Handle("GET /ws", ws)
+
+	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hub: hub, cancel: cancel}
+	for _, loop := range []func(context.Context){
+		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps,
+		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
+	} {
+		app.loops.Add(1)
+		go func() {
+			defer app.loops.Done()
+			loop(loopCtx)
+		}()
+	}
+	return app, nil
+}
+
+func runEvery(ctx context.Context, every time.Duration, fn func()) {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fn()
+		}
+	}
+}
+
+// Shutdown closes the realtime sockets (asking clients to reconnect), stops
+// the background loops, drains queued deliveries and background IdP work.
+// Call it after the HTTP server stopped accepting requests and before the
+// store is closed.
+func (a *App) Shutdown() {
+	a.shutdown.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), socketsTimeout)
+		a.Hub.Shutdown(ctx)
+		cancel()
+		a.cancel()
+		a.loops.Wait()
+		a.Chat.Stop()
+		a.Sessions.Wait()
+	})
 }
 
 // healthz answers {"status":"ok","db":"connected"}, or 503 when the
@@ -101,7 +190,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err := st.EnsureTenant(ctx, cfg.TenantID, cfg.TenantDomain, cfg.TenantDomain); err != nil {
 		return err
 	}
-	app, err := New(cfg, st, nil, logger)
+	app, err := New(ctx, cfg, st, nil, logger, Options{})
 	if err != nil {
 		return err
 	}
@@ -129,7 +218,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	err = srv.Shutdown(shutdownCtx)
-	app.Sessions.Wait()
+	app.Shutdown()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("api: shutdown: %w", err)
 	}

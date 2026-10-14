@@ -4,7 +4,7 @@
 // committed changes.
 import type { SqlParams, SqlStatement } from "@app/platform";
 import { EventKeys } from "../events/bus.ts";
-import type { Chat, Dialog, Message, ReactionCount, SyncState, User } from "../model/types.ts";
+import type { Chat, Dialog, Message, ReactionCount, SyncState, UpdateBody, User } from "../model/types.ts";
 import { searchText } from "../vifold/index.ts";
 import { flag } from "./rows.ts";
 
@@ -61,15 +61,15 @@ export function putUser(w: WriteBatch, user: User): void {
 export function putChat(w: WriteBatch, chat: Chat): void {
 	w.add(
 		`INSERT INTO chats (id, type, title, about, peer_user_id, sync_mode, history_shared, member_count,
-			default_permissions, pinned_seq, created_at, my_role, my_permissions, left_chat)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			default_permissions, pinned_seq, created_at, my_role, my_permissions, left_chat, forum)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET type = excluded.type, title = excluded.title, about = excluded.about,
 			peer_user_id = excluded.peer_user_id,
 			sync_mode = CASE WHEN chats.sync_mode = 'large' THEN 'large' ELSE excluded.sync_mode END,
 			history_shared = excluded.history_shared, member_count = excluded.member_count,
 			default_permissions = excluded.default_permissions, pinned_seq = excluded.pinned_seq,
 			created_at = excluded.created_at, my_role = excluded.my_role,
-			my_permissions = excluded.my_permissions, left_chat = excluded.left_chat`,
+			my_permissions = excluded.my_permissions, left_chat = excluded.left_chat, forum = excluded.forum`,
 		[
 			chat.id,
 			chat.type,
@@ -85,6 +85,7 @@ export function putChat(w: WriteBatch, chat: Chat): void {
 			chat.myRole,
 			chat.myPermissions,
 			flag(chat.left),
+			flag(chat.forum),
 		],
 	);
 	w.emit(EventKeys.chat(chat.id));
@@ -105,8 +106,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 	w.add(
 		`INSERT INTO messages (chat_id, seq, from_id, date, text, entities, media_kind, reply_to_seq, forward,
 			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, action,
-			search_text, stale)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+			search_text, topic_id, link_preview, stale)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
 		ON CONFLICT (chat_id, seq) DO UPDATE SET from_id = excluded.from_id, date = excluded.date,
 			text = excluded.text, entities = excluded.entities, media_kind = excluded.media_kind,
 			reply_to_seq = excluded.reply_to_seq, forward = excluded.forward, edit_date = excluded.edit_date,
@@ -114,7 +115,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			random_id = CASE WHEN excluded.random_id <> 0 THEN excluded.random_id ELSE messages.random_id END,
 			grouped_id = excluded.grouped_id, via_bot_id = excluded.via_bot_id, reactions = excluded.reactions,
 			integration_label = excluded.integration_label, action = excluded.action,
-			search_text = excluded.search_text, stale = 0
+			search_text = excluded.search_text, topic_id = excluded.topic_id, link_preview = excluded.link_preview,
+			stale = 0
 		WHERE excluded.edit_version >= messages.edit_version OR messages.stale = 1`,
 		[
 			message.chatId,
@@ -135,6 +137,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			message.integrationLabel,
 			message.action === null ? null : JSON.stringify(message.action),
 			messageSearchText(message),
+			message.topicId,
+			message.linkPreview === null ? null : JSON.stringify(message.linkPreview),
 		],
 	);
 	w.emit(EventKeys.history(message.chatId), EventKeys.message(message.chatId, message.seq));
@@ -211,12 +215,17 @@ export function putReadState(w: WriteBatch, dialog: Dialog, selfId: number): voi
 export function putNewMessage(w: WriteBatch, message: Message, selfId: number): void {
 	ensureDialog(w, message.chatId);
 	if (message.fromId !== selfId) {
-		w.add(
-			`UPDATE read_states SET unread_count = unread_count + 1
-			WHERE chat_id = ?1 AND topic_id = ?2 AND read_inbox_max_seq < ?3 AND counted_through < ?3
-				AND NOT EXISTS (SELECT 1 FROM messages WHERE chat_id = ?1 AND seq = ?3 AND stale = 0)`,
-			[message.chatId, CHAT_TOPIC, message.seq],
-		);
+		// The chat row, and the topic row of a forum message when the client
+		// keeps one.
+		const topics = message.topicId === CHAT_TOPIC ? [CHAT_TOPIC] : [CHAT_TOPIC, message.topicId];
+		for (const topic of topics) {
+			w.add(
+				`UPDATE read_states SET unread_count = unread_count + 1
+				WHERE chat_id = ?1 AND topic_id = ?2 AND read_inbox_max_seq < ?3 AND counted_through < ?3
+					AND NOT EXISTS (SELECT 1 FROM messages WHERE chat_id = ?1 AND seq = ?3 AND stale = 0)`,
+				[message.chatId, topic, message.seq],
+			);
+		}
 	}
 	putMessage(w, message);
 	raiseTop(w, message);
@@ -244,23 +253,51 @@ export function retopDialog(w: WriteBatch, chatId: number): void {
 	);
 }
 
-export function putRead(
-	w: WriteBatch,
-	chatId: number,
-	maxSeq: number,
-	outbox: boolean,
-	unreadCount: number,
-): void {
-	if (outbox) {
+/** Optimistic local read: the position and an unread count taken locally. */
+export function putLocalRead(w: WriteBatch, chatId: number, maxSeq: number, unreadCount: number): void {
+	w.add(
+		`UPDATE read_states SET read_inbox_max_seq = ?, unread_count = ?
+		WHERE chat_id = ? AND topic_id = ? AND read_inbox_max_seq <= ?`,
+		[maxSeq, unreadCount, chatId, CHAT_TOPIC, maxSeq],
+	);
+	w.emit(EventKeys.dialog(chatId));
+}
+
+/**
+ * Read update from the server. Outbox: others read the user's messages.
+ * Inbox: the server counted unread messages up to read.topSeq, so incoming
+ * messages the client already holds beyond it are unread on top, and later
+ * ones are counted once when they arrive (counted_through). A topic read
+ * also updates that topic's row.
+ */
+export function putRead(w: WriteBatch, read: Extract<UpdateBody, { kind: "read" }>, selfId: number): void {
+	const { chatId, maxSeq } = read;
+	if (read.outbox) {
 		w.add(
 			"UPDATE read_states SET read_outbox_max_seq = max(read_outbox_max_seq, ?) WHERE chat_id = ? AND topic_id = ?",
 			[maxSeq, chatId, CHAT_TOPIC],
 		);
-	} else {
+		w.emit(EventKeys.dialog(chatId));
+		return;
+	}
+	const beyond = `SELECT count(*) FROM messages
+		WHERE chat_id = ?1 AND seq > ?2 AND from_id <> ?3 AND stale = 0`;
+	w.add(
+		`UPDATE read_states SET read_inbox_max_seq = max(read_inbox_max_seq, ?4),
+			unread_count = ?5 + (${beyond}), counted_through = ?2
+		WHERE chat_id = ?1 AND topic_id = ?6 AND counted_through <= ?2`,
+		[chatId, read.topSeq, selfId, maxSeq, read.unreadCount, CHAT_TOPIC],
+	);
+	if (read.topicId !== CHAT_TOPIC) {
 		w.add(
-			`UPDATE read_states SET read_inbox_max_seq = ?, unread_count = ?
-			WHERE chat_id = ? AND topic_id = ? AND read_inbox_max_seq <= ?`,
-			[maxSeq, unreadCount, chatId, CHAT_TOPIC, maxSeq],
+			`INSERT INTO read_states (chat_id, topic_id, read_inbox_max_seq, read_outbox_max_seq, unread_count,
+				unread_mentions_count, counted_through)
+			VALUES (?1, ?6, ?4, 0, ?5 + (${beyond} AND topic_id = ?6), 0, ?2)
+			ON CONFLICT (chat_id, topic_id) DO UPDATE SET
+				read_inbox_max_seq = max(read_states.read_inbox_max_seq, excluded.read_inbox_max_seq),
+				unread_count = excluded.unread_count, counted_through = excluded.counted_through
+			WHERE read_states.counted_through <= excluded.counted_through`,
+			[chatId, read.topSeq, selfId, maxSeq, read.topicUnreadCount, read.topicId],
 		);
 	}
 	w.emit(EventKeys.dialog(chatId));

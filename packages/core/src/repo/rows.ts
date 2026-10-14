@@ -10,6 +10,7 @@ import type {
 	ForwardHeader,
 	MediaKind,
 	MemberRole,
+	LinkPreview,
 	Message,
 	MessageAction,
 	MessageEntity,
@@ -157,6 +158,17 @@ function parseAction(json: string | null): MessageAction | null {
 	}
 }
 
+function parseLinkPreview(raw: string | null): LinkPreview | null {
+	const value = parseJson(raw);
+	if (!isRecord(value)) return null;
+	return {
+		url: text(value, "url"),
+		siteName: text(value, "siteName"),
+		title: text(value, "title"),
+		description: text(value, "description"),
+	};
+}
+
 const MEDIA_KINDS = new Set<MediaKind>(["photo", "video", "audio", "voice", "document", "unknown"]);
 const CHAT_TYPES = new Set<ChatType>(["private", "group", "channel", "secret"]);
 const ROLES = new Set<MemberRole>(["member", "admin", "owner"]);
@@ -181,6 +193,8 @@ export function rowToMessage(row: SqlRow): Message {
 		reactions: parseReactions(optionalStr(row, "reactions")),
 		integrationLabel: str(row, "integration_label"),
 		action: parseAction(optionalStr(row, "action")),
+		topicId: num(row, "topic_id"),
+		linkPreview: parseLinkPreview(optionalStr(row, "link_preview")),
 	};
 }
 
@@ -214,6 +228,7 @@ export function rowToChat(row: SqlRow): Chat {
 		myRole: ROLES.has(role as MemberRole) ? (role as MemberRole) : "unknown",
 		myPermissions: num(row, "my_permissions"),
 		left: bool(row, "left_chat"),
+		forum: bool(row, "forum"),
 	};
 }
 

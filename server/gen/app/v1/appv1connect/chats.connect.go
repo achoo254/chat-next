@@ -72,6 +72,33 @@ const (
 	// ChatsServiceUpdateChatInfoProcedure is the fully-qualified name of the ChatsService's
 	// UpdateChatInfo RPC.
 	ChatsServiceUpdateChatInfoProcedure = "/app.v1.ChatsService/UpdateChatInfo"
+	// ChatsServiceGetPeerDialogsProcedure is the fully-qualified name of the ChatsService's
+	// GetPeerDialogs RPC.
+	ChatsServiceGetPeerDialogsProcedure = "/app.v1.ChatsService/GetPeerDialogs"
+	// ChatsServiceCheckInviteProcedure is the fully-qualified name of the ChatsService's CheckInvite
+	// RPC.
+	ChatsServiceCheckInviteProcedure = "/app.v1.ChatsService/CheckInvite"
+	// ChatsServiceGetInviteLinksProcedure is the fully-qualified name of the ChatsService's
+	// GetInviteLinks RPC.
+	ChatsServiceGetInviteLinksProcedure = "/app.v1.ChatsService/GetInviteLinks"
+	// ChatsServiceRevokeInviteLinkProcedure is the fully-qualified name of the ChatsService's
+	// RevokeInviteLink RPC.
+	ChatsServiceRevokeInviteLinkProcedure = "/app.v1.ChatsService/RevokeInviteLink"
+	// ChatsServiceGetForumTopicsProcedure is the fully-qualified name of the ChatsService's
+	// GetForumTopics RPC.
+	ChatsServiceGetForumTopicsProcedure = "/app.v1.ChatsService/GetForumTopics"
+	// ChatsServiceCreateForumTopicProcedure is the fully-qualified name of the ChatsService's
+	// CreateForumTopic RPC.
+	ChatsServiceCreateForumTopicProcedure = "/app.v1.ChatsService/CreateForumTopic"
+	// ChatsServiceEditForumTopicProcedure is the fully-qualified name of the ChatsService's
+	// EditForumTopic RPC.
+	ChatsServiceEditForumTopicProcedure = "/app.v1.ChatsService/EditForumTopic"
+	// ChatsServiceCloseForumTopicProcedure is the fully-qualified name of the ChatsService's
+	// CloseForumTopic RPC.
+	ChatsServiceCloseForumTopicProcedure = "/app.v1.ChatsService/CloseForumTopic"
+	// ChatsServiceHideForumTopicProcedure is the fully-qualified name of the ChatsService's
+	// HideForumTopic RPC.
+	ChatsServiceHideForumTopicProcedure = "/app.v1.ChatsService/HideForumTopic"
 )
 
 // ChatsServiceClient is a client for the app.v1.ChatsService service.
@@ -95,6 +122,24 @@ type ChatsServiceClient interface {
 	JoinByInvite(context.Context, *connect.Request[v1.JoinByInviteRequest]) (*connect.Response[v1.JoinByInviteResponse], error)
 	SetHistoryVisibility(context.Context, *connect.Request[v1.SetHistoryVisibilityRequest]) (*connect.Response[v1.SetHistoryVisibilityResponse], error)
 	UpdateChatInfo(context.Context, *connect.Request[v1.UpdateChatInfoRequest]) (*connect.Response[v1.UpdateChatInfoResponse], error)
+	// The caller's dialogs of the given chats (read state, top message), e.g.
+	// to refresh a few chats without reloading the whole list.
+	GetPeerDialogs(context.Context, *connect.Request[v1.GetPeerDialogsRequest]) (*connect.Response[v1.GetPeerDialogsResponse], error)
+	// Previews the chat behind an invite link before the user confirms.
+	CheckInvite(context.Context, *connect.Request[v1.CheckInviteRequest]) (*connect.Response[v1.CheckInviteResponse], error)
+	GetInviteLinks(context.Context, *connect.Request[v1.GetInviteLinksRequest]) (*connect.Response[v1.GetInviteLinksResponse], error)
+	RevokeInviteLink(context.Context, *connect.Request[v1.RevokeInviteLinkRequest]) (*connect.Response[v1.RevokeInviteLinkResponse], error)
+	// Forum topics of a group (Chat.forum). A topic is metadata of the group:
+	// its messages carry topic_id inside the group's single seq, and sync stays
+	// per chat.
+	GetForumTopics(context.Context, *connect.Request[v1.GetForumTopicsRequest]) (*connect.Response[v1.GetForumTopicsResponse], error)
+	CreateForumTopic(context.Context, *connect.Request[v1.CreateForumTopicRequest]) (*connect.Response[v1.CreateForumTopicResponse], error)
+	EditForumTopic(context.Context, *connect.Request[v1.EditForumTopicRequest]) (*connect.Response[v1.EditForumTopicResponse], error)
+	// Only admins post in a closed topic.
+	CloseForumTopic(context.Context, *connect.Request[v1.CloseForumTopicRequest]) (*connect.Response[v1.CloseForumTopicResponse], error)
+	// A hidden topic leaves the topic list; its messages stay readable and
+	// searchable by members.
+	HideForumTopic(context.Context, *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error)
 }
 
 // NewChatsServiceClient constructs a client for the app.v1.ChatsService service. By default, it
@@ -198,6 +243,60 @@ func NewChatsServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(chatsServiceMethods.ByName("UpdateChatInfo")),
 			connect.WithClientOptions(opts...),
 		),
+		getPeerDialogs: connect.NewClient[v1.GetPeerDialogsRequest, v1.GetPeerDialogsResponse](
+			httpClient,
+			baseURL+ChatsServiceGetPeerDialogsProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetPeerDialogs")),
+			connect.WithClientOptions(opts...),
+		),
+		checkInvite: connect.NewClient[v1.CheckInviteRequest, v1.CheckInviteResponse](
+			httpClient,
+			baseURL+ChatsServiceCheckInviteProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("CheckInvite")),
+			connect.WithClientOptions(opts...),
+		),
+		getInviteLinks: connect.NewClient[v1.GetInviteLinksRequest, v1.GetInviteLinksResponse](
+			httpClient,
+			baseURL+ChatsServiceGetInviteLinksProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetInviteLinks")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeInviteLink: connect.NewClient[v1.RevokeInviteLinkRequest, v1.RevokeInviteLinkResponse](
+			httpClient,
+			baseURL+ChatsServiceRevokeInviteLinkProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("RevokeInviteLink")),
+			connect.WithClientOptions(opts...),
+		),
+		getForumTopics: connect.NewClient[v1.GetForumTopicsRequest, v1.GetForumTopicsResponse](
+			httpClient,
+			baseURL+ChatsServiceGetForumTopicsProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetForumTopics")),
+			connect.WithClientOptions(opts...),
+		),
+		createForumTopic: connect.NewClient[v1.CreateForumTopicRequest, v1.CreateForumTopicResponse](
+			httpClient,
+			baseURL+ChatsServiceCreateForumTopicProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("CreateForumTopic")),
+			connect.WithClientOptions(opts...),
+		),
+		editForumTopic: connect.NewClient[v1.EditForumTopicRequest, v1.EditForumTopicResponse](
+			httpClient,
+			baseURL+ChatsServiceEditForumTopicProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("EditForumTopic")),
+			connect.WithClientOptions(opts...),
+		),
+		closeForumTopic: connect.NewClient[v1.CloseForumTopicRequest, v1.CloseForumTopicResponse](
+			httpClient,
+			baseURL+ChatsServiceCloseForumTopicProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("CloseForumTopic")),
+			connect.WithClientOptions(opts...),
+		),
+		hideForumTopic: connect.NewClient[v1.HideForumTopicRequest, v1.HideForumTopicResponse](
+			httpClient,
+			baseURL+ChatsServiceHideForumTopicProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("HideForumTopic")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -218,6 +317,15 @@ type chatsServiceClient struct {
 	joinByInvite         *connect.Client[v1.JoinByInviteRequest, v1.JoinByInviteResponse]
 	setHistoryVisibility *connect.Client[v1.SetHistoryVisibilityRequest, v1.SetHistoryVisibilityResponse]
 	updateChatInfo       *connect.Client[v1.UpdateChatInfoRequest, v1.UpdateChatInfoResponse]
+	getPeerDialogs       *connect.Client[v1.GetPeerDialogsRequest, v1.GetPeerDialogsResponse]
+	checkInvite          *connect.Client[v1.CheckInviteRequest, v1.CheckInviteResponse]
+	getInviteLinks       *connect.Client[v1.GetInviteLinksRequest, v1.GetInviteLinksResponse]
+	revokeInviteLink     *connect.Client[v1.RevokeInviteLinkRequest, v1.RevokeInviteLinkResponse]
+	getForumTopics       *connect.Client[v1.GetForumTopicsRequest, v1.GetForumTopicsResponse]
+	createForumTopic     *connect.Client[v1.CreateForumTopicRequest, v1.CreateForumTopicResponse]
+	editForumTopic       *connect.Client[v1.EditForumTopicRequest, v1.EditForumTopicResponse]
+	closeForumTopic      *connect.Client[v1.CloseForumTopicRequest, v1.CloseForumTopicResponse]
+	hideForumTopic       *connect.Client[v1.HideForumTopicRequest, v1.HideForumTopicResponse]
 }
 
 // CreatePrivate calls app.v1.ChatsService.CreatePrivate.
@@ -295,6 +403,51 @@ func (c *chatsServiceClient) UpdateChatInfo(ctx context.Context, req *connect.Re
 	return c.updateChatInfo.CallUnary(ctx, req)
 }
 
+// GetPeerDialogs calls app.v1.ChatsService.GetPeerDialogs.
+func (c *chatsServiceClient) GetPeerDialogs(ctx context.Context, req *connect.Request[v1.GetPeerDialogsRequest]) (*connect.Response[v1.GetPeerDialogsResponse], error) {
+	return c.getPeerDialogs.CallUnary(ctx, req)
+}
+
+// CheckInvite calls app.v1.ChatsService.CheckInvite.
+func (c *chatsServiceClient) CheckInvite(ctx context.Context, req *connect.Request[v1.CheckInviteRequest]) (*connect.Response[v1.CheckInviteResponse], error) {
+	return c.checkInvite.CallUnary(ctx, req)
+}
+
+// GetInviteLinks calls app.v1.ChatsService.GetInviteLinks.
+func (c *chatsServiceClient) GetInviteLinks(ctx context.Context, req *connect.Request[v1.GetInviteLinksRequest]) (*connect.Response[v1.GetInviteLinksResponse], error) {
+	return c.getInviteLinks.CallUnary(ctx, req)
+}
+
+// RevokeInviteLink calls app.v1.ChatsService.RevokeInviteLink.
+func (c *chatsServiceClient) RevokeInviteLink(ctx context.Context, req *connect.Request[v1.RevokeInviteLinkRequest]) (*connect.Response[v1.RevokeInviteLinkResponse], error) {
+	return c.revokeInviteLink.CallUnary(ctx, req)
+}
+
+// GetForumTopics calls app.v1.ChatsService.GetForumTopics.
+func (c *chatsServiceClient) GetForumTopics(ctx context.Context, req *connect.Request[v1.GetForumTopicsRequest]) (*connect.Response[v1.GetForumTopicsResponse], error) {
+	return c.getForumTopics.CallUnary(ctx, req)
+}
+
+// CreateForumTopic calls app.v1.ChatsService.CreateForumTopic.
+func (c *chatsServiceClient) CreateForumTopic(ctx context.Context, req *connect.Request[v1.CreateForumTopicRequest]) (*connect.Response[v1.CreateForumTopicResponse], error) {
+	return c.createForumTopic.CallUnary(ctx, req)
+}
+
+// EditForumTopic calls app.v1.ChatsService.EditForumTopic.
+func (c *chatsServiceClient) EditForumTopic(ctx context.Context, req *connect.Request[v1.EditForumTopicRequest]) (*connect.Response[v1.EditForumTopicResponse], error) {
+	return c.editForumTopic.CallUnary(ctx, req)
+}
+
+// CloseForumTopic calls app.v1.ChatsService.CloseForumTopic.
+func (c *chatsServiceClient) CloseForumTopic(ctx context.Context, req *connect.Request[v1.CloseForumTopicRequest]) (*connect.Response[v1.CloseForumTopicResponse], error) {
+	return c.closeForumTopic.CallUnary(ctx, req)
+}
+
+// HideForumTopic calls app.v1.ChatsService.HideForumTopic.
+func (c *chatsServiceClient) HideForumTopic(ctx context.Context, req *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error) {
+	return c.hideForumTopic.CallUnary(ctx, req)
+}
+
 // ChatsServiceHandler is an implementation of the app.v1.ChatsService service.
 type ChatsServiceHandler interface {
 	// Returns the existing private chat with the user when there is one.
@@ -316,6 +469,24 @@ type ChatsServiceHandler interface {
 	JoinByInvite(context.Context, *connect.Request[v1.JoinByInviteRequest]) (*connect.Response[v1.JoinByInviteResponse], error)
 	SetHistoryVisibility(context.Context, *connect.Request[v1.SetHistoryVisibilityRequest]) (*connect.Response[v1.SetHistoryVisibilityResponse], error)
 	UpdateChatInfo(context.Context, *connect.Request[v1.UpdateChatInfoRequest]) (*connect.Response[v1.UpdateChatInfoResponse], error)
+	// The caller's dialogs of the given chats (read state, top message), e.g.
+	// to refresh a few chats without reloading the whole list.
+	GetPeerDialogs(context.Context, *connect.Request[v1.GetPeerDialogsRequest]) (*connect.Response[v1.GetPeerDialogsResponse], error)
+	// Previews the chat behind an invite link before the user confirms.
+	CheckInvite(context.Context, *connect.Request[v1.CheckInviteRequest]) (*connect.Response[v1.CheckInviteResponse], error)
+	GetInviteLinks(context.Context, *connect.Request[v1.GetInviteLinksRequest]) (*connect.Response[v1.GetInviteLinksResponse], error)
+	RevokeInviteLink(context.Context, *connect.Request[v1.RevokeInviteLinkRequest]) (*connect.Response[v1.RevokeInviteLinkResponse], error)
+	// Forum topics of a group (Chat.forum). A topic is metadata of the group:
+	// its messages carry topic_id inside the group's single seq, and sync stays
+	// per chat.
+	GetForumTopics(context.Context, *connect.Request[v1.GetForumTopicsRequest]) (*connect.Response[v1.GetForumTopicsResponse], error)
+	CreateForumTopic(context.Context, *connect.Request[v1.CreateForumTopicRequest]) (*connect.Response[v1.CreateForumTopicResponse], error)
+	EditForumTopic(context.Context, *connect.Request[v1.EditForumTopicRequest]) (*connect.Response[v1.EditForumTopicResponse], error)
+	// Only admins post in a closed topic.
+	CloseForumTopic(context.Context, *connect.Request[v1.CloseForumTopicRequest]) (*connect.Response[v1.CloseForumTopicResponse], error)
+	// A hidden topic leaves the topic list; its messages stay readable and
+	// searchable by members.
+	HideForumTopic(context.Context, *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error)
 }
 
 // NewChatsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -415,6 +586,60 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(chatsServiceMethods.ByName("UpdateChatInfo")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatsServiceGetPeerDialogsHandler := connect.NewUnaryHandler(
+		ChatsServiceGetPeerDialogsProcedure,
+		svc.GetPeerDialogs,
+		connect.WithSchema(chatsServiceMethods.ByName("GetPeerDialogs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceCheckInviteHandler := connect.NewUnaryHandler(
+		ChatsServiceCheckInviteProcedure,
+		svc.CheckInvite,
+		connect.WithSchema(chatsServiceMethods.ByName("CheckInvite")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceGetInviteLinksHandler := connect.NewUnaryHandler(
+		ChatsServiceGetInviteLinksProcedure,
+		svc.GetInviteLinks,
+		connect.WithSchema(chatsServiceMethods.ByName("GetInviteLinks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceRevokeInviteLinkHandler := connect.NewUnaryHandler(
+		ChatsServiceRevokeInviteLinkProcedure,
+		svc.RevokeInviteLink,
+		connect.WithSchema(chatsServiceMethods.ByName("RevokeInviteLink")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceGetForumTopicsHandler := connect.NewUnaryHandler(
+		ChatsServiceGetForumTopicsProcedure,
+		svc.GetForumTopics,
+		connect.WithSchema(chatsServiceMethods.ByName("GetForumTopics")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceCreateForumTopicHandler := connect.NewUnaryHandler(
+		ChatsServiceCreateForumTopicProcedure,
+		svc.CreateForumTopic,
+		connect.WithSchema(chatsServiceMethods.ByName("CreateForumTopic")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceEditForumTopicHandler := connect.NewUnaryHandler(
+		ChatsServiceEditForumTopicProcedure,
+		svc.EditForumTopic,
+		connect.WithSchema(chatsServiceMethods.ByName("EditForumTopic")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceCloseForumTopicHandler := connect.NewUnaryHandler(
+		ChatsServiceCloseForumTopicProcedure,
+		svc.CloseForumTopic,
+		connect.WithSchema(chatsServiceMethods.ByName("CloseForumTopic")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceHideForumTopicHandler := connect.NewUnaryHandler(
+		ChatsServiceHideForumTopicProcedure,
+		svc.HideForumTopic,
+		connect.WithSchema(chatsServiceMethods.ByName("HideForumTopic")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.ChatsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatsServiceCreatePrivateProcedure:
@@ -447,6 +672,24 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 			chatsServiceSetHistoryVisibilityHandler.ServeHTTP(w, r)
 		case ChatsServiceUpdateChatInfoProcedure:
 			chatsServiceUpdateChatInfoHandler.ServeHTTP(w, r)
+		case ChatsServiceGetPeerDialogsProcedure:
+			chatsServiceGetPeerDialogsHandler.ServeHTTP(w, r)
+		case ChatsServiceCheckInviteProcedure:
+			chatsServiceCheckInviteHandler.ServeHTTP(w, r)
+		case ChatsServiceGetInviteLinksProcedure:
+			chatsServiceGetInviteLinksHandler.ServeHTTP(w, r)
+		case ChatsServiceRevokeInviteLinkProcedure:
+			chatsServiceRevokeInviteLinkHandler.ServeHTTP(w, r)
+		case ChatsServiceGetForumTopicsProcedure:
+			chatsServiceGetForumTopicsHandler.ServeHTTP(w, r)
+		case ChatsServiceCreateForumTopicProcedure:
+			chatsServiceCreateForumTopicHandler.ServeHTTP(w, r)
+		case ChatsServiceEditForumTopicProcedure:
+			chatsServiceEditForumTopicHandler.ServeHTTP(w, r)
+		case ChatsServiceCloseForumTopicProcedure:
+			chatsServiceCloseForumTopicHandler.ServeHTTP(w, r)
+		case ChatsServiceHideForumTopicProcedure:
+			chatsServiceHideForumTopicHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -514,4 +757,40 @@ func (UnimplementedChatsServiceHandler) SetHistoryVisibility(context.Context, *c
 
 func (UnimplementedChatsServiceHandler) UpdateChatInfo(context.Context, *connect.Request[v1.UpdateChatInfoRequest]) (*connect.Response[v1.UpdateChatInfoResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.UpdateChatInfo is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetPeerDialogs(context.Context, *connect.Request[v1.GetPeerDialogsRequest]) (*connect.Response[v1.GetPeerDialogsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetPeerDialogs is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) CheckInvite(context.Context, *connect.Request[v1.CheckInviteRequest]) (*connect.Response[v1.CheckInviteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.CheckInvite is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetInviteLinks(context.Context, *connect.Request[v1.GetInviteLinksRequest]) (*connect.Response[v1.GetInviteLinksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetInviteLinks is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) RevokeInviteLink(context.Context, *connect.Request[v1.RevokeInviteLinkRequest]) (*connect.Response[v1.RevokeInviteLinkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.RevokeInviteLink is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetForumTopics(context.Context, *connect.Request[v1.GetForumTopicsRequest]) (*connect.Response[v1.GetForumTopicsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetForumTopics is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) CreateForumTopic(context.Context, *connect.Request[v1.CreateForumTopicRequest]) (*connect.Response[v1.CreateForumTopicResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.CreateForumTopic is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) EditForumTopic(context.Context, *connect.Request[v1.EditForumTopicRequest]) (*connect.Response[v1.EditForumTopicResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.EditForumTopic is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) CloseForumTopic(context.Context, *connect.Request[v1.CloseForumTopicRequest]) (*connect.Response[v1.CloseForumTopicResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.CloseForumTopic is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) HideForumTopic(context.Context, *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.HideForumTopic is not implemented"))
 }

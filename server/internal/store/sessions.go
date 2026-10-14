@@ -24,6 +24,15 @@ var (
 		int(SessionIdleTimeout.Hours()), withinMaxAge)
 )
 
+// Revocation reasons stored in user_sessions.revoke_reason (values of
+// app.v1.SessionRevokeReason). A trigger copies them into the outbox row
+// that tells the realtime gateway to close the session's sockets.
+const (
+	reasonSignedOut     = "1"
+	reasonRevokedByUser = "2"
+	reasonGrantEnded    = "3"
+)
+
 // Session is a chat session without its secrets.
 type Session struct {
 	ID           int64
@@ -168,7 +177,8 @@ func (s *Store) RevokeSession(ctx context.Context, tenantID string, userID, sess
 			WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.id = $3 AND `+activeSession+`
 			FOR UPDATE)
 		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL,
-			id_token_enc = CASE WHEN u.token_hash = $4 THEN u.id_token_enc END
+			id_token_enc = CASE WHEN u.token_hash = $4 THEN u.id_token_enc END,
+			revoke_reason = CASE WHEN u.token_hash = $4 THEN `+reasonSignedOut+` ELSE `+reasonRevokedByUser+` END
 		FROM target WHERE u.id = target.id
 		RETURNING u.id, target.token_hash, target.refresh_token_enc`,
 		tenantID, userID, sessionID, callerTokenHash)
@@ -192,7 +202,8 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, tenantID string, userID
 			SELECT s.id, s.token_hash, s.refresh_token_enc FROM user_sessions s
 			WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.id <> $3 AND `+activeSession+`
 			FOR UPDATE)
-		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL
+		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
+			revoke_reason = `+reasonRevokedByUser+`
 		FROM target WHERE u.id = target.id
 		RETURNING u.id, target.token_hash, target.refresh_token_enc`,
 		tenantID, userID, keepID)
@@ -220,6 +231,7 @@ func (s *Store) EndSessionForLogout(ctx context.Context, tenantID string, tokenH
 			WHERE s.tenant_id = $1 AND s.token_hash = $2 AND `+withinMaxAge+`
 			FOR UPDATE)
 		UPDATE user_sessions u SET revoked_at = coalesce(u.revoked_at, now()),
+			revoke_reason = coalesce(u.revoke_reason, `+reasonSignedOut+`),
 			refresh_token_enc = NULL, id_token_enc = NULL
 		FROM target WHERE u.id = target.id
 		RETURNING u.id, target.token_hash, target.refresh_token_enc, target.id_token_enc`,
@@ -254,12 +266,14 @@ func (s *Store) BackchannelLogout(ctx context.Context, tenantID, clientID, jti s
 		fresh = true
 		if sid != "" {
 			tag, err = tx.Exec(ctx, `
-				UPDATE user_sessions SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL
+				UPDATE user_sessions SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
+					revoke_reason = `+reasonGrantEnded+`
 				WHERE tenant_id = $1 AND idp_client_id = $2 AND idp_sid = $3 AND revoked_at IS NULL`,
 				tenantID, clientID, sid)
 		} else {
 			tag, err = tx.Exec(ctx, `
-				UPDATE user_sessions s SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL
+				UPDATE user_sessions s SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
+					revoke_reason = `+reasonGrantEnded+`
 				FROM users u
 				WHERE u.id = s.user_id AND u.tenant_id = $1 AND u.idp_sub = $3
 					AND s.tenant_id = $1 AND s.idp_client_id = $2 AND s.revoked_at IS NULL`,

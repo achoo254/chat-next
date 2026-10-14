@@ -1,0 +1,789 @@
+package chat
+
+import (
+	"cmp"
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"time"
+
+	appv1 "app.local/server/gen/app/v1"
+	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/proto"
+)
+
+// Chat types, sync modes, history visibility and roles as stored.
+const (
+	typePrivate = "private"
+	typeGroup   = "group"
+	typeChannel = "channel"
+
+	syncSmall = "small"
+	syncLarge = "large"
+
+	visShared    = "shared"
+	visSinceJoin = "since_join"
+
+	roleMember = "member"
+	roleAdmin  = "admin"
+	roleOwner  = "owner"
+)
+
+// Permission bits (app.v1.ChatPermission).
+const (
+	permSend         = uint32(appv1.ChatPermission_CHAT_PERMISSION_SEND_MESSAGES)
+	permMedia        = uint32(appv1.ChatPermission_CHAT_PERMISSION_SEND_MEDIA)
+	permAddMembers   = uint32(appv1.ChatPermission_CHAT_PERMISSION_ADD_MEMBERS)
+	permPin          = uint32(appv1.ChatPermission_CHAT_PERMISSION_PIN_MESSAGES)
+	permChangeInfo   = uint32(appv1.ChatPermission_CHAT_PERMISSION_CHANGE_INFO)
+	permManageTopics = uint32(appv1.ChatPermission_CHAT_PERMISSION_MANAGE_TOPICS)
+
+	allPerms     = permSend | permMedia | permAddMembers | permPin | permChangeInfo | permManageTopics
+	privatePerms = permSend | permMedia | permPin
+	// Defaults of a new group: members talk, add people and open topics;
+	// pinning and chat info are for admins.
+	defaultGroupPerms = permSend | permMedia | permAddMembers | permManageTopics
+)
+
+// ------------------------------------------------------------------ chats
+
+type chatRow struct {
+	ID                int64
+	TenantID          string
+	Type              string
+	Title             string
+	About             string
+	CreatorID         int64
+	SyncMode          string
+	HistoryVisibility string
+	DefaultPerms      uint32
+	Forum             bool
+	LastSeq           int64
+	ChatPts           int64
+	LastTopicID       int64
+	MemberCount       int32
+	PinnedSeq         int64
+	CreatedAt         time.Time
+	// Private chats: the two participants.
+	UserLow, UserHigh int64
+}
+
+const chatColumns = `c.id, c.tenant_id, c.type, c.title, c.about, c.creator_id, c.sync_mode, c.history_visibility,
+	c.default_permissions, c.forum, c.last_seq, c.chat_pts, c.last_topic_id, c.member_count, c.pinned_seq, c.created_at,
+	coalesce(p.user_low, 0), coalesce(p.user_high, 0)`
+
+const chatFrom = `chats c LEFT JOIN private_chats p ON p.chat_id = c.id`
+
+func scanChat(row pgx.Row) (*chatRow, error) {
+	c := &chatRow{}
+	var perms int32
+	err := row.Scan(&c.ID, &c.TenantID, &c.Type, &c.Title, &c.About, &c.CreatorID, &c.SyncMode, &c.HistoryVisibility,
+		&perms, &c.Forum, &c.LastSeq, &c.ChatPts, &c.LastTopicID, &c.MemberCount, &c.PinnedSeq, &c.CreatedAt,
+		&c.UserLow, &c.UserHigh)
+	c.DefaultPerms = uint32(perms)
+	return c, err
+}
+
+// peerOf returns the other participant of a private chat.
+func (c *chatRow) peerOf(viewer int64) int64 {
+	switch viewer {
+	case c.UserLow:
+		return c.UserHigh
+	case c.UserHigh:
+		return c.UserLow
+	default:
+		return 0
+	}
+}
+
+type memberRow struct {
+	ChatID      int64
+	UserID      int64
+	Role        string
+	Perms       *uint32
+	InviterID   int64
+	JoinedAt    time.Time
+	JoinedSeq   int64
+	VisibleFrom int64
+	ReadOutbox  int64
+	Left        bool
+}
+
+const memberColumns = `m.chat_id, m.user_id, m.role, m.permissions, m.inviter_id, m.joined_at, m.joined_seq,
+	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL`
+
+func scanMember(row pgx.Row) (*memberRow, error) {
+	m := &memberRow{}
+	var perms *int32
+	err := row.Scan(&m.ChatID, &m.UserID, &m.Role, &perms, &m.InviterID, &m.JoinedAt, &m.JoinedSeq,
+		&m.VisibleFrom, &m.ReadOutbox, &m.Left)
+	if perms != nil {
+		p := uint32(*perms)
+		m.Perms = &p
+	}
+	return m, err
+}
+
+func (m *memberRow) active() bool {
+	return m != nil && !m.Left
+}
+
+func (m *memberRow) isAdmin() bool {
+	return m.active() && (m.Role == roleAdmin || m.Role == roleOwner)
+}
+
+// permsOf returns the effective ChatPermission bits of a member.
+func (c *chatRow) permsOf(m *memberRow) uint32 {
+	if !m.active() {
+		return 0
+	}
+	switch {
+	case c.Type == typePrivate:
+		return privatePerms
+	case m.Role == roleOwner || m.Role == roleAdmin:
+		return allPerms
+	case c.Type == typeChannel:
+		return 0
+	case m.Perms != nil:
+		return *m.Perms & c.DefaultPerms
+	default:
+		return c.DefaultPerms
+	}
+}
+
+func (c *chatRow) can(m *memberRow, perm uint32) bool {
+	return c.permsOf(m)&perm == perm
+}
+
+var chatTypes = map[string]appv1.ChatType{
+	typePrivate: appv1.ChatType_CHAT_TYPE_PRIVATE,
+	typeGroup:   appv1.ChatType_CHAT_TYPE_GROUP,
+	typeChannel: appv1.ChatType_CHAT_TYPE_CHANNEL,
+	"secret":    appv1.ChatType_CHAT_TYPE_SECRET,
+}
+
+var memberRoles = map[string]appv1.MemberRole{
+	roleMember: appv1.MemberRole_MEMBER_ROLE_MEMBER,
+	roleAdmin:  appv1.MemberRole_MEMBER_ROLE_ADMIN,
+	roleOwner:  appv1.MemberRole_MEMBER_ROLE_OWNER,
+}
+
+// render returns the chat as viewer sees it; m is the viewer's membership
+// (nil when never a member).
+func (c *chatRow) render(viewer int64, m *memberRow) *appv1.Chat {
+	out := &appv1.Chat{
+		Id:                 c.ID,
+		Type:               chatTypes[c.Type],
+		Title:              c.Title,
+		About:              c.About,
+		SyncMode:           appv1.SyncMode_SYNC_MODE_SMALL,
+		HistoryVisibility:  appv1.HistoryVisibility_HISTORY_VISIBILITY_SHARED,
+		MemberCount:        c.MemberCount,
+		DefaultPermissions: c.DefaultPerms,
+		PinnedSeq:          c.PinnedSeq,
+		CreatedAt:          c.CreatedAt.Unix(),
+		MyPermissions:      c.permsOf(m),
+		Left:               !m.active(),
+		Forum:              c.Forum,
+	}
+	if c.SyncMode == syncLarge {
+		out.SyncMode = appv1.SyncMode_SYNC_MODE_LARGE
+	}
+	if c.HistoryVisibility == visSinceJoin {
+		out.HistoryVisibility = appv1.HistoryVisibility_HISTORY_VISIBILITY_SINCE_JOIN
+	}
+	if c.Type == typePrivate {
+		out.Title, out.About = "", ""
+		out.PeerUserId = c.peerOf(viewer)
+	}
+	if m.active() {
+		out.MyRole = memberRoles[m.Role]
+	}
+	return out
+}
+
+func loadChats(ctx context.Context, q querier, tenantID string, ids []int64) (map[int64]*chatRow, error) {
+	out := map[int64]*chatRow{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT `+chatColumns+` FROM `+chatFrom+` WHERE c.tenant_id = $1 AND c.id = ANY($2)`,
+		tenantID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load chats: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		c, err := scanChat(rows)
+		if err != nil {
+			return nil, fmt.Errorf("chat: load chats: %w", err)
+		}
+		out[c.ID] = c
+	}
+	return out, rows.Err()
+}
+
+type memberKey struct{ chatID, userID int64 }
+
+func loadMembers(ctx context.Context, q querier, chatIDs, userIDs []int64) (map[memberKey]*memberRow, error) {
+	out := map[memberKey]*memberRow{}
+	if len(chatIDs) == 0 || len(userIDs) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT `+memberColumns+` FROM chat_members m WHERE m.chat_id = ANY($1) AND m.user_id = ANY($2)`,
+		chatIDs, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load members: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		m, err := scanMember(rows)
+		if err != nil {
+			return nil, fmt.Errorf("chat: load members: %w", err)
+		}
+		out[memberKey{m.ChatID, m.UserID}] = m
+	}
+	return out, rows.Err()
+}
+
+// ------------------------------------------------------------------ users
+
+type userRow struct {
+	ID       int64
+	Username string
+	Name     string
+	Bio      string
+	Email    string
+	LastSeen *time.Time
+}
+
+func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (map[int64]*userRow, error) {
+	out := map[int64]*userRow{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT id, username, name, bio, coalesce(email, ''), last_seen_at FROM users WHERE tenant_id = $1 AND id = ANY($2)`,
+		tenantID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load users: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		u := &userRow{}
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen); err != nil {
+			return nil, fmt.Errorf("chat: load users: %w", err)
+		}
+		out[u.ID] = u
+	}
+	return out, rows.Err()
+}
+
+func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
+	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked}
+	if u.ID == viewer {
+		out.Email = u.Email
+	}
+	return out
+}
+
+type blockKey struct{ blocker, blocked int64 }
+
+// loadBlocks returns which of viewers blocked which of users.
+func loadBlocks(ctx context.Context, q querier, viewers, users []int64) (map[blockKey]bool, error) {
+	out := map[blockKey]bool{}
+	if len(viewers) == 0 || len(users) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT blocker_id, blocked_id FROM blocks WHERE blocker_id = ANY($1) AND blocked_id = ANY($2)`,
+		viewers, users)
+	if err != nil {
+		return nil, fmt.Errorf("chat: load blocks: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k blockKey
+		if err := rows.Scan(&k.blocker, &k.blocked); err != nil {
+			return nil, fmt.Errorf("chat: load blocks: %w", err)
+		}
+		out[k] = true
+	}
+	return out, rows.Err()
+}
+
+// --------------------------------------------------------------- messages
+
+type msgKey struct{ chatID, seq int64 }
+
+type messageRow struct {
+	ChatID      int64
+	Seq         int64
+	TopicID     int64
+	FromID      int64
+	RandomID    int64
+	Date        time.Time
+	Text        string
+	Content     []byte
+	ReplyToSeq  int64
+	GroupedID   int64
+	EditVersion int32
+	EditDate    *time.Time
+	Deleted     bool
+}
+
+const messageColumns = `m.chat_id, m.seq, m.topic_id, m.from_id, m.random_id, m.date, m.text, m.content, m.reply_to_seq,
+	m.grouped_id, m.edit_version, m.edit_date, m.deleted_at IS NOT NULL`
+
+func scanMessage(row pgx.Row) (*messageRow, error) {
+	m := &messageRow{}
+	err := row.Scan(&m.ChatID, &m.Seq, &m.TopicID, &m.FromID, &m.RandomID, &m.Date, &m.Text, &m.Content, &m.ReplyToSeq,
+		&m.GroupedID, &m.EditVersion, &m.EditDate, &m.Deleted)
+	return m, err
+}
+
+// loadMessages loads messages by key, one query per chat (hash partition
+// pruning).
+func loadMessages(ctx context.Context, q querier, keys map[int64][]int64) (map[msgKey]*messageRow, error) {
+	out := map[msgKey]*messageRow{}
+	for chatID, seqs := range keys {
+		rows, err := q.Query(ctx, `SELECT `+messageColumns+` FROM messages m WHERE m.chat_id = $1 AND m.seq = ANY($2)`,
+			chatID, seqs)
+		if err != nil {
+			return nil, fmt.Errorf("chat: load messages: %w", err)
+		}
+		for rows.Next() {
+			m, err := scanMessage(rows)
+			if err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("chat: load messages: %w", err)
+			}
+			out[msgKey{m.ChatID, m.Seq}] = m
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("chat: load messages: %w", err)
+		}
+	}
+	return out, nil
+}
+
+// reactionsOf holds the reactions of a set of messages: counts per emoji and
+// the emoji each viewer chose.
+type reactionsOf struct {
+	counts map[msgKey][]*appv1.ReactionCount
+	mine   map[memberKey]map[int64]string // (chat, viewer) -> seq -> emoji
+}
+
+func loadReactions(ctx context.Context, q querier, keys map[int64][]int64, viewers []int64) (*reactionsOf, error) {
+	r := &reactionsOf{counts: map[msgKey][]*appv1.ReactionCount{}, mine: map[memberKey]map[int64]string{}}
+	for chatID, seqs := range keys {
+		rows, err := q.Query(ctx, `
+			SELECT seq, emoji, count(*), min(created_at) FROM message_reactions
+			WHERE chat_id = $1 AND seq = ANY($2) GROUP BY seq, emoji`, chatID, seqs)
+		if err != nil {
+			return nil, fmt.Errorf("chat: load reactions: %w", err)
+		}
+		type agg struct {
+			emoji string
+			n     int32
+			first time.Time
+		}
+		bySeq := map[int64][]agg{}
+		for rows.Next() {
+			var seq int64
+			var a agg
+			if err := rows.Scan(&seq, &a.emoji, &a.n, &a.first); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("chat: load reactions: %w", err)
+			}
+			bySeq[seq] = append(bySeq[seq], a)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("chat: load reactions: %w", err)
+		}
+		for seq, list := range bySeq {
+			// Most used first; ties keep the order they were first used.
+			slices.SortFunc(list, func(a, b agg) int {
+				return cmp.Or(cmp.Compare(b.n, a.n), a.first.Compare(b.first), cmp.Compare(a.emoji, b.emoji))
+			})
+			for _, a := range list {
+				r.counts[msgKey{chatID, seq}] = append(r.counts[msgKey{chatID, seq}], &appv1.ReactionCount{Emoji: a.emoji, Count: a.n})
+			}
+		}
+		if len(bySeq) == 0 || len(viewers) == 0 {
+			continue
+		}
+		rows, err = q.Query(ctx, `
+			SELECT seq, user_id, emoji FROM message_reactions WHERE chat_id = $1 AND seq = ANY($2) AND user_id = ANY($3)`,
+			chatID, seqs, viewers)
+		if err != nil {
+			return nil, fmt.Errorf("chat: load own reactions: %w", err)
+		}
+		for rows.Next() {
+			var seq, user int64
+			var emoji string
+			if err := rows.Scan(&seq, &user, &emoji); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("chat: load own reactions: %w", err)
+			}
+			k := memberKey{chatID, user}
+			if r.mine[k] == nil {
+				r.mine[k] = map[int64]string{}
+			}
+			r.mine[k][seq] = emoji
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("chat: load own reactions: %w", err)
+		}
+	}
+	return r, nil
+}
+
+// forViewer returns the reactions of a message with chosen set for viewer.
+func (r *reactionsOf) forViewer(k msgKey, viewer int64) []*appv1.ReactionCount {
+	list := r.counts[k]
+	if len(list) == 0 {
+		return nil
+	}
+	mine := r.mine[memberKey{k.chatID, viewer}][k.seq]
+	out := make([]*appv1.ReactionCount, len(list))
+	for i, c := range list {
+		out[i] = &appv1.ReactionCount{Emoji: c.Emoji, Count: c.Count, Chosen: c.Emoji == mine}
+	}
+	return out
+}
+
+type hiddenKey struct {
+	user int64
+	msg  msgKey
+}
+
+func loadHidden(ctx context.Context, q querier, viewers []int64, keys map[int64][]int64) (map[hiddenKey]bool, error) {
+	out := map[hiddenKey]bool{}
+	if len(viewers) == 0 {
+		return out, nil
+	}
+	for chatID, seqs := range keys {
+		rows, err := q.Query(ctx, `
+			SELECT user_id, seq FROM user_hidden_messages WHERE user_id = ANY($1) AND chat_id = $2 AND seq = ANY($3)`,
+			viewers, chatID, seqs)
+		if err != nil {
+			return nil, fmt.Errorf("chat: load hidden: %w", err)
+		}
+		for rows.Next() {
+			var user, seq int64
+			if err := rows.Scan(&user, &seq); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("chat: load hidden: %w", err)
+			}
+			out[hiddenKey{user, msgKey{chatID, seq}}] = true
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("chat: load hidden: %w", err)
+		}
+	}
+	return out, nil
+}
+
+// render returns the message as viewer sees it.
+func (m *messageRow) render(viewer int64, reactions []*appv1.ReactionCount) (*appv1.Message, error) {
+	out := &appv1.Message{}
+	if len(m.Content) > 0 {
+		if err := proto.Unmarshal(m.Content, out); err != nil {
+			return nil, fmt.Errorf("chat: decode message %d/%d: %w", m.ChatID, m.Seq, err)
+		}
+	}
+	out.ChatId, out.Seq, out.FromId, out.Date = m.ChatID, m.Seq, m.FromID, m.Date.Unix()
+	out.Text, out.ReplyToSeq, out.GroupedId, out.TopicId = m.Text, m.ReplyToSeq, m.GroupedID, m.TopicID
+	out.EditVersion = m.EditVersion
+	if m.EditDate != nil {
+		out.EditDate = m.EditDate.Unix()
+	}
+	if viewer == m.FromID {
+		out.RandomId = m.RandomID
+	}
+	out.Reactions = reactions
+	return out, nil
+}
+
+// referencedUsers lists the users a message mentions in any way.
+func referencedUsers(m *appv1.Message) []int64 {
+	ids := []int64{m.GetFromId()}
+	if f := m.GetForwardFrom(); f != nil {
+		ids = append(ids, f.GetFromUserId())
+	}
+	for _, e := range m.GetEntities() {
+		ids = append(ids, e.GetUserId())
+	}
+	switch a := m.GetAction().GetKind().(type) {
+	case *appv1.MessageAction_MembersAdded:
+		ids = append(ids, a.MembersAdded.GetUserIds()...)
+	case *appv1.MessageAction_MemberRemoved:
+		ids = append(ids, a.MemberRemoved.GetUserId(), a.MemberRemoved.GetBy())
+	default:
+	}
+	return ids
+}
+
+// ------------------------------------------------------------ batch render
+
+// entitySet collects users and chats to attach for each viewer.
+type entitySet struct {
+	users map[int64]map[int64]bool
+	chats map[int64]map[int64]bool
+}
+
+func newEntitySet() *entitySet {
+	return &entitySet{users: map[int64]map[int64]bool{}, chats: map[int64]map[int64]bool{}}
+}
+
+func (e *entitySet) addUsers(viewer int64, ids ...int64) {
+	for _, id := range ids {
+		if id == 0 {
+			continue
+		}
+		if e.users[viewer] == nil {
+			e.users[viewer] = map[int64]bool{}
+		}
+		e.users[viewer][id] = true
+	}
+}
+
+func (e *entitySet) addChats(viewer int64, ids ...int64) {
+	for _, id := range ids {
+		if id == 0 {
+			continue
+		}
+		if e.chats[viewer] == nil {
+			e.chats[viewer] = map[int64]bool{}
+		}
+		e.chats[viewer][id] = true
+	}
+}
+
+// renderedEntities holds users and chats rendered per viewer.
+type renderedEntities struct {
+	users map[int64][]*appv1.User
+	chats map[int64][]*appv1.Chat
+}
+
+// render loads every referenced user and chat once and renders them for
+// each viewer.
+func (e *entitySet) render(ctx context.Context, q querier, tenantID string) (*renderedEntities, error) {
+	var viewers, userIDs, chatIDs []int64
+	seenV, seenU, seenC := map[int64]bool{}, map[int64]bool{}, map[int64]bool{}
+	for v, set := range e.users {
+		if !seenV[v] {
+			seenV[v] = true
+			viewers = append(viewers, v)
+		}
+		for id := range set {
+			if !seenU[id] {
+				seenU[id] = true
+				userIDs = append(userIDs, id)
+			}
+		}
+	}
+	for v, set := range e.chats {
+		if !seenV[v] {
+			seenV[v] = true
+			viewers = append(viewers, v)
+		}
+		for id := range set {
+			if !seenC[id] {
+				seenC[id] = true
+				chatIDs = append(chatIDs, id)
+			}
+		}
+	}
+	users, err := loadUsers(ctx, q, tenantID, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	blocks, err := loadBlocks(ctx, q, viewers, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	chats, err := loadChats(ctx, q, tenantID, chatIDs)
+	if err != nil {
+		return nil, err
+	}
+	members, err := loadMembers(ctx, q, chatIDs, viewers)
+	if err != nil {
+		return nil, err
+	}
+	out := &renderedEntities{users: map[int64][]*appv1.User{}, chats: map[int64][]*appv1.Chat{}}
+	for v, set := range e.users {
+		for _, id := range sortedKeys(set) {
+			if u, ok := users[id]; ok {
+				out.users[v] = append(out.users[v], u.render(v, blocks[blockKey{v, id}]))
+			}
+		}
+	}
+	for v, set := range e.chats {
+		for _, id := range sortedKeys(set) {
+			if c, ok := chats[id]; ok {
+				out.chats[v] = append(out.chats[v], c.render(v, members[memberKey{id, v}]))
+			}
+		}
+	}
+	return out, nil
+}
+
+func sortedKeys(set map[int64]bool) []int64 {
+	out := make([]int64, 0, len(set))
+	for id := range set {
+		out = append(out, id)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// renderFrames renders log updates for their viewers: messages come from
+// the messages table as each viewer sees them now (an update about a
+// deleted or hidden message loses its body but keeps its position), chats
+// and users referenced are attached. jobs' updates are edited in place.
+func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, jobs map[int64][]*appv1.Update) (map[int64]*appv1.UpdateFrame, error) {
+	keys := map[int64][]int64{}
+	addKey := func(chatID, seq int64) {
+		if chatID != 0 && seq != 0 && !slices.Contains(keys[chatID], seq) {
+			keys[chatID] = append(keys[chatID], seq)
+		}
+	}
+	for _, list := range jobs {
+		for _, u := range list {
+			switch k := u.Kind.(type) {
+			case *appv1.Update_MessageNew:
+				addKey(k.MessageNew.GetMessage().GetChatId(), k.MessageNew.GetMessage().GetSeq())
+			case *appv1.Update_MessageEdit:
+				addKey(k.MessageEdit.GetMessage().GetChatId(), k.MessageEdit.GetMessage().GetSeq())
+			case *appv1.Update_Reaction:
+				addKey(k.Reaction.GetChatId(), k.Reaction.GetSeq())
+			default:
+			}
+		}
+	}
+	msgs, err := loadMessages(ctx, q, keys)
+	if err != nil {
+		return nil, err
+	}
+	reactions, err := loadReactions(ctx, q, keys, viewers)
+	if err != nil {
+		return nil, err
+	}
+	hidden, err := loadHidden(ctx, q, viewers, keys)
+	if err != nil {
+		return nil, err
+	}
+	ents := newEntitySet()
+	renderMsg := func(viewer int64, ref *appv1.Message) (*appv1.Message, error) {
+		k := msgKey{ref.GetChatId(), ref.GetSeq()}
+		m, ok := msgs[k]
+		if !ok || m.Deleted || hidden[hiddenKey{viewer, k}] {
+			return nil, nil
+		}
+		return m.render(viewer, reactions.forViewer(k, viewer))
+	}
+	for _, viewer := range viewers {
+		for _, u := range jobs[viewer] {
+			if chatID := updateChatID(u); chatID != 0 {
+				ents.addChats(viewer, chatID)
+			}
+			switch k := u.Kind.(type) {
+			case *appv1.Update_MessageNew:
+				m, err := renderMsg(viewer, k.MessageNew.GetMessage())
+				if err != nil {
+					return nil, err
+				}
+				if m == nil {
+					u.Kind = nil
+					continue
+				}
+				k.MessageNew.Message = m
+				ents.addUsers(viewer, referencedUsers(m)...)
+			case *appv1.Update_MessageEdit:
+				m, err := renderMsg(viewer, k.MessageEdit.GetMessage())
+				if err != nil {
+					return nil, err
+				}
+				if m == nil {
+					u.Kind = nil
+					continue
+				}
+				k.MessageEdit.Message = m
+				ents.addUsers(viewer, referencedUsers(m)...)
+			case *appv1.Update_Reaction:
+				key := msgKey{k.Reaction.GetChatId(), k.Reaction.GetSeq()}
+				if m, ok := msgs[key]; !ok || m.Deleted || hidden[hiddenKey{viewer, key}] {
+					u.Kind = nil
+					continue
+				}
+				k.Reaction.Reactions = reactions.forViewer(key, viewer)
+			case *appv1.Update_MemberAdded:
+				ents.addUsers(viewer, k.MemberAdded.GetUserIds()...)
+				ents.addUsers(viewer, k.MemberAdded.GetInviterId())
+			case *appv1.Update_MemberRemoved:
+				ents.addUsers(viewer, k.MemberRemoved.GetUserId(), k.MemberRemoved.GetActorId())
+			case *appv1.Update_MemberPermissions:
+				ents.addUsers(viewer, k.MemberPermissions.GetUserId())
+			default:
+			}
+		}
+	}
+	rendered, err := ents.render(ctx, q, s.cfg.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	frames := make(map[int64]*appv1.UpdateFrame, len(viewers))
+	for _, viewer := range viewers {
+		chats := rendered.chats[viewer]
+		// chat_updated carries the chat as the viewer sees it now.
+		for _, u := range jobs[viewer] {
+			if k, ok := u.Kind.(*appv1.Update_ChatUpdated); ok {
+				for _, c := range chats {
+					if c.GetId() == k.ChatUpdated.GetChat().GetId() {
+						k.ChatUpdated.Chat = c
+					}
+				}
+			}
+		}
+		frames[viewer] = &appv1.UpdateFrame{Updates: jobs[viewer], Users: rendered.users[viewer], Chats: chats}
+	}
+	return frames, nil
+}
+
+// renderMessages renders history rows for one viewer, with their users.
+func (s *Service) renderMessages(ctx context.Context, q querier, viewer int64, rows []*messageRow) ([]*appv1.Message, []*appv1.User, error) {
+	keys := map[int64][]int64{}
+	for _, m := range rows {
+		keys[m.ChatID] = append(keys[m.ChatID], m.Seq)
+	}
+	reactions, err := loadReactions(ctx, q, keys, []int64{viewer})
+	if err != nil {
+		return nil, nil, err
+	}
+	ents := newEntitySet()
+	out := make([]*appv1.Message, 0, len(rows))
+	for _, m := range rows {
+		msg, err := m.render(viewer, reactions.forViewer(msgKey{m.ChatID, m.Seq}, viewer))
+		if err != nil {
+			return nil, nil, err
+		}
+		out = append(out, msg)
+		ents.addUsers(viewer, referencedUsers(msg)...)
+	}
+	rendered, err := ents.render(ctx, q, s.cfg.TenantID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, rendered.users[viewer], nil
+}
+
+// errNoRows tells helpers apart from database failures.
+func isNoRows(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
+}

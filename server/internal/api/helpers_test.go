@@ -92,12 +92,12 @@ func newEnv(t *testing.T) *env {
 	}
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewTextHandler(io.MultiWriter(t.Output(), logs), nil))
-	app, err := api.New(cfg, st, idp.Server.Client(), logger)
+	app, err := api.New(ctx, cfg, st, idp.Server.Client(), logger, api.Options{LinkPreviewAllow: e2eAllow})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Background IdP work must finish before the store closes.
-	t.Cleanup(app.Sessions.Wait)
+	// Background work must finish before the store closes.
+	t.Cleanup(app.Shutdown)
 	if err := app.IdP.Discover(ctx); err != nil {
 		t.Fatal(err)
 	}

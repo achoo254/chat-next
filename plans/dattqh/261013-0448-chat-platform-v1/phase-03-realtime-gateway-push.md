@@ -81,14 +81,20 @@ Create:
 
 ## Todo
 
-- [ ] WS + auth + heartbeat + reconnect order + epoch
-- [ ] Registry + `u:`/`c:` + kiểm membership OpenChat
-- [ ] session_revoked đóng socket
-- [ ] Typing/presence tôn trọng privacy
-- [ ] Lanes + quota + push từ afterCommit + batch chat large
-- [ ] Badge counter
-- [ ] APNs/FCM/Web Push + payload mã hoá + xoá thông báo chéo
-- [ ] Metrics
+- [x] WS + auth + heartbeat + reconnect order + epoch
+- [x] Registry + `u:`/`c:` + kiểm membership OpenChat (registry trong bộ nhớ của process `api`; Redis/NATS khi scale ngang)
+- [x] session_revoked đóng socket (trigger → outbox → consumer 150 ms; test đo dưới 1 s)
+- [x] Typing/presence tôn trọng privacy
+- [ ] Lanes + quota + push từ afterCommit + batch chat large (push: R7)
+- [ ] Badge counter (R7)
+- [ ] APNs/FCM/Web Push + payload mã hoá + xoá thông báo chéo (R7)
+- [ ] Metrics (chưa có hạ tầng metrics; Phase 13)
+
+### Kết quả R1 (2026-10-14)
+
+- Gateway chạy trong process `api` ở `wss://chat.hoandat.com/ws` (cùng origin, nginx `location = /ws` có header upgrade), không thêm process hay cổng: giai đoạn 1 chỉ một server, pm2 một instance, nên hub trong bộ nhớ nhận update thẳng từ chat service sau commit. Handshake kiểm `Origin` và cookie phiên trước khi upgrade.
+- Backpressure: hàng đợi 256 frame mỗi socket, đầy thì `ResyncFrame(BACKPRESSURE)`; epoch đổi thì `EPOCH_CHANGED`; dừng server thì `SERVER_RESTART`.
+- Chưa làm trong R1: push (APNs/FCM/Web Push), làn ưu tiên, badge, metrics, token phiên native trong `ClientHelloFrame` (app native ở R7/R8), kiểm tenant theo Host (một tenant tĩnh), `wsbench`.
 
 ## Success Criteria
 

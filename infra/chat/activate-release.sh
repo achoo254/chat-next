@@ -3,7 +3,7 @@
 #   bash /opt/chat/infra/activate-release.sh <release-id>
 # Steps: back up the database, run migrations with the new binary, install the
 # release's nginx conf, switch /opt/chat/current, start or reload pm2
-# `chat-api`, wait for /healthz. Any failure after the switch restores the
+# `chat-api`, wait for /healthz and the realtime route /ws. Any failure after the switch restores the
 # previous release and nginx conf. Migrations are expand-only (backward
 # compatible), so the previous binary keeps working on the migrated schema.
 # Keeps the newest 5 releases.
@@ -31,6 +31,13 @@ health() {
 		sleep 1
 	done
 	return 1
+}
+
+# The realtime gateway answers a plain GET without Origin with 403 (an
+# unknown route would be 404), through the app and through nginx.
+realtime() {
+	[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:4600/ws)" = 403 ] || return 1
+	[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 --resolve chat.hoandat.com:443:127.0.0.1 https://chat.hoandat.com/ws)" = 403 ]
 }
 
 rollback() {
@@ -61,6 +68,7 @@ systemctl reload nginx
 pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || rollback
 pm2 save >/dev/null
 health || rollback
+realtime || rollback
 
 echo "== prune"
 ls -1dt "$ROOT"/releases/*/ | tail -n +6 | xargs -r rm -rf

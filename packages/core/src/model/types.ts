@@ -33,6 +33,31 @@ export interface Chat {
 	readonly myPermissions: number;
 	/** The user is no longer a member. */
 	readonly left: boolean;
+	/** Groups only: messages are organised in forum topics. */
+	readonly forum: boolean;
+}
+
+/** Topic of a forum group; topic 1 is the default "General" topic. */
+export interface ForumTopic {
+	readonly chatId: number;
+	readonly id: number;
+	readonly title: string;
+	/** 0xRRGGBB. */
+	readonly iconColor: number;
+	readonly creatorId: number;
+	readonly createdAt: number;
+	readonly pinned: boolean;
+	readonly closed: boolean;
+	readonly hidden: boolean;
+	readonly topSeq: number;
+}
+
+/** Text-only preview of the first web link of a message. */
+export interface LinkPreview {
+	readonly url: string;
+	readonly siteName: string;
+	readonly title: string;
+	readonly description: string;
 }
 
 export interface Dialog {
@@ -128,6 +153,9 @@ export interface Message {
 	readonly reactions: readonly ReactionCount[];
 	readonly integrationLabel: string;
 	readonly action: MessageAction | null;
+	/** Forum groups: the message's topic; 0 elsewhere. */
+	readonly topicId: number;
+	readonly linkPreview: LinkPreview | null;
 }
 
 export type SessionRevokeReason =
@@ -166,7 +194,16 @@ export type UpdateBody =
 			readonly chatId: number;
 			readonly maxSeq: number;
 			readonly outbox: boolean;
+			/** Inbox: unread messages of the whole chat after the read. */
 			readonly unreadCount: number;
+			/** Forum topic read (0 = the whole chat). */
+			readonly topicId: number;
+			/** Inbox, topicId != 0: unread messages left in the topic. */
+			readonly topicUnreadCount: number;
+			/** Inbox: the chat's newest seq when the counts were taken. */
+			readonly topSeq: number;
+			/** Inbox, sync_mode=large: the chat log position of the counts. */
+			readonly chatPts: number;
 	  }
 	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number; readonly pinned: boolean }
 	| {
@@ -195,6 +232,7 @@ export type UpdateBody =
 			readonly chatPts: number;
 	  }
 	| { readonly kind: "chat_updated"; readonly chat: Chat }
+	| { readonly kind: "topic_changed"; readonly topic: ForumTopic }
 	| {
 			readonly kind: "chat_activity";
 			readonly chatId: number;

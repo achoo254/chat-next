@@ -142,7 +142,7 @@ func (s *Store) finishGrantCheck(ctx context.Context, c GrantCandidate, lease ti
 	case GrantEnded:
 		return s.execLeased(ctx, `
 			UPDATE user_sessions SET revoked_at = now(), grant_lease_until = NULL,
-				refresh_token_enc = NULL, id_token_enc = NULL
+				refresh_token_enc = NULL, id_token_enc = NULL, revoke_reason = `+reasonGrantEnded+`
 			WHERE `+leaseHeld, c.SessionID, lease)
 	case GrantRetry:
 		// Backdate the check so it becomes due again after RetryAfter.

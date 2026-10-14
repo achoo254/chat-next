@@ -143,6 +143,14 @@ export const MIGRATIONS: readonly Migration[] = [
 			"CREATE INDEX outbox_by_chat ON outbox (chat_id, id)",
 		],
 	},
+	{
+		version: 2,
+		statements: [
+			// Forum groups (topics) and the text-only link preview of a message.
+			"ALTER TABLE chats ADD COLUMN forum INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE messages ADD COLUMN link_preview TEXT",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

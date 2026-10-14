@@ -16,7 +16,7 @@ import { classifyFailure, type RemoteApi } from "../protocol/api.ts";
 import { toMessage, toSyncAck, toWireEntity, toWireId } from "../protocol/map.ts";
 import type { OutboxRow, Repository } from "../repo/repository.ts";
 import { decodeEntities } from "../repo/rows.ts";
-import { messageSearchText, putMessage, putNewMessage, putRead, type WriteBatch } from "../repo/writes.ts";
+import { messageSearchText, putLocalRead, putMessage, putNewMessage, type WriteBatch } from "../repo/writes.ts";
 import { assertSafeId } from "../ids/index.ts";
 import type { SyncEngine } from "../sync/engine.ts";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffPolicy } from "../transport/backoff.ts";
@@ -246,7 +246,7 @@ export class Outbox {
 			const dialog = await this.options.repo.dialog(chatId);
 			if (dialog === null || dialog.readInboxMaxSeq >= maxSeq) return;
 			const unread = await this.options.repo.countIncomingAfter(chatId, maxSeq, this.options.selfId);
-			putRead(w, chatId, maxSeq, false, unread);
+			putLocalRead(w, chatId, maxSeq, unread);
 			w.add("DELETE FROM outbox WHERE chat_id = ? AND kind = 'read' AND failure IS NULL", [chatId]);
 			this.insert(w, chatId, { kind: "read", maxSeq }, 0);
 		});

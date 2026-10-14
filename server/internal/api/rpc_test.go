@@ -146,8 +146,9 @@ func TestProfileRPCs(t *testing.T) {
 	if _, err := alice.users.UpdateProfile(ctx, connect.NewRequest(&appv1.UpdateProfileRequest{PhotoFileId: &photo})); codeOf(err) != connect.CodeUnimplemented {
 		t.Fatalf("photo: %v", err)
 	}
-	if _, err := alice.users.GetUsers(ctx, connect.NewRequest(&appv1.GetUsersRequest{})); codeOf(err) != connect.CodeUnimplemented {
-		t.Fatalf("GetUsers: %v", err)
+	got, err := alice.users.GetUsers(ctx, connect.NewRequest(&appv1.GetUsersRequest{UserIds: []int64{u.GetId(), 999999}}))
+	if err != nil || len(got.Msg.GetUsers()) != 1 || got.Msg.GetUsers()[0].GetName() != "Alice" || !got.Msg.GetUsers()[0].GetIsSelf() {
+		t.Fatalf("GetUsers = %v, %v", got, err)
 	}
 }
 

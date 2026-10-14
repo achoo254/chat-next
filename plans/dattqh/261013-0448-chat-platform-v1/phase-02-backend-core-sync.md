@@ -128,16 +128,24 @@ Create:
 
 ## Todo
 
-- [ ] Store + migration + partition job + epoch
-- [ ] Ratelimit
-- [ ] Tenant theo Host + client API nội bộ IdP + cache
-- [ ] Auth OIDC web/native + back-channel logout + kiểm grant + phiên + Origin + revoke
-- [ ] Users/privacy mặc định/block
-- [ ] Chats + quyền + invite + history visibility + sync_mode
-- [ ] Messages đầy đủ (edit/delete/forward/copy/read/pin/reaction/album)
-- [ ] Updates + chat_activity + too_long
-- [ ] Outbox log + cursor + afterCommit + sweeper
-- [ ] Bộ test pts, đa chat, hot user, chuyển mode, failover, auth, tenant
+- [x] Store + migration + partition job + epoch (migration `0003_messaging.sql`; partition theo ngày tạo trước 30 ngày; `server_meta.server_epoch`; Snowflake thuê worker trong Postgres)
+- [x] Ratelimit (token bucket trong bộ nhớ, giai đoạn 1 một process; Redis khi scale ngang)
+- [ ] Tenant theo Host + client API nội bộ IdP + cache (R0/R1 vẫn một tenant tĩnh; làm ở R9)
+- [ ] Auth OIDC web/native + back-channel logout + kiểm grant + phiên + Origin + revoke (web xong ở R0, thu hồi phiên giờ ghi `revoke_reason` + `session_revoked` vào outbox; native `ExchangeNativeCode` chờ R7)
+- [x] Users/privacy mặc định/block (thêm `Report` vào hàng đợi `reports`)
+- [x] Chats + quyền + invite + history visibility + sync_mode (+ topic, `CheckInvite`, `GetInviteLinks`, `RevokeInviteLink`, `GetPeerDialogs`)
+- [x] Messages đầy đủ (edit/delete/forward/copy/read/pin/reaction) + xem trước link chỉ chữ; album chờ media (R3)
+- [x] Updates + chat_activity + too_long
+- [x] Outbox log + cursor + afterCommit + sweeper (consumer realtime giữ cursor trong bộ nhớ; bảng `outbox_cursors` cho consumer sau)
+- [ ] Bộ test pts, đa chat, hot user, chuyển mode, failover, auth, tenant (đã có: 1.000 tin song song, 20 chat × 150 thành viên chồng chéo 30%, chuyển mode giữa luồng gửi, `too_long`/epoch, tenant, `random_id` ×100; còn: hot user 2.000 tin/s và failover thật với standby, đo ở Phase 14)
+
+### Kết quả R1 (2026-10-14)
+
+- RPC đã làm: `ChatsService` (đủ, gồm topic và link mời), `MessagesService` (trừ `SendMedia`, `SendAlbum`, `PressInlineButton`), `UpdatesService`, `UsersService` (đủ trừ ảnh hồ sơ). Proto chỉ thêm trường/RPC, `buf breaking` qua.
+- `UpdateRead` mang thêm `chat_pts`, `top_seq` (seq mới nhất lúc đếm), `topic_id`, `topic_unread_count`; client core bỏ bước tải lại dialog để đối soát số chưa đọc.
+- "Danh bạ" trong quyền riêng tư = có chung ít nhất một chat (app chưa có danh bạ); mặc định thêm vào nhóm = danh bạ, nên muốn thêm người lạ vào nhóm thì mở chat riêng trước hoặc dùng link mời.
+- Update trong nhật ký lưu tin dạng `(chat_id, seq)` và dựng lại khi đọc, nên tin đã xoá không bị phát lại qua `GetDifference`.
+- Chi tiết vận hành: [`server/README.md`](../../../server/README.md), [`docs/deployment-guide.md`](../../../docs/deployment-guide.md).
 
 ## Success Criteria
 

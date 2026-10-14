@@ -37,7 +37,8 @@ func TestLoadValid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ListenAddr != DefaultListenAddr || c.TenantID != "primary" || c.TenantDomain != "hoandat.com" {
+	if c.ListenAddr != DefaultListenAddr || c.TenantID != "primary" || c.TenantDomain != "hoandat.com" ||
+		c.AppURLScheme != DefaultAppURLScheme {
 		t.Fatalf("defaults = %+v", c)
 	}
 	if c.PublicOrigin() != "https://chat.hoandat.com" || len(c.SessionKey) != 32 || c.Development() {
@@ -75,6 +76,7 @@ func TestLoadErrorsNameVariablesWithoutValues(t *testing.T) {
 		"TENANT_ID":          func(e map[string]string) { e["TENANT_ID"] = "Bad Tenant" },
 		"TENANT_DOMAIN":      func(e map[string]string) { e["TENANT_DOMAIN"] = "not a domain" },
 		"CHAT_LISTEN_ADDR":   func(e map[string]string) { e["CHAT_LISTEN_ADDR"] = "4600" },
+		"APP_URL_SCHEME":     func(e map[string]string) { e["APP_URL_SCHEME"] = "https" },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {

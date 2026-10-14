@@ -29,11 +29,6 @@ export interface Effects {
 	readonly modeChanges: Map<number, number>;
 	/** Chats whose notifications can go (read elsewhere). */
 	readonly readChats: Set<number>;
-	/**
-	 * Large chats whose unread_count came through the per-user log while
-	 * their own log may lag: reconcile once that log has caught up.
-	 */
-	readonly unreadToReconcile: Set<number>;
 	sessionEnded: SessionRevokeReason | null;
 }
 
@@ -45,7 +40,6 @@ export function newEffects(): Effects {
 		chatDifferences: new Set(),
 		modeChanges: new Map(),
 		readChats: new Set(),
-		unreadToReconcile: new Set(),
 		sessionEnded: null,
 	};
 }
@@ -106,15 +100,18 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 		case "reaction":
 			putReactions(w, body.chatId, body.seq, body.reactions);
 			return;
-		case "read":
-			putRead(w, body.chatId, body.maxSeq, body.outbox, body.unreadCount);
+		case "read": {
+			putRead(w, body, selfId);
 			if (!body.outbox) {
 				effects.readChats.add(body.chatId);
-				// UpdateRead carries no chat_pts, so for a large chat the count may
-				// include messages its log has not delivered yet.
-				if (ctx.chatPts(body.chatId) !== undefined) effects.unreadToReconcile.add(body.chatId);
+				// The counts were taken with the large chat's log at chatPts; a
+				// client behind it pulls the rest (counted_through keeps the
+				// pulled messages from being counted twice).
+				const local = ctx.chatPts(body.chatId);
+				if (local !== undefined && body.chatPts > local) effects.chatDifferences.add(body.chatId);
 			}
 			return;
+		}
 		case "pin":
 			putPin(w, body.chatId, body.seq, body.pinned);
 			// After an unpin the server may fall back to an older pinned message.
@@ -155,6 +152,10 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 				purgeChat(w, body.chat.id);
 				effects.purgedChats.add(body.chat.id);
 			}
+			return;
+		case "topic_changed":
+			// Topics are listed from the server (GetForumTopics); tell the views.
+			w.emit(EventKeys.chat(body.topic.chatId));
 			return;
 		case "chat_activity": {
 			const local = ctx.chatPts(body.chatId);

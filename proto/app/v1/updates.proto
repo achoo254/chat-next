@@ -70,6 +70,7 @@ message Update {
     UpdateChatUpdated chat_updated = 21;
     UpdateChatActivity chat_activity = 22;
     UpdateSessionRevoked session_revoked = 23;
+    UpdateTopicChanged topic_changed = 24;
   }
 }
 
@@ -107,8 +108,19 @@ message UpdateRead {
   // another device. true: others read the user's messages
   // (read_outbox_max_seq).
   bool outbox = 3;
-  // Inbox only: unread messages left after this read.
+  // Inbox only: unread messages left after this read, over the whole chat.
   int32 unread_count = 4;
+  // Forum groups: the topic read (0 = every topic).
+  int64 topic_id = 5 [jstype = JS_NUMBER];
+  // Inbox only, sync_mode=large: position of the chat's own log when
+  // unread_count was computed. A client behind it pulls GetChatDifference.
+  int64 chat_pts = 6 [jstype = JS_NUMBER];
+  // Inbox only, topic_id != 0: unread messages left in that topic.
+  int32 topic_unread_count = 7;
+  // Inbox only: the chat's newest seq when unread_count was computed.
+  // unread_count covers incoming messages up to it; later ones are unread on
+  // top of it.
+  int64 top_seq = 8 [jstype = JS_NUMBER];
 }
 
 message UpdatePin {
@@ -158,6 +170,12 @@ message UpdateChatActivity {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   int64 chat_pts = 2 [jstype = JS_NUMBER];
   int64 top_seq = 3 [jstype = JS_NUMBER];
+}
+
+// A forum topic was created or changed (title, icon, pinned, closed,
+// hidden). The topic carries no read state.
+message UpdateTopicChanged {
+  ForumTopic topic = 1;
 }
 
 message UpdateSessionRevoked {
