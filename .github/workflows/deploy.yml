@@ -3,7 +3,9 @@
 # `chat-deploy` user to /opt/chat/incoming/<id>, and activate through the one
 # sudo command that user has (infra/chat/activate-incoming.sh). The server
 # backs up the database, migrates, switches and rolls back on failure; the
-# smoke test then checks production from outside.
+# smoke test then checks production from outside. Building (which runs
+# dependency code) happens in a job without the deploy key; the deploy job
+# only downloads the artifact, uploads it and activates it.
 name: deploy
 
 on:
@@ -21,14 +23,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: production
-    env:
-      SHA: ${{ github.event.workflow_run.head_sha }}
-      TARGET: chat-deploy@103.72.98.65
+    timeout-minutes: 15
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -43,15 +43,43 @@ jobs:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
       - run: pnpm install --frozen-lockfile
-      - name: build release
+      - id: release
+        name: build release
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           id="$(date -u +%Y%m%d-%H%M%S)-${SHA:0:12}"
-          echo "RELEASE_ID=$id" >>"$GITHUB_ENV"
-          mkdir -p "release/$id"
+          echo "id=$id" >>"$GITHUB_OUTPUT"
+          mkdir -p release
           pnpm --filter @app/web build
-          cp -R apps/web/dist "release/$id/web"
-          (cd server && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "../release/$id/server" ./cmd/server)
-          echo "$id" >"release/$id/RELEASE"
+          cp -R apps/web/dist release/web
+          (cd server && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../release/server ./cmd/server)
+          echo "$id" >release/RELEASE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: release/
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      RELEASE_ID: ${{ needs.build.outputs.release_id }}
+      TARGET: chat-deploy@103.72.98.65
+    steps:
+      # Only the smoke script is needed from the repository.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          sparse-checkout: infra/chat/smoke.sh
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release/
       - name: ssh setup
         env:
           SSH_KEY: ${{ secrets.CHAT_DEPLOY_SSH_KEY }}
@@ -64,8 +92,8 @@ jobs:
           printf 'Host 103.72.98.65\n  Port 24700\n  IdentityFile ~/.ssh/chat_deploy\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' >~/.ssh/config
       - name: upload and activate
         run: |
-          rsync -rltz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "release/$RELEASE_ID/" "$TARGET:/opt/chat/incoming/$RELEASE_ID/"
-          ssh "$TARGET" "chmod 755 /opt/chat/incoming/$RELEASE_ID/server && sudo -n /usr/local/sbin/chat-activate-incoming $RELEASE_ID"
+          rsync -rltz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r release/ "$TARGET:/opt/chat/incoming/$RELEASE_ID/"
+          ssh "$TARGET" "sudo -n /usr/local/sbin/chat-activate-incoming $RELEASE_ID"
       - run: bash infra/chat/smoke.sh
       - if: always()
         run: rm -rf ~/.ssh/chat_deploy

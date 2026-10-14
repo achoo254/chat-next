@@ -249,3 +249,70 @@ func TestLogoutRedirectsToIdPWithHint(t *testing.T) {
 		t.Fatalf("revoked at IdP = %v", got)
 	}
 }
+
+// userAgentTransport sends a fixed User-Agent header.
+type userAgentTransport struct {
+	ua   string
+	next http.RoundTripper
+}
+
+func (u userAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("User-Agent", u.ua)
+	return u.next.RoundTrip(r)
+}
+
+func TestSignInWithInvalidUTF8UserAgent(t *testing.T) {
+	e := newEnv(t)
+	c := e.browser(t)
+	// Header values may carry any byte from 0x80; PostgreSQL text accepts
+	// only valid UTF-8. The multi-byte runes straddle the 512-byte cut.
+	c.Transport = userAgentTransport{ua: "Mozilla/5.0 \xff\xfe\xc3 " + strings.Repeat("ữ", 400), next: c.Transport}
+	e.mustSignIn(t, c)
+	cl := e.rpc(c, e.srv.URL)
+	resp, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{}))
+	if err != nil || len(resp.Msg.GetSessions()) != 1 {
+		t.Fatalf("ListSessions = %v, %v", resp, err)
+	}
+}
+
+func TestRevokedSessionsLoseIDToken(t *testing.T) {
+	e := newEnv(t)
+	victim, victimBrowser := e.signedIn(t)
+	bystander, bystanderBrowser := e.signedIn(t)
+	actor, _ := e.signedIn(t)
+	ctx := context.Background()
+
+	// Revoked from another session: its cookie no longer yields the ID token.
+	id := currentSessionID(t, victim)
+	if _, err := actor.auth.RevokeSession(ctx, connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: id})); err != nil {
+		t.Fatal(err)
+	}
+	if loc := e.postLogout(t, victimBrowser); loc != "/" {
+		t.Fatalf("logout after revocation by another session redirected to %q", loc)
+	}
+
+	// Same for every session ended by RevokeOtherSessions.
+	if _, err := actor.auth.RevokeOtherSessions(ctx, connect.NewRequest(&appv1.RevokeOtherSessionsRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := getSelf(t, bystander); codeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("other session still works: %v", err)
+	}
+	if loc := e.postLogout(t, bystanderBrowser); loc != "/" {
+		t.Fatalf("logout after RevokeOtherSessions redirected to %q", loc)
+	}
+}
+
+func TestRevokingOwnSessionKeepsLogoutHint(t *testing.T) {
+	e := newEnv(t)
+	cl, c := e.signedIn(t)
+	id := currentSessionID(t, cl)
+	if _, err := cl.auth.RevokeSession(context.Background(), connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: id})); err != nil {
+		t.Fatal(err)
+	}
+	loc, err := url.Parse(e.postLogout(t, c))
+	if err != nil || loc.Query().Get("id_token_hint") == "" {
+		t.Fatalf("logout after revoking the own session = %v, %v", loc, err)
+	}
+}

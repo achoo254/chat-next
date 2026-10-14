@@ -120,7 +120,11 @@ Cách làm cho mọi release:
 | R8 | App desktop, Mini App trên desktop | 11, 16 (desktop) | Nhóm nội bộ |
 | R9 | Mở công khai: chống lạm dụng đầy đủ, xuất/xoá dữ liệu, đánh giá Nghị định 13, tenant thứ hai (`inetdev.io.vn`), load test lượt 1 và checklist phát hành | 12, 14, tenant theo domain | Công khai |
 
-Phase 1 đã gần xong (chỉ còn chạy Compose và CI khi có remote), nên việc tiếp theo là R0. Khi tải chạm ngưỡng ở Phase 13, chuyển lên cụm riêng (giai đoạn 2) độc lập với thứ tự release.
+Trạng thái ngày 2026-10-14:
+- Phase 1 đã xong, CI GitHub Actions xanh. Còn mở: chạy Compose dev, vì máy dev không có Docker.
+- R0 đã lên prod. Release đầu `20261014-092434-30ec13025bf6` đã có người đăng nhập thật, đặt username, sửa hồ sơ và xem danh sách phiên, tất cả trả 200. Deploy tự động từ `main` đi qua user `chat-deploy` bị giới hạn quyền ([docs/deployment-guide.md](../../../docs/deployment-guide.md)).
+- Đang làm song song: sửa các lỗi review của backend R0 (giữ refresh token xoay vòng, không giữ transaction trong lúc gọi IdP, thu hồi `id_token` khi revoke) và Phase 5 phần web cho R1.
+- Việc tiếp theo là R1. Muốn bắt đầu UI R1 (Phase 6) thì user phải duyệt các màn R1 trong mock trước. Khi tải chạm ngưỡng ở Phase 13, chuyển lên cụm riêng (giai đoạn 2) độc lập với thứ tự release.
 
 ## Ngân sách tốc độ (mục tiêu, đo ở Phase 14)
 

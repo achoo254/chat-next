@@ -21,7 +21,11 @@ echo "== user and directories"
 id "$APP" >/dev/null 2>&1 || useradd --system --home-dir "$ROOT" --shell /sbin/nologin "$APP"
 install -d -m 755 "$ROOT" "$ROOT/releases" "$ROOT/infra"
 install -d -m 750 -o root -g "$APP" "$ROOT/backups"
-install -d -m 750 -o "$APP" -g "$APP" "$LOG_DIR"
+# Root-owned: the root pm2 daemon and the root backup cron append here, and
+# an app-writable directory would let the app swap a log for a symlink.
+install -d -m 755 -o root -g root "$LOG_DIR"
+chown root:root "$LOG_DIR"
+chmod 755 "$LOG_DIR"
 
 echo "== .env (generated values only when missing)"
 touch "$ENV_FILE"

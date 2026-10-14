@@ -101,7 +101,8 @@ func (s *Store) ActiveSession(ctx context.Context, tenantID string, tokenHash []
 }
 
 // TouchSession moves last_seen_at to now when it is older than minInterval.
-// A session locked by a running grant check is skipped rather than waited on.
+// A session whose row is locked by a concurrent write is skipped rather than
+// waited on; the next request touches it.
 func (s *Store) TouchSession(ctx context.Context, id int64, minInterval time.Duration) error {
 	_, err := s.pool.Exec(ctx, `
 		UPDATE user_sessions SET last_seen_at = now()
@@ -135,6 +136,11 @@ func (s *Store) ListActiveSessions(ctx context.Context, tenantID string, userID 
 // RevokedSession carries what a caller needs to revoke the IdP grant of a
 // session that was just revoked: the sealed refresh token and the token hash
 // it is bound to. IDTokenEnc is only returned by EndSessionForLogout.
+//
+// Revocation clears the sealed tokens, except that a session revoked by its
+// own holder (SignOut) keeps its ID token until /auth/logout hands it out
+// once as id_token_hint. A session revoked from another one loses it, so a
+// stolen cookie of that session cannot obtain the ID token.
 type RevokedSession struct {
 	ID              int64
 	TokenHash       []byte
@@ -151,17 +157,21 @@ func collectRevoked(rows pgx.Rows) ([]RevokedSession, error) {
 }
 
 // RevokeSession revokes one active session of the user; ErrNotFound when the
-// user has no such active session.
-func (s *Store) RevokeSession(ctx context.Context, tenantID string, userID, sessionID int64) (RevokedSession, error) {
+// user has no such active session. callerTokenHash is the token hash of the
+// session making the request (nil when unknown): the ID token is kept only
+// when it is the revoked session itself, for the SignOut then /auth/logout
+// flow.
+func (s *Store) RevokeSession(ctx context.Context, tenantID string, userID, sessionID int64, callerTokenHash []byte) (RevokedSession, error) {
 	rows, err := s.pool.Query(ctx, `
 		WITH target AS (
 			SELECT s.id, s.token_hash, s.refresh_token_enc FROM user_sessions s
 			WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.id = $3 AND `+activeSession+`
 			FOR UPDATE)
-		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL
+		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL,
+			id_token_enc = CASE WHEN u.token_hash = $4 THEN u.id_token_enc END
 		FROM target WHERE u.id = target.id
 		RETURNING u.id, target.token_hash, target.refresh_token_enc`,
-		tenantID, userID, sessionID)
+		tenantID, userID, sessionID, callerTokenHash)
 	if err != nil {
 		return RevokedSession{}, fmt.Errorf("store: revoke session: %w", err)
 	}
@@ -182,7 +192,7 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, tenantID string, userID
 			SELECT s.id, s.token_hash, s.refresh_token_enc FROM user_sessions s
 			WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.id <> $3 AND `+activeSession+`
 			FOR UPDATE)
-		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL
+		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL
 		FROM target WHERE u.id = target.id
 		RETURNING u.id, target.token_hash, target.refresh_token_enc`,
 		tenantID, userID, keepID)

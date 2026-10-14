@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,6 +43,25 @@ type env struct {
 	idp   *idptest.Provider
 	app   *api.App
 	store *store.Store
+	logs  *syncBuffer // everything the server logged
+}
+
+// syncBuffer is a bytes.Buffer safe for the concurrent writes of a logger.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 func newEnv(t *testing.T) *env {
@@ -70,7 +90,8 @@ func newEnv(t *testing.T) *env {
 		TenantID:         tenantID,
 		TenantDomain:     "hoandat.com",
 	}
-	logger := slog.New(slog.NewTextHandler(t.Output(), nil))
+	logs := &syncBuffer{}
+	logger := slog.New(slog.NewTextHandler(io.MultiWriter(t.Output(), logs), nil))
 	app, err := api.New(cfg, st, idp.Server.Client(), logger)
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +102,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	srv.Config.Handler = app.Handler
-	return &env{srv: srv, idp: idp, app: app, store: st}
+	return &env{srv: srv, idp: idp, app: app, store: st, logs: logs}
 }
 
 // browser returns an HTTP client with its own cookie jar that trusts the
@@ -141,6 +162,26 @@ func (e *env) cookie(t *testing.T, c *http.Client, name string) *http.Cookie {
 		}
 	}
 	return nil
+}
+
+// postLogout posts /auth/logout from browser c with the server's origin and
+// returns the redirect target.
+func (e *env) postLogout(t *testing.T, c *http.Client) string {
+	t.Helper()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, e.srv.URL+"/auth/logout", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Origin", e.srv.URL)
+	resp, err := noRedirect(c).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("logout status %d", resp.StatusCode)
+	}
+	return resp.Header.Get("Location")
 }
 
 // withOrigin sets the Origin header of every client call.

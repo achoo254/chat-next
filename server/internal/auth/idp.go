@@ -36,6 +36,11 @@ var (
 	ErrIdPUnavailable = errors.New("auth: IdP discovery not completed")
 	// ErrGrantEnded: the token endpoint answered invalid_grant.
 	ErrGrantEnded = errors.New("auth: IdP grant ended")
+	// ErrRefreshRejected: the token endpoint refused a refresh with a client
+	// error other than invalid_grant (invalid_client, unauthorized_client,
+	// ...). The grant may be fine; the client registration or secret is not,
+	// and retrying does not help until an operator fixes it.
+	ErrRefreshRejected = errors.New("auth: IdP rejected the refresh request")
 	// ErrInvalidToken: an ID or logout token failed verification.
 	ErrInvalidToken = errors.New("auth: invalid token")
 )
@@ -241,6 +246,11 @@ type Tokens struct {
 	RefreshToken string
 	IDToken      string
 	Claims       IDClaims
+	// ClaimsErr is set by Refresh when the token endpoint succeeded but the
+	// ID token or userinfo could not be verified (JWKS or userinfo outage, bad
+	// token). IDToken and Claims are then empty, while RefreshToken is valid
+	// and must still be stored: the IdP rotates it on every refresh.
+	ClaimsErr error
 }
 
 // Exchange redeems an authorization code with its PKCE verifier and verifies
@@ -289,10 +299,13 @@ func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDCl
 }
 
 // Refresh redeems a refresh token. ErrGrantEnded means the IdP answered
-// invalid_grant; any other error is transient. The returned RefreshToken is
-// the rotated token (or the old one when the IdP did not rotate). When the
-// response carries an ID token it is verified; otherwise the email claims
-// are read from userinfo, and Claims stays empty if that fails.
+// invalid_grant and ErrRefreshRejected another client error (wrapped with
+// the status and OAuth error code); any other error is transient. Once the
+// token endpoint succeeded the error is nil: the returned RefreshToken is the
+// rotated token (or the old one when the IdP did not rotate) and must be
+// stored even when Tokens.ClaimsErr reports that the claims could not be
+// verified. When the response carries an ID token it is verified; otherwise
+// the claims are read from userinfo.
 func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) {
 	st, err := p.ready()
 	if err != nil {
@@ -302,8 +315,13 @@ func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) 
 	tok, err := st.oauth.TokenSource(cctx, &oauth2.Token{RefreshToken: refreshToken}).Token()
 	if err != nil {
 		var re *oauth2.RetrieveError
-		if errors.As(err, &re) && re.ErrorCode == "invalid_grant" {
-			return Tokens{}, ErrGrantEnded
+		if errors.As(err, &re) {
+			if re.ErrorCode == "invalid_grant" {
+				return Tokens{}, ErrGrantEnded
+			}
+			if isPermanentClientError(tokenErrorStatus(re)) {
+				return Tokens{}, fmt.Errorf("%w: %w", ErrRefreshRejected, describeTokenError(err))
+			}
 		}
 		return Tokens{}, fmt.Errorf("auth: refresh: %w", describeTokenError(err))
 	}
@@ -311,18 +329,33 @@ func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) 
 	if raw, _ := tok.Extra("id_token").(string); raw != "" {
 		claims, err := p.verifyIDToken(ctx, st, raw)
 		if err != nil {
-			return Tokens{}, err
+			out.ClaimsErr = err
+			return out, nil
 		}
 		out.IDToken, out.Claims = raw, claims
 		return out, nil
 	}
 	info, err := st.provider.UserInfo(cctx, oauth2.StaticTokenSource(tok))
 	if err != nil {
-		p.cfg.Logger.Warn("userinfo after refresh failed; email unchanged", "err", err)
+		out.ClaimsErr = fmt.Errorf("auth: userinfo after refresh: %w", err)
 		return out, nil
 	}
 	out.Claims = IDClaims{Subject: info.Subject, Email: info.Email, EmailVerified: info.EmailVerified}
 	return out, nil
+}
+
+// isPermanentClientError reports a 4xx status that retrying will not fix;
+// 408 and 429 are transient.
+func isPermanentClientError(status int) bool {
+	return status >= 400 && status < 500 &&
+		status != http.StatusRequestTimeout && status != http.StatusTooManyRequests
+}
+
+func tokenErrorStatus(re *oauth2.RetrieveError) int {
+	if re.Response == nil {
+		return 0
+	}
+	return re.Response.StatusCode
 }
 
 // describeTokenError drops the response body of token endpoint errors, which
@@ -330,11 +363,7 @@ func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) 
 func describeTokenError(err error) error {
 	var re *oauth2.RetrieveError
 	if errors.As(err, &re) {
-		status := 0
-		if re.Response != nil {
-			status = re.Response.StatusCode
-		}
-		return fmt.Errorf("token endpoint status %d error %q", status, re.ErrorCode)
+		return fmt.Errorf("token endpoint status %d error %q", tokenErrorStatus(re), re.ErrorCode)
 	}
 	return err
 }

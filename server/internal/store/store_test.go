@@ -157,11 +157,11 @@ func TestSessionsLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := s.RevokeSession(ctx, tenant, u.ID, id2)
+	r, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil)
 	if err != nil || r.ID != id2 || string(r.RefreshTokenEnc) != "rt-two" {
 		t.Fatalf("RevokeSession = %+v, %v", r, err)
 	}
-	if _, err := s.RevokeSession(ctx, tenant, u.ID, id2); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("second revoke err = %v", err)
 	}
 	others, err := s.RevokeOtherSessions(ctx, tenant, u.ID, id1)
@@ -174,7 +174,7 @@ func TestSessionsLifecycle(t *testing.T) {
 	}
 
 	// Logout hands the ID token out once, even after the session was revoked.
-	if _, err := s.RevokeSession(ctx, tenant, u.ID, id1); err != nil {
+	if _, err := s.RevokeSession(ctx, tenant, u.ID, id1, hashOf("one")); err != nil {
 		t.Fatal(err)
 	}
 	end, err := s.EndSessionForLogout(ctx, tenant, hashOf("one"))
@@ -187,6 +187,14 @@ func TestSessionsLifecycle(t *testing.T) {
 	}
 	if _, err := s.EndSessionForLogout(ctx, tenant, hashOf("nope")); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("unknown token err = %v", err)
+	}
+
+	// Sessions revoked from another session keep no ID token.
+	for _, token := range []string{"two", "three"} {
+		end, err := s.EndSessionForLogout(ctx, tenant, hashOf(token))
+		if err != nil || end.IDTokenEnc != nil || end.RefreshTokenEnc != nil {
+			t.Fatalf("EndSessionForLogout(%s) = %+v, %v", token, end, err)
+		}
 	}
 }
 
@@ -304,5 +312,93 @@ func TestCheckGrantOutcomes(t *testing.T) {
 	}
 	if _, err := s.ActiveSession(ctx, tenant, hashOf("o")); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("ended grant kept the session: %v", err)
+	}
+}
+
+func TestCheckGrantWritesAfterCallerDeadline(t *testing.T) {
+	s := newStore(t)
+	u, _ := s.UpsertIdPUser(context.Background(), tenant, store.IdPProfile{Sub: "acc_d", PreferredUsername: "deadline"})
+	id := newSession(t, s, u.ID, "d", "sid-d")
+
+	// The caller's context ends while the IdP answers; the rotated token is
+	// stored anyway.
+	ctx, cancel := context.WithCancel(context.Background())
+	ran, err := s.CheckGrant(ctx, id, 0, func(context.Context, store.GrantCandidate) store.GrantOutcome {
+		cancel()
+		return store.GrantOutcome{Result: store.GrantAlive, RefreshTokenEnc: []byte("rt-rotated")}
+	})
+	if err != nil || !ran {
+		t.Fatalf("CheckGrant = %v, %v", ran, err)
+	}
+	r, err := s.RevokeSession(context.Background(), tenant, u.ID, id, nil)
+	if err != nil || string(r.RefreshTokenEnc) != "rt-rotated" {
+		t.Fatalf("stored refresh token = %q, %v", r.RefreshTokenEnc, err)
+	}
+}
+
+func TestCheckGrantHoldsNoLockAndKeepsRevocation(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	u, _ := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_l", PreferredUsername: "lease"})
+	id := newSession(t, s, u.ID, "l", "sid-l")
+
+	ran, err := s.CheckGrant(ctx, id, 0, func(context.Context, store.GrantCandidate) store.GrantOutcome {
+		// While the check consults the IdP the row is not locked: these
+		// would block until the deadline if it were.
+		qctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		if err := s.TouchSession(qctx, id, 0); err != nil {
+			t.Errorf("TouchSession during check: %v", err)
+		}
+		if _, err := s.RevokeSession(qctx, tenant, u.ID, id, nil); err != nil {
+			t.Errorf("RevokeSession during check: %v", err)
+		}
+		// A concurrent check finds the session leased.
+		again, err := s.CheckGrant(qctx, id, 0, func(context.Context, store.GrantCandidate) store.GrantOutcome {
+			t.Error("leased session checked twice")
+			return store.GrantOutcome{Result: store.GrantAlive}
+		})
+		if err != nil || again {
+			t.Errorf("concurrent CheckGrant = %v, %v", again, err)
+		}
+		return store.GrantOutcome{Result: store.GrantAlive, RefreshTokenEnc: []byte("rt-late"), IDTokenEnc: []byte("idt-late")}
+	})
+	if !ran || !errors.Is(err, store.ErrGrantNotApplied) {
+		t.Fatalf("CheckGrant on a session revoked meanwhile = %v, %v", ran, err)
+	}
+	// The late outcome did not bring the tokens back.
+	end, err := s.EndSessionForLogout(ctx, tenant, hashOf("l"))
+	if err != nil || end.RefreshTokenEnc != nil || end.IDTokenEnc != nil {
+		t.Fatalf("tokens after revocation = %+v, %v", end, err)
+	}
+}
+
+func TestCheckGrantLeaseExpires(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	u, _ := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_x", PreferredUsername: "expire"})
+	id := newSession(t, s, u.ID, "x", "sid-x")
+
+	// A check that never finished (crashed process) leaves its lease; the
+	// session is checked again once the lease has expired.
+	if _, err := s.CheckGrant(ctx, id, 0, func(context.Context, store.GrantCandidate) store.GrantOutcome {
+		return store.GrantOutcome{Result: 0} // unknown result: nothing written
+	}); err == nil {
+		t.Fatal("unknown result accepted")
+	}
+	called := false
+	ran, err := s.CheckGrant(ctx, id, 0, func(context.Context, store.GrantCandidate) store.GrantOutcome {
+		called = true
+		return store.GrantOutcome{Result: store.GrantAlive}
+	})
+	if err != nil || ran || called {
+		t.Fatalf("check while leased = %v, %v", ran, err)
+	}
+	store.ExpireGrantLeases(t, s)
+	ran, err = s.CheckGrant(ctx, id, 0, func(context.Context, store.GrantCandidate) store.GrantOutcome {
+		return store.GrantOutcome{Result: store.GrantAlive}
+	})
+	if err != nil || !ran {
+		t.Fatalf("check after lease expiry = %v, %v", ran, err)
 	}
 }

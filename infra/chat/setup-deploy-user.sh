@@ -28,7 +28,12 @@ fi
 
 install -d -m 750 -o "$USER_NAME" -g "$USER_NAME" "$ROOT/incoming"
 install -m 755 -o root -g root "$ROOT/infra/activate-incoming.sh" /usr/local/sbin/chat-activate-incoming
-printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/chat-activate-incoming\n' "$USER_NAME" >/etc/sudoers.d/chat-deploy
+# sudo's default secure_path lacks /usr/local/bin, where pm2 lives on this
+# server; widen it for this user only, not for the whole machine.
+{
+	printf 'Defaults:%s secure_path="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"\n' "$USER_NAME"
+	printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/chat-activate-incoming\n' "$USER_NAME"
+} >/etc/sudoers.d/chat-deploy
 chmod 440 /etc/sudoers.d/chat-deploy
 visudo -cf /etc/sudoers.d/chat-deploy
 echo "setup-deploy-user: done"

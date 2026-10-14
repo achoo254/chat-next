@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"app.local/server/internal/sealbox"
 )
@@ -96,5 +97,27 @@ func TestLoginCookieRoundTrip(t *testing.T) {
 	other, _ := sealbox.New(bytes.Repeat([]byte{2}, 32), "login cookie")
 	if _, err := readLoginCookie(req, other, now); err == nil {
 		t.Fatal("login state sealed with another key accepted")
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	cases := []struct {
+		in   string
+		n    int
+		want string
+	}{
+		{"short", 10, "short"},
+		{"abcdef", 3, "abc"},
+		{"ab\xffcd", 10, "ab�cd"},
+		{"a\x00b", 10, "ab"},
+		{"aữb", 2, "a"}, // ữ is 3 bytes: never split
+		{"aữb", 4, "aữ"},
+		{"\xff\xfe", 3, "�"},
+	}
+	for _, c := range cases {
+		got := truncate(c.in, c.n)
+		if got != c.want || !utf8.ValidString(got) || len(got) > c.n {
+			t.Errorf("truncate(%q, %d) = %q, want %q", c.in, c.n, got, c.want)
+		}
 	}
 }

@@ -32,6 +32,11 @@ const (
 	RefreshOK RefreshMode = iota
 	RefreshInvalidGrant
 	RefreshServerError
+	// RefreshInvalidClient answers 401 invalid_client.
+	RefreshInvalidClient
+	// RefreshBadIDToken rotates the refresh token normally but returns an ID
+	// token signed by a key that is not in the JWKS.
+	RefreshBadIDToken
 )
 
 // Account is the user the provider signs in.
@@ -70,6 +75,8 @@ type Provider struct {
 	refreshMode   RefreshMode
 	refreshDelay  time.Duration
 	refreshCalls  int
+	refreshGate   chan struct{}   // non-nil: refresh grants wait for it to close
+	refreshArrive chan struct{}   // receives one value per gated refresh grant
 	refreshTokens map[string]bool // issued token -> still valid
 	codes         map[string]codeGrant
 	authorizes    []Authorize
@@ -128,6 +135,28 @@ func (p *Provider) SetRefresh(mode RefreshMode, delay time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.refreshMode, p.refreshDelay = mode, delay
+}
+
+// HoldRefresh makes refresh grants wait, after they are counted and before
+// any token is checked or issued, until release is called. arrived receives
+// one value per held grant. release is also called when the test ends.
+func (p *Provider) HoldRefresh(t testing.TB) (arrived <-chan struct{}, release func()) {
+	t.Helper()
+	gate, arrive := make(chan struct{}), make(chan struct{}, 64)
+	p.mu.Lock()
+	p.refreshGate, p.refreshArrive = gate, arrive
+	p.mu.Unlock()
+	var once sync.Once
+	release = func() {
+		once.Do(func() {
+			p.mu.Lock()
+			p.refreshGate, p.refreshArrive = nil, nil
+			p.mu.Unlock()
+			close(gate)
+		})
+	}
+	t.Cleanup(release)
+	return arrive, release
 }
 
 // RefreshCalls is the number of refresh_token grants received.
@@ -251,14 +280,19 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request) {
 	if override != nil {
 		nonce = *override
 	}
-	p.issueTokens(w, account, nonce)
+	p.issueTokens(w, account, nonce, false)
 }
 
 func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.refreshCalls++
 	mode, delay, account := p.refreshMode, p.refreshDelay, p.account
+	gate, arrive := p.refreshGate, p.refreshArrive
 	p.mu.Unlock()
+	if gate != nil {
+		arrive <- struct{}{}
+		<-gate
+	}
 	time.Sleep(delay)
 	switch mode {
 	case RefreshServerError:
@@ -267,7 +301,10 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 	case RefreshInvalidGrant:
 		tokenError(w, http.StatusBadRequest, "invalid_grant")
 		return
-	case RefreshOK:
+	case RefreshInvalidClient:
+		tokenError(w, http.StatusUnauthorized, "invalid_client")
+		return
+	case RefreshOK, RefreshBadIDToken:
 	}
 	rt := r.PostForm.Get("refresh_token")
 	p.mu.Lock()
@@ -279,10 +316,12 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 		tokenError(w, http.StatusBadRequest, "invalid_grant")
 		return
 	}
-	p.issueTokens(w, account, "")
+	p.issueTokens(w, account, "", mode == RefreshBadIDToken)
 }
 
-func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string) {
+// issueTokens answers a successful grant with a new refresh token; with
+// foreignKey the ID token is signed by a key outside the JWKS.
+func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, foreignKey bool) {
 	rt := "rt-" + randomString()
 	p.mu.Lock()
 	p.refreshTokens[rt] = true
@@ -297,7 +336,16 @@ func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string) {
 	if nonce != "" {
 		claims["nonce"] = nonce
 	}
-	idToken, err := p.Sign(claims, "JWT")
+	key := p.key
+	if foreignKey {
+		other, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			tokenError(w, http.StatusInternalServerError, "server_error")
+			return
+		}
+		key = other
+	}
+	idToken, err := p.sign(key, claims, "JWT")
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error")
 		return
@@ -334,11 +382,15 @@ func (p *Provider) userinfo(w http.ResponseWriter, _ *http.Request) {
 // Sign returns a compact ES256 JWS of claims with the given typ header
 // (omitted when empty), signed by the provider's JWKS key.
 func (p *Provider) Sign(claims map[string]any, typ string) (string, error) {
+	return p.sign(p.key, claims, typ)
+}
+
+func (p *Provider) sign(key *ecdsa.PrivateKey, claims map[string]any, typ string) (string, error) {
 	opts := (&jose.SignerOptions{}).WithHeader("kid", p.kid)
 	if typ != "" {
 		opts = opts.WithType(jose.ContentType(typ))
 	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: p.key}, opts)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: key}, opts)
 	if err != nil {
 		return "", err
 	}

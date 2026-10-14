@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"app.local/server/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,11 +31,30 @@ type Store struct {
 // parts of the connection string.
 var errInvalidURL = errors.New("store: invalid database URL")
 
-// Open connects to the database and verifies the connection with a ping.
-func Open(ctx context.Context, databaseURL string) (*Store, error) {
+// defaultMaxConns is the pool size when DATABASE_URL sets no
+// pool_max_conns (pgx would otherwise use max(4, number of CPUs)).
+const defaultMaxConns = 10
+
+// poolConfig parses databaseURL and applies defaultMaxConns unless the URL
+// sets pool_max_conns itself.
+func poolConfig(databaseURL string) (*pgxpool.Config, error) {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, errInvalidURL
+	}
+	// ParseConfig removes pool_* settings from the parsed config, so look at
+	// the URL (or key=value string) itself.
+	if !strings.Contains(databaseURL, "pool_max_conns") {
+		cfg.MaxConns = defaultMaxConns
+	}
+	return cfg, nil
+}
+
+// Open connects to the database and verifies the connection with a ping.
+func Open(ctx context.Context, databaseURL string) (*Store, error) {
+	cfg, err := poolConfig(databaseURL)
+	if err != nil {
+		return nil, err
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
