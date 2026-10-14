@@ -9,5 +9,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@app/platform": "workspace:*",
+    "@app/proto-ts": "workspace:*",
+    "@bufbuild/protobuf": "2.16.0",
+    "@connectrpc/connect": "2.2.0"
   }
 }

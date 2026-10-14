@@ -1,0 +1,235 @@
+// Row decoding for the local database. JSON columns are written only by
+// this package, but they are still parsed defensively: a corrupt row becomes
+// an empty value instead of crashing the history view.
+import type { SqlRow, SqlValue } from "@app/platform";
+import type {
+	Chat,
+	ChatType,
+	Dialog,
+	EntityType,
+	ForwardHeader,
+	MediaKind,
+	MemberRole,
+	Message,
+	MessageAction,
+	MessageEntity,
+	ReactionCount,
+	User,
+} from "../model/types.ts";
+
+export function num(row: SqlRow, column: string): number {
+	const value = row[column];
+	if (typeof value === "number") return value;
+	if (value === null || value === undefined) return 0;
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function str(row: SqlRow, column: string): string {
+	const value = row[column];
+	return typeof value === "string" ? value : "";
+}
+
+function optionalStr(row: SqlRow, column: string): string | null {
+	const value = row[column];
+	return typeof value === "string" ? value : null;
+}
+
+function bool(row: SqlRow, column: string): boolean {
+	return num(row, column) !== 0;
+}
+
+function parseJson(text: string | null): unknown {
+	if (text === null) return null;
+	try {
+		return JSON.parse(text) as unknown;
+	} catch {
+		return null;
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function field(record: Record<string, unknown>, key: string): number {
+	const value = record[key];
+	return typeof value === "number" ? value : 0;
+}
+
+function text(record: Record<string, unknown>, key: string): string {
+	const value = record[key];
+	return typeof value === "string" ? value : "";
+}
+
+const ENTITY_TYPES = new Set<EntityType>([
+	"bold",
+	"italic",
+	"underline",
+	"strike",
+	"spoiler",
+	"code",
+	"pre",
+	"text_link",
+	"mention",
+	"mention_name",
+	"hashtag",
+	"url",
+	"email",
+	"bot_command",
+]);
+
+/** Decodes stored entities; null when the value is not a well-formed entity list. */
+export function decodeEntities(value: unknown): MessageEntity[] | null {
+	if (!Array.isArray(value)) return null;
+	const entities: MessageEntity[] = [];
+	for (const item of value) {
+		if (!isRecord(item) || typeof item.offset !== "number" || typeof item.length !== "number") return null;
+		const type = item.type;
+		entities.push({
+			type: typeof type === "string" && ENTITY_TYPES.has(type as EntityType) ? (type as EntityType) : "unknown",
+			offset: item.offset,
+			length: item.length,
+			...(typeof item.url === "string" ? { url: item.url } : {}),
+			...(typeof item.userId === "number" ? { userId: item.userId } : {}),
+			...(typeof item.language === "string" ? { language: item.language } : {}),
+		});
+	}
+	return entities;
+}
+
+function parseEntities(json: string | null): MessageEntity[] {
+	return decodeEntities(parseJson(json)) ?? [];
+}
+
+function parseReactions(json: string | null): ReactionCount[] {
+	const value = parseJson(json);
+	if (!Array.isArray(value)) return [];
+	return value.filter(isRecord).map((item) => ({
+		emoji: text(item, "emoji"),
+		count: field(item, "count"),
+		chosen: item.chosen === true,
+	}));
+}
+
+function parseForward(json: string | null): ForwardHeader | null {
+	const value = parseJson(json);
+	if (!isRecord(value)) return null;
+	return {
+		fromUserId: field(value, "fromUserId"),
+		fromChatId: field(value, "fromChatId"),
+		fromSeq: field(value, "fromSeq"),
+		fromName: text(value, "fromName"),
+		date: field(value, "date"),
+	};
+}
+
+function parseAction(json: string | null): MessageAction | null {
+	const value = parseJson(json);
+	if (!isRecord(value)) return null;
+	switch (value.kind) {
+		case "chat_created":
+			return { kind: "chat_created", title: text(value, "title") };
+		case "members_added": {
+			const ids = Array.isArray(value.userIds) ? value.userIds.filter((v): v is number => typeof v === "number") : [];
+			return { kind: "members_added", userIds: ids };
+		}
+		case "member_left":
+			return { kind: "member_left" };
+		case "member_removed":
+			return { kind: "member_removed", userId: field(value, "userId"), by: field(value, "by") };
+		case "title_changed":
+			return { kind: "title_changed", title: text(value, "title") };
+		case "photo_changed":
+			return { kind: "photo_changed" };
+		case "photo_removed":
+			return { kind: "photo_removed" };
+		case "message_pinned":
+			return { kind: "message_pinned", seq: field(value, "seq") };
+		case "history_visibility_changed":
+			return { kind: "history_visibility_changed", visible: value.visible === true };
+		case "chat_mode_changed":
+			return { kind: "chat_mode_changed" };
+		case "joined_by_invite":
+			return { kind: "joined_by_invite" };
+		default:
+			return { kind: "unsupported" };
+	}
+}
+
+const MEDIA_KINDS = new Set<MediaKind>(["photo", "video", "audio", "voice", "document", "unknown"]);
+const CHAT_TYPES = new Set<ChatType>(["private", "group", "channel", "secret"]);
+const ROLES = new Set<MemberRole>(["member", "admin", "owner"]);
+
+export function rowToMessage(row: SqlRow): Message {
+	const media = optionalStr(row, "media_kind");
+	return {
+		chatId: num(row, "chat_id"),
+		seq: num(row, "seq"),
+		fromId: num(row, "from_id"),
+		date: num(row, "date"),
+		text: str(row, "text"),
+		entities: parseEntities(optionalStr(row, "entities")),
+		mediaKind: media === null ? null : MEDIA_KINDS.has(media as MediaKind) ? (media as MediaKind) : "unknown",
+		replyToSeq: num(row, "reply_to_seq"),
+		forward: parseForward(optionalStr(row, "forward")),
+		editDate: num(row, "edit_date"),
+		editVersion: num(row, "edit_version"),
+		randomId: num(row, "random_id"),
+		groupedId: num(row, "grouped_id"),
+		viaBotId: num(row, "via_bot_id"),
+		reactions: parseReactions(optionalStr(row, "reactions")),
+		integrationLabel: str(row, "integration_label"),
+		action: parseAction(optionalStr(row, "action")),
+	};
+}
+
+export function rowToUser(row: SqlRow): User {
+	return {
+		id: num(row, "id"),
+		username: str(row, "username"),
+		name: str(row, "name"),
+		bio: str(row, "bio"),
+		isBot: bool(row, "is_bot"),
+		isSelf: bool(row, "is_self"),
+		isBlocked: bool(row, "is_blocked"),
+	};
+}
+
+export function rowToChat(row: SqlRow): Chat {
+	const type = str(row, "type");
+	const role = str(row, "my_role");
+	return {
+		id: num(row, "id"),
+		type: CHAT_TYPES.has(type as ChatType) ? (type as ChatType) : "unknown",
+		title: str(row, "title"),
+		about: str(row, "about"),
+		peerUserId: num(row, "peer_user_id"),
+		syncMode: str(row, "sync_mode") === "large" ? "large" : "small",
+		historyShared: bool(row, "history_shared"),
+		memberCount: num(row, "member_count"),
+		defaultPermissions: num(row, "default_permissions"),
+		pinnedSeq: num(row, "pinned_seq"),
+		createdAt: num(row, "created_at"),
+		myRole: ROLES.has(role as MemberRole) ? (role as MemberRole) : "unknown",
+		myPermissions: num(row, "my_permissions"),
+		left: bool(row, "left_chat"),
+	};
+}
+
+export function rowToDialog(row: SqlRow): Dialog {
+	return {
+		chatId: num(row, "chat_id"),
+		topSeq: num(row, "top_seq"),
+		readInboxMaxSeq: num(row, "read_inbox_max_seq"),
+		readOutboxMaxSeq: num(row, "read_outbox_max_seq"),
+		unreadCount: num(row, "unread_count"),
+		unreadMentionsCount: num(row, "unread_mentions_count"),
+		chatPts: num(row, "chat_pts"),
+	};
+}
+
+/** Encodes a boolean for an INTEGER column. */
+export function flag(value: boolean): SqlValue {
+	return value ? 1 : 0;
+}

@@ -100,7 +100,44 @@ importers:
         specifier: 8.20.0
         version: 8.20.0
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      '@app/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@app/proto-ts':
+        specifier: workspace:*
+        version: link:../proto-ts
+      '@bufbuild/protobuf':
+        specifier: 2.16.0
+        version: 2.16.0
+      '@connectrpc/connect':
+        specifier: 2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)
+
+  packages/platform: {}
+
+  packages/platform-web:
+    dependencies:
+      '@app/core':
+        specifier: workspace:*
+        version: link:../core
+      '@app/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@connectrpc/connect':
+        specifier: 2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect-web':
+        specifier: 2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
+      '@sqlite.org/sqlite-wasm':
+        specifier: 3.53.4-build2
+        version: 3.53.4-build2
+    devDependencies:
+      '@app/proto-ts':
+        specifier: workspace:*
+        version: link:../proto-ts
 
   packages/proto-ts:
     dependencies:
@@ -509,6 +546,10 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+
+  '@sqlite.org/sqlite-wasm@3.53.4-build2':
+    resolution: {integrity: sha512-kQVArGJA4z7s56Dm8t+eTBXad4LiohuVj9pfgDNOcxa+Ic5xMrWlLPTq6cT0hw5S4MIvtpsraW+B0wD+IPvC7A==}
+    engines: {node: '>=22'}
 
   '@testing-library/dom@10.4.2':
     resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
@@ -1743,6 +1784,8 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
+
+  '@sqlite.org/sqlite-wasm@3.53.4-build2': {}
 
   '@testing-library/dom@10.4.2':
     dependencies:

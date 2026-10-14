@@ -102,17 +102,25 @@ Create:
 
 ## Todo
 
-- [ ] Spike native bridge + chốt ADR 0007
-- [ ] Interface + driver web + leader election
-- [ ] Migrations + repository
-- [ ] Transport + reconnect order + epoch
-- [ ] Sync engine + gap + difference + chuyển mode
-- [ ] Purge local theo quyền
-- [ ] Event bus
-- [ ] Outbox + optimistic send
-- [ ] Snapshot
-- [ ] FTS5 local
-- [ ] Test hỗn loạn
+- [ ] Spike native bridge + chốt ADR 0007 (hoãn tới R7/R8)
+- [x] Interface + driver web + leader election (chưa chạy Playwright trên trình duyệt thật)
+- [x] Migrations + repository
+- [x] Transport + reconnect order + epoch
+- [x] Sync engine + gap + difference + chuyển mode
+- [x] Purge local theo quyền (phần media cache hoãn tới R3)
+- [x] Event bus
+- [x] Outbox + optimistic send
+- [x] Snapshot
+- [x] FTS5 local
+- [x] Test hỗn loạn
+
+Phần web cho R1 (2026-10-14): `packages/platform`, `packages/platform-web`, `packages/core` (transport, sync, repo, outbox, purge, events, search, snapshot, auth web). Lệch so với plan: migration local viết bằng TypeScript (`packages/core/src/repo/migrations.ts`) thay cho `migrations/*.sql` để mọi bundler và Node đọc như nhau; schema đã sẵn cho topic diễn đàn (`messages.topic_id`, `read_states` khoá `(chat_id, topic_id)`).
+
+Hoãn lại:
+- Spike native bridge, driver native, auth native (`GetAuthConfig`, `AuthBrowser`, `SecureStore`), chọn tenant trên native: R7/R8.
+- Media cache (trần dung lượng, LRU, purge media): R3.
+- Playwright Chromium/Firefox/WebKit cho `platform-web`: máy chỉ có Chromium, repo chưa có Playwright; OPFS `opfs-sahpool` và Web Locks mới được kiểm bằng test Node (driver sqlite-wasm in-memory, hub hai tab với BroadcastChannel thật và lock giả).
+- Typing/presence lên UI: Phase 6.
 
 ## Success Criteria
 
