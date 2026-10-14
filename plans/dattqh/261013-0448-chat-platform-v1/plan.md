@@ -335,4 +335,16 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
 - Lý do `TOO_MANY` khi thêm thành viên nghĩa là nhóm đã đủ số thành viên tối đa.
 - React Compiler để tắt (Jev 1.00): chỉ bật khi đã chuyển các chỗ đọc store lúc render sang hook theo id, JS khởi động vẫn ≤ 150 KiB và test xanh.
 - Perf gate `web-perf` chạy trong CI (commit `3814849`). Trên runner GitHub: mở chat từ cache p50 38 ms, p99 78 ms; cuộn 60 fps.
+- Giao diện mới theo mock lên prod (commit `7a8f061`, release `20261014-202424-7a8f061e4b5c`).
+  - Kiểm tra: 124 test web; perf gate JS khởi động 148,5/150 KiB, mở chat từ cache p50 18 ms, p99 36 ms; render-check 174 lượt, 0 lỗi.
+  - Chỗ đọc store lúc render đã chuyển sang hook theo id. Bật React Compiler thì test đều qua nhưng JS khởi động lên 166,8 KiB, nên compiler vẫn tắt.
+- Còn lệch so với mock vì thiếu backend hoặc core:
+  - danh sách nhiều tin ghim;
+  - dòng "Tin nhắn đã thu hồi" trong luồng tin;
+  - avatar người thả cảm xúc trên chip;
+  - đồng bộ "Đánh dấu chưa đọc" giữa các máy;
+  - cài đặt thông báo theo loại chat, âm báo, có tính chat tắt thông báo vào badge không;
+  - kiểm duyệt nâng cao;
+  - số thành viên đang hoạt động cho nhóm trên 50 người;
+  - fake server của core lỗi khi đẩy `pinned_dialogs`/`chat_deleted`.
 
