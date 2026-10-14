@@ -87,6 +87,10 @@ interface UserRecord {
 	readonly reads: Map<number, { inbox: number; outbox: number }>;
 	readonly sent: Map<number, { chatId: number; seq: number; ack: WireSyncAck }>;
 	revoked: boolean;
+	/** chat id -> muted until (unix seconds). */
+	readonly mutes: Map<number, number>;
+	/** Pinned chats, top first. */
+	pins: number[];
 }
 
 interface Session {
@@ -171,6 +175,8 @@ export class FakeServer {
 			reads: new Map(),
 			sent: new Map(),
 			revoked: false,
+			mutes: new Map(),
+			pins: [],
 		});
 		return id;
 	}
@@ -285,6 +291,8 @@ export class FakeServer {
 			readOutboxMaxSeq: big(read.outbox),
 			unreadCount: unread,
 			chatPts: big(chat.syncMode === SyncMode.LARGE ? chat.chatPts : 0),
+			muteUntil: big(this.user(viewer).mutes.get(chatId) ?? 0),
+			pinned: this.user(viewer).pins.includes(chatId),
 		});
 	}
 
@@ -535,6 +543,29 @@ export class FakeServer {
 		if (chat.syncMode === SyncMode.LARGE) this.pushUser(userId, kind, chatId);
 		this.pushChat(chatId, () => kind);
 		chat.members.delete(userId);
+	}
+
+	/** The user muted (until > 0) or unmuted a chat on another session. */
+	muteDialog(userId: number, chatId: number, until: number): void {
+		const user = this.user(userId);
+		if (until > 0) user.mutes.set(chatId, until);
+		else user.mutes.delete(chatId);
+		this.pushUser(userId, { case: "dialogMute", value: { chatId: big(chatId), muteUntil: big(until) } }, chatId);
+	}
+
+	/** The user's pinned chats changed on another session. */
+	pinDialogs(userId: number, chatIds: readonly number[]): void {
+		this.user(userId).pins = [...chatIds];
+		this.pushUser(userId, { case: "pinnedDialogs", value: { chatIds: chatIds.map(big) } }, 0);
+	}
+
+	/** The owner deleted the chat for every member. */
+	deleteChat(chatId: number): void {
+		const chat = this.chat(chatId);
+		for (const member of chat.members) {
+			this.pushUser(member, { case: "chatDeleted", value: { chatId: big(chatId), forEveryone: true } }, 0);
+		}
+		this.chats.delete(chatId);
 	}
 
 	/** One-way switch to sync_mode=large (ADR 0002). */
@@ -848,6 +879,7 @@ export class FakeServer {
 							messages,
 							...entities,
 							nextCursor: offset + limit < dialogs.length ? String(offset + limit) : "",
+							pinnedChatIds: offset === 0 ? this.user(userId).pins.map(big) : [],
 						});
 					}),
 				getPeerDialogs: (request) =>

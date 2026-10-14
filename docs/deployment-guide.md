@@ -45,6 +45,16 @@ bash infra/chat/smoke.sh
 
 `deploy.sh` build web và binary Linux trên máy dev, tải release lên, đồng bộ `infra/chat/`, rồi chạy [`activate-release.sh`](../infra/chat/activate-release.sh): backup DB, chạy migration bằng binary mới, cài conf nginx của release (`nginx -t` trước), đổi symlink, reload pm2 `chat-api`, chờ `/healthz`, rồi kiểm `/ws` trả 403 cho GET không có `Origin`, cả trực tiếp ở `127.0.0.1:4600` lẫn qua nginx; lỗi ở bất kỳ bước nào sau khi đổi thì tự trở lại release trước. Migration chỉ thêm (expand), nên binary trước vẫn chạy được trên schema mới.
 
+## Tài khoản vận hành (kiểm duyệt)
+
+Hàng đợi kiểm duyệt (`ModerationService`) chỉ mở cho các user id ghi trong `CHAT_OPERATOR_USER_IDS` của `/opt/chat/.env`. Mặc định biến này không có, nên không ai là người vận hành. Cách cấp quyền:
+
+1. Người được cấp đăng nhập chat một lần để có user. Lấy user id qua [`psql.sh`](../infra/chat/psql.sh): `SELECT id, username, name FROM users WHERE tenant_id = 'primary' AND username = '<username>';`.
+2. Thêm vào `/opt/chat/.env` (nhiều id cách nhau bằng dấu phẩy, tối đa 100): `CHAT_OPERATOR_USER_IDS=<id>[,<id>…]`.
+3. `pm2 startOrReload /opt/chat/infra/ecosystem.config.cjs --only chat-api --update-env` (process đọc lại `-env-file` khi khởi động); log khởi động ghi `operators=<số id>`. `GetSelf` của người đó trả `is_operator: true`.
+
+Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệt (bỏ qua, xoá tin, cấm khỏi chat, khoá tài khoản chat, gỡ khoá) ghi vào bảng `moderation_log` chỉ cho thêm (trigger chặn sửa và xoá).
+
 ## Kiểm tra sau deploy
 
 `infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401. Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).

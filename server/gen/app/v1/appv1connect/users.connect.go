@@ -67,6 +67,9 @@ const (
 	// UsersServiceGetContactsProcedure is the fully-qualified name of the UsersService's GetContacts
 	// RPC.
 	UsersServiceGetContactsProcedure = "/app.v1.UsersService/GetContacts"
+	// UsersServiceGetBlockedUsersProcedure is the fully-qualified name of the UsersService's
+	// GetBlockedUsers RPC.
+	UsersServiceGetBlockedUsersProcedure = "/app.v1.UsersService/GetBlockedUsers"
 )
 
 // UsersServiceClient is a client for the app.v1.UsersService service.
@@ -91,6 +94,8 @@ type UsersServiceClient interface {
 	AddContact(context.Context, *connect.Request[v1.AddContactRequest]) (*connect.Response[v1.AddContactResponse], error)
 	DeleteContact(context.Context, *connect.Request[v1.DeleteContactRequest]) (*connect.Response[v1.DeleteContactResponse], error)
 	GetContacts(context.Context, *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error)
+	// Users the caller blocked, most recently blocked first.
+	GetBlockedUsers(context.Context, *connect.Request[v1.GetBlockedUsersRequest]) (*connect.Response[v1.GetBlockedUsersResponse], error)
 }
 
 // NewUsersServiceClient constructs a client for the app.v1.UsersService service. By default, it
@@ -188,6 +193,12 @@ func NewUsersServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(usersServiceMethods.ByName("GetContacts")),
 			connect.WithClientOptions(opts...),
 		),
+		getBlockedUsers: connect.NewClient[v1.GetBlockedUsersRequest, v1.GetBlockedUsersResponse](
+			httpClient,
+			baseURL+UsersServiceGetBlockedUsersProcedure,
+			connect.WithSchema(usersServiceMethods.ByName("GetBlockedUsers")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -207,6 +218,7 @@ type usersServiceClient struct {
 	addContact      *connect.Client[v1.AddContactRequest, v1.AddContactResponse]
 	deleteContact   *connect.Client[v1.DeleteContactRequest, v1.DeleteContactResponse]
 	getContacts     *connect.Client[v1.GetContactsRequest, v1.GetContactsResponse]
+	getBlockedUsers *connect.Client[v1.GetBlockedUsersRequest, v1.GetBlockedUsersResponse]
 }
 
 // GetSelf calls app.v1.UsersService.GetSelf.
@@ -279,6 +291,11 @@ func (c *usersServiceClient) GetContacts(ctx context.Context, req *connect.Reque
 	return c.getContacts.CallUnary(ctx, req)
 }
 
+// GetBlockedUsers calls app.v1.UsersService.GetBlockedUsers.
+func (c *usersServiceClient) GetBlockedUsers(ctx context.Context, req *connect.Request[v1.GetBlockedUsersRequest]) (*connect.Response[v1.GetBlockedUsersResponse], error) {
+	return c.getBlockedUsers.CallUnary(ctx, req)
+}
+
 // UsersServiceHandler is an implementation of the app.v1.UsersService service.
 type UsersServiceHandler interface {
 	// The caller's own user (profile, email from the IdP).
@@ -301,6 +318,8 @@ type UsersServiceHandler interface {
 	AddContact(context.Context, *connect.Request[v1.AddContactRequest]) (*connect.Response[v1.AddContactResponse], error)
 	DeleteContact(context.Context, *connect.Request[v1.DeleteContactRequest]) (*connect.Response[v1.DeleteContactResponse], error)
 	GetContacts(context.Context, *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error)
+	// Users the caller blocked, most recently blocked first.
+	GetBlockedUsers(context.Context, *connect.Request[v1.GetBlockedUsersRequest]) (*connect.Response[v1.GetBlockedUsersResponse], error)
 }
 
 // NewUsersServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -394,6 +413,12 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(usersServiceMethods.ByName("GetContacts")),
 		connect.WithHandlerOptions(opts...),
 	)
+	usersServiceGetBlockedUsersHandler := connect.NewUnaryHandler(
+		UsersServiceGetBlockedUsersProcedure,
+		svc.GetBlockedUsers,
+		connect.WithSchema(usersServiceMethods.ByName("GetBlockedUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.UsersService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UsersServiceGetSelfProcedure:
@@ -424,6 +449,8 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 			usersServiceDeleteContactHandler.ServeHTTP(w, r)
 		case UsersServiceGetContactsProcedure:
 			usersServiceGetContactsHandler.ServeHTTP(w, r)
+		case UsersServiceGetBlockedUsersProcedure:
+			usersServiceGetBlockedUsersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -487,4 +514,8 @@ func (UnimplementedUsersServiceHandler) DeleteContact(context.Context, *connect.
 
 func (UnimplementedUsersServiceHandler) GetContacts(context.Context, *connect.Request[v1.GetContactsRequest]) (*connect.Response[v1.GetContactsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.GetContacts is not implemented"))
+}
+
+func (UnimplementedUsersServiceHandler) GetBlockedUsers(context.Context, *connect.Request[v1.GetBlockedUsersRequest]) (*connect.Response[v1.GetBlockedUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.GetBlockedUsers is not implemented"))
 }

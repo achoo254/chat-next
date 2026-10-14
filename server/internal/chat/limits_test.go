@@ -51,11 +51,11 @@ func TestUnreadCountsAreCappedAndBatched(t *testing.T) {
 	if _, err := h.svc.SetHistoryVisibility(ctx, a, quiet, appv1.HistoryVisibility_HISTORY_VISIBILITY_SINCE_JOIN); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.svc.AddMembers(ctx, a, quiet, []int64{c}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, a, quiet, []int64{c}); err != nil {
 		t.Fatal(err)
 	}
 	last := h.send(a, quiet, "after c").GetMessage().GetSeq()
-	if _, _, err := h.svc.AddMembers(ctx, a, busy, []int64{c}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, a, busy, []int64{c}); err != nil {
 		t.Fatal(err)
 	}
 	dl, err := h.svc.GetDialogs(ctx, b, "", 10)

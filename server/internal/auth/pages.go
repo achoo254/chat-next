@@ -4,6 +4,9 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // The pages carry no script and no external resource. The interstitial
@@ -16,11 +19,11 @@ var pages = template.Must(template.New("pages").Parse(`
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0;url=/">
+<meta http-equiv="refresh" content="0;url={{.}}">
 <title>Đang đăng nhập…</title>
 </head>
 <body>
-<p>Đang đăng nhập… <a href="/">Tiếp tục</a></p>
+<p>Đang đăng nhập… <a href="{{.}}">Tiếp tục</a></p>
 </body>
 </html>
 {{end}}
@@ -51,10 +54,44 @@ func writePageHeaders(w http.ResponseWriter) {
 	h.Set("X-Content-Type-Options", "nosniff")
 }
 
-func writeInterstitial(w http.ResponseWriter) {
+// writeInterstitial sends the browser to returnTo, a path CleanReturnTo
+// accepted ("" means "/").
+func writeInterstitial(w http.ResponseWriter, returnTo string) {
+	if returnTo == "" {
+		returnTo = "/"
+	}
 	writePageHeaders(w)
 	w.WriteHeader(http.StatusOK)
-	_ = pages.ExecuteTemplate(w, "interstitial", nil)
+	_ = pages.ExecuteTemplate(w, "interstitial", returnTo)
+}
+
+// returnToMax bounds the return_to path, in bytes.
+const returnToMax = 512
+
+// CleanReturnTo returns raw when it is safe to send the browser to after
+// sign-in, else "". Only a path on this origin passes: it starts with a
+// single "/" (never "//", which browsers read as another host), has no
+// backslash (browsers turn it into "/"), no control or space character
+// (browsers drop tabs and newlines inside URLs), parses with no scheme or
+// host, does not point back into /auth/, and is at most returnToMax bytes.
+func CleanReturnTo(raw string) string {
+	if raw == "" || len(raw) > returnToMax || raw[0] != '/' || strings.HasPrefix(raw, "//") ||
+		strings.ContainsAny(raw, "\\ ") {
+		return ""
+	}
+	for _, r := range raw {
+		if r < 0x20 || r == 0x7f || r == utf8.RuneError || unicode.IsSpace(r) {
+			return ""
+		}
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil || u.Opaque != "" || !strings.HasPrefix(u.Path, "/") {
+		return ""
+	}
+	if p := strings.ToLower(u.Path); p == "/auth" || strings.HasPrefix(p, "/auth/") {
+		return ""
+	}
+	return raw
 }
 
 // Messages of the sign-in error page.
@@ -63,10 +100,17 @@ const (
 	msgIdPUnavailable = "Máy chủ đăng nhập đang tạm thời không phản hồi. Vui lòng thử lại sau ít phút."
 )
 
-func writeErrorPage(w http.ResponseWriter, status int, message, locale string) {
+func writeErrorPage(w http.ResponseWriter, status int, message, locale, returnTo string) {
 	retry := "/auth/login"
+	q := url.Values{}
 	if locale != "" {
-		retry += "?" + url.Values{"locale": {locale}}.Encode()
+		q.Set("locale", locale)
+	}
+	if returnTo != "" {
+		q.Set("return_to", returnTo)
+	}
+	if len(q) > 0 {
+		retry += "?" + q.Encode()
 	}
 	writePageHeaders(w)
 	w.WriteHeader(status)

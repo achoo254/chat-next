@@ -31,7 +31,8 @@ type Deps struct {
 }
 
 // NewHandler returns the Connect handler for AuthService, UsersService,
-// ConfigService, ChatsService, MessagesService and UpdatesService. Every call passes the Origin check, the id-contract check
+// ConfigService, ChatsService, MessagesService, UpdatesService and
+// ModerationService. Every call passes the Origin check, the id-contract check
 // on request and response, and (except public procedures) the session check.
 func NewHandler(d Deps) (http.Handler, error) {
 	if d.Chat == nil {
@@ -61,5 +62,6 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewChatsServiceHandler(&chatsService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewMessagesServiceHandler(&messagesService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewUpdatesServiceHandler(&updatesService{chat: d.Chat, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewModerationServiceHandler(&moderationService{chat: d.Chat, logger: d.Logger}, opts...))
 	return mux, nil
 }

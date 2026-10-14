@@ -49,6 +49,7 @@ import {
 	putChat,
 	putChatPts,
 	putDialog,
+	putPinnedOrder,
 	putMessage,
 	putNewMessage,
 	putSyncState,
@@ -709,6 +710,12 @@ export class SyncEngine {
 					putChatPts(w, dialog.chatId, dialog.chatPts);
 				}
 			}
+			// The first page carries the pinned chats in order (a client whose
+			// server predates pins gets none and keeps every dialog unpinned).
+			putPinnedOrder(
+				w,
+				snapshot.pinnedChatIds.filter((chatId) => !effects.purgedChats.has(chatId)),
+			);
 			w.add("DELETE FROM chat_sync_state WHERE chat_id NOT IN (SELECT chat_id FROM dialogs)");
 			this.pts = state.pts;
 			this.epoch = state.serverEpoch;
@@ -736,16 +743,18 @@ export class SyncEngine {
 			users: DialogsPage["users"][number][];
 		};
 		let cursor = "";
+		let pinnedChatIds: readonly number[] = [];
 		for (let page = 0; page < MAX_DIALOG_PAGES; page++) {
 			const response = toDialogsPage(await this.options.api.chats.getDialogs({ cursor, limit: DIALOG_PAGE_SIZE }));
+			if (page === 0) pinnedChatIds = response.pinnedChatIds;
 			all.dialogs.push(...response.dialogs);
 			all.messages.push(...response.messages);
 			all.chats.push(...response.chats);
 			all.users.push(...response.users);
-			if (response.nextCursor === "") return { ...all, nextCursor: "", complete: true };
+			if (response.nextCursor === "") return { ...all, nextCursor: "", pinnedChatIds, complete: true };
 			cursor = response.nextCursor;
 		}
-		return { ...all, nextCursor: cursor, complete: false };
+		return { ...all, nextCursor: cursor, pinnedChatIds, complete: false };
 	}
 
 	// ------------------------------------------------------ chat difference

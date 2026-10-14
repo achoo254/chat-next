@@ -57,7 +57,7 @@ func TestPermissionsAndRoles(t *testing.T) {
 		t.Fatalf("gateway not told to forget the chat: %v", h.sink.forget)
 	}
 	// The owner leaving hands the chat to the admin.
-	if _, err := h.svc.LeaveChat(ctx, owner, chatID); err != nil {
+	if _, err := h.svc.LeaveChat(ctx, owner, chatID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if c, _, _ := h.svc.GetChat(ctx, admin, chatID); c.GetMyRole() != appv1.MemberRole_MEMBER_ROLE_OWNER {
@@ -68,7 +68,7 @@ func TestPermissionsAndRoles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.svc.AddMembers(ctx, owner, ch.GetChat().GetId(), []int64{member}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, owner, ch.GetChat().GetId(), []int64{member}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.svc.SendMessage(ctx, member, &appv1.SendMessageRequest{ChatId: ch.GetChat().GetId(), Text: "x"}); codeOf(err) != connect.CodePermissionDenied {
@@ -219,7 +219,7 @@ func TestHistoryVisibilityHideAndPaging(t *testing.T) {
 	if _, err := h.svc.SetHistoryVisibility(ctx, a, chatID, appv1.HistoryVisibility_HISTORY_VISIBILITY_SINCE_JOIN); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.svc.AddMembers(ctx, a, chatID, []int64{c}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, a, chatID, []int64{c}); err != nil {
 		t.Fatal(err)
 	}
 	h.send(a, chatID, "new")

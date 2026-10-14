@@ -278,6 +278,9 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 	if !c.can(m, permSend) {
 		return 0, errDenied("you cannot send messages in this chat")
 	}
+	if err := s.checkUnrestricted(ctx, q, me); err != nil {
+		return 0, err
+	}
 	blocked, err := peerBlockedMe(ctx, q, c, me)
 	if err != nil {
 		return 0, err
@@ -600,6 +603,9 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 	if err := s.allow(limitWrite, "write", me); err != nil {
 		return nil, err
 	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
+		return nil, err
+	}
 	url := ""
 	if !req.GetNoLinkPreview() {
 		url = s.previewURL(text, ents)
@@ -691,7 +697,7 @@ func (s *Service) DeleteMessages(ctx context.Context, me, chatID int64, seqs []i
 		if !forEveryone {
 			return t.hideMessages(ctx, c, m, me, seqs)
 		}
-		return t.deleteMessages(ctx, c, m, me, seqs)
+		return t.deleteMessages(ctx, c, c.Type == typePrivate || m.isAdmin(), me, seqs)
 	})
 	if err != nil {
 		return nil, err
@@ -723,8 +729,9 @@ func (t *txn) hideMessages(ctx context.Context, c *chatRow, m *memberRow, me int
 	return nil
 }
 
-func (t *txn) deleteMessages(ctx context.Context, c *chatRow, m *memberRow, me int64, seqs []int64) error {
-	anyone := c.Type == typePrivate || m.isAdmin()
+// deleteMessages deletes messages of a locked chat for everyone: any
+// author's when anyone, else only me's.
+func (t *txn) deleteMessages(ctx context.Context, c *chatRow, anyone bool, me int64, seqs []int64) error {
 	rows, err := t.tx.Query(ctx, `
 		UPDATE messages SET deleted_at = now(), text = '', content = NULL
 		WHERE chat_id = $1 AND seq = ANY($2) AND deleted_at IS NULL AND ($3 OR from_id = $4)
@@ -1457,6 +1464,9 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 		return nil, errInvalid("reaction must be one emoji")
 	}
 	if err := s.allow(limitWrite, "write", me); err != nil {
+		return nil, err
+	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {

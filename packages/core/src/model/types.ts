@@ -69,6 +69,43 @@ export interface Dialog {
 	readonly unreadMentionsCount: number;
 	/** sync_mode=large only: position in the chat's log; 0 otherwise. */
 	readonly chatPts: number;
+	/**
+	 * Notifications muted until this unix second; 0 when not muted.
+	 * MUTE_FOREVER means until unmuted. See isMuted.
+	 */
+	readonly muteUntil: number;
+	/** Pinned on top of the user's list (order: pinnedChatIds). */
+	readonly pinned: boolean;
+}
+
+/** Dialog.muteUntil of a chat muted until unmuted. */
+export const MUTE_FOREVER = 2147483647;
+
+/** Most chats one user can pin (SetDialogPinned refuses more). */
+export const PINNED_DIALOGS_MAX = 5;
+
+/** Whether the dialog's notifications are muted at `nowSeconds`. */
+export function isMuted(dialog: Pick<Dialog, "muteUntil">, nowSeconds: number): boolean {
+	return dialog.muteUntil > nowSeconds;
+}
+
+/**
+ * Totals for the app's unread badge: unread messages and chats with unread
+ * messages. Muted chats are left out unless includeMuted (a user setting).
+ */
+export function unreadTotals(
+	dialogs: Iterable<Pick<Dialog, "unreadCount" | "muteUntil">>,
+	nowSeconds: number,
+	includeMuted = false,
+): { readonly messages: number; readonly chats: number } {
+	let messages = 0;
+	let chats = 0;
+	for (const dialog of dialogs) {
+		if (dialog.unreadCount <= 0 || (!includeMuted && isMuted(dialog, nowSeconds))) continue;
+		messages += dialog.unreadCount;
+		chats += 1;
+	}
+	return { messages, chats };
 }
 
 export type EntityType =
@@ -244,6 +281,15 @@ export type UpdateBody =
 			readonly sessionId: number;
 			readonly reason: SessionRevokeReason;
 	  }
+	/** The user muted or unmuted a chat (another session or this one). */
+	| { readonly kind: "dialog_mute"; readonly chatId: number; readonly muteUntil: number }
+	/** The user's pinned chats, top first, after a change. */
+	| { readonly kind: "pinned_dialogs"; readonly chatIds: readonly number[] }
+	/**
+	 * The chat left the user's list: deleted by its owner (forEveryone) or a
+	 * private chat the user deleted for themselves. Purge it locally.
+	 */
+	| { readonly kind: "chat_deleted"; readonly chatId: number; readonly forEveryone: boolean }
 	/** A kind added to the protocol after this client was built. */
 	| { readonly kind: "unknown" };
 
@@ -313,6 +359,8 @@ export interface DialogsPage {
 	readonly chats: readonly Chat[];
 	readonly users: readonly User[];
 	readonly nextCursor: string;
+	/** First page of GetDialogs only: the pinned chats, top first; empty otherwise. */
+	readonly pinnedChatIds: readonly number[];
 }
 
 /** Realtime HelloFrame. */

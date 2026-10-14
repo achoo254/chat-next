@@ -241,6 +241,9 @@ func (s *Service) rebuildEvent(ctx context.Context, r outboxRow) (*Event, error)
 			if mr, ok := e.Update.Kind.(*appv1.Update_MemberRemoved); ok && mr.MemberRemoved.GetUserId() == e.UserID {
 				ev.Forget = append(ev.Forget, e.UserID)
 			}
+			if cd, ok := e.Update.Kind.(*appv1.Update_ChatDeleted); ok && cd.ChatDeleted.GetForEveryone() {
+				ev.Forget = append(ev.Forget, e.UserID)
+			}
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {

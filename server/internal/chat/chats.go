@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
@@ -52,7 +53,7 @@ func (s *Service) chatFor(ctx context.Context, q querier, chatID, userID int64, 
 	if chatID <= 0 {
 		return nil, nil, errInvalid("chat_id is required")
 	}
-	sql := `SELECT ` + chatColumns + ` FROM ` + chatFrom + ` WHERE c.id = $1 AND c.tenant_id = $2`
+	sql := `SELECT ` + chatColumns + ` FROM ` + chatFrom + ` WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL`
 	if lock {
 		sql += ` FOR UPDATE OF c`
 	}
@@ -130,6 +131,9 @@ func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Cha
 	if err := s.allow(limitCreate, "create", me); err != nil {
 		return nil, nil, err
 	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
+		return nil, nil, err
+	}
 	low, high := min(me, peer), max(me, peer)
 	var chatID int64
 	_, err := s.inTx(ctx, func(t *txn) error {
@@ -189,6 +193,9 @@ func (s *Service) CreateGroup(ctx context.Context, me int64, title string, userI
 	if err := s.allow(limitCreate, "create", me); err != nil {
 		return nil, err
 	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
+		return nil, err
+	}
 	resp := &appv1.CreateGroupResponse{}
 	var chatID int64
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -211,7 +218,7 @@ func (s *Service) CreateGroup(ctx context.Context, me int64, title string, userI
 		if err != nil {
 			return err
 		}
-		resp.FailedUserIds = failed
+		resp.FailedUserIds, resp.Failures = failed.split()
 		return s.startChat(ctx, t, c, me, allowed, &appv1.MessageAction{Kind: &appv1.MessageAction_ChatCreated{
 			ChatCreated: &appv1.ActionChatCreated{Title: title}}})
 	})
@@ -237,6 +244,9 @@ func (s *Service) CreateChannel(ctx context.Context, me int64, title, about stri
 		return nil, err
 	}
 	if err := s.allow(limitCreate, "create", me); err != nil {
+		return nil, err
+	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
 		return nil, err
 	}
 	var chatID int64
@@ -359,16 +369,18 @@ func bannedAmong(ctx context.Context, q querier, chatID int64, users []int64) (m
 	return out, nil
 }
 
-// AddMembers adds users to a group or channel; users whose privacy or
-// blocks refuse it come back in failed, and so do banned users unless an
-// admin adds them (which lifts the ban).
-func (s *Service) AddMembers(ctx context.Context, me, chatID int64, userIDs []int64) (failed []int64, ack *appv1.SyncAck, err error) {
+// AddMembers adds users to a group or channel. Users not added come back
+// with a reason: their privacy or blocks refuse it, they are banned (unless
+// an admin adds them, which lifts the ban), they are members already, or
+// the chat is full.
+func (s *Service) AddMembers(ctx context.Context, me, chatID int64, userIDs []int64) (*appv1.AddMembersResponse, error) {
 	if len(userIDs) == 0 || len(userIDs) > addMembersMax {
-		return nil, nil, errInvalid("user_ids must hold 1 to %d users", addMembersMax)
+		return nil, errInvalid("user_ids must hold 1 to %d users", addMembersMax)
 	}
 	if err := s.allow(limitWrite, "write", me); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
+	var failed addFailures
 	t, err := s.inTx(ctx, func(t *txn) error {
 		c, m, err := s.activeChatFor(ctx, t.tx, chatID, me, true)
 		if err != nil {
@@ -380,31 +392,97 @@ func (s *Service) AddMembers(ctx context.Context, me, chatID int64, userIDs []in
 		if !c.can(m, permAddMembers) {
 			return errDenied("you cannot add members to this chat")
 		}
+		if err := s.checkUnrestricted(ctx, t.tx, me); err != nil {
+			return err
+		}
 		allowed, refused, err := s.filterAddable(ctx, t.tx, me, userIDs)
 		if err != nil {
 			return err
 		}
+		current, err := s.membersAmong(ctx, t.tx, c.ID, allowed)
+		if err != nil {
+			return err
+		}
+		allowed = refused.drop(allowed, current, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_ALREADY_MEMBER)
 		if !m.isAdmin() {
 			banned, err := bannedAmong(ctx, t.tx, c.ID, allowed)
 			if err != nil {
 				return err
 			}
-			allowed = slices.DeleteFunc(allowed, func(id int64) bool {
-				if banned[id] {
-					refused = append(refused, id)
-				}
-				return banned[id]
-			})
-			slices.Sort(refused)
+			allowed = refused.drop(allowed, banned, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_BANNED)
+		}
+		if room := s.cfg.ChatMembersMax - int(c.MemberCount); len(allowed) > room {
+			full := map[int64]bool{}
+			for _, id := range allowed[max(room, 0):] {
+				full[id] = true
+			}
+			allowed = refused.drop(allowed, full, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_TOO_MANY)
 		}
 		failed = refused
 		_, err = t.addMembers(ctx, c, me, allowed, me, false)
 		return err
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return failed, t.ack(me, chatID), nil
+	resp := &appv1.AddMembersResponse{Ack: t.ack(me, chatID)}
+	resp.FailedUserIds, resp.Failures = failed.split()
+	return resp, nil
+}
+
+// membersAmong returns which of users are current members of the chat.
+func (s *Service) membersAmong(ctx context.Context, q querier, chatID int64, users []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if len(users) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT user_id FROM chat_members WHERE chat_id = $1 AND user_id = ANY($2) AND left_at IS NULL`, chatID, users)
+	if err != nil {
+		return nil, fmt.Errorf("chat: current members: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: current members: %w", err)
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// addFailure is one user not added to a chat, with the reason.
+type addFailure struct {
+	userID int64
+	reason appv1.AddMemberFailureReason
+}
+
+type addFailures []addFailure
+
+// drop removes the users in set from users, recording them with reason.
+func (f *addFailures) drop(users []int64, set map[int64]bool, reason appv1.AddMemberFailureReason) []int64 {
+	return slices.DeleteFunc(users, func(id int64) bool {
+		if set[id] {
+			*f = append(*f, addFailure{userID: id, reason: reason})
+		}
+		return set[id]
+	})
+}
+
+// split returns the legacy failed ids (every refusal except users who are
+// members already, sorted) and the failures with reasons, by user id.
+func (f addFailures) split() ([]int64, []*appv1.AddMemberFailure) {
+	list := slices.Clone(f)
+	slices.SortFunc(list, func(a, b addFailure) int { return cmp.Compare(a.userID, b.userID) })
+	var ids []int64
+	out := make([]*appv1.AddMemberFailure, 0, len(list))
+	for _, x := range list {
+		if x.reason != appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_ALREADY_MEMBER {
+			ids = append(ids, x.userID)
+		}
+		out = append(out, &appv1.AddMemberFailure{UserId: x.userID, Reason: x.reason})
+	}
+	return ids, out
 }
 
 // addMembers adds users to a locked chat and announces them: a service
@@ -473,7 +551,7 @@ func chatPtsIfLarge(c *chatRow) int64 {
 // created in the chat are revoked; without, they may rejoin by a valid link.
 func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64, ban bool) (*appv1.SyncAck, error) {
 	if userID == me {
-		return s.LeaveChat(ctx, me, chatID)
+		return s.LeaveChat(ctx, me, chatID, 0)
 	}
 	if err := s.allow(limitWrite, "write", me); err != nil {
 		return nil, err
@@ -520,9 +598,13 @@ func errOwnerNeedsAdmin() error {
 }
 
 // LeaveChat removes me from a group or channel. An owner who leaves hands
-// the chat to the longest-serving admin; with other members but no admin
-// the owner cannot leave.
-func (s *Service) LeaveChat(ctx context.Context, me, chatID int64) (*appv1.SyncAck, error) {
+// the chat to newOwner, which must be a current admin, or (newOwner 0) to
+// the longest-serving admin; with other members but no admin the owner
+// cannot leave.
+func (s *Service) LeaveChat(ctx context.Context, me, chatID, newOwner int64) (*appv1.SyncAck, error) {
+	if newOwner < 0 || newOwner == me {
+		return nil, errInvalid("new_owner_id must be another member")
+	}
 	if err := s.allow(limitWrite, "write", me); err != nil {
 		return nil, err
 	}
@@ -535,7 +617,19 @@ func (s *Service) LeaveChat(ctx context.Context, me, chatID int64) (*appv1.SyncA
 			return errInvalid("cannot leave a private chat")
 		}
 		var heir int64
-		if m.Role == roleOwner {
+		if newOwner != 0 {
+			if m.Role != roleOwner {
+				return errInvalid("only the owner names a new owner")
+			}
+			target, err := s.memberRow(ctx, t.tx, chatID, newOwner)
+			if isNotFound(err) || (err == nil && (!target.active() || target.Role != roleAdmin)) {
+				return errInvalid("new_owner_id must be an admin of the chat")
+			}
+			if err != nil {
+				return err
+			}
+			heir = newOwner
+		} else if m.Role == roleOwner {
 			err := t.tx.QueryRow(ctx, `
 				SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL AND role = 'admin'
 				ORDER BY joined_at, user_id LIMIT 1`, chatID).Scan(&heir)
@@ -574,14 +668,15 @@ func (s *Service) memberRow(ctx context.Context, q querier, chatID, userID int64
 
 // removeMember posts the service message while the user is still a member,
 // then removes them (banned when ban) and writes member_removed to the
-// remaining members and to the removed user.
+// remaining members and to the removed user. actor 0 is moderation: no
+// service message, and actor_id 0 in member_removed.
 func (t *txn) removeMember(ctx context.Context, c *chatRow, actor, userID int64, ban bool) error {
 	members, err := activeMembers(ctx, t.tx, c.ID)
 	if err != nil {
 		return err
 	}
 	ev := t.event(kindMemberRemoved, c.ID, actor)
-	if c.Type != typeChannel {
+	if c.Type != typeChannel && actor != 0 {
 		action := &appv1.MessageAction{Kind: &appv1.MessageAction_MemberRemoved{MemberRemoved: &appv1.ActionMemberRemoved{UserId: userID, By: actor}}}
 		if actor == userID {
 			action = &appv1.MessageAction{Kind: &appv1.MessageAction_MemberLeft{MemberLeft: &appv1.ActionMemberLeft{}}}
@@ -591,7 +686,7 @@ func (t *txn) removeMember(ctx context.Context, c *chatRow, actor, userID int64,
 		}
 	}
 	if _, err := t.tx.Exec(ctx, `
-		UPDATE chat_members SET left_at = now(), left_seq = $3, role = 'member', permissions = NULL,
+		UPDATE chat_members SET left_at = now(), left_seq = $3, role = 'member', permissions = NULL, pin_rank = NULL,
 			banned_at = CASE WHEN $4 THEN now() END, banned_by = CASE WHEN $4 THEN $5::bigint END
 		WHERE chat_id = $1 AND user_id = $2`, c.ID, userID, c.LastSeq, ban, actor); err != nil {
 		return fmt.Errorf("chat: remove member: %w", err)
@@ -902,7 +997,13 @@ func decodeDialogCursor(s string) (time.Time, int64, error) {
 	return time.UnixMicro(int64(binary.BigEndian.Uint64(b[:8]))), int64(binary.BigEndian.Uint64(b[8:])), nil
 }
 
-// GetDialogs lists the caller's chats, newest activity first.
+// dialogListed is the condition of a membership m (chat c) that shows in
+// the dialog list: current, and not a private chat deleted for oneself
+// (visible_from_seq past the newest message) until a new message arrives.
+const dialogListed = `m.left_at IS NULL AND NOT (c.type = 'private' AND m.visible_from_seq > c.last_seq)`
+
+// GetDialogs lists the caller's chats: on the first page every pinned chat
+// (pinned order) and then the others, newest activity first.
 func (s *Service) GetDialogs(ctx context.Context, me int64, cursor string, limit int32) (*appv1.GetDialogsResponse, error) {
 	if limit <= 0 || limit > dialogsPageMax {
 		limit = 100
@@ -915,9 +1016,16 @@ func (s *Service) GetDialogs(ctx context.Context, me int64, cursor string, limit
 			return nil, err
 		}
 	}
+	var pinned []int64
+	if cursor == "" {
+		var err error
+		if pinned, err = pinnedDialogs(ctx, s.pool, s.cfg.TenantID, me); err != nil {
+			return nil, err
+		}
+	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT c.id, c.last_message_at FROM chat_members m JOIN chats c ON c.id = m.chat_id
-		WHERE m.user_id = $1 AND m.left_at IS NULL AND c.tenant_id = $2
+		WHERE m.user_id = $1 AND `+dialogListed+` AND m.pin_rank IS NULL AND c.tenant_id = $2
 			AND (c.last_message_at, c.id) < ($3, $4)
 		ORDER BY c.last_message_at DESC, c.id DESC LIMIT $5`, me, s.cfg.TenantID, before, beforeID, limit+1)
 	if err != nil {
@@ -941,9 +1049,9 @@ func (s *Service) GetDialogs(ctx context.Context, me int64, cursor string, limit
 		last := items[len(items)-1]
 		next = encodeDialogCursor(last.at, last.id)
 	}
-	chatIDs := make([]int64, len(items))
-	for i, it := range items {
-		chatIDs[i] = it.id
+	chatIDs := slices.Clone(pinned)
+	for _, it := range items {
+		chatIDs = append(chatIDs, it.id)
 	}
 	page, err := s.dialogs(ctx, me, chatIDs)
 	if err != nil {
@@ -951,7 +1059,24 @@ func (s *Service) GetDialogs(ctx context.Context, me int64, cursor string, limit
 	}
 	return &appv1.GetDialogsResponse{
 		Dialogs: page.Dialogs, Messages: page.Messages, Chats: page.Chats, Users: page.Users, NextCursor: next,
+		PinnedChatIds: pinned,
 	}, nil
+}
+
+// pinnedDialogs returns the user's pinned chats, top first.
+func pinnedDialogs(ctx context.Context, q querier, tenantID string, me int64) ([]int64, error) {
+	rows, err := q.Query(ctx, `
+		SELECT c.id FROM chat_members m JOIN chats c ON c.id = m.chat_id
+		WHERE m.user_id = $1 AND `+dialogListed+` AND m.pin_rank IS NOT NULL AND c.tenant_id = $2
+		ORDER BY m.pin_rank DESC, c.id`, me, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("chat: pinned dialogs: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: pinned dialogs: %w", err)
+	}
+	return ids, nil
 }
 
 // GetPeerDialogs returns the caller's dialogs of the given chats.
@@ -1005,6 +1130,8 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 			UnreadCount:         rs.unread,
 			UnreadMentionsCount: rs.mentions,
 			ChatPts:             chatPtsIfLarge(c),
+			MuteUntil:           activeMute(m.MuteUntil, time.Now()),
+			Pinned:              m.PinRank != 0,
 		}
 		if top := tops[c.ID]; top != nil {
 			d.TopSeq = top.Seq

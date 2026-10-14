@@ -34,7 +34,7 @@ function toStored(row: SqlRow): StoredMessage {
 
 // Dialog rows joined with the chat-level read state (topic 0) and the
 // large-chat log position.
-const DIALOG_SELECT = `SELECT d.chat_id, d.top_seq, d.top_date, d.history_start,
+const DIALOG_SELECT = `SELECT d.chat_id, d.top_seq, d.top_date, d.history_start, d.mute_until, d.pin_rank,
 	COALESCE(r.read_inbox_max_seq, 0) AS read_inbox_max_seq, COALESCE(r.read_outbox_max_seq, 0) AS read_outbox_max_seq,
 	COALESCE(r.unread_count, 0) AS unread_count, COALESCE(r.unread_mentions_count, 0) AS unread_mentions_count,
 	COALESCE(s.chat_pts, 0) AS chat_pts
@@ -117,10 +117,10 @@ export class Repository {
 		return rows.map((row) => num(row, "chat_id"));
 	}
 
-	/** The dialog list, newest first, with what a list row renders. */
+	/** The dialog list, pinned chats first (pinned order), then newest first, with what a list row renders. */
 	async dialogViews(limit: number): Promise<DialogView[]> {
 		const rows = await this.driver.query(
-			`${DIALOG_SELECT} ORDER BY d.top_date DESC, d.chat_id DESC LIMIT ?`,
+			`${DIALOG_SELECT} ORDER BY d.pin_rank DESC, d.top_date DESC, d.chat_id DESC LIMIT ?`,
 			[limit],
 		);
 		const dialogs = rows.map(rowToDialog);

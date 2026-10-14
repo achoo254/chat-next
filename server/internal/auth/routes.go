@@ -67,8 +67,10 @@ func (h *Routes) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /auth/backchannel-logout", h.handleBackchannelLogout)
 }
 
-// handleLogin starts Code + PKCE: ?locale= becomes ui_locales and
-// ?prompt=create opens the IdP sign-up page.
+// handleLogin starts Code + PKCE: ?locale= becomes ui_locales,
+// ?prompt=create opens the IdP sign-up page, and ?return_to= (a same-origin
+// path, CleanReturnTo; anything else is ignored) is where the callback sends
+// the browser after sign-in.
 func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	locale := supportedLocales[strings.ToLower(q.Get("locale"))]
@@ -78,6 +80,7 @@ func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Verifier: oauth2.GenerateVerifier(),
 		Locale:   locale,
 		Expires:  h.now().Add(loginTTL).Unix(),
+		ReturnTo: CleanReturnTo(q.Get("return_to")),
 	}
 	target, err := h.cfg.IdP.AuthCodeURL(AuthRequest{
 		State: st.State, Nonce: st.Nonce, Verifier: st.Verifier,
@@ -85,12 +88,12 @@ func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.cfg.Logger.Warn("sign-in unavailable", "err", err)
-		writeErrorPage(w, http.StatusServiceUnavailable, msgIdPUnavailable, locale)
+		writeErrorPage(w, http.StatusServiceUnavailable, msgIdPUnavailable, locale, st.ReturnTo)
 		return
 	}
 	if err := setLoginCookie(w, h.login, st); err != nil {
 		h.cfg.Logger.Error("login cookie", "err", err)
-		writeErrorPage(w, http.StatusInternalServerError, msgSignInFailed, locale)
+		writeErrorPage(w, http.StatusInternalServerError, msgSignInFailed, locale, st.ReturnTo)
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -108,7 +111,7 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	clearCookie(w, LoginCookieName, http.SameSiteLaxMode)
 	fail := func(status int, msg, reason string, err error) {
 		h.cfg.Logger.Warn("sign-in callback rejected", "reason", reason, "err", err)
-		writeErrorPage(w, status, msg, st.Locale)
+		writeErrorPage(w, status, msg, st.Locale, st.ReturnTo)
 	}
 	if err != nil {
 		fail(http.StatusBadRequest, msgSignInFailed, "login state", err)
@@ -162,7 +165,7 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	h.cfg.Logger.Info("signed in", "user_id", user.ID, "session_id", sessionID)
 	setSessionCookie(w, token)
-	writeInterstitial(w)
+	writeInterstitial(w, st.ReturnTo)
 }
 
 // handleLogout ends the browser's session and sends it to the IdP

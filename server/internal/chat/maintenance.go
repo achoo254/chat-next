@@ -115,6 +115,11 @@ func (s *Service) maintain(ctx context.Context) {
 	if _, err := s.pool.Exec(ctx, `DELETE FROM read_receipts WHERE read_at < now() - $1::interval`, s.cfg.ReadReceiptsMaxAge); err != nil {
 		s.logger.Error("read receipts cleanup failed", "err", err)
 	}
+	if n, err := s.purgeDeletedChats(ctx); err != nil {
+		s.logger.Error("deleted chats purge failed", "err", err)
+	} else if n > 0 {
+		s.logger.Info("deleted chats purged", "chats", n)
+	}
 	if err := s.previews.Purge(ctx); err != nil {
 		s.logger.Error("link preview cleanup failed", "err", err)
 	}

@@ -43,7 +43,7 @@ func TestNewcomerNeverGetsHistoryBeforeJoining(t *testing.T) {
 	if _, err := h.svc.SetHistoryVisibility(ctx, a, chatID, appv1.HistoryVisibility_HISTORY_VISIBILITY_SINCE_JOIN); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.svc.AddMembers(ctx, a, chatID, []int64{c}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, a, chatID, []int64{c}); err != nil {
 		t.Fatal(err)
 	}
 	h.drain()
@@ -91,7 +91,7 @@ func TestFormerMemberSeesNothingNewerOrChanged(t *testing.T) {
 	chatID := h.group(a, b, c)
 	kept := h.send(a, chatID, "kept as it was").GetMessage().GetSeq()
 	changed := h.send(a, chatID, "draft").GetMessage().GetSeq()
-	if _, err := h.svc.LeaveChat(ctx, b, chatID); err != nil {
+	if _, err := h.svc.LeaveChat(ctx, b, chatID, 0); err != nil {
 		t.Fatal(err)
 	}
 	// Commits after leaving: an edit and a new message.
@@ -301,8 +301,8 @@ func TestRemovalBansUntilAnAdminUnbans(t *testing.T) {
 	if _, err := h.svc.CheckInvite(ctx, kicked, ownerLink); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("banned user checks a link: %v", err)
 	}
-	if failed, _, err := h.svc.AddMembers(ctx, member, chatID, []int64{kicked}); err != nil || !slices.Equal(failed, []int64{kicked}) {
-		t.Fatalf("non-admin re-adds a banned user: %v, %v", failed, err)
+	if resp, err := h.svc.AddMembers(ctx, member, chatID, []int64{kicked}); err != nil || !slices.Equal(resp.GetFailedUserIds(), []int64{kicked}) {
+		t.Fatalf("non-admin re-adds a banned user: %v, %v", resp.GetFailures(), err)
 	}
 	// The removed user's own links died with the removal.
 	if _, err := h.svc.JoinByInvite(ctx, newcomer, kickedLink); codeOf(err) != connect.CodeNotFound {
@@ -328,14 +328,14 @@ func TestRemovalBansUntilAnAdminUnbans(t *testing.T) {
 	if _, err := h.svc.RemoveMember(ctx, owner, chatID, kicked, true); err != nil {
 		t.Fatal(err)
 	}
-	if failed, _, err := h.svc.AddMembers(ctx, owner, chatID, []int64{kicked}); err != nil || len(failed) != 0 {
-		t.Fatalf("admin re-adds: %v, %v", failed, err)
+	if resp, err := h.svc.AddMembers(ctx, owner, chatID, []int64{kicked}); err != nil || len(resp.GetFailures()) != 0 {
+		t.Fatalf("admin re-adds: %v, %v", resp.GetFailures(), err)
 	}
 	if b, _ := h.svc.GetBannedMembers(ctx, owner, chatID, "", 0); len(b.GetMembers()) != 0 {
 		t.Fatalf("ban kept after an admin re-added: %v", b)
 	}
 	// A link stops working when its creator leaves (or may no longer invite).
-	if _, err := h.svc.LeaveChat(ctx, member, chatID); err != nil {
+	if _, err := h.svc.LeaveChat(ctx, member, chatID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.svc.JoinByInvite(ctx, newcomer, memberLink); codeOf(err) != connect.CodeNotFound {
@@ -355,7 +355,7 @@ func TestChannelMembersAndOwnerLeaving(t *testing.T) {
 		t.Fatal(err)
 	}
 	chatID := ch.GetChat().GetId()
-	if _, _, err := h.svc.AddMembers(ctx, owner, chatID, []int64{admin, reader}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, owner, chatID, []int64{admin, reader}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.svc.GetMembers(ctx, reader, chatID, "", "", 0); codeOf(err) != connect.CodePermissionDenied {
@@ -365,14 +365,14 @@ func TestChannelMembersAndOwnerLeaving(t *testing.T) {
 		t.Fatalf("owner lists members: %v, %v", list, err)
 	}
 	// Without an admin the owner cannot leave members behind.
-	_, err = h.svc.LeaveChat(ctx, owner, chatID)
+	_, err = h.svc.LeaveChat(ctx, owner, chatID, 0)
 	if codeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "owner_needs_admin") {
 		t.Fatalf("owner leaves without an admin: %v", err)
 	}
 	if _, err := h.svc.SetAdmin(ctx, owner, chatID, admin, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.svc.LeaveChat(ctx, owner, chatID); err != nil {
+	if _, err := h.svc.LeaveChat(ctx, owner, chatID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if c, _, _ := h.svc.GetChat(ctx, admin, chatID); c.GetMyRole() != appv1.MemberRole_MEMBER_ROLE_OWNER {
@@ -381,13 +381,13 @@ func TestChannelMembersAndOwnerLeaving(t *testing.T) {
 	// Groups follow the same rule; an owner alone may leave.
 	member := h.user("member")
 	g := h.group(owner, member)
-	if _, err := h.svc.LeaveChat(ctx, owner, g); codeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := h.svc.LeaveChat(ctx, owner, g, 0); codeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("group owner leaves without an admin: %v", err)
 	}
-	if _, err := h.svc.LeaveChat(ctx, member, g); err != nil {
+	if _, err := h.svc.LeaveChat(ctx, member, g, 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.svc.LeaveChat(ctx, owner, g); err != nil {
+	if _, err := h.svc.LeaveChat(ctx, owner, g, 0); err != nil {
 		t.Fatalf("owner alone leaves: %v", err)
 	}
 }
@@ -434,7 +434,7 @@ func TestBlockHidesPresenceTypingAndReactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.svc.AddMembers(ctx, publisher, ch.GetChat().GetId(), []int64{b}); err != nil {
+	if _, err := h.svc.AddMembers(ctx, publisher, ch.GetChat().GetId(), []int64{b}); err != nil {
 		t.Fatal(err)
 	}
 	if access, _ := h.svc.MemberChats(ctx, b, []int64{ch.GetChat().GetId()}); len(access) != 1 || access[0].CanSend {

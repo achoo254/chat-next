@@ -10,7 +10,9 @@ import {
 	putChatPts,
 	putMessage,
 	putNewMessage,
+	putMute,
 	putPin,
+	putPinnedOrder,
 	putReactions,
 	putRead,
 	type WriteBatch,
@@ -164,6 +166,19 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 		}
 		case "session_revoked":
 			if (body.sessionId === ctx.sessionId) effects.sessionEnded = body.reason;
+			return;
+		case "dialog_mute":
+			putMute(w, body.chatId, body.muteUntil);
+			return;
+		case "pinned_dialogs":
+			putPinnedOrder(w, body.chatIds);
+			return;
+		case "chat_deleted":
+			// Deleted for everyone, or a private chat the user cleared on
+			// another session: either way nothing of it stays here. A cleared
+			// private chat comes back with its next message.
+			purgeChat(w, body.chatId);
+			effects.purgedChats.add(body.chatId);
 			return;
 		case "unknown":
 			// A kind newer than this build; the next release knows how to apply it.

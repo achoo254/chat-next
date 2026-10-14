@@ -152,6 +152,27 @@ export function putReactions(w: WriteBatch, chatId: number, seq: number, reactio
 /** Read state of the chat as a whole; forum topics get their own topic_id. */
 export const CHAT_TOPIC = 0;
 
+export function putMute(w: WriteBatch, chatId: number, muteUntil: number): void {
+	w.add("UPDATE dialogs SET mute_until = ? WHERE chat_id = ?", [muteUntil, chatId]);
+	w.emit(EventKeys.dialogs, EventKeys.dialog(chatId));
+}
+
+/** Makes `chatIds` (top first) the pinned dialogs, unpinning every other. */
+export function putPinnedOrder(w: WriteBatch, chatIds: readonly number[]): void {
+	if (chatIds.length === 0) {
+		w.add("UPDATE dialogs SET pin_rank = 0 WHERE pin_rank <> 0");
+	} else {
+		w.add(`UPDATE dialogs SET pin_rank = 0 WHERE pin_rank <> 0 AND chat_id NOT IN (${placeholders(chatIds.length)})`, [
+			...chatIds,
+		]);
+	}
+	chatIds.forEach((chatId, i) => {
+		w.add("UPDATE dialogs SET pin_rank = ? WHERE chat_id = ?", [chatIds.length - i, chatId]);
+		w.emit(EventKeys.dialog(chatId));
+	});
+	w.emit(EventKeys.dialogs);
+}
+
 /** Creates the dialog and chat-level read state of a chat the user belongs to, if missing. */
 export function ensureDialog(w: WriteBatch, chatId: number): void {
 	w.add("INSERT INTO dialogs (chat_id, top_seq, top_date) VALUES (?, 0, 0) ON CONFLICT (chat_id) DO NOTHING", [
@@ -165,12 +186,17 @@ export function ensureDialog(w: WriteBatch, chatId: number): void {
 	w.emit(EventKeys.dialogs, EventKeys.dialog(chatId));
 }
 
-/** Replaces a dialog with the server's view (dialog snapshot). */
+/**
+ * Replaces a dialog with the server's view (dialog snapshot). A pinned
+ * dialog keeps its local rank (putPinnedOrder sets the order).
+ */
 export function putDialog(w: WriteBatch, dialog: Dialog, topDate: number, selfId: number): void {
 	w.add(
-		`INSERT INTO dialogs (chat_id, top_seq, top_date) VALUES (?, ?, ?)
-		ON CONFLICT (chat_id) DO UPDATE SET top_seq = excluded.top_seq, top_date = excluded.top_date`,
-		[dialog.chatId, dialog.topSeq, topDate],
+		`INSERT INTO dialogs (chat_id, top_seq, top_date, mute_until, pin_rank) VALUES (?1, ?2, ?3, ?4, ?5)
+		ON CONFLICT (chat_id) DO UPDATE SET top_seq = excluded.top_seq, top_date = excluded.top_date,
+			mute_until = excluded.mute_until,
+			pin_rank = CASE WHEN ?5 = 0 THEN 0 WHEN dialogs.pin_rank > 0 THEN dialogs.pin_rank ELSE 1 END`,
+		[dialog.chatId, dialog.topSeq, topDate, dialog.muteUntil, dialog.pinned ? 1 : 0],
 	);
 	putReadState(w, dialog, selfId);
 	w.emit(EventKeys.dialogs, EventKeys.dialog(dialog.chatId));

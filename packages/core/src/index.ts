@@ -27,7 +27,7 @@ export {
 	type SendTextOptions,
 } from "./outbox/outbox.ts";
 export { buildSnapshot, parseSnapshot, SNAPSHOT_VERSION, type ScreenSnapshot, type SnapshotDialog } from "./snapshot/snapshot.ts";
-export { databaseName, signInUrl, SIGN_OUT_PATH, type SessionEndReason } from "./auth/web.ts";
+export { databaseName, isReturnPath, signInUrl, SIGN_OUT_PATH, type SessionEndReason } from "./auth/web.ts";
 export {
 	startApp,
 	type ChatCore,

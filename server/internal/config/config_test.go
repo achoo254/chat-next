@@ -178,3 +178,29 @@ func TestLoadEnvFileKeepsExistingVariables(t *testing.T) {
 		t.Fatal("missing file accepted")
 	}
 }
+
+func TestLoadOperatorUserIDs(t *testing.T) {
+	c, err := Load(lookupFrom(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.OperatorUserIDs) != 0 {
+		t.Fatalf("operators by default = %v", c.OperatorUserIDs)
+	}
+	env := validEnv()
+	env["CHAT_OPERATOR_USER_IDS"] = " 42, 7,42 ,"
+	if c, err = Load(lookupFrom(env)); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.OperatorUserIDs) != 2 || c.OperatorUserIDs[0] != 42 || c.OperatorUserIDs[1] != 7 {
+		t.Fatalf("operators = %v", c.OperatorUserIDs)
+	}
+	for _, bad := range []string{"abc", "0", "-3", "9007199254740992", "1;2"} {
+		env["CHAT_OPERATOR_USER_IDS"] = bad
+		_, err := Load(lookupFrom(env))
+		var ve *VarError
+		if !errors.As(err, &ve) || ve.Name != "CHAT_OPERATOR_USER_IDS" {
+			t.Errorf("%q: err = %v", bad, err)
+		}
+	}
+}

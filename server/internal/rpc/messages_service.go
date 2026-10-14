@@ -118,3 +118,9 @@ func (s *messagesService) GetMessageReaders(ctx context.Context, req *connect.Re
 		return s.chat.GetMessageReaders(ctx, me, m.GetChatId(), m.GetSeq())
 	})
 }
+
+func (s *messagesService) GetMessageReactions(ctx context.Context, req *connect.Request[appv1.GetMessageReactionsRequest]) (*connect.Response[appv1.GetMessageReactionsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetMessageReactionsRequest) (*appv1.GetMessageReactionsResponse, error) {
+		return s.chat.GetMessageReactions(ctx, me, m)
+	})
+}

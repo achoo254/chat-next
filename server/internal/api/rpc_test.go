@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/auth"
 	"app.local/server/internal/auth/idptest"
 	"app.local/server/internal/ids"
@@ -233,5 +234,33 @@ func TestUnknownRoutes(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("GET back-channel logout status %d", resp.StatusCode)
+	}
+}
+
+// ModerationService is mounted behind the session check, and nobody is an
+// operator unless configured.
+func TestModerationRPCsNeedAnOperator(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	anon := appv1connect.NewModerationServiceClient(e.browser(t), e.srv.URL+"/rpc", withOrigin(e.srv.URL))
+	if _, err := anon.GetReports(ctx, connect.NewRequest(&appv1.GetReportsRequest{})); codeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("anonymous GetReports: %v", err)
+	}
+	cl, c := e.signedIn(t)
+	self, err := cl.users.GetSelf(ctx, connect.NewRequest(&appv1.GetSelfRequest{}))
+	if err != nil || self.Msg.GetIsOperator() {
+		t.Fatalf("GetSelf = %v, %v", self, err)
+	}
+	mod := appv1connect.NewModerationServiceClient(c, e.srv.URL+"/rpc", withOrigin(e.srv.URL))
+	if _, err := mod.GetReports(ctx, connect.NewRequest(&appv1.GetReportsRequest{})); codeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("GetReports by a user: %v", err)
+	}
+	blocked, err := cl.users.GetBlockedUsers(ctx, connect.NewRequest(&appv1.GetBlockedUsersRequest{}))
+	if err != nil || len(blocked.Msg.GetBlocked()) != 0 {
+		t.Fatalf("GetBlockedUsers = %v, %v", blocked, err)
+	}
+	chats := appv1connect.NewChatsServiceClient(c, e.srv.URL+"/rpc", withOrigin(e.srv.URL))
+	if _, err := chats.GetCommonChats(ctx, connect.NewRequest(&appv1.GetCommonChatsRequest{UserId: self.Msg.GetUser().GetId()})); codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("GetCommonChats with oneself: %v", err)
 	}
 }

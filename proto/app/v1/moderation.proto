@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/chats.proto";
+import "app/v1/messages.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+// Every report and action is scoped to the caller's tenant (ADR 0010).
+
+// The moderation queue of the tenant. Only operator accounts (configured by
+// the server operators, none by default) may call it; everyone else gets
+// permission_denied. GetSelfResponse.is_operator tells clients whether to
+// show it.
+service ModerationService {
+  // Reports, newest first.
+  rpc GetReports(GetReportsRequest) returns (GetReportsResponse);
+  // One report with the reported messages as filed, the messages around
+  // them as they are now, and earlier actions on the reported user.
+  rpc GetReport(GetReportRequest) returns (GetReportResponse);
+  // Closes an open report with one or more actions; a closed report gives
+  // failed_precondition.
+  rpc ResolveReport(ResolveReportRequest) returns (ResolveReportResponse);
+  // Ends an account restriction before its time.
+  rpc LiftRestriction(LiftRestrictionRequest) returns (LiftRestrictionResponse);
+}
+
+enum ReportStatus {
+  REPORT_STATUS_UNSPECIFIED = 0;
+  REPORT_STATUS_OPEN = 1;
+  // Closed with at least one action other than dismiss.
+  REPORT_STATUS_RESOLVED = 2;
+  // Closed without action.
+  REPORT_STATUS_DISMISSED = 3;
+}
+
+enum ReportTargetKind {
+  REPORT_TARGET_KIND_UNSPECIFIED = 0;
+  REPORT_TARGET_KIND_USER = 1;
+  REPORT_TARGET_KIND_CHAT = 2;
+  REPORT_TARGET_KIND_MESSAGES = 3;
+}
+
+enum ModerationAction {
+  MODERATION_ACTION_UNSPECIFIED = 0;
+  // Close without action; cannot be combined with other actions.
+  MODERATION_ACTION_DISMISS = 1;
+  // Delete the reported messages for everyone.
+  MODERATION_ACTION_DELETE_MESSAGES = 2;
+  // Remove and ban the authors of the reported messages from the chat (not
+  // its owner). Members see member_removed with actor_id 0.
+  MODERATION_ACTION_BAN_FROM_CHAT = 3;
+  // Restrict the reported user (or the authors of the reported messages):
+  // their chat sessions are revoked and, until the restriction ends, they
+  // cannot send, react, create or join chats, add members or create invite
+  // links (permission_denied, message prefix "account_restricted").
+  MODERATION_ACTION_RESTRICT_ACCOUNT = 4;
+  // LiftRestriction (log entries only).
+  MODERATION_ACTION_LIFT_RESTRICTION = 5;
+}
+
+message Report {
+  int64 id = 1 [jstype = JS_NUMBER];
+  ReportTargetKind target_kind = 2;
+  int64 reporter_id = 3 [jstype = JS_NUMBER];
+  // USER: the reported user.
+  int64 target_user_id = 4 [jstype = JS_NUMBER];
+  // CHAT and MESSAGES: the chat.
+  int64 target_chat_id = 5 [jstype = JS_NUMBER];
+  // MESSAGES: the reported messages.
+  repeated int64 seqs = 6 [jstype = JS_NUMBER];
+  ReportReason reason = 7;
+  string comment = 8;
+  ReportStatus status = 9;
+  int64 created_at = 10 [jstype = JS_NUMBER];
+  // Closed reports: when, by which operator, with what and why.
+  int64 resolved_at = 11 [jstype = JS_NUMBER];
+  int64 resolved_by = 12 [jstype = JS_NUMBER];
+  repeated ModerationAction actions = 13;
+  string resolution_note = 14;
+}
+
+// A reported message as it was when the report was filed.
+message ReportedMessage {
+  int64 seq = 1 [jstype = JS_NUMBER];
+  int64 from_id = 2 [jstype = JS_NUMBER];
+  int64 date = 3 [jstype = JS_NUMBER];
+  string text = 4;
+  // Already deleted for everyone when reported.
+  bool deleted = 5;
+}
+
+// One entry of the tenant's append-only moderation log.
+message ModerationLogEntry {
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 operator_id = 2 [jstype = JS_NUMBER];
+  // 0 for LiftRestriction.
+  int64 report_id = 3 [jstype = JS_NUMBER];
+  ModerationAction action = 4;
+  int64 target_user_id = 5 [jstype = JS_NUMBER];
+  int64 target_chat_id = 6 [jstype = JS_NUMBER];
+  string note = 7;
+  // RESTRICT_ACCOUNT: end of the restriction; 0 = until lifted.
+  int64 until = 8 [jstype = JS_NUMBER];
+  int64 created_at = 9 [jstype = JS_NUMBER];
+}
+
+message AccountRestriction {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // 0 = until lifted.
+  int64 until = 2 [jstype = JS_NUMBER];
+  string reason = 3;
+  int64 created_at = 4 [jstype = JS_NUMBER];
+}
+
+message GetReportsRequest {
+  // UNSPECIFIED lists open reports.
+  ReportStatus status = 1;
+  // Optional filters; UNSPECIFIED matches any.
+  ReportReason reason = 2;
+  ReportTargetKind target_kind = 3;
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 4;
+  // Default 50, at most 200.
+  int32 limit = 5;
+}
+
+message GetReportsResponse {
+  repeated Report reports = 1;
+  // Reporters, reported users and operators of these reports.
+  repeated User users = 2;
+  // Reported chats.
+  repeated Chat chats = 3;
+  // Empty when there are no more reports.
+  string next_cursor = 4;
+}
+
+message GetReportRequest {
+  int64 report_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetReportResponse {
+  Report report = 1;
+  // MESSAGES: the reported messages as filed.
+  repeated ReportedMessage evidence = 2;
+  // MESSAGES: the reported messages and up to 5 messages before and after
+  // them, as they are now (deleted ones have no content), ascending by seq.
+  repeated Message context = 3;
+  repeated User users = 4;
+  // CHAT and MESSAGES: the chat.
+  Chat chat = 5;
+  // Earlier log entries about the reported user (or the authors of the
+  // reported messages), newest first, at most 20.
+  repeated ModerationLogEntry history = 6;
+  // Active restrictions of those users.
+  repeated AccountRestriction restrictions = 7;
+}
+
+message ResolveReportRequest {
+  int64 report_id = 1 [jstype = JS_NUMBER];
+  repeated ModerationAction actions = 2;
+  // Why, recorded in the log; required, up to 1000 characters.
+  string note = 3;
+  // RESTRICT_ACCOUNT: length in seconds, up to 366 days; 0 = until lifted.
+  int32 restrict_seconds = 4;
+}
+
+message ResolveReportResponse {
+  Report report = 1;
+}
+
+message LiftRestrictionRequest {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // Why, recorded in the log; required, up to 1000 characters.
+  string note = 2;
+}
+
+message LiftRestrictionResponse {}

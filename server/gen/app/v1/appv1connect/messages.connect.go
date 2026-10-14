@@ -78,6 +78,9 @@ const (
 	// MessagesServiceGetMessageReadersProcedure is the fully-qualified name of the MessagesService's
 	// GetMessageReaders RPC.
 	MessagesServiceGetMessageReadersProcedure = "/app.v1.MessagesService/GetMessageReaders"
+	// MessagesServiceGetMessageReactionsProcedure is the fully-qualified name of the MessagesService's
+	// GetMessageReactions RPC.
+	MessagesServiceGetMessageReactionsProcedure = "/app.v1.MessagesService/GetMessageReactions"
 )
 
 // MessagesServiceClient is a client for the app.v1.MessagesService service.
@@ -107,6 +110,9 @@ type MessagesServiceClient interface {
 	// AppConfig.read_receipts_member_max members and for messages younger than
 	// read_receipts_max_age_seconds; FAILED_PRECONDITION otherwise.
 	GetMessageReaders(context.Context, *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error)
+	// Who reacted to a message, newest first, optionally for one emoji. Only
+	// current members, for messages they can see; in channels admins only.
+	GetMessageReactions(context.Context, *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error)
 }
 
 // NewMessagesServiceClient constructs a client for the app.v1.MessagesService service. By default,
@@ -210,26 +216,33 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("GetMessageReaders")),
 			connect.WithClientOptions(opts...),
 		),
+		getMessageReactions: connect.NewClient[v1.GetMessageReactionsRequest, v1.GetMessageReactionsResponse](
+			httpClient,
+			baseURL+MessagesServiceGetMessageReactionsProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("GetMessageReactions")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // messagesServiceClient implements MessagesServiceClient.
 type messagesServiceClient struct {
-	sendMessage       *connect.Client[v1.SendMessageRequest, v1.SendMessageResponse]
-	sendMedia         *connect.Client[v1.SendMediaRequest, v1.SendMediaResponse]
-	sendAlbum         *connect.Client[v1.SendAlbumRequest, v1.SendAlbumResponse]
-	forwardMessages   *connect.Client[v1.ForwardMessagesRequest, v1.ForwardMessagesResponse]
-	copyMessage       *connect.Client[v1.CopyMessageRequest, v1.CopyMessageResponse]
-	editMessage       *connect.Client[v1.EditMessageRequest, v1.EditMessageResponse]
-	deleteMessages    *connect.Client[v1.DeleteMessagesRequest, v1.DeleteMessagesResponse]
-	readHistory       *connect.Client[v1.ReadHistoryRequest, v1.ReadHistoryResponse]
-	pinMessage        *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
-	unpinMessage      *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
-	setReaction       *connect.Client[v1.SetReactionRequest, v1.SetReactionResponse]
-	getHistory        *connect.Client[v1.GetHistoryRequest, v1.GetHistoryResponse]
-	pressInlineButton *connect.Client[v1.PressInlineButtonRequest, v1.PressInlineButtonResponse]
-	getLinkPreview    *connect.Client[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse]
-	getMessageReaders *connect.Client[v1.GetMessageReadersRequest, v1.GetMessageReadersResponse]
+	sendMessage         *connect.Client[v1.SendMessageRequest, v1.SendMessageResponse]
+	sendMedia           *connect.Client[v1.SendMediaRequest, v1.SendMediaResponse]
+	sendAlbum           *connect.Client[v1.SendAlbumRequest, v1.SendAlbumResponse]
+	forwardMessages     *connect.Client[v1.ForwardMessagesRequest, v1.ForwardMessagesResponse]
+	copyMessage         *connect.Client[v1.CopyMessageRequest, v1.CopyMessageResponse]
+	editMessage         *connect.Client[v1.EditMessageRequest, v1.EditMessageResponse]
+	deleteMessages      *connect.Client[v1.DeleteMessagesRequest, v1.DeleteMessagesResponse]
+	readHistory         *connect.Client[v1.ReadHistoryRequest, v1.ReadHistoryResponse]
+	pinMessage          *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
+	unpinMessage        *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
+	setReaction         *connect.Client[v1.SetReactionRequest, v1.SetReactionResponse]
+	getHistory          *connect.Client[v1.GetHistoryRequest, v1.GetHistoryResponse]
+	pressInlineButton   *connect.Client[v1.PressInlineButtonRequest, v1.PressInlineButtonResponse]
+	getLinkPreview      *connect.Client[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse]
+	getMessageReaders   *connect.Client[v1.GetMessageReadersRequest, v1.GetMessageReadersResponse]
+	getMessageReactions *connect.Client[v1.GetMessageReactionsRequest, v1.GetMessageReactionsResponse]
 }
 
 // SendMessage calls app.v1.MessagesService.SendMessage.
@@ -307,6 +320,11 @@ func (c *messagesServiceClient) GetMessageReaders(ctx context.Context, req *conn
 	return c.getMessageReaders.CallUnary(ctx, req)
 }
 
+// GetMessageReactions calls app.v1.MessagesService.GetMessageReactions.
+func (c *messagesServiceClient) GetMessageReactions(ctx context.Context, req *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error) {
+	return c.getMessageReactions.CallUnary(ctx, req)
+}
+
 // MessagesServiceHandler is an implementation of the app.v1.MessagesService service.
 type MessagesServiceHandler interface {
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
@@ -334,6 +352,9 @@ type MessagesServiceHandler interface {
 	// AppConfig.read_receipts_member_max members and for messages younger than
 	// read_receipts_max_age_seconds; FAILED_PRECONDITION otherwise.
 	GetMessageReaders(context.Context, *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error)
+	// Who reacted to a message, newest first, optionally for one emoji. Only
+	// current members, for messages they can see; in channels admins only.
+	GetMessageReactions(context.Context, *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error)
 }
 
 // NewMessagesServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -433,6 +454,12 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("GetMessageReaders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceGetMessageReactionsHandler := connect.NewUnaryHandler(
+		MessagesServiceGetMessageReactionsProcedure,
+		svc.GetMessageReactions,
+		connect.WithSchema(messagesServiceMethods.ByName("GetMessageReactions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.MessagesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MessagesServiceSendMessageProcedure:
@@ -465,6 +492,8 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServiceGetLinkPreviewHandler.ServeHTTP(w, r)
 		case MessagesServiceGetMessageReadersProcedure:
 			messagesServiceGetMessageReadersHandler.ServeHTTP(w, r)
+		case MessagesServiceGetMessageReactionsProcedure:
+			messagesServiceGetMessageReactionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -532,4 +561,8 @@ func (UnimplementedMessagesServiceHandler) GetLinkPreview(context.Context, *conn
 
 func (UnimplementedMessagesServiceHandler) GetMessageReaders(context.Context, *connect.Request[v1.GetMessageReadersRequest]) (*connect.Response[v1.GetMessageReadersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetMessageReaders is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) GetMessageReactions(context.Context, *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetMessageReactions is not implemented"))
 }

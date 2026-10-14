@@ -92,6 +92,13 @@ Create:
 - [ ] Xoay vòng khoá + runbook
 - [ ] Review STRIDE + security scan
 
+### Hàng đợi kiểm duyệt R1 (2026-10-14, migration 0005)
+
+- `ModerationService` (`GetReports`, `GetReport`, `ResolveReport`, `LiftRestriction`) cho tài khoản vận hành. Người vận hành xác định bằng `CHAT_OPERATOR_USER_IDS` (danh sách user id trong `.env`, mặc định trống nên không ai có quyền): cách đơn giản nhất cho một tenant, không cần bảng hay script seed; chủ tenant qua `ownerSubs` của IdP làm ở R9 cùng phần đa tenant.
+- Hành động: bỏ qua, xoá tin, cấm tác giả khỏi chat, khoá tài khoản chat có thời hạn hoặc tới khi gỡ (thu hồi mọi phiên, chặn mọi thao tác ghi). Ghi chú bắt buộc; mọi hành động vào `moderation_log` chỉ thêm.
+- Chưa có: gộp báo cáo theo đối tượng, người đang xem, cảnh cáo, gửi thông báo cho người bị xử lý, tắt webhook, dấu xác minh bot (theo R2/R5).
+- Cách cấp quyền: [`docs/deployment-guide.md`](../../../docs/deployment-guide.md#tài-khoản-vận-hành-kiểm-duyệt).
+
 ## Success Criteria
 
 - Ma trận test "cài đặt × API" tự động: đặt "không ai thấy last seen" / "không ai tìm tôi bằng email" thì không API nào (client, Bot API, presence, search) lộ.

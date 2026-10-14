@@ -151,6 +151,18 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE messages ADD COLUMN link_preview TEXT",
 		],
 	},
+	{
+		version: 3,
+		statements: [
+			// The user's own dialog settings: muted until (unix seconds, 0 = not
+			// muted) and pinned position (0 = not pinned, higher = nearer the top).
+			"ALTER TABLE dialogs ADD COLUMN mute_until INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE dialogs ADD COLUMN pin_rank INTEGER NOT NULL DEFAULT 0",
+			// Existing dialogs lack these settings: dropping the sync position
+			// makes the next start take a fresh dialog snapshot.
+			"DELETE FROM sync_state",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

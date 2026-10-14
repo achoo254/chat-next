@@ -241,6 +241,8 @@ export function rowToDialog(row: SqlRow): Dialog {
 		unreadCount: num(row, "unread_count"),
 		unreadMentionsCount: num(row, "unread_mentions_count"),
 		chatPts: num(row, "chat_pts"),
+		muteUntil: num(row, "mute_until"),
+		pinned: num(row, "pin_rank") > 0,
 	};
 }
 

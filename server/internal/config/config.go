@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -48,6 +49,9 @@ type Config struct {
 	AppURLScheme string
 	// DevOrigins is empty in production even when DEV_ORIGINS is set.
 	DevOrigins []string
+	// OperatorUserIDs may use the moderation queue (CHAT_OPERATOR_USER_IDS);
+	// empty by default, so nobody can.
+	OperatorUserIDs []int64
 }
 
 // Development reports whether the server runs in the development environment.
@@ -189,10 +193,46 @@ func Load(lookup Lookup) (Config, error) {
 		}
 	}
 
+	if raw := get("CHAT_OPERATOR_USER_IDS"); raw != "" {
+		ids, err := parseUserIDs(raw)
+		if err != nil {
+			errs = append(errs, invalid("CHAT_OPERATOR_USER_IDS", err.Error()))
+		}
+		c.OperatorUserIDs = ids
+	}
+
 	if len(errs) > 0 {
 		return Config{}, errors.Join(errs...)
 	}
 	return c, nil
+}
+
+// operatorIDsMax bounds CHAT_OPERATOR_USER_IDS.
+const operatorIDsMax = 100
+
+// parseUserIDs reads a comma-separated list of positive user ids below
+// 2^53 (ADR 0001), ignoring empty items and duplicates.
+func parseUserIDs(raw string) ([]int64, error) {
+	seen := map[int64]bool{}
+	var ids []int64
+	for item := range strings.SplitSeq(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(item, 10, 64)
+		if err != nil || id <= 0 || id >= 1<<53 {
+			return nil, errors.New("must be a comma-separated list of user ids")
+		}
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) > operatorIDsMax {
+		return nil, fmt.Errorf("at most %d user ids", operatorIDsMax)
+	}
+	return ids, nil
 }
 
 // LoadDatabaseURL reads only DATABASE_URL, for the migrate role.

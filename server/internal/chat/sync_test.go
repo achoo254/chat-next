@@ -163,7 +163,8 @@ func TestSwitchToLargeKeepsEveryMessageOnce(t *testing.T) {
 			}
 		}
 	}()
-	failed, _, err := h.svc.AddMembers(ctx, a, chatID, []int64{d})
+	added, err := h.svc.AddMembers(ctx, a, chatID, []int64{d})
+	failed := added.GetFailures()
 	if err != nil || len(failed) > 0 {
 		t.Fatalf("AddMembers: %v %v", failed, err)
 	}
@@ -283,8 +284,9 @@ func TestTenantsAreIsolated(t *testing.T) {
 	if _, err := other.svc.SendMessage(ctx, stranger, &appv1.SendMessageRequest{ChatId: chatID, Text: "hi"}); codeOf(err) != connect.CodeNotFound {
 		t.Fatalf("other tenant posts: %v", err)
 	}
-	failed, _, err := h.svc.AddMembers(ctx, a, chatID, []int64{stranger})
-	if err != nil || !slices.Equal(failed, []int64{stranger}) {
+	resp, err := h.svc.AddMembers(ctx, a, chatID, []int64{stranger})
+	failed := resp.GetFailedUserIds()
+	if err != nil || !slices.Equal(failed, []int64{stranger}) || resp.GetFailures()[0].GetReason() != appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_NOT_FOUND {
 		t.Fatalf("adding a user of another tenant: %v %v", failed, err)
 	}
 	if _, _, err := h.svc.CreatePrivate(ctx, a, stranger); codeOf(err) != connect.CodeNotFound {

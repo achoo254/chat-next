@@ -155,6 +155,14 @@ Create:
 - Đếm chưa đọc tới 1000, dialog tính theo lô, `GetForumTopics` phân trang, tối đa 1000 topic, `unread_mentions_count` có thật; topic có `icon`, `message_count`; `GetMessageReaders` có thời điểm đọc; `CheckInvite` có thành viên xem trước và `history_visibility`; lý do báo cáo `SCAM`, `SEXUAL`.
 - Partition: tạo và xoá tách transaction, xoá qua `DETACH … CONCURRENTLY`, cảnh báo khi còn dưới 7 ngày.
 
+### RPC còn thiếu của R1 (2026-10-14, migration 0005)
+
+- Tắt tiếng và ghim chat theo từng người (`SetDialogMute`, `SetDialogPinned`, `ReorderPinnedDialogs`; tối đa 5 chat ghim): `Dialog.mute_until`, `Dialog.pinned`, `GetDialogs` đưa chat ghim lên đầu trang đầu kèm `pinned_chat_ids`; các phiên khác nhận `dialog_mute`, `pinned_dialogs`.
+- `DeleteChat`: chủ xoá nhóm hoặc kênh cho mọi người (`chat_deleted`, xoá ngay mọi dòng thành viên và link mời, tin xoá hẳn trong việc nền mỗi giờ); chat riêng chỉ xoá phía mình, quay lại khi có tin mới.
+- `LeaveChat.new_owner_id` (phải là admin), `AddMembers`/`CreateGroup` trả lý do từng người, `GetContacts` có ngày thêm, `GetCommonChats`, `GetMessageReactions` (theo emoji, phân trang, theo quyền thấy tin), `GetBlockedUsers`.
+- `/auth/login?return_to=` (đường dẫn cùng origin, niêm phong trong cookie đăng nhập) để quay lại trang cũ sau khi đăng nhập ở tab khác.
+- Chi tiết: [`server/README.md`](../../../server/README.md).
+
 ## Success Criteria
 
 - Mọi test ở bước 11 pass với `-race`.

@@ -44,6 +44,9 @@ service MessagesService {
   // AppConfig.read_receipts_member_max members and for messages younger than
   // read_receipts_max_age_seconds; FAILED_PRECONDITION otherwise.
   rpc GetMessageReaders(GetMessageReadersRequest) returns (GetMessageReadersResponse);
+  // Who reacted to a message, newest first, optionally for one emoji. Only
+  // current members, for messages they can see; in channels admins only.
+  rpc GetMessageReactions(GetMessageReactionsRequest) returns (GetMessageReactionsResponse);
 }
 
 enum EntityType {
@@ -507,4 +510,29 @@ message MessageReader {
   // Unix seconds when the reader's read position first reached the message
   // (for reads before read dates were kept: when it last moved).
   int64 read_at = 2 [jstype = JS_NUMBER];
+}
+
+message GetMessageReactionsRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  // One emoji to list; empty lists every reaction.
+  string emoji = 3;
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 4;
+  // Default 50, at most 100.
+  int32 limit = 5;
+}
+
+message MessageReactor {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  string emoji = 2;
+  // Unix seconds when the user set this reaction.
+  int64 date = 3 [jstype = JS_NUMBER];
+}
+
+message GetMessageReactionsResponse {
+  repeated MessageReactor reactors = 1;
+  repeated User users = 2;
+  // Empty when there are no more reactions.
+  string next_cursor = 3;
 }

@@ -121,3 +121,44 @@ func TestTruncate(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanReturnTo(t *testing.T) {
+	for _, ok := range []string{
+		"/", "/chat/123", "/join/abc?x=1&y=2", "/chat/1#msg-5", "/%2F%2Fevil.com", "/tìm-kiếm",
+		"/" + strings.Repeat("a", returnToMax-1),
+	} {
+		if got := CleanReturnTo(ok); got != ok {
+			t.Errorf("CleanReturnTo(%q) = %q, want it kept", ok, got)
+		}
+	}
+	for _, bad := range []string{
+		"", "//evil.com", "///evil.com", "/\\evil.com", "\\\\evil.com", "/\\/evil.com",
+		"https://evil.com", "http:/evil.com", "javascript:alert(1)", "evil.com", "chat/1",
+		"/\t/evil.com", "/\n/evil.com", "/\r\n/evil.com", "/ /evil.com", "/ /evil.com", "/\x7f",
+		"/a\x00b", "/auth/login", "/auth", "/AUTH/logout", "/" + strings.Repeat("a", returnToMax),
+		"/\xff\xfe",
+	} {
+		if got := CleanReturnTo(bad); got != "" {
+			t.Errorf("CleanReturnTo(%q) = %q, want it refused", bad, got)
+		}
+	}
+}
+
+func TestInterstitialAndRetryCarryReturnTo(t *testing.T) {
+	w := httptest.NewRecorder()
+	writeInterstitial(w, "/chat/7?topic=2&x=1")
+	body := w.Body.String()
+	if !strings.Contains(body, `content="0;url=/chat/7?topic=2&amp;x=1"`) || !strings.Contains(body, `href="/chat/7?topic=2&amp;x=1"`) {
+		t.Fatalf("interstitial = %s", body)
+	}
+	w = httptest.NewRecorder()
+	writeInterstitial(w, "")
+	if !strings.Contains(w.Body.String(), `content="0;url=/"`) {
+		t.Fatalf("interstitial without return_to = %s", w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	writeErrorPage(w, http.StatusBadRequest, msgSignInFailed, "vi", "/chat/7")
+	if !strings.Contains(w.Body.String(), `href="/auth/login?locale=vi&amp;return_to=%2Fchat%2F7"`) {
+		t.Fatalf("error page = %s", w.Body.String())
+	}
+}

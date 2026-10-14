@@ -33,6 +33,8 @@ service UsersService {
   rpc AddContact(AddContactRequest) returns (AddContactResponse);
   rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse);
   rpc GetContacts(GetContactsRequest) returns (GetContactsResponse);
+  // Users the caller blocked, most recently blocked first.
+  rpc GetBlockedUsers(GetBlockedUsersRequest) returns (GetBlockedUsersResponse);
 }
 
 // Presence as visible to the caller after privacy rules are applied.
@@ -80,6 +82,8 @@ message GetSelfRequest {}
 
 message GetSelfResponse {
   User user = 1;
+  // The caller may use ModerationService.
+  bool is_operator = 2;
 }
 
 message GetUsersRequest {
@@ -248,4 +252,31 @@ message GetContactsResponse {
   repeated User users = 1;
   // Empty when there are no more contacts.
   string next_cursor = 2;
+  // The same contacts, in the same order, with when each was added.
+  repeated Contact contacts = 3;
+}
+
+message Contact {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // Unix seconds when the caller added the user.
+  int64 added_at = 2 [jstype = JS_NUMBER];
+}
+
+message GetBlockedUsersRequest {
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 1;
+  // Default 50, at most 200.
+  int32 limit = 2;
+}
+
+message BlockedUser {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  int64 blocked_at = 2 [jstype = JS_NUMBER];
+}
+
+message GetBlockedUsersResponse {
+  repeated BlockedUser blocked = 1;
+  repeated User users = 2;
+  // Empty when there are no more blocked users.
+  string next_cursor = 3;
 }

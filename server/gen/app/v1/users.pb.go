@@ -432,8 +432,10 @@ func (*GetSelfRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetSelfResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	User  *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// The caller may use ModerationService.
+	IsOperator    bool `protobuf:"varint,2,opt,name=is_operator,json=isOperator,proto3" json:"is_operator,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -473,6 +475,13 @@ func (x *GetSelfResponse) GetUser() *User {
 		return x.User
 	}
 	return nil
+}
+
+func (x *GetSelfResponse) GetIsOperator() bool {
+	if x != nil {
+		return x.IsOperator
+	}
+	return false
 }
 
 type GetUsersRequest struct {
@@ -1904,7 +1913,9 @@ type GetContactsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Users []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
 	// Empty when there are no more contacts.
-	NextCursor    string `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	NextCursor string `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	// The same contacts, in the same order, with when each was added.
+	Contacts      []*Contact `protobuf:"bytes,3,rep,name=contacts,proto3" json:"contacts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1953,6 +1964,233 @@ func (x *GetContactsResponse) GetNextCursor() string {
 	return ""
 }
 
+func (x *GetContactsResponse) GetContacts() []*Contact {
+	if x != nil {
+		return x.Contacts
+	}
+	return nil
+}
+
+type Contact struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Unix seconds when the caller added the user.
+	AddedAt       int64 `protobuf:"varint,2,opt,name=added_at,json=addedAt,proto3" json:"added_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Contact) Reset() {
+	*x = Contact{}
+	mi := &file_app_v1_users_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Contact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Contact) ProtoMessage() {}
+
+func (x *Contact) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Contact.ProtoReflect.Descriptor instead.
+func (*Contact) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *Contact) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *Contact) GetAddedAt() int64 {
+	if x != nil {
+		return x.AddedAt
+	}
+	return 0
+}
+
+type GetBlockedUsersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Opaque cursor from a previous response; empty for the first page.
+	Cursor string `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// Default 50, at most 200.
+	Limit         int32 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlockedUsersRequest) Reset() {
+	*x = GetBlockedUsersRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlockedUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlockedUsersRequest) ProtoMessage() {}
+
+func (x *GetBlockedUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlockedUsersRequest.ProtoReflect.Descriptor instead.
+func (*GetBlockedUsersRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetBlockedUsersRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *GetBlockedUsersRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type BlockedUser struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	BlockedAt     int64                  `protobuf:"varint,2,opt,name=blocked_at,json=blockedAt,proto3" json:"blocked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockedUser) Reset() {
+	*x = BlockedUser{}
+	mi := &file_app_v1_users_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockedUser) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockedUser) ProtoMessage() {}
+
+func (x *BlockedUser) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockedUser.ProtoReflect.Descriptor instead.
+func (*BlockedUser) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *BlockedUser) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *BlockedUser) GetBlockedAt() int64 {
+	if x != nil {
+		return x.BlockedAt
+	}
+	return 0
+}
+
+type GetBlockedUsersResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Blocked []*BlockedUser         `protobuf:"bytes,1,rep,name=blocked,proto3" json:"blocked,omitempty"`
+	Users   []*User                `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	// Empty when there are no more blocked users.
+	NextCursor    string `protobuf:"bytes,3,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlockedUsersResponse) Reset() {
+	*x = GetBlockedUsersResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlockedUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlockedUsersResponse) ProtoMessage() {}
+
+func (x *GetBlockedUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlockedUsersResponse.ProtoReflect.Descriptor instead.
+func (*GetBlockedUsersResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetBlockedUsersResponse) GetBlocked() []*BlockedUser {
+	if x != nil {
+		return x.Blocked
+	}
+	return nil
+}
+
+func (x *GetBlockedUsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *GetBlockedUsersResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
 var File_app_v1_users_proto protoreflect.FileDescriptor
 
 const file_app_v1_users_proto_rawDesc = "" +
@@ -1977,9 +2215,11 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x05email\x18\n" +
 	" \x01(\tR\x05email\x124\n" +
 	"\x16bot_inline_placeholder\x18\v \x01(\tR\x14botInlinePlaceholder\"\x10\n" +
-	"\x0eGetSelfRequest\"3\n" +
+	"\x0eGetSelfRequest\"T\n" +
 	"\x0fGetSelfResponse\x12 \n" +
-	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\"0\n" +
+	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12\x1f\n" +
+	"\vis_operator\x18\x02 \x01(\bR\n" +
+	"isOperator\"0\n" +
 	"\x0fGetUsersRequest\x12\x1d\n" +
 	"\buser_ids\x18\x01 \x03(\x03B\x020\x02R\auserIds\"6\n" +
 	"\x10GetUsersResponse\x12\"\n" +
@@ -2064,10 +2304,26 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x15DeleteContactResponse\"B\n" +
 	"\x12GetContactsRequest\x12\x16\n" +
 	"\x06cursor\x18\x01 \x01(\tR\x06cursor\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limit\"Z\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"\x87\x01\n" +
 	"\x13GetContactsResponse\x12\"\n" +
 	"\x05users\x18\x01 \x03(\v2\f.app.v1.UserR\x05users\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +
+	"nextCursor\x12+\n" +
+	"\bcontacts\x18\x03 \x03(\v2\x0f.app.v1.ContactR\bcontacts\"E\n" +
+	"\aContact\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12\x1d\n" +
+	"\badded_at\x18\x02 \x01(\x03B\x020\x02R\aaddedAt\"F\n" +
+	"\x16GetBlockedUsersRequest\x12\x16\n" +
+	"\x06cursor\x18\x01 \x01(\tR\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"M\n" +
+	"\vBlockedUser\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12!\n" +
+	"\n" +
+	"blocked_at\x18\x02 \x01(\x03B\x020\x02R\tblockedAt\"\x8d\x01\n" +
+	"\x17GetBlockedUsersResponse\x12-\n" +
+	"\ablocked\x18\x01 \x03(\v2\x13.app.v1.BlockedUserR\ablocked\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\x1f\n" +
+	"\vnext_cursor\x18\x03 \x01(\tR\n" +
 	"nextCursor*\xcd\x01\n" +
 	"\x0eUserStatusKind\x12 \n" +
 	"\x1cUSER_STATUS_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
@@ -2090,7 +2346,7 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x1bREPORT_REASON_PERSONAL_DATA\x10\x05\x12\x17\n" +
 	"\x13REPORT_REASON_OTHER\x10\x06\x12\x16\n" +
 	"\x12REPORT_REASON_SCAM\x10\a\x12\x18\n" +
-	"\x14REPORT_REASON_SEXUAL\x10\b2\xcb\a\n" +
+	"\x14REPORT_REASON_SEXUAL\x10\b2\x9f\b\n" +
 	"\fUsersService\x12:\n" +
 	"\aGetSelf\x12\x16.app.v1.GetSelfRequest\x1a\x17.app.v1.GetSelfResponse\x12=\n" +
 	"\bGetUsers\x12\x17.app.v1.GetUsersRequest\x1a\x18.app.v1.GetUsersResponse\x12L\n" +
@@ -2108,7 +2364,8 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\n" +
 	"AddContact\x12\x19.app.v1.AddContactRequest\x1a\x1a.app.v1.AddContactResponse\x12L\n" +
 	"\rDeleteContact\x12\x1c.app.v1.DeleteContactRequest\x1a\x1d.app.v1.DeleteContactResponse\x12F\n" +
-	"\vGetContacts\x12\x1a.app.v1.GetContactsRequest\x1a\x1b.app.v1.GetContactsResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\vGetContacts\x12\x1a.app.v1.GetContactsRequest\x1a\x1b.app.v1.GetContactsResponse\x12R\n" +
+	"\x0fGetBlockedUsers\x12\x1e.app.v1.GetBlockedUsersRequest\x1a\x1f.app.v1.GetBlockedUsersResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_users_proto_rawDescOnce sync.Once
@@ -2123,7 +2380,7 @@ func file_app_v1_users_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_app_v1_users_proto_goTypes = []any{
 	(UserStatusKind)(0),             // 0: app.v1.UserStatusKind
 	(PrivacyAudience)(0),            // 1: app.v1.PrivacyAudience
@@ -2160,11 +2417,15 @@ var file_app_v1_users_proto_goTypes = []any{
 	(*DeleteContactResponse)(nil),   // 32: app.v1.DeleteContactResponse
 	(*GetContactsRequest)(nil),      // 33: app.v1.GetContactsRequest
 	(*GetContactsResponse)(nil),     // 34: app.v1.GetContactsResponse
-	(*MediaRef)(nil),                // 35: app.v1.MediaRef
+	(*Contact)(nil),                 // 35: app.v1.Contact
+	(*GetBlockedUsersRequest)(nil),  // 36: app.v1.GetBlockedUsersRequest
+	(*BlockedUser)(nil),             // 37: app.v1.BlockedUser
+	(*GetBlockedUsersResponse)(nil), // 38: app.v1.GetBlockedUsersResponse
+	(*MediaRef)(nil),                // 39: app.v1.MediaRef
 }
 var file_app_v1_users_proto_depIdxs = []int32{
 	0,  // 0: app.v1.UserStatus.kind:type_name -> app.v1.UserStatusKind
-	35, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
+	39, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
 	3,  // 2: app.v1.User.status:type_name -> app.v1.UserStatus
 	4,  // 3: app.v1.GetSelfResponse.user:type_name -> app.v1.User
 	4,  // 4: app.v1.GetUsersResponse.users:type_name -> app.v1.User
@@ -2190,39 +2451,44 @@ var file_app_v1_users_proto_depIdxs = []int32{
 	2,  // 24: app.v1.ReportRequest.reason:type_name -> app.v1.ReportReason
 	4,  // 25: app.v1.AddContactResponse.user:type_name -> app.v1.User
 	4,  // 26: app.v1.GetContactsResponse.users:type_name -> app.v1.User
-	5,  // 27: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
-	7,  // 28: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
-	9,  // 29: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
-	11, // 30: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
-	13, // 31: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
-	15, // 32: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
-	17, // 33: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
-	19, // 34: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
-	22, // 35: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
-	24, // 36: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
-	27, // 37: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
-	29, // 38: app.v1.UsersService.AddContact:input_type -> app.v1.AddContactRequest
-	31, // 39: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
-	33, // 40: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
-	6,  // 41: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
-	8,  // 42: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
-	10, // 43: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
-	12, // 44: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
-	14, // 45: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
-	16, // 46: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
-	18, // 47: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
-	20, // 48: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
-	23, // 49: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
-	25, // 50: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
-	28, // 51: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
-	30, // 52: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
-	32, // 53: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
-	34, // 54: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
-	41, // [41:55] is the sub-list for method output_type
-	27, // [27:41] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	35, // 27: app.v1.GetContactsResponse.contacts:type_name -> app.v1.Contact
+	37, // 28: app.v1.GetBlockedUsersResponse.blocked:type_name -> app.v1.BlockedUser
+	4,  // 29: app.v1.GetBlockedUsersResponse.users:type_name -> app.v1.User
+	5,  // 30: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
+	7,  // 31: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
+	9,  // 32: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
+	11, // 33: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
+	13, // 34: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
+	15, // 35: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
+	17, // 36: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
+	19, // 37: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
+	22, // 38: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
+	24, // 39: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
+	27, // 40: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
+	29, // 41: app.v1.UsersService.AddContact:input_type -> app.v1.AddContactRequest
+	31, // 42: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
+	33, // 43: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
+	36, // 44: app.v1.UsersService.GetBlockedUsers:input_type -> app.v1.GetBlockedUsersRequest
+	6,  // 45: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
+	8,  // 46: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
+	10, // 47: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
+	12, // 48: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
+	14, // 49: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
+	16, // 50: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
+	18, // 51: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
+	20, // 52: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
+	23, // 53: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
+	25, // 54: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
+	28, // 55: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
+	30, // 56: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
+	32, // 57: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
+	34, // 58: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
+	38, // 59: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
+	45, // [45:60] is the sub-list for method output_type
+	30, // [30:45] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_users_proto_init() }
@@ -2249,7 +2515,7 @@ func file_app_v1_users_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_users_proto_rawDesc), len(file_app_v1_users_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   32,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -71,6 +71,9 @@ message Update {
     UpdateChatActivity chat_activity = 22;
     UpdateSessionRevoked session_revoked = 23;
     UpdateTopicChanged topic_changed = 24;
+    UpdateDialogMute dialog_mute = 25;
+    UpdatePinnedDialogs pinned_dialogs = 26;
+    UpdateChatDeleted chat_deleted = 27;
   }
 }
 
@@ -178,6 +181,27 @@ message UpdateChatActivity {
 // hidden). The topic carries no read state.
 message UpdateTopicChanged {
   ForumTopic topic = 1;
+}
+
+// The user muted or unmuted a chat (Dialog.mute_until).
+message UpdateDialogMute {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 mute_until = 2 [jstype = JS_NUMBER];
+}
+
+// The user's pinned chats changed: the complete list, top first.
+message UpdatePinnedDialogs {
+  repeated int64 chat_ids = 1 [jstype = JS_NUMBER];
+}
+
+// The chat left the user's list: its owner deleted it for every member
+// (for_everyone), or the user deleted a private chat for themselves on
+// another session. The client purges the chat and its messages. A private
+// chat deleted for oneself comes back with its next message, showing only
+// messages from then on.
+message UpdateChatDeleted {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  bool for_everyone = 2;
 }
 
 message UpdateSessionRevoked {

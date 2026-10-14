@@ -316,3 +316,28 @@ func TestRevokingOwnSessionKeepsLogoutHint(t *testing.T) {
 		t.Fatalf("logout after revoking the own session = %v, %v", loc, err)
 	}
 }
+
+// return_to survives the IdP round trip inside the sealed login cookie;
+// anything that could leave the origin falls back to "/".
+func TestSignInReturnsToPage(t *testing.T) {
+	e := newEnv(t)
+	for raw, want := range map[string]string{
+		"/chat/42?topic=3":     "/chat/42?topic=3",
+		"//evil.example":       "/",
+		"/\\evil.example":      "/",
+		"https://evil.example": "/",
+		"/\t/evil.example":     "/",
+		"/auth/logout":         "/",
+		"":                     "/",
+	} {
+		c := e.browser(t)
+		resp, body := e.signIn(t, c, "?"+url.Values{"return_to": {raw}}.Encode())
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%q: status %d", raw, resp.StatusCode)
+		}
+		meta := `<meta http-equiv="refresh" content="0;url=` + strings.ReplaceAll(want, "&", "&amp;") + `">`
+		if !strings.Contains(body, meta) || strings.Contains(body, "evil") {
+			t.Errorf("return_to %q: interstitial = %q", raw, body)
+		}
+	}
+}

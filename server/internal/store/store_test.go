@@ -409,3 +409,10 @@ func TestCheckGrantLeaseExpires(t *testing.T) {
 		t.Fatalf("check after lease expiry = %v, %v", ran, err)
 	}
 }
+
+func TestLatestMigrationRollsBack(t *testing.T) {
+	s := newStore(t)
+	if v := store.RollBackAndReapplyLatest(t, s); v < 5 {
+		t.Fatalf("rolled back version %d", v)
+	}
+}

@@ -70,6 +70,48 @@ service ChatsService {
   // A hidden topic leaves the topic list; its messages stay readable and
   // searchable by members.
   rpc HideForumTopic(HideForumTopicRequest) returns (HideForumTopicResponse);
+  // Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
+  // The caller's other sessions get dialog_mute.
+  rpc SetDialogMute(SetDialogMuteRequest) returns (SetDialogMuteResponse);
+  // Pins a chat on top of the caller's list or unpins it, at most 5 chats;
+  // one more fails with failed_precondition
+  // (message prefix "pinned_dialogs_limit"). The caller's sessions get
+  // pinned_dialogs.
+  rpc SetDialogPinned(SetDialogPinnedRequest) returns (SetDialogPinnedResponse);
+  // Reorders the caller's pinned chats; chat_ids must be exactly the pinned
+  // chats.
+  rpc ReorderPinnedDialogs(ReorderPinnedDialogsRequest) returns (ReorderPinnedDialogsResponse);
+  // Groups and channels: the owner deletes the chat for every member (each
+  // gets chat_deleted with for_everyone; messages are purged from the server
+  // within the hour). Private chats: removes the chat and its history for
+  // the caller only; it comes back with the next message.
+  rpc DeleteChat(DeleteChatRequest) returns (DeleteChatResponse);
+  // Groups both the caller and the user are current members of, and
+  // channels where the user is a member and the caller an admin (channel
+  // members are visible to admins only).
+  rpc GetCommonChats(GetCommonChatsRequest) returns (GetCommonChatsResponse);
+}
+
+// Why a user was not added to a chat (AddMembers, CreateGroup).
+enum AddMemberFailureReason {
+  ADD_MEMBER_FAILURE_REASON_UNSPECIFIED = 0;
+  // No such user in the tenant.
+  ADD_MEMBER_FAILURE_REASON_NOT_FOUND = 1;
+  // The user's add_to_groups privacy setting refuses the caller.
+  ADD_MEMBER_FAILURE_REASON_PRIVACY_ADD_TO_GROUPS = 2;
+  // The user blocked the caller.
+  ADD_MEMBER_FAILURE_REASON_BLOCKED = 3;
+  // Banned from the chat; only an admin may add them back.
+  ADD_MEMBER_FAILURE_REASON_BANNED = 4;
+  // Already a member; nothing to do.
+  ADD_MEMBER_FAILURE_REASON_ALREADY_MEMBER = 5;
+  // The chat reached its member limit.
+  ADD_MEMBER_FAILURE_REASON_TOO_MANY = 6;
+}
+
+message AddMemberFailure {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  AddMemberFailureReason reason = 2;
 }
 
 // Same name `type` and values in DB, proto and JSON.
@@ -170,6 +212,13 @@ message Dialog {
   int32 unread_mentions_count = 6;
   // sync_mode=large only: chat_pts to pass to GetChatDifference.
   int64 chat_pts = 7 [jstype = JS_NUMBER];
+  // Notifications muted until this unix second; 0 when not muted (or the
+  // mute ended). 2147483647 means until unmuted (muted forever). Clients
+  // leave muted chats out of the total unread badge by default.
+  int64 mute_until = 8 [jstype = JS_NUMBER];
+  // Pinned on top of the caller's list (order in GetDialogsResponse
+  // .pinned_chat_ids and UpdatePinnedDialogs).
+  bool pinned = 9;
 }
 
 message InviteLink {
@@ -241,6 +290,8 @@ message CreateGroupResponse {
   // Users not added because of their privacy settings or blocks.
   repeated int64 failed_user_ids = 3 [jstype = JS_NUMBER];
   SyncAck ack = 4;
+  // Every user not added, with the reason.
+  repeated AddMemberFailure failures = 5;
 }
 
 message CreateChannelRequest {
@@ -260,6 +311,10 @@ message GetDialogsRequest {
 }
 
 message GetDialogsResponse {
+  // The first page starts with every pinned dialog (pinned order), followed
+  // by up to limit other dialogs, newest activity first; later pages hold
+  // unpinned dialogs only. A private chat the caller deleted for themselves
+  // is left out until a new message arrives.
   repeated Dialog dialogs = 1;
   // Top message of each dialog.
   repeated Message messages = 2;
@@ -267,6 +322,8 @@ message GetDialogsResponse {
   repeated User users = 4;
   // Empty when there are no more dialogs.
   string next_cursor = 5;
+  // First page only: the caller's pinned chats, top first.
+  repeated int64 pinned_chat_ids = 6 [jstype = JS_NUMBER];
 }
 
 message GetChatRequest {
@@ -299,8 +356,12 @@ message AddMembersRequest {
 }
 
 message AddMembersResponse {
+  // Users not added for privacy, blocks, bans or the member limit (already
+  // members are not listed here; see failures).
   repeated int64 failed_user_ids = 1 [jstype = JS_NUMBER];
   SyncAck ack = 2;
+  // Every user not added, already members included, with the reason.
+  repeated AddMemberFailure failures = 3;
 }
 
 message RemoveMemberRequest {
@@ -317,6 +378,9 @@ message RemoveMemberResponse {
 
 message LeaveChatRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Owner only: the admin who becomes the owner; 0 picks the
+  // longest-serving admin. Not a current admin: invalid_argument.
+  int64 new_owner_id = 2 [jstype = JS_NUMBER];
 }
 
 message LeaveChatResponse {
@@ -531,5 +595,67 @@ message GetBannedMembersResponse {
   repeated BannedMember members = 1;
   repeated User users = 2;
   // Empty when there are no more banned users.
+  string next_cursor = 3;
+}
+
+message SetDialogMuteRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Mute for this many seconds from now, 1 to 31622400 (366 days). 0 with
+  // forever unset unmutes.
+  int32 duration_seconds = 2;
+  // Mute until unmuted; duration_seconds is then ignored.
+  bool forever = 3;
+}
+
+message SetDialogMuteResponse {
+  // As Dialog.mute_until.
+  int64 mute_until = 1 [jstype = JS_NUMBER];
+  SyncAck ack = 2;
+}
+
+message SetDialogPinnedRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // true pins on top of the list; false unpins.
+  bool pinned = 2;
+}
+
+message SetDialogPinnedResponse {
+  // The caller's pinned chats after the change, top first.
+  repeated int64 pinned_chat_ids = 1 [jstype = JS_NUMBER];
+  SyncAck ack = 2;
+}
+
+message ReorderPinnedDialogsRequest {
+  // Every pinned chat of the caller, top first.
+  repeated int64 chat_ids = 1 [jstype = JS_NUMBER];
+}
+
+message ReorderPinnedDialogsResponse {
+  repeated int64 pinned_chat_ids = 1 [jstype = JS_NUMBER];
+  SyncAck ack = 2;
+}
+
+message DeleteChatRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message DeleteChatResponse {
+  SyncAck ack = 1;
+}
+
+message GetCommonChatsRequest {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 2;
+  // Default 50, at most 100.
+  int32 limit = 3;
+}
+
+message GetCommonChatsResponse {
+  // Ascending by chat id.
+  repeated Chat chats = 1;
+  // All common chats, not only this page.
+  int32 count = 2;
+  // Empty when there are no more chats.
   string next_cursor = 3;
 }

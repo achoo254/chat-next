@@ -104,6 +104,9 @@ func (s *Service) ExportInviteLink(ctx context.Context, me, chatID, expiresAt in
 	if err := s.allow(limitCreate, "create", me); err != nil {
 		return nil, err
 	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
+		return nil, err
+	}
 	c, m, err := s.activeChatFor(ctx, s.pool, chatID, me, false)
 	if err != nil {
 		return nil, err
@@ -280,13 +283,16 @@ func (s *Service) JoinByInvite(ctx context.Context, me int64, link string) (*app
 	if err := s.allow(limitJoin, "join", me); err != nil {
 		return nil, err
 	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
+		return nil, err
+	}
 	inv, err := s.inviteByToken(ctx, s.pool, token)
 	if err != nil {
 		return nil, err
 	}
 	chatID := inv.ChatID
 	t, err := s.inTx(ctx, func(t *txn) error {
-		c, err := scanChat(t.tx.QueryRow(ctx, `SELECT `+chatColumns+` FROM `+chatFrom+` WHERE c.id = $1 AND c.tenant_id = $2 FOR UPDATE OF c`,
+		c, err := scanChat(t.tx.QueryRow(ctx, `SELECT `+chatColumns+` FROM `+chatFrom+` WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL FOR UPDATE OF c`,
 			chatID, s.cfg.TenantID))
 		if isNoRows(err) {
 			return errNotFound("invite link")
@@ -297,6 +303,9 @@ func (s *Service) JoinByInvite(ctx context.Context, me int64, link string) (*app
 		// The usage update below decides whether the link itself is usable.
 		if m, err := s.joinCheck(ctx, t.tx, c, inv, me, true); err != nil || m != nil {
 			return err
+		}
+		if int(c.MemberCount) >= s.cfg.ChatMembersMax {
+			return errPrecondition("chat_full: this chat reached its member limit")
 		}
 		tag, err := t.tx.Exec(ctx, `
 			UPDATE invite_links SET usage_count = usage_count + 1

@@ -3,22 +3,37 @@
 import { Code, ConnectError, createClient, type Client, type Transport } from "@connectrpc/connect";
 import { ChatsService } from "@app/proto-ts/chats";
 import { MessagesService } from "@app/proto-ts/messages";
+import { ModerationService } from "@app/proto-ts/moderation";
 import { UpdatesService } from "@app/proto-ts/updates";
 import { UsersService } from "@app/proto-ts/users";
 
+/**
+ * The methods marked optional below are optional so test doubles written
+ * before they existed still fit; createRemoteApi always provides them.
+ */
 export interface RemoteApi {
 	readonly updates: Pick<Client<typeof UpdatesService>, "getState" | "getDifference" | "getChatDifference">;
-	/**
-	 * getPeerDialogs is optional so test doubles written before it existed
-	 * still fit; createRemoteApi always provides it.
-	 */
 	readonly chats: Pick<Client<typeof ChatsService>, "getDialogs" | "getChat"> &
-		Partial<Pick<Client<typeof ChatsService>, "getPeerDialogs">>;
+		Partial<
+			Pick<
+				Client<typeof ChatsService>,
+				| "getPeerDialogs"
+				| "setDialogMute"
+				| "setDialogPinned"
+				| "reorderPinnedDialogs"
+				| "deleteChat"
+				| "getCommonChats"
+			>
+		>;
 	readonly messages: Pick<
 		Client<typeof MessagesService>,
 		"sendMessage" | "editMessage" | "deleteMessages" | "readHistory" | "getHistory"
-	>;
-	readonly users: Pick<Client<typeof UsersService>, "getSelf" | "getUsers">;
+	> &
+		Partial<Pick<Client<typeof MessagesService>, "getMessageReactions">>;
+	readonly users: Pick<Client<typeof UsersService>, "getSelf" | "getUsers"> &
+		Partial<Pick<Client<typeof UsersService>, "getBlockedUsers" | "getContacts">>;
+	/** Operators only (GetSelfResponse.is_operator); others get permission_denied. */
+	readonly moderation?: Client<typeof ModerationService>;
 }
 
 export function createRemoteApi(transport: Transport): RemoteApi {
@@ -27,6 +42,7 @@ export function createRemoteApi(transport: Transport): RemoteApi {
 		chats: createClient(ChatsService, transport),
 		messages: createClient(MessagesService, transport),
 		users: createClient(UsersService, transport),
+		moderation: createClient(ModerationService, transport),
 	};
 }
 

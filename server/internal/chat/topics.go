@@ -307,6 +307,9 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 	if err := s.allow(limitTopic, "topic", me); err != nil {
 		return nil, nil, err
 	}
+	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
+		return nil, nil, err
+	}
 	var topic *topicRow
 	t, err := s.inTx(ctx, func(t *txn) error {
 		c, m, err := s.forumFor(ctx, t.tx, chatID, me, true)

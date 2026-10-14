@@ -84,11 +84,7 @@ func (s *chatsService) GetMembers(ctx context.Context, req *connect.Request[appv
 
 func (s *chatsService) AddMembers(ctx context.Context, req *connect.Request[appv1.AddMembersRequest]) (*connect.Response[appv1.AddMembersResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.AddMembersRequest) (*appv1.AddMembersResponse, error) {
-		failed, ack, err := s.chat.AddMembers(ctx, me, m.GetChatId(), m.GetUserIds())
-		if err != nil {
-			return nil, err
-		}
-		return &appv1.AddMembersResponse{FailedUserIds: failed, Ack: ack}, nil
+		return s.chat.AddMembers(ctx, me, m.GetChatId(), m.GetUserIds())
 	})
 }
 
@@ -105,7 +101,7 @@ func (s *chatsService) RemoveMember(ctx context.Context, req *connect.Request[ap
 
 func (s *chatsService) LeaveChat(ctx context.Context, req *connect.Request[appv1.LeaveChatRequest]) (*connect.Response[appv1.LeaveChatResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.LeaveChatRequest) (*appv1.LeaveChatResponse, error) {
-		ack, err := s.chat.LeaveChat(ctx, me, m.GetChatId())
+		ack, err := s.chat.LeaveChat(ctx, me, m.GetChatId(), m.GetNewOwnerId())
 		if err != nil {
 			return nil, err
 		}
@@ -246,5 +242,39 @@ func (s *chatsService) UnbanMember(ctx context.Context, req *connect.Request[app
 func (s *chatsService) GetBannedMembers(ctx context.Context, req *connect.Request[appv1.GetBannedMembersRequest]) (*connect.Response[appv1.GetBannedMembersResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetBannedMembersRequest) (*appv1.GetBannedMembersResponse, error) {
 		return s.chat.GetBannedMembers(ctx, me, m.GetChatId(), m.GetCursor(), m.GetLimit())
+	})
+}
+
+func (s *chatsService) SetDialogMute(ctx context.Context, req *connect.Request[appv1.SetDialogMuteRequest]) (*connect.Response[appv1.SetDialogMuteResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetDialogMuteRequest) (*appv1.SetDialogMuteResponse, error) {
+		return s.chat.SetDialogMute(ctx, me, m.GetChatId(), m.GetDurationSeconds(), m.GetForever())
+	})
+}
+
+func (s *chatsService) SetDialogPinned(ctx context.Context, req *connect.Request[appv1.SetDialogPinnedRequest]) (*connect.Response[appv1.SetDialogPinnedResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetDialogPinnedRequest) (*appv1.SetDialogPinnedResponse, error) {
+		return s.chat.SetDialogPinned(ctx, me, m.GetChatId(), m.GetPinned())
+	})
+}
+
+func (s *chatsService) ReorderPinnedDialogs(ctx context.Context, req *connect.Request[appv1.ReorderPinnedDialogsRequest]) (*connect.Response[appv1.ReorderPinnedDialogsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ReorderPinnedDialogsRequest) (*appv1.ReorderPinnedDialogsResponse, error) {
+		return s.chat.ReorderPinnedDialogs(ctx, me, m.GetChatIds())
+	})
+}
+
+func (s *chatsService) DeleteChat(ctx context.Context, req *connect.Request[appv1.DeleteChatRequest]) (*connect.Response[appv1.DeleteChatResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.DeleteChatRequest) (*appv1.DeleteChatResponse, error) {
+		ack, err := s.chat.DeleteChat(ctx, me, m.GetChatId())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.DeleteChatResponse{Ack: ack}, nil
+	})
+}
+
+func (s *chatsService) GetCommonChats(ctx context.Context, req *connect.Request[appv1.GetCommonChatsRequest]) (*connect.Response[appv1.GetCommonChatsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetCommonChatsRequest) (*appv1.GetCommonChatsResponse, error) {
+		return s.chat.GetCommonChats(ctx, me, m.GetUserId(), m.GetCursor(), m.GetLimit())
 	})
 }

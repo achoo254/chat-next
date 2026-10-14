@@ -28,6 +28,9 @@ const (
 	kindChatUpdated       = "chat_updated"
 	kindTopicChanged      = "topic_changed"
 	kindSessionRevoked    = "session_revoked"
+	kindDialogMute        = "dialog_mute"
+	kindPinnedDialogs     = "pinned_dialogs"
+	kindChatDeleted       = "chat_deleted"
 )
 
 // userEntry is one update in a user's log.
@@ -350,6 +353,10 @@ func updateChatID(u *appv1.Update) int64 {
 		return k.ChatActivity.GetChatId()
 	case *appv1.Update_TopicChanged:
 		return k.TopicChanged.GetTopic().GetChatId()
+	case *appv1.Update_DialogMute:
+		return k.DialogMute.GetChatId()
+	case *appv1.Update_ChatDeleted:
+		return k.ChatDeleted.GetChatId()
 	default:
 		return 0
 	}

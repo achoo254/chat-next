@@ -16,7 +16,29 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/chats.proto.
  */
 export const file_app_v1_chats: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcHAvdjEvY2hhdHMucHJvdG8SBmFwcC52MSKoAwoEQ2hhdBIOCgJpZBgBIAEoA0ICMAISHgoEdHlwZRgCIAEoDjIQLmFwcC52MS5DaGF0VHlwZRINCgV0aXRsZRgDIAEoCRINCgVhYm91dBgEIAEoCRIfCgVwaG90bxgFIAEoCzIQLmFwcC52MS5NZWRpYVJlZhIYCgxwZWVyX3VzZXJfaWQYBiABKANCAjACEiMKCXN5bmNfbW9kZRgHIAEoDjIQLmFwcC52MS5TeW5jTW9kZRI1ChJoaXN0b3J5X3Zpc2liaWxpdHkYCCABKA4yGS5hcHAudjEuSGlzdG9yeVZpc2liaWxpdHkSFAoMbWVtYmVyX2NvdW50GAkgASgFEhsKE2RlZmF1bHRfcGVybWlzc2lvbnMYCiABKA0SFgoKcGlubmVkX3NlcRgLIAEoA0ICMAISFgoKY3JlYXRlZF9hdBgMIAEoA0ICMAISIwoHbXlfcm9sZRgNIAEoDjISLmFwcC52MS5NZW1iZXJSb2xlEhYKDm15X3Blcm1pc3Npb25zGA4gASgNEgwKBGxlZnQYDyABKAgSDQoFZm9ydW0YECABKAgihwEKCkNoYXRNZW1iZXISEwoHdXNlcl9pZBgBIAEoA0ICMAISIAoEcm9sZRgCIAEoDjISLmFwcC52MS5NZW1iZXJSb2xlEhMKC3Blcm1pc3Npb25zGAMgASgNEhUKCWpvaW5lZF9hdBgEIAEoA0ICMAISFgoKaW52aXRlcl9pZBgFIAEoA0ICMAIivgEKBkRpYWxvZxITCgdjaGF0X2lkGAEgASgDQgIwAhITCgd0b3Bfc2VxGAIgASgDQgIwAhIeChJyZWFkX2luYm94X21heF9zZXEYAyABKANCAjACEh8KE3JlYWRfb3V0Ym94X21heF9zZXEYBCABKANCAjACEhQKDHVucmVhZF9jb3VudBgFIAEoBRIdChV1bnJlYWRfbWVudGlvbnNfY291bnQYBiABKAUSFAoIY2hhdF9wdHMYByABKANCAjACIoUBCgpJbnZpdGVMaW5rEgwKBGxpbmsYASABKAkSFgoKY3JlYXRvcl9pZBgCIAEoA0ICMAISFgoKZXhwaXJlc19hdBgDIAEoA0ICMAISEwoLdXNhZ2VfbGltaXQYBCABKAUSEwoLdXNhZ2VfY291bnQYBSABKAUSDwoHcmV2b2tlZBgGIAEoCCLDAgoKRm9ydW1Ub3BpYxITCgdjaGF0X2lkGAEgASgDQgIwAhIOCgJpZBgCIAEoA0ICMAISDQoFdGl0bGUYAyABKAkSEgoKaWNvbl9jb2xvchgEIAEoBRIWCgpjcmVhdG9yX2lkGAUgASgDQgIwAhIWCgpjcmVhdGVkX2F0GAYgASgDQgIwAhIOCgZwaW5uZWQYByABKAgSDgoGY2xvc2VkGAggASgIEg4KBmhpZGRlbhgJIAEoCBITCgd0b3Bfc2VxGAogASgDQgIwAhIeChJyZWFkX2luYm94X21heF9zZXEYCyABKANCAjACEhQKDHVucmVhZF9jb3VudBgMIAEoBRIMCgRpY29uGA0gASgJEhUKDW1lc3NhZ2VfY291bnQYDiABKAUSHQoVdW5yZWFkX21lbnRpb25zX2NvdW50GA8gASgFIlEKDEJhbm5lZE1lbWJlchITCgd1c2VyX2lkGAEgASgDQgIwAhIVCgliYW5uZWRfYnkYAiABKANCAjACEhUKCWJhbm5lZF9hdBgDIAEoA0ICMAIiKwoUQ3JlYXRlUHJpdmF0ZVJlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiUAoVQ3JlYXRlUHJpdmF0ZVJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyIkgKEkNyZWF0ZUdyb3VwUmVxdWVzdBINCgV0aXRsZRgBIAEoCRIUCgh1c2VyX2lkcxgCIAMoA0ICMAISDQoFZm9ydW0YAyABKAgiiQEKE0NyZWF0ZUdyb3VwUmVzcG9uc2USGgoEY2hhdBgBIAEoCzIMLmFwcC52MS5DaGF0EhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISGwoPZmFpbGVkX3VzZXJfaWRzGAMgAygDQgIwAhIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjayI0ChRDcmVhdGVDaGFubmVsUmVxdWVzdBINCgV0aXRsZRgBIAEoCRINCgVhYm91dBgCIAEoCSJRChVDcmVhdGVDaGFubmVsUmVzcG9uc2USGgoEY2hhdBgBIAEoCzIMLmFwcC52MS5DaGF0EhwKA2FjaxgCIAEoCzIPLmFwcC52MS5TeW5jQWNrIjIKEUdldERpYWxvZ3NSZXF1ZXN0Eg4KBmN1cnNvchgBIAEoCRINCgVsaW1pdBgCIAEoBSKnAQoSR2V0RGlhbG9nc1Jlc3BvbnNlEh8KB2RpYWxvZ3MYASADKAsyDi5hcHAudjEuRGlhbG9nEiEKCG1lc3NhZ2VzGAIgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFY2hhdHMYAyADKAsyDC5hcHAudjEuQ2hhdBIbCgV1c2VycxgEIAMoCzIMLmFwcC52MS5Vc2VyEhMKC25leHRfY3Vyc29yGAUgASgJIiUKDkdldENoYXRSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACIkoKD0dldENoYXRSZXNwb25zZRIaCgRjaGF0GAEgASgLMgwuYXBwLnYxLkNoYXQSGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlciJWChFHZXRNZW1iZXJzUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhINCgVxdWVyeRgCIAEoCRIOCgZjdXJzb3IYAyABKAkSDQoFbGltaXQYBCABKAUiawoSR2V0TWVtYmVyc1Jlc3BvbnNlEiMKB21lbWJlcnMYASADKAsyEi5hcHAudjEuQ2hhdE1lbWJlchIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhMKC25leHRfY3Vyc29yGAMgASgJIj4KEUFkZE1lbWJlcnNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhQKCHVzZXJfaWRzGAIgAygDQgIwAiJPChJBZGRNZW1iZXJzUmVzcG9uc2USGwoPZmFpbGVkX3VzZXJfaWRzGAEgAygDQgIwAhIcCgNhY2sYAiABKAsyDy5hcHAudjEuU3luY0FjayJZChNSZW1vdmVNZW1iZXJSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhMKB3VzZXJfaWQYAiABKANCAjACEhAKA2JhbhgDIAEoCEgAiAEBQgYKBF9iYW4iNAoUUmVtb3ZlTWVtYmVyUmVzcG9uc2USHAoDYWNrGAEgASgLMg8uYXBwLnYxLlN5bmNBY2siJwoQTGVhdmVDaGF0UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiIxChFMZWF2ZUNoYXRSZXNwb25zZRIcCgNhY2sYASABKAsyDy5hcHAudjEuU3luY0FjayJcChtTZXRNZW1iZXJQZXJtaXNzaW9uc1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISEwoHdXNlcl9pZBgCIAEoA0ICMAISEwoLcGVybWlzc2lvbnMYAyABKA0iPAocU2V0TWVtYmVyUGVybWlzc2lvbnNSZXNwb25zZRIcCgNhY2sYASABKAsyDy5hcHAudjEuU3luY0FjayJKCg9TZXRBZG1pblJlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISEwoHdXNlcl9pZBgCIAEoA0ICMAISDQoFYWRtaW4YAyABKAgiMAoQU2V0QWRtaW5SZXNwb25zZRIcCgNhY2sYASABKAsyDy5hcHAudjEuU3luY0FjayJbChdFeHBvcnRJbnZpdGVMaW5rUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIWCgpleHBpcmVzX2F0GAIgASgDQgIwAhITCgt1c2FnZV9saW1pdBgDIAEoBSI+ChhFeHBvcnRJbnZpdGVMaW5rUmVzcG9uc2USIgoGaW52aXRlGAEgASgLMhIuYXBwLnYxLkludml0ZUxpbmsiIwoTSm9pbkJ5SW52aXRlUmVxdWVzdBIMCgRsaW5rGAEgASgJIm0KFEpvaW5CeUludml0ZVJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhwKA2FjaxgDIAEoCzIPLmFwcC52MS5TeW5jQWNrImkKG1NldEhpc3RvcnlWaXNpYmlsaXR5UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhI1ChJoaXN0b3J5X3Zpc2liaWxpdHkYAiABKA4yGS5hcHAudjEuSGlzdG9yeVZpc2liaWxpdHkiPAocU2V0SGlzdG9yeVZpc2liaWxpdHlSZXNwb25zZRIcCgNhY2sYASABKAsyDy5hcHAudjEuU3luY0FjayLuAQoVVXBkYXRlQ2hhdEluZm9SZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhIKBXRpdGxlGAIgASgJSACIAQESEgoFYWJvdXQYAyABKAlIAYgBARIaCg1waG90b19maWxlX2lkGAQgASgJSAKIAQESIAoTZGVmYXVsdF9wZXJtaXNzaW9ucxgFIAEoDUgDiAEBEhIKBWZvcnVtGAYgASgISASIAQFCCAoGX3RpdGxlQggKBl9hYm91dEIQCg5fcGhvdG9fZmlsZV9pZEIWChRfZGVmYXVsdF9wZXJtaXNzaW9uc0IICgZfZm9ydW0iUgoWVXBkYXRlQ2hhdEluZm9SZXNwb25zZRIaCgRjaGF0GAEgASgLMgwuYXBwLnYxLkNoYXQSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2siLQoVR2V0UGVlckRpYWxvZ3NSZXF1ZXN0EhQKCGNoYXRfaWRzGAEgAygDQgIwAiKWAQoWR2V0UGVlckRpYWxvZ3NSZXNwb25zZRIfCgdkaWFsb2dzGAEgAygLMg4uYXBwLnYxLkRpYWxvZxIhCghtZXNzYWdlcxgCIAMoCzIPLmFwcC52MS5NZXNzYWdlEhsKBWNoYXRzGAMgAygLMgwuYXBwLnYxLkNoYXQSGwoFdXNlcnMYBCADKAsyDC5hcHAudjEuVXNlciIiChJDaGVja0ludml0ZVJlcXVlc3QSDAoEbGluaxgBIAEoCSLxAQoTQ2hlY2tJbnZpdGVSZXNwb25zZRINCgV0aXRsZRgBIAEoCRINCgVhYm91dBgCIAEoCRIeCgR0eXBlGAMgASgOMhAuYXBwLnYxLkNoYXRUeXBlEhQKDG1lbWJlcl9jb3VudBgEIAEoBRIaCgRjaGF0GAUgASgLMgwuYXBwLnYxLkNoYXQSFgoKbWVtYmVyX2lkcxgGIAMoA0ICMAISGwoFdXNlcnMYByADKAsyDC5hcHAudjEuVXNlchI1ChJoaXN0b3J5X3Zpc2liaWxpdHkYCCABKA4yGS5hcHAudjEuSGlzdG9yeVZpc2liaWxpdHkiLAoVR2V0SW52aXRlTGlua3NSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACIj0KFkdldEludml0ZUxpbmtzUmVzcG9uc2USIwoHaW52aXRlcxgBIAMoCzISLmFwcC52MS5JbnZpdGVMaW5rIjwKF1Jldm9rZUludml0ZUxpbmtSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEgwKBGxpbmsYAiABKAkiPgoYUmV2b2tlSW52aXRlTGlua1Jlc3BvbnNlEiIKBmludml0ZRgBIAEoCzISLmFwcC52MS5JbnZpdGVMaW5rIksKFUdldEZvcnVtVG9waWNzUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIOCgZjdXJzb3IYAiABKAkSDQoFbGltaXQYAyABKAUikQEKFkdldEZvcnVtVG9waWNzUmVzcG9uc2USIgoGdG9waWNzGAEgAygLMhIuYXBwLnYxLkZvcnVtVG9waWMSIQoIbWVzc2FnZXMYAiADKAsyDy5hcHAudjEuTWVzc2FnZRIbCgV1c2VycxgDIAMoCzIMLmFwcC52MS5Vc2VyEhMKC25leHRfY3Vyc29yGAQgASgJIl8KF0NyZWF0ZUZvcnVtVG9waWNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg0KBXRpdGxlGAIgASgJEhIKCmljb25fY29sb3IYAyABKAUSDAoEaWNvbhgEIAEoCSJbChhDcmVhdGVGb3J1bVRvcGljUmVzcG9uc2USIQoFdG9waWMYASABKAsyEi5hcHAudjEuRm9ydW1Ub3BpYxIcCgNhY2sYAiABKAsyDy5hcHAudjEuU3luY0FjayLEAQoVRWRpdEZvcnVtVG9waWNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhQKCHRvcGljX2lkGAIgASgDQgIwAhISCgV0aXRsZRgDIAEoCUgAiAEBEhcKCmljb25fY29sb3IYBCABKAVIAYgBARITCgZwaW5uZWQYBSABKAhIAogBARIRCgRpY29uGAYgASgJSAOIAQFCCAoGX3RpdGxlQg0KC19pY29uX2NvbG9yQgkKB19waW5uZWRCBwoFX2ljb24iWQoWRWRpdEZvcnVtVG9waWNSZXNwb25zZRIhCgV0b3BpYxgBIAEoCzISLmFwcC52MS5Gb3J1bVRvcGljEhwKA2FjaxgCIAEoCzIPLmFwcC52MS5TeW5jQWNrIlMKFkNsb3NlRm9ydW1Ub3BpY1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIdG9waWNfaWQYAiABKANCAjACEg4KBmNsb3NlZBgDIAEoCCJaChdDbG9zZUZvcnVtVG9waWNSZXNwb25zZRIhCgV0b3BpYxgBIAEoCzISLmFwcC52MS5Gb3J1bVRvcGljEhwKA2FjaxgCIAEoCzIPLmFwcC52MS5TeW5jQWNrIlIKFUhpZGVGb3J1bVRvcGljUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIUCgh0b3BpY19pZBgCIAEoA0ICMAISDgoGaGlkZGVuGAMgASgIIlkKFkhpZGVGb3J1bVRvcGljUmVzcG9uc2USIQoFdG9waWMYASABKAsyEi5hcHAudjEuRm9ydW1Ub3BpYxIcCgNhY2sYAiABKAsyDy5hcHAudjEuU3luY0FjayI+ChJVbmJhbk1lbWJlclJlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISEwoHdXNlcl9pZBgCIAEoA0ICMAIiFQoTVW5iYW5NZW1iZXJSZXNwb25zZSJNChdHZXRCYW5uZWRNZW1iZXJzUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIOCgZjdXJzb3IYAiABKAkSDQoFbGltaXQYAyABKAUicwoYR2V0QmFubmVkTWVtYmVyc1Jlc3BvbnNlEiUKB21lbWJlcnMYASADKAsyFC5hcHAudjEuQmFubmVkTWVtYmVyEhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISEwoLbmV4dF9jdXJzb3IYAyABKAkqfgoIQ2hhdFR5cGUSGQoVQ0hBVF9UWVBFX1VOU1BFQ0lGSUVEEAASFQoRQ0hBVF9UWVBFX1BSSVZBVEUQARITCg9DSEFUX1RZUEVfR1JPVVAQAhIVChFDSEFUX1RZUEVfQ0hBTk5FTBADEhQKEENIQVRfVFlQRV9TRUNSRVQQBCpPCghTeW5jTW9kZRIZChVTWU5DX01PREVfVU5TUEVDSUZJRUQQABITCg9TWU5DX01PREVfU01BTEwQARITCg9TWU5DX01PREVfTEFSR0UQAip5ChFIaXN0b3J5VmlzaWJpbGl0eRIiCh5ISVNUT1JZX1ZJU0lCSUxJVFlfVU5TUEVDSUZJRUQQABIdChlISVNUT1JZX1ZJU0lCSUxJVFlfU0hBUkVEEAESIQodSElTVE9SWV9WSVNJQklMSVRZX1NJTkNFX0pPSU4QAipvCgpNZW1iZXJSb2xlEhsKF01FTUJFUl9ST0xFX1VOU1BFQ0lGSUVEEAASFgoSTUVNQkVSX1JPTEVfTUVNQkVSEAESFQoRTUVNQkVSX1JPTEVfQURNSU4QAhIVChFNRU1CRVJfUk9MRV9PV05FUhADKvsBCg5DaGF0UGVybWlzc2lvbhIfChtDSEFUX1BFUk1JU1NJT05fVU5TUEVDSUZJRUQQABIhCh1DSEFUX1BFUk1JU1NJT05fU0VORF9NRVNTQUdFUxABEh4KGkNIQVRfUEVSTUlTU0lPTl9TRU5EX01FRElBEAISHwobQ0hBVF9QRVJNSVNTSU9OX0FERF9NRU1CRVJTEAQSIAocQ0hBVF9QRVJNSVNTSU9OX1BJTl9NRVNTQUdFUxAIEh8KG0NIQVRfUEVSTUlTU0lPTl9DSEFOR0VfSU5GTxAQEiEKHUNIQVRfUEVSTUlTU0lPTl9NQU5BR0VfVE9QSUNTECAygBAKDENoYXRzU2VydmljZRJMCg1DcmVhdGVQcml2YXRlEhwuYXBwLnYxLkNyZWF0ZVByaXZhdGVSZXF1ZXN0Gh0uYXBwLnYxLkNyZWF0ZVByaXZhdGVSZXNwb25zZRJGCgtDcmVhdGVHcm91cBIaLmFwcC52MS5DcmVhdGVHcm91cFJlcXVlc3QaGy5hcHAudjEuQ3JlYXRlR3JvdXBSZXNwb25zZRJMCg1DcmVhdGVDaGFubmVsEhwuYXBwLnYxLkNyZWF0ZUNoYW5uZWxSZXF1ZXN0Gh0uYXBwLnYxLkNyZWF0ZUNoYW5uZWxSZXNwb25zZRJDCgpHZXREaWFsb2dzEhkuYXBwLnYxLkdldERpYWxvZ3NSZXF1ZXN0GhouYXBwLnYxLkdldERpYWxvZ3NSZXNwb25zZRI6CgdHZXRDaGF0EhYuYXBwLnYxLkdldENoYXRSZXF1ZXN0GhcuYXBwLnYxLkdldENoYXRSZXNwb25zZRJDCgpHZXRNZW1iZXJzEhkuYXBwLnYxLkdldE1lbWJlcnNSZXF1ZXN0GhouYXBwLnYxLkdldE1lbWJlcnNSZXNwb25zZRJDCgpBZGRNZW1iZXJzEhkuYXBwLnYxLkFkZE1lbWJlcnNSZXF1ZXN0GhouYXBwLnYxLkFkZE1lbWJlcnNSZXNwb25zZRJJCgxSZW1vdmVNZW1iZXISGy5hcHAudjEuUmVtb3ZlTWVtYmVyUmVxdWVzdBocLmFwcC52MS5SZW1vdmVNZW1iZXJSZXNwb25zZRJACglMZWF2ZUNoYXQSGC5hcHAudjEuTGVhdmVDaGF0UmVxdWVzdBoZLmFwcC52MS5MZWF2ZUNoYXRSZXNwb25zZRJGCgtVbmJhbk1lbWJlchIaLmFwcC52MS5VbmJhbk1lbWJlclJlcXVlc3QaGy5hcHAudjEuVW5iYW5NZW1iZXJSZXNwb25zZRJVChBHZXRCYW5uZWRNZW1iZXJzEh8uYXBwLnYxLkdldEJhbm5lZE1lbWJlcnNSZXF1ZXN0GiAuYXBwLnYxLkdldEJhbm5lZE1lbWJlcnNSZXNwb25zZRJhChRTZXRNZW1iZXJQZXJtaXNzaW9ucxIjLmFwcC52MS5TZXRNZW1iZXJQZXJtaXNzaW9uc1JlcXVlc3QaJC5hcHAudjEuU2V0TWVtYmVyUGVybWlzc2lvbnNSZXNwb25zZRI9CghTZXRBZG1pbhIXLmFwcC52MS5TZXRBZG1pblJlcXVlc3QaGC5hcHAudjEuU2V0QWRtaW5SZXNwb25zZRJVChBFeHBvcnRJbnZpdGVMaW5rEh8uYXBwLnYxLkV4cG9ydEludml0ZUxpbmtSZXF1ZXN0GiAuYXBwLnYxLkV4cG9ydEludml0ZUxpbmtSZXNwb25zZRJJCgxKb2luQnlJbnZpdGUSGy5hcHAudjEuSm9pbkJ5SW52aXRlUmVxdWVzdBocLmFwcC52MS5Kb2luQnlJbnZpdGVSZXNwb25zZRJhChRTZXRIaXN0b3J5VmlzaWJpbGl0eRIjLmFwcC52MS5TZXRIaXN0b3J5VmlzaWJpbGl0eVJlcXVlc3QaJC5hcHAudjEuU2V0SGlzdG9yeVZpc2liaWxpdHlSZXNwb25zZRJPCg5VcGRhdGVDaGF0SW5mbxIdLmFwcC52MS5VcGRhdGVDaGF0SW5mb1JlcXVlc3QaHi5hcHAudjEuVXBkYXRlQ2hhdEluZm9SZXNwb25zZRJPCg5HZXRQZWVyRGlhbG9ncxIdLmFwcC52MS5HZXRQZWVyRGlhbG9nc1JlcXVlc3QaHi5hcHAudjEuR2V0UGVlckRpYWxvZ3NSZXNwb25zZRJGCgtDaGVja0ludml0ZRIaLmFwcC52MS5DaGVja0ludml0ZVJlcXVlc3QaGy5hcHAudjEuQ2hlY2tJbnZpdGVSZXNwb25zZRJPCg5HZXRJbnZpdGVMaW5rcxIdLmFwcC52MS5HZXRJbnZpdGVMaW5rc1JlcXVlc3QaHi5hcHAudjEuR2V0SW52aXRlTGlua3NSZXNwb25zZRJVChBSZXZva2VJbnZpdGVMaW5rEh8uYXBwLnYxLlJldm9rZUludml0ZUxpbmtSZXF1ZXN0GiAuYXBwLnYxLlJldm9rZUludml0ZUxpbmtSZXNwb25zZRJPCg5HZXRGb3J1bVRvcGljcxIdLmFwcC52MS5HZXRGb3J1bVRvcGljc1JlcXVlc3QaHi5hcHAudjEuR2V0Rm9ydW1Ub3BpY3NSZXNwb25zZRJVChBDcmVhdGVGb3J1bVRvcGljEh8uYXBwLnYxLkNyZWF0ZUZvcnVtVG9waWNSZXF1ZXN0GiAuYXBwLnYxLkNyZWF0ZUZvcnVtVG9waWNSZXNwb25zZRJPCg5FZGl0Rm9ydW1Ub3BpYxIdLmFwcC52MS5FZGl0Rm9ydW1Ub3BpY1JlcXVlc3QaHi5hcHAudjEuRWRpdEZvcnVtVG9waWNSZXNwb25zZRJSCg9DbG9zZUZvcnVtVG9waWMSHi5hcHAudjEuQ2xvc2VGb3J1bVRvcGljUmVxdWVzdBofLmFwcC52MS5DbG9zZUZvcnVtVG9waWNSZXNwb25zZRJPCg5IaWRlRm9ydW1Ub3BpYxIdLmFwcC52MS5IaWRlRm9ydW1Ub3BpY1JlcXVlc3QaHi5hcHAudjEuSGlkZUZvcnVtVG9waWNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChJhcHAvdjEvY2hhdHMucHJvdG8SBmFwcC52MSJXChBBZGRNZW1iZXJGYWlsdXJlEhMKB3VzZXJfaWQYASABKANCAjACEi4KBnJlYXNvbhgCIAEoDjIeLmFwcC52MS5BZGRNZW1iZXJGYWlsdXJlUmVhc29uIqgDCgRDaGF0Eg4KAmlkGAEgASgDQgIwAhIeCgR0eXBlGAIgASgOMhAuYXBwLnYxLkNoYXRUeXBlEg0KBXRpdGxlGAMgASgJEg0KBWFib3V0GAQgASgJEh8KBXBob3RvGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhgKDHBlZXJfdXNlcl9pZBgGIAEoA0ICMAISIwoJc3luY19tb2RlGAcgASgOMhAuYXBwLnYxLlN5bmNNb2RlEjUKEmhpc3RvcnlfdmlzaWJpbGl0eRgIIAEoDjIZLmFwcC52MS5IaXN0b3J5VmlzaWJpbGl0eRIUCgxtZW1iZXJfY291bnQYCSABKAUSGwoTZGVmYXVsdF9wZXJtaXNzaW9ucxgKIAEoDRIWCgpwaW5uZWRfc2VxGAsgASgDQgIwAhIWCgpjcmVhdGVkX2F0GAwgASgDQgIwAhIjCgdteV9yb2xlGA0gASgOMhIuYXBwLnYxLk1lbWJlclJvbGUSFgoObXlfcGVybWlzc2lvbnMYDiABKA0SDAoEbGVmdBgPIAEoCBINCgVmb3J1bRgQIAEoCCKHAQoKQ2hhdE1lbWJlchITCgd1c2VyX2lkGAEgASgDQgIwAhIgCgRyb2xlGAIgASgOMhIuYXBwLnYxLk1lbWJlclJvbGUSEwoLcGVybWlzc2lvbnMYAyABKA0SFQoJam9pbmVkX2F0GAQgASgDQgIwAhIWCgppbnZpdGVyX2lkGAUgASgDQgIwAiLmAQoGRGlhbG9nEhMKB2NoYXRfaWQYASABKANCAjACEhMKB3RvcF9zZXEYAiABKANCAjACEh4KEnJlYWRfaW5ib3hfbWF4X3NlcRgDIAEoA0ICMAISHwoTcmVhZF9vdXRib3hfbWF4X3NlcRgEIAEoA0ICMAISFAoMdW5yZWFkX2NvdW50GAUgASgFEh0KFXVucmVhZF9tZW50aW9uc19jb3VudBgGIAEoBRIUCghjaGF0X3B0cxgHIAEoA0ICMAISFgoKbXV0ZV91bnRpbBgIIAEoA0ICMAISDgoGcGlubmVkGAkgASgIIoUBCgpJbnZpdGVMaW5rEgwKBGxpbmsYASABKAkSFgoKY3JlYXRvcl9pZBgCIAEoA0ICMAISFgoKZXhwaXJlc19hdBgDIAEoA0ICMAISEwoLdXNhZ2VfbGltaXQYBCABKAUSEwoLdXNhZ2VfY291bnQYBSABKAUSDwoHcmV2b2tlZBgGIAEoCCLDAgoKRm9ydW1Ub3BpYxITCgdjaGF0X2lkGAEgASgDQgIwAhIOCgJpZBgCIAEoA0ICMAISDQoFdGl0bGUYAyABKAkSEgoKaWNvbl9jb2xvchgEIAEoBRIWCgpjcmVhdG9yX2lkGAUgASgDQgIwAhIWCgpjcmVhdGVkX2F0GAYgASgDQgIwAhIOCgZwaW5uZWQYByABKAgSDgoGY2xvc2VkGAggASgIEg4KBmhpZGRlbhgJIAEoCBITCgd0b3Bfc2VxGAogASgDQgIwAhIeChJyZWFkX2luYm94X21heF9zZXEYCyABKANCAjACEhQKDHVucmVhZF9jb3VudBgMIAEoBRIMCgRpY29uGA0gASgJEhUKDW1lc3NhZ2VfY291bnQYDiABKAUSHQoVdW5yZWFkX21lbnRpb25zX2NvdW50GA8gASgFIlEKDEJhbm5lZE1lbWJlchITCgd1c2VyX2lkGAEgASgDQgIwAhIVCgliYW5uZWRfYnkYAiABKANCAjACEhUKCWJhbm5lZF9hdBgDIAEoA0ICMAIiKwoUQ3JlYXRlUHJpdmF0ZVJlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiUAoVQ3JlYXRlUHJpdmF0ZVJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyIkgKEkNyZWF0ZUdyb3VwUmVxdWVzdBINCgV0aXRsZRgBIAEoCRIUCgh1c2VyX2lkcxgCIAMoA0ICMAISDQoFZm9ydW0YAyABKAgitQEKE0NyZWF0ZUdyb3VwUmVzcG9uc2USGgoEY2hhdBgBIAEoCzIMLmFwcC52MS5DaGF0EhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISGwoPZmFpbGVkX3VzZXJfaWRzGAMgAygDQgIwAhIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjaxIqCghmYWlsdXJlcxgFIAMoCzIYLmFwcC52MS5BZGRNZW1iZXJGYWlsdXJlIjQKFENyZWF0ZUNoYW5uZWxSZXF1ZXN0Eg0KBXRpdGxlGAEgASgJEg0KBWFib3V0GAIgASgJIlEKFUNyZWF0ZUNoYW5uZWxSZXNwb25zZRIaCgRjaGF0GAEgASgLMgwuYXBwLnYxLkNoYXQSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2siMgoRR2V0RGlhbG9nc1JlcXVlc3QSDgoGY3Vyc29yGAEgASgJEg0KBWxpbWl0GAIgASgFIsQBChJHZXREaWFsb2dzUmVzcG9uc2USHwoHZGlhbG9ncxgBIAMoCzIOLmFwcC52MS5EaWFsb2cSIQoIbWVzc2FnZXMYAiADKAsyDy5hcHAudjEuTWVzc2FnZRIbCgVjaGF0cxgDIAMoCzIMLmFwcC52MS5DaGF0EhsKBXVzZXJzGAQgAygLMgwuYXBwLnYxLlVzZXISEwoLbmV4dF9jdXJzb3IYBSABKAkSGwoPcGlubmVkX2NoYXRfaWRzGAYgAygDQgIwAiIlCg5HZXRDaGF0UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiJKCg9HZXRDaGF0UmVzcG9uc2USGgoEY2hhdBgBIAEoCzIMLmFwcC52MS5DaGF0EhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXIiVgoRR2V0TWVtYmVyc1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISDQoFcXVlcnkYAiABKAkSDgoGY3Vyc29yGAMgASgJEg0KBWxpbWl0GAQgASgFImsKEkdldE1lbWJlcnNSZXNwb25zZRIjCgdtZW1iZXJzGAEgAygLMhIuYXBwLnYxLkNoYXRNZW1iZXISGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchITCgtuZXh0X2N1cnNvchgDIAEoCSI+ChFBZGRNZW1iZXJzUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIUCgh1c2VyX2lkcxgCIAMoA0ICMAIiewoSQWRkTWVtYmVyc1Jlc3BvbnNlEhsKD2ZhaWxlZF91c2VyX2lkcxgBIAMoA0ICMAISHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2sSKgoIZmFpbHVyZXMYAyADKAsyGC5hcHAudjEuQWRkTWVtYmVyRmFpbHVyZSJZChNSZW1vdmVNZW1iZXJSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhMKB3VzZXJfaWQYAiABKANCAjACEhAKA2JhbhgDIAEoCEgAiAEBQgYKBF9iYW4iNAoUUmVtb3ZlTWVtYmVyUmVzcG9uc2USHAoDYWNrGAEgASgLMg8uYXBwLnYxLlN5bmNBY2siQQoQTGVhdmVDaGF0UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIYCgxuZXdfb3duZXJfaWQYAiABKANCAjACIjEKEUxlYXZlQ2hhdFJlc3BvbnNlEhwKA2FjaxgBIAEoCzIPLmFwcC52MS5TeW5jQWNrIlwKG1NldE1lbWJlclBlcm1pc3Npb25zUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhITCgd1c2VyX2lkGAIgASgDQgIwAhITCgtwZXJtaXNzaW9ucxgDIAEoDSI8ChxTZXRNZW1iZXJQZXJtaXNzaW9uc1Jlc3BvbnNlEhwKA2FjaxgBIAEoCzIPLmFwcC52MS5TeW5jQWNrIkoKD1NldEFkbWluUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhITCgd1c2VyX2lkGAIgASgDQgIwAhINCgVhZG1pbhgDIAEoCCIwChBTZXRBZG1pblJlc3BvbnNlEhwKA2FjaxgBIAEoCzIPLmFwcC52MS5TeW5jQWNrIlsKF0V4cG9ydEludml0ZUxpbmtSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhYKCmV4cGlyZXNfYXQYAiABKANCAjACEhMKC3VzYWdlX2xpbWl0GAMgASgFIj4KGEV4cG9ydEludml0ZUxpbmtSZXNwb25zZRIiCgZpbnZpdGUYASABKAsyEi5hcHAudjEuSW52aXRlTGluayIjChNKb2luQnlJbnZpdGVSZXF1ZXN0EgwKBGxpbmsYASABKAkibQoUSm9pbkJ5SW52aXRlUmVzcG9uc2USGgoEY2hhdBgBIAEoCzIMLmFwcC52MS5DaGF0EhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISHAoDYWNrGAMgASgLMg8uYXBwLnYxLlN5bmNBY2siaQobU2V0SGlzdG9yeVZpc2liaWxpdHlSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEjUKEmhpc3RvcnlfdmlzaWJpbGl0eRgCIAEoDjIZLmFwcC52MS5IaXN0b3J5VmlzaWJpbGl0eSI8ChxTZXRIaXN0b3J5VmlzaWJpbGl0eVJlc3BvbnNlEhwKA2FjaxgBIAEoCzIPLmFwcC52MS5TeW5jQWNrIu4BChVVcGRhdGVDaGF0SW5mb1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISEgoFdGl0bGUYAiABKAlIAIgBARISCgVhYm91dBgDIAEoCUgBiAEBEhoKDXBob3RvX2ZpbGVfaWQYBCABKAlIAogBARIgChNkZWZhdWx0X3Blcm1pc3Npb25zGAUgASgNSAOIAQESEgoFZm9ydW0YBiABKAhIBIgBAUIICgZfdGl0bGVCCAoGX2Fib3V0QhAKDl9waG90b19maWxlX2lkQhYKFF9kZWZhdWx0X3Blcm1pc3Npb25zQggKBl9mb3J1bSJSChZVcGRhdGVDaGF0SW5mb1Jlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIcCgNhY2sYAiABKAsyDy5hcHAudjEuU3luY0FjayItChVHZXRQZWVyRGlhbG9nc1JlcXVlc3QSFAoIY2hhdF9pZHMYASADKANCAjACIpYBChZHZXRQZWVyRGlhbG9nc1Jlc3BvbnNlEh8KB2RpYWxvZ3MYASADKAsyDi5hcHAudjEuRGlhbG9nEiEKCG1lc3NhZ2VzGAIgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFY2hhdHMYAyADKAsyDC5hcHAudjEuQ2hhdBIbCgV1c2VycxgEIAMoCzIMLmFwcC52MS5Vc2VyIiIKEkNoZWNrSW52aXRlUmVxdWVzdBIMCgRsaW5rGAEgASgJIvEBChNDaGVja0ludml0ZVJlc3BvbnNlEg0KBXRpdGxlGAEgASgJEg0KBWFib3V0GAIgASgJEh4KBHR5cGUYAyABKA4yEC5hcHAudjEuQ2hhdFR5cGUSFAoMbWVtYmVyX2NvdW50GAQgASgFEhoKBGNoYXQYBSABKAsyDC5hcHAudjEuQ2hhdBIWCgptZW1iZXJfaWRzGAYgAygDQgIwAhIbCgV1c2VycxgHIAMoCzIMLmFwcC52MS5Vc2VyEjUKEmhpc3RvcnlfdmlzaWJpbGl0eRgIIAEoDjIZLmFwcC52MS5IaXN0b3J5VmlzaWJpbGl0eSIsChVHZXRJbnZpdGVMaW5rc1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAIiPQoWR2V0SW52aXRlTGlua3NSZXNwb25zZRIjCgdpbnZpdGVzGAEgAygLMhIuYXBwLnYxLkludml0ZUxpbmsiPAoXUmV2b2tlSW52aXRlTGlua1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISDAoEbGluaxgCIAEoCSI+ChhSZXZva2VJbnZpdGVMaW5rUmVzcG9uc2USIgoGaW52aXRlGAEgASgLMhIuYXBwLnYxLkludml0ZUxpbmsiSwoVR2V0Rm9ydW1Ub3BpY3NSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg4KBmN1cnNvchgCIAEoCRINCgVsaW1pdBgDIAEoBSKRAQoWR2V0Rm9ydW1Ub3BpY3NSZXNwb25zZRIiCgZ0b3BpY3MYASADKAsyEi5hcHAudjEuRm9ydW1Ub3BpYxIhCghtZXNzYWdlcxgCIAMoCzIPLmFwcC52MS5NZXNzYWdlEhsKBXVzZXJzGAMgAygLMgwuYXBwLnYxLlVzZXISEwoLbmV4dF9jdXJzb3IYBCABKAkiXwoXQ3JlYXRlRm9ydW1Ub3BpY1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISDQoFdGl0bGUYAiABKAkSEgoKaWNvbl9jb2xvchgDIAEoBRIMCgRpY29uGAQgASgJIlsKGENyZWF0ZUZvcnVtVG9waWNSZXNwb25zZRIhCgV0b3BpYxgBIAEoCzISLmFwcC52MS5Gb3J1bVRvcGljEhwKA2FjaxgCIAEoCzIPLmFwcC52MS5TeW5jQWNrIsQBChVFZGl0Rm9ydW1Ub3BpY1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIdG9waWNfaWQYAiABKANCAjACEhIKBXRpdGxlGAMgASgJSACIAQESFwoKaWNvbl9jb2xvchgEIAEoBUgBiAEBEhMKBnBpbm5lZBgFIAEoCEgCiAEBEhEKBGljb24YBiABKAlIA4gBAUIICgZfdGl0bGVCDQoLX2ljb25fY29sb3JCCQoHX3Bpbm5lZEIHCgVfaWNvbiJZChZFZGl0Rm9ydW1Ub3BpY1Jlc3BvbnNlEiEKBXRvcGljGAEgASgLMhIuYXBwLnYxLkZvcnVtVG9waWMSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2siUwoWQ2xvc2VGb3J1bVRvcGljUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIUCgh0b3BpY19pZBgCIAEoA0ICMAISDgoGY2xvc2VkGAMgASgIIloKF0Nsb3NlRm9ydW1Ub3BpY1Jlc3BvbnNlEiEKBXRvcGljGAEgASgLMhIuYXBwLnYxLkZvcnVtVG9waWMSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2siUgoVSGlkZUZvcnVtVG9waWNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhQKCHRvcGljX2lkGAIgASgDQgIwAhIOCgZoaWRkZW4YAyABKAgiWQoWSGlkZUZvcnVtVG9waWNSZXNwb25zZRIhCgV0b3BpYxgBIAEoCzISLmFwcC52MS5Gb3J1bVRvcGljEhwKA2FjaxgCIAEoCzIPLmFwcC52MS5TeW5jQWNrIj4KElVuYmFuTWVtYmVyUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhITCgd1c2VyX2lkGAIgASgDQgIwAiIVChNVbmJhbk1lbWJlclJlc3BvbnNlIk0KF0dldEJhbm5lZE1lbWJlcnNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg4KBmN1cnNvchgCIAEoCRINCgVsaW1pdBgDIAEoBSJzChhHZXRCYW5uZWRNZW1iZXJzUmVzcG9uc2USJQoHbWVtYmVycxgBIAMoCzIULmFwcC52MS5CYW5uZWRNZW1iZXISGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchITCgtuZXh0X2N1cnNvchgDIAEoCSJWChRTZXREaWFsb2dNdXRlUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIYChBkdXJhdGlvbl9zZWNvbmRzGAIgASgFEg8KB2ZvcmV2ZXIYAyABKAgiTQoVU2V0RGlhbG9nTXV0ZVJlc3BvbnNlEhYKCm11dGVfdW50aWwYASABKANCAjACEhwKA2FjaxgCIAEoCzIPLmFwcC52MS5TeW5jQWNrIj0KFlNldERpYWxvZ1Bpbm5lZFJlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAISDgoGcGlubmVkGAIgASgIIlQKF1NldERpYWxvZ1Bpbm5lZFJlc3BvbnNlEhsKD3Bpbm5lZF9jaGF0X2lkcxgBIAMoA0ICMAISHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2siMwobUmVvcmRlclBpbm5lZERpYWxvZ3NSZXF1ZXN0EhQKCGNoYXRfaWRzGAEgAygDQgIwAiJZChxSZW9yZGVyUGlubmVkRGlhbG9nc1Jlc3BvbnNlEhsKD3Bpbm5lZF9jaGF0X2lkcxgBIAMoA0ICMAISHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2siKAoRRGVsZXRlQ2hhdFJlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAIiMgoSRGVsZXRlQ2hhdFJlc3BvbnNlEhwKA2FjaxgBIAEoCzIPLmFwcC52MS5TeW5jQWNrIksKFUdldENvbW1vbkNoYXRzUmVxdWVzdBITCgd1c2VyX2lkGAEgASgDQgIwAhIOCgZjdXJzb3IYAiABKAkSDQoFbGltaXQYAyABKAUiWQoWR2V0Q29tbW9uQ2hhdHNSZXNwb25zZRIbCgVjaGF0cxgBIAMoCzIMLmFwcC52MS5DaGF0Eg0KBWNvdW50GAIgASgFEhMKC25leHRfY3Vyc29yGAMgASgJKsQCChZBZGRNZW1iZXJGYWlsdXJlUmVhc29uEikKJUFERF9NRU1CRVJfRkFJTFVSRV9SRUFTT05fVU5TUEVDSUZJRUQQABInCiNBRERfTUVNQkVSX0ZBSUxVUkVfUkVBU09OX05PVF9GT1VORBABEjMKL0FERF9NRU1CRVJfRkFJTFVSRV9SRUFTT05fUFJJVkFDWV9BRERfVE9fR1JPVVBTEAISJQohQUREX01FTUJFUl9GQUlMVVJFX1JFQVNPTl9CTE9DS0VEEAMSJAogQUREX01FTUJFUl9GQUlMVVJFX1JFQVNPTl9CQU5ORUQQBBIsCihBRERfTUVNQkVSX0ZBSUxVUkVfUkVBU09OX0FMUkVBRFlfTUVNQkVSEAUSJgoiQUREX01FTUJFUl9GQUlMVVJFX1JFQVNPTl9UT09fTUFOWRAGKn4KCENoYXRUeXBlEhkKFUNIQVRfVFlQRV9VTlNQRUNJRklFRBAAEhUKEUNIQVRfVFlQRV9QUklWQVRFEAESEwoPQ0hBVF9UWVBFX0dST1VQEAISFQoRQ0hBVF9UWVBFX0NIQU5ORUwQAxIUChBDSEFUX1RZUEVfU0VDUkVUEAQqTwoIU3luY01vZGUSGQoVU1lOQ19NT0RFX1VOU1BFQ0lGSUVEEAASEwoPU1lOQ19NT0RFX1NNQUxMEAESEwoPU1lOQ19NT0RFX0xBUkdFEAIqeQoRSGlzdG9yeVZpc2liaWxpdHkSIgoeSElTVE9SWV9WSVNJQklMSVRZX1VOU1BFQ0lGSUVEEAASHQoZSElTVE9SWV9WSVNJQklMSVRZX1NIQVJFRBABEiEKHUhJU1RPUllfVklTSUJJTElUWV9TSU5DRV9KT0lOEAIqbwoKTWVtYmVyUm9sZRIbChdNRU1CRVJfUk9MRV9VTlNQRUNJRklFRBAAEhYKEk1FTUJFUl9ST0xFX01FTUJFUhABEhUKEU1FTUJFUl9ST0xFX0FETUlOEAISFQoRTUVNQkVSX1JPTEVfT1dORVIQAyr7AQoOQ2hhdFBlcm1pc3Npb24SHwobQ0hBVF9QRVJNSVNTSU9OX1VOU1BFQ0lGSUVEEAASIQodQ0hBVF9QRVJNSVNTSU9OX1NFTkRfTUVTU0FHRVMQARIeChpDSEFUX1BFUk1JU1NJT05fU0VORF9NRURJQRACEh8KG0NIQVRfUEVSTUlTU0lPTl9BRERfTUVNQkVSUxAEEiAKHENIQVRfUEVSTUlTU0lPTl9QSU5fTUVTU0FHRVMQCBIfChtDSEFUX1BFUk1JU1NJT05fQ0hBTkdFX0lORk8QEBIhCh1DSEFUX1BFUk1JU1NJT05fTUFOQUdFX1RPUElDUxAgMpsTCgxDaGF0c1NlcnZpY2USTAoNQ3JlYXRlUHJpdmF0ZRIcLmFwcC52MS5DcmVhdGVQcml2YXRlUmVxdWVzdBodLmFwcC52MS5DcmVhdGVQcml2YXRlUmVzcG9uc2USRgoLQ3JlYXRlR3JvdXASGi5hcHAudjEuQ3JlYXRlR3JvdXBSZXF1ZXN0GhsuYXBwLnYxLkNyZWF0ZUdyb3VwUmVzcG9uc2USTAoNQ3JlYXRlQ2hhbm5lbBIcLmFwcC52MS5DcmVhdGVDaGFubmVsUmVxdWVzdBodLmFwcC52MS5DcmVhdGVDaGFubmVsUmVzcG9uc2USQwoKR2V0RGlhbG9ncxIZLmFwcC52MS5HZXREaWFsb2dzUmVxdWVzdBoaLmFwcC52MS5HZXREaWFsb2dzUmVzcG9uc2USOgoHR2V0Q2hhdBIWLmFwcC52MS5HZXRDaGF0UmVxdWVzdBoXLmFwcC52MS5HZXRDaGF0UmVzcG9uc2USQwoKR2V0TWVtYmVycxIZLmFwcC52MS5HZXRNZW1iZXJzUmVxdWVzdBoaLmFwcC52MS5HZXRNZW1iZXJzUmVzcG9uc2USQwoKQWRkTWVtYmVycxIZLmFwcC52MS5BZGRNZW1iZXJzUmVxdWVzdBoaLmFwcC52MS5BZGRNZW1iZXJzUmVzcG9uc2USSQoMUmVtb3ZlTWVtYmVyEhsuYXBwLnYxLlJlbW92ZU1lbWJlclJlcXVlc3QaHC5hcHAudjEuUmVtb3ZlTWVtYmVyUmVzcG9uc2USQAoJTGVhdmVDaGF0EhguYXBwLnYxLkxlYXZlQ2hhdFJlcXVlc3QaGS5hcHAudjEuTGVhdmVDaGF0UmVzcG9uc2USRgoLVW5iYW5NZW1iZXISGi5hcHAudjEuVW5iYW5NZW1iZXJSZXF1ZXN0GhsuYXBwLnYxLlVuYmFuTWVtYmVyUmVzcG9uc2USVQoQR2V0QmFubmVkTWVtYmVycxIfLmFwcC52MS5HZXRCYW5uZWRNZW1iZXJzUmVxdWVzdBogLmFwcC52MS5HZXRCYW5uZWRNZW1iZXJzUmVzcG9uc2USYQoUU2V0TWVtYmVyUGVybWlzc2lvbnMSIy5hcHAudjEuU2V0TWVtYmVyUGVybWlzc2lvbnNSZXF1ZXN0GiQuYXBwLnYxLlNldE1lbWJlclBlcm1pc3Npb25zUmVzcG9uc2USPQoIU2V0QWRtaW4SFy5hcHAudjEuU2V0QWRtaW5SZXF1ZXN0GhguYXBwLnYxLlNldEFkbWluUmVzcG9uc2USVQoQRXhwb3J0SW52aXRlTGluaxIfLmFwcC52MS5FeHBvcnRJbnZpdGVMaW5rUmVxdWVzdBogLmFwcC52MS5FeHBvcnRJbnZpdGVMaW5rUmVzcG9uc2USSQoMSm9pbkJ5SW52aXRlEhsuYXBwLnYxLkpvaW5CeUludml0ZVJlcXVlc3QaHC5hcHAudjEuSm9pbkJ5SW52aXRlUmVzcG9uc2USYQoUU2V0SGlzdG9yeVZpc2liaWxpdHkSIy5hcHAudjEuU2V0SGlzdG9yeVZpc2liaWxpdHlSZXF1ZXN0GiQuYXBwLnYxLlNldEhpc3RvcnlWaXNpYmlsaXR5UmVzcG9uc2USTwoOVXBkYXRlQ2hhdEluZm8SHS5hcHAudjEuVXBkYXRlQ2hhdEluZm9SZXF1ZXN0Gh4uYXBwLnYxLlVwZGF0ZUNoYXRJbmZvUmVzcG9uc2USTwoOR2V0UGVlckRpYWxvZ3MSHS5hcHAudjEuR2V0UGVlckRpYWxvZ3NSZXF1ZXN0Gh4uYXBwLnYxLkdldFBlZXJEaWFsb2dzUmVzcG9uc2USRgoLQ2hlY2tJbnZpdGUSGi5hcHAudjEuQ2hlY2tJbnZpdGVSZXF1ZXN0GhsuYXBwLnYxLkNoZWNrSW52aXRlUmVzcG9uc2USTwoOR2V0SW52aXRlTGlua3MSHS5hcHAudjEuR2V0SW52aXRlTGlua3NSZXF1ZXN0Gh4uYXBwLnYxLkdldEludml0ZUxpbmtzUmVzcG9uc2USVQoQUmV2b2tlSW52aXRlTGluaxIfLmFwcC52MS5SZXZva2VJbnZpdGVMaW5rUmVxdWVzdBogLmFwcC52MS5SZXZva2VJbnZpdGVMaW5rUmVzcG9uc2USTwoOR2V0Rm9ydW1Ub3BpY3MSHS5hcHAudjEuR2V0Rm9ydW1Ub3BpY3NSZXF1ZXN0Gh4uYXBwLnYxLkdldEZvcnVtVG9waWNzUmVzcG9uc2USVQoQQ3JlYXRlRm9ydW1Ub3BpYxIfLmFwcC52MS5DcmVhdGVGb3J1bVRvcGljUmVxdWVzdBogLmFwcC52MS5DcmVhdGVGb3J1bVRvcGljUmVzcG9uc2USTwoORWRpdEZvcnVtVG9waWMSHS5hcHAudjEuRWRpdEZvcnVtVG9waWNSZXF1ZXN0Gh4uYXBwLnYxLkVkaXRGb3J1bVRvcGljUmVzcG9uc2USUgoPQ2xvc2VGb3J1bVRvcGljEh4uYXBwLnYxLkNsb3NlRm9ydW1Ub3BpY1JlcXVlc3QaHy5hcHAudjEuQ2xvc2VGb3J1bVRvcGljUmVzcG9uc2USTwoOSGlkZUZvcnVtVG9waWMSHS5hcHAudjEuSGlkZUZvcnVtVG9waWNSZXF1ZXN0Gh4uYXBwLnYxLkhpZGVGb3J1bVRvcGljUmVzcG9uc2USTAoNU2V0RGlhbG9nTXV0ZRIcLmFwcC52MS5TZXREaWFsb2dNdXRlUmVxdWVzdBodLmFwcC52MS5TZXREaWFsb2dNdXRlUmVzcG9uc2USUgoPU2V0RGlhbG9nUGlubmVkEh4uYXBwLnYxLlNldERpYWxvZ1Bpbm5lZFJlcXVlc3QaHy5hcHAudjEuU2V0RGlhbG9nUGlubmVkUmVzcG9uc2USYQoUUmVvcmRlclBpbm5lZERpYWxvZ3MSIy5hcHAudjEuUmVvcmRlclBpbm5lZERpYWxvZ3NSZXF1ZXN0GiQuYXBwLnYxLlJlb3JkZXJQaW5uZWREaWFsb2dzUmVzcG9uc2USQwoKRGVsZXRlQ2hhdBIZLmFwcC52MS5EZWxldGVDaGF0UmVxdWVzdBoaLmFwcC52MS5EZWxldGVDaGF0UmVzcG9uc2USTwoOR2V0Q29tbW9uQ2hhdHMSHS5hcHAudjEuR2V0Q29tbW9uQ2hhdHNSZXF1ZXN0Gh4uYXBwLnYxLkdldENvbW1vbkNoYXRzUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
+
+/**
+ * @generated from message app.v1.AddMemberFailure
+ */
+export type AddMemberFailure = Message<"app.v1.AddMemberFailure"> & {
+  /**
+   * @generated from field: int64 user_id = 1 [jstype = JS_NUMBER];
+   */
+  userId: bigint;
+
+  /**
+   * @generated from field: app.v1.AddMemberFailureReason reason = 2;
+   */
+  reason: AddMemberFailureReason;
+};
+
+/**
+ * Describes the message app.v1.AddMemberFailure.
+ * Use `create(AddMemberFailureSchema)` to create a new message.
+ */
+export const AddMemberFailureSchema: GenMessage<AddMemberFailure> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 0);
 
 /**
  * @generated from message app.v1.Chat
@@ -125,7 +147,7 @@ export type Chat = Message<"app.v1.Chat"> & {
  * Use `create(ChatSchema)` to create a new message.
  */
 export const ChatSchema: GenMessage<Chat> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 0);
+  messageDesc(file_app_v1_chats, 1);
 
 /**
  * @generated from message app.v1.ChatMember
@@ -162,7 +184,7 @@ export type ChatMember = Message<"app.v1.ChatMember"> & {
  * Use `create(ChatMemberSchema)` to create a new message.
  */
 export const ChatMemberSchema: GenMessage<ChatMember> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 1);
+  messageDesc(file_app_v1_chats, 2);
 
 /**
  * One entry of the caller's chat list.
@@ -215,6 +237,23 @@ export type Dialog = Message<"app.v1.Dialog"> & {
    * @generated from field: int64 chat_pts = 7 [jstype = JS_NUMBER];
    */
   chatPts: bigint;
+
+  /**
+   * Notifications muted until this unix second; 0 when not muted (or the
+   * mute ended). 2147483647 means until unmuted (muted forever). Clients
+   * leave muted chats out of the total unread badge by default.
+   *
+   * @generated from field: int64 mute_until = 8 [jstype = JS_NUMBER];
+   */
+  muteUntil: bigint;
+
+  /**
+   * Pinned on top of the caller's list (order in GetDialogsResponse
+   * .pinned_chat_ids and UpdatePinnedDialogs).
+   *
+   * @generated from field: bool pinned = 9;
+   */
+  pinned: boolean;
 };
 
 /**
@@ -222,7 +261,7 @@ export type Dialog = Message<"app.v1.Dialog"> & {
  * Use `create(DialogSchema)` to create a new message.
  */
 export const DialogSchema: GenMessage<Dialog> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 2);
+  messageDesc(file_app_v1_chats, 3);
 
 /**
  * @generated from message app.v1.InviteLink
@@ -268,7 +307,7 @@ export type InviteLink = Message<"app.v1.InviteLink"> & {
  * Use `create(InviteLinkSchema)` to create a new message.
  */
 export const InviteLinkSchema: GenMessage<InviteLink> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 3);
+  messageDesc(file_app_v1_chats, 4);
 
 /**
  * Topic of a forum group. Topic 1 is the default "General" topic, created
@@ -374,7 +413,7 @@ export type ForumTopic = Message<"app.v1.ForumTopic"> & {
  * Use `create(ForumTopicSchema)` to create a new message.
  */
 export const ForumTopicSchema: GenMessage<ForumTopic> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 4);
+  messageDesc(file_app_v1_chats, 5);
 
 /**
  * A user removed from a chat by an admin.
@@ -403,7 +442,7 @@ export type BannedMember = Message<"app.v1.BannedMember"> & {
  * Use `create(BannedMemberSchema)` to create a new message.
  */
 export const BannedMemberSchema: GenMessage<BannedMember> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 5);
+  messageDesc(file_app_v1_chats, 6);
 
 /**
  * @generated from message app.v1.CreatePrivateRequest
@@ -420,7 +459,7 @@ export type CreatePrivateRequest = Message<"app.v1.CreatePrivateRequest"> & {
  * Use `create(CreatePrivateRequestSchema)` to create a new message.
  */
 export const CreatePrivateRequestSchema: GenMessage<CreatePrivateRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 6);
+  messageDesc(file_app_v1_chats, 7);
 
 /**
  * @generated from message app.v1.CreatePrivateResponse
@@ -442,7 +481,7 @@ export type CreatePrivateResponse = Message<"app.v1.CreatePrivateResponse"> & {
  * Use `create(CreatePrivateResponseSchema)` to create a new message.
  */
 export const CreatePrivateResponseSchema: GenMessage<CreatePrivateResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 7);
+  messageDesc(file_app_v1_chats, 8);
 
 /**
  * @generated from message app.v1.CreateGroupRequest
@@ -471,7 +510,7 @@ export type CreateGroupRequest = Message<"app.v1.CreateGroupRequest"> & {
  * Use `create(CreateGroupRequestSchema)` to create a new message.
  */
 export const CreateGroupRequestSchema: GenMessage<CreateGroupRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 8);
+  messageDesc(file_app_v1_chats, 9);
 
 /**
  * @generated from message app.v1.CreateGroupResponse
@@ -498,6 +537,13 @@ export type CreateGroupResponse = Message<"app.v1.CreateGroupResponse"> & {
    * @generated from field: app.v1.SyncAck ack = 4;
    */
   ack?: SyncAck | undefined;
+
+  /**
+   * Every user not added, with the reason.
+   *
+   * @generated from field: repeated app.v1.AddMemberFailure failures = 5;
+   */
+  failures: AddMemberFailure[];
 };
 
 /**
@@ -505,7 +551,7 @@ export type CreateGroupResponse = Message<"app.v1.CreateGroupResponse"> & {
  * Use `create(CreateGroupResponseSchema)` to create a new message.
  */
 export const CreateGroupResponseSchema: GenMessage<CreateGroupResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 9);
+  messageDesc(file_app_v1_chats, 10);
 
 /**
  * @generated from message app.v1.CreateChannelRequest
@@ -527,7 +573,7 @@ export type CreateChannelRequest = Message<"app.v1.CreateChannelRequest"> & {
  * Use `create(CreateChannelRequestSchema)` to create a new message.
  */
 export const CreateChannelRequestSchema: GenMessage<CreateChannelRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 10);
+  messageDesc(file_app_v1_chats, 11);
 
 /**
  * @generated from message app.v1.CreateChannelResponse
@@ -549,7 +595,7 @@ export type CreateChannelResponse = Message<"app.v1.CreateChannelResponse"> & {
  * Use `create(CreateChannelResponseSchema)` to create a new message.
  */
 export const CreateChannelResponseSchema: GenMessage<CreateChannelResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 11);
+  messageDesc(file_app_v1_chats, 12);
 
 /**
  * @generated from message app.v1.GetDialogsRequest
@@ -573,13 +619,18 @@ export type GetDialogsRequest = Message<"app.v1.GetDialogsRequest"> & {
  * Use `create(GetDialogsRequestSchema)` to create a new message.
  */
 export const GetDialogsRequestSchema: GenMessage<GetDialogsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 12);
+  messageDesc(file_app_v1_chats, 13);
 
 /**
  * @generated from message app.v1.GetDialogsResponse
  */
 export type GetDialogsResponse = Message<"app.v1.GetDialogsResponse"> & {
   /**
+   * The first page starts with every pinned dialog (pinned order), followed
+   * by up to limit other dialogs, newest activity first; later pages hold
+   * unpinned dialogs only. A private chat the caller deleted for themselves
+   * is left out until a new message arrives.
+   *
    * @generated from field: repeated app.v1.Dialog dialogs = 1;
    */
   dialogs: Dialog[];
@@ -607,6 +658,13 @@ export type GetDialogsResponse = Message<"app.v1.GetDialogsResponse"> & {
    * @generated from field: string next_cursor = 5;
    */
   nextCursor: string;
+
+  /**
+   * First page only: the caller's pinned chats, top first.
+   *
+   * @generated from field: repeated int64 pinned_chat_ids = 6 [jstype = JS_NUMBER];
+   */
+  pinnedChatIds: bigint[];
 };
 
 /**
@@ -614,7 +672,7 @@ export type GetDialogsResponse = Message<"app.v1.GetDialogsResponse"> & {
  * Use `create(GetDialogsResponseSchema)` to create a new message.
  */
 export const GetDialogsResponseSchema: GenMessage<GetDialogsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 13);
+  messageDesc(file_app_v1_chats, 14);
 
 /**
  * @generated from message app.v1.GetChatRequest
@@ -631,7 +689,7 @@ export type GetChatRequest = Message<"app.v1.GetChatRequest"> & {
  * Use `create(GetChatRequestSchema)` to create a new message.
  */
 export const GetChatRequestSchema: GenMessage<GetChatRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 14);
+  messageDesc(file_app_v1_chats, 15);
 
 /**
  * @generated from message app.v1.GetChatResponse
@@ -655,7 +713,7 @@ export type GetChatResponse = Message<"app.v1.GetChatResponse"> & {
  * Use `create(GetChatResponseSchema)` to create a new message.
  */
 export const GetChatResponseSchema: GenMessage<GetChatResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 15);
+  messageDesc(file_app_v1_chats, 16);
 
 /**
  * @generated from message app.v1.GetMembersRequest
@@ -689,7 +747,7 @@ export type GetMembersRequest = Message<"app.v1.GetMembersRequest"> & {
  * Use `create(GetMembersRequestSchema)` to create a new message.
  */
 export const GetMembersRequestSchema: GenMessage<GetMembersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 16);
+  messageDesc(file_app_v1_chats, 17);
 
 /**
  * @generated from message app.v1.GetMembersResponse
@@ -716,7 +774,7 @@ export type GetMembersResponse = Message<"app.v1.GetMembersResponse"> & {
  * Use `create(GetMembersResponseSchema)` to create a new message.
  */
 export const GetMembersResponseSchema: GenMessage<GetMembersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 17);
+  messageDesc(file_app_v1_chats, 18);
 
 /**
  * @generated from message app.v1.AddMembersRequest
@@ -738,13 +796,16 @@ export type AddMembersRequest = Message<"app.v1.AddMembersRequest"> & {
  * Use `create(AddMembersRequestSchema)` to create a new message.
  */
 export const AddMembersRequestSchema: GenMessage<AddMembersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 18);
+  messageDesc(file_app_v1_chats, 19);
 
 /**
  * @generated from message app.v1.AddMembersResponse
  */
 export type AddMembersResponse = Message<"app.v1.AddMembersResponse"> & {
   /**
+   * Users not added for privacy, blocks, bans or the member limit (already
+   * members are not listed here; see failures).
+   *
    * @generated from field: repeated int64 failed_user_ids = 1 [jstype = JS_NUMBER];
    */
   failedUserIds: bigint[];
@@ -753,6 +814,13 @@ export type AddMembersResponse = Message<"app.v1.AddMembersResponse"> & {
    * @generated from field: app.v1.SyncAck ack = 2;
    */
   ack?: SyncAck | undefined;
+
+  /**
+   * Every user not added, already members included, with the reason.
+   *
+   * @generated from field: repeated app.v1.AddMemberFailure failures = 3;
+   */
+  failures: AddMemberFailure[];
 };
 
 /**
@@ -760,7 +828,7 @@ export type AddMembersResponse = Message<"app.v1.AddMembersResponse"> & {
  * Use `create(AddMembersResponseSchema)` to create a new message.
  */
 export const AddMembersResponseSchema: GenMessage<AddMembersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 19);
+  messageDesc(file_app_v1_chats, 20);
 
 /**
  * @generated from message app.v1.RemoveMemberRequest
@@ -790,7 +858,7 @@ export type RemoveMemberRequest = Message<"app.v1.RemoveMemberRequest"> & {
  * Use `create(RemoveMemberRequestSchema)` to create a new message.
  */
 export const RemoveMemberRequestSchema: GenMessage<RemoveMemberRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 20);
+  messageDesc(file_app_v1_chats, 21);
 
 /**
  * @generated from message app.v1.RemoveMemberResponse
@@ -807,7 +875,7 @@ export type RemoveMemberResponse = Message<"app.v1.RemoveMemberResponse"> & {
  * Use `create(RemoveMemberResponseSchema)` to create a new message.
  */
 export const RemoveMemberResponseSchema: GenMessage<RemoveMemberResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 21);
+  messageDesc(file_app_v1_chats, 22);
 
 /**
  * @generated from message app.v1.LeaveChatRequest
@@ -817,6 +885,14 @@ export type LeaveChatRequest = Message<"app.v1.LeaveChatRequest"> & {
    * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
    */
   chatId: bigint;
+
+  /**
+   * Owner only: the admin who becomes the owner; 0 picks the
+   * longest-serving admin. Not a current admin: invalid_argument.
+   *
+   * @generated from field: int64 new_owner_id = 2 [jstype = JS_NUMBER];
+   */
+  newOwnerId: bigint;
 };
 
 /**
@@ -824,7 +900,7 @@ export type LeaveChatRequest = Message<"app.v1.LeaveChatRequest"> & {
  * Use `create(LeaveChatRequestSchema)` to create a new message.
  */
 export const LeaveChatRequestSchema: GenMessage<LeaveChatRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 22);
+  messageDesc(file_app_v1_chats, 23);
 
 /**
  * @generated from message app.v1.LeaveChatResponse
@@ -841,7 +917,7 @@ export type LeaveChatResponse = Message<"app.v1.LeaveChatResponse"> & {
  * Use `create(LeaveChatResponseSchema)` to create a new message.
  */
 export const LeaveChatResponseSchema: GenMessage<LeaveChatResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 23);
+  messageDesc(file_app_v1_chats, 24);
 
 /**
  * @generated from message app.v1.SetMemberPermissionsRequest
@@ -868,7 +944,7 @@ export type SetMemberPermissionsRequest = Message<"app.v1.SetMemberPermissionsRe
  * Use `create(SetMemberPermissionsRequestSchema)` to create a new message.
  */
 export const SetMemberPermissionsRequestSchema: GenMessage<SetMemberPermissionsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 24);
+  messageDesc(file_app_v1_chats, 25);
 
 /**
  * @generated from message app.v1.SetMemberPermissionsResponse
@@ -885,7 +961,7 @@ export type SetMemberPermissionsResponse = Message<"app.v1.SetMemberPermissionsR
  * Use `create(SetMemberPermissionsResponseSchema)` to create a new message.
  */
 export const SetMemberPermissionsResponseSchema: GenMessage<SetMemberPermissionsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 25);
+  messageDesc(file_app_v1_chats, 26);
 
 /**
  * @generated from message app.v1.SetAdminRequest
@@ -914,7 +990,7 @@ export type SetAdminRequest = Message<"app.v1.SetAdminRequest"> & {
  * Use `create(SetAdminRequestSchema)` to create a new message.
  */
 export const SetAdminRequestSchema: GenMessage<SetAdminRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 26);
+  messageDesc(file_app_v1_chats, 27);
 
 /**
  * @generated from message app.v1.SetAdminResponse
@@ -931,7 +1007,7 @@ export type SetAdminResponse = Message<"app.v1.SetAdminResponse"> & {
  * Use `create(SetAdminResponseSchema)` to create a new message.
  */
 export const SetAdminResponseSchema: GenMessage<SetAdminResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 27);
+  messageDesc(file_app_v1_chats, 28);
 
 /**
  * @generated from message app.v1.ExportInviteLinkRequest
@@ -962,7 +1038,7 @@ export type ExportInviteLinkRequest = Message<"app.v1.ExportInviteLinkRequest"> 
  * Use `create(ExportInviteLinkRequestSchema)` to create a new message.
  */
 export const ExportInviteLinkRequestSchema: GenMessage<ExportInviteLinkRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 28);
+  messageDesc(file_app_v1_chats, 29);
 
 /**
  * @generated from message app.v1.ExportInviteLinkResponse
@@ -979,7 +1055,7 @@ export type ExportInviteLinkResponse = Message<"app.v1.ExportInviteLinkResponse"
  * Use `create(ExportInviteLinkResponseSchema)` to create a new message.
  */
 export const ExportInviteLinkResponseSchema: GenMessage<ExportInviteLinkResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 29);
+  messageDesc(file_app_v1_chats, 30);
 
 /**
  * @generated from message app.v1.JoinByInviteRequest
@@ -998,7 +1074,7 @@ export type JoinByInviteRequest = Message<"app.v1.JoinByInviteRequest"> & {
  * Use `create(JoinByInviteRequestSchema)` to create a new message.
  */
 export const JoinByInviteRequestSchema: GenMessage<JoinByInviteRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 30);
+  messageDesc(file_app_v1_chats, 31);
 
 /**
  * @generated from message app.v1.JoinByInviteResponse
@@ -1025,7 +1101,7 @@ export type JoinByInviteResponse = Message<"app.v1.JoinByInviteResponse"> & {
  * Use `create(JoinByInviteResponseSchema)` to create a new message.
  */
 export const JoinByInviteResponseSchema: GenMessage<JoinByInviteResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 31);
+  messageDesc(file_app_v1_chats, 32);
 
 /**
  * @generated from message app.v1.SetHistoryVisibilityRequest
@@ -1047,7 +1123,7 @@ export type SetHistoryVisibilityRequest = Message<"app.v1.SetHistoryVisibilityRe
  * Use `create(SetHistoryVisibilityRequestSchema)` to create a new message.
  */
 export const SetHistoryVisibilityRequestSchema: GenMessage<SetHistoryVisibilityRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 32);
+  messageDesc(file_app_v1_chats, 33);
 
 /**
  * @generated from message app.v1.SetHistoryVisibilityResponse
@@ -1064,7 +1140,7 @@ export type SetHistoryVisibilityResponse = Message<"app.v1.SetHistoryVisibilityR
  * Use `create(SetHistoryVisibilityResponseSchema)` to create a new message.
  */
 export const SetHistoryVisibilityResponseSchema: GenMessage<SetHistoryVisibilityResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 33);
+  messageDesc(file_app_v1_chats, 34);
 
 /**
  * @generated from message app.v1.UpdateChatInfoRequest
@@ -1112,7 +1188,7 @@ export type UpdateChatInfoRequest = Message<"app.v1.UpdateChatInfoRequest"> & {
  * Use `create(UpdateChatInfoRequestSchema)` to create a new message.
  */
 export const UpdateChatInfoRequestSchema: GenMessage<UpdateChatInfoRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 34);
+  messageDesc(file_app_v1_chats, 35);
 
 /**
  * @generated from message app.v1.UpdateChatInfoResponse
@@ -1134,7 +1210,7 @@ export type UpdateChatInfoResponse = Message<"app.v1.UpdateChatInfoResponse"> & 
  * Use `create(UpdateChatInfoResponseSchema)` to create a new message.
  */
 export const UpdateChatInfoResponseSchema: GenMessage<UpdateChatInfoResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 35);
+  messageDesc(file_app_v1_chats, 36);
 
 /**
  * @generated from message app.v1.GetPeerDialogsRequest
@@ -1151,7 +1227,7 @@ export type GetPeerDialogsRequest = Message<"app.v1.GetPeerDialogsRequest"> & {
  * Use `create(GetPeerDialogsRequestSchema)` to create a new message.
  */
 export const GetPeerDialogsRequestSchema: GenMessage<GetPeerDialogsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 36);
+  messageDesc(file_app_v1_chats, 37);
 
 /**
  * @generated from message app.v1.GetPeerDialogsResponse
@@ -1185,7 +1261,7 @@ export type GetPeerDialogsResponse = Message<"app.v1.GetPeerDialogsResponse"> & 
  * Use `create(GetPeerDialogsResponseSchema)` to create a new message.
  */
 export const GetPeerDialogsResponseSchema: GenMessage<GetPeerDialogsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 37);
+  messageDesc(file_app_v1_chats, 38);
 
 /**
  * @generated from message app.v1.CheckInviteRequest
@@ -1204,7 +1280,7 @@ export type CheckInviteRequest = Message<"app.v1.CheckInviteRequest"> & {
  * Use `create(CheckInviteRequestSchema)` to create a new message.
  */
 export const CheckInviteRequestSchema: GenMessage<CheckInviteRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 38);
+  messageDesc(file_app_v1_chats, 39);
 
 /**
  * @generated from message app.v1.CheckInviteResponse
@@ -1262,7 +1338,7 @@ export type CheckInviteResponse = Message<"app.v1.CheckInviteResponse"> & {
  * Use `create(CheckInviteResponseSchema)` to create a new message.
  */
 export const CheckInviteResponseSchema: GenMessage<CheckInviteResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 39);
+  messageDesc(file_app_v1_chats, 40);
 
 /**
  * @generated from message app.v1.GetInviteLinksRequest
@@ -1279,7 +1355,7 @@ export type GetInviteLinksRequest = Message<"app.v1.GetInviteLinksRequest"> & {
  * Use `create(GetInviteLinksRequestSchema)` to create a new message.
  */
 export const GetInviteLinksRequestSchema: GenMessage<GetInviteLinksRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 40);
+  messageDesc(file_app_v1_chats, 41);
 
 /**
  * @generated from message app.v1.GetInviteLinksResponse
@@ -1298,7 +1374,7 @@ export type GetInviteLinksResponse = Message<"app.v1.GetInviteLinksResponse"> & 
  * Use `create(GetInviteLinksResponseSchema)` to create a new message.
  */
 export const GetInviteLinksResponseSchema: GenMessage<GetInviteLinksResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 41);
+  messageDesc(file_app_v1_chats, 42);
 
 /**
  * @generated from message app.v1.RevokeInviteLinkRequest
@@ -1320,7 +1396,7 @@ export type RevokeInviteLinkRequest = Message<"app.v1.RevokeInviteLinkRequest"> 
  * Use `create(RevokeInviteLinkRequestSchema)` to create a new message.
  */
 export const RevokeInviteLinkRequestSchema: GenMessage<RevokeInviteLinkRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 42);
+  messageDesc(file_app_v1_chats, 43);
 
 /**
  * @generated from message app.v1.RevokeInviteLinkResponse
@@ -1337,7 +1413,7 @@ export type RevokeInviteLinkResponse = Message<"app.v1.RevokeInviteLinkResponse"
  * Use `create(RevokeInviteLinkResponseSchema)` to create a new message.
  */
 export const RevokeInviteLinkResponseSchema: GenMessage<RevokeInviteLinkResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 43);
+  messageDesc(file_app_v1_chats, 44);
 
 /**
  * @generated from message app.v1.GetForumTopicsRequest
@@ -1368,7 +1444,7 @@ export type GetForumTopicsRequest = Message<"app.v1.GetForumTopicsRequest"> & {
  * Use `create(GetForumTopicsRequestSchema)` to create a new message.
  */
 export const GetForumTopicsRequestSchema: GenMessage<GetForumTopicsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 44);
+  messageDesc(file_app_v1_chats, 45);
 
 /**
  * @generated from message app.v1.GetForumTopicsResponse
@@ -1407,7 +1483,7 @@ export type GetForumTopicsResponse = Message<"app.v1.GetForumTopicsResponse"> & 
  * Use `create(GetForumTopicsResponseSchema)` to create a new message.
  */
 export const GetForumTopicsResponseSchema: GenMessage<GetForumTopicsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 45);
+  messageDesc(file_app_v1_chats, 46);
 
 /**
  * @generated from message app.v1.CreateForumTopicRequest
@@ -1441,7 +1517,7 @@ export type CreateForumTopicRequest = Message<"app.v1.CreateForumTopicRequest"> 
  * Use `create(CreateForumTopicRequestSchema)` to create a new message.
  */
 export const CreateForumTopicRequestSchema: GenMessage<CreateForumTopicRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 46);
+  messageDesc(file_app_v1_chats, 47);
 
 /**
  * @generated from message app.v1.CreateForumTopicResponse
@@ -1463,7 +1539,7 @@ export type CreateForumTopicResponse = Message<"app.v1.CreateForumTopicResponse"
  * Use `create(CreateForumTopicResponseSchema)` to create a new message.
  */
 export const CreateForumTopicResponseSchema: GenMessage<CreateForumTopicResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 47);
+  messageDesc(file_app_v1_chats, 48);
 
 /**
  * @generated from message app.v1.EditForumTopicRequest
@@ -1511,7 +1587,7 @@ export type EditForumTopicRequest = Message<"app.v1.EditForumTopicRequest"> & {
  * Use `create(EditForumTopicRequestSchema)` to create a new message.
  */
 export const EditForumTopicRequestSchema: GenMessage<EditForumTopicRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 48);
+  messageDesc(file_app_v1_chats, 49);
 
 /**
  * @generated from message app.v1.EditForumTopicResponse
@@ -1533,7 +1609,7 @@ export type EditForumTopicResponse = Message<"app.v1.EditForumTopicResponse"> & 
  * Use `create(EditForumTopicResponseSchema)` to create a new message.
  */
 export const EditForumTopicResponseSchema: GenMessage<EditForumTopicResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 49);
+  messageDesc(file_app_v1_chats, 50);
 
 /**
  * @generated from message app.v1.CloseForumTopicRequest
@@ -1560,7 +1636,7 @@ export type CloseForumTopicRequest = Message<"app.v1.CloseForumTopicRequest"> & 
  * Use `create(CloseForumTopicRequestSchema)` to create a new message.
  */
 export const CloseForumTopicRequestSchema: GenMessage<CloseForumTopicRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 50);
+  messageDesc(file_app_v1_chats, 51);
 
 /**
  * @generated from message app.v1.CloseForumTopicResponse
@@ -1582,7 +1658,7 @@ export type CloseForumTopicResponse = Message<"app.v1.CloseForumTopicResponse"> 
  * Use `create(CloseForumTopicResponseSchema)` to create a new message.
  */
 export const CloseForumTopicResponseSchema: GenMessage<CloseForumTopicResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 51);
+  messageDesc(file_app_v1_chats, 52);
 
 /**
  * @generated from message app.v1.HideForumTopicRequest
@@ -1609,7 +1685,7 @@ export type HideForumTopicRequest = Message<"app.v1.HideForumTopicRequest"> & {
  * Use `create(HideForumTopicRequestSchema)` to create a new message.
  */
 export const HideForumTopicRequestSchema: GenMessage<HideForumTopicRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 52);
+  messageDesc(file_app_v1_chats, 53);
 
 /**
  * @generated from message app.v1.HideForumTopicResponse
@@ -1631,7 +1707,7 @@ export type HideForumTopicResponse = Message<"app.v1.HideForumTopicResponse"> & 
  * Use `create(HideForumTopicResponseSchema)` to create a new message.
  */
 export const HideForumTopicResponseSchema: GenMessage<HideForumTopicResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 53);
+  messageDesc(file_app_v1_chats, 54);
 
 /**
  * @generated from message app.v1.UnbanMemberRequest
@@ -1653,7 +1729,7 @@ export type UnbanMemberRequest = Message<"app.v1.UnbanMemberRequest"> & {
  * Use `create(UnbanMemberRequestSchema)` to create a new message.
  */
 export const UnbanMemberRequestSchema: GenMessage<UnbanMemberRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 54);
+  messageDesc(file_app_v1_chats, 55);
 
 /**
  * @generated from message app.v1.UnbanMemberResponse
@@ -1666,7 +1742,7 @@ export type UnbanMemberResponse = Message<"app.v1.UnbanMemberResponse"> & {
  * Use `create(UnbanMemberResponseSchema)` to create a new message.
  */
 export const UnbanMemberResponseSchema: GenMessage<UnbanMemberResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 55);
+  messageDesc(file_app_v1_chats, 56);
 
 /**
  * @generated from message app.v1.GetBannedMembersRequest
@@ -1695,7 +1771,7 @@ export type GetBannedMembersRequest = Message<"app.v1.GetBannedMembersRequest"> 
  * Use `create(GetBannedMembersRequestSchema)` to create a new message.
  */
 export const GetBannedMembersRequestSchema: GenMessage<GetBannedMembersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 56);
+  messageDesc(file_app_v1_chats, 57);
 
 /**
  * @generated from message app.v1.GetBannedMembersResponse
@@ -1724,7 +1800,310 @@ export type GetBannedMembersResponse = Message<"app.v1.GetBannedMembersResponse"
  * Use `create(GetBannedMembersResponseSchema)` to create a new message.
  */
 export const GetBannedMembersResponseSchema: GenMessage<GetBannedMembersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_chats, 57);
+  messageDesc(file_app_v1_chats, 58);
+
+/**
+ * @generated from message app.v1.SetDialogMuteRequest
+ */
+export type SetDialogMuteRequest = Message<"app.v1.SetDialogMuteRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * Mute for this many seconds from now, 1 to 31622400 (366 days). 0 with
+   * forever unset unmutes.
+   *
+   * @generated from field: int32 duration_seconds = 2;
+   */
+  durationSeconds: number;
+
+  /**
+   * Mute until unmuted; duration_seconds is then ignored.
+   *
+   * @generated from field: bool forever = 3;
+   */
+  forever: boolean;
+};
+
+/**
+ * Describes the message app.v1.SetDialogMuteRequest.
+ * Use `create(SetDialogMuteRequestSchema)` to create a new message.
+ */
+export const SetDialogMuteRequestSchema: GenMessage<SetDialogMuteRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 59);
+
+/**
+ * @generated from message app.v1.SetDialogMuteResponse
+ */
+export type SetDialogMuteResponse = Message<"app.v1.SetDialogMuteResponse"> & {
+  /**
+   * As Dialog.mute_until.
+   *
+   * @generated from field: int64 mute_until = 1 [jstype = JS_NUMBER];
+   */
+  muteUntil: bigint;
+
+  /**
+   * @generated from field: app.v1.SyncAck ack = 2;
+   */
+  ack?: SyncAck | undefined;
+};
+
+/**
+ * Describes the message app.v1.SetDialogMuteResponse.
+ * Use `create(SetDialogMuteResponseSchema)` to create a new message.
+ */
+export const SetDialogMuteResponseSchema: GenMessage<SetDialogMuteResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 60);
+
+/**
+ * @generated from message app.v1.SetDialogPinnedRequest
+ */
+export type SetDialogPinnedRequest = Message<"app.v1.SetDialogPinnedRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * true pins on top of the list; false unpins.
+   *
+   * @generated from field: bool pinned = 2;
+   */
+  pinned: boolean;
+};
+
+/**
+ * Describes the message app.v1.SetDialogPinnedRequest.
+ * Use `create(SetDialogPinnedRequestSchema)` to create a new message.
+ */
+export const SetDialogPinnedRequestSchema: GenMessage<SetDialogPinnedRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 61);
+
+/**
+ * @generated from message app.v1.SetDialogPinnedResponse
+ */
+export type SetDialogPinnedResponse = Message<"app.v1.SetDialogPinnedResponse"> & {
+  /**
+   * The caller's pinned chats after the change, top first.
+   *
+   * @generated from field: repeated int64 pinned_chat_ids = 1 [jstype = JS_NUMBER];
+   */
+  pinnedChatIds: bigint[];
+
+  /**
+   * @generated from field: app.v1.SyncAck ack = 2;
+   */
+  ack?: SyncAck | undefined;
+};
+
+/**
+ * Describes the message app.v1.SetDialogPinnedResponse.
+ * Use `create(SetDialogPinnedResponseSchema)` to create a new message.
+ */
+export const SetDialogPinnedResponseSchema: GenMessage<SetDialogPinnedResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 62);
+
+/**
+ * @generated from message app.v1.ReorderPinnedDialogsRequest
+ */
+export type ReorderPinnedDialogsRequest = Message<"app.v1.ReorderPinnedDialogsRequest"> & {
+  /**
+   * Every pinned chat of the caller, top first.
+   *
+   * @generated from field: repeated int64 chat_ids = 1 [jstype = JS_NUMBER];
+   */
+  chatIds: bigint[];
+};
+
+/**
+ * Describes the message app.v1.ReorderPinnedDialogsRequest.
+ * Use `create(ReorderPinnedDialogsRequestSchema)` to create a new message.
+ */
+export const ReorderPinnedDialogsRequestSchema: GenMessage<ReorderPinnedDialogsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 63);
+
+/**
+ * @generated from message app.v1.ReorderPinnedDialogsResponse
+ */
+export type ReorderPinnedDialogsResponse = Message<"app.v1.ReorderPinnedDialogsResponse"> & {
+  /**
+   * @generated from field: repeated int64 pinned_chat_ids = 1 [jstype = JS_NUMBER];
+   */
+  pinnedChatIds: bigint[];
+
+  /**
+   * @generated from field: app.v1.SyncAck ack = 2;
+   */
+  ack?: SyncAck | undefined;
+};
+
+/**
+ * Describes the message app.v1.ReorderPinnedDialogsResponse.
+ * Use `create(ReorderPinnedDialogsResponseSchema)` to create a new message.
+ */
+export const ReorderPinnedDialogsResponseSchema: GenMessage<ReorderPinnedDialogsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 64);
+
+/**
+ * @generated from message app.v1.DeleteChatRequest
+ */
+export type DeleteChatRequest = Message<"app.v1.DeleteChatRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+};
+
+/**
+ * Describes the message app.v1.DeleteChatRequest.
+ * Use `create(DeleteChatRequestSchema)` to create a new message.
+ */
+export const DeleteChatRequestSchema: GenMessage<DeleteChatRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 65);
+
+/**
+ * @generated from message app.v1.DeleteChatResponse
+ */
+export type DeleteChatResponse = Message<"app.v1.DeleteChatResponse"> & {
+  /**
+   * @generated from field: app.v1.SyncAck ack = 1;
+   */
+  ack?: SyncAck | undefined;
+};
+
+/**
+ * Describes the message app.v1.DeleteChatResponse.
+ * Use `create(DeleteChatResponseSchema)` to create a new message.
+ */
+export const DeleteChatResponseSchema: GenMessage<DeleteChatResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 66);
+
+/**
+ * @generated from message app.v1.GetCommonChatsRequest
+ */
+export type GetCommonChatsRequest = Message<"app.v1.GetCommonChatsRequest"> & {
+  /**
+   * @generated from field: int64 user_id = 1 [jstype = JS_NUMBER];
+   */
+  userId: bigint;
+
+  /**
+   * Opaque cursor from a previous response; empty for the first page.
+   *
+   * @generated from field: string cursor = 2;
+   */
+  cursor: string;
+
+  /**
+   * Default 50, at most 100.
+   *
+   * @generated from field: int32 limit = 3;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message app.v1.GetCommonChatsRequest.
+ * Use `create(GetCommonChatsRequestSchema)` to create a new message.
+ */
+export const GetCommonChatsRequestSchema: GenMessage<GetCommonChatsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 67);
+
+/**
+ * @generated from message app.v1.GetCommonChatsResponse
+ */
+export type GetCommonChatsResponse = Message<"app.v1.GetCommonChatsResponse"> & {
+  /**
+   * Ascending by chat id.
+   *
+   * @generated from field: repeated app.v1.Chat chats = 1;
+   */
+  chats: Chat[];
+
+  /**
+   * All common chats, not only this page.
+   *
+   * @generated from field: int32 count = 2;
+   */
+  count: number;
+
+  /**
+   * Empty when there are no more chats.
+   *
+   * @generated from field: string next_cursor = 3;
+   */
+  nextCursor: string;
+};
+
+/**
+ * Describes the message app.v1.GetCommonChatsResponse.
+ * Use `create(GetCommonChatsResponseSchema)` to create a new message.
+ */
+export const GetCommonChatsResponseSchema: GenMessage<GetCommonChatsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_chats, 68);
+
+/**
+ * Why a user was not added to a chat (AddMembers, CreateGroup).
+ *
+ * @generated from enum app.v1.AddMemberFailureReason
+ */
+export enum AddMemberFailureReason {
+  /**
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * No such user in the tenant.
+   *
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_NOT_FOUND = 1;
+   */
+  NOT_FOUND = 1,
+
+  /**
+   * The user's add_to_groups privacy setting refuses the caller.
+   *
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_PRIVACY_ADD_TO_GROUPS = 2;
+   */
+  PRIVACY_ADD_TO_GROUPS = 2,
+
+  /**
+   * The user blocked the caller.
+   *
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_BLOCKED = 3;
+   */
+  BLOCKED = 3,
+
+  /**
+   * Banned from the chat; only an admin may add them back.
+   *
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_BANNED = 4;
+   */
+  BANNED = 4,
+
+  /**
+   * Already a member; nothing to do.
+   *
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_ALREADY_MEMBER = 5;
+   */
+  ALREADY_MEMBER = 5,
+
+  /**
+   * The chat reached its member limit.
+   *
+   * @generated from enum value: ADD_MEMBER_FAILURE_REASON_TOO_MANY = 6;
+   */
+  TOO_MANY = 6,
+}
+
+/**
+ * Describes the enum app.v1.AddMemberFailureReason.
+ */
+export const AddMemberFailureReasonSchema: GenEnum<AddMemberFailureReason> = /*@__PURE__*/
+  enumDesc(file_app_v1_chats, 0);
 
 /**
  * Same name `type` and values in DB, proto and JSON.
@@ -1764,7 +2143,7 @@ export enum ChatType {
  * Describes the enum app.v1.ChatType.
  */
 export const ChatTypeSchema: GenEnum<ChatType> = /*@__PURE__*/
-  enumDesc(file_app_v1_chats, 0);
+  enumDesc(file_app_v1_chats, 1);
 
 /**
  * How updates of a chat are synced (ADR 0002). The switch SMALL -> LARGE is
@@ -1797,7 +2176,7 @@ export enum SyncMode {
  * Describes the enum app.v1.SyncMode.
  */
 export const SyncModeSchema: GenEnum<SyncMode> = /*@__PURE__*/
-  enumDesc(file_app_v1_chats, 1);
+  enumDesc(file_app_v1_chats, 2);
 
 /**
  * @generated from enum app.v1.HistoryVisibility
@@ -1827,7 +2206,7 @@ export enum HistoryVisibility {
  * Describes the enum app.v1.HistoryVisibility.
  */
 export const HistoryVisibilitySchema: GenEnum<HistoryVisibility> = /*@__PURE__*/
-  enumDesc(file_app_v1_chats, 2);
+  enumDesc(file_app_v1_chats, 3);
 
 /**
  * @generated from enum app.v1.MemberRole
@@ -1858,7 +2237,7 @@ export enum MemberRole {
  * Describes the enum app.v1.MemberRole.
  */
 export const MemberRoleSchema: GenEnum<MemberRole> = /*@__PURE__*/
-  enumDesc(file_app_v1_chats, 3);
+  enumDesc(file_app_v1_chats, 4);
 
 /**
  * Bit values combined into the uint32 `permissions` fields.
@@ -1908,7 +2287,7 @@ export enum ChatPermission {
  * Describes the enum app.v1.ChatPermission.
  */
 export const ChatPermissionSchema: GenEnum<ChatPermission> = /*@__PURE__*/
-  enumDesc(file_app_v1_chats, 4);
+  enumDesc(file_app_v1_chats, 5);
 
 /**
  * Chats, members, permissions and the dialog list.
@@ -2166,6 +2545,66 @@ export const ChatsService: GenService<{
     methodKind: "unary";
     input: typeof HideForumTopicRequestSchema;
     output: typeof HideForumTopicResponseSchema;
+  },
+  /**
+   * Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
+   * The caller's other sessions get dialog_mute.
+   *
+   * @generated from rpc app.v1.ChatsService.SetDialogMute
+   */
+  setDialogMute: {
+    methodKind: "unary";
+    input: typeof SetDialogMuteRequestSchema;
+    output: typeof SetDialogMuteResponseSchema;
+  },
+  /**
+   * Pins a chat on top of the caller's list or unpins it, at most 5 chats;
+   * one more fails with failed_precondition
+   * (message prefix "pinned_dialogs_limit"). The caller's sessions get
+   * pinned_dialogs.
+   *
+   * @generated from rpc app.v1.ChatsService.SetDialogPinned
+   */
+  setDialogPinned: {
+    methodKind: "unary";
+    input: typeof SetDialogPinnedRequestSchema;
+    output: typeof SetDialogPinnedResponseSchema;
+  },
+  /**
+   * Reorders the caller's pinned chats; chat_ids must be exactly the pinned
+   * chats.
+   *
+   * @generated from rpc app.v1.ChatsService.ReorderPinnedDialogs
+   */
+  reorderPinnedDialogs: {
+    methodKind: "unary";
+    input: typeof ReorderPinnedDialogsRequestSchema;
+    output: typeof ReorderPinnedDialogsResponseSchema;
+  },
+  /**
+   * Groups and channels: the owner deletes the chat for every member (each
+   * gets chat_deleted with for_everyone; messages are purged from the server
+   * within the hour). Private chats: removes the chat and its history for
+   * the caller only; it comes back with the next message.
+   *
+   * @generated from rpc app.v1.ChatsService.DeleteChat
+   */
+  deleteChat: {
+    methodKind: "unary";
+    input: typeof DeleteChatRequestSchema;
+    output: typeof DeleteChatResponseSchema;
+  },
+  /**
+   * Groups both the caller and the user are current members of, and
+   * channels where the user is a member and the caller an admin (channel
+   * members are visible to admins only).
+   *
+   * @generated from rpc app.v1.ChatsService.GetCommonChats
+   */
+  getCommonChats: {
+    methodKind: "unary";
+    input: typeof GetCommonChatsRequestSchema;
+    output: typeof GetCommonChatsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_chats, 0);

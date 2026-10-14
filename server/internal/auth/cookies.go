@@ -89,6 +89,8 @@ type loginState struct {
 	Verifier string `json:"v"`
 	Locale   string `json:"l,omitempty"`
 	Expires  int64  `json:"e"`
+	// ReturnTo is the same-origin path to open after sign-in (CleanReturnTo).
+	ReturnTo string `json:"r,omitempty"`
 }
 
 var loginCookieAAD = []byte(LoginCookieName)

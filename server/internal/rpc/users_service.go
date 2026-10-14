@@ -45,7 +45,7 @@ func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.G
 	if err != nil {
 		return nil, internal(s.logger, req.Spec().Procedure, err)
 	}
-	return connect.NewResponse(&appv1.GetSelfResponse{User: selfUser(u)}), nil
+	return connect.NewResponse(&appv1.GetSelfResponse{User: selfUser(u), IsOperator: s.chat.IsOperator(sess.UserID)}), nil
 }
 
 // UpdateProfile changes the name and/or bio. Profile photos need media
@@ -201,5 +201,12 @@ func (s *usersService) DeleteContact(ctx context.Context, req *connect.Request[a
 func (s *usersService) GetContacts(ctx context.Context, req *connect.Request[appv1.GetContactsRequest]) (*connect.Response[appv1.GetContactsResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetContactsRequest) (*appv1.GetContactsResponse, error) {
 		return s.chat.GetContacts(ctx, me, m.GetCursor(), m.GetLimit())
+	})
+}
+
+// GetBlockedUsers pages through the users the caller blocked.
+func (s *usersService) GetBlockedUsers(ctx context.Context, req *connect.Request[appv1.GetBlockedUsersRequest]) (*connect.Response[appv1.GetBlockedUsersResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetBlockedUsersRequest) (*appv1.GetBlockedUsersResponse, error) {
+		return s.chat.GetBlockedUsers(ctx, me, m.GetCursor(), m.GetLimit())
 	})
 }

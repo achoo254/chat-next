@@ -193,6 +193,8 @@ export function toDialog(dialog: WireDialog): Dialog {
 		unreadCount: dialog.unreadCount,
 		unreadMentionsCount: dialog.unreadMentionsCount,
 		chatPts: id(dialog.chatPts),
+		muteUntil: id(dialog.muteUntil),
+		pinned: dialog.pinned,
 	};
 }
 
@@ -386,6 +388,12 @@ function toBody(update: WireUpdate): UpdateBody {
 				sessionId: id(kind.value.sessionId),
 				reason: toRevokeReason(kind.value.reason),
 			};
+		case "dialogMute":
+			return { kind: "dialog_mute", chatId: id(kind.value.chatId), muteUntil: id(kind.value.muteUntil) };
+		case "pinnedDialogs":
+			return { kind: "pinned_dialogs", chatIds: kind.value.chatIds.map(id) };
+		case "chatDeleted":
+			return { kind: "chat_deleted", chatId: id(kind.value.chatId), forEveryone: kind.value.forEveryone };
 		case undefined:
 			return { kind: "unknown" };
 	}
@@ -501,11 +509,13 @@ export function toPeerDialogs(response: GetPeerDialogsResponse): DialogsPage {
 		chats: response.chats,
 		users: response.users,
 		nextCursor: "",
+		pinnedChatIds: [],
 	});
 }
 
 export function toDialogsPage(
-	response: Pick<GetDialogsResponse, "dialogs" | "messages" | "chats" | "users" | "nextCursor">,
+	response: Pick<GetDialogsResponse, "dialogs" | "messages" | "chats" | "users" | "nextCursor"> &
+		Partial<Pick<GetDialogsResponse, "pinnedChatIds">>,
 ): DialogsPage {
 	return {
 		dialogs: response.dialogs.map(toDialog),
@@ -513,5 +523,6 @@ export function toDialogsPage(
 		chats: response.chats.map(toChat),
 		users: response.users.map(toUser),
 		nextCursor: response.nextCursor,
+		pinnedChatIds: (response.pinnedChatIds ?? []).map(id),
 	};
 }

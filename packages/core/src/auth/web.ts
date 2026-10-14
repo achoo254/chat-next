@@ -12,14 +12,33 @@ export const SIGN_OUT_PATH = "/auth/logout";
 
 const LOCALE = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/i;
 
+const RETURN_TO_MAX = 512;
+
+/**
+ * Whether `path` may be sent as return_to: a path on this origin (one
+ * leading "/", no backslash, whitespace or control character, not under
+ * /auth/). The server checks the same rules and ignores anything else.
+ */
+export function isReturnPath(path: string): boolean {
+	if (path === "" || path.length > RETURN_TO_MAX || !path.startsWith("/") || path.startsWith("//")) return false;
+	if (/[\\\s\u0000-\u001f\u007f]/u.test(path)) return false;
+	const lower = path.toLowerCase();
+	return !(lower === "/auth" || lower.startsWith("/auth/") || lower.startsWith("/auth?") || lower.startsWith("/auth#"));
+}
+
 /**
  * URL that starts sign-in at the tenant's IdP. `create` opens the IdP's
- * sign-up page (prompt=create); `locale` becomes ui_locales on the server.
+ * sign-up page (prompt=create); `locale` becomes ui_locales on the server;
+ * `returnTo` (a path, see isReturnPath) is where the browser lands after
+ * sign-in instead of "/".
  */
-export function signInUrl(locale: string, options: { create?: boolean } = {}): string {
+export function signInUrl(locale: string, options: { create?: boolean; returnTo?: string } = {}): string {
 	const params = new URLSearchParams();
 	if (options.create === true) params.set("prompt", "create");
 	if (LOCALE.test(locale)) params.set("locale", locale.toLowerCase());
+	if (options.returnTo !== undefined && options.returnTo !== "/" && isReturnPath(options.returnTo)) {
+		params.set("return_to", options.returnTo);
+	}
 	return `/auth/login?${params.toString()}`;
 }
 

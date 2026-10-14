@@ -47,6 +47,11 @@ type Config struct {
 	ReadReceiptsMaxAge    time.Duration
 	// LogRetentionDays is how long update logs and the outbox are kept.
 	LogRetentionDays int
+	// ChatMembersMax caps the members of one group or channel.
+	ChatMembersMax int
+	// Operators are the user ids allowed to use the moderation queue; none
+	// by default.
+	Operators []int64
 }
 
 // DefaultConfig returns the stage 1 limits; they match rpc.newAppConfig.
@@ -58,6 +63,7 @@ func DefaultConfig() Config {
 		ReadReceiptsMemberMax: 100,
 		ReadReceiptsMaxAge:    7 * 24 * time.Hour,
 		LogRetentionDays:      30,
+		ChatMembersMax:        200000,
 	}
 }
 
@@ -101,6 +107,8 @@ type Service struct {
 	previews *linkpreview.Service
 	limiter  ratelimit.Limiter
 	logger   *slog.Logger
+	// operators is Config.Operators as a set.
+	operators map[int64]bool
 
 	mu       sync.RWMutex
 	sink     Sink
@@ -149,11 +157,21 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if cfg.LogRetentionDays <= 0 {
 		cfg.LogRetentionDays = def.LogRetentionDays
 	}
+	if cfg.ChatMembersMax <= 0 {
+		cfg.ChatMembersMax = def.ChatMembersMax
+	}
 	if d.Pool == nil || d.IDs == nil || d.Previews == nil || d.Limiter == nil || d.Logger == nil {
 		return nil, errors.New("chat: missing dependency")
 	}
 	s := &Service{
 		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, limiter: d.Limiter, logger: d.Logger,
+		operators: map[int64]bool{},
+	}
+	for _, id := range cfg.Operators {
+		if id <= 0 {
+			return nil, errors.New("chat: operator user ids must be positive")
+		}
+		s.operators[id] = true
 	}
 	s.stopCtx, s.stopAll = context.WithCancel(context.Background())
 	s.dispatch = newDispatcher(s)
@@ -245,6 +263,10 @@ func errDenied(format string, args ...any) error {
 
 func errPrecondition(format string, args ...any) error {
 	return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(format, args...))
+}
+
+func isNotFound(err error) bool {
+	return err != nil && connect.CodeOf(err) == connect.CodeNotFound
 }
 
 func errRateLimited() error {

@@ -113,17 +113,21 @@ type memberRow struct {
 	LeftSeq int64
 	// Removed by an admin and not unbanned yet.
 	Banned bool
+	// The member's own dialog settings: muted until (unix seconds, 0 = not
+	// muted) and pinned position (0 = not pinned).
+	MuteUntil int64
+	PinRank   int32
 }
 
 const memberColumns = `m.chat_id, m.user_id, m.role, m.permissions, m.inviter_id, m.joined_at, m.joined_seq,
 	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL, m.left_at, coalesce(m.left_seq, 0),
-	m.banned_at IS NOT NULL`
+	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0)`
 
 func scanMember(row pgx.Row) (*memberRow, error) {
 	m := &memberRow{}
 	var perms *int32
 	err := row.Scan(&m.ChatID, &m.UserID, &m.Role, &perms, &m.InviterID, &m.JoinedAt, &m.JoinedSeq,
-		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned)
+		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned, &m.MuteUntil, &m.PinRank)
 	if perms != nil {
 		p := uint32(*perms)
 		m.Perms = &p
@@ -752,6 +756,11 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 		served = append(served, viewer)
 		for _, u := range jobs[viewer] {
 			chatID := updateChatID(u)
+			if _, ok := u.Kind.(*appv1.Update_ChatDeleted); ok {
+				// Carries only the id of a chat the viewer was in; a chat
+				// deleted for everyone has no member rows left.
+				continue
+			}
 			var m *memberRow
 			if chatID != 0 {
 				if m = members[memberKey{chatID, viewer}]; m == nil {

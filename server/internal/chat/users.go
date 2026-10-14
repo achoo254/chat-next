@@ -164,7 +164,7 @@ func (s *Service) checkCanMessage(ctx context.Context, q querier, me, peer int64
 
 // filterAddable splits users into those me may add to a chat and those
 // refused (unknown, blocking me, or not allowing it in add_to_groups).
-func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userIDs []int64) (allowed, failed []int64, err error) {
+func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userIDs []int64) (allowed []int64, failed addFailures, err error) {
 	ids := slices.DeleteFunc(uniqueSorted(userIDs), func(id int64) bool { return id == me })
 	if len(ids) == 0 {
 		return nil, nil, nil
@@ -186,11 +186,16 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 		return nil, nil, err
 	}
 	for _, id := range ids {
-		if users[id] == nil || blocks[blockKey{id, me}] || !allowedBy(privacy[id].AddToGroups, contacts[id]) {
-			failed = append(failed, id)
-			continue
+		switch {
+		case users[id] == nil:
+			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_NOT_FOUND})
+		case blocks[blockKey{id, me}]:
+			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_BLOCKED})
+		case !allowedBy(privacy[id].AddToGroups, contacts[id]):
+			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_PRIVACY_ADD_TO_GROUPS})
+		default:
+			allowed = append(allowed, id)
 		}
-		allowed = append(allowed, id)
 	}
 	return allowed, failed, nil
 }
@@ -542,23 +547,34 @@ func (s *Service) GetContacts(ctx context.Context, me int64, cursor string, limi
 		}
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT c.contact_id FROM contacts c JOIN users u ON u.id = c.contact_id AND u.tenant_id = $2
+		SELECT c.contact_id, c.created_at FROM contacts c JOIN users u ON u.id = c.contact_id AND u.tenant_id = $2
 		WHERE c.owner_id = $1 AND c.contact_id > $3 ORDER BY c.contact_id LIMIT $4`, me, s.cfg.TenantID, after, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("chat: list contacts: %w", err)
 	}
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	contacts, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*appv1.Contact, error) {
+		c := &appv1.Contact{}
+		var at time.Time
+		err := r.Scan(&c.UserId, &at)
+		c.AddedAt = at.Unix()
+		return c, err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("chat: list contacts: %w", err)
 	}
 	resp := &appv1.GetContactsResponse{}
-	if len(ids) > int(limit) {
-		ids = ids[:limit]
-		resp.NextCursor = fmt.Sprint(ids[len(ids)-1])
+	if len(contacts) > int(limit) {
+		contacts = contacts[:limit]
+		resp.NextCursor = fmt.Sprint(contacts[len(contacts)-1].GetUserId())
+	}
+	ids := make([]int64, len(contacts))
+	for i, c := range contacts {
+		ids[i] = c.GetUserId()
 	}
 	if resp.Users, err = s.usersWithStatus(ctx, me, ids); err != nil {
 		return nil, err
 	}
+	resp.Contacts = contacts
 	return resp, nil
 }
 

@@ -87,7 +87,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{Allow: opts.LinkPreviewAllow}), logger)
 	limiter := ratelimit.NewMemory()
 	chatSvc, err := chat.New(chat.Config{
-		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme,
+		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme, Operators: cfg.OperatorUserIDs,
 	}, chat.Deps{Pool: st.Pool(), IDs: ids, Previews: previews, Limiter: limiter, Logger: logger})
 	if err != nil {
 		return nil, err
@@ -207,7 +207,8 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.ListenAndServe() }()
-	logger.Info("api listening", "addr", cfg.ListenAddr, "public_origin", cfg.PublicOrigin(), "env", cfg.Env)
+	logger.Info("api listening", "addr", cfg.ListenAddr, "public_origin", cfg.PublicOrigin(), "env", cfg.Env,
+		"operators", len(cfg.OperatorUserIDs))
 
 	select {
 	case err := <-serveErr:

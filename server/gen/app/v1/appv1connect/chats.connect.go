@@ -105,6 +105,20 @@ const (
 	// ChatsServiceHideForumTopicProcedure is the fully-qualified name of the ChatsService's
 	// HideForumTopic RPC.
 	ChatsServiceHideForumTopicProcedure = "/app.v1.ChatsService/HideForumTopic"
+	// ChatsServiceSetDialogMuteProcedure is the fully-qualified name of the ChatsService's
+	// SetDialogMute RPC.
+	ChatsServiceSetDialogMuteProcedure = "/app.v1.ChatsService/SetDialogMute"
+	// ChatsServiceSetDialogPinnedProcedure is the fully-qualified name of the ChatsService's
+	// SetDialogPinned RPC.
+	ChatsServiceSetDialogPinnedProcedure = "/app.v1.ChatsService/SetDialogPinned"
+	// ChatsServiceReorderPinnedDialogsProcedure is the fully-qualified name of the ChatsService's
+	// ReorderPinnedDialogs RPC.
+	ChatsServiceReorderPinnedDialogsProcedure = "/app.v1.ChatsService/ReorderPinnedDialogs"
+	// ChatsServiceDeleteChatProcedure is the fully-qualified name of the ChatsService's DeleteChat RPC.
+	ChatsServiceDeleteChatProcedure = "/app.v1.ChatsService/DeleteChat"
+	// ChatsServiceGetCommonChatsProcedure is the fully-qualified name of the ChatsService's
+	// GetCommonChats RPC.
+	ChatsServiceGetCommonChatsProcedure = "/app.v1.ChatsService/GetCommonChats"
 )
 
 // ChatsServiceClient is a client for the app.v1.ChatsService service.
@@ -163,6 +177,26 @@ type ChatsServiceClient interface {
 	// A hidden topic leaves the topic list; its messages stay readable and
 	// searchable by members.
 	HideForumTopic(context.Context, *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error)
+	// Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
+	// The caller's other sessions get dialog_mute.
+	SetDialogMute(context.Context, *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error)
+	// Pins a chat on top of the caller's list or unpins it, at most 5 chats;
+	// one more fails with failed_precondition
+	// (message prefix "pinned_dialogs_limit"). The caller's sessions get
+	// pinned_dialogs.
+	SetDialogPinned(context.Context, *connect.Request[v1.SetDialogPinnedRequest]) (*connect.Response[v1.SetDialogPinnedResponse], error)
+	// Reorders the caller's pinned chats; chat_ids must be exactly the pinned
+	// chats.
+	ReorderPinnedDialogs(context.Context, *connect.Request[v1.ReorderPinnedDialogsRequest]) (*connect.Response[v1.ReorderPinnedDialogsResponse], error)
+	// Groups and channels: the owner deletes the chat for every member (each
+	// gets chat_deleted with for_everyone; messages are purged from the server
+	// within the hour). Private chats: removes the chat and its history for
+	// the caller only; it comes back with the next message.
+	DeleteChat(context.Context, *connect.Request[v1.DeleteChatRequest]) (*connect.Response[v1.DeleteChatResponse], error)
+	// Groups both the caller and the user are current members of, and
+	// channels where the user is a member and the caller an admin (channel
+	// members are visible to admins only).
+	GetCommonChats(context.Context, *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error)
 }
 
 // NewChatsServiceClient constructs a client for the app.v1.ChatsService service. By default, it
@@ -332,6 +366,36 @@ func NewChatsServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(chatsServiceMethods.ByName("HideForumTopic")),
 			connect.WithClientOptions(opts...),
 		),
+		setDialogMute: connect.NewClient[v1.SetDialogMuteRequest, v1.SetDialogMuteResponse](
+			httpClient,
+			baseURL+ChatsServiceSetDialogMuteProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("SetDialogMute")),
+			connect.WithClientOptions(opts...),
+		),
+		setDialogPinned: connect.NewClient[v1.SetDialogPinnedRequest, v1.SetDialogPinnedResponse](
+			httpClient,
+			baseURL+ChatsServiceSetDialogPinnedProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("SetDialogPinned")),
+			connect.WithClientOptions(opts...),
+		),
+		reorderPinnedDialogs: connect.NewClient[v1.ReorderPinnedDialogsRequest, v1.ReorderPinnedDialogsResponse](
+			httpClient,
+			baseURL+ChatsServiceReorderPinnedDialogsProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("ReorderPinnedDialogs")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteChat: connect.NewClient[v1.DeleteChatRequest, v1.DeleteChatResponse](
+			httpClient,
+			baseURL+ChatsServiceDeleteChatProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("DeleteChat")),
+			connect.WithClientOptions(opts...),
+		),
+		getCommonChats: connect.NewClient[v1.GetCommonChatsRequest, v1.GetCommonChatsResponse](
+			httpClient,
+			baseURL+ChatsServiceGetCommonChatsProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetCommonChats")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -363,6 +427,11 @@ type chatsServiceClient struct {
 	editForumTopic       *connect.Client[v1.EditForumTopicRequest, v1.EditForumTopicResponse]
 	closeForumTopic      *connect.Client[v1.CloseForumTopicRequest, v1.CloseForumTopicResponse]
 	hideForumTopic       *connect.Client[v1.HideForumTopicRequest, v1.HideForumTopicResponse]
+	setDialogMute        *connect.Client[v1.SetDialogMuteRequest, v1.SetDialogMuteResponse]
+	setDialogPinned      *connect.Client[v1.SetDialogPinnedRequest, v1.SetDialogPinnedResponse]
+	reorderPinnedDialogs *connect.Client[v1.ReorderPinnedDialogsRequest, v1.ReorderPinnedDialogsResponse]
+	deleteChat           *connect.Client[v1.DeleteChatRequest, v1.DeleteChatResponse]
+	getCommonChats       *connect.Client[v1.GetCommonChatsRequest, v1.GetCommonChatsResponse]
 }
 
 // CreatePrivate calls app.v1.ChatsService.CreatePrivate.
@@ -495,6 +564,31 @@ func (c *chatsServiceClient) HideForumTopic(ctx context.Context, req *connect.Re
 	return c.hideForumTopic.CallUnary(ctx, req)
 }
 
+// SetDialogMute calls app.v1.ChatsService.SetDialogMute.
+func (c *chatsServiceClient) SetDialogMute(ctx context.Context, req *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error) {
+	return c.setDialogMute.CallUnary(ctx, req)
+}
+
+// SetDialogPinned calls app.v1.ChatsService.SetDialogPinned.
+func (c *chatsServiceClient) SetDialogPinned(ctx context.Context, req *connect.Request[v1.SetDialogPinnedRequest]) (*connect.Response[v1.SetDialogPinnedResponse], error) {
+	return c.setDialogPinned.CallUnary(ctx, req)
+}
+
+// ReorderPinnedDialogs calls app.v1.ChatsService.ReorderPinnedDialogs.
+func (c *chatsServiceClient) ReorderPinnedDialogs(ctx context.Context, req *connect.Request[v1.ReorderPinnedDialogsRequest]) (*connect.Response[v1.ReorderPinnedDialogsResponse], error) {
+	return c.reorderPinnedDialogs.CallUnary(ctx, req)
+}
+
+// DeleteChat calls app.v1.ChatsService.DeleteChat.
+func (c *chatsServiceClient) DeleteChat(ctx context.Context, req *connect.Request[v1.DeleteChatRequest]) (*connect.Response[v1.DeleteChatResponse], error) {
+	return c.deleteChat.CallUnary(ctx, req)
+}
+
+// GetCommonChats calls app.v1.ChatsService.GetCommonChats.
+func (c *chatsServiceClient) GetCommonChats(ctx context.Context, req *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error) {
+	return c.getCommonChats.CallUnary(ctx, req)
+}
+
 // ChatsServiceHandler is an implementation of the app.v1.ChatsService service.
 type ChatsServiceHandler interface {
 	// Returns the existing private chat with the user when there is one.
@@ -551,6 +645,26 @@ type ChatsServiceHandler interface {
 	// A hidden topic leaves the topic list; its messages stay readable and
 	// searchable by members.
 	HideForumTopic(context.Context, *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error)
+	// Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
+	// The caller's other sessions get dialog_mute.
+	SetDialogMute(context.Context, *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error)
+	// Pins a chat on top of the caller's list or unpins it, at most 5 chats;
+	// one more fails with failed_precondition
+	// (message prefix "pinned_dialogs_limit"). The caller's sessions get
+	// pinned_dialogs.
+	SetDialogPinned(context.Context, *connect.Request[v1.SetDialogPinnedRequest]) (*connect.Response[v1.SetDialogPinnedResponse], error)
+	// Reorders the caller's pinned chats; chat_ids must be exactly the pinned
+	// chats.
+	ReorderPinnedDialogs(context.Context, *connect.Request[v1.ReorderPinnedDialogsRequest]) (*connect.Response[v1.ReorderPinnedDialogsResponse], error)
+	// Groups and channels: the owner deletes the chat for every member (each
+	// gets chat_deleted with for_everyone; messages are purged from the server
+	// within the hour). Private chats: removes the chat and its history for
+	// the caller only; it comes back with the next message.
+	DeleteChat(context.Context, *connect.Request[v1.DeleteChatRequest]) (*connect.Response[v1.DeleteChatResponse], error)
+	// Groups both the caller and the user are current members of, and
+	// channels where the user is a member and the caller an admin (channel
+	// members are visible to admins only).
+	GetCommonChats(context.Context, *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error)
 }
 
 // NewChatsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -716,6 +830,36 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(chatsServiceMethods.ByName("HideForumTopic")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatsServiceSetDialogMuteHandler := connect.NewUnaryHandler(
+		ChatsServiceSetDialogMuteProcedure,
+		svc.SetDialogMute,
+		connect.WithSchema(chatsServiceMethods.ByName("SetDialogMute")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceSetDialogPinnedHandler := connect.NewUnaryHandler(
+		ChatsServiceSetDialogPinnedProcedure,
+		svc.SetDialogPinned,
+		connect.WithSchema(chatsServiceMethods.ByName("SetDialogPinned")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceReorderPinnedDialogsHandler := connect.NewUnaryHandler(
+		ChatsServiceReorderPinnedDialogsProcedure,
+		svc.ReorderPinnedDialogs,
+		connect.WithSchema(chatsServiceMethods.ByName("ReorderPinnedDialogs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceDeleteChatHandler := connect.NewUnaryHandler(
+		ChatsServiceDeleteChatProcedure,
+		svc.DeleteChat,
+		connect.WithSchema(chatsServiceMethods.ByName("DeleteChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceGetCommonChatsHandler := connect.NewUnaryHandler(
+		ChatsServiceGetCommonChatsProcedure,
+		svc.GetCommonChats,
+		connect.WithSchema(chatsServiceMethods.ByName("GetCommonChats")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.ChatsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatsServiceCreatePrivateProcedure:
@@ -770,6 +914,16 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 			chatsServiceCloseForumTopicHandler.ServeHTTP(w, r)
 		case ChatsServiceHideForumTopicProcedure:
 			chatsServiceHideForumTopicHandler.ServeHTTP(w, r)
+		case ChatsServiceSetDialogMuteProcedure:
+			chatsServiceSetDialogMuteHandler.ServeHTTP(w, r)
+		case ChatsServiceSetDialogPinnedProcedure:
+			chatsServiceSetDialogPinnedHandler.ServeHTTP(w, r)
+		case ChatsServiceReorderPinnedDialogsProcedure:
+			chatsServiceReorderPinnedDialogsHandler.ServeHTTP(w, r)
+		case ChatsServiceDeleteChatProcedure:
+			chatsServiceDeleteChatHandler.ServeHTTP(w, r)
+		case ChatsServiceGetCommonChatsProcedure:
+			chatsServiceGetCommonChatsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -881,4 +1035,24 @@ func (UnimplementedChatsServiceHandler) CloseForumTopic(context.Context, *connec
 
 func (UnimplementedChatsServiceHandler) HideForumTopic(context.Context, *connect.Request[v1.HideForumTopicRequest]) (*connect.Response[v1.HideForumTopicResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.HideForumTopic is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) SetDialogMute(context.Context, *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.SetDialogMute is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) SetDialogPinned(context.Context, *connect.Request[v1.SetDialogPinnedRequest]) (*connect.Response[v1.SetDialogPinnedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.SetDialogPinned is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) ReorderPinnedDialogs(context.Context, *connect.Request[v1.ReorderPinnedDialogsRequest]) (*connect.Response[v1.ReorderPinnedDialogsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.ReorderPinnedDialogs is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) DeleteChat(context.Context, *connect.Request[v1.DeleteChatRequest]) (*connect.Response[v1.DeleteChatResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.DeleteChat is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetCommonChats(context.Context, *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetCommonChats is not implemented"))
 }
