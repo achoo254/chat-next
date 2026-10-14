@@ -31,6 +31,8 @@ const (
 	kindDialogMute        = "dialog_mute"
 	kindPinnedDialogs     = "pinned_dialogs"
 	kindChatDeleted       = "chat_deleted"
+	kindDialogUnreadMark  = "dialog_unread_mark"
+	kindNotifySettings    = "notification_settings"
 )
 
 // userEntry is one update in a user's log.
@@ -357,6 +359,8 @@ func updateChatID(u *appv1.Update) int64 {
 		return k.DialogMute.GetChatId()
 	case *appv1.Update_ChatDeleted:
 		return k.ChatDeleted.GetChatId()
+	case *appv1.Update_DialogUnreadMark:
+		return k.DialogUnreadMark.GetChatId()
 	default:
 		return 0
 	}

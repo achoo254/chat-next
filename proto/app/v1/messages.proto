@@ -29,8 +29,16 @@ service MessagesService {
   // Deletes for the caller only (hidden) or for everyone.
   rpc DeleteMessages(DeleteMessagesRequest) returns (DeleteMessagesResponse);
   rpc ReadHistory(ReadHistoryRequest) returns (ReadHistoryResponse);
+  // Pins one more message; a chat (and each forum topic) keeps any number
+  // of pinned messages. Chat.pinned_seq is the newest pinned message.
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
   rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
+  // Unpins every pinned message of the chat, or of one forum topic. Members
+  // get one pin update listing the unpinned seqs.
+  rpc UnpinAllMessages(UnpinAllMessagesRequest) returns (UnpinAllMessagesResponse);
+  // Pinned messages the caller can see (history visibility, not hidden for
+  // them), newest first, optionally of one forum topic.
+  rpc GetPinnedMessages(GetPinnedMessagesRequest) returns (GetPinnedMessagesResponse);
   rpc SetReaction(SetReactionRequest) returns (SetReactionResponse);
   // Seq-cursor history; respects visible_from_seq and messages hidden for the
   // caller.
@@ -167,6 +175,11 @@ message ReactionCount {
   int32 count = 2;
   // The caller reacted with this emoji.
   bool chosen = 3;
+  // Up to 3 users who reacted with this emoji most recently, newest first,
+  // so clients can show avatars on the chip; their users come with the
+  // message. Empty in channels unless the caller is an admin (channel
+  // members are private), like GetMessageReactions.
+  repeated int64 recent_user_ids = 4 [jstype = JS_NUMBER];
 }
 
 message ActionChatCreated {
@@ -235,7 +248,8 @@ message MessageAction {
 // action, never both. A client that sees a message with empty text (and no
 // media) whose action is unset or of a kind it does not know renders it as
 // "unsupported message" instead of dropping it, so newer content types and
-// action kinds stay visible to older clients.
+// action kinds stay visible to older clients. A recalled message is neither:
+// it is a placeholder (see recalled).
 message Message {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   int64 seq = 2 [jstype = JS_NUMBER];
@@ -266,6 +280,12 @@ message Message {
   // Forum topic of the message in a forum group; 0 elsewhere.
   int64 topic_id = 19 [jstype = JS_NUMBER];
   LinkPreview link_preview = 20;
+  // Deleted for everyone ("recalled"): a placeholder that keeps the
+  // message's place in the history. Only chat_id, seq, from_id, date,
+  // topic_id, edit_version and (for the sender) random_id are set; content,
+  // reactions and reply are gone. It never counts as unread, cannot be
+  // searched, replied to, edited, pinned or forwarded.
+  bool recalled = 21;
 }
 
 // Position of the caller's update logs right after a mutation, so the client
@@ -427,6 +447,37 @@ message UnpinMessageRequest {
 
 message UnpinMessageResponse {
   SyncAck ack = 1;
+}
+
+message UnpinAllMessagesRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Forum groups: only the pins of this topic; 0 = the whole chat.
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+}
+
+message UnpinAllMessagesResponse {
+  SyncAck ack = 1;
+}
+
+message GetPinnedMessagesRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Forum groups: only the pins of this topic; 0 = the whole chat.
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+  // Pinned messages with seq < offset_seq; 0 = from the newest.
+  int64 offset_seq = 3 [jstype = JS_NUMBER];
+  // Default 50, at most 100.
+  int32 limit = 4;
+}
+
+message GetPinnedMessagesResponse {
+  // Newest first (descending seq).
+  repeated Message messages = 1;
+  repeated User users = 2;
+  // Every pinned message of the chat (or topic) the caller can see, not
+  // only this page.
+  int32 count = 3;
+  // More pinned messages older than the last one returned.
+  bool has_more = 4;
 }
 
 message SetReactionRequest {

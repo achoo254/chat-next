@@ -119,6 +119,18 @@ const (
 	// ChatsServiceGetCommonChatsProcedure is the fully-qualified name of the ChatsService's
 	// GetCommonChats RPC.
 	ChatsServiceGetCommonChatsProcedure = "/app.v1.ChatsService/GetCommonChats"
+	// ChatsServiceSetDialogUnreadMarkProcedure is the fully-qualified name of the ChatsService's
+	// SetDialogUnreadMark RPC.
+	ChatsServiceSetDialogUnreadMarkProcedure = "/app.v1.ChatsService/SetDialogUnreadMark"
+	// ChatsServiceGetChatOnlineCountProcedure is the fully-qualified name of the ChatsService's
+	// GetChatOnlineCount RPC.
+	ChatsServiceGetChatOnlineCountProcedure = "/app.v1.ChatsService/GetChatOnlineCount"
+	// ChatsServiceGetNotificationSettingsProcedure is the fully-qualified name of the ChatsService's
+	// GetNotificationSettings RPC.
+	ChatsServiceGetNotificationSettingsProcedure = "/app.v1.ChatsService/GetNotificationSettings"
+	// ChatsServiceSetNotificationSettingsProcedure is the fully-qualified name of the ChatsService's
+	// SetNotificationSettings RPC.
+	ChatsServiceSetNotificationSettingsProcedure = "/app.v1.ChatsService/SetNotificationSettings"
 )
 
 // ChatsServiceClient is a client for the app.v1.ChatsService service.
@@ -197,6 +209,20 @@ type ChatsServiceClient interface {
 	// channels where the user is a member and the caller an admin (channel
 	// members are visible to admins only).
 	GetCommonChats(context.Context, *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error)
+	// Marks a chat as unread for the caller (Dialog.unread_mark) or clears
+	// the mark; reading the chat (ReadHistory) clears it too. The caller's
+	// sessions get dialog_unread_mark.
+	SetDialogUnreadMark(context.Context, *connect.Request[v1.SetDialogUnreadMarkRequest]) (*connect.Response[v1.SetDialogUnreadMarkResponse], error)
+	// How many members of a group are online now, counted on the server
+	// (approximate: cached briefly, capped). Members whose last-seen privacy
+	// hides their status from the caller are not counted. Channels: admins
+	// only.
+	GetChatOnlineCount(context.Context, *connect.Request[v1.GetChatOnlineCountRequest]) (*connect.Response[v1.GetChatOnlineCountResponse], error)
+	// The caller's notification settings (defaults until changed).
+	GetNotificationSettings(context.Context, *connect.Request[v1.GetNotificationSettingsRequest]) (*connect.Response[v1.GetNotificationSettingsResponse], error)
+	// Changes the given settings; the caller's sessions get
+	// notification_settings.
+	SetNotificationSettings(context.Context, *connect.Request[v1.SetNotificationSettingsRequest]) (*connect.Response[v1.SetNotificationSettingsResponse], error)
 }
 
 // NewChatsServiceClient constructs a client for the app.v1.ChatsService service. By default, it
@@ -396,42 +422,70 @@ func NewChatsServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(chatsServiceMethods.ByName("GetCommonChats")),
 			connect.WithClientOptions(opts...),
 		),
+		setDialogUnreadMark: connect.NewClient[v1.SetDialogUnreadMarkRequest, v1.SetDialogUnreadMarkResponse](
+			httpClient,
+			baseURL+ChatsServiceSetDialogUnreadMarkProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("SetDialogUnreadMark")),
+			connect.WithClientOptions(opts...),
+		),
+		getChatOnlineCount: connect.NewClient[v1.GetChatOnlineCountRequest, v1.GetChatOnlineCountResponse](
+			httpClient,
+			baseURL+ChatsServiceGetChatOnlineCountProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetChatOnlineCount")),
+			connect.WithClientOptions(opts...),
+		),
+		getNotificationSettings: connect.NewClient[v1.GetNotificationSettingsRequest, v1.GetNotificationSettingsResponse](
+			httpClient,
+			baseURL+ChatsServiceGetNotificationSettingsProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("GetNotificationSettings")),
+			connect.WithClientOptions(opts...),
+		),
+		setNotificationSettings: connect.NewClient[v1.SetNotificationSettingsRequest, v1.SetNotificationSettingsResponse](
+			httpClient,
+			baseURL+ChatsServiceSetNotificationSettingsProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("SetNotificationSettings")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // chatsServiceClient implements ChatsServiceClient.
 type chatsServiceClient struct {
-	createPrivate        *connect.Client[v1.CreatePrivateRequest, v1.CreatePrivateResponse]
-	createGroup          *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
-	createChannel        *connect.Client[v1.CreateChannelRequest, v1.CreateChannelResponse]
-	getDialogs           *connect.Client[v1.GetDialogsRequest, v1.GetDialogsResponse]
-	getChat              *connect.Client[v1.GetChatRequest, v1.GetChatResponse]
-	getMembers           *connect.Client[v1.GetMembersRequest, v1.GetMembersResponse]
-	addMembers           *connect.Client[v1.AddMembersRequest, v1.AddMembersResponse]
-	removeMember         *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
-	leaveChat            *connect.Client[v1.LeaveChatRequest, v1.LeaveChatResponse]
-	unbanMember          *connect.Client[v1.UnbanMemberRequest, v1.UnbanMemberResponse]
-	getBannedMembers     *connect.Client[v1.GetBannedMembersRequest, v1.GetBannedMembersResponse]
-	setMemberPermissions *connect.Client[v1.SetMemberPermissionsRequest, v1.SetMemberPermissionsResponse]
-	setAdmin             *connect.Client[v1.SetAdminRequest, v1.SetAdminResponse]
-	exportInviteLink     *connect.Client[v1.ExportInviteLinkRequest, v1.ExportInviteLinkResponse]
-	joinByInvite         *connect.Client[v1.JoinByInviteRequest, v1.JoinByInviteResponse]
-	setHistoryVisibility *connect.Client[v1.SetHistoryVisibilityRequest, v1.SetHistoryVisibilityResponse]
-	updateChatInfo       *connect.Client[v1.UpdateChatInfoRequest, v1.UpdateChatInfoResponse]
-	getPeerDialogs       *connect.Client[v1.GetPeerDialogsRequest, v1.GetPeerDialogsResponse]
-	checkInvite          *connect.Client[v1.CheckInviteRequest, v1.CheckInviteResponse]
-	getInviteLinks       *connect.Client[v1.GetInviteLinksRequest, v1.GetInviteLinksResponse]
-	revokeInviteLink     *connect.Client[v1.RevokeInviteLinkRequest, v1.RevokeInviteLinkResponse]
-	getForumTopics       *connect.Client[v1.GetForumTopicsRequest, v1.GetForumTopicsResponse]
-	createForumTopic     *connect.Client[v1.CreateForumTopicRequest, v1.CreateForumTopicResponse]
-	editForumTopic       *connect.Client[v1.EditForumTopicRequest, v1.EditForumTopicResponse]
-	closeForumTopic      *connect.Client[v1.CloseForumTopicRequest, v1.CloseForumTopicResponse]
-	hideForumTopic       *connect.Client[v1.HideForumTopicRequest, v1.HideForumTopicResponse]
-	setDialogMute        *connect.Client[v1.SetDialogMuteRequest, v1.SetDialogMuteResponse]
-	setDialogPinned      *connect.Client[v1.SetDialogPinnedRequest, v1.SetDialogPinnedResponse]
-	reorderPinnedDialogs *connect.Client[v1.ReorderPinnedDialogsRequest, v1.ReorderPinnedDialogsResponse]
-	deleteChat           *connect.Client[v1.DeleteChatRequest, v1.DeleteChatResponse]
-	getCommonChats       *connect.Client[v1.GetCommonChatsRequest, v1.GetCommonChatsResponse]
+	createPrivate           *connect.Client[v1.CreatePrivateRequest, v1.CreatePrivateResponse]
+	createGroup             *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
+	createChannel           *connect.Client[v1.CreateChannelRequest, v1.CreateChannelResponse]
+	getDialogs              *connect.Client[v1.GetDialogsRequest, v1.GetDialogsResponse]
+	getChat                 *connect.Client[v1.GetChatRequest, v1.GetChatResponse]
+	getMembers              *connect.Client[v1.GetMembersRequest, v1.GetMembersResponse]
+	addMembers              *connect.Client[v1.AddMembersRequest, v1.AddMembersResponse]
+	removeMember            *connect.Client[v1.RemoveMemberRequest, v1.RemoveMemberResponse]
+	leaveChat               *connect.Client[v1.LeaveChatRequest, v1.LeaveChatResponse]
+	unbanMember             *connect.Client[v1.UnbanMemberRequest, v1.UnbanMemberResponse]
+	getBannedMembers        *connect.Client[v1.GetBannedMembersRequest, v1.GetBannedMembersResponse]
+	setMemberPermissions    *connect.Client[v1.SetMemberPermissionsRequest, v1.SetMemberPermissionsResponse]
+	setAdmin                *connect.Client[v1.SetAdminRequest, v1.SetAdminResponse]
+	exportInviteLink        *connect.Client[v1.ExportInviteLinkRequest, v1.ExportInviteLinkResponse]
+	joinByInvite            *connect.Client[v1.JoinByInviteRequest, v1.JoinByInviteResponse]
+	setHistoryVisibility    *connect.Client[v1.SetHistoryVisibilityRequest, v1.SetHistoryVisibilityResponse]
+	updateChatInfo          *connect.Client[v1.UpdateChatInfoRequest, v1.UpdateChatInfoResponse]
+	getPeerDialogs          *connect.Client[v1.GetPeerDialogsRequest, v1.GetPeerDialogsResponse]
+	checkInvite             *connect.Client[v1.CheckInviteRequest, v1.CheckInviteResponse]
+	getInviteLinks          *connect.Client[v1.GetInviteLinksRequest, v1.GetInviteLinksResponse]
+	revokeInviteLink        *connect.Client[v1.RevokeInviteLinkRequest, v1.RevokeInviteLinkResponse]
+	getForumTopics          *connect.Client[v1.GetForumTopicsRequest, v1.GetForumTopicsResponse]
+	createForumTopic        *connect.Client[v1.CreateForumTopicRequest, v1.CreateForumTopicResponse]
+	editForumTopic          *connect.Client[v1.EditForumTopicRequest, v1.EditForumTopicResponse]
+	closeForumTopic         *connect.Client[v1.CloseForumTopicRequest, v1.CloseForumTopicResponse]
+	hideForumTopic          *connect.Client[v1.HideForumTopicRequest, v1.HideForumTopicResponse]
+	setDialogMute           *connect.Client[v1.SetDialogMuteRequest, v1.SetDialogMuteResponse]
+	setDialogPinned         *connect.Client[v1.SetDialogPinnedRequest, v1.SetDialogPinnedResponse]
+	reorderPinnedDialogs    *connect.Client[v1.ReorderPinnedDialogsRequest, v1.ReorderPinnedDialogsResponse]
+	deleteChat              *connect.Client[v1.DeleteChatRequest, v1.DeleteChatResponse]
+	getCommonChats          *connect.Client[v1.GetCommonChatsRequest, v1.GetCommonChatsResponse]
+	setDialogUnreadMark     *connect.Client[v1.SetDialogUnreadMarkRequest, v1.SetDialogUnreadMarkResponse]
+	getChatOnlineCount      *connect.Client[v1.GetChatOnlineCountRequest, v1.GetChatOnlineCountResponse]
+	getNotificationSettings *connect.Client[v1.GetNotificationSettingsRequest, v1.GetNotificationSettingsResponse]
+	setNotificationSettings *connect.Client[v1.SetNotificationSettingsRequest, v1.SetNotificationSettingsResponse]
 }
 
 // CreatePrivate calls app.v1.ChatsService.CreatePrivate.
@@ -589,6 +643,26 @@ func (c *chatsServiceClient) GetCommonChats(ctx context.Context, req *connect.Re
 	return c.getCommonChats.CallUnary(ctx, req)
 }
 
+// SetDialogUnreadMark calls app.v1.ChatsService.SetDialogUnreadMark.
+func (c *chatsServiceClient) SetDialogUnreadMark(ctx context.Context, req *connect.Request[v1.SetDialogUnreadMarkRequest]) (*connect.Response[v1.SetDialogUnreadMarkResponse], error) {
+	return c.setDialogUnreadMark.CallUnary(ctx, req)
+}
+
+// GetChatOnlineCount calls app.v1.ChatsService.GetChatOnlineCount.
+func (c *chatsServiceClient) GetChatOnlineCount(ctx context.Context, req *connect.Request[v1.GetChatOnlineCountRequest]) (*connect.Response[v1.GetChatOnlineCountResponse], error) {
+	return c.getChatOnlineCount.CallUnary(ctx, req)
+}
+
+// GetNotificationSettings calls app.v1.ChatsService.GetNotificationSettings.
+func (c *chatsServiceClient) GetNotificationSettings(ctx context.Context, req *connect.Request[v1.GetNotificationSettingsRequest]) (*connect.Response[v1.GetNotificationSettingsResponse], error) {
+	return c.getNotificationSettings.CallUnary(ctx, req)
+}
+
+// SetNotificationSettings calls app.v1.ChatsService.SetNotificationSettings.
+func (c *chatsServiceClient) SetNotificationSettings(ctx context.Context, req *connect.Request[v1.SetNotificationSettingsRequest]) (*connect.Response[v1.SetNotificationSettingsResponse], error) {
+	return c.setNotificationSettings.CallUnary(ctx, req)
+}
+
 // ChatsServiceHandler is an implementation of the app.v1.ChatsService service.
 type ChatsServiceHandler interface {
 	// Returns the existing private chat with the user when there is one.
@@ -665,6 +739,20 @@ type ChatsServiceHandler interface {
 	// channels where the user is a member and the caller an admin (channel
 	// members are visible to admins only).
 	GetCommonChats(context.Context, *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error)
+	// Marks a chat as unread for the caller (Dialog.unread_mark) or clears
+	// the mark; reading the chat (ReadHistory) clears it too. The caller's
+	// sessions get dialog_unread_mark.
+	SetDialogUnreadMark(context.Context, *connect.Request[v1.SetDialogUnreadMarkRequest]) (*connect.Response[v1.SetDialogUnreadMarkResponse], error)
+	// How many members of a group are online now, counted on the server
+	// (approximate: cached briefly, capped). Members whose last-seen privacy
+	// hides their status from the caller are not counted. Channels: admins
+	// only.
+	GetChatOnlineCount(context.Context, *connect.Request[v1.GetChatOnlineCountRequest]) (*connect.Response[v1.GetChatOnlineCountResponse], error)
+	// The caller's notification settings (defaults until changed).
+	GetNotificationSettings(context.Context, *connect.Request[v1.GetNotificationSettingsRequest]) (*connect.Response[v1.GetNotificationSettingsResponse], error)
+	// Changes the given settings; the caller's sessions get
+	// notification_settings.
+	SetNotificationSettings(context.Context, *connect.Request[v1.SetNotificationSettingsRequest]) (*connect.Response[v1.SetNotificationSettingsResponse], error)
 }
 
 // NewChatsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -860,6 +948,30 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(chatsServiceMethods.ByName("GetCommonChats")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatsServiceSetDialogUnreadMarkHandler := connect.NewUnaryHandler(
+		ChatsServiceSetDialogUnreadMarkProcedure,
+		svc.SetDialogUnreadMark,
+		connect.WithSchema(chatsServiceMethods.ByName("SetDialogUnreadMark")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceGetChatOnlineCountHandler := connect.NewUnaryHandler(
+		ChatsServiceGetChatOnlineCountProcedure,
+		svc.GetChatOnlineCount,
+		connect.WithSchema(chatsServiceMethods.ByName("GetChatOnlineCount")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceGetNotificationSettingsHandler := connect.NewUnaryHandler(
+		ChatsServiceGetNotificationSettingsProcedure,
+		svc.GetNotificationSettings,
+		connect.WithSchema(chatsServiceMethods.ByName("GetNotificationSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatsServiceSetNotificationSettingsHandler := connect.NewUnaryHandler(
+		ChatsServiceSetNotificationSettingsProcedure,
+		svc.SetNotificationSettings,
+		connect.WithSchema(chatsServiceMethods.ByName("SetNotificationSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.ChatsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatsServiceCreatePrivateProcedure:
@@ -924,6 +1036,14 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 			chatsServiceDeleteChatHandler.ServeHTTP(w, r)
 		case ChatsServiceGetCommonChatsProcedure:
 			chatsServiceGetCommonChatsHandler.ServeHTTP(w, r)
+		case ChatsServiceSetDialogUnreadMarkProcedure:
+			chatsServiceSetDialogUnreadMarkHandler.ServeHTTP(w, r)
+		case ChatsServiceGetChatOnlineCountProcedure:
+			chatsServiceGetChatOnlineCountHandler.ServeHTTP(w, r)
+		case ChatsServiceGetNotificationSettingsProcedure:
+			chatsServiceGetNotificationSettingsHandler.ServeHTTP(w, r)
+		case ChatsServiceSetNotificationSettingsProcedure:
+			chatsServiceSetNotificationSettingsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1055,4 +1175,20 @@ func (UnimplementedChatsServiceHandler) DeleteChat(context.Context, *connect.Req
 
 func (UnimplementedChatsServiceHandler) GetCommonChats(context.Context, *connect.Request[v1.GetCommonChatsRequest]) (*connect.Response[v1.GetCommonChatsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetCommonChats is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) SetDialogUnreadMark(context.Context, *connect.Request[v1.SetDialogUnreadMarkRequest]) (*connect.Response[v1.SetDialogUnreadMarkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.SetDialogUnreadMark is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetChatOnlineCount(context.Context, *connect.Request[v1.GetChatOnlineCountRequest]) (*connect.Response[v1.GetChatOnlineCountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetChatOnlineCount is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) GetNotificationSettings(context.Context, *connect.Request[v1.GetNotificationSettingsRequest]) (*connect.Response[v1.GetNotificationSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.GetNotificationSettings is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) SetNotificationSettings(context.Context, *connect.Request[v1.SetNotificationSettingsRequest]) (*connect.Response[v1.SetNotificationSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.SetNotificationSettings is not implemented"))
 }

@@ -342,9 +342,11 @@ func TestRealtimeEndToEnd(t *testing.T) {
 		t.Fatalf("difference across epochs = %v, want too_long", stale)
 	}
 
-	// History of the topic, the dialog and the topic list.
+	// History of the topic (the recalled message keeps its place, without
+	// content), the dialog and the topic list.
 	hist := rpcOK(t, bob.messages.GetHistory, &appv1.GetHistoryRequest{ChatId: chatID, TopicId: topic.GetId()})
-	if len(hist.GetMessages()) != 1 || hist.GetMessages()[0].GetSeq() != reply.GetMessage().GetSeq() {
+	if msgs := hist.GetMessages(); len(msgs) != 2 || !msgs[0].GetRecalled() || msgs[0].GetText() != "" ||
+		msgs[1].GetSeq() != reply.GetMessage().GetSeq() {
 		t.Fatalf("topic history = %v", hist)
 	}
 	topics := rpcOK(t, bob.chats.GetForumTopics, &appv1.GetForumTopicsRequest{ChatId: chatID})

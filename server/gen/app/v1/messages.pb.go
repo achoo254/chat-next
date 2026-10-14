@@ -950,7 +950,12 @@ type ReactionCount struct {
 	Emoji string                 `protobuf:"bytes,1,opt,name=emoji,proto3" json:"emoji,omitempty"`
 	Count int32                  `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
 	// The caller reacted with this emoji.
-	Chosen        bool `protobuf:"varint,3,opt,name=chosen,proto3" json:"chosen,omitempty"`
+	Chosen bool `protobuf:"varint,3,opt,name=chosen,proto3" json:"chosen,omitempty"`
+	// Up to 3 users who reacted with this emoji most recently, newest first,
+	// so clients can show avatars on the chip; their users come with the
+	// message. Empty in channels unless the caller is an admin (channel
+	// members are private), like GetMessageReactions.
+	RecentUserIds []int64 `protobuf:"varint,4,rep,packed,name=recent_user_ids,json=recentUserIds,proto3" json:"recent_user_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1004,6 +1009,13 @@ func (x *ReactionCount) GetChosen() bool {
 		return x.Chosen
 	}
 	return false
+}
+
+func (x *ReactionCount) GetRecentUserIds() []int64 {
+	if x != nil {
+		return x.RecentUserIds
+	}
+	return nil
 }
 
 type ActionChatCreated struct {
@@ -1705,7 +1717,8 @@ func (*MessageAction_JoinedByInvite) isMessageAction_Kind() {}
 // action, never both. A client that sees a message with empty text (and no
 // media) whose action is unset or of a kind it does not know renders it as
 // "unsupported message" instead of dropping it, so newer content types and
-// action kinds stay visible to older clients.
+// action kinds stay visible to older clients. A recalled message is neither:
+// it is a placeholder (see recalled).
 type Message struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ChatId   int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
@@ -1735,8 +1748,14 @@ type Message struct {
 	// Set on system messages only; content fields are then empty.
 	Action *MessageAction `protobuf:"bytes,18,opt,name=action,proto3" json:"action,omitempty"`
 	// Forum topic of the message in a forum group; 0 elsewhere.
-	TopicId       int64        `protobuf:"varint,19,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
-	LinkPreview   *LinkPreview `protobuf:"bytes,20,opt,name=link_preview,json=linkPreview,proto3" json:"link_preview,omitempty"`
+	TopicId     int64        `protobuf:"varint,19,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	LinkPreview *LinkPreview `protobuf:"bytes,20,opt,name=link_preview,json=linkPreview,proto3" json:"link_preview,omitempty"`
+	// Deleted for everyone ("recalled"): a placeholder that keeps the
+	// message's place in the history. Only chat_id, seq, from_id, date,
+	// topic_id, edit_version and (for the sender) random_id are set; content,
+	// reactions and reply are gone. It never counts as unread, cannot be
+	// searched, replied to, edited, pinned or forwarded.
+	Recalled      bool `protobuf:"varint,21,opt,name=recalled,proto3" json:"recalled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1909,6 +1928,13 @@ func (x *Message) GetLinkPreview() *LinkPreview {
 		return x.LinkPreview
 	}
 	return nil
+}
+
+func (x *Message) GetRecalled() bool {
+	if x != nil {
+		return x.Recalled
+	}
+	return false
 }
 
 // Position of the caller's update logs right after a mutation, so the client
@@ -3323,6 +3349,246 @@ func (x *UnpinMessageResponse) GetAck() *SyncAck {
 	return nil
 }
 
+type UnpinAllMessagesRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	// Forum groups: only the pins of this topic; 0 = the whole chat.
+	TopicId       int64 `protobuf:"varint,2,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnpinAllMessagesRequest) Reset() {
+	*x = UnpinAllMessagesRequest{}
+	mi := &file_app_v1_messages_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnpinAllMessagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnpinAllMessagesRequest) ProtoMessage() {}
+
+func (x *UnpinAllMessagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_messages_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnpinAllMessagesRequest.ProtoReflect.Descriptor instead.
+func (*UnpinAllMessagesRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *UnpinAllMessagesRequest) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+func (x *UnpinAllMessagesRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
+}
+
+type UnpinAllMessagesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ack           *SyncAck               `protobuf:"bytes,1,opt,name=ack,proto3" json:"ack,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnpinAllMessagesResponse) Reset() {
+	*x = UnpinAllMessagesResponse{}
+	mi := &file_app_v1_messages_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnpinAllMessagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnpinAllMessagesResponse) ProtoMessage() {}
+
+func (x *UnpinAllMessagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_messages_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnpinAllMessagesResponse.ProtoReflect.Descriptor instead.
+func (*UnpinAllMessagesResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *UnpinAllMessagesResponse) GetAck() *SyncAck {
+	if x != nil {
+		return x.Ack
+	}
+	return nil
+}
+
+type GetPinnedMessagesRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	// Forum groups: only the pins of this topic; 0 = the whole chat.
+	TopicId int64 `protobuf:"varint,2,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	// Pinned messages with seq < offset_seq; 0 = from the newest.
+	OffsetSeq int64 `protobuf:"varint,3,opt,name=offset_seq,json=offsetSeq,proto3" json:"offset_seq,omitempty"`
+	// Default 50, at most 100.
+	Limit         int32 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPinnedMessagesRequest) Reset() {
+	*x = GetPinnedMessagesRequest{}
+	mi := &file_app_v1_messages_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPinnedMessagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPinnedMessagesRequest) ProtoMessage() {}
+
+func (x *GetPinnedMessagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_messages_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPinnedMessagesRequest.ProtoReflect.Descriptor instead.
+func (*GetPinnedMessagesRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *GetPinnedMessagesRequest) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+func (x *GetPinnedMessagesRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
+}
+
+func (x *GetPinnedMessagesRequest) GetOffsetSeq() int64 {
+	if x != nil {
+		return x.OffsetSeq
+	}
+	return 0
+}
+
+func (x *GetPinnedMessagesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetPinnedMessagesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Newest first (descending seq).
+	Messages []*Message `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	Users    []*User    `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	// Every pinned message of the chat (or topic) the caller can see, not
+	// only this page.
+	Count int32 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	// More pinned messages older than the last one returned.
+	HasMore       bool `protobuf:"varint,4,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPinnedMessagesResponse) Reset() {
+	*x = GetPinnedMessagesResponse{}
+	mi := &file_app_v1_messages_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPinnedMessagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPinnedMessagesResponse) ProtoMessage() {}
+
+func (x *GetPinnedMessagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_messages_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPinnedMessagesResponse.ProtoReflect.Descriptor instead.
+func (*GetPinnedMessagesResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *GetPinnedMessagesResponse) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+func (x *GetPinnedMessagesResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *GetPinnedMessagesResponse) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *GetPinnedMessagesResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
 type SetReactionRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
@@ -3335,7 +3601,7 @@ type SetReactionRequest struct {
 
 func (x *SetReactionRequest) Reset() {
 	*x = SetReactionRequest{}
-	mi := &file_app_v1_messages_proto_msgTypes[47]
+	mi := &file_app_v1_messages_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3347,7 +3613,7 @@ func (x *SetReactionRequest) String() string {
 func (*SetReactionRequest) ProtoMessage() {}
 
 func (x *SetReactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[47]
+	mi := &file_app_v1_messages_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3360,7 +3626,7 @@ func (x *SetReactionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetReactionRequest.ProtoReflect.Descriptor instead.
 func (*SetReactionRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{47}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *SetReactionRequest) GetChatId() int64 {
@@ -3394,7 +3660,7 @@ type SetReactionResponse struct {
 
 func (x *SetReactionResponse) Reset() {
 	*x = SetReactionResponse{}
-	mi := &file_app_v1_messages_proto_msgTypes[48]
+	mi := &file_app_v1_messages_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3406,7 +3672,7 @@ func (x *SetReactionResponse) String() string {
 func (*SetReactionResponse) ProtoMessage() {}
 
 func (x *SetReactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[48]
+	mi := &file_app_v1_messages_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3419,7 +3685,7 @@ func (x *SetReactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetReactionResponse.ProtoReflect.Descriptor instead.
 func (*SetReactionResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{48}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *SetReactionResponse) GetReactions() []*ReactionCount {
@@ -3450,7 +3716,7 @@ type GetHistoryRequest struct {
 
 func (x *GetHistoryRequest) Reset() {
 	*x = GetHistoryRequest{}
-	mi := &file_app_v1_messages_proto_msgTypes[49]
+	mi := &file_app_v1_messages_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3462,7 +3728,7 @@ func (x *GetHistoryRequest) String() string {
 func (*GetHistoryRequest) ProtoMessage() {}
 
 func (x *GetHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[49]
+	mi := &file_app_v1_messages_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3475,7 +3741,7 @@ func (x *GetHistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHistoryRequest.ProtoReflect.Descriptor instead.
 func (*GetHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{49}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *GetHistoryRequest) GetChatId() int64 {
@@ -3527,7 +3793,7 @@ type GetHistoryResponse struct {
 
 func (x *GetHistoryResponse) Reset() {
 	*x = GetHistoryResponse{}
-	mi := &file_app_v1_messages_proto_msgTypes[50]
+	mi := &file_app_v1_messages_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3539,7 +3805,7 @@ func (x *GetHistoryResponse) String() string {
 func (*GetHistoryResponse) ProtoMessage() {}
 
 func (x *GetHistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[50]
+	mi := &file_app_v1_messages_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3552,7 +3818,7 @@ func (x *GetHistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHistoryResponse.ProtoReflect.Descriptor instead.
 func (*GetHistoryResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{50}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *GetHistoryResponse) GetMessages() []*Message {
@@ -3594,7 +3860,7 @@ type PressInlineButtonRequest struct {
 
 func (x *PressInlineButtonRequest) Reset() {
 	*x = PressInlineButtonRequest{}
-	mi := &file_app_v1_messages_proto_msgTypes[51]
+	mi := &file_app_v1_messages_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3606,7 +3872,7 @@ func (x *PressInlineButtonRequest) String() string {
 func (*PressInlineButtonRequest) ProtoMessage() {}
 
 func (x *PressInlineButtonRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[51]
+	mi := &file_app_v1_messages_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3619,7 +3885,7 @@ func (x *PressInlineButtonRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PressInlineButtonRequest.ProtoReflect.Descriptor instead.
 func (*PressInlineButtonRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{51}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *PressInlineButtonRequest) GetChatId() int64 {
@@ -3656,7 +3922,7 @@ type PressInlineButtonResponse struct {
 
 func (x *PressInlineButtonResponse) Reset() {
 	*x = PressInlineButtonResponse{}
-	mi := &file_app_v1_messages_proto_msgTypes[52]
+	mi := &file_app_v1_messages_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3668,7 +3934,7 @@ func (x *PressInlineButtonResponse) String() string {
 func (*PressInlineButtonResponse) ProtoMessage() {}
 
 func (x *PressInlineButtonResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[52]
+	mi := &file_app_v1_messages_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3681,7 +3947,7 @@ func (x *PressInlineButtonResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PressInlineButtonResponse.ProtoReflect.Descriptor instead.
 func (*PressInlineButtonResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{52}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *PressInlineButtonResponse) GetText() string {
@@ -3715,7 +3981,7 @@ type GetLinkPreviewRequest struct {
 
 func (x *GetLinkPreviewRequest) Reset() {
 	*x = GetLinkPreviewRequest{}
-	mi := &file_app_v1_messages_proto_msgTypes[53]
+	mi := &file_app_v1_messages_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3727,7 +3993,7 @@ func (x *GetLinkPreviewRequest) String() string {
 func (*GetLinkPreviewRequest) ProtoMessage() {}
 
 func (x *GetLinkPreviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[53]
+	mi := &file_app_v1_messages_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3740,7 +4006,7 @@ func (x *GetLinkPreviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLinkPreviewRequest.ProtoReflect.Descriptor instead.
 func (*GetLinkPreviewRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{53}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *GetLinkPreviewRequest) GetUrl() string {
@@ -3760,7 +4026,7 @@ type GetLinkPreviewResponse struct {
 
 func (x *GetLinkPreviewResponse) Reset() {
 	*x = GetLinkPreviewResponse{}
-	mi := &file_app_v1_messages_proto_msgTypes[54]
+	mi := &file_app_v1_messages_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3772,7 +4038,7 @@ func (x *GetLinkPreviewResponse) String() string {
 func (*GetLinkPreviewResponse) ProtoMessage() {}
 
 func (x *GetLinkPreviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[54]
+	mi := &file_app_v1_messages_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3785,7 +4051,7 @@ func (x *GetLinkPreviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLinkPreviewResponse.ProtoReflect.Descriptor instead.
 func (*GetLinkPreviewResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{54}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *GetLinkPreviewResponse) GetPreview() *LinkPreview {
@@ -3805,7 +4071,7 @@ type GetMessageReadersRequest struct {
 
 func (x *GetMessageReadersRequest) Reset() {
 	*x = GetMessageReadersRequest{}
-	mi := &file_app_v1_messages_proto_msgTypes[55]
+	mi := &file_app_v1_messages_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3817,7 +4083,7 @@ func (x *GetMessageReadersRequest) String() string {
 func (*GetMessageReadersRequest) ProtoMessage() {}
 
 func (x *GetMessageReadersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[55]
+	mi := &file_app_v1_messages_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3830,7 +4096,7 @@ func (x *GetMessageReadersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMessageReadersRequest.ProtoReflect.Descriptor instead.
 func (*GetMessageReadersRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{55}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *GetMessageReadersRequest) GetChatId() int64 {
@@ -3859,7 +4125,7 @@ type GetMessageReadersResponse struct {
 
 func (x *GetMessageReadersResponse) Reset() {
 	*x = GetMessageReadersResponse{}
-	mi := &file_app_v1_messages_proto_msgTypes[56]
+	mi := &file_app_v1_messages_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3871,7 +4137,7 @@ func (x *GetMessageReadersResponse) String() string {
 func (*GetMessageReadersResponse) ProtoMessage() {}
 
 func (x *GetMessageReadersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[56]
+	mi := &file_app_v1_messages_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3884,7 +4150,7 @@ func (x *GetMessageReadersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMessageReadersResponse.ProtoReflect.Descriptor instead.
 func (*GetMessageReadersResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{56}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *GetMessageReadersResponse) GetUserIds() []int64 {
@@ -3920,7 +4186,7 @@ type MessageReader struct {
 
 func (x *MessageReader) Reset() {
 	*x = MessageReader{}
-	mi := &file_app_v1_messages_proto_msgTypes[57]
+	mi := &file_app_v1_messages_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3932,7 +4198,7 @@ func (x *MessageReader) String() string {
 func (*MessageReader) ProtoMessage() {}
 
 func (x *MessageReader) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[57]
+	mi := &file_app_v1_messages_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3945,7 +4211,7 @@ func (x *MessageReader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageReader.ProtoReflect.Descriptor instead.
 func (*MessageReader) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{57}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *MessageReader) GetUserId() int64 {
@@ -3978,7 +4244,7 @@ type GetMessageReactionsRequest struct {
 
 func (x *GetMessageReactionsRequest) Reset() {
 	*x = GetMessageReactionsRequest{}
-	mi := &file_app_v1_messages_proto_msgTypes[58]
+	mi := &file_app_v1_messages_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3990,7 +4256,7 @@ func (x *GetMessageReactionsRequest) String() string {
 func (*GetMessageReactionsRequest) ProtoMessage() {}
 
 func (x *GetMessageReactionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[58]
+	mi := &file_app_v1_messages_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4003,7 +4269,7 @@ func (x *GetMessageReactionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMessageReactionsRequest.ProtoReflect.Descriptor instead.
 func (*GetMessageReactionsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{58}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *GetMessageReactionsRequest) GetChatId() int64 {
@@ -4053,7 +4319,7 @@ type MessageReactor struct {
 
 func (x *MessageReactor) Reset() {
 	*x = MessageReactor{}
-	mi := &file_app_v1_messages_proto_msgTypes[59]
+	mi := &file_app_v1_messages_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4065,7 +4331,7 @@ func (x *MessageReactor) String() string {
 func (*MessageReactor) ProtoMessage() {}
 
 func (x *MessageReactor) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[59]
+	mi := &file_app_v1_messages_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4078,7 +4344,7 @@ func (x *MessageReactor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageReactor.ProtoReflect.Descriptor instead.
 func (*MessageReactor) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{59}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *MessageReactor) GetUserId() int64 {
@@ -4114,7 +4380,7 @@ type GetMessageReactionsResponse struct {
 
 func (x *GetMessageReactionsResponse) Reset() {
 	*x = GetMessageReactionsResponse{}
-	mi := &file_app_v1_messages_proto_msgTypes[60]
+	mi := &file_app_v1_messages_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4126,7 +4392,7 @@ func (x *GetMessageReactionsResponse) String() string {
 func (*GetMessageReactionsResponse) ProtoMessage() {}
 
 func (x *GetMessageReactionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_messages_proto_msgTypes[60]
+	mi := &file_app_v1_messages_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4139,7 +4405,7 @@ func (x *GetMessageReactionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMessageReactionsResponse.ProtoReflect.Descriptor instead.
 func (*GetMessageReactionsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_messages_proto_rawDescGZIP(), []int{60}
+	return file_app_v1_messages_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *GetMessageReactionsResponse) GetReactors() []*MessageReactor {
@@ -4217,11 +4483,12 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"fromChatId\x12\x1d\n" +
 	"\bfrom_seq\x18\x03 \x01(\x03B\x020\x02R\afromSeq\x12\x1b\n" +
 	"\tfrom_name\x18\x04 \x01(\tR\bfromName\x12\x16\n" +
-	"\x04date\x18\x05 \x01(\x03B\x020\x02R\x04date\"S\n" +
+	"\x04date\x18\x05 \x01(\x03B\x020\x02R\x04date\"\x7f\n" +
 	"\rReactionCount\x12\x14\n" +
 	"\x05emoji\x18\x01 \x01(\tR\x05emoji\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x05R\x05count\x12\x16\n" +
-	"\x06chosen\x18\x03 \x01(\bR\x06chosen\")\n" +
+	"\x06chosen\x18\x03 \x01(\bR\x06chosen\x12*\n" +
+	"\x0frecent_user_ids\x18\x04 \x03(\x03B\x020\x02R\rrecentUserIds\")\n" +
 	"\x11ActionChatCreated\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\"3\n" +
 	"\x12ActionMembersAdded\x12\x1d\n" +
@@ -4255,7 +4522,7 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x11chat_mode_changed\x18\n" +
 	" \x01(\v2\x1d.app.v1.ActionChatModeChangedH\x00R\x0fchatModeChanged\x12H\n" +
 	"\x10joined_by_invite\x18\v \x01(\v2\x1c.app.v1.ActionJoinedByInviteH\x00R\x0ejoinedByInviteB\x06\n" +
-	"\x04kind\"\x8a\x06\n" +
+	"\x04kind\"\xa6\x06\n" +
 	"\aMessage\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12\x1b\n" +
@@ -4280,7 +4547,8 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x11integration_label\x18\x11 \x01(\tR\x10integrationLabel\x12-\n" +
 	"\x06action\x18\x12 \x01(\v2\x15.app.v1.MessageActionR\x06action\x12\x1d\n" +
 	"\btopic_id\x18\x13 \x01(\x03B\x020\x02R\atopicId\x126\n" +
-	"\flink_preview\x18\x14 \x01(\v2\x13.app.v1.LinkPreviewR\vlinkPreview\"\xa8\x01\n" +
+	"\flink_preview\x18\x14 \x01(\v2\x13.app.v1.LinkPreviewR\vlinkPreview\x12\x1a\n" +
+	"\brecalled\x18\x15 \x01(\bR\brecalled\"\xa8\x01\n" +
 	"\aSyncAck\x12\x14\n" +
 	"\x03pts\x18\x01 \x01(\x03B\x020\x02R\x03pts\x12\x1b\n" +
 	"\tpts_count\x18\x02 \x01(\x05R\bptsCount\x12\x1d\n" +
@@ -4387,7 +4655,23 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\"9\n" +
 	"\x14UnpinMessageResponse\x12!\n" +
-	"\x03ack\x18\x01 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"]\n" +
+	"\x03ack\x18\x01 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"U\n" +
+	"\x17UnpinAllMessagesRequest\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1d\n" +
+	"\btopic_id\x18\x02 \x01(\x03B\x020\x02R\atopicId\"=\n" +
+	"\x18UnpinAllMessagesResponse\x12!\n" +
+	"\x03ack\x18\x01 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"\x8f\x01\n" +
+	"\x18GetPinnedMessagesRequest\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1d\n" +
+	"\btopic_id\x18\x02 \x01(\x03B\x020\x02R\atopicId\x12!\n" +
+	"\n" +
+	"offset_seq\x18\x03 \x01(\x03B\x020\x02R\toffsetSeq\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\"\x9d\x01\n" +
+	"\x19GetPinnedMessagesResponse\x12+\n" +
+	"\bmessages\x18\x01 \x03(\v2\x0f.app.v1.MessageR\bmessages\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\x14\n" +
+	"\x05count\x18\x03 \x01(\x05R\x05count\x12\x19\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"]\n" +
 	"\x12SetReactionRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12\x14\n" +
@@ -4467,7 +4751,7 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x1dHISTORY_DIRECTION_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17HISTORY_DIRECTION_OLDER\x10\x01\x12\x1b\n" +
 	"\x17HISTORY_DIRECTION_NEWER\x10\x02\x12\x1c\n" +
-	"\x18HISTORY_DIRECTION_AROUND\x10\x032\xdc\t\n" +
+	"\x18HISTORY_DIRECTION_AROUND\x10\x032\x8d\v\n" +
 	"\x0fMessagesService\x12F\n" +
 	"\vSendMessage\x12\x1a.app.v1.SendMessageRequest\x1a\x1b.app.v1.SendMessageResponse\x12@\n" +
 	"\tSendMedia\x12\x18.app.v1.SendMediaRequest\x1a\x19.app.v1.SendMediaResponse\x12@\n" +
@@ -4479,7 +4763,9 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\vReadHistory\x12\x1a.app.v1.ReadHistoryRequest\x1a\x1b.app.v1.ReadHistoryResponse\x12C\n" +
 	"\n" +
 	"PinMessage\x12\x19.app.v1.PinMessageRequest\x1a\x1a.app.v1.PinMessageResponse\x12I\n" +
-	"\fUnpinMessage\x12\x1b.app.v1.UnpinMessageRequest\x1a\x1c.app.v1.UnpinMessageResponse\x12F\n" +
+	"\fUnpinMessage\x12\x1b.app.v1.UnpinMessageRequest\x1a\x1c.app.v1.UnpinMessageResponse\x12U\n" +
+	"\x10UnpinAllMessages\x12\x1f.app.v1.UnpinAllMessagesRequest\x1a .app.v1.UnpinAllMessagesResponse\x12X\n" +
+	"\x11GetPinnedMessages\x12 .app.v1.GetPinnedMessagesRequest\x1a!.app.v1.GetPinnedMessagesResponse\x12F\n" +
 	"\vSetReaction\x12\x1a.app.v1.SetReactionRequest\x1a\x1b.app.v1.SetReactionResponse\x12C\n" +
 	"\n" +
 	"GetHistory\x12\x19.app.v1.GetHistoryRequest\x1a\x1a.app.v1.GetHistoryResponse\x12X\n" +
@@ -4501,7 +4787,7 @@ func file_app_v1_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_app_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 61)
+var file_app_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 65)
 var file_app_v1_messages_proto_goTypes = []any{
 	(EntityType)(0),                        // 0: app.v1.EntityType
 	(HistoryDirection)(0),                  // 1: app.v1.HistoryDirection
@@ -4552,22 +4838,26 @@ var file_app_v1_messages_proto_goTypes = []any{
 	(*PinMessageResponse)(nil),             // 46: app.v1.PinMessageResponse
 	(*UnpinMessageRequest)(nil),            // 47: app.v1.UnpinMessageRequest
 	(*UnpinMessageResponse)(nil),           // 48: app.v1.UnpinMessageResponse
-	(*SetReactionRequest)(nil),             // 49: app.v1.SetReactionRequest
-	(*SetReactionResponse)(nil),            // 50: app.v1.SetReactionResponse
-	(*GetHistoryRequest)(nil),              // 51: app.v1.GetHistoryRequest
-	(*GetHistoryResponse)(nil),             // 52: app.v1.GetHistoryResponse
-	(*PressInlineButtonRequest)(nil),       // 53: app.v1.PressInlineButtonRequest
-	(*PressInlineButtonResponse)(nil),      // 54: app.v1.PressInlineButtonResponse
-	(*GetLinkPreviewRequest)(nil),          // 55: app.v1.GetLinkPreviewRequest
-	(*GetLinkPreviewResponse)(nil),         // 56: app.v1.GetLinkPreviewResponse
-	(*GetMessageReadersRequest)(nil),       // 57: app.v1.GetMessageReadersRequest
-	(*GetMessageReadersResponse)(nil),      // 58: app.v1.GetMessageReadersResponse
-	(*MessageReader)(nil),                  // 59: app.v1.MessageReader
-	(*GetMessageReactionsRequest)(nil),     // 60: app.v1.GetMessageReactionsRequest
-	(*MessageReactor)(nil),                 // 61: app.v1.MessageReactor
-	(*GetMessageReactionsResponse)(nil),    // 62: app.v1.GetMessageReactionsResponse
-	(*MediaRef)(nil),                       // 63: app.v1.MediaRef
-	(*User)(nil),                           // 64: app.v1.User
+	(*UnpinAllMessagesRequest)(nil),        // 49: app.v1.UnpinAllMessagesRequest
+	(*UnpinAllMessagesResponse)(nil),       // 50: app.v1.UnpinAllMessagesResponse
+	(*GetPinnedMessagesRequest)(nil),       // 51: app.v1.GetPinnedMessagesRequest
+	(*GetPinnedMessagesResponse)(nil),      // 52: app.v1.GetPinnedMessagesResponse
+	(*SetReactionRequest)(nil),             // 53: app.v1.SetReactionRequest
+	(*SetReactionResponse)(nil),            // 54: app.v1.SetReactionResponse
+	(*GetHistoryRequest)(nil),              // 55: app.v1.GetHistoryRequest
+	(*GetHistoryResponse)(nil),             // 56: app.v1.GetHistoryResponse
+	(*PressInlineButtonRequest)(nil),       // 57: app.v1.PressInlineButtonRequest
+	(*PressInlineButtonResponse)(nil),      // 58: app.v1.PressInlineButtonResponse
+	(*GetLinkPreviewRequest)(nil),          // 59: app.v1.GetLinkPreviewRequest
+	(*GetLinkPreviewResponse)(nil),         // 60: app.v1.GetLinkPreviewResponse
+	(*GetMessageReadersRequest)(nil),       // 61: app.v1.GetMessageReadersRequest
+	(*GetMessageReadersResponse)(nil),      // 62: app.v1.GetMessageReadersResponse
+	(*MessageReader)(nil),                  // 63: app.v1.MessageReader
+	(*GetMessageReactionsRequest)(nil),     // 64: app.v1.GetMessageReactionsRequest
+	(*MessageReactor)(nil),                 // 65: app.v1.MessageReactor
+	(*GetMessageReactionsResponse)(nil),    // 66: app.v1.GetMessageReactionsResponse
+	(*MediaRef)(nil),                       // 67: app.v1.MediaRef
+	(*User)(nil),                           // 68: app.v1.User
 }
 var file_app_v1_messages_proto_depIdxs = []int32{
 	0,  // 0: app.v1.MessageEntity.type:type_name -> app.v1.EntityType
@@ -4578,7 +4868,7 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	5,  // 5: app.v1.ReplyMarkup.keyboard:type_name -> app.v1.ReplyKeyboard
 	8,  // 6: app.v1.ReplyMarkup.inline_keyboard:type_name -> app.v1.InlineKeyboard
 	9,  // 7: app.v1.ReplyMarkup.remove:type_name -> app.v1.ReplyKeyboardRemove
-	63, // 8: app.v1.ActionPhotoChanged.photo:type_name -> app.v1.MediaRef
+	67, // 8: app.v1.ActionPhotoChanged.photo:type_name -> app.v1.MediaRef
 	14, // 9: app.v1.MessageAction.chat_created:type_name -> app.v1.ActionChatCreated
 	15, // 10: app.v1.MessageAction.members_added:type_name -> app.v1.ActionMembersAdded
 	16, // 11: app.v1.MessageAction.member_left:type_name -> app.v1.ActionMemberLeft
@@ -4591,7 +4881,7 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	23, // 18: app.v1.MessageAction.chat_mode_changed:type_name -> app.v1.ActionChatModeChanged
 	24, // 19: app.v1.MessageAction.joined_by_invite:type_name -> app.v1.ActionJoinedByInvite
 	2,  // 20: app.v1.Message.entities:type_name -> app.v1.MessageEntity
-	63, // 21: app.v1.Message.media:type_name -> app.v1.MediaRef
+	67, // 21: app.v1.Message.media:type_name -> app.v1.MediaRef
 	12, // 22: app.v1.Message.forward_from:type_name -> app.v1.ForwardHeader
 	10, // 23: app.v1.Message.reply_markup:type_name -> app.v1.ReplyMarkup
 	13, // 24: app.v1.Message.reactions:type_name -> app.v1.ReactionCount
@@ -4619,53 +4909,60 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	27, // 46: app.v1.ReadHistoryResponse.ack:type_name -> app.v1.SyncAck
 	27, // 47: app.v1.PinMessageResponse.ack:type_name -> app.v1.SyncAck
 	27, // 48: app.v1.UnpinMessageResponse.ack:type_name -> app.v1.SyncAck
-	13, // 49: app.v1.SetReactionResponse.reactions:type_name -> app.v1.ReactionCount
-	27, // 50: app.v1.SetReactionResponse.ack:type_name -> app.v1.SyncAck
-	1,  // 51: app.v1.GetHistoryRequest.direction:type_name -> app.v1.HistoryDirection
-	26, // 52: app.v1.GetHistoryResponse.messages:type_name -> app.v1.Message
-	64, // 53: app.v1.GetHistoryResponse.users:type_name -> app.v1.User
-	11, // 54: app.v1.GetLinkPreviewResponse.preview:type_name -> app.v1.LinkPreview
-	64, // 55: app.v1.GetMessageReadersResponse.users:type_name -> app.v1.User
-	59, // 56: app.v1.GetMessageReadersResponse.readers:type_name -> app.v1.MessageReader
-	61, // 57: app.v1.GetMessageReactionsResponse.reactors:type_name -> app.v1.MessageReactor
-	64, // 58: app.v1.GetMessageReactionsResponse.users:type_name -> app.v1.User
-	28, // 59: app.v1.MessagesService.SendMessage:input_type -> app.v1.SendMessageRequest
-	30, // 60: app.v1.MessagesService.SendMedia:input_type -> app.v1.SendMediaRequest
-	33, // 61: app.v1.MessagesService.SendAlbum:input_type -> app.v1.SendAlbumRequest
-	35, // 62: app.v1.MessagesService.ForwardMessages:input_type -> app.v1.ForwardMessagesRequest
-	37, // 63: app.v1.MessagesService.CopyMessage:input_type -> app.v1.CopyMessageRequest
-	39, // 64: app.v1.MessagesService.EditMessage:input_type -> app.v1.EditMessageRequest
-	41, // 65: app.v1.MessagesService.DeleteMessages:input_type -> app.v1.DeleteMessagesRequest
-	43, // 66: app.v1.MessagesService.ReadHistory:input_type -> app.v1.ReadHistoryRequest
-	45, // 67: app.v1.MessagesService.PinMessage:input_type -> app.v1.PinMessageRequest
-	47, // 68: app.v1.MessagesService.UnpinMessage:input_type -> app.v1.UnpinMessageRequest
-	49, // 69: app.v1.MessagesService.SetReaction:input_type -> app.v1.SetReactionRequest
-	51, // 70: app.v1.MessagesService.GetHistory:input_type -> app.v1.GetHistoryRequest
-	53, // 71: app.v1.MessagesService.PressInlineButton:input_type -> app.v1.PressInlineButtonRequest
-	55, // 72: app.v1.MessagesService.GetLinkPreview:input_type -> app.v1.GetLinkPreviewRequest
-	57, // 73: app.v1.MessagesService.GetMessageReaders:input_type -> app.v1.GetMessageReadersRequest
-	60, // 74: app.v1.MessagesService.GetMessageReactions:input_type -> app.v1.GetMessageReactionsRequest
-	29, // 75: app.v1.MessagesService.SendMessage:output_type -> app.v1.SendMessageResponse
-	31, // 76: app.v1.MessagesService.SendMedia:output_type -> app.v1.SendMediaResponse
-	34, // 77: app.v1.MessagesService.SendAlbum:output_type -> app.v1.SendAlbumResponse
-	36, // 78: app.v1.MessagesService.ForwardMessages:output_type -> app.v1.ForwardMessagesResponse
-	38, // 79: app.v1.MessagesService.CopyMessage:output_type -> app.v1.CopyMessageResponse
-	40, // 80: app.v1.MessagesService.EditMessage:output_type -> app.v1.EditMessageResponse
-	42, // 81: app.v1.MessagesService.DeleteMessages:output_type -> app.v1.DeleteMessagesResponse
-	44, // 82: app.v1.MessagesService.ReadHistory:output_type -> app.v1.ReadHistoryResponse
-	46, // 83: app.v1.MessagesService.PinMessage:output_type -> app.v1.PinMessageResponse
-	48, // 84: app.v1.MessagesService.UnpinMessage:output_type -> app.v1.UnpinMessageResponse
-	50, // 85: app.v1.MessagesService.SetReaction:output_type -> app.v1.SetReactionResponse
-	52, // 86: app.v1.MessagesService.GetHistory:output_type -> app.v1.GetHistoryResponse
-	54, // 87: app.v1.MessagesService.PressInlineButton:output_type -> app.v1.PressInlineButtonResponse
-	56, // 88: app.v1.MessagesService.GetLinkPreview:output_type -> app.v1.GetLinkPreviewResponse
-	58, // 89: app.v1.MessagesService.GetMessageReaders:output_type -> app.v1.GetMessageReadersResponse
-	62, // 90: app.v1.MessagesService.GetMessageReactions:output_type -> app.v1.GetMessageReactionsResponse
-	75, // [75:91] is the sub-list for method output_type
-	59, // [59:75] is the sub-list for method input_type
-	59, // [59:59] is the sub-list for extension type_name
-	59, // [59:59] is the sub-list for extension extendee
-	0,  // [0:59] is the sub-list for field type_name
+	27, // 49: app.v1.UnpinAllMessagesResponse.ack:type_name -> app.v1.SyncAck
+	26, // 50: app.v1.GetPinnedMessagesResponse.messages:type_name -> app.v1.Message
+	68, // 51: app.v1.GetPinnedMessagesResponse.users:type_name -> app.v1.User
+	13, // 52: app.v1.SetReactionResponse.reactions:type_name -> app.v1.ReactionCount
+	27, // 53: app.v1.SetReactionResponse.ack:type_name -> app.v1.SyncAck
+	1,  // 54: app.v1.GetHistoryRequest.direction:type_name -> app.v1.HistoryDirection
+	26, // 55: app.v1.GetHistoryResponse.messages:type_name -> app.v1.Message
+	68, // 56: app.v1.GetHistoryResponse.users:type_name -> app.v1.User
+	11, // 57: app.v1.GetLinkPreviewResponse.preview:type_name -> app.v1.LinkPreview
+	68, // 58: app.v1.GetMessageReadersResponse.users:type_name -> app.v1.User
+	63, // 59: app.v1.GetMessageReadersResponse.readers:type_name -> app.v1.MessageReader
+	65, // 60: app.v1.GetMessageReactionsResponse.reactors:type_name -> app.v1.MessageReactor
+	68, // 61: app.v1.GetMessageReactionsResponse.users:type_name -> app.v1.User
+	28, // 62: app.v1.MessagesService.SendMessage:input_type -> app.v1.SendMessageRequest
+	30, // 63: app.v1.MessagesService.SendMedia:input_type -> app.v1.SendMediaRequest
+	33, // 64: app.v1.MessagesService.SendAlbum:input_type -> app.v1.SendAlbumRequest
+	35, // 65: app.v1.MessagesService.ForwardMessages:input_type -> app.v1.ForwardMessagesRequest
+	37, // 66: app.v1.MessagesService.CopyMessage:input_type -> app.v1.CopyMessageRequest
+	39, // 67: app.v1.MessagesService.EditMessage:input_type -> app.v1.EditMessageRequest
+	41, // 68: app.v1.MessagesService.DeleteMessages:input_type -> app.v1.DeleteMessagesRequest
+	43, // 69: app.v1.MessagesService.ReadHistory:input_type -> app.v1.ReadHistoryRequest
+	45, // 70: app.v1.MessagesService.PinMessage:input_type -> app.v1.PinMessageRequest
+	47, // 71: app.v1.MessagesService.UnpinMessage:input_type -> app.v1.UnpinMessageRequest
+	49, // 72: app.v1.MessagesService.UnpinAllMessages:input_type -> app.v1.UnpinAllMessagesRequest
+	51, // 73: app.v1.MessagesService.GetPinnedMessages:input_type -> app.v1.GetPinnedMessagesRequest
+	53, // 74: app.v1.MessagesService.SetReaction:input_type -> app.v1.SetReactionRequest
+	55, // 75: app.v1.MessagesService.GetHistory:input_type -> app.v1.GetHistoryRequest
+	57, // 76: app.v1.MessagesService.PressInlineButton:input_type -> app.v1.PressInlineButtonRequest
+	59, // 77: app.v1.MessagesService.GetLinkPreview:input_type -> app.v1.GetLinkPreviewRequest
+	61, // 78: app.v1.MessagesService.GetMessageReaders:input_type -> app.v1.GetMessageReadersRequest
+	64, // 79: app.v1.MessagesService.GetMessageReactions:input_type -> app.v1.GetMessageReactionsRequest
+	29, // 80: app.v1.MessagesService.SendMessage:output_type -> app.v1.SendMessageResponse
+	31, // 81: app.v1.MessagesService.SendMedia:output_type -> app.v1.SendMediaResponse
+	34, // 82: app.v1.MessagesService.SendAlbum:output_type -> app.v1.SendAlbumResponse
+	36, // 83: app.v1.MessagesService.ForwardMessages:output_type -> app.v1.ForwardMessagesResponse
+	38, // 84: app.v1.MessagesService.CopyMessage:output_type -> app.v1.CopyMessageResponse
+	40, // 85: app.v1.MessagesService.EditMessage:output_type -> app.v1.EditMessageResponse
+	42, // 86: app.v1.MessagesService.DeleteMessages:output_type -> app.v1.DeleteMessagesResponse
+	44, // 87: app.v1.MessagesService.ReadHistory:output_type -> app.v1.ReadHistoryResponse
+	46, // 88: app.v1.MessagesService.PinMessage:output_type -> app.v1.PinMessageResponse
+	48, // 89: app.v1.MessagesService.UnpinMessage:output_type -> app.v1.UnpinMessageResponse
+	50, // 90: app.v1.MessagesService.UnpinAllMessages:output_type -> app.v1.UnpinAllMessagesResponse
+	52, // 91: app.v1.MessagesService.GetPinnedMessages:output_type -> app.v1.GetPinnedMessagesResponse
+	54, // 92: app.v1.MessagesService.SetReaction:output_type -> app.v1.SetReactionResponse
+	56, // 93: app.v1.MessagesService.GetHistory:output_type -> app.v1.GetHistoryResponse
+	58, // 94: app.v1.MessagesService.PressInlineButton:output_type -> app.v1.PressInlineButtonResponse
+	60, // 95: app.v1.MessagesService.GetLinkPreview:output_type -> app.v1.GetLinkPreviewResponse
+	62, // 96: app.v1.MessagesService.GetMessageReaders:output_type -> app.v1.GetMessageReadersResponse
+	66, // 97: app.v1.MessagesService.GetMessageReactions:output_type -> app.v1.GetMessageReactionsResponse
+	80, // [80:98] is the sub-list for method output_type
+	62, // [62:80] is the sub-list for method input_type
+	62, // [62:62] is the sub-list for extension type_name
+	62, // [62:62] is the sub-list for extension extendee
+	0,  // [0:62] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_messages_proto_init() }
@@ -4707,7 +5004,7 @@ func file_app_v1_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_messages_proto_rawDesc), len(file_app_v1_messages_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   61,
+			NumMessages:   65,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

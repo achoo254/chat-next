@@ -23,7 +23,7 @@ export interface Demo {
 		readonly mobile: number;
 		readonly huy: number;
 		readonly channel: number;
-		readonly users: Readonly<Record<"huy" | "lan" | "minh" | "ha" | "ngoc" | "ducAnh" | "deployBot" | "khoa", number>>;
+		readonly users: Readonly<Record<"huy" | "lan" | "minh" | "ha" | "ngoc" | "ducAnh" | "deployBot" | "khoa" | "announcer", number>>;
 		readonly checklistSeq: number;
 		readonly opsFirstSeq: number;
 		readonly codeSeq: number;
@@ -196,7 +196,7 @@ export function seedDemo(): Demo {
 			mobile,
 			huy: huyChat,
 			channel,
-			users: { huy, lan, minh, ha, ngoc, ducAnh, deployBot, khoa },
+			users: { huy, lan, minh, ha, ngoc, ducAnh, deployBot, khoa, announcer },
 			checklistSeq,
 			opsFirstSeq,
 			codeSeq,

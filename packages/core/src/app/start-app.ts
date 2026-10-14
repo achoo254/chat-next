@@ -6,7 +6,7 @@ import { ClientPlatform } from "@app/proto-ts/auth";
 import { databaseName, type SessionEndReason } from "../auth/web.ts";
 import { EventBus, EventKeys } from "../events/bus.ts";
 import { assertSafeId } from "../ids/index.ts";
-import type { Chat, Message, MessageEntity, User } from "../model/types.ts";
+import type { Chat, Message, MessageEntity, NotificationSettings, PinnedMessagesPage, User } from "../model/types.ts";
 import { Outbox, type PendingMessage, type SendTextOptions } from "../outbox/outbox.ts";
 import { classifyFailure, SessionEndedError, type FailureKind, type RemoteApi } from "../protocol/api.ts";
 import { toUser } from "../protocol/map.ts";
@@ -16,6 +16,7 @@ import { searchLocal, type SearchOptions } from "../search/index.ts";
 import { buildSnapshot, type ScreenSnapshot } from "../snapshot/snapshot.ts";
 import { SyncEngine, type HistoryDirectionName } from "../sync/engine.ts";
 import { RealtimeConnection, type ConnectionState } from "../transport/realtime.ts";
+import { DirectActions, type PinnedMessagesRequest } from "./direct-actions.ts";
 
 export type ClientKind = "web" | "ios" | "android" | "desktop";
 
@@ -83,7 +84,22 @@ export interface ChatCore {
 	): Promise<PendingMessage | null>;
 	editText(chatId: number, seq: number, text: string, entities?: readonly MessageEntity[]): Promise<void>;
 	deleteMessages(chatId: number, seqs: readonly number[], forEveryone: boolean): Promise<void>;
+	/** Marks the chat read up to maxSeq; also clears a "marked as unread". */
 	markRead(chatId: number, maxSeq: number): Promise<void>;
+	/** Marks a chat as unread, or clears the mark, on every session (online only). */
+	setDialogUnreadMark(chatId: number, unread: boolean): Promise<void>;
+	/** The user's notification settings, synced from the server. */
+	notificationSettings(): Promise<NotificationSettings>;
+	/** Changes some notification settings (online only); returns all of them. */
+	setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings>;
+	/** A page of the chat's (or a topic's) pinned messages, newest first (online only). */
+	pinnedMessages(chatId: number, request?: PinnedMessagesRequest): Promise<PinnedMessagesPage>;
+	/** Unpins every pinned message of the chat, or of one forum topic (online only). */
+	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
+	/** Members of a group online now, counted by the server (online only). */
+	onlineCount(chatId: number): Promise<number>;
+	/** The app badge: unread messages and chats, muted chats per the user's setting. */
+	unreadTotals(): Promise<{ readonly messages: number; readonly chats: number }>;
 	retryOutbox(outboxId: number): Promise<void>;
 	discardOutbox(outboxId: number): Promise<void>;
 	search(query: string, options?: SearchOptions): Promise<StoredMessage[]>;
@@ -194,6 +210,8 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		onError: report,
 	});
 	await engine.load();
+
+	const actions = new DirectActions({ api: options.api, repo, engine, now: () => platform.timers.now() });
 
 	const outbox = new Outbox({
 		repo,
@@ -348,6 +366,34 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 			active();
 			await outbox.markRead(chatId, maxSeq);
 			platform.notify.clear(`chat:${chatId}`);
+		},
+		setDialogUnreadMark: async (chatId, unread) => {
+			active();
+			await actions.setDialogUnreadMark(assertSafeId(chatId), unread);
+		},
+		notificationSettings: async () => {
+			active();
+			return actions.notificationSettings();
+		},
+		setNotificationSettings: async (change) => {
+			active();
+			return actions.setNotificationSettings(change);
+		},
+		pinnedMessages: async (chatId, request) => {
+			active();
+			return actions.pinnedMessages(assertSafeId(chatId), request);
+		},
+		unpinAllMessages: async (chatId, topicId = 0) => {
+			active();
+			await actions.unpinAllMessages(assertSafeId(chatId), assertSafeId(topicId));
+		},
+		onlineCount: async (chatId) => {
+			active();
+			return actions.onlineCount(assertSafeId(chatId));
+		},
+		unreadTotals: async () => {
+			active();
+			return actions.unreadTotals();
 		},
 		retryOutbox: async (outboxId) => {
 			active();

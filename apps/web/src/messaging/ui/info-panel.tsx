@@ -16,10 +16,10 @@ import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { dialogTitle, shortDate, userName } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission, type MuteFor } from "../data/remote.ts";
-import { useListEntry, useServices, useUser } from "../data/services.tsx";
+import { useDialog, useListEntry, useServices, useUser } from "../data/services.tsx";
 import { CommonChatsSection } from "./common-chats.tsx";
 import { ContactRow } from "./contact-row.tsx";
-import { hiddenPins, usePinHidden } from "./conversation.tsx";
+import { hiddenPins, usePinHidden } from "./pinned-bar.tsx";
 import { MuteDurations, pinLimitReached, useMute } from "./dialog-settings.tsx";
 import { displayLink, inviteLinks, isActiveInvite, useInviteLinks, useMembers, useOnlineCount } from "./members.ts";
 import { ChatAvatar, CopyButton, Switch } from "./parts.tsx";
@@ -196,7 +196,9 @@ function QuickActions({ chatId, title, children }: { chatId: number; title: stri
 function PinnedBarRow({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const hidden = usePinHidden(chat.id);
-	if (chat.pinnedSeq === 0 || hidden !== chat.pinnedSeq) return null;
+	const top = (useDialog(chat.id)?.dialog.pinnedMessageSeq ?? 0) || chat.pinnedSeq;
+	// Forum groups hide the bar of a topic, whose newest pin the dialog does not name.
+	if (hidden === 0 || (!chat.forum && hidden !== top)) return null;
 	return (
 		<div className="info-sec">
 			<div className="row">
@@ -335,7 +337,7 @@ function GroupInfo({ chat }: { chat: Chat }) {
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const owner = chat.myRole === "owner";
 	const canAdd = admin || (!channel && (chat.myPermissions & Permission.addMembers) !== 0);
-	const online = useOnlineCount(channel ? 0 : chat.id, chat.memberCount);
+	const online = useOnlineCount(channel || chat.left ? 0 : chat.id);
 	const subtitle = channel
 		? copy.info.channel(chat.memberCount)
 		: online === null

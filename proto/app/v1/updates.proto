@@ -74,6 +74,8 @@ message Update {
     UpdateDialogMute dialog_mute = 25;
     UpdatePinnedDialogs pinned_dialogs = 26;
     UpdateChatDeleted chat_deleted = 27;
+    UpdateDialogUnreadMark dialog_unread_mark = 28;
+    UpdateNotificationSettings notification_settings = 29;
   }
 }
 
@@ -85,10 +87,15 @@ message UpdateMessageEdit {
   Message message = 1;
 }
 
-// Deleted for everyone: purge the messages, their FTS rows and media cache.
+// Deleted for everyone: purge the messages' content, their FTS rows and
+// media cache.
 message UpdateMessageDelete {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   repeated int64 seqs = 2 [jstype = JS_NUMBER];
+  // The messages were recalled: keep a placeholder (Message.recalled) in
+  // place of each cached one instead of removing the row; GetHistory
+  // returns the same placeholders. false (older servers): remove the rows.
+  bool recalled = 3;
 }
 
 // Deleted for this user only (from another of their sessions).
@@ -128,11 +135,16 @@ message UpdateRead {
   int64 top_seq = 8 [jstype = JS_NUMBER];
 }
 
+// A message was pinned or unpinned; the caller's Dialog pinned count and
+// newest pinned message change with it (GetPeerDialogs).
 message UpdatePin {
   int64 chat_id = 1 [jstype = JS_NUMBER];
+  // 0 for an unpin of several messages at once (seqs).
   int64 seq = 2 [jstype = JS_NUMBER];
   // false when unpinned.
   bool pinned = 3;
+  // UnpinAllMessages: every seq unpinned (pinned false, seq 0).
+  repeated int64 seqs = 4 [jstype = JS_NUMBER];
 }
 
 message UpdateMemberAdded {
@@ -202,6 +214,18 @@ message UpdatePinnedDialogs {
 message UpdateChatDeleted {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   bool for_everyone = 2;
+}
+
+// The user marked a chat as unread, or the mark went away (cleared by hand
+// or by reading the chat) on one of their sessions.
+message UpdateDialogUnreadMark {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  bool unread = 2;
+}
+
+// The user's notification settings after a change, complete.
+message UpdateNotificationSettings {
+  NotificationSettings settings = 1;
 }
 
 message UpdateSessionRevoked {

@@ -5,7 +5,7 @@
 // Chuyển tiếp · …); a double click replies. Right click, a long press or the
 // menu key on a reaction lists who reacted with it.
 import { memo, type ReactNode } from "react";
-import type { Chat, PendingMessage, StoredMessage } from "@app/core";
+import type { Chat, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -130,18 +130,40 @@ function ForwardLine({ message }: { message: StoredMessage }) {
 	);
 }
 
-/** One reaction chip: a click toggles yours; the context menu lists who reacted with it. */
-function ReactionChip({ message, emoji, count, chosen }: { message: StoredMessage; emoji: string; count: number; chosen: boolean }) {
+/** The latest reactors of a chip (up to 3, newest first), as avatars. */
+function ReactorAvatars({ ids }: { ids: readonly number[] }) {
+	const { self } = useServices();
+	const nameOf = useNameOf(ids);
+	return (
+		<span className="r-avs" aria-hidden="true">
+			{ids.map((id) => (
+				// Your own avatar shows your initials, not "Bạn".
+				<ChatAvatar key={id} id={id} name={id === self.id ? self.name : nameOf(id)} size="xs" />
+			))}
+		</span>
+	);
+}
+
+/**
+ * One reaction chip: a click toggles yours; the context menu lists who
+ * reacted with it. With the latest reactors known (channels: admins only)
+ * it shows their avatars, and the count only when more people reacted.
+ */
+function ReactionChip({ message, reaction }: { message: StoredMessage; reaction: ReactionCount }) {
 	const copy = useCopy();
 	const { remote, toasts } = useServices();
 	const ui = useUi();
+	const { emoji, count, chosen } = reaction;
+	const reactors = reaction.recentUserIds.slice(0, 3);
+	const nameOf = useNameOf(reactors);
 	const trigger = useContextTrigger(() => ui.dialog.set({ kind: "reactors", chatId: message.chatId, seq: message.seq, emoji }), true);
+	const label = reactors.length > 0 ? copy.message.reactionBy(emoji, reactors.map(nameOf), count) : copy.message.reaction(emoji, count);
 	return (
 		<button
 			type="button"
 			className="reaction"
 			aria-pressed={chosen}
-			aria-label={copy.message.reaction(emoji, count)}
+			aria-label={label}
 			title={copy.message.whoReacted(emoji)}
 			onClick={() => {
 				remote.setReaction(message.chatId, message.seq, chosen ? "" : emoji).catch(() => toasts.show(copy.common.failed));
@@ -163,7 +185,8 @@ function ReactionChip({ message, emoji, count, chosen }: { message: StoredMessag
 			}}
 		>
 			<span aria-hidden="true">{emoji}</span>
-			<span aria-hidden="true">{count}</span>
+			{reactors.length > 0 && <ReactorAvatars ids={reactors} />}
+			{count > reactors.length && <span aria-hidden="true">{count}</span>}
 		</button>
 	);
 }
@@ -173,7 +196,7 @@ function Reactions({ message }: { message: StoredMessage }) {
 	return (
 		<div className="reactions">
 			{message.reactions.map((reaction) => (
-				<ReactionChip key={reaction.emoji} message={message} emoji={reaction.emoji} count={reaction.count} chosen={reaction.chosen} />
+				<ReactionChip key={reaction.emoji} message={message} reaction={reaction} />
 			))}
 		</div>
 	);
@@ -241,7 +264,7 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const intent = useIntent(chatId);
 	const preview = backend.features.has("linkPreview") ? backend.linkPreview(message) : null;
 	// With a preview card or reactions the time goes on its own line at the end (mock #rich-messages).
-	const trailingStamp = preview !== null || message.reactions.length > 0;
+	const trailingStamp = !message.recalled && (preview !== null || message.reactions.length > 0);
 	const trigger = useMenuTrigger(chatId, itemKey);
 	const mine = message.fromId === store.selfId;
 	const channel = chat?.type === "channel";
@@ -250,16 +273,18 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const senderName = channel ? (chat?.title ?? "") : (sender?.name ?? copy.message.unknownUser);
 	const tone = toneOf(message.fromId);
 	const atMe = !mine && mentionsSelf(message.text, message.entities, self.id, self.username);
-	const unsupported = message.text === "" && message.mediaKind === null;
+	const recalled = message.recalled;
+	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const read = mine && readOutboxMaxSeq >= message.seq;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
-	const canReply = !channel || admin;
+	// A recalled message keeps its place only: nothing to reply to, react to or forward.
+	const canReply = (!channel || admin) && !message.recalled;
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
 	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : ""].filter(Boolean).join(" ");
 	const stamp = (
-		<Stamp date={message.editDate !== 0 ? message.editDate : message.date} edited={message.editDate !== 0}>
-			{mine && !channel && (
+		<Stamp date={message.editDate !== 0 && !recalled ? message.editDate : message.date} edited={message.editDate !== 0 && !recalled}>
+			{mine && !channel && !recalled && (
 				<LabelledIcon
 					name={read ? "checks" : "check"}
 					label={read ? copy.message.read : copy.message.sentTick}
@@ -297,7 +322,15 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 					<ChatAvatar id={message.fromId} name={senderName} size="sm" bot={sender?.isBot === true} />
 				</button>
 			)}
-			{unsupported ? (
+			{recalled ? (
+				<div className="bubble recalled">
+					{showSender && <span className={`who s-${tone}`}>{senderName}</span>}
+					<p>
+						{copy.message.recalled}
+						{stamp}
+					</p>
+				</div>
+			) : unsupported ? (
 				<div className="bubble unsupported">
 					<Icon name="alert" />
 					<div>

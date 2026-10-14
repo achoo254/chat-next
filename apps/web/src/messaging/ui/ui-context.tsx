@@ -17,6 +17,8 @@ export type DialogRequest =
 	/** Private chat: deleted for you; group or channel: deleted for everyone by its owner. */
 	| { readonly kind: "deleteChat"; readonly chatId: number }
 	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number }
+	/** Every pinned message of a chat, or of a forum topic (topicId 0: the whole chat). */
+	| { readonly kind: "pinnedList"; readonly chatId: number; readonly topicId: number }
 	/** Who reacted to a message, opened on one emoji. */
 	| { readonly kind: "reactors"; readonly chatId: number; readonly seq: number; readonly emoji: string }
 	| { readonly kind: "report"; readonly target: ReportTarget; readonly name: string; readonly blockUserId: number }

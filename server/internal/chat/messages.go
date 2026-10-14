@@ -24,6 +24,8 @@ const (
 	seqsPerCallMax   = 100
 	historyPageMax   = 200
 	historyPageDef   = 50
+	pinnedPageDef    = 50
+	pinnedPageMax    = 100
 	preLanguageMax   = 32
 	reactionBytesMax = 32
 	previewWorkers   = 8
@@ -729,8 +731,9 @@ func (t *txn) hideMessages(ctx context.Context, c *chatRow, m *memberRow, me int
 	return nil
 }
 
-// deleteMessages deletes messages of a locked chat for everyone: any
-// author's when anyone, else only me's.
+// deleteMessages deletes (recalls) messages of a locked chat for everyone:
+// any author's when anyone, else only me's. Their content goes; the rows
+// stay as recalled placeholders in everyone's history.
 func (t *txn) deleteMessages(ctx context.Context, c *chatRow, anyone bool, me int64, seqs []int64) error {
 	rows, err := t.tx.Query(ctx, `
 		UPDATE messages SET deleted_at = now(), text = '', content = NULL
@@ -789,7 +792,7 @@ func (t *txn) deleteMessages(ctx context.Context, c *chatRow, anyone bool, me in
 		return err
 	}
 	if err := t.toChat(ctx, ev, c, members, &appv1.Update{Kind: &appv1.Update_MessageDelete{MessageDelete: &appv1.UpdateMessageDelete{
-		ChatId: c.ID, Seqs: done,
+		ChatId: c.ID, Seqs: done, Recalled: true,
 	}}}); err != nil {
 		return err
 	}
@@ -1026,8 +1029,8 @@ func boolSet[V any](m map[int64]V) map[int64]bool {
 // ---------------------------------------------------------------- history
 
 // GetHistory pages through the messages me can see (respecting
-// visible_from_seq, deletions and messages hidden for me), optionally of
-// one forum topic.
+// visible_from_seq and messages hidden for me), optionally of one forum
+// topic. Messages deleted for everyone come as recalled placeholders.
 func (s *Service) GetHistory(ctx context.Context, me int64, req *appv1.GetHistoryRequest) (*appv1.GetHistoryResponse, error) {
 	c, m, err := s.activeChatFor(ctx, s.pool, req.GetChatId(), me, false)
 	if err != nil {
@@ -1115,7 +1118,7 @@ type historyQuery struct {
 	topic       int64
 }
 
-const historyVisible = `m.chat_id = $1 AND m.deleted_at IS NULL AND m.seq >= $2 AND ($4 = 0 OR m.topic_id = $4)
+const historyVisible = `m.chat_id = $1 AND m.seq >= $2 AND ($4 = 0 OR m.topic_id = $4)
 	AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $3 AND h.chat_id = m.chat_id AND h.seq = m.seq)`
 
 func (h historyQuery) fetch(ctx context.Context, cond, order string, bound int64, limit int) ([]*messageRow, error) {
@@ -1172,6 +1175,13 @@ func (s *Service) ReadHistory(ctx context.Context, me, chatID, maxSeq, topicID i
 
 func (t *txn) read(ctx context.Context, c *chatRow, m *memberRow, maxSeq, topicID int64) error {
 	me := m.UserID
+	// Reading the chat clears a "marked as unread", even when the position
+	// does not move.
+	if m.UnreadMark {
+		if err := t.setUnreadMark(ctx, c.ID, me, false); err != nil {
+			return err
+		}
+	}
 	// Topics whose position moves, with their old positions.
 	topics := []int64{0}
 	switch {
@@ -1437,6 +1447,110 @@ func (s *Service) UnpinMessage(ctx context.Context, me, chatID, seq int64) (*app
 		return nil, err
 	}
 	return t.ack(me, chatID), nil
+}
+
+// UnpinAllMessages unpins every pinned message of the chat, or of one forum
+// topic, with one pin update.
+func (s *Service) UnpinAllMessages(ctx context.Context, me, chatID, topicID int64) (*appv1.SyncAck, error) {
+	if topicID < 0 {
+		return nil, errInvalid("topic_id must not be negative")
+	}
+	if err := s.allow(limitWrite, "write", me); err != nil {
+		return nil, err
+	}
+	t, err := s.inTx(ctx, func(t *txn) error {
+		c, m, err := s.activeChatFor(ctx, t.tx, chatID, me, true)
+		if err != nil {
+			return err
+		}
+		if !c.can(m, permPin) {
+			return errDenied("you cannot unpin messages in this chat")
+		}
+		if topicID != 0 && !c.Forum {
+			return errInvalid("this chat has no topics")
+		}
+		rows, err := t.tx.Query(ctx, `
+			DELETE FROM pinned_messages p USING messages msg
+			WHERE p.chat_id = $1 AND msg.chat_id = p.chat_id AND msg.seq = p.seq AND ($2 = 0 OR msg.topic_id = $2)
+			RETURNING p.seq`, chatID, topicID)
+		if err != nil {
+			return fmt.Errorf("chat: unpin all: %w", err)
+		}
+		unpinned, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+		if err != nil {
+			return fmt.Errorf("chat: unpin all: %w", err)
+		}
+		if len(unpinned) == 0 {
+			return nil
+		}
+		slices.Sort(unpinned)
+		if err := t.refreshPinned(ctx, c); err != nil {
+			return fmt.Errorf("chat: unpin all: %w", err)
+		}
+		members, err := t.fanoutMembers(ctx, c)
+		if err != nil {
+			return err
+		}
+		ev := t.event(kindPin, chatID, me)
+		return t.toChat(ctx, ev, c, members, &appv1.Update{Kind: &appv1.Update_Pin{Pin: &appv1.UpdatePin{
+			ChatId: chatID, Seqs: unpinned,
+		}}})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return t.ack(me, chatID), nil
+}
+
+// pinnedVisible is the condition of a pinned message (p, message m) that
+// user $4 sees in chat $1: within their history ($2 = visible_from_seq),
+// in topic $3 (0 = any) and not hidden for them.
+const pinnedVisible = `p.chat_id = $1 AND m.chat_id = p.chat_id AND m.seq = p.seq AND m.deleted_at IS NULL
+	AND m.seq >= $2 AND ($3 = 0 OR m.topic_id = $3)
+	AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $4 AND h.chat_id = m.chat_id AND h.seq = m.seq)`
+
+// GetPinnedMessages lists the pinned messages I can see, newest first,
+// optionally of one forum topic, with their total count.
+func (s *Service) GetPinnedMessages(ctx context.Context, me int64, req *appv1.GetPinnedMessagesRequest) (*appv1.GetPinnedMessagesResponse, error) {
+	c, m, err := s.activeChatFor(ctx, s.pool, req.GetChatId(), me, false)
+	if err != nil {
+		return nil, err
+	}
+	topic := req.GetTopicId()
+	if topic < 0 || (topic != 0 && !c.Forum) {
+		return nil, errInvalid("this chat has no such topic")
+	}
+	offset := req.GetOffsetSeq()
+	if offset < 0 {
+		return nil, errInvalid("offset_seq must not be negative")
+	}
+	if offset == 0 {
+		offset = 1 << 53
+	}
+	limit := pageLimit(req.GetLimit(), pinnedPageDef, pinnedPageMax)
+	resp := &appv1.GetPinnedMessagesResponse{}
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM pinned_messages p, messages m WHERE `+pinnedVisible,
+		c.ID, m.VisibleFrom, topic, me).Scan(&resp.Count); err != nil {
+		return nil, fmt.Errorf("chat: count pinned: %w", err)
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+messageColumns+` FROM pinned_messages p, messages m WHERE `+pinnedVisible+`
+		AND m.seq < $5 ORDER BY m.seq DESC LIMIT $6`, c.ID, m.VisibleFrom, topic, me, offset, limit+1)
+	if err != nil {
+		return nil, fmt.Errorf("chat: pinned messages: %w", err)
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*messageRow, error) { return scanMessage(r) })
+	if err != nil {
+		return nil, fmt.Errorf("chat: pinned messages: %w", err)
+	}
+	if len(list) > limit {
+		list = list[:limit]
+		resp.HasMore = true
+	}
+	resp.Messages, resp.Users, err = s.renderMessages(ctx, s.pool, me, list)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func isService(m *messageRow) bool {

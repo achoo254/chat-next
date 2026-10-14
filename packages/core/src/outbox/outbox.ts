@@ -11,12 +11,19 @@ import type { Timers } from "@app/platform";
 import { codePointLength, validateEntities } from "../entities/index.ts";
 import { EventKeys } from "../events/bus.ts";
 import type { MessageEntity, SyncAck } from "../model/types.ts";
-import { purgeMessages } from "../purge/index.ts";
+import { purgeMessages, recallMessages } from "../purge/index.ts";
 import { classifyFailure, type RemoteApi } from "../protocol/api.ts";
 import { toMessage, toSyncAck, toWireEntity, toWireId } from "../protocol/map.ts";
 import type { OutboxRow, Repository } from "../repo/repository.ts";
 import { decodeEntities } from "../repo/rows.ts";
-import { messageSearchText, putLocalRead, putMessage, putNewMessage, type WriteBatch } from "../repo/writes.ts";
+import {
+	messageSearchText,
+	putLocalRead,
+	putMessage,
+	putNewMessage,
+	putUnreadMark,
+	type WriteBatch,
+} from "../repo/writes.ts";
 import { assertSafeId } from "../ids/index.ts";
 import type { SyncEngine } from "../sync/engine.ts";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffPolicy } from "../transport/backoff.ts";
@@ -259,21 +266,30 @@ export class Outbox {
 		const list = [...new Set(seqs.map(assertSafeId))];
 		if (list.length === 0) return;
 		await this.options.engine.commitLocal((w) => {
-			purgeMessages(w, chatId, list, this.options.selfId);
+			// Recalled messages keep a placeholder, like on every other device.
+			if (forEveryone) recallMessages(w, chatId, list, this.options.selfId);
+			else purgeMessages(w, chatId, list, this.options.selfId);
 			this.insert(w, chatId, { kind: "delete", seqs: list, forEveryone }, 0);
 		});
 		this.kick(chatId);
 	}
 
-	/** Marks the chat read up to maxSeq; later marks replace earlier unsent ones. */
+	/**
+	 * Marks the chat read up to maxSeq; later marks replace earlier unsent
+	 * ones. A chat marked as unread loses the mark even when the position
+	 * does not move (the server clears it with the read).
+	 */
 	async markRead(chatId: number, maxSeq: number): Promise<void> {
 		assertSafeId(chatId);
 		assertSafeId(maxSeq);
 		await this.options.engine.commitLocal(async (w) => {
 			const dialog = await this.options.repo.dialog(chatId);
-			if (dialog === null || dialog.readInboxMaxSeq >= maxSeq) return;
-			const unread = await this.options.repo.countIncomingAfter(chatId, maxSeq, this.options.selfId);
-			putLocalRead(w, chatId, maxSeq, unread);
+			if (dialog === null || (dialog.readInboxMaxSeq >= maxSeq && !dialog.unreadMark) || maxSeq === 0) return;
+			if (dialog.unreadMark) putUnreadMark(w, chatId, false);
+			if (dialog.readInboxMaxSeq < maxSeq) {
+				const unread = await this.options.repo.countIncomingAfter(chatId, maxSeq, this.options.selfId);
+				putLocalRead(w, chatId, maxSeq, unread);
+			}
 			w.add("DELETE FROM outbox WHERE chat_id = ? AND kind = 'read' AND failure IS NULL", [chatId]);
 			this.insert(w, chatId, { kind: "read", maxSeq }, 0);
 		});

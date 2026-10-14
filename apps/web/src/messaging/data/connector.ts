@@ -2,6 +2,7 @@
 // web client (web-client.ts); tests and the visual harness pass their own
 // connector built on the core's in-memory test server.
 import type { SessionEndReason } from "@app/core";
+import type { NotificationDecision, NotificationInput } from "./notification-filter.ts";
 import type { PendingBackend } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";
 import type { ChatSource, WebExtras } from "./source.ts";
@@ -10,6 +11,8 @@ export interface MessagingConnectorOptions {
 	readonly onSessionEnded: (reason: SessionEndReason) => void;
 	readonly onNotificationClick: (chatId: number) => void;
 	readonly onError: (context: string, message: string) => void;
+	/** Applies the user's notification settings and mutes; null shows nothing. */
+	readonly filterNotification: (request: NotificationInput) => NotificationDecision | null;
 }
 
 export interface MessagingClient extends WebExtras {

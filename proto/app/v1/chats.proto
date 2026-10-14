@@ -90,6 +90,20 @@ service ChatsService {
   // channels where the user is a member and the caller an admin (channel
   // members are visible to admins only).
   rpc GetCommonChats(GetCommonChatsRequest) returns (GetCommonChatsResponse);
+  // Marks a chat as unread for the caller (Dialog.unread_mark) or clears
+  // the mark; reading the chat (ReadHistory) clears it too. The caller's
+  // sessions get dialog_unread_mark.
+  rpc SetDialogUnreadMark(SetDialogUnreadMarkRequest) returns (SetDialogUnreadMarkResponse);
+  // How many members of a group are online now, counted on the server
+  // (approximate: cached briefly, capped). Members whose last-seen privacy
+  // hides their status from the caller are not counted. Channels: admins
+  // only.
+  rpc GetChatOnlineCount(GetChatOnlineCountRequest) returns (GetChatOnlineCountResponse);
+  // The caller's notification settings (defaults until changed).
+  rpc GetNotificationSettings(GetNotificationSettingsRequest) returns (GetNotificationSettingsResponse);
+  // Changes the given settings; the caller's sessions get
+  // notification_settings.
+  rpc SetNotificationSettings(SetNotificationSettingsRequest) returns (SetNotificationSettingsResponse);
 }
 
 // Why a user was not added to a chat (AddMembers, CreateGroup).
@@ -175,7 +189,8 @@ message Chat {
   int32 member_count = 9;
   // ChatPermission bits granted to ordinary members.
   uint32 default_permissions = 10;
-  // Most recently pinned message; 0 when none.
+  // Newest pinned message (highest seq); 0 when none. Dialog carries the
+  // caller's view (pinned_message_seq, pinned_message_count).
   int64 pinned_seq = 11 [jstype = JS_NUMBER];
   int64 created_at = 12 [jstype = JS_NUMBER];
   // Caller-specific view.
@@ -219,6 +234,12 @@ message Dialog {
   // Pinned on top of the caller's list (order in GetDialogsResponse
   // .pinned_chat_ids and UpdatePinnedDialogs).
   bool pinned = 9;
+  // Pinned messages of the chat the caller can see (history visibility,
+  // not hidden for them), and the newest of them (0 when none).
+  int32 pinned_message_count = 10;
+  int64 pinned_message_seq = 11 [jstype = JS_NUMBER];
+  // The caller marked the chat as unread (SetDialogUnreadMark).
+  bool unread_mark = 12;
 }
 
 message InviteLink {
@@ -641,6 +662,72 @@ message DeleteChatRequest {
 
 message DeleteChatResponse {
   SyncAck ack = 1;
+}
+
+message SetDialogUnreadMarkRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // true marks the chat as unread; false clears the mark.
+  bool unread = 2;
+}
+
+message SetDialogUnreadMarkResponse {
+  SyncAck ack = 1;
+}
+
+message GetChatOnlineCountRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetChatOnlineCountResponse {
+  // Members online now, the caller included when online. Counting stops
+  // at 10000 (clients show "10000+").
+  int32 online_count = 1;
+}
+
+// Notification sound of the user's devices.
+enum NotificationSound {
+  NOTIFICATION_SOUND_UNSPECIFIED = 0;
+  NOTIFICATION_SOUND_DEFAULT = 1;
+  NOTIFICATION_SOUND_SOFT = 2;
+  NOTIFICATION_SOUND_OFF = 3;
+}
+
+// Per-user notification settings, kept on the server and synced to every
+// session. Per chat type: notify at all (enabled) and show the message text
+// (preview). A muted chat (Dialog.mute_until) never notifies.
+message NotificationSettings {
+  bool private_enabled = 1;
+  bool private_preview = 2;
+  bool groups_enabled = 3;
+  bool groups_preview = 4;
+  bool channels_enabled = 5;
+  bool channels_preview = 6;
+  NotificationSound sound = 7;
+  // Count muted chats in the unread badge (default false).
+  bool badge_muted = 8;
+}
+
+message GetNotificationSettingsRequest {}
+
+message GetNotificationSettingsResponse {
+  NotificationSettings settings = 1;
+}
+
+message SetNotificationSettingsRequest {
+  // Unset fields are left unchanged.
+  optional bool private_enabled = 1;
+  optional bool private_preview = 2;
+  optional bool groups_enabled = 3;
+  optional bool groups_preview = 4;
+  optional bool channels_enabled = 5;
+  optional bool channels_preview = 6;
+  optional NotificationSound sound = 7;
+  optional bool badge_muted = 8;
+}
+
+message SetNotificationSettingsResponse {
+  NotificationSettings settings = 1;
+  SyncAck ack = 2;
 }
 
 message GetCommonChatsRequest {

@@ -163,6 +163,26 @@ export const MIGRATIONS: readonly Migration[] = [
 			"DELETE FROM sync_state",
 		],
 	},
+	{
+		version: 4,
+		statements: [
+			// Recalled messages stay as placeholders (no content, not searchable).
+			"ALTER TABLE messages ADD COLUMN recalled INTEGER NOT NULL DEFAULT 0",
+			// The user's unread mark, and the pinned messages they see (count and newest).
+			"ALTER TABLE dialogs ADD COLUMN unread_mark INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE dialogs ADD COLUMN pinned_message_count INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE dialogs ADD COLUMN pinned_message_seq INTEGER NOT NULL DEFAULT 0",
+			// The user's notification settings (JSON of NotificationSettings); no row until fetched.
+			`CREATE TABLE notification_settings (
+				id INTEGER PRIMARY KEY CHECK (id = 1),
+				settings TEXT NOT NULL
+			)`,
+			// Existing dialogs lack these fields and recalled messages were
+			// removed: a fresh dialog snapshot marks the cache stale, so history
+			// comes back with the placeholders.
+			"DELETE FROM sync_state",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

@@ -186,7 +186,7 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	const top = view.topMessage;
 	const muted = entry?.muted === true;
 	const pinned = entry?.pinned === true;
-	// Marked unread on this device with nothing unread on the server: a dot instead of a count.
+	// Marked as unread with nothing unread: a dot instead of a count (#list-states).
 	const marked = entry?.unread === true && dialog.unreadCount === 0 && dialog.unreadMentionsCount === 0;
 	const ownLast = top !== null && top.fromId === store.selfId && top.action === null;
 	const read = ownLast && dialog.readOutboxMaxSeq >= top.seq;

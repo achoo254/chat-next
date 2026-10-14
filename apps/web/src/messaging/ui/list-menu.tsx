@@ -2,8 +2,8 @@
 // most PINNED_DIALOGS_MAX), mark it read or unread, mute it for a while
 // (submenu) or turn notifications back on, and delete: a private chat for
 // yourself, a group or channel you own for everyone (#delete-chat). Opened by right click, a long press, the menu key or the row's
-// "…" button, never by opening the chat. Mute and pins sync to the user's
-// other sessions through the server; "unread" is a mark on this device.
+// "…" button, never by opening the chat. Mute, pins and "marked as unread"
+// sync to the user's other sessions through the server.
 import { MUTE_FOREVER, PINNED_DIALOGS_MAX } from "@app/core";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "../../components/icon.tsx";
@@ -23,7 +23,7 @@ const EDGE_PX = 8;
 export function ListMenu({ target, onClose }: { target: ListMenuTarget; onClose: () => void }) {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
-	const { remote, source, store, toasts } = useServices();
+	const { remote, source, toasts } = useServices();
 	const ui = useUi();
 	const view = useDialog(target.chatId);
 	const setMute = useMute(target.chatId, view === undefined ? "" : dialogTitle(view, copy));
@@ -75,14 +75,15 @@ export function ListMenu({ target, onClose }: { target: ListMenuTarget; onClose:
 	const mute = (label: string, muteFor: MuteFor) => run(() => setMute(label, muteFor));
 	const markRead = () =>
 		run(async () => {
-			store.setMarkedUnread(chatId, false);
 			const top = view.dialog.topSeq;
+			// Reading clears "marked as unread" too; a chat with nothing unread only drops the mark.
 			if (top > view.dialog.readInboxMaxSeq) await source.markRead(chatId, top);
+			else if (view.dialog.unreadMark) await source.setDialogUnreadMark(chatId, false);
 			return t.read;
 		});
 	const markUnread = () =>
 		run(async () => {
-			store.setMarkedUnread(chatId, true);
+			await source.setDialogUnreadMark(chatId, true);
 			return t.unread;
 		});
 	const muteUntil = view.dialog.muteUntil;

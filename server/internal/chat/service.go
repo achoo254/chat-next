@@ -72,9 +72,11 @@ type IDSource interface {
 	Next() (int64, error)
 }
 
-// Presence reports whether a user has a foreground realtime session.
+// Presence reports which users have a foreground realtime session.
 type Presence interface {
 	Online(userID int64) bool
+	// OnlineUsers lists every user online now.
+	OnlineUsers() []int64
 }
 
 // Sink receives rendered realtime frames (the gateway hub).
@@ -116,6 +118,10 @@ type Service struct {
 	epoch    int64
 	// previewSlots bounds the link preview fetches running after sends.
 	previewSlots chan struct{}
+
+	// onlineCounts caches GetChatOnlineCount per chat and viewer.
+	onlineMu     sync.Mutex
+	onlineCounts map[onlineKey]onlineEntry
 
 	dispatch *dispatcher
 	// background tracks goroutines Stop must wait for; stopCtx ends them.
@@ -165,7 +171,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	s := &Service{
 		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, limiter: d.Limiter, logger: d.Logger,
-		operators: map[int64]bool{},
+		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{},
 	}
 	for _, id := range cfg.Operators {
 		if id <= 0 {

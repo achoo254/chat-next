@@ -14,9 +14,11 @@ import type {
 	Message,
 	MessageAction,
 	MessageEntity,
+	NotificationSettings,
 	ReactionCount,
 	User,
 } from "../model/types.ts";
+import { DEFAULT_NOTIFICATION_SETTINGS } from "../model/types.ts";
 
 export function num(row: SqlRow, column: string): number {
 	const value = row[column];
@@ -110,6 +112,9 @@ function parseReactions(json: string | null): ReactionCount[] {
 		emoji: text(item, "emoji"),
 		count: field(item, "count"),
 		chosen: item.chosen === true,
+		recentUserIds: Array.isArray(item.recentUserIds)
+			? item.recentUserIds.filter((v): v is number => typeof v === "number")
+			: [],
 	}));
 }
 
@@ -195,6 +200,7 @@ export function rowToMessage(row: SqlRow): Message {
 		action: parseAction(optionalStr(row, "action")),
 		topicId: num(row, "topic_id"),
 		linkPreview: parseLinkPreview(optionalStr(row, "link_preview")),
+		recalled: bool(row, "recalled"),
 	};
 }
 
@@ -243,6 +249,31 @@ export function rowToDialog(row: SqlRow): Dialog {
 		chatPts: num(row, "chat_pts"),
 		muteUntil: num(row, "mute_until"),
 		pinned: num(row, "pin_rank") > 0,
+		pinnedMessageCount: num(row, "pinned_message_count"),
+		pinnedMessageSeq: num(row, "pinned_message_seq"),
+		unreadMark: bool(row, "unread_mark"),
+	};
+}
+
+/** Decodes stored notification settings; missing or corrupt fields take the defaults. */
+export function parseNotificationSettings(json: string | null): NotificationSettings {
+	const value = parseJson(json);
+	if (!isRecord(value)) return DEFAULT_NOTIFICATION_SETTINGS;
+	const flagOr = (key: keyof NotificationSettings, fallback: boolean): boolean => {
+		const v = value[key];
+		return typeof v === "boolean" ? v : fallback;
+	};
+	const d = DEFAULT_NOTIFICATION_SETTINGS;
+	const sound = value.sound;
+	return {
+		privateEnabled: flagOr("privateEnabled", d.privateEnabled),
+		privatePreview: flagOr("privatePreview", d.privatePreview),
+		groupsEnabled: flagOr("groupsEnabled", d.groupsEnabled),
+		groupsPreview: flagOr("groupsPreview", d.groupsPreview),
+		channelsEnabled: flagOr("channelsEnabled", d.channelsEnabled),
+		channelsPreview: flagOr("channelsPreview", d.channelsPreview),
+		sound: sound === "default" || sound === "soft" || sound === "off" ? sound : d.sound,
+		badgeMuted: flagOr("badgeMuted", d.badgeMuted),
 	};
 }
 

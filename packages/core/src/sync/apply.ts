@@ -3,7 +3,7 @@
 // batch and records follow-up effects for the engine to run after commit.
 import { EventKeys } from "../events/bus.ts";
 import type { Message, SessionRevokeReason, UpdateBody } from "../model/types.ts";
-import { purgeChat, purgeMessages } from "../purge/index.ts";
+import { purgeChat, purgeMessages, recallMessages } from "../purge/index.ts";
 import {
 	ensureDialog,
 	putChat,
@@ -11,10 +11,12 @@ import {
 	putMessage,
 	putNewMessage,
 	putMute,
+	putNotificationSettings,
 	putPin,
 	putPinnedOrder,
 	putReactions,
 	putRead,
+	putUnreadMark,
 	type WriteBatch,
 } from "../repo/writes.ts";
 
@@ -23,7 +25,7 @@ export interface Effects {
 	readonly incoming: Message[];
 	/** Chats the user is no longer in: drop in-memory sync state too. */
 	readonly purgedChats: Set<number>;
-	/** Chats whose entity must be fetched again (e.g. pinned_seq after an unpin). */
+	/** Chats whose entity and dialog must be fetched again (e.g. pinned messages after a pin). */
 	readonly refreshChats: Set<number>;
 	/** Large chats that have news in their own log. */
 	readonly chatDifferences: Set<number>;
@@ -96,6 +98,9 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			putMessage(w, body.message);
 			return;
 		case "message_delete":
+			if (body.recalled) recallMessages(w, body.chatId, body.seqs, selfId);
+			else purgeMessages(w, body.chatId, body.seqs, selfId);
+			return;
 		case "message_hidden":
 			purgeMessages(w, body.chatId, body.seqs, selfId);
 			return;
@@ -115,9 +120,10 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			return;
 		}
 		case "pin":
-			putPin(w, body.chatId, body.seq, body.pinned);
-			// After an unpin the server may fall back to an older pinned message.
-			if (!body.pinned) effects.refreshChats.add(body.chatId);
+			putPin(w, body.chatId, body.seq, body.pinned, body.seqs);
+			// The pinned count changes, and after an unpin the server falls back
+			// to an older pinned message: take both from the server.
+			effects.refreshChats.add(body.chatId);
 			return;
 		case "member_added":
 			// The chat entity was fetched before this update was applied
@@ -179,6 +185,12 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			// private chat comes back with its next message.
 			purgeChat(w, body.chatId);
 			effects.purgedChats.add(body.chatId);
+			return;
+		case "dialog_unread_mark":
+			putUnreadMark(w, body.chatId, body.unread);
+			return;
+		case "notification_settings":
+			putNotificationSettings(w, body.settings);
 			return;
 		case "unknown":
 			// A kind newer than this build; the next release knows how to apply it.

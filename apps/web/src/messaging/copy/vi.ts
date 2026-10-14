@@ -99,6 +99,9 @@ export const vi = {
 		hidden: "Đã ẩn thanh tin ghim ở phía bạn. Mở lại trong Thông tin chat",
 		show: "Hiện thanh tin ghim",
 		jump: "Nhảy tới tin ghim",
+		counter: (index: number, count: number) => `Tin ghim ${index}/${count}`,
+		jumpTo: (index: number, count: number) => `Nhảy tới tin ghim ${index}/${count}`,
+		all: (count: number) => `Tất cả tin ghim, ${count} tin`,
 	},
 	message: {
 		edited: "đã sửa",
@@ -120,6 +123,10 @@ export const vi = {
 		mediaPreview: "Ảnh, video hoặc file",
 		integration: (label: string) => `Tích hợp: ${label}`,
 		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
+		/** Names of the latest reactors (up to 3), "và n người khác" for the rest. */
+		reactionBy: (emoji: string, names: readonly string[], count: number) =>
+			`${emoji} ${names.join(", ")}${count > names.length ? ` và ${count - names.length} người khác` : ""}`,
+		recalled: "Tin nhắn đã thu hồi",
 		unknownUser: "Người dùng",
 		deleted: "Tin nhắn đã thu hồi",
 		quickActions: (name: string) => `Thao tác nhanh với tin của ${name}`,
@@ -207,6 +214,10 @@ export const vi = {
 	},
 	time: {
 		weekdays: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
+	},
+	notify: {
+		/** Shown instead of the message when its preview is off. */
+		hiddenBody: "Bạn có tin nhắn mới",
 	},
 };
 

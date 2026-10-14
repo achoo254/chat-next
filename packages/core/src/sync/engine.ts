@@ -21,6 +21,7 @@ import type {
 	HistoryPage,
 	Hello,
 	Message,
+	NotificationSettings,
 	SessionRevokeReason,
 	SyncAck,
 	SyncState,
@@ -35,6 +36,7 @@ import {
 	toDialogsPage,
 	toDifference,
 	toHistoryPage,
+	toNotificationSettings,
 	toPeerDialogs,
 	toState,
 	toUser,
@@ -49,6 +51,7 @@ import {
 	putChat,
 	putChatPts,
 	putDialog,
+	putNotificationSettings,
 	putPinnedOrder,
 	putMessage,
 	putNewMessage,
@@ -680,10 +683,12 @@ export class SyncEngine {
 	 */
 	private async resetFromServer(state: SyncState): Promise<void> {
 		const snapshot = await this.fetchDialogs();
+		const settings = await this.fetchNotificationSettings();
 		await this.queue.run(async () => {
 			const w = new WriteBatch();
 			const effects = newEffects();
 			markAllStale(w);
+			if (settings !== null) putNotificationSettings(w, settings);
 			if (snapshot.complete) {
 				const present = new Set(snapshot.dialogs.map((d) => d.chatId));
 				for (const chatId of await this.options.repo.dialogChatIds()) {
@@ -733,6 +738,24 @@ export class SyncEngine {
 			for (const chatId of effects.purgedChats) this.forgetChat(chatId);
 		});
 		if (this.openChat.chatId !== 0) await this.reloadWindowSafely(this.openChat.chatId);
+	}
+
+	/**
+	 * The user's notification settings, part of a fresh snapshot. Null when
+	 * the API lacks them or the call failed (reported); the stored settings
+	 * then stay until the next change or snapshot.
+	 */
+	async fetchNotificationSettings(): Promise<NotificationSettings | null> {
+		const get = this.options.api.chats.getNotificationSettings;
+		if (get === undefined) return null;
+		try {
+			const response = await get({});
+			return response.settings === undefined ? null : toNotificationSettings(response.settings);
+		} catch (err) {
+			if (classifyFailure(err) === "unauthenticated") throw err;
+			this.report(err, "GetNotificationSettings");
+			return null;
+		}
 	}
 
 	private async fetchDialogs(): Promise<DialogsPage & { complete: boolean }> {
@@ -937,6 +960,28 @@ export class SyncEngine {
 				this.expectedChatPts.set(chatId, Math.max(this.expectedChatPts.get(chatId) ?? 0, ack.chatPts));
 				this.armChatGap(chatId);
 			}
+		}
+	}
+
+	/**
+	 * Records the log positions a confirmed mutation reached without
+	 * applying anything: its own update then arrives (realtime or, after the
+	 * gap timeout, GetDifference) and applies like any other.
+	 */
+	expectAck(ack: SyncAck | null, chatId: number): void {
+		if (ack === null || this.stopped) return;
+		if (ack.serverEpoch !== 0 && this.hasState && ack.serverEpoch !== this.epoch) {
+			this.requestDifference();
+			return;
+		}
+		if (ack.pts > this.pts) {
+			this.expectedPts = Math.max(this.expectedPts, ack.pts);
+			this.armGap();
+		}
+		const local = this.chatPts.get(chatId);
+		if (ack.chatPts > 0 && local !== undefined && ack.chatPts > local) {
+			this.expectedChatPts.set(chatId, Math.max(this.expectedChatPts.get(chatId) ?? 0, ack.chatPts));
+			this.armChatGap(chatId);
 		}
 	}
 

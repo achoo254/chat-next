@@ -163,6 +163,16 @@ Create:
 - `/auth/login?return_to=` (đường dẫn cùng origin, niêm phong trong cookie đăng nhập) để quay lại trang cũ sau khi đăng nhập ở tab khác.
 - Chi tiết: [`server/README.md`](../../../server/README.md).
 
+### Bù phần backend cho giao diện mới (2026-10-15, migration 0006)
+
+- Nhiều tin ghim: `GetPinnedMessages` (mới nhất trước, theo topic, phân trang `offset_seq`, có `count`), `UnpinAllMessages` (cả chat hoặc một topic, một update `pin` có `seqs`), `Dialog.pinned_message_count`/`pinned_message_seq` theo phần người xem thấy được; `Chat.pinned_seq` giữ nghĩa cũ (tin ghim mới nhất).
+- Thu hồi để lại chỗ giữ: `message_delete.recalled`, `Message.recalled`; `GetHistory` và tin đầu dialog trả chỗ giữ không nội dung, không tính chưa đọc; "Xoá ở phía tôi" vẫn bỏ hẳn tin.
+- `ReactionCount.recent_user_ids` (3 người gần nhất, kênh chỉ admin) kèm user trong cùng phản hồi.
+- `SetDialogUnreadMark` + `Dialog.unread_mark` + update `dialog_unread_mark`; `ReadHistory` xoá dấu.
+- `GetNotificationSettings`/`SetNotificationSettings` (bảng `notification_settings`, update `notification_settings`).
+- `GetChatOnlineCount` (presence của gateway, theo quyền last seen, cache 30 giây, trần 10.000).
+- Chi tiết: [`server/README.md`](../../../server/README.md).
+
 ## Success Criteria
 
 - Mọi test ở bước 11 pass với `-race`.

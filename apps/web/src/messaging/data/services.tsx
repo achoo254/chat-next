@@ -2,14 +2,14 @@
 // start-up, so a context is fine for it; everything that changes often is
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
-import type { Chat, ConnectionState, DialogView, StoredMessage, User } from "@app/core";
+import type { Chat, ConnectionState, DialogView, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
 import type { Drafts } from "./drafts.ts";
 import type { Folder } from "./format.ts";
 import type { PendingBackend, Topic } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";
 import type { ChatSource } from "./source.ts";
-import type { ChatStore, ChatWindow, ListEntry, ListStatus, WindowItem } from "./store.ts";
+import type { ChatStore, ChatWindow, ListEntry, ListStatus, UnreadTotals, WindowItem } from "./store.ts";
 
 /** Short confirmation shown at the bottom of the screen (mockups: .toast). */
 export class Toasts {
@@ -91,10 +91,16 @@ export function useListEntry(chatId: number): ListEntry | undefined {
 	return useStoreKey(`entry:${chatId}`, () => store.listEntry(chatId));
 }
 
-/** Whether the chat is marked unread on this device. */
-export function useMarkedUnread(chatId: number): boolean {
+/** The user's notification settings, synced from the server (defaults until loaded). */
+export function useNotificationSettings(): NotificationSettings {
 	const { store } = useServices();
-	return useStoreKey(`mark:${chatId}`, () => store.markedUnread(chatId));
+	return useStoreKey("settings", () => store.notificationSettings());
+}
+
+/** Unread messages and chats of the app badge. */
+export function useUnreadTotals(): UnreadTotals {
+	const { store } = useServices();
+	return useStoreKey("totals", () => store.unreadTotals());
 }
 
 export function useListStatus(): ListStatus {
@@ -232,3 +238,4 @@ export function useTopics(chatId: number, forum: boolean): readonly Topic[] | nu
 	}, [backend, chatId, enabled]);
 	return topics;
 }
+

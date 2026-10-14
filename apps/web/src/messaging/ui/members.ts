@@ -1,19 +1,17 @@
-// Member lists, the online count of small groups and invite links, shared by
+// Member lists, the online count of groups and invite links, shared by
 // the conversation header, the info panel and the admin page.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Invite, Member, Remote } from "../data/remote.ts";
+import type { ChatSource } from "../data/source.ts";
 import { useServices } from "../data/services.tsx";
 import { rememberPresence } from "./presence.tsx";
 
-/** GetMembers page size used by the UI; groups up to this size have an exact online count. */
-export const MEMBERS_PAGE = 50;
-const ONLINE_TTL_MS = 60_000;
+/** "k đang hoạt động" is refreshed this often while the chat is on screen. */
+export const ONLINE_REFRESH_MS = 60_000;
+/** Mounts within this window (header and info panel together) share one request. */
+const ONLINE_FRESH_MS = 10_000;
 
-function onlineIn(members: readonly Member[]): number {
-	return members.filter((member) => !member.person.isBot && (member.person.isSelf || member.person.presence.kind === "online")).length;
-}
-
-/** "k đang hoạt động" of small groups, from their whole member list (one page), kept a minute. */
+/** "k đang hoạt động" of groups, counted by the server (GetChatOnlineCount). */
 class OnlineCounts {
 	private readonly byChat = new Map<number, { at: number; count: number }>();
 	private readonly loading = new Set<number>();
@@ -23,23 +21,19 @@ class OnlineCounts {
 		return this.byChat.get(chatId)?.count ?? null;
 	}
 
-	set(chatId: number, count: number): void {
-		const previous = this.byChat.get(chatId)?.count;
-		this.byChat.set(chatId, { at: Date.now(), count });
-		if (previous !== count) for (const listener of [...this.listeners]) listener();
-	}
-
-	load(remote: Remote, chatId: number): void {
+	load(source: ChatSource, chatId: number): void {
 		const known = this.byChat.get(chatId);
-		if (this.loading.has(chatId) || (known !== undefined && Date.now() - known.at < ONLINE_TTL_MS)) return;
+		if (this.loading.has(chatId) || (known !== undefined && Date.now() - known.at < ONLINE_FRESH_MS)) return;
 		this.loading.add(chatId);
-		remote
-			.members(chatId)
+		source
+			.onlineCount(chatId)
 			.then(
-				(page) => {
-					for (const member of page.members) rememberPresence(remote, member.person.id, member.person.presence);
-					if (page.nextCursor === "") this.set(chatId, onlineIn(page.members));
+				(count) => {
+					const previous = this.byChat.get(chatId)?.count;
+					this.byChat.set(chatId, { at: Date.now(), count });
+					if (previous !== count) for (const listener of [...this.listeners]) listener();
 				},
+				// Offline or an older server: the header shows the member count alone.
 				() => undefined,
 			)
 			.finally(() => this.loading.delete(chatId));
@@ -51,17 +45,40 @@ class OnlineCounts {
 	};
 }
 
-const onlineCounts = new OnlineCounts();
+/** One cache per client, so a new session (or test) never sees another one's counts. */
+const onlineCountsBySource = new WeakMap<ChatSource, OnlineCounts>();
 
-/** Members online in a group of up to MEMBERS_PAGE members; null for larger groups or while unknown. */
-export function useOnlineCount(chatId: number, memberCount: number): number | null {
-	const { remote } = useServices();
-	const enabled = chatId !== 0 && memberCount > 0 && memberCount <= MEMBERS_PAGE;
+function onlineCountsOf(source: ChatSource): OnlineCounts {
+	let counts = onlineCountsBySource.get(source);
+	if (counts === undefined) {
+		counts = new OnlineCounts();
+		onlineCountsBySource.set(source, counts);
+	}
+	return counts;
+}
+
+/**
+ * Members of a group online now (null while unknown; chatId 0 for none).
+ * Asked when the chat opens, again every minute while the page is visible,
+ * and when the page becomes visible again.
+ */
+export function useOnlineCount(chatId: number): number | null {
+	const { source } = useServices();
+	const onlineCounts = onlineCountsOf(source);
 	useEffect(() => {
-		if (enabled) onlineCounts.load(remote, chatId);
-	}, [remote, chatId, enabled]);
-	const count = useSyncExternalStore(onlineCounts.subscribe, () => (enabled ? onlineCounts.get(chatId) : null));
-	return count;
+		if (chatId === 0) return;
+		const refresh = () => {
+			if (document.visibilityState !== "hidden") onlineCounts.load(source, chatId);
+		};
+		refresh();
+		const timer = setInterval(refresh, ONLINE_REFRESH_MS);
+		document.addEventListener("visibilitychange", refresh);
+		return () => {
+			clearInterval(timer);
+			document.removeEventListener("visibilitychange", refresh);
+		};
+	}, [source, onlineCounts, chatId]);
+	return useSyncExternalStore(onlineCounts.subscribe, () => (chatId === 0 ? null : onlineCounts.get(chatId)));
 }
 
 /** Per chat, bumped when this UI changes the members (remove, promote) so open lists reload. */
@@ -105,7 +122,6 @@ export function useMembers(chatId: number, query = "", enabled = true): MembersS
 			(page) => {
 				if (!active) return;
 				for (const member of page.members) rememberPresence(remote, member.person.id, member.person.presence);
-				if (query === "" && page.nextCursor === "") onlineCounts.set(chatId, onlineIn(page.members));
 				setState({ key, members: page.members, status: "ready", hasMore: page.nextCursor !== "", cursor: page.nextCursor });
 			},
 			() => {

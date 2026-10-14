@@ -122,6 +122,12 @@ Hoãn lại:
 - Playwright Chromium/Firefox/WebKit cho `platform-web`: máy chỉ có Chromium, repo chưa có Playwright; OPFS `opfs-sahpool` và Web Locks mới được kiểm bằng test Node (driver sqlite-wasm in-memory, hub hai tab với BroadcastChannel thật và lock giả).
 - Typing/presence lên UI: Phase 6.
 
+Bù phần core cho giao diện mới (2026-10-15, migration local 4, reset `sync_state` để lấy snapshot mới):
+- Thu hồi: `message_delete.recalled` biến tin trong cache thành chỗ giữ (`Message.recalled`, xoá nội dung, reaction, dòng FTS), không tính chưa đọc; thu hồi tin của mình áp ngay ở local; bản sao cũ đến muộn không làm tin sống lại.
+- `ChatCore`: `pinnedMessages`, `unpinAllMessages`, `setDialogUnreadMark`, `notificationSettings`, `setNotificationSettings`, `onlineCount`, `unreadTotals` (dùng `badgeMuted`; chat đánh dấu chưa đọc tính là một tin). `markRead` xoá dấu chưa đọc. Update `pin` làm mới dialog để có số tin ghim; tin ghim không ghi vào cache lịch sử.
+- `ReactionCount.recentUserIds`, `Dialog.pinnedMessageCount/pinnedMessageSeq/unreadMark`, event `pins:<chat>`, `notification_settings`.
+- Fake server của core gửi được update theo người dùng không gắn chat (`pinned_dialogs`, `chat_deleted`, `notification_settings`) khi đang kết nối; fixture web bỏ chat 0 giả.
+
 ## Success Criteria
 
 - 10.000 update với 5% mất gói và 5% đảo thứ tự → state cuối khớp server 100%.

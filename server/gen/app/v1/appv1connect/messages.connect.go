@@ -63,6 +63,12 @@ const (
 	// MessagesServiceUnpinMessageProcedure is the fully-qualified name of the MessagesService's
 	// UnpinMessage RPC.
 	MessagesServiceUnpinMessageProcedure = "/app.v1.MessagesService/UnpinMessage"
+	// MessagesServiceUnpinAllMessagesProcedure is the fully-qualified name of the MessagesService's
+	// UnpinAllMessages RPC.
+	MessagesServiceUnpinAllMessagesProcedure = "/app.v1.MessagesService/UnpinAllMessages"
+	// MessagesServiceGetPinnedMessagesProcedure is the fully-qualified name of the MessagesService's
+	// GetPinnedMessages RPC.
+	MessagesServiceGetPinnedMessagesProcedure = "/app.v1.MessagesService/GetPinnedMessages"
 	// MessagesServiceSetReactionProcedure is the fully-qualified name of the MessagesService's
 	// SetReaction RPC.
 	MessagesServiceSetReactionProcedure = "/app.v1.MessagesService/SetReaction"
@@ -95,8 +101,16 @@ type MessagesServiceClient interface {
 	// Deletes for the caller only (hidden) or for everyone.
 	DeleteMessages(context.Context, *connect.Request[v1.DeleteMessagesRequest]) (*connect.Response[v1.DeleteMessagesResponse], error)
 	ReadHistory(context.Context, *connect.Request[v1.ReadHistoryRequest]) (*connect.Response[v1.ReadHistoryResponse], error)
+	// Pins one more message; a chat (and each forum topic) keeps any number
+	// of pinned messages. Chat.pinned_seq is the newest pinned message.
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
 	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
+	// Unpins every pinned message of the chat, or of one forum topic. Members
+	// get one pin update listing the unpinned seqs.
+	UnpinAllMessages(context.Context, *connect.Request[v1.UnpinAllMessagesRequest]) (*connect.Response[v1.UnpinAllMessagesResponse], error)
+	// Pinned messages the caller can see (history visibility, not hidden for
+	// them), newest first, optionally of one forum topic.
+	GetPinnedMessages(context.Context, *connect.Request[v1.GetPinnedMessagesRequest]) (*connect.Response[v1.GetPinnedMessagesResponse], error)
 	SetReaction(context.Context, *connect.Request[v1.SetReactionRequest]) (*connect.Response[v1.SetReactionResponse], error)
 	// Seq-cursor history; respects visible_from_seq and messages hidden for the
 	// caller.
@@ -186,6 +200,18 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("UnpinMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		unpinAllMessages: connect.NewClient[v1.UnpinAllMessagesRequest, v1.UnpinAllMessagesResponse](
+			httpClient,
+			baseURL+MessagesServiceUnpinAllMessagesProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("UnpinAllMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		getPinnedMessages: connect.NewClient[v1.GetPinnedMessagesRequest, v1.GetPinnedMessagesResponse](
+			httpClient,
+			baseURL+MessagesServiceGetPinnedMessagesProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("GetPinnedMessages")),
+			connect.WithClientOptions(opts...),
+		),
 		setReaction: connect.NewClient[v1.SetReactionRequest, v1.SetReactionResponse](
 			httpClient,
 			baseURL+MessagesServiceSetReactionProcedure,
@@ -237,6 +263,8 @@ type messagesServiceClient struct {
 	readHistory         *connect.Client[v1.ReadHistoryRequest, v1.ReadHistoryResponse]
 	pinMessage          *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
 	unpinMessage        *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
+	unpinAllMessages    *connect.Client[v1.UnpinAllMessagesRequest, v1.UnpinAllMessagesResponse]
+	getPinnedMessages   *connect.Client[v1.GetPinnedMessagesRequest, v1.GetPinnedMessagesResponse]
 	setReaction         *connect.Client[v1.SetReactionRequest, v1.SetReactionResponse]
 	getHistory          *connect.Client[v1.GetHistoryRequest, v1.GetHistoryResponse]
 	pressInlineButton   *connect.Client[v1.PressInlineButtonRequest, v1.PressInlineButtonResponse]
@@ -295,6 +323,16 @@ func (c *messagesServiceClient) UnpinMessage(ctx context.Context, req *connect.R
 	return c.unpinMessage.CallUnary(ctx, req)
 }
 
+// UnpinAllMessages calls app.v1.MessagesService.UnpinAllMessages.
+func (c *messagesServiceClient) UnpinAllMessages(ctx context.Context, req *connect.Request[v1.UnpinAllMessagesRequest]) (*connect.Response[v1.UnpinAllMessagesResponse], error) {
+	return c.unpinAllMessages.CallUnary(ctx, req)
+}
+
+// GetPinnedMessages calls app.v1.MessagesService.GetPinnedMessages.
+func (c *messagesServiceClient) GetPinnedMessages(ctx context.Context, req *connect.Request[v1.GetPinnedMessagesRequest]) (*connect.Response[v1.GetPinnedMessagesResponse], error) {
+	return c.getPinnedMessages.CallUnary(ctx, req)
+}
+
 // SetReaction calls app.v1.MessagesService.SetReaction.
 func (c *messagesServiceClient) SetReaction(ctx context.Context, req *connect.Request[v1.SetReactionRequest]) (*connect.Response[v1.SetReactionResponse], error) {
 	return c.setReaction.CallUnary(ctx, req)
@@ -337,8 +375,16 @@ type MessagesServiceHandler interface {
 	// Deletes for the caller only (hidden) or for everyone.
 	DeleteMessages(context.Context, *connect.Request[v1.DeleteMessagesRequest]) (*connect.Response[v1.DeleteMessagesResponse], error)
 	ReadHistory(context.Context, *connect.Request[v1.ReadHistoryRequest]) (*connect.Response[v1.ReadHistoryResponse], error)
+	// Pins one more message; a chat (and each forum topic) keeps any number
+	// of pinned messages. Chat.pinned_seq is the newest pinned message.
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
 	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
+	// Unpins every pinned message of the chat, or of one forum topic. Members
+	// get one pin update listing the unpinned seqs.
+	UnpinAllMessages(context.Context, *connect.Request[v1.UnpinAllMessagesRequest]) (*connect.Response[v1.UnpinAllMessagesResponse], error)
+	// Pinned messages the caller can see (history visibility, not hidden for
+	// them), newest first, optionally of one forum topic.
+	GetPinnedMessages(context.Context, *connect.Request[v1.GetPinnedMessagesRequest]) (*connect.Response[v1.GetPinnedMessagesResponse], error)
 	SetReaction(context.Context, *connect.Request[v1.SetReactionRequest]) (*connect.Response[v1.SetReactionResponse], error)
 	// Seq-cursor history; respects visible_from_seq and messages hidden for the
 	// caller.
@@ -424,6 +470,18 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("UnpinMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceUnpinAllMessagesHandler := connect.NewUnaryHandler(
+		MessagesServiceUnpinAllMessagesProcedure,
+		svc.UnpinAllMessages,
+		connect.WithSchema(messagesServiceMethods.ByName("UnpinAllMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagesServiceGetPinnedMessagesHandler := connect.NewUnaryHandler(
+		MessagesServiceGetPinnedMessagesProcedure,
+		svc.GetPinnedMessages,
+		connect.WithSchema(messagesServiceMethods.ByName("GetPinnedMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
 	messagesServiceSetReactionHandler := connect.NewUnaryHandler(
 		MessagesServiceSetReactionProcedure,
 		svc.SetReaction,
@@ -482,6 +540,10 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServicePinMessageHandler.ServeHTTP(w, r)
 		case MessagesServiceUnpinMessageProcedure:
 			messagesServiceUnpinMessageHandler.ServeHTTP(w, r)
+		case MessagesServiceUnpinAllMessagesProcedure:
+			messagesServiceUnpinAllMessagesHandler.ServeHTTP(w, r)
+		case MessagesServiceGetPinnedMessagesProcedure:
+			messagesServiceGetPinnedMessagesHandler.ServeHTTP(w, r)
 		case MessagesServiceSetReactionProcedure:
 			messagesServiceSetReactionHandler.ServeHTTP(w, r)
 		case MessagesServiceGetHistoryProcedure:
@@ -541,6 +603,14 @@ func (UnimplementedMessagesServiceHandler) PinMessage(context.Context, *connect.
 
 func (UnimplementedMessagesServiceHandler) UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.UnpinMessage is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) UnpinAllMessages(context.Context, *connect.Request[v1.UnpinAllMessagesRequest]) (*connect.Response[v1.UnpinAllMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.UnpinAllMessages is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) GetPinnedMessages(context.Context, *connect.Request[v1.GetPinnedMessagesRequest]) (*connect.Response[v1.GetPinnedMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetPinnedMessages is not implemented"))
 }
 
 func (UnimplementedMessagesServiceHandler) SetReaction(context.Context, *connect.Request[v1.SetReactionRequest]) (*connect.Response[v1.SetReactionResponse], error) {

@@ -1119,6 +1119,10 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 	if err != nil {
 		return nil, err
 	}
+	pins, err := pinnedStates(ctx, s.pool, me, list)
+	if err != nil {
+		return nil, err
+	}
 	ents := newEntitySet()
 	var topRows []*messageRow
 	for _, m := range list {
@@ -1132,6 +1136,9 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 			ChatPts:             chatPtsIfLarge(c),
 			MuteUntil:           activeMute(m.MuteUntil, time.Now()),
 			Pinned:              m.PinRank != 0,
+			PinnedMessageCount:  pins[c.ID].count,
+			PinnedMessageSeq:    pins[c.ID].newest,
+			UnreadMark:          m.UnreadMark,
 		}
 		if top := tops[c.ID]; top != nil {
 			d.TopSeq = top.Seq
@@ -1157,8 +1164,51 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 	return out, nil
 }
 
+// pinState is a member's view of a chat's pinned messages.
+type pinState struct {
+	count  int32
+	newest int64
+}
+
+// pinnedStates counts, per chat, the pinned messages the member sees
+// (history visibility, not hidden for them; pins are always of live
+// messages) and finds the newest, in one query.
+func pinnedStates(ctx context.Context, q querier, me int64, members []*memberRow) (map[int64]pinState, error) {
+	out := map[int64]pinState{}
+	if len(members) == 0 {
+		return out, nil
+	}
+	chatIDs := make([]int64, len(members))
+	visible := make([]int64, len(members))
+	for i, m := range members {
+		chatIDs[i], visible[i] = m.ChatID, m.VisibleFrom
+	}
+	rows, err := q.Query(ctx, `
+		SELECT x.chat_id, count(*), max(p.seq) FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, visible_from)
+		JOIN pinned_messages p ON p.chat_id = x.chat_id AND p.seq >= x.visible_from
+		WHERE NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $3 AND h.chat_id = p.chat_id AND h.seq = p.seq)
+		GROUP BY x.chat_id`, chatIDs, visible, me)
+	if err != nil {
+		return nil, fmt.Errorf("chat: pinned states: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var chatID int64
+		var st pinState
+		if err := rows.Scan(&chatID, &st.count, &st.newest); err != nil {
+			return nil, fmt.Errorf("chat: pinned states: %w", err)
+		}
+		out[chatID] = st
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: pinned states: %w", err)
+	}
+	return out, nil
+}
+
 // topMessages returns, per chat, the newest message visible to the member
-// (history visibility, not deleted, not hidden for them), in one query.
+// (history visibility, not hidden for them; a recalled one included as its
+// placeholder), in one query.
 func topMessages(ctx context.Context, q querier, me int64, members []*memberRow) (map[int64]*messageRow, error) {
 	out := map[int64]*messageRow{}
 	if len(members) == 0 {
@@ -1173,7 +1223,7 @@ func topMessages(ctx context.Context, q querier, me int64, members []*memberRow)
 		SELECT newest.* FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, visible_from)
 		CROSS JOIN LATERAL (
 			SELECT `+messageColumns+` FROM messages m
-			WHERE m.chat_id = x.chat_id AND m.deleted_at IS NULL AND m.seq >= x.visible_from
+			WHERE m.chat_id = x.chat_id AND m.seq >= x.visible_from
 				AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $3 AND h.chat_id = m.chat_id AND h.seq = m.seq)
 			ORDER BY m.seq DESC LIMIT 1) newest`, chatIDs, visible, me)
 	if err != nil {

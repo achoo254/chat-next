@@ -43,7 +43,18 @@ export interface WebChatOptions {
 	readonly storage?: Storage;
 	readonly onSessionEnded?: (reason: SessionEndReason) => void;
 	readonly onNotificationClick?: (chatId: number) => void;
+	/**
+	 * Decides whether a notification from the core is shown and how: null
+	 * drops it, otherwise the returned request (title and body may differ)
+	 * is shown. Lets the app apply the user's settings and mutes.
+	 */
+	readonly filterNotification?: (request: NotificationRequest) => ShownNotification | null;
 	readonly onError?: (context: string, message: string) => void;
+}
+
+/** A notification as shown; `silent` asks the system not to play a sound. */
+export interface ShownNotification extends NotificationRequest {
+	readonly silent?: boolean;
 }
 
 export type TabRole = "starting" | "leader" | "follower";
@@ -98,10 +109,21 @@ export function createWebChat(options: WebChatOptions): WebChat {
 		userId = undefined;
 	};
 
-	const showNotification = (request: NotificationRequest): void => {
+	const showNotification = (incoming: NotificationRequest): void => {
 		if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+		let request: ShownNotification | null = incoming;
+		if (options.filterNotification !== undefined) {
+			try {
+				request = options.filterNotification(incoming);
+			} catch (err) {
+				// Without a decision the settings may forbid it: show nothing.
+				request = null;
+				options.onError?.("notification filter", err instanceof Error ? err.message : String(err));
+			}
+		}
+		if (request === null) return;
 		notifications.get(request.tag)?.close();
-		const notification = new Notification(request.title, { body: request.body, tag: request.tag });
+		const notification = new Notification(request.title, { body: request.body, tag: request.tag, silent: request.silent === true });
 		notification.onclick = () => {
 			window.focus();
 			options.onNotificationClick?.(request.chatId);

@@ -97,6 +97,8 @@ Create:
 - Chưa làm trong R1: push (APNs/FCM/Web Push), làn ưu tiên, badge, metrics, token phiên native trong `ClientHelloFrame` (app native ở R7/R8), kiểm tenant theo Host (một tenant tĩnh), `wsbench`.
 - Sửa sau review R1 (2026-10-14): kiểm lại phiên ngay sau khi đăng ký socket và mỗi phút; tối đa 10 socket mỗi phiên, 30 mỗi user; `OpenChatFrame` 5/giây mỗi phiên; typing cần quyền gửi và không qua chặn; dispatcher và outbox sweeper không giao trùng; nhật ký chat lớn chỉ tới thành viên hiện tại; nginx `/ws` dùng zone riêng `chat_ws` (cần deploy bằng root một lần).
 
+- 2026-10-15: hub có `OnlineUsers()` (cho `GetChatOnlineCount`); update theo người dùng mới `dialog_unread_mark`, `notification_settings` đi qua outbox như `dialog_mute`. Cài đặt thông báo mới chỉ được lưu và đồng bộ; áp vào push khi làm push (R7).
+
 ## Success Criteria
 
 - Người nhận online thấy tin < 150 ms p50 (dev), chat large 100k p99 ≤ 2 s (Phase 14 đo).

@@ -147,6 +147,20 @@ func (h *Hub) Online(userID int64) bool {
 	return h.onlineLocked(userID)
 }
 
+// OnlineUsers implements chat.Presence: every user with a foreground
+// socket.
+func (h *Hub) OnlineUsers() []int64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	out := make([]int64, 0, len(h.byUser))
+	for u := range h.byUser {
+		if h.onlineLocked(u) {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
 // connsOf returns a snapshot of the user's connections.
 func (h *Hub) connsOf(userID int64) []*conn {
 	h.mu.RLock()

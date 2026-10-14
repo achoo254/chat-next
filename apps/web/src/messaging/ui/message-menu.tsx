@@ -4,12 +4,14 @@
 // button; Esc closes it. The + at the end of the reaction row (or the
 // message's emoji button) shows the full emoji panel under the message
 // (#emoji-picker). Your own messages offer "Thu hồi" (for everyone) and
-// "Xoá ở phía tôi"; other people's only "Xoá ở phía tôi".
+// "Xoá ở phía tôi"; other people's only "Xoá ở phía tôi"; a recalled message
+// only "Xoá ở phía tôi", without the reaction row.
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, StoredMessage } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { pinnedLists } from "../data/pinned.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
 import { EmojiPicker } from "./emoji-picker.tsx";
@@ -60,6 +62,7 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store, source, remote, backend, toasts } = useServices();
+	const pins = pinnedLists(store);
 	const item = useItem(chatId, itemKey);
 	const author = useUser(item?.kind === "message" && item.message.fromId !== store.selfId ? item.message.fromId : 0);
 	const menu = useRef<HTMLDivElement>(null);
@@ -111,6 +114,10 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 		}
 		entries.push(copyEntry);
 		entries.push({ label: copy.menu.discard, icon: "trash", danger: true, separated: true, run: () => source.discardOutbox(pending.outboxId).catch(failure) });
+	} else if (item.message.recalled) {
+		// A recalled message has nothing left but its place: it can only be hidden on your side.
+		const message = item.message;
+		entries.push({ label: copy.menu.deleteForMe, icon: "trash", danger: true, run: () => ui.dialog.set({ kind: "delete", chatId, seq: message.seq, recall: false }) });
 	} else {
 		const message = item.message;
 		const channel = chat?.type === "channel";
@@ -123,7 +130,7 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 			entries.push({ label: copy.menu.edit, icon: "edit", run: () => ui.intents.cell(chatId).set({ mode: "edit", seq: message.seq }) });
 		}
 		if (canPin(chat)) {
-			const pinned = chat?.pinnedSeq === message.seq;
+			const pinned = chat?.pinnedSeq === message.seq || pins.listed(chatId, message.seq);
 			const direct = pinned || chat?.type === "private" || chat?.type === "secret";
 			entries.push({
 				label: pinned ? copy.menu.unpin : copy.menu.pin,
@@ -135,7 +142,10 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 						return;
 					}
 					(pinned ? remote.unpin(chatId, message.seq) : remote.pin(chatId, message.seq)).then(
-						() => toasts.show(pinned ? copy.menu.unpinned : copy.menu.pinned),
+						() => {
+							if (pinned) pins.forget(chatId, [message.seq]);
+							toasts.show(pinned ? copy.menu.unpinned : copy.menu.pinned);
+						},
 						failure,
 					);
 				},
@@ -213,7 +223,7 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 				}
 			}}
 		>
-			{item.kind === "message" && !more && (
+			{item.kind === "message" && !item.message.recalled && !more && (
 				<div className="react-picker" role="group" aria-label={copy.menu.react}>
 					{QUICK_REACTIONS.map((emoji) => (
 						<button key={emoji} type="button" aria-label={copy.menu.reactionNames[emoji] ?? emoji} onClick={() => react(emoji)}>

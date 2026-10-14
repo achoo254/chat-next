@@ -1,16 +1,18 @@
 // Settings tabs added with messaging (mockups/settings.html#privacy,
 // #blocked, #notifications, #appearance, #shortcuts).
+import type { NotificationSettings as CoreNotificationSettings, NotificationSound } from "@app/core";
 import { requestNotificationPermission } from "@app/platform-web";
 import { Fragment, useEffect, useState } from "react";
 import { FONT_MAX, FONT_MIN, setFontSize, setTheme, storedFontSize, storedTheme, type Theme } from "../../appearance.ts";
-import { Icon } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import { Link, paths, type SettingsTab } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useContacts } from "../data/contacts.ts";
 import { clock } from "../data/format.ts";
 import type { Audience, BlockedPerson, Privacy } from "../data/remote.ts";
-import { useServices } from "../data/services.tsx";
+import { setSoundInChat, useSoundInChat } from "../data/device-settings.ts";
+import { useNotificationSettings, useServices } from "../data/services.tsx";
 import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
 
@@ -302,6 +304,7 @@ function currentPermission(): PermissionState {
 	return typeof Notification === "undefined" ? "unsupported" : Notification.permission;
 }
 
+/** The browser's permission (top banner), per chat type on/off and preview, sound and badge (#notifications). */
 function NotificationSettings() {
 	const copy = useScreensCopy();
 	const t = copy.notifications;
@@ -338,10 +341,156 @@ function NotificationSettings() {
 					<span className="grow">{t.granted}</span>
 				</div>
 			)}
-			<div className="set-body">
-				<p className="note">{t.whileOpen}</p>
-			</div>
+			<NotificationOptions />
 		</>
+	);
+}
+
+type SettingsLoad = "loading" | "ready" | "error";
+
+const CHAT_TYPES = [
+	{ icon: "user", enabled: "privateEnabled", preview: "privatePreview" },
+	{ icon: "users", enabled: "groupsEnabled", preview: "groupsPreview" },
+	{ icon: "megaphone", enabled: "channelsEnabled", preview: "channelsPreview" },
+] as const satisfies readonly { icon: IconName; enabled: keyof CoreNotificationSettings; preview: keyof CoreNotificationSettings }[];
+
+/** The synced settings (Get/SetNotificationSettings) and the device-only sound in the open chat. */
+function NotificationOptions() {
+	const copy = useScreensCopy();
+	const { store, self, toasts } = useServices();
+	const synced = useNotificationSettings();
+	const inChat = useSoundInChat(self.id);
+	const [load, setLoad] = useState<SettingsLoad>("loading");
+	const [attempt, setAttempt] = useState(0);
+	// Changes on their way to the server, shown at once.
+	const [pending, setPending] = useState<Partial<CoreNotificationSettings>>({});
+	const t = copy.notifications;
+
+	useEffect(() => {
+		let active = true;
+		store.loadNotificationSettings().then(
+			() => {
+				if (active) setLoad("ready");
+			},
+			() => {
+				if (active) setLoad("error");
+			},
+		);
+		return () => {
+			active = false;
+		};
+	}, [store, attempt]);
+
+	if (load !== "ready") {
+		return (
+			<div className="set-body">
+				{load === "error" ? (
+					<div className="banner error" role="alert">
+						<Icon name="alert" small />
+						<span className="grow">{copy.common.loadFailed}</span>
+						<button
+							type="button"
+							className="btn btn-sm"
+							onClick={() => {
+								setLoad("loading");
+								setAttempt((n) => n + 1);
+							}}
+						>
+							{copy.common.retry}
+						</button>
+					</div>
+				) : (
+					<p className="status">
+						<span className="spin" aria-hidden="true" />
+						{copy.common.loading}
+					</p>
+				)}
+			</div>
+		);
+	}
+
+	const settings: CoreNotificationSettings = { ...synced, ...pending };
+	const save = (change: Partial<CoreNotificationSettings>) => {
+		setPending((current) => ({ ...current, ...change }));
+		const done = () =>
+			setPending((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !(key in change))));
+		store.setNotificationSettings(change).then(
+			() => {
+				done();
+				toasts.show(t.saved);
+			},
+			() => {
+				done();
+				toasts.show(copy.common.failed);
+			},
+		);
+	};
+	const names = [t.private, t.groups, t.channels] as const;
+	const hints = [t.privateHint, undefined, undefined] as const;
+	const sounds: { value: NotificationSound; label: string }[] = [
+		{ value: "default", label: t.soundDefault },
+		{ value: "soft", label: t.soundSoft },
+		{ value: "off", label: t.soundOff },
+	];
+	return (
+		<div className="set-body">
+			<div className="card">
+				<h2 className="card-title">{t.byType}</h2>
+				{CHAT_TYPES.map((type, index) => {
+					const name = names[index] ?? "";
+					const hint = hints[index];
+					const enabled = settings[type.enabled];
+					return (
+						<Fragment key={type.enabled}>
+							<div className="row pad-x">
+								<span className="device">
+									<Icon name={type.icon} />
+								</span>
+								<span className="grow">
+									{name}
+									{hint !== undefined && <small>{hint}</small>}
+								</span>
+								<Switch checked={enabled} label={t.typeSwitch(name)} onChange={(on) => save({ [type.enabled]: on })} />
+							</div>
+							<div className="row pad-x sub-row">
+								<span className="grow">
+									{t.preview}
+									{!settings[type.preview] && <small>{t.previewOff}</small>}
+								</span>
+								<Switch
+									checked={settings[type.preview]}
+									disabled={!enabled}
+									label={t.previewSwitch(name)}
+									onChange={(on) => save({ [type.preview]: on })}
+								/>
+							</div>
+						</Fragment>
+					);
+				})}
+			</div>
+			<div className="card">
+				<h2 className="card-title">{t.soundAndCount}</h2>
+				<div className="row opt-row">
+					<span className="grow">{t.sound}</span>
+					<Choice<NotificationSound> label={t.sound} value={settings.sound} options={sounds} onChange={(sound) => save({ sound })} />
+				</div>
+				<div className="row pad-x">
+					<span className="grow">
+						{t.soundInChat}
+						<small>{t.soundInChatHint}</small>
+					</span>
+					<Switch checked={inChat} label={t.soundInChat} onChange={(on) => setSoundInChat(self.id, on)} />
+				</div>
+				<div className="row pad-x">
+					<span className="grow">
+						{t.badgeMuted}
+						<small>{t.badgeMutedHint}</small>
+					</span>
+					<Switch checked={settings.badgeMuted} label={t.badgeMuted} onChange={(on) => save({ badgeMuted: on })} />
+				</div>
+			</div>
+			<p className="note">{t.whileOpen}</p>
+		</div>
 	);
 }
 

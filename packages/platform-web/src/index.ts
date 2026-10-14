@@ -6,6 +6,7 @@ export {
 	openExternal,
 	requestNotificationPermission,
 	submitSignOut,
+	type ShownNotification,
 	type TabRole,
 	type WebChat,
 	type WebChatOptions,

@@ -278,3 +278,39 @@ func (s *chatsService) GetCommonChats(ctx context.Context, req *connect.Request[
 		return s.chat.GetCommonChats(ctx, me, m.GetUserId(), m.GetCursor(), m.GetLimit())
 	})
 }
+
+func (s *chatsService) SetDialogUnreadMark(ctx context.Context, req *connect.Request[appv1.SetDialogUnreadMarkRequest]) (*connect.Response[appv1.SetDialogUnreadMarkResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetDialogUnreadMarkRequest) (*appv1.SetDialogUnreadMarkResponse, error) {
+		ack, err := s.chat.SetDialogUnreadMark(ctx, me, m.GetChatId(), m.GetUnread())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SetDialogUnreadMarkResponse{Ack: ack}, nil
+	})
+}
+
+func (s *chatsService) GetChatOnlineCount(ctx context.Context, req *connect.Request[appv1.GetChatOnlineCountRequest]) (*connect.Response[appv1.GetChatOnlineCountResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetChatOnlineCountRequest) (*appv1.GetChatOnlineCountResponse, error) {
+		n, err := s.chat.GetChatOnlineCount(ctx, me, m.GetChatId())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetChatOnlineCountResponse{OnlineCount: n}, nil
+	})
+}
+
+func (s *chatsService) GetNotificationSettings(ctx context.Context, req *connect.Request[appv1.GetNotificationSettingsRequest]) (*connect.Response[appv1.GetNotificationSettingsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, _ *appv1.GetNotificationSettingsRequest) (*appv1.GetNotificationSettingsResponse, error) {
+		settings, err := s.chat.GetNotificationSettings(ctx, me)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetNotificationSettingsResponse{Settings: settings}, nil
+	})
+}
+
+func (s *chatsService) SetNotificationSettings(ctx context.Context, req *connect.Request[appv1.SetNotificationSettingsRequest]) (*connect.Response[appv1.SetNotificationSettingsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetNotificationSettingsRequest) (*appv1.SetNotificationSettingsResponse, error) {
+		return s.chat.SetNotificationSettings(ctx, me, m)
+	})
+}

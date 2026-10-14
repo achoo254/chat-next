@@ -3,7 +3,7 @@
 // core once per signed-in session and keeps it alive across the chat, settings
 // and moderation screens.
 import type { Transport } from "@connectrpc/connect";
-import { Suspense, lazy, useEffect, useEffectEvent, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -11,11 +11,13 @@ import { Link, navigate, paths, type Route, type SettingsTab } from "../router.t
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
 import { useCopy } from "./copy/use-copy.ts";
+import { countLabel } from "./data/format.ts";
 import { webConnector, type MessagingClient, type MessagingConnector } from "./data/connector.ts";
 import { Drafts } from "./data/drafts.ts";
 import type { PendingBackend } from "./data/pending-backend.ts";
+import { decideNotification, type NotificationInput } from "./data/notification-filter.ts";
 import { createRemote } from "./data/remote.ts";
-import { ServicesContext, Toasts, type Services } from "./data/services.tsx";
+import { ServicesContext, Toasts, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen } from "./ui/chat-screen.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
@@ -51,8 +53,15 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 	// effect events.
 	const signedOut = useEffectEvent(() => onSignedOut());
 	const currentSelf = useEffectEvent(() => self);
+	const copy = useCopy();
+	// Notifications arrive outside React: they read the store and the copy through this ref.
+	const notify = useRef<{ store: ChatStore | null; hiddenBody: string }>({ store: null, hiddenBody: copy.notify.hiddenBody });
+	useEffect(() => {
+		notify.current.hiddenBody = copy.notify.hiddenBody;
+	}, [copy]);
 
 	useEffect(() => {
+		const notifying = notify.current;
 		let active = true;
 		let started: { client: MessagingClient; store: ChatStore; backend: PendingBackend } | null = null;
 		Promise.resolve(
@@ -60,6 +69,16 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 				onSessionEnded: () => signedOut(),
 				onNotificationClick: (chatId) => navigate(paths.chat(chatId)),
 				onError: reportError,
+				filterNotification: (request: NotificationInput) => {
+					const { store, hiddenBody } = notifying;
+					// Until the store exists the settings are unknown: nothing is shown.
+					if (store === null) return null;
+					const settings = store.notificationSettings();
+					const decision = decideNotification(request, store.dialog(request.chatId), settings, Math.floor(Date.now() / 1000), hiddenBody);
+					// The soft tone loads on first use; the system notification itself is silent.
+					if (decision !== null && settings.sound === "soft") void import("./data/sound.ts").then((sound) => sound.playTone("soft"));
+					return decision;
+				},
 			}),
 		).then(
 			(client) => {
@@ -73,6 +92,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					client.dispose();
 					return;
 				}
+				notifying.store = store;
 				const drafts = new Drafts(self.id);
 				const services: Services = {
 					self: currentSelf(),
@@ -96,6 +116,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 		);
 		return () => {
 			active = false;
+			notifying.store = null;
 			if (started !== null) {
 				started.backend.dispose();
 				started.store.dispose();
@@ -143,6 +164,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 				moderator={self.isOperator}
 			/>
 			<Toast />
+			<AppBadge />
 		</ServicesContext>
 	);
 }
@@ -192,6 +214,30 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 				</Shell>
 			);
 	}
+}
+
+/**
+ * The app badge: unread messages in the tab title and, where the browser has
+ * it, on the installed app's icon. Muted chats count only when the user chose
+ * so (core unreadTotals with NotificationSettings.badgeMuted).
+ */
+function AppBadge() {
+	const { messages } = useUnreadTotals();
+	const base = useRef(document.title.replace(/^\(\d+\+?\) /, ""));
+	useEffect(() => {
+		document.title = messages > 0 ? `(${countLabel(messages)}) ${base.current}` : base.current;
+		if (typeof navigator.setAppBadge === "function") {
+			(messages > 0 ? navigator.setAppBadge(messages) : navigator.clearAppBadge()).catch(() => undefined);
+		}
+	}, [messages]);
+	useEffect(() => {
+		const title = base.current;
+		return () => {
+			document.title = title;
+			if (typeof navigator.clearAppBadge === "function") navigator.clearAppBadge().catch(() => undefined);
+		};
+	}, []);
+	return null;
 }
 
 /** The rail link to the contacts list (mockups/settings.html rail). */

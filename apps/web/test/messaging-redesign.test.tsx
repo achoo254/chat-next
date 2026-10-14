@@ -124,7 +124,7 @@ describe("messages", () => {
 		const dialog = await screen.findByRole("dialog", { name: "Ghim tin này?" }, LONG);
 		const notify = within(dialog).getByRole("checkbox", { name: "Thông báo cho mọi thành viên" });
 		expect(notify.getAttribute("aria-checked")).toBe("true");
-		expect(within(dialog).getByText(/đang có tin ghim/)).toBeTruthy();
+		expect(within(dialog).getByText(/đang có 1 tin ghim; tin này thành tin ghim mới nhất \(2\/2\)/)).toBeTruthy();
 		await userEvent.click(notify);
 		await userEvent.click(within(dialog).getByRole("button", { name: "Ghim" }));
 		await waitFor(() => expect(demo.fixture.silentPins).toEqual([Number(message.dataset.seq)]), LONG);
@@ -133,7 +133,7 @@ describe("messages", () => {
 
 	it("lists who reacted, per emoji", async () => {
 		const { log } = await openChat(`/c/${seedDemo().ids.ops}`, "Dashboard ổn định.");
-		fireEvent.contextMenu(within(log).getByRole("button", { name: "👍 3" }));
+		fireEvent.contextMenu(within(log).getByRole("button", { name: "👍 Bạn, Minh, Lan Anh" }));
 		const dialog = await screen.findByRole("dialog", { name: "Ai đã thả cảm xúc" }, LONG);
 		// Only the chip's list opens, not the message's own menu.
 		expect(screen.queryByRole("menu", { name: "Thao tác với tin" })).toBeNull();

@@ -16,6 +16,7 @@ export function connectWebChat(options: MessagingConnectorOptions): MessagingCli
 		appVersion: APP_VERSION,
 		onSessionEnded: options.onSessionEnded,
 		onNotificationClick: options.onNotificationClick,
+		filterNotification: options.filterNotification,
 		onError: options.onError,
 	});
 	return {

@@ -15,6 +15,10 @@ export const EventKeys = {
 	history: (chatId: number): string => `history:${chatId}`,
 	/** One message changed in place (edit, reaction). */
 	message: (chatId: number, seq: number): string => `message:${chatId}:${seq}`,
+	/** Pinned messages of a chat changed (refetch GetPinnedMessages). */
+	pins: (chatId: number): string => `pins:${chatId}`,
+	/** The user's notification settings changed. */
+	notificationSettings: "notification_settings",
 	outbox: "outbox",
 	connection: "connection",
 	/** The session ended; local data is gone. */

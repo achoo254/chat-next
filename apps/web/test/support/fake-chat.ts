@@ -11,6 +11,7 @@ import {
 	AddMemberFailureReason,
 	ChatSchema,
 	ChatsService,
+	GetChatOnlineCountResponseSchema,
 	ChatType,
 	HistoryVisibility,
 	MemberRole,
@@ -83,6 +84,12 @@ export interface FixtureReport {
 	createdAt: number;
 	actions: ModerationAction[];
 	note: string;
+}
+
+/** A method FakeServer always offers (optional in RemoteApi only for older doubles). */
+function offered<T>(method: T | undefined, name: string): T {
+	if (method === undefined) throw new Error(`FakeServer lacks ${name}`);
+	return method;
 }
 
 /** Copies the fields of `patch` onto `target` (protobuf-es messages are plain objects). */
@@ -158,6 +165,12 @@ export class ChatFixture {
 	readonly deletedChats: number[] = [];
 	/** SetDialogMute requests. */
 	readonly mutes: { chatId: number; durationSeconds: number; forever: boolean }[] = [];
+	/** GetPinnedMessages requests (chat and topic). */
+	readonly pinnedRequests: { chatId: number; topicId: number }[] = [];
+	/** Chats whose reactions come without the latest reactors (channels, for non-admins). */
+	readonly anonymousReactions = new Set<number>();
+	/** GetChatOnlineCount per chat; chats not listed count the sessions online on the fake server. */
+	readonly onlineCounts = new Map<number, number>();
 	/** GetSelf.is_operator: may use the moderation queue. */
 	operator = false;
 	readonly reportQueue: FixtureReport[] = [];
@@ -170,13 +183,6 @@ export class ChatFixture {
 		this.selfName = selfName;
 		this.selfUsername = selfUsername;
 		this.selfId = this.addUser(selfName, { username: selfUsername });
-		// FakeServer sends per-user updates that name no chat (pinned_dialogs,
-		// chat_deleted) with the entities of chat 0, which a live session needs
-		// to exist: an empty group nobody is in stands in for it.
-		const chats: unknown = Reflect.get(this.server, "chats");
-		if (!(chats instanceof Map)) throw new Error("FakeServer keeps its chats in a map");
-		const placeholder = this.server.createChat(ChatType.GROUP, "", []);
-		chats.set(0, chats.get(placeholder));
 	}
 
 	addUser(name: string, extras: UserExtras = {}): number {
@@ -250,6 +256,9 @@ export class ChatFixture {
 	// ------------------------------------------------------------- patching
 
 	patchMessage(message: WireMessage): void {
+		if (this.anonymousReactions.has(num(message.chatId))) for (const reaction of message.reactions) reaction.recentUserIds = [];
+		// A recalled message is a placeholder: the fixture's extras are gone with its content.
+		if (message.recalled) return;
 		const extras = this.messageExtras.get(`${num(message.chatId)}:${num(message.seq)}`);
 		if (extras === undefined) return;
 		// create() fills every field with its default: copy only the patched ones.
@@ -328,6 +337,14 @@ export class ChatFixture {
 					users(response.users);
 					return response;
 				},
+				setDialogUnreadMark: (request) => offered(base.chats.setDialogUnreadMark, "setDialogUnreadMark")(request),
+				getNotificationSettings: (request) => offered(base.chats.getNotificationSettings, "getNotificationSettings")(request),
+				setNotificationSettings: (request) => offered(base.chats.setNotificationSettings, "setNotificationSettings")(request),
+				getChatOnlineCount: async (request) => {
+					const override = this.onlineCounts.get(num(request.chatId ?? 0n));
+					if (override !== undefined) return create(GetChatOnlineCountResponseSchema, { onlineCount: override });
+					return offered(base.chats.getChatOnlineCount, "getChatOnlineCount")(request);
+				},
 			},
 			messages: {
 				sendMessage: (request) => {
@@ -344,6 +361,14 @@ export class ChatFixture {
 					users(response.users);
 					return response;
 				},
+				getPinnedMessages: async (request) => {
+					this.pinnedRequests.push({ chatId: num(request.chatId ?? 0n), topicId: num(request.topicId ?? 0n) });
+					const response = await offered(base.messages.getPinnedMessages, "getPinnedMessages")(request);
+					response.messages.forEach((m) => this.patchMessage(m));
+					users(response.users);
+					return response;
+				},
+				unpinAllMessages: (request) => offered(base.messages.unpinAllMessages, "unpinAllMessages")(request),
 			},
 			users: {
 				getSelf: async (request) => {
@@ -389,7 +414,8 @@ export class ChatFixture {
 
 	// ------------------------------------------------------------- core
 
-	async startCore(sql: SqlDriverFactory): Promise<ChatCore> {
+	/** `filter`: the app's notification filter (null drops one); notifications holds what it let through. */
+	async startCore(sql: SqlDriverFactory, filter?: (request: NotificationRequest) => NotificationRequest | null): Promise<ChatCore> {
 		let nextRandom = 1;
 		const platform: Platform = {
 			sql,
@@ -399,7 +425,10 @@ export class ChatFixture {
 				onOnline: () => () => undefined,
 			},
 			notify: {
-				show: (request) => this.notifications.push(request),
+				show: (request) => {
+					const shown = filter === undefined ? request : filter(request);
+					if (shown !== null) this.notifications.push(shown);
+				},
 				clear: () => undefined,
 			},
 			socket: this.socket(),
@@ -913,6 +942,13 @@ export function toSource(core: ChatCore): ChatSource {
 		editText: (chatId, seq, text, entities) => core.editText(chatId, seq, text, entities),
 		deleteMessages: (chatId, seqs, forEveryone) => core.deleteMessages(chatId, seqs, forEveryone),
 		markRead: (chatId, maxSeq) => core.markRead(chatId, maxSeq),
+		setDialogUnreadMark: (chatId, unread) => core.setDialogUnreadMark(chatId, unread),
+		notificationSettings: () => core.notificationSettings(),
+		setNotificationSettings: (change) => core.setNotificationSettings(change),
+		pinnedMessages: (chatId, request) => core.pinnedMessages(chatId, request),
+		unpinAllMessages: (chatId, topicId) => core.unpinAllMessages(chatId, topicId),
+		onlineCount: (chatId) => core.onlineCount(chatId),
+		unreadTotals: () => core.unreadTotals(),
 		retryOutbox: (id) => core.retryOutbox(id),
 		discardOutbox: (id) => core.discardOutbox(id),
 		search: (query, options) => core.search(query, options),
@@ -923,8 +959,8 @@ export function toSource(core: ChatCore): ChatSource {
 
 /** Connector for <App messagingConnector>: the real core on the fixture server. */
 export function fixtureConnector(fixture: ChatFixture, sql: () => Promise<SqlDriverFactory>): MessagingConnector {
-	return async () => {
-		const core = await fixture.startCore(await sql());
+	return async (options) => {
+		const core = await fixture.startCore(await sql(), options.filterNotification);
 		const client: MessagingClient = {
 			source: toSource(core),
 			createBackend: (remote, source) => new ServerBackend(remote, source, "https://chat.example.test"),

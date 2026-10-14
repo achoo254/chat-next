@@ -100,6 +100,9 @@ export const en: MessagingCopy = {
 		hidden: "Pinned bar hidden for you. Show it again in Chat info",
 		show: "Show pinned bar",
 		jump: "Go to pinned message",
+		counter: (index: number, count: number) => `Pinned message ${index}/${count}`,
+		jumpTo: (index: number, count: number) => `Go to pinned message ${index}/${count}`,
+		all: (count: number) => `All pinned messages, ${count}`,
 	},
 	message: {
 		edited: "edited",
@@ -121,6 +124,9 @@ export const en: MessagingCopy = {
 		mediaPreview: "Photo, video or file",
 		integration: (label: string) => `Integration: ${label}`,
 		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
+		reactionBy: (emoji: string, names: readonly string[], count: number) =>
+			`${emoji} ${names.join(", ")}${count > names.length ? ` and ${count - names.length} more` : ""}`,
+		recalled: "Message recalled",
 		unknownUser: "User",
 		deleted: "Message unsent",
 		quickActions: (name: string) => `Quick actions for ${name}'s message`,
@@ -205,6 +211,9 @@ export const en: MessagingCopy = {
 		shownDone: (name: string) => `Topic ${name} is visible again`,
 		hiddenBy: (name: string, date: string) => `Hidden by ${name} · ${date}`,
 		empty: "No messages in this topic yet",
+	},
+	notify: {
+		hiddenBody: "You have a new message",
 	},
 	time: {
 		weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],

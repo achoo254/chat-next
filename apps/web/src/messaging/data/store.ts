@@ -3,6 +3,8 @@
 // Components subscribe to narrow keys with useSyncExternalStore, so a new
 // message re-renders its own item and its dialog row, not the whole screen.
 import {
+	DEFAULT_NOTIFICATION_SETTINGS,
+	EventKeys,
 	isMuted,
 	MUTE_FOREVER,
 	type Chat,
@@ -10,6 +12,7 @@ import {
 	type DialogView,
 	type FailureKind,
 	type HistoryRequest,
+	type NotificationSettings,
 	type PendingMessage,
 	type ScreenSnapshot,
 	type StoredMessage,
@@ -50,44 +53,23 @@ export interface ListEntry {
 	readonly chatId: number;
 	readonly kind: ChatKind;
 	readonly forum: boolean;
-	/** Unread messages or mentions, or marked unread on this device. */
+	/** Unread messages or mentions, or marked as unread ("Đánh dấu chưa đọc", synced). */
 	readonly unread: boolean;
 	readonly muted: boolean;
 	readonly pinned: boolean;
 }
 
-/** Chats marked unread on this device ("Đánh dấu chưa đọc"; the server keeps no such flag). */
-class UnreadMarks {
-	private readonly ids: Set<number>;
+export interface UnreadTotals {
+	readonly messages: number;
+	readonly chats: number;
+}
 
-	constructor(private readonly key: string) {
-		this.ids = new Set(UnreadMarks.read(key));
-	}
-
-	private static read(key: string): number[] {
-		try {
-			const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? "[]");
-			return Array.isArray(parsed) ? parsed.filter((id): id is number => Number.isSafeInteger(id) && id > 0) : [];
-		} catch {
-			return [];
-		}
-	}
-
-	has(chatId: number): boolean {
-		return this.ids.has(chatId);
-	}
-
-	/** Returns whether the set changed. */
-	set(chatId: number, marked: boolean): boolean {
-		if (marked === this.ids.has(chatId)) return false;
-		if (marked) this.ids.add(chatId);
-		else this.ids.delete(chatId);
-		try {
-			window.localStorage.setItem(this.key, JSON.stringify([...this.ids]));
-		} catch {
-			// Storage off (privacy mode): the mark lasts until the tab closes.
-		}
-		return true;
+/** Earlier builds kept "marked as unread" in this browser only; the mark is synced now. */
+function dropLegacyUnreadMarks(selfId: number): void {
+	try {
+		window.localStorage.removeItem(`chat:unread-marks:${selfId}`);
+	} catch {
+		// Storage off: nothing was kept.
 	}
 }
 
@@ -109,8 +91,8 @@ export function pendingKey(pending: PendingMessage): string {
 }
 
 function messageSignature(message: StoredMessage): string {
-	const reactions = message.reactions.map((r) => `${r.emoji}:${r.count}:${r.chosen ? 1 : 0}`).join(",");
-	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${reactions}|${message.text}`;
+	const reactions = message.reactions.map((r) => `${r.emoji}:${r.count}:${r.chosen ? 1 : 0}:${r.recentUserIds.join("/")}`).join(",");
+	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${message.recalled ? 1 : 0}|${reactions}|${message.text}`;
 }
 
 function itemSignature(item: WindowItem): string {
@@ -169,7 +151,10 @@ export class ChatStore {
 	private entries: readonly ListEntry[] = [];
 	private readonly entryById = new Map<number, ListEntry>();
 	private folderUnread: Readonly<Record<Folder, number>> = { all: 0, private: 0, group: 0, bot: 0, unread: 0 };
-	private readonly marks: UnreadMarks;
+	private settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
+	private totals: UnreadTotals = { messages: 0, chats: 0 };
+	private readonly settingsRefresh = new Coalescer(() => this.loadSettings());
+	private readonly totalsRefresh = new Coalescer(() => this.loadTotals());
 	private muteTimer: ReturnType<typeof setTimeout> | undefined;
 	private listStatus: ListStatus = "loading";
 	private readonly users = new Map<number, User>();
@@ -199,13 +184,14 @@ export class ChatStore {
 		snapshot: ScreenSnapshot | null = null,
 	) {
 		this.selfId = options.selfId;
-		this.marks = new UnreadMarks(`chat:unread-marks:${options.selfId}`);
+		dropLegacyUnreadMarks(options.selfId);
 		if (snapshot !== null && snapshot.userId === options.selfId && snapshot.dialogs.length > 0) {
 			this.applyDialogs(snapshot.dialogs.map((d) => ({ ...d, topMessage: d.topMessage === null ? null : { ...d.topMessage, stale: true } })));
 			for (const user of snapshot.users) this.users.set(user.id, user);
 		}
 		this.unsubscribe = source.events.subscribeBatches((keys) => this.onKeys(keys));
 		this.dialogRefresh.run();
+		this.settingsRefresh.run();
 		this.refreshConnection();
 	}
 
@@ -238,8 +224,9 @@ export class ChatStore {
 		for (const listener of [...set]) listener();
 	}
 
-	private report(error: unknown, context: string): void {
-		this.options.onError?.(error, context);
+	/** Reports a failure of a background load (also used by caches built on the store). */
+	reportError(error: unknown, context: string): void {
+		if (!this.disposed) this.options.onError?.(error, context);
 	}
 
 	private onKeys(keys: readonly string[]): void {
@@ -260,6 +247,7 @@ export class ChatStore {
 			else if (key.startsWith("message:")) histories.add(Number(key.split(":")[1]));
 			else if (key === "outbox") for (const id of this.windows.keys()) histories.add(id);
 			else if (key === "connection") this.refreshConnection();
+			else if (key === EventKeys.notificationSettings) this.settingsRefresh.run();
 		}
 		if (dialogs) this.dialogRefresh.run();
 		for (const chatId of histories) {
@@ -292,7 +280,7 @@ export class ChatStore {
 			if (this.disposed) return;
 			this.applyDialogs(views);
 		} catch (err) {
-			this.report(err, "load dialogs");
+			this.reportError(err, "load dialogs");
 		} finally {
 			if (!this.disposed && this.listStatus === "loading") this.markListReady();
 		}
@@ -326,11 +314,13 @@ export class ChatStore {
 
 	private applyDialogs(views: readonly DialogView[]): void {
 		const seen = new Set<number>();
+		let changed = false;
 		for (const view of views) {
 			const id = view.dialog.chatId;
 			seen.add(id);
 			const json = JSON.stringify(view);
 			if (this.dialogJson.get(id) !== json) {
+				changed = true;
 				this.dialogJson.set(id, json);
 				this.dialogs.set(id, view);
 				if (view.chat !== null) this.chats.set(id, view.chat);
@@ -343,6 +333,7 @@ export class ChatStore {
 		}
 		for (const id of [...this.dialogs.keys()]) {
 			if (!seen.has(id)) {
+				changed = true;
 				this.dialogs.delete(id);
 				this.dialogJson.delete(id);
 				this.emit(`dialog:${id}`);
@@ -354,6 +345,7 @@ export class ChatStore {
 			this.emit("list");
 		}
 		this.refreshEntries();
+		if (changed) this.totalsRefresh.run();
 		if (views.length > 0 && this.listStatus === "loading") this.markListReady();
 	}
 
@@ -362,7 +354,7 @@ export class ChatStore {
 		return this.entries;
 	}
 
-	/** Chats with unread messages per built-in folder (the folder badges); muted chats do not count. */
+	/** Chats with unread messages per built-in folder (the folder badges); muted chats count only when the user chose so. */
 	folderCounts(): Readonly<Record<Folder, number>> {
 		return this.folderUnread;
 	}
@@ -372,16 +364,61 @@ export class ChatStore {
 		return this.entryById.get(chatId);
 	}
 
-	/** Whether the chat is marked unread on this device. */
-	markedUnread(chatId: number): boolean {
-		return this.marks.has(chatId);
+	// ------------------------------------------------------------- notification settings and badge
+
+	/** The user's notification settings (the defaults until they load). */
+	notificationSettings(): NotificationSettings {
+		return this.settings;
 	}
 
-	/** Marks a chat unread on this device, or clears the mark (reading it clears it too). */
-	setMarkedUnread(chatId: number, marked: boolean): void {
-		if (!this.marks.set(chatId, marked)) return;
-		this.emit(`mark:${chatId}`);
-		this.refreshEntries();
+	/** Changes notification settings on the server; the store follows the saved result. */
+	async setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings> {
+		const saved = await this.source.setNotificationSettings(change);
+		if (!this.disposed) this.applySettings(saved);
+		return saved;
+	}
+
+	/** Unread messages and chats of the app badge (core unreadTotals, muted chats per the settings). */
+	unreadTotals(): UnreadTotals {
+		return this.totals;
+	}
+
+	/** Reads the settings again (the settings screen waits for them); rejects when they cannot be read. */
+	async loadNotificationSettings(): Promise<NotificationSettings> {
+		const settings = await this.source.notificationSettings();
+		if (!this.disposed) this.applySettings(settings);
+		return settings;
+	}
+
+	private async loadSettings(): Promise<void> {
+		try {
+			await this.loadNotificationSettings();
+		} catch (err) {
+			this.reportError(err, "notification settings");
+		}
+	}
+
+	private applySettings(settings: NotificationSettings): void {
+		const same = (Object.keys(settings) as (keyof NotificationSettings)[]).every((key) => settings[key] === this.settings[key]);
+		if (same) return;
+		const badgeChanged = settings.badgeMuted !== this.settings.badgeMuted;
+		this.settings = settings;
+		this.emit("settings");
+		if (badgeChanged) {
+			this.refreshEntries();
+			this.totalsRefresh.run();
+		}
+	}
+
+	private async loadTotals(): Promise<void> {
+		try {
+			const totals = await this.source.unreadTotals();
+			if (this.disposed || (totals.messages === this.totals.messages && totals.chats === this.totals.chats)) return;
+			this.totals = totals;
+			this.emit("totals");
+		} catch (err) {
+			this.reportError(err, "unread totals");
+		}
 	}
 
 	/** Rebuilds the list entries and folder counts; listeners hear only of real changes. */
@@ -403,7 +440,7 @@ export class ChatStore {
 				chatId,
 				kind: chatKind(view.chat, view.peer, forum),
 				forum,
-				unread: dialog.unreadCount > 0 || dialog.unreadMentionsCount > 0 || this.marks.has(chatId),
+				unread: dialog.unreadCount > 0 || dialog.unreadMentionsCount > 0 || dialog.unreadMark,
 				muted,
 				pinned: dialog.pinned,
 			};
@@ -422,7 +459,7 @@ export class ChatStore {
 			}
 			seen.add(chatId);
 			entries.push(entry);
-			if (!entry.unread || muted) continue;
+			if (!entry.unread || (muted && !this.settings.badgeMuted)) continue;
 			for (const folder of FOLDERS) if (inFolder(entry.kind, folder, true)) counts[folder]++;
 		}
 		for (const chatId of [...this.entryById.keys()]) {
@@ -463,7 +500,7 @@ export class ChatStore {
 			this.chats.set(chatId, chat);
 			this.emit(`chat:${chatId}`);
 		} catch (err) {
-			this.report(err, `chat ${chatId}`);
+			this.reportError(err, `chat ${chatId}`);
 		}
 	}
 
@@ -493,7 +530,7 @@ export class ChatStore {
 				this.emit(`user:${user.id}`);
 			}
 		} catch (err) {
-			this.report(err, "load users");
+			this.reportError(err, "load users");
 		}
 	}
 
@@ -510,7 +547,7 @@ export class ChatStore {
 				this.connection = state;
 				this.emit("connection");
 			},
-			(err: unknown) => this.report(err, "connection state"),
+			(err: unknown) => this.reportError(err, "connection state"),
 		);
 	}
 
@@ -656,7 +693,7 @@ export class ChatStore {
 		try {
 			view = await this.source.history(chatId, request);
 		} catch (err) {
-			this.report(err, `history ${chatId}`);
+			this.reportError(err, `history ${chatId}`);
 			if (this.windows.get(chatId) === state && generation === state.generation) {
 				this.setWindow(state, { ...state.window, status: "ready", failure: "retryable", loadingOlder: false });
 			}
@@ -771,7 +808,7 @@ export class ChatStore {
 					if (found !== null && found.fromId !== this.selfId) this.wantUser(found.fromId);
 					this.emit(`lookup:${key}`);
 				},
-				(err: unknown) => this.report(err, `message ${key}`),
+				(err: unknown) => this.reportError(err, `message ${key}`),
 			)
 			.finally(() => this.lookupsInFlight.delete(key));
 	}

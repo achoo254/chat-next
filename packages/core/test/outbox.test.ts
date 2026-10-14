@@ -179,12 +179,15 @@ describe("outbox", () => {
 		await core.deleteMessages(chat, [2], true);
 		await core.markRead(chat, 4);
 		// Local state changed before the server answered.
+		// The recalled message keeps its place as an empty placeholder.
 		const local = await core.history(chat);
-		expect(local.messages.map((m) => m.text)).toEqual(["bản cuối", "tin 1", "tin 2"]);
+		expect(local.messages.map((m) => m.text)).toEqual(["bản cuối", "", "tin 1", "tin 2"]);
+		expect(local.messages.map((m) => m.recalled)).toEqual([false, true, false, false]);
 		expect((await core.dialogs())[0]?.dialog.unreadCount).toBe(0);
 		expect(await core.search("ban cuoi")).toHaveLength(1);
 		await settle(core);
-		expect(server.expectedMessages(chat, self).map((m) => m.text)).toEqual(["bản cuối", "tin 1", "tin 2"]);
+		expect(server.expectedMessages(chat, self).map((m) => m.text)).toEqual(["bản cuối", "", "tin 1", "tin 2"]);
+		expect((await core.history(chat)).messages.map((m) => m.recalled)).toEqual([false, true, false, false]);
 		expect(Number(server.dialog(chat, self).readInboxMaxSeq)).toBe(4);
 		const count = sql.db(dbName(self)).prepare("SELECT count(*) AS n FROM outbox").get();
 		expect(Number(count?.n)).toBe(0);

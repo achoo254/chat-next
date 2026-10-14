@@ -1,8 +1,8 @@
 // Reads of the local database and the single commit path for writes.
 import type { SqlDriver, SqlRow } from "@app/platform";
 import type { EventBus } from "../events/bus.ts";
-import type { Chat, Dialog, Message, SyncState, User } from "../model/types.ts";
-import { num, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
+import type { Chat, Dialog, Message, NotificationSettings, SyncState, User } from "../model/types.ts";
+import { num, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
 import { CHAT_TOPIC, placeholders, type WriteBatch } from "./writes.ts";
 
 /** A cached message plus whether it still has to be checked against the server. */
@@ -35,6 +35,7 @@ function toStored(row: SqlRow): StoredMessage {
 // Dialog rows joined with the chat-level read state (topic 0) and the
 // large-chat log position.
 const DIALOG_SELECT = `SELECT d.chat_id, d.top_seq, d.top_date, d.history_start, d.mute_until, d.pin_rank,
+	d.unread_mark, d.pinned_message_count, d.pinned_message_seq,
 	COALESCE(r.read_inbox_max_seq, 0) AS read_inbox_max_seq, COALESCE(r.read_outbox_max_seq, 0) AS read_outbox_max_seq,
 	COALESCE(r.unread_count, 0) AS unread_count, COALESCE(r.unread_mentions_count, 0) AS unread_mentions_count,
 	COALESCE(s.chat_pts, 0) AS chat_pts
@@ -112,6 +113,19 @@ export class Repository {
 		return { ...rowToDialog(row), historyStart: num(row, "history_start") !== 0, topDate: num(row, "top_date") };
 	}
 
+	/** What the unread badge counts, for every dialog. */
+	async badgeDialogs(): Promise<Pick<Dialog, "unreadCount" | "muteUntil" | "unreadMark">[]> {
+		const rows = await this.driver.query(
+			`SELECT COALESCE(r.unread_count, 0) AS unread_count, d.mute_until, d.unread_mark FROM dialogs d
+			LEFT JOIN read_states r ON r.chat_id = d.chat_id AND r.topic_id = ${CHAT_TOPIC}`,
+		);
+		return rows.map((row) => ({
+			unreadCount: num(row, "unread_count"),
+			muteUntil: num(row, "mute_until"),
+			unreadMark: num(row, "unread_mark") !== 0,
+		}));
+	}
+
 	async dialogChatIds(): Promise<number[]> {
 		const rows = await this.driver.query("SELECT chat_id FROM dialogs");
 		return rows.map((row) => num(row, "chat_id"));
@@ -180,13 +194,20 @@ export class Repository {
 		return num(rows[0] ?? {}, "seq");
 	}
 
-	/** Incoming messages after `seq` (the unread count after reading up to it). */
+	/** Incoming messages after `seq` (the unread count after reading up to it); placeholders do not count. */
 	async countIncomingAfter(chatId: number, seq: number, selfId: number): Promise<number> {
 		const rows = await this.driver.query(
-			"SELECT count(*) AS n FROM messages WHERE chat_id = ? AND seq > ? AND from_id <> ?",
+			"SELECT count(*) AS n FROM messages WHERE chat_id = ? AND seq > ? AND from_id <> ? AND recalled = 0",
 			[chatId, seq, selfId],
 		);
 		return num(rows[0] ?? {}, "n");
+	}
+
+	/** The user's notification settings; null until fetched from the server. */
+	async notificationSettings(): Promise<NotificationSettings | null> {
+		const rows = await this.driver.query("SELECT settings FROM notification_settings WHERE id = 1");
+		const row = rows[0];
+		return row === undefined ? null : parseNotificationSettings(str(row, "settings"));
 	}
 
 	async outbox(chatId?: number): Promise<OutboxRow[]> {

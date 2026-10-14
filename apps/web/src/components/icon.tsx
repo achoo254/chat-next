@@ -144,6 +144,7 @@ const PATHS = {
 		</>
 	),
 	"chevron-right": <path d="M9 6l6 6-6 6" />,
+	"chevron-down": <path d="M6 9l6 6 6-6" />,
 	"message-dot": (
 		<>
 			<path d="M8 9h5M8 13h6M14 4H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h2v3l5-3h5a3 3 0 0 0 3-3v-4" />

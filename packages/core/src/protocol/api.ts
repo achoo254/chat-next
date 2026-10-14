@@ -23,13 +23,17 @@ export interface RemoteApi {
 				| "reorderPinnedDialogs"
 				| "deleteChat"
 				| "getCommonChats"
+				| "setDialogUnreadMark"
+				| "getChatOnlineCount"
+				| "getNotificationSettings"
+				| "setNotificationSettings"
 			>
 		>;
 	readonly messages: Pick<
 		Client<typeof MessagesService>,
 		"sendMessage" | "editMessage" | "deleteMessages" | "readHistory" | "getHistory"
 	> &
-		Partial<Pick<Client<typeof MessagesService>, "getMessageReactions">>;
+		Partial<Pick<Client<typeof MessagesService>, "getMessageReactions" | "getPinnedMessages" | "unpinAllMessages">>;
 	readonly users: Pick<Client<typeof UsersService>, "getSelf" | "getUsers"> &
 		Partial<Pick<Client<typeof UsersService>, "getBlockedUsers" | "getContacts">>;
 	/** Operators only (GetSelfResponse.is_operator); others get permission_denied. */

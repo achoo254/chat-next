@@ -70,6 +70,13 @@ f.inviteLinks.set(announcements, [
 		revoked: false,
 	},
 ]);
+// Three pinned messages in Vận hành hệ thống ("Tin ghim 3/3", #pin-message),
+// a recalled message (#message-kinds) and a chip with four reactors (#rich-messages).
+f.server.pin(demo.ids.ops, demo.ids.codeSeq, true);
+f.server.pin(demo.ids.ops, demo.ids.mineSeq, true);
+for (const user of [demo.ids.users.huy, demo.ids.users.lan, demo.ids.users.minh, demo.ids.users.ha]) f.react(user, demo.ids.ops, demo.ids.codeSeq, "🔥");
+const recalledSeq = f.send(demo.ids.users.minh, demo.ids.ops, "Tin gửi nhầm");
+f.server.deleteMessages(demo.ids.users.minh, demo.ids.ops, [recalledSeq]);
 // ?at= names a screen whose path holds an id the seed assigns.
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
@@ -255,8 +262,27 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click("[role=menuitem]", "Thu hồi");
 		await find(() => byName("dialog h2", "Thu hồi tin nhắn?"));
 	},
+	"pinned-list": async () => {
+		await click(".pinned button", "Tất cả tin ghim, 3 tin");
+		await find(() => document.querySelector("dialog .pin-list li"));
+	},
+	"unpin-all": async () => {
+		await click(".pinned button", "Tất cả tin ghim, 3 tin");
+		await click("dialog button", "Bỏ ghim tất cả");
+		await find(() => byName("dialog h2", "Bỏ ghim tất cả tin?"));
+	},
+	recalled: async () => {
+		const placeholder = await find(() => document.querySelector<HTMLElement>(".messages .bubble.recalled"));
+		// The list settles on the unread divider first; scroll once it has.
+		await new Promise((resolve) => setTimeout(resolve, 600));
+		placeholder.scrollIntoView({ block: "center" });
+	},
+	"reaction-chips": async () => {
+		const chip = await find(() => byName(".messages .reaction", /^🔥 /));
+		chip.scrollIntoView({ block: "center" });
+	},
 	reactors: async () => {
-		const chip = await find(() => byName(".messages .reaction", "👍 3"));
+		const chip = await find(() => byName(".messages .reaction", "👍 Bạn, Minh, Lan Anh"));
 		const rect = chip.getBoundingClientRect();
 		chip.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left + 4, clientY: rect.top + 4 }));
 		await find(() => document.querySelector("dialog .react-tabs"));

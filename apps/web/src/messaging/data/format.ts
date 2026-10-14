@@ -157,6 +157,7 @@ export function joinNames(names: readonly string[], and: string): string {
 /** One-line preview of a message for the chat list and quotes; `channel` as in actionText. */
 export function messagePreview(message: Message, nameOf: NameOf, copy: MessagingCopy, channel: boolean): string {
 	if (message.action !== null) return actionText(message.action, nameOf(message.fromId), nameOf, copy, channel);
+	if (message.recalled) return copy.message.recalled;
 	if (message.text !== "") return oneLine(message.text);
 	if (message.mediaKind !== null) return copy.message.mediaPreview;
 	return copy.message.unsupportedTitle;

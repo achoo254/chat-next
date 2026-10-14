@@ -76,6 +76,11 @@ export interface Dialog {
 	readonly muteUntil: number;
 	/** Pinned on top of the user's list (order: pinnedChatIds). */
 	readonly pinned: boolean;
+	/** Pinned messages of the chat the user can see, and the newest of them (0 = none). */
+	readonly pinnedMessageCount: number;
+	readonly pinnedMessageSeq: number;
+	/** The user marked the chat as unread; reading it clears the mark. */
+	readonly unreadMark: boolean;
 }
 
 /** Dialog.muteUntil of a chat muted until unmuted. */
@@ -91,22 +96,51 @@ export function isMuted(dialog: Pick<Dialog, "muteUntil">, nowSeconds: number): 
 
 /**
  * Totals for the app's unread badge: unread messages and chats with unread
- * messages. Muted chats are left out unless includeMuted (a user setting).
+ * messages. A chat marked as unread counts as one unread message. Muted
+ * chats are left out unless includeMuted (NotificationSettings.badgeMuted).
  */
 export function unreadTotals(
-	dialogs: Iterable<Pick<Dialog, "unreadCount" | "muteUntil">>,
+	dialogs: Iterable<Pick<Dialog, "unreadCount" | "muteUntil"> & Partial<Pick<Dialog, "unreadMark">>>,
 	nowSeconds: number,
 	includeMuted = false,
 ): { readonly messages: number; readonly chats: number } {
 	let messages = 0;
 	let chats = 0;
 	for (const dialog of dialogs) {
-		if (dialog.unreadCount <= 0 || (!includeMuted && isMuted(dialog, nowSeconds))) continue;
-		messages += dialog.unreadCount;
+		const unread = dialog.unreadCount > 0 ? dialog.unreadCount : dialog.unreadMark === true ? 1 : 0;
+		if (unread === 0 || (!includeMuted && isMuted(dialog, nowSeconds))) continue;
+		messages += unread;
 		chats += 1;
 	}
 	return { messages, chats };
 }
+
+export type NotificationSound = "default" | "soft" | "off";
+
+/** The user's notification settings, kept on the server and synced to every session. */
+export interface NotificationSettings {
+	readonly privateEnabled: boolean;
+	readonly privatePreview: boolean;
+	readonly groupsEnabled: boolean;
+	readonly groupsPreview: boolean;
+	readonly channelsEnabled: boolean;
+	readonly channelsPreview: boolean;
+	readonly sound: NotificationSound;
+	/** Count muted chats in the unread badge. */
+	readonly badgeMuted: boolean;
+}
+
+/** Settings of a user who never changed them (the server's defaults). */
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+	privateEnabled: true,
+	privatePreview: true,
+	groupsEnabled: true,
+	groupsPreview: true,
+	channelsEnabled: true,
+	channelsPreview: true,
+	sound: "default",
+	badgeMuted: false,
+};
 
 export type EntityType =
 	| "bold"
@@ -142,6 +176,8 @@ export interface ReactionCount {
 	readonly emoji: string;
 	readonly count: number;
 	readonly chosen: boolean;
+	/** Up to 3 users who reacted with it most recently, newest first (empty in channels for non-admins). */
+	readonly recentUserIds: readonly number[];
 }
 
 export interface ForwardHeader {
@@ -193,6 +229,11 @@ export interface Message {
 	/** Forum groups: the message's topic; 0 elsewhere. */
 	readonly topicId: number;
 	readonly linkPreview: LinkPreview | null;
+	/**
+	 * Deleted for everyone (recalled): a placeholder that keeps
+	 * the message's place, with no content, reactions or reply.
+	 */
+	readonly recalled: boolean;
 }
 
 export type SessionRevokeReason =
@@ -218,7 +259,13 @@ export interface UpdatePosition {
 export type UpdateBody =
 	| { readonly kind: "message_new"; readonly message: Message }
 	| { readonly kind: "message_edit"; readonly message: Message }
-	| { readonly kind: "message_delete"; readonly chatId: number; readonly seqs: readonly number[] }
+	/** recalled: keep a placeholder in place of each message (older servers: remove them). */
+	| {
+			readonly kind: "message_delete";
+			readonly chatId: number;
+			readonly seqs: readonly number[];
+			readonly recalled: boolean;
+	  }
 	| { readonly kind: "message_hidden"; readonly chatId: number; readonly seqs: readonly number[] }
 	| {
 			readonly kind: "reaction";
@@ -242,7 +289,14 @@ export type UpdateBody =
 			/** Inbox, sync_mode=large: the chat log position of the counts. */
 			readonly chatPts: number;
 	  }
-	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number; readonly pinned: boolean }
+	/** seqs: unpin all (pinned false, seq 0); otherwise empty. */
+	| {
+			readonly kind: "pin";
+			readonly chatId: number;
+			readonly seq: number;
+			readonly pinned: boolean;
+			readonly seqs: readonly number[];
+	  }
 	| {
 			readonly kind: "member_added";
 			readonly chatId: number;
@@ -290,6 +344,10 @@ export type UpdateBody =
 	 * private chat the user deleted for themselves. Purge it locally.
 	 */
 	| { readonly kind: "chat_deleted"; readonly chatId: number; readonly forEveryone: boolean }
+	/** The user marked a chat as unread or the mark went away. */
+	| { readonly kind: "dialog_unread_mark"; readonly chatId: number; readonly unread: boolean }
+	/** The user's notification settings after a change. */
+	| { readonly kind: "notification_settings"; readonly settings: NotificationSettings }
 	/** A kind added to the protocol after this client was built. */
 	| { readonly kind: "unknown" };
 
@@ -361,6 +419,14 @@ export interface DialogsPage {
 	readonly nextCursor: string;
 	/** First page of GetDialogs only: the pinned chats, top first; empty otherwise. */
 	readonly pinnedChatIds: readonly number[];
+}
+
+/** A page of GetPinnedMessages: newest first, with the total the user can see. */
+export interface PinnedMessagesPage {
+	readonly messages: readonly Message[];
+	readonly users: readonly User[];
+	readonly count: number;
+	readonly hasMore: boolean;
 }
 
 /** Realtime HelloFrame. */

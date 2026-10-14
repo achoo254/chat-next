@@ -69,6 +69,41 @@ func (s *Service) SetDialogMute(ctx context.Context, me, chatID int64, durationS
 	return &appv1.SetDialogMuteResponse{MuteUntil: until, Ack: t.ack(me, chatID)}, nil
 }
 
+// SetDialogUnreadMark marks a chat as unread for me or clears the mark. My
+// sessions get dialog_unread_mark when it changes.
+func (s *Service) SetDialogUnreadMark(ctx context.Context, me, chatID int64, unread bool) (*appv1.SyncAck, error) {
+	if err := s.allow(limitWrite, "write", me); err != nil {
+		return nil, err
+	}
+	t, err := s.inTx(ctx, func(t *txn) error {
+		c, m, err := s.activeChatFor(ctx, t.tx, chatID, me, true)
+		if err != nil {
+			return err
+		}
+		if m.UnreadMark == unread {
+			return nil
+		}
+		return t.setUnreadMark(ctx, c.ID, me, unread)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return t.ack(me, chatID), nil
+}
+
+// setUnreadMark stores my unread mark of a chat and tells my sessions.
+func (t *txn) setUnreadMark(ctx context.Context, chatID, me int64, unread bool) error {
+	if _, err := t.tx.Exec(ctx, `UPDATE chat_members SET unread_mark = $3 WHERE chat_id = $1 AND user_id = $2`,
+		chatID, me, unread); err != nil {
+		return fmt.Errorf("chat: set unread mark: %w", err)
+	}
+	ev := t.event(kindDialogUnreadMark, chatID, me)
+	t.toUsers(ev, []int64{me}, &appv1.Update{Kind: &appv1.Update_DialogUnreadMark{DialogUnreadMark: &appv1.UpdateDialogUnreadMark{
+		ChatId: chatID, Unread: unread,
+	}}})
+	return nil
+}
+
 // lockPins serializes changes of one user's pinned chats (the limit check
 // and the ranks) within the transaction. Only pin operations take it, and
 // first, so it never meets the chat lock order.

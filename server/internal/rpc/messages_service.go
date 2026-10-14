@@ -124,3 +124,19 @@ func (s *messagesService) GetMessageReactions(ctx context.Context, req *connect.
 		return s.chat.GetMessageReactions(ctx, me, m)
 	})
 }
+
+func (s *messagesService) UnpinAllMessages(ctx context.Context, req *connect.Request[appv1.UnpinAllMessagesRequest]) (*connect.Response[appv1.UnpinAllMessagesResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.UnpinAllMessagesRequest) (*appv1.UnpinAllMessagesResponse, error) {
+		ack, err := s.chat.UnpinAllMessages(ctx, me, m.GetChatId(), m.GetTopicId())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.UnpinAllMessagesResponse{Ack: ack}, nil
+	})
+}
+
+func (s *messagesService) GetPinnedMessages(ctx context.Context, req *connect.Request[appv1.GetPinnedMessagesRequest]) (*connect.Response[appv1.GetPinnedMessagesResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetPinnedMessagesRequest) (*appv1.GetPinnedMessagesResponse, error) {
+		return s.chat.GetPinnedMessages(ctx, me, m)
+	})
+}

@@ -8,12 +8,20 @@ import type {
 	ForumTopic as WireForumTopic,
 	GetDialogsResponse,
 	GetPeerDialogsResponse,
+	NotificationSettings as WireNotificationSettings,
 } from "@app/proto-ts/chats";
-import { ChatType as WireChatType, HistoryVisibility, MemberRole as WireRole, SyncMode as WireSyncMode } from "@app/proto-ts/chats";
+import {
+	ChatType as WireChatType,
+	HistoryVisibility,
+	MemberRole as WireRole,
+	NotificationSound as WireSound,
+	SyncMode as WireSyncMode,
+} from "@app/proto-ts/chats";
 import { SessionRevokeReason as WireRevokeReason } from "@app/proto-ts/auth";
 import { MediaKind as WireMediaKind } from "@app/proto-ts/media";
 import type {
 	GetHistoryResponse,
+	GetPinnedMessagesResponse,
 	ForwardHeader as WireForward,
 	LinkPreview as WireLinkPreview,
 	Message as WireMessage,
@@ -56,6 +64,9 @@ import type {
 	Message,
 	MessageAction,
 	MessageEntity,
+	NotificationSettings,
+	NotificationSound,
+	PinnedMessagesPage,
 	ReactionCount,
 	SessionRevokeReason,
 	SyncAck,
@@ -195,7 +206,41 @@ export function toDialog(dialog: WireDialog): Dialog {
 		chatPts: id(dialog.chatPts),
 		muteUntil: id(dialog.muteUntil),
 		pinned: dialog.pinned,
+		pinnedMessageCount: dialog.pinnedMessageCount,
+		pinnedMessageSeq: id(dialog.pinnedMessageSeq),
+		unreadMark: dialog.unreadMark,
 	};
+}
+
+const SOUNDS: Record<number, NotificationSound> = {
+	[WireSound.DEFAULT]: "default",
+	[WireSound.SOFT]: "soft",
+	[WireSound.OFF]: "off",
+};
+
+const WIRE_SOUNDS: Record<NotificationSound, WireSound> = {
+	default: WireSound.DEFAULT,
+	soft: WireSound.SOFT,
+	off: WireSound.OFF,
+};
+
+export function toNotificationSettings(settings: WireNotificationSettings): NotificationSettings {
+	return {
+		privateEnabled: settings.privateEnabled,
+		privatePreview: settings.privatePreview,
+		groupsEnabled: settings.groupsEnabled,
+		groupsPreview: settings.groupsPreview,
+		channelsEnabled: settings.channelsEnabled,
+		channelsPreview: settings.channelsPreview,
+		// A sound this client does not know plays the default one.
+		sound: SOUNDS[settings.sound] ?? "default",
+		badgeMuted: settings.badgeMuted,
+	};
+}
+
+/** Protocol sound from a client sound. */
+export function toWireSound(sound: NotificationSound): WireSound {
+	return WIRE_SOUNDS[sound];
 }
 
 function toEntity(entity: WireEntity): MessageEntity {
@@ -232,7 +277,12 @@ export function toWireEntity(entity: MessageEntity): {
 }
 
 function toReaction(reaction: WireReaction): ReactionCount {
-	return { emoji: reaction.emoji, count: reaction.count, chosen: reaction.chosen };
+	return {
+		emoji: reaction.emoji,
+		count: reaction.count,
+		chosen: reaction.chosen,
+		recentUserIds: reaction.recentUserIds.map(id),
+	};
 }
 
 function toForward(forward: WireForward | undefined): ForwardHeader | null {
@@ -298,6 +348,7 @@ export function toMessage(message: WireMessage): Message {
 		action: toAction(message.action),
 		topicId: id(message.topicId),
 		linkPreview: toLinkPreview(message.linkPreview),
+		recalled: message.recalled,
 	};
 }
 
@@ -314,7 +365,12 @@ function toBody(update: WireUpdate): UpdateBody {
 			};
 		}
 		case "messageDelete":
-			return { kind: "message_delete", chatId: id(kind.value.chatId), seqs: kind.value.seqs.map(id) };
+			return {
+				kind: "message_delete",
+				chatId: id(kind.value.chatId),
+				seqs: kind.value.seqs.map(id),
+				recalled: kind.value.recalled,
+			};
 		case "messageHidden":
 			return { kind: "message_hidden", chatId: id(kind.value.chatId), seqs: kind.value.seqs.map(id) };
 		case "reaction":
@@ -337,7 +393,13 @@ function toBody(update: WireUpdate): UpdateBody {
 				chatPts: id(kind.value.chatPts),
 			};
 		case "pin":
-			return { kind: "pin", chatId: id(kind.value.chatId), seq: id(kind.value.seq), pinned: kind.value.pinned };
+			return {
+				kind: "pin",
+				chatId: id(kind.value.chatId),
+				seq: id(kind.value.seq),
+				pinned: kind.value.pinned,
+				seqs: kind.value.seqs.map(id),
+			};
 		case "memberAdded":
 			return {
 				kind: "member_added",
@@ -394,6 +456,14 @@ function toBody(update: WireUpdate): UpdateBody {
 			return { kind: "pinned_dialogs", chatIds: kind.value.chatIds.map(id) };
 		case "chatDeleted":
 			return { kind: "chat_deleted", chatId: id(kind.value.chatId), forEveryone: kind.value.forEveryone };
+		case "dialogUnreadMark":
+			return { kind: "dialog_unread_mark", chatId: id(kind.value.chatId), unread: kind.value.unread };
+		case "notificationSettings": {
+			const settings = kind.value.settings;
+			return settings === undefined
+				? { kind: "unknown" }
+				: { kind: "notification_settings", settings: toNotificationSettings(settings) };
+		}
 		case undefined:
 			return { kind: "unknown" };
 	}
@@ -498,6 +568,15 @@ export function toHistoryPage(response: GetHistoryResponse): HistoryPage {
 		users: response.users.map(toUser),
 		hasOlder: response.hasOlder,
 		hasNewer: response.hasNewer,
+	};
+}
+
+export function toPinnedMessagesPage(response: GetPinnedMessagesResponse): PinnedMessagesPage {
+	return {
+		messages: response.messages.map(toMessage),
+		users: response.users.map(toUser),
+		count: response.count,
+		hasMore: response.hasMore,
 	};
 }
 

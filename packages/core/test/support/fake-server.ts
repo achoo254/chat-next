@@ -11,23 +11,32 @@ import {
 	ChatSchema,
 	ChatType,
 	DialogSchema,
+	GetChatOnlineCountResponseSchema,
 	GetChatResponseSchema,
 	GetDialogsResponseSchema,
+	GetNotificationSettingsResponseSchema,
 	GetPeerDialogsResponseSchema,
+	NotificationSettingsSchema,
+	NotificationSound,
+	SetDialogUnreadMarkResponseSchema,
+	SetNotificationSettingsResponseSchema,
 	SyncMode,
 	type Chat as WireChat,
 	type Dialog as WireDialog,
+	type NotificationSettings as WireNotificationSettings,
 } from "@app/proto-ts/chats";
 import {
 	DeleteMessagesResponseSchema,
 	EditMessageResponseSchema,
 	GetHistoryResponseSchema,
+	GetPinnedMessagesResponseSchema,
 	HistoryDirection,
 	MessageSchema,
 	ReadHistoryResponseSchema,
 	ReactionCountSchema,
 	SendMessageResponseSchema,
 	SyncAckSchema,
+	UnpinAllMessagesResponseSchema,
 	type Message as WireMessage,
 	type SyncAck as WireSyncAck,
 } from "@app/proto-ts/messages";
@@ -54,7 +63,9 @@ interface LogEntry {
 
 interface MessageRecord {
 	message: WireMessage;
+	/** Recalled (deleted for everyone): history shows a placeholder. */
 	deleted: boolean;
+	/** Per emoji, who reacted, oldest first. */
 	readonly reactors: Map<string, Set<number>>;
 	readonly sender: number;
 	readonly randomId: number;
@@ -68,7 +79,8 @@ interface ChatRecord {
 	syncMode: SyncMode;
 	readonly messages: Map<number, MessageRecord>;
 	nextSeq: number;
-	pinnedSeq: number;
+	/** Seqs of the pinned messages. */
+	readonly pins: Set<number>;
 	log: LogEntry[];
 	chatPts: number;
 	logMin: number;
@@ -91,6 +103,24 @@ interface UserRecord {
 	readonly mutes: Map<number, number>;
 	/** Pinned chats, top first. */
 	pins: number[];
+	/** Chats the user marked as unread. */
+	readonly unreadMarks: Set<number>;
+	notify: WireNotificationSettings;
+}
+
+type NotifyChange = Partial<Omit<WireNotificationSettings, "$typeName" | "$unknown">>;
+
+function defaultNotify(): WireNotificationSettings {
+	return create(NotificationSettingsSchema, {
+		privateEnabled: true,
+		privatePreview: true,
+		groupsEnabled: true,
+		groupsPreview: true,
+		channelsEnabled: true,
+		channelsPreview: true,
+		sound: NotificationSound.DEFAULT,
+		badgeMuted: false,
+	});
 }
 
 interface Session {
@@ -177,6 +207,8 @@ export class FakeServer {
 			revoked: false,
 			mutes: new Map(),
 			pins: [],
+			unreadMarks: new Set(),
+			notify: defaultNotify(),
 		});
 		return id;
 	}
@@ -191,7 +223,7 @@ export class FakeServer {
 			syncMode: SyncMode.SMALL,
 			messages: new Map(),
 			nextSeq: 1,
-			pinnedSeq: 0,
+			pins: new Set(),
 			log: [],
 			chatPts: 0,
 			logMin: 0,
@@ -246,21 +278,42 @@ export class FakeServer {
 			peerUserId: big(chat.peerOf.get(viewer) ?? 0),
 			syncMode: chat.syncMode,
 			memberCount: chat.members.size,
-			pinnedSeq: big(chat.pinnedSeq),
+			pinnedSeq: big(this.pinnedSeq(id)),
 			left: !chat.members.has(viewer),
 		});
 	}
 
+	/** In the viewer's history: not hidden for them (a recalled one shows as its placeholder). */
 	private visible(record: MessageRecord, viewer: number): boolean {
-		return !record.deleted && !this.user(viewer).hidden.has(`${num(record.message.chatId)}:${num(record.message.seq)}`);
+		return !this.user(viewer).hidden.has(`${num(record.message.chatId)}:${num(record.message.seq)}`);
 	}
 
 	/** The message as `viewer` sees it (random_id only for its sender, chosen per viewer). */
 	private view(record: MessageRecord, viewer: number): WireMessage {
+		const { message } = record;
+		if (record.deleted) {
+			return create(MessageSchema, {
+				chatId: message.chatId,
+				seq: message.seq,
+				fromId: message.fromId,
+				date: message.date,
+				topicId: message.topicId,
+				editVersion: message.editVersion,
+				randomId: big(viewer === record.sender ? record.randomId : 0),
+				recalled: true,
+			});
+		}
 		const reactions = [...record.reactors.entries()]
 			.filter(([, users]) => users.size > 0)
 			.sort(([a], [b]) => a.localeCompare(b))
-			.map(([emoji, users]) => create(ReactionCountSchema, { emoji, count: users.size, chosen: users.has(viewer) }));
+			.map(([emoji, users]) =>
+				create(ReactionCountSchema, {
+					emoji,
+					count: users.size,
+					chosen: users.has(viewer),
+					recentUserIds: [...users].slice(-3).reverse().map(big),
+				}),
+			);
 		return create(MessageSchema, {
 			...record.message,
 			randomId: big(viewer === record.sender ? record.randomId : 0),
@@ -283,7 +336,8 @@ export class FakeServer {
 		const chat = this.chat(chatId);
 		const messages = this.visibleMessages(chatId, viewer);
 		const read = this.reads(viewer, chatId);
-		const unread = messages.filter((r) => r.sender !== viewer && num(r.message.seq) > read.inbox).length;
+		const unread = messages.filter((r) => !r.deleted && r.sender !== viewer && num(r.message.seq) > read.inbox).length;
+		const pinned = messages.filter((r) => !r.deleted && chat.pins.has(num(r.message.seq)));
 		return create(DialogSchema, {
 			chatId: big(chatId),
 			topSeq: big(messages.length === 0 ? 0 : num(messages[messages.length - 1]?.message.seq ?? 0n)),
@@ -293,6 +347,9 @@ export class FakeServer {
 			chatPts: big(chat.syncMode === SyncMode.LARGE ? chat.chatPts : 0),
 			muteUntil: big(this.user(viewer).mutes.get(chatId) ?? 0),
 			pinned: this.user(viewer).pins.includes(chatId),
+			pinnedMessageCount: pinned.length,
+			pinnedMessageSeq: pinned[pinned.length - 1]?.message.seq ?? 0n,
+			unreadMark: this.user(viewer).unreadMarks.has(chatId),
 		});
 	}
 
@@ -300,8 +357,9 @@ export class FakeServer {
 		return [...this.chats.values()].filter((c) => c.members.has(viewer)).map((c) => c.id);
 	}
 
+	/** Newest pinned message of the chat (0 = none). */
 	pinnedSeq(chatId: number): number {
-		return this.chat(chatId).pinnedSeq;
+		return Math.max(0, ...this.chat(chatId).pins);
 	}
 
 	userPts(userId: number): number {
@@ -438,13 +496,25 @@ export class FakeServer {
 		return this.ackFor(userId, chatId);
 	}
 
+	/** Recalls messages: they stay as placeholders; their pins go. */
 	deleteMessages(userId: number, chatId: number, seqs: readonly number[]): WireSyncAck {
-		for (const seq of seqs) this.record(chatId, seq).deleted = true;
+		const chat = this.chat(chatId);
+		for (const seq of seqs) {
+			const record = this.record(chatId, seq);
+			record.deleted = true;
+			record.reactors.clear();
+		}
 		this.pushChat(chatId, () => ({
 			case: "messageDelete",
-			value: { chatId: big(chatId), seqs: seqs.map(big) },
+			value: { chatId: big(chatId), seqs: seqs.map(big), recalled: true },
 		}));
-		return this.ackFor(userId, chatId);
+		const ack = this.ackFor(userId, chatId);
+		for (const seq of seqs) {
+			if (chat.pins.delete(seq)) {
+				this.pushChat(chatId, () => ({ case: "pin", value: { chatId: big(chatId), seq: big(seq), pinned: false } }));
+			}
+		}
+		return ack;
 	}
 
 	hideMessages(userId: number, chatId: number, seqs: readonly number[]): WireSyncAck {
@@ -473,8 +543,10 @@ export class FakeServer {
 		const chat = this.chat(chatId);
 		const read = this.reads(userId, chatId);
 		read.inbox = Math.max(read.inbox, maxSeq);
+		// Reading clears a "marked as unread".
+		if (this.user(userId).unreadMarks.has(chatId)) this.markUnread(userId, chatId, false);
 		const unread = this.visibleMessages(chatId, userId).filter(
-			(r) => r.sender !== userId && num(r.message.seq) > read.inbox,
+			(r) => !r.deleted && r.sender !== userId && num(r.message.seq) > read.inbox,
 		).length;
 		this.pushUser(
 			userId,
@@ -510,11 +582,41 @@ export class FakeServer {
 		return ack;
 	}
 
+	/** Pins one more message, or unpins one. */
 	pin(chatId: number, seq: number, pinned: boolean): void {
 		const chat = this.chat(chatId);
-		if (pinned) chat.pinnedSeq = seq;
-		else if (chat.pinnedSeq === seq) chat.pinnedSeq = 0;
+		if (pinned) chat.pins.add(seq);
+		else chat.pins.delete(seq);
 		this.pushChat(chatId, () => ({ case: "pin", value: { chatId: big(chatId), seq: big(seq), pinned } }));
+	}
+
+	/** Unpins every pinned message of the chat with one update. */
+	unpinAll(chatId: number): void {
+		const chat = this.chat(chatId);
+		const seqs = [...chat.pins].sort((a, b) => a - b);
+		if (seqs.length === 0) return;
+		chat.pins.clear();
+		this.pushChat(chatId, () => ({ case: "pin", value: { chatId: big(chatId), seqs: seqs.map(big), pinned: false } }));
+	}
+
+	/** The user marked a chat as unread (or cleared the mark) on some session. */
+	markUnread(userId: number, chatId: number, unread: boolean): void {
+		const user = this.user(userId);
+		if (unread) user.unreadMarks.add(chatId);
+		else user.unreadMarks.delete(chatId);
+		this.pushUser(userId, { case: "dialogUnreadMark", value: { chatId: big(chatId), unread } }, chatId);
+	}
+
+	/** The user changed notification settings on some session. */
+	setNotify(userId: number, change: NotifyChange): WireNotificationSettings {
+		const user = this.user(userId);
+		user.notify = create(NotificationSettingsSchema, { ...user.notify, ...change });
+		this.pushUser(userId, { case: "notificationSettings", value: { settings: user.notify } }, 0);
+		return user.notify;
+	}
+
+	notifySettings(userId: number): WireNotificationSettings {
+		return this.user(userId).notify;
 	}
 
 	addMember(chatId: number, userId: number, inviter: number): void {
@@ -714,22 +816,13 @@ export class FakeServer {
 		}
 	}
 
+	/**
+	 * Sends updates with the entities of `chatId`; 0 (or a chat that is gone)
+	 * for per-user updates that name no chat, which carry the user only.
+	 */
 	private sendUpdates(session: Session, updates: WireUpdate[], chatId: number, lossy: boolean): void {
-		const userIds = new Set<number>();
-		for (const record of this.chat(chatId).messages.values()) userIds.add(record.sender);
-		for (const member of this.chat(chatId).members) userIds.add(member);
-		this.sendFrame(
-			session,
-			{
-				case: "update",
-				value: {
-					updates,
-					users: [...userIds].map((id) => this.wireUser(id, session.userId)),
-					chats: [this.wireChat(chatId, session.userId)],
-				},
-			},
-			lossy,
-		);
+		const entities = this.entitiesForChats(session.userId, chatId === 0 ? [] : [chatId]);
+		this.sendFrame(session, { case: "update", value: { updates, ...entities } }, lossy);
 	}
 
 	private sendFrame(
@@ -897,9 +990,55 @@ export class FakeServer {
 						create(GetChatResponseSchema, {
 							chat: this.wireChat(num(request.chatId ?? 0n), userId),
 							users: [...this.chat(num(request.chatId ?? 0n)).members].map((id) => this.wireUser(id, userId)),
-						}),
-					),
-			},
+								}),
+							),
+						setDialogUnreadMark: (request) =>
+							this.rpc(userId, "setDialogUnreadMark", () => {
+								const chatId = num(request.chatId ?? 0n);
+								if (!this.chat(chatId).members.has(userId)) throw new ConnectError("not a member", Code.NotFound);
+								const unread = request.unread === true;
+								if (this.user(userId).unreadMarks.has(chatId) === unread) {
+									return create(SetDialogUnreadMarkResponseSchema, { ack: { serverEpoch: big(this.epoch) } });
+								}
+								this.markUnread(userId, chatId, unread);
+								return create(SetDialogUnreadMarkResponseSchema, {
+									ack: { pts: big(this.user(userId).pts), ptsCount: 1, serverEpoch: big(this.epoch) },
+								});
+							}),
+						getChatOnlineCount: (request) =>
+							this.rpc(userId, "getChatOnlineCount", () => {
+								const chat = this.chat(num(request.chatId ?? 0n));
+								if (!chat.members.has(userId)) throw new ConnectError("not a member", Code.NotFound);
+								const online = new Set([...this.sessions].map((s) => s.userId).filter((id) => chat.members.has(id)));
+								return create(GetChatOnlineCountResponseSchema, { onlineCount: online.size });
+							}),
+						getNotificationSettings: () =>
+							this.rpc(userId, "getNotificationSettings", () =>
+								create(GetNotificationSettingsResponseSchema, { settings: this.user(userId).notify }),
+							),
+						setNotificationSettings: (request) =>
+							this.rpc(userId, "setNotificationSettings", () => {
+								const change: NotifyChange = {};
+								for (const key of [
+									"privateEnabled",
+									"privatePreview",
+									"groupsEnabled",
+									"groupsPreview",
+									"channelsEnabled",
+									"channelsPreview",
+									"badgeMuted",
+								] as const) {
+									const value = request[key];
+									if (value !== undefined) change[key] = value;
+								}
+								if (request.sound !== undefined) change.sound = request.sound;
+								const settings = this.setNotify(userId, change);
+								return create(SetNotificationSettingsResponseSchema, {
+									settings,
+									ack: { pts: big(this.user(userId).pts), ptsCount: 1, serverEpoch: big(this.epoch) },
+								});
+							}),
+					},
 			messages: {
 				sendMessage: (request) =>
 					this.rpc(userId, "sendMessage", () => {
@@ -964,6 +1103,35 @@ export class FakeServer {
 							users: [...new Set(page.map((r) => r.sender))].map((id) => this.wireUser(id, userId)),
 							hasOlder: seqs.some((s) => s < pivot),
 							hasNewer: seqs.some((s) => s > (last ?? (offset === 0 ? Number.MAX_SAFE_INTEGER : offset - 1))),
+						});
+					}),
+				getPinnedMessages: (request) =>
+					this.rpc(userId, "getPinnedMessages", () => {
+						const chatId = num(request.chatId ?? 0n);
+						const chat = this.chat(chatId);
+						if (!chat.members.has(userId)) throw new ConnectError("not a member", Code.NotFound);
+						const pinned = this.visibleMessages(chatId, userId)
+							.filter((r) => !r.deleted && chat.pins.has(num(r.message.seq)))
+							.reverse();
+						const offset = num(request.offsetSeq ?? 0n);
+						const limit = request.limit !== undefined && request.limit > 0 ? request.limit : 50;
+						const after = pinned.filter((r) => offset === 0 || num(r.message.seq) < offset);
+						const page = after.slice(0, limit);
+						return create(GetPinnedMessagesResponseSchema, {
+							messages: page.map((r) => this.view(r, userId)),
+							users: [...new Set(page.map((r) => r.sender))].map((id) => this.wireUser(id, userId)),
+							count: pinned.length,
+							hasMore: after.length > limit,
+						});
+					}),
+				unpinAllMessages: (request) =>
+					this.rpc(userId, "unpinAllMessages", () => {
+						const chatId = num(request.chatId ?? 0n);
+						if (!this.chat(chatId).members.has(userId)) throw new ConnectError("not a member", Code.NotFound);
+						const before = this.chat(chatId).pins.size;
+						this.unpinAll(chatId);
+						return create(UnpinAllMessagesResponseSchema, {
+							ack: before === 0 ? { serverEpoch: big(this.epoch) } : this.ackFor(userId, chatId),
 						});
 					}),
 			},

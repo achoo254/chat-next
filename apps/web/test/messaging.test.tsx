@@ -107,13 +107,14 @@ describe("message rendering", () => {
 		expect(log.querySelector(".msg.at-me .mention.me")?.textContent).toBe("@ductrung");
 		expect(within(log).getByText(/^đã sửa/)).toBeTruthy();
 		expect(within(log).getByText("Nâng cấp Postgres gần như không gián đoạn")).toBeTruthy();
-		expect(within(log).getByRole("button", { name: "👍 3" }).getAttribute("aria-pressed")).toBe("true");
+		expect(within(log).getByRole("button", { name: "👍 Bạn, Minh, Lan Anh" }).getAttribute("aria-pressed")).toBe("true");
 		expect(within(log).getByText("Lan Anh đã thêm Deploy Bot")).toBeTruthy();
 		expect((await within(log).findByRole("separator", {}, LONG)).textContent).toBe("Tin chưa đọc");
 		expect(within(log).getAllByRole("img", { name: "Đã xem" }).length).toBeGreaterThan(0);
 		// Reply quote of your own message names the quoted author.
 		await waitFor(() => expect(log.querySelector(".msg.mine .reply b")?.textContent).toBe("Quang Huy"), LONG);
-		expect(screen.getByRole("button", { name: "Nhảy tới tin ghim" }).textContent).toContain("Checklist sau nâng cấp");
+		// The pinned bar loads with the first chat that has a pinned message.
+		expect((await screen.findByRole("button", { name: "Nhảy tới tin ghim" }, LONG)).textContent).toContain("Checklist sau nâng cấp");
 	});
 
 	it("reveals a spoiler and hides the pinned bar on this device", async () => {
@@ -121,7 +122,7 @@ describe("message rendering", () => {
 		await userEvent.click(within(log).getByRole("button", { name: "Nội dung ẩn, bấm để hiện" }));
 		expect(log.querySelector(".spoiler.revealed")?.textContent).toBe("482 913");
 
-		await userEvent.click(screen.getByRole("button", { name: "Ẩn thanh tin ghim" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Ẩn thanh tin ghim" }, LONG));
 		expect(screen.queryByRole("button", { name: "Nhảy tới tin ghim" })).toBeNull();
 		expect(await screen.findByRole("switch", { name: "Hiện thanh tin ghim" })).toBeTruthy();
 	});

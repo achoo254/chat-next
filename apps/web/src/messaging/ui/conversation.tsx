@@ -1,18 +1,18 @@
 // The open chat or topic (mockups/chat.html#app, #channel, #topics,
 // #topic-states, #connection-states).
-import { Suspense, lazy, useEffect, useSyncExternalStore } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { Chat } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, dialogTitle, messagePreview, namedUserIds } from "../data/format.ts";
+import { chatKind, dialogTitle } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
-import { useChat, useConnection, useDialog, useListEntry, useMessage, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
-import { useNameOf } from "./chat-row.tsx";
+import { useChat, useConnection, useDialog, useListEntry, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
 import { Composer } from "./composer.tsx";
 import { useOnlineCount } from "./members.ts";
+import { useIncomingSound } from "./incoming-sound.ts";
 import { MessageList } from "./message-list.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
@@ -40,66 +40,8 @@ function MessageMenu({ chat, readOutboxMaxSeq }: { chat: Chat; readOutboxMaxSeq:
 	);
 }
 
-/** Pinned bars hidden on this device (the pin itself stays for everyone). */
-export const hiddenPins = {
-	key: (chatId: number) => `chat:pin-hidden:${chatId}`,
-	listeners: new Set<() => void>(),
-	get(chatId: number): number {
-		try {
-			return Number(window.localStorage.getItem(this.key(chatId)) ?? 0);
-		} catch {
-			return 0;
-		}
-	},
-	set(chatId: number, seq: number): void {
-		try {
-			if (seq === 0) window.localStorage.removeItem(this.key(chatId));
-			else window.localStorage.setItem(this.key(chatId), String(seq));
-		} catch {
-			// The bar comes back on the next visit when storage is blocked.
-		}
-		for (const listener of this.listeners) listener();
-	},
-	subscribe(listener: () => void): () => void {
-		hiddenPins.listeners.add(listener);
-		return () => hiddenPins.listeners.delete(listener);
-	},
-};
-
-export function usePinHidden(chatId: number): number {
-	return useSyncExternalStore(hiddenPins.subscribe, () => hiddenPins.get(chatId));
-}
-
-function PinnedBar({ chat }: { chat: Chat }) {
-	const copy = useCopy();
-	const { store, toasts } = useServices();
-	const hidden = usePinHidden(chat.id);
-	const message = useMessage(chat.id, chat.pinnedSeq);
-	const nameOf = useNameOf(message == null ? [] : namedUserIds(message));
-	if (chat.pinnedSeq === 0 || hidden === chat.pinnedSeq) return null;
-	return (
-		<div className="pinned closable">
-			<button type="button" className="pin-jump" aria-label={copy.pinned.jump} onClick={() => store.openWindow(chat.id, chat.pinnedSeq)}>
-				<Icon name="pin" small />
-				<span className="txt">
-					<b>{copy.pinned.label}</b>
-					{message != null && ` · ${messagePreview(message, nameOf, copy, chat.type === "channel")}`}
-				</span>
-			</button>
-			<button
-				type="button"
-				className="icon-btn"
-				aria-label={copy.pinned.hide}
-				onClick={() => {
-					hiddenPins.set(chat.id, chat.pinnedSeq);
-					toasts.show(copy.pinned.hidden);
-				}}
-			>
-				<Icon name="x" small />
-			</button>
-		</div>
-	);
-}
+// The pinned bar loads with the first chat that has a pinned message.
+const PinnedBar = lazy(() => import("./pinned-bar.tsx"));
 
 function OfflineBanner({ chatId }: { chatId: number }) {
 	const copy = useCopy();
@@ -119,7 +61,7 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 	const connection = useConnection();
 	const peer = useUser(chat.type === "private" ? chat.peerUserId : 0);
 	const presence = usePresence(chat.type === "private" && peer?.isBot !== true ? chat.peerUserId : 0);
-	const online = useOnlineCount(chat.type === "group" ? chat.id : 0, chat.memberCount);
+	const online = useOnlineCount(chat.type === "group" && !chat.left ? chat.id : 0);
 	if (connection === "connecting") {
 		return (
 			<span className="status-line">
@@ -198,19 +140,23 @@ interface ConversationProps {
 export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const copy = useCopy();
 	const ui = useUi();
-	const { store } = useServices();
+	const { store, source } = useServices();
 	const chat = useChat(chatId);
 	const view = useDialog(chatId);
 	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
 	const topics = useTopics(chatId, chat?.forum === true);
 	const topic = topics === null ? null : (topics.find((t) => t.id === topicId) ?? topics.find((t) => t.general) ?? topics[0] ?? null);
 	const effectiveTopic = topic?.id ?? 0;
+	useIncomingSound(chatId);
 
 	useEffect(() => {
 		store.openWindow(chatId);
-		// Opening a chat ends "marked as unread" on this device.
-		store.setMarkedUnread(chatId, false);
-	}, [store, chatId]);
+		// Opening a chat ends "marked as unread" (on every session). Marking the
+		// open chat unread from the list keeps the mark until it is opened again.
+		if (store.dialog(chatId)?.dialog.unreadMark === true) {
+			source.setDialogUnreadMark(chatId, false).catch(() => undefined);
+		}
+	}, [store, source, chatId]);
 
 	useEffect(() => {
 		ui.menu.set(null);
@@ -267,7 +213,11 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					<Icon name="info" />
 				</button>
 			</header>
-			{topic === null && <PinnedBar chat={chat} />}
+			{(topics === null || topic !== null) && ((view?.dialog.pinnedMessageCount ?? 0) > 0 || chat.pinnedSeq !== 0) && (
+				<Suspense fallback={null}>
+					<PinnedBar key={effectiveTopic} chat={chat} topicId={effectiveTopic} />
+				</Suspense>
+			)}
 			<OfflineBanner chatId={chatId} />
 			<MessageList chatId={chatId} topicId={effectiveTopic} chat={chat} dialog={view} />
 			{chat.left ? (

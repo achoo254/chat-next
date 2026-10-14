@@ -24,6 +24,7 @@ const ReadByDialog = lazy(() => details().then((m) => ({ default: m.ReadByDialog
 const AddFailedDialog = lazy(() => create().then((m) => ({ default: m.AddFailedDialog })));
 const MembersDialog = lazy(() => members().then((m) => ({ default: m.MembersDialog })));
 const RemoveMemberDialog = lazy(() => members().then((m) => ({ default: m.RemoveMemberDialog })));
+const PinnedListDialog = lazy(() => import("./pinned-dialogs.tsx").then((m) => ({ default: m.PinnedListDialog })));
 const AddContactDialog = lazy(() => import("./contact-add.tsx").then((m) => ({ default: m.AddContactDialog })));
 
 export function DialogHost() {
@@ -55,6 +56,8 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 			return <DeleteChatDialog chatId={request.chatId} onClose={close} />;
 		case "pin":
 			return <PinDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
+		case "pinnedList":
+			return <PinnedListDialog chatId={request.chatId} topicId={request.topicId} onClose={close} />;
 		case "reactors":
 			return <ReactorsDialog chatId={request.chatId} seq={request.seq} emoji={request.emoji} onClose={close} />;
 		case "leave":

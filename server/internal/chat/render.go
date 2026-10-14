@@ -117,17 +117,20 @@ type memberRow struct {
 	// muted) and pinned position (0 = not pinned).
 	MuteUntil int64
 	PinRank   int32
+	// The member marked the chat as unread.
+	UnreadMark bool
 }
 
 const memberColumns = `m.chat_id, m.user_id, m.role, m.permissions, m.inviter_id, m.joined_at, m.joined_seq,
 	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL, m.left_at, coalesce(m.left_seq, 0),
-	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0)`
+	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0), m.unread_mark`
 
 func scanMember(row pgx.Row) (*memberRow, error) {
 	m := &memberRow{}
 	var perms *int32
 	err := row.Scan(&m.ChatID, &m.UserID, &m.Role, &perms, &m.InviterID, &m.JoinedAt, &m.JoinedSeq,
-		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned, &m.MuteUntil, &m.PinRank)
+		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned, &m.MuteUntil, &m.PinRank,
+		&m.UnreadMark)
 	if perms != nil {
 		p := uint32(*perms)
 		m.Perms = &p
@@ -410,37 +413,46 @@ func loadMessages(ctx context.Context, q querier, keys map[int64][]int64) (map[m
 	return out, nil
 }
 
-// reactionsOf holds the reactions of a set of messages: counts per emoji and
-// the emoji each viewer chose.
+// recentReactorsMax is how many recent reactors a reaction chip carries.
+const recentReactorsMax = 3
+
+// reactionsOf holds the reactions of a set of messages: counts per emoji
+// with their most recent reactors, and the emoji each viewer chose.
 type reactionsOf struct {
 	counts map[msgKey][]*appv1.ReactionCount
 	mine   map[memberKey]map[int64]string // (chat, viewer) -> seq -> emoji
+	// reactorsHidden: (channel, viewer) pairs where the viewer is not an
+	// admin, so who reacted stays private.
+	reactorsHidden map[memberKey]bool
 }
 
 func loadReactions(ctx context.Context, q querier, keys map[int64][]int64, viewers []int64) (*reactionsOf, error) {
-	r := &reactionsOf{counts: map[msgKey][]*appv1.ReactionCount{}, mine: map[memberKey]map[int64]string{}}
+	r := &reactionsOf{counts: map[msgKey][]*appv1.ReactionCount{}, mine: map[memberKey]map[int64]string{},
+		reactorsHidden: map[memberKey]bool{}}
 	chats, seqs := flattenKeys(keys)
 	if len(chats) == 0 {
 		return r, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT r.chat_id, r.seq, r.emoji, count(*), min(r.created_at)
+		SELECT r.chat_id, r.seq, r.emoji, count(*), min(r.created_at),
+			(array_agg(r.user_id ORDER BY r.created_at DESC, r.user_id DESC))[1:$3]
 		FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
 		JOIN message_reactions r ON r.chat_id = x.chat_id AND r.seq = x.seq
-		GROUP BY r.chat_id, r.seq, r.emoji`, chats, seqs)
+		GROUP BY r.chat_id, r.seq, r.emoji`, chats, seqs, recentReactorsMax)
 	if err != nil {
 		return nil, fmt.Errorf("chat: load reactions: %w", err)
 	}
 	type agg struct {
-		emoji string
-		n     int32
-		first time.Time
+		emoji  string
+		n      int32
+		first  time.Time
+		recent []int64
 	}
 	byMsg := map[msgKey][]agg{}
 	for rows.Next() {
 		var k msgKey
 		var a agg
-		if err := rows.Scan(&k.chatID, &k.seq, &a.emoji, &a.n, &a.first); err != nil {
+		if err := rows.Scan(&k.chatID, &k.seq, &a.emoji, &a.n, &a.first, &a.recent); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("chat: load reactions: %w", err)
 		}
@@ -456,11 +468,14 @@ func loadReactions(ctx context.Context, q querier, keys map[int64][]int64, viewe
 			return cmp.Or(cmp.Compare(b.n, a.n), a.first.Compare(b.first), cmp.Compare(a.emoji, b.emoji))
 		})
 		for _, a := range list {
-			r.counts[k] = append(r.counts[k], &appv1.ReactionCount{Emoji: a.emoji, Count: a.n})
+			r.counts[k] = append(r.counts[k], &appv1.ReactionCount{Emoji: a.emoji, Count: a.n, RecentUserIds: a.recent})
 		}
 	}
 	if len(byMsg) == 0 || len(viewers) == 0 {
 		return r, nil
+	}
+	if r.reactorsHidden, err = loadReactorsHidden(ctx, q, sortedKeys(boolSet(keys)), viewers); err != nil {
+		return nil, err
 	}
 	rows, err = q.Query(ctx, `
 		SELECT r.chat_id, r.seq, r.user_id, r.emoji FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
@@ -488,18 +503,59 @@ func loadReactions(ctx context.Context, q querier, keys map[int64][]int64, viewe
 	return r, nil
 }
 
-// forViewer returns the reactions of a message with chosen set for viewer.
+// loadReactorsHidden returns the (chat, viewer) pairs among chatIDs and
+// viewers where the chat is a channel and the viewer not one of its current
+// admins: there the viewer may not learn who reacted.
+func loadReactorsHidden(ctx context.Context, q querier, chatIDs, viewers []int64) (map[memberKey]bool, error) {
+	rows, err := q.Query(ctx, `
+		SELECT c.id, v.user_id FROM chats c CROSS JOIN unnest($2::bigint[]) AS v(user_id)
+		WHERE c.id = ANY($1) AND c.type = 'channel' AND NOT EXISTS (
+			SELECT 1 FROM chat_members m WHERE m.chat_id = c.id AND m.user_id = v.user_id AND m.left_at IS NULL
+				AND m.role IN ('admin', 'owner'))`, chatIDs, viewers)
+	if err != nil {
+		return nil, fmt.Errorf("chat: reactor visibility: %w", err)
+	}
+	defer rows.Close()
+	out := map[memberKey]bool{}
+	for rows.Next() {
+		var k memberKey
+		if err := rows.Scan(&k.chatID, &k.userID); err != nil {
+			return nil, fmt.Errorf("chat: reactor visibility: %w", err)
+		}
+		out[k] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: reactor visibility: %w", err)
+	}
+	return out, nil
+}
+
+// forViewer returns the reactions of a message with chosen set for viewer,
+// and the recent reactors only where viewer may see who reacted.
 func (r *reactionsOf) forViewer(k msgKey, viewer int64) []*appv1.ReactionCount {
 	list := r.counts[k]
 	if len(list) == 0 {
 		return nil
 	}
 	mine := r.mine[memberKey{k.chatID, viewer}][k.seq]
+	hidden := r.reactorsHidden[memberKey{k.chatID, viewer}]
 	out := make([]*appv1.ReactionCount, len(list))
 	for i, c := range list {
 		out[i] = &appv1.ReactionCount{Emoji: c.Emoji, Count: c.Count, Chosen: c.Emoji == mine}
+		if !hidden {
+			out[i].RecentUserIds = c.RecentUserIds
+		}
 	}
 	return out
+}
+
+// recentReactors lists the recent reactors carried by reactions.
+func recentReactors(reactions []*appv1.ReactionCount) []int64 {
+	var ids []int64
+	for _, c := range reactions {
+		ids = append(ids, c.GetRecentUserIds()...)
+	}
+	return ids
 }
 
 type hiddenKey struct {
@@ -535,8 +591,17 @@ func loadHidden(ctx context.Context, q querier, viewers []int64, keys map[int64]
 	return out, nil
 }
 
-// render returns the message as viewer sees it.
+// render returns the message as viewer sees it; a message deleted for
+// everyone becomes its recalled placeholder, with no content.
 func (m *messageRow) render(viewer int64, reactions []*appv1.ReactionCount) (*appv1.Message, error) {
+	if m.Deleted {
+		out := &appv1.Message{ChatId: m.ChatID, Seq: m.Seq, FromId: m.FromID, Date: m.Date.Unix(), TopicId: m.TopicID,
+			EditVersion: m.EditVersion, Recalled: true}
+		if viewer == m.FromID {
+			out.RandomId = m.RandomID
+		}
+		return out, nil
+	}
 	out := &appv1.Message{}
 	if len(m.Content) > 0 {
 		if err := proto.Unmarshal(m.Content, out); err != nil {
@@ -556,9 +621,10 @@ func (m *messageRow) render(viewer int64, reactions []*appv1.ReactionCount) (*ap
 	return out, nil
 }
 
-// referencedUsers lists the users a message mentions in any way.
+// referencedUsers lists the users a message mentions in any way, its recent
+// reactors included.
 func referencedUsers(m *appv1.Message) []int64 {
-	ids := []int64{m.GetFromId()}
+	ids := append([]int64{m.GetFromId()}, recentReactors(m.GetReactions())...)
 	if f := m.GetForwardFrom(); f != nil {
 		ids = append(ids, f.GetFromUserId())
 	}
@@ -801,6 +867,7 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 					continue
 				}
 				k.Reaction.Reactions = reactions.forViewer(msgKey{chatID, k.Reaction.GetSeq()}, viewer)
+				ents.addUsers(viewer, recentReactors(k.Reaction.GetReactions())...)
 			case *appv1.Update_MemberAdded:
 				ents.addUsers(viewer, k.MemberAdded.GetUserIds()...)
 				ents.addUsers(viewer, k.MemberAdded.GetInviterId())

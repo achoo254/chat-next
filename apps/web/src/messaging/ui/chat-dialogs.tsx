@@ -12,7 +12,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { Member, Reactor } from "../data/remote.ts";
-import { useChat, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useChat, useDialog, useMessage, useServices, useUser } from "../data/services.tsx";
 import { Quote } from "./dialogs.tsx";
 import { Glyph } from "./glyphs.tsx";
 import { useMembers } from "./members.ts";
@@ -378,6 +378,7 @@ export function PinDialog({ chatId, seq, onClose }: CloseProps & { chatId: numbe
 	const copy = useScreensCopy();
 	const { remote, toasts } = useServices();
 	const chat = useChat(chatId);
+	const pinnedCount = useDialog(chatId)?.dialog.pinnedMessageCount ?? 0;
 	const [notify, setNotify] = useState(true);
 	const [busy, setBusy] = useState(false);
 	const id = useDomId("pin");
@@ -407,10 +408,10 @@ export function PinDialog({ chatId, seq, onClose }: CloseProps & { chatId: numbe
 					</span>
 					{channel ? t.notifyChannel : t.notify}
 				</button>
-				{chat != null && chat.pinnedSeq !== 0 && (
+				{chat != null && (pinnedCount > 0 || chat.pinnedSeq !== 0) && (
 					<p className="note">
 						<Icon name="pin" />
-						<span>{t.replaces(chat.title)}</span>
+						<span>{t.replaces(chat.title, Math.max(pinnedCount, 1))}</span>
 					</p>
 				)}
 			</div>

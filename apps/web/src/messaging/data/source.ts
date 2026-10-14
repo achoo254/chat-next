@@ -10,7 +10,10 @@ import type {
 	HistoryRequest,
 	HistoryView,
 	MessageEntity,
+	NotificationSettings,
 	PendingMessage,
+	PinnedMessagesPage,
+	PinnedMessagesRequest,
 	SearchOptions,
 	ScreenSnapshot,
 	SendTextOptions,
@@ -29,6 +32,17 @@ export interface ChatSource {
 	editText(chatId: number, seq: number, text: string, entities?: readonly MessageEntity[]): Promise<void>;
 	deleteMessages(chatId: number, seqs: readonly number[], forEveryone: boolean): Promise<void>;
 	markRead(chatId: number, maxSeq: number): Promise<void>;
+	/** "Đánh dấu chưa đọc", synced to the user's other sessions (online only). */
+	setDialogUnreadMark(chatId: number, unread: boolean): Promise<void>;
+	notificationSettings(): Promise<NotificationSettings>;
+	setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings>;
+	/** Pinned messages of a chat or forum topic, newest first (online only). */
+	pinnedMessages(chatId: number, request?: PinnedMessagesRequest): Promise<PinnedMessagesPage>;
+	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
+	/** Members of a group online now, counted by the server (online only). */
+	onlineCount(chatId: number): Promise<number>;
+	/** The app badge: unread messages and chats, muted chats per the user's setting. */
+	unreadTotals(): Promise<{ readonly messages: number; readonly chats: number }>;
 	retryOutbox(outboxId: number): Promise<void>;
 	discardOutbox(outboxId: number): Promise<void>;
 	search(query: string, options?: SearchOptions): Promise<StoredMessage[]>;

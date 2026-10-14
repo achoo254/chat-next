@@ -365,6 +365,59 @@ func (ChatPermission) EnumDescriptor() ([]byte, []int) {
 	return file_app_v1_chats_proto_rawDescGZIP(), []int{5}
 }
 
+// Notification sound of the user's devices.
+type NotificationSound int32
+
+const (
+	NotificationSound_NOTIFICATION_SOUND_UNSPECIFIED NotificationSound = 0
+	NotificationSound_NOTIFICATION_SOUND_DEFAULT     NotificationSound = 1
+	NotificationSound_NOTIFICATION_SOUND_SOFT        NotificationSound = 2
+	NotificationSound_NOTIFICATION_SOUND_OFF         NotificationSound = 3
+)
+
+// Enum value maps for NotificationSound.
+var (
+	NotificationSound_name = map[int32]string{
+		0: "NOTIFICATION_SOUND_UNSPECIFIED",
+		1: "NOTIFICATION_SOUND_DEFAULT",
+		2: "NOTIFICATION_SOUND_SOFT",
+		3: "NOTIFICATION_SOUND_OFF",
+	}
+	NotificationSound_value = map[string]int32{
+		"NOTIFICATION_SOUND_UNSPECIFIED": 0,
+		"NOTIFICATION_SOUND_DEFAULT":     1,
+		"NOTIFICATION_SOUND_SOFT":        2,
+		"NOTIFICATION_SOUND_OFF":         3,
+	}
+)
+
+func (x NotificationSound) Enum() *NotificationSound {
+	p := new(NotificationSound)
+	*p = x
+	return p
+}
+
+func (x NotificationSound) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NotificationSound) Descriptor() protoreflect.EnumDescriptor {
+	return file_app_v1_chats_proto_enumTypes[6].Descriptor()
+}
+
+func (NotificationSound) Type() protoreflect.EnumType {
+	return &file_app_v1_chats_proto_enumTypes[6]
+}
+
+func (x NotificationSound) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NotificationSound.Descriptor instead.
+func (NotificationSound) EnumDescriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{6}
+}
+
 type AddMemberFailure struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -432,7 +485,8 @@ type Chat struct {
 	MemberCount       int32             `protobuf:"varint,9,opt,name=member_count,json=memberCount,proto3" json:"member_count,omitempty"`
 	// ChatPermission bits granted to ordinary members.
 	DefaultPermissions uint32 `protobuf:"varint,10,opt,name=default_permissions,json=defaultPermissions,proto3" json:"default_permissions,omitempty"`
-	// Most recently pinned message; 0 when none.
+	// Newest pinned message (highest seq); 0 when none. Dialog carries the
+	// caller's view (pinned_message_seq, pinned_message_count).
 	PinnedSeq int64 `protobuf:"varint,11,opt,name=pinned_seq,json=pinnedSeq,proto3" json:"pinned_seq,omitempty"`
 	CreatedAt int64 `protobuf:"varint,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Caller-specific view.
@@ -688,7 +742,13 @@ type Dialog struct {
 	MuteUntil int64 `protobuf:"varint,8,opt,name=mute_until,json=muteUntil,proto3" json:"mute_until,omitempty"`
 	// Pinned on top of the caller's list (order in GetDialogsResponse
 	// .pinned_chat_ids and UpdatePinnedDialogs).
-	Pinned        bool `protobuf:"varint,9,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	Pinned bool `protobuf:"varint,9,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	// Pinned messages of the chat the caller can see (history visibility,
+	// not hidden for them), and the newest of them (0 when none).
+	PinnedMessageCount int32 `protobuf:"varint,10,opt,name=pinned_message_count,json=pinnedMessageCount,proto3" json:"pinned_message_count,omitempty"`
+	PinnedMessageSeq   int64 `protobuf:"varint,11,opt,name=pinned_message_seq,json=pinnedMessageSeq,proto3" json:"pinned_message_seq,omitempty"`
+	// The caller marked the chat as unread (SetDialogUnreadMark).
+	UnreadMark    bool `protobuf:"varint,12,opt,name=unread_mark,json=unreadMark,proto3" json:"unread_mark,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -782,6 +842,27 @@ func (x *Dialog) GetMuteUntil() int64 {
 func (x *Dialog) GetPinned() bool {
 	if x != nil {
 		return x.Pinned
+	}
+	return false
+}
+
+func (x *Dialog) GetPinnedMessageCount() int32 {
+	if x != nil {
+		return x.PinnedMessageCount
+	}
+	return 0
+}
+
+func (x *Dialog) GetPinnedMessageSeq() int64 {
+	if x != nil {
+		return x.PinnedMessageSeq
+	}
+	return 0
+}
+
+func (x *Dialog) GetUnreadMark() bool {
+	if x != nil {
+		return x.UnreadMark
 	}
 	return false
 }
@@ -4464,6 +4545,530 @@ func (x *DeleteChatResponse) GetAck() *SyncAck {
 	return nil
 }
 
+type SetDialogUnreadMarkRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	// true marks the chat as unread; false clears the mark.
+	Unread        bool `protobuf:"varint,2,opt,name=unread,proto3" json:"unread,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDialogUnreadMarkRequest) Reset() {
+	*x = SetDialogUnreadMarkRequest{}
+	mi := &file_app_v1_chats_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDialogUnreadMarkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDialogUnreadMarkRequest) ProtoMessage() {}
+
+func (x *SetDialogUnreadMarkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDialogUnreadMarkRequest.ProtoReflect.Descriptor instead.
+func (*SetDialogUnreadMarkRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *SetDialogUnreadMarkRequest) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+func (x *SetDialogUnreadMarkRequest) GetUnread() bool {
+	if x != nil {
+		return x.Unread
+	}
+	return false
+}
+
+type SetDialogUnreadMarkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ack           *SyncAck               `protobuf:"bytes,1,opt,name=ack,proto3" json:"ack,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDialogUnreadMarkResponse) Reset() {
+	*x = SetDialogUnreadMarkResponse{}
+	mi := &file_app_v1_chats_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDialogUnreadMarkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDialogUnreadMarkResponse) ProtoMessage() {}
+
+func (x *SetDialogUnreadMarkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDialogUnreadMarkResponse.ProtoReflect.Descriptor instead.
+func (*SetDialogUnreadMarkResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *SetDialogUnreadMarkResponse) GetAck() *SyncAck {
+	if x != nil {
+		return x.Ack
+	}
+	return nil
+}
+
+type GetChatOnlineCountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatOnlineCountRequest) Reset() {
+	*x = GetChatOnlineCountRequest{}
+	mi := &file_app_v1_chats_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatOnlineCountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatOnlineCountRequest) ProtoMessage() {}
+
+func (x *GetChatOnlineCountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatOnlineCountRequest.ProtoReflect.Descriptor instead.
+func (*GetChatOnlineCountRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *GetChatOnlineCountRequest) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+type GetChatOnlineCountResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Members online now, the caller included when online. Counting stops
+	// at 10000 (clients show "10000+").
+	OnlineCount   int32 `protobuf:"varint,1,opt,name=online_count,json=onlineCount,proto3" json:"online_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatOnlineCountResponse) Reset() {
+	*x = GetChatOnlineCountResponse{}
+	mi := &file_app_v1_chats_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatOnlineCountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatOnlineCountResponse) ProtoMessage() {}
+
+func (x *GetChatOnlineCountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatOnlineCountResponse.ProtoReflect.Descriptor instead.
+func (*GetChatOnlineCountResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *GetChatOnlineCountResponse) GetOnlineCount() int32 {
+	if x != nil {
+		return x.OnlineCount
+	}
+	return 0
+}
+
+// Per-user notification settings, kept on the server and synced to every
+// session. Per chat type: notify at all (enabled) and show the message text
+// (preview). A muted chat (Dialog.mute_until) never notifies.
+type NotificationSettings struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PrivateEnabled  bool                   `protobuf:"varint,1,opt,name=private_enabled,json=privateEnabled,proto3" json:"private_enabled,omitempty"`
+	PrivatePreview  bool                   `protobuf:"varint,2,opt,name=private_preview,json=privatePreview,proto3" json:"private_preview,omitempty"`
+	GroupsEnabled   bool                   `protobuf:"varint,3,opt,name=groups_enabled,json=groupsEnabled,proto3" json:"groups_enabled,omitempty"`
+	GroupsPreview   bool                   `protobuf:"varint,4,opt,name=groups_preview,json=groupsPreview,proto3" json:"groups_preview,omitempty"`
+	ChannelsEnabled bool                   `protobuf:"varint,5,opt,name=channels_enabled,json=channelsEnabled,proto3" json:"channels_enabled,omitempty"`
+	ChannelsPreview bool                   `protobuf:"varint,6,opt,name=channels_preview,json=channelsPreview,proto3" json:"channels_preview,omitempty"`
+	Sound           NotificationSound      `protobuf:"varint,7,opt,name=sound,proto3,enum=app.v1.NotificationSound" json:"sound,omitempty"`
+	// Count muted chats in the unread badge (default false).
+	BadgeMuted    bool `protobuf:"varint,8,opt,name=badge_muted,json=badgeMuted,proto3" json:"badge_muted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NotificationSettings) Reset() {
+	*x = NotificationSettings{}
+	mi := &file_app_v1_chats_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NotificationSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NotificationSettings) ProtoMessage() {}
+
+func (x *NotificationSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NotificationSettings.ProtoReflect.Descriptor instead.
+func (*NotificationSettings) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *NotificationSettings) GetPrivateEnabled() bool {
+	if x != nil {
+		return x.PrivateEnabled
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetPrivatePreview() bool {
+	if x != nil {
+		return x.PrivatePreview
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetGroupsEnabled() bool {
+	if x != nil {
+		return x.GroupsEnabled
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetGroupsPreview() bool {
+	if x != nil {
+		return x.GroupsPreview
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetChannelsEnabled() bool {
+	if x != nil {
+		return x.ChannelsEnabled
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetChannelsPreview() bool {
+	if x != nil {
+		return x.ChannelsPreview
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetSound() NotificationSound {
+	if x != nil {
+		return x.Sound
+	}
+	return NotificationSound_NOTIFICATION_SOUND_UNSPECIFIED
+}
+
+func (x *NotificationSettings) GetBadgeMuted() bool {
+	if x != nil {
+		return x.BadgeMuted
+	}
+	return false
+}
+
+type GetNotificationSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotificationSettingsRequest) Reset() {
+	*x = GetNotificationSettingsRequest{}
+	mi := &file_app_v1_chats_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotificationSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotificationSettingsRequest) ProtoMessage() {}
+
+func (x *GetNotificationSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotificationSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetNotificationSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{72}
+}
+
+type GetNotificationSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Settings      *NotificationSettings  `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotificationSettingsResponse) Reset() {
+	*x = GetNotificationSettingsResponse{}
+	mi := &file_app_v1_chats_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotificationSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotificationSettingsResponse) ProtoMessage() {}
+
+func (x *GetNotificationSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotificationSettingsResponse.ProtoReflect.Descriptor instead.
+func (*GetNotificationSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *GetNotificationSettingsResponse) GetSettings() *NotificationSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+type SetNotificationSettingsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset fields are left unchanged.
+	PrivateEnabled  *bool              `protobuf:"varint,1,opt,name=private_enabled,json=privateEnabled,proto3,oneof" json:"private_enabled,omitempty"`
+	PrivatePreview  *bool              `protobuf:"varint,2,opt,name=private_preview,json=privatePreview,proto3,oneof" json:"private_preview,omitempty"`
+	GroupsEnabled   *bool              `protobuf:"varint,3,opt,name=groups_enabled,json=groupsEnabled,proto3,oneof" json:"groups_enabled,omitempty"`
+	GroupsPreview   *bool              `protobuf:"varint,4,opt,name=groups_preview,json=groupsPreview,proto3,oneof" json:"groups_preview,omitempty"`
+	ChannelsEnabled *bool              `protobuf:"varint,5,opt,name=channels_enabled,json=channelsEnabled,proto3,oneof" json:"channels_enabled,omitempty"`
+	ChannelsPreview *bool              `protobuf:"varint,6,opt,name=channels_preview,json=channelsPreview,proto3,oneof" json:"channels_preview,omitempty"`
+	Sound           *NotificationSound `protobuf:"varint,7,opt,name=sound,proto3,enum=app.v1.NotificationSound,oneof" json:"sound,omitempty"`
+	BadgeMuted      *bool              `protobuf:"varint,8,opt,name=badge_muted,json=badgeMuted,proto3,oneof" json:"badge_muted,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SetNotificationSettingsRequest) Reset() {
+	*x = SetNotificationSettingsRequest{}
+	mi := &file_app_v1_chats_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNotificationSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNotificationSettingsRequest) ProtoMessage() {}
+
+func (x *SetNotificationSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNotificationSettingsRequest.ProtoReflect.Descriptor instead.
+func (*SetNotificationSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *SetNotificationSettingsRequest) GetPrivateEnabled() bool {
+	if x != nil && x.PrivateEnabled != nil {
+		return *x.PrivateEnabled
+	}
+	return false
+}
+
+func (x *SetNotificationSettingsRequest) GetPrivatePreview() bool {
+	if x != nil && x.PrivatePreview != nil {
+		return *x.PrivatePreview
+	}
+	return false
+}
+
+func (x *SetNotificationSettingsRequest) GetGroupsEnabled() bool {
+	if x != nil && x.GroupsEnabled != nil {
+		return *x.GroupsEnabled
+	}
+	return false
+}
+
+func (x *SetNotificationSettingsRequest) GetGroupsPreview() bool {
+	if x != nil && x.GroupsPreview != nil {
+		return *x.GroupsPreview
+	}
+	return false
+}
+
+func (x *SetNotificationSettingsRequest) GetChannelsEnabled() bool {
+	if x != nil && x.ChannelsEnabled != nil {
+		return *x.ChannelsEnabled
+	}
+	return false
+}
+
+func (x *SetNotificationSettingsRequest) GetChannelsPreview() bool {
+	if x != nil && x.ChannelsPreview != nil {
+		return *x.ChannelsPreview
+	}
+	return false
+}
+
+func (x *SetNotificationSettingsRequest) GetSound() NotificationSound {
+	if x != nil && x.Sound != nil {
+		return *x.Sound
+	}
+	return NotificationSound_NOTIFICATION_SOUND_UNSPECIFIED
+}
+
+func (x *SetNotificationSettingsRequest) GetBadgeMuted() bool {
+	if x != nil && x.BadgeMuted != nil {
+		return *x.BadgeMuted
+	}
+	return false
+}
+
+type SetNotificationSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Settings      *NotificationSettings  `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	Ack           *SyncAck               `protobuf:"bytes,2,opt,name=ack,proto3" json:"ack,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNotificationSettingsResponse) Reset() {
+	*x = SetNotificationSettingsResponse{}
+	mi := &file_app_v1_chats_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNotificationSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNotificationSettingsResponse) ProtoMessage() {}
+
+func (x *SetNotificationSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_chats_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNotificationSettingsResponse.ProtoReflect.Descriptor instead.
+func (*SetNotificationSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *SetNotificationSettingsResponse) GetSettings() *NotificationSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *SetNotificationSettingsResponse) GetAck() *SyncAck {
+	if x != nil {
+		return x.Ack
+	}
+	return nil
+}
+
 type GetCommonChatsRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	UserId int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -4477,7 +5082,7 @@ type GetCommonChatsRequest struct {
 
 func (x *GetCommonChatsRequest) Reset() {
 	*x = GetCommonChatsRequest{}
-	mi := &file_app_v1_chats_proto_msgTypes[67]
+	mi := &file_app_v1_chats_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4489,7 +5094,7 @@ func (x *GetCommonChatsRequest) String() string {
 func (*GetCommonChatsRequest) ProtoMessage() {}
 
 func (x *GetCommonChatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_chats_proto_msgTypes[67]
+	mi := &file_app_v1_chats_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4502,7 +5107,7 @@ func (x *GetCommonChatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommonChatsRequest.ProtoReflect.Descriptor instead.
 func (*GetCommonChatsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_chats_proto_rawDescGZIP(), []int{67}
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GetCommonChatsRequest) GetUserId() int64 {
@@ -4540,7 +5145,7 @@ type GetCommonChatsResponse struct {
 
 func (x *GetCommonChatsResponse) Reset() {
 	*x = GetCommonChatsResponse{}
-	mi := &file_app_v1_chats_proto_msgTypes[68]
+	mi := &file_app_v1_chats_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4552,7 +5157,7 @@ func (x *GetCommonChatsResponse) String() string {
 func (*GetCommonChatsResponse) ProtoMessage() {}
 
 func (x *GetCommonChatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_chats_proto_msgTypes[68]
+	mi := &file_app_v1_chats_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4565,7 +5170,7 @@ func (x *GetCommonChatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommonChatsResponse.ProtoReflect.Descriptor instead.
 func (*GetCommonChatsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_chats_proto_rawDescGZIP(), []int{68}
+	return file_app_v1_chats_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *GetCommonChatsResponse) GetChats() []*Chat {
@@ -4625,7 +5230,7 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\vpermissions\x18\x03 \x01(\rR\vpermissions\x12\x1f\n" +
 	"\tjoined_at\x18\x04 \x01(\x03B\x020\x02R\bjoinedAt\x12!\n" +
 	"\n" +
-	"inviter_id\x18\x05 \x01(\x03B\x020\x02R\tinviterId\"\xd7\x02\n" +
+	"inviter_id\x18\x05 \x01(\x03B\x020\x02R\tinviterId\"\xdc\x03\n" +
 	"\x06Dialog\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
 	"\atop_seq\x18\x02 \x01(\x03B\x020\x02R\x06topSeq\x12/\n" +
@@ -4636,7 +5241,12 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\bchat_pts\x18\a \x01(\x03B\x020\x02R\achatPts\x12!\n" +
 	"\n" +
 	"mute_until\x18\b \x01(\x03B\x020\x02R\tmuteUntil\x12\x16\n" +
-	"\x06pinned\x18\t \x01(\bR\x06pinned\"\xc2\x01\n" +
+	"\x06pinned\x18\t \x01(\bR\x06pinned\x120\n" +
+	"\x14pinned_message_count\x18\n" +
+	" \x01(\x05R\x12pinnedMessageCount\x120\n" +
+	"\x12pinned_message_seq\x18\v \x01(\x03B\x020\x02R\x10pinnedMessageSeq\x12\x1f\n" +
+	"\vunread_mark\x18\f \x01(\bR\n" +
+	"unreadMark\"\xc2\x01\n" +
 	"\n" +
 	"InviteLink\x12\x12\n" +
 	"\x04link\x18\x01 \x01(\tR\x04link\x12!\n" +
@@ -4898,7 +5508,50 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\x11DeleteChatRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\"7\n" +
 	"\x12DeleteChatResponse\x12!\n" +
-	"\x03ack\x18\x01 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"b\n" +
+	"\x03ack\x18\x01 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"Q\n" +
+	"\x1aSetDialogUnreadMarkRequest\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x16\n" +
+	"\x06unread\x18\x02 \x01(\bR\x06unread\"@\n" +
+	"\x1bSetDialogUnreadMarkResponse\x12!\n" +
+	"\x03ack\x18\x01 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"8\n" +
+	"\x19GetChatOnlineCountRequest\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\"?\n" +
+	"\x1aGetChatOnlineCountResponse\x12!\n" +
+	"\fonline_count\x18\x01 \x01(\x05R\vonlineCount\"\xde\x02\n" +
+	"\x14NotificationSettings\x12'\n" +
+	"\x0fprivate_enabled\x18\x01 \x01(\bR\x0eprivateEnabled\x12'\n" +
+	"\x0fprivate_preview\x18\x02 \x01(\bR\x0eprivatePreview\x12%\n" +
+	"\x0egroups_enabled\x18\x03 \x01(\bR\rgroupsEnabled\x12%\n" +
+	"\x0egroups_preview\x18\x04 \x01(\bR\rgroupsPreview\x12)\n" +
+	"\x10channels_enabled\x18\x05 \x01(\bR\x0fchannelsEnabled\x12)\n" +
+	"\x10channels_preview\x18\x06 \x01(\bR\x0fchannelsPreview\x12/\n" +
+	"\x05sound\x18\a \x01(\x0e2\x19.app.v1.NotificationSoundR\x05sound\x12\x1f\n" +
+	"\vbadge_muted\x18\b \x01(\bR\n" +
+	"badgeMuted\" \n" +
+	"\x1eGetNotificationSettingsRequest\"[\n" +
+	"\x1fGetNotificationSettingsResponse\x128\n" +
+	"\bsettings\x18\x01 \x01(\v2\x1c.app.v1.NotificationSettingsR\bsettings\"\xa2\x04\n" +
+	"\x1eSetNotificationSettingsRequest\x12,\n" +
+	"\x0fprivate_enabled\x18\x01 \x01(\bH\x00R\x0eprivateEnabled\x88\x01\x01\x12,\n" +
+	"\x0fprivate_preview\x18\x02 \x01(\bH\x01R\x0eprivatePreview\x88\x01\x01\x12*\n" +
+	"\x0egroups_enabled\x18\x03 \x01(\bH\x02R\rgroupsEnabled\x88\x01\x01\x12*\n" +
+	"\x0egroups_preview\x18\x04 \x01(\bH\x03R\rgroupsPreview\x88\x01\x01\x12.\n" +
+	"\x10channels_enabled\x18\x05 \x01(\bH\x04R\x0fchannelsEnabled\x88\x01\x01\x12.\n" +
+	"\x10channels_preview\x18\x06 \x01(\bH\x05R\x0fchannelsPreview\x88\x01\x01\x124\n" +
+	"\x05sound\x18\a \x01(\x0e2\x19.app.v1.NotificationSoundH\x06R\x05sound\x88\x01\x01\x12$\n" +
+	"\vbadge_muted\x18\b \x01(\bH\aR\n" +
+	"badgeMuted\x88\x01\x01B\x12\n" +
+	"\x10_private_enabledB\x12\n" +
+	"\x10_private_previewB\x11\n" +
+	"\x0f_groups_enabledB\x11\n" +
+	"\x0f_groups_previewB\x13\n" +
+	"\x11_channels_enabledB\x13\n" +
+	"\x11_channels_previewB\b\n" +
+	"\x06_soundB\x0e\n" +
+	"\f_badge_muted\"~\n" +
+	"\x1fSetNotificationSettingsResponse\x128\n" +
+	"\bsettings\x18\x01 \x01(\v2\x1c.app.v1.NotificationSettingsR\bsettings\x12!\n" +
+	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"b\n" +
 	"\x15GetCommonChatsRequest\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x14\n" +
@@ -4943,7 +5596,12 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\x1bCHAT_PERMISSION_ADD_MEMBERS\x10\x04\x12 \n" +
 	"\x1cCHAT_PERMISSION_PIN_MESSAGES\x10\b\x12\x1f\n" +
 	"\x1bCHAT_PERMISSION_CHANGE_INFO\x10\x10\x12!\n" +
-	"\x1dCHAT_PERMISSION_MANAGE_TOPICS\x10 2\x9b\x13\n" +
+	"\x1dCHAT_PERMISSION_MANAGE_TOPICS\x10 *\x90\x01\n" +
+	"\x11NotificationSound\x12\"\n" +
+	"\x1eNOTIFICATION_SOUND_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aNOTIFICATION_SOUND_DEFAULT\x10\x01\x12\x1b\n" +
+	"\x17NOTIFICATION_SOUND_SOFT\x10\x02\x12\x1a\n" +
+	"\x16NOTIFICATION_SOUND_OFF\x10\x032\xb0\x16\n" +
 	"\fChatsService\x12L\n" +
 	"\rCreatePrivate\x12\x1c.app.v1.CreatePrivateRequest\x1a\x1d.app.v1.CreatePrivateResponse\x12F\n" +
 	"\vCreateGroup\x12\x1a.app.v1.CreateGroupRequest\x1a\x1b.app.v1.CreateGroupResponse\x12L\n" +
@@ -4979,7 +5637,11 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\x14ReorderPinnedDialogs\x12#.app.v1.ReorderPinnedDialogsRequest\x1a$.app.v1.ReorderPinnedDialogsResponse\x12C\n" +
 	"\n" +
 	"DeleteChat\x12\x19.app.v1.DeleteChatRequest\x1a\x1a.app.v1.DeleteChatResponse\x12O\n" +
-	"\x0eGetCommonChats\x12\x1d.app.v1.GetCommonChatsRequest\x1a\x1e.app.v1.GetCommonChatsResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\x0eGetCommonChats\x12\x1d.app.v1.GetCommonChatsRequest\x1a\x1e.app.v1.GetCommonChatsResponse\x12^\n" +
+	"\x13SetDialogUnreadMark\x12\".app.v1.SetDialogUnreadMarkRequest\x1a#.app.v1.SetDialogUnreadMarkResponse\x12[\n" +
+	"\x12GetChatOnlineCount\x12!.app.v1.GetChatOnlineCountRequest\x1a\".app.v1.GetChatOnlineCountResponse\x12j\n" +
+	"\x17GetNotificationSettings\x12&.app.v1.GetNotificationSettingsRequest\x1a'.app.v1.GetNotificationSettingsResponse\x12j\n" +
+	"\x17SetNotificationSettings\x12&.app.v1.SetNotificationSettingsRequest\x1a'.app.v1.SetNotificationSettingsResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_chats_proto_rawDescOnce sync.Once
@@ -4993,222 +5655,246 @@ func file_app_v1_chats_proto_rawDescGZIP() []byte {
 	return file_app_v1_chats_proto_rawDescData
 }
 
-var file_app_v1_chats_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_app_v1_chats_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
+var file_app_v1_chats_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
+var file_app_v1_chats_proto_msgTypes = make([]protoimpl.MessageInfo, 78)
 var file_app_v1_chats_proto_goTypes = []any{
-	(AddMemberFailureReason)(0),          // 0: app.v1.AddMemberFailureReason
-	(ChatType)(0),                        // 1: app.v1.ChatType
-	(SyncMode)(0),                        // 2: app.v1.SyncMode
-	(HistoryVisibility)(0),               // 3: app.v1.HistoryVisibility
-	(MemberRole)(0),                      // 4: app.v1.MemberRole
-	(ChatPermission)(0),                  // 5: app.v1.ChatPermission
-	(*AddMemberFailure)(nil),             // 6: app.v1.AddMemberFailure
-	(*Chat)(nil),                         // 7: app.v1.Chat
-	(*ChatMember)(nil),                   // 8: app.v1.ChatMember
-	(*Dialog)(nil),                       // 9: app.v1.Dialog
-	(*InviteLink)(nil),                   // 10: app.v1.InviteLink
-	(*ForumTopic)(nil),                   // 11: app.v1.ForumTopic
-	(*BannedMember)(nil),                 // 12: app.v1.BannedMember
-	(*CreatePrivateRequest)(nil),         // 13: app.v1.CreatePrivateRequest
-	(*CreatePrivateResponse)(nil),        // 14: app.v1.CreatePrivateResponse
-	(*CreateGroupRequest)(nil),           // 15: app.v1.CreateGroupRequest
-	(*CreateGroupResponse)(nil),          // 16: app.v1.CreateGroupResponse
-	(*CreateChannelRequest)(nil),         // 17: app.v1.CreateChannelRequest
-	(*CreateChannelResponse)(nil),        // 18: app.v1.CreateChannelResponse
-	(*GetDialogsRequest)(nil),            // 19: app.v1.GetDialogsRequest
-	(*GetDialogsResponse)(nil),           // 20: app.v1.GetDialogsResponse
-	(*GetChatRequest)(nil),               // 21: app.v1.GetChatRequest
-	(*GetChatResponse)(nil),              // 22: app.v1.GetChatResponse
-	(*GetMembersRequest)(nil),            // 23: app.v1.GetMembersRequest
-	(*GetMembersResponse)(nil),           // 24: app.v1.GetMembersResponse
-	(*AddMembersRequest)(nil),            // 25: app.v1.AddMembersRequest
-	(*AddMembersResponse)(nil),           // 26: app.v1.AddMembersResponse
-	(*RemoveMemberRequest)(nil),          // 27: app.v1.RemoveMemberRequest
-	(*RemoveMemberResponse)(nil),         // 28: app.v1.RemoveMemberResponse
-	(*LeaveChatRequest)(nil),             // 29: app.v1.LeaveChatRequest
-	(*LeaveChatResponse)(nil),            // 30: app.v1.LeaveChatResponse
-	(*SetMemberPermissionsRequest)(nil),  // 31: app.v1.SetMemberPermissionsRequest
-	(*SetMemberPermissionsResponse)(nil), // 32: app.v1.SetMemberPermissionsResponse
-	(*SetAdminRequest)(nil),              // 33: app.v1.SetAdminRequest
-	(*SetAdminResponse)(nil),             // 34: app.v1.SetAdminResponse
-	(*ExportInviteLinkRequest)(nil),      // 35: app.v1.ExportInviteLinkRequest
-	(*ExportInviteLinkResponse)(nil),     // 36: app.v1.ExportInviteLinkResponse
-	(*JoinByInviteRequest)(nil),          // 37: app.v1.JoinByInviteRequest
-	(*JoinByInviteResponse)(nil),         // 38: app.v1.JoinByInviteResponse
-	(*SetHistoryVisibilityRequest)(nil),  // 39: app.v1.SetHistoryVisibilityRequest
-	(*SetHistoryVisibilityResponse)(nil), // 40: app.v1.SetHistoryVisibilityResponse
-	(*UpdateChatInfoRequest)(nil),        // 41: app.v1.UpdateChatInfoRequest
-	(*UpdateChatInfoResponse)(nil),       // 42: app.v1.UpdateChatInfoResponse
-	(*GetPeerDialogsRequest)(nil),        // 43: app.v1.GetPeerDialogsRequest
-	(*GetPeerDialogsResponse)(nil),       // 44: app.v1.GetPeerDialogsResponse
-	(*CheckInviteRequest)(nil),           // 45: app.v1.CheckInviteRequest
-	(*CheckInviteResponse)(nil),          // 46: app.v1.CheckInviteResponse
-	(*GetInviteLinksRequest)(nil),        // 47: app.v1.GetInviteLinksRequest
-	(*GetInviteLinksResponse)(nil),       // 48: app.v1.GetInviteLinksResponse
-	(*RevokeInviteLinkRequest)(nil),      // 49: app.v1.RevokeInviteLinkRequest
-	(*RevokeInviteLinkResponse)(nil),     // 50: app.v1.RevokeInviteLinkResponse
-	(*GetForumTopicsRequest)(nil),        // 51: app.v1.GetForumTopicsRequest
-	(*GetForumTopicsResponse)(nil),       // 52: app.v1.GetForumTopicsResponse
-	(*CreateForumTopicRequest)(nil),      // 53: app.v1.CreateForumTopicRequest
-	(*CreateForumTopicResponse)(nil),     // 54: app.v1.CreateForumTopicResponse
-	(*EditForumTopicRequest)(nil),        // 55: app.v1.EditForumTopicRequest
-	(*EditForumTopicResponse)(nil),       // 56: app.v1.EditForumTopicResponse
-	(*CloseForumTopicRequest)(nil),       // 57: app.v1.CloseForumTopicRequest
-	(*CloseForumTopicResponse)(nil),      // 58: app.v1.CloseForumTopicResponse
-	(*HideForumTopicRequest)(nil),        // 59: app.v1.HideForumTopicRequest
-	(*HideForumTopicResponse)(nil),       // 60: app.v1.HideForumTopicResponse
-	(*UnbanMemberRequest)(nil),           // 61: app.v1.UnbanMemberRequest
-	(*UnbanMemberResponse)(nil),          // 62: app.v1.UnbanMemberResponse
-	(*GetBannedMembersRequest)(nil),      // 63: app.v1.GetBannedMembersRequest
-	(*GetBannedMembersResponse)(nil),     // 64: app.v1.GetBannedMembersResponse
-	(*SetDialogMuteRequest)(nil),         // 65: app.v1.SetDialogMuteRequest
-	(*SetDialogMuteResponse)(nil),        // 66: app.v1.SetDialogMuteResponse
-	(*SetDialogPinnedRequest)(nil),       // 67: app.v1.SetDialogPinnedRequest
-	(*SetDialogPinnedResponse)(nil),      // 68: app.v1.SetDialogPinnedResponse
-	(*ReorderPinnedDialogsRequest)(nil),  // 69: app.v1.ReorderPinnedDialogsRequest
-	(*ReorderPinnedDialogsResponse)(nil), // 70: app.v1.ReorderPinnedDialogsResponse
-	(*DeleteChatRequest)(nil),            // 71: app.v1.DeleteChatRequest
-	(*DeleteChatResponse)(nil),           // 72: app.v1.DeleteChatResponse
-	(*GetCommonChatsRequest)(nil),        // 73: app.v1.GetCommonChatsRequest
-	(*GetCommonChatsResponse)(nil),       // 74: app.v1.GetCommonChatsResponse
-	(*MediaRef)(nil),                     // 75: app.v1.MediaRef
-	(*User)(nil),                         // 76: app.v1.User
-	(*SyncAck)(nil),                      // 77: app.v1.SyncAck
-	(*Message)(nil),                      // 78: app.v1.Message
+	(AddMemberFailureReason)(0),             // 0: app.v1.AddMemberFailureReason
+	(ChatType)(0),                           // 1: app.v1.ChatType
+	(SyncMode)(0),                           // 2: app.v1.SyncMode
+	(HistoryVisibility)(0),                  // 3: app.v1.HistoryVisibility
+	(MemberRole)(0),                         // 4: app.v1.MemberRole
+	(ChatPermission)(0),                     // 5: app.v1.ChatPermission
+	(NotificationSound)(0),                  // 6: app.v1.NotificationSound
+	(*AddMemberFailure)(nil),                // 7: app.v1.AddMemberFailure
+	(*Chat)(nil),                            // 8: app.v1.Chat
+	(*ChatMember)(nil),                      // 9: app.v1.ChatMember
+	(*Dialog)(nil),                          // 10: app.v1.Dialog
+	(*InviteLink)(nil),                      // 11: app.v1.InviteLink
+	(*ForumTopic)(nil),                      // 12: app.v1.ForumTopic
+	(*BannedMember)(nil),                    // 13: app.v1.BannedMember
+	(*CreatePrivateRequest)(nil),            // 14: app.v1.CreatePrivateRequest
+	(*CreatePrivateResponse)(nil),           // 15: app.v1.CreatePrivateResponse
+	(*CreateGroupRequest)(nil),              // 16: app.v1.CreateGroupRequest
+	(*CreateGroupResponse)(nil),             // 17: app.v1.CreateGroupResponse
+	(*CreateChannelRequest)(nil),            // 18: app.v1.CreateChannelRequest
+	(*CreateChannelResponse)(nil),           // 19: app.v1.CreateChannelResponse
+	(*GetDialogsRequest)(nil),               // 20: app.v1.GetDialogsRequest
+	(*GetDialogsResponse)(nil),              // 21: app.v1.GetDialogsResponse
+	(*GetChatRequest)(nil),                  // 22: app.v1.GetChatRequest
+	(*GetChatResponse)(nil),                 // 23: app.v1.GetChatResponse
+	(*GetMembersRequest)(nil),               // 24: app.v1.GetMembersRequest
+	(*GetMembersResponse)(nil),              // 25: app.v1.GetMembersResponse
+	(*AddMembersRequest)(nil),               // 26: app.v1.AddMembersRequest
+	(*AddMembersResponse)(nil),              // 27: app.v1.AddMembersResponse
+	(*RemoveMemberRequest)(nil),             // 28: app.v1.RemoveMemberRequest
+	(*RemoveMemberResponse)(nil),            // 29: app.v1.RemoveMemberResponse
+	(*LeaveChatRequest)(nil),                // 30: app.v1.LeaveChatRequest
+	(*LeaveChatResponse)(nil),               // 31: app.v1.LeaveChatResponse
+	(*SetMemberPermissionsRequest)(nil),     // 32: app.v1.SetMemberPermissionsRequest
+	(*SetMemberPermissionsResponse)(nil),    // 33: app.v1.SetMemberPermissionsResponse
+	(*SetAdminRequest)(nil),                 // 34: app.v1.SetAdminRequest
+	(*SetAdminResponse)(nil),                // 35: app.v1.SetAdminResponse
+	(*ExportInviteLinkRequest)(nil),         // 36: app.v1.ExportInviteLinkRequest
+	(*ExportInviteLinkResponse)(nil),        // 37: app.v1.ExportInviteLinkResponse
+	(*JoinByInviteRequest)(nil),             // 38: app.v1.JoinByInviteRequest
+	(*JoinByInviteResponse)(nil),            // 39: app.v1.JoinByInviteResponse
+	(*SetHistoryVisibilityRequest)(nil),     // 40: app.v1.SetHistoryVisibilityRequest
+	(*SetHistoryVisibilityResponse)(nil),    // 41: app.v1.SetHistoryVisibilityResponse
+	(*UpdateChatInfoRequest)(nil),           // 42: app.v1.UpdateChatInfoRequest
+	(*UpdateChatInfoResponse)(nil),          // 43: app.v1.UpdateChatInfoResponse
+	(*GetPeerDialogsRequest)(nil),           // 44: app.v1.GetPeerDialogsRequest
+	(*GetPeerDialogsResponse)(nil),          // 45: app.v1.GetPeerDialogsResponse
+	(*CheckInviteRequest)(nil),              // 46: app.v1.CheckInviteRequest
+	(*CheckInviteResponse)(nil),             // 47: app.v1.CheckInviteResponse
+	(*GetInviteLinksRequest)(nil),           // 48: app.v1.GetInviteLinksRequest
+	(*GetInviteLinksResponse)(nil),          // 49: app.v1.GetInviteLinksResponse
+	(*RevokeInviteLinkRequest)(nil),         // 50: app.v1.RevokeInviteLinkRequest
+	(*RevokeInviteLinkResponse)(nil),        // 51: app.v1.RevokeInviteLinkResponse
+	(*GetForumTopicsRequest)(nil),           // 52: app.v1.GetForumTopicsRequest
+	(*GetForumTopicsResponse)(nil),          // 53: app.v1.GetForumTopicsResponse
+	(*CreateForumTopicRequest)(nil),         // 54: app.v1.CreateForumTopicRequest
+	(*CreateForumTopicResponse)(nil),        // 55: app.v1.CreateForumTopicResponse
+	(*EditForumTopicRequest)(nil),           // 56: app.v1.EditForumTopicRequest
+	(*EditForumTopicResponse)(nil),          // 57: app.v1.EditForumTopicResponse
+	(*CloseForumTopicRequest)(nil),          // 58: app.v1.CloseForumTopicRequest
+	(*CloseForumTopicResponse)(nil),         // 59: app.v1.CloseForumTopicResponse
+	(*HideForumTopicRequest)(nil),           // 60: app.v1.HideForumTopicRequest
+	(*HideForumTopicResponse)(nil),          // 61: app.v1.HideForumTopicResponse
+	(*UnbanMemberRequest)(nil),              // 62: app.v1.UnbanMemberRequest
+	(*UnbanMemberResponse)(nil),             // 63: app.v1.UnbanMemberResponse
+	(*GetBannedMembersRequest)(nil),         // 64: app.v1.GetBannedMembersRequest
+	(*GetBannedMembersResponse)(nil),        // 65: app.v1.GetBannedMembersResponse
+	(*SetDialogMuteRequest)(nil),            // 66: app.v1.SetDialogMuteRequest
+	(*SetDialogMuteResponse)(nil),           // 67: app.v1.SetDialogMuteResponse
+	(*SetDialogPinnedRequest)(nil),          // 68: app.v1.SetDialogPinnedRequest
+	(*SetDialogPinnedResponse)(nil),         // 69: app.v1.SetDialogPinnedResponse
+	(*ReorderPinnedDialogsRequest)(nil),     // 70: app.v1.ReorderPinnedDialogsRequest
+	(*ReorderPinnedDialogsResponse)(nil),    // 71: app.v1.ReorderPinnedDialogsResponse
+	(*DeleteChatRequest)(nil),               // 72: app.v1.DeleteChatRequest
+	(*DeleteChatResponse)(nil),              // 73: app.v1.DeleteChatResponse
+	(*SetDialogUnreadMarkRequest)(nil),      // 74: app.v1.SetDialogUnreadMarkRequest
+	(*SetDialogUnreadMarkResponse)(nil),     // 75: app.v1.SetDialogUnreadMarkResponse
+	(*GetChatOnlineCountRequest)(nil),       // 76: app.v1.GetChatOnlineCountRequest
+	(*GetChatOnlineCountResponse)(nil),      // 77: app.v1.GetChatOnlineCountResponse
+	(*NotificationSettings)(nil),            // 78: app.v1.NotificationSettings
+	(*GetNotificationSettingsRequest)(nil),  // 79: app.v1.GetNotificationSettingsRequest
+	(*GetNotificationSettingsResponse)(nil), // 80: app.v1.GetNotificationSettingsResponse
+	(*SetNotificationSettingsRequest)(nil),  // 81: app.v1.SetNotificationSettingsRequest
+	(*SetNotificationSettingsResponse)(nil), // 82: app.v1.SetNotificationSettingsResponse
+	(*GetCommonChatsRequest)(nil),           // 83: app.v1.GetCommonChatsRequest
+	(*GetCommonChatsResponse)(nil),          // 84: app.v1.GetCommonChatsResponse
+	(*MediaRef)(nil),                        // 85: app.v1.MediaRef
+	(*User)(nil),                            // 86: app.v1.User
+	(*SyncAck)(nil),                         // 87: app.v1.SyncAck
+	(*Message)(nil),                         // 88: app.v1.Message
 }
 var file_app_v1_chats_proto_depIdxs = []int32{
-	0,  // 0: app.v1.AddMemberFailure.reason:type_name -> app.v1.AddMemberFailureReason
-	1,  // 1: app.v1.Chat.type:type_name -> app.v1.ChatType
-	75, // 2: app.v1.Chat.photo:type_name -> app.v1.MediaRef
-	2,  // 3: app.v1.Chat.sync_mode:type_name -> app.v1.SyncMode
-	3,  // 4: app.v1.Chat.history_visibility:type_name -> app.v1.HistoryVisibility
-	4,  // 5: app.v1.Chat.my_role:type_name -> app.v1.MemberRole
-	4,  // 6: app.v1.ChatMember.role:type_name -> app.v1.MemberRole
-	7,  // 7: app.v1.CreatePrivateResponse.chat:type_name -> app.v1.Chat
-	76, // 8: app.v1.CreatePrivateResponse.users:type_name -> app.v1.User
-	7,  // 9: app.v1.CreateGroupResponse.chat:type_name -> app.v1.Chat
-	76, // 10: app.v1.CreateGroupResponse.users:type_name -> app.v1.User
-	77, // 11: app.v1.CreateGroupResponse.ack:type_name -> app.v1.SyncAck
-	6,  // 12: app.v1.CreateGroupResponse.failures:type_name -> app.v1.AddMemberFailure
-	7,  // 13: app.v1.CreateChannelResponse.chat:type_name -> app.v1.Chat
-	77, // 14: app.v1.CreateChannelResponse.ack:type_name -> app.v1.SyncAck
-	9,  // 15: app.v1.GetDialogsResponse.dialogs:type_name -> app.v1.Dialog
-	78, // 16: app.v1.GetDialogsResponse.messages:type_name -> app.v1.Message
-	7,  // 17: app.v1.GetDialogsResponse.chats:type_name -> app.v1.Chat
-	76, // 18: app.v1.GetDialogsResponse.users:type_name -> app.v1.User
-	7,  // 19: app.v1.GetChatResponse.chat:type_name -> app.v1.Chat
-	76, // 20: app.v1.GetChatResponse.users:type_name -> app.v1.User
-	8,  // 21: app.v1.GetMembersResponse.members:type_name -> app.v1.ChatMember
-	76, // 22: app.v1.GetMembersResponse.users:type_name -> app.v1.User
-	77, // 23: app.v1.AddMembersResponse.ack:type_name -> app.v1.SyncAck
-	6,  // 24: app.v1.AddMembersResponse.failures:type_name -> app.v1.AddMemberFailure
-	77, // 25: app.v1.RemoveMemberResponse.ack:type_name -> app.v1.SyncAck
-	77, // 26: app.v1.LeaveChatResponse.ack:type_name -> app.v1.SyncAck
-	77, // 27: app.v1.SetMemberPermissionsResponse.ack:type_name -> app.v1.SyncAck
-	77, // 28: app.v1.SetAdminResponse.ack:type_name -> app.v1.SyncAck
-	10, // 29: app.v1.ExportInviteLinkResponse.invite:type_name -> app.v1.InviteLink
-	7,  // 30: app.v1.JoinByInviteResponse.chat:type_name -> app.v1.Chat
-	76, // 31: app.v1.JoinByInviteResponse.users:type_name -> app.v1.User
-	77, // 32: app.v1.JoinByInviteResponse.ack:type_name -> app.v1.SyncAck
-	3,  // 33: app.v1.SetHistoryVisibilityRequest.history_visibility:type_name -> app.v1.HistoryVisibility
-	77, // 34: app.v1.SetHistoryVisibilityResponse.ack:type_name -> app.v1.SyncAck
-	7,  // 35: app.v1.UpdateChatInfoResponse.chat:type_name -> app.v1.Chat
-	77, // 36: app.v1.UpdateChatInfoResponse.ack:type_name -> app.v1.SyncAck
-	9,  // 37: app.v1.GetPeerDialogsResponse.dialogs:type_name -> app.v1.Dialog
-	78, // 38: app.v1.GetPeerDialogsResponse.messages:type_name -> app.v1.Message
-	7,  // 39: app.v1.GetPeerDialogsResponse.chats:type_name -> app.v1.Chat
-	76, // 40: app.v1.GetPeerDialogsResponse.users:type_name -> app.v1.User
-	1,  // 41: app.v1.CheckInviteResponse.type:type_name -> app.v1.ChatType
-	7,  // 42: app.v1.CheckInviteResponse.chat:type_name -> app.v1.Chat
-	76, // 43: app.v1.CheckInviteResponse.users:type_name -> app.v1.User
-	3,  // 44: app.v1.CheckInviteResponse.history_visibility:type_name -> app.v1.HistoryVisibility
-	10, // 45: app.v1.GetInviteLinksResponse.invites:type_name -> app.v1.InviteLink
-	10, // 46: app.v1.RevokeInviteLinkResponse.invite:type_name -> app.v1.InviteLink
-	11, // 47: app.v1.GetForumTopicsResponse.topics:type_name -> app.v1.ForumTopic
-	78, // 48: app.v1.GetForumTopicsResponse.messages:type_name -> app.v1.Message
-	76, // 49: app.v1.GetForumTopicsResponse.users:type_name -> app.v1.User
-	11, // 50: app.v1.CreateForumTopicResponse.topic:type_name -> app.v1.ForumTopic
-	77, // 51: app.v1.CreateForumTopicResponse.ack:type_name -> app.v1.SyncAck
-	11, // 52: app.v1.EditForumTopicResponse.topic:type_name -> app.v1.ForumTopic
-	77, // 53: app.v1.EditForumTopicResponse.ack:type_name -> app.v1.SyncAck
-	11, // 54: app.v1.CloseForumTopicResponse.topic:type_name -> app.v1.ForumTopic
-	77, // 55: app.v1.CloseForumTopicResponse.ack:type_name -> app.v1.SyncAck
-	11, // 56: app.v1.HideForumTopicResponse.topic:type_name -> app.v1.ForumTopic
-	77, // 57: app.v1.HideForumTopicResponse.ack:type_name -> app.v1.SyncAck
-	12, // 58: app.v1.GetBannedMembersResponse.members:type_name -> app.v1.BannedMember
-	76, // 59: app.v1.GetBannedMembersResponse.users:type_name -> app.v1.User
-	77, // 60: app.v1.SetDialogMuteResponse.ack:type_name -> app.v1.SyncAck
-	77, // 61: app.v1.SetDialogPinnedResponse.ack:type_name -> app.v1.SyncAck
-	77, // 62: app.v1.ReorderPinnedDialogsResponse.ack:type_name -> app.v1.SyncAck
-	77, // 63: app.v1.DeleteChatResponse.ack:type_name -> app.v1.SyncAck
-	7,  // 64: app.v1.GetCommonChatsResponse.chats:type_name -> app.v1.Chat
-	13, // 65: app.v1.ChatsService.CreatePrivate:input_type -> app.v1.CreatePrivateRequest
-	15, // 66: app.v1.ChatsService.CreateGroup:input_type -> app.v1.CreateGroupRequest
-	17, // 67: app.v1.ChatsService.CreateChannel:input_type -> app.v1.CreateChannelRequest
-	19, // 68: app.v1.ChatsService.GetDialogs:input_type -> app.v1.GetDialogsRequest
-	21, // 69: app.v1.ChatsService.GetChat:input_type -> app.v1.GetChatRequest
-	23, // 70: app.v1.ChatsService.GetMembers:input_type -> app.v1.GetMembersRequest
-	25, // 71: app.v1.ChatsService.AddMembers:input_type -> app.v1.AddMembersRequest
-	27, // 72: app.v1.ChatsService.RemoveMember:input_type -> app.v1.RemoveMemberRequest
-	29, // 73: app.v1.ChatsService.LeaveChat:input_type -> app.v1.LeaveChatRequest
-	61, // 74: app.v1.ChatsService.UnbanMember:input_type -> app.v1.UnbanMemberRequest
-	63, // 75: app.v1.ChatsService.GetBannedMembers:input_type -> app.v1.GetBannedMembersRequest
-	31, // 76: app.v1.ChatsService.SetMemberPermissions:input_type -> app.v1.SetMemberPermissionsRequest
-	33, // 77: app.v1.ChatsService.SetAdmin:input_type -> app.v1.SetAdminRequest
-	35, // 78: app.v1.ChatsService.ExportInviteLink:input_type -> app.v1.ExportInviteLinkRequest
-	37, // 79: app.v1.ChatsService.JoinByInvite:input_type -> app.v1.JoinByInviteRequest
-	39, // 80: app.v1.ChatsService.SetHistoryVisibility:input_type -> app.v1.SetHistoryVisibilityRequest
-	41, // 81: app.v1.ChatsService.UpdateChatInfo:input_type -> app.v1.UpdateChatInfoRequest
-	43, // 82: app.v1.ChatsService.GetPeerDialogs:input_type -> app.v1.GetPeerDialogsRequest
-	45, // 83: app.v1.ChatsService.CheckInvite:input_type -> app.v1.CheckInviteRequest
-	47, // 84: app.v1.ChatsService.GetInviteLinks:input_type -> app.v1.GetInviteLinksRequest
-	49, // 85: app.v1.ChatsService.RevokeInviteLink:input_type -> app.v1.RevokeInviteLinkRequest
-	51, // 86: app.v1.ChatsService.GetForumTopics:input_type -> app.v1.GetForumTopicsRequest
-	53, // 87: app.v1.ChatsService.CreateForumTopic:input_type -> app.v1.CreateForumTopicRequest
-	55, // 88: app.v1.ChatsService.EditForumTopic:input_type -> app.v1.EditForumTopicRequest
-	57, // 89: app.v1.ChatsService.CloseForumTopic:input_type -> app.v1.CloseForumTopicRequest
-	59, // 90: app.v1.ChatsService.HideForumTopic:input_type -> app.v1.HideForumTopicRequest
-	65, // 91: app.v1.ChatsService.SetDialogMute:input_type -> app.v1.SetDialogMuteRequest
-	67, // 92: app.v1.ChatsService.SetDialogPinned:input_type -> app.v1.SetDialogPinnedRequest
-	69, // 93: app.v1.ChatsService.ReorderPinnedDialogs:input_type -> app.v1.ReorderPinnedDialogsRequest
-	71, // 94: app.v1.ChatsService.DeleteChat:input_type -> app.v1.DeleteChatRequest
-	73, // 95: app.v1.ChatsService.GetCommonChats:input_type -> app.v1.GetCommonChatsRequest
-	14, // 96: app.v1.ChatsService.CreatePrivate:output_type -> app.v1.CreatePrivateResponse
-	16, // 97: app.v1.ChatsService.CreateGroup:output_type -> app.v1.CreateGroupResponse
-	18, // 98: app.v1.ChatsService.CreateChannel:output_type -> app.v1.CreateChannelResponse
-	20, // 99: app.v1.ChatsService.GetDialogs:output_type -> app.v1.GetDialogsResponse
-	22, // 100: app.v1.ChatsService.GetChat:output_type -> app.v1.GetChatResponse
-	24, // 101: app.v1.ChatsService.GetMembers:output_type -> app.v1.GetMembersResponse
-	26, // 102: app.v1.ChatsService.AddMembers:output_type -> app.v1.AddMembersResponse
-	28, // 103: app.v1.ChatsService.RemoveMember:output_type -> app.v1.RemoveMemberResponse
-	30, // 104: app.v1.ChatsService.LeaveChat:output_type -> app.v1.LeaveChatResponse
-	62, // 105: app.v1.ChatsService.UnbanMember:output_type -> app.v1.UnbanMemberResponse
-	64, // 106: app.v1.ChatsService.GetBannedMembers:output_type -> app.v1.GetBannedMembersResponse
-	32, // 107: app.v1.ChatsService.SetMemberPermissions:output_type -> app.v1.SetMemberPermissionsResponse
-	34, // 108: app.v1.ChatsService.SetAdmin:output_type -> app.v1.SetAdminResponse
-	36, // 109: app.v1.ChatsService.ExportInviteLink:output_type -> app.v1.ExportInviteLinkResponse
-	38, // 110: app.v1.ChatsService.JoinByInvite:output_type -> app.v1.JoinByInviteResponse
-	40, // 111: app.v1.ChatsService.SetHistoryVisibility:output_type -> app.v1.SetHistoryVisibilityResponse
-	42, // 112: app.v1.ChatsService.UpdateChatInfo:output_type -> app.v1.UpdateChatInfoResponse
-	44, // 113: app.v1.ChatsService.GetPeerDialogs:output_type -> app.v1.GetPeerDialogsResponse
-	46, // 114: app.v1.ChatsService.CheckInvite:output_type -> app.v1.CheckInviteResponse
-	48, // 115: app.v1.ChatsService.GetInviteLinks:output_type -> app.v1.GetInviteLinksResponse
-	50, // 116: app.v1.ChatsService.RevokeInviteLink:output_type -> app.v1.RevokeInviteLinkResponse
-	52, // 117: app.v1.ChatsService.GetForumTopics:output_type -> app.v1.GetForumTopicsResponse
-	54, // 118: app.v1.ChatsService.CreateForumTopic:output_type -> app.v1.CreateForumTopicResponse
-	56, // 119: app.v1.ChatsService.EditForumTopic:output_type -> app.v1.EditForumTopicResponse
-	58, // 120: app.v1.ChatsService.CloseForumTopic:output_type -> app.v1.CloseForumTopicResponse
-	60, // 121: app.v1.ChatsService.HideForumTopic:output_type -> app.v1.HideForumTopicResponse
-	66, // 122: app.v1.ChatsService.SetDialogMute:output_type -> app.v1.SetDialogMuteResponse
-	68, // 123: app.v1.ChatsService.SetDialogPinned:output_type -> app.v1.SetDialogPinnedResponse
-	70, // 124: app.v1.ChatsService.ReorderPinnedDialogs:output_type -> app.v1.ReorderPinnedDialogsResponse
-	72, // 125: app.v1.ChatsService.DeleteChat:output_type -> app.v1.DeleteChatResponse
-	74, // 126: app.v1.ChatsService.GetCommonChats:output_type -> app.v1.GetCommonChatsResponse
-	96, // [96:127] is the sub-list for method output_type
-	65, // [65:96] is the sub-list for method input_type
-	65, // [65:65] is the sub-list for extension type_name
-	65, // [65:65] is the sub-list for extension extendee
-	0,  // [0:65] is the sub-list for field type_name
+	0,   // 0: app.v1.AddMemberFailure.reason:type_name -> app.v1.AddMemberFailureReason
+	1,   // 1: app.v1.Chat.type:type_name -> app.v1.ChatType
+	85,  // 2: app.v1.Chat.photo:type_name -> app.v1.MediaRef
+	2,   // 3: app.v1.Chat.sync_mode:type_name -> app.v1.SyncMode
+	3,   // 4: app.v1.Chat.history_visibility:type_name -> app.v1.HistoryVisibility
+	4,   // 5: app.v1.Chat.my_role:type_name -> app.v1.MemberRole
+	4,   // 6: app.v1.ChatMember.role:type_name -> app.v1.MemberRole
+	8,   // 7: app.v1.CreatePrivateResponse.chat:type_name -> app.v1.Chat
+	86,  // 8: app.v1.CreatePrivateResponse.users:type_name -> app.v1.User
+	8,   // 9: app.v1.CreateGroupResponse.chat:type_name -> app.v1.Chat
+	86,  // 10: app.v1.CreateGroupResponse.users:type_name -> app.v1.User
+	87,  // 11: app.v1.CreateGroupResponse.ack:type_name -> app.v1.SyncAck
+	7,   // 12: app.v1.CreateGroupResponse.failures:type_name -> app.v1.AddMemberFailure
+	8,   // 13: app.v1.CreateChannelResponse.chat:type_name -> app.v1.Chat
+	87,  // 14: app.v1.CreateChannelResponse.ack:type_name -> app.v1.SyncAck
+	10,  // 15: app.v1.GetDialogsResponse.dialogs:type_name -> app.v1.Dialog
+	88,  // 16: app.v1.GetDialogsResponse.messages:type_name -> app.v1.Message
+	8,   // 17: app.v1.GetDialogsResponse.chats:type_name -> app.v1.Chat
+	86,  // 18: app.v1.GetDialogsResponse.users:type_name -> app.v1.User
+	8,   // 19: app.v1.GetChatResponse.chat:type_name -> app.v1.Chat
+	86,  // 20: app.v1.GetChatResponse.users:type_name -> app.v1.User
+	9,   // 21: app.v1.GetMembersResponse.members:type_name -> app.v1.ChatMember
+	86,  // 22: app.v1.GetMembersResponse.users:type_name -> app.v1.User
+	87,  // 23: app.v1.AddMembersResponse.ack:type_name -> app.v1.SyncAck
+	7,   // 24: app.v1.AddMembersResponse.failures:type_name -> app.v1.AddMemberFailure
+	87,  // 25: app.v1.RemoveMemberResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 26: app.v1.LeaveChatResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 27: app.v1.SetMemberPermissionsResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 28: app.v1.SetAdminResponse.ack:type_name -> app.v1.SyncAck
+	11,  // 29: app.v1.ExportInviteLinkResponse.invite:type_name -> app.v1.InviteLink
+	8,   // 30: app.v1.JoinByInviteResponse.chat:type_name -> app.v1.Chat
+	86,  // 31: app.v1.JoinByInviteResponse.users:type_name -> app.v1.User
+	87,  // 32: app.v1.JoinByInviteResponse.ack:type_name -> app.v1.SyncAck
+	3,   // 33: app.v1.SetHistoryVisibilityRequest.history_visibility:type_name -> app.v1.HistoryVisibility
+	87,  // 34: app.v1.SetHistoryVisibilityResponse.ack:type_name -> app.v1.SyncAck
+	8,   // 35: app.v1.UpdateChatInfoResponse.chat:type_name -> app.v1.Chat
+	87,  // 36: app.v1.UpdateChatInfoResponse.ack:type_name -> app.v1.SyncAck
+	10,  // 37: app.v1.GetPeerDialogsResponse.dialogs:type_name -> app.v1.Dialog
+	88,  // 38: app.v1.GetPeerDialogsResponse.messages:type_name -> app.v1.Message
+	8,   // 39: app.v1.GetPeerDialogsResponse.chats:type_name -> app.v1.Chat
+	86,  // 40: app.v1.GetPeerDialogsResponse.users:type_name -> app.v1.User
+	1,   // 41: app.v1.CheckInviteResponse.type:type_name -> app.v1.ChatType
+	8,   // 42: app.v1.CheckInviteResponse.chat:type_name -> app.v1.Chat
+	86,  // 43: app.v1.CheckInviteResponse.users:type_name -> app.v1.User
+	3,   // 44: app.v1.CheckInviteResponse.history_visibility:type_name -> app.v1.HistoryVisibility
+	11,  // 45: app.v1.GetInviteLinksResponse.invites:type_name -> app.v1.InviteLink
+	11,  // 46: app.v1.RevokeInviteLinkResponse.invite:type_name -> app.v1.InviteLink
+	12,  // 47: app.v1.GetForumTopicsResponse.topics:type_name -> app.v1.ForumTopic
+	88,  // 48: app.v1.GetForumTopicsResponse.messages:type_name -> app.v1.Message
+	86,  // 49: app.v1.GetForumTopicsResponse.users:type_name -> app.v1.User
+	12,  // 50: app.v1.CreateForumTopicResponse.topic:type_name -> app.v1.ForumTopic
+	87,  // 51: app.v1.CreateForumTopicResponse.ack:type_name -> app.v1.SyncAck
+	12,  // 52: app.v1.EditForumTopicResponse.topic:type_name -> app.v1.ForumTopic
+	87,  // 53: app.v1.EditForumTopicResponse.ack:type_name -> app.v1.SyncAck
+	12,  // 54: app.v1.CloseForumTopicResponse.topic:type_name -> app.v1.ForumTopic
+	87,  // 55: app.v1.CloseForumTopicResponse.ack:type_name -> app.v1.SyncAck
+	12,  // 56: app.v1.HideForumTopicResponse.topic:type_name -> app.v1.ForumTopic
+	87,  // 57: app.v1.HideForumTopicResponse.ack:type_name -> app.v1.SyncAck
+	13,  // 58: app.v1.GetBannedMembersResponse.members:type_name -> app.v1.BannedMember
+	86,  // 59: app.v1.GetBannedMembersResponse.users:type_name -> app.v1.User
+	87,  // 60: app.v1.SetDialogMuteResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 61: app.v1.SetDialogPinnedResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 62: app.v1.ReorderPinnedDialogsResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 63: app.v1.DeleteChatResponse.ack:type_name -> app.v1.SyncAck
+	87,  // 64: app.v1.SetDialogUnreadMarkResponse.ack:type_name -> app.v1.SyncAck
+	6,   // 65: app.v1.NotificationSettings.sound:type_name -> app.v1.NotificationSound
+	78,  // 66: app.v1.GetNotificationSettingsResponse.settings:type_name -> app.v1.NotificationSettings
+	6,   // 67: app.v1.SetNotificationSettingsRequest.sound:type_name -> app.v1.NotificationSound
+	78,  // 68: app.v1.SetNotificationSettingsResponse.settings:type_name -> app.v1.NotificationSettings
+	87,  // 69: app.v1.SetNotificationSettingsResponse.ack:type_name -> app.v1.SyncAck
+	8,   // 70: app.v1.GetCommonChatsResponse.chats:type_name -> app.v1.Chat
+	14,  // 71: app.v1.ChatsService.CreatePrivate:input_type -> app.v1.CreatePrivateRequest
+	16,  // 72: app.v1.ChatsService.CreateGroup:input_type -> app.v1.CreateGroupRequest
+	18,  // 73: app.v1.ChatsService.CreateChannel:input_type -> app.v1.CreateChannelRequest
+	20,  // 74: app.v1.ChatsService.GetDialogs:input_type -> app.v1.GetDialogsRequest
+	22,  // 75: app.v1.ChatsService.GetChat:input_type -> app.v1.GetChatRequest
+	24,  // 76: app.v1.ChatsService.GetMembers:input_type -> app.v1.GetMembersRequest
+	26,  // 77: app.v1.ChatsService.AddMembers:input_type -> app.v1.AddMembersRequest
+	28,  // 78: app.v1.ChatsService.RemoveMember:input_type -> app.v1.RemoveMemberRequest
+	30,  // 79: app.v1.ChatsService.LeaveChat:input_type -> app.v1.LeaveChatRequest
+	62,  // 80: app.v1.ChatsService.UnbanMember:input_type -> app.v1.UnbanMemberRequest
+	64,  // 81: app.v1.ChatsService.GetBannedMembers:input_type -> app.v1.GetBannedMembersRequest
+	32,  // 82: app.v1.ChatsService.SetMemberPermissions:input_type -> app.v1.SetMemberPermissionsRequest
+	34,  // 83: app.v1.ChatsService.SetAdmin:input_type -> app.v1.SetAdminRequest
+	36,  // 84: app.v1.ChatsService.ExportInviteLink:input_type -> app.v1.ExportInviteLinkRequest
+	38,  // 85: app.v1.ChatsService.JoinByInvite:input_type -> app.v1.JoinByInviteRequest
+	40,  // 86: app.v1.ChatsService.SetHistoryVisibility:input_type -> app.v1.SetHistoryVisibilityRequest
+	42,  // 87: app.v1.ChatsService.UpdateChatInfo:input_type -> app.v1.UpdateChatInfoRequest
+	44,  // 88: app.v1.ChatsService.GetPeerDialogs:input_type -> app.v1.GetPeerDialogsRequest
+	46,  // 89: app.v1.ChatsService.CheckInvite:input_type -> app.v1.CheckInviteRequest
+	48,  // 90: app.v1.ChatsService.GetInviteLinks:input_type -> app.v1.GetInviteLinksRequest
+	50,  // 91: app.v1.ChatsService.RevokeInviteLink:input_type -> app.v1.RevokeInviteLinkRequest
+	52,  // 92: app.v1.ChatsService.GetForumTopics:input_type -> app.v1.GetForumTopicsRequest
+	54,  // 93: app.v1.ChatsService.CreateForumTopic:input_type -> app.v1.CreateForumTopicRequest
+	56,  // 94: app.v1.ChatsService.EditForumTopic:input_type -> app.v1.EditForumTopicRequest
+	58,  // 95: app.v1.ChatsService.CloseForumTopic:input_type -> app.v1.CloseForumTopicRequest
+	60,  // 96: app.v1.ChatsService.HideForumTopic:input_type -> app.v1.HideForumTopicRequest
+	66,  // 97: app.v1.ChatsService.SetDialogMute:input_type -> app.v1.SetDialogMuteRequest
+	68,  // 98: app.v1.ChatsService.SetDialogPinned:input_type -> app.v1.SetDialogPinnedRequest
+	70,  // 99: app.v1.ChatsService.ReorderPinnedDialogs:input_type -> app.v1.ReorderPinnedDialogsRequest
+	72,  // 100: app.v1.ChatsService.DeleteChat:input_type -> app.v1.DeleteChatRequest
+	83,  // 101: app.v1.ChatsService.GetCommonChats:input_type -> app.v1.GetCommonChatsRequest
+	74,  // 102: app.v1.ChatsService.SetDialogUnreadMark:input_type -> app.v1.SetDialogUnreadMarkRequest
+	76,  // 103: app.v1.ChatsService.GetChatOnlineCount:input_type -> app.v1.GetChatOnlineCountRequest
+	79,  // 104: app.v1.ChatsService.GetNotificationSettings:input_type -> app.v1.GetNotificationSettingsRequest
+	81,  // 105: app.v1.ChatsService.SetNotificationSettings:input_type -> app.v1.SetNotificationSettingsRequest
+	15,  // 106: app.v1.ChatsService.CreatePrivate:output_type -> app.v1.CreatePrivateResponse
+	17,  // 107: app.v1.ChatsService.CreateGroup:output_type -> app.v1.CreateGroupResponse
+	19,  // 108: app.v1.ChatsService.CreateChannel:output_type -> app.v1.CreateChannelResponse
+	21,  // 109: app.v1.ChatsService.GetDialogs:output_type -> app.v1.GetDialogsResponse
+	23,  // 110: app.v1.ChatsService.GetChat:output_type -> app.v1.GetChatResponse
+	25,  // 111: app.v1.ChatsService.GetMembers:output_type -> app.v1.GetMembersResponse
+	27,  // 112: app.v1.ChatsService.AddMembers:output_type -> app.v1.AddMembersResponse
+	29,  // 113: app.v1.ChatsService.RemoveMember:output_type -> app.v1.RemoveMemberResponse
+	31,  // 114: app.v1.ChatsService.LeaveChat:output_type -> app.v1.LeaveChatResponse
+	63,  // 115: app.v1.ChatsService.UnbanMember:output_type -> app.v1.UnbanMemberResponse
+	65,  // 116: app.v1.ChatsService.GetBannedMembers:output_type -> app.v1.GetBannedMembersResponse
+	33,  // 117: app.v1.ChatsService.SetMemberPermissions:output_type -> app.v1.SetMemberPermissionsResponse
+	35,  // 118: app.v1.ChatsService.SetAdmin:output_type -> app.v1.SetAdminResponse
+	37,  // 119: app.v1.ChatsService.ExportInviteLink:output_type -> app.v1.ExportInviteLinkResponse
+	39,  // 120: app.v1.ChatsService.JoinByInvite:output_type -> app.v1.JoinByInviteResponse
+	41,  // 121: app.v1.ChatsService.SetHistoryVisibility:output_type -> app.v1.SetHistoryVisibilityResponse
+	43,  // 122: app.v1.ChatsService.UpdateChatInfo:output_type -> app.v1.UpdateChatInfoResponse
+	45,  // 123: app.v1.ChatsService.GetPeerDialogs:output_type -> app.v1.GetPeerDialogsResponse
+	47,  // 124: app.v1.ChatsService.CheckInvite:output_type -> app.v1.CheckInviteResponse
+	49,  // 125: app.v1.ChatsService.GetInviteLinks:output_type -> app.v1.GetInviteLinksResponse
+	51,  // 126: app.v1.ChatsService.RevokeInviteLink:output_type -> app.v1.RevokeInviteLinkResponse
+	53,  // 127: app.v1.ChatsService.GetForumTopics:output_type -> app.v1.GetForumTopicsResponse
+	55,  // 128: app.v1.ChatsService.CreateForumTopic:output_type -> app.v1.CreateForumTopicResponse
+	57,  // 129: app.v1.ChatsService.EditForumTopic:output_type -> app.v1.EditForumTopicResponse
+	59,  // 130: app.v1.ChatsService.CloseForumTopic:output_type -> app.v1.CloseForumTopicResponse
+	61,  // 131: app.v1.ChatsService.HideForumTopic:output_type -> app.v1.HideForumTopicResponse
+	67,  // 132: app.v1.ChatsService.SetDialogMute:output_type -> app.v1.SetDialogMuteResponse
+	69,  // 133: app.v1.ChatsService.SetDialogPinned:output_type -> app.v1.SetDialogPinnedResponse
+	71,  // 134: app.v1.ChatsService.ReorderPinnedDialogs:output_type -> app.v1.ReorderPinnedDialogsResponse
+	73,  // 135: app.v1.ChatsService.DeleteChat:output_type -> app.v1.DeleteChatResponse
+	84,  // 136: app.v1.ChatsService.GetCommonChats:output_type -> app.v1.GetCommonChatsResponse
+	75,  // 137: app.v1.ChatsService.SetDialogUnreadMark:output_type -> app.v1.SetDialogUnreadMarkResponse
+	77,  // 138: app.v1.ChatsService.GetChatOnlineCount:output_type -> app.v1.GetChatOnlineCountResponse
+	80,  // 139: app.v1.ChatsService.GetNotificationSettings:output_type -> app.v1.GetNotificationSettingsResponse
+	82,  // 140: app.v1.ChatsService.SetNotificationSettings:output_type -> app.v1.SetNotificationSettingsResponse
+	106, // [106:141] is the sub-list for method output_type
+	71,  // [71:106] is the sub-list for method input_type
+	71,  // [71:71] is the sub-list for extension type_name
+	71,  // [71:71] is the sub-list for extension extendee
+	0,   // [0:71] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_chats_proto_init() }
@@ -5222,13 +5908,14 @@ func file_app_v1_chats_proto_init() {
 	file_app_v1_chats_proto_msgTypes[21].OneofWrappers = []any{}
 	file_app_v1_chats_proto_msgTypes[35].OneofWrappers = []any{}
 	file_app_v1_chats_proto_msgTypes[49].OneofWrappers = []any{}
+	file_app_v1_chats_proto_msgTypes[74].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_chats_proto_rawDesc), len(file_app_v1_chats_proto_rawDesc)),
-			NumEnums:      6,
-			NumMessages:   69,
+			NumEnums:      7,
+			NumMessages:   78,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
