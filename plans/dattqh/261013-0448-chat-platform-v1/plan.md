@@ -76,7 +76,7 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 
 | # | Phase | Tier | Phụ thuộc | Nguyên tắc | Status |
 |---|---|---|---|---|---|
-| 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | In progress (còn chạy Docker Compose và CI) |
+| 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | In progress (còn chạy Docker Compose) |
 | 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | Pending |
 | 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | Pending |
 | 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | Pending |

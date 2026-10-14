@@ -178,7 +178,7 @@ Create:
 - [x] ID helpers + assert < 2^53
 - [x] `brand.config` + generator + lint
 - [ ] Docker Compose dev (đã viết và kiểm cú pháp; chưa chạy vì máy dev không có Docker; tenant thứ hai cần script seed ở `hoandat-auth` Phase 02)
-- [ ] CI GitHub Actions xanh
+- [x] CI GitHub Actions xanh (run 38537735232: `typescript`, `proto`, `go` đều pass)
 
 ## Success Criteria
 
