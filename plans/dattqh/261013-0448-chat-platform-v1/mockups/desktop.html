@@ -170,7 +170,7 @@
 <main class="shots">
 
 <section class="shot" id="window">
-	<div class="shot-head"><h2>Cửa sổ desktop</h2><span class="phase">Phase 11</span><p>App Tauri dùng thanh tiêu đề của hệ điều hành (macOS: ba nút bên trái, Windows/Linux: nút bên phải) và giữ nguyên giao diện web ở dạng gọn: rail, danh sách chat, khung chat; cột thông tin mở khi cần. Mở từ cache trong ≤ 400 ms, đóng cửa sổ thì thu vào khay và vẫn giữ kết nối.</p></div>
+	<div class="shot-head"><h2>Cửa sổ desktop</h2><span class="phase">Phase 11</span><p>App Tauri dùng thanh tiêu đề của hệ điều hành (macOS: ba nút bên trái, Windows/Linux: nút bên phải) và giữ nguyên giao diện web ở dạng gọn: rail, danh sách chat, khung chat; cột thông tin mở khi cần. Kéo mép phải cột danh sách để đổi rộng 280–420px (app nhớ độ rộng); chữ dài cắt bằng "…", không cuộn ngang. Bản desktop bật thêm ⌘/Ctrl+N cho chat mới (trình duyệt giữ phím này). Mở từ cache trong ≤ 400 ms, đóng cửa sổ thì thu vào khay và vẫn giữ kết nối.</p></div>
 	<div class="frame">
 		<div class="desk">
 			<div class="win" id="main-win">
@@ -197,16 +197,17 @@
 							<li class="chat-row" aria-current="true"><span class="avatar av-blue">VH</span><div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div><div class="meta"><span>09:42</span><span class="badge">3</span></div></li>
 							<li class="chat-row"><span class="avatar av-green">LA</span><div><div class="name">Lan Anh</div><div class="preview">Mình gửi file thiết kế rồi nhé</div></div><div class="meta"><span>09:30</span><span class="badge">1</span></div></li>
 							<li class="chat-row"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div><div class="meta"><span>08:55</span></div></li>
-							<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name">Team Mobile</div><div class="preview">Minh: Build iOS lỗi ký số</div></div><div class="meta"><span>Hôm qua</span><span class="badge muted-badge">3</span></div></li>
-							<li class="chat-row"><span class="avatar av-cyan">QH</span><div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div><div class="meta"><span>Hôm qua</span></div></li>
-						</ul>
-					</section>
+							<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name">Team Mobile <svg class="icon icon-sm" role="img" aria-label="Đã tắt thông báo"><use href="#i-bell-off"/></svg></div><div class="preview">Minh: Build iOS lỗi ký số</div></div><div class="meta"><span>Hôm qua</span><span class="badge muted-badge" aria-label="3 tin chưa đọc, đã tắt thông báo">3</span></div></li>
+									<li class="chat-row"><span class="avatar av-cyan">QH</span><div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div><div class="meta"><span>Hôm qua</span></div></li>
+								</ul>
+								<div class="list-resize" role="separator" aria-orientation="vertical" aria-label="Độ rộng danh sách chat" aria-valuemin="280" aria-valuemax="420" aria-valuenow="280" tabindex="0" data-list-resize></div>
+							</section>
 					<section class="convo" aria-label="Vận hành hệ thống">
 						<header class="convo-head">
 							<span class="avatar av-blue">VH</span>
-							<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 3 đang online</span></div>
+							<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên · 3 đang hoạt động</span></div>
 							<button type="button" class="icon-btn" aria-label="Tìm trong chat"><svg class="icon"><use href="#i-search"/></svg></button>
-							<button type="button" class="icon-btn" aria-label="Thông tin chat"><svg class="icon"><use href="#i-info"/></svg></button>
+							<button type="button" class="icon-btn" aria-label="Thông tin nhóm"><svg class="icon"><use href="#i-info"/></svg></button>
 						</header>
 						<div class="messages">
 							<span class="day">Hôm nay</span>
@@ -221,12 +222,12 @@
 									<span class="stamp">09:42</span>
 								</div>
 							</div>
-							<div class="msg mine"><div class="bubble"><span class="reply"><b>Grafana</b>CPU cao trên lab-174</span><p>Mình nhận, đang xem process nào ăn CPU.<span class="stamp">09:44 <svg class="icon icon-sm read" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+							<div class="msg mine"><div class="bubble"><span class="reply"><b>Grafana</b>CPU cao trên lab-174</span><p>Mình nhận, đang xem process nào ăn CPU.<span class="stamp">09:44 <svg class="icon icon-sm read" role="img" aria-label="Đã xem"><use href="#i-checks"/></svg></span></p></div></div>
 						</div>
 						<form class="composer" onsubmit="return false">
 							<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
-							<label class="sr-only" for="d-draft">Tin nhắn</label>
-							<textarea id="d-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+							<label class="sr-only" for="d-draft">Tin nhắn tới Vận hành hệ thống</label>
+							<textarea id="d-draft" rows="1" placeholder="Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống"></textarea>
 							<button type="button" class="icon-btn" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></button>
 							<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
 						</form>
@@ -238,7 +239,7 @@
 </section>
 
 <section class="shot" id="three-pane">
-	<div class="shot-head"><h2>Cửa sổ ba cột có thư mục</h2><span class="phase">R8 · Phase 11</span><p>Cửa sổ rộng dùng cột thư mục có nhãn gồm các bộ lọc có sẵn Tất cả, Cá nhân, Nhóm, Bot, giống cột thư mục trên web từ R1 (lọc ở client theo loại chat). Badge ở mỗi thư mục đếm chat chưa đọc, thư mục chỉ có chat tắt tiếng thì badge xám. Danh sách có biểu tượng loại chat, tên người gửi, bản nháp, badge "@" khi có người nhắc bạn, nhóm có chủ đề hiện hai dòng. Cột thông tin bên phải bật/tắt bằng nút "i" hoặc nút đóng; cửa sổ hẹp hơn 1100 px thì cột này ẩn. "Sửa thư mục" (thư mục tự tạo, chọn chat, đồng bộ) có sau R4.</p></div>
+	<div class="shot-head"><h2>Cửa sổ ba cột có thư mục</h2><span class="phase">R8 · Phase 11</span><p>Cửa sổ rộng dùng cột thư mục có nhãn gồm năm bộ lọc có sẵn Tất cả, Cá nhân, Nhóm, Bot, Chưa đọc, giống cột thư mục trên web từ R1 (lọc ở client). ⌘/Ctrl+1…5 chuyển bộ lọc, Alt+↑/↓ chuyển chat. Badge ở mỗi thư mục đếm chat chưa đọc, thư mục chỉ có chat đã tắt thông báo thì badge xám. Danh sách có biểu tượng loại chat, tên người gửi, bản nháp, badge "@" khi có người nhắc bạn, nhóm có chủ đề hiện hai dòng; cột danh sách kéo đổi rộng 280–420px. Cột thông tin bên phải theo thứ tự người Việt quen: nút nhanh Tắt thông báo · Ghim · Thêm thành viên, thành viên, ảnh/file/link, quản lý, rời nhóm; bật/tắt bằng nút "i" hoặc nút đóng; cửa sổ hẹp hơn 1100 px thì cột này ẩn.</p></div>
 	<div class="frame">
 		<div class="desk">
 			<div class="win wide">
@@ -249,8 +250,8 @@
 						<a class="folder" href="#three-pane" aria-current="true"><svg class="icon"><use href="#i-message"/></svg>Tất cả<span class="badge" aria-label="15 chat chưa đọc">15</span></a>
 						<a class="folder" href="#three-pane"><svg class="icon"><use href="#i-user"/></svg>Cá nhân<span class="badge" aria-label="1 chat chưa đọc">1</span></a>
 						<a class="folder" href="#three-pane"><svg class="icon"><use href="#i-users"/></svg>Nhóm<span class="badge" aria-label="12 chưa đọc">12</span></a>
-						<a class="folder" href="#three-pane"><svg class="icon"><use href="#i-robot"/></svg>Bot<span class="badge muted-badge" aria-label="2 chưa đọc, đã tắt tiếng">2</span></a>
-						<button type="button" class="folder" aria-disabled="true" data-toast="Thư mục tự tạo (chọn chat, đồng bộ giữa thiết bị) có sau R4"><svg class="icon"><use href="#i-edit"/></svg>Sửa thư mục<span class="soon">Sau R4</span></button>
+						<a class="folder" href="#three-pane"><svg class="icon"><use href="#i-robot"/></svg>Bot<span class="badge muted-badge" aria-label="2 chưa đọc, đã tắt thông báo">2</span></a>
+						<a class="folder" href="#three-pane"><svg class="icon"><use href="#i-message-dot"/></svg>Chưa đọc</a>
 						<span class="spacer"></span>
 						<a class="folder" href="settings.html"><svg class="icon"><use href="#i-settings"/></svg>Cài đặt</a>
 					</nav>
@@ -268,16 +269,17 @@
 							<li class="chat-row"><span class="avatar av-red">HĐ</span><div><div class="name"><svg class="icon type-ico" role="img" aria-label="Nhóm có chủ đề"><use href="#i-hash"/></svg><span class="title-text">Dự án Hải Đăng</span></div><div class="preview two-line"><span class="topics-line"><b>Thiết kế</b> · <b>Chung</b> · <b>Backend API</b></span><span><span class="from">Thu Hà:</span> Mình đẩy bản phác lên rồi</span></div></div><div class="meta"><span>09:26</span><span class="line"><span class="badge at" role="img" aria-label="Có người nhắc bạn">@</span><span class="badge">6</span></span></div></li>
 							<li class="chat-row"><span class="avatar av-green">LA</span><div><div class="name">Lan Anh</div><div class="preview"><span class="draft">Nháp:</span> Gửi bạn bản sửa sau nhé</div></div><div class="meta"><span>09:30</span><span class="badge">1</span></div></li>
 							<li class="chat-row"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name"><svg class="icon type-ico" role="img" aria-label="Bot"><use href="#i-robot"/></svg><span class="title-text">Deploy Bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div><div class="meta"><span>08:55</span></div></li>
-							<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name"><svg class="icon type-ico" role="img" aria-label="Nhóm"><use href="#i-users"/></svg><span class="title-text">Team Mobile</span></div><div class="preview"><span class="from">Minh:</span> Build iOS lỗi ký số</div></div><div class="meta"><span>Hôm qua</span><span class="badge muted-badge">3</span></div></li>
+							<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name"><svg class="icon type-ico" role="img" aria-label="Nhóm"><use href="#i-users"/></svg><span class="title-text">Team Mobile</span> <svg class="icon icon-sm" role="img" aria-label="Đã tắt thông báo"><use href="#i-bell-off"/></svg></div><div class="preview"><span class="from">Minh:</span> Build iOS lỗi ký số</div></div><div class="meta"><span>Hôm qua</span><span class="badge muted-badge" aria-label="3 tin chưa đọc, đã tắt thông báo">3</span></div></li>
 							<li class="chat-row"><span class="avatar av-grey">TB</span><div><div class="name"><svg class="icon type-ico" role="img" aria-label="Kênh"><use href="#i-megaphone"/></svg><span class="title-text">Thông báo hoandat</span></div><div class="preview">Lịch bảo trì tối thứ Bảy</div></div><div class="meta"><span>T2</span></div></li>
-						</ul>
-					</section>
+								</ul>
+								<div class="list-resize" role="separator" aria-orientation="vertical" aria-label="Độ rộng danh sách chat" aria-valuemin="280" aria-valuemax="420" aria-valuenow="290" tabindex="0" data-list-resize></div>
+							</section>
 					<section class="convo" aria-label="Vận hành hệ thống">
 						<header class="convo-head">
 							<span class="avatar av-blue">VH</span>
-							<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 3 đang online</span></div>
+							<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên · 3 đang hoạt động</span></div>
 							<button type="button" class="icon-btn" aria-label="Tìm trong chat"><svg class="icon"><use href="#i-search"/></svg></button>
-							<button type="button" class="icon-btn" aria-pressed="true" aria-label="Thông tin chat" id="tp-info-toggle"><svg class="icon"><use href="#i-info"/></svg></button>
+							<button type="button" class="icon-btn" aria-pressed="true" aria-label="Thông tin nhóm" id="tp-info-toggle"><svg class="icon"><use href="#i-info"/></svg></button>
 						</header>
 						<div class="pinned closable">
 							<button type="button" class="pin-jump" data-toast="Nhảy tới tin ghim"><svg class="icon icon-sm"><use href="#i-pin"/></svg><span class="txt"><b>Tin ghim 1/2</b> · Lịch trực sự cố tuần này</span></button>
@@ -289,11 +291,11 @@
 								<a class="lp" href="https://docs.example.com/runbook/cpu"><span class="site">docs.example.com</span><b>Runbook: CPU cao trên máy lab</b><span class="desc">Tìm process, giới hạn tài nguyên, khi nào cần báo đội nền tảng.</span><span class="thumb" aria-hidden="true"></span></a>
 								<div class="reactions"><button type="button" class="reaction" aria-pressed="true" aria-label="👍 Bạn, Lan Anh"><span aria-hidden="true">👍</span><span class="r-avs" aria-hidden="true"><span class="avatar av-violet">ĐT</span> <span class="avatar av-green">LA</span></span></button></div>
 								<p><span class="stamp">09:43</span></p></div></div>
-							<div class="msg mine"><div class="bubble"><span class="reply s-cyan"><b>Quang Huy</b>Hướng dẫn xử lý ở đây…</span><p>Mình làm theo runbook, đang giới hạn process build.<span class="stamp">09:44 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+							<div class="msg mine"><div class="bubble"><span class="reply s-cyan"><b>Quang Huy</b>Hướng dẫn xử lý ở đây…</span><p>Mình làm theo runbook, đang giới hạn process build.<span class="stamp">09:44 <svg class="icon icon-sm read" role="img" aria-label="Đã xem"><use href="#i-checks"/></svg></span></p></div></div>
 						</div>
 						<form class="composer" onsubmit="return false">
-							<label class="sr-only" for="tp-draft">Tin nhắn</label>
-							<textarea id="tp-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+							<label class="sr-only" for="tp-draft">Tin nhắn tới Vận hành hệ thống</label>
+							<textarea id="tp-draft" rows="1" placeholder="Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống"></textarea>
 							<button type="button" class="icon-btn" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></button>
 							<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
 						</form>
@@ -303,26 +305,29 @@
 						<div class="info-hero">
 							<span class="avatar lg av-blue">VH</span>
 							<h2>Vận hành hệ thống</h2>
-							<span class="muted">12 thành viên, 3 online</span>
+							<span class="muted">12 thành viên · 3 đang hoạt động</span>
 						</div>
-						<div class="profile-actions">
-							<button type="button" class="btn" data-toast="Đã tắt tiếng nhóm"><svg class="icon"><use href="#i-bell-off"/></svg>Tắt tiếng</button>
-							<button type="button" class="btn" data-toast="Mở Quản trị nhóm"><svg class="icon"><use href="#i-settings"/></svg>Quản lý</button>
-							<button type="button" class="btn danger-text" data-toast="Hỏi xác nhận trước khi rời nhóm"><svg class="icon"><use href="#i-logout"/></svg>Rời nhóm</button>
+						<div class="quick-acts">
+							<button type="button" aria-pressed="false" data-toast="Chọn thời hạn: 1 giờ, 8 giờ, 1 ngày, 1 tuần, Cho đến khi bật lại"><span class="qa-ico"><svg class="icon"><use href="#i-bell-off"/></svg></span>Tắt thông báo</button>
+							<button type="button" aria-pressed="true" data-toast="Đã bỏ ghim Vận hành hệ thống"><span class="qa-ico"><svg class="icon"><use href="#i-pin"/></svg></span>Bỏ ghim</button>
+							<button type="button" data-toast="Chọn người để thêm vào nhóm"><span class="qa-ico"><svg class="icon"><use href="#i-user-plus"/></svg></span>Thêm thành viên</button>
 						</div>
 						<div class="info-sec">
-							<h3>Đã chia sẻ</h3>
+							<div class="sec-head"><h3>Thành viên · 12</h3><a class="see-all" href="chat.html#member-remove">Xem tất cả</a></div>
+							<div class="row"><span class="avatar sm av-cyan online">QH</span><span class="grow">Quang Huy<small class="on">Đang hoạt động</small></span><span class="tag">Trưởng nhóm</span></div>
+							<div class="row"><span class="avatar sm av-green online">LA</span><span class="grow">Lan Anh<small class="on">Đang hoạt động</small></span><span class="tag grey">Phó nhóm</span></div>
+							<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh<small>Truy cập 12 phút trước</small></span></div>
+							<div class="row"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span class="grow">Deploy Bot<small>Bot · không đọc được tin nhắn</small></span></div>
+						</div>
+						<div class="info-sec">
+							<h3>Ảnh, file, link</h3>
 							<a class="row link-row" href="media.html#shared-media"><svg class="icon"><use href="#i-photo"/></svg><span class="grow">Ảnh và video</span><span class="num">128</span></a>
 							<a class="row link-row" href="media.html#shared-media"><svg class="icon"><use href="#i-file"/></svg><span class="grow">File</span><span class="num">42</span></a>
 							<a class="row link-row" href="media.html#shared-media"><svg class="icon"><use href="#i-link"/></svg><span class="grow">Link</span><span class="num">57</span></a>
 						</div>
 						<div class="info-sec">
-							<h3>12 thành viên</h3>
-							<div class="row"><span class="avatar sm av-cyan online">QH</span><span class="grow">Quang Huy<small class="on">online</small></span><span class="tag">Chủ nhóm</span></div>
-							<div class="row"><span class="avatar sm av-green online">LA</span><span class="grow">Lan Anh<small class="on">online</small></span><span class="tag">Admin</span></div>
-							<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh<small>truy cập gần đây</small></span></div>
-							<div class="row"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span class="grow">Deploy Bot<small>bot · không đọc được tin nhắn</small></span></div>
-							<button type="button" class="btn btn-block" data-toast="Chọn người để thêm vào nhóm" style="margin-top: var(--space-2)"><svg class="icon"><use href="#i-user-plus"/></svg>Thêm thành viên</button>
+							<a class="row link-row" href="chat.html#chat-admin"><svg class="icon"><use href="#i-settings"/></svg><span class="grow">Quản lý nhóm</span><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></a>
+							<button type="button" class="row link-row danger" data-toast="Hỏi xác nhận trước khi rời nhóm"><svg class="icon"><use href="#i-logout"/></svg><span class="grow">Rời nhóm</span></button>
 						</div>
 					</aside>
 				</div>
@@ -390,7 +395,7 @@
 </section>
 
 <section class="shot" id="tray">
-	<div class="shot-head"><h2>Khay hệ thống</h2><span class="phase">Phase 11</span><p>Biểu tượng ở menu bar (macOS) hoặc khay (Windows, Linux) có badge cộng tin chưa đọc của mọi tài khoản đang đăng nhập, theo từng tổ chức; chat tắt tiếng không tính trừ khi bật trong cài đặt. Menu chỉ có các việc cần khi cửa sổ đã đóng.</p></div>
+	<div class="shot-head"><h2>Khay hệ thống</h2><span class="phase">Phase 11</span><p>Biểu tượng ở menu bar (macOS) hoặc khay (Windows, Linux) có badge cộng tin chưa đọc của mọi tài khoản đang đăng nhập, theo từng tổ chức; chat đã tắt thông báo không tính trừ khi bật trong cài đặt. Menu chỉ có các việc cần khi cửa sổ đã đóng.</p></div>
 	<div class="frame">
 		<div class="desk">
 			<figure class="os-col os-wide">

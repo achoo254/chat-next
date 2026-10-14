@@ -460,7 +460,7 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .info-sec .sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
 .info-sec .sec-head h3 { margin: 0; }
 
-/* Folder rail: built-in filters by chat type (R1 web and desktop). User folders come after R4. */
+/* Folder rail: built-in filters (by chat type, plus Chưa đọc), filtered on the client. */
 .app.folders { --rail-w: 76px; }
 .folder-rail { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-1); background: var(--c-surface-subtle); border-right: 1px solid var(--c-border-subtle); overflow-y: auto; }
 .folder-rail .spacer { flex: 1; }
@@ -470,10 +470,56 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .folder .badge { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
 .folder .badge.muted-badge { background: var(--c-bar-track); color: var(--c-text-muted); }
 .folder.me { min-height: 48px; }
-.folder .soon { font-size: 0.625rem; font-weight: 600; color: var(--c-text-muted); }
-.folder[aria-disabled="true"] { cursor: not-allowed; }
 /* The compact filter row stands in for the rail when the rail is hidden (narrow screens). */
 .app.folders .list .tabs { display: none; }
+
+/* ---------- Per-area mix: Telegram layout and speed, Zalo wording and info order ---------- */
+/* Resizable list column (280–420px). Drag or arrow keys; the column never scrolls sideways. */
+.list { position: relative; }
+.list-resize { position: absolute; top: 0; right: 0; bottom: 0; z-index: 3; width: 8px; cursor: ew-resize; touch-action: none; }
+.list-resize::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 2px; background: transparent; transition: background var(--dur-fast) var(--ease-standard); }
+.list-resize:hover::after, .list-resize:focus-visible::after, .list-resize[data-drag]::after { background: var(--c-primary-solid); }
+.list-resize:focus-visible { outline: none; }
+
+/* "…" on a chat row: appears on hover or keyboard focus, opens the same menu as right-click. */
+.chat-row { position: relative; }
+.row-more { position: absolute; right: var(--space-2); top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface); color: var(--c-icon-muted); box-shadow: var(--shadow-sm); opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.row-more:hover { color: var(--c-text); }
+.chat-row:hover .row-more, .row-more:focus-visible, .row-more[aria-expanded="true"] { opacity: 1; }
+/* While "…" shows, it takes the place of the time and badges (they come back when the pointer leaves). */
+.chat-row:has(.row-more):hover .meta, .chat-row:has(.row-more:focus-visible, .row-more[aria-expanded="true"]) .meta { visibility: hidden; }
+
+/* Five built-in filters fit one row of a 280px list: compact, never broken inside a label. */
+.list .tabs, .narrow .tabs { flex-wrap: wrap; gap: 0; justify-content: space-between; padding-left: var(--space-3); padding-right: var(--space-3); }
+.list .tabs button, .narrow .tabs button { min-width: 44px; white-space: nowrap; padding-left: var(--space-1); padding-right: var(--space-1); font-size: 0.875rem; }
+
+/* Quick actions on a hovered bubble: Biểu cảm · Trả lời · Chuyển tiếp · more. */
+.msg { position: relative; }
+.msg-actions { position: absolute; top: calc(-1 * var(--space-4)); right: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+.msg.mine .msg-actions { right: auto; left: var(--space-2); }
+.msg:hover .msg-actions, .msg:focus-within .msg-actions, .msg.show-actions .msg-actions { opacity: 1; pointer-events: auto; }
+.msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
+.msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }
+
+/* Info panel, Zalo order: quick actions as three equal icon buttons whose labels may wrap. */
+.info-hero p { margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.quick-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.quick-acts > * { display: grid; justify-items: center; align-content: start; gap: var(--space-1); min-height: 72px; padding: var(--space-2) var(--space-1); border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text); font-size: 0.75rem; font-weight: 500; line-height: 1.3; text-align: center; text-decoration: none; }
+.quick-acts > :hover { background: var(--c-hover); }
+.qa-ico { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
+.quick-acts [aria-pressed="true"] .qa-ico { border-color: transparent; background: var(--c-selected); color: var(--c-primary); }
+button.link-row { width: calc(100% + 2 * var(--space-2)); border: 0; background: none; text-align: left; font: inherit; }
+.link-row.danger, .link-row.danger > .icon { color: var(--c-error); }
+
+/* Composer: grows with its text (and a long placeholder) up to the max height; one-line key hint under it. */
+.composer textarea { field-sizing: content; }
+.composer-hint { margin: 0; padding: 0 var(--space-4) var(--space-2); background: var(--c-surface); font-size: 0.75rem; color: var(--c-text-muted); }
+.composer-hint[hidden] { display: none; }
+
+@media (max-width: 760px), (pointer: coarse) {
+	.list-resize, .msg-actions { display: none; }
+	.row-more { display: none; }
+}
 
 @media (max-width: 760px) {
 	.review-bar nav a { min-height: 44px; }

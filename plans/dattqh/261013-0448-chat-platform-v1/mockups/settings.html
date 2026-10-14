@@ -71,7 +71,7 @@
 
 	<!-- ============ Privacy ============ -->
 	<section class="shot" id="privacy">
-		<div class="shot-head"><h2>Quyền riêng tư</h2><span class="phase">R1 · Phase 12</span><p>Mỗi cài đặt áp dụng ở mọi chỗ lộ thông tin: hồ sơ, trạng thái online và đang gõ, tìm người, Bot API, webhook và tìm kiếm tin. "Danh bạ" trong mọi lựa chọn là những người bạn đã tự thêm vào danh bạ của mình; chung nhóm, chung kênh hay đã nhắn tin với nhau không làm ai thành liên hệ. Mặc định an toàn: không ai tìm được bạn bằng email, chỉ người trong danh bạ của bạn thêm được bạn vào nhóm. Tìm bằng email chỉ khớp đúng cả địa chỉ; ai không được phép tìm sẽ thấy "Không tìm thấy" như khi không có tài khoản.</p></div>
+		<div class="shot-head"><h2>Quyền riêng tư</h2><span class="phase">R1 · Phase 12</span><p>Mỗi cài đặt áp dụng ở mọi chỗ lộ thông tin: hồ sơ, trạng thái hoạt động và đang gõ, tìm người, Bot API, webhook và tìm kiếm tin. "Danh bạ" trong mọi lựa chọn là những người bạn đã tự thêm vào danh bạ của mình; chung nhóm, chung kênh hay đã nhắn tin với nhau không làm ai thành liên hệ. Mặc định an toàn: không ai tìm được bạn bằng email, chỉ người trong danh bạ của bạn thêm được bạn vào nhóm. Tìm bằng email chỉ khớp đúng cả địa chỉ; ai không được phép tìm sẽ thấy "Không tìm thấy" như khi không có tài khoản.</p></div>
 		<div class="frame tall"><div class="set">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<nav class="set-nav" data-active="privacy" aria-label="Danh mục cài đặt"></nav>
@@ -82,13 +82,13 @@
 						<div class="card pad contacts-def">
 							<svg class="icon"><use href="#i-contacts"/></svg>
 							<p><b>"Danh bạ" là những người bạn đã thêm vào danh bạ.</b> Chung nhóm, chung kênh hay đã nhắn tin với nhau không làm ai thành liên hệ của bạn. Bạn tự thêm hoặc xoá từng người.</p>
-							<a class="btn" href="chat.html#contacts">Mở danh bạ · 5 người</a>
+							<a class="btn" href="chat.html#contacts">Mở danh bạ · 6 người</a>
 						</div>
 					<div class="card">
 						<h4 class="card-title">Ai thấy</h4>
 						<div class="row opt-row">
-							<span class="grow">Lần cuối online và đang online<small>Dòng "đang gõ" cũng theo cài đặt này</small></span>
-							<div class="choice" role="group" aria-label="Ai thấy lần cuối online"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="true">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
+							<span class="grow">Trạng thái hoạt động<small>"Đang hoạt động", "Truy cập {x} phút trước" và dòng "đang gõ". Người không được thấy chỉ thấy mức gần đúng như "Truy cập gần đây".</small></span>
+							<div class="choice" role="group" aria-label="Ai thấy trạng thái hoạt động"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="true">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
 						</div>
 						<div class="row opt-row">
 							<span class="grow">Ảnh đại diện</span>
@@ -129,7 +129,7 @@
 
 	<!-- ============ Blocked ============ -->
 	<section class="shot" id="blocked">
-		<div class="shot-head"><h2>Người đã chặn</h2><span class="phase">Phase 12</span><p>Người bị chặn không nhắn tin, không thêm bạn vào nhóm và không thấy lần cuối online của bạn; họ không nhận thông báo là đã bị chặn. Chặn được cả bot. Bấm "Bỏ chặn" để xem trạng thái đang xử lý; bỏ hết thì hiện trạng thái trống như khung dưới.</p></div>
+		<div class="shot-head"><h2>Người đã chặn</h2><span class="phase">Phase 12</span><p>Người bị chặn không nhắn tin, không thêm bạn vào nhóm và không thấy trạng thái hoạt động của bạn; họ không nhận thông báo là đã bị chặn. Chặn được cả bot. Bấm "Bỏ chặn" để xem trạng thái đang xử lý; bỏ hết thì hiện trạng thái trống như khung dưới.</p></div>
 		<div class="frame"><div class="set">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<nav class="set-nav" data-active="blocked" aria-label="Danh mục cài đặt"></nav>
@@ -158,7 +158,7 @@
 
 	<!-- ============ Notifications ============ -->
 	<section class="shot" id="notifications">
-		<div class="shot-head"><h2>Thông báo</h2><span class="phase">Phase 6, 10, 11</span><p>Bật tắt theo loại chat, âm thanh, và nút thao tác trên thông báo của bản desktop. Badge mặc định không đếm chat đã tắt tiếng. Trình duyệt chưa cấp quyền thì báo ngay ở đầu trang kèm nút xin quyền.</p></div>
+		<div class="shot-head"><h2>Thông báo</h2><span class="phase">Phase 6, 10, 11</span><p>Bật tắt theo loại chat, âm thanh, và nút thao tác trên thông báo của bản desktop. Badge mặc định không đếm chat đã tắt thông báo. Trình duyệt chưa cấp quyền thì báo ngay ở đầu trang kèm nút xin quyền.</p></div>
 		<div class="frame tall"><div class="set">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<nav class="set-nav" data-active="notifications" aria-label="Danh mục cài đặt"></nav>
@@ -176,7 +176,7 @@
 						<h4 class="card-title">Âm thanh và số đếm</h4>
 						<div class="row opt-row"><span class="grow">Âm báo</span><div class="choice" role="group" aria-label="Âm báo"><button type="button" aria-pressed="true">Mặc định</button><button type="button" aria-pressed="false">Nhẹ</button><button type="button" aria-pressed="false">Tắt</button></div></div>
 						<div class="row pad-x"><span class="grow">Phát âm thanh khi đang mở chat</span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Phát âm thanh khi đang mở chat"></button></div>
-						<div class="row pad-x"><span class="grow">Đếm cả chat đã tắt tiếng trên badge<small>Tắt: số trên biểu tượng app chỉ tính chat còn bật thông báo</small></span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Đếm cả chat đã tắt tiếng"></button></div>
+						<div class="row pad-x"><span class="grow">Đếm cả chat đã tắt thông báo trên badge<small>Tắt: số trên biểu tượng app chỉ tính chat còn bật thông báo</small></span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Đếm cả chat đã tắt thông báo"></button></div>
 					</div>
 					<div class="card">
 						<h4 class="card-title">Bản desktop</h4>
@@ -221,8 +221,42 @@
 						<div class="size-row"><span class="a-small" aria-hidden="true">A</span><input type="range" id="font-size" min="13" max="20" step="1" value="15"><span class="a-big" aria-hidden="true">A</span></div>
 						<div class="size-preview" id="size-preview">
 							<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Chiều nay mình review bản thiết kế nhé.<span class="stamp">14:02</span></p></div></div>
-							<div class="msg mine"><div class="bubble"><p>Ok, mình gửi link Figma ngay.<span class="stamp">14:03 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+							<div class="msg mine"><div class="bubble"><p>Ok, mình gửi link Figma ngay.<span class="stamp">14:03 <svg class="icon icon-sm read" role="img" aria-label="Đã xem"><use href="#i-checks"/></svg></span></p></div></div>
 						</div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Keyboard shortcuts ============ -->
+	<section class="shot" id="shortcuts">
+		<div class="shot-head"><h2>Phím tắt</h2><span class="phase">R1 · Phase 6</span><p>Một bộ phím nhỏ, lấy chỗ hai app người Việt hay dùng trùng nhau. Mở danh sách này từ Cài đặt › Phím tắt hoặc bằng ⌘/Ctrl+/ ở bất cứ đâu. Nút trên đầu đổi cách ghi phím theo máy (macOS dùng ⌘ và ⌥, Windows và Linux dùng Ctrl và Alt); app tự chọn theo hệ điều hành. Trên web chỉ dùng tổ hợp không đụng phím của trình duyệt; bản desktop thêm ⌘/Ctrl+N mở chat mới.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="shortcuts" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Phím tắt</h3><div class="choice" role="group" aria-label="Cách ghi phím" id="key-os"><button type="button" aria-pressed="true" data-os="mac">macOS</button><button type="button" aria-pressed="false" data-os="pc">Windows, Linux</button></div></header>
+				<div class="set-body">
+					<p class="lede"><svg class="icon icon-sm"><use href="#i-command"/></svg>Bấm <kbd data-key="mod">⌘</kbd><kbd>/</kbd> ở bất cứ đâu để mở lại danh sách này.</p>
+					<div class="card">
+						<h4 class="card-title">Tìm và di chuyển</h4>
+						<dl class="keys">
+							<div class="key-row"><dt>Tìm kiếm</dt><dd><kbd data-key="mod">⌘</kbd><kbd>K</kbd><span>hoặc</span><kbd data-key="mod">⌘</kbd><kbd>F</kbd></dd></div>
+							<div class="key-row"><dt>Chat phía trên / phía dưới trong danh sách</dt><dd><kbd data-key="alt">⌥</kbd><kbd>↑</kbd><span>/</span><kbd data-key="alt">⌥</kbd><kbd>↓</kbd></dd></div>
+							<div class="key-row"><dt>Bộ lọc Tất cả, Cá nhân, Nhóm, Bot, Chưa đọc</dt><dd><kbd data-key="mod">⌘</kbd><kbd>1</kbd><span>…</span><kbd>5</kbd></dd></div>
+							<div class="key-row"><dt>Danh sách phím tắt</dt><dd><kbd data-key="mod">⌘</kbd><kbd>/</kbd></dd></div>
+						</dl>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Soạn và trả lời</h4>
+						<dl class="keys">
+							<div class="key-row"><dt>Gửi tin</dt><dd><kbd>Enter</kbd></dd></div>
+							<div class="key-row"><dt>Xuống dòng</dt><dd><kbd>Shift</kbd><kbd>Enter</kbd></dd></div>
+							<div class="key-row"><dt>Sửa tin vừa gửi<small>Khi ô soạn đang trống</small></dt><dd><kbd>↑</kbd></dd></div>
+							<div class="key-row"><dt>Trả lời một tin</dt><dd><span>Bấm đúp vào tin</span></dd></div>
+							<div class="key-row"><dt>Huỷ trả lời hoặc sửa, đóng cột thông tin, đóng menu</dt><dd><kbd>Esc</kbd></dd></div>
+						</dl>
 					</div>
 				</div>
 			</div>
@@ -479,6 +513,14 @@
 .plain .row + .row { border-top: 1px solid var(--c-border-subtle); }
 .note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 .note .icon { vertical-align: -3px; }
+/* Keyboard shortcuts list: action on the left, keys on the right; wraps under on narrow screens. */
+.keys { margin: 0; }
+.key-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-height: 48px; padding: var(--space-2) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.key-row dt { flex: 1 1 220px; min-width: 0; font-weight: 500; }
+.key-row dt small { display: block; font-weight: 400; font-size: 0.8125rem; color: var(--c-text-muted); }
+.key-row dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--space-2); border: 1px solid var(--c-border); border-bottom-width: 2px; border-radius: var(--radius-xs); background: var(--c-surface); color: var(--c-text); font-family: var(--font-mono); font-size: 0.8125rem; }
+.lede kbd { margin: 0 2px; }
 .lede { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
 .callout { display: flex; gap: var(--space-2); align-items: flex-start; padding-top: var(--space-3); padding-bottom: var(--space-3); border-top: 1px solid var(--c-border-subtle); font-size: 0.8125rem; color: var(--c-text-muted); }
 .callout .icon { margin-top: 2px; }
@@ -688,7 +730,7 @@ a.btn { color: var(--c-text); text-decoration: none; }
 		<a class="icon-btn" href="#profile" aria-current="page" aria-label="Cài đặt">${icon("settings")}</a>`;
 	const NAV = [
 		["profile", "Hồ sơ", "user"], ["privacy", "Quyền riêng tư", "eye-off"], ["blocked", "Người đã chặn", "ban"], null,
-		["notifications", "Thông báo", "bell"], ["appearance", "Giao diện", "sun"], ["storage", "Dữ liệu và bộ nhớ", "database"], null,
+		["notifications", "Thông báo", "bell"], ["appearance", "Giao diện", "sun"], ["shortcuts", "Phím tắt", "command"], ["storage", "Dữ liệu và bộ nhớ", "database"], null,
 		["sessions", "Phiên đăng nhập", "laptop"], ["tenant", "Tổ chức", "globe"], null,
 		["console.html", "Developer Console", "code"], ["export-delete", "Tài khoản", "key"],
 	];
@@ -705,6 +747,15 @@ a.btn { color: var(--c-text); text-decoration: none; }
 	});
 	$$(".set .set-head").forEach((head) => head.insertAdjacentHTML("afterbegin",
 		`<a class="icon-btn back" href="#profile" aria-label="Về danh sách cài đặt">${icon("back")}</a>`));
+
+	// Shortcuts: write the keys the way this computer labels them (⌘/⌥ on macOS, Ctrl/Alt elsewhere).
+	const KEY_LABEL = { mac: { mod: "⌘", alt: "⌥" }, pc: { mod: "Ctrl", alt: "Alt" } };
+	const showKeys = (os) => {
+		$$("[data-key]").forEach((k) => { k.textContent = KEY_LABEL[os][k.dataset.key]; });
+		$$("#key-os button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.os === os)));
+	};
+	$$("#key-os button").forEach((b) => b.addEventListener("click", () => showKeys(b.dataset.os)));
+	showKeys(/Mac|iPhone|iPad/.test(navigator.platform) ? "mac" : "pc");
 
 	// Profile: username availability, checked as the user types.
 	const TAKEN = ["minh", "lananh", "quanghuy", "admin", "support", "hoandat"];

@@ -17,14 +17,14 @@
 
 	<!-- ============ Global search ============ -->
 	<section class="shot" id="global">
-		<div class="shot-head"><h2>Tìm toàn cục</h2><span class="phase">Phase 7</span><p>Gõ không dấu vẫn ra tin có dấu: "dep thiet ke" khớp "đẹp", "thiết kế". Kết quả trong máy (FTS local) hiện ngay mỗi phím; server được gọi sau khi ngừng gõ rồi gộp vào, không làm nhảy các dòng đã có. Ô tìm kiếm chạy thật: gõ thử "van hanh", "minh", "postgres".</p></div>
+		<div class="shot-head"><h2>Tìm toàn cục</h2><span class="phase">Phase 7</span><p>Mở bằng ⌘/Ctrl+K hoặc ⌘/Ctrl+F (cả hai đều được, thử bấm ngay trên trang này). Kết quả chia ba nhóm theo thứ tự người Việt hay tìm: Liên hệ (người trong danh bạ, chat riêng, bot và người tìm thấy theo username nếu họ cho phép) · Nhóm và kênh · Tin nhắn; từ khoá được tô vàng. Gõ không dấu vẫn ra tin có dấu: "dep thiet ke" khớp "đẹp", "thiết kế". Kết quả trong máy (FTS local) hiện ngay mỗi phím; server được gọi sau khi ngừng gõ rồi gộp vào, không làm nhảy các dòng đã có. Ô tìm kiếm chạy thật: gõ thử "van hanh", "minh", "postgres".</p></div>
 		<div class="frame"><div class="sx focus-list">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<section class="sx-col" aria-label="Tìm kiếm">
 				<div class="sx-top">
 					<label class="search-field">
 						<svg class="icon icon-sm"><use href="#i-search"/></svg>
-						<span class="sr-only">Tìm chat, người và tin nhắn</span>
+						<span class="sr-only">Tìm liên hệ, nhóm và kênh, tin nhắn</span>
 						<input id="g-q" type="search" value="dep thiet ke" autocomplete="off" spellcheck="false">
 						<span class="kbd">Esc</span>
 					</label>
@@ -66,7 +66,7 @@
 				<div class="sx-top">
 					<label class="search-field">
 						<svg class="icon icon-sm"><use href="#i-search"/></svg>
-						<span class="sr-only">Tìm chat, người và tin nhắn</span>
+						<span class="sr-only">Tìm liên hệ, nhóm và kênh, tin nhắn</span>
 						<input type="search" value="thiet ke" autocomplete="off" spellcheck="false">
 					</label>
 				</div>
@@ -151,8 +151,8 @@
 				</div>
 				<form class="composer" onsubmit="return false">
 					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
-					<label class="sr-only" for="ic-draft">Tin nhắn</label>
-					<textarea id="ic-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<label class="sr-only" for="ic-draft">Tin nhắn tới Vận hành hệ thống</label>
+					<textarea id="ic-draft" rows="1" placeholder="Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống"></textarea>
 					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
 			</section>
@@ -168,7 +168,7 @@
 				<div class="sx-top">
 					<label class="search-field">
 						<svg class="icon icon-sm"><use href="#i-search"/></svg>
-						<span class="sr-only">Tìm chat, người và tin nhắn</span>
+						<span class="sr-only">Tìm liên hệ, nhóm và kênh, tin nhắn</span>
 						<input type="search" value="dep thiet ke" autocomplete="off" spellcheck="false">
 					</label>
 				</div>
@@ -176,7 +176,7 @@
 				<div class="sx-results" id="j-results"></div>
 			</section>
 			<section class="convo" aria-label="Lan Anh">
-				<header class="convo-head"><span class="avatar av-green">LA</span><div class="title"><strong>Lan Anh</strong><span>online 5 phút trước</span></div><button type="button" class="icon-btn" aria-label="Tìm trong chat"><svg class="icon"><use href="#i-search"/></svg></button></header>
+				<header class="convo-head"><span class="avatar av-green">LA</span><div class="title"><strong>Lan Anh</strong><span>Truy cập 5 phút trước</span></div><button type="button" class="icon-btn" aria-label="Tìm trong chat"><svg class="icon"><use href="#i-search"/></svg></button></header>
 				<div class="messages jump-msgs" id="j-msgs">
 					<span class="day">12 tháng 9, 2026</span>
 					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><p>Thắng ơi, bộ icon cho app mobile xong rồi.<span class="stamp">15:02</span></p></div></div>
@@ -189,8 +189,8 @@
 				<button type="button" class="to-latest" id="to-latest" aria-label="Về tin mới nhất, 48 tin mới hơn"><svg class="icon"><use href="#i-arrow-down"/></svg><span>Về tin mới nhất</span><span class="badge">48</span></button>
 				<form class="composer" onsubmit="return false">
 					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
-					<label class="sr-only" for="j-draft">Tin nhắn</label>
-					<textarea id="j-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<label class="sr-only" for="j-draft">Tin nhắn tới Lan Anh</label>
+					<textarea id="j-draft" rows="1" placeholder="Nhập tin nhắn tới Lan Anh"></textarea>
 					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
 			</section>
@@ -405,15 +405,17 @@ mark.hit-now { background: color-mix(in srgb, var(--c-warning) 35%, var(--c-surf
 	$$("[data-rail]").forEach((el) => { el.innerHTML = RAIL; });
 
 	// Illustrative corpus. "server" rows are older messages not in the local cache.
+	// Groups and channels you are in.
 	const CHATS = [
 		{ name: "Góc thiết kế đẹp", sub: "Kênh · 1.204 người đăng ký", av: "amber", ini: "GT" },
 		{ name: "Vận hành hệ thống", sub: "Nhóm · 12 thành viên", av: "blue", ini: "VH" },
 		{ name: "Team Mobile", sub: "Nhóm · 8 thành viên", av: "amber", ini: "TM" },
-		{ name: "Lan Anh", sub: "online 5 phút trước", av: "green", ini: "LA" },
-		{ name: "Quang Huy", sub: "online", av: "cyan", ini: "QH" },
-		{ name: "Deploy Bot", sub: "Bot", av: "violet", ini: "DB" },
 	];
+	// People and bots: your contacts and 1-1 chats first, then accounts found by username (if they allow it).
 	const PEOPLE = [
+		{ name: "Lan Anh", sub: "Trong danh bạ · Truy cập 5 phút trước", user: "lananh", av: "green", ini: "LA" },
+		{ name: "Quang Huy", sub: "Trong danh bạ · Đang hoạt động", user: "quanghuy", av: "cyan", ini: "QH" },
+		{ name: "Deploy Bot", sub: "Bot · @deploy_bot", user: "deploy_bot", av: "violet", ini: "DB" },
 		{ name: "Thiết Kế Đẹp Studio", user: "thietkedep", av: "red", ini: "TĐ" },
 		{ name: "Minh Anh", user: "minhanh_design", av: "grey", ini: "MA" },
 		{ name: "Hoàng Văn Hạnh", user: "vanhanh", av: "grey", ini: "HH" },
@@ -457,8 +459,8 @@ mark.hit-now { background: color-mix(in srgb, var(--c-warning) 35%, var(--c-surf
 		const people = PEOPLE.filter((p) => matches(p.name + " " + p.user, ws));
 		const msgs = MSGS.filter((m) => (withServer || !m.server) && matches(m.text, ws));
 		let html = "";
-		if (chats.length) html += `<h3 class="sec-h">Chat</h3><ul class="hits">${chats.map((c) => `<li><a class="hit" href="#jump">${av(c.av, c.ini)}<span class="hit-main"><span class="hit-head"><b>${highlight(c.name, ws)}</b></span><span class="hit-sub">${escapeHtml(c.sub)}</span></span></a></li>`).join("")}</ul>`;
-		if (people.length) html += `<h3 class="sec-h">Người <span>theo username, nếu họ cho phép</span></h3><ul class="hits">${people.map((p) => `<li><a class="hit" href="#jump">${av(p.av, p.ini)}<span class="hit-main"><span class="hit-head"><b>${highlight(p.name, ws)}</b></span><span class="hit-sub">@${highlight(p.user, ws)}</span></span></a></li>`).join("")}</ul>`;
+		if (people.length) html += `<h3 class="sec-h">Liên hệ <span>danh bạ, chat riêng, bot, username</span></h3><ul class="hits">${people.map((p) => `<li><a class="hit" href="#jump">${av(p.av, p.ini)}<span class="hit-main"><span class="hit-head"><b>${highlight(p.name, ws)}</b></span><span class="hit-sub">${p.sub ? escapeHtml(p.sub) : "@" + highlight(p.user, ws)}</span></span></a></li>`).join("")}</ul>`;
+		if (chats.length) html += `<h3 class="sec-h">Nhóm và kênh</h3><ul class="hits">${chats.map((c) => `<li><a class="hit" href="#jump">${av(c.av, c.ini)}<span class="hit-main"><span class="hit-head"><b>${highlight(c.name, ws)}</b></span><span class="hit-sub">${escapeHtml(c.sub)}</span></span></a></li>`).join("")}</ul>`;
 		if (msgs.length) html += `<h3 class="sec-h">Tin nhắn <span>${msgs.length} tin</span></h3><ul class="hits">${msgs.map((m) => {
 			const cur = current && m.jump ? ' aria-current="true"' : "";
 			const fresh = m.server && withServer && !current ? " fresh" : "";
@@ -479,7 +481,7 @@ mark.hit-now { background: color-mix(in srgb, var(--c-warning) 35%, var(--c-surf
 	const runGlobal = () => {
 		clearTimeout(serverTimer);
 		const q = gq.value.trim();
-		if (!q) { gBox.innerHTML = ""; gStatus.innerHTML = "Gõ để tìm chat, người và tin nhắn"; return; }
+		if (!q) { gBox.innerHTML = ""; gStatus.innerHTML = "Gõ để tìm liên hệ, nhóm và kênh, tin nhắn"; return; }
 		renderResults(gBox, q, { withServer: false });
 		gStatus.innerHTML = `<span class="spinner" aria-hidden="true"></span>Kết quả trong máy · đang lấy thêm từ server…`;
 		serverTimer = setTimeout(() => {
@@ -489,6 +491,10 @@ mark.hit-now { background: color-mix(in srgb, var(--c-warning) 35%, var(--c-surf
 	};
 	gq.addEventListener("input", runGlobal);
 	gq.addEventListener("keydown", (e) => { if (e.key === "Escape") { gq.value = ""; runGlobal(); } });
+	// ⌘/Ctrl+K and ⌘/Ctrl+F both open search.
+	document.addEventListener("keydown", (e) => {
+		if ((e.metaKey || e.ctrlKey) && ["k", "f"].includes(e.key.toLowerCase())) { e.preventDefault(); gq.focus(); gq.select(); }
+	});
 	gBox.addEventListener("click", (e) => { if (e.target.closest(".hit")) toast("Mở chat tại đúng tin (xem khung Nhảy tới tin)"); });
 	runGlobal();
 

@@ -1,6 +1,7 @@
 /* Shared behaviour of the chat mock pages. Mock only: no product logic. */
 (() => {
 	const SPRITE = `<svg width="0" height="0" class="sr-only" aria-hidden="true">${String.raw`	<symbol id="i-message" viewBox="0 0 24 24"><path d="M8 9h8M8 13h6M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-5l-5 3v-3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h12z"/></symbol>
+	<symbol id="i-message-dot" viewBox="0 0 24 24"><path d="M8 9h5M8 13h6M14 4H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h2v3l5-3h5a3 3 0 0 0 3-3v-4"/><circle cx="19" cy="5" r="2.5"/></symbol>
 	<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="M21 21l-6-6"/></symbol>
 	<symbol id="i-send" viewBox="0 0 24 24"><path d="M10 14L21 3M21 3l-6.5 18a.55.55 0 0 1-1 0L10 14l-7-3.5a.55.55 0 0 1 0-1L21 3"/></symbol>
 	<symbol id="i-clip" viewBox="0 0 24 24"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3L18 10a3 3 0 0 0-6-6l-6.5 6.5a4.5 4.5 0 0 0 9 9L21 13"/></symbol>
@@ -169,6 +170,32 @@
 		if (opener) document.getElementById(opener.dataset.open)?.showModal();
 		const closer = t.closest("[data-close]");
 		if (closer) closer.closest("dialog")?.close();
+	});
+
+	// Resizable chat list column: drag the edge or use the arrow keys; clamped to 280–420px.
+	$$("[data-list-resize]").forEach((handle) => {
+		const app = handle.closest(".app");
+		const list = handle.closest(".list");
+		const MIN = 280, MAX = 420, STEP = 20;
+		const set = (w) => {
+			const v = Math.round(Math.min(MAX, Math.max(MIN, w)));
+			app.style.setProperty("--list-w", `${v}px`);
+			handle.setAttribute("aria-valuenow", String(v));
+		};
+		handle.addEventListener("pointerdown", (e) => {
+			const startX = e.clientX, startW = list.getBoundingClientRect().width;
+			handle.setPointerCapture(e.pointerId);
+			handle.dataset.drag = "";
+			const move = (ev) => set(startW + ev.clientX - startX);
+			const up = () => { delete handle.dataset.drag; handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", up); };
+			handle.addEventListener("pointermove", move);
+			handle.addEventListener("pointerup", up);
+		});
+		handle.addEventListener("keydown", (e) => {
+			const w = list.getBoundingClientRect().width;
+			const next = { ArrowLeft: w - STEP, ArrowRight: w + STEP, Home: MIN, End: MAX }[e.key];
+			if (next !== undefined) { e.preventDefault(); set(next); }
+		});
 	});
 
 	// Vietnamese fold, the same idea as spec/vi-fold: accent- and đ-insensitive.

@@ -205,7 +205,7 @@
 </section>
 
 <section class="shot" id="chat">
-	<div class="shot-head"><h2>Khung chat</h2><span class="phase">Phase 9, 10</span><p>Cảnh báo Grafana là một tin duy nhất được webhook sửa tại chỗ: lúc 09:42 ở trạng thái Firing có nút thao tác, lúc 10:05 cùng tin đó chuyển Resolved, nút biến mất và có nhãn "đã cập nhật". Không sinh tin mới nên nhóm không bị ngập cảnh báo.</p></div>
+	<div class="shot-head"><h2>Khung chat</h2><span class="phase">Phase 9, 10</span><p>Cảnh báo Grafana là một tin duy nhất được webhook sửa tại chỗ: lúc 09:42 ở trạng thái Firing có nút thao tác, lúc 10:05 cùng tin đó chuyển Resolved, nút biến mất và có nhãn "đã cập nhật". Không sinh tin mới nên nhóm không bị ngập cảnh báo. Ô soạn ghi rõ gửi tới đâu ("Nhập @ để nhắc tên, tin nhắn tới {nhóm}", chat riêng "Nhập tin nhắn tới {tên}") và tự giãn theo nội dung; trên điện thoại phím Enter xuống dòng, gửi bằng nút gửi nên không có dòng gợi ý phím.</p></div>
 	<div class="phones">
 		<figure class="phone-wrap">
 			<div class="phone">
@@ -213,7 +213,7 @@
 				<div class="m-head">
 					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
 					<span class="avatar sm av-blue">VH</span>
-					<div class="m-title"><strong>Vận hành hệ thống</strong><span>3 đang online</span></div>
+					<div class="m-title"><strong>Vận hành hệ thống</strong><span>12 thành viên · 3 đang hoạt động</span></div>
 					<button type="button" class="icon-btn" aria-label="Thêm"><svg class="icon"><use href="#i-dots"/></svg></button>
 				</div>
 				<div class="messages">
@@ -231,8 +231,8 @@
 				</div>
 				<form class="composer" onsubmit="return false">
 					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
-					<label class="sr-only" for="m-draft-1">Tin nhắn</label>
-					<textarea id="m-draft-1" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<label class="sr-only" for="m-draft-1">Tin nhắn tới Vận hành hệ thống</label>
+					<textarea id="m-draft-1" rows="1" placeholder="Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống"></textarea>
 					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
 			</div>
@@ -245,7 +245,7 @@
 				<div class="m-head">
 					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
 					<span class="avatar sm av-blue">VH</span>
-					<div class="m-title"><strong>Vận hành hệ thống</strong><span>3 đang online</span></div>
+					<div class="m-title"><strong>Vận hành hệ thống</strong><span>12 thành viên · 3 đang hoạt động</span></div>
 					<button type="button" class="icon-btn" aria-label="Thêm"><svg class="icon"><use href="#i-dots"/></svg></button>
 				</div>
 				<div class="messages">
@@ -259,12 +259,12 @@
 							<span class="stamp"><span class="edited">đã cập nhật</span>&nbsp;10:05</span>
 						</div>
 					</div>
-					<div class="msg mine"><div class="bubble"><span class="reply"><b>Grafana</b>CPU cao trên lab-174</span><p>Đã xử lý, do job backup chạy trùng giờ.<span class="stamp">10:06 <svg class="icon icon-sm read" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+					<div class="msg mine"><div class="bubble"><span class="reply"><b>Grafana</b>CPU cao trên lab-174</span><p>Đã xử lý, do job backup chạy trùng giờ.<span class="stamp">10:06 <svg class="icon icon-sm read" role="img" aria-label="Đã xem"><use href="#i-checks"/></svg></span></p></div></div>
 				</div>
 				<form class="composer" onsubmit="return false">
 					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
-					<label class="sr-only" for="m-draft-2">Tin nhắn</label>
-					<textarea id="m-draft-2" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<label class="sr-only" for="m-draft-2">Tin nhắn tới Vận hành hệ thống</label>
+					<textarea id="m-draft-2" rows="1" placeholder="Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống"></textarea>
 					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
 			</div>
@@ -425,7 +425,7 @@
 				<div class="m-head" aria-hidden="true">
 					<span class="icon-btn"><svg class="icon"><use href="#i-back"/></svg></span>
 					<span class="avatar sm av-green">LA</span>
-					<div class="m-title"><strong>Lan Anh</strong><span>online</span></div>
+					<div class="m-title"><strong>Lan Anh</strong><span>Đang hoạt động</span></div>
 				</div>
 				<div class="scrim"></div>
 				<div class="sheet" role="group" aria-label="Đính kèm">
@@ -515,14 +515,14 @@
 				<div class="banner warn"><svg class="icon icon-sm"><use href="#i-info"/></svg><span>2 tin sẽ tự gửi khi có mạng.</span></div>
 				<div class="messages">
 					<div class="msg"><div class="bubble"><span class="who">Lan Anh</span><p>Backup đã dời sang 02:00 nhé.<span class="stamp">10:08</span></p></div></div>
-					<div class="msg mine"><div class="bubble"><p>Ok, cảm ơn.<span class="stamp">10:09 <svg class="icon icon-sm read" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Ok, cảm ơn.<span class="stamp">10:09 <svg class="icon icon-sm read" role="img" aria-label="Đã xem"><use href="#i-checks"/></svg></span></p></div></div>
 					<div class="msg mine queued"><div class="bubble"><p>Mình kiểm lại lab-174 lúc 02:05.<span class="stamp">10:11 <svg class="icon icon-sm" aria-label="Đang chờ gửi"><use href="#i-clock"/></svg></span></p></div></div>
 					<div class="msg mine queued"><div class="bubble"><p>Nếu CPU còn cao thì mình gọi Huy.<span class="stamp">10:12 <svg class="icon icon-sm" aria-label="Đang chờ gửi"><use href="#i-clock"/></svg></span></p></div></div>
 				</div>
 				<form class="composer" onsubmit="return false">
 					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
 					<label class="sr-only" for="m-draft-3">Tin nhắn</label>
-					<textarea id="m-draft-3" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<textarea id="m-draft-3" rows="1" placeholder="Tin sẽ gửi khi có mạng"></textarea>
 					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
 			</div>

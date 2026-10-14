@@ -329,4 +329,10 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - hàng đợi kiểm duyệt cho operator (`CHAT_OPERATOR_USER_IDS`);
   - quay lại đúng trang sau khi đăng nhập.
 - Việc tiếp theo: sửa mock theo các quyết định trên, sau đó code UI theo mock.
+- Mock cập nhật theo hướng kết hợp, tổng cộng 109 màn; render-check 12 trang, sáng và tối, 0 lỗi. Jev quyết thêm:
+  - Bộ lọc "Chưa đọc" đứng cuối, sau "Bot": 0.69.
+  - Xoá nhóm phải gõ tên nhóm để xác nhận: 0.82.
+- Lý do `TOO_MANY` khi thêm thành viên nghĩa là nhóm đã đủ số thành viên tối đa.
+- React Compiler để tắt (Jev 1.00): chỉ bật khi đã chuyển các chỗ đọc store lúc render sang hook theo id, JS khởi động vẫn ≤ 150 KiB và test xanh.
+- Perf gate `web-perf` chạy trong CI (commit `3814849`). Trên runner GitHub: mở chat từ cache p50 38 ms, p99 78 ms; cuộn 60 fps.
 
