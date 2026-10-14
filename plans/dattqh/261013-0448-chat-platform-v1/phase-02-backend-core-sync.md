@@ -38,6 +38,7 @@ Dựng lõi server Go: đăng nhập đa thiết bị qua IdP `hoandat-auth` (t�
 ## Requirements
 
 Functional:
+- Nhóm có topic (R1, Validation Session 11): topic là thuộc tính của nhóm; tin mang `topic_id` trong seq của nhóm, sync và difference không đổi; bảng topic (tiêu đề, màu icon, ghim, đóng, ẩn), topic "Chung" mặc định; vị trí đã đọc và số chưa đọc theo (user, chat, topic); RPC tạo, sửa, đóng, ẩn, liệt kê topic; update `topic_changed`.
 - Đăng nhập **chỉ qua IdP `hoandat-auth`** theo ADR 0006: app chat không có đăng ký, mật khẩu, OTP, 2FA hay gửi email. Nút "Tạo tài khoản" gửi `prompt=create`; mọi trang đăng nhập/đăng ký là của IdP, có `ui_locales` theo ngôn ngữ app.
   - Web (`chat-web`): `/auth/login` tạo `state`, `nonce`, `code_verifier` lưu tạm phía server; `/auth/callback` đổi code, kiểm ID token (`iss` của tenant, `aud`, `nonce`, ES256), lấy `sub`, `sid`; tạo phiên chat gắn `(tenant_id, sub, sid)`.
   - Native (`chat-mobile`, `chat-desktop`): `ExchangeNativeCode(code, code_verifier, redirect_uri, client_id)` đổi code ở token endpoint của tenant rồi cấp phiên chat; chỉ chấp nhận `redirect_uri` đúng mẫu của client đó.

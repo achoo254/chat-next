@@ -110,7 +110,7 @@ Cách làm cho mọi release:
 | Release | Lên prod để review | Phase (phần) | Người dùng thật |
 |---|---|---|---|
 | R0 | Khung trên prod: đăng nhập bằng tài khoản hoandat (web), app trống, hồ sơ, phiên đăng nhập, đăng xuất; pipeline deploy và smoke test | 1, 2 (auth, user, tenant chính), 6 (khung), 13 (GĐ1, CI/CD), `hoandat-auth` Phase 02–04 cho tenant chính | User |
-| R1 | Nhắn tin chữ realtime: 1-1, nhóm, kênh, trả lời, sửa, xoá, reaction, đã đọc, ghim, link mời, quản trị nhóm; chặn, báo cáo, rate limit, quyền riêng tư cơ bản; hàng đợi kiểm duyệt tối thiểu; thông báo trình duyệt khi tab mở | 2, 3 (gateway, chưa push), 5 (web), 6, 12 (phần tối thiểu) | Nhóm nội bộ hoandat |
+| R1 | Nhắn tin chữ realtime: 1-1, nhóm, nhóm có topic, kênh, trả lời, sửa, xoá, reaction, đã đọc, ghim, link mời, quản trị nhóm; chặn, báo cáo, rate limit, quyền riêng tư cơ bản; hàng đợi kiểm duyệt tối thiểu; thông báo trình duyệt khi tab mở | 2, 3 (gateway, chưa push), 5 (web), 6, 12 (phần tối thiểu) | Nhóm nội bộ hoandat |
 | R2 | Webhook cảnh báo: Grafana, Alertmanager, GitLab, Uptime Kuma, Jenkins đẩy vào nhóm; cảnh báo cập nhật tại chỗ | 9 (incoming webhook) | Nhóm vận hành |
 | R3 | Media: ảnh, video, file, voice, album, trình xem, tải lên tiếp tục | 4, 13 (S3/CDN) | Nhóm nội bộ |
 | R4 | Tìm kiếm không dấu, local + server | 7 | Nhóm nội bộ |
@@ -245,4 +245,12 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
 ### Session 10 — 2026-10-14
 - User: các sản phẩm (chat-next, hoandat-auth) đều mới, chưa có người dùng, nên tập trung code và push thẳng `main`, không rẽ nhánh. Đã merge `feat/chat-app-clients` vào `main` của `hoandat-auth` và push (`4a9ca7d`); deploy IdP lên prod là một phần của R0.
 - Repo `chat-next` đặt trên GitHub private `achoo254/chat-next`, giống `localman-next`; CI chuyển từ GitLab sang GitHub Actions (`.github/workflows/ci.yml`).
+
+### Session 11 — 2026-10-14
+- User gửi ảnh Telegram Desktop làm tham khảo: nhóm có topic, cột thư mục, panel thông tin bên phải, tin cảnh báo có khối code kèm nút copy, thẻ xem trước link. Mock được bổ sung theo các mẫu này, nhưng chỉ lấy mẫu bố cục: không dùng logo, icon, hình ảnh, câu chữ của Telegram hay tên thật trong ảnh.
+- User đổi cách làm: đề xuất và quyết định phạm vi gửi Jev quyết rồi làm luôn; code UI bám theo mock, có chỉnh sửa thì sửa mock trước rồi mới code; bỏ bước chờ user duyệt mock cho từng release.
+- Jev (`jev-1.13.0`) quyết:
+  - Topic làm ở R1: 0.48 (R2 0.40, để sau R5 0.12; độ tin 0.22).
+  - Mô hình topic là thuộc tính trong luồng tin của nhóm: 0.77 (mỗi topic là một chat riêng 0.23). Mỗi tin mang `topic_id` trong seq của nhóm; sync và difference vẫn theo chat; vị trí đã đọc và số chưa đọc theo (user, chat, topic); topic "Chung" có sẵn; admin đóng hoặc ẩn được topic; link topic chỉ dùng được với thành viên.
+  - Phase 2 thêm proto và schema cho topic. Phase 5 giữ schema local sẵn chỗ cho `topic_id`. Phase 6 dựng danh sách topic và khung chat theo topic theo mock.
 

@@ -35,6 +35,7 @@ Xây giao diện chat web bằng React 19 đạt cảm giác nhanh như Telegram
 ## Requirements
 
 Functional:
+- Nhóm có topic (R1): cột danh sách topic thay cho danh sách chat khi mở nhóm, khung chat theo topic, panel thông tin topic; cột thư mục bên trái và panel thông tin bên phải; tất cả theo mock `chat.html` và `desktop.html`.
 - Màn hình: chào mừng với hai nút "Đăng nhập" và "Tạo tài khoản" bằng tài khoản hoandat (chuyển sang trang của IdP, không có form email hay mật khẩu trong app), danh sách chat, khung chat, composer (text, emoji, đính kèm, reply, edit), thông tin chat/người dùng, cài đặt cơ bản (bao gồm riêng tư), tìm kiếm (giao diện, nối API ở Phase 7).
 - Formatting theo entities (bold, italic, code, pre, link, mention, spoiler…).
 - Hiển thị media (inline thumb, kích thước cố định) làm cùng Phase 4 ở release R3; ở R1–R2 composer chưa có nút đính kèm.
