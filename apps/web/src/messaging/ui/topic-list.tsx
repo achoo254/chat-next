@@ -134,9 +134,6 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 					<strong>{title}</strong>
 					<span>{copy.convo.members(chat.memberCount)}</span>
 				</div>
-				<button type="button" className="icon-btn" aria-label={copy.topics.searchInGroup} disabled title={copy.common.soon}>
-					<Icon name="search" />
-				</button>
 			</div>
 			<div className="chats topic-scroll">
 				<ul className="topic-rows" aria-label={copy.topics.topicsLabel}>

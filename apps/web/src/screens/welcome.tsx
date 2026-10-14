@@ -1,6 +1,7 @@
 import { brand } from "../brand.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n, type Locale } from "../i18n/i18n.tsx";
+import { rememberReturnPath } from "../router.tsx";
 
 const LANGUAGES: { locale: Locale; label: string }[] = [
 	{ locale: "vi", label: "Tiếng Việt" },
@@ -18,6 +19,8 @@ export function loginUrl(locale: Locale, create = false): string {
 /** Signed-out screen: sign in or create an account at the IdP. */
 export function Welcome() {
 	const { locale, t, setLocale } = useI18n();
+	// Sign-in comes back to "/"; this page (e.g. an invite link) opens again afterwards.
+	const keepPage = () => rememberReturnPath(window.location.pathname);
 	return (
 		<main className="welcome">
 			<section className="welcome-card" aria-labelledby="welcome-title">
@@ -27,10 +30,10 @@ export function Welcome() {
 				<h1 id="welcome-title">{brand.appName}</h1>
 				<p>{brand.description}</p>
 				<div className="welcome-actions">
-					<a className="btn btn-primary" href={loginUrl(locale)}>
+					<a className="btn btn-primary" href={loginUrl(locale)} onClick={keepPage}>
 						{t.welcome.signIn}
 					</a>
-					<a className="btn" href={loginUrl(locale, true)}>
+					<a className="btn" href={loginUrl(locale, true)} onClick={keepPage}>
 						{t.welcome.createAccount}
 					</a>
 				</div>

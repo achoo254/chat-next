@@ -147,7 +147,14 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 	if (services === null) return <Starting />;
 	return (
 		<ServicesContext value={services}>
-			<Screen self={self} route={route} onSelfChange={onSelfChange} onSignOut={services.signOut} moderator={moderator} />
+			<Screen
+				self={self}
+				route={route}
+				onSelfChange={onSelfChange}
+				onSignOut={services.signOut}
+				moderator={moderator}
+				blockedList={services.backend.features.has("blockedList")}
+			/>
 			<Toast />
 		</ServicesContext>
 	);
@@ -159,9 +166,11 @@ interface ScreenProps {
 	onSelfChange: (self: SelfUser) => void;
 	onSignOut: () => void;
 	moderator: boolean;
+	/** The server lists blocked people (the settings tab needs it). */
+	blockedList: boolean;
 }
 
-function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
+function Screen({ self, route, onSelfChange, onSignOut, moderator, blockedList }: ScreenProps) {
 	switch (route.name) {
 		case "home":
 		case "chat":
@@ -178,6 +187,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 						messaging={{
 							onSignOut,
 							moderation: moderator,
+							blockedList,
 							render: (tab: SettingsTab): ReactNode => (
 								<Suspense fallback={<Loading />}>
 									<SettingsExtra tab={tab} />

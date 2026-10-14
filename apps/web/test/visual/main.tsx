@@ -5,7 +5,8 @@
 // ?at=<screen> opens a screen by name (ids come from the seed, see SCREENS);
 // ?open=<scenario> clicks through to a dialog or menu state (see SCENARIOS);
 // an image on /__hold keeps the page's load event back until it is done (see
-// vite.config.ts), so render checks capture the finished state.
+// vite.config.ts), so render checks capture the finished state. Every page
+// then audits horizontal overflow (auditOverflow) and logs offenders as errors.
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
 import { EntityType } from "@app/proto-ts/messages";
 import { createRouterTransport } from "@connectrpc/connect";
@@ -20,13 +21,12 @@ import { entity, seedDemo } from "../support/demo-data.ts";
 import { fixtureConnector } from "../support/fake-chat.ts";
 
 const params = new URLSearchParams(window.location.search);
-if (params.has("open")) {
-	const hold = new Image();
-	hold.alt = "";
-	hold.hidden = true;
-	hold.src = `/__hold?${Date.now()}`;
-	document.body.append(hold);
-}
+// Every page holds its load event until the scenario (if any) and the overflow audit ran.
+const hold = new Image();
+hold.alt = "";
+hold.hidden = true;
+hold.src = `/__hold?${Date.now()}`;
+document.body.append(hold);
 const theme = params.get("theme");
 if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
 
@@ -48,6 +48,26 @@ f.send(demo.ids.users.minh, demo.ids.ops, lure, {
 const nam = f.addUser("Hoàng Nam", { username: "hoangnam" });
 f.refusesGroups.add(nam);
 f.refusesMessages.add(nam);
+// A channel you own, with a long invite link (#chat-admin, info panel).
+const announcements = f.createChat(ChatType.CHANNEL, "Thông báo vận hành hệ thống", [f.selfId, demo.ids.users.minh, demo.ids.users.ha, demo.ids.users.huy, demo.ids.users.lan], {
+	myRole: MemberRole.OWNER,
+	about: "Lịch bảo trì, sự cố và bản phát hành của các dịch vụ nội bộ: auth, chat, mail, lưu trữ. Chỉ admin đăng bài.",
+});
+f.setRole(announcements, f.selfId, MemberRole.OWNER);
+f.setRole(announcements, demo.ids.users.minh, MemberRole.ADMIN);
+f.send(f.selfId, announcements, "", { action: { kind: { case: "chatCreated", value: { title: "Thông báo vận hành hệ thống" } } } });
+f.send(f.selfId, announcements, "Tối thứ Bảy 22:00 bảo trì cụm lưu trữ, dự kiến 30 phút.");
+f.inviteLinks.set(announcements, [
+	{
+		$typeName: "app.v1.InviteLink",
+		link: "https://chat.hoandat.com/join/V-puXq3hT9mZ2cLk8RbkVUp",
+		creatorId: BigInt(f.selfId),
+		expiresAt: 0n,
+		usageLimit: 0,
+		usageCount: 3,
+		revoked: false,
+	},
+]);
 // ?at= names a screen whose path holds an id the seed assigns.
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
@@ -57,6 +77,8 @@ const SCREENS: Record<string, string> = {
 	admin: `/c/${demo.ids.ops}/admin`,
 	banned: `/c/${demo.ids.ops}/admin/banned`,
 	contact: `/contacts/${demo.ids.users.lan}`,
+	channel: `/c/${announcements}`,
+	"channel-admin": `/c/${announcements}/admin`,
 };
 const at = params.get("at");
 const screenPath = at === null ? undefined : SCREENS[at];
@@ -205,6 +227,18 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click("[role=menuitem]", "Tắt tiếng");
 		await find(() => byName("[role=menu]", "Tắt tiếng trong"));
 	},
+	"new-channel": async () => {
+		await click("button", "Tạo chat mới");
+		await click("dialog .quick button", "Tạo kênh");
+		await find(() => byName("dialog h2", "Tạo kênh"));
+	},
+	"group-empty": async () => {
+		await click("button", "Tạo chat mới");
+		await click("dialog .quick button", "Tạo nhóm");
+		await find(() => byName("dialog h2", "Tạo nhóm"));
+		await type("dialog input[type=search]", "khongcoai");
+		await find(() => document.querySelector("dialog .empty"));
+	},
 	profile: async () => {
 		await openInfo();
 		// The row's text starts with the avatar's initials.
@@ -214,15 +248,39 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 };
 
+// ------------------------------------------------------------- overflow audit
+
+function describe(element: Element): string {
+	const classes = [...element.classList].slice(0, 2).join(".");
+	return `${element.tagName.toLowerCase()}${classes === "" ? "" : `.${classes}`}`;
+}
+
+/**
+ * No horizontal scrolling anywhere: the document and every scroll container
+ * must fit their content across. Each offender is a console error, which the
+ * render check counts as an error.
+ */
+function auditOverflow(): void {
+	const containers = [document.documentElement, ...document.body.querySelectorAll("*")].filter((element) => {
+		if (element === document.documentElement) return true;
+		const overflowX = getComputedStyle(element).overflowX;
+		return overflowX === "auto" || overflowX === "scroll";
+	});
+	for (const element of containers) {
+		if (element.scrollWidth > element.clientWidth + 1) {
+			console.error(`harness: horizontal overflow in ${describe(element)}: ${element.scrollWidth}px content in ${element.clientWidth}px`);
+		}
+	}
+}
+
 const scenario = params.get("open");
 const run = scenario === null ? undefined : SCENARIOS[scenario];
-if (run !== undefined) {
-	// Wait for the first screen, then click through; on failure the screenshot shows where it stopped.
-	void find(() => document.querySelector(".app, .shell"))
-		.then(run)
-		.catch((err: unknown) => console.warn(String(err)))
-		.then(() => new Promise((resolve) => setTimeout(resolve, 300)))
-		.finally(() => void fetch("/__release"));
-} else if (scenario !== null) {
-	void fetch("/__release");
-}
+if (scenario !== null && run === undefined) console.warn(`harness: unknown scenario ${scenario}`);
+// Wait for the first screen, then click through; on failure the screenshot shows where it stopped.
+void find(() => document.querySelector(".app, .shell, .welcome"))
+	.then(run ?? (() => Promise.resolve()))
+	.catch((err: unknown) => console.warn(String(err)))
+	// Let late content (messages, member lists) render before the audit and the capture.
+	.then(() => new Promise((resolve) => setTimeout(resolve, 800)))
+	.then(auditOverflow)
+	.finally(() => void fetch("/__release"));

@@ -95,7 +95,7 @@ export function BannedList({ chatId }: { chatId: number }) {
 				</Link>
 				<div className="title">
 					<strong id={titleId}>{t.title(state.items.length, state.cursor !== "")}</strong>
-					<span>{copy.admin.sub(chat.title, chat.memberCount)}</span>
+					<span>{copy.admin.sub(chat.title, chat.memberCount, channel)}</span>
 				</div>
 			</div>
 			{!admin ? (

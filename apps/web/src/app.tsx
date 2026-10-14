@@ -5,7 +5,7 @@ import { ApiContext } from "./api/api-context.tsx";
 import { createApi, errorCode } from "./api/client.ts";
 import { Icon } from "./components/icon.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
-import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
+import { matchRoute, navigate, paths, takeReturnPath, usePathname } from "./router.tsx";
 import { Welcome } from "./screens/welcome.tsx";
 import type { MessagingConnector } from "./messaging/data/connector.ts";
 
@@ -42,7 +42,11 @@ function Root({ transport, messagingConnector }: AppProps) {
 		let active = true;
 		api.getSelf().then(
 			(self) => {
-				if (active) setBoot({ status: "ready", self });
+				if (!active) return;
+				// Back to the page opened before sign-in (an invite link, a chat).
+				const back = takeReturnPath();
+				if (back !== null && window.location.pathname === paths.home) navigate(back, { replace: true });
+				setBoot({ status: "ready", self });
 			},
 			(err: unknown) => {
 				// Unauthenticated already switched to the welcome screen through the api hook.

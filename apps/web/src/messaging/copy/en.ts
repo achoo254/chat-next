@@ -3,6 +3,9 @@ import type { MessagingCopy } from "./vi.ts";
 
 export const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
+/** The chat kind in copy that names it: channels are never called groups. */
+export const kind = (channel: boolean): string => (channel ? "channel" : "group");
+
 export const en: MessagingCopy = {
 	common: {
 		cancel: "Cancel",
@@ -11,7 +14,6 @@ export const en: MessagingCopy = {
 		done: "Done",
 		retry: "Try again",
 		you: "You",
-		soon: "Coming later",
 		copied: "Copied",
 		failed: "That did not work. Try again in a few minutes.",
 		loadFailed: "Could not load data. Check your connection and try again.",
@@ -40,7 +42,7 @@ export const en: MessagingCopy = {
 	list: {
 		label: "Chat list",
 		search: "Search chats and messages",
-		searchPlaceholder: "Search chats, messages",
+		searchPlaceholder: "Search",
 		newChat: "New chat",
 		firstLoad: "Loading your chats for the first time…",
 		draft: "Draft:",
@@ -105,7 +107,8 @@ export const en: MessagingCopy = {
 		unsupportedTitle: "This message needs a newer version",
 		unsupportedBody: (name: string) => `${name} sent a kind of message this version cannot show yet.`,
 		reload: "Reload to update",
-		mediaLater: "Photos, videos and files show in a later release. Any text that came with it is below.",
+		media: "This version of the app cannot show photos, videos and files. Any text that came with it is below.",
+		mediaPreview: "Photo, video or file",
 		integration: (label: string) => `Integration: ${label}`,
 		reactedBy: (emoji: string, names: string) => `${emoji} ${names}`,
 		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
@@ -113,13 +116,13 @@ export const en: MessagingCopy = {
 		deleted: "Message deleted",
 	},
 	system: {
-		chatCreated: (actor: string, title: string) => `${actor} created the group “${title}”`,
+		chatCreated: (actor: string, title: string, channel: boolean) => `${actor} created the ${kind(channel)} “${title}”`,
 		membersAdded: (actor: string, names: string) => `${actor} added ${names}`,
-		memberLeft: (actor: string) => `${actor} left the group`,
-		memberRemoved: (actor: string, name: string) => `${actor} removed ${name}`,
-		titleChanged: (actor: string, title: string) => `${actor} renamed the group to “${title}”`,
-		photoChanged: (actor: string) => `${actor} changed the group photo`,
-		photoRemoved: (actor: string) => `${actor} removed the group photo`,
+		memberLeft: (actor: string, channel: boolean) => `${actor} left the ${kind(channel)}`,
+		memberRemoved: (actor: string, name: string, channel: boolean) => `${actor} removed ${name} from the ${kind(channel)}`,
+		titleChanged: (actor: string, title: string, channel: boolean) => `${actor} renamed the ${kind(channel)} to “${title}”`,
+		photoChanged: (actor: string, channel: boolean) => `${actor} changed the ${kind(channel)} photo`,
+		photoRemoved: (actor: string, channel: boolean) => `${actor} removed the ${kind(channel)} photo`,
 		pinned: (actor: string, text: string) => (text === "" ? `${actor} pinned a message` : `${actor} pinned “${text}”`),
 		historyOn: (actor: string) => `${actor} turned on: new members can see history`,
 		historyOff: (actor: string) => `${actor} turned off: new members can see history`,
@@ -158,7 +161,6 @@ export const en: MessagingCopy = {
 		list: (group: string) => `Topics of ${group}`,
 		topicsLabel: "Topics",
 		backToChats: "Back to chats",
-		searchInGroup: "Search in group",
 		searchInTopic: "Search in topic",
 		info: "Topic info",
 		messageCount: (n: number) => plural(n, "message", "messages"),

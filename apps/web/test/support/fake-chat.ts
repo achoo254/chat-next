@@ -584,7 +584,7 @@ export class ChatFixture {
 				this.invites.push({ chatId, expiresAt: num(req.expiresAt), usageLimit: req.usageLimit });
 				const invite = {
 					$typeName: "app.v1.InviteLink" as const,
-					link: `https://chat.example.test/+q7XrN2bT${this.invites.length}`,
+					link: `https://chat.example.test/join/q7XrN2bTk4RbZ9wLc1Np${this.invites.length}`,
 					creatorId: BigInt(this.selfId),
 					expiresAt: req.expiresAt,
 					usageLimit: req.usageLimit,
@@ -602,7 +602,7 @@ export class ChatFixture {
 				return { invite };
 			},
 			checkInvite: (req) => {
-				const token = req.link.replace(/^.*\+/, "");
+				const token = req.link.replace(/^.*[/+]/, "");
 				const found = this.inviteChecks.get(token);
 				if (found === undefined) throw new ConnectError("invite expired", Code.NotFound);
 				if (found.banned === true) throw new ConnectError("you were removed from this chat by an admin", Code.PermissionDenied);

@@ -33,3 +33,14 @@ export function usePeopleSearch(query: string): { people: Person[] | null; faile
 	if (clean === "" || result === null || result.query !== clean) return { people: null, failed: false };
 	return { people: result.people, failed: result.failed };
 }
+
+/**
+ * Whether `query` names the signed-in user: their username (with or without
+ * "@") or their email, in any letter case. Search never returns yourself, so
+ * an empty result for this query says so instead of "nobody found".
+ */
+export function isOwnAccount(query: string, self: { username: string; email: string }): boolean {
+	const clean = query.trim().replace(/^@/, "").toLowerCase();
+	if (clean === "") return false;
+	return clean === self.username.toLowerCase() || clean === self.email.toLowerCase();
+}

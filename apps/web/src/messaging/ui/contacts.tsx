@@ -6,6 +6,7 @@
 import { fold } from "@app/core";
 import { useState, type ReactNode } from "react";
 import { Icon } from "../../components/icon.tsx";
+import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -199,17 +200,17 @@ function ContactCard({ userId, listed }: { userId: number; listed: Person | unde
 					<Icon name="message" />
 					{copy.info.message}
 				</button>
-				<button
-					type="button"
-					className="btn"
-					aria-pressed={muted}
-					disabled={!muteSupported}
-					title={muteSupported ? undefined : copy.common.soon}
-					onClick={() => backend.setMuted(privateChat, !muted).catch(() => toasts.show(copy.common.failed))}
-				>
-					<Icon name={muted ? "bell" : "bell-off"} />
-					<span>{muted ? copy.convo.unmute : copy.convo.mute}</span>
-				</button>
+				{muteSupported && (
+					<button
+						type="button"
+						className="btn"
+						aria-pressed={muted}
+						onClick={() => backend.setMuted(privateChat, !muted).catch(() => toasts.show(copy.common.failed))}
+					>
+						<Icon name={muted ? "bell" : "bell-off"} />
+						<span>{muted ? copy.convo.unmute : copy.convo.mute}</span>
+					</button>
+				)}
 				<button type="button" className="btn danger-text" onClick={toggleBlock}>
 					<Icon name="ban" />
 					{isBlocked ? copy.info.unblock : copy.info.block}
@@ -223,7 +224,7 @@ function ContactCard({ userId, listed }: { userId: number; listed: Person | unde
 					<div className="row">
 						<Icon name="user" />
 						<span className="grow">
-							@{username}
+							<MiddleTruncate text={`@${username}`} tail={4} />
 							<small>{copy.info.username}</small>
 						</span>
 						<CopyButton text={`@${username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(username)} />

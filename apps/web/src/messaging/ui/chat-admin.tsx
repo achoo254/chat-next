@@ -1,10 +1,11 @@
 // Group and channel administration (mockups/chat.html#chat-admin): member
 // permissions (a bitmask), history for new members, admins, the member and
-// banned lists, invite links and leaving. Webhooks (R2) get their own page
-// later.
+// banned lists, invite links and leaving. Channels name their people
+// subscribers and skip the member permissions and history cards.
 import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
+import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -98,7 +99,7 @@ function AdminRow({ chat, member, canDemote, onChanged }: { chat: Chat; member: 
 	const name = self ? copy.common.you : member.person.name;
 	const detail =
 		member.role === "owner"
-			? copy.admin.creator
+			? copy.admin.creator(chat.type === "channel")
 			: member.inviterId !== 0
 				? copy.admin.adminAddedBy(userName(inviter, store.selfId, copy, member.inviterId))
 				: copy.admin.adminPlain;
@@ -150,6 +151,7 @@ function AdminsCard({ chat }: { chat: Chat }) {
 	const admins = members.filter((m) => m.role !== "member");
 	const others = members.filter((m) => m.role === "member" && !m.person.isBot);
 	const owner = chat.myRole === "owner";
+	const channel = chat.type === "channel";
 	return (
 		<section className="card" aria-labelledby={id}>
 			<h3 id={id}>{copy.admin.admins}</h3>
@@ -163,8 +165,8 @@ function AdminsCard({ chat }: { chat: Chat }) {
 				{copy.admin.addAdmin}
 			</button>
 			{picking && (
-				<div className="sub-form" role="group" aria-label={copy.admin.addAdminTitle}>
-					<strong>{copy.admin.addAdminTitle}</strong>
+				<div className="sub-form" role="group" aria-label={copy.admin.addAdminTitle(channel)}>
+					<strong>{copy.admin.addAdminTitle(channel)}</strong>
 					{others.map((member) => (
 						<div className="row" key={member.person.id}>
 							<ChatAvatar id={member.person.id} name={member.person.name} size="sm" />
@@ -200,6 +202,7 @@ function MembersCard({ chat }: { chat: Chat }) {
 	const ui = useUi();
 	const [banned, setBanned] = useState<{ count: number; more: boolean } | null>(null);
 	const id = useDomId("members");
+	const channel = chat.type === "channel";
 	useEffect(() => {
 		let active = true;
 		remote.bannedMembers(chat.id).then(
@@ -214,11 +217,11 @@ function MembersCard({ chat }: { chat: Chat }) {
 	}, [remote, chat.id]);
 	return (
 		<section className="card" aria-labelledby={id}>
-			<h3 id={id}>{copy.admin.members}</h3>
+			<h3 id={id}>{copy.admin.members(channel)}</h3>
 			<div className="row">
 				<Icon name="users" />
 				<button type="button" className="grow row-link" onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
-					{copy.admin.allMembers}
+					{copy.admin.allMembers(channel)}
 					<small>{copy.admin.allMembersSub(chat.memberCount)}</small>
 				</button>
 				<Icon name="chevron-right" small />
@@ -264,14 +267,14 @@ function LinksCard({ chat }: { chat: Chat }) {
 	return (
 		<section className="card" aria-labelledby={id}>
 			<h3 id={id}>{copy.admin.links}</h3>
-			<p>{copy.admin.linksNote}</p>
+			<p>{copy.admin.linksNote(chat.type === "channel")}</p>
 			{invites.map((invite) => {
 				const active = isActiveInvite(invite, now);
 				return (
 					<div className="row" key={invite.link}>
 						<Icon name="link" />
 						<span className="grow">
-							<span className={active ? "link-mono" : "link-mono muted"}>{displayLink(invite.link)}</span>
+							<MiddleTruncate className={active ? "value" : "value muted"} text={displayLink(invite.link)} />
 							<small>
 								{copy.admin.linkMeta(
 									invite.expiresAt === 0 ? copy.admin.noExpiry : copy.admin.expiresOn(shortDate(invite.expiresAt, locale)),
@@ -344,20 +347,20 @@ function LinksCard({ chat }: { chat: Chat }) {
 	);
 }
 
-function DangerCard({ chat }: { chat: Chat }) {
+/** Leaving; the leave dialog hands ownership over when the owner leaves. */
+function LeaveCard({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const ui = useUi();
-	const id = useDomId("danger");
+	const id = useDomId("leave");
+	const channel = chat.type === "channel";
 	return (
 		<section className="card danger-zone" aria-labelledby={id}>
-			<h3 id={id}>{copy.admin.danger}</h3>
-			<p>{copy.admin.dangerNote}</p>
+			<h3 id={id}>{copy.admin.leave(channel)}</h3>
+			<p>{copy.admin.leaveNote(channel)}</p>
 			<div className="actions">
-				<button type="button" className="btn" onClick={() => ui.dialog.set({ kind: "leave", chatId: chat.id })}>
-					{chat.type === "channel" ? copy.info.leaveChannel : copy.info.leaveGroup}
-				</button>
-				<button type="button" className="btn danger-text" disabled title={copy.admin.onlyCreator}>
-					{copy.admin.deleteGroup}
+				<button type="button" className="btn danger-text" onClick={() => ui.dialog.set({ kind: "leave", chatId: chat.id })}>
+					<Icon name="logout" />
+					{channel ? copy.info.leaveChannel : copy.info.leaveGroup}
 				</button>
 			</div>
 		</section>
@@ -385,7 +388,7 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 				<ChatAvatar id={chatId} name={chat.title} />
 				<div className="title">
 					<strong>{channel ? copy.admin.channelTitle : copy.admin.groupTitle}</strong>
-					<span>{copy.admin.sub(chat.title, chat.memberCount)}</span>
+					<span title={copy.admin.sub(chat.title, chat.memberCount, channel)}>{copy.admin.sub(chat.title, chat.memberCount, channel)}</span>
 				</div>
 			</div>
 			{admin ? (
@@ -398,7 +401,7 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 					</div>
 					<div className="admin-col">
 						<LinksCard chat={chat} />
-						<DangerCard chat={chat} />
+						{!chat.left && <LeaveCard chat={chat} />}
 					</div>
 				</div>
 			) : (

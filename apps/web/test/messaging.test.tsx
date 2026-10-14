@@ -2,7 +2,7 @@
 // in-memory protocol server: chat list filtering, message rendering states,
 // composer reply/edit, topics and the info panel.
 import { Code } from "@connectrpc/connect";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType, MemberRole } from "@app/proto-ts/chats";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
@@ -232,7 +232,7 @@ describe("topics", () => {
 		expect(screen.getByPlaceholderText("Viết trong Thiết kế")).toBeTruthy();
 		const info = await screen.findByRole("complementary", { name: "Thông tin chủ đề" }, LONG);
 		expect(within(info).getByRole("heading", { name: "Thiết kế" })).toBeTruthy();
-		expect(within(info).getByText(`chat.example.test/c/${demo.ids.forum}/t/12`)).toBeTruthy();
+		expect(within(info).getByTitle(`chat.example.test/c/${demo.ids.forum}/t/12`)).toBeTruthy();
 	});
 
 	it("sends into the open topic and lets admins close a topic from its menu", async () => {
@@ -264,7 +264,7 @@ describe("info panel", () => {
 		expect(within(info).getByRole("button", { name: /Rời nhóm/ })).toBeTruthy();
 
 		await userEvent.click(within(info).getByRole("button", { name: "Tạo link mời" }));
-		expect(await within(info).findByText(/chat\.example\.test\/\+q7XrN2bT1/)).toBeTruthy();
+		expect(await within(info).findByTitle("chat.example.test/join/q7XrN2bTk4RbZ9wLc1Np1")).toBeTruthy();
 
 		await userEvent.click(within(info).getByRole("button", { name: "Đóng cột thông tin (Esc)" }));
 		expect(screen.queryByRole("complementary", { name: "Thông tin nhóm" })).toBeNull();
@@ -276,7 +276,7 @@ describe("info panel", () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.lanAnh}`);
 		const info = await screen.findByRole("complementary", { name: "Thông tin" }, LONG);
-		expect(await within(info).findByText("@lananh", {}, LONG)).toBeTruthy();
+		expect(await within(info).findByTitle("@lananh", {}, LONG)).toBeTruthy();
 		expect(within(info).getByText("Thiết kế sản phẩm. Hỏi về giao diện cứ nhắn.")).toBeTruthy();
 
 		await userEvent.click(within(info).getByRole("button", { name: /^Chặn/ }));
@@ -346,7 +346,7 @@ describe("server features", () => {
 
 		const failed = await screen.findByRole("dialog", { name: "Chưa thêm được 1 người" }, LONG);
 		await userEvent.click(await within(failed).findByRole("button", { name: "Gửi link mời" }, LONG));
-		await waitFor(() => expect(demo.fixture.sent.some((m) => m.text.startsWith("https://chat.example.test/+"))).toBe(true), LONG);
+		await waitFor(() => expect(demo.fixture.sent.some((m) => m.text.startsWith("https://chat.example.test/join/"))).toBe(true), LONG);
 		expect(await within(failed).findByText("Đã gửi link mời cho Ngọc Mai")).toBeTruthy();
 	});
 
@@ -355,7 +355,7 @@ describe("server features", () => {
 		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.ops}/admin`);
 		expect(await screen.findByRole("heading", { name: "Link mời" }, LONG)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "Tạo link" }));
-		expect(await screen.findByText("chat.example.test/+q7XrN2bT1", {}, LONG)).toBeTruthy();
+		expect(await screen.findByTitle("chat.example.test/join/q7XrN2bTk4RbZ9wLc1Np1", {}, LONG)).toBeTruthy();
 		expect(demo.fixture.invites[0]?.expiresAt).toBeGreaterThan(Date.now() / 1000 + 6 * 86_400);
 		await userEvent.click(screen.getByRole("button", { name: "Thu hồi link" }));
 		expect(await screen.findByText("Đã thu hồi")).toBeTruthy();
@@ -363,7 +363,7 @@ describe("server features", () => {
 
 	it("previews an invite before joining", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, "/+teammobile");
+		renderMessaging(demo.fixture, demo.data, "/join/teammobile");
 		const dialog = await screen.findByRole("dialog", { name: "Team Mobile" }, LONG);
 		expect(within(dialog).getByText("Nhóm · 24 thành viên")).toBeTruthy();
 		expect(within(dialog).getByRole("button", { name: "Tham gia nhóm" })).toBeTruthy();
@@ -373,6 +373,142 @@ describe("server features", () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture, demo.data, "/+expiredlink");
 		expect(await screen.findByRole("dialog", { name: "Link mời không còn dùng được" }, LONG)).toBeTruthy();
+	});
+});
+
+const LONG_LINK = "https://chat.hoandat.com/join/V-puXq3hT9mZ2cLk8RbkVUp";
+
+/** A channel you own with three subscribers and a long invite link. */
+function ownedChannel() {
+	const demo = seedDemo();
+	const f = demo.fixture;
+	const { minh, ha, huy } = demo.ids.users;
+	const chatId = f.createChat(ChatType.CHANNEL, "Thông báo vận hành", [f.selfId, minh, ha, huy], { myRole: MemberRole.OWNER });
+	f.setRole(chatId, f.selfId, MemberRole.OWNER);
+	f.send(f.selfId, chatId, "", { action: { kind: { case: "chatCreated", value: { title: "Thông báo vận hành" } } } });
+	f.inviteLinks.set(chatId, [
+		{ $typeName: "app.v1.InviteLink", link: LONG_LINK, creatorId: BigInt(f.selfId), expiresAt: 0n, usageLimit: 0, usageCount: 0, revoked: false },
+	]);
+	return { demo, chatId };
+}
+
+describe("channels", () => {
+	it("names a channel a channel in the list, the chat and the info panel", async () => {
+		const { demo, chatId } = ownedChannel();
+		renderMessaging(demo.fixture, demo.data, `/c/${chatId}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		expect(await within(log).findByText("Bạn đã tạo kênh “Thông báo vận hành”", {}, LONG)).toBeTruthy();
+		expect(await within(chatList()).findByText("Bạn đã tạo kênh “Thông báo vận hành”", {}, LONG)).toBeTruthy();
+
+		const info = await screen.findByRole("complementary", { name: "Thông tin kênh" }, LONG);
+		expect(within(info).getByText("Kênh · 4 người đăng ký")).toBeTruthy();
+		expect(await within(info).findByText("Chủ kênh", {}, LONG)).toBeTruthy();
+		expect(within(info).queryByText(/Chủ nhóm|thành viên/)).toBeNull();
+		expect(within(info).getByRole("heading", { name: "4 người đăng ký" })).toBeTruthy();
+		expect(within(info).getByRole("button", { name: "Xem cả 4 người đăng ký" })).toBeTruthy();
+		// The long invite link stays whole in the DOM and the tooltip; only its look is shortened.
+		expect(await within(info).findByTitle("chat.hoandat.com/join/V-puXq3hT9mZ2cLk8RbkVUp", {}, LONG)).toBeTruthy();
+		expect(within(info).getByRole("button", { name: "Sao chép link mời" })).toBeTruthy();
+
+		await userEvent.click(within(info).getByRole("button", { name: /Thêm người đăng ký/ }));
+		const picker = await screen.findByRole("dialog", { name: "Thêm người đăng ký" }, LONG);
+		await userEvent.type(within(picker).getByRole("searchbox"), "khongcoai");
+		expect(await within(picker).findByText("Không tìm thấy ai", {}, LONG)).toBeTruthy();
+	});
+
+	it("offers only leaving on the channel admin page", async () => {
+		const { demo, chatId } = ownedChannel();
+		renderMessaging(demo.fixture, demo.data, `/c/${chatId}/admin`);
+		expect(await screen.findByRole("heading", { name: "Rời kênh" }, LONG)).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Người đăng ký" })).toBeTruthy();
+		expect(screen.getByRole("button", { name: /Tất cả người đăng ký/ })).toBeTruthy();
+		expect(await screen.findByText("Người tạo kênh", {}, LONG)).toBeTruthy();
+		expect(screen.getByText("Thông báo vận hành · 4 người đăng ký")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Rời kênh" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /^Xoá/ })).toBeNull();
+		expect(screen.queryByText(/nhóm|thành viên/)).toBeNull();
+	});
+
+	it("keeps the group wording and drops deleting on the group admin page", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.ops}/admin`);
+		expect(await screen.findByRole("heading", { name: "Rời nhóm" }, LONG)).toBeTruthy();
+		expect(screen.getByRole("button", { name: /Tất cả thành viên/ })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /^Xoá nhóm/ })).toBeNull();
+	});
+
+	it("creates a channel without a public or private choice", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, demo.data);
+		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
+		const start = await screen.findByRole("dialog", { name: "Tin nhắn mới" }, LONG);
+		await userEvent.click(within(start).getByRole("button", { name: "Tạo kênh" }));
+		const dialog = await screen.findByRole("dialog", { name: "Tạo kênh" }, LONG);
+		expect(within(dialog).queryByRole("radio")).toBeNull();
+		expect(within(dialog).queryByText(/Công khai|Riêng tư|bản sau/)).toBeNull();
+		expect(within(dialog).getByText(/Kênh chỉ vào được bằng link mời/)).toBeTruthy();
+
+		await userEvent.type(within(dialog).getByRole("textbox", { name: "Tên kênh" }), "Tin nội bộ");
+		await userEvent.click(within(dialog).getByRole("button", { name: "Tạo kênh" }));
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		expect(await within(log).findByText("Bạn đã tạo kênh “Tin nội bộ”", {}, LONG)).toBeTruthy();
+	});
+});
+
+describe("people search", () => {
+	async function openNewChat() {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, demo.data);
+		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
+		return { demo, dialog: await screen.findByRole("dialog", { name: "Tin nhắn mới" }, LONG) };
+	}
+
+	it("explains an empty result, and recognises your own account", async () => {
+		const { demo, dialog } = await openNewChat();
+		const box = within(dialog).getByRole("searchbox", { name: "Tìm người" });
+		await userEvent.type(box, "khongcoai");
+		expect(await within(dialog).findByText("Không tìm thấy ai", {}, LONG)).toBeTruthy();
+		expect(within(dialog).getByText(/cần đăng nhập chat\.hoandat\.com ít nhất một lần/)).toBeTruthy();
+
+		await userEvent.clear(box);
+		await userEvent.type(box, `@${demo.fixture.selfUsername}`);
+		expect(await within(dialog).findByText("Đây là tài khoản của bạn", {}, LONG)).toBeTruthy();
+		expect(within(dialog).queryByText("Không tìm thấy ai")).toBeNull();
+	});
+
+	it("shows the same empty state when picking group members", async () => {
+		const { dialog } = await openNewChat();
+		await userEvent.click(within(dialog).getByRole("button", { name: "Tạo nhóm" }));
+		const group = await screen.findByRole("dialog", { name: "Tạo nhóm" }, LONG);
+		await userEvent.type(within(group).getByRole("searchbox"), "khongcoai");
+		expect(await within(group).findByText("Không tìm thấy ai", {}, LONG)).toBeTruthy();
+	});
+});
+
+describe("features the server lacks", () => {
+	it("hides them instead of showing them disabled", async () => {
+		const demo = seedDemo();
+		// No backend data: the production server's feature set (no mute, no blocked list).
+		renderMessaging(demo.fixture, undefined, `/c/${demo.ids.channel}`);
+		const info = await screen.findByRole("complementary", { name: "Thông tin kênh" }, LONG);
+		expect(within(info).getByRole("button", { name: /Rời kênh/ })).toBeTruthy();
+		expect(within(info).queryByRole("button", { name: /Tắt tiếng/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: /Tắt tiếng/ })).toBeNull();
+		expect(screen.queryByText(/bản sau/)).toBeNull();
+		expect(document.querySelector("button:disabled[title]")).toBeNull();
+	});
+
+	it("leaves out settings that need them", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, undefined, "/settings/blocked");
+		expect(await screen.findByRole("heading", { level: 1, name: "Hồ sơ" }, LONG)).toBeTruthy();
+		expect(window.location.pathname).toBe("/settings/profile");
+		expect(screen.queryByRole("link", { name: "Người đã chặn" })).toBeNull();
+
+		await userEvent.click(screen.getByRole("link", { name: "Thông báo" }));
+		expect(await screen.findByRole("heading", { level: 1, name: "Thông báo" }, LONG)).toBeTruthy();
+		expect(screen.queryByText(/Theo loại chat|bản sau/)).toBeNull();
+		expect(document.querySelector("input:disabled, button:disabled")).toBeNull();
 	});
 });
 

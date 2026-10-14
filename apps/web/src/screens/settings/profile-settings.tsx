@@ -7,6 +7,7 @@ import { brand } from "../../brand.ts";
 import { Avatar } from "../../components/avatar.tsx";
 import { ExternalLink } from "../../components/external-link.tsx";
 import { Icon } from "../../components/icon.tsx";
+import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import type { Messages } from "../../i18n/vi.ts";
 
@@ -103,7 +104,7 @@ export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
 				<Avatar name={self.name} size="xl" />
 				<div>
 					<b>{self.name}</b>
-					{self.username && <span className="mono muted">@{self.username}</span>}
+					{self.username && <MiddleTruncate className="muted" text={`@${self.username}`} tail={4} />}
 				</div>
 			</div>
 
@@ -192,7 +193,7 @@ export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
 					</span>
 					<span className="grow">
 						{t.profile.email}
-						<small className="mono">{self.email || t.profile.noEmail}</small>
+						<small>{self.email === "" ? t.profile.noEmail : <MiddleTruncate text={self.email} tail={10} />}</small>
 					</span>
 					<span className="tag-neutral">{t.profile.emailSource}</span>
 				</div>

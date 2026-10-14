@@ -154,7 +154,15 @@ a.btn-primary { color: var(--c-on-primary); }
 .card > p { margin: 0 0 var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
 .card .row + .row { border-top: 1px solid var(--c-border-subtle); }
 .row > .icon { color: var(--c-icon-muted); }
-.link-mono { font-family: var(--font-mono); font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.link-mono { font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+/* Long one-line values (invite links, usernames, emails): whole when they fit, otherwise
+   the start and the end stay with "…" in the middle; the full value is in the title and
+   the copy button. Never wraps, never widens the column. */
+.mid-trunc { display: flex; min-width: 0; max-width: 100%; white-space: nowrap; contain: inline-size; }
+.mid-trunc .mid-head { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mid-trunc .mid-tail { flex: none; }
+.mid-trunc.value { font-size: 0.875rem; }
+.copy-field .mid-trunc { flex: 1; }
 .tag.grey { background: var(--c-bar-track); color: var(--c-text-muted); }
 .tag.ok { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
 .sub-form { display: grid; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
@@ -195,13 +203,6 @@ a.btn-primary { color: var(--c-on-primary); }
 .prefix-input input { flex: 1; min-width: 0; min-height: 42px; border: 0; outline: none; background: none; font-family: var(--font-mono); font-size: 0.8125rem; }
 .ok-text { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-success-text); }
 .ok-text .icon { width: 14px; height: 14px; }
-.radio-cards { display: grid; gap: var(--space-2); }
-.radio-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--space-3); align-items: start; width: 100%; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); text-align: left; }
-.radio-card .icon { grid-row: span 2; margin-top: 2px; color: var(--c-icon-muted); }
-.radio-card b { font-weight: 600; }
-.radio-card small { font-size: 0.8125rem; color: var(--c-text-muted); }
-.radio-card[aria-checked="true"] { border-color: var(--c-primary); background: var(--c-selected); }
-.radio-card[aria-checked="true"] .icon { color: var(--c-primary); }
 .copy-field { display: flex; align-items: center; gap: var(--space-1); padding-left: var(--space-3); min-height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
 .copy-field .link-mono { flex: 1; min-width: 0; }
 
@@ -444,7 +445,7 @@ a.btn-primary { color: var(--c-on-primary); }
 				<label class="search-field">
 					<svg class="icon icon-sm"><use href="#i-search"/></svg>
 					<span class="sr-only">Tìm chat và tin nhắn</span>
-					<input id="search-input" type="search" placeholder="Tìm chat, tin nhắn" autocomplete="off">
+					<input id="search-input" type="search" placeholder="Tìm kiếm" autocomplete="off">
 					<span class="kbd">⌘K</span>
 				</label>
 				<a class="icon-btn" href="#new-chat" aria-label="Tạo chat mới"><svg class="icon"><use href="#i-plus"/></svg></a>
@@ -630,7 +631,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 			<section class="pane list" aria-label="Danh sách chat, tab Tất cả">
 				<div class="pane-cap">Tab Tất cả</div>
 				<div class="list-head">
-					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm chat, tin nhắn"></label>
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm kiếm"></label>
 				</div>
 				<div class="tabs" role="tablist" aria-label="Lọc chat">
 					<button type="button" role="tab" aria-selected="true">Tất cả</button>
@@ -680,7 +681,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 			<section class="pane list" aria-label="Danh sách chat, bộ lọc Bot trống">
 				<div class="pane-cap">Bộ lọc Bot, chưa có chat nào</div>
 				<div class="list-head">
-					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm chat, tin nhắn"></label>
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm kiếm"></label>
 				</div>
 				<div class="tabs" role="tablist" aria-label="Lọc chat">
 					<button type="button" role="tab" aria-selected="false">Tất cả</button>
@@ -699,7 +700,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 			<section class="pane list" aria-label="Danh sách chat đang tải lần đầu" aria-busy="true">
 				<div class="pane-cap">Lần đầu đăng nhập trên máy</div>
 				<div class="list-head">
-					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm chat, tin nhắn" disabled></label>
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm kiếm" disabled></label>
 				</div>
 				<div aria-hidden="true">
 					<div class="sk-row"><span class="sk av"></span><div><span class="sk" style="width:60%"></span><span class="sk" style="width:85%"></span></div><span class="sk"></span></div>
@@ -1360,7 +1361,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 9. New chat ======================= -->
 <section class="shot" id="new-chat">
 	<div class="shot-head"><h2>Chat mới</h2><span class="phase">Phase 2, 12</span>
-		<p>Tìm theo username (gõ dần) hoặc email. Email chỉ khớp khi gõ đúng toàn bộ địa chỉ và người đó cho phép tìm bằng email, để không dò được danh sách người dùng. Kết quả không bao giờ hiện email của người khác. Thử gõ "lan" hoặc một phần email trong ô tìm.</p></div>
+		<p>Tìm theo username (gõ dần) hoặc email. Email chỉ khớp khi gõ đúng toàn bộ địa chỉ và người đó cho phép tìm bằng email, để không dò được danh sách người dùng. Kết quả không bao giờ hiện email của người khác. Không ra ai thì hiện "Không tìm thấy ai" kèm cách tìm: đồng nghiệp phải đăng nhập chat.hoandat.com ít nhất một lần, tìm bằng username hoặc email đầy đủ; gõ username hay email của chính mình thì hiện "Đây là tài khoản của bạn". Cùng trạng thái trống này dùng cho bước chọn người của Tạo nhóm và Thêm thành viên. Thử gõ "lan", "xyz", "ductrung" hoặc một phần email trong ô tìm.</p></div>
 	<div class="frame dlg-frame" data-ghost>
 		<div class="static-dialog">
 			<div class="panel" role="group" aria-labelledby="nc-title">
@@ -1578,9 +1579,9 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 11. New channel ======================= -->
 <section class="shot" id="new-channel">
 	<div class="shot-head"><h2>Tạo kênh</h2><span class="phase">Phase 2</span>
-		<p>Kênh phát tin một chiều: chỉ admin đăng. Công khai thì có username, ai cũng mở được qua chat.hoandat.com/&lt;username&gt; và tìm thấy trong tenant. Riêng tư thì chỉ vào được bằng link mời, admin thu hồi và tạo link mới được.</p></div>
+		<p>Kênh phát tin một chiều: chỉ admin đăng. Kênh chỉ vào được bằng link mời (không có lựa chọn công khai/riêng tư); link được tạo khi bấm Tạo kênh, admin thu hồi và tạo link mới được trong Quản trị kênh.</p></div>
 	<div class="frame dlg-frame" data-ghost>
-		<div class="static-dialog pair">
+		<div class="static-dialog">
 			<div class="panel" role="group" aria-labelledby="ch1-title">
 				<div class="dlg-head"><h2 id="ch1-title">Tạo kênh</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
 				<div class="dlg-body stack">
@@ -1589,32 +1590,9 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 						<div class="field"><label for="ch-name">Tên kênh</label><input class="input" id="ch-name" value="Thông báo hoandat"></div>
 					</div>
 					<div class="field"><label for="ch-desc">Mô tả</label><textarea class="input" id="ch-desc" rows="2" style="min-height:64px">Lịch bảo trì, bản phát hành và sự cố của hệ sinh thái hoandat.</textarea></div>
-					<div class="radio-cards" role="radiogroup" aria-label="Loại kênh">
-						<button type="button" class="radio-card" role="radio" aria-checked="true"><svg class="icon"><use href="#i-globe"/></svg><b>Công khai</b><small>Có username, ai trong tổ chức cũng tìm và xem được.</small></button>
-						<button type="button" class="radio-card" role="radio" aria-checked="false"><svg class="icon"><use href="#i-lock"/></svg><b>Riêng tư</b><small>Chỉ vào được bằng link mời.</small></button>
-					</div>
-					<div class="field">
-						<label for="ch-user">Username</label>
-						<div class="prefix-input"><span>chat.hoandat.com/</span><input id="ch-user" value="thongbaohoandat" autocomplete="off"></div>
-						<span class="ok-text"><svg class="icon"><use href="#i-check"/></svg>thongbaohoandat còn trống</span>
-					</div>
+					<p class="note"><svg class="icon"><use href="#i-link"/></svg><span>Kênh chỉ vào được bằng link mời. Link khó đoán, tạo khi bấm Tạo kênh; thu hồi hoặc đặt hạn trong Quản trị kênh.</span></p>
 				</div>
 				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã tạo kênh Thông báo hoandat">Tạo kênh</button></div>
-			</div>
-			<div class="panel" role="group" aria-labelledby="ch2-title">
-				<div class="dlg-head"><h2 id="ch2-title">Tạo kênh · Riêng tư</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
-				<div class="dlg-body stack">
-					<div class="radio-cards" role="radiogroup" aria-label="Loại kênh">
-						<button type="button" class="radio-card" role="radio" aria-checked="false"><svg class="icon"><use href="#i-globe"/></svg><b>Công khai</b><small>Có username, ai trong tổ chức cũng tìm và xem được.</small></button>
-						<button type="button" class="radio-card" role="radio" aria-checked="true"><svg class="icon"><use href="#i-lock"/></svg><b>Riêng tư</b><small>Chỉ vào được bằng link mời.</small></button>
-					</div>
-					<div class="field">
-						<span class="label">Link mời</span>
-						<div class="copy-field"><span class="link-mono">chat.hoandat.com/+Hq8vT2mXk4RbZ9wLc1Np</span><button type="button" class="icon-btn" aria-label="Sao chép link mời" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button></div>
-						<span class="hint">Link khó đoán, tạo khi bấm Tạo kênh. Ai có link đều xem trước được kênh. Thu hồi hoặc đặt hạn trong Quản trị.</span>
-					</div>
-				</div>
-				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã tạo kênh riêng tư">Tạo kênh</button></div>
 			</div>
 		</div>
 	</div>
@@ -1726,7 +1704,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 14. Chat admin ======================= -->
 <section class="shot" id="chat-admin">
 	<div class="shot-head"><h2>Quản trị nhóm</h2><span class="phase">Phase 2, 9</span>
-		<p>Quyền thành viên là một bitmask: mỗi công tắc là một bit, áp cho mọi thành viên không phải admin. Link mời có hạn và giới hạn lượt dùng tuỳ chọn, thu hồi được từng link. Đổi "lịch sử cho thành viên mới" chỉ áp cho người vào sau. Thẻ Thành viên mở danh sách thành viên và danh sách Đã cấm (R1): xoá thành viên mặc định kèm cấm vào lại. Webhook quản lý ở trang riêng.</p></div>
+		<p>Quyền thành viên là một bitmask: mỗi công tắc là một bit, áp cho mọi thành viên không phải admin. Link mời có hạn và giới hạn lượt dùng tuỳ chọn, thu hồi được từng link. Đổi "lịch sử cho thành viên mới" chỉ áp cho người vào sau. Thẻ Thành viên mở danh sách thành viên và danh sách Đã cấm (R1): xoá thành viên mặc định kèm cấm vào lại. Webhook quản lý ở trang riêng. Thẻ cuối chỉ có Rời nhóm (chưa có xoá nhóm thì không hiện nút xoá). Quản trị kênh dùng cùng trang nhưng gọi đúng tên kênh: không có thẻ quyền thành viên và lịch sử; "Người đăng ký" thay "Thành viên", "Tất cả người đăng ký", "Người tạo kênh", "Rời kênh". Link mời hiện cả link bằng font giao diện; dài quá thì giữ đầu và cuối, "…" ở giữa, cả link ở tooltip và nút sao chép.</p></div>
 	<div class="frame auto">
 		<div class="admin-head">
 			<a class="icon-btn" href="#app" aria-label="Quay lại thông tin chat"><svg class="icon"><use href="#i-back"/></svg></a>
@@ -1769,9 +1747,9 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				<section class="card" aria-labelledby="links-h">
 					<h3 id="links-h">Link mời</h3>
 					<p>Người mở link thấy xem trước nhóm và phải bấm Tham gia.</p>
-					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono">chat.hoandat.com/+q7XrN2bT…</span><small>Hết hạn 21/10 · đã dùng 3/10</small></span><button type="button" class="icon-btn" aria-label="Sao chép link" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button><button type="button" class="icon-btn" aria-label="Thu hồi link" data-press="Đã thu hồi link, người mở link sẽ thấy link không còn dùng được"><svg class="icon"><use href="#i-trash"/></svg></button></div>
-					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono">chat.hoandat.com/+Lm4pW9cZ…</span><small>Không hạn · đã dùng 8</small></span><button type="button" class="icon-btn" aria-label="Sao chép link" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button><button type="button" class="icon-btn" aria-label="Thu hồi link" data-press="Đã thu hồi link"><svg class="icon"><use href="#i-trash"/></svg></button></div>
-					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono muted">chat.hoandat.com/+Ra2vQ8hY…</span><small>Hết hạn 05/10 · đã dùng 10/10</small></span><span class="tag grey">Hết hạn</span></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="mid-trunc value" title="chat.hoandat.com/join/q7XrN2bTk4RbZ9wLc1Np"><span class="mid-head">chat.hoandat.com/join/q7XrN2bTk4RbZ9</span><span class="mid-tail">wLc1Np</span></span><small>Hết hạn 21/10 · đã dùng 3/10</small></span><button type="button" class="icon-btn" aria-label="Sao chép link" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button><button type="button" class="icon-btn" aria-label="Thu hồi link" data-press="Đã thu hồi link, người mở link sẽ thấy link không còn dùng được"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="mid-trunc value" title="chat.hoandat.com/join/Lm4pW9cZr2TqX8vNb3Hk"><span class="mid-head">chat.hoandat.com/join/Lm4pW9cZr2TqX8</span><span class="mid-tail">vNb3Hk</span></span><small>Không hạn · đã dùng 8</small></span><button type="button" class="icon-btn" aria-label="Sao chép link" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button><button type="button" class="icon-btn" aria-label="Thu hồi link" data-press="Đã thu hồi link"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="mid-trunc value muted" title="chat.hoandat.com/join/Ra2vQ8hYc5WmK1pLz7Df"><span class="mid-head">chat.hoandat.com/join/Ra2vQ8hYc5WmK1</span><span class="mid-tail">pLz7Df</span></span><small>Hết hạn 05/10 · đã dùng 10/10</small></span><span class="tag grey">Hết hạn</span></div>
 
 					<div class="sub-form" aria-labelledby="newlink-h">
 						<strong id="newlink-h">Tạo link mới</strong>
@@ -1789,9 +1767,9 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				</section>
 
 				<section class="card danger-zone" aria-labelledby="danger-h">
-					<h3 id="danger-h">Rời hoặc xoá nhóm</h3>
-					<p>Chỉ người tạo nhóm xoá được nhóm. Xoá nhóm gỡ toàn bộ tin và media cho mọi thành viên, không khôi phục được.</p>
-					<div class="actions"><button type="button" class="btn" data-press="Đã rời nhóm">Rời nhóm</button><button type="button" class="btn danger-text" disabled title="Chỉ người tạo nhóm">Xoá nhóm</button></div>
+					<h3 id="danger-h">Rời nhóm</h3>
+					<p>Bạn sẽ không nhận tin mới từ nhóm này. Muốn quay lại cần link mời hoặc được admin thêm vào.</p>
+					<div class="actions"><button type="button" class="btn danger-text" data-press="Đã rời nhóm"><svg class="icon"><use href="#i-logout"/></svg>Rời nhóm</button></div>
 				</section>
 			</div>
 		</div>
@@ -2028,7 +2006,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 16. Info panels ======================= -->
 <section class="shot" id="info-panels">
 	<div class="shot-head"><h2>Cột thông tin: nhóm, người, bot</h2><span class="phase">R1 · Phase 2, 6, 12</span>
-		<p>Cột phải mở bằng nút "i" trên khung chat và đóng được. Ba nút nhanh ở đầu đổi theo loại chat. Bộ đếm "Đã chia sẻ" mở đúng tab của Media đã chia sẻ; ảnh, file và voice có từ R3, ở R1 chỉ có Link. Thành viên hiện trạng thái theo cài đặt riêng tư của từng người (online hoặc mức gần đúng). Bot trong nhóm ở chế độ riêng tư ghi rõ "không đọc được tin nhắn". Cột của chat 1-1 có dòng danh bạ: trạng thái hiện tại và nút "Thêm vào danh bạ" hoặc "Xoá khỏi danh bạ". "Xem cả 12 thành viên" mở danh sách thành viên, nơi admin xoá thành viên (mặc định kèm cấm vào lại). Cột của bot lên prod cùng R5.</p></div>
+		<p>Cột phải mở bằng nút "i" trên khung chat và đóng được. Ba nút nhanh ở đầu đổi theo loại chat; nút nào server chưa hỗ trợ (ví dụ Tắt tiếng) thì không hiện, các nút còn lại chia đều hàng và không bao giờ ngắn hơn chữ của chúng. Kênh luôn gọi đúng tên kênh: "người đăng ký" thay "thành viên", "Thêm người đăng ký", huy hiệu "Chủ kênh". Link mời hiện bằng font giao diện; dài quá thì giữ đầu và cuối với "…" ở giữa, cả link ở tooltip và nút sao chép, cột không bao giờ cuộn ngang. Bộ đếm "Đã chia sẻ" mở đúng tab của Media đã chia sẻ; ảnh, file và voice có từ R3, ở R1 chỉ có Link. Thành viên hiện trạng thái theo cài đặt riêng tư của từng người (online hoặc mức gần đúng). Bot trong nhóm ở chế độ riêng tư ghi rõ "không đọc được tin nhắn". Cột của chat 1-1 có dòng danh bạ: trạng thái hiện tại và nút "Thêm vào danh bạ" hoặc "Xoá khỏi danh bạ". "Xem cả 12 thành viên" mở danh sách thành viên, nơi admin xoá thành viên (mặc định kèm cấm vào lại). Cột của bot lên prod cùng R5.</p></div>
 	<div class="frame auto">
 		<div class="split infos">
 			<aside class="info" aria-label="Thông tin nhóm Vận hành hệ thống">
@@ -2046,7 +2024,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				</div>
 				<div class="info-sec">
 					<div class="row"><svg class="icon"><use href="#i-info"/></svg><span class="grow">Kênh trực sự cố của đội vận hành. Cảnh báo tự động vào đây.<small>Mô tả</small></span></div>
-					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono">chat.hoandat.com/+q7XrN2bT…</span><small>Link mời · hết hạn 21/10</small></span><button type="button" class="icon-btn" aria-label="Sao chép link mời" data-copied="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="mid-trunc value" title="chat.hoandat.com/join/q7XrN2bTk4RbZ9wLc1Np"><span class="mid-head">chat.hoandat.com/join/q7XrN2bTk4RbZ9</span><span class="mid-tail">wLc1Np</span></span><small>Link mời · hết hạn 21/10</small></span><button type="button" class="icon-btn" aria-label="Sao chép link mời" data-copied="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button></div>
 				</div>
 				<div class="info-sec">
 					<h3>Đã chia sẻ</h3>
@@ -2064,6 +2042,33 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 					<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh<small>truy cập gần đây</small></span></div>
 					<div class="row"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span class="grow">Deploy Bot<small>bot · không đọc được tin nhắn</small></span></div>
 					<a class="see-all" href="#member-remove">Xem cả 12 thành viên</a>
+				</div>
+			</aside>
+
+			<aside class="info" aria-label="Thông tin kênh Thông báo vận hành hệ thống">
+				<div class="pane-cap">Kênh · bạn là chủ kênh</div>
+				<div class="info-head"><span>Thông tin kênh</span><button type="button" class="icon-btn" aria-label="Đóng cột thông tin"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="info-hero">
+					<span class="avatar lg av-cyan">TT</span>
+					<h2>Thông báo vận hành hệ thống</h2>
+					<span class="muted">Kênh · 5 người đăng ký</span>
+				</div>
+				<div class="profile-actions">
+					<button type="button" class="btn" aria-pressed="false" data-mute><svg class="icon"><use href="#i-bell-off"/></svg><span>Tắt tiếng</span></button>
+					<a class="btn" href="#chat-admin"><svg class="icon"><use href="#i-settings"/></svg>Quản lý</a>
+					<button type="button" class="btn danger-text" data-press="Đã rời kênh"><svg class="icon"><use href="#i-logout"/></svg>Rời kênh</button>
+				</div>
+				<div class="info-sec">
+					<div class="row"><svg class="icon"><use href="#i-info"/></svg><span class="grow">Lịch bảo trì, sự cố và bản phát hành của các dịch vụ nội bộ. Chỉ admin đăng bài.<small>Mô tả</small></span></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="mid-trunc value" title="chat.hoandat.com/join/V-puXq3hT9mZ2cLk8RbkVUp"><span class="mid-head">chat.hoandat.com/join/V-puXq3hT9mZ2cLk8</span><span class="mid-tail">RbkVUp</span></span><small>Link mời · không hạn</small></span><button type="button" class="icon-btn" aria-label="Sao chép link mời" data-copied="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+				</div>
+				<div class="info-sec">
+					<div class="sec-head"><h3>5 người đăng ký</h3><button type="button" class="icon-btn" aria-label="Tìm người đăng ký"><svg class="icon icon-sm"><use href="#i-search"/></svg></button></div>
+					<button type="button" class="btn btn-block" data-toast="Chọn người để thêm vào kênh"><svg class="icon"><use href="#i-user-plus"/></svg>Thêm người đăng ký</button>
+					<div class="row"><span class="avatar sm av-violet online">ĐT</span><span class="grow">Bạn<small class="on">online</small></span><span class="tag">Chủ kênh</span></div>
+					<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh<small>truy cập gần đây</small></span><span class="tag grey">Admin</span></div>
+					<div class="row"><span class="avatar sm av-cyan online">QH</span><span class="grow">Quang Huy<small class="on">online</small></span></div>
+					<a class="see-all" href="#member-remove">Xem cả 5 người đăng ký</a>
 				</div>
 			</aside>
 
@@ -2372,7 +2377,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 						<a class="icon-btn" href="#contacts" aria-label="Danh bạ"><svg class="icon"><use href="#i-contacts"/></svg></a>
 						<a class="icon-btn" href="#new-chat" aria-label="Tạo chat mới"><svg class="icon"><use href="#i-plus"/></svg></a>
 					</header>
-					<div class="n-search"><label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat và tin nhắn</span><input type="search" placeholder="Tìm chat, tin nhắn" autocomplete="off"></label></div>
+					<div class="n-search"><label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat và tin nhắn</span><input type="search" placeholder="Tìm kiếm" autocomplete="off"></label></div>
 					<div class="tabs" role="tablist" aria-label="Lọc chat">
 						<button type="button" role="tab" aria-selected="true">Tất cả</button>
 						<button type="button" role="tab" aria-selected="false">Cá nhân</button>
@@ -2593,6 +2598,10 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 		{ name: "Minh", user: "minh", email: null, av: "av-amber", ini: "MN" },
 	];
 	const card = (p, how) => `<div class="result"><span class="avatar ${p.av}">${p.ini}</span><span><b>${escapeHtml(p.name)}</b><small>@${p.user}</small><span class="match"><svg class="icon"><use href="#i-check"/></svg>${how}</span></span><a class="btn btn-primary btn-sm" href="#app">Nhắn tin</a></div>`;
+	// Search never returns yourself: your own username or email says so instead of "nobody found".
+	const me = { user: "ductrung", email: "ductrung@hoandat.com" };
+	const none = `<div class="empty" style="padding: var(--space-4)"><svg class="icon"><use href="#i-search"/></svg><strong>Không tìm thấy ai</strong><span>Đồng nghiệp cần đăng nhập chat.hoandat.com ít nhất một lần thì mới tìm được. Tìm bằng username hoặc email đầy đủ.</span></div>`;
+	const self = `<div class="empty" style="padding: var(--space-4)"><svg class="icon"><use href="#i-user"/></svg><strong>Đây là tài khoản của bạn</strong></div>`;
 	const ncRender = () => {
 		const q = $("#nc-q").value.trim().toLowerCase().replace(/^@/, "");
 		const out = $("#nc-out");
@@ -2600,12 +2609,12 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 		if (q.includes("@")) {
 			const p = people.find((x) => x.email === q);
 			out.innerHTML = p ? card(p, "Khớp email chính xác")
-				: `<div class="empty" style="padding: var(--space-4)"><strong>Không tìm thấy</strong><span>Email phải gõ đúng toàn bộ, và người đó phải cho phép tìm bằng email.</span></div>`;
+				: q === me.email ? self : none;
 			return;
 		}
 		const hits = people.filter((x) => x.user.startsWith(q));
 		out.innerHTML = hits.length ? `<div style="display:grid; gap: var(--space-2)">${hits.map((p) => card(p, "Khớp username")).join("")}</div>`
-			: `<div class="empty" style="padding: var(--space-4)"><strong>Không có username này</strong><span>Kiểm tra lại chính tả, hoặc thử email đầy đủ.</span></div>`;
+			: q === me.user ? self : none;
 	};
 	$("#nc-q").addEventListener("input", ncRender);
 	ncRender();

@@ -3,6 +3,7 @@ import { afterEach, beforeEach } from "vitest";
 
 beforeEach(() => {
 	window.localStorage.clear();
+	window.sessionStorage.clear();
 	window.history.replaceState(null, "", "/");
 	document.documentElement.lang = "vi";
 });

@@ -20,17 +20,6 @@ export const vi = {
 		settings: "Cài đặt",
 		account: (name: string) => `Tài khoản của bạn: ${name}`,
 	},
-	home: {
-		list: "Danh sách trò chuyện",
-		search: "Tìm trò chuyện và tin nhắn",
-		searchPlaceholder: "Tìm chat, tin nhắn",
-		searchLater: "Có ở bản sau",
-		emptyTitle: "Chưa có cuộc trò chuyện",
-		emptyBody: "Nhắn tin có ở bản phát hành tiếp theo. Khi đó các cuộc trò chuyện của bạn sẽ hiện ở đây.",
-		greeting: (name: string) => `Xin chào, ${name}`,
-		mainBody: "Trong lúc chờ nhắn tin, bạn có thể hoàn thiện hồ sơ để bạn bè dễ tìm thấy bạn.",
-		openProfile: "Mở hồ sơ",
-	},
 	settings: {
 		title: "Cài đặt",
 		categories: "Danh mục cài đặt",

@@ -7,6 +7,8 @@ const issuer = new URL(brandConfig.primaryTenant.issuer);
 export const brand = {
 	appName: brandConfig.appName,
 	description: brandConfig.description,
+	/** Host of the web app for the primary tenant, e.g. chat.<domain>. */
+	webHost: brandConfig.hostTemplates.web.replace("{domain}", brandConfig.primaryTenant.domain),
 	/** Host of the IdP sign-in page, e.g. auth.<domain>. */
 	idpHost: issuer.host,
 	/** IdP account page: sign-in methods, app grants, devices. */

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Chat, User } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
+import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -107,18 +108,17 @@ function InfoHead({ title }: { title: string }) {
 	);
 }
 
+/** Shown only where the server can mute chats. */
 function MuteButton({ chatId }: { chatId: number }) {
 	const copy = useScreensCopy();
 	const { backend, toasts } = useServices();
-	const supported = backend.features.has("mute");
 	const muted = backend.isMuted(chatId);
+	if (!backend.features.has("mute")) return null;
 	return (
 		<button
 			type="button"
 			className="btn"
 			aria-pressed={muted}
-			disabled={!supported}
-			title={supported ? undefined : copy.common.soon}
 			onClick={() => backend.setMuted(chatId, !muted).catch(() => toasts.show(copy.common.failed))}
 		>
 			<Icon name={muted ? "bell" : "bell-off"} />
@@ -153,7 +153,7 @@ function InviteRow({ chat }: { chat: Chat }) {
 			<div className="row">
 				<Icon name="link" />
 				<span className="grow">
-					<span className="link-mono">{displayLink(invite.link)}</span>
+					<MiddleTruncate className="value" text={displayLink(invite.link)} />
 					<small>{invite.expiresAt === 0 ? copy.info.inviteNoExpiry : copy.info.inviteExpires(shortDate(invite.expiresAt, locale))}</small>
 				</span>
 				<CopyButton text={invite.link} label={copy.info.copyInvite} copiedLabel={copy.info.copiedInvite} />
@@ -188,6 +188,7 @@ function InviteRow({ chat }: { chat: Chat }) {
 
 function GroupMembers({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
+	const channel = chat.type === "channel";
 	const { store } = useServices();
 	const ui = useUi();
 	const [searching, setSearching] = useState(false);
@@ -199,22 +200,22 @@ function GroupMembers({ chat }: { chat: Chat }) {
 	return (
 		<div className="info-sec">
 			<div className="sec-head">
-				<h3>{copy.info.membersHead(chat.memberCount)}</h3>
-				<button type="button" className="icon-btn" aria-label={copy.info.searchMembers} aria-pressed={searching} onClick={() => setSearching((on) => !on)}>
+				<h3>{copy.info.membersHead(chat.memberCount, channel)}</h3>
+				<button type="button" className="icon-btn" aria-label={copy.info.searchMembers(channel)} aria-pressed={searching} onClick={() => setSearching((on) => !on)}>
 					<Icon name="search" small />
 				</button>
 			</div>
 			{searching && (
 				<label className="search-field member-search">
 					<Icon name="search" small />
-					<span className="sr-only">{copy.info.searchMembers}</span>
+					<span className="sr-only">{copy.info.searchMembers(channel)}</span>
 					<input type="search" value={query} autoComplete="off" onChange={(event) => setQuery(event.target.value)} />
 				</label>
 			)}
 			{canAdd && (
 				<button type="button" className="btn btn-block" onClick={() => ui.dialog.set({ kind: "addMembers", chatId: chat.id })}>
 					<Icon name="user-plus" />
-					{copy.info.addMembers}
+					{copy.info.addMembers(channel)}
 				</button>
 			)}
 			{status === "loading" && <p className="note">{copy.common.loading}</p>}
@@ -229,13 +230,14 @@ function GroupMembers({ chat }: { chat: Chat }) {
 						name={self ? copy.common.you : member.person.name}
 						isBot={member.person.isBot}
 						role={member.role}
+						channel={channel}
 						presence={member.person.presence.kind === "online" || self}
 					/>
 				);
 			})}
 			{status === "ready" && (
 				<button type="button" className="see-all" onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
-					{copy.info.seeAll(chat.memberCount)}
+					{copy.info.seeAll(chat.memberCount, channel)}
 				</button>
 			)}
 		</div>
@@ -249,10 +251,12 @@ interface MemberLineProps {
 	name: string;
 	isBot: boolean;
 	role: string;
+	/** Channel owners are "Chủ kênh", group owners "Chủ nhóm". */
+	channel: boolean;
 	presence: boolean;
 }
 
-function MemberLine({ userId, avatarName, name, isBot, role, presence }: MemberLineProps) {
+function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }: MemberLineProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store } = useServices();
@@ -267,7 +271,7 @@ function MemberLine({ userId, avatarName, name, isBot, role, presence }: MemberL
 				{name}
 				<small className={online && !isBot ? "on" : undefined}>{label}</small>
 			</span>
-			{role === "owner" && <span className="tag">{copy.info.owner}</span>}
+			{role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
 			{role === "admin" && <span className="tag grey">{copy.info.admin}</span>}
 		</button>
 	);
@@ -372,7 +376,7 @@ function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
 					<div className="row">
 						<Icon name="user" />
 						<span className="grow">
-							@{peer.username}
+							<MiddleTruncate text={`@${peer.username}`} tail={4} />
 							<small>{copy.info.username}</small>
 						</span>
 						<CopyButton text={`@${peer.username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(peer.username)} />
@@ -426,10 +430,6 @@ function TopicInfo({ chat, topic, groupTitle }: { chat: Chat; topic: Topic; grou
 			</div>
 			<div className="profile-actions">
 				<MuteButton chatId={chat.id} />
-				<button type="button" className="btn" disabled title={copy.common.soon}>
-					<Icon name="search" />
-					{copy.info.search}
-				</button>
 				{admin && (
 					<button type="button" className="btn" onClick={() => navigate(paths.chatAdmin(chat.id))}>
 						<Icon name="settings" />
@@ -441,7 +441,7 @@ function TopicInfo({ chat, topic, groupTitle }: { chat: Chat; topic: Topic; grou
 				<div className="info-sec">
 					<h3>{copy.info.topicLink}</h3>
 					<div className="copy-field">
-						<span className="link-mono">{displayLink(topic.link)}</span>
+						<MiddleTruncate className="value" text={displayLink(topic.link)} />
 						<CopyButton text={topic.link} label={copy.info.copyTopicLink} copiedLabel={copy.info.copiedTopicLink} />
 					</div>
 					<p className="note">

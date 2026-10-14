@@ -30,7 +30,7 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, chat, re
 	if (item.kind === "pending") {
 		return <PendingBubble chatId={chatId} itemKey={itemKey} pending={item.pending} chat={chat} tabbable={tabbable} />;
 	}
-	if (item.message.action !== null) return <SystemLine message={item.message} />;
+	if (item.message.action !== null) return <SystemLine message={item.message} channel={chat?.type === "channel"} />;
 	return (
 		<MessageBubble
 			chatId={chatId}
@@ -43,7 +43,7 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, chat, re
 	);
 });
 
-function SystemLine({ message }: { message: StoredMessage }) {
+function SystemLine({ message, channel }: { message: StoredMessage; channel: boolean }) {
 	const copy = useCopy();
 	const { store } = useServices();
 	const actor = useUser(message.fromId === store.selfId ? 0 : message.fromId);
@@ -54,8 +54,8 @@ function SystemLine({ message }: { message: StoredMessage }) {
 	const actorName = userName(actor, store.selfId, copy, message.fromId);
 	const text =
 		message.action.kind === "message_pinned"
-			? copy.system.pinned(actorName, pinned == null ? "" : messagePreview(pinned, nameOf, copy).slice(0, 60))
-			: actionText(message.action, actorName, nameOf, copy);
+			? copy.system.pinned(actorName, pinned == null ? "" : messagePreview(pinned, nameOf, copy, channel).slice(0, 60))
+			: actionText(message.action, actorName, nameOf, copy, channel);
 	return (
 		<span className="system" data-seq={message.seq}>
 			{text}
@@ -95,6 +95,7 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 	const copy = useCopy();
 	const { store } = useServices();
 	const target = useMessage(chatId, seq);
+	const channel = useChat(chatId)?.type === "channel";
 	const author = useUser(target != null && target.fromId !== store.selfId ? target.fromId : 0);
 	if (target === undefined) return <span className="reply">…</span>;
 	if (target === null) {
@@ -109,7 +110,7 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 			onClick={() => store.openWindow(chatId, seq)}
 		>
 			<b>{name}</b>
-			<span className="q">{messagePreview(target, nameOf, copy)}</span>
+			<span className="q">{messagePreview(target, nameOf, copy, channel)}</span>
 		</button>
 	);
 }
@@ -276,7 +277,7 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 					{showSender && message.integrationLabel === "" && <span className={`who s-${tone}`}>{senderName}</span>}
 					<ForwardLine message={message} />
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
-					{message.mediaKind !== null && <p className="via">{copy.message.mediaLater}</p>}
+					{message.mediaKind !== null && <p className="via">{copy.message.media}</p>}
 					<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
 					{preview !== null && <LinkPreviewCard preview={preview} ctx={ctx} />}
 					<Reactions message={message} />

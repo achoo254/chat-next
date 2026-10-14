@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { UsersService } from "@app/proto-ts/users";
-import { screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import brandConfig from "../../../brand.config.json";
@@ -34,6 +34,35 @@ describe("boot", () => {
 		);
 		expect(document.documentElement.lang).toBe("en");
 		expect(window.localStorage.getItem("locale")).toBe("en");
+	});
+
+	it("comes back to an invite link opened before sign-in", async () => {
+		const token = "V-puXq3hT9mZ2cLk8RbkVUp";
+		// jsdom cannot follow the sign-in link; stop the navigation after the app's own click handler.
+		const stopNavigation = (event: MouseEvent) => event.preventDefault();
+		window.addEventListener("click", stopNavigation);
+		try {
+			renderApp((router) => {
+				router.service(UsersService, {
+					getSelf: () => {
+						throw new ConnectError("no session", Code.Unauthenticated);
+					},
+				});
+			}, `/join/${token}`);
+			fireEvent.click(await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" }));
+		} finally {
+			window.removeEventListener("click", stopNavigation);
+		}
+		cleanup();
+
+		// The server's callback page always lands on "/".
+		renderApp((router) => {
+			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
+		}, "/");
+		await waitFor(() => expect(window.location.pathname).toBe(`/join/${token}`));
+		// The invite route opens (this fixture knows no such link, so it reads as gone).
+		expect(await screen.findByRole("dialog", { name: "Link mời không còn dùng được" }, { timeout: 8000 })).toBeTruthy();
+		expect(window.sessionStorage.getItem("app:return-path")).toBeNull();
 	});
 
 	it("opens the chat list when signed in", async () => {

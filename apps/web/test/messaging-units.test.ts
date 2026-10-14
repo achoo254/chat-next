@@ -1,15 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import shellEnSource from "../src/i18n/en.ts?raw";
+import shellViSource from "../src/i18n/vi.ts?raw";
+import enScreensSource from "../src/messaging/copy/en-screens.ts?raw";
+import enSource from "../src/messaging/copy/en.ts?raw";
+import viScreensSource from "../src/messaging/copy/vi-screens.ts?raw";
+import viSource from "../src/messaging/copy/vi.ts?raw";
 import type { MessageEntity } from "@app/core";
 import { vi as copy } from "../src/messaging/copy/vi.ts";
 import { en } from "../src/messaging/copy/en.ts";
 import { enScreens } from "../src/messaging/copy/en-screens.ts";
 import { viScreens } from "../src/messaging/copy/vi-screens.ts";
-import { chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain } from "../src/messaging/data/format.ts";
+import { actionText, chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain } from "../src/messaging/data/format.ts";
 import { highlight } from "../src/messaging/data/highlight.ts";
 import type { Remote, ServerTopic } from "../src/messaging/data/remote.ts";
 import { loadNextTopicPage, loadTopicPages, toneForColor, topicIcon } from "../src/messaging/data/topic-mapping.ts";
+import { isOwnAccount } from "../src/messaging/ui/people-search.ts";
 import { entityTree } from "../src/messaging/ui/rich-text.tsx";
-import { matchRoute, paths } from "../src/router.tsx";
+import { matchRoute, paths, rememberReturnPath, takeReturnPath } from "../src/router.tsx";
 
 const NOW = new Date(2026, 9, 14, 18, 0); // Wed 14/10/2026 18:00 local time
 const at = (y: number, m: number, d: number, h = 9, min = 42) => Math.floor(new Date(y, m, d, h, min).getTime() / 1000);
@@ -81,12 +88,47 @@ describe("routes", () => {
 		expect(matchRoute("/c/5001")).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "chat" });
 		expect(matchRoute(paths.topic(5001, 12))).toEqual({ name: "chat", chatId: 5001, topicId: 12, panel: "chat" });
 		expect(matchRoute(paths.chatAdmin(5001))).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "admin" });
-		expect(matchRoute("/+q7XrN2bTabc")).toEqual({ name: "invite", token: "q7XrN2bTabc" });
 		expect(matchRoute("/settings/privacy")).toEqual({ name: "settings", tab: "privacy" });
 		expect(matchRoute(paths.moderation("R-1", true))).toEqual({ name: "moderation", reportId: "R-1", actions: true });
 		expect(matchRoute("/c/0")).toBeNull();
 		expect(matchRoute("/c/12345678901234567")).toBeNull();
 		expect(matchRoute("/moderation/%E0")).toBeNull();
+	});
+
+	it("opens the invite links the server hands out, and the older /+ form", () => {
+		const token = "V-puXq3hT9mZ2cLk8RbkVUp";
+		expect(paths.invite(token)).toBe(`/join/${token}`);
+		expect(matchRoute(`/join/${token}`)).toEqual({ name: "invite", token });
+		expect(matchRoute(`/join/${token}/`)).toEqual({ name: "invite", token });
+		expect(matchRoute(`/+${token}`)).toEqual({ name: "invite", token });
+		expect(matchRoute("/join/")).toBeNull();
+		expect(matchRoute(`/join/${token}/more`)).toBeNull();
+		expect(matchRoute("/join/bad token")).toBeNull();
+	});
+
+	describe("return after sign-in", () => {
+		afterEach(() => window.sessionStorage.clear());
+
+		it("returns once to the page opened before sign-in", () => {
+			rememberReturnPath("/join/V-puXq3hT9mZ2cLk8RbkVUp");
+			expect(takeReturnPath()).toBe("/join/V-puXq3hT9mZ2cLk8RbkVUp");
+			expect(takeReturnPath()).toBeNull();
+		});
+
+		it("keeps nothing for home, unknown paths or a tampered value", () => {
+			rememberReturnPath("/");
+			expect(takeReturnPath()).toBeNull();
+			rememberReturnPath("/no/such/page");
+			expect(takeReturnPath()).toBeNull();
+			window.sessionStorage.setItem("app:return-path", "https://example.net/join/abcd");
+			expect(takeReturnPath()).toBeNull();
+		});
+
+		it("forgets an earlier page when sign-in starts from home", () => {
+			rememberReturnPath("/c/5001");
+			rememberReturnPath("/");
+			expect(takeReturnPath()).toBeNull();
+		});
 	});
 
 	it("maps a topic's icon colour to the nearest avatar tone", () => {
@@ -108,6 +150,54 @@ describe("copy", () => {
 			);
 		expect(keys(en).sort()).toEqual(keys(copy).sort());
 		expect(keys(enScreens).sort()).toEqual(keys(viScreens).sort());
+	});
+});
+
+describe("channel wording", () => {
+	const nameOf = () => "Minh";
+
+	it("names a channel a channel in system messages, in both languages", () => {
+		const created = { kind: "chat_created", title: "Thông báo" } as const;
+		expect(actionText(created, "Bạn", nameOf, copy, true)).toBe("Bạn đã tạo kênh “Thông báo”");
+		expect(actionText(created, "Bạn", nameOf, copy, false)).toBe("Bạn đã tạo nhóm “Thông báo”");
+		expect(actionText({ kind: "member_left" }, "Hà", nameOf, copy, true)).toBe("Hà đã rời kênh");
+		expect(actionText({ kind: "member_removed", userId: 7, by: 1 }, "Bạn", nameOf, copy, true)).toBe("Bạn đã xoá Minh khỏi kênh");
+		expect(actionText({ kind: "title_changed", title: "Tin" }, "Bạn", nameOf, copy, true)).toBe("Bạn đã đổi tên kênh thành “Tin”");
+		expect(actionText({ kind: "photo_changed" }, "Bạn", nameOf, copy, true)).toBe("Bạn đã đổi ảnh kênh");
+		expect(actionText(created, "You", nameOf, en, true)).toBe("You created the channel “Thông báo”");
+		expect(actionText(created, "You", nameOf, en, false)).toBe("You created the group “Thông báo”");
+	});
+
+	it("counts subscribers, not members, in a channel", () => {
+		expect(viScreens.info.membersHead(5, true)).toBe("5 người đăng ký");
+		expect(viScreens.info.membersHead(5, false)).toBe("5 thành viên");
+		expect(viScreens.info.addMembers(true)).toBe("Thêm người đăng ký");
+		expect(viScreens.info.owner(true)).toBe("Chủ kênh");
+		expect(viScreens.info.owner(false)).toBe("Chủ nhóm");
+		expect(viScreens.admin.creator(true)).toBe("Người tạo kênh");
+		expect(viScreens.admin.allMembers(true)).toBe("Tất cả người đăng ký");
+		expect(viScreens.admin.leave(true)).toBe("Rời kênh");
+		expect(enScreens.info.membersHead(1, true)).toBe("1 subscriber");
+		expect(enScreens.admin.sub("News", 2, true)).toBe("News · 2 subscribers");
+	});
+
+	it("has no release labels or coming-later teasers in the product copy", () => {
+		for (const source of [viSource, enSource, viScreensSource, enScreensSource, shellViSource, shellEnSource]) {
+			expect(source).not.toMatch(/bản sau|có ở bản|Sau R\d|later release|coming later|coming soon/i);
+		}
+	});
+});
+
+describe("people search", () => {
+	const self = { username: "thang_dt", email: "thang@example.com" };
+
+	it("recognises the signed-in user's own username or email", () => {
+		expect(isOwnAccount("thang_dt", self)).toBe(true);
+		expect(isOwnAccount("  @Thang_DT ", self)).toBe(true);
+		expect(isOwnAccount("THANG@example.com", self)).toBe(true);
+		expect(isOwnAccount("thang", self)).toBe(false);
+		expect(isOwnAccount("", self)).toBe(false);
+		expect(isOwnAccount("", { username: "", email: "" })).toBe(false);
 	});
 });
 

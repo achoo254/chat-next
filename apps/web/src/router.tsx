@@ -27,13 +27,14 @@ export const paths = {
 	chatAdmin: (chatId: number) => `/c/${chatId}/admin`,
 	banned: (chatId: number) => `/c/${chatId}/admin/banned`,
 	contacts: (userId = 0) => (userId === 0 ? "/contacts" : `/contacts/${userId}`),
-	invite: (token: string) => `/+${token}`,
+	/** The link the server hands out (…/join/<token>); "/+<token>" still opens. */
+	invite: (token: string) => `/join/${token}`,
 	moderation: (reportId?: string, actions = false) =>
 		reportId === undefined ? "/moderation" : `/moderation/${encodeURIComponent(reportId)}${actions ? "/actions" : ""}`,
 } as const;
 
 const ID = /^[1-9][0-9]{0,15}$/;
-const INVITE = /^\/\+([A-Za-z0-9_-]{4,128})$/;
+const INVITE = /^\/(?:join\/|\+)([A-Za-z0-9_-]{4,128})$/;
 const REPORT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 function parseId(value: string | undefined): number | null {
@@ -94,6 +95,36 @@ export function matchRoute(pathname: string): Route | null {
 		// decodeURIComponent throws on a malformed escape: treat as unknown.
 		return null;
 	}
+}
+
+// Sign-in always lands on "/" (the server's callback page), so the page a
+// signed-out visitor opened, such as an invite link, is kept for the tab
+// and opened again once the user is signed in.
+const RETURN_KEY = "app:return-path";
+
+/** Keeps `pathname` to return to after sign-in; only known routes other than home. */
+export function rememberReturnPath(pathname: string): void {
+	const route = matchRoute(pathname);
+	try {
+		if (route === null || route.name === "home") window.sessionStorage.removeItem(RETURN_KEY);
+		else window.sessionStorage.setItem(RETURN_KEY, pathname);
+	} catch {
+		// Storage can be off (privacy mode); sign-in then lands on home.
+	}
+}
+
+/** The path kept by rememberReturnPath, once; null when none or no longer a known route. */
+export function takeReturnPath(): string | null {
+	let stored: string | null;
+	try {
+		stored = window.sessionStorage.getItem(RETURN_KEY);
+		window.sessionStorage.removeItem(RETURN_KEY);
+	} catch {
+		return null;
+	}
+	if (stored === null || !stored.startsWith("/")) return null;
+	const route = matchRoute(stored);
+	return route === null || route.name === "home" ? null : stored;
 }
 
 const listeners = new Set<() => void>();

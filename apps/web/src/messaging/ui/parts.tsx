@@ -207,16 +207,6 @@ export function Toast() {
 	);
 }
 
-/** Label for a control that exists in the mock but needs a later backend. */
-export function SoonTag({ id }: { id?: string }) {
-	const copy = useCopy();
-	return (
-		<span className="tag-neutral" id={id}>
-			{copy.common.soon}
-		</span>
-	);
-}
-
 /** Stable id for label/aria pairs. */
 export function useDomId(prefix: string): string {
 	return `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;

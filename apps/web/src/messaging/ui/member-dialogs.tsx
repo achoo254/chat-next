@@ -64,8 +64,8 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 			<div className="dlg-body stack">
 				<label className="search-field">
 					<Icon name="search" small />
-					<span className="sr-only">{t.search}</span>
-					<input type="search" placeholder={t.search} autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} />
+					<span className="sr-only">{t.search(channel)}</span>
+					<input type="search" placeholder={t.search(channel)} autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} />
 				</label>
 				{status === "loading" && <p className="note">{copy.common.loading}</p>}
 				{status === "error" && <p className="note">{copy.common.loadFailed}</p>}
@@ -83,7 +83,7 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 										{self ? copy.common.you : member.person.name}
 										<small className={online ? "on" : undefined}>{presence}</small>
 									</span>
-									{member.role === "owner" && <span className="tag">{copy.info.owner}</span>}
+									{member.role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
 									{member.role === "admin" && <span className="tag grey">{copy.info.admin}</span>}
 									{actions && (
 										<button

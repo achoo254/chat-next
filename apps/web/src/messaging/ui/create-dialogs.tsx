@@ -4,6 +4,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { fold, type DialogView } from "@app/core";
+import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -11,13 +12,37 @@ import { chatKind, dialogTitle, joinNames, messagePreview, userName } from "../d
 import { Permission, type Person } from "../data/remote.ts";
 import { useChat, useDialogOrder, useMessage, useServices, useUser } from "../data/services.tsx";
 import { inviteLinks, isActiveInvite } from "./members.ts";
-import { usePeopleSearch } from "./people-search.ts";
+import { isOwnAccount, usePeopleSearch } from "./people-search.ts";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
-import { ChatAvatar, copyText, DialogHead, Modal, SoonTag, Switch, useDomId } from "./parts.tsx";
+import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
 
 interface CloseProps {
 	onClose: () => void;
+}
+
+/**
+ * A people search that found nobody: the user's own account (the server
+ * never returns it), or someone who has not signed in yet or cannot be found.
+ */
+function NoPeopleFound({ query }: { query: string }) {
+	const copy = useScreensCopy();
+	const { self } = useServices();
+	if (isOwnAccount(query, self)) {
+		return (
+			<div className="empty compact">
+				<Icon name="user" />
+				<strong>{copy.newChat.selfTitle}</strong>
+			</div>
+		);
+	}
+	return (
+		<div className="empty compact">
+			<Icon name="search" />
+			<strong>{copy.newChat.noneTitle}</strong>
+			<span>{copy.newChat.noneBody(brand.webHost)}</span>
+		</div>
+	);
 }
 
 interface Candidate {
@@ -33,7 +58,7 @@ export function NewChatDialog({ onClose }: CloseProps) {
 	const { remote, toasts } = useServices();
 	const [query, setQuery] = useState("");
 	const [opening, setOpening] = useState(0);
-	const { people } = usePeopleSearch(query);
+	const { people, failed } = usePeopleSearch(query);
 	const id = useDomId("nc");
 	const email = query.includes("@") && !query.trim().startsWith("@");
 
@@ -52,13 +77,10 @@ export function NewChatDialog({ onClose }: CloseProps) {
 	};
 
 	let results: ReactNode = null;
-	if (people !== null && people.length === 0) {
-		results = (
-			<div className="empty compact">
-				<strong>{email ? copy.newChat.noEmailTitle : copy.newChat.noUserTitle}</strong>
-				<span>{email ? copy.newChat.noEmailBody : copy.newChat.noUserBody}</span>
-			</div>
-		);
+	if (failed) {
+		results = <p className="note">{copy.common.loadFailed}</p>;
+	} else if (people !== null && people.length === 0) {
+		results = <NoPeopleFound query={query} />;
 	} else if (people !== null) {
 		results = (
 			<div className="result-list">
@@ -156,7 +178,8 @@ function PeoplePicker({ selected, onToggle, exclude }: PickerProps) {
 	const copy = useScreensCopy();
 	const [query, setQuery] = useState("");
 	const recent = useRecentPeople();
-	const { people } = usePeopleSearch(query);
+	const { people, failed } = usePeopleSearch(query);
+	const searching = query.trim() !== "";
 	const candidates: Candidate[] =
 		query.trim() === ""
 			? recent
@@ -191,7 +214,11 @@ function PeoplePicker({ selected, onToggle, exclude }: PickerProps) {
 					</button>
 				))}
 			</div>
-			{shown.length === 0 && query.trim() === "" && <p className="note">{copy.newGroup.noPeople}</p>}
+			<div aria-live="polite">
+				{!searching && shown.length === 0 && <p className="note">{copy.newGroup.noPeople}</p>}
+				{searching && failed && <p className="note">{copy.common.loadFailed}</p>}
+				{searching && !failed && people !== null && shown.length === 0 && <NoPeopleFound query={query} />}
+			</div>
 		</>
 	);
 }
@@ -341,6 +368,7 @@ export function AddMembersDialog({ chatId, onClose }: CloseProps & { chatId: num
 	const [selected, toggle] = useSelection();
 	const [busy, setBusy] = useState(false);
 	const id = useDomId("add");
+	const channel = useChat(chatId)?.type === "channel";
 	const add = () => {
 		setBusy(true);
 		remote.addMembers(chatId, [...selected.keys()]).then(
@@ -361,7 +389,7 @@ export function AddMembersDialog({ chatId, onClose }: CloseProps & { chatId: num
 	};
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={copy.info.addMembersTitle} onClose={onClose} />
+			<DialogHead id={id} title={copy.info.addMembersTitle(channel)} onClose={onClose} />
 			<div className="dlg-body stack">
 				<PeoplePicker selected={selected} onToggle={toggle} />
 			</div>
@@ -427,24 +455,10 @@ export function NewChannelDialog({ onClose }: CloseProps) {
 					<label htmlFor={`${id}-about`}>{copy.newChannel.description}</label>
 					<textarea id={`${id}-about`} className="input" rows={2} value={about} onChange={(event) => setAbout(event.target.value)} />
 				</div>
-				<div className="radio-cards" role="radiogroup" aria-label={copy.newChannel.kind}>
-					<button type="button" className="radio-card" role="radio" aria-checked={false} aria-disabled="true" aria-describedby={`${id}-soon`}>
-						<Icon name="globe" />
-						<b>
-							{copy.newChannel.public} <SoonTag id={`${id}-soon`} />
-						</b>
-						<small>{copy.newChannel.publicHint}</small>
-					</button>
-					<button type="button" className="radio-card" role="radio" aria-checked>
-						<Icon name="lock" />
-						<b>{copy.newChannel.private}</b>
-						<small>{copy.newChannel.privateHint}</small>
-					</button>
-				</div>
-				<div className="field">
-					<span className="label">{copy.newChannel.inviteLink}</span>
-					<span className="hint">{copy.newChannel.inviteHint}</span>
-				</div>
+				<p className="note">
+					<Icon name="link" />
+					<span>{copy.newChannel.inviteHint}</span>
+				</p>
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
@@ -473,7 +487,7 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 	const order = useDialogOrder();
 	const message = useMessage(chatId, seq);
 	const author = useUser(message != null && message.fromId !== store.selfId ? message.fromId : 0);
-	useChat(chatId);
+	const channel = useChat(chatId)?.type === "channel";
 	const [query, setQuery] = useState("");
 	const [selected, toggle] = useSelection();
 	const [comment, setComment] = useState("");
@@ -519,7 +533,7 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 				{message != null && (
 					<div className="quote">
 						<b>{message.fromId === store.selfId ? copy.common.you : (author?.name ?? copy.message.unknownUser)}</b>
-						{messagePreview(message, nameOf, copy)}
+						{messagePreview(message, nameOf, copy, channel)}
 					</div>
 				)}
 				<label className="search-field">
@@ -601,6 +615,7 @@ export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFaile
 	const title = chat?.title ?? "";
 	// Admins adding a banned user lift the ban, so for them only privacy refuses.
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
+	const channel = chat?.type === "channel";
 
 	useEffect(() => {
 		let active = true;
@@ -683,7 +698,7 @@ export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFaile
 									<ChatAvatar id={person.id} name={person.name} bot={person.isBot} />
 									<span className="grow">
 										{person.name}
-										<small>{admin ? t.reason(person.name) : t.reasonMaybeBanned(person.name)}</small>
+										<small>{admin ? t.reason(person.name, channel) : t.reasonMaybeBanned(person.name, channel)}</small>
 									</span>
 								</div>
 								<div className="pick-actions" role="group" aria-label={t.otherWays(person.name)} aria-describedby={state === "refused" ? whyId : undefined}>

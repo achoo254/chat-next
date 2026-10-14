@@ -131,7 +131,7 @@ function Preview({ view, kind, draft, topics }: PreviewProps) {
 	} else if (top === null) {
 		line = copy.list.noMessages;
 	} else {
-		const text = messagePreview(top, nameOf, copy);
+		const text = messagePreview(top, nameOf, copy, kind === "channel");
 		const showFrom = top.action === null && (kind === "group" || kind === "forum" || top.fromId === store.selfId);
 		const from = top.fromId === store.selfId ? copy.common.you : (sender?.name ?? copy.message.unknownUser);
 		line = showFrom ? (

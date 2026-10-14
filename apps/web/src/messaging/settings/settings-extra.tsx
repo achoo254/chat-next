@@ -12,7 +12,7 @@ import type { BlockedUser } from "../data/pending-backend.ts";
 import type { Audience, Privacy } from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
 import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
-import { ChatAvatar, Choice, SoonTag, Switch } from "../ui/parts.tsx";
+import { ChatAvatar, Choice, Switch } from "../ui/parts.tsx";
 
 export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
 	switch (tab) {
@@ -234,7 +234,6 @@ function BlockedSettings() {
 						<Icon name="ban" />
 						<strong>{t.emptyTitle}</strong>
 						<span>{t.blockHint}</span>
-						{!supported && <SoonTag />}
 					</div>
 				)}
 			</div>
@@ -286,32 +285,8 @@ function NotificationSettings() {
 				</div>
 			)}
 			<div className="set-body">
-				<div className="card">
-					<h2 className="card-title">{t.byType}</h2>
-					<TypeRow icon="user" label={t.private} hint={t.privateHint} />
-					<TypeRow icon="users" label={t.groups} hint={t.groupsHint} />
-					<TypeRow icon="megaphone" label={t.channels} />
-				</div>
 				<p className="note">{t.whileOpen}</p>
 			</div>
 		</>
-	);
-}
-
-/** Per-type switches need per-chat notification settings on the server (pending). */
-function TypeRow({ icon, label, hint }: { icon: "user" | "users" | "megaphone"; label: string; hint?: string }) {
-	const id = `soon-${icon}`;
-	return (
-		<div className="row pad-x">
-			<span className="device">
-				<Icon name={icon} />
-			</span>
-			<span className="grow">
-				{label}
-				{hint !== undefined && <small>{hint}</small>}
-			</span>
-			<SoonTag id={id} />
-			<Switch checked label={label} disabled describedBy={id} />
-		</div>
 	);
 }

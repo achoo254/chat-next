@@ -115,23 +115,24 @@ export function oneLine(text: string, max = 140): string {
 /** Names of the users a system message talks about. */
 export type NameOf = (userId: number) => string;
 
-export function actionText(action: MessageAction, actor: string, nameOf: NameOf, copy: MessagingCopy): string {
+/** Text of a system message; `channel` names the chat a channel instead of a group. */
+export function actionText(action: MessageAction, actor: string, nameOf: NameOf, copy: MessagingCopy, channel: boolean): string {
 	const t = copy.system;
 	switch (action.kind) {
 		case "chat_created":
-			return t.chatCreated(actor, action.title);
+			return t.chatCreated(actor, action.title, channel);
 		case "members_added":
 			return t.membersAdded(actor, joinNames(action.userIds.map(nameOf), t.and));
 		case "member_left":
-			return t.memberLeft(actor);
+			return t.memberLeft(actor, channel);
 		case "member_removed":
-			return t.memberRemoved(actor, nameOf(action.userId));
+			return t.memberRemoved(actor, nameOf(action.userId), channel);
 		case "title_changed":
-			return t.titleChanged(actor, action.title);
+			return t.titleChanged(actor, action.title, channel);
 		case "photo_changed":
-			return t.photoChanged(actor);
+			return t.photoChanged(actor, channel);
 		case "photo_removed":
-			return t.photoRemoved(actor);
+			return t.photoRemoved(actor, channel);
 		case "message_pinned":
 			return t.pinned(actor, "");
 		case "history_visibility_changed":
@@ -150,11 +151,11 @@ export function joinNames(names: readonly string[], and: string): string {
 	return `${names.slice(0, -1).join(", ")}${and}${names[names.length - 1] ?? ""}`;
 }
 
-/** One-line preview of a message for the chat list and quotes. */
-export function messagePreview(message: Message, nameOf: NameOf, copy: MessagingCopy): string {
-	if (message.action !== null) return actionText(message.action, nameOf(message.fromId), nameOf, copy);
+/** One-line preview of a message for the chat list and quotes; `channel` as in actionText. */
+export function messagePreview(message: Message, nameOf: NameOf, copy: MessagingCopy, channel: boolean): string {
+	if (message.action !== null) return actionText(message.action, nameOf(message.fromId), nameOf, copy, channel);
 	if (message.text !== "") return oneLine(message.text);
-	if (message.mediaKind !== null) return copy.message.mediaLater;
+	if (message.mediaKind !== null) return copy.message.mediaPreview;
 	return copy.message.unsupportedTitle;
 }
 

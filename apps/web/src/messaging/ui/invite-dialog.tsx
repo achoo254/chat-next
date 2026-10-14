@@ -143,7 +143,7 @@ export function InviteDialog({ token }: { token: string }) {
 						<div className="dlg-body stack">
 							<p className="note">
 								<Icon name="info" />
-								<span>{known.historyShared ? copy.invite.note : copy.invite.noteSinceJoin}</span>
+								<span>{known.historyShared ? copy.invite.note(known.kind === "channel") : copy.invite.noteSinceJoin(known.kind === "channel")}</span>
 							</p>
 						</div>
 					)}

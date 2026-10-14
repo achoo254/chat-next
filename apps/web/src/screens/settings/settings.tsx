@@ -1,9 +1,9 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useEffect, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { Link, paths, type SettingsTab } from "../../router.tsx";
+import { Link, navigate, paths, type SettingsTab } from "../../router.tsx";
 import { ProfileSettings } from "./profile-settings.tsx";
 import { SessionsSettings } from "./sessions-settings.tsx";
 
@@ -33,6 +33,17 @@ export interface MessagingSettings {
 	onSignOut: () => void;
 	/** Shows the link to the moderation queue. */
 	moderation: boolean;
+	/** Shows the blocked people tab; it needs the server's blocked list. */
+	blockedList: boolean;
+}
+
+type TabGroups = readonly (readonly { tab: SettingsTab; icon: IconName }[])[];
+
+/** The tabs this session can use: features the server lacks are not shown. */
+function tabGroups(messaging: MessagingSettings | undefined): TabGroups {
+	if (messaging === undefined) return R0_GROUPS;
+	if (messaging.blockedList) return MESSAGING_GROUPS;
+	return MESSAGING_GROUPS.map((group) => group.filter((item) => item.tab !== "blocked"));
 }
 
 interface SettingsProps {
@@ -45,7 +56,11 @@ interface SettingsProps {
 /** Settings: category list plus the selected category. */
 export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) {
 	const { t } = useI18n();
-	const groups = messaging === undefined ? R0_GROUPS : MESSAGING_GROUPS;
+	const groups = tabGroups(messaging);
+	const available = groups.some((group) => group.some((item) => item.tab === tab));
+	useEffect(() => {
+		if (!available) navigate(paths.settings("profile"), { replace: true });
+	}, [available]);
 	let content: ReactNode;
 	if (tab === "profile") content = <ProfileSettings self={self} onSelfChange={onSelfChange} />;
 	else if (tab === "sessions") content = <SessionsSettings />;

@@ -22,17 +22,6 @@ export const en: Messages = {
 		settings: "Settings",
 		account: (name: string) => `Your account: ${name}`,
 	},
-	home: {
-		list: "Chat list",
-		search: "Search chats and messages",
-		searchPlaceholder: "Search chats, messages",
-		searchLater: "Coming later",
-		emptyTitle: "No conversations yet",
-		emptyBody: "Messaging arrives in the next release. Your conversations will show up here.",
-		greeting: (name: string) => `Hello, ${name}`,
-		mainBody: "While messaging is on its way, complete your profile so friends can find you.",
-		openProfile: "Open profile",
-	},
 	settings: {
 		title: "Settings",
 		categories: "Settings categories",

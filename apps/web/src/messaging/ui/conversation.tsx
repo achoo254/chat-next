@@ -74,7 +74,7 @@ function PinnedBar({ chat }: { chat: Chat }) {
 				<Icon name="pin" small />
 				<span className="txt">
 					<b>{copy.pinned.label}</b>
-					{message != null && ` · ${messagePreview(message, nameOf, copy)}`}
+					{message != null && ` · ${messagePreview(message, nameOf, copy, chat.type === "channel")}`}
 				</span>
 			</button>
 			<button
@@ -155,29 +155,23 @@ function placeholderFor(chat: Chat, topic: Topic | null, copy: MessagingCopy): s
 	return copy.composer.placeholder;
 }
 
+/** Subscribers of a channel get a mute button in place of the composer, where the server can mute. */
 function ChannelBar({ chatId }: { chatId: number }) {
 	const copy = useCopy();
 	const { backend, toasts } = useServices();
-	const supported = backend.features.has("mute");
 	const muted = backend.isMuted(chatId);
+	if (!backend.features.has("mute")) return null;
 	return (
 		<div className="sub-bar">
 			<button
 				type="button"
 				className="btn"
 				aria-pressed={muted}
-				disabled={!supported}
-				aria-describedby={supported ? undefined : "mute-later"}
 				onClick={() => backend.setMuted(chatId, !muted).catch(() => toasts.show(copy.common.failed))}
 			>
 				<Icon name={muted ? "bell" : "bell-off"} />
 				<span>{muted ? copy.convo.unmute : copy.convo.mute}</span>
 			</button>
-			{!supported && (
-				<span className="tag-neutral" id="mute-later">
-					{copy.common.soon}
-				</span>
-			)}
 		</div>
 	);
 }

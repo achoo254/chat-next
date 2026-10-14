@@ -5,6 +5,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "../../components/icon.tsx";
+import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -28,6 +29,7 @@ function Quote({ chatId, seq }: { chatId: number; seq: number }) {
 	const { locale } = useI18n();
 	const { store } = useServices();
 	const message = useMessage(chatId, seq);
+	const channel = useChat(chatId)?.type === "channel";
 	const author = useUser(message != null && message.fromId !== store.selfId ? message.fromId : 0);
 	if (message == null) return null;
 	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
@@ -37,7 +39,7 @@ function Quote({ chatId, seq }: { chatId: number; seq: number }) {
 			<b>
 				{name} · {clock(message.date, locale)}
 			</b>
-			{messagePreview(message, nameOf, copy)}
+			{messagePreview(message, nameOf, copy, channel)}
 		</div>
 	);
 }
@@ -515,6 +517,7 @@ function ReportQuote({ chatId, seq }: { chatId: number; seq: number }) {
 	const { locale } = useI18n();
 	const { store } = useServices();
 	const message = useMessage(chatId, seq);
+	const channel = useChat(chatId)?.type === "channel";
 	const author = useUser(message != null ? message.fromId : 0);
 	if (message == null) return null;
 	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
@@ -523,7 +526,7 @@ function ReportQuote({ chatId, seq }: { chatId: number; seq: number }) {
 			<b>
 				{author?.name ?? copy.message.unknownUser} · {clock(message.date, locale)}
 			</b>
-			{messagePreview(message, nameOf, copy)}
+			{messagePreview(message, nameOf, copy, channel)}
 		</blockquote>
 	);
 }
@@ -604,7 +607,7 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 					<div className="row">
 						<Icon name="user" />
 						<span className="grow">
-							@{user.username}
+							<MiddleTruncate text={`@${user.username}`} tail={4} />
 							<small>{copy.info.username}</small>
 						</span>
 						<CopyButton text={`@${user.username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(user.username)} />

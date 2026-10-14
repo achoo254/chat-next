@@ -1,6 +1,10 @@
 // Vietnamese copy of the messaging UI (release R1), taken from the approved
 // mockups. Loaded with the messaging chunk so the R0 shell stays small;
 // en.ts must provide the same keys.
+
+/** The chat kind in copy that names it: channels are never called groups. */
+const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");
+
 export const vi = {
 	common: {
 		cancel: "Huỷ",
@@ -9,7 +13,6 @@ export const vi = {
 		done: "Xong",
 		retry: "Thử lại",
 		you: "Bạn",
-		soon: "Có ở bản sau",
 		copied: "Đã sao chép",
 		failed: "Không thực hiện được, thử lại sau ít phút.",
 		loadFailed: "Không tải được dữ liệu. Kiểm tra kết nối mạng rồi thử lại.",
@@ -38,7 +41,7 @@ export const vi = {
 	list: {
 		label: "Danh sách chat",
 		search: "Tìm chat và tin nhắn",
-		searchPlaceholder: "Tìm chat, tin nhắn",
+		searchPlaceholder: "Tìm kiếm",
 		newChat: "Tạo chat mới",
 		firstLoad: "Đang tải danh sách chat lần đầu…",
 		draft: "Nháp:",
@@ -103,7 +106,8 @@ export const vi = {
 		unsupportedTitle: "Tin này cần phiên bản mới hơn",
 		unsupportedBody: (name: string) => `${name} gửi một loại tin mà bản app này chưa hiển thị được.`,
 		reload: "Tải lại để cập nhật",
-		mediaLater: "Ảnh, video và file hiển thị từ bản sau. Nội dung đi kèm vẫn ở dưới đây.",
+		media: "Bản app này chưa hiển thị được ảnh, video và file. Nội dung đi kèm ở bên dưới.",
+		mediaPreview: "Ảnh, video hoặc file",
 		integration: (label: string) => `Tích hợp: ${label}`,
 		reactedBy: (emoji: string, names: string) => `${emoji} ${names}`,
 		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
@@ -111,13 +115,13 @@ export const vi = {
 		deleted: "Tin đã bị xoá",
 	},
 	system: {
-		chatCreated: (actor: string, title: string) => `${actor} đã tạo nhóm “${title}”`,
+		chatCreated: (actor: string, title: string, channel: boolean) => `${actor} đã tạo ${kind(channel)} “${title}”`,
 		membersAdded: (actor: string, names: string) => `${actor} đã thêm ${names}`,
-		memberLeft: (actor: string) => `${actor} đã rời nhóm`,
-		memberRemoved: (actor: string, name: string) => `${actor} đã xoá ${name} khỏi nhóm`,
-		titleChanged: (actor: string, title: string) => `${actor} đã đổi tên nhóm thành “${title}”`,
-		photoChanged: (actor: string) => `${actor} đã đổi ảnh nhóm`,
-		photoRemoved: (actor: string) => `${actor} đã xoá ảnh nhóm`,
+		memberLeft: (actor: string, channel: boolean) => `${actor} đã rời ${kind(channel)}`,
+		memberRemoved: (actor: string, name: string, channel: boolean) => `${actor} đã xoá ${name} khỏi ${kind(channel)}`,
+		titleChanged: (actor: string, title: string, channel: boolean) => `${actor} đã đổi tên ${kind(channel)} thành “${title}”`,
+		photoChanged: (actor: string, channel: boolean) => `${actor} đã đổi ảnh ${kind(channel)}`,
+		photoRemoved: (actor: string, channel: boolean) => `${actor} đã xoá ảnh ${kind(channel)}`,
 		pinned: (actor: string, text: string) => (text === "" ? `${actor} đã ghim một tin` : `${actor} đã ghim “${text}”`),
 		historyOn: (actor: string) => `${actor} đã bật: thành viên mới xem được lịch sử`,
 		historyOff: (actor: string) => `${actor} đã tắt: thành viên mới xem được lịch sử`,
@@ -156,7 +160,6 @@ export const vi = {
 		list: (group: string) => `Chủ đề của ${group}`,
 		topicsLabel: "Chủ đề",
 		backToChats: "Về danh sách chat",
-		searchInGroup: "Tìm trong nhóm",
 		searchInTopic: "Tìm trong chủ đề",
 		info: "Thông tin chủ đề",
 		messageCount: (n: number) => `${n} tin nhắn`,

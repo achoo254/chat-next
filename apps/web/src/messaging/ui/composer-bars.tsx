@@ -6,7 +6,7 @@ import { Icon } from "../../components/icon.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { messagePreview, userName } from "../data/format.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
-import { useMessage, useServices, useUser } from "../data/services.tsx";
+import { useChat, useMessage, useServices, useUser } from "../data/services.tsx";
 import { useIntent } from "./ui-context.tsx";
 
 /** Reply or edit bar over the composer: the quoted message jumps to it, X or Esc cancels. */
@@ -15,6 +15,7 @@ export function ComposeBar({ chatId, onCancel }: { chatId: number; onCancel: () 
 	const { store } = useServices();
 	const intent = useIntent(chatId);
 	const target = useMessage(chatId, intent?.seq ?? 0);
+	const channel = useChat(chatId)?.type === "channel";
 	const author = useUser(target != null && target.fromId !== store.selfId ? target.fromId : 0);
 	if (intent === null) return null;
 	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
@@ -25,7 +26,7 @@ export function ComposeBar({ chatId, onCancel }: { chatId: number; onCancel: () 
 			<Icon name={editing ? "edit" : "reply"} />
 			<button type="button" className="cb-text" onClick={() => store.openWindow(chatId, intent.seq)}>
 				<b>{editing ? copy.composerBars.editing : copy.composerBars.replyTo(name)}</b>
-				<span>{target == null ? "…" : messagePreview(target, nameOf, copy)}</span>
+				<span>{target == null ? "…" : messagePreview(target, nameOf, copy, channel)}</span>
 			</button>
 			<span className="kbd" aria-hidden="true">
 				Esc
