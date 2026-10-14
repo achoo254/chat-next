@@ -347,4 +347,12 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - kiểm duyệt nâng cao;
   - số thành viên đang hoạt động cho nhóm trên 50 người;
   - fake server của core lỗi khi đẩy `pinned_dialogs`/`chat_deleted`.
+- Bù backend, core và UI so với mock, lên prod (commit `925d317`, migration 0006):
+  - nhiều tin ghim, dòng "Tin nhắn đã thu hồi";
+  - avatar người thả cảm xúc;
+  - "Đánh dấu chưa đọc" đồng bộ;
+  - cài đặt thông báo theo loại chat, áp cho badge và thông báo trình duyệt;
+  - số đang hoạt động lấy từ server.
+  - Kiểm tra: 698 test core, 141 test web, 14 test platform-web; JS khởi động 148/150 KiB.
+- R1 coi như xong phần nhắn tin. Còn lại cho R9: kiểm duyệt nâng cao, tenant theo Host. Tiếp theo: R2, incoming webhook (Phase 9).
 
