@@ -11,7 +11,7 @@ install -m 644 "$ROOT/releases/$ID/nginx/chat.hoandat.com.conf" /etc/nginx/conf.
 nginx -t
 ln -sfn "$ROOT/releases/$ID" "$ROOT/current"
 systemctl reload nginx
-pm2 reload chat-api --update-env
+pm2 startOrReload /opt/chat/infra/ecosystem.config.cjs --only chat-api --update-env
 for _ in $(seq 1 30); do
 	curl -fsS --max-time 2 http://127.0.0.1:4600/healthz | grep -q '"db":"connected"' && { echo "switched to $ID"; exit 0; }
 	sleep 1

@@ -39,7 +39,7 @@ rollback() {
 		ln -sfn "$PREV" "$ROOT/current"
 		[ -f "$PREV/nginx/chat.hoandat.com.conf" ] && install -m 644 "$PREV/nginx/chat.hoandat.com.conf" "$CONF"
 		nginx -t && systemctl reload nginx || true
-		pm2 reload chat-api --update-env || true
+		pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || true
 	fi
 	exit 1
 }
@@ -56,11 +56,9 @@ fi
 echo "== switch and start"
 ln -sfn "$NEW" "$ROOT/current"
 systemctl reload nginx
-if pm2 describe chat-api >/dev/null 2>&1; then
-	pm2 reload chat-api --update-env || rollback
-else
-	pm2 start "$ROOT/infra/ecosystem.config.cjs" || rollback
-fi
+# Through the ecosystem file, so option changes (kill_timeout, memory cap)
+# apply on every deploy.
+pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || rollback
 pm2 save >/dev/null
 health || rollback
 
