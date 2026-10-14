@@ -21,9 +21,17 @@ const RETURN_TO_MAX = 512;
  */
 export function isReturnPath(path: string): boolean {
 	if (path === "" || path.length > RETURN_TO_MAX || !path.startsWith("/") || path.startsWith("//")) return false;
-	if (/[\\\s\u0000-\u001f\u007f]/u.test(path)) return false;
+	if (/[\\\s]/u.test(path) || hasControlChar(path)) return false;
 	const lower = path.toLowerCase();
 	return !(lower === "/auth" || lower.startsWith("/auth/") || lower.startsWith("/auth?") || lower.startsWith("/auth#"));
+}
+
+function hasControlChar(value: string): boolean {
+	for (let i = 0; i < value.length; i += 1) {
+		const code = value.charCodeAt(i);
+		if (code <= 0x1f || code === 0x7f) return true;
+	}
+	return false;
 }
 
 /**
