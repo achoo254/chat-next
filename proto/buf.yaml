@@ -1,0 +1,11 @@
+# Protobuf contract between clients and server (source of truth).
+# Files live under app/v1 so the import path is "app/v1/<domain>.proto".
+version: v2
+modules:
+  - path: .
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

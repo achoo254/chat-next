@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot và Mini App — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* Author display rules below must not beat the hidden attribute. */
+[hidden] { display: none !important; }
+/* ---- Frame layouts used on this page ---- */
+.frame > .convo, .frame > .duo, .frame > .panes { height: 100%; }
+/* Several states of one screen, side by side. */
+.panes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.pane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--c-border-subtle); }
+.pane:last-child { border-right: 0; }
+.pane > .convo, .pane > .miniapp { flex: 1; min-height: 0; }
+.pane-cap {
+	padding: var(--space-2) var(--space-4); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+	color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle);
+}
+/* Chat plus a side panel (Mini App, chat info). */
+.duo { display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+.duo.narrow-side { grid-template-columns: minmax(0, 1fr) 340px; }
+.side { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; background: var(--c-surface); border-left: 1px solid var(--c-border-subtle); }
+.convo-head .title .sub { display: flex; align-items: center; gap: var(--space-1); }
+
+/* ---- Bot profile in an empty chat ---- */
+.bot-card {
+	align-self: center; display: grid; justify-items: center; gap: var(--space-2); width: min(100%, 420px);
+	margin: auto 0; padding: var(--space-6) var(--space-5); text-align: center;
+	background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-lg);
+}
+.bot-card .avatar { width: 72px; height: 72px; }
+.bot-card .avatar .icon { width: 32px; height: 32px; }
+.bot-card h3 { margin: var(--space-1) 0 0; font-size: 1.125rem; font-weight: 600; display: flex; align-items: center; gap: var(--space-1); }
+.bot-card p { margin: 0; color: var(--c-text-muted); }
+.bot-card ul { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); text-align: left; width: 100%; font-size: 0.875rem; }
+.bot-card li { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: var(--space-2); }
+.bot-card li code { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text); }
+.consent-note {
+	display: flex; gap: var(--space-2); width: 100%; margin-top: var(--space-2); padding: var(--space-3);
+	border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle);
+	font-size: 0.8125rem; color: var(--c-text-muted); text-align: left;
+}
+.start-bar { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border-top: 1px solid var(--c-border-subtle); }
+.start-bar .btn { width: 100%; }
+.start-bar small { text-align: center; color: var(--c-text-muted); font-size: 0.8125rem; }
+.verified { display: inline-flex; color: var(--c-info); }
+
+/* ---- Deep link dialog ---- */
+.panel .dlg-body p { margin: var(--space-3) 0 0; }
+.dlg-foot { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-5); }
+.bot-line { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.bot-line strong { display: flex; align-items: center; gap: var(--space-1); }
+.bot-line small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
+.param { display: block; margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); overflow-wrap: anywhere; }
+.fine { font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* ---- Composer extras: command menu, reply keyboard, inline results ---- */
+.composer-wrap { position: relative; }
+.cmd-menu {
+	position: absolute; left: var(--space-4); right: var(--space-4); bottom: calc(100% + var(--space-2)); max-width: 560px;
+	background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-md); overflow: hidden;
+}
+.cmd-menu .menu-head, .inline-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-subtle); }
+.cmd-menu ul { list-style: none; margin: 0; padding: var(--space-1); }
+.cmd-menu li[role="option"] {
+	display: grid; grid-template-columns: var(--avatar-sm) minmax(0, 1fr) auto; gap: var(--space-3); align-items: center;
+	min-height: 48px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); cursor: pointer;
+}
+.cmd-menu li[role="option"]:hover { background: var(--c-hover); }
+.cmd-menu li[aria-selected="true"] { background: var(--c-selected); }
+.cmd-menu .cmd { font-family: var(--font-mono); font-size: 0.875rem; font-weight: 500; }
+.cmd-menu .desc { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.cmd-menu .owner { font-size: 0.75rem; color: var(--c-text-muted); }
+.cmd-menu .menu-foot { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); font-size: 0.75rem; color: var(--c-text-muted); }
+.cmd-menu .no-match { padding: var(--space-3); font-size: 0.875rem; color: var(--c-text-muted); }
+.reply-kb { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); padding: var(--space-2) var(--space-4) var(--space-4); background: var(--c-surface); }
+.reply-kb[hidden] { display: none; }
+.reply-kb button {
+	min-height: 52px; border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle);
+	font-weight: 500; transition: background var(--dur-fast) var(--ease-standard);
+}
+.reply-kb button:hover { background: var(--c-hover); border-color: var(--c-border-strong); }
+.reply-kb .wide { grid-column: 1 / -1; }
+.composer .icon-btn[aria-pressed="true"] { color: var(--c-text); background: var(--c-hover); }
+/* In flow, not floating: the chat above stays readable while picking a result. */
+.inline-results { margin: 0 var(--space-4) var(--space-2); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+.inline-head b { color: var(--c-text); }
+.inline-grid { display: grid; grid-auto-flow: column; grid-auto-columns: 112px; gap: var(--space-2); padding: var(--space-3); overflow-x: auto; }
+.inline-grid button { display: grid; gap: var(--space-1); padding: var(--space-1); border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font-size: 0.75rem; color: var(--c-text-muted); text-align: left; }
+.inline-grid button:hover { border-color: var(--c-border); background: var(--c-hover); }
+.thumb { aspect-ratio: 1; border-radius: var(--radius-xs); background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-amber) 30%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-cyan) 22%, var(--c-surface-subtle))); }
+.inline-grid button:nth-child(2n) .thumb { background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-violet) 22%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-amber) 24%, var(--c-surface-subtle))); }
+.inline-grid button:nth-child(3n) .thumb { background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-green) 24%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-blue) 18%, var(--c-surface-subtle))); }
+.via-bot { display: block; font-size: 0.8125rem; color: var(--c-text-muted); margin-bottom: var(--space-1); }
+.via-bot b { color: var(--c-primary); font-weight: 600; }
+.gif { width: 220px; max-width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-sm); margin-bottom: var(--space-1); position: relative; }
+.gif-tag { position: absolute; left: var(--space-2); top: var(--space-2); padding: 0 var(--space-1); border-radius: var(--radius-xs); background: var(--c-surface); font-size: 0.6875rem; font-weight: 600; }
+
+/* ---- Inline keyboard states ---- */
+.bubble .keyboard { clear: both; }
+.keyboard button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); padding: 0 var(--space-2); }
+.keyboard button[aria-busy="true"]::before {
+	content: ""; width: 12px; height: 12px; border-radius: var(--radius-full);
+	border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.cb-answer {
+	position: absolute; left: 50%; top: calc(var(--topbar-h) + var(--space-7)); transform: translateX(-50%); z-index: 2;
+	width: max-content; max-width: calc(100% - 2 * var(--space-4)); padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm);
+	background: var(--c-text); color: var(--c-surface); box-shadow: var(--shadow-md); font-size: 0.875rem;
+}
+.edited { font-style: italic; }
+.host { font-family: var(--font-mono); font-weight: 600; color: var(--c-text); }
+.url-line { display: block; margin-top: var(--space-2); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+
+/* ---- Mini App container ---- */
+.miniapp { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--c-surface); border-left: 1px solid var(--c-border-subtle); }
+.pane > .miniapp { border-left: 0; }
+.ma-head { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
+.ma-title { flex: 1; min-width: 0; padding: 0 var(--space-1); }
+.ma-title strong { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-origin { display: flex; align-items: center; gap: var(--space-1); font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-origin .icon { width: 12px; height: 12px; }
+.ma-strip { padding: var(--space-1) var(--space-3); font-size: 0.75rem; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+/* The sandboxed iframe area: content here belongs to the bot, not to the app. */
+.ma-frame { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4); background: var(--c-bg); display: grid; gap: var(--space-3); align-content: start; }
+.ma-frame h4 { margin: 0; font-size: 1rem; font-weight: 600; }
+.ma-frame .muted { font-size: 0.8125rem; }
+.rel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-3); align-items: center; width: 100%; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface); text-align: left; }
+.rel[aria-checked="true"] { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
+.rel b { font-weight: 600; font-family: var(--font-mono); font-size: 0.875rem; }
+.rel > span:not(.env) { grid-column: 1 / -1; font-size: 0.8125rem; color: var(--c-text-muted); }
+.env { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; padding: 0 var(--space-2); border-radius: var(--radius-full); background: var(--c-bar-track); color: var(--c-text-muted); }
+.env.ok { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
+.ma-main { padding: var(--space-3); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.ma-main .btn { width: 100%; }
+.popup { width: min(360px, 100%) !important; }
+.popup .dlg-body { padding-top: var(--space-4); }
+.popup h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.popup p { margin: var(--space-2) 0 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.popup .host { overflow-wrap: anywhere; }
+.popup .dlg-foot { padding-top: var(--space-2); }
+.popup-from { display: flex; align-items: center; gap: var(--space-2); font-size: 0.75rem; color: var(--c-text-muted); }
+
+/* ---- Bot in group ---- */
+.privacy-row { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-2) var(--space-3); margin-top: var(--space-1); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-size: 0.8125rem; color: var(--c-text-muted); }
+.privacy-row.open { background: color-mix(in srgb, var(--c-warning) 10%, var(--c-surface)); color: var(--c-warning-text); border-color: color-mix(in srgb, var(--c-warning) 30%, var(--c-surface)); }
+.privacy-row .icon { margin-top: 1px; }
+.side .row .grow strong { display: inline-flex; align-items: center; gap: var(--space-1); font-weight: 600; }
+.side .bot-entry { padding: var(--space-2) 0; border-bottom: 1px solid var(--c-border-subtle); }
+.side .bot-entry:last-of-type { border-bottom: 0; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+	.frame:has(> .panes), .frame:has(> .duo) { height: auto; }
+	.panes, .duo, .duo.narrow-side { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.pane { border-right: 0; border-bottom: 1px solid var(--c-border-subtle); min-height: 560px; }
+	.pane:last-child { border-bottom: 0; }
+	.duo > .convo { min-height: 560px; }
+	.duo > .miniapp, .duo > .side { border-left: 0; border-top: 1px solid var(--c-border-subtle); min-height: 600px; }
+}
+@media (max-width: 760px) {
+	.convo { min-height: 0; }
+	.pane { min-height: 0; }
+	.pane > .convo, .duo > .convo { min-height: 440px; }
+	.pane > .miniapp { min-height: 480px; }
+	.messages { padding: var(--space-3); }
+	.cmd-menu { left: var(--space-2); right: var(--space-2); }
+	.inline-results { margin: 0 var(--space-2) var(--space-2); }
+	.reply-kb { padding: var(--space-2) var(--space-3) var(--space-3); }
+	.dlg-foot { flex-wrap: wrap; }
+	.dlg-foot .btn { flex: 1 1 auto; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.icon-btn { width: 44px; height: 44px; }
+	.choice button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.keyboard button[aria-busy="true"]::before { animation: none; }
+}
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<!-- Page-local icons, outside the shared sprite. -->
+<svg width="0" height="0" class="sr-only" aria-hidden="true">
+	<symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M10 14h4"/></symbol>
+	<symbol id="i-verified" viewBox="0 0 24 24"><path d="M5 7.2A2.2 2.2 0 0 1 7.2 5h1a2.2 2.2 0 0 0 1.55-.64l.7-.7a2.2 2.2 0 0 1 3.12 0l.7.7c.42.41.98.64 1.55.64h1a2.2 2.2 0 0 1 2.2 2.2v1c0 .58.23 1.14.64 1.55l.7.7a2.2 2.2 0 0 1 0 3.12l-.7.7a2.2 2.2 0 0 0-.64 1.55v1a2.2 2.2 0 0 1-2.2 2.2h-1a2.2 2.2 0 0 0-1.55.64l-.7.7a2.2 2.2 0 0 1-3.12 0l-.7-.7a2.2 2.2 0 0 0-1.55-.64h-1A2.2 2.2 0 0 1 5 16.8v-1a2.2 2.2 0 0 0-.64-1.55l-.7-.7a2.2 2.2 0 0 1 0-3.12l.7-.7A2.2 2.2 0 0 0 5 8.2v-1M9 12l2 2 4-4"/></symbol>
+</svg>
+<main class="shots">
+
+<!-- ===================================================================== -->
+<section class="shot" id="bot-start">
+	<div class="shot-head">
+		<h2>Bắt đầu với bot</h2><span class="phase">Phase 8</span>
+		<p>Chat với bot chưa có tin nào: khung chat hiện hồ sơ bot thay cho danh sách tin, ô soạn tin được thay bằng nút Bắt đầu. Đây là bước đồng ý: trước khi bạn bấm, server từ chối mọi tin bot gửi cho bạn (403). Bấm Bắt đầu gửi <code class="mono">/start</code> và ghi consent; chặn bot thì consent bị gỡ.</p>
+	</div>
+	<div class="frame">
+		<div class="app no-info">
+			<nav class="rail" aria-label="Điều hướng">
+				<span class="avatar sm av-violet" title="Tài khoản của bạn">ĐT</span>
+				<button type="button" class="icon-btn" aria-pressed="true" aria-label="Chat"><svg class="icon"><use href="#i-message"/></svg></button>
+				<button type="button" class="icon-btn" aria-label="Tìm kiếm"><svg class="icon"><use href="#i-search"/></svg></button>
+				<span class="spacer"></span>
+				<a class="icon-btn" href="settings.html" aria-label="Cài đặt"><svg class="icon"><use href="#i-settings"/></svg></a>
+			</nav>
+			<section class="list" aria-label="Danh sách chat">
+				<ul class="chats">
+					<li class="chat-row"><span class="avatar av-blue">VH</span><div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div><div class="meta"><span>09:42</span></div></li>
+					<li class="chat-row" aria-current="true"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Chưa bắt đầu</div></div><div class="meta"><span>Mới</span></div></li>
+					<li class="chat-row"><span class="avatar av-green">LA</span><div><div class="name">Lan Anh</div><div class="preview">Link release 241 nè</div></div><div class="meta"><span>09:30</span></div></li>
+					<li class="chat-row"><span class="avatar av-cyan">QH</span><div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div><div class="meta"><span>Hôm qua</span></div></li>
+				</ul>
+			</section>
+			<section class="convo" aria-label="Deploy Bot">
+				<header class="convo-head">
+					<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+					<div class="title"><strong>Deploy Bot</strong><span class="sub">@deploy_bot · bot</span></div>
+					<button type="button" class="icon-btn" aria-label="Thêm thao tác"><svg class="icon"><use href="#i-dots"/></svg></button>
+				</header>
+				<div class="messages" id="start-messages">
+					<div class="bot-card" id="start-card">
+						<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+						<h3>Deploy Bot <span class="verified" title="Bot đã xác minh"><svg class="icon icon-sm"><use href="#i-verified"/></svg><span class="sr-only">Đã xác minh</span></span></h3>
+						<p>Theo dõi pipeline và đẩy bản phát hành lên staging hoặc production cho đội vận hành.</p>
+						<ul>
+							<li><code>/status</code><span class="muted">Trạng thái pipeline</span></li>
+							<li><code>/deploy</code><span class="muted">Đẩy một bản lên môi trường</span></li>
+							<li><code>/changelog</code><span class="muted">Thay đổi của bản mới nhất</span></li>
+						</ul>
+						<div class="consent-note"><svg class="icon icon-sm"><use href="#i-lock"/></svg><span>Deploy Bot chưa thể nhắn cho bạn. Khi bạn bấm Bắt đầu, bot thấy tên và username của bạn và được phép trả lời. Bạn có thể chặn bot bất cứ lúc nào.</span></div>
+					</div>
+					<div class="msg mine" hidden data-after-start><div class="bubble"><p>/start<span class="stamp">09:51 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+					<div class="msg" hidden data-after-start>
+						<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+						<div class="bubble"><span class="who">Deploy Bot</span><p>Chào Đức Thắng. Gõ <code>/status</code> để xem pipeline, hoặc <code>/deploy</code> để đẩy một bản.<span class="stamp">09:51</span></p></div>
+					</div>
+				</div>
+				<div class="start-bar" id="start-bar">
+					<button type="button" class="btn btn-primary" id="start-btn">Bắt đầu</button>
+					<small>Gửi /start cho Deploy Bot</small>
+				</div>
+				<form class="composer" hidden id="start-composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Lệnh của bot"><svg class="icon"><use href="#i-command"/></svg></button>
+					<label class="sr-only" for="start-draft">Tin nhắn</label>
+					<textarea id="start-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="deep-link">
+	<div class="shot-head">
+		<h2>Link bot có tham số</h2><span class="phase">Phase 8</span>
+		<p>Bấm link <code class="mono">chat.hoandat.com/b/deploy_bot?start=release-241</code> trong một chat. Client không tự gửi gì: nó mở chat với bot và hỏi lại, hiện nguyên tham số sẽ gửi. Đồng ý thì gửi <code class="mono">/start release-241</code> và ghi consent; Huỷ thì không có gì rời máy.</p>
+	</div>
+	<div class="frame">
+		<section class="convo" aria-label="Lan Anh">
+			<header class="convo-head">
+				<span class="avatar av-green">LA</span>
+				<div class="title"><strong>Lan Anh</strong><span>đang online</span></div>
+			</header>
+			<div class="messages">
+				<span class="day">Hôm nay</span>
+				<div class="msg">
+					<span class="avatar sm av-green">LA</span>
+					<div class="bubble"><p>Link release 241 nè, bấm để bot gửi changelog cho bạn: <a href="#deep-link">chat.hoandat.com/b/deploy_bot?start=release-241</a><span class="stamp">09:30</span></p></div>
+				</div>
+			</div>
+			<form class="composer" onsubmit="return false">
+				<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+				<label class="sr-only" for="dl-draft">Tin nhắn</label>
+				<textarea id="dl-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+				<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+			</form>
+		</section>
+		<div class="static-dialog">
+			<div class="panel" role="group" aria-labelledby="dl-title">
+				<div class="dlg-head"><h2 id="dl-title">Mở Deploy Bot</h2><button type="button" class="icon-btn" aria-label="Đóng" data-toast="Đã huỷ, không gửi gì cho bot"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body">
+					<div class="bot-line">
+						<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+						<div><strong>Deploy Bot <span class="verified" title="Bot đã xác minh"><svg class="icon icon-sm"><use href="#i-verified"/></svg><span class="sr-only">Đã xác minh</span></span></strong><small>@deploy_bot · bot của hoandat.com</small></div>
+					</div>
+					<p><strong>Gửi /start release-241 cho Deploy Bot?</strong></p>
+					<code class="param mono">/start release-241</code>
+					<p class="fine">Bot sẽ biết bạn mở từ link này và được phép nhắn cho bạn sau đó. Link nhận từ Lan Anh.</p>
+				</div>
+				<div class="dlg-foot">
+					<button type="button" class="btn" data-toast="Đã huỷ, không gửi gì cho bot">Huỷ</button>
+					<button type="button" class="btn btn-primary" data-toast="Đã gửi /start release-241">Gửi /start</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="commands">
+	<div class="shot-head">
+		<h2>Menu lệnh</h2><span class="phase">Phase 8</span>
+		<p>Gõ <span class="kbd">/</span> ở đầu ô soạn tin để mở menu lệnh. Trong nhóm, menu gộp lệnh của các bot thành viên theo phạm vi "mọi nhóm"; lệnh phạm vi "admin nhóm" chỉ hiện với admin (bạn không phải admin nên không thấy <code class="mono">/rollback</code>). Chọn lệnh điền <code class="mono">/lệnh@username_bot</code> để đúng bot nhận. Gõ tiếp để lọc.</p>
+	</div>
+	<div class="frame">
+		<section class="convo" aria-label="Vận hành hệ thống">
+			<header class="convo-head">
+				<span class="avatar av-blue">VH</span>
+				<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 2 bot</span></div>
+				<button type="button" class="icon-btn" aria-label="Thông tin chat"><svg class="icon"><use href="#i-info"/></svg></button>
+			</header>
+			<div class="messages">
+				<div class="msg">
+					<span class="avatar sm av-amber">MN</span>
+					<div class="bubble"><span class="who">Minh</span><p>Ai xem giúp pipeline bản 2.4.1 đang ở đâu?<span class="stamp">09:46</span></p></div>
+				</div>
+			</div>
+			<div class="composer-wrap">
+				<div class="cmd-menu" id="cmd-menu">
+					<div class="menu-head"><svg class="icon icon-sm"><use href="#i-command"/></svg>Lệnh trong nhóm này</div>
+					<ul role="listbox" id="cmd-list" aria-label="Lệnh của bot">
+						<li role="option" aria-selected="true" data-cmd="/status@deploy_bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span><span class="cmd">/status</span><span class="desc">Trạng thái pipeline và bản đang chạy</span></span><span class="owner">Deploy Bot</span></li>
+						<li role="option" aria-selected="false" data-cmd="/deploy@deploy_bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span><span class="cmd">/deploy</span><span class="desc">Đẩy một bản lên staging hoặc production</span></span><span class="owner">Deploy Bot</span></li>
+						<li role="option" aria-selected="false" data-cmd="/changelog@deploy_bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span><span class="cmd">/changelog</span><span class="desc">Thay đổi của bản mới nhất</span></span><span class="owner">Deploy Bot</span></li>
+						<li role="option" aria-selected="false" data-cmd="/ca@oncall_bot"><span class="avatar sm av-green"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span><span class="cmd">/ca</span><span class="desc">Ai đang trực ca này</span></span><span class="owner">Trực ca Bot</span></li>
+					</ul>
+					<div class="no-match" id="cmd-empty" hidden>Không có lệnh nào khớp.</div>
+					<div class="menu-foot"><span><span class="kbd">↑</span> <span class="kbd">↓</span> chọn</span><span><span class="kbd">Tab</span> điền lệnh</span><span><span class="kbd">Enter</span> gửi</span></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-pressed="true" aria-label="Menu lệnh" aria-controls="cmd-menu"><svg class="icon"><use href="#i-command"/></svg></button>
+					<label class="sr-only" for="cmd-draft">Tin nhắn</label>
+					<textarea id="cmd-draft" rows="1" placeholder="Viết tin nhắn" aria-controls="cmd-list">/</textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+		</section>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="reply-keyboard">
+	<div class="shot-head">
+		<h2>Bàn phím trả lời</h2><span class="phase">Phase 8</span>
+		<p>Bot gửi kèm bàn phím trả lời: các nút lớn thay vùng bàn phím dưới ô soạn tin. Bấm một nút gửi đúng chữ trên nút như tin thường của bạn (bot không gửi thay bạn). Nút bàn phím trong ô soạn tin ẩn hoặc hiện lại bàn phím; bàn phím dùng một lần tự ẩn sau khi bấm.</p>
+	</div>
+	<div class="frame">
+		<section class="convo" aria-label="Deploy Bot">
+			<header class="convo-head">
+				<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+				<div class="title"><strong>Deploy Bot</strong><span>@deploy_bot · bot</span></div>
+			</header>
+			<div class="messages" id="rk-messages">
+				<div class="msg mine"><div class="bubble"><p>/status<span class="stamp">09:52 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+				<div class="msg">
+					<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+					<div class="bubble"><span class="who">Deploy Bot</span><p>Chọn môi trường cần xem trạng thái.<span class="stamp">09:52</span></p></div>
+				</div>
+			</div>
+			<form class="composer" onsubmit="return false">
+				<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+				<label class="sr-only" for="rk-draft">Tin nhắn</label>
+				<textarea id="rk-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+				<button type="button" class="icon-btn" id="rk-toggle" aria-pressed="true" aria-controls="rk-pad" aria-label="Ẩn bàn phím của bot"><svg class="icon"><use href="#i-keyboard"/></svg></button>
+				<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+			</form>
+			<div class="reply-kb" id="rk-pad" role="group" aria-label="Bàn phím của Deploy Bot">
+				<button type="button">staging</button>
+				<button type="button">production</button>
+				<button type="button">lab</button>
+				<button type="button">Tất cả môi trường</button>
+				<button type="button" class="wide">Huỷ</button>
+			</div>
+		</section>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="inline-keyboard">
+	<div class="shot-head">
+		<h2>Nút inline</h2><span class="phase">Phase 8</span>
+		<p>Ba thời điểm của cùng một tin. Bấm nút callback: nút chuyển trạng thái chờ, các nút khác vẫn bấm được. Bot trả lời callback bằng một dòng ngắn tự ẩn và sửa chính tin đó (không tạo tin mới). Nút URL không mở ngay: client kiểm scheme theo allowlist (ADR 0004) rồi hỏi lại, làm nổi tên miền đích.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">1 · Đang chờ bot</div>
+				<section class="convo" aria-label="Deploy Bot, đang chờ">
+					<header class="convo-head"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div class="title"><strong>Deploy Bot</strong><span>bot</span></div></header>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+							<div class="bubble">
+								<span class="who">Deploy Bot</span>
+								<p>Bản <code>2.4.1</code> đã lên staging, 214 test xanh. Đẩy lên production không?<span class="stamp">09:43</span></p>
+								<div class="keyboard">
+									<button type="button" aria-busy="true">Lên production</button>
+									<button type="button" data-press="Bot đã nhận: Hoãn">Hoãn</button>
+									<button type="button" class="wide" data-toast="Mở xác nhận link ngoài">Xem changelog <svg class="icon icon-sm"><use href="#i-external"/></svg></button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">2 · Bot đã trả lời và sửa tin</div>
+				<section class="convo" aria-label="Deploy Bot, đã sửa tin">
+					<header class="convo-head"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div class="title"><strong>Deploy Bot</strong><span>bot</span></div></header>
+					<div class="cb-answer" role="status">Đã xếp hàng deploy 2.4.1</div>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+							<div class="bubble">
+								<span class="who">Deploy Bot</span>
+								<p>Bản <code>2.4.1</code> đang lên production, Đức Thắng bấm lúc 09:44. Theo dõi ở kênh Vận hành.<span class="stamp"><span class="edited">đã sửa</span> 09:44</span></p>
+								<div class="keyboard">
+									<button type="button" data-press="Bot đã nhận: Huỷ deploy">Huỷ deploy</button>
+									<button type="button" class="wide" data-toast="Mở xác nhận link ngoài">Xem changelog <svg class="icon icon-sm"><use href="#i-external"/></svg></button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">3 · Bấm nút URL</div>
+				<section class="convo" aria-label="Deploy Bot, mở link">
+					<header class="convo-head"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div class="title"><strong>Deploy Bot</strong><span>bot</span></div></header>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+							<div class="bubble"><span class="who">Deploy Bot</span><p>Bản <code>2.4.1</code> đang lên production.<span class="stamp">09:44</span></p></div>
+						</div>
+					</div>
+				</section>
+				<div class="static-dialog">
+					<div class="panel popup" role="group" aria-labelledby="url-title">
+						<div class="dlg-body">
+							<h2 id="url-title">Mở link ngoài?</h2>
+							<p>Deploy Bot muốn mở trang ở <span class="host">gitlab.hoandat.com</span> trong trình duyệt.</p>
+							<span class="url-line">https://gitlab.hoandat.com/ops/deploy/-/releases/2.4.1</span>
+						</div>
+						<div class="dlg-foot">
+							<button type="button" class="btn" data-toast="Đã huỷ">Huỷ</button>
+							<button type="button" class="btn btn-primary" data-toast="Mở bằng trình duyệt">Mở link</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="inline-mode">
+	<div class="shot-head">
+		<h2>Chế độ inline</h2><span class="phase">Phase 8</span>
+		<p>Trong chat với Quang Huy (bot không phải thành viên), gõ <code class="mono">@gif_bot mèo</code>: kết quả của bot hiện thành dải phía trên ô soạn tin. Bot chỉ nhận từ khoá bạn gõ, không thấy tin trong chat. Chọn một kết quả gửi tin dưới tên bạn, kèm nhãn "qua @gif_bot" để người nhận biết nguồn.</p>
+	</div>
+	<div class="frame">
+		<section class="convo" aria-label="Quang Huy">
+			<header class="convo-head">
+				<span class="avatar av-cyan">QH</span>
+				<div class="title"><strong>Quang Huy</strong><span>đang online</span></div>
+			</header>
+			<div class="messages">
+				<div class="msg">
+					<span class="avatar sm av-cyan">QH</span>
+					<div class="bubble"><p>Deploy xong chưa, mình chờ cả sáng rồi.<span class="stamp">09:48</span></p></div>
+				</div>
+				<div class="msg mine">
+					<div class="bubble">
+						<span class="via-bot">qua <b>@gif_bot</b></span>
+						<div class="gif photo"><span class="gif-tag">GIF</span></div>
+						<p>Đang lên production đây.<span class="stamp">09:49 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p>
+					</div>
+				</div>
+			</div>
+			<div class="composer-wrap">
+				<div class="inline-results" role="region" aria-label="Kết quả từ @gif_bot">
+					<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Kết quả từ <b>@gif_bot</b> cho “mèo”</span></div>
+					<div class="inline-grid">
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo gõ phím</button>
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo ngủ gật</button>
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo chờ deploy</button>
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo hoảng hốt</button>
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo ăn mừng</button>
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo lăn tròn</button>
+						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo vẫy tay</button>
+					</div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="im-draft">Tin nhắn</label>
+					<textarea id="im-draft" rows="1">@gif_bot mèo</textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+		</section>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="mini-app">
+	<div class="shot-head">
+		<h2>Mini App</h2><span class="phase">R6 · Phase 16</span>
+		<p>Nút "Mở bảng phát hành" của bot mở Mini App trong khung riêng bên phải (mobile: toàn màn hình). Đầu khung do app vẽ: tên bot, origin thật của Mini App, quay lại, đóng. Nội dung chạy trong iframe sandbox trên origin riêng <code class="mono">b&lt;bot_id&gt;.chat-apps.invalid</code> (placeholder cho domain Mini App dùng chung, không cùng site với chat.hoandat.com): không đọc được cookie hay dữ liệu của app, chỉ nói chuyện qua bridge. Nút chính ở đáy cũng do app vẽ, Mini App chỉ đặt chữ và bật tắt.</p>
+	</div>
+	<div class="frame">
+		<div class="duo">
+			<section class="convo" aria-label="Deploy Bot">
+				<header class="convo-head">
+					<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+					<div class="title"><strong>Deploy Bot</strong><span>@deploy_bot · bot</span></div>
+				</header>
+				<div class="messages">
+					<div class="msg">
+						<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+						<div class="bubble">
+							<span class="who">Deploy Bot</span>
+							<p>Có 3 bản chờ phát hành. Mở bảng để chọn bản và môi trường.<span class="stamp">09:55</span></p>
+							<div class="keyboard"><button type="button" class="wide" aria-pressed="true"><svg class="icon icon-sm"><use href="#i-apps"/></svg>Mở bảng phát hành</button></div>
+						</div>
+					</div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Lệnh của bot"><svg class="icon"><use href="#i-command"/></svg></button>
+					<label class="sr-only" for="ma-draft">Tin nhắn</label>
+					<textarea id="ma-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+			<section class="miniapp" aria-label="Mini App của Deploy Bot">
+				<header class="ma-head">
+					<button type="button" class="icon-btn" aria-label="Quay lại trong Mini App" data-toast="Mini App nhận sự kiện back_button"><svg class="icon"><use href="#i-back"/></svg></button>
+					<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>b7302114.chat-apps.invalid</span></div>
+					<button type="button" class="icon-btn" aria-label="Thêm thao tác"><svg class="icon"><use href="#i-dots"/></svg></button>
+					<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+				</header>
+				<div class="ma-strip">Nội dung bên dưới do Deploy Bot cung cấp</div>
+				<div class="ma-frame" role="radiogroup" aria-label="Chọn bản phát hành">
+					<h4>Chọn bản phát hành</h4>
+					<span class="muted">Môi trường đích: production</span>
+					<button type="button" class="rel" role="radio" aria-checked="true"><b>2.4.1</b><span class="env ok">staging xanh</span><span>12 thay đổi · 214 test xanh</span></button>
+					<button type="button" class="rel" role="radio" aria-checked="false"><b>2.4.0-hotfix.2</b><span class="env">đã thay</span><span>1 thay đổi · đã có trên production</span></button>
+					<button type="button" class="rel" role="radio" aria-checked="false"><b>2.5.0-rc.1</b><span class="env">lab</span><span>31 thay đổi · đang test ở lab</span></button>
+				</div>
+				<div class="ma-main"><button type="button" class="btn btn-primary" data-press="Mini App nhận sự kiện main_button">Phát hành 2.4.1 lên production</button></div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="mini-app-permission">
+	<div class="shot-head">
+		<h2>Mini App xin quyền</h2><span class="phase">R6 · Phase 16</span>
+		<p>Popup do app vẽ, phủ cả đầu khung lẫn nội dung, để Mini App không giả được. Trái: xin quyền nhắn tin (<code class="mono">request_write_access</code>), đồng ý thì ghi consent như bấm Bắt đầu. Phải: mở link ngoài (<code class="mono">open_link</code>), qua allowlist scheme rồi mở bằng trình duyệt hệ thống; Mini App không được điều hướng khung ra khỏi origin của nó.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">Xin quyền nhắn tin</div>
+				<section class="miniapp" aria-label="Mini App của Deploy Bot">
+					<header class="ma-head">
+						<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>b7302114.chat-apps.invalid</span></div>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+					</header>
+					<div class="ma-frame"><h4>Theo dõi bản 2.4.1</h4><span class="muted">Nhận tin khi deploy xong hoặc lỗi.</span></div>
+					<div class="ma-main"><button type="button" class="btn btn-primary">Bật theo dõi</button></div>
+				</section>
+				<div class="static-dialog">
+					<div class="panel popup" role="group" aria-labelledby="wa-title">
+						<div class="dlg-body">
+							<span class="popup-from"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>Deploy Bot</span>
+							<h2 id="wa-title" style="margin-top: var(--space-3)">Cho phép Mini App gửi tin nhắn cho bạn?</h2>
+							<p>Deploy Bot sẽ nhắn được cho bạn trong chat riêng. Bạn có thể chặn bot bất cứ lúc nào.</p>
+						</div>
+						<div class="dlg-foot">
+							<button type="button" class="btn" data-toast="Mini App nhận: không cho phép">Không cho phép</button>
+							<button type="button" class="btn btn-primary" data-toast="Đã cho phép, consent được ghi">Cho phép</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">Mở link ngoài</div>
+				<section class="miniapp" aria-label="Mini App của Deploy Bot">
+					<header class="ma-head">
+						<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>b7302114.chat-apps.invalid</span></div>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+					</header>
+					<div class="ma-frame"><h4>Báo cáo phát hành</h4><span class="muted">Bản đầy đủ nằm ở trang ngoài.</span></div>
+					<div class="ma-main"><button type="button" class="btn btn-primary">Xem báo cáo đầy đủ</button></div>
+				</section>
+				<div class="static-dialog">
+					<div class="panel popup" role="group" aria-labelledby="ol-title">
+						<div class="dlg-body">
+							<span class="popup-from"><svg class="icon icon-sm"><use href="#i-alert"/></svg>Link ngoài</span>
+							<h2 id="ol-title" style="margin-top: var(--space-3)">Mở link ngoài: <span class="host">example.com</span>?</h2>
+							<p>Trang mở trong trình duyệt, ra khỏi Mini App. Chỉ mở nếu bạn tin trang này.</p>
+							<span class="url-line">https://example.com/reports/release-241</span>
+						</div>
+						<div class="dlg-foot">
+							<button type="button" class="btn" data-toast="Đã huỷ">Huỷ</button>
+							<button type="button" class="btn btn-primary" data-toast="Mở bằng trình duyệt hệ thống">Mở link</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="bot-in-group">
+	<div class="shot-head">
+		<h2>Bot trong nhóm</h2><span class="phase">Phase 8</span>
+		<p>Bot vào nhóm mặc định ở chế độ riêng tư: chỉ nhận lệnh gửi cho nó và tin trả lời tin của nó. Thông tin nhóm ghi rõ bot nào thấy gì; bot đã tắt chế độ riêng tư được tô cảnh báo. Huy hiệu xác minh do đội vận hành cấp (Phase 12), hiện cạnh tên bot ở tin và ở thông tin nhóm. Bot không vào được chat bí mật.</p>
+	</div>
+	<div class="frame">
+		<div class="duo narrow-side">
+			<section class="convo" aria-label="Vận hành hệ thống">
+				<header class="convo-head">
+					<span class="avatar av-blue">VH</span>
+					<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 2 bot</span></div>
+					<button type="button" class="icon-btn" aria-pressed="true" aria-label="Thông tin chat"><svg class="icon"><use href="#i-info"/></svg></button>
+				</header>
+				<div class="messages">
+					<span class="system">Lan Anh đã thêm Deploy Bot vào nhóm</span>
+					<div class="msg">
+						<span class="avatar sm av-amber">MN</span>
+						<div class="bubble"><span class="who">Minh</span><p>Sáng nay ai trực vậy?<span class="stamp">09:40</span></p></div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-amber">MN</span>
+						<div class="bubble"><span class="who">Minh</span><p>/status@deploy_bot<span class="stamp">09:41</span></p></div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+						<div class="bubble">
+							<span class="who">Deploy Bot <span class="verified" title="Bot đã xác minh"><svg class="icon icon-sm"><use href="#i-verified"/></svg><span class="sr-only">Đã xác minh</span></span></span>
+							<span class="reply"><b>Minh</b>/status@deploy_bot</span>
+							<p>production: <code>2.4.0-hotfix.2</code>, staging: <code>2.4.1</code>. Không có job lỗi.<span class="stamp">09:41</span></p>
+						</div>
+					</div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Lệnh của bot"><svg class="icon"><use href="#i-command"/></svg></button>
+					<label class="sr-only" for="grp-draft">Tin nhắn</label>
+					<textarea id="grp-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+			<aside class="side" aria-label="Thông tin chat">
+				<div class="info-head"><span>Thông tin chat</span><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="info-sec">
+					<h3>Bot trong nhóm</h3>
+					<div class="bot-entry">
+						<div class="row"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span class="grow"><strong>Deploy Bot <span class="verified" title="Bot đã xác minh"><svg class="icon icon-sm"><use href="#i-verified"/></svg></span></strong><small>@deploy_bot · Đã xác minh</small></span></div>
+						<div class="privacy-row"><svg class="icon icon-sm"><use href="#i-eye-off"/></svg><span>Bot chỉ thấy lệnh gửi cho nó và tin trả lời nó</span></div>
+					</div>
+					<div class="bot-entry">
+						<div class="row"><span class="avatar sm av-green"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><span class="grow"><strong>Trực ca Bot</strong><small>@oncall_bot · chưa xác minh</small></span></div>
+						<div class="privacy-row open"><svg class="icon icon-sm"><use href="#i-eye"/></svg><span>Bot đọc được mọi tin trong nhóm (chủ bot đã tắt chế độ riêng tư)</span></div>
+					</div>
+				</div>
+				<div class="info-sec">
+					<h3>Thành viên</h3>
+					<div class="row"><span class="avatar sm av-cyan">QH</span><span class="grow">Quang Huy</span><span class="role">Admin</span></div>
+					<div class="row"><span class="avatar sm av-green">LA</span><span class="grow">Lan Anh</span><span class="role">Admin</span></div>
+					<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh</span></div>
+				</div>
+			</aside>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast, escapeHtml } = window.Mock;
+
+	// Bot start: the button records consent, then the normal composer appears.
+	const startBtn = $("#start-btn");
+	startBtn.addEventListener("click", () => {
+		if (startBtn.getAttribute("aria-busy") === "true") return;
+		startBtn.setAttribute("aria-busy", "true");
+		startBtn.disabled = true;
+		startBtn.textContent = "Đang bắt đầu…";
+		setTimeout(() => {
+			$("#start-card").hidden = true;
+			$$("[data-after-start]").forEach((m) => { m.hidden = false; });
+			$("#start-bar").hidden = true;
+			$("#start-composer").hidden = false;
+		}, 450);
+	});
+
+	// Command menu: filter while typing, Tab fills the selected command.
+	const draft = $("#cmd-draft");
+	const options = $$("#cmd-list [role='option']");
+	const select = (opt) => options.forEach((o) => o.setAttribute("aria-selected", String(o === opt)));
+	const filter = () => {
+		const q = draft.value.trim();
+		$("#cmd-menu").hidden = !q.startsWith("/");
+		const visible = options.filter((o) => {
+			const show = o.dataset.cmd.startsWith(q.split("@")[0]);
+			o.hidden = !show;
+			return show;
+		});
+		$("#cmd-empty").hidden = visible.length > 0;
+		if (visible.length && !visible.some((o) => o.getAttribute("aria-selected") === "true")) select(visible[0]);
+	};
+	draft.addEventListener("input", filter);
+	draft.addEventListener("keydown", (e) => {
+		const visible = options.filter((o) => !o.hidden);
+		const i = visible.findIndex((o) => o.getAttribute("aria-selected") === "true");
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+			e.preventDefault();
+			const next = visible[(i + (e.key === "ArrowDown" ? 1 : -1) + visible.length) % visible.length];
+			if (next) select(next);
+		}
+		if (e.key === "Tab" && visible[i]) { e.preventDefault(); draft.value = visible[i].dataset.cmd + " "; filter(); }
+		if (e.key === "Enter" && visible[i]) { e.preventDefault(); toast("Đã gửi " + visible[i].dataset.cmd); draft.value = "/"; filter(); }
+	});
+	options.forEach((o) => o.addEventListener("click", () => { draft.value = o.dataset.cmd + " "; filter(); draft.focus(); }));
+
+	// Reply keyboard: toggle, and pressing a key sends its text as your own message.
+	const pad = $("#rk-pad");
+	const toggle = $("#rk-toggle");
+	toggle.addEventListener("click", () => {
+		pad.hidden = !pad.hidden;
+		toggle.setAttribute("aria-pressed", String(!pad.hidden));
+		toggle.setAttribute("aria-label", pad.hidden ? "Hiện bàn phím của bot" : "Ẩn bàn phím của bot");
+	});
+	$$("button", pad).forEach((b) => b.addEventListener("click", () => {
+		const list = $("#rk-messages");
+		const now = new Date().toTimeString().slice(0, 5);
+		list.insertAdjacentHTML("beforeend", `<div class="msg mine"><div class="bubble"><p>${escapeHtml(b.textContent)}<span class="stamp">${now} <svg class="icon icon-sm"><use href="#i-check"/></svg></span></p></div></div>`);
+		list.scrollTop = list.scrollHeight;
+	}));
+
+	// Mini App sample content: a single-choice list.
+	$$(".rel").forEach((r) => r.addEventListener("click", () => {
+		$$(".rel", r.parentElement).forEach((x) => x.setAttribute("aria-checked", String(x === r)));
+		const main = $(".ma-main .btn", r.closest(".miniapp"));
+		main.textContent = `Phát hành ${$("b", r).textContent} lên production`;
+	}));
+})();
+</script>
+</body>
+</html>

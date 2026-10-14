@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* ---------- Page-level pieces for the media screens (tokens only) ---------- */
+[hidden] { display: none !important; }
+a.btn { text-decoration: none; color: var(--c-text); }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+.spin { display: inline-block; width: 12px; height: 12px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Split frames: panes side by side, stacked on narrow screens. */
+.split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: 100%; }
+.split > * + * { border-left: 1px solid var(--c-border-subtle); }
+.pane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.pane-cap { padding: var(--space-2) var(--space-4); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.frame.auto .messages { overflow: visible; }
+/* Auto-height frames show everything, so messages start at the top instead of hugging the composer. */
+.frame.auto .messages > :first-child { margin-top: 0; }
+.msg .bubble.media { padding: var(--space-1); }
+.bubble.media > p { padding: var(--space-1) var(--space-2) var(--space-1); }
+
+/* Illustrative "photos": layered token gradients, no image files. The box keeps the real
+   aspect ratio from width/height sent with the message, so nothing jumps when the full image lands. */
+.shot-art {
+	--sky: color-mix(in srgb, var(--c-viz-cyan) 45%, var(--c-surface));
+	--sun: color-mix(in srgb, var(--c-viz-amber) 70%, var(--c-surface));
+	--hill: color-mix(in srgb, var(--c-viz-green) 55%, var(--c-surface));
+	--hill-2: color-mix(in srgb, var(--c-viz-green) 80%, var(--c-text));
+	position: relative; display: block; width: 100%; overflow: hidden; border-radius: var(--radius-sm);
+	aspect-ratio: var(--ar, 4 / 3);
+	background:
+		radial-gradient(circle at 72% 30%, var(--sun) 0 9%, transparent 10%),
+		radial-gradient(ellipse 70% 40% at 20% 100%, var(--hill-2) 0 60%, transparent 61%),
+		radial-gradient(ellipse 80% 45% at 80% 105%, var(--hill) 0 60%, transparent 61%),
+		linear-gradient(180deg, var(--sky), color-mix(in srgb, var(--c-viz-violet) 30%, var(--c-surface)));
+}
+.shot-art.b { --sky: color-mix(in srgb, var(--c-viz-violet) 40%, var(--c-surface)); --sun: color-mix(in srgb, var(--c-viz-red) 55%, var(--c-surface)); }
+.shot-art.c { --sky: color-mix(in srgb, var(--c-viz-blue) 35%, var(--c-surface)); --hill: color-mix(in srgb, var(--c-viz-cyan) 60%, var(--c-surface)); }
+.shot-art.d { --sky: color-mix(in srgb, var(--c-viz-amber) 30%, var(--c-surface)); --hill: color-mix(in srgb, var(--c-viz-amber) 60%, var(--c-surface)); --hill-2: color-mix(in srgb, var(--c-viz-red) 50%, var(--c-text)); }
+/* Inline thumb: a few hundred bytes, upscaled and blurred until the real size arrives. */
+.shot-art.thumb::before { content: ""; position: absolute; inset: -12px; background: inherit; filter: blur(14px); }
+.media-w { width: 300px; max-width: 100%; }
+.media-w.sm { width: 220px; }
+.overlay-center { position: absolute; inset: 0; display: grid; place-items: center; }
+.round-btn { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-full); border: 0; background: color-mix(in srgb, var(--c-backdrop) 100%, transparent); color: var(--c-on-primary); }
+.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, transparent); }
+.round-btn .icon { width: 22px; height: 22px; }
+.chip-on-media { position: absolute; left: var(--space-2); bottom: var(--space-2); display: inline-flex; align-items: center; gap: var(--space-1); padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--c-text); color: var(--c-surface); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.chip-on-media.top { top: var(--space-2); bottom: auto; }
+.state-cap { display: block; margin: var(--space-1) var(--space-2) 0; font-size: 0.75rem; color: var(--c-text-muted); }
+.ring { --p: 42; position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: var(--radius-full);
+	background: conic-gradient(var(--c-on-primary) calc(var(--p) * 1%), color-mix(in srgb, var(--c-on-primary) 25%, transparent) 0); }
+.ring .round-btn { width: 44px; height: 44px; }
+.album { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; border-radius: var(--radius-sm); overflow: hidden; }
+.album .shot-art { border-radius: 0; --ar: 1 / 1; }
+
+/* File card */
+.file-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2); min-width: min(300px, 100%); }
+.file-ext { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--c-selected); color: var(--c-primary); font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 500; }
+.file-ext.grey { background: var(--c-bar-track); color: var(--c-text-muted); }
+.file-card b { display: block; font-weight: 500; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-card small { display: block; font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.file-card .progress { margin-top: var(--space-1); }
+.file-card .warn-text { color: var(--c-warning-text); }
+.file-card .err-text { color: var(--c-error-text); }
+
+/* Voice */
+.voice { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: center; padding: var(--space-2); width: 280px; max-width: 100%; }
+.voice .play, .sm-row .play { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-full); border: 0; background: var(--c-primary-solid); color: var(--c-on-primary); }
+.voice .play:hover, .sm-row .play:hover { background: var(--c-primary-solid-hover); }
+.wave { display: flex; align-items: center; gap: 2px; height: 28px; }
+.wave i { display: block; flex: 1; max-width: 3px; min-height: 3px; border-radius: 2px; background: var(--c-border-strong); }
+.wave i.on { background: var(--c-primary-solid); }
+.voice small { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+
+/* Attach menu and drop zone */
+.composer-wrap { position: relative; }
+.attach-menu { position: absolute; left: var(--space-4); bottom: calc(100% + var(--space-2)); }
+.attach-menu small { margin-left: auto; padding-left: var(--space-4); font-size: 0.75rem; color: var(--c-text-muted); }
+.drop { position: absolute; inset: calc(var(--space-3) + 33px) var(--space-3) var(--space-3); display: grid; place-items: center; align-content: center; gap: var(--space-2); padding: var(--space-4); text-align: center; border-radius: var(--radius-lg); border: 2px dashed var(--c-primary); background: color-mix(in srgb, var(--c-surface) 92%, var(--c-primary-solid)); color: var(--c-text); }
+.drop .icon { width: 36px; height: 36px; color: var(--c-primary); }
+.drop strong { font-size: 1.125rem; font-weight: 600; }
+.drop span { font-size: 0.875rem; color: var(--c-text-muted); max-width: 40ch; }
+
+/* Upload */
+.up-photo { position: relative; }
+.up-photo .ring { position: absolute; left: 50%; top: 50%; translate: -50% -50%; }
+.banner .grow { flex: 1; }
+
+/* Viewer: always dark, whatever the app theme. */
+.viewer { --v-bg: var(--c-text); --v-fg: var(--c-surface); --v-muted: color-mix(in srgb, var(--v-fg) 72%, var(--v-bg)); --v-btn: color-mix(in srgb, var(--v-fg) 12%, var(--v-bg));
+	position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--v-bg); color: var(--v-fg); }
+:root[data-theme="dark"] .viewer { --v-bg: var(--c-bg); --v-fg: var(--c-text); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .viewer { --v-bg: var(--c-bg); --v-fg: var(--c-text); } }
+.v-top { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); }
+.v-top .who { flex: 1; min-width: 0; }
+.v-top .who strong { display: block; font-weight: 600; font-size: 0.9375rem; }
+.v-top .who span { font-size: 0.8125rem; color: var(--v-muted); }
+.viewer .icon-btn { color: var(--v-fg); }
+.viewer .icon-btn:hover { background: var(--v-btn); color: var(--v-fg); }
+.v-zoom { min-width: 48px; text-align: center; font-size: 0.8125rem; color: var(--v-muted); font-variant-numeric: tabular-nums; }
+.v-stage { position: relative; display: grid; place-items: center; overflow: hidden; padding: var(--space-2) var(--space-8); }
+.v-stage .shot-art { width: min(100%, 860px); max-height: 100%; transition: transform var(--dur-base) var(--ease-standard); }
+.v-nav { position: absolute; top: 50%; translate: 0 -50%; width: 48px; height: 48px; border-radius: var(--radius-full); background: var(--v-btn); }
+.v-nav.prev { left: var(--space-4); }
+.v-nav.next { right: var(--space-4); }
+.v-bottom { display: grid; gap: var(--space-2); justify-items: center; padding: var(--space-2) var(--space-4) var(--space-4); }
+.v-bottom p { margin: 0; font-size: 0.875rem; text-align: center; }
+.v-bottom .count { font-size: 0.75rem; color: var(--v-muted); font-variant-numeric: tabular-nums; }
+.v-strip { display: flex; gap: var(--space-1); }
+.v-strip button { width: 44px; height: 44px; padding: 0; border: 2px solid transparent; border-radius: var(--radius-xs); background: none; overflow: hidden; opacity: 0.6; }
+.v-strip button[aria-current="true"] { border-color: var(--v-fg); opacity: 1; }
+.v-strip .shot-art { --ar: 1 / 1; border-radius: 0; height: 100%; }
+.viewer :focus-visible { outline-color: var(--v-fg); }
+
+/* Shared media panels */
+.split.shared { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sm-panel { display: flex; flex-direction: column; min-width: 0; background: var(--c-surface); }
+.sm-panel .tabs { padding-top: var(--space-1); }
+.sm-panel .tabs button { flex: 1; }
+.sm-body { padding: var(--space-3); overflow-y: auto; flex: 1; }
+.sm-body h4 { margin: var(--space-2) 0 var(--space-2); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.sm-body h4:first-child { margin-top: 0; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.grid3 > * { position: relative; }
+.grid3 .shot-art { --ar: 1 / 1; border-radius: 0; }
+.grid3 .chip-on-media { left: var(--space-1); bottom: var(--space-1); padding: 0 var(--space-1); font-size: 0.6875rem; }
+.sm-list { display: grid; gap: 2px; margin: 0 calc(-1 * var(--space-2)); }
+.sm-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2); border-radius: var(--radius-sm); min-height: 56px; }
+.sm-row:hover { background: var(--c-hover); }
+.sm-row b { display: block; font-weight: 500; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-row small { display: block; font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-row .domain { font-family: var(--font-mono); color: var(--c-primary); }
+.sm-row .play { width: 40px; height: 40px; }
+.link-tile { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); color: var(--c-icon-muted); }
+
+/* Media gone */
+.gone { position: relative; display: grid; place-items: center; align-content: center; gap: var(--space-1); text-align: center; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px dashed var(--c-border); color: var(--c-text-muted); font-size: 0.8125rem; aspect-ratio: var(--ar, 4 / 3); }
+.gone .icon { width: 28px; height: 28px; }
+.gone strong { color: var(--c-text); font-weight: 600; font-size: 0.875rem; }
+.viewer .gone-v { display: grid; justify-items: center; gap: var(--space-2); text-align: center; max-width: 42ch; }
+.viewer .gone-v .icon { width: 40px; height: 40px; color: var(--v-muted); }
+.viewer .gone-v strong { font-size: 1.125rem; font-weight: 600; }
+.viewer .gone-v span { color: var(--v-muted); font-size: 0.875rem; }
+.viewer .btn { background: var(--v-btn); border-color: transparent; color: var(--v-fg); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+	.split.shared { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
+	.split.shared > :nth-child(3) { border-left: 0; }
+	.split.shared > :nth-child(n + 3) { border-top: 1px solid var(--c-border-subtle); }
+	.frame:has(> .split.shared) { height: auto; }
+	.split.shared .sm-panel { min-height: 420px; }
+}
+@media (max-width: 1024px) {
+	.split:not(.shared) { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.split:not(.shared) > * + * { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	.frame:has(> .split) { height: auto; }
+	.split .pane, .split .pane.convo { min-height: 600px; }
+	.frame.auto .split .pane { min-height: 0; }
+	.split .pane.dark-pane { min-height: 480px; }
+	.v-stage { padding: var(--space-2) var(--space-7); }
+}
+@media (max-width: 760px) {
+	.split.shared { grid-template-columns: minmax(0, 1fr); }
+	.split.shared > * + * { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	.split .convo { min-height: 0; }
+	.v-stage { padding: var(--space-2) var(--space-3); }
+	.v-nav { top: auto; bottom: var(--space-2); translate: none; }
+	.v-top { flex-wrap: wrap; padding: var(--space-2); gap: var(--space-1); }
+	.v-top .who { flex-basis: calc(100% - 56px); }
+	.v-zoom { min-width: 40px; }
+	.frame:has(> .viewer) { height: 640px; min-height: 0; }
+}
+/* Touch: every control reaches 44px. */
+@media (max-width: 760px), (pointer: coarse) {
+	.btn-sm, .menu button, .menu a { min-height: 44px; }
+	.sm-row .play { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<svg width="0" height="0" class="sr-only" aria-hidden="true">
+	<symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
+	<symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="M7 10h6M10 7v6M21 21l-6-6"/></symbol>
+	<symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="M7 10h6M21 21l-6-6"/></symbol>
+	<symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+	<symbol id="i-upload" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 9l5-5 5 5M12 4v12"/></symbol>
+	<symbol id="i-video" viewBox="0 0 24 24"><path d="M15 10l4.6-2.3A1 1 0 0 1 21 8.6v6.8a1 1 0 0 1-1.4.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="2"/></symbol>
+</svg>
+<main class="shots">
+
+<!-- ======================= 1. Attach ======================= -->
+<section class="shot" id="attach">
+	<div class="shot-head"><h2>Đính kèm</h2><span class="phase">R3 · Phase 4</span>
+		<p>Nút kẹp giấy mở menu: Ảnh hoặc video (gửi dạng media, có xem trước) và File (giữ nguyên, gửi dạng tài liệu). Kéo file từ máy vào khung chat hiện vùng thả phủ toàn khung. Ảnh được bỏ EXIF/GPS trước khi ai khác tải được.</p></div>
+	<div class="frame">
+		<div class="split">
+			<section class="pane convo" aria-label="Menu đính kèm">
+				<div class="pane-cap">Menu đính kèm đang mở</div>
+				<header class="convo-head">
+					<span class="avatar av-green">LA</span>
+					<div class="title"><strong>Lan Anh</strong><span>truy cập gần đây</span></div>
+				</header>
+				<div class="messages">
+					<div class="msg"><div class="bubble"><p>Gửi mình ảnh chụp màn đăng nhập mới nhé.<span class="stamp">10:02</span></p></div></div>
+				</div>
+				<div class="composer-wrap">
+					<div class="menu attach-menu" role="menu" aria-label="Đính kèm">
+						<button type="button" role="menuitem" data-toast="Mở chọn ảnh/video của hệ điều hành"><svg class="icon"><use href="#i-photo"/></svg>Ảnh hoặc video</button>
+						<button type="button" role="menuitem" data-toast="Mở chọn file của hệ điều hành"><svg class="icon"><use href="#i-file"/></svg>File<small>tối đa 2 GB</small></button>
+					</div>
+					<form class="composer" onsubmit="return false">
+						<button type="button" class="icon-btn" aria-pressed="true" aria-haspopup="menu" aria-expanded="true" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+						<label class="sr-only" for="d-a1">Tin nhắn</label>
+						<textarea id="d-a1" rows="1" placeholder="Viết tin nhắn"></textarea>
+						<button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+					</form>
+				</div>
+			</section>
+
+			<section class="pane convo" aria-label="Kéo thả file">
+				<div class="pane-cap">Đang kéo file vào khung chat</div>
+				<header class="convo-head">
+					<span class="avatar av-green">LA</span>
+					<div class="title"><strong>Lan Anh</strong><span>truy cập gần đây</span></div>
+				</header>
+				<div class="messages">
+					<div class="msg"><div class="bubble"><p>Gửi mình ảnh chụp màn đăng nhập mới nhé.<span class="stamp">10:02</span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="d-a2">Tin nhắn</label>
+					<textarea id="d-a2" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+				<div class="drop" role="status">
+					<svg class="icon"><use href="#i-upload"/></svg>
+					<strong>Thả file để gửi</strong>
+					<span>3 file · ảnh và video gửi thành album, file khác gửi dạng tài liệu. Tối đa 2 GB mỗi file.</span>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 2. Upload ======================= -->
+<section class="shot" id="upload">
+	<div class="shot-head"><h2>Tải lên</h2><span class="phase">R3 · Phase 4</span>
+		<p>Tin có media hiện ngay với thumb do máy tạo, tiến độ nằm trên chính tin đó. Upload chia phần nên tạm dừng/tiếp tục được, rớt mạng thì tự tiếp tục từ phần đã xong. File vượt 2 GB bị chặn trước khi tải. Thử bấm Tạm dừng, Tiếp tục, Thử lại.</p></div>
+	<div class="frame auto">
+		<section class="convo" aria-label="Các trạng thái tải lên">
+			<header class="convo-head">
+				<span class="avatar av-green">LA</span>
+				<div class="title"><strong>Lan Anh</strong><span>truy cập gần đây</span></div>
+			</header>
+			<div class="banner error" role="alert"><svg class="icon icon-sm"><use href="#i-alert-circle"/></svg><span class="grow">Không gửi được <b>quay-man-hinh.mov</b> (2,6 GB): mỗi file tối đa 2 GB.</span><button type="button" class="icon-btn" aria-label="Đóng thông báo" data-toast="Đã đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+			<div class="messages">
+				<div class="msg mine">
+					<div class="bubble media">
+						<div class="up-photo media-w sm">
+							<span class="shot-art thumb" style="--ar: 3 / 4" role="img" aria-label="Ảnh đang tải lên"></span>
+							<span class="ring" style="--p: 64"><button type="button" class="round-btn" data-toggle="pause" aria-label="Tạm dừng tải lên"><svg class="icon"><use href="#i-pause"/></svg></button></span>
+							<span class="chip-on-media top">2,1 / 3,3 MB · 64%</span>
+						</div>
+						<p><span class="stamp">10:05 <svg class="icon icon-sm" role="img" aria-label="Đang gửi"><use href="#i-clock"/></svg></span></p>
+					</div>
+				</div>
+
+				<div class="msg mine">
+					<div class="bubble media">
+						<div class="file-card">
+							<span class="file-ext">PDF</span>
+							<span><b>bao-cao-van-hanh-q3.pdf</b><small data-label>7,7 / 18,4 MB · 42%</small><div class="progress" role="progressbar" aria-label="Tiến độ tải lên" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100"><span style="width:42%"></span></div></span>
+							<button type="button" class="icon-btn" data-toggle="pause" aria-label="Tạm dừng tải lên"><svg class="icon"><use href="#i-pause"/></svg></button>
+						</div>
+						<p><span class="stamp">10:06 <svg class="icon icon-sm" role="img" aria-label="Đang gửi"><use href="#i-clock"/></svg></span></p>
+					</div>
+				</div>
+
+				<div class="msg mine">
+					<div class="bubble media">
+						<div class="file-card">
+							<span class="file-ext">ZIP</span>
+							<span><b>ban-thiet-ke-v3.zip</b><small>Đã tạm dừng · 120 / 310 MB</small><div class="progress" aria-hidden="true"><span style="width:39%; background: var(--c-border-strong)"></span></div></span>
+							<button type="button" class="icon-btn" data-toggle="resume" aria-label="Tiếp tục tải lên"><svg class="icon"><use href="#i-upload"/></svg></button>
+						</div>
+						<p><span class="stamp">10:07 <svg class="icon icon-sm" role="img" aria-label="Đang gửi"><use href="#i-clock"/></svg></span></p>
+					</div>
+				</div>
+
+				<div class="msg mine">
+					<div class="bubble media">
+						<div class="file-card">
+							<span class="file-ext">MP4</span>
+							<span><b>demo-dang-nhap.mp4</b><small class="warn-text"><svg class="icon icon-sm" style="vertical-align:-3px"><use href="#i-wifi-off"/></svg> Mất mạng — sẽ tiếp tục · 54 / 96 MB</small><div class="progress" aria-hidden="true"><span style="width:56%; background: var(--c-warning)"></span></div></span>
+							<button type="button" class="icon-btn" aria-label="Huỷ tải lên" data-toast="Đã huỷ, phần đã tải được dọn sau"><svg class="icon"><use href="#i-x"/></svg></button>
+						</div>
+						<p><span class="stamp">10:08 <svg class="icon icon-sm" role="img" aria-label="Chờ mạng"><use href="#i-clock"/></svg></span></p>
+					</div>
+				</div>
+
+				<div class="msg mine">
+					<div class="bubble media">
+						<div class="file-card">
+							<span class="file-ext grey">XLSX</span>
+							<span><b>lich-truc-thang-11.xlsx</b><small class="err-text">Tải lên lỗi · 1,2 MB</small></span>
+							<button type="button" class="btn btn-sm" data-press="Đang tải lên lại">Thử lại</button>
+						</div>
+						<p><span class="stamp">10:09 <svg class="icon icon-sm" role="img" aria-label="Gửi lỗi" style="color: var(--c-error)"><use href="#i-alert-circle"/></svg></span></p>
+					</div>
+				</div>
+			</div>
+			<form class="composer" onsubmit="return false">
+				<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+				<label class="sr-only" for="d-u">Tin nhắn</label>
+				<textarea id="d-u" rows="1" placeholder="Viết tin nhắn"></textarea>
+				<button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+			</form>
+		</section>
+	</div>
+</section>
+
+<!-- ======================= 3. Media in messages ======================= -->
+<section class="shot" id="message-media">
+	<div class="shot-head"><h2>Media trong tin</h2><span class="phase">R3 · Phase 4</span>
+		<p>Mỗi tin media mang sẵn kích thước và inline thumb, nên khung ảnh có đúng tỉ lệ ngay từ đầu: thumb mờ hiện liền, ảnh thật thay vào cùng chỗ, không nhảy layout. Media tải từ domain riêng bằng URL ngắn hạn; hết hạn thì app xin URL mới, không hiện ảnh vỡ. Video phát qua HTTP Range, voice có sóng âm.</p></div>
+	<div class="frame auto">
+		<div class="split">
+			<section class="pane convo" aria-label="Ảnh, video và album">
+				<div class="pane-cap">Ảnh, video, album</div>
+				<div class="messages">
+					<div class="msg">
+						<span class="avatar sm av-green">LA</span>
+						<div class="bubble media">
+							<span class="shot-art thumb media-w sm" style="--ar: 4 / 3" role="img" aria-label="Ảnh đang tải, đang hiện thumb mờ"><span class="overlay-center"><span class="round-btn"><span class="spin" aria-hidden="true"></span></span></span></span>
+							<span class="state-cap">1. Vừa đến: thumb mờ, 1,8 MB</span>
+						</div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-green">LA</span>
+						<div class="bubble media">
+							<span class="shot-art media-w sm" style="--ar: 4 / 3" role="img" aria-label="Ảnh dashboard sau nâng cấp"></span>
+							<span class="state-cap">2. Ảnh thật thay cùng khung</span>
+							<p>Dashboard sau nâng cấp.<span class="stamp">09:20</span></p>
+						</div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-cyan">QH</span>
+						<div class="bubble media">
+							<span class="shot-art c media-w" style="--ar: 16 / 9" role="img" aria-label="Video demo đăng nhập">
+								<span class="overlay-center"><button type="button" class="round-btn" aria-label="Phát video, 2 phút 14 giây" data-toast="Mở trình xem, phát qua HTTP Range"><svg class="icon"><use href="#i-play"/></svg></button></span>
+								<span class="chip-on-media"><svg class="icon icon-sm"><use href="#i-video"/></svg>02:14 · 48 MB</span>
+							</span>
+							<p>Demo luồng đăng nhập mới.<span class="stamp">09:24</span></p>
+						</div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-green">LA</span>
+						<div class="bubble media">
+							<div class="album media-w" role="group" aria-label="Album 4 ảnh">
+								<span class="shot-art" role="img" aria-label="Ảnh 1"></span>
+								<span class="shot-art b" role="img" aria-label="Ảnh 2"></span>
+								<span class="shot-art c" role="img" aria-label="Ảnh 3"></span>
+								<span class="shot-art d" role="img" aria-label="Ảnh 4"></span>
+							</div>
+							<p>Bốn màn trước khi nâng cấp.<span class="stamp">09:26</span></p>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="pane convo" aria-label="File và voice">
+				<div class="pane-cap">File và voice</div>
+				<div class="messages">
+					<div class="msg">
+						<span class="avatar sm av-amber">MN</span>
+						<div class="bubble media">
+							<div class="file-card">
+								<span class="file-ext">PDF</span>
+								<span><b>bao-cao-van-hanh-q3.pdf</b><small>2,4 MB · PDF</small></span>
+								<button type="button" class="icon-btn" aria-label="Tải xuống bao-cao-van-hanh-q3.pdf" data-toast="Đang tải xuống qua URL ngắn hạn"><svg class="icon"><use href="#i-download"/></svg></button>
+							</div>
+							<p><span class="stamp">09:30</span></p>
+						</div>
+					</div>
+					<div class="msg mine">
+						<div class="bubble media">
+							<div class="file-card">
+								<span class="file-ext">YAML</span>
+								<span><b>alertmanager.yml</b><small>4 KB · đã tải về máy</small></span>
+								<button type="button" class="icon-btn" aria-label="Mở alertmanager.yml" data-toast="Mở bằng ứng dụng mặc định"><svg class="icon"><use href="#i-file"/></svg></button>
+							</div>
+							<p><span class="stamp">09:31 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p>
+						</div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-cyan">QH</span>
+						<div class="bubble media">
+							<div class="voice">
+								<button type="button" class="play" aria-label="Phát tin thoại 27 giây" data-voice><svg class="icon"><use href="#i-play"/></svg></button>
+								<span><span class="wave" aria-hidden="true" data-bars="0"></span><small><span>0:27</span><span>Tin thoại</span></small></span>
+							</div>
+							<p><span class="stamp">09:33</span></p>
+						</div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-cyan">QH</span>
+						<div class="bubble media">
+							<div class="voice">
+								<button type="button" class="play" aria-label="Tạm dừng tin thoại" aria-pressed="true" data-voice><svg class="icon"><use href="#i-pause"/></svg></button>
+								<span><span class="wave" aria-hidden="true" data-bars="9"></span><small><span>0:09 / 0:41</span><span>Đang phát</span></small></span>
+							</div>
+							<p><span class="stamp">09:34</span></p>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 4. Viewer ======================= -->
+<section class="shot" id="viewer">
+	<div class="shot-head"><h2>Xem ảnh/video</h2><span class="phase">R3 · Phase 4</span>
+		<p>Trình xem nền tối phủ toàn cửa sổ: người gửi và thời gian, phóng to/thu nhỏ, tải xuống, chuyển tiếp, đóng (Esc). Mũi tên trái/phải hoặc phím ← → đi qua media của chat. Video dùng cùng trình xem với thanh điều khiển của trình duyệt.</p></div>
+	<div class="frame">
+		<div class="viewer" role="group" aria-label="Trình xem ảnh">
+			<div class="v-top">
+				<span class="avatar sm av-green">LA</span>
+				<div class="who"><strong>Lan Anh</strong><span>Hôm nay lúc 09:26</span></div>
+				<button type="button" class="icon-btn" aria-label="Thu nhỏ" data-zoom="-1"><svg class="icon"><use href="#i-zoom-out"/></svg></button>
+				<span class="v-zoom" id="v-zoom" aria-live="polite">100%</span>
+				<button type="button" class="icon-btn" aria-label="Phóng to" data-zoom="1"><svg class="icon"><use href="#i-zoom-in"/></svg></button>
+				<button type="button" class="icon-btn" aria-label="Tải xuống" data-toast="Đang tải ảnh gốc (đã bỏ EXIF)"><svg class="icon"><use href="#i-download"/></svg></button>
+				<a class="icon-btn" href="chat.html#forward" aria-label="Chuyển tiếp"><svg class="icon"><use href="#i-forward"/></svg></a>
+				<button type="button" class="icon-btn" aria-label="Đóng" data-toast="Đóng trình xem (Esc)"><svg class="icon"><use href="#i-x"/></svg></button>
+			</div>
+			<div class="v-stage">
+				<span class="shot-art b" id="v-img" style="--ar: 16 / 10" role="img" aria-label="Ảnh 2 trong album"></span>
+				<button type="button" class="icon-btn v-nav prev" aria-label="Ảnh trước" data-step="-1"><svg class="icon"><use href="#i-chevron-left"/></svg></button>
+				<button type="button" class="icon-btn v-nav next" aria-label="Ảnh sau" data-step="1"><svg class="icon"><use href="#i-chevron-right"/></svg></button>
+			</div>
+			<div class="v-bottom">
+				<p>Bốn màn trước khi nâng cấp.</p>
+				<span class="count" id="v-count">2 / 4</span>
+				<div class="v-strip" role="group" aria-label="Ảnh trong album">
+					<button type="button" aria-label="Ảnh 1" data-i="0"><span class="shot-art"></span></button>
+					<button type="button" aria-label="Ảnh 2" data-i="1" aria-current="true"><span class="shot-art b"></span></button>
+					<button type="button" aria-label="Ảnh 3" data-i="2"><span class="shot-art c"></span></button>
+					<button type="button" aria-label="Ảnh 4" data-i="3"><span class="shot-art d"></span></button>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 5. Shared media ======================= -->
+<section class="shot" id="shared-media">
+	<div class="shot-head"><h2>Media đã chia sẻ</h2><span class="phase">R3 · Phase 4</span>
+		<p>Trong thông tin chat có bốn tab: Ảnh (lưới, video có thời lượng), File, Link, Voice. Bốn cột dưới là cùng một panel ở bốn tab để duyệt một lần; tab trong mỗi cột vẫn bấm được. Link mở theo cùng luật cảnh báo link ngoài như trong tin.</p></div>
+	<div class="frame">
+		<div class="split shared" id="shared"></div>
+	</div>
+	<template id="t-photo">
+		<h4>Tháng 10</h4>
+		<div class="grid3">
+			<span class="shot-art" role="img" aria-label="Ảnh"></span><span class="shot-art b" role="img" aria-label="Ảnh"></span>
+			<span><span class="shot-art c" role="img" aria-label="Video"></span><span class="chip-on-media">02:14</span></span>
+			<span class="shot-art d" role="img" aria-label="Ảnh"></span><span class="shot-art" role="img" aria-label="Ảnh"></span><span class="shot-art c" role="img" aria-label="Ảnh"></span>
+		</div>
+		<h4>Tháng 9</h4>
+		<div class="grid3">
+			<span class="shot-art b" role="img" aria-label="Ảnh"></span><span class="shot-art d" role="img" aria-label="Ảnh"></span><span class="shot-art" role="img" aria-label="Ảnh"></span>
+		</div>
+	</template>
+	<template id="t-file">
+		<div class="sm-list">
+			<div class="sm-row"><span class="file-ext">PDF</span><span><b>bao-cao-van-hanh-q3.pdf</b><small>2,4 MB · 12/10</small></span><button type="button" class="icon-btn" aria-label="Tải xuống" data-toast="Đang tải xuống"><svg class="icon"><use href="#i-download"/></svg></button></div>
+			<div class="sm-row"><span class="file-ext">YAML</span><span><b>alertmanager.yml</b><small>4 KB · 12/10</small></span><button type="button" class="icon-btn" aria-label="Tải xuống" data-toast="Đang tải xuống"><svg class="icon"><use href="#i-download"/></svg></button></div>
+			<div class="sm-row"><span class="file-ext">ZIP</span><span><b>ban-thiet-ke-v3.zip</b><small>310 MB · 08/10</small></span><button type="button" class="icon-btn" aria-label="Tải xuống" data-toast="Đang tải xuống"><svg class="icon"><use href="#i-download"/></svg></button></div>
+		</div>
+	</template>
+	<template id="t-link">
+		<div class="sm-list">
+			<div class="sm-row"><span class="link-tile"><svg class="icon"><use href="#i-globe"/></svg></span><span><b>Wiki vận hành</b><small class="domain">wiki.hoandat.com</small></span></div>
+			<div class="sm-row"><span class="link-tile"><svg class="icon"><use href="#i-external"/></svg></span><span><b>pg_upgrade</b><small class="domain">postgresql.org</small></span></div>
+			<div class="sm-row"><span class="link-tile"><svg class="icon"><use href="#i-globe"/></svg></span><span><b>Staging</b><small class="domain">staging.hoandat.com</small></span></div>
+		</div>
+	</template>
+	<template id="t-voice">
+		<div class="sm-list">
+			<div class="sm-row"><button type="button" class="play voice-play" aria-label="Phát tin thoại của Quang Huy"><svg class="icon"><use href="#i-play"/></svg></button><span><b>Quang Huy</b><small>0:27 · hôm nay 09:33</small></span></div>
+			<div class="sm-row"><button type="button" class="play voice-play" aria-label="Phát tin thoại của Quang Huy"><svg class="icon"><use href="#i-play"/></svg></button><span><b>Quang Huy</b><small>0:41 · hôm nay 09:34</small></span></div>
+			<div class="sm-row"><button type="button" class="play voice-play" aria-label="Phát tin thoại của Lan Anh"><svg class="icon"><use href="#i-play"/></svg></button><span><b>Lan Anh</b><small>1:05 · 08/10</small></span></div>
+		</div>
+	</template>
+</section>
+
+<!-- ======================= 6. Media gone ======================= -->
+<section class="shot" id="media-gone">
+	<div class="shot-head"><h2>Media không còn</h2><span class="phase">R3 · Phase 4</span>
+		<p>Khi tin bị xoá cho mọi người, CDN bị purge và URL cũ trả lỗi trong vòng 60 giây. Bản tin đã chuyển tiếp hoặc trình xem đang mở hiện "Media này không còn" trong đúng khung cũ (không nhảy layout), không thử tải lại vô hạn. Bản cache trên máy cũng bị xoá.</p></div>
+	<div class="frame">
+		<div class="split">
+			<section class="pane convo" aria-label="Trong khung chat">
+				<div class="pane-cap">Trong khung chat</div>
+				<div class="messages">
+					<div class="msg">
+						<span class="avatar sm av-amber">MN</span>
+						<div class="bubble media">
+							<span class="fwd" style="display:block; padding: var(--space-1) var(--space-2) 0; font-size: 0.8125rem; color: var(--c-primary)">Chuyển tiếp từ <b>Lan Anh</b></span>
+							<div class="gone media-w sm" style="--ar: 4 / 3"><svg class="icon"><use href="#i-eye-off"/></svg><strong>Media này không còn</strong><span>Người gửi đã xoá tin cho mọi người.</span></div>
+							<p>Dashboard sau nâng cấp.<span class="stamp">09:40</span></p>
+						</div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-amber">MN</span>
+						<div class="bubble media">
+							<div class="file-card">
+								<span class="file-ext grey">PDF</span>
+								<span><b>bao-cao-van-hanh-q3.pdf</b><small>File này không còn</small></span>
+								<button type="button" class="icon-btn" aria-label="Tải xuống không khả dụng" disabled><svg class="icon"><use href="#i-download"/></svg></button>
+							</div>
+							<p><span class="stamp">09:41</span></p>
+						</div>
+					</div>
+				</div>
+			</section>
+			<section class="pane dark-pane" aria-label="Trình xem đang mở">
+				<div class="pane-cap">Trình xem đang mở thì tin bị xoá</div>
+				<div style="position:relative; flex:1; min-height: 0">
+					<div class="viewer" role="group" aria-label="Trình xem ảnh">
+						<div class="v-top">
+							<span class="avatar sm av-green">LA</span>
+							<div class="who"><strong>Lan Anh</strong><span>Hôm nay lúc 09:20</span></div>
+							<button type="button" class="icon-btn" aria-label="Đóng" data-toast="Đóng trình xem"><svg class="icon"><use href="#i-x"/></svg></button>
+						</div>
+						<div class="v-stage">
+							<div class="gone-v">
+								<svg class="icon"><use href="#i-eye-off"/></svg>
+								<strong>Media này không còn</strong>
+								<span>Lan Anh đã xoá tin này cho mọi người. Ảnh đã được gỡ khỏi máy của bạn.</span>
+								<button type="button" class="btn" data-toast="Đóng trình xem">Đóng</button>
+							</div>
+						</div>
+						<div class="v-bottom"><span class="count">Không còn trong album</span></div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast } = window.Mock;
+
+	// Voice waveforms: fixed pseudo-random bar heights, the first N bars are "played".
+	const heights = [30, 55, 80, 45, 95, 60, 35, 70, 100, 50, 25, 65, 85, 40, 75, 55, 30, 90, 60, 45, 70, 35, 50, 80, 40, 60, 30, 20];
+	$$(".wave").forEach((w) => {
+		const played = Number(w.dataset.bars || 0);
+		w.innerHTML = heights.map((h, i) => `<i style="height:${h}%"${i < played ? ' class="on"' : ""}></i>`).join("");
+	});
+
+	// Upload pause/resume: only the label and icon change in this mock.
+	document.addEventListener("click", (e) => {
+		const b = e.target instanceof Element ? e.target.closest("[data-toggle]") : null;
+		if (!b) return;
+		const pausing = b.dataset.toggle === "pause";
+		b.dataset.toggle = pausing ? "resume" : "pause";
+		b.setAttribute("aria-label", pausing ? "Tiếp tục tải lên" : "Tạm dừng tải lên");
+		$("use", b).setAttribute("href", pausing ? "#i-upload" : "#i-pause");
+		toast(pausing ? "Đã tạm dừng, phần đã tải được giữ lại" : "Tiếp tục từ phần đã tải");
+	});
+
+	// Voice play/pause.
+	$$("[data-voice]").forEach((b) => b.addEventListener("click", () => {
+		const on = b.getAttribute("aria-pressed") !== "true";
+		b.setAttribute("aria-pressed", String(on));
+		$("use", b).setAttribute("href", on ? "#i-pause" : "#i-play");
+	}));
+
+	// Viewer: zoom, prev/next, thumbnails, arrow keys.
+	const arts = ["", "b", "c", "d"];
+	let index = 1, zoom = 1;
+	const img = $("#v-img");
+	const show = () => {
+		img.className = `shot-art ${arts[index]}`.trim();
+		img.setAttribute("aria-label", `Ảnh ${index + 1} trong album`);
+		$("#v-count").textContent = `${index + 1} / ${arts.length}`;
+		$$(".v-strip button").forEach((t, i) => t.setAttribute("aria-current", String(i === index)));
+		zoom = 1; img.style.transform = ""; $("#v-zoom").textContent = "100%";
+	};
+	$$("[data-step]").forEach((b) => b.addEventListener("click", () => { index = (index + Number(b.dataset.step) + arts.length) % arts.length; show(); }));
+	$$(".v-strip button").forEach((b) => b.addEventListener("click", () => { index = Number(b.dataset.i); show(); }));
+	$$("[data-zoom]").forEach((b) => b.addEventListener("click", () => {
+		zoom = Math.min(3, Math.max(1, zoom + Number(b.dataset.zoom) * 0.5));
+		img.style.transform = `scale(${zoom})`;
+		$("#v-zoom").textContent = `${zoom * 100}%`;
+	}));
+	$("#viewer .viewer").addEventListener("keydown", (e) => {
+		if (e.key === "ArrowLeft") $(".v-nav.prev").click();
+		if (e.key === "ArrowRight") $(".v-nav.next").click();
+	});
+
+	// Shared media: one panel per tab, built from the <template>s so each column opens on a different tab.
+	const TABS = [["photo", "Ảnh"], ["file", "File"], ["link", "Link"], ["voice", "Voice"]];
+	const host = $("#shared");
+	TABS.forEach(([active], col) => {
+		const panel = document.createElement("section");
+		panel.className = "sm-panel";
+		panel.setAttribute("aria-label", "Media đã chia sẻ");
+		const tabs = TABS.map(([key, label]) => `<button type="button" role="tab" id="sm${col}-${key}-tab" aria-controls="sm${col}-${key}" aria-selected="${key === active}">${label}</button>`).join("");
+		panel.innerHTML = `<div class="info-head"><span>Media đã chia sẻ</span></div><div class="tabs" role="tablist" aria-label="Loại media">${tabs}</div>`;
+		TABS.forEach(([key]) => {
+			const body = document.createElement("div");
+			body.className = "sm-body";
+			body.id = `sm${col}-${key}`;
+			body.setAttribute("role", "tabpanel");
+			body.setAttribute("aria-labelledby", `sm${col}-${key}-tab`);
+			body.hidden = key !== active;
+			body.append($(`#t-${key}`).content.cloneNode(true));
+			panel.append(body);
+		});
+		host.append(panel);
+	});
+	host.addEventListener("click", (e) => {
+		const p = e.target instanceof Element ? e.target.closest(".voice-play") : null;
+		if (p) toast("Phát tin thoại");
+		const row = e.target instanceof Element ? e.target.closest(".sm-row .domain") : null;
+		if (row) toast(row.textContent.endsWith("hoandat.com") ? `Mở ${row.textContent}` : `Link ngoài: hỏi xác nhận trước khi mở ${row.textContent}`);
+	});
+})();
+</script>
+</body>
+</html>

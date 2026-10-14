@@ -1,0 +1,243 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/auth.proto";
+import "app/v1/chats.proto";
+import "app/v1/messages.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// (user_id, chat_id, seq, pts, chat_pts, server_epoch, unix-second dates)
+// always holds a value < 2^53 so JavaScript clients can use a plain number;
+// the server asserts the bound when serializing.
+//
+// Sync (ADR 0002): pts is per user; chats with sync_mode=large keep their own
+// chat_pts log. server_epoch increases on every database failover or restore;
+// a client that sees a new epoch resyncs. Reconnect order: subscribe, buffer,
+// GetDifference, merge by pts.
+
+// Catching up on missed updates.
+service UpdatesService {
+  rpc GetState(GetStateRequest) returns (GetStateResponse);
+  // Per-user log since pts.
+  rpc GetDifference(GetDifferenceRequest) returns (GetDifferenceResponse);
+  // Per-chat log of a sync_mode=large chat since chat_pts.
+  rpc GetChatDifference(GetChatDifferenceRequest) returns (GetChatDifferenceResponse);
+}
+
+message State {
+  int64 pts = 1 [jstype = JS_NUMBER];
+  int64 server_epoch = 2 [jstype = JS_NUMBER];
+  // Server time (unix seconds).
+  int64 date = 3 [jstype = JS_NUMBER];
+}
+
+message ChatState {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 chat_pts = 2 [jstype = JS_NUMBER];
+  int64 server_epoch = 3 [jstype = JS_NUMBER];
+}
+
+// One entry of an update log. Sequenced updates set exactly one of pts
+// (per-user log) or chat_pts (per-chat log of the chat in chat_id);
+// unsequenced ones (chat_activity, and updates pushed only in realtime)
+// leave both at 0. A client applies an update when its log position equals
+// pts - pts_count (or chat_pts - chat_pts_count); otherwise it has a gap.
+message Update {
+  int64 pts = 1 [jstype = JS_NUMBER];
+  int32 pts_count = 2;
+  int64 chat_pts = 3 [jstype = JS_NUMBER];
+  int32 chat_pts_count = 4;
+  // Chat whose per-chat log chat_pts belongs to.
+  int64 chat_id = 5 [jstype = JS_NUMBER];
+  int64 server_epoch = 6 [jstype = JS_NUMBER];
+  int64 date = 7 [jstype = JS_NUMBER];
+  oneof kind {
+    UpdateMessageNew message_new = 10;
+    UpdateMessageEdit message_edit = 11;
+    UpdateMessageDelete message_delete = 12;
+    UpdateMessageHidden message_hidden = 13;
+    UpdateReaction reaction = 14;
+    UpdateRead read = 15;
+    UpdatePin pin = 16;
+    UpdateMemberAdded member_added = 17;
+    UpdateMemberRemoved member_removed = 18;
+    UpdateMemberPermissions member_permissions = 19;
+    UpdateChatModeChanged chat_mode_changed = 20;
+    UpdateChatUpdated chat_updated = 21;
+    UpdateChatActivity chat_activity = 22;
+    UpdateSessionRevoked session_revoked = 23;
+  }
+}
+
+message UpdateMessageNew {
+  Message message = 1;
+}
+
+message UpdateMessageEdit {
+  Message message = 1;
+}
+
+// Deleted for everyone: purge the messages, their FTS rows and media cache.
+message UpdateMessageDelete {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 seqs = 2 [jstype = JS_NUMBER];
+}
+
+// Deleted for this user only (from another of their sessions).
+message UpdateMessageHidden {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 seqs = 2 [jstype = JS_NUMBER];
+}
+
+message UpdateReaction {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  // Full aggregated reactions after the change.
+  repeated ReactionCount reactions = 3;
+}
+
+message UpdateRead {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 max_seq = 2 [jstype = JS_NUMBER];
+  // false: the user read incoming messages (read_inbox_max_seq), e.g. on
+  // another device. true: others read the user's messages
+  // (read_outbox_max_seq).
+  bool outbox = 3;
+  // Inbox only: unread messages left after this read.
+  int32 unread_count = 4;
+}
+
+message UpdatePin {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  // false when unpinned.
+  bool pinned = 3;
+}
+
+message UpdateMemberAdded {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 user_ids = 2 [jstype = JS_NUMBER];
+  // Who added them; equals the user for self-joins (invite link).
+  int64 inviter_id = 3 [jstype = JS_NUMBER];
+}
+
+// When user_id is the receiving user, the client purges the chat locally.
+message UpdateMemberRemoved {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+  // Who removed them; equals user_id when the user left.
+  int64 actor_id = 3 [jstype = JS_NUMBER];
+}
+
+message UpdateMemberPermissions {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+  MemberRole role = 3;
+  uint32 permissions = 4;
+}
+
+// Written into every member's per-user log when a chat switches to
+// sync_mode=large; chat_pts is the base for GetChatDifference.
+message UpdateChatModeChanged {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  SyncMode sync_mode = 2;
+  int64 chat_pts = 3 [jstype = JS_NUMBER];
+}
+
+message UpdateChatUpdated {
+  Chat chat = 1;
+}
+
+// Coalesced periodic hint that a sync_mode=large chat has new updates; the
+// client pulls them with GetChatDifference.
+message UpdateChatActivity {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 chat_pts = 2 [jstype = JS_NUMBER];
+  int64 top_seq = 3 [jstype = JS_NUMBER];
+}
+
+message UpdateSessionRevoked {
+  int64 session_id = 1 [jstype = JS_NUMBER];
+  SessionRevokeReason reason = 2;
+}
+
+// No updates since the given position. GetDifference returns it only when no
+// large chat had activity either; otherwise it returns full (or slice) with
+// large_chats set, even if updates is empty.
+message DifferenceEmpty {}
+
+// Position of a sync_mode=large chat the user belongs to.
+message LargeChatState {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 chat_pts = 2 [jstype = JS_NUMBER];
+  int64 top_seq = 3 [jstype = JS_NUMBER];
+}
+
+// Updates plus every user and chat they reference, so clients never render an
+// unknown id.
+message DifferenceUpdates {
+  repeated Update updates = 1;
+  repeated User users = 2;
+  repeated Chat chats = 3;
+  // GetDifference only (always empty from GetChatDifference): the
+  // sync_mode=large chats the user belongs to that had activity since the
+  // request's pts. Their updates are not in the per-user log and
+  // chat_activity is realtime-only, so this is how a client that was offline
+  // learns which large chats changed; it then calls GetChatDifference for
+  // each chat whose chat_pts is ahead of its local position.
+  repeated LargeChatState large_chats = 4;
+}
+
+// The log no longer reaches back to the given position (retention passed or
+// server_epoch changed). The client drops its position, reloads dialogs (or
+// the open chat's visible window), marks older cache stale and continues from
+// the returned state.
+message DifferenceTooLong {}
+
+message GetStateRequest {}
+
+message GetStateResponse {
+  State state = 1;
+}
+
+message GetDifferenceRequest {
+  int64 pts = 1 [jstype = JS_NUMBER];
+  // Epoch the client's pts belongs to; a mismatch yields too_long.
+  int64 server_epoch = 2 [jstype = JS_NUMBER];
+  // Upper bound on updates returned; the server may cap it.
+  int32 limit = 3;
+}
+
+message GetDifferenceResponse {
+  // Position after applying this response.
+  State state = 1;
+  oneof result {
+    DifferenceEmpty empty = 2;
+    // More updates remain; call again from state.pts.
+    DifferenceUpdates slice = 3;
+    // All updates up to state.pts.
+    DifferenceUpdates full = 4;
+    DifferenceTooLong too_long = 5;
+  }
+}
+
+message GetChatDifferenceRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 chat_pts = 2 [jstype = JS_NUMBER];
+  int64 server_epoch = 3 [jstype = JS_NUMBER];
+  int32 limit = 4;
+}
+
+message GetChatDifferenceResponse {
+  ChatState state = 1;
+  oneof result {
+    DifferenceEmpty empty = 2;
+    DifferenceUpdates slice = 3;
+    DifferenceUpdates full = 4;
+    DifferenceTooLong too_long = 5;
+  }
+}

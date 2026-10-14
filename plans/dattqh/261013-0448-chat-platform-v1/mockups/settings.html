@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài đặt và quyền riêng tư — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+	<!-- ============ Profile ============ -->
+	<section class="shot" id="profile">
+		<div class="shot-head"><h2>Hồ sơ của tôi</h2><span class="phase">Phase 6</span><p>Tên, username, giới thiệu và ảnh sửa ngay trong app chat. Username được kiểm tra còn trống khi gõ (thử gõ <span class="mono">minh</span> để thấy lỗi trùng). Email chỉ đọc vì đến từ tài khoản hoandat; đổi email hay cách đăng nhập làm ở trang tài khoản của IdP.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="profile" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Hồ sơ</h3></header>
+				<form class="set-body" id="profile-form" onsubmit="return false">
+					<div class="card pad photo-row">
+						<span class="avatar xl av-violet">ĐT</span>
+						<div class="photo-actions">
+							<div class="btn-row">
+								<button type="button" class="btn" data-toast="Chọn ảnh: JPG hoặc PNG, cắt vuông trước khi tải lên"><svg class="icon"><use href="#i-camera"/></svg>Đổi ảnh</button>
+								<button type="button" class="btn-danger-text" data-toast="Đã xoá ảnh, hồ sơ dùng chữ cái đầu">Xoá ảnh</button>
+							</div>
+							<p class="note">JPG hoặc PNG, tối đa 5 MB. Ảnh ban đầu lấy từ tài khoản hoandat, đổi ở đây không ảnh hưởng app khác.</p>
+						</div>
+					</div>
+					<div class="card pad stack">
+						<div class="field">
+							<label for="p-name">Tên hiển thị</label>
+							<input id="p-name" class="input" value="Đức Thắng" maxlength="64" autocomplete="name">
+						</div>
+						<div class="field">
+							<label for="p-username">Username</label>
+							<div class="affix"><span aria-hidden="true">@</span><input id="p-username" class="input" value="thang_dt" maxlength="32" autocomplete="off" spellcheck="false" aria-describedby="p-username-status p-username-hint"></div>
+							<span class="status ok" id="p-username-status" aria-live="polite"><svg class="icon icon-sm"><use href="#i-check"/></svg><span>@thang_dt còn trống</span></span>
+							<span class="hint" id="p-username-hint">5–32 ký tự: chữ a–z, số và dấu gạch dưới. Username hiện tại: <span class="mono">@dattqh</span>, sẽ được trả lại cho người khác dùng sau khi đổi.</span>
+						</div>
+						<div class="field">
+							<label for="p-bio">Giới thiệu</label>
+							<textarea id="p-bio" class="input" maxlength="140" rows="2" aria-describedby="p-bio-count">Kỹ sư vận hành. Trực sự cố tuần chẵn.</textarea>
+							<span class="hint counter" id="p-bio-count">37/140</span>
+						</div>
+					</div>
+					<div class="card">
+						<div class="row pad-x wrap-row">
+							<span class="device"><svg class="icon"><use href="#i-lock"/></svg></span>
+							<span class="grow">Email<small class="mono">dattqh@gmail.com</small></span>
+							<span class="tag-neutral">từ tài khoản hoandat</span>
+						</div>
+						<p class="note pad-x pad-b">Email chỉ để người khác tìm bạn khi bạn cho phép (xem Quyền riêng tư). Muốn đổi email hoặc chuyển giữa Google và GitHub: <a class="link" href="#" onclick="return false" data-toast="Mở auth.hoandat.com/account trong tab mới">Đổi cách đăng nhập ở auth.hoandat.com/account <svg class="icon icon-sm"><use href="#i-external"/></svg></a></p>
+					</div>
+					<div class="save-bar">
+						<span class="muted">Có thay đổi chưa lưu</span>
+						<button type="button" class="btn" data-toast="Đã huỷ thay đổi">Huỷ</button>
+						<button type="submit" class="btn btn-primary" id="p-save" data-press="Đã lưu hồ sơ">Lưu thay đổi</button>
+					</div>
+				</form>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Privacy ============ -->
+	<section class="shot" id="privacy">
+		<div class="shot-head"><h2>Quyền riêng tư</h2><span class="phase">Phase 12</span><p>Mỗi cài đặt áp dụng ở mọi chỗ lộ thông tin: hồ sơ, trạng thái online và đang gõ, tìm người, Bot API, webhook và tìm kiếm tin. Mặc định an toàn: không ai tìm được bạn bằng email, chỉ danh bạ thêm được bạn vào nhóm. Tìm bằng email chỉ khớp đúng cả địa chỉ.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="privacy" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Quyền riêng tư</h3></header>
+				<div class="set-body">
+					<p class="lede"><svg class="icon icon-sm"><use href="#i-shield"/></svg>Áp dụng cho cả bot và tích hợp: bot cũng không thấy được những gì bạn đã ẩn.</p>
+					<div class="card">
+						<h4 class="card-title">Ai thấy</h4>
+						<div class="row opt-row">
+							<span class="grow">Lần cuối online và đang online<small>Dòng "đang gõ" cũng theo cài đặt này</small></span>
+							<div class="choice" role="group" aria-label="Ai thấy lần cuối online"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="true">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
+						</div>
+						<div class="row opt-row">
+							<span class="grow">Ảnh đại diện</span>
+							<div class="choice" role="group" aria-label="Ai thấy ảnh đại diện"><button type="button" aria-pressed="true">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
+						</div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Ai tìm và liên hệ được tôi</h4>
+						<div class="row opt-row">
+							<span class="grow">Tìm tôi bằng email<small>Mặc định: Không ai. Chỉ khớp khi gõ đúng toàn bộ email.</small></span>
+							<div class="choice" role="group" aria-label="Ai tìm tôi bằng email"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="true">Không ai</button></div>
+						</div>
+						<div class="row opt-row">
+							<span class="grow">Tìm tôi bằng username</span>
+							<div class="choice" role="group" aria-label="Ai tìm tôi bằng username"><button type="button" aria-pressed="true">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
+						</div>
+						<div class="row opt-row">
+							<span class="grow">Thêm tôi vào nhóm<small>Mặc định: Danh bạ. Người khác vẫn gửi được link mời để bạn tự vào.</small></span>
+							<div class="choice" role="group" aria-label="Ai thêm tôi vào nhóm"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="true">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
+						</div>
+						<div class="row opt-row">
+							<span class="grow">Nhắn tin cho tôi<small>Tài khoản mới nhắn người lạ bị giới hạn số tin để chặn spam.</small></span>
+							<div class="choice" role="group" aria-label="Ai nhắn tin cho tôi"><button type="button" aria-pressed="true">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
+						</div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Thông báo</h4>
+						<div class="row pad-x">
+							<span class="grow">Xem trước nội dung trong thông báo<small>Tắt thì thông báo chỉ hiện "Bạn có tin nhắn mới"</small></span>
+							<button type="button" class="switch" role="switch" aria-checked="true" aria-label="Xem trước nội dung trong thông báo"></button>
+						</div>
+						<div class="callout pad-x"><svg class="icon icon-sm"><use href="#i-lock"/></svg><p>Thông báo đẩy trên điện thoại đi qua máy chủ của Apple hoặc Google. Khi bật xem trước, nội dung được mã hoá riêng cho từng thiết bị trước khi gửi đi, nên Apple và Google không đọc được.</p></div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Blocked ============ -->
+	<section class="shot" id="blocked">
+		<div class="shot-head"><h2>Người đã chặn</h2><span class="phase">Phase 12</span><p>Người bị chặn không nhắn tin, không thêm bạn vào nhóm và không thấy lần cuối online của bạn; họ không nhận thông báo là đã bị chặn. Chặn được cả bot. Bấm "Bỏ chặn" để xem trạng thái đang xử lý; bỏ hết thì hiện trạng thái trống như khung dưới.</p></div>
+		<div class="frame"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="blocked" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Người đã chặn</h3><button type="button" class="btn head-btn" aria-label="Chặn người" data-toast="Chọn người từ danh bạ hoặc nhập username"><svg class="icon"><use href="#i-plus"/></svg><span>Chặn người</span></button></header>
+				<div class="set-body">
+					<div class="card">
+						<ul class="plain" id="blocked-list">
+							<li class="row pad-x"><span class="avatar av-red">NQ</span><span class="grow">Nhận quà 24h<small>@nhanqua24h · chặn 13/10/2026</small></span><button type="button" class="btn btn-sm" data-unblock="Nhận quà 24h">Bỏ chặn</button></li>
+							<li class="row pad-x"><span class="avatar av-amber"><svg class="icon"><use href="#i-robot"/></svg></span><span class="grow">Crypto Signal <span class="tag">bot</span><small>@cryptosignal_bot · chặn 02/10/2026</small></span><button type="button" class="btn btn-sm" data-unblock="Crypto Signal">Bỏ chặn</button></li>
+							<li class="row pad-x"><span class="avatar av-grey">TB</span><span class="grow">Trần Văn Bình<small>@binhtv · chặn 21/08/2026</small></span><button type="button" class="btn btn-sm" data-unblock="Trần Văn Bình">Bỏ chặn</button></li>
+						</ul>
+						<div class="empty" id="blocked-empty" hidden><svg class="icon"><use href="#i-ban"/></svg><strong>Bạn chưa chặn ai</strong><span>Chặn từ hồ sơ của người đó hoặc từ menu của tin nhắn.</span></div>
+					</div>
+					<p class="note">Bỏ chặn không khôi phục tin họ gửi trong lúc bị chặn.</p>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame auto">
+			<div class="set-main solo">
+				<header class="set-head"><h3>Người đã chặn</h3><span class="muted">Trạng thái trống</span></header>
+				<div class="set-body"><div class="card"><div class="empty"><svg class="icon"><use href="#i-ban"/></svg><strong>Bạn chưa chặn ai</strong><span>Chặn từ hồ sơ của người đó hoặc từ menu của tin nhắn.</span></div></div></div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Notifications ============ -->
+	<section class="shot" id="notifications">
+		<div class="shot-head"><h2>Thông báo</h2><span class="phase">Phase 6, 10, 11</span><p>Bật tắt theo loại chat, âm thanh, và nút thao tác trên thông báo của bản desktop. Badge mặc định không đếm chat đã tắt tiếng. Trình duyệt chưa cấp quyền thì báo ngay ở đầu trang kèm nút xin quyền.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="notifications" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Thông báo</h3></header>
+				<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span class="grow">Trình duyệt này chưa cho phép thông báo.</span><button type="button" class="btn btn-sm" data-toast="Trình duyệt hỏi quyền hiển thị thông báo">Cho phép</button></div>
+				<div class="set-body">
+					<div class="card">
+						<h4 class="card-title">Theo loại chat</h4>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-user"/></svg></span><span class="grow">Chat riêng tư<small>Tin từ một người hoặc bot</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thông báo chat riêng tư"></button></div>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-users"/></svg></span><span class="grow">Nhóm<small>Luôn báo khi có người nhắc tới bạn</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thông báo nhóm"></button></div>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-megaphone"/></svg></span><span class="grow">Kênh</span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Thông báo kênh"></button></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Âm thanh và số đếm</h4>
+						<div class="row opt-row"><span class="grow">Âm báo</span><div class="choice" role="group" aria-label="Âm báo"><button type="button" aria-pressed="true">Mặc định</button><button type="button" aria-pressed="false">Nhẹ</button><button type="button" aria-pressed="false">Tắt</button></div></div>
+						<div class="row pad-x"><span class="grow">Phát âm thanh khi đang mở chat</span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Phát âm thanh khi đang mở chat"></button></div>
+						<div class="row pad-x"><span class="grow">Đếm cả chat đã tắt tiếng trên badge<small>Tắt: số trên biểu tượng app chỉ tính chat còn bật thông báo</small></span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Đếm cả chat đã tắt tiếng"></button></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Bản desktop</h4>
+						<div class="row pad-x"><span class="grow">Nút Trả lời trên thông báo</span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Nút Trả lời trên thông báo"></button></div>
+						<div class="row pad-x"><span class="grow">Nút Đánh dấu đã đọc trên thông báo</span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Nút Đánh dấu đã đọc trên thông báo"></button></div>
+						<div class="pad-x pad-b">
+							<div class="os-note" aria-label="Xem trước thông báo desktop">
+								<span class="avatar sm av-green">LA</span>
+								<div class="grow"><b>Lan Anh</b><p>Mình gửi file thiết kế rồi nhé</p>
+									<div class="os-actions"><button type="button" class="btn btn-sm" data-toast="Ô trả lời mở ngay trên thông báo">Trả lời</button><button type="button" class="btn btn-sm" data-toast="Đã đánh dấu đã đọc">Đánh dấu đã đọc</button></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Appearance ============ -->
+	<section class="shot" id="appearance">
+		<div class="shot-head"><h2>Giao diện</h2><span class="phase">Phase 6</span><p>Sáng, tối hoặc theo hệ thống (bấm thử: cả trang mock đổi theo). Ngôn ngữ cũng được gửi sang trang đăng nhập hoandat để hai bên cùng một ngôn ngữ. Cỡ chữ đổi cỡ tin nhắn, xem trước ngay bên dưới.</p></div>
+		<div class="frame"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="appearance" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Giao diện</h3></header>
+				<div class="set-body">
+					<div class="card pad">
+						<h4 class="card-title flush">Chủ đề</h4>
+						<div class="theme-pick" role="group" aria-label="Chủ đề">
+							<button type="button" data-theme-pick="light" aria-pressed="false"><span class="swatch sw-light"><i></i><i></i></span>Sáng</button>
+							<button type="button" data-theme-pick="dark" aria-pressed="false"><span class="swatch sw-dark"><i></i><i></i></span>Tối</button>
+							<button type="button" data-theme-pick="system" aria-pressed="true"><span class="swatch sw-system"><i></i><i></i></span>Theo hệ thống</button>
+						</div>
+					</div>
+					<div class="card">
+						<div class="row opt-row"><span class="grow">Ngôn ngữ<small>Trang đăng nhập hoandat cũng hiện bằng ngôn ngữ này</small></span><div class="choice" role="group" aria-label="Ngôn ngữ"><button type="button" aria-pressed="true">Tiếng Việt</button><button type="button" aria-pressed="false">English</button></div></div>
+					</div>
+					<div class="card pad">
+						<div class="size-head"><label for="font-size">Cỡ chữ tin nhắn</label><output for="font-size" id="font-size-out" class="mono">15 px</output></div>
+						<div class="size-row"><span class="a-small" aria-hidden="true">A</span><input type="range" id="font-size" min="13" max="20" step="1" value="15"><span class="a-big" aria-hidden="true">A</span></div>
+						<div class="size-preview" id="size-preview">
+							<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Chiều nay mình review bản thiết kế nhé.<span class="stamp">14:02</span></p></div></div>
+							<div class="msg mine"><div class="bubble"><p>Ok, mình gửi link Figma ngay.<span class="stamp">14:03 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Storage ============ -->
+	<section class="shot" id="storage">
+		<div class="shot-head"><h2>Dữ liệu và bộ nhớ</h2><span class="phase">Phase 5, 6</span><p>Cache media có trần dung lượng, trần thời gian và ngân sách riêng cho video và file lớn; vượt trần thì xoá file lâu không mở trước (LRU). Trần mặc định do server cấp, người dùng chỉnh được. Xoá cache cần xác nhận (khung dưới). Trên web, database trong trình duyệt chỉ là cache và bị xoá khi đăng xuất.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="storage" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Dữ liệu và bộ nhớ</h3></header>
+				<div class="set-body">
+					<div class="card pad stack">
+						<div class="usage-head"><b id="usage-text">1,24 GB</b><span class="muted">trên trần 2 GB</span></div>
+						<div class="usage-bar" id="usage-bar" role="img" aria-label="Ảnh 640 MB, video 460 MB, file 120 MB, voice 20 MB">
+							<span class="u-photo" style="width:31%"></span><span class="u-video" style="width:23%"></span><span class="u-file" style="width:6%"></span><span class="u-voice" style="width:1%"></span>
+						</div>
+						<ul class="legend">
+							<li><i class="u-photo"></i>Ảnh <span class="mono">640 MB</span></li>
+							<li><i class="u-video"></i>Video <span class="mono">460 MB</span></li>
+							<li><i class="u-file"></i>File <span class="mono">120 MB</span></li>
+							<li><i class="u-voice"></i>Voice <span class="mono">20 MB</span></li>
+						</ul>
+						<p class="note">Thêm <span class="mono">86 MB</span> database tin nhắn để mở chat không cần chờ mạng. Phần này không tính vào trần media.</p>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Giới hạn cache media</h4>
+						<div class="row opt-row"><span class="grow">Dung lượng tối đa<small>Mặc định 2 GB</small></span><div class="choice" role="group" aria-label="Dung lượng tối đa"><button type="button" aria-pressed="false">1 GB</button><button type="button" aria-pressed="true">2 GB</button><button type="button" aria-pressed="false">5 GB</button><button type="button" aria-pressed="false">10 GB</button></div></div>
+						<div class="row opt-row"><span class="grow">Giữ media trong<small>File không mở lại sau thời gian này bị xoá khỏi máy</small></span><div class="choice" role="group" aria-label="Giữ media trong"><button type="button" aria-pressed="false">1 tuần</button><button type="button" aria-pressed="true">1 tháng</button><button type="button" aria-pressed="false">3 tháng</button><button type="button" aria-pressed="false">Luôn giữ</button></div></div>
+						<div class="row opt-row"><span class="grow">Ngân sách cho video và file lớn<small>File trên 20 MB tính riêng, để video không đẩy hết ảnh ra khỏi cache</small></span><div class="choice" role="group" aria-label="Ngân sách cho video và file lớn"><button type="button" aria-pressed="false">256 MB</button><button type="button" aria-pressed="true">512 MB</button><button type="button" aria-pressed="false">1 GB</button></div></div>
+					</div>
+					<div class="card">
+						<div class="row pad-x"><span class="grow">Xoá cache media<small>Media vẫn còn trên server, mở lại sẽ tải về</small></span><button type="button" class="btn" data-toast="Hộp xác nhận: xem khung bên dưới">Xoá cache</button></div>
+						<div class="callout pad-x"><svg class="icon icon-sm"><use href="#i-info"/></svg><p>Bản web: database trong trình duyệt chỉ là cache, không mã hoá và bị xoá toàn bộ khi đăng xuất. Bản điện thoại và máy tính mã hoá database trên máy.</p></div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame confirm-frame">
+			<div class="static-dialog">
+				<div class="panel narrow">
+					<div class="dlg-head"><h2>Xoá cache media?</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-body flow">
+						<p>Xoá <b>1,24 GB</b> ảnh, video, file và voice đã tải về máy này.</p>
+						<p class="muted">Tin nhắn, bản nháp và tin đang chờ gửi không bị xoá. Media vẫn còn trên server, mở lại sẽ tải về.</p>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-danger" id="clear-cache">Xoá cache</button></div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Sessions ============ -->
+	<section class="shot" id="sessions">
+		<div class="shot-head"><h2>Phiên đăng nhập</h2><span class="phase">Phase 6, 10, 11</span><p>Mỗi trình duyệt và mỗi máy là một phiên chat riêng, đăng xuất từng phiên được. "Đăng xuất mọi phiên khác" là thao tác nhạy cảm nên cần đăng nhập lại ở hoandat trong 10 phút gần nhất. App điện thoại và máy tính cũng thu hồi được ở trang tài khoản hoandat.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="sessions" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Phiên đăng nhập</h3></header>
+				<div class="set-body">
+					<div class="card">
+						<h4 class="card-title">Phiên này</h4>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-globe"/></svg></span><span class="grow">Chrome trên macOS <span class="current">Phiên này</span><small>chat.hoandat.com · Hà Nội · đang hoạt động</small></span><button type="button" class="btn btn-sm" data-press="Đã đăng xuất trình duyệt này, cache trong trình duyệt đã xoá">Đăng xuất</button></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Thiết bị khác</h4>
+						<ul class="plain">
+							<li class="row pad-x"><span class="device"><svg class="icon"><use href="#i-mobile"/></svg></span><span class="grow">iPhone 15 · app Chat 1.0.3<small>TP. Hồ Chí Minh · hôm nay 08:12</small></span><button type="button" class="btn btn-sm" data-press="Đã đăng xuất iPhone 15">Đăng xuất</button></li>
+							<li class="row pad-x"><span class="device"><svg class="icon"><use href="#i-laptop"/></svg></span><span class="grow">Windows 11 · app Chat cho desktop 1.0.2<small>Hà Nội · hôm qua 22:40</small></span><button type="button" class="btn btn-sm" data-press="Đã đăng xuất máy Windows">Đăng xuất</button></li>
+						</ul>
+						<div class="row pad-x top-line">
+							<span class="grow">Đăng xuất mọi phiên khác<small>Cần đăng nhập lại ở auth.hoandat.com để xác nhận</small></span>
+							<button type="button" class="btn danger-outline" data-toast="Chuyển sang auth.hoandat.com để đăng nhập lại, rồi quay về đăng xuất 2 phiên">Đăng xuất 2 phiên</button>
+						</div>
+					</div>
+					<div class="card">
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-shield"/></svg></span><span class="grow">Tài khoản hoandat<small>Đổi cách đăng nhập, gỡ quyền ứng dụng, thu hồi máy</small></span><a class="btn" href="#" onclick="return false" data-toast="Mở auth.hoandat.com/account trong tab mới">Quản lý tài khoản hoandat <svg class="icon icon-sm"><use href="#i-external"/></svg></a></div>
+						<div class="callout pad-x"><svg class="icon icon-sm"><use href="#i-info"/></svg><p>Đăng xuất hoandat trên trình duyệt chỉ đăng xuất bản web. iPhone và máy Windows ở trên cũng thu hồi được tại auth.hoandat.com/account; app trên máy đó sẽ tự đăng xuất trong khoảng một giờ.</p></div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Tenant ============ -->
+	<section class="shot" id="tenant">
+		<div class="shot-head"><h2>Tổ chức</h2><span class="phase">Phase 6, 10</span><p>Mỗi domain là một tổ chức với dữ liệu riêng: tài khoản, chat, bot và kết quả tìm kiếm không đi qua lại giữa các domain. Web không cần chọn vì domain đã nằm trong địa chỉ; app điện thoại và máy tính đổi tổ chức bằng "Đăng nhập bằng domain khác".</p></div>
+		<div class="frame"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="tenant" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Tổ chức</h3></header>
+				<div class="set-body">
+					<div class="card">
+						<div class="org pad"><span class="org-mark">h</span><div><b>hoandat.com</b><span class="muted">Tổ chức hiện tại</span></div></div>
+						<dl class="kv">
+							<div><dt>Địa chỉ web</dt><dd class="mono">chat.hoandat.com</dd></div>
+							<div><dt>Đăng nhập ở</dt><dd class="mono">auth.hoandat.com</dd></div>
+						</dl>
+						<div class="callout pad-x"><svg class="icon icon-sm"><use href="#i-lock"/></svg><p>Dữ liệu tách theo domain. Người dùng của <span class="mono">inetdev.io.vn</span> không thấy, không tìm và không nhắn được cho bạn ở đây, và ngược lại.</p></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Dùng tổ chức khác</h4>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-globe"/></svg></span><span class="grow">Trên web<small>Mở địa chỉ chat của domain đó, ví dụ chat.inetdev.io.vn</small></span></div>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-mobile"/></svg></span><span class="grow">Trên app điện thoại và máy tính<small>Đăng xuất, rồi chọn "Đăng nhập bằng domain khác" và nhập domain</small></span></div>
+						<div class="pad-x pad-b">
+							<div class="mini-sheet">
+								<label for="t-domain">Domain của tổ chức</label>
+								<input id="t-domain" class="input" value="inetdev.io.vn" spellcheck="false" autocomplete="off">
+								<span class="status ok"><svg class="icon icon-sm"><use href="#i-check"/></svg><span>Sẽ dùng chat.inetdev.io.vn</span></span>
+							</div>
+						</div>
+						<p class="note pad-x pad-b">Dữ liệu trong máy cũng tách theo domain và tài khoản, đổi qua lại không lẫn chat.</p>
+					</div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Export and delete ============ -->
+	<section class="shot" id="export-delete">
+		<div class="shot-head"><h2>Xuất và xoá dữ liệu</h2><span class="phase">Phase 12</span><p>Xuất dữ liệu cá nhân chạy nền; app không gửi email, bản xuất hiện ngay ở đây để tải. Tự xoá khi không dùng N tháng. Xoá tài khoản chat cần đăng nhập lại gần đây và chỉ xoá dữ liệu chat: tài khoản hoandat vẫn còn, quản lý ở IdP; đăng nhập lại sau này sẽ tạo một tài khoản chat mới, trống.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="export-delete" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Tài khoản</h3></header>
+				<div class="set-body">
+					<div class="card">
+						<h4 class="card-title">Xuất dữ liệu cá nhân</h4>
+						<p class="note pad-x">Hồ sơ, danh sách chat, tin bạn gửi và media bạn tải lên. Khi xong, file nằm ở đây 30 ngày.</p>
+						<div class="row pad-x top-line"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span class="grow"><span class="mono">chat-export-dattqh-20261014.zip</span><small>248 MB · sẵn sàng · hết hạn 21/10/2026</small></span><button type="button" class="btn btn-sm" data-toast="Đang tải bản xuất qua link ký có hạn"><svg class="icon icon-sm"><use href="#i-download"/></svg>Tải xuống</button></div>
+						<div class="row pad-x top-line"><span class="grow">Yêu cầu bản xuất mới<small>Mỗi 7 ngày một lần. Lần sau: 21/10/2026 09:30</small></span><button type="button" class="btn btn-sm" disabled>Yêu cầu</button></div>
+					</div>
+					<div class="card">
+						<div class="row opt-row"><span class="grow">Tự xoá tài khoản chat nếu không dùng<small>Tính từ lần cuối có thiết bị nào kết nối</small></span><div class="choice" role="group" aria-label="Tự xoá nếu không dùng"><button type="button" aria-pressed="true">Tắt</button><button type="button" aria-pressed="false">6 tháng</button><button type="button" aria-pressed="false">12 tháng</button><button type="button" aria-pressed="false">24 tháng</button></div></div>
+					</div>
+					<div class="card danger-zone">
+						<h4 class="card-title">Xoá tài khoản chat</h4>
+						<ul class="ticks pad-x">
+							<li>Xoá hồ sơ, username và lịch sử chat của bạn trên chat.hoandat.com; bạn rời mọi nhóm và kênh.</li>
+							<li>Tài khoản hoandat vẫn còn: Localman, Tunelo dùng bình thường. Quản lý hoặc xoá nó ở auth.hoandat.com/account.</li>
+							<li>Đăng nhập chat lại sau này sẽ tạo một tài khoản chat mới, trống.</li>
+						</ul>
+						<div class="row pad-x"><span class="grow"><small>Cần đăng nhập lại ở hoandat trong 10 phút gần nhất.</small></span><button type="button" class="btn btn-danger" data-toast="Chuyển sang auth.hoandat.com để đăng nhập lại (xem khung dưới)">Xoá tài khoản chat</button></div>
+					</div>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame confirm-frame">
+			<div class="static-dialog">
+				<form class="panel narrow" onsubmit="return false">
+					<div class="dlg-head"><h2>Xoá tài khoản chat</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="banner ok"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã xác nhận lại ở auth.hoandat.com lúc 14:20</div>
+					<div class="dlg-body flow">
+						<p>Không hoàn tác được. Tài khoản hoandat của bạn không bị xoá.</p>
+						<div class="field">
+							<label for="del-confirm">Gõ <span class="mono">dattqh</span> để xác nhận</label>
+							<input id="del-confirm" class="input" autocomplete="off" spellcheck="false" placeholder="dattqh">
+						</div>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-danger" id="del-submit" disabled data-press="Đã xoá tài khoản chat, phiên trên mọi thiết bị đã đăng xuất">Xoá vĩnh viễn</button></div>
+				</form>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Report ============ -->
+	<section class="shot" id="report">
+		<div class="shot-head"><h2>Báo cáo tin nhắn</h2><span class="phase">Phase 12</span><p>Mở từ menu của tin. Chọn một lý do mới gửi được; ghi chú không bắt buộc. Người kiểm duyệt của tổ chức thấy tin được báo cáo kèm vài tin xung quanh; người bị báo cáo không biết ai báo cáo. Bảng còn lại là trạng thái sau khi gửi.</p></div>
+		<div class="frame tall">
+			<section class="convo report-convo" aria-label="Nhận quà 24h">
+				<header class="convo-head"><span class="avatar av-red">NQ</span><div class="title"><strong>Nhận quà 24h</strong><span>@nhanqua24h · không có trong danh bạ</span></div></header>
+				<div class="messages">
+					<span class="day">Hôm nay</span>
+					<div class="msg"><span class="avatar sm av-red">NQ</span><div class="bubble"><p>Chúc mừng bạn được chọn nhận iPhone 16 từ chương trình tri ân khách hàng.<span class="stamp">10:13</span></p></div></div>
+					<div class="msg"><span class="avatar sm av-red">NQ</span><div class="bubble reported"><p>Bấm nhan-qua24h.top/nhan và nhập mã đăng nhập để nhận trước 12h hôm nay nhé.<span class="stamp">10:14</span></p></div></div>
+				</div>
+			</section>
+			<div class="static-dialog report-overlay">
+				<form class="panel" id="report-form" onsubmit="return false">
+					<div class="dlg-head"><h2 id="rp-title">Báo cáo tin nhắn</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-body flow">
+						<blockquote class="quote"><b>Nhận quà 24h · 10:14</b>Bấm nhan-qua24h.top/nhan và nhập mã đăng nhập để nhận trước 12h hôm nay nhé.</blockquote>
+						<fieldset class="opts">
+							<legend>Lý do</legend>
+							<label class="opt"><input type="radio" name="reason" value="spam"><span>Spam<small>Quảng cáo, tin gửi hàng loạt</small></span></label>
+							<label class="opt"><input type="radio" name="reason" value="scam"><span>Lừa đảo<small>Giả mạo, lừa lấy tiền hoặc tài khoản</small></span></label>
+							<label class="opt"><input type="radio" name="reason" value="violence"><span>Bạo lực<small>Đe doạ, kích động, hình ảnh bạo lực</small></span></label>
+							<label class="opt"><input type="radio" name="reason" value="sexual"><span>Nội dung khiêu dâm</span></label>
+							<label class="opt"><input type="radio" name="reason" value="other"><span>Khác<small>Ghi rõ ở ô bên dưới</small></span></label>
+						</fieldset>
+						<div class="field">
+							<label for="rp-note">Ghi chú cho người kiểm duyệt <span class="muted">(không bắt buộc)</span></label>
+							<textarea id="rp-note" class="input" rows="2" maxlength="500" placeholder="Ví dụ: link giả trang đăng nhập"></textarea>
+						</div>
+						<label class="opt check"><input type="checkbox" checked><span>Chặn Nhận quà 24h</span></label>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-primary" id="rp-submit" disabled>Gửi báo cáo</button></div>
+				</form>
+				<div class="panel done-panel" id="report-done">
+					<div class="done">
+						<span class="done-mark"><svg class="icon"><use href="#i-check"/></svg></span>
+						<h2>Đã gửi báo cáo</h2>
+						<p class="muted">Cảm ơn bạn. Người kiểm duyệt của hoandat.com sẽ xem xét tin này.</p>
+						<p class="muted">Đã chặn Nhận quà 24h. Bỏ chặn trong Cài đặt, mục Người đã chặn.</p>
+						<button type="button" class="btn btn-primary" data-toast="Đóng hộp báo cáo">Xong</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+</main>
+
+<style>
+/* ---------- Settings shell: rail + category list + content ---------- */
+.frame.tall { --frame-h: 860px; }
+.set { display: grid; grid-template-columns: var(--rail-w) 248px minmax(0, 1fr); height: 100%; }
+.set > * { min-height: 0; }
+.rail a.icon-btn { text-decoration: none; }
+.rail .icon-btn[aria-current="page"] { color: var(--c-primary); background: var(--c-selected); }
+.set-nav { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-2); overflow-y: auto; border-right: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.set-nav h2 { margin: var(--space-2) var(--space-3) var(--space-3); font-size: 1.125rem; font-weight: 600; }
+.set-nav a { display: flex; align-items: center; gap: var(--space-3); min-height: 40px; padding: 0 var(--space-3); border-radius: var(--radius-sm); color: var(--c-text); text-decoration: none; font-size: 0.9375rem; }
+.set-nav a .icon { color: var(--c-icon-muted); }
+.set-nav a:hover { background: var(--c-hover); }
+.set-nav a[aria-current="page"] { background: var(--c-selected); color: var(--c-primary); font-weight: 500; }
+.set-nav a[aria-current="page"] .icon { color: var(--c-primary); }
+.set-nav .go { margin-left: auto; width: 16px; height: 16px; }
+.set-nav hr { width: 100%; border: 0; border-top: 1px solid var(--c-border-subtle); margin: var(--space-2) 0; }
+
+.set-main { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }
+.set-main.solo { overflow: visible; }
+.set-head { display: flex; align-items: center; gap: var(--space-3); min-height: var(--topbar-h); padding: var(--space-2) var(--space-6); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.set-head h3 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.set-head .back { display: none; }
+.set-body { display: grid; gap: var(--space-4); width: 100%; max-width: 720px; padding: var(--space-5) var(--space-6) var(--space-6); }
+
+/* Cards and rows */
+.card { background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.card.pad, .pad { padding: var(--space-4); }
+.pad-x { padding-left: var(--space-4); padding-right: var(--space-4); }
+.pad-b { padding-bottom: var(--space-4); }
+.card .row { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+.card .row + .row, .top-line { border-top: 1px solid var(--c-border-subtle); }
+.card-title { margin: 0; padding: var(--space-3) var(--space-4) var(--space-1); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.card-title.flush { padding: 0 0 var(--space-3); }
+.stack { display: grid; gap: var(--space-4); }
+.plain { list-style: none; margin: 0; padding: 0; }
+.plain .row + .row { border-top: 1px solid var(--c-border-subtle); }
+.note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
+.note .icon { vertical-align: -3px; }
+.lede { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.callout { display: flex; gap: var(--space-2); align-items: flex-start; padding-top: var(--space-3); padding-bottom: var(--space-3); border-top: 1px solid var(--c-border-subtle); font-size: 0.8125rem; color: var(--c-text-muted); }
+.callout .icon { margin-top: 2px; }
+.callout p { margin: 0; }
+.opt-row { flex-wrap: wrap; padding-left: var(--space-4); padding-right: var(--space-4); }
+.opt-row .grow { min-width: 220px; }
+.tag-neutral { flex: none; font-size: 0.75rem; font-weight: 500; padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--c-bar-track); color: var(--c-text-muted); }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+.btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.btn[aria-busy="true"] { cursor: progress; opacity: 0.7; }
+.btn-danger { background: var(--c-error); border-color: var(--c-error); color: var(--c-on-tone); }
+.btn-danger:hover { background: color-mix(in srgb, var(--c-error) 88%, var(--c-text)); border-color: color-mix(in srgb, var(--c-error) 88%, var(--c-text)); }
+.btn-danger:disabled:hover { background: var(--c-error); }
+.danger-outline { color: var(--c-error); border-color: color-mix(in srgb, var(--c-error) 45%, var(--c-border)); }
+.danger-outline:hover { background: color-mix(in srgb, var(--c-error) 8%, var(--c-surface)); border-color: var(--c-error); }
+.link .icon { vertical-align: -3px; }
+a.btn { color: var(--c-text); text-decoration: none; }
+.empty[hidden], .plain[hidden] { display: none; }
+.banner .grow { flex: 1; }
+
+/* Form fields */
+.field .input { width: 100%; }
+.affix { display: flex; align-items: center; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
+.affix > span { padding-left: var(--space-3); color: var(--c-text-muted); }
+.affix .input { border: 0; box-shadow: none; padding-left: 2px; }
+.affix:focus-within { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
+.affix.invalid { border-color: var(--c-error); box-shadow: var(--shadow-focus-error); }
+.status { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+.status.ok { color: var(--c-success-text); }
+.status.bad { color: var(--c-error); }
+.counter { justify-self: end; font-variant-numeric: tabular-nums; }
+.save-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.save-bar .muted { margin-right: auto; font-size: 0.875rem; }
+
+/* Profile */
+.photo-row { display: flex; align-items: center; gap: var(--space-4); }
+.photo-actions { display: grid; gap: var(--space-2); min-width: 0; }
+.avatar.xl { width: 72px; height: 72px; font-size: 1.5rem; }
+
+/* Desktop notification preview */
+.os-note { display: flex; gap: var(--space-3); max-width: 380px; padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); box-shadow: var(--shadow-sm); }
+.os-note b { font-weight: 600; font-size: 0.875rem; }
+.os-note p { margin: 0 0 var(--space-2); font-size: 0.875rem; color: var(--c-text-muted); }
+.os-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Appearance */
+.theme-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.theme-pick button { display: grid; gap: var(--space-2); justify-items: start; padding: var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); font-weight: 500; text-align: left; }
+.theme-pick button:hover { border-color: var(--c-border-strong); }
+.theme-pick button[aria-pressed="true"] { border-color: var(--c-primary); box-shadow: 0 0 0 1px var(--c-primary); }
+.swatch { display: grid; gap: 6px; align-content: center; width: 100%; height: 64px; padding: 0 var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); }
+.swatch i { display: block; height: 8px; border-radius: var(--radius-full); }
+.swatch i:last-child { width: 60%; justify-self: end; }
+/* Theme previews: the page colours stand for the current theme, the inverse (text colour) for the other one. */
+.theme-pick { --light-bg: var(--c-bg); --light-bar: var(--c-border); --dark-bg: var(--c-text); --dark-bar: color-mix(in srgb, var(--c-surface) 35%, var(--c-text)); }
+:root[data-theme="dark"] .theme-pick { --light-bg: var(--c-text); --light-bar: color-mix(in srgb, var(--c-surface) 35%, var(--c-text)); --dark-bg: var(--c-bg); --dark-bar: var(--c-border); }
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .theme-pick { --light-bg: var(--c-text); --light-bar: color-mix(in srgb, var(--c-surface) 35%, var(--c-text)); --dark-bg: var(--c-bg); --dark-bar: var(--c-border); }
+}
+.sw-light { background: var(--light-bg); }
+.sw-light i { background: var(--light-bar); }
+.sw-dark { background: var(--dark-bg); }
+.sw-dark i { background: var(--dark-bar); }
+.sw-system { background: linear-gradient(90deg, var(--light-bg) 50%, var(--dark-bg) 50%); }
+.sw-system i { background: color-mix(in srgb, var(--c-text-muted) 60%, transparent); }
+.swatch i:last-child { background: var(--c-primary-solid); }
+.size-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
+.size-row { display: flex; align-items: center; gap: var(--space-3); }
+.size-row input { flex: 1; min-width: 0; height: 44px; accent-color: var(--c-primary-solid); }
+.a-small { font-size: 0.8125rem; color: var(--c-text-muted); }
+.a-big { font-size: 1.25rem; color: var(--c-text-muted); }
+.size-preview { --msg-size: 15px; display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-bg); border: 1px solid var(--c-border-subtle); }
+.size-preview .bubble p { font-size: var(--msg-size); }
+
+/* Storage */
+.usage-head { display: flex; align-items: baseline; gap: var(--space-2); }
+.usage-head b { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-bar { display: flex; gap: 2px; height: 10px; border-radius: var(--radius-full); background: var(--c-bar-track); overflow: hidden; }
+.usage-bar span { display: block; height: 100%; transition: width var(--dur-base) var(--ease-standard); }
+.u-photo { background: var(--c-viz-violet); }
+.u-video { background: var(--c-viz-cyan); }
+.u-file { background: var(--c-viz-amber); }
+.u-voice { background: var(--c-viz-green); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); list-style: none; margin: 0; padding: 0; font-size: 0.875rem; }
+.legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.legend i { width: 10px; height: 10px; border-radius: 3px; }
+.legend .mono { color: var(--c-text-muted); }
+
+/* Confirmation frames: dialog shown open over a dimmed backdrop. */
+.frame.confirm-frame { --frame-h: 380px; }
+.static-dialog .panel.narrow { width: min(460px, 100%); }
+.dlg-body.flow { display: grid; gap: var(--space-3); padding-top: var(--space-4); }
+.dlg-body.flow p { margin: 0; }
+.dlg-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.panel > .banner { border-radius: 0; }
+
+/* Tenant */
+.org { display: flex; align-items: center; gap: var(--space-3); }
+.org b { display: block; font-size: 1.125rem; font-weight: 600; }
+.org span { font-size: 0.875rem; }
+.org-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--c-primary-solid); color: var(--c-on-primary); font-weight: 600; font-size: 1.25rem; }
+.kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-top: 1px solid var(--c-border-subtle); }
+.kv > div { padding: var(--space-3) var(--space-4); min-width: 0; }
+.kv > div + div { border-left: 1px solid var(--c-border-subtle); }
+.kv dt { font-size: 0.8125rem; color: var(--c-text-muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.mini-sheet { display: grid; gap: var(--space-2); max-width: 360px; padding: var(--space-3); border-radius: var(--radius-md); border: 1px dashed var(--c-border); background: var(--c-surface-subtle); }
+.mini-sheet label { font-size: 0.875rem; font-weight: 500; }
+
+/* Account */
+.ticks { margin: 0; padding-top: var(--space-1); padding-bottom: var(--space-2); list-style: none; display: grid; gap: var(--space-2); font-size: 0.875rem; }
+.ticks li { position: relative; padding-left: var(--space-4); }
+.ticks li::before { content: ""; position: absolute; left: 2px; top: 0.6em; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.danger-zone { border-color: color-mix(in srgb, var(--c-error) 35%, var(--c-border-subtle)); }
+.danger-zone .card-title { color: var(--c-error); }
+
+/* Report */
+.frame > .report-convo { height: 100%; }
+.report-convo .messages { max-width: 340px; }
+.report-convo .messages > :first-child { margin-top: 0; }
+.bubble.reported { border-color: var(--c-error); box-shadow: 0 0 0 1px var(--c-error); }
+.frame .report-overlay { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: var(--space-5); padding: var(--space-5); }
+.report-overlay .panel { width: min(420px, 100%); }
+.quote { margin: 0; padding: var(--space-2) var(--space-3); border-left: 3px solid var(--c-error); border-radius: var(--radius-xs); background: var(--c-surface-subtle); font-size: 0.875rem; }
+.quote b { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
+.opts { margin: 0; padding: 0; border: 0; display: grid; gap: 2px; }
+.opts legend { padding: 0; margin-bottom: var(--space-1); font-size: 0.875rem; font-weight: 500; }
+/* Native input stretched over the whole row: real radio semantics, 44px target, custom mark. */
+.opt { position: relative; display: flex; align-items: center; gap: var(--space-3); min-height: 44px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); cursor: pointer; }
+.opt:hover { background: var(--c-hover); }
+.opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.opt::before { content: ""; flex: none; width: 18px; height: 18px; border-radius: var(--radius-full); border: 1.5px solid var(--c-border-strong); background: var(--c-surface); }
+.opt.check::before { border-radius: var(--radius-xs); }
+.opt:has(input:checked)::before { border: 5px solid var(--c-primary-solid); }
+.opt.check:has(input:checked)::before { border: 0; background: var(--c-primary-solid); }
+/* Check mark drawn with borders so it follows the theme tokens. */
+.opt.check::after { content: ""; position: absolute; left: calc(var(--space-2) + 6px); top: 50%; width: 5px; height: 10px; border: solid var(--c-on-primary); border-width: 0 2px 2px 0; transform: translateY(-65%) rotate(45deg); opacity: 0; }
+.opt.check:has(input:checked)::after { opacity: 1; }
+.opt:has(input:focus-visible) { outline: 2px solid var(--c-primary); outline-offset: 0; }
+.opt span { display: grid; font-size: 0.9375rem; }
+.opt small { color: var(--c-text-muted); font-size: 0.8125rem; }
+.done { display: grid; justify-items: center; gap: var(--space-2); padding: var(--space-6) var(--space-5); text-align: center; }
+.done h2 { margin: var(--space-2) 0 0; font-size: 1.125rem; font-weight: 600; }
+.done p { margin: 0; }
+.done .btn { margin-top: var(--space-3); }
+.done-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success); }
+
+/* Narrow: drill-down pattern, the category list is its own screen. */
+@media (max-width: 760px) {
+	.set { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.set > .rail, .set-nav { display: none; }
+	.set-main { overflow: visible; }
+	.set-head { padding: var(--space-2) var(--space-3); flex-wrap: wrap; }
+	.set-head .back { display: inline-grid; }
+	.set-body { padding: var(--space-4) var(--space-3) var(--space-5); }
+	.opt-row .grow { min-width: 100%; }
+	.opt-row .choice { width: 100%; }
+	.opt-row .choice button { flex: 1; padding: 0 var(--space-1); }
+	.theme-pick { grid-template-columns: minmax(0, 1fr); }
+	.theme-pick button { grid-template-columns: 72px 1fr; align-items: center; }
+	.swatch { height: 44px; padding: 0 var(--space-2); }
+	.kv { grid-template-columns: minmax(0, 1fr); }
+	.kv > div + div { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	.frame.confirm-frame { min-height: 0; height: auto; }
+	.frame.confirm-frame .static-dialog { position: static; }
+	.frame > .report-convo { height: auto; }
+	.report-convo .messages { overflow: visible; }
+	.frame .report-overlay { position: static; padding: var(--space-3); }
+	.row:has(> .btn) { flex-wrap: wrap; }
+	.row:has(> .btn) > .grow { flex: 1 1 140px; }
+	.wrap-row { flex-wrap: wrap; }
+	.wrap-row .tag-neutral { margin-left: 52px; }
+	.head-btn { width: 44px; padding: 0; }
+	.head-btn span { display: none; }
+	.frame.auto { min-height: 0; }
+	.report-convo { min-height: 0; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.choice button, .btn-sm { min-height: 44px; }
+	/* Switch keeps its 40x24 track but gets a 44px tall hit area. */
+	.switch { width: 52px; height: 44px; padding: 10px 6px; background-clip: content-box; }
+	.switch, .switch[aria-checked="true"] { background-clip: content-box; }
+	.switch::after { top: 13px; left: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.usage-bar span { transition: none; }
+}
+</style>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast } = window.Mock;
+
+	// Shared chrome, rendered once per shot so every frame shows where the user is.
+	const icon = (id, cls = "icon") => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+	const RAIL = `<span class="avatar sm av-violet" title="Đức Thắng">ĐT</span>
+		<a class="icon-btn" href="chat.html" aria-label="Chat">${icon("message")}</a>
+		<a class="icon-btn" href="search.html" aria-label="Tìm kiếm">${icon("search")}</a>
+		<span class="spacer"></span>
+		<a class="icon-btn" href="#profile" aria-current="page" aria-label="Cài đặt">${icon("settings")}</a>`;
+	const NAV = [
+		["profile", "Hồ sơ", "user"], ["privacy", "Quyền riêng tư", "eye-off"], ["blocked", "Người đã chặn", "ban"], null,
+		["notifications", "Thông báo", "bell"], ["appearance", "Giao diện", "sun"], ["storage", "Dữ liệu và bộ nhớ", "database"], null,
+		["sessions", "Phiên đăng nhập", "laptop"], ["tenant", "Tổ chức", "globe"], null,
+		["console.html", "Developer Console", "code"], ["export-delete", "Tài khoản", "key"],
+	];
+	$$("[data-rail]").forEach((el) => { el.innerHTML = RAIL; });
+	$$(".set-nav").forEach((nav) => {
+		const active = nav.dataset.active;
+		nav.innerHTML = "<h2>Cài đặt</h2>" + NAV.map((item) => {
+			if (!item) return "<hr>";
+			const [id, label, ic] = item;
+			const page = id.endsWith(".html");
+			const current = id === active ? ' aria-current="page"' : "";
+			return `<a href="${page ? id : "#" + id}"${current}>${icon(ic)}<span>${label}</span>${page ? icon("chevron-right", "icon go") : ""}</a>`;
+		}).join("");
+	});
+	$$(".set .set-head").forEach((head) => head.insertAdjacentHTML("afterbegin",
+		`<a class="icon-btn back" href="#profile" aria-label="Về danh sách cài đặt">${icon("back")}</a>`));
+
+	// Profile: username availability, checked as the user types.
+	const TAKEN = ["minh", "lananh", "quanghuy", "admin", "support", "hoandat"];
+	const uname = $("#p-username");
+	const status = $("#p-username-status");
+	const save = $("#p-save");
+	const setStatus = (kind, text) => {
+		status.className = "status " + kind;
+		const ic = kind === "ok" ? "check" : kind === "bad" ? "alert-circle" : "clock";
+		status.innerHTML = `${icon(ic, "icon icon-sm")}<span>${text}</span>`;
+		uname.setAttribute("aria-invalid", String(kind === "bad"));
+		uname.parentElement.classList.toggle("invalid", kind === "bad");
+		save.disabled = kind !== "ok";
+	};
+	let checkTimer;
+	uname.addEventListener("input", () => {
+		clearTimeout(checkTimer);
+		const v = uname.value.trim().toLowerCase();
+		if (v === "dattqh") return setStatus("ok", "Username hiện tại của bạn");
+		// Known handles go to the (simulated) server check first, so short ones like "minh" show the duplicate error.
+		const taken = TAKEN.includes(v);
+		if (!taken && !/^[a-z0-9_]{5,32}$/.test(v)) return setStatus("bad", v.length < 5 ? "Cần ít nhất 5 ký tự" : "Chỉ dùng chữ a–z, số và dấu gạch dưới");
+		setStatus("wait", "Đang kiểm tra…");
+		checkTimer = setTimeout(() => taken ? setStatus("bad", `@${v} đã có người dùng`) : setStatus("ok", `@${v} còn trống`), 400);
+	});
+	const bio = $("#p-bio");
+	bio.addEventListener("input", () => { $("#p-bio-count").textContent = `${bio.value.length}/140`; });
+
+	// Blocked list: unblock with a busy state, empty state when the list runs out.
+	$$("[data-unblock]").forEach((btn) => btn.addEventListener("click", () => {
+		btn.setAttribute("aria-busy", "true");
+		btn.textContent = "Đang bỏ chặn…";
+		setTimeout(() => {
+			btn.closest("li").remove();
+			toast(`Đã bỏ chặn ${btn.dataset.unblock}`);
+			if (!$("#blocked-list li")) { $("#blocked-list").hidden = true; $("#blocked-empty").hidden = false; }
+		}, 450);
+	}));
+
+	// Appearance: the theme choice drives the whole mock, same storage key as the review bar.
+	const picks = $$("[data-theme-pick]");
+	const applyTheme = (mode) => {
+		const root = document.documentElement;
+		if (mode === "system") { delete root.dataset.theme; localStorage.removeItem("mock-theme"); }
+		else { root.dataset.theme = mode; localStorage.setItem("mock-theme", mode); }
+		picks.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === mode)));
+		$("#theme-toggle")?.setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
+	};
+	const saved = localStorage.getItem("mock-theme");
+	picks.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === (saved || "system"))));
+	picks.forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.themePick)));
+	$("#theme-toggle")?.addEventListener("click", () => {
+		const t = document.documentElement.dataset.theme || "system";
+		picks.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === t)));
+	});
+	const size = $("#font-size");
+	size.addEventListener("input", () => {
+		$("#size-preview").style.setProperty("--msg-size", size.value + "px");
+		$("#font-size-out").textContent = size.value + " px";
+	});
+
+	// Storage: confirm clears the cache and resets the usage bar.
+	const clear = $("#clear-cache");
+	clear.addEventListener("click", () => {
+		if (clear.getAttribute("aria-busy") === "true") return;
+		clear.setAttribute("aria-busy", "true");
+		clear.textContent = "Đang xoá…";
+		setTimeout(() => {
+			clear.removeAttribute("aria-busy");
+			clear.textContent = "Xoá cache";
+			$("#usage-text").textContent = "0 MB";
+			$$("#usage-bar span").forEach((s) => { s.style.width = "0"; });
+			toast("Đã xoá 1,24 GB cache media");
+		}, 600);
+	});
+
+	// Delete account: the destructive button unlocks only when the username is typed exactly.
+	const del = $("#del-confirm");
+	del.addEventListener("input", () => { $("#del-submit").disabled = del.value.trim() !== "dattqh"; });
+
+	// Report: a reason is required before sending.
+	const form = $("#report-form");
+	form.addEventListener("change", () => { $("#rp-submit").disabled = !form.querySelector("input[name=reason]:checked"); });
+	$("#rp-submit").addEventListener("click", () => toast("Đã gửi báo cáo, xem trạng thái bên phải"));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package app.v1;
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// (ids, seq, pts, byte sizes, unix-second dates) always holds a value < 2^53
+// so JavaScript clients can use a plain number; the server asserts the bound
+// when serializing. Internal Snowflake ids and file uuids never appear here;
+// presigned upload URLs target random staging object keys, so they do not
+// carry the file uuid either (see UploadPartUrl.url).
+
+// Upload, finalize and download of media files.
+service MediaService {
+  // Starts a resumable multipart upload, or resumes one when upload_id is set.
+  // Returns presigned part URLs, or the already stored file when the caller
+  // owns a file with the same file_hash (dedupe never crosses owners).
+  rpc CreateUpload(CreateUploadRequest) returns (CreateUploadResponse);
+  // Finalizes the upload: verifies MIME by magic bytes, strips metadata,
+  // validates client-measured dimensions and inline thumb.
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+  rpc AbortUpload(AbortUploadRequest) returns (AbortUploadResponse);
+  // Issues a short-lived download URL on the media domain. Access is proven by
+  // the context (a message the caller can see, or a profile photo owner).
+  rpc GetFileUrl(GetFileUrlRequest) returns (GetFileUrlResponse);
+}
+
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  MEDIA_KIND_PHOTO = 1;
+  MEDIA_KIND_VIDEO = 2;
+  MEDIA_KIND_AUDIO = 3;
+  MEDIA_KIND_VOICE = 4;
+  MEDIA_KIND_DOCUMENT = 5;
+}
+
+// Rendition of a file. UNSPECIFIED means the stored (metadata-stripped)
+// original; S/M/X are produced by the media worker for photos and posters.
+enum MediaSizeType {
+  MEDIA_SIZE_TYPE_UNSPECIFIED = 0;
+  MEDIA_SIZE_TYPE_S = 1;
+  MEDIA_SIZE_TYPE_M = 2;
+  MEDIA_SIZE_TYPE_X = 3;
+}
+
+message MediaSize {
+  MediaSizeType type = 1;
+  int32 width = 2;
+  int32 height = 3;
+  int64 size = 4 [jstype = JS_NUMBER];
+}
+
+// Everything a client needs to lay out and fetch a file without extra calls.
+message MediaRef {
+  // Opaque id bound to the owning subject and source chat.
+  string file_id = 1;
+  // Stable content hash (hex SHA-256), used for dedupe and local caching.
+  string file_hash = 2;
+  MediaKind kind = 3;
+  string mime_type = 4;
+  // Size of the original in bytes.
+  int64 size = 5 [jstype = JS_NUMBER];
+  string file_name = 6;
+  int32 width = 7;
+  int32 height = 8;
+  // Duration in milliseconds (video, audio, voice).
+  int32 duration = 9;
+  // Tiny stripped thumbnail (a few hundred bytes) rendered before download.
+  bytes inline_thumb = 10;
+  // Renditions available for download, besides the original.
+  repeated MediaSize sizes = 11;
+  // Voice waveform samples (one byte per sample).
+  bytes waveform = 12;
+}
+
+message UploadPartUrl {
+  int32 part_number = 1;
+  // Presigned PUT URL for this part. It targets a random per-upload staging
+  // object key that CompleteUpload renames to the file's internal key, so the
+  // URL never reveals the internal file uuid.
+  string url = 2;
+}
+
+message CompletedPart {
+  int32 part_number = 1;
+  string etag = 2;
+}
+
+message CreateUploadRequest {
+  // Set to resume an earlier upload; all other fields are then ignored.
+  string upload_id = 1;
+  MediaKind kind = 2;
+  string file_name = 3;
+  string mime_type = 4;
+  int64 size = 5 [jstype = JS_NUMBER];
+  // Hex SHA-256 of the whole file, computed by the client.
+  string file_hash = 6;
+  // Client-measured layout data, revalidated by the server on completion.
+  int32 width = 7;
+  int32 height = 8;
+  // Milliseconds.
+  int32 duration = 9;
+  bytes inline_thumb = 10;
+  bytes waveform = 11;
+}
+
+message CreateUploadResponse {
+  oneof result {
+    // The caller already owns a file with this file_hash; no upload needed.
+    MediaRef existing = 1;
+    UploadSession upload = 2;
+  }
+}
+
+message UploadSession {
+  string upload_id = 1;
+  int64 part_size = 2 [jstype = JS_NUMBER];
+  // Presigned URLs for every part not yet uploaded.
+  repeated UploadPartUrl parts = 3;
+  // Parts already stored (when resuming).
+  repeated CompletedPart completed_parts = 4;
+  // When the presigned URLs stop working; call CreateUpload with upload_id
+  // again for fresh ones.
+  int64 urls_expire_at = 5 [jstype = JS_NUMBER];
+}
+
+message CompleteUploadRequest {
+  string upload_id = 1;
+  repeated CompletedPart parts = 2;
+}
+
+message CompleteUploadResponse {
+  MediaRef media = 1;
+}
+
+message AbortUploadRequest {
+  string upload_id = 1;
+}
+
+message AbortUploadResponse {}
+
+// A message that carries the file; the caller must be able to see it.
+message MessageFileContext {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+message GetFileUrlRequest {
+  string file_id = 1;
+  MediaSizeType size = 2;
+  oneof context {
+    MessageFileContext message = 3;
+    // Profile photo of this user.
+    int64 user_photo_of = 4 [jstype = JS_NUMBER];
+    // Photo of this chat.
+    int64 chat_photo_of = 5 [jstype = JS_NUMBER];
+  }
+}
+
+message GetFileUrlResponse {
+  string url = 1;
+  int64 expires_at = 2 [jstype = JS_NUMBER];
+}

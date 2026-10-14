@@ -1,0 +1,17 @@
+{
+  "name": "Chat",
+  "short_name": "Chat",
+  "description": "Nhắn tin nhanh trong hệ sinh thái hoandat.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#6e56cf",
+  "background_color": "#f9f9fb",
+  "icons": [
+    {
+      "src": "/brand/icon.svg",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}

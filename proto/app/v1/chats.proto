@@ -1,0 +1,308 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/media.proto";
+import "app/v1/messages.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// (user_id, chat_id, seq, pts, unix-second dates) always holds a value < 2^53
+// so JavaScript clients can use a plain number; the server asserts the bound
+// when serializing. Every chat, including 1-1, has its own chat_id; chats and
+// members never cross tenants (ADR 0010).
+
+// Chats, members, permissions and the dialog list.
+service ChatsService {
+  // Returns the existing private chat with the user when there is one.
+  rpc CreatePrivate(CreatePrivateRequest) returns (CreatePrivateResponse);
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc CreateChannel(CreateChannelRequest) returns (CreateChannelResponse);
+  rpc GetDialogs(GetDialogsRequest) returns (GetDialogsResponse);
+  rpc GetChat(GetChatRequest) returns (GetChatResponse);
+  rpc GetMembers(GetMembersRequest) returns (GetMembersResponse);
+  rpc AddMembers(AddMembersRequest) returns (AddMembersResponse);
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
+  rpc LeaveChat(LeaveChatRequest) returns (LeaveChatResponse);
+  // Sets one member's permission bitmask.
+  rpc SetMemberPermissions(SetMemberPermissionsRequest) returns (SetMemberPermissionsResponse);
+  rpc SetAdmin(SetAdminRequest) returns (SetAdminResponse);
+  // Creates an invite link (>= 128 bits of entropy).
+  rpc ExportInviteLink(ExportInviteLinkRequest) returns (ExportInviteLinkResponse);
+  // Joins after the user confirmed in the client.
+  rpc JoinByInvite(JoinByInviteRequest) returns (JoinByInviteResponse);
+  rpc SetHistoryVisibility(SetHistoryVisibilityRequest) returns (SetHistoryVisibilityResponse);
+  rpc UpdateChatInfo(UpdateChatInfoRequest) returns (UpdateChatInfoResponse);
+}
+
+// Same name `type` and values in DB, proto and JSON.
+enum ChatType {
+  CHAT_TYPE_UNSPECIFIED = 0;
+  CHAT_TYPE_PRIVATE = 1;
+  CHAT_TYPE_GROUP = 2;
+  CHAT_TYPE_CHANNEL = 3;
+  // End-to-end chat: never indexed, no bots, no multi-device sync.
+  CHAT_TYPE_SECRET = 4;
+}
+
+// How updates of a chat are synced (ADR 0002). The switch SMALL -> LARGE is
+// one-way and announced by the chat_mode_changed update.
+enum SyncMode {
+  SYNC_MODE_UNSPECIFIED = 0;
+  // Fan-out on write into every member's per-user log (pts).
+  SYNC_MODE_SMALL = 1;
+  // Per-chat log (chat_pts) pulled with GetChatDifference.
+  SYNC_MODE_LARGE = 2;
+}
+
+enum HistoryVisibility {
+  HISTORY_VISIBILITY_UNSPECIFIED = 0;
+  // New members can read history from before they joined (default).
+  HISTORY_VISIBILITY_SHARED = 1;
+  // New members only see messages sent after they joined.
+  HISTORY_VISIBILITY_SINCE_JOIN = 2;
+}
+
+enum MemberRole {
+  MEMBER_ROLE_UNSPECIFIED = 0;
+  MEMBER_ROLE_MEMBER = 1;
+  MEMBER_ROLE_ADMIN = 2;
+  MEMBER_ROLE_OWNER = 3;
+}
+
+// Bit values combined into the uint32 `permissions` fields.
+enum ChatPermission {
+  CHAT_PERMISSION_UNSPECIFIED = 0;
+  CHAT_PERMISSION_SEND_MESSAGES = 1;
+  CHAT_PERMISSION_SEND_MEDIA = 2;
+  CHAT_PERMISSION_ADD_MEMBERS = 4;
+  CHAT_PERMISSION_PIN_MESSAGES = 8;
+  CHAT_PERMISSION_CHANGE_INFO = 16;
+}
+
+message Chat {
+  int64 id = 1 [jstype = JS_NUMBER];
+  ChatType type = 2;
+  // Empty for private and secret chats (clients show the peer's name).
+  string title = 3;
+  string about = 4;
+  MediaRef photo = 5;
+  // PRIVATE and SECRET: the other participant.
+  int64 peer_user_id = 6 [jstype = JS_NUMBER];
+  SyncMode sync_mode = 7;
+  HistoryVisibility history_visibility = 8;
+  int32 member_count = 9;
+  // ChatPermission bits granted to ordinary members.
+  uint32 default_permissions = 10;
+  // Most recently pinned message; 0 when none.
+  int64 pinned_seq = 11 [jstype = JS_NUMBER];
+  int64 created_at = 12 [jstype = JS_NUMBER];
+  // Caller-specific view.
+  MemberRole my_role = 13;
+  // Effective ChatPermission bits of the caller.
+  uint32 my_permissions = 14;
+  // The caller is no longer a member (left or removed).
+  bool left = 15;
+}
+
+message ChatMember {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  MemberRole role = 2;
+  uint32 permissions = 3;
+  int64 joined_at = 4 [jstype = JS_NUMBER];
+  int64 inviter_id = 5 [jstype = JS_NUMBER];
+}
+
+// One entry of the caller's chat list.
+message Dialog {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 top_seq = 2 [jstype = JS_NUMBER];
+  // Highest seq the caller has read.
+  int64 read_inbox_max_seq = 3 [jstype = JS_NUMBER];
+  // Highest seq of the caller's own messages read by others.
+  int64 read_outbox_max_seq = 4 [jstype = JS_NUMBER];
+  int32 unread_count = 5;
+  int32 unread_mentions_count = 6;
+  // sync_mode=large only: chat_pts to pass to GetChatDifference.
+  int64 chat_pts = 7 [jstype = JS_NUMBER];
+}
+
+message InviteLink {
+  string link = 1;
+  int64 creator_id = 2 [jstype = JS_NUMBER];
+  // 0 = never expires.
+  int64 expires_at = 3 [jstype = JS_NUMBER];
+  // 0 = unlimited.
+  int32 usage_limit = 4;
+  int32 usage_count = 5;
+  bool revoked = 6;
+}
+
+message CreatePrivateRequest {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+}
+
+message CreatePrivateResponse {
+  Chat chat = 1;
+  repeated User users = 2;
+}
+
+message CreateGroupRequest {
+  string title = 1;
+  repeated int64 user_ids = 2 [jstype = JS_NUMBER];
+}
+
+message CreateGroupResponse {
+  Chat chat = 1;
+  repeated User users = 2;
+  // Users not added because of their privacy settings or blocks.
+  repeated int64 failed_user_ids = 3 [jstype = JS_NUMBER];
+  SyncAck ack = 4;
+}
+
+message CreateChannelRequest {
+  string title = 1;
+  string about = 2;
+}
+
+message CreateChannelResponse {
+  Chat chat = 1;
+  SyncAck ack = 2;
+}
+
+message GetDialogsRequest {
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 1;
+  int32 limit = 2;
+}
+
+message GetDialogsResponse {
+  repeated Dialog dialogs = 1;
+  // Top message of each dialog.
+  repeated Message messages = 2;
+  repeated Chat chats = 3;
+  repeated User users = 4;
+  // Empty when there are no more dialogs.
+  string next_cursor = 5;
+}
+
+message GetChatRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetChatResponse {
+  Chat chat = 1;
+  // The peer of a private chat.
+  repeated User users = 2;
+}
+
+message GetMembersRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Optional name/username filter.
+  string query = 2;
+  string cursor = 3;
+  int32 limit = 4;
+}
+
+message GetMembersResponse {
+  repeated ChatMember members = 1;
+  repeated User users = 2;
+  string next_cursor = 3;
+}
+
+message AddMembersRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 user_ids = 2 [jstype = JS_NUMBER];
+}
+
+message AddMembersResponse {
+  repeated int64 failed_user_ids = 1 [jstype = JS_NUMBER];
+  SyncAck ack = 2;
+}
+
+message RemoveMemberRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+}
+
+message RemoveMemberResponse {
+  SyncAck ack = 1;
+}
+
+message LeaveChatRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message LeaveChatResponse {
+  SyncAck ack = 1;
+}
+
+message SetMemberPermissionsRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+  uint32 permissions = 3;
+}
+
+message SetMemberPermissionsResponse {
+  SyncAck ack = 1;
+}
+
+message SetAdminRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+  // false demotes back to member.
+  bool admin = 3;
+}
+
+message SetAdminResponse {
+  SyncAck ack = 1;
+}
+
+message ExportInviteLinkRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // 0 = never expires.
+  int64 expires_at = 2 [jstype = JS_NUMBER];
+  // 0 = unlimited.
+  int32 usage_limit = 3;
+}
+
+message ExportInviteLinkResponse {
+  InviteLink invite = 1;
+}
+
+message JoinByInviteRequest {
+  // The full link or its token part.
+  string link = 1;
+}
+
+message JoinByInviteResponse {
+  Chat chat = 1;
+  repeated User users = 2;
+  SyncAck ack = 3;
+}
+
+message SetHistoryVisibilityRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  HistoryVisibility history_visibility = 2;
+}
+
+message SetHistoryVisibilityResponse {
+  SyncAck ack = 1;
+}
+
+message UpdateChatInfoRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Unset fields are left unchanged.
+  optional string title = 2;
+  optional string about = 3;
+  // Empty string removes the photo.
+  optional string photo_file_id = 4;
+  optional uint32 default_permissions = 5;
+}
+
+message UpdateChatInfoResponse {
+  Chat chat = 1;
+  SyncAck ack = 2;
+}

@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/auth.proto";
+import "app/v1/chats.proto";
+import "app/v1/updates.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+//
+// WebSocket frames (binary, one protobuf message per WS message). There is no
+// RPC service here. Web authenticates the handshake with the session cookie
+// and Origin allowlist; native clients send their session token in the first
+// ClientFrame (hello). The session's tenant must match the Host's tenant.
+// Either side treats the connection as dead when nothing arrives within
+// HelloFrame.heartbeat_interval_ms plus a margin.
+
+// Client -> server.
+message ClientFrame {
+  // Client-chosen id echoed in ErrorFrame/PongFrame; 0 when no reply needed.
+  int64 request_id = 1 [jstype = JS_NUMBER];
+  oneof frame {
+    ClientHelloFrame hello = 2;
+    PingFrame ping = 3;
+    OpenChatFrame open_chat = 4;
+    TypingFrame typing = 5;
+    ClientPresenceFrame presence = 6;
+  }
+}
+
+// Server -> client.
+message ServerFrame {
+  oneof frame {
+    HelloFrame hello = 1;
+    PongFrame pong = 2;
+    UpdateFrame update = 3;
+    TypingFrame typing = 4;
+    PresenceFrame presence = 5;
+    SessionRevokedFrame session_revoked = 6;
+    ResyncFrame resync = 7;
+    ErrorFrame error = 8;
+  }
+}
+
+message ClientHelloFrame {
+  // Native only; web relies on the HttpOnly session cookie.
+  string session_token = 1;
+  ClientPlatform platform = 2;
+  string app_version = 3;
+}
+
+// Sent once the session is accepted. The client then calls GetDifference
+// while buffering realtime updates, and merges both by pts.
+message HelloFrame {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  int64 session_id = 2 [jstype = JS_NUMBER];
+  int64 server_epoch = 3 [jstype = JS_NUMBER];
+  int32 heartbeat_interval_ms = 4;
+  // Server time (unix seconds) for clock skew correction.
+  int64 server_time = 5 [jstype = JS_NUMBER];
+}
+
+message PingFrame {}
+
+message PongFrame {
+  // request_id of the ClientFrame carrying the ping.
+  int64 request_id = 1 [jstype = JS_NUMBER];
+}
+
+// Realtime updates plus every user and chat they reference that the receiver
+// may not have yet.
+message UpdateFrame {
+  repeated Update updates = 1;
+  repeated User users = 2;
+  repeated Chat chats = 3;
+}
+
+// The chat the client has open (membership is checked before typing,
+// presence or sync_mode=large fan-out is delivered) and the large chats
+// currently visible in its dialog list.
+message OpenChatFrame {
+  // 0 when no chat is open.
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 visible_chat_ids = 2 [jstype = JS_NUMBER];
+}
+
+enum TypingAction {
+  TYPING_ACTION_UNSPECIFIED = 0;
+  TYPING_ACTION_TYPING = 1;
+  TYPING_ACTION_CANCEL = 2;
+  TYPING_ACTION_RECORDING_VOICE = 3;
+  TYPING_ACTION_UPLOADING_PHOTO = 4;
+  TYPING_ACTION_UPLOADING_VIDEO = 5;
+  TYPING_ACTION_UPLOADING_DOCUMENT = 6;
+}
+
+// Both directions. user_id is set by the server and ignored from clients.
+message TypingFrame {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 user_id = 2 [jstype = JS_NUMBER];
+  TypingAction action = 3;
+}
+
+// The client's own state: drives presence and push suppression.
+message ClientPresenceFrame {
+  bool foreground = 1;
+}
+
+// Another user's presence, after privacy rules are applied.
+message PresenceFrame {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  UserStatus status = 2;
+}
+
+// The session is revoked; the server closes the socket right after. The
+// client wipes local data and returns to sign-in.
+message SessionRevokedFrame {
+  SessionRevokeReason reason = 1;
+}
+
+enum ResyncReason {
+  RESYNC_REASON_UNSPECIFIED = 0;
+  // The per-connection send queue overflowed.
+  RESYNC_REASON_BACKPRESSURE = 1;
+  // server_epoch changed (database failover or restore).
+  RESYNC_REASON_EPOCH_CHANGED = 2;
+  // The gateway is shutting down or rebalancing.
+  RESYNC_REASON_SERVER_RESTART = 3;
+}
+
+// Realtime delivery cannot continue; the server closes the socket. The client
+// reconnects and catches up with GetDifference.
+message ResyncFrame {
+  ResyncReason reason = 1;
+}
+
+enum FrameErrorCode {
+  FRAME_ERROR_CODE_UNSPECIFIED = 0;
+  FRAME_ERROR_CODE_UNAUTHENTICATED = 1;
+  // e.g. OpenChat or typing for a chat the user is not a member of.
+  FRAME_ERROR_CODE_FORBIDDEN = 2;
+  FRAME_ERROR_CODE_INVALID_FRAME = 3;
+  FRAME_ERROR_CODE_RATE_LIMITED = 4;
+}
+
+message ErrorFrame {
+  // request_id of the ClientFrame that failed.
+  int64 request_id = 1 [jstype = JS_NUMBER];
+  FrameErrorCode code = 2;
+  string message = 3;
+}

@@ -1,0 +1,131 @@
+# Local development stack. Every port binds to 127.0.0.1 only.
+#
+#   cp deploy/dev/.env.example deploy/dev/.env   # then fill in the secrets
+#   docker compose -f deploy/dev/docker-compose.yml --env-file deploy/dev/.env up
+#
+# Postgres runs a primary plus one synchronous standby, so `server_epoch`
+# and failover behaviour can be tested locally (promote the standby with
+# `docker compose exec postgres-standby pg_ctl promote`).
+# The IdP is built from the sibling hoandat-auth checkout (../../../hoandat-auth).
+name: app-dev
+
+services:
+  postgres-primary:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: app
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?set REPLICATION_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=5
+      - -c
+      - synchronous_commit=on
+      - -c
+      - synchronous_standby_names=ANY 1 (standby1)
+    volumes:
+      - pg-primary:/var/lib/postgresql/data
+      - ./postgres/primary-init.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      # Over TCP: the init-time server listens on the socket only, so a socket
+      # check would pass before the standby can connect.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "app", "-d", "app"]
+      interval: 3s
+      retries: 20
+
+  postgres-standby:
+    image: postgres:17
+    environment:
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?set REPLICATION_PASSWORD}
+    entrypoint: ["/bin/bash", "/standby-entrypoint.sh"]
+    # The primary blocks every commit until this standby confirms it, so the
+    # standby must come back on its own after any failure.
+    restart: on-failure
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    volumes:
+      - pg-standby:/var/lib/postgresql/data
+      - ./postgres/standby-entrypoint.sh:/standby-entrypoint.sh:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.15
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili-data:/meili_data
+    ports:
+      - "127.0.0.1:7700:7700"
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+  idp-mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - idp-mongo-data:/data/db
+    healthcheck:
+      # Initiates the single-node replica set on first start.
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'idp-mongo:27017' }] }).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+
+  idp:
+    build: ../../../hoandat-auth
+    depends_on:
+      idp-mongo:
+        condition: service_healthy
+    env_file:
+      - path: ./idp.env
+        required: true
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: "4500"
+      ISSUER: http://localhost:4500
+      MONGO_URL: mongodb://idp-mongo:27017/auth?replicaSet=rs0
+      SIGNING_KEYS_PATH: /run/secrets/idp/signing-keys.json
+      CHAT_WEB_URL: http://localhost:5173
+    volumes:
+      - ../../../hoandat-auth/secrets:/run/secrets/idp:ro
+    ports:
+      - "127.0.0.1:4500:4500"
+
+volumes:
+  pg-primary:
+  pg-standby:
+  meili-data:
+  minio-data:
+  idp-mongo-data:

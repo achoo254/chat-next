@@ -1,0 +1,8 @@
+{
+  "appId": "com.hoandat.chat",
+  "appName": "Chat",
+  "android": {
+    "applicationId": "com.hoandat.chat"
+  },
+  "urlScheme": "com.hoandat.chat"
+}

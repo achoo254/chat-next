@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "brand.config.schema.json",
+  "title": "Brand configuration",
+  "description": "Product name, identifiers and hosts. Renaming the product means editing this file and rebuilding; no product name is hard-coded elsewhere.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appName",
+    "shortName",
+    "description",
+    "colors",
+    "icon",
+    "appIds",
+    "urlScheme",
+    "primaryTenant",
+    "hostTemplates",
+    "sharedDomains",
+    "devOrigins",
+    "pushSenderName"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "appName": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "shortName": { "type": "string", "minLength": 1, "maxLength": 12 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "background", "backgroundDark"],
+      "properties": {
+        "primary": { "$ref": "#/$defs/hexColor" },
+        "background": { "$ref": "#/$defs/hexColor" },
+        "backgroundDark": { "$ref": "#/$defs/hexColor" }
+      }
+    },
+    "icon": {
+      "description": "Path of the master icon, relative to the repository root.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9/._-]*\\.(svg|png)$"
+    },
+    "appIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ios", "android", "desktop"],
+      "properties": {
+        "ios": { "$ref": "#/$defs/reverseDomain" },
+        "android": { "$ref": "#/$defs/reverseDomain" },
+        "desktop": { "$ref": "#/$defs/reverseDomain" }
+      }
+    },
+    "urlScheme": {
+      "description": "Private-use URI scheme (RFC 8252): deep links and the native OIDC redirect. Must match the redirect the IdP registers for chat-mobile.",
+      "$ref": "#/$defs/reverseDomain"
+    },
+    "primaryTenant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "issuer"],
+      "properties": {
+        "domain": { "$ref": "#/$defs/domain" },
+        "issuer": { "type": "string", "pattern": "^https://[a-z0-9.-]+$" }
+      }
+    },
+    "hostTemplates": {
+      "description": "Hosts of one tenant; {domain} is the tenant's domain.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "botApi", "webhook"],
+      "properties": {
+        "web": { "$ref": "#/$defs/hostTemplate" },
+        "botApi": { "$ref": "#/$defs/hostTemplate" },
+        "webhook": { "$ref": "#/$defs/hostTemplate" }
+      }
+    },
+    "sharedDomains": {
+      "description": "Registrable domains shared by every tenant and never under a tenant's domain, so their content is not same-site with the app.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["media", "miniApp"],
+      "properties": {
+        "media": { "$ref": "#/$defs/domain" },
+        "miniApp": { "$ref": "#/$defs/domain" }
+      }
+    },
+    "devOrigins": {
+      "description": "Extra origins accepted only by development builds.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^http://(localhost|127\\.0\\.0\\.1)(:[0-9]{1,5})?$" },
+      "uniqueItems": true
+    },
+    "pushSenderName": { "type": "string", "minLength": 1, "maxLength": 40 }
+  },
+  "$defs": {
+    "hexColor": { "type": "string", "pattern": "^#[0-9a-f]{6}$" },
+    "reverseDomain": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*){2,}$" },
+    "domain": { "type": "string", "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$" },
+    "hostTemplate": { "type": "string", "pattern": "^([a-z0-9-]+\\.)+\\{domain\\}$" }
+  }
+}

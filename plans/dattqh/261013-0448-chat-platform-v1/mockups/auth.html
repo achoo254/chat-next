@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đăng nhập — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* Each frame is the full window behind the card: grid background, card centred. */
+.frame > .welcome { min-height: var(--frame-h); }
+/* Several states of the same card side by side; they stack on narrow screens. */
+.welcome.multi { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--space-5); align-content: center; align-items: start; }
+.welcome.multi .welcome-card { width: 100%; max-width: 400px; justify-self: center; padding: var(--space-5); }
+.state { display: grid; gap: var(--space-2); margin: 0; min-width: 0; justify-items: center; }
+.state > figcaption { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); }
+.welcome-card h1 { margin-top: var(--space-3); }
+.welcome-card .lead { margin-bottom: var(--space-5); }
+.welcome .card-back { margin: calc(-1 * var(--space-2)) 0 0 calc(-1 * var(--space-2)); }
+.welcome .field { margin-top: var(--space-4); }
+.welcome .field .hint, .welcome .field .error-text { margin: 0; }
+.welcome .input { width: 100%; }
+.welcome .actions { display: grid; gap: var(--space-2); margin-top: var(--space-5); }
+.welcome .actions .btn { width: 100%; }
+.welcome .actions.row-2 { grid-template-columns: 1fr 1fr; }
+
+/* Input with a fixed prefix (username). */
+.affix { display: flex; align-items: center; min-height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); padding-left: var(--space-3); }
+.affix > span { color: var(--c-text-muted); font-family: var(--font-mono); }
+.affix input { flex: 1; min-width: 0; min-height: 42px; border: 0; background: transparent; outline: none; padding: 0 var(--space-3) 0 var(--space-1); font-family: var(--font-mono); font-size: 0.875rem; }
+.affix:focus-within { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
+.affix[data-invalid] { border-color: var(--c-error); box-shadow: var(--shadow-focus-error); }
+.input.mono-in { font-family: var(--font-mono); font-size: 0.875rem; }
+
+/* Live validation status under the domain field. */
+.status-line { display: flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); min-height: 24px; }
+.status-line .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); animation: breathe 1.6s var(--ease-standard) infinite; }
+@keyframes breathe { 50% { opacity: 0.35; } }
+.error-text { display: flex; gap: var(--space-1); align-items: flex-start; }
+.error-text .icon { margin-top: 1px; }
+
+/* Tenant found: display name comes from the IdP, domain shown in mono. */
+.org { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+.org .tenant-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.875rem; }
+.org .grow { flex: 1; min-width: 0; }
+.org b { display: block; font-weight: 600; }
+.org .mono { color: var(--c-text-muted); }
+.org .ok-icon { color: var(--c-success); }
+
+/* Host chip: the page the system browser opens. */
+.host { justify-self: start; max-width: 100%; display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text); }
+.host .icon { color: var(--c-success); }
+.waiting { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding: var(--space-4); border-radius: var(--radius-sm); border: 1px dashed var(--c-border); }
+.waiting ol { margin: 0; padding-left: var(--space-5); color: var(--c-text-muted); font-size: 0.875rem; display: grid; gap: var(--space-1); }
+.waiting li[aria-current="step"] { color: var(--c-text); font-weight: 500; }
+
+/* Icon tile at the top of the state cards (neutral, not the brand accent). */
+.state-mark { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
+.state-mark .icon { width: 24px; height: 24px; }
+.state-mark.warn { background: color-mix(in srgb, var(--c-warning) 12%, var(--c-surface)); border-color: color-mix(in srgb, var(--c-warning) 30%, var(--c-surface)); color: var(--c-warning-text); }
+
+.profile-top { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+.profile-top .avatar { width: 56px; height: 56px; font-size: 1.125rem; }
+.profile-top small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
+.suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+.suggest .btn { min-height: 36px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: 0.8125rem; }
+
+.facts { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-2); font-size: 0.875rem; }
+.facts li { display: flex; gap: var(--space-2); align-items: flex-start; }
+.facts .icon { color: var(--c-icon-muted); margin-top: 1px; }
+.status-hint { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin-top: var(--space-4); font-size: 0.8125rem; color: var(--c-text-muted); }
+.status-hint .pill { display: inline-flex; align-items: center; gap: var(--space-1); }
+.status-hint .pill::before { content: ""; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-warning); }
+
+/* Footer rows mix plain text with 44px link targets: centre them on one axis. */
+.welcome-foot { align-items: center; flex-wrap: wrap; }
+.lang button { white-space: nowrap; }
+@media (max-width: 760px), (pointer: coarse) {
+	.suggest .btn { min-height: 44px; }
+}
+@media (max-width: 760px) {
+	.frame > .welcome { padding: var(--space-4) var(--space-3); }
+	.welcome-card, .welcome.multi .welcome-card { padding: var(--space-5) var(--space-4); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.status-line .dot { animation: none; }
+}
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+<section class="shot" id="welcome">
+	<div class="shot-head"><h2>Màn chào</h2><span class="phase">Phase 2, 6</span><p>Chat không có đăng ký, mật khẩu hay email riêng: mọi đăng nhập đi qua auth.hoandat.com bằng Google hoặc GitHub. "Tạo tài khoản" mở thẳng trang đăng ký của IdP (prompt=create); ngôn ngữ chọn ở đây được gửi sang IdP qua ui_locales.</p></div>
+	<div class="frame">
+		<div class="welcome">
+			<section class="welcome-card" aria-labelledby="welcome-title">
+				<span class="brand-mark"><svg class="icon"><use href="#i-message"/></svg></span>
+				<h1 id="welcome-title">Chat</h1>
+				<p>Nhắn tin nhanh trong hệ sinh thái hoandat. Dùng chung tài khoản với Localman và Tunelo.</p>
+				<div class="welcome-actions">
+					<button type="button" class="btn btn-primary" data-toast="Chuyển sang auth.hoandat.com để đăng nhập bằng Google hoặc GitHub">Đăng nhập bằng tài khoản hoandat</button>
+					<button type="button" class="btn" data-toast="Mở trang đăng ký của auth.hoandat.com (prompt=create)">Tạo tài khoản</button>
+				</div>
+				<div class="welcome-hint">
+					<svg class="icon icon-sm"><use href="#i-shield"/></svg>
+					<span>Bạn đăng nhập ở trang của hoandat, app chat không thấy mật khẩu Google hay GitHub. Bản mobile và desktop có thêm liên kết <button type="button" class="link" data-toast="Nhập domain, ví dụ inetdev.io.vn, app sẽ dùng chat.inetdev.io.vn">Đăng nhập bằng domain khác</button>.</span>
+				</div>
+				<div class="welcome-foot">
+					<span>auth.hoandat.com</span>
+					<div class="lang" role="group" aria-label="Ngôn ngữ">
+						<button type="button" aria-current="true">Tiếng Việt</button>
+						<button type="button">English</button>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="other-domain">
+	<div class="shot-head"><h2>Đăng nhập bằng domain khác</h2><span class="phase">Phase 5, 10, 11</span><p>Chỉ có ở mobile và desktop (web đã biết tenant từ Host). App kiểm chat.&lt;domain&gt; khi người dùng ngừng gõ; tên tổ chức lấy từ IdP. Domain lạ và domain chưa bật Chat đều trả 421 nên app chỉ nói một câu, không lộ domain nào là tenant thật. Tiếp tục chỉ bật khi đã tìm thấy.</p></div>
+	<div class="frame">
+		<div class="welcome multi">
+			<figure class="state">
+				<figcaption>Đang kiểm tra</figcaption>
+				<section class="welcome-card" aria-labelledby="od-1-title">
+					<button type="button" class="icon-btn card-back" aria-label="Quay lại màn chào"><svg class="icon"><use href="#i-back"/></svg></button>
+					<h1 id="od-1-title">Domain khác</h1>
+					<p class="lead">Dùng khi tổ chức của bạn có Chat riêng, ví dụ chat.inetdev.io.vn.</p>
+					<div class="field">
+						<label for="od-1">Domain của tổ chức</label>
+						<input class="input mono-in" id="od-1" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="vd: inetdev.io.vn" value="inetdev.io.vn">
+						<div class="status-line" role="status"><span class="dot" aria-hidden="true"></span>Đang kiểm tra chat.inetdev.io.vn…</div>
+					</div>
+					<div class="actions"><button type="button" class="btn btn-primary" disabled>Tiếp tục</button></div>
+				</section>
+			</figure>
+
+			<figure class="state">
+				<figcaption>Tìm thấy</figcaption>
+				<section class="welcome-card" aria-labelledby="od-2-title">
+					<button type="button" class="icon-btn card-back" aria-label="Quay lại màn chào"><svg class="icon"><use href="#i-back"/></svg></button>
+					<h1 id="od-2-title">Domain khác</h1>
+					<p class="lead">Dùng khi tổ chức của bạn có Chat riêng, ví dụ chat.inetdev.io.vn.</p>
+					<div class="field">
+						<label for="od-2">Domain của tổ chức</label>
+						<input class="input mono-in" id="od-2" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" value="inetdev.io.vn">
+					</div>
+					<div class="org" role="status" style="margin-top: var(--space-3)">
+						<span class="tenant-mark av-grey" aria-hidden="true">iN</span>
+						<div class="grow"><b>Tổ chức iNET dev</b><span class="mono">inetdev.io.vn</span></div>
+						<svg class="icon ok-icon" aria-label="Đã bật Chat"><use href="#i-check"/></svg>
+					</div>
+					<p class="hint" style="margin-top: var(--space-2); font-size: 0.8125rem">Bạn sẽ đăng nhập ở auth.inetdev.io.vn. Dữ liệu của tổ chức này tách riêng khỏi hoandat.com.</p>
+					<div class="actions"><button type="button" class="btn btn-primary" data-toast="Mở auth.inetdev.io.vn trong trình duyệt hệ thống">Tiếp tục</button></div>
+				</section>
+			</figure>
+
+			<figure class="state">
+				<figcaption>Chưa bật</figcaption>
+				<section class="welcome-card" aria-labelledby="od-3-title">
+					<button type="button" class="icon-btn card-back" aria-label="Quay lại màn chào"><svg class="icon"><use href="#i-back"/></svg></button>
+					<h1 id="od-3-title">Domain khác</h1>
+					<p class="lead">Dùng khi tổ chức của bạn có Chat riêng, ví dụ chat.inetdev.io.vn.</p>
+					<div class="field">
+						<label for="od-3">Domain của tổ chức</label>
+						<input class="input mono-in" id="od-3" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" value="inetdev.vn" aria-invalid="true" aria-describedby="od-3-err">
+						<p class="error-text" id="od-3-err"><svg class="icon icon-sm"><use href="#i-alert-circle"/></svg><span>Domain này chưa bật Chat. Kiểm tra lại chính tả, hoặc hỏi quản trị viên tổ chức của bạn.</span></p>
+					</div>
+					<div class="actions"><button type="button" class="btn btn-primary" disabled>Tiếp tục</button></div>
+				</section>
+			</figure>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="redirecting">
+	<div class="shot-head"><h2>Đang chuyển sang trang đăng nhập</h2><span class="phase">Phase 10, 11</span><p>Trạng thái tĩnh, không spinner: app đang chờ trình duyệt hệ thống quay về. Mobile dùng ASWebAuthenticationSession hoặc Custom Tabs, desktop mở trình duyệt mặc định và nghe callback ở 127.0.0.1 tối đa 10 phút. Không bao giờ mở trang IdP trong WebView của app. "Mở lại" mở lại đúng lần đăng nhập đang chờ; "Huỷ" bỏ state cũ, callback đến sau sẽ bị bỏ qua.</p></div>
+	<div class="frame">
+		<div class="welcome">
+			<section class="welcome-card" aria-labelledby="redir-title">
+				<span class="state-mark"><svg class="icon"><use href="#i-external"/></svg></span>
+				<h1 id="redir-title">Đang mở trang đăng nhập trong trình duyệt…</h1>
+				<p>Đăng nhập bằng Google hoặc GitHub ở trang của Tổ chức iNET dev. Xong bước đó, trình duyệt sẽ đưa bạn về Chat.</p>
+				<div class="waiting">
+					<span class="host"><svg class="icon icon-sm"><use href="#i-lock"/></svg>auth.inetdev.io.vn</span>
+					<ol>
+						<li>Mở trình duyệt của hệ thống</li>
+						<li aria-current="step">Đăng nhập và cho phép Chat</li>
+						<li>Quay về app</li>
+					</ol>
+				</div>
+				<div class="actions row-2">
+					<button type="button" class="btn" data-toast="Mở lại trình duyệt với lần đăng nhập đang chờ">Mở lại</button>
+					<button type="button" class="btn" data-toast="Đã huỷ, quay về màn chào">Huỷ</button>
+				</div>
+				<div class="welcome-hint">
+					<svg class="icon icon-sm"><use href="#i-shield"/></svg>
+					<span>Không thấy trình duyệt? Nó có thể đang nằm sau cửa sổ này. Chat không mở trang đăng nhập bên trong app nên không thấy mật khẩu của bạn.</span>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="first-login">
+	<div class="shot-head"><h2>Lần đầu đăng nhập</h2><span class="phase">Phase 2, 6</span><p>Chỉ hiện khi tenant thấy tài khoản này lần đầu. Tên, ảnh và username lấy sẵn từ hoandat (name, picture, preferred_username); người dùng chỉ cần xác nhận. Username duy nhất trong tenant: nếu đã có người dùng, server gợi ý hậu tố và báo lỗi ngay dưới ô, "Vào Chat" khoá cho tới khi hợp lệ.</p></div>
+	<div class="frame">
+		<div class="welcome multi">
+			<figure class="state">
+				<figcaption>Mặc định</figcaption>
+				<section class="welcome-card" aria-labelledby="fl-1-title">
+					<h1 id="fl-1-title" style="margin-top: 0">Chào mừng bạn đến Chat</h1>
+					<p>Kiểm tra lại cách người khác sẽ thấy bạn. Đổi được sau ở Hồ sơ.</p>
+					<div class="profile-top">
+						<span class="avatar av-violet">ĐT</span>
+						<div><b>Đức Thắng</b><small>Đăng nhập bằng Google · hoandat.com</small></div>
+					</div>
+					<div class="field">
+						<label for="fl-1-name">Tên hiển thị</label>
+						<input class="input" id="fl-1-name" type="text" value="Đức Thắng" autocomplete="name">
+					</div>
+					<div class="field">
+						<label for="fl-1-user">Username</label>
+						<div class="affix"><span aria-hidden="true">@</span><input id="fl-1-user" type="text" value="dattqh" autocapitalize="off" spellcheck="false" aria-describedby="fl-1-hint"></div>
+						<p class="hint" id="fl-1-hint">Người khác tìm bạn bằng username này. Chữ thường, số và dấu gạch dưới.</p>
+					</div>
+					<div class="actions"><button type="button" class="btn btn-primary" data-toast="Đang mở danh sách chat">Vào Chat</button></div>
+				</section>
+			</figure>
+
+			<figure class="state">
+				<figcaption>Username đã có người dùng</figcaption>
+				<section class="welcome-card" aria-labelledby="fl-2-title">
+					<h1 id="fl-2-title" style="margin-top: 0">Chào mừng bạn đến Chat</h1>
+					<p>Kiểm tra lại cách người khác sẽ thấy bạn. Đổi được sau ở Hồ sơ.</p>
+					<div class="profile-top">
+						<span class="avatar av-violet">ĐT</span>
+						<div><b>Đức Thắng</b><small>Đăng nhập bằng Google · hoandat.com</small></div>
+					</div>
+					<div class="field">
+						<label for="fl-2-name">Tên hiển thị</label>
+						<input class="input" id="fl-2-name" type="text" value="Đức Thắng" autocomplete="name">
+					</div>
+					<div class="field">
+						<label for="fl-2-user">Username</label>
+						<div class="affix" data-invalid><span aria-hidden="true">@</span><input id="fl-2-user" type="text" value="dattqh" autocapitalize="off" spellcheck="false" aria-invalid="true" aria-describedby="fl-2-err"></div>
+						<p class="error-text" id="fl-2-err"><svg class="icon icon-sm"><use href="#i-alert-circle"/></svg><span>@dattqh đã có người dùng trong hoandat.com.</span></p>
+						<div class="suggest">Gợi ý <button type="button" class="btn" id="use-suggest">@dattqh1</button></div>
+					</div>
+					<div class="actions"><button type="button" class="btn btn-primary" id="fl-2-go" disabled>Vào Chat</button></div>
+				</section>
+			</figure>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="signed-out">
+	<div class="shot-head"><h2>Phiên đã bị thu hồi</h2><span class="phase">Phase 2, 5</span><p>Hiện khi server gửi session_revoked: người dùng đăng xuất ở auth.hoandat.com (web) hoặc gỡ thiết bị này ở trang /account (mọi nền tảng). Trước khi hiện màn này app đã xoá DB local, cache media và token của tenant đó, nên không còn gì để mở lại. Tin nhắn vẫn ở server.</p></div>
+	<div class="frame">
+		<div class="welcome">
+			<section class="welcome-card" aria-labelledby="so-title">
+				<span class="state-mark"><svg class="icon"><use href="#i-logout"/></svg></span>
+				<h1 id="so-title">Bạn đã đăng xuất</h1>
+				<p>Phiên trên máy này đã kết thúc vì bạn đăng xuất ở auth.hoandat.com, hoặc thiết bị này đã được gỡ ở trang quản lý tài khoản.</p>
+				<ul class="facts">
+					<li><svg class="icon icon-sm"><use href="#i-trash"/></svg><span>Tin nhắn, media đã lưu và khoá trên máy này đã được xoá.</span></li>
+					<li><svg class="icon icon-sm"><use href="#i-database"/></svg><span>Tin nhắn vẫn còn trên server; đăng nhập lại là đồng bộ về.</span></li>
+				</ul>
+				<div class="actions"><button type="button" class="btn btn-primary" data-toast="Mở auth.hoandat.com trong trình duyệt">Đăng nhập lại</button></div>
+				<div class="welcome-foot"><span>Không phải bạn đăng xuất?</span><button type="button" class="link" data-toast="Mở auth.hoandat.com/account để xem thiết bị đã đăng nhập" style="min-height: 44px">Kiểm tra thiết bị</button></div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="idp-unavailable">
+	<div class="shot-head"><h2>Không kết nối được trang đăng nhập</h2><span class="phase">Phase 2, 6</span><p>IdP lỗi hoặc chậm chỉ chặn đăng nhập mới. Phiên chat đang có trên máy khác không gọi IdP khi gửi hay nhận tin nên vẫn chạy bình thường; lỗi 5xx hay lỗi mạng từ IdP không bao giờ thu hồi phiên. Màn nói rõ điều đó để người dùng không lo mất dữ liệu.</p></div>
+	<div class="frame">
+		<div class="welcome">
+			<section class="welcome-card" aria-labelledby="idp-title">
+				<span class="state-mark warn"><svg class="icon"><use href="#i-wifi-off"/></svg></span>
+				<h1 id="idp-title">Chưa mở được trang đăng nhập</h1>
+				<p>auth.hoandat.com đang không phản hồi, nên tạm thời chưa đăng nhập được trên máy này.</p>
+				<div class="welcome-hint">
+					<svg class="icon icon-sm"><use href="#i-info"/></svg>
+					<span>Điện thoại và máy tính đã đăng nhập vẫn nhắn tin bình thường. Lỗi này chỉ chặn lần đăng nhập mới.</span>
+				</div>
+				<div class="actions"><button type="button" class="btn btn-primary" data-press="Vẫn chưa kết nối được, sẽ tự thử lại">Thử lại</button></div>
+				<div class="status-hint" role="status">
+					<span class="pill">Tự thử lại sau 30 giây</span>
+					<span>Lần thử gần nhất 10:42</span>
+					<button type="button" class="link" data-toast="Mở trang trạng thái dịch vụ hoandat" style="min-height: 44px">Trạng thái dịch vụ</button>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $ } = window.Mock;
+	// Taking the suggested username clears the error and unlocks the button.
+	$("#use-suggest").addEventListener("click", () => {
+		const input = $("#fl-2-user");
+		input.value = "dattqh1";
+		input.removeAttribute("aria-invalid");
+		input.closest(".affix").removeAttribute("data-invalid");
+		$("#fl-2-err").hidden = true;
+		$("#use-suggest").parentElement.hidden = true;
+		$("#fl-2-go").disabled = false;
+	});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,448 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/media.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// (user_id, chat_id, seq, pts, unix-second dates) always holds a value < 2^53
+// so JavaScript clients can use a plain number; the server asserts the bound
+// when serializing. A message is addressed only by (chat_id, seq) on every
+// surface; its internal Snowflake id never leaves the server.
+//
+// Text (ADR 0004): text + entities, entity offset/length in UTF-16 code
+// units; URLs in entities and buttons are limited to http, https, mailto and
+// the app scheme; length limits count code points.
+
+// Sending, editing and reading messages.
+service MessagesService {
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc SendMedia(SendMediaRequest) returns (SendMediaResponse);
+  rpc SendAlbum(SendAlbumRequest) returns (SendAlbumResponse);
+  rpc ForwardMessages(ForwardMessagesRequest) returns (ForwardMessagesResponse);
+  // Re-sends a message's content without the forward header.
+  rpc CopyMessage(CopyMessageRequest) returns (CopyMessageResponse);
+  rpc EditMessage(EditMessageRequest) returns (EditMessageResponse);
+  // Deletes for the caller only (hidden) or for everyone.
+  rpc DeleteMessages(DeleteMessagesRequest) returns (DeleteMessagesResponse);
+  rpc ReadHistory(ReadHistoryRequest) returns (ReadHistoryResponse);
+  rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
+  rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
+  rpc SetReaction(SetReactionRequest) returns (SetReactionResponse);
+  // Seq-cursor history; respects visible_from_seq and messages hidden for the
+  // caller.
+  rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
+  // Sends an inline keyboard callback to the bot and waits for its answer.
+  rpc PressInlineButton(PressInlineButtonRequest) returns (PressInlineButtonResponse);
+}
+
+enum EntityType {
+  ENTITY_TYPE_UNSPECIFIED = 0;
+  ENTITY_TYPE_BOLD = 1;
+  ENTITY_TYPE_ITALIC = 2;
+  ENTITY_TYPE_UNDERLINE = 3;
+  ENTITY_TYPE_STRIKE = 4;
+  ENTITY_TYPE_SPOILER = 5;
+  ENTITY_TYPE_CODE = 6;
+  // Code block; language in MessageEntity.language.
+  ENTITY_TYPE_PRE = 7;
+  // Text with a hidden URL in MessageEntity.url.
+  ENTITY_TYPE_TEXT_LINK = 8;
+  // @username written in the text.
+  ENTITY_TYPE_MENTION = 9;
+  // Mention of a user without a username; target in MessageEntity.user_id.
+  ENTITY_TYPE_MENTION_NAME = 10;
+  ENTITY_TYPE_HASHTAG = 11;
+  ENTITY_TYPE_URL = 12;
+  ENTITY_TYPE_EMAIL = 13;
+  // /command, optionally /command@botname.
+  ENTITY_TYPE_BOT_COMMAND = 14;
+}
+
+message MessageEntity {
+  EntityType type = 1;
+  // UTF-16 code units.
+  int32 offset = 2;
+  int32 length = 3;
+  // TEXT_LINK only.
+  string url = 4;
+  // MENTION_NAME only.
+  int64 user_id = 5 [jstype = JS_NUMBER];
+  // PRE only; may be empty.
+  string language = 6;
+}
+
+message KeyboardButton {
+  string text = 1;
+}
+
+message KeyboardRow {
+  repeated KeyboardButton buttons = 1;
+}
+
+// Custom keyboard replacing the system keyboard.
+message ReplyKeyboard {
+  repeated KeyboardRow rows = 1;
+  bool resize = 2;
+  bool one_time = 3;
+  // Only for users mentioned in the text or the replied-to message's author.
+  bool selective = 4;
+  string placeholder = 5;
+}
+
+message InlineButton {
+  string text = 1;
+  oneof action {
+    // Up to 64 bytes, delivered to the bot by PressInlineButton.
+    bytes callback_data = 2;
+    // Allowed schemes per ADR 0004.
+    string url = 3;
+    // Opens the bot's Mini App at this URL on b<bot_id>.<miniapp domain>.
+    string mini_app_url = 4;
+    // Opens inline mode with this query in a chat the user picks.
+    string switch_inline_query = 5;
+    // Opens inline mode with this query in the current chat.
+    string switch_inline_query_current_chat = 6;
+  }
+}
+
+message InlineKeyboardRow {
+  repeated InlineButton buttons = 1;
+}
+
+message InlineKeyboard {
+  repeated InlineKeyboardRow rows = 1;
+}
+
+message ReplyKeyboardRemove {
+  bool selective = 1;
+}
+
+message ReplyMarkup {
+  oneof kind {
+    ReplyKeyboard keyboard = 1;
+    InlineKeyboard inline_keyboard = 2;
+    ReplyKeyboardRemove remove = 3;
+  }
+}
+
+message ForwardHeader {
+  // Original author; 0 when hidden by privacy or for channel posts.
+  int64 from_user_id = 1 [jstype = JS_NUMBER];
+  // Original channel for channel posts; 0 otherwise.
+  int64 from_chat_id = 2 [jstype = JS_NUMBER];
+  // Original seq in from_chat_id, when that chat is known.
+  int64 from_seq = 3 [jstype = JS_NUMBER];
+  // Display name snapshot, used when the original author is hidden.
+  string from_name = 4;
+  // Date of the original message.
+  int64 date = 5 [jstype = JS_NUMBER];
+}
+
+// Aggregated reactions of one emoji on a message.
+message ReactionCount {
+  string emoji = 1;
+  int32 count = 2;
+  // The caller reacted with this emoji.
+  bool chosen = 3;
+}
+
+message ActionChatCreated {
+  string title = 1;
+}
+
+message ActionMembersAdded {
+  repeated int64 user_ids = 1 [jstype = JS_NUMBER];
+}
+
+// The message author left the chat.
+message ActionMemberLeft {}
+
+message ActionMemberRemoved {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // Who removed the member.
+  int64 by = 2 [jstype = JS_NUMBER];
+}
+
+message ActionTitleChanged {
+  string title = 1;
+}
+
+message ActionPhotoChanged {
+  MediaRef photo = 1;
+}
+
+message ActionPhotoRemoved {}
+
+message ActionMessagePinned {
+  int64 seq = 1 [jstype = JS_NUMBER];
+}
+
+message ActionHistoryVisibilityChanged {
+  // true: new members can read history from before they joined (SHARED);
+  // false: they only see messages sent after they joined (SINCE_JOIN).
+  bool visible = 1;
+}
+
+// The chat switched to sync_mode=large; the switch is one-way, so this
+// carries no target mode.
+message ActionChatModeChanged {}
+
+// The message author joined through an invite link.
+message ActionJoinedByInvite {}
+
+// Service event shown inline in the history (system message). The actor is
+// Message.from_id.
+message MessageAction {
+  oneof kind {
+    ActionChatCreated chat_created = 1;
+    ActionMembersAdded members_added = 2;
+    ActionMemberLeft member_left = 3;
+    ActionMemberRemoved member_removed = 4;
+    ActionTitleChanged title_changed = 5;
+    ActionPhotoChanged photo_changed = 6;
+    ActionPhotoRemoved photo_removed = 7;
+    ActionMessagePinned message_pinned = 8;
+    ActionHistoryVisibilityChanged history_visibility_changed = 9;
+    ActionChatModeChanged chat_mode_changed = 10;
+    ActionJoinedByInvite joined_by_invite = 11;
+  }
+}
+
+// A message carries either content (text, entities, media, ...) or an
+// action, never both. A client that sees a message with empty text (and no
+// media) whose action is unset or of a kind it does not know renders it as
+// "unsupported message" instead of dropping it, so newer content types and
+// action kinds stay visible to older clients.
+message Message {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  int64 from_id = 3 [jstype = JS_NUMBER];
+  int64 date = 4 [jstype = JS_NUMBER];
+  string text = 5;
+  repeated MessageEntity entities = 6;
+  MediaRef media = 7;
+  // 0 when not a reply.
+  int64 reply_to_seq = 8 [jstype = JS_NUMBER];
+  ForwardHeader forward_from = 9;
+  // 0 when never edited.
+  int64 edit_date = 10 [jstype = JS_NUMBER];
+  // Incremented on every edit; consumers drop older versions.
+  int32 edit_version = 11;
+  // Client-generated dedupe key (< 2^53), echoed only to the sender.
+  int64 random_id = 12 [jstype = JS_NUMBER];
+  ReplyMarkup reply_markup = 13;
+  // Album id shared by messages sent together; 0 when not in an album.
+  int64 grouped_id = 14 [jstype = JS_NUMBER];
+  // Bot whose inline mode produced this message; 0 otherwise.
+  int64 via_bot_id = 15 [jstype = JS_NUMBER];
+  repeated ReactionCount reactions = 16;
+  // Label of the incoming webhook integration that posted this message.
+  string integration_label = 17;
+  // Set on system messages only; content fields are then empty.
+  MessageAction action = 18;
+}
+
+// Position of the caller's update logs right after a mutation, so the client
+// can advance local state without waiting for the realtime echo. Zero pts
+// means the mutation wrote nothing to that log.
+message SyncAck {
+  // Per-user log.
+  int64 pts = 1 [jstype = JS_NUMBER];
+  int32 pts_count = 2;
+  // Per-chat log of a sync_mode=large chat.
+  int64 chat_pts = 3 [jstype = JS_NUMBER];
+  int32 chat_pts_count = 4;
+  int64 server_epoch = 5 [jstype = JS_NUMBER];
+}
+
+message SendMessageRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  string text = 2;
+  repeated MessageEntity entities = 3;
+  int64 reply_to_seq = 4 [jstype = JS_NUMBER];
+  // Client-generated (< 2^53); retries with the same value never duplicate.
+  int64 random_id = 5 [jstype = JS_NUMBER];
+  // Deliver without a notification sound.
+  bool silent = 6;
+}
+
+message SendMessageResponse {
+  Message message = 1;
+  SyncAck ack = 2;
+}
+
+message SendMediaRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // A file the caller owns or can see in a message.
+  string file_id = 2;
+  // Caption.
+  string text = 3;
+  repeated MessageEntity entities = 4;
+  int64 reply_to_seq = 5 [jstype = JS_NUMBER];
+  int64 random_id = 6 [jstype = JS_NUMBER];
+  bool silent = 7;
+}
+
+message SendMediaResponse {
+  Message message = 1;
+  SyncAck ack = 2;
+}
+
+message AlbumItem {
+  string file_id = 1;
+  string text = 2;
+  repeated MessageEntity entities = 3;
+  int64 random_id = 4 [jstype = JS_NUMBER];
+}
+
+message SendAlbumRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated AlbumItem items = 2;
+  int64 reply_to_seq = 3 [jstype = JS_NUMBER];
+  bool silent = 4;
+}
+
+message SendAlbumResponse {
+  // Same order as the request items, sharing one grouped_id.
+  repeated Message messages = 1;
+  SyncAck ack = 2;
+}
+
+message ForwardMessagesRequest {
+  int64 from_chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 seqs = 2 [jstype = JS_NUMBER];
+  int64 to_chat_id = 3 [jstype = JS_NUMBER];
+  // One per seq, same order.
+  repeated int64 random_ids = 4 [jstype = JS_NUMBER];
+  bool silent = 5;
+}
+
+message ForwardMessagesResponse {
+  repeated Message messages = 1;
+  SyncAck ack = 2;
+}
+
+message CopyMessageRequest {
+  int64 from_chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  int64 to_chat_id = 3 [jstype = JS_NUMBER];
+  int64 random_id = 4 [jstype = JS_NUMBER];
+  int64 reply_to_seq = 5 [jstype = JS_NUMBER];
+  // Replaces the caption/text when set.
+  optional string text = 6;
+  repeated MessageEntity entities = 7;
+  bool silent = 8;
+}
+
+message CopyMessageResponse {
+  Message message = 1;
+  SyncAck ack = 2;
+}
+
+message EditMessageRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  string text = 3;
+  repeated MessageEntity entities = 4;
+}
+
+message EditMessageResponse {
+  Message message = 1;
+  SyncAck ack = 2;
+}
+
+message DeleteMessagesRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  repeated int64 seqs = 2 [jstype = JS_NUMBER];
+  // false hides the messages for the caller only.
+  bool for_everyone = 3;
+}
+
+message DeleteMessagesResponse {
+  SyncAck ack = 1;
+}
+
+message ReadHistoryRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Highest seq the user has seen.
+  int64 max_seq = 2 [jstype = JS_NUMBER];
+}
+
+message ReadHistoryResponse {
+  SyncAck ack = 1;
+}
+
+message PinMessageRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  bool silent = 3;
+}
+
+message PinMessageResponse {
+  SyncAck ack = 1;
+}
+
+message UnpinMessageRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+message UnpinMessageResponse {
+  SyncAck ack = 1;
+}
+
+message SetReactionRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  // Empty removes the caller's reaction.
+  string emoji = 3;
+}
+
+message SetReactionResponse {
+  repeated ReactionCount reactions = 1;
+  SyncAck ack = 2;
+}
+
+enum HistoryDirection {
+  HISTORY_DIRECTION_UNSPECIFIED = 0;
+  // Messages with seq < offset_seq (offset_seq 0 = from the newest).
+  HISTORY_DIRECTION_OLDER = 1;
+  // Messages with seq > offset_seq.
+  HISTORY_DIRECTION_NEWER = 2;
+  // A window centred on offset_seq, including it.
+  HISTORY_DIRECTION_AROUND = 3;
+}
+
+message GetHistoryRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 offset_seq = 2 [jstype = JS_NUMBER];
+  HistoryDirection direction = 3;
+  int32 limit = 4;
+}
+
+message GetHistoryResponse {
+  // Ascending by seq.
+  repeated Message messages = 1;
+  // Authors, forward sources, mentioned users and via bots of these messages.
+  repeated User users = 2;
+  bool has_older = 3;
+  bool has_newer = 4;
+}
+
+message PressInlineButtonRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  bytes callback_data = 3;
+}
+
+message PressInlineButtonResponse {
+  // Text from the bot, shown as a toast (or a dialog when show_alert).
+  string text = 1;
+  bool show_alert = 2;
+  // URL the bot asks the client to open (scheme allowlist applies).
+  string url = 3;
+}

@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiểm duyệt — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+	<!-- ============ Queue ============ -->
+	<section class="shot" id="queue">
+		<div class="shot-head"><h2>Hàng đợi báo cáo</h2><span class="phase">Phase 12</span><p>Báo cáo gộp theo đối tượng (tin, người, bot, kênh, webhook), xếp theo số báo cáo. Đội vận hành hoandat thấy mọi tenant và lọc được theo tenant; chủ tenant chỉ thấy tenant của mình (khung dưới). Lọc loại và trạng thái chạy thật.</p></div>
+		<div class="frame"><div class="mod">
+			<nav class="mod-side" data-active="queue" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<header class="mod-head"><h3>Hàng đợi báo cáo</h3><span class="muted hide-narrow">Cập nhật 14:32</span></header>
+				<div class="banner info"><svg class="icon icon-sm"><use href="#i-shield"/></svg><span>Bạn thuộc đội vận hành hoandat: thấy báo cáo của mọi tenant. Chủ tenant chỉ thấy tenant của họ.</span></div>
+				<div class="mod-body">
+					<div class="toolbar">
+						<div class="tabs" role="tablist" aria-label="Trạng thái">
+							<button type="button" role="tab" aria-selected="false" data-status="open">Đang mở <span class="count">5</span></button>
+							<button type="button" role="tab" aria-selected="false" data-status="done">Đã xử lý</button>
+							<button type="button" role="tab" aria-selected="false" data-status="skip">Bỏ qua</button>
+							<button type="button" role="tab" aria-selected="true" data-status="all">Tất cả</button>
+						</div>
+						<div class="filters">
+							<div class="choice" role="group" aria-label="Loại đối tượng" id="type-filter">
+								<button type="button" aria-pressed="true" data-type="all">Tất cả</button>
+								<button type="button" aria-pressed="false" data-type="msg">Tin</button>
+								<button type="button" aria-pressed="false" data-type="user">Người</button>
+								<button type="button" aria-pressed="false" data-type="bot">Bot</button>
+								<button type="button" aria-pressed="false" data-type="channel">Kênh</button>
+								<button type="button" aria-pressed="false" data-type="hook">Webhook</button>
+							</div>
+							<label class="search-field compact"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm theo username hoặc mã báo cáo</span><input type="search" placeholder="Username, mã báo cáo"></label>
+						</div>
+					</div>
+					<div class="table-wrap">
+						<table class="data queue" id="queue-table">
+							<thead><tr><th scope="col">Đối tượng</th><th scope="col">Loại</th><th scope="col">Lý do chính</th><th scope="col" class="num">Báo cáo</th><th scope="col">Trạng thái</th><th scope="col">Tenant</th><th scope="col">Gần nhất</th></tr></thead>
+							<tbody>
+								<tr data-type="msg" data-status="open" aria-current="true"><td><a class="obj" href="#report-detail"><b>Tin của @nhanqua24h</b><span>Chúc mừng 50 bạn may mắn nhận iPhone 16…</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-message"/></svg>Tin</span></td><td>Lừa đảo</td><td class="num"><span class="hot"><svg class="icon icon-sm"><use href="#i-alert"/></svg>13</span></td><td><span class="pill new">Mới</span></td><td class="mono">hoandat.com</td><td class="mono">14:02</td></tr>
+								<tr data-type="bot" data-status="open"><td><a class="obj" href="#bot-verified"><b>Promo Blast Bot</b><span>@promoblast_bot</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-robot"/></svg>Bot</span></td><td>Spam</td><td class="num"><span class="hot"><svg class="icon icon-sm"><use href="#i-alert"/></svg>41</span></td><td><span class="pill review">Đang xem · Minh</span></td><td class="mono">hoandat.com</td><td class="mono">13:40</td></tr>
+								<tr data-type="user" data-status="open"><td><a class="obj" href="#report-detail"><b>Nhận quà 24h</b><span>@nhanqua24h</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-user"/></svg>Người</span></td><td>Spam</td><td class="num">9</td><td><span class="pill new">Mới</span></td><td class="mono">hoandat.com</td><td class="mono">13:58</td></tr>
+								<tr data-type="channel" data-status="open"><td><a class="obj" href="#report-detail"><b>Kèo thơm mỗi ngày</b><span>Kênh · 3.120 người đăng ký</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-megaphone"/></svg>Kênh</span></td><td>Lừa đảo</td><td class="num">6</td><td><span class="pill new">Mới</span></td><td class="mono">inetdev.io.vn</td><td class="mono">12:15</td></tr>
+								<tr data-type="hook" data-status="open"><td><a class="obj" href="#actions"><b>CI Alerts</b><span>Webhook · nhóm Team Mobile</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-webhook"/></svg>Webhook</span></td><td>Spam</td><td class="num">3</td><td><span class="pill new">Mới</span></td><td class="mono">hoandat.com</td><td class="mono">11:02</td></tr>
+								<tr data-type="msg" data-status="done"><td><a class="obj" href="#audit-log"><b>Tin của @binhtv</b><span>Đe doạ trong nhóm Bóng đá chiều T5</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-message"/></svg>Tin</span></td><td>Bạo lực</td><td class="num">2</td><td><span class="pill done">Đã gỡ</span></td><td class="mono">inetdev.io.vn</td><td class="mono">Hôm qua</td></tr>
+								<tr data-type="msg" data-status="skip"><td><a class="obj" href="#audit-log"><b>Tin của @user_8812</b><span>Ảnh đồ bơi trong nhóm Du lịch</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-message"/></svg>Tin</span></td><td>Khiêu dâm</td><td class="num">1</td><td><span class="pill skip">Bỏ qua</span></td><td class="mono">inetdev.io.vn</td><td class="mono">Hôm qua</td></tr>
+								<tr class="no-rows" hidden><td colspan="7"><div class="empty"><svg class="icon"><use href="#i-inbox"/></svg><strong>Không có báo cáo nào khớp bộ lọc</strong><span>Đổi loại hoặc trạng thái để xem thêm.</span></div></td></tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame auto">
+			<div class="owner-view">
+				<div class="owner-head">
+					<span class="state-label">Chủ tenant inetdev.io.vn</span>
+					<span class="scope-lock"><svg class="icon icon-sm"><use href="#i-lock"/></svg>Phạm vi: inetdev.io.vn</span>
+				</div>
+				<div class="table-wrap">
+					<table class="data queue">
+						<thead><tr><th scope="col">Đối tượng</th><th scope="col">Loại</th><th scope="col">Lý do chính</th><th scope="col" class="num">Báo cáo</th><th scope="col">Trạng thái</th><th scope="col">Gần nhất</th></tr></thead>
+						<tbody>
+							<tr><td><a class="obj" href="#report-detail"><b>Kèo thơm mỗi ngày</b><span>Kênh · 3.120 người đăng ký</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-megaphone"/></svg>Kênh</span></td><td>Lừa đảo</td><td class="num">6</td><td><span class="pill new">Mới</span></td><td class="mono">12:15</td></tr>
+							<tr><td><a class="obj" href="#audit-log"><b>Tin của @binhtv</b><span>Đe doạ trong nhóm Bóng đá chiều T5</span></a></td><td><span class="kind"><svg class="icon icon-sm"><use href="#i-message"/></svg>Tin</span></td><td>Bạo lực</td><td class="num">2</td><td><span class="pill done">Đã gỡ</span></td><td class="mono">Hôm qua</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<p class="note">Không có cột Tenant và không có bộ chọn phạm vi: chủ tenant không xem được báo cáo của hoandat.com hay tenant khác.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Report detail ============ -->
+	<section class="shot" id="report-detail">
+		<div class="shot-head"><h2>Chi tiết báo cáo</h2><span class="phase">Phase 12</span><p>Tin bị báo cáo hiện cùng vài tin trước và sau, đủ để hiểu ngữ cảnh; người kiểm duyệt không mở được toàn bộ chat. Bên phải là tín hiệu về người gửi: tuổi tài khoản chat, tin tới người lạ, số người đã chặn, và các lần xử lý trước (kể cả do luật tự động).</p></div>
+		<div class="frame tall"><div class="mod">
+			<nav class="mod-side" data-active="queue" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<header class="mod-head">
+					<a class="icon-btn" href="#queue" aria-label="Về hàng đợi"><svg class="icon"><use href="#i-back"/></svg></a>
+					<h3>Báo cáo về tin nhắn <span class="mono muted id">R-20481</span></h3>
+					<span class="pill new">Mới</span>
+					<button type="button" class="btn btn-sm hide-narrow" data-press="Bạn đang xử lý báo cáo này, người khác thấy 'Đang xem'">Nhận xử lý</button>
+					<a class="btn btn-sm btn-primary" href="#actions">Hành động</a>
+				</header>
+				<div class="mod-body detail">
+					<div class="col">
+						<div class="card">
+							<h4 class="card-title">Tin bị báo cáo và ngữ cảnh</h4>
+							<p class="note pad-x">Nhóm công khai <b>Hội săn deal công nghệ</b> · 2.300 thành viên · hoandat.com</p>
+							<div class="thread">
+								<div class="msg"><span class="avatar sm av-cyan">TH</span><div class="bubble"><span class="who">Trần Hải</span><p>Có ai biết chỗ bán tai nghe chính hãng không?<span class="stamp">13:55</span></p></div></div>
+								<div class="msg"><span class="avatar sm av-red">NQ</span><div class="bubble"><span class="who who-red">Nhận quà 24h</span><p>Inbox mình nhé, đang có chương trình tri ân.<span class="stamp">13:57</span></p></div></div>
+								<div class="msg"><span class="avatar sm av-red">NQ</span><div class="bubble reported"><span class="flag-label"><svg class="icon icon-sm"><use href="#i-flag"/></svg>Tin bị báo cáo</span><span class="who who-red">Nhận quà 24h</span><p>Chúc mừng 50 bạn may mắn nhận iPhone 16. Bấm nhan-qua24h.top/nhan và nhập mã đăng nhập để nhận.<span class="stamp">14:01</span></p></div></div>
+								<div class="msg"><span class="avatar sm av-green">MP</span><div class="bubble"><span class="who who-green">Mai Phương</span><p>Link này lừa đảo đấy mọi người ơi.<span class="stamp">14:03</span></p></div></div>
+								<div class="msg"><span class="avatar sm av-amber">AD</span><div class="bubble"><span class="who who-amber">Admin nhóm</span><p>Đã báo cáo, mọi người đừng bấm.<span class="stamp">14:05</span></p></div></div>
+							</div>
+							<p class="note pad-x pad-b"><svg class="icon icon-sm"><use href="#i-eye-off"/></svg> Chỉ thấy tin được báo cáo và tối đa 5 tin xung quanh. Cùng nội dung này còn ở 5 nhóm khác.</p>
+						</div>
+						<div class="card pad">
+							<h4 class="card-title flush">13 người báo cáo · 2 ghi chú</h4>
+							<div class="reasons">
+								<span>Lừa đảo</span><div class="progress neutral"><span style="width:69%"></span></div><b>9</b>
+								<span>Spam</span><div class="progress neutral"><span style="width:31%"></span></div><b>4</b>
+							</div>
+							<ul class="notes">
+								<li>“Link giả trang đăng nhập Google, đừng bấm.”</li>
+								<li>“Gửi cùng nội dung vào nhiều nhóm trong 5 phút.”</li>
+							</ul>
+						</div>
+					</div>
+					<aside class="col">
+						<div class="card">
+							<div class="person pad"><span class="avatar av-red">NQ</span><div><b>Nhận quà 24h</b><span class="mono muted">@nhanqua24h · hoandat.com</span></div></div>
+							<dl class="facts">
+								<div><dt>Tuổi tài khoản chat</dt><dd>2 ngày <span class="pill review">Mới</span></dd></div>
+								<div><dt>Tin tới người lạ, 24 giờ</dt><dd>148</dd></div>
+								<div><dt>Bị chặn bởi</dt><dd>21 người</dd></div>
+								<div><dt>Nhóm đã vào, 24 giờ</dt><dd>6</dd></div>
+								<div><dt>Báo cáo khác đang mở</dt><dd><a class="link" href="#queue">1 (Người · Spam)</a></dd></div>
+							</dl>
+						</div>
+						<div class="card">
+							<h4 class="card-title">Xử lý trước đó</h4>
+							<ol class="timeline pad-x pad-b">
+								<li><b>Cảnh cáo</b><span>Quang Huy · 13/10 22:40</span><small>Spam vào nhóm</small></li>
+								<li><b>Giới hạn tin tới người lạ 24 giờ</b><span>Luật chống lạm dụng · 13/10 21:14</span><small>Tài khoản 1 ngày tuổi nhắn 60 người lạ</small></li>
+							</ol>
+						</div>
+					</aside>
+				</div>
+			</div>
+		</div></div>
+	</section>
+
+	<!-- ============ Actions ============ -->
+	<section class="shot" id="actions">
+		<div class="shot-head"><h2>Hành động</h2><span class="phase">Phase 12</span><p>Chọn một hoặc nhiều hành động; hành động không hợp với loại đối tượng bị khoá kèm lý do. Khoá chỉ áp dụng cho tài khoản chat trong tenant này, tài khoản hoandat ở IdP không bị đụng tới. Mọi hành động cần lý do và được ghi vào nhật ký (khung xác nhận bên dưới).</p></div>
+		<div class="frame tall"><div class="mod">
+			<nav class="mod-side" data-active="queue" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<header class="mod-head">
+					<a class="icon-btn" href="#report-detail" aria-label="Về chi tiết báo cáo"><svg class="icon"><use href="#i-back"/></svg></a>
+					<h3>Hành động <span class="mono muted id">R-20481</span></h3>
+				</header>
+				<form class="mod-body narrow-body" id="act-form" onsubmit="return false">
+					<div class="card target pad"><span class="avatar av-red">NQ</span><div class="grow"><b>Nhận quà 24h</b><span class="muted">@nhanqua24h · 1 tin bị báo cáo, 13 báo cáo · hoandat.com</span></div></div>
+					<fieldset class="card acts">
+						<legend class="sr-only">Hành động</legend>
+						<div class="act">
+							<label class="opt check"><input type="checkbox" name="act" value="remove" checked><span>Gỡ nội dung<small>Xoá tin cho mọi người, kể cả 5 tin cùng nội dung ở các nhóm khác</small></span></label>
+						</div>
+						<div class="act">
+							<label class="opt check"><input type="checkbox" name="act" value="lock" id="act-lock" checked><span>Khoá tài khoản chat<small>Đăng xuất mọi phiên chat; không gửi được tin, không vào được nhóm</small></span></label>
+							<div class="act-extra" id="lock-extra">
+								<div class="choice" role="group" aria-label="Thời hạn khoá"><button type="button" aria-pressed="false">24 giờ</button><button type="button" aria-pressed="true">7 ngày</button><button type="button" aria-pressed="false">30 ngày</button><button type="button" aria-pressed="false">Vĩnh viễn</button></div>
+								<p class="note"><svg class="icon icon-sm"><use href="#i-info"/></svg> Chỉ khoá trong app chat của hoandat.com. Tài khoản hoandat (đăng nhập, Localman, Tunelo) do IdP quản lý.</p>
+							</div>
+						</div>
+						<div class="act">
+							<label class="opt check"><input type="checkbox" name="act" value="warn"><span>Cảnh cáo<small>Gửi tin hệ thống giải thích vi phạm cho người này</small></span></label>
+						</div>
+						<div class="act is-disabled">
+							<label class="opt check"><input type="checkbox" name="act" value="hook" disabled><span>Tắt webhook<small>Chỉ dùng khi đối tượng là webhook</small></span></label>
+						</div>
+					</fieldset>
+					<div class="save-bar">
+						<button type="button" class="btn" data-press="Đã bỏ qua báo cáo, ghi vào nhật ký">Bỏ qua báo cáo</button>
+						<button type="button" class="btn btn-primary" id="act-next" data-toast="Mở hộp xác nhận (khung bên dưới)">Tiếp tục</button>
+					</div>
+				</form>
+			</div>
+		</div></div>
+		<div class="frame confirm-frame">
+			<div class="static-dialog">
+				<form class="panel" onsubmit="return false" aria-labelledby="cf-title">
+					<div class="dlg-head"><h2 id="cf-title">Xác nhận hành động</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-body flow">
+						<ul class="summary">
+							<li><svg class="icon icon-sm"><use href="#i-trash"/></svg>Gỡ 6 tin của @nhanqua24h</li>
+							<li><svg class="icon icon-sm"><use href="#i-ban"/></svg>Khoá tài khoản chat @nhanqua24h 7 ngày, tới 21/10/2026 14:31</li>
+						</ul>
+						<div class="field">
+							<label for="cf-reason">Lý do <span class="muted">(ghi vào nhật ký, người bị xử lý cũng thấy)</span></label>
+							<textarea id="cf-reason" class="input" rows="2" aria-describedby="cf-err">Lừa đảo nhận quà, link giả trang đăng nhập; 13 báo cáo trong 2 giờ.</textarea>
+							<span class="error-text" id="cf-err" hidden>Cần nhập lý do trước khi xác nhận.</span>
+						</div>
+						<label class="opt check"><input type="checkbox" checked><span>Gửi thông báo cho người bị xử lý kèm lý do</span></label>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-danger" id="cf-ok">Xác nhận</button></div>
+				</form>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Bot verified ============ -->
+	<section class="shot" id="bot-verified">
+		<div class="shot-head"><h2>Bot được xác minh</h2><span class="phase">Phase 12</span><p>Chỉ đội vận hành hoandat được cấp hoặc thu hồi dấu xác minh, cho bot của mọi tenant; chủ tenant không có nút này. Xác minh đưa bot lên tầng giới hạn cao nhất: gửi nhanh hơn và được gửi hàng loạt nhiều hơn. Luật chống lạm dụng tự hạ tầng bot khi tỷ lệ bị chặn hoặc số người nhận tăng bất thường (khung dưới); người kiểm duyệt quyết định giữ hay khôi phục.</p></div>
+		<div class="frame"><div class="mod">
+			<nav class="mod-side" data-active="bots" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<header class="mod-head"><a class="icon-btn" href="#queue" aria-label="Về danh sách bot"><svg class="icon"><use href="#i-back"/></svg></a><h3>Bot</h3></header>
+				<div class="mod-body">
+					<div class="card bot-hero pad">
+						<span class="avatar xl av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+						<div class="grow">
+							<b class="bot-name">Deploy Bot <span class="verified" id="v-badge"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã xác minh</span></b>
+							<span class="muted">@deploy_bot · chủ: Quang Huy (@quanghuy) · hoandat.com · tạo 03/03/2026</span>
+						</div>
+						<button type="button" class="btn danger-outline" id="v-toggle" data-verified="true">Thu hồi xác minh</button>
+					</div>
+					<div class="stats">
+						<div class="stat"><b>1.284</b><span>Người dùng</span></div>
+						<div class="stat"><b>18.420</b><span>Tin gửi, 7 ngày</span></div>
+						<div class="stat"><b>0,2%</b><span>Người nhận đã chặn</span></div>
+						<div class="stat"><b>0</b><span>Báo cáo đang mở</span></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Tầng giới hạn</h4>
+						<div class="table-wrap">
+							<table class="data tiers">
+								<thead><tr><th scope="col">Tầng</th><th scope="col" class="num">Tin mỗi giây</th><th scope="col" class="num">Gửi hàng loạt mỗi ngày</th><th scope="col" class="num">Người nhận mới mỗi giờ</th></tr></thead>
+								<tbody>
+									<tr data-tier="limited"><td>Hạn chế</td><td class="num">1</td><td class="num">0</td><td class="num">20</td></tr>
+									<tr data-tier="new"><td>Bot mới, dưới 14 ngày</td><td class="num">5</td><td class="num">500</td><td class="num">200</td></tr>
+									<tr data-tier="normal"><td>Thường</td><td class="num">30</td><td class="num">10.000</td><td class="num">2.000</td></tr>
+									<tr data-tier="verified" aria-current="true"><td>Đã xác minh <span class="here">đang ở đây</span></td><td class="num">100</td><td class="num">100.000</td><td class="num">20.000</td></tr>
+								</tbody>
+							</table>
+						</div>
+						<p class="note pad-x pad-b">Số minh hoạ; ngưỡng thật cấu hình ở server. Thu hồi xác minh đưa bot về tầng Thường ngay, người dùng không còn thấy dấu xác minh.</p>
+					</div>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame auto">
+			<div class="banner warn downgraded">
+				<svg class="icon"><use href="#i-alert"/></svg>
+				<p><b>Promo Blast Bot bị tự hạ xuống tầng Hạn chế lúc 13:05.</b> Luật chống lạm dụng: 18% người nhận đã chặn bot trong 24 giờ (ngưỡng 5%) và số người nhận mới tăng gấp 12 lần.</p>
+				<div class="btn-row"><button type="button" class="btn btn-sm" data-press="Giữ tầng Hạn chế, đã ghi nhật ký">Giữ tầng Hạn chế</button><button type="button" class="btn btn-sm" data-press="Đã khôi phục tầng Bot mới, ghi nhật ký">Khôi phục tầng trước</button></div>
+			</div>
+			<div class="bot-row pad">
+				<span class="avatar av-amber"><svg class="icon"><use href="#i-robot"/></svg></span>
+				<div class="grow"><b>Promo Blast Bot <span class="pill skip">Hạn chế</span></b><span class="muted">@promoblast_bot · chủ: @shopdeal · tạo 3 ngày trước · 41 báo cáo</span></div>
+				<button type="button" class="btn" disabled title="Không cấp được khi bot đang bị hạn chế">Cấp xác minh</button>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Audit log ============ -->
+	<section class="shot" id="audit-log">
+		<div class="shot-head"><h2>Nhật ký kiểm duyệt</h2><span class="phase">Phase 12</span><p>Ai làm gì, với ai, khi nào, vì sao; gồm cả hành động của luật tự động và của chủ tenant. Nhật ký chỉ ghi thêm, không sửa hay xoá được. Chủ tenant chỉ thấy dòng của tenant mình.</p></div>
+		<div class="frame"><div class="mod">
+			<nav class="mod-side" data-active="audit" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<header class="mod-head"><h3>Nhật ký kiểm duyệt</h3><button type="button" class="btn btn-sm" aria-label="Xuất CSV" data-press="Đã tạo file CSV, tải xuống trong vài giây"><svg class="icon icon-sm"><use href="#i-download"/></svg><span class="hide-narrow">Xuất CSV</span></button></header>
+				<div class="mod-body">
+					<div class="filters">
+						<button type="button" class="chip" data-toast="Chọn người thực hiện"><svg class="icon icon-sm"><use href="#i-user"/></svg>Người thực hiện<svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+						<button type="button" class="chip" data-toast="Chọn loại hành động"><svg class="icon icon-sm"><use href="#i-shield"/></svg>Hành động<svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+						<button type="button" class="chip on" data-toast="Chọn khoảng ngày"><svg class="icon icon-sm"><use href="#i-clock"/></svg>7 ngày qua<svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+						<span class="muted append-only"><svg class="icon icon-sm"><use href="#i-lock"/></svg>Chỉ ghi thêm</span>
+					</div>
+					<div class="table-wrap">
+						<table class="data audit">
+							<thead><tr><th scope="col">Thời gian</th><th scope="col">Người thực hiện</th><th scope="col">Hành động</th><th scope="col">Đối tượng</th><th scope="col">Lý do</th><th scope="col">Tenant</th></tr></thead>
+							<tbody>
+								<tr><td class="mono">14/10 14:31</td><td>Bạn (Đức Thắng)</td><td><span class="act-tag t-remove">Gỡ nội dung</span></td><td>6 tin của <span class="mono">@nhanqua24h</span></td><td class="why">Lừa đảo nhận quà, link giả trang đăng nhập</td><td class="mono">hoandat.com</td></tr>
+								<tr><td class="mono">14/10 14:31</td><td>Bạn (Đức Thắng)</td><td><span class="act-tag t-lock">Khoá 7 ngày</span></td><td><span class="mono">@nhanqua24h</span></td><td class="why">Lừa đảo nhận quà, link giả trang đăng nhập</td><td class="mono">hoandat.com</td></tr>
+								<tr><td class="mono">14/10 13:05</td><td><span class="by-rule"><svg class="icon icon-sm"><use href="#i-shield"/></svg>Luật tự động</span></td><td><span class="act-tag t-lock">Hạ tầng bot: Hạn chế</span></td><td><span class="mono">@promoblast_bot</span></td><td class="why">18% người nhận chặn bot trong 24 giờ</td><td class="mono">hoandat.com</td></tr>
+								<tr><td class="mono">14/10 11:20</td><td>Minh</td><td><span class="act-tag t-lock">Tắt webhook</span></td><td>CI Alerts · Team Mobile</td><td class="why">Vòng lặp gửi 3.000 tin mỗi giờ</td><td class="mono">hoandat.com</td></tr>
+								<tr><td class="mono">13/10 22:40</td><td>Quang Huy</td><td><span class="act-tag t-warn">Cảnh cáo</span></td><td><span class="mono">@nhanqua24h</span></td><td class="why">Spam vào nhóm</td><td class="mono">hoandat.com</td></tr>
+								<tr><td class="mono">13/10 21:14</td><td><span class="by-rule"><svg class="icon icon-sm"><use href="#i-shield"/></svg>Luật tự động</span></td><td><span class="act-tag t-warn">Giới hạn tin tới người lạ</span></td><td><span class="mono">@nhanqua24h</span></td><td class="why">Tài khoản 1 ngày tuổi nhắn 60 người lạ</td><td class="mono">hoandat.com</td></tr>
+								<tr><td class="mono">13/10 16:02</td><td>Tuấn · chủ tenant</td><td><span class="act-tag t-skip">Bỏ qua báo cáo</span></td><td>Tin của <span class="mono">@user_8812</span></td><td class="why">Ảnh du lịch, không vi phạm</td><td class="mono">inetdev.io.vn</td></tr>
+								<tr><td class="mono">12/10 09:15</td><td>Quang Huy · đội vận hành</td><td><span class="act-tag t-ok">Cấp xác minh</span></td><td><span class="mono">@deploy_bot</span></td><td class="why">Bot nội bộ của đội vận hành</td><td class="mono">hoandat.com</td></tr>
+							</tbody>
+						</table>
+					</div>
+					<div class="pager"><span class="muted">1–8 trong 214 dòng</span><button type="button" class="icon-btn" aria-label="Trang trước" disabled><svg class="icon flip-x"><use href="#i-chevron-right"/></svg></button><button type="button" class="icon-btn" aria-label="Trang sau" data-toast="Trang 2"><svg class="icon"><use href="#i-chevron-right"/></svg></button></div>
+				</div>
+			</div>
+		</div></div>
+	</section>
+</main>
+
+<style>
+/* ---------- Moderation shell: side navigation + main ---------- */
+.frame.tall { --frame-h: 860px; }
+.mod { display: grid; grid-template-columns: 240px minmax(0, 1fr); height: 100%; }
+.mod > * { min-height: 0; }
+.mod-side { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-2); overflow-y: auto; background: var(--c-surface-subtle); border-right: 1px solid var(--c-border-subtle); }
+.mod-brand { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-weight: 600; }
+.mod-brand .icon { color: var(--c-primary); }
+.scope { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-3); }
+.scope label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.scope select { width: 100%; }
+.mod-side a.nav { display: flex; align-items: center; gap: var(--space-3); min-height: 40px; padding: 0 var(--space-3); border-radius: var(--radius-sm); color: var(--c-text); text-decoration: none; }
+.mod-side a.nav .icon { color: var(--c-icon-muted); }
+.mod-side a.nav:hover { background: var(--c-hover); }
+.mod-side a.nav[aria-current="page"] { background: var(--c-selected); color: var(--c-primary); font-weight: 500; }
+.mod-side a.nav[aria-current="page"] .icon { color: var(--c-primary); }
+.mod-side a.nav .badge { margin-left: auto; }
+.mod-side .me { margin-top: auto; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-top: 1px solid var(--c-border-subtle); font-size: 0.8125rem; }
+.mod-side .me span { display: grid; min-width: 0; }
+.mod-side .me small { color: var(--c-text-muted); }
+
+.mod-main { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }
+.mod-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-5); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.mod-head h3 { flex: 1; min-width: 0; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.mod-head .id { font-size: 0.8125rem; font-weight: 400; margin-left: var(--space-1); }
+.mod-head a.btn { text-decoration: none; }
+.mod-body { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-4) var(--space-5) var(--space-5); }
+.mod-body.narrow-body { max-width: 760px; }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+a.btn-primary { color: var(--c-on-primary); }
+.btn[aria-busy="true"] { cursor: progress; opacity: 0.7; }
+.btn-danger { background: var(--c-error); border-color: var(--c-error); color: var(--c-on-tone); }
+.btn-danger:hover { background: color-mix(in srgb, var(--c-error) 88%, var(--c-text)); border-color: color-mix(in srgb, var(--c-error) 88%, var(--c-text)); }
+.danger-outline { color: var(--c-error); border-color: color-mix(in srgb, var(--c-error) 45%, var(--c-border)); }
+.danger-outline:hover { background: color-mix(in srgb, var(--c-error) 8%, var(--c-surface)); border-color: var(--c-error); }
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.save-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn:disabled:hover { background: none; color: var(--c-icon-muted); }
+.flip-x { transform: scaleX(-1); }
+
+/* Cards */
+.card { background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.pad { padding: var(--space-4); }
+.pad-x { padding-left: var(--space-4); padding-right: var(--space-4); }
+.pad-b { padding-bottom: var(--space-4); }
+.card-title { margin: 0; padding: var(--space-3) var(--space-4) var(--space-2); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.card-title.flush { padding: 0 0 var(--space-3); }
+.note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
+.note .icon { vertical-align: -3px; }
+.state-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+
+/* Queue toolbar and table */
+.toolbar { display: grid; gap: var(--space-3); }
+.toolbar .tabs { padding: 0; }
+.tabs .count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: var(--space-1); padding: 0 6px; border-radius: var(--radius-full); background: var(--c-bar-track); font-size: 0.75rem; color: var(--c-text); }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.search-field.compact { flex: 0 1 280px; background: var(--c-surface); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); }
+.card .table-wrap { border: 0; border-radius: 0; border-top: 1px solid var(--c-border-subtle); }
+.card .table-wrap + .note { padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+table.data { min-width: 720px; }
+table.data tbody tr:last-child td { border-bottom: 0; }
+table.data th.num { text-align: right; }
+.queue tbody tr:hover { background: var(--c-hover); }
+.queue tbody tr[aria-current="true"] { background: var(--c-selected); }
+.obj { display: grid; gap: 1px; min-width: 0; max-width: 300px; color: var(--c-text); text-decoration: none; }
+.obj b { font-weight: 600; }
+.obj span { font-size: 0.8125rem; color: var(--c-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.obj:hover b { text-decoration: underline; text-underline-offset: 2px; }
+.kind { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--c-text-muted); white-space: nowrap; }
+.hot { display: inline-flex; align-items: center; gap: var(--space-1); font-weight: 600; color: var(--c-error-text); }
+.pill { display: inline-flex; align-items: center; white-space: nowrap; padding: 1px var(--space-2); border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 600; }
+.pill.new { background: color-mix(in srgb, var(--c-info) 14%, var(--c-surface)); color: var(--c-info-text); }
+.pill.review { background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); }
+.pill.done { background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success-text); }
+.pill.skip { background: var(--c-bar-track); color: var(--c-text-muted); }
+.no-rows .empty { padding: var(--space-6) var(--space-4); }
+.no-rows[hidden] { display: none; }
+.owner-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-4); background: var(--c-bg); }
+.owner-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.scope-lock { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* Detail */
+.detail { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+.col { display: grid; gap: var(--space-4); min-width: 0; }
+.thread { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0; padding: var(--space-4); background: var(--c-bg); border-top: 1px solid var(--c-border-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.thread .msg { max-width: 560px; }
+.bubble .who-red { color: var(--c-viz-red-text); }
+.bubble .who-green { color: var(--c-viz-green-text); }
+.bubble .who-amber { color: var(--c-viz-amber-text); }
+.bubble .who { color: var(--c-viz-cyan-text); }
+.bubble.reported { border-color: var(--c-error); box-shadow: 0 0 0 1px var(--c-error); }
+.flag-label { display: inline-flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-1); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-error); }
+.reasons { display: grid; grid-template-columns: 80px minmax(0, 1fr) 28px; align-items: center; gap: var(--space-2) var(--space-3); font-size: 0.875rem; }
+.reasons b { text-align: right; font-variant-numeric: tabular-nums; }
+.progress.neutral > span { background: var(--c-border-strong); }
+.notes { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-2); font-size: 0.875rem; }
+.notes li { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+.person { display: flex; align-items: center; gap: var(--space-3); }
+.person > div { display: grid; min-width: 0; }
+.person b { font-weight: 600; }
+.person .mono { overflow-wrap: anywhere; }
+.facts { margin: 0; border-top: 1px solid var(--c-border-subtle); }
+.facts > div { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); min-height: 40px; }
+.facts > div + div { border-top: 1px solid var(--c-border-subtle); }
+.facts dt { font-size: 0.875rem; color: var(--c-text-muted); }
+.facts dd { margin: 0; display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+.timeline { list-style: none; margin: 0; display: grid; gap: var(--space-3); }
+.timeline li { position: relative; display: grid; gap: 1px; padding-left: var(--space-4); font-size: 0.875rem; }
+.timeline li::before { content: ""; position: absolute; left: 0; top: 0.5em; width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.timeline b { font-weight: 600; }
+.timeline span, .timeline small { color: var(--c-text-muted); font-size: 0.8125rem; }
+
+/* Actions */
+.target { display: flex; align-items: center; gap: var(--space-3); }
+.target .grow { display: grid; min-width: 0; }
+.target b { font-weight: 600; }
+.target .muted { font-size: 0.875rem; }
+fieldset.acts { margin: 0; padding: var(--space-1) 0; }
+.act { padding: var(--space-2) var(--space-3); }
+.act + .act { border-top: 1px solid var(--c-border-subtle); }
+.act.is-disabled .opt { cursor: not-allowed; opacity: 0.55; }
+.act-extra { display: grid; gap: var(--space-2); padding: var(--space-1) 0 var(--space-2) calc(var(--space-2) + 18px + var(--space-3)); }
+.act-extra[hidden] { display: none; }
+.act-extra .choice { justify-self: start; }
+/* Native input stretched over the row: real checkbox semantics, 44px target, custom mark. */
+.opt { position: relative; display: flex; align-items: center; gap: var(--space-3); min-height: 44px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); cursor: pointer; }
+.opt:hover { background: var(--c-hover); }
+.opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.opt::before { content: ""; flex: none; width: 18px; height: 18px; border-radius: var(--radius-xs); border: 1.5px solid var(--c-border-strong); background: var(--c-surface); }
+.opt:has(input:checked)::before { border: 0; background: var(--c-primary-solid); }
+.opt::after { content: ""; position: absolute; left: calc(var(--space-2) + 6px); top: 50%; width: 5px; height: 10px; border: solid var(--c-on-primary); border-width: 0 2px 2px 0; transform: translateY(-65%) rotate(45deg); opacity: 0; }
+.opt:has(input:checked)::after { opacity: 1; }
+.opt:has(input:focus-visible) { outline: 2px solid var(--c-primary); outline-offset: 0; }
+.opt span { display: grid; font-weight: 500; }
+.opt small { color: var(--c-text-muted); font-size: 0.8125rem; font-weight: 400; }
+.frame.confirm-frame { --frame-h: 520px; }
+.dlg-body.flow { display: grid; gap: var(--space-3); padding-top: var(--space-4); }
+.dlg-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.summary { list-style: none; margin: 0; padding: var(--space-3); display: grid; gap: var(--space-2); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-size: 0.875rem; }
+.summary li { display: flex; gap: var(--space-2); align-items: flex-start; }
+.summary .icon { margin-top: 2px; color: var(--c-error); }
+.field .input { width: 100%; }
+.error-text[hidden] { display: none; }
+
+/* Bot */
+.bot-hero { display: flex; align-items: center; gap: var(--space-4); }
+.bot-hero .grow, .bot-row .grow { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.avatar.xl { width: 64px; height: 64px; }
+.avatar.xl .icon { width: 28px; height: 28px; }
+.bot-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 1.125rem; font-weight: 600; }
+.verified { display: inline-flex; align-items: center; gap: 2px; padding: 1px var(--space-2); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success-text); font-size: 0.75rem; font-weight: 600; }
+.verified[hidden] { display: none; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.stats .stat { background: var(--c-surface); }
+.tiers tbody tr[aria-current="true"] { background: var(--c-selected); }
+.tiers tbody tr[aria-current="true"] td:first-child { font-weight: 600; }
+.here { margin-left: var(--space-2); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-primary); }
+.downgraded { align-items: flex-start; flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+.downgraded p { flex: 1 1 320px; margin: 0; }
+.downgraded .icon { margin-top: 2px; }
+.bot-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bot-row b { display: flex; align-items: center; gap: var(--space-2); font-weight: 600; }
+
+/* Audit */
+.chip { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; padding: 0 var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-text); font-size: 0.8125rem; font-weight: 500; white-space: nowrap; }
+.chip .icon { color: var(--c-icon-muted); }
+.chip:hover { border-color: var(--c-border-strong); }
+.chip.on { border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-border)); background: var(--c-selected); color: var(--c-primary); }
+.chip.on .icon { color: var(--c-primary); }
+.append-only { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: auto; font-size: 0.8125rem; }
+.audit td { vertical-align: top; }
+.audit td.mono { white-space: nowrap; }
+.audit .why { max-width: 260px; color: var(--c-text-muted); }
+.by-rule { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--c-text-muted); white-space: nowrap; }
+.act-tag { display: inline-block; padding: 1px var(--space-2); border-radius: var(--radius-xs); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.t-remove { background: color-mix(in srgb, var(--c-error) 12%, var(--c-surface)); color: var(--c-error-text); }
+.t-lock { background: color-mix(in srgb, var(--c-error) 12%, var(--c-surface)); color: var(--c-error-text); }
+.t-warn { background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); }
+.t-skip { background: var(--c-bar-track); color: var(--c-text-muted); }
+.t-ok { background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success-text); }
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); font-size: 0.8125rem; }
+.pager .muted { margin-right: var(--space-2); }
+
+@media (max-width: 1100px) {
+	.detail { grid-template-columns: minmax(0, 1fr); }
+	.stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+	.mod { grid-template-columns: minmax(0, 1fr); }
+	.mod-side { display: none; }
+}
+@media (max-width: 760px) {
+	.mod { height: auto; }
+	.mod-main { overflow: visible; }
+	.mod-head { padding: var(--space-2) var(--space-3); flex-wrap: wrap; }
+	.mod-body { padding: var(--space-3) var(--space-3) var(--space-4); }
+	.hide-narrow { display: none; }
+	.mod-head .id { display: none; }
+	.search-field.compact { flex: 1 1 100%; }
+	.filters .choice { flex-wrap: wrap; }
+	.append-only { margin-left: 0; }
+	.bot-hero { flex-wrap: wrap; }
+	.frame.auto { min-height: 0; }
+	.frame.confirm-frame { min-height: 0; height: auto; }
+	.frame.confirm-frame .static-dialog { position: static; }
+	.act-extra { padding-left: var(--space-2); }
+	.act-extra .choice { justify-self: stretch; display: flex; }
+	.act-extra .choice button { flex: 1; padding: 0 var(--space-1); }
+	.filters .choice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+	.bot-hero .grow, .bot-row .grow { flex: 1 1 200px; }
+	/* Tables become stacked rows: each cell carries its column name (set by the page script). */
+	table.data { min-width: 0; }
+	table.data thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+	table.data, table.data tbody, table.data tr, table.data td { display: block; }
+	table.data tr { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+	table.data tbody tr:last-child { border-bottom: 0; }
+	table.data td { display: flow-root; padding: var(--space-1) 0; border: 0; text-align: right; }
+	table.data td::before { content: attr(data-label); float: left; margin-right: var(--space-3); font-size: 0.75rem; font-weight: 600; line-height: 1.9; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); text-align: left; }
+	table.data td:first-child { display: block; text-align: left; }
+	table.data td:first-child::before { content: none; }
+	table.data tr[hidden] { display: none; }
+	.obj, .audit .why { max-width: none; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.choice button, .btn-sm, .chip { min-height: 44px; }
+	.mod-head .icon-btn, .pager .icon-btn { width: 44px; height: 44px; }
+	.obj { min-height: 44px; align-content: center; }
+	.facts dd .link { display: inline-flex; align-items: center; min-height: 44px; }
+}
+</style>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast } = window.Mock;
+	const icon = (id, cls = "icon") => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+
+	// Shared side navigation: same items in every frame, with the current place marked.
+	const NAV = [["queue", "Hàng đợi báo cáo", "inbox", "#queue", 5], ["bots", "Bot và xác minh", "robot", "#bot-verified"], ["audit", "Nhật ký kiểm duyệt", "file", "#audit-log"]];
+	$$(".mod-side").forEach((side, i) => {
+		const id = `scope-${i}`;
+		side.innerHTML = `<div class="mod-brand">${icon("shield")}<span>Kiểm duyệt</span></div>
+			<div class="scope"><label for="${id}">Phạm vi</label>
+				<select class="input" id="${id}"><option>Tất cả tenant</option><option>hoandat.com</option><option>inetdev.io.vn</option></select></div>
+			${NAV.map(([key, label, ic, href, count]) => `<a class="nav" href="${href}"${key === side.dataset.active ? ' aria-current="page"' : ""}>${icon(ic)}<span>${label}</span>${count ? `<span class="badge">${count}</span>` : ""}</a>`).join("")}
+			<div class="me"><span class="avatar sm av-violet">ĐT</span><span>Đức Thắng<small>Đội vận hành hoandat</small></span></div>`;
+	});
+
+	// Column names on every cell, used as labels when tables stack on narrow screens.
+	$$("table.data").forEach((t) => {
+		const heads = $$("thead th", t).map((th) => th.textContent.trim());
+		$$("tbody tr", t).forEach((tr) => [...tr.cells].forEach((td, i) => { if (heads[i] && !td.hasAttribute("colspan")) td.dataset.label = heads[i]; }));
+	});
+
+	// Queue filters: type (segmented) and status (tabs) combine.
+	const table = $("#queue-table");
+	let type = "all", status = "all";
+	const applyFilters = () => {
+		let shown = 0;
+		$$("tbody tr[data-type]", table).forEach((tr) => {
+			const okType = type === "all" || tr.dataset.type === type;
+			const okStatus = status === "all" || tr.dataset.status === status;
+			tr.hidden = !(okType && okStatus);
+			if (!tr.hidden) shown++;
+		});
+		$(".no-rows", table).hidden = shown > 0;
+	};
+	$$("#type-filter button").forEach((b) => b.addEventListener("click", () => { type = b.dataset.type; applyFilters(); }));
+	$$("[data-status]").forEach((b) => { if (b.getAttribute("role") === "tab") b.addEventListener("click", () => { status = b.dataset.status; applyFilters(); }); });
+
+	// Actions: duration only applies when locking; continue needs at least one action.
+	const form = $("#act-form");
+	form.addEventListener("change", () => {
+		$("#lock-extra").hidden = !$("#act-lock").checked;
+		$("#act-next").disabled = !form.querySelector("input[name=act]:checked");
+	});
+
+	// Confirmation: a reason is required and goes to the audit log.
+	const reason = $("#cf-reason");
+	$("#cf-ok").addEventListener("click", () => {
+		const empty = reason.value.trim() === "";
+		reason.setAttribute("aria-invalid", String(empty));
+		$("#cf-err").hidden = !empty;
+		if (empty) { reason.focus(); return; }
+		const ok = $("#cf-ok");
+		ok.setAttribute("aria-busy", "true");
+		setTimeout(() => { ok.removeAttribute("aria-busy"); toast("Đã gỡ 6 tin và khoá @nhanqua24h 7 ngày, đã ghi nhật ký"); }, 500);
+	});
+	reason.addEventListener("input", () => { if (reason.value.trim()) { reason.setAttribute("aria-invalid", "false"); $("#cf-err").hidden = true; } });
+
+	// Verified toggle: badge and tier row follow the state.
+	const toggle = $("#v-toggle");
+	toggle.addEventListener("click", () => {
+		const on = toggle.dataset.verified !== "true";
+		toggle.dataset.verified = String(on);
+		toggle.textContent = on ? "Thu hồi xác minh" : "Cấp xác minh";
+		toggle.classList.toggle("danger-outline", on);
+		toggle.classList.toggle("btn-primary", !on);
+		$("#v-badge").hidden = !on;
+		$$(".tiers tbody tr").forEach((tr) => {
+			const cur = tr.dataset.tier === (on ? "verified" : "normal");
+			if (cur) tr.setAttribute("aria-current", "true"); else tr.removeAttribute("aria-current");
+			const here = $(".here", tr);
+			if (here) here.remove();
+			if (cur) tr.cells[0].insertAdjacentHTML("beforeend", ' <span class="here">đang ở đây</span>');
+		});
+		toast(on ? "Đã cấp xác minh, bot lên tầng Đã xác minh" : "Đã thu hồi xác minh, bot về tầng Thường");
+	});
+})();
+</script>
+</body>
+</html>

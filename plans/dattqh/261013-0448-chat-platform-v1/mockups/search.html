@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tìm kiếm — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+	<!-- ============ Global search ============ -->
+	<section class="shot" id="global">
+		<div class="shot-head"><h2>Tìm toàn cục</h2><span class="phase">Phase 7</span><p>Gõ không dấu vẫn ra tin có dấu: "dep thiet ke" khớp "đẹp", "thiết kế". Kết quả trong máy (FTS local) hiện ngay mỗi phím; server được gọi sau khi ngừng gõ rồi gộp vào, không làm nhảy các dòng đã có. Ô tìm kiếm chạy thật: gõ thử "van hanh", "minh", "postgres".</p></div>
+		<div class="frame"><div class="sx focus-list">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<section class="sx-col" aria-label="Tìm kiếm">
+				<div class="sx-top">
+					<label class="search-field">
+						<svg class="icon icon-sm"><use href="#i-search"/></svg>
+						<span class="sr-only">Tìm chat, người và tin nhắn</span>
+						<input id="g-q" type="search" value="dep thiet ke" autocomplete="off" spellcheck="false">
+						<span class="kbd">Esc</span>
+					</label>
+				</div>
+				<div class="chips" role="group" aria-label="Bộ lọc">
+					<button type="button" class="chip" aria-haspopup="true" aria-expanded="false" data-toast="Chọn người gửi (xem khung Bộ lọc)"><svg class="icon icon-sm"><use href="#i-user"/></svg>Người gửi<svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+					<button type="button" class="chip" aria-haspopup="true" aria-expanded="false" data-toast="Ảnh, file, link hoặc voice (xem khung Bộ lọc)"><svg class="icon icon-sm"><use href="#i-file"/></svg>Loại<svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+					<button type="button" class="chip" aria-haspopup="true" aria-expanded="false" data-toast="Chọn khoảng ngày (xem khung Bộ lọc)"><svg class="icon icon-sm"><use href="#i-clock"/></svg>Ngày<svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+				</div>
+				<div class="sx-status" id="g-status" role="status"></div>
+				<div class="sx-results" id="g-results"></div>
+			</section>
+			<section class="sx-pane" aria-label="Xem kết quả">
+				<div class="empty">
+					<svg class="icon"><use href="#i-search"/></svg>
+					<strong>Bấm một kết quả để mở chat tại đúng tin đó</strong>
+					<span><span class="kbd">↑</span> <span class="kbd">↓</span> chọn · <span class="kbd">Enter</span> mở · <span class="kbd">Esc</span> đóng tìm kiếm</span>
+				</div>
+			</section>
+		</div></div>
+		<div class="frame auto states">
+			<div class="state">
+				<span class="state-label">Ngay khi gõ</span>
+				<div class="sx-status"><span class="spinner" aria-hidden="true"></span>Kết quả trong máy · đang lấy thêm từ server…</div>
+			</div>
+			<div class="state">
+				<span class="state-label">Sau khi server trả về</span>
+				<div class="sx-status"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã gộp kết quả từ server · 6 tin</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Filters ============ -->
+	<section class="shot" id="filters">
+		<div class="shot-head"><h2>Bộ lọc</h2><span class="phase">Phase 7</span><p>Lọc theo người gửi, loại (ảnh, file, link, voice) và khoảng ngày. Bộ lọc đang bật hiện thành chip có nút bỏ. Bảng chọn ngày có khoảng nhanh và lịch; bấm hai ngày để chọn khoảng. Lọc áp dụng cho cả kết quả trong máy và kết quả từ server.</p></div>
+		<div class="frame"><div class="sx focus-list">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<section class="sx-col" aria-label="Tìm kiếm có bộ lọc">
+				<div class="sx-top">
+					<label class="search-field">
+						<svg class="icon icon-sm"><use href="#i-search"/></svg>
+						<span class="sr-only">Tìm chat, người và tin nhắn</span>
+						<input type="search" value="thiet ke" autocomplete="off" spellcheck="false">
+					</label>
+				</div>
+				<div class="chips" role="group" aria-label="Loại">
+					<button type="button" class="chip" aria-pressed="false"><svg class="icon icon-sm"><use href="#i-photo"/></svg>Ảnh</button>
+					<button type="button" class="chip" aria-pressed="true"><svg class="icon icon-sm"><use href="#i-file"/></svg>File</button>
+					<button type="button" class="chip" aria-pressed="false"><svg class="icon icon-sm"><use href="#i-link"/></svg>Link</button>
+					<button type="button" class="chip" aria-pressed="false"><svg class="icon icon-sm"><use href="#i-mic"/></svg>Voice</button>
+				</div>
+				<div class="chips" role="group" aria-label="Bộ lọc">
+					<span class="chip on"><span class="avatar xs av-green">LA</span>Lan Anh<button type="button" class="chip-x" aria-label="Bỏ lọc người gửi Lan Anh" data-toast="Đã bỏ lọc người gửi"><svg class="icon icon-sm"><use href="#i-x"/></svg></button></span>
+					<button type="button" class="chip on" aria-haspopup="dialog" aria-expanded="true" aria-controls="date-pop"><svg class="icon icon-sm"><use href="#i-clock"/></svg><span id="date-chip">01/10 – 14/10</span><svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+				</div>
+				<div class="pop" id="date-pop" role="dialog" aria-label="Chọn khoảng ngày">
+					<div class="choice quick" role="group" aria-label="Khoảng nhanh">
+						<button type="button" aria-pressed="false" data-range="today">Hôm nay</button>
+						<button type="button" aria-pressed="false" data-range="7">7 ngày</button>
+						<button type="button" aria-pressed="false" data-range="30">30 ngày</button>
+						<button type="button" aria-pressed="true" data-range="custom">Tuỳ chọn</button>
+					</div>
+					<div class="cal-head">
+						<button type="button" class="icon-btn" aria-label="Tháng trước"><svg class="icon flip-x"><use href="#i-chevron-right"/></svg></button>
+						<b>Tháng 10, 2026</b>
+						<button type="button" class="icon-btn" aria-label="Tháng sau" disabled><svg class="icon"><use href="#i-chevron-right"/></svg></button>
+					</div>
+					<div class="cal" id="cal" role="grid" aria-label="Tháng 10, 2026"></div>
+					<div class="pop-foot">
+						<span class="muted" id="range-label">01/10 – 14/10/2026</span>
+						<button type="button" class="btn btn-sm" id="range-clear">Xoá</button>
+						<button type="button" class="btn btn-sm btn-primary" data-toast="Đã áp dụng khoảng ngày">Áp dụng</button>
+					</div>
+				</div>
+				<div class="sx-status"><svg class="icon icon-sm"><use href="#i-check"/></svg>3 file · trong máy và server</div>
+				<div class="sx-results">
+					<ul class="hits">
+						<li><a class="hit" href="#jump"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span class="hit-main"><span class="hit-head"><b class="mono-name"><mark>thiet-ke</mark>-man-dang-nhap-v2.fig</b><span>09:30</span></span><span class="hit-sub">4,2 MB · Lan Anh</span></span></a></li>
+						<li><a class="hit" href="#jump"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span class="hit-main"><span class="hit-head"><b class="mono-name">brief-<mark>thiet-ke</mark>-icon.pdf</b><span>08/10</span></span><span class="hit-sub">820 KB · Lan Anh</span></span></a></li>
+						<li><a class="hit" href="#jump"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span class="hit-main"><span class="hit-head"><b class="mono-name">bo-icon-<mark>thiet-ke</mark>-v3.zip</b><span>02/10</span></span><span class="hit-sub">12,6 MB · Lan Anh · <span class="from-server">từ server</span></span></span></a></li>
+					</ul>
+				</div>
+			</section>
+			<section class="sx-pane" aria-label="Xem kết quả">
+				<div class="empty"><svg class="icon"><use href="#i-file"/></svg><strong>Bộ lọc áp dụng cho cả trong máy và server</strong><span>Lọc theo loại dùng loại media của tin, không cần mở file.</span></div>
+			</section>
+		</div></div>
+	</section>
+
+	<!-- ============ In-chat search ============ -->
+	<section class="shot" id="in-chat">
+		<div class="shot-head"><h2>Tìm trong chat</h2><span class="phase">Phase 7</span><p>Thanh tìm thay tiêu đề chat. Bộ đếm "3/12" và nút lên/xuống (hoặc Enter, Shift+Enter) chuyển giữa các kết quả; kết quả đang chọn được tô đậm hơn, các kết quả khác tô nhạt. Thử bấm lên/xuống.</p></div>
+		<div class="frame"><div class="sx focus-convo">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<section class="sx-col" aria-label="Danh sách chat">
+				<ul class="chats">
+					<li class="chat-row" aria-current="true"><span class="avatar av-blue">VH</span><div><div class="name">Vận hành hệ thống</div><div class="preview">Bạn: Ok, sau khi nâng cấp mình theo dõi CPU</div></div><div class="meta"><span>09:35</span></div></li>
+					<li class="chat-row"><span class="avatar av-green">LA</span><div><div class="name">Lan Anh</div><div class="preview">Mình gửi file thiết kế rồi nhé</div></div><div class="meta"><span>09:30</span><span class="badge">1</span></div></li>
+					<li class="chat-row"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div><div class="meta"><span>08:55</span></div></li>
+					<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name">Team Mobile</div><div class="preview">Minh: Build iOS lỗi ký số, đang xem</div></div><div class="meta"><span>Hôm qua</span></div></li>
+					<li class="chat-row"><span class="avatar av-cyan">QH</span><div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div><div class="meta"><span>Hôm qua</span></div></li>
+				</ul>
+			</section>
+			<section class="convo" aria-label="Vận hành hệ thống">
+				<header class="convo-head insearch">
+					<label class="search-field">
+						<svg class="icon icon-sm"><use href="#i-search"/></svg>
+						<span class="sr-only">Tìm trong Vận hành hệ thống</span>
+						<input id="ic-q" type="search" value="nang cap" autocomplete="off" spellcheck="false">
+					</label>
+					<span class="counter" id="ic-count" aria-live="polite">3/12</span>
+					<button type="button" class="icon-btn" id="ic-up" aria-label="Kết quả cũ hơn (Shift+Enter)"><svg class="icon flip-y"><use href="#i-chevron-down"/></svg></button>
+					<button type="button" class="icon-btn" id="ic-down" aria-label="Kết quả mới hơn (Enter)"><svg class="icon"><use href="#i-chevron-down"/></svg></button>
+					<button type="button" class="icon-btn hide-narrow" aria-label="Lọc theo người gửi" data-toast="Chọn thành viên để chỉ tìm tin của người đó"><svg class="icon"><use href="#i-user"/></svg></button>
+					<button type="button" class="icon-btn" aria-label="Đóng tìm kiếm" data-toast="Đóng thanh tìm, giữ vị trí đang xem"><svg class="icon"><use href="#i-x"/></svg></button>
+				</header>
+				<div class="messages" id="ic-msgs">
+					<span class="day">Hôm nay</span>
+					<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Sáng nay mình sẽ <mark data-hit="4">nâng cấp</mark> <code>postgres-17</code> trên box lab. Ai đang test thì báo nhé.<span class="stamp">09:12</span></p></div></div>
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><span class="who who-green">Lan Anh</span><p>Trước khi <mark data-hit="3" class="hit-now">nâng cấp</mark>, đây là trạng thái hiện tại: 3 replica đều khoẻ.<span class="stamp">09:20</span></p></div></div>
+					<div class="msg"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div class="bubble"><span class="who">Deploy Bot <span class="tag">bot</span></span><p>Đã tạm dừng job backup trong 30 phút.<span class="stamp">09:22</span></p></div></div>
+					<div class="msg"><span class="avatar sm av-amber">MN</span><div class="bubble"><span class="who who-amber">Minh</span><p><mark data-hit="2">Nâng cấp</mark> xong nhớ chạy lại migration test nhé.<span class="stamp">09:31</span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Ok, sau khi <mark data-hit="1">nâng cấp</mark> mình theo dõi CPU.<span class="stamp">09:35 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="ic-draft">Tin nhắn</label>
+					<textarea id="ic-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div></div>
+	</section>
+
+	<!-- ============ Jump to message ============ -->
+	<section class="shot" id="jump">
+		<div class="shot-head"><h2>Nhảy tới tin</h2><span class="phase">Phase 7</span><p>Bấm một kết quả: chat mở tại đúng tin đó, có vài tin trước và sau làm ngữ cảnh. Tin được tô sáng vài giây rồi mờ dần (mock giữ nguyên để duyệt; bấm vào khung tin để xem hiệu ứng mờ). Nút "Về tin mới nhất" đưa về cuối chat, kèm số tin mới hơn.</p></div>
+		<div class="frame"><div class="sx focus-convo">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<section class="sx-col" aria-label="Kết quả tìm kiếm">
+				<div class="sx-top">
+					<label class="search-field">
+						<svg class="icon icon-sm"><use href="#i-search"/></svg>
+						<span class="sr-only">Tìm chat, người và tin nhắn</span>
+						<input type="search" value="dep thiet ke" autocomplete="off" spellcheck="false">
+					</label>
+				</div>
+				<div class="sx-status"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã gộp kết quả từ server · 6 tin</div>
+				<div class="sx-results" id="j-results"></div>
+			</section>
+			<section class="convo" aria-label="Lan Anh">
+				<header class="convo-head"><span class="avatar av-green">LA</span><div class="title"><strong>Lan Anh</strong><span>online 5 phút trước</span></div><button type="button" class="icon-btn" aria-label="Tìm trong chat"><svg class="icon"><use href="#i-search"/></svg></button></header>
+				<div class="messages jump-msgs" id="j-msgs">
+					<span class="day">12 tháng 9, 2026</span>
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><p>Thắng ơi, bộ icon cho app mobile xong rồi.<span class="stamp">15:02</span></p></div></div>
+					<div class="msg found" id="j-found"><span class="avatar sm av-green">LA</span><div class="bubble"><div class="file-chip"><svg class="icon"><use href="#i-file"/></svg><span><b>bo-icon-v2.fig</b><small>6,8 MB</small></span></div><p>Gửi Thắng bộ <mark>thiết kế</mark> icon, <mark>đẹp</mark> và nhẹ hơn bản cũ.<span class="stamp">15:04</span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Đẹp quá, để mình đưa vào bản 2.3.<span class="stamp">15:10 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><p>Ok, có gì cần sửa thì báo mình nhé.<span class="stamp">15:11</span></p></div></div>
+					<span class="day">13 tháng 9, 2026</span>
+					<div class="msg mine"><div class="bubble"><p>Đã gộp vào nhánh release, cảm ơn Lan Anh.<span class="stamp">09:05 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p></div></div>
+				</div>
+				<button type="button" class="to-latest" id="to-latest" aria-label="Về tin mới nhất, 48 tin mới hơn"><svg class="icon"><use href="#i-arrow-down"/></svg><span>Về tin mới nhất</span><span class="badge">48</span></button>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="j-draft">Tin nhắn</label>
+					<textarea id="j-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div></div>
+	</section>
+
+	<!-- ============ Empty, offline, server error ============ -->
+	<section class="shot" id="empty-error">
+		<div class="shot-head"><h2>Không có kết quả và mất mạng</h2><span class="phase">Phase 7</span><p>Không có kết quả thì gợi ý bước tiếp, kể cả bỏ bộ lọc đang bật. Mất mạng hoặc server tìm kiếm lỗi thì vẫn hiện kết quả trong máy, nói rõ là chưa đủ và cho thử lại; không bao giờ treo chờ.</p></div>
+		<div class="frame auto"><div class="trio">
+			<section class="sx-col card-col" aria-label="Không có kết quả">
+				<span class="state-label">Không có kết quả</span>
+				<div class="sx-top"><label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm</span><input type="search" value="hop dong bao tri" autocomplete="off"></label></div>
+				<div class="chips"><span class="chip on"><span class="avatar xs av-amber">MN</span>Minh<button type="button" class="chip-x" aria-label="Bỏ lọc người gửi Minh" data-toast="Đã bỏ lọc người gửi, đang tìm lại"><svg class="icon icon-sm"><use href="#i-x"/></svg></button></span></div>
+				<div class="empty">
+					<svg class="icon"><use href="#i-search"/></svg>
+					<strong>Không có kết quả cho “hop dong bao tri”</strong>
+					<ul class="tips">
+						<li>Kiểm tra chính tả hoặc dùng ít từ hơn.</li>
+						<li>Tin trước khi bạn vào nhóm có thể không xem được, nên không hiện trong kết quả.</li>
+					</ul>
+					<button type="button" class="btn" data-toast="Đã bỏ lọc người gửi, đang tìm lại">Bỏ lọc người gửi Minh</button>
+				</div>
+			</section>
+			<section class="sx-col card-col" aria-label="Mất mạng">
+				<span class="state-label">Mất mạng</span>
+				<div class="banner warn"><svg class="icon icon-sm"><use href="#i-wifi-off"/></svg><span>Mất mạng. Chỉ hiện kết quả trong máy.</span></div>
+				<div class="sx-top"><label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm</span><input type="search" value="postgres" autocomplete="off"></label></div>
+				<div class="sx-results" id="off-results"></div>
+				<p class="foot-note">Tin cũ chưa có trong máy sẽ được tìm khi có mạng lại.</p>
+			</section>
+			<section class="sx-col card-col" aria-label="Server tìm kiếm lỗi">
+				<span class="state-label">Server tìm kiếm lỗi</span>
+				<div class="banner error"><svg class="icon icon-sm"><use href="#i-alert-circle"/></svg><span class="grow">Không lấy được kết quả từ server.</span><button type="button" class="btn btn-sm" data-press="Đã lấy được kết quả từ server"><svg class="icon icon-sm"><use href="#i-refresh"/></svg>Thử lại</button></div>
+				<div class="sx-top"><label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm</span><input type="search" value="grafana" autocomplete="off"></label></div>
+				<div class="sx-results" id="err-results"></div>
+				<p class="foot-note">Đang hiện kết quả trong máy. Có thể còn tin cũ hơn trên server.</p>
+			</section>
+		</div></div>
+	</section>
+</main>
+
+<style>
+/* ---------- Search shell: rail + search column + pane ---------- */
+.sx { display: grid; grid-template-columns: var(--rail-w) 400px minmax(0, 1fr); height: 100%; background: var(--c-surface); }
+.sx > * { min-height: 0; }
+.rail a.icon-btn { text-decoration: none; }
+.rail .icon-btn[aria-current="page"] { color: var(--c-primary); background: var(--c-selected); }
+.sx-col { position: relative; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.sx-top { padding: var(--space-3) var(--space-4) var(--space-2); }
+.sx-pane { display: grid; place-items: center; background: var(--c-bg); }
+.sx-pane .empty { max-width: 360px; }
+.sx-pane .empty strong { color: var(--c-text); }
+.sx .convo { position: relative; }
+.sx-results { flex: 1; overflow-y: auto; padding: 0 var(--space-2) var(--space-3); }
+.search-field .kbd { flex: none; }
+
+/* Filter chips */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 var(--space-4) var(--space-2); }
+.chip { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-text); font-size: 0.8125rem; font-weight: 500; white-space: nowrap; }
+.chip .icon { color: var(--c-icon-muted); }
+button.chip:hover { border-color: var(--c-border-strong); background: var(--c-surface-subtle); }
+.chip.on, .chip[aria-pressed="true"] { border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-border)); background: var(--c-selected); color: var(--c-primary); }
+.chip.on .icon, .chip[aria-pressed="true"] .icon { color: var(--c-primary); }
+span.chip.on { padding-right: 2px; }
+.chip-x { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-primary); }
+.chip-x:hover { background: color-mix(in srgb, var(--c-primary-solid) 16%, transparent); }
+.avatar.xs { width: 20px; height: 20px; font-size: 0.5625rem; margin-left: calc(-1 * var(--space-2)); }
+.chips.types { padding-top: 0; }
+
+/* Status line: local first, server merged later */
+.sx-status { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: var(--space-1) var(--space-4); font-size: 0.8125rem; color: var(--c-text-muted); border-top: 1px solid var(--c-border-subtle); border-bottom: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+.sx-status .icon { color: var(--c-success); }
+.spinner { flex: none; width: 12px; height: 12px; border-radius: var(--radius-full); border: 2px solid var(--c-border); border-top-color: var(--c-primary-solid); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Result sections */
+.sec-h { display: flex; justify-content: space-between; margin: var(--space-3) var(--space-2) var(--space-1); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.sec-h span { font-weight: 500; text-transform: none; letter-spacing: 0; }
+.hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hit { display: flex; align-items: flex-start; gap: var(--space-3); min-height: 52px; padding: var(--space-2); border-radius: var(--radius-sm); color: var(--c-text); text-decoration: none; }
+.hit:hover { background: var(--c-hover); }
+.hit[aria-current="true"] { background: var(--c-selected); }
+.hit .avatar, .hit .device { margin-top: 2px; }
+.hit-main { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.hit-head { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.875rem; }
+.hit-head b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hit-head > span { flex: none; font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.hit-sub { font-size: 0.8125rem; color: var(--c-text-muted); }
+.hit-text { font-size: 0.875rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mono-name { font-family: var(--font-mono); font-size: 0.8125rem; }
+.from-server { font-size: 0.6875rem; font-weight: 600; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: var(--c-bar-track); color: var(--c-text-muted); }
+.hit.fresh { animation: arrive var(--dur-slow) var(--ease-decelerate); }
+@keyframes arrive { from { opacity: 0; } to { opacity: 1; } }
+
+/* Status strip under the global shot */
+.frame.states { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.state { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.state + .state { border-left: 1px solid var(--c-border-subtle); }
+.state .sx-status { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); }
+.state-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+
+/* Date picker popover */
+.pop { position: absolute; z-index: 2; top: 158px; left: var(--space-4); width: 344px; display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-lg); }
+.choice.quick { display: flex; }
+.choice.quick button { flex: 1; padding: 0 var(--space-1); white-space: nowrap; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cal-head b { font-weight: 600; }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn:disabled:hover { background: none; color: var(--c-icon-muted); }
+.flip-x { transform: scaleX(-1); }
+.flip-y { transform: scaleY(-1); }
+.cal { display: grid; grid-template-columns: repeat(7, 40px); gap: 2px 2px; justify-content: space-between; }
+.cal .wd { display: grid; place-items: center; height: 28px; font-size: 0.75rem; font-weight: 500; color: var(--c-text-muted); }
+.cal button { width: 40px; height: 40px; border: 0; border-radius: var(--radius-sm); background: none; font-size: 0.875rem; font-variant-numeric: tabular-nums; color: var(--c-text); }
+.cal button:hover { background: var(--c-hover); }
+.cal button.in { background: var(--c-selected); border-radius: 0; }
+.cal button.edge { background: var(--c-primary-solid); color: var(--c-on-primary); font-weight: 600; }
+.cal button.today { box-shadow: inset 0 0 0 1px var(--c-primary); }
+.cal button:disabled { color: var(--c-text-muted); opacity: 0.5; cursor: not-allowed; }
+.pop-foot { display: flex; align-items: center; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.pop-foot .muted { flex: 1; font-size: 0.8125rem; }
+
+/* In-chat search bar */
+.convo-head.insearch { gap: var(--space-2); }
+.convo-head.insearch .search-field { flex: 1; min-width: 0; }
+.counter { flex: none; min-width: 48px; text-align: center; font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.bubble .who-green { color: var(--c-viz-green-text); }
+.bubble .who-amber { color: var(--c-viz-amber-text); }
+mark.hit-now { background: color-mix(in srgb, var(--c-warning) 35%, var(--c-surface)); box-shadow: 0 0 0 2px var(--c-warning); }
+
+/* Jump: found message highlighted, then fades when the user interacts */
+.msg.found .bubble { background: color-mix(in srgb, var(--c-primary-solid) 16%, var(--c-surface)); border-color: var(--c-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary-solid) 22%, transparent); transition: background var(--dur-slow) var(--ease-standard), box-shadow var(--dur-slow) var(--ease-standard), border-color var(--dur-slow) var(--ease-standard); }
+.msg.found.faded .bubble { background: var(--c-surface); border-color: var(--c-border-subtle); box-shadow: none; }
+.jump-msgs > :first-child { margin-top: 0; }
+.file-chip { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1); padding: var(--space-2); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+.file-chip span { display: grid; }
+.file-chip b { font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 500; }
+.file-chip small { font-size: 0.75rem; color: var(--c-text-muted); }
+.to-latest { position: absolute; right: var(--space-5); bottom: 88px; display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-2) 0 var(--space-4); border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-md); font-weight: 500; font-size: 0.875rem; }
+.to-latest:hover { background: var(--c-surface-subtle); }
+
+/* Empty / offline / error trio */
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.card-col { border-right: 1px solid var(--c-border-subtle); padding-top: var(--space-3); min-height: 440px; }
+.card-col:last-child { border-right: 0; }
+.card-col > .state-label { padding: 0 var(--space-4) var(--space-2); }
+.card-col > .banner { min-height: 52px; border-top: 1px solid var(--c-border-subtle); }
+.empty .btn { color: var(--c-text); }
+.card-col .banner .grow { flex: 1; }
+.card-col .empty { padding: var(--space-5) var(--space-4); }
+.card-col .empty strong { color: var(--c-text); }
+.tips { margin: 0; padding-left: var(--space-5); text-align: left; font-size: 0.8125rem; display: grid; gap: var(--space-1); }
+.foot-note { margin: 0; padding: var(--space-3) var(--space-4); font-size: 0.8125rem; color: var(--c-text-muted); border-top: 1px solid var(--c-border-subtle); }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+.btn[aria-busy="true"] { cursor: progress; opacity: 0.7; }
+
+/* Tablet: one pane next to the rail; list-focused shots hide the pane, chat-focused shots hide the list. */
+@media (max-width: 1100px) {
+	.sx { grid-template-columns: var(--rail-w) 340px minmax(0, 1fr); }
+	.trio { grid-template-columns: minmax(0, 1fr); }
+	.card-col { border-right: 0; border-bottom: 1px solid var(--c-border-subtle); min-height: 0; }
+	.card-col:last-child { border-bottom: 0; }
+}
+@media (max-width: 900px) {
+	.sx.focus-list { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+	.sx.focus-list .sx-pane { display: none; }
+	.sx.focus-convo { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+	.sx.focus-convo .sx-col { display: none; }
+	.sx-col { border-right: 0; }
+}
+@media (max-width: 760px) {
+	.sx.focus-list, .sx.focus-convo { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.sx > .rail { display: none; }
+	.sx-col { min-height: 720px; }
+	.sx .convo { min-height: 720px; }
+	.frame.states { grid-template-columns: minmax(0, 1fr); }
+	.state + .state { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	.frame.auto { min-height: 0; }
+	.pop { position: static; width: auto; margin: 0 var(--space-3) var(--space-3); }
+	.cal { grid-template-columns: repeat(7, minmax(40px, 1fr)); }
+	.cal button { width: 100%; }
+	.convo-head.insearch { padding: var(--space-2); }
+	.hide-narrow { display: none; }
+	.to-latest span:not(.badge) { display: none; }
+	.to-latest { padding: 0 var(--space-2); right: var(--space-3); }
+	.card-col { min-height: 0; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.chip, .choice button, .btn-sm { min-height: 44px; }
+	.chip-x { width: 40px; height: 40px; }
+	span.chip.on { padding-right: 2px; }
+	.hit { min-height: 56px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.spinner { animation: none; border-color: var(--c-primary-solid); }
+	.hit.fresh { animation: none; }
+}
+</style>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast, fold, escapeHtml } = window.Mock;
+	const icon = (id, cls = "icon") => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+
+	// Shared rail, so every frame shows search as the current place.
+	const RAIL = `<span class="avatar sm av-violet" title="Đức Thắng">ĐT</span>
+		<a class="icon-btn" href="chat.html" aria-label="Chat">${icon("message")}</a>
+		<a class="icon-btn" href="#global" aria-current="page" aria-label="Tìm kiếm">${icon("search")}</a>
+		<span class="spacer"></span>
+		<a class="icon-btn" href="settings.html" aria-label="Cài đặt">${icon("settings")}</a>`;
+	$$("[data-rail]").forEach((el) => { el.innerHTML = RAIL; });
+
+	// Illustrative corpus. "server" rows are older messages not in the local cache.
+	const CHATS = [
+		{ name: "Góc thiết kế đẹp", sub: "Kênh · 1.204 người đăng ký", av: "amber", ini: "GT" },
+		{ name: "Vận hành hệ thống", sub: "Nhóm · 12 thành viên", av: "blue", ini: "VH" },
+		{ name: "Team Mobile", sub: "Nhóm · 8 thành viên", av: "amber", ini: "TM" },
+		{ name: "Lan Anh", sub: "online 5 phút trước", av: "green", ini: "LA" },
+		{ name: "Quang Huy", sub: "online", av: "cyan", ini: "QH" },
+		{ name: "Deploy Bot", sub: "Bot", av: "violet", ini: "DB" },
+	];
+	const PEOPLE = [
+		{ name: "Thiết Kế Đẹp Studio", user: "thietkedep", av: "red", ini: "TĐ" },
+		{ name: "Minh Anh", user: "minhanh_design", av: "grey", ini: "MA" },
+		{ name: "Hoàng Văn Hạnh", user: "vanhanh", av: "grey", ini: "HH" },
+	];
+	const MSGS = [
+		{ chat: "Lan Anh", av: "green", ini: "LA", when: "09:30", text: "Mình gửi file thiết kế rồi nhé, bản đẹp nhất là bản thứ hai" },
+		{ chat: "Team Mobile", from: "Quang Huy", av: "amber", ini: "TM", when: "Hôm qua", text: "Màn đăng nhập thiết kế mới đẹp hơn hẳn, chốt bản này nhé" },
+		{ chat: "Vận hành hệ thống", from: "Minh", av: "blue", ini: "VH", when: "T2", text: "Dashboard Grafana thiết kế lại đẹp ghê, ai làm vậy" },
+		{ chat: "Vận hành hệ thống", from: "Quang Huy", av: "blue", ini: "VH", when: "09:12", text: "Sáng nay mình sẽ nâng cấp postgres-17 trên box lab" },
+		{ chat: "Vận hành hệ thống", from: "Grafana", av: "blue", ini: "VH", when: "09:42", text: "Grafana: CPU host lab-174 vượt 90%" },
+		{ chat: "Team Mobile", from: "Minh", av: "amber", ini: "TM", when: "Hôm qua", text: "Build iOS lỗi ký số, đang xem chứng chỉ" },
+		{ chat: "Lan Anh", av: "green", ini: "LA", when: "12/09", text: "Gửi Thắng bộ thiết kế icon, đẹp và nhẹ hơn bản cũ", server: true, jump: true },
+		{ chat: "Góc thiết kế đẹp", av: "amber", ini: "GT", when: "03/08", text: "10 mẫu thiết kế landing page đẹp của tháng 8", server: true },
+		{ chat: "Team Mobile", from: "Minh", av: "amber", ini: "TM", when: "21/07", text: "Đôi dép thiết kế lạ quá, ai mua ở đâu vậy", server: true },
+		{ chat: "Vận hành hệ thống", from: "Lan Anh", av: "blue", ini: "VH", when: "02/06", text: "Runbook nâng cấp postgres bản 16 lên 17", server: true },
+	];
+
+	// Every query word must appear (accent- and đ-insensitive). Fold keeps one char per char for NFC Vietnamese.
+	const words = (q) => fold(q).split(/\s+/).filter(Boolean);
+	const matches = (text, ws) => { const f = fold(text); return ws.every((w) => f.includes(w)); };
+	const highlight = (text, ws) => {
+		const f = fold(text);
+		const on = new Array(text.length).fill(false);
+		ws.forEach((w) => { for (let i = f.indexOf(w); i >= 0; i = f.indexOf(w, i + 1)) for (let k = i; k < i + w.length; k++) on[k] = true; });
+		let out = "";
+		for (let i = 0; i < text.length;) {
+			let j = i;
+			while (j < text.length && on[j] === on[i]) j++;
+			const part = escapeHtml(text.slice(i, j));
+			out += on[i] ? `<mark>${part}</mark>` : part;
+			i = j;
+		}
+		return out;
+	};
+	const av = (c, ini, cls = "") => `<span class="avatar ${cls} av-${c}">${ini}</span>`;
+
+	function renderResults(box, q, { withServer, current } = {}) {
+		const ws = words(q);
+		if (!ws.length) { box.innerHTML = ""; return 0; }
+		const chats = CHATS.filter((c) => matches(c.name, ws));
+		const people = PEOPLE.filter((p) => matches(p.name + " " + p.user, ws));
+		const msgs = MSGS.filter((m) => (withServer || !m.server) && matches(m.text, ws));
+		let html = "";
+		if (chats.length) html += `<h3 class="sec-h">Chat</h3><ul class="hits">${chats.map((c) => `<li><a class="hit" href="#jump">${av(c.av, c.ini)}<span class="hit-main"><span class="hit-head"><b>${highlight(c.name, ws)}</b></span><span class="hit-sub">${escapeHtml(c.sub)}</span></span></a></li>`).join("")}</ul>`;
+		if (people.length) html += `<h3 class="sec-h">Người <span>theo username, nếu họ cho phép</span></h3><ul class="hits">${people.map((p) => `<li><a class="hit" href="#jump">${av(p.av, p.ini)}<span class="hit-main"><span class="hit-head"><b>${highlight(p.name, ws)}</b></span><span class="hit-sub">@${highlight(p.user, ws)}</span></span></a></li>`).join("")}</ul>`;
+		if (msgs.length) html += `<h3 class="sec-h">Tin nhắn <span>${msgs.length} tin</span></h3><ul class="hits">${msgs.map((m) => {
+			const cur = current && m.jump ? ' aria-current="true"' : "";
+			const fresh = m.server && withServer && !current ? " fresh" : "";
+			const who = m.from ? `<b>${escapeHtml(m.from)}:</b> ` : "";
+			const tag = m.server ? ' <span class="from-server">từ server</span>' : "";
+			return `<li><a class="hit${fresh}" href="#jump"${cur}>${av(m.av, m.ini, "sm")}<span class="hit-main"><span class="hit-head"><b>${escapeHtml(m.chat)}${tag}</b><span>${m.when}</span></span><span class="hit-text">${who}${highlight(m.text, ws)}</span></span></a></li>`;
+		}).join("")}</ul>`;
+		if (!html) html = `<div class="empty"><svg class="icon"><use href="#i-search"/></svg><strong>Không có kết quả</strong><span>Thử từ khác, hoặc bỏ bớt bộ lọc.</span></div>`;
+		box.innerHTML = html;
+		return msgs.length;
+	}
+
+	// Global search: local results on every key, server merged after a debounce plus latency.
+	const gq = $("#g-q");
+	const gStatus = $("#g-status");
+	const gBox = $("#g-results");
+	let serverTimer;
+	const runGlobal = () => {
+		clearTimeout(serverTimer);
+		const q = gq.value.trim();
+		if (!q) { gBox.innerHTML = ""; gStatus.innerHTML = "Gõ để tìm chat, người và tin nhắn"; return; }
+		renderResults(gBox, q, { withServer: false });
+		gStatus.innerHTML = `<span class="spinner" aria-hidden="true"></span>Kết quả trong máy · đang lấy thêm từ server…`;
+		serverTimer = setTimeout(() => {
+			const n = renderResults(gBox, q, { withServer: true });
+			gStatus.innerHTML = `${icon("check", "icon icon-sm")}Đã gộp kết quả từ server · ${n} tin`;
+		}, 900);
+	};
+	gq.addEventListener("input", runGlobal);
+	gq.addEventListener("keydown", (e) => { if (e.key === "Escape") { gq.value = ""; runGlobal(); } });
+	gBox.addEventListener("click", (e) => { if (e.target.closest(".hit")) toast("Mở chat tại đúng tin (xem khung Nhảy tới tin)"); });
+	runGlobal();
+
+	// Static result lists for the other shots.
+	renderResults($("#j-results"), "dep thiet ke", { withServer: true, current: true });
+	renderResults($("#off-results"), "postgres", { withServer: false });
+	renderResults($("#err-results"), "grafana", { withServer: false });
+
+	// Date range picker: October 2026 starts on a Thursday; weeks start on Monday.
+	const cal = $("#cal");
+	const TODAY = 14;
+	let start = 1, end = 14;
+	const pad = (n) => String(n).padStart(2, "0");
+	const drawCal = () => {
+		let html = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((d) => `<span class="wd" role="columnheader">${d}</span>`).join("");
+		html += '<span></span><span></span><span></span>';
+		for (let d = 1; d <= 31; d++) {
+			const cls = [d === start || d === end ? "edge" : "", end && d > start && d < end ? "in" : "", d === TODAY ? "today" : ""].filter(Boolean).join(" ");
+			const future = d > TODAY ? " disabled" : "";
+			const sel = d === start || d === end || (end && d > start && d < end);
+			html += `<button type="button" class="${cls}" data-day="${d}" aria-label="${d} tháng 10"${sel ? ' aria-selected="true"' : ""}${future}>${d}</button>`;
+		}
+		cal.innerHTML = html;
+		const label = end ? `${pad(start)}/10 – ${pad(end)}/10/2026` : `Từ ${pad(start)}/10/2026, chọn ngày kết thúc`;
+		$("#range-label").textContent = label;
+		$("#date-chip").textContent = end ? `${pad(start)}/10 – ${pad(end)}/10` : "Chọn ngày";
+	};
+	cal.addEventListener("click", (e) => {
+		const b = e.target.closest("button[data-day]");
+		if (!b) return;
+		const d = Number(b.dataset.day);
+		if (!start || end) { start = d; end = 0; } else if (d < start) { start = d; } else { end = d; }
+		$$(".choice.quick button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.range === "custom")));
+		drawCal();
+	});
+	$$(".choice.quick button").forEach((b) => b.addEventListener("click", () => {
+		const r = b.dataset.range;
+		if (r === "today") { start = TODAY; end = TODAY; }
+		if (r === "7") { start = TODAY - 6; end = TODAY; }
+		if (r === "30") { start = 1; end = TODAY; toast("30 ngày qua bắt đầu từ 15/09; lịch đang hiện tháng 10"); }
+		drawCal();
+	}));
+	$("#range-clear").addEventListener("click", () => { start = 0; end = 0; drawCal(); $("#range-label").textContent = "Chưa chọn ngày"; $("#date-chip").textContent = "Ngày"; });
+	drawCal();
+
+	// In-chat search: move between hits; 1 is the newest, the counter shows position of 12.
+	const TOTAL = 12;
+	let cur = 3;
+	const hits = $$("#ic-msgs mark[data-hit]");
+	const visibleMax = hits.length;
+	const showHit = () => {
+		hits.forEach((m) => m.classList.toggle("hit-now", Number(m.dataset.hit) === cur));
+		$("#ic-count").textContent = `${cur}/${TOTAL}`;
+		$("#ic-down").disabled = cur === 1;
+	};
+	const older = () => { if (cur < visibleMax) { cur++; showHit(); } else toast("Đang tải tin cũ hơn để tới kết quả tiếp theo…"); };
+	const newer = () => { if (cur > 1) { cur--; showHit(); } };
+	$("#ic-up").addEventListener("click", older);
+	$("#ic-down").addEventListener("click", newer);
+	$("#ic-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? older() : newer(); } });
+	showHit();
+
+	// Jump: highlight fades on interaction; "Về tin mới nhất" returns to the bottom.
+	$("#j-msgs").addEventListener("click", () => $("#j-found").classList.add("faded"));
+	$("#to-latest").addEventListener("click", () => { $("#j-found").classList.add("faded"); toast("Về cuối chat, 48 tin mới hơn đã đánh dấu đã xem"); });
+})();
+</script>
+</body>
+</html>

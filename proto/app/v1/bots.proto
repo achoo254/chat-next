@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/chats.proto";
+import "app/v1/media.proto";
+import "app/v1/messages.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+//
+// A bot is a user with is_bot; bot_id is that user's id. Bots belong to one
+// tenant and never see secret chats. This service is the client side of the
+// bot platform; bots themselves use the HTTP Bot API.
+
+// Client interactions with bots.
+service BotsService {
+  // Forwards an inline query to the bot and returns its results.
+  rpc InlineQuery(InlineQueryRequest) returns (InlineQueryResponse);
+  // Returns the Mini App URL and signed init data for the container.
+  rpc OpenMiniApp(OpenMiniAppRequest) returns (OpenMiniAppResponse);
+  // Records the user's consent, opens the private chat with the bot and
+  // sends the start message (after the client confirmed a deep link).
+  rpc StartBot(StartBotRequest) returns (StartBotResponse);
+}
+
+enum InlineResultKind {
+  INLINE_RESULT_KIND_UNSPECIFIED = 0;
+  INLINE_RESULT_KIND_ARTICLE = 1;
+  INLINE_RESULT_KIND_PHOTO = 2;
+  INLINE_RESULT_KIND_VIDEO = 3;
+  INLINE_RESULT_KIND_AUDIO = 4;
+  INLINE_RESULT_KIND_VOICE = 5;
+  INLINE_RESULT_KIND_DOCUMENT = 6;
+}
+
+message InlineResult {
+  // Bot-chosen id, unique within the query.
+  string id = 1;
+  InlineResultKind kind = 2;
+  string title = 3;
+  string description = 4;
+  // File-backed results.
+  MediaRef media = 5;
+  // Article preview image from the bot (http/https only).
+  string thumbnail_url = 6;
+}
+
+message InlineQueryRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // Chat the user is typing in.
+  int64 chat_id = 2 [jstype = JS_NUMBER];
+  string query = 3;
+  // next_offset of the previous page; empty for the first page.
+  string offset = 4;
+}
+
+message InlineQueryResponse {
+  // Identifies the server-cached answer when a result is chosen.
+  string query_id = 1;
+  repeated InlineResult results = 2;
+  // Empty when there are no more results.
+  string next_offset = 3;
+  // Show results as a media grid instead of a list.
+  bool gallery = 4;
+  int32 cache_time_seconds = 5;
+}
+
+message OpenMiniAppRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // Chat the Mini App is opened from; 0 when opened from the bot profile.
+  int64 chat_id = 2 [jstype = JS_NUMBER];
+  // Message whose inline button opened it; 0 otherwise.
+  int64 seq = 3 [jstype = JS_NUMBER];
+  // Button URL; empty opens the bot's main Mini App.
+  string url = 4;
+  string start_param = 5;
+  // Client theme colours passed to the Mini App.
+  map<string, string> theme_params = 6;
+}
+
+message OpenMiniAppResponse {
+  // URL on b<bot_id>.<miniapp domain>; the container blocks navigation away
+  // from this origin.
+  string url = 1;
+  // Signed init data (carries tenant_id and auth_date) handed over the bridge.
+  string init_data = 2;
+}
+
+message StartBotRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // Deep-link start parameter; may be empty.
+  string start_param = 2;
+  // Client-generated (< 2^53) dedupe key for the start message.
+  int64 random_id = 3 [jstype = JS_NUMBER];
+}
+
+message StartBotResponse {
+  Chat chat = 1;
+  Message message = 2;
+  repeated User users = 3;
+  SyncAck ack = 4;
+}

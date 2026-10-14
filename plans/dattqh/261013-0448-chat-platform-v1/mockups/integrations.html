@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Webhook tích hợp — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* Author display rules below must not beat the hidden attribute. */
+[hidden] { display: none !important; }
+
+/* ---- Hook management shell: opened from chat info > Tích hợp, admins only ---- */
+.frame > .console, .frame > .panes { height: 100%; }
+.console { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--c-bg); }
+.c-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); min-height: var(--topbar-h); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-1); font-size: 0.875rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumbs b { color: var(--c-text); font-weight: 600; }
+.crumbs .icon { width: 14px; height: 14px; }
+.who-chip { font-size: 0.8125rem; color: var(--c-text-muted); }
+.c-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); display: grid; gap: var(--space-4); align-content: start; }
+.c-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.c-title h3 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.c-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); align-items: start; }
+.card { display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-5); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.card > h4 { margin: 0; font-size: 1rem; font-weight: 600; }
+.card > p, .sub { margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.card .banner, .dlg-body .banner { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); align-items: flex-start; }
+.banner .icon { margin-top: 1px; flex: none; }
+.banner .grow { flex: 1; min-width: 0; }
+.card-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2); padding-top: var(--space-2); }
+.form { display: grid; gap: var(--space-4); }
+a.btn { text-decoration: none; }
+a.btn:not(.btn-primary) { color: var(--c-text); }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+.btn-danger { color: var(--c-error); }
+.btn-danger:hover { border-color: var(--c-error); }
+.setting { display: flex; align-items: flex-start; gap: var(--space-3); }
+.setting > div { flex: 1; min-width: 0; }
+.setting strong { display: block; font-weight: 500; font-size: 0.875rem; }
+.setting small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.dot { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; }
+.dot::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.dot.ok::before { background: var(--c-success); }
+.dot.err::before { background: var(--c-error); }
+.dot.warn::before { background: var(--c-warning); }
+.cell-sub { display: block; font-size: 0.8125rem; color: var(--c-text-muted); font-weight: 400; }
+.secret { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle); }
+.secret code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.snippet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.875rem; font-weight: 500; }
+.illustrative { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0 var(--space-2); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 14%, transparent); color: var(--c-warning-text); }
+.fmt { font-family: var(--font-mono); font-size: 0.8125rem; }
+.hook-cell { display: flex; align-items: center; gap: var(--space-3); }
+.hook-cell strong { font-weight: 600; }
+.actions { display: flex; gap: var(--space-1); justify-content: flex-end; }
+.table-card { padding: 0; overflow: hidden; }
+.table-card table.data td, .table-card table.data th { padding-left: var(--space-4); padding-right: var(--space-4); }
+.table-card table.data tr:last-child td { border-bottom: 0; }
+table.data th.num { text-align: right; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); }
+
+/* Radio cards (format, priority) and avatar presets. */
+.radio-cards { display: grid; gap: var(--space-2); }
+.radio-card { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 2px var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); text-align: left; }
+.radio-card::before { content: ""; grid-row: 1 / 3; width: 16px; height: 16px; margin-top: 2px; border-radius: var(--radius-full); border: 1.5px solid var(--c-border-strong); background: var(--c-surface); }
+.radio-card[aria-checked="true"] { border-color: var(--c-primary); background: var(--c-selected); }
+.radio-card[aria-checked="true"]::before { border: 5px solid var(--c-primary-solid); }
+.radio-card[aria-disabled="true"] { cursor: not-allowed; background: var(--c-surface-subtle); }
+.radio-card b { font-weight: 600; font-size: 0.875rem; }
+.radio-card span { font-size: 0.8125rem; color: var(--c-text-muted); }
+.radio-card .reason { color: var(--c-warning-text); }
+.presets { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.presets [role="radio"] { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-full); border: 2px solid transparent; padding: 0; }
+.presets [role="radio"][aria-checked="true"] { border-color: var(--c-primary); }
+
+/* Setup guides */
+.guide-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--c-border-subtle); overflow-x: auto; }
+.guide-tabs button { border: 0; background: none; min-height: 44px; padding: 0 var(--space-3); white-space: nowrap; font-weight: 500; color: var(--c-text-muted); border-bottom: 2px solid transparent; }
+.guide-tabs button[aria-selected="true"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+.guide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-5); padding-top: var(--space-4); }
+.guide ol { align-content: start; margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-3); font-size: 0.9375rem; }
+.guide ol li::marker { color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.guide code { font-family: var(--font-mono); font-size: 0.8125rem; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+.guide .note { margin: var(--space-3) 0 0; font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* Rotation */
+.secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--c-border-subtle); }
+.secret-row .progress { grid-column: 1 / -1; }
+.countdown { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* Chat panes (disabled hook notice, alert grouping). */
+.panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--c-border-subtle); }
+.pane:last-child { border-right: 0; }
+.pane > .convo, .pane > .console { flex: 1; min-height: 0; }
+.pane-cap { padding: var(--space-2) var(--space-4); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.bubble .keyboard { clear: both; }
+.stamp .upd { font-style: italic; }
+.silent-mark { display: inline-flex; align-items: center; gap: 2px; }
+.int-time { display: block; margin-top: var(--space-1); font-size: 0.75rem; color: var(--c-text-muted); }
+
+/* Dialog content */
+.panel.wide { width: min(680px, 100%); }
+.dlg-body { display: grid; gap: var(--space-3); padding-top: var(--space-4); }
+.dlg-body .field { gap: var(--space-1); }
+.dlg-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); padding: var(--space-3) var(--space-5) var(--space-5); }
+.dlg-foot .setting { flex: 1; min-width: 220px; align-items: center; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+	.frame:has(> .panes), .frame:has(.c-grid) { height: auto; }
+	.frame:has(.c-grid) .c-body { overflow: visible; }
+	.panes { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.pane { border-right: 0; border-bottom: 1px solid var(--c-border-subtle); min-height: 480px; }
+	.pane:last-child { border-bottom: 0; }
+	.c-grid { grid-template-columns: minmax(0, 1fr); }
+	.guide { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+	.who-chip { display: none; }
+	.c-body { padding: var(--space-3); }
+	.card { padding: var(--space-3); }
+	.frame .c-body { overflow: visible; }
+	.convo { min-height: 0; }
+	.pane > .convo { min-height: 440px; }
+	.messages { padding: var(--space-3); }
+	.dlg-head, .dlg-body, .dlg-foot { padding-left: var(--space-4); padding-right: var(--space-4); }
+	/* The one-time URL dialog is long on phones: give its frame room so nothing hides behind a scroll. */
+	.frame:has(.panel.wide) { min-height: 1080px; }
+	.guide-tabs { flex-wrap: wrap; overflow-x: visible; }
+	.dlg-foot .btn { flex: 1 1 auto; }
+	table.stack thead { display: none; }
+	table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; }
+	table.stack tr { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--c-border-subtle); }
+	table.stack tr:last-child { border-bottom: 0; }
+	table.stack td { padding: 0 !important; border: 0; text-align: left !important; }
+	table.stack td[data-label] { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); align-items: baseline; }
+	table.stack td[data-label]::before { content: attr(data-label); font-size: 0.75rem; color: var(--c-text-muted); font-family: var(--font-sans); }
+	table.stack .actions { justify-content: flex-start; padding-top: var(--space-1); }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.icon-btn { width: 44px; height: 44px; }
+	.btn-sm { min-height: 44px; }
+	.switch { width: 60px; height: 44px; border: 10px solid transparent; background-clip: padding-box; }
+}
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+<!-- ===================================================================== -->
+<section class="shot" id="hooks-list">
+	<div class="shot-head">
+		<h2>Webhook của nhóm</h2><span class="phase">Phase 9</span>
+		<p>Mở từ Thông tin chat, mục Tích hợp; chỉ admin thấy màn này và URL. Mỗi webhook gắn với đúng một chat và tổ chức của chat đó. Trạng thái cho biết hook đang chạy, đang xoay secret, hay đã tự tắt vì người tạo mất quyền admin. Công tắc trên cùng là quyền của admin nhóm cho phép webhook gửi tin ưu tiên Cảnh báo.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<header class="c-head">
+				<button type="button" class="icon-btn" aria-label="Về thông tin chat"><svg class="icon"><use href="#i-back"/></svg></button>
+				<span class="crumbs">Vận hành hệ thống <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Webhook</b></span>
+				<span class="who-chip">Bạn là admin nhóm</span>
+			</header>
+			<div class="c-body">
+				<div class="c-title"><h3>Webhook của nhóm</h3><a class="btn btn-primary" href="#create-hook"><svg class="icon"><use href="#i-plus"/></svg>Tạo webhook</a></div>
+				<div class="card">
+					<div class="setting">
+						<div><strong>Cho phép tin ưu tiên Cảnh báo</strong><small>Webhook đặt priority "alert" sẽ đi làn push nhanh nhất. Tắt thì mọi tin webhook là ưu tiên thường.</small></div>
+						<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Cho phép tin ưu tiên Cảnh báo"></button>
+					</div>
+				</div>
+				<div class="card table-card">
+					<table class="data stack">
+						<thead><tr><th>Webhook</th><th>Định dạng</th><th>Tạo bởi</th><th>Nhận gần nhất</th><th>Trạng thái</th><th><span class="sr-only">Thao tác</span></th></tr></thead>
+						<tbody>
+							<tr>
+								<td><div class="hook-cell"><span class="avatar sm av-red"><svg class="icon icon-sm"><use href="#i-webhook"/></svg></span><strong>Grafana prod</strong></div></td>
+								<td data-label="Định dạng"><div class="fmt">Slack-compatible</div></td>
+								<td data-label="Tạo bởi"><div>Quang Huy</div></td>
+								<td data-label="Nhận gần nhất"><div>09:42</div></td>
+								<td data-label="Trạng thái"><div><span class="dot ok">Hoạt động</span></div></td>
+								<td><div class="actions"><a class="btn btn-sm" href="#hook-stats">Quản lý</a></div></td>
+							</tr>
+							<tr>
+								<td><div class="hook-cell"><span class="avatar sm av-amber"><svg class="icon icon-sm"><use href="#i-alert"/></svg></span><strong>Alertmanager prod</strong></div></td>
+								<td data-label="Định dạng"><div class="fmt">Alertmanager</div></td>
+								<td data-label="Tạo bởi"><div>Lan Anh</div></td>
+								<td data-label="Nhận gần nhất"><div>10:05</div></td>
+								<td data-label="Trạng thái"><div><span class="dot warn">Đang xoay secret</span><span class="cell-sub">URL cũ hết hạn sau 6 ngày</span></div></td>
+								<td><div class="actions"><a class="btn btn-sm" href="#rotate">Quản lý</a></div></td>
+							</tr>
+							<tr>
+								<td><div class="hook-cell"><span class="avatar sm av-grey"><svg class="icon icon-sm"><use href="#i-code"/></svg></span><strong>GitLab ops/deploy</strong></div></td>
+								<td data-label="Định dạng"><div class="fmt">Slack-compatible</div></td>
+								<td data-label="Tạo bởi"><div>Minh</div></td>
+								<td data-label="Nhận gần nhất"><div>Hôm qua 16:12</div></td>
+								<td data-label="Trạng thái"><div><span class="dot err">Đã tự tắt</span><span class="cell-sub">Người tạo không còn là admin</span></div></td>
+								<td><div class="actions"><a class="btn btn-sm" href="#hook-disabled">Quản lý</a></div></td>
+							</tr>
+							<tr>
+								<td><div class="hook-cell"><span class="avatar sm av-blue"><svg class="icon icon-sm"><use href="#i-refresh"/></svg></span><strong>Jenkins build</strong></div></td>
+								<td data-label="Định dạng"><div class="fmt">Native JSON</div></td>
+								<td data-label="Tạo bởi"><div>Bạn</div></td>
+								<td data-label="Nhận gần nhất"><div>10:07</div></td>
+								<td data-label="Trạng thái"><div><span class="dot ok">Hoạt động</span><span class="cell-sub">Gửi im lặng</span></div></td>
+								<td><div class="actions"><a class="btn btn-sm" href="#hook-stats">Quản lý</a></div></td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<p class="sub">Thành viên thường thấy tin tích hợp trong chat, không thấy danh sách này. Discord-compatible và Zabbix có ở bản sau.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="create-hook">
+	<div class="shot-head">
+		<h2>Tạo webhook</h2><span class="phase">Phase 9</span>
+		<p>Tên và ảnh là thứ người trong nhóm thấy ở nhãn "Tích hợp: &lt;tên&gt;"; webhook không giả được tên người dùng. Định dạng quyết định đuôi URL. Ưu tiên Cảnh báo chỉ chọn được khi admin nhóm đã cho phép (ở đây chưa, nên ô bị khoá kèm lý do). Gửi im lặng: tin vẫn vào chat nhưng không phát thông báo.</p>
+	</div>
+	<div class="frame auto">
+		<div class="console">
+			<header class="c-head">
+				<a class="icon-btn" href="#hooks-list" aria-label="Về danh sách webhook"><svg class="icon"><use href="#i-back"/></svg></a>
+				<span class="crumbs">Vận hành hệ thống <svg class="icon"><use href="#i-chevron-right"/></svg> Webhook <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Tạo mới</b></span>
+			</header>
+			<div class="c-body">
+				<div class="c-grid">
+					<form class="card form" onsubmit="return false">
+						<div class="field">
+							<label for="hk-name">Tên</label>
+							<input class="input" id="hk-name" value="Grafana prod" autocomplete="off">
+						</div>
+						<div class="field">
+							<span class="label" id="hk-av-label">Ảnh</span>
+							<div class="presets" role="radiogroup" aria-labelledby="hk-av-label">
+								<button type="button" role="radio" aria-checked="true" class="avatar av-red" aria-label="Biểu tượng webhook"><svg class="icon"><use href="#i-webhook"/></svg></button>
+								<button type="button" role="radio" aria-checked="false" class="avatar av-amber" aria-label="Biểu tượng cảnh báo"><svg class="icon"><use href="#i-alert"/></svg></button>
+								<button type="button" role="radio" aria-checked="false" class="avatar av-blue" aria-label="Biểu tượng biểu đồ"><svg class="icon"><use href="#i-chart"/></svg></button>
+								<button type="button" role="radio" aria-checked="false" class="avatar av-grey" aria-label="Biểu tượng mã"><svg class="icon"><use href="#i-code"/></svg></button>
+								<button type="button" class="btn btn-sm" data-toast="Chọn ảnh từ máy"><svg class="icon icon-sm"><use href="#i-photo"/></svg>Tải ảnh lên</button>
+							</div>
+						</div>
+						<div class="field">
+							<span class="label" id="hk-fmt-label">Định dạng</span>
+							<div class="radio-cards" role="radiogroup" aria-labelledby="hk-fmt-label">
+								<button type="button" class="radio-card" role="radio" aria-checked="false"><b>Native JSON</b><span><code class="mono">text</code>, nút, <code class="mono">group_key</code>, <code class="mono">idempotency_key</code>. Cho script và Jenkins.</span></button>
+								<button type="button" class="radio-card" role="radio" aria-checked="true"><b>Slack-compatible · /slack</b><span>Grafana, GitLab qua Mattermost, Uptime Kuma. Hiểu mrkdwn.</span></button>
+								<button type="button" class="radio-card" role="radio" aria-checked="false"><b>Alertmanager · /alertmanager</b><span>Cảnh báo cùng groupKey cập nhật tại chỗ, firing sang resolved.</span></button>
+							</div>
+						</div>
+						<div class="field">
+							<span class="label" id="hk-pri-label">Ưu tiên</span>
+							<div class="radio-cards" role="radiogroup" aria-labelledby="hk-pri-label">
+								<button type="button" class="radio-card" role="radio" aria-checked="true"><b>Thường</b><span>Mặc định cho webhook.</span></button>
+								<button type="button" class="radio-card" role="radio" aria-checked="false" aria-disabled="true"><b>Cảnh báo</b><span class="reason">Admin nhóm chưa cho phép tin Cảnh báo. Bật ở Webhook của nhóm.</span></button>
+							</div>
+						</div>
+						<div class="setting">
+							<div><strong>Gửi im lặng</strong><small>Tin vào chat, không rung, không push có âm thanh.</small></div>
+							<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Gửi im lặng"></button>
+						</div>
+						<div class="card-foot">
+							<a class="btn" href="#hooks-list">Huỷ</a>
+							<a class="btn btn-primary" href="#hook-created">Tạo webhook</a>
+						</div>
+					</form>
+					<div class="card">
+						<h4>Tin sẽ trông như thế này</h4>
+						<div class="msg">
+							<span class="avatar sm av-red"><svg class="icon icon-sm"><use href="#i-webhook"/></svg></span>
+							<div class="bubble integration" style="min-width: 0">
+								<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: <span id="hk-preview-name">Grafana prod</span></span>
+								<div class="int-title"><span class="sev firing">Firing</span>CPU cao trên lab-174</div>
+								<p class="via">Gửi qua incoming webhook.<span class="stamp">09:42</span></p>
+							</div>
+						</div>
+						<p>Ai có URL đều gửi được tin vào nhóm, nên URL chỉ hiện một lần sau khi tạo.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="hook-created">
+	<div class="shot-head">
+		<h2>URL hiện một lần</h2><span class="phase">Phase 9</span>
+		<p>Server chỉ giữ hash của secret, nên URL đầy đủ hiện đúng lần này. Có nút sao chép URL và một lệnh curl để thử ngay; phản hồi là <code class="mono">{chat_id, seq}</code>. Nút Xong chỉ bật sau khi xác nhận đã lưu (thử bật công tắc).</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<header class="c-head">
+				<button type="button" class="icon-btn" aria-label="Về thông tin chat"><svg class="icon"><use href="#i-back"/></svg></button>
+				<span class="crumbs">Vận hành hệ thống <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Webhook</b></span>
+			</header>
+			<div class="c-body"><div class="c-title"><h3>Webhook của nhóm</h3></div></div>
+		</div>
+		<div class="static-dialog">
+			<div class="panel wide" role="group" aria-labelledby="created-title">
+				<div class="dlg-head"><svg class="icon" style="color: var(--c-success)"><use href="#i-check"/></svg><h2 id="created-title">Đã tạo webhook Grafana prod</h2></div>
+				<div class="dlg-body">
+					<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span class="grow">URL chỉ hiện một lần. Lưu ngay vào nơi an toàn; ai có URL đều gửi được tin vào nhóm Vận hành hệ thống.</span></div>
+					<div class="field">
+						<span class="label">URL webhook (Slack-compatible)</span>
+						<div class="secret"><code>https://hook.chat.hoandat.com/hook/hk_7Qm2xR/Zt4pW9cLs3vN0eYb8KdQ/slack</code><button type="button" class="btn btn-sm" data-toast="Đã sao chép URL"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
+					</div>
+					<div class="field">
+						<div class="snippet-head"><span>Thử ngay</span><button type="button" class="btn btn-sm" data-toast="Đã sao chép lệnh"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
+						<pre class="snippet">curl -X POST 'https://hook.chat.hoandat.com/hook/hk_7Qm2xR/Zt4pW9cLs3vN0eYb8KdQ/slack' \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Xin chào từ *Grafana prod*"}'</pre>
+						<span class="hint">Phản hồi: <code class="mono">ok</code> với định dạng Slack; <code class="mono">{"chat_id": "…", "seq": 1842}</code> với Native JSON.</span>
+					</div>
+				</div>
+				<div class="dlg-foot">
+					<div class="setting"><div><strong>Tôi đã lưu URL</strong></div><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Tôi đã lưu URL" id="saved-switch"></button></div>
+					<button type="button" class="btn btn-primary" id="created-done" disabled data-toast="URL đã được che, chỉ còn tên và trạng thái">Xong</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="setup-guides">
+	<div class="shot-head">
+		<h2>Hướng dẫn công cụ</h2><span class="phase">Phase 9</span>
+		<p>Mỗi công cụ 2–4 bước và một đoạn cấu hình, không cần plugin riêng. GitLab đi qua tích hợp Mattermost tới endpoint Slack-compatible (GitLab chặn URL Discord, còn tích hợp Slack mới cần app). <code class="mono">{URL}</code> là URL bạn đã lưu khi tạo webhook, không gồm đuôi định dạng.</p>
+	</div>
+	<div class="frame auto">
+		<div class="console">
+			<header class="c-head">
+				<a class="icon-btn" href="#hooks-list" aria-label="Về danh sách webhook"><svg class="icon"><use href="#i-back"/></svg></a>
+				<span class="crumbs">Webhook <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Hướng dẫn kết nối</b></span>
+			</header>
+			<div class="c-body">
+				<div class="card">
+					<div class="guide-tabs" role="tablist" aria-label="Công cụ">
+						<button type="button" role="tab" aria-selected="true" aria-controls="g-grafana" id="t-grafana">Grafana</button>
+						<button type="button" role="tab" aria-selected="false" aria-controls="g-am" id="t-am">Alertmanager</button>
+						<button type="button" role="tab" aria-selected="false" aria-controls="g-gitlab" id="t-gitlab">GitLab</button>
+						<button type="button" role="tab" aria-selected="false" aria-controls="g-kuma" id="t-kuma">Uptime Kuma</button>
+						<button type="button" role="tab" aria-selected="false" aria-controls="g-jenkins" id="t-jenkins">Jenkins</button>
+					</div>
+					<div class="guide" role="tabpanel" id="g-grafana" aria-labelledby="t-grafana">
+						<ol>
+							<li>Tạo webhook định dạng <b>Slack-compatible</b>.</li>
+							<li>Grafana: <b>Alerting → Contact points → Add contact point</b>, chọn Integration <b>Slack</b>.</li>
+							<li>Dán <code>{URL}/slack</code> vào Webhook URL, bấm <b>Test</b>: tin "Tích hợp: Grafana prod" hiện trong nhóm.</li>
+						</ol>
+						<div>
+							<pre class="snippet"># provisioning/alerting/contact-points.yaml
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: chat-van-hanh
+    receivers:
+      - uid: chat-van-hanh
+        type: slack
+        settings:
+          url: "{URL}/slack"</pre>
+						</div>
+					</div>
+					<div class="guide" role="tabpanel" id="g-am" aria-labelledby="t-am" hidden>
+						<ol>
+							<li>Tạo webhook định dạng <b>Alertmanager</b>.</li>
+							<li>Thêm receiver <code>webhook_configs</code> trỏ tới <code>{URL}/alertmanager</code>, bật <code>send_resolved</code>.</li>
+							<li>Reload Alertmanager. Cảnh báo cùng groupKey sửa tại chỗ một tin, không tạo tin mới.</li>
+						</ol>
+						<div>
+							<pre class="snippet"># alertmanager.yml
+route:
+  receiver: chat-van-hanh
+receivers:
+  - name: chat-van-hanh
+    webhook_configs:
+      - url: "{URL}/alertmanager"
+        send_resolved: true</pre>
+						</div>
+					</div>
+					<div class="guide" role="tabpanel" id="g-gitlab" aria-labelledby="t-gitlab" hidden>
+						<ol>
+							<li>Tạo webhook định dạng <b>Slack-compatible</b>.</li>
+							<li>GitLab: <b>Settings → Integrations → Mattermost notifications</b>.</li>
+							<li>Dán <code>{URL}/slack</code> vào Webhook, chọn sự kiện (pipeline, merge request, deployment).</li>
+							<li>Bấm <b>Test settings</b> rồi <b>Save changes</b>.</li>
+						</ol>
+						<div>
+							<pre class="snippet">Integration: Mattermost notifications
+Webhook:     {URL}/slack
+Username:    (để trống, tên lấy từ webhook)
+Triggers:    Pipeline, Merge request, Deployment
+Branches:    Default branch</pre>
+							<p class="note">Dùng Mattermost vì GitLab chặn URL Discord, còn tích hợp Slack mới bắt buộc cài app.</p>
+						</div>
+					</div>
+					<div class="guide" role="tabpanel" id="g-kuma" aria-labelledby="t-kuma" hidden>
+						<ol>
+							<li>Tạo webhook định dạng <b>Slack-compatible</b>.</li>
+							<li>Uptime Kuma: <b>Settings → Notifications → Setup Notification</b>, Notification Type <b>Slack</b>.</li>
+							<li>Dán <code>{URL}/slack</code> vào Webhook URL, gắn thông báo cho các monitor cần theo dõi.</li>
+						</ol>
+						<div>
+							<pre class="snippet">Notification Type: Slack
+Friendly Name:     Chat Vận hành
+Webhook URL:       {URL}/slack
+Default enabled:   bật</pre>
+						</div>
+					</div>
+					<div class="guide" role="tabpanel" id="g-jenkins" aria-labelledby="t-jenkins" hidden>
+						<ol>
+							<li>Tạo webhook định dạng <b>Native JSON</b>, có thể bật Gửi im lặng cho build thành công.</li>
+							<li>Lưu URL vào Jenkins Credentials (Secret text) với id <code>chat-hook-url</code>.</li>
+							<li>Thêm bước <code>post</code> gọi curl; <code>idempotency_key</code> chống gửi trùng khi Jenkins thử lại.</li>
+						</ol>
+						<div>
+							<pre class="snippet">post {
+  failure {
+    withCredentials([string(credentialsId: 'chat-hook-url', variable: 'HOOK')]) {
+      sh '''curl -fsS -X POST "$HOOK" -H 'Content-Type: application/json' \
+        -d "{\"text\": \"$JOB_NAME #$BUILD_NUMBER lỗi\", \"idempotency_key\": \"$BUILD_TAG\"}"'''
+    }
+  }
+}</pre>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="rotate">
+	<div class="shot-head">
+		<h2>Xoay secret</h2><span class="phase">Phase 9</span>
+		<p>Xoay secret tạo URL mới, hiện một lần. URL cũ vẫn chạy trong thời gian ân hạn để kịp đổi cấu hình ở Alertmanager; đồng hồ đếm ngược tới lúc URL cũ hết hiệu lực (7 ngày). Nếu URL cũ đã lộ thì thu hồi ngay, không chờ.</p>
+	</div>
+	<div class="frame auto">
+		<div class="console">
+			<header class="c-head">
+				<a class="icon-btn" href="#hooks-list" aria-label="Về danh sách webhook"><svg class="icon"><use href="#i-back"/></svg></a>
+				<span class="crumbs">Webhook <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Alertmanager prod</b></span>
+			</header>
+			<div class="c-body">
+				<div class="c-grid">
+					<div class="card">
+						<h4>URL mới</h4>
+						<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span class="grow">Chỉ hiện một lần. Cập nhật vào Alertmanager trước khi URL cũ hết hạn.</span></div>
+						<div class="secret"><code>https://hook.chat.hoandat.com/hook/hk_3Lp8sA/Rb7nX2fQm9TzC4wE6jHu/alertmanager</code><button type="button" class="btn btn-sm" data-toast="Đã sao chép URL mới"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
+						<div>
+							<div class="secret-row">
+								<span><span class="dot ok">Secret mới</span><span class="cell-sub">Tạo hôm nay 10:12 bởi Lan Anh</span></span>
+								<span class="sub">Đang nhận</span>
+							</div>
+							<div class="secret-row" id="old-secret">
+								<span><span class="dot warn">Secret cũ</span><span class="cell-sub">Vẫn nhận trong thời gian ân hạn</span></span>
+								<span>Hết hạn sau <span class="countdown" id="countdown">6 ngày 23:47:58</span></span>
+								<div class="progress" role="progressbar" aria-label="Thời gian ân hạn đã qua" aria-valuemin="0" aria-valuemax="100" aria-valuenow="1"><span id="grace-bar" style="width: 1%"></span></div>
+							</div>
+						</div>
+						<div class="card-foot"><button type="button" class="btn btn-danger" id="revoke-old">Thu hồi secret cũ ngay</button></div>
+					</div>
+					<div class="card">
+						<h4>Trong thời gian ân hạn</h4>
+						<p>Request tới URL cũ hoặc URL mới đều vào nhóm. Hết hạn hoặc thu hồi, URL cũ bị từ chối như một URL không tồn tại.</p>
+						<p>Secret không xuất hiện trong log: đường dẫn hook được che ở edge và ở logger.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="hook-stats">
+	<div class="shot-head">
+		<h2>Số liệu</h2><span class="phase">Phase 9</span>
+		<p>Bốn bộ đếm tổng hợp theo hook trong 24 giờ: đã nhận, đã đẩy realtime tới ít nhất một phiên, dịch vụ push đã nhận, lỗi. Không có trạng thái giao tới từng người nhận, theo thiết kế (không ghi dòng cho mỗi người, không callback). Mọi con số là minh hoạ.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<header class="c-head">
+				<a class="icon-btn" href="#hooks-list" aria-label="Về danh sách webhook"><svg class="icon"><use href="#i-back"/></svg></a>
+				<span class="crumbs">Webhook <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Grafana prod</b></span>
+			</header>
+			<div class="c-body">
+				<div class="c-title"><h3>24 giờ qua <span class="illustrative">Minh hoạ</span></h3></div>
+				<div class="tiles">
+					<div class="stat"><span>Đã nhận</span><b>1.284</b><span>Request được chấp nhận</span></div>
+					<div class="stat"><span>Đã giao realtime</span><b>1.201</b><span>Tới ít nhất một phiên online</span></div>
+					<div class="stat"><span>Push được nhận</span><b>312</b><span>FCM, APNs, Web Push nhận</span></div>
+					<div class="stat"><span>Lỗi</span><b>7</b><span>Không tạo được tin</span></div>
+				</div>
+				<div class="card">
+					<div class="banner info"><svg class="icon icon-sm"><use href="#i-info"/></svg><span class="grow">Không theo dõi việc giao tới từng thành viên: chỉ có bộ đếm tổng. Muốn biết ai đã đọc, xem "Ai đã đọc" trên tin (nhóm nhỏ).</span></div>
+				</div>
+				<div class="card table-card">
+					<table class="data stack">
+						<thead><tr><th>Lý do lỗi</th><th class="num">Số lần</th><th>Gần nhất</th></tr></thead>
+						<tbody>
+							<tr><td data-label="Lý do"><div>Vượt rate limit</div></td><td data-label="Số lần" class="num"><div>3</div></td><td data-label="Gần nhất"><div>09:44</div></td></tr>
+							<tr><td data-label="Lý do"><div>Payload lớn hơn 64 KB</div></td><td data-label="Số lần" class="num"><div>2</div></td><td data-label="Gần nhất"><div>08:15</div></td></tr>
+							<tr><td data-label="Lý do"><div>Link dùng scheme không cho phép</div></td><td data-label="Số lần" class="num"><div>1</div></td><td data-label="Gần nhất"><div>Hôm qua 22:03</div></td></tr>
+							<tr><td data-label="Lý do"><div>JSON sai định dạng</div></td><td data-label="Số lần" class="num"><div>1</div></td><td data-label="Gần nhất"><div>Hôm qua 17:40</div></td></tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="hook-disabled">
+	<div class="shot-head">
+		<h2>Webhook tự tắt</h2><span class="phase">Phase 9</span>
+		<p>Người tạo hook bị gỡ admin hoặc rời nhóm thì hook ngừng nhận trong vài giây. Trái: admin khác thấy lý do và nhận lại hook về mình (mặc định giữ nguyên URL để công cụ giám sát chạy tiếp; muốn chặn người cũ thì bật xoay secret). Phải: trong chat có tin hệ thống để cả nhóm biết vì sao cảnh báo ngừng về.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">Quản lý webhook</div>
+				<div class="console">
+					<header class="c-head">
+						<a class="icon-btn" href="#hooks-list" aria-label="Về danh sách webhook"><svg class="icon"><use href="#i-back"/></svg></a>
+						<span class="crumbs">Webhook <svg class="icon"><use href="#i-chevron-right"/></svg> <b>GitLab ops/deploy</b></span>
+					</header>
+					<div class="banner error"><svg class="icon icon-sm"><use href="#i-ban"/></svg><span class="grow">Webhook đã tự tắt vì Minh không còn là admin nhóm (hôm qua 16:20). Request tới URL này đang bị từ chối.</span></div>
+					<div class="c-body">
+						<div class="card">
+							<h4>Nhận lại webhook</h4>
+							<p>Bạn thành người tạo mới; hook chạy lại ngay với định dạng và cài đặt cũ.</p>
+							<div class="setting">
+								<div><strong>Xoay secret khi nhận lại</strong><small>Mặc định tắt để cảnh báo không gián đoạn. Bật nếu không muốn Minh dùng URL cũ nữa; URL mới hiện một lần.</small></div>
+								<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Xoay secret khi nhận lại"></button>
+							</div>
+							<div class="card-foot">
+								<button type="button" class="btn btn-danger" data-toast="Đã xoá webhook">Xoá webhook</button>
+								<button type="button" class="btn btn-primary" data-press="Đã nhận lại webhook, URL giữ nguyên">Nhận lại webhook</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">Trong chat</div>
+				<section class="convo" aria-label="Vận hành hệ thống">
+					<header class="convo-head"><span class="avatar av-blue">VH</span><div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên</span></div></header>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-grey"><svg class="icon icon-sm"><use href="#i-code"/></svg></span>
+							<div class="bubble integration resolved">
+								<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: GitLab ops/deploy</span>
+								<div class="int-title">Pipeline #5121 thành công trên main</div>
+								<span class="stamp">16:12</span>
+							</div>
+						</div>
+						<span class="system">Quang Huy đã gỡ quyền admin của Minh</span>
+						<span class="system">Webhook GitLab ops/deploy đã tắt: người tạo không còn là admin</span>
+					</div>
+				</section>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="alert-grouping">
+	<div class="shot-head">
+		<h2>Cảnh báo cập nhật tại chỗ</h2><span class="phase">Phase 9</span>
+		<p>Cùng <code class="mono">group_key</code> (groupKey của Alertmanager) thì sửa đúng tin cũ, giữ nguyên vị trí, không tạo tin mới. Firing lặp lại chỉ sửa, không push lại; chuyển sang resolved là đổi trạng thái nên có một thông báo. Thứ tự theo thời điểm ở nguồn, nên resolved đến trước firing vẫn kết thúc là resolved. Tin Jenkins gửi im lặng có dấu chuông gạch, không phát thông báo.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">09:42 · firing</div>
+				<section class="convo" aria-label="Vận hành hệ thống lúc 09:42">
+					<header class="convo-head"><span class="avatar av-blue">VH</span><div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên</span></div></header>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-amber"><svg class="icon icon-sm"><use href="#i-alert"/></svg></span>
+							<div class="bubble integration">
+								<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Alertmanager prod</span>
+								<div class="int-title"><span class="sev firing">Firing</span>DiskFull trên db-02</div>
+								<div class="int-body mono">mountpoint: /var/lib/postgresql
+used: 94% (ngưỡng 90%)</div>
+								<div class="keyboard">
+									<button type="button" data-press="Đã nhận xử lý cảnh báo">Nhận xử lý</button>
+									<button type="button" data-press="Đã tắt tiếng 1 giờ">Tắt tiếng 1 giờ</button>
+								</div>
+								<span class="stamp">09:42</span>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">10:05 · cùng tin, đã resolved</div>
+				<section class="convo" aria-label="Vận hành hệ thống lúc 10:07">
+					<header class="convo-head"><span class="avatar av-blue">VH</span><div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên</span></div></header>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-amber"><svg class="icon icon-sm"><use href="#i-alert"/></svg></span>
+							<div class="bubble integration resolved">
+								<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Alertmanager prod</span>
+								<div class="int-title"><span class="sev ok">Resolved</span>DiskFull trên db-02</div>
+								<div class="int-body mono">mountpoint: /var/lib/postgresql
+used: 71% · firing 09:42 → resolved 10:05</div>
+								<span class="stamp"><span class="upd">đã cập nhật</span> 10:05</span>
+							</div>
+						</div>
+						<div class="msg">
+							<span class="avatar sm av-green">LA</span>
+							<div class="bubble"><span class="who">Lan Anh</span><p>Đã dọn WAL cũ, đĩa về 71%.<span class="stamp">10:06</span></p></div>
+						</div>
+						<div class="msg">
+							<span class="avatar sm av-blue"><svg class="icon icon-sm"><use href="#i-refresh"/></svg></span>
+							<div class="bubble integration resolved">
+								<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Jenkins build</span>
+								<div class="int-title">Build chat-server #318 thành công</div>
+								<span class="stamp"><span class="silent-mark" title="Gửi im lặng, không thông báo"><svg class="icon icon-sm"><use href="#i-bell-off"/></svg><span class="sr-only">Gửi im lặng</span></span> 10:07</span>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast } = window.Mock;
+
+	// Radio groups built from buttons; disabled options explain instead of selecting.
+	$$('[role="radiogroup"]').forEach((group) => group.addEventListener("click", (e) => {
+		const opt = e.target instanceof Element ? e.target.closest('[role="radio"]') : null;
+		if (!opt) return;
+		if (opt.getAttribute("aria-disabled") === "true") { toast("Cần admin nhóm cho phép tin Cảnh báo trước"); return; }
+		$$('[role="radio"]', group).forEach((r) => r.setAttribute("aria-checked", String(r === opt)));
+	}));
+	$("#hk-name").addEventListener("input", (e) => { $("#hk-preview-name").textContent = e.target.value.trim() || "…"; });
+
+	// URL shown once: "Done" unlocks only after confirming it was saved.
+	const saved = $("#saved-switch");
+	saved.addEventListener("click", () => {
+		// mock.js flips aria-checked on the same click; read it after that runs.
+		setTimeout(() => { $("#created-done").disabled = saved.getAttribute("aria-checked") !== "true"; });
+	});
+
+	// Grace period countdown for the old secret.
+	const GRACE = 7 * 24 * 3600;
+	let left = 6 * 24 * 3600 + 23 * 3600 + 47 * 60 + 58;
+	const pad = (n) => String(n).padStart(2, "0");
+	const tick = () => {
+		const days = Math.floor(left / 86400);
+		$("#countdown").textContent = `${days} ngày ${pad(Math.floor(left / 3600) % 24)}:${pad(Math.floor(left / 60) % 60)}:${pad(left % 60)}`;
+		const pct = Math.round(((GRACE - left) / GRACE) * 100);
+		$("#grace-bar").style.width = `${Math.max(pct, 1)}%`;
+		$("#old-secret .progress").setAttribute("aria-valuenow", String(pct));
+	};
+	let timer = setInterval(() => { left = Math.max(0, left - 1); tick(); }, 1000);
+	$("#revoke-old").addEventListener("click", (e) => {
+		clearInterval(timer);
+		const row = $("#old-secret");
+		row.innerHTML = '<span><span class="dot err">Secret cũ</span><span class="cell-sub">Đã thu hồi lúc vừa xong</span></span><span class="sub">Bị từ chối</span>';
+		e.currentTarget.disabled = true;
+		toast("Đã thu hồi secret cũ, chỉ URL mới còn hiệu lực");
+	});
+})();
+</script>
+</body>
+</html>

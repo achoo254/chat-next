@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* Phones sit straight in the shot; on narrow screens they take the full shot width. */
+.shot .phones { padding: var(--space-2) 0; }
+.shot .phone { position: relative; width: min(var(--phone-w), calc(100vw - 2 * var(--space-3))); }
+.phone-wrap { margin: 0; max-width: 100%; }
+.phone-wrap figcaption { max-width: var(--phone-w); text-align: center; }
+.m-title { flex: 1; min-width: 0; }
+.m-title h2, .m-title strong { display: block; margin: 0; font-size: 1.25rem; font-weight: 600; }
+.m-title strong { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-title span { display: flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+.m-head { min-height: 56px; }
+.m-head .icon-btn, .phone .composer .icon-btn { width: 44px; height: 44px; }
+.m-body { flex: 1; min-height: 0; overflow-y: auto; }
+.home-bar { align-self: center; width: 120px; height: 4px; margin: var(--space-2) 0; border-radius: var(--radius-full); background: var(--c-text); opacity: 0.35; flex: none; }
+.phone .empty { flex: 1; align-content: center; }
+.phone .empty .btn { margin-top: var(--space-2); }
+
+/* In-place alert update: the same message, edited by the webhook. */
+.edited { font-style: italic; }
+
+/* Mobile welcome and domain entry. */
+.m-welcome { flex: 1; display: flex; flex-direction: column; padding: var(--space-6) var(--space-5) var(--space-3); }
+.m-welcome .spacer { flex: 1; }
+.m-welcome h1 { margin: var(--space-4) 0 var(--space-2); font-size: 1.5rem; font-weight: 600; }
+.m-welcome p { margin: 0; color: var(--c-text-muted); }
+.m-welcome .welcome-actions .btn { width: 100%; }
+.text-btn { min-height: 44px; border: 0; background: none; color: var(--c-primary); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.m-foot { display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; color: var(--c-text-muted); }
+.m-form { flex: 1; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
+.m-form p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
+.m-form .input { width: 100%; font-family: var(--font-mono); font-size: 0.9375rem; }
+.m-form .spacer { flex: 1; }
+.m-form .btn { width: 100%; }
+.org { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+.org .tenant-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.875rem; }
+.org .grow { flex: 1; min-width: 0; }
+.org b { display: block; font-weight: 600; }
+.org .mono { color: var(--c-text-muted); }
+.org .ok-icon { color: var(--c-success); }
+
+/* Bottom and full sheets drawn over a dimmed screen. */
+.scrim { position: absolute; inset: 0; background: var(--c-backdrop); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--c-surface); box-shadow: var(--shadow-lg); overflow: hidden; }
+/* Tall sheets leave the status bar and screen header visible, dimmed. */
+.sheet.tall { top: calc(var(--space-8) + var(--space-5)); }
+.grabber { align-self: center; width: 36px; height: 4px; margin: var(--space-2) 0 var(--space-1); border-radius: var(--radius-full); background: var(--c-border); flex: none; }
+.sheet-bar { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
+.sheet-bar .grow { flex: 1; min-width: 0; text-align: center; }
+.sheet-bar b { display: block; font-weight: 600; }
+.origin { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }
+.origin .icon { width: 12px; height: 12px; color: var(--c-success); }
+.sheet-bar .text-btn { padding: 0 var(--space-2); text-decoration: none; }
+
+/* System browser: the IdP page is illustrative, it is not our UI. */
+.idp-page { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-6) var(--space-5); text-align: center; background: var(--c-surface-subtle); }
+.idp-page .tenant-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-md); font-weight: 600; }
+.idp-page h3 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.idp-page p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
+.idp-page .btn { width: 100%; }
+.idp-note { margin-top: auto; font-size: 0.75rem; color: var(--c-text-muted); }
+
+/* Lock screen. */
+.lock { background: linear-gradient(170deg, color-mix(in srgb, var(--c-viz-violet) 16%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-cyan) 14%, var(--c-surface-subtle))); }
+.lock-clock { display: grid; justify-items: center; gap: var(--space-1); padding: var(--space-5) 0 var(--space-6); }
+.lock-clock .icon { color: var(--c-text-muted); }
+.lock-clock time { font-size: 4rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lock-clock span { font-weight: 500; }
+.notifs { display: grid; gap: var(--space-4); padding: 0 var(--space-3); }
+.notif { position: relative; display: grid; gap: 2px; padding: var(--space-3); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--c-surface) 92%, transparent); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-sm); font-size: 0.875rem; }
+/* Grouped by chat: the cards under it peek out below. */
+.notif.stacked { margin-bottom: var(--space-2); }
+.notif.stacked::after { content: ""; position: absolute; left: var(--space-3); right: var(--space-3); bottom: calc(-1 * var(--space-2)); height: var(--space-4); z-index: -1; border-radius: 0 0 var(--radius-md) var(--radius-md); background: color-mix(in srgb, var(--c-surface) 70%, transparent); border: 1px solid var(--c-border-subtle); }
+.notifs { isolation: isolate; }
+.n-head { display: flex; align-items: center; gap: var(--space-2); font-size: 0.75rem; color: var(--c-text-muted); }
+.n-head .app-ico { display: grid; place-items: center; width: 20px; height: 20px; border-radius: var(--radius-xs); background: var(--c-primary-solid); color: var(--c-on-primary); }
+.n-head .app-ico .icon { width: 14px; height: 14px; }
+.n-head .n-time { margin-left: auto; }
+.notif b { font-weight: 600; }
+.notif p { margin: 0; }
+.n-more { font-size: 0.75rem; color: var(--c-text-muted); }
+.lock-foot { margin-top: auto; display: flex; justify-content: space-between; padding: 0 var(--space-6); }
+.lock-foot span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-surface) 70%, transparent); color: var(--c-text); }
+
+/* Mini App content: rendered by the bot's own page inside the in-app browser. */
+.mini-body { flex: 1; overflow-y: auto; padding: var(--space-4); display: grid; align-content: start; gap: var(--space-3); }
+.mini-body h3 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.mini-body p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
+.env { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-2); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); }
+.env b { font-weight: 600; }
+.env .mono { color: var(--c-text-muted); }
+.env .state { grid-row: span 2; align-self: center; font-size: 0.75rem; font-weight: 600; padding: 0 var(--space-2); border-radius: var(--radius-full); }
+.env .state.ok { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
+.env .state.old { background: color-mix(in srgb, var(--c-text) 8%, transparent); color: var(--c-text-muted); }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); font-size: 0.875rem; }
+.checks li { display: flex; gap: var(--space-2); align-items: center; }
+.checks .icon { color: var(--c-success); }
+.mini-main { padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.mini-main .btn { width: 100%; }
+
+/* Attach sheet. */
+.thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 0 var(--space-3); }
+.thumb { position: relative; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-text) 8%, var(--c-surface)); color: var(--c-icon-muted); }
+.thumb[aria-pressed="true"] { outline: 2px solid var(--c-primary-solid); outline-offset: -2px; }
+.thumb .pick { position: absolute; top: var(--space-1); right: var(--space-1); display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-full); border: 1.5px solid var(--c-surface); background: color-mix(in srgb, var(--c-text) 30%, transparent); font-size: 0.75rem; font-weight: 600; }
+.thumb[aria-pressed="true"] .pick { background: var(--c-primary-solid); color: var(--c-on-primary); }
+.sheet-list { list-style: none; margin: var(--space-2) 0 0; padding: 0 var(--space-2); }
+.sheet-list button { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 52px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; text-align: left; }
+.sheet-list button:hover { background: var(--c-hover); }
+.sheet-list .device { width: 36px; height: 36px; }
+.sheet-list small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.sheet-send { padding: var(--space-3); }
+.sheet-send .btn { width: 100%; }
+
+/* Settings index. */
+.acct { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); color: inherit; text-decoration: none; min-height: 72px; }
+.acct .avatar { width: 52px; height: 52px; font-size: 1.0625rem; }
+.acct .grow { flex: 1; min-width: 0; }
+.acct b { display: block; font-weight: 600; }
+.acct small { color: var(--c-text-muted); font-size: 0.8125rem; }
+.acct > .icon, .set-row > .icon:last-child { color: var(--c-icon-muted); }
+.set-group { margin: 0 var(--space-3) var(--space-3); }
+.acct { margin-bottom: var(--space-2); }
+.set-group h3 { margin: 0 0 var(--space-1) var(--space-2); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.set-group ul { list-style: none; margin: 0; padding: 0; border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); overflow: hidden; }
+.set-group li + li { border-top: 1px solid var(--c-border-subtle); }
+.set-row { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: 0 var(--space-3); color: var(--c-text); text-decoration: none; }
+.set-row:hover { background: var(--c-hover); }
+.set-row > .icon:first-child { color: var(--c-icon-muted); }
+.set-row .label { flex: 1; min-width: 0; }
+.set-row .val { font-size: 0.8125rem; color: var(--c-text-muted); }
+.set-row.danger, .set-row.danger > .icon:first-child { color: var(--c-error); }
+
+/* Offline: queued messages keep a clock until the network is back. */
+.phone .banner { border-bottom: 1px solid var(--c-border-subtle); padding: var(--space-2) var(--space-3); font-size: 0.8125rem; }
+.queued .bubble { border-style: dashed; }
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+<section class="shot" id="list">
+	<div class="shot-head"><h2>Danh sách chat</h2><span class="phase">Phase 5, 10</span><p>Mở thẳng từ DB local (SQLCipher) trong ≤ 1 s, không chờ mạng; dòng "Đang cập nhật…" chỉ báo app đang bắt kịp bằng GetDifference sau khi mở lại. Tài khoản mới chưa có chat thì thấy trạng thái trống với một việc cần làm.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:45</span><span>5G</span></div>
+				<div class="m-head">
+					<div class="m-title"><h2>Chat</h2><span role="status">Đang cập nhật…</span></div>
+					<button type="button" class="icon-btn" aria-label="Tìm"><svg class="icon"><use href="#i-search"/></svg></button>
+					<button type="button" class="icon-btn" aria-label="Tạo chat"><svg class="icon"><use href="#i-plus"/></svg></button>
+				</div>
+				<ul class="chats m-body">
+					<li class="chat-row"><span class="avatar av-blue">VH</span><div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div><div class="meta"><span>09:42</span><span class="badge">3</span></div></li>
+					<li class="chat-row"><span class="avatar av-green">LA</span><div><div class="name">Lan Anh</div><div class="preview">Mình gửi file thiết kế rồi nhé</div></div><div class="meta"><span>09:30</span><span class="badge">1</span></div></li>
+					<li class="chat-row"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div><div class="meta"><span>08:55</span></div></li>
+					<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name">Team Mobile</div><div class="preview">Minh: Build iOS lỗi ký số</div></div><div class="meta"><span>Hôm qua</span><span class="badge muted-badge">3</span></div></li>
+					<li class="chat-row"><span class="avatar av-cyan">QH</span><div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div><div class="meta"><span>Hôm qua</span></div></li>
+					<li class="chat-row"><span class="avatar av-grey">TB</span><div><div class="name">Thông báo hoandat <span class="tag">kênh</span></div><div class="preview">Lịch bảo trì auth.hoandat.com tối thứ Bảy</div></div><div class="meta"><span>T2</span></div></li>
+				</ul>
+				<nav class="tabbar" aria-label="Thanh dưới">
+					<button type="button" aria-current="true"><svg class="icon"><use href="#i-message"/></svg>Chat</button>
+					<button type="button"><svg class="icon"><use href="#i-user"/></svg>Danh bạ</button>
+					<button type="button"><svg class="icon"><use href="#i-settings"/></svg>Cài đặt</button>
+				</nav>
+			</div>
+			<figcaption>Mở từ cache, đang bắt kịp tin mới</figcaption>
+		</figure>
+
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:45</span><span>5G</span></div>
+				<div class="m-head">
+					<div class="m-title"><h2>Chat</h2></div>
+					<button type="button" class="icon-btn" aria-label="Tìm"><svg class="icon"><use href="#i-search"/></svg></button>
+					<button type="button" class="icon-btn" aria-label="Tạo chat"><svg class="icon"><use href="#i-plus"/></svg></button>
+				</div>
+				<div class="empty">
+					<svg class="icon"><use href="#i-message"/></svg>
+					<strong>Chưa có chat nào</strong>
+					<span>Tìm người theo username hoặc email để bắt đầu.</span>
+					<button type="button" class="btn btn-primary" data-toast="Mở Chat mới">Chat mới</button>
+				</div>
+				<nav class="tabbar" aria-label="Thanh dưới">
+					<button type="button" aria-current="true"><svg class="icon"><use href="#i-message"/></svg>Chat</button>
+					<button type="button"><svg class="icon"><use href="#i-user"/></svg>Danh bạ</button>
+					<button type="button"><svg class="icon"><use href="#i-settings"/></svg>Cài đặt</button>
+				</nav>
+			</div>
+			<figcaption>Tài khoản mới, chưa có chat</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="chat">
+	<div class="shot-head"><h2>Khung chat</h2><span class="phase">Phase 9, 10</span><p>Cảnh báo Grafana là một tin duy nhất được webhook sửa tại chỗ: lúc 09:42 ở trạng thái Firing có nút thao tác, lúc 10:05 cùng tin đó chuyển Resolved, nút biến mất và có nhãn "đã cập nhật". Không sinh tin mới nên nhóm không bị ngập cảnh báo.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:43</span><span>5G</span></div>
+				<div class="m-head">
+					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+					<span class="avatar sm av-blue">VH</span>
+					<div class="m-title"><strong>Vận hành hệ thống</strong><span>3 đang online</span></div>
+					<button type="button" class="icon-btn" aria-label="Thêm"><svg class="icon"><use href="#i-dots"/></svg></button>
+				</div>
+				<div class="messages">
+					<span class="day">Hôm nay</span>
+					<div class="msg"><div class="bubble"><span class="who">Quang Huy</span><p>Sáng nay mình nâng cấp <code>postgres-17</code> trên box lab.<span class="stamp">09:12</span></p></div></div>
+					<div class="msg">
+						<div class="bubble integration">
+							<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Grafana</span>
+							<div class="int-title"><span class="sev firing">Firing</span>CPU cao trên lab-174</div>
+							<div class="int-body mono">cpu_usage: 93% (ngưỡng 90%)</div>
+							<div class="keyboard"><button type="button" data-press="Đã nhận xử lý cảnh báo">Nhận xử lý</button><button type="button" data-press="Đã tắt tiếng 1 giờ">Tắt tiếng 1 giờ</button></div>
+							<span class="stamp">09:42</span>
+						</div>
+					</div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="m-draft-1">Tin nhắn</label>
+					<textarea id="m-draft-1" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+			<figcaption>09:42 · cảnh báo đang Firing</figcaption>
+		</figure>
+
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>10:06</span><span>5G</span></div>
+				<div class="m-head">
+					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+					<span class="avatar sm av-blue">VH</span>
+					<div class="m-title"><strong>Vận hành hệ thống</strong><span>3 đang online</span></div>
+					<button type="button" class="icon-btn" aria-label="Thêm"><svg class="icon"><use href="#i-dots"/></svg></button>
+				</div>
+				<div class="messages">
+					<span class="day">Hôm nay</span>
+					<div class="msg"><div class="bubble"><span class="who">Quang Huy</span><p>Sáng nay mình nâng cấp <code>postgres-17</code> trên box lab.<span class="stamp">09:12</span></p></div></div>
+					<div class="msg">
+						<div class="bubble integration resolved">
+							<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Grafana</span>
+							<div class="int-title"><span class="sev ok">Resolved</span>CPU lab-174 đã về 41%</div>
+							<div class="int-body mono">Firing 09:42 → Resolved 10:05 (23 phút)</div>
+							<span class="stamp"><span class="edited">đã cập nhật</span>&nbsp;10:05</span>
+						</div>
+					</div>
+					<div class="msg mine"><div class="bubble"><span class="reply"><b>Grafana</b>CPU cao trên lab-174</span><p>Đã xử lý, do job backup chạy trùng giờ.<span class="stamp">10:06 <svg class="icon icon-sm read" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="m-draft-2">Tin nhắn</label>
+					<textarea id="m-draft-2" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+			<figcaption>10:05 · cùng tin đó chuyển Resolved</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="login-domain">
+	<div class="shot-head"><h2>Đăng nhập trên mobile</h2><span class="phase">Phase 10</span><p>Một bản app cho mọi tenant: mặc định chat.hoandat.com, "Đăng nhập bằng domain khác" chuyển sang chat.&lt;domain&gt;. Trang IdP luôn mở bằng trình duyệt hệ thống (ASWebAuthenticationSession trên iOS, Custom Tabs trên Android), không bao giờ trong WebView của app; callback về qua scheme riêng của app và chỉ được nhận khi state khớp.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:45</span><span>5G</span></div>
+				<div class="m-welcome">
+					<div class="spacer"></div>
+					<span class="brand-mark"><svg class="icon"><use href="#i-message"/></svg></span>
+					<h1>Chat</h1>
+					<p>Nhắn tin nhanh trong hệ sinh thái hoandat. Dùng chung tài khoản với Localman và Tunelo.</p>
+					<div class="welcome-actions">
+						<button type="button" class="btn btn-primary" data-toast="Mở auth.hoandat.com trong trình duyệt hệ thống">Đăng nhập bằng tài khoản hoandat</button>
+						<button type="button" class="btn" data-toast="Mở trang đăng ký của auth.hoandat.com">Tạo tài khoản</button>
+					</div>
+					<div class="spacer"></div>
+					<button type="button" class="text-btn">Đăng nhập bằng domain khác</button>
+					<div class="m-foot"><span>chat.hoandat.com</span><span>Tiếng Việt</span></div>
+				</div>
+				<div class="home-bar"></div>
+			</div>
+			<figcaption>Màn chào trên mobile</figcaption>
+		</figure>
+
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:45</span><span>5G</span></div>
+				<div class="m-head">
+					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+					<div class="m-title"><strong>Domain khác</strong></div>
+				</div>
+				<div class="m-form">
+					<p>Dùng khi tổ chức của bạn có Chat riêng.</p>
+					<div class="field">
+						<label for="m-domain">Domain của tổ chức</label>
+						<input class="input" id="m-domain" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" value="inetdev.io.vn">
+					</div>
+					<div class="org" role="status">
+						<span class="tenant-mark av-grey" aria-hidden="true">iN</span>
+						<div class="grow"><b>Tổ chức iNET dev</b><span class="mono">inetdev.io.vn</span></div>
+						<svg class="icon ok-icon" aria-label="Đã bật Chat"><use href="#i-check"/></svg>
+					</div>
+					<p>Đăng nhập ở auth.inetdev.io.vn. Dữ liệu của tổ chức này lưu riêng trên máy, không lẫn với hoandat.com.</p>
+					<div class="spacer"></div>
+					<button type="button" class="btn btn-primary" data-toast="Mở auth.inetdev.io.vn trong trình duyệt hệ thống">Tiếp tục</button>
+				</div>
+				<div class="home-bar"></div>
+			</div>
+			<figcaption>Nhập domain, tên tổ chức lấy từ IdP</figcaption>
+		</figure>
+
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:46</span><span>5G</span></div>
+				<div class="m-welcome" aria-hidden="true"><div class="spacer"></div><span class="brand-mark"><svg class="icon"><use href="#i-message"/></svg></span><h1>Chat</h1><div class="spacer"></div></div>
+				<div class="scrim"></div>
+				<div class="sheet tall" role="group" aria-label="Trình duyệt hệ thống">
+					<div class="grabber"></div>
+					<div class="sheet-bar">
+						<button type="button" class="text-btn" data-toast="Đã huỷ, app quay về màn chào">Huỷ</button>
+						<div class="grow"><span class="origin"><svg class="icon"><use href="#i-lock"/></svg>auth.inetdev.io.vn</span></div>
+						<span style="width: 44px" aria-hidden="true"></span>
+					</div>
+					<div class="idp-page">
+						<span class="tenant-mark av-grey">iN</span>
+						<h3>Đăng nhập Tổ chức iNET dev</h3>
+						<p>để tiếp tục tới Chat</p>
+						<button type="button" class="btn">Tiếp tục với Google</button>
+						<button type="button" class="btn">Tiếp tục với GitHub</button>
+						<span class="idp-note">Trang của IdP, minh hoạ. App chỉ nhận code qua callback.</span>
+					</div>
+				</div>
+			</div>
+			<figcaption>Trình duyệt hệ thống, không phải WebView</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="push">
+	<div class="shot-head"><h2>Thông báo đẩy</h2><span class="phase">Phase 10</span><p>Nội dung push được mã hoá theo khoá của từng thiết bị; extension native giải mã ngay trên máy rồi mới hiện. Có xem trước hay không là cài đặt của người dùng, theo từng tài khoản và tổ chức: thông báo thứ hai đến từ tài khoản inetdev.io.vn đã tắt xem trước. Thông báo gộp theo chat và tự gỡ khi tin đã được đọc ở thiết bị khác.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone lock">
+				<div class="statusbar"><span></span><span>5G</span></div>
+				<div class="lock-clock"><svg class="icon"><use href="#i-lock"/></svg><time>09:45</time><span>Thứ Ba, 14 tháng 10</span></div>
+				<div class="notifs">
+					<article class="notif stacked" aria-label="Thông báo từ Vận hành hệ thống">
+						<div class="n-head"><span class="app-ico"><svg class="icon"><use href="#i-message"/></svg></span><span>Chat</span><span class="n-time">bây giờ</span></div>
+						<b>Vận hành hệ thống</b>
+						<p>Quang Huy: Mình nhận, đang xem…</p>
+						<span class="n-more">2 thông báo khác từ chat này</span>
+					</article>
+					<article class="notif" aria-label="Thông báo không xem trước">
+						<div class="n-head"><span class="app-ico"><svg class="icon"><use href="#i-message"/></svg></span><span>Chat · inetdev.io.vn</span><span class="n-time">5 phút trước</span></div>
+						<b>Chat</b>
+						<p>Bạn có tin nhắn mới</p>
+					</article>
+				</div>
+				<div class="lock-foot" aria-hidden="true"><span><svg class="icon"><use href="#i-sun"/></svg></span><span><svg class="icon"><use href="#i-camera"/></svg></span></div>
+				<div class="home-bar"></div>
+			</div>
+			<figcaption>Màn khoá: có và không xem trước</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="mini-app">
+	<div class="shot-head"><h2>Mini App</h2><span class="phase">R7 · Phase 16</span><p>Mini App mở trong trình duyệt trong app tách biệt, không chạy trong WebView chính. Thanh trên luôn của Chat: tên bot, origin thật của Mini App (domain riêng, không nằm dưới domain của tenant) và nút đóng, để Mini App không giả được giao diện của app. Nội dung bên dưới do bot vẽ.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:50</span><span>5G</span></div>
+				<div class="m-head" aria-hidden="true">
+					<span class="icon-btn"><svg class="icon"><use href="#i-back"/></svg></span>
+					<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+					<div class="m-title"><strong>Deploy Bot</strong><span>bot</span></div>
+				</div>
+				<div class="scrim"></div>
+				<div class="sheet tall" role="group" aria-label="Mini App của Deploy Bot">
+					<div class="grabber"></div>
+					<div class="sheet-bar">
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+						<div class="grow"><b>Deploy Bot</b><span class="origin"><svg class="icon"><use href="#i-lock"/></svg>b4821.chatapps.vn</span></div>
+						<button type="button" class="icon-btn" aria-label="Thêm: tải lại, mở bằng trình duyệt"><svg class="icon"><use href="#i-dots"/></svg></button>
+					</div>
+					<div class="mini-body">
+						<h3>Triển khai</h3>
+						<p>Chọn bản để đẩy lên production.</p>
+						<div class="env"><b>staging</b><span class="state ok">Đang chạy</span><span class="mono">2.4.1 · 08:55</span></div>
+						<div class="env"><b>production</b><span class="state old">Bản cũ</span><span class="mono">2.4.0 · hôm qua</span></div>
+						<ul class="checks">
+							<li><svg class="icon icon-sm"><use href="#i-check"/></svg>Test 128/128 đạt</li>
+							<li><svg class="icon icon-sm"><use href="#i-check"/></svg>Không có migration</li>
+						</ul>
+					</div>
+					<div class="mini-main"><button type="button" class="btn btn-primary" data-press="Bot đã nhận yêu cầu đẩy 2.4.1">Đẩy 2.4.1 lên production</button></div>
+				</div>
+			</div>
+			<figcaption>Trình duyệt trong app, thanh trên của Chat</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="attach-sheet">
+	<div class="shot-head"><h2>Chọn đính kèm</h2><span class="phase">Phase 4, 10</span><p>Bottom sheet mở từ nút kẹp giấy: ảnh gần đây chọn nhanh ngay trên sheet (số thứ tự là thứ tự gửi), rồi ba nguồn của hệ điều hành. Ảnh ở đây là ô giữ chỗ trung tính. Nút gửi chỉ hiện khi đã chọn ít nhất một ảnh.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:52</span><span>5G</span></div>
+				<div class="m-head" aria-hidden="true">
+					<span class="icon-btn"><svg class="icon"><use href="#i-back"/></svg></span>
+					<span class="avatar sm av-green">LA</span>
+					<div class="m-title"><strong>Lan Anh</strong><span>online</span></div>
+				</div>
+				<div class="scrim"></div>
+				<div class="sheet" role="group" aria-label="Đính kèm">
+					<div class="grabber"></div>
+					<div class="thumbs" aria-label="Ảnh gần đây">
+						<button type="button" class="thumb" aria-pressed="true" aria-label="Ảnh 1, đã chọn thứ 1"><svg class="icon"><use href="#i-photo"/></svg><span class="pick">1</span></button>
+						<button type="button" class="thumb" aria-pressed="false" aria-label="Ảnh 2"><svg class="icon"><use href="#i-photo"/></svg><span class="pick"></span></button>
+						<button type="button" class="thumb" aria-pressed="true" aria-label="Ảnh 3, đã chọn thứ 2"><svg class="icon"><use href="#i-photo"/></svg><span class="pick">2</span></button>
+						<button type="button" class="thumb" aria-pressed="false" aria-label="Ảnh 4"><svg class="icon"><use href="#i-photo"/></svg><span class="pick"></span></button>
+						<button type="button" class="thumb" aria-pressed="false" aria-label="Ảnh 5"><svg class="icon"><use href="#i-photo"/></svg><span class="pick"></span></button>
+						<button type="button" class="thumb" aria-pressed="false" aria-label="Ảnh 6"><svg class="icon"><use href="#i-photo"/></svg><span class="pick"></span></button>
+					</div>
+					<ul class="sheet-list">
+						<li><button type="button" data-toast="Mở thư viện ảnh của hệ điều hành"><span class="device"><svg class="icon"><use href="#i-photo"/></svg></span><span>Thư viện ảnh<small>Ảnh và video</small></span></button></li>
+						<li><button type="button" data-toast="Mở camera"><span class="device"><svg class="icon"><use href="#i-camera"/></svg></span><span>Chụp ảnh<small>Ảnh hoặc quay video</small></span></button></li>
+						<li><button type="button" data-toast="Mở trình chọn file"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span>File<small>Gửi nguyên bản, không nén</small></span></button></li>
+					</ul>
+					<div class="sheet-send"><button type="button" class="btn btn-primary" id="send-photos" data-toast="Đang gửi 2 ảnh">Gửi 2 ảnh</button></div>
+					<div class="home-bar"></div>
+				</div>
+			</div>
+			<figcaption>Ảnh gần đây, thư viện, camera, file</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="settings">
+	<div class="shot-head"><h2>Cài đặt</h2><span class="phase">Phase 6, 10</span><p>Danh mục cài đặt trên mobile: thẻ tài khoản ở trên cùng (tên, username, tổ chức đang dùng), các nhóm mục có giá trị hiện tại bên phải để khỏi phải mở từng mục. Mỗi dòng mở đúng màn trong trang Cài đặt.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:55</span><span>5G</span></div>
+				<div class="m-head"><div class="m-title"><h2>Cài đặt</h2></div></div>
+				<div class="m-body">
+					<a class="acct" href="settings.html#profile">
+						<span class="avatar av-violet">ĐT</span>
+						<span class="grow"><b>Đức Thắng</b><small>@dattqh · hoandat.com</small></span>
+						<svg class="icon"><use href="#i-chevron-right"/></svg>
+					</a>
+					<div class="set-group">
+						<h3>Tài khoản</h3>
+						<ul>
+							<li><a class="set-row" href="settings.html#privacy"><svg class="icon"><use href="#i-lock"/></svg><span class="label">Quyền riêng tư</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#sessions"><svg class="icon"><use href="#i-laptop"/></svg><span class="label">Phiên đăng nhập</span><span class="val">3 thiết bị</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+						</ul>
+					</div>
+					<div class="set-group">
+						<h3>Ứng dụng</h3>
+						<ul>
+							<li><a class="set-row" href="settings.html#notifications"><svg class="icon"><use href="#i-bell"/></svg><span class="label">Thông báo</span><span class="val">Có xem trước</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#appearance"><svg class="icon"><use href="#i-sun"/></svg><span class="label">Giao diện</span><span class="val">Theo hệ thống</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#storage"><svg class="icon"><use href="#i-database"/></svg><span class="label">Dữ liệu và bộ nhớ</span><span class="val">1,2 GB</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+						</ul>
+					</div>
+					<div class="set-group">
+						<h3>Tổ chức và dữ liệu</h3>
+						<ul>
+							<li><a class="set-row" href="settings.html#tenant"><svg class="icon"><use href="#i-globe"/></svg><span class="label">Tổ chức</span><span class="val">hoandat.com</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#export-delete"><svg class="icon"><use href="#i-download"/></svg><span class="label">Xuất và xoá dữ liệu</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row danger" href="auth.html#signed-out"><svg class="icon"><use href="#i-logout"/></svg><span class="label">Đăng xuất</span></a></li>
+						</ul>
+					</div>
+				</div>
+				<nav class="tabbar" aria-label="Thanh dưới">
+					<button type="button"><svg class="icon"><use href="#i-message"/></svg>Chat</button>
+					<button type="button"><svg class="icon"><use href="#i-user"/></svg>Danh bạ</button>
+					<button type="button" aria-current="true"><svg class="icon"><use href="#i-settings"/></svg>Cài đặt</button>
+				</nav>
+			</div>
+			<figcaption>Danh mục cài đặt</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section class="shot" id="offline">
+	<div class="shot-head"><h2>Ngoại tuyến</h2><span class="phase">Phase 5, 10</span><p>Mất mạng vẫn đọc được mọi thứ đã có trong máy và vẫn soạn, gửi được. Tin gửi lúc này nằm trong hàng chờ với đồng hồ và viền nét đứt; có mạng lại thì tự gửi theo đúng thứ tự, không cần bấm lại. Tiêu đề chat nói rõ đang chờ mạng thay vì trạng thái online.</p></div>
+	<div class="phones">
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>10:12</span><span>Không có mạng</span></div>
+				<div class="m-head">
+					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+					<span class="avatar sm av-blue">VH</span>
+					<div class="m-title"><strong>Vận hành hệ thống</strong><span role="status"><svg class="icon icon-sm"><use href="#i-wifi-off"/></svg>Đang chờ mạng…</span></div>
+					<button type="button" class="icon-btn" aria-label="Thêm"><svg class="icon"><use href="#i-dots"/></svg></button>
+				</div>
+				<div class="banner warn"><svg class="icon icon-sm"><use href="#i-info"/></svg><span>2 tin sẽ tự gửi khi có mạng.</span></div>
+				<div class="messages">
+					<div class="msg"><div class="bubble"><span class="who">Lan Anh</span><p>Backup đã dời sang 02:00 nhé.<span class="stamp">10:08</span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Ok, cảm ơn.<span class="stamp">10:09 <svg class="icon icon-sm read" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+					<div class="msg mine queued"><div class="bubble"><p>Mình kiểm lại lab-174 lúc 02:05.<span class="stamp">10:11 <svg class="icon icon-sm" aria-label="Đang chờ gửi"><use href="#i-clock"/></svg></span></p></div></div>
+					<div class="msg mine queued"><div class="bubble"><p>Nếu CPU còn cao thì mình gọi Huy.<span class="stamp">10:12 <svg class="icon icon-sm" aria-label="Đang chờ gửi"><use href="#i-clock"/></svg></span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="m-draft-3">Tin nhắn</label>
+					<textarea id="m-draft-3" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+			<figcaption>Tin chờ gửi khi mất mạng</figcaption>
+		</figure>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$ } = window.Mock;
+	// Recent photos: tap toggles selection; numbers follow the tap order.
+	const order = $$(".thumb[aria-pressed='true']");
+	const sync = () => {
+		$$(".thumb").forEach((t) => {
+			const i = order.indexOf(t);
+			t.setAttribute("aria-pressed", String(i >= 0));
+			$(".pick", t).textContent = i >= 0 ? String(i + 1) : "";
+		});
+		const btn = $("#send-photos");
+		btn.hidden = order.length === 0;
+		btn.textContent = `Gửi ${order.length} ảnh`;
+		btn.dataset.toast = `Đang gửi ${order.length} ảnh`;
+	};
+	$$(".thumb").forEach((t) => t.addEventListener("click", () => {
+		const i = order.indexOf(t);
+		if (i >= 0) order.splice(i, 1); else order.push(t);
+		sync();
+	}));
+})();
+</script>
+</body>
+</html>

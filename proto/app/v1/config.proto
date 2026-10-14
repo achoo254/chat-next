@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package app.v1;
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+
+// Server-issued limits and timers per tenant. Clients never hardcode them.
+service ConfigService {
+  // Returns not_modified when hash equals the current config hash.
+  rpc GetAppConfig(GetAppConfigRequest) returns (GetAppConfigResponse);
+}
+
+message GetAppConfigRequest {
+  // Hash of the config the client already holds; empty on first call.
+  string hash = 1;
+}
+
+message GetAppConfigResponse {
+  oneof result {
+    AppConfigNotModified not_modified = 1;
+    AppConfig config = 2;
+  }
+}
+
+message AppConfigNotModified {}
+
+message AppConfig {
+  // Opaque hash to send back in GetAppConfigRequest.
+  string hash = 1;
+  // Text limits, counted in Unicode code points (ADR 0004).
+  int32 message_length_max = 2;
+  int32 caption_length_max = 3;
+  // How long after sending a message may still be edited.
+  int32 edit_time_limit_seconds = 4;
+  // Per-member read receipts are only available in groups up to this size...
+  int32 read_receipts_member_max = 5;
+  // ...and for messages younger than this.
+  int32 read_receipts_max_age_seconds = 6;
+  // Delay before showing a desktop notification (lets another device read it).
+  int32 desktop_notify_delay_ms = 7;
+  // Local media cache defaults; users may override them in settings.
+  int64 media_cache_size_bytes = 8 [jstype = JS_NUMBER];
+  int32 media_cache_max_age_seconds = 9;
+  // Separate budget for large files and video inside the media cache.
+  int64 media_cache_large_files_bytes = 10 [jstype = JS_NUMBER];
+  int64 upload_size_max_bytes = 11 [jstype = JS_NUMBER];
+  int32 album_size_max = 12;
+}

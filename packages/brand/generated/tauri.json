@@ -1,0 +1,13 @@
+{
+  "productName": "Chat",
+  "identifier": "com.hoandat.chat",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "com.hoandat.chat"
+        ]
+      }
+    }
+  }
+}

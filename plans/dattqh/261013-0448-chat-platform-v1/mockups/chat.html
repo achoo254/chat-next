@@ -1,0 +1,1320 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhắn tin — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* ---------- Page-level pieces for the chat screens (tokens only) ---------- */
+/* Panels shown open below are <dialog> elements in the product; here they are static groups. */
+[hidden] { display: none !important; }
+a.btn { text-decoration: none; color: var(--c-text); }
+a.btn-primary { color: var(--c-on-primary); }
+
+/* Muted chat: grey pill so the count reads as low priority; text keeps 4.5:1 in both themes. */
+.badge.muted-badge { background: var(--c-bar-track); color: var(--c-text-muted); }
+.chat-row .meta .line { display: inline-flex; align-items: center; gap: var(--space-1); }
+.chat-row .meta .icon, .chat-row .name .icon { color: var(--c-icon-muted); }
+.preview .typing-text { color: var(--c-primary); }
+.preview .draft { color: var(--c-error); font-weight: 500; }
+
+.avatar.xs { width: 24px; height: 24px; font-size: 0.625rem; }
+.avatar.lg { width: 72px; height: 72px; font-size: 1.5rem; }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+.btn-danger { background: var(--c-error); border-color: var(--c-error); color: var(--c-on-tone); }
+.btn-danger:hover { background: color-mix(in srgb, var(--c-error) 88%, var(--c-text)); border-color: color-mix(in srgb, var(--c-error) 88%, var(--c-text)); }
+.btn[aria-busy="true"] { cursor: progress; opacity: 0.7; }
+.btn-block { width: 100%; }
+.spin { display: inline-block; width: 12px; height: 12px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin, .sk { animation: none; } }
+
+/* Split frames: several panes of the same feature side by side, stacked on narrow screens. */
+.split { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); height: 100%; }
+.frame.auto > .split { height: auto; }
+.split > * + * { border-left: 1px solid var(--c-border-subtle); }
+.pane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.pane-cap { padding: var(--space-2) var(--space-4); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.split .convo { flex: 1; min-height: 0; }
+.frame.auto .messages { overflow: visible; }
+
+/* Dialog frames: the 3-pane app sits dimmed behind an open dialog. */
+.ghost { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ghost > .app { height: 100%; min-height: 0; }
+.static-dialog > .panel { border: 1px solid var(--c-border-subtle); }
+.static-dialog.pair { grid-template-columns: repeat(2, minmax(0, 460px)); justify-content: center; align-items: center; gap: var(--space-5); }
+.static-dialog.pair > .panel { width: 100%; }
+.panel .dlg-body.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding-top: var(--space-4); }
+.panel .dlg-body.stack h3 { margin: var(--space-2) 0 0; }
+.dlg-head .step { font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.system { text-align: center; }
+/* Grid stacks size to their container, never to a long unbreakable line inside. */
+.field, .admin-col, .sub-form { grid-template-columns: minmax(0, 1fr); }
+.dlg-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.note { display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 0.8125rem; background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); color: var(--c-text-muted); }
+.note .icon { width: 16px; height: 16px; margin-top: 2px; }
+.note.warn { background: color-mix(in srgb, var(--c-warning) 10%, var(--c-surface)); border-color: color-mix(in srgb, var(--c-warning) 30%, var(--c-surface)); color: var(--c-warning-text); }
+.quote { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border-left: 3px solid var(--c-border-strong); font-size: 0.875rem; }
+.quote b { display: block; font-size: 0.8125rem; }
+
+/* Selectable rows (multi select in forward / new group). The whole row is the 56px target. */
+.pick-list { display: grid; gap: 2px; margin: 0 calc(-1 * var(--space-2)); }
+.pick { display: grid; grid-template-columns: var(--avatar) minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); width: 100%; min-height: 56px; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; text-align: left; }
+.pick:hover { background: var(--c-hover); }
+.pick b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick[aria-disabled="true"] { cursor: not-allowed; }
+.pick[aria-disabled="true"]:hover { background: none; }
+.pick[aria-disabled="true"] b { color: var(--c-text-muted); font-weight: 500; }
+.pick[hidden] { display: none; }
+.tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-full); border: 1.5px solid var(--c-border-strong); color: var(--c-on-primary); flex: none; }
+.tick.sq { border-radius: var(--radius-xs); width: 20px; height: 20px; }
+.tick .icon { width: 14px; height: 14px; stroke-width: 2.5; visibility: hidden; }
+[aria-checked="true"] > .tick { background: var(--c-primary-solid); border-color: var(--c-primary-solid); }
+[aria-checked="true"] > .tick .icon { visibility: visible; }
+.check-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 44px; padding: 0; border: 0; background: none; text-align: left; font-weight: 500; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.chip { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; padding: 0 var(--space-2) 0 var(--space-1); border: 0; border-radius: var(--radius-full); background: var(--c-selected); font-size: 0.8125rem; font-weight: 500; }
+.chip .icon { width: 14px; height: 14px; color: var(--c-icon-muted); }
+@media (max-width: 760px), (pointer: coarse) { .chip { min-height: 44px; } }
+
+/* ---------- List states ---------- */
+.split.lists { --cols: 3; }
+.split.lists .list { border-right: 0; max-height: none; }
+.sk { display: block; height: 10px; border-radius: var(--radius-xs); background: var(--c-bar-track); animation: pulse 1.6s var(--ease-standard) infinite; }
+.sk.av { width: var(--avatar); height: var(--avatar); border-radius: var(--radius-full); }
+.sk-row { display: flex; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); min-height: 64px; }
+.sk-row .sk.av { flex: none; }
+.sk-row div { flex: 1; display: grid; gap: var(--space-2); }
+.sk-row > .sk:last-child { width: 32px; flex: none; }
+@keyframes pulse { 50% { opacity: 0.55; } }
+.list-foot { padding: var(--space-3) var(--space-4); font-size: 0.8125rem; color: var(--c-text-muted); border-top: 1px solid var(--c-border-subtle); display: flex; align-items: center; gap: var(--space-2); }
+
+/* ---------- Message kinds ---------- */
+.split.kinds { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
+.split.kinds > :first-child { border-right: 1px solid var(--c-border-subtle); }
+.split.kinds > * + * { border-left: 0; }
+.spoiler { padding: 0 2px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-text) 14%, transparent); filter: blur(4px); cursor: pointer; transition: filter var(--dur-base) var(--ease-standard); }
+.spoiler.revealed { filter: none; background: none; cursor: auto; }
+.hashtag { color: var(--c-primary); }
+.code-block { margin-top: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); overflow: hidden; }
+.cb-head { display: flex; align-items: center; justify-content: space-between; padding-left: var(--space-3); font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-subtle); }
+.code-block pre code { padding: 0; border: 0; background: none; font-size: inherit; }
+.code-block pre { margin: 0; padding: var(--space-2) var(--space-3); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.5; overflow-x: auto; }
+.fwd { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-primary); }
+.fwd b { font-weight: 600; }
+.bubble.unsupported { display: flex; gap: var(--space-2); align-items: flex-start; border-style: dashed; }
+.bubble.unsupported .icon { color: var(--c-icon-muted); margin-top: 2px; }
+.bubble.unsupported small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
+.bubble.unsupported .btn { margin-top: var(--space-2); }
+.unread-div { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; font-size: 0.75rem; font-weight: 600; color: var(--c-primary); }
+.unread-div::before, .unread-div::after { content: ""; flex: 1; border-top: 1px solid color-mix(in srgb, var(--c-primary-solid) 40%, transparent); }
+.to-bottom { position: absolute; right: var(--space-4); bottom: var(--space-4); display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-icon-muted); box-shadow: var(--shadow-md); }
+.to-bottom:hover { color: var(--c-text); }
+.to-bottom .badge { position: absolute; top: -8px; right: -6px; }
+.stamp .icon-sm { width: 14px; height: 14px; }
+.stamp .fail { color: var(--c-error); }
+.msg-stack { display: grid; justify-items: end; gap: var(--space-1); min-width: 0; }
+.failed-row { display: flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-error); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); font-size: 0.8125rem; color: var(--c-text-muted); }
+.legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.legend .read { color: var(--c-primary); }
+.legend .fail { color: var(--c-error); }
+
+/* ---------- Connection states ---------- */
+.split.conn { --cols: 3; }
+.status-line { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* ---------- Context menu ---------- */
+.ctx-layer { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-2); padding: var(--space-5); background: color-mix(in srgb, var(--c-backdrop) 70%, transparent); }
+.ctx-layer.mine { align-items: flex-end; }
+.ctx-layer .msg { max-width: min(420px, 100%); }
+.react-picker { display: flex; gap: 2px; padding: var(--space-1); border-radius: var(--radius-full); background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-md); }
+.react-picker button { display: grid; place-items: center; width: 40px; min-height: 40px; border: 0; border-radius: var(--radius-full); background: none; font-size: 1.25rem; color: var(--c-icon-muted); }
+.react-picker button:hover { background: var(--c-hover); }
+.menu .count { margin-left: auto; font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.menu .kbd { margin-left: auto; }
+
+/* ---------- Channel ---------- */
+.post { max-width: min(var(--bubble-max), 100%); }
+.post .bubble { width: 100%; }
+.post .who { color: var(--c-primary); }
+.sub-bar { display: flex; justify-content: center; padding: var(--space-3) var(--space-4); background: var(--c-surface); border-top: 1px solid var(--c-border-subtle); }
+.sub-bar .btn { min-width: 220px; }
+
+/* ---------- Admin ---------- */
+.admin-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--c-border-subtle); }
+.admin-head .title { flex: 1; min-width: 0; }
+.admin-head strong { display: block; font-weight: 600; }
+.admin-head span { font-size: 0.8125rem; color: var(--c-text-muted); }
+.admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); padding: var(--space-4); background: var(--c-bg); align-items: start; }
+.admin-col { display: grid; gap: var(--space-4); }
+.card { padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.card h3 { margin: 0 0 var(--space-1); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.card > p { margin: 0 0 var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+.card .row + .row { border-top: 1px solid var(--c-border-subtle); }
+.row > .icon { color: var(--c-icon-muted); }
+.link-mono { font-family: var(--font-mono); font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.tag.grey { background: var(--c-bar-track); color: var(--c-text-muted); }
+.tag.ok { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
+.sub-form { display: grid; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+.sub-form .actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.choice { flex-wrap: wrap; }
+.choice button { flex: 1 1 auto; }
+.row a.grow { color: inherit; text-decoration: none; }
+.danger-zone { border-color: color-mix(in srgb, var(--c-error) 35%, var(--c-surface)); }
+.danger-zone .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* ---------- Invite, profile, new chat ---------- */
+.hero { display: grid; justify-items: center; gap: var(--space-1); padding: var(--space-5) var(--space-5) var(--space-3); text-align: center; }
+.hero h2 { margin: var(--space-2) 0 0; font-size: 1.25rem; font-weight: 600; }
+.hero p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
+.av-stack { display: flex; align-items: center; margin-top: var(--space-2); }
+.av-stack .avatar { border: 2px solid var(--c-surface); }
+.av-stack .avatar + .avatar { margin-left: -8px; }
+.av-stack .more { margin-left: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+.hero-actions { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-5); }
+.big-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: var(--radius-full); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); color: var(--c-icon-muted); }
+.big-icon .icon { width: 28px; height: 28px; }
+.result { display: grid; grid-template-columns: var(--avatar) minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); }
+.result b { display: block; font-weight: 600; }
+.result small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.match { display: inline-flex; align-items: center; gap: 2px; font-size: 0.75rem; color: var(--c-success-text); }
+.match .icon { width: 14px; height: 14px; }
+.quick { display: grid; gap: 2px; margin: 0 calc(-1 * var(--space-2)); }
+.quick a { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: 0 var(--space-2); border-radius: var(--radius-sm); color: var(--c-text); text-decoration: none; font-weight: 500; }
+.quick a:hover { background: var(--c-hover); }
+.quick .icon { color: var(--c-primary); }
+.profile-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); padding: 0 var(--space-5) var(--space-4); }
+.profile-actions .btn { flex-direction: column; gap: 2px; min-height: 60px; padding: var(--space-1) var(--space-2); font-size: 0.8125rem; }
+.btn.danger-text { color: var(--c-error); }
+.photo-pick { display: grid; place-items: center; width: 72px; height: 72px; flex: none; border-radius: var(--radius-full); border: 1.5px dashed var(--c-border-strong); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
+.photo-pick:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.name-row { display: flex; align-items: center; gap: var(--space-4); }
+.name-row .field { flex: 1; min-width: 0; }
+.prefix-input { display: flex; align-items: center; min-height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); overflow: hidden; }
+.prefix-input:focus-within { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
+.prefix-input span { padding: 0 var(--space-2) 0 var(--space-3); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; }
+.prefix-input input { flex: 1; min-width: 0; min-height: 42px; border: 0; outline: none; background: none; font-family: var(--font-mono); font-size: 0.8125rem; }
+.ok-text { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-success-text); }
+.ok-text .icon { width: 14px; height: 14px; }
+.radio-cards { display: grid; gap: var(--space-2); }
+.radio-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--space-3); align-items: start; width: 100%; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); text-align: left; }
+.radio-card .icon { grid-row: span 2; margin-top: 2px; color: var(--c-icon-muted); }
+.radio-card b { font-weight: 600; }
+.radio-card small { font-size: 0.8125rem; color: var(--c-text-muted); }
+.radio-card[aria-checked="true"] { border-color: var(--c-primary); background: var(--c-selected); }
+.radio-card[aria-checked="true"] .icon { color: var(--c-primary); }
+.copy-field { display: flex; align-items: center; gap: var(--space-1); padding-left: var(--space-3); min-height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+.copy-field .link-mono { flex: 1; min-width: 0; }
+
+/* ---------- Responsive ---------- */
+/* Touch: every control reaches 44px. The switch keeps its drawn track inside a transparent border. */
+@media (max-width: 760px), (pointer: coarse) {
+	.switch { width: 60px; height: 44px; margin: -10px; border: 10px solid transparent; }
+	.switch, .switch[aria-checked="true"] { background-clip: padding-box; }
+	.choice button, .menu button, .menu a, .react-picker button, .btn-sm { min-height: 44px; }
+}
+@media (max-width: 1100px) {
+	.split.conn, .split.lists { --cols: 1; }
+	.split.conn > * + *, .split.lists > * + * { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	.frame:has(> .split.conn), .frame:has(> .split.lists) { height: auto; }
+	.split.conn .convo { min-height: 340px; }
+	.split.lists .list { max-height: 520px; }
+}
+@media (max-width: 1024px) {
+	.split:not(.conn):not(.lists) { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.split:not(.conn):not(.lists) > * + * { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	.frame:has(> .split) { height: auto; }
+	.split .pane, .split .pane.convo { min-height: 560px; }
+	.split.lists .pane, .frame.auto .split .pane { min-height: 0; }
+	.split.kinds > :first-child { border-right: 0; }
+	.frame.dlg-frame { height: auto; min-height: var(--frame-h); }
+	.frame.dlg-frame .static-dialog { position: relative; inset: auto; min-height: var(--frame-h); }
+	.static-dialog.pair { grid-template-columns: minmax(0, 520px); align-content: center; }
+	.frame.dlg-frame .static-dialog > .panel { max-height: none; }
+	.admin-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+	.split .convo { min-height: 0; }
+	.ctx-layer { padding: var(--space-3); }
+	.frame .static-dialog { padding: var(--space-3); }
+	.dlg-head, .dlg-foot { padding-left: var(--space-4); padding-right: var(--space-4); }
+	.panel .dlg-body { padding-left: var(--space-4); padding-right: var(--space-4); }
+	.dlg-foot .btn { flex: 1 1 auto; }
+	.admin-grid { padding: var(--space-3); }
+}
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+<!-- ======================= 1. App ======================= -->
+<section class="shot" id="app">
+	<div class="shot-head"><h2>Ứng dụng 3 cột</h2><span class="phase">Phase 6</span>
+		<p>Danh sách chat, khung chat và thông tin chat. Mở app là hiện ngay từ cache, không chờ mạng. Gửi tin lạc quan: tin hiện liền với đồng hồ, có dấu tích khi server nhận. Ô tìm (⌘K) gõ không dấu vẫn khớp tin có dấu. Bấm "i" để ẩn/hiện cột thông tin.</p></div>
+	<div class="frame">
+	<div class="app">
+		<nav class="rail" aria-label="Điều hướng">
+			<span class="avatar sm av-violet" title="Tài khoản của bạn">ĐT</span>
+			<button type="button" class="icon-btn" aria-pressed="true" aria-label="Chat, 7 chưa đọc"><svg class="icon"><use href="#i-message"/></svg><span class="badge">7</span></button>
+			<button type="button" class="icon-btn" aria-label="Tìm kiếm" data-action="search"><svg class="icon"><use href="#i-search"/></svg></button>
+			<span class="spacer"></span>
+			<a class="icon-btn" href="settings.html" aria-label="Cài đặt"><svg class="icon"><use href="#i-settings"/></svg></a>
+		</nav>
+
+		<section class="list" aria-label="Danh sách chat">
+			<div class="list-head">
+				<label class="search-field">
+					<svg class="icon icon-sm"><use href="#i-search"/></svg>
+					<span class="sr-only">Tìm chat và tin nhắn</span>
+					<input id="search-input" type="search" placeholder="Tìm chat, tin nhắn" autocomplete="off">
+					<span class="kbd">⌘K</span>
+				</label>
+				<a class="icon-btn" href="#new-chat" aria-label="Tạo chat mới"><svg class="icon"><use href="#i-plus"/></svg></a>
+			</div>
+
+			<div id="list-chats">
+				<div class="tabs" role="tablist" aria-label="Lọc chat">
+					<button type="button" role="tab" aria-selected="true">Tất cả</button>
+					<button type="button" role="tab" aria-selected="false">Chưa đọc</button>
+					<button type="button" role="tab" aria-selected="false">Nhóm</button>
+					<button type="button" role="tab" aria-selected="false">Bot</button>
+				</div>
+				<ul class="chats">
+					<li class="chat-row" aria-current="true">
+						<span class="avatar av-blue">VH</span>
+						<div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div>
+						<div class="meta"><span>09:42</span><span class="badge">3</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-green">LA</span>
+						<div><div class="name">Lan Anh</div><div class="preview">Mình gửi file thiết kế rồi nhé</div></div>
+						<div class="meta"><span>09:30</span><span class="badge">1</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+						<div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div>
+						<div class="meta"><span>08:55</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-amber">TM</span>
+						<div><div class="name">Team Mobile <svg class="icon icon-sm" role="img" aria-label="Đã tắt tiếng"><use href="#i-bell-off"/></svg></div><div class="preview">Minh: Build iOS lỗi ký số, đang xem</div></div>
+						<div class="meta"><span>Hôm qua</span><span class="badge muted-badge">3</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-cyan">QH</span>
+						<div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div>
+						<div class="meta"><span>Hôm qua</span><svg class="icon icon-sm" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-grey">TB</span>
+						<div><div class="name">Thông báo hoandat <span class="tag">kênh</span></div><div class="preview">Lịch bảo trì auth.hoandat.com tối thứ Bảy</div></div>
+						<div class="meta"><span>T2</span></div>
+					</li>
+				</ul>
+			</div>
+
+			<div id="list-search" hidden>
+				<div class="search-note">Gõ không dấu vẫn ra tin có dấu. Kết quả trong máy hiện ngay, kết quả từ server gộp vào sau.</div>
+				<ul class="results" id="results"></ul>
+				<div class="empty" id="results-empty" hidden>
+					<svg class="icon"><use href="#i-search"/></svg>
+					<strong>Không thấy tin nào</strong>
+					<span>Thử từ khác, hoặc bỏ bớt bộ lọc người gửi và ngày.</span>
+				</div>
+			</div>
+		</section>
+
+		<section class="convo" aria-label="Vận hành hệ thống">
+			<header class="convo-head">
+				<span class="avatar av-blue">VH</span>
+				<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 3 đang online</span></div>
+				<button type="button" class="icon-btn" aria-label="Tìm trong chat" data-action="search"><svg class="icon"><use href="#i-search"/></svg></button>
+				<button type="button" class="icon-btn" aria-pressed="true" aria-label="Thông tin chat" id="info-toggle"><svg class="icon"><use href="#i-info"/></svg></button>
+			</header>
+			<div class="pinned"><svg class="icon icon-sm"><use href="#i-pin"/></svg><span><b>Tin ghim</b> · Quy trình trực sự cố tuần này: Huy trực chính, Lan Anh trực phụ.</span></div>
+
+			<div class="messages" id="messages" aria-live="polite">
+				<span class="day">Hôm nay</span>
+				<span class="system">Lan Anh đã thêm Deploy Bot vào nhóm</span>
+
+				<div class="msg">
+					<span class="avatar sm av-cyan">QH</span>
+					<div class="bubble">
+						<span class="who">Quang Huy</span>
+						<p>Sáng nay mình sẽ nâng cấp <code>postgres-17</code> trên box lab. Ai đang test thì báo <span class="mention">@Lan Anh</span> nhé. Hướng dẫn ở <a href="https://wiki.hoandat.com/van-hanh" data-trusted>wiki vận hành</a>.<span class="stamp">09:12</span></p>
+						<div class="reactions"><button type="button" class="reaction" aria-pressed="true">👍 4</button><button type="button" class="reaction" aria-pressed="false">👀 1</button></div>
+					</div>
+				</div>
+
+				<div class="msg">
+					<span class="avatar sm av-green">LA</span>
+					<div class="bubble">
+						<span class="who">Lan Anh</span>
+						<div class="photo-grid" aria-label="Album 2 ảnh">
+							<div class="photo">Ảnh chụp dashboard</div>
+							<div class="photo">Ảnh chụp log</div>
+						</div>
+						<p>Trước khi nâng cấp, đây là trạng thái hiện tại.<span class="stamp">09:20</span></p>
+					</div>
+				</div>
+
+				<div class="msg">
+					<span class="avatar sm av-red"><svg class="icon icon-sm"><use href="#i-webhook"/></svg></span>
+					<div class="bubble integration">
+						<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Grafana</span>
+						<div class="int-title"><span class="sev firing">Firing</span>CPU cao trên lab-174</div>
+						<div class="int-body mono">instance: lab-174:9100
+cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
+						<div class="keyboard">
+							<button type="button" data-press="Đã nhận xử lý cảnh báo">Nhận xử lý</button>
+							<button type="button" data-press="Đã tắt tiếng cảnh báo 1 giờ">Tắt tiếng 1 giờ</button>
+							<button type="button" class="wide" data-toast="Mở Grafana bằng trình duyệt sau khi kiểm allowlist scheme">Mở trong Grafana <svg class="icon icon-sm"><use href="#i-external"/></svg></button>
+						</div>
+						<p class="via">Gửi qua incoming webhook, không thể giả tên người dùng.<span class="stamp">09:42</span></p>
+					</div>
+				</div>
+
+				<div class="msg">
+					<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+					<div class="bubble">
+						<span class="who">Deploy Bot <span class="tag">bot</span></span>
+						<p>Bản <code>2.4.1</code> đã lên staging. Đẩy lên production không?<span class="stamp">09:43</span></p>
+						<div class="keyboard">
+							<button type="button" data-press="Bot đã nhận: Đẩy lên production">Đẩy lên production</button>
+							<button type="button" data-press="Bot đã nhận: Hoãn">Hoãn</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="msg mine">
+					<div class="bubble">
+						<span class="reply"><b>Grafana</b>CPU cao trên lab-174</span>
+						<p>Mình nhận, đang xem process nào ăn CPU.<span class="stamp">09:44 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p>
+					</div>
+				</div>
+				<span class="typing">Quang Huy đang soạn tin…</span>
+			</div>
+
+			<form class="composer" id="composer">
+				<a class="icon-btn" href="media.html#attach" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></a>
+				<label class="sr-only" for="draft">Tin nhắn</label>
+				<textarea id="draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+				<button type="button" class="icon-btn" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></button>
+				<button type="submit" class="send" id="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+			</form>
+		</section>
+
+		<aside class="info" aria-label="Thông tin chat">
+			<div class="info-head"><span>Thông tin chat</span><button type="button" class="icon-btn" aria-label="Đóng" data-action="close-info"><svg class="icon"><use href="#i-x"/></svg></button></div>
+			<div class="info-hero">
+				<span class="avatar av-blue">VH</span>
+				<h2>Vận hành hệ thống</h2>
+				<span class="muted">Nhóm · 12 thành viên</span>
+			</div>
+			<div class="info-sec">
+				<div class="row"><svg class="icon"><use href="#i-bell"/></svg><span class="grow">Thông báo</span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thông báo"></button></div>
+				<div class="row"><svg class="icon"><use href="#i-lock"/></svg><span class="grow">Thành viên mới xem lịch sử<small>Admin có thể tắt</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thành viên mới xem lịch sử"></button></div>
+				<div class="row"><svg class="icon"><use href="#i-settings"/></svg><a class="grow" href="#chat-admin">Quản trị nhóm</a><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></div>
+			</div>
+			<div class="info-sec">
+				<h3>Tích hợp</h3>
+				<div class="row"><span class="device"><svg class="icon"><use href="#i-webhook"/></svg></span><span class="grow">Grafana<small>Incoming webhook · tạo bởi Quang Huy</small></span></div>
+				<div class="row"><span class="device"><svg class="icon"><use href="#i-robot"/></svg></span><span class="grow">Deploy Bot<small>Bot · chỉ đọc lệnh gửi cho nó</small></span></div>
+				<a class="btn btn-block" href="integrations.html#create-hook" style="margin-top: var(--space-2)">Thêm webhook</a>
+			</div>
+			<div class="info-sec">
+				<h3>Thành viên</h3>
+				<div class="row"><span class="avatar sm av-cyan">QH</span><span class="grow">Quang Huy</span><span class="role">Admin</span></div>
+				<div class="row"><span class="avatar sm av-green">LA</span><span class="grow">Lan Anh</span><span class="role">Admin</span></div>
+				<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh</span></div>
+				<div class="row"><span class="avatar sm av-violet">ĐT</span><span class="grow">Bạn</span></div>
+			</div>
+		</aside>
+	</div>
+	</div>
+</section>
+
+<!-- ======================= 2. List states ======================= -->
+<section class="shot" id="list-states">
+	<div class="shot-head"><h2>Trạng thái danh sách chat</h2><span class="phase">Phase 6</span>
+		<p>Chat ghim luôn ở đầu (biểu tượng ghim cạnh giờ). Chat tắt tiếng có chuông gạch và badge xám để không giành sự chú ý. Preview ưu tiên: đang gõ (màu tím) &gt; bản nháp (chữ "Nháp:" màu đỏ) &gt; tin cuối. Tab "Chưa đọc" trống có trạng thái riêng. Khung skeleton chỉ xuất hiện ở lần đầu đăng nhập trên máy, những lần sau danh sách mở từ cache.</p></div>
+	<div class="frame">
+		<div class="split lists">
+			<section class="pane list" aria-label="Danh sách chat, tab Tất cả">
+				<div class="pane-cap">Tab Tất cả</div>
+				<div class="list-head">
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm chat, tin nhắn"></label>
+				</div>
+				<div class="tabs" role="tablist" aria-label="Lọc chat">
+					<button type="button" role="tab" aria-selected="true">Tất cả</button>
+					<button type="button" role="tab" aria-selected="false">Chưa đọc</button>
+					<button type="button" role="tab" aria-selected="false">Nhóm</button>
+				</div>
+				<ul class="chats">
+					<li class="chat-row">
+						<span class="avatar av-blue">VH</span>
+						<div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div>
+						<div class="meta"><span class="line"><svg class="icon icon-sm" role="img" aria-label="Đã ghim"><use href="#i-pin"/></svg>09:42</span><span class="badge">3</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-green">LA</span>
+						<div><div class="name">Lan Anh</div><div class="preview"><span class="draft">Nháp:</span> Chiều nay mình gửi bản sửa màn đăng nhập</div></div>
+						<div class="meta"><span class="line"><svg class="icon icon-sm" role="img" aria-label="Đã ghim"><use href="#i-pin"/></svg>09:30</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-cyan">QH</span>
+						<div><div class="name">Quang Huy</div><div class="preview"><span class="typing-text">đang gõ…</span></div></div>
+						<div class="meta"><span>09:28</span><span class="badge">1</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-amber">TM</span>
+						<div><div class="name">Team Mobile <svg class="icon icon-sm" role="img" aria-label="Đã tắt tiếng"><use href="#i-bell-off"/></svg></div><div class="preview"><span class="typing-text">Minh đang gõ…</span></div></div>
+						<div class="meta"><span>09:10</span><span class="badge muted-badge">12</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
+						<div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div>
+						<div class="meta"><span>08:55</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-amber">MN</span>
+						<div><div class="name">Minh</div><div class="preview">Bạn: Ok, cảm ơn nhé</div></div>
+						<div class="meta"><span class="line"><svg class="icon icon-sm" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg>Hôm qua</span></div>
+					</li>
+					<li class="chat-row">
+						<span class="avatar av-grey">TB</span>
+						<div><div class="name">Thông báo hoandat <span class="tag">kênh</span> <svg class="icon icon-sm" role="img" aria-label="Đã tắt tiếng"><use href="#i-bell-off"/></svg></div><div class="preview">Lịch bảo trì auth.hoandat.com tối thứ Bảy</div></div>
+						<div class="meta"><span>T2</span></div>
+					</li>
+				</ul>
+			</section>
+
+			<section class="pane list" aria-label="Danh sách chat, tab Chưa đọc">
+				<div class="pane-cap">Tab Chưa đọc, đã đọc hết</div>
+				<div class="list-head">
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm chat, tin nhắn"></label>
+				</div>
+				<div class="tabs" role="tablist" aria-label="Lọc chat">
+					<button type="button" role="tab" aria-selected="false">Tất cả</button>
+					<button type="button" role="tab" aria-selected="true">Chưa đọc</button>
+					<button type="button" role="tab" aria-selected="false">Nhóm</button>
+				</div>
+				<div class="empty">
+					<svg class="icon"><use href="#i-checks"/></svg>
+					<strong>Bạn đã đọc hết</strong>
+					<span>Chat có tin mới sẽ hiện ở đây. Chat đã tắt tiếng vẫn được tính.</span>
+					<button type="button" class="btn btn-sm" data-toast="Chuyển về tab Tất cả">Xem tất cả chat</button>
+				</div>
+			</section>
+
+			<section class="pane list" aria-label="Danh sách chat đang tải lần đầu" aria-busy="true">
+				<div class="pane-cap">Lần đầu đăng nhập trên máy</div>
+				<div class="list-head">
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm chat, tin nhắn" disabled></label>
+				</div>
+				<div aria-hidden="true">
+					<div class="sk-row"><span class="sk av"></span><div><span class="sk" style="width:60%"></span><span class="sk" style="width:85%"></span></div><span class="sk"></span></div>
+					<div class="sk-row"><span class="sk av"></span><div><span class="sk" style="width:45%"></span><span class="sk" style="width:70%"></span></div><span class="sk"></span></div>
+					<div class="sk-row"><span class="sk av"></span><div><span class="sk" style="width:55%"></span><span class="sk" style="width:90%"></span></div><span class="sk"></span></div>
+					<div class="sk-row"><span class="sk av"></span><div><span class="sk" style="width:35%"></span><span class="sk" style="width:65%"></span></div><span class="sk"></span></div>
+					<div class="sk-row"><span class="sk av"></span><div><span class="sk" style="width:50%"></span><span class="sk" style="width:80%"></span></div><span class="sk"></span></div>
+				</div>
+				<div class="list-foot" style="margin-top:auto"><span class="spin" aria-hidden="true"></span>Đang tải danh sách chat lần đầu…</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 3. Message kinds ======================= -->
+<section class="shot" id="message-kinds">
+	<div class="shot-head"><h2>Các loại tin nhắn</h2><span class="phase">Phase 6</span>
+		<p>Định dạng render từ entities (offset UTF-16), không chèn HTML thô. Link chỉ nhận http/https/mailto/scheme của app; link ngoài domain tin cậy hỏi xác nhận trước khi mở. Spoiler bấm để hiện. Tin hệ thống gom vào một khung để duyệt, thực tế mỗi loại xuất hiện đúng lúc của nó. Bên phải: bốn trạng thái gửi của tin của bạn.</p></div>
+	<div class="frame auto">
+		<div class="split kinds">
+			<section class="pane convo" aria-label="Vận hành hệ thống, các loại tin">
+				<header class="convo-head">
+					<span class="avatar av-blue">VH</span>
+					<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên</span></div>
+					<button type="button" class="icon-btn" aria-label="Thông tin chat"><svg class="icon"><use href="#i-info"/></svg></button>
+				</header>
+				<div class="messages">
+					<span class="day">Thứ Hai, 12/10</span>
+					<span class="system">Quang Huy đã tạo nhóm “Vận hành”</span>
+					<span class="system">Quang Huy đã thêm Lan Anh và Minh</span>
+					<span class="system">Lan Anh đã đổi tên nhóm thành “Vận hành hệ thống”</span>
+					<span class="system">Quang Huy đã bật: thành viên mới xem được lịch sử</span>
+					<span class="system">Nhóm đã chuyển sang chế độ nhóm lớn (hơn 200 thành viên)</span>
+					<span class="day">Hôm nay</span>
+
+					<div class="msg">
+						<span class="avatar sm av-cyan">QH</span>
+						<div class="bubble">
+							<span class="who">Quang Huy</span>
+							<p><b>Lịch nâng cấp</b> <i>postgres-17</i> trên box lab: bắt đầu <u>09:30</u>, không phải <s>09:00</s>. Mã phòng họp: <span class="spoiler" role="button" tabindex="0" aria-label="Nội dung ẩn, bấm để hiện">482 913</span>. Sau khi xong chạy <code>make migrate</code>. Đọc <a href="https://www.postgresql.org/docs/17/pgupgrade.html">tài liệu pg_upgrade</a>, nhờ <span class="mention">@lananh</span> kiểm tra replica. <span class="hashtag">#baotri</span></p>
+							<div class="code-block">
+								<div class="cb-head"><span>bash</span><button type="button" class="icon-btn" aria-label="Sao chép đoạn code" data-toast="Đã sao chép đoạn code"><svg class="icon icon-sm"><use href="#i-copy"/></svg></button></div>
+								<pre><code>pg_upgrade -b /usr/lib/postgresql/16/bin \
+  -B /usr/lib/postgresql/17/bin --check</code></pre>
+							</div>
+							<p><span class="stamp">09:12</span></p>
+						</div>
+					</div>
+
+					<div class="msg">
+						<span class="avatar sm av-amber">MN</span>
+						<div class="bubble">
+							<span class="who">Minh</span>
+							<span class="fwd">Chuyển tiếp từ <b>Lan Anh</b></span>
+							<p>Checklist sau nâng cấp: vacuum analyze, kiểm tra extension, so số dòng các bảng chính.<span class="stamp">09:18</span></p>
+						</div>
+					</div>
+
+					<div class="msg">
+						<span class="avatar sm av-green">LA</span>
+						<div class="bubble">
+							<span class="who">Lan Anh</span>
+							<span class="reply"><b>Quang Huy</b>Lịch nâng cấp postgres-17 trên box lab…</span>
+							<p>Replica đã bắt kịp, độ trễ dưới 1 giây.<span class="stamp">đã sửa 09:20</span></p>
+						</div>
+					</div>
+
+					<div class="msg mine">
+						<div class="bubble">
+							<span class="reply"><b>Minh</b>Checklist sau nâng cấp: vacuum analyze…</span>
+							<p>Cảm ơn, mình ghim checklist lên nhé.<span class="stamp">09:21 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p>
+						</div>
+					</div>
+					<span class="system">Bạn đã ghim “Checklist sau nâng cấp”</span>
+
+					<div class="msg">
+						<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+						<div class="bubble unsupported">
+							<svg class="icon"><use href="#i-alert-circle"/></svg>
+							<div>
+								<p>Tin này cần phiên bản mới hơn</p>
+								<small>Deploy Bot gửi một loại tin mà bản app này chưa hiển thị được.</small>
+								<button type="button" class="btn btn-sm" data-toast="Tải lại trang để lấy bản web mới nhất">Tải lại để cập nhật</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="unread-div" role="separator">Tin chưa đọc</div>
+					<div class="msg">
+						<span class="avatar sm av-cyan">QH</span>
+						<div class="bubble"><span class="who">Quang Huy</span><p>Xong rồi, mọi người kiểm tra giúp mình.<span class="stamp">09:31</span></p></div>
+					</div>
+					<div class="msg">
+						<span class="avatar sm av-green">LA</span>
+						<div class="bubble"><span class="who">Lan Anh</span><p>Dashboard ổn định.<span class="stamp">09:32</span></p></div>
+					</div>
+				</div>
+				<button type="button" class="to-bottom" aria-label="Xuống tin mới nhất, 5 tin chưa đọc"><svg class="icon"><use href="#i-arrow-down"/></svg><span class="badge">5</span></button>
+			</section>
+
+			<section class="pane convo" aria-label="Quang Huy, trạng thái gửi">
+				<header class="convo-head">
+					<span class="avatar av-cyan">QH</span>
+					<div class="title"><strong>Quang Huy</strong><span>truy cập gần đây</span></div>
+					<button type="button" class="icon-btn" aria-label="Thông tin"><svg class="icon"><use href="#i-info"/></svg></button>
+				</header>
+				<div class="messages">
+					<span class="day">Hôm nay</span>
+					<div class="msg">
+						<div class="bubble"><p>Chiều nay review PR màn đăng nhập nhé?<span class="stamp">14:02</span></p></div>
+					</div>
+					<div class="msg mine">
+						<div class="bubble"><p>Ok, mình xem lúc 15:00.<span class="stamp">14:03 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div>
+					</div>
+					<div class="msg mine">
+						<div class="bubble"><p>Link staging: <a href="https://staging.hoandat.com" data-trusted>staging.hoandat.com</a><span class="stamp">14:05 <svg class="icon icon-sm" role="img" aria-label="Đã gửi"><use href="#i-check"/></svg></span></p></div>
+					</div>
+					<div class="msg mine">
+						<div class="msg-stack">
+							<div class="bubble"><p>Bản build lỗi ở bước chuyển sang auth.<span class="stamp">14:06 <svg class="icon icon-sm fail" role="img" aria-label="Gửi lỗi"><use href="#i-alert-circle"/></svg></span></p></div>
+							<div class="failed-row">Chưa gửi được <button type="button" class="btn btn-sm" data-press="Đã gửi lại tin">Gửi lại</button></div>
+						</div>
+					</div>
+					<div class="msg mine">
+						<div class="bubble"><p>Để mình chụp màn hình gửi bạn.<span class="stamp">14:07 <svg class="icon icon-sm" role="img" aria-label="Đang gửi"><use href="#i-clock"/></svg></span></p></div>
+					</div>
+				</div>
+				<div class="legend" aria-label="Chú thích trạng thái gửi">
+					<span><svg class="icon icon-sm"><use href="#i-clock"/></svg>Đang gửi</span>
+					<span><svg class="icon icon-sm"><use href="#i-check"/></svg>Server đã nhận</span>
+					<span><svg class="icon icon-sm read"><use href="#i-checks"/></svg>Đã đọc</span>
+					<span class="fail"><svg class="icon icon-sm"><use href="#i-alert-circle"/></svg>Gửi lỗi</span>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="draft-qh">Tin nhắn</label>
+					<textarea id="draft-qh" rows="1" placeholder="Viết tin nhắn"></textarea>
+					<button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 4. Connection states ======================= -->
+<section class="shot" id="connection-states">
+	<div class="shot-head"><h2>Trạng thái kết nối</h2><span class="phase">Phase 5</span>
+		<p>Dòng trạng thái thay cho số thành viên trên đầu khung chat. Tin cũ vẫn đọc được từ cache trong mọi trạng thái. Ngoại tuyến: vẫn soạn và gửi được, tin xếp hàng với đồng hồ và tự gửi theo thứ tự khi có mạng.</p></div>
+	<div class="frame">
+		<div class="split conn">
+			<section class="pane convo" aria-label="Đang kết nối">
+				<div class="pane-cap">Mất WebSocket, đang kết nối lại</div>
+				<header class="convo-head">
+					<span class="avatar av-blue">VH</span>
+					<div class="title"><strong>Vận hành hệ thống</strong><span class="status-line"><span class="spin" aria-hidden="true"></span>Đang kết nối…</span></div>
+				</header>
+				<div class="messages">
+					<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Xong rồi, mọi người kiểm tra giúp mình.<span class="stamp">09:31</span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Mình xem ngay.<span class="stamp">09:33 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false"><label class="sr-only" for="d-c1">Tin nhắn</label><textarea id="d-c1" rows="1" placeholder="Viết tin nhắn"></textarea><button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button></form>
+			</section>
+
+			<section class="pane convo" aria-label="Đang cập nhật">
+				<div class="pane-cap">Đã kết nối, đang lấy phần chênh lệch</div>
+				<header class="convo-head">
+					<span class="avatar av-blue">VH</span>
+					<div class="title"><strong>Vận hành hệ thống</strong><span class="status-line"><span class="spin" aria-hidden="true"></span>Đang cập nhật…</span></div>
+				</header>
+				<div class="messages">
+					<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Xong rồi, mọi người kiểm tra giúp mình.<span class="stamp">09:31</span></p></div></div>
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><span class="who">Lan Anh</span><p>Dashboard ổn định.<span class="stamp">09:32</span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false"><label class="sr-only" for="d-c2">Tin nhắn</label><textarea id="d-c2" rows="1" placeholder="Viết tin nhắn"></textarea><button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button></form>
+			</section>
+
+			<section class="pane convo" aria-label="Ngoại tuyến">
+				<div class="pane-cap">Không có mạng</div>
+				<header class="convo-head">
+					<span class="avatar av-blue">VH</span>
+					<div class="title"><strong>Vận hành hệ thống</strong><span>Chờ mạng</span></div>
+				</header>
+				<div class="banner warn" role="status"><svg class="icon icon-sm"><use href="#i-wifi-off"/></svg>Ngoại tuyến — 2 tin sẽ gửi khi có mạng</div>
+				<div class="messages">
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><span class="who">Lan Anh</span><p>Dashboard ổn định.<span class="stamp">09:32</span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Mình đi họp, 30 phút nữa quay lại.<span class="stamp">09:40 <svg class="icon icon-sm" role="img" aria-label="Chờ gửi"><use href="#i-clock"/></svg></span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Có gì cứ gọi Huy nhé.<span class="stamp">09:41 <svg class="icon icon-sm" role="img" aria-label="Chờ gửi"><use href="#i-clock"/></svg></span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false"><label class="sr-only" for="d-c3">Tin nhắn</label><textarea id="d-c3" rows="1" placeholder="Tin sẽ gửi khi có mạng"></textarea><button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button></form>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 5. Context menu ======================= -->
+<section class="shot" id="context-menu">
+	<div class="shot-head"><h2>Menu thao tác tin</h2><span class="phase">Phase 6</span>
+		<p>Chuột phải (desktop) hoặc nhấn giữ (cảm ứng) mở hàng reaction và menu. Tin của bạn có "Sửa" (trong thời hạn server cấp) và "Xem ai đã đọc" (chỉ nhóm không vượt ngưỡng thành viên do server cấu hình). Tin người khác có "Báo cáo"; "Xoá" với tin người khác chỉ xoá ở phía bạn.</p></div>
+	<div class="frame">
+		<div class="split">
+			<section class="pane convo" aria-label="Menu trên tin của người khác">
+				<div class="pane-cap">Tin của người khác</div>
+				<div class="messages">
+					<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Xong rồi, mọi người kiểm tra giúp mình.<span class="stamp">09:31</span></p></div></div>
+					<div class="msg mine"><div class="bubble"><p>Mình xem ngay.<span class="stamp">09:33</span></p></div></div>
+				</div>
+				<div class="ctx-layer">
+					<div class="react-picker" role="group" aria-label="Thả reaction">
+						<button type="button" aria-label="Thích" data-toast="Đã thả 👍">👍</button><button type="button" aria-label="Yêu thích" data-toast="Đã thả ❤️">❤️</button><button type="button" aria-label="Cười" data-toast="Đã thả 😂">😂</button><button type="button" aria-label="Ngạc nhiên" data-toast="Đã thả 😮">😮</button><button type="button" aria-label="Cảm ơn" data-toast="Đã thả 🙏">🙏</button><button type="button" aria-label="Thêm reaction"><svg class="icon"><use href="#i-plus"/></svg></button>
+					</div>
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><span class="who">Lan Anh</span><p>Dashboard ổn định, latency p95 về lại như cũ.<span class="stamp">09:32</span></p></div></div>
+					<div class="menu" role="menu" aria-label="Thao tác với tin">
+						<button type="button" role="menuitem" data-toast="Đang trả lời Lan Anh"><svg class="icon"><use href="#i-reply"/></svg>Trả lời</button>
+						<a role="menuitem" href="#forward"><svg class="icon"><use href="#i-forward"/></svg>Chuyển tiếp</a>
+						<button type="button" role="menuitem" data-toast="Đã sao chép nội dung"><svg class="icon"><use href="#i-copy"/></svg>Sao chép</button>
+						<button type="button" role="menuitem" data-toast="Đã ghim tin cho cả nhóm"><svg class="icon"><use href="#i-pin"/></svg>Ghim</button>
+						<a role="menuitem" href="settings.html#report"><svg class="icon"><use href="#i-flag"/></svg>Báo cáo</a>
+						<hr>
+						<a role="menuitem" class="danger" href="#delete"><svg class="icon"><use href="#i-trash"/></svg>Xoá ở phía tôi</a>
+					</div>
+				</div>
+			</section>
+
+			<section class="pane convo" aria-label="Menu trên tin của bạn">
+				<div class="pane-cap">Tin của bạn, nhóm nhỏ</div>
+				<div class="messages">
+					<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><span class="who">Lan Anh</span><p>Dashboard ổn định.<span class="stamp">09:32</span></p></div></div>
+				</div>
+				<div class="ctx-layer mine">
+					<div class="react-picker" role="group" aria-label="Thả reaction">
+						<button type="button" aria-label="Thích" data-toast="Đã thả 👍">👍</button><button type="button" aria-label="Yêu thích" data-toast="Đã thả ❤️">❤️</button><button type="button" aria-label="Cười" data-toast="Đã thả 😂">😂</button><button type="button" aria-label="Ngạc nhiên" data-toast="Đã thả 😮">😮</button><button type="button" aria-label="Cảm ơn" data-toast="Đã thả 🙏">🙏</button><button type="button" aria-label="Thêm reaction"><svg class="icon"><use href="#i-plus"/></svg></button>
+					</div>
+					<div class="msg mine"><div class="bubble"><p>Mình đã cập nhật runbook, link ở tin ghim.<span class="stamp">09:35 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+					<div class="menu" role="menu" aria-label="Thao tác với tin của bạn">
+						<button type="button" role="menuitem" data-toast="Đang trả lời tin của bạn"><svg class="icon"><use href="#i-reply"/></svg>Trả lời</button>
+						<a role="menuitem" href="#forward"><svg class="icon"><use href="#i-forward"/></svg>Chuyển tiếp</a>
+						<button type="button" role="menuitem" data-toast="Đã sao chép nội dung"><svg class="icon"><use href="#i-copy"/></svg>Sao chép</button>
+						<button type="button" role="menuitem" data-toast="Đang sửa tin, Esc để huỷ"><svg class="icon"><use href="#i-edit"/></svg>Sửa</button>
+						<button type="button" role="menuitem" data-toast="Đã ghim tin cho cả nhóm"><svg class="icon"><use href="#i-pin"/></svg>Ghim</button>
+						<a role="menuitem" href="#read-by"><svg class="icon"><use href="#i-checks"/></svg>Xem ai đã đọc<span class="count">3 người</span></a>
+						<hr>
+						<a role="menuitem" class="danger" href="#delete"><svg class="icon"><use href="#i-trash"/></svg>Xoá</a>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 6. Forward ======================= -->
+<section class="shot" id="forward">
+	<div class="shot-head"><h2>Chuyển tiếp tin</h2><span class="phase">Phase 6</span>
+		<p>Chọn nhiều chat đích (tìm không dấu), thêm lời nhắn nếu muốn, rồi gửi. Nút Gửi đếm số chat và tắt khi chưa chọn. Tin chuyển tiếp mang dòng "Chuyển tiếp từ …" theo người gửi gốc. Chat không có quyền gửi (kênh không phải admin) không hiện trong danh sách.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog">
+			<div class="panel" role="group" aria-labelledby="fw-title">
+				<div class="dlg-head"><h2 id="fw-title">Chuyển tiếp tới</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="quote"><b>Lan Anh</b>Dashboard ổn định, latency p95 về lại như cũ.</div>
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" id="fw-search" placeholder="Tìm chat" autocomplete="off"></label>
+					<div class="chips" id="fw-chips" aria-live="polite"></div>
+					<div class="pick-list" id="fw-list" role="group" aria-label="Chat đích">
+						<button type="button" class="pick" role="checkbox" aria-checked="true" data-name="Team Mobile"><span class="avatar av-amber">TM</span><span><b>Team Mobile</b><small>Nhóm · 8 thành viên</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+						<button type="button" class="pick" role="checkbox" aria-checked="true" data-name="Quang Huy"><span class="avatar av-cyan">QH</span><span><b>Quang Huy</b><small>truy cập gần đây</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+						<button type="button" class="pick" role="checkbox" aria-checked="false" data-name="Minh"><span class="avatar av-amber">MN</span><span><b>Minh</b><small>online</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+						<button type="button" class="pick" role="checkbox" aria-checked="false" data-name="Vận hành hệ thống"><span class="avatar av-blue">VH</span><span><b>Vận hành hệ thống</b><small>Nhóm · 12 thành viên</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+					</div>
+					<div class="empty" id="fw-empty" hidden><strong>Không thấy chat nào</strong><span>Thử tên khác, gõ không dấu cũng được.</span></div>
+					<div class="field"><label for="fw-comment">Lời nhắn kèm theo</label><textarea class="input" id="fw-comment" rows="2" placeholder="Không bắt buộc" style="min-height:64px"></textarea></div>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" id="fw-send" data-press="Đã chuyển tiếp">Gửi tới 2 chat</button></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 7. Delete ======================= -->
+<section class="shot" id="delete">
+	<div class="shot-head"><h2>Xoá tin</h2><span class="phase">Phase 2, 4</span>
+		<p>Ô "Xoá cho mọi người" chỉ có với tin của bạn trong thời hạn server cho phép. Xoá cho mọi người gỡ tin trên mọi thiết bị; media đi kèm bị thu hồi khỏi CDN và link cũ ngừng hoạt động trong vòng 60 giây. Tin của người khác chỉ ẩn ở phía bạn.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="del1-title">
+				<div class="dlg-head"><h2 id="del1-title">Xoá tin của bạn?</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="quote"><b>Bạn · 09:35</b>Mình đã cập nhật runbook, kèm 2 ảnh chụp màn hình.</div>
+					<button type="button" class="check-row" role="checkbox" aria-checked="true" id="del-all"><span class="tick sq"><svg class="icon"><use href="#i-check"/></svg></span>Xoá cho mọi người trong “Vận hành hệ thống”</button>
+					<p class="note" id="del-note"><svg class="icon"><use href="#i-info"/></svg><span>Tin và 2 ảnh bị gỡ khỏi máy của mọi thành viên. Link ảnh đã chia sẻ ngừng hoạt động trong vòng 60 giây. Không hoàn tác được.</span></p>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-danger" data-press="Đã xoá tin">Xoá</button></div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="del2-title">
+				<div class="dlg-head"><h2 id="del2-title">Xoá tin của Lan Anh?</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="quote"><b>Lan Anh · 09:32</b>Dashboard ổn định.</div>
+					<p class="note"><svg class="icon"><use href="#i-eye-off"/></svg><span>Tin chỉ bị ẩn trên các thiết bị của bạn. Thành viên khác vẫn thấy.</span></p>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-danger" data-press="Đã ẩn tin ở phía bạn">Xoá ở phía tôi</button></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 8. Read by ======================= -->
+<section class="shot" id="read-by">
+	<div class="shot-head"><h2>Ai đã đọc</h2><span class="phase">Phase 2</span>
+		<p>Danh sách từng người đã đọc chỉ có ở nhóm không vượt ngưỡng thành viên (server cấp qua cấu hình, client không tự đặt) và chỉ trong một số ngày sau khi gửi. Nhóm lớn hơn chỉ có trạng thái đã đọc: hai dấu tích tím nghĩa là ít nhất một người đã đọc.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="rb-title">
+				<div class="dlg-head"><h2 id="rb-title">Đã đọc · 3 người</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="quote"><b>Bạn · 09:35</b>Mình đã cập nhật runbook, link ở tin ghim.</div>
+					<div>
+						<div class="row"><span class="avatar sm av-cyan">QH</span><span class="grow">Quang Huy</span><span class="role">09:36</span></div>
+						<div class="row"><span class="avatar sm av-green">LA</span><span class="grow">Lan Anh</span><span class="role">09:38</span></div>
+						<div class="row"><span class="avatar sm av-amber">MN</span><span class="grow">Minh</span><span class="role">09:51</span></div>
+					</div>
+					<p class="note"><svg class="icon"><use href="#i-users"/></svg><span>8 thành viên chưa đọc. Bot trong nhóm không được tính.</span></p>
+				</div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="rb2-title">
+				<div class="dlg-head"><h2 id="rb2-title">Nhóm lớn: chỉ có trạng thái</h2></div>
+				<div class="dlg-body stack">
+					<div class="msg mine" style="max-width:100%"><div class="bubble"><p>Lịch bảo trì tối thứ Bảy đã chốt.<span class="stamp">10:02 <svg class="icon icon-sm read" role="img" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+					<p class="note"><svg class="icon"><use href="#i-info"/></svg><span>Nhóm vượt ngưỡng thành viên: menu tin không có mục "Xem ai đã đọc". Dấu tích tím chỉ báo đã có người đọc.</span></p>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 9. New chat ======================= -->
+<section class="shot" id="new-chat">
+	<div class="shot-head"><h2>Chat mới</h2><span class="phase">Phase 2, 12</span>
+		<p>Tìm theo username (gõ dần) hoặc email. Email chỉ khớp khi gõ đúng toàn bộ địa chỉ và người đó cho phép tìm bằng email, để không dò được danh sách người dùng. Kết quả không bao giờ hiện email của người khác. Thử gõ "lan" hoặc một phần email trong ô tìm.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog">
+			<div class="panel" role="group" aria-labelledby="nc-title">
+				<div class="dlg-head"><h2 id="nc-title">Tin nhắn mới</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="quick">
+						<a href="#new-group"><svg class="icon"><use href="#i-users"/></svg>Tạo nhóm</a>
+						<a href="#new-channel"><svg class="icon"><use href="#i-megaphone"/></svg>Tạo kênh</a>
+					</div>
+					<div class="field">
+						<label for="nc-q">Tìm người</label>
+						<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><input id="nc-q" type="search" value="lananh@hoandat.com" placeholder="Username hoặc email đầy đủ" autocomplete="off"></label>
+					</div>
+					<div id="nc-out" aria-live="polite"></div>
+					<p class="note"><svg class="icon"><use href="#i-shield"/></svg><span>Tìm bằng email chỉ khớp chính xác và có giới hạn số lần tìm. Gõ một phần email sẽ không ra kết quả.</span></p>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 10. New group ======================= -->
+<section class="shot" id="new-group">
+	<div class="shot-head"><h2>Tạo nhóm</h2><span class="phase">Phase 2</span>
+		<p>Hai bước: chọn thành viên rồi đặt tên và ảnh. Người chỉ cho danh bạ thêm vào nhóm hiện mờ với lý do, không lộ thêm gì. "Thành viên mới xem được lịch sử" mặc định bật; admin đổi được sau trong Quản trị nhóm.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="ng1-title">
+				<div class="dlg-head"><h2 id="ng1-title">Tạo nhóm</h2><span class="step">Bước 1/2</span><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm người</span><input type="search" placeholder="Tìm theo tên hoặc username" autocomplete="off"></label>
+					<div class="chips" id="ng-chips"></div>
+					<div class="pick-list" id="ng-list" role="group" aria-label="Thành viên">
+						<button type="button" class="pick" role="checkbox" aria-checked="true" data-name="Quang Huy"><span class="avatar av-cyan">QH</span><span><b>Quang Huy</b><small>@quanghuy</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+						<button type="button" class="pick" role="checkbox" aria-checked="true" data-name="Lan Anh"><span class="avatar av-green">LA</span><span><b>Lan Anh</b><small>@lananh</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+						<button type="button" class="pick" role="checkbox" aria-checked="false" aria-disabled="true" data-name="Minh"><span class="avatar av-amber">MN</span><span><b>Minh</b><small>Chỉ danh bạ của Minh thêm được vào nhóm</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+						<button type="button" class="pick" role="checkbox" aria-checked="false" data-name="Deploy Bot"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><span><b>Deploy Bot</b><small>Bot · chỉ thấy lệnh gửi cho nó</small></span><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></button>
+					</div>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" id="ng-next">Tiếp · 2 người</button></div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="ng2-title">
+				<div class="dlg-head"><button type="button" class="icon-btn" aria-label="Quay lại bước 1"><svg class="icon"><use href="#i-back"/></svg></button><h2 id="ng2-title">Tạo nhóm</h2><span class="step">Bước 2/2</span></div>
+				<div class="dlg-body stack">
+					<div class="name-row">
+						<button type="button" class="photo-pick" aria-label="Chọn ảnh nhóm" data-toast="Mở chọn ảnh, cắt vuông trước khi tải lên"><svg class="icon"><use href="#i-camera"/></svg></button>
+						<div class="field"><label for="ng-name">Tên nhóm</label><input class="input" id="ng-name" value="Team Mobile" maxlength="128"></div>
+					</div>
+					<div class="row"><span class="grow">Thành viên mới xem được lịch sử<small>Tắt thì người vào sau chỉ thấy tin từ lúc tham gia.</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thành viên mới xem được lịch sử"></button></div>
+					<div>
+						<h3>3 thành viên</h3>
+						<div class="row"><span class="avatar sm av-violet">ĐT</span><span class="grow">Bạn</span><span class="role">Người tạo</span></div>
+						<div class="row"><span class="avatar sm av-cyan">QH</span><span class="grow">Quang Huy</span></div>
+						<div class="row"><span class="avatar sm av-green">LA</span><span class="grow">Lan Anh</span></div>
+					</div>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Quay lại</button><button type="button" class="btn btn-primary" data-press="Đã tạo nhóm Team Mobile">Tạo nhóm</button></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 11. New channel ======================= -->
+<section class="shot" id="new-channel">
+	<div class="shot-head"><h2>Tạo kênh</h2><span class="phase">Phase 2</span>
+		<p>Kênh phát tin một chiều: chỉ admin đăng. Công khai thì có username, ai cũng mở được qua chat.hoandat.com/&lt;username&gt; và tìm thấy trong tenant. Riêng tư thì chỉ vào được bằng link mời, admin thu hồi và tạo link mới được.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="ch1-title">
+				<div class="dlg-head"><h2 id="ch1-title">Tạo kênh</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="name-row">
+						<button type="button" class="photo-pick" aria-label="Chọn ảnh kênh" data-toast="Mở chọn ảnh kênh"><svg class="icon"><use href="#i-camera"/></svg></button>
+						<div class="field"><label for="ch-name">Tên kênh</label><input class="input" id="ch-name" value="Thông báo hoandat"></div>
+					</div>
+					<div class="field"><label for="ch-desc">Mô tả</label><textarea class="input" id="ch-desc" rows="2" style="min-height:64px">Lịch bảo trì, bản phát hành và sự cố của hệ sinh thái hoandat.</textarea></div>
+					<div class="radio-cards" role="radiogroup" aria-label="Loại kênh">
+						<button type="button" class="radio-card" role="radio" aria-checked="true"><svg class="icon"><use href="#i-globe"/></svg><b>Công khai</b><small>Có username, ai trong tổ chức cũng tìm và xem được.</small></button>
+						<button type="button" class="radio-card" role="radio" aria-checked="false"><svg class="icon"><use href="#i-lock"/></svg><b>Riêng tư</b><small>Chỉ vào được bằng link mời.</small></button>
+					</div>
+					<div class="field">
+						<label for="ch-user">Username</label>
+						<div class="prefix-input"><span>chat.hoandat.com/</span><input id="ch-user" value="thongbaohoandat" autocomplete="off"></div>
+						<span class="ok-text"><svg class="icon"><use href="#i-check"/></svg>thongbaohoandat còn trống</span>
+					</div>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã tạo kênh Thông báo hoandat">Tạo kênh</button></div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="ch2-title">
+				<div class="dlg-head"><h2 id="ch2-title">Tạo kênh · Riêng tư</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="radio-cards" role="radiogroup" aria-label="Loại kênh">
+						<button type="button" class="radio-card" role="radio" aria-checked="false"><svg class="icon"><use href="#i-globe"/></svg><b>Công khai</b><small>Có username, ai trong tổ chức cũng tìm và xem được.</small></button>
+						<button type="button" class="radio-card" role="radio" aria-checked="true"><svg class="icon"><use href="#i-lock"/></svg><b>Riêng tư</b><small>Chỉ vào được bằng link mời.</small></button>
+					</div>
+					<div class="field">
+						<span class="label">Link mời</span>
+						<div class="copy-field"><span class="link-mono">chat.hoandat.com/+Hq8vT2mXk4RbZ9wLc1Np</span><button type="button" class="icon-btn" aria-label="Sao chép link mời" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+						<span class="hint">Link khó đoán, tạo khi bấm Tạo kênh. Ai có link đều xem trước được kênh. Thu hồi hoặc đặt hạn trong Quản trị.</span>
+					</div>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã tạo kênh riêng tư">Tạo kênh</button></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 12. Invite preview ======================= -->
+<section class="shot" id="invite-preview">
+	<div class="shot-head"><h2>Xem trước lời mời</h2><span class="phase">Phase 2</span>
+		<p>Mở link mời không vào nhóm ngay: app hiện xem trước (tên, ảnh, số thành viên, vài thành viên) và chỉ tham gia khi bấm. Link hết hạn hoặc hết lượt dùng có trạng thái riêng, không lộ thông tin nhóm.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="iv-title">
+				<div class="hero">
+					<span class="avatar lg av-amber">TM</span>
+					<h2 id="iv-title">Team Mobile</h2>
+					<p>Nhóm · 24 thành viên</p>
+					<div class="av-stack" aria-label="Một số thành viên"><span class="avatar sm av-cyan">QH</span><span class="avatar sm av-green">LA</span><span class="avatar sm av-amber">MN</span><span class="more">và 21 người khác</span></div>
+				</div>
+				<div class="dlg-body stack">
+					<p class="note"><svg class="icon"><use href="#i-info"/></svg><span>Bạn sẽ xem được tin cũ của nhóm. Thành viên thấy tên và username của bạn.</span></p>
+				</div>
+				<div class="hero-actions"><button type="button" class="btn btn-primary" data-press="Đã tham gia Team Mobile">Tham gia nhóm</button><button type="button" class="btn">Huỷ</button></div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="iv2-title">
+				<div class="hero">
+					<span class="big-icon"><svg class="icon"><use href="#i-link"/></svg></span>
+					<h2 id="iv2-title">Link mời không còn dùng được</h2>
+					<p>Link đã hết hạn, hết lượt dùng hoặc bị thu hồi. Nhờ admin của nhóm gửi link mới.</p>
+				</div>
+				<div class="hero-actions"><button type="button" class="btn">Đóng</button></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 13. Channel ======================= -->
+<section class="shot" id="channel">
+	<div class="shot-head"><h2>Xem kênh</h2><span class="phase">Phase 2, 6</span>
+		<p>Người đăng ký không có ô soạn tin: chỉ có nút Tắt tiếng / Bật thông báo. Bài đăng hiện tên kênh, không có bộ đếm lượt xem. Admin thấy ô soạn "Đăng bài" và có thể đăng im lặng (người đăng ký không nhận thông báo).</p></div>
+	<div class="frame">
+		<div class="split">
+			<section class="pane convo" aria-label="Kênh, góc nhìn người đăng ký">
+				<div class="pane-cap">Người đăng ký</div>
+				<header class="convo-head">
+					<span class="avatar av-grey">TB</span>
+					<div class="title"><strong>Thông báo hoandat</strong><span>Kênh · 1.248 người đăng ký</span></div>
+					<button type="button" class="icon-btn" aria-label="Thông tin kênh"><svg class="icon"><use href="#i-info"/></svg></button>
+				</header>
+				<div class="messages">
+					<span class="day">Thứ Hai</span>
+					<div class="msg post"><div class="bubble"><span class="who">Thông báo hoandat</span><p><b>Bảo trì auth.hoandat.com</b> tối thứ Bảy 22:00–23:00. Phiên đang đăng nhập không bị ảnh hưởng, chỉ đăng nhập mới tạm gián đoạn.<span class="stamp">09:00</span></p><div class="reactions"><button type="button" class="reaction" aria-pressed="false">👍 32</button><button type="button" class="reaction" aria-pressed="true">🙏 9</button></div></div></div>
+					<span class="day">Hôm nay</span>
+					<div class="msg post"><div class="bubble"><span class="who">Thông báo hoandat</span><div class="photo-grid" style="width:100%; grid-template-columns:1fr"><div class="photo" style="aspect-ratio: 16 / 5">Ảnh minh hoạ bản phát hành</div></div><p>Chat 1.2: tìm không dấu và xem trước link mời. Xem chi tiết ở <a href="https://hoandat.com/changelog" data-trusted>trang thay đổi</a>.<span class="stamp">đã sửa 08:30</span></p></div></div>
+				</div>
+				<div class="sub-bar"><button type="button" class="btn" id="mute-btn" aria-pressed="false"><svg class="icon"><use href="#i-bell-off"/></svg><span>Tắt tiếng</span></button></div>
+			</section>
+
+			<section class="pane convo" aria-label="Kênh, góc nhìn admin">
+				<div class="pane-cap">Admin của kênh</div>
+				<header class="convo-head">
+					<span class="avatar av-grey">TB</span>
+					<div class="title"><strong>Thông báo hoandat</strong><span>Kênh · bạn là admin</span></div>
+					<a class="icon-btn" href="#chat-admin" aria-label="Quản trị kênh"><svg class="icon"><use href="#i-settings"/></svg></a>
+				</header>
+				<div class="messages">
+					<div class="msg post"><div class="bubble"><span class="who">Thông báo hoandat</span><p>Chat 1.2: tìm không dấu và xem trước link mời.<span class="stamp">đã sửa 08:30</span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="ch-post">Bài đăng</label>
+					<textarea id="ch-post" rows="1" placeholder="Đăng bài lên kênh"></textarea>
+					<button type="button" class="icon-btn" aria-pressed="false" aria-label="Đăng im lặng" id="silent-btn"><svg class="icon"><use href="#i-bell"/></svg></button>
+					<button type="button" class="send" aria-label="Đăng" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 14. Chat admin ======================= -->
+<section class="shot" id="chat-admin">
+	<div class="shot-head"><h2>Quản trị nhóm</h2><span class="phase">Phase 2, 9</span>
+		<p>Quyền thành viên là một bitmask: mỗi công tắc là một bit, áp cho mọi thành viên không phải admin. Link mời có hạn và giới hạn lượt dùng tuỳ chọn, thu hồi được từng link. Đổi "lịch sử cho thành viên mới" chỉ áp cho người vào sau. Webhook quản lý ở trang riêng.</p></div>
+	<div class="frame auto">
+		<div class="admin-head">
+			<a class="icon-btn" href="#app" aria-label="Quay lại thông tin chat"><svg class="icon"><use href="#i-back"/></svg></a>
+			<span class="avatar av-blue">VH</span>
+			<div class="title"><strong>Quản trị nhóm</strong><span>Vận hành hệ thống · 12 thành viên</span></div>
+		</div>
+		<div class="admin-grid">
+			<div class="admin-col">
+				<section class="card" aria-labelledby="perm-h">
+					<h3 id="perm-h">Thành viên được phép</h3>
+					<p>Admin luôn có đủ quyền. Thay đổi có hiệu lực ngay.</p>
+					<div class="row"><svg class="icon"><use href="#i-message"/></svg><span class="grow">Gửi tin nhắn</span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Gửi tin nhắn"></button></div>
+					<div class="row"><svg class="icon"><use href="#i-photo"/></svg><span class="grow">Gửi ảnh, video, file</span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Gửi ảnh, video, file"></button></div>
+					<div class="row"><svg class="icon"><use href="#i-user-plus"/></svg><span class="grow">Thêm thành viên</span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Thêm thành viên"></button></div>
+					<div class="row"><svg class="icon"><use href="#i-pin"/></svg><span class="grow">Ghim tin</span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Ghim tin"></button></div>
+					<div class="row"><svg class="icon"><use href="#i-edit"/></svg><span class="grow">Đổi tên, ảnh, mô tả nhóm</span><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Đổi tên, ảnh, mô tả nhóm"></button></div>
+				</section>
+
+				<section class="card" aria-labelledby="hist-h">
+					<h3 id="hist-h">Lịch sử</h3>
+					<div class="row"><svg class="icon"><use href="#i-eye"/></svg><span class="grow">Thành viên mới xem được lịch sử<small>Tắt thì người vào sau chỉ thấy tin từ lúc tham gia. Không ảnh hưởng thành viên hiện tại.</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thành viên mới xem được lịch sử"></button></div>
+				</section>
+
+				<section class="card" aria-labelledby="admins-h">
+					<h3 id="admins-h">Admin</h3>
+					<div class="row"><span class="avatar sm av-cyan">QH</span><span class="grow">Quang Huy<small>Người tạo nhóm</small></span></div>
+					<div class="row"><span class="avatar sm av-green">LA</span><span class="grow">Lan Anh<small>Admin · thêm bởi Quang Huy</small></span><button type="button" class="icon-btn" aria-label="Thao tác với admin Lan Anh" data-toast="Mở menu: bỏ quyền admin"><svg class="icon"><use href="#i-dots"/></svg></button></div>
+					<div class="row"><span class="avatar sm av-violet">ĐT</span><span class="grow">Bạn<small>Admin · thêm bởi Quang Huy</small></span></div>
+					<button type="button" class="btn btn-block" style="margin-top: var(--space-2)" data-toast="Chọn thành viên để cấp quyền admin"><svg class="icon"><use href="#i-user-plus"/></svg>Thêm admin</button>
+				</section>
+			</div>
+
+			<div class="admin-col">
+				<section class="card" aria-labelledby="links-h">
+					<h3 id="links-h">Link mời</h3>
+					<p>Người mở link thấy xem trước nhóm và phải bấm Tham gia.</p>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono">chat.hoandat.com/+q7XrN2bT…</span><small>Hết hạn 21/10 · đã dùng 3/10</small></span><button type="button" class="icon-btn" aria-label="Sao chép link" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button><button type="button" class="icon-btn" aria-label="Thu hồi link" data-press="Đã thu hồi link, người mở link sẽ thấy link không còn dùng được"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono">chat.hoandat.com/+Lm4pW9cZ…</span><small>Không hạn · đã dùng 8</small></span><button type="button" class="icon-btn" aria-label="Sao chép link" data-toast="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button><button type="button" class="icon-btn" aria-label="Thu hồi link" data-press="Đã thu hồi link"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="link-mono muted">chat.hoandat.com/+Ra2vQ8hY…</span><small>Hết hạn 05/10 · đã dùng 10/10</small></span><span class="tag grey">Hết hạn</span></div>
+
+					<div class="sub-form" aria-labelledby="newlink-h">
+						<strong id="newlink-h">Tạo link mới</strong>
+						<div class="field"><span class="label">Hết hạn sau</span>
+							<div class="choice" role="group" aria-label="Hết hạn sau"><button type="button" aria-pressed="false">1 giờ</button><button type="button" aria-pressed="false">1 ngày</button><button type="button" aria-pressed="true">7 ngày</button><button type="button" aria-pressed="false">Không hạn</button></div>
+						</div>
+						<div class="field"><label for="link-limit">Giới hạn lượt dùng</label><input class="input" id="link-limit" type="number" min="1" inputmode="numeric" placeholder="Không giới hạn"></div>
+						<div class="actions"><button type="button" class="btn btn-primary" data-press="Đã tạo link mời mới, hết hạn sau 7 ngày">Tạo link</button></div>
+					</div>
+				</section>
+
+				<section class="card" aria-labelledby="int-h">
+					<h3 id="int-h">Tích hợp</h3>
+					<div class="row"><svg class="icon"><use href="#i-webhook"/></svg><a class="grow" href="integrations.html#hooks-list">Webhook tích hợp<small>1 đang chạy: Grafana</small></a><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></div>
+				</section>
+
+				<section class="card danger-zone" aria-labelledby="danger-h">
+					<h3 id="danger-h">Rời hoặc xoá nhóm</h3>
+					<p>Chỉ người tạo nhóm xoá được nhóm. Xoá nhóm gỡ toàn bộ tin và media cho mọi thành viên, không khôi phục được.</p>
+					<div class="actions"><button type="button" class="btn" data-press="Đã rời nhóm">Rời nhóm</button><button type="button" class="btn danger-text" disabled title="Chỉ người tạo nhóm">Xoá nhóm</button></div>
+				</section>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 15. User profile ======================= -->
+<section class="shot" id="user-profile">
+	<div class="shot-head"><h2>Hồ sơ người khác</h2><span class="phase">Phase 6, 12</span>
+		<p>Hồ sơ tôn trọng cài đặt riêng tư của người kia: last seen chỉ hiện mức gần đúng ("truy cập gần đây"), email không bao giờ hiện. Chặn thì người kia không nhắn, không thêm bạn vào nhóm được. Báo cáo đi vào hàng đợi kiểm duyệt của tổ chức.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog">
+			<div class="panel" role="group" aria-labelledby="up-title" style="width:min(440px, 100%)">
+				<div class="dlg-head"><h2 id="up-title">Thông tin</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="hero">
+					<span class="avatar lg av-green">LA</span>
+					<h2>Lan Anh</h2>
+					<p>truy cập gần đây</p>
+				</div>
+				<div class="profile-actions">
+					<a class="btn btn-primary" href="#app"><svg class="icon"><use href="#i-message"/></svg>Nhắn tin</a>
+					<button type="button" class="btn" data-press="Đã chặn Lan Anh"><svg class="icon"><use href="#i-ban"/></svg>Chặn</button>
+					<a class="btn danger-text" href="settings.html#report"><svg class="icon"><use href="#i-flag"/></svg>Báo cáo</a>
+				</div>
+				<div class="info-sec">
+					<div class="row"><svg class="icon"><use href="#i-user"/></svg><span class="grow">@lananh<small>Username</small></span><button type="button" class="icon-btn" aria-label="Sao chép username" data-toast="Đã sao chép @lananh"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+					<div class="row"><svg class="icon"><use href="#i-info"/></svg><span class="grow">Thiết kế sản phẩm ở hoandat. Hỏi về Figma cứ nhắn.<small>Giới thiệu</small></span></div>
+					<div class="row"><svg class="icon"><use href="#i-bell"/></svg><span class="grow">Thông báo</span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thông báo từ Lan Anh"></button></div>
+				</div>
+				<div class="info-sec">
+					<h3>2 nhóm chung</h3>
+					<div class="row"><span class="avatar sm av-blue">VH</span><span class="grow">Vận hành hệ thống<small>12 thành viên</small></span></div>
+					<div class="row"><span class="avatar sm av-amber">TM</span><span class="grow">Team Mobile<small>24 thành viên</small></span></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast, fold, escapeHtml } = window.Mock;
+	const appShot = $("#app");
+
+	// Info panel of the 3-pane app.
+	const app = $(".app", appShot);
+	const infoToggle = $("#info-toggle");
+	const setInfo = (open) => { app.classList.toggle("no-info", !open); infoToggle.setAttribute("aria-pressed", String(open)); };
+	infoToggle.addEventListener("click", () => setInfo(app.classList.contains("no-info")));
+	$("[data-action='close-info']", appShot).addEventListener("click", () => setInfo(false));
+
+	// Search in the list column: accent-insensitive.
+	const corpus = [
+		{ chat: "Lan Anh", when: "09:30", text: "Mình gửi file thiết kế rồi nhé, bản đẹp nhất là bản thứ hai" },
+		{ chat: "Vận hành hệ thống", when: "09:12", text: "Sáng nay mình sẽ nâng cấp postgres-17 trên box lab" },
+		{ chat: "Team Mobile", when: "Hôm qua", text: "Build iOS lỗi ký số, đang xem chứng chỉ" },
+		{ chat: "Quang Huy", when: "T2", text: "Ưu đãi gói lab mới: đăng ký trước thứ Sáu" },
+	];
+	const highlight = (text, q) => {
+		const i = fold(text).indexOf(fold(q));
+		if (i < 0 || !q) return escapeHtml(text);
+		return escapeHtml(text.slice(0, i)) + "<mark>" + escapeHtml(text.slice(i, i + q.length)) + "</mark>" + escapeHtml(text.slice(i + q.length));
+	};
+	const input = $("#search-input");
+	const render = () => {
+		const q = input.value.trim();
+		$("#list-chats").hidden = q !== "";
+		$("#list-search").hidden = q === "";
+		if (!q) return;
+		const hits = corpus.filter((m) => fold(m.text).includes(fold(q)) || fold(m.chat).includes(fold(q)));
+		$("#results").innerHTML = hits.map((m) => `<li><div class="r-head"><b>${escapeHtml(m.chat)}</b><span>${m.when}</span></div><p>${highlight(m.text, q)}</p></li>`).join("");
+		$("#results-empty").hidden = hits.length > 0;
+	};
+	let debounce;
+	input.addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(render, 80); });
+	$$("[data-action='search']", appShot).forEach((b) => b.addEventListener("click", () => { input.value = "dep"; render(); input.focus(); }));
+	document.addEventListener("keydown", (e) => {
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); input.focus(); }
+		if (e.key === "Escape" && document.activeElement === input) { input.value = ""; render(); }
+	});
+
+	// Optimistic send: shown at once with a clock, a tick on ack.
+	const draft = $("#draft");
+	const send = $("#send");
+	draft.addEventListener("input", () => { send.disabled = draft.value.trim() === ""; });
+	draft.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#composer").requestSubmit(); } });
+	$("#composer").addEventListener("submit", (e) => {
+		e.preventDefault();
+		const text = draft.value.trim();
+		if (!text) return;
+		const now = new Date().toTimeString().slice(0, 5);
+		const msg = document.createElement("div");
+		msg.className = "msg mine";
+		msg.innerHTML = `<div class="bubble"><p>${escapeHtml(text)}<span class="stamp">${now} <svg class="icon icon-sm" role="img" aria-label="Đang gửi"><use href="#i-clock"/></svg></span></p></div>`;
+		const list = $("#messages");
+		list.insertBefore(msg, $(".typing", list));
+		list.scrollTop = list.scrollHeight;
+		draft.value = ""; send.disabled = true;
+		setTimeout(() => { $("use", msg).setAttribute("href", "#i-check"); $("svg", msg).setAttribute("aria-label", "Đã gửi"); }, 300);
+	});
+
+	// Links: trusted domains open directly, others ask first (the rule from the plan, shown as a toast here).
+	document.addEventListener("click", (e) => {
+		const a = e.target instanceof Element ? e.target.closest(".bubble a[href^='http']") : null;
+		if (!a) return;
+		e.preventDefault();
+		const host = new URL(a.href).host;
+		toast(a.hasAttribute("data-trusted") ? `Mở ${host} trong tab mới` : `Link ngoài: hỏi xác nhận trước khi mở ${host}`);
+	});
+
+	// Spoiler: click or Enter reveals.
+	$$(".spoiler").forEach((s) => {
+		const reveal = () => { s.classList.add("revealed"); s.removeAttribute("role"); s.removeAttribute("tabindex"); s.removeAttribute("aria-label"); };
+		s.addEventListener("click", reveal);
+		s.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); reveal(); } });
+	});
+
+	// Checkbox and radio rows (mock.js handles switches; these are page-specific).
+	document.addEventListener("click", (e) => {
+		const t = e.target instanceof Element ? e.target : null;
+		const box = t?.closest('[role="checkbox"]');
+		if (box && box.getAttribute("aria-disabled") !== "true") {
+			box.setAttribute("aria-checked", String(box.getAttribute("aria-checked") !== "true"));
+			box.dispatchEvent(new Event("change", { bubbles: true }));
+		}
+		const radio = t?.closest('[role="radio"]');
+		if (radio) $$('[role="radio"]', radio.parentElement).forEach((r) => r.setAttribute("aria-checked", String(r === radio)));
+	});
+
+	// Multi-select lists: chips mirror the selection, the main button counts it.
+	const bindPicker = (listSel, chipsSel, button, label) => {
+		const list = $(listSel), chips = $(chipsSel);
+		const sync = () => {
+			const on = $$('[aria-checked="true"]', list);
+			chips.innerHTML = on.map((b) => `<button type="button" class="chip" data-for="${escapeHtml(b.dataset.name)}" aria-label="Bỏ chọn ${escapeHtml(b.dataset.name)}">${b.querySelector(".avatar").outerHTML.replace('class="avatar', 'class="avatar xs')}${escapeHtml(b.dataset.name)}<svg class="icon"><use href="#i-x"/></svg></button>`).join("");
+			button.disabled = on.length === 0;
+			button.textContent = label(on.length);
+		};
+		list.addEventListener("change", sync);
+		chips.addEventListener("click", (e) => {
+			const chip = e.target instanceof Element ? e.target.closest(".chip") : null;
+			if (!chip) return;
+			$$(".pick", list).find((b) => b.dataset.name === chip.dataset.for)?.setAttribute("aria-checked", "false");
+			sync();
+		});
+		sync();
+	};
+	bindPicker("#fw-list", "#fw-chips", $("#fw-send"), (n) => n ? `Gửi tới ${n} chat` : "Chọn chat để gửi");
+	bindPicker("#ng-list", "#ng-chips", $("#ng-next"), (n) => n ? `Tiếp · ${n} người` : "Chọn ít nhất 1 người");
+
+	// Forward search, accent-insensitive.
+	$("#fw-search").addEventListener("input", (e) => {
+		const q = fold(e.target.value.trim());
+		let shown = 0;
+		$$("#fw-list .pick").forEach((b) => { const hit = fold(b.dataset.name).includes(q); b.hidden = !hit; shown += hit; });
+		$("#fw-empty").hidden = shown > 0;
+	});
+
+	// Delete: the note explains what "for everyone" does, only when it is ticked.
+	$("#del-all").addEventListener("change", (e) => { $("#del-note").hidden = e.currentTarget.getAttribute("aria-checked") !== "true"; });
+
+	// New chat: username prefix search vs exact-only email search.
+	const people = [
+		{ name: "Lan Anh", user: "lananh", email: "lananh@hoandat.com", av: "av-green", ini: "LA" },
+		{ name: "Quang Huy", user: "quanghuy", email: "quanghuy@hoandat.com", av: "av-cyan", ini: "QH" },
+		{ name: "Minh", user: "minh", email: null, av: "av-amber", ini: "MN" },
+	];
+	const card = (p, how) => `<div class="result"><span class="avatar ${p.av}">${p.ini}</span><span><b>${escapeHtml(p.name)}</b><small>@${p.user}</small><span class="match"><svg class="icon"><use href="#i-check"/></svg>${how}</span></span><a class="btn btn-primary btn-sm" href="#app">Nhắn tin</a></div>`;
+	const ncRender = () => {
+		const q = $("#nc-q").value.trim().toLowerCase().replace(/^@/, "");
+		const out = $("#nc-out");
+		if (!q) { out.innerHTML = ""; return; }
+		if (q.includes("@")) {
+			const p = people.find((x) => x.email === q);
+			out.innerHTML = p ? card(p, "Khớp email chính xác")
+				: `<div class="empty" style="padding: var(--space-4)"><strong>Không tìm thấy</strong><span>Email phải gõ đúng toàn bộ, và người đó phải cho phép tìm bằng email.</span></div>`;
+			return;
+		}
+		const hits = people.filter((x) => x.user.startsWith(q));
+		out.innerHTML = hits.length ? `<div style="display:grid; gap: var(--space-2)">${hits.map((p) => card(p, "Khớp username")).join("")}</div>`
+			: `<div class="empty" style="padding: var(--space-4)"><strong>Không có username này</strong><span>Kiểm tra lại chính tả, hoặc thử email đầy đủ.</span></div>`;
+	};
+	$("#nc-q").addEventListener("input", ncRender);
+	ncRender();
+
+	// Channel: subscriber mute toggle and admin silent post.
+	$("#mute-btn").addEventListener("click", (e) => {
+		const b = e.currentTarget, muted = b.getAttribute("aria-pressed") !== "true";
+		b.setAttribute("aria-pressed", String(muted));
+		$("use", b).setAttribute("href", muted ? "#i-bell" : "#i-bell-off");
+		$("span", b).textContent = muted ? "Bật thông báo" : "Tắt tiếng";
+		toast(muted ? "Đã tắt tiếng kênh" : "Đã bật thông báo kênh");
+	});
+	$("#silent-btn").addEventListener("click", (e) => {
+		const b = e.currentTarget, on = b.getAttribute("aria-pressed") !== "true";
+		b.setAttribute("aria-pressed", String(on));
+		$("use", b).setAttribute("href", on ? "#i-bell-off" : "#i-bell");
+		toast(on ? "Bài tiếp theo đăng im lặng" : "Người đăng ký sẽ nhận thông báo");
+	});
+
+	// Dialog frames: the 3-pane app sits dimmed behind the open dialog (inert copy, ids removed).
+	$$("[data-ghost]").forEach((frame) => {
+		const copy = app.cloneNode(true);
+		$$("[id]", copy).forEach((n) => n.removeAttribute("id"));
+		const ghost = document.createElement("div");
+		ghost.className = "ghost";
+		ghost.inert = true;
+		ghost.setAttribute("aria-hidden", "true");
+		ghost.append(copy);
+		frame.prepend(ghost);
+	});
+	$$(".messages").forEach((m) => { m.scrollTop = m.scrollHeight; });
+})();
+</script>
+</body>
+</html>

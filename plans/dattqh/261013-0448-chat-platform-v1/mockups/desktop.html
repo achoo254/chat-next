@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desktop — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* Desktop wallpaper behind the windows: the ecosystem grid, lightly tinted. */
+.desk {
+	position: relative; min-height: var(--frame-h); height: 100%; padding: var(--space-6);
+	display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-6);
+	background-color: color-mix(in srgb, var(--c-viz-violet) 5%, var(--c-bg));
+	background-image: linear-gradient(var(--c-grid) 1px, transparent 1px), linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
+	background-size: var(--grid-size) var(--grid-size);
+}
+
+/* Window chrome (macOS style). Traffic lights are placeholders drawn with tokens. */
+.win { --win-h: 620px; position: relative; width: 100%; max-width: 1120px; height: var(--win-h); display: flex; flex-direction: column; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: var(--c-surface); box-shadow: var(--shadow-lg); overflow: hidden; }
+.titlebar { position: relative; display: flex; align-items: center; gap: var(--space-2); flex: none; height: 38px; padding: 0 var(--space-3); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.lights { display: flex; gap: var(--space-2); }
+.lights i { width: 12px; height: 12px; border-radius: var(--radius-full); }
+.lights i:nth-child(1) { background: var(--c-viz-red); }
+.lights i:nth-child(2) { background: var(--c-viz-amber); }
+.lights i:nth-child(3) { background: var(--c-viz-green); }
+.titlebar .title { position: absolute; left: 50%; transform: translateX(-50%); max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
+.win > .app { --list-w: 280px; flex: 1; min-height: 0; }
+.win .chat-row { min-height: 56px; }
+.win .messages { padding: var(--space-3) var(--space-4); }
+
+/* System notifications. */
+.os-col { display: grid; gap: var(--space-3); justify-items: center; align-content: start; margin: 0; min-width: 0; max-width: 100%; }
+.os-col > figcaption, .os-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); }
+.app-ico { display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: var(--radius-xs); background: var(--c-primary-solid); color: var(--c-on-primary); }
+.app-ico .icon { width: 14px; height: 14px; }
+.mac-notif { width: min(360px, 100%); border-radius: var(--radius-lg); border: 1px solid var(--c-border-subtle); background: color-mix(in srgb, var(--c-surface) 94%, transparent); box-shadow: var(--shadow-md); font-size: 0.875rem; overflow: hidden; }
+.n-row { display: flex; gap: var(--space-3); padding: var(--space-3); }
+.n-text { flex: 1; min-width: 0; }
+.n-top { display: flex; align-items: baseline; gap: var(--space-2); }
+.n-top b { flex: 1; font-weight: 600; }
+.n-top span, .n-sub { font-size: 0.75rem; color: var(--c-text-muted); }
+.n-sub { display: block; }
+.mac-notif p, .win-toast p { margin: 2px 0 0; }
+.n-actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--c-border-subtle); }
+.n-actions button { min-height: 40px; border: 0; background: none; font-weight: 500; color: var(--c-text); }
+.n-actions button + button { border-left: 1px solid var(--c-border-subtle); }
+.n-actions button:hover { background: var(--c-hover); }
+.n-actions button[aria-expanded="true"] { color: var(--c-primary); }
+.n-reply { display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.n-reply .input { flex: 1; min-width: 0; }
+.gone { width: min(360px, 100%); display: grid; gap: var(--space-1); padding: var(--space-3); border-radius: var(--radius-lg); border: 1px dashed var(--c-border); font-size: 0.875rem; color: var(--c-text-muted); }
+.gone b { color: var(--c-text); font-weight: 600; text-decoration: line-through; }
+.gone .chip { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.75rem; }
+
+.win-toast { width: min(380px, 100%); display: grid; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); box-shadow: var(--shadow-md); font-size: 0.875rem; }
+.t-head { display: flex; align-items: center; gap: var(--space-2); font-size: 0.75rem; color: var(--c-text-muted); margin-right: calc(-1 * var(--space-2)); }
+.t-head .grow { flex: 1; }
+.t-body { display: flex; gap: var(--space-3); }
+.t-body b { font-weight: 600; }
+.t-reply { display: flex; gap: var(--space-2); }
+.t-reply .input { flex: 1; min-width: 0; }
+.t-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.t-actions .btn { padding: 0 var(--space-3); }
+
+/* Tray / menu bar. */
+.os-col.os-wide { flex: 1 1 440px; max-width: 540px; justify-items: stretch; }
+.os-col.os-wide > figcaption { justify-self: center; }
+.os { position: relative; width: 100%; height: 400px; display: flex; flex-direction: column; border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: color-mix(in srgb, var(--c-viz-cyan) 8%, var(--c-surface-subtle)); box-shadow: var(--shadow-sm); overflow: hidden; }
+.menubar { display: flex; align-items: center; gap: var(--space-3); height: 32px; padding: 0 var(--space-3); flex: none; background: color-mix(in srgb, var(--c-surface) 85%, transparent); border-bottom: 1px solid var(--c-border-subtle); font-size: 0.8125rem; }
+.menubar b { font-weight: 600; }
+.menubar .grow, .taskbar .grow { flex: 1; }
+.tray-ico { position: relative; display: inline-grid; place-items: center; width: 40px; height: 32px; border: 0; border-radius: var(--radius-xs); background: none; color: var(--c-text); }
+.tray-ico[aria-expanded="true"] { background: var(--c-hover); }
+.tray-ico .icon { width: 18px; height: 18px; }
+.tray-ico .badge { position: absolute; top: 0; right: 0; min-width: 16px; height: 16px; padding: 0 4px; font-size: 0.625rem; }
+.os .muted-ico { color: var(--c-icon-muted); }
+.tray-menu { position: absolute; width: 280px; max-width: calc(100% - 2 * var(--space-3)); }
+.mac .tray-menu { top: 36px; right: var(--space-8); }
+.windows .tray-menu { bottom: 56px; right: var(--space-7); }
+.menu-label { display: grid; gap: 2px; padding: var(--space-2) var(--space-3); font-size: 0.8125rem; }
+.menu-label b { font-weight: 600; }
+.menu-label span { display: flex; justify-content: space-between; color: var(--c-text-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.tray-menu .kbd { margin-left: auto; }
+.tray-menu [role="menuitemcheckbox"] .check { color: var(--c-primary); }
+.tray-menu [role="menuitemcheckbox"][aria-checked="false"] .check { visibility: hidden; }
+.taskbar { margin-top: auto; display: flex; align-items: center; gap: var(--space-2); height: 48px; padding: 0 var(--space-3); flex: none; background: color-mix(in srgb, var(--c-surface) 90%, transparent); border-top: 1px solid var(--c-border-subtle); font-size: 0.75rem; }
+.taskbar .start { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-xs); color: var(--c-icon-muted); }
+.taskbar .clock { display: grid; justify-items: end; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.taskbar .up .icon { transform: rotate(180deg); }
+
+/* Mini App window and Mini App content (drawn by the bot). */
+.mini-win { width: min(380px, 100%); height: 560px; display: flex; flex-direction: column; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: var(--c-surface); box-shadow: var(--shadow-lg); overflow: hidden; }
+.origin-bar { display: flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2) 0 var(--space-3); min-height: 44px; border-bottom: 1px solid var(--c-border-subtle); }
+.origin { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }
+.origin .icon { width: 12px; height: 12px; color: var(--c-success); }
+.mini-body { flex: 1; overflow-y: auto; padding: var(--space-4); display: grid; align-content: start; gap: var(--space-3); }
+.mini-body h3 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.mini-body p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
+.env { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-2); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); }
+.env b { font-weight: 600; }
+.env .mono { color: var(--c-text-muted); }
+.env .state { grid-row: span 2; align-self: center; font-size: 0.75rem; font-weight: 600; padding: 0 var(--space-2); border-radius: var(--radius-full); }
+.env .state.ok { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
+.env .state.old { background: color-mix(in srgb, var(--c-text) 8%, transparent); color: var(--c-text-muted); }
+.mini-main { padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.mini-main .btn { width: 100%; }
+.note-card { width: min(360px, 100%); padding: var(--space-5); border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); }
+.note-card h3 { margin: 0 0 var(--space-3); font-size: 1rem; font-weight: 600; }
+.note-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); font-size: 0.875rem; }
+.note-card li { display: flex; gap: var(--space-2); align-items: flex-start; }
+.note-card li .icon { color: var(--c-icon-muted); margin-top: 1px; }
+
+/* Update dialog. */
+.dlg-head .device { width: 36px; height: 36px; }
+.dlg-body ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); }
+.dlg-body p { margin: var(--space-3) 0 0; color: var(--c-text-muted); }
+.signed { display: flex; gap: var(--space-2); align-items: flex-start; margin-top: var(--space-4); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-size: 0.8125rem; color: var(--c-text-muted); }
+.signed .icon { color: var(--c-success); flex: none; }
+.dlg-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--c-border-subtle); }
+.upd-progress { display: grid; gap: var(--space-2); margin-top: var(--space-4); font-size: 0.8125rem; color: var(--c-text-muted); }
+.upd-progress[hidden] { display: none; }
+.progress > span { transition: width var(--dur-slow) var(--ease-standard); }
+
+/* Drag and drop overlay over the conversation. */
+.win-wrap { position: relative; width: 100%; max-width: 1120px; }
+.drop { position: absolute; top: 38px; right: 0; bottom: 0; left: 0; display: grid; place-items: center; padding: var(--space-4); background: color-mix(in srgb, var(--c-surface) 94%, transparent); border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.drop-zone { display: grid; justify-items: center; gap: var(--space-2); width: 100%; height: 100%; align-content: center; padding: var(--space-5); text-align: center; border: 2px dashed var(--c-primary); border-radius: var(--radius-md); background: color-mix(in srgb, var(--c-primary-solid) 6%, transparent); }
+.drop-zone .ring { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-full); background: var(--c-selected); color: var(--c-primary); }
+.drop-zone .ring .icon { width: 28px; height: 28px; }
+.drop-zone h3 { margin: var(--space-2) 0 0; font-size: 1.125rem; font-weight: 600; }
+.drop-zone p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
+.files { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-2); }
+.files span { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface); font-family: var(--font-mono); font-size: 0.75rem; }
+
+@media (max-width: 760px) {
+	.desk { padding: var(--space-4) var(--space-3); gap: var(--space-5); }
+	/* On a phone-width viewport the desktop window shows only its conversation pane. */
+	.win { height: auto; }
+	.win .list { display: none; }
+	.win > .app { grid-template-rows: minmax(0, 1fr); }
+	.win .convo { min-height: 480px; }
+	.drop { top: 38px; }
+	.os { height: 420px; }
+	.mac .tray-menu { right: var(--space-3); }
+	.windows .tray-menu { right: var(--space-3); }
+}
+/* Touch screens: the tray icon reaches 44px; the bars grow with it. */
+@media (max-width: 760px), (pointer: coarse) {
+	.tray-ico { width: 44px; height: 44px; }
+	.menubar { height: 44px; }
+	.mac .tray-menu { top: 48px; }
+	.taskbar { height: 56px; }
+	.windows .tray-menu { bottom: 64px; }
+}
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<main class="shots">
+
+<section class="shot" id="window">
+	<div class="shot-head"><h2>Cửa sổ desktop</h2><span class="phase">Phase 11</span><p>App Tauri dùng thanh tiêu đề của hệ điều hành (macOS: ba nút bên trái, Windows/Linux: nút bên phải) và giữ nguyên giao diện web ở dạng gọn: rail, danh sách chat, khung chat; cột thông tin mở khi cần. Mở từ cache trong ≤ 400 ms, đóng cửa sổ thì thu vào khay và vẫn giữ kết nối.</p></div>
+	<div class="frame">
+		<div class="desk">
+			<div class="win" id="main-win">
+				<div class="titlebar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">Chat — Vận hành hệ thống</span></div>
+				<div class="app no-info">
+					<nav class="rail" aria-label="Điều hướng">
+						<span class="avatar sm av-violet" title="Tài khoản của bạn">ĐT</span>
+						<button type="button" class="icon-btn" aria-pressed="true" aria-label="Chat, 7 chưa đọc"><svg class="icon"><use href="#i-message"/></svg><span class="badge">7</span></button>
+						<button type="button" class="icon-btn" aria-label="Tìm kiếm"><svg class="icon"><use href="#i-search"/></svg></button>
+						<span class="spacer"></span>
+						<a class="icon-btn" href="settings.html" aria-label="Cài đặt"><svg class="icon"><use href="#i-settings"/></svg></a>
+					</nav>
+					<section class="list" aria-label="Danh sách chat">
+						<div class="list-head">
+							<label class="search-field">
+								<svg class="icon icon-sm"><use href="#i-search"/></svg>
+								<span class="sr-only">Tìm chat và tin nhắn</span>
+								<input type="search" placeholder="Tìm chat, tin nhắn" autocomplete="off">
+								<span class="kbd">⌘K</span>
+							</label>
+							<button type="button" class="icon-btn" aria-label="Tạo chat mới"><svg class="icon"><use href="#i-plus"/></svg></button>
+						</div>
+						<ul class="chats">
+							<li class="chat-row" aria-current="true"><span class="avatar av-blue">VH</span><div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div><div class="meta"><span>09:42</span><span class="badge">3</span></div></li>
+							<li class="chat-row"><span class="avatar av-green">LA</span><div><div class="name">Lan Anh</div><div class="preview">Mình gửi file thiết kế rồi nhé</div></div><div class="meta"><span>09:30</span><span class="badge">1</span></div></li>
+							<li class="chat-row"><span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name">Deploy Bot <span class="tag">bot</span></div><div class="preview">Bản 2.4.1 đã lên staging</div></div><div class="meta"><span>08:55</span></div></li>
+							<li class="chat-row"><span class="avatar av-amber">TM</span><div><div class="name">Team Mobile</div><div class="preview">Minh: Build iOS lỗi ký số</div></div><div class="meta"><span>Hôm qua</span><span class="badge muted-badge">3</span></div></li>
+							<li class="chat-row"><span class="avatar av-cyan">QH</span><div><div class="name">Quang Huy</div><div class="preview">Bạn: Ok, chiều mình review</div></div><div class="meta"><span>Hôm qua</span></div></li>
+						</ul>
+					</section>
+					<section class="convo" aria-label="Vận hành hệ thống">
+						<header class="convo-head">
+							<span class="avatar av-blue">VH</span>
+							<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 3 đang online</span></div>
+							<button type="button" class="icon-btn" aria-label="Tìm trong chat"><svg class="icon"><use href="#i-search"/></svg></button>
+							<button type="button" class="icon-btn" aria-label="Thông tin chat"><svg class="icon"><use href="#i-info"/></svg></button>
+						</header>
+						<div class="messages">
+							<span class="day">Hôm nay</span>
+							<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Sáng nay mình nâng cấp <code>postgres-17</code> trên box lab. Ai đang test thì báo nhé.<span class="stamp">09:12</span></p></div></div>
+							<div class="msg">
+								<span class="avatar sm av-red"><svg class="icon icon-sm"><use href="#i-webhook"/></svg></span>
+								<div class="bubble integration">
+									<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Grafana</span>
+									<div class="int-title"><span class="sev firing">Firing</span>CPU cao trên lab-174</div>
+									<div class="int-body mono">cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
+									<div class="keyboard"><button type="button" data-press="Đã nhận xử lý cảnh báo">Nhận xử lý</button><button type="button" data-press="Đã tắt tiếng cảnh báo 1 giờ">Tắt tiếng 1 giờ</button></div>
+									<span class="stamp">09:42</span>
+								</div>
+							</div>
+							<div class="msg mine"><div class="bubble"><span class="reply"><b>Grafana</b>CPU cao trên lab-174</span><p>Mình nhận, đang xem process nào ăn CPU.<span class="stamp">09:44 <svg class="icon icon-sm read" aria-label="Đã đọc"><use href="#i-checks"/></svg></span></p></div></div>
+						</div>
+						<form class="composer" onsubmit="return false">
+							<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+							<label class="sr-only" for="d-draft">Tin nhắn</label>
+							<textarea id="d-draft" rows="1" placeholder="Viết tin nhắn"></textarea>
+							<button type="button" class="icon-btn" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></button>
+							<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+						</form>
+					</section>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="notification">
+	<div class="shot-head"><h2>Thông báo hệ thống</h2><span class="phase">Phase 11</span><p>Thông báo native có "Đánh dấu đã đọc" và "Trả lời" ngay trên thông báo (macOS và Windows; Linux tuỳ môi trường desktop; có tuỳ chọn ẩn nút trả lời). App giữ thông báo một nhịp ngắn trước khi hiện và huỷ nếu chat đã được đọc; khi đọc ở thiết bị khác, thông báo đã hiện cũng tự gỡ. Bấm vào mở đúng tổ chức, tài khoản và chat.</p></div>
+	<div class="frame">
+		<div class="desk">
+			<figure class="os-col">
+				<figcaption>macOS · đang trả lời</figcaption>
+				<article class="mac-notif" aria-label="Thông báo từ Quang Huy">
+					<div class="n-row">
+						<span class="app-ico"><svg class="icon"><use href="#i-message"/></svg></span>
+						<div class="n-text">
+							<div class="n-top"><b>Quang Huy</b><span>bây giờ</span></div>
+							<span class="n-sub">Vận hành hệ thống</span>
+							<p>Mình nhận, đang xem process nào ăn CPU.</p>
+						</div>
+						<span class="avatar sm av-cyan">QH</span>
+					</div>
+					<div class="n-actions">
+						<button type="button" data-toast="Đã đánh dấu đã đọc, thông báo được gỡ">Đánh dấu đã đọc</button>
+						<button type="button" aria-expanded="true">Trả lời</button>
+					</div>
+					<form class="n-reply" onsubmit="return false">
+						<label class="sr-only" for="n-reply-mac">Trả lời Quang Huy</label>
+						<input class="input" id="n-reply-mac" type="text" value="Ok, mình xem log giúp">
+						<button type="submit" class="send" aria-label="Gửi trả lời" data-toast="Đã gửi trả lời vào Vận hành hệ thống"><svg class="icon"><use href="#i-send"/></svg></button>
+					</form>
+				</article>
+				<div class="gone" role="note">
+					<b>Lan Anh · Mình gửi file thiết kế rồi nhé</b>
+					<span class="chip"><svg class="icon icon-sm"><use href="#i-mobile"/></svg>Đã đọc trên điện thoại, thông báo tự gỡ</span>
+				</div>
+			</figure>
+
+			<figure class="os-col">
+				<figcaption>Windows</figcaption>
+				<article class="win-toast" aria-label="Thông báo từ Quang Huy">
+					<div class="t-head">
+						<span class="app-ico"><svg class="icon"><use href="#i-message"/></svg></span><span class="grow">Chat</span>
+						<button type="button" class="icon-btn" aria-label="Tuỳ chọn thông báo"><svg class="icon icon-sm"><use href="#i-dots"/></svg></button>
+						<button type="button" class="icon-btn" aria-label="Đóng thông báo"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+					</div>
+					<div class="t-body">
+						<span class="avatar av-cyan">QH</span>
+						<div><b>Quang Huy · Vận hành hệ thống</b><p>Mình nhận, đang xem process nào ăn CPU.</p></div>
+					</div>
+					<div class="t-reply">
+						<label class="sr-only" for="n-reply-win">Nhập trả lời</label>
+						<input class="input" id="n-reply-win" type="text" placeholder="Nhập trả lời">
+					</div>
+					<div class="t-actions">
+						<button type="button" class="btn" data-toast="Đã gửi trả lời">Trả lời</button>
+						<button type="button" class="btn" data-toast="Đã đánh dấu đã đọc">Đánh dấu đã đọc</button>
+					</div>
+				</article>
+			</figure>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="tray">
+	<div class="shot-head"><h2>Khay hệ thống</h2><span class="phase">Phase 11</span><p>Biểu tượng ở menu bar (macOS) hoặc khay (Windows, Linux) có badge cộng tin chưa đọc của mọi tài khoản đang đăng nhập, theo từng tổ chức; chat tắt tiếng không tính trừ khi bật trong cài đặt. Menu chỉ có các việc cần khi cửa sổ đã đóng.</p></div>
+	<div class="frame">
+		<div class="desk">
+			<figure class="os-col os-wide">
+				<figcaption>macOS · menu bar</figcaption>
+				<div class="os mac">
+					<div class="menubar">
+						<b>Finder</b><span class="grow"></span>
+						<button type="button" class="tray-ico" aria-haspopup="menu" aria-expanded="true" aria-label="Chat, 7 tin chưa đọc"><svg class="icon"><use href="#i-message"/></svg><span class="badge">7</span></button>
+						<span>Th 3 09:45</span>
+					</div>
+					<div class="menu tray-menu" role="menu" aria-label="Chat">
+						<div class="menu-label"><b>7 tin chưa đọc</b><span><span>hoandat.com</span><span>5</span></span><span><span>inetdev.io.vn</span><span>2</span></span></div>
+						<hr>
+						<button type="button" role="menuitem" data-toast="Mở cửa sổ Chat"><svg class="icon icon-sm"><use href="#i-message"/></svg>Mở Chat</button>
+						<button type="button" role="menuitem" data-toast="Đã tắt thông báo tới 10:45"><svg class="icon icon-sm"><use href="#i-bell-off"/></svg>Tắt thông báo 1 giờ</button>
+						<hr>
+						<button type="button" role="menuitemcheckbox" aria-checked="true"><svg class="icon icon-sm check"><use href="#i-check"/></svg>Khởi động cùng hệ thống</button>
+						<hr>
+						<button type="button" role="menuitem" data-toast="Thoát hẳn: ngừng nhận tin và thông báo"><svg class="icon icon-sm"><use href="#i-logout"/></svg>Thoát<span class="kbd">⌘Q</span></button>
+					</div>
+				</div>
+			</figure>
+
+			<figure class="os-col os-wide">
+				<figcaption>Windows · khay</figcaption>
+				<div class="os windows">
+					<div class="menu tray-menu" role="menu" aria-label="Chat">
+						<div class="menu-label"><b>7 tin chưa đọc</b><span><span>hoandat.com</span><span>5</span></span><span><span>inetdev.io.vn</span><span>2</span></span></div>
+						<hr>
+						<button type="button" role="menuitem" data-toast="Mở cửa sổ Chat"><svg class="icon icon-sm"><use href="#i-message"/></svg>Mở Chat</button>
+						<button type="button" role="menuitem" data-toast="Đã tắt thông báo tới 10:45"><svg class="icon icon-sm"><use href="#i-bell-off"/></svg>Tắt thông báo 1 giờ</button>
+						<hr>
+						<button type="button" role="menuitemcheckbox" aria-checked="false"><svg class="icon icon-sm check"><use href="#i-check"/></svg>Khởi động cùng hệ thống</button>
+						<hr>
+						<button type="button" role="menuitem" data-toast="Thoát hẳn: ngừng nhận tin và thông báo"><svg class="icon icon-sm"><use href="#i-logout"/></svg>Thoát</button>
+					</div>
+					<div class="taskbar">
+						<span class="start" aria-hidden="true"><svg class="icon"><use href="#i-apps"/></svg></span>
+						<span class="grow"></span>
+						<span class="up muted-ico" aria-hidden="true"><svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></span>
+						<button type="button" class="tray-ico" aria-haspopup="menu" aria-expanded="true" aria-label="Chat, 7 tin chưa đọc"><svg class="icon"><use href="#i-message"/></svg><span class="badge">7</span></button>
+						<svg class="icon icon-sm muted-ico" aria-hidden="true"><use href="#i-globe"/></svg>
+						<span class="clock"><span>09:45</span><span>14/10/2026</span></span>
+					</div>
+				</div>
+			</figure>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="mini-app-window">
+	<div class="shot-head"><h2>Cửa sổ Mini App</h2><span class="phase">R8 · Phase 16</span><p>Mini App mở trong cửa sổ riêng, tiêu đề luôn là tên bot và origin thật, nên không giả được cửa sổ Chat. Cửa sổ này không có capability Tauri nào và dùng kho dữ liệu riêng cho từng bot.</p></div>
+	<div class="frame">
+		<div class="desk">
+			<div class="mini-win">
+				<div class="titlebar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">Deploy Bot · Mini App</span></div>
+				<div class="origin-bar">
+					<span class="origin"><svg class="icon"><use href="#i-lock"/></svg>b4821.chatapps.vn</span>
+					<button type="button" class="icon-btn" aria-label="Tải lại Mini App"><svg class="icon icon-sm"><use href="#i-refresh"/></svg></button>
+					<button type="button" class="icon-btn" aria-label="Mở bằng trình duyệt" data-toast="Mở bằng trình duyệt mặc định sau khi kiểm scheme"><svg class="icon icon-sm"><use href="#i-external"/></svg></button>
+				</div>
+				<div class="mini-body">
+					<h3>Triển khai</h3>
+					<p>Chọn bản để đẩy lên production.</p>
+					<div class="env"><b>staging</b><span class="state ok">Đang chạy</span><span class="mono">2.4.1 · 08:55</span></div>
+					<div class="env"><b>production</b><span class="state old">Bản cũ</span><span class="mono">2.4.0 · hôm qua</span></div>
+				</div>
+				<div class="mini-main"><button type="button" class="btn btn-primary" data-press="Bot đã nhận yêu cầu đẩy 2.4.1">Đẩy 2.4.1 lên production</button></div>
+			</div>
+			<aside class="note-card" aria-label="Giới hạn của cửa sổ Mini App">
+				<h3>Không có quyền hệ thống</h3>
+				<ul>
+					<li><svg class="icon icon-sm"><use href="#i-ban"/></svg><span>Không đọc file, clipboard, không gửi thông báo hệ thống, không gọi lệnh của app.</span></li>
+					<li><svg class="icon icon-sm"><use href="#i-database"/></svg><span>Cookie và storage riêng cho từng bot, không dính sang bot khác hay cửa sổ Chat.</span></li>
+					<li><svg class="icon icon-sm"><use href="#i-globe"/></svg><span>Origin riêng trên domain đăng ký riêng, không nằm dưới domain của tổ chức.</span></li>
+					<li><svg class="icon icon-sm"><use href="#i-external"/></svg><span>Link ngoài mở bằng trình duyệt mặc định, chặn file:, smb:, ms-msdt:.</span></li>
+				</ul>
+			</aside>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="update">
+	<div class="shot-head"><h2>Cập nhật</h2><span class="phase">Phase 11</span><p>Updater chỉ nhận bản có chữ ký hợp lệ; bản sai chữ ký bị từ chối, không hỏi người dùng. "Để sau" nhắc lại ở lần mở kế tiếp. Bấm cập nhật thì tải, kiểm chữ ký rồi khởi động lại, tin chưa gửi vẫn nằm trong hàng chờ.</p></div>
+	<div class="frame">
+		<div class="desk">
+			<div data-clone="main-win"></div>
+		</div>
+		<div class="static-dialog">
+			<section class="panel" aria-labelledby="upd-title">
+				<div class="dlg-head">
+					<span class="device"><svg class="icon"><use href="#i-download"/></svg></span>
+					<h2 id="upd-title">Có bản Chat 1.2.0</h2>
+					<button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button>
+				</div>
+				<div class="dlg-body">
+					<p>Bạn đang dùng 1.1.3. Có gì mới:</p>
+					<ul style="margin-top: var(--space-2)">
+						<li>Trả lời ngay trên thông báo hệ thống.</li>
+						<li>Dán ảnh từ clipboard vào khung chat.</li>
+						<li>Badge giảm ngay khi đọc trên điện thoại.</li>
+					</ul>
+					<div class="signed"><svg class="icon icon-sm"><use href="#i-shield"/></svg><span>Bản cập nhật có chữ ký số. App kiểm chữ ký trước khi cài và từ chối bản không hợp lệ.</span></div>
+					<div class="upd-progress" id="upd-progress" hidden role="status">
+						<div class="progress"><span id="upd-bar" style="width: 0%"></span></div>
+						<span id="upd-text">Đang tải 0 / 38 MB</span>
+					</div>
+				</div>
+				<div class="dlg-foot">
+					<button type="button" class="btn" id="upd-later" data-toast="Sẽ nhắc lại ở lần mở kế tiếp">Để sau</button>
+					<button type="button" class="btn btn-primary" id="upd-go">Cập nhật và khởi động lại</button>
+				</div>
+			</section>
+		</div>
+	</div>
+</section>
+
+<section class="shot" id="drop">
+	<div class="shot-head"><h2>Kéo thả file</h2><span class="phase">Phase 4, 11</span><p>Kéo file từ Finder hay Explorer vào cửa sổ: lớp phủ nói rõ file sẽ vào chat nào trước khi thả. Thả xong mở bước đính kèm (chú thích, gửi ảnh dạng file); ảnh dán bằng ⌘V/Ctrl+V cũng đi đường này.</p></div>
+	<div class="frame">
+		<div class="desk">
+			<div class="win-wrap">
+				<div data-clone="main-win"></div>
+				<div class="drop" role="status">
+					<div class="drop-zone">
+						<span class="ring"><svg class="icon"><use href="#i-file"/></svg></span>
+						<h3>Thả file để gửi vào Vận hành hệ thống</h3>
+						<p>3 file · 12,4 MB. Ảnh gửi kèm xem trước, file khác gửi nguyên bản.</p>
+						<div class="files"><span><svg class="icon icon-sm"><use href="#i-photo"/></svg>dashboard.png</span><span><svg class="icon icon-sm"><use href="#i-file"/></svg>cpu-log.txt</span><span><svg class="icon icon-sm"><use href="#i-file"/></svg>postmortem.pdf</span></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$ } = window.Mock;
+	// Background windows for the update and drop shots reuse the main window markup.
+	const source = $("#main-win");
+	$$("[data-clone='main-win']").forEach((slot) => {
+		const copy = source.cloneNode(true);
+		copy.removeAttribute("id");
+		$$("[id]", copy).forEach((el) => el.removeAttribute("id"));
+		$$("label[for]", copy).forEach((el) => el.removeAttribute("for"));
+		copy.setAttribute("aria-hidden", "true");
+		copy.inert = true;
+		slot.replaceWith(copy);
+	});
+
+	// Tray menu checkbox items.
+	$$("[role='menuitemcheckbox']").forEach((item) => item.addEventListener("click", () => {
+		item.setAttribute("aria-checked", String(item.getAttribute("aria-checked") !== "true"));
+	}));
+
+	// Update: download progress, signature check, then restart.
+	$("#upd-go").addEventListener("click", (e) => {
+		const go = e.currentTarget;
+		if (go.disabled) return;
+		go.disabled = true;
+		$("#upd-later").disabled = true;
+		$("#upd-progress").hidden = false;
+		let mb = 0;
+		const timer = setInterval(() => {
+			mb = Math.min(38, mb + 7.6);
+			$("#upd-bar").style.width = `${(mb / 38) * 100}%`;
+			$("#upd-text").textContent = `Đang tải ${mb.toFixed(1).replace(".", ",")} / 38 MB`;
+			if (mb >= 38) {
+				clearInterval(timer);
+				$("#upd-text").textContent = "Chữ ký hợp lệ. Đang khởi động lại…";
+			}
+		}, 300);
+	});
+})();
+</script>
+</body>
+</html>

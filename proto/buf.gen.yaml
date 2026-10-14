@@ -1,0 +1,17 @@
+# Run from the repository root: plugin commands and `out` paths resolve
+# against the current directory.
+version: v2
+clean: true
+plugins:
+  # Resolved from the root node_modules/.bin, which `pnpm exec` puts on PATH.
+  - local: protoc-gen-es
+    out: packages/proto-ts/src/gen
+    include_imports: false
+    opt:
+      - target=ts
+      - import_extension=ts
+  # Pinned through the `tool` directive in server/go.mod.
+  - local: ["go", "-C", "server", "tool", "protoc-gen-go"]
+    out: server/gen
+    opt:
+      - paths=source_relative

@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Developer Console — Mock Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap&subset=vietnamese" rel="stylesheet">
+<!-- Copied verbatim from hoandat-auth/static/css/tokens.css (Localman design tokens). -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+/* Author display rules below must not beat the hidden attribute. */
+[hidden] { display: none !important; }
+
+/* ---- Console shell: reached from Settings, runs on the chat session ---- */
+.frame > .console, .frame > .panes { height: 100%; }
+.console { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--c-bg); }
+.c-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); min-height: var(--topbar-h); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-1); font-size: 0.875rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumbs b { color: var(--c-text); font-weight: 600; }
+.crumbs .icon { width: 14px; height: 14px; }
+.who-chip { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+.c-bot { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5) 0; background: var(--c-surface); }
+.c-bot strong { display: inline-flex; align-items: center; gap: var(--space-1); font-weight: 600; }
+.c-bot small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.c-tabs { display: flex; gap: var(--space-1); padding: 0 var(--space-5); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); overflow-x: auto; }
+.c-tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-2); white-space: nowrap; text-decoration: none; font-weight: 500; font-size: 0.875rem; color: var(--c-text-muted); border-bottom: 2px solid transparent; }
+.c-tabs a:hover { color: var(--c-text); }
+.c-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+.c-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); display: grid; gap: var(--space-4); align-content: start; }
+.c-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.c-title h3 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.c-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.card { display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-5); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.card > h4 { margin: 0; font-size: 1rem; font-weight: 600; }
+.card > p, .card .sub { margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.card .banner { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); align-items: flex-start; }
+.card .banner .icon { margin-top: 1px; }
+.card-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding-top: var(--space-2); }
+.form { display: grid; gap: var(--space-4); }
+.hint-ok { font-size: 0.8125rem; color: var(--c-success-text); }
+.prefixed { display: flex; align-items: stretch; }
+.prefixed > span { display: grid; place-items: center; padding: 0 var(--space-3); border: 1px solid var(--c-border); border-right: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); background: var(--c-surface-subtle); color: var(--c-text-muted); font-family: var(--font-mono); font-size: 0.875rem; }
+.prefixed > .input { flex: 1; min-width: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.input.mono { font-family: var(--font-mono); font-size: 0.875rem; }
+.inline-row { display: flex; gap: var(--space-2); align-items: center; }
+.inline-row > .input { flex: 1; min-width: 0; }
+.suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+a.btn { text-decoration: none; }
+a.btn:not(.btn-primary) { color: var(--c-text); }
+.btn-sm { min-height: 36px; padding: 0 var(--space-3); font-size: 0.875rem; }
+.btn-ghost { border-color: transparent; background: none; }
+.btn-danger { color: var(--c-error); }
+.btn-danger:hover { border-color: var(--c-error); }
+.setting { display: flex; align-items: flex-start; gap: var(--space-3); }
+.setting > div { flex: 1; min-width: 0; }
+.setting strong { display: block; font-weight: 500; font-size: 0.875rem; }
+.setting small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* Status, tiers, secrets */
+.dot { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; }
+.dot::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.dot.ok::before { background: var(--c-success); }
+.dot.err::before { background: var(--c-error); }
+.cell-sub { display: block; font-size: 0.8125rem; color: var(--c-text-muted); font-weight: 400; }
+.tier { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 600; background: var(--c-bar-track); color: var(--c-text-muted); }
+.tier.verified { background: color-mix(in srgb, var(--c-info) 12%, transparent); color: var(--c-info-text); }
+.tier .icon { width: 14px; height: 14px; }
+.verified { display: inline-flex; color: var(--c-info); }
+.secret { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle); }
+.secret code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.875rem; overflow-wrap: anywhere; }
+.snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); margin: 0; font-size: 0.875rem; }
+.kv dt { color: var(--c-text-muted); }
+.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.illustrative { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0 var(--space-2); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 14%, transparent); color: var(--c-warning-text); }
+
+/* Toggle chips for multi-select (allowed_updates). */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chips button { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; padding: 0 var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--c-border); background: var(--c-surface); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text-muted); }
+.chips button[aria-pressed="true"] { border-color: var(--c-primary); background: var(--c-selected); color: var(--c-text); }
+.chips button[aria-pressed="true"]::before { content: "✓"; font-family: var(--font-sans); color: var(--c-primary); }
+
+/* Tables that become label/value cards on narrow screens. */
+.table-card { padding: 0; overflow: hidden; }
+.table-card table.data td, .table-card table.data th { padding-left: var(--space-4); padding-right: var(--space-4); }
+.table-card table.data tr:last-child td { border-bottom: 0; }
+.bot-cell { display: flex; align-items: center; gap: var(--space-3); }
+.bot-cell strong { display: inline-flex; align-items: center; gap: var(--space-1); font-weight: 600; }
+.actions { display: flex; gap: var(--space-1); justify-content: flex-end; }
+td.err-text { color: var(--c-error-text); }
+tr[aria-busy="true"] td { color: var(--c-text-muted); }
+
+/* SDK quick start links */
+.sdks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.sdk { display: grid; gap: 2px; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); color: var(--c-text); text-decoration: none; }
+.sdk:hover { border-color: var(--c-border-strong); background: var(--c-hover); }
+.sdk b { display: flex; align-items: center; gap: var(--space-2); font-weight: 600; }
+.sdk b .icon { margin-left: auto; width: 16px; height: 16px; color: var(--c-icon-muted); }
+.sdk span { font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* Command rows */
+.cmd-rows { display: grid; gap: var(--space-2); }
+.cmd-row { display: grid; grid-template-columns: 240px minmax(0, 1fr) 44px; gap: var(--space-2); align-items: start; }
+.cmd-row .field { gap: 2px; }
+.preview-menu { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.preview-menu div { display: grid; gap: 0; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.preview-menu div:last-child { border-bottom: 0; }
+.preview-menu b { font-family: var(--font-mono); font-size: 0.875rem; font-weight: 500; }
+.preview-menu span { font-size: 0.8125rem; color: var(--c-text-muted); }
+.scope-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--c-border-subtle); }
+.scope-tabs button { border: 0; background: none; min-height: 44px; padding: 0 var(--space-3); font-weight: 500; color: var(--c-text-muted); border-bottom: 2px solid transparent; }
+.scope-tabs button[aria-selected="true"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+
+/* Mini App preview header, same as the one users see in chat. */
+.ma-preview { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.ma-preview .bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.ma-preview .bar strong { display: block; font-weight: 600; font-size: 0.875rem; }
+.ma-preview .bar span { display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.ma-preview .body { padding: var(--space-4); background: var(--c-bg); font-size: 0.8125rem; color: var(--c-text-muted); }
+.card ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); font-size: 0.875rem; }
+
+/* Panes: two states side by side. */
+.panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.panes.stack { grid-template-columns: minmax(0, 1fr); }
+.pane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--c-border-subtle); }
+.pane:last-child { border-right: 0; }
+.panes.stack .pane { border-right: 0; border-bottom: 1px solid var(--c-border-subtle); }
+.panes.stack .pane:last-child { border-bottom: 0; }
+.pane > .console { flex: 1; }
+.pane-cap { padding: var(--space-2) var(--space-4); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.dlg-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-5); }
+.panel .dlg-body p { margin: var(--space-3) 0 0; font-size: 0.9375rem; }
+.panel .dlg-body .banner { margin-top: var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); align-items: flex-start; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+	.frame:has(> .panes), .frame:has(.c-grid) { height: auto; }
+	.panes { grid-template-columns: minmax(0, 1fr); height: auto; }
+	.pane { border-right: 0; border-bottom: 1px solid var(--c-border-subtle); min-height: 520px; }
+	.pane:last-child { border-bottom: 0; }
+	.c-grid { grid-template-columns: minmax(0, 1fr); }
+	.frame:has(.c-grid) .c-body { overflow: visible; }
+}
+@media (max-width: 760px) {
+	.who-chip { display: none; }
+	.c-body { padding: var(--space-3); }
+	.c-bot, .c-tabs { padding-left: var(--space-3); padding-right: var(--space-3); }
+	.card { padding: var(--space-3); }
+	.sdks { grid-template-columns: minmax(0, 1fr); }
+	.cmd-row { grid-template-columns: minmax(0, 1fr) 44px; }
+	.cmd-row > .field:nth-child(2) { grid-column: 1; }
+	.cmd-row > .icon-btn { grid-row: 1; grid-column: 2; }
+	.cmd-row { padding-bottom: var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
+	.frame .c-body { overflow: visible; }
+	/* Tables turn into label/value cards. */
+	table.stack thead { display: none; }
+	table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; }
+	table.stack tr { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--c-border-subtle); }
+	table.stack tr:last-child { border-bottom: 0; }
+	table.stack td { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); padding: 0 !important; border: 0; text-align: left !important; }
+	table.stack td[data-label] { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); align-items: baseline; }
+	table.stack td[data-label]::before { content: attr(data-label); font-size: 0.75rem; color: var(--c-text-muted); font-family: var(--font-sans); }
+	table.stack .actions { justify-content: flex-start; padding-top: var(--space-1); }
+	.dlg-foot .btn { flex: 1 1 auto; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.icon-btn { width: 44px; height: 44px; }
+	.btn-sm, .chips button, .choice button { min-height: 44px; }
+	.switch { width: 60px; height: 44px; border: 10px solid transparent; background-clip: padding-box; }
+}
+</style>
+</head>
+<body>
+<header class="review-bar"></header>
+<svg width="0" height="0" class="sr-only" aria-hidden="true">
+	<symbol id="i-verified" viewBox="0 0 24 24"><path d="M5 7.2A2.2 2.2 0 0 1 7.2 5h1a2.2 2.2 0 0 0 1.55-.64l.7-.7a2.2 2.2 0 0 1 3.12 0l.7.7c.42.41.98.64 1.55.64h1a2.2 2.2 0 0 1 2.2 2.2v1c0 .58.23 1.14.64 1.55l.7.7a2.2 2.2 0 0 1 0 3.12l-.7.7a2.2 2.2 0 0 0-.64 1.55v1a2.2 2.2 0 0 1-2.2 2.2h-1a2.2 2.2 0 0 0-1.55.64l-.7.7a2.2 2.2 0 0 1-3.12 0l-.7-.7a2.2 2.2 0 0 0-1.55-.64h-1A2.2 2.2 0 0 1 5 16.8v-1a2.2 2.2 0 0 0-.64-1.55l-.7-.7a2.2 2.2 0 0 1 0-3.12l.7-.7A2.2 2.2 0 0 0 5 8.2v-1M9 12l2 2 4-4"/></symbol>
+</svg>
+<main class="shots">
+
+<!-- ===================================================================== -->
+<section class="shot" id="bots-list">
+	<div class="shot-head">
+		<h2>Bot của tôi</h2><span class="phase">Phase 15</span>
+		<p>Mở từ Cài đặt, dùng luôn phiên chat (không đăng nhập riêng); bot tạo ra thuộc tổ chức hoandat.com của bạn. Bảng cho biết cách nhận update, sức khoẻ webhook và tầng rate limit; long poll không có trạng thái webhook. Dưới: lần đầu vào Console, chưa có bot, có lối vào SDK.</p>
+	</div>
+	<div class="frame auto">
+		<div class="panes stack">
+			<div class="pane">
+				<div class="pane-cap">Đã có bot</div>
+				<div class="console">
+					<header class="c-head">
+						<a class="icon-btn" href="settings.html" aria-label="Về Cài đặt"><svg class="icon"><use href="#i-back"/></svg></a>
+						<span class="crumbs">Cài đặt <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Developer Console</b></span>
+						<span class="who-chip"><span class="avatar sm av-violet">ĐT</span>Đức Thắng · hoandat.com</span>
+					</header>
+					<div class="c-body">
+						<div class="c-title"><h3>Bot của tôi</h3><a class="btn btn-primary" href="#create-bot"><svg class="icon"><use href="#i-plus"/></svg>Tạo bot</a></div>
+						<div class="card table-card">
+							<table class="data stack">
+								<thead><tr><th>Bot</th><th>Nhận update</th><th>Webhook</th><th>Tầng rate limit</th><th><span class="sr-only">Thao tác</span></th></tr></thead>
+								<tbody>
+									<tr>
+										<td><div class="bot-cell"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot <span class="verified" title="Đã xác minh"><svg class="icon icon-sm"><use href="#i-verified"/></svg></span></strong><span class="cell-sub mono">@deploy_bot</span></div></div></td>
+										<td data-label="Nhận update"><div>Webhook</div></td>
+										<td data-label="Webhook"><div><span class="dot err">Đang lỗi</span><span class="cell-sub">HTTP 502 lúc 09:58 · 12 update chờ</span></div></td>
+										<td data-label="Tầng"><div><span class="tier verified"><svg class="icon"><use href="#i-verified"/></svg>verified</span></div></td>
+										<td><div class="actions"><a class="btn btn-sm" href="#webhook">Quản lý</a></div></td>
+									</tr>
+									<tr>
+										<td><div class="bot-cell"><span class="avatar sm av-green"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Trực ca Bot</strong><span class="cell-sub mono">@oncall_bot</span></div></div></td>
+										<td data-label="Nhận update"><div>Long poll</div></td>
+										<td data-label="Webhook"><div><span class="dot">Không dùng</span><span class="cell-sub">Poll gần nhất 10:04</span></div></td>
+										<td data-label="Tầng"><div><span class="tier">default</span></div></td>
+										<td><div class="actions"><a class="btn btn-sm" href="#webhook">Quản lý</a></div></td>
+									</tr>
+									<tr>
+										<td><div class="bot-cell"><span class="avatar sm av-amber"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Báo cáo Bot</strong><span class="cell-sub mono">@report_daily_bot</span></div></div></td>
+										<td data-label="Nhận update"><div>Webhook</div></td>
+										<td data-label="Webhook"><div><span class="dot ok">Ổn định</span><span class="cell-sub">Giao gần nhất 10:02 · 0 chờ</span></div></td>
+										<td data-label="Tầng"><div><span class="tier">default</span></div></td>
+										<td><div class="actions"><a class="btn btn-sm" href="#webhook">Quản lý</a></div></td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">Lần đầu vào Console</div>
+				<div class="console">
+					<div class="c-body">
+						<div class="card">
+							<div class="empty">
+								<svg class="icon"><use href="#i-robot"/></svg>
+								<strong>Bạn chưa có bot nào</strong>
+								<span>Bot gửi tin, nhận lệnh và mở Mini App cho người trong tổ chức hoandat.com. Tạo một bot để lấy token.</span>
+								<a class="btn btn-primary" href="#create-bot"><svg class="icon"><use href="#i-plus"/></svg>Tạo bot đầu tiên</a>
+							</div>
+						</div>
+						<div class="card">
+							<h4>Bắt đầu nhanh với SDK chính thức</h4>
+							<p>Bot echo chạy được trong khoảng 10 phút. Base URL của tổ chức này: <code class="mono">https://bot.chat.hoandat.com</code></p>
+							<div class="sdks">
+								<a class="sdk" href="#" data-toast="Mở hướng dẫn bắt đầu nhanh TypeScript"><b>TypeScript <svg class="icon"><use href="#i-external"/></svg></b><span>Node LTS · long poll, webhook, Mini App</span></a>
+								<a class="sdk" href="#" data-toast="Mở hướng dẫn bắt đầu nhanh Python"><b>Python <svg class="icon"><use href="#i-external"/></svg></b><span>Python 3.11+ · long poll, webhook, Mini App</span></a>
+								<a class="sdk" href="#" data-toast="Mở hướng dẫn bắt đầu nhanh Go"><b>Go <svg class="icon"><use href="#i-external"/></svg></b><span>Go module · long poll, webhook, Mini App</span></a>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="create-bot">
+	<div class="shot-head">
+		<h2>Tạo bot</h2><span class="phase">Phase 15</span>
+		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định. Thử gõ lại username trong khung.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<header class="c-head">
+				<a class="icon-btn" href="#bots-list" aria-label="Về Bot của tôi"><svg class="icon"><use href="#i-back"/></svg></a>
+				<span class="crumbs">Developer Console <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Tạo bot</b></span>
+				<span class="who-chip"><span class="avatar sm av-violet">ĐT</span>Đức Thắng · hoandat.com</span>
+			</header>
+			<div class="c-body">
+				<div class="c-grid">
+					<form class="card form" id="create-form" onsubmit="return false" novalidate>
+						<h4>Bot mới</h4>
+						<div class="field">
+							<label for="cb-name">Tên hiển thị</label>
+							<input class="input" id="cb-name" value="Báo cáo Bot" autocomplete="off">
+						</div>
+						<div class="field">
+							<label for="cb-user">Username</label>
+							<div class="prefixed"><span>@</span><input class="input mono" id="cb-user" value="report_bot" autocomplete="off" spellcheck="false" aria-invalid="true" aria-describedby="cb-user-msg cb-user-hint"></div>
+							<span class="error-text" id="cb-user-msg" role="status">username đã có người dùng</span>
+							<div class="suggest" id="cb-suggest">Thử: <button type="button" class="btn btn-sm">report_daily_bot</button><button type="button" class="btn btn-sm">baocao_bot</button></div>
+							<span class="hint" id="cb-user-hint">Kết thúc bằng "bot". Chỉ a–z, 0–9 và dấu gạch dưới. Không đổi được sau khi tạo.</span>
+						</div>
+						<div class="field">
+							<label for="cb-desc">Mô tả</label>
+							<textarea class="input" id="cb-desc" rows="3">Gửi báo cáo doanh thu mỗi sáng cho nhóm Kinh doanh.</textarea>
+							<span class="hint">Hiện trong màn "Bắt đầu với bot" trước khi người dùng đồng ý.</span>
+						</div>
+						<div class="setting">
+							<div><strong>Chế độ riêng tư trong nhóm</strong><small>Bot chỉ thấy lệnh gửi cho nó và tin trả lời nó. Nên bật.</small></div>
+							<button type="button" class="switch" role="switch" aria-checked="true" aria-label="Chế độ riêng tư trong nhóm"></button>
+						</div>
+						<div class="card-foot">
+							<a class="btn" href="#bots-list">Huỷ</a>
+							<button type="submit" class="btn btn-primary" id="cb-submit" disabled>Tạo bot</button>
+						</div>
+					</form>
+					<div class="card">
+						<h4>Bot thuộc tổ chức hoandat.com</h4>
+						<ul>
+							<li>Chỉ nhắn được người và nhóm trong hoandat.com.</li>
+							<li>Chỉ nhắn được người đã bấm Bắt đầu, hoặc nhóm có bot là thành viên.</li>
+							<li>Token chỉ dùng ở <code class="mono">bot.chat.hoandat.com</code>.</li>
+							<li>Bạn là chủ bot; bot không có tài khoản hoandat.</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="token">
+	<div class="shot-head">
+		<h2>Token</h2><span class="phase">Phase 15</span>
+		<p>Trái: token hiện đúng một lần ngay sau khi tạo hoặc cấp lại, có nút sao chép; server chỉ giữ hash. Phải: những lần sau token bị che. Cấp lại token (và xoá bot) cần đăng nhập hoandat trong 10 phút gần đây (ADR 0006), nên Console chuyển sang auth.hoandat.com rồi quay về. Token cũ ngừng hoạt động ngay, khoá ký Mini App đổi theo.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">Ngay sau khi tạo</div>
+				<div class="console">
+					<div class="c-bot"><span class="avatar sm av-amber"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Báo cáo Bot</strong><small class="mono">@report_daily_bot</small></div></div>
+					<nav class="c-tabs" data-active="token" aria-label="Mục của bot"></nav>
+					<div class="c-body">
+						<div class="card">
+							<h4>Token của bot</h4>
+							<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span>Token chỉ hiện một lần. Lưu vào secret manager ngay; rời trang này là không xem lại được.</span></div>
+							<div class="secret"><code>7302199:AAE9qmZr4TfX2LwN8pK3vYc6HsJ0dGuB1o</code><button type="button" class="btn btn-sm" data-toast="Đã sao chép token"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
+							<pre class="snippet">Authorization: Bearer &lt;token&gt;
+POST https://bot.chat.hoandat.com/bot/v1/…</pre>
+							<div class="card-foot"><button type="button" class="btn btn-primary" data-toast="Token đã được che">Tôi đã lưu token</button></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">Những lần sau · cấp lại</div>
+				<div class="console">
+					<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot</strong><small class="mono">@deploy_bot</small></div></div>
+					<nav class="c-tabs" data-active="token" aria-label="Mục của bot"></nav>
+					<div class="c-body">
+						<div class="card">
+							<h4>Token của bot</h4>
+							<div class="secret"><code>7302114:••••••••••••••••••••••••Qx9</code></div>
+							<p>Cấp lúc 02/10/2026 14:20 bởi Đức Thắng.</p>
+							<div class="card-foot"><button type="button" class="btn btn-danger">Cấp lại token</button></div>
+						</div>
+					</div>
+				</div>
+				<div class="static-dialog">
+					<div class="panel" role="group" aria-labelledby="reauth-title">
+						<div class="dlg-head"><h2 id="reauth-title">Đăng nhập lại để tiếp tục</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+						<div class="dlg-body">
+							<p>Cấp lại token cần đăng nhập tài khoản hoandat trong 10 phút gần đây. Lần đăng nhập gần nhất của bạn: 2 giờ trước.</p>
+							<p class="muted" style="font-size: 0.875rem">Bạn sẽ sang <span class="mono">auth.hoandat.com</span> rồi quay lại đây.</p>
+							<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span>Sau khi cấp lại, token cũ ngừng hoạt động ngay: Deploy Bot sẽ nhận lỗi 401 tới khi bạn cập nhật token mới. Mini App đang mở phải tải lại.</span></div>
+						</div>
+						<div class="dlg-foot">
+							<button type="button" class="btn">Huỷ</button>
+							<button type="button" class="btn btn-primary" data-press="Đang chuyển sang auth.hoandat.com">Đăng nhập lại <svg class="icon icon-sm"><use href="#i-external"/></svg></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="webhook">
+	<div class="shot-head">
+		<h2>Nhận update</h2><span class="phase">Phase 15</span>
+		<p>Chọn webhook hoặc long poll (thử bấm). Webhook: URL https, secret, loại update, số kết nối song song, có thể bỏ update đang chờ. Cột phải là trạng thái thật của lần giao: lỗi gần nhất kèm giờ và mã HTTP, số update chờ, độ trễ lần giao gần nhất. Server gọi URL qua lớp chặn địa chỉ nội bộ, nên URL nội bộ bị từ chối ngay khi lưu.</p>
+	</div>
+	<div class="frame auto">
+		<div class="console">
+			<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot <span class="verified" title="Đã xác minh"><svg class="icon icon-sm"><use href="#i-verified"/></svg></span></strong><small class="mono">@deploy_bot</small></div></div>
+			<nav class="c-tabs" data-active="webhook" aria-label="Mục của bot"></nav>
+			<div class="c-body">
+				<div class="c-grid">
+					<form class="card form" onsubmit="return false">
+						<div class="field">
+							<span class="label" id="mode-label">Cách nhận update</span>
+							<div class="choice" role="group" aria-labelledby="mode-label" id="mode-choice">
+								<button type="button" aria-pressed="true" data-mode="webhook">Webhook</button>
+								<button type="button" aria-pressed="false" data-mode="poll">Long poll</button>
+							</div>
+						</div>
+						<div class="form" id="mode-webhook">
+							<div class="field">
+								<label for="wh-url">URL webhook</label>
+								<input class="input mono" id="wh-url" value="https://deploy.hoandat.com/chat/updates" spellcheck="false">
+								<span class="hint">Chỉ https, cổng 443, 80 hoặc 8443. Không theo redirect.</span>
+							</div>
+							<div class="field">
+								<label for="wh-secret">Secret token</label>
+								<div class="inline-row">
+									<input class="input mono" id="wh-secret" type="password" value="whsec-4f1c9a7e20b3" spellcheck="false">
+									<button type="button" class="icon-btn" id="wh-eye" aria-label="Hiện secret" aria-pressed="false"><svg class="icon"><use href="#i-eye"/></svg></button>
+									<button type="button" class="btn btn-sm" data-toast="Đã tạo secret mới, nhớ cập nhật ở server của bạn">Tạo mới</button>
+								</div>
+								<span class="hint">Mỗi request kèm secret, chữ ký HMAC và timestamp. SDK kiểm sẵn.</span>
+							</div>
+							<div class="field">
+								<span class="label" id="au-label">Loại update nhận</span>
+								<div class="chips" role="group" aria-labelledby="au-label">
+									<button type="button" aria-pressed="true">message</button>
+									<button type="button" aria-pressed="true">message_edited</button>
+									<button type="button" aria-pressed="false">channel_post</button>
+									<button type="button" aria-pressed="true">callback</button>
+									<button type="button" aria-pressed="false">inline_query</button>
+									<button type="button" aria-pressed="false">inline_result_chosen</button>
+									<button type="button" aria-pressed="true">member_changed</button>
+									<button type="button" aria-pressed="false">reaction</button>
+								</div>
+							</div>
+							<div class="field">
+								<label for="wh-max">Số kết nối song song</label>
+								<input class="input" id="wh-max" type="number" min="1" max="100" value="40" style="max-width: 120px">
+								<span class="hint">Tuần tự trong từng chat, song song giữa các chat tới con số này.</span>
+							</div>
+							<div class="setting">
+								<div><strong>Bỏ update đang chờ khi lưu</strong><small>12 update đang chờ sẽ bị xoá, không giao nữa.</small></div>
+								<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Bỏ update đang chờ khi lưu"></button>
+							</div>
+						</div>
+						<div class="form" id="mode-poll" hidden>
+							<p class="sub" style="margin:0">Server của bạn tự gọi lấy update. Mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request sau nhận 409. Webhook đang đặt sẽ bị gỡ khi lưu.</p>
+							<pre class="snippet">GET https://bot.chat.hoandat.com/bot/v1/updates?offset=884246&amp;timeout=50
+Authorization: Bearer &lt;token&gt;</pre>
+						</div>
+						<div class="card-foot"><button type="submit" class="btn btn-primary" data-press="Đã lưu cách nhận update">Lưu</button></div>
+					</form>
+					<div class="card">
+						<h4>Trạng thái webhook</h4>
+						<span class="dot err">Đang lỗi, đang thử lại</span>
+						<dl class="kv">
+							<dt>Lỗi gần nhất</dt><dd>HTTP 502 Bad Gateway<span class="cell-sub">hôm nay 09:58:12</span></dd>
+							<dt>Update đang chờ</dt><dd>12</dd>
+							<dt>Độ trễ lần giao gần nhất</dt><dd>84 ms<span class="cell-sub">lúc 09:57:40</span></dd>
+							<dt>Kết nối đang mở</dt><dd>3 / 40</dd>
+							<dt>Update lỗi (dead-letter)</dt><dd><a class="btn btn-sm" href="#dead-letter">Xem 4 update</a></dd>
+						</dl>
+						<p class="sub">Thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, theo Retry-After nếu có. Sau 10 lần, update chuyển sang dead-letter để các update sau của cùng chat vẫn được giao.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="dead-letter">
+	<div class="shot-head">
+		<h2>Update không giao được</h2><span class="phase">Phase 15</span>
+		<p>Update đã thử 10 lần không thành công nằm ở đây, giữ 24 giờ. Thử lại gửi đúng update đó một lần nữa; Bỏ thì xoá. Một dòng đang thử lại; thử bấm để thấy dòng biến mất và trạng thái rỗng khi hết.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot</strong><small class="mono">@deploy_bot</small></div></div>
+			<nav class="c-tabs" data-active="dead-letter" aria-label="Mục của bot"></nav>
+			<div class="c-body">
+				<div class="c-title"><h3>Update lỗi <span class="muted" id="dl-count">(4)</span></h3><button type="button" class="btn btn-sm" id="dl-retry-all">Thử lại tất cả</button><button type="button" class="btn btn-sm btn-danger" id="dl-drop-all">Bỏ tất cả</button></div>
+				<div class="card table-card">
+					<table class="data stack" id="dl-table">
+						<thead><tr><th>update_id</th><th>Loại</th><th>Chat</th><th>Lỗi cuối</th><th>Lúc</th><th><span class="sr-only">Thao tác</span></th></tr></thead>
+						<tbody>
+							<tr><td data-label="update_id" class="mono"><div>884213</div></td><td data-label="Loại" class="mono"><div>message</div></td><td data-label="Chat"><div>Vận hành hệ thống</div></td><td data-label="Lỗi cuối" class="err-text"><div>HTTP 500 Internal Server Error</div></td><td data-label="Lúc"><div>09:31</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
+							<tr aria-busy="true"><td data-label="update_id" class="mono"><div>884220</div></td><td data-label="Loại" class="mono"><div>callback</div></td><td data-label="Chat"><div>Lan Anh</div></td><td data-label="Lỗi cuối"><div>Đang thử lại…</div></td><td data-label="Lúc"><div>09:40</div></td><td><div class="actions"><button type="button" class="btn btn-sm" disabled>Thử lại</button><button type="button" class="btn btn-sm btn-ghost" disabled>Bỏ</button></div></td></tr>
+							<tr><td data-label="update_id" class="mono"><div>884231</div></td><td data-label="Loại" class="mono"><div>member_changed</div></td><td data-label="Chat"><div>Team Mobile</div></td><td data-label="Lỗi cuối" class="err-text"><div>Hết thời gian chờ sau 10 giây</div></td><td data-label="Lúc"><div>09:52</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
+							<tr><td data-label="update_id" class="mono"><div>884245</div></td><td data-label="Loại" class="mono"><div>message</div></td><td data-label="Chat"><div>Quang Huy</div></td><td data-label="Lỗi cuối" class="err-text"><div>TLS: chứng chỉ hết hạn</div></td><td data-label="Lúc"><div>09:58</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
+						</tbody>
+					</table>
+					<div class="empty" id="dl-empty" hidden><svg class="icon"><use href="#i-inbox"/></svg><strong>Không có update nào bị kẹt</strong><span>Update lỗi 10 lần sẽ hiện ở đây trong 24 giờ.</span></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="stats">
+	<div class="shot-head">
+		<h2>Số liệu gửi</h2><span class="phase">Phase 15</span>
+		<p>Bộ đếm tổng hợp theo bot, không có dòng theo từng người nhận (quyết định ở Phase 9). Bốn ô: server đã nhận, đã đẩy tới ít nhất một phiên online, dịch vụ push đã nhận, lỗi. Dưới là các lần gửi hàng loạt qua <code class="mono">messages:bulk</code>, chỉ tính người đã bắt đầu chat với bot. Mọi con số trên trang là minh hoạ.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot</strong><small class="mono">@deploy_bot</small></div></div>
+			<nav class="c-tabs" data-active="stats" aria-label="Mục của bot"></nav>
+			<div class="c-body">
+				<div class="c-title">
+					<h3>Số liệu gửi <span class="illustrative">Minh hoạ</span></h3>
+					<div class="choice" role="group" aria-label="Khoảng thời gian"><button type="button" aria-pressed="true">24 giờ</button><button type="button" aria-pressed="false">7 ngày</button></div>
+				</div>
+				<div class="sdks" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))">
+					<div class="stat"><span>Đã nhận</span><b>12.480</b><span>Request server chấp nhận</span></div>
+					<div class="stat"><span>Đã giao realtime</span><b>11.902</b><span>Tới ít nhất một phiên online</span></div>
+					<div class="stat"><span>Push được nhận</span><b>3.115</b><span>FCM, APNs, Web Push nhận</span></div>
+					<div class="stat"><span>Lỗi</span><b>37</b><span>Không xử lý được</span></div>
+				</div>
+				<div class="card">
+					<div class="c-title"><h4 style="flex:1;margin:0;font-size:1rem;font-weight:600">Tầng rate limit</h4><span class="tier verified"><svg class="icon"><use href="#i-verified"/></svg>verified</span></div>
+					<p>Bot đã xác minh được gửi hàng loạt tới nhiều người nhận hơn mỗi ngày. Tầng do đội vận hành cấp ở công cụ kiểm duyệt.</p>
+				</div>
+				<div class="card table-card">
+					<table class="data stack">
+						<thead><tr><th>Lần gửi hàng loạt</th><th>Lúc</th><th>Đã nhận</th><th>Realtime</th><th>Push</th><th>Lỗi</th><th>Trạng thái</th></tr></thead>
+						<tbody>
+							<tr><td data-label="request_id" class="mono"><div>blk_9f2c41</div></td><td data-label="Lúc"><div>10:00</div></td><td data-label="Đã nhận" class="num"><div>4.200</div></td><td data-label="Realtime" class="num"><div>1.380</div></td><td data-label="Push" class="num"><div>2.010</div></td><td data-label="Lỗi" class="num"><div>0</div></td><td data-label="Trạng thái"><div><span class="dot">Đang gửi</span><div class="progress" style="width: 120px; margin-top: var(--space-1)"><span style="width: 81%"></span></div></div></td></tr>
+							<tr><td data-label="request_id" class="mono"><div>blk_8a17d0</div></td><td data-label="Lúc"><div>Hôm qua 17:30</div></td><td data-label="Đã nhận" class="num"><div>3.950</div></td><td data-label="Realtime" class="num"><div>2.204</div></td><td data-label="Push" class="num"><div>1.702</div></td><td data-label="Lỗi" class="num"><div>44</div></td><td data-label="Trạng thái"><div><span class="dot ok">Xong</span></div></td></tr>
+							<tr><td data-label="request_id" class="mono"><div>blk_77c3e9</div></td><td data-label="Lúc"><div>Hôm qua 08:00</div></td><td data-label="Đã nhận" class="num"><div>3.948</div></td><td data-label="Realtime" class="num"><div>1.115</div></td><td data-label="Push" class="num"><div>2.790</div></td><td data-label="Lỗi" class="num"><div>43</div></td><td data-label="Trạng thái"><div><span class="dot ok">Xong</span></div></td></tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="commands-editor">
+	<div class="shot-head">
+		<h2>Lệnh bot</h2><span class="phase">Phase 15</span>
+		<p>Lệnh theo phạm vi: mọi chat riêng, mọi nhóm, admin nhóm. Phạm vi hẹp hơn thay cho phạm vi rộng: admin trong nhóm thấy danh sách "Admin nhóm" thay cho "Mọi nhóm". Thêm, bỏ dòng (thử bấm); lỗi hiện dưới đúng ô. Cột phải là menu người dùng sẽ thấy khi gõ "/".</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot</strong><small class="mono">@deploy_bot</small></div></div>
+			<nav class="c-tabs" data-active="commands-editor" aria-label="Mục của bot"></nav>
+			<div class="c-body">
+				<div class="c-grid">
+					<form class="card form" onsubmit="return false">
+						<div class="scope-tabs" role="tablist" aria-label="Phạm vi lệnh">
+							<button type="button" role="tab" aria-selected="false" aria-controls="scope-private" id="tab-private">Mọi chat riêng</button>
+							<button type="button" role="tab" aria-selected="true" aria-controls="scope-groups" id="tab-groups">Mọi nhóm</button>
+							<button type="button" role="tab" aria-selected="false" aria-controls="scope-admins" id="tab-admins">Admin nhóm</button>
+						</div>
+						<div class="cmd-rows" role="tabpanel" id="scope-private" aria-labelledby="tab-private" hidden>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="start" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Bắt đầu dùng bot" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="status" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Trạng thái pipeline và bản đang chạy" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="deploy" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Đẩy một bản lên staging hoặc production" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+						</div>
+						<div class="cmd-rows" role="tabpanel" id="scope-groups" aria-labelledby="tab-groups">
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="status" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Trạng thái pipeline và bản đang chạy" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="changelog" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Thay đổi của bản mới nhất" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="Deploy-Now" aria-label="Lệnh" aria-invalid="true"></div><span class="error-text">Chỉ chữ thường a–z, số và dấu gạch dưới</span></div><div class="field"><input class="input" value="Đẩy ngay bản mới nhất" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+						</div>
+						<div class="cmd-rows" role="tabpanel" id="scope-admins" aria-labelledby="tab-admins" hidden>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="deploy" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Đẩy một bản lên staging hoặc production" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+							<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="rollback" aria-label="Lệnh"></div></div><div class="field"><input class="input" value="Quay về bản trước" aria-label="Mô tả"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>
+						</div>
+						<div><button type="button" class="btn btn-sm" id="cmd-add"><svg class="icon icon-sm"><use href="#i-plus"/></svg>Thêm lệnh</button></div>
+						<div class="card-foot"><button type="submit" class="btn btn-primary" data-press="Đã lưu lệnh cho phạm vi này">Lưu</button></div>
+					</form>
+					<div class="card">
+						<h4>Người dùng thấy</h4>
+						<p id="preview-scope">Trong nhóm, với thành viên thường</p>
+						<div class="preview-menu" id="preview-menu"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="mini-app-settings">
+	<div class="shot-head">
+		<h2>Mini App</h2><span class="phase">R6 · Phase 16</span>
+		<p>Đăng ký URL Mini App: chỉ https (thử gõ http:// để thấy lỗi). Console cho xem trước origin riêng mà người dùng sẽ thấy ở đầu khung, <code class="mono">chat-apps.invalid</code> là placeholder cho domain Mini App dùng chung. Server của bot phải xác thực initData bằng SDK trước khi tin danh tính người dùng.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot</strong><small class="mono">@deploy_bot</small></div></div>
+			<nav class="c-tabs" data-active="mini-app-settings" aria-label="Mục của bot"></nav>
+			<div class="c-body">
+				<div class="c-grid">
+					<form class="card form" onsubmit="return false">
+						<h4>Mini App</h4>
+						<div class="field">
+							<label for="ma-url">URL Mini App</label>
+							<input class="input mono" id="ma-url" value="https://release.deploy.hoandat.com/app" spellcheck="false" aria-describedby="ma-url-msg">
+							<span class="hint" id="ma-url-msg">Chỉ https. Trang được nạp trong khung sandbox, không có cookie của app chat.</span>
+						</div>
+						<div class="field">
+							<label for="ma-short">Tên ngắn</label>
+							<input class="input mono" id="ma-short" value="release" spellcheck="false" style="max-width: 240px">
+							<span class="hint">Dùng trong link mở Mini App. Chữ thường, số, dấu gạch dưới.</span>
+						</div>
+						<div class="field">
+							<span class="label">Xem trước đầu khung</span>
+							<div class="ma-preview">
+								<div class="bar"><svg class="icon"><use href="#i-back"/></svg><div style="flex:1;min-width:0"><strong>Deploy Bot</strong><span>b7302114.chat-apps.invalid</span></div><svg class="icon"><use href="#i-x"/></svg></div>
+								<div class="body">Nội dung từ <span class="mono" id="ma-preview-url">https://release.deploy.hoandat.com/app</span></div>
+							</div>
+						</div>
+						<div class="card-foot"><button type="submit" class="btn btn-primary" id="ma-save" data-press="Đã lưu Mini App">Lưu</button></div>
+					</form>
+					<div class="card">
+						<h4>Xác thực initData ở server</h4>
+						<ul>
+							<li>Mini App nhận initData có chữ ký (HMAC, hoặc Ed25519 với khoá công khai của nền tảng), kèm <code class="mono">tenant_id</code> và <code class="mono">auth_date</code>.</li>
+							<li>Kiểm chữ ký bằng hàm xác thực của SDK trước khi tin id người dùng; từ chối <code class="mono">auth_date</code> quá 1 giờ.</li>
+							<li>Cấp lại token đổi khoá ký, initData cũ hết hiệu lực.</li>
+						</ul>
+						<div class="sdks" style="grid-template-columns: minmax(0, 1fr)">
+							<a class="sdk" href="#" data-toast="Mở hướng dẫn Mini App cho TypeScript"><b>TypeScript <svg class="icon"><use href="#i-external"/></svg></b><span>Xác thực initData trong Node</span></a>
+							<a class="sdk" href="#" data-toast="Mở hướng dẫn Mini App cho Python"><b>Python <svg class="icon"><use href="#i-external"/></svg></b><span>Xác thực initData trong Python</span></a>
+							<a class="sdk" href="#" data-toast="Mở hướng dẫn Mini App cho Go"><b>Go <svg class="icon"><use href="#i-external"/></svg></b><span>Xác thực initData trong Go</span></a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+</main>
+<script src="assets/mock.js"></script>
+<script>
+(() => {
+	const { $, $$, toast, escapeHtml } = window.Mock;
+
+	// Bot section tabs, shared by every bot-level screen (each tab links to its shot).
+	const TABS = [["create-bot", "Hồ sơ"], ["token", "Token"], ["webhook", "Nhận update"], ["dead-letter", "Update lỗi"], ["stats", "Số liệu"], ["commands-editor", "Lệnh"], ["mini-app-settings", "Mini App"]];
+	$$(".c-tabs").forEach((nav) => {
+		nav.innerHTML = TABS.map(([id, label]) => `<a href="#${id}"${id === nav.dataset.active ? ' aria-current="page"' : ""}>${label}</a>`).join("");
+	});
+	// Doc links are placeholders: only the toast fires.
+	$$('a[href="#"]').forEach((a) => a.addEventListener("click", (e) => e.preventDefault()));
+
+	// Create bot: live username validation.
+	const TAKEN = ["report_bot", "deploy_bot", "oncall_bot", "report_daily_bot"];
+	const user = $("#cb-user");
+	const msg = $("#cb-user-msg");
+	const validate = () => {
+		const v = user.value.trim();
+		let error = "";
+		if (!/^[a-z0-9_]*$/.test(v)) error = "Chỉ dùng a–z, 0–9 và dấu gạch dưới";
+		else if (!v.endsWith("bot")) error = "Username phải kết thúc bằng bot";
+		else if (TAKEN.includes(v)) error = "username đã có người dùng";
+		user.setAttribute("aria-invalid", String(error !== ""));
+		msg.className = error ? "error-text" : "hint-ok";
+		msg.textContent = error || "Dùng được";
+		$("#cb-suggest").hidden = error !== "username đã có người dùng";
+		$("#cb-submit").disabled = error !== "" || $("#cb-name").value.trim() === "";
+	};
+	user.addEventListener("input", validate);
+	$("#cb-name").addEventListener("input", validate);
+	$$("#cb-suggest button").forEach((b) => b.addEventListener("click", () => { user.value = b.textContent; validate(); }));
+	$("#cb-submit").addEventListener("click", (e) => {
+		const b = e.currentTarget;
+		b.setAttribute("aria-busy", "true"); b.textContent = "Đang tạo…";
+		setTimeout(() => { b.removeAttribute("aria-busy"); b.textContent = "Tạo bot"; toast("Đã tạo bot, token hiện một lần ở bước sau"); }, 500);
+	});
+
+	// Webhook vs long poll.
+	$$("#mode-choice button").forEach((b) => b.addEventListener("click", () => {
+		$("#mode-webhook").hidden = b.dataset.mode !== "webhook";
+		$("#mode-poll").hidden = b.dataset.mode !== "poll";
+	}));
+	$("#wh-eye").addEventListener("click", (e) => {
+		const show = $("#wh-secret").type === "password";
+		$("#wh-secret").type = show ? "text" : "password";
+		e.currentTarget.setAttribute("aria-pressed", String(show));
+		e.currentTarget.setAttribute("aria-label", show ? "Ẩn secret" : "Hiện secret");
+	});
+	$$(".chips button").forEach((b) => b.addEventListener("click", () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"))));
+
+	// Dead-letter: retry and drop remove rows; empty state when none left.
+	const dlBody = $("#dl-table tbody");
+	const refreshDl = () => {
+		const n = $$("tr", dlBody).length;
+		$("#dl-count").textContent = `(${n})`;
+		$("#dl-table").hidden = n === 0;
+		$("#dl-empty").hidden = n > 0;
+		$("#dl-retry-all").disabled = $("#dl-drop-all").disabled = n === 0;
+	};
+	const settle = (row, retry) => {
+		row.setAttribute("aria-busy", "true");
+		$$("button", row).forEach((b) => { b.disabled = true; });
+		const id = $("td", row).textContent;
+		setTimeout(() => { row.remove(); refreshDl(); toast(retry ? `Đã giao lại update ${id}` : `Đã bỏ update ${id}`); }, retry ? 600 : 150);
+	};
+	dlBody.addEventListener("click", (e) => {
+		const b = e.target instanceof Element ? e.target.closest("[data-act]") : null;
+		if (b && !b.disabled) settle(b.closest("tr"), b.dataset.act === "retry");
+	});
+	$("#dl-retry-all").addEventListener("click", () => $$("tr:not([aria-busy])", dlBody).forEach((r) => settle(r, true)));
+	$("#dl-drop-all").addEventListener("click", () => $$("tr", dlBody).forEach((r) => settle(r, false)));
+
+	// Commands editor: add/remove rows, live preview of the active scope.
+	const SCOPE_NOTE = { "scope-private": "Trong chat riêng với bot", "scope-groups": "Trong nhóm, với thành viên thường", "scope-admins": "Trong nhóm, với admin" };
+	const activePanel = () => $(".cmd-rows:not([hidden])");
+	const renderPreview = () => {
+		const panel = activePanel();
+		$("#preview-scope").textContent = SCOPE_NOTE[panel.id];
+		const rows = $$(".cmd-row", panel).map((r) => $$("input", r).map((i) => i.value.trim()));
+		$("#preview-menu").innerHTML = rows.filter(([c]) => /^[a-z0-9_]+$/.test(c))
+			.map(([c, d]) => `<div><b>/${escapeHtml(c)}</b><span>${escapeHtml(d)}</span></div>`).join("") || '<div><span>Chưa có lệnh hợp lệ</span></div>';
+	};
+	const validateCmd = (input) => {
+		const field = input.closest(".field");
+		const bad = !/^[a-z0-9_]+$/.test(input.value.trim());
+		input.setAttribute("aria-invalid", String(bad));
+		let err = $(".error-text", field);
+		if (bad && !err) { field.insertAdjacentHTML("beforeend", '<span class="error-text">Chỉ chữ thường a–z, số và dấu gạch dưới</span>'); }
+		if (!bad && err) err.remove();
+	};
+	const form = $("#commands-editor form");
+	form.addEventListener("input", (e) => { if (e.target.matches(".mono")) validateCmd(e.target); renderPreview(); });
+	form.addEventListener("click", (e) => {
+		const t = e.target instanceof Element ? e.target : null;
+		if (!t) return;
+		const remove = t.closest('[aria-label="Bỏ lệnh"]');
+		if (remove) { remove.closest(".cmd-row").remove(); renderPreview(); }
+		if (t.closest('[role="tab"]')) setTimeout(renderPreview);
+	});
+	$("#cmd-add").addEventListener("click", () => {
+		activePanel().insertAdjacentHTML("beforeend", `<div class="cmd-row"><div class="field"><div class="prefixed"><span>/</span><input class="input mono" value="" aria-label="Lệnh" placeholder="lenh_moi"></div></div><div class="field"><input class="input" value="" aria-label="Mô tả" placeholder="Mô tả ngắn"></div><button type="button" class="icon-btn" aria-label="Bỏ lệnh"><svg class="icon"><use href="#i-trash"/></svg></button></div>`);
+		$$(".cmd-row", activePanel()).pop().querySelector("input").focus();
+	});
+	renderPreview();
+
+	// Mini App URL: https only.
+	const maUrl = $("#ma-url");
+	maUrl.addEventListener("input", () => {
+		const v = maUrl.value.trim();
+		const ok = /^https:\/\/[^\s/]+\.[^\s/]+/.test(v);
+		maUrl.setAttribute("aria-invalid", String(!ok));
+		$("#ma-url-msg").className = ok ? "hint" : "error-text";
+		$("#ma-url-msg").textContent = ok ? "Chỉ https. Trang được nạp trong khung sandbox, không có cookie của app chat." : "URL phải bắt đầu bằng https:// và có tên miền";
+		$("#ma-save").disabled = !ok;
+		if (ok) $("#ma-preview-url").textContent = v;
+	});
+})();
+</script>
+</body>
+</html>

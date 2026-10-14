@@ -1,0 +1,119 @@
+---
+phase: 6
+title: "Phase 6: Web UI React 19 và ngân sách tốc độ"
+status: pending
+priority: P1
+effort: "XL"
+dependencies: [5]
+principles: [2, 3, 1]
+---
+
+# Phase 6: Web UI React 19 và ngân sách tốc độ
+
+<!-- Updated: Red Team 2026-10-13 - UI bot dựa trên reply_markup trong proto, allowlist scheme khi mở link, nhãn tích hợp cho tin từ webhook, perf gate có hồ sơ thiết bị native -->
+<!-- Updated: Validation Session 2 2026-10-14 - màn hình đăng nhập chuyển sang IdP hoandat-auth, phiên đăng nhập + link /account, ui_locales -->
+<!-- Updated: Validation Session 8 2026-10-14 - media hiển thị làm cùng Phase 4 (sau cùng) -->
+<!-- Updated: Validation Session 9 2026-10-14 - UI lớn dần theo release, mỗi release duyệt mock tương ứng rồi lên prod -->
+
+## Goal
+
+Xây giao diện chat web bằng React 19 đạt cảm giác nhanh như Telegram, với ngân sách hiệu năng được đo tự động trong CI để không bị thoái lui.
+
+## Context Links
+
+- [Mock giao diện HTML](./mockups/index.html): mục lục 86 màn hình và trạng thái phủ mọi tính năng có giao diện trong plan, chia 11 trang theo nhóm tính năng; dùng token của hệ sinh thái (`mockups/tokens.css`, bản sao nguyên văn từ `hoandat-auth`). **Cổng:** user duyệt mock trước khi code UI; mọi thay đổi bố cục được thống nhất trên mock trước.
+- [Kỹ thuật tốc độ client web](../reports/researcher-261013-1120-telegram-web-client-speed.md) — top-10 kỹ thuật
+- [Client đa nền tảng](../reports/researcher-261013-1120-cross-platform-client.md) — mục 1, 4
+
+## Key Insights
+
+- Báo cáo xếp React 19 cuối về tốc độ thô; user đã chọn React. Bù lại bằng kỷ luật kiến trúc: React Compiler, store ngoài React, subscribe theo id bằng `useSyncExternalStore`, không dùng Context cho dữ liệu thay đổi nhanh.
+- Lợi thế thật của Teact là scheduler: gom đọc DOM trước, ghi sau, trong mỗi frame; hoãn cập nhật UI khi đang chạy animation nặng.
+- Message list chỉ giữ ~80–120 node; khi chèn lịch sử cũ phía trên, tắt `overflow-anchor` và khôi phục vị trí theo phần tử nhìn thấy.
+- Chat list dùng hàng chiều cao cố định, định vị tuyệt đối.
+
+## Requirements
+
+Functional:
+- Màn hình: chào mừng với hai nút "Đăng nhập" và "Tạo tài khoản" bằng tài khoản hoandat (chuyển sang trang của IdP, không có form email hay mật khẩu trong app), danh sách chat, khung chat, composer (text, emoji, đính kèm, reply, edit), thông tin chat/người dùng, cài đặt cơ bản (bao gồm riêng tư), tìm kiếm (giao diện, nối API ở Phase 7).
+- Formatting theo entities (bold, italic, code, pre, link, mention, spoiler…).
+- Hiển thị media (inline thumb, kích thước cố định) làm cùng Phase 4 ở release R3; ở R1–R2 composer chưa có nút đính kèm.
+- UI bot dựa trên `reply_markup` của `Message` (reply keyboard, inline keyboard + `PressInlineButton`, URL button), menu lệnh, nhãn `via_bot`; tin từ webhook hiển thị nhãn "Tích hợp: <tên>" không giả mạo được (`integration_label`).
+- Reaction, album (`grouped_id`), ghim, trả lời, chuyển tiếp.
+- Theme sáng/tối, đọc màu và tên từ `brand.config`; tên tenant (`displayName` từ IdP) hiện ở màn hình chào và cài đặt khi không phải tenant chính.
+- Cài đặt → Phiên đăng nhập: danh sách phiên chat, thu hồi từng phiên hoặc mọi phiên khác, và link "Quản lý tài khoản hoandat" tới `/account` của IdP (đổi cách đăng nhập, gỡ quyền ứng dụng).
+- i18n: tiếng Việt và tiếng Anh; gửi `ui_locales` khi chuyển sang IdP để trang đăng nhập cùng ngôn ngữ.
+
+Non-functional (ngân sách, đo trong CI bằng Playwright + Chrome trace trên máy CI cố định):
+- Cold start tới khi danh sách chat hiển thị từ cache: ≤ 400 ms trên laptop chuẩn, ≤ 1 s trên Android tầm trung (đo ở Phase 10).
+- Mở chat từ cache: ≤ 100 ms p99.
+- Cuộn 1.000 tin: không frame nào > 32 ms, trung bình ≥ 55 fps.
+- JS initial (gzip) ≤ 150 KB; phần còn lại lazy load.
+
+## Architecture
+
+- `packages/ui`: component React; hook `useDialog(id)`, `useMessage(key)` bọc `useSyncExternalStore` trên event bus của `packages/core`.
+- `packages/ui/src/scheduler`: `requestMeasure`/`requestMutation` theo frame.
+- `packages/ui/src/virtual-list`: list tự viết, neo theo phần tử nhìn thấy, hỗ trợ chèn đầu và cuối.
+- `apps/web`: Vite, code splitting theo route/màn phụ, preload chunk chat.
+
+## Related Code Files
+
+Create:
+- `packages/ui/src/{components,hooks,scheduler,virtual-list,theme,i18n}/`
+- `apps/web/{index.html,src/main.tsx,vite.config.ts}`
+- `apps/web/perf/` (Playwright perf scenarios + ngưỡng)
+
+## Implementation Steps
+
+1. Thiết lập React 19 + React Compiler + Vite; lint rule cấm Context cho state thay đổi nhanh.
+2. Hook subscribe hạt mịn trên event bus.
+3. Scheduler đọc/ghi DOM theo frame.
+4. Virtual list cho message (neo vị trí, chèn đầu/cuối, nhảy tới tin) và chat list (chiều cao cố định).
+5. Composer + optimistic send; trạng thái pending/failed.
+6. Render entities.
+7. UI bot: reply keyboard, inline keyboard (callback), menu lệnh.
+8. Theme + brand + i18n.
+9. Bộ đo perf trong CI: cold start, mở chat, cuộn 1.000 tin, kích thước bundle; fail CI khi vượt ngưỡng. Chạy thêm hồ sơ CPU throttling 4× làm đại diện WebView tầm trung; đo thật trên thiết bị ở Phase 10/11.
+
+## Todo
+
+- [ ] React 19 + Compiler + Vite
+- [ ] Hook hạt mịn + scheduler
+- [ ] Virtual list message + chat list
+- [ ] Composer + optimistic send
+- [ ] Entities
+- [ ] UI bot
+- [ ] Theme/brand/i18n
+- [ ] Perf gate trong CI
+
+## Success Criteria
+
+- Mọi ngưỡng ngân sách ở trên pass trong CI ba lần liên tiếp.
+- React Profiler: nhận một tin mới chỉ render lại đúng item tin đó và dòng dialog tương ứng.
+- Kiểm thử accessibility cơ bản (axe) không có lỗi mức critical.
+
+## Verification
+
+- `pnpm --filter @app/web build && pnpm --filter @app/web perf`
+- `pnpm --filter @app/ui test`
+
+## Risk Assessment
+
+| Rủi ro | Mức | Giảm thiểu |
+|---|---|---|
+| React re-render dây chuyền làm giật khi nhiều update | Cao | Subscribe theo id, perf gate trong CI, Profiler test |
+| Bundle phình | Trung bình | Ngưỡng bundle trong CI, lazy load màn phụ |
+
+## Security Considerations
+
+- Render entities không dùng `dangerouslySetInnerHTML`; mọi URL (entity, nút) đi qua allowlist scheme của ADR 0004 trước khi mở; link mở với `rel="noopener noreferrer"` và cảnh báo link ngoài domain tin cậy.
+- CSP chặt cho web app (Phase 13 cấu hình header).
+
+## Rollback
+
+UI chưa phát hành; tính năng mới đặt sau feature flag cấu hình khi đã có người dùng.
+
+## Next Steps
+
+UI lớn dần theo release: R1 nhắn tin, R2 webhook, R3 media, R4 tìm kiếm, R5 bot, R6 Mini App; Phase 10/11 bọc app ở R7/R8.

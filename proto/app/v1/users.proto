@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/media.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// (user_id, chat_id, seq, pts, unix-second dates) always holds a value < 2^53
+// so JavaScript clients can use a plain number; the server asserts the bound
+// when serializing. Every lookup is scoped to the caller's tenant (ADR 0010).
+
+// Profiles, usernames, blocking and privacy settings.
+service UsersService {
+  rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc SetUsername(SetUsernameRequest) returns (SetUsernameResponse);
+  rpc ResolveUsername(ResolveUsernameRequest) returns (ResolveUsernameResponse);
+  // Searches by username/name, and by exact email when the target allows it.
+  rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+  rpc Block(BlockRequest) returns (BlockResponse);
+  rpc Unblock(UnblockRequest) returns (UnblockResponse);
+  rpc GetPrivacy(GetPrivacyRequest) returns (GetPrivacyResponse);
+  rpc SetPrivacy(SetPrivacyRequest) returns (SetPrivacyResponse);
+}
+
+// Presence as visible to the caller after privacy rules are applied.
+enum UserStatusKind {
+  // Hidden by privacy settings or never seen.
+  USER_STATUS_KIND_UNSPECIFIED = 0;
+  USER_STATUS_KIND_ONLINE = 1;
+  // Exact last_seen is shared.
+  USER_STATUS_KIND_OFFLINE = 2;
+  // Coarse buckets used when the exact time is hidden.
+  USER_STATUS_KIND_RECENTLY = 3;
+  USER_STATUS_KIND_LAST_WEEK = 4;
+  USER_STATUS_KIND_LAST_MONTH = 5;
+}
+
+message UserStatus {
+  UserStatusKind kind = 1;
+  // Set for OFFLINE.
+  int64 last_seen = 2 [jstype = JS_NUMBER];
+  // Set for ONLINE: when the status lapses to OFFLINE without a new update.
+  int64 expires = 3 [jstype = JS_NUMBER];
+}
+
+message User {
+  int64 id = 1 [jstype = JS_NUMBER];
+  // Unique within the tenant; empty when the user has none.
+  string username = 2;
+  string name = 3;
+  string bio = 4;
+  MediaRef photo = 5;
+  bool is_bot = 6;
+  // True only for the caller's own user.
+  bool is_self = 7;
+  // The caller has blocked this user.
+  bool is_blocked = 8;
+  UserStatus status = 9;
+  // Only for the caller's own user, or when the owner's privacy allows it.
+  // Comes from the IdP and is present only while verified there.
+  string email = 10;
+  // Bots with inline mode enabled: placeholder shown in the input field.
+  string bot_inline_placeholder = 11;
+}
+
+message GetUsersRequest {
+  repeated int64 user_ids = 1 [jstype = JS_NUMBER];
+}
+
+message GetUsersResponse {
+  // Unknown or invisible ids are omitted.
+  repeated User users = 1;
+}
+
+message UpdateProfileRequest {
+  // Unset fields are left unchanged.
+  optional string name = 1;
+  optional string bio = 2;
+  // file_id of an uploaded photo; empty string removes the photo.
+  optional string photo_file_id = 3;
+}
+
+message UpdateProfileResponse {
+  User user = 1;
+}
+
+message SetUsernameRequest {
+  string username = 1;
+}
+
+message SetUsernameResponse {
+  User user = 1;
+}
+
+message ResolveUsernameRequest {
+  string username = 1;
+}
+
+message ResolveUsernameResponse {
+  User user = 1;
+}
+
+message SearchUsersRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message SearchUsersResponse {
+  repeated User users = 1;
+}
+
+message BlockRequest {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+}
+
+message BlockResponse {}
+
+message UnblockRequest {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+}
+
+message UnblockResponse {}
+
+// Who a privacy rule applies to.
+enum PrivacyAudience {
+  PRIVACY_AUDIENCE_UNSPECIFIED = 0;
+  PRIVACY_AUDIENCE_EVERYONE = 1;
+  PRIVACY_AUDIENCE_CONTACTS = 2;
+  PRIVACY_AUDIENCE_NOBODY = 3;
+}
+
+message PrivacySettings {
+  PrivacyAudience last_seen = 1;
+  PrivacyAudience profile_photo = 2;
+  PrivacyAudience find_by_email = 3;
+  PrivacyAudience find_by_username = 4;
+  PrivacyAudience add_to_groups = 5;
+  PrivacyAudience send_messages = 6;
+  // Show message content in push notifications.
+  bool notification_preview = 7;
+}
+
+message GetPrivacyRequest {}
+
+message GetPrivacyResponse {
+  PrivacySettings settings = 1;
+}
+
+message SetPrivacyRequest {
+  // Unset fields are left unchanged.
+  optional PrivacyAudience last_seen = 1;
+  optional PrivacyAudience profile_photo = 2;
+  optional PrivacyAudience find_by_email = 3;
+  optional PrivacyAudience find_by_username = 4;
+  optional PrivacyAudience add_to_groups = 5;
+  optional PrivacyAudience send_messages = 6;
+  optional bool notification_preview = 7;
+}
+
+message SetPrivacyResponse {
+  PrivacySettings settings = 1;
+}

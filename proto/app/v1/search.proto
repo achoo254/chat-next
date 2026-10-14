@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/chats.proto";
+import "app/v1/media.proto";
+import "app/v1/messages.proto";
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+//
+// Queries are folded server-side (ADR 0005), so unaccented input matches
+// accented text; exact-accent matches rank first. Every hit is re-checked
+// against membership, visible_from_seq, hidden and deleted messages. Secret
+// chats are never indexed. Pages use an opaque cursor; a page is either full
+// or the last one, and never repeats an earlier hit.
+
+// Server-side message search.
+service SearchService {
+  // Across all chats of the caller.
+  rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
+  // Within one chat.
+  rpc SearchChatMessages(SearchChatMessagesRequest) returns (SearchChatMessagesResponse);
+}
+
+message SearchFilter {
+  // Only messages from this sender; 0 = any.
+  int64 from_id = 1 [jstype = JS_NUMBER];
+  // Only messages with this media kind; UNSPECIFIED = any.
+  MediaKind media_kind = 2;
+  // Inclusive unix-second bounds; 0 = unbounded.
+  int64 min_date = 3 [jstype = JS_NUMBER];
+  int64 max_date = 4 [jstype = JS_NUMBER];
+}
+
+message SearchMessagesRequest {
+  string query = 1;
+  SearchFilter filter = 2;
+  // Opaque cursor from a previous response; empty for the first page.
+  string cursor = 3;
+  int32 limit = 4;
+}
+
+message SearchMessagesResponse {
+  // Ranked hits.
+  repeated Message messages = 1;
+  repeated User users = 2;
+  repeated Chat chats = 3;
+  // Empty when there are no more results.
+  string next_cursor = 4;
+}
+
+message SearchChatMessagesRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  string query = 2;
+  SearchFilter filter = 3;
+  string cursor = 4;
+  int32 limit = 5;
+}
+
+message SearchChatMessagesResponse {
+  repeated Message messages = 1;
+  repeated User users = 2;
+  repeated Chat chats = 3;
+  string next_cursor = 4;
+}

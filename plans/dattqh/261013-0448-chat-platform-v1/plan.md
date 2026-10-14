@@ -1,0 +1,244 @@
+---
+title: "Nền tảng chat v1 — hiệu năng và kiến trúc học từ Telegram"
+description: "Sản phẩm app tiếp theo trong hệ sinh thái hoandat (đăng nhập qua IdP hoandat-auth). Ứng dụng chat tên cấu hình được, web-first, đóng gói Capacitor/Tauri, nhanh ngang Telegram, có nền tảng Bot riêng, tìm kiếm lịch sử và thông báo qua Bot/webhook cực nhanh."
+status: pending
+priority: P1
+effort: "XL"
+branch: main
+tags: [feature, frontend, backend, api, database, infra, critical]
+blockedBy: []
+blocks: []
+created: 2026-10-13
+---
+
+# Nền tảng chat v1
+
+## Overview
+
+Sản phẩm chat là **app tiếp theo trong hệ sinh thái hoandat**, cùng hàng với Localman và Tunelo, dùng chung IdP `hoandat-auth` (xem mục [Hệ sinh thái hoandat](#hệ-sinh-thái-hoandat)). Tên sản phẩm cấu hình được (`{{APP_NAME}}` trong `brand.config.json`; "chat-inet" chỉ là tên thư mục). Telegram chỉ là chuẩn tham chiếu về hiệu năng và kiến trúc; sản phẩm độc lập với Telegram, không tương thích và không liên quan Telegram về API, tên gọi hay thương hiệu.
+
+Stack đã chốt: web app React 19 (web-first), Capacitor cho iOS/Android, Tauri v2 cho desktop, backend Go, Postgres + Redis + Meilisearch + S3-compatible, self-host tại Việt Nam. Hạ tầng hai giai đoạn: chạy chung server `.65` với IdP trước, chuyển lên cụm riêng (Postgres replica đồng bộ) khi chạm ngưỡng tải (Phase 13). Ứng dụng công khai, đăng nhập bằng tài khoản hoandat (Google/GitHub qua `hoandat-auth`), hỗ trợ tenant theo domain, contract dữ liệu thiết kế cho hàng triệu người dùng; v1 triển khai cỡ ~100k.
+
+Đầu vào: [báo cáo tổng hợp xia](../reports/xia-261013-1139-telegram-like-chat-design.md), 5 báo cáo nghiên cứu trong `../reports/`, và [báo cáo REA về Telegram Desktop 7.3.1](../reports/rea-261014-1200-telegram-desktop-architecture.md) (kiểm kê tĩnh binary đã cài, không decompile, không chạy app).
+
+## Hệ sinh thái hoandat
+
+App chat là một sản phẩm trong hệ sinh thái hoandat, không phải sản phẩm đứng riêng. Danh tính người dùng do IdP OpenID Connect `hoandat-auth` quản lý (repo [`achoo254/hoandat-auth`](https://github.com/achoo254/hoandat-auth), bản local `../../../../hoandat-auth`, production `https://auth.hoandat.com`). Đây là IdP đang phục vụ các app hiện có:
+
+| App trong hệ sinh thái | Địa chỉ | `client_id` |
+|---|---|---|
+| Localman web, Localman MCP | `https://localman.hoandat.com` | `localman-web`, DCR |
+| Tunelo CLI, Tunelo web | lệnh `tunelo`, `https://tunnel.hoandat.com` | `tunelo-cli`, `tunelo-web` |
+| **App chat (plan này)** | `https://chat.hoandat.com` (tenant: `https://chat.<d>`) | `chat-web`, `chat-mobile`, `chat-desktop` |
+
+Những điều sau là ràng buộc của hệ sinh thái mà plan này phải tuân theo. Nguồn: `hoandat-auth/README.md` và `hoandat-auth/docs/integration-guide.md`.
+
+- Một tài khoản hoandat dùng cho mọi app. App chat không tự quản lý danh tính gốc; tài khoản chat gắn với `sub` của IdP.
+- IdP chỉ cho đăng nhập và đăng ký bằng Google hoặc GitHub. Không có mật khẩu, không có mã khôi phục, và IdP không gửi email ở bất kỳ đâu (ADR 0004 của `hoandat-auth`).
+- App mới phải khai client tĩnh trong `hoandat-auth/src/oidc/clients.ts` (Code + PKCE S256 bắt buộc, redirect `/auth/callback`, back-channel logout có `sid`). Sau đó cập nhật bảng ứng dụng trong README, trang `/apps`, mục "Client và audience" và `docs/integration-guide.md` mục 2. Phần này là thay đổi ở repo `hoandat-auth`, không nằm trong repo này.
+- Endpoint đọc từ `/.well-known/openid-configuration`, không hardcode. Access token là JWT ES256 sống 15 phút, xác minh offline bằng JWKS và kiểm `iss`, `aud`, `typ`. Refresh token dùng một lần và xoay vòng, phiên trượt 30 ngày, trần 90 ngày. Client phải khoá khi refresh.
+- Hệ sinh thái có tenant theo domain (ADR 0006 của `hoandat-auth`): người dùng của `<domain>` đăng nhập ở `auth.<domain>` và dữ liệu tách khỏi `hoandat.com`. Tenant đầu tiên là `inetdev.io.vn`.
+- Trang `/account` của IdP là nơi người dùng xem phiên, thiết bị và gỡ quyền ứng dụng. Gỡ quyền hoặc đăng xuất ở IdP phải cắt được phiên của app chat qua back-channel logout.
+
+### Cách app chat tham gia hệ sinh thái (đã chốt ngày 2026-10-14)
+
+- **Đăng nhập:** chỉ qua `hoandat-auth`. App chat không có đăng ký, mật khẩu, OTP, 2FA hay gửi email. Web dùng client confidential `chat-web` (server làm Code + PKCE). Mobile dùng client public `chat-mobile` (trình duyệt hệ thống + private-use scheme), desktop dùng `chat-desktop` (trình duyệt hệ thống + loopback). Chi tiết ở ADR 0006, [Phase 1](./phase-01-contracts-foundation.md).
+- **Phiên:** app tự cấp phiên chat để IdP không nằm trên đường nóng, nhưng phiên luôn gắn với grant của IdP. Phiên bị thu hồi khi nhận back-channel logout hoặc khi refresh trả `invalid_grant`. Phiên web trượt 30 ngày, trần 90 ngày; phiên native trượt 30 ngày, không trần (grant theo thiết bị, như `tunelo-cli`). Xem [Phase 2](./phase-02-backend-core-sync.md).
+- **Domain:** `chat.hoandat.com` cho tenant chính. Mỗi tenant `<d>` dùng `chat.<d>`, `bot.chat.<d>`, `hook.chat.<d>`; media và Mini App nằm trên domain đăng ký riêng, dùng chung mọi tenant.
+- **Tenant:** có từ v1 (ADR 0010). `tenant_id` có từ migration đầu; không có chat, tin, bot hay tìm kiếm xuyên tenant. Một bản app mobile/desktop dùng cho mọi tenant ("Đăng nhập bằng domain khác"). Tenant nghiệm thu là `inetdev.io.vn`.
+
+### Thay đổi cần làm ở `hoandat-auth`
+
+Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integration/plan.md` (4 phase, vị trí code đã scout). Phase 04 của plan đó nghiệm thu cùng Phase 2 của plan này.
+
+| Thay đổi | Lý do | Phase chat cần |
+|---|---|---|
+| Khai client tĩnh `chat-web` (confidential, back-channel logout `https://chat.<d>/auth/backchannel-logout`, scope `openid profile email`) | Đăng nhập web | 2 |
+| Khai `chat-mobile` (native, redirect private-use scheme) và `chat-desktop` (native, loopback cổng bất kỳ theo RFC 8252); refresh token theo chính sách client, không trần 90 ngày như `tunelo-cli` | Đăng nhập native, phiên dài trên thiết bị | 10, 11 |
+| Thêm host `chat.<d>`, `*.chat.<d>` vào quy ước host của tenant, bật theo từng tenant ở `/admin`; chặn nhãn `chat` khi nhận domain; cấp chứng chỉ cho tenant đã bật | Tenant theo domain | 2, 13 |
+| Credentials API nội bộ cho vai `chat` (backend chat chạy chung server `.65` nên gọi qua loopback, không cần kênh từ xa) | Backend chat tra tenant, JWKS, discovery | 2, 13 |
+| Khoá app `chat-web` để suy secret theo tenant | Tenant mới không cần cấu hình tay | 2 |
+| Bucket hạn mức riêng ở `/token` cho request vào thẳng IdP qua loopback | Job kiểm grant cho nhiều phiên | 2, 14 |
+| Thêm app chat vào bảng README, trang `/apps`, `docs/integration-guide.md` | Quy ước khi thêm app mới | 14 |
+
+## Yêu cầu tối thiểu (không được cắt)
+
+1. Tốc độ cực nhanh ngang Telegram — Phase 2, 3, 5, 6, 14.
+2. Nền tảng Bot mạnh ngang Telegram, API riêng — Phase 8, 15.
+3. Tìm kiếm lịch sử tin nhắn, gõ không dấu vẫn ra — Phase 7.
+4. Gửi thông báo qua Bot và webhook, xử lý cực nhanh — Phase 9.
+
+## Nguyên tắc sản phẩm
+
+(1) Core first · (2) Speed matters · (3) Simple by default · (4) Cloud-enabled · (5) Privacy by design · (6) Platform over features · (7) Scale from the beginning. Mỗi phase ghi nguyên tắc chính trong frontmatter `principles`.
+
+## Phases
+
+| # | Phase | Tier | Phụ thuộc | Nguyên tắc | Status |
+|---|---|---|---|---|---|
+| 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | In progress (còn chạy Docker Compose và CI) |
+| 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | Pending |
+| 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | Pending |
+| 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | Pending |
+| 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | Pending |
+| 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | Pending |
+| 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | Pending |
+| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | Pending |
+| 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | Pending |
+| 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | Pending |
+| 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | Pending |
+| 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Pending |
+| 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Pending |
+| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | Pending |
+| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | Pending |
+| 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
+
+Phase là luồng việc kỹ thuật; thứ tự làm và đưa lên prod theo mục "Lộ trình phát hành" dưới đây. Mỗi release lấy đúng phần cần của các phase liên quan. Phase 15 mang số 15 vì được tách ra sau; về logic nó là 8b.
+
+## Lộ trình phát hành liên tục
+
+User quyết định ngày 2026-10-14: review từng giai đoạn ngay trên prod thay vì làm xong hết mới xem; sản phẩm phải có người dùng thật từ sớm; trong giai đoạn thiết kế và đưa lên prod, user cho phép **deploy prod liên tục**.
+
+Cách làm cho mọi release:
+- Mỗi release là một lát dọc chạy được từ đầu tới cuối, lên `https://chat.hoandat.com` (server `.65`, giai đoạn 1 của Phase 13), không phải bản nháp trên staging.
+- Commit lên `main` qua đủ kiểm tra thì tự deploy prod; smoke test tự động trên prod, đỏ thì tự rollback. Một release có thể gồm nhiều lần deploy.
+- Tính năng dở dang nằm sau feature flag; người dùng thật chỉ thấy khi bật.
+- Migration theo kiểu expand/contract, backup Postgres trước mỗi migration, để deploy liên tục không làm hỏng dữ liệu của người dùng thật.
+- Trước khi code UI của release: user duyệt các màn tương ứng trong [mock](./mockups/index.html). Sau khi lên prod: user và nhóm dùng thử test trên prod, phản hồi vào chính app chat (từ R1) để sửa ở các lần deploy sau.
+- Khi chuyển release: release trước phải chạy ổn trên prod với người dùng thật, không có lỗi chặn.
+
+| Release | Lên prod để review | Phase (phần) | Người dùng thật |
+|---|---|---|---|
+| R0 | Khung trên prod: đăng nhập bằng tài khoản hoandat (web), app trống, hồ sơ, phiên đăng nhập, đăng xuất; pipeline deploy và smoke test | 1, 2 (auth, user, tenant chính), 6 (khung), 13 (GĐ1, CI/CD), `hoandat-auth` Phase 02–04 cho tenant chính | User |
+| R1 | Nhắn tin chữ realtime: 1-1, nhóm, kênh, trả lời, sửa, xoá, reaction, đã đọc, ghim, link mời, quản trị nhóm; chặn, báo cáo, rate limit, quyền riêng tư cơ bản; hàng đợi kiểm duyệt tối thiểu; thông báo trình duyệt khi tab mở | 2, 3 (gateway, chưa push), 5 (web), 6, 12 (phần tối thiểu) | Nhóm nội bộ hoandat |
+| R2 | Webhook cảnh báo: Grafana, Alertmanager, GitLab, Uptime Kuma, Jenkins đẩy vào nhóm; cảnh báo cập nhật tại chỗ | 9 (incoming webhook) | Nhóm vận hành |
+| R3 | Media: ảnh, video, file, voice, album, trình xem, tải lên tiếp tục | 4, 13 (S3/CDN) | Nhóm nội bộ |
+| R4 | Tìm kiếm không dấu, local + server | 7 | Nhóm nội bộ |
+| R5 | Bot, Developer Console, SDK TS/Python/Go, thông báo và gửi hàng loạt qua bot | 8, 15, 9 (phần bot) | Nhóm nội bộ, dev viết bot |
+| R6 | Mini App trên web | 16 (web) | Dev viết bot |
+| R7 | App iOS/Android, push, Mini App trên mobile | 10, 3 (push), 16 (mobile) | Nhóm nội bộ |
+| R8 | App desktop, Mini App trên desktop | 11, 16 (desktop) | Nhóm nội bộ |
+| R9 | Mở công khai: chống lạm dụng đầy đủ, xuất/xoá dữ liệu, đánh giá Nghị định 13, tenant thứ hai (`inetdev.io.vn`), load test lượt 1 và checklist phát hành | 12, 14, tenant theo domain | Công khai |
+
+Phase 1 đã gần xong (chỉ còn chạy Compose và CI khi có remote), nên việc tiếp theo là R0. Khi tải chạm ngưỡng ở Phase 13, chuyển lên cụm riêng (giai đoạn 2) độc lập với thứ tự release.
+
+## Ngân sách tốc độ (mục tiêu, đo ở Phase 14)
+
+| Chỉ số | p50 | p99 |
+|---|---|---|
+| Gửi → ack | ≤ 60 ms | ≤ 250 ms |
+| Tới người nhận online (chat small) | ≤ 150 ms | ≤ 500 ms |
+| Tới session đang mở chat large 100k | — | ≤ 2 s |
+| Mở chat từ cache | ≤ 50 ms | ≤ 100 ms |
+| Tìm kiếm | ≤ 100 ms | ≤ 500 ms |
+| Gửi → tìm được | ≤ 1 s | ≤ 5 s |
+| Webhook POST → 200 | ≈ 15 ms | ≈ 50 ms |
+| Webhook → client online | ≤ 100 ms | ≤ 300 ms |
+| Push được FCM/APNs nhận | ≤ 200 ms | ≤ 1 s |
+
+## Success Criteria
+
+- [ ] Mọi chỉ số trong bảng ngân sách đạt ở mức tải an toàn đã chốt trên `.65` trước khi ra mắt, và ở quy mô ~100k sau khi lên cụm riêng (Phase 13, 14).
+- [ ] Bot mẫu của SDK TS/Python/Go pass conformance ở long poll và webhook (Phase 15); bot không gửi được cho người chưa bắt đầu chat với bot (Phase 8).
+- [ ] Gõ không dấu tìm được tin có dấu; rời chat, bị kick hoặc tin bị xoá thì không còn tìm được ở cả server lẫn local (Phase 5, 7).
+- [ ] Grafana, Alertmanager, GitLab (qua Mattermost), Uptime Kuma, Jenkins đẩy được thông báo vào chat không cần plugin riêng (Phase 9).
+- [ ] Failover Postgres không làm mất tin đã ack, từ khi lên cụm riêng; trên `.65` khôi phục PITR mất tối đa khoảng WAL chưa archive (Phase 2, 13, 14).
+- [ ] Đổi tên sản phẩm chỉ bằng `brand.config.json` + build lại (Phase 1, 10, 11).
+- [ ] Đăng nhập web, mobile và desktop qua `hoandat-auth`; đăng xuất hoặc thu hồi ở `/account` của IdP thì phiên chat bị thu hồi (web ≤ 1 s); IdP sập không làm gián đoạn phiên đang có (Phase 2, 3, 14).
+- [ ] Tenant `inetdev.io.vn` chạy ở `chat.inetdev.io.vn`, không thấy dữ liệu của `hoandat.com` qua bất kỳ API nào (Phase 12, 13).
+
+## Non-goals (v1)
+
+Secret chat E2E (đã chừa chỗ trong data model), cuộc gọi thoại/video, stories, payments, games trong bot, tương thích client hoặc Bot API của Telegram, đăng ký bằng số điện thoại, đăng ký/mật khẩu/OTP/2FA riêng trong app chat (thuộc IdP), chat xuyên tenant, callback trạng thái giao cho bên gửi thông báo, format webhook Discord (v1.1).
+
+## Dependencies
+
+- Phụ thuộc IdP `hoandat-auth` (`https://auth.hoandat.com`): các thay đổi trong bảng "Thay đổi cần làm ở `hoandat-auth`" phải có ở staging của IdP trước khi Phase 2 tích hợp đăng nhập thật; trước đó Phase 2 test với IdP chạy local. Không phụ thuộc plan nào khác trong repo này.
+- Phase 13 cần quyền triển khai trên server dùng chung `.65` (giai đoạn 1), hạ tầng datacenter Việt Nam cho cụm riêng (giai đoạn 2), và tài khoản Apple Developer, Google Play, FCM.
+
+## Red Team Review
+
+### Session — 2026-10-13
+**Findings:** 40 thô từ 4 reviewer (Security, Failure Mode, Assumption, Scope/Contract), gộp còn 15 (15 accepted, 0 rejected; 3 gợi ý cắt phạm vi chuyển thành câu hỏi cho user)
+**Severity breakdown:** 7 Critical, 7 High, 1 High/Medium gộp
+
+| # | Finding | Severity | Disposition | Applied To |
+|---|---|---|---|---|
+| 1 | Failover Postgres làm pts/seq chạy lùi | Critical | Accept | Phase 1, 2, 13, 14 |
+| 2 | Outbox dùng chung không cursor, mất thứ tự, thiếu kind, không retention | Critical | Accept | Phase 1, 2, 3, 7, 8 |
+| 3 | Fan-out deadlock, bot thành hot row, unique trên bảng partition | Critical | Accept | Phase 2, 8 |
+| 4 | Luồng chat large đứt (kênh, chuyển mode, push, badge) | Critical | Accept | Phase 1, 2, 3, 14 |
+| 5 | Worker không dùng được với plugin native | Critical | Accept | Phase 1, 5, 10, 11 |
+| 6 | Bot/bulk thành công cụ spam (thiếu consent) | Critical | Accept | Phase 2, 8, 9, 12 |
+| 7 | Lưu phiên web chưa chốt (CSRF/CSWSH/XSS), revoke không cắt WS | Critical | Accept | Phase 1, 2, 3, 5 |
+| 8 | Contract lệch giữa phase (bulk path, message_id, proto, ratelimit, tên) | High | Accept | Phase 1, 2, 8, 9, 13 |
+| 9 | Bot API phơi tính năng core không có | High | Accept | Phase 1, 2 |
+| 10 | Mini App: khoá, origin, sandbox, native IPC | High | Accept | Phase 8, 10, 11, 12 |
+| 11 | SSRF guard sơ sài | High | Accept | Phase 8, 9, 13 |
+| 12 | Media ACL, CDN, EXIF, worker sandbox | High | Accept | Phase 4, 13 |
+| 13 | Search ACL/local purge/phân trang/xếp hạng dấu | High | Accept | Phase 2, 5, 7 |
+| 14 | Bảo mật xuyên suốt (OTP, dò tìm, push ND13, secret log, OTA, link scheme) | High | Accept | Phase 2, 3, 6, 9, 10, 11, 12 |
+| 15 | Delivery bot/webhook, push nền iOS/desktop, GitLab qua Mattermost, spec fold | High/Medium | Accept | Phase 1, 3, 8, 9, 10, 11 |
+
+### Whole-Plan Consistency Sweep
+- Đã grep toàn bộ phase cho thuật ngữ cũ: số điện thoại/SMS (đăng ký), `/ext/sendBulk`, `message_id`, tenant token, `sendMessage` Telegram, supergroup, bot hệ thống, Deno/Bun, callback trạng thái, `notify_deliveries`, "tổ chức", "Phase 12 quyết định", `file_unique_id`, `chats.kind`, file proto rời. Không còn mâu thuẫn; các lần xuất hiện còn lại là câu phủ định có chủ đích.
+- Phụ thuộc đã cập nhật: Phase 13 `[1, 2]`, Phase 14 thêm 15, Phase 15 `[8]`.
+
+## Validation Log
+
+### Session 1 — 2026-10-13
+- Áp dụng cả 15 finding red-team.
+- Bot v1: Developer Console + SDK TS (Node), Python, Go; tách 8a (Phase 8) / 8b (Phase 15); không có bot hệ thống quản lý bot.
+- Thông báo: chỉ trả accepted `{chat_id, seq}` + bộ đếm tổng hợp; không callback, không trạng thái theo từng người nhận.
+- Đăng ký tài khoản: **chỉ email** (OTP email + 2FA tuỳ chọn); bỏ số điện thoại. *(Đã thay ở Session 2: đăng nhập qua `hoandat-auth`.)*
+- Quyết định kỹ thuật tự chốt (user có thể bác): RPO = 0 cho tin nhắn (replica đồng bộ quorum + `server_epoch`); update log giữ 30 ngày; thành viên mới mặc định xem được lịch sử, admin group được tắt.
+
+### Session 2 — 2026-10-14
+- User xác định: app chat là sản phẩm app tiếp theo trong hệ sinh thái hoandat, dùng IdP `hoandat-auth`. Đã thêm mục [Hệ sinh thái hoandat](#hệ-sinh-thái-hoandat) và phụ thuộc vào IdP.
+- Thay quyết định "đăng ký chỉ email (OTP email + 2FA)" của Session 1: đăng nhập chỉ qua `hoandat-auth` (Google/GitHub), bỏ OTP, 2FA và SMTP khỏi app chat.
+- Domain production: `chat.hoandat.com`. Tenant theo domain có ngay từ v1 (`chat.<d>`).
+- Quyết định kỹ thuật tự chốt (user có thể bác): phiên chat riêng gắn grant IdP thay vì dùng thẳng token IdP; native dùng grant theo thiết bị không trần 90 ngày (cần IdP hỗ trợ); Mini App và media trên domain đăng ký riêng để không same-site với `chat.<d>`; username chat mặc định lấy `preferred_username` của IdP.
+- Đã sửa các Phase 1–15 bị ảnh hưởng; mỗi phase sửa có ghi chú `Updated: Validation Session 2`.
+
+### Whole-Plan Consistency Sweep — Session 2
+- Grep toàn bộ phase cho: OTP, 2FA, `email_codes`, `RequestEmailCode`, SMTP, CAPTCHA đăng ký, "đăng ký chỉ email", `{{web_domain}}`, `*.{{miniapp_domain}}`, TTL 180 ngày. Không còn mâu thuẫn; lần xuất hiện còn lại là câu phủ định có chủ đích hoặc ghi chú lịch sử.
+
+### Session 3 — 2026-10-14
+- Cho phép thay đổi ở repo `hoandat-auth`; plan phía IdP: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integration/`. Quyết định chi tiết từ plan đó áp ngược vào đây: refresh token native theo chính sách client (không `offline_access`), gọi `/token` qua loopback, chat bật theo từng tenant.
+- Backend chat chạy chung server `103.72.98.65` với IdP: API nội bộ của IdP gọi qua loopback, bỏ yêu cầu kênh WireGuard/mTLS ở giai đoạn đầu.
+- Hạ tầng hai giai đoạn (user chọn hướng A): `.65` cho staging và bản ra mắt đầu; chuyển lên cụm riêng khi chạm ngưỡng RAM/kết nối/latency. RPO = 0 và quy mô 100k chỉ cam kết ở cụm riêng; khi chuyển, API nội bộ IdP cần kênh từ xa. Đã sửa Phase 13, 14 và Success Criteria.
+
+### Session 4 — 2026-10-14
+- Dùng REA kiểm kê tĩnh Telegram Desktop 7.3.1 (macOS arm64, Mach-O Evidence `ev_e92380557ae0528ec07cd7d6022ea5722597548aa92f473b3c5d07e2315c1135` và chuỗi trong binary). Không decompile vì auto-analysis của Ghidra trên binary 254MB quá nặng cho máy dùng chung.
+- Áp các đề xuất "nên thêm" của báo cáo vào Phase 1 (`config.GetAppConfig`), 2, 4, 5, 7, 8, 11. Giữ nguyên gap timer 150 ms và FTS5 local, vì binary không lộ hằng số của Telegram, và Telegram Desktop chỉ tìm ở server do không lưu tin local.
+
+### Session 5 — 2026-10-14
+- Bắt đầu Phase 1 theo đề xuất của Jev (0.79). Đã xong contract, ADR 0001–0010, helper TS/Go, brand, Compose và CI; chi tiết ở mục "Kết quả" của Phase 1.
+- Jev quyết bốn điểm phát sinh: giữ protobuf-es và đổi `bigint` sang `number` ở core; outbox giữ 30 ngày; IdP đọc redirect mobile từ biến môi trường; RPC còn thiếu thêm ở phase sở hữu.
+
+### Session 6 — 2026-10-14
+- User yêu cầu có mock UI HTML để xem giao diện trước khi code UI. Đã tạo bộ mock [`mockups/index.html`](./mockups/index.html) (ban đầu là một trang, sau mở rộng thành 11 trang, 86 màn hình theo yêu cầu "đủ mọi tính năng trong plan"), dùng token của hệ sinh thái (slate + violet, Inter) như Localman và trang đăng nhập hoandat. Phase 6 chỉ bắt đầu code UI sau khi user duyệt mock.
+- Review độc lập Phase 1 ra 15 điểm; đã sửa toàn bộ trong phạm vi Phase 1 (CI, tokenizer tìm kiếm, contract proto, Compose, allowlist URL, Snowflake). Việc thuộc phase sau được ghi vào Phase 2 và 4.
+
+### Session 7 — 2026-10-14
+Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp vào mock và Phase 8, 9, 12:
+- Xoay secret webhook: URL cũ chạy thêm 7 ngày (0.93).
+- Kết nối song song của webhook bot: 1–100, mặc định 40 như Telegram (0.67; độ tin thấp, đo lại ở load test).
+- Admin khác nhận lại webhook đã tự tắt: giữ nguyên URL (0.93). Người cũ vẫn giữ URL, nên màn nhận lại có tuỳ chọn xoay secret, mặc định tắt.
+- Chỉ đội vận hành hoandat cấp hoặc thu hồi xác minh bot (0.85).
+- Tự xoá tài khoản khi không dùng: mặc định tắt, người dùng tự bật (0.62).
+- Bản xuất dữ liệu: giữ 30 ngày, mỗi 7 ngày một lần (0.42, gần ngang phương án 7 ngày/24 giờ 0.41).
+- Media và Mini App nằm trên hai domain đăng ký riêng biệt (0.65); tên domain thật vẫn chờ user.
+
+### Session 8 — 2026-10-14
+- User quyết định: Media và Mini App chưa cần làm ngay, để sau cùng. Phase 4 (Media) chuyển xuống cuối; mọi phần Mini App đang rải ở Phase 1, 8, 10, 11, 12, 13, 15 được gom về Phase 16 mới. Cả hai làm ngay trước Phase 14.
+- Hệ quả: Phase 6 và 8 bỏ phụ thuộc Phase 4; trước khi có Phase 4, app chỉ có tin chữ (composer không có nút đính kèm, Bot API trả "chưa hỗ trợ" cho method file). Tên domain đăng ký riêng cho media và Mini App chọn khi làm Phase 4 và 16.
+
+### Session 9 — 2026-10-14
+- User xem lại và quyết: Media và Mini App vẫn làm như kế hoạch, không dời xuống cuối (thay Session 8). Phase 4 và 16 trở về thứ tự bình thường: media lên prod ở R3, Mini App web ở R6; file của Bot API trả về Phase 8. Phase 16 giữ làm phase riêng để Mini App lên prod thành một lát trọn vẹn.
+- User muốn review từng giai đoạn trên prod và có người dùng thật; cho phép deploy prod liên tục trong giai đoạn thiết kế và đưa lên prod. Đã thêm mục "Lộ trình phát hành liên tục" (R0–R9). Phase 13 chuyển sang tự deploy prod từ `main` kèm smoke test, tự rollback, feature flag, migration expand/contract. Phase 14 thành smoke test sau mỗi release và cổng mở công khai ở R9.
+
+### Session 10 — 2026-10-14
+- User: các sản phẩm (chat-next, hoandat-auth) đều mới, chưa có người dùng, nên tập trung code và push thẳng `main`, không rẽ nhánh. Đã merge `feat/chat-app-clients` vào `main` của `hoandat-auth` và push (`4a9ca7d`); deploy IdP lên prod là một phần của R0.
+- Repo `chat-next` đặt trên GitHub private `achoo254/chat-next`, giống `localman-next`; CI chuyển từ GitLab sang GitHub Actions (`.github/workflows/ci.yml`).
+

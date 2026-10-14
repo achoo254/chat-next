@@ -1,0 +1,28 @@
+{
+  "name": "@app/root",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0 && node scripts/check-brand.mjs",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "proto:lint": "buf lint proto",
+    "proto:breaking": "buf breaking proto --against '.git#branch=main,subdir=proto'",
+    "proto:gen": "buf generate proto --template proto/buf.gen.yaml",
+    "brand:gen": "pnpm --filter @app/brand generate"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.73.0",
+    "@bufbuild/protoc-gen-es": "2.16.0",
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.4"
+  }
+}
