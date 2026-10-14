@@ -13,6 +13,8 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 
 // Profiles, usernames, blocking and privacy settings.
 service UsersService {
+  // The caller's own user (profile, email from the IdP).
+  rpc GetSelf(GetSelfRequest) returns (GetSelfResponse);
   rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
   rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
   rpc SetUsername(SetUsernameRequest) returns (SetUsernameResponse);
@@ -64,6 +66,12 @@ message User {
   string email = 10;
   // Bots with inline mode enabled: placeholder shown in the input field.
   string bot_inline_placeholder = 11;
+}
+
+message GetSelfRequest {}
+
+message GetSelfResponse {
+  User user = 1;
 }
 
 message GetUsersRequest {

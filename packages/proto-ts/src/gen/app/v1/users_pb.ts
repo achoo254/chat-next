@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/users.proto.
  */
 export const file_app_v1_users: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIicKD0dldFVzZXJzUmVxdWVzdBIUCgh1c2VyX2lkcxgBIAMoA0ICMAIiLwoQR2V0VXNlcnNSZXNwb25zZRIbCgV1c2VycxgBIAMoCzIMLmFwcC52MS5Vc2VyInoKFFVwZGF0ZVByb2ZpbGVSZXF1ZXN0EhEKBG5hbWUYASABKAlIAIgBARIQCgNiaW8YAiABKAlIAYgBARIaCg1waG90b19maWxlX2lkGAMgASgJSAKIAQFCBwoFX25hbWVCBgoEX2Jpb0IQCg5fcGhvdG9fZmlsZV9pZCIzChVVcGRhdGVQcm9maWxlUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIiYKElNldFVzZXJuYW1lUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCSIxChNTZXRVc2VybmFtZVJlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlciIqChZSZXNvbHZlVXNlcm5hbWVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjUKF1Jlc29sdmVVc2VybmFtZVJlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlciIyChJTZWFyY2hVc2Vyc1JlcXVlc3QSDQoFcXVlcnkYASABKAkSDQoFbGltaXQYAiABKAUiMgoTU2VhcmNoVXNlcnNSZXNwb25zZRIbCgV1c2VycxgBIAMoCzIMLmFwcC52MS5Vc2VyIiMKDEJsb2NrUmVxdWVzdBITCgd1c2VyX2lkGAEgASgDQgIwAiIPCg1CbG9ja1Jlc3BvbnNlIiUKDlVuYmxvY2tSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIhEKD1VuYmxvY2tSZXNwb25zZSLOAgoPUHJpdmFjeVNldHRpbmdzEioKCWxhc3Rfc2VlbhgBIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2USLgoNcHJvZmlsZV9waG90bxgCIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2USLgoNZmluZF9ieV9lbWFpbBgDIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2USMQoQZmluZF9ieV91c2VybmFtZRgEIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2USLgoNYWRkX3RvX2dyb3VwcxgFIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2USLgoNc2VuZF9tZXNzYWdlcxgGIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2USHAoUbm90aWZpY2F0aW9uX3ByZXZpZXcYByABKAgiEwoRR2V0UHJpdmFjeVJlcXVlc3QiPwoSR2V0UHJpdmFjeVJlc3BvbnNlEikKCHNldHRpbmdzGAEgASgLMhcuYXBwLnYxLlByaXZhY3lTZXR0aW5ncyL3AwoRU2V0UHJpdmFjeVJlcXVlc3QSLwoJbGFzdF9zZWVuGAEgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgAiAEBEjMKDXByb2ZpbGVfcGhvdG8YAiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAGIAQESMwoNZmluZF9ieV9lbWFpbBgDIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAogBARI2ChBmaW5kX2J5X3VzZXJuYW1lGAQgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgDiAEBEjMKDWFkZF90b19ncm91cHMYBSABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSASIAQESMwoNc2VuZF9tZXNzYWdlcxgGIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIBYgBARIhChRub3RpZmljYXRpb25fcHJldmlldxgHIAEoCEgGiAEBQgwKCl9sYXN0X3NlZW5CEAoOX3Byb2ZpbGVfcGhvdG9CEAoOX2ZpbmRfYnlfZW1haWxCEwoRX2ZpbmRfYnlfdXNlcm5hbWVCEAoOX2FkZF90b19ncm91cHNCEAoOX3NlbmRfbWVzc2FnZXNCFwoVX25vdGlmaWNhdGlvbl9wcmV2aWV3Ij8KElNldFByaXZhY3lSZXNwb25zZRIpCghzZXR0aW5ncxgBIAEoCzIXLmFwcC52MS5Qcml2YWN5U2V0dGluZ3MqzQEKDlVzZXJTdGF0dXNLaW5kEiAKHFVTRVJfU1RBVFVTX0tJTkRfVU5TUEVDSUZJRUQQABIbChdVU0VSX1NUQVRVU19LSU5EX09OTElORRABEhwKGFVTRVJfU1RBVFVTX0tJTkRfT0ZGTElORRACEh0KGVVTRVJfU1RBVFVTX0tJTkRfUkVDRU5UTFkQAxIeChpVU0VSX1NUQVRVU19LSU5EX0xBU1RfV0VFSxAEEh8KG1VTRVJfU1RBVFVTX0tJTkRfTEFTVF9NT05USBAFKo4BCg9Qcml2YWN5QXVkaWVuY2USIAocUFJJVkFDWV9BVURJRU5DRV9VTlNQRUNJRklFRBAAEh0KGVBSSVZBQ1lfQVVESUVOQ0VfRVZFUllPTkUQARIdChlQUklWQUNZX0FVRElFTkNFX0NPTlRBQ1RTEAISGwoXUFJJVkFDWV9BVURJRU5DRV9OT0JPRFkQAzL7BAoMVXNlcnNTZXJ2aWNlEj0KCEdldFVzZXJzEhcuYXBwLnYxLkdldFVzZXJzUmVxdWVzdBoYLmFwcC52MS5HZXRVc2Vyc1Jlc3BvbnNlEkwKDVVwZGF0ZVByb2ZpbGUSHC5hcHAudjEuVXBkYXRlUHJvZmlsZVJlcXVlc3QaHS5hcHAudjEuVXBkYXRlUHJvZmlsZVJlc3BvbnNlEkYKC1NldFVzZXJuYW1lEhouYXBwLnYxLlNldFVzZXJuYW1lUmVxdWVzdBobLmFwcC52MS5TZXRVc2VybmFtZVJlc3BvbnNlElIKD1Jlc29sdmVVc2VybmFtZRIeLmFwcC52MS5SZXNvbHZlVXNlcm5hbWVSZXF1ZXN0Gh8uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlc3BvbnNlEkYKC1NlYXJjaFVzZXJzEhouYXBwLnYxLlNlYXJjaFVzZXJzUmVxdWVzdBobLmFwcC52MS5TZWFyY2hVc2Vyc1Jlc3BvbnNlEjQKBUJsb2NrEhQuYXBwLnYxLkJsb2NrUmVxdWVzdBoVLmFwcC52MS5CbG9ja1Jlc3BvbnNlEjoKB1VuYmxvY2sSFi5hcHAudjEuVW5ibG9ja1JlcXVlc3QaFy5hcHAudjEuVW5ibG9ja1Jlc3BvbnNlEkMKCkdldFByaXZhY3kSGS5hcHAudjEuR2V0UHJpdmFjeVJlcXVlc3QaGi5hcHAudjEuR2V0UHJpdmFjeVJlc3BvbnNlEkMKClNldFByaXZhY3kSGS5hcHAudjEuU2V0UHJpdmFjeVJlcXVlc3QaGi5hcHAudjEuU2V0UHJpdmFjeVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_media]);
+  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIhAKDkdldFNlbGZSZXF1ZXN0Ii0KD0dldFNlbGZSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJwoPR2V0VXNlcnNSZXF1ZXN0EhQKCHVzZXJfaWRzGAEgAygDQgIwAiIvChBHZXRVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiegoUVXBkYXRlUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhAKA2JpbxgCIAEoCUgBiAEBEhoKDXBob3RvX2ZpbGVfaWQYAyABKAlIAogBAUIHCgVfbmFtZUIGCgRfYmlvQhAKDl9waG90b19maWxlX2lkIjMKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiJgoSU2V0VXNlcm5hbWVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjEKE1NldFVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIioKFlJlc29sdmVVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiNQoXUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIjIKElNlYXJjaFVzZXJzUmVxdWVzdBINCgVxdWVyeRgBIAEoCRINCgVsaW1pdBgCIAEoBSIyChNTZWFyY2hVc2Vyc1Jlc3BvbnNlEhsKBXVzZXJzGAEgAygLMgwuYXBwLnYxLlVzZXIiIwoMQmxvY2tSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIg8KDUJsb2NrUmVzcG9uc2UiJQoOVW5ibG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiEQoPVW5ibG9ja1Jlc3BvbnNlIs4CCg9Qcml2YWN5U2V0dGluZ3MSKgoJbGFzdF9zZWVuGAEgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIxChBmaW5kX2J5X3VzZXJuYW1lGAQgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIuCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZRIcChRub3RpZmljYXRpb25fcHJldmlldxgHIAEoCCITChFHZXRQcml2YWN5UmVxdWVzdCI/ChJHZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIvcDChFTZXRQcml2YWN5UmVxdWVzdBIvCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSACIAQESMwoNcHJvZmlsZV9waG90bxgCIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAYgBARIzCg1maW5kX2J5X2VtYWlsGAMgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgCiAEBEjYKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAOIAQESMwoNYWRkX3RvX2dyb3VwcxgFIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIBIgBARIzCg1zZW5kX21lc3NhZ2VzGAYgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgFiAEBEiEKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgISAaIAQFCDAoKX2xhc3Rfc2VlbkIQCg5fcHJvZmlsZV9waG90b0IQCg5fZmluZF9ieV9lbWFpbEITChFfZmluZF9ieV91c2VybmFtZUIQCg5fYWRkX3RvX2dyb3Vwc0IQCg5fc2VuZF9tZXNzYWdlc0IXChVfbm90aWZpY2F0aW9uX3ByZXZpZXciPwoSU2V0UHJpdmFjeVJlc3BvbnNlEikKCHNldHRpbmdzGAEgASgLMhcuYXBwLnYxLlByaXZhY3lTZXR0aW5ncyrNAQoOVXNlclN0YXR1c0tpbmQSIAocVVNFUl9TVEFUVVNfS0lORF9VTlNQRUNJRklFRBAAEhsKF1VTRVJfU1RBVFVTX0tJTkRfT05MSU5FEAESHAoYVVNFUl9TVEFUVVNfS0lORF9PRkZMSU5FEAISHQoZVVNFUl9TVEFUVVNfS0lORF9SRUNFTlRMWRADEh4KGlVTRVJfU1RBVFVTX0tJTkRfTEFTVF9XRUVLEAQSHwobVVNFUl9TVEFUVVNfS0lORF9MQVNUX01PTlRIEAUqjgEKD1ByaXZhY3lBdWRpZW5jZRIgChxQUklWQUNZX0FVRElFTkNFX1VOU1BFQ0lGSUVEEAASHQoZUFJJVkFDWV9BVURJRU5DRV9FVkVSWU9ORRABEh0KGVBSSVZBQ1lfQVVESUVOQ0VfQ09OVEFDVFMQAhIbChdQUklWQUNZX0FVRElFTkNFX05PQk9EWRADMrcFCgxVc2Vyc1NlcnZpY2USOgoHR2V0U2VsZhIWLmFwcC52MS5HZXRTZWxmUmVxdWVzdBoXLmFwcC52MS5HZXRTZWxmUmVzcG9uc2USPQoIR2V0VXNlcnMSFy5hcHAudjEuR2V0VXNlcnNSZXF1ZXN0GhguYXBwLnYxLkdldFVzZXJzUmVzcG9uc2USTAoNVXBkYXRlUHJvZmlsZRIcLmFwcC52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBodLmFwcC52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2USRgoLU2V0VXNlcm5hbWUSGi5hcHAudjEuU2V0VXNlcm5hbWVSZXF1ZXN0GhsuYXBwLnYxLlNldFVzZXJuYW1lUmVzcG9uc2USUgoPUmVzb2x2ZVVzZXJuYW1lEh4uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlcXVlc3QaHy5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USRgoLU2VhcmNoVXNlcnMSGi5hcHAudjEuU2VhcmNoVXNlcnNSZXF1ZXN0GhsuYXBwLnYxLlNlYXJjaFVzZXJzUmVzcG9uc2USNAoFQmxvY2sSFC5hcHAudjEuQmxvY2tSZXF1ZXN0GhUuYXBwLnYxLkJsb2NrUmVzcG9uc2USOgoHVW5ibG9jaxIWLmFwcC52MS5VbmJsb2NrUmVxdWVzdBoXLmFwcC52MS5VbmJsb2NrUmVzcG9uc2USQwoKR2V0UHJpdmFjeRIZLmFwcC52MS5HZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5HZXRQcml2YWN5UmVzcG9uc2USQwoKU2V0UHJpdmFjeRIZLmFwcC52MS5TZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5TZXRQcml2YWN5UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media]);
 
 /**
  * @generated from message app.v1.UserStatus
@@ -124,6 +124,36 @@ export const UserSchema: GenMessage<User> = /*@__PURE__*/
   messageDesc(file_app_v1_users, 1);
 
 /**
+ * @generated from message app.v1.GetSelfRequest
+ */
+export type GetSelfRequest = Message<"app.v1.GetSelfRequest"> & {
+};
+
+/**
+ * Describes the message app.v1.GetSelfRequest.
+ * Use `create(GetSelfRequestSchema)` to create a new message.
+ */
+export const GetSelfRequestSchema: GenMessage<GetSelfRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 2);
+
+/**
+ * @generated from message app.v1.GetSelfResponse
+ */
+export type GetSelfResponse = Message<"app.v1.GetSelfResponse"> & {
+  /**
+   * @generated from field: app.v1.User user = 1;
+   */
+  user?: User | undefined;
+};
+
+/**
+ * Describes the message app.v1.GetSelfResponse.
+ * Use `create(GetSelfResponseSchema)` to create a new message.
+ */
+export const GetSelfResponseSchema: GenMessage<GetSelfResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 3);
+
+/**
  * @generated from message app.v1.GetUsersRequest
  */
 export type GetUsersRequest = Message<"app.v1.GetUsersRequest"> & {
@@ -138,7 +168,7 @@ export type GetUsersRequest = Message<"app.v1.GetUsersRequest"> & {
  * Use `create(GetUsersRequestSchema)` to create a new message.
  */
 export const GetUsersRequestSchema: GenMessage<GetUsersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 2);
+  messageDesc(file_app_v1_users, 4);
 
 /**
  * @generated from message app.v1.GetUsersResponse
@@ -157,7 +187,7 @@ export type GetUsersResponse = Message<"app.v1.GetUsersResponse"> & {
  * Use `create(GetUsersResponseSchema)` to create a new message.
  */
 export const GetUsersResponseSchema: GenMessage<GetUsersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 3);
+  messageDesc(file_app_v1_users, 5);
 
 /**
  * @generated from message app.v1.UpdateProfileRequest
@@ -188,7 +218,7 @@ export type UpdateProfileRequest = Message<"app.v1.UpdateProfileRequest"> & {
  * Use `create(UpdateProfileRequestSchema)` to create a new message.
  */
 export const UpdateProfileRequestSchema: GenMessage<UpdateProfileRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 4);
+  messageDesc(file_app_v1_users, 6);
 
 /**
  * @generated from message app.v1.UpdateProfileResponse
@@ -205,7 +235,7 @@ export type UpdateProfileResponse = Message<"app.v1.UpdateProfileResponse"> & {
  * Use `create(UpdateProfileResponseSchema)` to create a new message.
  */
 export const UpdateProfileResponseSchema: GenMessage<UpdateProfileResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 5);
+  messageDesc(file_app_v1_users, 7);
 
 /**
  * @generated from message app.v1.SetUsernameRequest
@@ -222,7 +252,7 @@ export type SetUsernameRequest = Message<"app.v1.SetUsernameRequest"> & {
  * Use `create(SetUsernameRequestSchema)` to create a new message.
  */
 export const SetUsernameRequestSchema: GenMessage<SetUsernameRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 6);
+  messageDesc(file_app_v1_users, 8);
 
 /**
  * @generated from message app.v1.SetUsernameResponse
@@ -239,7 +269,7 @@ export type SetUsernameResponse = Message<"app.v1.SetUsernameResponse"> & {
  * Use `create(SetUsernameResponseSchema)` to create a new message.
  */
 export const SetUsernameResponseSchema: GenMessage<SetUsernameResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 7);
+  messageDesc(file_app_v1_users, 9);
 
 /**
  * @generated from message app.v1.ResolveUsernameRequest
@@ -256,7 +286,7 @@ export type ResolveUsernameRequest = Message<"app.v1.ResolveUsernameRequest"> & 
  * Use `create(ResolveUsernameRequestSchema)` to create a new message.
  */
 export const ResolveUsernameRequestSchema: GenMessage<ResolveUsernameRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 8);
+  messageDesc(file_app_v1_users, 10);
 
 /**
  * @generated from message app.v1.ResolveUsernameResponse
@@ -273,7 +303,7 @@ export type ResolveUsernameResponse = Message<"app.v1.ResolveUsernameResponse"> 
  * Use `create(ResolveUsernameResponseSchema)` to create a new message.
  */
 export const ResolveUsernameResponseSchema: GenMessage<ResolveUsernameResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 9);
+  messageDesc(file_app_v1_users, 11);
 
 /**
  * @generated from message app.v1.SearchUsersRequest
@@ -295,7 +325,7 @@ export type SearchUsersRequest = Message<"app.v1.SearchUsersRequest"> & {
  * Use `create(SearchUsersRequestSchema)` to create a new message.
  */
 export const SearchUsersRequestSchema: GenMessage<SearchUsersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 10);
+  messageDesc(file_app_v1_users, 12);
 
 /**
  * @generated from message app.v1.SearchUsersResponse
@@ -312,7 +342,7 @@ export type SearchUsersResponse = Message<"app.v1.SearchUsersResponse"> & {
  * Use `create(SearchUsersResponseSchema)` to create a new message.
  */
 export const SearchUsersResponseSchema: GenMessage<SearchUsersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 11);
+  messageDesc(file_app_v1_users, 13);
 
 /**
  * @generated from message app.v1.BlockRequest
@@ -329,7 +359,7 @@ export type BlockRequest = Message<"app.v1.BlockRequest"> & {
  * Use `create(BlockRequestSchema)` to create a new message.
  */
 export const BlockRequestSchema: GenMessage<BlockRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 12);
+  messageDesc(file_app_v1_users, 14);
 
 /**
  * @generated from message app.v1.BlockResponse
@@ -342,7 +372,7 @@ export type BlockResponse = Message<"app.v1.BlockResponse"> & {
  * Use `create(BlockResponseSchema)` to create a new message.
  */
 export const BlockResponseSchema: GenMessage<BlockResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 13);
+  messageDesc(file_app_v1_users, 15);
 
 /**
  * @generated from message app.v1.UnblockRequest
@@ -359,7 +389,7 @@ export type UnblockRequest = Message<"app.v1.UnblockRequest"> & {
  * Use `create(UnblockRequestSchema)` to create a new message.
  */
 export const UnblockRequestSchema: GenMessage<UnblockRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 14);
+  messageDesc(file_app_v1_users, 16);
 
 /**
  * @generated from message app.v1.UnblockResponse
@@ -372,7 +402,7 @@ export type UnblockResponse = Message<"app.v1.UnblockResponse"> & {
  * Use `create(UnblockResponseSchema)` to create a new message.
  */
 export const UnblockResponseSchema: GenMessage<UnblockResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 15);
+  messageDesc(file_app_v1_users, 17);
 
 /**
  * @generated from message app.v1.PrivacySettings
@@ -421,7 +451,7 @@ export type PrivacySettings = Message<"app.v1.PrivacySettings"> & {
  * Use `create(PrivacySettingsSchema)` to create a new message.
  */
 export const PrivacySettingsSchema: GenMessage<PrivacySettings> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 16);
+  messageDesc(file_app_v1_users, 18);
 
 /**
  * @generated from message app.v1.GetPrivacyRequest
@@ -434,7 +464,7 @@ export type GetPrivacyRequest = Message<"app.v1.GetPrivacyRequest"> & {
  * Use `create(GetPrivacyRequestSchema)` to create a new message.
  */
 export const GetPrivacyRequestSchema: GenMessage<GetPrivacyRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 17);
+  messageDesc(file_app_v1_users, 19);
 
 /**
  * @generated from message app.v1.GetPrivacyResponse
@@ -451,7 +481,7 @@ export type GetPrivacyResponse = Message<"app.v1.GetPrivacyResponse"> & {
  * Use `create(GetPrivacyResponseSchema)` to create a new message.
  */
 export const GetPrivacyResponseSchema: GenMessage<GetPrivacyResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 18);
+  messageDesc(file_app_v1_users, 20);
 
 /**
  * @generated from message app.v1.SetPrivacyRequest
@@ -500,7 +530,7 @@ export type SetPrivacyRequest = Message<"app.v1.SetPrivacyRequest"> & {
  * Use `create(SetPrivacyRequestSchema)` to create a new message.
  */
 export const SetPrivacyRequestSchema: GenMessage<SetPrivacyRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 19);
+  messageDesc(file_app_v1_users, 21);
 
 /**
  * @generated from message app.v1.SetPrivacyResponse
@@ -517,7 +547,7 @@ export type SetPrivacyResponse = Message<"app.v1.SetPrivacyResponse"> & {
  * Use `create(SetPrivacyResponseSchema)` to create a new message.
  */
 export const SetPrivacyResponseSchema: GenMessage<SetPrivacyResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 20);
+  messageDesc(file_app_v1_users, 22);
 
 /**
  * Presence as visible to the caller after privacy rules are applied.
@@ -607,6 +637,16 @@ export const PrivacyAudienceSchema: GenEnum<PrivacyAudience> = /*@__PURE__*/
  * @generated from service app.v1.UsersService
  */
 export const UsersService: GenService<{
+  /**
+   * The caller's own user (profile, email from the IdP).
+   *
+   * @generated from rpc app.v1.UsersService.GetSelf
+   */
+  getSelf: {
+    methodKind: "unary";
+    input: typeof GetSelfRequestSchema;
+    output: typeof GetSelfResponseSchema;
+  },
   /**
    * @generated from rpc app.v1.UsersService.GetUsers
    */

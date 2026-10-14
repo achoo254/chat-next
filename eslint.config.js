@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -24,9 +25,21 @@ export default tseslint.config(
 		},
 	},
 	{
+		files: ["apps/web/**/*.{ts,tsx}"],
+		...reactHooks.configs.flat.recommended,
+	},
+	{
 		files: ["**/*.mjs", "scripts/**"],
 		languageOptions: {
 			globals: { process: "readonly", console: "readonly", URL: "readonly" },
+		},
+	},
+	{
+		// CommonJS config files (pm2 ecosystem).
+		files: ["**/*.cjs"],
+		languageOptions: {
+			sourceType: "commonjs",
+			globals: { module: "writable", require: "readonly" },
 		},
 	},
 );

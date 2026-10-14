@@ -1,0 +1,71 @@
+# Continuous deploy of chat.hoandat.com: after `ci` passes on main, build the
+# web app and the Linux server binary, upload them as the restricted
+# `chat-deploy` user to /opt/chat/incoming/<id>, and activate through the one
+# sudo command that user has (infra/chat/activate-incoming.sh). The server
+# backs up the database, migrates, switches and rolls back on failure; the
+# smoke test then checks production from outside.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Never cancel a deploy halfway; later runs wait their turn.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      TARGET: chat-deploy@103.72.98.65
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: pnpm install --frozen-lockfile
+      - name: build release
+        run: |
+          id="$(date -u +%Y%m%d-%H%M%S)-${SHA:0:12}"
+          echo "RELEASE_ID=$id" >>"$GITHUB_ENV"
+          mkdir -p "release/$id"
+          pnpm --filter @app/web build
+          cp -R apps/web/dist "release/$id/web"
+          (cd server && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "../release/$id/server" ./cmd/server)
+          echo "$id" >"release/$id/RELEASE"
+      - name: ssh setup
+        env:
+          SSH_KEY: ${{ secrets.CHAT_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.CHAT_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" >~/.ssh/chat_deploy
+          chmod 600 ~/.ssh/chat_deploy
+          printf '%s\n' "$KNOWN_HOSTS" >~/.ssh/known_hosts
+          printf 'Host 103.72.98.65\n  Port 24700\n  IdentityFile ~/.ssh/chat_deploy\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' >~/.ssh/config
+      - name: upload and activate
+        run: |
+          rsync -rltz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "release/$RELEASE_ID/" "$TARGET:/opt/chat/incoming/$RELEASE_ID/"
+          ssh "$TARGET" "chmod 755 /opt/chat/incoming/$RELEASE_ID/server && sudo -n /usr/local/sbin/chat-activate-incoming $RELEASE_ID"
+      - run: bash infra/chat/smoke.sh
+      - if: always()
+        run: rm -rf ~/.ssh/chat_deploy

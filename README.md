@@ -20,12 +20,14 @@ cd server && go vet ./... && go test -race ./...
 | `pnpm typecheck` / `pnpm test` | TypeScript và Vitest cho mọi package |
 | `pnpm proto:lint` / `pnpm proto:gen` | `buf lint` / sinh code Go (`server/gen`) và TS (`packages/proto-ts/src/gen`) từ `proto/` |
 | `pnpm proto:breaking` | So contract với nhánh `main` |
+| `pnpm --filter @app/web dev` | Web app ở `http://localhost:5173`, proxy `/rpc` và `/auth` tới server `127.0.0.1:4600` |
 | `pnpm brand:gen` | Sinh manifest web, Capacitor, Tauri từ `brand.config.json` vào `packages/brand/generated/` |
 
 ## Cấu trúc
 
 | Đường dẫn | Nội dung |
 |---|---|
+| `apps/web` | Web app React 19 + Vite, gọi server qua Connect RPC (`/rpc`) |
 | `proto/app/v1/` | Contract client ↔ server, mỗi domain một file |
 | `packages/core` | Fold tiếng Việt, ID, entities (dùng chung cho mọi client) |
 | `packages/brand` | Đọc và kiểm `brand.config.json`, host theo tenant, sinh manifest |
@@ -33,6 +35,7 @@ cd server && go vet ./... && go test -race ./...
 | `server/` | Go module: `cmd/server` (một binary chạy theo `-role`), `internal/` |
 | `spec/` | Đặc tả và test vector dùng chung TS/Go (`vi-fold`, `entities`) |
 | `deploy/dev/` | Docker Compose cho dev: Postgres primary + standby đồng bộ, Redis, Meilisearch, MinIO, IdP local |
+| `infra/chat/` | Script production: deploy, kích hoạt/rollback release, setup server, chứng chỉ, nginx, pm2, backup ([`docs/deployment-guide.md`](docs/deployment-guide.md)) |
 
 ## Môi trường dev
 
@@ -43,3 +46,7 @@ docker compose -f deploy/dev/docker-compose.yml --env-file deploy/dev/.env up
 ```
 
 IdP được build từ checkout `hoandat-auth` nằm cạnh repo này (`../hoandat-auth`); cần tạo khoá ký một lần ở đó bằng `pnpm generate-key`. Mọi cổng chỉ bind `127.0.0.1`. Không commit file `.env` hay `*.env`.
+
+## Production
+
+`https://chat.hoandat.com` trên server dùng chung `103.72.98.65`. Deploy và vận hành theo [`docs/deployment-guide.md`](docs/deployment-guide.md) và skill `chat-ops-prod` (`.claude/skills/chat-ops-prod/`).

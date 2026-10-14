@@ -15,3 +15,9 @@ plugins:
     out: server/gen
     opt:
       - paths=source_relative
+  # Connect handlers and clients for Go (connect-es v2 needs no plugin: the
+  # service descriptors from protoc-gen-es are enough).
+  - local: ["go", "-C", "server", "tool", "protoc-gen-connect-go"]
+    out: server/gen
+    opt:
+      - paths=source_relative
