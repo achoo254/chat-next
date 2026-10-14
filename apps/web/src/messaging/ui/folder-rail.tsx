@@ -1,13 +1,13 @@
 // Built-in folders (R1): Tất cả, Cá nhân, Nhóm, Bot, filtered on the client
 // by chat kind, then Danh bạ and Cài đặt. Wide screens show the labelled
 // rail; narrow screens the tab row inside the list (mockups/chat.html#app,
-// #contacts, #narrow). Custom folders come after R4.
+// #contacts, #narrow). Custom folders are not built yet, so no edit entry.
 import type { SelfUser } from "../../api/adapters.ts";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { countLabel, FOLDERS, type Folder } from "../data/format.ts";
-import { useFolderCounts, useServices } from "../data/services.tsx";
+import { useFolderCounts } from "../data/services.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar } from "./parts.tsx";
 
@@ -21,7 +21,6 @@ interface FolderProps {
 /** `folder` null: the contacts list is open instead of a folder. */
 export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder: Folder | null; onFolder: (folder: Folder) => void }) {
 	const copy = useCopy();
-	const { toasts } = useServices();
 	const counts = useFolderCounts();
 	return (
 		<nav className="folder-rail" aria-label={copy.folders.nav}>
@@ -46,19 +45,6 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 					)}
 				</button>
 			))}
-			<button
-				type="button"
-				className="folder"
-				aria-disabled="true"
-				aria-describedby="folder-edit-later"
-				onClick={() => toasts.show(copy.folders.editHint)}
-			>
-				<Icon name="edit" />
-				{copy.folders.edit}
-				<span className="soon" id="folder-edit-later">
-					{copy.folders.editLater}
-				</span>
-			</button>
 			<span className="spacer" />
 			<Link to={paths.contacts()} className="folder" current={folder === null}>
 				<ContactsGlyph />

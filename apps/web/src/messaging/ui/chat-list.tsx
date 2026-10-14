@@ -26,6 +26,9 @@ interface ChatListProps {
 	onVisibleChats: (chatIds: readonly number[]) => void;
 }
 
+/** The search shortcut as this platform writes it (⌘K on Apple, Ctrl K elsewhere). */
+const SEARCH_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘K" : "Ctrl K";
+
 export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onVisibleChats }: ChatListProps) {
 	const copy = useCopy();
 	const ui = useUi();
@@ -64,7 +67,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 						onKeyDown={onKeyDown}
 					/>
 					<span className="kbd" aria-hidden="true">
-						⌘K
+						{SEARCH_SHORTCUT}
 					</span>
 				</label>
 				<button type="button" className="icon-btn hide-narrow" aria-label={copy.list.newChat} onClick={() => ui.dialog.set({ kind: "newChat" })}>

@@ -44,6 +44,9 @@ describe("boot", () => {
 		// Signed in, the app opens the (empty) chat list.
 		expect(await screen.findByText("Chưa có chat nào ở đây", {}, { timeout: 5000 })).toBeTruthy();
 		expect(screen.getAllByText("ĐT").length).toBeGreaterThan(0);
+		// The empty state says "bấm +": the new-chat button must be there.
+		expect(screen.getAllByRole("button", { name: "Tạo chat mới" }).length).toBeGreaterThan(0);
+		expect(screen.queryByText(/Sửa thư mục/)).toBeNull();
 	});
 
 	it("offers a retry when the server cannot be reached", async () => {
