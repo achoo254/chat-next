@@ -41,6 +41,12 @@ importers:
       '@app/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@app/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@app/platform-web':
+        specifier: workspace:*
+        version: link:../../packages/platform-web
       '@app/proto-ts':
         specifier: workspace:*
         version: link:../../packages/proto-ts

@@ -1,15 +1,26 @@
 import { Code, type Transport } from "@connectrpc/connect";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { SelfUser } from "./api/adapters.ts";
 import { ApiContext } from "./api/api-context.tsx";
 import { createApi, errorCode } from "./api/client.ts";
 import { Icon } from "./components/icon.tsx";
+import { messagingEnabled } from "./features.ts";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
 import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
 import { Home } from "./screens/home.tsx";
 import { Settings } from "./screens/settings/settings.tsx";
 import { Shell } from "./screens/shell.tsx";
 import { Welcome } from "./screens/welcome.tsx";
+import type { MessagingConnector } from "./messaging/data/connector.ts";
+
+// The messaging UI (release R1) is its own chunk: the R0 shell never loads it.
+const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
+
+export interface AppProps {
+	transport: Transport;
+	/** Tests and the visual harness provide the chat client; production uses the web worker. */
+	messagingConnector?: MessagingConnector | undefined;
+}
 
 type Boot =
 	| { status: "loading" }
@@ -17,15 +28,15 @@ type Boot =
 	| { status: "error" }
 	| { status: "ready"; self: SelfUser };
 
-export function App({ transport }: { transport: Transport }) {
+export function App({ transport, messagingConnector }: AppProps) {
 	return (
 		<I18nProvider>
-			<Root transport={transport} />
+			<Root transport={transport} messagingConnector={messagingConnector} />
 		</I18nProvider>
 	);
 }
 
-function Root({ transport }: { transport: Transport }) {
+function Root({ transport, messagingConnector }: AppProps) {
 	const [boot, setBoot] = useState<Boot>({ status: "loading" });
 	const [attempt, setAttempt] = useState(0);
 	const signedOut = useCallback(() => setBoot({ status: "signedOut" }), []);
@@ -63,15 +74,30 @@ function Root({ transport }: { transport: Transport }) {
 		case "ready":
 			return (
 				<ApiContext value={api}>
-					<SignedIn self={boot.self} onSelfChange={setSelf} />
+					<SignedIn
+						self={boot.self}
+						onSelfChange={setSelf}
+						onSignedOut={signedOut}
+						transport={transport}
+						messagingConnector={messagingConnector}
+					/>
 				</ApiContext>
 			);
 	}
 }
 
-function SignedIn({ self, onSelfChange }: { self: SelfUser; onSelfChange: (self: SelfUser) => void }) {
+interface SignedInProps {
+	self: SelfUser;
+	onSelfChange: (self: SelfUser) => void;
+	onSignedOut: () => void;
+	transport: Transport;
+	messagingConnector: MessagingConnector | undefined;
+}
+
+function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnector }: SignedInProps) {
+	const [messaging] = useState(messagingEnabled);
 	const pathname = usePathname();
-	const route = matchRoute(pathname);
+	const route = matchRoute(pathname, messaging);
 	const known = route !== null;
 
 	useEffect(() => {
@@ -79,12 +105,26 @@ function SignedIn({ self, onSelfChange }: { self: SelfUser; onSelfChange: (self:
 	}, [known]);
 
 	if (!route) return null;
+	if (messaging) {
+		return (
+			<Suspense fallback={<Loading />}>
+				<MessagingRoot
+					self={self}
+					route={route}
+					transport={transport}
+					onSelfChange={onSelfChange}
+					onSignedOut={onSignedOut}
+					{...(messagingConnector === undefined ? {} : { connector: messagingConnector })}
+				/>
+			</Suspense>
+		);
+	}
 	return (
 		<Shell self={self} route={route}>
-			{route.name === "home" ? (
-				<Home self={self} />
-			) : (
+			{route.name === "settings" ? (
 				<Settings tab={route.tab} self={self} onSelfChange={onSelfChange} />
+			) : (
+				<Home self={self} />
 			)}
 		</Shell>
 	);

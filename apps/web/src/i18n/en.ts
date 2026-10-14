@@ -38,6 +38,10 @@ export const en: Messages = {
 		categories: "Settings categories",
 		profile: "Profile",
 		sessions: "Sessions",
+		privacy: "Privacy",
+		blocked: "Blocked users",
+		notifications: "Notifications",
+		moderation: "Moderation",
 		signOut: "Sign out",
 	},
 	profile: {

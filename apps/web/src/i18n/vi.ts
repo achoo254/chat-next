@@ -36,6 +36,10 @@ export const vi = {
 		categories: "Danh mục cài đặt",
 		profile: "Hồ sơ",
 		sessions: "Phiên đăng nhập",
+		privacy: "Quyền riêng tư",
+		blocked: "Người đã chặn",
+		notifications: "Thông báo",
+		moderation: "Kiểm duyệt",
 		signOut: "Đăng xuất",
 	},
 	profile: {

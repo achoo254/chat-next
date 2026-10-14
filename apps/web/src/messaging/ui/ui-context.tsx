@@ -1,0 +1,97 @@
+// Screen-level controls shared by the chat screen's parts: which dialog is
+// open, what the composer is doing (reply or edit) and the message menu.
+// The context value is created once per screen and never changes; the
+// changing parts are small external stores read with useSyncExternalStore.
+import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+import type { ReportTarget } from "../data/pending-backend.ts";
+
+export type DialogRequest =
+	| { readonly kind: "newChat" }
+	| { readonly kind: "newGroup" }
+	| { readonly kind: "newChannel" }
+	| { readonly kind: "forward"; readonly chatId: number; readonly seq: number }
+	| {
+			readonly kind: "delete";
+			readonly chatId: number;
+			readonly seq: number;
+			readonly mine: boolean;
+	  }
+	| { readonly kind: "report"; readonly target: ReportTarget; readonly name: string; readonly blockUserId: number }
+	| { readonly kind: "profile"; readonly userId: number }
+	| { readonly kind: "leave"; readonly chatId: number }
+	| { readonly kind: "addMembers"; readonly chatId: number }
+	| { readonly kind: "link"; readonly url: string }
+	| { readonly kind: "readBy"; readonly chatId: number; readonly seq: number }
+	/** People the server did not add (their privacy settings): offer an invite link or a private chat. */
+	| { readonly kind: "addFailed"; readonly chatId: number; readonly userIds: readonly number[] };
+
+export type ComposerIntent =
+	| { readonly mode: "reply"; readonly seq: number }
+	| { readonly mode: "edit"; readonly seq: number };
+
+export interface MenuTarget {
+	readonly chatId: number;
+	readonly key: string;
+}
+
+/** A value with subscribers, for state several distant components read. */
+export class Cell<T> {
+	private readonly listeners = new Set<() => void>();
+
+	constructor(private value: T) {}
+
+	get = (): T => this.value;
+
+	set(value: T): void {
+		if (Object.is(value, this.value)) return;
+		this.value = value;
+		for (const listener of [...this.listeners]) listener();
+	}
+
+	subscribe = (listener: () => void): (() => void) => {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	};
+}
+
+/** Reply/edit state per chat, so switching chats keeps each composer's intent. */
+export class ComposerIntents {
+	private readonly cells = new Map<number, Cell<ComposerIntent | null>>();
+
+	cell(chatId: number): Cell<ComposerIntent | null> {
+		let cell = this.cells.get(chatId);
+		if (cell === undefined) {
+			cell = new Cell<ComposerIntent | null>(null);
+			this.cells.set(chatId, cell);
+		}
+		return cell;
+	}
+}
+
+export interface Ui {
+	readonly dialog: Cell<DialogRequest | null>;
+	readonly menu: Cell<MenuTarget | null>;
+	readonly intents: ComposerIntents;
+	/** Focuses the search box of the chat list (⌘K, header search button). */
+	readonly focusSearch: () => void;
+	readonly toggleInfo: (open?: boolean) => void;
+}
+
+export const UiContext = createContext<Ui | null>(null);
+
+export function useUi(): Ui {
+	const ui = useContext(UiContext);
+	if (ui === null) throw new Error("useUi must be used inside <UiContext>");
+	return ui;
+}
+
+export function useCell<T>(cell: Cell<T>): T {
+	return useSyncExternalStore(cell.subscribe, cell.get);
+}
+
+export function useIntent(chatId: number): ComposerIntent | null {
+	const ui = useUi();
+	const cell = ui.intents.cell(chatId);
+	const subscribe = useCallback((listener: () => void) => cell.subscribe(listener), [cell]);
+	return useSyncExternalStore(subscribe, cell.get);
+}

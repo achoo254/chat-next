@@ -262,3 +262,11 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Thêm RPC `GetPeerDialogs`: 0.98.
   - WebSocket cùng origin tại `wss://chat.hoandat.com/ws`, nginx proxy sang gateway: 0.96.
 - Bỏ tab "Chưa đọc" khỏi mock; R1 chỉ có bốn bộ lọc đã chốt. Xác suất 0.86 (giữ làm bộ lọc thứ năm 0.14).
+- Backend R1 lên prod (commit `848354e`, migration 0003). Jev giữ mặc định "Ai thêm tôi vào nhóm" là Danh bạ: 0.74.
+- Review bảo mật backend R1 tìm ra 4 lỗi High (lộ tin trước `visible_from_seq`, socket còn sống sau khi phiên bị thu hồi, mặc định Danh bạ vô hiệu, thành viên bị kick vào lại qua link mời), 10 Medium và 7 Low. Jev quyết:
+  - Danh bạ là danh sách tường minh do người dùng tự thêm; có chung chat không còn được tính. Xác suất 0.77 (giữ định nghĩa nhóm và chat riêng đã trả lời 0.22).
+  - Kick là cấm: chặn vào lại qua mọi link cho tới khi admin gỡ cấm, và thu hồi link mời do người bị kick tạo. Xác suất 0.96.
+  - Chủ channel hoặc nhóm chỉ chuyển quyền cho admin; chưa có admin thì không được rời. Xác suất 0.83.
+  - Mock cập nhật các màn danh bạ, danh sách bị cấm, hộp thoại rời chat trước, sau đó mới sửa backend và UI.
+- Việc vận hành còn mở: cổng 443 của server `.65` đang mở cho mọi IP. Bộ lấy trang để xem trước link vì vậy có thể làm lộ IP gốc sau Cloudflare. Muốn giới hạn 443 cho dải Cloudflare thì phải đổi tường lửa chung của server, ảnh hưởng mọi app.
+

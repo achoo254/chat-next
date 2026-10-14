@@ -1,0 +1,118 @@
+// The messaging screen (mockups/chat.html#app): folder rail, chat list (or
+// the topic list of an open group with topics), conversation and the info
+// column. On narrow screens one column shows at a time.
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { SelfUser } from "../../api/adapters.ts";
+import type { Route } from "../../router.tsx";
+import { useCopy } from "../copy/use-copy.ts";
+import { dialogTitle, type Folder } from "../data/format.ts";
+import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
+import { ChatListColumn } from "./chat-list.tsx";
+import { Conversation, EmptyConversation } from "./conversation.tsx";
+import { DialogHost } from "./dialog-host.tsx";
+import { FolderRail } from "./folder-rail.tsx";
+import { Cell, ComposerIntents, UiContext, type DialogRequest, type MenuTarget, type Ui } from "./ui-context.tsx";
+
+const WIDE_QUERY = "(min-width: 1101px)";
+
+const TopicListColumn = lazy(() => import("./topic-list.tsx").then((m) => ({ default: m.TopicListColumn })));
+const InfoPanel = lazy(() => import("./info-panel.tsx").then((m) => ({ default: m.InfoPanel })));
+const ChatAdmin = lazy(() => import("./chat-admin.tsx").then((m) => ({ default: m.ChatAdmin })));
+const InviteDialog = lazy(() => import("./invite-dialog.tsx").then((m) => ({ default: m.InviteDialog })));
+
+function initialInfoOpen(): boolean {
+	return typeof window.matchMedia !== "function" || window.matchMedia(WIDE_QUERY).matches;
+}
+
+type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" }>;
+
+export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }) {
+	const copy = useCopy();
+	const { source, store } = useServices();
+	const [folder, setFolder] = useState<Folder>("all");
+	const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
+	const [visible, setVisible] = useState<readonly number[]>([]);
+	const searchRef = useRef<HTMLInputElement>(null);
+
+	const ui = useMemo<Ui>(
+		() => ({
+			dialog: new Cell<DialogRequest | null>(null),
+			menu: new Cell<MenuTarget | null>(null),
+			intents: new ComposerIntents(),
+			focusSearch: () => searchRef.current?.focus(),
+			toggleInfo: (open?: boolean) => setInfoOpen((current) => open ?? !current),
+		}),
+		[],
+	);
+
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+				event.preventDefault();
+				searchRef.current?.focus();
+			}
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, []);
+
+	const chatId = route.name === "chat" ? route.chatId : 0;
+	const panel = route.name === "chat" ? route.panel : "chat";
+	const chat = useChat(chatId);
+	const view = useDialog(chatId);
+	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
+	const topics = useTopics(chatId, chat?.forum === true);
+	const requestedTopic = route.name === "chat" ? route.topicId : 0;
+	const topic =
+		topics === null ? null : (topics.find((t) => t.id === requestedTopic) ?? topics.find((t) => t.general) ?? topics[0] ?? null);
+	const title = chat == null ? "" : dialogTitle({ chat, peer: view?.peer ?? peer ?? null }, copy);
+
+	// The core follows the open chat and the large chats visible in the list.
+	const visibleKey = visible.join(",");
+	useEffect(() => {
+		const large = visibleKey === "" ? [] : visibleKey.split(",").map(Number).filter((id) => store.dialog(id)?.chat?.syncMode === "large");
+		source.openChat(chatId, 0, large).catch(() => undefined);
+	}, [source, store, chatId, visibleKey]);
+	useEffect(() => () => void source.openChat(0).catch(() => undefined), [source]);
+
+	const onVisibleChats = useCallback((ids: readonly number[]) => setVisible(ids), []);
+	const showInfo = infoOpen && chat != null && panel === "chat";
+	const classes = ["app", "folders", showInfo ? "" : "no-info", chatId !== 0 ? "has-chat" : "", panel === "admin" ? "admin-mode" : ""]
+		.filter(Boolean)
+		.join(" ");
+
+	return (
+		<UiContext value={ui}>
+			<div className={classes}>
+				<FolderRail self={self} folder={folder} onFolder={setFolder} />
+				{topics !== null && chat != null && panel === "chat" ? (
+					<Suspense fallback={<section className="list" aria-busy="true" />}>
+						<TopicListColumn chat={chat} title={title} topics={topics} currentTopicId={topic?.id ?? 0} />
+					</Suspense>
+				) : (
+					<ChatListColumn folder={folder} onFolder={setFolder} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
+				)}
+				{chatId === 0 ? (
+					<EmptyConversation />
+				) : panel === "admin" ? (
+					<Suspense fallback={<section className="admin-page" aria-busy="true" />}>
+						<ChatAdmin chatId={chatId} />
+					</Suspense>
+				) : (
+					<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />
+				)}
+				{showInfo && chat != null && (
+					<Suspense fallback={<aside className="info" aria-busy="true" />}>
+						<InfoPanel chat={chat} peer={view?.peer ?? peer} topic={topic} title={title} />
+					</Suspense>
+				)}
+			</div>
+			<DialogHost />
+			{route.name === "invite" && (
+				<Suspense fallback={null}>
+					<InviteDialog token={route.token} />
+				</Suspense>
+			)}
+		</UiContext>
+	);
+}

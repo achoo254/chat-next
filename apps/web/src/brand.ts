@@ -11,4 +11,6 @@ export const brand = {
 	idpHost: issuer.host,
 	/** IdP account page: sign-in methods, app grants, devices. */
 	accountUrl: new URL("/account", issuer).toString(),
+	/** App URL scheme; links with it pass the allowlist (ADR 0004). */
+	urlScheme: brandConfig.urlScheme,
 } as const;
