@@ -44,7 +44,7 @@ Những điều sau là ràng buộc của hệ sinh thái mà plan này phải 
 
 - **Đăng nhập:** chỉ qua `hoandat-auth`. App chat không có đăng ký, mật khẩu, OTP, 2FA hay gửi email. Web dùng client confidential `chat-web` (server làm Code + PKCE). Mobile dùng client public `chat-mobile` (trình duyệt hệ thống + private-use scheme), desktop dùng `chat-desktop` (trình duyệt hệ thống + loopback). Chi tiết ở ADR 0006, [Phase 1](./phase-01-contracts-foundation.md).
 - **Phiên:** app tự cấp phiên chat để IdP không nằm trên đường nóng, nhưng phiên luôn gắn với grant của IdP. Phiên bị thu hồi khi nhận back-channel logout hoặc khi refresh trả `invalid_grant`. Phiên web trượt 30 ngày, trần 90 ngày; phiên native trượt 30 ngày, không trần (grant theo thiết bị, như `tunelo-cli`). Xem [Phase 2](./phase-02-backend-core-sync.md).
-- **Domain:** `chat.hoandat.com` cho tenant chính. Mỗi tenant `<d>` dùng `chat.<d>`, `bot.chat.<d>`, `hook.chat.<d>`; media và Mini App nằm trên domain đăng ký riêng, dùng chung mọi tenant.
+- **Domain:** `chat.hoandat.com` cho tenant chính. Mỗi tenant `<d>` dùng `chat.<d>` (webhook ở đường dẫn `chat.<d>/hook/…`), `bot.chat.<d>`; media và Mini App nằm trên domain đăng ký riêng, dùng chung mọi tenant.
 - **Tenant:** có từ v1 (ADR 0010). `tenant_id` có từ migration đầu; không có chat, tin, bot hay tìm kiếm xuyên tenant. Một bản app mobile/desktop dùng cho mọi tenant ("Đăng nhập bằng domain khác"). Tenant nghiệm thu là `inetdev.io.vn`.
 
 ### Thay đổi cần làm ở `hoandat-auth`
@@ -355,4 +355,5 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - số đang hoạt động lấy từ server.
   - Kiểm tra: 698 test core, 141 test web, 14 test platform-web; JS khởi động 148/150 KiB.
 - R1 coi như xong phần nhắn tin. Còn lại cho R9: kiểm duyệt nâng cao, tenant theo Host. Tiếp theo: R2, incoming webhook (Phase 9).
+- Jev quyết đặt incoming webhook tại `https://chat.<d>/hook/{id}/{secret}` trên host chat đang được Cloudflare proxy (0.72). Phương án `hook.chat.<d>` không proxy được 0.27. Lý do: SSL Universal miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, nên host hai cấp được proxy sẽ lỗi TLS. `bot.chat.<d>` của R5 gặp cùng vấn đề, sẽ quyết khi làm R5.
 

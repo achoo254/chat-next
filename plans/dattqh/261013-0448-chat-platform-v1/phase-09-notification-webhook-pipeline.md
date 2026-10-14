@@ -40,7 +40,7 @@ Hệ thống bên ngoài (monitoring, CI/CD, billing, ứng dụng nghiệp vụ
 ## Requirements
 
 Functional:
-- Incoming webhook gắn với một chat (và thuộc tenant của chat đó), URL dạng `https://hook.chat.<d>/hook/{id}/{secret}`; hook gọi sai host tenant trả 404. Do admin tạo; lưu `created_by`; hook tự tắt khi người tạo mất quyền admin hoặc rời chat (qua outbox `member_permissions`/`member_removed`), admin khác có thể nhận lại; mặc định giữ nguyên URL để công cụ giám sát chạy tiếp, admin bật "xoay secret khi nhận lại" nếu không muốn người cũ dùng URL nữa.
+- Incoming webhook gắn với một chat (và thuộc tenant của chat đó), URL dạng `https://chat.<d>/hook/{id}/{secret}`; hook gọi sai host tenant trả 404. Do admin tạo; lưu `created_by`; hook tự tắt khi người tạo mất quyền admin hoặc rời chat (qua outbox `member_permissions`/`member_removed`), admin khác có thể nhận lại; mặc định giữ nguyên URL để công cụ giám sát chạy tiếp, admin bật "xoay secret khi nhận lại" nếu không muốn người cũ dùng URL nữa.
 - Secret trong URL lưu hash, hiển thị một lần, xoay vòng có thời gian ân hạn 7 ngày với hai secret song song (thu hồi ngay được nếu URL cũ lộ); path được redact ở edge và logger.
 - Format v1: JSON riêng (`text`, `entities`/`parse_mode`, `buttons`, `silent`, `idempotency_key`, `group_key`, `priority`); Slack-compatible (`text` mrkdwn, `blocks`/`attachments` cơ bản); Alertmanager native (`groupKey`, `status`, `startsAt`/`endsAt`).
 - Format v1.1 (không làm trong phase này): Discord-compatible, kèm tài liệu Zabbix.
