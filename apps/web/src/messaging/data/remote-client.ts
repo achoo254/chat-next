@@ -25,6 +25,10 @@ import {
 import type { ReportReason } from "./pending-backend.ts";
 import type { Audience, Invite, Limits, Member, Person, Presence, Privacy, Remote, Role, ServerTopic } from "./remote.ts";
 
+const TOPICS_PAGE = 100;
+const CONTACTS_PAGE = 500;
+const BANNED_PAGE = 100;
+
 const AUDIENCES: Record<PrivacyAudience, Audience> = {
 	[PrivacyAudience.UNSPECIFIED]: "nobody",
 	[PrivacyAudience.EVERYONE]: "everyone",
@@ -98,17 +102,18 @@ export function toPrivacy(settings: PrivacySettings | undefined): Privacy {
 	};
 }
 
-/**
- * The report reasons of the mock (spam, scam, violence, sexual, other) map
- * onto ReportReason; scam and sexual content have no value of their own yet,
- * so they go as OTHER with a tag at the start of the comment.
- */
-const REPORT_REASONS: Record<ReportReason, { reason: WireReason; tag: string }> = {
-	spam: { reason: WireReason.SPAM, tag: "" },
-	scam: { reason: WireReason.OTHER, tag: "[scam]" },
-	violence: { reason: WireReason.VIOLENCE, tag: "" },
-	sexual: { reason: WireReason.OTHER, tag: "[sexual]" },
-	other: { reason: WireReason.OTHER, tag: "" },
+/** The report reasons of the mock (settings.html#report) on the wire. */
+const REPORT_REASONS: Record<ReportReason, WireReason> = {
+	spam: WireReason.SPAM,
+	scam: WireReason.SCAM,
+	violence: WireReason.VIOLENCE,
+	sexual: WireReason.SEXUAL,
+	other: WireReason.OTHER,
+};
+
+const HISTORY: Partial<Record<HistoryVisibility, boolean>> = {
+	[HistoryVisibility.SHARED]: true,
+	[HistoryVisibility.SINCE_JOIN]: false,
 };
 
 function toTopic(topic: ForumTopic): ServerTopic {
@@ -124,6 +129,9 @@ function toTopic(topic: ForumTopic): ServerTopic {
 		topSeq: assertSafeId(topic.topSeq),
 		readInboxMaxSeq: assertSafeId(topic.readInboxMaxSeq),
 		unreadCount: topic.unreadCount,
+		icon: topic.icon,
+		messageCount: topic.messageCount,
+		unreadMentions: topic.unreadMentionsCount,
 	};
 }
 
@@ -230,6 +238,33 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				const response = await chats.addMembers({ chatId: BigInt(chatId), userIds: userIds.map(BigInt) });
 				return response.failedUserIds.map(assertSafeId);
 			}),
+		removeMember: (chatId, userId, ban) =>
+			call(async () => {
+				await chats.removeMember({ chatId: BigInt(chatId), userId: BigInt(userId), ban });
+			}),
+		unbanMember: (chatId, userId) =>
+			call(async () => {
+				await chats.unbanMember({ chatId: BigInt(chatId), userId: BigInt(userId) });
+			}),
+		bannedMembers: (chatId, cursor = "") =>
+			call(async () => {
+				const response = await chats.getBannedMembers({ chatId: BigInt(chatId), cursor, limit: BANNED_PAGE });
+				const people = new Map(response.users.map((user) => [assertSafeId(user.id), toPerson(user)]));
+				const items = response.members.flatMap((member) => {
+					const person = people.get(assertSafeId(member.userId));
+					return person === undefined
+						? []
+						: [
+								{
+									person,
+									bannedBy: assertSafeId(member.bannedBy),
+									bannedByName: people.get(assertSafeId(member.bannedBy))?.name ?? "",
+									bannedAt: assertSafeId(member.bannedAt),
+								},
+							];
+				});
+				return { items, nextCursor: response.nextCursor };
+			}),
 		leaveChat: (chatId) =>
 			call(async () => {
 				await chats.leaveChat({ chatId: BigInt(chatId) });
@@ -276,9 +311,30 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				await users.unblock({ userId: BigInt(userId) });
 			}),
 		privacy: () => call(async () => toPrivacy((await users.getPrivacy({})).settings)),
-		forumTopics: (chatId) =>
+		contacts: (cursor = "") =>
 			call(async () => {
-				const response = await chats.getForumTopics({ chatId: BigInt(chatId) });
+				const response = await users.getContacts({ cursor, limit: CONTACTS_PAGE });
+				return { items: response.users.map(toPerson), nextCursor: response.nextCursor };
+			}),
+		addContact: (target) =>
+			call(async () => {
+				const wire =
+					"userId" in target
+						? { case: "userId" as const, value: BigInt(target.userId) }
+						: "username" in target
+							? { case: "username" as const, value: target.username }
+							: { case: "email" as const, value: target.email };
+				const user = (await users.addContact({ target: wire })).user;
+				if (user === undefined) throw new ConnectError("AddContact returned no user", Code.Internal);
+				return toPerson(user);
+			}),
+		deleteContact: (userId) =>
+			call(async () => {
+				await users.deleteContact({ userId: BigInt(userId) });
+			}),
+		forumTopics: (chatId, cursor = "") =>
+			call(async () => {
+				const response = await chats.getForumTopics({ chatId: BigInt(chatId), cursor, limit: TOPICS_PAGE });
 				return {
 					topics: response.topics.map(toTopic),
 					tops: response.messages.map((m) => ({
@@ -287,6 +343,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 						text: m.text,
 						date: assertSafeId(m.date),
 					})),
+					nextCursor: response.nextCursor,
 				};
 			}),
 		pinTopic: (chatId, topicId, pinned) =>
@@ -301,7 +358,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				await chats.hideForumTopic({ chatId: BigInt(chatId), topicId: BigInt(topicId), hidden });
 			}),
-		sendToTopic: (chatId, topicId, text, replyToSeq) =>
+		sendToTopic: (chatId, topicId, text, replyToSeq, noLinkPreview = false) =>
 			call(async () => {
 				await messages.sendMessage({
 					chatId: BigInt(chatId),
@@ -309,6 +366,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					replyToSeq: BigInt(replyToSeq),
 					topicId: BigInt(topicId),
 					randomId: BigInt(cryptoRandomId()),
+					noLinkPreview,
 				});
 			}),
 		readTopic: (chatId, topicId, maxSeq) =>
@@ -323,15 +381,13 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			}),
 		report: (target, reason, comment) =>
 			call(async () => {
-				const mapped = REPORT_REASONS[reason];
-				const text = [mapped.tag, comment].filter((part) => part !== "").join(" ");
 				const wireTarget =
 					target.kind === "user"
 						? { case: "userId" as const, value: BigInt(target.userId) }
 						: target.kind === "chat"
 							? { case: "chatId" as const, value: BigInt(target.chatId) }
 							: { case: "messages" as const, value: { chatId: BigInt(target.chatId), seqs: [BigInt(target.seq)] } };
-				await users.report({ target: wireTarget, reason: mapped.reason, comment: text });
+				await users.report({ target: wireTarget, reason: REPORT_REASONS[reason], comment });
 			}),
 		checkInvite: (link) =>
 			call(async () => {
@@ -342,6 +398,8 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					kind: response.type === ChatType.CHANNEL ? "channel" : response.type === ChatType.GROUP ? "group" : "other",
 					memberCount: response.memberCount,
 					memberOfChatId: response.chat === undefined ? 0 : assertSafeId(response.chat.id),
+					members: response.users.map(toPerson),
+					historyShared: HISTORY[response.historyVisibility] ?? null,
 				};
 			}),
 		inviteLinks: (chatId) => call(async () => (await chats.getInviteLinks({ chatId: BigInt(chatId) })).invites.map(toInvite)),
@@ -352,7 +410,19 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				return toInvite(response.invite);
 			}),
 		readers: (chatId, seq) =>
-			call(async () => (await messages.getMessageReaders({ chatId: BigInt(chatId), seq: BigInt(seq) })).users.map(toPerson)),
+			call(async () => {
+				const response = await messages.getMessageReaders({ chatId: BigInt(chatId), seq: BigInt(seq) });
+				const people = new Map(response.users.map((user) => [assertSafeId(user.id), toPerson(user)]));
+				// Servers before read dates list user_ids only; keep their order, without a time.
+				const read =
+					response.readers.length > 0
+						? response.readers.map((reader) => ({ userId: assertSafeId(reader.userId), readAt: assertSafeId(reader.readAt) }))
+						: response.userIds.map((id) => ({ userId: assertSafeId(id), readAt: 0 }));
+				return read.flatMap(({ userId, readAt }) => {
+					const person = people.get(userId);
+					return person === undefined ? [] : [{ person, readAt }];
+				});
+			}),
 		setPrivacy: (change) =>
 			call(async () => {
 				const request = {

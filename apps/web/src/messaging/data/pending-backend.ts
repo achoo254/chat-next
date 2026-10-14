@@ -2,7 +2,8 @@
 // topics, link previews, reports and invite previews (on the R1 server, see
 // server-backend.ts) and mute, pinned chats, per-reaction user lists, the
 // blocked list and the moderation queue (no RPC yet). The UI asks `features`
-// before it shows any of them, so a missing one is simply hidden.
+// before it shows any of them, so a missing one is simply hidden. Contacts,
+// member bans and owner leave are plain RPCs on Remote (every R1 server).
 import type { Message } from "@app/core";
 
 export type PendingFeature =
@@ -14,17 +15,7 @@ export type PendingFeature =
 	| "report"
 	| "blockedList"
 	| "invitePreview"
-	| "moderation"
-	/**
-	 * Pending flows decided after the R1 security review, wired once their
-	 * mock screens and RPCs land: an explicit contacts list
-	 * (AddContact/DeleteContact/GetContacts) behind "Danh bạ", and member
-	 * bans (removing a member bans them; UnbanMember, GetBannedMembers).
-	 * The UI offers neither yet. Owner leave is handled: LeaveChat answers
-	 * FailedPrecondition until another admin exists.
-	 */
-	| "contacts"
-	| "bans";
+	| "moderation";
 
 /** Icons a topic can carry (mockups/chat.html#topics). */
 export type TopicIcon = "hash" | "megaphone" | "edit" | "code" | "flag" | "inbox" | "users" | "database";
@@ -41,8 +32,10 @@ export interface Topic {
 	readonly closed: boolean;
 	readonly hidden: boolean;
 	readonly muted: boolean;
+	/** Counted up to 1000 by the server (shown as "999+"). */
 	readonly unreadCount: number;
 	readonly unreadMentions: number;
+	/** 0 when the server does not count it. */
 	readonly messageCount: number;
 	readonly lastMessage: { readonly fromId: number; readonly text: string; readonly date: number } | null;
 	readonly createdBy: number;
@@ -81,8 +74,8 @@ export interface InvitePreview {
 	readonly memberCount: number;
 	/** Whether new members read earlier messages; null when the server does not say. */
 	readonly historyShared: boolean | null;
-	/** A few members to show as avatars. */
-	readonly sampleNames: readonly string[];
+	/** A few members to show as avatars (groups). */
+	readonly members: readonly { readonly id: number; readonly name: string; readonly isBot: boolean }[];
 	/** Set when the user is already a member: open this chat instead. */
 	readonly memberOfChatId: number;
 }
@@ -143,12 +136,16 @@ export interface PendingBackend {
 	readonly features: ReadonlySet<PendingFeature>;
 	/** Cached topics of a group, or null when it has none (or they are not loaded yet). */
 	topics(chatId: number): readonly Topic[] | null;
-	/** Fetches the topics of a group; `subscribe` listeners run when they arrive. */
+	/** Fetches the first page of a group's topics; `subscribe` listeners run when they arrive. */
 	loadTopics(chatId: number): void;
+	/** Whether the server has more topics than the cached pages. */
+	hasMoreTopics(chatId: number): boolean;
+	/** Fetches the next page of topics (no-op while one is loading or none is left). */
+	loadMoreTopics(chatId: number): void;
 	/** Topic of a message in a group with topics; 0 elsewhere. */
 	messageTopic(message: Message): number;
 	setTopic(chatId: number, topicId: number, change: TopicChange): Promise<void>;
-	sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number): Promise<void>;
+	sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number, noLinkPreview?: boolean): Promise<void>;
 	readTopic(chatId: number, topicId: number, maxSeq: number): Promise<void>;
 	/** Preview the server attached to a message, if any. */
 	linkPreview(message: Message): LinkPreview | null;
@@ -157,8 +154,10 @@ export interface PendingBackend {
 	/** Users who reacted with `emoji` in small chats; null when only counts are known. */
 	reactors(chatId: number, seq: number, emoji: string): readonly number[] | null;
 	isMuted(chatId: number): boolean;
-	setMuted(chatId: number, muted: boolean): Promise<void>;
+	/** `forSeconds` limits a mute (0 or omitted: until turned back on). */
+	setMuted(chatId: number, muted: boolean, forSeconds?: number): Promise<void>;
 	isPinnedDialog(chatId: number): boolean;
+	setPinnedDialog(chatId: number, pinned: boolean): Promise<void>;
 	report(target: ReportTarget, reason: ReportReason, note: string): Promise<void>;
 	blockedUsers(): Promise<readonly BlockedUser[]>;
 	invitePreview(token: string): Promise<InvitePreview | null>;

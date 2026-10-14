@@ -143,8 +143,11 @@ describe("message rendering", () => {
 	it("asks before opening a link outside the tenant's sites", async () => {
 		const { log } = await openOps();
 		await userEvent.click(within(log).getByRole("link", { name: "https://docs.example.com/postgres/upgrade" }));
-		expect(await screen.findByRole("dialog", { name: "Mở link ngoài?" })).toBeTruthy();
-		expect(screen.getByText(/docs\.example\.com, ngoài các trang của tổ chức/)).toBeTruthy();
+		const dialog = await screen.findByRole("dialog", { name: "Mở link ngoài?" });
+		expect(within(dialog).getByText(/^Quang Huy gửi link này\. Nó dẫn ra ngoài /)).toBeTruthy();
+		expect(dialog.querySelector(".url-box b")?.textContent).toBe("docs.example.com");
+		expect(within(dialog).getByRole("button", { name: "Sao chép link" })).toBeTruthy();
+		expect(within(dialog).getByRole("button", { name: "Mở link" })).toBeTruthy();
 	});
 });
 
@@ -184,7 +187,7 @@ describe("composer", () => {
 		const menu = await screen.findByRole("menu", { name: "Thao tác với tin" });
 		await userEvent.click(within(menu).getByRole("menuitem", { name: "Trả lời" }));
 
-		expect(screen.getByText("Trả lời Lan Anh")).toBeTruthy();
+		expect(await screen.findByText("Trả lời Lan Anh")).toBeTruthy();
 		await userEvent.type(screen.getByRole("textbox", { name: "Tin nhắn" }), "Cảm ơn bạn{Enter}");
 		expect(await within(log).findByText("Cảm ơn bạn", {}, LONG)).toBeTruthy();
 		expect(screen.queryByText("Trả lời Lan Anh")).toBeNull();
@@ -201,7 +204,7 @@ describe("composer", () => {
 
 		const box = screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement;
 		await waitFor(() => expect(box.value).toBe("Mục 3 ổn, extension đã lên bản mới."));
-		expect(screen.getByText("Sửa tin")).toBeTruthy();
+		expect(await screen.findByText("Sửa tin")).toBeTruthy();
 		await userEvent.keyboard("{Escape}");
 		expect(screen.queryByText("Sửa tin")).toBeNull();
 		expect(box.value).toBe("");
@@ -277,7 +280,7 @@ describe("info panel", () => {
 		await userEvent.click(within(info).getByRole("button", { name: "Tạo link mời" }));
 		expect(await within(info).findByText(/chat\.example\.test\/\+q7XrN2bT1/)).toBeTruthy();
 
-		await userEvent.click(within(info).getByRole("button", { name: "Đóng cột thông tin" }));
+		await userEvent.click(within(info).getByRole("button", { name: "Đóng cột thông tin (Esc)" }));
 		expect(screen.queryByRole("complementary", { name: "Thông tin nhóm" })).toBeNull();
 		await userEvent.click(screen.getByRole("button", { name: "Thông tin chat" }));
 		expect(await screen.findByRole("complementary", { name: "Thông tin nhóm" })).toBeTruthy();
@@ -325,7 +328,8 @@ describe("dialogs", () => {
 		await userEvent.click(within(dialog).getByRole("radio", { name: /Lừa đảo/ }));
 		await userEvent.click(submit);
 		expect(await screen.findByText("Đã gửi báo cáo")).toBeTruthy();
-		expect(demo.fixture.reports).toEqual([{ target: expect.stringMatching(/^messages:/), reason: 6, comment: "[scam]" }]);
+		// ReportReason.SCAM: the reason has its own value now, the comment stays the user's.
+		expect(demo.fixture.reports).toEqual([{ target: expect.stringMatching(/^messages:/), reason: 7, comment: "" }]);
 		expect(demo.fixture.blocked.has(demo.ids.users.lan)).toBe(true);
 	});
 });

@@ -1,5 +1,5 @@
-// PendingBackend on the R1 server: forum topics (GetForumTopics and the
-// topic RPCs), link previews (stored by the core on each message, and
+// PendingBackend on the R1 server: forum topics (GetForumTopics, paged, and
+// the topic RPCs), link previews (stored by the core on each message, and
 // GetLinkPreview while typing), reports and invite previews (CheckInvite).
 // Mute, pinned chats, reactor lists, the blocked list and the moderation
 // queue have no RPC yet and stay off.
@@ -20,17 +20,22 @@ import type {
 } from "./pending-backend.ts";
 import { FeatureUnavailableError } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";
+import type { TopicPages } from "./topic-mapping.ts";
 import type { ChatSource } from "./source.ts";
-
 import { GENERAL_TOPIC } from "./general-topic.ts";
+
 const RELOAD_DELAY_MS = 250;
+
+type TopicPaging = typeof import("./topic-mapping.ts");
 
 const unavailable = (feature: PendingFeature) => (): Promise<never> => Promise.reject(new FeatureUnavailableError(feature));
 
 export class ServerBackend implements PendingBackend {
 	readonly features: ReadonlySet<PendingFeature> = new Set<PendingFeature>(["topics", "linkPreview", "report", "invitePreview"]);
-	private readonly cache = new Map<number, Topic[]>();
+	private readonly cache = new Map<number, TopicPages>();
 	private readonly inFlight = new Set<number>();
+	/** Chats that changed while their topics were loading: reload once the load ends. */
+	private readonly stale = new Set<number>();
 	private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
 	private readonly listeners = new Set<() => void>();
 	private readonly unsubscribe: () => void;
@@ -76,12 +81,22 @@ export class ServerBackend implements PendingBackend {
 	// ------------------------------------------------------------- topics
 
 	topics(chatId: number): readonly Topic[] | null {
-		return this.cache.get(chatId) ?? null;
+		return this.cache.get(chatId)?.topics ?? null;
 	}
 
 	loadTopics(chatId: number): void {
 		if (this.cache.has(chatId)) return;
-		void this.fetchTopics(chatId);
+		void this.fetchTopics(chatId, 1);
+	}
+
+	hasMoreTopics(chatId: number): boolean {
+		return (this.cache.get(chatId)?.nextCursor ?? "") !== "";
+	}
+
+	loadMoreTopics(chatId: number): void {
+		const cached = this.cache.get(chatId);
+		if (cached === undefined || cached.nextCursor === "" || this.inFlight.has(chatId)) return;
+		void this.load(chatId, (paging) => paging.loadNextTopicPage(this.remote, chatId, cached, this.origin));
 	}
 
 	private scheduleReload(chatId: number): void {
@@ -90,26 +105,31 @@ export class ServerBackend implements PendingBackend {
 			chatId,
 			setTimeout(() => {
 				this.timers.delete(chatId);
-				void this.fetchTopics(chatId);
+				void this.fetchTopics(chatId, this.cache.get(chatId)?.pages ?? 1);
 			}, RELOAD_DELAY_MS),
 		);
 	}
 
-	private async fetchTopics(chatId: number): Promise<void> {
-		if (this.inFlight.has(chatId)) return;
+	/** Loads the first `pages` pages again (a reload keeps what the user scrolled to). */
+	private fetchTopics(chatId: number, pages: number): Promise<void> {
+		return this.load(chatId, (paging) => paging.loadTopicPages(this.remote, chatId, pages, this.origin));
+	}
+
+	/** Runs one load of a forum's topics at a time; a change during a load reloads after it. */
+	private async load(chatId: number, run: (paging: TopicPaging) => Promise<TopicPages>): Promise<void> {
+		if (this.inFlight.has(chatId)) {
+			this.stale.add(chatId);
+			return;
+		}
 		this.inFlight.add(chatId);
 		try {
-			const [page, { toTopic }] = await Promise.all([this.remote.forumTopics(chatId), import("./topic-mapping.ts")]);
-			const tops = new Map(page.tops.map((top) => [top.seq, top]));
-			this.cache.set(
-				chatId,
-				page.topics.map((topic) => toTopic(chatId, topic, tops, this.origin)),
-			);
+			this.cache.set(chatId, await run(await import("./topic-mapping.ts")));
 			this.emit();
 		} catch {
 			// The list stays as it was; the next change of the chat retries.
 		} finally {
 			this.inFlight.delete(chatId);
+			if (this.stale.delete(chatId)) this.scheduleReload(chatId);
 		}
 	}
 
@@ -122,21 +142,21 @@ export class ServerBackend implements PendingBackend {
 		if (change.pinned !== undefined) await this.remote.pinTopic(chatId, topicId, change.pinned);
 		if (change.closed !== undefined) await this.remote.closeTopic(chatId, topicId, change.closed);
 		if (change.hidden !== undefined) await this.remote.hideTopic(chatId, topicId, change.hidden);
-		await this.fetchTopics(chatId);
+		await this.fetchTopics(chatId, this.cache.get(chatId)?.pages ?? 1);
 	}
 
-	async sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number): Promise<void> {
-		await this.remote.sendToTopic(chatId, topicId, text, replyToSeq);
+	async sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number, noLinkPreview = false): Promise<void> {
+		await this.remote.sendToTopic(chatId, topicId, text, replyToSeq, noLinkPreview);
 	}
 
 	async readTopic(chatId: number, topicId: number, maxSeq: number): Promise<void> {
 		await this.remote.readTopic(chatId, topicId, maxSeq);
-		const list = this.cache.get(chatId);
-		if (list !== undefined) {
-			this.cache.set(
-				chatId,
-				list.map((topic) => (topic.id === topicId ? { ...topic, unreadCount: 0, unreadMentions: 0 } : topic)),
-			);
+		const cached = this.cache.get(chatId);
+		if (cached !== undefined) {
+			this.cache.set(chatId, {
+				...cached,
+				topics: cached.topics.map((topic) => (topic.id === topicId ? { ...topic, unreadCount: 0, unreadMentions: 0 } : topic)),
+			});
 			this.emit();
 		}
 	}
@@ -167,8 +187,8 @@ export class ServerBackend implements PendingBackend {
 			title: check.title,
 			kind: check.kind === "channel" ? "channel" : "group",
 			memberCount: check.memberCount,
-			historyShared: null,
-			sampleNames: [],
+			historyShared: check.historyShared,
+			members: check.members.map((person) => ({ id: person.id, name: person.name, isBot: person.isBot })),
 			memberOfChatId: check.memberOfChatId,
 		};
 	}
@@ -183,12 +203,16 @@ export class ServerBackend implements PendingBackend {
 		return false;
 	}
 
-	setMuted(_chatId: number, _muted: boolean): Promise<void> {
+	setMuted(_chatId: number, _muted: boolean, _forSeconds?: number): Promise<void> {
 		return unavailable("mute")();
 	}
 
 	isPinnedDialog(_chatId: number): boolean {
 		return false;
+	}
+
+	setPinnedDialog(_chatId: number, _pinned: boolean): Promise<void> {
+		return unavailable("pinnedDialogs")();
 	}
 
 	blockedUsers(): Promise<readonly BlockedUser[]> {

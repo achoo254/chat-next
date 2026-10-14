@@ -1,7 +1,9 @@
-// The chat list column: search box, filter tabs (narrow screens) and the
-// dialog list. Rows have a fixed height per kind and are absolutely
+// The chat list column: search box, filter tabs and the header with
+// Settings, Contacts and New chat (narrow screens, mockups/chat.html#narrow)
+// and the dialog list. Rows have a fixed height per kind and are absolutely
 // positioned, and only the rows in view (plus a margin) are mounted.
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
+import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -9,6 +11,7 @@ import { chatKind, inFolder, type Folder } from "../data/format.ts";
 import { useBackendVersion, useDialogOrder, useListStatus, useServices } from "../data/services.tsx";
 import { ChatRow, ROW_HEIGHT, TWO_LINE_ROW_HEIGHT } from "./chat-row.tsx";
 import { FolderTabs } from "./folder-rail.tsx";
+import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { useUi } from "./ui-context.tsx";
 
 const OVERSCAN_PX = 320;
@@ -35,6 +38,18 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 
 	return (
 		<section className="list" aria-label={copy.list.label}>
+			<header className="n-head narrow-only">
+				<Link to={paths.settings("profile")} className="icon-btn" aria-label={copy.folders.settings}>
+					<Icon name="settings" />
+				</Link>
+				<h2>{brand.appName}</h2>
+				<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
+					<ContactsGlyph />
+				</Link>
+				<button type="button" className="icon-btn" aria-label={copy.list.newChat} onClick={() => ui.dialog.set({ kind: "newChat" })}>
+					<Icon name="plus" />
+				</button>
+			</header>
 			<div className="list-head">
 				<label className="search-field">
 					<Icon name="search" small />
@@ -52,12 +67,9 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 						⌘K
 					</span>
 				</label>
-				<button type="button" className="icon-btn" aria-label={copy.list.newChat} onClick={() => ui.dialog.set({ kind: "newChat" })}>
+				<button type="button" className="icon-btn hide-narrow" aria-label={copy.list.newChat} onClick={() => ui.dialog.set({ kind: "newChat" })}>
 					<Icon name="plus" />
 				</button>
-				<Link to={paths.settings("profile")} className="icon-btn narrow-only" aria-label={copy.folders.settings}>
-					<Icon name="settings" />
-				</Link>
 			</div>
 			{searching ? (
 				<Suspense fallback={<div className="search-panel" aria-busy="true" />}>

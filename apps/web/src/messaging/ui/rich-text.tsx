@@ -45,8 +45,8 @@ export function entityTree(text: string, entities: readonly MessageEntity[]): No
 export interface RichContext {
 	readonly selfId: number;
 	readonly selfUsername: string;
-	/** Opens a link, asking first when it leaves the tenant's sites. */
-	readonly openLink: (url: string) => void;
+	/** Opens a link, asking first when it leaves the tenant's sites; `shown` is the text the message shows for it. */
+	readonly openLink: (url: string, shown?: string) => void;
 }
 
 function Spoiler({ children }: { children: ReactNode }) {
@@ -66,11 +66,11 @@ function Spoiler({ children }: { children: ReactNode }) {
 	);
 }
 
-function MessageLink({ url, ctx, children }: { url: string; ctx: RichContext; children: ReactNode }) {
+function MessageLink({ url, shown = "", ctx, children }: { url: string; shown?: string; ctx: RichContext; children: ReactNode }) {
 	const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
 		if (url.startsWith("mailto:")) return;
 		event.preventDefault();
-		ctx.openLink(url);
+		ctx.openLink(url, shown);
 	};
 	return (
 		<a href={url} target="_blank" rel="noopener noreferrer" onClick={onClick}>
@@ -146,7 +146,7 @@ function RichNode({ text, node, ctx }: { text: string; node: Node; ctx: RichCont
 			return <code>{slice}</code>;
 		case "text_link":
 			return entity.url !== undefined && isAllowedUrl(entity.url, APP_SCHEME) ? (
-				<MessageLink url={entity.url} ctx={ctx}>
+				<MessageLink url={entity.url} shown={slice} ctx={ctx}>
 					{inner}
 				</MessageLink>
 			) : (
@@ -236,13 +236,13 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 }
 
 /** Link opening with the trusted-host rule; `ask` shows the confirmation. */
-export function linkOpener(ask: (url: string) => void): (url: string) => void {
-	return (url) => {
+export function linkOpener(ask: (url: string, shown: string) => void): (url: string, shown?: string) => void {
+	return (url, shown = "") => {
 		if (!isAllowedUrl(url, APP_SCHEME)) return;
 		if (url.startsWith("mailto:") || isTrustedHost(hostOf(url), window.location.host)) {
 			window.open(url, "_blank", "noopener,noreferrer");
 			return;
 		}
-		ask(url);
+		ask(url, shown);
 	};
 }

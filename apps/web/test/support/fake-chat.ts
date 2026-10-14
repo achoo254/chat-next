@@ -48,6 +48,9 @@ export interface FixtureTopic {
 	closed: boolean;
 	hidden: boolean;
 	unreadCount: number;
+	icon?: string;
+	messageCount?: number;
+	unreadMentions?: number;
 }
 
 export interface FixturePreview {
@@ -77,7 +80,7 @@ export class ChatFixture {
 	private readonly messageExtras = new Map<string, MessageExtras>();
 	private readonly userExtras = new Map<number, UserExtras>();
 	private readonly chatExtras = new Map<number, ChatExtras>();
-	private readonly dialogExtras = new Map<number, { unreadMentionsCount: number }>();
+	private readonly dialogExtras = new Map<number, { unreadMentionsCount?: number; unreadCount?: number }>();
 	readonly blocked = new Set<number>();
 	readonly reactions: { chatId: number; seq: number; emoji: string }[] = [];
 	readonly pins: { chatId: number; seq: number; pinned: boolean }[] = [];
@@ -88,12 +91,34 @@ export class ChatFixture {
 	readonly topics = new Map<number, FixtureTopic[]>();
 	private readonly messageTopics = new Map<string, number>();
 	readonly previews: FixturePreview[] = [];
-	readonly inviteChecks = new Map<string, { title: string; type: ChatType; memberCount: number; memberOf: number }>();
+	readonly inviteChecks = new Map<
+		string,
+		{ title: string; type: ChatType; memberCount: number; memberOf: number; members?: number[]; history?: HistoryVisibility; banned?: boolean }
+	>();
 	readonly inviteLinks = new Map<number, InviteLink[]>();
 	readonly readers = new Map<string, number[]>();
 	readonly reports: { target: string; reason: number; comment: string }[] = [];
 	/** Users whose privacy refuses being added to groups by this user. */
 	readonly refusesGroups = new Set<number>();
+	/** Users whose privacy refuses a new private chat with this user ("message me": contacts). */
+	readonly refusesMessages = new Set<number>();
+	/** Texts of SendMessage requests that asked for no link preview. */
+	readonly sentWithoutPreview: string[] = [];
+	/** The signed-in user's contact list (AddContact/DeleteContact/GetContacts). */
+	readonly contacts = new Set<number>();
+	/** Users their own find_by_username/email settings hide from this user. */
+	readonly hiddenFromSearch = new Set<number>();
+	/** Contacts per GetContacts page. */
+	contactsPageSize = 500;
+	/** Bans per chat (RemoveMember with ban, GetBannedMembers, UnbanMember). */
+	readonly bans = new Map<number, { userId: number; by: number; at: number }[]>();
+	readonly removals: { chatId: number; userId: number; ban: boolean }[] = [];
+	/** Chats whose owner (this user) may not leave until another admin exists. */
+	readonly ownerNeedsAdmin = new Set<number>();
+	/** Topics per GetForumTopics page. */
+	topicPageSize = 100;
+	/** Read dates per reader, by `${chatId}:${seq}`; readers without one have none. */
+	readonly readDates = new Map<string, Map<number, number>>();
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
@@ -143,7 +168,12 @@ export class ChatFixture {
 	}
 
 	mentions(chatId: number, count: number): void {
-		this.dialogExtras.set(chatId, { unreadMentionsCount: count });
+		this.dialogExtras.set(chatId, { ...this.dialogExtras.get(chatId), unreadMentionsCount: count });
+	}
+
+	/** The server's (capped) unread count for a chat, as GetDialogs reports it. */
+	unread(chatId: number, count: number): void {
+		this.dialogExtras.set(chatId, { ...this.dialogExtras.get(chatId), unreadCount: count });
 	}
 
 	// ------------------------------------------------------------- patching
@@ -169,7 +199,8 @@ export class ChatFixture {
 
 	patchDialog(dialog: WireDialog): void {
 		const extras = this.dialogExtras.get(num(dialog.chatId));
-		if (extras !== undefined && dialog.unreadCount > 0) dialog.unreadMentionsCount = extras.unreadMentionsCount;
+		if (extras?.unreadCount !== undefined) dialog.unreadCount = extras.unreadCount;
+		if (extras?.unreadMentionsCount !== undefined && dialog.unreadCount > 0) dialog.unreadMentionsCount = extras.unreadMentionsCount;
 	}
 
 	private patchUpdates(updates: readonly WireUpdate[]): void {
@@ -230,6 +261,7 @@ export class ChatFixture {
 			messages: {
 				sendMessage: (request) => {
 					this.sent.push({ chatId: num(request.chatId ?? 0n), text: request.text ?? "", replyToSeq: num(request.replyToSeq ?? 0n), topicId: 0 });
+					if (request.noLinkPreview === true) this.sentWithoutPreview.push(request.text ?? "");
 					return base.messages.sendMessage(request);
 				},
 				editMessage: (request) => base.messages.editMessage(request),
@@ -327,6 +359,7 @@ export class ChatFixture {
 				const ids = [...this.names.keys()].filter((id) => id !== this.selfId);
 				const hits = ids.filter((id) => {
 					const user = this.wireUser(id);
+					if (this.hiddenFromSearch.has(id)) return false;
 					return q.includes("@") ? `${user.username}@hoandat.com` === q : user.username.startsWith(q.replace(/^@/, ""));
 				});
 				return { users: hits.map((id) => this.wireUser(id)) };
@@ -338,6 +371,33 @@ export class ChatFixture {
 			unblock: (req) => {
 				this.blocked.delete(num(req.userId));
 				return {};
+			},
+			addContact: (req) => {
+				const target = req.target;
+				let id = 0;
+				if (target.case === "userId") id = num(target.value);
+				else if (target.case === "username") {
+					const name = target.value.replace(/^@/, "").toLowerCase();
+					id = [...this.names.keys()].find((userId) => this.wireUser(userId).username === name) ?? 0;
+				} else if (target.case === "email") {
+					id = [...this.names.keys()].find((userId) => `${this.wireUser(userId).username}@hoandat.com` === target.value.toLowerCase()) ?? 0;
+				}
+				if (id === 0 || id === this.selfId || (target.case !== "userId" && this.hiddenFromSearch.has(id))) {
+					throw new ConnectError("user not found", Code.NotFound);
+				}
+				this.contacts.add(id);
+				return { user: this.wireUser(id) };
+			},
+			deleteContact: (req) => {
+				this.contacts.delete(num(req.userId));
+				return {};
+			},
+			getContacts: (req) => {
+				const ids = [...this.contacts].sort((a, b) => a - b);
+				const after = req.cursor === "" ? 0 : Number(req.cursor);
+				const page = ids.filter((id) => id > after).slice(0, this.contactsPageSize);
+				const last = page.at(-1) ?? 0;
+				return { users: page.map((id) => this.wireUser(id)), nextCursor: ids.some((id) => id > last) && page.length > 0 ? String(last) : "" };
 			},
 			report: (req) => {
 				const target = req.target.case === "messages" ? `messages:${num(req.target.value.chatId)}:${req.target.value.seqs.map(num).join(",")}` : `${req.target.case ?? ""}:${String(req.target.value ?? "")}`;
@@ -374,6 +434,7 @@ export class ChatFixture {
 			sendMessage: (req) => {
 				const chatId = num(req.chatId);
 				this.sent.push({ chatId, text: req.text, replyToSeq: num(req.replyToSeq), topicId: num(req.topicId) });
+				if (req.noLinkPreview) this.sentWithoutPreview.push(req.text);
 				this.send(this.selfId, chatId, req.text, { topicId: req.topicId === 0n ? 1n : req.topicId, replyToSeq: req.replyToSeq });
 				return {};
 			},
@@ -391,7 +452,12 @@ export class ChatFixture {
 			getMessageReaders: (req) => {
 				const ids = this.readers.get(`${num(req.chatId)}:${num(req.seq)}`);
 				if (ids === undefined) throw new ConnectError("readers not available", Code.FailedPrecondition);
-				return { userIds: ids.map(BigInt), users: ids.map((id) => this.wireUser(id)) };
+				const dates = this.readDates.get(`${num(req.chatId)}:${num(req.seq)}`);
+				return {
+					userIds: ids.map(BigInt),
+					users: ids.map((id) => this.wireUser(id)),
+					readers: dates === undefined ? [] : ids.map((id) => ({ userId: BigInt(id), readAt: BigInt(dates.get(id) ?? 0) })),
+				};
 			},
 			setReaction: (req) => {
 				const chatId = num(req.chatId);
@@ -418,6 +484,7 @@ export class ChatFixture {
 		router.service(ChatsService, {
 			createPrivate: (req) => {
 				const userId = num(req.userId);
+				if (this.refusesMessages.has(userId)) throw new ConnectError("the user only takes messages from contacts", Code.PermissionDenied);
 				const existing = [...this.members.entries()].find(
 					([id, list]) => this.server.wireChat(id, this.selfId).type === ChatType.PRIVATE && list.includes(userId),
 				);
@@ -465,9 +532,39 @@ export class ChatFixture {
 				}
 				return { failedUserIds: failed };
 			},
-			leaveChat: () => ({}),
+			removeMember: (req) => {
+				const chatId = num(req.chatId);
+				const userId = num(req.userId);
+				const ban = req.ban ?? true;
+				this.removals.push({ chatId, userId, ban });
+				this.server.removeMember(chatId, userId, this.selfId);
+				this.members.set(chatId, (this.members.get(chatId) ?? []).filter((id) => id !== userId));
+				if (ban) this.bans.set(chatId, [...(this.bans.get(chatId) ?? []), { userId, by: this.selfId, at: 1_760_400_000 }]);
+				return {};
+			},
+			unbanMember: (req) => {
+				const chatId = num(req.chatId);
+				this.bans.set(chatId, (this.bans.get(chatId) ?? []).filter((ban) => ban.userId !== num(req.userId)));
+				return {};
+			},
+			getBannedMembers: (req) => {
+				const list = this.bans.get(num(req.chatId)) ?? [];
+				const ids = [...new Set(list.flatMap((ban) => [ban.userId, ban.by]))];
+				return {
+					members: list.map((ban) => ({ userId: BigInt(ban.userId), bannedBy: BigInt(ban.by), bannedAt: BigInt(ban.at) })),
+					users: ids.map((id) => this.wireUser(id)),
+					nextCursor: "",
+				};
+			},
+			leaveChat: (req) => {
+				if (this.ownerNeedsAdmin.has(num(req.chatId))) {
+					throw new ConnectError("owner_needs_admin: appoint an admin before leaving", Code.FailedPrecondition);
+				}
+				return {};
+			},
 			setAdmin: (req) => {
 				this.setRole(num(req.chatId), num(req.userId), req.admin ? MemberRole.ADMIN : MemberRole.MEMBER);
+				if (req.admin) this.ownerNeedsAdmin.delete(num(req.chatId));
 				return {};
 			},
 			updateChatInfo: (req) => ({ chat: this.server.wireChat(num(req.chatId), this.selfId) }),
@@ -498,11 +595,16 @@ export class ChatFixture {
 				const token = req.link.replace(/^.*\+/, "");
 				const found = this.inviteChecks.get(token);
 				if (found === undefined) throw new ConnectError("invite expired", Code.NotFound);
+				if (found.banned === true) throw new ConnectError("you were removed from this chat by an admin", Code.PermissionDenied);
+				const members = found.members ?? [];
 				return {
 					title: found.title,
 					type: found.type,
 					memberCount: found.memberCount,
 					...(found.memberOf === 0 ? {} : { chat: this.server.wireChat(found.memberOf, this.selfId) }),
+					memberIds: members.map(BigInt),
+					users: members.map((id) => this.wireUser(id)),
+					historyVisibility: found.history ?? HistoryVisibility.UNSPECIFIED,
 				};
 			},
 			getForumTopics: (req) => {
@@ -510,9 +612,13 @@ export class ChatFixture {
 				const list = this.topics.get(chatId) ?? [];
 				const messages = this.server.expectedMessages(chatId, this.selfId);
 				const sorted = [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || this.topicTop(chatId, b.id) - this.topicTop(chatId, a.id));
-				const tops = sorted.map((t) => messages.find((m) => m.seq === this.topicTop(chatId, t.id))).filter((m) => m !== undefined);
+				const start = req.cursor === "" ? 0 : Number(req.cursor);
+				const page = sorted.slice(start, start + this.topicPageSize);
+				const next = start + page.length < sorted.length ? String(start + page.length) : "";
+				const tops = page.map((t) => messages.find((m) => m.seq === this.topicTop(chatId, t.id))).filter((m) => m !== undefined);
 				return {
-					topics: sorted.map((t) => ({
+					nextCursor: next,
+					topics: page.map((t) => ({
 						chatId: BigInt(chatId),
 						id: BigInt(t.id),
 						title: t.title,
@@ -525,6 +631,9 @@ export class ChatFixture {
 						topSeq: BigInt(this.topicTop(chatId, t.id)),
 						readInboxMaxSeq: 0n,
 						unreadCount: t.unreadCount,
+						icon: t.icon ?? "",
+						messageCount: t.messageCount ?? 0,
+						unreadMentionsCount: t.unreadMentions ?? 0,
 					})),
 					messages: tops.map((m) => ({ chatId: BigInt(chatId), seq: BigInt(m.seq), fromId: BigInt(m.fromId), date: BigInt(m.date), text: m.text })),
 					users: [],
@@ -597,6 +706,7 @@ export class FixtureBackend extends ServerBackend {
 		"moderation",
 	]);
 	private readonly muted: Set<number>;
+	private readonly pinned: Set<number>;
 
 	constructor(
 		remote: Remote,
@@ -605,6 +715,7 @@ export class FixtureBackend extends ServerBackend {
 	) {
 		super(remote, source, "https://chat.example.test");
 		this.muted = new Set(data.muted ?? []);
+		this.pinned = new Set(data.pinnedDialogs ?? []);
 	}
 
 	override reactors(chatId: number, seq: number, emoji: string): readonly number[] | null {
@@ -622,7 +733,13 @@ export class FixtureBackend extends ServerBackend {
 	}
 
 	override isPinnedDialog(chatId: number): boolean {
-		return this.data.pinnedDialogs?.has(chatId) ?? false;
+		return this.pinned.has(chatId);
+	}
+
+	override async setPinnedDialog(chatId: number, pinned: boolean): Promise<void> {
+		if (pinned) this.pinned.add(chatId);
+		else this.pinned.delete(chatId);
+		this.emit();
 	}
 
 	override async blockedUsers(): Promise<readonly BlockedUser[]> {

@@ -1,17 +1,21 @@
-// Confirmation and detail dialogs: delete (mockups #delete), leave, external
-// link, report (settings.html#report) and another user's profile
-// (#user-profile).
+// Confirmation and detail dialogs: delete (mockups #delete), leave with the
+// owner's hand-over (#channel-owner-leave), external link (#external-link),
+// report (settings.html#report), another user's profile (#user-profile) and
+// who read a message (#read-by).
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { clock, dialogTitle, hostOf, messagePreview, userName } from "../data/format.ts";
+import { clock, dialogTitle, hostOf, messagePreview, orgDomain, userName } from "../data/format.ts";
 import type { ReportReason, ReportTarget } from "../data/pending-backend.ts";
-import type { Person } from "../data/remote.ts";
+import type { Member, Reader } from "../data/remote.ts";
 import { useChat, useMessage, useServices, useUser } from "../data/services.tsx";
-import { ChatAvatar, CopyButton, DialogHead, Modal, useDomId } from "./parts.tsx";
+import { ContactRow } from "./contact-row.tsx";
+import { Glyph } from "./glyphs.tsx";
+import { useMembers } from "./members.ts";
+import { ChatAvatar, copyText, CopyButton, DialogHead, Modal, useDomId } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
 
@@ -94,13 +98,24 @@ export function DeleteDialog({ chatId, seq, mine, onClose }: CloseProps & { chat
 	);
 }
 
+/** LeaveChat's answer when an owner would leave members behind without an admin. */
+function ownerNeedsAdmin(err: unknown): boolean {
+	const error = ConnectError.from(err);
+	return error.code === Code.FailedPrecondition && error.rawMessage.startsWith("owner_needs_admin");
+}
+
 export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }) {
 	const copy = useScreensCopy();
 	const { remote, toasts } = useServices();
 	const chat = useChat(chatId);
+	const [view, setView] = useState<"confirm" | "blocked" | "pick">("confirm");
 	const [busy, setBusy] = useState(false);
+	const owner = chat?.myRole === "owner";
+	const channel = chat?.type === "channel";
+	const { members, reload } = useMembers(chatId, "", owner);
 	const id = useDomId("leave");
 	const title = chat?.title ?? "";
+	const t = copy.ownerLeave;
 	const leave = () => {
 		setBusy(true);
 		remote.leaveChat(chatId).then(
@@ -111,44 +126,255 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 			},
 			(err: unknown) => {
 				setBusy(false);
-				// The owner of a group or channel leaves only after naming another admin.
-				toasts.show(ConnectError.from(err).code === Code.FailedPrecondition ? copy.info.ownerMustHandOver : copy.common.failed);
+				if (ownerNeedsAdmin(err)) setView("blocked");
+				else toasts.show(copy.common.failed);
 			},
 		);
 	};
+
+	if (view === "pick") {
+		return (
+			<PickAdmin
+				chatId={chatId}
+				channel={channel}
+				memberCount={chat?.memberCount ?? 0}
+				onBack={() => setView("blocked")}
+				onDone={() => {
+					reload();
+					setView("confirm");
+				}}
+				onClose={onClose}
+			/>
+		);
+	}
+	if (view === "blocked") {
+		return (
+			<Modal labelledBy={id} onClose={onClose} className="narrow">
+				<DialogHead id={id} title={t.blockedTitle(channel)} onClose={onClose} />
+				<div className="hero">
+					<span className="big-icon">
+						<Glyph name="crown" />
+					</span>
+					<p>
+						{t.blockedKind(channel)} <b>{title}</b>
+						{t.blockedRest(channel)}
+					</p>
+				</div>
+				<div className="dlg-foot">
+					<button type="button" className="btn" onClick={onClose}>
+						{copy.common.cancel}
+					</button>
+					<button type="button" className="btn btn-primary" onClick={() => setView("pick")}>
+						<Icon name="user-plus" />
+						{t.pickAdmin}
+					</button>
+				</div>
+			</Modal>
+		);
+	}
+	const admins = members.filter((member) => member.role === "admin");
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
 			<DialogHead id={id} title={copy.info.leaveTitle(title)} onClose={onClose} />
 			<div className="dlg-body stack">
-				<p className="note">
-					<Icon name="info" />
-					<span>{copy.info.leaveNote}</span>
-				</p>
+				{owner ? (
+					<>
+						<p className="note">
+							<Glyph name="crown" />
+							<span>{t.transferNote(channel)}</span>
+						</p>
+						{admins.length > 0 && (
+							<div>
+								<h3>{t.admins}</h3>
+								{admins.map((member) => (
+									<div className="row" key={member.person.id}>
+										<ChatAvatar id={member.person.id} name={member.person.name} size="sm" />
+										<span className="grow">{member.person.name}</span>
+									</div>
+								))}
+							</div>
+						)}
+						<p className="note">
+							<Icon name="info" />
+							<span>{t.transferInfo(channel)}</span>
+						</p>
+					</>
+				) : (
+					<p className="note">
+						<Icon name="info" />
+						<span>{copy.info.leaveNote}</span>
+					</p>
+				)}
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
 					{copy.common.cancel}
 				</button>
 				<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy} onClick={leave}>
-					{chat?.type === "channel" ? copy.info.leaveChannel : copy.info.leaveGroup}
+					{owner ? t.transferLeave(channel) : channel ? copy.info.leaveChannel : copy.info.leaveGroup}
 				</button>
 			</div>
 		</Modal>
 	);
 }
 
-export function LinkDialog({ url, onClose }: CloseProps & { url: string }) {
+interface PickAdminProps extends CloseProps {
+	chatId: number;
+	channel: boolean;
+	memberCount: number;
+	onBack: () => void;
+	onDone: () => void;
+}
+
+/** Makes a member an admin so the owner can hand the chat over (#channel-owner-leave, lower frame). */
+function PickAdmin({ chatId, channel, memberCount, onBack, onDone, onClose }: PickAdminProps) {
 	const copy = useScreensCopy();
-	const id = useDomId("link");
+	const { remote, store, toasts } = useServices();
+	const [query, setQuery] = useState("");
+	const [picked, setPicked] = useState<Member | null>(null);
+	const [busy, setBusy] = useState(false);
+	const { members, status } = useMembers(chatId, query.trim());
+	const id = useDomId("pick-admin");
+	const t = copy.ownerLeave;
+	const candidates = members.filter((member) => member.role === "member" && !member.person.isBot && member.person.id !== store.selfId);
+	const grant = () => {
+		if (picked === null) return;
+		setBusy(true);
+		remote.setAdmin(chatId, picked.person.id, true).then(
+			() => {
+				toasts.show(t.granted(picked.person.name, channel));
+				onDone();
+			},
+			() => {
+				setBusy(false);
+				toasts.show(copy.common.failed);
+			},
+		);
+	};
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={copy.message.openLinkTitle} onClose={onClose} />
+			<DialogHead id={id} title={t.pickTitle(channel)} onBack={onBack} onClose={onClose} />
 			<div className="dlg-body stack">
-				<p className="note warn">
-					<Icon name="alert-triangle" />
-					<span>{copy.message.openLinkBody(hostOf(url))}</span>
+				<label className="search-field">
+					<Icon name="search" small />
+					<span className="sr-only">{t.pickSearch(memberCount, channel)}</span>
+					<input type="search" placeholder={t.pickSearch(memberCount, channel)} autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} />
+				</label>
+				{status === "loading" && <p className="note">{copy.common.loading}</p>}
+				{status === "ready" && candidates.length === 0 && <p className="note">{t.noCandidates}</p>}
+				<div className="pick-list" role="radiogroup" aria-label={t.pickList(channel)}>
+					{candidates.map((member) => (
+						<button
+							key={member.person.id}
+							type="button"
+							className="pick"
+							role="radio"
+							aria-checked={picked?.person.id === member.person.id}
+							onClick={() => setPicked(member)}
+						>
+							<ChatAvatar id={member.person.id} name={member.person.name} />
+							<span>
+								<b>{member.person.name}</b>
+								<small>{member.person.username === "" ? t.pickRole(channel) : `@${member.person.username} · ${t.pickRole(channel)}`}</small>
+							</span>
+							<span className="tick">
+								<Icon name="check" />
+							</span>
+						</button>
+					))}
+				</div>
+				<p className="note">
+					<Icon name="info" />
+					<span>{t.pickNote(channel)}</span>
 				</p>
-				<span className="link-mono">{url}</span>
+			</div>
+			<div className="dlg-foot">
+				<button type="button" className="btn" onClick={onBack}>
+					{copy.common.back}
+				</button>
+				<button type="button" className="btn btn-primary" aria-busy={busy} disabled={picked === null || busy} onClick={grant}>
+					{t.grant}
+				</button>
+			</div>
+		</Modal>
+	);
+}
+
+/** Host of the text a message shows for a link, when that text looks like an address ("" otherwise). */
+function shownHost(text: string): string {
+	const trimmed = text.trim();
+	if (!/^(https?:\/\/)?[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)+([/?#:].*)?$/u.test(trimmed)) return "";
+	return hostOf(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`).toLowerCase();
+}
+
+/** The address with its host in bold (the part people check). */
+function UrlBox({ url }: { url: string }) {
+	const host = hostOf(url);
+	const at = host === "" ? -1 : url.indexOf(host);
+	if (at < 0) return <div className="url-box">{url}</div>;
+	return (
+		<div className="url-box">
+			{url.slice(0, at)}
+			<b>{host}</b>
+			{url.slice(at + host.length)}
+		</div>
+	);
+}
+
+/** Confirmation before opening a link off the tenant's sites (#external-link). */
+export function LinkDialog({ url, text, fromId, onClose }: CloseProps & { url: string; text: string; fromId: number }) {
+	const copy = useScreensCopy();
+	const { store, toasts } = useServices();
+	const sender = useUser(fromId === store.selfId ? 0 : fromId);
+	const id = useDomId("link");
+	const domain = orgDomain(window.location.host);
+	const claimed = shownHost(text);
+	const mismatch = claimed !== "" && claimed.replace(/^www\./, "") !== hostOf(url).toLowerCase().replace(/^www\./, "");
+	const t = copy.link;
+	const open = () => {
+		window.open(url, "_blank", "noopener,noreferrer");
+		onClose();
+	};
+	if (mismatch) {
+		return (
+			<Modal labelledBy={id} onClose={onClose}>
+				<DialogHead id={id} title={t.mismatchTitle} onClose={onClose} />
+				<div className="dlg-body stack">
+					<div className="field">
+						<span className="label">{t.shown}</span>
+						<div className="url-box">{text}</div>
+					</div>
+					<div className="field">
+						<span className="label">{t.real}</span>
+						<UrlBox url={url} />
+					</div>
+					<p className="note warn">
+						<Icon name="alert-triangle" />
+						<span>{t.mismatchNote(claimed)}</span>
+					</p>
+				</div>
+				<div className="dlg-foot">
+					<button type="button" className="btn" onClick={open}>
+						{t.openAnyway}
+					</button>
+					<button type="button" className="btn btn-primary" onClick={onClose}>
+						{copy.common.cancel}
+					</button>
+				</div>
+			</Modal>
+		);
+	}
+	const name = fromId === 0 ? "" : userName(sender, store.selfId, copy, fromId);
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<DialogHead id={id} title={t.title} onClose={onClose} />
+			<div className="dlg-body stack">
+				<p className="dlg-lede">{name === "" ? t.ledePlain(domain) : t.lede(name, domain)}</p>
+				<UrlBox url={url} />
+				<p className="note">
+					<Icon name="shield" />
+					<span>{t.note(domain)}</span>
+				</p>
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
@@ -156,13 +382,16 @@ export function LinkDialog({ url, onClose }: CloseProps & { url: string }) {
 				</button>
 				<button
 					type="button"
-					className="btn btn-primary"
+					className="btn"
 					onClick={() => {
-						window.open(url, "_blank", "noopener,noreferrer");
-						onClose();
+						void copyText(url).then((ok) => toasts.show(ok ? t.copied : copy.common.failed));
 					}}
 				>
-					{copy.message.openLink}
+					{t.copy}
+				</button>
+				<button type="button" className="btn btn-primary" onClick={open}>
+					<Icon name="external" />
+					{t.open}
 				</button>
 			</div>
 		</Modal>
@@ -337,7 +566,7 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 	};
 	return (
 		<Modal labelledBy={id} onClose={onClose} className="narrow">
-			<DialogHead id={id} title={copy.profile.title} onClose={onClose} />
+			<DialogHead id={id} title={user === undefined ? copy.profile.title : copy.profile.titleOf(name)} onClose={onClose} />
 			<div className="hero">
 				<ChatAvatar id={userId} name={name} size="lg" bot={user?.isBot === true} />
 				<h2>{self ? `${name} (${copy.common.you})` : name}</h2>
@@ -363,6 +592,11 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 							{copy.info.report}
 						</button>
 					)}
+				</div>
+			)}
+			{!self && user !== undefined && !user.isBot && (
+				<div className="profile-sec">
+					<ContactRow userId={userId} name={name} />
 				</div>
 			)}
 			<div className="info-sec">
@@ -395,7 +629,8 @@ export function ReadByDialog({ chatId, seq, onClose }: CloseProps & { chatId: nu
 	const copy = useScreensCopy();
 	const { remote } = useServices();
 	const chat = useChat(chatId);
-	const [readers, setReaders] = useState<readonly Person[] | null | "unavailable">(null);
+	const { locale } = useI18n();
+	const [readers, setReaders] = useState<readonly Reader[] | null | "unavailable">(null);
 	const id = useDomId("readby");
 	useEffect(() => {
 		let active = true;
@@ -427,10 +662,11 @@ export function ReadByDialog({ chatId, seq, onClose }: CloseProps & { chatId: nu
 				)}
 				{list.length > 0 && (
 					<div>
-						{list.map((person) => (
+						{list.map(({ person, readAt }) => (
 							<div className="row" key={person.id}>
 								<ChatAvatar id={person.id} name={person.name} size="sm" bot={person.isBot} />
 								<span className="grow">{person.name}</span>
+								{readAt > 0 && <span className="role">{clock(readAt, locale)}</span>}
 							</div>
 						))}
 					</div>

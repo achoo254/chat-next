@@ -1,9 +1,11 @@
 // The messaging screen (mockups/chat.html#app): folder rail, chat list (or
-// the topic list of an open group with topics), conversation and the info
-// column. On narrow screens one column shows at a time.
+// the topic list of an open group with topics, or the contacts list),
+// conversation and the info column. On narrow screens one column shows at a
+// time (#narrow); the info column handles its overlay and narrow behaviour
+// itself (info-panel.tsx).
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
-import type { Route } from "../../router.tsx";
+import { navigate, paths, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { dialogTitle, type Folder } from "../data/format.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
@@ -11,20 +13,23 @@ import { ChatListColumn } from "./chat-list.tsx";
 import { Conversation, EmptyConversation } from "./conversation.tsx";
 import { DialogHost } from "./dialog-host.tsx";
 import { FolderRail } from "./folder-rail.tsx";
-import { Cell, ComposerIntents, UiContext, type DialogRequest, type MenuTarget, type Ui } from "./ui-context.tsx";
+import { Cell, ComposerIntents, UiContext, useCell, type DialogRequest, type ListMenuTarget, type MenuTarget, type Ui } from "./ui-context.tsx";
 
 const WIDE_QUERY = "(min-width: 1101px)";
 
 const TopicListColumn = lazy(() => import("./topic-list.tsx").then((m) => ({ default: m.TopicListColumn })));
 const InfoPanel = lazy(() => import("./info-panel.tsx").then((m) => ({ default: m.InfoPanel })));
 const ChatAdmin = lazy(() => import("./chat-admin.tsx").then((m) => ({ default: m.ChatAdmin })));
+const BannedList = lazy(() => import("./banned-list.tsx").then((m) => ({ default: m.BannedList })));
 const InviteDialog = lazy(() => import("./invite-dialog.tsx").then((m) => ({ default: m.InviteDialog })));
+const ContactsView = lazy(() => import("./contacts.tsx").then((m) => ({ default: m.ContactsView })));
+const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
 
 function initialInfoOpen(): boolean {
 	return typeof window.matchMedia !== "function" || window.matchMedia(WIDE_QUERY).matches;
 }
 
-type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" }>;
+type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" } | { name: "contacts" }>;
 
 export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }) {
 	const copy = useCopy();
@@ -38,6 +43,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 		() => ({
 			dialog: new Cell<DialogRequest | null>(null),
 			menu: new Cell<MenuTarget | null>(null),
+			listMenu: new Cell<ListMenuTarget | null>(null),
 			intents: new ComposerIntents(),
 			focusSearch: () => searchRef.current?.focus(),
 			toggleInfo: (open?: boolean) => setInfoOpen((current) => open ?? !current),
@@ -56,6 +62,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 		return () => document.removeEventListener("keydown", onKey);
 	}, []);
 
+	const contacts = route.name === "contacts";
 	const chatId = route.name === "chat" ? route.chatId : 0;
 	const panel = route.name === "chat" ? route.panel : "chat";
 	const chat = useChat(chatId);
@@ -76,43 +83,68 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 	useEffect(() => () => void source.openChat(0).catch(() => undefined), [source]);
 
 	const onVisibleChats = useCallback((ids: readonly number[]) => setVisible(ids), []);
-	const showInfo = infoOpen && chat != null && panel === "chat";
-	const classes = ["app", "folders", showInfo ? "" : "no-info", chatId !== 0 ? "has-chat" : "", panel === "admin" ? "admin-mode" : ""]
-		.filter(Boolean)
-		.join(" ");
+	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts;
+
+	const pickFolder = (next: Folder) => {
+		setFolder(next);
+		if (contacts) navigate(paths.home);
+	};
+	const open = chatId !== 0 || (contacts && route.userId !== 0);
+	const adminMode = panel === "admin" || panel === "banned";
+	const classes = ["app", "folders", showInfo ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
 
 	return (
 		<UiContext value={ui}>
 			<div className={classes}>
-				<FolderRail self={self} folder={folder} onFolder={setFolder} />
-				{topics !== null && chat != null && panel === "chat" ? (
+				<FolderRail self={self} folder={contacts ? null : folder} onFolder={pickFolder} />
+				{contacts ? (
 					<Suspense fallback={<section className="list" aria-busy="true" />}>
-						<TopicListColumn chat={chat} title={title} topics={topics} currentTopicId={topic?.id ?? 0} />
+						<ContactsView userId={route.userId} />
 					</Suspense>
 				) : (
-					<ChatListColumn folder={folder} onFolder={setFolder} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
-				)}
-				{chatId === 0 ? (
-					<EmptyConversation />
-				) : panel === "admin" ? (
-					<Suspense fallback={<section className="admin-page" aria-busy="true" />}>
-						<ChatAdmin chatId={chatId} />
-					</Suspense>
-				) : (
-					<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />
-				)}
-				{showInfo && chat != null && (
-					<Suspense fallback={<aside className="info" aria-busy="true" />}>
-						<InfoPanel chat={chat} peer={view?.peer ?? peer} topic={topic} title={title} />
-					</Suspense>
+					<>
+						{topics !== null && chat != null && panel === "chat" ? (
+							<Suspense fallback={<section className="list" aria-busy="true" />}>
+								<TopicListColumn chat={chat} title={title} topics={topics} currentTopicId={topic?.id ?? 0} />
+							</Suspense>
+						) : (
+							<ChatListColumn folder={folder} onFolder={setFolder} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
+						)}
+						{chatId === 0 ? (
+							<EmptyConversation />
+						) : adminMode ? (
+							<Suspense fallback={<section className="admin-page" aria-busy="true" />}>
+								{panel === "banned" ? <BannedList chatId={chatId} /> : <ChatAdmin chatId={chatId} />}
+							</Suspense>
+						) : (
+							<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />
+						)}
+						{showInfo && chat != null && (
+							<Suspense fallback={<aside className="info" aria-busy="true" />}>
+								<InfoPanel chat={chat} peer={view?.peer ?? peer} topic={topic} title={title} />
+							</Suspense>
+						)}
+					</>
 				)}
 			</div>
 			<DialogHost />
+			<RowMenu ui={ui} />
 			{route.name === "invite" && (
 				<Suspense fallback={null}>
 					<InviteDialog token={route.token} />
 				</Suspense>
 			)}
 		</UiContext>
+	);
+}
+
+/** The chat list's row menu, loaded on first use. */
+function RowMenu({ ui }: { ui: Ui }) {
+	const target = useCell(ui.listMenu);
+	if (target === null) return null;
+	return (
+		<Suspense fallback={null}>
+			<ListMenu key={target.chatId} target={target} onClose={() => ui.listMenu.set(null)} />
+		</Suspense>
 	);
 }

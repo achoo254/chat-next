@@ -1,5 +1,7 @@
 // Opening an invite link (mockups/chat.html#invite-preview): the app shows
-// the group first and joins only when the user confirms.
+// the group first and joins only when the user confirms. A user an admin
+// removed with a ban gets a refusal instead (#invite-banned); a link that no
+// longer admits anyone reads as gone.
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useState } from "react";
 import { Icon } from "../../components/icon.tsx";
@@ -9,13 +11,21 @@ import type { InvitePreview } from "../data/pending-backend.ts";
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, Modal, useDomId } from "./parts.tsx";
 
-const GONE = new Set<Code>([Code.NotFound, Code.InvalidArgument, Code.FailedPrecondition, Code.PermissionDenied]);
+const GONE = new Set<Code>([Code.NotFound, Code.InvalidArgument, Code.FailedPrecondition]);
+
+type Refusal = "gone" | "banned" | null;
+
+function refusalOf(err: unknown): Refusal {
+	const code = ConnectError.from(err).code;
+	if (code === Code.PermissionDenied) return "banned";
+	return GONE.has(code) ? "gone" : null;
+}
 
 export function InviteDialog({ token }: { token: string }) {
 	const copy = useScreensCopy();
 	const { backend, remote, toasts } = useServices();
 	const [preview, setPreview] = useState<InvitePreview | null | "loading">(backend.features.has("invitePreview") ? "loading" : null);
-	const [gone, setGone] = useState(false);
+	const [refusal, setRefusal] = useState<Refusal>(null);
 	const [busy, setBusy] = useState(false);
 	const id = useDomId("invite");
 	const close = () => navigate(paths.home, { replace: true });
@@ -30,12 +40,12 @@ export function InviteDialog({ token }: { token: string }) {
 					navigate(paths.chat(found.memberOfChatId), { replace: true });
 					return;
 				}
-				if (found === null) setGone(true);
+				if (found === null) setRefusal("gone");
 				setPreview(found);
 			},
 			(err: unknown) => {
 				if (!active) return;
-				if (GONE.has(ConnectError.from(err).code)) setGone(true);
+				setRefusal(refusalOf(err));
 				setPreview(null);
 			},
 		);
@@ -53,13 +63,44 @@ export function InviteDialog({ token }: { token: string }) {
 			},
 			(err: unknown) => {
 				setBusy(false);
-				if (GONE.has(ConnectError.from(err).code)) setGone(true);
-				else toasts.show(copy.common.failed);
+				const refused = refusalOf(err);
+				if (refused === null) toasts.show(copy.common.failed);
+				else setRefusal(refused);
 			},
 		);
 	};
 
-	if (gone) {
+	if (refusal === "banned") {
+		return (
+			<Modal labelledBy={id} onClose={close} className="narrow">
+				<div className="hero">
+					<span className="ban-av">
+						<span className="big-icon">
+							<Icon name="users" />
+						</span>
+						<span className="ban-badge">
+							<Icon name="ban" />
+						</span>
+					</span>
+					<h2 id={id}>{copy.invite.bannedTitle}</h2>
+					<p>{copy.invite.bannedBody}</p>
+				</div>
+				<div className="dlg-body stack">
+					<p className="note">
+						<Icon name="info" />
+						<span>{copy.invite.bannedNote}</span>
+					</p>
+				</div>
+				<div className="hero-actions">
+					<button type="button" className="btn" onClick={close}>
+						{copy.common.close}
+					</button>
+				</div>
+			</Modal>
+		);
+	}
+
+	if (refusal === "gone") {
 		return (
 			<Modal labelledBy={id} onClose={close} className="narrow">
 				<div className="hero">
@@ -87,12 +128,14 @@ export function InviteDialog({ token }: { token: string }) {
 						<ChatAvatar id={0} name={known.title} size="lg" />
 						<h2 id={id}>{known.title}</h2>
 						<p>{known.kind === "channel" ? copy.invite.subscribers(known.memberCount) : copy.invite.members(known.memberCount)}</p>
-						{known.sampleNames.length > 0 && (
-							<div className="av-stack" role="img" aria-label={copy.invite.someMembers}>
-								{known.sampleNames.slice(0, 3).map((name, index) => (
-									<ChatAvatar key={name + index} id={index + 1} name={name} size="sm" />
+						{known.members.length > 0 && (
+							<div className="av-stack" role="img" aria-label={`${copy.invite.someMembers}: ${known.members.map((member) => member.name).join(", ")}`}>
+								{known.members.slice(0, 5).map((member) => (
+									<ChatAvatar key={member.id} id={member.id} name={member.name} size="sm" bot={member.isBot} />
 								))}
-								{known.memberCount > 3 && <span className="more">{copy.invite.more(known.memberCount - 3)}</span>}
+								{known.memberCount > known.members.length && (
+									<span className="more">{copy.invite.more(known.memberCount - Math.min(5, known.members.length))}</span>
+								)}
 							</div>
 						)}
 					</div>

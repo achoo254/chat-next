@@ -76,15 +76,17 @@ interface DialogHeadProps {
 	title: string;
 	onClose?: () => void;
 	onBack?: () => void;
+	/** Name of the back button when "Quay lại" is not specific enough. */
+	backLabel?: string;
 	step?: string;
 }
 
-export function DialogHead({ id, title, onClose, onBack, step }: DialogHeadProps) {
+export function DialogHead({ id, title, onClose, onBack, backLabel, step }: DialogHeadProps) {
 	const copy = useCopy();
 	return (
 		<div className="dlg-head">
 			{onBack !== undefined && (
-				<button type="button" className="icon-btn" aria-label={copy.common.back} onClick={onBack}>
+				<button type="button" className="icon-btn" aria-label={backLabel ?? copy.common.back} onClick={onBack}>
 					<Icon name="back" />
 				</button>
 			)}

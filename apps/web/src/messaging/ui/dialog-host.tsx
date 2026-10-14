@@ -5,6 +5,7 @@ import { useCell, useUi, type DialogRequest } from "./ui-context.tsx";
 
 const create = () => import("./create-dialogs.tsx");
 const details = () => import("./dialogs.tsx");
+const members = () => import("./member-dialogs.tsx");
 const NewChatDialog = lazy(() => create().then((m) => ({ default: m.NewChatDialog })));
 const NewGroupDialog = lazy(() => create().then((m) => ({ default: m.NewGroupDialog })));
 const NewChannelDialog = lazy(() => create().then((m) => ({ default: m.NewChannelDialog })));
@@ -17,6 +18,9 @@ const ReportDialog = lazy(() => details().then((m) => ({ default: m.ReportDialog
 const ProfileDialog = lazy(() => details().then((m) => ({ default: m.ProfileDialog })));
 const ReadByDialog = lazy(() => details().then((m) => ({ default: m.ReadByDialog })));
 const AddFailedDialog = lazy(() => create().then((m) => ({ default: m.AddFailedDialog })));
+const MembersDialog = lazy(() => members().then((m) => ({ default: m.MembersDialog })));
+const RemoveMemberDialog = lazy(() => members().then((m) => ({ default: m.RemoveMemberDialog })));
+const AddContactDialog = lazy(() => import("./contact-add.tsx").then((m) => ({ default: m.AddContactDialog })));
 
 export function DialogHost() {
 	const ui = useUi();
@@ -46,7 +50,7 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "leave":
 			return <LeaveDialog chatId={request.chatId} onClose={close} />;
 		case "link":
-			return <LinkDialog url={request.url} onClose={close} />;
+			return <LinkDialog url={request.url} text={request.text} fromId={request.fromId} onClose={close} />;
 		case "report":
 			return <ReportDialog target={request.target} name={request.name} blockUserId={request.blockUserId} onClose={close} />;
 		case "profile":
@@ -54,6 +58,12 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "readBy":
 			return <ReadByDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "addFailed":
-			return <AddFailedDialog chatId={request.chatId} userIds={request.userIds} onClose={close} />;
+			return <AddFailedDialog chatId={request.chatId} userIds={request.userIds} addedIds={request.addedIds} onClose={close} />;
+		case "members":
+			return <MembersDialog chatId={request.chatId} onClose={close} />;
+		case "removeMember":
+			return <RemoveMemberDialog chatId={request.chatId} userId={request.userId} back={request.back} onClose={close} />;
+		case "addContact":
+			return <AddContactDialog onClose={close} />;
 	}
 }

@@ -1,6 +1,6 @@
 // Chats and messages modelled on mockups/chat.html (#app, #rich-messages,
 // #topics), seeded into the core's in-memory server. Test and harness only.
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
+import { ChatType, HistoryVisibility, MemberRole } from "@app/proto-ts/chats";
 import { EntityType } from "@app/proto-ts/messages";
 import { ChatFixture, type FixtureBackendData, type FixtureTopic } from "./fake-chat.ts";
 
@@ -23,7 +23,7 @@ export interface Demo {
 		readonly mobile: number;
 		readonly huy: number;
 		readonly channel: number;
-		readonly users: Readonly<Record<"huy" | "lan" | "minh" | "ha" | "ngoc" | "ducAnh" | "deployBot", number>>;
+		readonly users: Readonly<Record<"huy" | "lan" | "minh" | "ha" | "ngoc" | "ducAnh" | "deployBot" | "khoa", number>>;
 		readonly checklistSeq: number;
 		readonly opsFirstSeq: number;
 		readonly codeSeq: number;
@@ -46,6 +46,7 @@ export function seedDemo(): Demo {
 	const ducAnh = f.addUser("Đức Anh", { username: "ducanh" });
 	const deployBot = f.addUser("Deploy Bot", { username: "deploy_bot", isBot: true });
 	const announcer = f.addUser("Ban truyền thông", { username: "truyenthong" });
+	const khoa = f.addUser("Phạm Khoa", { username: "khoapham" });
 
 	// Group with rich messages (#app, #message-kinds, #rich-messages).
 	const ops = f.createChat(ChatType.GROUP, "Vận hành hệ thống", [me, huy, lan, minh, deployBot], {
@@ -99,6 +100,9 @@ export function seedDemo(): Demo {
 	const mineSeq = f.send(me, ops, "Mục 3 ổn, extension đã lên bản mới.", { replyToSeq: BigInt(mention) });
 	f.server.readHistory(me, ops, mineSeq);
 	f.readers.set(`${ops}:${mineSeq}`, [huy, lan]);
+	f.readDates.set(`${ops}:${mineSeq}`, new Map([[huy, Math.floor(Date.now() / 1000) - 600], [lan, Math.floor(Date.now() / 1000) - 300]]));
+	// Removed with a ban earlier (#banned).
+	f.bans.set(ops, [{ userId: khoa, by: me, at: 1_759_017_600 }]);
 	f.server.readHistory(huy, ops, mineSeq);
 	f.server.pin(ops, checklistSeq, true);
 	f.send(huy, ops, "Xong rồi, mọi người kiểm tra giúp mình.");
@@ -127,10 +131,10 @@ export function seedDemo(): Demo {
 	f.mentions(forum, 1);
 	f.topics.set(forum, [
 		topic({ id: 1, title: "Chung", iconColor: 0x8e8e93, pinned: true, unreadCount: 1, creatorId: ngoc }),
-		topic({ id: 2, title: "Thông báo", iconColor: 0xffd67e, pinned: true, closed: true, creatorId: huy }),
-		topic({ id: 12, title: "Thiết kế", iconColor: 0xcb86db, unreadCount: 3, creatorId: ngoc }),
-		topic({ id: 4, title: "Backend API", iconColor: 0x6fb9f0, unreadCount: 2, creatorId: ducAnh }),
-		topic({ id: 5, title: "Phát hành 1.3", iconColor: 0x8eee98, unreadCount: 4, creatorId: minh }),
+		topic({ id: 2, title: "Thông báo", iconColor: 0xffd67e, pinned: true, closed: true, creatorId: huy, icon: "megaphone", messageCount: 14 }),
+		topic({ id: 12, title: "Thiết kế", iconColor: 0xcb86db, unreadCount: 3, unreadMentions: 1, creatorId: ngoc, icon: "edit", messageCount: 4 }),
+		topic({ id: 4, title: "Backend API", iconColor: 0x6fb9f0, unreadCount: 2, creatorId: ducAnh, icon: "code", messageCount: 1 }),
+		topic({ id: 5, title: "Phát hành 1.3", iconColor: 0x8eee98, unreadCount: 4, creatorId: minh, icon: "flag", messageCount: 1 }),
 		topic({ id: 9, title: "Tuyển dụng", hidden: true, creatorId: ngoc }),
 	]);
 
@@ -150,7 +154,17 @@ export function seedDemo(): Demo {
 	f.server.readHistory(me, channel, 1);
 
 	const now = Math.floor(Date.now() / 1000);
-	f.inviteChecks.set("teammobile", { title: "Team Mobile", type: ChatType.GROUP, memberCount: 24, memberOf: 0 });
+	f.inviteChecks.set("teammobile", {
+		title: "Team Mobile",
+		type: ChatType.GROUP,
+		memberCount: 24,
+		memberOf: 0,
+		members: [minh, huy, ha],
+		history: HistoryVisibility.SHARED,
+	});
+	f.inviteChecks.set("bannedlink", { title: "Team Mobile", type: ChatType.GROUP, memberCount: 24, memberOf: 0, banned: true });
+	// Contacts the user added (#contacts); Thu Hà shares a group but is not one.
+	for (const id of [ngoc, lan, huy]) f.contacts.add(id);
 	const data: FixtureBackendData = {
 		reactors: new Map([[`${ops}:${upgradeSeq}:👍`, [huy, lan, minh]]]),
 		muted: new Set([mobile]),
@@ -198,7 +212,7 @@ export function seedDemo(): Demo {
 			mobile,
 			huy: huyChat,
 			channel,
-			users: { huy, lan, minh, ha, ngoc, ducAnh, deployBot },
+			users: { huy, lan, minh, ha, ngoc, ducAnh, deployBot, khoa },
 			checklistSeq,
 			opsFirstSeq,
 			codeSeq,

@@ -1,7 +1,7 @@
 // One message (mockups/chat.html#message-kinds, #rich-messages): sender,
 // forward header, reply quote, formatted text, text-only link preview,
 // reactions and the send state of your own messages.
-import { memo, useRef, type KeyboardEvent, type ReactNode, type TouchEvent } from "react";
+import { memo, type ReactNode } from "react";
 import type { Chat, PendingMessage, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
@@ -9,12 +9,10 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { actionText, clock, messagePreview, toneOf, userName } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
-import { LabelledIcon } from "./chat-row.tsx";
+import { LabelledIcon, useContextTrigger } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
-import { useUi } from "./ui-context.tsx";
-
-const LONG_PRESS_MS = 500;
+import { useIntent, useUi } from "./ui-context.tsx";
 
 interface MessageItemProps {
 	chatId: number;
@@ -68,33 +66,18 @@ function SystemLine({ message }: { message: StoredMessage }) {
 /** Context menu on right click, long press or the keyboard (Enter, Shift+F10, Menu key). */
 function useMenuTrigger(chatId: number, itemKey: string) {
 	const ui = useUi();
-	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	const open = () => ui.menu.set({ chatId, key: itemKey });
-	return {
-		onContextMenu: (event: { preventDefault: () => void }) => {
-			event.preventDefault();
-			open();
-		},
-		onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
-			if (event.target !== event.currentTarget) return;
-			if (event.key === "ContextMenu" || event.key === "Enter" || (event.key === "F10" && event.shiftKey)) {
-				event.preventDefault();
-				open();
-			}
-		},
-		onTouchStart: (_event: TouchEvent<HTMLDivElement>) => {
-			clearTimeout(timer.current);
-			timer.current = setTimeout(open, LONG_PRESS_MS);
-		},
-		onTouchEnd: () => clearTimeout(timer.current),
-		onTouchMove: () => clearTimeout(timer.current),
-	};
+	return useContextTrigger(() => ui.menu.set({ chatId, key: itemKey }), true);
 }
 
-function useRichContext(): RichContext {
+/** `fromId`: the sender, named in the external link confirmation. */
+function useRichContext(fromId: number): RichContext {
 	const { self } = useServices();
 	const ui = useUi();
-	return { selfId: self.id, selfUsername: self.username, openLink: linkOpener((url) => ui.dialog.set({ kind: "link", url })) };
+	return {
+		selfId: self.id,
+		selfUsername: self.username,
+		openLink: linkOpener((url, text) => ui.dialog.set({ kind: "link", url, text, fromId })),
+	};
 }
 
 function Stamp({ date, edited, children }: { date: number; edited: boolean; children?: ReactNode }) {
@@ -222,7 +205,8 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const copy = useCopy();
 	const { store, self, backend } = useServices();
 	const ui = useUi();
-	const ctx = useRichContext();
+	const ctx = useRichContext(message.fromId);
+	const intent = useIntent(chatId);
 	const preview = backend.features.has("linkPreview") ? backend.linkPreview(message) : null;
 	// With a preview card or reactions the time goes on its own line at the end (mock #rich-messages).
 	const trailingStamp = preview !== null || message.reactions.length > 0;
@@ -237,7 +221,8 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const unsupported = message.text === "" && message.mediaKind === null;
 	const read = mine && readOutboxMaxSeq >= message.seq;
 
-	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : ""].filter(Boolean).join(" ");
+	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
+	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : ""].filter(Boolean).join(" ");
 	const stamp = (
 		<Stamp date={message.editDate !== 0 ? message.editDate : message.date} edited={message.editDate !== 0}>
 			{mine && !channel && (
@@ -313,9 +298,9 @@ interface PendingProps {
 
 export function PendingBubble({ chatId, itemKey, pending, chat, tabbable, inert = false }: PendingProps) {
 	const copy = useCopy();
-	const { source, toasts } = useServices();
+	const { source, toasts, self } = useServices();
 	const connection = useConnection();
-	const ctx = useRichContext();
+	const ctx = useRichContext(self.id);
 	const trigger = useMenuTrigger(chatId, itemKey);
 	const failed = pending.failure !== null;
 	const waiting = connection === "offline" || connection === "waiting";

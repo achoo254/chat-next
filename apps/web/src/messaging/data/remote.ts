@@ -78,7 +78,13 @@ export interface ServerTopic {
 	readonly hidden: boolean;
 	readonly topSeq: number;
 	readonly readInboxMaxSeq: number;
+	/** Counted up to 1000 by the server. */
 	readonly unreadCount: number;
+	/** Glyph name from the client's icon set; "" for the default. */
+	readonly icon: string;
+	readonly messageCount: number;
+	/** Unread messages that mention the caller or reply to them (up to 1000). */
+	readonly unreadMentions: number;
 }
 
 export interface TopicTop {
@@ -102,7 +108,37 @@ export interface InviteCheck {
 	readonly memberCount: number;
 	/** Set when the caller is already a member: open this chat instead. */
 	readonly memberOfChatId: number;
+	/** Groups: a few members (admins first). */
+	readonly members: readonly Person[];
+	/** Whether new members read earlier messages; null when the server does not say. */
+	readonly historyShared: boolean | null;
 }
+
+/** One page of a list the server pages with an opaque cursor ("" = no more). */
+export interface Page<T> {
+	readonly items: T[];
+	readonly nextCursor: string;
+}
+
+/** A user removed from a chat with a ban (GetBannedMembers). */
+export interface BannedMember {
+	readonly person: Person;
+	readonly bannedBy: number;
+	/** Name of the admin who removed them; "" when the server did not send that user. */
+	readonly bannedByName: string;
+	/** Unix seconds. */
+	readonly bannedAt: number;
+}
+
+/** A member who read a message, with when (GetMessageReaders). */
+export interface Reader {
+	readonly person: Person;
+	/** Unix seconds. */
+	readonly readAt: number;
+}
+
+/** Who to add to the contact list: a user you can see, an exact username or an exact email. */
+export type ContactTarget = { readonly userId: number } | { readonly username: string } | { readonly email: string };
 
 /** ChatPermission bits (chats.proto). */
 export const Permission = {
@@ -125,11 +161,17 @@ export interface Remote {
 	createChannel(title: string, about: string): Promise<number>;
 	members(chatId: number, query?: string, cursor?: string): Promise<{ members: Member[]; nextCursor: string }>;
 	addMembers(chatId: number, userIds: readonly number[]): Promise<number[]>;
+	/** Removes a member; `ban` also keeps them from rejoining until an admin unbans them. */
+	removeMember(chatId: number, userId: number, ban: boolean): Promise<void>;
+	unbanMember(chatId: number, userId: number): Promise<void>;
+	bannedMembers(chatId: number, cursor?: string): Promise<Page<BannedMember>>;
+	/** FailedPrecondition "owner_needs_admin…" when an owner would leave members without an admin. */
 	leaveChat(chatId: number): Promise<void>;
 	setAdmin(chatId: number, userId: number, admin: boolean): Promise<void>;
 	setDefaultPermissions(chatId: number, permissions: number): Promise<void>;
 	setHistoryShared(chatId: number, shared: boolean): Promise<void>;
 	exportInvite(chatId: number, expiresAt: number, usageLimit: number): Promise<Invite>;
+	/** PermissionDenied when an admin removed and banned the caller. */
 	joinByInvite(link: string): Promise<number>;
 	searchPeople(query: string): Promise<Person[]>;
 	people(ids: readonly number[]): Promise<Person[]>;
@@ -137,20 +179,73 @@ export interface Remote {
 	unblock(userId: number): Promise<void>;
 	privacy(): Promise<Privacy>;
 	setPrivacy(change: Partial<Privacy>): Promise<Privacy>;
-	forumTopics(chatId: number): Promise<{ topics: ServerTopic[]; tops: TopicTop[] }>;
+	/** The caller's own contact list, a page at a time (ordered by user id). */
+	contacts(cursor?: string): Promise<Page<Person>>;
+	/** NotFound when the user is unknown or their privacy hides them from this kind of search. */
+	addContact(target: ContactTarget): Promise<Person>;
+	deleteContact(userId: number): Promise<void>;
+	forumTopics(chatId: number, cursor?: string): Promise<{ topics: ServerTopic[]; tops: TopicTop[]; nextCursor: string }>;
 	pinTopic(chatId: number, topicId: number, pinned: boolean): Promise<void>;
 	closeTopic(chatId: number, topicId: number, closed: boolean): Promise<void>;
 	hideTopic(chatId: number, topicId: number, hidden: boolean): Promise<void>;
-	sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number): Promise<void>;
+	sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number, noLinkPreview?: boolean): Promise<void>;
 	readTopic(chatId: number, topicId: number, maxSeq: number): Promise<void>;
 	linkPreview(url: string): Promise<WebPreview | null>;
 	report(target: ReportTarget, reason: ReportReason, comment: string): Promise<void>;
+	/** PermissionDenied when the caller is banned from the chat; NotFound when the link no longer admits anyone. */
 	checkInvite(link: string): Promise<InviteCheck>;
 	inviteLinks(chatId: number): Promise<Invite[]>;
 	revokeInvite(chatId: number, link: string): Promise<Invite>;
-	/** Members who read a message (small groups, recent messages only). */
-	readers(chatId: number, seq: number): Promise<Person[]>;
+	/** Members who read a message (small groups, recent messages only), most recent first. */
+	readers(chatId: number, seq: number): Promise<Reader[]>;
 }
+
+const METHODS = [
+	"limits",
+	"setReaction",
+	"pin",
+	"unpin",
+	"forward",
+	"createPrivate",
+	"createGroup",
+	"createChannel",
+	"members",
+	"addMembers",
+	"removeMember",
+	"unbanMember",
+	"bannedMembers",
+	"leaveChat",
+	"setAdmin",
+	"setDefaultPermissions",
+	"setHistoryShared",
+	"exportInvite",
+	"joinByInvite",
+	"searchPeople",
+	"people",
+	"block",
+	"unblock",
+	"privacy",
+	"setPrivacy",
+	"contacts",
+	"addContact",
+	"deleteContact",
+	"forumTopics",
+	"pinTopic",
+	"closeTopic",
+	"hideTopic",
+	"sendToTopic",
+	"readTopic",
+	"linkPreview",
+	"report",
+	"checkInvite",
+	"inviteLinks",
+	"revokeInvite",
+	"readers",
+] as const satisfies readonly (keyof Remote)[];
+
+// Fails to compile when a Remote method is missing from METHODS.
+const everyMethodForwarded: [Exclude<keyof Remote, (typeof METHODS)[number]>] extends [never] ? true : never = true;
+void everyMethodForwarded;
 
 /**
  * Builds the server calls on `transport`. The Connect clients and their
@@ -163,40 +258,12 @@ export function createRemote(transport: Transport, onUnauthenticated: () => void
 		client ??= import("./remote-client.ts").then((module) => module.createRemoteClient(transport, onUnauthenticated));
 		return client;
 	};
-	return {
-		limits: () => load().then((r) => r.limits()),
-		setReaction: (chatId, seq, emoji) => load().then((r) => r.setReaction(chatId, seq, emoji)),
-		pin: (chatId, seq) => load().then((r) => r.pin(chatId, seq)),
-		unpin: (chatId, seq) => load().then((r) => r.unpin(chatId, seq)),
-		forward: (fromChatId, seqs, toChatId) => load().then((r) => r.forward(fromChatId, seqs, toChatId)),
-		createPrivate: (userId) => load().then((r) => r.createPrivate(userId)),
-		createGroup: (title, userIds) => load().then((r) => r.createGroup(title, userIds)),
-		createChannel: (title, about) => load().then((r) => r.createChannel(title, about)),
-		members: (chatId, query, cursor) => load().then((r) => r.members(chatId, query, cursor)),
-		addMembers: (chatId, userIds) => load().then((r) => r.addMembers(chatId, userIds)),
-		leaveChat: (chatId) => load().then((r) => r.leaveChat(chatId)),
-		setAdmin: (chatId, userId, admin) => load().then((r) => r.setAdmin(chatId, userId, admin)),
-		setDefaultPermissions: (chatId, permissions) => load().then((r) => r.setDefaultPermissions(chatId, permissions)),
-		setHistoryShared: (chatId, shared) => load().then((r) => r.setHistoryShared(chatId, shared)),
-		exportInvite: (chatId, expiresAt, usageLimit) => load().then((r) => r.exportInvite(chatId, expiresAt, usageLimit)),
-		joinByInvite: (link) => load().then((r) => r.joinByInvite(link)),
-		searchPeople: (query) => load().then((r) => r.searchPeople(query)),
-		people: (ids) => load().then((r) => r.people(ids)),
-		block: (userId) => load().then((r) => r.block(userId)),
-		unblock: (userId) => load().then((r) => r.unblock(userId)),
-		privacy: () => load().then((r) => r.privacy()),
-		setPrivacy: (change) => load().then((r) => r.setPrivacy(change)),
-		forumTopics: (chatId) => load().then((r) => r.forumTopics(chatId)),
-		pinTopic: (chatId, topicId, pinned) => load().then((r) => r.pinTopic(chatId, topicId, pinned)),
-		closeTopic: (chatId, topicId, closed) => load().then((r) => r.closeTopic(chatId, topicId, closed)),
-		hideTopic: (chatId, topicId, hidden) => load().then((r) => r.hideTopic(chatId, topicId, hidden)),
-		sendToTopic: (chatId, topicId, text, replyToSeq) => load().then((r) => r.sendToTopic(chatId, topicId, text, replyToSeq)),
-		readTopic: (chatId, topicId, maxSeq) => load().then((r) => r.readTopic(chatId, topicId, maxSeq)),
-		linkPreview: (url) => load().then((r) => r.linkPreview(url)),
-		report: (target, reason, comment) => load().then((r) => r.report(target, reason, comment)),
-		checkInvite: (link) => load().then((r) => r.checkInvite(link)),
-		inviteLinks: (chatId) => load().then((r) => r.inviteLinks(chatId)),
-		revokeInvite: (chatId, link) => load().then((r) => r.revokeInvite(chatId, link)),
-		readers: (chatId, seq) => load().then((r) => r.readers(chatId, seq)),
-	};
+	// Each method waits for the client and passes its arguments through
+	// unchanged, so the forwarder keeps the signature of the method it stands
+	// for (checked above against the Remote interface).
+	const forward =
+		(method: (typeof METHODS)[number]) =>
+		(...args: unknown[]): Promise<unknown> =>
+			load().then((remote): unknown => Reflect.apply(remote[method], remote, args));
+	return Object.fromEntries(METHODS.map((method) => [method, forward(method)])) as unknown as Remote;
 }

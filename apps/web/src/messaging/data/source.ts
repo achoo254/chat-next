@@ -13,6 +13,7 @@ import type {
 	PendingMessage,
 	SearchOptions,
 	ScreenSnapshot,
+	SendTextOptions,
 	StoredMessage,
 	User,
 } from "@app/core";
@@ -24,11 +25,7 @@ export interface ChatSource {
 	history(chatId: number, request?: HistoryRequest): Promise<HistoryView>;
 	users(ids: readonly number[]): Promise<User[]>;
 	chat(chatId: number): Promise<Chat | null>;
-	sendText(
-		chatId: number,
-		text: string,
-		options?: { entities?: readonly MessageEntity[]; replyToSeq?: number; randomId?: number },
-	): Promise<PendingMessage | null>;
+	sendText(chatId: number, text: string, options?: SendTextOptions): Promise<PendingMessage | null>;
 	editText(chatId: number, seq: number, text: string, entities?: readonly MessageEntity[]): Promise<void>;
 	deleteMessages(chatId: number, seqs: readonly number[], forEveryone: boolean): Promise<void>;
 	markRead(chatId: number, maxSeq: number): Promise<void>;

@@ -1,18 +1,20 @@
-// New chat, group, channel, adding members and forwarding (mockups
-// chat.html#new-chat, #new-group, #new-channel, #forward).
+// New chat, group, channel, adding members and its result, and forwarding
+// (mockups chat.html#new-chat, #new-group, #new-channel, #add-members,
+// #forward).
+import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { fold, type DialogView } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { chatKind, dialogTitle, messagePreview, userName } from "../data/format.ts";
+import { chatKind, dialogTitle, joinNames, messagePreview, userName } from "../data/format.ts";
 import { Permission, type Person } from "../data/remote.ts";
 import { useChat, useDialogOrder, useMessage, useServices, useUser } from "../data/services.tsx";
 import { inviteLinks, isActiveInvite } from "./members.ts";
-import { ChatAvatar, DialogHead, Modal, SoonTag, Switch, useDomId } from "./parts.tsx";
+import { usePeopleSearch } from "./people-search.ts";
+import { ContactsGlyph } from "./contacts-glyph.tsx";
+import { ChatAvatar, copyText, DialogHead, Modal, SoonTag, Switch, useDomId } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
-
-const SEARCH_DELAY_MS = 250;
 
 interface CloseProps {
 	onClose: () => void;
@@ -23,33 +25,6 @@ interface Candidate {
 	readonly name: string;
 	readonly detail: string;
 	readonly isBot: boolean;
-}
-
-/** People search on the server, debounced; empty query gives no results. */
-function usePeopleSearch(query: string): { people: Person[] | null; failed: boolean } {
-	const { remote } = useServices();
-	const [result, setResult] = useState<{ query: string; people: Person[]; failed: boolean } | null>(null);
-	const clean = query.trim().replace(/^@/, "");
-	useEffect(() => {
-		if (clean === "") return;
-		let active = true;
-		const timer = setTimeout(() => {
-			remote.searchPeople(clean).then(
-				(people) => {
-					if (active) setResult({ query: clean, people, failed: false });
-				},
-				() => {
-					if (active) setResult({ query: clean, people: [], failed: true });
-				},
-			);
-		}, SEARCH_DELAY_MS);
-		return () => {
-			active = false;
-			clearTimeout(timer);
-		};
-	}, [remote, clean]);
-	if (clean === "" || result === null || result.query !== clean) return { people: null, failed: false };
-	return { people: result.people, failed: result.failed };
 }
 
 export function NewChatDialog({ onClose }: CloseProps) {
@@ -119,6 +94,16 @@ export function NewChatDialog({ onClose }: CloseProps) {
 					<button type="button" onClick={() => ui.dialog.set({ kind: "newChannel" })}>
 						<Icon name="megaphone" />
 						{copy.newChat.newChannel}
+					</button>
+					<button
+						type="button"
+						onClick={() => {
+							onClose();
+							navigate(paths.contacts());
+						}}
+					>
+						<ContactsGlyph />
+						{copy.contacts.title}
 					</button>
 				</div>
 				<div className="field">
@@ -262,7 +247,10 @@ export function NewGroupDialog({ onClose }: CloseProps) {
 			if (!history) await remote.setHistoryShared(chatId, false).catch(() => undefined);
 			toasts.show(copy.newGroup.created(title));
 			navigate(paths.chat(chatId));
-			if (failedUserIds.length > 0) ui.dialog.set({ kind: "addFailed", chatId, userIds: failedUserIds });
+			if (failedUserIds.length > 0) {
+				const added = [...selected.keys()].filter((userId) => !failedUserIds.includes(userId));
+				ui.dialog.set({ kind: "addFailed", chatId, userIds: failedUserIds, addedIds: added });
+			}
 			else onClose();
 		} catch {
 			setBusy(false);
@@ -357,10 +345,13 @@ export function AddMembersDialog({ chatId, onClose }: CloseProps & { chatId: num
 		setBusy(true);
 		remote.addMembers(chatId, [...selected.keys()]).then(
 			(failed) => {
-				const added = selected.size - failed.length;
-				if (added > 0) toasts.show(copy.info.added(added));
-				if (failed.length > 0) ui.dialog.set({ kind: "addFailed", chatId, userIds: failed });
-				else onClose();
+				const added = [...selected.keys()].filter((userId) => !failed.includes(userId));
+				if (failed.length > 0) {
+					ui.dialog.set({ kind: "addFailed", chatId, userIds: failed, addedIds: added });
+					return;
+				}
+				toasts.show(copy.info.added(added.length));
+				onClose();
 			},
 			() => {
 				setBusy(false);
@@ -581,31 +572,52 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 	);
 }
 
+/** Where an invite to one person stands in the add-members result. */
+type InviteState = "idle" | "sending" | "sent" | "refused";
+
+interface AddFailedProps extends CloseProps {
+	chatId: number;
+	userIds: readonly number[];
+	addedIds: readonly number[];
+}
+
 /**
- * People the server did not add because of their "add me to groups" privacy
- * setting (only people who share a chat with them). Offers what still works:
- * send them an invite link in a private chat, or open a private chat.
+ * The add-members result (#add-members): who was added, and for each person
+ * the server refused (their "add me to groups" privacy, or a ban from the
+ * chat) what still works: an invite link sent in a private chat, or a private
+ * chat. When their "message me" setting refuses you too, the link is copied
+ * for you to send another way. The server gives no reason per person, so the
+ * row names the possible ones.
  */
-export function AddFailedDialog({ chatId, userIds, onClose }: CloseProps & { chatId: number; userIds: readonly number[] }) {
+export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFailedProps) {
 	const copy = useScreensCopy();
 	const { remote, source, toasts } = useServices();
+	const chat = useChat(chatId);
 	const [people, setPeople] = useState<readonly Person[]>([]);
-	const [busy, setBusy] = useState(0);
-	const [sent, setSent] = useState<ReadonlySet<number>>(new Set());
+	const [added, setAdded] = useState<readonly Person[]>([]);
+	const [invites, setInvites] = useState<ReadonlyMap<number, InviteState>>(new Map());
 	const id = useDomId("failed");
+	const t = copy.addFailed;
+	const title = chat?.title ?? "";
+	// Admins adding a banned user lift the ban, so for them only privacy refuses.
+	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
+
 	useEffect(() => {
 		let active = true;
-		remote.people(userIds).then(
+		remote.people([...userIds, ...addedIds]).then(
 			(found) => {
-				if (active) setPeople(found);
+				if (!active) return;
+				setPeople(found.filter((person) => userIds.includes(person.id)));
+				setAdded(found.filter((person) => addedIds.includes(person.id)));
 			},
 			() => undefined,
 		);
 		return () => {
 			active = false;
 		};
-	}, [remote, userIds]);
+	}, [remote, userIds, addedIds]);
 
+	const setInvite = (userId: number, state: InviteState) => setInvites((current) => new Map(current).set(userId, state));
 	const inviteLink = async (): Promise<string> => {
 		const existing = inviteLinks.list(chatId).find((invite) => isActiveInvite(invite, Date.now()));
 		if (existing !== undefined) return existing.link;
@@ -613,71 +625,117 @@ export function AddFailedDialog({ chatId, userIds, onClose }: CloseProps & { cha
 		inviteLinks.add(chatId, created);
 		return created.link;
 	};
-	const sendInvite = async (person: Person) => {
-		setBusy(person.id);
+	const sendInvite = async (person: Person): Promise<void> => {
+		setInvite(person.id, "sending");
 		try {
 			const link = await inviteLink();
 			const privateChat = await remote.createPrivate(person.id);
 			await source.sendText(privateChat, link);
-			setSent((current) => new Set(current).add(person.id));
-			toasts.show(copy.addFailed.inviteSent(person.name));
+			setInvite(person.id, "sent");
+			toasts.show(t.inviteSentToast(person.name));
+		} catch (err) {
+			// Their "message me" privacy refuses a private chat with you.
+			const refused = ConnectError.from(err).code === Code.PermissionDenied;
+			setInvite(person.id, refused ? "refused" : "idle");
+			if (!refused) toasts.show(copy.common.failed);
+		}
+	};
+	const copyLink = async () => {
+		try {
+			const ok = await copyText(await inviteLink());
+			toasts.show(ok ? t.copied(title) : copy.common.failed);
 		} catch {
 			toasts.show(copy.common.failed);
-		} finally {
-			setBusy(0);
 		}
 	};
 	const message = (person: Person) => {
-		setBusy(person.id);
 		remote.createPrivate(person.id).then(
 			(privateChat) => {
 				onClose();
 				navigate(paths.chat(privateChat));
 			},
-			() => {
-				setBusy(0);
-				toasts.show(copy.common.failed);
-			},
+			() => toasts.show(copy.common.failed),
 		);
 	};
+	const pending = people.filter((person) => (invites.get(person.id) ?? "idle") === "idle");
+	const busy = [...invites.values()].includes("sending");
+	const sendAll = async () => {
+		for (const person of pending) await sendInvite(person);
+	};
+
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={copy.addFailed.title(userIds.length)} onClose={onClose} />
+			<DialogHead id={id} title={t.title(userIds.length)} onClose={onClose} />
 			<div className="dlg-body stack">
-				<p className="note">
-					<Icon name="shield" />
-					<span>{copy.addFailed.note}</span>
-				</p>
-				<div className="result-list">
-					{people.map((person) => (
-						<div className="result" key={person.id}>
-							<ChatAvatar id={person.id} name={person.name} bot={person.isBot} />
-							<span>
-								<b>{person.name}</b>
-								{person.username !== "" && <small>@{person.username}</small>}
-								{sent.has(person.id) && (
-									<span className="match">
-										<Icon name="check" />
-										{copy.addFailed.inviteSent(person.name)}
+				{added.length > 0 && (
+					<p className="note ok">
+						<Icon name="check" />
+						<span>{t.added(joinNames(added.map((person) => person.name), copy.system.and), title)}</span>
+					</p>
+				)}
+				<ul className="fail-list">
+					{people.map((person) => {
+						const state = invites.get(person.id) ?? "idle";
+						const whyId = `${id}-why-${person.id}`;
+						return (
+							<li key={person.id}>
+								<div className="row">
+									<ChatAvatar id={person.id} name={person.name} bot={person.isBot} />
+									<span className="grow">
+										{person.name}
+										<small>{admin ? t.reason(person.name) : t.reasonMaybeBanned(person.name)}</small>
 									</span>
+								</div>
+								<div className="pick-actions" role="group" aria-label={t.otherWays(person.name)} aria-describedby={state === "refused" ? whyId : undefined}>
+									<button
+										type="button"
+										className="btn btn-compact"
+										aria-busy={state === "sending"}
+										disabled={state !== "idle" || busy}
+										onClick={() => void sendInvite(person)}
+									>
+										<Icon name={state === "sent" ? "check" : "link"} />
+										{t.sendInvite}
+									</button>
+									{state === "refused" ? (
+										<button type="button" className="btn btn-compact" onClick={() => void copyLink()}>
+											<Icon name="copy" />
+											{t.copyLink}
+										</button>
+									) : (
+										<button type="button" className="btn btn-compact" disabled={busy} onClick={() => message(person)}>
+											<Icon name="message" />
+											{t.message}
+										</button>
+									)}
+								</div>
+								{state === "sent" && (
+									<p className="why">
+										<Icon name="check" />
+										{t.inviteSent(person.name)}
+									</p>
 								)}
-							</span>
-							<span className="result-actions">
-								<button type="button" className="btn btn-primary btn-sm" aria-busy={busy === person.id} disabled={busy !== 0} onClick={() => void sendInvite(person)}>
-									{copy.addFailed.sendInvite}
-								</button>
-								<button type="button" className="btn btn-sm" disabled={busy !== 0} onClick={() => message(person)}>
-									{copy.addFailed.message}
-								</button>
-							</span>
-						</div>
-					))}
-				</div>
+								{state === "refused" && (
+									<p className="why" id={whyId}>
+										<Icon name="lock" />
+										{t.cantSend(person.name)}
+									</p>
+								)}
+							</li>
+						);
+					})}
+				</ul>
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
 					{copy.common.done}
 				</button>
+				{pending.length > 0 && (
+					<button type="button" className="btn btn-primary" aria-busy={busy} disabled={busy} onClick={() => void sendAll()}>
+						<Icon name="link" />
+						{t.sendAll(pending.length)}
+					</button>
+				)}
 			</div>
 		</Modal>
 	);

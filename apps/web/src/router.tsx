@@ -4,7 +4,7 @@ import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "notifications";
 
 /** What the chat column shows next to the conversation list. */
-export type ChatPanel = "chat" | "admin";
+export type ChatPanel = "chat" | "admin" | "banned";
 
 export type Route =
 	| { name: "home" }
@@ -12,6 +12,8 @@ export type Route =
 	/** topicId 0: the chat itself (or the default topic of a group with topics). */
 	| { name: "chat"; chatId: number; topicId: number; panel: ChatPanel }
 	| { name: "invite"; token: string }
+	/** userId 0: the list without a profile open. */
+	| { name: "contacts"; userId: number }
 	| { name: "moderation"; reportId: string | null; actions: boolean };
 
 /** Tabs that exist before messaging ships (release R0). */
@@ -24,6 +26,8 @@ export const paths = {
 	chat: (chatId: number) => `/c/${chatId}`,
 	topic: (chatId: number, topicId: number) => `/c/${chatId}/t/${topicId}`,
 	chatAdmin: (chatId: number) => `/c/${chatId}/admin`,
+	banned: (chatId: number) => `/c/${chatId}/admin/banned`,
+	contacts: (userId = 0) => (userId === 0 ? "/contacts" : `/contacts/${userId}`),
 	invite: (token: string) => `/+${token}`,
 	moderation: (reportId?: string, actions = false) =>
 		reportId === undefined ? "/moderation" : `/moderation/${encodeURIComponent(reportId)}${actions ? "/actions" : ""}`,
@@ -43,11 +47,19 @@ function matchMessaging(path: string): Route | null {
 	const invite = INVITE.exec(path);
 	if (invite?.[1] !== undefined) return { name: "invite", token: invite[1] };
 	const parts = path.split("/").slice(1);
+	if (parts[0] === "contacts" && parts.length <= 2) {
+		const userId = parts.length === 1 ? 0 : parseId(parts[1]);
+		return userId === null ? null : { name: "contacts", userId };
+	}
 	if (parts[0] === "c") {
 		const chatId = parseId(parts[1]);
 		if (chatId === null) return null;
 		if (parts.length === 2) return { name: "chat", chatId, topicId: 0, panel: "chat" };
-		if (parts.length === 3 && parts[2] === "admin") return { name: "chat", chatId, topicId: 0, panel: "admin" };
+		if (parts[2] === "admin") {
+			if (parts.length === 3) return { name: "chat", chatId, topicId: 0, panel: "admin" };
+			if (parts.length === 4 && parts[3] === "banned") return { name: "chat", chatId, topicId: 0, panel: "banned" };
+			return null;
+		}
 		const topicId = parseId(parts[3]);
 		if (parts.length === 4 && parts[2] === "t" && topicId !== null) {
 			return { name: "chat", chatId, topicId, panel: "chat" };

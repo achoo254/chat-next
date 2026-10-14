@@ -5,8 +5,16 @@ import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, paths, type Route } from "../router.tsx";
 
+interface ShellProps {
+	self: SelfUser;
+	route: Route;
+	/** Extra rail links after Chats (the messaging UI adds Contacts). */
+	nav?: ReactNode;
+	children: ReactNode;
+}
+
 /** Signed-in frame: navigation rail plus the active screen. */
-export function Shell({ self, route, children }: { self: SelfUser; route: Route; children: ReactNode }) {
+export function Shell({ self, route, nav, children }: ShellProps) {
 	const { t } = useI18n();
 	return (
 		<div className="shell">
@@ -18,6 +26,7 @@ export function Shell({ self, route, children }: { self: SelfUser; route: Route;
 				<Link to={paths.home} className="icon-btn" current={route.name === "home"} aria-label={t.shell.chats}>
 					<Icon name="message" />
 				</Link>
+				{nav}
 				<span className="spacer" />
 				<Link
 					to={paths.settings("profile")}

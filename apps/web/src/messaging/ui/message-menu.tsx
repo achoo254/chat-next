@@ -1,10 +1,12 @@
 // Message actions (mockups/chat.html#context-menu): a dimmed layer over the
 // conversation with the reaction row, the message itself and the menu.
-// Opened by right click, long press or the keyboard; Esc closes it.
+// Opened by right click, long press or the keyboard; Esc closes it. The +
+// at the end of the reaction row swaps the row and the menu for the full
+// emoji panel under the message (#emoji-picker).
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, StoredMessage } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
-import { useCopy } from "../copy/use-copy.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices } from "../data/services.tsx";
 import { EmojiPicker } from "./emoji-picker.tsx";
@@ -43,7 +45,7 @@ interface MenuEntry {
 }
 
 export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq }: { chatId: number; itemKey: string; chat: Chat | null; readOutboxMaxSeq: number }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store, source, remote, backend, toasts } = useServices();
 	const item = useItem(chatId, itemKey);
@@ -65,8 +67,8 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq }: {
 	}, [remote]);
 
 	useEffect(() => {
-		menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-	}, []);
+		if (!more) menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+	}, [more]);
 
 	const close = () => {
 		ui.menu.set(null);
@@ -185,29 +187,30 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq }: {
 				}
 			}}
 		>
-			{item.kind === "message" && (
+			{item.kind === "message" && !more && (
 				<div className="react-picker" role="group" aria-label={copy.menu.react}>
 					{QUICK_REACTIONS.map((emoji) => (
 						<button key={emoji} type="button" aria-label={copy.menu.reactionNames[emoji] ?? emoji} onClick={() => react(emoji)}>
 							{emoji}
 						</button>
 					))}
-					<span className="emoji-anchor">
-						<button type="button" aria-label={copy.menu.moreReactions} aria-expanded={more} onClick={() => setMore((open) => !open)}>
-							<Icon name="plus" />
-						</button>
-						{more && <EmojiPicker onPick={react} onClose={() => setMore(false)} />}
-					</span>
+					<button type="button" className="more-react" aria-label={copy.menu.moreReactions} aria-expanded={false} onClick={() => setMore(true)}>
+						<Icon name="plus" />
+					</button>
 				</div>
 			)}
 			<div className="ctx-message" aria-hidden="true" inert>
 				{bubble}
 			</div>
-			<div className="menu" role="menu" ref={menu} aria-label={mine ? copy.menu.labelMine : copy.menu.label} onKeyDown={onMenuKey}>
-				{entries.map((entry) => (
-					<MenuButton key={entry.label} entry={entry} onDone={close} />
-				))}
-			</div>
+			{more ? (
+				<EmojiPicker mode="reaction" onPick={react} onClose={close} />
+			) : (
+				<div className="menu" role="menu" ref={menu} aria-label={mine ? copy.menu.labelMine : copy.menu.label} onKeyDown={onMenuKey}>
+					{entries.map((entry) => (
+						<MenuButton key={entry.label} entry={entry} onDone={close} />
+					))}
+				</div>
+			)}
 		</div>
 	);
 }

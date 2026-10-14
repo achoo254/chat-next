@@ -1,32 +1,106 @@
 // Right column (mockups/chat.html#info-panels, #topics): group or channel,
 // the other person of a 1-1 chat, or the open topic. Opened with the "i"
-// button, closed with X.
-import { useState } from "react";
+// button, closed with X; an overlay below 1100px takes focus when it opens
+// (#info-overlay), and below 760px it fills the screen with a back arrow
+// (#narrow).
+import { useEffect, useRef, useState } from "react";
 import type { Chat, User } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
-import { useCopy } from "../copy/use-copy.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { dialogTitle, shortDate, userName } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
 import { useServices, useUser } from "../data/services.tsx";
+import { ContactRow } from "./contact-row.tsx";
 import { hiddenPins, usePinHidden } from "./conversation.tsx";
 import { displayLink, inviteLinks, isActiveInvite, useInviteLinks, useMembers } from "./members.ts";
 import { ChatAvatar, CopyButton, Switch } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
-import { useUi } from "./ui-context.tsx";
+import { useUi, type Ui } from "./ui-context.tsx";
 
 const MEMBERS_SHOWN = 20;
+const WIDE_QUERY = "(min-width: 1101px)";
+const NARROW_QUERY = "(max-width: 760px)";
+
+function matches(query: string): boolean {
+	return typeof window.matchMedia === "function" && window.matchMedia(query).matches;
+}
+
+/** Between 760 and 1100px the column lays over the conversation (no media queries: beside it). */
+function overlayLayout(): boolean {
+	return typeof window.matchMedia === "function" && !matches(WIDE_QUERY) && !matches(NARROW_QUERY);
+}
+
+/** Whether the current history entry is the one pushed for the narrow column. */
+function infoEntry(): boolean {
+	const state: unknown = window.history.state;
+	return typeof state === "object" && state !== null && "info" in state && state.info === true;
+}
+
+/** Closes the column; on narrow screens through history, so Back and the arrow agree. */
+function closeInfo(ui: Ui, refocus: boolean): void {
+	if (infoEntry()) window.history.back();
+	else ui.toggleInfo(false);
+	if (refocus) document.querySelector<HTMLElement>(".convo-head [data-info-toggle]")?.focus();
+}
+
+/**
+ * Narrow screens give the column a history entry, so the browser's Back
+ * closes it (#narrow). As an overlay, Esc or a click in the conversation
+ * closes it and focus returns to the "i" button (#info-overlay).
+ */
+function useColumnBehaviour(ui: Ui): void {
+	useEffect(() => {
+		if (matches(NARROW_QUERY) && !infoEntry()) window.history.pushState({ info: true }, "");
+		const onPop = () => {
+			if (matches(NARROW_QUERY) && !infoEntry()) ui.toggleInfo(false);
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented || !overlayLayout()) return;
+			if (document.querySelector("dialog[open], .ctx-layer") !== null) return;
+			closeInfo(ui, true);
+		};
+		const onDown = (event: PointerEvent) => {
+			if (!overlayLayout() || !(event.target instanceof Element)) return;
+			if (event.target.closest(".app > .convo") !== null && event.target.closest("[data-info-toggle]") === null) closeInfo(ui, true);
+		};
+		window.addEventListener("popstate", onPop);
+		document.addEventListener("keydown", onKey);
+		document.addEventListener("pointerdown", onDown);
+		return () => {
+			window.removeEventListener("popstate", onPop);
+			document.removeEventListener("keydown", onKey);
+			document.removeEventListener("pointerdown", onDown);
+		};
+	}, [ui]);
+}
 
 function InfoHead({ title }: { title: string }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const ui = useUi();
+	const back = useRef<HTMLButtonElement>(null);
+	const close = useRef<HTMLButtonElement>(null);
+	// As an overlay or a full screen the column takes focus; beside the chat it does not.
+	useEffect(() => {
+		if (matches(NARROW_QUERY)) back.current?.focus();
+		else if (overlayLayout()) close.current?.focus();
+	}, []);
 	return (
 		<div className="info-head">
+			<button ref={back} type="button" className="icon-btn narrow-only" aria-label={copy.infoPanel.backToChat} onClick={() => closeInfo(ui, false)}>
+				<Icon name="back" />
+			</button>
 			<span>{title}</span>
-			<button type="button" className="icon-btn" aria-label={copy.info.close} onClick={() => ui.toggleInfo(false)}>
+			<button
+				ref={close}
+				type="button"
+				className="icon-btn hide-narrow"
+				aria-label={copy.infoPanel.closeEsc}
+				onClick={() => closeInfo(ui, true)}
+			>
 				<Icon name="x" />
 			</button>
 		</div>
@@ -34,7 +108,7 @@ function InfoHead({ title }: { title: string }) {
 }
 
 function MuteButton({ chatId }: { chatId: number }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { backend, toasts } = useServices();
 	const supported = backend.features.has("mute");
 	const muted = backend.isMuted(chatId);
@@ -54,7 +128,7 @@ function MuteButton({ chatId }: { chatId: number }) {
 }
 
 function PinnedBarRow({ chat }: { chat: Chat }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const hidden = usePinHidden(chat.id);
 	if (chat.pinnedSeq === 0 || hidden !== chat.pinnedSeq) return null;
 	return (
@@ -67,7 +141,7 @@ function PinnedBarRow({ chat }: { chat: Chat }) {
 }
 
 function InviteRow({ chat }: { chat: Chat }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { locale } = useI18n();
 	const { remote, toasts } = useServices();
 	const invites = useInviteLinks(chat.id);
@@ -113,16 +187,15 @@ function InviteRow({ chat }: { chat: Chat }) {
 }
 
 function GroupMembers({ chat }: { chat: Chat }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { store } = useServices();
 	const ui = useUi();
 	const [searching, setSearching] = useState(false);
 	const [query, setQuery] = useState("");
-	const [expanded, setExpanded] = useState(false);
-	const { members, status, hasMore, more } = useMembers(chat.id, query.trim());
+	const { members, status } = useMembers(chat.id, query.trim());
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const canAdd = admin || (chat.myPermissions & Permission.addMembers) !== 0;
-	const shown = expanded ? members : members.slice(0, MEMBERS_SHOWN);
+	const shown = members.slice(0, MEMBERS_SHOWN);
 	return (
 		<div className="info-sec">
 			<div className="sec-head">
@@ -160,15 +233,8 @@ function GroupMembers({ chat }: { chat: Chat }) {
 					/>
 				);
 			})}
-			{(hasMore || (!expanded && members.length > MEMBERS_SHOWN)) && (
-				<button
-					type="button"
-					className="see-all"
-					onClick={() => {
-						setExpanded(true);
-						if (hasMore) more();
-					}}
-				>
+			{status === "ready" && (
+				<button type="button" className="see-all" onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
 					{copy.info.seeAll(chat.memberCount)}
 				</button>
 			)}
@@ -187,7 +253,7 @@ interface MemberLineProps {
 }
 
 function MemberLine({ userId, avatarName, name, isBot, role, presence }: MemberLineProps) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store } = useServices();
 	const known = usePresence(isBot || userId === store.selfId ? 0 : userId);
@@ -208,7 +274,7 @@ function MemberLine({ userId, avatarName, name, isBot, role, presence }: MemberL
 }
 
 function GroupInfo({ chat }: { chat: Chat }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const ui = useUi();
 	const channel = chat.type === "channel";
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
@@ -255,7 +321,7 @@ function GroupInfo({ chat }: { chat: Chat }) {
 }
 
 function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { remote, backend, toasts } = useServices();
 	const ui = useUi();
 	const presence = usePresence(peer?.isBot === true ? 0 : chat.peerUserId);
@@ -296,6 +362,11 @@ function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
 					{isBlocked ? copy.info.unblock : copy.info.block}
 				</button>
 			</div>
+			{peer !== undefined && !peer.isBot && !peer.isSelf && (
+				<div className="info-sec">
+					<ContactRow userId={peer.id} name={name} />
+				</div>
+			)}
 			<div className="info-sec">
 				{peer !== undefined && peer.username !== "" && (
 					<div className="row">
@@ -335,7 +406,7 @@ function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
 }
 
 function TopicInfo({ chat, topic, groupTitle }: { chat: Chat; topic: Topic; groupTitle: string }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { locale } = useI18n();
 	const { store } = useServices();
 	const creator = useUser(topic.createdBy === store.selfId ? 0 : topic.createdBy);
@@ -400,6 +471,7 @@ interface InfoPanelProps {
 }
 
 export function InfoPanel({ chat, peer, topic, title }: InfoPanelProps) {
+	useColumnBehaviour(useUi());
 	if (topic !== null) return <TopicInfo chat={chat} topic={topic} groupTitle={title} />;
 	if (chat.type === "group" || chat.type === "channel") return <GroupInfo chat={chat} />;
 	return <UserInfo chat={chat} peer={peer} />;

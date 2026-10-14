@@ -1,12 +1,14 @@
 // Built-in folders (R1): Tất cả, Cá nhân, Nhóm, Bot, filtered on the client
-// by chat kind. Wide screens show the labelled rail; narrow screens the tab
-// row inside the list (mockups/chat.html#app). Custom folders come after R4.
+// by chat kind, then Danh bạ and Cài đặt. Wide screens show the labelled
+// rail; narrow screens the tab row inside the list (mockups/chat.html#app,
+// #contacts, #narrow). Custom folders come after R4.
 import type { SelfUser } from "../../api/adapters.ts";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { FOLDERS, type Folder } from "../data/format.ts";
+import { countLabel, FOLDERS, type Folder } from "../data/format.ts";
 import { useFolderCounts, useServices } from "../data/services.tsx";
+import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar } from "./parts.tsx";
 
 const FOLDER_ICONS: Record<Folder, IconName> = { all: "message", private: "user", group: "users", bot: "robot" };
@@ -16,7 +18,8 @@ interface FolderProps {
 	onFolder: (folder: Folder) => void;
 }
 
-export function FolderRail({ self, folder, onFolder }: FolderProps & { self: SelfUser }) {
+/** `folder` null: the contacts list is open instead of a folder. */
+export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder: Folder | null; onFolder: (folder: Folder) => void }) {
 	const copy = useCopy();
 	const { toasts } = useServices();
 	const counts = useFolderCounts();
@@ -38,7 +41,7 @@ export function FolderRail({ self, folder, onFolder }: FolderProps & { self: Sel
 					{copy.folders[item]}
 					{counts[item] > 0 && (
 						<span className="badge" aria-label={copy.folders.unreadChats(counts[item])}>
-							{counts[item]}
+							{countLabel(counts[item])}
 						</span>
 					)}
 				</button>
@@ -57,6 +60,10 @@ export function FolderRail({ self, folder, onFolder }: FolderProps & { self: Sel
 				</span>
 			</button>
 			<span className="spacer" />
+			<Link to={paths.contacts()} className="folder" current={folder === null}>
+				<ContactsGlyph />
+				{copy.folders.contacts}
+			</Link>
 			<Link to={paths.settings("profile")} className="folder">
 				<Icon name="settings" />
 				{copy.folders.settings}

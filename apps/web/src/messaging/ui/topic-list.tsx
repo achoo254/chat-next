@@ -1,18 +1,21 @@
 // Topic list of a group with topics (mockups/chat.html#topics,
 // #topic-states). It replaces the chat list while the group is open; the
 // back arrow returns to the chats. Admins pin, close and hide topics from the
-// row menu and see hidden topics in their own section.
+// row menu and see hidden topics in their own section. The server pages the
+// topics: the next page loads when the end of the list scrolls into view.
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { Chat } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { listTime, shortDate, userName } from "../data/format.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { countLabel, listTime, shortDate, userName } from "../data/format.ts";
 import type { Topic, TopicChange } from "../data/pending-backend.ts";
-import { useServices, useUser } from "../data/services.tsx";
+import { useBackendVersion, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
+import { PopupMenu } from "./popup-menu.tsx";
 import { sortTopics, TopicIco } from "./topic-ico.tsx";
 
 function TopicPreview({ topic }: { topic: Topic }) {
@@ -37,33 +40,8 @@ interface TopicMenuProps {
 
 function TopicMenu({ topic, onAction, onClose }: TopicMenuProps) {
 	const copy = useCopy();
-	const ref = useRef<HTMLDivElement>(null);
-	const closeRef = useRef(onClose);
-	useEffect(() => {
-		closeRef.current = onClose;
-	}, [onClose]);
-	useEffect(() => {
-		ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-		const onDown = (event: PointerEvent) => {
-			if (ref.current !== null && event.target instanceof Node && !ref.current.contains(event.target)) closeRef.current();
-		};
-		document.addEventListener("pointerdown", onDown);
-		return () => document.removeEventListener("pointerdown", onDown);
-	}, []);
-	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-		if (event.key === "Escape") {
-			event.preventDefault();
-			closeRef.current();
-			return;
-		}
-		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-		event.preventDefault();
-		const items = [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
-		const index = items.indexOf(document.activeElement as HTMLElement);
-		items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
-	};
 	return (
-		<div className="menu topic-menu" role="menu" ref={ref} aria-label={copy.topics.menu(topic.title)} onKeyDown={onKeyDown}>
+		<PopupMenu className="topic-menu" label={copy.topics.menu(topic.title)} onClose={onClose}>
 			<button type="button" role="menuitem" onClick={() => onAction({ pinned: !topic.pinned }, copy.topics.pinnedDone)}>
 				<Icon name="pin" />
 				{topic.pinned ? copy.topics.unpin : copy.topics.pin}
@@ -86,7 +64,7 @@ function TopicMenu({ topic, onAction, onClose }: TopicMenuProps) {
 					{copy.topics.hide}
 				</button>
 			)}
-		</div>
+		</PopupMenu>
 	);
 }
 
@@ -95,6 +73,30 @@ interface TopicListProps {
 	title: string;
 	topics: readonly Topic[];
 	currentTopicId: number;
+}
+
+/** "Tải thêm chủ đề", also pressed for you when it scrolls into view. */
+function MoreTopics({ chatId }: { chatId: number }) {
+	const copy = useScreensCopy();
+	const { backend } = useServices();
+	useBackendVersion();
+	const ref = useRef<HTMLButtonElement>(null);
+	const more = backend.hasMoreTopics(chatId);
+	useEffect(() => {
+		const element = ref.current;
+		if (!more || element === null || typeof IntersectionObserver === "undefined") return;
+		const observer = new IntersectionObserver((entries) => {
+			if (entries.some((entry) => entry.isIntersecting)) backend.loadMoreTopics(chatId);
+		});
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, [backend, chatId, more]);
+	if (!more) return null;
+	return (
+		<button ref={ref} type="button" className="see-all more-topics" onClick={() => backend.loadMoreTopics(chatId)}>
+			{copy.topicList.more}
+		</button>
+	);
 }
 
 export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicListProps) {
@@ -170,7 +172,7 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 												</span>
 											)}
 											{topic.unreadCount > 0 && (
-												<span className={topic.muted ? "badge muted-badge" : "badge"}>{topic.unreadCount}</span>
+												<span className={topic.muted ? "badge muted-badge" : "badge"}>{countLabel(topic.unreadCount)}</span>
 											)}
 										</span>
 									)}
@@ -182,6 +184,7 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 						</li>
 					))}
 				</ul>
+				<MoreTopics chatId={chat.id} />
 				{admin && hidden.length > 0 && (
 					<details className="hidden-topics">
 						<summary>

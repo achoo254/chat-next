@@ -1,7 +1,8 @@
 // Group and channel administration (mockups/chat.html#chat-admin): member
-// permissions (a bitmask), history for new members, admins, invite links and
-// leaving. Webhooks (R2) get their own page later.
-import { useState } from "react";
+// permissions (a bitmask), history for new members, admins, the member and
+// banned lists, invite links and leaving. Webhooks (R2) get their own page
+// later.
+import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -192,6 +193,48 @@ function AdminsCard({ chat }: { chat: Chat }) {
 	);
 }
 
+/** Links to the full member list and the banned list (#member-remove, #banned). */
+function MembersCard({ chat }: { chat: Chat }) {
+	const copy = useScreensCopy();
+	const { remote } = useServices();
+	const ui = useUi();
+	const [banned, setBanned] = useState<{ count: number; more: boolean } | null>(null);
+	const id = useDomId("members");
+	useEffect(() => {
+		let active = true;
+		remote.bannedMembers(chat.id).then(
+			(page) => {
+				if (active) setBanned({ count: page.items.length, more: page.nextCursor !== "" });
+			},
+			() => undefined,
+		);
+		return () => {
+			active = false;
+		};
+	}, [remote, chat.id]);
+	return (
+		<section className="card" aria-labelledby={id}>
+			<h3 id={id}>{copy.admin.members}</h3>
+			<div className="row">
+				<Icon name="users" />
+				<button type="button" className="grow row-link" onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
+					{copy.admin.allMembers}
+					<small>{copy.admin.allMembersSub(chat.memberCount)}</small>
+				</button>
+				<Icon name="chevron-right" small />
+			</div>
+			<div className="row">
+				<Icon name="ban" />
+				<Link to={paths.banned(chat.id)} className="grow row-link">
+					{copy.admin.banned}
+					<small>{banned === null ? copy.admin.bannedSubPlain : copy.admin.bannedSub(banned.count, banned.more)}</small>
+				</Link>
+				<Icon name="chevron-right" small />
+			</div>
+		</section>
+	);
+}
+
 function LinksCard({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
@@ -351,6 +394,7 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 						{!channel && <PermissionsCard chat={chat} />}
 						{!channel && <HistoryCard chat={chat} />}
 						<AdminsCard chat={chat} />
+						<MembersCard chat={chat} />
 					</div>
 					<div className="admin-col">
 						<LinksCard chat={chat} />

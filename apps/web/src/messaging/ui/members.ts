@@ -4,6 +4,20 @@ import type { Invite, Member, Remote } from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
 import { rememberPresence } from "./presence.tsx";
 
+/** Per chat, bumped when this UI changes the members (remove, promote) so open lists reload. */
+const memberChanges = new Map<number, number>();
+const changeListeners = new Set<() => void>();
+
+function subscribeChanges(listener: () => void): () => void {
+	changeListeners.add(listener);
+	return () => changeListeners.delete(listener);
+}
+
+export function membersChanged(chatId: number): void {
+	memberChanges.set(chatId, (memberChanges.get(chatId) ?? 0) + 1);
+	for (const listener of [...changeListeners]) listener();
+}
+
 export interface MembersState {
 	readonly members: readonly Member[];
 	readonly status: "loading" | "ready" | "error";
@@ -21,7 +35,8 @@ export function useMembers(chatId: number, query = "", enabled = true): MembersS
 		cursor: "",
 	});
 	const [attempt, setAttempt] = useState(0);
-	const key = `${chatId}|${query}|${attempt}`;
+	const changes = useSyncExternalStore(subscribeChanges, () => memberChanges.get(chatId) ?? 0);
+	const key = `${chatId}|${query}|${attempt}|${changes}`;
 
 	useEffect(() => {
 		if (!enabled) return;

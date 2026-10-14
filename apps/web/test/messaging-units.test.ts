@@ -4,9 +4,10 @@ import { vi as copy } from "../src/messaging/copy/vi.ts";
 import { en } from "../src/messaging/copy/en.ts";
 import { enScreens } from "../src/messaging/copy/en-screens.ts";
 import { viScreens } from "../src/messaging/copy/vi-screens.ts";
-import { chatKind, dayLabel, inFolder, isTrustedHost, listTime, oneLine } from "../src/messaging/data/format.ts";
+import { chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain } from "../src/messaging/data/format.ts";
 import { highlight } from "../src/messaging/data/highlight.ts";
-import { toneForColor } from "../src/messaging/data/topic-mapping.ts";
+import type { Remote, ServerTopic } from "../src/messaging/data/remote.ts";
+import { loadNextTopicPage, loadTopicPages, toneForColor, topicIcon } from "../src/messaging/data/topic-mapping.ts";
 import { entityTree } from "../src/messaging/ui/rich-text.tsx";
 import { matchRoute, paths } from "../src/router.tsx";
 
@@ -110,3 +111,73 @@ describe("copy", () => {
 		expect(keys(enScreens).sort()).toEqual(keys(viScreens).sort());
 	});
 });
+
+describe("capped counts", () => {
+	it("shows the server's cap of 1000 as 999+", () => {
+		expect(countLabel(1)).toBe("1");
+		expect(countLabel(999)).toBe("999");
+		expect(countLabel(1000)).toBe("999+");
+	});
+
+	it("takes the tenant's domain from the chat host", () => {
+		expect(orgDomain("chat.hoandat.com")).toBe("hoandat.com");
+		expect(orgDomain("localhost:5173")).toBe("localhost:5173");
+	});
+});
+
+describe("forum topics", () => {
+	const topic = (id: number, extra: Partial<ServerTopic> = {}): ServerTopic => ({
+		id,
+		title: `T${id}`,
+		iconColor: 0,
+		creatorId: 1,
+		createdAt: 1,
+		pinned: false,
+		closed: false,
+		hidden: false,
+		topSeq: 0,
+		readInboxMaxSeq: 0,
+		unreadCount: 0,
+		icon: "",
+		messageCount: 0,
+		unreadMentions: 0,
+		...extra,
+	});
+	/** A Remote that answers only GetForumTopics, from fixed pages keyed by cursor. */
+	const pagedRemote = (pages: Record<string, { topics: ServerTopic[]; nextCursor: string }>): Remote =>
+		({
+			forumTopics: async (_chatId: number, cursor = "") => {
+				const page = pages[cursor];
+				if (page === undefined) throw new Error(`unexpected cursor ${cursor}`);
+				return { topics: page.topics, tops: [], nextCursor: page.nextCursor };
+			},
+		}) as unknown as Remote; // Only forumTopics is called by the paging helpers.
+
+	it("uses the server's icon when the client has it", () => {
+		expect(topicIcon("code")).toBe("code");
+		expect(topicIcon("")).toBe("hash");
+		expect(topicIcon("rocket-2")).toBe("hash");
+	});
+
+	it("loads pages up to the count asked for, then appends the next page without duplicates", async () => {
+		const remote = pagedRemote({
+			"": { topics: [topic(1), topic(2, { unreadCount: 1000, unreadMentions: 3, messageCount: 12, icon: "flag" })], nextCursor: "a" },
+			a: { topics: [topic(3)], nextCursor: "b" },
+			b: { topics: [topic(3, { title: "moved" }), topic(4)], nextCursor: "" },
+		});
+		const first = await loadTopicPages(remote, 7, 1, "https://chat.example.test");
+		expect(first.topics.map((t) => t.id)).toEqual([1, 2]);
+		expect(first.nextCursor).toBe("a");
+		expect(first.topics[1]).toMatchObject({ unreadCount: 1000, unreadMentions: 3, messageCount: 12, icon: "flag" });
+
+		const two = await loadTopicPages(remote, 7, 2, "https://chat.example.test");
+		expect(two.topics.map((t) => t.id)).toEqual([1, 2, 3]);
+		expect(two.pages).toBe(2);
+
+		const all = await loadNextTopicPage(remote, 7, two, "https://chat.example.test");
+		expect(all.topics.map((t) => `${t.id}:${t.title}`)).toEqual(["1:T1", "2:T2", "3:moved", "4:T4"]);
+		expect(all.nextCursor).toBe("");
+		expect(all.pages).toBe(3);
+	});
+});
+

@@ -145,7 +145,7 @@ export function actionText(action: MessageAction, actor: string, nameOf: NameOf,
 	}
 }
 
-function joinNames(names: readonly string[], and: string): string {
+export function joinNames(names: readonly string[], and: string): string {
 	if (names.length <= 1) return names[0] ?? "";
 	return `${names.slice(0, -1).join(", ")}${and}${names[names.length - 1] ?? ""}`;
 }
@@ -167,12 +167,19 @@ export function hostOf(url: string): string {
 	}
 }
 
-/**
- * Links to the tenant's own sites open directly; any other host asks first
- * (phase 6 security). The web app runs on chat.<domain>.
- */
+/** The tenant's domain: the web app runs on chat.<domain>. */
+export function orgDomain(appHost: string): string {
+	return appHost.startsWith("chat.") ? appHost.slice("chat.".length) : appHost;
+}
+
+/** Links to the tenant's own sites open directly; any other host asks first (phase 6 security). */
 export function isTrustedHost(host: string, appHost: string): boolean {
 	if (host === "" || host === appHost) return true;
-	const domain = appHost.startsWith("chat.") ? appHost.slice("chat.".length) : appHost;
+	const domain = orgDomain(appHost);
 	return host === domain || host.endsWith(`.${domain}`);
+}
+
+/** Unread and mention counts stop at 1000 on the server; the cap reads "999+". */
+export function countLabel(count: number): string {
+	return count >= 1000 ? "999+" : String(count);
 }

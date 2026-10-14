@@ -1,17 +1,21 @@
 // One row of the chat list (mockups/chat.html#app, #list-states,
 // #topic-states). Subscribes to its own dialog, draft and sender, so a new
-// message re-renders this row only.
-import { memo, type CSSProperties, type ReactNode } from "react";
+// message re-renders this row only. Right click, a long press or the menu
+// key opens the row menu (#list-menu).
+import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from "react";
 import type { DialogView } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, dialogTitle, listTime, messagePreview, userName, type ChatKind } from "../data/format.ts";
+import { chatKind, countLabel, dialogTitle, listTime, messagePreview, userName, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatAvatar } from "./parts.tsx";
+import { useUi } from "./ui-context.tsx";
+
+const LONG_PRESS_MS = 500;
 
 /** Row heights: fixed per kind so the list can position rows absolutely. */
 export const ROW_HEIGHT = 64;
@@ -37,6 +41,45 @@ function kindLabel(kind: ChatKind, copy: MessagingCopy): string {
 		case "private":
 			return "";
 	}
+}
+
+/**
+ * Context menu on right click, long press or the menu keys (Menu, Shift+F10;
+ * `own` also Enter, and only for keys pressed on the element itself, as on a
+ * message). The tap that ends a long press does not also click.
+ */
+export function useContextTrigger(open: (x: number, y: number) => void, own = false) {
+	const press = useRef<{ timer: ReturnType<typeof setTimeout> | undefined; opened: boolean }>({ timer: undefined, opened: false });
+	const cancel = () => clearTimeout(press.current.timer);
+	return {
+		onContextMenu: (event: MouseEvent<HTMLElement>) => {
+			event.preventDefault();
+			open(event.clientX, event.clientY);
+		},
+		onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+			if (own && event.target !== event.currentTarget) return;
+			if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey) && !(own && event.key === "Enter")) return;
+			event.preventDefault();
+			const rect = event.currentTarget.getBoundingClientRect();
+			open(rect.left + rect.width / 2, rect.bottom);
+		},
+		onTouchStart: (event: TouchEvent<HTMLElement>) => {
+			const touch = event.touches[0];
+			cancel();
+			press.current.opened = false;
+			press.current.timer = setTimeout(() => {
+				press.current.opened = true;
+				open(touch?.clientX ?? 0, touch?.clientY ?? 0);
+			}, LONG_PRESS_MS);
+		},
+		onTouchEnd: cancel,
+		onTouchMove: cancel,
+		onClickCapture: (event: MouseEvent<HTMLElement>) => {
+			if (!press.current.opened) return;
+			press.current.opened = false;
+			event.preventDefault();
+		},
+	};
 }
 
 /** Decorative-by-default icon with an accessible name (mock: svg role="img"). */
@@ -122,9 +165,11 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const { store, backend } = useServices();
+	const ui = useUi();
 	const view = useDialog(chatId);
 	const draft = useDraft(chatId);
 	const topics = useTopics(chatId, view?.chat?.forum === true);
+	const trigger = useContextTrigger((x, y) => ui.listMenu.set({ chatId, x, y }));
 	if (view === undefined) return null;
 	const kind = chatKind(view.chat, view.peer, view.chat?.forum === true);
 	const title = dialogTitle(view, copy);
@@ -135,9 +180,10 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	const ownLast = top !== null && top.fromId === store.selfId && top.action === null;
 	const read = ownLast && dialog.readOutboxMaxSeq >= top.seq;
 	const kindIcon = KIND_ICONS[kind];
-	const unread = topics !== null ? topics.filter((t) => !t.muted).reduce((sum, t) => sum + t.unreadCount, 0) : dialog.unreadCount;
+	// The server counts the whole chat (every topic), up to 1000.
+	const unread = dialog.unreadCount;
 	return (
-		<li className="chat-slot" style={style} aria-setsize={total} aria-posinset={position}>
+		<li className="chat-slot" style={style} aria-setsize={total} aria-posinset={position} {...trigger}>
 			<Link to={paths.chat(chatId)} className="chat-row" current={current}>
 				<ChatAvatar id={chatId} name={title} bot={kind === "bot"} />
 				<span className="tx">
@@ -163,7 +209,7 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 									@
 								</span>
 							)}
-							{unread > 0 && <span className={muted ? "badge muted-badge" : "badge"}>{unread}</span>}
+							{unread > 0 && <span className={muted ? "badge muted-badge" : "badge"}>{countLabel(unread)}</span>}
 						</span>
 					)}
 				</span>

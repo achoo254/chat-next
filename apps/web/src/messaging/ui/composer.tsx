@@ -1,16 +1,21 @@
 // Composer (R1: text, emoji, reply, edit; attachments arrive with R3).
-// Enter sends, Shift+Enter breaks the line, Esc cancels reply or edit.
-// Sending is optimistic: the core shows the message at once with a clock.
+// Enter sends, Shift+Enter breaks the line, Esc cancels reply or edit
+// (mockups/chat.html#composer-states). Sending is optimistic: the core shows
+// the message at once with a clock. Dropping the link preview sends the
+// message with no_link_preview, so the server attaches none.
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { codePointLength } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { messagePreview, userName } from "../data/format.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
-import { useConnection, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useConnection, useMessage, useServices } from "../data/services.tsx";
 import { useIntent, useUi } from "./ui-context.tsx";
 
 const EmojiPicker = lazy(() => import("./emoji-picker.tsx").then((m) => ({ default: m.EmojiPicker })));
+// The reply/edit and link preview bars load the first time one shows.
+const bars = () => import("./composer-bars.tsx");
+const ComposeBar = lazy(() => bars().then((m) => ({ default: m.ComposeBar })));
+const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 
 const MAX_HEIGHT_PX = 160;
 const PREVIEW_DELAY_MS = 400;
@@ -23,51 +28,6 @@ interface ComposerProps {
 	channel: boolean;
 	placeholder: string;
 	disabled?: boolean;
-}
-
-function IntentBar({ chatId, onCancel }: { chatId: number; onCancel: () => void }) {
-	const copy = useCopy();
-	const { store } = useServices();
-	const intent = useIntent(chatId);
-	const target = useMessage(chatId, intent?.seq ?? 0);
-	const author = useUser(target != null && target.fromId !== store.selfId ? target.fromId : 0);
-	if (intent === null) return null;
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
-	const name = target == null ? "" : target.fromId === store.selfId ? copy.common.you : (author?.name ?? copy.message.unknownUser);
-	const editing = intent.mode === "edit";
-	return (
-		<div className="lp-compose intent">
-			<Icon name={editing ? "edit" : "reply"} small />
-			<span className="lp-text">
-				<b>{editing ? copy.composer.editing : copy.composer.replyTo(name)}</b>
-				<span>{target == null ? "…" : messagePreview(target, nameOf, copy)}</span>
-			</span>
-			<button
-				type="button"
-				className="icon-btn"
-				aria-label={editing ? copy.composer.cancelEdit : copy.composer.cancelReply}
-				onClick={onCancel}
-			>
-				<Icon name="x" small />
-			</button>
-		</div>
-	);
-}
-
-function PreviewBar({ preview, onRemove }: { preview: LinkPreview; onRemove: () => void }) {
-	const copy = useCopy();
-	return (
-		<div className="lp-compose">
-			<Icon name="link" small />
-			<span className="lp-text">
-				<b>{preview.site}</b>
-				<span>{preview.title}</span>
-			</span>
-			<button type="button" className="icon-btn" aria-label={copy.composer.noPreview} onClick={onRemove}>
-				<Icon name="x" small />
-			</button>
-		</div>
-	);
 }
 
 export function Composer({ chatId, topicId, channel, placeholder, disabled = false }: ComposerProps) {
@@ -141,6 +101,14 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 		ui.intents.cell(chatId).set(null);
 	};
 
+	// X or Esc: the composer keeps focus and says what happened.
+	const cancelByUser = () => {
+		if (intent === null) return;
+		toasts.show(intent.mode === "edit" ? copy.composer.editCancelled : copy.composer.replyCancelled);
+		cancelIntent();
+		area.current?.focus();
+	};
+
 	const submit = async (event?: FormEvent) => {
 		event?.preventDefault();
 		const value = text.trim();
@@ -151,6 +119,7 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 			return;
 		}
 		const current = intent;
+		const noLinkPreview = url !== "" && url === dismissed;
 		try {
 			if (current?.mode === "edit") {
 				await source.editText(chatId, current.seq, value);
@@ -159,8 +128,8 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 				const replyToSeq = current?.mode === "reply" ? current.seq : 0;
 				setText("");
 				drafts.set(chatId, "", topicId);
-				if (topicId !== 0) await backend.sendToTopic(chatId, topicId, value, replyToSeq);
-				else await source.sendText(chatId, value, replyToSeq === 0 ? {} : { replyToSeq });
+				if (topicId !== 0) await backend.sendToTopic(chatId, topicId, value, replyToSeq, noLinkPreview);
+				else await source.sendText(chatId, value, { ...(replyToSeq === 0 ? {} : { replyToSeq }), ...(noLinkPreview ? { noLinkPreview } : {}) });
 			}
 			cancelIntent();
 			setPreview(null);
@@ -177,7 +146,7 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
-			cancelIntent();
+			cancelByUser();
 			return;
 		}
 		if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -186,35 +155,46 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 		}
 	};
 
+	// The picker stays open to pick more; each emoji goes in at the caret.
 	const insertEmoji = (emoji: string) => {
 		const element = area.current;
 		const start = element?.selectionStart ?? text.length;
 		const end = element?.selectionEnd ?? text.length;
 		caret.current = start + emoji.length;
 		update(text.slice(0, start) + emoji + text.slice(end));
+	};
+	const emojiButton = useRef<HTMLButtonElement>(null);
+	const closePicker = () => {
 		setPicker(false);
-		element?.focus();
+		emojiButton.current?.focus();
 	};
 
 	const offline = connection === "offline" || connection === "waiting";
 	const label = channel ? copy.composer.channelLabel : copy.composer.label;
 	const shownPlaceholder = offline && !disabled ? copy.composer.placeholderOffline : placeholder;
 	const empty = text.trim() === "";
+	const editing = intent?.mode === "edit";
 	return (
 		<div className="composer-wrap">
-			{(intent !== null || shownPreview !== null) && (
+			{shownPreview !== null && !editing && (
 				<div className="compose-extras">
-					<IntentBar chatId={chatId} onCancel={cancelIntent} />
-					{shownPreview !== null && intent?.mode !== "edit" && (
+					<Suspense fallback={null}>
 						<PreviewBar
 							preview={shownPreview}
 							onRemove={() => {
 								setDismissed(url);
 								toasts.show(copy.composer.noPreviewDone);
+								// The bar goes away with its button: keep typing where you were.
+								area.current?.focus();
 							}}
 						/>
-					)}
+					</Suspense>
 				</div>
+			)}
+			{intent !== null && (
+				<Suspense fallback={null}>
+					<ComposeBar chatId={chatId} onCancel={cancelByUser} />
+				</Suspense>
 			)}
 			{error !== "" && (
 				<div className="composer-error" role="alert">
@@ -238,10 +218,12 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 				/>
 				<div className="emoji-anchor">
 					<button
+						ref={emojiButton}
 						type="button"
 						className="icon-btn"
 						aria-label={copy.composer.emoji}
 						aria-expanded={picker}
+						aria-pressed={picker}
 						disabled={disabled}
 						onClick={() => setPicker((open) => !open)}
 					>
@@ -249,12 +231,17 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 					</button>
 					{picker && (
 						<Suspense fallback={null}>
-							<EmojiPicker onPick={insertEmoji} onClose={() => setPicker(false)} />
+							<EmojiPicker mode="insert" onPick={insertEmoji} onClose={closePicker} />
 						</Suspense>
 					)}
 				</div>
-				<button type="submit" className="send" aria-label={channel ? copy.composer.post : copy.composer.send} disabled={empty || disabled}>
-					<Icon name="send" />
+				<button
+					type="submit"
+					className="send"
+					aria-label={editing ? copy.composer.save : channel ? copy.composer.post : copy.composer.send}
+					disabled={empty || disabled}
+				>
+					<Icon name={editing ? "check" : "send"} />
 				</button>
 			</form>
 		</div>

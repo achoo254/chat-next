@@ -8,11 +8,16 @@ import { viScreens, type ScreensCopy } from "./vi-screens.ts";
 // strings stay out of the first chunk. English is fetched when first needed.
 export type FullCopy = MessagingCopy & ScreensCopy;
 
-const vietnamese: FullCopy = { ...vi, ...viScreens };
+/** `info` is split: presence words ship with the first chunk, the rest with the screens. */
+function merge(base: MessagingCopy, screens: ScreensCopy): FullCopy {
+	return { ...base, ...screens, info: { ...base.info, ...screens.info } };
+}
+
+const vietnamese: FullCopy = merge(vi, viScreens);
 let english: Promise<FullCopy> | null = null;
 
 function loadEnglish(): Promise<FullCopy> {
-	english ??= Promise.all([import("./en.ts"), import("./en-screens.ts")]).then(([base, screens]) => ({ ...base.en, ...screens.enScreens }));
+	english ??= Promise.all([import("./en.ts"), import("./en-screens.ts")]).then(([base, screens]) => merge(base.en, screens.enScreens));
 	return english;
 }
 

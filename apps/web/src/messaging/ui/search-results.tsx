@@ -5,7 +5,7 @@ import type { StoredMessage } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
-import { useCopy } from "../copy/use-copy.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { dialogTitle, listTime } from "../data/format.ts";
 import { highlight } from "../data/highlight.ts";
 import { useServices } from "../data/services.tsx";
@@ -13,7 +13,7 @@ import { useServices } from "../data/services.tsx";
 const SEARCH_DELAY_MS = 80;
 
 export default function SearchResults({ query }: { query: string }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { locale } = useI18n();
 	const { source, store } = useServices();
 	const [result, setResult] = useState<{ query: string; hits: StoredMessage[] } | null>(null);

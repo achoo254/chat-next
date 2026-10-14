@@ -20,10 +20,15 @@ export type DialogRequest =
 	| { readonly kind: "profile"; readonly userId: number }
 	| { readonly kind: "leave"; readonly chatId: number }
 	| { readonly kind: "addMembers"; readonly chatId: number }
-	| { readonly kind: "link"; readonly url: string }
+	/** `text`: what the message shows for the link ("" when it is the address itself); `fromId`: the sender. */
+	| { readonly kind: "link"; readonly url: string; readonly text: string; readonly fromId: number }
 	| { readonly kind: "readBy"; readonly chatId: number; readonly seq: number }
-	/** People the server did not add (their privacy settings): offer an invite link or a private chat. */
-	| { readonly kind: "addFailed"; readonly chatId: number; readonly userIds: readonly number[] };
+	/** People the server did not add (privacy or a ban): offer an invite link or a private chat. */
+	| { readonly kind: "addFailed"; readonly chatId: number; readonly userIds: readonly number[]; readonly addedIds: readonly number[] }
+	| { readonly kind: "members"; readonly chatId: number }
+	/** `back`: return to the member list when done. */
+	| { readonly kind: "removeMember"; readonly chatId: number; readonly userId: number; readonly back: boolean }
+	| { readonly kind: "addContact" };
 
 export type ComposerIntent =
 	| { readonly mode: "reply"; readonly seq: number }
@@ -32,6 +37,13 @@ export type ComposerIntent =
 export interface MenuTarget {
 	readonly chatId: number;
 	readonly key: string;
+}
+
+/** The chat list's row menu (mockups/chat.html#list-menu), opened at a point of the viewport. */
+export interface ListMenuTarget {
+	readonly chatId: number;
+	readonly x: number;
+	readonly y: number;
 }
 
 /** A value with subscribers, for state several distant components read. */
@@ -71,6 +83,7 @@ export class ComposerIntents {
 export interface Ui {
 	readonly dialog: Cell<DialogRequest | null>;
 	readonly menu: Cell<MenuTarget | null>;
+	readonly listMenu: Cell<ListMenuTarget | null>;
 	readonly intents: ComposerIntents;
 	/** Focuses the search box of the chat list (⌘K, header search button). */
 	readonly focusSearch: () => void;

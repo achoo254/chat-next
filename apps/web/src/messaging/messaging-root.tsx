@@ -6,7 +6,7 @@ import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "re
 import type { SelfUser } from "../api/adapters.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { navigate, paths, type Route, type SettingsTab } from "../router.tsx";
+import { Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
 import { Settings } from "../screens/settings/settings.tsx";
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
@@ -18,6 +18,7 @@ import { createRemote } from "./data/remote.ts";
 import { ServicesContext, Toasts, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen } from "./ui/chat-screen.tsx";
+import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { Toast } from "./ui/parts.tsx";
 
 const SettingsExtra = lazy(() => import("./settings/settings-extra.tsx"));
@@ -164,10 +165,11 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		case "home":
 		case "chat":
 		case "invite":
+		case "contacts":
 			return <ChatScreen self={self} route={route} />;
 		case "settings":
 			return (
-				<Shell self={self} route={route}>
+				<Shell self={self} route={route} nav={<ContactsLink />}>
 					<Settings
 						tab={route.tab}
 						self={self}
@@ -186,13 +188,23 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			);
 		case "moderation":
 			return (
-				<Shell self={self} route={route}>
+				<Shell self={self} route={route} nav={<ContactsLink />}>
 					<Suspense fallback={<Loading />}>
 						<Moderation reportId={route.reportId} actions={route.actions} />
 					</Suspense>
 				</Shell>
 			);
 	}
+}
+
+/** The rail link to the contacts list (mockups/settings.html rail). */
+function ContactsLink() {
+	const copy = useCopy();
+	return (
+		<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
+			<ContactsGlyph />
+		</Link>
+	);
 }
 
 function Loading() {

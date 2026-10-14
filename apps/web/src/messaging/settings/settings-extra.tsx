@@ -4,12 +4,14 @@ import { requestNotificationPermission } from "@app/platform-web";
 import { useEffect, useState } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import type { SettingsTab } from "../../router.tsx";
+import { Link, paths, type SettingsTab } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { useContacts } from "../data/contacts.ts";
 import { shortDate } from "../data/format.ts";
 import type { BlockedUser } from "../data/pending-backend.ts";
 import type { Audience, Privacy } from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
+import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
 import { ChatAvatar, Choice, SoonTag, Switch } from "../ui/parts.tsx";
 
 export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
@@ -23,6 +25,25 @@ export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
 		default:
 			return null;
 	}
+}
+
+/** What "Danh bạ" means in every option below: the list you add people to yourself. */
+function ContactsDefinition() {
+	const copy = useScreensCopy();
+	const { remote } = useServices();
+	const contacts = useContacts(remote);
+	const t = copy.privacy;
+	return (
+		<div className="card pad contacts-def">
+			<ContactsGlyph />
+			<p>
+				<b>{t.contactsDefTitle}</b> {t.contactsDefBody}
+			</p>
+			<Link to={paths.contacts()} className="btn">
+				{contacts.status === "ready" ? t.openContactsCount(contacts.people.length) : t.openContacts}
+			</Link>
+		</div>
+	);
 }
 
 type AudienceKey = "lastSeen" | "profilePhoto" | "findByEmail" | "findByUsername" | "addToGroups" | "sendMessages";
@@ -114,6 +135,7 @@ function PrivacySettings() {
 				<Icon name="shield" small />
 				{t.lede}
 			</p>
+			<ContactsDefinition />
 			<div className="card">
 				<h2 className="card-title">{t.whoSees}</h2>
 				{row("lastSeen", t.lastSeen, t.whoLastSeen, t.lastSeenHint)}
@@ -122,7 +144,7 @@ function PrivacySettings() {
 			<div className="card">
 				<h2 className="card-title">{t.whoFinds}</h2>
 				{row("findByEmail", t.findByEmail, t.whoEmail, t.findByEmailHint)}
-				{row("findByUsername", t.findByUsername, t.whoUsername)}
+				{row("findByUsername", t.findByUsername, t.whoUsername, t.findByUsernameHint)}
 				{row("addToGroups", t.addToGroups, t.whoGroups, t.addToGroupsHint)}
 				{row("sendMessages", t.sendMessages, t.whoMessages, t.sendMessagesHint)}
 			</div>

@@ -249,6 +249,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				<button
 					type="button"
 					className="icon-btn"
+					data-info-toggle
 					aria-pressed={infoOpen}
 					aria-label={topic !== null ? copy.topics.info : copy.convo.info}
 					onClick={() => ui.toggleInfo()}

@@ -8,7 +8,7 @@ import type { Chat, DialogView } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { dayLabel, sameDay } from "../data/format.ts";
+import { countLabel, dayLabel, sameDay } from "../data/format.ts";
 import { useBackendVersion, useServices, useWindow } from "../data/services.tsx";
 import type { WindowItem } from "../data/store.ts";
 import { MessageItem } from "./message-item.tsx";
@@ -232,7 +232,7 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 					}}
 				>
 					<Icon name="arrow-down" />
-					{unread > 0 && <span className="badge">{unread}</span>}
+					{unread > 0 && <span className="badge">{countLabel(unread)}</span>}
 				</button>
 			)}
 		</div>
