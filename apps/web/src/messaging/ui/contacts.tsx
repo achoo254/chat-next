@@ -1,8 +1,10 @@
 // Contacts (mockups/chat.html#contacts): the list you curate yourself, opened
-// from "Danh bạ" in the folder rail (narrow screens: the list header). Rows
-// show the @username and presence as each person's privacy allows; the
-// search matches names without accents. A row opens the profile card on the
-// right (full screen on narrow screens, with a way back).
+// from "Danh bạ" in the folder rail (narrow screens: the list header), A–Z
+// with a letter over each group. Rows show the @username and presence as
+// each person's privacy allows; the search matches names without accents. A
+// row opens the profile card on the right (full screen on narrow screens,
+// with a way back): message, new group with them, block, the date you added
+// them and the groups you share.
 import { fold } from "@app/core";
 import { useState, type ReactNode } from "react";
 import { Icon } from "../../components/icon.tsx";
@@ -11,8 +13,9 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { contactsOf, useContacts } from "../data/contacts.ts";
-import type { Person } from "../data/remote.ts";
-import { useBackendVersion, useDialogOrder, useServices, useUser } from "../data/services.tsx";
+import type { Contact } from "../data/remote.ts";
+import { useServices, useUser } from "../data/services.tsx";
+import { useCommonChats } from "./common-chats.tsx";
 import { ContactRow } from "./contact-row.tsx";
 import { ChatAvatar, CopyButton, useDomId } from "./parts.tsx";
 import { presenceText } from "./presence.tsx";
@@ -27,7 +30,7 @@ export function ContactsView({ userId }: { userId: number }) {
 	const [query, setQuery] = useState("");
 	const t = copy.contacts;
 	const needle = fold(query.trim().replace(/^@/, ""));
-	const shown = contacts.people.filter((person) => needle === "" || fold(person.name).includes(needle) || person.username.toLowerCase().startsWith(needle));
+	const shown = contacts.entries.filter(({ person }) => needle === "" || fold(person.name).includes(needle) || person.username.toLowerCase().startsWith(needle));
 	const addButton = (primary: boolean) => (
 		<button type="button" className={primary ? "btn btn-primary" : "btn"} onClick={() => ui.dialog.set({ kind: "addContact" })}>
 			<Icon name="user-plus" />
@@ -53,7 +56,7 @@ export function ContactsView({ userId }: { userId: number }) {
 				{copy.common.loading}
 			</p>
 		);
-	} else if (contacts.people.length === 0) {
+	} else if (contacts.entries.length === 0) {
 		body = (
 			<div className="empty">
 				<Icon name="users" />
@@ -74,10 +77,18 @@ export function ContactsView({ userId }: { userId: number }) {
 	} else {
 		body = (
 			<ul className="chats contact-list" aria-label={t.title}>
-				{shown.map((person) => {
+				{shown.map(({ person }, index) => {
 					const online = person.presence.kind === "online";
+					const letter = initialLetter(person.name);
+					const previous = shown[index - 1];
+					const head = previous === undefined || initialLetter(previous.person.name) !== letter;
 					return (
 						<li key={person.id}>
+							{head && (
+								<span className="az-head" aria-hidden="true">
+									{letter}
+								</span>
+							)}
 							<Link to={paths.contacts(person.id)} className="chat-row contact-row" current={person.id === userId}>
 								<ChatAvatar id={person.id} name={person.name} bot={person.isBot} online={online} />
 								<span className="tx">
@@ -113,7 +124,7 @@ export function ContactsView({ userId }: { userId: number }) {
 						<Icon name="user-plus" />
 					</button>
 				</div>
-				{contacts.status === "ready" && contacts.people.length > 0 && (
+				{contacts.status === "ready" && contacts.entries.length > 0 && (
 					<div className="list-sub">
 						<span>{t.count(shown.length)}</span>
 						<span>{t.byName}</span>
@@ -129,40 +140,36 @@ export function ContactsView({ userId }: { userId: number }) {
 						<span>{t.pickBody}</span>
 					</div>
 				) : (
-					<ContactCard key={userId} userId={userId} listed={contacts.people.find((person) => person.id === userId)} />
+					<ContactCard key={userId} userId={userId} listed={contacts.entries.find((entry) => entry.person.id === userId)} />
 				)}
 			</section>
 		</>
 	);
 }
 
-/** The private chat with `userId` when there is one in the dialog list (0 otherwise). */
-function usePrivateChat(userId: number): number {
-	const { store } = useServices();
-	const order = useDialogOrder();
-	return order.find((chatId) => {
-		const chat = store.dialog(chatId)?.chat;
-		return chat?.type === "private" && chat.peerUserId === userId;
-	}) ?? 0;
+/** The letter a name is listed under: Vietnamese base letter (Đ stays Đ), "#" for anything else. */
+export function initialLetter(name: string): string {
+	const first = name.trim().charAt(0).toLocaleUpperCase("vi");
+	const base = first.normalize("NFD").replace(/\p{Mn}/gu, "");
+	return /\p{L}/u.test(base) ? base : "#";
 }
 
-function ContactCard({ userId, listed }: { userId: number; listed: Person | undefined }) {
+function ContactCard({ userId, listed }: { userId: number; listed: Contact | undefined }) {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
-	const { remote, backend, toasts } = useServices();
+	const { remote, toasts } = useServices();
 	const ui = useUi();
 	const user = useUser(userId);
-	const privateChat = usePrivateChat(userId);
-	useBackendVersion();
+	const common = useCommonChats(userId);
 	const [blocked, setBlocked] = useState<boolean | null>(null);
 	const [opening, setOpening] = useState(false);
 	const id = useDomId("contact");
-	const name = listed?.name ?? user?.name ?? copy.message.unknownUser;
-	const username = listed?.username ?? user?.username ?? "";
-	const isBlocked = blocked ?? listed?.isBlocked ?? user?.isBlocked ?? false;
-	const online = listed?.presence.kind === "online";
-	const muteSupported = backend.features.has("mute") && privateChat !== 0;
-	const muted = privateChat !== 0 && backend.isMuted(privateChat);
+	const person = listed?.person;
+	const name = person?.name ?? user?.name ?? copy.message.unknownUser;
+	const username = person?.username ?? user?.username ?? "";
+	const isBot = person?.isBot ?? user?.isBot ?? false;
+	const isBlocked = blocked ?? person?.isBlocked ?? user?.isBlocked ?? false;
+	const online = person?.presence.kind === "online";
 
 	const message = () => {
 		setOpening(true);
@@ -191,24 +198,19 @@ function ContactCard({ userId, listed }: { userId: number; listed: Person | unde
 				<Icon name="back" />
 			</Link>
 			<div className="info-hero">
-				<ChatAvatar id={userId} name={name} size="lg" bot={user?.isBot === true} online={online} />
+				<ChatAvatar id={userId} name={name} size="lg" bot={isBot} online={online} />
 				<h2 id={id}>{name}</h2>
-				{listed !== undefined && <span className="muted">{presenceText(listed.presence, copy, locale)}</span>}
+				{person !== undefined && <span className={online ? "muted on" : "muted"}>{presenceText(person.presence, copy, locale)}</span>}
 			</div>
 			<div className="profile-actions">
 				<button type="button" className="btn btn-primary" aria-busy={opening} disabled={opening} onClick={message}>
 					<Icon name="message" />
 					{copy.info.message}
 				</button>
-				{muteSupported && (
-					<button
-						type="button"
-						className="btn"
-						aria-pressed={muted}
-						onClick={() => backend.setMuted(privateChat, !muted).catch(() => toasts.show(copy.common.failed))}
-					>
-						<Icon name={muted ? "bell" : "bell-off"} />
-						<span>{muted ? copy.convo.unmute : copy.convo.mute}</span>
+				{!isBot && (
+					<button type="button" className="btn" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: userId })}>
+						<Icon name="users" />
+						{copy.info.createGroup}
 					</button>
 				)}
 				<button type="button" className="btn danger-text" onClick={toggleBlock}>
@@ -229,6 +231,13 @@ function ContactCard({ userId, listed }: { userId: number; listed: Person | unde
 						</span>
 						<CopyButton text={`@${username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(username)} />
 					</div>
+				)}
+				{common !== null && (
+					<button type="button" className="row link-row" onClick={() => ui.dialog.set({ kind: "profile", userId })}>
+						<Icon name="users" />
+						<span className="grow">{common.count === 0 ? copy.profile.noCommonGroups : copy.profile.commonGroups(common.count)}</span>
+						<Icon name="chevron-right" small />
+					</button>
 				)}
 				<button type="button" className="row link-row" onClick={() => ui.dialog.set({ kind: "profile", userId })}>
 					<Icon name="info" />

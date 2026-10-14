@@ -10,9 +10,10 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { countLabel, listTime, shortDate, userName } from "../data/format.ts";
+import { countLabel, listTime, shortDate } from "../data/format.ts";
 import type { Topic, TopicChange } from "../data/pending-backend.ts";
-import { useBackendVersion, useServices, useUser } from "../data/services.tsx";
+import { useBackendValue, useServices, useUser } from "../data/services.tsx";
+import { useNameOf } from "./chat-row.tsx";
 import { LabelledIcon } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { PopupMenu } from "./popup-menu.tsx";
@@ -79,9 +80,8 @@ interface TopicListProps {
 function MoreTopics({ chatId }: { chatId: number }) {
 	const copy = useScreensCopy();
 	const { backend } = useServices();
-	useBackendVersion();
 	const ref = useRef<HTMLButtonElement>(null);
-	const more = backend.hasMoreTopics(chatId);
+	const more = useBackendValue((pending) => pending.hasMoreTopics(chatId));
 	useEffect(() => {
 		const element = ref.current;
 		if (!more || element === null || typeof IntersectionObserver === "undefined") return;
@@ -102,12 +102,13 @@ function MoreTopics({ chatId }: { chatId: number }) {
 export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
-	const { backend, store, toasts } = useServices();
+	const { backend, toasts } = useServices();
 	const [menuFor, setMenuFor] = useState(0);
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const sorted = sortTopics(topics);
 	const visible = sorted.filter((topic) => !topic.hidden);
 	const hidden = sorted.filter((topic) => topic.hidden);
+	const nameOf = useNameOf(hidden.map((topic) => topic.changedBy));
 
 	const change = (topic: Topic, update: TopicChange, done: string) => {
 		setMenuFor(0);
@@ -198,7 +199,7 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 										</span>
 										{topic.changedBy !== 0 && (
 											<span className="preview">
-												{copy.topics.hiddenBy(userName(store.user(topic.changedBy), store.selfId, copy, topic.changedBy), shortDate(topic.changedAt, locale))}
+												{copy.topics.hiddenBy(nameOf(topic.changedBy), shortDate(topic.changedAt, locale))}
 											</span>
 										)}
 									</span>

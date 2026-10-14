@@ -5,10 +5,10 @@ import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNo
 
 interface PopupMenuProps {
 	label: string;
-	className?: string;
+	className?: string | undefined;
 	style?: CSSProperties;
 	/** Clicks inside this element do not close the menu (a submenu next to it). */
-	boundary?: RefObject<HTMLElement | null>;
+	boundary?: RefObject<HTMLElement | null> | undefined;
 	onClose: () => void;
 	children: ReactNode;
 }

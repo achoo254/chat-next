@@ -1,16 +1,10 @@
 // PendingBackend on the R1 server: forum topics (GetForumTopics, paged, and
 // the topic RPCs), link previews (stored by the core on each message, and
 // GetLinkPreview while typing), reports and invite previews (CheckInvite).
-// Mute, pinned chats, reactor lists, the blocked list and the moderation
-// queue have no RPC yet and stay off.
 import type { Message } from "@app/core";
 import type {
-	BlockedUser,
 	InvitePreview,
 	LinkPreview,
-	ModerationDecision,
-	ModerationDetail,
-	ModerationRow,
 	PendingBackend,
 	PendingFeature,
 	ReportReason,
@@ -18,7 +12,6 @@ import type {
 	Topic,
 	TopicChange,
 } from "./pending-backend.ts";
-import { FeatureUnavailableError } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";
 import type { TopicPages } from "./topic-mapping.ts";
 import type { ChatSource } from "./source.ts";
@@ -27,8 +20,6 @@ import { GENERAL_TOPIC } from "./general-topic.ts";
 const RELOAD_DELAY_MS = 250;
 
 type TopicPaging = typeof import("./topic-mapping.ts");
-
-const unavailable = (feature: PendingFeature) => (): Promise<never> => Promise.reject(new FeatureUnavailableError(feature));
 
 export class ServerBackend implements PendingBackend {
 	readonly features: ReadonlySet<PendingFeature> = new Set<PendingFeature>(["topics", "linkPreview", "report", "invitePreview"]);
@@ -39,7 +30,6 @@ export class ServerBackend implements PendingBackend {
 	private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
 	private readonly listeners = new Set<() => void>();
 	private readonly unsubscribe: () => void;
-	private serial = 0;
 
 	constructor(
 		protected readonly remote: Remote,
@@ -65,17 +55,12 @@ export class ServerBackend implements PendingBackend {
 	}
 
 	protected emit(): void {
-		this.serial++;
 		for (const listener of [...this.listeners]) listener();
 	}
 
 	subscribe(listener: () => void): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
-	}
-
-	version(): number {
-		return this.serial;
 	}
 
 	// ------------------------------------------------------------- topics
@@ -191,52 +176,6 @@ export class ServerBackend implements PendingBackend {
 			members: check.members.map((person) => ({ id: person.id, name: person.name, isBot: person.isBot })),
 			memberOfChatId: check.memberOfChatId,
 		};
-	}
-
-	// ------------------------------------------------------------- not on the server yet
-
-	reactors(_chatId: number, _seq: number, _emoji: string): readonly number[] | null {
-		return null;
-	}
-
-	isMuted(_chatId: number): boolean {
-		return false;
-	}
-
-	setMuted(_chatId: number, _muted: boolean, _forSeconds?: number): Promise<void> {
-		return unavailable("mute")();
-	}
-
-	isPinnedDialog(_chatId: number): boolean {
-		return false;
-	}
-
-	setPinnedDialog(_chatId: number, _pinned: boolean): Promise<void> {
-		return unavailable("pinnedDialogs")();
-	}
-
-	blockedUsers(): Promise<readonly BlockedUser[]> {
-		return unavailable("blockedList")();
-	}
-
-	async moderationScope(): Promise<string | null> {
-		return null;
-	}
-
-	moderationQueue(): Promise<readonly ModerationRow[]> {
-		return unavailable("moderation")();
-	}
-
-	moderationDetail(_id: string): Promise<ModerationDetail | null> {
-		return unavailable("moderation")();
-	}
-
-	claimReport(_id: string): Promise<void> {
-		return unavailable("moderation")();
-	}
-
-	decideReport(_id: string, _decision: ModerationDecision | "skip"): Promise<void> {
-		return unavailable("moderation")();
 	}
 }
 

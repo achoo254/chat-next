@@ -1,25 +1,32 @@
 // Test and visual-harness wiring of the messaging UI: the real client core
 // (startApp) against the core's in-memory protocol server, plus the Connect
-// routes the UI calls directly and a fixture for the backend features that do
-// not exist yet. The production ServerBackend runs on these routes; only the
-// features with no RPC yet come from fixture data. Never imported by
+// routes the UI calls directly (chats, messages, users, moderation). The
+// production ServerBackend and Remote run on these routes. Never imported by
 // production code.
 import { create, fromBinary, toBinary, type MessageInitShape } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { startApp, type ChatCore } from "@app/core";
 import { systemTimers, type NotificationRequest, type Platform, type SqlDriverFactory } from "@app/platform";
-import { ChatSchema, ChatsService, ChatType, HistoryVisibility, MemberRole, type Chat as WireChat, type Dialog as WireDialog } from "@app/proto-ts/chats";
+import {
+	AddMemberFailureReason,
+	ChatSchema,
+	ChatsService,
+	ChatType,
+	HistoryVisibility,
+	MemberRole,
+	type Chat as WireChat,
+	type Dialog as WireDialog,
+} from "@app/proto-ts/chats";
 import type { InviteLink } from "@app/proto-ts/chats";
 import { ConfigService } from "@app/proto-ts/config";
 import { MessageSchema, MessagesService, type Message as WireMessage } from "@app/proto-ts/messages";
 import { ServerFrameSchema } from "@app/proto-ts/realtime";
 import type { Update as WireUpdate } from "@app/proto-ts/updates";
-import { PrivacyAudience, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
+import { ModerationAction, ModerationService, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
+import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
 import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
-import type { BlockedUser, ModerationDetail, ModerationRow, PendingFeature } from "../../src/messaging/data/pending-backend.ts";
-import type { Remote } from "../../src/messaging/data/remote.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
 import type { ChatSource } from "../../src/messaging/data/source.ts";
 
@@ -61,6 +68,22 @@ export interface FixturePreview {
 }
 
 const num = (value: bigint): number => Number(value);
+
+/** A report in the fixture's moderation queue (ModerationService). */
+export interface FixtureReport {
+	id: number;
+	kind: ReportTargetKind;
+	reporterId: number;
+	targetUserId: number;
+	targetChatId: number;
+	seqs: number[];
+	reason: ReportReason;
+	comment: string;
+	status: ReportStatus;
+	createdAt: number;
+	actions: ModerationAction[];
+	note: string;
+}
 
 /** Copies the fields of `patch` onto `target` (protobuf-es messages are plain objects). */
 function assign(target: object, patch: object): void {
@@ -119,11 +142,41 @@ export class ChatFixture {
 	topicPageSize = 100;
 	/** Read dates per reader, by `${chatId}:${seq}`; readers without one have none. */
 	readonly readDates = new Map<string, Map<number, number>>();
+	/** Who reacted with what, by `${chatId}:${seq}` (GetMessageReactions), newest first. */
+	readonly reactors = new Map<string, { userId: number; emoji: string; date: number }[]>();
+	/** When each contact was added (GetContacts.contacts). */
+	readonly contactDates = new Map<number, number>();
+	/** When each blocked user was blocked (GetBlockedUsers). */
+	readonly blockedAt = new Map<number, number>();
+	/** Chats that reached their member limit (AddMembers: TOO_MANY). */
+	readonly fullChats = new Set<number>();
+	/** LeaveChat requests: the chat and the admin the owner picked (0 for none). */
+	readonly leaves: { chatId: number; newOwnerId: number }[] = [];
+	/** PinMessage requests that asked to pin quietly (silent). */
+	readonly silentPins: number[] = [];
+	/** Deleted chats (DeleteChat). */
+	readonly deletedChats: number[] = [];
+	/** SetDialogMute requests. */
+	readonly mutes: { chatId: number; durationSeconds: number; forever: boolean }[] = [];
+	/** GetSelf.is_operator: may use the moderation queue. */
+	operator = false;
+	readonly reportQueue: FixtureReport[] = [];
+	/** Users restricted by moderation, with the end (0: until lifted). */
+	readonly restrictions = new Map<number, number>();
+	readonly lifted: number[] = [];
+	private pinnedChats: number[] = [];
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
 		this.selfUsername = selfUsername;
 		this.selfId = this.addUser(selfName, { username: selfUsername });
+		// FakeServer sends per-user updates that name no chat (pinned_dialogs,
+		// chat_deleted) with the entities of chat 0, which a live session needs
+		// to exist: an empty group nobody is in stands in for it.
+		const chats: unknown = Reflect.get(this.server, "chats");
+		if (!(chats instanceof Map)) throw new Error("FakeServer keeps its chats in a map");
+		const placeholder = this.server.createChat(ChatType.GROUP, "", []);
+		chats.set(0, chats.get(placeholder));
 	}
 
 	addUser(name: string, extras: UserExtras = {}): number {
@@ -165,6 +218,24 @@ export class ChatFixture {
 			if (topic === topicId) top = Math.max(top, seq);
 		}
 		return top;
+	}
+
+	/** A reaction the server knows who set (GetMessageReactions lists it). */
+	react(userId: number, chatId: number, seq: number, emoji: string): void {
+		this.server.react(userId, chatId, seq, emoji);
+		const key = `${chatId}:${seq}`;
+		this.reactors.set(key, [{ userId, emoji, date: 1_760_400_000 + (this.reactors.get(key)?.length ?? 0) }, ...(this.reactors.get(key) ?? [])]);
+	}
+
+	/** Mutes a chat for the signed-in user until `until` (0 unmutes), as another session would. */
+	mute(chatId: number, until: number): void {
+		this.server.muteDialog(this.selfId, chatId, until);
+	}
+
+	/** Pins chats for the signed-in user, top first, as another session would. */
+	pinChats(chatIds: readonly number[]): void {
+		this.pinnedChats = [...chatIds];
+		this.server.pinDialogs(this.selfId, chatIds);
 	}
 
 	mentions(chatId: number, count: number): void {
@@ -358,7 +429,7 @@ export class ChatFixture {
 	userRoutes(router: ConnectRouter): void {
 		const self = () => this.wireUser(this.selfId);
 		router.service(UsersService, {
-			getSelf: () => ({ user: self() }),
+			getSelf: () => ({ user: self(), isOperator: this.operator }),
 			getUsers: (req) => ({ users: req.userIds.map((id) => this.wireUser(num(id))) }),
 			searchUsers: (req) => {
 				const q = req.query.toLowerCase();
@@ -372,11 +443,21 @@ export class ChatFixture {
 			},
 			block: (req) => {
 				this.blocked.add(num(req.userId));
+				this.blockedAt.set(num(req.userId), 1_760_500_000);
 				return {};
 			},
 			unblock: (req) => {
 				this.blocked.delete(num(req.userId));
+				this.blockedAt.delete(num(req.userId));
 				return {};
+			},
+			getBlockedUsers: () => {
+				const ids = [...this.blocked].sort((a, b) => (this.blockedAt.get(b) ?? 0) - (this.blockedAt.get(a) ?? 0));
+				return {
+					blocked: ids.map((id) => ({ userId: BigInt(id), blockedAt: BigInt(this.blockedAt.get(id) ?? 0) })),
+					users: ids.map((id) => this.wireUser(id)),
+					nextCursor: "",
+				};
 			},
 			addContact: (req) => {
 				const target = req.target;
@@ -392,6 +473,7 @@ export class ChatFixture {
 					throw new ConnectError("user not found", Code.NotFound);
 				}
 				this.contacts.add(id);
+				this.contactDates.set(id, 1_760_500_000);
 				return { user: this.wireUser(id) };
 			},
 			deleteContact: (req) => {
@@ -403,7 +485,11 @@ export class ChatFixture {
 				const after = req.cursor === "" ? 0 : Number(req.cursor);
 				const page = ids.filter((id) => id > after).slice(0, this.contactsPageSize);
 				const last = page.at(-1) ?? 0;
-				return { users: page.map((id) => this.wireUser(id)), nextCursor: ids.some((id) => id > last) && page.length > 0 ? String(last) : "" };
+				return {
+					users: page.map((id) => this.wireUser(id)),
+					contacts: page.map((id) => ({ userId: BigInt(id), addedAt: BigInt(this.contactDates.get(id) ?? 1_757_000_000) })),
+					nextCursor: ids.some((id) => id > last) && page.length > 0 ? String(last) : "",
+				};
 			},
 			report: (req) => {
 				const target = req.target.case === "messages" ? `messages:${num(req.target.value.chatId)}:${req.target.value.seqs.map(num).join(",")}` : `${req.target.case ?? ""}:${String(req.target.value ?? "")}`;
@@ -478,6 +564,7 @@ export class ChatFixture {
 			},
 			pinMessage: (req) => {
 				this.pins.push({ chatId: num(req.chatId), seq: num(req.seq), pinned: true });
+				if (req.silent) this.silentPins.push(num(req.seq));
 				this.server.pin(num(req.chatId), num(req.seq), true);
 				return {};
 			},
@@ -490,7 +577,17 @@ export class ChatFixture {
 				this.forwards.push({ from: num(req.fromChatId), seqs: req.seqs.map(num), to: num(req.toChatId) });
 				return {};
 			},
+			getMessageReactions: (req) => {
+				const all = this.reactors.get(`${num(req.chatId)}:${num(req.seq)}`) ?? [];
+				const list = req.emoji === "" ? all : all.filter((reactor) => reactor.emoji === req.emoji);
+				return {
+					reactors: list.map((reactor) => ({ userId: BigInt(reactor.userId), emoji: reactor.emoji, date: BigInt(reactor.date) })),
+					users: [...new Set(list.map((reactor) => reactor.userId))].map((id) => this.wireUser(id)),
+					nextCursor: "",
+				};
+			},
 		});
+		this.moderationRoutes(router);
 		router.service(ChatsService, {
 			createPrivate: (req) => {
 				const userId = num(req.userId);
@@ -502,9 +599,16 @@ export class ChatFixture {
 				return { chat: this.server.wireChat(chatId, this.selfId) };
 			},
 			createGroup: (req) => {
-				const chatId = this.createChat(ChatType.GROUP, req.title, [this.selfId, ...req.userIds.map(num)], { myRole: MemberRole.OWNER });
+				const refused = req.userIds.map(num).filter((id) => this.refusesGroups.has(id));
+				const added = req.userIds.map(num).filter((id) => !this.refusesGroups.has(id));
+				const chatId = this.createChat(ChatType.GROUP, req.title, [this.selfId, ...added], { myRole: MemberRole.OWNER });
+				this.setRole(chatId, this.selfId, MemberRole.OWNER);
 				this.send(this.selfId, chatId, "", { action: { kind: { case: "chatCreated", value: { title: req.title } } } });
-				return { chat: this.server.wireChat(chatId, this.selfId), failedUserIds: [] };
+				return {
+					chat: this.server.wireChat(chatId, this.selfId),
+					failedUserIds: refused.map(BigInt),
+					failures: refused.map((id) => ({ userId: BigInt(id), reason: AddMemberFailureReason.PRIVACY_ADD_TO_GROUPS })),
+				};
 			},
 			createChannel: (req) => {
 				const chatId = this.createChat(ChatType.CHANNEL, req.title, [this.selfId], { myRole: MemberRole.OWNER, about: req.about });
@@ -531,16 +635,30 @@ export class ChatFixture {
 			},
 			addMembers: (req) => {
 				const chatId = num(req.chatId);
-				const failed: bigint[] = [];
+				const failures: { userId: bigint; reason: AddMemberFailureReason }[] = [];
 				for (const id of req.userIds.map(num)) {
-					if (this.refusesGroups.has(id)) {
-						failed.push(BigInt(id));
+					const reason = !this.names.has(id)
+						? AddMemberFailureReason.NOT_FOUND
+						: (this.members.get(chatId) ?? []).includes(id)
+							? AddMemberFailureReason.ALREADY_MEMBER
+							: (this.bans.get(chatId) ?? []).some((ban) => ban.userId === id)
+								? AddMemberFailureReason.BANNED
+								: this.refusesGroups.has(id)
+									? AddMemberFailureReason.PRIVACY_ADD_TO_GROUPS
+									: this.fullChats.has(chatId)
+										? AddMemberFailureReason.TOO_MANY
+										: AddMemberFailureReason.UNSPECIFIED;
+					if (reason !== AddMemberFailureReason.UNSPECIFIED) {
+						failures.push({ userId: BigInt(id), reason });
 						continue;
 					}
 					this.server.addMember(chatId, id, this.selfId);
 					this.members.get(chatId)?.push(id);
 				}
-				return { failedUserIds: failed };
+				return {
+					failedUserIds: failures.filter((failure) => failure.reason !== AddMemberFailureReason.ALREADY_MEMBER).map((failure) => failure.userId),
+					failures,
+				};
 			},
 			removeMember: (req) => {
 				const chatId = num(req.chatId);
@@ -570,7 +688,40 @@ export class ChatFixture {
 				if (this.ownerNeedsAdmin.has(num(req.chatId))) {
 					throw new ConnectError("owner_needs_admin: appoint an admin before leaving", Code.FailedPrecondition);
 				}
+				this.leaves.push({ chatId: num(req.chatId), newOwnerId: num(req.newOwnerId) });
 				return {};
+			},
+			setDialogMute: (req) => {
+				const chatId = num(req.chatId);
+				this.mutes.push({ chatId, durationSeconds: req.durationSeconds, forever: req.forever });
+				const until = req.forever ? 2_147_483_647 : req.durationSeconds > 0 ? Math.floor(Date.now() / 1000) + req.durationSeconds : 0;
+				this.server.muteDialog(this.selfId, chatId, until);
+				return { muteUntil: BigInt(until) };
+			},
+			setDialogPinned: (req) => {
+				const chatId = num(req.chatId);
+				const rest = this.pinnedChats.filter((id) => id !== chatId);
+				if (req.pinned && rest.length >= 5) throw new ConnectError("pinned_dialogs_limit: unpin a chat first", Code.FailedPrecondition);
+				this.pinChats(req.pinned ? [chatId, ...rest] : rest);
+				return { pinnedChatIds: this.pinnedChats.map(BigInt) };
+			},
+			deleteChat: (req) => {
+				const chatId = num(req.chatId);
+				this.deletedChats.push(chatId);
+				this.server.deleteChat(chatId);
+				this.members.delete(chatId);
+				return {};
+			},
+			getCommonChats: (req) => {
+				const userId = num(req.userId);
+				const ids = [...this.members.entries()]
+					.filter(([chatId, list]) => {
+						const type = this.server.wireChat(chatId, this.selfId).type;
+						return (type === ChatType.GROUP || type === ChatType.CHANNEL) && list.includes(userId) && list.includes(this.selfId);
+					})
+					.map(([chatId]) => chatId)
+					.sort((a, b) => a - b);
+				return { chats: ids.map((chatId) => this.server.wireChat(chatId, this.selfId)), count: ids.length, nextCursor: "" };
 			},
 			setAdmin: (req) => {
 				this.setRole(num(req.chatId), num(req.userId), req.admin ? MemberRole.ADMIN : MemberRole.MEMBER);
@@ -671,6 +822,83 @@ export class ChatFixture {
 			},
 		});
 	}
+
+	/** ModerationService on the fixture's report queue (operators only, as on the server). */
+	moderationRoutes(router: ConnectRouter): void {
+		const report = (r: FixtureReport) => ({
+			id: BigInt(r.id),
+			targetKind: r.kind,
+			reporterId: BigInt(r.reporterId),
+			targetUserId: BigInt(r.targetUserId),
+			targetChatId: BigInt(r.targetChatId),
+			seqs: r.seqs.map(BigInt),
+			reason: r.reason,
+			comment: r.comment,
+			status: r.status,
+			createdAt: BigInt(r.createdAt),
+			actions: r.actions,
+			resolutionNote: r.note,
+			resolvedBy: BigInt(r.status === ReportStatus.OPEN ? 0 : this.selfId),
+			resolvedAt: BigInt(r.status === ReportStatus.OPEN ? 0 : r.createdAt + 600),
+		});
+		const operator = () => {
+			if (!this.operator) throw new ConnectError("not an operator", Code.PermissionDenied);
+		};
+		const find = (id: bigint): FixtureReport => {
+			const found = this.reportQueue.find((r) => r.id === num(id));
+			if (found === undefined) throw new ConnectError("no such report", Code.NotFound);
+			return found;
+		};
+		const chatsOf = (ids: readonly number[]) => ids.filter((id) => id !== 0 && this.members.has(id)).map((id) => this.server.wireChat(id, this.selfId));
+		const usersOf = (ids: readonly number[]) => [...new Set(ids)].filter((id) => this.names.has(id)).map((id) => this.wireUser(id));
+		router.service(ModerationService, {
+			getReports: (req) => {
+				operator();
+				const status = req.status === ReportStatus.UNSPECIFIED ? ReportStatus.OPEN : req.status;
+				const list = this.reportQueue.filter((r) => r.status === status).sort((a, b) => b.createdAt - a.createdAt);
+				return {
+					reports: list.map(report),
+					users: usersOf(list.flatMap((r) => [r.reporterId, r.targetUserId])),
+					chats: chatsOf(list.map((r) => r.targetChatId)),
+					nextCursor: "",
+				};
+			},
+			getReport: (req) => {
+				operator();
+				const r = find(req.reportId);
+				const messages = r.kind === ReportTargetKind.MESSAGES ? this.server.expectedMessages(r.targetChatId, this.selfId) : [];
+				const around = messages.filter((m) => r.seqs.some((seq) => Math.abs(m.seq - seq) <= 5));
+				return {
+					report: report(r),
+					evidence: around.filter((m) => r.seqs.includes(m.seq)).map((m) => ({ seq: BigInt(m.seq), fromId: BigInt(m.fromId), date: BigInt(m.date), text: m.text, deleted: false })),
+					context: around.map((m) => ({ chatId: BigInt(r.targetChatId), seq: BigInt(m.seq), fromId: BigInt(m.fromId), date: BigInt(m.date), text: m.text })),
+					users: usersOf([r.reporterId, r.targetUserId, ...around.map((m) => m.fromId), ...this.restrictions.keys()]),
+					...(r.targetChatId === 0 || !this.members.has(r.targetChatId) ? {} : { chat: this.server.wireChat(r.targetChatId, this.selfId) }),
+					history: [],
+					restrictions: [...this.restrictions].map(([userId, until]) => ({ userId: BigInt(userId), until: BigInt(until), reason: "", createdAt: 1_760_000_000n })),
+				};
+			},
+			resolveReport: (req) => {
+				operator();
+				const r = find(req.reportId);
+				if (r.status !== ReportStatus.OPEN) throw new ConnectError("report closed", Code.FailedPrecondition);
+				if (req.note.trim() === "") throw new ConnectError("note required", Code.InvalidArgument);
+				r.status = req.actions.includes(ModerationAction.DISMISS) ? ReportStatus.DISMISSED : ReportStatus.RESOLVED;
+				r.actions = [...req.actions];
+				r.note = req.note;
+				if (req.actions.includes(ModerationAction.RESTRICT_ACCOUNT) && r.targetUserId !== 0) {
+					this.restrictions.set(r.targetUserId, req.restrictSeconds === 0 ? 0 : 1_760_000_000 + req.restrictSeconds);
+				}
+				return { report: report(r) };
+			},
+			liftRestriction: (req) => {
+				operator();
+				this.restrictions.delete(num(req.userId));
+				this.lifted.push(num(req.userId));
+				return {};
+			},
+		});
+	}
 }
 
 /** The in-process core seen through the same interface as the worker client. */
@@ -693,97 +921,13 @@ export function toSource(core: ChatCore): ChatSource {
 	};
 }
 
-/** Fixture data for the features that have no RPC yet. */
-export interface FixtureBackendData {
-	readonly reactors?: ReadonlyMap<string, readonly number[]>;
-	readonly muted?: ReadonlySet<number>;
-	readonly pinnedDialogs?: ReadonlySet<number>;
-	readonly blocked?: readonly BlockedUser[];
-	readonly moderation?: { readonly scope: string; readonly rows: readonly ModerationRow[]; readonly details: ReadonlyMap<string, ModerationDetail> };
-}
-
-/** The production ServerBackend plus fixture data for the features with no RPC yet. */
-export class FixtureBackend extends ServerBackend {
-	override readonly features = new Set<PendingFeature>([
-		"topics",
-		"linkPreview",
-		"report",
-		"invitePreview",
-		"reactors",
-		"mute",
-		"pinnedDialogs",
-		"blockedList",
-		"moderation",
-	]);
-	private readonly muted: Set<number>;
-	private readonly pinned: Set<number>;
-
-	constructor(
-		remote: Remote,
-		source: ChatSource,
-		private readonly data: FixtureBackendData,
-	) {
-		super(remote, source, "https://chat.example.test");
-		this.muted = new Set(data.muted ?? []);
-		this.pinned = new Set(data.pinnedDialogs ?? []);
-	}
-
-	override reactors(chatId: number, seq: number, emoji: string): readonly number[] | null {
-		return this.data.reactors?.get(`${chatId}:${seq}:${emoji}`) ?? null;
-	}
-
-	override isMuted(chatId: number): boolean {
-		return this.muted.has(chatId);
-	}
-
-	override async setMuted(chatId: number, muted: boolean): Promise<void> {
-		if (muted) this.muted.add(chatId);
-		else this.muted.delete(chatId);
-		this.emit();
-	}
-
-	override isPinnedDialog(chatId: number): boolean {
-		return this.pinned.has(chatId);
-	}
-
-	override async setPinnedDialog(chatId: number, pinned: boolean): Promise<void> {
-		if (pinned) this.pinned.add(chatId);
-		else this.pinned.delete(chatId);
-		this.emit();
-	}
-
-	override async blockedUsers(): Promise<readonly BlockedUser[]> {
-		return this.data.blocked ?? [];
-	}
-
-	override async moderationScope(): Promise<string | null> {
-		return this.data.moderation?.scope ?? null;
-	}
-
-	override async moderationQueue(): Promise<readonly ModerationRow[]> {
-		return this.data.moderation?.rows ?? [];
-	}
-
-	override async moderationDetail(id: string): Promise<ModerationDetail | null> {
-		return this.data.moderation?.details.get(id) ?? null;
-	}
-
-	override async claimReport(): Promise<void> {}
-
-	override async decideReport(): Promise<void> {}
-}
-
-/**
- * Connector for <App messagingConnector>: the real core on the fixture
- * server. With `data` the backend also fakes the features that have no RPC.
- */
-export function fixtureConnector(fixture: ChatFixture, sql: () => Promise<SqlDriverFactory>, data?: FixtureBackendData): MessagingConnector {
+/** Connector for <App messagingConnector>: the real core on the fixture server. */
+export function fixtureConnector(fixture: ChatFixture, sql: () => Promise<SqlDriverFactory>): MessagingConnector {
 	return async () => {
 		const core = await fixture.startCore(await sql());
 		const client: MessagingClient = {
 			source: toSource(core),
-			createBackend: (remote, source) =>
-				data === undefined ? new ServerBackend(remote, source, "https://chat.example.test") : new FixtureBackend(remote, source, data),
+			createBackend: (remote, source) => new ServerBackend(remote, source, "https://chat.example.test"),
 			coldSnapshot: () => null,
 			saveSnapshot: async () => undefined,
 			signOutAndLeave: () => core.signOut(),

@@ -1,18 +1,21 @@
 // The messaging screen (mockups/chat.html#app): folder rail, chat list (or
-// the topic list of an open group with topics, or the contacts list),
-// conversation and the info column. On narrow screens one column shows at a
-// time (#narrow); the info column handles its overlay and narrow behaviour
-// itself (info-panel.tsx).
+// the topic list of an open group with topics, or the contacts list) with its
+// width handle, conversation and the info column. On narrow screens one
+// column shows at a time (#narrow); the info column handles its overlay and
+// narrow behaviour itself (info-panel.tsx). Screen-wide shortcuts
+// (settings.html#shortcuts): ⌘/Ctrl+K or F search, ⌘/Ctrl+1…5 pick a folder,
+// ⌘/Ctrl+/ opens the shortcut list.
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { navigate, paths, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { dialogTitle, type Folder } from "../data/format.ts";
+import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatListColumn } from "./chat-list.tsx";
 import { Conversation, EmptyConversation } from "./conversation.tsx";
 import { DialogHost } from "./dialog-host.tsx";
 import { FolderRail } from "./folder-rail.tsx";
+import { ListResizer } from "./list-resizer.tsx";
 import { Cell, ComposerIntents, UiContext, useCell, type DialogRequest, type ListMenuTarget, type MenuTarget, type Ui } from "./ui-context.tsx";
 
 const WIDE_QUERY = "(min-width: 1101px)";
@@ -38,6 +41,8 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 	const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
 	const [visible, setVisible] = useState<readonly number[]>([]);
 	const searchRef = useRef<HTMLInputElement>(null);
+	const appRef = useRef<HTMLDivElement>(null);
+	const contacts = route.name === "contacts";
 
 	const ui = useMemo<Ui>(
 		() => ({
@@ -53,16 +58,35 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
-			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+			if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+			const key = event.key.toLowerCase();
+			if (key === "k" || key === "f") {
 				event.preventDefault();
-				searchRef.current?.focus();
+				// Contacts, a topic list or an admin page hold the column: go back to the chat list first.
+				if (searchRef.current === null) navigate(paths.home);
+				requestAnimationFrame(() => {
+					searchRef.current?.focus();
+					searchRef.current?.select();
+				});
+				return;
+			}
+			if (key === "/") {
+				event.preventDefault();
+				navigate(paths.settings("shortcuts"));
+				return;
+			}
+			const index = Number(key) - 1;
+			const picked = Number.isInteger(index) ? FOLDERS[index] : undefined;
+			if (picked !== undefined) {
+				event.preventDefault();
+				setFolder(picked);
+				if (route.name === "contacts") navigate(paths.home);
 			}
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, []);
+	}, [route]);
 
-	const contacts = route.name === "contacts";
 	const chatId = route.name === "chat" ? route.chatId : 0;
 	const panel = route.name === "chat" ? route.panel : "chat";
 	const chat = useChat(chatId);
@@ -95,7 +119,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 
 	return (
 		<UiContext value={ui}>
-			<div className={classes}>
+			<div className={classes} ref={appRef}>
 				<FolderRail self={self} folder={contacts ? null : folder} onFolder={pickFolder} />
 				{contacts ? (
 					<Suspense fallback={<section className="list" aria-busy="true" />}>
@@ -126,6 +150,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 						)}
 					</>
 				)}
+				<ListResizer app={appRef} />
 			</div>
 			<DialogHost />
 			<RowMenu ui={ui} />

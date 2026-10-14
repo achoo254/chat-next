@@ -21,29 +21,29 @@ const MESSAGING_GROUPS: readonly (readonly { tab: SettingsTab; icon: IconName }[
 		{ tab: "privacy", icon: "eye-off" },
 		{ tab: "blocked", icon: "ban" },
 	],
-	[{ tab: "notifications", icon: "bell" }],
+	[
+		{ tab: "notifications", icon: "bell" },
+		{ tab: "appearance", icon: "sun" },
+		{ tab: "shortcuts", icon: "command" },
+	],
 	[{ tab: "sessions", icon: "laptop" }],
 ];
 
 /** Settings added by the messaging UI (release R1). */
 export interface MessagingSettings {
-	/** Renders the privacy, blocked and notifications tabs. */
+	/** Renders the privacy, blocked, notifications, appearance and shortcuts tabs. */
 	render: (tab: SettingsTab) => ReactNode;
 	/** Wipes the local chat data before the sign-out route. */
 	onSignOut: () => void;
-	/** Shows the link to the moderation queue. */
+	/** Shows the link to the moderation queue (operators only). */
 	moderation: boolean;
-	/** Shows the blocked people tab; it needs the server's blocked list. */
-	blockedList: boolean;
 }
 
 type TabGroups = readonly (readonly { tab: SettingsTab; icon: IconName }[])[];
 
-/** The tabs this session can use: features the server lacks are not shown. */
+/** The tabs this session can use. */
 function tabGroups(messaging: MessagingSettings | undefined): TabGroups {
-	if (messaging === undefined) return R0_GROUPS;
-	if (messaging.blockedList) return MESSAGING_GROUPS;
-	return MESSAGING_GROUPS.map((group) => group.filter((item) => item.tab !== "blocked"));
+	return messaging === undefined ? R0_GROUPS : MESSAGING_GROUPS;
 }
 
 interface SettingsProps {

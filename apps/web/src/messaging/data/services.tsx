@@ -1,7 +1,7 @@
 // Long-lived services of the messaging UI. The object never changes after
 // start-up, so a context is fine for it; everything that changes often is
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
-import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Chat, ConnectionState, DialogView, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
 import type { Drafts } from "./drafts.ts";
@@ -9,7 +9,7 @@ import type { Folder } from "./format.ts";
 import type { PendingBackend, Topic } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";
 import type { ChatSource } from "./source.ts";
-import type { ChatStore, ChatWindow, ListStatus, WindowItem } from "./store.ts";
+import type { ChatStore, ChatWindow, ListEntry, ListStatus, WindowItem } from "./store.ts";
 
 /** Short confirmation shown at the bottom of the screen (mockups: .toast). */
 export class Toasts {
@@ -79,6 +79,24 @@ export function useFolderCounts(): Readonly<Record<Folder, number>> {
 	return useStoreKey("folders", () => store.folderCounts());
 }
 
+/** The chat list's entries (kind, unread, muted, pinned), in list order. */
+export function useListEntries(): readonly ListEntry[] {
+	const { store } = useServices();
+	return useStoreKey("entries", () => store.listEntries());
+}
+
+/** One chat's list entry: muted (now), pinned, unread or marked unread. */
+export function useListEntry(chatId: number): ListEntry | undefined {
+	const { store } = useServices();
+	return useStoreKey(`entry:${chatId}`, () => store.listEntry(chatId));
+}
+
+/** Whether the chat is marked unread on this device. */
+export function useMarkedUnread(chatId: number): boolean {
+	const { store } = useServices();
+	return useStoreKey(`mark:${chatId}`, () => store.markedUnread(chatId));
+}
+
 export function useListStatus(): ListStatus {
 	const { store } = useServices();
 	return useStoreKey("list", () => store.listState());
@@ -109,6 +127,51 @@ export function useUser(userId: number): User | undefined {
 	return user;
 }
 
+const UNIT = "\u0001";
+const RECORD = "\u0002";
+
+/**
+ * Names of several users (system lines, previews, reactors), loading the
+ * unknown ones. Re-renders when any of them changes; unknown users map to "".
+ */
+export function useUserNames(ids: readonly number[]): ReadonlyMap<number, string> {
+	const { store } = useServices();
+	const key = [...new Set(ids)]
+		.filter((id) => id !== 0)
+		.sort((a, b) => a - b)
+		.join(",");
+	const subscribe = useCallback(
+		(listener: () => void) => {
+			const stops = key === "" ? [] : key.split(",").map((id) => store.subscribe(`user:${id}`, listener));
+			return () => {
+				for (const stop of stops) stop();
+			};
+		},
+		[store, key],
+	);
+	const snapshot = useSyncExternalStore(subscribe, () =>
+		key === ""
+			? ""
+			: key
+					.split(",")
+					.map((id) => `${id}${UNIT}${store.user(Number(id))?.name ?? ""}`)
+					.join(RECORD),
+	);
+	useEffect(() => {
+		if (key === "") return;
+		for (const id of key.split(",")) store.wantUser(Number(id));
+	}, [store, key]);
+	return useMemo(() => {
+		const names = new Map<number, string>();
+		if (snapshot === "") return names;
+		for (const record of snapshot.split(RECORD)) {
+			const [id = "0", name = ""] = record.split(UNIT);
+			names.set(Number(id), name);
+		}
+		return names;
+	}, [snapshot]);
+}
+
 export function useConnection(): ConnectionState {
 	const { store } = useServices();
 	return useStoreKey("connection", () => store.connectionState());
@@ -135,11 +198,15 @@ export function useMessage(chatId: number, seq: number): StoredMessage | null | 
 	return message;
 }
 
-/** Re-renders when state kept by the pending backend (topics, mute) changes. */
-export function useBackendVersion(): number {
+/**
+ * A value kept by the pending backend (topics and their paging), read through
+ * a subscription so the component re-renders when it changes. `read` must
+ * return the same value while nothing changed (the backend caches it).
+ */
+export function useBackendValue<T>(read: (backend: PendingBackend) => T): T {
 	const { backend } = useServices();
 	const subscribe = useCallback((listener: () => void) => backend.subscribe(listener), [backend]);
-	return useSyncExternalStore(subscribe, () => backend.version());
+	return useSyncExternalStore(subscribe, () => read(backend));
 }
 
 export function useToast(): string {
@@ -158,10 +225,10 @@ export function useDraft(chatId: number, topicId = 0): string {
 /** Topics of a forum group (null for any other chat), loaded on demand. */
 export function useTopics(chatId: number, forum: boolean): readonly Topic[] | null {
 	const { backend } = useServices();
-	useBackendVersion();
 	const enabled = forum && backend.features.has("topics");
+	const topics = useBackendValue((pending) => (enabled ? pending.topics(chatId) : null));
 	useEffect(() => {
 		if (enabled) backend.loadTopics(chatId);
 	}, [backend, chatId, enabled]);
-	return enabled ? backend.topics(chatId) : null;
+	return topics;
 }

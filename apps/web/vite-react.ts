@@ -2,15 +2,13 @@
 // perf runs measure the code that ships.
 //
 // React Compiler is wired but off by default; REACT_COMPILER=1 turns it on
-// for a build or test run. Two things must hold before it becomes the
-// default:
-// - Render reads no mutable state straight from the store or the pending
-//   backend (`backend.isMuted(id)`, `store.user(id)` after a hook that only
-//   forces a re-render): the compiler memoizes those calls and the UI goes
-//   stale. Five messaging tests fail with it on until every read goes
-//   through a subscribing hook (useDialog, useUser, ... in services.tsx).
-// - The startup bundle keeps the perf gate's 150 KB budget with the
-//   compiler's output (about +19 KB gzip today; test/perf/budgets.ts).
+// for a build or test run. Render reads no mutable state straight from the
+// store or the pending backend any more (every read goes through a
+// subscribing hook in services.tsx: useDialog, useListEntry, useUserNames,
+// useBackendValue, ...), and the whole web test suite passes with the
+// compiler on. What keeps it off is the startup bundle: with the compiler's
+// output a signed-in start loads 166.8 KB gzip against the perf gate's
+// 150 KB budget (148.5 KB without it; test/perf/budgets.ts).
 // The lint rules of eslint-plugin-react-hooks (recommended-latest) already
 // enforce what the compiler needs, so every component compiles today.
 import babel from "@rolldown/plugin-babel";

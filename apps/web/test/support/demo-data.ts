@@ -2,7 +2,9 @@
 // #topics), seeded into the core's in-memory server. Test and harness only.
 import { ChatType, HistoryVisibility, MemberRole } from "@app/proto-ts/chats";
 import { EntityType } from "@app/proto-ts/messages";
-import { ChatFixture, type FixtureBackendData, type FixtureTopic } from "./fake-chat.ts";
+import { ModerationAction, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
+import { ReportReason } from "@app/proto-ts/users";
+import { ChatFixture, type FixtureTopic } from "./fake-chat.ts";
 
 /** Entity for the first occurrence of `needle` in `text` (UTF-16 offsets). */
 export function entity(type: EntityType, text: string, needle: string, extra: { url?: string; language?: string; userId?: bigint } = {}) {
@@ -13,8 +15,6 @@ export function entity(type: EntityType, text: string, needle: string, extra: { 
 
 export interface Demo {
 	readonly fixture: ChatFixture;
-	/** Fixture data for the features that have no RPC yet. */
-	readonly data: FixtureBackendData;
 	readonly ids: {
 		readonly ops: number;
 		readonly lanAnh: number;
@@ -65,10 +65,10 @@ export function seedDemo(): Demo {
 			entity(EntityType.TEXT_LINK, upgrade, "wiki vận hành", { url: "https://wiki.hoandat.com/van-hanh" }),
 		],
 	});
-	f.server.react(lan, ops, upgradeSeq, "👍");
-	f.server.react(minh, ops, upgradeSeq, "👍");
-	f.server.react(me, ops, upgradeSeq, "👍");
-	f.server.react(huy, ops, upgradeSeq, "👀");
+	f.react(lan, ops, upgradeSeq, "👍");
+	f.react(minh, ops, upgradeSeq, "👍");
+	f.react(me, ops, upgradeSeq, "👍");
+	f.react(huy, ops, upgradeSeq, "👀");
 	const code = "Lịch nâng cấp postgres-17 trên box lab: bắt đầu 09:30, không phải 09:00. Mã phòng họp: 482 913. Sau khi xong chạy make migrate.\npg_upgrade -b /usr/lib/postgresql/16/bin \\\n  -B /usr/lib/postgresql/17/bin --check";
 	const codeSeq = f.send(huy, ops, code, {
 		entities: [
@@ -93,7 +93,7 @@ export function seedDemo(): Demo {
 	};
 	f.previews.push(preview);
 	const docsSeq = f.send(huy, ops, docs, { entities: [entity(EntityType.URL, docs, "https://docs.example.com/postgres/upgrade")], linkPreview: preview });
-	f.server.react(huy, ops, docsSeq, "🎉");
+	f.react(huy, ops, docsSeq, "🎉");
 	f.send(lan, ops, "Replica đã bắt kịp, độ trễ dưới 1 giây.", { replyToSeq: BigInt(codeSeq), editDate: BigInt(Math.floor(Date.now() / 1000)), editVersion: 1 });
 	const mentionText = "@ductrung xem giúp mục 3 trong checklist nhé, mình cần chốt trước 10:00.";
 	const mention = f.send(huy, ops, mentionText, { entities: [entity(EntityType.MENTION, mentionText, "@ductrung")] });
@@ -125,7 +125,7 @@ export function seedDemo(): Demo {
 	const askText = "@ductrung bạn xem giúp phần chữ của nút đăng nhập bằng domain khác.";
 	f.send(ha, forum, askText, { topicId: DESIGN, replyToSeq: BigInt(f1), entities: [entity(EntityType.MENTION, askText, "@ductrung")] });
 	const f4 = f.send(ducAnh, forum, "Ổn, API trả đủ trường cho màn này rồi.", { topicId: DESIGN });
-	f.server.react(ha, forum, f4, "👍");
+	f.react(ha, forum, f4, "👍");
 	f.send(ducAnh, forum, "PR phân trang lịch sử đã merge", { topicId: 4n });
 	f.send(ngoc, forum, "Thứ Sáu họp tổng kết lúc 16:00", { topicId: 1n });
 	f.mentions(forum, 1);
@@ -165,45 +165,29 @@ export function seedDemo(): Demo {
 	f.inviteChecks.set("bannedlink", { title: "Team Mobile", type: ChatType.GROUP, memberCount: 24, memberOf: 0, banned: true });
 	// Contacts the user added (#contacts); Thu Hà shares a group but is not one.
 	for (const id of [ngoc, lan, huy]) f.contacts.add(id);
-	const data: FixtureBackendData = {
-		reactors: new Map([[`${ops}:${upgradeSeq}:👍`, [huy, lan, minh]]]),
-		muted: new Set([mobile]),
-		pinnedDialogs: new Set([ops]),
-		blocked: [
-			{ id: 9001, name: "Nhận quà 24h", username: "nhanqua24h", isBot: false, blockedAt: now - 86_400 },
-			{ id: 9002, name: "Crypto Signal", username: "cryptosignal_bot", isBot: true, blockedAt: now - 1_000_000 },
-		],
-		moderation: {
-			scope: "hoandat.com",
-			rows: [
-				{ id: "R-20481", object: "message", title: "Tin của @nhanqua24h", subtitle: "Chúc mừng 50 bạn may mắn nhận iPhone 16…", reason: "scam", reports: 13, status: "open", reviewer: "", latestAt: now - 1800 },
-				{ id: "R-20477", object: "user", title: "Nhận quà 24h", subtitle: "@nhanqua24h", reason: "spam", reports: 9, status: "open", reviewer: "Minh", latestAt: now - 2400 },
-				{ id: "R-20410", object: "message", title: "Tin của @binhtv", subtitle: "Đe doạ trong nhóm Bóng đá chiều T5", reason: "violence", reports: 2, status: "handled", reviewer: "", latestAt: now - 90_000 },
-			],
-			details: new Map([
-				[
-					"R-20481",
-					{
-						row: { id: "R-20481", object: "message", title: "Tin của @nhanqua24h", subtitle: "Chúc mừng 50 bạn may mắn nhận iPhone 16…", reason: "scam", reports: 13, status: "open", reviewer: "", latestAt: now - 1800 },
-						context: [
-							{ seq: 41, fromName: "Trần Hải", text: "Có ai biết chỗ bán tai nghe chính hãng không?", date: now - 2400, reported: false },
-							{ seq: 42, fromName: "Nhận quà 24h", text: "Chúc mừng 50 bạn may mắn nhận iPhone 16. Bấm nhan-qua24h.top/nhan và nhập mã đăng nhập để nhận.", date: now - 2000, reported: true },
-							{ seq: 43, fromName: "Mai Phương", text: "Link này lừa đảo đấy mọi người ơi.", date: now - 1900, reported: false },
-						],
-						reasons: [
-							{ reason: "scam", count: 9 },
-							{ reason: "spam", count: 4 },
-						],
-						notes: ["Link giả trang đăng nhập Google, đừng bấm."],
-						history: [{ action: "Cảnh cáo", by: "Quang Huy", at: now - 50_000, note: "Spam vào nhóm" }],
-					},
-				],
-			]),
-		},
-	};
+	// Pinned on top and muted, as set on another session (#list-states).
+	f.pinChats([ops]);
+	f.mute(mobile, 2_147_483_647);
+	// People blocked earlier (settings.html#blocked).
+	const spammer = f.addUser("Nhận quà 24h", { username: "nhanqua24h" });
+	const signals = f.addUser("Crypto Signal", { username: "cryptosignal_bot", isBot: true });
+	f.blocked.add(spammer);
+	f.blockedAt.set(spammer, now - 86_400);
+	f.blocked.add(signals);
+	f.blockedAt.set(signals, now - 1_000_000);
+	// The moderation queue an operator sees (moderation.html#queue).
+	const deals = f.createChat(ChatType.GROUP, "Hội săn deal công nghệ", [me, minh, spammer]);
+	f.send(minh, deals, "Có ai biết chỗ bán tai nghe chính hãng không?");
+	const scam = f.send(spammer, deals, "Chúc mừng 50 bạn may mắn nhận iPhone 16. Bấm nhan-qua24h.top/nhan và nhập mã đăng nhập để nhận.");
+	f.send(minh, deals, "Link này lừa đảo đấy mọi người ơi.");
+	f.server.readHistory(me, deals, scam + 1);
+	f.reportQueue.push(
+		{ id: 20481, kind: ReportTargetKind.MESSAGES, reporterId: minh, targetUserId: 0, targetChatId: deals, seqs: [scam], reason: ReportReason.SCAM, comment: "Link giả trang đăng nhập, đừng bấm.", status: ReportStatus.OPEN, createdAt: now - 1800, actions: [], note: "" },
+		{ id: 20477, kind: ReportTargetKind.USER, reporterId: lan, targetUserId: spammer, targetChatId: 0, seqs: [], reason: ReportReason.SPAM, comment: "", status: ReportStatus.OPEN, createdAt: now - 2400, actions: [], note: "" },
+		{ id: 20410, kind: ReportTargetKind.CHAT, reporterId: huy, targetUserId: 0, targetChatId: channel, seqs: [], reason: ReportReason.VIOLENCE, comment: "", status: ReportStatus.RESOLVED, createdAt: now - 90_000, actions: [ModerationAction.DELETE_MESSAGES], note: "Đã gỡ bài đe doạ" },
+	);
 	return {
 		fixture: f,
-		data,
 		ids: {
 			ops,
 			lanAnh,

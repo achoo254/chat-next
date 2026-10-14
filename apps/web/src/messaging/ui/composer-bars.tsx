@@ -4,9 +4,10 @@
 // time one shows.
 import { Icon } from "../../components/icon.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { messagePreview, userName } from "../data/format.ts";
+import { messagePreview, namedUserIds } from "../data/format.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
-import { useChat, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useChat, useMessage, useServices } from "../data/services.tsx";
+import { useNameOf } from "./chat-row.tsx";
 import { useIntent } from "./ui-context.tsx";
 
 /** Reply or edit bar over the composer: the quoted message jumps to it, X or Esc cancels. */
@@ -16,10 +17,9 @@ export function ComposeBar({ chatId, onCancel }: { chatId: number; onCancel: () 
 	const intent = useIntent(chatId);
 	const target = useMessage(chatId, intent?.seq ?? 0);
 	const channel = useChat(chatId)?.type === "channel";
-	const author = useUser(target != null && target.fromId !== store.selfId ? target.fromId : 0);
+	const nameOf = useNameOf(target == null ? [] : namedUserIds(target));
 	if (intent === null) return null;
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
-	const name = target == null ? "" : target.fromId === store.selfId ? copy.common.you : (author?.name ?? copy.message.unknownUser);
+	const name = target == null ? "" : nameOf(target.fromId);
 	const editing = intent.mode === "edit";
 	return (
 		<div className="compose-bar">

@@ -30,6 +30,8 @@ export const en: Messages = {
 		privacy: "Privacy",
 		blocked: "Blocked users",
 		notifications: "Notifications",
+		appearance: "Appearance",
+		shortcuts: "Keyboard shortcuts",
 		moderation: "Moderation",
 		signOut: "Sign out",
 	},

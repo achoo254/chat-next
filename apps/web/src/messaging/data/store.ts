@@ -2,18 +2,20 @@
 // list, the open chat's message window, users and the connection state.
 // Components subscribe to narrow keys with useSyncExternalStore, so a new
 // message re-renders its own item and its dialog row, not the whole screen.
-import type {
-	Chat,
-	ConnectionState,
-	DialogView,
-	FailureKind,
-	HistoryRequest,
-	PendingMessage,
-	ScreenSnapshot,
-	StoredMessage,
-	User,
+import {
+	isMuted,
+	MUTE_FOREVER,
+	type Chat,
+	type ConnectionState,
+	type DialogView,
+	type FailureKind,
+	type HistoryRequest,
+	type PendingMessage,
+	type ScreenSnapshot,
+	type StoredMessage,
+	type User,
 } from "@app/core";
-import { chatKind, FOLDERS, inFolder, type Folder } from "./format.ts";
+import { chatKind, FOLDERS, inFolder, type ChatKind, type Folder } from "./format.ts";
 import type { ChatSource } from "./source.ts";
 
 export type WindowItem =
@@ -37,9 +39,57 @@ export interface ChatWindow {
 	readonly focusSeq: number;
 	/** Bumps on every jump so the list scrolls even to the same seq. */
 	readonly focusToken: number;
+	/** Messages of this chat still in the outbox (the offline banner counts them). */
+	readonly pendingCount: number;
 }
 
 export type ListStatus = "loading" | "ready";
+
+/** What the chat list needs of a dialog to filter, count and size its row. */
+export interface ListEntry {
+	readonly chatId: number;
+	readonly kind: ChatKind;
+	readonly forum: boolean;
+	/** Unread messages or mentions, or marked unread on this device. */
+	readonly unread: boolean;
+	readonly muted: boolean;
+	readonly pinned: boolean;
+}
+
+/** Chats marked unread on this device ("Đánh dấu chưa đọc"; the server keeps no such flag). */
+class UnreadMarks {
+	private readonly ids: Set<number>;
+
+	constructor(private readonly key: string) {
+		this.ids = new Set(UnreadMarks.read(key));
+	}
+
+	private static read(key: string): number[] {
+		try {
+			const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+			return Array.isArray(parsed) ? parsed.filter((id): id is number => Number.isSafeInteger(id) && id > 0) : [];
+		} catch {
+			return [];
+		}
+	}
+
+	has(chatId: number): boolean {
+		return this.ids.has(chatId);
+	}
+
+	/** Returns whether the set changed. */
+	set(chatId: number, marked: boolean): boolean {
+		if (marked === this.ids.has(chatId)) return false;
+		if (marked) this.ids.add(chatId);
+		else this.ids.delete(chatId);
+		try {
+			window.localStorage.setItem(this.key, JSON.stringify([...this.ids]));
+		} catch {
+			// Storage off (privacy mode): the mark lasts until the tab closes.
+		}
+		return true;
+	}
+}
 
 const MAX_WINDOW = 120;
 const PAGE = 40;
@@ -116,7 +166,11 @@ export class ChatStore {
 	private readonly dialogs = new Map<number, DialogView>();
 	private readonly dialogJson = new Map<number, string>();
 	private order: readonly number[] = [];
-	private folderUnread: Readonly<Record<Folder, number>> = { all: 0, private: 0, group: 0, bot: 0 };
+	private entries: readonly ListEntry[] = [];
+	private readonly entryById = new Map<number, ListEntry>();
+	private folderUnread: Readonly<Record<Folder, number>> = { all: 0, private: 0, group: 0, bot: 0, unread: 0 };
+	private readonly marks: UnreadMarks;
+	private muteTimer: ReturnType<typeof setTimeout> | undefined;
 	private listStatus: ListStatus = "loading";
 	private readonly users = new Map<number, User>();
 	private readonly chats = new Map<number, Chat | null>();
@@ -145,6 +199,7 @@ export class ChatStore {
 		snapshot: ScreenSnapshot | null = null,
 	) {
 		this.selfId = options.selfId;
+		this.marks = new UnreadMarks(`chat:unread-marks:${options.selfId}`);
 		if (snapshot !== null && snapshot.userId === options.selfId && snapshot.dialogs.length > 0) {
 			this.applyDialogs(snapshot.dialogs.map((d) => ({ ...d, topMessage: d.topMessage === null ? null : { ...d.topMessage, stale: true } })));
 			for (const user of snapshot.users) this.users.set(user.id, user);
@@ -156,6 +211,7 @@ export class ChatStore {
 
 	dispose(): void {
 		this.disposed = true;
+		clearTimeout(this.muteTimer);
 		this.unsubscribe();
 		this.listeners.clear();
 	}
@@ -292,30 +348,101 @@ export class ChatStore {
 				this.emit(`dialog:${id}`);
 			}
 		}
-		this.countFolders(views);
 		const order = views.map((view) => view.dialog.chatId);
 		if (!sameKeys(order, this.order)) {
 			this.order = order;
 			this.emit("list");
 		}
+		this.refreshEntries();
 		if (views.length > 0 && this.listStatus === "loading") this.markListReady();
 	}
 
-	/** Chats with unread messages per built-in folder (the folder badges). */
+	/** The list as the chat list filters it, in list order (pinned chats first). */
+	listEntries(): readonly ListEntry[] {
+		return this.entries;
+	}
+
+	/** Chats with unread messages per built-in folder (the folder badges); muted chats do not count. */
 	folderCounts(): Readonly<Record<Folder, number>> {
 		return this.folderUnread;
 	}
 
-	private countFolders(views: readonly DialogView[]): void {
-		const counts: Record<Folder, number> = { all: 0, private: 0, group: 0, bot: 0 };
-		for (const view of views) {
-			if (view.dialog.unreadCount === 0 && view.dialog.unreadMentionsCount === 0) continue;
-			const kind = chatKind(view.chat, view.peer, false);
-			for (const folder of FOLDERS) if (inFolder(kind, folder)) counts[folder]++;
+	/** The list entry of one chat (muted, pinned, unread), for its row and menus. */
+	listEntry(chatId: number): ListEntry | undefined {
+		return this.entryById.get(chatId);
+	}
+
+	/** Whether the chat is marked unread on this device. */
+	markedUnread(chatId: number): boolean {
+		return this.marks.has(chatId);
+	}
+
+	/** Marks a chat unread on this device, or clears the mark (reading it clears it too). */
+	setMarkedUnread(chatId: number, marked: boolean): void {
+		if (!this.marks.set(chatId, marked)) return;
+		this.emit(`mark:${chatId}`);
+		this.refreshEntries();
+	}
+
+	/** Rebuilds the list entries and folder counts; listeners hear only of real changes. */
+	private refreshEntries(): void {
+		const now = Math.floor(Date.now() / 1000);
+		let nextMuteEnd = 0;
+		const entries: ListEntry[] = [];
+		const counts: Record<Folder, number> = { all: 0, private: 0, group: 0, bot: 0, unread: 0 };
+		const changed: number[] = [];
+		const seen = new Set<number>();
+		for (const chatId of this.order) {
+			const view = this.dialogs.get(chatId);
+			if (view === undefined) continue;
+			const { dialog } = view;
+			const muted = isMuted(dialog, now);
+			if (muted && dialog.muteUntil !== MUTE_FOREVER && (nextMuteEnd === 0 || dialog.muteUntil < nextMuteEnd)) nextMuteEnd = dialog.muteUntil;
+			const forum = view.chat?.forum === true;
+			const fresh: ListEntry = {
+				chatId,
+				kind: chatKind(view.chat, view.peer, forum),
+				forum,
+				unread: dialog.unreadCount > 0 || dialog.unreadMentionsCount > 0 || this.marks.has(chatId),
+				muted,
+				pinned: dialog.pinned,
+			};
+			const previous = this.entryById.get(chatId);
+			const same =
+				previous !== undefined &&
+				previous.kind === fresh.kind &&
+				previous.forum === fresh.forum &&
+				previous.unread === fresh.unread &&
+				previous.muted === fresh.muted &&
+				previous.pinned === fresh.pinned;
+			const entry = same ? previous : fresh;
+			if (!same) {
+				this.entryById.set(chatId, entry);
+				changed.push(chatId);
+			}
+			seen.add(chatId);
+			entries.push(entry);
+			if (!entry.unread || muted) continue;
+			for (const folder of FOLDERS) if (inFolder(entry.kind, folder, true)) counts[folder]++;
+		}
+		for (const chatId of [...this.entryById.keys()]) {
+			if (seen.has(chatId)) continue;
+			this.entryById.delete(chatId);
+			changed.push(chatId);
+		}
+		if (changed.length > 0 || !sameKeys(entries, this.entries)) {
+			this.entries = entries;
+			this.emit("entries");
+			for (const chatId of changed) this.emit(`entry:${chatId}`);
 		}
 		if (FOLDERS.some((folder) => counts[folder] !== this.folderUnread[folder])) {
 			this.folderUnread = counts;
 			this.emit("folders");
+		}
+		// A mute that ends while the app is open: unmute the row then.
+		clearTimeout(this.muteTimer);
+		if (nextMuteEnd !== 0 && !this.disposed) {
+			this.muteTimer = setTimeout(() => this.refreshEntries(), Math.min((nextMuteEnd - now) * 1000 + 500, 2_147_000_000));
 		}
 	}
 
@@ -433,6 +560,7 @@ export class ChatStore {
 				unreadFromSeq: 0,
 				focusSeq: 0,
 				focusToken: 0,
+				pendingCount: 0,
 			},
 			items: new Map(),
 			signatures: new Map(),
@@ -600,6 +728,7 @@ export class ChatStore {
 			loadingOlder: mode === "prepend" ? false : state.window.loadingOlder,
 			focusSeq: mode === "replace" && focusSeq !== 0 ? focusSeq : state.window.focusSeq,
 			focusToken: mode === "replace" && focusSeq !== 0 ? state.window.focusToken + 1 : state.window.focusToken,
+			pendingCount: view.pending.length,
 		};
 		this.setWindow(state, next);
 		for (const key of changed) this.emit(`item:${chatId}:${key}`);

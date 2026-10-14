@@ -1,6 +1,7 @@
-// Group and channel administration (mockups/chat.html#chat-admin): member
-// permissions (a bitmask), history for new members, admins, the member and
-// banned lists, invite links and leaving. Channels name their people
+// "Quản lý nhóm" / "Quản lý kênh" (mockups/chat.html#chat-admin): member
+// permissions (a bitmask), history for new members, the leader and deputies
+// (channels: owner and admins), the member and banned lists, invite links,
+// leaving and, for the owner, deleting the chat. Channels name their people
 // subscribers and skip the member permissions and history cards.
 import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
@@ -96,13 +97,14 @@ function AdminRow({ chat, member, canDemote, onChanged }: { chat: Chat; member: 
 	const inviter = useUser(member.inviterId === store.selfId ? 0 : member.inviterId);
 	const [menu, setMenu] = useState(false);
 	const self = member.person.id === store.selfId;
+	const channel = chat.type === "channel";
 	const name = self ? copy.common.you : member.person.name;
 	const detail =
 		member.role === "owner"
-			? copy.admin.creator(chat.type === "channel")
+			? copy.admin.creator(channel)
 			: member.inviterId !== 0
-				? copy.admin.adminAddedBy(userName(inviter, store.selfId, copy, member.inviterId))
-				: copy.admin.adminPlain;
+				? copy.admin.adminAddedBy(userName(inviter, store.selfId, copy, member.inviterId), channel)
+				: copy.admin.adminPlain(channel);
 	return (
 		<div className="row">
 			<ChatAvatar id={member.person.id} name={member.person.name} size="sm" />
@@ -110,9 +112,16 @@ function AdminRow({ chat, member, canDemote, onChanged }: { chat: Chat; member: 
 				{name}
 				<small>{detail}</small>
 			</span>
+			{member.role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
 			{canDemote && member.role === "admin" && !self && (
 				<span className="menu-anchor">
-					<button type="button" className="icon-btn" aria-label={copy.admin.adminActions(member.person.name)} aria-expanded={menu} onClick={() => setMenu((open) => !open)}>
+					<button
+						type="button"
+						className="icon-btn"
+						aria-label={copy.admin.adminActions(member.person.name, channel)}
+						aria-expanded={menu}
+						onClick={() => setMenu((open) => !open)}
+					>
 						<Icon name="dots" />
 					</button>
 					{menu && (
@@ -125,14 +134,14 @@ function AdminRow({ chat, member, canDemote, onChanged }: { chat: Chat; member: 
 									setMenu(false);
 									remote.setAdmin(chat.id, member.person.id, false).then(
 										() => {
-											toasts.show(copy.admin.demoted(member.person.name));
+											toasts.show(copy.admin.demoted(member.person.name, channel));
 											onChanged();
 										},
 										() => toasts.show(copy.common.failed),
 									);
 								}}
 							>
-								{copy.admin.demote}
+								{copy.admin.demote(channel)}
 							</button>
 						</div>
 					)}
@@ -154,7 +163,7 @@ function AdminsCard({ chat }: { chat: Chat }) {
 	const channel = chat.type === "channel";
 	return (
 		<section className="card" aria-labelledby={id}>
-			<h3 id={id}>{copy.admin.admins}</h3>
+			<h3 id={id}>{copy.admin.admins(channel)}</h3>
 			{status === "loading" && <p>{copy.common.loading}</p>}
 			{status === "error" && <p>{copy.common.loadFailed}</p>}
 			{admins.map((member) => (
@@ -162,7 +171,7 @@ function AdminsCard({ chat }: { chat: Chat }) {
 			))}
 			<button type="button" className="btn btn-block" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
 				<Icon name="user-plus" />
-				{copy.admin.addAdmin}
+				{copy.admin.addAdmin(channel)}
 			</button>
 			{picking && (
 				<div className="sub-form" role="group" aria-label={copy.admin.addAdminTitle(channel)}>
@@ -177,7 +186,7 @@ function AdminsCard({ chat }: { chat: Chat }) {
 								onClick={() =>
 									remote.setAdmin(chat.id, member.person.id, true).then(
 										() => {
-											toasts.show(copy.admin.promoted(member.person.name));
+											toasts.show(copy.admin.promoted(member.person.name, channel));
 											setPicking(false);
 											reload();
 										},
@@ -185,7 +194,7 @@ function AdminsCard({ chat }: { chat: Chat }) {
 									)
 								}
 							>
-								{copy.admin.promote}
+								{copy.admin.promote(channel)}
 							</button>
 						</div>
 					))}
@@ -232,6 +241,14 @@ function MembersCard({ chat }: { chat: Chat }) {
 					{copy.admin.banned}
 					<small>{banned === null ? copy.admin.bannedSubPlain : copy.admin.bannedSub(banned.count, banned.more)}</small>
 				</Link>
+				<Icon name="chevron-right" small />
+			</div>
+			<div className="row">
+				<Icon name="user-plus" />
+				<button type="button" className="grow row-link" onClick={() => ui.dialog.set({ kind: "addMembers", chatId: chat.id })}>
+					{copy.admin.addMembersRow(channel)}
+					<small>{copy.admin.addMembersSub}</small>
+				</button>
 				<Icon name="chevron-right" small />
 			</div>
 		</section>
@@ -347,21 +364,29 @@ function LinksCard({ chat }: { chat: Chat }) {
 	);
 }
 
-/** Leaving; the leave dialog hands ownership over when the owner leaves. */
+/** Leaving (the leave dialog hands ownership over when the owner leaves) and, for the owner, deleting. */
 function LeaveCard({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const id = useDomId("leave");
 	const channel = chat.type === "channel";
+	const owner = chat.myRole === "owner";
 	return (
 		<section className="card danger-zone" aria-labelledby={id}>
 			<h3 id={id}>{copy.admin.leave(channel)}</h3>
 			<p>{copy.admin.leaveNote(channel)}</p>
+			{owner && <p>{copy.admin.deleteNote(channel)}</p>}
 			<div className="actions">
 				<button type="button" className="btn danger-text" onClick={() => ui.dialog.set({ kind: "leave", chatId: chat.id })}>
 					<Icon name="logout" />
 					{channel ? copy.info.leaveChannel : copy.info.leaveGroup}
 				</button>
+				{owner && (
+					<button type="button" className="btn danger-text" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
+						<Icon name="trash" />
+						{copy.info.deleteGroup(channel)}
+					</button>
+				)}
 			</div>
 		</section>
 	);
@@ -379,16 +404,18 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 	}
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const channel = chat.type === "channel";
+	const role = chat.myRole === "owner" || chat.myRole === "admin" ? chat.myRole : null;
+	const subtitle = [copy.admin.sub(chat.title, chat.memberCount, channel), role === null ? "" : copy.admin.youAre(role, channel)].filter(Boolean).join(" · ");
 	return (
 		<section className="admin-page" aria-label={channel ? copy.admin.channelTitle : copy.admin.groupTitle}>
 			<div className="admin-head">
-				<Link to={paths.chat(chatId)} className="icon-btn" aria-label={copy.admin.back}>
+				<Link to={paths.chat(chatId)} className="icon-btn" aria-label={copy.admin.back(channel)}>
 					<Icon name="back" />
 				</Link>
 				<ChatAvatar id={chatId} name={chat.title} />
 				<div className="title">
 					<strong>{channel ? copy.admin.channelTitle : copy.admin.groupTitle}</strong>
-					<span title={copy.admin.sub(chat.title, chat.memberCount, channel)}>{copy.admin.sub(chat.title, chat.memberCount, channel)}</span>
+					<span title={subtitle}>{subtitle}</span>
 				</div>
 			</div>
 			{admin ? (

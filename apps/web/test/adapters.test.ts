@@ -13,6 +13,7 @@ describe("protocol adapters", () => {
 			username: "an_1",
 			bio: "",
 			email: "an@example.com",
+			isOperator: false,
 		});
 	});
 

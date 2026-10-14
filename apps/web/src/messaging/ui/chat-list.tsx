@@ -1,14 +1,16 @@
 // The chat list column: search box, filter tabs and the header with
 // Settings, Contacts and New chat (narrow screens, mockups/chat.html#narrow)
 // and the dialog list. Rows have a fixed height per kind and are absolutely
-// positioned, and only the rows in view (plus a margin) are mounted.
+// positioned, and only the rows in view (plus a margin) are mounted. The
+// "Chưa đọc" filter keeps a chat you just read until you change filters, so
+// the list does not jump (#list-states). Alt+↑/↓ opens the chat above/below.
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
-import { Link, paths } from "../../router.tsx";
+import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { chatKind, inFolder, type Folder } from "../data/format.ts";
-import { useBackendVersion, useDialogOrder, useListStatus, useServices } from "../data/services.tsx";
+import { inFolder, type Folder } from "../data/format.ts";
+import { useBackendValue, useListEntries, useListStatus } from "../data/services.tsx";
 import { ChatRow, ROW_HEIGHT, TWO_LINE_ROW_HEIGHT } from "./chat-row.tsx";
 import { FolderTabs } from "./folder-rail.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
@@ -17,6 +19,12 @@ import { useUi } from "./ui-context.tsx";
 const OVERSCAN_PX = 320;
 
 const SearchResults = lazy(() => import("./search-results.tsx"));
+
+/** Chats kept in the "Chưa đọc" filter after they were read, until the filter changes. */
+interface Kept {
+	readonly folder: Folder;
+	readonly ids: ReadonlySet<number>;
+}
 
 interface ChatListProps {
 	folder: Folder;
@@ -36,7 +44,10 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 	const searching = query.trim() !== "";
 
 	const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-		if (event.key === "Escape") setQuery("");
+		if (event.key === "Escape") {
+			setQuery("");
+			event.currentTarget.blur();
+		}
 	};
 
 	return (
@@ -76,7 +87,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 			</div>
 			{searching ? (
 				<Suspense fallback={<div className="search-panel" aria-busy="true" />}>
-					<SearchResults query={query.trim()} />
+					<SearchResults query={query.trim()} onOpen={() => setQuery("")} />
 				</Suspense>
 			) : (
 				<>
@@ -128,33 +139,60 @@ interface DialogsProps {
 
 function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsProps) {
 	const copy = useCopy();
-	const { store, backend } = useServices();
-	const order = useDialogOrder();
+	const entries = useListEntries();
 	const status = useListStatus();
-	const backendVersion = useBackendVersion();
 	const scroller = useRef<HTMLDivElement>(null);
 	const [scrollTop, setScrollTop] = useState(0);
 	const [viewport, setViewport] = useState(640);
+	const [kept, setKept] = useState<Kept>({ folder, ids: new Set() });
+	if (kept.folder !== folder) setKept({ folder, ids: new Set() });
+	// Forums whose topics are loaded show a second line (the topics), so their rows are taller.
+	const twoLine = useBackendValue((backend) =>
+		entries
+			.filter((entry) => entry.forum && backend.topics(entry.chatId) !== null)
+			.map((entry) => entry.chatId)
+			.join(","),
+	);
 
 	const rows = useMemo(() => {
-		void backendVersion;
-		const pinned: number[] = [];
-		const rest: number[] = [];
-		for (const chatId of order) {
-			const view = store.dialog(chatId);
-			if (view === undefined || !inFolder(chatKind(view.chat, view.peer, false), folder)) continue;
-			(backend.isPinnedDialog(chatId) ? pinned : rest).push(chatId);
-		}
-		const ids = [...pinned, ...rest];
+		const tall = new Set(twoLine === "" ? [] : twoLine.split(",").map(Number));
+		const ids: number[] = [];
 		const offsets: number[] = [];
 		let total = 0;
-		for (const chatId of ids) {
+		for (const entry of entries) {
+			const unread = entry.unread || (kept.folder === folder && kept.ids.has(entry.chatId)) || (folder === "unread" && entry.chatId === currentChatId);
+			if (!inFolder(entry.kind, folder, unread)) continue;
+			ids.push(entry.chatId);
 			offsets.push(total);
-			const view = store.dialog(chatId);
-			total += view?.chat?.forum === true && backend.topics(chatId) !== null ? TWO_LINE_ROW_HEIGHT : ROW_HEIGHT;
+			total += tall.has(entry.chatId) ? TWO_LINE_ROW_HEIGHT : ROW_HEIGHT;
 		}
 		return { ids, offsets, total };
-	}, [order, folder, store, backend, backendVersion]);
+	}, [entries, folder, kept, currentChatId, twoLine]);
+
+	// Remember what the "Chưa đọc" filter showed, so reading a chat does not drop it.
+	if (folder === "unread" && kept.folder === folder && rows.ids.some((id) => !kept.ids.has(id))) {
+		setKept({ folder, ids: new Set([...kept.ids, ...rows.ids]) });
+	}
+
+	// Alt+↑/↓: the chat above or below the open one in this list.
+	useEffect(() => {
+		const onKey = (event: globalThis.KeyboardEvent) => {
+			if (!event.altKey || event.metaKey || event.ctrlKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+			const index = rows.ids.indexOf(currentChatId);
+			const next = rows.ids[index === -1 ? 0 : index + (event.key === "ArrowUp" ? -1 : 1)];
+			if (next === undefined) return;
+			event.preventDefault();
+			navigate(paths.chat(next));
+			const element = scroller.current;
+			const position = rows.ids.indexOf(next);
+			const top = rows.offsets[position] ?? 0;
+			if (element !== null && (top < element.scrollTop || top + ROW_HEIGHT > element.scrollTop + element.clientHeight)) {
+				element.scrollTop = Math.max(0, top - element.clientHeight / 2);
+			}
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [rows, currentChatId]);
 
 	useLayoutEffect(() => {
 		const element = scroller.current;
@@ -175,12 +213,12 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 		onVisibleChats(visibleKey === "" ? [] : visibleKey.split(",").map(Number));
 	}, [visibleKey, onVisibleChats]);
 
-	if (status === "loading" && order.length === 0) return <Skeleton />;
+	if (status === "loading" && entries.length === 0) return <Skeleton />;
 	if (rows.ids.length === 0) {
 		return (
 			<div className="empty">
 				<Icon name="checks" />
-				<strong>{copy.folders.emptyTitle}</strong>
+				<strong>{folder === "unread" ? copy.folders.emptyTitleUnread : copy.folders.emptyTitle}</strong>
 				<span>{copy.folders.emptyBody[folder]}</span>
 				{folder !== "all" && (
 					<button type="button" className="btn btn-sm" onClick={() => onFolder("all")}>

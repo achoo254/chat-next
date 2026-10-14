@@ -1,21 +1,12 @@
 // The UI's view of server features that vary by backend release: forum
-// topics, link previews, reports and invite previews (on the R1 server, see
-// server-backend.ts) and mute, pinned chats, per-reaction user lists, the
-// blocked list and the moderation queue (no RPC yet). The UI asks `features`
-// before it shows any of them, so a missing one is simply hidden. Contacts,
-// member bans and owner leave are plain RPCs on Remote (every R1 server).
+// topics, link previews, reports and invite previews (see server-backend.ts).
+// The UI asks `features` before it shows any of them, so a missing one is
+// simply hidden. Everything else (contacts, bans, mute, pinned chats, the
+// blocked list, moderation) is a plain RPC on Remote, on every R1 server;
+// mute and pinned chats reach the dialog list through the client core.
 import type { Message } from "@app/core";
 
-export type PendingFeature =
-	| "topics"
-	| "linkPreview"
-	| "reactors"
-	| "mute"
-	| "pinnedDialogs"
-	| "report"
-	| "blockedList"
-	| "invitePreview"
-	| "moderation";
+export type PendingFeature = "topics" | "linkPreview" | "report" | "invitePreview";
 
 /** Icons a topic can carry (mockups/chat.html#topics). */
 export type TopicIcon = "hash" | "megaphone" | "edit" | "code" | "flag" | "inbox" | "users" | "database";
@@ -80,58 +71,6 @@ export interface InvitePreview {
 	readonly memberOfChatId: number;
 }
 
-export interface BlockedUser {
-	readonly id: number;
-	readonly name: string;
-	readonly username: string;
-	readonly isBot: boolean;
-	/** Unix seconds. */
-	readonly blockedAt: number;
-}
-
-export type ModerationObject = "message" | "user" | "bot" | "channel" | "webhook";
-export type ModerationStatus = "open" | "handled" | "skipped";
-
-export interface ModerationRow {
-	readonly id: string;
-	readonly object: ModerationObject;
-	readonly title: string;
-	readonly subtitle: string;
-	readonly reason: ReportReason;
-	readonly reports: number;
-	readonly status: ModerationStatus;
-	/** Display name of the moderator reviewing it, "" when nobody is. */
-	readonly reviewer: string;
-	/** Unix seconds. */
-	readonly latestAt: number;
-}
-
-export interface ModerationContextMessage {
-	readonly seq: number;
-	readonly fromName: string;
-	readonly text: string;
-	readonly date: number;
-	readonly reported: boolean;
-}
-
-export interface ModerationDetail {
-	readonly row: ModerationRow;
-	readonly context: readonly ModerationContextMessage[];
-	readonly reasons: readonly { readonly reason: ReportReason; readonly count: number }[];
-	readonly notes: readonly string[];
-	readonly history: readonly { readonly action: string; readonly by: string; readonly at: number; readonly note: string }[];
-}
-
-export type ModerationAction = "remove" | "lock" | "warn" | "disable_webhook";
-export type LockDuration = "day" | "week" | "month" | "forever";
-
-export interface ModerationDecision {
-	readonly actions: readonly ModerationAction[];
-	readonly lock: LockDuration;
-	readonly reason: string;
-	readonly notify: boolean;
-}
-
 export interface PendingBackend {
 	readonly features: ReadonlySet<PendingFeature>;
 	/** Cached topics of a group, or null when it has none (or they are not loaded yet). */
@@ -151,32 +90,10 @@ export interface PendingBackend {
 	linkPreview(message: Message): LinkPreview | null;
 	/** Preview for a URL being typed in the composer. */
 	composePreview(url: string): Promise<LinkPreview | null>;
-	/** Users who reacted with `emoji` in small chats; null when only counts are known. */
-	reactors(chatId: number, seq: number, emoji: string): readonly number[] | null;
-	isMuted(chatId: number): boolean;
-	/** `forSeconds` limits a mute (0 or omitted: until turned back on). */
-	setMuted(chatId: number, muted: boolean, forSeconds?: number): Promise<void>;
-	isPinnedDialog(chatId: number): boolean;
-	setPinnedDialog(chatId: number, pinned: boolean): Promise<void>;
 	report(target: ReportTarget, reason: ReportReason, note: string): Promise<void>;
-	blockedUsers(): Promise<readonly BlockedUser[]>;
 	invitePreview(token: string): Promise<InvitePreview | null>;
-	moderationScope(): Promise<string | null>;
-	moderationQueue(): Promise<readonly ModerationRow[]>;
-	moderationDetail(id: string): Promise<ModerationDetail | null>;
-	claimReport(id: string): Promise<void>;
-	decideReport(id: string, decision: ModerationDecision | "skip"): Promise<void>;
-	/** Re-render signal for state kept by the backend (topics, mute). */
+	/** Re-render signal for state kept by the backend (topics). */
 	subscribe(listener: () => void): () => void;
-	/** Changes whenever `subscribe` listeners are called. */
-	version(): number;
 	/** Stops listening to the client (sign-out, unmount). */
 	dispose(): void;
-}
-
-export class FeatureUnavailableError extends Error {
-	constructor(feature: PendingFeature) {
-		super(`${feature} is not available on this server yet`);
-		this.name = "FeatureUnavailableError";
-	}
 }

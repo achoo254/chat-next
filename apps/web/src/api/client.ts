@@ -35,11 +35,11 @@ export function errorCode(err: unknown): Code {
 	return ConnectError.from(err).code;
 }
 
-function requireUser(user: User | undefined, method: string): SelfUser {
+function requireUser(user: User | undefined, method: string, isOperator = false): SelfUser {
 	if (!user) {
 		throw new ConnectError(`${method} returned no user`, Code.Internal);
 	}
-	return toSelfUser(user);
+	return toSelfUser(user, isOperator);
 }
 
 /**
@@ -61,7 +61,11 @@ export function createApi(transport: Transport, onUnauthenticated: () => void): 
 	}
 
 	return {
-		getSelf: () => call(async () => requireUser((await users.getSelf({})).user, "GetSelf")),
+		getSelf: () =>
+			call(async () => {
+				const response = await users.getSelf({});
+				return requireUser(response.user, "GetSelf", response.isOperator);
+			}),
 		updateProfile: (changes) =>
 			call(async () => requireUser((await users.updateProfile(changes)).user, "UpdateProfile")),
 		setUsername: (username) =>

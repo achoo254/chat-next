@@ -5,6 +5,7 @@ import { useCell, useUi, type DialogRequest } from "./ui-context.tsx";
 
 const create = () => import("./create-dialogs.tsx");
 const details = () => import("./dialogs.tsx");
+const chats = () => import("./chat-dialogs.tsx");
 const members = () => import("./member-dialogs.tsx");
 const NewChatDialog = lazy(() => create().then((m) => ({ default: m.NewChatDialog })));
 const NewGroupDialog = lazy(() => create().then((m) => ({ default: m.NewGroupDialog })));
@@ -12,7 +13,10 @@ const NewChannelDialog = lazy(() => create().then((m) => ({ default: m.NewChanne
 const AddMembersDialog = lazy(() => create().then((m) => ({ default: m.AddMembersDialog })));
 const ForwardDialog = lazy(() => create().then((m) => ({ default: m.ForwardDialog })));
 const DeleteDialog = lazy(() => details().then((m) => ({ default: m.DeleteDialog })));
-const LeaveDialog = lazy(() => details().then((m) => ({ default: m.LeaveDialog })));
+const LeaveDialog = lazy(() => chats().then((m) => ({ default: m.LeaveDialog })));
+const DeleteChatDialog = lazy(() => chats().then((m) => ({ default: m.DeleteChatDialog })));
+const PinDialog = lazy(() => chats().then((m) => ({ default: m.PinDialog })));
+const ReactorsDialog = lazy(() => chats().then((m) => ({ default: m.ReactorsDialog })));
 const LinkDialog = lazy(() => details().then((m) => ({ default: m.LinkDialog })));
 const ReportDialog = lazy(() => details().then((m) => ({ default: m.ReportDialog })));
 const ProfileDialog = lazy(() => details().then((m) => ({ default: m.ProfileDialog })));
@@ -38,7 +42,7 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "newChat":
 			return <NewChatDialog onClose={close} />;
 		case "newGroup":
-			return <NewGroupDialog onClose={close} />;
+			return <NewGroupDialog withUserId={request.withUserId} onClose={close} />;
 		case "newChannel":
 			return <NewChannelDialog onClose={close} />;
 		case "addMembers":
@@ -46,7 +50,13 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "forward":
 			return <ForwardDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "delete":
-			return <DeleteDialog chatId={request.chatId} seq={request.seq} mine={request.mine} onClose={close} />;
+			return <DeleteDialog chatId={request.chatId} seq={request.seq} recall={request.recall} onClose={close} />;
+		case "deleteChat":
+			return <DeleteChatDialog chatId={request.chatId} onClose={close} />;
+		case "pin":
+			return <PinDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
+		case "reactors":
+			return <ReactorsDialog chatId={request.chatId} seq={request.seq} emoji={request.emoji} onClose={close} />;
 		case "leave":
 			return <LeaveDialog chatId={request.chatId} onClose={close} />;
 		case "link":
@@ -58,7 +68,7 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "readBy":
 			return <ReadByDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "addFailed":
-			return <AddFailedDialog chatId={request.chatId} userIds={request.userIds} addedIds={request.addedIds} onClose={close} />;
+			return <AddFailedDialog chatId={request.chatId} failures={request.failures} addedIds={request.addedIds} onClose={close} />;
 		case "members":
 			return <MembersDialog chatId={request.chatId} onClose={close} />;
 		case "removeMember":

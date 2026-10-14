@@ -1,8 +1,68 @@
-// Member lists and invite links shared by the info panel and the admin page.
+// Member lists, the online count of small groups and invite links, shared by
+// the conversation header, the info panel and the admin page.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Invite, Member, Remote } from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
 import { rememberPresence } from "./presence.tsx";
+
+/** GetMembers page size used by the UI; groups up to this size have an exact online count. */
+export const MEMBERS_PAGE = 50;
+const ONLINE_TTL_MS = 60_000;
+
+function onlineIn(members: readonly Member[]): number {
+	return members.filter((member) => !member.person.isBot && (member.person.isSelf || member.person.presence.kind === "online")).length;
+}
+
+/** "k đang hoạt động" of small groups, from their whole member list (one page), kept a minute. */
+class OnlineCounts {
+	private readonly byChat = new Map<number, { at: number; count: number }>();
+	private readonly loading = new Set<number>();
+	private readonly listeners = new Set<() => void>();
+
+	get(chatId: number): number | null {
+		return this.byChat.get(chatId)?.count ?? null;
+	}
+
+	set(chatId: number, count: number): void {
+		const previous = this.byChat.get(chatId)?.count;
+		this.byChat.set(chatId, { at: Date.now(), count });
+		if (previous !== count) for (const listener of [...this.listeners]) listener();
+	}
+
+	load(remote: Remote, chatId: number): void {
+		const known = this.byChat.get(chatId);
+		if (this.loading.has(chatId) || (known !== undefined && Date.now() - known.at < ONLINE_TTL_MS)) return;
+		this.loading.add(chatId);
+		remote
+			.members(chatId)
+			.then(
+				(page) => {
+					for (const member of page.members) rememberPresence(remote, member.person.id, member.person.presence);
+					if (page.nextCursor === "") this.set(chatId, onlineIn(page.members));
+				},
+				() => undefined,
+			)
+			.finally(() => this.loading.delete(chatId));
+	}
+
+	subscribe = (listener: () => void): (() => void) => {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	};
+}
+
+const onlineCounts = new OnlineCounts();
+
+/** Members online in a group of up to MEMBERS_PAGE members; null for larger groups or while unknown. */
+export function useOnlineCount(chatId: number, memberCount: number): number | null {
+	const { remote } = useServices();
+	const enabled = chatId !== 0 && memberCount > 0 && memberCount <= MEMBERS_PAGE;
+	useEffect(() => {
+		if (enabled) onlineCounts.load(remote, chatId);
+	}, [remote, chatId, enabled]);
+	const count = useSyncExternalStore(onlineCounts.subscribe, () => (enabled ? onlineCounts.get(chatId) : null));
+	return count;
+}
 
 /** Per chat, bumped when this UI changes the members (remove, promote) so open lists reload. */
 const memberChanges = new Map<number, number>();
@@ -45,6 +105,7 @@ export function useMembers(chatId: number, query = "", enabled = true): MembersS
 			(page) => {
 				if (!active) return;
 				for (const member of page.members) rememberPresence(remote, member.person.id, member.person.presence);
+				if (query === "" && page.nextCursor === "") onlineCounts.set(chatId, onlineIn(page.members));
 				setState({ key, members: page.members, status: "ready", hasMore: page.nextCursor !== "", cursor: page.nextCursor });
 			},
 			() => {

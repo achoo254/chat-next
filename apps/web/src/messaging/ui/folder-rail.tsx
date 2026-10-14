@@ -1,7 +1,8 @@
-// Built-in folders (R1): Tất cả, Cá nhân, Nhóm, Bot, filtered on the client
-// by chat kind, then Danh bạ and Cài đặt. Wide screens show the labelled
-// rail; narrow screens the tab row inside the list (mockups/chat.html#app,
-// #contacts, #narrow). Custom folders are not built yet, so no edit entry.
+// Built-in folders (R1): Tất cả, Cá nhân, Nhóm, Bot filtered on the client by
+// chat kind, and Chưa đọc by read state; then Danh bạ and Cài đặt. Wide
+// screens show the labelled rail; narrow screens the tab row inside the list
+// (mockups/chat.html#app, #contacts, #narrow). Badges count chats with
+// unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
 import type { SelfUser } from "../../api/adapters.ts";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { Link, paths } from "../../router.tsx";
@@ -11,7 +12,7 @@ import { useFolderCounts } from "../data/services.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar } from "./parts.tsx";
 
-const FOLDER_ICONS: Record<Folder, IconName> = { all: "message", private: "user", group: "users", bot: "robot" };
+const FOLDER_ICONS: Record<Folder, IconName> = { all: "message", private: "user", group: "users", bot: "robot", unread: "message-dot" };
 
 interface FolderProps {
 	folder: Folder;
@@ -38,7 +39,7 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 				>
 					<Icon name={FOLDER_ICONS[item]} />
 					{copy.folders[item]}
-					{counts[item] > 0 && (
+					{item !== "unread" && counts[item] > 0 && (
 						<span className="badge" aria-label={copy.folders.unreadChats(counts[item])}>
 							{countLabel(counts[item])}
 						</span>

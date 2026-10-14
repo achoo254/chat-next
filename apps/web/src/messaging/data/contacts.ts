@@ -4,28 +4,28 @@
 // server pages it by user id, the screens sort it by name) and kept per
 // Remote, so the contacts screen, profiles and the info column agree.
 import { useEffect, useSyncExternalStore } from "react";
-import type { ContactTarget, Person, Remote } from "./remote.ts";
+import type { Contact, ContactTarget, Person, Remote } from "./remote.ts";
 
 /** At most 10 000 contacts in pages of 500. */
 const MAX_PAGES = 20;
 
 export interface ContactsSnapshot {
 	readonly status: "idle" | "loading" | "ready" | "error";
-	/** Sorted by name. */
-	readonly people: readonly Person[];
+	/** Sorted by name (Vietnamese collation). */
+	readonly entries: readonly Contact[];
 	readonly ids: ReadonlySet<number>;
 }
 
 const collator = new Intl.Collator("vi", { sensitivity: "base" });
 
-function snapshotOf(status: ContactsSnapshot["status"], byId: ReadonlyMap<number, Person>): ContactsSnapshot {
-	const people = [...byId.values()].sort((a, b) => collator.compare(a.name, b.name) || a.id - b.id);
-	return { status, people, ids: new Set(byId.keys()) };
+function snapshotOf(status: ContactsSnapshot["status"], byId: ReadonlyMap<number, Contact>): ContactsSnapshot {
+	const entries = [...byId.values()].sort((a, b) => collator.compare(a.person.name, b.person.name) || a.person.id - b.person.id);
+	return { status, entries, ids: new Set(byId.keys()) };
 }
 
 export class Contacts {
-	private byId = new Map<number, Person>();
-	private current: ContactsSnapshot = { status: "idle", people: [], ids: new Set() };
+	private byId = new Map<number, Contact>();
+	private current: ContactsSnapshot = { status: "idle", entries: [], ids: new Set() };
 	private loading: Promise<void> | null = null;
 	private readonly listeners = new Set<() => void>();
 
@@ -45,12 +45,12 @@ export class Contacts {
 		this.set("loading");
 		this.loading = (async () => {
 			try {
-				const byId = new Map<number, Person>();
+				const byId = new Map<number, Contact>();
 				let cursor = "";
 				let pages = 0;
 				do {
 					const page = await this.remote.contacts(cursor);
-					for (const person of page.items) byId.set(person.id, person);
+					for (const contact of page.items) byId.set(contact.person.id, contact);
 					cursor = page.nextCursor;
 					pages++;
 				} while (cursor !== "" && pages < MAX_PAGES);
@@ -68,7 +68,7 @@ export class Contacts {
 	/** Adds someone to the list; rejects with the server error (NotFound when hidden by privacy). */
 	async add(target: ContactTarget): Promise<Person> {
 		const person = await this.remote.addContact(target);
-		this.byId.set(person.id, person);
+		this.byId.set(person.id, { person, addedAt: Math.floor(Date.now() / 1000) });
 		this.set(this.current.status);
 		return person;
 	}

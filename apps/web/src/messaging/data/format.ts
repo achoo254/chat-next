@@ -5,10 +5,11 @@ import type { MessagingCopy } from "../copy/vi.ts";
 import type { Tone } from "./pending-backend.ts";
 
 export type ChatKind = "private" | "bot" | "group" | "forum" | "channel";
-/** Built-in folders (R1): a client-side filter over the chat kind. */
-export type Folder = "all" | "private" | "group" | "bot";
+/** Built-in folders (R1): client-side filters over the chat kind, and "unread" over the read state. */
+export type Folder = "all" | "private" | "group" | "bot" | "unread";
 
-export const FOLDERS: readonly Folder[] = ["all", "private", "group", "bot"];
+/** In rail order; Ctrl/⌘+1…5 picks them by position. */
+export const FOLDERS: readonly Folder[] = ["all", "private", "group", "bot", "unread"];
 
 const TONES: readonly Tone[] = ["violet", "green", "blue", "amber", "cyan", "red", "grey"];
 
@@ -28,11 +29,13 @@ export function chatKind(chat: Chat | null, peer: User | null, forum: boolean): 
 	}
 }
 
-/** Whether a chat of `kind` belongs in `folder`. Channels only show under "all". */
-export function inFolder(kind: ChatKind, folder: Folder): boolean {
+/** Whether a chat of `kind` belongs in `folder`. Channels show under "all" and, when unread, "unread". */
+export function inFolder(kind: ChatKind, folder: Folder, unread: boolean): boolean {
 	switch (folder) {
 		case "all":
 			return true;
+		case "unread":
+			return unread;
 		case "private":
 			return kind === "private";
 		case "group":
@@ -178,6 +181,15 @@ export function isTrustedHost(host: string, appHost: string): boolean {
 	if (host === "" || host === appHost) return true;
 	const domain = orgDomain(appHost);
 	return host === domain || host.endsWith(`.${domain}`);
+}
+
+/** Every user a message preview or system line names (sender, added or removed members). */
+export function namedUserIds(message: Message): number[] {
+	const ids = [message.fromId];
+	const action = message.action;
+	if (action?.kind === "members_added") ids.push(...action.userIds);
+	if (action?.kind === "member_removed") ids.push(action.userId);
+	return ids;
 }
 
 /** Unread and mention counts stop at 1000 on the server; the cap reads "999+". */

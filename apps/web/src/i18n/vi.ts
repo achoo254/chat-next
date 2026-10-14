@@ -28,6 +28,8 @@ export const vi = {
 		privacy: "Quyền riêng tư",
 		blocked: "Người đã chặn",
 		notifications: "Thông báo",
+		appearance: "Giao diện",
+		shortcuts: "Phím tắt",
 		moderation: "Kiểm duyệt",
 		signOut: "Đăng xuất",
 	},

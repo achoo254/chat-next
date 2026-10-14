@@ -2,16 +2,18 @@
 // ~120 messages (ChatStore): scrolling up prepends older pages, scrolling
 // down after a jump appends newer ones. Browser scroll anchoring is off
 // (overflow-anchor: none); the list restores the position of the first
-// visible message itself after a prepend.
+// visible message itself after a prepend. Floating buttons go to the newest
+// message and, while someone's mention of you is unread, to that message.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, DialogView } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { countLabel, dayLabel, sameDay } from "../data/format.ts";
-import { useBackendVersion, useServices, useWindow } from "../data/services.tsx";
-import type { WindowItem } from "../data/store.ts";
+import { useBackendValue, useServices, useWindow } from "../data/services.tsx";
+import type { ChatStore, WindowItem } from "../data/store.ts";
 import { MessageItem } from "./message-item.tsx";
+import { mentionsSelf } from "./rich-text.tsx";
 
 const EDGE_PX = 240;
 const BOTTOM_PX = 48;
@@ -29,12 +31,33 @@ function itemDate(item: WindowItem | undefined): number {
 	return item.kind === "message" ? item.message.date : item.pending.date;
 }
 
+/**
+ * The first unread message in the window that mentions you or replies to
+ * you; 0 when it is outside the window (the caller loads around the first
+ * unread message, where the next press finds it).
+ */
+function firstMention(store: ChatStore, chatId: number, readInbox: number, self: { id: number; username: string }): number {
+	const own = new Set<number>();
+	for (const item of store.items(chatId)) {
+		if (item.kind !== "message") continue;
+		const message = item.message;
+		if (message.fromId === store.selfId) {
+			own.add(message.seq);
+			continue;
+		}
+		if (message.seq <= readInbox) continue;
+		if (mentionsSelf(message.text, message.entities, self.id, self.username) || own.has(message.replyToSeq)) return message.seq;
+	}
+	return 0;
+}
+
 export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
-	const { store, source, backend } = useServices();
+	const { store, source, backend, self } = useServices();
 	const window_ = useWindow(chatId);
-	useBackendVersion();
+	// A message's topic is known once the forum's topics are loaded.
+	const topicsLoaded = useBackendValue((pending) => pending.topics(chatId) !== null);
 	const scroller = useRef<HTMLDivElement>(null);
 	const anchor = useRef<{ key: string; offset: number } | null>(null);
 	const stick = useRef(true);
@@ -44,7 +67,7 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 	const [focused, setFocused] = useState<string | null>(null);
 
 	const keys = (window_?.keys ?? []).filter((key) => {
-		if (topicId === 0) return true;
+		if (topicId === 0 || !topicsLoaded) return topicId === 0;
 		const item = store.item(chatId, key);
 		return item?.kind === "message" && backend.messageTopic(item.message) === topicId;
 	});
@@ -182,6 +205,14 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 	}
 
 	const unread = dialog?.dialog.unreadCount ?? 0;
+	const mentions = topicId === 0 ? (dialog?.dialog.unreadMentionsCount ?? 0) : 0;
+	const toMention = () => {
+		// Messages unread when the chat was opened count, even if reading it since moved the read mark.
+		const from = unreadFrom !== 0 ? unreadFrom : readInbox + 1;
+		const seq = firstMention(store, chatId, from - 1, self);
+		stick.current = false;
+		store.openWindow(chatId, seq !== 0 ? seq : from);
+	};
 	return (
 		<div className="messages-wrap">
 			<div
@@ -217,24 +248,31 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 					rows
 				)}
 			</div>
-			{!atBottom && (
-				<button
-					type="button"
-					className="to-bottom"
-					aria-label={copy.convo.toBottom(unread)}
-					onClick={() => {
-						stick.current = true;
-						setAtBottom(true);
-						if (window_.live) {
-							const element = scroller.current;
-							if (element !== null) element.scrollTop = element.scrollHeight;
-						} else store.jumpToNewest(chatId);
-					}}
-				>
-					<Icon name="arrow-down" />
-					{unread > 0 && <span className="badge">{countLabel(unread)}</span>}
-				</button>
-			)}
+			<div className="jump-stack">
+				{mentions > 0 && (
+					<button type="button" className="to-bottom to-mention" aria-label={copy.convo.toMention(mentions)} onClick={toMention}>
+						@<span className="badge">{countLabel(mentions)}</span>
+					</button>
+				)}
+				{!atBottom && (
+					<button
+						type="button"
+						className="to-bottom"
+						aria-label={copy.convo.toBottom(unread)}
+						onClick={() => {
+							stick.current = true;
+							setAtBottom(true);
+							if (window_.live) {
+								const element = scroller.current;
+								if (element !== null) element.scrollTop = element.scrollHeight;
+							} else store.jumpToNewest(chatId);
+						}}
+					>
+						<Icon name="arrow-down" />
+						{unread > 0 && <span className="badge">{countLabel(unread)}</span>}
+					</button>
+				)}
+			</div>
 		</div>
 	);
 }

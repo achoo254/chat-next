@@ -1,8 +1,11 @@
 // Composer (R1: text, emoji, reply, edit; attachments arrive with R3).
-// Enter sends, Shift+Enter breaks the line, Esc cancels reply or edit
-// (mockups/chat.html#composer-states). Sending is optimistic: the core shows
-// the message at once with a clock. Dropping the link preview sends the
-// message with no_link_preview, so the server attaches none.
+// Enter sends, Shift+Enter breaks the line, Esc cancels reply or edit, ↑ in
+// an empty composer edits your last message (mockups/chat.html#composer-states,
+// settings.html#shortcuts). The placeholder says where the message goes; the
+// key hint under it shows until the first message sent on this device.
+// Sending is optimistic: the core shows the message at once with a clock.
+// Dropping the link preview sends the message with no_link_preview, so the
+// server attaches none.
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { codePointLength } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
@@ -20,19 +23,39 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 const MAX_HEIGHT_PX = 160;
 const PREVIEW_DELAY_MS = 400;
 const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
+const HINT_KEY = "chat:composer-hint-done";
+
+function hintDone(): boolean {
+	try {
+		return window.localStorage.getItem(HINT_KEY) === "1";
+	} catch {
+		return false;
+	}
+}
+
+function markHintDone(): void {
+	try {
+		window.localStorage.setItem(HINT_KEY, "1");
+	} catch {
+		// Storage off: the hint shows again next time.
+	}
+}
 
 interface ComposerProps {
 	chatId: number;
 	topicId: number;
 	/** Channel admins post instead of sending. */
 	channel: boolean;
+	/** Accessible name of the text box ("Tin nhắn tới …"). */
+	label: string;
 	placeholder: string;
 	disabled?: boolean;
 }
 
-export function Composer({ chatId, topicId, channel, placeholder, disabled = false }: ComposerProps) {
+export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false }: ComposerProps) {
 	const copy = useCopy();
-	const { source, remote, backend, drafts, toasts } = useServices();
+	const { source, remote, backend, drafts, store, toasts } = useServices();
+	const [hint, setHint] = useState(() => !hintDone());
 	const ui = useUi();
 	const connection = useConnection();
 	const intent = useIntent(chatId);
@@ -138,6 +161,10 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 			cancelIntent();
 			setPreview(null);
 			setDismissed("");
+			if (hint) {
+				markHintDone();
+				setHint(false);
+			}
 		} catch {
 			if (!editing) {
 				setText(value);
@@ -147,10 +174,39 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 		}
 	};
 
+	/** ↑ in an empty composer: edit your newest message, when it can still be edited. */
+	const editLast = () => {
+		const own = store
+			.items(chatId)
+			.flatMap((item) => (item.kind === "message" ? [item.message] : []))
+			.filter(
+				(message) =>
+					message.fromId === store.selfId &&
+					message.text !== "" &&
+					message.forward === null &&
+					message.action === null &&
+					(topicId === 0 || backend.messageTopic(message) === topicId),
+			);
+		const last = own[own.length - 1];
+		if (last === undefined) return;
+		remote.limits().then(
+			(limits) => {
+				if (limits.editTimeLimit > 0 && Date.now() / 1000 - last.date > limits.editTimeLimit) return;
+				ui.intents.cell(chatId).set({ mode: "edit", seq: last.seq });
+			},
+			() => undefined,
+		);
+	};
+
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
 			cancelByUser();
+			return;
+		}
+		if (event.key === "ArrowUp" && text === "" && intent === null) {
+			event.preventDefault();
+			editLast();
 			return;
 		}
 		if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -174,7 +230,6 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 	};
 
 	const offline = connection === "offline" || connection === "waiting";
-	const label = channel ? copy.composer.channelLabel : copy.composer.label;
 	const shownPlaceholder = offline && !disabled ? copy.composer.placeholderOffline : placeholder;
 	const empty = text.trim() === "";
 	const editing = intent?.mode === "edit";
@@ -248,6 +303,7 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 					<Icon name={editing ? "check" : "send"} />
 				</button>
 			</form>
+			{hint && !editing && !disabled && <p className="composer-hint">{copy.composer.hint}</p>}
 		</div>
 	);
 }

@@ -21,7 +21,7 @@ function chatList(): HTMLElement {
 }
 
 async function openOps(demo = seedDemo()) {
-	renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.ops}`);
+	renderMessaging(demo.fixture, `/c/${demo.ids.ops}`);
 	const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
 	await within(log).findByText("Dashboard ổn định.", {}, LONG);
 	return { demo, log };
@@ -30,7 +30,7 @@ async function openOps(demo = seedDemo()) {
 describe("chat list", () => {
 	it("lists chats with type icons, badges and the pinned group first", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data);
+		renderMessaging(demo.fixture);
 
 		await within(await screen.findByRole("list", { name: "Danh sách chat" }, LONG)).findByText("Vận hành hệ thống", {}, LONG);
 		const rows = within(chatList()).getAllByRole("link");
@@ -46,7 +46,7 @@ describe("chat list", () => {
 
 	it("filters by the built-in folders and shows the empty state of an empty folder", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data);
+		renderMessaging(demo.fixture);
 		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
 		await within(await screen.findByRole("list", { name: "Danh sách chat" }, LONG)).findByText("Deploy Bot", {}, LONG);
 
@@ -70,7 +70,7 @@ describe("chat list", () => {
 		const lan = fixture.addUser("Lan Anh");
 		const chat = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, lan]);
 		fixture.send(lan, chat, "Chào bạn");
-		renderMessaging(fixture, undefined);
+		renderMessaging(fixture);
 		await screen.findByText("Chào bạn", {}, LONG);
 
 		await userEvent.click(screen.getByRole("tab", { name: "Bot" }));
@@ -82,7 +82,7 @@ describe("chat list", () => {
 
 	it("searches local messages without accents and highlights the match", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data);
+		renderMessaging(demo.fixture);
 		await within(await screen.findByRole("list", { name: "Danh sách chat" }, LONG)).findByText("Vận hành hệ thống", {}, LONG);
 
 		await userEvent.type(screen.getByRole("searchbox", { name: "Tìm chat và tin nhắn" }), "ky so");
@@ -107,10 +107,10 @@ describe("message rendering", () => {
 		expect(log.querySelector(".msg.at-me .mention.me")?.textContent).toBe("@ductrung");
 		expect(within(log).getByText(/^đã sửa/)).toBeTruthy();
 		expect(within(log).getByText("Nâng cấp Postgres gần như không gián đoạn")).toBeTruthy();
-		expect(within(log).getByRole("button", { name: "👍 Quang Huy, Lan Anh, Minh" }).getAttribute("aria-pressed")).toBe("true");
+		expect(within(log).getByRole("button", { name: "👍 3" }).getAttribute("aria-pressed")).toBe("true");
 		expect(within(log).getByText("Lan Anh đã thêm Deploy Bot")).toBeTruthy();
 		expect((await within(log).findByRole("separator", {}, LONG)).textContent).toBe("Tin chưa đọc");
-		expect(within(log).getAllByRole("img", { name: "Đã đọc" }).length).toBeGreaterThan(0);
+		expect(within(log).getAllByRole("img", { name: "Đã xem" }).length).toBeGreaterThan(0);
 		// Reply quote of your own message names the quoted author.
 		await waitFor(() => expect(log.querySelector(".msg.mine .reply b")?.textContent).toBe("Quang Huy"), LONG);
 		expect(screen.getByRole("button", { name: "Nhảy tới tin ghim" }).textContent).toContain("Checklist sau nâng cấp");
@@ -140,13 +140,13 @@ describe("message rendering", () => {
 describe("composer", () => {
 	it("sends optimistically and shows the server tick", async () => {
 		const { log } = await openOps();
-		const box = screen.getByRole("textbox", { name: "Tin nhắn" });
+		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / });
 		await userEvent.type(box, "Mình kiểm tra replica nhé{Enter}");
 
 		expect(await within(log).findByText("Mình kiểm tra replica nhé", {}, LONG)).toBeTruthy();
 		await waitFor(() => {
 			const last = [...log.querySelectorAll(".msg.mine")].at(-1);
-			expect(last?.querySelector('[aria-label="Đã gửi"], [aria-label="Đã đọc"]')).not.toBeNull();
+			expect(last?.querySelector('[aria-label="Đã gửi"], [aria-label="Đã xem"]')).not.toBeNull();
 		}, LONG);
 		expect((box as HTMLTextAreaElement).value).toBe("");
 	});
@@ -155,12 +155,12 @@ describe("composer", () => {
 		const demo = seedDemo();
 		demo.fixture.server.faults.push({ method: "sendMessage", when: "before", code: Code.InvalidArgument, remaining: 1 });
 		const { log } = await openOps(demo);
-		await userEvent.type(screen.getByRole("textbox", { name: "Tin nhắn" }), "Tin thử lỗi{Enter}");
+		await userEvent.type(screen.getByRole("textbox", { name: /^Tin nhắn tới / }), "Tin thử lỗi{Enter}");
 
-		const failed = await within(log).findByText("Chưa gửi được", {}, LONG);
-		expect(within(log).getByRole("img", { name: "Gửi lỗi" })).toBeTruthy();
+		const failed = await within(log).findByText("Chưa gửi được", { selector: ".failed-row" }, LONG);
+		expect(within(log).getByRole("img", { name: "Chưa gửi được" })).toBeTruthy();
 		await userEvent.click(within(failed).getByRole("button", { name: "Gửi lại" }));
-		await waitFor(() => expect(within(log).queryByText("Chưa gửi được")).toBeNull(), LONG);
+		await waitFor(() => expect(within(log).queryByText("Chưa gửi được", { selector: ".failed-row" })).toBeNull(), LONG);
 		expect(within(log).getByText("Tin thử lỗi")).toBeTruthy();
 	});
 
@@ -174,7 +174,7 @@ describe("composer", () => {
 		await userEvent.click(within(menu).getByRole("menuitem", { name: "Trả lời" }));
 
 		expect(await screen.findByText("Trả lời Lan Anh")).toBeTruthy();
-		await userEvent.type(screen.getByRole("textbox", { name: "Tin nhắn" }), "Cảm ơn bạn{Enter}");
+		await userEvent.type(screen.getByRole("textbox", { name: /^Tin nhắn tới / }), "Cảm ơn bạn{Enter}");
 		expect(await within(log).findByText("Cảm ơn bạn", {}, LONG)).toBeTruthy();
 		expect(screen.queryByText("Trả lời Lan Anh")).toBeNull();
 		// The test server keeps only the text, so the reply is checked on the request.
@@ -188,7 +188,7 @@ describe("composer", () => {
 		fireEvent.contextMenu(own);
 		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin của bạn" })).getByRole("menuitem", { name: "Sửa" }));
 
-		const box = screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement;
+		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / }) as HTMLTextAreaElement;
 		await waitFor(() => expect(box.value).toBe("Mục 3 ổn, extension đã lên bản mới."));
 		expect(await screen.findByText("Sửa tin")).toBeTruthy();
 		await userEvent.keyboard("{Escape}");
@@ -205,7 +205,7 @@ describe("composer", () => {
 
 	it("keeps a draft per chat and shows it in the list", async () => {
 		const { demo } = await openOps();
-		await userEvent.type(screen.getByRole("textbox", { name: "Tin nhắn" }), "Chiều nay mình gửi bản sửa");
+		await userEvent.type(screen.getByRole("textbox", { name: /^Tin nhắn tới / }), "Chiều nay mình gửi bản sửa");
 		const row = within(chatList()).getByText("Vận hành hệ thống").closest("a");
 		await waitFor(() => expect(row?.textContent).toContain("Nháp:"));
 		expect(window.localStorage.getItem(`chat:draft:${demo.fixture.selfId}:${demo.ids.ops}`)).toBe("Chiều nay mình gửi bản sửa");
@@ -215,7 +215,7 @@ describe("composer", () => {
 describe("topics", () => {
 	it("replaces the chat list with the topic list and opens a topic", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.forum}`);
+		renderMessaging(demo.fixture, `/c/${demo.ids.forum}`);
 
 		const topics = await screen.findByRole("list", { name: "Chủ đề" }, LONG);
 		const rows = within(topics).getAllByRole("button");
@@ -229,7 +229,7 @@ describe("topics", () => {
 		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
 		expect(await within(log).findByText("Ổn, API trả đủ trường cho màn này rồi.", {}, LONG)).toBeTruthy();
 		expect(within(log).queryByText("PR phân trang lịch sử đã merge")).toBeNull();
-		expect(screen.getByPlaceholderText("Viết trong Thiết kế")).toBeTruthy();
+		expect(screen.getByPlaceholderText("Nhập @ để nhắc tên, tin nhắn tới Thiết kế")).toBeTruthy();
 		const info = await screen.findByRole("complementary", { name: "Thông tin chủ đề" }, LONG);
 		expect(within(info).getByRole("heading", { name: "Thiết kế" })).toBeTruthy();
 		expect(within(info).getByTitle(`chat.example.test/c/${demo.ids.forum}/t/12`)).toBeTruthy();
@@ -237,8 +237,8 @@ describe("topics", () => {
 
 	it("sends into the open topic and lets admins close a topic from its menu", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.forum}/t/4`);
-		const box = await screen.findByPlaceholderText("Viết trong Backend API", {}, LONG);
+		renderMessaging(demo.fixture, `/c/${demo.ids.forum}/t/4`);
+		const box = await screen.findByPlaceholderText("Nhập @ để nhắc tên, tin nhắn tới Backend API", {}, LONG);
 		await userEvent.type(box, "Mình review PR này{Enter}");
 		await waitFor(() => expect(demo.fixture.sent).toContainEqual({ chatId: demo.ids.forum, topicId: 4, text: "Mình review PR này", replyToSeq: 0 }));
 		const log = screen.getByRole("log", { name: "Tin nhắn" });
@@ -258,10 +258,17 @@ describe("info panel", () => {
 		expect(within(info).getByRole("heading", { name: "Vận hành hệ thống" })).toBeTruthy();
 		expect(within(info).getByText("Kênh trực sự cố của đội vận hành. Cảnh báo tự động vào đây.")).toBeTruthy();
 		await within(info).findByText("Quang Huy", {}, LONG);
-		expect(within(info).getByText("Chủ nhóm")).toBeTruthy();
-		expect(within(info).getAllByText("Admin").length).toBeGreaterThan(0);
-		expect(within(info).getByRole("link", { name: /Quản lý/ })).toBeTruthy();
+		expect(within(info).getByText("Trưởng nhóm")).toBeTruthy();
+		expect(within(info).getAllByText("Phó nhóm").length).toBeGreaterThan(0);
+		expect(within(info).queryByText("Admin")).toBeNull();
+		expect(within(info).getByRole("link", { name: /Quản lý nhóm/ })).toBeTruthy();
 		expect(within(info).getByRole("button", { name: /Rời nhóm/ })).toBeTruthy();
+		// Zalo order: quick actions, then members with "Xem tất cả", then the invite link, Quản lý, leave.
+		const order = [...info.querySelectorAll(".quick-acts, .info-sec h3, .info-sec .link-row")].map((node) => node.textContent?.trim() ?? "");
+		expect(order[0]).toContain("Tắt thông báo");
+		expect(order.findIndex((text) => text.startsWith("Thành viên · "))).toBeLessThan(order.indexOf("Link mời"));
+		expect(order.indexOf("Link mời")).toBeLessThan(order.findIndex((text) => text.includes("Quản lý nhóm")));
+		expect(within(info).getByRole("button", { name: "Xem tất cả 5 thành viên" })).toBeTruthy();
 
 		await userEvent.click(within(info).getByRole("button", { name: "Tạo link mời" }));
 		expect(await within(info).findByTitle("chat.example.test/join/q7XrN2bTk4RbZ9wLc1Np1")).toBeTruthy();
@@ -274,11 +281,12 @@ describe("info panel", () => {
 
 	it("shows the other person in a 1-1 chat and blocks them", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.lanAnh}`);
+		renderMessaging(demo.fixture, `/c/${demo.ids.lanAnh}`);
 		const info = await screen.findByRole("complementary", { name: "Thông tin" }, LONG);
 		expect(await within(info).findByTitle("@lananh", {}, LONG)).toBeTruthy();
 		expect(within(info).getByText("Thiết kế sản phẩm. Hỏi về giao diện cứ nhắn.")).toBeTruthy();
 
+		expect(within(info).getByRole("button", { name: /Tạo nhóm/ })).toBeTruthy();
 		await userEvent.click(within(info).getByRole("button", { name: /^Chặn/ }));
 		await waitFor(() => expect(demo.fixture.blocked.has(demo.ids.users.lan)).toBe(true));
 		expect(within(info).getByRole("button", { name: /Bỏ chặn/ })).toBeTruthy();
@@ -326,10 +334,10 @@ describe("server features", () => {
 		const own = within(log).getByText("Mục 3 ổn, extension đã lên bản mới.").closest<HTMLElement>(".msg");
 		if (own === null) throw new Error("message not found");
 		fireEvent.contextMenu(own);
-		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin của bạn" })).getByRole("menuitem", { name: "Xem ai đã đọc" }));
-		const dialog = await screen.findByRole("dialog", { name: "Đã đọc · 2 người" }, LONG);
+		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin của bạn" })).getByRole("menuitem", { name: "Xem ai đã xem" }));
+		const dialog = await screen.findByRole("dialog", { name: "Đã xem · 2 người" }, LONG);
 		expect(within(dialog).getByText("Quang Huy")).toBeTruthy();
-		expect(within(dialog).getByText("2 thành viên chưa đọc. Bot trong nhóm không được tính.")).toBeTruthy();
+		expect(within(dialog).getByText("2 thành viên chưa xem. Bot trong nhóm không được tính.")).toBeTruthy();
 	});
 
 	it("offers an invite link when privacy refuses adding someone", async () => {
@@ -352,7 +360,7 @@ describe("server features", () => {
 
 	it("lists, creates and revokes invite links on the admin page", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.ops}/admin`);
+		renderMessaging(demo.fixture, `/c/${demo.ids.ops}/admin`);
 		expect(await screen.findByRole("heading", { name: "Link mời" }, LONG)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "Tạo link" }));
 		expect(await screen.findByTitle("chat.example.test/join/q7XrN2bTk4RbZ9wLc1Np1", {}, LONG)).toBeTruthy();
@@ -363,7 +371,7 @@ describe("server features", () => {
 
 	it("previews an invite before joining", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, "/join/teammobile");
+		renderMessaging(demo.fixture, "/join/teammobile");
 		const dialog = await screen.findByRole("dialog", { name: "Team Mobile" }, LONG);
 		expect(within(dialog).getByText("Nhóm · 24 thành viên")).toBeTruthy();
 		expect(within(dialog).getByRole("button", { name: "Tham gia nhóm" })).toBeTruthy();
@@ -371,7 +379,7 @@ describe("server features", () => {
 
 	it("shows a dead invite link as no longer usable", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, "/+expiredlink");
+		renderMessaging(demo.fixture, "/+expiredlink");
 		expect(await screen.findByRole("dialog", { name: "Link mời không còn dùng được" }, LONG)).toBeTruthy();
 	});
 });
@@ -395,7 +403,7 @@ function ownedChannel() {
 describe("channels", () => {
 	it("names a channel a channel in the list, the chat and the info panel", async () => {
 		const { demo, chatId } = ownedChannel();
-		renderMessaging(demo.fixture, demo.data, `/c/${chatId}`);
+		renderMessaging(demo.fixture, `/c/${chatId}`);
 		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
 		expect(await within(log).findByText("Bạn đã tạo kênh “Thông báo vận hành”", {}, LONG)).toBeTruthy();
 		expect(await within(chatList()).findByText("Bạn đã tạo kênh “Thông báo vận hành”", {}, LONG)).toBeTruthy();
@@ -403,9 +411,9 @@ describe("channels", () => {
 		const info = await screen.findByRole("complementary", { name: "Thông tin kênh" }, LONG);
 		expect(within(info).getByText("Kênh · 4 người đăng ký")).toBeTruthy();
 		expect(await within(info).findByText("Chủ kênh", {}, LONG)).toBeTruthy();
-		expect(within(info).queryByText(/Chủ nhóm|thành viên/)).toBeNull();
-		expect(within(info).getByRole("heading", { name: "4 người đăng ký" })).toBeTruthy();
-		expect(within(info).getByRole("button", { name: "Xem cả 4 người đăng ký" })).toBeTruthy();
+		expect(within(info).queryByText(/Trưởng nhóm|Phó nhóm|thành viên/)).toBeNull();
+		expect(within(info).getByRole("heading", { name: "Người đăng ký · 4" })).toBeTruthy();
+		expect(within(info).getByRole("button", { name: "Xem tất cả 4 người đăng ký" })).toBeTruthy();
 		// The long invite link stays whole in the DOM and the tooltip; only its look is shortened.
 		expect(await within(info).findByTitle("chat.hoandat.com/join/V-puXq3hT9mZ2cLk8RbkVUp", {}, LONG)).toBeTruthy();
 		expect(within(info).getByRole("button", { name: "Sao chép link mời" })).toBeTruthy();
@@ -416,22 +424,24 @@ describe("channels", () => {
 		expect(await within(picker).findByText("Không tìm thấy ai", {}, LONG)).toBeTruthy();
 	});
 
-	it("offers only leaving on the channel admin page", async () => {
+	it("offers leaving and, to the owner, deleting on the channel's Quản lý kênh page", async () => {
 		const { demo, chatId } = ownedChannel();
-		renderMessaging(demo.fixture, demo.data, `/c/${chatId}/admin`);
+		renderMessaging(demo.fixture, `/c/${chatId}/admin`);
 		expect(await screen.findByRole("heading", { name: "Rời kênh" }, LONG)).toBeTruthy();
+		expect(screen.getByText("Quản lý kênh")).toBeTruthy();
 		expect(screen.getByRole("heading", { name: "Người đăng ký" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Chủ kênh và admin" })).toBeTruthy();
 		expect(screen.getByRole("button", { name: /Tất cả người đăng ký/ })).toBeTruthy();
 		expect(await screen.findByText("Người tạo kênh", {}, LONG)).toBeTruthy();
-		expect(screen.getByText("Thông báo vận hành · 4 người đăng ký")).toBeTruthy();
+		expect(screen.getByText("Thông báo vận hành · 4 người đăng ký · bạn là chủ kênh")).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Rời kênh" })).toBeTruthy();
-		expect(screen.queryByRole("button", { name: /^Xoá/ })).toBeNull();
+		expect(screen.getByRole("button", { name: "Xoá kênh" })).toBeTruthy();
 		expect(screen.queryByText(/nhóm|thành viên/)).toBeNull();
 	});
 
 	it("keeps the group wording and drops deleting on the group admin page", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, `/c/${demo.ids.ops}/admin`);
+		renderMessaging(demo.fixture, `/c/${demo.ids.ops}/admin`);
 		expect(await screen.findByRole("heading", { name: "Rời nhóm" }, LONG)).toBeTruthy();
 		expect(screen.getByRole("button", { name: /Tất cả thành viên/ })).toBeTruthy();
 		expect(screen.queryByRole("button", { name: /^Xoá nhóm/ })).toBeNull();
@@ -439,9 +449,9 @@ describe("channels", () => {
 
 	it("creates a channel without a public or private choice", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data);
+		renderMessaging(demo.fixture);
 		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
-		const start = await screen.findByRole("dialog", { name: "Tin nhắn mới" }, LONG);
+		const start = await screen.findByRole("dialog", { name: "Chat mới" }, LONG);
 		await userEvent.click(within(start).getByRole("button", { name: "Tạo kênh" }));
 		const dialog = await screen.findByRole("dialog", { name: "Tạo kênh" }, LONG);
 		expect(within(dialog).queryByRole("radio")).toBeNull();
@@ -458,9 +468,9 @@ describe("channels", () => {
 describe("people search", () => {
 	async function openNewChat() {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data);
+		renderMessaging(demo.fixture);
 		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
-		return { demo, dialog: await screen.findByRole("dialog", { name: "Tin nhắn mới" }, LONG) };
+		return { demo, dialog: await screen.findByRole("dialog", { name: "Chat mới" }, LONG) };
 	}
 
 	it("explains an empty result, and recognises your own account", async () => {
@@ -485,37 +495,52 @@ describe("people search", () => {
 	});
 });
 
-describe("features the server lacks", () => {
-	it("hides them instead of showing them disabled", async () => {
+describe("nothing without server support", () => {
+	it("shows no shared media, group photo or disabled placeholders", async () => {
 		const demo = seedDemo();
-		// No backend data: the production server's feature set (no mute, no blocked list).
-		renderMessaging(demo.fixture, undefined, `/c/${demo.ids.channel}`);
+		renderMessaging(demo.fixture, `/c/${demo.ids.channel}`);
 		const info = await screen.findByRole("complementary", { name: "Thông tin kênh" }, LONG);
 		expect(within(info).getByRole("button", { name: /Rời kênh/ })).toBeTruthy();
-		expect(within(info).queryByRole("button", { name: /Tắt tiếng/ })).toBeNull();
-		expect(screen.queryByRole("button", { name: /Tắt tiếng/ })).toBeNull();
+		expect(within(info).getByRole("button", { name: /Tắt thông báo/ })).toBeTruthy();
+		expect(within(info).queryByText(/Ảnh, file, link|Ảnh và video/)).toBeNull();
 		expect(screen.queryByText(/bản sau/)).toBeNull();
 		expect(document.querySelector("button:disabled[title]")).toBeNull();
 	});
+});
 
-	it("leaves out settings that need them", async () => {
+describe("appearance and shortcuts", () => {
+	it("keeps the theme and message size on this device", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, undefined, "/settings/blocked");
-		expect(await screen.findByRole("heading", { level: 1, name: "Hồ sơ" }, LONG)).toBeTruthy();
-		expect(window.location.pathname).toBe("/settings/profile");
-		expect(screen.queryByRole("link", { name: "Người đã chặn" })).toBeNull();
+		renderMessaging(demo.fixture, "/settings/appearance");
+		expect(await screen.findByRole("heading", { level: 1, name: "Giao diện" }, LONG)).toBeTruthy();
+		await userEvent.click(within(await screen.findByRole("group", { name: "Chủ đề" }, LONG)).getByRole("button", { name: "Tối" }));
+		expect(document.documentElement.dataset.theme).toBe("dark");
+		expect(window.localStorage.getItem("app:theme")).toBe("dark");
+		fireEvent.change(screen.getByRole("slider", { name: "Cỡ chữ tin nhắn" }), { target: { value: "18" } });
+		expect(screen.getByText("18 px")).toBeTruthy();
+		expect(document.documentElement.style.getPropertyValue("--msg-font")).toBe("1.125rem");
+		await userEvent.click(within(screen.getByRole("group", { name: "Chủ đề" })).getByRole("button", { name: "Theo hệ thống" }));
+		expect(document.documentElement.dataset.theme).toBeUndefined();
+	});
 
-		await userEvent.click(screen.getByRole("link", { name: "Thông báo" }));
-		expect(await screen.findByRole("heading", { level: 1, name: "Thông báo" }, LONG)).toBeTruthy();
-		expect(screen.queryByText(/Theo loại chat|bản sau/)).toBeNull();
-		expect(document.querySelector("input:disabled, button:disabled")).toBeNull();
+	it("lists the shortcuts and opens the list with Ctrl+/", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, `/c/${demo.ids.ops}`);
+		await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		fireEvent.keyDown(document, { key: "/", ctrlKey: true });
+		expect(await screen.findByRole("heading", { level: 1, name: "Phím tắt" }, LONG)).toBeTruthy();
+		await userEvent.click(within(await screen.findByRole("group", { name: "Cách ghi phím" }, LONG)).getByRole("button", { name: "Windows, Linux" }));
+		const search = screen.getByText("Tìm kiếm", { selector: "dt" }).closest(".key-row");
+		expect(search?.textContent).toContain("CtrlK");
+		expect(search?.textContent).toContain("CtrlF");
+		expect(screen.getByText("Bộ lọc Tất cả, Cá nhân, Nhóm, Bot, Chưa đọc")).toBeTruthy();
 	});
 });
 
 describe("settings", () => {
-	it("adds privacy, blocked users and notifications to settings", async () => {
+	it("adds privacy, blocked users (from the server) and notifications to settings", async () => {
 		const demo = seedDemo();
-		renderMessaging(demo.fixture, demo.data, "/settings/privacy");
+		renderMessaging(demo.fixture, "/settings/privacy");
 		expect(await screen.findByRole("heading", { level: 1, name: "Quyền riêng tư" }, LONG)).toBeTruthy();
 		const email = await screen.findByRole("group", { name: "Ai tìm tôi bằng email" }, LONG);
 		expect(within(email).getByRole("button", { name: "Không ai" }).getAttribute("aria-pressed")).toBe("true");
@@ -528,5 +553,7 @@ describe("settings", () => {
 			await userEvent.click(screen.getAllByRole("button", { name: "Bỏ chặn" })[0] as HTMLElement);
 		});
 		expect(await screen.findByText("Đã bỏ chặn Nhận quà 24h")).toBeTruthy();
+		await waitFor(() => expect(demo.fixture.blocked.size).toBe(1));
+		expect(screen.getByText("@cryptosignal_bot", { exact: false })).toBeTruthy();
 	});
 });

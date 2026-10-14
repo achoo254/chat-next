@@ -1,7 +1,8 @@
 // Server calls the client core does not make (ADR 0001 mapping included):
-// chat creation, members, invite links, reactions, pins, forwarding, blocking
-// and privacy. Their results reach the local database through the core's
-// update stream; these calls only return what the UI needs right away.
+// chat creation, members, invite links, reactions, pins, forwarding, blocking,
+// privacy, per-chat settings (mute, pinned chats, delete) and the moderation
+// queue. Their results reach the local database through the core's update
+// stream; these calls only return what the UI needs right away.
 import type { Transport } from "@connectrpc/connect";
 import type { ReportReason, ReportTarget } from "./pending-backend.ts";
 
@@ -137,6 +138,122 @@ export interface Reader {
 	readonly readAt: number;
 }
 
+/** A contact with the date the caller added them (GetContacts). */
+export interface Contact {
+	readonly person: Person;
+	/** Unix seconds; 0 when the server did not say. */
+	readonly addedAt: number;
+}
+
+/** A user the caller blocked (GetBlockedUsers). */
+export interface BlockedPerson {
+	readonly person: Person;
+	/** Unix seconds. */
+	readonly blockedAt: number;
+}
+
+/** Why the server did not add a user to a chat (AddMembers, CreateGroup). */
+export type AddFailureReason = "privacy" | "blocked" | "banned" | "already_member" | "too_many" | "not_found";
+
+export interface AddFailure {
+	readonly userId: number;
+	readonly reason: AddFailureReason;
+}
+
+/** A group or channel two users share (GetCommonChats). */
+export interface CommonChat {
+	readonly id: number;
+	readonly title: string;
+	readonly channel: boolean;
+	readonly memberCount: number;
+}
+
+/** One user's reaction to a message (GetMessageReactions). */
+export interface Reactor {
+	readonly person: Person;
+	readonly emoji: string;
+	/** Unix seconds. */
+	readonly date: number;
+}
+
+/** SetDialogMute: muted for a number of seconds, until turned back on, or not at all (0). */
+export type MuteFor = number | "forever";
+
+export type ReportStatus = "open" | "resolved" | "dismissed";
+export type ReportKind = "user" | "chat" | "messages";
+/** What an operator can do with a report (ModerationService.ResolveReport). */
+export type ModerationAction = "dismiss" | "delete_messages" | "ban_from_chat" | "restrict_account" | "lift_restriction";
+
+/** A chat as the moderation screens name it. */
+export interface ChatBrief {
+	readonly id: number;
+	readonly title: string;
+	readonly channel: boolean;
+	readonly memberCount: number;
+}
+
+export interface ModerationReport {
+	readonly id: number;
+	readonly kind: ReportKind;
+	readonly reporterId: number;
+	readonly targetUserId: number;
+	readonly targetChatId: number;
+	readonly seqs: readonly number[];
+	readonly reason: ReportReason;
+	readonly comment: string;
+	readonly status: ReportStatus;
+	readonly createdAt: number;
+	readonly resolvedAt: number;
+	readonly resolvedBy: number;
+	readonly actions: readonly ModerationAction[];
+	readonly resolutionNote: string;
+}
+
+export interface ReportsPage {
+	readonly reports: readonly ModerationReport[];
+	readonly people: ReadonlyMap<number, Person>;
+	readonly chats: ReadonlyMap<number, ChatBrief>;
+	readonly nextCursor: string;
+}
+
+/** A message around a reported one, as it is now (deleted ones have no text). */
+export interface ContextMessage {
+	readonly seq: number;
+	readonly fromId: number;
+	readonly date: number;
+	readonly text: string;
+}
+
+export interface ModerationEntry {
+	readonly id: number;
+	readonly operatorId: number;
+	readonly action: ModerationAction;
+	readonly targetUserId: number;
+	readonly note: string;
+	/** Restrictions: when it ends; 0 = until lifted. */
+	readonly until: number;
+	readonly createdAt: number;
+}
+
+export interface Restriction {
+	readonly userId: number;
+	/** 0 = until lifted. */
+	readonly until: number;
+	readonly reason: string;
+	readonly createdAt: number;
+}
+
+export interface ReportDetail {
+	readonly report: ModerationReport;
+	/** The reported messages as filed. */
+	readonly evidence: readonly { readonly seq: number; readonly fromId: number; readonly date: number; readonly text: string; readonly deleted: boolean }[];
+	readonly context: readonly ContextMessage[];
+	readonly people: ReadonlyMap<number, Person>;
+	readonly chat: ChatBrief | null;
+	readonly history: readonly ModerationEntry[];
+	readonly restrictions: readonly Restriction[];
+}
+
 /** Who to add to the contact list: a user you can see, an exact username or an exact email. */
 export type ContactTarget = { readonly userId: number } | { readonly username: string } | { readonly email: string };
 
@@ -153,20 +270,25 @@ export const Permission = {
 export interface Remote {
 	limits(): Promise<Limits>;
 	setReaction(chatId: number, seq: number, emoji: string): Promise<void>;
-	pin(chatId: number, seq: number): Promise<void>;
+	/** `notify` false pins silently: members see the system line only. */
+	pin(chatId: number, seq: number, notify?: boolean): Promise<void>;
 	unpin(chatId: number, seq: number): Promise<void>;
 	forward(fromChatId: number, seqs: readonly number[], toChatId: number): Promise<void>;
 	createPrivate(userId: number): Promise<number>;
-	createGroup(title: string, userIds: readonly number[]): Promise<{ chatId: number; failedUserIds: number[] }>;
+	createGroup(title: string, userIds: readonly number[]): Promise<{ chatId: number; failures: AddFailure[] }>;
 	createChannel(title: string, about: string): Promise<number>;
 	members(chatId: number, query?: string, cursor?: string): Promise<{ members: Member[]; nextCursor: string }>;
-	addMembers(chatId: number, userIds: readonly number[]): Promise<number[]>;
+	/** Everyone not added, with the reason (already members included). */
+	addMembers(chatId: number, userIds: readonly number[]): Promise<AddFailure[]>;
 	/** Removes a member; `ban` also keeps them from rejoining until an admin unbans them. */
 	removeMember(chatId: number, userId: number, ban: boolean): Promise<void>;
 	unbanMember(chatId: number, userId: number): Promise<void>;
 	bannedMembers(chatId: number, cursor?: string): Promise<Page<BannedMember>>;
-	/** FailedPrecondition "owner_needs_admin…" when an owner would leave members without an admin. */
-	leaveChat(chatId: number): Promise<void>;
+	/**
+	 * Owners pass the admin who becomes the owner (0: the longest-serving
+	 * admin). FailedPrecondition "owner_needs_admin…" when there is no admin.
+	 */
+	leaveChat(chatId: number, newOwnerId?: number): Promise<void>;
 	setAdmin(chatId: number, userId: number, admin: boolean): Promise<void>;
 	setDefaultPermissions(chatId: number, permissions: number): Promise<void>;
 	setHistoryShared(chatId: number, shared: boolean): Promise<void>;
@@ -180,7 +302,7 @@ export interface Remote {
 	privacy(): Promise<Privacy>;
 	setPrivacy(change: Partial<Privacy>): Promise<Privacy>;
 	/** The caller's own contact list, a page at a time (ordered by user id). */
-	contacts(cursor?: string): Promise<Page<Person>>;
+	contacts(cursor?: string): Promise<Page<Contact>>;
 	/** NotFound when the user is unknown or their privacy hides them from this kind of search. */
 	addContact(target: ContactTarget): Promise<Person>;
 	deleteContact(userId: number): Promise<void>;
@@ -198,6 +320,22 @@ export interface Remote {
 	revokeInvite(chatId: number, link: string): Promise<Invite>;
 	/** Members who read a message (small groups, recent messages only), most recent first. */
 	readers(chatId: number, seq: number): Promise<Reader[]>;
+	/** Mutes the caller's notifications of a chat; 0 unmutes. Returns the new mute end (Dialog.muteUntil). */
+	setDialogMute(chatId: number, muteFor: MuteFor): Promise<number>;
+	/** FailedPrecondition "pinned_dialogs_limit…" past PINNED_DIALOGS_MAX. Returns the pinned chats, top first. */
+	setDialogPinned(chatId: number, pinned: boolean): Promise<number[]>;
+	/** Private chats: for the caller only. Groups and channels: the owner deletes it for everyone. */
+	deleteChat(chatId: number): Promise<void>;
+	/** Groups and channels shared with a user, and how many in all. */
+	commonChats(userId: number): Promise<{ chats: CommonChat[]; count: number }>;
+	/** Who reacted to a message, newest first; `emoji` "" lists every reaction. */
+	reactions(chatId: number, seq: number, emoji: string, cursor?: string): Promise<Page<Reactor>>;
+	blockedUsers(cursor?: string): Promise<Page<BlockedPerson>>;
+	moderationReports(status: ReportStatus, cursor?: string): Promise<ReportsPage>;
+	moderationReport(reportId: number): Promise<ReportDetail>;
+	/** `restrictSeconds` 0 restricts until lifted (restrict_account only). */
+	resolveReport(reportId: number, actions: readonly ModerationAction[], note: string, restrictSeconds: number): Promise<ModerationReport>;
+	liftRestriction(userId: number, note: string): Promise<void>;
 }
 
 const METHODS = [
@@ -241,6 +379,16 @@ const METHODS = [
 	"inviteLinks",
 	"revokeInvite",
 	"readers",
+	"setDialogMute",
+	"setDialogPinned",
+	"deleteChat",
+	"commonChats",
+	"reactions",
+	"blockedUsers",
+	"moderationReports",
+	"moderationReport",
+	"resolveReport",
+	"liftRestriction",
 ] as const satisfies readonly (keyof Remote)[];
 
 // Fails to compile when a Remote method is missing from METHODS.

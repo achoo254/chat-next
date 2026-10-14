@@ -8,10 +8,14 @@ import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { chatKind, dialogTitle, joinNames, messagePreview, userName } from "../data/format.ts";
-import { Permission, type Person } from "../data/remote.ts";
+import type { FullCopy } from "../copy/use-screens-copy.ts";
+import { useContacts } from "../data/contacts.ts";
+import { chatKind, dialogTitle, joinNames, messagePreview, namedUserIds } from "../data/format.ts";
+import { Permission, type AddFailure, type Person } from "../data/remote.ts";
 import { useChat, useDialogOrder, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useNameOf } from "./chat-row.tsx";
 import { inviteLinks, isActiveInvite } from "./members.ts";
+import { presenceText } from "./presence.tsx";
 import { isOwnAccount, usePeopleSearch } from "./people-search.ts";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
@@ -109,7 +113,7 @@ export function NewChatDialog({ onClose }: CloseProps) {
 			<DialogHead id={id} title={copy.newChat.title} onClose={onClose} />
 			<div className="dlg-body stack">
 				<div className="quick">
-					<button type="button" onClick={() => ui.dialog.set({ kind: "newGroup" })}>
+					<button type="button" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: 0 })}>
 						<Icon name="users" />
 						{copy.newChat.newGroup}
 					</button>
@@ -152,20 +156,35 @@ export function NewChatDialog({ onClose }: CloseProps) {
 	);
 }
 
-/** People from your private chats: the default list of the member picker. */
-function useRecentPeople(): Candidate[] {
-	const { store } = useServices();
+/**
+ * The default list of the member picker: your contacts, then the people of
+ * your private chats (#new-group: "Gợi ý từ danh bạ").
+ */
+function useSuggestedPeople(): Candidate[] {
+	const copy = useScreensCopy();
+	const { remote, store } = useServices();
+	const contacts = useContacts(remote);
 	const order = useDialogOrder();
 	return useMemo(() => {
-		const people: Candidate[] = [];
+		const people = new Map<number, Candidate>();
+		for (const { person } of contacts.entries) {
+			people.set(person.id, { id: person.id, name: person.name, detail: personDetail(person, copy), isBot: person.isBot });
+		}
 		for (const chatId of order) {
 			const view = store.dialog(chatId);
 			const peer = view?.peer;
-			if (view?.chat?.type !== "private" || peer == null || peer.isSelf) continue;
-			people.push({ id: peer.id, name: peer.name, detail: peer.username === "" ? "" : `@${peer.username}`, isBot: peer.isBot });
+			if (view?.chat?.type !== "private" || peer == null || peer.isSelf || people.has(peer.id)) continue;
+			people.set(peer.id, { id: peer.id, name: peer.name, detail: peer.isBot ? copy.newGroup.bot : peer.username === "" ? "" : `@${peer.username}`, isBot: peer.isBot });
 		}
-		return people;
-	}, [order, store]);
+		return [...people.values()];
+	}, [contacts, order, store, copy]);
+}
+
+/** "@username · Đang hoạt động", or the bot line. */
+function personDetail(person: Person, copy: FullCopy): string {
+	if (person.isBot) return copy.newGroup.bot;
+	const presence = presenceText(person.presence, copy);
+	return person.username === "" ? presence : `@${person.username} · ${presence}`;
 }
 
 interface PickerProps {
@@ -177,14 +196,16 @@ interface PickerProps {
 function PeoplePicker({ selected, onToggle, exclude }: PickerProps) {
 	const copy = useScreensCopy();
 	const [query, setQuery] = useState("");
-	const recent = useRecentPeople();
+	const suggested = useSuggestedPeople();
 	const { people, failed } = usePeopleSearch(query);
 	const searching = query.trim() !== "";
-	const candidates: Candidate[] =
-		query.trim() === ""
-			? recent
-			: (people ?? []).map((p) => ({ id: p.id, name: p.name, detail: p.isBot ? copy.newGroup.bot : p.username === "" ? "" : `@${p.username}`, isBot: p.isBot }));
-	const shown = candidates.filter((c) => exclude?.has(c.id) !== true);
+	const needle = fold(query.trim().replace(/^@/, ""));
+	// Suggestions that match show at once; the server's matches join them.
+	const local = suggested.filter((c) => needle === "" || fold(c.name).includes(needle) || c.detail.toLowerCase().includes(`@${needle}`));
+	const remoteMatches = (people ?? []).map((p) => ({ id: p.id, name: p.name, detail: personDetail(p, copy), isBot: p.isBot }));
+	const candidates = searching ? [...local, ...remoteMatches.filter((c) => !local.some((l) => l.id === c.id))] : local;
+	// Picked people stay on the list even when the search moves on.
+	const shown = [...[...selected.values()].filter((c) => !candidates.some((x) => x.id === c.id)), ...candidates].filter((c) => exclude?.has(c.id) !== true);
 	return (
 		<>
 			<label className="search-field">
@@ -250,83 +271,92 @@ function useSelection(): [ReadonlyMap<number, Candidate>, (candidate: Candidate)
 	return [selected, toggle];
 }
 
-export function NewGroupDialog({ onClose }: CloseProps) {
+/** Group titles are at most 128 characters on the server. */
+const TITLE_MAX = 128;
+
+/** Without a name the group is named after its first three members (#new-group). */
+export function autoGroupName(names: readonly string[]): string {
+	return names.slice(0, 3).join(", ").slice(0, TITLE_MAX);
+}
+
+/** The people a server refusal is worth showing: everything except "already a member". */
+function realFailures(failures: readonly AddFailure[]): AddFailure[] {
+	return failures.filter((failure) => failure.reason !== "already_member");
+}
+
+/**
+ * One screen (#new-group): an optional name (empty: the first three members),
+ * the people picker with chips and the history switch. Opened from a profile,
+ * that person is picked already and Back returns to the profile.
+ */
+export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserId: number }) {
 	const copy = useScreensCopy();
 	const ui = useUi();
-	const { remote, self, toasts } = useServices();
+	const { remote, toasts } = useServices();
+	const preset = useUser(withUserId);
 	const [selected, toggle] = useSelection();
-	const [step, setStep] = useState<1 | 2>(1);
+	const [presetDone, setPresetDone] = useState(withUserId === 0);
 	const [name, setName] = useState("");
 	const [history, setHistory] = useState(true);
 	const [busy, setBusy] = useState(false);
-	const [invalid, setInvalid] = useState(false);
 	const id = useDomId("ng");
+	if (!presetDone && preset !== undefined) {
+		setPresetDone(true);
+		toggle({ id: preset.id, name: preset.name, detail: preset.username === "" ? "" : `@${preset.username}`, isBot: preset.isBot });
+	}
+	const auto = autoGroupName([...selected.values()].map((candidate) => candidate.name));
 
 	const create = async () => {
-		const title = name.trim();
-		if (title === "") {
-			setInvalid(true);
-			return;
-		}
+		const title = name.trim() === "" ? auto : name.trim();
+		if (selected.size === 0 || title === "") return;
 		setBusy(true);
 		try {
-			const { chatId, failedUserIds } = await remote.createGroup(title, [...selected.keys()]);
+			const ids = [...selected.keys()];
+			const { chatId, failures } = await remote.createGroup(title, ids);
 			if (!history) await remote.setHistoryShared(chatId, false).catch(() => undefined);
 			toasts.show(copy.newGroup.created(title));
 			navigate(paths.chat(chatId));
-			if (failedUserIds.length > 0) {
-				const added = [...selected.keys()].filter((userId) => !failedUserIds.includes(userId));
-				ui.dialog.set({ kind: "addFailed", chatId, userIds: failedUserIds, addedIds: added });
-			}
-			else onClose();
+			const refused = realFailures(failures);
+			if (refused.length > 0) {
+				const added = ids.filter((userId) => !failures.some((failure) => failure.userId === userId));
+				ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added });
+			} else onClose();
 		} catch {
 			setBusy(false);
 			toasts.show(copy.common.failed);
 		}
 	};
 
-	if (step === 1) {
-		return (
-			<Modal labelledBy={id} onClose={onClose}>
-				<DialogHead id={id} title={copy.newGroup.title} step={copy.newGroup.step(1)} onClose={onClose} />
-				<div className="dlg-body stack">
-					<PeoplePicker selected={selected} onToggle={toggle} />
-				</div>
-				<div className="dlg-foot">
-					<button type="button" className="btn" onClick={onClose}>
-						{copy.common.cancel}
-					</button>
-					<button type="button" className="btn btn-primary" disabled={selected.size === 0} onClick={() => setStep(2)}>
-						{copy.newGroup.next(selected.size)}
-					</button>
-				</div>
-			</Modal>
-		);
-	}
+	const presetName = preset?.name ?? "";
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={copy.newGroup.title} step={copy.newGroup.step(2)} onBack={() => setStep(1)} />
+			<DialogHead
+				id={id}
+				title={withUserId === 0 ? copy.newGroup.title : copy.newGroup.titleWith(presetName)}
+				{...(withUserId === 0
+					? {}
+					: { onBack: () => ui.dialog.set({ kind: "profile", userId: withUserId }), backLabel: copy.newGroup.backToProfile(presetName) })}
+				onClose={onClose}
+			/>
 			<div className="dlg-body stack">
 				<div className="field">
-					<label htmlFor={`${id}-name`}>{copy.newGroup.name}</label>
+					<label htmlFor={`${id}-name`}>
+						{copy.newGroup.name} <span className="muted">{copy.newGroup.optional}</span>
+					</label>
 					<input
 						id={`${id}-name`}
 						className="input"
-						maxLength={128}
+						maxLength={TITLE_MAX}
 						value={name}
-						aria-invalid={invalid}
-						aria-describedby={invalid ? `${id}-err` : undefined}
-						onChange={(event) => {
-							setName(event.target.value);
-							setInvalid(false);
-						}}
+						placeholder={auto}
+						aria-describedby={`${id}-hint`}
+						onChange={(event) => setName(event.target.value)}
 					/>
-					{invalid && (
-						<span className="error-text" id={`${id}-err`}>
-							{copy.newGroup.nameRequired}
-						</span>
-					)}
+					<span className="hint" id={`${id}-hint`}>
+						{copy.newGroup.nameHint}
+					</span>
 				</div>
+				<PeoplePicker selected={selected} onToggle={toggle} />
 				<div className="row">
 					<span className="grow">
 						{copy.newGroup.history}
@@ -334,27 +364,17 @@ export function NewGroupDialog({ onClose }: CloseProps) {
 					</span>
 					<Switch checked={history} label={copy.newGroup.history} onChange={setHistory} />
 				</div>
-				<div>
-					<h3>{copy.newGroup.memberCount(selected.size + 1)}</h3>
-					<div className="row">
-						<ChatAvatar id={self.id} name={self.name} size="sm" />
-						<span className="grow">{copy.common.you}</span>
-						<span className="role">{copy.newGroup.creator}</span>
-					</div>
-					{[...selected.values()].map((candidate) => (
-						<div className="row" key={candidate.id}>
-							<ChatAvatar id={candidate.id} name={candidate.name} size="sm" bot={candidate.isBot} />
-							<span className="grow">{candidate.name}</span>
-						</div>
-					))}
-				</div>
+				<p className="note">
+					<Icon name="info" />
+					<span>{copy.newGroup.suggestions}</span>
+				</p>
 			</div>
 			<div className="dlg-foot">
-				<button type="button" className="btn" onClick={() => setStep(1)}>
-					{copy.common.back}
+				<button type="button" className="btn" onClick={onClose}>
+					{copy.common.cancel}
 				</button>
-				<button type="button" className="btn btn-primary" aria-busy={busy} disabled={busy} onClick={() => void create()}>
-					{copy.newGroup.create}
+				<button type="button" className="btn btn-primary" aria-busy={busy} disabled={busy || selected.size === 0} onClick={() => void create()}>
+					{copy.newGroup.create(selected.size)}
 				</button>
 			</div>
 		</Modal>
@@ -371,11 +391,12 @@ export function AddMembersDialog({ chatId, onClose }: CloseProps & { chatId: num
 	const channel = useChat(chatId)?.type === "channel";
 	const add = () => {
 		setBusy(true);
-		remote.addMembers(chatId, [...selected.keys()]).then(
-			(failed) => {
-				const added = [...selected.keys()].filter((userId) => !failed.includes(userId));
-				if (failed.length > 0) {
-					ui.dialog.set({ kind: "addFailed", chatId, userIds: failed, addedIds: added });
+		const ids = [...selected.keys()];
+		remote.addMembers(chatId, ids).then(
+			(failures) => {
+				const added = ids.filter((userId) => !failures.some((failure) => failure.userId === userId));
+				if (realFailures(failures).length > 0) {
+					ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added });
 					return;
 				}
 				toasts.show(copy.info.added(added.length));
@@ -486,7 +507,7 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 	const { remote, source, store, toasts } = useServices();
 	const order = useDialogOrder();
 	const message = useMessage(chatId, seq);
-	const author = useUser(message != null && message.fromId !== store.selfId ? message.fromId : 0);
+	const nameOf = useNameOf(message == null ? [] : namedUserIds(message));
 	const channel = useChat(chatId)?.type === "channel";
 	const [query, setQuery] = useState("");
 	const [selected, toggle] = useSelection();
@@ -527,14 +548,13 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 		}
 	};
 
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
 			<DialogHead id={id} title={copy.forward.title} onClose={onClose} />
 			<div className="dlg-body stack">
 				{message != null && (
 					<div className="quote">
-						<b>{message.fromId === store.selfId ? copy.common.you : (author?.name ?? copy.message.unknownUser)}</b>
+						<b>{nameOf(message.fromId)}</b>
 						{messagePreview(message, nameOf, copy, channel)}
 					</div>
 				)}
@@ -588,53 +608,54 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 	);
 }
 
-/** Where an invite to one person stands in the add-members result. */
-type InviteState = "idle" | "sending" | "sent" | "refused";
+/** Where the way round a refusal stands for one person in the add-members result. */
+type RowState = "idle" | "sending" | "sent" | "refused" | "done";
 
 interface AddFailedProps extends CloseProps {
 	chatId: number;
-	userIds: readonly number[];
+	failures: readonly AddFailure[];
 	addedIds: readonly number[];
 }
 
 /**
- * The add-members result (#add-members): who was added, and for each person
- * the server refused (their "add me to groups" privacy, or a ban from the
- * chat) what still works: an invite link sent in a private chat, or a private
- * chat. When their "message me" setting refuses you too, the link is copied
- * for you to send another way. The server gives no reason per person, so the
- * row names the possible ones.
+ * The add-members result (#add-members): who was added or already there,
+ * and for each person the server refused, the reason it gave and what still
+ * works. Privacy refusals (and people who blocked you, shown the same way so
+ * a block stays private): an invite link sent in a private chat, or a private
+ * chat; when their "message me" setting refuses you too, the link is copied
+ * for you to send another way. People you blocked: unblock. Banned: admins
+ * unban and add. Unknown accounts and a full chat: the reason only.
  */
-export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFailedProps) {
+export function AddFailedDialog({ chatId, failures, addedIds, onClose }: AddFailedProps) {
 	const copy = useScreensCopy();
 	const { remote, source, toasts } = useServices();
 	const chat = useChat(chatId);
-	const [people, setPeople] = useState<readonly Person[]>([]);
-	const [added, setAdded] = useState<readonly Person[]>([]);
-	const [invites, setInvites] = useState<ReadonlyMap<number, InviteState>>(new Map());
+	const [people, setPeople] = useState<ReadonlyMap<number, Person>>(new Map());
+	const [states, setStates] = useState<ReadonlyMap<number, RowState>>(new Map());
 	const id = useDomId("failed");
 	const t = copy.addFailed;
 	const title = chat?.title ?? "";
-	// Admins adding a banned user lift the ban, so for them only privacy refuses.
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 	const channel = chat?.type === "channel";
+	const refused = realFailures(failures);
+	const already = failures.filter((failure) => failure.reason === "already_member").map((failure) => failure.userId);
 
 	useEffect(() => {
 		let active = true;
-		remote.people([...userIds, ...addedIds]).then(
+		const ids = [...new Set([...failures.map((failure) => failure.userId), ...addedIds])];
+		remote.people(ids).then(
 			(found) => {
-				if (!active) return;
-				setPeople(found.filter((person) => userIds.includes(person.id)));
-				setAdded(found.filter((person) => addedIds.includes(person.id)));
+				if (active) setPeople(new Map(found.map((person) => [person.id, person])));
 			},
 			() => undefined,
 		);
 		return () => {
 			active = false;
 		};
-	}, [remote, userIds, addedIds]);
+	}, [remote, failures, addedIds]);
 
-	const setInvite = (userId: number, state: InviteState) => setInvites((current) => new Map(current).set(userId, state));
+	const setState = (userId: number, state: RowState) => setStates((current) => new Map(current).set(userId, state));
+	const nameOf = (userId: number) => people.get(userId)?.name ?? copy.message.unknownUser;
 	const inviteLink = async (): Promise<string> => {
 		const existing = inviteLinks.list(chatId).find((invite) => isActiveInvite(invite, Date.now()));
 		if (existing !== undefined) return existing.link;
@@ -642,27 +663,27 @@ export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFaile
 		inviteLinks.add(chatId, created);
 		return created.link;
 	};
-	const sendInvite = async (person: Person): Promise<void> => {
-		setInvite(person.id, "sending");
+	const sendInvite = async (userId: number): Promise<void> => {
+		setState(userId, "sending");
 		try {
 			const link = await inviteLink();
-			const privateChat = await remote.createPrivate(person.id);
+			const privateChat = await remote.createPrivate(userId);
 			await source.sendText(privateChat, link);
-			setInvite(person.id, "sent");
-			toasts.show(t.inviteSentToast(person.name));
+			setState(userId, "sent");
+			toasts.show(t.inviteSentToast(nameOf(userId)));
 		} catch (err) {
 			// Their "message me" privacy refuses a private chat with you.
-			const refused = ConnectError.from(err).code === Code.PermissionDenied;
-			setInvite(person.id, refused ? "refused" : "idle");
-			if (!refused) toasts.show(copy.common.failed);
+			const refusedChat = ConnectError.from(err).code === Code.PermissionDenied;
+			setState(userId, refusedChat ? "refused" : "idle");
+			if (!refusedChat) toasts.show(copy.common.failed);
 		}
 	};
 	const copyLink = async () => {
 		const ok = await inviteLink().then(copyText, () => false);
 		toasts.show(ok ? t.copied(title) : copy.common.failed);
 	};
-	const message = (person: Person) => {
-		remote.createPrivate(person.id).then(
+	const message = (userId: number) => {
+		remote.createPrivate(userId).then(
 			(privateChat) => {
 				onClose();
 				navigate(paths.chat(privateChat));
@@ -670,68 +691,145 @@ export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFaile
 			() => toasts.show(copy.common.failed),
 		);
 	};
-	const pending = people.filter((person) => (invites.get(person.id) ?? "idle") === "idle");
-	const busy = [...invites.values()].includes("sending");
-	const sendAll = async () => {
-		for (const person of pending) await sendInvite(person);
+	const unblock = (userId: number) => {
+		setState(userId, "sending");
+		remote.unblock(userId).then(
+			() => {
+				setState(userId, "done");
+				toasts.show(t.unblocked(nameOf(userId)));
+			},
+			() => {
+				setState(userId, "idle");
+				toasts.show(copy.common.failed);
+			},
+		);
+	};
+	const unbanAndAdd = (userId: number) => {
+		setState(userId, "sending");
+		remote
+			.unbanMember(chatId, userId)
+			.then(() => remote.addMembers(chatId, [userId]))
+			.then(
+				(again) => {
+					const ok = !again.some((failure) => failure.userId === userId && failure.reason !== "already_member");
+					setState(userId, ok ? "done" : "idle");
+					toasts.show(ok ? t.unbannedAdded(nameOf(userId), channel) : copy.common.failed);
+				},
+				() => {
+					setState(userId, "idle");
+					toasts.show(copy.common.failed);
+				},
+			);
 	};
 
+	/** People you blocked are told so; everyone else refusing is a privacy refusal. */
+	const kindOf = (failure: AddFailure): "privacy" | "youBlocked" | "banned" | "not_found" | "too_many" => {
+		if (people.get(failure.userId)?.isBlocked === true) return "youBlocked";
+		if (failure.reason === "privacy" || failure.reason === "blocked" || failure.reason === "already_member") return "privacy";
+		return failure.reason;
+	};
+	const reasonText = (failure: AddFailure): string => {
+		switch (kindOf(failure)) {
+			case "privacy":
+				return t.reasonPrivacy(nameOf(failure.userId), channel);
+			case "youBlocked":
+				return t.reasonYouBlocked;
+			case "banned":
+				return t.reasonBanned(channel);
+			case "not_found":
+				return t.reasonNotFound;
+			case "too_many":
+				return t.reasonTooMany(channel);
+		}
+	};
+	const pending = refused.filter((failure) => kindOf(failure) === "privacy" && (states.get(failure.userId) ?? "idle") === "idle");
+	const busy = [...states.values()].includes("sending");
+	const sendAll = async () => {
+		for (const failure of pending) await sendInvite(failure.userId);
+	};
+
+	const addedNames = addedIds.map(nameOf);
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={t.title(userIds.length)} onClose={onClose} />
+			<DialogHead id={id} title={t.title(refused.length)} onClose={onClose} />
 			<div className="dlg-body stack">
-				{added.length > 0 && (
+				{(addedIds.length > 0 || already.length > 0) && (
 					<p className="note ok">
 						<Icon name="check" />
-						<span>{t.added(joinNames(added.map((person) => person.name), copy.system.and), title)}</span>
+						<span>
+							{addedIds.length > 0 && t.added(joinNames(addedNames, copy.system.and), title)}
+							{addedIds.length > 0 && already.length > 0 && " "}
+							{already.length > 0 && t.already(joinNames(already.map(nameOf), copy.system.and), channel)}
+						</span>
 					</p>
 				)}
 				<ul className="fail-list">
-					{people.map((person) => {
-						const state = invites.get(person.id) ?? "idle";
-						const whyId = `${id}-why-${person.id}`;
+					{refused.map((failure) => {
+						const userId = failure.userId;
+						const person = people.get(userId);
+						const state = states.get(userId) ?? "idle";
+						const kind = kindOf(failure);
+						const whyId = `${id}-why-${userId}`;
 						return (
-							<li key={person.id}>
+							<li key={userId}>
 								<div className="row">
-									<ChatAvatar id={person.id} name={person.name} bot={person.isBot} />
+									<ChatAvatar id={userId} name={person?.name ?? "?"} bot={person?.isBot === true} />
 									<span className="grow">
-										{person.name}
-										<small>{admin ? t.reason(person.name, channel) : t.reasonMaybeBanned(person.name, channel)}</small>
+										{person?.name ?? copy.message.unknownUser}
+										<small>{reasonText(failure)}</small>
 									</span>
 								</div>
-								<div className="pick-actions" role="group" aria-label={t.otherWays(person.name)} aria-describedby={state === "refused" ? whyId : undefined}>
-									<button
-										type="button"
-										className="btn btn-compact"
-										aria-busy={state === "sending"}
-										disabled={state !== "idle" || busy}
-										onClick={() => void sendInvite(person)}
-									>
-										<Icon name={state === "sent" ? "check" : "link"} />
-										{t.sendInvite}
-									</button>
-									{state === "refused" ? (
-										<button type="button" className="btn btn-compact" onClick={() => void copyLink()}>
-											<Icon name="copy" />
-											{t.copyLink}
+								{kind === "privacy" && (
+									<div className="pick-actions" role="group" aria-label={t.otherWays(nameOf(userId))} aria-describedby={state === "refused" ? whyId : undefined}>
+										<button
+											type="button"
+											className="btn btn-compact"
+											aria-busy={state === "sending"}
+											disabled={state !== "idle" || busy}
+											onClick={() => void sendInvite(userId)}
+										>
+											<Icon name={state === "sent" ? "check" : "link"} />
+											{t.sendInvite}
 										</button>
-									) : (
-										<button type="button" className="btn btn-compact" disabled={busy} onClick={() => message(person)}>
-											<Icon name="message" />
-											{t.message}
+										{state === "refused" ? (
+											<button type="button" className="btn btn-compact" onClick={() => void copyLink()}>
+												<Icon name="copy" />
+												{t.copyLink}
+											</button>
+										) : (
+											<button type="button" className="btn btn-compact" disabled={busy} onClick={() => message(userId)}>
+												<Icon name="message" />
+												{t.message}
+											</button>
+										)}
+									</div>
+								)}
+								{kind === "youBlocked" && state !== "done" && (
+									<div className="pick-actions" role="group" aria-label={t.actionsFor(nameOf(userId))}>
+										<button type="button" className="btn btn-compact" aria-busy={state === "sending"} disabled={busy} onClick={() => unblock(userId)}>
+											<Icon name="ban" />
+											{t.unblock}
 										</button>
-									)}
-								</div>
+									</div>
+								)}
+								{kind === "banned" && admin && state !== "done" && (
+									<div className="pick-actions" role="group" aria-label={t.actionsFor(nameOf(userId))}>
+										<button type="button" className="btn btn-compact" aria-busy={state === "sending"} disabled={busy} onClick={() => unbanAndAdd(userId)}>
+											<Icon name="user-plus" />
+											{t.unbanAdd}
+										</button>
+									</div>
+								)}
 								{state === "sent" && (
 									<p className="why">
 										<Icon name="check" />
-										{t.inviteSent(person.name)}
+										{t.inviteSent(nameOf(userId))}
 									</p>
 								)}
 								{state === "refused" && (
 									<p className="why" id={whyId}>
 										<Icon name="lock" />
-										{t.cantSend(person.name)}
+										{t.cantSend(nameOf(userId))}
 									</p>
 								)}
 							</li>

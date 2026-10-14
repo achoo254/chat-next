@@ -8,7 +8,6 @@ import type { SelfUser } from "../api/adapters.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
-import { Settings } from "../screens/settings/settings.tsx";
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
 import { useCopy } from "./copy/use-copy.ts";
@@ -22,6 +21,8 @@ import { ChatScreen } from "./ui/chat-screen.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { Toast } from "./ui/parts.tsx";
 
+// Settings and moderation load when opened, keeping the first chat screen small.
+const Settings = lazy(() => import("../screens/settings/settings.tsx").then((m) => ({ default: m.Settings })));
 const SettingsExtra = lazy(() => import("./settings/settings-extra.tsx"));
 const Moderation = lazy(() => import("./moderation/moderation.tsx"));
 
@@ -118,22 +119,6 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 		};
 	}, [start]);
 
-	// Moderators get a link to the queue in settings (no RPC yet: see pending-backend).
-	const [moderator, setModerator] = useState(false);
-	useEffect(() => {
-		if (start.status !== "ready") return;
-		let active = true;
-		start.services.backend.moderationScope().then(
-			(scope) => {
-				if (active) setModerator(scope !== null);
-			},
-			() => undefined,
-		);
-		return () => {
-			active = false;
-		};
-	}, [start]);
-
 	// One services object per client and profile, so context readers re-render rarely.
 	const services = useMemo(() => (start.status === "ready" ? { ...start.services, self } : null), [start, self]);
 
@@ -155,8 +140,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 				route={route}
 				onSelfChange={onSelfChange}
 				onSignOut={services.signOut}
-				moderator={moderator}
-				blockedList={services.backend.features.has("blockedList")}
+				moderator={self.isOperator}
 			/>
 			<Toast />
 		</ServicesContext>
@@ -169,11 +153,9 @@ interface ScreenProps {
 	onSelfChange: (self: SelfUser) => void;
 	onSignOut: () => void;
 	moderator: boolean;
-	/** The server lists blocked people (the settings tab needs it). */
-	blockedList: boolean;
 }
 
-function Screen({ self, route, onSelfChange, onSignOut, moderator, blockedList }: ScreenProps) {
+function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
 	switch (route.name) {
 		case "home":
 		case "chat":
@@ -183,21 +165,22 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator, blockedList }
 		case "settings":
 			return (
 				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Settings
-						tab={route.tab}
-						self={self}
-						onSelfChange={onSelfChange}
-						messaging={{
-							onSignOut,
-							moderation: moderator,
-							blockedList,
-							render: (tab: SettingsTab): ReactNode => (
-								<Suspense fallback={<Loading />}>
-									<SettingsExtra tab={tab} />
-								</Suspense>
-							),
-						}}
-					/>
+					<Suspense fallback={<Loading />}>
+						<Settings
+							tab={route.tab}
+							self={self}
+							onSelfChange={onSelfChange}
+							messaging={{
+								onSignOut,
+								moderation: moderator,
+								render: (tab: SettingsTab): ReactNode => (
+									<Suspense fallback={<Loading />}>
+										<SettingsExtra tab={tab} />
+									</Suspense>
+								),
+							}}
+						/>
+					</Suspense>
 				</Shell>
 			);
 		case "moderation":

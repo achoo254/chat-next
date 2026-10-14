@@ -1,14 +1,17 @@
 // Message actions (mockups/chat.html#context-menu): a dimmed layer over the
-// conversation with the reaction row, the message itself and the menu.
-// Opened by right click, long press or the keyboard; Esc closes it. The +
-// at the end of the reaction row swaps the row and the menu for the full
-// emoji panel under the message (#emoji-picker).
+// conversation with the "Thả cảm xúc" row, the message itself and the menu.
+// Opened by right click, long press, the keyboard or the message's "…"
+// button; Esc closes it. The + at the end of the reaction row (or the
+// message's emoji button) shows the full emoji panel under the message
+// (#emoji-picker). Your own messages offer "Thu hồi" (for everyone) and
+// "Xoá ở phía tôi"; other people's only "Xoá ở phía tôi".
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, StoredMessage } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
+import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { Permission, type Limits } from "../data/remote.ts";
-import { useItem, useServices } from "../data/services.tsx";
+import { useItem, useServices, useUser } from "../data/services.tsx";
 import { EmojiPicker } from "./emoji-picker.tsx";
 import { MessageBubble, PendingBubble } from "./message-item.tsx";
 import { copyText } from "./parts.tsx";
@@ -38,20 +41,30 @@ function canEdit(message: StoredMessage, selfId: number, limits: Limits | null):
 
 interface MenuEntry {
 	readonly label: string;
-	readonly icon: IconName;
+	readonly icon: IconName | { readonly glyph: GlyphName };
 	readonly run: () => void;
 	readonly danger?: boolean;
 	readonly separated?: boolean;
 }
 
-export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq }: { chatId: number; itemKey: string; chat: Chat | null; readOutboxMaxSeq: number }) {
+interface MenuLayerProps {
+	chatId: number;
+	itemKey: string;
+	chat: Chat | null;
+	readOutboxMaxSeq: number;
+	/** Open on the emoji panel instead of the menu. */
+	picker: boolean;
+}
+
+export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, picker }: MenuLayerProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store, source, remote, backend, toasts } = useServices();
 	const item = useItem(chatId, itemKey);
+	const author = useUser(item?.kind === "message" && item.message.fromId !== store.selfId ? item.message.fromId : 0);
 	const menu = useRef<HTMLDivElement>(null);
 	const [limits, setLimits] = useState<Limits | null>(null);
-	const [more, setMore] = useState(false);
+	const [more, setMore] = useState(picker);
 
 	useEffect(() => {
 		let active = true;
@@ -111,21 +124,27 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq }: {
 		}
 		if (canPin(chat)) {
 			const pinned = chat?.pinnedSeq === message.seq;
+			const direct = pinned || chat?.type === "private" || chat?.type === "secret";
 			entries.push({
 				label: pinned ? copy.menu.unpin : copy.menu.pin,
 				icon: "pin",
-				run: () =>
+				run: () => {
+					// Groups and channels ask first (notify everyone or pin quietly); a private chat pins at once.
+					if (!direct) {
+						ui.dialog.set({ kind: "pin", chatId, seq: message.seq });
+						return;
+					}
 					(pinned ? remote.unpin(chatId, message.seq) : remote.pin(chatId, message.seq)).then(
 						() => toasts.show(pinned ? copy.menu.unpinned : copy.menu.pinned),
 						failure,
-					),
+					);
+				},
 			});
 		}
 		if (canSeeReaders(message, chat, store.selfId, limits)) {
-			entries.push({ label: copy.menu.readBy, icon: "checks", run: () => ui.dialog.set({ kind: "readBy", chatId, seq: message.seq }) });
+			entries.push({ label: copy.menu.readBy, icon: "eye", run: () => ui.dialog.set({ kind: "readBy", chatId, seq: message.seq }) });
 		}
 		if (!mine && backend.features.has("report")) {
-			const author = store.user(message.fromId);
 			entries.push({
 				label: copy.menu.report,
 				icon: "flag",
@@ -138,15 +157,22 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq }: {
 					}),
 			});
 		}
-		if (mine || !channel || admin) {
+		if (mine) {
 			entries.push({
-				label: mine ? copy.menu.deleteMine : copy.menu.deleteTheirs,
-				icon: "trash",
+				label: copy.menu.recall,
+				icon: { glyph: "refresh" },
 				danger: true,
 				separated: true,
-				run: () => ui.dialog.set({ kind: "delete", chatId, seq: message.seq, mine }),
+				run: () => ui.dialog.set({ kind: "delete", chatId, seq: message.seq, recall: true }),
 			});
 		}
+		entries.push({
+			label: copy.menu.deleteForMe,
+			icon: "trash",
+			danger: true,
+			separated: !mine,
+			run: () => ui.dialog.set({ kind: "delete", chatId, seq: message.seq, recall: false }),
+		});
 	}
 
 	const react = (emoji: string) => {
@@ -228,7 +254,7 @@ function MenuButton({ entry, onDone }: { entry: MenuEntry; onDone: () => void })
 					entry.run();
 				}}
 			>
-				<Icon name={entry.icon} />
+				{typeof entry.icon === "string" ? <Icon name={entry.icon} /> : <Glyph name={entry.icon.glyph} />}
 				{entry.label}
 			</button>
 		</>

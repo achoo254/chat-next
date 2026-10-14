@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import shellEnSource from "../src/i18n/en.ts?raw";
 import shellViSource from "../src/i18n/vi.ts?raw";
 import enScreensSource from "../src/messaging/copy/en-screens.ts?raw";
@@ -16,7 +16,12 @@ import type { Remote, ServerTopic } from "../src/messaging/data/remote.ts";
 import { loadNextTopicPage, loadTopicPages, toneForColor, topicIcon } from "../src/messaging/data/topic-mapping.ts";
 import { isOwnAccount } from "../src/messaging/ui/people-search.ts";
 import { entityTree } from "../src/messaging/ui/rich-text.tsx";
-import { matchRoute, paths, rememberReturnPath, takeReturnPath } from "../src/router.tsx";
+import { matchRoute, paths, returnPathFor } from "../src/router.tsx";
+import { loginUrl } from "../src/screens/welcome.tsx";
+import { presenceText } from "../src/messaging/ui/presence.tsx";
+import { autoGroupName } from "../src/messaging/ui/create-dialogs.tsx";
+import { initialLetter } from "../src/messaging/ui/contacts.tsx";
+import { clampListWidth } from "../src/messaging/ui/list-resizer.tsx";
 
 const NOW = new Date(2026, 9, 14, 18, 0); // Wed 14/10/2026 18:00 local time
 const at = (y: number, m: number, d: number, h = 9, min = 42) => Math.floor(new Date(y, m, d, h, min).getTime() / 1000);
@@ -31,14 +36,45 @@ describe("format", () => {
 		expect(dayLabel(at(2026, 9, 12), NOW, "vi", copy)).toBe("Thứ Hai, 12/10");
 	});
 
-	it("maps chats to folders; channels only show under All", () => {
+	it("maps chats to folders; channels only show under All and, when unread, Unread", () => {
 		const bot = { id: 1, username: "b", name: "Bot", bio: "", isBot: true, isSelf: false, isBlocked: false };
 		expect(chatKind(null, bot, false)).toBe("bot");
-		expect(inFolder("bot", "bot")).toBe(true);
-		expect(inFolder("bot", "private")).toBe(false);
-		expect(inFolder("forum", "group")).toBe(true);
-		expect(inFolder("channel", "group")).toBe(false);
-		expect(inFolder("channel", "all")).toBe(true);
+		expect(inFolder("bot", "bot", false)).toBe(true);
+		expect(inFolder("bot", "private", false)).toBe(false);
+		expect(inFolder("forum", "group", false)).toBe(true);
+		expect(inFolder("channel", "group", true)).toBe(false);
+		expect(inFolder("channel", "all", false)).toBe(true);
+		expect(inFolder("channel", "unread", true)).toBe(true);
+		expect(inFolder("private", "unread", false)).toBe(false);
+	});
+
+	it("says presence the way Zalo users know it", () => {
+		const now = 1_760_000_000;
+		expect(presenceText({ kind: "online" }, copy, "vi", now)).toBe("Đang hoạt động");
+		expect(presenceText({ kind: "offline", lastSeen: now - 20 }, copy, "vi", now)).toBe("Vừa truy cập");
+		expect(presenceText({ kind: "offline", lastSeen: now - 12 * 60 }, copy, "vi", now)).toBe("Truy cập 12 phút trước");
+		expect(presenceText({ kind: "offline", lastSeen: now - 2 * 3600 }, copy, "vi", now)).toBe("Truy cập 2 giờ trước");
+		expect(presenceText({ kind: "recently" }, copy, "vi", now)).toBe("Truy cập gần đây");
+		expect(presenceText({ kind: "last_week" }, copy, "vi", now)).toBe("Truy cập trong tuần");
+	});
+
+	it("names a group without a name after its first three members", () => {
+		expect(autoGroupName(["Quang Huy", "Lan Anh"])).toBe("Quang Huy, Lan Anh");
+		expect(autoGroupName(["A", "B", "C", "D"])).toBe("A, B, C");
+		expect(autoGroupName(["x".repeat(100), "y".repeat(100)]).length).toBe(128);
+	});
+
+	it("files contacts under their Vietnamese initial", () => {
+		expect(initialLetter("Đức Anh")).toBe("Đ");
+		expect(initialLetter("ánh dương")).toBe("A");
+		expect(initialLetter("Bảo Ngọc")).toBe("B");
+		expect(initialLetter("123")).toBe("#");
+	});
+
+	it("keeps the chat list between 280 and 420px", () => {
+		expect(clampListWidth(100)).toBe(280);
+		expect(clampListWidth(333.4)).toBe(333);
+		expect(clampListWidth(900)).toBe(420);
 	});
 
 	it("trusts only the tenant's own hosts", () => {
@@ -106,29 +142,12 @@ describe("routes", () => {
 		expect(matchRoute("/join/bad token")).toBeNull();
 	});
 
-	describe("return after sign-in", () => {
-		afterEach(() => window.sessionStorage.clear());
-
-		it("returns once to the page opened before sign-in", () => {
-			rememberReturnPath("/join/V-puXq3hT9mZ2cLk8RbkVUp");
-			expect(takeReturnPath()).toBe("/join/V-puXq3hT9mZ2cLk8RbkVUp");
-			expect(takeReturnPath()).toBeNull();
-		});
-
-		it("keeps nothing for home, unknown paths or a tampered value", () => {
-			rememberReturnPath("/");
-			expect(takeReturnPath()).toBeNull();
-			rememberReturnPath("/no/such/page");
-			expect(takeReturnPath()).toBeNull();
-			window.sessionStorage.setItem("app:return-path", "https://example.net/join/abcd");
-			expect(takeReturnPath()).toBeNull();
-		});
-
-		it("forgets an earlier page when sign-in starts from home", () => {
-			rememberReturnPath("/c/5001");
-			rememberReturnPath("/");
-			expect(takeReturnPath()).toBeNull();
-		});
+	it("asks sign-in to come back to the page a visitor opened", () => {
+		expect(returnPathFor("/join/V-puXq3hT9mZ2cLk8RbkVUp")).toBe("/join/V-puXq3hT9mZ2cLk8RbkVUp");
+		expect(returnPathFor("/")).toBeUndefined();
+		expect(returnPathFor("/no/such/page")).toBeUndefined();
+		expect(loginUrl("vi", false, "/c/5001")).toBe("/auth/login?locale=vi&return_to=%2Fc%2F5001");
+		expect(loginUrl("en", true, "/")).toBe("/auth/login?prompt=create&locale=en");
 	});
 
 	it("maps a topic's icon colour to the nearest avatar tone", () => {
@@ -168,16 +187,20 @@ describe("channel wording", () => {
 		expect(actionText(created, "You", nameOf, en, false)).toBe("You created the group “Thông báo”");
 	});
 
-	it("counts subscribers, not members, in a channel", () => {
-		expect(viScreens.info.membersHead(5, true)).toBe("5 người đăng ký");
-		expect(viScreens.info.membersHead(5, false)).toBe("5 thành viên");
+	it("counts subscribers, not members, in a channel; groups have a leader and deputies", () => {
+		expect(viScreens.info.membersHead(5, true)).toBe("Người đăng ký · 5");
+		expect(viScreens.info.membersHead(5, false)).toBe("Thành viên · 5");
 		expect(viScreens.info.addMembers(true)).toBe("Thêm người đăng ký");
 		expect(viScreens.info.owner(true)).toBe("Chủ kênh");
-		expect(viScreens.info.owner(false)).toBe("Chủ nhóm");
+		expect(viScreens.info.owner(false)).toBe("Trưởng nhóm");
+		expect(viScreens.info.admin(true)).toBe("Admin");
+		expect(viScreens.info.admin(false)).toBe("Phó nhóm");
+		expect(viScreens.admin.groupTitle).toBe("Quản lý nhóm");
+		expect(viScreens.ownerLeave.transferLeave(false)).toBe("Chọn và rời nhóm");
 		expect(viScreens.admin.creator(true)).toBe("Người tạo kênh");
 		expect(viScreens.admin.allMembers(true)).toBe("Tất cả người đăng ký");
 		expect(viScreens.admin.leave(true)).toBe("Rời kênh");
-		expect(enScreens.info.membersHead(1, true)).toBe("1 subscriber");
+		expect(enScreens.info.membersHead(1, true)).toBe("Subscribers · 1");
 		expect(enScreens.admin.sub("News", 2, true)).toBe("News · 2 subscribers");
 	});
 
@@ -185,6 +208,29 @@ describe("channel wording", () => {
 		for (const source of [viSource, enSource, viScreensSource, enScreensSource, shellViSource, shellEnSource]) {
 			expect(source).not.toMatch(/bản sau|có ở bản|Sau R\d|later release|coming later|coming soon/i);
 		}
+	});
+
+	it("uses the agreed Vietnamese terms: Huỷ/Xoá spelling, Thu hồi, Tắt thông báo, Đã xem, Thả cảm xúc, no Kết bạn", () => {
+		for (const source of [viSource, viScreensSource, shellViSource]) {
+			// Only the words people read: string and template literals, not keys.
+			const texts = source.match(/"[^"\n]*"|`[^`\n]*`/g) ?? [];
+			expect(texts.filter((text) => /Hủy|hủy|Xóa|xóa|Kết bạn|kết bạn|[Tt]ắt tiếng|reaction|(?<!\{)\bonline\b(?!\})/.test(text))).toEqual([]);
+		}
+		expect(copy.message.deleted).toBe("Tin nhắn đã thu hồi");
+		expect(copy.message.read).toBe("Đã xem");
+		expect(copy.list.muted).toBe("Đã tắt thông báo");
+		expect(viScreens.menu.react).toBe("Thả cảm xúc");
+		expect(viScreens.menu.moreReactions).toBe("Chọn biểu cảm");
+		expect(viScreens.menu.recall).toBe("Thu hồi");
+		expect(viScreens.menu.deleteForMe).toBe("Xoá ở phía tôi");
+		expect(viScreens.menu.readBy).toBe("Xem ai đã xem");
+		expect(viScreens.listMenu.markUnread).toBe("Đánh dấu chưa đọc");
+		expect(viScreens.contacts.add).toBe("Thêm vào danh bạ");
+		expect(copy.composer.placeholder("Lan Anh")).toBe("Nhập tin nhắn tới Lan Anh");
+		expect(copy.composer.placeholderGroup("Vận hành hệ thống")).toBe("Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống");
+		expect(copy.composer.hint).toBe("Enter gửi · Shift+Enter xuống dòng");
+		expect(copy.convo.membersOnline(12, 3)).toBe("12 thành viên · 3 đang hoạt động");
+		expect(viScreens.addFailed.reasonTooMany(false)).toBe("Nhóm đã đủ số thành viên tối đa");
 	});
 });
 

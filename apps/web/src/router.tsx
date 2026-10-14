@@ -1,7 +1,7 @@
 // Minimal history-based routing: a handful of screens do not justify a router library.
 import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 
-export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "notifications";
+export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts";
 
 /** What the chat column shows next to the conversation list. */
 export type ChatPanel = "chat" | "admin" | "banned";
@@ -17,7 +17,7 @@ export type Route =
 	| { name: "moderation"; reportId: string | null; actions: boolean };
 
 /** Tabs that exist before messaging ships (release R0). */
-const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "sessions"];
+const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "appearance", "shortcuts", "sessions"];
 
 export const paths = {
 	home: "/",
@@ -97,34 +97,15 @@ export function matchRoute(pathname: string): Route | null {
 	}
 }
 
-// Sign-in always lands on "/" (the server's callback page), so the page a
-// signed-out visitor opened, such as an invite link, is kept for the tab
-// and opened again once the user is signed in.
-const RETURN_KEY = "app:return-path";
-
-/** Keeps `pathname` to return to after sign-in; only known routes other than home. */
-export function rememberReturnPath(pathname: string): void {
+/**
+ * Where sign-in should come back to (the server's return_to): the page a
+ * signed-out visitor opened, such as an invite link or a chat, when it is a
+ * known route other than home; undefined otherwise. The server validates the
+ * path again and keeps it across tabs, so the IdP may finish in another tab.
+ */
+export function returnPathFor(pathname: string): string | undefined {
 	const route = matchRoute(pathname);
-	try {
-		if (route === null || route.name === "home") window.sessionStorage.removeItem(RETURN_KEY);
-		else window.sessionStorage.setItem(RETURN_KEY, pathname);
-	} catch {
-		// Storage can be off (privacy mode); sign-in then lands on home.
-	}
-}
-
-/** The path kept by rememberReturnPath, once; null when none or no longer a known route. */
-export function takeReturnPath(): string | null {
-	let stored: string | null;
-	try {
-		stored = window.sessionStorage.getItem(RETURN_KEY);
-		window.sessionStorage.removeItem(RETURN_KEY);
-	} catch {
-		return null;
-	}
-	if (stored === null || !stored.startsWith("/")) return null;
-	const route = matchRoute(stored);
-	return route === null || route.name === "home" ? null : stored;
+	return route === null || route.name === "home" ? undefined : pathname;
 }
 
 const listeners = new Set<() => void>();

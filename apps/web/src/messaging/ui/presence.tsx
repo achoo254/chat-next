@@ -1,10 +1,11 @@
-// Presence as the other user's privacy allows ("online", "truy cập gần
-// đây"). The core keeps no presence, so it is read from GetUsers and cached
-// for a minute per user.
+// Presence as the other user's privacy allows, in the words Vietnamese users
+// know from Zalo: "Đang hoạt động", "Vừa truy cập", "Truy cập 12 phút
+// trước", or an estimate ("Truy cập gần đây"). The core keeps no presence,
+// so it is read from GetUsers and cached for a minute per user.
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n/i18n.tsx";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { clock, shortDate } from "../data/format.ts";
+import { shortDate } from "../data/format.ts";
 import type { Presence, Remote } from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
 
@@ -49,13 +50,21 @@ export function usePresence(userId: number): Presence | null {
 	return loaded?.userId === userId ? loaded.presence : null;
 }
 
-export function presenceText(presence: Presence, copy: MessagingCopy, locale = "vi"): string {
+const MINUTE = 60;
+const HOUR = 3600;
+const DAY = 86_400;
+
+/** `nowSeconds` is passed by tests; the UI uses the current time. */
+export function presenceText(presence: Presence, copy: MessagingCopy, locale = "vi", nowSeconds = Math.floor(Date.now() / 1000)): string {
 	switch (presence.kind) {
 		case "online":
 			return copy.info.online;
 		case "offline": {
-			const sameDay = new Date(presence.lastSeen * 1000).toDateString() === new Date().toDateString();
-			return copy.info.lastSeen(sameDay ? clock(presence.lastSeen, locale) : shortDate(presence.lastSeen, locale));
+			const ago = Math.max(0, nowSeconds - presence.lastSeen);
+			if (ago < MINUTE) return copy.info.justNow;
+			if (ago < HOUR) return copy.info.minutesAgo(Math.floor(ago / MINUTE));
+			if (ago < DAY) return copy.info.hoursAgo(Math.floor(ago / HOUR));
+			return copy.info.lastSeenOn(shortDate(presence.lastSeen, locale));
 		}
 		case "recently":
 			return copy.info.recently;

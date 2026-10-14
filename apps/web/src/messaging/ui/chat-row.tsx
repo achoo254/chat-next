@@ -1,7 +1,8 @@
 // One row of the chat list (mockups/chat.html#app, #list-states,
-// #topic-states). Subscribes to its own dialog, draft and sender, so a new
-// message re-renders this row only. Right click, a long press or the menu
-// key opens the row menu (#list-menu).
+// #topic-states). Subscribes to its own dialog, list entry, draft and the
+// people its preview names, so a new message re-renders this row only. Right
+// click, a long press, the menu key or the "…" button that shows on hover
+// opens the row menu (#list-menu).
 import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from "react";
 import type { DialogView } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
@@ -9,9 +10,9 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, countLabel, dialogTitle, listTime, messagePreview, userName, type ChatKind } from "../data/format.ts";
+import { chatKind, countLabel, dialogTitle, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
-import { useDialog, useDraft, useServices, useTopics, useUser } from "../data/services.tsx";
+import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
 
@@ -115,12 +116,19 @@ interface PreviewProps {
 	topics: readonly Topic[] | null;
 }
 
+/** Names for previews and system lines: "Bạn" for yourself, "Người dùng" while unknown. */
+export function useNameOf(ids: readonly number[]): (userId: number) => string {
+	const copy = useCopy();
+	const { store } = useServices();
+	const names = useUserNames(ids);
+	return (userId: number) => (userId === store.selfId ? copy.common.you : names.get(userId) || copy.message.unknownUser);
+}
+
 function Preview({ view, kind, draft, topics }: PreviewProps) {
 	const copy = useCopy();
 	const { store } = useServices();
 	const top = view.topMessage;
-	const sender = useUser(top !== null && top.fromId !== store.selfId ? top.fromId : 0);
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
+	const nameOf = useNameOf(top === null ? [] : namedUserIds(top));
 	let line: ReactNode;
 	if (draft !== "") {
 		line = (
@@ -133,7 +141,7 @@ function Preview({ view, kind, draft, topics }: PreviewProps) {
 	} else {
 		const text = messagePreview(top, nameOf, copy, kind === "channel");
 		const showFrom = top.action === null && (kind === "group" || kind === "forum" || top.fromId === store.selfId);
-		const from = top.fromId === store.selfId ? copy.common.you : (sender?.name ?? copy.message.unknownUser);
+		const from = nameOf(top.fromId);
 		line = showFrom ? (
 			<>
 				<span className="from">{from}:</span> {text}
@@ -164,9 +172,10 @@ interface ChatRowProps {
 export const ChatRow = memo(function ChatRow({ chatId, current, style, position, total }: ChatRowProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
-	const { store, backend } = useServices();
+	const { store } = useServices();
 	const ui = useUi();
 	const view = useDialog(chatId);
+	const entry = useListEntry(chatId);
 	const draft = useDraft(chatId);
 	const topics = useTopics(chatId, view?.chat?.forum === true);
 	const trigger = useContextTrigger((x, y) => ui.listMenu.set({ chatId, x, y }));
@@ -175,8 +184,10 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	const title = dialogTitle(view, copy);
 	const { dialog } = view;
 	const top = view.topMessage;
-	const muted = backend.isMuted(chatId);
-	const pinned = backend.isPinnedDialog(chatId);
+	const muted = entry?.muted === true;
+	const pinned = entry?.pinned === true;
+	// Marked unread on this device with nothing unread on the server: a dot instead of a count.
+	const marked = entry?.unread === true && dialog.unreadCount === 0 && dialog.unreadMentionsCount === 0;
 	const ownLast = top !== null && top.fromId === store.selfId && top.action === null;
 	const read = ownLast && dialog.readOutboxMaxSeq >= top.seq;
 	const kindIcon = KIND_ICONS[kind];
@@ -202,18 +213,38 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 						{ownLast && <LabelledIcon name={read ? "checks" : "check"} label={read ? copy.list.read : copy.list.sent} className={read ? "read" : undefined} />}
 						{top !== null && listTime(top.date, new Date(), locale, copy)}
 					</span>
-					{(unread > 0 || dialog.unreadMentionsCount > 0) && (
+					{(unread > 0 || dialog.unreadMentionsCount > 0 || marked) && (
 						<span className="line">
 							{dialog.unreadMentionsCount > 0 && (
 								<span className="badge at" role="img" aria-label={copy.list.mention}>
 									@
 								</span>
 							)}
-							{unread > 0 && <span className={muted ? "badge muted-badge" : "badge"}>{countLabel(unread)}</span>}
+							{unread > 0 &&
+								(muted ? (
+									<span className="badge muted-badge" role="img" aria-label={copy.list.unreadMuted(unread)}>
+										{countLabel(unread)}
+									</span>
+								) : (
+									<span className="badge">{countLabel(unread)}</span>
+								))}
+							{marked && <span className={muted ? "badge dot muted-badge" : "badge dot"} role="img" aria-label={copy.list.markedUnread} />}
 						</span>
 					)}
 				</span>
 			</Link>
+			<button
+				type="button"
+				className="row-more"
+				aria-label={copy.list.rowActions(title)}
+				aria-haspopup="menu"
+				onClick={(event) => {
+					const rect = event.currentTarget.getBoundingClientRect();
+					ui.listMenu.set({ chatId, x: rect.left, y: rect.bottom });
+				}}
+			>
+				<Icon name="dots" small />
+			</button>
 		</li>
 	);
 });

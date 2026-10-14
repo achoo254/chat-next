@@ -144,6 +144,19 @@ const PATHS = {
 		</>
 	),
 	"chevron-right": <path d="M9 6l6 6-6 6" />,
+	"message-dot": (
+		<>
+			<path d="M8 9h5M8 13h6M14 4H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h2v3l5-3h5a3 3 0 0 0 3-3v-4" />
+			<circle cx="19" cy="5" r="2.5" />
+		</>
+	),
+	sun: (
+		<>
+			<circle cx="12" cy="12" r="4" />
+			<path d="M3 12h1M12 3v1M20 12h1M12 20v1M5.6 5.6l.7.7M18.4 5.6l-.7.7M17.7 17.7l.7.7M6.3 17.7l-.7.7" />
+		</>
+	),
+	command: <path d="M7 9a2 2 0 1 1 2-2v10a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2V7a2 2 0 1 1 2 2H7" />,
 	megaphone: <path d="M18 8a3 3 0 0 1 0 6M10 8v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5M12 8l4.5-3.8a.9.9 0 0 1 1.5.7v12.2a.9.9 0 0 1-1.5.7L12 14H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h8" />,
 	hash: <path d="M5 9h14M5 15h14M11 4L7 20M17 4l-4 16" />,
 	"arrow-down": <path d="M12 5v14M18 13l-6 6M6 13l6 6" />,

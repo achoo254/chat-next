@@ -1,21 +1,22 @@
-// Confirmation and detail dialogs: delete (mockups #delete), leave with the
-// owner's hand-over (#channel-owner-leave), external link (#external-link),
-// report (settings.html#report), another user's profile (#user-profile) and
-// who read a message (#read-by).
-import { Code, ConnectError } from "@connectrpc/connect";
+// Confirmation and detail dialogs: unsending and deleting a message for
+// yourself (mockups #delete), external link (#external-link), report
+// (settings.html#report), another user's profile (#user-profile) and who has
+// seen a message (#read-by). Chat-level dialogs (leave, delete chat, pin,
+// reactions) are in chat-dialogs.tsx.
 import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { clock, dialogTitle, hostOf, messagePreview, orgDomain, userName } from "../data/format.ts";
+import { clock, dialogTitle, hostOf, messagePreview, namedUserIds, orgDomain, userName } from "../data/format.ts";
 import type { ReportReason, ReportTarget } from "../data/pending-backend.ts";
-import type { Member, Reader } from "../data/remote.ts";
+import type { Reader } from "../data/remote.ts";
 import { useChat, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useNameOf } from "./chat-row.tsx";
+import { CommonChatsSection } from "./common-chats.tsx";
 import { ContactRow } from "./contact-row.tsx";
 import { Glyph } from "./glyphs.tsx";
-import { useMembers } from "./members.ts";
 import { ChatAvatar, copyText, CopyButton, DialogHead, Modal, useDomId } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
@@ -24,42 +25,46 @@ interface CloseProps {
 	onClose: () => void;
 }
 
-function Quote({ chatId, seq }: { chatId: number; seq: number }) {
-	const copy = useScreensCopy();
+/** The message a dialog acts on: author, time and a one-line preview. */
+export function Quote({ chatId, seq, className = "quote" }: { chatId: number; seq: number; className?: string }) {
 	const { locale } = useI18n();
-	const { store } = useServices();
 	const message = useMessage(chatId, seq);
 	const channel = useChat(chatId)?.type === "channel";
-	const author = useUser(message != null && message.fromId !== store.selfId ? message.fromId : 0);
+	const copy = useScreensCopy();
+	const nameOf = useNameOf(message == null ? [] : namedUserIds(message));
 	if (message == null) return null;
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
-	const name = message.fromId === store.selfId ? copy.common.you : (author?.name ?? copy.message.unknownUser);
 	return (
-		<div className="quote">
+		<div className={className}>
 			<b>
-				{name} · {clock(message.date, locale)}
+				{nameOf(message.fromId)} · {clock(message.date, locale)}
 			</b>
 			{messagePreview(message, nameOf, copy, channel)}
 		</div>
 	);
 }
 
-export function DeleteDialog({ chatId, seq, mine, onClose }: CloseProps & { chatId: number; seq: number; mine: boolean }) {
+/**
+ * "Thu hồi" removes your message for everyone; "Xoá ở phía tôi" hides any
+ * message on your devices only (#delete).
+ */
+export function DeleteDialog({ chatId, seq, recall, onClose }: CloseProps & { chatId: number; seq: number; recall: boolean }) {
 	const copy = useScreensCopy();
 	const { source, store, toasts } = useServices();
 	const chat = useChat(chatId);
+	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
 	const message = useMessage(chatId, seq);
+	const mine = message != null && message.fromId === store.selfId;
 	const author = useUser(message != null && !mine ? message.fromId : 0);
-	const [forEveryone, setForEveryone] = useState(true);
 	const [busy, setBusy] = useState(false);
 	const id = useDomId("del");
-	const chatTitle = chat == null ? "" : dialogTitle({ chat, peer: store.user(chat.peerUserId) ?? null }, copy);
-	const everyone = mine && forEveryone;
-	const confirm = () => {
+	const t = copy.deleteDialog;
+	const chatTitle = chat == null ? "" : dialogTitle({ chat, peer: peer ?? null }, copy);
+	const authorName = author?.name ?? copy.message.unknownUser;
+	const remove = (forEveryone: boolean) => {
 		setBusy(true);
-		source.deleteMessages(chatId, [seq], everyone).then(
+		source.deleteMessages(chatId, [seq], forEveryone).then(
 			() => {
-				toasts.show(everyone ? copy.deleteDialog.deleted : copy.deleteDialog.hidden);
+				toasts.show(forEveryone ? t.recalled : t.hidden);
 				onClose();
 			},
 			() => {
@@ -68,143 +73,24 @@ export function DeleteDialog({ chatId, seq, mine, onClose }: CloseProps & { chat
 			},
 		);
 	};
+	const title = recall ? t.recallTitle : mine ? t.forMeTitle : t.theirsTitle(authorName);
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={mine ? copy.deleteDialog.mineTitle : copy.deleteDialog.theirsTitle(author?.name ?? copy.message.unknownUser)} onClose={onClose} />
+			<DialogHead id={id} title={title} onClose={onClose} />
 			<div className="dlg-body stack">
 				<Quote chatId={chatId} seq={seq} />
-				{mine && (
-					<button type="button" className="check-row" role="checkbox" aria-checked={forEveryone} onClick={() => setForEveryone((on) => !on)}>
-						<span className="tick sq">
-							<Icon name="check" />
-						</span>
-						{copy.deleteDialog.forEveryone(chatTitle)}
-					</button>
-				)}
-				{(everyone || !mine) && (
+				{recall ? (
 					<p className="note">
-						<Icon name={mine ? "info" : "eye-off"} />
-						<span>{mine ? copy.deleteDialog.forEveryoneNote : copy.deleteDialog.onlyMeNote}</span>
+						<Glyph name="refresh" />
+						<span>{t.recallNote(chatTitle)}</span>
 					</p>
-				)}
-			</div>
-			<div className="dlg-foot">
-				<button type="button" className="btn" onClick={onClose}>
-					{copy.common.cancel}
-				</button>
-				<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy} onClick={confirm}>
-					{mine ? copy.deleteDialog.delete : copy.deleteDialog.deleteForMe}
-				</button>
-			</div>
-		</Modal>
-	);
-}
-
-/** LeaveChat's answer when an owner would leave members behind without an admin. */
-function ownerNeedsAdmin(err: unknown): boolean {
-	const error = ConnectError.from(err);
-	return error.code === Code.FailedPrecondition && error.rawMessage.startsWith("owner_needs_admin");
-}
-
-export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }) {
-	const copy = useScreensCopy();
-	const { remote, toasts } = useServices();
-	const chat = useChat(chatId);
-	const [view, setView] = useState<"confirm" | "blocked" | "pick">("confirm");
-	const [busy, setBusy] = useState(false);
-	const owner = chat?.myRole === "owner";
-	const channel = chat?.type === "channel";
-	const { members, reload } = useMembers(chatId, "", owner);
-	const id = useDomId("leave");
-	const title = chat?.title ?? "";
-	const t = copy.ownerLeave;
-	const leave = () => {
-		setBusy(true);
-		remote.leaveChat(chatId).then(
-			() => {
-				toasts.show(copy.info.left(title));
-				onClose();
-				navigate(paths.home);
-			},
-			(err: unknown) => {
-				setBusy(false);
-				if (ownerNeedsAdmin(err)) setView("blocked");
-				else toasts.show(copy.common.failed);
-			},
-		);
-	};
-
-	if (view === "pick") {
-		return (
-			<PickAdmin
-				chatId={chatId}
-				channel={channel}
-				memberCount={chat?.memberCount ?? 0}
-				onBack={() => setView("blocked")}
-				onDone={() => {
-					reload();
-					setView("confirm");
-				}}
-				onClose={onClose}
-			/>
-		);
-	}
-	if (view === "blocked") {
-		return (
-			<Modal labelledBy={id} onClose={onClose} className="narrow">
-				<DialogHead id={id} title={t.blockedTitle(channel)} onClose={onClose} />
-				<div className="hero">
-					<span className="big-icon">
-						<Glyph name="crown" />
-					</span>
-					<p>
-						{t.blockedKind(channel)} <b>{title}</b>
-						{t.blockedRest(channel)}
-					</p>
-				</div>
-				<div className="dlg-foot">
-					<button type="button" className="btn" onClick={onClose}>
-						{copy.common.cancel}
-					</button>
-					<button type="button" className="btn btn-primary" onClick={() => setView("pick")}>
-						<Icon name="user-plus" />
-						{t.pickAdmin}
-					</button>
-				</div>
-			</Modal>
-		);
-	}
-	const admins = members.filter((member) => member.role === "admin");
-	return (
-		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={copy.info.leaveTitle(title)} onClose={onClose} />
-			<div className="dlg-body stack">
-				{owner ? (
-					<>
-						<p className="note">
-							<Glyph name="crown" />
-							<span>{t.transferNote(channel)}</span>
-						</p>
-						{admins.length > 0 && (
-							<div>
-								<h3>{t.admins}</h3>
-								{admins.map((member) => (
-									<div className="row" key={member.person.id}>
-										<ChatAvatar id={member.person.id} name={member.person.name} size="sm" />
-										<span className="grow">{member.person.name}</span>
-									</div>
-								))}
-							</div>
-						)}
-						<p className="note">
-							<Icon name="info" />
-							<span>{t.transferInfo(channel)}</span>
-						</p>
-					</>
 				) : (
 					<p className="note">
-						<Icon name="info" />
-						<span>{copy.info.leaveNote}</span>
+						<Icon name="eye-off" />
+						<span>
+							{t.onlyMeNote}
+							{!mine && message != null && ` ${t.onlyAuthor(authorName)}`}
+						</span>
 					</p>
 				)}
 			</div>
@@ -212,91 +98,20 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 				<button type="button" className="btn" onClick={onClose}>
 					{copy.common.cancel}
 				</button>
-				<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy} onClick={leave}>
-					{owner ? t.transferLeave(channel) : channel ? copy.info.leaveChannel : copy.info.leaveGroup}
-				</button>
-			</div>
-		</Modal>
-	);
-}
-
-interface PickAdminProps extends CloseProps {
-	chatId: number;
-	channel: boolean;
-	memberCount: number;
-	onBack: () => void;
-	onDone: () => void;
-}
-
-/** Makes a member an admin so the owner can hand the chat over (#channel-owner-leave, lower frame). */
-function PickAdmin({ chatId, channel, memberCount, onBack, onDone, onClose }: PickAdminProps) {
-	const copy = useScreensCopy();
-	const { remote, store, toasts } = useServices();
-	const [query, setQuery] = useState("");
-	const [picked, setPicked] = useState<Member | null>(null);
-	const [busy, setBusy] = useState(false);
-	const { members, status } = useMembers(chatId, query.trim());
-	const id = useDomId("pick-admin");
-	const t = copy.ownerLeave;
-	const candidates = members.filter((member) => member.role === "member" && !member.person.isBot && member.person.id !== store.selfId);
-	const grant = () => {
-		if (picked === null) return;
-		setBusy(true);
-		remote.setAdmin(chatId, picked.person.id, true).then(
-			() => {
-				toasts.show(t.granted(picked.person.name, channel));
-				onDone();
-			},
-			() => {
-				setBusy(false);
-				toasts.show(copy.common.failed);
-			},
-		);
-	};
-	return (
-		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={t.pickTitle(channel)} onBack={onBack} onClose={onClose} />
-			<div className="dlg-body stack">
-				<label className="search-field">
-					<Icon name="search" small />
-					<span className="sr-only">{t.pickSearch(memberCount, channel)}</span>
-					<input type="search" placeholder={t.pickSearch(memberCount, channel)} autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} />
-				</label>
-				{status === "loading" && <p className="note">{copy.common.loading}</p>}
-				{status === "ready" && candidates.length === 0 && <p className="note">{t.noCandidates}</p>}
-				<div className="pick-list" role="radiogroup" aria-label={t.pickList(channel)}>
-					{candidates.map((member) => (
-						<button
-							key={member.person.id}
-							type="button"
-							className="pick"
-							role="radio"
-							aria-checked={picked?.person.id === member.person.id}
-							onClick={() => setPicked(member)}
-						>
-							<ChatAvatar id={member.person.id} name={member.person.name} />
-							<span>
-								<b>{member.person.name}</b>
-								<small>{member.person.username === "" ? t.pickRole(channel) : `@${member.person.username} · ${t.pickRole(channel)}`}</small>
-							</span>
-							<span className="tick">
-								<Icon name="check" />
-							</span>
+				{recall ? (
+					<>
+						<button type="button" className="btn" disabled={busy} onClick={() => remove(false)}>
+							{t.deleteForMe}
 						</button>
-					))}
-				</div>
-				<p className="note">
-					<Icon name="info" />
-					<span>{t.pickNote(channel)}</span>
-				</p>
-			</div>
-			<div className="dlg-foot">
-				<button type="button" className="btn" onClick={onBack}>
-					{copy.common.back}
-				</button>
-				<button type="button" className="btn btn-primary" aria-busy={busy} disabled={picked === null || busy} onClick={grant}>
-					{t.grant}
-				</button>
+						<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy} onClick={() => remove(true)}>
+							{t.recall}
+						</button>
+					</>
+				) : (
+					<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy} onClick={() => remove(false)}>
+						{t.deleteForMe}
+					</button>
+				)}
 			</div>
 		</Modal>
 	);
@@ -467,7 +282,7 @@ export function ReportDialog({ target, name, blockUserId, onClose }: ReportProps
 			<form onSubmit={(event) => void submit(event)}>
 				<DialogHead id={id} title={title} onClose={onClose} />
 				<div className="dlg-body flow">
-					{target.kind === "message" && <ReportQuote chatId={target.chatId} seq={target.seq} />}
+					{target.kind === "message" && <Quote chatId={target.chatId} seq={target.seq} className="quote report-quote" />}
 					<fieldset className="opts">
 						<legend>{copy.report.reason}</legend>
 						{REASONS.map((value) => (
@@ -511,25 +326,6 @@ export function ReportDialog({ target, name, blockUserId, onClose }: ReportProps
 				</div>
 			</form>
 		</Modal>
-	);
-}
-
-function ReportQuote({ chatId, seq }: { chatId: number; seq: number }) {
-	const copy = useScreensCopy();
-	const { locale } = useI18n();
-	const { store } = useServices();
-	const message = useMessage(chatId, seq);
-	const channel = useChat(chatId)?.type === "channel";
-	const author = useUser(message != null ? message.fromId : 0);
-	if (message == null) return null;
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
-	return (
-		<blockquote className="quote report-quote">
-			<b>
-				{author?.name ?? copy.message.unknownUser} · {clock(message.date, locale)}
-			</b>
-			{messagePreview(message, nameOf, copy, channel)}
-		</blockquote>
 	);
 }
 
@@ -624,7 +420,15 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 						</span>
 					</div>
 				)}
+				{!self && user !== undefined && !user.isBot && (
+					<button type="button" className="row link-row" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: userId })}>
+						<Icon name="users" />
+						<span className="grow">{copy.profile.createGroupWith(name)}</span>
+						<Icon name="chevron-right" small />
+					</button>
+				)}
 			</div>
+			{!self && user !== undefined && <CommonChatsSection userId={userId} bot={user.isBot} />}
 		</Modal>
 	);
 }

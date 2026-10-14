@@ -4,16 +4,27 @@ import { Code, ConnectError, createClient, type Transport } from "@connectrpc/co
 import { assertSafeId } from "@app/core";
 import { cryptoRandomId } from "@app/platform";
 import {
+	AddMemberFailureReason,
 	ChatsService,
 	ChatType,
 	HistoryVisibility,
 	MemberRole as WireRole,
+	type AddMemberFailure,
+	type Chat as WireChat,
 	type ChatMember,
 	type ForumTopic,
 	type InviteLink,
 } from "@app/proto-ts/chats";
 import { ConfigService } from "@app/proto-ts/config";
 import { MessagesService } from "@app/proto-ts/messages";
+import {
+	ModerationAction as WireAction,
+	ModerationService,
+	ReportStatus as WireStatus,
+	ReportTargetKind,
+	type ModerationLogEntry,
+	type Report as WireReport,
+} from "@app/proto-ts/moderation";
 import {
 	PrivacyAudience,
 	ReportReason as WireReason,
@@ -23,11 +34,35 @@ import {
 	type User as WireUser,
 } from "@app/proto-ts/users";
 import type { ReportReason } from "./pending-backend.ts";
-import type { Audience, Invite, Limits, Member, Person, Presence, Privacy, Remote, Role, ServerTopic } from "./remote.ts";
+import type {
+	AddFailure,
+	AddFailureReason,
+	Audience,
+	ChatBrief,
+	Invite,
+	Limits,
+	Member,
+	ModerationAction,
+	ModerationEntry,
+	ModerationReport,
+	Person,
+	Presence,
+	Privacy,
+	Remote,
+	ReportStatus,
+	Role,
+	ServerTopic,
+} from "./remote.ts";
 
 const TOPICS_PAGE = 100;
 const CONTACTS_PAGE = 500;
 const BANNED_PAGE = 100;
+const BLOCKED_PAGE = 200;
+const REACTIONS_PAGE = 100;
+const COMMON_PAGE = 100;
+const REPORTS_PAGE = 100;
+/** SetDialogMute takes at most 366 days; longer means until turned back on. */
+const MUTE_MAX_SECONDS = 31_622_400;
 
 const AUDIENCES: Record<PrivacyAudience, Audience> = {
 	[PrivacyAudience.UNSPECIFIED]: "nobody",
@@ -111,6 +146,109 @@ const REPORT_REASONS: Record<ReportReason, WireReason> = {
 	other: WireReason.OTHER,
 };
 
+const WIRE_REASONS: Partial<Record<WireReason, ReportReason>> = {
+	[WireReason.SPAM]: "spam",
+	[WireReason.SCAM]: "scam",
+	[WireReason.VIOLENCE]: "violence",
+	[WireReason.SEXUAL]: "sexual",
+};
+
+const FAILURE_REASONS: Record<AddMemberFailureReason, AddFailureReason> = {
+	[AddMemberFailureReason.UNSPECIFIED]: "privacy",
+	[AddMemberFailureReason.NOT_FOUND]: "not_found",
+	[AddMemberFailureReason.PRIVACY_ADD_TO_GROUPS]: "privacy",
+	[AddMemberFailureReason.BLOCKED]: "blocked",
+	[AddMemberFailureReason.BANNED]: "banned",
+	[AddMemberFailureReason.ALREADY_MEMBER]: "already_member",
+	[AddMemberFailureReason.TOO_MANY]: "too_many",
+};
+
+/**
+ * Every user the server did not add. Servers before per-person reasons send
+ * failed_user_ids only: those count as refused by privacy.
+ */
+function toFailures(failures: readonly AddMemberFailure[], failedUserIds: readonly bigint[]): AddFailure[] {
+	if (failures.length > 0) {
+		return failures.map((failure) => ({ userId: assertSafeId(failure.userId), reason: FAILURE_REASONS[failure.reason] ?? "privacy" }));
+	}
+	return failedUserIds.map((id) => ({ userId: assertSafeId(id), reason: "privacy" }));
+}
+
+const STATUSES: Record<WireStatus, ReportStatus> = {
+	[WireStatus.UNSPECIFIED]: "open",
+	[WireStatus.OPEN]: "open",
+	[WireStatus.RESOLVED]: "resolved",
+	[WireStatus.DISMISSED]: "dismissed",
+};
+
+const WIRE_STATUSES: Record<ReportStatus, WireStatus> = {
+	open: WireStatus.OPEN,
+	resolved: WireStatus.RESOLVED,
+	dismissed: WireStatus.DISMISSED,
+};
+
+const ACTIONS: Partial<Record<WireAction, ModerationAction>> = {
+	[WireAction.DISMISS]: "dismiss",
+	[WireAction.DELETE_MESSAGES]: "delete_messages",
+	[WireAction.BAN_FROM_CHAT]: "ban_from_chat",
+	[WireAction.RESTRICT_ACCOUNT]: "restrict_account",
+	[WireAction.LIFT_RESTRICTION]: "lift_restriction",
+};
+
+const WIRE_ACTIONS: Record<ModerationAction, WireAction> = {
+	dismiss: WireAction.DISMISS,
+	delete_messages: WireAction.DELETE_MESSAGES,
+	ban_from_chat: WireAction.BAN_FROM_CHAT,
+	restrict_account: WireAction.RESTRICT_ACCOUNT,
+	lift_restriction: WireAction.LIFT_RESTRICTION,
+};
+
+function toActions(actions: readonly WireAction[]): ModerationAction[] {
+	return actions.flatMap((action) => {
+		const mapped = ACTIONS[action];
+		return mapped === undefined ? [] : [mapped];
+	});
+}
+
+function toReport(report: WireReport): ModerationReport {
+	return {
+		id: assertSafeId(report.id),
+		kind: report.targetKind === ReportTargetKind.USER ? "user" : report.targetKind === ReportTargetKind.CHAT ? "chat" : "messages",
+		reporterId: assertSafeId(report.reporterId),
+		targetUserId: assertSafeId(report.targetUserId),
+		targetChatId: assertSafeId(report.targetChatId),
+		seqs: report.seqs.map(assertSafeId),
+		reason: WIRE_REASONS[report.reason] ?? "other",
+		comment: report.comment,
+		status: STATUSES[report.status] ?? "open",
+		createdAt: assertSafeId(report.createdAt),
+		resolvedAt: assertSafeId(report.resolvedAt),
+		resolvedBy: assertSafeId(report.resolvedBy),
+		actions: toActions(report.actions),
+		resolutionNote: report.resolutionNote,
+	};
+}
+
+function toEntry(entry: ModerationLogEntry): ModerationEntry {
+	return {
+		id: assertSafeId(entry.id),
+		operatorId: assertSafeId(entry.operatorId),
+		action: ACTIONS[entry.action] ?? "dismiss",
+		targetUserId: assertSafeId(entry.targetUserId),
+		note: entry.note,
+		until: assertSafeId(entry.until),
+		createdAt: assertSafeId(entry.createdAt),
+	};
+}
+
+function toChatBrief(chat: WireChat): ChatBrief {
+	return { id: assertSafeId(chat.id), title: chat.title, channel: chat.type === ChatType.CHANNEL, memberCount: chat.memberCount };
+}
+
+function peopleOf(users: readonly WireUser[]): Map<number, Person> {
+	return new Map(users.map((user) => [assertSafeId(user.id), toPerson(user)]));
+}
+
 const HISTORY: Partial<Record<HistoryVisibility, boolean>> = {
 	[HistoryVisibility.SHARED]: true,
 	[HistoryVisibility.SINCE_JOIN]: false,
@@ -159,6 +297,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 	const messages = createClient(MessagesService, transport);
 	const users = createClient(UsersService, transport);
 	const config = createClient(ConfigService, transport);
+	const moderation = createClient(ModerationService, transport);
 	let limits: Promise<Limits> | null = null;
 
 	async function call<T>(run: () => Promise<T>): Promise<T> {
@@ -194,9 +333,9 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				await messages.setReaction({ chatId: BigInt(chatId), seq: BigInt(seq), emoji });
 			}),
-		pin: (chatId, seq) =>
+		pin: (chatId, seq, notify = true) =>
 			call(async () => {
-				await messages.pinMessage({ chatId: BigInt(chatId), seq: BigInt(seq) });
+				await messages.pinMessage({ chatId: BigInt(chatId), seq: BigInt(seq), silent: !notify });
 			}),
 		unpin: (chatId, seq) =>
 			call(async () => {
@@ -218,7 +357,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				const response = await chats.createGroup({ title, userIds: userIds.map(BigInt) });
 				return {
 					chatId: requireChatId(response.chat, "CreateGroup"),
-					failedUserIds: response.failedUserIds.map(assertSafeId),
+					failures: toFailures(response.failures, response.failedUserIds),
 				};
 			}),
 		createChannel: (title, about) =>
@@ -236,7 +375,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 		addMembers: (chatId, userIds) =>
 			call(async () => {
 				const response = await chats.addMembers({ chatId: BigInt(chatId), userIds: userIds.map(BigInt) });
-				return response.failedUserIds.map(assertSafeId);
+				return toFailures(response.failures, response.failedUserIds);
 			}),
 		removeMember: (chatId, userId, ban) =>
 			call(async () => {
@@ -265,9 +404,9 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				});
 				return { items, nextCursor: response.nextCursor };
 			}),
-		leaveChat: (chatId) =>
+		leaveChat: (chatId, newOwnerId = 0) =>
 			call(async () => {
-				await chats.leaveChat({ chatId: BigInt(chatId) });
+				await chats.leaveChat({ chatId: BigInt(chatId), newOwnerId: BigInt(newOwnerId) });
 			}),
 		setAdmin: (chatId, userId, admin) =>
 			call(async () => {
@@ -314,7 +453,12 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 		contacts: (cursor = "") =>
 			call(async () => {
 				const response = await users.getContacts({ cursor, limit: CONTACTS_PAGE });
-				return { items: response.users.map(toPerson), nextCursor: response.nextCursor };
+				const added = new Map(response.contacts.map((contact) => [assertSafeId(contact.userId), assertSafeId(contact.addedAt)]));
+				const items = response.users.map((user) => {
+					const person = toPerson(user);
+					return { person, addedAt: added.get(person.id) ?? 0 };
+				});
+				return { items, nextCursor: response.nextCursor };
 			}),
 		addContact: (target) =>
 			call(async () => {
@@ -422,6 +566,99 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					const person = people.get(userId);
 					return person === undefined ? [] : [{ person, readAt }];
 				});
+			}),
+		setDialogMute: (chatId, muteFor) =>
+			call(async () => {
+				const seconds = muteFor === "forever" ? Number.POSITIVE_INFINITY : Math.max(0, Math.floor(muteFor));
+				const forever = seconds > MUTE_MAX_SECONDS;
+				const response = await chats.setDialogMute({ chatId: BigInt(chatId), forever, durationSeconds: forever ? 0 : seconds });
+				return assertSafeId(response.muteUntil);
+			}),
+		setDialogPinned: (chatId, pinned) =>
+			call(async () => (await chats.setDialogPinned({ chatId: BigInt(chatId), pinned })).pinnedChatIds.map(assertSafeId)),
+		deleteChat: (chatId) =>
+			call(async () => {
+				await chats.deleteChat({ chatId: BigInt(chatId) });
+			}),
+		commonChats: (userId) =>
+			call(async () => {
+				const response = await chats.getCommonChats({ userId: BigInt(userId), limit: COMMON_PAGE });
+				return { chats: response.chats.map(toChatBrief), count: response.count };
+			}),
+		reactions: (chatId, seq, emoji, cursor = "") =>
+			call(async () => {
+				const response = await messages.getMessageReactions({ chatId: BigInt(chatId), seq: BigInt(seq), emoji, cursor, limit: REACTIONS_PAGE });
+				const people = peopleOf(response.users);
+				const items = response.reactors.flatMap((reactor) => {
+					const person = people.get(assertSafeId(reactor.userId));
+					return person === undefined ? [] : [{ person, emoji: reactor.emoji, date: assertSafeId(reactor.date) }];
+				});
+				return { items, nextCursor: response.nextCursor };
+			}),
+		blockedUsers: (cursor = "") =>
+			call(async () => {
+				const response = await users.getBlockedUsers({ cursor, limit: BLOCKED_PAGE });
+				const people = peopleOf(response.users);
+				const items = response.blocked.flatMap((entry) => {
+					const person = people.get(assertSafeId(entry.userId));
+					return person === undefined ? [] : [{ person, blockedAt: assertSafeId(entry.blockedAt) }];
+				});
+				return { items, nextCursor: response.nextCursor };
+			}),
+		moderationReports: (status, cursor = "") =>
+			call(async () => {
+				const response = await moderation.getReports({ status: WIRE_STATUSES[status], cursor, limit: REPORTS_PAGE });
+				return {
+					reports: response.reports.map(toReport),
+					people: peopleOf(response.users),
+					chats: new Map(response.chats.map((chat) => [assertSafeId(chat.id), toChatBrief(chat)])),
+					nextCursor: response.nextCursor,
+				};
+			}),
+		moderationReport: (reportId) =>
+			call(async () => {
+				const response = await moderation.getReport({ reportId: BigInt(reportId) });
+				if (response.report === undefined) throw new ConnectError("GetReport returned no report", Code.Internal);
+				return {
+					report: toReport(response.report),
+					evidence: response.evidence.map((message) => ({
+						seq: assertSafeId(message.seq),
+						fromId: assertSafeId(message.fromId),
+						date: assertSafeId(message.date),
+						text: message.text,
+						deleted: message.deleted,
+					})),
+					context: response.context.map((message) => ({
+						seq: assertSafeId(message.seq),
+						fromId: assertSafeId(message.fromId),
+						date: assertSafeId(message.date),
+						text: message.text,
+					})),
+					people: peopleOf(response.users),
+					chat: response.chat === undefined ? null : toChatBrief(response.chat),
+					history: response.history.map(toEntry),
+					restrictions: response.restrictions.map((restriction) => ({
+						userId: assertSafeId(restriction.userId),
+						until: assertSafeId(restriction.until),
+						reason: restriction.reason,
+						createdAt: assertSafeId(restriction.createdAt),
+					})),
+				};
+			}),
+		resolveReport: (reportId, actions, note, restrictSeconds) =>
+			call(async () => {
+				const response = await moderation.resolveReport({
+					reportId: BigInt(reportId),
+					actions: actions.map((action) => WIRE_ACTIONS[action]),
+					note,
+					restrictSeconds,
+				});
+				if (response.report === undefined) throw new ConnectError("ResolveReport returned no report", Code.Internal);
+				return toReport(response.report);
+			}),
+		liftRestriction: (userId, note) =>
+			call(async () => {
+				await moderation.liftRestriction({ userId: BigInt(userId), note });
 			}),
 		setPrivacy: (change) =>
 			call(async () => {

@@ -298,7 +298,9 @@ window.history.replaceState(null, "", "/");
 const container = document.getElementById("root");
 if (container === null) throw new Error("perf page is missing #root");
 const f = data.fixture;
-const fixture = fixtureConnector(f, openMemoryFactory, { pinnedDialogs: new Set(data.cached.map((chat) => chat.id)) });
+// The chats with cached history stay on top of the list, pinned as on another session.
+f.pinChats(data.cached.map((chat) => chat.id));
+const fixture = fixtureConnector(f, openMemoryFactory);
 const connector: MessagingConnector = async (options) => {
 	const client = await fixture(options);
 	chatSource = client.source;

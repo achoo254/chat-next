@@ -13,6 +13,8 @@ export interface SelfUser {
 	bio: string;
 	/** Verified email from the IdP; empty when there is none. */
 	email: string;
+	/** May use the moderation queue (GetSelfResponse.is_operator). */
+	isOperator: boolean;
 }
 
 export type SessionPlatform = "web" | "ios" | "android" | "desktop" | "unknown";
@@ -31,13 +33,15 @@ export interface SessionView {
 	newLogin: boolean;
 }
 
-export function toSelfUser(user: User): SelfUser {
+/** `isOperator` comes with GetSelf only; profile updates keep the value the app has. */
+export function toSelfUser(user: User, isOperator = false): SelfUser {
 	return {
 		id: assertSafeId(user.id),
 		username: user.username,
 		name: user.name,
 		bio: user.bio,
 		email: user.email,
+		isOperator,
 	};
 }
 

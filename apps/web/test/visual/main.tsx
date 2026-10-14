@@ -32,6 +32,8 @@ if (theme === "dark" || theme === "light") document.documentElement.dataset.them
 
 const demo = seedDemo();
 const f = demo.fixture;
+// The harness user is an operator, so the moderation queue renders (moderation.html#queue).
+f.operator = true;
 // A draft in the 1-1 chat with Quang Huy, as in mockups/chat.html#app.
 window.localStorage.setItem(`chat:draft:${f.selfId}:${demo.ids.huy}`, "Chiều nay mình gửi bản sửa");
 // A group you own with no other admin (#channel-owner-leave).
@@ -79,6 +81,9 @@ const SCREENS: Record<string, string> = {
 	contact: `/contacts/${demo.ids.users.lan}`,
 	channel: `/c/${announcements}`,
 	"channel-admin": `/c/${announcements}/admin`,
+	bot: `/c/${demo.ids.bot}`,
+	report: "/moderation/20481",
+	"report-actions": "/moderation/20481/actions",
 };
 const at = params.get("at");
 const screenPath = at === null ? undefined : SCREENS[at];
@@ -90,7 +95,7 @@ createRoot(container).render(
 	<StrictMode>
 		<App
 			transport={createRouterTransport((router) => f.routes(router))}
-			messagingConnector={fixtureConnector(f, openMemoryFactory, demo.data)}
+			messagingConnector={fixtureConnector(f, openMemoryFactory)}
 		/>
 	</StrictMode>,
 );
@@ -157,12 +162,12 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	members: async () => {
 		await openInfo();
-		await click("aside.info button", /^Xem cả \d+ thành viên$/);
+		await click("aside.info button", /^Xem tất cả \d+ thành viên$/);
 		await find(() => document.querySelector("dialog .member-list li"));
 	},
 	"remove-member": async () => {
 		await openInfo();
-		await click("aside.info button", /^Xem cả \d+ thành viên$/);
+		await click("aside.info button", /^Xem tất cả \d+ thành viên$/);
 		await click("dialog button", "Thao tác với Minh");
 		await click("[role=menuitem]", "Xoá khỏi nhóm");
 		await find(() => byName("dialog h2", "Xoá Minh khỏi nhóm?"));
@@ -170,18 +175,22 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	"owner-leave": async () => {
 		await openInfo();
 		await click("aside.info button", /Rời nhóm/);
-		await click("dialog button", "Chuyển quyền và rời nhóm");
 		await find(() => byName("dialog h2", "Chưa thể rời nhóm"));
 	},
 	"owner-pick": async () => {
 		await openInfo();
 		await click("aside.info button", /Rời nhóm/);
-		await click("dialog button", "Chuyển quyền và rời nhóm");
-		await click("dialog button", "Chọn admin");
+		await click("dialog button", "Chọn phó nhóm");
 		await click("[role=radio]", /Minh/);
 	},
+	"delete-group": async () => {
+		await openInfo();
+		await click("aside.info button", /Rời nhóm/);
+		await click("dialog button", "Xoá nhóm");
+		await find(() => document.querySelector("dialog .effects"));
+	},
 	"add-contact": async () => {
-		await click("button", "Thêm liên hệ");
+		await click("button", "Thêm vào danh bạ");
 		await type("dialog input[type=search]", "@thuha");
 		await find(() => byName("dialog button", "Thêm vào danh bạ"));
 	},
@@ -195,7 +204,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	"add-failed": async () => {
 		await openInfo();
-		await click("aside.info button", /Thêm thành viên/);
+		await click("aside.info .quick-acts button", /Thêm thành viên/);
 		await type("dialog input[type=search]", "hoang");
 		await click("dialog [role=checkbox]", /Hoàng Nam/);
 		await click("dialog button", "Thêm 1 người");
@@ -209,7 +218,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	"emoji-reaction": async () => {
 		await contextMenu(".messages .msg", "Dashboard ổn định.");
-		await click(".react-picker button", "Thêm reaction");
+		await click(".react-picker button", "Chọn biểu cảm");
 		await find(() => document.querySelector(".ctx-layer .emoji-pop"));
 	},
 	reply: async () => {
@@ -224,8 +233,58 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	"list-menu": async () => {
 		await contextMenu(".chat-rows li", "Dự án Hải Đăng");
-		await click("[role=menuitem]", "Tắt tiếng");
-		await find(() => byName("[role=menu]", "Tắt tiếng trong"));
+		await click("[role=menuitem]", "Tắt thông báo");
+		await find(() => byName("[role=menu]", "Tắt thông báo trong"));
+	},
+	"list-menu-private": async () => {
+		await contextMenu(".chat-rows li", "Quang Huy");
+		await find(() => byName("[role=menuitem]", "Xoá chat"));
+	},
+	"delete-chat": async () => {
+		await contextMenu(".chat-rows li", "Quang Huy");
+		await click("[role=menuitem]", "Xoá chat");
+		await find(() => byName("dialog h2", "Xoá chat với Quang Huy?"));
+	},
+	pin: async () => {
+		await contextMenu(".messages .msg", "Dashboard ổn định.");
+		await click("[role=menuitem]", "Ghim");
+		await find(() => byName("dialog h2", "Ghim tin này?"));
+	},
+	recall: async () => {
+		await contextMenu(".messages .msg.mine", "Mục 3 ổn");
+		await click("[role=menuitem]", "Thu hồi");
+		await find(() => byName("dialog h2", "Thu hồi tin nhắn?"));
+	},
+	reactors: async () => {
+		const chip = await find(() => byName(".messages .reaction", "👍 3"));
+		const rect = chip.getBoundingClientRect();
+		chip.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left + 4, clientY: rect.top + 4 }));
+		await find(() => document.querySelector("dialog .react-tabs"));
+	},
+	"quick-actions": async () => {
+		const message = await find(() => [...document.querySelectorAll<HTMLElement>(".messages .msg")].find((m) => m.textContent?.includes("Dashboard ổn định.")));
+		message.classList.add("show-actions");
+		message.querySelector<HTMLElement>(".msg-actions")?.style.setProperty("opacity", "1");
+	},
+	search: async () => {
+		await type(".list-head input[type=search]", "van hanh");
+		await find(() => document.querySelector(".sx-results .hit mark"));
+	},
+	"new-group": async () => {
+		await click("button", "Tạo chat mới");
+		await click("dialog .quick button", "Tạo nhóm");
+		await click("dialog [role=checkbox]", /Lan Anh/);
+		await click("dialog [role=checkbox]", /Quang Huy/);
+	},
+	"group-with": async () => {
+		await openInfo();
+		await click("aside.info .quick-acts button", "Tạo nhóm");
+		await find(() => document.querySelector("dialog .chip"));
+	},
+	"info-mute": async () => {
+		await openInfo();
+		await click("aside.info .quick-acts button", "Tắt thông báo");
+		await find(() => byName("[role=menu]", "Tắt thông báo trong"));
 	},
 	"new-channel": async () => {
 		await click("button", "Tạo chat mới");

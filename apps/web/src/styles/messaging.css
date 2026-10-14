@@ -586,7 +586,7 @@ dialog.modal::backdrop { background: var(--c-backdrop); }
 .mod-body.narrow-body { max-width: 760px; }
 .mod .card { padding: 0; }
 .mod .card.pad { padding: var(--space-4); }
-.mod .card-title.flush { padding: 0 0 var(--space-3); }
+.card-title.flush { padding: 0 0 var(--space-3); }
 .mod .note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 .scope-lock { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
 .toolbar { display: grid; gap: var(--space-3); }
@@ -644,6 +644,121 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .summary li { display: flex; gap: var(--space-2); align-items: flex-start; }
 .summary .icon { margin-top: 2px; color: var(--c-error); }
 .save-bar .btn-primary:disabled:hover { background: var(--c-primary-solid); }
+
+/* ---------- Per-area mix: Telegram layout and speed, Zalo wording and info order ---------- */
+/* Resizable list column (280–420px): the handle sits on the list's right edge. Drag or ←/→. */
+.list-resize { position: absolute; top: 0; bottom: 0; left: calc(var(--rail-w) + var(--list-w) - 4px); z-index: 4; width: 8px; cursor: ew-resize; touch-action: none; }
+.list-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background var(--dur-fast) var(--ease-standard); }
+.list-resize:hover::after, .list-resize:focus-visible::after { background: var(--c-primary-solid); }
+.list-resize:focus-visible { outline: none; }
+
+/* "…" on a chat row: shows on hover or keyboard focus and opens the row menu; it takes the place of time and badges meanwhile. */
+.row-more { position: absolute; right: var(--space-4); top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface); color: var(--c-icon-muted); box-shadow: var(--shadow-sm); opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.row-more:hover { color: var(--c-text); }
+.chat-slot:hover .row-more, .row-more:focus-visible { opacity: 1; }
+.chat-slot:hover > .chat-row .meta, .chat-slot:has(.row-more:focus-visible) > .chat-row .meta { visibility: hidden; }
+/* Marked unread on this device: a dot instead of a count. */
+.badge.dot { min-width: 12px; width: 12px; height: 12px; padding: 0; }
+
+/* Five built-in filters fit one row of a 280px list: compact, never broken inside a label. */
+.list .tabs { flex-wrap: wrap; gap: 0; justify-content: space-between; padding-left: var(--space-3); padding-right: var(--space-3); }
+.list .tabs button { min-width: 44px; white-space: nowrap; padding-left: var(--space-1); padding-right: var(--space-1); font-size: 0.875rem; }
+
+/* Message text follows the chosen size (Cài đặt › Giao diện). */
+.messages .bubble, .size-preview .bubble { font-size: var(--msg-font, 0.9375rem); }
+
+/* Quick actions on a hovered message: Thả cảm xúc · Trả lời · Chuyển tiếp · more. */
+.msg { position: relative; }
+.msg-actions { position: absolute; top: calc(-1 * var(--space-4)); right: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+.msg.mine .msg-actions { right: auto; left: var(--space-2); }
+.msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; pointer-events: auto; }
+.msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
+.msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }
+
+/* Jump buttons over the message list: "@" (oldest unread mention) sits above "latest". */
+.jump-stack { position: absolute; right: var(--space-4); bottom: var(--space-4); display: grid; gap: var(--space-3); }
+.jump-stack .to-bottom { position: relative; right: auto; bottom: auto; }
+.to-mention { color: var(--c-primary); font-size: 1.125rem; font-weight: 600; }
+.to-mention:hover { color: var(--c-primary); }
+
+/* Composer: one-line key hint under it until the first message sent on this device. */
+.composer-hint { margin: 0; padding: 0 var(--space-4) var(--space-2); background: var(--c-surface); font-size: 0.75rem; color: var(--c-text-muted); }
+.composer + .composer-hint { margin-top: calc(-1 * var(--space-2)); }
+
+/* Info panel, Zalo order: three equal quick actions whose labels may wrap. */
+.info-hero p { margin: 0; font-size: 0.875rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.info-hero .on { color: var(--c-primary); }
+.quick-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.quick-acts > *, .qa-anchor > button { display: grid; justify-items: center; align-content: start; gap: var(--space-1); width: 100%; min-height: 72px; padding: var(--space-2) var(--space-1); border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text); font-size: 0.75rem; font-weight: 500; line-height: 1.3; text-align: center; text-decoration: none; }
+.quick-acts > .qa-anchor { position: relative; display: block; padding: 0; min-height: 0; }
+.quick-acts > :hover, .qa-anchor > button:hover { background: var(--c-hover); }
+.qa-ico { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
+.quick-acts [aria-pressed="true"] .qa-ico { border-color: transparent; background: var(--c-selected); color: var(--c-primary); }
+.qa-label { overflow-wrap: anywhere; }
+.qa-menu { position: absolute; left: 0; top: calc(100% + var(--space-1)); z-index: 10; min-width: 200px; }
+.link-row.danger, .link-row.danger > .icon { color: var(--c-error); }
+.info-sec > .link-row { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; text-decoration: none; }
+
+/* Contacts A–Z: a letter over each group. */
+.contact-list .az-head { display: block; padding: var(--space-2) var(--space-3) var(--space-1); font-size: 0.75rem; font-weight: 600; color: var(--c-primary); }
+.muted.on { color: var(--c-primary); }
+
+/* Who reacted, per emoji. */
+.react-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.react-tabs .reaction[aria-pressed="true"] { background: var(--c-selected); }
+.react-emoji { font-size: 1.125rem; }
+.field .hint { font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* Search grouped as Liên hệ · Nhóm và kênh · Tin nhắn. */
+.sx-results { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--space-2) var(--space-3); }
+.sec-h { display: flex; justify-content: space-between; gap: var(--space-2); margin: var(--space-3) var(--space-2) var(--space-1); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.sec-h span { font-weight: 500; text-transform: none; letter-spacing: 0; text-align: right; }
+.hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hit { display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; min-height: 52px; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text); text-align: left; text-decoration: none; }
+.hit:hover { background: var(--c-hover); }
+.hit .avatar { margin-top: 2px; }
+.hit-main { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.hit-head { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.875rem; }
+.hit-head b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hit-head > span { flex: none; font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.hit-sub { font-size: 0.8125rem; color: var(--c-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hit-text { font-size: 0.875rem; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.hit-text b { font-weight: 600; }
+
+/* Settings › Phím tắt and Giao diện. */
+.set-tools { display: flex; justify-content: flex-end; }
+.keys { margin: 0; }
+.key-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-height: 48px; padding: var(--space-2) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
+.key-row dt { flex: 1 1 220px; min-width: 0; font-weight: 500; }
+.key-row dt small { display: block; font-weight: 400; font-size: 0.8125rem; color: var(--c-text-muted); }
+.key-row dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--space-2); border: 1px solid var(--c-border); border-bottom-width: 2px; border-radius: var(--radius-xs); background: var(--c-surface); color: var(--c-text); font-family: var(--font-mono); font-size: 0.8125rem; }
+.lede kbd { margin: 0 2px; }
+.theme-pick { --light-bg: var(--c-bg); --light-bar: var(--c-border); --dark-bg: var(--c-text); --dark-bar: color-mix(in srgb, var(--c-surface) 35%, var(--c-text)); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+:root[data-theme="dark"] .theme-pick { --light-bg: var(--c-text); --light-bar: color-mix(in srgb, var(--c-surface) 35%, var(--c-text)); --dark-bg: var(--c-bg); --dark-bar: var(--c-border); }
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .theme-pick { --light-bg: var(--c-text); --light-bar: color-mix(in srgb, var(--c-surface) 35%, var(--c-text)); --dark-bg: var(--c-bg); --dark-bar: var(--c-border); }
+}
+.theme-pick button { display: grid; gap: var(--space-2); justify-items: start; padding: var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); font-weight: 500; text-align: left; }
+.theme-pick button:hover { border-color: var(--c-border-strong); }
+.theme-pick button[aria-pressed="true"] { border-color: var(--c-primary); box-shadow: 0 0 0 1px var(--c-primary); }
+.swatch { display: grid; gap: 6px; align-content: center; width: 100%; height: 64px; padding: 0 var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); }
+.swatch i { display: block; height: 8px; border-radius: var(--radius-full); }
+.sw-light { background: var(--light-bg); }
+.sw-light i { background: var(--light-bar); }
+.sw-dark { background: var(--dark-bg); }
+.sw-dark i { background: var(--dark-bar); }
+.sw-system { background: linear-gradient(90deg, var(--light-bg) 50%, var(--dark-bg) 50%); }
+.sw-system i { background: color-mix(in srgb, var(--c-text-muted) 60%, transparent); }
+.swatch i:last-child { width: 60%; justify-self: end; background: var(--c-primary-solid); }
+.size-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
+.size-row { display: flex; align-items: center; gap: var(--space-3); }
+.size-row input { flex: 1; min-width: 0; height: 44px; accent-color: var(--c-primary-solid); }
+.a-small { font-size: 0.8125rem; color: var(--c-text-muted); }
+.a-big { font-size: 1.25rem; color: var(--c-text-muted); }
+.size-preview { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-bg); border: 1px solid var(--c-border-subtle); }
+.resolution { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.resolution p { margin: 0; }
 
 /* ---------- Responsive ---------- */
 /* Below 1100px the info column overlays the conversation instead of a fourth column. */
@@ -708,6 +823,15 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 	/* The sender's avatar keeps its drawn size; the padding makes the target 44px. */
 	.avatar-btn { padding: 6px; margin: -6px; }
 	.icon-btn { min-width: 44px; }
+}
+/* Touch and narrow screens: no hover affordances (long press opens the menus); one column, no width handle. */
+@media (max-width: 760px), (pointer: coarse) {
+	.list-resize, .msg-actions, .row-more { display: none; }
+}
+@media (max-width: 760px) {
+	.theme-pick { grid-template-columns: minmax(0, 1fr); }
+	.theme-pick button { grid-template-columns: 72px 1fr; align-items: center; }
+	.swatch { height: 44px; padding: 0 var(--space-2); }
 }
 @media (prefers-reduced-motion: reduce) {
 	.sk { animation: none; }

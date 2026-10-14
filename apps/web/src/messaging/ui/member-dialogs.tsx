@@ -51,7 +51,7 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 	const promote = (member: Member) => {
 		remote.setAdmin(chatId, member.person.id, true).then(
 			() => {
-				toasts.show(copy.admin.promoted(member.person.name));
+				toasts.show(copy.admin.promoted(member.person.name, channel));
 				membersChanged(chatId);
 			},
 			() => toasts.show(copy.common.failed),
@@ -84,7 +84,7 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 										<small className={online ? "on" : undefined}>{presence}</small>
 									</span>
 									{member.role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
-									{member.role === "admin" && <span className="tag grey">{copy.info.admin}</span>}
+									{member.role === "admin" && <span className="tag grey">{copy.info.admin(channel)}</span>}
 									{actions && (
 										<button
 											type="button"
@@ -128,7 +128,7 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 												}}
 											>
 												<Glyph name="key" />
-												{t.makeAdmin}
+												{t.makeAdmin(channel)}
 											</button>
 										)}
 										{canRemove(member) && (

@@ -1,15 +1,18 @@
-// One message (mockups/chat.html#message-kinds, #rich-messages): sender,
-// forward header, reply quote, formatted text, text-only link preview,
-// reactions and the send state of your own messages.
+// One message (mockups/chat.html#message-kinds, #rich-messages,
+// #context-menu): sender, forward header, reply quote, formatted text,
+// text-only link preview, reactions and the send state of your own messages
+// ("Đã gửi", "Đã xem"). Hovering shows quick actions (Thả cảm xúc · Trả lời ·
+// Chuyển tiếp · …); a double click replies. Right click, a long press or the
+// menu key on a reaction lists who reacted with it.
 import { memo, type ReactNode } from "react";
 import type { Chat, PendingMessage, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { actionText, clock, messagePreview, toneOf, userName } from "../data/format.ts";
+import { actionText, clock, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
-import { LabelledIcon, useContextTrigger } from "./chat-row.tsx";
+import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { useIntent, useUi } from "./ui-context.tsx";
@@ -45,13 +48,11 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, chat, re
 
 function SystemLine({ message, channel }: { message: StoredMessage; channel: boolean }) {
 	const copy = useCopy();
-	const { store } = useServices();
-	const actor = useUser(message.fromId === store.selfId ? 0 : message.fromId);
 	const pinnedSeq = message.action?.kind === "message_pinned" ? message.action.seq : 0;
 	const pinned = useMessage(message.chatId, pinnedSeq);
+	const nameOf = useNameOf([...namedUserIds(message), ...(pinned == null ? [] : namedUserIds(pinned))]);
 	if (message.action === null) return null;
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
-	const actorName = userName(actor, store.selfId, copy, message.fromId);
+	const actorName = nameOf(message.fromId);
 	const text =
 		message.action.kind === "message_pinned"
 			? copy.system.pinned(actorName, pinned == null ? "" : messagePreview(pinned, nameOf, copy, channel).slice(0, 60))
@@ -96,13 +97,12 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 	const { store } = useServices();
 	const target = useMessage(chatId, seq);
 	const channel = useChat(chatId)?.type === "channel";
-	const author = useUser(target != null && target.fromId !== store.selfId ? target.fromId : 0);
+	const nameOf = useNameOf(target == null ? [] : namedUserIds(target));
 	if (target === undefined) return <span className="reply">…</span>;
 	if (target === null) {
 		return <span className="reply">{copy.message.deleted}</span>;
 	}
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
-	const name = target.fromId === store.selfId ? copy.common.you : (author?.name ?? copy.message.unknownUser);
+	const name = nameOf(target.fromId);
 	return (
 		<button
 			type="button"
@@ -130,44 +130,75 @@ function ForwardLine({ message }: { message: StoredMessage }) {
 	);
 }
 
-function Reactions({ message }: { message: StoredMessage }) {
+/** One reaction chip: a click toggles yours; the context menu lists who reacted with it. */
+function ReactionChip({ message, emoji, count, chosen }: { message: StoredMessage; emoji: string; count: number; chosen: boolean }) {
 	const copy = useCopy();
-	const { remote, backend, store, toasts } = useServices();
+	const { remote, toasts } = useServices();
+	const ui = useUi();
+	const trigger = useContextTrigger(() => ui.dialog.set({ kind: "reactors", chatId: message.chatId, seq: message.seq, emoji }), true);
+	return (
+		<button
+			type="button"
+			className="reaction"
+			aria-pressed={chosen}
+			aria-label={copy.message.reaction(emoji, count)}
+			title={copy.message.whoReacted(emoji)}
+			onClick={() => {
+				remote.setReaction(message.chatId, message.seq, chosen ? "" : emoji).catch(() => toasts.show(copy.common.failed));
+			}}
+			{...trigger}
+			// The message under the chip has its own menu: the chip's gestures stop here.
+			onContextMenu={(event) => {
+				event.stopPropagation();
+				trigger.onContextMenu(event);
+			}}
+			onTouchStart={(event) => {
+				event.stopPropagation();
+				trigger.onTouchStart(event);
+			}}
+			onKeyDown={(event) => {
+				// Enter and Space toggle the reaction; the menu keys list who reacted.
+				if (event.key === "Enter") return;
+				trigger.onKeyDown(event);
+			}}
+		>
+			<span aria-hidden="true">{emoji}</span>
+			<span aria-hidden="true">{count}</span>
+		</button>
+	);
+}
+
+function Reactions({ message }: { message: StoredMessage }) {
 	if (message.reactions.length === 0) return null;
-	const toggle = (emoji: string, chosen: boolean) => {
-		remote.setReaction(message.chatId, message.seq, chosen ? "" : emoji).catch(() => toasts.show(copy.common.failed));
-	};
 	return (
 		<div className="reactions">
-			{message.reactions.map((reaction) => {
-				const reactors = backend.reactors(message.chatId, message.seq, reaction.emoji);
-				const names = reactors?.map((id) => userName(store.user(id), store.selfId, copy, id)).join(", ");
-				return (
-					<button
-						key={reaction.emoji}
-						type="button"
-						className="reaction"
-						aria-pressed={reaction.chosen}
-						aria-label={
-							names === undefined
-								? copy.message.reaction(reaction.emoji, reaction.count)
-								: copy.message.reactedBy(reaction.emoji, names)
-						}
-						onClick={() => toggle(reaction.emoji, reaction.chosen)}
-					>
-						<span aria-hidden="true">{reaction.emoji}</span>
-						{reactors === null ? (
-							<span aria-hidden="true">{reaction.count}</span>
-						) : (
-							<span className="r-avs" aria-hidden="true">
-								{reactors.slice(0, 3).map((id) => (
-									<ChatAvatar key={id} id={id} name={userName(store.user(id), store.selfId, copy, id)} size="xs" />
-								))}
-							</span>
-						)}
-					</button>
-				);
-			})}
+			{message.reactions.map((reaction) => (
+				<ReactionChip key={reaction.emoji} message={message} emoji={reaction.emoji} count={reaction.count} chosen={reaction.chosen} />
+			))}
+		</div>
+	);
+}
+
+/** Buttons that show when the pointer is over a message (#context-menu); the keyboard has the menu. */
+function QuickActions({ chatId, itemKey, seq, label, canReply }: { chatId: number; itemKey: string; seq: number; label: string; canReply: boolean }) {
+	const copy = useCopy();
+	const ui = useUi();
+	return (
+		<div className="msg-actions" role="toolbar" aria-label={label}>
+			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.react} onClick={() => ui.menu.set({ chatId, key: itemKey, picker: true })}>
+				<Icon name="smile" small />
+			</button>
+			{canReply && (
+				<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={() => ui.intents.cell(chatId).set({ mode: "reply", seq })}>
+					<Icon name="reply" small />
+				</button>
+			)}
+			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq })}>
+				<Icon name="forward" small />
+			</button>
+			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={() => ui.menu.set({ chatId, key: itemKey })}>
+				<Icon name="dots" small />
+			</button>
 		</div>
 	);
 }
@@ -221,6 +252,8 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const atMe = !mine && mentionsSelf(message.text, message.entities, self.id, self.username);
 	const unsupported = message.text === "" && message.mediaKind === null;
 	const read = mine && readOutboxMaxSeq >= message.seq;
+	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
+	const canReply = !channel || admin;
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
 	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : ""].filter(Boolean).join(" ");
@@ -243,6 +276,15 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 			data-seq={message.seq}
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
 			{...(inert ? {} : trigger)}
+			onDoubleClick={
+				inert || !canReply
+					? undefined
+					: (event) => {
+							if ((event.target as Element).closest("a, button, .spoiler") !== null) return;
+							window.getSelection()?.removeAllRanges();
+							ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq });
+						}
+			}
 		>
 			{group && !mine && (
 				<button
@@ -282,6 +324,15 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 					{preview !== null && <LinkPreviewCard preview={preview} ctx={ctx} />}
 					<Reactions message={message} />
 					{trailingStamp && <p>{stamp}</p>}
+					{!inert && (
+						<QuickActions
+							chatId={chatId}
+							itemKey={itemKey}
+							seq={message.seq}
+							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
+							canReply={canReply}
+						/>
+					)}
 				</div>
 			)}
 		</div>

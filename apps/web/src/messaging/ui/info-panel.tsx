@@ -1,28 +1,34 @@
 // Right column (mockups/chat.html#info-panels, #topics): group or channel,
-// the other person of a 1-1 chat, or the open topic. Opened with the "i"
-// button, closed with X; an overlay below 1100px takes focus when it opens
-// (#info-overlay), and below 760px it fills the screen with a back arrow
-// (#narrow).
-import { useEffect, useRef, useState } from "react";
-import type { Chat, User } from "@app/core";
+// the other person of a 1-1 chat, a bot, or the open topic, in the order
+// people know from Zalo: picture, name, status and description; three quick
+// actions (Tắt thông báo · Ghim · Thêm thành viên / Tạo nhóm); members with
+// "Xem tất cả"; invite link; Quản lý; leave, delete and report. Opened with
+// the "i" button, closed with X; an overlay below 1100px takes focus when it
+// opens (#info-overlay), and below 760px it fills the screen with a back
+// arrow (#narrow). Shared media is not listed: messages carry no media yet.
+import { PINNED_DIALOGS_MAX, type Chat, type User } from "@app/core";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { Link, navigate, paths } from "../../router.tsx";
+import { Link, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { dialogTitle, shortDate, userName } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
-import { Permission } from "../data/remote.ts";
-import { useServices, useUser } from "../data/services.tsx";
+import { Permission, type MuteFor } from "../data/remote.ts";
+import { useListEntry, useServices, useUser } from "../data/services.tsx";
+import { CommonChatsSection } from "./common-chats.tsx";
 import { ContactRow } from "./contact-row.tsx";
 import { hiddenPins, usePinHidden } from "./conversation.tsx";
-import { displayLink, inviteLinks, isActiveInvite, useInviteLinks, useMembers } from "./members.ts";
+import { MuteDurations, pinLimitReached, useMute } from "./dialog-settings.tsx";
+import { displayLink, inviteLinks, isActiveInvite, useInviteLinks, useMembers, useOnlineCount } from "./members.ts";
 import { ChatAvatar, CopyButton, Switch } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useUi, type Ui } from "./ui-context.tsx";
 
-const MEMBERS_SHOWN = 20;
+/** Members shown in the column; "Xem tất cả" opens the rest. */
+const MEMBERS_SHOWN = 5;
 const WIDE_QUERY = "(min-width: 1101px)";
 const NARROW_QUERY = "(max-width: 760px)";
 
@@ -108,22 +114,82 @@ function InfoHead({ title }: { title: string }) {
 	);
 }
 
-/** Shown only where the server can mute chats. */
-function MuteButton({ chatId }: { chatId: number }) {
+/** Mute with a duration menu, or turn notifications back on (#info-panels quick actions). */
+function MuteAction({ chatId, title }: { chatId: number; title: string }) {
 	const copy = useScreensCopy();
-	const { backend, toasts } = useServices();
-	const muted = backend.isMuted(chatId);
-	if (!backend.features.has("mute")) return null;
+	const { toasts } = useServices();
+	const entry = useListEntry(chatId);
+	const setMute = useMute(chatId, title);
+	const [open, setOpen] = useState(false);
+	const anchor = useRef<HTMLDivElement>(null);
+	const muted = entry?.muted === true;
+	const run = (label: string, muteFor: MuteFor) => {
+		setOpen(false);
+		setMute(label, muteFor).then(
+			(done) => toasts.show(done),
+			() => toasts.show(copy.common.failed),
+		);
+	};
 	return (
-		<button
-			type="button"
-			className="btn"
-			aria-pressed={muted}
-			onClick={() => backend.setMuted(chatId, !muted).catch(() => toasts.show(copy.common.failed))}
-		>
-			<Icon name={muted ? "bell" : "bell-off"} />
-			<span>{muted ? copy.convo.unmute : copy.convo.mute}</span>
+		<div className="qa-anchor" ref={anchor}>
+			<button
+				type="button"
+				aria-pressed={muted}
+				aria-haspopup={muted ? undefined : "menu"}
+				aria-expanded={muted ? undefined : open}
+				onClick={() => (muted ? run("", 0) : setOpen((on) => !on))}
+			>
+				<span className="qa-ico">
+					<Icon name={muted ? "bell" : "bell-off"} />
+				</span>
+				<span className="qa-label">{muted ? copy.info.unmute : copy.info.mute}</span>
+			</button>
+			{open && (
+				<MuteDurations
+					boundary={anchor}
+					className="qa-menu"
+					onPick={run}
+					onClose={() => {
+						setOpen(false);
+						anchor.current?.querySelector<HTMLElement>("button")?.focus();
+					}}
+				/>
+			)}
+		</div>
+	);
+}
+
+/** Pin the chat on top of the list (at most PINNED_DIALOGS_MAX) or unpin it. */
+function PinAction({ chatId, title }: { chatId: number; title: string }) {
+	const copy = useScreensCopy();
+	const { remote, toasts } = useServices();
+	const entry = useListEntry(chatId);
+	const pinned = entry?.pinned === true;
+	const toggle = () => {
+		remote.setDialogPinned(chatId, !pinned).then(
+			(ids) => toasts.show(pinned ? copy.listMenu.unpinned(title) : copy.listMenu.pinned(title, ids.length, PINNED_DIALOGS_MAX)),
+			(err: unknown) => toasts.show(pinLimitReached(err) ? copy.listMenu.pinLimit(PINNED_DIALOGS_MAX) : copy.common.failed),
+		);
+	};
+	return (
+		<button type="button" aria-pressed={pinned} onClick={toggle}>
+			<span className="qa-ico">
+				<Icon name="pin" />
+			</span>
+			<span className="qa-label">{pinned ? copy.info.unpin : copy.info.pin}</span>
 		</button>
+	);
+}
+
+/** Three evenly shared quick actions: mute, pin and one that depends on the chat. */
+function QuickActions({ chatId, title, children }: { chatId: number; title: string; children?: ReactNode }) {
+	const copy = useScreensCopy();
+	return (
+		<div className="quick-acts" role="group" aria-label={copy.info.quickActions}>
+			<MuteAction chatId={chatId} title={title} />
+			<PinAction chatId={chatId} title={title} />
+			{children}
+		</div>
 	);
 }
 
@@ -132,10 +198,12 @@ function PinnedBarRow({ chat }: { chat: Chat }) {
 	const hidden = usePinHidden(chat.id);
 	if (chat.pinnedSeq === 0 || hidden !== chat.pinnedSeq) return null;
 	return (
-		<div className="row">
-			<Icon name="pin" />
-			<span className="grow">{copy.info.pinnedBar}</span>
-			<Switch checked={false} label={copy.pinned.show} onChange={() => hiddenPins.set(chat.id, 0)} />
+		<div className="info-sec">
+			<div className="row">
+				<Icon name="pin" />
+				<span className="grow">{copy.info.pinnedBar}</span>
+				<Switch checked={false} label={copy.pinned.show} onChange={() => hiddenPins.set(chat.id, 0)} />
+			</div>
 		</div>
 	);
 }
@@ -186,38 +254,24 @@ function InviteRow({ chat }: { chat: Chat }) {
 	);
 }
 
+/** The first members with "Xem tất cả" (#info-panels): the full list opens in a dialog with search. */
 function GroupMembers({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const channel = chat.type === "channel";
 	const { store } = useServices();
 	const ui = useUi();
-	const [searching, setSearching] = useState(false);
-	const [query, setQuery] = useState("");
-	const { members, status } = useMembers(chat.id, query.trim());
-	const admin = chat.myRole === "admin" || chat.myRole === "owner";
-	const canAdd = admin || (chat.myPermissions & Permission.addMembers) !== 0;
+	const { members, status } = useMembers(chat.id);
 	const shown = members.slice(0, MEMBERS_SHOWN);
 	return (
 		<div className="info-sec">
 			<div className="sec-head">
 				<h3>{copy.info.membersHead(chat.memberCount, channel)}</h3>
-				<button type="button" className="icon-btn" aria-label={copy.info.searchMembers(channel)} aria-pressed={searching} onClick={() => setSearching((on) => !on)}>
-					<Icon name="search" small />
-				</button>
+				{status === "ready" && (
+					<button type="button" className="see-all" aria-label={copy.info.seeAllLabel(chat.memberCount, channel)} onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
+						{copy.info.seeAll}
+					</button>
+				)}
 			</div>
-			{searching && (
-				<label className="search-field member-search">
-					<Icon name="search" small />
-					<span className="sr-only">{copy.info.searchMembers(channel)}</span>
-					<input type="search" value={query} autoComplete="off" onChange={(event) => setQuery(event.target.value)} />
-				</label>
-			)}
-			{canAdd && (
-				<button type="button" className="btn btn-block" onClick={() => ui.dialog.set({ kind: "addMembers", chatId: chat.id })}>
-					<Icon name="user-plus" />
-					{copy.info.addMembers(channel)}
-				</button>
-			)}
 			{status === "loading" && <p className="note">{copy.common.loading}</p>}
 			{status === "error" && <p className="note">{copy.common.loadFailed}</p>}
 			{shown.map((member) => {
@@ -235,11 +289,6 @@ function GroupMembers({ chat }: { chat: Chat }) {
 					/>
 				);
 			})}
-			{status === "ready" && (
-				<button type="button" className="see-all" onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
-					{copy.info.seeAll(chat.memberCount, channel)}
-				</button>
-			)}
 		</div>
 	);
 }
@@ -251,7 +300,7 @@ interface MemberLineProps {
 	name: string;
 	isBot: boolean;
 	role: string;
-	/** Channel owners are "Chủ kênh", group owners "Chủ nhóm". */
+	/** Groups say "Trưởng nhóm / Phó nhóm", channels "Chủ kênh / Admin". */
 	channel: boolean;
 	presence: boolean;
 }
@@ -272,139 +321,173 @@ function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }
 				<small className={online && !isBot ? "on" : undefined}>{label}</small>
 			</span>
 			{role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
-			{role === "admin" && <span className="tag grey">{copy.info.admin}</span>}
+			{role === "admin" && <span className="tag grey">{copy.info.admin(channel)}</span>}
 		</button>
 	);
 }
 
+/** Groups and channels, in the order people know from Zalo (#info-panels). */
 function GroupInfo({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const ui = useUi();
+	const { backend } = useServices();
 	const channel = chat.type === "channel";
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
-	const canInvite = admin || (!channel && (chat.myPermissions & Permission.addMembers) !== 0);
+	const owner = chat.myRole === "owner";
+	const canAdd = admin || (!channel && (chat.myPermissions & Permission.addMembers) !== 0);
+	const online = useOnlineCount(channel ? 0 : chat.id, chat.memberCount);
+	const subtitle = channel
+		? copy.info.channel(chat.memberCount)
+		: online === null
+			? copy.convo.members(chat.memberCount)
+			: copy.convo.membersOnline(chat.memberCount, online);
 	return (
 		<aside className="info" aria-label={channel ? copy.info.channelTitle : copy.info.groupTitle}>
 			<InfoHead title={channel ? copy.info.channelTitle : copy.info.groupTitle} />
 			<div className="info-hero">
 				<ChatAvatar id={chat.id} name={chat.title} size="lg" />
 				<h2>{chat.title}</h2>
-				<span className="muted">{channel ? copy.info.channel(chat.memberCount) : copy.info.group(chat.memberCount)}</span>
+				<span className="muted">{subtitle}</span>
+				{chat.about !== "" && <p>{chat.about}</p>}
 			</div>
-			<div className="profile-actions">
-				<MuteButton chatId={chat.id} />
-				{admin && (
-					<Link to={paths.chatAdmin(chat.id)} className="btn">
+			{!chat.left && (
+				<QuickActions chatId={chat.id} title={chat.title}>
+					{canAdd && (
+						<button type="button" onClick={() => ui.dialog.set({ kind: "addMembers", chatId: chat.id })}>
+							<span className="qa-ico">
+								<Icon name="user-plus" />
+							</span>
+							<span className="qa-label">{copy.info.addMembers(channel)}</span>
+						</button>
+					)}
+				</QuickActions>
+			)}
+			{(!channel || admin) && <GroupMembers chat={chat} />}
+			{canAdd && !chat.left && (
+				<div className="info-sec">
+					<h3>{copy.info.inviteLink}</h3>
+					<InviteRow chat={chat} />
+				</div>
+			)}
+			<PinnedBarRow chat={chat} />
+			{admin && (
+				<div className="info-sec">
+					<Link to={paths.chatAdmin(chat.id)} className="row link-row">
 						<Icon name="settings" />
-						{copy.info.manage}
+						<span className="grow">{copy.info.manage(channel)}</span>
+						<Icon name="chevron-right" small />
 					</Link>
-				)}
+				</div>
+			)}
+			<div className="info-sec">
 				{!chat.left && (
-					<button type="button" className="btn danger-text" onClick={() => ui.dialog.set({ kind: "leave", chatId: chat.id })}>
+					<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "leave", chatId: chat.id })}>
 						<Icon name="logout" />
-						{channel ? copy.info.leaveChannel : copy.info.leaveGroup}
+						<span className="grow">{channel ? copy.info.leaveChannel : copy.info.leaveGroup}</span>
+					</button>
+				)}
+				{owner && !chat.left && (
+					<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
+						<Icon name="trash" />
+						<span className="grow">{copy.info.deleteGroup(channel)}</span>
+					</button>
+				)}
+				{backend.features.has("report") && (
+					<button
+						type="button"
+						className="row link-row"
+						onClick={() => ui.dialog.set({ kind: "report", target: { kind: "chat", chatId: chat.id }, name: chat.title, blockUserId: 0 })}
+					>
+						<Icon name="flag" />
+						<span className="grow">{copy.info.reportChat(channel)}</span>
 					</button>
 				)}
 			</div>
-			<div className="info-sec">
-				{chat.about !== "" && (
-					<div className="row">
-						<Icon name="info" />
-						<span className="grow">
-							{chat.about}
-							<small>{copy.info.description}</small>
-						</span>
-					</div>
-				)}
-				{canInvite && <InviteRow chat={chat} />}
-				<PinnedBarRow chat={chat} />
-			</div>
-			{(!channel || admin) && <GroupMembers chat={chat} />}
 		</aside>
 	);
 }
 
+/** The other person of a private chat, or a bot (#info-panels). */
 function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
 	const copy = useScreensCopy();
 	const { remote, backend, toasts } = useServices();
 	const ui = useUi();
-	const presence = usePresence(peer?.isBot === true ? 0 : chat.peerUserId);
+	const bot = peer?.isBot === true;
+	const presence = usePresence(bot ? 0 : chat.peerUserId);
 	const presenceLabel = usePresenceText(presence, copy);
 	const [blocked, setBlocked] = useState<boolean | null>(null);
 	const isBlocked = blocked ?? peer?.isBlocked ?? false;
 	const name = peer?.name ?? dialogTitle({ chat, peer: null }, copy);
+	const online = presence?.kind === "online";
 	const toggleBlock = () => {
 		const next = !isBlocked;
 		(next ? remote.block(chat.peerUserId) : remote.unblock(chat.peerUserId)).then(
 			() => {
 				setBlocked(next);
-				toasts.show(next ? copy.info.blocked(name) : copy.info.unblocked(name));
+				toasts.show(next ? (bot ? copy.info.botStopped(name) : copy.info.blocked(name)) : copy.info.unblocked(name));
 			},
 			() => toasts.show(copy.common.failed),
 		);
 	};
+	const title = bot ? copy.info.botTitle : copy.info.userTitle;
 	return (
-		<aside className="info" aria-label={copy.info.userTitle}>
-			<InfoHead title={copy.info.userTitle} />
+		<aside className="info" aria-label={title}>
+			<InfoHead title={title} />
 			<div className="info-hero">
-				<ChatAvatar id={chat.id} name={name} size="lg" bot={peer?.isBot === true} />
+				<ChatAvatar id={chat.id} name={name} size="lg" bot={bot} online={online} />
 				<h2>{name}</h2>
-				<span className="muted">{peer?.isBot === true ? copy.info.bot : presenceLabel}</span>
+				<span className={online ? "muted on" : "muted"}>{bot ? copy.info.botLine(peer?.username ?? "") : presenceLabel}</span>
+				{peer !== undefined && peer.bio !== "" && <p>{peer.bio}</p>}
 			</div>
-			<div className="profile-actions">
-				<button
-					type="button"
-					className="btn btn-primary"
-					onClick={() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus()}
-				>
-					<Icon name="message" />
-					{copy.info.message}
-				</button>
-				<MuteButton chatId={chat.id} />
-				<button type="button" className="btn danger-text" onClick={toggleBlock}>
-					<Icon name="ban" />
-					{isBlocked ? copy.info.unblock : copy.info.block}
-				</button>
-			</div>
-			{peer !== undefined && !peer.isBot && !peer.isSelf && (
+			<QuickActions chatId={chat.id} title={name}>
+				{!bot && peer !== undefined && (
+					<button type="button" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: peer.id })}>
+						<span className="qa-ico">
+							<Icon name="users" />
+						</span>
+						<span className="qa-label">{copy.info.createGroup}</span>
+					</button>
+				)}
+			</QuickActions>
+			{!bot && (
 				<div className="info-sec">
-					<ContactRow userId={peer.id} name={name} />
+					{peer !== undefined && !peer.isSelf && <ContactRow userId={peer.id} name={name} />}
+					{peer !== undefined && peer.username !== "" && (
+						<div className="row">
+							<Icon name="user" />
+							<span className="grow">
+								<MiddleTruncate text={`@${peer.username}`} tail={4} />
+								<small>{copy.info.username}</small>
+							</span>
+							<CopyButton text={`@${peer.username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(peer.username)} />
+						</div>
+					)}
 				</div>
 			)}
+			{peer !== undefined && !peer.isSelf && <CommonChatsSection userId={peer.id} bot={bot} />}
+			<PinnedBarRow chat={chat} />
 			<div className="info-sec">
-				{peer !== undefined && peer.username !== "" && (
-					<div className="row">
-						<Icon name="user" />
-						<span className="grow">
-							<MiddleTruncate text={`@${peer.username}`} tail={4} />
-							<small>{copy.info.username}</small>
-						</span>
-						<CopyButton text={`@${peer.username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(peer.username)} />
-					</div>
+				<button type="button" className="row link-row danger" onClick={toggleBlock}>
+					<Icon name="ban" />
+					<span className="grow">{isBlocked ? copy.info.unblock : bot ? copy.info.stopBot : copy.info.block}</span>
+				</button>
+				{!bot && (
+					<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
+						<Icon name="trash" />
+						<span className="grow">{copy.info.deleteChat}</span>
+					</button>
 				)}
-				{peer !== undefined && peer.bio !== "" && (
-					<div className="row">
-						<Icon name="info" />
-						<span className="grow">
-							{peer.bio}
-							<small>{copy.info.bio}</small>
-						</span>
-					</div>
-				)}
-				<PinnedBarRow chat={chat} />
-			</div>
-			{backend.features.has("report") && (
-				<div className="info-sec">
+				{backend.features.has("report") && (
 					<button
 						type="button"
 						className="row link-row"
 						onClick={() => ui.dialog.set({ kind: "report", target: { kind: "user", userId: chat.peerUserId }, name, blockUserId: chat.peerUserId })}
 					>
 						<Icon name="flag" />
-						<span className="grow">{copy.info.report}</span>
+						<span className="grow">{bot ? copy.info.reportBot : copy.info.report}</span>
 					</button>
-				</div>
-			)}
+				)}
+			</div>
 		</aside>
 	);
 }
@@ -428,15 +511,16 @@ function TopicInfo({ chat, topic, groupTitle }: { chat: Chat; topic: Topic; grou
 					</Link>
 				</span>
 			</div>
-			<div className="profile-actions">
-				<MuteButton chatId={chat.id} />
+			<QuickActions chatId={chat.id} title={groupTitle}>
 				{admin && (
-					<button type="button" className="btn" onClick={() => navigate(paths.chatAdmin(chat.id))}>
-						<Icon name="settings" />
-						{copy.info.manage}
-					</button>
+					<Link to={paths.chatAdmin(chat.id)}>
+						<span className="qa-ico">
+							<Icon name="settings" />
+						</span>
+						<span className="qa-label">{copy.info.manageShort}</span>
+					</Link>
 				)}
-			</div>
+			</QuickActions>
 			{topic.link !== "" && (
 				<div className="info-sec">
 					<h3>{copy.info.topicLink}</h3>

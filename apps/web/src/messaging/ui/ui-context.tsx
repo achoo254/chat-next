@@ -4,18 +4,21 @@
 // changing parts are small external stores read with useSyncExternalStore.
 import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
 import type { ReportTarget } from "../data/pending-backend.ts";
+import type { AddFailure } from "../data/remote.ts";
 
 export type DialogRequest =
 	| { readonly kind: "newChat" }
-	| { readonly kind: "newGroup" }
+	/** `withUserId`: opened from a profile, that person is picked already (0: nobody). */
+	| { readonly kind: "newGroup"; readonly withUserId: number }
 	| { readonly kind: "newChannel" }
 	| { readonly kind: "forward"; readonly chatId: number; readonly seq: number }
-	| {
-			readonly kind: "delete";
-			readonly chatId: number;
-			readonly seq: number;
-			readonly mine: boolean;
-	  }
+	/** `recall`: your own message, removed for everyone ("Thu hồi"); otherwise hidden for you only. */
+	| { readonly kind: "delete"; readonly chatId: number; readonly seq: number; readonly recall: boolean }
+	/** Private chat: deleted for you; group or channel: deleted for everyone by its owner. */
+	| { readonly kind: "deleteChat"; readonly chatId: number }
+	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number }
+	/** Who reacted to a message, opened on one emoji. */
+	| { readonly kind: "reactors"; readonly chatId: number; readonly seq: number; readonly emoji: string }
 	| { readonly kind: "report"; readonly target: ReportTarget; readonly name: string; readonly blockUserId: number }
 	| { readonly kind: "profile"; readonly userId: number }
 	| { readonly kind: "leave"; readonly chatId: number }
@@ -23,8 +26,8 @@ export type DialogRequest =
 	/** `text`: what the message shows for the link ("" when it is the address itself); `fromId`: the sender. */
 	| { readonly kind: "link"; readonly url: string; readonly text: string; readonly fromId: number }
 	| { readonly kind: "readBy"; readonly chatId: number; readonly seq: number }
-	/** People the server did not add (privacy or a ban): offer an invite link or a private chat. */
-	| { readonly kind: "addFailed"; readonly chatId: number; readonly userIds: readonly number[]; readonly addedIds: readonly number[] }
+	/** People the server did not add, each with the reason, and what still works for them. */
+	| { readonly kind: "addFailed"; readonly chatId: number; readonly failures: readonly AddFailure[]; readonly addedIds: readonly number[] }
 	| { readonly kind: "members"; readonly chatId: number }
 	/** `back`: return to the member list when done. */
 	| { readonly kind: "removeMember"; readonly chatId: number; readonly userId: number; readonly back: boolean }
@@ -37,6 +40,8 @@ export type ComposerIntent =
 export interface MenuTarget {
 	readonly chatId: number;
 	readonly key: string;
+	/** Opened from the message's "Thả cảm xúc" button: straight to the emoji panel. */
+	readonly picker?: boolean;
 }
 
 /** The chat list's row menu (mockups/chat.html#list-menu), opened at a point of the viewport. */

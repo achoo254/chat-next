@@ -6,11 +6,13 @@ import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, dialogTitle, messagePreview, userName } from "../data/format.ts";
+import { chatKind, dialogTitle, messagePreview, namedUserIds } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
-import { useChat, useConnection, useDialog, useMessage, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
+import { useChat, useConnection, useDialog, useListEntry, useMessage, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
+import { useNameOf } from "./chat-row.tsx";
 import { Composer } from "./composer.tsx";
+import { useOnlineCount } from "./members.ts";
 import { MessageList } from "./message-list.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
@@ -26,7 +28,14 @@ function MessageMenu({ chat, readOutboxMaxSeq }: { chat: Chat; readOutboxMaxSeq:
 	if (target === null) return null;
 	return (
 		<Suspense fallback={null}>
-			<MenuLayer key={`${target.chatId}:${target.key}`} chatId={target.chatId} itemKey={target.key} chat={chat} readOutboxMaxSeq={readOutboxMaxSeq} />
+			<MenuLayer
+				key={`${target.chatId}:${target.key}:${target.picker === true ? 1 : 0}`}
+				chatId={target.chatId}
+				itemKey={target.key}
+				chat={chat}
+				readOutboxMaxSeq={readOutboxMaxSeq}
+				picker={target.picker === true}
+			/>
 		</Suspense>
 	);
 }
@@ -66,8 +75,8 @@ function PinnedBar({ chat }: { chat: Chat }) {
 	const { store, toasts } = useServices();
 	const hidden = usePinHidden(chat.id);
 	const message = useMessage(chat.id, chat.pinnedSeq);
+	const nameOf = useNameOf(message == null ? [] : namedUserIds(message));
 	if (chat.pinnedSeq === 0 || hidden === chat.pinnedSeq) return null;
-	const nameOf = (id: number) => userName(store.user(id), store.selfId, copy, id);
 	return (
 		<div className="pinned closable">
 			<button type="button" className="pin-jump" aria-label={copy.pinned.jump} onClick={() => store.openWindow(chat.id, chat.pinnedSeq)}>
@@ -94,11 +103,9 @@ function PinnedBar({ chat }: { chat: Chat }) {
 
 function OfflineBanner({ chatId }: { chatId: number }) {
 	const copy = useCopy();
-	const { store } = useServices();
 	const connection = useConnection();
-	useWindow(chatId);
+	const pending = useWindow(chatId)?.pendingCount ?? 0;
 	if (connection !== "offline" && connection !== "waiting") return null;
-	const pending = store.items(chatId).filter((item) => item.kind === "pending").length;
 	return (
 		<div className="banner warn" role="status">
 			<Icon name="wifi-off" small />
@@ -112,6 +119,7 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 	const connection = useConnection();
 	const peer = useUser(chat.type === "private" ? chat.peerUserId : 0);
 	const presence = usePresence(chat.type === "private" && peer?.isBot !== true ? chat.peerUserId : 0);
+	const online = useOnlineCount(chat.type === "group" ? chat.id : 0, chat.memberCount);
 	if (connection === "connecting") {
 		return (
 			<span className="status-line">
@@ -132,9 +140,13 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 	}
 	switch (chat.type) {
 		case "channel":
-			return <span>{chat.myRole === "admin" || chat.myRole === "owner" ? copy.convo.channelAdmin : copy.convo.subscribers(chat.memberCount)}</span>;
+			return (
+				<span>
+					{chat.myRole === "owner" ? copy.convo.channelOwner : chat.myRole === "admin" ? copy.convo.channelAdmin : copy.convo.subscribers(chat.memberCount)}
+				</span>
+			);
 		case "group":
-			return <span>{copy.convo.members(chat.memberCount)}</span>;
+			return <span>{online === null ? copy.convo.members(chat.memberCount) : copy.convo.membersOnline(chat.memberCount, online)}</span>;
 		default:
 			if (peer?.isBot === true) return <span>{copy.info.bot}</span>;
 			return <span>{presence === null ? "" : presenceText(presence, copy)}</span>;
@@ -149,25 +161,26 @@ function canSend(chat: Chat): boolean {
 	return true;
 }
 
-function placeholderFor(chat: Chat, topic: Topic | null, copy: MessagingCopy): string {
+/** Says where the message goes (#composer-states): a person, a group (with the @ hint) or a topic. */
+function placeholderFor(chat: Chat, topic: Topic | null, title: string, copy: MessagingCopy): string {
 	if (chat.type === "channel") return copy.composer.channelPlaceholder;
-	if (topic !== null) return topic.closed ? copy.topics.closedPlaceholder : copy.composer.placeholderTopic(topic.title);
-	return copy.composer.placeholder;
+	if (topic !== null) return topic.closed ? copy.topics.closedPlaceholder : copy.composer.placeholderGroup(topic.title);
+	if (chat.type === "group") return copy.composer.placeholderGroup(title);
+	return copy.composer.placeholder(title);
 }
 
-/** Subscribers of a channel get a mute button in place of the composer, where the server can mute. */
+/** Subscribers of a channel get a notifications switch in place of the composer. */
 function ChannelBar({ chatId }: { chatId: number }) {
 	const copy = useCopy();
-	const { backend, toasts } = useServices();
-	const muted = backend.isMuted(chatId);
-	if (!backend.features.has("mute")) return null;
+	const { remote, toasts } = useServices();
+	const muted = useListEntry(chatId)?.muted === true;
 	return (
 		<div className="sub-bar">
 			<button
 				type="button"
 				className="btn"
 				aria-pressed={muted}
-				onClick={() => backend.setMuted(chatId, !muted).catch(() => toasts.show(copy.common.failed))}
+				onClick={() => remote.setDialogMute(chatId, muted ? 0 : "forever").catch(() => toasts.show(copy.common.failed))}
 			>
 				<Icon name={muted ? "bell" : "bell-off"} />
 				<span>{muted ? copy.convo.unmute : copy.convo.mute}</span>
@@ -188,12 +201,15 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const { store } = useServices();
 	const chat = useChat(chatId);
 	const view = useDialog(chatId);
+	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
 	const topics = useTopics(chatId, chat?.forum === true);
 	const topic = topics === null ? null : (topics.find((t) => t.id === topicId) ?? topics.find((t) => t.general) ?? topics[0] ?? null);
 	const effectiveTopic = topic?.id ?? 0;
 
 	useEffect(() => {
 		store.openWindow(chatId);
+		// Opening a chat ends "marked as unread" on this device.
+		store.setMarkedUnread(chatId, false);
 	}, [store, chatId]);
 
 	useEffect(() => {
@@ -221,7 +237,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 		);
 	}
 
-	const title = dialogTitle({ chat, peer: view?.peer ?? store.user(chat.peerUserId) ?? null }, copy);
+	const title = dialogTitle({ chat, peer: view?.peer ?? peer ?? null }, copy);
 	const kind = chatKind(chat, view?.peer ?? null, topics !== null);
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const closedForMe = topic !== null && topic.closed && !admin;
@@ -271,7 +287,8 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					chatId={chatId}
 					topicId={effectiveTopic}
 					channel={chat.type === "channel"}
-					placeholder={placeholderFor(chat, topic, copy)}
+					label={chat.type === "channel" ? copy.composer.channelLabel : copy.composer.label(topic?.title ?? title)}
+					placeholder={placeholderFor(chat, topic, title, copy)}
 				/>
 			) : (
 				<div className="closed-bar" role="status">
