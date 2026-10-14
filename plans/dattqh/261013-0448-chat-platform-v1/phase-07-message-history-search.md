@@ -35,6 +35,7 @@ Tìm tin trong một chat và trên toàn bộ chat của người dùng: p50 �
 ## Requirements
 
 Functional:
+- Topic bị admin ẩn: tin của topic vẫn nằm trong kết quả tìm kiếm của thành viên; ẩn chỉ bỏ topic khỏi danh sách topic.
 - Indexer tiêu thụ outbox (`message_new`, `message_edit`, `message_delete`, `message_hidden` không cần index, `member_removed` không cần index vì ACL re-check) theo cursor riêng.
 - `SearchMessages(query, filters, cursor)` toàn cục và `SearchChatMessages(chat_id, query, filters, cursor)`; lọc người gửi, loại media, khoảng ngày.
 - Chat `secret` không bao giờ được index.

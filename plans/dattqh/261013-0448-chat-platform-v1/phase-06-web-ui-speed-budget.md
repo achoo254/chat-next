@@ -21,7 +21,7 @@ Xây giao diện chat web bằng React 19 đạt cảm giác nhanh như Telegram
 
 ## Context Links
 
-- [Mock giao diện HTML](./mockups/index.html): mục lục 86 màn hình và trạng thái phủ mọi tính năng có giao diện trong plan, chia 11 trang theo nhóm tính năng; dùng token của hệ sinh thái (`mockups/tokens.css`, bản sao nguyên văn từ `hoandat-auth`). **Cổng:** user duyệt mock trước khi code UI; mọi thay đổi bố cục được thống nhất trên mock trước.
+- [Mock giao diện HTML](./mockups/index.html): mục lục 92 màn hình và trạng thái phủ mọi tính năng có giao diện trong plan, chia 11 trang theo nhóm tính năng; dùng token của hệ sinh thái (`mockups/tokens.css`, bản sao nguyên văn từ `hoandat-auth`). **Cổng:** user duyệt mock trước khi code UI; mọi thay đổi bố cục được thống nhất trên mock trước.
 - [Kỹ thuật tốc độ client web](../reports/researcher-261013-1120-telegram-web-client-speed.md) — top-10 kỹ thuật
 - [Client đa nền tảng](../reports/researcher-261013-1120-cross-platform-client.md) — mục 1, 4
 
@@ -35,6 +35,7 @@ Xây giao diện chat web bằng React 19 đạt cảm giác nhanh như Telegram
 ## Requirements
 
 Functional:
+- Bộ lọc thư mục có sẵn (R1): Tất cả, Cá nhân, Nhóm, Bot, lọc phía client theo loại chat; thư mục tự tạo và đồng bộ giữa thiết bị làm sau R4.
 - Nhóm có topic (R1): cột danh sách topic thay cho danh sách chat khi mở nhóm, khung chat theo topic, panel thông tin topic; cột thư mục bên trái và panel thông tin bên phải; tất cả theo mock `chat.html` và `desktop.html`.
 - Màn hình: chào mừng với hai nút "Đăng nhập" và "Tạo tài khoản" bằng tài khoản hoandat (chuyển sang trang của IdP, không có form email hay mật khẩu trong app), danh sách chat, khung chat, composer (text, emoji, đính kèm, reply, edit), thông tin chat/người dùng, cài đặt cơ bản (bao gồm riêng tư), tìm kiếm (giao diện, nối API ở Phase 7).
 - Formatting theo entities (bold, italic, code, pre, link, mention, spoiler…).

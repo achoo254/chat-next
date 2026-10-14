@@ -104,6 +104,15 @@ table.data th.num { text-align: right; }
 .silent-mark { display: inline-flex; align-items: center; gap: 2px; }
 .int-time { display: block; margin-top: var(--space-1); font-size: 0.75rem; color: var(--c-text-muted); }
 
+/* Alert message: labelled fields (emoji come from the payload as Unicode text) and code blocks with copy. */
+.alert-fields { list-style: none; display: grid; gap: 2px; margin: var(--space-2) 0 0; padding: 0; font-size: 0.875rem; }
+.alert-fields li { display: flex; gap: var(--space-2); align-items: baseline; min-width: 0; }
+.alert-fields .e { flex: none; width: 1.25em; text-align: center; }
+.alert-fields .k { flex: none; color: var(--c-text-muted); }
+.alert-fields .v { min-width: 0; overflow-wrap: anywhere; }
+.bubble .code-block + .code-block { margin-top: var(--space-2); }
+.map { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); font-size: 0.875rem; }
+
 /* Dialog content */
 .panel.wide { width: min(680px, 100%); }
 .dlg-body { display: grid; gap: var(--space-3); padding-top: var(--space-4); }
@@ -634,6 +643,76 @@ used: 71% · firing 09:42 → resolved 10:05</div>
 						</div>
 					</div>
 				</section>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="alert-message">
+	<div class="shot-head">
+		<h2>Tin cảnh báo có trường và khối lệnh</h2><span class="phase">R2 · Phase 9</span>
+		<p>Công cụ giám sát gửi text kèm emoji Unicode làm nhãn cho từng dòng; app giữ nguyên các dòng "nhãn: giá trị", không tự đổi định dạng. Khối <code class="mono">```</code> trong payload thành khối lệnh có nút sao chép riêng, bấm thì biểu tượng đổi thành dấu tích trong chốc lát. Nhãn "Tích hợp: &lt;tên&gt;" do server gắn, payload không giả được tên người dùng. Phải: payload Slack-compatible đã tạo ra tin bên trái. Máy chủ và domain là minh hoạ.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">Trong chat</div>
+				<section class="convo" aria-label="Vận hành hệ thống, tin cảnh báo">
+					<header class="convo-head"><span class="avatar av-blue">VH</span><div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên</span></div></header>
+					<div class="messages">
+						<div class="msg">
+							<span class="avatar sm av-amber"><svg class="icon icon-sm"><use href="#i-alert"/></svg></span>
+							<div class="bubble integration">
+								<span class="int-label"><svg class="icon"><use href="#i-webhook"/></svg>Tích hợp: Giám sát máy chủ</span>
+								<div class="int-title"><span class="sev firing">Firing</span>Ổ đĩa sắp đầy trên db-02</div>
+								<ul class="alert-fields">
+									<li><span class="e" aria-hidden="true">🖥️</span><span class="k">Máy chủ:</span><span class="v mono">db-02.example.invalid</span></li>
+									<li><span class="e" aria-hidden="true">📊</span><span class="k">Đã dùng:</span><span class="v">94% (ngưỡng 90%)</span></li>
+									<li><span class="e" aria-hidden="true">🕘</span><span class="k">Bắt đầu:</span><span class="v">09:42, 14/10</span></li>
+									<li><span class="e" aria-hidden="true">🏷️</span><span class="k">Nhãn:</span><span class="v mono">env=prod team=ops</span></li>
+								</ul>
+								<div class="code-block">
+									<div class="cb-head"><span>Kiểm tra nhanh</span><button type="button" class="icon-btn" aria-label="Sao chép lệnh kiểm tra" data-copied="Đã sao chép lệnh kiểm tra"><svg class="icon icon-sm"><use href="#i-copy"/></svg></button></div>
+									<pre><code>df -h /var/lib/postgresql</code></pre>
+								</div>
+								<div class="code-block">
+									<div class="cb-head"><span>Dọn WAL đã lưu trữ</span><button type="button" class="icon-btn" aria-label="Sao chép lệnh dọn WAL" data-copied="Đã sao chép lệnh dọn WAL"><svg class="icon icon-sm"><use href="#i-copy"/></svg></button></div>
+									<pre><code>pg_archivecleanup /var/lib/postgresql/wal \
+  000000010000002A000000F3</code></pre>
+								</div>
+								<div class="keyboard">
+									<button type="button" data-press="Đã nhận xử lý cảnh báo">Nhận xử lý</button>
+									<button type="button" data-press="Đã tắt tiếng cảnh báo 1 giờ">Tắt tiếng 1 giờ</button>
+									<button type="button" class="wide" data-toast="Link ngoài: hỏi xác nhận trước khi mở runbook.example.com">Mở runbook <svg class="icon icon-sm"><use href="#i-external"/></svg></button>
+								</div>
+								<span class="stamp">09:42</span>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">Payload đã gửi</div>
+				<div class="console">
+					<div class="c-body">
+						<div class="field">
+							<div class="snippet-head"><span>POST {URL}/slack</span><button type="button" class="btn btn-sm" data-copied="Đã sao chép payload"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
+							<pre class="snippet">{
+  "text": "*Firing* Ổ đĩa sắp đầy trên db-02\n🖥️ Máy chủ: `db-02.example.invalid`\n📊 Đã dùng: 94% (ngưỡng 90%)\n🕘 Bắt đầu: 09:42, 14/10\n🏷️ Nhãn: `env=prod team=ops`\n```Kiểm tra nhanh\ndf -h /var/lib/postgresql\n```\n```Dọn WAL đã lưu trữ\npg_archivecleanup …\n```"
+}</pre>
+						</div>
+						<div class="card">
+							<h4>Cách app hiển thị</h4>
+							<ol class="map">
+								<li>Dòng đầu có chữ <code class="mono">Firing</code> hoặc <code class="mono">Resolved</code> thành nhãn trạng thái.</li>
+								<li>Mỗi dòng "emoji nhãn: giá trị" giữ nguyên; emoji là ký tự Unicode, không phải ảnh.</li>
+								<li>Mỗi khối <code class="mono">```</code> thành một khối lệnh có nút sao chép; chữ ngay sau <code class="mono">```</code> (thường là tên ngôn ngữ hoặc tiêu đề ngắn) hiện ở đầu khối.</li>
+								<li>Nút bấm (Nhận xử lý, Tắt tiếng) do webhook khai báo; link đi qua allowlist scheme.</li>
+							</ol>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>

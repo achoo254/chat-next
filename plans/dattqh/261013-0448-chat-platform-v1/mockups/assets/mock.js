@@ -126,6 +126,20 @@
 		if (!t) return;
 		const toastBtn = t.closest("[data-toast]");
 		if (toastBtn) toast(toastBtn.dataset.toast);
+		// Copy buttons: the icon turns into a tick for a moment, the label says it was copied.
+		const copyBtn = t.closest("[data-copied]");
+		if (copyBtn && !copyBtn.dataset.label) {
+			const use = copyBtn.querySelector("use");
+			copyBtn.dataset.label = copyBtn.getAttribute("aria-label") || "";
+			use?.setAttribute("href", "#i-check");
+			copyBtn.setAttribute("aria-label", copyBtn.dataset.copied);
+			toast(copyBtn.dataset.copied);
+			setTimeout(() => {
+				use?.setAttribute("href", "#i-copy");
+				copyBtn.setAttribute("aria-label", copyBtn.dataset.label);
+				delete copyBtn.dataset.label;
+			}, 1600);
+		}
 		// Buttons that wait for a server answer: busy, then a toast.
 		const press = t.closest("[data-press]");
 		if (press && press.getAttribute("aria-busy") !== "true") {

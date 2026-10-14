@@ -45,6 +45,7 @@ Phase này gồm cả các phần media nằm ở phase khác:
 ## Requirements
 
 Functional:
+- Ảnh thumbnail cho xem trước link (R3): bộ lấy trang của Phase 2 tải ảnh Open Graph qua cùng lớp chặn SSRF, lưu như media thường.
 - Upload resumable (multipart S3 với presigned URL), giới hạn kích thước cấu hình (mặc định 2 GB).
 - `CompleteUpload`: kiểm MIME thật (magic bytes), strip metadata, validate kích thước/thumb client gửi, chống decompression bomb.
 - Worker nền: các cỡ ảnh (s/m/x), poster video, waveform voice, kiểm tra thêm.

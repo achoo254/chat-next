@@ -253,4 +253,12 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Topic làm ở R1: 0.48 (R2 0.40, để sau R5 0.12; độ tin 0.22).
   - Mô hình topic là thuộc tính trong luồng tin của nhóm: 0.77 (mỗi topic là một chat riêng 0.23). Mỗi tin mang `topic_id` trong seq của nhóm; sync và difference vẫn theo chat; vị trí đã đọc và số chưa đọc theo (user, chat, topic); topic "Chung" có sẵn; admin đóng hoặc ẩn được topic; link topic chỉ dùng được với thành viên.
   - Phase 2 thêm proto và schema cho topic. Phase 5 giữ schema local sẵn chỗ cho `topic_id`. Phase 6 dựng danh sách topic và khung chat theo topic theo mock.
-
+- Mock bổ sung theo ảnh tham khảo: 6 màn mới và màn `chat.html#app` được sửa, nâng tổng số lên 92 màn; render-check 0 lỗi ở cả hai theme. Jev quyết thêm ba điểm, mock được sửa theo trước khi code:
+  - Xem trước link: R1 chỉ có chữ, server lấy trang và chặn SSRF (Phase 2); ảnh thumbnail làm ở R3 (Phase 4). Xác suất 0.98.
+  - Thư mục: R1 có bộ lọc sẵn (Tất cả, Cá nhân, Nhóm, Bot), lọc phía client; thư mục tự tạo, đồng bộ giữa thiết bị làm sau R4. Xác suất 0.97.
+  - Tin trong topic bị ẩn vẫn tìm được; ẩn chỉ bỏ topic khỏi danh sách (Phase 7). Xác suất 0.99.
+- Phase 5 phần web cho R1 đã xong (commit `25f47a2`): core 671 test, platform-web 9 test, có test hỗn loạn, purge khi bị kick, đổi epoch và hai tab. Driver OPFS và Web Locks chưa chạy thử trên trình duyệt thật. Jev quyết ba câu hỏi agent để lại:
+  - Thêm `chat_pts` vào `UpdateRead` cho chat large và bỏ bước client đối chiếu unread: 1.00.
+  - Thêm RPC `GetPeerDialogs`: 0.98.
+  - WebSocket cùng origin tại `wss://chat.hoandat.com/ws`, nginx proxy sang gateway: 0.96.
+- Bỏ tab "Chưa đọc" khỏi mock; R1 chỉ có bốn bộ lọc đã chốt. Xác suất 0.86 (giữ làm bộ lọc thứ năm 0.14).

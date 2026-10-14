@@ -379,8 +379,105 @@ table.data th { text-align: left; font-weight: 600; font-size: 0.75rem; text-tra
 table.data td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); vertical-align: middle; }
 table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* ---------- Shared chat patterns (chat list, rich messages, info panel) ---------- */
+.avatar.xs { width: 24px; height: 24px; font-size: 0.625rem; }
+.avatar.lg { width: 72px; height: 72px; font-size: 1.5rem; }
+/* Presence dot on an avatar: drawn with the success token, ringed by the surface. */
+.avatar.online { position: relative; }
+.avatar.online::after { content: ""; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: var(--radius-full); background: var(--c-success); border: 2px solid var(--c-surface); }
+
+/* Chat list: type icon before the title, sender prefix, draft, two-line preview of a topic group. */
+.chat-row .name .type-ico { width: 16px; height: 16px; color: var(--c-icon-muted); }
+.chat-row .name .title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.preview .from { color: var(--c-text); font-weight: 500; }
+.preview .typing-text { color: var(--c-primary); }
+.preview .draft { color: var(--c-error); font-weight: 500; }
+.preview.two-line { display: grid; white-space: normal; }
+.preview.two-line > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview .topics-line { color: var(--c-text); }
+.preview .topics-line b { font-weight: 600; }
+.badge.at { padding: 0; min-width: 20px; }
+
+/* Pinned bar that can be closed; the text part jumps to the pinned message. */
+.pinned[hidden] { display: none; }
+.pinned.closable { padding: 0 var(--space-2) 0 var(--space-4); }
+.pin-jump { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0; border: 0; background: none; text-align: left; color: inherit; }
+.pin-jump .txt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pin-jump .icon { color: var(--c-primary); }
+
+/* Sender colours: names on bubbles use step 11; reply quotes use the soft-label text. */
+.s-green { --who: var(--c-viz-green); --who-text: var(--c-viz-green-text); }
+.s-amber { --who: var(--c-viz-amber); --who-text: var(--c-viz-amber-text); }
+.s-cyan { --who: var(--c-viz-cyan); --who-text: var(--c-viz-cyan-text); }
+.s-red { --who: var(--c-viz-red); --who-text: var(--c-viz-red-text); }
+.s-violet { --who: var(--c-viz-violet); --who-text: var(--c-viz-violet-text); }
+.bubble .who[class*="s-"] { color: var(--who); }
+.reply[class*="s-"] { border-left-color: var(--who); background: color-mix(in srgb, var(--who) 9%, transparent); }
+.reply[class*="s-"] b { color: var(--who-text); }
+.reply.has-thumb { display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: var(--space-2); align-items: center; padding: var(--space-1) var(--space-2); }
+.reply .thumb { grid-row: span 2; width: 36px; height: 36px; border-radius: var(--radius-xs);
+	background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-cyan) 40%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-violet) 36%, var(--c-surface-subtle))); }
+.reply .q { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Mentions of the reader: the mention gets a tint, the bubble an accent edge. */
+.mention.me { padding: 0 2px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-primary-solid) 14%, transparent); }
+.msg.at-me .bubble { box-shadow: inset 3px 0 0 var(--c-primary-solid); }
+
+/* Link preview card. The server fetches it; the sender can drop it before sending. */
+.bubble a.lp, a.lp { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-3); margin-top: var(--space-2); padding: var(--space-2) var(--space-3);
+	border-left: 3px solid var(--c-primary-solid); border-radius: var(--radius-xs) var(--radius-sm) var(--radius-sm) var(--radius-xs);
+	background: color-mix(in srgb, var(--c-primary-solid) 7%, transparent); color: var(--c-text); text-decoration: none; }
+a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transparent); }
+.lp .site { font-size: 0.8125rem; font-weight: 600; color: var(--c-primary); }
+.lp b { font-size: 0.875rem; font-weight: 600; }
+.lp .desc { font-size: 0.8125rem; color: var(--c-text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lp > :not(.thumb) { grid-column: 1; }
+.lp .thumb { grid-column: 2; grid-row: 1 / span 3; width: 64px; height: 64px; border-radius: var(--radius-xs);
+	background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-amber) 34%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-violet) 30%, var(--c-surface-subtle))); }
+
+/* Reactions that show who reacted (small chats) instead of a count. */
+.r-avs { display: inline-flex; align-items: center; }
+.r-avs .avatar { width: 22px; height: 22px; font-size: 0.5625rem; letter-spacing: -0.02em; box-shadow: 0 0 0 1.5px var(--c-surface); }
+.r-avs .avatar + .avatar { margin-left: -4px; }
+
+/* Code block with its own copy button (messages and integration alerts). */
+.code-block { margin-top: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); overflow: hidden; }
+.cb-head { display: flex; align-items: center; justify-content: space-between; padding-left: var(--space-3); font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-subtle); }
+.code-block pre code { padding: 0; border: 0; background: none; font-size: inherit; }
+.code-block pre { margin: 0; padding: var(--space-2) var(--space-3); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.5; overflow-x: auto; }
+
+/* Info panel pieces: quick actions, shared-content counters, member presence. */
+.profile-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); padding: 0 var(--space-5) var(--space-4); }
+.profile-actions .btn { flex-direction: column; gap: 2px; min-height: 60px; padding: var(--space-1) var(--space-2); font-size: 0.8125rem; }
+.btn.danger-text { color: var(--c-error); }
+.info .profile-actions { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--c-border-subtle); }
+.link-row { color: inherit; text-decoration: none; margin: 0 calc(-1 * var(--space-2)); padding: 0 var(--space-2); border-radius: var(--radius-sm); }
+.link-row:hover { background: var(--c-hover); }
+.link-row > .icon { color: var(--c-icon-muted); }
+.link-row .num { font-size: 0.875rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.row small.on { color: var(--c-primary); }
+.info-sec .sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
+.info-sec .sec-head h3 { margin: 0; }
+
+/* Folder rail: built-in filters by chat type (R1 web and desktop). User folders come after R4. */
+.app.folders { --rail-w: 76px; }
+.folder-rail { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-1); background: var(--c-surface-subtle); border-right: 1px solid var(--c-border-subtle); overflow-y: auto; }
+.folder-rail .spacer { flex: 1; }
+.folder { position: relative; display: grid; justify-items: center; gap: 2px; min-height: 56px; padding: var(--space-2) 2px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text-muted); font-size: 0.6875rem; font-weight: 500; line-height: 1.2; text-align: center; text-decoration: none; }
+.folder:hover { background: var(--c-hover); color: var(--c-text); }
+.folder[aria-current="true"] { background: var(--c-selected); color: var(--c-primary); }
+.folder .badge { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
+.folder .badge.muted-badge { background: var(--c-bar-track); color: var(--c-text-muted); }
+.folder.me { min-height: 48px; }
+.folder .soon { font-size: 0.625rem; font-weight: 600; color: var(--c-text-muted); }
+.folder[aria-disabled="true"] { cursor: not-allowed; }
+/* The compact filter row stands in for the rail when the rail is hidden (narrow screens). */
+.app.folders .list .tabs { display: none; }
+
 @media (max-width: 760px) {
 	.review-bar nav a { min-height: 44px; }
+	.folder-rail { display: none; }
+	.app.folders .list .tabs { display: flex; }
 	.shots { padding: var(--space-5) var(--space-3) var(--space-7); }
 	.frame { height: auto; min-height: var(--frame-h); }
 }
