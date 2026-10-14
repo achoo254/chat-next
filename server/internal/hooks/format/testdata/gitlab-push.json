@@ -1,0 +1,14 @@
+{
+  "object_kind": "push",
+  "event_name": "push",
+  "before": "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0",
+  "after": "d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0a1b2c3",
+  "ref": "refs/heads/main",
+  "user_name": "Minh",
+  "user_username": "minh",
+  "project": {"id": 42, "name": "deploy", "path_with_namespace": "ops/deploy", "web_url": "https://gitlab.example.invalid/ops/deploy"},
+  "commits": [
+    {"id": "d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0a1b2c3", "title": "Fix nginx reload", "message": "Fix nginx reload\n", "url": "https://gitlab.example.invalid/ops/deploy/-/commit/d4e5f6a7"}
+  ],
+  "total_commits_count": 1
+}

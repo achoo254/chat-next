@@ -1,0 +1,288 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+//
+// Incoming webhooks: external tools (monitoring, CI/CD, scripts) post into a
+// group or channel through a secret URL
+//
+//   <web origin>/hook/<hook_id>/<secret>[/<format suffix>]
+//
+// served on the tenant's own chat host (chat.<domain>); any other host gets
+// 404. Messages from a hook have from_id 0 and integration_label set to the
+// hook name; clients show "Integration: <name>". The secret is stored hashed
+// and returned only once, in the url of CreateIncomingHook,
+// RotateIncomingHookSecret and TakeOverIncomingHook (when rotated).
+
+// Management of a chat's incoming webhooks. Only current admins (and the
+// owner) of the group or channel may call it: other members get
+// permission_denied, non-members not_found.
+service IntegrationsService {
+  // Creates a hook (at most 20 per chat) and returns its URL once.
+  rpc CreateIncomingHook(CreateIncomingHookRequest) returns (CreateIncomingHookResponse);
+  // Hooks of a chat, oldest first, with their creators.
+  rpc GetIncomingHooks(GetIncomingHooksRequest) returns (GetIncomingHooksResponse);
+  rpc GetIncomingHook(GetIncomingHookRequest) returns (GetIncomingHookResponse);
+  // Issues a new secret. The previous one keeps working for 7 days (two
+  // secrets in parallel) unless revoke_previous is set.
+  rpc RotateIncomingHookSecret(RotateIncomingHookSecretRequest) returns (RotateIncomingHookSecretResponse);
+  // Ends the grace period of the previous secret now (its URL leaked).
+  rpc RevokePreviousHookSecret(RevokePreviousHookSecretRequest) returns (RevokePreviousHookSecretResponse);
+  // Turns a hook off or on. Turning on needs its creator to still be an
+  // admin of the chat (failed_precondition "creator_not_admin" otherwise:
+  // take it over instead).
+  rpc SetIncomingHookEnabled(SetIncomingHookEnabledRequest) returns (SetIncomingHookEnabledResponse);
+  // Makes the caller the hook's creator and turns it on, keeping its URL
+  // unless rotate_secret (then the old URL stops at once and the new URL is
+  // returned once).
+  rpc TakeOverIncomingHook(TakeOverIncomingHookRequest) returns (TakeOverIncomingHookResponse);
+  rpc DeleteIncomingHook(DeleteIncomingHookRequest) returns (DeleteIncomingHookResponse);
+  // Aggregated counters of the last hours; no per-recipient delivery state.
+  rpc GetIncomingHookStats(GetIncomingHookStatsRequest) returns (GetIncomingHookStatsResponse);
+  // Requests the hook could not process (kept 30 days), newest first.
+  rpc GetIncomingHookDeadLetters(GetIncomingHookDeadLettersRequest) returns (GetIncomingHookDeadLettersResponse);
+  // Audit log of the chat's hooks (deleted hooks included), newest first.
+  rpc GetIncomingHookAudit(GetIncomingHookAuditRequest) returns (GetIncomingHookAuditResponse);
+}
+
+// Payload format; it decides the URL suffix.
+enum IncomingHookFormat {
+  INCOMING_HOOK_FORMAT_UNSPECIFIED = 0;
+  // Our JSON: text, entities or parse_mode, buttons, silent,
+  // idempotency_key, group_key, status, priority, timestamp. No suffix.
+  INCOMING_HOOK_FORMAT_NATIVE = 1;
+  // Slack-compatible (text mrkdwn, basic blocks and attachments; also
+  // Mattermost, so GitLab, Uptime Kuma and Jenkins). Suffix /slack; answers
+  // the text "ok".
+  INCOMING_HOOK_FORMAT_SLACK = 2;
+  // Alertmanager webhook_configs. Suffix /alertmanager.
+  INCOMING_HOOK_FORMAT_ALERTMANAGER = 3;
+  // Grafana webhook contact point. Suffix /grafana.
+  INCOMING_HOOK_FORMAT_GRAFANA = 4;
+  // GitLab project webhooks (push, tag, merge request, pipeline,
+  // deployment, issue, comment, release). Suffix /gitlab.
+  INCOMING_HOOK_FORMAT_GITLAB = 5;
+}
+
+enum IncomingHookState {
+  INCOMING_HOOK_STATE_UNSPECIFIED = 0;
+  INCOMING_HOOK_STATE_ACTIVE = 1;
+  // Turned off by an admin.
+  INCOMING_HOOK_STATE_DISABLED = 2;
+  // Turned off by the server because its creator lost admin rights or left
+  // the chat; another admin can take it over.
+  INCOMING_HOOK_STATE_AUTO_DISABLED = 3;
+}
+
+enum IncomingHookDisabledReason {
+  INCOMING_HOOK_DISABLED_REASON_UNSPECIFIED = 0;
+  INCOMING_HOOK_DISABLED_REASON_BY_ADMIN = 1;
+  INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN = 2;
+  INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT = 3;
+}
+
+message IncomingHook {
+  // Public id, part of the URL ("hk_" and 12 letters or digits).
+  string id = 1;
+  int64 chat_id = 2 [jstype = JS_NUMBER];
+  // Shown as the integration label of its messages.
+  string name = 3;
+  IncomingHookFormat format = 4;
+  // Payloads may ask for priority "alert" (otherwise downgraded to
+  // transactional). The lane takes effect with push notifications.
+  bool allow_alert = 5;
+  // Every message of the hook is posted without a notification.
+  bool silent = 6;
+  int64 created_by = 7 [jstype = JS_NUMBER];
+  int64 created_at = 8 [jstype = JS_NUMBER];
+  IncomingHookState state = 9;
+  IncomingHookDisabledReason disabled_reason = 10;
+  int64 disabled_at = 11 [jstype = JS_NUMBER];
+  // Last accepted request; 0 when never used.
+  int64 last_used_at = 12 [jstype = JS_NUMBER];
+  // When the current secret was issued and by whom.
+  int64 secret_created_at = 13 [jstype = JS_NUMBER];
+  int64 secret_created_by = 14 [jstype = JS_NUMBER];
+  // The previous secret still works until then (unix seconds); 0 when
+  // there is none.
+  int64 previous_secret_expires_at = 15 [jstype = JS_NUMBER];
+}
+
+message CreateIncomingHookRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // 1 to 64 characters.
+  string name = 2;
+  IncomingHookFormat format = 3;
+  bool allow_alert = 4;
+  bool silent = 5;
+}
+
+message CreateIncomingHookResponse {
+  IncomingHook hook = 1;
+  // Full URL with the secret and format suffix; never shown again.
+  string url = 2;
+}
+
+message GetIncomingHooksRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetIncomingHooksResponse {
+  repeated IncomingHook hooks = 1;
+  // Creators and secret issuers.
+  repeated User users = 2;
+}
+
+message GetIncomingHookRequest {
+  string hook_id = 1;
+}
+
+message GetIncomingHookResponse {
+  IncomingHook hook = 1;
+  repeated User users = 2;
+}
+
+message RotateIncomingHookSecretRequest {
+  string hook_id = 1;
+  // The previous URL stops at once instead of after 7 days.
+  bool revoke_previous = 2;
+}
+
+message RotateIncomingHookSecretResponse {
+  IncomingHook hook = 1;
+  string url = 2;
+}
+
+message RevokePreviousHookSecretRequest {
+  string hook_id = 1;
+}
+
+message RevokePreviousHookSecretResponse {
+  IncomingHook hook = 1;
+}
+
+message SetIncomingHookEnabledRequest {
+  string hook_id = 1;
+  bool enabled = 2;
+}
+
+message SetIncomingHookEnabledResponse {
+  IncomingHook hook = 1;
+}
+
+message TakeOverIncomingHookRequest {
+  string hook_id = 1;
+  // Off by default so monitoring keeps working with the same URL.
+  bool rotate_secret = 2;
+}
+
+message TakeOverIncomingHookResponse {
+  IncomingHook hook = 1;
+  // Set only when rotate_secret.
+  string url = 2;
+}
+
+message DeleteIncomingHookRequest {
+  string hook_id = 1;
+}
+
+message DeleteIncomingHookResponse {}
+
+message GetIncomingHookStatsRequest {
+  string hook_id = 1;
+  // Window in hours, 1 to 720; 0 means 24.
+  int32 hours = 2;
+}
+
+message IncomingHookFailure {
+  // Stable code: rate_limited, payload_too_large, invalid_json,
+  // invalid_payload, text_empty, text_too_long, url_not_allowed,
+  // hook_disabled, chat_unavailable, internal.
+  string reason = 1;
+  int64 count = 2 [jstype = JS_NUMBER];
+  int64 last_at = 3 [jstype = JS_NUMBER];
+}
+
+message GetIncomingHookStatsResponse {
+  int32 hours = 1;
+  // Requests answered 200 (retries with a known idempotency_key included).
+  int64 accepted = 2 [jstype = JS_NUMBER];
+  // Messages handed in realtime to at least one online session.
+  int64 delivered_realtime = 3 [jstype = JS_NUMBER];
+  // Requests rejected after the hook was identified.
+  int64 failed = 4 [jstype = JS_NUMBER];
+  // Failed requests by reason, most frequent first.
+  repeated IncomingHookFailure failures = 5;
+}
+
+message IncomingHookDeadLetter {
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 date = 2 [jstype = JS_NUMBER];
+  // Failure code, as in IncomingHookFailure.reason.
+  string reason = 3;
+  // What was wrong, for the admin (no secrets).
+  string detail = 4;
+  int32 http_status = 5;
+  string content_type = 6;
+  // Request body as received, at most 16 KiB.
+  bytes body = 7;
+  bool body_truncated = 8;
+}
+
+message GetIncomingHookDeadLettersRequest {
+  string hook_id = 1;
+  // Entries with a smaller id; 0 for the newest.
+  int64 before_id = 2 [jstype = JS_NUMBER];
+  // Default 50, at most 100.
+  int32 limit = 3;
+}
+
+message GetIncomingHookDeadLettersResponse {
+  repeated IncomingHookDeadLetter dead_letters = 1;
+}
+
+enum IncomingHookAuditAction {
+  INCOMING_HOOK_AUDIT_ACTION_UNSPECIFIED = 0;
+  INCOMING_HOOK_AUDIT_ACTION_CREATED = 1;
+  INCOMING_HOOK_AUDIT_ACTION_SECRET_ROTATED = 2;
+  INCOMING_HOOK_AUDIT_ACTION_PREVIOUS_SECRET_REVOKED = 3;
+  INCOMING_HOOK_AUDIT_ACTION_DISABLED = 4;
+  INCOMING_HOOK_AUDIT_ACTION_ENABLED = 5;
+  // By the server (actor_id 0); detail is the IncomingHookDisabledReason
+  // name.
+  INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED = 6;
+  INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER = 7;
+  INCOMING_HOOK_AUDIT_ACTION_DELETED = 8;
+}
+
+message IncomingHookAuditEntry {
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 date = 2 [jstype = JS_NUMBER];
+  string hook_id = 3;
+  // Hook name at the time.
+  string hook_name = 4;
+  // 0 for the server.
+  int64 actor_id = 5 [jstype = JS_NUMBER];
+  IncomingHookAuditAction action = 6;
+  string detail = 7;
+}
+
+message GetIncomingHookAuditRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Only this hook; empty for every hook of the chat.
+  string hook_id = 2;
+  int64 before_id = 3 [jstype = JS_NUMBER];
+  // Default 50, at most 100.
+  int32 limit = 4;
+}
+
+message GetIncomingHookAuditResponse {
+  repeated IncomingHookAuditEntry entries = 1;
+  repeated User users = 2;
+}

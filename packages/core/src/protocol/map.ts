@@ -28,6 +28,7 @@ import type {
 	MessageAction as WireAction,
 	MessageEntity as WireEntity,
 	ReactionCount as WireReaction,
+	ReplyMarkup as WireReplyMarkup,
 	SyncAck as WireSyncAck,
 } from "@app/proto-ts/messages";
 import { EntityType as WireEntityType } from "@app/proto-ts/messages";
@@ -63,6 +64,7 @@ import type {
 	MemberRole,
 	Message,
 	MessageAction,
+	MessageButton,
 	MessageEntity,
 	NotificationSettings,
 	NotificationSound,
@@ -188,6 +190,14 @@ export function toForumTopic(topic: WireForumTopic): ForumTopic {
 		hidden: topic.hidden,
 		topSeq: id(topic.topSeq),
 	};
+}
+
+/** Inline keyboard rows; other markups (reply keyboards) are for bots in private chats, not kept. */
+function toButtons(markup: WireReplyMarkup | undefined): MessageButton[][] {
+	if (markup?.kind.case !== "inlineKeyboard") return [];
+	return markup.kind.value.rows
+		.map((row) => row.buttons.map((button) => ({ text: button.text, url: button.action.case === "url" ? button.action.value : null })))
+		.filter((row) => row.length > 0);
 }
 
 function toLinkPreview(preview: WireLinkPreview | undefined): LinkPreview | null {
@@ -345,6 +355,7 @@ export function toMessage(message: WireMessage): Message {
 		viaBotId: id(message.viaBotId),
 		reactions: message.reactions.map(toReaction),
 		integrationLabel: message.integrationLabel,
+		buttons: toButtons(message.replyMarkup),
 		action: toAction(message.action),
 		topicId: id(message.topicId),
 		linkPreview: toLinkPreview(message.linkPreview),
@@ -359,10 +370,8 @@ function toBody(update: WireUpdate): UpdateBody {
 		case "messageEdit": {
 			const message = kind.value.message;
 			if (message === undefined) return { kind: "unknown" };
-			return {
-				kind: kind.case === "messageNew" ? "message_new" : "message_edit",
-				message: toMessage(message),
-			};
+			if (kind.case === "messageNew") return { kind: "message_new", message: toMessage(message), notify: !message.silent };
+			return { kind: "message_edit", message: toMessage(message), notify: kind.value.notify };
 		}
 		case "messageDelete":
 			return {

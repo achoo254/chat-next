@@ -1755,7 +1755,10 @@ type Message struct {
 	// topic_id, edit_version and (for the sender) random_id are set; content,
 	// reactions and reply are gone. It never counts as unread, cannot be
 	// searched, replied to, edited, pinned or forwarded.
-	Recalled      bool `protobuf:"varint,21,opt,name=recalled,proto3" json:"recalled,omitempty"`
+	Recalled bool `protobuf:"varint,21,opt,name=recalled,proto3" json:"recalled,omitempty"`
+	// Posted without a notification (incoming webhooks marked silent);
+	// clients do not notify for it.
+	Silent        bool `protobuf:"varint,22,opt,name=silent,proto3" json:"silent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1933,6 +1936,13 @@ func (x *Message) GetLinkPreview() *LinkPreview {
 func (x *Message) GetRecalled() bool {
 	if x != nil {
 		return x.Recalled
+	}
+	return false
+}
+
+func (x *Message) GetSilent() bool {
+	if x != nil {
+		return x.Silent
 	}
 	return false
 }
@@ -4522,7 +4532,7 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x11chat_mode_changed\x18\n" +
 	" \x01(\v2\x1d.app.v1.ActionChatModeChangedH\x00R\x0fchatModeChanged\x12H\n" +
 	"\x10joined_by_invite\x18\v \x01(\v2\x1c.app.v1.ActionJoinedByInviteH\x00R\x0ejoinedByInviteB\x06\n" +
-	"\x04kind\"\xa6\x06\n" +
+	"\x04kind\"\xbe\x06\n" +
 	"\aMessage\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12\x1b\n" +
@@ -4548,7 +4558,8 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x06action\x18\x12 \x01(\v2\x15.app.v1.MessageActionR\x06action\x12\x1d\n" +
 	"\btopic_id\x18\x13 \x01(\x03B\x020\x02R\atopicId\x126\n" +
 	"\flink_preview\x18\x14 \x01(\v2\x13.app.v1.LinkPreviewR\vlinkPreview\x12\x1a\n" +
-	"\brecalled\x18\x15 \x01(\bR\brecalled\"\xa8\x01\n" +
+	"\brecalled\x18\x15 \x01(\bR\brecalled\x12\x16\n" +
+	"\x06silent\x18\x16 \x01(\bR\x06silent\"\xa8\x01\n" +
 	"\aSyncAck\x12\x14\n" +
 	"\x03pts\x18\x01 \x01(\x03B\x020\x02R\x03pts\x12\x1b\n" +
 	"\tpts_count\x18\x02 \x01(\x05R\bptsCount\x12\x1d\n" +

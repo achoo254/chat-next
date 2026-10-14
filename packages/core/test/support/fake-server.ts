@@ -469,6 +469,50 @@ export class FakeServer {
 		return { seq, ack };
 	}
 
+	/** An incoming webhook message: from_id 0 under its label, optionally silent with URL buttons. */
+	postIntegration(
+		chatId: number,
+		label: string,
+		text: string,
+		options: { silent?: boolean; buttons?: readonly (readonly { text: string; url: string }[])[] } = {},
+	): number {
+		const chat = this.chat(chatId);
+		const seq = chat.nextSeq++;
+		const rows = (options.buttons ?? []).map((row) => ({
+			buttons: row.map((b) => ({ text: b.text, action: { case: "url" as const, value: b.url } })),
+		}));
+		const record: MessageRecord = {
+			message: create(MessageSchema, {
+				chatId: big(chatId),
+				seq: big(seq),
+				date: big(this.now()),
+				text,
+				integrationLabel: label,
+				silent: options.silent ?? false,
+				replyMarkup: rows.length === 0 ? undefined : { kind: { case: "inlineKeyboard", value: { rows } } },
+			}),
+			deleted: false,
+			reactors: new Map(),
+			sender: 0,
+			randomId: 0,
+		};
+		chat.messages.set(seq, record);
+		this.pushChat(chatId, (viewer) => ({ case: "messageNew", value: { message: this.view(record, viewer) } }));
+		return seq;
+	}
+
+	/** Updates an integration alert in place; notify when its state changed. */
+	editIntegration(chatId: number, seq: number, text: string, notify: boolean): void {
+		const record = this.record(chatId, seq);
+		record.message = create(MessageSchema, {
+			...record.message,
+			text,
+			editVersion: record.message.editVersion + 1,
+			editDate: big(this.now()),
+		});
+		this.pushChat(chatId, (viewer) => ({ case: "messageEdit", value: { message: this.view(record, viewer), notify } }));
+	}
+
 	private ackFor(userId: number, chatId: number): WireSyncAck {
 		const chat = this.chat(chatId);
 		if (chat.syncMode === SyncMode.LARGE) {
@@ -880,7 +924,8 @@ export class FakeServer {
 			const chat = this.chats.get(chatId);
 			if (chat === undefined) continue;
 			for (const member of chat.members) userIds.add(member);
-			for (const record of chat.messages.values()) userIds.add(record.sender);
+			// Incoming webhook messages have no sender (from_id 0).
+			for (const record of chat.messages.values()) if (record.sender !== 0) userIds.add(record.sender);
 		}
 		return {
 			users: [...userIds].map((id) => this.wireUser(id, viewer)),

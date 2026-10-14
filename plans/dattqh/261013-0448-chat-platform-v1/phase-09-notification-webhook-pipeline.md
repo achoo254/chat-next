@@ -97,16 +97,26 @@ Create:
 
 ## Todo
 
-- [ ] Schema hooks/notify
-- [ ] Router + redact + auth + ratelimit
-- [ ] Mapper native/Slack mrkdwn/Alertmanager + fixture thật
-- [ ] notify_groups chống race + thứ tự
-- [ ] Lanes + bulk dùng endpoint Phase 8
-- [ ] Bộ đếm + API/UI
-- [ ] Vòng đời hook theo quyền
+- [x] Schema hooks/notify (R2, migration 0007)
+- [x] Router + redact + auth + ratelimit (R2)
+- [x] Mapper native/Slack mrkdwn/Alertmanager, thêm Grafana và GitLab; fixture theo đúng hình dạng payload của từng công cụ (chưa thử với instance thật)
+- [x] notify_groups chống race + thứ tự (R2)
+- [ ] Lanes + bulk dùng endpoint Phase 8 (R5; priority đã nhận và lưu theo hook, làn có tác dụng khi có push ở R7)
+- [x] Bộ đếm + API (R2); UI chưa làm
+- [x] Vòng đời hook theo quyền (R2)
 - [ ] UI quản lý hook
-- [ ] Docs tích hợp
+- [ ] Docs tích hợp (`docs/integrations/`; giao thức đã có ở `server/README.md`)
 - [ ] Canary
+
+## Kết quả R2 (backend, 2026-10-15)
+
+- Endpoint `POST https://chat.<d>/hook/{id}/{secret}[/slack|/alertmanager|/grafana|/gitlab]` chạy trong process `api` (không thêm role hay host), để tin đi thẳng vào gateway trong bộ nhớ sau commit. Sai host, sai secret, secret cũ hết hạn đều trả 404.
+- `IntegrationsService` (11 RPC): tạo, liệt kê, xem, xoay secret (secret cũ còn 7 ngày hoặc thu hồi ngay), thu hồi secret cũ, bật/tắt, nhận lại (giữ URL, tuỳ chọn xoay), xoá, bộ đếm, dead letter, nhật ký.
+- Hook tự tắt bằng trigger trên `chat_members` khi người tạo mất quyền admin, rời hoặc bị xoá khỏi chat, trong cùng transaction, nên request kế tiếp bị từ chối ngay (thay cho cách đọc outbox `member_permissions`/`member_removed`).
+- Tin của hook có `from_id` 0, `integration_label`, `silent` (trường mới của `Message`) và nút URL. `UpdateMessageEdit.notify` (trường mới) báo client thông báo khi cảnh báo đổi trạng thái. Core map các trường này, lưu nút vào DB local (schema v5) và dùng nhãn tích hợp làm tên người gửi trong thông báo.
+- nginx: location `/hook/` trên `chat.hoandat.com`, zone `chat_hook`, body 128 KiB, không chuyển cookie, access log che secret, error log tắt cho location này. Không cần DNS mới.
+- Đo POST → 200 trên máy dev (embedded PostgreSQL, loopback, 2.000 request): p50 0,33 ms, p99 0,68 ms một luồng; 8 luồng p50 1,5 ms, p99 8,1 ms. Đo lại trên `.65` ở Phase 14.
+- Còn thiếu: UI quản lý hook và cách hiển thị nút, khối lệnh trong tin (web), ảnh đại diện của hook (cần media R3), tin hệ thống "Webhook … đã tắt" trong chat, `parse_mode` HTML, IP allowlist theo hook, docs từng công cụ, thử với instance thật của Grafana, Alertmanager, GitLab, Uptime Kuma, Jenkins, canary.
 
 ## Success Criteria
 

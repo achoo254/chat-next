@@ -64,6 +64,10 @@ type Event struct {
 	Reason    appv1.SessionRevokeReason
 	// Users who are no longer members of ChatID.
 	Forget []int64
+	// delivered, when set, learns after the realtime delivery whether a
+	// recipient had a session online (incoming webhook counters). Events
+	// replayed by the outbox sweeper do not carry it.
+	delivered func(reached bool)
 }
 
 // queued is a per-user log entry waiting for pts allocation at flush.
@@ -456,10 +460,15 @@ func (d *dispatcher) run(ev *Event) {
 
 // deliver renders the event for every recipient and hands it to the sink.
 func (s *Service) deliver(ctx context.Context, ev *Event) error {
-	sink, _ := s.realtime()
+	sink, presence := s.realtime()
 	if sink == nil {
+		if ev.delivered != nil {
+			ev.delivered(false)
+		}
 		return nil
 	}
+	// reached: a recipient other than the actor had a session online.
+	reached := false
 	if ev.SessionID != 0 {
 		sink.RevokeSession(ev.SessionID, ev.Reason)
 	}
@@ -485,10 +494,14 @@ func (s *Service) deliver(ctx context.Context, ev *Event) error {
 		}
 		for _, viewer := range order {
 			sink.SendUser(viewer, &appv1.ServerFrame{Frame: &appv1.ServerFrame_Update{Update: frames[viewer]}})
+			if ev.delivered != nil && !reached && viewer != ev.ActorID && presence != nil && presence.Online(viewer) {
+				reached = true
+			}
 		}
 	}
 	for _, c := range ev.Chats {
 		viewers := sink.ChatViewers(c.ChatID)
+		reached = reached || len(viewers) > 0
 		if len(viewers) > 0 {
 			jobs := map[int64][]*appv1.Update{}
 			for _, v := range viewers {
@@ -509,6 +522,9 @@ func (s *Service) deliver(ctx context.Context, ev *Event) error {
 			}
 		}
 		sink.ChatActivity(c.ChatID, c.ChatPts, ev.TopSeq)
+	}
+	if ev.delivered != nil {
+		ev.delivered(reached)
 	}
 	return nil
 }

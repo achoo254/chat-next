@@ -555,14 +555,16 @@ func (s *Service) setPreview(ctx context.Context, chatID, seq int64, version int
 			}
 		}
 		content.LinkPreview = lp
-		return t.rewriteMessage(ctx, c, m.FromID, m, m.Text, content, false)
+		return t.rewriteMessage(ctx, c, m.FromID, m, m.Text, content, false, false)
 	})
 	return err
 }
 
 // rewriteMessage stores new content for a message and writes message_edit.
 // markEdited sets edit_date; a server-side change (link preview) does not.
-func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *messageRow, text string, content *appv1.Message, markEdited bool) error {
+// notify asks clients to notify as for a new message (an integration alert
+// changed state).
+func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *messageRow, text string, content *appv1.Message, markEdited, notify bool) error {
 	var raw []byte
 	if proto.Size(content) > 0 {
 		var err error
@@ -589,7 +591,7 @@ func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *me
 	}
 	ev := t.event(kindMessageEdit, c.ID, actor)
 	return t.toChat(ctx, ev, c, members, &appv1.Update{Kind: &appv1.Update_MessageEdit{MessageEdit: &appv1.UpdateMessageEdit{
-		Message: &appv1.Message{ChatId: m.ChatID, Seq: m.Seq},
+		Message: &appv1.Message{ChatId: m.ChatID, Seq: m.Seq}, Notify: notify,
 	}}})
 }
 
@@ -648,7 +650,7 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 			return nil
 		}
 		content.Entities, content.LinkPreview = ents, preview
-		if err := t.rewriteMessage(ctx, c, me, m, text, content, true); err != nil {
+		if err := t.rewriteMessage(ctx, c, me, m, text, content, true, false); err != nil {
 			return err
 		}
 		edited = m

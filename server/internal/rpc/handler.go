@@ -11,6 +11,7 @@ import (
 	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/auth"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/hooks"
 	"app.local/server/internal/store"
 	"connectrpc.com/connect"
 )
@@ -25,18 +26,19 @@ type Deps struct {
 	Sessions   *auth.Sessions
 	Origins    *auth.Origins
 	Chat       *chat.Service
+	Hooks      *hooks.Service
 	TenantID   string
 	TenantName string
 	Logger     *slog.Logger
 }
 
 // NewHandler returns the Connect handler for AuthService, UsersService,
-// ConfigService, ChatsService, MessagesService, UpdatesService and
-// ModerationService. Every call passes the Origin check, the id-contract check
+// ConfigService, ChatsService, MessagesService, UpdatesService,
+// ModerationService and IntegrationsService. Every call passes the Origin check, the id-contract check
 // on request and response, and (except public procedures) the session check.
 func NewHandler(d Deps) (http.Handler, error) {
-	if d.Chat == nil {
-		return nil, errors.New("rpc: chat service is required")
+	if d.Chat == nil || d.Hooks == nil {
+		return nil, errors.New("rpc: chat and hooks services are required")
 	}
 	appConfig, err := newAppConfig()
 	if err != nil {
@@ -63,5 +65,6 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewMessagesServiceHandler(&messagesService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewUpdatesServiceHandler(&updatesService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewModerationServiceHandler(&moderationService{chat: d.Chat, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewIntegrationsServiceHandler(&integrationsService{hooks: d.Hooks, logger: d.Logger}, opts...))
 	return mux, nil
 }

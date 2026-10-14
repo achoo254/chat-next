@@ -7,8 +7,8 @@ Một binary `server`, chạy theo `-role`. Quyết định: [ADR 0006](../docs/
 | Lệnh | Việc |
 |---|---|
 | `server -role migrate [-env-file F]` | Áp các migration nhúng (`migrations/*.sql`, goose, có advisory lock) rồi thoát. Chỉ cần `DATABASE_URL`. |
-| `server -role api [-env-file F]` | HTTP server: `/healthz`, `/auth/*`, Connect RPC dưới `/rpc/`, WebSocket realtime `/ws`. Dừng êm khi nhận SIGINT/SIGTERM (xem [Dừng êm](#dừng-êm)). |
-| `gateway`, `worker`, `botapi`, `webhook` | Chưa có, thoát mã 1. Giai đoạn 1 (một server) gateway chạy trong `api`, xem [Realtime](#realtime-ws). |
+| `server -role api [-env-file F]` | HTTP server: `/healthz`, `/auth/*`, Connect RPC dưới `/rpc/`, WebSocket realtime `/ws`, webhook `POST /hook/…`. Dừng êm khi nhận SIGINT/SIGTERM (xem [Dừng êm](#dừng-êm)). |
+| `gateway`, `worker`, `botapi`, `webhook` | Chưa có, thoát mã 1. Giai đoạn 1 (một server) gateway và endpoint webhook chạy trong `api`, xem [Realtime](#realtime-ws) và [Webhook](#webhook-incoming-package-internalhooks). |
 
 `-env-file` đọc dòng `KEY=VALUE` (bỏ dòng trống và dòng `#`, giá trị có thể nằm trong `'…'` hoặc `"…"`), không ghi đè biến đã có trong môi trường. Cấu hình thiếu hoặc sai thì thoát mã 1 và nêu tên biến, không in giá trị.
 
@@ -41,8 +41,9 @@ Server nghe trên loopback sau nginx: `X-Real-IP` chỉ được tin khi peer l�
 | `GET /auth/callback` | Kiểm state, đổi code, xác minh ID token (iss, aud, ES256, nonce), tạo/cập nhật user, tạo phiên, đặt cookie `__Host-chat_session` (HttpOnly, Secure, SameSite=Strict, 90 ngày) và trả trang trung gian 200 `<meta http-equiv="refresh" content="0;url=/">` (hoặc tới `return_to` đã lưu trong cookie đăng nhập; link "Thử lại" của trang lỗi giữ `return_to`). Lỗi trả trang có link "Thử lại": 400 (state, nonce, code), 503 (IdP chưa sẵn sàng), 500 (lỗi nội bộ). |
 | `POST /auth/logout` | Cần `Origin` trong allowlist (403 nếu không). Thu hồi phiên và refresh token ở IdP, xoá cookie, 303 tới `end_session_endpoint` với `id_token_hint`, `client_id`, `post_logout_redirect_uri`; không có phiên thì 303 về `/`. |
 | `POST /auth/backchannel-logout` | Form `logout_token`; 200 khi đã xử lý, 400 khi token sai hoặc phát lại `jti`, 503 khi IdP chưa discovery |
-| `/rpc/app.v1.<Service>/<Method>` | Connect: `AuthService`, `UsersService`, `ConfigService`, `ChatsService`, `MessagesService`, `UpdatesService`, `ModerationService` |
+| `/rpc/app.v1.<Service>/<Method>` | Connect: `AuthService`, `UsersService`, `ConfigService`, `ChatsService`, `MessagesService`, `UpdatesService`, `ModerationService`, `IntegrationsService` |
 | `GET /ws` | WebSocket realtime, xem [Realtime](#realtime-ws) |
+| `POST /hook/{id}/{secret}[/slack\|/alertmanager\|/grafana\|/gitlab]` | Webhook gửi tin vào nhóm, không cookie, không `Origin`; xem [Webhook](#webhook-incoming-package-internalhooks) |
 
 Mọi RPC cần `Origin` trong allowlist (`CHAT_PUBLIC_URL`, cộng `DEV_ORIGINS` khi development), nếu không trả `permission_denied`. Trừ `GetAuthConfig`, `ExchangeNativeCode` và `GetAppConfig`, mọi RPC cần cookie phiên, nếu không trả `unauthenticated`. Còn `unimplemented`: `ExchangeNativeCode` (app native), `SendMedia`, `SendAlbum` (media, R3), `PressInlineButton` (bot, R5), ảnh hồ sơ và ảnh chat, cùng `MediaService`, `SearchService`, `BotsService`.
 
@@ -80,6 +81,43 @@ Mọi RPC cần `Origin` trong allowlist (`CHAT_PUBLIC_URL`, cộng `DEV_ORIGINS
 
 Server lấy link web đầu tiên của tin (entity `url`/`text_link`, hoặc URL trần trong text) trừ khi người gửi đặt `no_link_preview`. Có sẵn trong cache thì gắn ngay khi gửi; chưa có thì lấy sau khi tin đã lưu và gắn bằng một `message_edit` không đặt `edit_date`. `GetLinkPreview` cho ô soạn tin. Chống SSRF ([`internal/linkpreview`](internal/linkpreview/fetch.go)): chỉ `http`/`https` không kèm thông tin đăng nhập, dạng chuẩn hoá tối đa 2048 byte (khoá cache); địa chỉ được kiểm **sau khi phân giải tên, đúng địa chỉ được kết nối** (chặn DNS rebinding), từ chối private, loopback, link-local, multicast, CGNAT, dải dành riêng, IPv4-compatible `::/96`, NAT64/6to4/Teredo và cả `2001::/23`, site-local `fec0::/10`, discard `100::/64`, tài liệu `2001:db8::/32`/`3fff::/20`, SRv6 `5f00::/16`; chỉ cổng 80, 443, 8080, 8443; không proxy; tối đa 3 lần chuyển hướng (mỗi lần kiểm lại), 5 giây, 512 KB, chỉ `text/html`. Đọc `og:site_name`, `og:title`, `og:description` (dự phòng `twitter:*`, `description`, `<title>`). Cache theo URL: có preview giữ 24 giờ, lỗi giữ 1 giờ.
 
+## Webhook (incoming, package `internal/hooks`)
+
+Công cụ bên ngoài (Alertmanager, Grafana, GitLab, Uptime Kuma, Jenkins, script) gửi tin vào một nhóm hoặc kênh qua URL bí mật `<CHAT_PUBLIC_URL>/hook/<hook_id>/<secret>[/<đuôi định dạng>]`. Endpoint chạy trong process `api`, trên đúng host của tenant (`chat.<domain>`), không có host hay process riêng: sau commit, tin đi thẳng vào gateway trong bộ nhớ như tin của người dùng, nên không thêm bước nào vào đường gửi. Request tới host khác (kể cả domain gốc hay tenant khác) trả 404. Đo trên máy dev (embedded PostgreSQL, loopback): POST → 200 p50 0,33 ms, p99 0,68 ms một luồng; 8 luồng song song p50 1,5 ms, p99 8,1 ms (`go test -run '^$' -bench HookPost -benchtime 2000x ./internal/hooks/`). Chưa gồm độ trễ ghi đĩa thật của server, đo lại ở Phase 14.
+
+Quản lý (`IntegrationsService`, chỉ admin hoặc chủ của nhóm/kênh đang là thành viên; thành viên khác nhận `permission_denied`, người ngoài `not_found`; chat riêng không có webhook):
+
+| RPC | Việc |
+|---|---|
+| `CreateIncomingHook` | Tên 1–64 ký tự (là nhãn "Tích hợp: <tên>"), định dạng, `allow_alert`, `silent`; tối đa 20 hook mỗi chat (`failed_precondition` `hooks_limit`). Trả URL đầy đủ **một lần** |
+| `GetIncomingHooks`, `GetIncomingHook` | Hook kèm người tạo và người cấp secret hiện tại, trạng thái, lý do tắt, lần nhận gần nhất, hạn của secret cũ |
+| `RotateIncomingHookSecret` | Secret mới (trả URL một lần); secret cũ vẫn nhận thêm 7 ngày, hai secret song song, trừ khi `revoke_previous` |
+| `RevokePreviousHookSecret` | Thu hồi ngay secret cũ đang trong thời gian ân hạn (`failed_precondition` `no_previous_secret` nếu không có) |
+| `SetIncomingHookEnabled` | Tắt; bật lại chỉ khi người tạo còn là admin (`failed_precondition` `creator_not_admin`, khi đó phải nhận lại) |
+| `TakeOverIncomingHook` | Người gọi thành người tạo, hook chạy lại ngay, mặc định giữ URL; `rotate_secret` thì URL cũ hết hiệu lực ngay và URL mới trả một lần |
+| `DeleteIncomingHook` | Xoá hook cùng nhóm cảnh báo và khoá idempotency; nhật ký vẫn giữ |
+| `GetIncomingHookStats` | Tổng `accepted`, `delivered_realtime` (đã đẩy tới ít nhất một phiên online), `failed` và lý do lỗi trong `hours` giờ gần nhất (mặc định 24, tối đa 720); không có trạng thái giao tới từng người |
+| `GetIncomingHookDeadLetters` | Request không xử lý được (lý do, mô tả, mã HTTP, content type, body tối đa 16 KiB), mới nhất trước, giữ 30 ngày |
+| `GetIncomingHookAudit` | Nhật ký quản lý của mọi hook trong chat (kể cả hook đã xoá): tạo, xoay, thu hồi secret cũ, tắt, bật, tự tắt (actor 0), nhận lại, xoá |
+
+Secret: 32 ký tự base62 (khoảng 190 bit), DB chỉ giữ SHA-256, so sánh hằng thời gian. `hook_id` là `hk_` + 12 ký tự base62. Đường dẫn (chứa secret) không bao giờ vào log của app; lỗi chỉ ghi `hook_id`. Hook tự tắt (`auto_disabled`) khi người tạo bị gỡ admin, rời hoặc bị xoá khỏi chat, hay chat bị xoá: một trigger trên `chat_members` làm việc này trong cùng transaction với thay đổi thành viên và ghi nhật ký với actor 0, nên request kế tiếp bị từ chối ngay.
+
+Định dạng (đuôi URL; chọn khi tạo, quyết định URL được hiển thị):
+
+| Đuôi | Payload |
+|---|---|
+| (không) | JSON riêng: `text`; `entities` (như ADR 0004, tên kiểu `bold`, `text_link`…) hoặc `parse_mode` `markdown` (`*đậm*`, `_nghiêng_`, `__gạch dưới__`, `~gạch~`, `\|\|spoiler\|\|`, `` `code` ``, ```` ``` ````, `[chữ](url)`, `\` thoát ký tự) hay `mrkdwn` (kiểu Slack); `buttons` (một hàng `[{text,url}]` hoặc nhiều hàng `[[…]]`, tối đa 8×8); `silent`; `idempotency_key` (≤ 128 byte, giữ 24 giờ); `group_key` (khoá dài hơn 256 byte được băm); `status`; `priority` (`transactional`, `alert` chỉ khi hook có `allow_alert`, nếu không thì hạ về `transactional`; làn ưu tiên có tác dụng khi có push, R7); `timestamp` (RFC 3339 hoặc giây unix, thứ tự cập nhật của nhóm). Văn bản quá 4096 ký tự bị từ chối (`text_too_long`) |
+| `/slack` | Slack/Mattermost: `text` mrkdwn (`*đậm*`, `_nghiêng_`, `~gạch~`, `` ` ``, ```` ``` ````, `<url\|chữ>`, `<!here>`, `&lt;`…; kèm `[chữ](url)` và `**đậm**` của Mattermost, nên GitLab đi qua tích hợp Mattermost), `blocks` cơ bản (`header`, `section` có `fields` và nút, `context`, `actions`, `divider`), `attachments` (`pretext`, `author_name`, `title`/`title_link`, `text`, `fields`, `footer`, `actions` có `url`, `blocks`, `fallback`); body JSON hoặc form `payload=`. Trả đúng chữ `ok` (Grafana so từng byte). Dùng cho Grafana (Slack contact point), GitLab (Mattermost notifications), Uptime Kuma, Jenkins |
+| `/alertmanager` | `webhook_configs` của Alertmanager: `groupKey` thành khoá cập nhật tại chỗ, `status` firing/resolved, thời điểm nguồn là `startsAt` mới nhất (firing) hoặc `endsAt` mới nhất (resolved). Tin: dòng đầu "**Firing**/**Resolved** <alertname> trên <instance>", summary, description, nhãn chung, từng cảnh báo (tối đa 10), giờ theo UTC+7; nút "Mở nguồn" (`generatorURL`) và "Alertmanager" |
+| `/grafana` | Webhook contact point của Grafana: như Alertmanager, tiêu đề lấy `title` (bỏ tiền tố `[FIRING:1]`), thêm `valueString`, nút Dashboard, Panel, Tắt tiếng |
+| `/gitlab` | Webhook dự án GitLab: push, tag, merge request (cập nhật tại chỗ theo MR), pipeline (cập nhật tại chỗ theo pipeline, thứ tự theo `finished_at`/`created_at`), deployment (theo deployment), issue, comment, release. Sự kiện khác (job…) trả 200 `{"ignored": true}` vì GitLab tự tắt webhook lỗi liên tục |
+
+Với các định dạng của công cụ, văn bản dài quá bị cắt về 4096 ký tự (kết thúc bằng "…"), nút có URL ngoài allowlist bị bỏ; với JSON riêng thì các lỗi đó trả 400. URL trần trong văn bản được đánh dấu link. Không lấy xem trước link cho tin của webhook.
+
+Xử lý một request: kiểm host, tra hook và secret (404 `hook_not_found` nếu sai bất kỳ thứ gì, kể cả secret cũ đã hết hạn), hook phải đang chạy (403 `hook_disabled`), rate limit theo hook 10/giây, burst 100 (429 `rate_limited`, `Retry-After: 1`), body tối đa 64 KiB (413 `payload_too_large`), parse (400 `invalid_json`, `invalid_payload`, `text_empty`, `text_too_long`, `url_not_allowed`), rồi một transaction: khoá dòng chat, kiểm lại trạng thái hook, khoá idempotency (trùng thì trả lại `seq` cũ, không tạo tin), nhóm cảnh báo (`notify_groups`: payload cũ hơn theo thời điểm nguồn thì bỏ qua; còn tin thì sửa tại chỗ, mất tin thì gửi tin mới), ghi tin (`from_id` 0, `integration_label` là tên hook, `silent`, nút URL) và update như tin thường. Mọi request vào cùng một chat xếp hàng theo khoá dòng chat, nên hai payload song song cùng khoá không bao giờ tạo hai tin. Sửa tại chỗ đặt `edit_date`; update `message_edit` mang `notify = true` khi trạng thái đổi (ví dụ firing sang resolved), lặp lại cùng trạng thái thì không. Chat đã xoá trả 410 `chat_unavailable`. Trả `{"chat_id", "seq"}` (định dạng Slack: `ok`); lỗi trả `{"error", "description"}` (Slack: mã lỗi dạng chữ).
+
+Bộ đếm cộng trong bộ nhớ và ghi vào `hook_counters`/`hook_failures` theo giờ mỗi 5 giây (và khi dừng, sau khi dispatcher đã giao xong); `delivered_realtime` tính khi lúc giao có ít nhất một người nhận online (giao lại bởi consumer outbox không được tính). Dead letter cho mọi request 400/413/500 sau khi đã nhận ra hook (tối đa 1/giây, burst 20 mỗi hook). Dọn mỗi giờ như ở [Việc nền](#việc-nền-của--role-api).
+
 ## Realtime (`/ws`)
 
 Gateway chạy trong process `api` (giai đoạn 1, một server, pm2 một instance): sau khi commit, chat service dựng update cho từng người nhận và đẩy thẳng vào hub trong bộ nhớ, không qua message bus. Khi chạy nhiều process, vai trò `Sink` của hub chuyển sang pub/sub (Redis rồi NATS) mà chat service không đổi.
@@ -110,13 +148,13 @@ Chỉ phiên tự thu hồi chính nó (request mang cookie của chính phiên 
 
 ## Việc nền của `-role api`
 
-Thuê số worker Snowflake (gia hạn 15 giây, ngừng cấp id nếu 40 giây không gia hạn được), consumer outbox realtime (150 ms), gửi `chat_activity` gộp (1 giây), đọc lại `server_epoch` (30 giây), và mỗi giờ: tạo partition nhật ký và outbox (tạo trước 30 ngày, một transaction riêng, `chat_create_day_partitions`; log `Warn` khi còn dưới 7 ngày phía trước), rồi xoá partition quá 30 ngày bằng `ALTER TABLE … DETACH PARTITION … CONCURRENTLY` rồi `DROP TABLE`, mỗi câu một transaction riêng (lần detach dở dang được `FINALIZE`, bảng đã detach mà chưa xoá thì xoá), dọn `send_dedupe` (7 ngày), `read_receipts` (7 ngày), tin của chat đã bị xoá cho mọi người (cùng reaction, tin ẩn, mention, ghim, read receipt, topic; xoá theo lô 5.000 tin), cache xem trước link (7 ngày), `jti` logout hết hạn.
+Thuê số worker Snowflake (gia hạn 15 giây, ngừng cấp id nếu 40 giây không gia hạn được), consumer outbox realtime (150 ms), gửi `chat_activity` gộp (1 giây), đọc lại `server_epoch` (30 giây), và mỗi giờ: tạo partition nhật ký và outbox (tạo trước 30 ngày, một transaction riêng, `chat_create_day_partitions`; log `Warn` khi còn dưới 7 ngày phía trước), rồi xoá partition quá 30 ngày bằng `ALTER TABLE … DETACH PARTITION … CONCURRENTLY` rồi `DROP TABLE`, mỗi câu một transaction riêng (lần detach dở dang được `FINALIZE`, bảng đã detach mà chưa xoá thì xoá), dọn `send_dedupe` (7 ngày), `read_receipts` (7 ngày), khoá idempotency của webhook (24 giờ), nhóm cảnh báo, bộ đếm và dead letter của webhook (30 ngày), tin của chat đã bị xoá cho mọi người (cùng reaction, tin ẩn, mention, ghim, read receipt, topic; xoá theo lô 5.000 tin), cache xem trước link (7 ngày), `jti` logout hết hạn.
 
 ## Dừng êm
 
-Khi nhận SIGINT/SIGTERM, `-role api` dừng nhận kết nối mới, chờ request đang chạy tối đa 20 giây, gửi `ResyncFrame(SERVER_RESTART)` và đóng mọi socket (tối đa 5 giây), dừng việc nền, chờ các lần lấy xem trước link đang chạy (tối đa khoảng 7 giây) và hàng đợi giao realtime, rồi chờ các việc nền với IdP (kiểm grant, thu hồi token ở IdP) xong hẳn, kể cả việc được tạo trong lúc chờ, trước khi đóng DB. Một lần kiểm grant bắt đầu muộn nhất ở cuối bước chờ request cần tối đa 20 giây chờ IdP, 5 giây ghi kết quả và 5 giây thu hồi token không lưu được, tức 30 giây (`auth.ShutdownBudget`).
+Khi nhận SIGINT/SIGTERM, `-role api` dừng nhận kết nối mới, chờ request đang chạy tối đa 20 giây, gửi `ResyncFrame(SERVER_RESTART)` và đóng mọi socket (tối đa 5 giây), dừng việc nền, chờ các lần lấy xem trước link đang chạy (tối đa khoảng 7 giây) và hàng đợi giao realtime, ghi bộ đếm webhook còn trong bộ nhớ (tối đa 5 giây), rồi chờ các việc nền với IdP (kiểm grant, thu hồi token ở IdP) xong hẳn, kể cả việc được tạo trong lúc chờ, trước khi đóng DB. Một lần kiểm grant bắt đầu muộn nhất ở cuối bước chờ request cần tối đa 20 giây chờ IdP, 5 giây ghi kết quả và 5 giây thu hồi token không lưu được, tức 30 giây (`auth.ShutdownBudget`).
 
-**Tổng ngân sách dừng: tối đa 62 giây.** Đặt `kill_timeout` của pm2 lớn hơn, ví dụ `70000` (ms); nếu process bị kill giữa lúc IdP đã xoay token mà chưa ghi DB, phiên đó sẽ bị thu hồi ở lần kiểm grant sau.
+**Tổng ngân sách dừng: tối đa 67 giây.** Đặt `kill_timeout` của pm2 lớn hơn, ví dụ `70000` (ms, như `ecosystem.config.cjs`); nếu process bị kill giữa lúc IdP đã xoay token mà chưa ghi DB, phiên đó sẽ bị thu hồi ở lần kiểm grant sau.
 - IdP sập lúc khởi động: server vẫn chạy và phục vụ phiên đang có; discovery thử lại với backoff tới 1 phút, trong lúc đó đăng nhập trả 503.
 
 ## Phát triển

@@ -188,7 +188,8 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		for (const message of latest.values()) {
 			if (platform.lifecycle.isForeground() && message.chatId === openChatId) continue;
 			const [chat, sender] = await Promise.all([repo.chat(message.chatId), repo.user(message.fromId)]);
-			const senderName = sender?.name ?? "";
+			// Incoming webhooks post with from_id 0 under their own label.
+			const senderName = message.integrationLabel !== "" ? message.integrationLabel : (sender?.name ?? "");
 			const title = chat !== null && chat.title !== "" ? chat.title : senderName;
 			const body = chat !== null && chat.type !== "private" && senderName !== "" ? `${senderName}: ${preview(message)}` : preview(message);
 			platform.notify.show({ title, body, tag: `chat:${message.chatId}`, chatId: message.chatId });

@@ -6,16 +6,16 @@ Giai đoạn 1 của hạ tầng: app chat chạy chung server `103.72.98.65` v�
 
 | Thành phần | Vị trí |
 |---|---|
-| DNS (Cloudflare, zone `hoandat.com`) | `chat` → `103.72.98.65`, proxied. `*.chat` (bot, hook) thêm khi có release cần |
+| DNS (Cloudflare, zone `hoandat.com`) | `chat` → `103.72.98.65`, proxied. Webhook không cần bản ghi riêng: nằm ở `https://chat.hoandat.com/hook/…`, vì Universal SSL miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, không phủ host cấp hai như `hook.chat.hoandat.com` (quyết định 2026-10-15). `*.chat` (bot) thêm khi có release cần |
 | TLS | Let's Encrypt `chat.hoandat.com` + `*.chat.hoandat.com`, DNS-01 Cloudflare với token Zone:DNS:Edit đã có trên server (`/etc/letsencrypt/cloudflare-localman.ini`), gia hạn bằng timer certbot kèm `systemctl reload nginx` ([`issue-cert.sh`](../infra/chat/issue-cert.sh)) |
 | Release | `/opt/chat/releases/<id>/{server,web,nginx}`, id = giờ UTC + commit 12 ký tự (+`-dirty`), symlink `/opt/chat/current`; giữ 5 bản |
 | Process | pm2 `chat-api` ([`ecosystem.config.cjs`](../infra/chat/ecosystem.config.cjs)), một instance, user hệ thống `chat`, binary Go tĩnh `server -role api -env-file /opt/chat/.env`, nghe `127.0.0.1:4600`, restart khi vượt 300 MB. Gateway realtime (WebSocket `/ws`) chạy trong chính process này, không có process hay cổng riêng |
-| nginx | `/etc/nginx/conf.d/chat-http.conf` (log format bỏ query, zone rate limit; cài một lần) và `/etc/nginx/conf.d/chat.hoandat.com.conf` (mỗi release mang bản của nó, [`nginx/`](../infra/chat/nginx/)). Web tĩnh từ `current/web`, `/rpc/` và `/auth/` tới API, `/ws` tới API với header `Upgrade`/`Connection` (timeout đọc 75 s, rate limit handshake theo zone riêng `chat_ws` 10 r/s, burst 200, khai báo ngay trong conf của site nên không phải cài lại `chat-http.conf`; đừng khai báo `chat_ws` lần nữa ở `chat-http.conf`), `/healthz` công khai. CSP `connect-src` có `wss://chat.hoandat.com`; `script-src` có `'wasm-unsafe-eval'` và có `worker-src 'self'` (SQLite wasm với OPFS chạy trong worker cùng origin) |
+| nginx | `/etc/nginx/conf.d/chat-http.conf` (log format bỏ query, zone rate limit; cài một lần) và `/etc/nginx/conf.d/chat.hoandat.com.conf` (mỗi release mang bản của nó, [`nginx/`](../infra/chat/nginx/)). Web tĩnh từ `current/web`, `/rpc/` và `/auth/` tới API, `/ws` tới API với header `Upgrade`/`Connection` (timeout đọc 75 s, rate limit handshake theo zone riêng `chat_ws` 10 r/s, burst 200, khai báo ngay trong conf của site nên không phải cài lại `chat-http.conf`; đừng khai báo `chat_ws` lần nữa ở `chat-http.conf`), `/healthz` công khai. `/hook/` (webhook) chỉ nhận `POST`, tới API không kèm cookie, zone rate limit riêng `chat_hook` 50 r/s mỗi IP (burst 200, khai báo trong conf của site như `chat_ws`), body tối đa 128 KiB ở nginx (app giới hạn 64 KiB và tự trả 413 để còn đếm), access log ghi `/hook/<id>/[redacted]` thay cho đường dẫn chứa secret (log format `chat_hook`), error log của nginx tắt cho location này vì nginx chép dòng request vào đó. CSP `connect-src` có `wss://chat.hoandat.com`; `script-src` có `'wasm-unsafe-eval'` và có `worker-src 'self'` (SQLite wasm với OPFS chạy trong worker cùng origin) |
 | Realtime | WebSocket cùng origin `wss://chat.hoandat.com/ws`, qua Cloudflare (proxied, WebSocket bật sẵn, cắt kết nối im lặng sau 100 s; heartbeat của app là 25 s). Handshake kiểm `Origin` và cookie phiên như `/rpc`; giao thức ở [`server/README.md`](../server/README.md#realtime-ws) |
 | Database | PostgreSQL 16.8 dùng chung của server (cổng 5432, chỉ localhost), database và role `chat` riêng, hai dòng `pg_hba` scram-sha-256 của chat đặt trước các dòng `ident` chung |
 | Cấu hình | `/opt/chat/.env` (root:chat, 640), mẫu [`.env.production.example`](../infra/chat/.env.production.example); không bao giờ sync từ máy dev |
 | Backup | [`backup-chat-db.sh`](../infra/chat/backup-chat-db.sh), cron 02:50 (`/etc/cron.d/chat-backup`), và trước mỗi lần kích hoạt release; giữ 14 bản trong `/opt/chat/backups` |
-| Log | pm2 `/var/log/chat/api.{out,err}.log` (thư mục thuộc root vì daemon pm2 và cron backup chạy bằng root; pm2-logrotate của server xoay), nginx `/var/log/nginx/chat.hoandat.com.{access,error}.log` |
+| Log | pm2 `/var/log/chat/api.{out,err}.log` (thư mục thuộc root vì daemon pm2 và cron backup chạy bằng root; pm2-logrotate của server xoay), nginx `/var/log/nginx/chat.hoandat.com.{access,error}.log`. Secret của webhook không có trong log nào: nginx ghi đường dẫn đã che, app chỉ ghi `hook_id` |
 
 ## Lần đầu (đã làm ngày 2026-10-14)
 
@@ -27,6 +27,8 @@ Giai đoạn 1 của hạ tầng: app chat chạy chung server `103.72.98.65` v�
 Release R1 (nhắn tin realtime) đổi conf nginx (thêm `/ws`, CSP `wss:`). Deploy tự động không đổi được nginx (xem dưới), nên lần đầu lên R1 phải deploy bằng root một lần để đồng bộ `infra/chat/` (gồm `nginx/`); trước đó mọi lần deploy tự động của R1 sẽ trượt bước kiểm `/ws` của `activate-release.sh` và tự trở lại release trước.
 
 Release sửa lỗi bảo mật sau R1 (migration `0004_messaging_hardening`) lại đổi conf nginx (zone `chat_ws` cho `/ws`, CSP cho SQLite wasm), nên cũng phải deploy bằng root một lần như trên; không cần cài lại `chat-http.conf`.
+
+Release R2 (webhook, migration `0007_incoming_hooks`) đổi conf nginx (location `/hook/`, zone `chat_hook`, log format `chat_hook`), `activate-release.sh` (thêm bước kiểm `/hook/`) và `smoke.sh`, nên cũng phải deploy bằng root một lần. Không cần DNS mới, không cần chứng chỉ mới, không cần cài lại `chat-http.conf`, không có biến môi trường mới.
 
 ## Các lần sau
 
@@ -43,7 +45,7 @@ SSH_TARGET=root@103.72.98.65 SSH_OPTS="-i <key> -p 24700 -o IdentitiesOnly=yes" 
 bash infra/chat/smoke.sh
 ```
 
-`deploy.sh` build web và binary Linux trên máy dev, tải release lên, đồng bộ `infra/chat/`, rồi chạy [`activate-release.sh`](../infra/chat/activate-release.sh): backup DB, chạy migration bằng binary mới, cài conf nginx của release (`nginx -t` trước), đổi symlink, reload pm2 `chat-api`, chờ `/healthz`, rồi kiểm `/ws` trả 403 cho GET không có `Origin`, cả trực tiếp ở `127.0.0.1:4600` lẫn qua nginx; lỗi ở bất kỳ bước nào sau khi đổi thì tự trở lại release trước. Migration chỉ thêm (expand), nên binary trước vẫn chạy được trên schema mới.
+`deploy.sh` build web và binary Linux trên máy dev, tải release lên, đồng bộ `infra/chat/`, rồi chạy [`activate-release.sh`](../infra/chat/activate-release.sh): backup DB, chạy migration bằng binary mới, cài conf nginx của release (`nginx -t` trước), đổi symlink, reload pm2 `chat-api`, chờ `/healthz`, rồi kiểm `/ws` trả 403 cho GET không có `Origin` và `POST /hook/` với hook không tồn tại trả JSON `hook_not_found`, cả trực tiếp ở `127.0.0.1:4600` lẫn qua nginx; lỗi ở bất kỳ bước nào sau khi đổi thì tự trở lại release trước. Migration chỉ thêm (expand), nên binary trước vẫn chạy được trên schema mới.
 
 ## Tài khoản vận hành (kiểm duyệt)
 
@@ -57,7 +59,18 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 
 ## Kiểm tra sau deploy
 
-`infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401. Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
+`infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`. Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
+
+## Webhook (incoming)
+
+- Admin nhóm hoặc kênh tạo webhook qua `IntegrationsService` (giao thức ở [`server/README.md`](../server/README.md#webhook-incoming-package-internalhooks)). URL dạng `https://chat.hoandat.com/hook/<hook_id>/<secret>[/slack|/alertmanager|/grafana|/gitlab]`, chỉ hiện một lần; DB chỉ giữ SHA-256 của secret.
+- Tra cứu khi có người báo "cảnh báo không về" (qua [`psql.sh`](../infra/chat/psql.sh), không bao giờ cần secret):
+  - trạng thái: `SELECT id, chat_id, name, format, state, disabled_reason, last_used_at FROM incoming_hooks WHERE id = '<hook_id>';` (`auto_disabled` là người tạo đã mất quyền admin; admin khác nhận lại trong app);
+  - request lỗi gần đây: `SELECT created_at, reason, detail, http_status FROM hook_dead_letters WHERE hook_id = '<hook_id>' ORDER BY id DESC LIMIT 20;`;
+  - bộ đếm theo giờ: `SELECT * FROM hook_counters WHERE hook_id = '<hook_id>' ORDER BY hour DESC LIMIT 24;` và `hook_failures` (lý do lỗi, kể cả `rate_limited`);
+  - lịch sử quản lý: `SELECT * FROM hook_audit WHERE hook_id = '<hook_id>' ORDER BY id;` (bảng chỉ thêm, trigger chặn sửa và xoá).
+- URL lộ: admin xoay secret trong app với "thu hồi ngay", hoặc tắt webhook. Người vận hành tắt khẩn cấp: `UPDATE incoming_hooks SET state = 'disabled', disabled_reason = 'by_admin', disabled_at = now() WHERE id = '<hook_id>';` (có hiệu lực ở request kế tiếp).
+- Dọn mỗi giờ: khoá idempotency quá 24 giờ; nhóm cảnh báo (`notify_groups`), bộ đếm và dead letter quá 30 ngày.
 
 ## Bảo mật mạng
 

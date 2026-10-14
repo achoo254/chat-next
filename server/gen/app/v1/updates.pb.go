@@ -619,8 +619,11 @@ func (x *UpdateMessageNew) GetMessage() *Message {
 }
 
 type UpdateMessageEdit struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       *Message               `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Message *Message               `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// The edit changed the state of an alert posted by an incoming webhook
+	// (for example firing to resolved): clients notify as for a new message.
+	Notify        bool `protobuf:"varint,2,opt,name=notify,proto3" json:"notify,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -660,6 +663,13 @@ func (x *UpdateMessageEdit) GetMessage() *Message {
 		return x.Message
 	}
 	return nil
+}
+
+func (x *UpdateMessageEdit) GetNotify() bool {
+	if x != nil {
+		return x.Notify
+	}
+	return false
 }
 
 // Deleted for everyone: purge the messages' content, their FTS rows and
@@ -2457,9 +2467,10 @@ const file_app_v1_updates_proto_rawDesc = "" +
 	"\x15notification_settings\x18\x1d \x01(\v2\".app.v1.UpdateNotificationSettingsH\x00R\x14notificationSettingsB\x06\n" +
 	"\x04kind\"=\n" +
 	"\x10UpdateMessageNew\x12)\n" +
-	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\">\n" +
+	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\"V\n" +
 	"\x11UpdateMessageEdit\x12)\n" +
-	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\"f\n" +
+	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\x12\x16\n" +
+	"\x06notify\x18\x02 \x01(\bR\x06notify\"f\n" +
 	"\x13UpdateMessageDelete\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x16\n" +
 	"\x04seqs\x18\x02 \x03(\x03B\x020\x02R\x04seqs\x12\x1a\n" +

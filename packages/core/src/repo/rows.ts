@@ -13,6 +13,7 @@ import type {
 	LinkPreview,
 	Message,
 	MessageAction,
+	MessageButton,
 	MessageEntity,
 	NotificationSettings,
 	ReactionCount,
@@ -163,6 +164,18 @@ function parseAction(json: string | null): MessageAction | null {
 	}
 }
 
+function parseButtons(raw: string | null): MessageButton[][] {
+	const value = parseJson(raw);
+	if (!Array.isArray(value)) return [];
+	const rows: MessageButton[][] = [];
+	for (const row of value) {
+		if (!Array.isArray(row)) continue;
+		const buttons = row.filter(isRecord).map((b) => ({ text: text(b, "text"), url: typeof b.url === "string" ? b.url : null }));
+		if (buttons.length > 0) rows.push(buttons);
+	}
+	return rows;
+}
+
 function parseLinkPreview(raw: string | null): LinkPreview | null {
 	const value = parseJson(raw);
 	if (!isRecord(value)) return null;
@@ -197,6 +210,7 @@ export function rowToMessage(row: SqlRow): Message {
 		viaBotId: num(row, "via_bot_id"),
 		reactions: parseReactions(optionalStr(row, "reactions")),
 		integrationLabel: str(row, "integration_label"),
+		buttons: parseButtons(optionalStr(row, "buttons")),
 		action: parseAction(optionalStr(row, "action")),
 		topicId: num(row, "topic_id"),
 		linkPreview: parseLinkPreview(optionalStr(row, "link_preview")),

@@ -183,6 +183,14 @@ export const MIGRATIONS: readonly Migration[] = [
 			"DELETE FROM sync_state",
 		],
 	},
+	{
+		version: 5,
+		statements: [
+			// Inline buttons of a message (JSON rows of MessageButton; NULL = none),
+			// posted by incoming webhooks. Older cached messages had none.
+			"ALTER TABLE messages ADD COLUMN buttons TEXT",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

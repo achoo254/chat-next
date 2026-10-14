@@ -91,11 +91,13 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 				w.add("DELETE FROM outbox WHERE kind = 'send' AND chat_id = ? AND random_id = ?", [m.chatId, m.randomId]);
 				w.emit(EventKeys.outbox);
 			}
-			if (m.fromId !== selfId) effects.incoming.push(m);
+			if (m.fromId !== selfId && body.notify) effects.incoming.push(m);
 			return;
 		}
 		case "message_edit":
 			putMessage(w, body.message);
+			// An integration alert that changed state (firing to resolved).
+			if (body.notify && body.message.fromId !== selfId) effects.incoming.push(body.message);
 			return;
 		case "message_delete":
 			if (body.recalled) recallMessages(w, body.chatId, body.seqs, selfId);

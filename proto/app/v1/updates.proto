@@ -85,6 +85,9 @@ message UpdateMessageNew {
 
 message UpdateMessageEdit {
   Message message = 1;
+  // The edit changed the state of an alert posted by an incoming webhook
+  // (for example firing to resolved): clients notify as for a new message.
+  bool notify = 2;
 }
 
 // Deleted for everyone: purge the messages' content, their FTS rows and

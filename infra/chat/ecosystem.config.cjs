@@ -15,7 +15,7 @@ module.exports = {
 			instances: 1,
 			exec_mode: "fork",
 			max_memory_restart: "300M",
-			// Above the server's graceful shutdown budget (62 s, server/README.md).
+			// Above the server's graceful shutdown budget (67 s, server/README.md).
 			kill_timeout: 70000,
 			out_file: "/var/log/chat/api.out.log",
 			error_file: "/var/log/chat/api.err.log",

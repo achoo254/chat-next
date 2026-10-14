@@ -116,16 +116,16 @@ export function messageSearchText(message: Message): string {
 export function putMessage(w: WriteBatch, message: Message): void {
 	w.add(
 		`INSERT INTO messages (chat_id, seq, from_id, date, text, entities, media_kind, reply_to_seq, forward,
-			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, action,
+			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, buttons, action,
 			search_text, topic_id, link_preview, recalled, stale)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
 		ON CONFLICT (chat_id, seq) DO UPDATE SET from_id = excluded.from_id, date = excluded.date,
 			text = excluded.text, entities = excluded.entities, media_kind = excluded.media_kind,
 			reply_to_seq = excluded.reply_to_seq, forward = excluded.forward, edit_date = excluded.edit_date,
 			edit_version = excluded.edit_version,
 			random_id = CASE WHEN excluded.random_id <> 0 THEN excluded.random_id ELSE messages.random_id END,
 			grouped_id = excluded.grouped_id, via_bot_id = excluded.via_bot_id, reactions = excluded.reactions,
-			integration_label = excluded.integration_label, action = excluded.action,
+			integration_label = excluded.integration_label, buttons = excluded.buttons, action = excluded.action,
 			search_text = excluded.search_text, topic_id = excluded.topic_id, link_preview = excluded.link_preview,
 			recalled = excluded.recalled, stale = 0
 		WHERE messages.stale = 1 OR (excluded.recalled >= messages.recalled
@@ -147,6 +147,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			message.viaBotId,
 			JSON.stringify(message.reactions),
 			message.integrationLabel,
+			message.buttons.length === 0 ? null : JSON.stringify(message.buttons),
 			message.action === null ? null : JSON.stringify(message.action),
 			messageSearchText(message),
 			message.topicId,

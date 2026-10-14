@@ -1,0 +1,14 @@
+{
+  "text": "[api.example.invalid] [🔴 Down] connect ECONNREFUSED",
+  "blocks": [
+    {"type": "header", "text": {"type": "plain_text", "text": "Uptime Kuma Alert"}},
+    {"type": "section", "fields": [
+      {"type": "mrkdwn", "text": "*Message*\nconnect ECONNREFUSED"},
+      {"type": "mrkdwn", "text": "*Time (Asia/Saigon)*\n2026-10-14 09:42:00"}
+    ]},
+    {"type": "actions", "elements": [
+      {"type": "button", "text": {"type": "plain_text", "text": "Visit Uptime Kuma"}, "value": "Uptime-Kuma", "url": "https://status.example.invalid/dashboard/3"},
+      {"type": "button", "text": {"type": "plain_text", "text": "Bad"}, "url": "javascript:alert(1)"}
+    ]}
+  ]
+}

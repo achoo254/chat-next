@@ -1,0 +1,22 @@
+{
+  "receiver": "chat-van-hanh",
+  "status": "resolved",
+  "alerts": [
+    {
+      "status": "resolved",
+      "labels": {"alertname": "DiskFull", "instance": "db-02", "job": "node", "mountpoint": "/var/lib/postgresql", "severity": "critical", "env": "prod"},
+      "annotations": {"summary": "Ổ đĩa sắp đầy trên db-02", "description": "used: 71%"},
+      "startsAt": "2026-10-14T02:42:00.000Z",
+      "endsAt": "2026-10-14T03:05:00.000Z",
+      "generatorURL": "http://prometheus.example.invalid/graph?g0.expr=disk_used",
+      "fingerprint": "c4b2c0f1a8e3d9b7"
+    }
+  ],
+  "groupLabels": {"alertname": "DiskFull"},
+  "commonLabels": {"alertname": "DiskFull", "instance": "db-02", "job": "node", "mountpoint": "/var/lib/postgresql", "severity": "critical", "env": "prod"},
+  "commonAnnotations": {"summary": "Ổ đĩa sắp đầy trên db-02", "description": "used: 71%"},
+  "externalURL": "http://alertmanager.example.invalid",
+  "version": "4",
+  "groupKey": "{}/{severity=\"critical\"}:{alertname=\"DiskFull\"}",
+  "truncatedAlerts": 0
+}

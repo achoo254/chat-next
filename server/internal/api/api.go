@@ -1,7 +1,9 @@
 // Package api assembles the HTTP server of the api role: /healthz, the web
-// sign-in routes under /auth, the Connect services under /rpc and the
+// sign-in routes under /auth, the Connect services under /rpc, the
 // realtime WebSocket at /ws (the gateway runs inside the api process in
-// stage 1).
+// stage 1) and the incoming webhook endpoint POST /hook/... (in the same
+// process, so a hook message reaches the in-memory gateway right after
+// commit).
 package api
 
 import (
@@ -21,6 +23,7 @@ import (
 	"app.local/server/internal/chat"
 	"app.local/server/internal/config"
 	"app.local/server/internal/gateway"
+	"app.local/server/internal/hooks"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/rpc"
@@ -40,8 +43,10 @@ type App struct {
 	IdP      *auth.IdP
 	Sessions *auth.Sessions
 	Chat     *chat.Service
+	Hooks    *hooks.Service
 	Hub      *gateway.Hub
 
+	logger   *slog.Logger
 	cancel   context.CancelFunc
 	loops    sync.WaitGroup
 	shutdown sync.Once
@@ -98,8 +103,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	hookSvc, err := hooks.New(hooks.Config{TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme},
+		st.Pool(), chatSvc, limiter, logger)
+	if err != nil {
+		return nil, err
+	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
-		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc,
+		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc,
 		TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {
@@ -114,11 +124,14 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	routes.Register(mux)
 	mux.Handle("/rpc/", http.StripPrefix("/rpc", rpcHandler))
 	mux.Handle("GET /ws", ws)
+	for _, route := range hooks.Routes {
+		mux.Handle(route, hookSvc)
+	}
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hub: hub, cancel: cancel}
+	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Hub: hub, logger: logger, cancel: cancel}
 	for _, loop := range []func(context.Context){
-		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps,
+		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
 	} {
 		app.loops.Add(1)
@@ -155,6 +168,12 @@ func (a *App) Shutdown() {
 		a.cancel()
 		a.loops.Wait()
 		a.Chat.Stop()
+		// After the dispatcher drained: its realtime counts are in memory.
+		flushCtx, cancelFlush := context.WithTimeout(context.Background(), socketsTimeout)
+		if err := a.Hooks.Flush(flushCtx); err != nil {
+			a.logger.Warn("hook counters lost at shutdown", "err", err)
+		}
+		cancelFlush()
 		a.Sessions.Wait()
 	})
 }

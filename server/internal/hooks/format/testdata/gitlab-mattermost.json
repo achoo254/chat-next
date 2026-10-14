@@ -1,0 +1,8 @@
+{
+  "text": "Administrator pushed to branch [main](https://gitlab.example.invalid/ops/deploy/-/commits/main) of [ops/deploy](https://gitlab.example.invalid/ops/deploy) ([Compare changes](https://gitlab.example.invalid/ops/deploy/-/compare/a1b2c3...d4e5f6))",
+  "attachments": [
+    {"text": "[d4e5f6a7](https://gitlab.example.invalid/ops/deploy/-/commit/d4e5f6a7): Fix **nginx** reload - Administrator", "color": "#345"}
+  ],
+  "channel": null,
+  "username": "GitLab"
+}

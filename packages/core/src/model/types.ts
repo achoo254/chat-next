@@ -53,6 +53,16 @@ export interface ForumTopic {
 }
 
 /** Text-only preview of the first web link of a message. */
+/**
+ * A button under a message (inline keyboard). Incoming webhooks post URL
+ * buttons; url is null for kinds this client does not handle yet (bot
+ * callbacks, Mini Apps, inline queries).
+ */
+export interface MessageButton {
+	readonly text: string;
+	readonly url: string | null;
+}
+
 export interface LinkPreview {
 	readonly url: string;
 	readonly siteName: string;
@@ -224,7 +234,10 @@ export interface Message {
 	readonly groupedId: number;
 	readonly viaBotId: number;
 	readonly reactions: readonly ReactionCount[];
+	/** Label of the incoming webhook that posted it (shown as "Integration: <label>"); from_id is then 0. */
 	readonly integrationLabel: string;
+	/** Rows of inline buttons; empty when none. */
+	readonly buttons: readonly (readonly MessageButton[])[];
 	readonly action: MessageAction | null;
 	/** Forum groups: the message's topic; 0 elsewhere. */
 	readonly topicId: number;
@@ -257,8 +270,13 @@ export interface UpdatePosition {
 }
 
 export type UpdateBody =
-	| { readonly kind: "message_new"; readonly message: Message }
-	| { readonly kind: "message_edit"; readonly message: Message }
+	/**
+	 * notify: whether this message may raise a notification (false for
+	 * silent messages); an edit notifies only when an integration alert
+	 * changed state (firing to resolved).
+	 */
+	| { readonly kind: "message_new"; readonly message: Message; readonly notify: boolean }
+	| { readonly kind: "message_edit"; readonly message: Message; readonly notify: boolean }
 	/** recalled: keep a placeholder in place of each message (older servers: remove them). */
 	| {
 			readonly kind: "message_delete";

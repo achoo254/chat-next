@@ -35,7 +35,7 @@ export function recallMessages(w: WriteBatch, chatId: number, seqs: readonly num
 	);
 	w.add(
 		`UPDATE messages SET text = '', entities = '[]', media_kind = NULL, reply_to_seq = 0, forward = NULL,
-			edit_date = 0, via_bot_id = 0, reactions = '[]', integration_label = '', action = NULL, search_text = '',
+			edit_date = 0, via_bot_id = 0, reactions = '[]', integration_label = '', buttons = NULL, action = NULL, search_text = '',
 			link_preview = NULL, recalled = 1
 		WHERE chat_id = ? AND seq IN (${list})`,
 		[chatId, ...seqs],

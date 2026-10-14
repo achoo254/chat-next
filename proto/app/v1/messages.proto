@@ -286,6 +286,9 @@ message Message {
   // reactions and reply are gone. It never counts as unread, cannot be
   // searched, replied to, edited, pinned or forwarded.
   bool recalled = 21;
+  // Posted without a notification (incoming webhooks marked silent);
+  // clients do not notify for it.
+  bool silent = 22;
 }
 
 // Position of the caller's update logs right after a mutation, so the client

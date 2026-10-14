@@ -1,0 +1,12 @@
+{
+  "object_kind": "pipeline",
+  "object_attributes": {
+    "id": 5121, "iid": 87, "ref": "main", "tag": false, "sha": "d4e5f6a7b8c9", "status": "success",
+    "detailed_status": "passed", "stages": ["build", "deploy"], "created_at": "2026-10-14 09:01:00 UTC",
+    "finished_at": "2026-10-14 09:12:00 UTC", "duration": 660, "url": "https://gitlab.example.invalid/ops/deploy/-/pipelines/5121"
+  },
+  "user": {"id": 1, "name": "Minh", "username": "minh"},
+  "project": {"id": 42, "name": "deploy", "path_with_namespace": "ops/deploy", "web_url": "https://gitlab.example.invalid/ops/deploy"},
+  "commit": {"id": "d4e5f6a7b8c9", "title": "Fix nginx reload", "url": "https://gitlab.example.invalid/ops/deploy/-/commit/d4e5f6a7b8c9"},
+  "builds": []
+}
