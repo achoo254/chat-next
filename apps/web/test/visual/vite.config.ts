@@ -1,8 +1,9 @@
 // Build of the visual harness (test only): `vite build -c test/visual/vite.config.ts`
-// then `vite preview -c test/visual/vite.config.ts`.
-import react from "@vitejs/plugin-react";
+// then `vite preview -c test/visual/vite.config.ts`. The perf gate
+// (test/perf/perf-gate.ts) builds and serves it the same way.
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { reactPlugins } from "../../vite-react.ts";
 
 const HOLD_MAX_MS = 20_000;
 
@@ -43,11 +44,19 @@ function holdLoad(): Plugin {
 	};
 }
 
+const root = fileURLToPath(new URL(".", import.meta.url));
+
 export default defineConfig({
-	root: fileURLToPath(new URL(".", import.meta.url)),
-	plugins: [react(), holdLoad()],
+	root,
+	plugins: [...reactPlugins(), holdLoad()],
 	worker: { format: "es" },
 	optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },
-	build: { outDir: "dist", emptyOutDir: true, assetsInlineLimit: 0 },
+	build: {
+		outDir: "dist",
+		emptyOutDir: true,
+		assetsInlineLimit: 0,
+		// index.html: render checks; perf.html: the perf gate (test/perf).
+		rollupOptions: { input: { index: `${root}index.html`, perf: `${root}perf.html` } },
+	},
 	preview: { port: 5174, strictPort: true },
 });

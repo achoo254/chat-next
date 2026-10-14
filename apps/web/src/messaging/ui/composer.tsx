@@ -119,23 +119,27 @@ export function Composer({ chatId, topicId, channel, placeholder, disabled = fal
 			return;
 		}
 		const current = intent;
+		const editing = current?.mode === "edit";
 		const noLinkPreview = url !== "" && url === dismissed;
-		try {
+		const deliver = async () => {
 			if (current?.mode === "edit") {
 				await source.editText(chatId, current.seq, value);
 				setText(drafts.get(chatId, topicId));
-			} else {
-				const replyToSeq = current?.mode === "reply" ? current.seq : 0;
-				setText("");
-				drafts.set(chatId, "", topicId);
-				if (topicId !== 0) await backend.sendToTopic(chatId, topicId, value, replyToSeq, noLinkPreview);
-				else await source.sendText(chatId, value, { ...(replyToSeq === 0 ? {} : { replyToSeq }), ...(noLinkPreview ? { noLinkPreview } : {}) });
+				return;
 			}
+			const replyToSeq = current?.mode === "reply" ? current.seq : 0;
+			setText("");
+			drafts.set(chatId, "", topicId);
+			if (topicId !== 0) await backend.sendToTopic(chatId, topicId, value, replyToSeq, noLinkPreview);
+			else await source.sendText(chatId, value, { ...(replyToSeq === 0 ? {} : { replyToSeq }), ...(noLinkPreview ? { noLinkPreview } : {}) });
+		};
+		try {
+			await deliver();
 			cancelIntent();
 			setPreview(null);
 			setDismissed("");
 		} catch {
-			if (current?.mode !== "edit") {
+			if (!editing) {
 				setText(value);
 				drafts.set(chatId, value, topicId);
 			}

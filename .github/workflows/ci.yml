@@ -1,6 +1,8 @@
 # Quality gates for every push to main and every pull request: TS lint,
-# typecheck and tests; Go format, vet, race tests and golangci-lint;
-# protobuf lint, breaking-change check and up-to-date generated code.
+# typecheck and tests; the web perf gate (startup bundle size and UI timings
+# in Chromium, see apps/web/test/perf); Go format, vet, race tests and
+# golangci-lint; protobuf lint, breaking-change check and up-to-date
+# generated code.
 # The Vietnamese fold and entity helpers run in both languages against the
 # shared vectors under spec/, which keeps TS and Go in step.
 name: ci
@@ -32,6 +34,34 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  # Budgets live in apps/web/test/perf/budgets.ts; `pnpm perf` runs the same locally.
+  web-perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter @app/web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      # Only Chromium's headless shell, cached per Playwright version.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm --filter @app/web exec playwright install --with-deps --only-shell chromium
+      # The cache holds the browser only; its system libraries come from apt.
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm --filter @app/web exec playwright install-deps chromium
+      - run: pnpm perf
 
   proto:
     runs-on: ubuntu-latest

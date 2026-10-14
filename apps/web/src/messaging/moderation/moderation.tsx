@@ -2,7 +2,7 @@
 // #actions): the tenant's report queue, a report with its context, and the
 // actions with a required reason. Bot verification and the audit log come
 // with later releases.
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
@@ -32,9 +32,11 @@ type Loaded<T> = { status: "loading" } | { status: "error" } | { status: "ready"
 function useLoad<T>(load: () => Promise<T>, key: string): [Loaded<T>, () => void] {
 	const [state, setState] = useState<Loaded<T> & { key: string }>({ status: "loading", key });
 	const [attempt, setAttempt] = useState(0);
+	// `load` is recreated per render; `key` identifies what it loads.
+	const run = useEffectEvent(load);
 	useEffect(() => {
 		let active = true;
-		load().then(
+		run().then(
 			(value) => {
 				if (active) setState({ status: "ready", value, key });
 			},
@@ -45,8 +47,6 @@ function useLoad<T>(load: () => Promise<T>, key: string): [Loaded<T>, () => void
 		return () => {
 			active = false;
 		};
-		// `load` is recreated per render; `key` identifies what it loads.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [key, attempt]);
 	return [state.key === key ? state : { status: "loading" }, () => setAttempt((n) => n + 1)];
 }

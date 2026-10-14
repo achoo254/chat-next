@@ -1,0 +1,74 @@
+// Budgets of the perf gate. Sources: the speed budget of plan phase 06
+// (initial JS, open a chat from cache, scroll frames) and the plan's speed
+// table (open from cache p50). Budgets the plan does not set (CSS, long
+// tasks) are marked as derived and sit above the measured baseline. Sizes
+// are KiB (1024 bytes).
+
+/** Lazy modules every signed-in start loads (manifest keys, relative to apps/web). */
+export const STARTUP_MODULES = [
+	// The signed-in app (app.tsx) and the worker-backed client it starts (connector.ts).
+	"src/messaging/messaging-root.tsx",
+	"src/messaging/data/web-client.ts",
+] as const;
+
+export const BUNDLE_BUDGET = {
+	/** Phase 06: initial JS (gzip) at most 150 KB; the rest loads lazily. 146.4 KB when the gate started. */
+	startupJsGzip: 150 * 1024,
+	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
+	startupCssGzip: 20 * 1024,
+} as const;
+
+export interface ProfileBudget {
+	/** Open a chat from cache, ms (plan: p50 at most 50, p99 at most 100). */
+	readonly openP50Ms: number;
+	readonly openP99Ms: number;
+	/** Frames over 32 ms while scrolling (phase 06: none). */
+	readonly scrollSlowFrames: number;
+	/** Average frame rate while scrolling (phase 06: at least 55 fps). */
+	readonly scrollMinFps: number;
+	/** Derived: total blocking time of long tasks while scrolling, ms. */
+	readonly scrollTbtMs: number;
+	/** Derived: total blocking time per chat switch, ms. */
+	readonly openTbtPerSwitchMs: number;
+}
+
+export interface Profile {
+	readonly name: string;
+	/** Chrome DevTools CPU throttling rate (1 = no throttling). */
+	readonly cpuThrottle: number;
+	/** null: measured and reported, not gated. */
+	readonly budget: ProfileBudget | null;
+}
+
+export const PROFILES: readonly Profile[] = [
+	{
+		// Phase 06 budgets are for a standard laptop; a CI runner core is about one.
+		name: "laptop",
+		cpuThrottle: 1,
+		budget: {
+			openP50Ms: 50,
+			openP99Ms: 100,
+			scrollSlowFrames: 0,
+			scrollMinFps: 55,
+			scrollTbtMs: 0,
+			openTbtPerSwitchMs: 25,
+		},
+	},
+	{
+		// Phase 06: a 4x CPU throttling profile stands in for a mid-range
+		// Android WebView. The plan sets no budget for it beyond cold start
+		// (Phase 10 measures on devices), so it is reported, not gated.
+		name: "midrange-4x",
+		cpuThrottle: 4,
+		budget: null,
+	},
+];
+
+/** Scenario sizes: scroll speeds approximate a fast flick (px per 60 Hz frame). */
+export const SCENARIO = {
+	openRounds: 10,
+	chatListStepPx: 120,
+	historyStepPx: 120,
+	/** Each scroll runs this many times; the smoothest run is judged. */
+	scrollAttempts: 2,
+} as const;

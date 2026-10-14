@@ -111,9 +111,8 @@ export function SessionsSettings() {
 			} else {
 				setNotice(failure(err));
 			}
-		} finally {
-			setBusy(null);
 		}
+		setBusy(null);
 	};
 
 	const revokeOthers = async () => {
@@ -125,9 +124,8 @@ export function SessionsSettings() {
 			setNotice({ kind: "ok", text: t.sessions.revokedOthers(count) });
 		} catch (err) {
 			setNotice(failure(err));
-		} finally {
-			setBusy(null);
 		}
+		setBusy(null);
 	};
 
 	if (load.status === "loading") {

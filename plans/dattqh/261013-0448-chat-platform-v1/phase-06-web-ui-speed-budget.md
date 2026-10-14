@@ -80,14 +80,21 @@ Create:
 
 ## Todo
 
-- [ ] React 19 + Compiler + Vite (React 19 + Vite xong; chưa bật React Compiler)
+- [ ] React 19 + Compiler + Vite (React 19 + Vite xong; code đã sẵn sàng cho React Compiler: 179/179 component biên dịch được, lint `react-hooks` recommended-latest bật mọi rule của compiler. Plugin đã nối trong `apps/web/vite-react.ts` nhưng tắt mặc định, bật bằng `REACT_COMPILER=1`. Chưa bật vì hai việc chặn, xem ghi chú bên dưới)
 - [x] Hook hạt mịn + scheduler (store ngoài React, `useSyncExternalStore` theo id, event bus gom theo frame)
 - [x] Virtual list message + chat list (cửa sổ trượt tin nhắn, hàng chat cao cố định định vị bằng translateY)
 - [x] Composer + optimistic send (trả lời, sửa, emoji, bỏ xem trước link)
 - [x] Entities
 - [ ] UI bot (R5)
 - [x] Theme/brand/i18n (vi/en, sáng/tối, brand.config)
-- [ ] Perf gate trong CI (đang đo tay: JS ban đầu khoảng 105 KB gzip)
+- [x] Perf gate trong CI (job `web-perf` trong `.github/workflows/ci.yml`; chạy local bằng `pnpm perf`; ngưỡng ở `apps/web/test/perf/budgets.ts`)
+
+Ghi chú perf gate và React Compiler (2026-10-15):
+
+- Bundle: JS lúc khởi động sau đăng nhập (entry + `messaging-root` + `web-client` cùng import tĩnh của chúng) là 146,4 KiB gzip so với ngưỡng 150; CSS 13,7 KiB so với ngưỡng 20 (ngưỡng CSS tự đặt, plan chưa có).
+- Trình duyệt (Playwright Chromium headless shell, trang `apps/web/test/visual/perf.html`, 1.000 chat, chat 5.000 tin): mở chat từ cache p50 17–18 ms, p99 29–33 ms; cuộn danh sách 1.000 chat và cuộn ngược 1.000 tin đều 60 fps, không frame nào quá 32 ms, không long task. Hồ sơ CPU chậm 4× chỉ báo số, chưa chặn CI. Ba lần chạy liên tiếp trên máy dev đều đạt.
+- Chưa đo trong CI: cold start tới khi danh sách chat hiện từ cache (harness dùng SQLite trong bộ nhớ, không có cache bền), mở chat lần đầu khi cache chưa đủ tin, React Profiler (một tin mới chỉ render lại đúng item và dòng dialog), axe.
+- Việc chặn bật React Compiler: (1) nhiều component đọc trạng thái thay đổi được thẳng từ `store`/`backend` lúc render sau một hook chỉ để ép render lại; compiler ghi nhớ các lệnh gọi đó nên UI cũ đi, 5 test messaging hỏng khi bật compiler. Cần chuyển mọi chỗ đọc sang hook subscribe theo id. (2) Compiler làm JS khởi động thành 165,8 KiB, vượt ngưỡng 150; cần tách bớt (ví dụ lazy Settings khỏi `messaging-root`, xem lại protobuf trong entry).
 
 ## Success Criteria
 

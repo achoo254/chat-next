@@ -25,8 +25,10 @@ export default tseslint.config(
 		},
 	},
 	{
+		// recommended-latest: the hooks rules plus every React Compiler rule, so
+		// code the compiler would skip fails lint instead of shipping unoptimized.
 		files: ["apps/web/**/*.{ts,tsx}"],
-		...reactHooks.configs.flat.recommended,
+		...reactHooks.configs.flat["recommended-latest"],
 	},
 	{
 		files: ["**/*.mjs", "scripts/**"],

@@ -3,7 +3,7 @@
 // core once per signed-in session and keeps it alive across the chat, settings
 // and moderation screens.
 import type { Transport } from "@connectrpc/connect";
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useEffectEvent, useMemo, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -45,20 +45,25 @@ function reportError(context: string, message: string): void {
 export default function MessagingRoot({ self, route, transport, onSelfChange, onSignedOut, connector = webConnector }: MessagingRootProps) {
 	const [start, setStart] = useState<Start>({ status: "starting" });
 	const [attempt, setAttempt] = useState(0);
+	// The client lives for the signed-in user: profile edits and a new
+	// sign-out callback must not restart it, so the effect reads them through
+	// effect events.
+	const signedOut = useEffectEvent(() => onSignedOut());
+	const currentSelf = useEffectEvent(() => self);
 
 	useEffect(() => {
 		let active = true;
 		let started: { client: MessagingClient; store: ChatStore; backend: PendingBackend } | null = null;
 		Promise.resolve(
 			connector({
-				onSessionEnded: () => onSignedOut(),
+				onSessionEnded: () => signedOut(),
 				onNotificationClick: (chatId) => navigate(paths.chat(chatId)),
 				onError: reportError,
 			}),
 		).then(
 			(client) => {
 				const store = new ChatStore(client.source, { selfId: self.id, onError: (err, context) => reportError(context, String(err)) }, client.coldSnapshot());
-				const remote = createRemote(transport, onSignedOut);
+				const remote = createRemote(transport, () => signedOut());
 				const backend = client.createBackend(remote, client.source);
 				started = { client, store, backend };
 				if (!active) {
@@ -69,7 +74,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 				}
 				const drafts = new Drafts(self.id);
 				const services: Services = {
-					self,
+					self: currentSelf(),
 					source: client.source,
 					store,
 					remote,
@@ -96,8 +101,6 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 				started.client.dispose();
 			}
 		};
-		// The client lives for the signed-in user; profile edits must not restart it.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [connector, transport, self.id, attempt]);
 
 	// Save the last screen for an instant next start.

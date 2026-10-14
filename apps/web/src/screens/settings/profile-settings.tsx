@@ -61,14 +61,15 @@ export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
 		if (!canSave) return;
 		setSaving(true);
 		setResult(null);
-		let latest = self;
-		let step: "username" | "profile" = "username";
-		try {
+		// The step that failed decides which error the form shows.
+		const progress: { step: "username" | "profile" } = { step: "username" };
+		const persist = async () => {
+			let latest = self;
 			if (username !== latest.username) {
 				latest = await api.setUsername(username);
 				onSelfChange(latest);
 			}
-			step = "profile";
+			progress.step = "profile";
 			const changes: ProfileChanges = {};
 			if (trimmedName !== latest.name) changes.name = trimmedName;
 			if (bio !== latest.bio) changes.bio = bio;
@@ -78,7 +79,11 @@ export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
 			}
 			reset(latest);
 			setResult({ kind: "saved" });
+		};
+		try {
+			await persist();
 		} catch (err) {
+			const { step } = progress;
 			const code = errorCode(err);
 			if (step === "username" && code === Code.AlreadyExists) {
 				setUsernameServerError(t.profile.usernameTaken(username));
@@ -89,9 +94,8 @@ export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
 			} else if (code !== Code.Unauthenticated) {
 				setResult({ kind: "error", message: t.common.networkError });
 			}
-		} finally {
-			setSaving(false);
 		}
+		setSaving(false);
 	};
 
 	const nameId = `${ids}-name`;

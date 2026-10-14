@@ -10,6 +10,7 @@
     "lint": "eslint . --max-warnings=0 && node scripts/check-brand.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
+    "perf": "pnpm --filter @app/web perf",
     "proto:lint": "buf lint proto",
     "proto:breaking": "buf breaking proto --against '.git#branch=main,subdir=proto'",
     "proto:gen": "buf generate proto --template proto/buf.gen.yaml",

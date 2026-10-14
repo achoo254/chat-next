@@ -431,15 +431,17 @@ export function ReportDialog({ target, name, blockUserId, onClose }: ReportProps
 		event.preventDefault();
 		if (reason === null) return;
 		setBusy(true);
-		try {
+		const blockAfter = block && blockUserId !== 0;
+		const reportAndBlock = async () => {
 			await backend.report(target, reason, note.trim());
-			const blocked = block && blockUserId !== 0 ? await remote.block(blockUserId).then(() => true, () => false) : false;
-			setDone({ blocked });
+			return blockAfter ? remote.block(blockUserId).then(() => true, () => false) : false;
+		};
+		try {
+			setDone({ blocked: await reportAndBlock() });
 		} catch {
 			toasts.show(copy.common.failed);
-		} finally {
-			setBusy(false);
 		}
+		setBusy(false);
 	};
 
 	if (done !== null) {

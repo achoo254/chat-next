@@ -1,7 +1,7 @@
-import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import brand from "../../brand.config.json" with { type: "json" };
+import { reactPlugins } from "./vite-react.ts";
 
 const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
 
@@ -34,7 +34,7 @@ function brandHtml(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [react(), brandHtml()],
+	plugins: [...reactPlugins(), brandHtml()],
 	server: {
 		// brand.config.json devOrigins lists this origin; never fall back to another port.
 		port: 5173,

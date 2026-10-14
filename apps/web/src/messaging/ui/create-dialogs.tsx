@@ -509,14 +509,16 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 	const needle = fold(query);
 	const shown = targets.filter((target) => needle === "" || fold(target.name).includes(needle));
 
+	const forwardAll = async (text: string) => {
+		for (const target of selected.keys()) {
+			if (text !== "") await source.sendText(target, text);
+			await remote.forward(chatId, [seq], target);
+		}
+	};
 	const send = async () => {
 		setBusy(true);
-		const text = comment.trim();
 		try {
-			for (const target of selected.keys()) {
-				if (text !== "") await source.sendText(target, text);
-				await remote.forward(chatId, [seq], target);
-			}
+			await forwardAll(comment.trim());
 			toasts.show(copy.forward.done);
 			onClose();
 		} catch {
@@ -656,12 +658,8 @@ export function AddFailedDialog({ chatId, userIds, addedIds, onClose }: AddFaile
 		}
 	};
 	const copyLink = async () => {
-		try {
-			const ok = await copyText(await inviteLink());
-			toasts.show(ok ? t.copied(title) : copy.common.failed);
-		} catch {
-			toasts.show(copy.common.failed);
-		}
+		const ok = await inviteLink().then(copyText, () => false);
+		toasts.show(ok ? t.copied(title) : copy.common.failed);
 	};
 	const message = (person: Person) => {
 		remote.createPrivate(person.id).then(
