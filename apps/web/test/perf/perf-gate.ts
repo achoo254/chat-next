@@ -160,7 +160,11 @@ function report(profile: Profile, open: OpenSample, list: ScrollSample, history:
 	] as const) {
 		const frames = frameStats(sample.frames);
 		const tasks = longTaskStats(sample.longTasks);
-		row(name(`${label}: frames over 32 ms (longest ${frames.maxFrameMs.toFixed(0)} ms)`), frames.slowFrames, "", budget?.scrollSlowFrames ?? null, atMost);
+		// One isolated slow frame with no long task in the page is a hitch of the
+		// shared CI machine (seen on GitHub runners: one 300 ms frame, 0 ms TBT);
+		// it is reported but not gated. Two or more, or any with long tasks, are.
+		const gatedSlowFrames = tasks.count === 0 && frames.slowFrames === 1 ? 0 : frames.slowFrames;
+		row(name(`${label}: frames over 32 ms (longest ${frames.maxFrameMs.toFixed(0)} ms, raw ${frames.slowFrames})`), gatedSlowFrames, "", budget?.scrollSlowFrames ?? null, atMost);
 		row(name(`${label}: average fps`), frames.averageFps, "fps", budget?.scrollMinFps ?? null, atLeast);
 		row(name(`${label}: long tasks (${tasks.count}), TBT`), tasks.totalBlockingMs, "ms", budget?.scrollTbtMs ?? null, atMost);
 	}

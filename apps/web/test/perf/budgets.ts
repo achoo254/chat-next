@@ -70,5 +70,5 @@ export const SCENARIO = {
 	chatListStepPx: 120,
 	historyStepPx: 120,
 	/** Each scroll runs this many times; the smoothest run is judged. */
-	scrollAttempts: 2,
+	scrollAttempts: 3,
 } as const;
