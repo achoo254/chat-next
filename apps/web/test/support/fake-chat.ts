@@ -171,6 +171,10 @@ export class ChatFixture {
 	readonly refusesMessages = new Set<number>();
 	/** Texts of SendMessage requests that asked for no link preview. */
 	readonly sentWithoutPreview: string[] = [];
+	/** Server message searches the core made (query, chat; 0 = global). */
+	readonly searchRequests: { query: string; chatId: number; cursor: string }[] = [];
+	/** Set: the server's message search answers with this error code. */
+	searchFailure: Code | null = null;
 	/** The signed-in user's contact list (AddContact/DeleteContact/GetContacts). */
 	readonly contacts = new Set<number>();
 	/** Users their own find_by_username/email settings hide from this user. */
@@ -493,6 +497,26 @@ export class ChatFixture {
 				unpinAllMessages: (request) => offered(base.messages.unpinAllMessages, "unpinAllMessages")(request),
 				sendMedia: (request) => offered(base.messages.sendMedia, "sendMedia")(request),
 				sendAlbum: (request) => offered(base.messages.sendAlbum, "sendAlbum")(request),
+			},
+			search: {
+				searchMessages: async (request) => {
+					this.searchRequests.push({ query: request.query ?? "", chatId: 0, cursor: request.cursor ?? "" });
+					if (this.searchFailure !== null) throw new ConnectError("search unavailable", this.searchFailure);
+					const response = await offered(base.search?.searchMessages, "searchMessages")(request);
+					response.messages.forEach((m) => this.patchMessage(m));
+					users(response.users);
+					chats(response.chats);
+					return response;
+				},
+				searchChatMessages: async (request) => {
+					this.searchRequests.push({ query: request.query ?? "", chatId: num(request.chatId ?? 0n), cursor: request.cursor ?? "" });
+					if (this.searchFailure !== null) throw new ConnectError("search unavailable", this.searchFailure);
+					const response = await offered(base.search?.searchChatMessages, "searchChatMessages")(request);
+					response.messages.forEach((m) => this.patchMessage(m));
+					users(response.users);
+					chats(response.chats);
+					return response;
+				},
 			},
 			config: this.mediaConfig,
 			...(base.media === undefined
@@ -1097,6 +1121,7 @@ export function toSource(core: ChatCore): ChatSource {
 		retryOutbox: (id) => core.retryOutbox(id),
 		discardOutbox: (id) => core.discardOutbox(id),
 		search: (query, options) => core.search(query, options),
+		searchServer: (request) => core.searchServer(request),
 		openChat: async (chatId, anchorSeq, visible) => core.openChat(chatId, anchorSeq, visible),
 		connectionState: async () => core.connectionState(),
 	};

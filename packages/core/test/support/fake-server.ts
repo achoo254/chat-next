@@ -53,6 +53,12 @@ import {
 	type Update as WireUpdate,
 } from "@app/proto-ts/updates";
 import { GetSelfResponseSchema, GetUsersResponseSchema, UserSchema, type User as WireUser } from "@app/proto-ts/users";
+import {
+	SearchChatMessagesResponseSchema,
+	SearchMessagesResponseSchema,
+	SearchFilterSchema,
+} from "@app/proto-ts/search";
+import { searchText } from "../../src/vifold/index.ts";
 import type { RemoteApi } from "../../src/protocol/api.ts";
 import type { MediaRef as WireMediaRef } from "@app/proto-ts/media";
 import type { FakeMedia } from "./fake-media.ts";
@@ -334,6 +340,58 @@ export class FakeServer {
 		return [...this.chat(chatId).messages.values()]
 			.filter((record) => this.visible(record, viewer))
 			.sort((a, b) => num(a.message.seq) - num(b.message.seq));
+	}
+
+	/**
+	 * SearchService over the visible messages: every query token starts a
+	 * word, the last may be cut short; newest first; the cursor is an offset.
+	 */
+	private searchPage(
+		viewer: number,
+		chatId: number,
+		query: string,
+		cursor: string,
+		limit: number,
+		filter?: Omit<MessageInitShape<typeof SearchFilterSchema>, "$typeName">,
+	) {
+		const tokens = searchText(query).split(" ").filter((token) => token !== "");
+		const fromId = num(filter?.fromId ?? 0n);
+		const minDate = num(filter?.minDate ?? 0n);
+		const maxDate = num(filter?.maxDate ?? 0n);
+		const kind = filter?.mediaKind ?? 0;
+		const filtered = fromId !== 0 || minDate !== 0 || maxDate !== 0 || kind !== 0 || filter?.hasLink === true;
+		const chats = chatId === 0 ? [...this.chats.values()].filter((chat) => chat.members.has(viewer)).map((chat) => chat.id) : [chatId];
+		const hits = chats
+			.flatMap((id) => this.visibleMessages(id, viewer))
+			.filter((record) => {
+				const m = record.message;
+				if (record.deleted || m.action !== undefined || (tokens.length === 0 && !filtered)) return false;
+				if (fromId !== 0 && num(m.fromId) !== fromId) return false;
+				if (kind !== 0 && m.media?.kind !== kind) return false;
+				if (minDate !== 0 && num(m.date) < minDate) return false;
+				if (maxDate !== 0 && num(m.date) > maxDate) return false;
+				if (filter?.hasLink === true && m.linkPreview === undefined && !/https?:\/\//i.test(m.text)) return false;
+				if (tokens.length === 0) return m.text !== "" || m.media !== undefined;
+				const words = searchText(`${m.text}\n${m.media?.fileName ?? ""}`).split(" ");
+				return tokens.every((token, index) =>
+					index === tokens.length - 1 ? words.some((word) => word.startsWith(token)) : words.includes(token),
+				);
+			})
+			.sort(
+				(a, b) =>
+					num(b.message.date) - num(a.message.date) ||
+					num(b.message.chatId) - num(a.message.chatId) ||
+					num(b.message.seq) - num(a.message.seq),
+			);
+		const offset = cursor === "" ? 0 : Number(cursor);
+		const page = hits.slice(offset, offset + (limit > 0 ? limit : 20));
+		const end = offset + page.length;
+		return {
+			messages: page.map((record) => this.view(record, viewer)),
+			users: this.senders(page, viewer),
+			chats: [...new Set(page.map((record) => num(record.message.chatId)))].map((id) => this.wireChat(id, viewer)),
+			nextCursor: end < hits.length ? String(end) : "",
+		};
 	}
 
 	/** Expected client view of a chat's messages, for assertions. */
@@ -1263,6 +1321,24 @@ export class FakeServer {
 						return create(UnpinAllMessagesResponseSchema, {
 							ack: before === 0 ? { serverEpoch: big(this.epoch) } : this.ackFor(userId, chatId),
 						});
+					}),
+			},
+			search: {
+				searchMessages: (request) =>
+					this.rpc(userId, "searchMessages", () =>
+						create(
+							SearchMessagesResponseSchema,
+							this.searchPage(userId, 0, request.query ?? "", request.cursor ?? "", request.limit ?? 0, request.filter),
+						),
+					),
+				searchChatMessages: (request) =>
+					this.rpc(userId, "searchChatMessages", () => {
+						const chatId = num(request.chatId ?? 0n);
+						if (!this.chat(chatId).members.has(userId)) throw new ConnectError("not a member", Code.PermissionDenied);
+						return create(
+							SearchChatMessagesResponseSchema,
+							this.searchPage(userId, chatId, request.query ?? "", request.cursor ?? "", request.limit ?? 0, request.filter),
+						);
 					}),
 			},
 			users: {

@@ -87,7 +87,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 			</div>
 			{searching ? (
 				<Suspense fallback={<div className="search-panel" aria-busy="true" />}>
-					<SearchResults query={query.trim()} onOpen={() => setQuery("")} />
+					<SearchResults query={query.trim()} onOpen={() => setQuery("")} inputRef={searchRef} />
 				</Suspense>
 			) : (
 				<>

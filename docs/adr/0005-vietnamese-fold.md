@@ -51,3 +51,7 @@ Hàm fold biến một chuỗi thành chuỗi đã bỏ dấu, theo đúng thứ
 - Client: phiên bản đặc tả mới làm đổi phiên bản fold lưu trong DB local, nên DB tự tính lại `searchText` và dựng lại bảng FTS5 khi mở. Client cũ vẫn nhất quán với chính DB của nó cho tới khi cập nhật.
 
 Nguồn: [plan nền tảng chat v1, phần contract](../../plans/dattqh/261013-0448-chat-platform-v1/phase-01-contracts-foundation.md)
+
+## Cập nhật 2026-10-15 (R4)
+
+Server không dùng Meilisearch: tìm kiếm chạy trên Postgres trong DB chat (Jev quyết, 1.00). Cột `messages.search_tsv` là tsvector dựng từ chính token của `tokens` (`array_to_tsvector`, không qua parser của Postgres), nên token phía server đúng bằng `tokens` mà không cần cấu hình tách từ; truy vấn là tsquery của `tokens(query)`, token cuối khớp tiền tố như FTS5 local. Xếp hạng theo dấu vẫn làm ở Go trên chữ gốc. Đổi đặc tả fold thì chạy lại backfill (`search_tsv = NULL` rồi `-role migrate`). Chi tiết ở [server/README.md](../../server/README.md#tìm-kiếm-tin-nhắn-package-internalsearch-r4).

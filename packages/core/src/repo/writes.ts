@@ -103,9 +103,15 @@ export function putChat(w: WriteBatch, chat: Chat): void {
 	w.emit(EventKeys.chat(chat.id));
 }
 
-/** Indexed text of a message: its text folded per ADR 0005; system messages and recalled ones are not indexed. */
+/**
+ * Indexed text of a message: its text (or caption) and file name folded per
+ * ADR 0005, as the server indexes them; system messages and recalled ones are
+ * not indexed.
+ */
 export function messageSearchText(message: Message): string {
-	return message.action === null && !message.recalled ? searchText(message.text) : "";
+	if (message.action !== null || message.recalled) return "";
+	const fileName = message.media?.fileName ?? "";
+	return searchText(fileName === "" ? message.text : `${message.text}\n${fileName}`);
 }
 
 /**

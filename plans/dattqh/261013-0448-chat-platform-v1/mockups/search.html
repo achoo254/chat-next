@@ -116,7 +116,7 @@
 
 	<!-- ============ In-chat search ============ -->
 	<section class="shot" id="in-chat">
-		<div class="shot-head"><h2>Tìm trong chat</h2><span class="phase">Phase 7</span><p>Thanh tìm thay tiêu đề chat. Bộ đếm "3/12" và nút lên/xuống (hoặc Enter, Shift+Enter) chuyển giữa các kết quả; kết quả đang chọn được tô đậm hơn, các kết quả khác tô nhạt. Thử bấm lên/xuống.</p></div>
+		<div class="shot-head"><h2>Tìm trong chat</h2><span class="phase">Phase 7</span><p>Thanh tìm thay tiêu đề chat. Bộ đếm "3/12" và nút lên/xuống (Enter sang kết quả cũ hơn, Shift+Enter sang kết quả mới hơn) chuyển giữa các kết quả, bắt đầu từ kết quả mới nhất; kết quả đang chọn được tô đậm hơn, các kết quả khác tô nhạt. Thử bấm lên/xuống.</p></div>
 		<div class="frame"><div class="sx focus-convo">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<section class="sx-col" aria-label="Danh sách chat">
@@ -136,8 +136,8 @@
 						<input id="ic-q" type="search" value="nang cap" autocomplete="off" spellcheck="false">
 					</label>
 					<span class="counter" id="ic-count" aria-live="polite">3/12</span>
-					<button type="button" class="icon-btn" id="ic-up" aria-label="Kết quả cũ hơn (Shift+Enter)"><svg class="icon flip-y"><use href="#i-chevron-down"/></svg></button>
-					<button type="button" class="icon-btn" id="ic-down" aria-label="Kết quả mới hơn (Enter)"><svg class="icon"><use href="#i-chevron-down"/></svg></button>
+					<button type="button" class="icon-btn" id="ic-up" aria-label="Kết quả cũ hơn (Enter)"><svg class="icon flip-y"><use href="#i-chevron-down"/></svg></button>
+					<button type="button" class="icon-btn" id="ic-down" aria-label="Kết quả mới hơn (Shift+Enter)"><svg class="icon"><use href="#i-chevron-down"/></svg></button>
 					<button type="button" class="icon-btn hide-narrow" aria-label="Lọc theo người gửi" data-toast="Chọn thành viên để chỉ tìm tin của người đó"><svg class="icon"><use href="#i-user"/></svg></button>
 					<button type="button" class="icon-btn" aria-label="Đóng tìm kiếm" data-toast="Đóng thanh tìm, giữ vị trí đang xem"><svg class="icon"><use href="#i-x"/></svg></button>
 				</header>
@@ -554,7 +554,7 @@ mark.hit-now { background: color-mix(in srgb, var(--c-warning) 35%, var(--c-surf
 	const newer = () => { if (cur > 1) { cur--; showHit(); } };
 	$("#ic-up").addEventListener("click", older);
 	$("#ic-down").addEventListener("click", newer);
-	$("#ic-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? older() : newer(); } });
+	$("#ic-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? newer() : older(); } });
 	showHit();
 
 	// Jump: highlight fades on interaction; "Về tin mới nhất" returns to the bottom.

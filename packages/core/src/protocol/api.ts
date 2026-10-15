@@ -6,6 +6,7 @@ import { ConfigService } from "@app/proto-ts/config";
 import { MediaService } from "@app/proto-ts/media";
 import { MessagesService } from "@app/proto-ts/messages";
 import { ModerationService } from "@app/proto-ts/moderation";
+import { SearchService } from "@app/proto-ts/search";
 import { UpdatesService } from "@app/proto-ts/updates";
 import { UsersService } from "@app/proto-ts/users";
 
@@ -52,6 +53,8 @@ export interface RemoteApi {
 	>;
 	/** Server-issued limits (AppConfig). */
 	readonly config?: Pick<Client<typeof ConfigService>, "getAppConfig">;
+	/** Message search on the server (R4). */
+	readonly search?: Pick<Client<typeof SearchService>, "searchMessages" | "searchChatMessages">;
 }
 
 export function createRemoteApi(transport: Transport): RemoteApi {
@@ -63,6 +66,7 @@ export function createRemoteApi(transport: Transport): RemoteApi {
 		moderation: createClient(ModerationService, transport),
 		media: createClient(MediaService, transport),
 		config: createClient(ConfigService, transport),
+		search: createClient(SearchService, transport),
 	};
 }
 

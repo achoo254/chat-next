@@ -18,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/search.proto.
  */
 export const file_app_v1_search: GenFile = /*@__PURE__*/
-  fileDesc("ChNhcHAvdjEvc2VhcmNoLnByb3RvEgZhcHAudjEidgoMU2VhcmNoRmlsdGVyEhMKB2Zyb21faWQYASABKANCAjACEiUKCm1lZGlhX2tpbmQYAiABKA4yES5hcHAudjEuTWVkaWFLaW5kEhQKCG1pbl9kYXRlGAMgASgDQgIwAhIUCghtYXhfZGF0ZRgEIAEoA0ICMAIiawoVU2VhcmNoTWVzc2FnZXNSZXF1ZXN0Eg0KBXF1ZXJ5GAEgASgJEiQKBmZpbHRlchgCIAEoCzIULmFwcC52MS5TZWFyY2hGaWx0ZXISDgoGY3Vyc29yGAMgASgJEg0KBWxpbWl0GAQgASgFIooBChZTZWFyY2hNZXNzYWdlc1Jlc3BvbnNlEiEKCG1lc3NhZ2VzGAEgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchIbCgVjaGF0cxgDIAMoCzIMLmFwcC52MS5DaGF0EhMKC25leHRfY3Vyc29yGAQgASgJIoQBChlTZWFyY2hDaGF0TWVzc2FnZXNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg0KBXF1ZXJ5GAIgASgJEiQKBmZpbHRlchgDIAEoCzIULmFwcC52MS5TZWFyY2hGaWx0ZXISDgoGY3Vyc29yGAQgASgJEg0KBWxpbWl0GAUgASgFIo4BChpTZWFyY2hDaGF0TWVzc2FnZXNSZXNwb25zZRIhCghtZXNzYWdlcxgBIAMoCzIPLmFwcC52MS5NZXNzYWdlEhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISGwoFY2hhdHMYAyADKAsyDC5hcHAudjEuQ2hhdBITCgtuZXh0X2N1cnNvchgEIAEoCTK9AQoNU2VhcmNoU2VydmljZRJPCg5TZWFyY2hNZXNzYWdlcxIdLmFwcC52MS5TZWFyY2hNZXNzYWdlc1JlcXVlc3QaHi5hcHAudjEuU2VhcmNoTWVzc2FnZXNSZXNwb25zZRJbChJTZWFyY2hDaGF0TWVzc2FnZXMSIS5hcHAudjEuU2VhcmNoQ2hhdE1lc3NhZ2VzUmVxdWVzdBoiLmFwcC52MS5TZWFyY2hDaGF0TWVzc2FnZXNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChNhcHAvdjEvc2VhcmNoLnByb3RvEgZhcHAudjEiiAEKDFNlYXJjaEZpbHRlchITCgdmcm9tX2lkGAEgASgDQgIwAhIlCgptZWRpYV9raW5kGAIgASgOMhEuYXBwLnYxLk1lZGlhS2luZBIUCghtaW5fZGF0ZRgDIAEoA0ICMAISFAoIbWF4X2RhdGUYBCABKANCAjACEhAKCGhhc19saW5rGAUgASgIImsKFVNlYXJjaE1lc3NhZ2VzUmVxdWVzdBINCgVxdWVyeRgBIAEoCRIkCgZmaWx0ZXIYAiABKAsyFC5hcHAudjEuU2VhcmNoRmlsdGVyEg4KBmN1cnNvchgDIAEoCRINCgVsaW1pdBgEIAEoBSKKAQoWU2VhcmNoTWVzc2FnZXNSZXNwb25zZRIhCghtZXNzYWdlcxgBIAMoCzIPLmFwcC52MS5NZXNzYWdlEhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISGwoFY2hhdHMYAyADKAsyDC5hcHAudjEuQ2hhdBITCgtuZXh0X2N1cnNvchgEIAEoCSKaAQoZU2VhcmNoQ2hhdE1lc3NhZ2VzUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhINCgVxdWVyeRgCIAEoCRIkCgZmaWx0ZXIYAyABKAsyFC5hcHAudjEuU2VhcmNoRmlsdGVyEg4KBmN1cnNvchgEIAEoCRINCgVsaW1pdBgFIAEoBRIUCgh0b3BpY19pZBgGIAEoA0ICMAIijgEKGlNlYXJjaENoYXRNZXNzYWdlc1Jlc3BvbnNlEiEKCG1lc3NhZ2VzGAEgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchIbCgVjaGF0cxgDIAMoCzIMLmFwcC52MS5DaGF0EhMKC25leHRfY3Vyc29yGAQgASgJMr0BCg1TZWFyY2hTZXJ2aWNlEk8KDlNlYXJjaE1lc3NhZ2VzEh0uYXBwLnYxLlNlYXJjaE1lc3NhZ2VzUmVxdWVzdBoeLmFwcC52MS5TZWFyY2hNZXNzYWdlc1Jlc3BvbnNlElsKElNlYXJjaENoYXRNZXNzYWdlcxIhLmFwcC52MS5TZWFyY2hDaGF0TWVzc2FnZXNSZXF1ZXN0GiIuYXBwLnYxLlNlYXJjaENoYXRNZXNzYWdlc1Jlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.SearchFilter
@@ -49,6 +49,13 @@ export type SearchFilter = Message<"app.v1.SearchFilter"> & {
    * @generated from field: int64 max_date = 4 [jstype = JS_NUMBER];
    */
   maxDate: bigint;
+
+  /**
+   * Only messages with a link (a URL or text link, or a link preview).
+   *
+   * @generated from field: bool has_link = 5;
+   */
+  hasLink: boolean;
 };
 
 /**
@@ -80,6 +87,8 @@ export type SearchMessagesRequest = Message<"app.v1.SearchMessagesRequest"> & {
   cursor: string;
 
   /**
+   * Page size: 1 to 50; 0 means 20.
+   *
    * @generated from field: int32 limit = 4;
    */
   limit: number;
@@ -97,7 +106,7 @@ export const SearchMessagesRequestSchema: GenMessage<SearchMessagesRequest> = /*
  */
 export type SearchMessagesResponse = Message<"app.v1.SearchMessagesResponse"> & {
   /**
-   * Ranked hits.
+   * Ranked hits, with their senders in users and their chats in chats.
    *
    * @generated from field: repeated app.v1.Message messages = 1;
    */
@@ -153,9 +162,18 @@ export type SearchChatMessagesRequest = Message<"app.v1.SearchChatMessagesReques
   cursor: string;
 
   /**
+   * Page size: 1 to 50; 0 means 20.
+   *
    * @generated from field: int32 limit = 5;
    */
   limit: number;
+
+  /**
+   * Forum groups: only this topic; 0 = every topic.
+   *
+   * @generated from field: int64 topic_id = 6 [jstype = JS_NUMBER];
+   */
+  topicId: bigint;
 };
 
 /**
@@ -204,7 +222,9 @@ export const SearchChatMessagesResponseSchema: GenMessage<SearchChatMessagesResp
  */
 export const SearchService: GenService<{
   /**
-   * Across all chats of the caller.
+   * Across all chats of the caller. Messages holding the query with its
+   * exact accents rank first (among the newest 500 matches), then the
+   * others; newest first within each group.
    *
    * @generated from rpc app.v1.SearchService.SearchMessages
    */
@@ -214,7 +234,8 @@ export const SearchService: GenService<{
     output: typeof SearchMessagesResponseSchema;
   },
   /**
-   * Within one chat.
+   * Within one chat (or one forum topic of it), newest first, so clients can
+   * step through the hits in order.
    *
    * @generated from rpc app.v1.SearchService.SearchChatMessages
    */

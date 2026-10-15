@@ -23,6 +23,7 @@ import (
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
+	"app.local/server/internal/search"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -115,9 +116,10 @@ type Service struct {
 	ids      IDSource
 	previews *linkpreview.Service
 	// media is nil when no storage is configured.
-	media   *media.Service
-	limiter ratelimit.Limiter
-	logger  *slog.Logger
+	media    *media.Service
+	searcher search.Searcher
+	limiter  ratelimit.Limiter
+	logger   *slog.Logger
 	// operators is Config.Operators as a set.
 	operators map[int64]bool
 
@@ -146,9 +148,12 @@ type Deps struct {
 	Previews *linkpreview.Service
 	// Media is optional: without it media sends answer media_disabled and
 	// link previews have no photos.
-	Media   *media.Service
-	Limiter ratelimit.Limiter
-	Logger  *slog.Logger
+	Media *media.Service
+	// Searcher finds messages for SearchService; nil means the Postgres
+	// searcher on Pool.
+	Searcher search.Searcher
+	Limiter  ratelimit.Limiter
+	Logger   *slog.Logger
 }
 
 // New returns the Service; call Start before serving.
@@ -189,7 +194,10 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	s := &Service{
 		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, media: d.Media, limiter: d.Limiter, logger: d.Logger,
-		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{},
+		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{}, searcher: d.Searcher,
+	}
+	if s.searcher == nil {
+		s.searcher = search.NewPostgres(d.Pool)
 	}
 	for _, id := range cfg.Operators {
 		if id <= 0 {
@@ -313,6 +321,8 @@ var (
 	limitReport  = ratelimit.Rule{Rate: 1.0 / 360, Burst: 10}
 	limitPreview = ratelimit.Rule{Rate: 1, Burst: 20}
 	limitSearch  = ratelimit.Rule{Rate: 1, Burst: 20}
+	// Message search: one call per pause in typing, plus paging.
+	limitMessageSearch = ratelimit.Rule{Rate: 2, Burst: 30}
 )
 
 func (s *Service) allow(rule ratelimit.Rule, bucket string, userID int64) error {

@@ -36,6 +36,13 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"media-viewer": "?at=media&open=viewer",
 	"media-upload": "?at=media&open=upload",
 	"media-attach": "?at=media&open=attach",
+	// Search (mockups/search.html): merged, filters, empty, server failure, in a chat.
+	search: "?open=search-merged",
+	"search-filters": "?open=search-filters",
+	"search-empty": "?open=search-empty",
+	"search-error": "?open=search-error",
+	"search-in-chat": "?at=ops&open=search-in-chat",
+	"search-in-chat-sender": "?at=ops&open=search-in-chat-sender",
 };
 
 export const VIEWPORTS = [

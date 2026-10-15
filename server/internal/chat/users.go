@@ -11,6 +11,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/profile"
+	"app.local/server/internal/vifold"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -382,8 +383,9 @@ func (s *Service) ResolveUsername(ctx context.Context, me int64, username string
 	return users[0], nil
 }
 
-// SearchUsers matches usernames by prefix and names by substring, and an
-// exact email when the owner allows it (find_by_email).
+// SearchUsers matches usernames by prefix and names by substring, ignoring
+// accents and đ (chat_fold_name), and an exact email when the owner allows it
+// (find_by_email).
 func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit int32) ([]*appv1.User, error) {
 	query = strings.TrimSpace(query)
 	if utf8.RuneCountInString(query) < 2 {
@@ -406,9 +408,9 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 		q := strings.ToLower(strings.TrimPrefix(query, "@"))
 		rows, err = s.pool.Query(ctx, `
 			SELECT u.id, coalesce(p.find_by_username, $5) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND u.id <> $4 AND (u.username LIKE $2 || '%' OR lower(u.name) LIKE '%' || $3 || '%')
+			WHERE u.tenant_id = $1 AND u.id <> $4 AND (u.username LIKE $2 || '%' OR chat_fold_name(u.name) LIKE '%' || $3 || '%')
 			ORDER BY (u.username = $2) DESC, u.username LIMIT $6`,
-			s.cfg.TenantID, escapeLike(q), escapeLike(strings.ToLower(query)), me, audEveryone, limit*2)
+			s.cfg.TenantID, escapeLike(q), escapeLike(vifold.Fold(query)), me, audEveryone, limit*2)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("chat: search users: %w", err)

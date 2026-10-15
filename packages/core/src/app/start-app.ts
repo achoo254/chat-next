@@ -24,8 +24,11 @@ import { UploadQueue, type UploadProgress } from "../media/upload-queue.ts";
 import { classifyFailure, isChatRefusal, SessionEndedError, type FailureKind, type RemoteApi } from "../protocol/api.ts";
 import { toUser } from "../protocol/map.ts";
 import { migrate } from "../repo/migrations.ts";
+import { putUser } from "../repo/writes.ts";
 import { Repository, type DialogView, type StoredMessage } from "../repo/repository.ts";
 import { searchLocal, type SearchOptions } from "../search/index.ts";
+import { fetchServerSearch, type ServerSearchRequest } from "../search/server.ts";
+import type { ServerSearchResult } from "../search/session.ts";
 import { buildSnapshot, type ScreenSnapshot } from "../snapshot/snapshot.ts";
 import { SyncEngine, type HistoryDirectionName } from "../sync/engine.ts";
 import { RealtimeConnection, type ConnectionState } from "../transport/realtime.ts";
@@ -143,6 +146,11 @@ export interface ChatCore {
 	retryOutbox(outboxId: number): Promise<void>;
 	discardOutbox(outboxId: number): Promise<void>;
 	search(query: string, options?: SearchOptions): Promise<StoredMessage[]>;
+	/**
+	 * One page of the server's message search (online only). Never throws for
+	 * a failed call: the failure kind tells offline or refused apart.
+	 */
+	searchServer(request: ServerSearchRequest): Promise<ServerSearchResult>;
 	/** The chat on screen (0 = none), the seq being viewed and the large chats visible in the list. */
 	openChat(chatId: number, anchorSeq?: number, visibleChatIds?: readonly number[]): void;
 	snapshot(): Promise<ScreenSnapshot>;
@@ -615,6 +623,27 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		search: async (query, searchOptions) => {
 			active();
 			return searchLocal(repo, query, searchOptions);
+		},
+		searchServer: async (request) => {
+			active();
+			const api = options.api.search;
+			if (api === undefined) throw new UnsupportedApiError("SearchMessages");
+			assertSafeId(request.chatId ?? 0);
+			assertSafeId(request.topicId ?? 0);
+			try {
+				const page = await fetchServerSearch(api, request);
+				if (page.users.length > 0) {
+					await engine.commitLocal((w) => {
+						for (const user of page.users) putUser(w, user);
+					});
+				}
+				return { ok: true, page };
+			} catch (err) {
+				const failure = classifyFailure(err);
+				if (failure === "unauthenticated") sessionEnded("unauthenticated");
+				else if (failure === "permanent") report(err, "search");
+				return { ok: false, failure };
+			}
 		},
 		openChat: (chatId, anchorSeq = 0, visibleChatIds = []) => {
 			openChatId = assertSafeId(chatId);

@@ -63,7 +63,7 @@ Server nghe trên loopback sau nginx: `X-Real-IP` chỉ được tin khi peer l�
 
 RPC nhận cả mã hoá binary lẫn JSON của Connect. Web gọi `GetSelf` bằng JSON (request đầu tiên của mỗi lần mở app, trước khi tải runtime protobuf; `TestGetSelfOverJSON` giữ hợp đồng này), các RPC khác bằng binary; proxy phía trước không được chặn `Content-Type: application/json` trên `/rpc/`.
 
-Mọi RPC cần `Origin` trong allowlist (`CHAT_PUBLIC_URL`, cộng `DEV_ORIGINS` khi development), nếu không trả `permission_denied`. Trừ `GetAuthConfig`, `ExchangeNativeCode` và `GetAppConfig`, mọi RPC cần cookie phiên, nếu không trả `unauthenticated`. Còn `unimplemented`: `ExchangeNativeCode` (app native), `PressInlineButton` (bot, R5), ảnh hồ sơ và ảnh chat (kể cả ngữ cảnh `user_photo_of`/`chat_photo_of` của `GetFileUrl`, trả `not_found`/`unavailable`), `SearchService`, `BotsService`.
+Mọi RPC cần `Origin` trong allowlist (`CHAT_PUBLIC_URL`, cộng `DEV_ORIGINS` khi development), nếu không trả `permission_denied`. Trừ `GetAuthConfig`, `ExchangeNativeCode` và `GetAppConfig`, mọi RPC cần cookie phiên, nếu không trả `unauthenticated`. Còn `unimplemented`: `ExchangeNativeCode` (app native), `PressInlineButton` (bot, R5), ảnh hồ sơ và ảnh chat (kể cả ngữ cảnh `user_photo_of`/`chat_photo_of` của `GetFileUrl`, trả `not_found`/`unavailable`), `BotsService`.
 
 ## Nhắn tin (package `internal/chat`)
 
@@ -98,6 +98,17 @@ Mọi RPC cần `Origin` trong allowlist (`CHAT_PUBLIC_URL`, cộng `DEV_ORIGINS
 ### Xem trước link
 
 Server lấy link web đầu tiên của tin (entity `url`/`text_link`, hoặc URL trần trong text) trừ khi người gửi đặt `no_link_preview`. Có sẵn trong cache thì gắn ngay khi gửi; chưa có thì lấy sau khi tin đã lưu và gắn bằng một `message_edit` không đặt `edit_date`. `GetLinkPreview` cho ô soạn tin. Chống SSRF ([`internal/linkpreview`](internal/linkpreview/fetch.go)): chỉ `http`/`https` không kèm thông tin đăng nhập, dạng chuẩn hoá tối đa 2048 byte (khoá cache); địa chỉ được kiểm **sau khi phân giải tên, đúng địa chỉ được kết nối** (chặn DNS rebinding), từ chối private, loopback, link-local, multicast, CGNAT, dải dành riêng, IPv4-compatible `::/96`, NAT64/6to4/Teredo và cả `2001::/23`, site-local `fec0::/10`, discard `100::/64`, tài liệu `2001:db8::/32`/`3fff::/20`, SRv6 `5f00::/16`; chỉ cổng 80, 443, 8080, 8443; không proxy; tối đa 3 lần chuyển hướng (mỗi lần kiểm lại), 5 giây, 512 KB, chỉ `text/html`. Đọc `og:site_name`, `og:title`, `og:description` (dự phòng `twitter:*`, `description`, `<title>`) và `og:image` (`og:image:secure_url`, `twitter:image`; URL tương đối tính theo trang cuối cùng). Cache theo URL: có preview giữ 24 giờ, lỗi giữ 1 giờ. Khi media bật, ảnh `og:image` được tải qua cùng lớp chặn SSRF (chỉ `image/*`, tối đa 5 MB), xử lý như ảnh thường (bỏ metadata, cỡ S/M, inline thumb), lưu thành file của server (`owner_id` 0) theo tenant và gắn vào `LinkPreview.photo` bằng một `message_edit` không đặt `edit_date`; cache ảnh theo (tenant, URL ảnh) 7 ngày, ảnh lỗi thử lại sau 1 giờ. Caption của tin media không có xem trước link.
+
+## Tìm kiếm tin nhắn (package `internal/search`, R4)
+
+- `SearchMessages` tìm trên mọi chat người gọi đang là thành viên, `SearchChatMessages` trong một chat hoặc một topic. Lọc theo người gửi, loại media, có link, khoảng ngày; phân trang bằng cursor mờ (một trang hoặc đủ, hoặc là trang cuối; không lặp tin giữa các trang; cursor chỉ dùng được cho đúng truy vấn đã cấp nó).
+- Chỉ mục nằm ngay trong bảng `messages` (migration `0011_message_search`): `search_tsv` là tsvector dựng thẳng từ token vifold của chữ, chú thích và tên file (`array_to_tsvector`, không qua parser của Postgres), cùng `media_kind`, `has_link`; ghi trong cùng transaction với gửi, sửa, thu hồi (thu hồi xoá trắng). Chat `secret` không được đánh chỉ mục. Truy vấn: mọi token của câu tìm là một lexeme, token cuối khớp tiền tố, giống FTS5 ở client. Không dùng `pg_trgm` vì Postgres trên `.65` không có contrib.
+- Quyền xem kiểm ngay trong SQL: thành viên hiện tại của chat chưa xoá thuộc tenant, `seq >= visible_from_seq`, không bị ẩn cho người gọi, không bị thu hồi. Tin trong topic bị ẩn vẫn tìm được.
+- Xếp hạng toàn cục: trong 500 kết quả mới nhất, tin chứa đúng dấu của câu tìm lên trước (so ở Go trên chữ gốc), sau đó tới các tin còn lại, mới nhất trước. Câu tìm không dấu và tìm trong chat chỉ xếp theo thời gian.
+- `Searcher` là interface để thay Postgres bằng Meilisearch hay OpenSearch sau này mà không đổi RPC.
+- Tin chưa có chỉ mục (`search_tsv IS NULL`: dòng có trước migration, hoặc do binary cũ ghi sau migration) được `search.Backfill` đánh chỉ mục mỗi lần chạy `-role migrate`.
+- `SearchUsers` so tên đã bỏ dấu bằng hàm SQL `chat_fold_name`.
+- Đo tải: `CHAT_SEARCH_PERF=1 go test -run TestSearchLatency -v ./internal/search/` (200.000 tin, 3.000 chat của một người).
 
 ## Media (package `internal/media`)
 

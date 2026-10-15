@@ -129,9 +129,9 @@ Kiểm chứng: [`packages/core/test/vifold-fts5.test.ts`](../../packages/core/t
 
 Sai khác còn lại (đã đo trên toàn bộ code point có thể nằm trong token): `unicode61` tự gập chữ theo bảng Unicode 6.1 và đổi 9 ký tự mà `fold` giữ nguyên: U+00B5 `µ`→`μ`, U+017F `ſ`→`s`, U+03D0 `ϐ`→`β`, U+03D1 `ϑ`→`θ`, U+03D5 `ϕ`→`φ`, U+03D6 `ϖ`→`π`, U+03F0 `ϰ`→`κ`, U+03F1 `ϱ`→`ρ`, U+03F5 `ϵ`→`ε`. Term FTS5 của token chứa các ký tự này khác chuỗi trong `tokens`, nhưng index và truy vấn đi qua cùng tokenizer nên việc khớp không bị ảnh hưởng. Bộ vector không chứa các ký tự này.
 
-### 4.2. Meilisearch (server)
+### 4.2. Postgres (server)
 
-Server đánh chỉ mục `SearchText` và truy vấn bằng `SearchText`. Meilisearch phải được cấu hình (`separatorTokens`, `nonSeparatorTokens`) sao cho token của nó khớp `tokens`; việc này được kiểm chứng ở phase tìm kiếm bằng cùng bộ vector. Sai khác còn lại chỉ được chấp nhận kèm danh sách đã đo, ghi vào mục này.
+Server lưu `Tokens` của chữ, chú thích và tên file thành tsvector bằng `array_to_tsvector(string_to_array(SearchText, ' '))`: không qua parser hay từ điển của Postgres, nên lexeme đúng bằng token (mỗi token cắt còn tối đa 255 byte, vì lexeme của tsvector có giới hạn độ dài). Truy vấn là tsquery dạng nhập (ép kiểu `::tsquery`, không dùng `to_tsquery`) của `Tokens(query)`, mỗi token đặt trong nháy đơn, token cuối khớp tiền tố (`:*`). Kiểm chứng: [`server/internal/search/postgres_test.go`](../../server/internal/search/postgres_test.go) (`TestLexemesFollowSharedVectors`) đòi lexeme Postgres lưu bằng `tokens` và truy vấn của mỗi vector tìm lại được chính nó trên mọi vector. Nếu sau này thay Postgres bằng search engine khác (Meilisearch, OpenSearch), engine đó phải được cấu hình sao cho token của nó khớp `tokens` và qua cùng bài kiểm này.
 
 ### 4.3. Phiên bản fold trong DB local
 

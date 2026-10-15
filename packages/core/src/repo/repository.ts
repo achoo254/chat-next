@@ -1,9 +1,21 @@
 // Reads of the local database and the single commit path for writes.
 import type { SqlDriver, SqlRow } from "@app/platform";
 import type { EventBus } from "../events/bus.ts";
-import type { Chat, Dialog, Message, NotificationSettings, SyncState, User } from "../model/types.ts";
+import type { Chat, Dialog, Message, NotificationSettings, SearchFilters, SyncState, User } from "../model/types.ts";
 import { num, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
 import { CHAT_TOPIC, placeholders, type WriteBatch } from "./writes.ts";
+
+/** What Repository.search looks for. */
+export interface LocalSearchRequest {
+	/** FTS5 MATCH expression; null lists every message with content (filters only). */
+	readonly match: string | null;
+	/** 0 = every chat. */
+	readonly chatId: number;
+	/** 0 = every topic. */
+	readonly topicId: number;
+	readonly filters: SearchFilters;
+	readonly limit: number;
+}
 
 /** A cached message plus whether it still has to be checked against the server. */
 export type StoredMessage = Message & { readonly stale: boolean };
@@ -227,13 +239,53 @@ export class Repository {
 		}));
 	}
 
-	/** Full-text search over cached messages; `match` is an FTS5 query. */
-	async search(match: string, chatId: number, limit: number): Promise<StoredMessage[]> {
-		const chatFilter = chatId === 0 ? "" : " AND m.chat_id = ?";
-		const params = chatId === 0 ? [match, limit] : [match, chatId, limit];
+	/**
+	 * Cached messages matching an FTS5 query (null: every message with
+	 * content) and the filters, newest first.
+	 */
+	async search(request: LocalSearchRequest): Promise<StoredMessage[]> {
+		const where: string[] = ["m.action IS NULL", "m.recalled = 0"];
+		const params: (string | number)[] = [];
+		let from = "messages m";
+		if (request.match !== null) {
+			from = "messages_fts f JOIN messages m ON m.id = f.rowid";
+			where.push("messages_fts MATCH ?");
+			params.push(request.match);
+		} else {
+			where.push("(m.search_text <> '' OR m.media_kind IS NOT NULL)");
+		}
+		if (request.chatId !== 0) {
+			where.push("m.chat_id = ?");
+			params.push(request.chatId);
+		}
+		if (request.topicId !== 0) {
+			where.push("m.topic_id = ?");
+			params.push(request.topicId);
+		}
+		const f = request.filters;
+		if ((f.fromId ?? 0) !== 0) {
+			where.push("m.from_id = ?");
+			params.push(f.fromId ?? 0);
+		}
+		if (f.mediaKind !== undefined) {
+			where.push("m.media_kind = ?");
+			params.push(f.mediaKind);
+		}
+		if (f.hasLink === true) {
+			where.push(`(m.link_preview IS NOT NULL OR m.entities LIKE '%"url"%' OR m.entities LIKE '%"text_link"%'
+				OR m.text LIKE '%http://%' OR m.text LIKE '%https://%')`);
+		}
+		if ((f.since ?? 0) > 0) {
+			where.push("m.date >= ?");
+			params.push(f.since ?? 0);
+		}
+		if ((f.until ?? 0) > 0) {
+			where.push("m.date <= ?");
+			params.push(f.until ?? 0);
+		}
+		params.push(request.limit);
 		const rows = await this.driver.query(
-			`SELECT m.* FROM messages_fts f JOIN messages m ON m.id = f.rowid
-			WHERE messages_fts MATCH ?${chatFilter} ORDER BY m.date DESC, m.seq DESC LIMIT ?`,
+			`SELECT m.* FROM ${from} WHERE ${where.join(" AND ")} ORDER BY m.date DESC, m.chat_id DESC, m.seq DESC LIMIT ?`,
 			params,
 		);
 		return rows.map(toStored);

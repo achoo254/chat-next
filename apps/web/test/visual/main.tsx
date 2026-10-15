@@ -7,6 +7,7 @@
 // an image on /__hold keeps the page's load event back until it is done (see
 // vite.config.ts), so render checks capture the finished state. Every page
 // then audits horizontal overflow (auditOverflow) and logs offenders as errors.
+import { Code } from "@connectrpc/connect";
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
 import { IncomingHookAuditAction, IncomingHookFormat } from "@app/proto-ts/integrations";
 import { EntityType, IncomingHookStopReason } from "@app/proto-ts/messages";
@@ -189,6 +190,7 @@ f.sendFile(f.selfId, design, picture(1, 900, 1600), "Màn hình điện thoại"
 // Recalled last: the fixture numbers the next message after the newest one left.
 const recalledPhoto = f.sendFile(demo.ids.users.minh, design, picture(3), "Ảnh gửi nhầm");
 f.server.deleteMessages(demo.ids.users.minh, design, [recalledPhoto]);
+if (params.get("open") === "search-error") f.searchFailure = Code.Unavailable;
 if (params.get("open") === "upload") {
 	media.refuse.add(MediaKind.VIDEO);
 	const put = media.http.put;
@@ -498,6 +500,46 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	search: async () => {
 		await type(".list-head input[type=search]", "van hanh");
 		await find(() => document.querySelector(".sx-results .hit mark"));
+	},
+	// Device hits merged with the server's (search.html#global).
+	"search-merged": async () => {
+		await type(".list-head input[type=search]", "nang cap");
+		await find(() => byName(".sx-status", /^Đã gộp kết quả từ server/));
+	},
+	// The date filter's calendar over the results (#filters).
+	"search-filters": async () => {
+		await type(".list-head input[type=search]", "nang cap");
+		await find(() => byName(".sx-status", /^Đã gộp kết quả từ server/));
+		await click(".sx-filters button", "Loại");
+		await click(".sx-pop button", "File");
+		await click(".sx-filters button", "Ngày");
+		await click(".sx-pop button", "7 ngày");
+		await find(() => document.querySelector(".sx-dates .cal button.edge"));
+	},
+	// Nothing found with a sender filter on (#empty-error, left).
+	"search-empty": async () => {
+		await type(".list-head input[type=search]", "hop dong bao tri");
+		await click(".sx-filters button", "Người gửi");
+		await click(".sx-pop .sx-sender-list button", /Lan Anh$/);
+		await find(() => byName(".search-panel .empty button", "Bỏ lọc người gửi Lan Anh"));
+	},
+	// The server fails: device hits stay, with a retry (#empty-error, right).
+	"search-error": async () => {
+		await type(".list-head input[type=search]", "postgres");
+		await find(() => document.querySelector(".search-panel .banner.error"));
+	},
+	// The in-chat bar on a hit (#in-chat).
+	"search-in-chat": async () => {
+		await click(".convo-head button", "Tìm trong chat");
+		await type(".convo-head.insearch input[type=search]", "nang cap");
+		await find(() => byName(".convo-head.insearch .counter", /^1\/\d/));
+	},
+	// Its sender picker (#in-chat, "Lọc theo người gửi").
+	"search-in-chat-sender": async () => {
+		await click(".convo-head button", "Tìm trong chat");
+		await type(".convo-head.insearch input[type=search]", "nang cap");
+		await click(".convo-head.insearch button", "Lọc theo người gửi");
+		await find(() => document.querySelector(".convo > .sx-pop .sx-sender-list button"));
 	},
 	"new-group": async () => {
 		await click("button", "Tạo chat mới");

@@ -28,8 +28,10 @@ type SearchFilter struct {
 	// Only messages with this media kind; UNSPECIFIED = any.
 	MediaKind MediaKind `protobuf:"varint,2,opt,name=media_kind,json=mediaKind,proto3,enum=app.v1.MediaKind" json:"media_kind,omitempty"`
 	// Inclusive unix-second bounds; 0 = unbounded.
-	MinDate       int64 `protobuf:"varint,3,opt,name=min_date,json=minDate,proto3" json:"min_date,omitempty"`
-	MaxDate       int64 `protobuf:"varint,4,opt,name=max_date,json=maxDate,proto3" json:"max_date,omitempty"`
+	MinDate int64 `protobuf:"varint,3,opt,name=min_date,json=minDate,proto3" json:"min_date,omitempty"`
+	MaxDate int64 `protobuf:"varint,4,opt,name=max_date,json=maxDate,proto3" json:"max_date,omitempty"`
+	// Only messages with a link (a URL or text link, or a link preview).
+	HasLink       bool `protobuf:"varint,5,opt,name=has_link,json=hasLink,proto3" json:"has_link,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -92,13 +94,21 @@ func (x *SearchFilter) GetMaxDate() int64 {
 	return 0
 }
 
+func (x *SearchFilter) GetHasLink() bool {
+	if x != nil {
+		return x.HasLink
+	}
+	return false
+}
+
 type SearchMessagesRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Query  string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
 	Filter *SearchFilter          `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Opaque cursor from a previous response; empty for the first page.
-	Cursor        string `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	Limit         int32  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	Cursor string `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// Page size: 1 to 50; 0 means 20.
+	Limit         int32 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -163,7 +173,7 @@ func (x *SearchMessagesRequest) GetLimit() int32 {
 
 type SearchMessagesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Ranked hits.
+	// Ranked hits, with their senders in users and their chats in chats.
 	Messages []*Message `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
 	Users    []*User    `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
 	Chats    []*Chat    `protobuf:"bytes,3,rep,name=chats,proto3" json:"chats,omitempty"`
@@ -232,12 +242,15 @@ func (x *SearchMessagesResponse) GetNextCursor() string {
 }
 
 type SearchChatMessagesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	Filter        *SearchFilter          `protobuf:"bytes,3,opt,name=filter,proto3" json:"filter,omitempty"`
-	Cursor        string                 `protobuf:"bytes,4,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	Limit         int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	Query  string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	Filter *SearchFilter          `protobuf:"bytes,3,opt,name=filter,proto3" json:"filter,omitempty"`
+	Cursor string                 `protobuf:"bytes,4,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// Page size: 1 to 50; 0 means 20.
+	Limit int32 `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Forum groups: only this topic; 0 = every topic.
+	TopicId       int64 `protobuf:"varint,6,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -303,6 +316,13 @@ func (x *SearchChatMessagesRequest) GetCursor() string {
 func (x *SearchChatMessagesRequest) GetLimit() int32 {
 	if x != nil {
 		return x.Limit
+	}
+	return 0
+}
+
+func (x *SearchChatMessagesRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
 	}
 	return 0
 }
@@ -379,13 +399,14 @@ var File_app_v1_search_proto protoreflect.FileDescriptor
 
 const file_app_v1_search_proto_rawDesc = "" +
 	"\n" +
-	"\x13app/v1/search.proto\x12\x06app.v1\x1a\x12app/v1/chats.proto\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\x9b\x01\n" +
+	"\x13app/v1/search.proto\x12\x06app.v1\x1a\x12app/v1/chats.proto\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\xb6\x01\n" +
 	"\fSearchFilter\x12\x1b\n" +
 	"\afrom_id\x18\x01 \x01(\x03B\x020\x02R\x06fromId\x120\n" +
 	"\n" +
 	"media_kind\x18\x02 \x01(\x0e2\x11.app.v1.MediaKindR\tmediaKind\x12\x1d\n" +
 	"\bmin_date\x18\x03 \x01(\x03B\x020\x02R\aminDate\x12\x1d\n" +
-	"\bmax_date\x18\x04 \x01(\x03B\x020\x02R\amaxDate\"\x89\x01\n" +
+	"\bmax_date\x18\x04 \x01(\x03B\x020\x02R\amaxDate\x12\x19\n" +
+	"\bhas_link\x18\x05 \x01(\bR\ahasLink\"\x89\x01\n" +
 	"\x15SearchMessagesRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12,\n" +
 	"\x06filter\x18\x02 \x01(\v2\x14.app.v1.SearchFilterR\x06filter\x12\x16\n" +
@@ -396,13 +417,14 @@ const file_app_v1_search_proto_rawDesc = "" +
 	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\"\n" +
 	"\x05chats\x18\x03 \x03(\v2\f.app.v1.ChatR\x05chats\x12\x1f\n" +
 	"\vnext_cursor\x18\x04 \x01(\tR\n" +
-	"nextCursor\"\xaa\x01\n" +
+	"nextCursor\"\xc9\x01\n" +
 	"\x19SearchChatMessagesRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12,\n" +
 	"\x06filter\x18\x03 \x01(\v2\x14.app.v1.SearchFilterR\x06filter\x12\x16\n" +
 	"\x06cursor\x18\x04 \x01(\tR\x06cursor\x12\x14\n" +
-	"\x05limit\x18\x05 \x01(\x05R\x05limit\"\xb2\x01\n" +
+	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x1d\n" +
+	"\btopic_id\x18\x06 \x01(\x03B\x020\x02R\atopicId\"\xb2\x01\n" +
 	"\x1aSearchChatMessagesResponse\x12+\n" +
 	"\bmessages\x18\x01 \x03(\v2\x0f.app.v1.MessageR\bmessages\x12\"\n" +
 	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\"\n" +

@@ -77,6 +77,8 @@ function MessageMenu({ chat, readOutboxMaxSeq }: { chat: Chat; readOutboxMaxSeq:
 
 // The pinned bar loads with the first chat that has a pinned message.
 const PinnedBar = lazy(() => import("./pinned-bar.tsx"));
+// Search in the chat (mockups/search.html#in-chat) loads when first opened.
+const InChatSearch = lazy(() => import("../search/in-chat-search.tsx"));
 
 function OfflineBanner({ chatId }: { chatId: number }) {
 	const copy = useCopy();
@@ -208,6 +210,9 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const limits = useMediaLimits();
 	const [dragging, setDragging] = useState<number | null>(null);
 	const dragDepth = useRef(0);
+	// The search bar in place of the header, for the chat (and topic) it was opened in.
+	const [searchIn, setSearchIn] = useState<{ chatId: number; topicId: number } | null>(null);
+	const searching = searchIn !== null && searchIn.chatId === chatId && searchIn.topicId === effectiveTopic;
 	useIncomingSound(chatId);
 
 	useEffect(() => {
@@ -280,33 +285,44 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 		: {};
 	return (
 		<section className="convo" aria-label={topic?.title ?? title} {...dragHandlers}>
-			<header className="convo-head">
-				<button type="button" className="icon-btn narrow-only" aria-label={copy.convo.backToList} onClick={() => navigate(paths.home)}>
-					<Icon name="back" />
-				</button>
-				{topic !== null ? (
-					<TopicIco topic={topic} size="sm" />
-				) : (
-					<ChatAvatar id={chatId} name={title} bot={kind === "bot"} saved={isSavedChat(chat, view?.peer ?? peer ?? null)} />
-				)}
-				<div className="title">
-					<strong>{topic?.title ?? title}</strong>
-					<Subtitle chat={chat} topic={topic} groupTitle={title} />
-				</div>
-				<button type="button" className="icon-btn" aria-label={topic !== null ? copy.topics.searchInTopic : copy.convo.searchInChat} onClick={ui.focusSearch}>
-					<Icon name="search" />
-				</button>
-				<button
-					type="button"
-					className="icon-btn"
-					data-info-toggle
-					aria-pressed={infoOpen}
-					aria-label={topic !== null ? copy.topics.info : copy.convo.info}
-					onClick={() => ui.toggleInfo()}
-				>
-					<Icon name="info" />
-				</button>
-			</header>
+			{searching ? (
+				<Suspense fallback={<header className="convo-head insearch" />}>
+					<InChatSearch chatId={chatId} topicId={effectiveTopic} title={topic?.title ?? title} onClose={() => setSearchIn(null)} />
+				</Suspense>
+			) : (
+				<header className="convo-head">
+					<button type="button" className="icon-btn narrow-only" aria-label={copy.convo.backToList} onClick={() => navigate(paths.home)}>
+						<Icon name="back" />
+					</button>
+					{topic !== null ? (
+						<TopicIco topic={topic} size="sm" />
+					) : (
+						<ChatAvatar id={chatId} name={title} bot={kind === "bot"} saved={isSavedChat(chat, view?.peer ?? peer ?? null)} />
+					)}
+					<div className="title">
+						<strong>{topic?.title ?? title}</strong>
+						<Subtitle chat={chat} topic={topic} groupTitle={title} />
+					</div>
+					<button
+						type="button"
+						className="icon-btn"
+						aria-label={topic !== null ? copy.topics.searchInTopic : copy.convo.searchInChat}
+						onClick={() => setSearchIn({ chatId, topicId: effectiveTopic })}
+					>
+						<Icon name="search" />
+					</button>
+					<button
+						type="button"
+						className="icon-btn"
+						data-info-toggle
+						aria-pressed={infoOpen}
+						aria-label={topic !== null ? copy.topics.info : copy.convo.info}
+						onClick={() => ui.toggleInfo()}
+					>
+						<Icon name="info" />
+					</button>
+				</header>
+			)}
 			{!chat.left && (topics === null || topic !== null) && ((view?.dialog.pinnedMessageCount ?? 0) > 0 || chat.pinnedSeq !== 0) && (
 				<Suspense fallback={null}>
 					<PinnedBar key={effectiveTopic} chat={chat} topicId={effectiveTopic} />

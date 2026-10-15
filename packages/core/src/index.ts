@@ -6,7 +6,21 @@ export { EventBus, EventKeys, type BatchListener, type KeyListener } from "./eve
 export { createRemoteApi, classifyFailure, SessionEndedError, type FailureKind, type RemoteApi } from "./protocol/api.ts";
 export { MIGRATIONS, SCHEMA_VERSION, migrate, type Migration, type MigrationOutcome } from "./repo/migrations.ts";
 export { Repository, type DialogView, type OutboxRow, type StoredMessage } from "./repo/repository.ts";
-export { ftsQuery, searchLocal, type SearchOptions } from "./search/index.ts";
+export { ftsQuery, hasFilters, searchLocal, type SearchOptions } from "./search/index.ts";
+export { hitKey, mergeSearchHits, sortNewestFirst, type HitSource, type SearchHit, type ServerHits } from "./search/merge.ts";
+export { fetchServerSearch, SERVER_PAGE, type ServerSearchPage, type ServerSearchRequest } from "./search/server.ts";
+export {
+	IDLE_SEARCH,
+	isSearchable,
+	SearchSession,
+	SERVER_DEBOUNCE_MS,
+	type SearchRequest,
+	type SearchSessionOptions,
+	type SearchSessionTimers,
+	type SearchState,
+	type ServerSearchResult,
+	type ServerSearchStatus,
+} from "./search/session.ts";
 export { backoffDelay, DEFAULT_BACKOFF, type BackoffPolicy } from "./transport/backoff.ts";
 export {
 	RealtimeConnection,

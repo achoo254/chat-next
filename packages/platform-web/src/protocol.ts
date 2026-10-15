@@ -33,6 +33,7 @@ export const CORE_METHODS = [
 	"retryOutbox",
 	"discardOutbox",
 	"search",
+	"searchServer",
 	"openChat",
 	"snapshot",
 	"signOut",

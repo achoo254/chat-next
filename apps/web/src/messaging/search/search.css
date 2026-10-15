@@ -1,0 +1,110 @@
+/* Search screens (mockups/search.html), loaded with the search chunks. */
+
+/* ---------- Filter chips and popovers (#filters) ---------- */
+.sx-filters { position: relative; }
+.sx-filters .chips, .sx-pop .chips, .convo-head.insearch .chip { gap: var(--space-2); }
+.sx-filters > .chips { padding: 0 var(--space-4) var(--space-2); }
+.sx-filters .chip, .sx-pop .chip, .convo-head.insearch .chip {
+	display: inline-flex; align-items: center; gap: var(--space-1); min-height: 32px; padding: 0 var(--space-3);
+	border-radius: var(--radius-full); border: 1px solid var(--c-border); background: var(--c-surface);
+	color: var(--c-text); font-size: 0.8125rem; font-weight: 500; white-space: nowrap;
+}
+.sx-filters .chip .icon, .sx-pop .chip .icon { width: 14px; height: 14px; color: var(--c-icon-muted); }
+.sx-filters button.chip:hover, .sx-pop button.chip:hover { border-color: var(--c-border-strong); background: var(--c-surface-subtle); }
+.sx-filters .chip.on, .sx-pop .chip[aria-pressed="true"], .convo-head.insearch .chip.on {
+	border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-border)); background: var(--c-selected); color: var(--c-primary);
+}
+.sx-filters .chip.on .icon, .sx-pop .chip[aria-pressed="true"] .icon { color: var(--c-primary); }
+span.chip.on { padding-right: 2px; }
+.chip.on .avatar.xs { margin-left: calc(-1 * var(--space-2)); }
+.chip-label { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 28px; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+.chip-x { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-primary); }
+.chip-x:hover { background: color-mix(in srgb, var(--c-primary-solid) 16%, transparent); }
+
+.sx-pop {
+	position: absolute; z-index: 5; top: 100%; left: var(--space-4); width: min(344px, calc(100% - 2 * var(--space-4)));
+	display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md);
+	border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-lg);
+}
+.sx-pop .search-field { margin: 0; }
+.sx-pop p { margin: 0; font-size: 0.8125rem; }
+.sx-sender-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 280px; overflow-y: auto; }
+.sx-sender-list button {
+	display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 40px; padding: 0 var(--space-2);
+	border: 0; border-radius: var(--radius-xs); background: none; color: var(--c-text); text-align: left; font-size: 0.875rem;
+}
+.sx-sender-list button:hover, .sx-sender-list button:focus-visible { background: var(--c-hover); }
+.sx-sender-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The in-chat sender picker hangs under the search bar, on the right. */
+.convo > .sx-pop { top: var(--topbar-h); left: auto; right: var(--space-4); }
+
+/* Date range */
+.sx-dates .choice.quick { display: flex; flex-wrap: wrap; }
+.sx-dates .choice.quick button { flex: 1 1 auto; padding: 0 var(--space-2); white-space: nowrap; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cal-head b { font-weight: 600; }
+.cal-head .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.flip-x .icon { transform: scaleX(-1); }
+.flip-y .icon { transform: scaleY(-1); }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(36px, 1fr)); gap: 2px; }
+.cal .wd { display: grid; place-items: center; height: 28px; font-size: 0.75rem; font-weight: 500; color: var(--c-text-muted); }
+.cal button {
+	height: 40px; border: 0; border-radius: var(--radius-sm); background: none;
+	font-size: 0.875rem; font-variant-numeric: tabular-nums; color: var(--c-text);
+}
+.cal button:hover { background: var(--c-hover); }
+.cal button.in { background: var(--c-selected); border-radius: 0; }
+.cal button.edge { background: var(--c-primary-solid); color: var(--c-on-primary); font-weight: 600; }
+.cal button.today { box-shadow: inset 0 0 0 1px var(--c-primary); }
+.cal button:disabled { color: var(--c-text-muted); opacity: 0.5; cursor: not-allowed; }
+.pop-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.pop-foot .muted { flex: 1 1 12ch; font-size: 0.8125rem; }
+
+/* ---------- Status, results, empty and failure states (#global, #empty-error) ---------- */
+.sx-status {
+	display: flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: var(--space-1) var(--space-4);
+	font-size: 0.8125rem; color: var(--c-text-muted); border-top: 1px solid var(--c-border-subtle);
+	border-bottom: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle);
+}
+.sx-status .icon { color: var(--c-success); }
+.search-panel > .banner { border-radius: 0; min-height: 44px; border-top: 1px solid var(--c-border-subtle); }
+.search-panel > .banner .btn { color: var(--c-text); }
+.hit[aria-current="true"] { background: var(--c-selected); }
+.hit .device { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin-top: 2px; border-radius: var(--radius-sm); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
+.mono-name { font-family: var(--font-mono); font-size: 0.8125rem; }
+.from-server {
+	display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 0 var(--space-1); border-radius: var(--radius-xs);
+	background: var(--c-bar-track); color: var(--c-text-muted); vertical-align: 1px;
+}
+.hit.arrived { animation: sx-arrive var(--dur-slow) var(--ease-decelerate); }
+@keyframes sx-arrive { from { opacity: 0; } to { opacity: 1; } }
+.sx-more { display: block; margin: var(--space-2) auto 0; }
+.search-panel .tips { margin: 0; padding-left: var(--space-5); text-align: left; font-size: 0.8125rem; display: grid; gap: var(--space-1); }
+.search-panel .empty .btn { color: var(--c-text); }
+.foot-note { margin: 0; padding: var(--space-3) var(--space-4); font-size: 0.8125rem; color: var(--c-text-muted); border-top: 1px solid var(--c-border-subtle); }
+
+/* ---------- In-chat search bar (#in-chat) ---------- */
+.convo-head.insearch { gap: var(--space-2); }
+.convo-head.insearch .search-field { flex: 1; min-width: 0; }
+.convo-head.insearch .counter {
+	flex: none; min-width: 48px; text-align: center; font-size: 0.8125rem; color: var(--c-text-muted);
+	font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.convo-head.insearch .icon-btn:disabled { opacity: 0.4; cursor: default; }
+.convo-head.insearch .icon-btn[aria-pressed="true"] { color: var(--c-primary); background: var(--c-selected); }
+::highlight(chat-search-hit) { background-color: color-mix(in srgb, var(--c-warning) 26%, transparent); }
+::highlight(chat-search-hit-now) { background-color: color-mix(in srgb, var(--c-warning) 55%, transparent); }
+
+@media (max-width: 760px) {
+	.convo-head.insearch { padding: var(--space-2); }
+	.convo-head.insearch .hide-narrow { display: none; }
+	.convo > .sx-pop { left: var(--space-3); right: var(--space-3); width: auto; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.sx-filters .chip, .sx-pop .chip, .sx-dates .choice button, .pop-foot .btn-sm { min-height: 44px; }
+	.chip-x { width: 40px; height: 40px; }
+	.hit { min-height: 56px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.hit.arrived { animation: none; }
+}

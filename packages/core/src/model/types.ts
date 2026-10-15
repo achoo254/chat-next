@@ -500,6 +500,19 @@ export interface PinnedMessagesPage {
 	readonly hasMore: boolean;
 }
 
+/** Narrows a message search, locally and on the server. Unset fields do not filter. */
+export interface SearchFilters {
+	/** Only messages from this sender; 0 = anyone. */
+	readonly fromId?: number;
+	/** Only messages carrying this kind of file. */
+	readonly mediaKind?: MediaKind;
+	/** Only messages with a link (URL, text link or link preview). */
+	readonly hasLink?: boolean;
+	/** Message date bounds in unix seconds, both inclusive; 0 = unbounded. */
+	readonly since?: number;
+	readonly until?: number;
+}
+
 /** Realtime HelloFrame. */
 export interface Hello {
 	readonly userId: number;

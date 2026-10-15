@@ -22,6 +22,8 @@ import type {
 	PinnedMessagesRequest,
 	SearchOptions,
 	ScreenSnapshot,
+	ServerSearchRequest,
+	ServerSearchResult,
 	SendAlbumOptions,
 	SendMediaOptions,
 	SendTextOptions,
@@ -69,6 +71,8 @@ export interface ChatSource {
 	retryOutbox(outboxId: number): Promise<void>;
 	discardOutbox(outboxId: number): Promise<void>;
 	search(query: string, options?: SearchOptions): Promise<StoredMessage[]>;
+	/** One page of the server's message search; failures come back as a result, not thrown. */
+	searchServer(request: ServerSearchRequest): Promise<ServerSearchResult>;
 	openChat(chatId: number, anchorSeq?: number, visibleChatIds?: readonly number[]): Promise<void>;
 	connectionState(): Promise<ConnectionState>;
 }

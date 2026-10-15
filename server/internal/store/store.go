@@ -11,7 +11,9 @@ import (
 	"log/slog"
 	"strings"
 
+	"app.local/server/internal/search"
 	"app.local/server/migrations"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -77,8 +79,10 @@ func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)
 }
 
-// Migrate applies every pending embedded migration. A Postgres advisory lock
-// serializes concurrent runs.
+// Migrate applies every pending embedded migration, then indexes for search
+// the messages that are not indexed yet (search.Backfill). A Postgres
+// advisory lock serializes concurrent migration runs; the backfill is
+// idempotent.
 func Migrate(ctx context.Context, databaseURL string, logger *slog.Logger) error {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
@@ -86,7 +90,18 @@ func Migrate(ctx context.Context, databaseURL string, logger *slog.Logger) error
 	}
 	db := stdlib.OpenDB(*cfg.ConnConfig)
 	defer func() { _ = db.Close() }()
-	return migrate(ctx, db, logger)
+	if err := migrate(ctx, db, logger); err != nil {
+		return err
+	}
+	conn, err := pgx.ConnectConfig(ctx, cfg.ConnConfig)
+	if err != nil {
+		return fmt.Errorf("store: connect for search backfill: %w", err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if _, err := search.Backfill(ctx, conn, logger); err != nil {
+		return err
+	}
+	return nil
 }
 
 func migrate(ctx context.Context, db *sql.DB, logger *slog.Logger) error {

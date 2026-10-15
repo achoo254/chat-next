@@ -43,9 +43,12 @@ const (
 
 // SearchServiceClient is a client for the app.v1.SearchService service.
 type SearchServiceClient interface {
-	// Across all chats of the caller.
+	// Across all chats of the caller. Messages holding the query with its
+	// exact accents rank first (among the newest 500 matches), then the
+	// others; newest first within each group.
 	SearchMessages(context.Context, *connect.Request[v1.SearchMessagesRequest]) (*connect.Response[v1.SearchMessagesResponse], error)
-	// Within one chat.
+	// Within one chat (or one forum topic of it), newest first, so clients can
+	// step through the hits in order.
 	SearchChatMessages(context.Context, *connect.Request[v1.SearchChatMessagesRequest]) (*connect.Response[v1.SearchChatMessagesResponse], error)
 }
 
@@ -93,9 +96,12 @@ func (c *searchServiceClient) SearchChatMessages(ctx context.Context, req *conne
 
 // SearchServiceHandler is an implementation of the app.v1.SearchService service.
 type SearchServiceHandler interface {
-	// Across all chats of the caller.
+	// Across all chats of the caller. Messages holding the query with its
+	// exact accents rank first (among the newest 500 matches), then the
+	// others; newest first within each group.
 	SearchMessages(context.Context, *connect.Request[v1.SearchMessagesRequest]) (*connect.Response[v1.SearchMessagesResponse], error)
-	// Within one chat.
+	// Within one chat (or one forum topic of it), newest first, so clients can
+	// step through the hits in order.
 	SearchChatMessages(context.Context, *connect.Request[v1.SearchChatMessagesRequest]) (*connect.Response[v1.SearchChatMessagesResponse], error)
 }
 

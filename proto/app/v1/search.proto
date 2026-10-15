@@ -13,16 +13,22 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // always holds a value < 2^53; the server asserts the bound when serializing.
 //
 // Queries are folded server-side (ADR 0005), so unaccented input matches
-// accented text; exact-accent matches rank first. Every hit is re-checked
-// against membership, visible_from_seq, hidden and deleted messages. Secret
+// accented text: every word of the query must start a word of the message
+// (its text, caption or file name), the last word may be cut short. Every hit
+// is checked against current membership, visible_from_seq, hidden and
+// deleted messages; messages of hidden forum topics stay searchable. Secret
 // chats are never indexed. Pages use an opaque cursor; a page is either full
-// or the last one, and never repeats an earlier hit.
+// or the last one, and never repeats an earlier hit. A query without words
+// returns nothing unless a filter is set.
 
 // Server-side message search.
 service SearchService {
-  // Across all chats of the caller.
+  // Across all chats of the caller. Messages holding the query with its
+  // exact accents rank first (among the newest 500 matches), then the
+  // others; newest first within each group.
   rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
-  // Within one chat.
+  // Within one chat (or one forum topic of it), newest first, so clients can
+  // step through the hits in order.
   rpc SearchChatMessages(SearchChatMessagesRequest) returns (SearchChatMessagesResponse);
 }
 
@@ -34,6 +40,8 @@ message SearchFilter {
   // Inclusive unix-second bounds; 0 = unbounded.
   int64 min_date = 3 [jstype = JS_NUMBER];
   int64 max_date = 4 [jstype = JS_NUMBER];
+  // Only messages with a link (a URL or text link, or a link preview).
+  bool has_link = 5;
 }
 
 message SearchMessagesRequest {
@@ -41,11 +49,12 @@ message SearchMessagesRequest {
   SearchFilter filter = 2;
   // Opaque cursor from a previous response; empty for the first page.
   string cursor = 3;
+  // Page size: 1 to 50; 0 means 20.
   int32 limit = 4;
 }
 
 message SearchMessagesResponse {
-  // Ranked hits.
+  // Ranked hits, with their senders in users and their chats in chats.
   repeated Message messages = 1;
   repeated User users = 2;
   repeated Chat chats = 3;
@@ -58,7 +67,10 @@ message SearchChatMessagesRequest {
   string query = 2;
   SearchFilter filter = 3;
   string cursor = 4;
+  // Page size: 1 to 50; 0 means 20.
   int32 limit = 5;
+  // Forum groups: only this topic; 0 = every topic.
+  int64 topic_id = 6 [jstype = JS_NUMBER];
 }
 
 message SearchChatMessagesResponse {
