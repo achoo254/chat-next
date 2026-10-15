@@ -83,8 +83,8 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
 | 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI R1 lên prod; còn React Compiler, perf gate CI) |
 | 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres pg_trgm chuỗi con + tsvector; Meilisearch để giai đoạn scale) |
-| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | Pending |
-| 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | Pending |
+| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | In progress (R5 lát A lên prod: quản lý bot, consent, tin chữ + bàn phím, long poll, callback) |
+| 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | In progress (Console lát A lên prod; còn webhook, dead-letter, số liệu, SDK) |
 | 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | Pending |
 | 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 lên prod: incoming webhook; phần bot ở R5) |
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Pending |
@@ -486,3 +486,16 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
 - Trước khi code: đọc Phase 8 và 15, mock `bots.html` và `console.html`, báo cáo `researcher-261013-1120-telegram-bot-platform.md`.
 - Cần quyết host cho Bot API: `bot.chat.<d>` không proxy được qua SSL miễn phí của Cloudflare, cùng vấn đề webhook đã gặp. Gửi Jev, phương án gần nhất là đường dẫn trên `chat.<d>`.
 
+
+## Tiến độ R5 (2026-10-15 15:35)
+
+Lát A lên prod, release `20261015-083208-4affc40f9568` (commit `4affc40`, deploy bằng root vì đổi nginx `/bot/`):
+- Bot API tại `https://chat.<d>/bot/v1/` trong process `chat-api` ([spec](../../../spec/bot-api/openapi.yaml)): `me`, gửi tin chữ (entities hoặc Markdown/HTML), bàn phím trả lời và inline, long poll (409 khi poll trùng), trả lời callback, đặt lệnh, xem chat.
+- Consent kiểm ở lõi; update từ consumer outbox riêng, một writer `update_id` mỗi bot.
+- Developer Console trong Cài đặt: tạo, sửa, lệnh theo phạm vi, cấp lại token và xoá (cần đăng nhập IdP trong 10 phút).
+- Deep link `/b/<username>?start=`, nút Bắt đầu, menu lệnh, bàn phím một lần lưu local.
+- Cloud của tôi: xoá toàn bộ tin vẫn giữ Cloud và ghim, ô soạn "Ghi chú vào Cloud của tôi", không có Tắt thông báo, biểu cảm chỉ emoji; danh sách chat có ảnh nhỏ cho tin ảnh/video.
+
+Quyết định của Jev (`jev-1.13.0`): host đường dẫn trên `chat.<d>` (0,92); chạy trong process `api` (1,0); lát đầu Console + long poll (0,67); update từ consumer outbox (0,99); năm sửa màn Cloud (0,59–0,91); ô soạn 390px ẩn emoji khi có bàn phím bot (0,80 làm trước deploy); lưu bàn phím một lần (0,56); menu lệnh bot trong nhóm để sau (0,13).
+
+Còn lại của R5: webhook ra ngoài + `safehttp` + dead-letter + HMAC; file/media, sửa/xoá/chuyển tiếp, quản trị nhóm; bulk; inline mode; menu lệnh trong nhóm; SDK TS/Python/Go + docs; bot chào người dùng mới; kiểm response theo OpenAPI tự động. Kiểm một lần trên prod: "Cấp lại token" (IdP phải trả `auth_time`).
