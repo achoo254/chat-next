@@ -8,6 +8,11 @@ export interface GeneratedManifests {
 	readonly "tauri.json": Record<string, unknown>;
 }
 
+/** The names the Go server shows users (server/internal/brand/brand.json). */
+export function serverBrandNames(brand: BrandConfig): { appName: string; shortName: string } {
+	return { appName: brand.appName, shortName: brand.shortName };
+}
+
 export function generateManifests(brand: BrandConfig): GeneratedManifests {
 	return {
 		"web.webmanifest.json": {

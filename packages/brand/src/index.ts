@@ -3,7 +3,7 @@ export {
 	loadBrandConfig,
 	parseBrandConfig,
 } from "./config.ts";
-export { generateManifests, type GeneratedManifests } from "./generate.ts";
+export { generateManifests, serverBrandNames, type GeneratedManifests } from "./generate.ts";
 export { allowedOrigins, hostsFor, type TenantHosts } from "./hosts.ts";
 export {
 	FAVICON_ICO,

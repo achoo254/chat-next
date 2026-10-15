@@ -18,8 +18,11 @@ import {
 import { ConfigService } from "@app/proto-ts/config";
 import { MessagesService } from "@app/proto-ts/messages";
 import {
+	FeedbackKind as WireFeedbackKind,
+	FeedbackStatus as WireFeedbackStatus,
 	ModerationAction as WireAction,
 	ModerationService,
+	type Feedback as WireFeedback,
 	ReportStatus as WireStatus,
 	ReportTargetKind,
 	type ModerationLogEntry,
@@ -39,6 +42,8 @@ import type {
 	AddFailureReason,
 	Audience,
 	ChatBrief,
+	FeedbackItem,
+	FeedbackStatus,
 	Invite,
 	Limits,
 	Member,
@@ -61,6 +66,7 @@ const BLOCKED_PAGE = 200;
 const REACTIONS_PAGE = 100;
 const COMMON_PAGE = 100;
 const REPORTS_PAGE = 100;
+const FEEDBACK_PAGE = 100;
 /** SetDialogMute takes at most 366 days; longer means until turned back on. */
 const MUTE_MAX_SECONDS = 31_622_400;
 
@@ -226,6 +232,27 @@ function toReport(report: WireReport): ModerationReport {
 		resolvedBy: assertSafeId(report.resolvedBy),
 		actions: toActions(report.actions),
 		resolutionNote: report.resolutionNote,
+	};
+}
+
+const WIRE_FEEDBACK_STATUSES: Record<FeedbackStatus, WireFeedbackStatus> = {
+	open: WireFeedbackStatus.OPEN,
+	handled: WireFeedbackStatus.HANDLED,
+};
+
+function toFeedback(item: WireFeedback): FeedbackItem {
+	return {
+		id: assertSafeId(item.id),
+		userId: assertSafeId(item.userId),
+		kind: item.kind === WireFeedbackKind.BUG ? "bug" : "idea",
+		text: item.text,
+		status: item.status === WireFeedbackStatus.HANDLED ? "handled" : "open",
+		createdAt: assertSafeId(item.createdAt),
+		handledAt: assertSafeId(item.handledAt),
+		handledBy: assertSafeId(item.handledBy),
+		replyText: item.replyText,
+		repliedAt: assertSafeId(item.repliedAt),
+		repliedBy: assertSafeId(item.repliedBy),
 	};
 }
 
@@ -663,6 +690,23 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 		liftRestriction: (userId, note) =>
 			call(async () => {
 				await moderation.liftRestriction({ userId: BigInt(userId), note });
+			}),
+		moderationFeedback: (status, cursor = "") =>
+			call(async () => {
+				const response = await moderation.getFeedback({ status: WIRE_FEEDBACK_STATUSES[status], cursor, limit: FEEDBACK_PAGE });
+				return { items: response.feedback.map(toFeedback), people: peopleOf(response.users), nextCursor: response.nextCursor };
+			}),
+		resolveFeedback: (feedbackId) =>
+			call(async () => {
+				const response = await moderation.resolveFeedback({ feedbackId: BigInt(feedbackId) });
+				if (response.feedback === undefined) throw new ConnectError("ResolveFeedback returned no item", Code.Internal);
+				return toFeedback(response.feedback);
+			}),
+		replyFeedback: (feedbackId, text) =>
+			call(async () => {
+				const response = await moderation.replyFeedback({ feedbackId: BigInt(feedbackId), text });
+				if (response.feedback === undefined) throw new ConnectError("ReplyFeedback returned no item", Code.Internal);
+				return toFeedback(response.feedback);
 			}),
 		setPrivacy: (change) =>
 			call(async () => {

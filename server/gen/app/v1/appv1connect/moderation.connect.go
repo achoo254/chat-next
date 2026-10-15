@@ -45,6 +45,15 @@ const (
 	// ModerationServiceLiftRestrictionProcedure is the fully-qualified name of the ModerationService's
 	// LiftRestriction RPC.
 	ModerationServiceLiftRestrictionProcedure = "/app.v1.ModerationService/LiftRestriction"
+	// ModerationServiceGetFeedbackProcedure is the fully-qualified name of the ModerationService's
+	// GetFeedback RPC.
+	ModerationServiceGetFeedbackProcedure = "/app.v1.ModerationService/GetFeedback"
+	// ModerationServiceResolveFeedbackProcedure is the fully-qualified name of the ModerationService's
+	// ResolveFeedback RPC.
+	ModerationServiceResolveFeedbackProcedure = "/app.v1.ModerationService/ResolveFeedback"
+	// ModerationServiceReplyFeedbackProcedure is the fully-qualified name of the ModerationService's
+	// ReplyFeedback RPC.
+	ModerationServiceReplyFeedbackProcedure = "/app.v1.ModerationService/ReplyFeedback"
 )
 
 // ModerationServiceClient is a client for the app.v1.ModerationService service.
@@ -59,6 +68,16 @@ type ModerationServiceClient interface {
 	ResolveReport(context.Context, *connect.Request[v1.ResolveReportRequest]) (*connect.Response[v1.ResolveReportResponse], error)
 	// Ends an account restriction before its time.
 	LiftRestriction(context.Context, *connect.Request[v1.LiftRestrictionRequest]) (*connect.Response[v1.LiftRestrictionResponse], error)
+	// Feedback users sent the tenant's assistant bot ("Góp ý" and "Báo lỗi"),
+	// newest first.
+	GetFeedback(context.Context, *connect.Request[v1.GetFeedbackRequest]) (*connect.Response[v1.GetFeedbackResponse], error)
+	// Marks a feedback item handled; an item already handled is returned as
+	// is.
+	ResolveFeedback(context.Context, *connect.Request[v1.ResolveFeedbackRequest]) (*connect.Response[v1.ResolveFeedbackResponse], error)
+	// Sends the operator's answer to the user through the assistant bot (as a
+	// reply to their message) and marks the item handled. One answer per
+	// item: a second gives failed_precondition "already_replied".
+	ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error)
 }
 
 // NewModerationServiceClient constructs a client for the app.v1.ModerationService service. By
@@ -96,6 +115,24 @@ func NewModerationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(moderationServiceMethods.ByName("LiftRestriction")),
 			connect.WithClientOptions(opts...),
 		),
+		getFeedback: connect.NewClient[v1.GetFeedbackRequest, v1.GetFeedbackResponse](
+			httpClient,
+			baseURL+ModerationServiceGetFeedbackProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("GetFeedback")),
+			connect.WithClientOptions(opts...),
+		),
+		resolveFeedback: connect.NewClient[v1.ResolveFeedbackRequest, v1.ResolveFeedbackResponse](
+			httpClient,
+			baseURL+ModerationServiceResolveFeedbackProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("ResolveFeedback")),
+			connect.WithClientOptions(opts...),
+		),
+		replyFeedback: connect.NewClient[v1.ReplyFeedbackRequest, v1.ReplyFeedbackResponse](
+			httpClient,
+			baseURL+ModerationServiceReplyFeedbackProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("ReplyFeedback")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -105,6 +142,9 @@ type moderationServiceClient struct {
 	getReport       *connect.Client[v1.GetReportRequest, v1.GetReportResponse]
 	resolveReport   *connect.Client[v1.ResolveReportRequest, v1.ResolveReportResponse]
 	liftRestriction *connect.Client[v1.LiftRestrictionRequest, v1.LiftRestrictionResponse]
+	getFeedback     *connect.Client[v1.GetFeedbackRequest, v1.GetFeedbackResponse]
+	resolveFeedback *connect.Client[v1.ResolveFeedbackRequest, v1.ResolveFeedbackResponse]
+	replyFeedback   *connect.Client[v1.ReplyFeedbackRequest, v1.ReplyFeedbackResponse]
 }
 
 // GetReports calls app.v1.ModerationService.GetReports.
@@ -127,6 +167,21 @@ func (c *moderationServiceClient) LiftRestriction(ctx context.Context, req *conn
 	return c.liftRestriction.CallUnary(ctx, req)
 }
 
+// GetFeedback calls app.v1.ModerationService.GetFeedback.
+func (c *moderationServiceClient) GetFeedback(ctx context.Context, req *connect.Request[v1.GetFeedbackRequest]) (*connect.Response[v1.GetFeedbackResponse], error) {
+	return c.getFeedback.CallUnary(ctx, req)
+}
+
+// ResolveFeedback calls app.v1.ModerationService.ResolveFeedback.
+func (c *moderationServiceClient) ResolveFeedback(ctx context.Context, req *connect.Request[v1.ResolveFeedbackRequest]) (*connect.Response[v1.ResolveFeedbackResponse], error) {
+	return c.resolveFeedback.CallUnary(ctx, req)
+}
+
+// ReplyFeedback calls app.v1.ModerationService.ReplyFeedback.
+func (c *moderationServiceClient) ReplyFeedback(ctx context.Context, req *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error) {
+	return c.replyFeedback.CallUnary(ctx, req)
+}
+
 // ModerationServiceHandler is an implementation of the app.v1.ModerationService service.
 type ModerationServiceHandler interface {
 	// Reports, newest first.
@@ -139,6 +194,16 @@ type ModerationServiceHandler interface {
 	ResolveReport(context.Context, *connect.Request[v1.ResolveReportRequest]) (*connect.Response[v1.ResolveReportResponse], error)
 	// Ends an account restriction before its time.
 	LiftRestriction(context.Context, *connect.Request[v1.LiftRestrictionRequest]) (*connect.Response[v1.LiftRestrictionResponse], error)
+	// Feedback users sent the tenant's assistant bot ("Góp ý" and "Báo lỗi"),
+	// newest first.
+	GetFeedback(context.Context, *connect.Request[v1.GetFeedbackRequest]) (*connect.Response[v1.GetFeedbackResponse], error)
+	// Marks a feedback item handled; an item already handled is returned as
+	// is.
+	ResolveFeedback(context.Context, *connect.Request[v1.ResolveFeedbackRequest]) (*connect.Response[v1.ResolveFeedbackResponse], error)
+	// Sends the operator's answer to the user through the assistant bot (as a
+	// reply to their message) and marks the item handled. One answer per
+	// item: a second gives failed_precondition "already_replied".
+	ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error)
 }
 
 // NewModerationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -172,6 +237,24 @@ func NewModerationServiceHandler(svc ModerationServiceHandler, opts ...connect.H
 		connect.WithSchema(moderationServiceMethods.ByName("LiftRestriction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	moderationServiceGetFeedbackHandler := connect.NewUnaryHandler(
+		ModerationServiceGetFeedbackProcedure,
+		svc.GetFeedback,
+		connect.WithSchema(moderationServiceMethods.ByName("GetFeedback")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceResolveFeedbackHandler := connect.NewUnaryHandler(
+		ModerationServiceResolveFeedbackProcedure,
+		svc.ResolveFeedback,
+		connect.WithSchema(moderationServiceMethods.ByName("ResolveFeedback")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceReplyFeedbackHandler := connect.NewUnaryHandler(
+		ModerationServiceReplyFeedbackProcedure,
+		svc.ReplyFeedback,
+		connect.WithSchema(moderationServiceMethods.ByName("ReplyFeedback")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.ModerationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModerationServiceGetReportsProcedure:
@@ -182,6 +265,12 @@ func NewModerationServiceHandler(svc ModerationServiceHandler, opts ...connect.H
 			moderationServiceResolveReportHandler.ServeHTTP(w, r)
 		case ModerationServiceLiftRestrictionProcedure:
 			moderationServiceLiftRestrictionHandler.ServeHTTP(w, r)
+		case ModerationServiceGetFeedbackProcedure:
+			moderationServiceGetFeedbackHandler.ServeHTTP(w, r)
+		case ModerationServiceResolveFeedbackProcedure:
+			moderationServiceResolveFeedbackHandler.ServeHTTP(w, r)
+		case ModerationServiceReplyFeedbackProcedure:
+			moderationServiceReplyFeedbackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -205,4 +294,16 @@ func (UnimplementedModerationServiceHandler) ResolveReport(context.Context, *con
 
 func (UnimplementedModerationServiceHandler) LiftRestriction(context.Context, *connect.Request[v1.LiftRestrictionRequest]) (*connect.Response[v1.LiftRestrictionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.LiftRestriction is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) GetFeedback(context.Context, *connect.Request[v1.GetFeedbackRequest]) (*connect.Response[v1.GetFeedbackResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.GetFeedback is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) ResolveFeedback(context.Context, *connect.Request[v1.ResolveFeedbackRequest]) (*connect.Response[v1.ResolveFeedbackResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.ResolveFeedback is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.ReplyFeedback is not implemented"))
 }

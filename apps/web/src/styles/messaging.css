@@ -698,6 +698,30 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 .pill.review { background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); }
 .pill.done { background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success-text); }
 .pill.skip { background: var(--c-bar-track); color: var(--c-text-muted); }
+/* Feedback (mockups/moderation.html#feedback) */
+/* Reports and feedback on narrow screens, where the side navigation is hidden. */
+.mod-tabs { display: none; }
+.mod-tabs a { flex: 1; display: grid; place-items: center; min-height: 44px; color: var(--c-text-muted); font-weight: 500; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+.mod-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+.fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.fb-item { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.fb-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.fb-who { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); min-width: 0; flex: 1; }
+.fb-who b { font-weight: 600; }
+.fb-who .mono { font-size: 0.8125rem; overflow-wrap: anywhere; }
+.fb-time { font-size: 0.8125rem; white-space: nowrap; }
+.fb-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fb-reply { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3); border-left: 3px solid var(--c-success); border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
+.fb-reply p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-meta { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+.fb-meta .icon { color: var(--c-success-text); }
+.fb-quote { margin: 0; padding: var(--space-2) var(--space-3); border-left: 3px solid var(--c-border-strong); background: var(--c-surface-subtle); border-radius: var(--radius-sm); font-size: 0.875rem; color: var(--c-text-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+	.fb-item { padding: var(--space-3); }
+	.fb-head { flex-wrap: wrap; }
+	.fb-actions .btn { flex: 1 1 140px; }
+}
 .no-rows .empty { padding: var(--space-6) var(--space-4); }
 .detail { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
 .col { display: grid; gap: var(--space-4); min-width: 0; }
@@ -872,6 +896,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 @media (max-width: 900px) {
 	.mod { grid-template-columns: minmax(0, 1fr); }
 	.mod-side { display: none; }
+	.mod-tabs { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
 }
 /* Narrow: one column at a time; the filter tabs stand in for the folder rail. */
 /* Narrow screens: a bot keyboard's toggle takes the emoji button's place (emoji stay on the system keyboard). */

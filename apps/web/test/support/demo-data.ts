@@ -2,7 +2,7 @@
 // #topics), seeded into the core's in-memory server. Test and harness only.
 import { ChatType, HistoryVisibility, MemberRole } from "@app/proto-ts/chats";
 import { EntityType } from "@app/proto-ts/messages";
-import { ModerationAction, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
+import { FeedbackKind, FeedbackStatus, ModerationAction, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
 import { ReportReason } from "@app/proto-ts/users";
 import { ChatFixture, type FixtureTopic } from "./fake-chat.ts";
 
@@ -185,6 +185,11 @@ export function seedDemo(): Demo {
 		{ id: 20481, kind: ReportTargetKind.MESSAGES, reporterId: minh, targetUserId: 0, targetChatId: deals, seqs: [scam], reason: ReportReason.SCAM, comment: "Link giả trang đăng nhập, đừng bấm.", status: ReportStatus.OPEN, createdAt: now - 1800, actions: [], note: "" },
 		{ id: 20477, kind: ReportTargetKind.USER, reporterId: lan, targetUserId: spammer, targetChatId: 0, seqs: [], reason: ReportReason.SPAM, comment: "", status: ReportStatus.OPEN, createdAt: now - 2400, actions: [], note: "" },
 		{ id: 20410, kind: ReportTargetKind.CHAT, reporterId: huy, targetUserId: 0, targetChatId: channel, seqs: [], reason: ReportReason.VIOLENCE, comment: "", status: ReportStatus.RESOLVED, createdAt: now - 90_000, actions: [ModerationAction.DELETE_MESSAGES], note: "Đã gỡ bài đe doạ" },
+	);
+	f.feedbackQueue.push(
+		{ id: 3, userId: lan, kind: FeedbackKind.BUG, text: "Gửi ảnh trong nhóm bị treo ở 99%.", status: FeedbackStatus.OPEN, createdAt: now - 600, handledBy: 0, replyText: "" },
+		{ id: 2, userId: minh, kind: FeedbackKind.IDEA, text: "Cho mình chọn chế độ tối theo giờ nhé.", status: FeedbackStatus.OPEN, createdAt: now - 1200, handledBy: 0, replyText: "" },
+		{ id: 1, userId: huy, kind: FeedbackKind.IDEA, text: "Nút gửi hơi nhỏ trên điện thoại.", status: FeedbackStatus.HANDLED, createdAt: now - 90_000, handledBy: f.selfId, replyText: "Đã sửa, bạn tải lại trang nhé." },
 	);
 	return {
 		fixture: f,

@@ -113,7 +113,10 @@ type Bot struct {
 	// nil when it never did.
 	LastUpdateAt *time.Time
 	// Webhook tells that updates are POSTed to the bot's webhook.
-	Webhook   bool
+	Webhook bool
+	// System marks the tenant's assistant: no human owner (OwnerID is the
+	// bot itself), no token, run inside the api process.
+	System    bool
 	tokenHash []byte
 }
 
@@ -215,7 +218,7 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 // ------------------------------------------------------------------- rows
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
-	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.token_hash`
+	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.is_system, b.token_hash`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -223,7 +226,7 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	b := &Bot{}
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
-		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.tokenHash)
+		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.tokenHash)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +241,7 @@ func (s *Service) ownedBot(ctx context.Context, q interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }, owner, botID int64, lock bool) (*Bot, error) {
 	sql := `SELECT ` + botColumns + ` FROM ` + botFrom + `
-		WHERE b.user_id = $1 AND b.owner_id = $2 AND b.tenant_id = $3 AND b.deleted_at IS NULL`
+		WHERE b.user_id = $1 AND b.owner_id = $2 AND b.tenant_id = $3 AND b.deleted_at IS NULL AND NOT b.is_system`
 	if lock {
 		sql += ` FOR UPDATE OF b`
 	}
@@ -328,7 +331,8 @@ func renderCommands(list []Command) []*appv1.BotCommand {
 // ListMyBots returns owner's live bots, oldest first.
 func (s *Service) ListMyBots(ctx context.Context, owner int64) ([]*appv1.Bot, error) {
 	rows, err := s.pool.Query(ctx, `SELECT `+botColumns+` FROM `+botFrom+`
-		WHERE b.owner_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL ORDER BY b.created_at, b.user_id`, owner, s.tenantID)
+		WHERE b.owner_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL AND NOT b.is_system
+		ORDER BY b.created_at, b.user_id`, owner, s.tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("botadmin: list bots: %w", err)
 	}
@@ -367,7 +371,7 @@ func (s *Service) CreateBot(ctx context.Context, owner int64, username, name str
 			return fmt.Errorf("botadmin: lock owner: %w", err)
 		}
 		var n int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM bots WHERE owner_id = $1 AND deleted_at IS NULL`, owner).Scan(&n); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM bots WHERE owner_id = $1 AND deleted_at IS NULL AND NOT is_system`, owner).Scan(&n); err != nil {
 			return fmt.Errorf("botadmin: count bots: %w", err)
 		}
 		if n >= BotsPerOwnerMax {

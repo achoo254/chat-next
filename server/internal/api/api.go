@@ -21,10 +21,12 @@ import (
 	"syscall"
 	"time"
 
+	"app.local/server/internal/assistant"
 	"app.local/server/internal/auth"
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botapi"
 	"app.local/server/internal/botupdates"
+	"app.local/server/internal/brand"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/config"
 	"app.local/server/internal/gateway"
@@ -57,6 +59,9 @@ type App struct {
 	// BotAdmin manages bots; BotUpdates feeds the Bot API's getUpdates.
 	BotAdmin   *botadmin.Service
 	BotUpdates *botupdates.Service
+	// Assistant is the tenant's official bot; nil when it could not be set
+	// up (its username belongs to someone else).
+	Assistant *assistant.Service
 
 	logger   *slog.Logger
 	cancel   context.CancelFunc
@@ -157,9 +162,18 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	}); err != nil {
 		return nil, err
 	}
+	assistantSvc, err := newAssistant(ctx, chatSvc, botAdmin, botUpdates, botAPI, logger)
+	if err != nil {
+		return nil, err
+	}
+	var feedback rpc.FeedbackReplier
+	if assistantSvc != nil {
+		feedback = assistantSvc
+	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
-		Bots: botAdmin, BotUpdates: botUpdates, TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
+		Bots: botAdmin, BotUpdates: botUpdates, Feedback: feedback, TenantID: cfg.TenantID, TenantName: cfg.TenantDomain,
+		Logger: logger,
 	})
 	if err != nil {
 		return nil, err
@@ -180,10 +194,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
-		BotAdmin: botAdmin, BotUpdates: botUpdates, logger: logger, cancel: cancel}
+		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, logger: logger, cancel: cancel}
 	loops := []func(context.Context){
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
+	}
+	if assistantSvc != nil {
+		loops = append(loops, assistantSvc.Run)
 	}
 	if mediaSvc != nil {
 		app.Handler = byHost(cfg.Media.PublicURL.Host, mediaSvc.Handler(), mux)
@@ -197,6 +214,32 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		}()
 	}
 	return app, nil
+}
+
+// newAssistant sets up the tenant's assistant bot. When another account
+// holds its username the app runs without it (logged as an error for the
+// operators); any other failure stops the start like other database errors.
+func newAssistant(ctx context.Context, chatSvc *chat.Service, admin *botadmin.Service, updates *botupdates.Service,
+	botAPI *botapi.Service, logger *slog.Logger) (*assistant.Service, error) {
+	names, err := brand.Load()
+	if err != nil {
+		return nil, err
+	}
+	svc, err := assistant.New(chatSvc, admin, updates, botAPI, names, logger.With("component", "assistant"))
+	if err != nil {
+		return nil, err
+	}
+	err = svc.Ensure(ctx)
+	if errors.Is(err, botadmin.ErrSystemUsernameTaken) {
+		logger.Error("assistant bot is off: another account holds its username; rename that account and restart",
+			"username", assistant.Username)
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("api: assistant bot: %w", err)
+	}
+	logger.Info("assistant bot ready", "bot_id", svc.BotID(), "username", assistant.Username)
+	return svc, nil
 }
 
 // outboundDeny is what URLs chosen by users and bots (webhooks, link

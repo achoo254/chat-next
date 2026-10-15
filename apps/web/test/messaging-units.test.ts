@@ -152,6 +152,7 @@ describe("routes", () => {
 		expect(matchRoute(paths.chatAdmin(5001))).toEqual({ name: "chat", chatId: 5001, topicId: 0, panel: "admin" });
 		expect(matchRoute("/settings/privacy")).toEqual({ name: "settings", tab: "privacy" });
 		expect(matchRoute(paths.moderation("R-1", true))).toEqual({ name: "moderation", reportId: "R-1", actions: true });
+		expect(matchRoute(paths.feedback())).toEqual({ name: "feedback" });
 		expect(matchRoute("/c/0")).toBeNull();
 		expect(matchRoute("/c/12345678901234567")).toBeNull();
 		expect(matchRoute("/moderation/%E0")).toBeNull();

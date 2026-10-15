@@ -3,8 +3,11 @@
 // report queue by status, a report with the messages around it and earlier
 // actions on the people involved, and the actions with a required reason:
 // remove content, remove and ban from the chat, restrict the chat account,
-// or dismiss. Active restrictions can be lifted early. Everyone else sees
-// "no access"; the server refuses them too.
+// or dismiss. Active restrictions can be lifted early. The feedback users
+// sent the assistant bot (#feedback) is listed next to the reports: mark it
+// handled or answer it through the bot. Everyone else sees "no access"; the
+// server refuses them too.
+import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
 import { useLoader as useDelayedLoader } from "../../components/delayed-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
@@ -12,7 +15,19 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useScreensCopy, type FullCopy } from "../copy/use-screens-copy.ts";
 import { clock, listTime, orgDomain, shortDate, toneOf } from "../data/format.ts";
-import type { ChatBrief, ModerationAction, ModerationReport, Person, ReportDetail, ReportStatus, ReportsPage, Restriction } from "../data/remote.ts";
+import type {
+	ChatBrief,
+	FeedbackItem,
+	FeedbackPage,
+	FeedbackStatus,
+	ModerationAction,
+	ModerationReport,
+	Person,
+	ReportDetail,
+	ReportStatus,
+	ReportsPage,
+	Restriction,
+} from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, Choice, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 
@@ -81,7 +96,7 @@ function describe(report: ModerationReport, people: ReadonlyMap<number, Person>,
 	return { title: chatTitle, sub: chat === undefined ? "" : t.memberCount(chat.memberCount, chat.channel) };
 }
 
-export default function Moderation({ reportId, actions }: { reportId: string | null; actions: boolean }) {
+export default function Moderation({ reportId, actions, feedback = false }: { reportId: string | null; actions: boolean; feedback?: boolean }) {
 	const copy = useScreensCopy();
 	const { self } = useServices();
 	const scope = orgDomain(window.location.host);
@@ -93,9 +108,13 @@ export default function Moderation({ reportId, actions }: { reportId: string | n
 					<Icon name="shield" />
 					<span>{copy.moderation.title}</span>
 				</div>
-				<Link to={paths.moderation()} className="nav" current>
+				<Link to={paths.moderation()} className="nav" current={!feedback}>
 					<Icon name="inbox" />
 					<span>{copy.moderation.queue}</span>
+				</Link>
+				<Link to={paths.feedback()} className="nav" current={feedback}>
+					<Icon name="message-dot" />
+					<span>{copy.moderation.feedback}</span>
 				</Link>
 				<div className="me">
 					<ChatAvatar id={self.id} name={self.name} size="sm" />
@@ -106,11 +125,23 @@ export default function Moderation({ reportId, actions }: { reportId: string | n
 				</div>
 			</nav>
 			<div className="mod-main">
+				{self.isOperator && (
+					<nav className="mod-tabs" aria-label={copy.moderation.title}>
+						<Link to={paths.moderation()} current={!feedback}>
+							{copy.moderation.queue}
+						</Link>
+						<Link to={paths.feedback()} current={feedback}>
+							{copy.moderation.feedback}
+						</Link>
+					</nav>
+				)}
 				{!self.isOperator ? (
 					<div className="empty">
 						<Icon name="shield" />
 						<strong>{copy.moderation.noAccess}</strong>
 					</div>
+				) : feedback ? (
+					<FeedbackQueue />
 				) : reportId === null ? (
 					<Queue scope={scope} />
 				) : id === null ? (
@@ -711,6 +742,238 @@ function LiftDialog({ userId, name, onClose, onDone }: { userId: number; name: s
 					</button>
 					<button type="submit" className="btn btn-primary" aria-busy={busy} disabled={busy}>
 						{t.lift}
+					</button>
+				</div>
+			</form>
+		</Modal>
+	);
+}
+
+/** The tabs of the feedback list. */
+const FEEDBACK_TABS: readonly FeedbackStatus[] = ["open", "handled"];
+
+function FeedbackQueue() {
+	const copy = useScreensCopy();
+	const { locale } = useI18n();
+	const { remote, toasts } = useServices();
+	const [status, setStatus] = useState<FeedbackStatus>("open");
+	const [first, retry] = useLoad(() => remote.moderationFeedback(status), `feedback:${status}`);
+	const [extra, setExtra] = useState<{ status: FeedbackStatus; pages: readonly FeedbackPage[] }>({ status, pages: [] });
+	if (extra.status !== status) setExtra({ status, pages: [] });
+	// Items changed here (handled, answered) since they were loaded.
+	const [changed, setChanged] = useState<ReadonlyMap<number, FeedbackItem>>(new Map());
+	const [replying, setReplying] = useState<FeedbackItem | null>(null);
+	const [busy, setBusy] = useState<ReadonlySet<number>>(new Set());
+	const t = copy.moderation;
+
+	const pages = first.status === "ready" ? [first.value, ...extra.pages] : [];
+	const people = new Map(pages.flatMap((page) => [...page.people]));
+	const cursor = pages.at(-1)?.nextCursor ?? "";
+	const items = pages
+		.flatMap((page) => page.items)
+		.map((item) => changed.get(item.id) ?? item)
+		.filter((item) => item.status === status);
+	const nameOf = (userId: number) => people.get(userId)?.name ?? copy.message.unknownUser;
+	const update = (item: FeedbackItem) => setChanged((current) => new Map(current).set(item.id, item));
+	const more = () => {
+		if (cursor === "") return;
+		remote.moderationFeedback(status, cursor).then(
+			(page) => setExtra((current) => (current.status === status ? { status, pages: [...current.pages, page] } : current)),
+			() => toasts.show(copy.common.failed),
+		);
+	};
+	const markHandled = (item: FeedbackItem) => {
+		setBusy((current) => new Set(current).add(item.id));
+		const done = () =>
+			setBusy((current) => {
+				const next = new Set(current);
+				next.delete(item.id);
+				return next;
+			});
+		remote.resolveFeedback(item.id).then(
+			(resolved) => {
+				done();
+				update(resolved);
+				toasts.show(t.markedHandled);
+			},
+			() => {
+				done();
+				toasts.show(copy.common.failed);
+			},
+		);
+	};
+	const now = new Date();
+	return (
+		<>
+			<header className="mod-head">
+				<h1>{t.feedback}</h1>
+				<span className="scope-lock hide-narrow">
+					<Icon name="robot" small />
+					{t.feedbackVia}
+				</span>
+			</header>
+			<div className="mod-body">
+				<div className="tabs" role="tablist" aria-label={t.feedbackStatus}>
+					{FEEDBACK_TABS.map((value) => (
+						<button key={value} type="button" role="tab" aria-selected={status === value} onClick={() => setStatus(value)}>
+							{value === "open" ? t.feedbackOpen : t.feedbackHandled}
+							{value === "open" && status === "open" && items.length > 0 && <span className="count">{cursor === "" ? items.length : `${items.length}+`}</span>}
+						</button>
+					))}
+				</div>
+				{first.status === "error" ? (
+					<div className="banner error" role="alert">
+						<Icon name="alert" small />
+						<span className="grow">{copy.common.loadFailed}</span>
+						<button type="button" className="btn btn-sm" onClick={retry}>
+							{copy.common.retry}
+						</button>
+					</div>
+				) : (
+					<ul className="fb-list" aria-busy={first.status === "loading"}>
+						{items.map((item) => {
+							const person = people.get(item.userId);
+							const name = nameOf(item.userId);
+							return (
+								<li className="fb-item" key={item.id}>
+									<div className="fb-head">
+										<ChatAvatar id={item.userId} name={name} size="sm" />
+										<span className="fb-who">
+											<b>{name}</b>
+											{person !== undefined && person.username !== "" && <span className="mono muted">@{person.username}</span>}
+										</span>
+										<span className={item.kind === "bug" ? "pill review" : "pill new"}>{t.feedbackKinds[item.kind] ?? item.kind}</span>
+										<span className="fb-time mono muted">{listTime(item.createdAt, now, locale, copy)}</span>
+									</div>
+									<p className="fb-text">{item.text}</p>
+									{item.status === "open" ? (
+										<div className="fb-actions">
+											<button type="button" className="btn btn-sm btn-primary" onClick={() => setReplying(item)}>
+												<Icon name="reply" small />
+												{t.reply}
+											</button>
+											<button type="button" className="btn btn-sm" aria-busy={busy.has(item.id)} disabled={busy.has(item.id)} onClick={() => markHandled(item)}>
+												{t.markHandled}
+											</button>
+										</div>
+									) : (
+										<div className="fb-reply">
+											<span className="fb-meta">
+												<Icon name="check" small />
+												{item.replyText !== ""
+													? t.repliedBy(nameOf(item.repliedBy), listTime(item.repliedAt, now, locale, copy))
+													: t.handledBy(nameOf(item.handledBy), listTime(item.handledAt, now, locale, copy))}
+											</span>
+											{item.replyText !== "" && <p>{item.replyText}</p>}
+										</div>
+									)}
+								</li>
+							);
+						})}
+						{first.status === "ready" && items.length === 0 && (
+							<li>
+								<div className="empty">
+									<Icon name="inbox" />
+									<strong>{status === "open" ? t.noFeedback : t.noHandledFeedback}</strong>
+									{status === "open" && <span>{t.noFeedbackHint}</span>}
+								</div>
+							</li>
+						)}
+					</ul>
+				)}
+				{cursor !== "" && (
+					<button type="button" className="btn" onClick={more}>
+						{t.more}
+					</button>
+				)}
+			</div>
+			{replying !== null && (
+				<ReplyDialog
+					item={replying}
+					name={nameOf(replying.userId)}
+					onClose={() => setReplying(null)}
+					onDone={(answered) => {
+						setReplying(null);
+						update(answered);
+					}}
+				/>
+			)}
+		</>
+	);
+}
+
+/** Why an answer was refused, as the server says it (message prefix). */
+function replyFailure(err: unknown, t: FullCopy["moderation"], fallback: string): string {
+	const error = ConnectError.from(err);
+	if (error.code === Code.FailedPrecondition && error.rawMessage.startsWith("already_replied")) return t.alreadyReplied;
+	if (error.code === Code.FailedPrecondition && error.rawMessage.startsWith("user_unreachable")) return t.userUnreachable;
+	return fallback;
+}
+
+/** Answers one feedback item through the assistant bot. */
+function ReplyDialog({ item, name, onClose, onDone }: { item: FeedbackItem; name: string; onClose: () => void; onDone: (item: FeedbackItem) => void }) {
+	const copy = useScreensCopy();
+	const { remote, toasts } = useServices();
+	const [text, setText] = useState("");
+	const [invalid, setInvalid] = useState(false);
+	const [busy, setBusy] = useState(false);
+	const id = useDomId("reply");
+	const t = copy.moderation;
+	const submit = (event: FormEvent) => {
+		event.preventDefault();
+		const answer = text.trim();
+		if (answer === "") {
+			setInvalid(true);
+			return;
+		}
+		setBusy(true);
+		remote.replyFeedback(item.id, answer).then(
+			(answered) => {
+				toasts.show(t.replied);
+				onDone(answered);
+			},
+			(err: unknown) => {
+				setBusy(false);
+				toasts.show(replyFailure(err, t, copy.common.failed));
+			},
+		);
+	};
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<form onSubmit={submit}>
+				<DialogHead id={id} title={t.replyTitle(name)} onClose={onClose} />
+				<div className="dlg-body flow">
+					<blockquote className="fb-quote">{item.text}</blockquote>
+					<div className="field">
+						<label htmlFor={`${id}-text`}>
+							{t.replyLabel} <span className="muted">{t.replyHint}</span>
+						</label>
+						<textarea
+							id={`${id}-text`}
+							className="input"
+							rows={4}
+							maxLength={2000}
+							value={text}
+							aria-invalid={invalid}
+							aria-describedby={invalid ? `${id}-err` : undefined}
+							onChange={(event) => {
+								setText(event.target.value);
+								if (event.target.value.trim() !== "") setInvalid(false);
+							}}
+						/>
+						{invalid && (
+							<span className="error-text" id={`${id}-err`}>
+								{t.replyRequired}
+							</span>
+						)}
+					</div>
+				</div>
+				<div className="dlg-foot">
+					<button type="button" className="btn" onClick={onClose}>
+						{copy.common.cancel}
+					</button>
+					<button type="submit" className="btn btn-primary" aria-busy={busy} disabled={busy}>
+						{t.sendReply}
 					</button>
 				</div>
 			</form>

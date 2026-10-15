@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -138,6 +139,8 @@ type Service struct {
 	onlineCounts map[onlineKey]onlineEntry
 
 	dispatch *dispatcher
+	// systemBot is the tenant's assistant bot (0 until SetSystemBot).
+	systemBot atomic.Int64
 	// background tracks goroutines Stop must wait for; stopCtx ends them.
 	background sync.WaitGroup
 	stopCtx    context.Context

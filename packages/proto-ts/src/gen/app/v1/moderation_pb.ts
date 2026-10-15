@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/moderation.proto.
  */
 export const file_app_v1_moderation: GenFile = /*@__PURE__*/
-  fileDesc("ChdhcHAvdjEvbW9kZXJhdGlvbi5wcm90bxIGYXBwLnYxIpUDCgZSZXBvcnQSDgoCaWQYASABKANCAjACEi0KC3RhcmdldF9raW5kGAIgASgOMhguYXBwLnYxLlJlcG9ydFRhcmdldEtpbmQSFwoLcmVwb3J0ZXJfaWQYAyABKANCAjACEhoKDnRhcmdldF91c2VyX2lkGAQgASgDQgIwAhIaCg50YXJnZXRfY2hhdF9pZBgFIAEoA0ICMAISEAoEc2VxcxgGIAMoA0ICMAISJAoGcmVhc29uGAcgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAggASgJEiQKBnN0YXR1cxgJIAEoDjIULmFwcC52MS5SZXBvcnRTdGF0dXMSFgoKY3JlYXRlZF9hdBgKIAEoA0ICMAISFwoLcmVzb2x2ZWRfYXQYCyABKANCAjACEhcKC3Jlc29sdmVkX2J5GAwgASgDQgIwAhIpCgdhY3Rpb25zGA0gAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SFwoPcmVzb2x1dGlvbl9ub3RlGA4gASgJImgKD1JlcG9ydGVkTWVzc2FnZRIPCgNzZXEYASABKANCAjACEhMKB2Zyb21faWQYAiABKANCAjACEhAKBGRhdGUYAyABKANCAjACEgwKBHRleHQYBCABKAkSDwoHZGVsZXRlZBgFIAEoCCLvAQoSTW9kZXJhdGlvbkxvZ0VudHJ5Eg4KAmlkGAEgASgDQgIwAhIXCgtvcGVyYXRvcl9pZBgCIAEoA0ICMAISFQoJcmVwb3J0X2lkGAMgASgDQgIwAhIoCgZhY3Rpb24YBCABKA4yGC5hcHAudjEuTW9kZXJhdGlvbkFjdGlvbhIaCg50YXJnZXRfdXNlcl9pZBgFIAEoA0ICMAISGgoOdGFyZ2V0X2NoYXRfaWQYBiABKANCAjACEgwKBG5vdGUYByABKAkSEQoFdW50aWwYCCABKANCAjACEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACImQKEkFjY291bnRSZXN0cmljdGlvbhITCgd1c2VyX2lkGAEgASgDQgIwAhIRCgV1bnRpbBgCIAEoA0ICMAISDgoGcmVhc29uGAMgASgJEhYKCmNyZWF0ZWRfYXQYBCABKANCAjACIq0BChFHZXRSZXBvcnRzUmVxdWVzdBIkCgZzdGF0dXMYASABKA4yFC5hcHAudjEuUmVwb3J0U3RhdHVzEiQKBnJlYXNvbhgCIAEoDjIULmFwcC52MS5SZXBvcnRSZWFzb24SLQoLdGFyZ2V0X2tpbmQYAyABKA4yGC5hcHAudjEuUmVwb3J0VGFyZ2V0S2luZBIOCgZjdXJzb3IYBCABKAkSDQoFbGltaXQYBSABKAUihAEKEkdldFJlcG9ydHNSZXNwb25zZRIfCgdyZXBvcnRzGAEgAygLMg4uYXBwLnYxLlJlcG9ydBIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhsKBWNoYXRzGAMgAygLMgwuYXBwLnYxLkNoYXQSEwoLbmV4dF9jdXJzb3IYBCABKAkiKQoQR2V0UmVwb3J0UmVxdWVzdBIVCglyZXBvcnRfaWQYASABKANCAjACIpgCChFHZXRSZXBvcnRSZXNwb25zZRIeCgZyZXBvcnQYASABKAsyDi5hcHAudjEuUmVwb3J0EikKCGV2aWRlbmNlGAIgAygLMhcuYXBwLnYxLlJlcG9ydGVkTWVzc2FnZRIgCgdjb250ZXh0GAMgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYBCADKAsyDC5hcHAudjEuVXNlchIaCgRjaGF0GAUgASgLMgwuYXBwLnYxLkNoYXQSKwoHaGlzdG9yeRgGIAMoCzIaLmFwcC52MS5Nb2RlcmF0aW9uTG9nRW50cnkSMAoMcmVzdHJpY3Rpb25zGAcgAygLMhouYXBwLnYxLkFjY291bnRSZXN0cmljdGlvbiKAAQoUUmVzb2x2ZVJlcG9ydFJlcXVlc3QSFQoJcmVwb3J0X2lkGAEgASgDQgIwAhIpCgdhY3Rpb25zGAIgAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SDAoEbm90ZRgDIAEoCRIYChByZXN0cmljdF9zZWNvbmRzGAQgASgFIjcKFVJlc29sdmVSZXBvcnRSZXNwb25zZRIeCgZyZXBvcnQYASABKAsyDi5hcHAudjEuUmVwb3J0IjsKFkxpZnRSZXN0cmljdGlvblJlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAISDAoEbm90ZRgCIAEoCSIZChdMaWZ0UmVzdHJpY3Rpb25SZXNwb25zZSp+CgxSZXBvcnRTdGF0dXMSHQoZUkVQT1JUX1NUQVRVU19VTlNQRUNJRklFRBAAEhYKElJFUE9SVF9TVEFUVVNfT1BFThABEhoKFlJFUE9SVF9TVEFUVVNfUkVTT0xWRUQQAhIbChdSRVBPUlRfU1RBVFVTX0RJU01JU1NFRBADKpEBChBSZXBvcnRUYXJnZXRLaW5kEiIKHlJFUE9SVF9UQVJHRVRfS0lORF9VTlNQRUNJRklFRBAAEhsKF1JFUE9SVF9UQVJHRVRfS0lORF9VU0VSEAESGwoXUkVQT1JUX1RBUkdFVF9LSU5EX0NIQVQQAhIfChtSRVBPUlRfVEFSR0VUX0tJTkRfTUVTU0FHRVMQAyrwAQoQTW9kZXJhdGlvbkFjdGlvbhIhCh1NT0RFUkFUSU9OX0FDVElPTl9VTlNQRUNJRklFRBAAEh0KGU1PREVSQVRJT05fQUNUSU9OX0RJU01JU1MQARIlCiFNT0RFUkFUSU9OX0FDVElPTl9ERUxFVEVfTUVTU0FHRVMQAhIjCh9NT0RFUkFUSU9OX0FDVElPTl9CQU5fRlJPTV9DSEFUEAMSJgoiTU9ERVJBVElPTl9BQ1RJT05fUkVTVFJJQ1RfQUNDT1VOVBAEEiYKIk1PREVSQVRJT05fQUNUSU9OX0xJRlRfUkVTVFJJQ1RJT04QBTK8AgoRTW9kZXJhdGlvblNlcnZpY2USQwoKR2V0UmVwb3J0cxIZLmFwcC52MS5HZXRSZXBvcnRzUmVxdWVzdBoaLmFwcC52MS5HZXRSZXBvcnRzUmVzcG9uc2USQAoJR2V0UmVwb3J0EhguYXBwLnYxLkdldFJlcG9ydFJlcXVlc3QaGS5hcHAudjEuR2V0UmVwb3J0UmVzcG9uc2USTAoNUmVzb2x2ZVJlcG9ydBIcLmFwcC52MS5SZXNvbHZlUmVwb3J0UmVxdWVzdBodLmFwcC52MS5SZXNvbHZlUmVwb3J0UmVzcG9uc2USUgoPTGlmdFJlc3RyaWN0aW9uEh4uYXBwLnYxLkxpZnRSZXN0cmljdGlvblJlcXVlc3QaHy5hcHAudjEuTGlmdFJlc3RyaWN0aW9uUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_chats, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChdhcHAvdjEvbW9kZXJhdGlvbi5wcm90bxIGYXBwLnYxIpUDCgZSZXBvcnQSDgoCaWQYASABKANCAjACEi0KC3RhcmdldF9raW5kGAIgASgOMhguYXBwLnYxLlJlcG9ydFRhcmdldEtpbmQSFwoLcmVwb3J0ZXJfaWQYAyABKANCAjACEhoKDnRhcmdldF91c2VyX2lkGAQgASgDQgIwAhIaCg50YXJnZXRfY2hhdF9pZBgFIAEoA0ICMAISEAoEc2VxcxgGIAMoA0ICMAISJAoGcmVhc29uGAcgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAggASgJEiQKBnN0YXR1cxgJIAEoDjIULmFwcC52MS5SZXBvcnRTdGF0dXMSFgoKY3JlYXRlZF9hdBgKIAEoA0ICMAISFwoLcmVzb2x2ZWRfYXQYCyABKANCAjACEhcKC3Jlc29sdmVkX2J5GAwgASgDQgIwAhIpCgdhY3Rpb25zGA0gAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SFwoPcmVzb2x1dGlvbl9ub3RlGA4gASgJImgKD1JlcG9ydGVkTWVzc2FnZRIPCgNzZXEYASABKANCAjACEhMKB2Zyb21faWQYAiABKANCAjACEhAKBGRhdGUYAyABKANCAjACEgwKBHRleHQYBCABKAkSDwoHZGVsZXRlZBgFIAEoCCLvAQoSTW9kZXJhdGlvbkxvZ0VudHJ5Eg4KAmlkGAEgASgDQgIwAhIXCgtvcGVyYXRvcl9pZBgCIAEoA0ICMAISFQoJcmVwb3J0X2lkGAMgASgDQgIwAhIoCgZhY3Rpb24YBCABKA4yGC5hcHAudjEuTW9kZXJhdGlvbkFjdGlvbhIaCg50YXJnZXRfdXNlcl9pZBgFIAEoA0ICMAISGgoOdGFyZ2V0X2NoYXRfaWQYBiABKANCAjACEgwKBG5vdGUYByABKAkSEQoFdW50aWwYCCABKANCAjACEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACImQKEkFjY291bnRSZXN0cmljdGlvbhITCgd1c2VyX2lkGAEgASgDQgIwAhIRCgV1bnRpbBgCIAEoA0ICMAISDgoGcmVhc29uGAMgASgJEhYKCmNyZWF0ZWRfYXQYBCABKANCAjACIq0BChFHZXRSZXBvcnRzUmVxdWVzdBIkCgZzdGF0dXMYASABKA4yFC5hcHAudjEuUmVwb3J0U3RhdHVzEiQKBnJlYXNvbhgCIAEoDjIULmFwcC52MS5SZXBvcnRSZWFzb24SLQoLdGFyZ2V0X2tpbmQYAyABKA4yGC5hcHAudjEuUmVwb3J0VGFyZ2V0S2luZBIOCgZjdXJzb3IYBCABKAkSDQoFbGltaXQYBSABKAUihAEKEkdldFJlcG9ydHNSZXNwb25zZRIfCgdyZXBvcnRzGAEgAygLMg4uYXBwLnYxLlJlcG9ydBIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhsKBWNoYXRzGAMgAygLMgwuYXBwLnYxLkNoYXQSEwoLbmV4dF9jdXJzb3IYBCABKAkiKQoQR2V0UmVwb3J0UmVxdWVzdBIVCglyZXBvcnRfaWQYASABKANCAjACIpgCChFHZXRSZXBvcnRSZXNwb25zZRIeCgZyZXBvcnQYASABKAsyDi5hcHAudjEuUmVwb3J0EikKCGV2aWRlbmNlGAIgAygLMhcuYXBwLnYxLlJlcG9ydGVkTWVzc2FnZRIgCgdjb250ZXh0GAMgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYBCADKAsyDC5hcHAudjEuVXNlchIaCgRjaGF0GAUgASgLMgwuYXBwLnYxLkNoYXQSKwoHaGlzdG9yeRgGIAMoCzIaLmFwcC52MS5Nb2RlcmF0aW9uTG9nRW50cnkSMAoMcmVzdHJpY3Rpb25zGAcgAygLMhouYXBwLnYxLkFjY291bnRSZXN0cmljdGlvbiKAAQoUUmVzb2x2ZVJlcG9ydFJlcXVlc3QSFQoJcmVwb3J0X2lkGAEgASgDQgIwAhIpCgdhY3Rpb25zGAIgAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SDAoEbm90ZRgDIAEoCRIYChByZXN0cmljdF9zZWNvbmRzGAQgASgFIjcKFVJlc29sdmVSZXBvcnRSZXNwb25zZRIeCgZyZXBvcnQYASABKAsyDi5hcHAudjEuUmVwb3J0IjsKFkxpZnRSZXN0cmljdGlvblJlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAISDAoEbm90ZRgCIAEoCSIZChdMaWZ0UmVzdHJpY3Rpb25SZXNwb25zZSKVAgoIRmVlZGJhY2sSDgoCaWQYASABKANCAjACEhMKB3VzZXJfaWQYAiABKANCAjACEiIKBGtpbmQYAyABKA4yFC5hcHAudjEuRmVlZGJhY2tLaW5kEgwKBHRleHQYBCABKAkSJgoGc3RhdHVzGAUgASgOMhYuYXBwLnYxLkZlZWRiYWNrU3RhdHVzEhYKCmNyZWF0ZWRfYXQYBiABKANCAjACEhYKCmhhbmRsZWRfYXQYByABKANCAjACEhYKCmhhbmRsZWRfYnkYCCABKANCAjACEhIKCnJlcGx5X3RleHQYCSABKAkSFgoKcmVwbGllZF9hdBgKIAEoA0ICMAISFgoKcmVwbGllZF9ieRgLIAEoA0ICMAIiWwoSR2V0RmVlZGJhY2tSZXF1ZXN0EiYKBnN0YXR1cxgBIAEoDjIWLmFwcC52MS5GZWVkYmFja1N0YXR1cxIOCgZjdXJzb3IYAiABKAkSDQoFbGltaXQYAyABKAUiawoTR2V0RmVlZGJhY2tSZXNwb25zZRIiCghmZWVkYmFjaxgBIAMoCzIQLmFwcC52MS5GZWVkYmFjaxIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhMKC25leHRfY3Vyc29yGAMgASgJIjEKFlJlc29sdmVGZWVkYmFja1JlcXVlc3QSFwoLZmVlZGJhY2tfaWQYASABKANCAjACIj0KF1Jlc29sdmVGZWVkYmFja1Jlc3BvbnNlEiIKCGZlZWRiYWNrGAEgASgLMhAuYXBwLnYxLkZlZWRiYWNrIj0KFFJlcGx5RmVlZGJhY2tSZXF1ZXN0EhcKC2ZlZWRiYWNrX2lkGAEgASgDQgIwAhIMCgR0ZXh0GAIgASgJIjsKFVJlcGx5RmVlZGJhY2tSZXNwb25zZRIiCghmZWVkYmFjaxgBIAEoCzIQLmFwcC52MS5GZWVkYmFjayp+CgxSZXBvcnRTdGF0dXMSHQoZUkVQT1JUX1NUQVRVU19VTlNQRUNJRklFRBAAEhYKElJFUE9SVF9TVEFUVVNfT1BFThABEhoKFlJFUE9SVF9TVEFUVVNfUkVTT0xWRUQQAhIbChdSRVBPUlRfU1RBVFVTX0RJU01JU1NFRBADKpEBChBSZXBvcnRUYXJnZXRLaW5kEiIKHlJFUE9SVF9UQVJHRVRfS0lORF9VTlNQRUNJRklFRBAAEhsKF1JFUE9SVF9UQVJHRVRfS0lORF9VU0VSEAESGwoXUkVQT1JUX1RBUkdFVF9LSU5EX0NIQVQQAhIfChtSRVBPUlRfVEFSR0VUX0tJTkRfTUVTU0FHRVMQAyrwAQoQTW9kZXJhdGlvbkFjdGlvbhIhCh1NT0RFUkFUSU9OX0FDVElPTl9VTlNQRUNJRklFRBAAEh0KGU1PREVSQVRJT05fQUNUSU9OX0RJU01JU1MQARIlCiFNT0RFUkFUSU9OX0FDVElPTl9ERUxFVEVfTUVTU0FHRVMQAhIjCh9NT0RFUkFUSU9OX0FDVElPTl9CQU5fRlJPTV9DSEFUEAMSJgoiTU9ERVJBVElPTl9BQ1RJT05fUkVTVFJJQ1RfQUNDT1VOVBAEEiYKIk1PREVSQVRJT05fQUNUSU9OX0xJRlRfUkVTVFJJQ1RJT04QBSpoCg5GZWVkYmFja1N0YXR1cxIfChtGRUVEQkFDS19TVEFUVVNfVU5TUEVDSUZJRUQQABIYChRGRUVEQkFDS19TVEFUVVNfT1BFThABEhsKF0ZFRURCQUNLX1NUQVRVU19IQU5ETEVEEAIqXAoMRmVlZGJhY2tLaW5kEh0KGUZFRURCQUNLX0tJTkRfVU5TUEVDSUZJRUQQABIWChJGRUVEQkFDS19LSU5EX0lERUEQARIVChFGRUVEQkFDS19LSU5EX0JVRxACMqYEChFNb2RlcmF0aW9uU2VydmljZRJDCgpHZXRSZXBvcnRzEhkuYXBwLnYxLkdldFJlcG9ydHNSZXF1ZXN0GhouYXBwLnYxLkdldFJlcG9ydHNSZXNwb25zZRJACglHZXRSZXBvcnQSGC5hcHAudjEuR2V0UmVwb3J0UmVxdWVzdBoZLmFwcC52MS5HZXRSZXBvcnRSZXNwb25zZRJMCg1SZXNvbHZlUmVwb3J0EhwuYXBwLnYxLlJlc29sdmVSZXBvcnRSZXF1ZXN0Gh0uYXBwLnYxLlJlc29sdmVSZXBvcnRSZXNwb25zZRJSCg9MaWZ0UmVzdHJpY3Rpb24SHi5hcHAudjEuTGlmdFJlc3RyaWN0aW9uUmVxdWVzdBofLmFwcC52MS5MaWZ0UmVzdHJpY3Rpb25SZXNwb25zZRJGCgtHZXRGZWVkYmFjaxIaLmFwcC52MS5HZXRGZWVkYmFja1JlcXVlc3QaGy5hcHAudjEuR2V0RmVlZGJhY2tSZXNwb25zZRJSCg9SZXNvbHZlRmVlZGJhY2sSHi5hcHAudjEuUmVzb2x2ZUZlZWRiYWNrUmVxdWVzdBofLmFwcC52MS5SZXNvbHZlRmVlZGJhY2tSZXNwb25zZRJMCg1SZXBseUZlZWRiYWNrEhwuYXBwLnYxLlJlcGx5RmVlZGJhY2tSZXF1ZXN0Gh0uYXBwLnYxLlJlcGx5RmVlZGJhY2tSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_chats, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.Report
@@ -496,6 +496,218 @@ export const LiftRestrictionResponseSchema: GenMessage<LiftRestrictionResponse> 
   messageDesc(file_app_v1_moderation, 11);
 
 /**
+ * One message a user sent the assistant bot as feedback.
+ *
+ * @generated from message app.v1.Feedback
+ */
+export type Feedback = Message<"app.v1.Feedback"> & {
+  /**
+   * @generated from field: int64 id = 1 [jstype = JS_NUMBER];
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: int64 user_id = 2 [jstype = JS_NUMBER];
+   */
+  userId: bigint;
+
+  /**
+   * @generated from field: app.v1.FeedbackKind kind = 3;
+   */
+  kind: FeedbackKind;
+
+  /**
+   * @generated from field: string text = 4;
+   */
+  text: string;
+
+  /**
+   * @generated from field: app.v1.FeedbackStatus status = 5;
+   */
+  status: FeedbackStatus;
+
+  /**
+   * @generated from field: int64 created_at = 6 [jstype = JS_NUMBER];
+   */
+  createdAt: bigint;
+
+  /**
+   * Handled items: when and by which operator.
+   *
+   * @generated from field: int64 handled_at = 7 [jstype = JS_NUMBER];
+   */
+  handledAt: bigint;
+
+  /**
+   * @generated from field: int64 handled_by = 8 [jstype = JS_NUMBER];
+   */
+  handledBy: bigint;
+
+  /**
+   * The operator's answer sent to the user; empty when none was sent.
+   *
+   * @generated from field: string reply_text = 9;
+   */
+  replyText: string;
+
+  /**
+   * @generated from field: int64 replied_at = 10 [jstype = JS_NUMBER];
+   */
+  repliedAt: bigint;
+
+  /**
+   * @generated from field: int64 replied_by = 11 [jstype = JS_NUMBER];
+   */
+  repliedBy: bigint;
+};
+
+/**
+ * Describes the message app.v1.Feedback.
+ * Use `create(FeedbackSchema)` to create a new message.
+ */
+export const FeedbackSchema: GenMessage<Feedback> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 12);
+
+/**
+ * @generated from message app.v1.GetFeedbackRequest
+ */
+export type GetFeedbackRequest = Message<"app.v1.GetFeedbackRequest"> & {
+  /**
+   * UNSPECIFIED lists open items.
+   *
+   * @generated from field: app.v1.FeedbackStatus status = 1;
+   */
+  status: FeedbackStatus;
+
+  /**
+   * Opaque cursor from a previous response; empty for the first page.
+   *
+   * @generated from field: string cursor = 2;
+   */
+  cursor: string;
+
+  /**
+   * Default 50, at most 200.
+   *
+   * @generated from field: int32 limit = 3;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message app.v1.GetFeedbackRequest.
+ * Use `create(GetFeedbackRequestSchema)` to create a new message.
+ */
+export const GetFeedbackRequestSchema: GenMessage<GetFeedbackRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 13);
+
+/**
+ * @generated from message app.v1.GetFeedbackResponse
+ */
+export type GetFeedbackResponse = Message<"app.v1.GetFeedbackResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.Feedback feedback = 1;
+   */
+  feedback: Feedback[];
+
+  /**
+   * The senders and the operators of these items.
+   *
+   * @generated from field: repeated app.v1.User users = 2;
+   */
+  users: User[];
+
+  /**
+   * Empty when there are no more items.
+   *
+   * @generated from field: string next_cursor = 3;
+   */
+  nextCursor: string;
+};
+
+/**
+ * Describes the message app.v1.GetFeedbackResponse.
+ * Use `create(GetFeedbackResponseSchema)` to create a new message.
+ */
+export const GetFeedbackResponseSchema: GenMessage<GetFeedbackResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 14);
+
+/**
+ * @generated from message app.v1.ResolveFeedbackRequest
+ */
+export type ResolveFeedbackRequest = Message<"app.v1.ResolveFeedbackRequest"> & {
+  /**
+   * @generated from field: int64 feedback_id = 1 [jstype = JS_NUMBER];
+   */
+  feedbackId: bigint;
+};
+
+/**
+ * Describes the message app.v1.ResolveFeedbackRequest.
+ * Use `create(ResolveFeedbackRequestSchema)` to create a new message.
+ */
+export const ResolveFeedbackRequestSchema: GenMessage<ResolveFeedbackRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 15);
+
+/**
+ * @generated from message app.v1.ResolveFeedbackResponse
+ */
+export type ResolveFeedbackResponse = Message<"app.v1.ResolveFeedbackResponse"> & {
+  /**
+   * @generated from field: app.v1.Feedback feedback = 1;
+   */
+  feedback?: Feedback | undefined;
+};
+
+/**
+ * Describes the message app.v1.ResolveFeedbackResponse.
+ * Use `create(ResolveFeedbackResponseSchema)` to create a new message.
+ */
+export const ResolveFeedbackResponseSchema: GenMessage<ResolveFeedbackResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 16);
+
+/**
+ * @generated from message app.v1.ReplyFeedbackRequest
+ */
+export type ReplyFeedbackRequest = Message<"app.v1.ReplyFeedbackRequest"> & {
+  /**
+   * @generated from field: int64 feedback_id = 1 [jstype = JS_NUMBER];
+   */
+  feedbackId: bigint;
+
+  /**
+   * Required, up to 2000 characters.
+   *
+   * @generated from field: string text = 2;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message app.v1.ReplyFeedbackRequest.
+ * Use `create(ReplyFeedbackRequestSchema)` to create a new message.
+ */
+export const ReplyFeedbackRequestSchema: GenMessage<ReplyFeedbackRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 17);
+
+/**
+ * @generated from message app.v1.ReplyFeedbackResponse
+ */
+export type ReplyFeedbackResponse = Message<"app.v1.ReplyFeedbackResponse"> & {
+  /**
+   * @generated from field: app.v1.Feedback feedback = 1;
+   */
+  feedback?: Feedback | undefined;
+};
+
+/**
+ * Describes the message app.v1.ReplyFeedbackResponse.
+ * Use `create(ReplyFeedbackResponseSchema)` to create a new message.
+ */
+export const ReplyFeedbackResponseSchema: GenMessage<ReplyFeedbackResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 18);
+
+/**
  * @generated from enum app.v1.ReportStatus
  */
 export enum ReportStatus {
@@ -617,6 +829,62 @@ export const ModerationActionSchema: GenEnum<ModerationAction> = /*@__PURE__*/
   enumDesc(file_app_v1_moderation, 2);
 
 /**
+ * @generated from enum app.v1.FeedbackStatus
+ */
+export enum FeedbackStatus {
+  /**
+   * @generated from enum value: FEEDBACK_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: FEEDBACK_STATUS_OPEN = 1;
+   */
+  OPEN = 1,
+
+  /**
+   * @generated from enum value: FEEDBACK_STATUS_HANDLED = 2;
+   */
+  HANDLED = 2,
+}
+
+/**
+ * Describes the enum app.v1.FeedbackStatus.
+ */
+export const FeedbackStatusSchema: GenEnum<FeedbackStatus> = /*@__PURE__*/
+  enumDesc(file_app_v1_moderation, 3);
+
+/**
+ * @generated from enum app.v1.FeedbackKind
+ */
+export enum FeedbackKind {
+  /**
+   * @generated from enum value: FEEDBACK_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * "Góp ý": an idea or a remark.
+   *
+   * @generated from enum value: FEEDBACK_KIND_IDEA = 1;
+   */
+  IDEA = 1,
+
+  /**
+   * "Báo lỗi": something does not work.
+   *
+   * @generated from enum value: FEEDBACK_KIND_BUG = 2;
+   */
+  BUG = 2,
+}
+
+/**
+ * Describes the enum app.v1.FeedbackKind.
+ */
+export const FeedbackKindSchema: GenEnum<FeedbackKind> = /*@__PURE__*/
+  enumDesc(file_app_v1_moderation, 4);
+
+/**
  * The moderation queue of the tenant. Only operator accounts (configured by
  * the server operators, none by default) may call it; everyone else gets
  * permission_denied. GetSelfResponse.is_operator tells clients whether to
@@ -666,6 +934,40 @@ export const ModerationService: GenService<{
     methodKind: "unary";
     input: typeof LiftRestrictionRequestSchema;
     output: typeof LiftRestrictionResponseSchema;
+  },
+  /**
+   * Feedback users sent the tenant's assistant bot ("Góp ý" and "Báo lỗi"),
+   * newest first.
+   *
+   * @generated from rpc app.v1.ModerationService.GetFeedback
+   */
+  getFeedback: {
+    methodKind: "unary";
+    input: typeof GetFeedbackRequestSchema;
+    output: typeof GetFeedbackResponseSchema;
+  },
+  /**
+   * Marks a feedback item handled; an item already handled is returned as
+   * is.
+   *
+   * @generated from rpc app.v1.ModerationService.ResolveFeedback
+   */
+  resolveFeedback: {
+    methodKind: "unary";
+    input: typeof ResolveFeedbackRequestSchema;
+    output: typeof ResolveFeedbackResponseSchema;
+  },
+  /**
+   * Sends the operator's answer to the user through the assistant bot (as a
+   * reply to their message) and marks the item handled. One answer per
+   * item: a second gives failed_precondition "already_replied".
+   *
+   * @generated from rpc app.v1.ModerationService.ReplyFeedback
+   */
+  replyFeedback: {
+    methodKind: "unary";
+    input: typeof ReplyFeedbackRequestSchema;
+    output: typeof ReplyFeedbackResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_moderation, 0);

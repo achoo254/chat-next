@@ -6,7 +6,7 @@
 // grouped search, keyboard shortcuts, the list width handle and the composer.
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
 import { EntityType } from "@app/proto-ts/messages";
-import { ModerationAction } from "@app/proto-ts/moderation";
+import { FeedbackStatus, ModerationAction } from "@app/proto-ts/moderation";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -333,6 +333,43 @@ describe("moderation", () => {
 		await waitFor(() => expect(demo.fixture.reportQueue.find((report) => report.id === 20481)?.actions).toEqual([ModerationAction.DELETE_MESSAGES]), LONG);
 		expect(await screen.findByText("Đã thực hiện hành động, đã ghi nhật ký")).toBeTruthy();
 		await waitFor(() => expect(window.location.pathname).toBe("/moderation"), LONG);
+	});
+
+	it("lists the assistant's feedback, marks it handled and answers it", async () => {
+		const demo = seedDemo();
+		demo.fixture.operator = true;
+		renderMessaging(demo.fixture, "/moderation");
+		// The side navigation; narrow screens show the same links as tabs instead.
+		const [sideLink] = await screen.findAllByRole("link", { name: "Góp ý" }, LONG);
+		if (sideLink === undefined) throw new Error("no feedback link");
+		await userEvent.click(sideLink);
+		await waitFor(() => expect(window.location.pathname).toBe("/moderation/feedback"), LONG);
+		expect(await screen.findByText("Gửi ảnh trong nhóm bị treo ở 99%.", {}, LONG)).toBeTruthy();
+		expect(screen.getByText("Báo lỗi")).toBeTruthy();
+		expect(screen.queryByText("Nút gửi hơi nhỏ trên điện thoại.")).toBeNull();
+
+		const idea = screen.getByText("Cho mình chọn chế độ tối theo giờ nhé.").closest("li");
+		if (idea === null) throw new Error("item not found");
+		await userEvent.click(within(idea).getByRole("button", { name: "Đã xử lý" }));
+		expect(await screen.findByText("Đã chuyển sang Đã xử lý", {}, LONG)).toBeTruthy();
+		await waitFor(() => expect(screen.queryByText("Cho mình chọn chế độ tối theo giờ nhé.")).toBeNull(), LONG);
+		expect(demo.fixture.feedbackQueue.find((f) => f.id === 2)?.status).toBe(FeedbackStatus.HANDLED);
+
+		const bug = screen.getByText("Gửi ảnh trong nhóm bị treo ở 99%.").closest("li");
+		if (bug === null) throw new Error("item not found");
+		await userEvent.click(within(bug).getByRole("button", { name: "Trả lời" }));
+		const dialog = await screen.findByRole("dialog", { name: /Trả lời/ }, LONG);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi trả lời" }));
+		expect(within(dialog).getByText("Nhập câu trả lời trước khi gửi.")).toBeTruthy();
+		await userEvent.type(within(dialog).getByRole("textbox", { name: /Câu trả lời/ }), "Đã sửa, cảm ơn bạn");
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi trả lời" }));
+		expect(await screen.findByText("Đã gửi trả lời qua bot Trợ lý", {}, LONG)).toBeTruthy();
+		expect(demo.fixture.feedbackQueue.find((f) => f.id === 3)?.replyText).toBe("Đã sửa, cảm ơn bạn");
+
+		await userEvent.click(screen.getByRole("tab", { name: "Đã xử lý" }));
+		expect(await screen.findByText("Đã sửa, cảm ơn bạn", {}, LONG)).toBeTruthy();
+		expect(screen.getByText("Nút gửi hơi nhỏ trên điện thoại.")).toBeTruthy();
+		expect(screen.getAllByText(/^Đã trả lời ·/).length).toBe(2);
 	});
 
 	it("shows closed reports under their status", async () => {

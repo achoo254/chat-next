@@ -69,6 +69,14 @@ Bản hardening webhook và service worker (sau review 2026-10-15) **phải depl
 - Developer Console: đặt hay đổi webhook (`SetBotWebhook`) cần đăng nhập IdP trong 10 phút như cấp lại token; quay về từ trang đăng nhập, Console mở hộp xác nhận với những gì đã nhập (giữ trong `sessionStorage` của tab, dùng một lần) và chỉ lưu khi bấm nút. `PUT /bot/v1/webhook` của Bot API không đổi (đã cần token). Đổi URL webhook ở Console cần secret mới.
 - Webhook: câu trả lời 2xx chỉ đọc tối đa 64 KiB cho hành động; cả process tối đa 256 request đang chạy, chia đều giữa các bot; `Retry-After: 0` vẫn chờ 1 giây; bot rảnh không đọc DB theo đồng hồ. Số liệu 24 giờ của Console tính cả từ update còn lưu, nên có số từ trước khi bộ đếm ra đời.
 
+Release R5 bot chính thức (Trợ lý, migration `0016_system_bot_feedback`) không đổi nginx, script, DNS hay biến môi trường; deploy tự động như các lần sau, không cần root.
+
+- Migration chỉ thêm: cột `bots.is_system` (một bot hệ thống mỗi tenant, unique index), bảng `feedback`. Binary trước vẫn chạy trên schema mới: bot Trợ lý là một dòng `bots` hợp lệ (tự sở hữu, `owner_id` là chính nó), binary cũ không chạy logic của nó nên Trợ lý im lặng cho tới khi lên lại bản này.
+- Khi khởi động, `chat-api` tạo (lần đầu) hoặc cập nhật bot Trợ lý: username `tro_ly_bot`, tên `<shortName> Trợ lý` lấy từ `brand.config.json` (bản sao `server/internal/brand/brand.json`, sinh bằng `pnpm brand:gen`), log `assistant bot ready`. Nếu một tài khoản đã giữ username đó, app vẫn chạy nhưng không có Trợ lý, log `Error` `assistant bot is off: another account holds its username`; đổi username tài khoản đó rồi reload.
+- Mỗi người dùng có chat trống với Trợ lý ở lần mở app kế tiếp (`GetSelf`), ngay dưới "Cloud của tôi"; không có tin hàng loạt. Bot chỉ chào sau khi người dùng bấm "Bắt đầu".
+- Góp ý gửi cho Trợ lý nằm ở Kiểm duyệt > Góp ý, chỉ tài khoản vận hành thấy: đặt `CHAT_OPERATOR_USER_IDS` như ở [Tài khoản vận hành](#tài-khoản-vận-hành-kiểm-duyệt). Chưa đặt thì góp ý vẫn được lưu, chỉ chưa ai đọc được.
+- Rollback code về bản trước: chat với Trợ lý vẫn hiện (là chat với một bot), bấm "Bắt đầu" không có trả lời; góp ý đã lưu giữ nguyên.
+
 ## Các lần sau
 
 Mặc định deploy tự động: mỗi lần `ci` xanh trên `main`, workflow [`deploy`](../.github/workflows/deploy.yml) build release trong một job không có key deploy, rồi job deploy tải lên `/opt/chat/incoming/<id>` bằng user `chat-deploy` rồi gọi lệnh sudo duy nhất user này có, `/usr/local/sbin/chat-activate-incoming <id>` ([`activate-incoming.sh`](../infra/chat/activate-incoming.sh)). Lệnh đó chuyển bản upload vào `/opt/chat/staging` (chỉ root), đổi chủ sang root rồi mới kiểm (từ chối symlink và file đặc biệt), chuyển sang `/opt/chat/releases`, thay conf nginx bằng bản trong `/opt/chat/infra/nginx` (bản upload không đổi được nginx), rồi chạy `activate-release.sh`; cuối cùng workflow chạy `smoke.sh`.
@@ -121,6 +129,14 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
   - consent: `SELECT source, created_at FROM bot_user_consent WHERE bot_id = <id> AND user_id = <user>;` (bot gửi riêng cho người chưa có dòng này nhận `403 no_consent`).
 - Tầng `verified`/`internal` (rate limit cao hơn) chỉ đội vận hành đặt: `UPDATE bots SET verified = true WHERE user_id = <id>;`.
 - Token lộ: chủ bot cấp lại token trong app. Người vận hành vô hiệu hoá khẩn cấp: `UPDATE bots SET token_hash = NULL WHERE user_id = <id>;` (có hiệu lực ở request kế tiếp).
+
+## Bot chính thức (Trợ lý)
+
+- Bot hệ thống của tenant chạy trong `chat-api` (không token, không có trong Developer Console của ai), giao thức ở [`server/README.md`](../server/README.md#bot-chính-thức-trợ-lý-package-internalassistant). Người vận hành đọc và trả lời góp ý ở Kiểm duyệt > Góp ý (cần `CHAT_OPERATOR_USER_IDS`).
+- Tra cứu (qua [`psql.sh`](../infra/chat/psql.sh)):
+  - bot: `SELECT b.user_id, u.username, u.name, b.verified, b.internal FROM bots b JOIN users u ON u.id = b.user_id WHERE b.is_system;`
+  - góp ý đang chờ: `SELECT id, user_id, kind, created_at, left(text, 80) FROM feedback WHERE status = 'open' ORDER BY id DESC LIMIT 20;`
+  - Trợ lý không trả lời: update chờ của nó `SELECT count(*) FROM bot_updates WHERE bot_id = <id> AND NOT acked;` và log `assistant` (`assistant could not read its updates`, `assistant skipped an update`).
 
 ## Media (R3)
 

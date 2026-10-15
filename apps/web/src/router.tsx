@@ -27,6 +27,8 @@ export type Route =
 	/** userId 0: the list without a profile open. */
 	| { name: "contacts"; userId: number }
 	| { name: "moderation"; reportId: string | null; actions: boolean }
+	/** The feedback users sent the assistant bot, in the moderation screen. */
+	| { name: "feedback" }
 	| { name: "console"; view: ConsolePage }
 	/** A bot deep link (/b/<username>?start=<param>); the start parameter is read from the query. */
 	| { name: "bot"; username: string };
@@ -53,6 +55,7 @@ export const paths = {
 	botLink: (username: string, startParam = "") => (startParam === "" ? `/b/${username}` : `/b/${username}?start=${encodeURIComponent(startParam)}`),
 	moderation: (reportId?: string, actions = false) =>
 		reportId === undefined ? "/moderation" : `/moderation/${encodeURIComponent(reportId)}${actions ? "/actions" : ""}`,
+	feedback: () => "/moderation/feedback",
 } as const;
 
 const ID = /^[1-9][0-9]{0,15}$/;
@@ -115,6 +118,7 @@ function matchMessaging(path: string): Route | null {
 	}
 	if (parts[0] === "moderation") {
 		if (parts.length === 1) return { name: "moderation", reportId: null, actions: false };
+		if (parts.length === 2 && parts[1] === "feedback") return { name: "feedback" };
 		const reportId = parts[1] === undefined ? "" : decodeURIComponent(parts[1]);
 		if (!REPORT_ID.test(reportId)) return null;
 		if (parts.length === 2) return { name: "moderation", reportId, actions: false };

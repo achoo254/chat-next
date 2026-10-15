@@ -27,12 +27,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
 	"app.local/server/internal/api"
 	"app.local/server/internal/auth/idptest"
 	"app.local/server/internal/config"
+	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
 )
 
@@ -43,7 +45,14 @@ var Accounts = []idptest.Account{
 	{Sub: "acc_e2e_chi", SID: "sid-chi", PreferredUsername: "chi", Name: "Chi", Email: "chi@e2e.test", EmailVerified: true},
 	// Kept for scenarios that need an account nobody has talked to yet.
 	{Sub: "acc_e2e_dung", SID: "sid-dung", PreferredUsername: "dung", Name: "Dũng", Email: "dung@e2e.test", EmailVerified: true},
+	// A brand-new account for the assistant bot scenario.
+	{Sub: "acc_e2e_giang", SID: "sid-giang", PreferredUsername: "giang", Name: "Giang", Email: "giang@e2e.test", EmailVerified: true},
 }
+
+// operatorSub is the account that may use the moderation queue (Chi): it
+// is created before the api starts so its id can go into
+// CHAT_OPERATOR_USER_IDS.
+const operatorSub = "acc_e2e_chi"
 
 const clientID = "chat-web"
 
@@ -89,6 +98,11 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 		return fmt.Errorf("migrate: %w", err)
 	}
 
+	operator, err := createOperator(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("operator account: %w", err)
+	}
+
 	secret, sessionKey := randomBase64(24), randomBase64(32)
 	idp, err := idptest.Serve(idpAddr, clientID, secret, Accounts)
 	if err != nil {
@@ -114,6 +128,7 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 		"MEDIA_MIN_FREE_BYTES": "0",
 		// The bots scenario runs its webhook receiver on loopback over http.
 		"BOT_WEBHOOK_ALLOW_LOCAL": "true",
+		"CHAT_OPERATOR_USER_IDS":  strconv.FormatInt(operator, 10),
 	}
 	cfg, err := config.Load(func(name string) (string, bool) { v, ok := env[name]; return v, ok })
 	if err != nil {
@@ -122,6 +137,30 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 
 	go announceReady(ctx, apiAddr, public, idp.Issuer())
 	return api.RunWrapped(ctx, cfg, logger, newRealtimeSwitch().wrap)
+}
+
+// createOperator creates the operator's account as its first sign-in
+// would, in the tenant the api uses by default, and returns its id.
+func createOperator(ctx context.Context, dbURL string) (int64, error) {
+	st, err := store.Open(ctx, dbURL)
+	if err != nil {
+		return 0, err
+	}
+	defer st.Close()
+	if err := st.EnsureTenant(ctx, config.DefaultTenantID, config.DefaultTenantDomain, config.DefaultTenantDomain); err != nil {
+		return 0, err
+	}
+	for _, a := range Accounts {
+		if a.Sub != operatorSub {
+			continue
+		}
+		u, err := st.UpsertIdPUser(ctx, config.DefaultTenantID, store.IdPProfile{
+			Sub: a.Sub, PreferredUsername: a.PreferredUsername, Name: a.Name,
+			Email: store.IdPEmail{Email: a.Email, Verified: a.EmailVerified},
+		})
+		return u.ID, err
+	}
+	return 0, fmt.Errorf("no account %s", operatorSub)
 }
 
 // announceReady prints one line once the api answers, so a runner can wait

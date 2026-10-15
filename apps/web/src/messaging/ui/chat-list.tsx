@@ -228,8 +228,9 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 			</div>
 		);
 	}
-	// Only "Cloud của tôi" so far: the rest of the list invites the team (#first-run).
-	const alone = folder === "all" && entries.every((entry) => entry.saved);
+	// Only "Cloud của tôi" and bots (every account starts with the assistant
+	// bot's chat) so far: the rest of the list invites the team (#first-run).
+	const alone = folder === "all" && entries.every((entry) => entry.saved || entry.kind === "bot");
 	return (
 		<div className={alone ? "chats alone" : "chats"} ref={scroller} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
 			<ul className="chat-rows" aria-label={copy.list.label} style={{ height: rows.total }}>

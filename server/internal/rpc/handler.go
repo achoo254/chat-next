@@ -40,7 +40,10 @@ type Deps struct {
 	Bots       *botadmin.Service
 	BotUpdates *botupdates.Service
 	// Media is nil when no storage is configured.
-	Media      *media.Service
+	Media *media.Service
+	// Feedback answers feedback through the tenant's assistant bot; nil
+	// when the assistant is off (ReplyFeedback then fails).
+	Feedback   FeedbackReplier
 	TenantID   string
 	TenantName string
 	Logger     *slog.Logger
@@ -83,7 +86,7 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewChatsServiceHandler(&chatsService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewMessagesServiceHandler(&messagesService{chat: d.Chat, bots: d.BotUpdates, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewUpdatesServiceHandler(&updatesService{chat: d.Chat, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewModerationServiceHandler(&moderationService{chat: d.Chat, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewModerationServiceHandler(&moderationService{chat: d.Chat, feedback: d.Feedback, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewIntegrationsServiceHandler(&integrationsService{hooks: d.Hooks, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewMediaServiceHandler(&mediaService{media: d.Media, chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewSearchServiceHandler(&searchService{chat: d.Chat, logger: d.Logger}, opts...))

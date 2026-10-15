@@ -23,7 +23,7 @@ import { ConfigService } from "@app/proto-ts/config";
 import { MessageSchema, MessagesService, type Message as WireMessage } from "@app/proto-ts/messages";
 import { ServerFrameSchema } from "@app/proto-ts/realtime";
 import type { Update as WireUpdate } from "@app/proto-ts/updates";
-import { ModerationAction, ModerationService, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
+import { FeedbackKind, FeedbackStatus, ModerationAction, ModerationService, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
 import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
 import { FakeMedia, MemoryBlobs } from "../../../../packages/core/test/support/fake-media.ts";
@@ -88,6 +88,18 @@ export interface FixtureReport {
 	createdAt: number;
 	actions: ModerationAction[];
 	note: string;
+}
+
+/** Feedback a user sent the assistant bot (ModerationService.GetFeedback). */
+export interface FixtureFeedback {
+	id: number;
+	userId: number;
+	kind: FeedbackKind;
+	text: string;
+	status: FeedbackStatus;
+	createdAt: number;
+	handledBy: number;
+	replyText: string;
 }
 
 /** A method FakeServer always offers (optional in RemoteApi only for older doubles). */
@@ -218,6 +230,7 @@ export class ChatFixture {
 	/** GetSelf.is_operator: may use the moderation queue. */
 	operator = false;
 	readonly reportQueue: FixtureReport[] = [];
+	readonly feedbackQueue: FixtureFeedback[] = [];
 	/** Users restricted by moderation, with the end (0: until lifted). */
 	readonly restrictions = new Map<number, number>();
 	readonly lifted: number[] = [];
@@ -1101,6 +1114,24 @@ export class ChatFixture {
 			if (found === undefined) throw new ConnectError("no such report", Code.NotFound);
 			return found;
 		};
+		const feedback = (f: FixtureFeedback) => ({
+			id: BigInt(f.id),
+			userId: BigInt(f.userId),
+			kind: f.kind,
+			text: f.text,
+			status: f.status,
+			createdAt: BigInt(f.createdAt),
+			handledAt: BigInt(f.status === FeedbackStatus.OPEN ? 0 : f.createdAt + 600),
+			handledBy: BigInt(f.handledBy),
+			replyText: f.replyText,
+			repliedAt: BigInt(f.replyText === "" ? 0 : f.createdAt + 600),
+			repliedBy: BigInt(f.replyText === "" ? 0 : f.handledBy),
+		});
+		const findFeedback = (id: bigint): FixtureFeedback => {
+			const found = this.feedbackQueue.find((f) => f.id === num(id));
+			if (found === undefined) throw new ConnectError("no such feedback", Code.NotFound);
+			return found;
+		};
 		const chatsOf = (ids: readonly number[]) => ids.filter((id) => id !== 0 && this.members.has(id)).map((id) => this.server.wireChat(id, this.selfId));
 		const usersOf = (ids: readonly number[]) => [...new Set(ids)].filter((id) => this.names.has(id)).map((id) => this.wireUser(id));
 		router.service(ModerationService, {
@@ -1148,6 +1179,35 @@ export class ChatFixture {
 				this.restrictions.delete(num(req.userId));
 				this.lifted.push(num(req.userId));
 				return {};
+			},
+			getFeedback: (req) => {
+				operator();
+				const status = req.status === FeedbackStatus.UNSPECIFIED ? FeedbackStatus.OPEN : req.status;
+				const list = this.feedbackQueue.filter((f) => f.status === status).sort((a, b) => b.id - a.id);
+				return {
+					feedback: list.map(feedback),
+					users: usersOf(list.flatMap((f) => [f.userId, f.handledBy])),
+					nextCursor: "",
+				};
+			},
+			resolveFeedback: (req) => {
+				operator();
+				const f = findFeedback(req.feedbackId);
+				if (f.status === FeedbackStatus.OPEN) {
+					f.status = FeedbackStatus.HANDLED;
+					f.handledBy = this.selfId;
+				}
+				return { feedback: feedback(f) };
+			},
+			replyFeedback: (req) => {
+				operator();
+				const f = findFeedback(req.feedbackId);
+				if (f.replyText !== "") throw new ConnectError("already_replied: this feedback was already answered", Code.FailedPrecondition);
+				if (req.text.trim() === "") throw new ConnectError("text is required", Code.InvalidArgument);
+				f.replyText = req.text.trim();
+				f.status = FeedbackStatus.HANDLED;
+				f.handledBy = this.selfId;
+				return { feedback: feedback(f) };
 			},
 		});
 	}

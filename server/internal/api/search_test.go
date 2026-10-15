@@ -43,7 +43,7 @@ func TestSearchRPCs(t *testing.T) {
 	if err != nil || len(inChat.Msg.GetMessages()) != 1 {
 		t.Fatalf("SearchChatMessages = %v, %v", inChat, err)
 	}
-	if _, err := search.SearchChatMessages(ctx, connect.NewRequest(&appv1.SearchChatMessagesRequest{ChatId: saved + 1, Query: "lich"})); err == nil {
+	if _, err := search.SearchChatMessages(ctx, connect.NewRequest(&appv1.SearchChatMessagesRequest{ChatId: saved + 1<<20, Query: "lich"})); err == nil {
 		t.Fatal("searched a chat the user is not in")
 	}
 	if _, err := search.SearchMessages(ctx, connect.NewRequest(&appv1.SearchMessagesRequest{Query: "lich", Cursor: "garbage"})); codeOf(err) != connect.CodeInvalidArgument {

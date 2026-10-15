@@ -140,9 +140,12 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 		case "member_added":
 			// The chat entity was fetched before this update was applied
 			// (requiredEntities); its history loads when the chat is opened.
+			// The dialog itself (its place in the list, the top message) comes
+			// from the server: a chat created for the user without a message,
+			// like the assistant bot's, has nothing else to sort it by.
 			if (body.userIds.includes(selfId)) ensureDialog(w, body.chatId);
 			// Someone else joined: the member count changed on the server.
-			else effects.refreshChats.add(body.chatId);
+			effects.refreshChats.add(body.chatId);
 			return;
 		case "member_removed":
 			if (body.userId === selfId) {

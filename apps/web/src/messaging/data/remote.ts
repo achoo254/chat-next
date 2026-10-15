@@ -209,6 +209,32 @@ export interface ModerationReport {
 	readonly resolutionNote: string;
 }
 
+export type FeedbackStatus = "open" | "handled";
+export type FeedbackKind = "idea" | "bug";
+
+/** What a user sent the assistant bot ("Góp ý" or "Báo lỗi"), with the operator's answer. */
+export interface FeedbackItem {
+	readonly id: number;
+	readonly userId: number;
+	readonly kind: FeedbackKind;
+	readonly text: string;
+	readonly status: FeedbackStatus;
+	readonly createdAt: number;
+	/** Handled items: when and by whom (0 while open). */
+	readonly handledAt: number;
+	readonly handledBy: number;
+	/** The answer sent through the assistant; "" when none. */
+	readonly replyText: string;
+	readonly repliedAt: number;
+	readonly repliedBy: number;
+}
+
+export interface FeedbackPage {
+	readonly items: readonly FeedbackItem[];
+	readonly people: ReadonlyMap<number, Person>;
+	readonly nextCursor: string;
+}
+
 export interface ReportsPage {
 	readonly reports: readonly ModerationReport[];
 	readonly people: ReadonlyMap<number, Person>;
@@ -339,6 +365,10 @@ export interface Remote {
 	/** `restrictSeconds` 0 restricts until lifted (restrict_account only). */
 	resolveReport(reportId: number, actions: readonly ModerationAction[], note: string, restrictSeconds: number): Promise<ModerationReport>;
 	liftRestriction(userId: number, note: string): Promise<void>;
+	moderationFeedback(status: FeedbackStatus, cursor?: string): Promise<FeedbackPage>;
+	resolveFeedback(feedbackId: number): Promise<FeedbackItem>;
+	/** FailedPrecondition "already_replied…" for an item already answered. */
+	replyFeedback(feedbackId: number, text: string): Promise<FeedbackItem>;
 }
 
 const METHODS = [
@@ -393,6 +423,9 @@ const METHODS = [
 	"moderationReport",
 	"resolveReport",
 	"liftRestriction",
+	"moderationFeedback",
+	"resolveFeedback",
+	"replyFeedback",
 ] as const satisfies readonly (keyof Remote)[];
 
 // Fails to compile when a Remote method is missing from METHODS.

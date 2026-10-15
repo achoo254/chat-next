@@ -11,6 +11,7 @@ import {
 	hostsFor,
 	loadBrandConfig,
 	parseBrandConfig,
+	serverBrandNames,
 } from "../src/index.ts";
 
 const brand = loadBrandConfig();
@@ -62,6 +63,11 @@ describe("manifests", () => {
 		expect(renamed["web.webmanifest.json"]).toMatchObject({ name: "Renamed", short_name: "Ren" });
 		expect(renamed["capacitor.json"]).toMatchObject({ appName: "Renamed" });
 		expect(renamed["tauri.json"]).toMatchObject({ productName: "Renamed" });
+	});
+
+	it("gave the Go server the current names (run pnpm brand:gen after editing them)", () => {
+		const copied: unknown = JSON.parse(readFileSync(new URL("../../../server/internal/brand/brand.json", import.meta.url), "utf8"));
+		expect(copied).toEqual(serverBrandNames(brand));
 	});
 
 	it("keeps the Capacitor WebView on its own origin, not a tenant's host", () => {

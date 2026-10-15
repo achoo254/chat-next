@@ -46,8 +46,17 @@ type Env struct {
 	Admin   *botadmin.Service
 	Updates *botupdates.Service
 	Limiter *ratelimit.Memory
-	n       int
-	stop    func()
+	// Operators are the accounts of Options.Operators, in that order.
+	Operators []int64
+	n         int
+	stop      func()
+}
+
+// Options adjust NewWith.
+type Options struct {
+	// Operators names accounts created before the chat core and allowed to
+	// use the moderation queue.
+	Operators []string
 }
 
 // New builds the environment; the consumer loop and the webhook dispatcher
@@ -56,10 +65,20 @@ type Env struct {
 // stay well below them.
 func New(t testing.TB) *Env {
 	t.Helper()
+	return NewWith(t, Options{})
+}
+
+// NewWith is New with options.
+func NewWith(t testing.TB, o Options) *Env {
+	t.Helper()
 	st := testdb.Open(t)
 	ctx := context.Background()
 	if err := st.EnsureTenant(ctx, TenantID, "example.test", "example.test"); err != nil {
 		t.Fatal(err)
+	}
+	var operators []int64
+	for i, name := range o.Operators {
+		operators = append(operators, createUser(t, st, name, -1-i))
 	}
 	gen, err := ids.NewSnowflake(7)
 	if err != nil {
@@ -67,7 +86,7 @@ func New(t testing.TB) *Env {
 	}
 	limiter := ratelimit.NewMemory()
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{}), Quiet)
-	chatSvc, err := chat.New(chat.Config{TenantID: TenantID, PublicOrigin: PublicOrigin, AppScheme: AppScheme},
+	chatSvc, err := chat.New(chat.Config{TenantID: TenantID, PublicOrigin: PublicOrigin, AppScheme: AppScheme, Operators: operators},
 		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Limiter: limiter, Logger: Quiet})
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +104,7 @@ func New(t testing.TB) *Env {
 	chatSvc.SetCommitObserver(updates.Kick)
 	stop := RunUpdates(updates)
 	t.Cleanup(stop)
-	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter, stop: stop}
+	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter, Operators: operators, stop: stop}
 }
 
 // RunUpdates runs u in the background; the returned stop ends it and waits
@@ -133,15 +152,20 @@ func NewUpdates(t testing.TB, st *store.Store, chatSvc *chat.Service) *botupdate
 func (e *Env) User(name string) int64 {
 	e.T.Helper()
 	e.n++
+	return createUser(e.T, e.Store, name, e.n)
+}
+
+func createUser(t testing.TB, st *store.Store, name string, n int) int64 {
+	t.Helper()
 	ctx := context.Background()
-	u, err := e.Store.UpsertIdPUser(ctx, TenantID, store.IdPProfile{
-		Sub: fmt.Sprintf("acc_%s_%d", name, e.n), PreferredUsername: name, Name: name,
+	u, err := st.UpsertIdPUser(ctx, TenantID, store.IdPProfile{
+		Sub: fmt.Sprintf("acc_%s_%d", name, n), PreferredUsername: name, Name: name,
 	})
 	if err != nil {
-		e.T.Fatal(err)
+		t.Fatal(err)
 	}
-	if _, err := e.Store.Pool().Exec(ctx, `INSERT INTO privacy_settings (user_id, add_to_groups) VALUES ($1, 1)`, u.ID); err != nil {
-		e.T.Fatal(err)
+	if _, err := st.Pool().Exec(ctx, `INSERT INTO privacy_settings (user_id, add_to_groups) VALUES ($1, 1)`, u.ID); err != nil {
+		t.Fatal(err)
 	}
 	return u.ID
 }

@@ -114,7 +114,8 @@ Create:
 - [ ] Bulk có consent
 - [ ] Inline mode
 - [ ] Contract test
-- [ ] Bot chính thức chào người dùng mới (R5): tự có chat với bot ở lần đăng nhập đầu, hướng dẫn dùng app, nhận góp ý, báo tính năng mới
+- [x] Bot chính thức chào người dùng mới (R5): tự có chat với bot ở lần đăng nhập đầu, hướng dẫn dùng app, nhận góp ý (bot hệ thống `tro_ly_bot` chạy trong `chat-api`, chat trống + "Bắt đầu", góp ý vào Kiểm duyệt > Góp ý, người vận hành trả lời qua bot)
+- [ ] Bot chính thức báo tính năng mới (gửi thông báo cho người đã bắt đầu Trợ lý; chưa làm)
 
 ## Success Criteria
 

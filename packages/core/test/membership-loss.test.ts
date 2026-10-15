@@ -80,6 +80,19 @@ describe("losing membership of a group", () => {
 		expect(keys.filter((key) => key.includes("987654321"))).toEqual([]);
 	});
 
+	it("asks the server for the dialog of a chat the user was added to", async () => {
+		// The assistant bot's chat is created for the user without a message:
+		// only the server's dialog gives it a place in the list.
+		const { server, core, self, admin } = await groupWithSelf();
+		const added = server.createChat(ChatType.GROUP, "Mới", [admin]);
+		const before = server.calls.get("getPeerDialogs") ?? 0;
+		server.addMember(added, self, admin);
+		await settle(core);
+
+		expect(server.calls.get("getPeerDialogs") ?? 0).toBeGreaterThan(before);
+		expect((await core.dialogs()).map((view) => view.dialog.chatId)).toContain(added);
+	});
+
 	it("updates the member count when someone else is removed", async () => {
 		const { server, core, admin, other, chatId } = await groupWithSelf();
 		expect((await core.chat(chatId))?.memberCount).toBe(3);

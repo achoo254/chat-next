@@ -258,6 +258,68 @@
 		</div>
 	</section>
 
+	<!-- ============ Feedback ============ -->
+	<section class="shot" id="feedback">
+		<div class="shot-head"><h2>Góp ý</h2><span class="phase">Phase 8</span><p>Góp ý và báo lỗi người dùng gửi cho bot chính thức (Chat Trợ lý, tên lấy từ brand) nằm cạnh báo cáo, cùng màn Kiểm duyệt. Mỗi mục có người gửi, thời gian, loại (Góp ý hoặc Báo lỗi) và nguyên văn. "Trả lời" gửi câu trả lời qua Trợ lý, ngay dưới tin của người đó, rồi chuyển mục sang Đã xử lý; mỗi mục trả lời một lần. "Đã xử lý" đóng mục không cần trả lời. Màn hẹp (side nav ẩn) có thanh "Hàng đợi báo cáo · Góp ý" trên cùng để chuyển qua lại. Chỉ tài khoản vận hành (CHAT_OPERATOR_USER_IDS) thấy mục này.</p></div>
+		<div class="frame"><div class="mod">
+			<nav class="mod-side" data-active="feedback" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<nav class="mod-tabs" aria-label="Kiểm duyệt (màn hẹp)"><a href="#queue">Hàng đợi báo cáo</a><a href="#feedback" aria-current="page">Góp ý</a></nav>
+				<header class="mod-head"><h3>Góp ý</h3><span class="scope-lock hide-narrow"><svg class="icon icon-sm"><use href="#i-robot"/></svg>Gửi qua bot Trợ lý</span></header>
+				<div class="mod-body">
+					<div class="tabs" role="tablist" aria-label="Trạng thái góp ý">
+						<button type="button" role="tab" aria-selected="true" data-fb="open">Chưa xử lý <span class="count">3</span></button>
+						<button type="button" role="tab" aria-selected="false" data-fb="handled">Đã xử lý</button>
+					</div>
+					<ul class="fb-list" id="fb-list">
+						<li class="fb-item" data-fb="open">
+							<div class="fb-head"><span class="avatar sm av-cyan">LA</span><span class="fb-who"><b>Lan Anh</b><span class="mono muted">@lananh</span></span><span class="pill review">Báo lỗi</span><span class="fb-time mono muted">14:12</span></div>
+							<p class="fb-text">Gửi ảnh trong nhóm Team Mobile bị treo ở 99%, thử lại vẫn vậy. Mạng wifi công ty, Chrome trên Windows.</p>
+							<div class="fb-actions"><button type="button" class="btn btn-sm btn-primary" data-reply="Lan Anh"><svg class="icon icon-sm"><use href="#i-reply"/></svg>Trả lời</button><button type="button" class="btn btn-sm" data-done>Đã xử lý</button></div>
+						</li>
+						<li class="fb-item" data-fb="open">
+							<div class="fb-head"><span class="avatar sm av-green">MP</span><span class="fb-who"><b>Mai Phương</b><span class="mono muted">@maiphuong</span></span><span class="pill new">Góp ý</span><span class="fb-time mono muted">13:47</span></div>
+							<p class="fb-text">Cho mình chọn chế độ tối theo giờ nhé, tối tự chuyển tối, sáng tự chuyển sáng.</p>
+							<div class="fb-actions"><button type="button" class="btn btn-sm btn-primary" data-reply="Mai Phương"><svg class="icon icon-sm"><use href="#i-reply"/></svg>Trả lời</button><button type="button" class="btn btn-sm" data-done>Đã xử lý</button></div>
+						</li>
+						<li class="fb-item" data-fb="open">
+							<div class="fb-head"><span class="avatar sm av-amber">NVA</span><span class="fb-who"><b>Nguyễn Văn An Khang</b><span class="mono muted">@nguyenvanankhang_2026</span></span><span class="pill new">Góp ý</span><span class="fb-time mono muted">Hôm qua</span></div>
+							<p class="fb-text">App nhanh lắm. Mong có thêm sticker.</p>
+							<div class="fb-actions"><button type="button" class="btn btn-sm btn-primary" data-reply="Nguyễn Văn An Khang"><svg class="icon icon-sm"><use href="#i-reply"/></svg>Trả lời</button><button type="button" class="btn btn-sm" data-done>Đã xử lý</button></div>
+						</li>
+						<li class="fb-item" data-fb="handled" hidden>
+							<div class="fb-head"><span class="avatar sm av-violet">TH</span><span class="fb-who"><b>Trần Hải</b><span class="mono muted">@tranhai</span></span><span class="pill review">Báo lỗi</span><span class="fb-time mono muted">12/10</span></div>
+							<p class="fb-text">Không tìm được tin nhắn cũ hơn 1 tháng.</p>
+							<div class="fb-reply"><span class="fb-meta"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã trả lời · Đức Thắng · 12/10 16:05</span><p>Đã sửa trong bản hôm nay, bạn tải lại trang giúp mình nhé.</p></div>
+						</li>
+						<li class="fb-item" data-fb="handled" hidden>
+							<div class="fb-head"><span class="avatar sm av-red">BT</span><span class="fb-who"><b>Bình Trần</b><span class="mono muted">@binhtv</span></span><span class="pill new">Góp ý</span><span class="fb-time mono muted">11/10</span></div>
+							<p class="fb-text">Nút gửi hơi nhỏ trên điện thoại.</p>
+							<div class="fb-reply"><span class="fb-meta"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã xử lý · Minh · 11/10 09:20</span></div>
+						</li>
+						<li class="fb-empty" hidden><div class="empty"><svg class="icon"><use href="#i-inbox"/></svg><strong>Chưa có góp ý nào</strong><span>Góp ý người dùng gửi cho bot Trợ lý sẽ hiện ở đây.</span></div></li>
+					</ul>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame confirm-frame">
+			<div class="static-dialog">
+				<form class="panel" onsubmit="return false" aria-labelledby="fr-title">
+					<div class="dlg-head"><h2 id="fr-title">Trả lời Lan Anh</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-body flow">
+						<blockquote class="fb-quote">Gửi ảnh trong nhóm Team Mobile bị treo ở 99%, thử lại vẫn vậy. Mạng wifi công ty, Chrome trên Windows.</blockquote>
+						<div class="field">
+							<label for="fr-text">Câu trả lời <span class="muted">(bot Trợ lý gửi ngay dưới tin của họ)</span></label>
+							<textarea id="fr-text" class="input" rows="4" maxlength="2000" aria-describedby="fr-err">Cảm ơn bạn đã báo. Đội đã sửa lỗi gửi ảnh qua mạng công ty, bạn tải lại trang rồi thử lại giúp mình nhé.</textarea>
+							<span class="error-text" id="fr-err" hidden>Nhập câu trả lời trước khi gửi.</span>
+						</div>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-primary" id="fr-send">Gửi trả lời</button></div>
+				</form>
+			</div>
+		</div>
+	</section>
+
 	<!-- ============ Audit log ============ -->
 	<section class="shot" id="audit-log">
 		<div class="shot-head"><h2>Nhật ký kiểm duyệt</h2><span class="phase">Phase 12</span><p>Ai làm gì, với ai, khi nào, vì sao; gồm cả hành động của luật tự động và của chủ tenant. Nhật ký chỉ ghi thêm, không sửa hay xoá được. Chủ tenant chỉ thấy dòng của tenant mình.</p></div>
@@ -479,6 +541,34 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); font-size: 0.8125rem; }
 .pager .muted { margin-right: var(--space-2); }
 
+/* Feedback */
+/* Reports and feedback on narrow screens, where the side navigation is hidden. */
+.mod-tabs { display: none; }
+.mod-tabs a { flex: 1; display: grid; place-items: center; min-height: 44px; color: var(--c-text-muted); font-weight: 500; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+.mod-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+@media (max-width: 900px) { .mod-tabs { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); } }
+.fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.fb-item { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.fb-item[hidden], .fb-empty[hidden] { display: none; }
+.fb-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.fb-who { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); min-width: 0; flex: 1; }
+.fb-who b { font-weight: 600; }
+.fb-who .mono { font-size: 0.8125rem; overflow-wrap: anywhere; }
+.fb-time { font-size: 0.8125rem; white-space: nowrap; }
+.fb-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fb-actions .btn .icon { margin-right: var(--space-1); }
+.fb-reply { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3); border-left: 3px solid var(--c-success); border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
+.fb-reply p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-meta { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+.fb-meta .icon { color: var(--c-success-text); }
+.fb-quote { margin: 0; padding: var(--space-2) var(--space-3); border-left: 3px solid var(--c-border-strong); background: var(--c-surface-subtle); border-radius: var(--radius-sm); font-size: 0.875rem; color: var(--c-text-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+	.fb-item { padding: var(--space-3); }
+	.fb-head { flex-wrap: wrap; }
+	.fb-actions .btn { flex: 1 1 140px; }
+}
+
 @media (max-width: 1100px) {
 	.detail { grid-template-columns: minmax(0, 1fr); }
 	.stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -533,7 +623,7 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 	const icon = (id, cls = "icon") => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
 
 	// Shared side navigation: same items in every frame, with the current place marked.
-	const NAV = [["queue", "Hàng đợi báo cáo", "inbox", "#queue", 5], ["bots", "Bot và xác minh", "robot", "#bot-verified"], ["audit", "Nhật ký kiểm duyệt", "file", "#audit-log"]];
+	const NAV = [["queue", "Hàng đợi báo cáo", "inbox", "#queue", 5], ["feedback", "Góp ý", "message-dot", "#feedback", 3], ["bots", "Bot và xác minh", "robot", "#bot-verified"], ["audit", "Nhật ký kiểm duyệt", "file", "#audit-log"]];
 	$$(".mod-side").forEach((side, i) => {
 		const id = `scope-${i}`;
 		side.innerHTML = `<div class="mod-brand">${icon("shield")}<span>Kiểm duyệt</span></div>
@@ -584,6 +674,43 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 		setTimeout(() => { ok.removeAttribute("aria-busy"); toast("Đã gỡ 6 tin và khoá @nhanqua24h 7 ngày, đã ghi nhật ký"); }, 500);
 	});
 	reason.addEventListener("input", () => { if (reason.value.trim()) { reason.setAttribute("aria-invalid", "false"); $("#cf-err").hidden = true; } });
+
+	// Feedback: status tabs filter the list; "Đã xử lý" moves an item; "Trả lời" opens the dialog below.
+	let fbStatus = "open";
+	const fbList = $("#fb-list");
+	const fbApply = () => {
+		let shown = 0;
+		$$(".fb-item", fbList).forEach((li) => { li.hidden = li.dataset.fb !== fbStatus; if (!li.hidden) shown++; });
+		$(".fb-empty", fbList).hidden = shown > 0;
+		const open = $$('.fb-item[data-fb="open"]', fbList).length;
+		const count = $('[data-fb="open"] .count');
+		if (count) { count.textContent = String(open); count.hidden = open === 0; }
+	};
+	$$('[role="tab"][data-fb]').forEach((tab) => tab.addEventListener("click", () => {
+		fbStatus = tab.dataset.fb;
+		$$('[role="tab"][data-fb]').forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+		fbApply();
+	}));
+	fbList.addEventListener("click", (event) => {
+		const done = event.target.closest("[data-done]");
+		const reply = event.target.closest("[data-reply]");
+		if (done) {
+			const li = done.closest(".fb-item");
+			li.dataset.fb = "handled";
+			$(".fb-actions", li).outerHTML = `<div class="fb-reply"><span class="fb-meta">${icon("check", "icon icon-sm")}Đã xử lý · Bạn · vừa xong</span></div>`;
+			fbApply();
+			toast("Đã chuyển sang Đã xử lý");
+		}
+		if (reply) { $("#fr-title").textContent = `Trả lời ${reply.dataset.reply}`; $("#fr-text").focus(); toast("Viết câu trả lời ở hộp bên dưới"); }
+	});
+	const frText = $("#fr-text");
+	$("#fr-send").addEventListener("click", () => {
+		const empty = frText.value.trim() === "";
+		frText.setAttribute("aria-invalid", String(empty));
+		$("#fr-err").hidden = !empty;
+		if (empty) { frText.focus(); return; }
+		toast("Đã gửi trả lời qua bot Trợ lý");
+	});
 
 	// Verified toggle: badge and tier row follow the state.
 	const toggle = $("#v-toggle");

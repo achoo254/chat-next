@@ -16,6 +16,8 @@ export const ACCOUNTS = {
 	chi: { name: "Chi", username: "chi" },
 	/** Nobody talks to Dũng except the first-run scenario: always a brand-new account. */
 	dung: { name: "Dũng", username: "dung" },
+	/** A brand-new account for the assistant bot scenario. */
+	giang: { name: "Giang", username: "giang" },
 } as const;
 export type AccountKey = keyof typeof ACCOUNTS;
 

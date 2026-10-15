@@ -118,6 +118,12 @@ func (e *env) connect(t *testing.T, m *chatClients) *socket {
 		}
 	}()
 	f := s.next(t)
+	// The socket is registered before Hello is written, so an update the
+	// dispatcher was still delivering (committed before the dial, like the
+	// chats every start creates) may come first; clients order by pts.
+	for f.GetUpdate() != nil {
+		f = s.next(t)
+	}
 	if f.GetHello() == nil {
 		t.Fatalf("first frame = %v, want hello", f)
 	}

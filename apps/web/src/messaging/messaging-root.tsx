@@ -94,6 +94,7 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 			if (route.view.page === "new") return [consoleCode.preload()];
 			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
 		case "moderation":
+		case "feedback":
 			return [moderationCode.preload()];
 	}
 	return [];
@@ -284,6 +285,9 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			break;
 		case "moderation":
 			screen = <Moderation reportId={route.reportId} actions={route.actions} />;
+			break;
+		case "feedback":
+			screen = <Moderation reportId={null} actions={false} feedback />;
 			break;
 	}
 	return (

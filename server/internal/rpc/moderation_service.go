@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -14,8 +15,15 @@ import (
 // checks that the caller is an operator.
 type moderationService struct {
 	appv1connect.UnimplementedModerationServiceHandler
-	chat   *chat.Service
-	logger *slog.Logger
+	chat     *chat.Service
+	feedback FeedbackReplier
+	logger   *slog.Logger
+}
+
+// FeedbackReplier sends an operator's answer to a feedback item (the
+// assistant bot).
+type FeedbackReplier interface {
+	Reply(ctx context.Context, operator, feedbackID int64, text string) (*appv1.Feedback, error)
 }
 
 func (s *moderationService) GetReports(ctx context.Context, req *connect.Request[appv1.GetReportsRequest]) (*connect.Response[appv1.GetReportsResponse], error) {
@@ -39,5 +47,37 @@ func (s *moderationService) ResolveReport(ctx context.Context, req *connect.Requ
 func (s *moderationService) LiftRestriction(ctx context.Context, req *connect.Request[appv1.LiftRestrictionRequest]) (*connect.Response[appv1.LiftRestrictionResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.LiftRestrictionRequest) (*appv1.LiftRestrictionResponse, error) {
 		return &appv1.LiftRestrictionResponse{}, s.chat.LiftRestriction(ctx, me, m.GetUserId(), m.GetNote())
+	})
+}
+
+func (s *moderationService) GetFeedback(ctx context.Context, req *connect.Request[appv1.GetFeedbackRequest]) (*connect.Response[appv1.GetFeedbackResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetFeedbackRequest) (*appv1.GetFeedbackResponse, error) {
+		return s.chat.GetFeedback(ctx, me, m)
+	})
+}
+
+func (s *moderationService) ResolveFeedback(ctx context.Context, req *connect.Request[appv1.ResolveFeedbackRequest]) (*connect.Response[appv1.ResolveFeedbackResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ResolveFeedbackRequest) (*appv1.ResolveFeedbackResponse, error) {
+		f, err := s.chat.ResolveFeedback(ctx, me, m.GetFeedbackId())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.ResolveFeedbackResponse{Feedback: f}, nil
+	})
+}
+
+func (s *moderationService) ReplyFeedback(ctx context.Context, req *connect.Request[appv1.ReplyFeedbackRequest]) (*connect.Response[appv1.ReplyFeedbackResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ReplyFeedbackRequest) (*appv1.ReplyFeedbackResponse, error) {
+		if s.feedback == nil {
+			if !s.chat.IsOperator(me) {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("moderation is for operators only"))
+			}
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("assistant_unavailable: the assistant bot is off"))
+		}
+		f, err := s.feedback.Reply(ctx, me, m.GetFeedbackId(), m.GetText())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.ReplyFeedbackResponse{Feedback: f}, nil
 	})
 }

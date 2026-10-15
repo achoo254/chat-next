@@ -55,6 +55,10 @@ func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.G
 	if _, err := s.chat.EnsureSavedChat(ctx, sess.UserID); err != nil {
 		s.logger.WarnContext(ctx, "saved chat", "user_id", sess.UserID, "err", err)
 	}
+	// Likewise the empty chat with the assistant bot, below "Cloud của tôi".
+	if err := s.chat.EnsureSystemBotChat(ctx, sess.UserID); err != nil {
+		s.logger.WarnContext(ctx, "assistant chat", "user_id", sess.UserID, "err", err)
+	}
 	return connect.NewResponse(&appv1.GetSelfResponse{User: selfUser(u), IsOperator: s.chat.IsOperator(sess.UserID)}), nil
 }
 
