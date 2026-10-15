@@ -1,6 +1,6 @@
 # R3b — Người dùng mới: Cloud của tôi và mời đồng đội
 
-Status: In progress · Tier L (backend, core, web, mock) · Plan gốc: [chat-platform-v1](../261013-0448-chat-platform-v1/plan.md) (hàng R3b), mock `chat.html#first-run`.
+Status: Done (lên prod 2026-10-15) · Tier L (backend, core, web, mock) · Plan gốc: [chat-platform-v1](../261013-0448-chat-platform-v1/plan.md) (hàng R3b), mock `chat.html#first-run`.
 
 ## Outcome
 

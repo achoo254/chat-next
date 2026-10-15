@@ -425,3 +425,5 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Esc không đóng hộp thoại Thành viên;
   - log ERROR "context canceled" khi client tự huỷ request.
 
+- E2E nhiều người dùng lên `main` (`pnpm e2e`, `pnpm e2e --serve`): IdP giả trong `server/cmd/e2e-stack`, không thêm đường đăng nhập nào vào server (Jev 0.69); test đặt ở `apps/web/test/e2e` (0.99); chỉ chạy local trước (0.94). E2E bắt được và đã sửa: tạo chat riêng rồi mở ngay báo "Không mở được chat này" (core chỉ đọc DB local), hộp thoại "Chưa thêm được" ghi "Người dùng" thay vì tên.
+- R3b lên prod (commit `e7c9c9c`, `bd14849`, `dd898b1`, migration 0010). Jev quyết: chat với chính mình là chat riêng có hai đầu là một người (0.77); tạo ở `GetSelf` cho cả tài khoản cũ (0.69); không tính vào giới hạn 5 chat ghim (0.99); tạo nhóm từ màn trống dùng hộp thoại thường cho phép không chọn ai (0.63). Nút màn trống rút gọn thành "Tạo nhóm và mời" để không xuống dòng ở cột 280 px. Kiểm tra: Go toàn bộ, core 733, web 207, E2E 15/15. Chi tiết: [R3b](../261015-0949-r3b-first-run/plan.md).
