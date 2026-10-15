@@ -474,10 +474,11 @@ export class SyncEngine {
 
 	/**
 	 * Reloads a chat and its dialog (read state, top message) with
-	 * GetPeerDialogs, e.g. after an unpin or for a large chat first seen in a
-	 * difference.
+	 * GetPeerDialogs, e.g. after an unpin, for a large chat first seen in a
+	 * difference, or for a chat this device never synced. Failures are
+	 * reported, not thrown; a chat the server does not return stays absent.
 	 */
-	private async refreshChat(chatId: number): Promise<void> {
+	async refreshChat(chatId: number): Promise<void> {
 		try {
 			const getPeerDialogs = this.options.api.chats.getPeerDialogs;
 			if (getPeerDialogs === undefined) {

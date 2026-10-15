@@ -496,7 +496,13 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		},
 		chat: async (chatId) => {
 			active();
-			return repo.chat(assertSafeId(chatId));
+			const id = assertSafeId(chatId);
+			const stored = await repo.chat(id);
+			if (stored !== null) return stored;
+			// No update announces a private chat before its first message, so
+			// the one just created (or opened from a link) is fetched here.
+			await engine.refreshChat(id);
+			return repo.chat(id);
 		},
 		sendText: async (chatId, text, sendOptions) => {
 			active();
