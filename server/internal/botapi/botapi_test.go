@@ -556,7 +556,7 @@ func TestSetCommands(t *testing.T) {
 	h.call(http.MethodPut, "/bot/v1/commands", token, `{"scope": "nowhere", "commands": []}`).fails(t, http.StatusBadRequest, "bad_request")
 	h.call(http.MethodPut, "/bot/v1/commands", token, `{"commands": [{"command": "bad name", "description": "x"}]}`).fails(t, http.StatusBadRequest, "bad_request")
 
-	private, err := h.Admin.Info(ctx, botID, 0)
+	private, err := h.Admin.Info(ctx, owner, botID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,5 +630,58 @@ func TestUpdatesDuringShutdown(t *testing.T) {
 	a.fails(t, http.StatusServiceUnavailable, "unavailable")
 	if a.Error.RetryAfter != int(botupdates.RetryAfterShutdown.Seconds()) {
 		t.Fatalf("retry_after = %d", a.Error.RetryAfter)
+	}
+}
+
+func TestGetUpdatesRecordsTheFetchForTheOwner(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	owner := h.User("owner")
+	stranger := h.User("stranger")
+	botID, token := h.Bot(owner, "pollbot")
+
+	before, err := h.Admin.Info(ctx, owner, botID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !before.GetIsOwner() || before.GetLastUpdateAt() != 0 {
+		t.Fatalf("before any poll: owner=%v last=%d", before.GetIsOwner(), before.GetLastUpdateAt())
+	}
+
+	h.updates(token, "timeout=0")
+	var first int64
+	if err := h.Store.Pool().QueryRow(ctx, `SELECT floor(extract(epoch FROM last_update_fetch_at))::bigint FROM bots WHERE user_id = $1`, botID).Scan(&first); err != nil {
+		t.Fatal(err)
+	}
+	owned, err := h.Admin.Info(ctx, owner, botID, 0)
+	if err != nil || owned.GetLastUpdateAt() != first || first == 0 {
+		t.Fatalf("owner info after a poll = %v, %v (stored %d)", owned, err, first)
+	}
+	other, err := h.Admin.Info(ctx, stranger, botID, 0)
+	if err != nil || other.GetIsOwner() || other.GetLastUpdateAt() != 0 {
+		t.Fatalf("stranger info = %v, %v", other, err)
+	}
+	bots, err := h.Admin.ListMyBots(ctx, owner)
+	if err != nil || len(bots) != 1 || bots[0].GetLastUpdateAt() != first {
+		t.Fatalf("ListMyBots = %v, %v", bots, err)
+	}
+
+	// Polls within 30 seconds do not write again.
+	if _, err := h.Store.Pool().Exec(ctx, `UPDATE bots SET last_update_fetch_at = now() - interval '10 seconds' WHERE user_id = $1`, botID); err != nil {
+		t.Fatal(err)
+	}
+	h.updates(token, "timeout=0")
+	var fresh bool
+	if err := h.Store.Pool().QueryRow(ctx, `SELECT last_update_fetch_at < now() - interval '5 seconds' FROM bots WHERE user_id = $1`, botID).Scan(&fresh); err != nil || !fresh {
+		t.Fatalf("a poll within the interval wrote again: %v", err)
+	}
+	// An older record is moved to now.
+	if _, err := h.Store.Pool().Exec(ctx, `UPDATE bots SET last_update_fetch_at = now() - interval '5 minutes' WHERE user_id = $1`, botID); err != nil {
+		t.Fatal(err)
+	}
+	h.updates(token, "timeout=0")
+	var recent bool
+	if err := h.Store.Pool().QueryRow(ctx, `SELECT last_update_fetch_at > now() - interval '5 seconds' FROM bots WHERE user_id = $1`, botID).Scan(&recent); err != nil || !recent {
+		t.Fatalf("a poll after the interval did not write: %v", err)
 	}
 }

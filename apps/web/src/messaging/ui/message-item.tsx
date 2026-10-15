@@ -502,13 +502,15 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	// reactions float over the bubble's edge and take no line.
 	const trailingStamp = !message.recalled && (preview !== null || message.buttons.length > 0);
 	const trigger = useMenuTrigger(chatId, itemKey);
-	const mine = message.fromId === store.selfId;
 	const channel = chat?.type === "channel";
+	// Channel posts speak as the channel (mockups/chat.html#channel): an admin's
+	// own posts read like everyone else's, on the left under the channel name.
+	const mine = message.fromId === store.selfId && !channel;
 	const group = chat?.type === "group";
 	const sender = useUser(mine || channel ? 0 : message.fromId);
 	const senderName = integration ? message.integrationLabel : channel ? (chat?.title ?? "") : (sender?.name ?? copy.message.unknownUser);
 	const tone = toneOf(message.fromId);
-	const atMe = !mine && mentionsSelf(message.text, message.entities, self.id, self.username);
+	const atMe = message.fromId !== store.selfId && mentionsSelf(message.text, message.entities, self.id, self.username);
 	const recalled = message.recalled;
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;
@@ -534,7 +536,7 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
 			silent={message.silent && !recalled ? copy.message.silent : ""}
 		>
-			{mine && !channel && !recalled && !isSavedChat(chat, null) && (
+			{mine && !recalled && !isSavedChat(chat, null) && (
 				<LabelledIcon
 					name={read ? "checks" : "check"}
 					label={read ? copy.message.read : copy.message.sentTick}
@@ -696,6 +698,8 @@ export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	const connection = useConnection();
 	const ctx = useRichContext(self.id);
 	const trigger = useMenuTrigger(chatId, itemKey);
+	// A post being sent already reads as the channel's, like the posts around it.
+	const channel = chat?.type === "channel";
 	const failed = pending.failure !== null;
 	const waiting = connection === "offline" || connection === "waiting";
 	const icon = failed ? "alert" : "clock";
@@ -707,6 +711,7 @@ export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	);
 	const bubble = (
 		<div className={hasMedia ? "bubble media" : "bubble"}>
+			{channel && <span className="who">{chat.title}</span>}
 			{pending.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={pending.replyToSeq} />}
 			{hasMedia && <PendingMediaSlot chatId={chatId} pending={pending} albumKeys={albumKeys} />}
 			<RichText text={pending.text} entities={pending.entities} ctx={ctx} tail={stamp} />
@@ -714,7 +719,7 @@ export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	);
 	return (
 		<div
-			className={chat?.type === "channel" ? "msg mine post" : "msg mine"}
+			className={channel ? "msg post" : "msg mine"}
 			data-key={rowKey}
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
 			{...(inert ? {} : trigger)}

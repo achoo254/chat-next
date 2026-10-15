@@ -50,6 +50,21 @@ describe("session end wipes local data", () => {
 		await expect(core.dialogs()).rejects.toBeInstanceOf(SessionEndedError);
 	});
 
+	it("not when the browser signed in again: it reconnects with the new session", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const sql = new MemorySqlFactory();
+		const ended: string[] = [];
+		const { core } = await startTestApp(server, self, sql, { onSessionEnded: (reason) => ended.push(reason) });
+		await settle(core);
+		server.replaceSessions(self);
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(ended).toEqual([]);
+		expect(core.sessionEnded()).toBeNull();
+		expect(sql.files.has(dbName(self))).toBe(true);
+		expect(core.connectionState()).toBe("connected");
+	});
+
 	it("on 401 from an RPC", async () => {
 		const server = new FakeServer();
 		const self = server.addUser("Tôi");

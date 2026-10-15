@@ -100,6 +100,9 @@ message Bot {
   int64 created_at = 8 [jstype = JS_NUMBER];
   // Unix seconds when the current token was issued; 0 without a token.
   int64 token_issued_at = 9 [jstype = JS_NUMBER];
+  // Unix seconds when the bot last asked for updates (long poll getUpdates),
+  // kept to within about 30 seconds; 0 when it never did.
+  int64 last_update_at = 10 [jstype = JS_NUMBER];
 }
 
 message ListMyBotsRequest {}

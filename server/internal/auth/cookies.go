@@ -91,6 +91,9 @@ type loginState struct {
 	Expires  int64  `json:"e"`
 	// ReturnTo is the same-origin path to open after sign-in (CleanReturnTo).
 	ReturnTo string `json:"r,omitempty"`
+	// Replaces is the base64url token hash of the session the browser held
+	// when it started this sign-in; the new session replaces it.
+	Replaces string `json:"p,omitempty"`
 }
 
 var loginCookieAAD = []byte(LoginCookieName)

@@ -76,7 +76,8 @@ export const en: Messages = {
 		accountHint: "Change how you sign in, remove app access, revoke devices",
 		manageAccount: "Manage hoandat account",
 		activeNow: "active now",
-		lastActive: (when: string) => `active ${when}`,
+		today: "today",
+		yesterday: "yesterday",
 		newLogin: "New sign-in",
 		platform: {
 			web: "Browser",

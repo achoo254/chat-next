@@ -198,6 +198,7 @@ const REVOKE_REASONS: Record<number, SessionRevokeReason> = {
 	[WireRevokeReason.IDP_GRANT_ENDED]: "idp_grant_ended",
 	[WireRevokeReason.EXPIRED]: "expired",
 	[WireRevokeReason.ADMIN]: "admin",
+	[WireRevokeReason.REPLACED]: "replaced",
 };
 
 function syncMode(mode: WireSyncMode): SyncMode {

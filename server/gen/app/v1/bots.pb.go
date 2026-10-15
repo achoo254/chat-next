@@ -653,7 +653,13 @@ type GetBotInfoResponse struct {
 	About       string                 `protobuf:"bytes,3,opt,name=about,proto3" json:"about,omitempty"`
 	// The command menu for the caller in chat_id: the most specific list set
 	// (GROUP_ADMIN for admins, GROUP or PRIVATE, then DEFAULT).
-	Commands      []*BotCommand `protobuf:"bytes,4,rep,name=commands,proto3" json:"commands,omitempty"`
+	Commands []*BotCommand `protobuf:"bytes,4,rep,name=commands,proto3" json:"commands,omitempty"`
+	// The caller owns the bot (Developer Console manages it).
+	IsOwner bool `protobuf:"varint,5,opt,name=is_owner,json=isOwner,proto3" json:"is_owner,omitempty"`
+	// Owner only: Unix seconds when the bot last asked for updates (long poll
+	// getUpdates), kept to within about 30 seconds; 0 when it never did or
+	// the caller is not the owner.
+	LastUpdateAt  int64 `protobuf:"varint,6,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -716,6 +722,20 @@ func (x *GetBotInfoResponse) GetCommands() []*BotCommand {
 	return nil
 }
 
+func (x *GetBotInfoResponse) GetIsOwner() bool {
+	if x != nil {
+		return x.IsOwner
+	}
+	return false
+}
+
+func (x *GetBotInfoResponse) GetLastUpdateAt() int64 {
+	if x != nil {
+		return x.LastUpdateAt
+	}
+	return 0
+}
+
 var File_app_v1_bots_proto protoreflect.FileDescriptor
 
 const file_app_v1_bots_proto_rawDesc = "" +
@@ -766,12 +786,14 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x03ack\x18\x04 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"K\n" +
 	"\x11GetBotInfoRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1b\n" +
-	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\x9e\x01\n" +
+	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\xe3\x01\n" +
 	"\x12GetBotInfoResponse\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
 	"\x05about\x18\x03 \x01(\tR\x05about\x12.\n" +
-	"\bcommands\x18\x04 \x03(\v2\x12.app.v1.BotCommandR\bcommands*\xef\x01\n" +
+	"\bcommands\x18\x04 \x03(\v2\x12.app.v1.BotCommandR\bcommands\x12\x19\n" +
+	"\bis_owner\x18\x05 \x01(\bR\aisOwner\x12(\n" +
+	"\x0elast_update_at\x18\x06 \x01(\x03B\x020\x02R\flastUpdateAt*\xef\x01\n" +
 	"\x10InlineResultKind\x12\"\n" +
 	"\x1eINLINE_RESULT_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aINLINE_RESULT_KIND_ARTICLE\x10\x01\x12\x1c\n" +

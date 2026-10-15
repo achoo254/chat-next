@@ -45,13 +45,19 @@ function once<T>(load: () => Promise<T>): () => Promise<T> {
 		}));
 }
 
+/** Connect-Web's code; fetched ahead by screens whose first data comes through the web transport. */
+export const loadConnectWeb = () => import("@connectrpc/connect-web");
+
+/** The account calls' code (sessions, profile); fetched ahead like loadConnectWeb. */
+export const loadAccountClient = () => import("./account-client.ts");
+
 /**
  * Connect transport (binary encoding) at /rpc over `rpcFetch`. Connect-Web
  * and the protobuf runtime load with the first call made through it.
  */
 export function createWebTransport(rpcFetch: RpcFetch): Transport {
 	const load = once(() =>
-		import("@connectrpc/connect-web").then(({ createConnectTransport }) =>
+		loadConnectWeb().then(({ createConnectTransport }) =>
 			createConnectTransport({ baseUrl: RPC_BASE_URL, useBinaryFormat: true, fetch: rpcFetch }),
 		),
 	);
@@ -83,7 +89,7 @@ export function errorCode(err: unknown): Code {
  * to the welcome screen from any call site; the error is still rethrown.
  */
 export function createApi(transport: Transport, rpcFetch: RpcFetch, onUnauthenticated: () => void): Api {
-	const account = once(() => import("./account-client.ts").then((module) => module.createAccountCalls(transport)));
+	const account = once(() => loadAccountClient().then((module) => module.createAccountCalls(transport)));
 
 	async function call<T>(run: () => Promise<T>): Promise<T> {
 		try {

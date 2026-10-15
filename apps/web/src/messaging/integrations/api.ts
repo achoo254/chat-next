@@ -156,10 +156,13 @@ export interface Integrations {
  * first call (a failed load is tried again on the next call).
  * `onUnauthenticated` runs when the session is gone; the error is rethrown.
  */
+/** The Connect client's code, which the webhook screens' first data waits for; fetched ahead with them. */
+export const loadIntegrationsClient = () => import("./client.ts");
+
 export function createIntegrations(transport: Transport, onUnauthenticated: () => void): Integrations {
 	let client: Promise<Integrations> | null = null;
 	const load = (): Promise<Integrations> => {
-		client ??= import("./client.ts")
+		client ??= loadIntegrationsClient()
 			.then((module) => module.createIntegrationsClient(transport, onUnauthenticated))
 			.catch((err: unknown) => {
 				client = null;

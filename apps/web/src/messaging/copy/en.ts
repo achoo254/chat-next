@@ -52,6 +52,7 @@ export const en: MessagingCopy = {
 		search: "Search chats and messages",
 		searchPlaceholder: "Search",
 		newChat: "New chat",
+		newChatTitle: "New chat",
 		firstLoad: "Loading your chats for the first time…",
 		draft: "Draft:",
 		typeGroup: "Group",

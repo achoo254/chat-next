@@ -341,3 +341,72 @@ func TestSignInReturnsToPage(t *testing.T) {
 		}
 	}
 }
+
+// listSessions returns the active sessions the clients' user sees.
+func listSessions(t *testing.T, cl clients) []*appv1.Session {
+	t.Helper()
+	resp, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.Msg.GetSessions()
+}
+
+func TestSignInAgainReplacesTheBrowsersSession(t *testing.T) {
+	e := newEnv(t)
+	other, _ := e.signedIn(t) // another browser of the same user
+	cl, c := e.signedIn(t)
+	before := currentSessionID(t, cl)
+
+	// Confirming a sensitive action signs in again in the same browser and
+	// the same IdP session: the old session goes, the IdP grant they share stays.
+	resp, body := e.signIn(t, c, "?reauth=1")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("re-sign-in status %d: %s", resp.StatusCode, body)
+	}
+	sessions := listSessions(t, cl)
+	if len(sessions) != 2 {
+		t.Fatalf("sessions after re-sign-in = %d, want this browser once and the other browser", len(sessions))
+	}
+	after := currentSessionID(t, cl)
+	if after == before {
+		t.Fatal("re-sign-in kept the old session current")
+	}
+	for _, s := range sessions {
+		if s.GetId() == before {
+			t.Fatal("the replaced session is still listed")
+		}
+	}
+	if _, err := getSelf(t, other); err != nil {
+		t.Fatalf("the other browser's session ended: %v", err)
+	}
+	e.app.Sessions.Wait()
+	if got := e.idp.Revoked(); len(got) != 0 {
+		t.Fatalf("revoked at IdP = %d tokens, want none: the grant is shared with the new session", len(got))
+	}
+
+	// A sign-in under another IdP session has its own grant: the replaced
+	// session's refresh token is revoked at the IdP.
+	e.idp.SetAccount(idptest.Account{Sub: "acc_test", SID: "sid-other", PreferredUsername: "tester", Name: "Người Thử",
+		Email: "tester@example.com", EmailVerified: true})
+	e.mustSignIn(t, c)
+	if n := len(listSessions(t, cl)); n != 2 {
+		t.Fatalf("sessions after a sign-in under a new IdP session = %d, want 2", n)
+	}
+	e.app.Sessions.Wait()
+	if got := e.idp.Revoked(); len(got) != 1 {
+		t.Fatalf("revoked at IdP = %d tokens, want the replaced session's", len(got))
+	}
+}
+
+func TestSignInWithoutASessionCookieReplacesNothing(t *testing.T) {
+	e := newEnv(t)
+	first, _ := e.signedIn(t)
+	second, _ := e.signedIn(t)
+	if n := len(listSessions(t, first)); n != 2 {
+		t.Fatalf("sessions = %d, want one per browser", n)
+	}
+	if _, err := getSelf(t, second); err != nil {
+		t.Fatal(err)
+	}
+}

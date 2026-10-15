@@ -18,6 +18,13 @@ import (
 // the other sessions can warn about them.
 const newLoginWindow = 24 * time.Hour
 
+// isNewLogin reports whether a session is flagged as a new sign-in: created
+// within newLoginWindow, and never the session asking (you know you just
+// signed in there).
+func isNewLogin(createdAt, now time.Time, current bool) bool {
+	return !current && now.Sub(createdAt) < newLoginWindow
+}
+
 // authService implements AuthService. ExchangeNativeCode stays
 // Unimplemented until native clients ship.
 type authService struct {
@@ -91,7 +98,7 @@ func (s *authService) ListSessions(ctx context.Context, req *connect.Request[app
 			CreatedAt:    x.CreatedAt.Unix(),
 			LastActiveAt: x.LastSeenAt.Unix(),
 			Current:      current,
-			NewLogin:     !current && now.Sub(x.CreatedAt) < newLoginWindow,
+			NewLogin:     isNewLogin(x.CreatedAt, now, current),
 		})
 	}
 	return connect.NewResponse(&appv1.ListSessionsResponse{Sessions: out}), nil

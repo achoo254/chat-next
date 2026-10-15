@@ -201,6 +201,23 @@ describe("Developer Console", () => {
 		expect(fake.bots.get(botId)?.tokenSecret).toBe("s");
 	});
 
+	it("says on the token tab when the bot last asked for updates", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		const idle = fake.seed("Trực ca Bot", "oncall_bot", { tokenSecret: "s", tokenIssuedAt: fake.now });
+		renderMessaging(demo.fixture, `/console/${idle}/token`);
+		expect(await screen.findByText("Bot chưa nhận update lần nào", {}, LONG)).toBeTruthy();
+	});
+
+	it("shows the last update fetch time of a running bot", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		const at = new Date(2026, 9, 15, 16, 40).getTime() / 1000;
+		const busy = fake.seed("Báo cáo Bot", "report_daily_bot", { tokenSecret: "s", tokenIssuedAt: fake.now, lastUpdateAt: at });
+		renderMessaging(demo.fixture, `/console/${busy}/token`);
+		expect(await screen.findByText("Lần cuối nhận update: 15/10 16:40", {}, LONG)).toBeTruthy();
+	});
+
 	it("ignores ?after= on a tab it does not belong to", async () => {
 		const demo = seedDemo();
 		const fake = demo.fixture.bots;
@@ -366,6 +383,46 @@ describe("bots in chats", () => {
 		await userEvent.click(start);
 		expect(await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG)).toBeTruthy();
 		expect(f.bots.calls).toContain(`StartBot ${botId} `);
+	});
+
+	it("tells the owner their bot is not running and links to Developer Console, and hides an empty group count", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const botId = f.bots.seed("Báo cáo Bot", "report_daily_bot", { tokenSecret: "s", tokenIssuedAt: f.bots.now });
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, botId]);
+		f.send(f.selfId, chat, "/start");
+		renderMessaging(f, `/c/${chat}`);
+		const banner = (await screen.findByText("Bot chưa chạy — chưa có chương trình nào nhận tin.", {}, LONG)).closest(".banner") as HTMLElement;
+		expect(within(banner).getByRole("link", { name: "Xem hướng dẫn" }).getAttribute("href")).toBe(`/console/${botId}/token`);
+
+		const info = await screen.findByRole("complementary", { name: "Thông tin bot" }, LONG);
+		const manage = await within(info).findByRole("link", { name: /Quản lý bot/ }, LONG);
+		expect(manage.getAttribute("href")).toBe(`/console/${botId}`);
+		await waitFor(() => expect(f.bots.calls.filter((call) => call === `GetBotInfo ${botId}`).length).toBeGreaterThan(0));
+		expect(within(info).queryByText(/Có trong 0 nhóm/)).toBeNull();
+	});
+
+	it("shows no banner for a running bot, and neither banner nor Quản lý bot to someone else", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const running = f.bots.seed("Trực ca Bot", "oncall_bot", { lastUpdateAt: Math.floor(Date.now() / 1000) - 20 });
+		const runningChat = f.createChat(ChatType.PRIVATE, "", [f.selfId, running]);
+		f.send(f.selfId, runningChat, "/start");
+		const theirs = f.bots.seed("Thời tiết Bot", "weather_bot", { owned: false });
+		const theirChat = f.createChat(ChatType.PRIVATE, "", [f.selfId, theirs]);
+		f.send(f.selfId, theirChat, "/start");
+
+		renderMessaging(f, `/c/${runningChat}`);
+		const info = await screen.findByRole("complementary", { name: "Thông tin bot" }, LONG);
+		expect(await within(info).findByRole("link", { name: /Quản lý bot/ }, LONG)).toBeTruthy();
+		expect(screen.queryByText(/Bot chưa chạy/)).toBeNull();
+
+		act(() => navigate(`/c/${theirChat}`));
+		await screen.findByText("@weather_bot · bot", {}, LONG);
+		await waitFor(() => expect(f.bots.calls).toContain(`GetBotInfo ${theirs}`));
+		await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+		expect(screen.queryByText(/Bot chưa chạy/)).toBeNull();
+		expect(screen.queryByRole("link", { name: /Quản lý bot/ })).toBeNull();
 	});
 
 	it("presses callback buttons: waits for the bot, shows its answer, a dialog, or that it is not responding", async () => {

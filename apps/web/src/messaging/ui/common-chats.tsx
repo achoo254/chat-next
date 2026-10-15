@@ -55,7 +55,8 @@ export function useCommonChats(userId: number): CommonChats | null {
 export function CommonChatsSection({ userId, bot = false }: { userId: number; bot?: boolean }) {
 	const copy = useScreensCopy();
 	const common = useCommonChats(userId);
-	if (common === null) return null;
+	// "Có trong 0 nhóm của bạn" says nothing about a bot: the row only shows when there are some.
+	if (common === null || (bot && common.count === 0)) return null;
 	const title = bot ? copy.profile.botIn(common.count) : common.count === 0 ? copy.profile.noCommonGroups : copy.profile.commonGroups(common.count);
 	return (
 		<div className="info-sec">

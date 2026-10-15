@@ -55,6 +55,10 @@ enum SessionRevokeReason {
   SESSION_REVOKE_REASON_EXPIRED = 4;
   // Removed by tenant operators or moderation.
   SESSION_REVOKE_REASON_ADMIN = 5;
+  // The same browser signed in again (for example to confirm a sensitive
+  // action) and now holds the new session's cookie: clients keep their local
+  // data and reconnect, which picks up the new session.
+  SESSION_REVOKE_REASON_REPLACED = 6;
 }
 
 message GetAuthConfigRequest {

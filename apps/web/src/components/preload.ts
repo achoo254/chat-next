@@ -8,6 +8,9 @@
 //                         and the screen that reads it (useLoad)
 //   prefetchWhenIdle      fetches code of secondary screens once the browser
 //                         is idle after startup
+//   warm(...loaders)      starts code a screen's data will wait for (a
+//                         client loaded on first call), next to the screen's
+//                         own code, so neither waits for the other
 import { lazy, useEffect, useEffectEvent, useState, type LazyExoticComponent, type ReactNode } from "react";
 
 /** A promise carrying its outcome, read synchronously by isSettled() and the first render of useLoad(). */
@@ -88,12 +91,24 @@ export function preloadable<P extends object>(load: () => Promise<{ default: Scr
 	};
 }
 
-/** Fetches the code of screens opened later once the browser is idle, without competing with startup. */
+/**
+ * Starts loaders now and ignores their outcome: a failed fetch is retried by
+ * the call that needs the code, which reports the error there.
+ */
+export function warm(...loaders: readonly (() => Promise<unknown>)[]): void {
+	for (const load of loaders) load().catch(() => undefined);
+}
+
+/**
+ * Fetches, once the browser is idle and without competing with startup, the
+ * code of screens opened later: every module a screen and its first data
+ * import on demand, so opening it later requests no code.
+ */
 export function prefetchWhenIdle(preloads: readonly (() => Promise<unknown>)[]): () => void {
 	let cancelled = false;
 	const run = () => {
 		if (cancelled) return;
-		for (const preload of preloads) void preload();
+		warm(...preloads);
 	};
 	if (typeof window.requestIdleCallback === "function") {
 		const handle = window.requestIdleCallback(run, { timeout: 5000 });

@@ -99,6 +99,25 @@ export function shortDate(unixSeconds: number, locale: string): string {
 	return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit" }).format(date);
 }
 
+/** Full date with the year: 14/10/2026 in Vietnamese. */
+export function fullDate(unixSeconds: number, locale: string): string {
+	const date = new Date(unixSeconds * 1000);
+	if (locale === "vi") return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+	return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+
+/**
+ * When something last happened, for rows such as sessions
+ * (mockups/settings.html#sessions): "hôm nay 16:40", "hôm qua 21:52",
+ * otherwise the full date "14/10/2026". `words` are the lowercase day words.
+ */
+export function recentTime(unixSeconds: number, now: Date, locale: string, words: { today: string; yesterday: string }): string {
+	const days = daysBetween(new Date(unixSeconds * 1000), now);
+	if (days <= 0) return `${words.today} ${clock(unixSeconds, locale)}`;
+	if (days === 1) return `${words.yesterday} ${clock(unixSeconds, locale)}`;
+	return fullDate(unixSeconds, locale);
+}
+
 /** Chat list time: 09:42, Hôm qua, T2, 03/10 (mockups/chat.html#app). */
 export function listTime(unixSeconds: number, now: Date, locale: string, copy: MessagingCopy): string {
 	if (unixSeconds <= 0) return "";

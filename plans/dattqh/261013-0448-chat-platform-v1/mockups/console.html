@@ -318,7 +318,7 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 <section class="shot" id="token">
 	<div class="shot-head">
 		<h2>Token</h2><span class="phase">Phase 15</span>
-		<p>Trái: token hiện đúng một lần ngay sau khi tạo hoặc cấp lại, có nút sao chép; server chỉ giữ hash. Phải: những lần sau token bị che. Cấp lại token (và xoá bot) cần đăng nhập hoandat trong 10 phút gần đây (ADR 0006), nên Console chuyển sang auth.hoandat.com rồi quay về. Quay về, Console mở lại hộp xác nhận ("Cấp token cho Báo cáo Bot?" khi bot chưa có token, "Cấp lại token?" khi đã có) và chỉ cấp khi bạn bấm nút trong hộp; một link có sẵn tham số quay về không tự cấp token, và chuyển tab hay tải lại trang không hỏi lại. Xoá bot cũng vậy. Token cũ ngừng hoạt động ngay, khoá ký Mini App đổi theo.</p>
+		<p>Trái: token hiện đúng một lần ngay sau khi tạo hoặc cấp lại, có nút sao chép; server chỉ giữ hash. Phải: những lần sau token bị che. Cấp lại token (và xoá bot) cần đăng nhập hoandat trong 10 phút gần đây (ADR 0006), nên Console chuyển sang auth.hoandat.com rồi quay về. Quay về, Console mở lại hộp xác nhận ("Cấp token cho Báo cáo Bot?" khi bot chưa có token, "Cấp lại token?" khi đã có) và chỉ cấp khi bạn bấm nút trong hộp; một link có sẵn tham số quay về không tự cấp token, và chuyển tab hay tải lại trang không hỏi lại. Xoá bot cũng vậy. Token cũ ngừng hoạt động ngay, khoá ký Mini App đổi theo. Thẻ "Nhận update" ghi "Lần cuối nhận update: 15/10 16:40" (lần gần nhất bot gọi long poll, chính xác tới khoảng 30 giây) hoặc "Bot chưa nhận update lần nào"; chat riêng của chủ bot với bot dẫn tới đây bằng "Xem hướng dẫn" khi bot chưa chạy (<a href="bots.html#bot-not-running">Bot chưa chạy</a>).</p>
 	</div>
 	<div class="frame">
 		<div class="panes">
@@ -350,6 +350,11 @@ POST https://bot.chat.hoandat.com/bot/v1/…</pre>
 							<div class="secret"><code>7302114:••••••••••••••••••••••••Qx9</code></div>
 							<p>Cấp lúc 02/10/2026 14:20 bởi Đức Thắng.</p>
 							<div class="card-foot"><button type="button" class="btn btn-danger">Cấp lại token</button></div>
+						</div>
+						<div class="card">
+							<h4>Nhận update</h4>
+							<p>Lần cuối nhận update: 15/10 16:40</p>
+							<p class="muted">Bot nhận update bằng long poll: server của bạn tự gọi lấy update, mỗi request chờ tối đa 50 giây.</p>
 						</div>
 					</div>
 				</div>

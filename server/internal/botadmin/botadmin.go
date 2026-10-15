@@ -108,7 +108,10 @@ type Bot struct {
 	Commands      []CommandSet
 	CreatedAt     time.Time
 	TokenIssuedAt *time.Time
-	tokenHash     []byte
+	// LastUpdateAt is when the bot last asked for updates (RecordUpdateFetch);
+	// nil when it never did.
+	LastUpdateAt *time.Time
+	tokenHash    []byte
 }
 
 // Tier is the bot's rate limit tier.
@@ -202,7 +205,7 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 // ------------------------------------------------------------------- rows
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
-	b.commands, b.created_at, b.token_issued_at, b.token_hash`
+	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.token_hash`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -210,7 +213,7 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	b := &Bot{}
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
-		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.tokenHash)
+		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.tokenHash)
 	if err != nil {
 		return nil, err
 	}
@@ -255,6 +258,7 @@ func (b *Bot) Render() *appv1.Bot {
 	if b.TokenIssuedAt != nil && b.tokenHash != nil {
 		out.TokenIssuedAt = b.TokenIssuedAt.Unix()
 	}
+	out.LastUpdateAt = b.lastUpdateUnix()
 	for _, set := range b.Commands {
 		out.Commands = append(out.Commands, renderSet(set))
 	}
@@ -648,6 +652,36 @@ func cleanText(s string, maxLen int, field string) (string, error) {
 
 // ---------------------------------------------------------- authenticate
 
+// lastUpdateUnix is LastUpdateAt in Unix seconds; 0 when the bot never asked.
+func (b *Bot) lastUpdateUnix() int64 {
+	if b.LastUpdateAt == nil {
+		return 0
+	}
+	return b.LastUpdateAt.Unix()
+}
+
+// updateFetchInterval is how stale bots.last_update_fetch_at may get while
+// the bot keeps polling: one write per bot per interval at most.
+const updateFetchInterval = 30 * time.Second
+
+// RecordUpdateFetch notes that the bot asked for updates. It writes at most
+// once per updateFetchInterval, and not at all while the update writer holds
+// the bot's row (the next poll records it).
+func (s *Service) RecordUpdateFetch(ctx context.Context, botID int64) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE bots SET last_update_fetch_at = now()
+		WHERE user_id = (
+			SELECT user_id FROM bots
+			WHERE user_id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+				AND (last_update_fetch_at IS NULL OR last_update_fetch_at < now() - make_interval(secs => $3))
+			FOR UPDATE SKIP LOCKED)`,
+		botID, s.tenantID, updateFetchInterval.Seconds())
+	if err != nil {
+		return fmt.Errorf("botadmin: record update fetch: %w", err)
+	}
+	return nil
+}
+
 // ErrBadToken is any token that does not open a live bot.
 var ErrBadToken = errors.New("botadmin: invalid token")
 
@@ -685,8 +719,9 @@ const (
 )
 
 // Info returns the public profile of a live bot with the command menu of
-// role: GROUP_ADMIN, then GROUP (or PRIVATE), then DEFAULT.
-func (s *Service) Info(ctx context.Context, botID int64, role ChatRole) (*appv1.GetBotInfoResponse, error) {
+// role: GROUP_ADMIN, then GROUP (or PRIVATE), then DEFAULT. When caller owns
+// the bot it also says so and when the bot last asked for updates.
+func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) (*appv1.GetBotInfoResponse, error) {
 	b, err := scanBot(s.pool.QueryRow(ctx, `SELECT `+botColumns+` FROM `+botFrom+`
 		WHERE b.user_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL`, botID, s.tenantID))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -707,6 +742,10 @@ func (s *Service) Info(ctx context.Context, botID int64, role ChatRole) (*appv1.
 	resp := &appv1.GetBotInfoResponse{
 		User:        &appv1.User{Id: b.ID, Username: b.Username, Name: b.Name, IsBot: true},
 		Description: b.Description, About: b.About,
+	}
+	if b.OwnerID == caller {
+		resp.IsOwner = true
+		resp.LastUpdateAt = b.lastUpdateUnix()
 	}
 	for _, scope := range order {
 		for _, set := range b.Commands {

@@ -91,6 +91,10 @@ const (
 	SessionRevokeReason_SESSION_REVOKE_REASON_EXPIRED SessionRevokeReason = 4
 	// Removed by tenant operators or moderation.
 	SessionRevokeReason_SESSION_REVOKE_REASON_ADMIN SessionRevokeReason = 5
+	// The same browser signed in again (for example to confirm a sensitive
+	// action) and now holds the new session's cookie: clients keep their local
+	// data and reconnect, which picks up the new session.
+	SessionRevokeReason_SESSION_REVOKE_REASON_REPLACED SessionRevokeReason = 6
 )
 
 // Enum value maps for SessionRevokeReason.
@@ -102,6 +106,7 @@ var (
 		3: "SESSION_REVOKE_REASON_IDP_GRANT_ENDED",
 		4: "SESSION_REVOKE_REASON_EXPIRED",
 		5: "SESSION_REVOKE_REASON_ADMIN",
+		6: "SESSION_REVOKE_REASON_REPLACED",
 	}
 	SessionRevokeReason_value = map[string]int32{
 		"SESSION_REVOKE_REASON_UNSPECIFIED":     0,
@@ -110,6 +115,7 @@ var (
 		"SESSION_REVOKE_REASON_IDP_GRANT_ENDED": 3,
 		"SESSION_REVOKE_REASON_EXPIRED":         4,
 		"SESSION_REVOKE_REASON_ADMIN":           5,
+		"SESSION_REVOKE_REASON_REPLACED":        6,
 	}
 )
 
@@ -890,14 +896,15 @@ const file_app_v1_auth_proto_rawDesc = "" +
 	"\x13CLIENT_PLATFORM_WEB\x10\x01\x12\x17\n" +
 	"\x13CLIENT_PLATFORM_IOS\x10\x02\x12\x1b\n" +
 	"\x17CLIENT_PLATFORM_ANDROID\x10\x03\x12\x1b\n" +
-	"\x17CLIENT_PLATFORM_DESKTOP\x10\x04*\xfc\x01\n" +
+	"\x17CLIENT_PLATFORM_DESKTOP\x10\x04*\xa0\x02\n" +
 	"\x13SessionRevokeReason\x12%\n" +
 	"!SESSION_REVOKE_REASON_UNSPECIFIED\x10\x00\x12$\n" +
 	" SESSION_REVOKE_REASON_SIGNED_OUT\x10\x01\x12)\n" +
 	"%SESSION_REVOKE_REASON_REVOKED_BY_USER\x10\x02\x12)\n" +
 	"%SESSION_REVOKE_REASON_IDP_GRANT_ENDED\x10\x03\x12!\n" +
 	"\x1dSESSION_REVOKE_REASON_EXPIRED\x10\x04\x12\x1f\n" +
-	"\x1bSESSION_REVOKE_REASON_ADMIN\x10\x052\xed\x03\n" +
+	"\x1bSESSION_REVOKE_REASON_ADMIN\x10\x05\x12\"\n" +
+	"\x1eSESSION_REVOKE_REASON_REPLACED\x10\x062\xed\x03\n" +
 	"\vAuthService\x12L\n" +
 	"\rGetAuthConfig\x12\x1c.app.v1.GetAuthConfigRequest\x1a\x1d.app.v1.GetAuthConfigResponse\x12[\n" +
 	"\x12ExchangeNativeCode\x12!.app.v1.ExchangeNativeCodeRequest\x1a\".app.v1.ExchangeNativeCodeResponse\x12:\n" +

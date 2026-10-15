@@ -32,6 +32,8 @@ import { useUi, type Ui } from "./ui-context.tsx";
 const sharedChunk = () => import("../media/shared-media.tsx");
 const SharedMediaSection = lazy(() => sharedChunk().then((m) => ({ default: m.SharedMediaSection })));
 const SharedMediaView = lazy(() => sharedChunk().then((m) => ({ default: m.SharedMediaView })));
+// "Quản lý bot" for the bot's owner comes with the bot chat's code.
+const BotManageRow = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotManageRow })));
 
 /** Members shown in the column; "Xem tất cả" opens the rest. */
 const MEMBERS_SHOWN = 5;
@@ -517,6 +519,11 @@ function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined
 			)}
 			<SharedRows chatId={chat.id} onShared={onShared} />
 			{peer !== undefined && !peer.isSelf && <CommonChatsSection userId={peer.id} bot={bot} />}
+			{bot && (
+				<Suspense fallback={null}>
+					<BotManageRow botId={chat.peerUserId} />
+				</Suspense>
+			)}
 			<PinnedBarRow chat={chat} />
 			<div className="info-sec">
 				<button type="button" className="row link-row danger" onClick={toggleBlock}>

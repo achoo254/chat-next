@@ -55,6 +55,7 @@ export function toOwnBot(bot: WireBot | undefined, method: string): OwnBot {
 		hasToken: bot.hasToken,
 		createdAt: assertSafeId(bot.createdAt),
 		tokenIssuedAt: assertSafeId(bot.tokenIssuedAt),
+		lastUpdateAt: assertSafeId(bot.lastUpdateAt),
 	};
 }
 
@@ -68,6 +69,8 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 		description: response.description,
 		about: response.about,
 		commands: response.commands.map(toCommand),
+		isOwner: response.isOwner,
+		lastUpdateAt: assertSafeId(response.lastUpdateAt),
 	};
 }
 

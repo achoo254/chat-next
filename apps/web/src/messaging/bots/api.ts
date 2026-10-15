@@ -36,6 +36,8 @@ export interface OwnBot {
 	readonly createdAt: number;
 	/** Unix seconds; 0 without a token. */
 	readonly tokenIssuedAt: number;
+	/** Unix seconds of the bot's last update fetch (long poll); 0 when it never asked. */
+	readonly lastUpdateAt: number;
 }
 
 /** The fields UpdateBot changes; absent ones stay as they are. */
@@ -56,6 +58,10 @@ export interface BotInfo {
 	readonly description: string;
 	readonly about: string;
 	readonly commands: readonly BotCommand[];
+	/** The viewer owns the bot. */
+	readonly isOwner: boolean;
+	/** Owner only: Unix seconds of the bot's last update fetch; 0 when it never asked or for anyone else. */
+	readonly lastUpdateAt: number;
 }
 
 /** The bot's answer to a callback button (PressInlineButton). */
@@ -143,10 +149,13 @@ export interface Bots {
  * (a failed load is tried again on the next call). `onUnauthenticated` runs
  * when the session is gone; the error is rethrown.
  */
+/** The Connect client's code, which the Developer Console's first data waits for; fetched ahead with the screen. */
+export const loadBotsClient = () => import("./client.ts");
+
 export function createBots(transport: Transport, onUnauthenticated: () => void): Bots {
 	let client: Promise<Bots> | null = null;
 	const load = (): Promise<Bots> => {
-		client ??= import("./client.ts")
+		client ??= loadBotsClient()
 			.then((module) => module.createBotsClient(transport, onUnauthenticated))
 			.catch((err: unknown) => {
 				client = null;

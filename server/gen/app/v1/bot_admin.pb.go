@@ -304,6 +304,9 @@ type Bot struct {
 	CreatedAt int64 `protobuf:"varint,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Unix seconds when the current token was issued; 0 without a token.
 	TokenIssuedAt int64 `protobuf:"varint,9,opt,name=token_issued_at,json=tokenIssuedAt,proto3" json:"token_issued_at,omitempty"`
+	// Unix seconds when the bot last asked for updates (long poll getUpdates),
+	// kept to within about 30 seconds; 0 when it never did.
+	LastUpdateAt  int64 `protobuf:"varint,10,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -397,6 +400,13 @@ func (x *Bot) GetCreatedAt() int64 {
 func (x *Bot) GetTokenIssuedAt() int64 {
 	if x != nil {
 		return x.TokenIssuedAt
+	}
+	return 0
+}
+
+func (x *Bot) GetLastUpdateAt() int64 {
+	if x != nil {
+		return x.LastUpdateAt
 	}
 	return 0
 }
@@ -900,7 +910,7 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x05scope\x18\x01 \x01(\x0e2\x17.app.v1.BotCommandScopeR\x05scope\x12.\n" +
 	"\bcommands\x18\x02 \x03(\v2\x12.app.v1.BotCommandR\bcommands\";\n" +
 	"\x0eBotCommandSets\x12)\n" +
-	"\x04sets\x18\x01 \x03(\v2\x15.app.v1.BotCommandSetR\x04sets\"\xbd\x02\n" +
+	"\x04sets\x18\x01 \x03(\v2\x15.app.v1.BotCommandSetR\x04sets\"\xe7\x02\n" +
 	"\x03Bot\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
@@ -911,7 +921,9 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\thas_token\x18\a \x01(\bR\bhasToken\x12!\n" +
 	"\n" +
 	"created_at\x18\b \x01(\x03B\x020\x02R\tcreatedAt\x12*\n" +
-	"\x0ftoken_issued_at\x18\t \x01(\x03B\x020\x02R\rtokenIssuedAt\"\x13\n" +
+	"\x0ftoken_issued_at\x18\t \x01(\x03B\x020\x02R\rtokenIssuedAt\x12(\n" +
+	"\x0elast_update_at\x18\n" +
+	" \x01(\x03B\x020\x02R\flastUpdateAt\"\x13\n" +
 	"\x11ListMyBotsRequest\"5\n" +
 	"\x12ListMyBotsResponse\x12\x1f\n" +
 	"\x04bots\x18\x01 \x03(\v2\v.app.v1.BotR\x04bots\"B\n" +

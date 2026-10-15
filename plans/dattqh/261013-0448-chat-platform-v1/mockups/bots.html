@@ -259,6 +259,46 @@
 	</div>
 </section>
 
+<section class="shot" id="bot-not-running">
+	<div class="shot-head">
+		<h2>Bot chưa chạy (chủ bot)</h2><span class="phase">R5</span>
+		<p>Chỉ chủ bot thấy, trong chat riêng với bot của mình: khi bot chưa gọi lấy update (long poll) trong 2 phút gần nhất, dưới thanh tiêu đề có băng vàng "Bot chưa chạy — chưa có chương trình nào nhận tin." kèm link "Xem hướng dẫn" mở bot đó trong Developer Console, thẻ Token (<a href="console.html#token">Token</a>). Server ghi lần bot lấy update tối đa 30 giây một lần; băng tự ẩn khi bot bắt đầu chạy. Người dùng khác không thấy băng này. Cột thông tin của bot có thêm "Quản lý bot" cho chủ bot.</p>
+	</div>
+	<div class="frame">
+		<div class="app no-info">
+			<nav class="rail" aria-label="Điều hướng">
+				<span class="avatar sm av-violet" title="Tài khoản của bạn">ĐT</span>
+				<button type="button" class="icon-btn" aria-pressed="true" aria-label="Chat"><svg class="icon"><use href="#i-message"/></svg></button>
+				<span class="spacer"></span>
+				<a class="icon-btn" href="settings.html" aria-label="Cài đặt"><svg class="icon"><use href="#i-settings"/></svg></a>
+			</nav>
+			<section class="list" aria-label="Danh sách chat">
+				<ul class="chats">
+					<li class="chat-row" aria-current="true"><span class="avatar av-amber"><svg class="icon"><use href="#i-robot"/></svg></span><div><div class="name">Báo cáo Bot <span class="tag">bot</span></div><div class="preview">Bạn: /start</div></div><div class="meta"><span>16:40</span></div></li>
+					<li class="chat-row"><span class="avatar av-blue">VH</span><div><div class="name">Vận hành hệ thống</div><div class="preview">Grafana: CPU host lab-174 vượt 90%</div></div><div class="meta"><span>09:42</span></div></li>
+				</ul>
+			</section>
+			<section class="convo" aria-label="Báo cáo Bot">
+				<header class="convo-head">
+					<span class="avatar av-amber"><svg class="icon"><use href="#i-robot"/></svg></span>
+					<div class="title"><strong>Báo cáo Bot</strong><span class="sub">@report_daily_bot · bot</span></div>
+					<button type="button" class="icon-btn" aria-label="Thông tin bot"><svg class="icon"><use href="#i-info"/></svg></button>
+				</header>
+				<div class="banner warn" role="status"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span class="grow">Bot chưa chạy — chưa có chương trình nào nhận tin.</span><a href="console.html#token">Xem hướng dẫn</a></div>
+				<div class="messages">
+					<div class="msg mine"><div class="bubble"><p>/start<span class="stamp">16:40 <svg class="icon icon-sm"><use href="#i-check"/></svg></span></p></div></div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Lệnh của bot"><svg class="icon"><use href="#i-command"/></svg></button>
+					<label class="sr-only" for="nr-draft">Tin nhắn</label>
+					<textarea id="nr-draft" rows="1" placeholder="Nhập tin nhắn tới Báo cáo Bot"></textarea>
+					<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div>
+	</div>
+</section>
+
 <!-- ===================================================================== -->
 <section class="shot" id="deep-link">
 	<div class="shot-head">

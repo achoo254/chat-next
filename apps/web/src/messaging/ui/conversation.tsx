@@ -29,6 +29,7 @@ const MediaViewer = lazy(() => import("../media/viewer.tsx"));
 const botChat = () => import("../bots/bot-chat.tsx");
 const BotProfileCard = lazy(() => botChat().then((m) => ({ default: m.BotProfileCard })));
 const BotStartBar = lazy(() => botChat().then((m) => ({ default: m.BotStartBar })));
+const BotNotRunningBanner = lazy(() => botChat().then((m) => ({ default: m.BotNotRunningBanner })));
 
 /** The photo and video viewer of this chat (mockups/media.html#viewer), loaded when first opened. */
 function ViewerLayer({ chatId }: { chatId: number }) {
@@ -346,6 +347,11 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</Suspense>
 			)}
 			<OfflineBanner chatId={chatId} />
+			{botId !== 0 && (
+				<Suspense fallback={null}>
+					<BotNotRunningBanner botId={botId} chatId={chatId} />
+				</Suspense>
+			)}
 			<MessageList
 				chatId={chatId}
 				topicId={effectiveTopic}

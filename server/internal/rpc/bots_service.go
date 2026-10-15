@@ -46,7 +46,7 @@ func (s *botsService) GetBotInfo(ctx context.Context, req *connect.Request[appv1
 				role = botadmin.RoleGroupMember
 			}
 		}
-		return s.bots.Info(ctx, m.GetBotId(), role)
+		return s.bots.Info(ctx, me, m.GetBotId(), role)
 	})
 }
 

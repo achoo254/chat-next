@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net"
@@ -84,6 +85,11 @@ func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Expires:  h.now().Add(loginTTL).Unix(),
 		ReturnTo: CleanReturnTo(q.Get("return_to")),
 	}
+	// /auth/login is a same-site navigation, so the SameSite=Strict session
+	// cookie is here; the IdP's cross-site redirect to the callback is not.
+	if hash, ok := hashToken(SessionToken(r.Header)); ok {
+		st.Replaces = base64.RawURLEncoding.EncodeToString(hash)
+	}
 	target, err := h.cfg.IdP.AuthCodeURL(AuthRequest{
 		State: st.State, Nonce: st.Nonce, Verifier: st.Verifier,
 		Locale: locale, Create: q.Get("prompt") == "create", Reauth: q.Get("reauth") == "1",
@@ -163,6 +169,13 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.cfg.Logger.Info("signed in", "user_id", user.ID, "session_id", sessionID)
+	if replaced, err := base64.RawURLEncoding.DecodeString(st.Replaces); err == nil && len(replaced) > 0 {
+		// The browser's cookie now names the new session; the old one would
+		// linger in the session list as a duplicate of this browser.
+		if err := h.cfg.Sessions.Replace(ctx, replaced, sessionID, user.ID, c.SessionID); err != nil {
+			h.cfg.Logger.Warn("revoking the replaced session failed", "session_id", sessionID, "err", err)
+		}
+	}
 	setSessionCookie(w, token)
 	writeInterstitial(w, st.ReturnTo)
 }

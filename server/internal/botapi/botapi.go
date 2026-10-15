@@ -496,6 +496,10 @@ func (s *Service) getUpdates(ctx context.Context, r *http.Request, bot *botadmin
 	if err != nil {
 		return nil, err
 	}
+	// The owner's chat with the bot and the Console tell whether a program runs the bot.
+	if err := s.admin.RecordUpdateFetch(ctx, bot.ID); err != nil {
+		s.logger.Warn("recording a bot's update fetch failed", "bot_id", bot.ID, "err", err)
+	}
 	list, err := s.updates.Poll(ctx, bot.ID, offset, int(limit), time.Duration(timeout)*time.Second)
 	switch {
 	case errors.Is(err, botupdates.ErrConflict):

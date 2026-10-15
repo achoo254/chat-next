@@ -51,6 +51,8 @@ export const vi = {
 		search: "Tìm chat và tin nhắn",
 		searchPlaceholder: "Tìm kiếm",
 		newChat: "Tạo chat mới",
+		/** Title of the Chat mới dialog, shown at once while its content loads. */
+		newChatTitle: "Chat mới",
 		firstLoad: "Đang tải danh sách chat lần đầu…",
 		draft: "Nháp:",
 		typeGroup: "Nhóm",

@@ -11,6 +11,7 @@ import { Icon, type IconName } from "../../components/icon.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import type { Messages } from "../../i18n/vi.ts";
+import { recentTime } from "../../messaging/data/format.ts";
 import { sessionsData } from "./sessions-data.ts";
 
 type Notice = { kind: "ok" | "error"; text: string } | null;
@@ -29,20 +30,18 @@ function sessionLabel(session: SessionView, t: Messages["sessions"]): string {
 	return session.appVersion ? `${device} · ${session.appVersion}` : device;
 }
 
-function sessionDetail(session: SessionView, t: Messages["sessions"], locale: Locale): string {
+/** "Hà Nội · hôm qua 21:52": where, and when the session was last used (mockups/settings.html#sessions). */
+function sessionDetail(session: SessionView, t: Messages["sessions"], locale: Locale, now: Date): string {
 	const parts = [session.location];
 	if (session.current) parts.push(t.activeNow);
-	else if (session.lastActiveAt > 0) {
-		const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
-			session.lastActiveAt * 1000,
-		);
-		parts.push(t.lastActive(when));
-	}
-	return parts.filter(Boolean).join(" · ");
+	else if (session.lastActiveAt > 0) parts.push(recentTime(session.lastActiveAt, now, locale, t));
+	const detail = parts.filter(Boolean).join(" · ");
+	return detail.charAt(0).toLocaleUpperCase(locale) + detail.slice(1);
 }
 
 function SessionInfo({ session }: { session: SessionView }) {
 	const { t, locale } = useI18n();
+	const [now] = useState(() => new Date());
 	return (
 		<>
 			<span className="device">
@@ -51,8 +50,8 @@ function SessionInfo({ session }: { session: SessionView }) {
 			<span className="grow">
 				{sessionLabel(session, t.sessions)}
 				{session.current && <span className="current">{t.sessions.thisSession}</span>}
-				{session.newLogin && <span className="fresh">{t.sessions.newLogin}</span>}
-				<small>{sessionDetail(session, t.sessions, locale)}</small>
+				{session.newLogin && !session.current && <span className="fresh">{t.sessions.newLogin}</span>}
+				<small>{sessionDetail(session, t.sessions, locale, now)}</small>
 			</span>
 		</>
 	);

@@ -6,10 +6,10 @@ import type { Transport } from "@connectrpc/connect";
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { useApi } from "../api/api-context.tsx";
-import type { Api } from "../api/client.ts";
+import { loadAccountClient, loadConnectWeb, type Api } from "../api/client.ts";
 import { PageLoader } from "../components/brand-loader.tsx";
 import { LoaderBoundary, Ready } from "../components/delayed-loader.tsx";
-import { prefetchWhenIdle, preloadable } from "../components/preload.ts";
+import { prefetchWhenIdle, preloadable, warm } from "../components/preload.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
@@ -22,9 +22,9 @@ import { webConnector, type MessagingClient, type MessagingConnector } from "./d
 import { Drafts } from "./data/drafts.ts";
 import type { PendingBackend } from "./data/pending-backend.ts";
 import { decideNotification, type NotificationInput } from "./data/notification-filter.ts";
-import { createRemote } from "./data/remote.ts";
-import { createIntegrations } from "./integrations/api.ts";
-import { createBots } from "./bots/api.ts";
+import { createRemote, loadRemoteClient } from "./data/remote.ts";
+import { createIntegrations, loadIntegrationsClient } from "./integrations/api.ts";
+import { createBots, loadBotsClient } from "./bots/api.ts";
 import { blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
@@ -43,8 +43,22 @@ const SettingsExtra = settingsExtraCode.Component;
 const Moderation = moderationCode.Component;
 const DeveloperConsole = consoleCode.Component;
 
-/** Secondary screens whose code is fetched when the browser is idle after startup. */
-const IDLE_PREFETCH = [settingsCode.preload, settingsExtraCode.preload, consoleCode.preload, ...chatPanePreloads];
+/**
+ * Secondary screens whose code is fetched when the browser is idle after
+ * startup, with the clients their first data loads on demand and the
+ * transport those calls go through.
+ */
+const IDLE_PREFETCH = [
+	settingsCode.preload,
+	settingsExtraCode.preload,
+	consoleCode.preload,
+	...chatPanePreloads,
+	loadConnectWeb,
+	loadAccountClient,
+	loadRemoteClient,
+	loadBotsClient,
+	loadIntegrationsClient,
+];
 
 /**
  * What a settings, console or moderation screen needs before it first shows,
@@ -58,10 +72,13 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 				case "profile":
 					return [settingsCode.preload()];
 				case "sessions":
+					warm(loadConnectWeb, loadAccountClient);
 					return [settingsCode.preload(), sessionsData(api).promise];
 				case "privacy":
+					warm(loadConnectWeb, loadRemoteClient);
 					return [settingsCode.preload(), settingsExtraCode.preload(), privacyData(services.remote).promise];
 				case "blocked":
+					warm(loadConnectWeb, loadRemoteClient);
 					return [settingsCode.preload(), settingsExtraCode.preload(), blockedData(services.remote).promise];
 				case "notifications":
 					return [settingsCode.preload(), settingsExtraCode.preload(), notificationSettingsData(services.store).promise];
@@ -71,6 +88,8 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 			}
 			break;
 		case "console":
+			// The list's request waits for the bots client and the transport: fetch them with the screen.
+			warm(loadConnectWeb, loadBotsClient);
 			if (route.view.page === "new") return [consoleCode.preload()];
 			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
 		case "moderation":

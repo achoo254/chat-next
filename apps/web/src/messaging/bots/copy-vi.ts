@@ -82,6 +82,8 @@ export const viBots = {
 		savedIt: "Tôi đã lưu token",
 		hidden: "Token đã được che",
 		issuedAt: (date: string) => `Cấp lúc ${date}.`,
+		lastUpdate: (date: string) => `Lần cuối nhận update: ${date}`,
+		neverUpdated: "Bot chưa nhận update lần nào",
 		none: "Bot chưa có token. Cấp token để bot gọi được Bot API.",
 		issue: "Cấp token",
 		reissue: "Cấp lại token",
@@ -157,6 +159,12 @@ export const viBots = {
 	},
 	alert: {
 		ok: "Đã hiểu",
+	},
+	owner: {
+		notRunning: "Bot chưa chạy — chưa có chương trình nào nhận tin.",
+		guide: "Xem hướng dẫn",
+		manage: "Quản lý bot",
+		manageHint: "Bot của bạn · mở trong Developer Console",
 	},
 };
 

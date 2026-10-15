@@ -900,6 +900,15 @@ export class FakeServer {
 		}
 	}
 
+	/** The browser signed in again: the old session's sockets close with REPLACED; the cookie still works. */
+	replaceSessions(userId: number): void {
+		for (const session of [...this.sessions]) {
+			if (session.userId !== userId) continue;
+			this.sendFrame(session, { case: "sessionRevoked", value: { reason: SessionRevokeReason.REPLACED } }, false);
+			this.closeSession(session);
+		}
+	}
+
 	/** Cuts every socket (network blip). */
 	dropConnections(): void {
 		for (const session of [...this.sessions]) this.closeSession(session);

@@ -79,6 +79,8 @@ export const enBots: BotsCopy = {
 		savedIt: "I saved the token",
 		hidden: "Token hidden",
 		issuedAt: (date) => `Issued ${date}.`,
+		lastUpdate: (date) => `Last asked for updates: ${date}`,
+		neverUpdated: "The bot has never asked for updates",
 		none: "The bot has no token yet. Issue one so it can call the Bot API.",
 		issue: "Issue token",
 		reissue: "Issue a new token",
@@ -151,5 +153,11 @@ export const enBots: BotsCopy = {
 	},
 	alert: {
 		ok: "OK",
+	},
+	owner: {
+		notRunning: "The bot is not running — no program is receiving its messages.",
+		guide: "See how to run it",
+		manage: "Manage bot",
+		manageHint: "Your bot · opens in Developer Console",
 	},
 };

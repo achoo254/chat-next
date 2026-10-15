@@ -400,10 +400,13 @@ void everyMethodForwarded;
  * schemas load on the first call, so the first screen does not wait for them.
  * `onUnauthenticated` runs when the session is gone; the error is rethrown.
  */
+/** The Connect clients' code; fetched ahead by screens whose first data comes through Remote. */
+export const loadRemoteClient = () => import("./remote-client.ts");
+
 export function createRemote(transport: Transport, onUnauthenticated: () => void): Remote {
 	let client: Promise<Remote> | null = null;
 	const load = (): Promise<Remote> => {
-		client ??= import("./remote-client.ts").then((module) => module.createRemoteClient(transport, onUnauthenticated));
+		client ??= loadRemoteClient().then((module) => module.createRemoteClient(transport, onUnauthenticated));
 		return client;
 	};
 	// Each method waits for the client and passes its arguments through

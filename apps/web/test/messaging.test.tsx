@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ChatFixture } from "./support/fake-chat.ts";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { newChatDialog } from "./support/new-chat-dialog.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -425,6 +426,20 @@ describe("channels", () => {
 		expect(await within(picker).findByText("Không tìm thấy ai", {}, LONG)).toBeTruthy();
 	});
 
+	it("shows the owner's own posts as the channel's, on the left under the channel name", async () => {
+		const { demo, chatId } = ownedChannel();
+		demo.fixture.send(demo.fixture.selfId, chatId, "Bảo trì tối thứ Bảy");
+		renderMessaging(demo.fixture, `/c/${chatId}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		const text = await within(log).findByText("Bảo trì tối thứ Bảy", {}, LONG);
+		const post = text.closest(".msg");
+		expect(post?.classList.contains("post")).toBe(true);
+		expect(post?.classList.contains("mine")).toBe(false);
+		expect(post?.querySelector(".who")?.textContent).toBe("Thông báo vận hành");
+		// No read ticks on a post: a channel has no "Đã xem".
+		expect(post?.querySelector(".stamp [aria-label='Đã xem'], .stamp [aria-label='Đã gửi']")).toBeNull();
+	});
+
 	it("offers leaving and, to the owner, deleting on the channel's Quản lý kênh page", async () => {
 		const { demo, chatId } = ownedChannel();
 		renderMessaging(demo.fixture, `/c/${chatId}/admin`);
@@ -452,7 +467,7 @@ describe("channels", () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture);
 		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
-		const start = await screen.findByRole("dialog", { name: "Chat mới" }, LONG);
+		const start = await newChatDialog();
 		await userEvent.click(within(start).getByRole("button", { name: "Tạo kênh" }));
 		const dialog = await screen.findByRole("dialog", { name: "Tạo kênh" }, LONG);
 		expect(within(dialog).queryByRole("radio")).toBeNull();
@@ -471,7 +486,7 @@ describe("people search", () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture);
 		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
-		return { demo, dialog: await screen.findByRole("dialog", { name: "Chat mới" }, LONG) };
+		return { demo, dialog: await newChatDialog() };
 	}
 
 	it("explains an empty result, and recognises your own account", async () => {

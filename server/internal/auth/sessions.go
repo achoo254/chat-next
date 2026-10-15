@@ -342,6 +342,29 @@ func (m *Sessions) Revoke(ctx context.Context, userID, sessionID int64) error {
 	return nil
 }
 
+// Replace revokes the session the browser held when it started a sign-in
+// (replacedHash, carried by the login cookie) now that session newID of
+// userID, bound to IdP session idpSID, replaces it. Nothing happens when that
+// session is no longer active. Its refresh token is revoked at the IdP only
+// when the two sessions cannot share one IdP grant: the IdP extends the grant
+// of its browser session on every sign-in, and revoking a refresh token may
+// end the whole grant, the new session's included. A token left unrevoked is
+// erased here and expires with the grant.
+func (m *Sessions) Replace(ctx context.Context, replacedHash []byte, newID, userID int64, idpSID string) error {
+	r, err := m.store.ReplaceSession(ctx, m.tenantID, replacedHash, newID)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	sharedGrant := r.UserID == userID && (r.IdPSID == "" || idpSID == "" || r.IdPSID == idpSID)
+	if !sharedGrant {
+		m.revokeAtIdP([]store.RevokedSession{r.RevokedSession})
+	}
+	return nil
+}
+
 // RevokeOthers revokes every other session of the user and returns how many.
 func (m *Sessions) RevokeOthers(ctx context.Context, userID, keepID int64) (int, error) {
 	list, err := m.store.RevokeOtherSessions(ctx, m.tenantID, userID, keepID)

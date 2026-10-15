@@ -253,6 +253,13 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		if (wipe) options.onSessionEnded?.(reason);
 	};
 	const sessionEnded = (reason: SessionEndReason): void => {
+		if (reason === "replaced") {
+			// The cookie now names the session that replaced this one (the same
+			// browser signed in again): reconnecting picks it up, and a
+			// different account there ends the session as user_changed.
+			connection.reconnectNow();
+			return;
+		}
 		void endSession(reason, true);
 	};
 

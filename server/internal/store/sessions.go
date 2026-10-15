@@ -31,6 +31,7 @@ const (
 	reasonSignedOut     = "1"
 	reasonRevokedByUser = "2"
 	reasonGrantEnded    = "3"
+	reasonReplaced      = "6"
 )
 
 // Session is a chat session without its secrets.
@@ -252,6 +253,39 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, tenantID string, userID
 		return nil, fmt.Errorf("store: revoke other sessions: %w", err)
 	}
 	return list, nil
+}
+
+// ReplacedSession is a session revoked because the browser holding it signed
+// in again: its sealed refresh token for the IdP revocation, and the owner
+// and IdP session the caller compares with the new session.
+type ReplacedSession struct {
+	RevokedSession
+	UserID int64
+	IdPSID string
+}
+
+// ReplaceSession revokes the active session whose token hashes to tokenHash,
+// unless it is newID (the session that replaces it), and clears its sealed
+// tokens. ErrNotFound when no such active session exists.
+func (s *Store) ReplaceSession(ctx context.Context, tenantID string, tokenHash []byte, newID int64) (ReplacedSession, error) {
+	var r ReplacedSession
+	err := s.pool.QueryRow(ctx, `
+		WITH target AS (
+			SELECT s.id, s.token_hash, s.refresh_token_enc, s.user_id, coalesce(s.idp_sid, '') AS idp_sid FROM user_sessions s
+			WHERE s.tenant_id = $1 AND s.token_hash = $2 AND s.id <> $3 AND `+activeSession+`
+			FOR UPDATE)
+		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
+			revoke_reason = `+reasonReplaced+`
+		FROM target WHERE u.id = target.id
+		RETURNING u.id, target.token_hash, target.refresh_token_enc, target.user_id, target.idp_sid`,
+		tenantID, tokenHash, newID).Scan(&r.ID, &r.TokenHash, &r.RefreshTokenEnc, &r.UserID, &r.IdPSID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ReplacedSession{}, ErrNotFound
+	}
+	if err != nil {
+		return ReplacedSession{}, fmt.Errorf("store: replace session: %w", err)
+	}
+	return r, nil
 }
 
 // EndSessionForLogout revokes the session of tokenHash if it is still active

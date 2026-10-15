@@ -8,7 +8,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { LoaderBoundary, LoaderScope, Ready } from "../../components/delayed-loader.tsx";
-import { preloadable } from "../../components/preload.ts";
+import { loadConnectWeb } from "../../api/client.ts";
+import { preloadable, warm } from "../../components/preload.ts";
+import { loadIntegrationsClient } from "../integrations/api.ts";
 import { navigate, paths, useSearch, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
@@ -132,6 +134,8 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 	};
 	// Webhook pages: their data starts with their code, so the page shows once (components/preload.ts).
 	const hookId = route.name === "chat" ? (route.hookId ?? "") : "";
+	// Their first request waits for the integrations client and the transport: fetch those with the page.
+	if (panel === "hooks" || panel === "hook" || panel === "hook-new") warm(loadConnectWeb, loadIntegrationsClient);
 	const paneParts =
 		panel === "hooks"
 			? [integrationsCode.preload(), hooksData(integrations, chatId).promise]

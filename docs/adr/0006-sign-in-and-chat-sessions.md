@@ -52,6 +52,7 @@ App chat là một sản phẩm trong hệ sinh thái hoandat. Danh tính ngư�
 
 - Đăng xuất xoá phiên chat và thu hồi refresh token ở `revocation_endpoint`. Web đăng xuất qua route HTTP `/auth/logout`: server trả 302 tới `end_session_endpoint` với `id_token_hint`, nên ID token không bao giờ tới JavaScript; RPC `SignOut` (dùng cho native) không trả URL nào.
 - Cấp lại token bot, xoá tài khoản chat và thu hồi mọi phiên khác cần lần đăng nhập IdP trong 10 phút gần nhất: server gửi `prompt=login` và `max_age=600`, rồi kiểm `auth_time`.
+- Đăng nhập lại trên cùng trình duyệt (như bước trên) thay phiên cũ của trình duyệt đó: `/auth/login` là điều hướng cùng site nên đọc được cookie phiên `SameSite=Strict` và ghi hash của nó vào cookie đăng nhập đã niêm phong; callback tạo phiên mới rồi thu hồi phiên cũ với lý do `SESSION_REVOKE_REASON_REPLACED`. Client nhận lý do này thì giữ DB local và kết nối lại (cookie đã là phiên mới). Refresh token của phiên cũ bị xoá khỏi DB; chỉ thu hồi ở IdP khi hai phiên không thể chung grant (khác người dùng, hoặc cả hai `sid` đều biết và khác nhau), vì IdP mở rộng grant của phiên trình duyệt ở mỗi lần đăng nhập và thu hồi refresh token có thể chấm dứt cả grant của phiên mới.
 
 ## Lý do
 

@@ -35,6 +35,10 @@ describe("sessions settings", () => {
 
 		const others = screen.getByRole("region", { name: "Thiết bị khác" });
 		expect(within(others).getAllByRole("listitem")).toHaveLength(2);
+		// Older than yesterday: the full date, after the place.
+		const lastActive = new Date(1_759_000_000 * 1000);
+		const full = [lastActive.getDate(), lastActive.getMonth() + 1].map((n) => String(n).padStart(2, "0")).join("/") + `/${lastActive.getFullYear()}`;
+		expect(within(others).getByText(`Hà Nội · ${full}`)).toBeTruthy();
 
 		await userEvent.click(within(others).getByRole("button", { name: "Đăng xuất: iPhone 15" }));
 
@@ -43,6 +47,31 @@ describe("sessions settings", () => {
 		expect(within(others).getAllByRole("listitem")).toHaveLength(1);
 		expect(within(others).queryByText("iPhone 15")).toBeNull();
 		expect(within(others).getByText("Windows 11")).toBeTruthy();
+	});
+
+	it("shows today's activity as a relative time and the new sign-in badge from the server", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const startOfToday = Math.floor(new Date(new Date().setHours(0, 0, 0, 0)).getTime() / 1000);
+		const today = Math.max(startOfToday, now - 60);
+		const clock = new Intl.DateTimeFormat("vi", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(today * 1000);
+		renderApp((router) => {
+			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
+			router.service(AuthService, {
+				listSessions: () => ({
+					sessions: [
+						{ id: 1n, platform: ClientPlatform.WEB, deviceName: "Edge trên macOS", current: true },
+						{ id: 4n, platform: ClientPlatform.WEB, deviceName: "Firefox trên Windows", lastActiveAt: BigInt(today), newLogin: true },
+					],
+				}),
+			});
+		}, "/settings/sessions");
+
+		const others = await screen.findByRole("region", { name: "Thiết bị khác" });
+		expect(within(others).getByText(`Hôm nay ${clock}`)).toBeTruthy();
+		expect(within(others).getByText("Mới đăng nhập")).toBeTruthy();
+		const current = screen.getByRole("region", { name: "Phiên này" });
+		expect(within(current).queryByText("Mới đăng nhập")).toBeNull();
+		expect(within(current).getByText("Đang hoạt động")).toBeTruthy();
 	});
 
 	it("signs out every other session", async () => {

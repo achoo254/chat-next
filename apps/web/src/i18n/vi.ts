@@ -74,7 +74,8 @@ export const vi = {
 		accountHint: "Đổi cách đăng nhập, gỡ quyền ứng dụng, thu hồi thiết bị",
 		manageAccount: "Quản lý tài khoản hoandat",
 		activeNow: "đang hoạt động",
-		lastActive: (when: string) => `hoạt động ${when}`,
+		today: "hôm nay",
+		yesterday: "hôm qua",
 		newLogin: "Mới đăng nhập",
 		platform: {
 			web: "Trình duyệt",

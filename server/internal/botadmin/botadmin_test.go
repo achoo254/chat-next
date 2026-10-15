@@ -214,12 +214,12 @@ func TestUpdateBot(t *testing.T) {
 		len(bot.GetCommands()) != 2 {
 		t.Fatalf("bot = %v", bot)
 	}
-	admin, err := env.Admin.Info(ctx, botID, botadmin.RoleGroupAdmin)
-	if err != nil || len(admin.GetCommands()) != 1 || admin.GetCommands()[0].GetCommand() != "ban" {
+	admin, err := env.Admin.Info(ctx, owner, botID, botadmin.RoleGroupAdmin)
+	if err != nil || len(admin.GetCommands()) != 1 || admin.GetCommands()[0].GetCommand() != "ban" || !admin.GetIsOwner() {
 		t.Fatalf("admin menu = %v, %v", admin, err)
 	}
-	member, err := env.Admin.Info(ctx, botID, botadmin.RoleGroupMember)
-	if err != nil || len(member.GetCommands()) != 1 || member.GetCommands()[0].GetCommand() != "start" {
+	member, err := env.Admin.Info(ctx, owner+1, botID, botadmin.RoleGroupMember)
+	if err != nil || len(member.GetCommands()) != 1 || member.GetCommands()[0].GetCommand() != "start" || member.GetIsOwner() {
 		t.Fatalf("member menu = %v, %v", member, err)
 	}
 	long := strings.Repeat("x", 513)

@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { entity, seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { newChatDialog } from "./support/new-chat-dialog.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -238,7 +239,7 @@ describe("group creation", () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture);
 		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
-		await userEvent.click(within(await screen.findByRole("dialog", { name: "Chat mới" }, LONG)).getByRole("button", { name: "Tạo nhóm" }));
+		await userEvent.click(within(await newChatDialog()).getByRole("button", { name: "Tạo nhóm" }));
 		const dialog = await screen.findByRole("dialog", { name: "Tạo nhóm" }, LONG);
 		// Nobody picked is allowed (the group starts with an invite link), but then it needs a name.
 		const create = within(dialog).getByRole("button", { name: "Tạo nhóm" });

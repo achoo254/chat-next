@@ -343,6 +343,8 @@ export type SessionRevokeReason =
 	| "idp_grant_ended"
 	| "expired"
 	| "admin"
+	/** The browser signed in again and holds the new session: reconnect, keep local data. */
+	| "replaced"
 	| "unknown";
 
 /** Position of an update in the per-user log (pts) or a per-chat log (chatPts). */

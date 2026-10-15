@@ -7,33 +7,115 @@ import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react"
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@app/core";
 import { cryptoRandomId } from "@app/platform";
 import { Icon } from "../../components/icon.tsx";
+import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices, useUser } from "../data/services.tsx";
 import { ChatAvatar, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 
 /** Id of a chat's command menu, which the composer's menu button controls. */
 export const BOT_MENU_ID = (chatId: number): string => `bot-cmds-${chatId}`;
-import type { BotCommand, BotInfo } from "./api.ts";
+import type { BotCommand, BotInfo, Bots } from "./api.ts";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import "./bot-chat.css";
 
-function useBotInfo(botId: number, chatId: number): BotInfo | null {
+/** GetBotInfo requests in flight, so the parts of one chat that need it share a single call. */
+const infoRequests = new Map<string, Promise<BotInfo>>();
+
+function requestInfo(bots: Bots, botId: number, chatId: number): Promise<BotInfo> {
+	const key = `${botId}:${chatId}`;
+	let request = infoRequests.get(key);
+	if (request === undefined) {
+		request = bots.info(botId, chatId);
+		infoRequests.set(key, request);
+		const forget = () => infoRequests.delete(key);
+		request.then(forget, forget);
+	}
+	return request;
+}
+
+interface Fetched {
+	readonly key: string;
+	readonly value: BotInfo;
+	/** Unix seconds when the answer arrived. */
+	readonly at: number;
+}
+
+/** `refreshMs` > 0 asks again at that interval while the viewer owns the bot (the "not running" banner follows it). */
+function useFetchedBotInfo(botId: number, chatId: number, refreshMs = 0): Fetched | null {
 	const { bots } = useServices();
-	const [info, setInfo] = useState<BotInfo | null>(null);
+	const [info, setInfo] = useState<Fetched | null>(null);
+	const key = `${botId}:${chatId}`;
 	useEffect(() => {
 		let active = true;
-		// Fetched each time the chat opens: the owner may have changed the menu.
-		bots.info(botId, chatId).then(
-			(found) => {
-				if (active) setInfo(found);
-			},
-			() => undefined,
-		);
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const load = () => {
+			// Fetched each time the chat opens: the owner may have changed the menu.
+			requestInfo(bots, botId, chatId).then(
+				(found) => {
+					if (!active) return;
+					setInfo({ key: `${botId}:${chatId}`, value: found, at: Math.floor(Date.now() / 1000) });
+					if (refreshMs > 0 && found.isOwner) timer = setTimeout(load, refreshMs);
+				},
+				() => undefined,
+			);
+		};
+		load();
 		return () => {
 			active = false;
+			clearTimeout(timer);
 		};
-	}, [bots, botId, chatId]);
-	return info;
+	}, [bots, botId, chatId, refreshMs]);
+	return info?.key === key ? info : null;
+}
+
+function useBotInfo(botId: number, chatId: number): BotInfo | null {
+	return useFetchedBotInfo(botId, chatId)?.value ?? null;
+}
+
+/** A bot that has not asked for updates for this long has no program running it. */
+export const NOT_RUNNING_AFTER_S = 120;
+
+/** Whether the owner's bot looks stopped: no update fetch within NOT_RUNNING_AFTER_S. */
+export function botNotRunning(info: BotInfo, nowSeconds: number): boolean {
+	return info.isOwner && nowSeconds - info.lastUpdateAt > NOT_RUNNING_AFTER_S;
+}
+
+const NOT_RUNNING_RECHECK_MS = 30_000;
+
+/**
+ * In the owner's private chat with their bot: "Bot chưa chạy" while the bot
+ * has not asked for updates lately, with a link to its token and long poll
+ * guide in Developer Console (mockups/bots.html#bot-not-running).
+ */
+export function BotNotRunningBanner({ botId, chatId }: { botId: number; chatId: number }) {
+	const t = useBotsCopy();
+	const fetched = useFetchedBotInfo(botId, chatId, NOT_RUNNING_RECHECK_MS);
+	if (fetched === null || !botNotRunning(fetched.value, fetched.at)) return null;
+	return (
+		<div className="banner warn" role="status">
+			<Icon name="alert" small />
+			<span className="grow">{t.owner.notRunning}</span>
+			<Link to={paths.consoleBot(botId, "token")}>{t.owner.guide}</Link>
+		</div>
+	);
+}
+
+/** "Quản lý bot" in the bot's info column, for its owner only (mockups/chat.html#info-panels). */
+export function BotManageRow({ botId }: { botId: number }) {
+	const t = useBotsCopy();
+	const info = useBotInfo(botId, 0);
+	if (info === null || !info.isOwner) return null;
+	return (
+		<div className="info-sec">
+			<Link to={paths.consoleBot(botId)} className="row link-row">
+				<Icon name="settings" />
+				<span className="grow">
+					{t.owner.manage}
+					<small>{t.owner.manageHint}</small>
+				</span>
+			</Link>
+		</div>
+	);
 }
 
 /** The bot's profile in its empty chat: description, commands and what starting it means. */

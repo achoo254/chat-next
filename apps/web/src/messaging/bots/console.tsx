@@ -820,6 +820,7 @@ function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { on
 			</div>
 			<div className="card side-card">
 				<h2>{t.token.pollTitle}</h2>
+				<p>{bot.lastUpdateAt > 0 ? t.token.lastUpdate(when(bot.lastUpdateAt, locale)) : t.token.neverUpdated}</p>
 				<p>{t.token.pollNote}</p>
 				<pre className="snippet">{snippet}</pre>
 			</div>

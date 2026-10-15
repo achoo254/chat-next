@@ -127,4 +127,10 @@ message GetBotInfoResponse {
   // The command menu for the caller in chat_id: the most specific list set
   // (GROUP_ADMIN for admins, GROUP or PRIVATE, then DEFAULT).
   repeated BotCommand commands = 4;
+  // The caller owns the bot (Developer Console manages it).
+  bool is_owner = 5;
+  // Owner only: Unix seconds when the bot last asked for updates (long poll
+  // getUpdates), kept to within about 30 seconds; 0 when it never did or
+  // the caller is not the owner.
+  int64 last_update_at = 6 [jstype = JS_NUMBER];
 }

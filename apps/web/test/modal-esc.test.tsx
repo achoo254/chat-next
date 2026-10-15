@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Modal } from "../src/messaging/ui/parts.tsx";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { newChatDialog } from "./support/new-chat-dialog.ts";
 
 const LONG = { timeout: 8000 };
 const proto = HTMLDialogElement.prototype;
@@ -109,7 +110,7 @@ describe("chat screen dialogs", () => {
 		const button = within(list).getAllByRole("button", { name: "Tạo chat mới" })[0];
 		if (button === undefined) throw new Error("no New chat button");
 		await userEvent.click(button);
-		const dialog = await screen.findByRole("dialog", { name: "Chat mới" }, LONG);
+		const dialog = await newChatDialog();
 		await nextTask();
 		expect(dialog.hasAttribute("open")).toBe(true);
 		await userEvent.keyboard("{Escape}");

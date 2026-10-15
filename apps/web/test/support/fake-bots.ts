@@ -40,6 +40,8 @@ interface FakeBot {
 	deleted: boolean;
 	/** Owned by the signed-in user (listed in the Developer Console). */
 	owned: boolean;
+	/** Unix seconds of the bot's last update fetch; 0 when it never asked. */
+	lastUpdateAt: number;
 }
 
 export interface PressAnswerSeed {
@@ -95,6 +97,7 @@ export class FakeBots {
 			createdAt: this.now - 86_400,
 			deleted: false,
 			owned: true,
+			lastUpdateAt: 0,
 			...extras,
 		});
 		return id;
@@ -130,6 +133,7 @@ export class FakeBots {
 			hasToken: bot.tokenSecret !== "",
 			createdAt: BigInt(bot.createdAt),
 			tokenIssuedAt: BigInt(bot.tokenIssuedAt),
+			lastUpdateAt: BigInt(bot.lastUpdateAt),
 		};
 	}
 
@@ -200,7 +204,15 @@ export class FakeBots {
 		router.service(BotsService, {
 			getBotInfo: (req) => {
 				const bot = this.bot(num(req.botId));
-				return { user: this.host.wireUser(bot.id), description: bot.description, about: bot.about, commands: this.menu(bot) };
+				this.calls.push(`GetBotInfo ${bot.id}`);
+				return {
+					user: this.host.wireUser(bot.id),
+					description: bot.description,
+					about: bot.about,
+					commands: this.menu(bot),
+					isOwner: bot.owned,
+					lastUpdateAt: BigInt(bot.owned ? bot.lastUpdateAt : 0),
+				};
 			},
 			startBot: (req) => {
 				const bot = this.bot(num(req.botId));
