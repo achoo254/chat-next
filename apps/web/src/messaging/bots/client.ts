@@ -12,7 +12,7 @@ import {
 	type BotWebhook as WireWebhook,
 	type GetBotDeliveryResponse,
 } from "@app/proto-ts/bot_admin";
-import { BotsService, type GetBotInfoResponse } from "@app/proto-ts/bots";
+import { BotsService, type GetBotInfoResponse, type GetChatBotCommandsResponse } from "@app/proto-ts/bots";
 import { MessagesService } from "@app/proto-ts/messages";
 import { UsersService } from "@app/proto-ts/users";
 import {
@@ -24,6 +24,7 @@ import {
 	type BotInfo,
 	type Bots,
 	type BotWebhook,
+	type ChatMenus,
 	type CommandScope,
 	type CommandSets,
 	type DeadLetter,
@@ -132,6 +133,16 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 	};
 }
 
+function toMenus(response: GetChatBotCommandsResponse): ChatMenus {
+	const bots = [];
+	for (const entry of response.bots) {
+		const bot = entry.bot;
+		if (bot === undefined || bot.username === "") continue;
+		bots.push({ botId: assertSafeId(bot.id), name: bot.name, username: bot.username, commands: entry.commands.map(toCommand) });
+	}
+	return { bots, botCount: response.botCount };
+}
+
 /** The server's error codes ("reauth_required: …") ride at the start of the message. */
 export function errorKindOf(err: ConnectError): BotErrorKind {
 	const message = err.rawMessage;
@@ -228,6 +239,7 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 			}),
 		usernameTaken: (username) => call(async () => (await lookup(username)) !== null),
 		info,
+		chatMenus: (chatId) => call(async () => toMenus(await bots.getChatBotCommands({ chatId: BigInt(chatId) }))),
 		start: (botId, startParam, randomId) =>
 			call(async () => {
 				const response = await bots.startBot({ botId: BigInt(botId), startParam, randomId: BigInt(randomId) });

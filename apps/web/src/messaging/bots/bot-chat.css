@@ -70,3 +70,7 @@
 @media (prefers-reduced-motion: reduce) {
 	.reply-row button { transition: none; }
 }
+
+/* Group menu: the bot's name after each command. */
+.cmd-menu li.with-owner[role="option"] { grid-template-columns: var(--avatar-sm) minmax(0, 1fr) auto; }
+.cmd-menu .owner { max-width: 12em; font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

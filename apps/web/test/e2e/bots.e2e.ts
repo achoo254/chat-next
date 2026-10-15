@@ -8,14 +8,17 @@
 // on loopback (the e2e stack allows local webhook URLs) checks the secret
 // and the HMAC signature and answers with a sendMessage the server runs; An
 // sees the reply, reads the delivery state in the Developer Console and
-// switches the bot back to long polling there.
+// switches the bot back to long polling there. Last, the bot edits its
+// message and inline keyboard, uploads a photo, and An uses its command menu
+// in a group (screenshots of the menu when E2E_SHOTS_DIR is set).
 import assert from "node:assert/strict";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { after, before } from "node:test";
 import type { Browser } from "playwright";
-import { launch, message, scenario, send, signIn, WEB_ORIGIN, type Person } from "./people.ts";
+import { composer, launch, message, scenario, send, signIn, WEB_ORIGIN, type Person } from "./people.ts";
 
 let browser: Browser;
 let an: Person;
@@ -34,6 +37,7 @@ interface Update {
 	readonly update_id: number;
 	readonly message?: { readonly chat: { readonly id: number }; readonly text?: string };
 	readonly callback?: { readonly id: string; readonly data: string };
+	readonly member_changed?: { readonly chat: { readonly id: number }; readonly member: { readonly status: string } };
 }
 
 /** The bot's side: Bot API calls with its token. */
@@ -46,10 +50,11 @@ class TestBot {
 	}
 
 	async call<T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+		const form = body instanceof FormData;
 		const response = await fetch(`${WEB_ORIGIN}/bot/v1${path}`, {
 			method,
-			headers: { Authorization: `Bearer ${this.token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-			...(body === undefined ? {} : { body: JSON.stringify(body) }),
+			headers: { Authorization: `Bearer ${this.token}`, ...(body === undefined || form ? {} : { "Content-Type": "application/json" }) },
+			...(body === undefined ? {} : { body: form ? body : JSON.stringify(body) }),
 		});
 		const envelope = (await response.json()) as { ok: boolean; result?: T; error?: { code: string; description: string } };
 		if (!envelope.ok || envelope.result === undefined) throw new Error(`${method} ${path}: ${response.status} ${JSON.stringify(envelope.error)}`);
@@ -210,4 +215,117 @@ scenario("the bot receives updates at a webhook and replies in its answer", () =
 	} finally {
 		await new Promise<void>((resolve) => receiver.close(() => resolve()));
 	}
+});
+
+/** A 2×2 PNG, small enough to inline. */
+const PNG = Buffer.from(
+	"iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4YRMFRAwQCgAoDgV5D3pylwAAAABJRU5ErkJggg==",
+	"base64",
+);
+
+interface SentMessage {
+	readonly seq: number;
+	readonly edit_date?: number;
+	readonly media?: { readonly kind: string; readonly file_id: string };
+}
+
+/** No horizontal scrolling in the page nor in the command menu. */
+async function noSideScroll(person: Person): Promise<void> {
+	const wide = await person.page.evaluate(() => {
+		const root = document.scrollingElement;
+		const menu = document.querySelector(".cmd-menu ul");
+		return [root !== null && root.scrollWidth > root.clientWidth, menu !== null && menu.scrollWidth > menu.clientWidth];
+	});
+	assert.deepEqual(wide, [false, false], "something scrolls sideways");
+}
+
+scenario("the bot edits its message, sends a photo, and offers its commands in a group", () => [an], async () => {
+	assert.ok(echo !== null, "the first scenario sets up the bot");
+	const { bot, chatId } = echo;
+	const { page } = an;
+	await page.goto(`${WEB_ORIGIN}/c/${chatId}`);
+
+	// Edit: new text and a new inline keyboard on the same message.
+	const sent = await bot.call<SentMessage>("POST", "/messages", {
+		chat_id: chatId,
+		text: "Đang xử lý yêu cầu…",
+		reply_markup: { inline_keyboard: [[{ text: "Huỷ", callback_data: "cancel" }]] },
+	});
+	await message(an, "Đang xử lý yêu cầu…").getByRole("button", { name: "Huỷ" }).waitFor();
+	const edited = await bot.call<SentMessage>("POST", "/messages:edit", {
+		chat_id: chatId,
+		seq: sent.seq,
+		text: "*Xong* rồi",
+		parse_mode: "markdown",
+		reply_markup: { inline_keyboard: [[{ text: "Xem kết quả", url: "https://docs.example.com/result" }]] },
+	});
+	assert.ok((edited.edit_date ?? 0) > 0);
+	const done = message(an, "Xong rồi");
+	await done.getByRole("link", { name: "Xem kết quả" }).waitFor();
+	assert.equal(await message(an, "Đang xử lý yêu cầu…").count(), 0);
+	assert.equal(await done.getByRole("button", { name: "Huỷ" }).count(), 0);
+
+	// A photo uploaded with multipart, shown to An like any photo.
+	const form = new FormData();
+	form.set("chat_id", String(chatId));
+	form.set("kind", "photo");
+	form.set("text", "Ảnh từ bot");
+	form.set("file", new Blob([PNG], { type: "image/png" }), "anh.png");
+	const photo = await bot.call<SentMessage>("POST", "/messages:sendMedia", form);
+	assert.equal(photo.media?.kind, "photo");
+	await message(an, "Ảnh từ bot").locator("img").first().waitFor();
+	const file = await bot.call<{ url: string; size: number }>("GET", `/files/${photo.media?.file_id ?? ""}`);
+	assert.ok(file.size > 0);
+	const download = await fetch(file.url);
+	assert.equal(download.status, 200);
+
+	// The group command menu: the bot's GROUP commands, picked as "/ping" (one bot).
+	await bot.call("PUT", "/commands", {
+		scope: "group",
+		commands: [
+			{ command: "ping", description: "Kiểm tra bot còn chạy" },
+			{ command: "help", description: "Hướng dẫn dùng bot trong nhóm, các lệnh và cách gọi đúng bot khi nhóm có nhiều bot" },
+		],
+	});
+	const group = "Nhóm có bot E2E";
+	await page.getByRole("button", { name: "Tạo chat mới" }).first().click();
+	await page.getByRole("dialog", { name: "Chat mới" }).getByRole("button", { name: "Tạo nhóm" }).click();
+	const dialog = page.getByRole("dialog", { name: "Tạo nhóm" });
+	await dialog.getByLabel(/Tên nhóm/).fill(group);
+	await dialog.getByPlaceholder("Nhập tên, username hoặc email").fill("e2e_echo_bot");
+	await dialog.getByRole("checkbox", { name: /Echo Bot/ }).click();
+	await dialog.getByRole("button", { name: /^Tạo nhóm · / }).click();
+	const box = composer(an);
+	await box.waitFor();
+	const joined = await bot.next((update) => update.member_changed?.member.status === "member");
+	const groupId = joined.member_changed?.chat.id ?? 0;
+	// The new group opens with its info column; close it so the chat fills the screen.
+	const info = page.getByRole("complementary", { name: "Thông tin nhóm" });
+	if (await info.waitFor({ timeout: 3000 }).then(() => true, () => false)) {
+		await page.getByRole("button", { name: "Thông tin chat" }).click();
+	}
+	await info.waitFor({ state: "detached" });
+	await page.locator(".toast.show").waitFor({ state: "detached" });
+	await page.setViewportSize({ width: 1333, height: 780 });
+	await page.getByRole("button", { name: "Lệnh của bot" }).click();
+	const list = page.getByRole("listbox", { name: "Lệnh của bot" });
+	await list.getByRole("option", { name: /\/ping/ }).waitFor();
+	assert.equal(await list.getByRole("option").count(), 2);
+	await noSideScroll(an);
+	const shots = process.env.E2E_SHOTS_DIR;
+	if (shots !== undefined && shots !== "") {
+		await page.screenshot({ path: join(shots, "group-command-menu-1333x780.png") });
+	}
+	await page.setViewportSize({ width: 390, height: 844 });
+	await list.getByRole("option", { name: /\/help/ }).waitFor();
+	await noSideScroll(an);
+	if (shots !== undefined && shots !== "") {
+		await page.screenshot({ path: join(shots, "group-command-menu-390x844.png") });
+	}
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await box.press("p");
+	await box.press("Enter");
+	await message(an, "/ping").waitFor();
+	const ping = await bot.next((update) => update.message?.text === "/ping");
+	assert.equal(ping.message?.chat.id, groupId);
 });

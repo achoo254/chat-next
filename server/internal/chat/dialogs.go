@@ -38,7 +38,7 @@ func (s *Service) SetDialogMute(ctx context.Context, me, chatID int64, durationS
 	if !forever && (durationSeconds < 0 || durationSeconds > muteDurationMax) {
 		return nil, errInvalid("duration_seconds must be 0 to %d", muteDurationMax)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	until := int64(0)
@@ -72,7 +72,7 @@ func (s *Service) SetDialogMute(ctx context.Context, me, chatID int64, durationS
 // SetDialogUnreadMark marks a chat as unread for me or clears the mark. My
 // sessions get dialog_unread_mark when it changes.
 func (s *Service) SetDialogUnreadMark(ctx context.Context, me, chatID int64, unread bool) (*appv1.SyncAck, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -129,7 +129,7 @@ func (s *Service) announcePins(ctx context.Context, t *txn, me int64) ([]int64, 
 
 // SetDialogPinned pins a chat on top of my list or unpins it.
 func (s *Service) SetDialogPinned(ctx context.Context, me, chatID int64, pinned bool) (*appv1.SetDialogPinnedResponse, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	var list []int64
@@ -181,7 +181,7 @@ func (s *Service) ReorderPinnedDialogs(ctx context.Context, me int64, chatIDs []
 	if len(chatIDs) > pinnedDialogsMax {
 		return nil, errInvalid("at most %d pinned chats", pinnedDialogsMax)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	var list []int64
@@ -222,7 +222,7 @@ func (s *Service) ReorderPinnedDialogs(ctx context.Context, me int64, chatIDs []
 // DeleteChat deletes a group or channel for every member (owner only), or
 // removes a private chat and its history for me only.
 func (s *Service) DeleteChat(ctx context.Context, me, chatID int64) (*appv1.SyncAck, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {

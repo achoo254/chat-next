@@ -345,7 +345,20 @@ var (
 	limitMessageSearch = ratelimit.Rule{Rate: 2, Burst: 30}
 )
 
-func (s *Service) allow(rule ratelimit.Rule, bucket string, userID int64) error {
+type botCallKey struct{}
+
+// AsBot marks ctx as a Bot API call of botID. The Bot API already applied
+// the bot's rate limit tier (calls, sends, sends per chat), so the per-user
+// buckets above do not apply to botID on this ctx; every other rule
+// (membership, permissions, consent, blocks) does.
+func AsBot(ctx context.Context, botID int64) context.Context {
+	return context.WithValue(ctx, botCallKey{}, botID)
+}
+
+func (s *Service) allow(ctx context.Context, rule ratelimit.Rule, bucket string, userID int64) error {
+	if botID, ok := ctx.Value(botCallKey{}).(int64); ok && botID == userID {
+		return nil // the Bot API applied the bot's tier
+	}
 	if !s.limiter.Allow(rule, fmt.Sprintf("%s:%d", bucket, userID)) {
 		return errRateLimited()
 	}

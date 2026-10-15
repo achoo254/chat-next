@@ -366,7 +366,7 @@ func (s *Service) ResolveUsername(ctx context.Context, me int64, username string
 	if !profile.ValidUsername(name) {
 		return nil, errInvalid("invalid username")
 	}
-	if err := s.allow(limitSearch, "search", me); err != nil {
+	if err := s.allow(ctx, limitSearch, "search", me); err != nil {
 		return nil, err
 	}
 	id, err := s.findable(ctx, me, name, "")
@@ -394,7 +394,7 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	if limit <= 0 || limit > searchMax {
 		limit = 20
 	}
-	if err := s.allow(limitSearch, "search", me); err != nil {
+	if err := s.allow(ctx, limitSearch, "search", me); err != nil {
 		return nil, err
 	}
 	var rows pgx.Rows
@@ -470,7 +470,7 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 		if !profile.ValidUsername(name) {
 			return nil, errInvalid("invalid username")
 		}
-		if err := s.allow(limitSearch, "search", me); err != nil {
+		if err := s.allow(ctx, limitSearch, "search", me); err != nil {
 			return nil, err
 		}
 		var err error
@@ -482,7 +482,7 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 		if email == "" || len(email) > 320 || !strings.Contains(email, "@") {
 			return nil, errInvalid("invalid email")
 		}
-		if err := s.allow(limitSearch, "search", me); err != nil {
+		if err := s.allow(ctx, limitSearch, "search", me); err != nil {
 			return nil, err
 		}
 		var err error
@@ -495,7 +495,7 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 	if id == me {
 		return nil, errInvalid("you cannot add yourself")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	var count int
@@ -526,7 +526,7 @@ func (s *Service) DeleteContact(ctx context.Context, me, userID int64) error {
 	if userID <= 0 {
 		return errInvalid("user_id is required")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return err
 	}
 	if _, err := s.pool.Exec(ctx, `DELETE FROM contacts WHERE owner_id = $1 AND contact_id = $2`, me, userID); err != nil {
@@ -585,7 +585,7 @@ func (s *Service) Block(ctx context.Context, me, userID int64) error {
 	if userID == me || userID <= 0 {
 		return errInvalid("user_id must be another user")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return err
 	}
 	tag, err := s.pool.Exec(ctx, `
@@ -610,7 +610,7 @@ func (s *Service) Block(ctx context.Context, me, userID int64) error {
 
 // Unblock removes a block.
 func (s *Service) Unblock(ctx context.Context, me, userID int64) error {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return err
 	}
 	if _, err := s.pool.Exec(ctx, `DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2`, me, userID); err != nil {
@@ -630,7 +630,7 @@ func (s *Service) GetPrivacy(ctx context.Context, me int64) (*appv1.PrivacySetti
 
 // SetPrivacy changes the given settings.
 func (s *Service) SetPrivacy(ctx context.Context, me int64, req *appv1.SetPrivacyRequest) (*appv1.PrivacySettings, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	all, err := loadPrivacy(ctx, s.pool, []int64{me})
@@ -687,7 +687,7 @@ func (s *Service) Report(ctx context.Context, me int64, req *appv1.ReportRequest
 	if utf8.RuneCountInString(comment) > reportCommentMax {
 		return errInvalid("comment is longer than %d characters", reportCommentMax)
 	}
-	if err := s.allow(limitReport, "report", me); err != nil {
+	if err := s.allow(ctx, limitReport, "report", me); err != nil {
 		return err
 	}
 	var userID, chatID int64

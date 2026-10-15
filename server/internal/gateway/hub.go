@@ -409,10 +409,28 @@ func (h *Hub) presenceChanged(userID int64, online bool) {
 
 // typing forwards a typing frame to the other users who have the chat open.
 func (h *Hub) typing(from *conn, chatID int64, b []byte) {
+	h.typingFrom(from.userID, chatID, b)
+}
+
+// BotTyping relays a bot's chat action (Bot API POST /chats/{id}/actions,
+// already checked: the bot may post there) to the users who have the chat
+// open, as a typing frame of the bot. Clients drop it after about 5
+// seconds unless it comes again.
+func (h *Hub) BotTyping(botID, chatID, topicID int64, action appv1.TypingAction) {
+	b, err := encodeFrame(&appv1.ServerFrame{Frame: &appv1.ServerFrame_Typing{Typing: &appv1.TypingFrame{
+		ChatId: chatID, UserId: botID, Action: action, TopicId: topicID,
+	}}})
+	if err != nil {
+		return
+	}
+	h.typingFrom(botID, chatID, b)
+}
+
+func (h *Hub) typingFrom(userID, chatID int64, b []byte) {
 	h.mu.RLock()
 	var targets []*conn
 	for user, set := range h.byUser {
-		if user == from.userID {
+		if user == userID {
 			continue
 		}
 		for c := range set {

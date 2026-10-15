@@ -6,6 +6,7 @@ import { createApi, createWebTransport, errorCode, sameOriginFetch, type RpcFetc
 import { forgetSelf, lastSelf, rememberSelf } from "./api/offline-self.ts";
 import { PageLoader } from "./components/brand-loader.tsx";
 import { Icon } from "./components/icon.tsx";
+import { UpdateBar } from "./components/update-bar.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
 import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
 import { Welcome } from "./screens/welcome.tsx";
@@ -31,6 +32,7 @@ export function App({ rpcFetch = sameOriginFetch, messagingConnector }: AppProps
 	return (
 		<I18nProvider>
 			<Root rpcFetch={rpcFetch} messagingConnector={messagingConnector} />
+			<UpdateBar />
 		</I18nProvider>
 	);
 }

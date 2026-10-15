@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -213,7 +214,7 @@ func TestWebhookDeliversSignedUpdatesInChatOrder(t *testing.T) {
 	}
 	mu.Unlock()
 	st, err := env.Updates.Stats(ctx, botID)
-	if err != nil || st.Delivered != 5 || st.Received != 6 || st.Failed != 0 {
+	if err != nil || st.Delivered != 5 || st.Received != 7 || st.Failed != 0 {
 		t.Fatalf("stats = %+v, %v", st, err)
 	}
 	i := info(t, env, botID)
@@ -454,12 +455,12 @@ func TestWebhookAndLongPollExcludeEachOther(t *testing.T) {
 	botID, _, _ := talkativeBot(t, env, "modebot")
 	env.CatchUp()
 	pending, err := env.Updates.Poll(ctx, botID, 0, 100, 0)
-	if err != nil || len(pending) != 1 {
+	if err != nil || len(pending) != 2 { // the group's creation: member_changed and the message
 		t.Fatalf("first poll = %v, %v", pending, err)
 	}
 	waiting := make(chan error, 1)
 	go func() {
-		_, err := env.Updates.Poll(ctx, botID, pending[0].ID+1, 100, 30*time.Second)
+		_, err := env.Updates.Poll(ctx, botID, pending[1].ID+1, 100, 30*time.Second)
 		waiting <- err
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -573,7 +574,7 @@ func TestAllowedUpdatesFilterNewUpdates(t *testing.T) {
 	setHook(t, env, botID, rcv.srv.URL, botupdates.WebhookSettings{AllowedUpdates: []string{"callback"}, DropPending: true})
 	send(t, env, user, group, "not wanted")
 	env.CatchUp()
-	if ids, _ := stored(t, env, botID); len(ids) != 1 { // only the dropped group creation
+	if ids, _ := stored(t, env, botID); len(ids) != 2 { // only the dropped group creation (two updates)
 		t.Fatalf("stored = %v", ids)
 	}
 	setHook(t, env, botID, rcv.srv.URL, botupdates.WebhookSettings{AllowedUpdates: []string{"message"}})
@@ -601,12 +602,19 @@ func TestRemovedBotLosesPendingUpdatesOfTheChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	removal := 0
 	for _, u := range list {
+		if u.Kind == "member_changed" && strings.Contains(string(u.Payload), `"status": "left"`) {
+			removal++
+			continue
+		}
 		if d := parseDelivery(t, mustJSON(t, u)); d.ChatID == group {
 			t.Fatalf("update of the chat the bot left: %s", u.Payload)
 		}
 	}
-	if len(list) != 2 { // the other group's creation and "kept"
+	// The other group's creation (member_changed and the message), "kept",
+	// and the member_changed telling the bot it was removed.
+	if len(list) != 4 || removal != 1 {
 		t.Fatalf("updates = %d", len(list))
 	}
 	// Added back: new messages reach it again.

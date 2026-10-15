@@ -73,7 +73,7 @@ func (s *Service) SendMedia(ctx context.Context, me int64, req *appv1.SendMediaR
 	if req.GetRandomId() < 0 {
 		return nil, errInvalid("random_id must not be negative")
 	}
-	if err := s.allow(limitSend, "send", me); err != nil {
+	if err := s.allow(ctx, limitSend, "send", me); err != nil {
 		return nil, err
 	}
 	chatID := req.GetChatId()
@@ -202,7 +202,7 @@ func (s *Service) SendAlbum(ctx context.Context, me int64, req *appv1.SendAlbumR
 		seenRandom[r] = r != 0
 		parsed[i] = item{text: text, ents: ents, randomID: r}
 	}
-	if err := s.allow(limitSend, "send", me); err != nil {
+	if err := s.allow(ctx, limitSend, "send", me); err != nil {
 		return nil, err
 	}
 	chatID := req.GetChatId()
@@ -401,4 +401,42 @@ func scanFileByID(ctx context.Context, q querier, id int64) (*media.File, error)
 		return nil, fmt.Errorf("chat: load file: %w", err)
 	}
 	return f, nil
+}
+
+// FileAccess finds the newest message me can still see that carries the
+// file (as its media or link preview photo), for a download URL of the Bot
+// API: the same visibility as a download, so a file is only reachable
+// through a message that still carries it.
+func (s *Service) FileAccess(ctx context.Context, me int64, publicID string) (*media.Access, error) {
+	if !media.ValidPublicID(publicID) {
+		return nil, media.ErrFileNotFound
+	}
+	var chatID, seq int64
+	f, err := media.ScanFile(prefixedRow{row: s.pool.QueryRow(ctx, `
+		SELECT mf.chat_id, mf.seq, `+media.FileColumns+`
+		FROM files f
+		JOIN message_files mf ON mf.file_id = f.id
+		JOIN messages m ON m.chat_id = mf.chat_id AND m.seq = mf.seq AND m.deleted_at IS NULL
+		JOIN chat_members cm ON cm.chat_id = mf.chat_id AND cm.user_id = $3 AND cm.visible_from_seq <= mf.seq
+			AND (cm.left_at IS NULL OR (cm.left_seq >= mf.seq AND (m.changed_at IS NULL OR m.changed_at <= cm.left_at)))
+		WHERE f.public_id = $1 AND f.tenant_id = $2
+			AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $3 AND h.chat_id = mf.chat_id AND h.seq = mf.seq)
+		ORDER BY m.date DESC, mf.chat_id, mf.seq DESC LIMIT 1`, publicID, s.cfg.TenantID, me), head: []any{&chatID, &seq}})
+	if isNoRows(err) {
+		return nil, media.ErrFileNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("chat: file access: %w", err)
+	}
+	return &media.Access{File: f, ChatID: chatID, Seq: seq}, nil
+}
+
+// prefixedRow scans leading columns into head, the rest for media.ScanFile.
+type prefixedRow struct {
+	row  pgx.Row
+	head []any
+}
+
+func (r prefixedRow) Scan(dest ...any) error {
+	return r.row.Scan(append(r.head, dest...)...)
 }

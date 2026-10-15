@@ -37,7 +37,20 @@ const (
 
 // UpdateKinds are the update kinds a bot can receive, in the order the
 // Console lists them.
-var UpdateKinds = []string{chat.BotUpdateMessage, chat.BotUpdateMessageEdited, chat.BotUpdateChannelPost, chat.BotUpdateCallback}
+var UpdateKinds = []string{chat.BotUpdateMessage, chat.BotUpdateMessageEdited, chat.BotUpdateChannelPost, chat.BotUpdateCallback,
+	chat.BotUpdateMemberChanged, chat.BotUpdateReaction}
+
+// optInKinds are only stored for a bot that lists them in allowed_updates;
+// an empty allowed_updates means every other kind.
+var optInKinds = []string{chat.BotUpdateReaction}
+
+// Wants reports whether a bot with allowed_updates allowed receives kind.
+func Wants(allowed []string, kind string) bool {
+	if len(allowed) == 0 {
+		return !slices.Contains(optInKinds, kind)
+	}
+	return slices.Contains(allowed, kind)
+}
 
 var secretPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,256}$`)
 
@@ -133,6 +146,36 @@ func secretAAD(botID int64) []byte {
 	return binary.BigEndian.AppendUint64([]byte("bot:"), uint64(botID))
 }
 
+// CheckKinds validates allowed_updates and drops duplicates.
+func CheckKinds(list []string) ([]string, error) {
+	kinds := []string{}
+	for _, k := range list {
+		if !slices.Contains(UpdateKinds, k) {
+			return nil, &WebhookError{"allowed_updates_invalid", fmt.Sprintf("unknown update kind %q (known: %s)", k, strings.Join(UpdateKinds, ", "))}
+		}
+		if !slices.Contains(kinds, k) {
+			kinds = append(kinds, k)
+		}
+	}
+	return kinds, nil
+}
+
+// SetPollAllowedUpdates stores the kinds a polling bot receives from now
+// on (empty: every kind but the opt-in ones). While a webhook is set
+// nothing changes (getUpdates answers 409 then).
+func (s *Service) SetPollAllowedUpdates(ctx context.Context, botID int64, kinds []string) error {
+	kinds, err := CheckKinds(kinds)
+	if err != nil {
+		return err
+	}
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE bots SET allowed_updates = $2, updated_at = now()
+		WHERE user_id = $1 AND deleted_at IS NULL AND webhook_url IS NULL AND allowed_updates <> $2`, botID, kinds); err != nil {
+		return fmt.Errorf("botupdates: set allowed updates: %w", err)
+	}
+	return nil
+}
+
 // checkSettings validates w and returns the URL and allowed kinds to store.
 func (s *Service) checkSettings(ctx context.Context, w *WebhookSettings) error {
 	if w.MaxConnections == 0 {
@@ -144,14 +187,9 @@ func (s *Service) checkSettings(ctx context.Context, w *WebhookSettings) error {
 	if w.Secret != "" && !secretPattern.MatchString(w.Secret) {
 		return &WebhookError{"secret_invalid", fmt.Sprintf("secret must have 1 to %d characters of A-Z, a-z, 0-9, _ and -", secretMax)}
 	}
-	var kinds []string
-	for _, k := range w.AllowedUpdates {
-		if !slices.Contains(UpdateKinds, k) {
-			return &WebhookError{"allowed_updates_invalid", fmt.Sprintf("unknown update kind %q (known: %s)", k, strings.Join(UpdateKinds, ", "))}
-		}
-		if !slices.Contains(kinds, k) {
-			kinds = append(kinds, k)
-		}
+	kinds, err := CheckKinds(w.AllowedUpdates)
+	if err != nil {
+		return err
 	}
 	w.AllowedUpdates = kinds
 	ctx, cancel := context.WithTimeout(ctx, checkURLTimeout)

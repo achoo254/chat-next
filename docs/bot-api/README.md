@@ -126,3 +126,72 @@ Body của câu trả lời 2xx có thể mang một phương thức để serve
 ```
 
 Chỉ hỗ trợ `sendMessage` và `answerCallback` (`callback_id`, `text`, `show_alert`, `url`). Body tối đa 64 KiB; lớn hơn thì update vẫn tính là đã giao nhưng phương thức bị bỏ qua. Kết quả không được báo lại; lỗi bị bỏ qua. `random_id` của tin được server tự đặt theo bot và update, nên update giao lại không làm bot gửi trùng.
+
+## 4. Sửa, xoá, chuyển tiếp tin
+
+Các method về tin đều là `POST` JSON. Bot làm được đúng những gì một người cùng quyền làm được trong app. Trong ví dụ, `curl -s ...` là `curl -s` kèm hai header `Authorization` và `Content-Type: application/json` như ví dụ đầu.
+
+```sh
+# Sửa chữ (và thay bàn phím inline; không gửi reply_markup thì giữ bàn phím cũ)
+curl -s -H "Authorization: Bearer $BOT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"chat_id": 42, "seq": 17, "text": "*Xong* rồi", "parse_mode": "markdown",
+       "reply_markup": {"inline_keyboard": [[{"text": "Xem", "url": "https://hoandat.com"}]]}}' $API/messages:edit
+# Chỉ đổi bàn phím inline (không gửi reply_markup thì gỡ bàn phím; không hiện "đã sửa")
+curl -s ... -d '{"chat_id": 42, "seq": 17}' $API/messages:editMarkup
+```
+
+- `messages:edit`: chỉ tin của chính bot, sửa lúc nào cũng được khi bot còn quyền gửi trong chat. Bàn phím trả lời (`keyboard`) không sửa được, gửi tin mới.
+- `messages:delete` `{"chat_id", "seqs": [..]}` (1–100 tin): tin của bot luôn xoá được; tin người khác chỉ khi bot là admin (hoặc trong chat riêng). Tin không được phép xoá thì giữ nguyên; không xoá được tin nào thì `403`.
+- `messages:forward` `{"from_chat_id", "seqs", "chat_id", "random_ids"}`: chuyển tiếp kèm "Chuyển tiếp từ"; `messages:copy` `{"from_chat_id", "seq", "chat_id", "text"?}`: gửi lại nội dung không kèm nguồn, `text` thay chữ hoặc chú thích. Nguồn phải là chat bot đang ở và thấy được tin; đích theo luật gửi (consent ở chat riêng).
+- `messages:react` `{"chat_id", "seq", "emoji"}`: một emoji, `""` để bỏ.
+- `messages:pin` / `messages:unpin` `{"chat_id", "seq"}`: cần quyền ghim (admin; thành viên nếu nhóm cho phép; cả hai phía ở chat riêng).
+
+Gửi tin, sửa, chuyển tiếp, sao chép, file và ghim cùng tính vào giới hạn gửi của bot (mặc định 30 tin/giây, 1 tin/giây mỗi chat, dồn được 20).
+
+## 5. Gửi ảnh và file
+
+Tải file lên bằng `multipart/form-data` (phần `file`, `kind` là `photo`, `video`, `audio`, `voice` hoặc `document`; `entities` nếu có là chuỗi JSON). Tối đa 50 MiB một request, ảnh tối đa 20 MiB; server kiểm nội dung đúng loại, xoá EXIF/GPS, tạo ảnh thu nhỏ và tính vào dung lượng của bot. Server không tải URL hộ bot.
+
+```sh
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  -F chat_id=42 -F kind=photo -F text='Biểu đồ hôm nay' -F file=@chart.png $API/messages:sendMedia
+# Gửi lại file đã có (file_id lấy từ media.file_id của tin)
+curl -s ... -d '{"chat_id": 43, "file_id": "AbC..."}' $API/messages:sendMedia
+# Album 2–10 file: items là JSON, attach trỏ tới tên phần chứa file
+curl -s -H "Authorization: Bearer $BOT_TOKEN" -F chat_id=42 \
+  -F items='[{"attach": "a", "kind": "photo", "text": "Trước"}, {"attach": "b", "kind": "photo"}]' \
+  -F a=@before.jpg -F b=@after.jpg $API/messages:sendAlbum
+```
+
+Đọc file bot thấy được (tin của bot hoặc tin trong chat bot đang ở): `GET $API/files/<file_id>` trả `size`, `mime_type`, … và `url` tải trực tiếp (GET thường, hỗ trợ Range) dùng được khoảng một giờ; xoá tin hay bot rời chat thì URL hết hiệu lực, cần URL mới thì gọi lại.
+
+## 6. Quản trị nhóm
+
+```sh
+curl -s -H "Authorization: Bearer $BOT_TOKEN" $API/chats/77/admins
+curl -s -H "Authorization: Bearer $BOT_TOKEN" $API/chats/77/members/1001
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" $API/chats/77/members/1001:ban      # cấm và mời ra
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" $API/chats/77/members/1001:unban    # chỉ bỏ cấm
+curl -s -H "Authorization: Bearer $BOT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"permissions": 1}' $API/chats/77/members/1001:restrict                              # chỉ được nhắn chữ
+curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"title": "Vận hành", "about": "Trực ca 24/7"}' $API/chats/77
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" $API/chats/77:leave
+```
+
+`status` của thành viên: `owner`, `admin`, `member`, `left`, `banned`; `permissions` là bitmask: 1 nhắn tin, 2 gửi media, 4 thêm người, 8 ghim, 16 đổi thông tin nhóm, 32 quản lý chủ đề. Cấm, bỏ cấm và giới hạn cần bot là admin; đổi tên và mô tả cần quyền đổi thông tin.
+
+"Đang gõ": `POST $API/chats/77/actions` với `{"action": "typing"}` (hoặc `upload_photo`, `upload_video`, `upload_document`, `record_voice`, `cancel`). Người đang mở chat thấy khoảng 5 giây; lặp lại khi còn làm việc. Lưu ý: app web chưa hiển thị trạng thái này, API vẫn nhận để bot không phải sửa sau.
+
+## 7. Update về thành viên và reaction
+
+- `member_changed`: tư cách thành viên của chính bot đổi (được thêm, kể cả lúc nhóm được tạo cùng bot; bị mời ra hay tự rời; được lên hay xuống admin; bị giới hạn). Có `chat`, `from` (người làm), `member` (`status`, `permissions` của bot sau thay đổi). Nhận mặc định.
+- `reaction`: người dùng thả, đổi hay bỏ reaction trên tin của bot (`seq`, `user`, `emoji`; `""` là đã bỏ). Chỉ nhận khi đăng ký: webhook đặt `allowed_updates` có `reaction`; long poll gửi `allowed_updates` một lần, server nhớ:
+
+```sh
+curl -s -H "Authorization: Bearer $BOT_TOKEN" "$API/updates?allowed_updates=message,callback,member_changed,reaction"
+```
+
+## 8. Menu lệnh trong nhóm
+
+Đặt lệnh theo phạm vi bằng `PUT $API/commands` (`scope`: `default`, `private`, `group`, `group_admin`). Trong nhóm, nút menu lệnh ở ô soạn tin liệt kê lệnh của mọi bot trong nhóm (admin thấy danh sách `group_admin`). Nhóm có từ hai bot trở lên thì lệnh chọn từ menu được gửi dạng `/lệnh@username_bot`, nên ở chế độ riêng tư chỉ đúng bot đó nhận.

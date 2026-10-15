@@ -796,15 +796,6 @@ func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) 
 	if err != nil {
 		return nil, err
 	}
-	var order []string
-	switch role {
-	case RoleGroupAdmin:
-		order = []string{ScopeGroupAdmin, ScopeGroup, ScopeDefault}
-	case RoleGroupMember:
-		order = []string{ScopeGroup, ScopeDefault}
-	default:
-		order = []string{ScopePrivate, ScopeDefault}
-	}
 	resp := &appv1.GetBotInfoResponse{
 		User:        &appv1.User{Id: b.ID, Username: b.Username, Name: b.Name, IsBot: true},
 		Description: b.Description, About: b.About,
@@ -814,12 +805,61 @@ func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) 
 		resp.LastUpdateAt = b.lastUpdateUnix()
 		resp.NotRunning = b.notRunning(s.now())
 	}
+	resp.Commands = b.menu(role)
+	return resp, nil
+}
+
+// menu is the most specific command list the bot set for role.
+func (b *Bot) menu(role ChatRole) []*appv1.BotCommand {
+	var order []string
+	switch role {
+	case RoleGroupAdmin:
+		order = []string{ScopeGroupAdmin, ScopeGroup, ScopeDefault}
+	case RoleGroupMember:
+		order = []string{ScopeGroup, ScopeDefault}
+	default:
+		order = []string{ScopePrivate, ScopeDefault}
+	}
 	for _, scope := range order {
 		for _, set := range b.Commands {
-			if set.Scope == scope && resp.Commands == nil {
-				resp.Commands = renderCommands(set.Commands)
+			if set.Scope == scope {
+				return renderCommands(set.Commands)
 			}
 		}
 	}
-	return resp, nil
+	return nil
+}
+
+// Menus returns the command menus for role of the live bots among ids, in
+// the order of ids, leaving out bots without commands.
+func (s *Service) Menus(ctx context.Context, ids []int64, role ChatRole) ([]*appv1.ChatBotCommands, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+botColumns+` FROM `+botFrom+`
+		WHERE b.user_id = ANY($1) AND b.tenant_id = $2 AND b.deleted_at IS NULL`, ids, s.tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("botadmin: load bots: %w", err)
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*Bot, error) { return scanBot(r) })
+	if err != nil {
+		return nil, fmt.Errorf("botadmin: load bots: %w", err)
+	}
+	byID := make(map[int64]*Bot, len(list))
+	for _, b := range list {
+		byID[b.ID] = b
+	}
+	var out []*appv1.ChatBotCommands
+	for _, id := range ids {
+		b := byID[id]
+		if b == nil {
+			continue
+		}
+		if commands := b.menu(role); len(commands) > 0 {
+			out = append(out, &appv1.ChatBotCommands{
+				Bot: &appv1.User{Id: b.ID, Username: b.Username, Name: b.Name, IsBot: true}, Commands: commands,
+			})
+		}
+	}
+	return out, nil
 }

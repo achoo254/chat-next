@@ -252,7 +252,7 @@ func (t *txn) announceHooksOff(ctx context.Context, c *chatRow, userID int64) er
 // restricted: NotFound when the chat is unknown to me, PermissionDenied for
 // other members.
 func (s *Service) WithChatAdmin(ctx context.Context, chatID, me int64, fn func(it *IntegrationTx) error) error {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return err
 	}
 	_, err := s.inTx(ctx, func(t *txn) error {

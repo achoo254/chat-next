@@ -32,6 +32,11 @@ service BotsService {
   // Public profile of a bot: description, about and the command menu for
   // a chat.
   rpc GetBotInfo(GetBotInfoRequest) returns (GetBotInfoResponse);
+  // The command menus of the bots in a group, for the composer's command
+  // menu: one entry per bot member with commands for the caller (the
+  // GROUP_ADMIN list for admins, else GROUP, then DEFAULT). Empty for chats
+  // that are not groups.
+  rpc GetChatBotCommands(GetChatBotCommandsRequest) returns (GetChatBotCommandsResponse);
 }
 
 enum InlineResultKind {
@@ -136,4 +141,25 @@ message GetBotInfoResponse {
   // Owner only: the bot has not asked for updates in the last 2 minutes (or
   // never did), judged by the server's clock; false for anyone else.
   bool not_running = 7;
+}
+
+message GetChatBotCommandsRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+// One bot's command menu in a group.
+message ChatBotCommands {
+  // The bot (is_bot set; username always present).
+  User bot = 1;
+  repeated BotCommand commands = 2;
+}
+
+message GetChatBotCommandsResponse {
+  // Bots in the order they joined; bots without commands for the caller
+  // are left out.
+  repeated ChatBotCommands bots = 1;
+  // Every bot in the group, with or without commands. With more than one
+  // the client sends a picked command as "/command@username", so only that
+  // bot takes it.
+  int32 bot_count = 2;
 }

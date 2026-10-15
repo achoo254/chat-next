@@ -304,7 +304,7 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.allow(limitTopic, "topic", me); err != nil {
+	if err := s.allow(ctx, limitTopic, "topic", me); err != nil {
 		return nil, nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -347,7 +347,7 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, adminOnly bool,
 	edit func(t *topicRow) (changed bool, err error),
 ) (*appv1.ForumTopic, *appv1.SyncAck, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, nil, err
 	}
 	var topic *topicRow

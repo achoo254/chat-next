@@ -82,7 +82,7 @@ func TestReplayIsIdempotent(t *testing.T) {
 	}
 	env.CatchUp()
 	before, next := stored(t, env, botID)
-	if len(before) != 6 { // the group's creation and five messages
+	if len(before) != 7 { // the group's creation (member_changed and the message) and five messages
 		t.Fatalf("stored %v", before)
 	}
 	// Another process replays the whole range from an old cursor.
@@ -138,8 +138,9 @@ func TestConcurrentConsumersKeepOneWriterPerBot(t *testing.T) {
 	<-consumersDone
 	env.CatchUp()
 	ids, next := stored(t, env, botID)
-	// Group creations (5) plus every message, each exactly once.
-	want := 1 + senders + senders*each
+	// Group creations (5, each a member_changed and a message) plus every
+	// message, each exactly once.
+	want := 2*(1+senders) + senders*each
 	if len(ids) != want {
 		t.Fatalf("stored %d updates, want %d", len(ids), want)
 	}
@@ -171,7 +172,7 @@ func TestCursorWaitsForOpenTransactions(t *testing.T) {
 	}
 	send(t, env, user, group, "after the gap")
 	env.CatchUp()
-	if ids, _ := stored(t, env, botID); len(ids) != 2 {
+	if ids, _ := stored(t, env, botID); len(ids) != 3 {
 		t.Fatalf("message after the gap not delivered: %v", ids)
 	}
 	if c := cursor(t, env); c >= held {
@@ -184,7 +185,7 @@ func TestCursorWaitsForOpenTransactions(t *testing.T) {
 	if c := cursor(t, env); c <= held {
 		t.Fatalf("cursor %d stuck below the committed id %d", c, held)
 	}
-	if ids, _ := stored(t, env, botID); len(ids) != 2 {
+	if ids, _ := stored(t, env, botID); len(ids) != 3 {
 		t.Fatalf("updates after the gap closed: %v", ids)
 	}
 }
@@ -199,7 +200,7 @@ func TestAcknowledgedUpdatesAreNotRedelivered(t *testing.T) {
 	}
 	env.CatchUp()
 	list, err := env.Updates.Poll(ctx, botID, 0, 100, 0)
-	if err != nil || len(list) != 4 { // the group's creation and three messages
+	if err != nil || len(list) != 5 { // the group's creation (two updates) and three messages
 		t.Fatalf("poll = %d updates, %v", len(list), err)
 	}
 	offset := list[len(list)-1].ID + 1
@@ -269,7 +270,7 @@ func TestPoisonRowDoesNotStallOtherBots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := len(list); n != 2 || !strings.Contains(string(list[n-1].Payload), "after the poison row") {
+	if n := len(list); n != 3 || !strings.Contains(string(list[n-1].Payload), "after the poison row") {
 		t.Fatalf("updates = %d, last %s", n, list[n-1].Payload)
 	}
 }

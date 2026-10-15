@@ -54,6 +54,26 @@ func (s *botsService) GetBotInfo(ctx context.Context, req *connect.Request[appv1
 	})
 }
 
+// GetChatBotCommands lists the menus of the bots in a group for the
+// caller (group admins get the GROUP_ADMIN lists).
+func (s *botsService) GetChatBotCommands(ctx context.Context, req *connect.Request[appv1.GetChatBotCommandsRequest]) (*connect.Response[appv1.GetChatBotCommandsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetChatBotCommandsRequest) (*appv1.GetChatBotCommandsResponse, error) {
+		ids, admin, err := s.chat.ChatBots(ctx, me, m.GetChatId())
+		if err != nil {
+			return nil, err
+		}
+		role := botadmin.RoleGroupMember
+		if admin {
+			role = botadmin.RoleGroupAdmin
+		}
+		menus, err := s.bots.Menus(ctx, ids, role)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetChatBotCommandsResponse{Bots: menus, BotCount: int32(len(ids))}, nil
+	})
+}
+
 func (s *botsService) InlineQuery(context.Context, *connect.Request[appv1.InlineQueryRequest]) (*connect.Response[appv1.InlineQueryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("inline_mode_unavailable: inline mode comes in a later release"))
 }

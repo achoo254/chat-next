@@ -290,7 +290,7 @@ func (s *Service) PressInlineButton(ctx context.Context, me int64, req *appv1.Pr
 	if len(data) == 0 || len(data) > callbackDataMax {
 		return nil, errInvalid("callback_data must have 1 to %d bytes", callbackDataMax)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	id, err := newCallbackID()
@@ -400,6 +400,13 @@ const (
 	// BotUpdateChannelPost is a new post of a channel the bot administers;
 	// an edited post is a BotUpdateMessageEdited of the channel.
 	BotUpdateChannelPost = "channel_post"
+	// BotUpdateMemberChanged is a change of the bot's own membership: added
+	// (also when the chat is created with it), removed or left, promoted,
+	// demoted or restricted.
+	BotUpdateMemberChanged = "member_changed"
+	// BotUpdateReaction is a user's reaction set, changed or removed on a
+	// message of the bot.
+	BotUpdateReaction = "reaction"
 )
 
 // BotRemoval tells that a bot is no longer a member of a chat as of an
@@ -426,6 +433,36 @@ type BotUpdate struct {
 	// chat); it may hold more users, shared by the updates of one batch.
 	Users    []*appv1.User
 	Callback *BotCallback
+	// Member: member_changed only (Message is nil).
+	Member *BotMemberChange
+	// Reaction: reaction only (Message is nil).
+	Reaction *BotReaction
+}
+
+// Seq is the message the update is about (0 for member_changed).
+func (u BotUpdate) Seq() int64 {
+	if u.Reaction != nil {
+		return u.Reaction.Seq
+	}
+	return u.Message.GetSeq()
+}
+
+// BotMemberChange is the bot's own membership after a change.
+type BotMemberChange struct {
+	// ActorID made the change (0: moderation).
+	ActorID int64
+	// Status is one of the MemberStatus values; Permissions the effective
+	// ChatPermission bits.
+	Status      string
+	Permissions uint32
+}
+
+// BotReaction is a user's reaction on a message of the bot as of the
+// update; Emoji "" means it was removed.
+type BotReaction struct {
+	Seq    int64
+	UserID int64
+	Emoji  string
 }
 
 // BotCallback is a button press for the bot.
@@ -458,11 +495,21 @@ type botRef struct {
 // concern no bot cost one query in total.
 func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate, error) {
 	var chatIDs, pressRows []int64
+	var eventRows []OutboxRow
 	for _, r := range rows {
 		switch r.Kind {
 		case kindMessageNew, kindMessageEdit:
 			if r.ChatID != 0 {
 				chatIDs = append(chatIDs, r.ChatID)
+			}
+		case kindMemberAdded, kindMemberPermissions, kindReaction:
+			if r.ChatID != 0 {
+				chatIDs = append(chatIDs, r.ChatID)
+				eventRows = append(eventRows, r)
+			}
+		case kindMemberRemoved:
+			if r.ChatID != 0 {
+				eventRows = append(eventRows, r)
 			}
 		case kindInlineButton:
 			pressRows = append(pressRows, r.ID)
@@ -474,16 +521,25 @@ func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate
 		return nil, err
 	}
 	var out []BotUpdate
+	var created []memberEvent
 	if len(members) > 0 {
 		refs, err := s.botRefs(ctx, rows, members)
 		if err != nil {
 			return nil, err
 		}
-		msgs, err := s.botMessageUpdates(ctx, refs, members)
+		msgs, joined, err := s.botMessageUpdates(ctx, refs, members)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, msgs...)
+		created = joined
+	}
+	if len(eventRows) > 0 || len(created) > 0 {
+		events, err := s.botEventUpdates(ctx, eventRows, members, created)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, events...)
 	}
 	if len(pressRows) > 0 {
 		presses, err := s.botCallbackUpdates(ctx, rows, pressRows)
@@ -493,7 +549,7 @@ func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate
 		out = append(out, presses...)
 	}
 	slices.SortStableFunc(out, func(a, b BotUpdate) int {
-		return cmp.Or(cmp.Compare(a.OutboxID, b.OutboxID), cmp.Compare(a.Message.GetSeq(), b.Message.GetSeq()))
+		return cmp.Or(cmp.Compare(a.OutboxID, b.OutboxID), cmp.Compare(a.Seq(), b.Seq()))
 	})
 	return out, nil
 }
@@ -562,72 +618,30 @@ func (s *Service) botRefs(ctx context.Context, rows []OutboxRow, members map[int
 		default:
 		}
 	}
-	if len(users) > 0 {
-		list, err := s.pool.Query(ctx, `
-			SELECT u.user_id, u.pts, u."update" FROM user_updates u
-			JOIN unnest($1::bigint[], $2::bigint[]) AS x(user_id, pts) ON x.user_id = u.user_id AND x.pts = u.pts
-			ORDER BY u.user_id, u.pts`, users, pts)
-		if err != nil {
-			return nil, fmt.Errorf("chat: bot log entries: %w", err)
-		}
-		for list.Next() {
-			var k logKey
-			var payload []byte
-			if err := list.Scan(&k.id, &k.pos, &payload); err != nil {
-				list.Close()
-				return nil, fmt.Errorf("chat: bot log entries: %w", err)
-			}
-			u, err := decodeStored(payload)
-			if err != nil {
-				list.Close()
-				return nil, err
-			}
-			add(userRow[k], k.id, u)
-		}
-		list.Close()
-		if err := list.Err(); err != nil {
-			return nil, fmt.Errorf("chat: bot log entries: %w", err)
-		}
+	if err := readUserLog(ctx, s.pool, users, pts, func(user, pos int64, u *appv1.Update) {
+		add(userRow[logKey{user, pos}], user, u)
+	}); err != nil {
+		return nil, err
 	}
-	if len(chats) > 0 {
-		list, err := s.pool.Query(ctx, `
-			SELECT u.chat_id, u.chat_pts, u."update" FROM chat_updates u
-			JOIN unnest($1::bigint[], $2::bigint[]) AS x(chat_id, chat_pts) ON x.chat_id = u.chat_id AND x.chat_pts = u.chat_pts
-			ORDER BY u.chat_id, u.chat_pts`, chats, chatPts)
-		if err != nil {
-			return nil, fmt.Errorf("chat: bot chat log entries: %w", err)
+	if err := readChatLog(ctx, s.pool, chats, chatPts, func(chatID, pos int64, u *appv1.Update) {
+		r := chatRow[logKey{chatID, pos}]
+		for _, b := range members[r.ChatID] {
+			add(r, b.botID, u)
 		}
-		for list.Next() {
-			var k logKey
-			var payload []byte
-			if err := list.Scan(&k.id, &k.pos, &payload); err != nil {
-				list.Close()
-				return nil, fmt.Errorf("chat: bot chat log entries: %w", err)
-			}
-			u, err := decodeStored(payload)
-			if err != nil {
-				list.Close()
-				return nil, err
-			}
-			r := chatRow[k]
-			for _, b := range members[r.ChatID] {
-				add(r, b.botID, u)
-			}
-		}
-		list.Close()
-		if err := list.Err(); err != nil {
-			return nil, fmt.Errorf("chat: bot chat log entries: %w", err)
-		}
+	}); err != nil {
+		return nil, err
 	}
 	return refs, nil
 }
 
 // botMessageUpdates loads and filters the referenced messages, then renders
 // them per bot: one render of all its messages and one chat render per
-// chat it is in, whatever the number of updates.
-func (s *Service) botMessageUpdates(ctx context.Context, refs []botRef, members map[int64][]botMember) ([]BotUpdate, error) {
+// chat it is in, whatever the number of updates. It also returns, as
+// member events, the bots a chat was created with (their chat_created
+// service message).
+func (s *Service) botMessageUpdates(ctx context.Context, refs []botRef, members map[int64][]botMember) ([]BotUpdate, []memberEvent, error) {
 	if len(refs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	keys := map[int64][]int64{}
 	for _, r := range refs {
@@ -635,11 +649,11 @@ func (s *Service) botMessageUpdates(ctx context.Context, refs []botRef, members 
 	}
 	msgs, err := loadMessages(ctx, s.pool, keys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	chats, err := loadChats(ctx, s.pool, s.cfg.TenantID, sortedKeysOf(keys))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Authors that are bots, and authors of replied-to messages (privacy).
 	replies := map[int64][]int64{}
@@ -652,13 +666,14 @@ func (s *Service) botMessageUpdates(ctx context.Context, refs []botRef, members 
 	}
 	botAuthors, err := botsAmong(ctx, s.pool, uniqueSorted(authors))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	replied, err := loadMessages(ctx, s.pool, replies)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	batches := newBotBatches()
+	var created []memberEvent
 	for _, ref := range refs {
 		m := msgs[msgKey{ref.row.ChatID, ref.seq}]
 		c := chats[ref.row.ChatID]
@@ -684,9 +699,17 @@ func (s *Service) botMessageUpdates(ctx context.Context, refs []botRef, members 
 		if c.Type == typeChannel && kind == BotUpdateMessage {
 			kind = BotUpdateChannelPost
 		}
+		if kind == BotUpdateMessage && isChatCreated(m) {
+			created = append(created, memberEvent{row: ref.row, bot: ref.bot, chatID: c.ID,
+				change: BotMemberChange{ActorID: m.FromID, Status: MemberStatusMember}})
+		}
 		batches.add(ref.bot, c, m, BotUpdate{BotID: ref.bot, OutboxID: ref.row.ID, Kind: kind, At: ref.row.CreatedAt})
 	}
-	return s.renderBotBatches(ctx, batches)
+	out, err := s.renderBotBatches(ctx, batches)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, created, nil
 }
 
 // editedBy reports whether the message_edit outbox row is the edit that
@@ -953,4 +976,56 @@ func sortedKeysOf(m map[int64][]int64) []int64 {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// readUserLog calls fn with the user log entries (users[i], pts[i]) that
+// exist, in user and pts order.
+func readUserLog(ctx context.Context, q querier, users, pts []int64, fn func(user, pts int64, u *appv1.Update)) error {
+	if len(users) == 0 {
+		return nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT u.user_id, u.pts, u."update" FROM user_updates u
+		JOIN unnest($1::bigint[], $2::bigint[]) AS x(user_id, pts) ON x.user_id = u.user_id AND x.pts = u.pts
+		ORDER BY u.user_id, u.pts`, users, pts)
+	if err != nil {
+		return fmt.Errorf("chat: bot log entries: %w", err)
+	}
+	return eachLogEntry(rows, fn)
+}
+
+// readChatLog calls fn with the chat log entries (chats[i], chatPts[i])
+// that exist, in chat and chat_pts order.
+func readChatLog(ctx context.Context, q querier, chats, chatPts []int64, fn func(chatID, chatPts int64, u *appv1.Update)) error {
+	if len(chats) == 0 {
+		return nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT u.chat_id, u.chat_pts, u."update" FROM chat_updates u
+		JOIN unnest($1::bigint[], $2::bigint[]) AS x(chat_id, chat_pts) ON x.chat_id = u.chat_id AND x.chat_pts = u.chat_pts
+		ORDER BY u.chat_id, u.chat_pts`, chats, chatPts)
+	if err != nil {
+		return fmt.Errorf("chat: bot chat log entries: %w", err)
+	}
+	return eachLogEntry(rows, fn)
+}
+
+func eachLogEntry(rows pgx.Rows, fn func(id, pos int64, u *appv1.Update)) error {
+	defer rows.Close()
+	for rows.Next() {
+		var id, pos int64
+		var payload []byte
+		if err := rows.Scan(&id, &pos, &payload); err != nil {
+			return fmt.Errorf("chat: bot log entries: %w", err)
+		}
+		u, err := decodeStored(payload)
+		if err != nil {
+			return err
+		}
+		fn(id, pos, u)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("chat: bot log entries: %w", err)
+	}
+	return nil
 }

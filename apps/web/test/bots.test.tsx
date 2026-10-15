@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { BotCommandScope } from "@app/proto-ts/bot_admin";
 import { ChatType } from "@app/proto-ts/chats";
-import { matchCommands } from "../src/messaging/bots/bot-chat.tsx";
+import { groupEntries, matchCommands } from "../src/messaging/bots/bot-chat.tsx";
 import { startCommand } from "../src/messaging/bots/bot-link-dialog.tsx";
 import { normalizeUsername, usernameFromName, usernameSuggestions } from "../src/messaging/bots/console.tsx";
 import { reauthUrl } from "../src/messaging/bots/dialogs.tsx";
@@ -83,6 +83,13 @@ describe("bot routes and helpers", () => {
 		expect(matchCommands(commands, "/deploy now", false)).toEqual([]);
 		expect(matchCommands(commands, "hi", false)).toEqual([]);
 		expect(matchCommands(commands, "", true)).toHaveLength(2);
+	});
+
+	it("tags group commands with the bot's username only when the group has several bots", () => {
+		const bot = { botId: 7, name: "Deploy Bot", username: "deploy_bot", commands: [{ command: "status", description: "Trạng thái" }] };
+		expect(groupEntries({ bots: [bot], botCount: 1 }).map((e) => e.insert)).toEqual(["/status"]);
+		expect(groupEntries({ bots: [bot], botCount: 2 }).map((e) => e.insert)).toEqual(["/status@deploy_bot"]);
+		expect(groupEntries({ bots: [], botCount: 3 })).toEqual([]);
 	});
 });
 
@@ -666,6 +673,48 @@ describe("bots in chats", () => {
 		expect(within(log).queryByText("Chọn ca")).toBeNull();
 		const pad = await screen.findByRole("group", { name: "Bàn phím của Trực ca Bot" }, LONG);
 		expect(within(pad).getByRole("button", { name: "Ca sáng" })).toBeTruthy();
+	});
+
+	it("offers the commands of a group's bots and sends /command@bot when the group has several bots", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const { deployBot } = demo.ids.users;
+		const oncall = f.addUser("Trực ca Bot", { username: "oncall_bot", isBot: true });
+		f.bots.adopt(deployBot, "Deploy Bot", "deploy_bot", { owned: false });
+		f.bots.adopt(oncall, "Trực ca Bot", "oncall_bot", { owned: false });
+		f.bots.setCommands(deployBot, BotCommandScope.GROUP, [
+			{ command: "status", description: "Trạng thái pipeline" },
+			{ command: "deploy", description: "Đẩy một bản" },
+		]);
+		f.bots.setCommands(oncall, BotCommandScope.DEFAULT, [{ command: "ca", description: "Ai đang trực" }]);
+		f.bots.chatBots.set(demo.ids.ops, [deployBot, oncall]);
+		renderMessaging(f, `/c/${demo.ids.ops}`);
+		const box = await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG);
+		const button = await screen.findByRole("button", { name: "Lệnh của bot" }, LONG);
+		await userEvent.type(box, "/");
+		const list = await screen.findByRole("listbox", { name: "Lệnh của bot" });
+		expect(within(list).getAllByRole("option").map((o) => o.textContent)).toEqual([
+			"/statusTrạng thái pipelineDeploy Bot",
+			"/deployĐẩy một bảnDeploy Bot",
+			"/caAi đang trựcTrực ca Bot",
+		]);
+		await userEvent.type(box, "c");
+		await userEvent.keyboard("{Enter}");
+		await waitFor(() => expect(f.sent.map((s) => s.text)).toContain("/ca@oncall_bot"));
+		await userEvent.click(button);
+		await userEvent.click(within(await screen.findByRole("listbox", { name: "Lệnh của bot" })).getByRole("option", { name: /\/status/ }));
+		expect((box as HTMLTextAreaElement).value).toBe("/status@deploy_bot ");
+	});
+
+	it("shows no command menu in a group whose bots have no commands", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		f.bots.adopt(demo.ids.users.deployBot, "Deploy Bot", "deploy_bot", { owned: false });
+		f.bots.chatBots.set(demo.ids.ops, [demo.ids.users.deployBot]);
+		renderMessaging(f, `/c/${demo.ids.ops}`);
+		await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG);
+		await waitFor(() => expect(f.bots.calls).toContain(`GetChatBotCommands ${demo.ids.ops}`));
+		expect(screen.queryByRole("button", { name: "Lệnh của bot" })).toBeNull();
 	});
 
 	it("tags bots by name in group messages", async () => {

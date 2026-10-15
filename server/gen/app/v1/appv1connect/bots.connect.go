@@ -41,6 +41,9 @@ const (
 	BotsServiceStartBotProcedure = "/app.v1.BotsService/StartBot"
 	// BotsServiceGetBotInfoProcedure is the fully-qualified name of the BotsService's GetBotInfo RPC.
 	BotsServiceGetBotInfoProcedure = "/app.v1.BotsService/GetBotInfo"
+	// BotsServiceGetChatBotCommandsProcedure is the fully-qualified name of the BotsService's
+	// GetChatBotCommands RPC.
+	BotsServiceGetChatBotCommandsProcedure = "/app.v1.BotsService/GetChatBotCommands"
 )
 
 // BotsServiceClient is a client for the app.v1.BotsService service.
@@ -58,6 +61,11 @@ type BotsServiceClient interface {
 	// Public profile of a bot: description, about and the command menu for
 	// a chat.
 	GetBotInfo(context.Context, *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error)
+	// The command menus of the bots in a group, for the composer's command
+	// menu: one entry per bot member with commands for the caller (the
+	// GROUP_ADMIN list for admins, else GROUP, then DEFAULT). Empty for chats
+	// that are not groups.
+	GetChatBotCommands(context.Context, *connect.Request[v1.GetChatBotCommandsRequest]) (*connect.Response[v1.GetChatBotCommandsResponse], error)
 }
 
 // NewBotsServiceClient constructs a client for the app.v1.BotsService service. By default, it uses
@@ -95,15 +103,22 @@ func NewBotsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(botsServiceMethods.ByName("GetBotInfo")),
 			connect.WithClientOptions(opts...),
 		),
+		getChatBotCommands: connect.NewClient[v1.GetChatBotCommandsRequest, v1.GetChatBotCommandsResponse](
+			httpClient,
+			baseURL+BotsServiceGetChatBotCommandsProcedure,
+			connect.WithSchema(botsServiceMethods.ByName("GetChatBotCommands")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // botsServiceClient implements BotsServiceClient.
 type botsServiceClient struct {
-	inlineQuery *connect.Client[v1.InlineQueryRequest, v1.InlineQueryResponse]
-	openMiniApp *connect.Client[v1.OpenMiniAppRequest, v1.OpenMiniAppResponse]
-	startBot    *connect.Client[v1.StartBotRequest, v1.StartBotResponse]
-	getBotInfo  *connect.Client[v1.GetBotInfoRequest, v1.GetBotInfoResponse]
+	inlineQuery        *connect.Client[v1.InlineQueryRequest, v1.InlineQueryResponse]
+	openMiniApp        *connect.Client[v1.OpenMiniAppRequest, v1.OpenMiniAppResponse]
+	startBot           *connect.Client[v1.StartBotRequest, v1.StartBotResponse]
+	getBotInfo         *connect.Client[v1.GetBotInfoRequest, v1.GetBotInfoResponse]
+	getChatBotCommands *connect.Client[v1.GetChatBotCommandsRequest, v1.GetChatBotCommandsResponse]
 }
 
 // InlineQuery calls app.v1.BotsService.InlineQuery.
@@ -126,6 +141,11 @@ func (c *botsServiceClient) GetBotInfo(ctx context.Context, req *connect.Request
 	return c.getBotInfo.CallUnary(ctx, req)
 }
 
+// GetChatBotCommands calls app.v1.BotsService.GetChatBotCommands.
+func (c *botsServiceClient) GetChatBotCommands(ctx context.Context, req *connect.Request[v1.GetChatBotCommandsRequest]) (*connect.Response[v1.GetChatBotCommandsResponse], error) {
+	return c.getChatBotCommands.CallUnary(ctx, req)
+}
+
 // BotsServiceHandler is an implementation of the app.v1.BotsService service.
 type BotsServiceHandler interface {
 	// Forwards an inline query to the bot and returns its results.
@@ -141,6 +161,11 @@ type BotsServiceHandler interface {
 	// Public profile of a bot: description, about and the command menu for
 	// a chat.
 	GetBotInfo(context.Context, *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error)
+	// The command menus of the bots in a group, for the composer's command
+	// menu: one entry per bot member with commands for the caller (the
+	// GROUP_ADMIN list for admins, else GROUP, then DEFAULT). Empty for chats
+	// that are not groups.
+	GetChatBotCommands(context.Context, *connect.Request[v1.GetChatBotCommandsRequest]) (*connect.Response[v1.GetChatBotCommandsResponse], error)
 }
 
 // NewBotsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -174,6 +199,12 @@ func NewBotsServiceHandler(svc BotsServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(botsServiceMethods.ByName("GetBotInfo")),
 		connect.WithHandlerOptions(opts...),
 	)
+	botsServiceGetChatBotCommandsHandler := connect.NewUnaryHandler(
+		BotsServiceGetChatBotCommandsProcedure,
+		svc.GetChatBotCommands,
+		connect.WithSchema(botsServiceMethods.ByName("GetChatBotCommands")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.BotsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BotsServiceInlineQueryProcedure:
@@ -184,6 +215,8 @@ func NewBotsServiceHandler(svc BotsServiceHandler, opts ...connect.HandlerOption
 			botsServiceStartBotHandler.ServeHTTP(w, r)
 		case BotsServiceGetBotInfoProcedure:
 			botsServiceGetBotInfoHandler.ServeHTTP(w, r)
+		case BotsServiceGetChatBotCommandsProcedure:
+			botsServiceGetChatBotCommandsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -207,4 +240,8 @@ func (UnimplementedBotsServiceHandler) StartBot(context.Context, *connect.Reques
 
 func (UnimplementedBotsServiceHandler) GetBotInfo(context.Context, *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.GetBotInfo is not implemented"))
+}
+
+func (UnimplementedBotsServiceHandler) GetChatBotCommands(context.Context, *connect.Request[v1.GetChatBotCommandsRequest]) (*connect.Response[v1.GetChatBotCommandsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.GetChatBotCommands is not implemented"))
 }

@@ -349,7 +349,7 @@ func (s *Service) sendMessage(ctx context.Context, me int64, req *appv1.SendMess
 	if req.GetRandomId() < 0 {
 		return nil, errInvalid("random_id must not be negative")
 	}
-	if err := s.allow(limitSend, "send", me); err != nil {
+	if err := s.allow(ctx, limitSend, "send", me); err != nil {
 		return nil, err
 	}
 	return s.postText(ctx, me, textPost{
@@ -675,7 +675,7 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 	if err != nil {
 		return nil, err
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -770,7 +770,7 @@ func (s *Service) DeleteMessages(ctx context.Context, me, chatID int64, seqs []i
 	if len(seqs) == 0 || len(seqs) > seqsPerCallMax {
 		return nil, errInvalid("seqs must hold 1 to %d messages", seqsPerCallMax)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -978,7 +978,7 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 			return nil, errInvalid("random_id must not be negative")
 		}
 	}
-	if err := s.allow(limitSend, "send", me); err != nil {
+	if err := s.allow(ctx, limitSend, "send", me); err != nil {
 		return nil, err
 	}
 	src, srcMember, err := s.activeChatFor(ctx, s.pool, fromChat, me, false)
@@ -1239,7 +1239,7 @@ func (s *Service) ReadHistory(ctx context.Context, me, chatID, maxSeq, topicID i
 	if maxSeq <= 0 {
 		return nil, errInvalid("max_seq is required")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -1450,7 +1450,7 @@ func uniqueSorted0(xs []int64) []int64 {
 
 // PinMessage pins a message and posts the pinned-message service message.
 func (s *Service) PinMessage(ctx context.Context, me, chatID, seq int64) (*appv1.SyncAck, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -1501,7 +1501,7 @@ func (s *Service) PinMessage(ctx context.Context, me, chatID, seq int64) (*appv1
 
 // UnpinMessage unpins a message.
 func (s *Service) UnpinMessage(ctx context.Context, me, chatID, seq int64) (*appv1.SyncAck, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -1541,7 +1541,7 @@ func (s *Service) UnpinAllMessages(ctx context.Context, me, chatID, topicID int6
 	if topicID < 0 {
 		return nil, errInvalid("topic_id must not be negative")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -1663,7 +1663,7 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 	if emoji != "" && !validEmoji(emoji) {
 		return nil, errInvalid("reaction must be one emoji")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -1796,7 +1796,7 @@ func (s *Service) GetLinkPreview(ctx context.Context, me int64, raw string) (*ap
 	if err != nil {
 		return nil, errInvalid("url must be an http or https URL")
 	}
-	if err := s.allow(limitPreview, "preview", me); err != nil {
+	if err := s.allow(ctx, limitPreview, "preview", me); err != nil {
 		return nil, err
 	}
 	p, err := s.previews.Get(ctx, url)

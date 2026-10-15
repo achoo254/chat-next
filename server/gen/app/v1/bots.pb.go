@@ -746,6 +746,161 @@ func (x *GetBotInfoResponse) GetNotRunning() bool {
 	return false
 }
 
+type GetChatBotCommandsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatBotCommandsRequest) Reset() {
+	*x = GetChatBotCommandsRequest{}
+	mi := &file_app_v1_bots_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatBotCommandsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatBotCommandsRequest) ProtoMessage() {}
+
+func (x *GetChatBotCommandsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatBotCommandsRequest.ProtoReflect.Descriptor instead.
+func (*GetChatBotCommandsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetChatBotCommandsRequest) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+// One bot's command menu in a group.
+type ChatBotCommands struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The bot (is_bot set; username always present).
+	Bot           *User         `protobuf:"bytes,1,opt,name=bot,proto3" json:"bot,omitempty"`
+	Commands      []*BotCommand `protobuf:"bytes,2,rep,name=commands,proto3" json:"commands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatBotCommands) Reset() {
+	*x = ChatBotCommands{}
+	mi := &file_app_v1_bots_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatBotCommands) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatBotCommands) ProtoMessage() {}
+
+func (x *ChatBotCommands) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatBotCommands.ProtoReflect.Descriptor instead.
+func (*ChatBotCommands) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ChatBotCommands) GetBot() *User {
+	if x != nil {
+		return x.Bot
+	}
+	return nil
+}
+
+func (x *ChatBotCommands) GetCommands() []*BotCommand {
+	if x != nil {
+		return x.Commands
+	}
+	return nil
+}
+
+type GetChatBotCommandsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Bots in the order they joined; bots without commands for the caller
+	// are left out.
+	Bots []*ChatBotCommands `protobuf:"bytes,1,rep,name=bots,proto3" json:"bots,omitempty"`
+	// Every bot in the group, with or without commands. With more than one
+	// the client sends a picked command as "/command@username", so only that
+	// bot takes it.
+	BotCount      int32 `protobuf:"varint,2,opt,name=bot_count,json=botCount,proto3" json:"bot_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatBotCommandsResponse) Reset() {
+	*x = GetChatBotCommandsResponse{}
+	mi := &file_app_v1_bots_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatBotCommandsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatBotCommandsResponse) ProtoMessage() {}
+
+func (x *GetChatBotCommandsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatBotCommandsResponse.ProtoReflect.Descriptor instead.
+func (*GetChatBotCommandsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetChatBotCommandsResponse) GetBots() []*ChatBotCommands {
+	if x != nil {
+		return x.Bots
+	}
+	return nil
+}
+
+func (x *GetChatBotCommandsResponse) GetBotCount() int32 {
+	if x != nil {
+		return x.BotCount
+	}
+	return 0
+}
+
 var File_app_v1_bots_proto protoreflect.FileDescriptor
 
 const file_app_v1_bots_proto_rawDesc = "" +
@@ -805,7 +960,15 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\bis_owner\x18\x05 \x01(\bR\aisOwner\x12(\n" +
 	"\x0elast_update_at\x18\x06 \x01(\x03B\x020\x02R\flastUpdateAt\x12\x1f\n" +
 	"\vnot_running\x18\a \x01(\bR\n" +
-	"notRunning*\xef\x01\n" +
+	"notRunning\"8\n" +
+	"\x19GetChatBotCommandsRequest\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\"a\n" +
+	"\x0fChatBotCommands\x12\x1e\n" +
+	"\x03bot\x18\x01 \x01(\v2\f.app.v1.UserR\x03bot\x12.\n" +
+	"\bcommands\x18\x02 \x03(\v2\x12.app.v1.BotCommandR\bcommands\"f\n" +
+	"\x1aGetChatBotCommandsResponse\x12+\n" +
+	"\x04bots\x18\x01 \x03(\v2\x17.app.v1.ChatBotCommandsR\x04bots\x12\x1b\n" +
+	"\tbot_count\x18\x02 \x01(\x05R\bbotCount*\xef\x01\n" +
 	"\x10InlineResultKind\x12\"\n" +
 	"\x1eINLINE_RESULT_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aINLINE_RESULT_KIND_ARTICLE\x10\x01\x12\x1c\n" +
@@ -813,13 +976,14 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x18INLINE_RESULT_KIND_VIDEO\x10\x03\x12\x1c\n" +
 	"\x18INLINE_RESULT_KIND_AUDIO\x10\x04\x12\x1c\n" +
 	"\x18INLINE_RESULT_KIND_VOICE\x10\x05\x12\x1f\n" +
-	"\x1bINLINE_RESULT_KIND_DOCUMENT\x10\x062\xa1\x02\n" +
+	"\x1bINLINE_RESULT_KIND_DOCUMENT\x10\x062\xfe\x02\n" +
 	"\vBotsService\x12F\n" +
 	"\vInlineQuery\x12\x1a.app.v1.InlineQueryRequest\x1a\x1b.app.v1.InlineQueryResponse\x12F\n" +
 	"\vOpenMiniApp\x12\x1a.app.v1.OpenMiniAppRequest\x1a\x1b.app.v1.OpenMiniAppResponse\x12=\n" +
 	"\bStartBot\x12\x17.app.v1.StartBotRequest\x1a\x18.app.v1.StartBotResponse\x12C\n" +
 	"\n" +
-	"GetBotInfo\x12\x19.app.v1.GetBotInfoRequest\x1a\x1a.app.v1.GetBotInfoResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"GetBotInfo\x12\x19.app.v1.GetBotInfoRequest\x1a\x1a.app.v1.GetBotInfoResponse\x12[\n" +
+	"\x12GetChatBotCommands\x12!.app.v1.GetChatBotCommandsRequest\x1a\".app.v1.GetChatBotCommandsResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_bots_proto_rawDescOnce sync.Once
@@ -834,50 +998,58 @@ func file_app_v1_bots_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_bots_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_app_v1_bots_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_app_v1_bots_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_app_v1_bots_proto_goTypes = []any{
-	(InlineResultKind)(0),       // 0: app.v1.InlineResultKind
-	(*InlineResult)(nil),        // 1: app.v1.InlineResult
-	(*InlineQueryRequest)(nil),  // 2: app.v1.InlineQueryRequest
-	(*InlineQueryResponse)(nil), // 3: app.v1.InlineQueryResponse
-	(*OpenMiniAppRequest)(nil),  // 4: app.v1.OpenMiniAppRequest
-	(*OpenMiniAppResponse)(nil), // 5: app.v1.OpenMiniAppResponse
-	(*StartBotRequest)(nil),     // 6: app.v1.StartBotRequest
-	(*StartBotResponse)(nil),    // 7: app.v1.StartBotResponse
-	(*GetBotInfoRequest)(nil),   // 8: app.v1.GetBotInfoRequest
-	(*GetBotInfoResponse)(nil),  // 9: app.v1.GetBotInfoResponse
-	nil,                         // 10: app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	(*MediaRef)(nil),            // 11: app.v1.MediaRef
-	(*Chat)(nil),                // 12: app.v1.Chat
-	(*Message)(nil),             // 13: app.v1.Message
-	(*User)(nil),                // 14: app.v1.User
-	(*SyncAck)(nil),             // 15: app.v1.SyncAck
-	(*BotCommand)(nil),          // 16: app.v1.BotCommand
+	(InlineResultKind)(0),              // 0: app.v1.InlineResultKind
+	(*InlineResult)(nil),               // 1: app.v1.InlineResult
+	(*InlineQueryRequest)(nil),         // 2: app.v1.InlineQueryRequest
+	(*InlineQueryResponse)(nil),        // 3: app.v1.InlineQueryResponse
+	(*OpenMiniAppRequest)(nil),         // 4: app.v1.OpenMiniAppRequest
+	(*OpenMiniAppResponse)(nil),        // 5: app.v1.OpenMiniAppResponse
+	(*StartBotRequest)(nil),            // 6: app.v1.StartBotRequest
+	(*StartBotResponse)(nil),           // 7: app.v1.StartBotResponse
+	(*GetBotInfoRequest)(nil),          // 8: app.v1.GetBotInfoRequest
+	(*GetBotInfoResponse)(nil),         // 9: app.v1.GetBotInfoResponse
+	(*GetChatBotCommandsRequest)(nil),  // 10: app.v1.GetChatBotCommandsRequest
+	(*ChatBotCommands)(nil),            // 11: app.v1.ChatBotCommands
+	(*GetChatBotCommandsResponse)(nil), // 12: app.v1.GetChatBotCommandsResponse
+	nil,                                // 13: app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	(*MediaRef)(nil),                   // 14: app.v1.MediaRef
+	(*Chat)(nil),                       // 15: app.v1.Chat
+	(*Message)(nil),                    // 16: app.v1.Message
+	(*User)(nil),                       // 17: app.v1.User
+	(*SyncAck)(nil),                    // 18: app.v1.SyncAck
+	(*BotCommand)(nil),                 // 19: app.v1.BotCommand
 }
 var file_app_v1_bots_proto_depIdxs = []int32{
 	0,  // 0: app.v1.InlineResult.kind:type_name -> app.v1.InlineResultKind
-	11, // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
+	14, // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
 	1,  // 2: app.v1.InlineQueryResponse.results:type_name -> app.v1.InlineResult
-	10, // 3: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	12, // 4: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
-	13, // 5: app.v1.StartBotResponse.message:type_name -> app.v1.Message
-	14, // 6: app.v1.StartBotResponse.users:type_name -> app.v1.User
-	15, // 7: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
-	14, // 8: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
-	16, // 9: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
-	2,  // 10: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
-	4,  // 11: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
-	6,  // 12: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
-	8,  // 13: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
-	3,  // 14: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
-	5,  // 15: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
-	7,  // 16: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
-	9,  // 17: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	13, // 3: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	15, // 4: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
+	16, // 5: app.v1.StartBotResponse.message:type_name -> app.v1.Message
+	17, // 6: app.v1.StartBotResponse.users:type_name -> app.v1.User
+	18, // 7: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
+	17, // 8: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
+	19, // 9: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
+	17, // 10: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
+	19, // 11: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
+	11, // 12: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
+	2,  // 13: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
+	4,  // 14: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
+	6,  // 15: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
+	8,  // 16: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
+	10, // 17: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
+	3,  // 18: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
+	5,  // 19: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
+	7,  // 20: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
+	9,  // 21: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
+	12, // 22: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_bots_proto_init() }
@@ -896,7 +1068,7 @@ func file_app_v1_bots_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_bots_proto_rawDesc), len(file_app_v1_bots_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

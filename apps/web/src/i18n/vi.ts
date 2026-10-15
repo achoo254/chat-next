@@ -14,6 +14,10 @@ export const vi = {
 			`Bạn đăng nhập ở ${host} bằng Google hoặc GitHub. App không bao giờ thấy mật khẩu của bạn.`,
 		language: "Ngôn ngữ",
 	},
+	update: {
+		available: "Đã có bản mới",
+		reload: "Tải lại",
+	},
 	shell: {
 		nav: "Điều hướng",
 		chats: "Trò chuyện",

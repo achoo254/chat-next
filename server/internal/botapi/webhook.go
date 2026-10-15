@@ -13,6 +13,7 @@ import (
 
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botupdates"
+	"app.local/server/internal/chat"
 )
 
 // setWebhookRequest is the body of PUT /webhook.
@@ -168,7 +169,7 @@ func (s *Service) WebhookReply(ctx context.Context, botID, randomID int64, body 
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, replyTimeout)
+	ctx, cancel := context.WithTimeout(chat.AsBot(ctx, botID), replyTimeout)
 	defer cancel()
 	bot, err := s.admin.Live(ctx, botID)
 	if err != nil {

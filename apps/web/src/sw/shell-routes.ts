@@ -51,7 +51,26 @@ export function shellRoute(request: RequestInfo, origin: string, shellFiles: Rea
 	return "network";
 }
 
-/** Shell caches of other builds, to delete once this build's worker takes over. */
-export function staleCaches(keys: readonly string[], current: string): string[] {
-	return keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== current);
+/**
+ * Previous builds' shell caches kept for tabs whose build is unknown (a tab
+ * that does not answer: a build older than the build query, or a frozen
+ * background tab). Each holds one build (about 3.5 MB).
+ */
+export const MAX_UNKNOWN_KEPT = 3;
+
+/**
+ * The shell caches to delete. A tab keeps running the build it loaded, and
+ * nginx serves only the current release's files, so the cache of every
+ * build a tab still runs must stay until that tab is gone: otherwise its
+ * next lazy chunk fails to load.
+ *
+ * keys: every cache name, oldest first (the order of caches.keys()).
+ * current: this worker's cache. neededByTabs: caches of builds that open
+ * tabs said they run. unknownTabs: some tab did not say; then the newest
+ * MAX_UNKNOWN_KEPT other previous caches stay too.
+ */
+export function cachesToDelete(keys: readonly string[], current: string, neededByTabs: ReadonlySet<string>, unknownTabs: boolean): string[] {
+	const previous = keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== current && !neededByTabs.has(key));
+	const kept = unknownTabs ? MAX_UNKNOWN_KEPT : 0;
+	return previous.slice(0, Math.max(0, previous.length - kept));
 }

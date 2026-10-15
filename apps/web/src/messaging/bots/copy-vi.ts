@@ -127,7 +127,7 @@ export const viBots = {
 		generate: "Tạo mới",
 		generated: "Đã tạo secret mới, bấm Lưu rồi cập nhật ở server của bạn",
 		kinds: "Loại update nhận",
-		kindsHint: "Không chọn loại nào: nhận mọi loại. Chỉ áp cho update mới.",
+		kindsHint: "Không chọn loại nào: nhận mọi loại trừ reaction (reaction phải chọn mới nhận). Chỉ áp cho update mới.",
 		maxConnections: "Số kết nối song song",
 		maxHint: "Tuần tự trong từng chat, song song giữa các chat tới con số này.",
 		maxBad: "Từ 1 đến 100",
@@ -272,6 +272,7 @@ export const viBots = {
 	menu: {
 		button: "Lệnh của bot",
 		head: "Lệnh của bot",
+		groupHead: "Lệnh trong nhóm này",
 		noMatch: "Không có lệnh nào khớp.",
 		select: "chọn",
 		fill: "điền lệnh",

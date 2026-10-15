@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CACHE_PREFIX, shellRoute, staleCaches } from "../src/sw/shell-routes.ts";
-import { appShell, SERVICE_WORKER_FILE } from "../vite-service-worker.ts";
+import { CACHE_PREFIX, cachesToDelete, MAX_UNKNOWN_KEPT, shellRoute } from "../src/sw/shell-routes.ts";
+import { appShell, entryScript, SERVICE_WORKER_FILE } from "../vite-service-worker.ts";
 
 const ORIGIN = "https://chat.hoandat.com";
 const FILES = new Set(["/index.html", "/manifest.webmanifest", "/icon.svg", "/assets/index-Cl5eqHAX.js"]);
@@ -39,16 +39,29 @@ describe("service worker routes", () => {
 		expect(shellRoute(get("/botanist", "navigate"), ORIGIN, FILES)).toBe("page");
 	});
 
-	it("deletes only other builds' shell caches", () => {
+	it("deletes only other builds' shell caches that no open tab runs", () => {
+		const [a, b, c, current] = [`${CACHE_PREFIX}a`, `${CACHE_PREFIX}b`, `${CACHE_PREFIX}c`, `${CACHE_PREFIX}new`] as const;
+		const keys = [a, "media-cache", b, c, current];
+		// Every tab answered: only the builds they run stay.
+		expect(cachesToDelete(keys, current, new Set([b]), false)).toEqual([a, c]);
+		expect(cachesToDelete(keys, current, new Set(), false)).toEqual([a, b, c]);
+		expect(cachesToDelete([current, "media-cache"], current, new Set(), false)).toEqual([]);
+	});
+
+	it("keeps the newest previous caches while a tab's build is unknown", () => {
+		const previous = Array.from({ length: MAX_UNKNOWN_KEPT + 2 }, (_, i) => `${CACHE_PREFIX}${i}`);
 		const current = `${CACHE_PREFIX}new`;
-		expect(staleCaches([`${CACHE_PREFIX}old`, current, "media-cache", `${CACHE_PREFIX}older`], current)).toEqual([`${CACHE_PREFIX}old`, `${CACHE_PREFIX}older`]);
+		expect(cachesToDelete([...previous, current], current, new Set(), true)).toEqual(previous.slice(0, 2));
+		// A cache a known tab needs does not count against the newest kept.
+		expect(cachesToDelete([...previous, current], current, new Set([previous[0] ?? ""]), true)).toEqual([previous[1]]);
+		expect(cachesToDelete([previous[0] ?? "", current], current, new Set(), true)).toEqual([]);
 	});
 });
 
 describe("app shell of a build", () => {
 	const output = (index: string) =>
 		new Map<string, string | Uint8Array>([
-			["index.html", index],
+			["index.html", `${index}<script type="module" crossorigin src="/assets/index-Cl5eqHAX.js"></script>`],
 			["assets/index-Cl5eqHAX.js", "console.log(1)"],
 			["assets/index-Cl5eqHAX.js.map", "{}"],
 			["assets/inter-vietnamese.woff2", new Uint8Array([1, 2, 3])],
@@ -64,6 +77,12 @@ describe("app shell of a build", () => {
 			"/index.html",
 			"/manifest.webmanifest",
 		]);
+	});
+
+	it("names the build by the entry script index.html loads", () => {
+		expect(appShell(output("<html>")).entry).toBe("/assets/index-Cl5eqHAX.js");
+		expect(entryScript('<link rel="modulepreload" href="/assets/x.js">\n  <script type="module" crossorigin src="/assets/index-B1.js"></script>')).toBe("/assets/index-B1.js");
+		expect(() => entryScript("<html><body></body></html>")).toThrow(/no module script/);
 	});
 
 	it("changes its version with the contents of any file", () => {

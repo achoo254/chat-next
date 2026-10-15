@@ -47,8 +47,8 @@ export interface OwnBot {
 
 export type BotTierName = "default" | "verified" | "internal";
 
-/** Update kinds a bot can receive. */
-export type UpdateKind = "message" | "message_edited" | "channel_post" | "callback";
+/** Update kinds a bot can receive; "reaction" only when listed. */
+export type UpdateKind = "message" | "message_edited" | "channel_post" | "callback" | "member_changed" | "reaction";
 
 /** The bot's webhook as set; the secret never comes back. */
 export interface BotWebhook {
@@ -132,6 +132,22 @@ export interface BotInfo {
 	readonly notRunning: boolean;
 }
 
+/** One bot's command menu in a group (GetChatBotCommands). */
+export interface ChatBotMenu {
+	readonly botId: number;
+	readonly name: string;
+	readonly username: string;
+	readonly commands: readonly BotCommand[];
+}
+
+/** The command menus of a group's bots for the viewer. */
+export interface ChatMenus {
+	/** Bots with commands for the viewer, in the order they joined. */
+	readonly bots: readonly ChatBotMenu[];
+	/** Every bot in the group; with more than one, picked commands carry "@username". */
+	readonly botCount: number;
+}
+
 /** The bot's answer to a callback button (PressInlineButton). */
 export interface PressAnswer {
 	readonly text: string;
@@ -199,6 +215,8 @@ export interface Bots {
 	usernameTaken(username: string): Promise<boolean>;
 	/** Profile and command menu for `chatId` (0: the private chat with the bot). */
 	info(botId: number, chatId: number): Promise<BotInfo>;
+	/** The command menus of the bots in a group (none for other chats). */
+	chatMenus(chatId: number): Promise<ChatMenus>;
 	/**
 	 * Records consent, opens the private chat and sends "/start [param]";
 	 * returns the chat id. `randomId` stays the same when the user tries
@@ -251,6 +269,7 @@ export function createBots(transport: Transport, onUnauthenticated: () => void):
 		resolve: (username) => load().then((api) => api.resolve(username)),
 		usernameTaken: (username) => load().then((api) => api.usernameTaken(username)),
 		info: (botId, chatId) => load().then((api) => api.info(botId, chatId)),
+		chatMenus: (chatId) => load().then((api) => api.chatMenus(chatId)),
 		start: (botId, startParam, randomId) => load().then((api) => api.start(botId, startParam, randomId)),
 		press: (chatId, seq, callbackData) => load().then((api) => api.press(chatId, seq, callbackData)),
 		delivery: (botId) => load().then((api) => api.delivery(botId)),

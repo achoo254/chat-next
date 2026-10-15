@@ -155,6 +155,10 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	if mediaSvc != nil {
+		botAPI.UseMedia(mediaSvc)
+	}
+	botAPI.UseTyper(hub)
 	// Webhooks of bots: outbound requests through safehttp; actions in their
 	// answers run through the Bot API's own checks.
 	if err := botUpdates.EnableWebhooks(botupdates.WebhookOptions{

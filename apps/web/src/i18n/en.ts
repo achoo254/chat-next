@@ -16,6 +16,10 @@ export const en: Messages = {
 			`You sign in at ${host} with Google or GitHub. The app never sees your password.`,
 		language: "Language",
 	},
+	update: {
+		available: "A new version is available",
+		reload: "Reload",
+	},
 	shell: {
 		nav: "Navigation",
 		chats: "Chats",

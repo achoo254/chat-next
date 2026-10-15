@@ -19,6 +19,7 @@ import (
 	"app.local/server/internal/chat"
 	"app.local/server/internal/ids"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
@@ -46,6 +47,9 @@ type Env struct {
 	Admin   *botadmin.Service
 	Updates *botupdates.Service
 	Limiter *ratelimit.Memory
+	// Media stores files on a temporary directory (Options.Media); nil
+	// otherwise.
+	Media *media.Service
 	// Operators are the accounts of Options.Operators, in that order.
 	Operators []int64
 	n         int
@@ -57,6 +61,8 @@ type Options struct {
 	// Operators names accounts created before the chat core and allowed to
 	// use the moderation queue.
 	Operators []string
+	// Media turns on media storage in a temporary directory.
+	Media bool
 }
 
 // New builds the environment; the consumer loop and the webhook dispatcher
@@ -86,10 +92,27 @@ func NewWith(t testing.TB, o Options) *Env {
 	}
 	limiter := ratelimit.NewMemory()
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{}), Quiet)
+	var mediaSvc *media.Service
+	if o.Media {
+		objects, err := media.NewFilesystem(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		mediaSvc, err = media.New(media.Config{
+			TenantID: TenantID, PublicOrigin: "https://media.example.test", UploadMaxBytes: 1 << 30, UserQuotaBytes: 1 << 30,
+			SessionKey: bytes.Repeat([]byte{5}, 32),
+		}, st.Pool(), objects, limiter, Quiet)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	chatSvc, err := chat.New(chat.Config{TenantID: TenantID, PublicOrigin: PublicOrigin, AppScheme: AppScheme, Operators: operators},
-		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Limiter: limiter, Logger: Quiet})
+		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Media: mediaSvc, Limiter: limiter, Logger: Quiet})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if mediaSvc != nil {
+		mediaSvc.SetRefresher(chatSvc)
 	}
 	if err := chatSvc.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -104,7 +127,8 @@ func NewWith(t testing.TB, o Options) *Env {
 	chatSvc.SetCommitObserver(updates.Kick)
 	stop := RunUpdates(updates)
 	t.Cleanup(stop)
-	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter, Operators: operators, stop: stop}
+	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter, Media: mediaSvc,
+		Operators: operators, stop: stop}
 }
 
 // RunUpdates runs u in the background; the returned stop ends it and waits

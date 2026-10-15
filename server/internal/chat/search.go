@@ -15,7 +15,7 @@ func (s *Service) SearchMessages(ctx context.Context, me int64, req *appv1.Searc
 	if err != nil {
 		return nil, err
 	}
-	if err := s.allow(limitMessageSearch, "search_messages", me); err != nil {
+	if err := s.allow(ctx, limitMessageSearch, "search_messages", me); err != nil {
 		return nil, err
 	}
 	page, err := s.searcher.Search(ctx, search.Request{
@@ -49,7 +49,7 @@ func (s *Service) SearchChatMessages(ctx context.Context, me int64, req *appv1.S
 	if req.GetTopicId() != 0 && !c.Forum {
 		return nil, errInvalid("this chat has no topics")
 	}
-	if err := s.allow(limitMessageSearch, "search_messages", me); err != nil {
+	if err := s.allow(ctx, limitMessageSearch, "search_messages", me); err != nil {
 		return nil, err
 	}
 	page, err := s.searcher.Search(ctx, search.Request{

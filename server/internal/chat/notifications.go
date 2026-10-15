@@ -63,7 +63,7 @@ func (s *Service) SetNotificationSettings(ctx context.Context, me int64, req *ap
 			return nil, errInvalid("unknown notification sound")
 		}
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	var out notifySettingsRow

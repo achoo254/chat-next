@@ -135,6 +135,12 @@ a.btn-primary { color: var(--c-on-primary); }
 /* ---------- Connection states ---------- */
 .split.conn { --cols: 3; }
 .status-line { display: inline-flex; align-items: center; gap: var(--space-1); }
+/* New build available: one floating line above the composer; the app never reloads on its own. */
+.update-bar { position: absolute; left: 50%; bottom: calc(44px + 2 * var(--space-3) + var(--space-5)); transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-2); max-width: calc(100% - 2 * var(--space-4)); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4); border-radius: var(--radius-sm); background: var(--c-text); color: var(--c-surface); box-shadow: var(--shadow-md); font-size: 0.875rem; white-space: nowrap; z-index: 30; }
+.update-bar button { min-height: 36px; padding: 0 var(--space-3); border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.update-bar button:hover { background: color-mix(in srgb, var(--c-surface) 16%, transparent); }
+.update-bar .sep { opacity: 0.6; }
+.frame.update { height: 320px; }
 
 /* ---------- Context menu ---------- */
 .ctx-layer { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-2); padding: var(--space-5); background: color-mix(in srgb, var(--c-backdrop) 70%, transparent); }
@@ -1254,7 +1260,8 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 4. Connection states ======================= -->
 <section class="shot" id="connection-states">
 	<div class="shot-head"><h2>Trạng thái kết nối</h2><span class="phase">Phase 5</span>
-		<p>Dòng trạng thái thay cho dòng "12 thành viên · 3 đang hoạt động" trên đầu khung chat. Tin cũ vẫn đọc được từ cache trong mọi trạng thái. Ngoại tuyến: vẫn soạn và gửi được, tin xếp hàng với đồng hồ và tự gửi theo thứ tự khi có mạng.</p></div>
+		<p>Dòng trạng thái thay cho dòng "12 thành viên · 3 đang hoạt động" trên đầu khung chat. Tin cũ vẫn đọc được từ cache trong mọi trạng thái. Ngoại tuyến: vẫn soạn và gửi được, tin xếp hàng với đồng hồ và tự gửi theo thứ tự khi có mạng.</p>
+		<p>Bản mới: khi server đã có bản app mới hơn bản tab đang chạy, một dòng nổi "Đã có bản mới · Tải lại" hiện phía trên ô soạn (ở mọi màn hình, kể cả trang chào). Bấm "Tải lại" để tải trang và chạy bản mới; app không tự tải lại, nên bản nháp và việc đang làm không mất. Dòng này ở lại tới khi tải lại; tab mở trước khi deploy vẫn chạy bình thường bằng file của bản cũ.</p></div>
 	<div class="frame">
 		<div class="split conn">
 			<section class="pane convo" aria-label="Đang kết nối">
@@ -1298,6 +1305,20 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				<form class="composer" onsubmit="return false"><label class="sr-only" for="d-c3">Tin nhắn</label><textarea id="d-c3" rows="1" placeholder="Tin sẽ gửi khi có mạng"></textarea><button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button></form>
 			</section>
 		</div>
+	</div>
+	<div class="frame update">
+		<section class="pane convo" aria-label="Đã có bản mới">
+			<div class="pane-cap">Server đã có bản mới, tab đang chạy bản cũ</div>
+			<header class="convo-head">
+				<span class="avatar av-blue">VH</span>
+				<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên · 3 đang hoạt động</span></div>
+			</header>
+			<div class="messages">
+				<div class="msg"><span class="avatar sm av-cyan">QH</span><div class="bubble"><span class="who">Quang Huy</span><p>Xong rồi, mọi người kiểm tra giúp mình.<span class="stamp">09:31</span></p></div></div>
+			</div>
+			<div class="update-bar" role="status"><span>Đã có bản mới</span><span class="sep" aria-hidden="true">·</span><button type="button" data-toast="Tải lại trang, mở bản mới">Tải lại</button></div>
+			<form class="composer" onsubmit="return false"><label class="sr-only" for="d-c4">Tin nhắn</label><textarea id="d-c4" rows="1" placeholder="Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống"></textarea><button type="button" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button></form>
+		</section>
 	</div>
 </section>
 

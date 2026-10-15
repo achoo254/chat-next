@@ -11,7 +11,8 @@
 // (mockups/media.html#attach). With nothing typed the send button turns
 // into the microphone, which records a voice message. In a private chat with
 // a bot the bot layer (bots/bot-chat.tsx, loaded with the first bot chat)
-// adds the command menu and the bot's reply keyboard.
+// adds the command menu and the bot's reply keyboard; in a group it adds the
+// command menu of the group's bots.
 import {
 	Suspense,
 	lazy,
@@ -43,6 +44,7 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
 const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
 const BotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotLayer })));
+const GroupBotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.GroupBotLayer })));
 
 /** The bot layer's state for the composer's buttons (bots/bot-chat.tsx BotBar); empty until it loads. */
 interface BotBar {
@@ -106,9 +108,11 @@ interface ComposerProps {
 	media?: boolean;
 	/** Private chat with a bot: the bot's user id (its command menu and reply keyboard); 0 otherwise. */
 	botId?: number;
+	/** A group: the command menu of its bots. */
+	group?: boolean;
 }
 
-export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false, botId = 0 }: ComposerProps) {
+export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false, botId = 0, group = false }: ComposerProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const limits = useMediaLimits();
@@ -277,7 +281,9 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 
 	/** A bot command or reply keyboard button: sent as typed by the user, the draft left alone. */
 	const sendBotText = (value: string) => {
-		source.sendText(chatId, value).catch(() => toasts.show(copy.composer.sendFailed));
+		// A command picked in a forum group goes to the open topic.
+		const sent = topicId !== 0 ? backend.sendToTopic(chatId, topicId, value, 0, false) : source.sendText(chatId, value);
+		sent.catch(() => toasts.show(copy.composer.sendFailed));
 	};
 
 	/** ↑ in an empty composer: edit your newest message, when it can still be edited. */
@@ -533,6 +539,22 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					<BotLayer
 						chatId={chatId}
 						botId={botId}
+						text={text}
+						setText={(value) => {
+							caret.current = value.length;
+							update(value);
+						}}
+						send={sendBotText}
+						focus={() => area.current?.focus()}
+						onBar={setBotBar}
+						actionsRef={botActions}
+					/>
+				</Suspense>
+			)}
+			{group && botId === 0 && !disabled && (
+				<Suspense fallback={null}>
+					<GroupBotLayer
+						chatId={chatId}
 						text={text}
 						setText={(value) => {
 							caret.current = value.length;

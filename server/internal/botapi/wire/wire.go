@@ -68,9 +68,11 @@ type ReplyMarkup struct {
 	Selective bool `json:"selective,omitempty"`
 }
 
-// Media summarizes the file of a media message (file methods come later).
+// Media summarizes the file of a media message; file_id reads it with GET
+// /files/{file_id} or sends it again.
 type Media struct {
 	Kind     string `json:"kind"`
+	FileID   string `json:"file_id,omitempty"`
 	MimeType string `json:"mime_type,omitempty"`
 	Size     int64  `json:"size,omitempty"`
 	FileName string `json:"file_name,omitempty"`
@@ -115,6 +117,8 @@ type Message struct {
 	IntegrationLabel string `json:"integration_label,omitempty"`
 	// Echoed to the sender only.
 	RandomID int64 `json:"random_id,omitempty"`
+	// GroupedID is shared by the messages of one album.
+	GroupedID int64 `json:"grouped_id,omitempty"`
 }
 
 // Callback is a press of one of the bot's callback buttons.
@@ -123,6 +127,49 @@ type Callback struct {
 	From    User    `json:"from"`
 	Message Message `json:"message"`
 	Data    string  `json:"data"`
+}
+
+// ChatMember is a member of a group or channel; status is owner, admin,
+// member, left or banned.
+type ChatMember struct {
+	User        User   `json:"user"`
+	Status      string `json:"status"`
+	Permissions uint32 `json:"permissions"`
+}
+
+// MemberChanged is the bot's own membership after a change.
+type MemberChanged struct {
+	Chat Chat `json:"chat"`
+	// From made the change; absent for moderation.
+	From   *User      `json:"from,omitempty"`
+	Date   int64      `json:"date"`
+	Member ChatMember `json:"member"`
+}
+
+// Reaction is a user's reaction on a message of the bot; Emoji "" means it
+// was removed.
+type Reaction struct {
+	Chat  Chat   `json:"chat"`
+	Seq   int64  `json:"seq"`
+	User  User   `json:"user"`
+	Emoji string `json:"emoji"`
+	Date  int64  `json:"date"`
+}
+
+// File is a file the bot can see, with a short-lived download URL.
+type File struct {
+	FileID   string `json:"file_id"`
+	Kind     string `json:"kind"`
+	MimeType string `json:"mime_type,omitempty"`
+	Size     int64  `json:"size"`
+	FileName string `json:"file_name,omitempty"`
+	Width    int32  `json:"width,omitempty"`
+	Height   int32  `json:"height,omitempty"`
+	// Milliseconds.
+	Duration int32 `json:"duration,omitempty"`
+	// URL downloads the file until URLExpires (unix seconds).
+	URL        string `json:"url"`
+	URLExpires int64  `json:"url_expires"`
 }
 
 var entityNames = map[appv1.EntityType]string{
@@ -176,6 +223,27 @@ func IndexUsers(list []*appv1.User) Users {
 	return out
 }
 
+// MediaKindName is the wire name of a media kind ("" when unknown).
+func MediaKindName(k appv1.MediaKind) string { return mediaKindNames[k] }
+
+// MediaKindOf maps a wire media kind name.
+func MediaKindOf(name string) (appv1.MediaKind, bool) {
+	for k, n := range mediaKindNames {
+		if n == name {
+			return k, true
+		}
+	}
+	return appv1.MediaKind_MEDIA_KIND_UNSPECIFIED, false
+}
+
+// UserOf renders the user id from users, or a bare user when unknown.
+func (us Users) UserOf(id int64) User {
+	if u := us.user(id); u != nil {
+		return *u
+	}
+	return User{ID: id}
+}
+
 // FromUser maps a user.
 func FromUser(u *appv1.User) User {
 	return User{ID: u.GetId(), IsBot: u.GetIsBot(), Name: u.GetName(), Username: u.GetUsername()}
@@ -212,7 +280,7 @@ func FromMessage(m *appv1.Message, chat Chat, users Users) Message {
 	out := Message{
 		Chat: chat, Seq: m.GetSeq(), From: users.user(m.GetFromId()), Date: m.GetDate(), TopicID: m.GetTopicId(),
 		Text: m.GetText(), ReplyToSeq: m.GetReplyToSeq(), EditDate: m.GetEditDate(),
-		IntegrationLabel: m.GetIntegrationLabel(), RandomID: m.GetRandomId(),
+		IntegrationLabel: m.GetIntegrationLabel(), RandomID: m.GetRandomId(), GroupedID: m.GetGroupedId(),
 	}
 	for _, e := range m.GetEntities() {
 		out.Entities = append(out.Entities, Entity{
@@ -223,7 +291,7 @@ func FromMessage(m *appv1.Message, chat Chat, users Users) Message {
 	out.ReplyMarkup = fromMarkup(m.GetReplyMarkup())
 	if md := m.GetMedia(); md != nil {
 		out.Media = &Media{
-			Kind: mediaKindNames[md.GetKind()], MimeType: md.GetMimeType(), Size: md.GetSize(), FileName: md.GetFileName(),
+			Kind: mediaKindNames[md.GetKind()], FileID: md.GetFileId(), MimeType: md.GetMimeType(), Size: md.GetSize(), FileName: md.GetFileName(),
 			Width: md.GetWidth(), Height: md.GetHeight(), Duration: md.GetDuration(),
 		}
 	}

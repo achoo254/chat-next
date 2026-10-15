@@ -388,6 +388,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					placeholder={placeholderFor(chat, topic, title, copy, isSavedChat(chat, view?.peer ?? peer ?? null))}
 					media={canSendMedia(chat)}
 					botId={botId}
+					group={chat.type === "group"}
 				/>
 			) : (
 				<div className="closed-bar" role="status">

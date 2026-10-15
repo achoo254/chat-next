@@ -136,7 +136,7 @@ func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Cha
 		}
 		return s.GetChat(ctx, me, chatID)
 	}
-	if err := s.allow(limitCreate, "create", me); err != nil {
+	if err := s.allow(ctx, limitCreate, "create", me); err != nil {
 		return nil, nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -260,7 +260,7 @@ func (s *Service) CreateGroup(ctx context.Context, me int64, title string, userI
 	if len(userIDs) > addMembersMax {
 		return nil, errInvalid("at most %d users at once", addMembersMax)
 	}
-	if err := s.allow(limitCreate, "create", me); err != nil {
+	if err := s.allow(ctx, limitCreate, "create", me); err != nil {
 		return nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -313,7 +313,7 @@ func (s *Service) CreateChannel(ctx context.Context, me int64, title, about stri
 	if about, err = cleanAbout(about); err != nil {
 		return nil, err
 	}
-	if err := s.allow(limitCreate, "create", me); err != nil {
+	if err := s.allow(ctx, limitCreate, "create", me); err != nil {
 		return nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -447,7 +447,7 @@ func (s *Service) AddMembers(ctx context.Context, me, chatID int64, userIDs []in
 	if len(userIDs) == 0 || len(userIDs) > addMembersMax {
 		return nil, errInvalid("user_ids must hold 1 to %d users", addMembersMax)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	var failed addFailures
@@ -623,7 +623,7 @@ func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64, ba
 	if userID == me {
 		return s.LeaveChat(ctx, me, chatID, 0)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -675,7 +675,7 @@ func (s *Service) LeaveChat(ctx context.Context, me, chatID, newOwner int64) (*a
 	if newOwner < 0 || newOwner == me {
 		return nil, errInvalid("new_owner_id must be another member")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -784,7 +784,7 @@ func (s *Service) SetMemberPermissions(ctx context.Context, me, chatID, userID i
 	if perms&^allPerms != 0 {
 		return nil, errInvalid("unknown permission bits")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -820,7 +820,7 @@ func (s *Service) SetMemberPermissions(ctx context.Context, me, chatID, userID i
 
 // SetAdmin promotes or demotes a member (owner only).
 func (s *Service) SetAdmin(ctx context.Context, me, chatID, userID int64, admin bool) (*appv1.SyncAck, error) {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -892,7 +892,7 @@ func (s *Service) SetHistoryVisibility(ctx context.Context, me, chatID int64, vi
 	default:
 		return nil, errInvalid("history_visibility is required")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	t, err := s.inTx(ctx, func(t *txn) error {
@@ -926,7 +926,7 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 	if req.PhotoFileId != nil {
 		return nil, errPrecondition("chat photos need media uploads, which are not available yet")
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	chatID := req.GetChatId()
@@ -1495,7 +1495,7 @@ func (s *Service) GetMembers(ctx context.Context, me, chatID int64, query, curso
 
 // UnbanMember lifts a ban (admins). The user is not added back.
 func (s *Service) UnbanMember(ctx context.Context, me, chatID, userID int64) error {
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return err
 	}
 	c, m, err := s.activeChatFor(ctx, s.pool, chatID, me, false)

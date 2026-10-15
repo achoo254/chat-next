@@ -473,7 +473,7 @@ func (s *Service) ResolveReport(ctx context.Context, me int64, req *appv1.Resolv
 	if req.GetRestrictSeconds() < 0 || req.GetRestrictSeconds() > restrictMaxSeconds {
 		return nil, errInvalid("restrict_seconds must be 0 to %d", restrictMaxSeconds)
 	}
-	if err := s.allow(limitWrite, "write", me); err != nil {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
 	_, err = s.inTx(ctx, func(t *txn) error {

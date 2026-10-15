@@ -19,23 +19,52 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(testdb.Main(m))
+	os.Exit(contractCoverage(testdb.Main(m)))
 }
 
 type harness struct {
 	*bottest.Env
-	api *Service
+	api   *Service
+	typer *fakeTyper
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	env := bottest.New(t)
+	return newHarnessWith(t, bottest.Options{})
+}
+
+func newHarnessWith(t *testing.T, o bottest.Options) *harness {
+	t.Helper()
+	env := bottest.NewWith(t, o)
 	api, err := New(Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme},
 		env.Chat, env.Admin, env.Updates, env.Limiter, bottest.Quiet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &harness{Env: env, api: api}
+	if env.Media != nil {
+		api.UseMedia(env.Media)
+	}
+	typer := &fakeTyper{}
+	api.UseTyper(typer)
+	return &harness{Env: env, api: api, typer: typer}
+}
+
+// fakeTyper records the chat actions relayed to the realtime gateway.
+type fakeTyper struct {
+	mu  sync.Mutex
+	got []string
+}
+
+func (f *fakeTyper) BotTyping(botID, chatID, topicID int64, action appv1.TypingAction) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.got = append(f.got, fmt.Sprintf("%d:%d:%d:%s", botID, chatID, topicID, action))
+}
+
+func (f *fakeTyper) list() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.got...)
 }
 
 // answer is a decoded envelope.
@@ -71,10 +100,22 @@ func (h *harness) callFrom(addr, method, path, token, body string) answer {
 		h.T.Fatalf("%s %s: not an envelope: %q", method, path, rec.Body.String())
 	}
 	a.status = rec.Code
+	h.checkContract(method, path, rec.Code, rec.Body.Bytes())
 	if a.OK != (rec.Code == http.StatusOK) {
 		h.T.Fatalf("%s %s: status %d with ok=%v", method, path, rec.Code, a.OK)
 	}
 	return a
+}
+
+// checkContract validates a response against the OpenAPI spec.
+func (h *harness) checkContract(method, path string, status int, body []byte) {
+	h.T.Helper()
+	spec, err := loadContract()
+	if err != nil {
+		h.T.Errorf("contract: %v", err)
+		return
+	}
+	spec.check(h.T, method, path, status, body)
 }
 
 func (a answer) into(t testing.TB, v any) {
@@ -116,7 +157,32 @@ type update struct {
 	UpdateID      int64        `json:"update_id"`
 	Message       *sentMessage `json:"message"`
 	MessageEdited *sentMessage `json:"message_edited"`
-	Callback      *struct {
+	MemberChanged *struct {
+		Chat struct {
+			ID int64 `json:"id"`
+		} `json:"chat"`
+		From *struct {
+			ID int64 `json:"id"`
+		} `json:"from"`
+		Member struct {
+			User struct {
+				ID int64 `json:"id"`
+			} `json:"user"`
+			Status      string `json:"status"`
+			Permissions uint32 `json:"permissions"`
+		} `json:"member"`
+	} `json:"member_changed"`
+	Reaction *struct {
+		Chat struct {
+			ID int64 `json:"id"`
+		} `json:"chat"`
+		Seq  int64 `json:"seq"`
+		User struct {
+			ID int64 `json:"id"`
+		} `json:"user"`
+		Emoji string `json:"emoji"`
+	} `json:"reaction"`
+	Callback *struct {
 		ID   string `json:"id"`
 		Data string `json:"data"`
 		From struct {
@@ -433,13 +499,14 @@ func TestPrivacyModeInGroups(t *testing.T) {
 	member := h.User("member")
 	botID, token := h.Bot(owner, "quietbot")
 	group := h.Group(owner, member, botID)
-	// The service message of the group's creation reaches the bot; skip it.
+	// The group's creation reaches the bot (its membership, then the
+	// service message); skip it.
 	h.CatchUp()
 	created := h.updates(token, "timeout=0")
-	if len(created) != 1 || created[0].Message == nil {
+	if len(created) != 2 || created[0].MemberChanged == nil || created[1].Message == nil {
 		t.Fatalf("creation updates = %+v", created)
 	}
-	h.updates(token, fmt.Sprintf("offset=%d", created[0].UpdateID+1))
+	h.updates(token, fmt.Sprintf("offset=%d", created[1].UpdateID+1))
 
 	var botMsg sentMessage
 	h.send(token, group, `"text": "I am here"`).into(t, &botMsg)

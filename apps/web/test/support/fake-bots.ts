@@ -124,6 +124,8 @@ export class FakeBots {
 	loseNextStartAnswer = false;
 	/** GetBotInfo fails with unavailable this many more times. */
 	failInfo = 0;
+	/** The bots in each group, as GetChatBotCommands lists them (none unless set). */
+	readonly chatBots = new Map<number, number[]>();
 	private serial = 0;
 
 	constructor(private readonly host: BotHost) {}
@@ -229,6 +231,12 @@ export class FakeBots {
 	private menu(bot: FakeBot) {
 		const of = (scope: BotCommandScope) => bot.commands.find((set) => set.scope === scope)?.commands;
 		return of(BotCommandScope.PRIVATE) ?? of(BotCommandScope.DEFAULT) ?? [];
+	}
+
+	/** The menu GetChatBotCommands returns for a member of a group: GROUP, else DEFAULT. */
+	private groupMenu(bot: FakeBot) {
+		const of = (scope: BotCommandScope) => bot.commands.find((set) => set.scope === scope)?.commands;
+		return of(BotCommandScope.GROUP) ?? of(BotCommandScope.DEFAULT) ?? [];
 	}
 
 	/** The answer of the next press. */
@@ -363,6 +371,16 @@ export class FakeBots {
 			},
 		});
 		router.service(BotsService, {
+			getChatBotCommands: (req) => {
+				const chatId = num(req.chatId);
+				this.calls.push(`GetChatBotCommands ${chatId}`);
+				const ids = this.chatBots.get(chatId) ?? [];
+				const bots = ids
+					.map((id) => this.bots.get(id))
+					.filter((bot): bot is FakeBot => bot !== undefined && !bot.deleted && this.groupMenu(bot).length > 0)
+					.map((bot) => ({ bot: this.host.wireUser(bot.id), commands: this.groupMenu(bot) }));
+				return { bots, botCount: ids.length };
+			},
 			getBotInfo: (req) => {
 				const bot = this.bot(num(req.botId));
 				this.calls.push(`GetBotInfo ${bot.id}`);

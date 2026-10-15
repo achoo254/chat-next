@@ -20,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bots.proto.
  */
 export const file_app_v1_bots: GenFile = /*@__PURE__*/
-  fileDesc("ChFhcHAvdjEvYm90cy5wcm90bxIGYXBwLnYxIp4BCgxJbmxpbmVSZXN1bHQSCgoCaWQYASABKAkSJgoEa2luZBgCIAEoDjIYLmFwcC52MS5JbmxpbmVSZXN1bHRLaW5kEg0KBXRpdGxlGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEh8KBW1lZGlhGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhUKDXRodW1ibmFpbF91cmwYBiABKAkiXAoSSW5saW5lUXVlcnlSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoHY2hhdF9pZBgCIAEoA0ICMAISDQoFcXVlcnkYAyABKAkSDgoGb2Zmc2V0GAQgASgJIpABChNJbmxpbmVRdWVyeVJlc3BvbnNlEhAKCHF1ZXJ5X2lkGAEgASgJEiUKB3Jlc3VsdHMYAiADKAsyFC5hcHAudjEuSW5saW5lUmVzdWx0EhMKC25leHRfb2Zmc2V0GAMgASgJEg8KB2dhbGxlcnkYBCABKAgSGgoSY2FjaGVfdGltZV9zZWNvbmRzGAUgASgFIucBChJPcGVuTWluaUFwcFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgdjaGF0X2lkGAIgASgDQgIwAhIPCgNzZXEYAyABKANCAjACEgsKA3VybBgEIAEoCRITCgtzdGFydF9wYXJhbRgFIAEoCRJBCgx0aGVtZV9wYXJhbXMYBiADKAsyKy5hcHAudjEuT3Blbk1pbmlBcHBSZXF1ZXN0LlRoZW1lUGFyYW1zRW50cnkaMgoQVGhlbWVQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjUKE09wZW5NaW5pQXBwUmVzcG9uc2USCwoDdXJsGAEgASgJEhEKCWluaXRfZGF0YRgCIAEoCSJRCg9TdGFydEJvdFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgtzdGFydF9wYXJhbRgCIAEoCRIVCglyYW5kb21faWQYAyABKANCAjACIosBChBTdGFydEJvdFJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIgCgdtZXNzYWdlGAIgASgLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAyADKAsyDC5hcHAudjEuVXNlchIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjayI8ChFHZXRCb3RJbmZvUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACIr0BChJHZXRCb3RJbmZvUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyEhMKC2Rlc2NyaXB0aW9uGAIgASgJEg0KBWFib3V0GAMgASgJEiQKCGNvbW1hbmRzGAQgAygLMhIuYXBwLnYxLkJvdENvbW1hbmQSEAoIaXNfb3duZXIYBSABKAgSGgoObGFzdF91cGRhdGVfYXQYBiABKANCAjACEhMKC25vdF9ydW5uaW5nGAcgASgIKu8BChBJbmxpbmVSZXN1bHRLaW5kEiIKHklOTElORV9SRVNVTFRfS0lORF9VTlNQRUNJRklFRBAAEh4KGklOTElORV9SRVNVTFRfS0lORF9BUlRJQ0xFEAESHAoYSU5MSU5FX1JFU1VMVF9LSU5EX1BIT1RPEAISHAoYSU5MSU5FX1JFU1VMVF9LSU5EX1ZJREVPEAMSHAoYSU5MSU5FX1JFU1VMVF9LSU5EX0FVRElPEAQSHAoYSU5MSU5FX1JFU1VMVF9LSU5EX1ZPSUNFEAUSHwobSU5MSU5FX1JFU1VMVF9LSU5EX0RPQ1VNRU5UEAYyoQIKC0JvdHNTZXJ2aWNlEkYKC0lubGluZVF1ZXJ5EhouYXBwLnYxLklubGluZVF1ZXJ5UmVxdWVzdBobLmFwcC52MS5JbmxpbmVRdWVyeVJlc3BvbnNlEkYKC09wZW5NaW5pQXBwEhouYXBwLnYxLk9wZW5NaW5pQXBwUmVxdWVzdBobLmFwcC52MS5PcGVuTWluaUFwcFJlc3BvbnNlEj0KCFN0YXJ0Qm90EhcuYXBwLnYxLlN0YXJ0Qm90UmVxdWVzdBoYLmFwcC52MS5TdGFydEJvdFJlc3BvbnNlEkMKCkdldEJvdEluZm8SGS5hcHAudjEuR2V0Qm90SW5mb1JlcXVlc3QaGi5hcHAudjEuR2V0Qm90SW5mb1Jlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_bot_admin, file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChFhcHAvdjEvYm90cy5wcm90bxIGYXBwLnYxIp4BCgxJbmxpbmVSZXN1bHQSCgoCaWQYASABKAkSJgoEa2luZBgCIAEoDjIYLmFwcC52MS5JbmxpbmVSZXN1bHRLaW5kEg0KBXRpdGxlGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEh8KBW1lZGlhGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhUKDXRodW1ibmFpbF91cmwYBiABKAkiXAoSSW5saW5lUXVlcnlSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoHY2hhdF9pZBgCIAEoA0ICMAISDQoFcXVlcnkYAyABKAkSDgoGb2Zmc2V0GAQgASgJIpABChNJbmxpbmVRdWVyeVJlc3BvbnNlEhAKCHF1ZXJ5X2lkGAEgASgJEiUKB3Jlc3VsdHMYAiADKAsyFC5hcHAudjEuSW5saW5lUmVzdWx0EhMKC25leHRfb2Zmc2V0GAMgASgJEg8KB2dhbGxlcnkYBCABKAgSGgoSY2FjaGVfdGltZV9zZWNvbmRzGAUgASgFIucBChJPcGVuTWluaUFwcFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgdjaGF0X2lkGAIgASgDQgIwAhIPCgNzZXEYAyABKANCAjACEgsKA3VybBgEIAEoCRITCgtzdGFydF9wYXJhbRgFIAEoCRJBCgx0aGVtZV9wYXJhbXMYBiADKAsyKy5hcHAudjEuT3Blbk1pbmlBcHBSZXF1ZXN0LlRoZW1lUGFyYW1zRW50cnkaMgoQVGhlbWVQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjUKE09wZW5NaW5pQXBwUmVzcG9uc2USCwoDdXJsGAEgASgJEhEKCWluaXRfZGF0YRgCIAEoCSJRCg9TdGFydEJvdFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgtzdGFydF9wYXJhbRgCIAEoCRIVCglyYW5kb21faWQYAyABKANCAjACIosBChBTdGFydEJvdFJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIgCgdtZXNzYWdlGAIgASgLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAyADKAsyDC5hcHAudjEuVXNlchIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjayI8ChFHZXRCb3RJbmZvUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACIr0BChJHZXRCb3RJbmZvUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyEhMKC2Rlc2NyaXB0aW9uGAIgASgJEg0KBWFib3V0GAMgASgJEiQKCGNvbW1hbmRzGAQgAygLMhIuYXBwLnYxLkJvdENvbW1hbmQSEAoIaXNfb3duZXIYBSABKAgSGgoObGFzdF91cGRhdGVfYXQYBiABKANCAjACEhMKC25vdF9ydW5uaW5nGAcgASgIIjAKGUdldENoYXRCb3RDb21tYW5kc1JlcXVlc3QSEwoHY2hhdF9pZBgBIAEoA0ICMAIiUgoPQ2hhdEJvdENvbW1hbmRzEhkKA2JvdBgBIAEoCzIMLmFwcC52MS5Vc2VyEiQKCGNvbW1hbmRzGAIgAygLMhIuYXBwLnYxLkJvdENvbW1hbmQiVgoaR2V0Q2hhdEJvdENvbW1hbmRzUmVzcG9uc2USJQoEYm90cxgBIAMoCzIXLmFwcC52MS5DaGF0Qm90Q29tbWFuZHMSEQoJYm90X2NvdW50GAIgASgFKu8BChBJbmxpbmVSZXN1bHRLaW5kEiIKHklOTElORV9SRVNVTFRfS0lORF9VTlNQRUNJRklFRBAAEh4KGklOTElORV9SRVNVTFRfS0lORF9BUlRJQ0xFEAESHAoYSU5MSU5FX1JFU1VMVF9LSU5EX1BIT1RPEAISHAoYSU5MSU5FX1JFU1VMVF9LSU5EX1ZJREVPEAMSHAoYSU5MSU5FX1JFU1VMVF9LSU5EX0FVRElPEAQSHAoYSU5MSU5FX1JFU1VMVF9LSU5EX1ZPSUNFEAUSHwobSU5MSU5FX1JFU1VMVF9LSU5EX0RPQ1VNRU5UEAYy/gIKC0JvdHNTZXJ2aWNlEkYKC0lubGluZVF1ZXJ5EhouYXBwLnYxLklubGluZVF1ZXJ5UmVxdWVzdBobLmFwcC52MS5JbmxpbmVRdWVyeVJlc3BvbnNlEkYKC09wZW5NaW5pQXBwEhouYXBwLnYxLk9wZW5NaW5pQXBwUmVxdWVzdBobLmFwcC52MS5PcGVuTWluaUFwcFJlc3BvbnNlEj0KCFN0YXJ0Qm90EhcuYXBwLnYxLlN0YXJ0Qm90UmVxdWVzdBoYLmFwcC52MS5TdGFydEJvdFJlc3BvbnNlEkMKCkdldEJvdEluZm8SGS5hcHAudjEuR2V0Qm90SW5mb1JlcXVlc3QaGi5hcHAudjEuR2V0Qm90SW5mb1Jlc3BvbnNlElsKEkdldENoYXRCb3RDb21tYW5kcxIhLmFwcC52MS5HZXRDaGF0Qm90Q29tbWFuZHNSZXF1ZXN0GiIuYXBwLnYxLkdldENoYXRCb3RDb21tYW5kc1Jlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_bot_admin, file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.InlineResult
@@ -375,6 +375,78 @@ export const GetBotInfoResponseSchema: GenMessage<GetBotInfoResponse> = /*@__PUR
   messageDesc(file_app_v1_bots, 8);
 
 /**
+ * @generated from message app.v1.GetChatBotCommandsRequest
+ */
+export type GetChatBotCommandsRequest = Message<"app.v1.GetChatBotCommandsRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+};
+
+/**
+ * Describes the message app.v1.GetChatBotCommandsRequest.
+ * Use `create(GetChatBotCommandsRequestSchema)` to create a new message.
+ */
+export const GetChatBotCommandsRequestSchema: GenMessage<GetChatBotCommandsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 9);
+
+/**
+ * One bot's command menu in a group.
+ *
+ * @generated from message app.v1.ChatBotCommands
+ */
+export type ChatBotCommands = Message<"app.v1.ChatBotCommands"> & {
+  /**
+   * The bot (is_bot set; username always present).
+   *
+   * @generated from field: app.v1.User bot = 1;
+   */
+  bot?: User | undefined;
+
+  /**
+   * @generated from field: repeated app.v1.BotCommand commands = 2;
+   */
+  commands: BotCommand[];
+};
+
+/**
+ * Describes the message app.v1.ChatBotCommands.
+ * Use `create(ChatBotCommandsSchema)` to create a new message.
+ */
+export const ChatBotCommandsSchema: GenMessage<ChatBotCommands> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 10);
+
+/**
+ * @generated from message app.v1.GetChatBotCommandsResponse
+ */
+export type GetChatBotCommandsResponse = Message<"app.v1.GetChatBotCommandsResponse"> & {
+  /**
+   * Bots in the order they joined; bots without commands for the caller
+   * are left out.
+   *
+   * @generated from field: repeated app.v1.ChatBotCommands bots = 1;
+   */
+  bots: ChatBotCommands[];
+
+  /**
+   * Every bot in the group, with or without commands. With more than one
+   * the client sends a picked command as "/command@username", so only that
+   * bot takes it.
+   *
+   * @generated from field: int32 bot_count = 2;
+   */
+  botCount: number;
+};
+
+/**
+ * Describes the message app.v1.GetChatBotCommandsResponse.
+ * Use `create(GetChatBotCommandsResponseSchema)` to create a new message.
+ */
+export const GetChatBotCommandsResponseSchema: GenMessage<GetChatBotCommandsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 11);
+
+/**
  * @generated from enum app.v1.InlineResultKind
  */
 export enum InlineResultKind {
@@ -470,6 +542,19 @@ export const BotsService: GenService<{
     methodKind: "unary";
     input: typeof GetBotInfoRequestSchema;
     output: typeof GetBotInfoResponseSchema;
+  },
+  /**
+   * The command menus of the bots in a group, for the composer's command
+   * menu: one entry per bot member with commands for the caller (the
+   * GROUP_ADMIN list for admins, else GROUP, then DEFAULT). Empty for chats
+   * that are not groups.
+   *
+   * @generated from rpc app.v1.BotsService.GetChatBotCommands
+   */
+  getChatBotCommands: {
+    methodKind: "unary";
+    input: typeof GetChatBotCommandsRequestSchema;
+    output: typeof GetChatBotCommandsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_bots, 0);

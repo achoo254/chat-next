@@ -101,7 +101,7 @@ func (s *Service) ExportInviteLink(ctx context.Context, me, chatID, expiresAt in
 	if usageLimit < 0 || usageLimit > inviteUsageMax {
 		return nil, errInvalid("usage_limit must be 0 to %d", inviteUsageMax)
 	}
-	if err := s.allow(limitCreate, "create", me); err != nil {
+	if err := s.allow(ctx, limitCreate, "create", me); err != nil {
 		return nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {
@@ -226,7 +226,7 @@ func (s *Service) CheckInvite(ctx context.Context, me int64, link string) (*appv
 	if err != nil {
 		return nil, err
 	}
-	if err := s.allow(limitJoin, "join", me); err != nil {
+	if err := s.allow(ctx, limitJoin, "join", me); err != nil {
 		return nil, err
 	}
 	inv, err := s.inviteByToken(ctx, s.pool, token)
@@ -280,7 +280,7 @@ func (s *Service) JoinByInvite(ctx context.Context, me int64, link string) (*app
 	if err != nil {
 		return nil, err
 	}
-	if err := s.allow(limitJoin, "join", me); err != nil {
+	if err := s.allow(ctx, limitJoin, "join", me); err != nil {
 		return nil, err
 	}
 	if err := s.checkUnrestricted(ctx, s.pool, me); err != nil {

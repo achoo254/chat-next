@@ -57,7 +57,7 @@ Release R5 lát B1 (webhook tới bot, migration `0015_bot_webhooks`) không đ�
 - Server gọi ra URL webhook của bot (cổng 443/80/8443, chỉ địa chỉ công khai, chặn lúc kết nối). Đổi `SESSION_KEY` làm secret webhook không mở được: mỗi lần giao lỗi `secret_unreadable` tới khi chủ bot lưu lại webhook.
 - Rollback code về lát A: binary cũ bỏ qua webhook, nên bot có webhook chỉ nhận update nếu chuyển sang long poll (binary cũ không trả `409` cho chúng); lên lại lát B1 thì webhook giao tiếp các update còn chờ.
 
-Bản mở app khi offline (service worker `/sw.js` chỉ cache app shell: `index.html`, file trong `/assets/`, icon, manifest; không bao giờ `/rpc`, `/ws`, `/auth`, `/hook`, `/bot` hay host media) không đổi nginx, script hay biến môi trường, deploy như các lần sau. `location /` của `chat.hoandat.com.conf` đã trả `Cache-Control: no-cache` cho `/sw.js` và `index.html`, và CSP đã có `worker-src 'self'`; nếu sau này tách location riêng cho hai file này thì phải giữ `no-cache`, nếu không trình duyệt có thể giữ worker cũ lâu hơn. Mỗi build có một `sw.js` riêng (phiên bản là hash nội dung các file); worker mới cài xong thì chờ đến khi không còn tab nào của bản cũ mới thay và xoá cache cũ.
+Bản mở app khi offline (service worker `/sw.js` chỉ cache app shell: `index.html`, file trong `/assets/`, icon, manifest; không bao giờ `/rpc`, `/ws`, `/auth`, `/hook`, `/bot` hay host media) không đổi nginx, script hay biến môi trường, deploy như các lần sau. `location /` của `chat.hoandat.com.conf` đã trả `Cache-Control: no-cache` cho `/sw.js` và `index.html`, và CSP đã có `worker-src 'self'`; nếu sau này tách location riêng cho hai file này thì phải giữ `no-cache`, nếu không trình duyệt có thể giữ worker cũ lâu hơn. Mỗi build có một `sw.js` riêng (phiên bản là hash nội dung các file); cách worker mới thay worker cũ xem [Service worker: cập nhật](#service-worker-cập-nhật).
 
 - Rollback code về một release cũng có `sw.js`: lần kiểm tra cập nhật tiếp theo (mỗi lần tải trang online) lấy `sw.js` của release đó, khác nội dung nên trình duyệt cài worker của bản đó; không cần làm gì thêm.
 - Rollback về release **không có** `sw.js` (trước bản này): conf nginx của release đó trả `index.html` (200, `text/html`) cho `/sw.js`, nên lần kiểm tra cập nhật lỗi vì sai MIME và trình duyệt **giữ** worker đang có vô thời hạn. Worker đó vẫn lấy trang từ mạng trước, nhưng phục vụ manifest, icon, font từ cache và mở shell của build không còn trên server khi offline. Ngay sau `switch-release.sh`, đặt kill switch vào chính release đó: `install -m 644 /opt/chat/infra/sw-kill-switch.js /opt/chat/current/web/sw.js` (xem [Service worker: kill switch](#service-worker-kill-switch)).
@@ -162,6 +162,23 @@ Vận hành:
 ## Bảo mật mạng
 
 - Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này. Cả hai không gọi được chính `.65` (`OUTBOUND_DENY_CIDRS`, xem trên), nên luật này không bị vượt bằng một URL trỏ về chính server.
+
+## Service worker: cập nhật
+
+Từ bản sửa cập nhật service worker (2026-10-15), deploy như thường: không đổi nginx, script hay biến môi trường. Hành vi ([`app-shell-worker.ts`](../apps/web/src/sw/app-shell-worker.ts)):
+
+- Tải trang (`index.html`, mọi route của app) luôn lấy từ mạng trước; chỉ khi không tới được server mới mở `index.html` đã cache của build mà worker đang chạy. File trong `/assets/` (tên có hash) lấy từ cache trước.
+- Worker của build mới cache xong file của nó thì thay ngay (`skipWaiting`, `clients.claim`), kể cả khi tab cũ còn mở và kể cả thay một worker đang `waiting` của bản trước (bản trước chờ tới khi đóng hết tab). Trình duyệt chỉ thấy `sw.js` mới khi kiểm tra cập nhật: mỗi lần tải trang online, và tab đang mở tự kiểm mỗi giờ và khi quay lại tab sau ít nhất 15 phút.
+- nginx chỉ phục vụ `/assets/` của release hiện tại, nên worker **giữ cache của build cũ** khi còn tab chạy build đó: tab cũ vẫn tải được chunk lazy của nó. Worker hỏi từng tab đang mở đang chạy build nào (tên script entry `/assets/index-<hash>.js`) mỗi khi một tab mới mở, rồi xoá cache của build không còn tab nào chạy. Tab không trả lời (code trước bản này, tab bị đóng băng) thì giữ thêm tối đa 3 build gần nhất (`MAX_UNKNOWN_KEPT`, mỗi build khoảng 3,5 MB).
+- Tab đang chạy build cũ hiện dòng "Đã có bản mới · Tải lại" (en: "A new version is available · Reload"); bấm thì tải lại trang và chạy build mới. App không tự tải lại (giữ bản nháp, hộp thoại đang mở). Tab mở sau deploy đã chạy build mới, không hiện dòng này.
+- Rollback về release trước bản này: `sw.js` của release đó cài như một bản cập nhật nhưng **chờ** tới khi đóng hết tab (hành vi cũ), rồi xoá mọi cache khác. Trang vẫn lấy từ mạng trước nên người dùng tải lại là chạy đúng release; không cần kill switch.
+
+Kiểm sau deploy: `sw.js` mang đúng script entry mà `index.html` đang nạp (in `1`), và trong trình duyệt DevTools → Application → Service workers không còn worker `waiting` sau một lần tải trang:
+
+```bash
+E=$(curl -s https://chat.hoandat.com/ | grep -o 'src="/assets/index-[^"]*\.js"' | cut -d'"' -f2)
+echo "$E"; curl -s https://chat.hoandat.com/sw.js | grep -c "entry:.$E"
+```
 
 ## Service worker: kill switch
 

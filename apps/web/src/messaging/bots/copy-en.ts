@@ -124,7 +124,7 @@ export const enBots: BotsCopy = {
 		generate: "Generate",
 		generated: "New secret generated; press Save, then update your server",
 		kinds: "Update kinds",
-		kindsHint: "None selected: every kind. Applies to new updates only.",
+		kindsHint: "None selected: every kind but reaction (select reaction to get it). Applies to new updates only.",
 		maxConnections: "Parallel connections",
 		maxHint: "One at a time per chat, in parallel across chats up to this number.",
 		maxBad: "From 1 to 100",
@@ -266,6 +266,7 @@ export const enBots: BotsCopy = {
 	menu: {
 		button: "Bot commands",
 		head: "Bot commands",
+		groupHead: "Commands in this group",
 		noMatch: "No matching command.",
 		select: "select",
 		fill: "fill in",

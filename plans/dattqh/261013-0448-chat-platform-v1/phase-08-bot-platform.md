@@ -16,6 +16,7 @@ principles: [6, 2, 3, 5]
 <!-- Updated: Validation Session 8 2026-10-14 - Mini App chuyển sang Phase 16, file của Bot API làm cùng Phase 4 (cả hai làm sau cùng) -->
 <!-- Updated: Validation Session 9 2026-10-14 - lên prod ở release R5; file Bot API trả về phase này vì media đã có từ R3 -->
 <!-- Updated: R5 lát A 2026-10-15 - Bot API ở đường dẫn https://chat.<d>/bot/v1/ trong process api (không host bot.chat.<d>, không role riêng); lát A đã làm: spec, quản lý bot, consent, gửi tin + bàn phím, long poll, callback, lệnh -->
+<!-- Updated: R5 lát B2 2026-10-15 - đủ method: sửa/xoá/chuyển tiếp/sao chép, reaction, ghim, "đang gõ", file (multipart hoặc file_id, GET /files), quản trị nhóm; update member_changed, reaction (opt-in, allowed_updates cho cả long poll); menu lệnh trong nhóm ở web; contract test theo OpenAPI -->
 <!-- Updated: R5 lát B1 2026-10-15 - webhook tới bot (dispatcher trong process api, HMAC X-Bot-Signature, dead-letter, bộ đếm), safehttp, channel_post cho bot admin kênh, bot rời chat thì bỏ update đang chờ của chat đó -->
 
 ## Goal
@@ -102,10 +103,10 @@ Create:
 
 ## Todo
 
-- [x] OpenAPI + format spec (lát A: me, messages, updates, callbacks answer, commands, chats; các lát sau thêm method)
+- [x] OpenAPI + format spec (lát A: me, messages, updates, callbacks answer, commands, chats; lát B1: webhook; lát B2: sửa, xoá, chuyển tiếp, sao chép, reaction, ghim, file, quản trị nhóm, chat action; còn inline mode, bulk)
 - [x] Router + auth + envelope + rate limit tầng
 - [x] Consent invariant
-- [ ] Mapping + validate OpenAPI (lát A: mapping xong ở `internal/botapi/wire`; chưa có test validate response theo OpenAPI)
+- [x] Mapping + validate OpenAPI (mapping ở `internal/botapi/wire`; lát B2: mọi response của test Bot API được kiểm theo schema OpenAPI, `internal/botapi/contract_test.go`)
 - [x] Parser + allowlist scheme + fuzz
 - [x] update_id một writer + bot_updates
 - [x] Long poll + dispatcher + dead-letter + dedupe action (lát A: long poll + 409; lát B1: webhook dispatcher, retry/Retry-After, dead-letter, circuit breaker, action trong body với `random_id` dẫn xuất, bot rời chat thì bỏ update chờ, `channel_post`)
@@ -113,7 +114,8 @@ Create:
 - [x] safehttp (lát B1; link preview dùng chung chính sách địa chỉ)
 - [ ] Bulk có consent
 - [ ] Inline mode
-- [ ] Contract test
+- [x] Contract test (lát B2: Go test HTTP thô trong `go test ./...`, kiểm mọi response thành công và lỗi theo `openapi.yaml`, chạy đủ gói thì đòi mọi operation và mọi loại update đều có response được kiểm; thay cho `pnpm conformance:contract`)
+- [x] Method đầy đủ ngoài inline/bulk (lát B2): sửa chữ và bàn phím inline, xoá, chuyển tiếp, sao chép, reaction, ghim/bỏ ghim, "đang gõ" (frame typing realtime; web chưa hiển thị), file (multipart ≤ 50 MiB hoặc `file_id`, album, `GET /files` với URL ngắn hạn; không gửi theo URL), quản trị nhóm (admin, thành viên, cấm/bỏ cấm/giới hạn, đổi tên/mô tả, rời); update `member_changed`, `reaction` (opt-in); menu lệnh của bot trong nhóm ở web (`GetChatBotCommands`)
 - [x] Bot chính thức chào người dùng mới (R5): tự có chat với bot ở lần đăng nhập đầu, hướng dẫn dùng app, nhận góp ý (bot hệ thống `tro_ly_bot` chạy trong `chat-api`, chat trống + "Bắt đầu", góp ý vào Kiểm duyệt > Góp ý, người vận hành trả lời qua bot)
 - [ ] Bot chính thức báo tính năng mới (gửi thông báo cho người đã bắt đầu Trợ lý; chưa làm)
 

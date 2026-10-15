@@ -1,8 +1,10 @@
 // The private chat with a bot (mockups/bots.html): before the first message
 // the chat shows the bot's profile and "Bắt đầu" in place of the composer
 // (#bot-start); afterwards the composer gets the bot's command menu
-// (#commands) and the reply keyboard the bot set (#reply-keyboard). Loaded
-// with the first bot chat opened, with its own styles.
+// (#commands) and the reply keyboard the bot set (#reply-keyboard). In a
+// group the composer gets the command menu of the group's bots (#commands):
+// a picked command carries "@username" when the group has more than one
+// bot. Loaded with the first bot chat or group opened, with its own styles.
 import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@app/core";
 import { cryptoRandomId } from "@app/platform";
@@ -14,7 +16,7 @@ import { ChatAvatar, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 
 /** Id of a chat's command menu, which the composer's menu button controls. */
 export const BOT_MENU_ID = (chatId: number): string => `bot-cmds-${chatId}`;
-import type { BotCommand, BotInfo, Bots } from "./api.ts";
+import type { BotCommand, BotInfo, Bots, ChatMenus } from "./api.ts";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import "./bot-chat.css";
 
@@ -233,7 +235,7 @@ function useBotKeyboard(chatId: number, botId: number): { seq: number; keyboard:
 }
 
 /** Commands matching what is typed: "/de" keeps /deploy; anything but a bare command shows none. */
-export function matchCommands(commands: readonly BotCommand[], text: string, manual: boolean): BotCommand[] {
+export function matchCommands<C extends BotCommand>(commands: readonly C[], text: string, manual: boolean): C[] {
 	if (text === "") return manual ? [...commands] : [];
 	if (!text.startsWith("/") || /\s/.test(text)) return [];
 	const typed = text.slice(1).split("@")[0]?.toLowerCase() ?? "";
@@ -271,32 +273,47 @@ export interface BotLayerProps {
 	actionsRef: { current: BotActions | null };
 }
 
-/** Command menu and reply keyboard around the composer of a private chat with a bot. */
-export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, actionsRef }: BotLayerProps) {
-	const t = useBotsCopy();
-	const { source, toasts } = useServices();
-	const copy = useCopy();
-	const user = useUser(botId);
-	const info = useBotInfo(botId, chatId);
-	const active = useBotKeyboard(chatId, botId);
+/** A command the menu offers: what picking it puts in the composer, and the bot it is for. */
+export interface MenuEntry extends BotCommand {
+	readonly key: string;
+	readonly botId: number;
+	readonly botName: string;
+	/** "/status", or "/status@deploy_bot" in a group with several bots. */
+	readonly insert: string;
+}
+
+interface CommandMenuState {
+	readonly open: boolean;
+	readonly matches: readonly MenuEntry[];
+	readonly index: number;
+	fill(entry: MenuEntry): void;
+	toggleMenu(): void;
+	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
+}
+
+/** The command menu's state and keys: typing "/" filters, ↑ ↓ select, Tab fills, Enter sends, Esc closes. */
+function useCommandMenu(
+	entries: readonly MenuEntry[],
+	text: string,
+	setText: (text: string) => void,
+	send: (text: string) => void,
+	focus: () => void,
+): CommandMenuState {
 	const [manual, setManual] = useState(false);
 	const [closedFor, setClosedFor] = useState<string | null>(null);
 	const [selected, setSelected] = useState(0);
-
-	const commands = info?.commands ?? [];
-	const matches = closedFor === text ? [] : matchCommands(commands, text, manual);
-	const open = matches.length > 0 || (manual && commands.length > 0 && text.startsWith("/") && !/\s/.test(text));
+	const matches = closedFor === text ? [] : matchCommands(entries, text, manual);
+	const open = matches.length > 0 || (manual && entries.length > 0 && text.startsWith("/") && !/\s/.test(text));
 	const index = Math.min(selected, Math.max(0, matches.length - 1));
 	const close = () => {
 		setManual(false);
 		setClosedFor(text);
 	};
-	const fill = (command: BotCommand) => {
-		setText(`/${command.command} `);
+	const fill = (entry: MenuEntry) => {
+		setText(`${entry.insert} `);
 		setManual(false);
 		focus();
 	};
-
 	const onKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
 		if (!open || matches.length === 0) return false;
 		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -315,7 +332,7 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 			event.preventDefault();
 			setText("");
 			setManual(false);
-			send(`/${picked.command}`);
+			send(picked.insert);
 			return true;
 		}
 		if (event.key === "Escape") {
@@ -325,14 +342,6 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 		}
 		return false;
 	};
-
-	// Hidden on this device is kept in the local database (survives a reload).
-	const padShown = active !== null && !active.keyboard.hidden;
-	const setHidden = (seq: number, hidden: boolean) => {
-		source.setKeyboardHidden(chatId, seq, hidden).catch(() => toasts.show(copy.common.failed));
-	};
-	const name = user?.name ?? "";
-
 	const toggleMenu = () => {
 		if (open) close();
 		else {
@@ -342,17 +351,88 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 			focus();
 		}
 	};
+	return { open, matches, index, fill, toggleMenu, onKey };
+}
+
+/** The list above the composer; `owners` adds the bot's name to each row (groups). */
+function CommandMenu({ chatId, menu, head, owners }: { chatId: number; menu: CommandMenuState; head: string; owners: boolean }) {
+	const t = useBotsCopy();
+	if (!menu.open || menu.matches.length === 0) return null;
+	return (
+		<div className="cmd-menu">
+			<div className="menu-head">
+				<Icon name="command" small />
+				{head}
+			</div>
+			<ul role="listbox" id={BOT_MENU_ID(chatId)} aria-label={t.menu.button}>
+				{menu.matches.map((entry, position) => (
+					<li
+						key={entry.key}
+						role="option"
+						className={owners ? "with-owner" : undefined}
+						aria-selected={position === menu.index}
+						onMouseDown={(event) => event.preventDefault()}
+						onClick={() => menu.fill(entry)}
+					>
+						<ChatAvatar id={entry.botId} name={entry.botName} size="sm" bot />
+						<span>
+							<span className="cmd">/{entry.command}</span>
+							<span className="desc">{entry.description}</span>
+						</span>
+						{owners && <span className="owner">{entry.botName}</span>}
+					</li>
+				))}
+			</ul>
+			<div className="menu-foot">
+				<span>
+					<span className="kbd">↑</span> <span className="kbd">↓</span> {t.menu.select}
+				</span>
+				<span>
+					<span className="kbd">Tab</span> {t.menu.fill}
+				</span>
+				<span>
+					<span className="kbd">Enter</span> {t.menu.send}
+				</span>
+			</div>
+		</div>
+	);
+}
+
+/** Command menu and reply keyboard around the composer of a private chat with a bot. */
+export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, actionsRef }: BotLayerProps) {
+	const t = useBotsCopy();
+	const { source, toasts } = useServices();
+	const copy = useCopy();
+	const user = useUser(botId);
+	const info = useBotInfo(botId, chatId);
+	const active = useBotKeyboard(chatId, botId);
+	const name = user?.name ?? "";
+	const entries: MenuEntry[] = (info?.commands ?? []).map((command) => ({
+		...command,
+		key: command.command,
+		botId,
+		botName: name,
+		insert: `/${command.command}`,
+	}));
+	const menu = useCommandMenu(entries, text, setText, send, focus);
+
+	// Hidden on this device is kept in the local database (survives a reload).
+	const padShown = active !== null && !active.keyboard.hidden;
+	const setHidden = (seq: number, hidden: boolean) => {
+		source.setKeyboardHidden(chatId, seq, hidden).catch(() => toasts.show(copy.common.failed));
+	};
+
 	const toggleKeyboard = () => {
 		if (active !== null) setHidden(active.seq, padShown);
 	};
 	useLayoutEffect(() => {
-		actionsRef.current = { toggleMenu, toggleKeyboard, onKey };
+		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard, onKey: menu.onKey };
 		return () => {
 			actionsRef.current = null;
 		};
 	});
 
-	const menuState = commands.length > 0 ? open : null;
+	const menuState = entries.length > 0 ? menu.open : null;
 	const keyboardState = active === null ? null : padShown;
 	const placeholder = padShown && active.keyboard.placeholder !== "" ? active.keyboard.placeholder : null;
 	useLayoutEffect(() => {
@@ -362,42 +442,7 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 
 	return (
 		<>
-			{open && matches.length > 0 && (
-				<div className="cmd-menu">
-					<div className="menu-head">
-						<Icon name="command" small />
-						{t.menu.head}
-					</div>
-					<ul role="listbox" id={BOT_MENU_ID(chatId)} aria-label={t.menu.button}>
-						{matches.map((command, position) => (
-							<li
-								key={command.command}
-								role="option"
-								aria-selected={position === index}
-								onMouseDown={(event) => event.preventDefault()}
-								onClick={() => fill(command)}
-							>
-								<ChatAvatar id={botId} name={name} size="sm" bot />
-								<span>
-									<span className="cmd">/{command.command}</span>
-									<span className="desc">{command.description}</span>
-								</span>
-							</li>
-						))}
-					</ul>
-					<div className="menu-foot">
-						<span>
-							<span className="kbd">↑</span> <span className="kbd">↓</span> {t.menu.select}
-						</span>
-						<span>
-							<span className="kbd">Tab</span> {t.menu.fill}
-						</span>
-						<span>
-							<span className="kbd">Enter</span> {t.menu.send}
-						</span>
-					</div>
-				</div>
-			)}
+			<CommandMenu chatId={chatId} menu={menu} head={t.menu.head} owners={false} />
 			{padShown && (
 				<div className="reply-kb" role="group" aria-label={t.keyboard.label(name)}>
 					{active.keyboard.rows.map((row, rowIndex) => (
@@ -421,3 +466,57 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 		</>
 	);
 }
+
+/** The commands of a group's bots, "/cmd@username" when the group has more than one bot. */
+export function groupEntries(menus: ChatMenus): MenuEntry[] {
+	const tagged = menus.botCount > 1;
+	return menus.bots.flatMap((bot) =>
+		bot.commands.map((command) => ({
+			...command,
+			key: `${bot.botId}:${command.command}`,
+			botId: bot.botId,
+			botName: bot.name,
+			insert: tagged ? `/${command.command}@${bot.username}` : `/${command.command}`,
+		})),
+	);
+}
+
+export type GroupBotLayerProps = Omit<BotLayerProps, "botId">;
+
+/** The command menu of a group's bots above its composer; nothing when no bot has commands there. */
+export function GroupBotLayer({ chatId, text, setText, send, focus, onBar, actionsRef }: GroupBotLayerProps) {
+	const t = useBotsCopy();
+	const { bots } = useServices();
+	const [loaded, setLoaded] = useState<{ chatId: number; entries: MenuEntry[] } | null>(null);
+	useEffect(() => {
+		let active = true;
+		// Asked each time the group opens: bots join, leave and change their menus.
+		bots.chatMenus(chatId).then(
+			(menus) => {
+				if (active) setLoaded({ chatId, entries: groupEntries(menus) });
+			},
+			() => {
+				// No menu then; the composer works as without bots.
+			},
+		);
+		return () => {
+			active = false;
+		};
+	}, [bots, chatId]);
+	const entries = loaded !== null && loaded.chatId === chatId ? loaded.entries : NO_ENTRIES;
+	const menu = useCommandMenu(entries, text, setText, send, focus);
+	useLayoutEffect(() => {
+		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard: () => {}, onKey: menu.onKey };
+		return () => {
+			actionsRef.current = null;
+		};
+	});
+	const menuState = entries.length > 0 ? menu.open : null;
+	useLayoutEffect(() => {
+		onBar({ menu: menuState, keyboard: null, placeholder: null });
+	}, [onBar, menuState]);
+	useLayoutEffect(() => () => onBar({ menu: null, keyboard: null, placeholder: null }), [onBar]);
+	return <CommandMenu chatId={chatId} menu={menu} head={t.menu.groupHead} owners />;
+}
+
+const NO_ENTRIES: MenuEntry[] = [];

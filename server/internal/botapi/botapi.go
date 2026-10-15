@@ -37,6 +37,7 @@ import (
 	"app.local/server/internal/botapi/wire"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"connectrpc.com/connect"
 )
@@ -91,6 +92,12 @@ type Config struct {
 	AppScheme string
 }
 
+// Typer relays a bot's chat action to the users viewing the chat (the
+// realtime gateway's typing frames).
+type Typer interface {
+	BotTyping(botID, chatID, topicID int64, action appv1.TypingAction)
+}
+
 // Service is the Bot API handler.
 type Service struct {
 	cfg     Config
@@ -101,6 +108,11 @@ type Service struct {
 	limiter ratelimit.Limiter
 	logger  *slog.Logger
 	mux     *http.ServeMux
+	// media stores uploaded files and signs download URLs; nil when the
+	// server has no media storage. typer relays chat actions; nil drops
+	// them. Both are set before serving (UseMedia, UseTyper).
+	media *media.Service
+	typer Typer
 
 	blockMu sync.Mutex
 	blocked map[string]time.Time
@@ -121,10 +133,28 @@ func New(cfg Config, chatSvc *chat.Service, admin *botadmin.Service, updates *bo
 	}
 	s.mux.Handle("/bot/v1/me", s.method(http.MethodGet, s.getMe))
 	s.mux.Handle("/bot/v1/messages", s.method(http.MethodPost, s.sendMessage))
+	s.mux.Handle("/bot/v1/messages:edit", s.method(http.MethodPost, s.editMessage))
+	s.mux.Handle("/bot/v1/messages:editMarkup", s.method(http.MethodPost, s.editMarkup))
+	s.mux.Handle("/bot/v1/messages:delete", s.method(http.MethodPost, s.deleteMessages))
+	s.mux.Handle("/bot/v1/messages:forward", s.method(http.MethodPost, s.forwardMessages))
+	s.mux.Handle("/bot/v1/messages:copy", s.method(http.MethodPost, s.copyMessage))
+	s.mux.Handle("/bot/v1/messages:react", s.method(http.MethodPost, s.react))
+	s.mux.Handle("/bot/v1/messages:pin", s.method(http.MethodPost, s.pin))
+	s.mux.Handle("/bot/v1/messages:unpin", s.method(http.MethodPost, s.unpin))
+	s.mux.Handle("/bot/v1/messages:sendMedia", s.method(http.MethodPost, s.sendMedia))
+	s.mux.Handle("/bot/v1/messages:sendAlbum", s.method(http.MethodPost, s.sendAlbum))
+	s.mux.Handle("/bot/v1/files/{file_id}", s.method(http.MethodGet, s.getFile))
 	s.mux.Handle("/bot/v1/updates", s.method(http.MethodGet, s.getUpdates))
 	s.mux.Handle("/bot/v1/callbacks/{action}", s.method(http.MethodPost, s.answerCallback))
 	s.mux.Handle("/bot/v1/commands", s.method(http.MethodPut, s.setCommands))
-	s.mux.Handle("/bot/v1/chats/{chat_id}", s.method(http.MethodGet, s.getChat))
+	s.mux.Handle("/bot/v1/chats/{chat_id}", s.methods(map[string]call{
+		http.MethodGet: s.getChat, http.MethodPatch: s.editChat, http.MethodPost: s.leaveChat,
+	}))
+	s.mux.Handle("/bot/v1/chats/{chat_id}/admins", s.method(http.MethodGet, s.getAdmins))
+	s.mux.Handle("/bot/v1/chats/{chat_id}/members/{member}", s.methods(map[string]call{
+		http.MethodGet: s.getMember, http.MethodPost: s.memberAction,
+	}))
+	s.mux.Handle("/bot/v1/chats/{chat_id}/actions", s.method(http.MethodPost, s.chatAction))
 	s.mux.Handle("/bot/v1/webhook", s.methods(map[string]call{
 		http.MethodGet: s.getWebhook, http.MethodPut: s.setWebhook, http.MethodDelete: s.deleteWebhook,
 	}))
@@ -133,6 +163,14 @@ func New(cfg Config, chatSvc *chat.Service, admin *botadmin.Service, updates *bo
 	})
 	return s, nil
 }
+
+// UseMedia connects the media service (file sends and downloads); call it
+// before serving.
+func (s *Service) UseMedia(m *media.Service) { s.media = m }
+
+// UseTyper connects the realtime gateway for chat actions; call it before
+// serving.
+func (s *Service) UseTyper(t Typer) { s.typer = t }
 
 // ServeHTTP implements http.Handler.
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +351,7 @@ func (s *Service) methods(fns map[string]call) http.Handler {
 			writeError(w, errRateLimited(rules.calls))
 			return
 		}
-		result, err := fn(ctx, r, bot)
+		result, err := fn(chat.AsBot(ctx, bot.ID), r, bot)
 		if err != nil {
 			writeError(w, s.fromCore(ctx, bot.ID, err))
 			return
@@ -451,42 +489,22 @@ func (s *Service) sendMessage(ctx context.Context, r *http.Request, bot *botadmi
 // send checks and sends a message of the bot (the sendMessage method, and
 // the same method in a webhook answer).
 func (s *Service) send(ctx context.Context, bot *botadmin.Bot, req sendMessageRequest) (*appv1.Message, error) {
-	switch {
-	case req.ChatID <= 0 || req.ChatID >= maxSafeInt:
-		return nil, errBadRequest("chat_id is required")
-	case req.RandomID < 0 || req.RandomID >= maxSafeInt:
-		return nil, errBadRequest("random_id must be between 0 and 2^53-1")
-	case req.ParseMode != "" && len(req.Entities) > 0:
-		return nil, errBadRequest("send either entities or parse_mode")
+	if err := checkID("chat_id", req.ChatID); err != nil {
+		return nil, err
 	}
-	text := req.Text
-	var ents []*appv1.MessageEntity
-	var err error
-	switch req.ParseMode {
-	case "":
-		if ents, err = wire.ToEntities(req.Entities); err != nil {
-			return nil, errBadRequest("%v", err)
-		}
-	case "markdown":
-		text, ents, err = format.Markdown(req.Text, format.Options{AppScheme: s.cfg.AppScheme})
-	case "html":
-		text, ents, err = format.HTML(req.Text, format.Options{AppScheme: s.cfg.AppScheme})
-	default:
-		return nil, errBadRequest(`parse_mode must be "markdown" or "html"`)
+	if err := checkRandomID(req.RandomID); err != nil {
+		return nil, err
 	}
+	text, ents, err := s.parseText(req.Text, req.Entities, req.ParseMode)
 	if err != nil {
-		return nil, errBadRequest("cannot parse %s: %v", req.ParseMode, err)
+		return nil, err
 	}
 	markup, err := wire.ToMarkup(req.ReplyMarkup)
 	if err != nil {
 		return nil, errBadRequest("%v", err)
 	}
-	rules := tiers[bot.Tier()]
-	if !s.limiter.Allow(rules.send, fmt.Sprintf("botsend:%d", bot.ID)) {
-		return nil, errRateLimited(rules.send)
-	}
-	if !s.limiter.Allow(rules.perChat, fmt.Sprintf("botchat:%d:%d", bot.ID, req.ChatID)) {
-		return nil, errRateLimited(rules.perChat)
+	if err := s.allowSend(bot, req.ChatID); err != nil {
+		return nil, err
 	}
 	sent, err := s.chat.SendBotMessage(ctx, bot.ID, chat.BotMessage{
 		ChatID: req.ChatID, TopicID: req.TopicID, Text: text, Entities: ents, ReplyTo: req.ReplyToSeq, Markup: markup,
@@ -496,6 +514,61 @@ func (s *Service) send(ctx context.Context, bot *botadmin.Bot, req sendMessageRe
 		return nil, err
 	}
 	return sent.GetMessage(), nil
+}
+
+// checkID checks a required id field.
+func checkID(name string, id int64) error {
+	if id <= 0 || id >= maxSafeInt {
+		return errBadRequest("%s is required (an integer from 1 to 2^53-1)", name)
+	}
+	return nil
+}
+
+func checkRandomID(id int64) error {
+	if id < 0 || id >= maxSafeInt {
+		return errBadRequest("random_id must be between 0 and 2^53-1")
+	}
+	return nil
+}
+
+// parseText turns text with entities or parse_mode (never both) into plain
+// text and entities; the core checks the result like every message.
+func (s *Service) parseText(text string, list []wire.Entity, parseMode string) (string, []*appv1.MessageEntity, error) {
+	if parseMode != "" && len(list) > 0 {
+		return "", nil, errBadRequest("send either entities or parse_mode")
+	}
+	var ents []*appv1.MessageEntity
+	var err error
+	switch parseMode {
+	case "":
+		if ents, err = wire.ToEntities(list); err != nil {
+			return "", nil, errBadRequest("%v", err)
+		}
+		return text, ents, nil
+	case "markdown":
+		text, ents, err = format.Markdown(text, format.Options{AppScheme: s.cfg.AppScheme})
+	case "html":
+		text, ents, err = format.HTML(text, format.Options{AppScheme: s.cfg.AppScheme})
+	default:
+		return "", nil, errBadRequest(`parse_mode must be "markdown" or "html"`)
+	}
+	if err != nil {
+		return "", nil, errBadRequest("cannot parse %s: %v", parseMode, err)
+	}
+	return text, ents, nil
+}
+
+// allowSend applies the bot's send limits: every send and sends into one
+// chat (posts, edits, forwards, copies, media and pins).
+func (s *Service) allowSend(bot *botadmin.Bot, chatID int64) error {
+	rules := tiers[bot.Tier()]
+	if !s.limiter.Allow(rules.send, fmt.Sprintf("botsend:%d", bot.ID)) {
+		return errRateLimited(rules.send)
+	}
+	if !s.limiter.Allow(rules.perChat, fmt.Sprintf("botchat:%d:%d", bot.ID, chatID)) {
+		return errRateLimited(rules.perChat)
+	}
+	return nil
 }
 
 // messageResult renders a message of a chat the bot is in.
@@ -521,6 +594,17 @@ func (s *Service) getUpdates(ctx context.Context, r *http.Request, bot *botadmin
 	timeout, err := intParam(q, "timeout", 0, 0, int64(botupdates.LongPollMax.Seconds()))
 	if err != nil {
 		return nil, err
+	}
+	if raw, ok := q["allowed_updates"]; ok {
+		var kinds []string
+		for _, k := range strings.Split(strings.Join(raw, ","), ",") {
+			if k = strings.TrimSpace(k); k != "" {
+				kinds = append(kinds, k)
+			}
+		}
+		if err := s.updates.SetPollAllowedUpdates(ctx, bot.ID, kinds); err != nil {
+			return nil, webhookError(err)
+		}
 	}
 	// The owner's chat with the bot and the Console tell whether a program runs the bot.
 	if err := s.admin.RecordUpdateFetch(ctx, bot.ID); err != nil {
@@ -605,18 +689,18 @@ func (s *Service) setCommands(ctx context.Context, r *http.Request, bot *botadmi
 }
 
 func (s *Service) getChat(ctx context.Context, r *http.Request, bot *botadmin.Bot) (any, error) {
-	chatID, err := strconv.ParseInt(r.PathValue("chat_id"), 10, 64)
-	if err != nil || chatID <= 0 || chatID >= maxSafeInt {
-		return nil, errBadRequest("chat_id must be a positive integer")
+	id, err := chatID(r)
+	if err != nil {
+		return nil, err
 	}
-	members, err := s.chat.MembersAmong(ctx, chatID, []int64{bot.ID})
+	members, err := s.chat.MembersAmong(ctx, id, []int64{bot.ID})
 	if err != nil {
 		return nil, err
 	}
 	if len(members) == 0 {
 		return nil, errNotFound("chat not found or the bot is not a member")
 	}
-	c, users, err := s.chat.GetChat(ctx, bot.ID, chatID)
+	c, users, err := s.chat.GetChat(ctx, bot.ID, id)
 	if err != nil {
 		return nil, err
 	}

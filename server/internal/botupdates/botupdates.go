@@ -319,9 +319,10 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 	}
 	slices.Sort(bots)
 	bots = slices.Compact(bots)
-	// allowed_updates applies while a webhook is set (empty: every kind).
+	// allowed_updates of the webhook or of the last getUpdates that set it
+	// (empty: every kind but the opt-in ones).
 	rows, err := tx.Query(ctx, `
-		SELECT user_id, next_update_id, CASE WHEN webhook_url IS NULL THEN '{}' ELSE allowed_updates END
+		SELECT user_id, next_update_id, allowed_updates
 		FROM bots WHERE user_id = ANY($1) AND deleted_at IS NULL ORDER BY user_id FOR UPDATE`, bots)
 	if err != nil {
 		return nil, fmt.Errorf("botupdates: lock bots: %w", err)
@@ -344,7 +345,7 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 	received := map[int64]int64{}
 	for _, u := range updates {
 		id, ok := next[u.BotID]
-		if !ok || (len(allowed[u.BotID]) > 0 && !slices.Contains(allowed[u.BotID], u.Kind)) {
+		if !ok || !Wants(allowed[u.BotID], u.Kind) {
 			continue
 		}
 		payload, err := payloadOf(u)
@@ -360,7 +361,7 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 			INSERT INTO bot_updates (bot_id, update_id, outbox_id, kind, seq, chat_id, payload, expires_at, queue_key)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			ON CONFLICT ON CONSTRAINT bot_updates_outbox_key DO NOTHING`,
-			u.BotID, id, u.OutboxID, u.Kind, u.Message.GetSeq(), u.Chat.GetId(), payload, u.At.Add(ttl), queueKey(u))
+			u.BotID, id, u.OutboxID, u.Kind, u.Seq(), u.Chat.GetId(), payload, u.At.Add(ttl), queueKey(u))
 		if err != nil {
 			return nil, fmt.Errorf("botupdates: store update: %w", err)
 		}
@@ -403,7 +404,8 @@ func queueKey(u chat.BotUpdate) int64 {
 
 // dropRemoved acknowledges, without delivering, the pending updates of
 // chats bots were removed from (kicked or left) that were cut before the
-// removal; dead letters of those chats go too.
+// removal; dead letters of those chats go too. The member_changed that
+// tells the bot it left or was removed stays.
 func (s *Service) dropRemoved(ctx context.Context, tx pgx.Tx, rows []chat.OutboxRow) error {
 	removals, err := s.chat.BotRemovals(ctx, rows)
 	if err != nil {
@@ -411,8 +413,10 @@ func (s *Service) dropRemoved(ctx context.Context, tx pgx.Tx, rows []chat.Outbox
 	}
 	for _, r := range removals {
 		if _, err := tx.Exec(ctx, `
-			UPDATE bot_updates SET acked = true WHERE bot_id = $1 AND chat_id = $2 AND outbox_id < $3 AND NOT acked`,
-			r.BotID, r.ChatID, r.OutboxID); err != nil {
+			UPDATE bot_updates SET acked = true
+			WHERE bot_id = $1 AND chat_id = $2 AND outbox_id < $3 AND NOT acked
+				AND NOT (kind = $4 AND payload->'member'->>'status' IN ('left', 'banned'))`,
+			r.BotID, r.ChatID, r.OutboxID, chat.BotUpdateMemberChanged); err != nil {
 			return fmt.Errorf("botupdates: drop updates of a left chat: %w", err)
 		}
 	}
@@ -460,14 +464,27 @@ func (s *Service) updatesOf(ctx context.Context, rows []chat.OutboxRow) ([]chat.
 // payloadOf serializes the update body (without update_id) for the bot.
 func payloadOf(u chat.BotUpdate) ([]byte, error) {
 	users := wire.IndexUsers(u.Users)
-	msg := wire.FromMessage(u.Message, wire.FromChat(u.Chat, users), users)
-	var v any = msg
-	if u.Kind == chat.BotUpdateCallback {
-		from := wire.User{ID: u.Callback.FromID}
-		if p, ok := users[u.Callback.FromID]; ok {
-			from = wire.FromUser(p)
+	c := wire.FromChat(u.Chat, users)
+	var v any
+	switch {
+	case u.Kind == chat.BotUpdateMemberChanged && u.Member != nil:
+		mc := wire.MemberChanged{Chat: c, Date: u.At.Unix(), Member: wire.ChatMember{
+			User: users.UserOf(u.BotID), Status: u.Member.Status, Permissions: u.Member.Permissions,
+		}}
+		if u.Member.ActorID != 0 {
+			from := users.UserOf(u.Member.ActorID)
+			mc.From = &from
 		}
-		v = wire.Callback{ID: u.Callback.ID, From: from, Message: msg, Data: string(u.Callback.Data)}
+		v = mc
+	case u.Kind == chat.BotUpdateReaction && u.Reaction != nil:
+		v = wire.Reaction{Chat: c, Seq: u.Reaction.Seq, User: users.UserOf(u.Reaction.UserID), Emoji: u.Reaction.Emoji, Date: u.At.Unix()}
+	case u.Message == nil:
+		return nil, fmt.Errorf("botupdates: %s update without its content", u.Kind)
+	case u.Kind == chat.BotUpdateCallback:
+		v = wire.Callback{ID: u.Callback.ID, From: users.UserOf(u.Callback.FromID), Message: wire.FromMessage(u.Message, c, users),
+			Data: string(u.Callback.Data)}
+	default:
+		v = wire.FromMessage(u.Message, c, users)
 	}
 	b, err := json.Marshal(v)
 	if err != nil {

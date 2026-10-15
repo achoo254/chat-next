@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Chat Bot API
-  version: 1.0.0
+  version: 1.1.0
   summary: HTTP API for bots of the chat platform (release R5).
   description: |
     Bots talk to the chat server of their tenant over HTTPS with JSON.
@@ -41,7 +41,13 @@ info:
       request; retry after `retry_after` seconds when given, else after a
       short pause.
     - Request bodies are `application/json`, at most 1 MiB; unknown fields
-      are rejected.
+      are rejected. The file sends (`POST /messages:sendMedia`,
+      `POST /messages:sendAlbum`) also take `multipart/form-data` up to
+      50 MiB.
+    - Bots act like a person with the same rights: what a member, an admin
+      or the author may do in the app, the bot may do through the API, and
+      nothing more. The bot's tier replaces the per-person rate limits;
+      posts, edits, forwards, copies, media and pins count as sends.
     - Updates arrive either by long poll (`GET /updates`) or at a webhook
       (`PUT /webhook`, see the `update` webhook below), never both: while a
       webhook is set, `GET /updates` answers `409 conflict`.
@@ -67,7 +73,9 @@ tags:
   - name: updates
     description: Receiving updates and answering callbacks.
   - name: chats
-    description: Chats the bot is in.
+    description: Chats the bot is in, and their administration.
+  - name: files
+    description: Files of messages the bot can see.
 paths:
   /me:
     get:
@@ -122,6 +130,291 @@ paths:
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:edit:
+    post:
+      tags: [messages]
+      operationId: editMessage
+      summary: Edits the text of one of the bot's messages.
+      description: |
+        Replaces the text (the caption of a media message) and its entities;
+        the message gets `edit_date` and users see "đã sửa". A
+        `reply_markup` with an `inline_keyboard` replaces the keyboard; none
+        keeps it (`messages:editMarkup` removes it). Bots edit their own
+        messages at any age while they may still send in the chat; reply
+        keyboards cannot be edited. Counts as a send.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditMessageRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/MessageResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:editMarkup:
+    post:
+      tags: [messages]
+      operationId: editMessageMarkup
+      summary: Replaces or removes the inline keyboard of one of the bot's messages.
+      description: |
+        Without `reply_markup` the keyboard is removed. Changing only the
+        keyboard is not an edit for users (no "đã sửa", no
+        `message_edited`). Counts as a send.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditMarkupRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/MessageResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:delete:
+    post:
+      tags: [messages]
+      operationId: deleteMessages
+      summary: Deletes messages for everyone.
+      description: |
+        The bot's own messages at any time; others' where the bot is an
+        admin of the group or channel, and in a private chat (either side
+        may). Messages the bot may not delete stay as they are; when none of
+        them may be deleted the answer is `403 forbidden`. Unknown or already
+        deleted seqs are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeleteMessagesRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:forward:
+    post:
+      tags: [messages]
+      operationId: forwardMessages
+      summary: Forwards messages with a forward header.
+      description: |
+        Forwards messages of a chat the bot is in (and can see) into
+        `chat_id`, in the order given; the rules of sending apply to the
+        target (consent in private chats). `random_ids` (one per seq) make a
+        retry return the first messages.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ForwardMessagesRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/MessagesResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:copy:
+    post:
+      tags: [messages]
+      operationId: copyMessage
+      summary: Posts a copy of a message without a forward header.
+      description: |
+        Copies a message of a chat the bot is in (text or media, with its
+        caption); `text` (with `entities` or `parse_mode`) replaces the text
+        or caption.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CopyMessageRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/MessageResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:react:
+    post:
+      tags: [messages]
+      operationId: setReaction
+      summary: Sets or removes the bot's reaction on a message.
+      description: One emoji per bot and message; an empty `emoji` removes the bot's reaction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReactRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:pin:
+    post:
+      tags: [messages]
+      operationId: pinMessage
+      summary: Pins a message.
+      description: |
+        Needs the permission to pin (admins; members where the group allows
+        it; both sides of a private chat). Posts the "pinned" service
+        message and counts as a send. Pinning a pinned message does nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MessageRef'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:unpin:
+    post:
+      tags: [messages]
+      operationId: unpinMessage
+      summary: Unpins a message.
+      description: Needs the permission to pin. Unpinning a message that is not pinned does nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MessageRef'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:sendMedia:
+    post:
+      tags: [messages, files]
+      operationId: sendMedia
+      summary: Sends a photo, video, audio, voice message or document.
+      description: |
+        Either upload the file (`multipart/form-data`: the file in the part
+        `file`, `kind` and the other fields as form fields, `entities` as a
+        JSON string) or send a file the bot can see again by `file_id` (JSON
+        body). Uploads are checked like the app's: the content must match
+        `kind` (photos: JPEG, PNG, GIF or WebP up to 20 MiB), metadata
+        (EXIF/GPS) is stripped, photos get thumbnails, and the bot's storage
+        quota applies; a file is at most 50 MiB. The same bytes uploaded
+        again reuse the stored file. The server never downloads a URL for a
+        bot. The text is the caption (up to 1024 characters).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SendMediaRequest'}
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/SendMediaUpload'}
+      responses:
+        '200': {$ref: '#/components/responses/MessageResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:sendAlbum:
+    post:
+      tags: [messages, files]
+      operationId: sendAlbum
+      summary: Sends 2 to 10 files as one album.
+      description: |
+        Photos and videos mixed, or only documents, or only audio files.
+        Each item names a `file_id` or, in a `multipart/form-data` request,
+        the part holding its file (`attach`; `items` is then a JSON string
+        form field). The messages share `grouped_id`. Upload rules as in
+        `messages:sendMedia`; the whole request is at most 50 MiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SendAlbumRequest'}
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/SendAlbumUpload'}
+      responses:
+        '200': {$ref: '#/components/responses/MessagesResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /files/{file_id}:
+    get:
+      tags: [files]
+      operationId: getFile
+      summary: A file the bot can see, with a download URL.
+      description: |
+        The file of a message the bot can see (its own, or in a chat it is
+        in, within the history it may see). `url` downloads it with a plain
+        GET (Range supported) until `url_expires`, about an hour; it is
+        bound to the bot and to that message, so deleting the message for
+        everyone or the bot leaving the chat ends it. Ask again for a fresh
+        URL.
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: {type: string, pattern: '^[A-Za-z0-9_-]{22}$'}
+      responses:
+        '200':
+          description: The file.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/File'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /updates:
     get:
       tags: [updates]
@@ -152,6 +445,15 @@ paths:
           in: query
           description: Seconds to wait for the first update; 0 answers at once.
           schema: {type: integer, minimum: 0, maximum: 50, default: 0}
+        - name: allowed_updates
+          in: query
+          description: |
+            Comma-separated update kinds to receive from now on (stored, like
+            the webhook's `allowed_updates`; empty means every kind but the
+            opt-in `reaction`). Absent keeps the current setting. It does not
+            filter updates already queued.
+          schema: {type: string}
+          example: message,callback,reaction
       responses:
         '200':
           description: Pending updates (possibly none).
@@ -306,6 +608,238 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
+    patch:
+      tags: [chats]
+      operationId: editChat
+      summary: Changes the title and/or description of a group or channel.
+      description: |
+        Needs the permission to change the info (admins; members where the
+        group allows it). A new title posts the "title changed" service
+        message.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditChatRequest'}
+      responses:
+        '200':
+          description: The chat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/Chat'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}:leave:
+    post:
+      tags: [chats]
+      operationId: leaveChat
+      summary: The bot leaves a group or channel.
+      description: |
+        Its pending updates of the chat are dropped; a `member_changed`
+        with status `left` follows. A bot that owns the chat hands it to the
+        longest-serving admin and cannot leave without one.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}/admins:
+    get:
+      tags: [chats]
+      operationId: getChatAdmins
+      summary: The owner and admins of a group or channel.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      responses:
+        '200':
+          description: Owner first, then admins by when they joined.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result:
+                    type: array
+                    items: {$ref: '#/components/schemas/ChatMember'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}/members/{user_id}:
+    get:
+      tags: [chats]
+      operationId: getChatMember
+      summary: One member of a group or channel.
+      description: A current member, one who left or one who is banned; someone who never joined is `404`. In channels only admins see members.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+        - name: user_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      responses:
+        '200':
+          description: The member.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/ChatMember'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}/members/{user_id}:ban:
+    post:
+      tags: [chats]
+      operationId: banChatMember
+      summary: Removes a member and bans them (admins).
+      description: |
+        The user cannot come back (also not by invite link; the links they
+        made stop working) until unbanned. Admins can be removed by the
+        owner only.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+        - name: user_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}/members/{user_id}:unban:
+    post:
+      tags: [chats]
+      operationId: unbanChatMember
+      summary: Lifts a ban (admins); the user is not added back.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+        - name: user_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}/members/{user_id}:restrict:
+    post:
+      tags: [chats]
+      operationId: restrictChatMember
+      summary: Sets what a member may do (admins).
+      description: |
+        `permissions` is a bitmask; the member's rights are these bits
+        within the group's defaults. Admins have every right (demote them
+        first in the app).
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+        - name: user_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RestrictRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}/actions:
+    post:
+      tags: [chats]
+      operationId: sendChatAction
+      summary: Shows "đang gõ…" (or sending a photo, …) for the bot.
+      description: |
+        Users who have the chat open see the action for about 5 seconds or
+        until the bot's next message; repeat it while working. The bot must
+        be allowed to post there (consent in private chats). More than one
+        action a second into one chat is merged. Note: the web app does not
+        show actions yet; the API accepts them so bots need no change later.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatActionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
 webhooks:
   update:
     post:
@@ -383,6 +917,28 @@ components:
             properties:
               ok: {const: true}
               result: {const: true}
+    MessageResult:
+      description: The message.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok, result]
+            properties:
+              ok: {const: true}
+              result: {$ref: '#/components/schemas/Message'}
+    MessagesResult:
+      description: The messages, in seq order.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok, result]
+            properties:
+              ok: {const: true}
+              result:
+                type: array
+                items: {$ref: '#/components/schemas/Message'}
     BadRequest:
       description: The request is invalid (`bad_request`).
       content:
@@ -414,12 +970,12 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorEnvelope'}
     PayloadTooLarge:
-      description: The body is larger than 1 MiB (`payload_too_large`).
+      description: The body is larger than 1 MiB, or a multipart body than 50 MiB (`payload_too_large`).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorEnvelope'}
     UnsupportedMediaType:
-      description: The body is not `application/json` (`unsupported_media_type`).
+      description: The body is not `application/json` (nor `multipart/form-data` where allowed) (`unsupported_media_type`).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorEnvelope'}
@@ -609,11 +1165,14 @@ components:
     Media:
       type: object
       required: [kind]
-      description: The file of a media message; file methods come in a later version.
+      description: The file of a media message.
       properties:
         kind:
           type: string
           examples: [photo, video, audio, voice, document]
+        file_id:
+          type: string
+          description: Read it with `GET /files/{file_id}` or send it again (`messages:sendMedia`).
         mime_type: {type: string}
         size: {type: integer}
         file_name: {type: string}
@@ -678,6 +1237,9 @@ components:
         random_id:
           type: integer
           description: Echoed to the sender only.
+        grouped_id:
+          type: integer
+          description: Shared by the messages of one album.
     Callback:
       type: object
       required: [id, from, message, data]
@@ -704,8 +1266,13 @@ components:
         channels where the bot is an admin), `message_edited` (the author
         edited the message or post; server-side changes such as an attached
         link preview are not edits) and `callback` (a press of the bot's
-        button on a message that still exists). When the bot leaves or is
-        removed from a chat, its pending updates of that chat are dropped.
+        button on a message that still exists). Version 1.1 adds
+        `member_changed` (the bot's own membership: added, also when a group
+        is created with it, removed, left, promoted, demoted or restricted)
+        and `reaction` (a person set, changed or removed a reaction on one of
+        the bot's messages; opt-in: only when `allowed_updates` lists it).
+        When the bot leaves or is removed from a chat, its pending updates
+        of that chat are dropped, except the `member_changed` telling it so.
         Later versions add kinds; ignore unknown ones.
       properties:
         update_id:
@@ -716,11 +1283,292 @@ components:
         channel_post: {$ref: '#/components/schemas/Message'}
         message_edited: {$ref: '#/components/schemas/Message'}
         callback: {$ref: '#/components/schemas/Callback'}
+        member_changed: {$ref: '#/components/schemas/MemberChanged'}
+        reaction: {$ref: '#/components/schemas/Reaction'}
       minProperties: 2
       maxProperties: 2
     UpdateKind:
       type: string
-      enum: [message, message_edited, channel_post, callback]
+      enum: [message, message_edited, channel_post, callback, member_changed, reaction]
+    ChatMember:
+      type: object
+      required: [user, status, permissions]
+      properties:
+        user: {$ref: '#/components/schemas/User'}
+        status:
+          type: string
+          description: New statuses may be added.
+          examples: [owner, admin, member, left, banned]
+        permissions:
+          type: integer
+          minimum: 0
+          description: |
+            Effective rights as a bitmask: 1 send messages, 2 send media, 4
+            add members, 8 pin messages, 16 change the chat's info, 32 manage
+            topics. 0 for former members.
+    MemberChanged:
+      type: object
+      required: [chat, date, member]
+      properties:
+        chat: {$ref: '#/components/schemas/Chat'}
+        from:
+          $ref: '#/components/schemas/User'
+          description: Who made the change; absent when the moderators did.
+        date:
+          type: integer
+          description: Unix seconds.
+        member:
+          $ref: '#/components/schemas/ChatMember'
+          description: The bot itself, after the change.
+    Reaction:
+      type: object
+      required: [chat, seq, user, emoji, date]
+      properties:
+        chat: {$ref: '#/components/schemas/Chat'}
+        seq: {$ref: '#/components/schemas/Id'}
+        user: {$ref: '#/components/schemas/User'}
+        emoji:
+          type: string
+          description: |
+            The user's reaction when the update was made; empty when removed.
+            Quick changes may arrive as several updates with the latest state.
+        date:
+          type: integer
+          description: Unix seconds.
+    File:
+      type: object
+      required: [file_id, kind, size, url, url_expires]
+      properties:
+        file_id: {type: string}
+        kind:
+          type: string
+          examples: [photo, video, audio, voice, document]
+        mime_type: {type: string}
+        size: {type: integer, minimum: 0}
+        file_name: {type: string}
+        width: {type: integer}
+        height: {type: integer}
+        duration:
+          type: integer
+          description: Milliseconds.
+        url:
+          type: string
+          description: Plain GET download (Range supported), no token header needed.
+        url_expires:
+          type: integer
+          description: Unix seconds when url stops working.
+    MessageRef:
+      type: object
+      required: [chat_id, seq]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        seq: {$ref: '#/components/schemas/Id'}
+    EditMessageRequest:
+      type: object
+      required: [chat_id, seq, text]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        seq: {$ref: '#/components/schemas/Id'}
+        text:
+          type: string
+          description: The new text (caption of a media message; may be empty there).
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+        reply_markup:
+          $ref: '#/components/schemas/ReplyMarkup'
+          description: An inline_keyboard only; absent keeps the keyboard.
+        disable_link_preview: {type: boolean}
+    EditMarkupRequest:
+      type: object
+      required: [chat_id, seq]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        seq: {$ref: '#/components/schemas/Id'}
+        reply_markup:
+          $ref: '#/components/schemas/ReplyMarkup'
+          description: An inline_keyboard only; absent removes the keyboard.
+    DeleteMessagesRequest:
+      type: object
+      required: [chat_id, seqs]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        seqs:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Id'}
+    ForwardMessagesRequest:
+      type: object
+      required: [from_chat_id, seqs, chat_id]
+      additionalProperties: false
+      properties:
+        from_chat_id: {$ref: '#/components/schemas/Id'}
+        seqs:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Id'}
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id: {$ref: '#/components/schemas/Id'}
+        random_ids:
+          type: array
+          description: One dedupe key per seq.
+          items: {type: integer, minimum: 0, maximum: 9007199254740991}
+    CopyMessageRequest:
+      type: object
+      required: [from_chat_id, seq, chat_id]
+      additionalProperties: false
+      properties:
+        from_chat_id: {$ref: '#/components/schemas/Id'}
+        seq: {$ref: '#/components/schemas/Id'}
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id: {$ref: '#/components/schemas/Id'}
+        text:
+          type: string
+          description: Replaces the text or caption; absent keeps it.
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        random_id: {type: integer, minimum: 0, maximum: 9007199254740991}
+    ReactRequest:
+      type: object
+      required: [chat_id, seq, emoji]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        seq: {$ref: '#/components/schemas/Id'}
+        emoji:
+          type: string
+          maxLength: 32
+          description: One emoji; empty removes the bot's reaction.
+    MediaKind:
+      type: string
+      enum: [photo, video, audio, voice, document]
+    SendMediaRequest:
+      type: object
+      required: [chat_id, file_id]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id: {$ref: '#/components/schemas/Id'}
+        file_id:
+          type: string
+          description: A file the bot can see (Media.file_id); it keeps its kind.
+        text:
+          type: string
+          description: Caption.
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        random_id: {type: integer, minimum: 0, maximum: 9007199254740991}
+    SendMediaUpload:
+      type: object
+      required: [chat_id, kind, file]
+      additionalProperties: false
+      description: Form fields; entities is a JSON string.
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id: {$ref: '#/components/schemas/Id'}
+        kind: {$ref: '#/components/schemas/MediaKind'}
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          description: The file; its part's filename becomes file_name.
+        text: {type: string}
+        entities: {type: string}
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        random_id: {type: integer, minimum: 0, maximum: 9007199254740991}
+    AlbumItem:
+      type: object
+      additionalProperties: false
+      description: Exactly one of file_id and attach.
+      properties:
+        file_id: {type: string}
+        attach:
+          type: string
+          description: Name of the multipart part holding the file.
+        kind:
+          $ref: '#/components/schemas/MediaKind'
+          description: Required with attach.
+        text: {type: string}
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+        random_id: {type: integer, minimum: 0, maximum: 9007199254740991}
+    SendAlbumRequest:
+      type: object
+      required: [chat_id, items]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id: {$ref: '#/components/schemas/Id'}
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        items:
+          type: array
+          minItems: 2
+          maxItems: 10
+          items: {$ref: '#/components/schemas/AlbumItem'}
+    SendAlbumUpload:
+      type: object
+      required: [chat_id, items]
+      description: Form fields (items is a JSON string of AlbumItem) plus one part per attached file.
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id: {$ref: '#/components/schemas/Id'}
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        items: {type: string}
+    EditChatRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: {type: string, minLength: 1, maxLength: 128}
+        about: {type: string, maxLength: 255}
+    RestrictRequest:
+      type: object
+      required: [permissions]
+      additionalProperties: false
+      properties:
+        permissions:
+          type: integer
+          minimum: 0
+          maximum: 63
+          description: Bitmask as in ChatMember.permissions.
+    ChatActionRequest:
+      type: object
+      required: [action]
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          enum: [typing, upload_photo, upload_video, upload_document, record_voice, cancel]
+        topic_id: {$ref: '#/components/schemas/Id'}
     SetWebhookRequest:
       type: object
       required: [url, secret]
@@ -741,9 +1589,10 @@ components:
           type: array
           items: {$ref: '#/components/schemas/UpdateKind'}
           description: |
-            Kinds to receive; empty or absent means every kind. Applies to
-            updates created from now on, not to queued ones, and only while
-            the webhook is set.
+            Kinds to receive; empty or absent means every kind except the
+            opt-in `reaction`. Applies to updates created from now on, not
+            to queued ones. Removing the webhook resets it (a polling bot
+            sets it with `GET /updates?allowed_updates=`).
         max_connections:
           type: integer
           minimum: 1

@@ -138,6 +138,18 @@ button { cursor: pointer; }
 .banner .grow { flex: 1; min-width: 12ch; }
 .banner.error { background: color-mix(in srgb, var(--c-error) 10%, var(--c-surface)); color: var(--c-error-text); }
 .banner.ok { background: color-mix(in srgb, var(--c-success) 10%, var(--c-surface)); color: var(--c-success-text); }
+/* A newer build is on the server (mockups/chat.html#connection-states): one floating line,
+   above the composer when a chat is open. Reloading is the user's call. */
+.update-bar {
+	position: fixed; left: 50%; bottom: var(--space-5); transform: translateX(-50%); z-index: 30;
+	display: flex; align-items: center; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-4));
+	padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4); border-radius: var(--radius-sm);
+	background: var(--c-text); color: var(--c-surface); box-shadow: var(--shadow-md); font-size: 0.875rem; white-space: nowrap;
+}
+.update-bar button { min-height: 36px; padding: 0 var(--space-3); border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.update-bar button:hover { background: color-mix(in srgb, var(--c-surface) 16%, transparent); }
+.update-bar .sep { opacity: 0.6; }
+:root:has(.composer) .update-bar { bottom: calc(44px + 2 * var(--space-3) + 1.5rem + var(--space-5)); }
 .status { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
 .status.ok { color: var(--c-success-text); }
 .status.bad { color: var(--c-error); }
