@@ -156,6 +156,18 @@ func (s *socket) next(t *testing.T) *appv1.ServerFrame {
 	return nil
 }
 
+// reply returns the next frame that is not an update: the chats every
+// start creates (the assistant chat) may still be on their way when a test
+// waits for the answer to a request.
+func (s *socket) reply(t *testing.T) *appv1.ServerFrame {
+	t.Helper()
+	f := s.next(t)
+	for f.GetUpdate() != nil {
+		f = s.next(t)
+	}
+	return f
+}
+
 // updates collects the next n per-user updates (skipping presence, typing
 // and pong frames).
 func (s *socket) updates(t *testing.T, n int) []*appv1.Update {
@@ -404,16 +416,16 @@ func TestRealtimeHandshakeChecks(t *testing.T) {
 	group := rpcOK(t, bob.chats.CreateGroup, &appv1.CreateGroupRequest{Title: "private"})
 	ws := e.connect(t, carol)
 	ws.send(t, &appv1.ClientFrame{RequestId: 5, Frame: &appv1.ClientFrame_OpenChat{OpenChat: &appv1.OpenChatFrame{ChatId: group.GetChat().GetId()}}})
-	f := ws.next(t)
+	f := ws.reply(t)
 	if f.GetError().GetCode() != appv1.FrameErrorCode_FRAME_ERROR_CODE_FORBIDDEN || f.GetError().GetRequestId() != 5 {
 		t.Fatalf("open chat of a stranger = %v", f)
 	}
 	ws.send(t, &appv1.ClientFrame{RequestId: 6, Frame: &appv1.ClientFrame_Typing{Typing: &appv1.TypingFrame{ChatId: group.GetChat().GetId()}}})
-	if f := ws.next(t); f.GetError().GetCode() != appv1.FrameErrorCode_FRAME_ERROR_CODE_FORBIDDEN {
+	if f := ws.reply(t); f.GetError().GetCode() != appv1.FrameErrorCode_FRAME_ERROR_CODE_FORBIDDEN {
 		t.Fatalf("typing in a stranger's chat = %v", f)
 	}
 	ws.send(t, &appv1.ClientFrame{RequestId: 7, Frame: &appv1.ClientFrame_Ping{Ping: &appv1.PingFrame{}}})
-	if f := ws.next(t); f.GetPong().GetRequestId() != 7 {
+	if f := ws.reply(t); f.GetPong().GetRequestId() != 7 {
 		t.Fatalf("pong = %v", f)
 	}
 }
@@ -432,26 +444,26 @@ func TestRealtimeTypingAndPresence(t *testing.T) {
 	}
 	open(aliceWS)
 	// Bob is offline: alice hears his presence when she opens the chat.
-	if p := aliceWS.next(t).GetPresence(); p.GetUserId() != bob.userID || p.GetStatus().GetKind() == appv1.UserStatusKind_USER_STATUS_KIND_ONLINE {
+	if p := aliceWS.reply(t).GetPresence(); p.GetUserId() != bob.userID || p.GetStatus().GetKind() == appv1.UserStatusKind_USER_STATUS_KIND_ONLINE {
 		t.Fatalf("presence of offline bob = %v", p)
 	}
 	bobWS := e.connect(t, bob)
-	if p := aliceWS.next(t).GetPresence(); p.GetUserId() != bob.userID || p.GetStatus().GetKind() != appv1.UserStatusKind_USER_STATUS_KIND_ONLINE {
+	if p := aliceWS.reply(t).GetPresence(); p.GetUserId() != bob.userID || p.GetStatus().GetKind() != appv1.UserStatusKind_USER_STATUS_KIND_ONLINE {
 		t.Fatalf("presence after bob connected = %v", p)
 	}
 	open(bobWS)
-	if p := bobWS.next(t).GetPresence(); p.GetUserId() != alice.userID {
+	if p := bobWS.reply(t).GetPresence(); p.GetUserId() != alice.userID {
 		t.Fatalf("bob's view of alice = %v", p)
 	}
 	bobWS.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_Typing{Typing: &appv1.TypingFrame{
 		ChatId: chat.GetId(), Action: appv1.TypingAction_TYPING_ACTION_TYPING, UserId: 12345,
 	}}})
-	ty := aliceWS.next(t).GetTyping()
+	ty := aliceWS.reply(t).GetTyping()
 	if ty.GetChatId() != chat.GetId() || ty.GetUserId() != bob.userID || ty.GetAction() != appv1.TypingAction_TYPING_ACTION_TYPING {
 		t.Fatalf("typing = %v (user_id is set by the server)", ty)
 	}
 	bobWS.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_Presence{Presence: &appv1.ClientPresenceFrame{Foreground: false}}})
-	if p := aliceWS.next(t).GetPresence(); p.GetStatus().GetKind() != appv1.UserStatusKind_USER_STATUS_KIND_OFFLINE {
+	if p := aliceWS.reply(t).GetPresence(); p.GetStatus().GetKind() != appv1.UserStatusKind_USER_STATUS_KIND_OFFLINE {
 		t.Fatalf("presence after bob went to background = %v", p)
 	}
 }
