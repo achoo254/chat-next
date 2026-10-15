@@ -3,6 +3,7 @@
 // off or turned off by the server), then the chat's webhook log.
 import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
@@ -59,10 +60,7 @@ export function HookList({ chat }: { chat: Chat }) {
 			</div>
 			{full && <p className="note">{t.limitReached(HOOKS_PER_CHAT_MAX)}</p>}
 			{state.status === "loading" && (
-				<p className="status">
-					<span className="spin" aria-hidden="true" />
-					{copy.common.loading}
-				</p>
+				<BrandLoader label={copy.common.loading} />
 			)}
 			{state.status === "error" && (
 				<div className="banner error" role="alert">

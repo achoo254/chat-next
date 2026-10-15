@@ -6,6 +6,7 @@
 // leads to the incoming webhooks (mockups/integrations.html#hooks-list).
 import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -440,7 +441,7 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 	if (chat == null) {
 		return (
 			<section className="admin-page">
-				<div className="empty">{chat === undefined ? <span className="spin" aria-hidden="true" /> : copy.convo.notFound}</div>
+				{chat === undefined ? <BrandLoader /> : <div className="empty">{copy.convo.notFound}</div>}
 			</section>
 		);
 	}

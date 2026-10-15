@@ -1,6 +1,5 @@
-import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
-import brand from "../../brand.config.json" with { type: "json" };
+import { brandAssets } from "./vite-brand.ts";
 import { reactPlugins } from "./vite-react.ts";
 
 const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
@@ -8,33 +7,8 @@ const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
 // The Go server listens here in development (see server/cmd/server).
 const API_ORIGIN = "http://127.0.0.1:4600";
 
-const HTML_ESCAPES: Record<string, string> = {
-	"&": "&amp;",
-	"<": "&lt;",
-	">": "&gt;",
-	'"': "&quot;",
-};
-
-function escapeHtml(value: string): string {
-	return value.replace(/[&<>"]/g, (char) => HTML_ESCAPES[char] ?? char);
-}
-
-/** Fills the product name and description into index.html from brand.config.json. */
-function brandHtml(): Plugin {
-	return {
-		name: "app-brand-html",
-		transformIndexHtml: {
-			order: "pre",
-			handler: (html) =>
-				html
-					.replaceAll("%APP_NAME%", escapeHtml(brand.appName))
-					.replaceAll("%APP_DESCRIPTION%", escapeHtml(brand.description)),
-		},
-	};
-}
-
 export default defineConfig({
-	plugins: [...reactPlugins(), brandHtml()],
+	plugins: [...reactPlugins(), brandAssets()],
 	server: {
 		// brand.config.json devOrigins lists this origin; never fall back to another port.
 		port: 5173,

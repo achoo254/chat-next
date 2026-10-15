@@ -5,6 +5,7 @@
 import type { Transport } from "@connectrpc/connect";
 import { Suspense, lazy, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
+import { BrandLoader, PageLoader } from "../components/brand-loader.tsx";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
@@ -158,7 +159,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 			/>
 		);
 	}
-	if (services === null) return <Starting />;
+	if (services === null) return <PageLoader />;
 	return (
 		<ServicesContext value={services}>
 			<Screen
@@ -193,7 +194,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		case "settings":
 			return (
 				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Suspense fallback={<Loading />}>
+					<Suspense fallback={<BrandLoader />}>
 						<Settings
 							tab={route.tab}
 							self={self}
@@ -202,7 +203,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 								onSignOut,
 								moderation: moderator,
 								render: (tab: SettingsTab): ReactNode => (
-									<Suspense fallback={<Loading />}>
+									<Suspense fallback={<BrandLoader />}>
 										<SettingsExtra tab={tab} />
 									</Suspense>
 								),
@@ -214,7 +215,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		case "console":
 			return (
 				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Suspense fallback={<Loading />}>
+					<Suspense fallback={<BrandLoader />}>
 						<DeveloperConsole view={route.view} />
 					</Suspense>
 				</Shell>
@@ -222,7 +223,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		case "moderation":
 			return (
 				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Suspense fallback={<Loading />}>
+					<Suspense fallback={<BrandLoader />}>
 						<Moderation reportId={route.reportId} actions={route.actions} />
 					</Suspense>
 				</Shell>
@@ -261,28 +262,6 @@ function ContactsLink() {
 		<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
 			<ContactsGlyph />
 		</Link>
-	);
-}
-
-function Loading() {
-	const { t } = useI18n();
-	return (
-		<p className="status pad">
-			<span className="spin" aria-hidden="true" />
-			{t.common.loading}
-		</p>
-	);
-}
-
-function Starting() {
-	const { t } = useI18n();
-	return (
-		<main className="welcome" aria-busy="true">
-			<p className="status">
-				<span className="spin" aria-hidden="true" />
-				{t.common.loading}
-			</p>
-		</main>
 	);
 }
 

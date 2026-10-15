@@ -9,6 +9,7 @@
 // its own styles.
 import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
 import { signInUrl } from "@app/core";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch, type ConsolePage, type ConsoleTab } from "../../router.tsx";
@@ -102,10 +103,7 @@ function LoadState({ state, onRetry }: { state: Loaded<unknown>; onRetry: () => 
 	const copy = useCopy();
 	if (state.status === "loading") {
 		return (
-			<p className="status">
-				<span className="spin" aria-hidden="true" />
-				{copy.common.loading}
-			</p>
+			<BrandLoader label={copy.common.loading} />
 		);
 	}
 	return (

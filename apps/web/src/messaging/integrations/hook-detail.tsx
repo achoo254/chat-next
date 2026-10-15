@@ -6,6 +6,7 @@
 // connection guide for its format, its log, and deleting it.
 import { useEffect, useState, type FormEvent } from "react";
 import type { Chat } from "@app/core";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
@@ -93,10 +94,7 @@ export function HookDetail({ chat, hookId }: { chat: Chat; hookId: string }) {
 						</button>
 					</div>
 				) : (
-					<p className="status">
-						<span className="spin" aria-hidden="true" />
-						{copy.common.loading}
-					</p>
+					<BrandLoader label={copy.common.loading} />
 				)}
 			</div>
 		);

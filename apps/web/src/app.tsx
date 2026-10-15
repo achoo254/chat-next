@@ -3,6 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react
 import type { SelfUser } from "./api/adapters.ts";
 import { ApiContext } from "./api/api-context.tsx";
 import { createApi, createWebTransport, errorCode, sameOriginFetch, type RpcFetch } from "./api/client.ts";
+import { PageLoader } from "./components/brand-loader.tsx";
 import { Icon } from "./components/icon.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
 import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
@@ -68,7 +69,7 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 
 	switch (boot.status) {
 		case "loading":
-			return <Loading />;
+			return <PageLoader />;
 		case "signedOut":
 			return <Welcome />;
 		case "error":
@@ -107,7 +108,7 @@ function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnect
 
 	if (!route) return null;
 	return (
-		<Suspense fallback={<Loading />}>
+		<Suspense fallback={<PageLoader />}>
 			<MessagingRoot
 				self={self}
 				route={route}
@@ -117,18 +118,6 @@ function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnect
 				{...(messagingConnector === undefined ? {} : { connector: messagingConnector })}
 			/>
 		</Suspense>
-	);
-}
-
-function Loading() {
-	const { t } = useI18n();
-	return (
-		<main className="welcome" aria-busy="true">
-			<p className="status">
-				<span className="spin" aria-hidden="true" />
-				{t.common.loading}
-			</p>
-		</main>
 	);
 }
 

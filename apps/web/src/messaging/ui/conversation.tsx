@@ -2,6 +2,7 @@
 // #topic-states, #connection-states).
 import { Suspense, lazy, useEffect, useRef, useState, type DragEvent } from "react";
 import type { Chat } from "@app/core";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -237,9 +238,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	if (chat === undefined) {
 		return (
 			<section className="convo" aria-busy="true">
-				<div className="empty">
-					<span className="spin" aria-hidden="true" />
-				</div>
+				<BrandLoader />
 			</section>
 		);
 	}

@@ -11,6 +11,7 @@
     "description",
     "colors",
     "icon",
+    "iconMaskable",
     "appIds",
     "urlScheme",
     "primaryTenant",
@@ -35,9 +36,14 @@
       }
     },
     "icon": {
-      "description": "Path of the master icon, relative to the repository root.",
+      "description": "Path of the master icon (SVG), relative to the repository root: favicon, PNG icons and the in-app logo. The loading animation moves the elements with class logo-dot (the typing dots); ids inside are made unique where the logo is inlined.",
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9/._-]*\\.(svg|png)$"
+      "pattern": "^[a-z0-9][a-z0-9/._-]*\\.svg$"
+    },
+    "iconMaskable": {
+      "description": "Full-bleed icon (SVG) whose artwork stays inside the central 80% circle: manifest maskable icons and the Apple touch icon.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9/._-]*\\.svg$"
     },
     "appIds": {
       "type": "object",

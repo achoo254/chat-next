@@ -6,6 +6,7 @@
 // or dismiss. Active restrictions can be lifted early. Everyone else sees
 // "no access"; the server refuses them too.
 import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
@@ -321,7 +322,7 @@ function Detail({ reportId }: { reportId: number }) {
 	const [detail, reload] = useLoad(() => remote.moderationReport(reportId), `detail:${reportId}`);
 	const [lifting, setLifting] = useState<Restriction | null>(null);
 	const t = copy.moderation;
-	if (detail.status === "loading") return <p className="status pad">{copy.common.loading}</p>;
+	if (detail.status === "loading") return <BrandLoader label={copy.common.loading} />;
 	if (detail.status === "error") return <NotFound />;
 	const value = detail.value;
 	const { report, people } = value;
@@ -457,7 +458,7 @@ function Actions({ reportId }: { reportId: number }) {
 	const [lock, setLock] = useState<LockDuration>("week");
 	const [confirming, setConfirming] = useState<readonly ModerationAction[] | null>(null);
 	const t = copy.moderation;
-	if (detail.status === "loading") return <p className="status pad">{copy.common.loading}</p>;
+	if (detail.status === "loading") return <BrandLoader label={copy.common.loading} />;
 	if (detail.status === "error") return <NotFound />;
 	const value = detail.value;
 	const report = value.report;

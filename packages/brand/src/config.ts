@@ -12,6 +12,7 @@ export interface BrandConfig {
 		readonly backgroundDark: string;
 	};
 	readonly icon: string;
+	readonly iconMaskable: string;
 	readonly appIds: {
 		readonly ios: string;
 		readonly android: string;

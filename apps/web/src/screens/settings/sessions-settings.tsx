@@ -5,6 +5,7 @@ import { useApi } from "../../api/api-context.tsx";
 import { errorCode } from "../../api/client.ts";
 import { brand } from "../../brand.ts";
 import { ExternalLink } from "../../components/external-link.tsx";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
@@ -129,14 +130,7 @@ export function SessionsSettings() {
 	};
 
 	if (load.status === "loading") {
-		return (
-			<div className="set-body" aria-busy="true">
-				<p className="status">
-					<span className="spin" aria-hidden="true" />
-					{t.common.loading}
-				</p>
-			</div>
-		);
+		return <BrandLoader label={t.common.loading} />;
 	}
 
 	if (load.status === "error") {

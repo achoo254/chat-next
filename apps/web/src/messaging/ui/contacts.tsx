@@ -7,6 +7,7 @@
 // them and the groups you share.
 import { fold } from "@app/core";
 import { useState, type ReactNode } from "react";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -51,10 +52,7 @@ export function ContactsView({ userId }: { userId: number }) {
 		);
 	} else if (contacts.status !== "ready") {
 		body = (
-			<p className="status pad">
-				<span className="spin" aria-hidden="true" />
-				{copy.common.loading}
-			</p>
+			<BrandLoader label={copy.common.loading} />
 		);
 	} else if (contacts.entries.length === 0) {
 		body = (

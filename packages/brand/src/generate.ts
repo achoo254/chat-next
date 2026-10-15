@@ -1,4 +1,5 @@
 import type { BrandConfig } from "./config.ts";
+import { manifestIcons } from "./icons.ts";
 
 /** Platform manifests derived from the brand; apps read these at build time. */
 export interface GeneratedManifests {
@@ -18,7 +19,7 @@ export function generateManifests(brand: BrandConfig): GeneratedManifests {
 			display: "standalone",
 			theme_color: brand.colors.primary,
 			background_color: brand.colors.background,
-			icons: [{ src: `/${brand.icon}`, sizes: "any", purpose: "any" }],
+			icons: manifestIcons(),
 		},
 		"capacitor.json": {
 			appId: brand.appIds.ios,

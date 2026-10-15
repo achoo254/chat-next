@@ -9,6 +9,7 @@
     "backgroundDark": "#111113"
   },
   "icon": "brand/icon.svg",
+  "iconMaskable": "brand/icon-maskable.svg",
   "appIds": {
     "ios": "com.hoandat.chat",
     "android": "com.hoandat.chat",

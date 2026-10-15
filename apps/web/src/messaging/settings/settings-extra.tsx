@@ -4,6 +4,7 @@ import type { NotificationSettings as CoreNotificationSettings, NotificationSoun
 import { requestNotificationPermission } from "@app/platform-web";
 import { Fragment, useEffect, useState } from "react";
 import { FONT_MAX, FONT_MIN, setFontSize, setTheme, storedFontSize, storedTheme, type Theme } from "../../appearance.ts";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import { Link, paths, type SettingsTab } from "../../router.tsx";
@@ -102,9 +103,10 @@ function PrivacySettings() {
 	};
 
 	if (privacy === null) {
+		if (!failed) return <BrandLoader label={copy.common.loading} />;
 		return (
 			<div className="set-body">
-				{failed ? (
+				{failed && (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
 						<span className="grow">{copy.common.loadFailed}</span>
@@ -119,11 +121,6 @@ function PrivacySettings() {
 							{copy.common.retry}
 						</button>
 					</div>
-				) : (
-					<p className="status">
-						<span className="spin" aria-hidden="true" />
-						{copy.common.loading}
-					</p>
 				)}
 			</div>
 		);
@@ -234,15 +231,11 @@ function BlockedSettings() {
 		);
 	};
 
+	if (state.status === "loading") return <BrandLoader label={copy.common.loading} />;
 	return (
 		<div className="set-body">
 			<div className="card">
-				{state.status === "loading" ? (
-					<p className="status pad">
-						<span className="spin" aria-hidden="true" />
-						{copy.common.loading}
-					</p>
-				) : state.status === "error" ? (
+				{state.status === "error" ? (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
 						<span className="grow">{copy.common.loadFailed}</span>
@@ -382,9 +375,10 @@ function NotificationOptions() {
 	}, [store, attempt]);
 
 	if (load !== "ready") {
+		if (load !== "error") return <BrandLoader label={copy.common.loading} />;
 		return (
 			<div className="set-body">
-				{load === "error" ? (
+				{load === "error" && (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
 						<span className="grow">{copy.common.loadFailed}</span>
@@ -399,11 +393,6 @@ function NotificationOptions() {
 							{copy.common.retry}
 						</button>
 					</div>
-				) : (
-					<p className="status">
-						<span className="spin" aria-hidden="true" />
-						{copy.common.loading}
-					</p>
 				)}
 			</div>
 		);

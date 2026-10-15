@@ -3,6 +3,7 @@
 // lifts the ban only: the person is not added back, but invite links and
 // being added work for them again. Admins only.
 import { useEffect, useState } from "react";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
@@ -81,7 +82,7 @@ export function BannedList({ chatId }: { chatId: number }) {
 	if (chat == null) {
 		return (
 			<section className="admin-page">
-				<div className="empty">{chat === undefined ? <span className="spin" aria-hidden="true" /> : copy.convo.notFound}</div>
+				{chat === undefined ? <BrandLoader /> : <div className="empty">{copy.convo.notFound}</div>}
 			</section>
 		);
 	}
@@ -104,10 +105,7 @@ export function BannedList({ chatId }: { chatId: number }) {
 				<div className="ban-page">
 					<div className="card">
 						{state.status === "loading" && (
-							<p className="status pad">
-								<span className="spin" aria-hidden="true" />
-								{copy.common.loading}
-							</p>
+							<BrandLoader label={copy.common.loading} />
 						)}
 						{state.status === "error" && (
 							<div className="banner error" role="alert">

@@ -89,18 +89,86 @@
 @media (prefers-reduced-motion: reduce) {
 	.status-line .dot { animation: none; }
 }
+/* Loading frames: the page loader fills its frame instead of the window. */
+.frame > .brand-loader.page, .load-states .brand-loader.page { position: absolute; }
+.load-states { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); height: 100%; }
+.load-states > figure { position: relative; margin: 0; min-height: 320px; border-right: 1px solid var(--c-border-subtle); }
+.load-states > figure:last-child { border-right: 0; }
+.load-states figcaption { position: absolute; z-index: 2; top: var(--space-3); left: var(--space-3); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); }
+.load-states .still .logo-dot, .load-states .still .brand-logo::before { animation: none; }
+.load-states .still .brand-loader-text { animation: none; }
+.load-states .early .brand-loader-text { visibility: hidden; animation: none; }
+/* Panel loader inside the app shell (Settings while its tab loads). */
+.load-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); height: 100%; }
+.load-shell nav { display: grid; align-content: start; gap: var(--space-1); padding: var(--space-4) var(--space-3); border-right: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+.load-shell nav span { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 0.875rem; }
+.load-shell nav span[aria-current] { background: var(--c-surface); font-weight: 600; box-shadow: var(--shadow-sm); }
+.load-shell main { display: flex; flex-direction: column; min-width: 0; }
+.load-shell main h2 { margin: 0; padding: var(--space-4) var(--space-5); font-size: 1.125rem; border-bottom: 1px solid var(--c-border-subtle); }
+@media (max-width: 760px) {
+	.load-shell { grid-template-columns: minmax(0, 1fr); }
+	.load-shell nav { display: none; }
+}
 </style>
 </head>
 <body>
 <header class="review-bar"></header>
 <main class="shots">
 
+<section class="shot" id="loading">
+	<div class="shot-head"><h2>Đang tải</h2><span class="phase">R0 · Phase 2, 6</span><p>Logo của app (bong bóng chat trắng có ba chấm "đang gõ" trên nền tím) là biểu tượng duy nhất cho mọi màn chờ cấp trang và cấp vùng. Ba chấm nhấp nhô lần lượt như đang gõ, quầng sáng phía sau thở nhẹ; dòng trạng thái ("Đang tải…" hoặc trạng thái cụ thể) chỉ hiện sau khoảng 600 ms nên lần tải nhanh chỉ thấy logo. Màn khởi động có sẵn trong index.html (SVG và CSS, không cần JavaScript) nên hiện ngay trước khi bundle tải xong; khi app kiểm phiên đăng nhập và tải phần đã đăng nhập, vẫn chính phần tử đó tiếp tục chạy, không nháy hay giật. Trong app, vùng nội dung đang tải lần đầu (Cài đặt, Developer Console, Webhook, khung chat, danh bạ, kiểm duyệt) dùng cùng logo, cỡ nhỏ hơn, giữa vùng. Giữ nguyên spinner nhỏ cho "Đang tải thêm…", tải media, nút đang xử lý, và skeleton của danh sách chat lần đầu. Giảm chuyển động: logo đứng yên, chữ vẫn hiện sau 600 ms. Sáng và tối dùng nền và chữ của theme.</p></div>
+	<div class="frame">
+		<div class="load-states">
+			<figure class="early">
+				<figcaption>Khởi động · dưới 600 ms</figcaption>
+				<div class="brand-loader page" role="status" aria-live="polite" aria-busy="true">
+					<span class="brand-logo" role="img" aria-label="Chat"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="brand-bg-s1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8874d8"/><stop offset="1" stop-color="#5a47aa"/></linearGradient></defs><rect class="logo-bg" width="1024" height="1024" rx="232" fill="url(#brand-bg-s1)"/><path class="logo-bubble" d="M512 224c-170 0-300 112-300 256 0 78 38 147 100 194l-26 108c-3 13 11 23 22 16l124-74c25 6 52 10 80 10 170 0 300-112 300-254S682 224 512 224z" fill="#fff"/><circle class="logo-dot" cx="382" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="512" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="642" cy="480" r="50" fill="#6e56cf"/></svg></span>
+					<p class="brand-loader-text">Đang tải…</p>
+				</div>
+			</figure>
+			<figure>
+				<figcaption>Khởi động · sau 600 ms</figcaption>
+				<div class="brand-loader page" role="status" aria-live="polite" aria-busy="true">
+					<span class="brand-logo" role="img" aria-label="Chat"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="brand-bg-s2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8874d8"/><stop offset="1" stop-color="#5a47aa"/></linearGradient></defs><rect class="logo-bg" width="1024" height="1024" rx="232" fill="url(#brand-bg-s2)"/><path class="logo-bubble" d="M512 224c-170 0-300 112-300 256 0 78 38 147 100 194l-26 108c-3 13 11 23 22 16l124-74c25 6 52 10 80 10 170 0 300-112 300-254S682 224 512 224z" fill="#fff"/><circle class="logo-dot" cx="382" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="512" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="642" cy="480" r="50" fill="#6e56cf"/></svg></span>
+					<p class="brand-loader-text">Đang tải…</p>
+				</div>
+			</figure>
+			<figure class="still">
+				<figcaption>Giảm chuyển động</figcaption>
+				<div class="brand-loader page" role="status" aria-live="polite" aria-busy="true">
+					<span class="brand-logo" role="img" aria-label="Chat"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="brand-bg-s3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8874d8"/><stop offset="1" stop-color="#5a47aa"/></linearGradient></defs><rect class="logo-bg" width="1024" height="1024" rx="232" fill="url(#brand-bg-s3)"/><path class="logo-bubble" d="M512 224c-170 0-300 112-300 256 0 78 38 147 100 194l-26 108c-3 13 11 23 22 16l124-74c25 6 52 10 80 10 170 0 300-112 300-254S682 224 512 224z" fill="#fff"/><circle class="logo-dot" cx="382" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="512" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="642" cy="480" r="50" fill="#6e56cf"/></svg></span>
+					<p class="brand-loader-text">Đang tải…</p>
+				</div>
+			</figure>
+		</div>
+	</div>
+	<div class="frame">
+		<div class="load-shell">
+			<nav aria-label="Cài đặt">
+				<span>Hồ sơ của tôi</span>
+				<span>Quyền riêng tư</span>
+				<span>Người đã chặn</span>
+				<span>Thông báo</span>
+				<span>Giao diện</span>
+				<span aria-current="page">Phiên đăng nhập</span>
+			</nav>
+			<main>
+				<h2>Phiên đăng nhập</h2>
+				<div class="brand-loader" role="status" aria-live="polite" aria-busy="true">
+					<span class="brand-logo" role="img" aria-label="Chat"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="brand-bg-p1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8874d8"/><stop offset="1" stop-color="#5a47aa"/></linearGradient></defs><rect class="logo-bg" width="1024" height="1024" rx="232" fill="url(#brand-bg-p1)"/><path class="logo-bubble" d="M512 224c-170 0-300 112-300 256 0 78 38 147 100 194l-26 108c-3 13 11 23 22 16l124-74c25 6 52 10 80 10 170 0 300-112 300-254S682 224 512 224z" fill="#fff"/><circle class="logo-dot" cx="382" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="512" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="642" cy="480" r="50" fill="#6e56cf"/></svg></span>
+					<p class="brand-loader-text">Đang tải…</p>
+				</div>
+			</main>
+		</div>
+	</div>
+</section>
+
 <section class="shot" id="welcome">
 	<div class="shot-head"><h2>Màn chào</h2><span class="phase">Phase 2, 6</span><p>Chat không có đăng ký, mật khẩu hay email riêng: mọi đăng nhập đi qua auth.hoandat.com bằng Google hoặc GitHub. "Tạo tài khoản" mở thẳng trang đăng ký của IdP (prompt=create); ngôn ngữ chọn ở đây được gửi sang IdP qua ui_locales.</p></div>
 	<div class="frame">
 		<div class="welcome">
 			<section class="welcome-card" aria-labelledby="welcome-title">
-				<span class="brand-mark"><svg class="icon"><use href="#i-message"/></svg></span>
+				<span class="brand-logo" role="img" aria-label="Chat"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="brand-bg-w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8874d8"/><stop offset="1" stop-color="#5a47aa"/></linearGradient></defs><rect class="logo-bg" width="1024" height="1024" rx="232" fill="url(#brand-bg-w)"/><path class="logo-bubble" d="M512 224c-170 0-300 112-300 256 0 78 38 147 100 194l-26 108c-3 13 11 23 22 16l124-74c25 6 52 10 80 10 170 0 300-112 300-254S682 224 512 224z" fill="#fff"/><circle class="logo-dot" cx="382" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="512" cy="480" r="50" fill="#6e56cf"/><circle class="logo-dot" cx="642" cy="480" r="50" fill="#6e56cf"/></svg></span>
 				<h1 id="welcome-title">Chat</h1>
 				<p>Nhắn tin nhanh trong hệ sinh thái hoandat. Dùng chung tài khoản với Localman và Tunelo.</p>
 				<div class="welcome-actions">

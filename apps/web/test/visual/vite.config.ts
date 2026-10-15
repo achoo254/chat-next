@@ -3,6 +3,7 @@
 // (test/perf/perf-gate.ts) builds and serves it the same way.
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { brandAssets } from "../../vite-brand.ts";
 import { reactPlugins } from "../../vite-react.ts";
 
 const HOLD_MAX_MS = 20_000;
@@ -48,7 +49,7 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
 	root,
-	plugins: [...reactPlugins(), holdLoad()],
+	plugins: [...reactPlugins(), brandAssets(), holdLoad()],
 	worker: { format: "es" },
 	optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },
 	build: {

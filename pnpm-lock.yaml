@@ -72,6 +72,9 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@app/brand':
+        specifier: workspace:*
+        version: link:../../packages/brand
       '@babel/core':
         specifier: 7.29.7
         version: 7.29.7
@@ -117,6 +120,10 @@ importers:
       ajv:
         specifier: 8.20.0
         version: 8.20.0
+    devDependencies:
+      playwright:
+        specifier: 1.64.0
+        version: 1.64.0
 
   packages/core:
     dependencies:

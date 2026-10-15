@@ -6,6 +6,7 @@
 // message and, while someone's mention of you is unread, to that message.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, DialogView } from "@app/core";
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -185,9 +186,7 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	if (window_ === undefined || (window_.status === "loading" && keys.length === 0)) {
 		return (
 			<div className="messages" aria-busy="true">
-				<span className="system">
-					<span className="spin" aria-hidden="true" /> {copy.common.loading}
-				</span>
+				<BrandLoader label={copy.common.loading} />
 			</div>
 		);
 	}

@@ -23,7 +23,7 @@ cd server && go vet ./... && go test -race ./...
 | `pnpm --filter @app/web dev` | Web app ở `http://localhost:5173`, proxy `/rpc` và `/auth` tới server `127.0.0.1:4600` |
 | `pnpm e2e [lọc]` | E2E nhiều người dùng trên máy dev (không cần Docker): `server/cmd/e2e-stack` dựng Postgres tạm, IdP giả cho chọn tài khoản An, Bình, Chi, Dũng và API thật; Vite ở 5173; Playwright mở mỗi người một trình duyệt và chạy `apps/web/test/e2e/*.e2e.ts`. DB mới mỗi lần chạy; bước lỗi lưu ảnh chụp mỗi người vào `$TMPDIR/chat-e2e-shots` |
 | `pnpm e2e --serve` | Chỉ dựng môi trường đó và giữ chạy, để tự chat với chính mình bằng nhiều profile trình duyệt (Ctrl+C để dừng) |
-| `pnpm brand:gen` | Sinh manifest web, Capacitor, Tauri từ `brand.config.json` vào `packages/brand/generated/` |
+| `pnpm brand:gen` | Sinh manifest web, Capacitor, Tauri từ `brand.config.json` và icon PNG/ICO (favicon, Apple touch, manifest 192/512, maskable) từ `brand/icon.svg`, `brand/icon-maskable.svg` vào `packages/brand/generated/` (dùng Chromium của Playwright); chạy lại sau khi sửa logo |
 
 ## Cấu trúc
 
@@ -32,7 +32,7 @@ cd server && go vet ./... && go test -race ./...
 | `apps/web` | Web app React 19 + Vite, gọi server qua Connect RPC (`/rpc`) |
 | `proto/app/v1/` | Contract client ↔ server, mỗi domain một file |
 | `packages/core` | Fold tiếng Việt, ID, entities (dùng chung cho mọi client) |
-| `packages/brand` | Đọc và kiểm `brand.config.json`, host theo tenant, sinh manifest |
+| `packages/brand` | Đọc và kiểm `brand.config.json`, host theo tenant, sinh manifest và icon |
 | `packages/proto-ts` | Code TS sinh từ proto |
 | `server/` | Go module: `cmd/server` (một binary chạy theo `-role`), `internal/` |
 | `spec/` | Đặc tả và test vector dùng chung TS/Go (`vi-fold`, `entities`) |

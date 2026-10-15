@@ -2,6 +2,7 @@
 // opened from "Quản lý nhóm" > Tích hợp or the info column, admins only:
 // the list with the chat's log, a new webhook, and one webhook. Loaded on
 // demand with its own styles, so none of it weighs on startup.
+import { BrandLoader } from "../../components/brand-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { Link, paths, type ChatPanel } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -26,7 +27,7 @@ export default function IntegrationsPage({ chatId, panel, hookId }: Integrations
 	if (chat == null) {
 		return (
 			<section className="admin-page">
-				<div className="empty">{chat === undefined ? <span className="spin" aria-hidden="true" /> : copy.convo.notFound}</div>
+				{chat === undefined ? <BrandLoader /> : <div className="empty">{copy.convo.notFound}</div>}
 			</section>
 		);
 	}

@@ -1,5 +1,6 @@
 import { signInUrl } from "@app/core";
 import { brand } from "../brand.ts";
+import { BrandLogo } from "../components/brand-loader.tsx";
 import { Icon } from "../components/icon.tsx";
 import { useI18n, type Locale } from "../i18n/i18n.tsx";
 import { returnPathFor } from "../router.tsx";
@@ -24,9 +25,7 @@ export function Welcome() {
 	return (
 		<main className="welcome">
 			<section className="welcome-card" aria-labelledby="welcome-title">
-				<span className="brand-mark" aria-hidden="true">
-					<Icon name="message" />
-				</span>
+				<BrandLogo decorative />
 				<h1 id="welcome-title">{brand.appName}</h1>
 				<p>{brand.description}</p>
 				<div className="welcome-actions">
