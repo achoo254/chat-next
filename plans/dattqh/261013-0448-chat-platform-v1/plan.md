@@ -381,4 +381,9 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Bucket `chat-media`, danh tính `chat-api`, quyền `write` (Get, List, Put, Delete, AbortMultipartUpload); endpoint `drive-storagehns3st.000nethost.com`, region `hn-storage`, path-style.
   - Khoá S3 chỉ phát trên web OneDash. User đưa vào `$ACCESS_TOKENS_JSON` với mục `chat-media-s3`, tôi ghi vào `/opt/chat/.env` mà không in giá trị.
 - DNS `media-chat.hoandat.com` (proxied) và chứng chỉ Let's Encrypt đã tạo bằng `infra/chat/ensure-dns.sh` và `issue-cert.sh`.
+- User đổi quyết định (2026-10-15): media lưu ngay trên server `.65`, không dùng iNET Object Storage. Thay cho các mục về gói test và khoá S3 ở trên. Jev quyết:
+  - Driver lưu trên filesystem, thư mục `/opt/chat/media`: 0.99. Upload chia khúc qua API; tải xuống do app phục vụ có Range tại `media-chat.hoandat.com`. Driver S3 giữ lại trong code để chuyển lên cụm riêng sau này.
+  - Backup media mỗi đêm ra ngoài server, cùng lúc với dump DB: 1.00. Nơi nhận backup chưa chọn, script tắt cho tới khi đặt đích.
+  - Có ngưỡng đĩa trống tối thiểu: hết chỗ thì từ chối upload, để không làm đầy đĩa của server dùng chung.
+- Bucket `chat-media` và danh tính `chat-api` trên OneDash không còn dùng. MCP không có tool xoá; user xoá trên web nếu muốn.
 
