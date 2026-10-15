@@ -83,6 +83,8 @@ const PAGE = 40;
 const FIRST_PAGE = 60;
 const DIALOG_LIMIT = 1000;
 const KEPT_WINDOWS = 6;
+/** Most users one GetUsers may ask for (server/internal/chat/users.go getUsersMax). */
+const GET_USERS_MAX = 200;
 
 type Listener = () => void;
 
@@ -566,10 +568,13 @@ export class ChatStore {
 			this.putUsers(users);
 			const found = new Set(users.map((user) => user.id));
 			const missing = ids.filter((id) => !found.has(id));
-			if (missing.length === 0 || this.options.fetchUsers === undefined) return;
-			const fetched = await this.options.fetchUsers(missing);
-			if (this.disposed) return;
-			this.putUsers(fetched);
+			const fetchUsers = this.options.fetchUsers;
+			if (fetchUsers === undefined) return;
+			for (let i = 0; i < missing.length; i += GET_USERS_MAX) {
+				const fetched = await fetchUsers(missing.slice(i, i + GET_USERS_MAX));
+				if (this.disposed) return;
+				this.putUsers(fetched);
+			}
 		} catch (err) {
 			this.reportError(err, "load users");
 		}

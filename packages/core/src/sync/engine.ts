@@ -96,6 +96,8 @@ const DIALOG_PAGE_SIZE = 100;
 const MAX_TOO_LONG_IN_A_ROW = 3;
 /** Chats per GetPeerDialogs when repairing the dialog list. */
 const REPAIR_BATCH = 100;
+/** Most users one GetUsers may ask for (server/internal/chat/users.go getUsersMax). */
+const GET_USERS_MAX = 200;
 
 /** Inclusive range of seqs a history response speaks for. */
 function coveredRange(
@@ -458,10 +460,7 @@ export class SyncEngine {
 		for (const chat of batch.chats) chatIds.delete(chat.id);
 		const missingUsers = await this.options.repo.missing("users", userIds);
 		const missingChats = await this.options.repo.missing("chats", chatIds);
-		if (missingUsers.length > 0) {
-			const response = await this.options.api.users.getUsers({ userIds: missingUsers.map(toWireId) });
-			for (const user of response.users) putUser(w, toUser(user));
-		}
+		for (const user of await this.getUsers(missingUsers)) putUser(w, user);
 		for (const chatId of missingChats) {
 			const response = await this.options.api.chats.getChat({ chatId: toWireId(chatId) });
 			if (response.chat !== undefined) putChat(w, toChat(response.chat));
@@ -602,17 +601,27 @@ export class SyncEngine {
 	async fetchUsers(userIds: readonly number[]): Promise<void> {
 		if (userIds.length === 0) return;
 		try {
-			const response = await this.options.api.users.getUsers({ userIds: userIds.map(toWireId) });
-			if (response.users.length === 0) return;
+			const users = await this.getUsers(userIds);
+			if (users.length === 0) return;
 			await this.queue.run(async () => {
 				const w = new WriteBatch();
-				for (const user of response.users) putUser(w, toUser(user));
+				for (const user of users) putUser(w, user);
 				await this.commit(w);
 			});
 		} catch (err) {
 			if (classifyFailure(err) === "unauthenticated") this.options.onSessionEnded("unknown");
 			else this.report(err, "fetch users");
 		}
+	}
+
+	/** GetUsers in requests the server accepts; the users it returned, in order. */
+	private async getUsers(userIds: readonly number[]): Promise<User[]> {
+		const users: User[] = [];
+		for (let i = 0; i < userIds.length; i += GET_USERS_MAX) {
+			const response = await this.options.api.users.getUsers({ userIds: userIds.slice(i, i + GET_USERS_MAX).map(toWireId) });
+			for (const user of response.users) users.push(toUser(user));
+		}
+		return users;
 	}
 
 	// ------------------------------------------------------------ gap timers

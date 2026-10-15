@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -371,14 +372,17 @@ func TestRetryBackoffAndRetryAfter(t *testing.T) {
 	botID, user, group := talkativeBot(t, env, "backoffbot")
 	env.CatchUp()
 	setHook(t, env, botID, "http://127.0.0.1:1/unused", botupdates.WebhookSettings{DropPending: true})
-	retryAfter := ""
-	var mu sync.Mutex
+	// The answer is decided by the attempt it answers, not by when the test
+	// reads the request: the receiver hands a request to the test before the
+	// handler writes the answer, so a header switched by the test after a
+	// read could still land on that same answer.
+	var requests atomic.Int32
 	rcv := newReceiver(t, func(w http.ResponseWriter, _ delivery) {
-		mu.Lock()
-		if retryAfter != "" {
-			w.Header().Set("Retry-After", retryAfter)
+		// Attempts 1 to 3 back off on their own; the 4th answer's Retry-After
+		// decides the next attempt.
+		if requests.Add(1) >= 4 {
+			w.Header().Set("Retry-After", "120")
 		}
-		mu.Unlock()
 		w.WriteHeader(http.StatusTooManyRequests)
 	})
 	setHook(t, env, botID, rcv.srv.URL, botupdates.WebhookSettings{})
@@ -393,9 +397,6 @@ func TestRetryBackoffAndRetryAfter(t *testing.T) {
 		t.Fatalf("second retry after %v, want about 2 s", gap)
 	}
 	// Retry-After decides the next attempt.
-	mu.Lock()
-	retryAfter = "120"
-	mu.Unlock()
 	rcv.wait(10 * time.Second)
 	eventually(t, "the long wait recorded", func() bool {
 		var wait time.Duration

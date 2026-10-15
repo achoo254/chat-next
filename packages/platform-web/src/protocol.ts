@@ -67,8 +67,6 @@ export interface WorkerConfig {
 	/** WebSocket endpoint of the realtime gateway. */
 	readonly realtimeUrl: string;
 	readonly appVersion: string;
-	/** When this tab's build was made (Unix ms; 0 = unknown): a newer build takes over leadership. */
-	readonly build?: number;
 	/** User of the previous session in this browser; skips GetSelf on warm start. */
 	readonly userIdHint?: number;
 	readonly foreground: boolean;
@@ -99,8 +97,7 @@ export type HubMessage =
 	| ({ readonly type: "result"; readonly id: string } & CallResult)
 	| { readonly type: "events"; readonly keys: readonly string[] }
 	| { readonly type: "leader" }
-	// build: see WorkerConfig.build; tabs of builds before it send none.
-	| { readonly type: "presence"; readonly tabId: string; readonly foreground: boolean; readonly build?: number }
+	| { readonly type: "presence"; readonly tabId: string; readonly foreground: boolean }
 	| { readonly type: "online" }
 	| { readonly type: "ended"; readonly reason: SessionEndReason }
 	| { readonly type: "user"; readonly userId: number };

@@ -40,15 +40,6 @@ export class LeaderLock {
 		});
 	}
 
-	/**
-	 * Lets the next tab in line take over while this one stays open; call
-	 * acquire again to queue behind it.
-	 */
-	handOver(): void {
-		this.releaseHeld?.();
-		this.releaseHeld = null;
-	}
-
 	/** Lets the next tab take over (this tab is closing or signing out). */
 	release(): void {
 		this.released = true;

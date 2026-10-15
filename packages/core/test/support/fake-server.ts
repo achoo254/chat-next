@@ -1392,11 +1392,14 @@ export class FakeServer {
 			users: {
 				getSelf: () => this.rpc(userId, "getSelf", () => create(GetSelfResponseSchema, { user: this.wireUser(userId, userId) })),
 				getUsers: (request) =>
-					this.rpc(userId, "getUsers", () =>
-						create(GetUsersResponseSchema, {
-							users: (request.userIds ?? []).map(num).filter((id) => this.users.has(id)).map((id) => this.wireUser(id, userId)),
-						}),
-					),
+					this.rpc(userId, "getUsers", () => {
+						const ids = [...new Set((request.userIds ?? []).map(num))];
+						// The server's limit (server/internal/chat/users.go getUsersMax).
+						if (ids.length > 200) throw new ConnectError("at most 200 users", Code.InvalidArgument);
+						return create(GetUsersResponseSchema, {
+							users: ids.filter((id) => this.users.has(id)).map((id) => this.wireUser(id, userId)),
+						});
+					}),
 			},
 		};
 	}

@@ -64,6 +64,17 @@ describe("the peer of a private chat", () => {
 		expect(server.calls.get("getUsers") ?? 0).toBe(before + 1);
 	});
 
+	it("is fetched in requests of at most 200 users the server accepts", async () => {
+		const { server, core } = await existingUser();
+		const unknown = Array.from({ length: 450 }, (_, i) => server.addUser(`Người ${i}`));
+		const before = server.calls.get("getUsers") ?? 0;
+
+		const users = await core.users(unknown);
+
+		expect(users.map((user) => user.id).sort((a, b) => a - b)).toEqual([...unknown].sort((a, b) => a - b));
+		expect(server.calls.get("getUsers") ?? 0).toBe(before + 3);
+	});
+
 	// What an older build may have stored for the assistant chat; the
 	// next start reloads the chat itself from the server.
 	it.each([

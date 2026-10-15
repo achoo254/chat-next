@@ -39,8 +39,6 @@ export interface WebChatOptions {
 	/** WebSocket endpoint of the realtime gateway. */
 	readonly realtimeUrl: string;
 	readonly appVersion: string;
-	/** When the app was built (Unix ms): a tab of a newer build takes over the database from older ones. */
-	readonly build?: number;
 	/** Defaults to window.localStorage. */
 	readonly storage?: Storage;
 	readonly onSessionEnded?: (reason: SessionEndReason) => void;
@@ -200,7 +198,6 @@ export function createWebChat(options: WebChatOptions): WebChat {
 		config: {
 			realtimeUrl: options.realtimeUrl,
 			appVersion: options.appVersion,
-			...(options.build === undefined ? {} : { build: options.build }),
 			foreground: !document.hidden,
 			...(userId === undefined ? {} : { userIdHint: userId }),
 		},

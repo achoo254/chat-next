@@ -10,9 +10,6 @@ const API_ORIGIN = "http://127.0.0.1:4600";
 
 export default defineConfig({
 	plugins: [...reactPlugins(), brandAssets(), serviceWorker()],
-	// When this build was made: a tab of a newer build takes the local
-	// database over from tabs of older ones (packages/platform-web tab-hub.ts).
-	define: { __APP_BUILD_TIME__: JSON.stringify(Date.now()) },
 	server: {
 		// brand.config.json devOrigins lists this origin; never fall back to another port.
 		port: 5173,
