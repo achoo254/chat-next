@@ -9,13 +9,14 @@ import type { MediaRef, MediaRequest, MediaSizeType, PendingMedia, PendingMessag
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
+import { inlineThumbUrl } from "../data/format.ts";
 import { useConnection, useItem, useServices } from "../data/services.tsx";
 import { boxStyle, isVisual, mediaBox } from "./box.ts";
 import { downloadMedia } from "./download.ts";
 import { fileExt, formatBytes, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
 import { MediaIcon } from "./media-icons.tsx";
 import { viewer } from "./media-state.ts";
-import { inlineThumbUrl, useMediaFile, useNearViewport, usePendingFileUrl, useUploadProgress } from "./use-media.ts";
+import { useMediaFile, useNearViewport, usePendingFileUrl, useUploadProgress } from "./use-media.ts";
 import { useMediaCopy } from "./use-media-copy.ts";
 import "./media.css";
 

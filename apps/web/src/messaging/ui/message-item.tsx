@@ -21,7 +21,7 @@ import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
-import { isAllowedLink, linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
+import { isAllowedLink, laterLinkOpener, linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { Cell, useCell, useIntent, useUi } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
@@ -364,6 +364,7 @@ function MessageButtons({ message, ctx }: { message: StoredMessage; ctx: RichCon
 		)
 		.filter((row) => row.length > 0);
 	if (rows.length === 0) return null;
+	const openLater = laterLinkOpener((url) => ctx.openLink(url));
 	const press = (key: string, data: string) => {
 		if (pressing.get().has(key)) return;
 		setPressing(key, true);
@@ -379,7 +380,7 @@ function MessageButtons({ message, ctx }: { message: StoredMessage; ctx: RichCon
 						if (answer.showAlert) ui.dialog.set({ kind: "botAlert", botId: fromId, text: answer.text });
 						else toasts.show(answer.text);
 					}
-					if (answer.url !== "") ctx.openLink(answer.url);
+					if (answer.url !== "") openLater(answer.url);
 				},
 				() => toasts.show(copy.common.failed),
 			)

@@ -4,10 +4,11 @@
 // (#commands) and the reply keyboard the bot set (#reply-keyboard). Loaded
 // with the first bot chat opened, with its own styles.
 import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react";
+import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@app/core";
+import { cryptoRandomId } from "@app/platform";
 import { Icon } from "../../components/icon.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { useItem, useServices, useUser, useWindow } from "../data/services.tsx";
-import { messageKey, type WindowItem } from "../data/store.ts";
+import { useServices, useUser } from "../data/services.tsx";
 import { ChatAvatar, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 
 /** Id of a chat's command menu, which the composer's menu button controls. */
@@ -71,10 +72,12 @@ export function BotStartBar({ botId }: { botId: number }) {
 	const { bots, toasts } = useServices();
 	const user = useUser(botId);
 	const [busy, setBusy] = useState(false);
+	// One id for this bar: pressing again after a failure cannot send /start twice.
+	const [randomId] = useState(cryptoRandomId);
 	const start = async () => {
 		setBusy(true);
 		try {
-			await bots.start(botId, "");
+			await bots.start(botId, "", randomId);
 			// The chat fills from the update stream; this bar goes once the message is there.
 		} catch {
 			toasts.show(copy.common.failed);
@@ -111,16 +114,41 @@ export function BotAlertDialog({ botId, text, onClose }: { botId: number; text: 
 	);
 }
 
-/** The bot's newest message with a reply markup, when that markup is a keyboard (not its removal); null otherwise. */
-export function activeKeyboard(items: readonly (WindowItem | undefined)[], botId: number): { seq: number; key: string } | null {
-	for (let index = items.length - 1; index >= 0; index--) {
-		const item = items[index];
-		if (item?.kind !== "message") continue;
-		const message = item.message;
-		if (message.fromId !== botId || message.keyboard === undefined) continue;
-		return message.keyboard.kind === "keyboard" ? { seq: message.seq, key: messageKey(message) } : null;
-	}
-	return null;
+type ShownKeyboard = Extract<ReplyKeyboard, { kind: "keyboard" }>;
+
+/**
+ * The reply keyboard the bot set last in this chat, as Telegram keeps it for
+ * the whole chat: read from the local database, so jumping to an old message
+ * or scrolling far back neither brings back an older keyboard nor drops this
+ * one. Read again whenever the chat's messages change (a new markup, hidden
+ * or shown on this device). null without one, or when the bot removed it.
+ */
+function useBotKeyboard(chatId: number, botId: number): { seq: number; keyboard: ShownKeyboard } | null {
+	const { source, store } = useServices();
+	const [found, setFound] = useState<{ chatId: number; botId: number; message: StoredMessage | null } | null>(null);
+	useEffect(() => {
+		let active = true;
+		let asked = 0;
+		const read = () => {
+			const ticket = ++asked;
+			source.botKeyboard(chatId, botId).then(
+				(message) => {
+					// Only the newest answer counts: an older read may finish last.
+					if (active && ticket === asked) setFound({ chatId, botId, message });
+				},
+				(err: unknown) => store.reportError(err, `bot keyboard ${chatId}`),
+			);
+		};
+		read();
+		const stop = source.events.subscribe(EventKeys.history(chatId), read);
+		return () => {
+			active = false;
+			stop();
+		};
+	}, [source, store, chatId, botId]);
+	const message = found !== null && found.chatId === chatId && found.botId === botId ? found.message : null;
+	const keyboard = message?.keyboard;
+	return message !== null && keyboard?.kind === "keyboard" ? { seq: message.seq, keyboard } : null;
 }
 
 /** Commands matching what is typed: "/de" keeps /deploy; anything but a bare command shows none. */
@@ -165,11 +193,11 @@ export interface BotLayerProps {
 /** Command menu and reply keyboard around the composer of a private chat with a bot. */
 export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, actionsRef }: BotLayerProps) {
 	const t = useBotsCopy();
-	const { store, source, toasts } = useServices();
+	const { source, toasts } = useServices();
 	const copy = useCopy();
 	const user = useUser(botId);
 	const info = useBotInfo(botId, chatId);
-	const window_ = useWindow(chatId);
+	const active = useBotKeyboard(chatId, botId);
 	const [manual, setManual] = useState(false);
 	const [closedFor, setClosedFor] = useState<string | null>(null);
 	const [selected, setSelected] = useState(0);
@@ -217,12 +245,6 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 		return false;
 	};
 
-
-	const newest = activeKeyboard(window_?.keys.map((key) => store.item(chatId, key)) ?? [], botId);
-	// That message as it is now (hidden or shown on this device changes it, not the window's keys).
-	const item = useItem(chatId, newest?.key ?? "");
-	const keyboard = item?.kind === "message" && item.message.keyboard?.kind === "keyboard" ? item.message.keyboard : null;
-	const active = newest !== null && keyboard !== null ? { seq: newest.seq, keyboard } : null;
 	// Hidden on this device is kept in the local database (survives a reload).
 	const padShown = active !== null && !active.keyboard.hidden;
 	const setHidden = (seq: number, hidden: boolean) => {

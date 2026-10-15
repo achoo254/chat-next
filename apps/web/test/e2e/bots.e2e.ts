@@ -81,6 +81,9 @@ scenario("create a bot, start it from a link, press its buttons", () => [an], as
 	const reauth = page.getByRole("dialog", { name: "Đăng nhập lại để tiếp tục" });
 	await reauth.getByRole("link", { name: "Đăng nhập lại" }).click();
 	await page.getByRole("link", { name: "Đăng nhập là An @an" }).click();
+	// Back on the console, the token is issued only from the confirmation.
+	const ask = page.getByRole("dialog", { name: "Cấp token cho Echo Bot?" });
+	await ask.getByRole("button", { name: "Cấp token" }).click();
 	const tokenText = (await page.getByTestId("bot-token").textContent()) ?? "";
 	assert.match(tokenText, /^\d+:\S{20,}$/);
 	await page.getByRole("button", { name: "Tôi đã lưu token" }).click();

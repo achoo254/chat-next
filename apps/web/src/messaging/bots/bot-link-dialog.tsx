@@ -4,6 +4,7 @@
 // consent, opens the private chat and sends the command (StartBot); Huỷ sends
 // nothing.
 import { useEffect, useState } from "react";
+import { cryptoRandomId } from "@app/platform";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -25,6 +26,8 @@ export default function BotLinkDialog({ username, startParam }: { username: stri
 	const { bots, toasts } = useServices();
 	const [bot, setBot] = useState<BotInfo | null>(null);
 	const [busy, setBusy] = useState(false);
+	// One id for this dialog: pressing again after a failure cannot send /start twice.
+	const [randomId] = useState(cryptoRandomId);
 	const id = useDomId("bot-link");
 	const valid = validStartParam(startParam);
 
@@ -63,7 +66,7 @@ export default function BotLinkDialog({ username, startParam }: { username: stri
 	const send = async () => {
 		setBusy(true);
 		try {
-			const chatId = await bots.start(bot.id, startParam);
+			const chatId = await bots.start(bot.id, startParam, randomId);
 			navigate(paths.chat(chatId), { replace: true });
 		} catch {
 			setBusy(false);

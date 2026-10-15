@@ -240,6 +240,11 @@ message Dialog {
   int64 pinned_message_seq = 11 [jstype = JS_NUMBER];
   // The caller marked the chat as unread (SetDialogUnreadMark).
   bool unread_mark = 12;
+  // Unix second the list orders the chat by: its newest message (its
+  // creation before any). Kept when the caller clears their saved chat
+  // ("Cloud của tôi"), so the empty chat keeps its place without a top
+  // message.
+  int64 sort_date = 13 [jstype = JS_NUMBER];
 }
 
 message InviteLink {

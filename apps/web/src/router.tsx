@@ -180,6 +180,11 @@ export function usePathname(): string {
 	return useSyncExternalStore(subscribe, () => window.location.pathname);
 }
 
+/** The query ("?start=…"); re-renders when only the query changes. */
+export function useSearch(): string {
+	return useSyncExternalStore(subscribe, () => window.location.search);
+}
+
 interface LinkProps {
 	to: string;
 	className?: string;

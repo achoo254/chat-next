@@ -4,13 +4,13 @@
 // click, a long press, the menu key or the "…" button that shows on hover
 // opens the row menu (#list-menu).
 import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from "react";
-import { toBase64, type DialogView, type Message } from "@app/core";
+import type { DialogView, Message } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, countLabel, dialogTitle, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
+import { chatKind, countLabel, dialogTitle, inlineThumbUrl, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
 import { ChatAvatar } from "./parts.tsx";
@@ -140,7 +140,7 @@ export function PreviewThumb({ message }: { message: Message }) {
 	return (
 		<img
 			className="pv-thumb"
-			src={`data:image/jpeg;base64,${toBase64(media.inlineThumb)}`}
+			src={inlineThumbUrl(media.inlineThumb)}
 			alt={message.text === "" ? "" : copy.message.mediaKind[message.mediaKind]}
 		/>
 	);

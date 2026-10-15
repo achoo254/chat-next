@@ -183,6 +183,16 @@ export class Repository {
 		return row === undefined ? null : toStored(row);
 	}
 
+	/** The newest message from `fromId` in the chat that sets or removes a reply keyboard; null for none. */
+	async newestKeyboard(chatId: number, fromId: number): Promise<StoredMessage | null> {
+		const rows = await this.driver.query(
+			"SELECT * FROM messages WHERE chat_id = ? AND from_id = ? AND reply_keyboard IS NOT NULL ORDER BY seq DESC LIMIT 1",
+			[chatId, fromId],
+		);
+		const row = rows[0];
+		return row === undefined ? null : toStored(row);
+	}
+
 	/** Up to `limit` messages with seq < beforeSeq (0 = from the newest), ascending. */
 	async messagesBefore(chatId: number, beforeSeq: number, limit: number): Promise<StoredMessage[]> {
 		const bound = beforeSeq === 0 ? Number.MAX_SAFE_INTEGER : beforeSeq;

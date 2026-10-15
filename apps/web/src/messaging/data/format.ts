@@ -1,6 +1,6 @@
 // Pure presentation helpers: chat kinds, names, avatar tones, times and
 // one-line previews. No React, so they are unit-tested directly.
-import type { Chat, DialogView, Message, MessageAction, User } from "@app/core";
+import { toBase64, type Chat, type DialogView, type Message, type MessageAction, type User } from "@app/core";
 import type { MessagingCopy } from "../copy/vi.ts";
 import type { Tone } from "./pending-backend.ts";
 
@@ -219,4 +219,9 @@ export function namedUserIds(message: Message): number[] {
 /** Unread and mention counts stop at 1000 on the server; the cap reads "999+". */
 export function countLabel(count: number): string {
 	return count >= 1000 ? "999+" : String(count);
+}
+
+/** The inline thumbnail (a JPEG of a few hundred bytes) as a data URL; "" when there is none. */
+export function inlineThumbUrl(bytes: Uint8Array): string {
+	return bytes.length === 0 ? "" : `data:image/jpeg;base64,${toBase64(bytes)}`;
 }

@@ -35,7 +35,7 @@ describe("Cloud của tôi", () => {
 
 		await userEvent.click(within(info).getByRole("button", { name: "Xoá toàn bộ tin nhắn" }));
 		const dialog = await screen.findByRole("dialog", { name: "Xoá toàn bộ tin trong Cloud của tôi?" }, LONG);
-		expect(within(dialog).getByText("Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở đầu danh sách.")).toBeTruthy();
+		expect(within(dialog).getByText("Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở trong danh sách chat.")).toBeTruthy();
 		expect(within(dialog).queryByText(/Thu hồi/)).toBeNull();
 		await userEvent.click(within(dialog).getByRole("button", { name: "Xoá toàn bộ" }));
 		await waitFor(() => expect(document.querySelector(".toast")?.textContent).toBe("Đã xoá toàn bộ tin trong Cloud của tôi"));

@@ -423,6 +423,8 @@ export class FakeServer {
 			pinnedMessageCount: pinned.length,
 			pinnedMessageSeq: pinned[pinned.length - 1]?.message.seq ?? 0n,
 			unreadMark: this.user(viewer).unreadMarks.has(chatId),
+			// The newest message, hidden ones too (the server's last_message_at).
+			sortDate: [...chat.messages.values()].reduce((newest, r) => (r.message.date > newest ? r.message.date : newest), 0n),
 		});
 	}
 

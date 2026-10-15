@@ -244,16 +244,23 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 	return <>{blocks}</>;
 }
 
-/** A bot link of this app (/b/<username>?start=…): its path and query, opened in place; null otherwise. */
-export function inAppBotLink(url: string, origin: string): string | null {
+/** A link to a page of this app: its path, query and fragment; null for another origin or a malformed URL. */
+export function inAppPath(url: string, origin: string): string | null {
 	let parsed: URL;
 	try {
 		parsed = new URL(url);
 	} catch {
 		return null;
 	}
-	if (parsed.origin !== origin || matchRoute(parsed.pathname)?.name !== "bot") return null;
-	return parsed.pathname + parsed.search;
+	return parsed.origin === origin ? parsed.pathname + parsed.search + parsed.hash : null;
+}
+
+/** A bot link of this app (/b/<username>?start=…): its path and query, opened in place; null otherwise. */
+export function inAppBotLink(url: string, origin: string): string | null {
+	const path = inAppPath(url, origin);
+	if (path === null) return null;
+	const parsed = new URL(path, origin);
+	return matchRoute(parsed.pathname)?.name === "bot" ? parsed.pathname + parsed.search : null;
 }
 
 /** Link opening with the trusted-host rule; `ask` shows the confirmation. Bot links of this app open in place. */
@@ -270,5 +277,18 @@ export function linkOpener(ask: (url: string, shown: string) => void): (url: str
 			return;
 		}
 		ask(url, shown);
+	};
+}
+
+/**
+ * Link opening without a click of its own, such as a URL in a bot's answer
+ * that arrives after the request: by then the browser may block a new tab,
+ * so this app's own pages open in place; other links go to `open`.
+ */
+export function laterLinkOpener(open: (url: string) => void): (url: string) => void {
+	return (url) => {
+		const local = isAllowedUrl(url, APP_SCHEME) ? inAppPath(url, window.location.origin) : null;
+		if (local !== null) navigate(local);
+		else open(url);
 	};
 }

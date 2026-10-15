@@ -1,7 +1,6 @@
 // Connect implementation of Bots (see api.ts), loaded on first use.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
 import { assertSafeId, fromBase64 } from "@app/core";
-import { cryptoRandomId } from "@app/platform";
 import {
 	BotAdminService,
 	BotCommandScope as WireScope,
@@ -102,6 +101,9 @@ function wireSets(sets: CommandSets): { sets: { scope: WireScope; commands: BotC
 	return { sets: list };
 }
 
+/** A callback press with no answer by then reads "Bot không phản hồi". */
+export const PRESS_TIMEOUT_MS = 15_000;
+
 export function createBotsClient(transport: Transport, onUnauthenticated: () => void): Bots {
 	const admin = createClient(BotAdminService, transport);
 	const bots = createClient(BotsService, transport);
@@ -165,9 +167,9 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 			}),
 		usernameTaken: (username) => call(async () => (await lookup(username)) !== null),
 		info,
-		start: (botId, startParam) =>
+		start: (botId, startParam, randomId) =>
 			call(async () => {
-				const response = await bots.startBot({ botId: BigInt(botId), startParam, randomId: BigInt(cryptoRandomId()) });
+				const response = await bots.startBot({ botId: BigInt(botId), startParam, randomId: BigInt(randomId) });
 				const chat = response.chat;
 				if (chat === undefined) throw new BotError("other", "StartBot returned no chat");
 				return assertSafeId(chat.id);
@@ -176,8 +178,26 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 			call(async () => {
 				const data = fromBase64(callbackData);
 				if (data === null || data.length === 0) throw new BotError("invalid", "button without callback data");
-				const answer = await messages.pressInlineButton({ chatId: BigInt(chatId), seq: BigInt(seq), callbackData: data });
-				return { text: answer.text, showAlert: answer.showAlert, url: answer.url, timedOut: answer.timedOut };
+				// The server gives up on a slow bot after 10 seconds; this covers a
+				// connection that stalls (proxy, network lost, a laptop waking up).
+				const controller = new AbortController();
+				let timer: ReturnType<typeof setTimeout> | undefined;
+				const stalled = new Promise<null>((resolve) => {
+					timer = setTimeout(() => {
+						resolve(null);
+						controller.abort();
+					}, PRESS_TIMEOUT_MS);
+				});
+				try {
+					const answer = await Promise.race([
+						messages.pressInlineButton({ chatId: BigInt(chatId), seq: BigInt(seq), callbackData: data }, { signal: controller.signal }),
+						stalled,
+					]);
+					if (answer === null) return { text: "", showAlert: false, url: "", timedOut: true };
+					return { text: answer.text, showAlert: answer.showAlert, url: answer.url, timedOut: answer.timedOut };
+				} finally {
+					clearTimeout(timer);
+				}
 			}),
 	};
 }

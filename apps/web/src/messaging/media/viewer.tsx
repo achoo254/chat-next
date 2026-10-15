@@ -9,14 +9,14 @@ import type { MediaRef, StoredMessage } from "@app/core";
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type TouchEvent } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { clock, shortDate } from "../data/format.ts";
+import { clock, inlineThumbUrl, shortDate } from "../data/format.ts";
 import { useItem, useMessage, useServices, useUser, useWindow } from "../data/services.tsx";
 import { messageKey } from "../data/store.ts";
 import { Modal } from "../ui/parts.tsx";
 import { useUi } from "../ui/ui-context.tsx";
 import { downloadMedia } from "./download.ts";
 import { MediaIcon } from "./media-icons.tsx";
-import { inlineThumbUrl, useMediaFile } from "./use-media.ts";
+import { useMediaFile } from "./use-media.ts";
 import { useMediaCopy } from "./use-media-copy.ts";
 import "./media.css";
 

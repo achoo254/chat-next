@@ -497,7 +497,7 @@ export class SyncEngine {
 					putMessage(w, message);
 					topDates.set(message.chatId, message.date);
 				}
-				for (const dialog of page.dialogs) putDialog(w, dialog, topDates.get(dialog.chatId) ?? 0, this.options.selfId);
+				for (const dialog of page.dialogs) putDialog(w, dialog, topDates.get(dialog.chatId) ?? dialog.sortDate, this.options.selfId);
 				await this.commit(w);
 			});
 		} catch (err) {
@@ -759,7 +759,7 @@ export class SyncEngine {
 			const large = new Set(snapshot.chats.filter((c) => c.syncMode === "large").map((c) => c.id));
 			for (const dialog of snapshot.dialogs) {
 				if (effects.purgedChats.has(dialog.chatId)) continue;
-				putDialog(w, dialog, topDates.get(dialog.chatId) ?? 0, this.options.selfId);
+				putDialog(w, dialog, topDates.get(dialog.chatId) ?? dialog.sortDate, this.options.selfId);
 				// chat_pts 0 is a valid position of a chat that just became large.
 				if (large.has(dialog.chatId) || dialog.chatPts > 0) {
 					chatPts.set(dialog.chatId, dialog.chatPts);

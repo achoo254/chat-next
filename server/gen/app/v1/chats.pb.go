@@ -748,7 +748,12 @@ type Dialog struct {
 	PinnedMessageCount int32 `protobuf:"varint,10,opt,name=pinned_message_count,json=pinnedMessageCount,proto3" json:"pinned_message_count,omitempty"`
 	PinnedMessageSeq   int64 `protobuf:"varint,11,opt,name=pinned_message_seq,json=pinnedMessageSeq,proto3" json:"pinned_message_seq,omitempty"`
 	// The caller marked the chat as unread (SetDialogUnreadMark).
-	UnreadMark    bool `protobuf:"varint,12,opt,name=unread_mark,json=unreadMark,proto3" json:"unread_mark,omitempty"`
+	UnreadMark bool `protobuf:"varint,12,opt,name=unread_mark,json=unreadMark,proto3" json:"unread_mark,omitempty"`
+	// Unix second the list orders the chat by: its newest message (its
+	// creation before any). Kept when the caller clears their saved chat
+	// ("Cloud của tôi"), so the empty chat keeps its place without a top
+	// message.
+	SortDate      int64 `protobuf:"varint,13,opt,name=sort_date,json=sortDate,proto3" json:"sort_date,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -865,6 +870,13 @@ func (x *Dialog) GetUnreadMark() bool {
 		return x.UnreadMark
 	}
 	return false
+}
+
+func (x *Dialog) GetSortDate() int64 {
+	if x != nil {
+		return x.SortDate
+	}
+	return 0
 }
 
 type InviteLink struct {
@@ -5230,7 +5242,7 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\vpermissions\x18\x03 \x01(\rR\vpermissions\x12\x1f\n" +
 	"\tjoined_at\x18\x04 \x01(\x03B\x020\x02R\bjoinedAt\x12!\n" +
 	"\n" +
-	"inviter_id\x18\x05 \x01(\x03B\x020\x02R\tinviterId\"\xdc\x03\n" +
+	"inviter_id\x18\x05 \x01(\x03B\x020\x02R\tinviterId\"\xfd\x03\n" +
 	"\x06Dialog\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
 	"\atop_seq\x18\x02 \x01(\x03B\x020\x02R\x06topSeq\x12/\n" +
@@ -5246,7 +5258,8 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	" \x01(\x05R\x12pinnedMessageCount\x120\n" +
 	"\x12pinned_message_seq\x18\v \x01(\x03B\x020\x02R\x10pinnedMessageSeq\x12\x1f\n" +
 	"\vunread_mark\x18\f \x01(\bR\n" +
-	"unreadMark\"\xc2\x01\n" +
+	"unreadMark\x12\x1f\n" +
+	"\tsort_date\x18\r \x01(\x03B\x020\x02R\bsortDate\"\xc2\x01\n" +
 	"\n" +
 	"InviteLink\x12\x12\n" +
 	"\x04link\x18\x01 \x01(\tR\x04link\x12!\n" +

@@ -77,14 +77,24 @@ func TestClearSavedChatKeepsDialogAndPin(t *testing.T) {
 	if got := h.found(me, "zeta"); fmt.Sprint(got) != "[ghi chú mới zeta]" {
 		t.Fatalf("search after a new note = %v", got)
 	}
-	// An unpinned saved chat stays listed too.
+	// An unpinned saved chat stays listed too, in the same place: its sort
+	// date stays the time of the newest note, with no top message.
 	if _, err := h.svc.SetDialogPinned(ctx, me, saved, false); err != nil {
 		t.Fatal(err)
+	}
+	d, _ = h.dialogOf(me, saved)
+	sortDate := d.GetSortDate()
+	if sortDate == 0 || d.GetTopSeq() == 0 {
+		t.Fatalf("saved chat before clear: sort date %d, top %d", sortDate, d.GetTopSeq())
 	}
 	if _, err := h.svc.DeleteChat(ctx, me, saved); err != nil {
 		t.Fatal(err)
 	}
-	if d, pinned := h.dialogOf(me, saved); d == nil || slices.Contains(pinned, saved) {
+	d, pinned = h.dialogOf(me, saved)
+	if d == nil || slices.Contains(pinned, saved) {
 		t.Fatalf("unpinned saved chat after clear: dialog %v, pinned %v", d, pinned)
+	}
+	if d.GetTopSeq() != 0 || d.GetSortDate() != sortDate {
+		t.Fatalf("unpinned saved chat after clear: top %d, sort date %d, want 0 and %d", d.GetTopSeq(), d.GetSortDate(), sortDate)
 	}
 }

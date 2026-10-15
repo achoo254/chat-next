@@ -10,6 +10,7 @@ import type {
 	Message,
 	NotificationSettings,
 	ReactionCount,
+	ReplyKeyboard,
 	SyncState,
 	UpdateBody,
 	User,
@@ -165,7 +166,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			flag(message.recalled),
 			flag(message.silent),
 			message.media === undefined ? null : encodeMediaRef(message.media),
-			message.keyboard === undefined ? null : JSON.stringify(message.keyboard),
+			message.keyboard === undefined ? null : encodeKeyboard(message.keyboard),
 		],
 	);
 	w.emit(EventKeys.history(message.chatId), EventKeys.message(message.chatId, message.seq));
@@ -174,6 +175,13 @@ export function putMessage(w: WriteBatch, message: Message): void {
 export function putReactions(w: WriteBatch, chatId: number, seq: number, reactions: readonly ReactionCount[]): void {
 	w.add("UPDATE messages SET reactions = ? WHERE chat_id = ? AND seq = ?", [JSON.stringify(reactions), chatId, seq]);
 	w.emit(EventKeys.message(chatId, seq));
+}
+
+/** The keyboard as the bot sent it; hidden-on-this-device lives in its own column (putKeyboardHidden). */
+function encodeKeyboard(keyboard: ReplyKeyboard): string {
+	if (keyboard.kind === "remove") return JSON.stringify(keyboard);
+	const { hidden: _hidden, ...sent } = keyboard;
+	return JSON.stringify(sent);
 }
 
 /** Read state of the chat as a whole; forum topics get their own topic_id. */

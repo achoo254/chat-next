@@ -106,6 +106,12 @@ export interface ChatCore {
 	setDialogUnreadMark(chatId: number, unread: boolean): Promise<void>;
 	/** Hides or shows a bot message's reply keyboard on this device (kept locally). */
 	setKeyboardHidden(chatId: number, seq: number, hidden: boolean): Promise<void>;
+	/**
+	 * The bot's newest message in the chat that sets or removes a reply
+	 * keyboard, from the local database whatever part of the chat is on
+	 * screen; null for none. Changes arrive as EventKeys.history(chatId).
+	 */
+	botKeyboard(chatId: number, botId: number): Promise<StoredMessage | null>;
 	/** The user's notification settings, synced from the server. */
 	notificationSettings(): Promise<NotificationSettings>;
 	/** Changes some notification settings (online only); returns all of them. */
@@ -553,6 +559,10 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 			const w = new WriteBatch();
 			putKeyboardHidden(w, assertSafeId(chatId), assertSafeId(seq), hidden);
 			await repo.commit(w);
+		},
+		botKeyboard: async (chatId, botId) => {
+			active();
+			return repo.newestKeyboard(assertSafeId(chatId), assertSafeId(botId));
 		},
 		notificationSettings: async () => {
 			active();

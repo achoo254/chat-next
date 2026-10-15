@@ -760,7 +760,7 @@ export const enScreens: ScreensCopy = {
 		deleteGroup: (channel: boolean) => `Delete ${kind(channel)}`,
 		clearSaved: "Delete all messages",
 		savedTitle: "Delete everything in My Cloud?",
-		savedNote: "Deleted on all your devices and cannot be restored. My Cloud stays at the top of the list.",
+		savedNote: "Deleted on all your devices and cannot be restored. My Cloud stays in your chat list.",
 		savedAction: "Delete all",
 		savedDone: "Everything in My Cloud was deleted",
 		deletedGroup: (title: string, channel: boolean) => `${capital(kind(channel))} ${title} deleted`,

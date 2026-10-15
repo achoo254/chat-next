@@ -2,15 +2,16 @@
 // session: the caller's bots, a new bot, and one bot's profile, token and
 // commands. A token is shown once, right after it is issued; issuing one or
 // deleting a bot needs a recent sign-in, so the console sends the browser to
-// /auth/login?reauth=1 and, back on the same page, carries on with the
-// action (`?after=token` issues the token, `?after=delete` asks again).
+// /auth/login?reauth=1 and, back on the same page, asks once more
+// (`?after=token` or `?after=delete` opens the confirmation; only its button
+// acts, so a link carrying the parameter cannot issue a token by itself).
 // Bots receive updates by long polling only for now. Loaded on demand with
 // its own styles.
-import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
 import { signInUrl } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { Link, navigate, paths, type ConsolePage, type ConsoleTab } from "../../router.tsx";
+import { Link, navigate, paths, useSearch, type ConsolePage, type ConsoleTab } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { clock, orgDomain, shortDate } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
@@ -395,16 +396,15 @@ function CreateBot() {
 
 // ------------------------------------------------------------- one bot
 
-/** What to do on coming back from the reauth sign-in (?after=…). */
+/** What to ask again on coming back from the reauth sign-in (?after=…). */
 type After = "token" | "delete" | null;
 
-function takeAfter(): After {
-	const params = new URLSearchParams(window.location.search);
-	const after = params.get("after");
-	if (after === null) return null;
-	// Done once: a reload must not issue another token.
-	window.history.replaceState(null, "", window.location.pathname);
-	return after === "token" || after === "delete" ? after : null;
+/** The `?after=` of `search` when it belongs to `tab` (token on Token, delete on Hồ sơ); null otherwise. */
+function afterOf(search: string, tab: ConsoleTab): After {
+	const after = new URLSearchParams(search).get("after");
+	if (after === "token" && tab === "token") return "token";
+	if (after === "delete" && tab === "profile") return "delete";
+	return null;
 }
 
 /** Where the reauth sign-in sends the browser, coming back to `tab` to carry on with `after`. */
@@ -415,7 +415,19 @@ export function reauthUrl(locale: string, botId: number, tab: ConsoleTab, after:
 function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 	const t = useBotsCopy();
 	const [state, reload, put] = useMyBots();
-	const [after] = useState(takeAfter);
+	// ?after= is taken once per navigation: the tab opens its confirmation
+	// (remounted for a new one) and marks it shown, and the parameter leaves
+	// the URL, so neither a tab switch nor a reload asks again.
+	const search = useSearch();
+	const [taken, setTaken] = useState(() => ({ search, after: afterOf(search, tab), round: 0 }));
+	if (search !== taken.search) {
+		const next = afterOf(search, tab);
+		setTaken(next === null ? { ...taken, search } : { search, after: next, round: taken.round + 1 });
+	}
+	useEffect(() => {
+		if (new URLSearchParams(search).has("after")) navigate(window.location.pathname, { replace: true });
+	}, [search]);
+	const shown = () => setTaken((current) => (current.after === null ? current : { ...current, after: null }));
 	const bot = state.status === "ready" ? (state.value.find((b) => b.id === botId) ?? null) : null;
 	const titleId = useDomId("bot");
 	const TABS: readonly ConsoleTab[] = ["profile", "token", "commands"];
@@ -454,9 +466,9 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 					</nav>
 					<div className="c-body">
 						{tab === "profile" ? (
-							<ProfileTab bot={bot} onSaved={put} deleteNow={after === "delete"} />
+							<ProfileTab key={taken.round} bot={bot} onSaved={put} confirmNow={taken.after === "delete"} onConfirmShown={shown} />
 						) : tab === "token" ? (
-							<TokenTab bot={bot} onIssued={put} issueNow={after === "token"} />
+							<TokenTab key={taken.round} bot={bot} onIssued={put} confirmNow={taken.after === "token"} onConfirmShown={shown} />
 						) : (
 							<CommandsTab bot={bot} onSaved={put} />
 						)}
@@ -537,7 +549,22 @@ function ConfirmDialog({
 
 // ---------------------------------------------------------------- profile
 
-function ProfileTab({ bot, onSaved, deleteNow }: { bot: OwnBot; onSaved: (bot: OwnBot) => void; deleteNow: boolean }) {
+/** `confirmNow`: back from the reauth sign-in, open the tab's confirmation (delete or issue), then call `onConfirmShown`. */
+interface TabProps {
+	bot: OwnBot;
+	confirmNow: boolean;
+	onConfirmShown: () => void;
+}
+
+/** Marks a confirmation opened from ?after= as shown, once the tab has it on screen. */
+function useConfirmShown(confirmNow: boolean, onConfirmShown: () => void): void {
+	const report = useEffectEvent(onConfirmShown);
+	useEffect(() => {
+		if (confirmNow) report();
+	}, [confirmNow]);
+}
+
+function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { onSaved: (bot: OwnBot) => void }) {
 	const t = useBotsCopy();
 	const copy = useCopy();
 	const { locale } = useI18n();
@@ -548,7 +575,8 @@ function ProfileTab({ bot, onSaved, deleteNow }: { bot: OwnBot; onSaved: (bot: O
 	const [privacy, setPrivacy] = useState(bot.privacy);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState("");
-	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(deleteNow ? "confirm" : null);
+	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(confirmNow ? "confirm" : null);
+	useConfirmShown(confirmNow, onConfirmShown);
 	const [deleting, setDeleting] = useState(false);
 	const formId = useDomId("profile");
 	const nameId = useDomId("pf-name");
@@ -690,14 +718,16 @@ function ProfileTab({ bot, onSaved, deleteNow }: { bot: OwnBot; onSaved: (bot: O
 
 // ------------------------------------------------------------------ token
 
-function TokenTab({ bot, onIssued, issueNow }: { bot: OwnBot; onIssued: (bot: OwnBot) => void; issueNow: boolean }) {
+function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { onIssued: (bot: OwnBot) => void }) {
 	const t = useBotsCopy();
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const { bots, toasts } = useServices();
 	const [token, setToken] = useState("");
 	const [busy, setBusy] = useState(false);
-	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(null);
+	// Back from the reauth sign-in: the user asks once more with the confirmation's button.
+	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(confirmNow ? "confirm" : null);
+	useConfirmShown(confirmNow, onConfirmShown);
 	const titleId = useDomId("token");
 
 	const issue = async () => {
@@ -718,15 +748,6 @@ function TokenTab({ bot, onIssued, issueNow }: { bot: OwnBot; onIssued: (bot: Ow
 			setBusy(false);
 		}
 	};
-	const issueOnReturn = useEffectEvent(() => void issue());
-
-	// Back from the reauth sign-in: the user already asked for the token.
-	const started = useRef(false);
-	useEffect(() => {
-		if (!issueNow || started.current) return;
-		started.current = true;
-		issueOnReturn();
-	}, [issueNow]);
 
 	const masked = `${bot.id}:${"•".repeat(24)}`;
 	const snippet = `GET ${apiBase()}/updates?offset=<update_id + 1>&timeout=50\nAuthorization: Bearer <token>`;
@@ -795,23 +816,35 @@ function TokenTab({ bot, onIssued, issueNow }: { bot: OwnBot; onIssued: (bot: Ow
 				<p>{t.token.pollNote}</p>
 				<pre className="snippet">{snippet}</pre>
 			</div>
-			{dialog === "confirm" && (
-				<ConfirmDialog
-					title={t.token.confirmTitle}
-					body={
-						<div className="banner warn">
-							<Icon name="alert" small />
-							<span className="grow">{t.token.confirmBody(bot.name)}</span>
-						</div>
-					}
-					action={t.token.reissue}
-					busyLabel={t.token.issuing}
-					busy={busy}
-					danger
-					onConfirm={() => void issue()}
-					onClose={() => setDialog(null)}
-				/>
-			)}
+			{dialog === "confirm" &&
+				(bot.hasToken ? (
+					<ConfirmDialog
+						title={t.token.confirmTitle}
+						body={
+							<div className="banner warn">
+								<Icon name="alert" small />
+								<span className="grow">{t.token.confirmBody(bot.name)}</span>
+							</div>
+						}
+						action={t.token.reissue}
+						busyLabel={t.token.issuing}
+						busy={busy}
+						danger
+						onConfirm={() => void issue()}
+						onClose={() => setDialog(null)}
+					/>
+				) : (
+					<ConfirmDialog
+						title={t.token.issueTitle(bot.name)}
+						body={<p className="dlg-lede">{t.token.issueBody}</p>}
+						action={t.token.issue}
+						busyLabel={t.token.issuing}
+						busy={busy}
+						danger={false}
+						onConfirm={() => void issue()}
+						onClose={() => setDialog(null)}
+					/>
+				))}
 			{dialog === "reauth" && (
 				<ReauthDialog
 					body={t.reauth.bodyToken}

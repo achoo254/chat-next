@@ -2,7 +2,7 @@
 // downloaded through short-lived URLs, which the core refreshes on its
 // own), the local file and progress of an upload, and whether a picture is
 // near the viewport (pictures load lazily).
-import { EventKeys, toBase64, type MediaRequest, type MediaSizeType, type UploadProgress } from "@app/core";
+import { EventKeys, type MediaRequest, type MediaSizeType, type UploadProgress } from "@app/core";
 import { useCallback, useEffect, useState } from "react";
 import { useServices } from "../data/services.tsx";
 
@@ -140,9 +140,4 @@ export function useNearViewport(): [(element: Element | null) => (() => void) | 
 		return () => observer.disconnect();
 	}, []);
 	return [ref, near];
-}
-
-/** The inline thumbnail (a JPEG of a few hundred bytes) as a data URL; "" when there is none. */
-export function inlineThumbUrl(bytes: Uint8Array): string {
-	return bytes.length === 0 ? "" : `data:image/jpeg;base64,${toBase64(bytes)}`;
 }

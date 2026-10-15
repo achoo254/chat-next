@@ -16,6 +16,7 @@ export const CORE_METHODS = [
 	"markRead",
 	"setDialogUnreadMark",
 	"setKeyboardHidden",
+	"botKeyboard",
 	"notificationSettings",
 	"setNotificationSettings",
 	"pinnedMessages",

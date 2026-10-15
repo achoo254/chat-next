@@ -5,7 +5,7 @@ import { MessageSchema } from "@app/proto-ts/messages";
 import { fromBase64 } from "../src/media/codec.ts";
 import { toMessage } from "../src/protocol/map.ts";
 import { FakeServer } from "./support/fake-server.ts";
-import { settle, startTestApp } from "./support/harness.ts";
+import { dbName, settle, startTestApp } from "./support/harness.ts";
 import { MemorySqlFactory } from "./support/node-sql.ts";
 
 beforeEach(() => {
@@ -141,6 +141,9 @@ describe("bot reply markup", () => {
 		await settle(core);
 		const keyboardOf = async (app: typeof core) => (await app.history(chat)).messages.find((m) => m.seq === seq)?.keyboard;
 		expect(await keyboardOf(core)).toMatchObject({ kind: "keyboard", hidden: false });
+		// The stored markup is what the bot sent; hidden lives in its own column.
+		const stored = sql.db(dbName(self)).prepare("SELECT reply_keyboard FROM messages WHERE chat_id = ? AND seq = ?").get(chat, seq);
+		expect(JSON.parse(String(stored?.reply_keyboard))).not.toHaveProperty("hidden");
 
 		await core.setKeyboardHidden(chat, seq, true);
 		expect(await keyboardOf(core)).toMatchObject({ kind: "keyboard", hidden: true });
@@ -156,5 +159,28 @@ describe("bot reply markup", () => {
 		await again.core.setKeyboardHidden(chat, seq, false);
 		expect(await keyboardOf(again.core)).toMatchObject({ hidden: false });
 		await again.core.close();
+	});
+
+	it("finds the bot's newest keyboard markup of a chat in the local database", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const bot = server.addUser("Deploy Bot");
+		const chat = server.createChat(ChatType.PRIVATE, "", [self, bot]);
+		const { core } = await startTestApp(server, self, new MemorySqlFactory());
+		await settle(core);
+		expect(await core.botKeyboard(chat, bot)).toBeNull();
+
+		const keys = (label: string) => ({ replyMarkup: { kind: { case: "keyboard" as const, value: { rows: [{ buttons: [{ text: label }] }] } } } });
+		server.sendMessage(bot, chat, "Chọn ca", 0, keys("Ca cũ"));
+		const newest = server.sendMessage(bot, chat, "Chọn ca mới", 0, keys("Ca mới")).seq;
+		server.sendMessage(bot, chat, "Nhật ký");
+		server.sendMessage(self, chat, "staging");
+		await settle(core);
+		expect(await core.botKeyboard(chat, bot)).toMatchObject({ seq: newest, keyboard: { kind: "keyboard", rows: [["Ca mới"]] } });
+
+		const removed = server.sendMessage(bot, chat, "Xong", 0, { replyMarkup: { kind: { case: "remove", value: {} } } }).seq;
+		await settle(core);
+		expect(await core.botKeyboard(chat, bot)).toMatchObject({ seq: removed, keyboard: { kind: "remove" } });
+		await core.close();
 	});
 });

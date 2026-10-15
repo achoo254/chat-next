@@ -62,3 +62,89 @@ Kiểm thử lại:
 Status: DONE
 Summary: Đã làm xong Console, deep link, Bắt đầu, menu lệnh, bàn phím trả lời và nút inline, năm sửa cho Cloud, và hai sửa của Jev (ô soạn tin bot ở màn hẹp, lưu trạng thái ẩn bàn phím). lint, typecheck, test, perf, e2e đều pass.
 Concerns/Blockers: Hành vi giữ Cloud trong danh sách dựa vào thay đổi server của backend agent (client đã xử lý chuỗi update và có test).
+
+## Sửa theo review
+
+Ngày 2026-10-15. Sửa mọi điểm trong `code-reviewer-261015-1531-r5-slice-a-web.md` trên commit `4affc40`. Chưa commit, không đụng production.
+
+### High
+
+- **H1, `?after=` không còn tự hành động** (`bots/console.tsx`). Khi quay về từ trang đăng nhập lại, Console mở hộp xác nhận và chỉ cấp token hay xoá bot khi người dùng bấm nút trong hộp.
+  - Bot chưa có token: hộp mới "Cấp token cho <bot>?" có nút chính "Cấp token".
+  - Bot đã có token: dùng hộp "Cấp lại token?" như cũ.
+  - `after=delete` mở "Xoá <bot>?" như trước.
+  - `?after=` chỉ có hiệu lực ở đúng tab của nó (token ở tab Token, delete ở tab Hồ sơ) và được lấy một lần cho mỗi lần điều hướng. `BotPage` theo dõi query qua `useSearch()` mới trong `router.tsx`. Tab hiện hộp rồi báo đã hiện, nên `after` về `null`. Tham số bị xoá khỏi URL bằng `navigate(pathname, { replace: true })`.
+  - Hệ quả: chuyển tab, tải lại trang, hay mở lại một link có `?after=` đều không hỏi lại và không cấp token.
+  - Mock `console.html#token` được cập nhật trước, thêm câu mô tả hành vi này.
+
+### Medium
+
+- **M1, Cloud không ghim giữ chỗ sau khi xoá.** Thứ tự là thời điểm tin cuối cùng trước khi xoá, khớp với thứ tự `last_message_at` mà server vẫn dùng cho GetDialogs.
+  - Proto thêm `Dialog.sort_date = 13` (thay đổi bổ sung, `buf breaking` sạch, đã chạy `pnpm proto:gen`).
+  - Server: `chatRow.LastMessageAt` đọc từ `chatColumns`, và `dialogs()` điền `SortDate`.
+  - Client:
+    - `Dialog.sortDate`. `engine.putDialog` dùng giá trị này khi dialog không có tin đầu (Cloud vừa xoá).
+    - `apply.ts`: khi nhận `chat_updated` của Cloud thì thêm `refreshChats`, nên dialog được tải lại qua GetPeerDialogs cùng `sort_date`.
+  - Chữ ghi chú đổi thành "Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở trong danh sách chat." Mock `chat.html#delete-chat` (đoạn mô tả và hộp) được sửa trước, rồi tới copy vi/en.
+- **M2, bàn phím trả lời lấy từ SQLite local, không từ cửa sổ tin đang tải.**
+  - `Repository.newestKeyboard` truy vấn tin mới nhất của bot có `reply_keyboard IS NOT NULL`.
+  - Thêm `ChatCore.botKeyboard` (có trong `CORE_METHODS` và `ChatSource`).
+  - `useBotKeyboard` trong `bot-chat.tsx` đọc lại mỗi khi có `EventKeys.history(chatId)` và bỏ qua câu trả lời cũ về muộn. Đã bỏ `activeKeyboard`, hàm cũ dựa theo cửa sổ tin.
+- **M3, nút inline có timeout 15 giây phía client** (`bots/client.ts`, `PRESS_TIMEOUT_MS`). `Promise.race` cùng `AbortController`, nên request bị huỷ. Khi hết giờ, kết quả là `timedOut: true`: UI hiện "Bot không phản hồi" và xoá trạng thái chờ. Trạng thái chờ vẫn là `Cell` cấp module, nên an toàn khi component đã unmount.
+
+### Low
+
+- **L1:** StartBot nhận `randomId` từ bên gọi. Hộp deep link và thanh "Bắt đầu" giữ một id cho mỗi lần hiện (`useState(cryptoRandomId)`), nên bấm lại sau khi mất phản hồi không gửi `/start` lần hai (server đã dedupe theo random_id).
+- **L2:** URL trong câu trả lời của bot nếu cùng origin với app thì mở ngay trong app (`laterLinkOpener` → `navigate`), không còn `window.open` sau `await`. Link khác vẫn đi qua `openLink` như cũ.
+- **L3:** `inlineThumbUrl` chuyển sang `data/format.ts` và được dùng chung cho chat-row, media-content và viewer.
+- **L4:** Enter trong menu lệnh giữ hành vi Telegram, không đổi (theo chỉ đạo).
+- **L5:** Hộp deep link đọc `start` qua `useSearch()` và dùng key `username?start`, nên khi chỉ đổi query thì hộp mở lại với lệnh mới.
+- **L6:** `encodeKeyboard` bỏ `hidden` trước khi lưu JSON, vì `hidden` nằm ở cột riêng.
+
+### Test mới
+
+- **web `bots.test.tsx`:**
+  - Quay về với `after=token` chỉ hiện hộp và không gọi ResetBotToken cho tới khi bấm. Chuyển tab rồi quay lại không hỏi lại, số lần reset vẫn giữ nguyên.
+  - Link `?after=token` tuỳ ý: Huỷ, rồi chuyển tab, vẫn 0 ResetBotToken.
+  - `?after=token` ở tab Hồ sơ bị bỏ qua.
+  - `after=delete`: Huỷ, rồi chuyển tab, không hỏi lại và 0 DeleteBot.
+  - Bấm nút inline bị treo: hết 15 giây thì hiện "Bot không phản hồi", trạng thái chờ được xoá. URL câu trả lời cùng origin mở trong app, không gọi `window.open`.
+  - Bàn phím: nhảy tới tin ghim cũ vẫn hiện bàn phím mới nhất; bàn phím nằm ngoài 200 tin đã tải vẫn hiện. Cả hai test đã chạy thử và fail trên code cũ.
+  - StartBot mất phản hồi rồi bấm lại: cùng random_id, chỉ có một `/start`.
+  - Deep link chỉ đổi query thì hiện lệnh mới.
+- **core:**
+  - `saved-chat-clear.test.ts`: Cloud không ghim giữ vị trí giữa hai chat, cả khi đang chạy lẫn khi một máy mới đồng bộ từ đầu. Bỏ phần sửa thì test fail.
+  - `bot-markup.test.ts`: JSON đã lưu không có `hidden`; `botKeyboard` trả về bàn phím mới nhất, rồi trả về lệnh `remove`.
+- **server:** `saved_clear_test.go` kiểm `sort_date` giữ nguyên và `top_seq = 0` sau khi xoá Cloud không ghim.
+- **e2e:** `bots.e2e.ts` bấm "Cấp token" trong hộp xác nhận sau khi đăng nhập lại.
+
+### Bằng chứng
+
+- `pnpm lint`: eslint `--max-warnings=0` không lỗi, không cảnh báo; `check-brand: no hard-coded product name`.
+- `pnpm typecheck`: 6/6 project `Done`.
+- vitest `--maxWorkers=2`, chạy lần lượt từng package:
+
+  | Package | File | Test |
+  |---|---|---|
+  | core | 23 | 761 pass |
+  | platform-web | 5 | 17 pass |
+  | brand | 1 | 7 pass |
+  | web | 23 | 252 pass |
+
+- `pnpm perf`: tất cả budget đạt. Startup JS 141,0 KB / 150 (trước 140,8), CSS 16,2 KB / 20. Mở chat p50 18 ms, p99 25 ms. History scroll 60 fps, khung dài nhất 33 ms (raw 0 khung quá 32 ms).
+- `pnpm e2e`: 17/17 pass, 60 giây.
+- Server:
+  - `gofmt -l` không có file nào; `go vet ./internal/chat/ ./gen/...` sạch; `golangci-lint run ./internal/chat/...` cho 0 issues.
+  - `go test -race -count=1 ./internal/chat/` ok (32 giây). `go build ./...` ok.
+  - `buf lint` và `buf breaking` sạch.
+- Kiểm hình bằng Playwright trên e2e stack, ở 1333x780 và 390x844. Đã chụp: hộp "Cấp token cho <bot>?" sau `?after=token`, hộp xoá bot sau `?after=delete`, hộp xoá Cloud với chữ mới. Không phần tử nào cuộn ngang, và query bị xoá khỏi URL ở cả hai kích thước. Stack đã được dừng.
+- gitleaks trên các file đã đổi và trên `git diff`: "no leaks found".
+
+### Còn lưu ý
+
+- Trên máy đang mở, lúc xoá Cloud không ghim có thể có một khoảnh khắc ngắn (một lượt GetPeerDialogs) Cloud nằm cuối danh sách, sau đó trở về đúng chỗ. Nếu không có mạng thì Cloud nằm cuối cho tới lần đồng bộ sau.
+- Chat rỗng hoàn toàn (không có tin nào nhìn thấy được) giờ được xếp theo `sort_date` của server (thời điểm tạo hoặc tin cuối) thay vì luôn nằm cuối. Thứ tự này khớp với phân trang của server.
+
+Status: DONE
+Summary: Đã sửa H1, M1 (gồm thay đổi proto/server `Dialog.sort_date`), M2, M3 và L1–L6 (riêng L4 giữ nguyên theo chỉ đạo), có test cho từng điểm. lint, typecheck, test, perf, e2e, các bước kiểm server và gitleaks đều sạch.
+Concerns/Blockers: Lúc xoá Cloud không ghim có thể thoáng thấy Cloud nhảy xuống cuối trong một round trip (xem trên).

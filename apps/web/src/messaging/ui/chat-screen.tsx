@@ -7,7 +7,7 @@
 // ⌘/Ctrl+/ opens the shortcut list.
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
-import { navigate, paths, type Route } from "../../router.tsx";
+import { navigate, paths, useSearch, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
@@ -109,6 +109,8 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 	useEffect(() => () => void source.openChat(0).catch(() => undefined), [source]);
 
 	const onVisibleChats = useCallback((ids: readonly number[]) => setVisible(ids), []);
+	// A bot link's start parameter: another one in place (same path) opens a new dialog.
+	const startParam = new URLSearchParams(useSearch()).get("start") ?? "";
 	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts;
 
 	const pickFolder = (next: Folder) => {
@@ -169,7 +171,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 			)}
 			{route.name === "bot" && (
 				<Suspense fallback={null}>
-					<BotLinkDialog key={route.username} username={route.username} startParam={new URLSearchParams(window.location.search).get("start") ?? ""} />
+					<BotLinkDialog key={`${route.username}?${startParam}`} username={route.username} startParam={startParam} />
 				</Suspense>
 			)}
 		</UiContext>

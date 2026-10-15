@@ -1149,6 +1149,7 @@ export function toSource(core: ChatCore): ChatSource {
 		markRead: (chatId, maxSeq) => core.markRead(chatId, maxSeq),
 		setDialogUnreadMark: (chatId, unread) => core.setDialogUnreadMark(chatId, unread),
 		setKeyboardHidden: (chatId, seq, hidden) => core.setKeyboardHidden(chatId, seq, hidden),
+		botKeyboard: (chatId, botId) => core.botKeyboard(chatId, botId),
 		notificationSettings: () => core.notificationSettings(),
 		setNotificationSettings: (change) => core.setNotificationSettings(change),
 		pinnedMessages: (chatId, request) => core.pinnedMessages(chatId, request),

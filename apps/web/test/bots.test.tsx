@@ -5,15 +5,15 @@
 // reply keyboard and the command menu.
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BotCommandScope } from "@app/proto-ts/bot_admin";
 import { ChatType } from "@app/proto-ts/chats";
-import { matchCommands, activeKeyboard } from "../src/messaging/bots/bot-chat.tsx";
+import { matchCommands } from "../src/messaging/bots/bot-chat.tsx";
 import { startCommand } from "../src/messaging/bots/bot-link-dialog.tsx";
 import { reauthUrl, usernameSuggestions } from "../src/messaging/bots/console.tsx";
 import { usernameProblem, validStartParam } from "../src/messaging/bots/api.ts";
 import { inAppBotLink } from "../src/messaging/ui/rich-text.tsx";
-import { matchRoute, returnPathFor } from "../src/router.tsx";
+import { matchRoute, navigate, returnPathFor } from "../src/router.tsx";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 
@@ -68,7 +68,6 @@ describe("bot routes and helpers", () => {
 		expect(matchCommands(commands, "/deploy now", false)).toEqual([]);
 		expect(matchCommands(commands, "hi", false)).toEqual([]);
 		expect(matchCommands(commands, "", true)).toHaveLength(2);
-		expect(typeof activeKeyboard).toBe("function");
 	});
 });
 
@@ -127,14 +126,20 @@ describe("Developer Console", () => {
 		expect(window.location.pathname).toBe("/console/new");
 	});
 
-	it("issues the token on coming back from the sign-in, shows it once and masks it after", async () => {
+	it("asks once more on coming back from the sign-in, then shows the token once and masks it after", async () => {
 		const demo = seedDemo();
 		const fake = demo.fixture.bots;
 		const botId = fake.seed("Báo cáo Bot", "report_daily_bot");
+		const resets = () => fake.calls.filter((call) => call === `ResetBotToken ${botId}`).length;
 		renderMessaging(demo.fixture, `/console/${botId}/token?after=token`);
+		// Nothing is issued until the confirmation's button is pressed.
+		const ask = await screen.findByRole("dialog", { name: "Cấp token cho Báo cáo Bot?" }, LONG);
+		expect(resets()).toBe(0);
+		await waitFor(() => expect(window.location.search).toBe(""));
+		await userEvent.click(within(ask).getByRole("button", { name: "Cấp token" }));
 		const token = await screen.findByTestId("bot-token", {}, LONG);
 		expect(token.textContent).toBe(`${botId}:${fake.bots.get(botId)?.tokenSecret ?? "?"}`);
-		expect(window.location.search).toBe("");
+		expect(screen.queryByRole("dialog")).toBeNull();
 		expect(screen.getByText(/Token chỉ hiện một lần/)).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Sao chép" })).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "Tôi đã lưu token" }));
@@ -146,9 +151,47 @@ describe("Developer Console", () => {
 		const confirm = await screen.findByRole("dialog", { name: "Cấp lại token?" }, LONG);
 		await userEvent.click(within(confirm).getByRole("button", { name: "Cấp lại token" }));
 		expect(await screen.findByTestId("bot-token", {}, LONG)).toBeTruthy();
-		expect(fake.calls.filter((call) => call === `ResetBotToken ${botId}`)).toHaveLength(2);
+		expect(resets()).toBe(2);
 		// The poll line explains how updates arrive.
 		expect(screen.getByText(/GET http:\/\/localhost(:\d+)?\/bot\/v1\/updates/)).toBeTruthy();
+		// Another tab and back: the return from the sign-in is not acted on again.
+		await userEvent.click(screen.getByRole("link", { name: "Hồ sơ" }));
+		await screen.findByRole("form", { name: "Hồ sơ bot" }, LONG);
+		await userEvent.click(screen.getByRole("link", { name: "Token" }));
+		await screen.findByRole("button", { name: "Cấp lại token" }, LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(resets()).toBe(2);
+	});
+
+	it("a link carrying ?after=token only opens the confirmation, and a tab switch does not reopen it", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		const botId = fake.seed("Trực ca Bot", "oncall_bot", { tokenSecret: "s", tokenIssuedAt: fake.now });
+		renderMessaging(demo.fixture, `/console/${botId}/token?after=token`);
+		const ask = await screen.findByRole("dialog", { name: "Cấp lại token?" }, LONG);
+		await waitFor(() => expect(window.location.search).toBe(""));
+		await userEvent.click(within(ask).getByRole("button", { name: "Huỷ" }));
+		expect(screen.queryByRole("dialog")).toBeNull();
+		await userEvent.click(screen.getByRole("link", { name: "Lệnh" }));
+		await screen.findByRole("form", { name: "Lệnh" }, LONG);
+		await userEvent.click(screen.getByRole("link", { name: "Token" }));
+		await screen.findByRole("button", { name: "Cấp lại token" }, LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(fake.calls).not.toContain(`ResetBotToken ${botId}`);
+		expect(fake.bots.get(botId)?.tokenSecret).toBe("s");
+	});
+
+	it("ignores ?after= on a tab it does not belong to", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		const botId = fake.seed("Trực ca Bot", "oncall_bot", { tokenSecret: "s", tokenIssuedAt: fake.now });
+		renderMessaging(demo.fixture, `/console/${botId}?after=token`);
+		await screen.findByRole("form", { name: "Hồ sơ bot" }, LONG);
+		await waitFor(() => expect(window.location.search).toBe(""));
+		await userEvent.click(screen.getByRole("link", { name: "Token" }));
+		await screen.findByRole("button", { name: "Cấp lại token" }, LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(fake.calls).not.toContain(`ResetBotToken ${botId}`);
 	});
 
 	it("lists bots, edits the profile and deletes a bot after signing in again", async () => {
@@ -174,6 +217,22 @@ describe("Developer Console", () => {
 		const reauth = await screen.findByRole("dialog", { name: "Đăng nhập lại để tiếp tục" }, LONG);
 		expect(within(reauth).getByRole("link", { name: "Đăng nhập lại" }).getAttribute("href")).toContain(`return_to=%2Fconsole%2F${botId}%3Fafter%3Ddelete`);
 		expect(fake.bots.get(botId)?.deleted).toBe(false);
+	});
+
+	it("asks about deleting once after the sign-in: cancelled, a tab switch does not ask again", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		const botId = fake.seed("Trực ca Bot", "oncall_bot");
+		renderMessaging(demo.fixture, `/console/${botId}?after=delete`);
+		const confirm = await screen.findByRole("dialog", { name: "Xoá Trực ca Bot?" }, LONG);
+		await waitFor(() => expect(window.location.search).toBe(""));
+		await userEvent.click(within(confirm).getByRole("button", { name: "Huỷ" }));
+		await userEvent.click(screen.getByRole("link", { name: "Token" }));
+		await screen.findByRole("button", { name: "Cấp token" }, LONG);
+		await userEvent.click(screen.getByRole("link", { name: "Hồ sơ" }));
+		await screen.findByRole("form", { name: "Hồ sơ bot" }, LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(fake.calls).not.toContain(`DeleteBot ${botId}`);
 	});
 
 	it("asks again after the sign-in and deletes the bot", async () => {
@@ -234,11 +293,27 @@ describe("bots in chats", () => {
 		const dialog = await screen.findByRole("dialog", { name: "Mở Deploy Bot" }, LONG);
 		expect(within(dialog).getByText("Gửi /start release-241 cho Deploy Bot?")).toBeTruthy();
 		expect(within(dialog).getByText("Theo dõi pipeline và đẩy bản phát hành.")).toBeTruthy();
+		// The first answer is lost: pressing again repeats the same request, not a second /start.
+		fake.loseNextStartAnswer = true;
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi /start release-241" }));
+		await waitFor(() => expect(toastText()).toBe("Không thực hiện được, thử lại sau ít phút."));
 		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi /start release-241" }));
 		await waitFor(() => expect(window.location.pathname).toBe(`/c/${demo.ids.bot}`), LONG);
-		expect(fake.calls).toContain(`StartBot ${deployBot} release-241`);
+		expect(fake.calls.filter((call) => call === `StartBot ${deployBot} release-241`)).toHaveLength(2);
+		expect(new Set(fake.startRandomIds).size).toBe(1);
 		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
 		expect(await within(log).findByText("/start release-241", {}, LONG)).toBeTruthy();
+		expect(within(log).getAllByText("/start release-241")).toHaveLength(1);
+	});
+
+	it("a bot link opened again in place with another start parameter shows that one", async () => {
+		const demo = seedDemo();
+		demo.fixture.bots.adopt(demo.ids.users.deployBot, "Deploy Bot", "deploy_bot", { owned: false });
+		renderMessaging(demo.fixture, "/b/deploy_bot?start=release-241");
+		expect(await screen.findByRole("button", { name: "Gửi /start release-241" }, LONG)).toBeTruthy();
+		act(() => navigate("/b/deploy_bot?start=release-242"));
+		expect(await screen.findByRole("button", { name: "Gửi /start release-242" }, LONG)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Gửi /start release-241" })).toBeNull();
 	});
 
 	it("cancelling a bot link sends nothing", async () => {
@@ -385,6 +460,96 @@ describe("bots in chats", () => {
 		expect(within(await screen.findByRole("listbox", { name: "Lệnh của bot" })).getAllByRole("option")).toHaveLength(2);
 		await userEvent.click(screen.getByRole("option", { name: /\/status/ }));
 		expect((box as HTMLTextAreaElement).value).toBe("/status ");
+	});
+
+	it("gives up on a press the server leaves unanswered for 15 seconds, and opens this app's links from an answer in place", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const { deployBot } = demo.ids.users;
+		f.bots.adopt(deployBot, "Deploy Bot", "deploy_bot", { owned: false });
+		f.send(deployBot, demo.ids.bot, "Xem nhóm vận hành?", {
+			replyMarkup: {
+				kind: {
+					case: "inlineKeyboard",
+					value: { rows: [{ buttons: [{ text: "Mở nhóm", action: { case: "callbackData", value: utf8.encode("open") } }] }] },
+				},
+			},
+		});
+		// A connection that stalls: the server never answers.
+		f.bots.holdPress = new Promise<void>(() => undefined);
+		renderMessaging(f, `/c/${demo.ids.bot}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		const button = await within(log).findByRole("button", { name: "Mở nhóm" }, LONG);
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+		try {
+			await userEvent.click(button);
+			await waitFor(() => expect(within(log).getByRole("button", { name: /Mở nhóm/ }).getAttribute("aria-busy")).toBe("true"));
+			await act(async () => {
+				vi.advanceTimersByTime(14_000);
+				await Promise.resolve();
+			});
+			expect(within(log).getByText("Đang chờ bot")).toBeTruthy();
+			await act(async () => {
+				vi.advanceTimersByTime(1_000);
+				await Promise.resolve();
+			});
+			await waitFor(() => expect(toastText()).toBe("Bot không phản hồi"));
+			await waitFor(() => expect(within(log).getByRole("button", { name: "Mở nhóm" }).getAttribute("aria-busy")).toBe("false"));
+		} finally {
+			vi.useRealTimers();
+		}
+
+		// The bot answers with a page of this app: it opens in place (no new tab to block).
+		f.bots.holdPress = null;
+		f.bots.answers.push({ url: `${window.location.origin}/c/${demo.ids.ops}` });
+		const opened = vi.spyOn(window, "open");
+		try {
+			await userEvent.click(within(log).getByRole("button", { name: "Mở nhóm" }));
+			await waitFor(() => expect(window.location.pathname).toBe(`/c/${demo.ids.ops}`), LONG);
+			expect(opened).not.toHaveBeenCalled();
+		} finally {
+			opened.mockRestore();
+		}
+	});
+
+	it("keeps the bot's newest reply keyboard after a jump to an older message", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const botId = f.bots.seed("Trực ca Bot", "oncall_bot", { owned: false });
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, botId]);
+		const keyboard = (label: string) => ({ replyMarkup: { kind: { case: "keyboard" as const, value: { rows: [{ buttons: [{ text: label }] }] } } } });
+		const old = f.send(botId, chat, "Chọn ca", keyboard("Ca cũ"));
+		f.server.pin(chat, old, true);
+		for (let i = 0; i < 200; i++) f.send(botId, chat, `Nhật ký ${i}`);
+		const last = f.send(botId, chat, "Chọn ca mới", keyboard("Ca mới"));
+		f.server.readHistory(f.selfId, chat, last);
+		renderMessaging(f, `/c/${chat}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		const pad = () => screen.findByRole("group", { name: "Bàn phím của Trực ca Bot" }, LONG);
+		expect(within(await pad()).getByRole("button", { name: "Ca mới" })).toBeTruthy();
+		// The pinned bar jumps to the old message: only that part of the chat is loaded now.
+		await userEvent.click(await screen.findByRole("button", { name: "Nhảy tới tin ghim" }, LONG));
+		expect(await within(log).findByText("Chọn ca", {}, LONG)).toBeTruthy();
+		await waitFor(() => expect(within(log).queryByText("Chọn ca mới")).toBeNull(), LONG);
+		expect(within(await pad()).getByRole("button", { name: "Ca mới" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Ca cũ" })).toBeNull();
+	});
+
+	it("keeps the bot's reply keyboard when its message is far above what is loaded", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const botId = f.bots.seed("Trực ca Bot", "oncall_bot", { owned: false });
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, botId]);
+		f.send(botId, chat, "Chọn ca", { replyMarkup: { kind: { case: "keyboard", value: { rows: [{ buttons: [{ text: "Ca sáng" }] }] } } } });
+		let last = 0;
+		for (let i = 0; i < 200; i++) last = f.send(botId, chat, `Nhật ký ${i}`);
+		f.server.readHistory(f.selfId, chat, last);
+		renderMessaging(f, `/c/${chat}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		expect(await within(log).findByText("Nhật ký 199", {}, LONG)).toBeTruthy();
+		expect(within(log).queryByText("Chọn ca")).toBeNull();
+		const pad = await screen.findByRole("group", { name: "Bàn phím của Trực ca Bot" }, LONG);
+		expect(within(pad).getByRole("button", { name: "Ca sáng" })).toBeTruthy();
 	});
 
 	it("tags bots by name in group messages", async () => {

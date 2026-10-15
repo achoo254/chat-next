@@ -85,6 +85,8 @@ export const enBots: BotsCopy = {
 		issuing: "Issuing…",
 		pollTitle: "Receiving updates",
 		pollNote: "The bot receives updates by long polling: your server asks for them, each request waits up to 50 seconds; with two requests at once the earlier one gets 409.",
+		issueTitle: (name) => `Issue a token for ${name}?`,
+		issueBody: "The token is shown only once, right after it is issued; have a place to store it ready.",
 		confirmTitle: "Issue a new token?",
 		confirmBody: (name) => `The old token stops working at once: ${name} gets 401 errors until you update it.`,
 		issued: "New token issued",

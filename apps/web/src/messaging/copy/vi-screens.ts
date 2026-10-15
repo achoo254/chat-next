@@ -767,7 +767,7 @@ export const viScreens = {
 		/** "Cloud của tôi" (mockups/chat.html#delete-chat): every note goes, the chat stays. */
 		clearSaved: "Xoá toàn bộ tin nhắn",
 		savedTitle: "Xoá toàn bộ tin trong Cloud của tôi?",
-		savedNote: "Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở đầu danh sách.",
+		savedNote: "Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở trong danh sách chat.",
 		savedAction: "Xoá toàn bộ",
 		savedDone: "Đã xoá toàn bộ tin trong Cloud của tôi",
 	},

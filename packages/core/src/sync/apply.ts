@@ -179,8 +179,11 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 				effects.purgedChats.add(body.chat.id);
 			} else if (isSavedChat(body.chat, selfId)) {
 				// Clearing "Cloud của tôi" sends chat_deleted then chat_updated: the
-				// chat stays in the list, empty, even when it is not pinned.
+				// chat stays in the list, empty, even when it is not pinned. Its
+				// dialog comes again from the server, with the sort date that keeps
+				// its place in the list.
 				ensureDialog(w, body.chat.id);
+				effects.refreshChats.add(body.chat.id);
 			}
 			return;
 		case "topic_changed":

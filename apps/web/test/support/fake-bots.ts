@@ -67,6 +67,10 @@ export class FakeBots {
 	readonly answers: PressAnswerSeed[] = [];
 	/** Set to hold presses until released (to see the waiting state). */
 	holdPress: Promise<void> | null = null;
+	/** StartBot random ids, in order. */
+	readonly startRandomIds: bigint[] = [];
+	/** The next StartBot does its work, then fails as if its answer was lost. */
+	loseNextStartAnswer = false;
 	private serial = 0;
 
 	constructor(private readonly host: BotHost) {}
@@ -201,8 +205,16 @@ export class FakeBots {
 			startBot: (req) => {
 				const bot = this.bot(num(req.botId));
 				this.calls.push(`StartBot ${bot.id} ${req.startParam}`);
+				this.startRandomIds.push(req.randomId);
 				const chatId = this.host.privateChat(bot.id);
-				this.host.sendAsSelf(chatId, req.startParam === "" ? "/start" : `/start ${req.startParam}`);
+				// The server sends /start once per random id.
+				if (this.startRandomIds.indexOf(req.randomId) === this.startRandomIds.length - 1) {
+					this.host.sendAsSelf(chatId, req.startParam === "" ? "/start" : `/start ${req.startParam}`);
+				}
+				if (this.loseNextStartAnswer) {
+					this.loseNextStartAnswer = false;
+					throw new ConnectError("connection lost", Code.Unavailable);
+				}
 				return { chat: this.host.wireChat(chatId), users: [this.host.wireUser(bot.id)] };
 			},
 		});

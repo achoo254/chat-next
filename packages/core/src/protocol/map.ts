@@ -306,6 +306,7 @@ export function toDialog(dialog: WireDialog): Dialog {
 		pinnedMessageCount: dialog.pinnedMessageCount,
 		pinnedMessageSeq: id(dialog.pinnedMessageSeq),
 		unreadMark: dialog.unreadMark,
+		sortDate: id(dialog.sortDate),
 	};
 }
 

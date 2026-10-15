@@ -47,6 +47,8 @@ export interface ChatSource {
 	setDialogUnreadMark(chatId: number, unread: boolean): Promise<void>;
 	/** Hides or shows a bot message's reply keyboard on this device (kept locally). */
 	setKeyboardHidden(chatId: number, seq: number, hidden: boolean): Promise<void>;
+	/** The bot's newest message in the chat that sets or removes a reply keyboard (local database); null for none. */
+	botKeyboard(chatId: number, botId: number): Promise<StoredMessage | null>;
 	notificationSettings(): Promise<NotificationSettings>;
 	setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings>;
 	/** Pinned messages of a chat or forum topic, newest first (online only). */

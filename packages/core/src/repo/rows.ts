@@ -328,6 +328,7 @@ export function rowToDialog(row: SqlRow): Dialog {
 		pinnedMessageCount: num(row, "pinned_message_count"),
 		pinnedMessageSeq: num(row, "pinned_message_seq"),
 		unreadMark: bool(row, "unread_mark"),
+		sortDate: num(row, "top_date"),
 	};
 }
 

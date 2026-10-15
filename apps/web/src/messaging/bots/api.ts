@@ -65,7 +65,7 @@ export interface PressAnswer {
 	readonly showAlert: boolean;
 	/** A link the bot asks the client to open; "" for none. */
 	readonly url: string;
-	/** The bot did not answer within 10 seconds (the press still reached it). */
+	/** The bot did not answer within 10 seconds (the press still reached it), or the server did not within 15. */
 	readonly timedOut: boolean;
 }
 
@@ -125,9 +125,16 @@ export interface Bots {
 	usernameTaken(username: string): Promise<boolean>;
 	/** Profile and command menu for `chatId` (0: the private chat with the bot). */
 	info(botId: number, chatId: number): Promise<BotInfo>;
-	/** Records consent, opens the private chat and sends "/start [param]"; returns the chat id. */
-	start(botId: number, startParam: string): Promise<number>;
-	/** `callbackData`: the button's data as standard base64. */
+	/**
+	 * Records consent, opens the private chat and sends "/start [param]";
+	 * returns the chat id. `randomId` stays the same when the user tries
+	 * again, so a retry after a lost answer does not send a second /start.
+	 */
+	start(botId: number, startParam: string, randomId: number): Promise<number>;
+	/**
+	 * `callbackData`: the button's data as standard base64. A press without
+	 * an answer within 15 seconds (a stalled connection) answers timedOut.
+	 */
 	press(chatId: number, seq: number, callbackData: string): Promise<PressAnswer>;
 }
 
@@ -156,7 +163,7 @@ export function createBots(transport: Transport, onUnauthenticated: () => void):
 		resolve: (username) => load().then((api) => api.resolve(username)),
 		usernameTaken: (username) => load().then((api) => api.usernameTaken(username)),
 		info: (botId, chatId) => load().then((api) => api.info(botId, chatId)),
-		start: (botId, startParam) => load().then((api) => api.start(botId, startParam)),
+		start: (botId, startParam, randomId) => load().then((api) => api.start(botId, startParam, randomId)),
 		press: (chatId, seq, callbackData) => load().then((api) => api.press(chatId, seq, callbackData)),
 	};
 }

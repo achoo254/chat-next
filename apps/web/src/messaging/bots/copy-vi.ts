@@ -88,6 +88,8 @@ export const viBots = {
 		issuing: "Đang cấp…",
 		pollTitle: "Nhận update",
 		pollNote: "Bot nhận update bằng long poll: server của bạn tự gọi lấy update, mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request trước nhận 409.",
+		issueTitle: (name: string) => `Cấp token cho ${name}?`,
+		issueBody: "Token chỉ hiện một lần ngay sau khi cấp; chuẩn bị chỗ lưu trước khi bấm.",
 		confirmTitle: "Cấp lại token?",
 		confirmBody: (name: string) => `Token cũ ngừng hoạt động ngay: ${name} sẽ nhận lỗi 401 tới khi bạn cập nhật token mới.`,
 		issued: "Đã cấp token mới",

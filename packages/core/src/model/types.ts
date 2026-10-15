@@ -125,6 +125,12 @@ export interface Dialog {
 	readonly pinnedMessageSeq: number;
 	/** The user marked the chat as unread; reading it clears the mark. */
 	readonly unreadMark: boolean;
+	/**
+	 * Unix second the list orders the chat by: its newest message. Kept by
+	 * the server when the user clears "Cloud của tôi", so the empty chat
+	 * keeps its place; 0 when unknown.
+	 */
+	readonly sortDate: number;
 }
 
 /** Dialog.muteUntil of a chat muted until unmuted. */

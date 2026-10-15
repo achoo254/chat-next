@@ -39,4 +39,36 @@ describe("clearing Cloud của tôi", () => {
 		expect(views.some((view) => view.dialog.chatId === talk)).toBe(true);
 		await core.close();
 	});
+
+	it("keeps an unpinned Cloud in its place in the list, here and after a full sync", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const an = server.addUser("An");
+		const binh = server.addUser("Bình");
+		const older = server.createChat(ChatType.PRIVATE, "", [self, an]);
+		const cloud = server.createChat(ChatType.PRIVATE, "", [self]);
+		const newer = server.createChat(ChatType.PRIVATE, "", [self, binh]);
+		server.sendMessage(an, older, "Hôm qua");
+		vi.advanceTimersByTime(60_000);
+		server.sendMessage(self, cloud, "Link tài liệu onboarding");
+		vi.advanceTimersByTime(60_000);
+		server.sendMessage(binh, newer, "Hôm nay");
+		const sql = new MemorySqlFactory();
+		const { core } = await startTestApp(server, self, sql);
+		await settle(core);
+		const order = async (app: typeof core) => (await app.dialogs()).map((view) => view.dialog.chatId);
+		expect(await order(core)).toEqual([newer, cloud, older]);
+
+		server.clearSavedChat(self, cloud);
+		await settle(core);
+		expect(await order(core)).toEqual([newer, cloud, older]);
+		expect((await core.history(cloud)).messages).toEqual([]);
+		await core.close();
+
+		// A device that syncs from scratch puts it in the same place.
+		const fresh = await startTestApp(server, self, new MemorySqlFactory());
+		await settle(fresh.core);
+		expect(await order(fresh.core)).toEqual([newer, cloud, older]);
+		await fresh.core.close();
+	});
 });

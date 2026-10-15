@@ -65,13 +65,15 @@ type chatRow struct {
 	MemberCount       int32
 	PinnedSeq         int64
 	CreatedAt         time.Time
+	// The newest message (creation before any): what the dialog list orders by.
+	LastMessageAt time.Time
 	// Private chats: the two participants.
 	UserLow, UserHigh int64
 }
 
 const chatColumns = `c.id, c.tenant_id, c.type, c.title, c.about, c.creator_id, c.sync_mode, c.history_visibility,
 	c.default_permissions, c.forum, c.last_seq, c.chat_pts, c.last_topic_id, c.member_count, c.pinned_seq, c.created_at,
-	coalesce(p.user_low, 0), coalesce(p.user_high, 0)`
+	c.last_message_at, coalesce(p.user_low, 0), coalesce(p.user_high, 0)`
 
 const chatFrom = `chats c LEFT JOIN private_chats p ON p.chat_id = c.id`
 
@@ -80,7 +82,7 @@ func scanChat(row pgx.Row) (*chatRow, error) {
 	var perms int32
 	err := row.Scan(&c.ID, &c.TenantID, &c.Type, &c.Title, &c.About, &c.CreatorID, &c.SyncMode, &c.HistoryVisibility,
 		&perms, &c.Forum, &c.LastSeq, &c.ChatPts, &c.LastTopicID, &c.MemberCount, &c.PinnedSeq, &c.CreatedAt,
-		&c.UserLow, &c.UserHigh)
+		&c.LastMessageAt, &c.UserLow, &c.UserHigh)
 	c.DefaultPerms = uint32(perms)
 	return c, err
 }
