@@ -367,4 +367,9 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - ảnh webhook (cần media R3);
   - fake server của core lỗi với `from_id 0`.
 - Ngân sách JS khởi động gần hết: cần tách bớt (protobuf trong entry, Settings) trước khi thêm tính năng ở màn đầu.
+- Bù xong R2 (commit `85ac913` và `b581817`, migration 0008):
+  - tin hệ thống khi webhook dừng, sửa cài đặt hook, chuông gạch cho tin im lặng;
+  - JS khởi động từ 149,1 xuống 112,5 KiB; React Compiler bật mặc định, JS khởi động 130,7/150 KiB.
+- Việc mock còn thiếu: màn sửa webhook (UI đang dùng lại các trường của `#create-hook`).
+- Tiếp theo: R3 media (Phase 4).
 
