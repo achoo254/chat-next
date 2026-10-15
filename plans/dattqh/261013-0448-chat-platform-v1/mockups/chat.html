@@ -1298,7 +1298,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 5. Context menu ======================= -->
 <section class="shot" id="context-menu">
 	<div class="shot-head"><h2>Thao tác với tin: nút nhanh và menu</h2><span class="phase">R1 · Phase 6</span>
-		<p>Rê chuột lên một tin hiện hàng nút nhanh ngay trên bong bóng: Biểu cảm · Trả lời · Chuyển tiếp · "…" (mở menu đầy đủ). Bấm đúp vào tin để trả lời. Chuột phải (desktop) hoặc nhấn giữ (cảm ứng) mở hàng "Thả cảm xúc" và menu. Tin của bạn có "Sửa" (trong thời hạn server cấp), "Xem ai đã xem" (chỉ nhóm không vượt ngưỡng thành viên do server cấu hình), "Thu hồi" (xoá cho mọi người, trong thời hạn) và "Xoá ở phía tôi". Tin người khác có "Báo cáo" và chỉ "Xoá ở phía tôi". Nút thêm biểu cảm chỉ nằm trong hàng nút nhanh và hàng "Thả cảm xúc", không có nút cố định trên tin; biểu cảm đã có nổi trên mép dưới bong bóng (tin của bạn trong nhóm nhỏ: ảnh người thả ở góc dưới trái).</p></div>
+		<p>Rê chuột lên một tin hiện hàng nút nhanh ngay trên bong bóng: Biểu cảm · Trả lời · Chuyển tiếp · "…" (mở menu đầy đủ). Bấm đúp vào tin để trả lời. Chuột phải (desktop) hoặc nhấn giữ (cảm ứng) mở hàng "Thả cảm xúc" và menu. Tin của bạn có "Sửa" (trong thời hạn server cấp), "Xem ai đã xem" (chỉ nhóm không vượt ngưỡng thành viên do server cấu hình), "Thu hồi" (xoá cho mọi người, trong thời hạn) và "Xoá ở phía tôi". Tin người khác có "Báo cáo" và chỉ "Xoá ở phía tôi". Mọi tin có "Lưu vào Cloud của tôi" (R3b): chuyển tiếp tin vào <a href="#first-run">Cloud của tôi</a>, giữ dòng "Chuyển tiếp từ", báo "Đã lưu vào Cloud của tôi"; mục này ẩn khi đang ở chính Cloud của tôi. Nút thêm biểu cảm chỉ nằm trong hàng nút nhanh và hàng "Thả cảm xúc", không có nút cố định trên tin; biểu cảm đã có nổi trên mép dưới bong bóng (tin của bạn trong nhóm nhỏ: ảnh người thả ở góc dưới trái).</p></div>
 	<div class="frame">
 		<div class="split" style="--cols: 3">
 			<section class="pane convo" aria-label="Nút nhanh khi rê chuột lên tin">
@@ -1332,6 +1332,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 					<div class="menu" role="menu" aria-label="Thao tác với tin">
 						<a role="menuitem" href="#composer-states"><svg class="icon"><use href="#i-reply"/></svg>Trả lời</a>
 						<a role="menuitem" href="#forward"><svg class="icon"><use href="#i-forward"/></svg>Chuyển tiếp</a>
+						<button type="button" role="menuitem" data-toast="Đã lưu vào Cloud của tôi"><svg class="icon"><use href="#i-cloud"/></svg>Lưu vào Cloud của tôi</button>
 						<button type="button" role="menuitem" data-toast="Đã sao chép nội dung"><svg class="icon"><use href="#i-copy"/></svg>Sao chép</button>
 						<a role="menuitem" href="#pin-message"><svg class="icon"><use href="#i-pin"/></svg>Ghim</a>
 						<a role="menuitem" href="settings.html#report"><svg class="icon"><use href="#i-flag"/></svg>Báo cáo</a>
@@ -1354,6 +1355,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 					<div class="menu" role="menu" aria-label="Thao tác với tin của bạn">
 						<a role="menuitem" href="#composer-states"><svg class="icon"><use href="#i-reply"/></svg>Trả lời</a>
 						<a role="menuitem" href="#forward"><svg class="icon"><use href="#i-forward"/></svg>Chuyển tiếp</a>
+						<button type="button" role="menuitem" data-toast="Đã lưu vào Cloud của tôi"><svg class="icon"><use href="#i-cloud"/></svg>Lưu vào Cloud của tôi</button>
 						<button type="button" role="menuitem" data-toast="Đã sao chép nội dung"><svg class="icon"><use href="#i-copy"/></svg>Sao chép</button>
 						<a role="menuitem" href="#composer-states"><svg class="icon"><use href="#i-edit"/></svg>Sửa</a>
 						<a role="menuitem" href="#pin-message"><svg class="icon"><use href="#i-pin"/></svg>Ghim</a>
