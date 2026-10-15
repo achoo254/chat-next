@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -133,6 +134,12 @@ type Service struct {
 	limiter  ratelimit.Limiter
 	logger   *slog.Logger
 	now      func() time.Time
+
+	// fetchMu guards fetchWritten: when this process last wrote each bot's
+	// last_update_fetch_at, so most polls skip the database (one entry per
+	// bot that polled, bounded by the number of bots).
+	fetchMu      sync.Mutex
+	fetchWritten map[int64]time.Time
 }
 
 // New returns the Service.
@@ -140,7 +147,8 @@ func New(pool *pgxpool.Pool, tenantID string, limiter ratelimit.Limiter, logger 
 	if pool == nil || tenantID == "" || limiter == nil || logger == nil {
 		return nil, errors.New("botadmin: missing configuration or dependency")
 	}
-	return &Service{pool: pool, tenantID: tenantID, limiter: limiter, logger: logger, now: time.Now}, nil
+	return &Service{pool: pool, tenantID: tenantID, limiter: limiter, logger: logger, now: time.Now,
+		fetchWritten: map[int64]time.Time{}}, nil
 }
 
 // ------------------------------------------------------------------ errors
@@ -664,11 +672,30 @@ func (b *Bot) lastUpdateUnix() int64 {
 // the bot keeps polling: one write per bot per interval at most.
 const updateFetchInterval = 30 * time.Second
 
+// notRunningAfter is how long a bot may go without asking for updates before
+// its owner is told no program runs it: the write lag (updateFetchInterval)
+// plus the longest long poll, with room to spare.
+const notRunningAfter = 2 * time.Minute
+
+// notRunning tells whether the bot has not asked for updates lately, by the
+// server's clock.
+func (b *Bot) notRunning(now time.Time) bool {
+	return b.LastUpdateAt == nil || now.Sub(*b.LastUpdateAt) > notRunningAfter
+}
+
 // RecordUpdateFetch notes that the bot asked for updates. It writes at most
 // once per updateFetchInterval, and not at all while the update writer holds
-// the bot's row (the next poll records it).
+// the bot's row (the next poll records it). Within the interval after this
+// process wrote, it does not reach the database at all.
 func (s *Service) RecordUpdateFetch(ctx context.Context, botID int64) error {
-	_, err := s.pool.Exec(ctx, `
+	now := s.now()
+	s.fetchMu.Lock()
+	written, ok := s.fetchWritten[botID]
+	s.fetchMu.Unlock()
+	if ok && now.Sub(written) < updateFetchInterval {
+		return nil
+	}
+	tag, err := s.pool.Exec(ctx, `
 		UPDATE bots SET last_update_fetch_at = now()
 		WHERE user_id = (
 			SELECT user_id FROM bots
@@ -678,6 +705,13 @@ func (s *Service) RecordUpdateFetch(ctx context.Context, botID int64) error {
 		botID, s.tenantID, updateFetchInterval.Seconds())
 	if err != nil {
 		return fmt.Errorf("botadmin: record update fetch: %w", err)
+	}
+	// Nothing written (row locked, or recorded lately by another process):
+	// the next poll asks the database again.
+	if tag.RowsAffected() > 0 {
+		s.fetchMu.Lock()
+		s.fetchWritten[botID] = now
+		s.fetchMu.Unlock()
 	}
 	return nil
 }
@@ -746,6 +780,7 @@ func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) 
 	if b.OwnerID == caller {
 		resp.IsOwner = true
 		resp.LastUpdateAt = b.lastUpdateUnix()
+		resp.NotRunning = b.notRunning(s.now())
 	}
 	for _, scope := range order {
 		for _, set := range b.Commands {

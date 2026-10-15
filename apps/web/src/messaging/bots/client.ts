@@ -70,7 +70,7 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 		about: response.about,
 		commands: response.commands.map(toCommand),
 		isOwner: response.isOwner,
-		lastUpdateAt: assertSafeId(response.lastUpdateAt),
+		notRunning: response.isOwner && response.notRunning,
 	};
 }
 

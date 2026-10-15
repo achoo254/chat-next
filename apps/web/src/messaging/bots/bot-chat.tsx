@@ -36,11 +36,12 @@ function requestInfo(bots: Bots, botId: number, chatId: number): Promise<BotInfo
 interface Fetched {
 	readonly key: string;
 	readonly value: BotInfo;
-	/** Unix seconds when the answer arrived. */
-	readonly at: number;
 }
 
-/** `refreshMs` > 0 asks again at that interval while the viewer owns the bot (the "not running" banner follows it). */
+/**
+ * `refreshMs` > 0 asks again at that interval while the viewer owns the bot
+ * (the "not running" banner follows it), also after a failed request.
+ */
 function useFetchedBotInfo(botId: number, chatId: number, refreshMs = 0): Fetched | null {
 	const { bots } = useServices();
 	const [info, setInfo] = useState<Fetched | null>(null);
@@ -48,15 +49,21 @@ function useFetchedBotInfo(botId: number, chatId: number, refreshMs = 0): Fetche
 	useEffect(() => {
 		let active = true;
 		let timer: ReturnType<typeof setTimeout> | undefined;
+		// Unknown until the first answer: a failed first request is retried too.
+		let owner: boolean | null = null;
+		const again = () => {
+			if (active && refreshMs > 0 && owner !== false) timer = setTimeout(load, refreshMs);
+		};
 		const load = () => {
 			// Fetched each time the chat opens: the owner may have changed the menu.
 			requestInfo(bots, botId, chatId).then(
 				(found) => {
 					if (!active) return;
-					setInfo({ key: `${botId}:${chatId}`, value: found, at: Math.floor(Date.now() / 1000) });
-					if (refreshMs > 0 && found.isOwner) timer = setTimeout(load, refreshMs);
+					owner = found.isOwner;
+					setInfo({ key: `${botId}:${chatId}`, value: found });
+					again();
 				},
-				() => undefined,
+				() => again(),
 			);
 		};
 		load();
@@ -72,14 +79,6 @@ function useBotInfo(botId: number, chatId: number): BotInfo | null {
 	return useFetchedBotInfo(botId, chatId)?.value ?? null;
 }
 
-/** A bot that has not asked for updates for this long has no program running it. */
-export const NOT_RUNNING_AFTER_S = 120;
-
-/** Whether the owner's bot looks stopped: no update fetch within NOT_RUNNING_AFTER_S. */
-export function botNotRunning(info: BotInfo, nowSeconds: number): boolean {
-	return info.isOwner && nowSeconds - info.lastUpdateAt > NOT_RUNNING_AFTER_S;
-}
-
 const NOT_RUNNING_RECHECK_MS = 30_000;
 
 /**
@@ -90,7 +89,7 @@ const NOT_RUNNING_RECHECK_MS = 30_000;
 export function BotNotRunningBanner({ botId, chatId }: { botId: number; chatId: number }) {
 	const t = useBotsCopy();
 	const fetched = useFetchedBotInfo(botId, chatId, NOT_RUNNING_RECHECK_MS);
-	if (fetched === null || !botNotRunning(fetched.value, fetched.at)) return null;
+	if (fetched === null || !fetched.value.notRunning) return null;
 	return (
 		<div className="banner warn" role="status">
 			<Icon name="alert" small />

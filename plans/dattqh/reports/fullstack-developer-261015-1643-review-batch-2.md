@@ -66,3 +66,38 @@ At 180 ms RTT, every screen went from about 800 ms to 205–210 ms. After the ch
 - Web bundles cached from before this change map `REPLACED` to "unknown", so their other tabs wipe local data once after a re-sign-in. This lasts until they reload the new bundle.
 - The "not running" check compares the server's fetch time with the client clock when the answer arrived. A client clock more than about 2 minutes off could show or hide the banner wrongly.
 - Changing the "Chat mới" dialog into a shell changed test timing. Three existing tests now wait for the loaded dialog through `test/support/new-chat-dialog.ts`; their assertions are unchanged.
+
+## Sửa theo review
+
+These fixes answer `code-reviewer-261015-1755-session-replace.md` (commit 00a5264). They are not committed.
+
+- **M1, server.** The callback now sets the new cookie first and writes the interstitial with a `Content-Length`. It flushes the response and only then revokes the replaced session, on `context.WithoutCancel` with a 10 s timeout (`server/internal/auth/routes.go`, `pages.go`). The browser has the whole page and the new cookie before any `REPLACED` event exists.
+  - Test: `TestSignInAgainSendsTheNewCookieBeforeRevokingTheOldSession` holds the old session's row with `FOR UPDATE`. The browser must get the page and the new cookie while the revoke is blocked, and the row must end up revoked with REPLACED once the lock is released.
+  - Against the old callback this test fails with a client timeout "awaiting headers".
+- **M1, client.** For 10 s after `replaced`, an `unauthenticated` result from the outbox, uploads, probe, history, search or sync no longer wipes anything (`packages/core/src/app/start-app.ts`). Instead it schedules one `GetSelf` re-check 1.5 s later, and repeated 401s share that one re-check. The result decides what happens:
+  - Same user: the outbox and uploads restart, and the socket reconnects if it is not connected.
+  - 401: the session ends as unauthenticated and the local data is wiped.
+  - Another user: the session ends as `user_changed`.
+  - Network error: the data is kept.
+  - New tests: replaced, then a transient 401, then the re-check succeeds, so no wipe. Replaced, then a 401, then the re-check also gets 401, so the data is wiped, but not before the re-check. A 401 60 s after replaced still wipes at once. The first two fail without the fix.
+- **M2.** `GetBotInfoResponse.not_running = 7` was added. It is owner-only and computed in `botadmin.Info` with the server clock: never polled, or more than 2 min ago. The web banner uses it, and `BotInfo.lastUpdateAt` was replaced by `notRunning`. The Console still shows `Bot.last_update_at`.
+- **L5.** The banner refresh is rescheduled after a failed request. It stops only once the viewer is known not to own the bot. The new web test "keeps checking … also after a failed check" fails without the fix.
+- **L1.** The comments in routes.go and pages.go and ADR 0006 now say that auth.hoandat.com and chat.hoandat.com are same-site, so the cookie does reach the callback. The hash still travels in the login cookie because an IdP on another site would not send it. The ADR also describes the new ordering and the client re-check.
+- **L4.** This is documented, not changed (sessions.go `Replace`, ADR 0006).
+  - hoandat-auth registers `chat-web` with `backchannel_logout_session_required: true` (hoandat-auth `src/oidc/chat-clients.ts:72`), so ID tokens always carry `sid`. An empty sid therefore means a row stored without one, and nothing proves the grants differ.
+  - Revoking could sign the new session out at its next grant check.
+  - The old refresh token is erased from our DB and lives no longer than its IdP session.
+- **L6.** `botadmin.Service` keeps a per-bot "last written" time in memory and skips the DB for 30 s after a write. It records the time only when a row was actually written, so a locked row or another process's write means the next poll asks the DB again.
+  - `TestRecordUpdateFetchAndNotRunning` covers the memory skip, the write after 30 s, the DB throttle from a second Service, and `not_running` for owner and stranger, including a +3 min clock.
+  - The 10 s and 5 min steps of the botapi test moved there because they need a controllable clock (`export_test.go` `SetClock`).
+- **L7.** Added `TestSignInAsAnotherUserOnTheSameBrowser`: the previous user's session is revoked with REPLACED and its RT is revoked at the IdP. Added `TestSignInAgainAfterTheOldSessionWasRevoked`: no error is logged and nothing is revoked at the IdP. The non-owner check (no timestamp, `not_running` false) is asserted in both the botapi and botadmin tests. The client 401 after replaced is covered by the M1 tests.
+
+### Gates (sequential, run after the QA e2e stack finished)
+
+- `gofmt -l`: empty. `go vet ./...`: ok. `golangci-lint run ./...`: 0 issues.
+- `go test -race -count=1 -p 2` on auth, auth/idptest, api, botadmin and botapi: all ok. The 5 new or changed Go tests were confirmed PASS with `-v`.
+- `pnpm lint`: clean. `pnpm typecheck`: 0 errors.
+- vitest `--maxWorkers=2`: core 765/765 (was 762, plus 3 new), web 297/297 (plus 1 new). bots.test.tsx was run 3 times with no flake.
+- `pnpm proto:lint`, `proto:breaking` and `proto:gen`: clean. The only change is the additive field 7.
+- gitleaks over the diff and the new file: no leaks.
+- Not run: `pnpm e2e` (the QA agent owns the stack) and the full `go test ./...`.

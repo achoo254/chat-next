@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/auth"
@@ -408,5 +409,122 @@ func TestSignInWithoutASessionCookieReplacesNothing(t *testing.T) {
 	}
 	if _, err := getSelf(t, second); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// sessionRevokeState reads whether a session is revoked, and why.
+func (e *env) sessionRevokeState(t *testing.T, id int64) (revoked bool, reason int32) {
+	t.Helper()
+	var r *int32
+	err := e.store.Pool().QueryRow(context.Background(),
+		`SELECT revoked_at IS NOT NULL, revoke_reason FROM user_sessions WHERE id = $1`, id).Scan(&revoked, &r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != nil {
+		reason = *r
+	}
+	return revoked, reason
+}
+
+func TestSignInAgainSendsTheNewCookieBeforeRevokingTheOldSession(t *testing.T) {
+	e := newEnv(t)
+	cl, c := e.signedIn(t)
+	before := currentSessionID(t, cl)
+	oldCookie := e.cookie(t, c, auth.SessionCookieName).Value
+
+	// Hold the old session's row: revoking it waits until the lock goes.
+	ctx := context.Background()
+	tx, err := e.store.Pool().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM user_sessions WHERE id = $1 FOR UPDATE`, before); err != nil {
+		t.Fatal(err)
+	}
+
+	// The browser gets the whole page and the new cookie while the
+	// revocation still waits.
+	timed := *c
+	timed.Timeout = 10 * time.Second
+	resp, body := e.signIn(t, &timed, "?reauth=1")
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, `http-equiv="refresh"`) {
+		t.Fatalf("re-sign-in: status %d body %q", resp.StatusCode, body)
+	}
+	if got := e.cookie(t, c, auth.SessionCookieName).Value; got == oldCookie {
+		t.Fatal("the browser still holds the old cookie")
+	}
+	if revoked, _ := e.sessionRevokeState(t, before); revoked {
+		t.Fatal("the old session was revoked before the response reached the browser")
+	}
+
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		revoked, reason := e.sessionRevokeState(t, before)
+		if revoked {
+			if reason != int32(appv1.SessionRevokeReason_SESSION_REVOKE_REASON_REPLACED) {
+				t.Fatalf("revoke reason = %d, want REPLACED", reason)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the old session was never revoked")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestSignInAsAnotherUserOnTheSameBrowser(t *testing.T) {
+	e := newEnv(t)
+	cl, c := e.signedIn(t)
+	before := currentSessionID(t, cl)
+
+	e.idp.SetAccount(idptest.Account{Sub: "acc_bob", SID: "sid-bob", PreferredUsername: "bob", Name: "Bob"})
+	e.mustSignIn(t, c)
+	self, err := getSelf(t, cl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if self.GetUsername() != "bob" {
+		t.Fatalf("browser signed in as %q, want bob", self.GetUsername())
+	}
+	if revoked, reason := e.sessionRevokeState(t, before); !revoked ||
+		reason != int32(appv1.SessionRevokeReason_SESSION_REVOKE_REASON_REPLACED) {
+		t.Fatalf("previous user's session: revoked %v reason %d, want REPLACED", revoked, reason)
+	}
+	// Two accounts never share an IdP grant: the previous user's refresh
+	// token is revoked at the IdP.
+	e.app.Sessions.Wait()
+	if got := e.idp.Revoked(); len(got) != 1 {
+		t.Fatalf("revoked at IdP = %d tokens, want the previous user's", len(got))
+	}
+}
+
+func TestSignInAgainAfterTheOldSessionWasRevoked(t *testing.T) {
+	e := newEnv(t)
+	cl, c := e.signedIn(t)
+	before := currentSessionID(t, cl)
+	if _, err := e.store.Pool().Exec(context.Background(),
+		`UPDATE user_sessions SET revoked_at = now() WHERE id = $1`, before); err != nil {
+		t.Fatal(err)
+	}
+
+	e.mustSignIn(t, c)
+	if _, err := getSelf(t, cl); err != nil {
+		t.Fatalf("the new session does not work: %v", err)
+	}
+	if n := len(listSessions(t, cl)); n != 1 {
+		t.Fatalf("sessions = %d, want only the new one", n)
+	}
+	e.app.Sessions.Wait()
+	if got := e.idp.Revoked(); len(got) != 0 {
+		t.Fatalf("revoked at IdP = %d tokens, want none", len(got))
+	}
+	if strings.Contains(e.logs.String(), "revoking the replaced session failed") {
+		t.Fatal("an already revoked session was reported as a failure")
 	}
 }

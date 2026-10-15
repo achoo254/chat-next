@@ -644,8 +644,8 @@ func TestGetUpdatesRecordsTheFetchForTheOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !before.GetIsOwner() || before.GetLastUpdateAt() != 0 {
-		t.Fatalf("before any poll: owner=%v last=%d", before.GetIsOwner(), before.GetLastUpdateAt())
+	if !before.GetIsOwner() || before.GetLastUpdateAt() != 0 || !before.GetNotRunning() {
+		t.Fatalf("before any poll: owner=%v last=%d not running=%v", before.GetIsOwner(), before.GetLastUpdateAt(), before.GetNotRunning())
 	}
 
 	h.updates(token, "timeout=0")
@@ -654,34 +654,16 @@ func TestGetUpdatesRecordsTheFetchForTheOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	owned, err := h.Admin.Info(ctx, owner, botID, 0)
-	if err != nil || owned.GetLastUpdateAt() != first || first == 0 {
+	if err != nil || owned.GetLastUpdateAt() != first || first == 0 || owned.GetNotRunning() {
 		t.Fatalf("owner info after a poll = %v, %v (stored %d)", owned, err, first)
 	}
 	other, err := h.Admin.Info(ctx, stranger, botID, 0)
-	if err != nil || other.GetIsOwner() || other.GetLastUpdateAt() != 0 {
+	// Someone else learns nothing about the bot's polling.
+	if err != nil || other.GetIsOwner() || other.GetLastUpdateAt() != 0 || other.GetNotRunning() {
 		t.Fatalf("stranger info = %v, %v", other, err)
 	}
 	bots, err := h.Admin.ListMyBots(ctx, owner)
 	if err != nil || len(bots) != 1 || bots[0].GetLastUpdateAt() != first {
 		t.Fatalf("ListMyBots = %v, %v", bots, err)
-	}
-
-	// Polls within 30 seconds do not write again.
-	if _, err := h.Store.Pool().Exec(ctx, `UPDATE bots SET last_update_fetch_at = now() - interval '10 seconds' WHERE user_id = $1`, botID); err != nil {
-		t.Fatal(err)
-	}
-	h.updates(token, "timeout=0")
-	var fresh bool
-	if err := h.Store.Pool().QueryRow(ctx, `SELECT last_update_fetch_at < now() - interval '5 seconds' FROM bots WHERE user_id = $1`, botID).Scan(&fresh); err != nil || !fresh {
-		t.Fatalf("a poll within the interval wrote again: %v", err)
-	}
-	// An older record is moved to now.
-	if _, err := h.Store.Pool().Exec(ctx, `UPDATE bots SET last_update_fetch_at = now() - interval '5 minutes' WHERE user_id = $1`, botID); err != nil {
-		t.Fatal(err)
-	}
-	h.updates(token, "timeout=0")
-	var recent bool
-	if err := h.Store.Pool().QueryRow(ctx, `SELECT last_update_fetch_at > now() - interval '5 seconds' FROM bots WHERE user_id = $1`, botID).Scan(&recent); err != nil || !recent {
-		t.Fatalf("a poll after the interval did not write: %v", err)
 	}
 }

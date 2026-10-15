@@ -60,8 +60,8 @@ export interface BotInfo {
 	readonly commands: readonly BotCommand[];
 	/** The viewer owns the bot. */
 	readonly isOwner: boolean;
-	/** Owner only: Unix seconds of the bot's last update fetch; 0 when it never asked or for anyone else. */
-	readonly lastUpdateAt: number;
+	/** Owner only: the server saw no update fetch from the bot lately (by its own clock); false for anyone else. */
+	readonly notRunning: boolean;
 }
 
 /** The bot's answer to a callback button (PressInlineButton). */

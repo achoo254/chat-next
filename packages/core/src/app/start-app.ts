@@ -174,7 +174,15 @@ export type StartResult =
 	| { readonly status: "active"; readonly core: ChatCore }
 	| { readonly status: "signed_out"; readonly reason: SessionEndReason };
 
-async function resolveUserId(options: StartOptions): Promise<number | SessionEndReason> {
+/**
+ * How long after a REPLACED notification a 401 is checked again before the
+ * session is treated as ended, and how long that check waits for the browser
+ * to hold the new cookie.
+ */
+const REPLACED_GRACE_MS = 10_000;
+const REPLACED_RECHECK_DELAY_MS = 1_500;
+
+async function resolveUserId(options: Pick<StartOptions, "api" | "userIdHint">): Promise<number | SessionEndReason> {
 	if (options.userIdHint !== undefined) return assertSafeId(options.userIdHint);
 	try {
 		const response = await options.api.users.getSelf({});
@@ -234,6 +242,7 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		uploads?.stop();
 		engine.stop();
 		if (sweepTimer !== null) platform.timers.clearTimeout(sweepTimer);
+		if (recheckTimer !== null) platform.timers.clearTimeout(recheckTimer);
 		unsubscribeSweep();
 		try {
 			if (wipe) await driver.destroy();
@@ -252,12 +261,49 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		bus.flush();
 		if (wipe) options.onSessionEnded?.(reason);
 	};
+	// Set when the same browser signed in again (REPLACED). For a while after
+	// it, a 401 may come from a request that left with the old cookie before
+	// the browser stored the new one, so it is checked again before wiping.
+	let replacedAt: number | null = null;
+	let recheckTimer: unknown = null;
+	const resumeAfterRecheck = (): void => {
+		// The 401 stopped the outbox and uploads; the socket may be backing off.
+		outbox.start().catch((err: unknown) => report(err, "outbox restart"));
+		uploads?.start().catch((err: unknown) => report(err, "uploads restart"));
+		if (connection.connectionState !== "connected") connection.reconnectNow();
+	};
+	const recheckSession = async (): Promise<void> => {
+		let current: number | SessionEndReason;
+		try {
+			current = await resolveUserId({ api: options.api });
+		} catch (err) {
+			// Not an answer about the cookie (offline, server error): keep the
+			// data; a later 401 outside the window ends the session.
+			report(err, "session recheck");
+			if (ended === null) resumeAfterRecheck();
+			return;
+		}
+		if (ended !== null) return;
+		if (current === userId) resumeAfterRecheck();
+		else void endSession(typeof current === "string" ? current : "user_changed", true);
+	};
 	const sessionEnded = (reason: SessionEndReason): void => {
+		if (ended !== null) return;
 		if (reason === "replaced") {
 			// The cookie now names the session that replaced this one (the same
 			// browser signed in again): reconnecting picks it up, and a
 			// different account there ends the session as user_changed.
+			replacedAt = platform.timers.now();
 			connection.reconnectNow();
+			return;
+		}
+		if (reason === "unauthenticated" && replacedAt !== null && platform.timers.now() - replacedAt < REPLACED_GRACE_MS) {
+			if (recheckTimer === null) {
+				recheckTimer = platform.timers.setTimeout(() => {
+					recheckTimer = null;
+					if (ended === null) void recheckSession();
+				}, REPLACED_RECHECK_DELAY_MS);
+			}
 			return;
 		}
 		void endSession(reason, true);

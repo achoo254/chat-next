@@ -350,6 +350,14 @@ func (m *Sessions) Revoke(ctx context.Context, userID, sessionID int64) error {
 // of its browser session on every sign-in, and revoking a refresh token may
 // end the whole grant, the new session's included. A token left unrevoked is
 // erased here and expires with the grant.
+//
+// An unknown sid (either side) counts as a shared grant on purpose. The IdP
+// registers chat-web with backchannel_logout_session_required, so its ID
+// tokens always carry sid; an empty one means a session stored without it,
+// and nothing then proves the grants differ. Revoking would risk signing the
+// new session out at its next grant check, while the old token, erased here,
+// can no longer be presented by this server and lives no longer than the IdP
+// session it belongs to.
 func (m *Sessions) Replace(ctx context.Context, replacedHash []byte, newID, userID int64, idpSID string) error {
 	r, err := m.store.ReplaceSession(ctx, m.tenantID, replacedHash, newID)
 	if errors.Is(err, store.ErrNotFound) {

@@ -65,6 +65,71 @@ describe("session end wipes local data", () => {
 		expect(core.connectionState()).toBe("connected");
 	});
 
+	it("not on a 401 right after REPLACED when the cookie still works a moment later", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const a = server.addUser("An");
+		const chat = server.createChat(ChatType.GROUP, "G", [self, a]);
+		const sql = new MemorySqlFactory();
+		const ended: string[] = [];
+		const { core } = await startTestApp(server, self, sql, { onSessionEnded: (reason) => ended.push(reason) });
+		await settle(core);
+		server.replaceSessions(self);
+		await vi.advanceTimersByTimeAsync(50);
+		// A request that left with the old cookie before the browser stored the new one.
+		server.faults.push({ method: "getHistory", when: "before", code: Code.Unauthenticated, remaining: 1 });
+		const view = await core.history(chat);
+		expect(view.failure).toBe("unauthenticated");
+		const selfCalls = server.calls.get("getSelf") ?? 0;
+		await vi.advanceTimersByTimeAsync(3_000);
+		expect(server.calls.get("getSelf") ?? 0).toBe(selfCalls + 1);
+		expect(ended).toEqual([]);
+		expect(core.sessionEnded()).toBeNull();
+		expect(sql.files.has(dbName(self))).toBe(true);
+		expect(core.connectionState()).toBe("connected");
+	});
+
+	it("after REPLACED when the delayed recheck also gets 401", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const a = server.addUser("An");
+		const chat = server.createChat(ChatType.GROUP, "G", [self, a]);
+		const sql = new MemorySqlFactory();
+		const ended: string[] = [];
+		const { core } = await startTestApp(server, self, sql, { onSessionEnded: (reason) => ended.push(reason) });
+		await settle(core);
+		server.replaceSessions(self);
+		await vi.advanceTimersByTimeAsync(50);
+		server.faults.push({ method: "getHistory", when: "before", code: Code.Unauthenticated, remaining: 1 });
+		server.faults.push({ method: "getSelf", when: "before", code: Code.Unauthenticated, remaining: 1 });
+		await core.history(chat);
+		await vi.advanceTimersByTimeAsync(100);
+		// Nothing is wiped before the recheck answers.
+		expect(ended).toEqual([]);
+		expect(sql.files.has(dbName(self))).toBe(true);
+		await vi.advanceTimersByTimeAsync(3_000);
+		expect(ended).toEqual(["unauthenticated"]);
+		expect(sql.files.has(dbName(self))).toBe(false);
+	});
+
+	it("on a 401 long after REPLACED", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const a = server.addUser("An");
+		const chat = server.createChat(ChatType.GROUP, "G", [self, a]);
+		const sql = new MemorySqlFactory();
+		const ended: string[] = [];
+		const { core } = await startTestApp(server, self, sql, { onSessionEnded: (reason) => ended.push(reason) });
+		await settle(core);
+		server.replaceSessions(self);
+		await vi.advanceTimersByTimeAsync(60_000);
+		server.faults.push({ method: "getHistory", when: "before", code: Code.Unauthenticated, remaining: 1 });
+		await core.history(chat);
+		await vi.advanceTimersByTimeAsync(10);
+		expect(ended).toEqual(["unauthenticated"]);
+		expect(sql.files.has(dbName(self))).toBe(false);
+	});
+
 	it("on 401 from an RPC", async () => {
 		const server = new FakeServer();
 		const self = server.addUser("Tôi");

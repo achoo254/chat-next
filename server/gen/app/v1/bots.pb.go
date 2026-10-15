@@ -659,7 +659,10 @@ type GetBotInfoResponse struct {
 	// Owner only: Unix seconds when the bot last asked for updates (long poll
 	// getUpdates), kept to within about 30 seconds; 0 when it never did or
 	// the caller is not the owner.
-	LastUpdateAt  int64 `protobuf:"varint,6,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
+	LastUpdateAt int64 `protobuf:"varint,6,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
+	// Owner only: the bot has not asked for updates in the last 2 minutes (or
+	// never did), judged by the server's clock; false for anyone else.
+	NotRunning    bool `protobuf:"varint,7,opt,name=not_running,json=notRunning,proto3" json:"not_running,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -736,6 +739,13 @@ func (x *GetBotInfoResponse) GetLastUpdateAt() int64 {
 	return 0
 }
 
+func (x *GetBotInfoResponse) GetNotRunning() bool {
+	if x != nil {
+		return x.NotRunning
+	}
+	return false
+}
+
 var File_app_v1_bots_proto protoreflect.FileDescriptor
 
 const file_app_v1_bots_proto_rawDesc = "" +
@@ -786,14 +796,16 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x03ack\x18\x04 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"K\n" +
 	"\x11GetBotInfoRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1b\n" +
-	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\xe3\x01\n" +
+	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\x84\x02\n" +
 	"\x12GetBotInfoResponse\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
 	"\x05about\x18\x03 \x01(\tR\x05about\x12.\n" +
 	"\bcommands\x18\x04 \x03(\v2\x12.app.v1.BotCommandR\bcommands\x12\x19\n" +
 	"\bis_owner\x18\x05 \x01(\bR\aisOwner\x12(\n" +
-	"\x0elast_update_at\x18\x06 \x01(\x03B\x020\x02R\flastUpdateAt*\xef\x01\n" +
+	"\x0elast_update_at\x18\x06 \x01(\x03B\x020\x02R\flastUpdateAt\x12\x1f\n" +
+	"\vnot_running\x18\a \x01(\bR\n" +
+	"notRunning*\xef\x01\n" +
 	"\x10InlineResultKind\x12\"\n" +
 	"\x1eINLINE_RESULT_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aINLINE_RESULT_KIND_ARTICLE\x10\x01\x12\x1c\n" +

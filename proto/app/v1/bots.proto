@@ -133,4 +133,7 @@ message GetBotInfoResponse {
   // getUpdates), kept to within about 30 seconds; 0 when it never did or
   // the caller is not the owner.
   int64 last_update_at = 6 [jstype = JS_NUMBER];
+  // Owner only: the bot has not asked for updates in the last 2 minutes (or
+  // never did), judged by the server's clock; false for anyone else.
+  bool not_running = 7;
 }

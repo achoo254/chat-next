@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"bytes"
 	"html/template"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -11,8 +13,9 @@ import (
 
 // The pages carry no script and no external resource. The interstitial
 // exists because the session cookie is SameSite=Strict: it is set on the
-// response to the IdP's cross-site redirect, and only a navigation started
-// from this same-site page sends it on the first app request.
+// response to the IdP's redirect, which is cross-site when the IdP is on
+// another site, and only a navigation started from this same-site page is
+// sure to send it on the first app request.
 var pages = template.Must(template.New("pages").Parse(`
 {{define "interstitial"}}<!doctype html>
 <html lang="vi">
@@ -60,9 +63,18 @@ func writeInterstitial(w http.ResponseWriter, returnTo string) {
 	if returnTo == "" {
 		returnTo = "/"
 	}
+	// Rendered first so the response carries a Content-Length: the browser
+	// has the whole page even while the callback still revokes the session
+	// it replaces.
+	var page bytes.Buffer
+	if err := pages.ExecuteTemplate(&page, "interstitial", returnTo); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	writePageHeaders(w)
+	w.Header().Set("Content-Length", strconv.Itoa(page.Len()))
 	w.WriteHeader(http.StatusOK)
-	_ = pages.ExecuteTemplate(w, "interstitial", returnTo)
+	_, _ = w.Write(page.Bytes())
 }
 
 // returnToMax bounds the return_to path, in bytes.

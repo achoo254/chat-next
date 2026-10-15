@@ -73,6 +73,8 @@ export class FakeBots {
 	readonly startRandomIds: bigint[] = [];
 	/** The next StartBot does its work, then fails as if its answer was lost. */
 	loseNextStartAnswer = false;
+	/** GetBotInfo fails with unavailable this many more times. */
+	failInfo = 0;
 	private serial = 0;
 
 	constructor(private readonly host: BotHost) {}
@@ -205,6 +207,10 @@ export class FakeBots {
 			getBotInfo: (req) => {
 				const bot = this.bot(num(req.botId));
 				this.calls.push(`GetBotInfo ${bot.id}`);
+				if (this.failInfo > 0) {
+					this.failInfo--;
+					throw new ConnectError("connection lost", Code.Unavailable);
+				}
 				return {
 					user: this.host.wireUser(bot.id),
 					description: bot.description,
@@ -212,6 +218,8 @@ export class FakeBots {
 					commands: this.menu(bot),
 					isOwner: bot.owned,
 					lastUpdateAt: BigInt(bot.owned ? bot.lastUpdateAt : 0),
+					// Judged by the server's clock, as the real server does.
+					notRunning: bot.owned && Math.floor(Date.now() / 1000) - bot.lastUpdateAt > 120,
 				};
 			},
 			startBot: (req) => {

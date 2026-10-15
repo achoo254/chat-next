@@ -238,3 +238,93 @@ func TestUpdateBot(t *testing.T) {
 		t.Fatalf("empty update = %v, %v", bot, err)
 	}
 }
+
+func TestRecordUpdateFetchAndNotRunning(t *testing.T) {
+	env := bottest.New(t)
+	ctx := context.Background()
+	owner := env.User("owner")
+	stranger := env.User("stranger")
+	botID, _ := env.Bot(owner, "pollbot")
+	clock := time.Now()
+	env.Admin.SetClock(func() time.Time { return clock })
+	stored := func() time.Duration {
+		t.Helper()
+		var age float64
+		if err := env.Store.Pool().QueryRow(ctx,
+			`SELECT extract(epoch FROM now() - last_update_fetch_at) FROM bots WHERE user_id = $1`, botID).Scan(&age); err != nil {
+			t.Fatal(err)
+		}
+		return time.Duration(age * float64(time.Second))
+	}
+	notRunning := func(caller int64) bool {
+		t.Helper()
+		info, err := env.Admin.Info(ctx, caller, botID, botadmin.RolePrivate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return info.GetNotRunning()
+	}
+	backdate := func(by string) {
+		t.Helper()
+		if _, err := env.Store.Pool().Exec(ctx,
+			`UPDATE bots SET last_update_fetch_at = now() - $2::interval WHERE user_id = $1`, botID, by); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if !notRunning(owner) {
+		t.Fatal("a bot that never polled counts as running")
+	}
+	if err := env.Admin.RecordUpdateFetch(ctx, botID); err != nil {
+		t.Fatal(err)
+	}
+	if age := stored(); age > 5*time.Second {
+		t.Fatalf("first fetch not recorded: %v old", age)
+	}
+	if notRunning(owner) {
+		t.Fatal("a bot that just polled counts as stopped")
+	}
+
+	// Within the interval after this process wrote, the database is not asked.
+	backdate("5 minutes")
+	if err := env.Admin.RecordUpdateFetch(ctx, botID); err != nil {
+		t.Fatal(err)
+	}
+	if age := stored(); age < 4*time.Minute {
+		t.Fatalf("a fetch within the interval reached the database (record %v old)", age)
+	}
+	// The server's clock decides, and only the owner is told.
+	if !notRunning(owner) || notRunning(stranger) {
+		t.Fatalf("not running: owner %v, stranger %v; want true, false", notRunning(owner), notRunning(stranger))
+	}
+
+	// After the interval it writes again.
+	clock = clock.Add(31 * time.Second)
+	if err := env.Admin.RecordUpdateFetch(ctx, botID); err != nil {
+		t.Fatal(err)
+	}
+	if age := stored(); age > 5*time.Second {
+		t.Fatalf("a fetch after the interval did not write (record %v old)", age)
+	}
+	if notRunning(owner) {
+		t.Fatal("a bot that polled 31 seconds of server time ago counts as stopped")
+	}
+	clock = clock.Add(3 * time.Minute)
+	if !notRunning(owner) {
+		t.Fatal("a bot silent for 3 minutes counts as running")
+	}
+
+	// Another process (no memory of the write) still writes at most once per
+	// interval, through the database.
+	other, err := botadmin.New(env.Store.Pool(), bottest.TenantID, env.Limiter, bottest.Quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backdate("10 seconds")
+	if err := other.RecordUpdateFetch(ctx, botID); err != nil {
+		t.Fatal(err)
+	}
+	if age := stored(); age < 5*time.Second {
+		t.Fatalf("a recent record was written again (record %v old)", age)
+	}
+}

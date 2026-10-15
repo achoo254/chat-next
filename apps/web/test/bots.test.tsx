@@ -402,6 +402,42 @@ describe("bots in chats", () => {
 		expect(within(info).queryByText(/Có trong 0 nhóm/)).toBeNull();
 	});
 
+	it("keeps checking whether the owner's bot runs, also after a failed check", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const botId = f.bots.seed("Báo cáo Bot", "report_daily_bot", { tokenSecret: "s", tokenIssuedAt: f.bots.now });
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, botId]);
+		f.send(f.selfId, chat, "/start");
+		const infoCalls = () => f.bots.calls.filter((call) => call === `GetBotInfo ${botId}`).length;
+		// Faked before the chat opens, so the banner's recheck timer is a fake one.
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+		try {
+			renderMessaging(f, `/c/${chat}`);
+			await screen.findByText(/Bot chưa chạy/, {}, LONG);
+			await waitFor(() => expect(infoCalls()).toBeGreaterThan(0));
+			// The next check fails; the one after it still runs.
+			f.bots.failInfo = 1;
+			const before = infoCalls();
+			await act(async () => {
+				vi.advanceTimersByTime(30_000);
+				await Promise.resolve();
+			});
+			await waitFor(() => expect(infoCalls()).toBe(before + 1));
+			expect(screen.getByText(/Bot chưa chạy/)).toBeTruthy();
+			// The bot starts polling: the server now says it runs.
+			const bot = f.bots.bots.get(botId);
+			if (bot === undefined) throw new Error("bot not seeded");
+			bot.lastUpdateAt = Math.floor(Date.now() / 1000);
+			await act(async () => {
+				vi.advanceTimersByTime(30_000);
+				await Promise.resolve();
+			});
+			await waitFor(() => expect(screen.queryByText(/Bot chưa chạy/)).toBeNull());
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("shows no banner for a running bot, and neither banner nor Quản lý bot to someone else", async () => {
 		const demo = seedDemo();
 		const f = demo.fixture;
