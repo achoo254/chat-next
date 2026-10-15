@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Phase 7: Tìm kiếm lịch sử tin nhắn"
-status: pending
+status: in-progress
 priority: P1
 effort: "L"
 dependencies: [2, 5]
@@ -22,6 +22,16 @@ Tìm tin trong một chat và trên toàn bộ chat của người dùng: p50 �
 
 - [Backend sync và tìm kiếm](../reports/researcher-261013-1120-backend-sync-search.md) — mục 5 (chia index, ACL, Meilisearch bỏ dấu sẵn, SLO lag)
 - ADR 0003 (outbox), 0005 (fold)
+
+## Trạng thái R4 (2026-10-15)
+
+Đã lên prod: commit `b83b949`, migration 0011. Bản này thay thiết kế Meilisearch bên dưới cho giai đoạn chưa có người dùng thật (Jev 1.00):
+- Cột `messages.search_tsv` là tsvector của các token vifold (text, caption, tên file), có GIN index, ghi cùng transaction với gửi/sửa tin, xoá khi thu hồi.
+- Không dùng `pg_trgm` vì `.65` không cài contrib. Hệ quả: mỗi từ phải khớp phần đầu một từ trong tin; từ cuối được phép gõ dở.
+- ACL kiểm bằng SQL; tin khớp đúng dấu xếp trước (trong top 500), rồi tới tin mới hơn; phân trang bằng cursor.
+- Interface `Searcher` giữ chỗ để đổi sang Meilisearch khi có người dùng thật.
+- Đo trên 200k tin trong 3.000 chat: p50 11,8 ms, p99 16,6 ms.
+- Phần dưới đây là thiết kế cho giai đoạn scale.
 
 ## Key Insights
 

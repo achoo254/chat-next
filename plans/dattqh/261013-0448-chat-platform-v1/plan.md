@@ -82,7 +82,7 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | Pending |
 | 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
 | 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI R1 lên prod; còn React Compiler, perf gate CI) |
-| 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | Pending |
+| 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres tsvector; Meilisearch để giai đoạn scale) |
 | 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | Pending |
 | 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | Pending |
 | 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | Pending |
@@ -429,4 +429,10 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
 - R3b lên prod (commit `e7c9c9c`, `bd14849`, `dd898b1`, migration 0010). Jev quyết: chat với chính mình là chat riêng có hai đầu là một người (0.77); tạo ở `GetSelf` cho cả tài khoản cũ (0.69); không tính vào giới hạn 5 chat ghim (0.99); tạo nhóm từ màn trống dùng hộp thoại thường cho phép không chọn ai (0.63). Nút màn trống rút gọn thành "Tạo nhóm và mời" để không xuống dòng ở cột 280 px. Kiểm tra: Go toàn bộ, core 733, web 207, E2E 15/15. Chi tiết: [R3b](../261015-0949-r3b-first-run/plan.md).
 - Tên và email lấy từ userinfo khi đăng nhập và refresh (commit `a753562`). Đã xác nhận trên prod: `achoo254` có tên "Đạt Trịnh Quốc Hoàn" và email `quocdat254@gmail.com` đã xác minh; `trinhquochoandat` có email đã xác minh, tên do user tự đặt được giữ nguyên.
 - R4 bắt đầu. Jev quyết tìm kiếm phía server dùng Postgres (1.00), không dùng Meilisearch: cột text đã fold (vifold) có index trong DB chat, ghi cùng transaction với tin; ACL kiểm bằng SQL; re-rank theo dấu ở Go; có interface để thay bằng Meilisearch khi có người dùng thật.
+- R4 lên prod (commit `b83b949`, migration 0011).
+  - Tìm không dấu phía server bằng Postgres tsvector trên token vifold; khớp theo đầu từ, vì `.65` không có `pg_trgm`.
+  - Client gộp kết quả local với kết quả server; panel tìm kiếm chia nhóm; tìm trong chat.
+  - Kiểm tra: E2E 16/16, core 751 test, web 223 test, JS khởi động 138,2/150 KiB.
+  - Muốn tìm theo chuỗi con thì phải cài `postgresql-16` contrib trên `.65`. Đó là thay đổi máy dùng chung, cần user quyết.
+- Tiếp theo theo lộ trình: R5 (bot, Developer Console, SDK).
 
