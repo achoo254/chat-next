@@ -138,6 +138,8 @@ Create:
 - [x] Updates + chat_activity + too_long
 - [x] Outbox log + cursor + afterCommit + sweeper (consumer realtime giữ cursor trong bộ nhớ; bảng `outbox_cursors` cho consumer sau)
 - [ ] Bộ test pts, đa chat, hot user, chuyển mode, failover, auth, tenant (đã có: 1.000 tin song song, 20 chat × 150 thành viên chồng chéo 30%, chuyển mode giữa luồng gửi, `too_long`/epoch, tenant, `random_id` ×100; còn: hot user 2.000 tin/s và failover thật với standby, đo ở Phase 14)
+- [ ] "Cloud của tôi" (R3b): mỗi tài khoản có sẵn một dialog với chính mình, tạo khi đăng nhập lần đầu và ghim đầu danh sách, không tính vào giới hạn 5 chat ghim; dùng lại đường chat riêng (gửi, sửa, xoá, chuyển tiếp, file từ R3), không phát `read`, typing hay trạng thái hoạt động; thuộc bộ lọc Cá nhân
+- [ ] Tạo nhóm khi chưa chọn thành viên (R3b): trả về nhóm kèm link mời mặc định, để màn trống mời được đồng đội ngay
 
 ### Kết quả R1 (2026-10-14)
 

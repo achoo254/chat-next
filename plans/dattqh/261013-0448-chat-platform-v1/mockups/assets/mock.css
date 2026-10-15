@@ -551,3 +551,10 @@ button.link-row { width: calc(100% + 2 * var(--space-2)); border: 0; background:
 	.shots { padding: var(--space-5) var(--space-3) var(--space-7); }
 	.frame { height: auto; min-height: var(--frame-h); }
 }
+
+/* First run: the lone pinned chat keeps its height, the team invite fills the space below. */
+.chats:has(+ .empty.invite-team) { flex: none; }
+.empty.invite-team { flex: 1; align-content: center; }
+.empty.invite-team .btn + .btn { margin-top: 0; }
+.empty.invite-team .btn .icon { width: 20px; height: 20px; margin: 0; }
+.empty.invite-team a.btn { text-decoration: none; }

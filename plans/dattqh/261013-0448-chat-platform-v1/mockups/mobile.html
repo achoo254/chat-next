@@ -187,11 +187,19 @@
 					<button type="button" class="icon-btn" aria-label="Tìm"><svg class="icon"><use href="#i-search"/></svg></button>
 					<button type="button" class="icon-btn" aria-label="Tạo chat"><svg class="icon"><use href="#i-plus"/></svg></button>
 				</div>
-				<div class="empty">
-					<svg class="icon"><use href="#i-message"/></svg>
-					<strong>Chưa có chat nào</strong>
-					<span>Tìm người theo username hoặc email để bắt đầu.</span>
-					<button type="button" class="btn btn-primary" data-toast="Mở Chat mới">Chat mới</button>
+				<ul class="chats">
+					<li class="chat-row">
+						<span class="avatar av-blue"><svg class="icon"><use href="#i-cloud"/></svg></span>
+						<div><div class="name"><span class="title-text">Cloud của tôi</span></div><div class="preview">Ghi chú, link và file trên mọi máy</div></div>
+						<div class="meta"><span class="line"><svg class="icon icon-sm" role="img" aria-label="Đã ghim"><use href="#i-pin"/></svg></span></div>
+					</li>
+				</ul>
+				<div class="empty invite-team">
+					<svg class="icon"><use href="#i-users"/></svg>
+					<strong>Mời đồng đội vào cùng</strong>
+					<span>Tạo nhóm rồi gửi link mời cho đồng đội.</span>
+					<a class="btn btn-primary" href="chat.html#first-run-invite"><svg class="icon"><use href="#i-user-plus"/></svg>Tạo nhóm và mời đồng đội</a>
+					<button type="button" class="btn" data-toast="Mở Chat mới"><svg class="icon"><use href="#i-message"/></svg>Nhắn cho một người</button>
 				</div>
 				<nav class="tabbar" aria-label="Thanh dưới">
 					<button type="button" aria-current="true"><svg class="icon"><use href="#i-message"/></svg>Chat</button>
@@ -199,7 +207,7 @@
 					<button type="button"><svg class="icon"><use href="#i-settings"/></svg>Cài đặt</button>
 				</nav>
 			</div>
-			<figcaption>Tài khoản mới, chưa có chat</figcaption>
+			<figcaption>Tài khoản mới: Cloud của tôi và lời mời đồng đội</figcaption>
 		</figure>
 	</div>
 </section>

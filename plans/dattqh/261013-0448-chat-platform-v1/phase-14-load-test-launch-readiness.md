@@ -83,6 +83,7 @@ Create:
 - [ ] Dữ liệu giả lập quy mô v1
 - [ ] Kịch bản k6 đầy đủ
 - [ ] Chạy + so ngân sách
+- [ ] E2E nhiều người dùng trên stack local (làm trước R3b): đăng nhập dev chỉ có ở bản build local, tạo sẵn vài người dùng thử, Playwright mở 2–3 trình duyệt độc lập để chạy kịch bản gửi, trả lời, sửa, xoá, reaction, đã đọc, ghim, link mời, kick, chặn, file và thông báo; có test chứng minh bản prod không có đường đăng nhập dev
 - [ ] Sửa điểm nghẽn + chạy lại
 - [ ] Chaos test
 - [ ] Đo thiết bị thật

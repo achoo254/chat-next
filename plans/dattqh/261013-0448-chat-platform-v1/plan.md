@@ -106,6 +106,7 @@ Cách làm cho mọi release:
 - Migration theo kiểu expand/contract, backup Postgres trước mỗi migration, để deploy liên tục không làm hỏng dữ liệu của người dùng thật.
 - Trước khi code UI của release: user duyệt các màn tương ứng trong [mock](./mockups/index.html). Sau khi lên prod: user và nhóm dùng thử test trên prod, phản hồi vào chính app chat (từ R1) để sửa ở các lần deploy sau.
 - Khi chuyển release: release trước phải chạy ổn trên prod với người dùng thật, không có lỗi chặn.
+- Tăng trưởng theo nhóm, không theo từng người lẻ: người dùng đầu tiên là cả một nhóm vào cùng lúc (đội nội bộ, đội vận hành, tenant theo domain), nhờ link mời nhóm và cảnh báo webhook có giá trị ngay khi chưa ai nhắn tin. Người dùng mới chưa có ai thì vẫn có Cloud của tôi và lời mời đồng đội (R3b), từ R5 có thêm bot chính thức.
 
 | Release | Lên prod để review | Phase (phần) | Người dùng thật |
 |---|---|---|---|
@@ -113,8 +114,9 @@ Cách làm cho mọi release:
 | R1 | Nhắn tin chữ realtime: 1-1, nhóm, nhóm có topic, kênh, trả lời, sửa, xoá, reaction, đã đọc, ghim, link mời, quản trị nhóm; chặn, báo cáo, rate limit, quyền riêng tư cơ bản; hàng đợi kiểm duyệt tối thiểu; thông báo trình duyệt khi tab mở | 2, 3 (gateway, chưa push), 5 (web), 6, 12 (phần tối thiểu) | Nhóm nội bộ hoandat |
 | R2 | Webhook cảnh báo: Grafana, Alertmanager, GitLab, Uptime Kuma, Jenkins đẩy vào nhóm; cảnh báo cập nhật tại chỗ | 9 (incoming webhook) | Nhóm vận hành |
 | R3 | Media: ảnh, video, file, voice, album, trình xem, tải lên tiếp tục | 4, 13 (S3/CDN) | Nhóm nội bộ |
+| R3b | Người dùng mới: "Cloud của tôi" ghim đầu danh sách (chat với chính mình, đồng bộ mọi máy), màn trống "Tạo nhóm và mời đồng đội", link mời ngay sau khi tạo nhóm. Làm song song với R3, bản đầu chỉ có chữ; file vào được khi R3 lên prod. Trước đó: E2E nhiều người dùng trên stack local (Phase 14) | 2, 6, 14 (E2E) | Nhóm nội bộ |
 | R4 | Tìm kiếm không dấu, local + server | 7 | Nhóm nội bộ |
-| R5 | Bot, Developer Console, SDK TS/Python/Go, thông báo và gửi hàng loạt qua bot | 8, 15, 9 (phần bot) | Nhóm nội bộ, dev viết bot |
+| R5 | Bot, Developer Console, SDK TS/Python/Go, thông báo và gửi hàng loạt qua bot; bot chính thức chào người dùng mới ở lần đăng nhập đầu | 8, 15, 9 (phần bot) | Nhóm nội bộ, dev viết bot |
 | R6 | Mini App trên web | 16 (web) | Dev viết bot |
 | R7 | App iOS/Android, push, Mini App trên mobile | 10, 3 (push), 16 (mobile) | Nhóm nội bộ |
 | R8 | App desktop, Mini App trên desktop | 11, 16 (desktop) | Nhóm nội bộ |
@@ -396,3 +398,11 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Tách ngưỡng 10 người cho avatar trên chip khỏi ngưỡng danh sách "ai đã thả, ai đã xem" của server: 0.99.
   - Hơn 3 người thả cùng một emoji thì hiện 3 avatar kèm "+N": 0.58, sát ngưỡng.
 
+- Phát triển một mình và người dùng chưa có bạn (2026-10-15). User hỏi: chỉ có một người phát triển thì test tính năng nhiều người thế nào, và người dùng thật chưa có bạn thì chat với ai. User đồng ý làm theo các phương án Jev đánh giá cao:
+  - Hướng tăng trưởng: kéo cả nhóm vào cùng lúc qua tenant theo domain, link mời nhóm và cảnh báo webhook: 0.96. Làm app dùng được một mình 0.04; tìm người và vòng mời bạn 0.00.
+  - Test một mình: trước tiên làm E2E Playwright nhiều trình duyệt trên stack local với người dùng thử: 0.64 (tài khoản Google/GitHub phụ test tay 0.28, người dùng ảo trên prod 0.08). Đăng nhập dev bỏ qua IdP chấp nhận được nếu chỉ có ở bản build local: 0.72. Làm E2E trước R3b: 0.65.
+  - Chat với chính mình, làm trước R5: 0.66. Tên "Cloud của tôi" theo Zalo: 0.78. Luôn có sẵn và ghim đầu danh sách: 0.76. Làm ngay, song song với R3: 0.45 (sau R3 0.31; độ tin thấp).
+  - Nút trên màn trống mở luồng tạo nhóm rồi đưa link mời của nhóm: 0.96; link cá nhân và QR 0.00.
+  - Bot chính thức chào người dùng mới ở R5: 0.68.
+  - Kênh công khai của sản phẩm gợi ý cho người mới: 0.41, chưa làm.
+  - Đã thêm release R3b vào lộ trình, mục todo vào Phase 2, 6, 8, 14 và màn `chat.html#first-run` (mock 110 màn).

@@ -109,6 +109,7 @@ Create:
 - [ ] Bulk có consent
 - [ ] Inline mode
 - [ ] Contract test
+- [ ] Bot chính thức chào người dùng mới (R5): tự có chat với bot ở lần đăng nhập đầu, hướng dẫn dùng app, nhận góp ý, báo tính năng mới
 
 ## Success Criteria
 

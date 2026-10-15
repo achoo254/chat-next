@@ -83,6 +83,7 @@ a.btn-primary { color: var(--c-on-primary); }
 /* ---------- List states ---------- */
 .split.lists { --cols: 3; }
 .split.four { --cols: 4; }
+.split.two { --cols: 2; }
 .split.lists .list { border-right: 0; max-height: none; }
 .sk { display: block; height: 10px; border-radius: var(--radius-xs); background: var(--c-bar-track); animation: pulse 1.6s var(--ease-standard) infinite; }
 .sk.av { width: var(--avatar); height: var(--avatar); border-radius: var(--radius-full); }
@@ -804,6 +805,94 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				</div>
 				<div class="list-foot" style="margin-top:auto"><span class="spin" aria-hidden="true"></span>Đang tải danh sách chat lần đầu…</div>
 			</section>
+		</div>
+	</div>
+</section>
+
+<!-- ======================= 2a. First run: Cloud của tôi, invite the team ======================= -->
+<section class="shot" id="first-run">
+	<div class="shot-head"><h2>Người dùng mới: Cloud của tôi và mời đồng đội</h2><span class="phase">R3b · Phase 2, 6</span>
+		<p>Tài khoản mới không bao giờ thấy danh sách trống hoàn toàn. "Cloud của tôi" là chat với chính mình, có sẵn và ghim đầu danh sách từ lần đăng nhập đầu; bỏ ghim được và không tính vào giới hạn 5 chat ghim. Tin trong đó đồng bộ mọi máy: ghi chú, link, và từ R3 là ảnh, file để chuyển giữa máy tính và điện thoại. Menu của một tin có thêm "Lưu vào Cloud của tôi" (chuyển tiếp, giữ dòng "Chuyển tiếp từ"). Chat này không có "Đã xem", không có trạng thái hoạt động; thuộc bộ lọc Cá nhân. Khi danh sách chỉ có Cloud của tôi, phần dưới là lời mời: nút chính "Tạo nhóm và mời đồng đội" mở Tạo nhóm cho phép tạo khi chưa chọn ai, tạo xong hiện ngay link mời của nhóm để sao chép hoặc chia sẻ. "Nhắn cho một người" mở Chat mới. Lời mời tự ẩn khi đã có chat thứ hai.</p></div>
+	<div class="frame">
+		<div class="split lists two">
+			<section class="pane list" aria-label="Danh sách chat của tài khoản mới">
+				<div class="pane-cap">Tài khoản mới · Tất cả</div>
+				<div class="list-head">
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm chat</span><input type="search" placeholder="Tìm kiếm"></label>
+				</div>
+				<div class="tabs" role="tablist" aria-label="Lọc chat">
+					<button type="button" role="tab" aria-selected="true">Tất cả</button>
+					<button type="button" role="tab" aria-selected="false">Cá nhân</button>
+					<button type="button" role="tab" aria-selected="false">Nhóm</button>
+					<button type="button" role="tab" aria-selected="false">Bot</button>
+					<button type="button" role="tab" aria-selected="false">Chưa đọc</button>
+				</div>
+				<ul class="chats">
+					<li class="chat-row" aria-current="true">
+						<span class="avatar av-blue"><svg class="icon"><use href="#i-cloud"/></svg></span>
+						<div><div class="name"><span class="title-text">Cloud của tôi</span></div><div class="preview">Ghi chú, link và file trên mọi máy</div></div>
+						<div class="meta"><span class="line"><svg class="icon icon-sm" role="img" aria-label="Đã ghim"><use href="#i-pin"/></svg></span></div>
+					</li>
+				</ul>
+				<div class="empty invite-team">
+					<svg class="icon"><use href="#i-users"/></svg>
+					<strong>Mời đồng đội vào cùng</strong>
+					<span>Chat vui hơn khi cả nhóm ở đây. Tạo nhóm rồi gửi link mời cho đồng đội qua email hay app bạn đang dùng.</span>
+					<a class="btn btn-primary" href="#first-run-invite"><svg class="icon"><use href="#i-user-plus"/></svg>Tạo nhóm và mời đồng đội</a>
+					<a class="btn" href="#new-chat"><svg class="icon"><use href="#i-message"/></svg>Nhắn cho một người</a>
+				</div>
+			</section>
+
+			<section class="pane convo" aria-label="Cloud của tôi">
+				<header class="convo-head">
+					<span class="avatar av-blue"><svg class="icon"><use href="#i-cloud"/></svg></span>
+					<div class="title"><strong>Cloud của tôi</strong><span>Chỉ mình bạn thấy · đồng bộ mọi máy</span></div>
+					<button type="button" class="icon-btn" aria-label="Tìm trong chat" data-action="search"><svg class="icon"><use href="#i-search"/></svg></button>
+				</header>
+				<div class="msgs-wrap">
+				<div class="messages">
+					<span class="day">Hôm nay</span>
+					<div class="msg mine">
+						<div class="bubble">
+							<p>Checklist trực tuần sau: đổi mật khẩu VPN, xem lại cảnh báo disk lab-174.<span class="stamp">08:52</span></p>
+						</div>
+					</div>
+					<div class="msg mine">
+						<div class="bubble">
+							<span class="fwd">Chuyển tiếp từ <b>Vận hành hệ thống</b></span>
+							<p>Hướng dẫn nâng cấp ở <a href="https://wiki.hoandat.com/van-hanh" data-trusted>wiki vận hành</a>.<span class="stamp">09:13</span></p>
+						</div>
+					</div>
+				</div>
+				</div>
+				<form class="composer">
+					<a class="icon-btn" href="media.html#attach" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></a>
+					<label class="sr-only" for="fr-input">Ghi chú vào Cloud của tôi</label>
+					<textarea id="fr-input" rows="1" placeholder="Ghi chú cho chính bạn"></textarea>
+					<a class="icon-btn" href="#emoji-picker" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></a>
+					<button type="button" class="send" aria-label="Gửi" data-toast="Đã lưu vào Cloud của tôi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</section>
+		</div>
+	</div>
+	<div class="frame dlg-frame" data-ghost id="first-run-invite">
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="fr1-title">
+				<div class="dlg-head"><h2 id="fr1-title">Tạo nhóm</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="field"><label for="fr-name">Tên nhóm</label><input class="input" id="fr-name" maxlength="128" value="Đội Vận hành"></div>
+					<p class="note"><svg class="icon"><use href="#i-info"/></svg><span>Chưa cần chọn ai. Tạo xong bạn nhận link mời để gửi cho đồng đội; ai mở link sẽ xem trước nhóm rồi bấm Tham gia.</span></p>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã tạo nhóm Đội Vận hành">Tạo nhóm</button></div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="fr2-title">
+				<div class="dlg-head"><h2 id="fr2-title">Mời đồng đội vào Đội Vận hành</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="row"><svg class="icon"><use href="#i-link"/></svg><span class="grow"><span class="mid-trunc value" title="chat.hoandat.com/join/Hd3pQ8vXz1KmT5yWa7Re"><span class="mid-head">chat.hoandat.com/join/Hd3pQ8vXz1KmT5</span><span class="mid-tail">yWa7Re</span></span><small>Thu hồi hoặc tạo link mới trong Quản lý nhóm</small></span><button type="button" class="icon-btn" aria-label="Sao chép link mời" data-copied="Đã sao chép link mời"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+					<p class="note"><svg class="icon"><use href="#i-info"/></svg><span>Dán link vào email, nhóm làm việc hay tin nhắn bạn vẫn dùng. Người chưa có tài khoản đăng nhập bằng Google hoặc GitHub, sau đó thấy xem trước nhóm và bấm Tham gia.</span></p>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn" data-toast="Mở bảng chia sẻ của hệ điều hành"><svg class="icon"><use href="#i-forward"/></svg>Chia sẻ</button><button type="button" class="btn btn-primary" data-copied="Đã sao chép link mời">Sao chép link</button></div>
+			</div>
 		</div>
 	</div>
 </section>
