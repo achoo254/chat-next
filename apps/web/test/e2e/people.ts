@@ -14,6 +14,8 @@ export const ACCOUNTS = {
 	an: { name: "An", username: "an" },
 	binh: { name: "Bình", username: "binh" },
 	chi: { name: "Chi", username: "chi" },
+	/** Nobody talks to Dũng except the first-run scenario: always a brand-new account. */
+	dung: { name: "Dũng", username: "dung" },
 } as const;
 export type AccountKey = keyof typeof ACCOUNTS;
 

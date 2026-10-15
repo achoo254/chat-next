@@ -15,16 +15,22 @@ interface ChatAvatarProps {
 	name: string;
 	size?: AvatarSize;
 	bot?: boolean;
+	/** The user's chat with themselves: a cloud instead of initials. */
+	saved?: boolean;
 	online?: boolean;
 	tone?: Tone;
 }
 
-/** Soft avatar with initials (robot icon for bots); colour follows the id. */
-export function ChatAvatar({ id, name, size = "md", bot = false, online = false, tone }: ChatAvatarProps) {
-	const classes = ["avatar", size === "md" ? "" : size, `av-${tone ?? toneOf(id)}`, online ? "online" : ""];
+/** Soft avatar with initials (robot icon for bots, cloud for the saved chat); colour follows the id. */
+export function ChatAvatar({ id, name, size = "md", bot = false, saved = false, online = false, tone }: ChatAvatarProps) {
+	const classes = ["avatar", size === "md" ? "" : size, `av-${tone ?? (saved ? "blue" : toneOf(id))}`, online ? "online" : ""];
+	const small = size !== "md" && size !== "lg";
+	let face: ReactNode = initials(name);
+	if (saved) face = <Icon name="cloud" small={small} />;
+	else if (bot) face = <Icon name="robot" small={small} />;
 	return (
 		<span className={classes.filter(Boolean).join(" ")} aria-hidden="true">
-			{bot ? <Icon name="robot" small={size !== "md" && size !== "lg"} /> : initials(name)}
+			{face}
 		</span>
 	);
 }

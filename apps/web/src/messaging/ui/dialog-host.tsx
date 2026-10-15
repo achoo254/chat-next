@@ -9,6 +9,7 @@ const chats = () => import("./chat-dialogs.tsx");
 const members = () => import("./member-dialogs.tsx");
 const NewChatDialog = lazy(() => create().then((m) => ({ default: m.NewChatDialog })));
 const NewGroupDialog = lazy(() => create().then((m) => ({ default: m.NewGroupDialog })));
+const InviteTeamDialog = lazy(() => create().then((m) => ({ default: m.InviteTeamDialog })));
 const NewChannelDialog = lazy(() => create().then((m) => ({ default: m.NewChannelDialog })));
 const AddMembersDialog = lazy(() => create().then((m) => ({ default: m.AddMembersDialog })));
 const ForwardDialog = lazy(() => create().then((m) => ({ default: m.ForwardDialog })));
@@ -44,6 +45,8 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 			return <NewChatDialog onClose={close} />;
 		case "newGroup":
 			return <NewGroupDialog withUserId={request.withUserId} onClose={close} />;
+		case "inviteTeam":
+			return <InviteTeamDialog chatId={request.chatId} onClose={close} />;
 		case "newChannel":
 			return <NewChannelDialog onClose={close} />;
 		case "addMembers":

@@ -13,7 +13,7 @@ import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { actionText, clock, integrationTone, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
+import { actionText, clock, integrationTone, isSavedChat, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
@@ -469,7 +469,7 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
 			silent={message.silent && !recalled ? copy.message.silent : ""}
 		>
-			{mine && !channel && !recalled && (
+			{mine && !channel && !recalled && !isSavedChat(chat, null) && (
 				<LabelledIcon
 					name={read ? "checks" : "check"}
 					label={read ? copy.message.read : copy.message.sentTick}

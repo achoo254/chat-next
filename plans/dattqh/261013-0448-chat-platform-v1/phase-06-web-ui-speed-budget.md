@@ -86,7 +86,7 @@ Create:
 - [x] Composer + optimistic send (trả lời, sửa, emoji, bỏ xem trước link)
 - [x] Entities
 - [ ] UI bot (R5)
-- [ ] Người dùng mới (R3b, mock `chat.html#first-run`): hàng "Cloud của tôi" ghim đầu, mục "Lưu vào Cloud của tôi" trong menu tin, màn trống "Tạo nhóm và mời đồng đội" và "Nhắn cho một người", hộp link mời ngay sau khi tạo nhóm; lời mời ẩn khi đã có chat thứ hai
+- [ ] Người dùng mới (R3b, mock `chat.html#first-run`): hàng "Cloud của tôi" ghim đầu, mục "Lưu vào Cloud của tôi" trong menu tin, màn trống "Tạo nhóm và mời" và "Nhắn cho một người", hộp link mời ngay sau khi tạo nhóm; lời mời ẩn khi đã có chat thứ hai
 - [x] Theme/brand/i18n (vi/en, sáng/tối, brand.config)
 - [x] Perf gate trong CI (job `web-perf` trong `.github/workflows/ci.yml`; chạy local bằng `pnpm perf`; ngưỡng ở `apps/web/test/perf/budgets.ts`)
 

@@ -42,6 +42,10 @@ export const en: MessagingCopy = {
 			unread: "Chats with unread messages show up in this filter.",
 		},
 		showAll: "Show all chats",
+		inviteTitle: "Bring your team",
+		inviteBody: "Chat works better with the whole team here. Create a group and send the invite link by email or the app you already use.",
+		inviteCreateGroup: "Create group and invite",
+		inviteMessageOne: "Message someone",
 	},
 	list: {
 		label: "Chat list",
@@ -67,6 +71,8 @@ export const en: MessagingCopy = {
 		yesterday: "Yesterday",
 		noMessages: "No messages yet",
 		deletedChat: "Deleted chat",
+		savedChat: "My Cloud",
+		savedEmpty: "Notes, links and files on every device",
 	},
 	convo: {
 		pick: "Pick a conversation",
@@ -94,6 +100,7 @@ export const en: MessagingCopy = {
 		mute: "Turn off notifications",
 		unmute: "Turn on notifications",
 		readOnly: "You cannot send messages in this chat.",
+		savedSubtitle: "Only you · synced on every device",
 	},
 	pinned: {
 		label: "Pinned message",

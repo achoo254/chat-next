@@ -6,7 +6,7 @@ import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, dialogTitle } from "../data/format.ts";
+import { chatKind, dialogTitle, isSavedChat } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
 import { useChat, useConnection, useDialog, useListEntry, useMediaLimits, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
@@ -95,7 +95,8 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 	const copy = useCopy();
 	const connection = useConnection();
 	const peer = useUser(chat.type === "private" ? chat.peerUserId : 0);
-	const presence = usePresence(chat.type === "private" && peer?.isBot !== true ? chat.peerUserId : 0);
+	const saved = isSavedChat(chat, peer);
+	const presence = usePresence(chat.type === "private" && peer?.isBot !== true && !saved ? chat.peerUserId : 0);
 	const online = useOnlineCount(chat.type === "group" && !chat.left ? chat.id : 0);
 	if (connection === "connecting") {
 		return (
@@ -106,6 +107,7 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 		);
 	}
 	if (connection === "offline" || connection === "waiting") return <span>{copy.convo.waitingNetwork}</span>;
+	if (saved) return <span>{copy.convo.savedSubtitle}</span>;
 	if (topic !== null) {
 		// The server does not count a topic's messages yet: show the count only when known.
 		const parts = [
@@ -261,7 +263,11 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				<button type="button" className="icon-btn narrow-only" aria-label={copy.convo.backToList} onClick={() => navigate(paths.home)}>
 					<Icon name="back" />
 				</button>
-				{topic !== null ? <TopicIco topic={topic} size="sm" /> : <ChatAvatar id={chatId} name={title} bot={kind === "bot"} />}
+				{topic !== null ? (
+					<TopicIco topic={topic} size="sm" />
+				) : (
+					<ChatAvatar id={chatId} name={title} bot={kind === "bot"} saved={isSavedChat(chat, view?.peer ?? peer ?? null)} />
+				)}
 				<div className="title">
 					<strong>{topic?.title ?? title}</strong>
 					<Subtitle chat={chat} topic={topic} groupTitle={title} />

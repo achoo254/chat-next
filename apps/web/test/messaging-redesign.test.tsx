@@ -240,7 +240,8 @@ describe("group creation", () => {
 		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
 		await userEvent.click(within(await screen.findByRole("dialog", { name: "Chat mới" }, LONG)).getByRole("button", { name: "Tạo nhóm" }));
 		const dialog = await screen.findByRole("dialog", { name: "Tạo nhóm" }, LONG);
-		const create = within(dialog).getByRole("button", { name: "Chọn ít nhất 1 người" });
+		// Nobody picked is allowed (the group starts with an invite link), but then it needs a name.
+		const create = within(dialog).getByRole("button", { name: "Tạo nhóm" });
 		expect(create).toHaveProperty("disabled", true);
 		// Suggestions come from your contacts first.
 		await userEvent.click(await within(dialog).findByRole("checkbox", { name: /Lan Anh/ }, LONG));

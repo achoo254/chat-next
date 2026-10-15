@@ -10,7 +10,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, countLabel, dialogTitle, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
+import { chatKind, countLabel, dialogTitle, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
 import { ChatAvatar } from "./parts.tsx";
@@ -112,6 +112,8 @@ function TopicsLine({ topics }: { topics: readonly Topic[] }) {
 interface PreviewProps {
 	view: DialogView;
 	kind: ChatKind;
+	/** The user's chat with themselves: every message is theirs, so no "Bạn:". */
+	saved: boolean;
 	draft: string;
 	topics: readonly Topic[] | null;
 }
@@ -124,7 +126,7 @@ export function useNameOf(ids: readonly number[]): (userId: number) => string {
 	return (userId: number) => (userId === store.selfId ? copy.common.you : names.get(userId) || copy.message.unknownUser);
 }
 
-function Preview({ view, kind, draft, topics }: PreviewProps) {
+function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
 	const copy = useCopy();
 	const { store } = useServices();
 	const top = view.topMessage;
@@ -137,10 +139,10 @@ function Preview({ view, kind, draft, topics }: PreviewProps) {
 			</>
 		);
 	} else if (top === null) {
-		line = copy.list.noMessages;
+		line = saved ? copy.list.savedEmpty : copy.list.noMessages;
 	} else {
 		const text = messagePreview(top, nameOf, copy, kind === "channel");
-		const showFrom = top.action === null && (kind === "group" || kind === "forum" || top.fromId === store.selfId);
+		const showFrom = top.action === null && !saved && (kind === "group" || kind === "forum" || top.fromId === store.selfId);
 		const from = top.integrationLabel !== "" ? top.integrationLabel : nameOf(top.fromId);
 		line = showFrom ? (
 			<>
@@ -182,13 +184,14 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	if (view === undefined) return null;
 	const kind = chatKind(view.chat, view.peer, view.chat?.forum === true);
 	const title = dialogTitle(view, copy);
+	const saved = isSavedChat(view.chat, view.peer);
 	const { dialog } = view;
 	const top = view.topMessage;
 	const muted = entry?.muted === true;
 	const pinned = entry?.pinned === true;
 	// Marked as unread with nothing unread: a dot instead of a count (#list-states).
 	const marked = entry?.unread === true && dialog.unreadCount === 0 && dialog.unreadMentionsCount === 0;
-	const ownLast = top !== null && top.fromId === store.selfId && top.action === null;
+	const ownLast = top !== null && top.fromId === store.selfId && top.action === null && !saved;
 	const read = ownLast && dialog.readOutboxMaxSeq >= top.seq;
 	const kindIcon = KIND_ICONS[kind];
 	// The server counts the whole chat (every topic), up to 1000.
@@ -196,7 +199,7 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	return (
 		<li className="chat-slot" style={style} aria-setsize={total} aria-posinset={position} {...trigger}>
 			<Link to={paths.chat(chatId)} className="chat-row" current={current}>
-				<ChatAvatar id={chatId} name={title} bot={kind === "bot"} />
+				<ChatAvatar id={chatId} name={title} bot={kind === "bot"} saved={saved} />
 				<span className="tx">
 					<span className="name">
 						{kindIcon !== undefined && (
@@ -205,7 +208,7 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 						<span className="title-text">{title}</span>
 						{muted && <LabelledIcon name="bell-off" label={copy.list.muted} />}
 					</span>
-					<Preview view={view} kind={kind} draft={draft} topics={topics} />
+					<Preview view={view} kind={kind} saved={saved} draft={draft} topics={topics} />
 				</span>
 				<span className="meta">
 					<span className="line">

@@ -10,6 +10,7 @@ export type DialogRequest =
 	| { readonly kind: "newChat" }
 	/** `withUserId`: opened from a profile, that person is picked already (0: nobody). */
 	| { readonly kind: "newGroup"; readonly withUserId: number }
+	| { readonly kind: "inviteTeam"; readonly chatId: number }
 	| { readonly kind: "newChannel" }
 	/** `seqs`: every message of an album (the server keeps their files, nothing is uploaded again). */
 	| { readonly kind: "forward"; readonly chatId: number; readonly seq: number; readonly seqs?: readonly number[] }

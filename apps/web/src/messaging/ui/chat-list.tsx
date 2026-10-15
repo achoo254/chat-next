@@ -228,8 +228,10 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 			</div>
 		);
 	}
+	// Only "Cloud của tôi" so far: the rest of the list invites the team (#first-run).
+	const alone = folder === "all" && entries.every((entry) => entry.saved);
 	return (
-		<div className="chats" ref={scroller} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
+		<div className={alone ? "chats alone" : "chats"} ref={scroller} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
 			<ul className="chat-rows" aria-label={copy.list.label} style={{ height: rows.total }}>
 				{visible.map((chatId, index) => {
 					const position = first + index;
@@ -248,6 +250,28 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 					);
 				})}
 			</ul>
+			{alone && <InviteTeam />}
+		</div>
+	);
+}
+
+/** The empty list of a new account: bring the team in with a group invite link. */
+function InviteTeam() {
+	const copy = useCopy();
+	const ui = useUi();
+	return (
+		<div className="empty invite-team">
+			<Icon name="users" />
+			<strong>{copy.folders.inviteTitle}</strong>
+			<span>{copy.folders.inviteBody}</span>
+			<button type="button" className="btn btn-primary" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: 0 })}>
+				<Icon name="user-plus" />
+				{copy.folders.inviteCreateGroup}
+			</button>
+			<button type="button" className="btn" onClick={() => ui.dialog.set({ kind: "newChat" })}>
+				<Icon name="message" />
+				{copy.folders.inviteMessageOne}
+			</button>
 		</div>
 	);
 }

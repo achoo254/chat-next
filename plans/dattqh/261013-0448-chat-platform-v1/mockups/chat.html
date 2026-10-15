@@ -812,7 +812,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 2a. First run: Cloud của tôi, invite the team ======================= -->
 <section class="shot" id="first-run">
 	<div class="shot-head"><h2>Người dùng mới: Cloud của tôi và mời đồng đội</h2><span class="phase">R3b · Phase 2, 6</span>
-		<p>Tài khoản mới không bao giờ thấy danh sách trống hoàn toàn. "Cloud của tôi" là chat với chính mình, có sẵn và ghim đầu danh sách từ lần đăng nhập đầu; bỏ ghim được và không tính vào giới hạn 5 chat ghim. Tin trong đó đồng bộ mọi máy: ghi chú, link, và từ R3 là ảnh, file để chuyển giữa máy tính và điện thoại. Menu của một tin có thêm "Lưu vào Cloud của tôi" (chuyển tiếp, giữ dòng "Chuyển tiếp từ"). Chat này không có "Đã xem", không có trạng thái hoạt động; thuộc bộ lọc Cá nhân. Khi danh sách chỉ có Cloud của tôi, phần dưới là lời mời: nút chính "Tạo nhóm và mời đồng đội" mở Tạo nhóm cho phép tạo khi chưa chọn ai, tạo xong hiện ngay link mời của nhóm để sao chép hoặc chia sẻ. "Nhắn cho một người" mở Chat mới. Lời mời tự ẩn khi đã có chat thứ hai.</p></div>
+		<p>Tài khoản mới không bao giờ thấy danh sách trống hoàn toàn. "Cloud của tôi" là chat với chính mình, có sẵn và ghim đầu danh sách từ lần đăng nhập đầu; bỏ ghim được và không tính vào giới hạn 5 chat ghim. Tin trong đó đồng bộ mọi máy: ghi chú, link, và từ R3 là ảnh, file để chuyển giữa máy tính và điện thoại. Menu của một tin có thêm "Lưu vào Cloud của tôi" (chuyển tiếp, giữ dòng "Chuyển tiếp từ"). Chat này không có "Đã xem", không có trạng thái hoạt động; thuộc bộ lọc Cá nhân. Khi danh sách chỉ có Cloud của tôi, phần dưới là lời mời: nút chính "Tạo nhóm và mời" mở hộp thoại Tạo nhóm thường (có ô tìm người) nhưng cho phép tạo khi chưa chọn ai: khi đó tên nhóm là bắt buộc và nút chính ghi "Tạo nhóm"; tạo xong (dù có chọn người hay không) mà nhóm chỉ có mình bạn thì hiện ngay link mời của nhóm để sao chép hoặc chia sẻ. "Nhắn cho một người" mở Chat mới. Lời mời tự ẩn khi đã có chat thứ hai.</p></div>
 	<div class="frame">
 		<div class="split lists two">
 			<section class="pane list" aria-label="Danh sách chat của tài khoản mới">
@@ -838,7 +838,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 					<svg class="icon"><use href="#i-users"/></svg>
 					<strong>Mời đồng đội vào cùng</strong>
 					<span>Chat vui hơn khi cả nhóm ở đây. Tạo nhóm rồi gửi link mời cho đồng đội qua email hay app bạn đang dùng.</span>
-					<a class="btn btn-primary" href="#first-run-invite"><svg class="icon"><use href="#i-user-plus"/></svg>Tạo nhóm và mời đồng đội</a>
+					<a class="btn btn-primary" href="#first-run-invite"><svg class="icon"><use href="#i-user-plus"/></svg>Tạo nhóm và mời</a>
 					<a class="btn" href="#new-chat"><svg class="icon"><use href="#i-message"/></svg>Nhắn cho một người</a>
 				</div>
 			</section>
@@ -880,7 +880,8 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 			<div class="panel" role="group" aria-labelledby="fr1-title">
 				<div class="dlg-head"><h2 id="fr1-title">Tạo nhóm</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
 				<div class="dlg-body stack">
-					<div class="field"><label for="fr-name">Tên nhóm</label><input class="input" id="fr-name" maxlength="128" value="Đội Vận hành"></div>
+					<div class="field"><label for="fr-name">Tên nhóm <span class="muted">(không bắt buộc khi đã chọn người)</span></label><input class="input" id="fr-name" maxlength="128" value="Đội Vận hành"></div>
+					<label class="search-field"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Tìm người</span><input type="search" placeholder="Nhập tên, username hoặc email" autocomplete="off"></label>
 					<p class="note"><svg class="icon"><use href="#i-info"/></svg><span>Chưa cần chọn ai. Tạo xong bạn nhận link mời để gửi cho đồng đội; ai mở link sẽ xem trước nhóm rồi bấm Tham gia.</span></p>
 				</div>
 				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã tạo nhóm Đội Vận hành">Tạo nhóm</button></div>

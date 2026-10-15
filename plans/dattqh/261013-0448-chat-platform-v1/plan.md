@@ -114,7 +114,7 @@ Cách làm cho mọi release:
 | R1 | Nhắn tin chữ realtime: 1-1, nhóm, nhóm có topic, kênh, trả lời, sửa, xoá, reaction, đã đọc, ghim, link mời, quản trị nhóm; chặn, báo cáo, rate limit, quyền riêng tư cơ bản; hàng đợi kiểm duyệt tối thiểu; thông báo trình duyệt khi tab mở | 2, 3 (gateway, chưa push), 5 (web), 6, 12 (phần tối thiểu) | Nhóm nội bộ hoandat |
 | R2 | Webhook cảnh báo: Grafana, Alertmanager, GitLab, Uptime Kuma, Jenkins đẩy vào nhóm; cảnh báo cập nhật tại chỗ | 9 (incoming webhook) | Nhóm vận hành |
 | R3 | Media: ảnh, video, file, voice, album, trình xem, tải lên tiếp tục | 4, 13 (S3/CDN) | Nhóm nội bộ |
-| R3b | Người dùng mới: "Cloud của tôi" ghim đầu danh sách (chat với chính mình, đồng bộ mọi máy), màn trống "Tạo nhóm và mời đồng đội", link mời ngay sau khi tạo nhóm. Làm song song với R3, bản đầu chỉ có chữ; file vào được khi R3 lên prod. Trước đó: E2E nhiều người dùng trên stack local (Phase 14) | 2, 6, 14 (E2E) | Nhóm nội bộ |
+| R3b | Người dùng mới: "Cloud của tôi" ghim đầu danh sách (chat với chính mình, đồng bộ mọi máy), màn trống "Tạo nhóm và mời", link mời ngay sau khi tạo nhóm. Làm song song với R3, bản đầu chỉ có chữ; file vào được khi R3 lên prod. Trước đó: E2E nhiều người dùng trên stack local (Phase 14) | 2, 6, 14 (E2E) | Nhóm nội bộ |
 | R4 | Tìm kiếm không dấu, local + server | 7 | Nhóm nội bộ |
 | R5 | Bot, Developer Console, SDK TS/Python/Go, thông báo và gửi hàng loạt qua bot; bot chính thức chào người dùng mới ở lần đăng nhập đầu | 8, 15, 9 (phần bot) | Nhóm nội bộ, dev viết bot |
 | R6 | Mini App trên web | 16 (web) | Dev viết bot |

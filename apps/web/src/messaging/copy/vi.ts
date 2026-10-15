@@ -41,6 +41,10 @@ export const vi = {
 			unread: "Chat có tin chưa đọc sẽ hiện ở bộ lọc này.",
 		},
 		showAll: "Xem tất cả chat",
+		inviteTitle: "Mời đồng đội vào cùng",
+		inviteBody: "Chat vui hơn khi cả nhóm ở đây. Tạo nhóm rồi gửi link mời cho đồng đội qua email hay app bạn đang dùng.",
+		inviteCreateGroup: "Tạo nhóm và mời",
+		inviteMessageOne: "Nhắn cho một người",
 	},
 	list: {
 		label: "Danh sách chat",
@@ -66,6 +70,8 @@ export const vi = {
 		yesterday: "Hôm qua",
 		noMessages: "Chưa có tin nhắn",
 		deletedChat: "Chat đã xoá",
+		savedChat: "Cloud của tôi",
+		savedEmpty: "Ghi chú, link và file trên mọi máy",
 	},
 	convo: {
 		pick: "Chọn một cuộc trò chuyện",
@@ -93,6 +99,7 @@ export const vi = {
 		mute: "Tắt thông báo",
 		unmute: "Bật thông báo",
 		readOnly: "Bạn không có quyền gửi tin trong chat này.",
+		savedSubtitle: "Chỉ mình bạn thấy · đồng bộ mọi máy",
 	},
 	pinned: {
 		label: "Tin ghim",

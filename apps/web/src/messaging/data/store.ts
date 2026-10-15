@@ -19,7 +19,7 @@ import {
 	type StoredMessage,
 	type User,
 } from "@app/core";
-import { chatKind, FOLDERS, inFolder, type ChatKind, type Folder } from "./format.ts";
+import { chatKind, FOLDERS, inFolder, isSavedChat, type ChatKind, type Folder } from "./format.ts";
 import type { ChatSource } from "./source.ts";
 
 export type WindowItem =
@@ -53,6 +53,8 @@ export type ListStatus = "loading" | "ready";
 export interface ListEntry {
 	readonly chatId: number;
 	readonly kind: ChatKind;
+	/** The user's chat with themselves ("Cloud của tôi"). */
+	readonly saved: boolean;
 	readonly forum: boolean;
 	/** Unread messages or mentions, or marked as unread ("Đánh dấu chưa đọc", synced). */
 	readonly unread: boolean;
@@ -447,6 +449,7 @@ export class ChatStore {
 			const fresh: ListEntry = {
 				chatId,
 				kind: chatKind(view.chat, view.peer, forum),
+				saved: isSavedChat(view.chat, view.peer),
 				forum,
 				unread: dialog.unreadCount > 0 || dialog.unreadMentionsCount > 0 || dialog.unreadMark,
 				muted,
@@ -456,6 +459,7 @@ export class ChatStore {
 			const same =
 				previous !== undefined &&
 				previous.kind === fresh.kind &&
+				previous.saved === fresh.saved &&
 				previous.forum === fresh.forum &&
 				previous.unread === fresh.unread &&
 				previous.muted === fresh.muted &&

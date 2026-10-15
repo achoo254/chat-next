@@ -484,6 +484,13 @@ aside.info { display: flex; flex-direction: column; min-width: 0; overflow-y: au
 .contacts-def p b { color: var(--c-text); font-weight: 600; }
 .contacts-def .btn { margin-left: auto; text-decoration: none; color: var(--c-text); }
 .empty .btn { margin-top: var(--space-2); }
+/* First run (#first-run): the lone "Cloud của tôi" row keeps its height, the team invite fills the column. */
+.chats.alone { display: flex; flex-direction: column; }
+.chats.alone .chat-rows { flex: none; }
+.empty.invite-team { flex: 1; align-content: center; }
+.empty.invite-team .btn { white-space: nowrap; }
+.empty.invite-team .btn + .btn { margin-top: 0; }
+.empty.invite-team .btn .icon { width: 20px; height: 20px; }
 
 /* ---------- Admin page ---------- */
 .admin-page { grid-column: 3 / -1; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }

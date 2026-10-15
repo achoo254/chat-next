@@ -6,19 +6,20 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { fold, type DialogView } from "@app/core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
+import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { FullCopy } from "../copy/use-screens-copy.ts";
 import { useContacts } from "../data/contacts.ts";
 import { chatKind, dialogTitle, joinNames, messagePreview, namedUserIds } from "../data/format.ts";
-import { Permission, type AddFailure, type Person } from "../data/remote.ts";
+import { Permission, type AddFailure, type Invite, type Person, type Remote } from "../data/remote.ts";
 import { useChat, useDialogOrder, useMessage, useServices, useUser } from "../data/services.tsx";
 import { useNameOf } from "./chat-row.tsx";
-import { inviteLinks, isActiveInvite } from "./members.ts";
+import { displayLink, inviteLinks, isActiveInvite } from "./members.ts";
 import { presenceText } from "./presence.tsx";
 import { isOwnAccount, usePeopleSearch } from "./people-search.ts";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
-import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
+import { ChatAvatar, CopyButton, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
 
 interface CloseProps {
@@ -312,7 +313,8 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 
 	const create = async () => {
 		const title = name.trim() === "" ? auto : name.trim();
-		if (selected.size === 0 || title === "") return;
+		// Nobody picked is fine (#first-run): the group starts with you and an invite link.
+		if (title === "") return;
 		setBusy(true);
 		try {
 			const ids = [...selected.keys()];
@@ -324,7 +326,8 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 			if (refused.length > 0) {
 				const added = ids.filter((userId) => !failures.some((failure) => failure.userId === userId));
 				ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added, pickedNames: pickedNames(selected) });
-			} else onClose();
+			} else if (ids.length === 0) ui.dialog.set({ kind: "inviteTeam", chatId });
+			else onClose();
 		} catch {
 			setBusy(false);
 			toasts.show(copy.common.failed);
@@ -370,14 +373,20 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 				</div>
 				<p className="note">
 					<Icon name="info" />
-					<span>{copy.newGroup.suggestions}</span>
+					<span>{selected.size === 0 ? copy.newGroup.aloneHint : copy.newGroup.suggestions}</span>
 				</p>
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
 					{copy.common.cancel}
 				</button>
-				<button type="button" className="btn btn-primary" aria-busy={busy} disabled={busy || selected.size === 0} onClick={() => void create()}>
+				<button
+					type="button"
+					className="btn btn-primary"
+					aria-busy={busy}
+					disabled={busy || (selected.size === 0 && name.trim() === "")}
+					onClick={() => void create()}
+				>
 					{copy.newGroup.create(selected.size)}
 				</button>
 			</div>
@@ -631,6 +640,97 @@ interface AddFailedProps extends CloseProps {
  * for you to send another way. People you blocked: unblock. Banned: admins
  * unban and add. Unknown accounts and a full chat: the reason only.
  */
+const inviteLinkRequests = new Map<number, Promise<string>>();
+
+/**
+ * The chat's active invite link: a cached or server-side one, else a new one
+ * (no expiry, no use limit). Concurrent calls for a chat share one request,
+ * so a dialog effect run twice never creates two links.
+ */
+function activeInviteLink(remote: Remote, chatId: number): Promise<string> {
+	const pending = inviteLinkRequests.get(chatId);
+	if (pending !== undefined) return pending;
+	const request = (async () => {
+		const isActive = (invite: Invite) => isActiveInvite(invite, Date.now());
+		const cached = inviteLinks.list(chatId).find(isActive);
+		if (cached !== undefined) return cached.link;
+		const stored = (await remote.inviteLinks(chatId)).find(isActive);
+		const invite = stored ?? (await remote.exportInvite(chatId, 0, 0));
+		inviteLinks.add(chatId, invite);
+		return invite.link;
+	})().finally(() => inviteLinkRequests.delete(chatId));
+	inviteLinkRequests.set(chatId, request);
+	return request;
+}
+
+/**
+ * Right after creating a group with nobody in it (#first-run-invite): the
+ * group's invite link to copy or share wherever the team already talks.
+ */
+export function InviteTeamDialog({ chatId, onClose }: CloseProps & { chatId: number }) {
+	const copy = useScreensCopy();
+	const { remote, toasts } = useServices();
+	const chat = useChat(chatId);
+	const [link, setLink] = useState<string | null>(null);
+	const id = useDomId("invite-team");
+	const title = chat?.title ?? "";
+	const failed = copy.common.failed;
+
+	useEffect(() => {
+		let active = true;
+		activeInviteLink(remote, chatId).then(
+			(found) => {
+				if (active) setLink(found);
+			},
+			() => {
+				if (active) toasts.show(failed);
+			},
+		);
+		return () => {
+			active = false;
+		};
+	}, [remote, chatId, toasts, failed]);
+
+	const copyLink = () => {
+		if (link === null) return;
+		void copyText(link).then((ok) => toasts.show(ok ? copy.inviteTeam.copied : failed));
+	};
+	const share = () => {
+		if (link === null) return;
+		navigator.share({ title: copy.inviteTeam.shareText(title), url: link }).catch(() => undefined);
+	};
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<DialogHead id={id} title={copy.inviteTeam.title(title)} onClose={onClose} />
+			<div className="dlg-body stack">
+				<div className="row">
+					<Icon name="link" />
+					<span className="grow">
+						{link === null ? <span className="spin" aria-hidden="true" /> : <MiddleTruncate className="value" text={displayLink(link)} />}
+						<small>{copy.inviteTeam.manage}</small>
+					</span>
+					{link !== null && <CopyButton text={link} label={copy.info.copyInvite} copiedLabel={copy.info.copiedInvite} />}
+				</div>
+				<p className="note">
+					<Icon name="info" />
+					<span>{copy.inviteTeam.note}</span>
+				</p>
+			</div>
+			<div className="dlg-foot">
+				{typeof navigator.share === "function" && (
+					<button type="button" className="btn" disabled={link === null} onClick={share}>
+						<Icon name="forward" />
+						{copy.inviteTeam.share}
+					</button>
+				)}
+				<button type="button" className="btn btn-primary" disabled={link === null} onClick={copyLink}>
+					{copy.inviteTeam.copy}
+				</button>
+			</div>
+		</Modal>
+	);
+}
+
 export function AddFailedDialog({ chatId, failures, addedIds, pickedNames, onClose }: AddFailedProps) {
 	const copy = useScreensCopy();
 	const { remote, source, toasts } = useServices();
@@ -663,13 +763,7 @@ export function AddFailedDialog({ chatId, failures, addedIds, pickedNames, onClo
 	// Someone who refused you is often not visible through GetUsers yet; the
 	// picker already showed you their name.
 	const nameOf = (userId: number) => people.get(userId)?.name ?? pickedNames.get(userId) ?? copy.message.unknownUser;
-	const inviteLink = async (): Promise<string> => {
-		const existing = inviteLinks.list(chatId).find((invite) => isActiveInvite(invite, Date.now()));
-		if (existing !== undefined) return existing.link;
-		const created = await remote.exportInvite(chatId, 0, 0);
-		inviteLinks.add(chatId, created);
-		return created.link;
-	};
+	const inviteLink = (): Promise<string> => activeInviteLink(remote, chatId);
 	const sendInvite = async (userId: number): Promise<void> => {
 		setState(userId, "sending");
 		try {

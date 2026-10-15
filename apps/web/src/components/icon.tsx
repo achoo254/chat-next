@@ -143,6 +143,7 @@ const PATHS = {
 			<path d="M4 13h3l3 3h4l3-3h3" />
 		</>
 	),
+	cloud: <path d="M7 18a4.6 4.4 0 0 1 0-8.8 5 4.5 0 0 1 9.8 1H18a3.5 3.5 0 0 1 0 7.8H7z" />,
 	"chevron-right": <path d="M9 6l6 6-6 6" />,
 	"chevron-down": <path d="M6 9l6 6 6-6" />,
 	"message-dot": (

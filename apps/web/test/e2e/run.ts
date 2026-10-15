@@ -1,5 +1,5 @@
 // Multi-user end-to-end runner: starts the local backend (server/cmd/e2e-stack:
-// throwaway PostgreSQL, fake IdP with the test accounts An, Bình and Chi,
+// throwaway PostgreSQL, fake IdP with the test accounts An, Bình, Chi and Dũng,
 // the real api) and the Vite dev server, runs the *.e2e.ts files with
 // node:test, then stops everything it started.
 //
@@ -114,7 +114,7 @@ async function main(): Promise<number> {
 
 		if (serve) {
 			console.log(
-				`e2e: stack running. Open ${WEB_ORIGIN} in several browser profiles and pick An, Bình or Chi on the sign-in page. Ctrl+C stops it.`,
+				`e2e: stack running. Open ${WEB_ORIGIN} in several browser profiles and pick An, Bình, Chi or Dũng on the sign-in page. Ctrl+C stops it.`,
 			);
 			await new Promise<void>((resolve) => {
 				process.once("SIGINT", resolve);

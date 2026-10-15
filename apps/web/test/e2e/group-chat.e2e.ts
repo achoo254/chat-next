@@ -82,7 +82,7 @@ scenario("a removed member stops receiving the group's messages", () => [an, bin
 	await members.getByText("Chi", { exact: true }).waitFor({ state: "detached" });
 	await members.getByRole("button", { name: "Đóng" }).click();
 	await members.waitFor({ state: "detached" });
-	await chi.page.getByText("Bạn không còn là thành viên của chat này.").waitFor();
+	await chi.page.getByText(/^Bạn (không còn là thành viên|đã bị xoá khỏi nhóm)/).first().waitFor();
 
 	await send(an, "Tin sau khi Chi rời nhóm");
 	await message(binh, "Tin sau khi Chi rời nhóm").waitFor();

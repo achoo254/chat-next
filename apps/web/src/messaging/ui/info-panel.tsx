@@ -15,7 +15,7 @@ import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { dialogTitle, shortDate, userName } from "../data/format.ts";
+import { dialogTitle, isSavedChat, shortDate, userName } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission, type MuteFor } from "../data/remote.ts";
 import { useDialog, useListEntry, useServices, useUser } from "../data/services.tsx";
@@ -429,6 +429,32 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 	);
 }
 
+/** "Cloud của tôi" (#first-run): your own notes, so no presence, contact, block or report rows. */
+function SavedInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) => void }) {
+	const copy = useScreensCopy();
+	const ui = useUi();
+	const name = copy.list.savedChat;
+	return (
+		<aside className="info" aria-label={name}>
+			<InfoHead title={name} />
+			<div className="info-hero">
+				<ChatAvatar id={chat.id} name={name} size="lg" saved />
+				<h2>{name}</h2>
+				<span className="muted">{copy.convo.savedSubtitle}</span>
+			</div>
+			<QuickActions chatId={chat.id} title={name} />
+			<SharedRows chatId={chat.id} onShared={onShared} />
+			<PinnedBarRow chat={chat} />
+			<div className="info-sec">
+				<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
+					<Icon name="trash" />
+					<span className="grow">{copy.info.deleteChat}</span>
+				</button>
+			</div>
+		</aside>
+	);
+}
+
 /** The other person of a private chat, or a bot (#info-panels). */
 function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined; onShared: (tab: SharedTab) => void }) {
 	const copy = useScreensCopy();
@@ -596,5 +622,6 @@ export function InfoPanel({ chat, peer, topic, title }: InfoPanelProps) {
 	}
 	if (topic !== null) return <TopicInfo chat={chat} topic={topic} groupTitle={title} />;
 	if (chat.type === "group" || chat.type === "channel") return <GroupInfo chat={chat} onShared={openShared} />;
+	if (isSavedChat(chat, peer ?? null)) return <SavedInfo chat={chat} onShared={openShared} />;
 	return <UserInfo chat={chat} peer={peer} onShared={openShared} />;
 }

@@ -11,6 +11,7 @@ import type { Chat, StoredMessage } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { isSavedChat } from "../data/format.ts";
 import { pinnedLists } from "../data/pinned.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
@@ -125,6 +126,18 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 		const canWrite = !channel || admin;
 		if (canWrite) entries.push({ label: copy.menu.reply, icon: "reply", run: () => ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq }) });
 		entries.push({ label: copy.menu.forward, icon: "forward", run: () => ui.dialog.set({ kind: "forward", chatId, seq: message.seq }) });
+		if (!isSavedChat(chat, null)) {
+			entries.push({
+				label: copy.menu.saveToCloud,
+				icon: "cloud",
+				// CreatePrivate with yourself answers your saved chat, creating it when needed.
+				run: () =>
+					remote
+						.createPrivate(store.selfId)
+						.then((saved) => remote.forward(chatId, [message.seq], saved))
+						.then(() => toasts.show(copy.menu.savedToCloud), failure),
+			});
+		}
 		if (message.text !== "") entries.push(copyEntry);
 		const media = message.media;
 		if (media !== undefined) {

@@ -52,7 +52,17 @@ export function inFolder(kind: ChatKind, folder: Folder, unread: boolean): boole
 	}
 }
 
+/**
+ * Whether the chat is the user's chat with themselves ("Cloud của tôi"):
+ * a private chat whose other end is the user, the only private chat with a
+ * single member.
+ */
+export function isSavedChat(chat: Chat | null | undefined, peer: User | null | undefined): boolean {
+	return chat?.type === "private" && (peer?.isSelf === true || chat.memberCount === 1);
+}
+
 export function dialogTitle(view: Pick<DialogView, "chat" | "peer">, copy: MessagingCopy): string {
+	if (isSavedChat(view.chat, view.peer)) return copy.list.savedChat;
 	if (view.chat !== null && view.chat.title !== "") return view.chat.title;
 	if (view.peer !== null) return view.peer.name;
 	return copy.list.deletedChat;
