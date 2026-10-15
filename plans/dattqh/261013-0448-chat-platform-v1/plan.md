@@ -377,4 +377,8 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Media tạm phục vụ từ `media-chat.hoandat.com` qua Cloudflare; chuyển sang domain đăng ký riêng trước R9: 0.92.
   - Hiện chưa có gói storage dùng được cho prod: gói test 1 GB còn hạn, gói PRO 100 GB đã hết hạn 03/09/2026. Mua hoặc gia hạn gói cần user quyết.
   - Code R3 viết theo S3 chung, cấu hình qua env, nên không phải chờ gói.
+- User chọn tạm dùng gói test 1 GB (dịch vụ `dattqh-test`, OneDash hệ nb) cho R3.
+  - Bucket `chat-media`, danh tính `chat-api`, quyền `write` (Get, List, Put, Delete, AbortMultipartUpload); endpoint `drive-storagehns3st.000nethost.com`, region `hn-storage`, path-style.
+  - Khoá S3 chỉ phát trên web OneDash. User đưa vào `$ACCESS_TOKENS_JSON` với mục `chat-media-s3`, tôi ghi vào `/opt/chat/.env` mà không in giá trị.
+- DNS `media-chat.hoandat.com` (proxied) và chứng chỉ Let's Encrypt đã tạo bằng `infra/chat/ensure-dns.sh` và `issue-cert.sh`.
 
