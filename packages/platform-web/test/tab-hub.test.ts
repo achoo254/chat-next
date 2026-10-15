@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 /** A tab whose leader core answers "dialogs" with its own id and can be told to hang. */
-function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = {}): Tab {
+function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod; build?: number; log?: string[] } = {}): Tab {
 	const roles: string[] = [];
 	const events: (readonly string[])[] = [];
 	const ended: SessionEndReason[] = [];
@@ -59,9 +59,12 @@ function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = 
 	channels.push(channel);
 	const hub = new TabHub({
 		tabId: id,
+		...(options.build === undefined ? {} : { build: options.build }),
 		channel,
 		lock: new LeaderLock(locks, "leader"),
-		startLeader: async (): Promise<LeaderCore> => ({
+		startLeader: async (): Promise<LeaderCore> => {
+			options.log?.push(`${id} opens`);
+			return {
 			invoke: async (method, args) => {
 				invoked.push({ method, args });
 				if (method === options.hang) return new Promise(() => undefined);
@@ -71,8 +74,11 @@ function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = 
 				listeners.add(listener);
 				return () => listeners.delete(listener);
 			},
-			close: async () => undefined,
-		}),
+			close: async () => {
+				options.log?.push(`${id} closes`);
+			},
+		};
+		},
 		onEvents: (keys) => events.push(keys),
 		onEnded: (reason) => ended.push(reason),
 		onRole: (role) => roles.push(role),
@@ -163,3 +169,32 @@ describe("tab hub: one tab owns the database", () => {
 		expect(first.foreground.at(-1)).toBe(true);
 	});
 });
+
+describe("tab hub: a newer build takes over", () => {
+	it("makes the leader of an older build step down for a tab of a newer one", async () => {
+		const locks = new FakeLocks();
+		const log: string[] = [];
+		const old = openTab("A", locks, { build: 100, log });
+		await until(() => old.roles.includes("leader"));
+		const fresh = openTab("B", locks, { build: 200, log });
+		await until(() => fresh.roles.includes("leader"));
+
+		expect(old.roles).toEqual(["leader", "follower"]);
+		// The old core closes the database before the new one opens it.
+		expect(log).toEqual(["A opens", "A closes", "B opens"]);
+		expect(await fresh.hub.call("dialogs", [])).toBe("dialogs from B");
+		expect(await old.hub.call("dialogs", [])).toBe("dialogs from B");
+	});
+
+	it("keeps the leader for a tab of the same, an older or an unknown build", async () => {
+		const locks = new FakeLocks();
+		const leader = openTab("A", locks, { build: 200 });
+		await until(() => leader.roles.includes("leader"));
+		const same = openTab("B", locks, { build: 200 });
+		const older = openTab("C", locks, { build: 100 });
+		const unknown = openTab("D", locks);
+		for (const tab of [same, older, unknown]) expect(await tab.hub.call("dialogs", [])).toBe("dialogs from A");
+		expect(leader.roles).toEqual(["leader"]);
+	});
+});
+

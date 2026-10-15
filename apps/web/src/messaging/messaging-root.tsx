@@ -154,8 +154,12 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 			}),
 		).then(
 			(client) => {
-				const store = new ChatStore(client.source, { selfId: self.id, onError: (err, context) => reportError(context, String(err)) }, client.coldSnapshot());
 				const remote = createRemote(transport, () => signedOut());
+				const store = new ChatStore(
+					client.source,
+					{ selfId: self.id, onError: (err, context) => reportError(context, String(err)), fetchUsers: async (ids) => (await remote.people(ids)).map(({ presence: _presence, ...user }) => user) },
+					client.coldSnapshot(),
+				);
 				const backend = client.createBackend(remote, client.source);
 				started = { client, store, backend };
 				if (!active) {

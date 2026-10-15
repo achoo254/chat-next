@@ -14,6 +14,7 @@ export function connectWebChat(options: MessagingConnectorOptions): MessagingCli
 		createWorker: () => new ChatWorker(),
 		realtimeUrl: realtimeUrlFor(window.location.origin),
 		appVersion: APP_VERSION,
+		build: __APP_BUILD_TIME__,
 		onSessionEnded: options.onSessionEnded,
 		onNotificationClick: options.onNotificationClick,
 		filterNotification: options.filterNotification,

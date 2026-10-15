@@ -152,6 +152,13 @@ export interface StoreOptions {
 	readonly onError?: (error: unknown, context: string) => void;
 	/** What the device reports about its network; the browser's by default. */
 	readonly network?: NetworkStatus;
+	/**
+	 * Asks the server for users the source does not know. The source answers
+	 * from the database of the tab that leads, which may run an older build
+	 * that never fetches a missing user (a chat partner stored without the
+	 * user); this tab then fills them in itself.
+	 */
+	readonly fetchUsers?: (ids: readonly number[]) => Promise<User[]>;
 }
 
 export class ChatStore {
@@ -349,7 +356,7 @@ export class ChatStore {
 			if (this.dialogJson.get(id) !== json) {
 				changed = true;
 				this.dialogJson.set(id, json);
-				this.dialogs.set(id, view);
+				this.dialogs.set(id, this.withKnownPeer(view));
 				if (view.chat !== null) this.chats.set(id, view.chat);
 				if (view.peer !== null) this.users.set(view.peer.id, view.peer);
 				// A private chat stored without its peer: fetch it so the row is not shown as deleted.
@@ -556,13 +563,41 @@ export class ChatStore {
 		try {
 			const users = await this.source.users(ids);
 			if (this.disposed) return;
-			for (const user of users) {
-				this.users.set(user.id, user);
-				this.emit(`user:${user.id}`);
-			}
+			this.putUsers(users);
+			const found = new Set(users.map((user) => user.id));
+			const missing = ids.filter((id) => !found.has(id));
+			if (missing.length === 0 || this.options.fetchUsers === undefined) return;
+			const fetched = await this.options.fetchUsers(missing);
+			if (this.disposed) return;
+			this.putUsers(fetched);
 		} catch (err) {
 			this.reportError(err, "load users");
 		}
+	}
+
+	private putUsers(users: readonly User[]): void {
+		if (users.length === 0) return;
+		for (const user of users) {
+			this.users.set(user.id, user);
+			this.emit(`user:${user.id}`);
+		}
+		// Dialog rows waiting for one of them.
+		let changed = false;
+		for (const [chatId, view] of this.dialogs) {
+			const filled = this.withKnownPeer(view);
+			if (filled === view) continue;
+			this.dialogs.set(chatId, filled);
+			this.emit(`dialog:${chatId}`);
+			changed = true;
+		}
+		if (changed) this.refreshEntries();
+	}
+
+	/** The view with its private chat's peer from the users this store knows, when the source had none. */
+	private withKnownPeer(view: DialogView): DialogView {
+		if (view.peer !== null || view.chat?.type !== "private" || view.chat.peerUserId === 0) return view;
+		const peer = this.users.get(view.chat.peerUserId);
+		return peer === undefined ? view : { ...view, peer };
 	}
 
 	// ------------------------------------------------------------- connection

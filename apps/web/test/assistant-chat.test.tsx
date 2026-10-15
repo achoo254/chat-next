@@ -4,13 +4,17 @@
 // older build). Either way the list names the bot and the chat offers
 // "Bắt đầu", never "Chat đã xoá".
 import { Code } from "@connectrpc/connect";
-import { screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ChatType } from "@app/proto-ts/chats";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
+import { App } from "../src/app.tsx";
+import type { MessagingConnector } from "../src/messaging/data/connector.ts";
 import { seedDemo } from "./support/demo-data.ts";
+import { fixtureConnector } from "./support/fake-chat.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { routerFetch } from "./support/router-fetch.ts";
 
 const LONG = { timeout: 8000 };
 const BOT = "Chat Trợ lý";
@@ -66,4 +70,48 @@ describe("the assistant chat of an existing account", () => {
 
 		await expectStartableBotChat();
 	});
+
+	it("names the bot when every request of the client core for it fails", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const bot = f.bots.seed(BOT, "tro_ly_bot", { description: "Trợ lý của bạn.", owned: false });
+		f.createChat(ChatType.PRIVATE, "", [f.selfId, bot]);
+		const sql = new MemorySqlFactory();
+		const first = renderMessaging(f, "/", sql);
+		await within(await screen.findByRole("list", { name: /Danh sách chat|Chats/ }, LONG)).findByText(BOT, {}, LONG);
+		first.unmount();
+		for (const db of sql.files.values()) db.prepare("DELETE FROM users WHERE id = ?").run(bot);
+		for (const method of ["getUsers", "getChat", "getPeerDialogs"]) {
+			f.server.faults.push({ method, when: "before", code: Code.Unavailable, remaining: 5 });
+		}
+		renderMessaging(f, "/", sql);
+
+		// The list asks the server itself.
+		await expectStartableBotChat();
+	});
+
+	it("names the bot in a tab whose database is served by a tab of an older build", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const bot = f.bots.seed(BOT, "tro_ly_bot", { description: "Trợ lý của bạn.", owned: false });
+		f.createChat(ChatType.PRIVATE, "", [f.selfId, bot]);
+		// The leading tab's database has the chat but not the bot, and its
+		// build never asks the server for a missing user.
+		const base = fixtureConnector(f, async () => new MemorySqlFactory());
+		const connector: MessagingConnector = async (options) => {
+			const client = await base(options);
+			const source = {
+				...client.source,
+				users: async (ids: readonly number[]) => (await client.source.users(ids)).filter((user) => user.id !== bot),
+				dialogs: async (limit?: number) =>
+					(await client.source.dialogs(limit)).map((view) => (view.peer?.id === bot ? { ...view, peer: null } : view)),
+			};
+			return { ...client, source };
+		};
+		window.history.replaceState(null, "", "/");
+		render(<App rpcFetch={routerFetch((router) => f.routes(router))} messagingConnector={connector} />);
+
+		await expectStartableBotChat();
+	});
 });
+

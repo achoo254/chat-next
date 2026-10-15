@@ -34,6 +34,13 @@ export interface LeaderCore {
 
 export interface TabHubOptions {
 	readonly tabId: string;
+	/**
+	 * When this tab's build was made (0 = unknown). A leader steps down for a
+	 * tab of a newer build, so code fixed since (sync, repairs of the local
+	 * database) runs once that tab is open, instead of whatever an old tab
+	 * left open runs.
+	 */
+	readonly build?: number;
 	readonly channel: ChannelLike;
 	readonly lock: LeaderLock;
 	/** Starts the core once this tab leads; throwing answers every call with that error. */
@@ -57,6 +64,11 @@ interface PendingCall {
 }
 
 const HANDLED_LIMIT = 500;
+
+/** Whether build a is newer than b; an unknown build (0) is never compared. */
+function isNewer(a: number, b: number): boolean {
+	return a !== 0 && b !== 0 && a > b;
+}
 
 function isHubMessage(value: unknown): value is HubMessage {
 	return typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
@@ -88,13 +100,21 @@ export class TabHub {
 		this.options.channel.addEventListener("message", (event) => {
 			if (isHubMessage(event.data)) this.receive(event.data);
 		});
-		this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground });
+		this.announce(foreground);
+		this.queueForLeadership();
+	}
+
+	private queueForLeadership(): void {
 		this.options.lock
 			.acquire(
 				() => this.becomeLeader(),
 				(err) => this.options.onError(err, "start leader"),
 			)
 			.catch((err: unknown) => this.options.onError(err, "leader lock"));
+	}
+
+	private announce(foreground: boolean): void {
+		this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground, build: this.options.build ?? 0 });
 	}
 
 	/** Runs a core method on the leader, wherever it is. */
@@ -110,7 +130,7 @@ export class TabHub {
 	setForeground(foreground: boolean): void {
 		this.foreground = foreground;
 		if (this.isLeader) this.options.onForeground(this.anyForeground());
-		else this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground });
+		else this.announce(foreground);
 	}
 
 	reportOnline(): void {
@@ -133,9 +153,7 @@ export class TabHub {
 	close(): void {
 		if (this.closed) return;
 		this.closed = true;
-		if (!this.isLeader) {
-			this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground: false });
-		}
+		if (!this.isLeader) this.announce(false);
 		for (const call of this.pending.values()) call.reject(new Error("tab hub is closed"));
 		this.pending.clear();
 		const core = this.core;
@@ -222,6 +240,32 @@ export class TabHub {
 		for (const call of waiting) void this.answer(call.id, call.method, call.args);
 	}
 
+	/**
+	 * A tab of a newer build is open: close the core and let the next tab
+	 * in line lead (the newer one, or a tab that steps down for it in turn),
+	 * then queue again. This tab's calls go to the new leader; unanswered
+	 * ones are sent again when it announces itself.
+	 */
+	private async stepDown(): Promise<void> {
+		if (this.closed || !this.isLeader || !this.ready) return;
+		this.role = "follower";
+		this.ready = false;
+		this.coreError = null;
+		this.options.onRole("follower");
+		const core = this.core;
+		this.core = null;
+		try {
+			await core?.close();
+		} catch (err) {
+			this.options.onError(err, "close core");
+		}
+		if (this.closed) return;
+		// Release only after the database is closed: the next leader opens it.
+		this.options.lock.handOver();
+		this.announce(this.foreground);
+		this.queueForLeadership();
+	}
+
 	private async answer(id: string, method: CoreMethod, args: unknown[]): Promise<void> {
 		const result = await this.execute(id, method, args);
 		this.options.channel.postMessage({ type: "result", id, ...result });
@@ -243,12 +287,18 @@ export class TabHub {
 			case "leader":
 				// A new leader is up: whatever it did not answer yet, ask again.
 				if (this.isLeader) return;
-				this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground: this.foreground });
+				this.announce(this.foreground);
 				for (const id of this.pending.keys()) this.dispatch(id);
 				return;
 			case "presence":
 				this.presence.set(message.tabId, message.foreground);
-				if (this.isLeader && this.ready) this.options.onForeground(this.anyForeground());
+				if (this.isLeader && this.ready) {
+					if (isNewer(message.build ?? 0, this.options.build ?? 0)) {
+						void this.stepDown();
+						return;
+					}
+					this.options.onForeground(this.anyForeground());
+				}
 				return;
 			case "online":
 				if (this.isLeader) this.options.onOnline();

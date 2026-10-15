@@ -111,3 +111,60 @@ Reported on prod: the device runs the fb29dac bundle and still shows chat 7 as d
 - `plans/dattqh/reports/debugger-261015-2018-assistant-chat-unknown-user.md`
 
 **Unresolved.** The exact damaged state of user 1's database (peer 0, an unknown id, or no chat row) is unproven without reading it. The repair covers all of them. After this deploy, one reload should show chat 7 named with "Bắt đầu"; if it does not, the next step is to read chat 7's local `chats` row on that device.
+
+## Second follow-up: still "Chat đã xoá" after the repair (673b374)
+
+**Root cause.** The prod tab was a follower. A tab of an older build was the leader, and every read and write went through it.
+- **Live tab evidence** (collected by the coordinator):
+  - `navigator.locks` showed one held exclusive lock `chat-core-leader:chat.hoandat.com` and two pending ones. The user has other chat.hoandat.com tabs open from before the deploys.
+  - The second load showed only GetSelf and GetUsers, with no GetState or GetDifference: this tab's worker was not syncing.
+  - The snapshot (built by the leader's core) had chat 7 = `{type: private, peerUserId: 4, memberCount: 2}` with `peer: null`.
+- **Why that shows "Chat đã xoá".** Only one tab owns the local database: an exclusive Web Lock, with no version check (`packages/platform-web/src/leader.ts`, `tab-hub.ts`). The old leader's `core.users()` reads only its database and never asks the server, so the new tab's repair code never ran on the database it was shown.
+- **The client code itself is correct.** In real Chromium (a dev build and a production build with the SW, against an e2e stack that leaves the bot out of frames), I created the broken device state by answering GetUsers, GetPeerDialogs and GetChat with empty responses, then reloaded. The first reload repaired it (GetSelf, GetAppConfig, GetUsers, GetDifference, then the list shows the bot).
+- There is no "tombstoned" user in the client: the local users table has no deleted flag, and the server's GetUsers simply omits unknown ids.
+
+**Fix.**
+1. **Peer resolution no longer depends on the leader.**
+   - `ChatStore` has a new `fetchUsers` option. When the source (the leader's core) does not return a wanted user, the store asks the server from the main thread (`remote.people` → GetUsers).
+   - The store fills the missing `peer` of private dialog views from the users it knows (`withKnownPeer`, also applied to later dialog loads), then re-renders the rows and entries.
+   - This is wired in `messaging-root.tsx`. It fixes the current device even while the old tab keeps the lock.
+2. **A newer build takes over leadership.**
+   - Each build carries `__APP_BUILD_TIME__`, a Vite define. It goes to the worker (`WorkerConfig.build`) and into the tab hub's `presence` message.
+   - A leader that sees a tab of a newer build steps down. It closes its core, then hands the lock over (`LeaderLock.handOver`) and queues again. Unanswered calls are re-sent when the new leader announces itself.
+   - The same, an older or an unknown build (0) never displaces the leader.
+   - This only works with leaders that run this release or later. A tab older than this release keeps the lock until the user reloads or closes it; fix 1 covers that case.
+
+**Tests.**
+- **platform-web `tab-hub.test.ts`:**
+  - "makes the leader of an older build step down": the log is A opens, A closes, B opens, and both tabs' calls are answered by B. It fails without the step-down.
+  - "keeps the leader for the same, an older or an unknown build".
+- **web `assistant-chat.test.tsx`:**
+  - "names the bot in a tab whose database is served by a tab of an older build": the source never returns the bot and its dialogs have `peer: null`.
+  - "names the bot when every request of the client core for it fails".
+  - Both fail without the `fetchUsers` wiring.
+
+**Gates.**
+- vitest (`--maxWorkers=2`): platform-web 19/19, core 773/773, web 354/354.
+- `pnpm lint`: clean. `pnpm typecheck`: all 6 projects done.
+- `pnpm e2e`: 25/25.
+- gitleaks: no leaks found.
+- My repro stack and preview server are stopped, and the ports are free.
+
+**Files changed in this round:**
+- `apps/web/src/messaging/data/store.ts`
+- `apps/web/src/messaging/messaging-root.tsx`
+- `apps/web/src/messaging/data/web-client.ts`
+- `apps/web/src/vite-env.d.ts`
+- `apps/web/vite.config.ts`
+- `apps/web/test/assistant-chat.test.tsx`
+- `packages/platform-web/src/tab-hub.ts`
+- `packages/platform-web/src/leader.ts`
+- `packages/platform-web/src/protocol.ts`
+- `packages/platform-web/src/client.ts`
+- `packages/platform-web/src/sqlite-worker.ts`
+- `packages/platform-web/test/tab-hub.test.ts`
+- this report
+
+**Still open.**
+- User 1's old tabs keep the stale leader until they are reloaded or closed. After this deploy the list is right anyway (fix 1), but those tabs' database still lacks the bot until a tab of this release leads.
+- `pnpm perf` was not run in this round. The store change sits in the lazily loaded messaging chunk.

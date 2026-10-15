@@ -56,6 +56,7 @@ function startHub(config: WorkerConfig): TabHub {
 	const lifecycle = new RelayedLifecycle(config.foreground);
 	const hub: TabHub = new TabHub({
 		tabId: crypto.randomUUID(),
+		build: config.build ?? 0,
 		channel: new BroadcastChannel(`chat-core:${host}`),
 		lock: new LeaderLock(navigator.locks, `chat-core-leader:${host}`),
 		startLeader: async (): Promise<LeaderCore> => {
