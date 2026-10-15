@@ -22,8 +22,6 @@ export interface BrandConfig {
 	readonly primaryTenant: { readonly domain: string; readonly issuer: string };
 	readonly hostTemplates: {
 		readonly web: string;
-		readonly botApi: string;
-		readonly webhook: string;
 	};
 	readonly sharedDomains: { readonly media: string; readonly miniApp: string };
 	readonly devOrigins: readonly string[];

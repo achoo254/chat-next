@@ -42,8 +42,8 @@ describe("hosts", () => {
 	it("derives each tenant's hosts from the templates", () => {
 		const hosts = hostsFor(brand, "inetdev.io.vn");
 		expect(hosts.web).toBe("chat.inetdev.io.vn");
-		expect(hosts.botApi).toBe("bot.chat.inetdev.io.vn");
-		expect(hosts.webhook).toBe("hook.chat.inetdev.io.vn");
+		expect(hosts.botApiUrl).toBe("https://chat.inetdev.io.vn/bot/v1");
+		expect(hosts.webhookUrl).toBe("https://chat.inetdev.io.vn/hook");
 		expect(hosts.miniAppOrigin(42)).toBe(`https://b42.${brand.sharedDomains.miniApp}`);
 	});
 

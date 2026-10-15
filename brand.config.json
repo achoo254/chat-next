@@ -21,9 +21,7 @@
     "issuer": "https://auth.hoandat.com"
   },
   "hostTemplates": {
-    "web": "chat.{domain}",
-    "botApi": "bot.chat.{domain}",
-    "webhook": "hook.chat.{domain}"
+    "web": "chat.{domain}"
   },
   "sharedDomains": {
     "media": "media.chat-media.invalid",

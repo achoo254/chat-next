@@ -3,8 +3,10 @@ import type { BrandConfig } from "./config.ts";
 /** The hosts one tenant serves the app from. */
 export interface TenantHosts {
 	readonly web: string;
-	readonly botApi: string;
-	readonly webhook: string;
+	/** Bot API base URL: a path on the web host (one-level hosts only, see ADR 0010). */
+	readonly botApiUrl: string;
+	/** Incoming webhook base URL, also a path on the web host. */
+	readonly webhookUrl: string;
 	/** Origin of one bot's Mini App, on the shared Mini App domain. */
 	readonly miniAppOrigin: (botId: number) => string;
 }
@@ -14,10 +16,11 @@ function fill(template: string, domain: string): string {
 }
 
 export function hostsFor(brand: BrandConfig, domain: string): TenantHosts {
+	const web = fill(brand.hostTemplates.web, domain);
 	return {
-		web: fill(brand.hostTemplates.web, domain),
-		botApi: fill(brand.hostTemplates.botApi, domain),
-		webhook: fill(brand.hostTemplates.webhook, domain),
+		web,
+		botApiUrl: `https://${web}/bot/v1`,
+		webhookUrl: `https://${web}/hook`,
 		miniAppOrigin: (botId) => `https://b${botId}.${brand.sharedDomains.miniApp}`,
 	};
 }

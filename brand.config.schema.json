@@ -69,14 +69,12 @@
       }
     },
     "hostTemplates": {
-      "description": "Hosts of one tenant; {domain} is the tenant's domain.",
+      "description": "Hosts of one tenant; {domain} is the tenant's domain. The Bot API and incoming webhooks are paths on the web host.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["web", "botApi", "webhook"],
+      "required": ["web"],
       "properties": {
-        "web": { "$ref": "#/$defs/hostTemplate" },
-        "botApi": { "$ref": "#/$defs/hostTemplate" },
-        "webhook": { "$ref": "#/$defs/hostTemplate" }
+        "web": { "$ref": "#/$defs/hostTemplate" }
       }
     },
     "sharedDomains": {
