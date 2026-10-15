@@ -392,4 +392,7 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Vị trí kiểu Zalo, chip nổi đè lên mép dưới bong bóng: 0.53. Kiểu Telegram, cùng hàng với giờ gửi: 0.47, sát ngưỡng. Giữ hàng riêng như hiện tại: 0.
   - Avatar trong chip chỉ hiện ở chat riêng và nhóm từ 10 người trở xuống; nhóm lớn hơn hiện emoji kèm số: 0.83.
   - Sửa mock trước, rồi code UI.
+- Mock chip cảm xúc kiểu Zalo đã xong. Jev quyết thêm:
+  - Tách ngưỡng 10 người cho avatar trên chip khỏi ngưỡng danh sách "ai đã thả, ai đã xem" của server: 0.99.
+  - Hơn 3 người thả cùng một emoji thì hiện 3 avatar kèm "+N": 0.58, sát ngưỡng.
 

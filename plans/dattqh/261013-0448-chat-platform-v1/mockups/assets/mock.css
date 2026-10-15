@@ -196,9 +196,31 @@ button { cursor: pointer; }
 .stamp .read { color: var(--c-primary); }
 .reply { display: block; margin-bottom: var(--space-1); padding: 2px var(--space-2); border-left: 2px solid var(--c-primary-solid); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-primary-solid) 8%, transparent); font-size: 0.8125rem; }
 .reply b { display: block; color: var(--c-primary); font-weight: 600; }
-.reactions { display: flex; gap: var(--space-1); margin-top: var(--space-1); }
-.reaction { display: inline-flex; gap: var(--space-1); align-items: center; padding: 0 var(--space-2); min-height: 28px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
-.reaction[aria-pressed="true"] { border-color: var(--c-primary); color: var(--c-primary); }
+/* Reactions, Zalo placement: one compact pill group floats over the bubble's bottom edge (about half outside).
+   The group is the bubble's last child with zero height, so the bubble keeps its height but is never narrower
+   than the pills (they cannot leave the list). Others' messages: bottom-right corner; yours: bottom-left.
+   Each emoji is a 32px-tall button drawn as a 24px pill segment, with a 44px-tall hit area. */
+.reactions { clear: both; display: flex; justify-content: flex-end; align-items: center; height: 0; transform: translateY(calc(var(--space-2) + 2px)); }
+.msg.mine .reactions { justify-content: flex-start; }
+/* The row makes room below the bubble only when it has reactions, so pills never cover the next message. */
+.msg:has(.reactions) { margin-bottom: var(--space-4); }
+.reaction {
+	position: relative; z-index: 0; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+	min-width: 44px; min-height: 32px; padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted);
+	font-size: 0.75rem; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.reaction::before { content: ""; position: absolute; inset: var(--space-1) 0; z-index: -1; background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-left-width: 0; transition: background var(--dur-fast) var(--ease-standard); }
+.reaction:first-child::before { border-left-width: 1px; border-radius: var(--radius-full) 0 0 var(--radius-full); }
+.reaction:last-child::before { border-radius: 0 var(--radius-full) var(--radius-full) 0; }
+.reaction:only-child::before { border-radius: var(--radius-full); }
+.reaction::after { content: ""; position: absolute; inset: calc(-1 * (var(--space-1) + 2px)) 0; }
+.reaction .r-emoji { font-size: 0.875rem; }
+.reaction:hover::before { background: color-mix(in srgb, var(--c-text) 6%, var(--c-surface)); }
+/* Your own reaction: tinted segment, primary text. */
+.reaction[aria-pressed="true"] { color: var(--c-primary); font-weight: 600; }
+.reaction[aria-pressed="true"]::before { background: var(--c-selected); }
+.reaction:focus-visible { outline: none; z-index: 1; }
+.reaction:focus-visible::before { box-shadow: var(--shadow-focus-primary); }
 .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 320px; max-width: 100%; border-radius: var(--radius-sm); overflow: hidden; margin-bottom: var(--space-1); }
 .photo { aspect-ratio: 4 / 3; display: grid; place-items: center; color: var(--c-text-muted); font-size: 0.75rem;
 	background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-cyan) 30%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-violet) 26%, var(--c-surface-subtle))); }
@@ -320,7 +342,7 @@ dialog::backdrop { background: var(--c-backdrop); }
 }
 /* Touch screens: every control reaches the 44px target. */
 @media (max-width: 760px), (pointer: coarse) {
-	.keyboard button, .reaction { min-height: 44px; }
+	.keyboard button { min-height: 44px; }
 	.phone .keyboard button { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -435,10 +457,11 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .lp .thumb { grid-column: 2; grid-row: 1 / span 3; width: 64px; height: 64px; border-radius: var(--radius-xs);
 	background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-amber) 34%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-violet) 30%, var(--c-surface-subtle))); }
 
-/* Reactions that show who reacted (small chats) instead of a count. */
-.r-avs { display: inline-flex; align-items: center; }
-.r-avs .avatar { width: 22px; height: 22px; font-size: 0.5625rem; letter-spacing: -0.02em; box-shadow: 0 0 0 1.5px var(--c-surface); }
-.r-avs .avatar + .avatar { margin-left: -4px; }
+/* Private chats and groups of up to 10 members: up to 3 small avatars of who reacted instead of a count. */
+.r-avs { display: inline-flex; align-items: center; margin-left: 2px; }
+.r-avs .avatar { width: 18px; height: 18px; font-size: 0.5rem; letter-spacing: -0.02em; box-shadow: 0 0 0 1.5px var(--c-surface); }
+.r-avs .avatar + .avatar { margin-left: -2px; }
+.reaction[aria-pressed="true"] .r-avs .avatar { box-shadow: 0 0 0 1.5px var(--c-selected); }
 
 /* Code block with its own copy button (messages and integration alerts). */
 .code-block { margin-top: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); overflow: hidden; }

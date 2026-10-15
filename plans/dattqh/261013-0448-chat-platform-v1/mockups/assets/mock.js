@@ -172,6 +172,63 @@
 		if (closer) closer.closest("dialog")?.close();
 	});
 
+	// Reaction pills: a click adds or removes your reaction; right-click, the context-menu key
+	// or a long press opens "Ai đã thả cảm xúc". Labels read like "👍 3 người, gồm bạn".
+	const MY_AVATAR = '<span class="avatar av-violet" data-name="bạn">ĐT</span>';
+	const reactionLabel = (btn) => {
+		const emoji = $(".r-emoji", btn).textContent;
+		const names = $$(".r-avs .avatar", btn).map((a) => a.dataset.name);
+		if (names.length) return `${emoji} ${names.length} người: ${names.join(", ")}`;
+		const mine = btn.getAttribute("aria-pressed") === "true";
+		return `${emoji} ${$(".r-n", btn).textContent} người${mine ? ", gồm bạn" : ""}`;
+	};
+	const toggleReaction = (btn) => {
+		const mine = btn.getAttribute("aria-pressed") !== "true";
+		const emoji = $(".r-emoji", btn).textContent;
+		const count = $(".r-n", btn);
+		const avatars = $(".r-avs", btn);
+		let left = 0;
+		if (count) {
+			left = Number(count.textContent) + (mine ? 1 : -1);
+			count.textContent = String(left);
+		} else if (avatars) {
+			if (mine) avatars.insertAdjacentHTML("afterbegin", MY_AVATAR);
+			else $('[data-name="bạn"]', avatars)?.remove();
+			left = avatars.children.length;
+		}
+		toast(mine ? `Đã thả ${emoji}` : `Đã bỏ ${emoji}`);
+		if (left === 0) {
+			const group = btn.parentElement;
+			btn.remove();
+			if (!group.children.length) group.remove();
+			return;
+		}
+		btn.setAttribute("aria-pressed", String(mine));
+		btn.setAttribute("aria-label", reactionLabel(btn));
+	};
+	const openReactors = () => toast("Mở “Ai đã thả cảm xúc”, chia theo từng biểu cảm (xem màn Nội dung tin phong phú)");
+	let pressTimer = 0;
+	let longPressed = false;
+	document.addEventListener("click", (e) => {
+		const btn = e.target instanceof Element ? e.target.closest(".reactions .reaction") : null;
+		if (!btn) return;
+		if (longPressed) { longPressed = false; return; }
+		toggleReaction(btn);
+	});
+	document.addEventListener("contextmenu", (e) => {
+		const btn = e.target instanceof Element ? e.target.closest(".reactions .reaction") : null;
+		if (!btn) return;
+		e.preventDefault();
+		openReactors();
+	});
+	document.addEventListener("pointerdown", (e) => {
+		const btn = e.target instanceof Element ? e.target.closest(".reactions .reaction") : null;
+		if (!btn || e.pointerType === "mouse") return;
+		longPressed = false;
+		pressTimer = setTimeout(() => { longPressed = true; openReactors(); }, 500);
+	});
+	["pointerup", "pointercancel", "pointerleave"].forEach((type) => document.addEventListener(type, () => clearTimeout(pressTimer)));
+
 	// Resizable chat list column: drag the edge or use the arrow keys; clamped to 280–420px.
 	$$("[data-list-resize]").forEach((handle) => {
 		const app = handle.closest(".app");
