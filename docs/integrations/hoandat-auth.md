@@ -22,5 +22,6 @@ Cả ba xin scope `openid profile email`, không có audience API: app chat tự
 
 Plan: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integration/plan.md`.
 
-- Đã làm (nhánh `feat/chat-app-clients`, chưa merge): ba client chat, refresh native không trần, secret suy theo tenant, `CHAT_MOBILE_REDIRECT_URI`.
-- Chưa làm: host `chat.<domain>` theo tenant và bật chat ở `/admin`, vai `chat` của API nội bộ, hạn mức `/token` cho request loopback, hiển thị máy chat ở `/account`, app chat ở `/apps`, script tạo tenant thử cho dev.
+- Đã làm và đang chạy ở production (`main` của `hoandat-auth`, commit `0c0020d`, `4a9ca7d`; đo 15/10/2026): ba client chat, refresh native không trần, secret suy theo tenant, `CHAT_MOBILE_REDIRECT_URI`. `.env` của IdP có `CHAT_WEB_URL`, `CHAT_WEB_CLIENT_SECRET`; env và cách kiểm client nằm ở `hoandat-auth/docs/deployment-guide.md` mục "Client của app chat".
+- App chat ở trang `/apps` của IdP: chỉ ở tenant chính (`auth.hoandat.com/apps`), vì tenant khác chưa có host `chat.<domain>`.
+- Chưa làm: host `chat.<domain>` theo tenant và bật chat ở `/admin` (khi có thì `/apps` của tenant đó mới hiện Chat), vai `chat` của API nội bộ, hạn mức `/token` cho request loopback, hiển thị máy chat ở `/account`, script tạo tenant thử cho dev.
