@@ -3,6 +3,7 @@
 export {
 	createWebChat,
 	goToSignIn,
+	LAST_USER_KEY,
 	openExternal,
 	requestNotificationPermission,
 	submitSignOut,

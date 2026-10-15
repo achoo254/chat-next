@@ -19,6 +19,8 @@ import {
 	type StoredMessage,
 	type User,
 } from "@app/core";
+import { browserNetwork, ConnectionStatus, type NetworkStatus } from "./connection-status.ts";
+import { Permission } from "./remote.ts";
 import { chatKind, FOLDERS, inFolder, isSavedChat, type ChatKind, type Folder } from "./format.ts";
 import type { ChatSource } from "./source.ts";
 
@@ -148,6 +150,8 @@ interface WindowState {
 export interface StoreOptions {
 	readonly selfId: number;
 	readonly onError?: (error: unknown, context: string) => void;
+	/** What the device reports about its network; the browser's by default. */
+	readonly network?: NetworkStatus;
 }
 
 export class ChatStore {
@@ -169,7 +173,7 @@ export class ChatStore {
 	private readonly windows = new Map<number, WindowState>();
 	private readonly lookups = new Map<string, StoredMessage | null>();
 	private readonly lookupsInFlight = new Set<string>();
-	private connection: ConnectionState = "connecting";
+	private readonly connection: ConnectionStatus;
 	/** AppConfig media limits; null until read once. */
 	private limits: MediaLimits | null = null;
 	private readonly limitsRefresh = new Coalescer(() => this.loadLimits());
@@ -194,6 +198,7 @@ export class ChatStore {
 		snapshot: ScreenSnapshot | null = null,
 	) {
 		this.selfId = options.selfId;
+		this.connection = new ConnectionStatus(options.network ?? browserNetwork, () => this.emit("connection"));
 		dropLegacyUnreadMarks(options.selfId);
 		if (snapshot !== null && snapshot.userId === options.selfId && snapshot.dialogs.length > 0) {
 			this.applyDialogs(snapshot.dialogs.map((d) => ({ ...d, topMessage: d.topMessage === null ? null : { ...d.topMessage, stale: true } })));
@@ -209,6 +214,7 @@ export class ChatStore {
 	dispose(): void {
 		this.disposed = true;
 		clearTimeout(this.muteTimer);
+		this.connection.dispose();
 		this.unsubscribe();
 		this.listeners.clear();
 	}
@@ -279,6 +285,16 @@ export class ChatStore {
 
 	dialog(chatId: number): DialogView | undefined {
 		return this.dialogs.get(chatId);
+	}
+
+	/** The user may create invite links in at least one group or channel of the list (server rule canInvite). */
+	canInviteSomewhere(): boolean {
+		for (const { chat } of this.dialogs.values()) {
+			if (chat === null || chat.left || (chat.type !== "group" && chat.type !== "channel")) continue;
+			if (chat.myRole === "owner" || chat.myRole === "admin") return true;
+			if (chat.type === "group" && (chat.myPermissions & Permission.addMembers) !== 0) return true;
+		}
+		return false;
 	}
 
 	refreshDialogs(): void {
@@ -549,16 +565,16 @@ export class ChatStore {
 
 	// ------------------------------------------------------------- connection
 
+	/** The socket state corrected by the device's network state (connection-status.ts). */
 	connectionState(): ConnectionState {
-		return this.connection;
+		return this.connection.get();
 	}
 
 	private refreshConnection(): void {
 		this.source.connectionState().then(
 			(state) => {
-				if (this.disposed || state === this.connection) return;
-				this.connection = state;
-				this.emit("connection");
+				if (this.disposed) return;
+				this.connection.setCore(state);
 				// Limits read offline are the defaults: ask the server again once connected.
 				if (state === "connected" && this.limits?.fromServer !== true) this.limitsRefresh.run();
 			},

@@ -10,6 +10,8 @@
 // same OIDC flow as in production, only against a fake provider. Every run
 // starts from an empty database. The web app is the Vite dev server
 // (pnpm --filter @app/web dev), which proxies /rpc, /auth and /ws here.
+// POST /e2e/realtime on the api port drops and restores the realtime
+// sockets (realtime_switch.go).
 package main
 
 import (
@@ -110,6 +112,8 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 		"MEDIA_PUBLIC_URL":     mediaURL(apiAddr),
 		"MEDIA_ROOT":           mediaRoot,
 		"MEDIA_MIN_FREE_BYTES": "0",
+		// The bots scenario runs its webhook receiver on loopback over http.
+		"BOT_WEBHOOK_ALLOW_LOCAL": "true",
 	}
 	cfg, err := config.Load(func(name string) (string, bool) { v, ok := env[name]; return v, ok })
 	if err != nil {
@@ -117,7 +121,7 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 	}
 
 	go announceReady(ctx, apiAddr, public, idp.Issuer())
-	return api.Run(ctx, cfg, logger)
+	return api.RunWrapped(ctx, cfg, logger, newRealtimeSwitch().wrap)
 }
 
 // announceReady prints one line once the api answers, so a runner can wait

@@ -31,6 +31,10 @@
 @container list-search (max-width: 240px) {
 	.search-field .kbd { display: none; }
 }
+/* Touch screens and the one-column layout have no keyboard shortcut to hint at. */
+@media (max-width: 760px), (pointer: coarse) {
+	.search-field .kbd { display: none; }
+}
 .kbd { flex: none; white-space: nowrap; font-family: var(--font-mono); font-size: 0.75rem; padding: 0 var(--space-1); border: 1px solid var(--c-border); border-radius: var(--radius-xs); color: var(--c-text-muted); }
 .badge {
 	display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
@@ -72,6 +76,8 @@
 	transition: opacity var(--dur-base) var(--ease-decelerate), transform var(--dur-base) var(--ease-decelerate); z-index: 30; font-size: 0.875rem;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+/* With a chat open the toast clears the composer and its hint line instead of covering them. */
+:root:has(.composer) .toast { bottom: calc(44px + 2 * var(--space-3) + 1.5rem + var(--space-5)); }
 
 /* Avatars: soft tints keep the text contrast in both themes (tone classes set the colours). */
 .avatar.xs { width: var(--avatar-xs); height: var(--avatar-xs); font-size: 0.625rem; }

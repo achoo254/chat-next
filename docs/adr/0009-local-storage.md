@@ -14,6 +14,7 @@ Client lưu tin nhắn, hội thoại, người dùng và chỉ mục tìm kiế
   - Tauri dùng SQLCipher qua `rusqlite`; khoá nằm trong OS keyring.
   - Bản build SQLCipher phải có FTS5; kiểm bằng `PRAGMA compile_options` trên từng nền tảng.
 - Web không mã hoá DB local. SQLite trên OPFS chỉ là cache, bị xoá toàn bộ khi đăng xuất.
+- Web mở được khi offline: service worker chỉ cache app shell của build (`index.html`, file build, icon, manifest), không bao giờ cache câu trả lời API hay media. Hồ sơ của người dùng lần chạy trước (`app:last-self` trong `localStorage`) chỉ được dùng để mở app khi không gọi được server và DB local vẫn là của đúng người đó; bị xoá khi đăng xuất hoặc khi server trả 401.
 - Mọi dữ liệu local (DB, media cache, mục trong `SecureStore`) tách theo cặp `(tenant, user)`. Đổi tenant hay đổi tài khoản không bao giờ đọc chung dữ liệu.
 - Nhận `SessionRevoked`, nhận 401 hoặc đăng xuất thì client xoá DB local, media cache và token của `(tenant, user)` đó.
 - Cache tuân thủ quyền: khi chính người dùng bị gỡ khỏi chat (`member_removed`), khi tin bị xoá (`message_delete`) hoặc bị ẩn (`message_hidden`), client xoá bản ghi, dòng FTS và media cache tương ứng.

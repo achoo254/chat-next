@@ -31,6 +31,7 @@ import { ChatStore } from "./data/store.ts";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { Toast } from "./ui/parts.tsx";
+import { forgetSelf } from "../api/offline-self.ts";
 
 // Settings, the console and moderation load when opened, keeping the first
 // chat screen small; once the app is idle their code is fetched ahead.
@@ -176,6 +177,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					drafts,
 					signOut: () => {
 						drafts.clear();
+						forgetSelf();
 						void client.signOutAndLeave();
 					},
 				};

@@ -64,9 +64,9 @@ Create:
 
 - [ ] Sinh model từ OpenAPI (3 ngôn ngữ)
 - [ ] Runtime + ví dụ TS/Python/Go
-- [ ] Developer Console
+- [ ] Developer Console (lát A: tạo bot, hồ sơ, token, lệnh; lát B1: nhận update webhook/long poll, trạng thái, update lỗi, số liệu 24 giờ, tầng rate limit; còn: ảnh bot)
 - [ ] Conformance 3 SDK × 2 chế độ
-- [ ] Docs
+- [ ] Docs (lát B1: `docs/bot-api/README.md` bắt đầu nhanh + kiểm HMAC Node/Python/Go; còn: tham chiếu sinh từ OpenAPI)
 - [ ] Phát hành registry nội bộ
 
 ## Success Criteria

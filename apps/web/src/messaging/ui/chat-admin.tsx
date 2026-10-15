@@ -1,5 +1,5 @@
 // "Quản lý nhóm" / "Quản lý kênh" (mockups/chat.html#chat-admin): member
-// permissions (a bitmask), history for new members, the leader and deputies
+// permissions (a bitmask), history for new members, turning topics on, the leader and deputies
 // (channels: owner and admins), the member and banned lists, invite links,
 // leaving and, for the owner, deleting the chat. Channels name their people
 // subscribers and skip the member permissions and history cards. "Tích hợp"
@@ -88,6 +88,38 @@ function HistoryCard({ chat }: { chat: Chat }) {
 					<small>{copy.admin.historyNote}</small>
 				</span>
 				<Switch checked={value} label={copy.admin.historyRow} onChange={toggle} />
+			</div>
+		</section>
+	);
+}
+
+/** Turns topics on; the server cannot turn them off, so the switch then stays on and locked. */
+function TopicsCard({ chat }: { chat: Chat }) {
+	const copy = useScreensCopy();
+	const { remote, toasts } = useServices();
+	const [turningOn, setTurningOn] = useState(false);
+	const on = chat.forum || turningOn;
+	const id = useDomId("topics");
+	const enable = () => {
+		setTurningOn(true);
+		remote.enableTopics(chat.id).then(
+			() => toasts.show(copy.admin.topicsEnabled),
+			() => {
+				setTurningOn(false);
+				toasts.show(copy.common.failed);
+			},
+		);
+	};
+	return (
+		<section className="card" aria-labelledby={id}>
+			<h3 id={id}>{copy.admin.topics}</h3>
+			<div className="row">
+				<Icon name="hash" />
+				<span className="grow">
+					{copy.admin.topicsRow}
+					<small>{chat.forum ? copy.admin.topicsOnNote : copy.admin.topicsNote}</small>
+				</span>
+				<Switch checked={on} label={copy.admin.topicsRow} disabled={on} onChange={enable} />
 			</div>
 		</section>
 	);
@@ -463,6 +495,7 @@ export function ChatAdmin({ chatId }: { chatId: number }) {
 					<div className="admin-col">
 						{!channel && <PermissionsCard chat={chat} />}
 						{!channel && <HistoryCard chat={chat} />}
+						{!channel && <TopicsCard chat={chat} />}
 						<AdminsCard chat={chat} />
 						<MembersCard chat={chat} />
 					</div>

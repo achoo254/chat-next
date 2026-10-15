@@ -23,9 +23,10 @@ func TestUsernameBase(t *testing.T) {
 	cases := map[string]string{
 		"Dat.Tran":              "dat_tran",
 		"hoan-dat":              "hoan_dat",
-		"x":                     "user",
+		"x":                     "x",
+		"an":                    "an",
 		"Trần":                  "trn",
-		"!!":                    "user",
+		"!!":                    "",
 		strings.Repeat("a", 40): strings.Repeat("a", 32),
 	}
 	for in, want := range cases {
@@ -53,6 +54,40 @@ func TestUsernameCandidate(t *testing.T) {
 	}
 	if got := UsernameCandidate("dat", 10); len(got) != 9 || !ValidUsername(got) {
 		t.Fatalf("random candidate = %q", got)
+	}
+}
+
+func TestUsernameCandidateShortBase(t *testing.T) {
+	cases := []struct {
+		base    string
+		attempt int
+		want    string
+	}{
+		{"an", 0, "an1"},
+		{"an", 1, "an2"},
+		{"an", 8, "an9"},
+		{"an", 9, "an10"},
+		{"x", 0, "x01"},
+		{"x", 1, "x02"},
+		{"x", 9, "x10"},
+		{"", 0, "001"},
+		{"", 9, "010"},
+	}
+	for _, c := range cases {
+		if got := UsernameCandidate(c.base, c.attempt); got != c.want {
+			t.Errorf("UsernameCandidate(%q, %d) = %q, want %q", c.base, c.attempt, got, c.want)
+		}
+	}
+	for _, base := range []string{"", "x", "an"} {
+		for attempt := range 15 {
+			c := UsernameCandidate(base, attempt)
+			if !ValidUsername(c) {
+				t.Fatalf("UsernameCandidate(%q, %d) produced invalid %q", base, attempt, c)
+			}
+			if c == "user" || !strings.HasPrefix(c, base) {
+				t.Fatalf("UsernameCandidate(%q, %d) = %q drops the name part", base, attempt, c)
+			}
+		}
 	}
 }
 

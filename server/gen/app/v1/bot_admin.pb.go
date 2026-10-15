@@ -306,7 +306,10 @@ type Bot struct {
 	TokenIssuedAt int64 `protobuf:"varint,9,opt,name=token_issued_at,json=tokenIssuedAt,proto3" json:"token_issued_at,omitempty"`
 	// Unix seconds when the bot last asked for updates (long poll getUpdates),
 	// kept to within about 30 seconds; 0 when it never did.
-	LastUpdateAt  int64 `protobuf:"varint,10,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
+	LastUpdateAt int64 `protobuf:"varint,10,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
+	// Updates are POSTed to a webhook (GetBotDelivery has the details);
+	// false when the bot fetches them by long poll.
+	Webhook       bool `protobuf:"varint,11,opt,name=webhook,proto3" json:"webhook,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -409,6 +412,13 @@ func (x *Bot) GetLastUpdateAt() int64 {
 		return x.LastUpdateAt
 	}
 	return 0
+}
+
+func (x *Bot) GetWebhook() bool {
+	if x != nil {
+		return x.Webhook
+	}
+	return false
 }
 
 type ListMyBotsRequest struct {
@@ -897,6 +907,959 @@ func (*DeleteBotResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{13}
 }
 
+type GetBotDeliveryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BotId         int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotDeliveryRequest) Reset() {
+	*x = GetBotDeliveryRequest{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotDeliveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotDeliveryRequest) ProtoMessage() {}
+
+func (x *GetBotDeliveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotDeliveryRequest.ProtoReflect.Descriptor instead.
+func (*GetBotDeliveryRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetBotDeliveryRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+// The bot's webhook as set; the secret is never returned.
+type BotWebhook struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// https URL; "" when the bot fetches updates by long poll.
+	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	// Update kinds stored for the bot ("message", "message_edited",
+	// "channel_post", "callback"); empty means every kind.
+	AllowedUpdates []string `protobuf:"bytes,2,rep,name=allowed_updates,json=allowedUpdates,proto3" json:"allowed_updates,omitempty"`
+	// Parallel requests, 1 to 100.
+	MaxConnections int32 `protobuf:"varint,3,opt,name=max_connections,json=maxConnections,proto3" json:"max_connections,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *BotWebhook) Reset() {
+	*x = BotWebhook{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BotWebhook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BotWebhook) ProtoMessage() {}
+
+func (x *BotWebhook) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BotWebhook.ProtoReflect.Descriptor instead.
+func (*BotWebhook) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *BotWebhook) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *BotWebhook) GetAllowedUpdates() []string {
+	if x != nil {
+		return x.AllowedUpdates
+	}
+	return nil
+}
+
+func (x *BotWebhook) GetMaxConnections() int32 {
+	if x != nil {
+		return x.MaxConnections
+	}
+	return 0
+}
+
+type BotDeliveryStatus struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Updates not delivered yet (neither dead-lettered nor expired).
+	PendingCount    int64 `protobuf:"varint,1,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
+	DeadLetterCount int64 `protobuf:"varint,2,opt,name=dead_letter_count,json=deadLetterCount,proto3" json:"dead_letter_count,omitempty"`
+	// Reason of the newest failed attempt: "http_<status>", "timeout",
+	// "tls", "connect", "dns", "blocked_address", "invalid_url",
+	// "secret_unreadable" (the webhook must be set again); "" for none.
+	LastError string `protobuf:"bytes,3,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	// Unix seconds of last_error; 0 for none.
+	LastErrorDate int64 `protobuf:"varint,4,opt,name=last_error_date,json=lastErrorDate,proto3" json:"last_error_date,omitempty"`
+	// Unix seconds of the newest successful request; 0 for none.
+	LastSuccessDate int64 `protobuf:"varint,5,opt,name=last_success_date,json=lastSuccessDate,proto3" json:"last_success_date,omitempty"`
+	// Duration of that request in milliseconds.
+	LastSuccessMs int32 `protobuf:"varint,6,opt,name=last_success_ms,json=lastSuccessMs,proto3" json:"last_success_ms,omitempty"`
+	// Requests in flight now.
+	OpenConnections int32 `protobuf:"varint,7,opt,name=open_connections,json=openConnections,proto3" json:"open_connections,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *BotDeliveryStatus) Reset() {
+	*x = BotDeliveryStatus{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BotDeliveryStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BotDeliveryStatus) ProtoMessage() {}
+
+func (x *BotDeliveryStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BotDeliveryStatus.ProtoReflect.Descriptor instead.
+func (*BotDeliveryStatus) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *BotDeliveryStatus) GetPendingCount() int64 {
+	if x != nil {
+		return x.PendingCount
+	}
+	return 0
+}
+
+func (x *BotDeliveryStatus) GetDeadLetterCount() int64 {
+	if x != nil {
+		return x.DeadLetterCount
+	}
+	return 0
+}
+
+func (x *BotDeliveryStatus) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+func (x *BotDeliveryStatus) GetLastErrorDate() int64 {
+	if x != nil {
+		return x.LastErrorDate
+	}
+	return 0
+}
+
+func (x *BotDeliveryStatus) GetLastSuccessDate() int64 {
+	if x != nil {
+		return x.LastSuccessDate
+	}
+	return 0
+}
+
+func (x *BotDeliveryStatus) GetLastSuccessMs() int32 {
+	if x != nil {
+		return x.LastSuccessMs
+	}
+	return 0
+}
+
+func (x *BotDeliveryStatus) GetOpenConnections() int32 {
+	if x != nil {
+		return x.OpenConnections
+	}
+	return 0
+}
+
+// Delivery counters of the last 24 hours (whole hours).
+type BotDeliveryStats struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Updates stored for the bot.
+	Received int64 `protobuf:"varint,1,opt,name=received,proto3" json:"received,omitempty"`
+	// Acknowledged by a 2xx answer of the webhook or by a long poll.
+	Delivered int64 `protobuf:"varint,2,opt,name=delivered,proto3" json:"delivered,omitempty"`
+	// Failed webhook attempts.
+	Failed        int64 `protobuf:"varint,3,opt,name=failed,proto3" json:"failed,omitempty"`
+	DeadLettered  int64 `protobuf:"varint,4,opt,name=dead_lettered,json=deadLettered,proto3" json:"dead_lettered,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BotDeliveryStats) Reset() {
+	*x = BotDeliveryStats{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BotDeliveryStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BotDeliveryStats) ProtoMessage() {}
+
+func (x *BotDeliveryStats) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BotDeliveryStats.ProtoReflect.Descriptor instead.
+func (*BotDeliveryStats) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *BotDeliveryStats) GetReceived() int64 {
+	if x != nil {
+		return x.Received
+	}
+	return 0
+}
+
+func (x *BotDeliveryStats) GetDelivered() int64 {
+	if x != nil {
+		return x.Delivered
+	}
+	return 0
+}
+
+func (x *BotDeliveryStats) GetFailed() int64 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *BotDeliveryStats) GetDeadLettered() int64 {
+	if x != nil {
+		return x.DeadLettered
+	}
+	return 0
+}
+
+type GetBotDeliveryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Webhook       *BotWebhook            `protobuf:"bytes,1,opt,name=webhook,proto3" json:"webhook,omitempty"`
+	Status        *BotDeliveryStatus     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Stats         *BotDeliveryStats      `protobuf:"bytes,3,opt,name=stats,proto3" json:"stats,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotDeliveryResponse) Reset() {
+	*x = GetBotDeliveryResponse{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotDeliveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotDeliveryResponse) ProtoMessage() {}
+
+func (x *GetBotDeliveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotDeliveryResponse.ProtoReflect.Descriptor instead.
+func (*GetBotDeliveryResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetBotDeliveryResponse) GetWebhook() *BotWebhook {
+	if x != nil {
+		return x.Webhook
+	}
+	return nil
+}
+
+func (x *GetBotDeliveryResponse) GetStatus() *BotDeliveryStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *GetBotDeliveryResponse) GetStats() *BotDeliveryStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+type SetBotWebhookRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// https URL on port 443, 80 or 8443 resolving to public addresses only;
+	// redirects are not followed.
+	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	// 1 to 256 characters of A-Z, a-z, 0-9, _ and -, sent in the
+	// X-Bot-Api-Secret-Token header and keying the X-Bot-Signature HMAC.
+	// Empty keeps the current secret (required when no webhook is set).
+	Secret         string   `protobuf:"bytes,3,opt,name=secret,proto3" json:"secret,omitempty"`
+	AllowedUpdates []string `protobuf:"bytes,4,rep,name=allowed_updates,json=allowedUpdates,proto3" json:"allowed_updates,omitempty"`
+	// 1 to 100; 0 is 40.
+	MaxConnections int32 `protobuf:"varint,5,opt,name=max_connections,json=maxConnections,proto3" json:"max_connections,omitempty"`
+	// Drop the pending updates instead of delivering them.
+	DropPending   bool `protobuf:"varint,6,opt,name=drop_pending,json=dropPending,proto3" json:"drop_pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBotWebhookRequest) Reset() {
+	*x = SetBotWebhookRequest{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBotWebhookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBotWebhookRequest) ProtoMessage() {}
+
+func (x *SetBotWebhookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBotWebhookRequest.ProtoReflect.Descriptor instead.
+func (*SetBotWebhookRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SetBotWebhookRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *SetBotWebhookRequest) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *SetBotWebhookRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+func (x *SetBotWebhookRequest) GetAllowedUpdates() []string {
+	if x != nil {
+		return x.AllowedUpdates
+	}
+	return nil
+}
+
+func (x *SetBotWebhookRequest) GetMaxConnections() int32 {
+	if x != nil {
+		return x.MaxConnections
+	}
+	return 0
+}
+
+func (x *SetBotWebhookRequest) GetDropPending() bool {
+	if x != nil {
+		return x.DropPending
+	}
+	return false
+}
+
+type SetBotWebhookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Webhook       *BotWebhook            `protobuf:"bytes,1,opt,name=webhook,proto3" json:"webhook,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBotWebhookResponse) Reset() {
+	*x = SetBotWebhookResponse{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBotWebhookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBotWebhookResponse) ProtoMessage() {}
+
+func (x *SetBotWebhookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBotWebhookResponse.ProtoReflect.Descriptor instead.
+func (*SetBotWebhookResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SetBotWebhookResponse) GetWebhook() *BotWebhook {
+	if x != nil {
+		return x.Webhook
+	}
+	return nil
+}
+
+type DeleteBotWebhookRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// Drop the pending updates instead of keeping them for long poll.
+	DropPending   bool `protobuf:"varint,2,opt,name=drop_pending,json=dropPending,proto3" json:"drop_pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBotWebhookRequest) Reset() {
+	*x = DeleteBotWebhookRequest{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBotWebhookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBotWebhookRequest) ProtoMessage() {}
+
+func (x *DeleteBotWebhookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBotWebhookRequest.ProtoReflect.Descriptor instead.
+func (*DeleteBotWebhookRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DeleteBotWebhookRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *DeleteBotWebhookRequest) GetDropPending() bool {
+	if x != nil {
+		return x.DropPending
+	}
+	return false
+}
+
+type DeleteBotWebhookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBotWebhookResponse) Reset() {
+	*x = DeleteBotWebhookResponse{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBotWebhookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBotWebhookResponse) ProtoMessage() {}
+
+func (x *DeleteBotWebhookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBotWebhookResponse.ProtoReflect.Descriptor instead.
+func (*DeleteBotWebhookResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{22}
+}
+
+type BotDeadLetter struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	UpdateId int64                  `protobuf:"varint,1,opt,name=update_id,json=updateId,proto3" json:"update_id,omitempty"`
+	// "message", "message_edited", "channel_post" or "callback".
+	Kind   string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	ChatId int64  `protobuf:"varint,3,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	// The chat's title, or the user's name for a private chat.
+	ChatTitle string `protobuf:"bytes,4,opt,name=chat_title,json=chatTitle,proto3" json:"chat_title,omitempty"`
+	// Reason of the last attempt, as BotDeliveryStatus.last_error.
+	LastError string `protobuf:"bytes,5,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	// Unix seconds of the last attempt.
+	LastErrorDate int64 `protobuf:"varint,6,opt,name=last_error_date,json=lastErrorDate,proto3" json:"last_error_date,omitempty"`
+	Attempts      int32 `protobuf:"varint,7,opt,name=attempts,proto3" json:"attempts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BotDeadLetter) Reset() {
+	*x = BotDeadLetter{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BotDeadLetter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BotDeadLetter) ProtoMessage() {}
+
+func (x *BotDeadLetter) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BotDeadLetter.ProtoReflect.Descriptor instead.
+func (*BotDeadLetter) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *BotDeadLetter) GetUpdateId() int64 {
+	if x != nil {
+		return x.UpdateId
+	}
+	return 0
+}
+
+func (x *BotDeadLetter) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *BotDeadLetter) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+func (x *BotDeadLetter) GetChatTitle() string {
+	if x != nil {
+		return x.ChatTitle
+	}
+	return ""
+}
+
+func (x *BotDeadLetter) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+func (x *BotDeadLetter) GetLastErrorDate() int64 {
+	if x != nil {
+		return x.LastErrorDate
+	}
+	return 0
+}
+
+func (x *BotDeadLetter) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
+}
+
+type ListBotDeadLettersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BotId         int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBotDeadLettersRequest) Reset() {
+	*x = ListBotDeadLettersRequest{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBotDeadLettersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBotDeadLettersRequest) ProtoMessage() {}
+
+func (x *ListBotDeadLettersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBotDeadLettersRequest.ProtoReflect.Descriptor instead.
+func (*ListBotDeadLettersRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListBotDeadLettersRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+type ListBotDeadLettersResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	DeadLetters []*BotDeadLetter       `protobuf:"bytes,1,rep,name=dead_letters,json=deadLetters,proto3" json:"dead_letters,omitempty"`
+	// All dead letters of the bot (the list holds the newest 100).
+	Total         int64 `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBotDeadLettersResponse) Reset() {
+	*x = ListBotDeadLettersResponse{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBotDeadLettersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBotDeadLettersResponse) ProtoMessage() {}
+
+func (x *ListBotDeadLettersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBotDeadLettersResponse.ProtoReflect.Descriptor instead.
+func (*ListBotDeadLettersResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ListBotDeadLettersResponse) GetDeadLetters() []*BotDeadLetter {
+	if x != nil {
+		return x.DeadLetters
+	}
+	return nil
+}
+
+func (x *ListBotDeadLettersResponse) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type RetryBotDeadLettersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// 1 to 100 update ids.
+	UpdateIds     []int64 `protobuf:"varint,2,rep,packed,name=update_ids,json=updateIds,proto3" json:"update_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryBotDeadLettersRequest) Reset() {
+	*x = RetryBotDeadLettersRequest{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryBotDeadLettersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryBotDeadLettersRequest) ProtoMessage() {}
+
+func (x *RetryBotDeadLettersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryBotDeadLettersRequest.ProtoReflect.Descriptor instead.
+func (*RetryBotDeadLettersRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RetryBotDeadLettersRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *RetryBotDeadLettersRequest) GetUpdateIds() []int64 {
+	if x != nil {
+		return x.UpdateIds
+	}
+	return nil
+}
+
+type RetryBotDeadLettersResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How many of update_ids were dead letters (others are skipped).
+	Retried       int32 `protobuf:"varint,1,opt,name=retried,proto3" json:"retried,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryBotDeadLettersResponse) Reset() {
+	*x = RetryBotDeadLettersResponse{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryBotDeadLettersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryBotDeadLettersResponse) ProtoMessage() {}
+
+func (x *RetryBotDeadLettersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryBotDeadLettersResponse.ProtoReflect.Descriptor instead.
+func (*RetryBotDeadLettersResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RetryBotDeadLettersResponse) GetRetried() int32 {
+	if x != nil {
+		return x.Retried
+	}
+	return 0
+}
+
+type DiscardBotDeadLettersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// 1 to 100 update ids.
+	UpdateIds     []int64 `protobuf:"varint,2,rep,packed,name=update_ids,json=updateIds,proto3" json:"update_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscardBotDeadLettersRequest) Reset() {
+	*x = DiscardBotDeadLettersRequest{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscardBotDeadLettersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscardBotDeadLettersRequest) ProtoMessage() {}
+
+func (x *DiscardBotDeadLettersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscardBotDeadLettersRequest.ProtoReflect.Descriptor instead.
+func (*DiscardBotDeadLettersRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *DiscardBotDeadLettersRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *DiscardBotDeadLettersRequest) GetUpdateIds() []int64 {
+	if x != nil {
+		return x.UpdateIds
+	}
+	return nil
+}
+
+type DiscardBotDeadLettersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Discarded     int32                  `protobuf:"varint,1,opt,name=discarded,proto3" json:"discarded,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscardBotDeadLettersResponse) Reset() {
+	*x = DiscardBotDeadLettersResponse{}
+	mi := &file_app_v1_bot_admin_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscardBotDeadLettersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscardBotDeadLettersResponse) ProtoMessage() {}
+
+func (x *DiscardBotDeadLettersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bot_admin_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscardBotDeadLettersResponse.ProtoReflect.Descriptor instead.
+func (*DiscardBotDeadLettersResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bot_admin_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *DiscardBotDeadLettersResponse) GetDiscarded() int32 {
+	if x != nil {
+		return x.Discarded
+	}
+	return 0
+}
+
 var File_app_v1_bot_admin_proto protoreflect.FileDescriptor
 
 const file_app_v1_bot_admin_proto_rawDesc = "" +
@@ -910,7 +1873,7 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x05scope\x18\x01 \x01(\x0e2\x17.app.v1.BotCommandScopeR\x05scope\x12.\n" +
 	"\bcommands\x18\x02 \x03(\v2\x12.app.v1.BotCommandR\bcommands\";\n" +
 	"\x0eBotCommandSets\x12)\n" +
-	"\x04sets\x18\x01 \x03(\v2\x15.app.v1.BotCommandSetR\x04sets\"\xe7\x02\n" +
+	"\x04sets\x18\x01 \x03(\v2\x15.app.v1.BotCommandSetR\x04sets\"\x81\x03\n" +
 	"\x03Bot\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
@@ -923,7 +1886,8 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"created_at\x18\b \x01(\x03B\x020\x02R\tcreatedAt\x12*\n" +
 	"\x0ftoken_issued_at\x18\t \x01(\x03B\x020\x02R\rtokenIssuedAt\x12(\n" +
 	"\x0elast_update_at\x18\n" +
-	" \x01(\x03B\x020\x02R\flastUpdateAt\"\x13\n" +
+	" \x01(\x03B\x020\x02R\flastUpdateAt\x12\x18\n" +
+	"\awebhook\x18\v \x01(\bR\awebhook\"\x13\n" +
 	"\x11ListMyBotsRequest\"5\n" +
 	"\x12ListMyBotsResponse\x12\x1f\n" +
 	"\x04bots\x18\x01 \x03(\v2\v.app.v1.BotR\x04bots\"B\n" +
@@ -953,7 +1917,72 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\tR\x05token\"-\n" +
 	"\x10DeleteBotRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\"\x13\n" +
-	"\x11DeleteBotResponse*g\n" +
+	"\x11DeleteBotResponse\"2\n" +
+	"\x15GetBotDeliveryRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\"p\n" +
+	"\n" +
+	"BotWebhook\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12'\n" +
+	"\x0fallowed_updates\x18\x02 \x03(\tR\x0eallowedUpdates\x12'\n" +
+	"\x0fmax_connections\x18\x03 \x01(\x05R\x0emaxConnections\"\xba\x02\n" +
+	"\x11BotDeliveryStatus\x12'\n" +
+	"\rpending_count\x18\x01 \x01(\x03B\x020\x02R\fpendingCount\x12.\n" +
+	"\x11dead_letter_count\x18\x02 \x01(\x03B\x020\x02R\x0fdeadLetterCount\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\x03 \x01(\tR\tlastError\x12*\n" +
+	"\x0flast_error_date\x18\x04 \x01(\x03B\x020\x02R\rlastErrorDate\x12.\n" +
+	"\x11last_success_date\x18\x05 \x01(\x03B\x020\x02R\x0flastSuccessDate\x12&\n" +
+	"\x0flast_success_ms\x18\x06 \x01(\x05R\rlastSuccessMs\x12)\n" +
+	"\x10open_connections\x18\a \x01(\x05R\x0fopenConnections\"\x99\x01\n" +
+	"\x10BotDeliveryStats\x12\x1e\n" +
+	"\breceived\x18\x01 \x01(\x03B\x020\x02R\breceived\x12 \n" +
+	"\tdelivered\x18\x02 \x01(\x03B\x020\x02R\tdelivered\x12\x1a\n" +
+	"\x06failed\x18\x03 \x01(\x03B\x020\x02R\x06failed\x12'\n" +
+	"\rdead_lettered\x18\x04 \x01(\x03B\x020\x02R\fdeadLettered\"\xa9\x01\n" +
+	"\x16GetBotDeliveryResponse\x12,\n" +
+	"\awebhook\x18\x01 \x01(\v2\x12.app.v1.BotWebhookR\awebhook\x121\n" +
+	"\x06status\x18\x02 \x01(\v2\x19.app.v1.BotDeliveryStatusR\x06status\x12.\n" +
+	"\x05stats\x18\x03 \x01(\v2\x18.app.v1.BotDeliveryStatsR\x05stats\"\xd0\x01\n" +
+	"\x14SetBotWebhookRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x16\n" +
+	"\x06secret\x18\x03 \x01(\tR\x06secret\x12'\n" +
+	"\x0fallowed_updates\x18\x04 \x03(\tR\x0eallowedUpdates\x12'\n" +
+	"\x0fmax_connections\x18\x05 \x01(\x05R\x0emaxConnections\x12!\n" +
+	"\fdrop_pending\x18\x06 \x01(\bR\vdropPending\"E\n" +
+	"\x15SetBotWebhookResponse\x12,\n" +
+	"\awebhook\x18\x01 \x01(\v2\x12.app.v1.BotWebhookR\awebhook\"W\n" +
+	"\x17DeleteBotWebhookRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12!\n" +
+	"\fdrop_pending\x18\x02 \x01(\bR\vdropPending\"\x1a\n" +
+	"\x18DeleteBotWebhookResponse\"\xe7\x01\n" +
+	"\rBotDeadLetter\x12\x1f\n" +
+	"\tupdate_id\x18\x01 \x01(\x03B\x020\x02R\bupdateId\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1b\n" +
+	"\achat_id\x18\x03 \x01(\x03B\x020\x02R\x06chatId\x12\x1d\n" +
+	"\n" +
+	"chat_title\x18\x04 \x01(\tR\tchatTitle\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\x05 \x01(\tR\tlastError\x12*\n" +
+	"\x0flast_error_date\x18\x06 \x01(\x03B\x020\x02R\rlastErrorDate\x12\x1a\n" +
+	"\battempts\x18\a \x01(\x05R\battempts\"6\n" +
+	"\x19ListBotDeadLettersRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\"p\n" +
+	"\x1aListBotDeadLettersResponse\x128\n" +
+	"\fdead_letters\x18\x01 \x03(\v2\x15.app.v1.BotDeadLetterR\vdeadLetters\x12\x18\n" +
+	"\x05total\x18\x02 \x01(\x03B\x020\x02R\x05total\"Z\n" +
+	"\x1aRetryBotDeadLettersRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12!\n" +
+	"\n" +
+	"update_ids\x18\x02 \x03(\x03B\x020\x02R\tupdateIds\"7\n" +
+	"\x1bRetryBotDeadLettersResponse\x12\x18\n" +
+	"\aretried\x18\x01 \x01(\x05R\aretried\"\\\n" +
+	"\x1cDiscardBotDeadLettersRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12!\n" +
+	"\n" +
+	"update_ids\x18\x02 \x03(\x03B\x020\x02R\tupdateIds\"=\n" +
+	"\x1dDiscardBotDeadLettersResponse\x12\x1c\n" +
+	"\tdiscarded\x18\x01 \x01(\x05R\tdiscarded*g\n" +
 	"\aBotTier\x12\x18\n" +
 	"\x14BOT_TIER_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10BOT_TIER_DEFAULT\x10\x01\x12\x15\n" +
@@ -964,14 +1993,20 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x19BOT_COMMAND_SCOPE_DEFAULT\x10\x01\x12\x1d\n" +
 	"\x19BOT_COMMAND_SCOPE_PRIVATE\x10\x02\x12\x1b\n" +
 	"\x17BOT_COMMAND_SCOPE_GROUP\x10\x03\x12!\n" +
-	"\x1dBOT_COMMAND_SCOPE_GROUP_ADMIN\x10\x042\xea\x02\n" +
+	"\x1dBOT_COMMAND_SCOPE_GROUP_ADMIN\x10\x042\x83\a\n" +
 	"\x0fBotAdminService\x12C\n" +
 	"\n" +
 	"ListMyBots\x12\x19.app.v1.ListMyBotsRequest\x1a\x1a.app.v1.ListMyBotsResponse\x12@\n" +
 	"\tCreateBot\x12\x18.app.v1.CreateBotRequest\x1a\x19.app.v1.CreateBotResponse\x12@\n" +
 	"\tUpdateBot\x12\x18.app.v1.UpdateBotRequest\x1a\x19.app.v1.UpdateBotResponse\x12L\n" +
 	"\rResetBotToken\x12\x1c.app.v1.ResetBotTokenRequest\x1a\x1d.app.v1.ResetBotTokenResponse\x12@\n" +
-	"\tDeleteBot\x12\x18.app.v1.DeleteBotRequest\x1a\x19.app.v1.DeleteBotResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\tDeleteBot\x12\x18.app.v1.DeleteBotRequest\x1a\x19.app.v1.DeleteBotResponse\x12O\n" +
+	"\x0eGetBotDelivery\x12\x1d.app.v1.GetBotDeliveryRequest\x1a\x1e.app.v1.GetBotDeliveryResponse\x12L\n" +
+	"\rSetBotWebhook\x12\x1c.app.v1.SetBotWebhookRequest\x1a\x1d.app.v1.SetBotWebhookResponse\x12U\n" +
+	"\x10DeleteBotWebhook\x12\x1f.app.v1.DeleteBotWebhookRequest\x1a .app.v1.DeleteBotWebhookResponse\x12[\n" +
+	"\x12ListBotDeadLetters\x12!.app.v1.ListBotDeadLettersRequest\x1a\".app.v1.ListBotDeadLettersResponse\x12^\n" +
+	"\x13RetryBotDeadLetters\x12\".app.v1.RetryBotDeadLettersRequest\x1a#.app.v1.RetryBotDeadLettersResponse\x12d\n" +
+	"\x15DiscardBotDeadLetters\x12$.app.v1.DiscardBotDeadLettersRequest\x1a%.app.v1.DiscardBotDeadLettersResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_bot_admin_proto_rawDescOnce sync.Once
@@ -986,31 +2021,47 @@ func file_app_v1_bot_admin_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_bot_admin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_app_v1_bot_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_app_v1_bot_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_app_v1_bot_admin_proto_goTypes = []any{
-	(BotTier)(0),                  // 0: app.v1.BotTier
-	(BotCommandScope)(0),          // 1: app.v1.BotCommandScope
-	(*BotCommand)(nil),            // 2: app.v1.BotCommand
-	(*BotCommandSet)(nil),         // 3: app.v1.BotCommandSet
-	(*BotCommandSets)(nil),        // 4: app.v1.BotCommandSets
-	(*Bot)(nil),                   // 5: app.v1.Bot
-	(*ListMyBotsRequest)(nil),     // 6: app.v1.ListMyBotsRequest
-	(*ListMyBotsResponse)(nil),    // 7: app.v1.ListMyBotsResponse
-	(*CreateBotRequest)(nil),      // 8: app.v1.CreateBotRequest
-	(*CreateBotResponse)(nil),     // 9: app.v1.CreateBotResponse
-	(*UpdateBotRequest)(nil),      // 10: app.v1.UpdateBotRequest
-	(*UpdateBotResponse)(nil),     // 11: app.v1.UpdateBotResponse
-	(*ResetBotTokenRequest)(nil),  // 12: app.v1.ResetBotTokenRequest
-	(*ResetBotTokenResponse)(nil), // 13: app.v1.ResetBotTokenResponse
-	(*DeleteBotRequest)(nil),      // 14: app.v1.DeleteBotRequest
-	(*DeleteBotResponse)(nil),     // 15: app.v1.DeleteBotResponse
-	(*User)(nil),                  // 16: app.v1.User
+	(BotTier)(0),                          // 0: app.v1.BotTier
+	(BotCommandScope)(0),                  // 1: app.v1.BotCommandScope
+	(*BotCommand)(nil),                    // 2: app.v1.BotCommand
+	(*BotCommandSet)(nil),                 // 3: app.v1.BotCommandSet
+	(*BotCommandSets)(nil),                // 4: app.v1.BotCommandSets
+	(*Bot)(nil),                           // 5: app.v1.Bot
+	(*ListMyBotsRequest)(nil),             // 6: app.v1.ListMyBotsRequest
+	(*ListMyBotsResponse)(nil),            // 7: app.v1.ListMyBotsResponse
+	(*CreateBotRequest)(nil),              // 8: app.v1.CreateBotRequest
+	(*CreateBotResponse)(nil),             // 9: app.v1.CreateBotResponse
+	(*UpdateBotRequest)(nil),              // 10: app.v1.UpdateBotRequest
+	(*UpdateBotResponse)(nil),             // 11: app.v1.UpdateBotResponse
+	(*ResetBotTokenRequest)(nil),          // 12: app.v1.ResetBotTokenRequest
+	(*ResetBotTokenResponse)(nil),         // 13: app.v1.ResetBotTokenResponse
+	(*DeleteBotRequest)(nil),              // 14: app.v1.DeleteBotRequest
+	(*DeleteBotResponse)(nil),             // 15: app.v1.DeleteBotResponse
+	(*GetBotDeliveryRequest)(nil),         // 16: app.v1.GetBotDeliveryRequest
+	(*BotWebhook)(nil),                    // 17: app.v1.BotWebhook
+	(*BotDeliveryStatus)(nil),             // 18: app.v1.BotDeliveryStatus
+	(*BotDeliveryStats)(nil),              // 19: app.v1.BotDeliveryStats
+	(*GetBotDeliveryResponse)(nil),        // 20: app.v1.GetBotDeliveryResponse
+	(*SetBotWebhookRequest)(nil),          // 21: app.v1.SetBotWebhookRequest
+	(*SetBotWebhookResponse)(nil),         // 22: app.v1.SetBotWebhookResponse
+	(*DeleteBotWebhookRequest)(nil),       // 23: app.v1.DeleteBotWebhookRequest
+	(*DeleteBotWebhookResponse)(nil),      // 24: app.v1.DeleteBotWebhookResponse
+	(*BotDeadLetter)(nil),                 // 25: app.v1.BotDeadLetter
+	(*ListBotDeadLettersRequest)(nil),     // 26: app.v1.ListBotDeadLettersRequest
+	(*ListBotDeadLettersResponse)(nil),    // 27: app.v1.ListBotDeadLettersResponse
+	(*RetryBotDeadLettersRequest)(nil),    // 28: app.v1.RetryBotDeadLettersRequest
+	(*RetryBotDeadLettersResponse)(nil),   // 29: app.v1.RetryBotDeadLettersResponse
+	(*DiscardBotDeadLettersRequest)(nil),  // 30: app.v1.DiscardBotDeadLettersRequest
+	(*DiscardBotDeadLettersResponse)(nil), // 31: app.v1.DiscardBotDeadLettersResponse
+	(*User)(nil),                          // 32: app.v1.User
 }
 var file_app_v1_bot_admin_proto_depIdxs = []int32{
 	1,  // 0: app.v1.BotCommandSet.scope:type_name -> app.v1.BotCommandScope
 	2,  // 1: app.v1.BotCommandSet.commands:type_name -> app.v1.BotCommand
 	3,  // 2: app.v1.BotCommandSets.sets:type_name -> app.v1.BotCommandSet
-	16, // 3: app.v1.Bot.user:type_name -> app.v1.User
+	32, // 3: app.v1.Bot.user:type_name -> app.v1.User
 	3,  // 4: app.v1.Bot.commands:type_name -> app.v1.BotCommandSet
 	0,  // 5: app.v1.Bot.tier:type_name -> app.v1.BotTier
 	5,  // 6: app.v1.ListMyBotsResponse.bots:type_name -> app.v1.Bot
@@ -1018,21 +2069,38 @@ var file_app_v1_bot_admin_proto_depIdxs = []int32{
 	4,  // 8: app.v1.UpdateBotRequest.commands:type_name -> app.v1.BotCommandSets
 	5,  // 9: app.v1.UpdateBotResponse.bot:type_name -> app.v1.Bot
 	5,  // 10: app.v1.ResetBotTokenResponse.bot:type_name -> app.v1.Bot
-	6,  // 11: app.v1.BotAdminService.ListMyBots:input_type -> app.v1.ListMyBotsRequest
-	8,  // 12: app.v1.BotAdminService.CreateBot:input_type -> app.v1.CreateBotRequest
-	10, // 13: app.v1.BotAdminService.UpdateBot:input_type -> app.v1.UpdateBotRequest
-	12, // 14: app.v1.BotAdminService.ResetBotToken:input_type -> app.v1.ResetBotTokenRequest
-	14, // 15: app.v1.BotAdminService.DeleteBot:input_type -> app.v1.DeleteBotRequest
-	7,  // 16: app.v1.BotAdminService.ListMyBots:output_type -> app.v1.ListMyBotsResponse
-	9,  // 17: app.v1.BotAdminService.CreateBot:output_type -> app.v1.CreateBotResponse
-	11, // 18: app.v1.BotAdminService.UpdateBot:output_type -> app.v1.UpdateBotResponse
-	13, // 19: app.v1.BotAdminService.ResetBotToken:output_type -> app.v1.ResetBotTokenResponse
-	15, // 20: app.v1.BotAdminService.DeleteBot:output_type -> app.v1.DeleteBotResponse
-	16, // [16:21] is the sub-list for method output_type
-	11, // [11:16] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	17, // 11: app.v1.GetBotDeliveryResponse.webhook:type_name -> app.v1.BotWebhook
+	18, // 12: app.v1.GetBotDeliveryResponse.status:type_name -> app.v1.BotDeliveryStatus
+	19, // 13: app.v1.GetBotDeliveryResponse.stats:type_name -> app.v1.BotDeliveryStats
+	17, // 14: app.v1.SetBotWebhookResponse.webhook:type_name -> app.v1.BotWebhook
+	25, // 15: app.v1.ListBotDeadLettersResponse.dead_letters:type_name -> app.v1.BotDeadLetter
+	6,  // 16: app.v1.BotAdminService.ListMyBots:input_type -> app.v1.ListMyBotsRequest
+	8,  // 17: app.v1.BotAdminService.CreateBot:input_type -> app.v1.CreateBotRequest
+	10, // 18: app.v1.BotAdminService.UpdateBot:input_type -> app.v1.UpdateBotRequest
+	12, // 19: app.v1.BotAdminService.ResetBotToken:input_type -> app.v1.ResetBotTokenRequest
+	14, // 20: app.v1.BotAdminService.DeleteBot:input_type -> app.v1.DeleteBotRequest
+	16, // 21: app.v1.BotAdminService.GetBotDelivery:input_type -> app.v1.GetBotDeliveryRequest
+	21, // 22: app.v1.BotAdminService.SetBotWebhook:input_type -> app.v1.SetBotWebhookRequest
+	23, // 23: app.v1.BotAdminService.DeleteBotWebhook:input_type -> app.v1.DeleteBotWebhookRequest
+	26, // 24: app.v1.BotAdminService.ListBotDeadLetters:input_type -> app.v1.ListBotDeadLettersRequest
+	28, // 25: app.v1.BotAdminService.RetryBotDeadLetters:input_type -> app.v1.RetryBotDeadLettersRequest
+	30, // 26: app.v1.BotAdminService.DiscardBotDeadLetters:input_type -> app.v1.DiscardBotDeadLettersRequest
+	7,  // 27: app.v1.BotAdminService.ListMyBots:output_type -> app.v1.ListMyBotsResponse
+	9,  // 28: app.v1.BotAdminService.CreateBot:output_type -> app.v1.CreateBotResponse
+	11, // 29: app.v1.BotAdminService.UpdateBot:output_type -> app.v1.UpdateBotResponse
+	13, // 30: app.v1.BotAdminService.ResetBotToken:output_type -> app.v1.ResetBotTokenResponse
+	15, // 31: app.v1.BotAdminService.DeleteBot:output_type -> app.v1.DeleteBotResponse
+	20, // 32: app.v1.BotAdminService.GetBotDelivery:output_type -> app.v1.GetBotDeliveryResponse
+	22, // 33: app.v1.BotAdminService.SetBotWebhook:output_type -> app.v1.SetBotWebhookResponse
+	24, // 34: app.v1.BotAdminService.DeleteBotWebhook:output_type -> app.v1.DeleteBotWebhookResponse
+	27, // 35: app.v1.BotAdminService.ListBotDeadLetters:output_type -> app.v1.ListBotDeadLettersResponse
+	29, // 36: app.v1.BotAdminService.RetryBotDeadLetters:output_type -> app.v1.RetryBotDeadLettersResponse
+	31, // 37: app.v1.BotAdminService.DiscardBotDeadLetters:output_type -> app.v1.DiscardBotDeadLettersResponse
+	27, // [27:38] is the sub-list for method output_type
+	16, // [16:27] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_bot_admin_proto_init() }
@@ -1048,7 +2116,7 @@ func file_app_v1_bot_admin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_bot_admin_proto_rawDesc), len(file_app_v1_bot_admin_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   14,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

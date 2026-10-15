@@ -214,6 +214,49 @@ describe("composer", () => {
 	});
 });
 
+describe("turning topics on", () => {
+	it("creates a group with topics from the new group dialog", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture);
+		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
+		await userEvent.click(within(await newChatDialog()).getByRole("button", { name: "Tạo nhóm" }));
+		const dialog = await screen.findByRole("dialog", { name: "Tạo nhóm" }, LONG);
+		await userEvent.click(await within(dialog).findByRole("checkbox", { name: /Lan Anh/ }, LONG));
+		await userEvent.type(within(dialog).getByRole("textbox", { name: /Tên nhóm/ }), "Dự án Mới");
+		const topicsSwitch = within(dialog).getByRole("switch", { name: "Nhóm có chủ đề" });
+		expect(topicsSwitch.getAttribute("aria-checked")).toBe("false");
+		expect(within(dialog).getByText(/Bật rồi không tắt được/)).toBeTruthy();
+		await userEvent.click(topicsSwitch);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Tạo nhóm · 1 người" }));
+
+		const topics = await screen.findByRole("list", { name: "Chủ đề" }, LONG);
+		// The server's "General" shows by its Vietnamese name.
+		expect(await within(topics).findByRole("button", { name: /Chung/ }, LONG)).toBeTruthy();
+		expect(within(topics).queryByText("General")).toBeNull();
+	});
+
+	it("turns topics on from Quản lý nhóm, after which the switch stays on", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, `/c/${demo.ids.ops}/admin`);
+		const card = (await screen.findByRole("heading", { name: "Chủ đề" }, LONG)).closest("section") as HTMLElement;
+		const toggle = within(card).getByRole("switch", { name: "Bật chủ đề" });
+		expect(toggle.getAttribute("aria-checked")).toBe("false");
+		await userEvent.click(toggle);
+		expect(await screen.findByText("Đã bật chủ đề cho nhóm")).toBeTruthy();
+		expect(demo.fixture.updatedChats).toEqual([{ chatId: demo.ids.ops, forum: true }]);
+		await waitFor(() => expect(within(card).getByText("Đã bật. Chủ đề không tắt được.")).toBeTruthy(), LONG);
+		expect(toggle.getAttribute("aria-checked")).toBe("true");
+		expect(toggle).toHaveProperty("disabled", true);
+	});
+
+	it("shows no topics card for a channel", async () => {
+		const { demo, chatId } = ownedChannel();
+		renderMessaging(demo.fixture, `/c/${chatId}/admin`);
+		expect(await screen.findByRole("heading", { name: "Link mời" }, LONG)).toBeTruthy();
+		expect(screen.queryByRole("switch", { name: "Bật chủ đề" })).toBeNull();
+	});
+});
+
 describe("topics", () => {
 	it("replaces the chat list with the topic list and opens a topic", async () => {
 		const demo = seedDemo();
@@ -508,6 +551,33 @@ describe("people search", () => {
 		const group = await screen.findByRole("dialog", { name: "Tạo nhóm" }, LONG);
 		await userEvent.type(within(group).getByRole("searchbox"), "khongcoai");
 		expect(await within(group).findByText("Không tìm thấy ai", {}, LONG)).toBeTruthy();
+	});
+});
+
+describe("a private chat the person refuses", () => {
+	async function messageRefusingPerson(fixture: ChatFixture): Promise<void> {
+		const nam = fixture.addUser("Hoàng Nam", { username: "hoangnam" });
+		fixture.refusesMessages.add(nam);
+		renderMessaging(fixture);
+		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
+		const dialog = await newChatDialog();
+		await userEvent.type(within(dialog).getByRole("searchbox", { name: "Tìm người" }), "hoangnam");
+		await userEvent.click(await within(dialog).findByRole("button", { name: "Nhắn tin" }, LONG));
+	}
+
+	it("says so without naming the setting or asking to retry", async () => {
+		await messageRefusingPerson(new ChatFixture());
+		const toast = await screen.findByText("Không thể nhắn tin cho người này lúc này.", {}, LONG);
+		expect(toast.textContent).not.toMatch(/thử lại|danh bạ|link mời/);
+	});
+
+	it("hints at invite links when the user can invite people to a group", async () => {
+		const fixture = new ChatFixture();
+		const minh = fixture.addUser("Minh");
+		const chat = fixture.createChat(ChatType.GROUP, "Nhóm đọc sách", [fixture.selfId, minh], { myRole: MemberRole.OWNER });
+		fixture.setRole(chat, fixture.selfId, MemberRole.OWNER);
+		await messageRefusingPerson(fixture);
+		expect(await screen.findByText("Không thể nhắn tin cho người này lúc này. Bạn có thể mời họ vào nhóm bằng link mời.", {}, LONG)).toBeTruthy();
 	});
 });
 

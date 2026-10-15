@@ -21,7 +21,8 @@ export const enBots: BotsCopy = {
 		manageName: (name) => `Manage ${name}`,
 		notFound: "This bot was not found. It may have been deleted.",
 		tabs: "Bot sections",
-		tab: { profile: "Profile", token: "Token", commands: "Commands" },
+		tab: { profile: "Profile", token: "Token", updates: "Updates", "dead-letters": "Failed updates", stats: "Delivery", commands: "Commands" },
+		webhook: "Webhook",
 	},
 	create: {
 		title: "New bot",
@@ -86,12 +87,124 @@ export const enBots: BotsCopy = {
 		reissue: "Issue a new token",
 		issuing: "Issuing…",
 		pollTitle: "Receiving updates",
+		webhookNote: "The bot receives updates at its webhook.",
+		deliverySettings: "Update delivery settings",
 		pollNote: "The bot receives updates by long polling: your server asks for them, each request waits up to 50 seconds; with two requests at once the earlier one gets 409.",
 		issueTitle: (name) => `Issue a token for ${name}?`,
 		issueBody: "The token is shown only once, right after it is issued; have a place to store it ready.",
 		confirmTitle: "Issue a new token?",
 		confirmBody: (name) => `The old token stops working at once: ${name} gets 401 errors until you update it.`,
 		issued: "New token issued",
+	},
+	delivery: {
+		modeLabel: "How the bot gets updates",
+		webhook: "Webhook",
+		longPoll: "Long polling",
+		url: "Webhook URL",
+		urlHint: "https only, port 443, 80 or 8443. Redirects are not followed.",
+		urlProblem: {
+			empty: "Enter the webhook URL",
+			scheme: "The URL must start with https://",
+			invalid: "Not a valid URL",
+			url_invalid: "URL not allowed: https only, port 443, 80 or 8443, no credentials",
+			url_blocked: "The URL points to an internal address",
+			url_unresolved: "The URL's domain was not found",
+		},
+		secret: "Secret token",
+		secretKeep: "Leave empty to keep the current secret",
+		secretNew: "Enter a secret or press Generate",
+		secretHint: "1–256 characters of A–Z, a–z, 0–9, _ and -. Every request carries the secret, an HMAC-SHA256 signature and a timestamp for your server to check.",
+		secretBad: "Only A–Z, a–z, 0–9, _ and -, up to 256 characters",
+		secretRequired: "A secret is needed when setting the webhook the first time",
+		showSecret: "Show secret",
+		hideSecret: "Hide secret",
+		generate: "Generate",
+		generated: "New secret generated; press Save, then update your server",
+		kinds: "Update kinds",
+		kindsHint: "None selected: every kind. Applies to new updates only.",
+		maxConnections: "Parallel connections",
+		maxHint: "One at a time per chat, in parallel across chats up to this number.",
+		maxBad: "From 1 to 100",
+		drop: "Drop pending updates on save",
+		dropHint: (n) => (n === 0 ? "No updates are pending." : `${n} pending updates will be dropped and not delivered.`),
+		pollNote:
+			"Your server fetches updates itself. Each request waits up to 50 seconds; of two requests at once the earlier gets 409. Saving removes the webhook; while a webhook is set, long polls get 409.",
+		save: "Save",
+		saving: "Saving…",
+		saved: "Update delivery saved",
+		fixFirst: "Fix the fields marked in red first",
+		statusTitle: "Webhook status",
+		pollStatusTitle: "Long polling status",
+		state: { ok: "Working", failing: "Failing, retrying", idle: "Nothing delivered yet" },
+		lastError: "Last error",
+		pending: "Pending updates",
+		lastSuccess: "Last successful delivery",
+		open: "Open connections",
+		deadLetters: "Failed updates (dead letters)",
+		viewDead: (n) => `View ${n}`,
+		none: "None",
+		lastFetch: "Bot last fetched updates",
+		never: "Never",
+		retryNote:
+			"Retried after 1 second, doubling up to a random 60–120 seconds, or after Retry-After. After 10 attempts an update moves to the dead letters so later updates of the same chat still arrive.",
+		ms: (n) => `${n} ms`,
+		at: (date) => `at ${date}`,
+		failure: (code) => {
+			if (code.startsWith("http_")) return `HTTP ${code.slice(5)}`;
+			switch (code) {
+				case "timeout":
+					return "No answer within 10 seconds";
+				case "tls":
+					return "TLS error (certificate)";
+				case "connect":
+					return "Could not connect";
+				case "dns":
+					return "Domain not found";
+				case "blocked_address":
+					return "The URL points to an internal address";
+				case "invalid_url":
+					return "URL not allowed";
+				case "secret_unreadable":
+					return "The secret cannot be read; save the webhook again";
+				default:
+					return code;
+			}
+		},
+	},
+	deadLetters: {
+		title: "Failed updates",
+		retryAll: "Retry all",
+		dropAll: "Drop all",
+		retry: "Retry",
+		drop: "Drop",
+		retryName: (id) => `Retry update ${id}`,
+		dropName: (id) => `Drop update ${id}`,
+		columns: { id: "update_id", kind: "Kind", chat: "Conversation", error: "Last error", at: "When", actions: "Actions" },
+		retrying: "Retrying…",
+		emptyTitle: "No stuck updates",
+		emptyBody: "Updates that failed 10 times show here for 24 hours.",
+		retried: (n) => (n === 1 ? "Update sent for one more try" : `${n} updates sent for one more try`),
+		dropped: (n) => (n === 1 ? "Update dropped" : `${n} updates dropped`),
+		more: (shown, total) => `Showing the newest ${shown} of ${total}.`,
+		note: "Retry gives the update exactly one more delivery; if it fails again it comes back here. Drop removes it for good.",
+	},
+	stats: {
+		title: "Delivery · last 24 hours",
+		received: "Updates created",
+		receivedHint: "Made by the server for the bot",
+		delivered: "Delivered",
+		deliveredHint: "Webhook answered 2xx or the bot acknowledged",
+		failed: "Failed attempts",
+		failedHint: "Each unsuccessful try",
+		dead: "Dead-lettered",
+		deadHint: "Failed 10 times",
+		tierTitle: "Rate limit tier",
+		tierBody: {
+			default: "Up to 30 calls and 30 messages per second, 1 message per second into one chat (bursts of 20).",
+			verified: "Verified bot: up to 100 calls and 100 messages per second, 5 per second into one chat.",
+			internal: "Internal bot: up to 500 calls and 500 messages per second, 20 per second into one chat.",
+		},
+		tierNote: "The operations team sets the tier in the moderation tool.",
 	},
 	reauth: {
 		title: "Sign in again to continue",

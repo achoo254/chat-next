@@ -25,6 +25,7 @@ import (
 	"unicode/utf8"
 
 	"app.local/server/internal/entities"
+	"app.local/server/internal/safehttp"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 )
@@ -71,46 +72,13 @@ var (
 	ErrNotImage = errors.New("linkpreview: not a usable image")
 )
 
-// blockedPrefixes are special-purpose ranges netip has no predicate for.
-var blockedPrefixes = []netip.Prefix{
-	netip.MustParsePrefix("0.0.0.0/8"),       // "this network"
-	netip.MustParsePrefix("100.64.0.0/10"),   // carrier-grade NAT
-	netip.MustParsePrefix("192.0.0.0/24"),    // IETF protocol assignments
-	netip.MustParsePrefix("192.0.2.0/24"),    // documentation
-	netip.MustParsePrefix("198.18.0.0/15"),   // benchmarking
-	netip.MustParsePrefix("198.51.100.0/24"), // documentation
-	netip.MustParsePrefix("203.0.113.0/24"),  // documentation
-	netip.MustParsePrefix("192.88.99.0/24"),  // 6to4 relay anycast (deprecated)
-	netip.MustParsePrefix("240.0.0.0/4"),     // reserved, broadcast
-	netip.MustParsePrefix("::/96"),           // IPv4-compatible (embeds IPv4, deprecated)
-	netip.MustParsePrefix("64:ff9b::/96"),    // NAT64 (could reach private IPv4)
-	netip.MustParsePrefix("64:ff9b:1::/48"),  // local-use NAT64
-	netip.MustParsePrefix("100::/64"),        // discard-only
-	netip.MustParsePrefix("2001::/23"),       // IETF protocol assignments: Teredo, benchmarking, ORCHID
-	netip.MustParsePrefix("2001:db8::/32"),   // documentation
-	netip.MustParsePrefix("2002::/16"),       // 6to4 (embeds IPv4)
-	netip.MustParsePrefix("3fff::/20"),       // documentation
-	netip.MustParsePrefix("5f00::/16"),       // SRv6 SIDs
-	netip.MustParsePrefix("fec0::/10"),       // site-local (deprecated)
-}
-
 // allowedPorts are the ports a preview may be fetched from.
 var allowedPorts = map[uint16]bool{80: true, 443: true, 8080: true, 8443: true}
 
 // PublicAddress reports whether the fetcher may connect to ap: a public
-// unicast address on a web port.
+// unicast address (safehttp.PublicIP) on a web port.
 func PublicAddress(ap netip.AddrPort) bool {
-	a := ap.Addr().Unmap()
-	if !a.IsValid() || !a.IsGlobalUnicast() || a.IsPrivate() || a.IsLoopback() ||
-		a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() {
-		return false
-	}
-	for _, p := range blockedPrefixes {
-		if p.Contains(a) {
-			return false
-		}
-	}
-	return allowedPorts[ap.Port()]
+	return safehttp.PublicIP(ap.Addr()) && allowedPorts[ap.Port()]
 }
 
 // Options configure a Fetcher; zero values take the defaults.

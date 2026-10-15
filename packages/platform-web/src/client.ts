@@ -72,7 +72,8 @@ export type WebChat = RemoteCore & {
 	dispose(): void;
 };
 
-const LAST_USER_KEY = "chat:last-user";
+/** localStorage key of the user whose data this browser holds; removed on sign-out and when the session ends. */
+export const LAST_USER_KEY = "chat:last-user";
 const snapshotKey = (userId: number): string => `chat:snapshot:${userId}`;
 
 /** Batches per animation frame while visible; hidden tabs get no frames, so fall back to a task. */

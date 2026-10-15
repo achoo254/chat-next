@@ -3,8 +3,10 @@
 // in "bot" and unique, 20 bots per owner, a token shown once by
 // ResetBotToken, a recent sign-in for ResetBotToken and DeleteBot
 // (reauth_required otherwise), and StartBot opening the private chat with
-// "/start [param]". Callback presses answer what the test queued. Never
-// imported by production code.
+// "/start [param]". Callback presses answer what the test queued. Update
+// delivery: a webhook (https, no internal address, a secret the first time),
+// its status and counters as seeded, and dead letters to retry or drop.
+// Never imported by production code.
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { BotAdminService, BotCommandScope, BotTier, type BotCommandSet } from "@app/proto-ts/bot_admin";
 import { BotsService } from "@app/proto-ts/bots";
@@ -42,7 +44,53 @@ interface FakeBot {
 	owned: boolean;
 	/** Unix seconds of the bot's last update fetch; 0 when it never asked. */
 	lastUpdateAt: number;
+	tier: BotTier;
+	/** "" when the bot polls. */
+	webhookUrl: string;
+	/** The secret as set (the real server keeps it sealed and never returns it). */
+	webhookSecret: string;
+	allowedUpdates: string[];
+	maxConnections: number;
+	delivery: DeliverySeed;
+	deadLetters: DeadLetterSeed[];
 }
+
+/** The delivery state GetBotDelivery reports. */
+export interface DeliverySeed {
+	pending: number;
+	lastError: string;
+	lastErrorAt: number;
+	lastSuccessAt: number;
+	lastSuccessMs: number;
+	openConnections: number;
+	received: number;
+	delivered: number;
+	failed: number;
+	deadLettered: number;
+}
+
+export interface DeadLetterSeed {
+	updateId: number;
+	kind: string;
+	chatId: number;
+	chatTitle: string;
+	lastError: string;
+	lastErrorAt: number;
+	attempts: number;
+}
+
+const NO_DELIVERY: DeliverySeed = {
+	pending: 0,
+	lastError: "",
+	lastErrorAt: 0,
+	lastSuccessAt: 0,
+	lastSuccessMs: 0,
+	openConnections: 0,
+	received: 0,
+	delivered: 0,
+	failed: 0,
+	deadLettered: 0,
+};
 
 export interface PressAnswerSeed {
 	text?: string;
@@ -100,6 +148,13 @@ export class FakeBots {
 			deleted: false,
 			owned: true,
 			lastUpdateAt: 0,
+			tier: BotTier.DEFAULT,
+			webhookUrl: "",
+			webhookSecret: "",
+			allowedUpdates: [],
+			maxConnections: 40,
+			delivery: { ...NO_DELIVERY },
+			deadLetters: [],
 			...extras,
 		});
 		return id;
@@ -131,12 +186,35 @@ export class FakeBots {
 			about: bot.about,
 			privacy: bot.privacy,
 			commands: bot.commands,
-			tier: BotTier.DEFAULT,
+			tier: bot.tier,
 			hasToken: bot.tokenSecret !== "",
 			createdAt: BigInt(bot.createdAt),
 			tokenIssuedAt: BigInt(bot.tokenIssuedAt),
 			lastUpdateAt: BigInt(bot.lastUpdateAt),
+			webhook: bot.webhookUrl !== "",
 		};
+	}
+
+	private wireWebhook(bot: FakeBot) {
+		return { url: bot.webhookUrl, allowedUpdates: bot.allowedUpdates, maxConnections: bot.webhookUrl === "" ? 40 : bot.maxConnections };
+	}
+
+	/** The server's checks of SetBotWebhook that the Console shows. */
+	private checkWebhook(bot: FakeBot, url: string, secret: string, maxConnections: number): void {
+		let parsed: URL;
+		try {
+			parsed = new URL(url);
+		} catch {
+			throw new ConnectError("url_invalid: not a URL", Code.InvalidArgument);
+		}
+		if (parsed.protocol !== "https:") throw new ConnectError("url_invalid: the scheme must be https", Code.InvalidArgument);
+		if (/^(10\.|127\.|192\.168\.|169\.254\.)|^localhost$/.test(parsed.hostname)) {
+			throw new ConnectError("url_blocked: the url points to a private, local or reserved address", Code.InvalidArgument);
+		}
+		if (parsed.hostname.endsWith(".invalid")) throw new ConnectError("url_unresolved: the url's host name does not resolve", Code.InvalidArgument);
+		if (secret !== "" && !/^[A-Za-z0-9_-]{1,256}$/.test(secret)) throw new ConnectError("secret_invalid: bad secret", Code.InvalidArgument);
+		if (secret === "" && bot.webhookSecret === "") throw new ConnectError("secret_required: a secret is required", Code.InvalidArgument);
+		if (maxConnections < 0 || maxConnections > 100) throw new ConnectError("max_connections_invalid: 1 to 100", Code.InvalidArgument);
 	}
 
 	private needRecentSignIn(): void {
@@ -201,6 +279,82 @@ export class FakeBots {
 				this.needRecentSignIn();
 				bot.deleted = true;
 				return {};
+			},
+			getBotDelivery: (req) => {
+				const bot = this.own(num(req.botId));
+				this.calls.push(`GetBotDelivery ${bot.id}`);
+				const d = bot.delivery;
+				return {
+					webhook: this.wireWebhook(bot),
+					status: {
+						pendingCount: BigInt(d.pending),
+						deadLetterCount: BigInt(bot.deadLetters.length),
+						lastError: d.lastError,
+						lastErrorDate: BigInt(d.lastErrorAt),
+						lastSuccessDate: BigInt(d.lastSuccessAt),
+						lastSuccessMs: d.lastSuccessMs,
+						openConnections: d.openConnections,
+					},
+					stats: {
+						received: BigInt(d.received),
+						delivered: BigInt(d.delivered),
+						failed: BigInt(d.failed),
+						deadLettered: BigInt(d.deadLettered),
+					},
+				};
+			},
+			setBotWebhook: (req) => {
+				const bot = this.own(num(req.botId));
+				this.calls.push(`SetBotWebhook ${bot.id} ${req.url}`);
+				this.checkWebhook(bot, req.url, req.secret, req.maxConnections);
+				bot.webhookUrl = req.url;
+				if (req.secret !== "") bot.webhookSecret = req.secret;
+				bot.allowedUpdates = [...req.allowedUpdates];
+				bot.maxConnections = req.maxConnections === 0 ? 40 : req.maxConnections;
+				if (req.dropPending) bot.delivery.pending = 0;
+				return { webhook: this.wireWebhook(bot) };
+			},
+			deleteBotWebhook: (req) => {
+				const bot = this.own(num(req.botId));
+				this.calls.push(`DeleteBotWebhook ${bot.id} ${req.dropPending}`);
+				bot.webhookUrl = "";
+				bot.webhookSecret = "";
+				bot.allowedUpdates = [];
+				bot.maxConnections = 40;
+				if (req.dropPending) bot.delivery.pending = 0;
+				return {};
+			},
+			listBotDeadLetters: (req) => {
+				const bot = this.own(num(req.botId));
+				this.calls.push(`ListBotDeadLetters ${bot.id}`);
+				return {
+					deadLetters: bot.deadLetters.map((d) => ({
+						updateId: BigInt(d.updateId),
+						kind: d.kind,
+						chatId: BigInt(d.chatId),
+						chatTitle: d.chatTitle,
+						lastError: d.lastError,
+						lastErrorDate: BigInt(d.lastErrorAt),
+						attempts: d.attempts,
+					})),
+					total: BigInt(bot.deadLetters.length),
+				};
+			},
+			retryBotDeadLetters: (req) => {
+				const bot = this.own(num(req.botId));
+				const ids = req.updateIds.map(num);
+				this.calls.push(`RetryBotDeadLetters ${bot.id} ${ids.join(",")}`);
+				const before = bot.deadLetters.length;
+				bot.deadLetters = bot.deadLetters.filter((d) => !ids.includes(d.updateId));
+				return { retried: before - bot.deadLetters.length };
+			},
+			discardBotDeadLetters: (req) => {
+				const bot = this.own(num(req.botId));
+				const ids = req.updateIds.map(num);
+				this.calls.push(`DiscardBotDeadLetters ${bot.id} ${ids.join(",")}`);
+				const before = bot.deadLetters.length;
+				bot.deadLetters = bot.deadLetters.filter((d) => !ids.includes(d.updateId));
+				return { discarded: before - bot.deadLetters.length };
 			},
 		});
 		router.service(BotsService, {

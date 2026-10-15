@@ -835,6 +835,13 @@ export class FakeServer {
 		this.pushUser(userId, { case: "chatUpdated", value: { chat: this.wireChat(chatId, userId) } }, 0);
 	}
 
+	/** Tells every member the chat's info changed (chat_updated), as UpdateChatInfo does. */
+	announceChat(chatId: number): void {
+		for (const member of this.chat(chatId).members) {
+			this.pushUser(member, { case: "chatUpdated", value: { chat: this.wireChat(chatId, member) } }, 0);
+		}
+	}
+
 	/** One-way switch to sync_mode=large (ADR 0002). */
 	switchToLarge(chatId: number): void {
 		const chat = this.chat(chatId);

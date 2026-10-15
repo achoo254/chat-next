@@ -78,9 +78,15 @@ message User {
   string bot_inline_placeholder = 11;
 }
 
-message GetSelfRequest {}
+message GetSelfRequest {
+  // A caller without a session gets a response without user instead of an
+  // Unauthenticated error. The web app's start-up probe sets it, so a
+  // signed-out start does not log a failed request.
+  bool allow_signed_out = 1;
+}
 
 message GetSelfResponse {
+  // Unset only for GetSelfRequest.allow_signed_out without a session.
   User user = 1;
   // The caller may use ModerationService.
   bool is_operator = 2;

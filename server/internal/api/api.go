@@ -142,6 +142,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	// Webhooks of bots: outbound requests through safehttp; actions in their
+	// answers run through the Bot API's own checks.
+	if err := botUpdates.EnableWebhooks(botupdates.WebhookOptions{
+		TenantID: cfg.TenantID, SessionKey: cfg.SessionKey, Local: cfg.BotWebhookLocal, Reply: botAPI.WebhookReply,
+	}); err != nil {
+		return nil, err
+	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
 		Bots: botAdmin, BotUpdates: botUpdates, TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
@@ -281,6 +288,13 @@ func healthz(st *store.Store) http.HandlerFunc {
 // Run serves the api role until SIGINT or SIGTERM, then drains requests and
 // background IdP work.
 func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
+	return RunWrapped(ctx, cfg, logger, nil)
+}
+
+// RunWrapped is Run with the app's handler passed through wrap (nil leaves
+// it as is). The local end-to-end stack uses it to cut realtime sockets on
+// demand; production runs plain Run.
+func RunWrapped(ctx context.Context, cfg config.Config, logger *slog.Logger, wrap func(http.Handler) http.Handler) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -298,9 +312,13 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	go app.IdP.RunDiscovery(ctx)
 
+	handler := app.Handler
+	if wrap != nil {
+		handler = wrap(handler)
+	}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           app.Handler,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

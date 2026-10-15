@@ -21,6 +21,7 @@ import { isOwnAccount, usePeopleSearch } from "./people-search.ts";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar, CopyButton, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
+import { usePrivateChatFailure } from "./private-chat-failure.ts";
 
 interface CloseProps {
 	onClose: () => void;
@@ -60,13 +61,14 @@ interface Candidate {
 export function NewChatDialog({ onClose }: CloseProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
-	const { remote, toasts } = useServices();
+	const { remote } = useServices();
 	const [query, setQuery] = useState("");
 	const [opening, setOpening] = useState(0);
 	const { people, failed } = usePeopleSearch(query);
 	const id = useDomId("nc");
 	const email = query.includes("@") && !query.trim().startsWith("@");
 
+	const privateChatFailed = usePrivateChatFailure();
 	const open = (person: Person) => {
 		setOpening(person.id);
 		remote.createPrivate(person.id).then(
@@ -74,9 +76,9 @@ export function NewChatDialog({ onClose }: CloseProps) {
 				onClose();
 				navigate(paths.chat(chatId));
 			},
-			() => {
+			(err: unknown) => {
 				setOpening(0);
-				toasts.show(copy.common.failed);
+				privateChatFailed(err, person.id);
 			},
 		);
 	};
@@ -303,6 +305,7 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 	const [presetDone, setPresetDone] = useState(withUserId === 0);
 	const [name, setName] = useState("");
 	const [history, setHistory] = useState(true);
+	const [topics, setTopics] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const id = useDomId("ng");
 	if (!presetDone && preset !== undefined) {
@@ -318,7 +321,7 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 		setBusy(true);
 		try {
 			const ids = [...selected.keys()];
-			const { chatId, failures } = await remote.createGroup(title, ids);
+			const { chatId, failures } = await remote.createGroup(title, ids, topics);
 			if (!history) await remote.setHistoryShared(chatId, false).catch(() => undefined);
 			toasts.show(copy.newGroup.created(title));
 			navigate(paths.chat(chatId));
@@ -370,6 +373,13 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 						<small>{copy.newGroup.historyHint}</small>
 					</span>
 					<Switch checked={history} label={copy.newGroup.history} onChange={setHistory} />
+				</div>
+				<div className="row">
+					<span className="grow">
+						{copy.newGroup.topics}
+						<small>{copy.newGroup.topicsHint}</small>
+					</span>
+					<Switch checked={topics} label={copy.newGroup.topics} onChange={setTopics} />
 				</div>
 				<p className="note">
 					<Icon name="info" />
@@ -783,13 +793,14 @@ export function AddFailedDialog({ chatId, failures, addedIds, pickedNames, onClo
 		const ok = await inviteLink().then(copyText, () => false);
 		toasts.show(ok ? t.copied(title) : copy.common.failed);
 	};
+	const privateChatFailed = usePrivateChatFailure();
 	const message = (userId: number) => {
 		remote.createPrivate(userId).then(
 			(privateChat) => {
 				onClose();
 				navigate(paths.chat(privateChat));
 			},
-			() => toasts.show(copy.common.failed),
+			(err: unknown) => privateChatFailed(err, userId),
 		);
 	};
 	const unblock = (userId: number) => {

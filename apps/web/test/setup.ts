@@ -1,6 +1,7 @@
 import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { resetMediaState } from "../src/messaging/media/media-state.ts";
+import { inviteLinks } from "../src/messaging/ui/members.ts";
 
 // jsdom has no object URLs; media screens make them for downloaded files.
 if (typeof URL.createObjectURL !== "function") {
@@ -29,4 +30,5 @@ beforeEach(() => {
 afterEach(() => {
 	cleanup();
 	resetMediaState();
+	inviteLinks.clear();
 });

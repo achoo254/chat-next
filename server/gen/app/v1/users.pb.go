@@ -396,9 +396,13 @@ func (x *User) GetBotInlinePlaceholder() string {
 }
 
 type GetSelfRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A caller without a session gets a response without user instead of an
+	// Unauthenticated error. The web app's start-up probe sets it, so a
+	// signed-out start does not log a failed request.
+	AllowSignedOut bool `protobuf:"varint,1,opt,name=allow_signed_out,json=allowSignedOut,proto3" json:"allow_signed_out,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetSelfRequest) Reset() {
@@ -431,9 +435,17 @@ func (*GetSelfRequest) Descriptor() ([]byte, []int) {
 	return file_app_v1_users_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *GetSelfRequest) GetAllowSignedOut() bool {
+	if x != nil {
+		return x.AllowSignedOut
+	}
+	return false
+}
+
 type GetSelfResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	User  *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// Unset only for GetSelfRequest.allow_signed_out without a session.
+	User *User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	// The caller may use ModerationService.
 	IsOperator    bool `protobuf:"varint,2,opt,name=is_operator,json=isOperator,proto3" json:"is_operator,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2214,8 +2226,9 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x06status\x18\t \x01(\v2\x12.app.v1.UserStatusR\x06status\x12\x14\n" +
 	"\x05email\x18\n" +
 	" \x01(\tR\x05email\x124\n" +
-	"\x16bot_inline_placeholder\x18\v \x01(\tR\x14botInlinePlaceholder\"\x10\n" +
-	"\x0eGetSelfRequest\"T\n" +
+	"\x16bot_inline_placeholder\x18\v \x01(\tR\x14botInlinePlaceholder\":\n" +
+	"\x0eGetSelfRequest\x12(\n" +
+	"\x10allow_signed_out\x18\x01 \x01(\bR\x0eallowSignedOut\"T\n" +
 	"\x0fGetSelfResponse\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12\x1f\n" +
 	"\vis_operator\x18\x02 \x01(\bR\n" +

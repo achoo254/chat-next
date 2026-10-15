@@ -26,6 +26,7 @@ import { ChatAvatar } from "./parts.tsx";
 import { usePeopleSearch } from "./people-search.ts";
 import { presenceText } from "./presence.tsx";
 import "../search/search.css";
+import { usePrivateChatFailure } from "./private-chat-failure.ts";
 
 /** Load the next server page when the list is scrolled this close to its end. */
 const MORE_THRESHOLD_PX = 160;
@@ -76,7 +77,7 @@ interface SearchResultsProps {
 export default function SearchResults({ query, onOpen, inputRef }: SearchResultsProps) {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
-	const { store, remote, toasts } = useServices();
+	const { store, remote } = useServices();
 	const contacts = useContacts(remote);
 	const order = useDialogOrder();
 	const server = usePeopleSearch(query);
@@ -136,12 +137,13 @@ export default function SearchResults({ query, onOpen, inputRef }: SearchResults
 		onOpen();
 		navigate(paths.chat(chatId));
 	};
+	const privateChatFailed = usePrivateChatFailure();
 	const openPerson = (hit: PersonHit) => {
 		if (hit.chatId !== 0) {
 			openChat(hit.chatId);
 			return;
 		}
-		remote.createPrivate(hit.id).then(openChat, () => toasts.show(copy.common.failed));
+		remote.createPrivate(hit.id).then(openChat, (err: unknown) => privateChatFailed(err, hit.id));
 	};
 	const openMessage = (message: StoredMessage) => {
 		store.openWindow(message.chatId, message.seq);

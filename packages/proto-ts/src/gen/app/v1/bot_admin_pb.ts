@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bot_admin.proto.
  */
 export const file_app_v1_bot_admin: GenFile = /*@__PURE__*/
-  fileDesc("ChZhcHAvdjEvYm90X2FkbWluLnByb3RvEgZhcHAudjEiMgoKQm90Q29tbWFuZBIPCgdjb21tYW5kGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJIl0KDUJvdENvbW1hbmRTZXQSJgoFc2NvcGUYASABKA4yFy5hcHAudjEuQm90Q29tbWFuZFNjb3BlEiQKCGNvbW1hbmRzGAIgAygLMhIuYXBwLnYxLkJvdENvbW1hbmQiNQoOQm90Q29tbWFuZFNldHMSIwoEc2V0cxgBIAMoCzIVLmFwcC52MS5Cb3RDb21tYW5kU2V0IoICCgNCb3QSGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyEhMKC2Rlc2NyaXB0aW9uGAIgASgJEg0KBWFib3V0GAMgASgJEg8KB3ByaXZhY3kYBCABKAgSJwoIY29tbWFuZHMYBSADKAsyFS5hcHAudjEuQm90Q29tbWFuZFNldBIdCgR0aWVyGAYgASgOMg8uYXBwLnYxLkJvdFRpZXISEQoJaGFzX3Rva2VuGAcgASgIEhYKCmNyZWF0ZWRfYXQYCCABKANCAjACEhsKD3Rva2VuX2lzc3VlZF9hdBgJIAEoA0ICMAISGgoObGFzdF91cGRhdGVfYXQYCiABKANCAjACIhMKEUxpc3RNeUJvdHNSZXF1ZXN0Ii8KEkxpc3RNeUJvdHNSZXNwb25zZRIZCgRib3RzGAEgAygLMgsuYXBwLnYxLkJvdCIyChBDcmVhdGVCb3RSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEgwKBG5hbWUYAiABKAkiLQoRQ3JlYXRlQm90UmVzcG9uc2USGAoDYm90GAEgASgLMgsuYXBwLnYxLkJvdCLWAQoQVXBkYXRlQm90UmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhEKBG5hbWUYAiABKAlIAIgBARIYCgtkZXNjcmlwdGlvbhgDIAEoCUgBiAEBEhIKBWFib3V0GAQgASgJSAKIAQESFAoHcHJpdmFjeRgFIAEoCEgDiAEBEigKCGNvbW1hbmRzGAYgASgLMhYuYXBwLnYxLkJvdENvbW1hbmRTZXRzQgcKBV9uYW1lQg4KDF9kZXNjcmlwdGlvbkIICgZfYWJvdXRCCgoIX3ByaXZhY3kiLQoRVXBkYXRlQm90UmVzcG9uc2USGAoDYm90GAEgASgLMgsuYXBwLnYxLkJvdCIqChRSZXNldEJvdFRva2VuUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACIkAKFVJlc2V0Qm90VG9rZW5SZXNwb25zZRIYCgNib3QYASABKAsyCy5hcHAudjEuQm90Eg0KBXRva2VuGAIgASgJIiYKEERlbGV0ZUJvdFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAiITChFEZWxldGVCb3RSZXNwb25zZSpnCgdCb3RUaWVyEhgKFEJPVF9USUVSX1VOU1BFQ0lGSUVEEAASFAoQQk9UX1RJRVJfREVGQVVMVBABEhUKEUJPVF9USUVSX1ZFUklGSUVEEAISFQoRQk9UX1RJRVJfSU5URVJOQUwQAyqyAQoPQm90Q29tbWFuZFNjb3BlEiEKHUJPVF9DT01NQU5EX1NDT1BFX1VOU1BFQ0lGSUVEEAASHQoZQk9UX0NPTU1BTkRfU0NPUEVfREVGQVVMVBABEh0KGUJPVF9DT01NQU5EX1NDT1BFX1BSSVZBVEUQAhIbChdCT1RfQ09NTUFORF9TQ09QRV9HUk9VUBADEiEKHUJPVF9DT01NQU5EX1NDT1BFX0dST1VQX0FETUlOEAQy6gIKD0JvdEFkbWluU2VydmljZRJDCgpMaXN0TXlCb3RzEhkuYXBwLnYxLkxpc3RNeUJvdHNSZXF1ZXN0GhouYXBwLnYxLkxpc3RNeUJvdHNSZXNwb25zZRJACglDcmVhdGVCb3QSGC5hcHAudjEuQ3JlYXRlQm90UmVxdWVzdBoZLmFwcC52MS5DcmVhdGVCb3RSZXNwb25zZRJACglVcGRhdGVCb3QSGC5hcHAudjEuVXBkYXRlQm90UmVxdWVzdBoZLmFwcC52MS5VcGRhdGVCb3RSZXNwb25zZRJMCg1SZXNldEJvdFRva2VuEhwuYXBwLnYxLlJlc2V0Qm90VG9rZW5SZXF1ZXN0Gh0uYXBwLnYxLlJlc2V0Qm90VG9rZW5SZXNwb25zZRJACglEZWxldGVCb3QSGC5hcHAudjEuRGVsZXRlQm90UmVxdWVzdBoZLmFwcC52MS5EZWxldGVCb3RSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_users]);
+  fileDesc("ChZhcHAvdjEvYm90X2FkbWluLnByb3RvEgZhcHAudjEiMgoKQm90Q29tbWFuZBIPCgdjb21tYW5kGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJIl0KDUJvdENvbW1hbmRTZXQSJgoFc2NvcGUYASABKA4yFy5hcHAudjEuQm90Q29tbWFuZFNjb3BlEiQKCGNvbW1hbmRzGAIgAygLMhIuYXBwLnYxLkJvdENvbW1hbmQiNQoOQm90Q29tbWFuZFNldHMSIwoEc2V0cxgBIAMoCzIVLmFwcC52MS5Cb3RDb21tYW5kU2V0IpMCCgNCb3QSGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyEhMKC2Rlc2NyaXB0aW9uGAIgASgJEg0KBWFib3V0GAMgASgJEg8KB3ByaXZhY3kYBCABKAgSJwoIY29tbWFuZHMYBSADKAsyFS5hcHAudjEuQm90Q29tbWFuZFNldBIdCgR0aWVyGAYgASgOMg8uYXBwLnYxLkJvdFRpZXISEQoJaGFzX3Rva2VuGAcgASgIEhYKCmNyZWF0ZWRfYXQYCCABKANCAjACEhsKD3Rva2VuX2lzc3VlZF9hdBgJIAEoA0ICMAISGgoObGFzdF91cGRhdGVfYXQYCiABKANCAjACEg8KB3dlYmhvb2sYCyABKAgiEwoRTGlzdE15Qm90c1JlcXVlc3QiLwoSTGlzdE15Qm90c1Jlc3BvbnNlEhkKBGJvdHMYASADKAsyCy5hcHAudjEuQm90IjIKEENyZWF0ZUJvdFJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSDAoEbmFtZRgCIAEoCSItChFDcmVhdGVCb3RSZXNwb25zZRIYCgNib3QYASABKAsyCy5hcHAudjEuQm90ItYBChBVcGRhdGVCb3RSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEQoEbmFtZRgCIAEoCUgAiAEBEhgKC2Rlc2NyaXB0aW9uGAMgASgJSAGIAQESEgoFYWJvdXQYBCABKAlIAogBARIUCgdwcml2YWN5GAUgASgISAOIAQESKAoIY29tbWFuZHMYBiABKAsyFi5hcHAudjEuQm90Q29tbWFuZFNldHNCBwoFX25hbWVCDgoMX2Rlc2NyaXB0aW9uQggKBl9hYm91dEIKCghfcHJpdmFjeSItChFVcGRhdGVCb3RSZXNwb25zZRIYCgNib3QYASABKAsyCy5hcHAudjEuQm90IioKFFJlc2V0Qm90VG9rZW5SZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAIiQAoVUmVzZXRCb3RUb2tlblJlc3BvbnNlEhgKA2JvdBgBIAEoCzILLmFwcC52MS5Cb3QSDQoFdG9rZW4YAiABKAkiJgoQRGVsZXRlQm90UmVxdWVzdBISCgZib3RfaWQYASABKANCAjACIhMKEURlbGV0ZUJvdFJlc3BvbnNlIisKFUdldEJvdERlbGl2ZXJ5UmVxdWVzdBISCgZib3RfaWQYASABKANCAjACIksKCkJvdFdlYmhvb2sSCwoDdXJsGAEgASgJEhcKD2FsbG93ZWRfdXBkYXRlcxgCIAMoCRIXCg9tYXhfY29ubmVjdGlvbnMYAyABKAUi0AEKEUJvdERlbGl2ZXJ5U3RhdHVzEhkKDXBlbmRpbmdfY291bnQYASABKANCAjACEh0KEWRlYWRfbGV0dGVyX2NvdW50GAIgASgDQgIwAhISCgpsYXN0X2Vycm9yGAMgASgJEhsKD2xhc3RfZXJyb3JfZGF0ZRgEIAEoA0ICMAISHQoRbGFzdF9zdWNjZXNzX2RhdGUYBSABKANCAjACEhcKD2xhc3Rfc3VjY2Vzc19tcxgGIAEoBRIYChBvcGVuX2Nvbm5lY3Rpb25zGAcgASgFIm4KEEJvdERlbGl2ZXJ5U3RhdHMSFAoIcmVjZWl2ZWQYASABKANCAjACEhUKCWRlbGl2ZXJlZBgCIAEoA0ICMAISEgoGZmFpbGVkGAMgASgDQgIwAhIZCg1kZWFkX2xldHRlcmVkGAQgASgDQgIwAiKRAQoWR2V0Qm90RGVsaXZlcnlSZXNwb25zZRIjCgd3ZWJob29rGAEgASgLMhIuYXBwLnYxLkJvdFdlYmhvb2sSKQoGc3RhdHVzGAIgASgLMhkuYXBwLnYxLkJvdERlbGl2ZXJ5U3RhdHVzEicKBXN0YXRzGAMgASgLMhguYXBwLnYxLkJvdERlbGl2ZXJ5U3RhdHMijwEKFFNldEJvdFdlYmhvb2tSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISCwoDdXJsGAIgASgJEg4KBnNlY3JldBgDIAEoCRIXCg9hbGxvd2VkX3VwZGF0ZXMYBCADKAkSFwoPbWF4X2Nvbm5lY3Rpb25zGAUgASgFEhQKDGRyb3BfcGVuZGluZxgGIAEoCCI8ChVTZXRCb3RXZWJob29rUmVzcG9uc2USIwoHd2ViaG9vaxgBIAEoCzISLmFwcC52MS5Cb3RXZWJob29rIkMKF0RlbGV0ZUJvdFdlYmhvb2tSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISFAoMZHJvcF9wZW5kaW5nGAIgASgIIhoKGERlbGV0ZUJvdFdlYmhvb2tSZXNwb25zZSKgAQoNQm90RGVhZExldHRlchIVCgl1cGRhdGVfaWQYASABKANCAjACEgwKBGtpbmQYAiABKAkSEwoHY2hhdF9pZBgDIAEoA0ICMAISEgoKY2hhdF90aXRsZRgEIAEoCRISCgpsYXN0X2Vycm9yGAUgASgJEhsKD2xhc3RfZXJyb3JfZGF0ZRgGIAEoA0ICMAISEAoIYXR0ZW1wdHMYByABKAUiLwoZTGlzdEJvdERlYWRMZXR0ZXJzUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACIlwKGkxpc3RCb3REZWFkTGV0dGVyc1Jlc3BvbnNlEisKDGRlYWRfbGV0dGVycxgBIAMoCzIVLmFwcC52MS5Cb3REZWFkTGV0dGVyEhEKBXRvdGFsGAIgASgDQgIwAiJIChpSZXRyeUJvdERlYWRMZXR0ZXJzUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhYKCnVwZGF0ZV9pZHMYAiADKANCAjACIi4KG1JldHJ5Qm90RGVhZExldHRlcnNSZXNwb25zZRIPCgdyZXRyaWVkGAEgASgFIkoKHERpc2NhcmRCb3REZWFkTGV0dGVyc1JlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhIWCgp1cGRhdGVfaWRzGAIgAygDQgIwAiIyCh1EaXNjYXJkQm90RGVhZExldHRlcnNSZXNwb25zZRIRCglkaXNjYXJkZWQYASABKAUqZwoHQm90VGllchIYChRCT1RfVElFUl9VTlNQRUNJRklFRBAAEhQKEEJPVF9USUVSX0RFRkFVTFQQARIVChFCT1RfVElFUl9WRVJJRklFRBACEhUKEUJPVF9USUVSX0lOVEVSTkFMEAMqsgEKD0JvdENvbW1hbmRTY29wZRIhCh1CT1RfQ09NTUFORF9TQ09QRV9VTlNQRUNJRklFRBAAEh0KGUJPVF9DT01NQU5EX1NDT1BFX0RFRkFVTFQQARIdChlCT1RfQ09NTUFORF9TQ09QRV9QUklWQVRFEAISGwoXQk9UX0NPTU1BTkRfU0NPUEVfR1JPVVAQAxIhCh1CT1RfQ09NTUFORF9TQ09QRV9HUk9VUF9BRE1JThAEMoMHCg9Cb3RBZG1pblNlcnZpY2USQwoKTGlzdE15Qm90cxIZLmFwcC52MS5MaXN0TXlCb3RzUmVxdWVzdBoaLmFwcC52MS5MaXN0TXlCb3RzUmVzcG9uc2USQAoJQ3JlYXRlQm90EhguYXBwLnYxLkNyZWF0ZUJvdFJlcXVlc3QaGS5hcHAudjEuQ3JlYXRlQm90UmVzcG9uc2USQAoJVXBkYXRlQm90EhguYXBwLnYxLlVwZGF0ZUJvdFJlcXVlc3QaGS5hcHAudjEuVXBkYXRlQm90UmVzcG9uc2USTAoNUmVzZXRCb3RUb2tlbhIcLmFwcC52MS5SZXNldEJvdFRva2VuUmVxdWVzdBodLmFwcC52MS5SZXNldEJvdFRva2VuUmVzcG9uc2USQAoJRGVsZXRlQm90EhguYXBwLnYxLkRlbGV0ZUJvdFJlcXVlc3QaGS5hcHAudjEuRGVsZXRlQm90UmVzcG9uc2USTwoOR2V0Qm90RGVsaXZlcnkSHS5hcHAudjEuR2V0Qm90RGVsaXZlcnlSZXF1ZXN0Gh4uYXBwLnYxLkdldEJvdERlbGl2ZXJ5UmVzcG9uc2USTAoNU2V0Qm90V2ViaG9vaxIcLmFwcC52MS5TZXRCb3RXZWJob29rUmVxdWVzdBodLmFwcC52MS5TZXRCb3RXZWJob29rUmVzcG9uc2USVQoQRGVsZXRlQm90V2ViaG9vaxIfLmFwcC52MS5EZWxldGVCb3RXZWJob29rUmVxdWVzdBogLmFwcC52MS5EZWxldGVCb3RXZWJob29rUmVzcG9uc2USWwoSTGlzdEJvdERlYWRMZXR0ZXJzEiEuYXBwLnYxLkxpc3RCb3REZWFkTGV0dGVyc1JlcXVlc3QaIi5hcHAudjEuTGlzdEJvdERlYWRMZXR0ZXJzUmVzcG9uc2USXgoTUmV0cnlCb3REZWFkTGV0dGVycxIiLmFwcC52MS5SZXRyeUJvdERlYWRMZXR0ZXJzUmVxdWVzdBojLmFwcC52MS5SZXRyeUJvdERlYWRMZXR0ZXJzUmVzcG9uc2USZAoVRGlzY2FyZEJvdERlYWRMZXR0ZXJzEiQuYXBwLnYxLkRpc2NhcmRCb3REZWFkTGV0dGVyc1JlcXVlc3QaJS5hcHAudjEuRGlzY2FyZEJvdERlYWRMZXR0ZXJzUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_users]);
 
 /**
  * @generated from message app.v1.BotCommand
@@ -155,6 +155,14 @@ export type Bot = Message<"app.v1.Bot"> & {
    * @generated from field: int64 last_update_at = 10 [jstype = JS_NUMBER];
    */
   lastUpdateAt: bigint;
+
+  /**
+   * Updates are POSTed to a webhook (GetBotDelivery has the details);
+   * false when the bot fetches them by long poll.
+   *
+   * @generated from field: bool webhook = 11;
+   */
+  webhook: boolean;
 };
 
 /**
@@ -372,6 +380,474 @@ export const DeleteBotResponseSchema: GenMessage<DeleteBotResponse> = /*@__PURE_
   messageDesc(file_app_v1_bot_admin, 13);
 
 /**
+ * @generated from message app.v1.GetBotDeliveryRequest
+ */
+export type GetBotDeliveryRequest = Message<"app.v1.GetBotDeliveryRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+};
+
+/**
+ * Describes the message app.v1.GetBotDeliveryRequest.
+ * Use `create(GetBotDeliveryRequestSchema)` to create a new message.
+ */
+export const GetBotDeliveryRequestSchema: GenMessage<GetBotDeliveryRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 14);
+
+/**
+ * The bot's webhook as set; the secret is never returned.
+ *
+ * @generated from message app.v1.BotWebhook
+ */
+export type BotWebhook = Message<"app.v1.BotWebhook"> & {
+  /**
+   * https URL; "" when the bot fetches updates by long poll.
+   *
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * Update kinds stored for the bot ("message", "message_edited",
+   * "channel_post", "callback"); empty means every kind.
+   *
+   * @generated from field: repeated string allowed_updates = 2;
+   */
+  allowedUpdates: string[];
+
+  /**
+   * Parallel requests, 1 to 100.
+   *
+   * @generated from field: int32 max_connections = 3;
+   */
+  maxConnections: number;
+};
+
+/**
+ * Describes the message app.v1.BotWebhook.
+ * Use `create(BotWebhookSchema)` to create a new message.
+ */
+export const BotWebhookSchema: GenMessage<BotWebhook> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 15);
+
+/**
+ * @generated from message app.v1.BotDeliveryStatus
+ */
+export type BotDeliveryStatus = Message<"app.v1.BotDeliveryStatus"> & {
+  /**
+   * Updates not delivered yet (neither dead-lettered nor expired).
+   *
+   * @generated from field: int64 pending_count = 1 [jstype = JS_NUMBER];
+   */
+  pendingCount: bigint;
+
+  /**
+   * @generated from field: int64 dead_letter_count = 2 [jstype = JS_NUMBER];
+   */
+  deadLetterCount: bigint;
+
+  /**
+   * Reason of the newest failed attempt: "http_<status>", "timeout",
+   * "tls", "connect", "dns", "blocked_address", "invalid_url",
+   * "secret_unreadable" (the webhook must be set again); "" for none.
+   *
+   * @generated from field: string last_error = 3;
+   */
+  lastError: string;
+
+  /**
+   * Unix seconds of last_error; 0 for none.
+   *
+   * @generated from field: int64 last_error_date = 4 [jstype = JS_NUMBER];
+   */
+  lastErrorDate: bigint;
+
+  /**
+   * Unix seconds of the newest successful request; 0 for none.
+   *
+   * @generated from field: int64 last_success_date = 5 [jstype = JS_NUMBER];
+   */
+  lastSuccessDate: bigint;
+
+  /**
+   * Duration of that request in milliseconds.
+   *
+   * @generated from field: int32 last_success_ms = 6;
+   */
+  lastSuccessMs: number;
+
+  /**
+   * Requests in flight now.
+   *
+   * @generated from field: int32 open_connections = 7;
+   */
+  openConnections: number;
+};
+
+/**
+ * Describes the message app.v1.BotDeliveryStatus.
+ * Use `create(BotDeliveryStatusSchema)` to create a new message.
+ */
+export const BotDeliveryStatusSchema: GenMessage<BotDeliveryStatus> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 16);
+
+/**
+ * Delivery counters of the last 24 hours (whole hours).
+ *
+ * @generated from message app.v1.BotDeliveryStats
+ */
+export type BotDeliveryStats = Message<"app.v1.BotDeliveryStats"> & {
+  /**
+   * Updates stored for the bot.
+   *
+   * @generated from field: int64 received = 1 [jstype = JS_NUMBER];
+   */
+  received: bigint;
+
+  /**
+   * Acknowledged by a 2xx answer of the webhook or by a long poll.
+   *
+   * @generated from field: int64 delivered = 2 [jstype = JS_NUMBER];
+   */
+  delivered: bigint;
+
+  /**
+   * Failed webhook attempts.
+   *
+   * @generated from field: int64 failed = 3 [jstype = JS_NUMBER];
+   */
+  failed: bigint;
+
+  /**
+   * @generated from field: int64 dead_lettered = 4 [jstype = JS_NUMBER];
+   */
+  deadLettered: bigint;
+};
+
+/**
+ * Describes the message app.v1.BotDeliveryStats.
+ * Use `create(BotDeliveryStatsSchema)` to create a new message.
+ */
+export const BotDeliveryStatsSchema: GenMessage<BotDeliveryStats> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 17);
+
+/**
+ * @generated from message app.v1.GetBotDeliveryResponse
+ */
+export type GetBotDeliveryResponse = Message<"app.v1.GetBotDeliveryResponse"> & {
+  /**
+   * @generated from field: app.v1.BotWebhook webhook = 1;
+   */
+  webhook?: BotWebhook | undefined;
+
+  /**
+   * @generated from field: app.v1.BotDeliveryStatus status = 2;
+   */
+  status?: BotDeliveryStatus | undefined;
+
+  /**
+   * @generated from field: app.v1.BotDeliveryStats stats = 3;
+   */
+  stats?: BotDeliveryStats | undefined;
+};
+
+/**
+ * Describes the message app.v1.GetBotDeliveryResponse.
+ * Use `create(GetBotDeliveryResponseSchema)` to create a new message.
+ */
+export const GetBotDeliveryResponseSchema: GenMessage<GetBotDeliveryResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 18);
+
+/**
+ * @generated from message app.v1.SetBotWebhookRequest
+ */
+export type SetBotWebhookRequest = Message<"app.v1.SetBotWebhookRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * https URL on port 443, 80 or 8443 resolving to public addresses only;
+   * redirects are not followed.
+   *
+   * @generated from field: string url = 2;
+   */
+  url: string;
+
+  /**
+   * 1 to 256 characters of A-Z, a-z, 0-9, _ and -, sent in the
+   * X-Bot-Api-Secret-Token header and keying the X-Bot-Signature HMAC.
+   * Empty keeps the current secret (required when no webhook is set).
+   *
+   * @generated from field: string secret = 3;
+   */
+  secret: string;
+
+  /**
+   * @generated from field: repeated string allowed_updates = 4;
+   */
+  allowedUpdates: string[];
+
+  /**
+   * 1 to 100; 0 is 40.
+   *
+   * @generated from field: int32 max_connections = 5;
+   */
+  maxConnections: number;
+
+  /**
+   * Drop the pending updates instead of delivering them.
+   *
+   * @generated from field: bool drop_pending = 6;
+   */
+  dropPending: boolean;
+};
+
+/**
+ * Describes the message app.v1.SetBotWebhookRequest.
+ * Use `create(SetBotWebhookRequestSchema)` to create a new message.
+ */
+export const SetBotWebhookRequestSchema: GenMessage<SetBotWebhookRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 19);
+
+/**
+ * @generated from message app.v1.SetBotWebhookResponse
+ */
+export type SetBotWebhookResponse = Message<"app.v1.SetBotWebhookResponse"> & {
+  /**
+   * @generated from field: app.v1.BotWebhook webhook = 1;
+   */
+  webhook?: BotWebhook | undefined;
+};
+
+/**
+ * Describes the message app.v1.SetBotWebhookResponse.
+ * Use `create(SetBotWebhookResponseSchema)` to create a new message.
+ */
+export const SetBotWebhookResponseSchema: GenMessage<SetBotWebhookResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 20);
+
+/**
+ * @generated from message app.v1.DeleteBotWebhookRequest
+ */
+export type DeleteBotWebhookRequest = Message<"app.v1.DeleteBotWebhookRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * Drop the pending updates instead of keeping them for long poll.
+   *
+   * @generated from field: bool drop_pending = 2;
+   */
+  dropPending: boolean;
+};
+
+/**
+ * Describes the message app.v1.DeleteBotWebhookRequest.
+ * Use `create(DeleteBotWebhookRequestSchema)` to create a new message.
+ */
+export const DeleteBotWebhookRequestSchema: GenMessage<DeleteBotWebhookRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 21);
+
+/**
+ * @generated from message app.v1.DeleteBotWebhookResponse
+ */
+export type DeleteBotWebhookResponse = Message<"app.v1.DeleteBotWebhookResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.DeleteBotWebhookResponse.
+ * Use `create(DeleteBotWebhookResponseSchema)` to create a new message.
+ */
+export const DeleteBotWebhookResponseSchema: GenMessage<DeleteBotWebhookResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 22);
+
+/**
+ * @generated from message app.v1.BotDeadLetter
+ */
+export type BotDeadLetter = Message<"app.v1.BotDeadLetter"> & {
+  /**
+   * @generated from field: int64 update_id = 1 [jstype = JS_NUMBER];
+   */
+  updateId: bigint;
+
+  /**
+   * "message", "message_edited", "channel_post" or "callback".
+   *
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: int64 chat_id = 3 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * The chat's title, or the user's name for a private chat.
+   *
+   * @generated from field: string chat_title = 4;
+   */
+  chatTitle: string;
+
+  /**
+   * Reason of the last attempt, as BotDeliveryStatus.last_error.
+   *
+   * @generated from field: string last_error = 5;
+   */
+  lastError: string;
+
+  /**
+   * Unix seconds of the last attempt.
+   *
+   * @generated from field: int64 last_error_date = 6 [jstype = JS_NUMBER];
+   */
+  lastErrorDate: bigint;
+
+  /**
+   * @generated from field: int32 attempts = 7;
+   */
+  attempts: number;
+};
+
+/**
+ * Describes the message app.v1.BotDeadLetter.
+ * Use `create(BotDeadLetterSchema)` to create a new message.
+ */
+export const BotDeadLetterSchema: GenMessage<BotDeadLetter> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 23);
+
+/**
+ * @generated from message app.v1.ListBotDeadLettersRequest
+ */
+export type ListBotDeadLettersRequest = Message<"app.v1.ListBotDeadLettersRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+};
+
+/**
+ * Describes the message app.v1.ListBotDeadLettersRequest.
+ * Use `create(ListBotDeadLettersRequestSchema)` to create a new message.
+ */
+export const ListBotDeadLettersRequestSchema: GenMessage<ListBotDeadLettersRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 24);
+
+/**
+ * @generated from message app.v1.ListBotDeadLettersResponse
+ */
+export type ListBotDeadLettersResponse = Message<"app.v1.ListBotDeadLettersResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.BotDeadLetter dead_letters = 1;
+   */
+  deadLetters: BotDeadLetter[];
+
+  /**
+   * All dead letters of the bot (the list holds the newest 100).
+   *
+   * @generated from field: int64 total = 2 [jstype = JS_NUMBER];
+   */
+  total: bigint;
+};
+
+/**
+ * Describes the message app.v1.ListBotDeadLettersResponse.
+ * Use `create(ListBotDeadLettersResponseSchema)` to create a new message.
+ */
+export const ListBotDeadLettersResponseSchema: GenMessage<ListBotDeadLettersResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 25);
+
+/**
+ * @generated from message app.v1.RetryBotDeadLettersRequest
+ */
+export type RetryBotDeadLettersRequest = Message<"app.v1.RetryBotDeadLettersRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * 1 to 100 update ids.
+   *
+   * @generated from field: repeated int64 update_ids = 2 [jstype = JS_NUMBER];
+   */
+  updateIds: bigint[];
+};
+
+/**
+ * Describes the message app.v1.RetryBotDeadLettersRequest.
+ * Use `create(RetryBotDeadLettersRequestSchema)` to create a new message.
+ */
+export const RetryBotDeadLettersRequestSchema: GenMessage<RetryBotDeadLettersRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 26);
+
+/**
+ * @generated from message app.v1.RetryBotDeadLettersResponse
+ */
+export type RetryBotDeadLettersResponse = Message<"app.v1.RetryBotDeadLettersResponse"> & {
+  /**
+   * How many of update_ids were dead letters (others are skipped).
+   *
+   * @generated from field: int32 retried = 1;
+   */
+  retried: number;
+};
+
+/**
+ * Describes the message app.v1.RetryBotDeadLettersResponse.
+ * Use `create(RetryBotDeadLettersResponseSchema)` to create a new message.
+ */
+export const RetryBotDeadLettersResponseSchema: GenMessage<RetryBotDeadLettersResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 27);
+
+/**
+ * @generated from message app.v1.DiscardBotDeadLettersRequest
+ */
+export type DiscardBotDeadLettersRequest = Message<"app.v1.DiscardBotDeadLettersRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * 1 to 100 update ids.
+   *
+   * @generated from field: repeated int64 update_ids = 2 [jstype = JS_NUMBER];
+   */
+  updateIds: bigint[];
+};
+
+/**
+ * Describes the message app.v1.DiscardBotDeadLettersRequest.
+ * Use `create(DiscardBotDeadLettersRequestSchema)` to create a new message.
+ */
+export const DiscardBotDeadLettersRequestSchema: GenMessage<DiscardBotDeadLettersRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 28);
+
+/**
+ * @generated from message app.v1.DiscardBotDeadLettersResponse
+ */
+export type DiscardBotDeadLettersResponse = Message<"app.v1.DiscardBotDeadLettersResponse"> & {
+  /**
+   * @generated from field: int32 discarded = 1;
+   */
+  discarded: number;
+};
+
+/**
+ * Describes the message app.v1.DiscardBotDeadLettersResponse.
+ * Use `create(DiscardBotDeadLettersResponseSchema)` to create a new message.
+ */
+export const DiscardBotDeadLettersResponseSchema: GenMessage<DiscardBotDeadLettersResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bot_admin, 29);
+
+/**
  * Rate limit tier of a bot; only the operations team changes it.
  *
  * @generated from enum app.v1.BotTier
@@ -503,6 +979,70 @@ export const BotAdminService: GenService<{
     methodKind: "unary";
     input: typeof DeleteBotRequestSchema;
     output: typeof DeleteBotResponseSchema;
+  },
+  /**
+   * How the bot receives updates (webhook or long poll), the delivery
+   * state and the counters of the last 24 hours.
+   *
+   * @generated from rpc app.v1.BotAdminService.GetBotDelivery
+   */
+  getBotDelivery: {
+    methodKind: "unary";
+    input: typeof GetBotDeliveryRequestSchema;
+    output: typeof GetBotDeliveryResponseSchema;
+  },
+  /**
+   * Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
+   * POSTed to it and long polls get 409 conflict.
+   *
+   * @generated from rpc app.v1.BotAdminService.SetBotWebhook
+   */
+  setBotWebhook: {
+    methodKind: "unary";
+    input: typeof SetBotWebhookRequestSchema;
+    output: typeof SetBotWebhookResponseSchema;
+  },
+  /**
+   * Removes the webhook; the bot fetches updates by long poll again.
+   *
+   * @generated from rpc app.v1.BotAdminService.DeleteBotWebhook
+   */
+  deleteBotWebhook: {
+    methodKind: "unary";
+    input: typeof DeleteBotWebhookRequestSchema;
+    output: typeof DeleteBotWebhookResponseSchema;
+  },
+  /**
+   * Updates given up after 10 failed attempts, newest first (at most 100),
+   * kept until they expire (24 hours; callbacks 15 minutes).
+   *
+   * @generated from rpc app.v1.BotAdminService.ListBotDeadLetters
+   */
+  listBotDeadLetters: {
+    methodKind: "unary";
+    input: typeof ListBotDeadLettersRequestSchema;
+    output: typeof ListBotDeadLettersResponseSchema;
+  },
+  /**
+   * Gives dead letters one more attempt each; a failure dead-letters them
+   * again.
+   *
+   * @generated from rpc app.v1.BotAdminService.RetryBotDeadLetters
+   */
+  retryBotDeadLetters: {
+    methodKind: "unary";
+    input: typeof RetryBotDeadLettersRequestSchema;
+    output: typeof RetryBotDeadLettersResponseSchema;
+  },
+  /**
+   * Drops dead letters for good.
+   *
+   * @generated from rpc app.v1.BotAdminService.DiscardBotDeadLetters
+   */
+  discardBotDeadLetters: {
+    methodKind: "unary";
+    input: typeof DiscardBotDeadLettersRequestSchema;
+    output: typeof DiscardBotDeadLettersResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_bot_admin, 0);

@@ -20,6 +20,7 @@ import { Glyph } from "./glyphs.tsx";
 import { ChatAvatar, copyText, CopyButton, DialogHead, Modal, useDomId } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
+import { usePrivateChatFailure } from "./private-chat-failure.ts";
 
 interface CloseProps {
 	onClose: () => void;
@@ -342,6 +343,7 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 	const self = userId === store.selfId;
 	const name = user?.name ?? copy.message.unknownUser;
 	const isBlocked = blocked ?? user?.isBlocked ?? false;
+	const privateChatFailed = usePrivateChatFailure();
 	const message = () => {
 		setOpening(true);
 		remote.createPrivate(userId).then(
@@ -349,9 +351,9 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 				onClose();
 				navigate(paths.chat(chatId));
 			},
-			() => {
+			(err: unknown) => {
 				setOpening(false);
-				toasts.show(copy.common.failed);
+				privateChatFailed(err, userId);
 			},
 		);
 	};

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -272,9 +273,9 @@ func TestModerationRPCsNeedAnOperator(t *testing.T) {
 // loads; it relies on these field names and error bodies.
 func TestGetSelfOverJSON(t *testing.T) {
 	e := newEnv(t)
-	post := func(c *http.Client) (int, map[string]any) {
+	post := func(c *http.Client, request string) (int, map[string]any) {
 		t.Helper()
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, e.srv.URL+"/rpc/app.v1.UsersService/GetSelf", strings.NewReader("{}"))
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, e.srv.URL+"/rpc/app.v1.UsersService/GetSelf", strings.NewReader(request))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,9 +293,25 @@ func TestGetSelfOverJSON(t *testing.T) {
 		return resp.StatusCode, body
 	}
 
-	status, body := post(e.browser(t))
+	status, body := post(e.browser(t), "{}")
 	if status != http.StatusUnauthorized || body["code"] != "unauthenticated" {
 		t.Fatalf("signed out: %d %v", status, body)
+	}
+	// The start-up probe asks for an empty answer instead of an error, with
+	// no cookie and with one that names no session.
+	status, body = post(e.browser(t), `{"allowSignedOut":true}`)
+	if status != http.StatusOK || len(body) != 0 {
+		t.Fatalf("signed out, allowed: %d %v", status, body)
+	}
+	forged := e.browser(t)
+	srvURL, err := url.Parse(e.srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forged.Jar.SetCookies(srvURL, []*http.Cookie{{Name: auth.SessionCookieName, Value: strings.Repeat("A", 43)}})
+	status, body = post(forged, `{"allowSignedOut":true}`)
+	if status != http.StatusOK || len(body) != 0 {
+		t.Fatalf("unknown session, allowed: %d %v", status, body)
 	}
 
 	cl, c := e.signedIn(t)
@@ -302,7 +319,7 @@ func TestGetSelfOverJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status, body = post(c)
+	status, body = post(c, `{"allowSignedOut":true}`)
 	user, ok := body["user"].(map[string]any)
 	if status != http.StatusOK || !ok {
 		t.Fatalf("signed in: %d %v", status, body)

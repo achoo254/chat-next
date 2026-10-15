@@ -24,6 +24,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 ## Đặc tả
 
 - [Fold tiếng Việt](../spec/vi-fold/SPEC.md): đặc tả và bộ test vector mà bản TypeScript và Go cùng phải pass.
+- [Bot API](../spec/bot-api/openapi.yaml) (OpenAPI 3.1, kèm [`format.md`](../spec/bot-api/format.md)); bắt đầu nhanh cho người viết bot: [`bot-api/`](./bot-api/README.md) (token, long poll, webhook, kiểm chữ ký HMAC).
 
 ## Kế hoạch
 

@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Chat, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
+import { useCopy } from "../copy/use-copy.ts";
 import type { Bots } from "../bots/api.ts";
 import type { Integrations } from "../integrations/api.ts";
 import type { Drafts } from "./drafts.ts";
@@ -241,13 +242,20 @@ export function useDraft(chatId: number, topicId = 0): string {
 }
 
 /** Topics of a forum group (null for any other chat), loaded on demand. */
+/** The server's name of the default topic; shown by the copy's name unless an admin renamed it. */
+const SERVER_GENERAL_TITLE = "General";
+
 export function useTopics(chatId: number, forum: boolean): readonly Topic[] | null {
 	const { backend } = useServices();
+	const copy = useCopy();
 	const enabled = forum && backend.features.has("topics");
 	const topics = useBackendValue((pending) => (enabled ? pending.topics(chatId) : null));
 	useEffect(() => {
 		if (enabled) backend.loadTopics(chatId);
 	}, [backend, chatId, enabled]);
-	return topics;
+	return useMemo(
+		() => topics?.map((topic) => (topic.general && topic.title === SERVER_GENERAL_TITLE ? { ...topic, title: copy.topics.general } : topic)) ?? null,
+		[topics, copy],
+	);
 }
 

@@ -16,6 +16,7 @@ principles: [6, 2, 3, 5]
 <!-- Updated: Validation Session 8 2026-10-14 - Mini App chuyển sang Phase 16, file của Bot API làm cùng Phase 4 (cả hai làm sau cùng) -->
 <!-- Updated: Validation Session 9 2026-10-14 - lên prod ở release R5; file Bot API trả về phase này vì media đã có từ R3 -->
 <!-- Updated: R5 lát A 2026-10-15 - Bot API ở đường dẫn https://chat.<d>/bot/v1/ trong process api (không host bot.chat.<d>, không role riêng); lát A đã làm: spec, quản lý bot, consent, gửi tin + bàn phím, long poll, callback, lệnh -->
+<!-- Updated: R5 lát B1 2026-10-15 - webhook tới bot (dispatcher trong process api, HMAC X-Bot-Signature, dead-letter, bộ đếm), safehttp, channel_post cho bot admin kênh, bot rời chat thì bỏ update đang chờ của chat đó -->
 
 ## Goal
 
@@ -107,9 +108,9 @@ Create:
 - [ ] Mapping + validate OpenAPI (lát A: mapping xong ở `internal/botapi/wire`; chưa có test validate response theo OpenAPI)
 - [x] Parser + allowlist scheme + fuzz
 - [x] update_id một writer + bot_updates
-- [ ] Long poll + dispatcher + dead-letter + dedupe action (lát A: long poll + 409 xong; webhook dispatcher, dead-letter, action trong body ở lát sau)
+- [x] Long poll + dispatcher + dead-letter + dedupe action (lát A: long poll + 409; lát B1: webhook dispatcher, retry/Retry-After, dead-letter, circuit breaker, action trong body với `random_id` dẫn xuất, bot rời chat thì bỏ update chờ, `channel_post`)
 - [x] Quản lý bot (`BotAdminService`) + StartBot/GetBotInfo + PressInlineButton (lát A)
-- [ ] safehttp
+- [x] safehttp (lát B1; link preview dùng chung chính sách địa chỉ)
 - [ ] Bulk có consent
 - [ ] Inline mode
 - [ ] Contract test

@@ -75,6 +75,30 @@ func TestUpsertIdPUser(t *testing.T) {
 	}
 }
 
+func TestUpsertIdPUserShortLoginName(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+
+	// A login name under the minimum keeps its letters and gets digits; a
+	// second account with the same name takes the next number.
+	for i, want := range []string{"an1", "an2"} {
+		u, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_an" + want, PreferredUsername: "An"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if u.Username != want || u.Name != "An" {
+			t.Fatalf("account %d = %+v, want username %q", i, u, want)
+		}
+	}
+	u, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_symbols", PreferredUsername: "!!", Name: "Ký Hiệu"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Username != "001" {
+		t.Fatalf("name without usable characters = %+v", u)
+	}
+}
+
 func TestUpsertIdPUserNameFromIdP(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)

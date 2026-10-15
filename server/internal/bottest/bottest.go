@@ -5,10 +5,12 @@
 package bottest
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,6 +35,9 @@ const (
 // Quiet discards logs.
 var Quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
+// WebhookKey seals webhook secrets in tests.
+var WebhookKey = bytes.Repeat([]byte{9}, 32)
+
 // Env is a wired bot platform.
 type Env struct {
 	T       testing.TB
@@ -42,10 +47,13 @@ type Env struct {
 	Updates *botupdates.Service
 	Limiter *ratelimit.Memory
 	n       int
+	stop    func()
 }
 
-// New builds the environment; the consumer loop runs until the test ends.
-// The chat core's per-user limits are real; tests stay well below them.
+// New builds the environment; the consumer loop and the webhook dispatcher
+// (local URLs allowed, so a test receiver on loopback works) run until the
+// test ends or StopUpdates. The chat core's per-user limits are real; tests
+// stay well below them.
 func New(t testing.TB) *Env {
 	t.Helper()
 	st := testdb.Open(t)
@@ -73,18 +81,41 @@ func New(t testing.TB) *Env {
 		t.Fatal(err)
 	}
 	updates := NewUpdates(t, st, chatSvc)
+	EnableWebhooks(t, updates)
 	chatSvc.SetCommitObserver(updates.Kick)
+	stop := RunUpdates(updates)
+	t.Cleanup(stop)
+	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter, stop: stop}
+}
+
+// RunUpdates runs u in the background; the returned stop ends it and waits
+// (it may be called more than once).
+func RunUpdates(u *botupdates.Service) func() {
 	loopCtx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		updates.Run(loopCtx)
+		u.Run(loopCtx)
 	}()
-	t.Cleanup(func() {
-		cancel()
-		<-done
-	})
-	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			cancel()
+			<-done
+		})
+	}
+}
+
+// StopUpdates stops the environment's consumer and dispatcher, as when
+// the process stops.
+func (e *Env) StopUpdates() { e.stop() }
+
+// EnableWebhooks turns on webhooks for u with local URLs allowed.
+func EnableWebhooks(t testing.TB, u *botupdates.Service) {
+	t.Helper()
+	if err := u.EnableWebhooks(botupdates.WebhookOptions{TenantID: TenantID, SessionKey: WebhookKey, Local: true}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // NewUpdates returns another consumer on the same database, as a second

@@ -16,6 +16,9 @@ export const vi = {
 		you: "Bạn",
 		copied: "Đã sao chép",
 		failed: "Không thực hiện được, thử lại sau ít phút.",
+		/** A private chat the person's settings refuse; never says which setting (or a block). */
+		privateRefused: "Không thể nhắn tin cho người này lúc này.",
+		privateRefusedInviteHint: "Bạn có thể mời họ vào nhóm bằng link mời.",
 		loadFailed: "Không tải được dữ liệu. Kiểm tra kết nối mạng rồi thử lại.",
 		loading: "Đang tải…",
 	},
@@ -242,6 +245,8 @@ export const vi = {
 		bot: "Bot",
 	},
 	topics: {
+		/** The default topic every forum starts with (the server names it "General"). */
+		general: "Chung",
 		list: (group: string) => `Chủ đề của ${group}`,
 		topicsLabel: "Chủ đề",
 		backToChats: "Về danh sách chat",

@@ -2,7 +2,8 @@
 //
 // Usernames are lowercase ASCII letters, digits and underscore, 3 to 32
 // characters, unique within a tenant. New accounts start from the IdP
-// preferred_username; on a conflict digits are appended. Names and bios are
+// preferred_username; on a conflict, or when that name is too short, digits
+// are appended. Names and bios are
 // counted in code points (ADR 0004) and may not contain control characters.
 package profile
 
@@ -37,9 +38,9 @@ var (
 	ErrControlCharacter = errors.New("profile: text contains control characters")
 )
 
-// usernameFallback is the base used when the IdP name has too few usable
-// characters.
-const usernameFallback = "user"
+// nameFallback is the display name of a new account whose IdP claims carry
+// no usable name at all.
+const nameFallback = "user"
 
 var usernamePattern = regexp.MustCompile(`^[a-z0-9_]{3,32}$`)
 
@@ -57,8 +58,8 @@ func NormalizeUsername(input string) string {
 
 // UsernameBase derives the first candidate from an IdP preferred_username:
 // lowercase, '-' and '.' become '_', other characters are dropped, and the
-// result is cut to UsernameMaxLen. Names left shorter than UsernameMinLen
-// fall back to "user".
+// result is cut to UsernameMaxLen. The base may be shorter than
+// UsernameMinLen, even empty; UsernameCandidate then pads it with digits.
 func UsernameBase(preferred string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(preferred) {
@@ -73,9 +74,6 @@ func UsernameBase(preferred string) string {
 	if len(base) > UsernameMaxLen {
 		base = base[:UsernameMaxLen]
 	}
-	if len(base) < UsernameMinLen {
-		return usernameFallback
-	}
 	return base
 }
 
@@ -85,17 +83,26 @@ const sequentialAttempts = 9
 
 // UsernameCandidate returns the username to try on the given attempt
 // (0-based): the base itself, then base2..base10, then base followed by six
-// random digits. The base is shortened so the result never exceeds
-// UsernameMaxLen.
+// random digits. A base shorter than UsernameMinLen is never used alone: its
+// numbered suffixes start at 1 and get leading zeros up to the minimum length
+// ("an" gives an1, an2, ...; "x" gives x01, x02, ...). The base is shortened
+// so the result never exceeds UsernameMaxLen.
 func UsernameCandidate(base string, attempt int) string {
-	if attempt == 0 {
+	short := len(base) < UsernameMinLen
+	if attempt == 0 && !short {
 		return base
 	}
 	var suffix string
-	if attempt <= sequentialAttempts {
-		suffix = strconv.Itoa(attempt + 1)
-	} else {
+	switch {
+	case attempt > sequentialAttempts:
 		suffix = randomDigits(6)
+	case short:
+		suffix = strconv.Itoa(attempt + 1)
+		if pad := UsernameMinLen - len(base) - len(suffix); pad > 0 {
+			suffix = strings.Repeat("0", pad) + suffix
+		}
+	default:
+		suffix = strconv.Itoa(attempt + 1)
 	}
 	if len(base)+len(suffix) > UsernameMaxLen {
 		base = base[:UsernameMaxLen-len(suffix)]
@@ -163,5 +170,5 @@ func InitialName(name, preferredUsername, fallback string) string {
 		}
 		return cleaned
 	}
-	return usernameFallback
+	return nameFallback
 }

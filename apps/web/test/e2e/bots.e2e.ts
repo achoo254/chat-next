@@ -4,14 +4,23 @@
 // polling through the dev server's /bot/ proxy). An opens the bot's deep link
 // and starts it; the bot receives "/start hello", answers with an inline
 // keyboard, An presses a button and sees the bot's callback answer, then
-// taps the bot's reply keyboard.
+// taps the bot's reply keyboard. Then the bot moves to a webhook: a receiver
+// on loopback (the e2e stack allows local webhook URLs) checks the secret
+// and the HMAC signature and answers with a sendMessage the server runs; An
+// sees the reply, reads the delivery state in the Developer Console and
+// switches the bot back to long polling there.
 import assert from "node:assert/strict";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { after, before } from "node:test";
 import type { Browser } from "playwright";
-import { launch, message, scenario, signIn, WEB_ORIGIN, type Person } from "./people.ts";
+import { launch, message, scenario, send, signIn, WEB_ORIGIN, type Person } from "./people.ts";
 
 let browser: Browser;
 let an: Person;
+/** The bot of the first scenario, for the webhook scenario. */
+let echo: { bot: TestBot; botId: number; chatId: number } | null = null;
 
 before(async () => {
 	browser = await launch();
@@ -36,7 +45,7 @@ class TestBot {
 		this.token = token;
 	}
 
-	async call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+	async call<T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
 		const response = await fetch(`${WEB_ORIGIN}/bot/v1${path}`, {
 			method,
 			headers: { Authorization: `Bearer ${this.token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
@@ -75,6 +84,7 @@ scenario("create a bot, start it from a link, press its buttons", () => [an], as
 	await form.getByRole("textbox", { name: "Mô tả" }).fill("Bot thử nghiệm: lặp lại lệnh của bạn.");
 	await form.getByRole("button", { name: "Tạo bot" }).click();
 	await page.waitForURL(/\/console\/\d+\/token$/);
+	const botId = Number(new URL(page.url()).pathname.split("/")[2]);
 
 	// The sign-in is older than 10 minutes as far as the server knows: sign in again at the fake IdP.
 	await page.getByRole("button", { name: "Cấp token" }).click();
@@ -130,4 +140,74 @@ scenario("create a bot, start it from a link, press its buttons", () => [an], as
 	await pad.waitFor({ state: "detached" });
 	const tapped = await bot.next((update) => update.message?.text === "staging");
 	assert.equal(tapped.message?.chat.id, chatId);
+	echo = { bot, botId, chatId };
+});
+
+const HOOK_SECRET = "e2e_hook-secret";
+
+/** The bot's webhook: checks each request like a bot's server should and answers with a reply. */
+function startReceiver(received: Update[]): Promise<Server> {
+	const server = createServer((req, res) => {
+		const chunks: Buffer[] = [];
+		req.on("data", (chunk: Buffer) => chunks.push(chunk));
+		req.on("end", () => {
+			const body = Buffer.concat(chunks);
+			const timestamp = String(req.headers["x-bot-timestamp"] ?? "");
+			const signature = String(req.headers["x-bot-signature"] ?? "");
+			const expected = "v1=" + createHmac("sha256", HOOK_SECRET).update(`${timestamp}.`).update(body).digest("hex");
+			const fresh = Math.abs(Date.now() / 1000 - Number(timestamp)) < 300;
+			const signed = signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+			if (req.headers["x-bot-api-secret-token"] !== HOOK_SECRET || !signed || !fresh) {
+				res.writeHead(401).end();
+				return;
+			}
+			const update = JSON.parse(body.toString("utf8")) as Update;
+			received.push(update);
+			const text = update.message?.text ?? "";
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ method: "sendMessage", chat_id: update.message?.chat.id, text: `Webhook nhận: ${text}` }));
+		});
+	});
+	return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
+}
+
+scenario("the bot receives updates at a webhook and replies in its answer", () => [an], async () => {
+	assert.ok(echo !== null, "the first scenario sets up the bot");
+	const { bot, botId, chatId } = echo;
+	const { page } = an;
+	const received: Update[] = [];
+	const receiver = await startReceiver(received);
+	try {
+		const port = (receiver.address() as AddressInfo).port;
+		await bot.call("PUT", "/webhook", { url: `http://127.0.0.1:${port}/hook`, secret: HOOK_SECRET, allowed_updates: ["message"], drop_pending: true });
+		// While the webhook is set, long polling is refused.
+		await assert.rejects(bot.call("GET", "/updates"), /409/);
+
+		await page.goto(`${WEB_ORIGIN}/c/${chatId}`);
+		await send(an, "ping qua webhook");
+		await message(an, "Webhook nhận: ping qua webhook").waitFor();
+		assert.ok(received.some((update) => update.message?.text === "ping qua webhook"));
+
+		// The owner sees the webhook working in the Developer Console.
+		await page.goto(`${WEB_ORIGIN}/console/${botId}/updates`);
+		const status = page.getByRole("region", { name: "Trạng thái webhook" });
+		await status.getByText("Đang hoạt động").waitFor();
+		const form = page.getByRole("form", { name: "Nhận update" });
+		assert.equal(await form.getByLabel("URL webhook").inputValue(), `http://127.0.0.1:${port}/hook`);
+		await page.getByRole("link", { name: "Số liệu" }).click();
+		const stats = page.getByRole("region", { name: "Số liệu gửi · 24 giờ qua" });
+		await stats.getByText("Đã giao", { exact: true }).waitFor();
+
+		// Back to long polling from the Console.
+		await page.getByRole("link", { name: "Nhận update" }).click();
+		await form.getByRole("button", { name: "Long poll" }).click();
+		await form.getByRole("button", { name: "Lưu" }).click();
+		await page.locator(".toast", { hasText: "Đã lưu cách nhận update" }).waitFor();
+		await page.getByRole("region", { name: "Trạng thái long poll" }).waitFor();
+		const info = await bot.call<{ url: string }>("GET", "/webhook");
+		assert.equal(info.url, "");
+		await bot.call("GET", "/updates");
+	} finally {
+		await new Promise<void>((resolve) => receiver.close(() => resolve()));
+	}
 });

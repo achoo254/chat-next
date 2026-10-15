@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -124,6 +125,9 @@ func New(cfg Config, chatSvc *chat.Service, admin *botadmin.Service, updates *bo
 	s.mux.Handle("/bot/v1/callbacks/{action}", s.method(http.MethodPost, s.answerCallback))
 	s.mux.Handle("/bot/v1/commands", s.method(http.MethodPut, s.setCommands))
 	s.mux.Handle("/bot/v1/chats/{chat_id}", s.method(http.MethodGet, s.getChat))
+	s.mux.Handle("/bot/v1/webhook", s.methods(map[string]call{
+		http.MethodGet: s.getWebhook, http.MethodPut: s.setWebhook, http.MethodDelete: s.deleteWebhook,
+	}))
 	s.mux.HandleFunc(Prefix, func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, errNotFound("unknown method"))
 	})
@@ -256,14 +260,26 @@ type call func(ctx context.Context, r *http.Request, bot *botadmin.Bot) (any, er
 // method checks the HTTP method, authenticates the bot, applies its call
 // budget and runs fn.
 func (s *Service) method(verb string, fn call) http.Handler {
+	return s.methods(map[string]call{verb: fn})
+}
+
+// methods is method for a path that answers several HTTP methods.
+func (s *Service) methods(fns map[string]call) http.Handler {
+	verbs := make([]string, 0, len(fns))
+	for v := range fns {
+		verbs = append(verbs, v)
+	}
+	slices.Sort(verbs)
+	allow := strings.Join(verbs, ", ")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != verb {
-			w.Header().Set("Allow", verb)
-			writeError(w, &apiError{status: http.StatusMethodNotAllowed, code: "method_not_allowed", description: "use " + verb})
+		fn, ok := fns[r.Method]
+		if !ok {
+			w.Header().Set("Allow", allow)
+			writeError(w, &apiError{status: http.StatusMethodNotAllowed, code: "method_not_allowed", description: "use " + allow})
 			return
 		}
 		ctx := r.Context()
-		if verb != http.MethodGet || r.URL.Path != "/bot/v1/updates" {
+		if r.Method != http.MethodGet || r.URL.Path != "/bot/v1/updates" {
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, requestTimeout)
 			defer cancel()
@@ -425,6 +441,16 @@ func (s *Service) sendMessage(ctx context.Context, r *http.Request, bot *botadmi
 	if err := decode(r, &req, false); err != nil {
 		return nil, err
 	}
+	sent, err := s.send(ctx, bot, req)
+	if err != nil {
+		return nil, err
+	}
+	return s.messageResult(ctx, bot, sent)
+}
+
+// send checks and sends a message of the bot (the sendMessage method, and
+// the same method in a webhook answer).
+func (s *Service) send(ctx context.Context, bot *botadmin.Bot, req sendMessageRequest) (*appv1.Message, error) {
 	switch {
 	case req.ChatID <= 0 || req.ChatID >= maxSafeInt:
 		return nil, errBadRequest("chat_id is required")
@@ -469,7 +495,7 @@ func (s *Service) sendMessage(ctx context.Context, r *http.Request, bot *botadmi
 	if err != nil {
 		return nil, err
 	}
-	return s.messageResult(ctx, bot, sent.GetMessage())
+	return sent.GetMessage(), nil
 }
 
 // messageResult renders a message of a chat the bot is in.
@@ -502,6 +528,9 @@ func (s *Service) getUpdates(ctx context.Context, r *http.Request, bot *botadmin
 	}
 	list, err := s.updates.Poll(ctx, bot.ID, offset, int(limit), time.Duration(timeout)*time.Second)
 	switch {
+	case errors.Is(err, botupdates.ErrWebhookSet):
+		return nil, &apiError{status: http.StatusConflict, code: "conflict",
+			description: "a webhook is set; updates go there (DELETE /webhook to use getUpdates)"}
 	case errors.Is(err, botupdates.ErrConflict):
 		return nil, &apiError{status: http.StatusConflict, code: "conflict",
 			description: "terminated by a newer getUpdates request of this bot"}

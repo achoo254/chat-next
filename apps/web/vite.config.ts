@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { brandAssets } from "./vite-brand.ts";
 import { reactPlugins } from "./vite-react.ts";
+import { serviceWorker } from "./vite-service-worker.ts";
 
 const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
 
@@ -8,7 +9,7 @@ const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
 const API_ORIGIN = "http://127.0.0.1:4600";
 
 export default defineConfig({
-	plugins: [...reactPlugins(), brandAssets()],
+	plugins: [...reactPlugins(), brandAssets(), serviceWorker()],
 	server: {
 		// brand.config.json devOrigins lists this origin; never fall back to another port.
 		port: 5173,
@@ -20,6 +21,9 @@ export default defineConfig({
 			// HTTP Bot API (bots call it; the e2e scenarios play a bot through it). It
 			// answers only on the app's own host, so the Host header stays as sent.
 			"/bot/": { target: API_ORIGIN, changeOrigin: false },
+			// Incoming webhooks: the URL shown in the group panel uses this origin, and
+			// the server resolves the tenant from the Host header, as for /bot/.
+			"/hook/": { target: API_ORIGIN, changeOrigin: false },
 			// Realtime gateway (same origin as in production).
 			"/ws": { target: API_ORIGIN, ws: true },
 		},

@@ -204,3 +204,24 @@ func TestLoadOperatorUserIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadBotWebhookAllowLocal(t *testing.T) {
+	env := validEnv()
+	env["BOT_WEBHOOK_ALLOW_LOCAL"] = "true"
+	if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "BOT_WEBHOOK_ALLOW_LOCAL") {
+		t.Fatalf("production with local webhooks: err = %v", err)
+	}
+	env["CHAT_ENV"] = "development"
+	c, err := Load(lookupFrom(env))
+	if err != nil || !c.BotWebhookLocal {
+		t.Fatalf("development: %+v, %v", c.BotWebhookLocal, err)
+	}
+	env["BOT_WEBHOOK_ALLOW_LOCAL"] = "yes"
+	if _, err := Load(lookupFrom(env)); err == nil {
+		t.Fatal("invalid value accepted")
+	}
+	delete(env, "BOT_WEBHOOK_ALLOW_LOCAL")
+	if c, err := Load(lookupFrom(env)); err != nil || c.BotWebhookLocal {
+		t.Fatalf("default: %+v, %v", c.BotWebhookLocal, err)
+	}
+}

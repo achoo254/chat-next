@@ -51,6 +51,14 @@ Release R5 lát A (Bot API lõi, migration `0013_bots`) đổi conf nginx (locat
 - Cấp lại token và xoá bot cần đăng nhập IdP trong 10 phút gần đây (ADR 0006): web gửi `/auth/login?reauth=1`, server gửi `prompt=login` và `max_age=600` rồi lưu `auth_time` của ID token vào phiên mới. IdP (`oidc-provider`) có `auth_time` khi request có `max_age`; sau deploy kiểm một lần bằng "Cấp lại token" trong Developer Console. Nếu IdP không trả `auth_time`, mọi lần cấp lại token đều trả `reauth_required`.
 - Rollback code (`switch-release.sh`) về R4 không cần đụng dữ liệu; bot ngừng hoạt động (R4 không có `/bot/`).
 
+Release R5 lát B1 (webhook tới bot, migration `0015_bot_webhooks`) không đổi nginx, script hay DNS: `PUT/GET/DELETE /bot/v1/webhook` nằm dưới `location ^~ /bot/` sẵn có, việc giao chạy trong process `chat-api`. Không có biến môi trường mới cho production (`BOT_WEBHOOK_ALLOW_LOCAL` chỉ dùng khi `CHAT_ENV=development`; đặt ở production thì server không khởi động). Deploy tự động như các lần sau.
+
+- Migration chỉ thêm: cột webhook của `bots` (secret mã hoá bằng `SESSION_KEY`), cột giao của `bot_updates` (`queue_key`, `attempts`, `next_attempt_at`, `last_error`, `delivered_at`, `dead_at`), loại update `channel_post`, bảng `bot_delivery_counters`. Binary lát A vẫn chạy trên schema mới (không đọc cột mới; bot đặt webhook thì binary cũ không giao, update chờ tới 24 giờ).
+- Server gọi ra URL webhook của bot (cổng 443/80/8443, chỉ địa chỉ công khai, chặn lúc kết nối). Đổi `SESSION_KEY` làm secret webhook không mở được: mỗi lần giao lỗi `secret_unreadable` tới khi chủ bot lưu lại webhook.
+- Rollback code về lát A: binary cũ bỏ qua webhook, nên bot có webhook chỉ nhận update nếu chuyển sang long poll (binary cũ không trả `409` cho chúng); lên lại lát B1 thì webhook giao tiếp các update còn chờ.
+
+Bản mở app khi offline (service worker `/sw.js` chỉ cache app shell: `index.html`, file trong `/assets/`, icon, manifest; không bao giờ `/rpc`, `/ws`, `/auth`, `/hook`, `/bot` hay host media) không đổi nginx, script hay biến môi trường, deploy như các lần sau. `location /` của `chat.hoandat.com.conf` đã trả `Cache-Control: no-cache` cho `/sw.js` và `index.html`, và CSP đã có `worker-src 'self'`; nếu sau này tách location riêng cho hai file này thì phải giữ `no-cache`, nếu không trình duyệt có thể giữ worker cũ lâu hơn. Mỗi build có một `sw.js` riêng (phiên bản là hash nội dung các file); worker mới cài xong thì chờ đến khi không còn tab nào của bản cũ mới thay và xoá cache cũ. Rollback code không cần gì thêm: lần tải trang online tiếp theo lấy `index.html` mới từ server rồi cài worker của bản đó.
+
 ## Các lần sau
 
 Mặc định deploy tự động: mỗi lần `ci` xanh trên `main`, workflow [`deploy`](../.github/workflows/deploy.yml) build release trong một job không có key deploy, rồi job deploy tải lên `/opt/chat/incoming/<id>` bằng user `chat-deploy` rồi gọi lệnh sudo duy nhất user này có, `/usr/local/sbin/chat-activate-incoming <id>` ([`activate-incoming.sh`](../infra/chat/activate-incoming.sh)). Lệnh đó chuyển bản upload vào `/opt/chat/staging` (chỉ root), đổi chủ sang root rồi mới kiểm (từ chối symlink và file đặc biệt), chuyển sang `/opt/chat/releases`, thay conf nginx bằng bản trong `/opt/chat/infra/nginx` (bản upload không đổi được nginx), rồi chạy `activate-release.sh`; cuối cùng workflow chạy `smoke.sh`.
@@ -127,7 +135,7 @@ Vận hành:
 
 ## Bảo mật mạng
 
-- Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác.
+- Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này.
 
 ## Rollback
 

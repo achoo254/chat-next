@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Chat Bot API
   version: 1.0.0
-  summary: HTTP API for bots of the chat platform (release R5, slice A).
+  summary: HTTP API for bots of the chat platform (release R5).
   description: |
     Bots talk to the chat server of their tenant over HTTPS with JSON.
     This API is our own and is not compatible with the Telegram Bot API.
@@ -42,6 +42,9 @@ info:
       short pause.
     - Request bodies are `application/json`, at most 1 MiB; unknown fields
       are rejected.
+    - Updates arrive either by long poll (`GET /updates`) or at a webhook
+      (`PUT /webhook`, see the `update` webhook below), never both: while a
+      webhook is set, `GET /updates` answers `409 conflict`.
 
     Later versions only add methods, fields and update kinds; bots must
     ignore fields and update kinds they do not know.
@@ -131,7 +134,9 @@ paths:
         again, even for a lower `offset`. When none are pending the request
         waits up to `timeout` seconds for the first one. Only one poll per
         bot runs at a time: a newer request ends the older one with
-        `409 conflict`. While the server restarts a waiting poll ends with
+        `409 conflict`; while the bot has a webhook every poll answers
+        `409 conflict`, and setting a webhook ends a waiting poll with it.
+        While the server restarts a waiting poll ends with
         an empty list and new polls answer `503 unavailable` with
         `retry_after`. Updates are kept 24 hours (callbacks 15 minutes).
         `update_id` strictly increases per bot.
@@ -163,6 +168,68 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /webhook:
+    put:
+      tags: [updates]
+      operationId: setWebhook
+      summary: Receive updates at a webhook.
+      description: |
+        From now on every update is POSTed to `url` (see the `update`
+        webhook), a waiting long poll ends with `409 conflict` and further
+        polls get it too. The URL must be `https` on port 443, 80 or 8443
+        and resolve to public addresses only; private, loopback,
+        link-local, CGNAT, multicast, reserved and cloud metadata addresses
+        are refused (`400 bad_request`), now and at every connection, so a
+        name that later resolves to such an address (DNS rebinding) is not
+        reached either. Redirects are not followed. Calling it again
+        replaces every setting.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SetWebhookRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+    delete:
+      tags: [updates]
+      operationId: deleteWebhook
+      summary: Go back to long poll.
+      description: Removes the webhook (also when none is set). Pending updates stay for `GET /updates` unless `drop_pending`.
+      parameters:
+        - name: drop_pending
+          in: query
+          description: Drop the pending updates instead of keeping them.
+          schema: {type: boolean, default: false}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+    get:
+      tags: [updates]
+      operationId: getWebhook
+      summary: Webhook settings and delivery state.
+      responses:
+        '200':
+          description: The webhook (`url` is empty when the bot polls).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/WebhookInfo'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
   /callbacks/{callback_id}:answer:
@@ -239,6 +306,66 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
+webhooks:
+  update:
+    post:
+      tags: [updates]
+      operationId: receiveUpdate
+      summary: An update POSTed to the bot's webhook.
+      description: |
+        The server POSTs each update (the same object as one item of
+        `GET /updates`) to the URL set with `PUT /webhook`.
+
+        - Order: updates of one chat (button presses: of one user) arrive one
+          at a time, in `update_id` order; different chats are delivered in
+          parallel up to `max_connections`. There is no global order.
+        - Success is any 2xx answer within 10 seconds. Anything else (other
+          status, redirect, timeout, TLS or connection error) is retried
+          after 1 s, doubling per failure up to a random 60 to 120 s, or
+          after the answer's `Retry-After` (seconds or HTTP date, clamped to
+          0 to 3600 s). After 10 failed attempts the update is dead-lettered
+          and the next update of the chat goes on; the bot's owner can
+          retry or drop it in the Developer Console. Updates expire after
+          24 hours (callbacks 15 minutes).
+        - Delivery is at least once: an update can arrive twice (a lost
+          answer, a server restart), so deduplicate by `update_id`.
+        - After many failures in a row the bot's webhook gets one request at
+          a time until one succeeds.
+        - Verify each request: `X-Bot-Api-Secret-Token` equals your secret,
+          and `X-Bot-Signature` equals `v1=` + hex(HMAC-SHA256(key = secret,
+          message = X-Bot-Timestamp + "." + raw body)), compared in constant
+          time; reject timestamps more than 5 minutes from your clock.
+        - The answer may carry one method to run (WebhookAnswer).
+      parameters:
+        - name: X-Bot-Api-Secret-Token
+          in: header
+          required: true
+          schema: {type: string}
+          description: The secret set with `PUT /webhook`.
+        - name: X-Bot-Timestamp
+          in: header
+          required: true
+          schema: {type: string, pattern: '^[0-9]+$'}
+          description: Unix seconds when the request was signed.
+        - name: X-Bot-Signature
+          in: header
+          required: true
+          schema: {type: string, pattern: '^v1=[0-9a-f]{64}$'}
+          description: '`v1=` + hex(HMAC-SHA256(secret, timestamp + "." + body)).'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Update'}
+      responses:
+        '200':
+          description: Delivered; the body may name a method to run.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebhookAnswer'}
+        '204':
+          description: Delivered.
 components:
   securitySchemes:
     botToken:
@@ -280,7 +407,9 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorEnvelope'}
     Conflict:
-      description: A newer getUpdates request of this bot ended this one (`conflict`).
+      description: |
+        A newer getUpdates request of this bot ended this one, or the bot
+        has a webhook (`conflict`).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/ErrorEnvelope'}
@@ -571,21 +700,121 @@ components:
         `message` (new messages in private chats and groups the bot is in;
         in groups with privacy mode only commands addressed to the bot,
         replies to its messages and service messages; never the bot's own
-        messages nor messages of other bots), `message_edited` (the author
-        edited the message; server-side changes such as an attached link
-        preview are not edits) and `callback` (a press of the bot's button
-        on a message that still exists). Later versions add kinds; ignore
-        unknown ones.
+        messages nor messages of other bots), `channel_post` (new posts of
+        channels where the bot is an admin), `message_edited` (the author
+        edited the message or post; server-side changes such as an attached
+        link preview are not edits) and `callback` (a press of the bot's
+        button on a message that still exists). When the bot leaves or is
+        removed from a chat, its pending updates of that chat are dropped.
+        Later versions add kinds; ignore unknown ones.
       properties:
         update_id:
           type: integer
           minimum: 1
           maximum: 9007199254740991
         message: {$ref: '#/components/schemas/Message'}
+        channel_post: {$ref: '#/components/schemas/Message'}
         message_edited: {$ref: '#/components/schemas/Message'}
         callback: {$ref: '#/components/schemas/Callback'}
       minProperties: 2
       maxProperties: 2
+    UpdateKind:
+      type: string
+      enum: [message, message_edited, channel_post, callback]
+    SetWebhookRequest:
+      type: object
+      required: [url, secret]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: https URL on port 443, 80 or 8443, without credentials or fragment.
+        secret:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{1,256}$'
+          description: |
+            Sent back in `X-Bot-Api-Secret-Token` and the HMAC key of
+            `X-Bot-Signature`. Stored encrypted; never returned.
+        allowed_updates:
+          type: array
+          items: {$ref: '#/components/schemas/UpdateKind'}
+          description: |
+            Kinds to receive; empty or absent means every kind. Applies to
+            updates created from now on, not to queued ones, and only while
+            the webhook is set.
+        max_connections:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 40
+          description: Parallel requests (one per chat at a time).
+        drop_pending:
+          type: boolean
+          description: Drop the pending updates instead of delivering them.
+    WebhookInfo:
+      type: object
+      required: [url, pending_update_count, dead_letter_count, max_connections, allowed_updates, open_connections]
+      properties:
+        url:
+          type: string
+          description: Empty when the bot polls.
+        pending_update_count: {type: integer, minimum: 0}
+        dead_letter_count:
+          type: integer
+          minimum: 0
+          description: Updates given up after 10 attempts (the bot's owner retries or drops them in the Developer Console).
+        max_connections: {type: integer, minimum: 1, maximum: 100}
+        allowed_updates:
+          type: array
+          items: {$ref: '#/components/schemas/UpdateKind'}
+        open_connections:
+          type: integer
+          minimum: 0
+          description: Requests in flight now.
+        last_error:
+          type: string
+          description: |
+            Reason of the newest failed attempt: `http_<status>`, `timeout`,
+            `tls`, `connect`, `dns`, `blocked_address`, `invalid_url` or
+            `secret_unreadable` (set the webhook again).
+          examples: [http_502, timeout]
+        last_error_message:
+          type: string
+          description: Human-readable last_error; do not parse.
+        last_error_date:
+          type: integer
+          description: Unix seconds of last_error.
+        last_success_date:
+          type: integer
+          description: Unix seconds of the newest 2xx answer.
+    WebhookAnswer:
+      description: |
+        Optional body of the webhook's 2xx answer: a method the server runs
+        as the bot right after the delivery, with the same checks and rate
+        limits as calling it. Its result is not reported; errors are
+        ignored. The `random_id` of `sendMessage` is replaced by one derived
+        from the bot and the update, so a redelivered update never sends
+        the reply twice. Any other body (empty, `{}`, `{"ok": true}`) is no
+        action.
+      oneOf:
+        - type: object
+          required: [method, chat_id, text]
+          description: '`method` plus the fields of SendMessageRequest.'
+          properties:
+            method: {const: sendMessage}
+            chat_id: {$ref: '#/components/schemas/Id'}
+            text: {type: string}
+        - type: object
+          required: [method, callback_id]
+          additionalProperties: false
+          properties:
+            method: {const: answerCallback}
+            callback_id: {type: string}
+            text: {type: string, maxLength: 200}
+            show_alert: {type: boolean}
+            url: {type: string, maxLength: 2048}
     SendMessageRequest:
       type: object
       required: [chat_id, text]

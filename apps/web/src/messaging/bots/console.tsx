@@ -5,8 +5,8 @@
 // /auth/login?reauth=1 and, back on the same page, asks once more
 // (`?after=token` or `?after=delete` opens the confirmation; only its button
 // acts, so a link carrying the parameter cannot issue a token by itself).
-// Bots receive updates by long polling only for now. Loaded on demand with
-// its own styles.
+// The delivery tabs (Nhận update, Update lỗi, Số liệu) live in delivery.tsx.
+// Loaded on demand with its own styles.
 import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
 import { fold, signInUrl } from "@app/core";
 import { useLoader } from "../../components/delayed-loader.tsx";
@@ -15,11 +15,12 @@ import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch, type ConsolePage, type ConsoleTab } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { clock, orgDomain, shortDate } from "../data/format.ts";
+import { orgDomain } from "../data/format.ts";
 import { myBotsData } from "../data/screen-data.ts";
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "../ui/parts.tsx";
 import { BOT_LIMITS, botErrorKind, EDITABLE_SCOPES, usernameProblem, validCommand, type BotCommand, type CommandScope, type CommandSets, type OwnBot } from "./api.ts";
+import { DeadLettersTab, StatsTab, UpdatesTab, when } from "./delivery.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import type { BotsCopy } from "./copy-vi.ts";
 import "./console.css";
@@ -38,11 +39,6 @@ function useMyBots(page: number): [Load<OwnBot[]>, () => void, (bot: OwnBot) => 
 	const [state, reload, update] = useLoad(myBotsData(bots, page));
 	const put = (bot: OwnBot) => update((value) => value.map((b) => (b.id === bot.id ? bot : b)));
 	return [state, reload, put];
-}
-
-/** "02/10 14:20" in the user's time zone. */
-function when(unixSeconds: number, locale: string): string {
-	return `${shortDate(unixSeconds, locale)} ${clock(unixSeconds, locale)}`;
 }
 
 /** The Bot API base of this tenant. */
@@ -161,7 +157,7 @@ function BotList() {
 												</span>
 											</span>
 										</td>
-										<td data-label={t.console.columns.updates}>{t.console.longPoll}</td>
+										<td data-label={t.console.columns.updates}>{bot.webhook ? t.console.webhook : t.console.longPoll}</td>
 										<td data-label={t.console.columns.token}>
 											{bot.hasToken ? t.console.tokenIssued(when(bot.tokenIssuedAt, locale)) : <span className="muted">{t.console.noToken}</span>}
 										</td>
@@ -439,7 +435,7 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 	const shown = () => setTaken((current) => (current.after === null ? current : { ...current, after: null }));
 	const bot = state.status === "ready" ? (state.value.find((b) => b.id === botId) ?? null) : null;
 	const titleId = useDomId("bot");
-	const TABS: readonly ConsoleTab[] = ["profile", "token", "commands"];
+	const TABS: readonly ConsoleTab[] = ["profile", "token", "updates", "dead-letters", "stats", "commands"];
 	return (
 		<section className="console" aria-labelledby={titleId}>
 			<ConsoleHead back={paths.console()} backLabel={t.console.backToList} parent={t.console.title} current={bot?.name ?? t.console.myBots} />
@@ -476,6 +472,12 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 							<ProfileTab key={taken.round} bot={bot} onSaved={put} confirmNow={taken.after === "delete"} onConfirmShown={shown} />
 						) : tab === "token" ? (
 							<TokenTab key={taken.round} bot={bot} onIssued={put} confirmNow={taken.after === "token"} onConfirmShown={shown} />
+						) : tab === "updates" ? (
+							<UpdatesTab bot={bot} onChanged={put} />
+						) : tab === "dead-letters" ? (
+							<DeadLettersTab bot={bot} />
+						) : tab === "stats" ? (
+							<StatsTab bot={bot} />
 						) : (
 							<CommandsTab bot={bot} onSaved={put} />
 						)}
@@ -820,9 +822,22 @@ function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { on
 			</div>
 			<div className="card side-card">
 				<h2>{t.token.pollTitle}</h2>
-				<p>{bot.lastUpdateAt > 0 ? t.token.lastUpdate(when(bot.lastUpdateAt, locale)) : t.token.neverUpdated}</p>
-				<p>{t.token.pollNote}</p>
-				<pre className="snippet">{snippet}</pre>
+				{bot.webhook ? (
+					<>
+						<p>{t.token.webhookNote}</p>
+						<div>
+							<Link to={paths.consoleBot(bot.id, "updates")} className="btn btn-sm">
+								{t.token.deliverySettings}
+							</Link>
+						</div>
+					</>
+				) : (
+					<>
+						<p>{bot.lastUpdateAt > 0 ? t.token.lastUpdate(when(bot.lastUpdateAt, locale)) : t.token.neverUpdated}</p>
+						<p>{t.token.pollNote}</p>
+						<pre className="snippet">{snippet}</pre>
+					</>
+				)}
 			</div>
 			{dialog === "confirm" &&
 				(bot.hasToken ? (

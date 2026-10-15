@@ -48,6 +48,24 @@ const (
 	// BotAdminServiceDeleteBotProcedure is the fully-qualified name of the BotAdminService's DeleteBot
 	// RPC.
 	BotAdminServiceDeleteBotProcedure = "/app.v1.BotAdminService/DeleteBot"
+	// BotAdminServiceGetBotDeliveryProcedure is the fully-qualified name of the BotAdminService's
+	// GetBotDelivery RPC.
+	BotAdminServiceGetBotDeliveryProcedure = "/app.v1.BotAdminService/GetBotDelivery"
+	// BotAdminServiceSetBotWebhookProcedure is the fully-qualified name of the BotAdminService's
+	// SetBotWebhook RPC.
+	BotAdminServiceSetBotWebhookProcedure = "/app.v1.BotAdminService/SetBotWebhook"
+	// BotAdminServiceDeleteBotWebhookProcedure is the fully-qualified name of the BotAdminService's
+	// DeleteBotWebhook RPC.
+	BotAdminServiceDeleteBotWebhookProcedure = "/app.v1.BotAdminService/DeleteBotWebhook"
+	// BotAdminServiceListBotDeadLettersProcedure is the fully-qualified name of the BotAdminService's
+	// ListBotDeadLetters RPC.
+	BotAdminServiceListBotDeadLettersProcedure = "/app.v1.BotAdminService/ListBotDeadLetters"
+	// BotAdminServiceRetryBotDeadLettersProcedure is the fully-qualified name of the BotAdminService's
+	// RetryBotDeadLetters RPC.
+	BotAdminServiceRetryBotDeadLettersProcedure = "/app.v1.BotAdminService/RetryBotDeadLetters"
+	// BotAdminServiceDiscardBotDeadLettersProcedure is the fully-qualified name of the
+	// BotAdminService's DiscardBotDeadLetters RPC.
+	BotAdminServiceDiscardBotDeadLettersProcedure = "/app.v1.BotAdminService/DiscardBotDeadLetters"
 )
 
 // BotAdminServiceClient is a client for the app.v1.BotAdminService service.
@@ -66,6 +84,22 @@ type BotAdminServiceClient interface {
 	// dropped; its messages stay. The username stays reserved. Needs a recent
 	// sign-in.
 	DeleteBot(context.Context, *connect.Request[v1.DeleteBotRequest]) (*connect.Response[v1.DeleteBotResponse], error)
+	// How the bot receives updates (webhook or long poll), the delivery
+	// state and the counters of the last 24 hours.
+	GetBotDelivery(context.Context, *connect.Request[v1.GetBotDeliveryRequest]) (*connect.Response[v1.GetBotDeliveryResponse], error)
+	// Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
+	// POSTed to it and long polls get 409 conflict.
+	SetBotWebhook(context.Context, *connect.Request[v1.SetBotWebhookRequest]) (*connect.Response[v1.SetBotWebhookResponse], error)
+	// Removes the webhook; the bot fetches updates by long poll again.
+	DeleteBotWebhook(context.Context, *connect.Request[v1.DeleteBotWebhookRequest]) (*connect.Response[v1.DeleteBotWebhookResponse], error)
+	// Updates given up after 10 failed attempts, newest first (at most 100),
+	// kept until they expire (24 hours; callbacks 15 minutes).
+	ListBotDeadLetters(context.Context, *connect.Request[v1.ListBotDeadLettersRequest]) (*connect.Response[v1.ListBotDeadLettersResponse], error)
+	// Gives dead letters one more attempt each; a failure dead-letters them
+	// again.
+	RetryBotDeadLetters(context.Context, *connect.Request[v1.RetryBotDeadLettersRequest]) (*connect.Response[v1.RetryBotDeadLettersResponse], error)
+	// Drops dead letters for good.
+	DiscardBotDeadLetters(context.Context, *connect.Request[v1.DiscardBotDeadLettersRequest]) (*connect.Response[v1.DiscardBotDeadLettersResponse], error)
 }
 
 // NewBotAdminServiceClient constructs a client for the app.v1.BotAdminService service. By default,
@@ -109,16 +143,58 @@ func NewBotAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(botAdminServiceMethods.ByName("DeleteBot")),
 			connect.WithClientOptions(opts...),
 		),
+		getBotDelivery: connect.NewClient[v1.GetBotDeliveryRequest, v1.GetBotDeliveryResponse](
+			httpClient,
+			baseURL+BotAdminServiceGetBotDeliveryProcedure,
+			connect.WithSchema(botAdminServiceMethods.ByName("GetBotDelivery")),
+			connect.WithClientOptions(opts...),
+		),
+		setBotWebhook: connect.NewClient[v1.SetBotWebhookRequest, v1.SetBotWebhookResponse](
+			httpClient,
+			baseURL+BotAdminServiceSetBotWebhookProcedure,
+			connect.WithSchema(botAdminServiceMethods.ByName("SetBotWebhook")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteBotWebhook: connect.NewClient[v1.DeleteBotWebhookRequest, v1.DeleteBotWebhookResponse](
+			httpClient,
+			baseURL+BotAdminServiceDeleteBotWebhookProcedure,
+			connect.WithSchema(botAdminServiceMethods.ByName("DeleteBotWebhook")),
+			connect.WithClientOptions(opts...),
+		),
+		listBotDeadLetters: connect.NewClient[v1.ListBotDeadLettersRequest, v1.ListBotDeadLettersResponse](
+			httpClient,
+			baseURL+BotAdminServiceListBotDeadLettersProcedure,
+			connect.WithSchema(botAdminServiceMethods.ByName("ListBotDeadLetters")),
+			connect.WithClientOptions(opts...),
+		),
+		retryBotDeadLetters: connect.NewClient[v1.RetryBotDeadLettersRequest, v1.RetryBotDeadLettersResponse](
+			httpClient,
+			baseURL+BotAdminServiceRetryBotDeadLettersProcedure,
+			connect.WithSchema(botAdminServiceMethods.ByName("RetryBotDeadLetters")),
+			connect.WithClientOptions(opts...),
+		),
+		discardBotDeadLetters: connect.NewClient[v1.DiscardBotDeadLettersRequest, v1.DiscardBotDeadLettersResponse](
+			httpClient,
+			baseURL+BotAdminServiceDiscardBotDeadLettersProcedure,
+			connect.WithSchema(botAdminServiceMethods.ByName("DiscardBotDeadLetters")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // botAdminServiceClient implements BotAdminServiceClient.
 type botAdminServiceClient struct {
-	listMyBots    *connect.Client[v1.ListMyBotsRequest, v1.ListMyBotsResponse]
-	createBot     *connect.Client[v1.CreateBotRequest, v1.CreateBotResponse]
-	updateBot     *connect.Client[v1.UpdateBotRequest, v1.UpdateBotResponse]
-	resetBotToken *connect.Client[v1.ResetBotTokenRequest, v1.ResetBotTokenResponse]
-	deleteBot     *connect.Client[v1.DeleteBotRequest, v1.DeleteBotResponse]
+	listMyBots            *connect.Client[v1.ListMyBotsRequest, v1.ListMyBotsResponse]
+	createBot             *connect.Client[v1.CreateBotRequest, v1.CreateBotResponse]
+	updateBot             *connect.Client[v1.UpdateBotRequest, v1.UpdateBotResponse]
+	resetBotToken         *connect.Client[v1.ResetBotTokenRequest, v1.ResetBotTokenResponse]
+	deleteBot             *connect.Client[v1.DeleteBotRequest, v1.DeleteBotResponse]
+	getBotDelivery        *connect.Client[v1.GetBotDeliveryRequest, v1.GetBotDeliveryResponse]
+	setBotWebhook         *connect.Client[v1.SetBotWebhookRequest, v1.SetBotWebhookResponse]
+	deleteBotWebhook      *connect.Client[v1.DeleteBotWebhookRequest, v1.DeleteBotWebhookResponse]
+	listBotDeadLetters    *connect.Client[v1.ListBotDeadLettersRequest, v1.ListBotDeadLettersResponse]
+	retryBotDeadLetters   *connect.Client[v1.RetryBotDeadLettersRequest, v1.RetryBotDeadLettersResponse]
+	discardBotDeadLetters *connect.Client[v1.DiscardBotDeadLettersRequest, v1.DiscardBotDeadLettersResponse]
 }
 
 // ListMyBots calls app.v1.BotAdminService.ListMyBots.
@@ -146,6 +222,36 @@ func (c *botAdminServiceClient) DeleteBot(ctx context.Context, req *connect.Requ
 	return c.deleteBot.CallUnary(ctx, req)
 }
 
+// GetBotDelivery calls app.v1.BotAdminService.GetBotDelivery.
+func (c *botAdminServiceClient) GetBotDelivery(ctx context.Context, req *connect.Request[v1.GetBotDeliveryRequest]) (*connect.Response[v1.GetBotDeliveryResponse], error) {
+	return c.getBotDelivery.CallUnary(ctx, req)
+}
+
+// SetBotWebhook calls app.v1.BotAdminService.SetBotWebhook.
+func (c *botAdminServiceClient) SetBotWebhook(ctx context.Context, req *connect.Request[v1.SetBotWebhookRequest]) (*connect.Response[v1.SetBotWebhookResponse], error) {
+	return c.setBotWebhook.CallUnary(ctx, req)
+}
+
+// DeleteBotWebhook calls app.v1.BotAdminService.DeleteBotWebhook.
+func (c *botAdminServiceClient) DeleteBotWebhook(ctx context.Context, req *connect.Request[v1.DeleteBotWebhookRequest]) (*connect.Response[v1.DeleteBotWebhookResponse], error) {
+	return c.deleteBotWebhook.CallUnary(ctx, req)
+}
+
+// ListBotDeadLetters calls app.v1.BotAdminService.ListBotDeadLetters.
+func (c *botAdminServiceClient) ListBotDeadLetters(ctx context.Context, req *connect.Request[v1.ListBotDeadLettersRequest]) (*connect.Response[v1.ListBotDeadLettersResponse], error) {
+	return c.listBotDeadLetters.CallUnary(ctx, req)
+}
+
+// RetryBotDeadLetters calls app.v1.BotAdminService.RetryBotDeadLetters.
+func (c *botAdminServiceClient) RetryBotDeadLetters(ctx context.Context, req *connect.Request[v1.RetryBotDeadLettersRequest]) (*connect.Response[v1.RetryBotDeadLettersResponse], error) {
+	return c.retryBotDeadLetters.CallUnary(ctx, req)
+}
+
+// DiscardBotDeadLetters calls app.v1.BotAdminService.DiscardBotDeadLetters.
+func (c *botAdminServiceClient) DiscardBotDeadLetters(ctx context.Context, req *connect.Request[v1.DiscardBotDeadLettersRequest]) (*connect.Response[v1.DiscardBotDeadLettersResponse], error) {
+	return c.discardBotDeadLetters.CallUnary(ctx, req)
+}
+
 // BotAdminServiceHandler is an implementation of the app.v1.BotAdminService service.
 type BotAdminServiceHandler interface {
 	// The caller's bots, oldest first.
@@ -162,6 +268,22 @@ type BotAdminServiceHandler interface {
 	// dropped; its messages stay. The username stays reserved. Needs a recent
 	// sign-in.
 	DeleteBot(context.Context, *connect.Request[v1.DeleteBotRequest]) (*connect.Response[v1.DeleteBotResponse], error)
+	// How the bot receives updates (webhook or long poll), the delivery
+	// state and the counters of the last 24 hours.
+	GetBotDelivery(context.Context, *connect.Request[v1.GetBotDeliveryRequest]) (*connect.Response[v1.GetBotDeliveryResponse], error)
+	// Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
+	// POSTed to it and long polls get 409 conflict.
+	SetBotWebhook(context.Context, *connect.Request[v1.SetBotWebhookRequest]) (*connect.Response[v1.SetBotWebhookResponse], error)
+	// Removes the webhook; the bot fetches updates by long poll again.
+	DeleteBotWebhook(context.Context, *connect.Request[v1.DeleteBotWebhookRequest]) (*connect.Response[v1.DeleteBotWebhookResponse], error)
+	// Updates given up after 10 failed attempts, newest first (at most 100),
+	// kept until they expire (24 hours; callbacks 15 minutes).
+	ListBotDeadLetters(context.Context, *connect.Request[v1.ListBotDeadLettersRequest]) (*connect.Response[v1.ListBotDeadLettersResponse], error)
+	// Gives dead letters one more attempt each; a failure dead-letters them
+	// again.
+	RetryBotDeadLetters(context.Context, *connect.Request[v1.RetryBotDeadLettersRequest]) (*connect.Response[v1.RetryBotDeadLettersResponse], error)
+	// Drops dead letters for good.
+	DiscardBotDeadLetters(context.Context, *connect.Request[v1.DiscardBotDeadLettersRequest]) (*connect.Response[v1.DiscardBotDeadLettersResponse], error)
 }
 
 // NewBotAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -201,6 +323,42 @@ func NewBotAdminServiceHandler(svc BotAdminServiceHandler, opts ...connect.Handl
 		connect.WithSchema(botAdminServiceMethods.ByName("DeleteBot")),
 		connect.WithHandlerOptions(opts...),
 	)
+	botAdminServiceGetBotDeliveryHandler := connect.NewUnaryHandler(
+		BotAdminServiceGetBotDeliveryProcedure,
+		svc.GetBotDelivery,
+		connect.WithSchema(botAdminServiceMethods.ByName("GetBotDelivery")),
+		connect.WithHandlerOptions(opts...),
+	)
+	botAdminServiceSetBotWebhookHandler := connect.NewUnaryHandler(
+		BotAdminServiceSetBotWebhookProcedure,
+		svc.SetBotWebhook,
+		connect.WithSchema(botAdminServiceMethods.ByName("SetBotWebhook")),
+		connect.WithHandlerOptions(opts...),
+	)
+	botAdminServiceDeleteBotWebhookHandler := connect.NewUnaryHandler(
+		BotAdminServiceDeleteBotWebhookProcedure,
+		svc.DeleteBotWebhook,
+		connect.WithSchema(botAdminServiceMethods.ByName("DeleteBotWebhook")),
+		connect.WithHandlerOptions(opts...),
+	)
+	botAdminServiceListBotDeadLettersHandler := connect.NewUnaryHandler(
+		BotAdminServiceListBotDeadLettersProcedure,
+		svc.ListBotDeadLetters,
+		connect.WithSchema(botAdminServiceMethods.ByName("ListBotDeadLetters")),
+		connect.WithHandlerOptions(opts...),
+	)
+	botAdminServiceRetryBotDeadLettersHandler := connect.NewUnaryHandler(
+		BotAdminServiceRetryBotDeadLettersProcedure,
+		svc.RetryBotDeadLetters,
+		connect.WithSchema(botAdminServiceMethods.ByName("RetryBotDeadLetters")),
+		connect.WithHandlerOptions(opts...),
+	)
+	botAdminServiceDiscardBotDeadLettersHandler := connect.NewUnaryHandler(
+		BotAdminServiceDiscardBotDeadLettersProcedure,
+		svc.DiscardBotDeadLetters,
+		connect.WithSchema(botAdminServiceMethods.ByName("DiscardBotDeadLetters")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.BotAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BotAdminServiceListMyBotsProcedure:
@@ -213,6 +371,18 @@ func NewBotAdminServiceHandler(svc BotAdminServiceHandler, opts ...connect.Handl
 			botAdminServiceResetBotTokenHandler.ServeHTTP(w, r)
 		case BotAdminServiceDeleteBotProcedure:
 			botAdminServiceDeleteBotHandler.ServeHTTP(w, r)
+		case BotAdminServiceGetBotDeliveryProcedure:
+			botAdminServiceGetBotDeliveryHandler.ServeHTTP(w, r)
+		case BotAdminServiceSetBotWebhookProcedure:
+			botAdminServiceSetBotWebhookHandler.ServeHTTP(w, r)
+		case BotAdminServiceDeleteBotWebhookProcedure:
+			botAdminServiceDeleteBotWebhookHandler.ServeHTTP(w, r)
+		case BotAdminServiceListBotDeadLettersProcedure:
+			botAdminServiceListBotDeadLettersHandler.ServeHTTP(w, r)
+		case BotAdminServiceRetryBotDeadLettersProcedure:
+			botAdminServiceRetryBotDeadLettersHandler.ServeHTTP(w, r)
+		case BotAdminServiceDiscardBotDeadLettersProcedure:
+			botAdminServiceDiscardBotDeadLettersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -240,4 +410,28 @@ func (UnimplementedBotAdminServiceHandler) ResetBotToken(context.Context, *conne
 
 func (UnimplementedBotAdminServiceHandler) DeleteBot(context.Context, *connect.Request[v1.DeleteBotRequest]) (*connect.Response[v1.DeleteBotResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.DeleteBot is not implemented"))
+}
+
+func (UnimplementedBotAdminServiceHandler) GetBotDelivery(context.Context, *connect.Request[v1.GetBotDeliveryRequest]) (*connect.Response[v1.GetBotDeliveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.GetBotDelivery is not implemented"))
+}
+
+func (UnimplementedBotAdminServiceHandler) SetBotWebhook(context.Context, *connect.Request[v1.SetBotWebhookRequest]) (*connect.Response[v1.SetBotWebhookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.SetBotWebhook is not implemented"))
+}
+
+func (UnimplementedBotAdminServiceHandler) DeleteBotWebhook(context.Context, *connect.Request[v1.DeleteBotWebhookRequest]) (*connect.Response[v1.DeleteBotWebhookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.DeleteBotWebhook is not implemented"))
+}
+
+func (UnimplementedBotAdminServiceHandler) ListBotDeadLetters(context.Context, *connect.Request[v1.ListBotDeadLettersRequest]) (*connect.Response[v1.ListBotDeadLettersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.ListBotDeadLetters is not implemented"))
+}
+
+func (UnimplementedBotAdminServiceHandler) RetryBotDeadLetters(context.Context, *connect.Request[v1.RetryBotDeadLettersRequest]) (*connect.Response[v1.RetryBotDeadLettersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.RetryBotDeadLetters is not implemented"))
+}
+
+func (UnimplementedBotAdminServiceHandler) DiscardBotDeadLetters(context.Context, *connect.Request[v1.DiscardBotDeadLettersRequest]) (*connect.Response[v1.DiscardBotDeadLettersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotAdminService.DiscardBotDeadLetters is not implemented"))
 }

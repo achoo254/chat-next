@@ -100,12 +100,17 @@ export function parseGetSelf(body: unknown): SelfUser {
 	};
 }
 
-/** The signed-in user; RpcError with Unauthenticated when there is no session. */
+/**
+ * The signed-in user; RpcError with Unauthenticated when there is no session.
+ * The request allows a signed-out answer (allow_signed_out): the server then
+ * answers 200 without a user instead of 401, so a signed-out start logs no
+ * failed request in the browser console.
+ */
 export async function fetchSelf(rpcFetch: typeof globalThis.fetch): Promise<SelfUser> {
 	const response = await rpcFetch(GET_SELF_URL, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1" },
-		body: "{}",
+		body: '{"allowSignedOut":true}',
 	});
 	let body: unknown = null;
 	try {
@@ -118,5 +123,6 @@ export async function fetchSelf(rpcFetch: typeof globalThis.fetch): Promise<Self
 		const message = isRecord(body) && typeof body.message === "string" ? body.message : `HTTP ${response.status}`;
 		throw new RpcError(code ?? codeOfStatus(response.status), message);
 	}
+	if (isRecord(body) && body.user === undefined) throw new RpcError(Code.Unauthenticated, "signed out");
 	return parseGetSelf(body);
 }

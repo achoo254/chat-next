@@ -397,7 +397,19 @@ const (
 	BotUpdateMessage       = "message"
 	BotUpdateMessageEdited = "message_edited"
 	BotUpdateCallback      = "callback"
+	// BotUpdateChannelPost is a new post of a channel the bot administers;
+	// an edited post is a BotUpdateMessageEdited of the channel.
+	BotUpdateChannelPost = "channel_post"
 )
+
+// BotRemoval tells that a bot is no longer a member of a chat as of an
+// outbox row (kicked or left): its updates of that chat cut before the row
+// are not delivered any more.
+type BotRemoval struct {
+	BotID    int64
+	ChatID   int64
+	OutboxID int64
+}
 
 // BotUpdate is one update for one bot cut from an outbox row, rendered as
 // the bot sees it.
@@ -441,9 +453,9 @@ type botRef struct {
 
 // BotUpdates cuts the updates for bots out of outbox rows: new and edited
 // messages of private chats and groups the bots are in (privacy mode
-// applied; never the bot's own messages nor those of other bots) and
-// presses of their buttons. Channels come with channel posts in a later
-// release. Rows that concern no bot cost one query in total.
+// applied; never the bot's own messages nor those of other bots), posts of
+// channels the bots administer, and presses of their buttons. Rows that
+// concern no bot cost one query in total.
 func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate, error) {
 	var chatIDs, pressRows []int64
 	for _, r := range rows {
@@ -486,8 +498,9 @@ func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate
 	return out, nil
 }
 
-// botMembers returns the live bots that are current members of chats
-// (private chats and groups; channels are not served yet).
+// botMembers returns the live bots that are current members of chats:
+// private chats and groups, and channels where the bot is an admin (a
+// channel's subscribers do not see posts as updates).
 func (s *Service) botMembers(ctx context.Context, chatIDs []int64) (map[int64][]botMember, error) {
 	out := map[int64][]botMember{}
 	if len(chatIDs) == 0 {
@@ -498,7 +511,8 @@ func (s *Service) botMembers(ctx context.Context, chatIDs []int64) (map[int64][]
 		FROM chat_members m JOIN bots b ON b.user_id = m.user_id JOIN users u ON u.id = b.user_id
 		JOIN chats c ON c.id = m.chat_id
 		WHERE m.chat_id = ANY($1) AND m.left_at IS NULL AND b.deleted_at IS NULL AND b.tenant_id = $2
-			AND c.type IN ('private', 'group') AND c.deleted_at IS NULL`, chatIDs, s.cfg.TenantID)
+			AND c.deleted_at IS NULL
+			AND (c.type IN ('private', 'group') OR (c.type = 'channel' AND m.role IN ('admin', 'owner')))`, chatIDs, s.cfg.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("chat: bot members: %w", err)
 	}
@@ -666,7 +680,11 @@ func (s *Service) botMessageUpdates(ctx context.Context, refs []botRef, members 
 		if c.Type == typeGroup && member.privacy && !s.reachesPrivateBot(m, member, replied) {
 			continue
 		}
-		batches.add(ref.bot, c, m, BotUpdate{BotID: ref.bot, OutboxID: ref.row.ID, Kind: ref.kind, At: ref.row.CreatedAt})
+		kind := ref.kind
+		if c.Type == typeChannel && kind == BotUpdateMessage {
+			kind = BotUpdateChannelPost
+		}
+		batches.add(ref.bot, c, m, BotUpdate{BotID: ref.bot, OutboxID: ref.row.ID, Kind: kind, At: ref.row.CreatedAt})
 	}
 	return s.renderBotBatches(ctx, batches)
 }
@@ -869,6 +887,43 @@ func (s *Service) botCallbackUpdates(ctx context.Context, rows []OutboxRow, ids 
 		batch.users = append(batch.users, p.cb.FromID)
 	}
 	return s.renderBotBatches(ctx, batches)
+}
+
+// BotRemovals reads, for the member_removed rows among rows, which bots
+// are not members of those chats any more. A bot that was added back since
+// is a member again and keeps its updates.
+func (s *Service) BotRemovals(ctx context.Context, rows []OutboxRow) ([]BotRemoval, error) {
+	last := map[int64]int64{}
+	for _, r := range rows {
+		if r.Kind == kindMemberRemoved && r.ChatID != 0 {
+			last[r.ChatID] = max(last[r.ChatID], r.ID)
+		}
+	}
+	if len(last) == 0 {
+		return nil, nil
+	}
+	chats := make([]int64, 0, len(last))
+	for id := range last {
+		chats = append(chats, id)
+	}
+	slices.Sort(chats)
+	list, err := s.pool.Query(ctx, `
+		SELECT m.chat_id, m.user_id FROM chat_members m JOIN bots b ON b.user_id = m.user_id
+		WHERE m.chat_id = ANY($1) AND m.left_at IS NOT NULL AND b.tenant_id = $2 ORDER BY m.chat_id, m.user_id`,
+		chats, s.cfg.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("chat: removed bots: %w", err)
+	}
+	out, err := pgx.CollectRows(list, func(r pgx.CollectableRow) (BotRemoval, error) {
+		var b BotRemoval
+		err := r.Scan(&b.ChatID, &b.BotID)
+		b.OutboxID = last[b.ChatID]
+		return b, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("chat: removed bots: %w", err)
+	}
+	return out, nil
 }
 
 // botsAmong returns which of ids are bots.

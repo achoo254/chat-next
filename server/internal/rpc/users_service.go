@@ -35,11 +35,15 @@ func selfUser(u store.User) *appv1.User {
 	}
 }
 
-// GetSelf returns the caller's own user.
+// GetSelf returns the caller's own user. Without a session it answers
+// Unauthenticated, or an empty response when the request allows signing out.
 func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.GetSelfRequest]) (*connect.Response[appv1.GetSelfResponse], error) {
-	sess, err := mustSession(ctx)
-	if err != nil {
-		return nil, err
+	sess, ok := sessionFrom(ctx)
+	if !ok {
+		if req.Msg.GetAllowSignedOut() {
+			return connect.NewResponse(&appv1.GetSelfResponse{}), nil
+		}
+		return nil, errUnauthenticated()
 	}
 	u, err := s.store.UserByID(ctx, s.tenantID, sess.UserID)
 	if err != nil {

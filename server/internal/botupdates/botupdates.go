@@ -15,14 +15,19 @@
 // Commits of the chat core kick the consumer right away (the after-commit
 // path); a slow tick picks up gaps and rows written elsewhere.
 //
-// Bots fetch updates by long poll (Poll). A newer poll of the same bot ends
-// the older one with ErrConflict. Waiting is woken in process when updates
-// are stored, with a periodic recheck of the database, which stays the
-// source of truth. Updates are kept 24 hours (callbacks 15 minutes); a
-// poll with a higher offset acknowledges them (they are no longer returned).
+// Bots fetch updates by long poll (Poll) or get them POSTed to their
+// webhook (webhook.go, dispatch.go). A newer poll of the same bot ends the
+// older one with ErrConflict, and so does setting a webhook; a poll while a
+// webhook is set fails with ErrConflict. Waiting is woken in process when
+// updates are stored, with a periodic recheck of the database, which stays
+// the source of truth. Updates are kept 24 hours (callbacks 15 minutes); a
+// poll with a higher offset acknowledges them, a 2xx answer of the webhook
+// acknowledges one (they are no longer returned). When a bot leaves or is
+// removed from a chat, its pending updates of that chat are dropped.
 //
-// The 409 single-poller rule and the in-process wake-ups assume one api
-// process serves the Bot API of a tenant (server/README.md).
+// The 409 single-poller rule, the in-process wake-ups and the webhook
+// dispatcher assume one api process serves the Bot API of a tenant
+// (server/README.md).
 package botupdates
 
 import (
@@ -40,6 +45,7 @@ import (
 	"app.local/server/internal/botapi/wire"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/entities"
+	"app.local/server/internal/sealbox"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -73,10 +79,17 @@ const (
 	poisonPasses  = 3
 	answerTextMax = 200
 	answerURLMax  = 2048
+	// countersKept is how long delivery counters are kept.
+	countersKept = 48 * time.Hour
 )
 
-// ErrConflict ends a long poll superseded by a newer poll of the same bot.
+// ErrConflict ends a long poll superseded by a newer poll of the same bot
+// or by a webhook, and refuses a poll while the bot has a webhook.
 var ErrConflict = errors.New("botupdates: a newer poll of this bot is running")
+
+// ErrWebhookSet refuses a poll while the bot has a webhook (it wraps
+// ErrConflict).
+var ErrWebhookSet = fmt.Errorf("%w: updates go to the webhook; delete it to poll", ErrConflict)
 
 // ErrUnavailable refuses a poll once the process shuts down; the bot
 // retries after RetryAfterShutdown (on another process after the deploy).
@@ -108,6 +121,10 @@ type Service struct {
 	// skipped counts the rows given up since start.
 	failures map[int64]int
 	skipped  int64
+
+	// webhooks delivers to bots with a webhook; nil until EnableWebhooks.
+	webhooks *dispatcher
+	box      *sealbox.Box
 
 	mu        sync.Mutex
 	wake      map[int64]chan struct{}
@@ -150,8 +167,18 @@ func (s *Service) ReleasePolls() {
 	s.closeOnce.Do(func() { close(s.closing) })
 }
 
-// Run consumes the outbox until ctx ends.
+// Run consumes the outbox until ctx ends, and runs the webhook dispatcher
+// when webhooks are enabled (it drains its in-flight requests before Run
+// returns).
 func (s *Service) Run(ctx context.Context) {
+	if s.webhooks != nil {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			s.webhooks.run(ctx)
+		}()
+		defer func() { <-done }()
+	}
 	ticker := time.NewTicker(tickEvery)
 	defer ticker.Stop()
 	cleanup := time.NewTicker(cleanupEvery)
@@ -232,6 +259,9 @@ func (s *Service) pass(ctx context.Context) (int, error) {
 		if stored, err = s.store(ctx, tx, updates); err != nil {
 			return err
 		}
+		if err := s.dropRemoved(ctx, tx, all); err != nil {
+			return err
+		}
 		low := s.high
 		for id, first := range s.pending {
 			if now.Sub(first) > gapTTL {
@@ -289,28 +319,32 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 	}
 	slices.Sort(bots)
 	bots = slices.Compact(bots)
+	// allowed_updates applies while a webhook is set (empty: every kind).
 	rows, err := tx.Query(ctx, `
-		SELECT user_id, next_update_id FROM bots WHERE user_id = ANY($1) AND deleted_at IS NULL ORDER BY user_id FOR UPDATE`, bots)
+		SELECT user_id, next_update_id, CASE WHEN webhook_url IS NULL THEN '{}' ELSE allowed_updates END
+		FROM bots WHERE user_id = ANY($1) AND deleted_at IS NULL ORDER BY user_id FOR UPDATE`, bots)
 	if err != nil {
 		return nil, fmt.Errorf("botupdates: lock bots: %w", err)
 	}
 	next := map[int64]int64{}
+	allowed := map[int64][]string{}
 	for rows.Next() {
 		var id, n int64
-		if err := rows.Scan(&id, &n); err != nil {
+		var kinds []string
+		if err := rows.Scan(&id, &n, &kinds); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("botupdates: lock bots: %w", err)
 		}
-		next[id] = n
+		next[id], allowed[id] = n, kinds
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("botupdates: lock bots: %w", err)
 	}
-	changed := map[int64]bool{}
+	received := map[int64]int64{}
 	for _, u := range updates {
 		id, ok := next[u.BotID]
-		if !ok {
+		if !ok || (len(allowed[u.BotID]) > 0 && !slices.Contains(allowed[u.BotID], u.Kind)) {
 			continue
 		}
 		payload, err := payloadOf(u)
@@ -323,21 +357,21 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 			ttl = CallbackTTL
 		}
 		tag, err := tx.Exec(ctx, `
-			INSERT INTO bot_updates (bot_id, update_id, outbox_id, kind, seq, chat_id, payload, expires_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			INSERT INTO bot_updates (bot_id, update_id, outbox_id, kind, seq, chat_id, payload, expires_at, queue_key)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			ON CONFLICT ON CONSTRAINT bot_updates_outbox_key DO NOTHING`,
-			u.BotID, id, u.OutboxID, u.Kind, u.Message.GetSeq(), u.Chat.GetId(), payload, u.At.Add(ttl))
+			u.BotID, id, u.OutboxID, u.Kind, u.Message.GetSeq(), u.Chat.GetId(), payload, u.At.Add(ttl), queueKey(u))
 		if err != nil {
 			return nil, fmt.Errorf("botupdates: store update: %w", err)
 		}
 		if tag.RowsAffected() == 1 {
 			next[u.BotID] = id + 1
-			changed[u.BotID] = true
+			received[u.BotID]++
 		}
 	}
-	var ids, values []int64
-	for id := range changed {
-		ids, values = append(ids, id), append(values, next[id])
+	var ids, values, counts []int64
+	for id, n := range received {
+		ids, values, counts = append(ids, id), append(values, next[id]), append(counts, n)
 	}
 	if len(ids) > 0 {
 		if _, err := tx.Exec(ctx, `
@@ -345,9 +379,44 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 			ids, values); err != nil {
 			return nil, fmt.Errorf("botupdates: advance update ids: %w", err)
 		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO bot_delivery_counters (bot_id, hour, received)
+			SELECT x.id, date_trunc('hour', now()), x.n FROM unnest($1::bigint[], $2::bigint[]) AS x(id, n)
+			ON CONFLICT (bot_id, hour) DO UPDATE SET received = bot_delivery_counters.received + excluded.received`,
+			ids, counts); err != nil {
+			return nil, fmt.Errorf("botupdates: count received updates: %w", err)
+		}
 	}
 	slices.Sort(ids)
 	return ids, nil
+}
+
+// queueKey is the delivery queue of an update: updates of one queue reach a
+// webhook one at a time, in update_id order. Messages queue by chat,
+// button presses by the user who pressed (negative, apart from chat ids).
+func queueKey(u chat.BotUpdate) int64 {
+	if u.Kind == chat.BotUpdateCallback && u.Callback != nil {
+		return -u.Callback.FromID
+	}
+	return u.Chat.GetId()
+}
+
+// dropRemoved acknowledges, without delivering, the pending updates of
+// chats bots were removed from (kicked or left) that were cut before the
+// removal; dead letters of those chats go too.
+func (s *Service) dropRemoved(ctx context.Context, tx pgx.Tx, rows []chat.OutboxRow) error {
+	removals, err := s.chat.BotRemovals(ctx, rows)
+	if err != nil {
+		return err
+	}
+	for _, r := range removals {
+		if _, err := tx.Exec(ctx, `
+			UPDATE bot_updates SET acked = true WHERE bot_id = $1 AND chat_id = $2 AND outbox_id < $3 AND NOT acked`,
+			r.BotID, r.ChatID, r.OutboxID); err != nil {
+			return fmt.Errorf("botupdates: drop updates of a left chat: %w", err)
+		}
+	}
+	return nil
 }
 
 // updatesOf cuts the updates of rows (in id order). When the batch fails,
@@ -411,6 +480,7 @@ func (s *Service) cleanup(ctx context.Context) {
 	for _, sql := range []string{
 		`DELETE FROM bot_updates WHERE expires_at < now()`,
 		`DELETE FROM bot_callbacks WHERE created_at < now() - interval '1 day'`,
+		fmt.Sprintf(`DELETE FROM bot_delivery_counters WHERE hour < now() - interval '%d seconds'`, int(countersKept.Seconds())),
 	} {
 		if _, err := s.pool.Exec(ctx, sql); err != nil && ctx.Err() == nil {
 			s.logger.Warn("bot update cleanup failed", "err", err)
@@ -445,23 +515,45 @@ func (s *Service) wakeChan(botID int64) chan struct{} {
 
 func (s *Service) notify(botID int64) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if ch := s.wake[botID]; ch != nil {
 		close(ch)
 		delete(s.wake, botID)
+	}
+	s.mu.Unlock()
+	if s.webhooks != nil {
+		s.webhooks.wake(botID)
+	}
+}
+
+// endPoll ends the bot's waiting poll with ErrConflict (a webhook was set).
+func (s *Service) endPoll(botID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p := s.polls[botID]; p != nil {
+		close(p.superseded)
+		delete(s.polls, botID)
 	}
 }
 
 // Poll acknowledges every update below offset (when offset > 0) and returns
 // up to limit updates from offset on, waiting up to timeout for the first
-// one. A newer Poll of the same bot ends this one with ErrConflict; once
-// the process shuts down a waiting poll ends empty and a new one fails with
-// ErrUnavailable.
+// one. A newer Poll of the same bot ends this one with ErrConflict, and so
+// does setting a webhook; while the bot has a webhook Poll fails with
+// ErrWebhookSet. Once the process shuts down a waiting poll ends empty and
+// a new one fails with ErrUnavailable.
 func (s *Service) Poll(ctx context.Context, botID, offset int64, limit int, timeout time.Duration) ([]Update, error) {
 	select {
 	case <-s.closing:
 		return nil, ErrUnavailable
 	default:
+	}
+	var hooked bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM bots WHERE user_id = $1 AND webhook_url IS NOT NULL)`,
+		botID).Scan(&hooked); err != nil {
+		return nil, fmt.Errorf("botupdates: webhook state: %w", err)
+	}
+	if hooked {
+		return nil, ErrWebhookSet
 	}
 	p := &poll{superseded: make(chan struct{})}
 	s.mu.Lock()
@@ -481,7 +573,13 @@ func (s *Service) Poll(ctx context.Context, botID, offset int64, limit int, time
 		// Acknowledged updates stay until they expire: a replay of their
 		// outbox rows must find them (see the package comment).
 		if _, err := s.pool.Exec(ctx, `
-			UPDATE bot_updates SET acked = true WHERE bot_id = $1 AND update_id < $2 AND NOT acked`, botID, offset); err != nil {
+			WITH a AS (
+				UPDATE bot_updates SET acked = true WHERE bot_id = $1 AND update_id < $2 AND NOT acked RETURNING dead_at
+			)
+			INSERT INTO bot_delivery_counters (bot_id, hour, delivered)
+			SELECT $1, date_trunc('hour', now()), count(*) FROM a WHERE dead_at IS NULL HAVING count(*) > 0
+			ON CONFLICT (bot_id, hour) DO UPDATE SET delivered = bot_delivery_counters.delivered + excluded.delivered`,
+			botID, offset); err != nil {
 			return nil, fmt.Errorf("botupdates: acknowledge: %w", err)
 		}
 	}
@@ -518,7 +616,9 @@ func (s *Service) Poll(ctx context.Context, botID, offset int64, limit int, time
 func (s *Service) read(ctx context.Context, botID, offset int64, limit int) ([]Update, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT update_id, kind, payload FROM bot_updates
-		WHERE bot_id = $1 AND update_id >= $2 AND NOT acked AND expires_at > now() ORDER BY update_id LIMIT $3`, botID, offset, limit)
+		WHERE bot_id = $1 AND update_id >= $2 AND NOT acked AND dead_at IS NULL AND expires_at > now()
+			AND NOT EXISTS (SELECT 1 FROM bots WHERE user_id = $1 AND webhook_url IS NOT NULL)
+		ORDER BY update_id LIMIT $3`, botID, offset, limit)
 	if err != nil {
 		return nil, fmt.Errorf("botupdates: read: %w", err)
 	}

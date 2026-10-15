@@ -36,9 +36,13 @@ describe("GetSelf over JSON", () => {
 		expect(requests).toEqual([
 			{
 				url: "/rpc/app.v1.UsersService/GetSelf",
-				init: { method: "POST", headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1" }, body: "{}" },
+				init: { method: "POST", headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1" }, body: '{"allowSignedOut":true}' },
 			},
 		]);
+
+		// The probe allows a signed-out answer: 200 without a user, no failed request.
+		const empty = await fetchSelf(reply(200, "{}")).catch((err: unknown) => err);
+		expect(errorCode(empty)).toBe(Code.Unauthenticated);
 
 		const signedOut = await fetchSelf(reply(401, '{"code":"unauthenticated","message":"no session"}')).catch((err: unknown) => err);
 		expect(signedOut).toBeInstanceOf(RpcError);

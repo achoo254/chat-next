@@ -21,6 +21,7 @@ import { ContactRow } from "./contact-row.tsx";
 import { ChatAvatar, CopyButton, useDomId } from "./parts.tsx";
 import { presenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
+import { usePrivateChatFailure } from "./private-chat-failure.ts";
 
 export function ContactsView({ userId }: { userId: number }) {
 	const copy = useScreensCopy();
@@ -169,13 +170,14 @@ function ContactCard({ userId, listed }: { userId: number; listed: Contact | und
 	const isBlocked = blocked ?? person?.isBlocked ?? user?.isBlocked ?? false;
 	const online = person?.presence.kind === "online";
 
+	const privateChatFailed = usePrivateChatFailure();
 	const message = () => {
 		setOpening(true);
 		remote.createPrivate(userId).then(
 			(chatId) => navigate(paths.chat(chatId)),
-			() => {
+			(err: unknown) => {
 				setOpening(false);
-				toasts.show(copy.common.failed);
+				privateChatFailed(err, userId);
 			},
 		);
 	};

@@ -17,6 +17,8 @@ export const en: MessagingCopy = {
 		you: "You",
 		copied: "Copied",
 		failed: "That did not work. Try again in a few minutes.",
+		privateRefused: "You cannot message this person right now.",
+		privateRefusedInviteHint: "You can invite them to a group with an invite link.",
 		loadFailed: "Could not load data. Check your connection and try again.",
 		loading: "Loading…",
 	},
@@ -234,6 +236,7 @@ export const en: MessagingCopy = {
 		bot: "Bot",
 	},
 	topics: {
+		general: "General",
 		list: (group: string) => `Topics of ${group}`,
 		topicsLabel: "Topics",
 		backToChats: "Back to chats",

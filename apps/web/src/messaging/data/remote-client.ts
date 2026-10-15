@@ -352,9 +352,9 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			}),
 		createPrivate: (userId) =>
 			call(async () => requireChatId((await chats.createPrivate({ userId: BigInt(userId) })).chat, "CreatePrivate")),
-		createGroup: (title, userIds) =>
+		createGroup: (title, userIds, forum = false) =>
 			call(async () => {
-				const response = await chats.createGroup({ title, userIds: userIds.map(BigInt) });
+				const response = await chats.createGroup({ title, userIds: userIds.map(BigInt), forum });
 				return {
 					chatId: requireChatId(response.chat, "CreateGroup"),
 					failures: toFailures(response.failures, response.failedUserIds),
@@ -422,6 +422,10 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					chatId: BigInt(chatId),
 					historyVisibility: shared ? HistoryVisibility.SHARED : HistoryVisibility.SINCE_JOIN,
 				});
+			}),
+		enableTopics: (chatId) =>
+			call(async () => {
+				await chats.updateChatInfo({ chatId: BigInt(chatId), forum: true });
 			}),
 		exportInvite: (chatId, expiresAt, usageLimit) =>
 			call(async () => {

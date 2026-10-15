@@ -21,6 +21,13 @@ var publicProcedures = map[string]bool{
 	appv1connect.ConfigServiceGetAppConfigProcedure:     true,
 }
 
+// signedOutProcedures also run for a caller without a session (no session
+// attached); the handler decides what that caller gets. A caller with a
+// session gets it attached as for every other procedure.
+var signedOutProcedures = map[string]bool{
+	appv1connect.UsersServiceGetSelfProcedure: true,
+}
+
 type sessionKey struct{}
 
 // sessionFrom returns the session the auth interceptor attached.
@@ -95,10 +102,16 @@ func authInterceptor(sessions *auth.Sessions, logger *slog.Logger) connect.Unary
 			}
 			token := auth.SessionToken(req.Header())
 			if token == "" {
+				if signedOutProcedures[procedure] {
+					return next(ctx, req)
+				}
 				return nil, errUnauthenticated()
 			}
 			s, err := sessions.Authenticate(ctx, token)
 			if errors.Is(err, auth.ErrNoSession) {
+				if signedOutProcedures[procedure] {
+					return next(ctx, req)
+				}
 				return nil, errUnauthenticated()
 			}
 			if err != nil {

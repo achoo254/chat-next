@@ -52,6 +52,10 @@ type Config struct {
 	// OperatorUserIDs may use the moderation queue (CHAT_OPERATOR_USER_IDS);
 	// empty by default, so nobody can.
 	OperatorUserIDs []int64
+	// BotWebhookLocal lets bot webhooks use http, loopback addresses and any
+	// port (BOT_WEBHOOK_ALLOW_LOCAL, development only: a local receiver in
+	// development and end-to-end tests).
+	BotWebhookLocal bool
 	// Media is nil when MEDIA_S3_ENDPOINT is unset: media RPCs then answer
 	// failed_precondition and AppConfig.upload_size_max_bytes is 0.
 	Media *Media
@@ -202,6 +206,17 @@ func Load(lookup Lookup) (Config, error) {
 			errs = append(errs, invalid("CHAT_OPERATOR_USER_IDS", err.Error()))
 		}
 		c.OperatorUserIDs = ids
+	}
+
+	switch raw := get("BOT_WEBHOOK_ALLOW_LOCAL"); raw {
+	case "", "false", "0":
+	case "true", "1":
+		if production {
+			errs = append(errs, invalid("BOT_WEBHOOK_ALLOW_LOCAL", "is only allowed when CHAT_ENV=development"))
+		}
+		c.BotWebhookLocal = !production
+	default:
+		errs = append(errs, invalid("BOT_WEBHOOK_ALLOW_LOCAL", "must be true or false"))
 	}
 
 	media, mediaErrs := loadMedia(get, production, c.PublicURL)

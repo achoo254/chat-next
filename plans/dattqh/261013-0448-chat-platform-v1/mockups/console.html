@@ -333,7 +333,7 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 							<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span>Token chỉ hiện một lần. Lưu vào secret manager ngay; rời trang này là không xem lại được.</span></div>
 							<div class="secret"><code>7302199:AAE9qmZr4TfX2LwN8pK3vYc6HsJ0dGuB1o</code><button type="button" class="btn btn-sm" data-toast="Đã sao chép token"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
 							<pre class="snippet">Authorization: Bearer &lt;token&gt;
-POST https://bot.chat.hoandat.com/bot/v1/…</pre>
+POST https://chat.hoandat.com/bot/v1/…</pre>
 							<div class="card-foot"><button type="button" class="btn btn-primary" data-toast="Token đã được che">Tôi đã lưu token</button></div>
 						</div>
 					</div>
@@ -354,7 +354,7 @@ POST https://bot.chat.hoandat.com/bot/v1/…</pre>
 						<div class="card">
 							<h4>Nhận update</h4>
 							<p>Lần cuối nhận update: 15/10 16:40</p>
-							<p class="muted">Bot nhận update bằng long poll: server của bạn tự gọi lấy update, mỗi request chờ tối đa 50 giây.</p>
+							<p class="muted">Bot nhận update bằng long poll: server của bạn tự gọi lấy update, mỗi request chờ tối đa 50 giây. Khi đặt webhook, thẻ này ghi "Bot nhận update qua webhook" và nút "Cài đặt nhận update" mở tab Nhận update.</p>
 						</div>
 					</div>
 				</div>
@@ -381,7 +381,7 @@ POST https://bot.chat.hoandat.com/bot/v1/…</pre>
 <section class="shot" id="webhook">
 	<div class="shot-head">
 		<h2>Nhận update</h2><span class="phase">Phase 15</span>
-		<p>Chọn webhook hoặc long poll (thử bấm). Webhook: URL https, secret, loại update, số kết nối song song, có thể bỏ update đang chờ. Cột phải là trạng thái thật của lần giao: lỗi gần nhất kèm giờ và mã HTTP, số update chờ, độ trễ lần giao gần nhất. Server gọi URL qua lớp chặn địa chỉ nội bộ, nên URL nội bộ bị từ chối ngay khi lưu.</p>
+		<p>Chọn webhook hoặc long poll (thử bấm). Webhook: URL https, secret, loại update, số kết nối song song, có thể bỏ update đang chờ. Chỉ liệt kê loại update server đã giao được; không chọn loại nào là nhận mọi loại. Secret không bao giờ được gửi lại cho trình duyệt: khi webhook đã đặt, ô secret để trống nghĩa là giữ secret đang dùng; "Tạo mới" điền một secret ngẫu nhiên (hiện rõ để bạn sao chép sang server của mình) và chỉ có hiệu lực khi bấm Lưu. Cột phải là trạng thái thật của lần giao: lỗi gần nhất kèm giờ và mã HTTP, số update chờ, lần giao thành công gần nhất và độ trễ của nó, số kết nối đang mở; tự làm mới mỗi vài giây khi tab đang mở. Server gọi URL qua lớp chặn địa chỉ nội bộ, nên URL nội bộ bị từ chối ngay khi lưu ("URL trỏ tới địa chỉ nội bộ"). Chọn Long poll rồi Lưu thì gỡ webhook; update đang chờ vẫn giữ để bot lấy bằng long poll (trừ khi bật "Bỏ update đang chờ").</p>
 	</div>
 	<div class="frame auto">
 		<div class="console">
@@ -406,11 +406,11 @@ POST https://bot.chat.hoandat.com/bot/v1/…</pre>
 							<div class="field">
 								<label for="wh-secret">Secret token</label>
 								<div class="inline-row">
-									<input class="input mono" id="wh-secret" type="password" value="whsec-4f1c9a7e20b3" spellcheck="false">
+									<input class="input mono" id="wh-secret" type="password" value="" placeholder="Để trống để giữ secret đang dùng" spellcheck="false" autocomplete="off">
 									<button type="button" class="icon-btn" id="wh-eye" aria-label="Hiện secret" aria-pressed="false"><svg class="icon"><use href="#i-eye"/></svg></button>
-									<button type="button" class="btn btn-sm" data-toast="Đã tạo secret mới, nhớ cập nhật ở server của bạn">Tạo mới</button>
+									<button type="button" class="btn btn-sm" id="wh-generate">Tạo mới</button>
 								</div>
-								<span class="hint">Mỗi request kèm secret, chữ ký HMAC và timestamp. SDK kiểm sẵn.</span>
+								<span class="hint">1–256 ký tự A–Z, a–z, 0–9, _ và -. Mỗi request kèm secret, chữ ký HMAC-SHA256 và timestamp để server của bạn kiểm.</span>
 							</div>
 							<div class="field">
 								<span class="label" id="au-label">Loại update nhận</span>
@@ -419,11 +419,8 @@ POST https://bot.chat.hoandat.com/bot/v1/…</pre>
 									<button type="button" aria-pressed="true">message_edited</button>
 									<button type="button" aria-pressed="false">channel_post</button>
 									<button type="button" aria-pressed="true">callback</button>
-									<button type="button" aria-pressed="false">inline_query</button>
-									<button type="button" aria-pressed="false">inline_result_chosen</button>
-									<button type="button" aria-pressed="true">member_changed</button>
-									<button type="button" aria-pressed="false">reaction</button>
 								</div>
+								<span class="hint">Không chọn loại nào: nhận mọi loại. Chỉ áp cho update mới.</span>
 							</div>
 							<div class="field">
 								<label for="wh-max">Số kết nối song song</label>
@@ -431,14 +428,18 @@ POST https://bot.chat.hoandat.com/bot/v1/…</pre>
 								<span class="hint">Tuần tự trong từng chat, song song giữa các chat tới con số này.</span>
 							</div>
 							<div class="setting">
-								<div><strong>Bỏ update đang chờ khi lưu</strong><small>12 update đang chờ sẽ bị xoá, không giao nữa.</small></div>
+								<div><strong>Bỏ update đang chờ khi lưu</strong><small>12 update đang chờ sẽ bị bỏ, không giao nữa.</small></div>
 								<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Bỏ update đang chờ khi lưu"></button>
 							</div>
 						</div>
 						<div class="form" id="mode-poll" hidden>
-							<p class="sub" style="margin:0">Server của bạn tự gọi lấy update. Mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request sau nhận 409. Webhook đang đặt sẽ bị gỡ khi lưu.</p>
-							<pre class="snippet">GET https://bot.chat.hoandat.com/bot/v1/updates?offset=884246&amp;timeout=50
+							<p class="sub" style="margin:0">Server của bạn tự gọi lấy update. Mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request trước nhận 409. Webhook đang đặt sẽ bị gỡ khi lưu; khi webhook còn đặt, long poll nhận 409.</p>
+							<pre class="snippet">GET https://chat.hoandat.com/bot/v1/updates?offset=884246&amp;timeout=50
 Authorization: Bearer &lt;token&gt;</pre>
+							<div class="setting">
+								<div><strong>Bỏ update đang chờ khi lưu</strong><small>12 update đang chờ sẽ bị bỏ, không giao nữa.</small></div>
+								<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Bỏ update đang chờ khi lưu"></button>
+							</div>
 						</div>
 						<div class="card-foot"><button type="submit" class="btn btn-primary" data-press="Đã lưu cách nhận update">Lưu</button></div>
 					</form>
@@ -446,12 +447,13 @@ Authorization: Bearer &lt;token&gt;</pre>
 						<h4>Trạng thái webhook</h4>
 						<span class="dot err">Đang lỗi, đang thử lại</span>
 						<dl class="kv">
-							<dt>Lỗi gần nhất</dt><dd>HTTP 502 Bad Gateway<span class="cell-sub">hôm nay 09:58:12</span></dd>
+							<dt>Lỗi gần nhất</dt><dd>HTTP 502<span class="cell-sub">hôm nay 09:58:12</span></dd>
 							<dt>Update đang chờ</dt><dd>12</dd>
-							<dt>Độ trễ lần giao gần nhất</dt><dd>84 ms<span class="cell-sub">lúc 09:57:40</span></dd>
+							<dt>Giao thành công gần nhất</dt><dd>84 ms<span class="cell-sub">lúc 09:57:40</span></dd>
 							<dt>Kết nối đang mở</dt><dd>3 / 40</dd>
 							<dt>Update lỗi (dead-letter)</dt><dd><a class="btn btn-sm" href="#dead-letter">Xem 4 update</a></dd>
 						</dl>
+						<p class="sub">Trạng thái khác: "Đang hoạt động" (lần giao gần nhất thành công), "Chưa giao update nào". Lỗi hiện bằng lời: "HTTP 502", "Hết thời gian chờ sau 10 giây", "Lỗi TLS (chứng chỉ)", "Không kết nối được", "Không tìm thấy tên miền", "URL trỏ tới địa chỉ nội bộ". Webhook trả 2xx là đã giao, kể cả khi phần thân trả lời quá lớn (khi đó phương thức trong phần thân bị bỏ qua). Ở chế độ long poll cột này chỉ ghi số update đang chờ và lần cuối bot lấy update.</p>
 						<p class="sub">Thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, theo Retry-After nếu có. Sau 10 lần, update chuyển sang dead-letter để các update sau của cùng chat vẫn được giao.</p>
 					</div>
 				</div>
@@ -464,7 +466,7 @@ Authorization: Bearer &lt;token&gt;</pre>
 <section class="shot" id="dead-letter">
 	<div class="shot-head">
 		<h2>Update không giao được</h2><span class="phase">Phase 15</span>
-		<p>Update đã thử 10 lần không thành công nằm ở đây, giữ 24 giờ. Thử lại gửi đúng update đó một lần nữa; Bỏ thì xoá. Một dòng đang thử lại; thử bấm để thấy dòng biến mất và trạng thái rỗng khi hết.</p>
+		<p>Update đã thử 10 lần không thành công nằm ở đây, giữ tới hết hạn của update (24 giờ, callback 15 phút). Thử lại cho update đó thêm đúng một lần giao (lỗi nữa thì quay lại đây); Bỏ thì bỏ hẳn. "Thử lại tất cả"/"Bỏ tất cả" áp cho các dòng đang hiện (tối đa 100 dòng mới nhất). Một dòng đang thử lại; thử bấm để thấy dòng biến mất và trạng thái rỗng khi hết.</p>
 	</div>
 	<div class="frame">
 		<div class="console">
@@ -474,12 +476,12 @@ Authorization: Bearer &lt;token&gt;</pre>
 				<div class="c-title"><h3>Update lỗi <span class="muted" id="dl-count">(4)</span></h3><button type="button" class="btn btn-sm" id="dl-retry-all">Thử lại tất cả</button><button type="button" class="btn btn-sm btn-danger" id="dl-drop-all">Bỏ tất cả</button></div>
 				<div class="card table-card">
 					<table class="data stack" id="dl-table">
-						<thead><tr><th>update_id</th><th>Loại</th><th>Chat</th><th>Lỗi cuối</th><th>Lúc</th><th><span class="sr-only">Thao tác</span></th></tr></thead>
+						<thead><tr><th>update_id</th><th>Loại</th><th>Cuộc chat</th><th>Lỗi cuối</th><th>Lúc</th><th><span class="sr-only">Thao tác</span></th></tr></thead>
 						<tbody>
-							<tr><td data-label="update_id" class="mono"><div>884213</div></td><td data-label="Loại" class="mono"><div>message</div></td><td data-label="Chat"><div>Vận hành hệ thống</div></td><td data-label="Lỗi cuối" class="err-text"><div>HTTP 500 Internal Server Error</div></td><td data-label="Lúc"><div>09:31</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
-							<tr aria-busy="true"><td data-label="update_id" class="mono"><div>884220</div></td><td data-label="Loại" class="mono"><div>callback</div></td><td data-label="Chat"><div>Lan Anh</div></td><td data-label="Lỗi cuối"><div>Đang thử lại…</div></td><td data-label="Lúc"><div>09:40</div></td><td><div class="actions"><button type="button" class="btn btn-sm" disabled>Thử lại</button><button type="button" class="btn btn-sm btn-ghost" disabled>Bỏ</button></div></td></tr>
-							<tr><td data-label="update_id" class="mono"><div>884231</div></td><td data-label="Loại" class="mono"><div>member_changed</div></td><td data-label="Chat"><div>Team Mobile</div></td><td data-label="Lỗi cuối" class="err-text"><div>Hết thời gian chờ sau 10 giây</div></td><td data-label="Lúc"><div>09:52</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
-							<tr><td data-label="update_id" class="mono"><div>884245</div></td><td data-label="Loại" class="mono"><div>message</div></td><td data-label="Chat"><div>Quang Huy</div></td><td data-label="Lỗi cuối" class="err-text"><div>TLS: chứng chỉ hết hạn</div></td><td data-label="Lúc"><div>09:58</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
+							<tr><td data-label="update_id" class="mono"><div>884213</div></td><td data-label="Loại" class="mono"><div>message</div></td><td data-label="Cuộc chat"><div>Vận hành hệ thống</div></td><td data-label="Lỗi cuối" class="err-text"><div>HTTP 500 Internal Server Error</div></td><td data-label="Lúc"><div>09:31</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
+							<tr aria-busy="true"><td data-label="update_id" class="mono"><div>884220</div></td><td data-label="Loại" class="mono"><div>callback</div></td><td data-label="Cuộc chat"><div>Lan Anh</div></td><td data-label="Lỗi cuối"><div>Đang thử lại…</div></td><td data-label="Lúc"><div>09:40</div></td><td><div class="actions"><button type="button" class="btn btn-sm" disabled>Thử lại</button><button type="button" class="btn btn-sm btn-ghost" disabled>Bỏ</button></div></td></tr>
+							<tr><td data-label="update_id" class="mono"><div>884231</div></td><td data-label="Loại" class="mono"><div>member_changed</div></td><td data-label="Cuộc chat"><div>Team Mobile</div></td><td data-label="Lỗi cuối" class="err-text"><div>Hết thời gian chờ sau 10 giây</div></td><td data-label="Lúc"><div>09:52</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
+							<tr><td data-label="update_id" class="mono"><div>884245</div></td><td data-label="Loại" class="mono"><div>message</div></td><td data-label="Cuộc chat"><div>Quang Huy</div></td><td data-label="Lỗi cuối" class="err-text"><div>TLS: chứng chỉ hết hạn</div></td><td data-label="Lúc"><div>09:58</div></td><td><div class="actions"><button type="button" class="btn btn-sm" data-act="retry">Thử lại</button><button type="button" class="btn btn-sm btn-ghost" data-act="drop">Bỏ</button></div></td></tr>
 						</tbody>
 					</table>
 					<div class="empty" id="dl-empty" hidden><svg class="icon"><use href="#i-inbox"/></svg><strong>Không có update nào bị kẹt</strong><span>Update lỗi 10 lần sẽ hiện ở đây trong 24 giờ.</span></div>
@@ -493,36 +495,23 @@ Authorization: Bearer &lt;token&gt;</pre>
 <section class="shot" id="stats">
 	<div class="shot-head">
 		<h2>Số liệu gửi</h2><span class="phase">Phase 15</span>
-		<p>Bộ đếm tổng hợp theo bot, không có dòng theo từng người nhận (quyết định ở Phase 9). Bốn ô: server đã nhận, đã đẩy tới ít nhất một phiên online, dịch vụ push đã nhận, lỗi. Dưới là các lần gửi hàng loạt qua <code class="mono">messages:bulk</code>, chỉ tính người đã bắt đầu chat với bot. Mọi con số trên trang là minh hoạ.</p>
+		<p>Bộ đếm giao update tới bot trong 24 giờ qua, tổng theo bot (không có dòng theo từng người). Bốn ô: update server tạo cho bot, đã giao (webhook trả 2xx hoặc bot xác nhận qua long poll), lần giao lỗi (mỗi lần thử không thành công), chuyển sang dead-letter. Dưới là tầng rate limit hiện tại. Gửi hàng loạt (<code class="mono">messages:bulk</code>) có số liệu riêng khi tính năng đó ra mắt; trang này không hiện chỗ trống cho nó.</p>
 	</div>
 	<div class="frame">
 		<div class="console">
 			<div class="c-bot"><span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span><div><strong>Deploy Bot</strong><small class="mono">@deploy_bot</small></div></div>
 			<nav class="c-tabs" data-active="stats" aria-label="Mục của bot"></nav>
 			<div class="c-body">
-				<div class="c-title">
-					<h3>Số liệu gửi <span class="illustrative">Minh hoạ</span></h3>
-					<div class="choice" role="group" aria-label="Khoảng thời gian"><button type="button" aria-pressed="true">24 giờ</button><button type="button" aria-pressed="false">7 ngày</button></div>
-				</div>
+				<div class="c-title"><h3>Số liệu gửi · 24 giờ qua</h3></div>
 				<div class="sdks" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))">
-					<div class="stat"><span>Đã nhận</span><b>12.480</b><span>Request server chấp nhận</span></div>
-					<div class="stat"><span>Đã giao realtime</span><b>11.902</b><span>Tới ít nhất một phiên online</span></div>
-					<div class="stat"><span>Push được nhận</span><b>3.115</b><span>FCM, APNs, Web Push nhận</span></div>
-					<div class="stat"><span>Lỗi</span><b>37</b><span>Không xử lý được</span></div>
+					<div class="stat"><span>Update đã tạo</span><b>12.480</b><span>Server tạo cho bot</span></div>
+					<div class="stat"><span>Đã giao</span><b>12.431</b><span>Webhook trả 2xx hoặc bot đã xác nhận</span></div>
+					<div class="stat"><span>Lần giao lỗi</span><b>37</b><span>Mỗi lần thử không thành công</span></div>
+					<div class="stat"><span>Vào dead-letter</span><b>4</b><span>Lỗi 10 lần</span></div>
 				</div>
 				<div class="card">
 					<div class="c-title"><h4 style="flex:1;margin:0;font-size:1rem;font-weight:600">Tầng rate limit</h4><span class="tier verified"><svg class="icon"><use href="#i-verified"/></svg>verified</span></div>
-					<p>Bot đã xác minh được gửi hàng loạt tới nhiều người nhận hơn mỗi ngày. Tầng do đội vận hành cấp ở công cụ kiểm duyệt.</p>
-				</div>
-				<div class="card table-card">
-					<table class="data stack">
-						<thead><tr><th>Lần gửi hàng loạt</th><th>Lúc</th><th>Đã nhận</th><th>Realtime</th><th>Push</th><th>Lỗi</th><th>Trạng thái</th></tr></thead>
-						<tbody>
-							<tr><td data-label="request_id" class="mono"><div>blk_9f2c41</div></td><td data-label="Lúc"><div>10:00</div></td><td data-label="Đã nhận" class="num"><div>4.200</div></td><td data-label="Realtime" class="num"><div>1.380</div></td><td data-label="Push" class="num"><div>2.010</div></td><td data-label="Lỗi" class="num"><div>0</div></td><td data-label="Trạng thái"><div><span class="dot">Đang gửi</span><div class="progress" style="width: 120px; margin-top: var(--space-1)"><span style="width: 81%"></span></div></div></td></tr>
-							<tr><td data-label="request_id" class="mono"><div>blk_8a17d0</div></td><td data-label="Lúc"><div>Hôm qua 17:30</div></td><td data-label="Đã nhận" class="num"><div>3.950</div></td><td data-label="Realtime" class="num"><div>2.204</div></td><td data-label="Push" class="num"><div>1.702</div></td><td data-label="Lỗi" class="num"><div>44</div></td><td data-label="Trạng thái"><div><span class="dot ok">Xong</span></div></td></tr>
-							<tr><td data-label="request_id" class="mono"><div>blk_77c3e9</div></td><td data-label="Lúc"><div>Hôm qua 08:00</div></td><td data-label="Đã nhận" class="num"><div>3.948</div></td><td data-label="Realtime" class="num"><div>1.115</div></td><td data-label="Push" class="num"><div>2.790</div></td><td data-label="Lỗi" class="num"><div>43</div></td><td data-label="Trạng thái"><div><span class="dot ok">Xong</span></div></td></tr>
-						</tbody>
-					</table>
+					<p>Bot đã xác minh được gửi nhiều tin hơn mỗi giây. Tầng do đội vận hành cấp ở công cụ kiểm duyệt.</p>
 				</div>
 			</div>
 		</div>
@@ -690,6 +679,12 @@ Authorization: Bearer &lt;token&gt;</pre>
 		$("#wh-secret").type = show ? "text" : "password";
 		e.currentTarget.setAttribute("aria-pressed", String(show));
 		e.currentTarget.setAttribute("aria-label", show ? "Ẩn secret" : "Hiện secret");
+	});
+	$("#wh-generate").addEventListener("click", () => {
+		const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
+		$("#wh-secret").value = Array.from(crypto.getRandomValues(new Uint8Array(32)), (n) => abc[n % abc.length]).join("");
+		$("#wh-secret").type = "text";
+		toast("Đã tạo secret mới, bấm Lưu rồi cập nhật ở server của bạn");
 	});
 	$$(".chips button").forEach((b) => b.addEventListener("click", () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"))));
 

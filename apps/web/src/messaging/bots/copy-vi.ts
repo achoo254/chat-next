@@ -2,7 +2,7 @@
 // the Developer Console, the deep-link dialog, the bot's empty chat with
 // "Bắt đầu", the command menu and the reply keyboard. Loaded with those
 // parts only; copy-en.ts must provide the same keys.
-import type { CommandScope } from "./api.ts";
+import type { BotTierName, CommandScope } from "./api.ts";
 
 export const viBots = {
 	console: {
@@ -24,7 +24,8 @@ export const viBots = {
 		manageName: (name: string) => `Quản lý ${name}`,
 		notFound: "Không tìm thấy bot này. Bot có thể đã bị xoá.",
 		tabs: "Mục của bot",
-		tab: { profile: "Hồ sơ", token: "Token", commands: "Lệnh" },
+		tab: { profile: "Hồ sơ", token: "Token", updates: "Nhận update", "dead-letters": "Update lỗi", stats: "Số liệu", commands: "Lệnh" },
+		webhook: "Webhook",
 	},
 	create: {
 		title: "Bot mới",
@@ -89,12 +90,124 @@ export const viBots = {
 		reissue: "Cấp lại token",
 		issuing: "Đang cấp…",
 		pollTitle: "Nhận update",
+		webhookNote: "Bot nhận update qua webhook.",
+		deliverySettings: "Cài đặt nhận update",
 		pollNote: "Bot nhận update bằng long poll: server của bạn tự gọi lấy update, mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request trước nhận 409.",
 		issueTitle: (name: string) => `Cấp token cho ${name}?`,
 		issueBody: "Token chỉ hiện một lần ngay sau khi cấp; chuẩn bị chỗ lưu trước khi bấm.",
 		confirmTitle: "Cấp lại token?",
 		confirmBody: (name: string) => `Token cũ ngừng hoạt động ngay: ${name} sẽ nhận lỗi 401 tới khi bạn cập nhật token mới.`,
 		issued: "Đã cấp token mới",
+	},
+	delivery: {
+		modeLabel: "Cách nhận update",
+		webhook: "Webhook",
+		longPoll: "Long poll",
+		url: "URL webhook",
+		urlHint: "Chỉ https, cổng 443, 80 hoặc 8443. Không theo redirect.",
+		urlProblem: {
+			empty: "Nhập URL webhook",
+			scheme: "URL phải bắt đầu bằng https://",
+			invalid: "URL không hợp lệ",
+			url_invalid: "URL không được phép: chỉ https, cổng 443, 80 hoặc 8443, không kèm tài khoản",
+			url_blocked: "URL trỏ tới địa chỉ nội bộ",
+			url_unresolved: "Không tìm thấy tên miền của URL",
+		},
+		secret: "Secret token",
+		secretKeep: "Để trống để giữ secret đang dùng",
+		secretNew: "Nhập secret hoặc bấm Tạo mới",
+		secretHint: "1–256 ký tự A–Z, a–z, 0–9, _ và -. Mỗi request kèm secret, chữ ký HMAC-SHA256 và timestamp để server của bạn kiểm.",
+		secretBad: "Chỉ A–Z, a–z, 0–9, _ và -, tối đa 256 ký tự",
+		secretRequired: "Cần secret khi đặt webhook lần đầu",
+		showSecret: "Hiện secret",
+		hideSecret: "Ẩn secret",
+		generate: "Tạo mới",
+		generated: "Đã tạo secret mới, bấm Lưu rồi cập nhật ở server của bạn",
+		kinds: "Loại update nhận",
+		kindsHint: "Không chọn loại nào: nhận mọi loại. Chỉ áp cho update mới.",
+		maxConnections: "Số kết nối song song",
+		maxHint: "Tuần tự trong từng chat, song song giữa các chat tới con số này.",
+		maxBad: "Từ 1 đến 100",
+		drop: "Bỏ update đang chờ khi lưu",
+		dropHint: (n: number) => (n === 0 ? "Không có update nào đang chờ." : `${n} update đang chờ sẽ bị bỏ, không giao nữa.`),
+		pollNote:
+			"Server của bạn tự gọi lấy update. Mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request trước nhận 409. Webhook đang đặt sẽ bị gỡ khi lưu; khi webhook còn đặt, long poll nhận 409.",
+		save: "Lưu",
+		saving: "Đang lưu…",
+		saved: "Đã lưu cách nhận update",
+		fixFirst: "Sửa các ô báo lỗi trước khi lưu",
+		statusTitle: "Trạng thái webhook",
+		pollStatusTitle: "Trạng thái long poll",
+		state: { ok: "Đang hoạt động", failing: "Đang lỗi, đang thử lại", idle: "Chưa giao update nào" },
+		lastError: "Lỗi gần nhất",
+		pending: "Update đang chờ",
+		lastSuccess: "Giao thành công gần nhất",
+		open: "Kết nối đang mở",
+		deadLetters: "Update lỗi (dead-letter)",
+		viewDead: (n: number) => `Xem ${n} update`,
+		none: "Không có",
+		lastFetch: "Lần cuối bot lấy update",
+		never: "Chưa lần nào",
+		retryNote:
+			"Thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, theo Retry-After nếu có. Sau 10 lần, update chuyển sang dead-letter để các update sau của cùng chat vẫn được giao.",
+		ms: (n: number) => `${n} ms`,
+		at: (date: string) => `lúc ${date}`,
+		failure: (code: string): string => {
+			if (code.startsWith("http_")) return `HTTP ${code.slice(5)}`;
+			switch (code) {
+				case "timeout":
+					return "Hết thời gian chờ sau 10 giây";
+				case "tls":
+					return "Lỗi TLS (chứng chỉ)";
+				case "connect":
+					return "Không kết nối được";
+				case "dns":
+					return "Không tìm thấy tên miền";
+				case "blocked_address":
+					return "URL trỏ tới địa chỉ nội bộ";
+				case "invalid_url":
+					return "URL không được phép";
+				case "secret_unreadable":
+					return "Không đọc được secret, hãy lưu lại webhook";
+				default:
+					return code;
+			}
+		},
+	},
+	deadLetters: {
+		title: "Update lỗi",
+		retryAll: "Thử lại tất cả",
+		dropAll: "Bỏ tất cả",
+		retry: "Thử lại",
+		drop: "Bỏ",
+		retryName: (id: number) => `Thử lại update ${id}`,
+		dropName: (id: number) => `Bỏ update ${id}`,
+		columns: { id: "update_id", kind: "Loại", chat: "Cuộc chat", error: "Lỗi cuối", at: "Lúc", actions: "Thao tác" },
+		retrying: "Đang thử lại…",
+		emptyTitle: "Không có update nào bị kẹt",
+		emptyBody: "Update lỗi 10 lần sẽ hiện ở đây trong 24 giờ.",
+		retried: (n: number) => (n === 1 ? "Đã cho thử lại update" : `Đã cho thử lại ${n} update`),
+		dropped: (n: number) => (n === 1 ? "Đã bỏ update" : `Đã bỏ ${n} update`),
+		more: (shown: number, total: number) => `Đang hiện ${shown} update mới nhất trong ${total}.`,
+		note: "Thử lại cho update thêm đúng một lần giao; lỗi nữa thì quay lại đây. Bỏ là bỏ hẳn.",
+	},
+	stats: {
+		title: "Số liệu gửi · 24 giờ qua",
+		received: "Update đã tạo",
+		receivedHint: "Server tạo cho bot",
+		delivered: "Đã giao",
+		deliveredHint: "Webhook trả 2xx hoặc bot đã xác nhận",
+		failed: "Lần giao lỗi",
+		failedHint: "Mỗi lần thử không thành công",
+		dead: "Vào dead-letter",
+		deadHint: "Lỗi 10 lần",
+		tierTitle: "Tầng rate limit",
+		tierBody: {
+			default: "Mỗi giây tối đa 30 lần gọi và 30 tin, 1 tin vào cùng một chat (dồn được 20).",
+			verified: "Bot đã xác minh: mỗi giây tối đa 100 lần gọi và 100 tin, 5 tin vào cùng một chat.",
+			internal: "Bot nội bộ: mỗi giây tối đa 500 lần gọi và 500 tin, 20 tin vào cùng một chat.",
+		} as Record<BotTierName, string>,
+		tierNote: "Tầng do đội vận hành cấp ở công cụ kiểm duyệt.",
 	},
 	reauth: {
 		title: "Đăng nhập lại để tiếp tục",

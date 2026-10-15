@@ -25,6 +25,10 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // - already_exists "username_taken: ...": the username belongs to a user or
 //   bot of the tenant.
 // - not_found: the bot does not exist, is deleted or belongs to someone else.
+// - invalid_argument "<code>: ..." from SetBotWebhook, code one of
+//   url_invalid, url_blocked (private, local or reserved address),
+//   url_unresolved, secret_invalid, secret_required,
+//   allowed_updates_invalid, max_connections_invalid.
 
 // Developer Console: the caller's own bots.
 service BotAdminService {
@@ -42,6 +46,22 @@ service BotAdminService {
   // dropped; its messages stay. The username stays reserved. Needs a recent
   // sign-in.
   rpc DeleteBot(DeleteBotRequest) returns (DeleteBotResponse);
+  // How the bot receives updates (webhook or long poll), the delivery
+  // state and the counters of the last 24 hours.
+  rpc GetBotDelivery(GetBotDeliveryRequest) returns (GetBotDeliveryResponse);
+  // Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
+  // POSTed to it and long polls get 409 conflict.
+  rpc SetBotWebhook(SetBotWebhookRequest) returns (SetBotWebhookResponse);
+  // Removes the webhook; the bot fetches updates by long poll again.
+  rpc DeleteBotWebhook(DeleteBotWebhookRequest) returns (DeleteBotWebhookResponse);
+  // Updates given up after 10 failed attempts, newest first (at most 100),
+  // kept until they expire (24 hours; callbacks 15 minutes).
+  rpc ListBotDeadLetters(ListBotDeadLettersRequest) returns (ListBotDeadLettersResponse);
+  // Gives dead letters one more attempt each; a failure dead-letters them
+  // again.
+  rpc RetryBotDeadLetters(RetryBotDeadLettersRequest) returns (RetryBotDeadLettersResponse);
+  // Drops dead letters for good.
+  rpc DiscardBotDeadLetters(DiscardBotDeadLettersRequest) returns (DiscardBotDeadLettersResponse);
 }
 
 // Rate limit tier of a bot; only the operations team changes it.
@@ -103,6 +123,9 @@ message Bot {
   // Unix seconds when the bot last asked for updates (long poll getUpdates),
   // kept to within about 30 seconds; 0 when it never did.
   int64 last_update_at = 10 [jstype = JS_NUMBER];
+  // Updates are POSTed to a webhook (GetBotDelivery has the details);
+  // false when the bot fetches them by long poll.
+  bool webhook = 11;
 }
 
 message ListMyBotsRequest {}
@@ -153,3 +176,126 @@ message DeleteBotRequest {
 }
 
 message DeleteBotResponse {}
+
+message GetBotDeliveryRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+}
+
+// The bot's webhook as set; the secret is never returned.
+message BotWebhook {
+  // https URL; "" when the bot fetches updates by long poll.
+  string url = 1;
+  // Update kinds stored for the bot ("message", "message_edited",
+  // "channel_post", "callback"); empty means every kind.
+  repeated string allowed_updates = 2;
+  // Parallel requests, 1 to 100.
+  int32 max_connections = 3;
+}
+
+message BotDeliveryStatus {
+  // Updates not delivered yet (neither dead-lettered nor expired).
+  int64 pending_count = 1 [jstype = JS_NUMBER];
+  int64 dead_letter_count = 2 [jstype = JS_NUMBER];
+  // Reason of the newest failed attempt: "http_<status>", "timeout",
+  // "tls", "connect", "dns", "blocked_address", "invalid_url",
+  // "secret_unreadable" (the webhook must be set again); "" for none.
+  string last_error = 3;
+  // Unix seconds of last_error; 0 for none.
+  int64 last_error_date = 4 [jstype = JS_NUMBER];
+  // Unix seconds of the newest successful request; 0 for none.
+  int64 last_success_date = 5 [jstype = JS_NUMBER];
+  // Duration of that request in milliseconds.
+  int32 last_success_ms = 6;
+  // Requests in flight now.
+  int32 open_connections = 7;
+}
+
+// Delivery counters of the last 24 hours (whole hours).
+message BotDeliveryStats {
+  // Updates stored for the bot.
+  int64 received = 1 [jstype = JS_NUMBER];
+  // Acknowledged by a 2xx answer of the webhook or by a long poll.
+  int64 delivered = 2 [jstype = JS_NUMBER];
+  // Failed webhook attempts.
+  int64 failed = 3 [jstype = JS_NUMBER];
+  int64 dead_lettered = 4 [jstype = JS_NUMBER];
+}
+
+message GetBotDeliveryResponse {
+  BotWebhook webhook = 1;
+  BotDeliveryStatus status = 2;
+  BotDeliveryStats stats = 3;
+}
+
+message SetBotWebhookRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // https URL on port 443, 80 or 8443 resolving to public addresses only;
+  // redirects are not followed.
+  string url = 2;
+  // 1 to 256 characters of A-Z, a-z, 0-9, _ and -, sent in the
+  // X-Bot-Api-Secret-Token header and keying the X-Bot-Signature HMAC.
+  // Empty keeps the current secret (required when no webhook is set).
+  string secret = 3;
+  repeated string allowed_updates = 4;
+  // 1 to 100; 0 is 40.
+  int32 max_connections = 5;
+  // Drop the pending updates instead of delivering them.
+  bool drop_pending = 6;
+}
+
+message SetBotWebhookResponse {
+  BotWebhook webhook = 1;
+}
+
+message DeleteBotWebhookRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // Drop the pending updates instead of keeping them for long poll.
+  bool drop_pending = 2;
+}
+
+message DeleteBotWebhookResponse {}
+
+message BotDeadLetter {
+  int64 update_id = 1 [jstype = JS_NUMBER];
+  // "message", "message_edited", "channel_post" or "callback".
+  string kind = 2;
+  int64 chat_id = 3 [jstype = JS_NUMBER];
+  // The chat's title, or the user's name for a private chat.
+  string chat_title = 4;
+  // Reason of the last attempt, as BotDeliveryStatus.last_error.
+  string last_error = 5;
+  // Unix seconds of the last attempt.
+  int64 last_error_date = 6 [jstype = JS_NUMBER];
+  int32 attempts = 7;
+}
+
+message ListBotDeadLettersRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+}
+
+message ListBotDeadLettersResponse {
+  repeated BotDeadLetter dead_letters = 1;
+  // All dead letters of the bot (the list holds the newest 100).
+  int64 total = 2 [jstype = JS_NUMBER];
+}
+
+message RetryBotDeadLettersRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // 1 to 100 update ids.
+  repeated int64 update_ids = 2 [jstype = JS_NUMBER];
+}
+
+message RetryBotDeadLettersResponse {
+  // How many of update_ids were dead letters (others are skipped).
+  int32 retried = 1;
+}
+
+message DiscardBotDeadLettersRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // 1 to 100 update ids.
+  repeated int64 update_ids = 2 [jstype = JS_NUMBER];
+}
+
+message DiscardBotDeadLettersResponse {
+  int32 discarded = 1;
+}

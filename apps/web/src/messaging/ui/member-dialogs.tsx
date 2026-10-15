@@ -16,6 +16,7 @@ import { ChatAvatar, DialogHead, Modal, useDomId } from "./parts.tsx";
 import { PopupMenu } from "./popup-menu.tsx";
 import { presenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
+import { usePrivateChatFailure } from "./private-chat-failure.ts";
 
 interface CloseProps {
 	onClose: () => void;
@@ -44,13 +45,14 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 		if (left) onClose();
 	}, [left, onClose]);
 
+	const privateChatFailed = usePrivateChatFailure();
 	const message = (member: Member) => {
 		remote.createPrivate(member.person.id).then(
 			(privateChat) => {
 				onClose();
 				navigate(paths.chat(privateChat));
 			},
-			() => toasts.show(copy.common.failed),
+			(err: unknown) => privateChatFailed(err, member.person.id),
 		);
 	};
 	const promote = (member: Member) => {

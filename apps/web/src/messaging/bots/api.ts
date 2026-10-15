@@ -1,4 +1,5 @@
-// Bots on the client side (BotAdminService for the Developer Console,
+// Bots on the client side (BotAdminService for the Developer Console, with
+// the bot's update delivery: webhook or long poll, dead letters, counters;
 // BotsService for starting a bot and its menu, MessagesService.PressInlineButton
 // for callback buttons), mapped from the wire (ADR 0001: int64 arrive as
 // bigint and leave as number). The Connect client and the generated schemas
@@ -38,6 +39,73 @@ export interface OwnBot {
 	readonly tokenIssuedAt: number;
 	/** Unix seconds of the bot's last update fetch (long poll); 0 when it never asked. */
 	readonly lastUpdateAt: number;
+	/** Updates go to a webhook (else the bot polls). */
+	readonly webhook: boolean;
+	/** Rate limit tier; only the operations team changes it. */
+	readonly tier: BotTierName;
+}
+
+export type BotTierName = "default" | "verified" | "internal";
+
+/** Update kinds a bot can receive. */
+export type UpdateKind = "message" | "message_edited" | "channel_post" | "callback";
+
+/** The bot's webhook as set; the secret never comes back. */
+export interface BotWebhook {
+	/** "" when the bot polls. */
+	readonly url: string;
+	/** Empty: every kind. */
+	readonly allowedUpdates: readonly string[];
+	readonly maxConnections: number;
+}
+
+/** How the bot's updates are doing. */
+export interface DeliveryStatus {
+	readonly pending: number;
+	readonly deadLetters: number;
+	/** A failure code ("http_502", "timeout", "tls", …); "" for none. */
+	readonly lastError: string;
+	/** Unix seconds; 0 for none. */
+	readonly lastErrorAt: number;
+	/** Unix seconds of the newest successful request; 0 for none. */
+	readonly lastSuccessAt: number;
+	readonly lastSuccessMs: number;
+	readonly openConnections: number;
+}
+
+/** Counters of the last 24 hours. */
+export interface DeliveryStats {
+	readonly received: number;
+	readonly delivered: number;
+	readonly failed: number;
+	readonly deadLettered: number;
+}
+
+export interface BotDelivery {
+	readonly webhook: BotWebhook;
+	readonly status: DeliveryStatus;
+	readonly stats: DeliveryStats;
+}
+
+/** An update given up after 10 attempts. */
+export interface DeadLetter {
+	readonly updateId: number;
+	readonly kind: string;
+	readonly chatId: number;
+	readonly chatTitle: string;
+	readonly lastError: string;
+	/** Unix seconds of the last attempt. */
+	readonly lastErrorAt: number;
+	readonly attempts: number;
+}
+
+/** What SetBotWebhook takes; an empty secret keeps the one in use. */
+export interface WebhookChanges {
+	readonly url: string;
+	readonly secret: string;
+	readonly allowedUpdates: readonly UpdateKind[];
+	readonly maxConnections: number;
+	readonly dropPending: boolean;
 }
 
 /** The fields UpdateBot changes; absent ones stay as they are. */
@@ -142,6 +210,17 @@ export interface Bots {
 	 * an answer within 15 seconds (a stalled connection) answers timedOut.
 	 */
 	press(chatId: number, seq: number, callbackData: string): Promise<PressAnswer>;
+	/** Webhook, delivery state and 24-hour counters. */
+	delivery(botId: number): Promise<BotDelivery>;
+	/** BotError "invalid" with a webhookProblem() code when refused. */
+	setWebhook(botId: number, changes: WebhookChanges): Promise<BotWebhook>;
+	/** Back to long poll; pending updates stay unless `dropPending`. */
+	deleteWebhook(botId: number, dropPending: boolean): Promise<void>;
+	/** The newest dead letters (at most 100) and how many there are. */
+	deadLetters(botId: number): Promise<{ list: DeadLetter[]; total: number }>;
+	/** One more attempt each; returns how many were dead letters. */
+	retryDeadLetters(botId: number, updateIds: readonly number[]): Promise<number>;
+	discardDeadLetters(botId: number, updateIds: readonly number[]): Promise<number>;
 }
 
 /**
@@ -174,6 +253,12 @@ export function createBots(transport: Transport, onUnauthenticated: () => void):
 		info: (botId, chatId) => load().then((api) => api.info(botId, chatId)),
 		start: (botId, startParam, randomId) => load().then((api) => api.start(botId, startParam, randomId)),
 		press: (chatId, seq, callbackData) => load().then((api) => api.press(chatId, seq, callbackData)),
+		delivery: (botId) => load().then((api) => api.delivery(botId)),
+		setWebhook: (botId, changes) => load().then((api) => api.setWebhook(botId, changes)),
+		deleteWebhook: (botId, dropPending) => load().then((api) => api.deleteWebhook(botId, dropPending)),
+		deadLetters: (botId) => load().then((api) => api.deadLetters(botId)),
+		retryDeadLetters: (botId, ids) => load().then((api) => api.retryDeadLetters(botId, ids)),
+		discardDeadLetters: (botId, ids) => load().then((api) => api.discardDeadLetters(botId, ids)),
 	};
 }
 

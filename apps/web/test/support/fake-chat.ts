@@ -157,6 +157,8 @@ export class ChatFixture {
 	/** SendMessage requests from the client (the server keeps only the text). */
 	readonly sent: { chatId: number; text: string; replyToSeq: number; topicId: number }[] = [];
 	readonly topics = new Map<number, FixtureTopic[]>();
+	/** UpdateChatInfo calls, in order (forum: what the call asked for). */
+	readonly updatedChats: { chatId: number; forum: boolean | undefined }[] = [];
 	private readonly messageTopics = new Map<string, number>();
 	readonly previews: FixturePreview[] = [];
 	readonly inviteChecks = new Map<
@@ -319,6 +321,11 @@ export class ChatFixture {
 		this.members.set(id, [...members]);
 		this.chatExtras.set(id, { myRole: MemberRole.MEMBER, myPermissions: 0x1f, defaultPermissions: 0x1d, historyVisibility: HistoryVisibility.SHARED, ...extras });
 		return id;
+	}
+
+	/** The "General" topic a forum starts with, named as the server names it (topic 1, created when topics are turned on). */
+	private generalTopic(): FixtureTopic {
+		return { id: 1, title: "General", iconColor: 0x8e8e93, creatorId: this.selfId, pinned: false, closed: false, hidden: false, unreadCount: 0 };
 	}
 
 	setRole(chatId: number, userId: number, role: MemberRole): void {
@@ -829,8 +836,9 @@ export class ChatFixture {
 			createGroup: (req) => {
 				const refused = req.userIds.map(num).filter((id) => this.refusesGroups.has(id));
 				const added = req.userIds.map(num).filter((id) => !this.refusesGroups.has(id));
-				const chatId = this.createChat(ChatType.GROUP, req.title, [this.selfId, ...added], { myRole: MemberRole.OWNER });
+				const chatId = this.createChat(ChatType.GROUP, req.title, [this.selfId, ...added], { myRole: MemberRole.OWNER, forum: req.forum });
 				this.setRole(chatId, this.selfId, MemberRole.OWNER);
+				if (req.forum) this.topics.set(chatId, [this.generalTopic()]);
 				this.send(this.selfId, chatId, "", { action: { kind: { case: "chatCreated", value: { title: req.title } } } });
 				return {
 					chat: this.server.wireChat(chatId, this.selfId),
@@ -962,7 +970,17 @@ export class ChatFixture {
 				if (req.admin) this.ownerNeedsAdmin.delete(num(req.chatId));
 				return {};
 			},
-			updateChatInfo: (req) => ({ chat: this.server.wireChat(num(req.chatId), this.selfId) }),
+			updateChatInfo: (req) => {
+				const chatId = num(req.chatId);
+				const extras = this.chatExtras.get(chatId);
+				if (req.forum === true && extras !== undefined && extras.forum !== true) {
+					this.chatExtras.set(chatId, { ...extras, forum: true });
+					this.topics.set(chatId, [this.generalTopic()]);
+					this.server.announceChat(chatId);
+				}
+				this.updatedChats.push({ chatId, forum: req.forum });
+				return { chat: this.server.wireChat(chatId, this.selfId) };
+			},
 			setHistoryVisibility: () => ({}),
 			exportInviteLink: (req) => {
 				const chatId = num(req.chatId);

@@ -185,6 +185,12 @@ class InviteLinks {
 			.finally(() => this.loading.delete(chatId));
 	}
 
+	/** Forgets every chat's links (tests render several sessions in one page). */
+	clear(): void {
+		this.byChat.clear();
+		this.loading.clear();
+	}
+
 	add(chatId: number, invite: Invite): void {
 		this.set(chatId, [invite, ...this.list(chatId).filter((item) => item.link !== invite.link)]);
 	}

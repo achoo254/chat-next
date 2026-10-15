@@ -1,6 +1,6 @@
 # Bot API text formatting (`parse_mode`)
 
-`POST /bot/v1/messages` takes either `entities` (ADR 0004: offsets and lengths in UTF-16 code units) or `parse_mode`, never both. With `parse_mode` the server parses `text` into plain text plus entities ([`server/internal/botapi/format`](../../server/internal/botapi/format)) and then checks the result like every message: at most 4096 characters (code points) and 100 entities, entities nested but never partially overlapping, links only to `http`, `https`, `mailto` and the app's own scheme.
+`POST /bot/v1/messages` (and `sendMessage` in a webhook answer) takes either `entities` (ADR 0004: offsets and lengths in UTF-16 code units) or `parse_mode`, never both. With `parse_mode` the server parses `text` into plain text plus entities ([`server/internal/botapi/format`](../../server/internal/botapi/format)) and then checks the result like every message: at most 4096 characters (code points) and 100 entities, entities nested but never partially overlapping, links only to `http`, `https`, `mailto` and the app's own scheme.
 
 Parsing is strict. An unclosed or mis-nested marker, an unknown tag or attribute, or a link to another scheme answers `400 bad_request` with the byte offset of the problem; the server never guesses what was meant. Empty formatting (`**`) is dropped.
 

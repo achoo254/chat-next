@@ -4,14 +4,31 @@ import { assertSafeId, fromBase64 } from "@app/core";
 import {
 	BotAdminService,
 	BotCommandScope as WireScope,
+	BotTier,
 	type Bot as WireBot,
 	type BotCommand as WireCommand,
 	type BotCommandSet as WireCommandSet,
+	type BotDeadLetter as WireDeadLetter,
+	type BotWebhook as WireWebhook,
+	type GetBotDeliveryResponse,
 } from "@app/proto-ts/bot_admin";
 import { BotsService, type GetBotInfoResponse } from "@app/proto-ts/bots";
 import { MessagesService } from "@app/proto-ts/messages";
 import { UsersService } from "@app/proto-ts/users";
-import { BotError, type BotChanges, type BotCommand, type BotErrorKind, type BotInfo, type Bots, type CommandScope, type CommandSets, type OwnBot } from "./api.ts";
+import {
+	BotError,
+	type BotChanges,
+	type BotCommand,
+	type BotDelivery,
+	type BotErrorKind,
+	type BotInfo,
+	type Bots,
+	type BotWebhook,
+	type CommandScope,
+	type CommandSets,
+	type DeadLetter,
+	type OwnBot,
+} from "./api.ts";
 
 const SCOPES: Partial<Record<WireScope, CommandScope>> = {
 	[WireScope.DEFAULT]: "default",
@@ -56,6 +73,47 @@ export function toOwnBot(bot: WireBot | undefined, method: string): OwnBot {
 		createdAt: assertSafeId(bot.createdAt),
 		tokenIssuedAt: assertSafeId(bot.tokenIssuedAt),
 		lastUpdateAt: assertSafeId(bot.lastUpdateAt),
+		webhook: bot.webhook,
+		tier: bot.tier === BotTier.INTERNAL ? "internal" : bot.tier === BotTier.VERIFIED ? "verified" : "default",
+	};
+}
+
+function toWebhook(webhook: WireWebhook | undefined): BotWebhook {
+	return { url: webhook?.url ?? "", allowedUpdates: webhook?.allowedUpdates ?? [], maxConnections: webhook?.maxConnections ?? 0 };
+}
+
+function toDelivery(response: GetBotDeliveryResponse): BotDelivery {
+	const status = response.status;
+	const stats = response.stats;
+	return {
+		webhook: toWebhook(response.webhook),
+		status: {
+			pending: assertSafeId(status?.pendingCount ?? 0n),
+			deadLetters: assertSafeId(status?.deadLetterCount ?? 0n),
+			lastError: status?.lastError ?? "",
+			lastErrorAt: assertSafeId(status?.lastErrorDate ?? 0n),
+			lastSuccessAt: assertSafeId(status?.lastSuccessDate ?? 0n),
+			lastSuccessMs: status?.lastSuccessMs ?? 0,
+			openConnections: status?.openConnections ?? 0,
+		},
+		stats: {
+			received: assertSafeId(stats?.received ?? 0n),
+			delivered: assertSafeId(stats?.delivered ?? 0n),
+			failed: assertSafeId(stats?.failed ?? 0n),
+			deadLettered: assertSafeId(stats?.deadLettered ?? 0n),
+		},
+	};
+}
+
+function toDeadLetter(d: WireDeadLetter): DeadLetter {
+	return {
+		updateId: assertSafeId(d.updateId),
+		kind: d.kind,
+		chatId: assertSafeId(d.chatId),
+		chatTitle: d.chatTitle,
+		lastError: d.lastError,
+		lastErrorAt: assertSafeId(d.lastErrorDate),
+		attempts: d.attempts,
 	};
 }
 
@@ -202,5 +260,31 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 					clearTimeout(timer);
 				}
 			}),
+		delivery: (botId) => call(async () => toDelivery(await admin.getBotDelivery({ botId: BigInt(botId) }))),
+		setWebhook: (botId, changes) =>
+			call(async () => {
+				const response = await admin.setBotWebhook({
+					botId: BigInt(botId),
+					url: changes.url.trim(),
+					secret: changes.secret,
+					allowedUpdates: [...changes.allowedUpdates],
+					maxConnections: changes.maxConnections,
+					dropPending: changes.dropPending,
+				});
+				return toWebhook(response.webhook);
+			}),
+		deleteWebhook: (botId, dropPending) =>
+			call(async () => {
+				await admin.deleteBotWebhook({ botId: BigInt(botId), dropPending });
+			}),
+		deadLetters: (botId) =>
+			call(async () => {
+				const response = await admin.listBotDeadLetters({ botId: BigInt(botId) });
+				return { list: response.deadLetters.map(toDeadLetter), total: assertSafeId(response.total) };
+			}),
+		retryDeadLetters: (botId, ids) =>
+			call(async () => (await admin.retryBotDeadLetters({ botId: BigInt(botId), updateIds: ids.map((id) => BigInt(id)) })).retried),
+		discardDeadLetters: (botId, ids) =>
+			call(async () => (await admin.discardBotDeadLetters({ botId: BigInt(botId), updateIds: ids.map((id) => BigInt(id)) })).discarded),
 	};
 }

@@ -275,7 +275,8 @@ export interface Remote {
 	unpin(chatId: number, seq: number): Promise<void>;
 	forward(fromChatId: number, seqs: readonly number[], toChatId: number): Promise<void>;
 	createPrivate(userId: number): Promise<number>;
-	createGroup(title: string, userIds: readonly number[]): Promise<{ chatId: number; failures: AddFailure[] }>;
+	/** `forum` creates the group with topics on. */
+	createGroup(title: string, userIds: readonly number[], forum?: boolean): Promise<{ chatId: number; failures: AddFailure[] }>;
 	createChannel(title: string, about: string): Promise<number>;
 	members(chatId: number, query?: string, cursor?: string): Promise<{ members: Member[]; nextCursor: string }>;
 	/** Everyone not added, with the reason (already members included). */
@@ -292,6 +293,8 @@ export interface Remote {
 	setAdmin(chatId: number, userId: number, admin: boolean): Promise<void>;
 	setDefaultPermissions(chatId: number, permissions: number): Promise<void>;
 	setHistoryShared(chatId: number, shared: boolean): Promise<void>;
+	/** Turns forum topics on for a group (admins; it cannot be turned off). */
+	enableTopics(chatId: number): Promise<void>;
 	exportInvite(chatId: number, expiresAt: number, usageLimit: number): Promise<Invite>;
 	/** PermissionDenied when an admin removed and banned the caller. */
 	joinByInvite(link: string): Promise<number>;
@@ -356,6 +359,7 @@ const METHODS = [
 	"setAdmin",
 	"setDefaultPermissions",
 	"setHistoryShared",
+	"enableTopics",
 	"exportInvite",
 	"joinByInvite",
 	"searchPeople",

@@ -4,6 +4,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import brandConfig from "../../../brand.config.json";
+import { CORE_LAST_USER_KEY } from "../src/api/offline-self.ts";
 import { renderApp, SELF } from "./render-app.tsx";
 
 describe("boot", () => {
@@ -80,6 +81,40 @@ describe("boot", () => {
 
 		expect(await screen.findByText("Chưa có chat nào ở đây", {}, { timeout: 5000 })).toBeTruthy();
 		expect(calls).toBe(2);
+	});
+
+	it("opens the chats on this device when the server cannot be reached", async () => {
+		window.localStorage.setItem(CORE_LAST_USER_KEY, "42");
+		window.localStorage.setItem("app:last-self", JSON.stringify({ id: 42, name: "Đức Thắng", username: "thang_dt", bio: "", email: "", isOperator: false }));
+		try {
+			renderApp((router) => {
+				router.service(UsersService, {
+					getSelf: () => {
+						throw new ConnectError("fetch failed", Code.Unavailable);
+					},
+				});
+			});
+			expect(await screen.findByText("Chưa có chat nào ở đây", {}, { timeout: 5000 })).toBeTruthy();
+			expect(screen.queryByRole("button", { name: "Thử lại" })).toBeNull();
+		} finally {
+			window.localStorage.removeItem(CORE_LAST_USER_KEY);
+			window.localStorage.removeItem("app:last-self");
+		}
+	});
+
+	it("forgets the remembered user when the server says the session is gone", async () => {
+		window.localStorage.setItem(CORE_LAST_USER_KEY, "42");
+		window.localStorage.setItem("app:last-self", JSON.stringify({ id: 42, name: "Đức Thắng", username: "thang_dt", bio: "", email: "", isOperator: false }));
+		renderApp((router) => {
+			router.service(UsersService, {
+				getSelf: () => {
+					throw new ConnectError("no session", Code.Unauthenticated);
+				},
+			});
+		});
+		expect(await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" })).toBeTruthy();
+		expect(window.localStorage.getItem("app:last-self")).toBeNull();
+		window.localStorage.removeItem(CORE_LAST_USER_KEY);
 	});
 
 	it("opens settings from the rail without a page load", async () => {

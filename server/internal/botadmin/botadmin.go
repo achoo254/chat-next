@@ -112,7 +112,9 @@ type Bot struct {
 	// LastUpdateAt is when the bot last asked for updates (RecordUpdateFetch);
 	// nil when it never did.
 	LastUpdateAt *time.Time
-	tokenHash    []byte
+	// Webhook tells that updates are POSTed to the bot's webhook.
+	Webhook   bool
+	tokenHash []byte
 }
 
 // Tier is the bot's rate limit tier.
@@ -213,7 +215,7 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 // ------------------------------------------------------------------- rows
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
-	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.token_hash`
+	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.token_hash`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -221,7 +223,7 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	b := &Bot{}
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
-		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.tokenHash)
+		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.tokenHash)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +252,24 @@ func (s *Service) ownedBot(ctx context.Context, q interface {
 	return b, nil
 }
 
+// Owned returns owner's live bot; NotFound when it is not theirs.
+func (s *Service) Owned(ctx context.Context, owner, botID int64) (*Bot, error) {
+	return s.ownedBot(ctx, s.pool, owner, botID, false)
+}
+
+// Live returns a live bot of the tenant; NotFound otherwise.
+func (s *Service) Live(ctx context.Context, botID int64) (*Bot, error) {
+	b, err := scanBot(s.pool.QueryRow(ctx, `SELECT `+botColumns+` FROM `+botFrom+`
+		WHERE b.user_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL`, botID, s.tenantID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errNotFound()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("botadmin: load bot: %w", err)
+	}
+	return b, nil
+}
+
 // Render returns the bot for its owner.
 func (b *Bot) Render() *appv1.Bot {
 	out := &appv1.Bot{
@@ -267,6 +287,7 @@ func (b *Bot) Render() *appv1.Bot {
 		out.TokenIssuedAt = b.TokenIssuedAt.Unix()
 	}
 	out.LastUpdateAt = b.lastUpdateUnix()
+	out.Webhook = b.Webhook
 	for _, set := range b.Commands {
 		out.Commands = append(out.Commands, renderSet(set))
 	}
@@ -678,9 +699,10 @@ const updateFetchInterval = 30 * time.Second
 const notRunningAfter = 2 * time.Minute
 
 // notRunning tells whether the bot has not asked for updates lately, by the
-// server's clock.
+// server's clock. A bot with a webhook does not ask: its delivery state is
+// in the Developer Console instead.
 func (b *Bot) notRunning(now time.Time) bool {
-	return b.LastUpdateAt == nil || now.Sub(*b.LastUpdateAt) > notRunningAfter
+	return !b.Webhook && (b.LastUpdateAt == nil || now.Sub(*b.LastUpdateAt) > notRunningAfter)
 }
 
 // RecordUpdateFetch notes that the bot asked for updates. It writes at most
@@ -756,13 +778,9 @@ const (
 // role: GROUP_ADMIN, then GROUP (or PRIVATE), then DEFAULT. When caller owns
 // the bot it also says so and when the bot last asked for updates.
 func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) (*appv1.GetBotInfoResponse, error) {
-	b, err := scanBot(s.pool.QueryRow(ctx, `SELECT `+botColumns+` FROM `+botFrom+`
-		WHERE b.user_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL`, botID, s.tenantID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, errNotFound()
-	}
+	b, err := s.Live(ctx, botID)
 	if err != nil {
-		return nil, fmt.Errorf("botadmin: bot info: %w", err)
+		return nil, err
 	}
 	var order []string
 	switch role {

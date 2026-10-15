@@ -3,6 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react
 import type { SelfUser } from "./api/adapters.ts";
 import { ApiContext } from "./api/api-context.tsx";
 import { createApi, createWebTransport, errorCode, sameOriginFetch, type RpcFetch } from "./api/client.ts";
+import { forgetSelf, lastSelf, rememberSelf } from "./api/offline-self.ts";
 import { PageLoader } from "./components/brand-loader.tsx";
 import { Icon } from "./components/icon.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
@@ -37,7 +38,10 @@ export function App({ rpcFetch = sameOriginFetch, messagingConnector }: AppProps
 function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingConnector: MessagingConnector | undefined }) {
 	const [boot, setBoot] = useState<Boot>({ status: "loading" });
 	const [attempt, setAttempt] = useState(0);
-	const signedOut = useCallback(() => setBoot({ status: "signedOut" }), []);
+	const signedOut = useCallback(() => {
+		forgetSelf();
+		setBoot({ status: "signedOut" });
+	}, []);
 	const transport = useMemo(() => createWebTransport(rpcFetch), [rpcFetch]);
 	const api = useMemo(() => createApi(transport, rpcFetch, signedOut), [transport, rpcFetch, signedOut]);
 
@@ -45,11 +49,16 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 		let active = true;
 		api.getSelf().then(
 			(self) => {
+				rememberSelf(self);
 				if (active) setBoot({ status: "ready", self });
 			},
 			(err: unknown) => {
 				// Unauthenticated already switched to the welcome screen through the api hook.
-				if (active && errorCode(err) !== Code.Unauthenticated) setBoot({ status: "error" });
+				if (!active || errorCode(err) === Code.Unauthenticated) return;
+				// No answer (offline, server down): open the chats stored on this device
+				// when there are some; the client core reconnects on its own.
+				const known = lastSelf();
+				setBoot(known === null ? { status: "error" } : { status: "ready", self: known });
 			},
 		);
 		return () => {
@@ -63,7 +72,12 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 	};
 	// Profile edits return the user without the operator flag; it stays what sign-in said.
 	const setSelf = useCallback(
-		(self: SelfUser) => setBoot((current) => ({ status: "ready", self: current.status === "ready" ? { ...self, isOperator: current.self.isOperator } : self })),
+		(self: SelfUser) =>
+			setBoot((current) => {
+				const next = current.status === "ready" ? { ...self, isOperator: current.self.isOperator } : self;
+				rememberSelf(next);
+				return { status: "ready", self: next };
+			}),
 		[],
 	);
 
