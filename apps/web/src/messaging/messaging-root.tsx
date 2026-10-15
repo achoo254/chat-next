@@ -3,12 +3,17 @@
 // core once per signed-in session and keeps it alive across the chat, settings
 // and moderation screens.
 import type { Transport } from "@connectrpc/connect";
-import { Suspense, lazy, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
-import { BrandLoader, PageLoader } from "../components/brand-loader.tsx";
+import { useApi } from "../api/api-context.tsx";
+import type { Api } from "../api/client.ts";
+import { PageLoader } from "../components/brand-loader.tsx";
+import { LoaderBoundary, Ready } from "../components/delayed-loader.tsx";
+import { prefetchWhenIdle, preloadable } from "../components/preload.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
+import { sessionsData } from "../screens/settings/sessions-data.ts";
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
 import { useCopy } from "./copy/use-copy.ts";
@@ -20,17 +25,59 @@ import { decideNotification, type NotificationInput } from "./data/notification-
 import { createRemote } from "./data/remote.ts";
 import { createIntegrations } from "./integrations/api.ts";
 import { createBots } from "./bots/api.ts";
-import { ServicesContext, Toasts, useUnreadTotals, type Services } from "./data/services.tsx";
+import { blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
+import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
-import { ChatScreen } from "./ui/chat-screen.tsx";
+import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { Toast } from "./ui/parts.tsx";
 
-// Settings and moderation load when opened, keeping the first chat screen small.
-const Settings = lazy(() => import("../screens/settings/settings.tsx").then((m) => ({ default: m.Settings })));
-const SettingsExtra = lazy(() => import("./settings/settings-extra.tsx"));
-const Moderation = lazy(() => import("./moderation/moderation.tsx"));
-const DeveloperConsole = lazy(() => import("./bots/console.tsx"));
+// Settings, the console and moderation load when opened, keeping the first
+// chat screen small; once the app is idle their code is fetched ahead.
+const settingsCode = preloadable(async () => ({ default: (await import("../screens/settings/settings.tsx")).Settings }));
+const settingsExtraCode = preloadable(() => import("./settings/settings-extra.tsx"));
+const moderationCode = preloadable(() => import("./moderation/moderation.tsx"));
+const consoleCode = preloadable(() => import("./bots/console.tsx"));
+const Settings = settingsCode.Component;
+const SettingsExtra = settingsExtraCode.Component;
+const Moderation = moderationCode.Component;
+const DeveloperConsole = consoleCode.Component;
+
+/** Secondary screens whose code is fetched when the browser is idle after startup. */
+const IDLE_PREFETCH = [settingsCode.preload, settingsExtraCode.preload, consoleCode.preload, ...chatPanePreloads];
+
+/**
+ * What a settings, console or moderation screen needs before it first shows,
+ * started together: its code and its first data. The screen shows once, with
+ * one loader while any of it is missing.
+ */
+function screenParts(route: Route, services: Services, api: Api): Promise<unknown>[] {
+	switch (route.name) {
+		case "settings":
+			switch (route.tab) {
+				case "profile":
+					return [settingsCode.preload()];
+				case "sessions":
+					return [settingsCode.preload(), sessionsData(api).promise];
+				case "privacy":
+					return [settingsCode.preload(), settingsExtraCode.preload(), privacyData(services.remote).promise];
+				case "blocked":
+					return [settingsCode.preload(), settingsExtraCode.preload(), blockedData(services.remote).promise];
+				case "notifications":
+					return [settingsCode.preload(), settingsExtraCode.preload(), notificationSettingsData(services.store).promise];
+				case "appearance":
+				case "shortcuts":
+					return [settingsCode.preload(), settingsExtraCode.preload()];
+			}
+			break;
+		case "console":
+			if (route.view.page === "new") return [consoleCode.preload()];
+			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
+		case "moderation":
+			return [moderationCode.preload()];
+	}
+	return [];
+}
 
 export interface MessagingRootProps {
 	self: SelfUser;
@@ -146,6 +193,10 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 		};
 	}, [start]);
 
+	// Fetch the code of secondary screens once startup is over.
+	const started = start.status === "ready";
+	useEffect(() => (started ? prefetchWhenIdle(IDLE_PREFETCH) : undefined), [started]);
+
 	// One services object per client and profile, so context readers re-render rarely.
 	const services = useMemo(() => (start.status === "ready" ? { ...start.services, self } : null), [start, self]);
 
@@ -184,51 +235,43 @@ interface ScreenProps {
 }
 
 function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
-	switch (route.name) {
-		case "home":
-		case "chat":
-		case "invite":
-		case "contacts":
-		case "bot":
-			return <ChatScreen self={self} route={route} />;
-		case "settings":
-			return (
-				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Suspense fallback={<BrandLoader />}>
-						<Settings
-							tab={route.tab}
-							self={self}
-							onSelfChange={onSelfChange}
-							messaging={{
-								onSignOut,
-								moderation: moderator,
-								render: (tab: SettingsTab): ReactNode => (
-									<Suspense fallback={<BrandLoader />}>
-										<SettingsExtra tab={tab} />
-									</Suspense>
-								),
-							}}
-						/>
-					</Suspense>
-				</Shell>
-			);
-		case "console":
-			return (
-				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Suspense fallback={<BrandLoader />}>
-						<DeveloperConsole view={route.view} />
-					</Suspense>
-				</Shell>
-			);
-		case "moderation":
-			return (
-				<Shell self={self} route={route} nav={<ContactsLink />}>
-					<Suspense fallback={<BrandLoader />}>
-						<Moderation reportId={route.reportId} actions={route.actions} />
-					</Suspense>
-				</Shell>
-			);
+	const services = useServices();
+	const api = useApi();
+	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot") {
+		return <ChatScreen self={self} route={route} />;
 	}
+	// Started on every render: the requests are shared, so this only starts what a new route needs.
+	const parts = screenParts(route, services, api);
+	let screen: ReactNode;
+	switch (route.name) {
+		case "settings":
+			screen = (
+				<Settings
+					tab={route.tab}
+					self={self}
+					onSelfChange={onSelfChange}
+					messaging={{
+						onSignOut,
+						moderation: moderator,
+						render: (tab: SettingsTab): ReactNode => <SettingsExtra tab={tab} />,
+					}}
+				/>
+			);
+			break;
+		case "console":
+			screen = <DeveloperConsole view={route.view} />;
+			break;
+		case "moderation":
+			screen = <Moderation reportId={route.reportId} actions={route.actions} />;
+			break;
+	}
+	return (
+		<Shell self={self} route={route} nav={<ContactsLink />}>
+			<LoaderBoundary key={route.name}>
+				<Ready parts={parts}>{screen}</Ready>
+			</LoaderBoundary>
+		</Shell>
+	);
 }
 
 /**

@@ -4,13 +4,15 @@
 // the server turned it off, the secret with its 7-day grace period
 // (rotate, revoke the old one now), counters and failed requests, a
 // connection guide for its format, its log, and deleting it.
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type { Chat } from "@app/core";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
+import { useLoad } from "../../components/preload.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
+import { hookData } from "../data/screen-data.ts";
 import { useServices } from "../data/services.tsx";
 import { Glyph } from "../ui/glyphs.tsx";
 import { DialogHead, Modal, Switch, useDomId } from "../ui/parts.tsx";
@@ -23,46 +25,29 @@ import { useHooksCopy } from "./use-hooks-copy.ts";
 
 type NameOf = (userId: number) => string;
 
-interface DetailState {
-	readonly hook: Hook | null;
-	readonly names: HookNames;
-	readonly status: "loading" | "ready" | "error" | "gone";
-}
+const NO_NAMES: HookNames = new Map();
 
 export function HookDetail({ chat, hookId }: { chat: Chat; hookId: string }) {
 	const copy = useCopy();
 	const t = useHooksCopy();
 	const { locale } = useI18n();
 	const { integrations, store } = useServices();
-	const [state, setState] = useState<DetailState>({ hook: null, names: new Map(), status: "loading" });
-	const [attempt, setAttempt] = useState(0);
+	// The first load is started by the chat screen with this page's code (chat-screen.tsx).
+	const [load, reload, change] = useLoad(hookData(integrations, hookId));
+	const loader = useLoader(load.status === "loading", copy.common.loading);
 	// Shown once after a rotation or a take-over with a new secret, then dropped.
 	const [once, setOnce] = useState<HookWithUrl | null>(null);
 	// Turning on failed because the creator is no longer an admin: offer the take-over.
 	const [needTakeOver, setNeedTakeOver] = useState(false);
-	const hook = state.hook;
+	const hook = load.status === "ready" ? load.value.hook : null;
+	const names = load.status === "ready" ? load.value.names : NO_NAMES;
 	const now = useNow(false);
 	const channel = chat.type === "channel";
 
-	useEffect(() => {
-		let active = true;
-		integrations.hook(hookId).then(
-			({ hook: loaded, names }) => {
-				if (active) setState({ hook: loaded, names, status: "ready" });
-			},
-			(err: unknown) => {
-				if (active) setState((current) => ({ ...current, status: hookErrorCode(err) === "not_found" ? "gone" : "error" }));
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [integrations, hookId, attempt]);
+	const nameOf: NameOf = (userId) => (userId === store.selfId ? copy.common.you : (names.get(userId) ?? copy.message.unknownUser));
+	const update = (next: Hook) => change((current) => ({ ...current, hook: next }));
 
-	const nameOf: NameOf = (userId) => (userId === store.selfId ? copy.common.you : (state.names.get(userId) ?? copy.message.unknownUser));
-	const update = (next: Hook) => setState((current) => ({ ...current, hook: next }));
-
-	if (state.status === "gone") {
+	if (load.status === "error" && hookErrorCode(load.error) === "not_found") {
 		return (
 			<div className="hooks-body">
 				<div className="card empty">
@@ -75,26 +60,21 @@ export function HookDetail({ chat, hookId }: { chat: Chat; hookId: string }) {
 			</div>
 		);
 	}
-	if (hook === null) {
+	if (loader !== null || hook === null) {
 		return (
 			<div className="hooks-body">
-				{state.status === "error" ? (
+				{loader ?? (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
 						<span className="grow">{copy.common.loadFailed}</span>
 						<button
 							type="button"
 							className="btn btn-sm"
-							onClick={() => {
-								setState((current) => ({ ...current, status: "loading" }));
-								setAttempt((n) => n + 1);
-							}}
+							onClick={reload}
 						>
 							{copy.common.retry}
 						</button>
 					</div>
-				) : (
-					<BrandLoader label={copy.common.loading} />
 				)}
 			</div>
 		);

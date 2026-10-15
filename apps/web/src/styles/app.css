@@ -164,7 +164,7 @@ button { cursor: pointer; }
 .card.pad, .pad { padding: var(--space-4); }
 .pad-x { padding-left: var(--space-4); padding-right: var(--space-4); }
 .pad-b { padding-bottom: var(--space-4); }
-.card-title { margin: 0; padding: var(--space-3) var(--space-4) var(--space-1); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-text-muted); }
+.card-title { margin: 0; padding: var(--space-3) var(--space-4) var(--space-1); font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
 .row { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; }
 .row .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .row small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
@@ -236,27 +236,33 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
    The logo is the brand icon inlined as SVG. The loader animates its three
    typing dots in a wave under a breathing halo; the status text fades in
    after 600 ms so fast loads show the logo only. Reduced motion: static logo;
-   the duration tokens collapse, so the text appears after 600 ms. */
+   the duration tokens collapse, so the text appears after 600 ms.
+   In the app a loader appears only after 320 ms of waiting (an empty frame
+   until then) and stays at least 400 ms (components/loader-gate.ts). Loaders
+   that take over from one another share --loader-phase (the animation clock)
+   and --loader-age (time already on screen), so the hand-over does not show. */
 .brand-logo { position: relative; isolation: isolate; display: inline-block; flex: none; width: 48px; height: 48px; line-height: 0; }
 .brand-logo svg { display: block; width: 100%; height: 100%; }
 .brand-loader {
 	flex: 1 1 auto; align-self: stretch; display: grid; place-content: center; justify-items: center; gap: var(--space-4);
 	min-height: 240px; padding: var(--space-6) var(--space-4); text-align: center; color: var(--c-text-muted);
 }
-/* The index.html splash shows until React puts something in #root. */
-#root:not(:empty) ~ #splash { display: none; }
-.brand-loader.page { position: fixed; inset: 0; z-index: 1; min-height: 0; background: var(--c-bg); }
+/* The index.html splash stays up until the first screen is ready (it covers the app until then). */
+#splash[hidden] { display: none; }
+.brand-loader.page { position: fixed; inset: 0; z-index: 40; min-height: 0; background: var(--c-bg); }
 .brand-loader .brand-logo { width: 64px; height: 64px; }
 .brand-loader.page .brand-logo { width: 88px; height: 88px; }
 .brand-loader .brand-logo::before {
 	content: ""; position: absolute; inset: -30%; z-index: -1; border-radius: var(--radius-full);
 	background: radial-gradient(closest-side, color-mix(in srgb, var(--c-primary-solid) 55%, transparent), transparent);
-	animation: loader-halo 2.4s ease-in-out infinite;
+	animation: loader-halo 2.4s ease-in-out var(--loader-phase, 0s) infinite;
 }
-.brand-loader .logo-dot { transform-box: fill-box; transform-origin: center; animation: loader-dot 1.2s ease-in-out infinite; }
-.brand-loader .logo-dot:nth-of-type(2) { animation-delay: 0.15s; }
-.brand-loader .logo-dot:nth-of-type(3) { animation-delay: 0.3s; }
+.brand-loader .logo-dot { transform-box: fill-box; transform-origin: center; animation: loader-dot 1.2s ease-in-out var(--loader-phase, 0s) infinite; }
+.brand-loader .logo-dot:nth-of-type(2) { animation-delay: calc(var(--loader-phase, 0s) + 0.15s); }
+.brand-loader .logo-dot:nth-of-type(3) { animation-delay: calc(var(--loader-phase, 0s) + 0.3s); }
 .brand-loader-text { margin: 0; font-size: 0.875rem; animation: loader-reveal var(--dur-slow) var(--ease-decelerate) 600ms both; }
+/* In-app loaders appear after 320 ms already: the text follows ~600 ms after the wait began. */
+.brand-loader.delayed .brand-loader-text { animation-delay: calc(280ms + var(--loader-age, 0s)); }
 @keyframes loader-dot {
 	0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
 	30% { transform: translateY(-38%); opacity: 1; }

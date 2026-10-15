@@ -7,7 +7,7 @@
 // them and the groups you share.
 import { fold } from "@app/core";
 import { useState, type ReactNode } from "react";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -28,6 +28,8 @@ export function ContactsView({ userId }: { userId: number }) {
 	const { remote } = useServices();
 	const ui = useUi();
 	const contacts = useContacts(remote);
+	// One loader with the view's code (LoaderBoundary in chat-screen.tsx), which also starts the load.
+	const loader = useLoader(contacts.status === "idle" || contacts.status === "loading", copy.common.loading);
 	const [query, setQuery] = useState("");
 	const t = copy.contacts;
 	const needle = fold(query.trim().replace(/^@/, ""));
@@ -50,10 +52,8 @@ export function ContactsView({ userId }: { userId: number }) {
 				</button>
 			</div>
 		);
-	} else if (contacts.status !== "ready") {
-		body = (
-			<BrandLoader label={copy.common.loading} />
-		);
+	} else if (loader !== null || contacts.status !== "ready") {
+		body = loader;
 	} else if (contacts.entries.length === 0) {
 		body = (
 			<div className="empty">

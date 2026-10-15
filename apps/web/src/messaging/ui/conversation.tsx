@@ -2,7 +2,7 @@
 // #topic-states, #connection-states).
 import { Suspense, lazy, useEffect, useRef, useState, type DragEvent } from "react";
 import type { Chat } from "@app/core";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -221,6 +221,8 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const [searchIn, setSearchIn] = useState<{ chatId: number; topicId: number } | null>(null);
 	const searching = searchIn !== null && searchIn.chatId === chatId && searchIn.topicId === effectiveTopic;
 	useIncomingSound(chatId);
+	// Shares one loader timing with the message list (LoaderScope in chat-screen.tsx).
+	const loader = useLoader(chat === undefined);
 
 	useEffect(() => {
 		store.openWindow(chatId);
@@ -235,10 +237,10 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 		ui.menu.set(null);
 	}, [ui, chatId, effectiveTopic]);
 
-	if (chat === undefined) {
+	if (loader !== null || chat === undefined) {
 		return (
 			<section className="convo" aria-busy="true">
-				<BrandLoader />
+				{loader}
 			</section>
 		);
 	}

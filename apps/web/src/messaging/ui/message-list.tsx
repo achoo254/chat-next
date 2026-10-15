@@ -6,7 +6,7 @@
 // message and, while someone's mention of you is unread, to that message.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, DialogView } from "@app/core";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -101,6 +101,7 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	const groups = groupRows(allKeys, (key) => store.item(chatId, key));
 	// One row per message or album: keyboard moves between rows.
 	const keys = groups.map((group) => group.key);
+	const loader = useLoader(window_ === undefined || (window_.status === "loading" && keys.length === 0), copy.common.loading);
 	const lastKey = keys[keys.length - 1] ?? "";
 	const unreadFrom = window_?.unreadFromSeq ?? 0;
 	const readOutbox = dialog?.dialog.readOutboxMaxSeq ?? 0;
@@ -183,10 +184,10 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 		scroller.current?.querySelector<HTMLElement>(`[data-key="${next}"]`)?.focus();
 	};
 
-	if (window_ === undefined || (window_.status === "loading" && keys.length === 0)) {
+	if (loader !== null || window_ === undefined) {
 		return (
 			<div className="messages" aria-busy="true">
-				<BrandLoader label={copy.common.loading} />
+				{loader}
 			</div>
 		);
 	}

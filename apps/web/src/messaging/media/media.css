@@ -135,7 +135,7 @@ dialog.modal.viewer {
 .sm-view .tabs { padding-top: var(--space-1); }
 .sm-view .tabs button { flex: 1; }
 .sm-body { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
-.sm-body h4 { margin: var(--space-2) 0 0; font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.sm-body h4 { margin: var(--space-2) 0 0; font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
 .sm-body h4:first-child { margin-top: 0; }
 .sm-body .note { font-size: 0.75rem; color: var(--c-text-muted); margin: 0; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }

@@ -3,7 +3,7 @@
 // lifts the ban only: the person is not added back, but invite links and
 // being added work for them again. Admins only.
 import { useEffect, useState } from "react";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
@@ -35,6 +35,8 @@ export function BannedList({ chatId }: { chatId: number }) {
 	const [busy, setBusy] = useState(0);
 	const t = copy.banned;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
+	const chatLoader = useLoader(chat === undefined);
+	const listLoader = useLoader(state.status === "loading", copy.common.loading);
 
 	useEffect(() => {
 		if (!admin) return;
@@ -79,12 +81,8 @@ export function BannedList({ chatId }: { chatId: number }) {
 		);
 	};
 
-	if (chat == null) {
-		return (
-			<section className="admin-page">
-				{chat === undefined ? <BrandLoader /> : <div className="empty">{copy.convo.notFound}</div>}
-			</section>
-		);
+	if (chatLoader !== null || chat == null) {
+		return <section className="admin-page">{chatLoader ?? <div className="empty">{copy.convo.notFound}</div>}</section>;
 	}
 	const channel = chat.type === "channel";
 	const titleId = `banned-${chatId}`;
@@ -104,10 +102,8 @@ export function BannedList({ chatId }: { chatId: number }) {
 			) : (
 				<div className="ban-page">
 					<div className="card">
-						{state.status === "loading" && (
-							<BrandLoader label={copy.common.loading} />
-						)}
-						{state.status === "error" && (
+						{listLoader}
+						{listLoader === null && state.status === "error" && (
 							<div className="banner error" role="alert">
 								<Icon name="alert" small />
 								<span className="grow">{copy.common.loadFailed}</span>

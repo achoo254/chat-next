@@ -1,17 +1,18 @@
 import { Code } from "@connectrpc/connect";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { SessionView } from "../../api/adapters.ts";
 import { useApi } from "../../api/api-context.tsx";
 import { errorCode } from "../../api/client.ts";
 import { brand } from "../../brand.ts";
 import { ExternalLink } from "../../components/external-link.tsx";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
+import { useLoad } from "../../components/preload.ts";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import type { Messages } from "../../i18n/vi.ts";
+import { sessionsData } from "./sessions-data.ts";
 
-type Load = { status: "loading" } | { status: "error" } | { status: "ready"; sessions: SessionView[] };
 type Notice = { kind: "ok" | "error"; text: string } | null;
 type Busy = number | "others" | null;
 
@@ -60,34 +61,15 @@ function SessionInfo({ session }: { session: SessionView }) {
 export function SessionsSettings() {
 	const api = useApi();
 	const { t } = useI18n();
-	const [load, setLoad] = useState<Load>({ status: "loading" });
-	const [attempt, setAttempt] = useState(0);
+	// The first load is started by the settings route with this screen's code (messaging-root.tsx).
+	const [load, retry, update] = useLoad(sessionsData(api));
+	// Unauthenticated already sent the app back to the welcome screen: keep loading until it shows.
+	const signedOut = load.status === "error" && errorCode(load.error) === Code.Unauthenticated;
+	const loader = useLoader(load.status === "loading" || signedOut, t.common.loading);
 	const [busy, setBusy] = useState<Busy>(null);
 	const [notice, setNotice] = useState<Notice>(null);
 
-	useEffect(() => {
-		let active = true;
-		api.listSessions().then(
-			(sessions) => {
-				if (active) setLoad({ status: "ready", sessions });
-			},
-			(err: unknown) => {
-				// Unauthenticated already sent the app back to the welcome screen.
-				if (active && errorCode(err) !== Code.Unauthenticated) setLoad({ status: "error" });
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [api, attempt]);
-
-	const retry = () => {
-		setLoad({ status: "loading" });
-		setAttempt((n) => n + 1);
-	};
-
-	const keepOnly = (keep: (session: SessionView) => boolean) =>
-		setLoad((prev) => (prev.status === "ready" ? { ...prev, sessions: prev.sessions.filter(keep) } : prev));
+	const keepOnly = (keep: (session: SessionView) => boolean) => update((sessions) => sessions.filter(keep));
 
 	const failure = (err: unknown): Notice => {
 		const code = errorCode(err);
@@ -129,11 +111,9 @@ export function SessionsSettings() {
 		setBusy(null);
 	};
 
-	if (load.status === "loading") {
-		return <BrandLoader label={t.common.loading} />;
-	}
+	if (loader !== null) return loader;
 
-	if (load.status === "error") {
+	if (load.status !== "ready") {
 		return (
 			<div className="set-body">
 				<div className="banner error" role="alert">
@@ -147,8 +127,8 @@ export function SessionsSettings() {
 		);
 	}
 
-	const current = load.sessions.filter((s) => s.current);
-	const others = load.sessions.filter((s) => !s.current);
+	const current = load.value.filter((s) => s.current);
+	const others = load.value.filter((s) => !s.current);
 
 	return (
 		<div className="set-body">

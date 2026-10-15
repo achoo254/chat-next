@@ -10,7 +10,7 @@ import { BotCommandScope } from "@app/proto-ts/bot_admin";
 import { ChatType } from "@app/proto-ts/chats";
 import { matchCommands } from "../src/messaging/bots/bot-chat.tsx";
 import { startCommand } from "../src/messaging/bots/bot-link-dialog.tsx";
-import { reauthUrl, usernameSuggestions } from "../src/messaging/bots/console.tsx";
+import { normalizeUsername, reauthUrl, usernameFromName, usernameSuggestions } from "../src/messaging/bots/console.tsx";
 import { usernameProblem, validStartParam } from "../src/messaging/bots/api.ts";
 import { inAppBotLink } from "../src/messaging/ui/rich-text.tsx";
 import { matchRoute, navigate, returnPathFor } from "../src/router.tsx";
@@ -39,6 +39,20 @@ describe("bot routes and helpers", () => {
 		expect(returnPathFor("/b/deploy_bot", "?start=release-241")).toBe("/b/deploy_bot?start=release-241");
 		expect(returnPathFor("/c/12", "?x=1")).toBe("/c/12");
 		expect(reauthUrl("vi", 42, "token", "token")).toBe("/auth/login?reauth=1&locale=vi&return_to=%2Fconsole%2F42%2Ftoken%3Fafter%3Dtoken");
+	});
+
+	it("normalizes usernames as they are typed and offers one from the display name", () => {
+		expect(normalizeUsername("Báo-Cáo Đêm")).toBe("bao_cao_dem");
+		expect(normalizeUsername("deploy ")).toBe("deploy_");
+		expect(normalizeUsername("Hello@World!_bot")).toBe("helloworld_bot");
+		expect(normalizeUsername("Ứng dụng  của tôi")).toBe("ung_dung_cua_toi");
+		expect(normalizeUsername("x".repeat(40))).toHaveLength(32);
+		expect(usernameFromName("Deploy Thử")).toBe("deploy_thu_bot");
+		expect(usernameFromName("Báo cáo Bot")).toBe("bao_cao_bot");
+		expect(usernameFromName("  Trực ca -- Đêm  ")).toBe("truc_ca_dem_bot");
+		expect(usernameFromName("!!!")).toBe("");
+		expect(usernameFromName("báo cáo doanh thu hằng ngày cho nhóm kinh doanh")).toBe("bao_cao_doanh_thu_hang_ngay_bot");
+		expect(usernameProblem(usernameFromName("báo cáo doanh thu hằng ngày cho nhóm kinh doanh"))).toBeNull();
 	});
 
 	it("validate usernames, start parameters and in-app bot links", () => {
@@ -86,8 +100,14 @@ describe("Developer Console", () => {
 		const submit = within(form).getByRole("button", { name: "Tạo bot" });
 		expect(submit.hasAttribute("disabled")).toBe(true);
 		await userEvent.type(within(form).getByRole("textbox", { name: "Tên hiển thị" }), "Báo cáo Bot");
-		const username = within(form).getByRole("textbox", { name: "Username" });
-		await userEvent.type(username, "report");
+		const username = within(form).getByRole<HTMLInputElement>("textbox", { name: "Username" });
+		// Offered from the display name until the username is typed in.
+		expect(username.value).toBe("bao_cao_bot");
+		await userEvent.clear(username);
+		await userEvent.type(username, "Ré port");
+		expect(username.value).toBe("re_port");
+		await userEvent.type(within(form).getByRole("textbox", { name: "Tên hiển thị" }), " Mới");
+		expect(username.value).toBe("re_port");
 		expect(within(form).getByText("Username phải kết thúc bằng bot")).toBeTruthy();
 		await userEvent.clear(username);
 		// Taken by the demo's Deploy Bot: told while typing, with other names to try.
@@ -102,7 +122,7 @@ describe("Developer Console", () => {
 		await waitFor(() => expect(window.location.pathname).toMatch(/^\/console\/\d+\/token$/), LONG);
 		const botId = Number(window.location.pathname.split("/")[2]);
 		const bot = fake.bots.get(botId);
-		expect(bot).toMatchObject({ username: "deploy_team_bot", name: "Báo cáo Bot", description: "Báo cáo doanh thu mỗi sáng.", privacy: false, tokenSecret: "" });
+		expect(bot).toMatchObject({ username: "deploy_team_bot", name: "Báo cáo Bot Mới", description: "Báo cáo doanh thu mỗi sáng.", privacy: false, tokenSecret: "" });
 
 		// No recent sign-in: the console sends the browser to sign in again, back to this page.
 		await userEvent.click(await screen.findByRole("button", { name: "Cấp token" }, LONG));

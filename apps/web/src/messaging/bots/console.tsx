@@ -8,13 +8,15 @@
 // Bots receive updates by long polling only for now. Loaded on demand with
 // its own styles.
 import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
-import { signInUrl } from "@app/core";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { fold, signInUrl } from "@app/core";
+import { useLoader } from "../../components/delayed-loader.tsx";
+import { useLoad, type Load } from "../../components/preload.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch, type ConsolePage, type ConsoleTab } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { clock, orgDomain, shortDate } from "../data/format.ts";
+import { myBotsData } from "../data/screen-data.ts";
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "../ui/parts.tsx";
 import { BOT_LIMITS, botErrorKind, EDITABLE_SCOPES, usernameProblem, validCommand, type BotCommand, type CommandScope, type CommandSets, type OwnBot } from "./api.ts";
@@ -26,33 +28,15 @@ import "./console.css";
 const BOTS_MAX = 20;
 const USERNAME_CHECK_DELAY_MS = 400;
 
-type Loaded<T> = { readonly status: "loading" } | { readonly status: "error" } | { readonly status: "ready"; readonly value: T };
-
-/** The caller's bots, with a way to reload and to apply a changed bot locally. */
-function useMyBots(): [Loaded<OwnBot[]>, () => void, (bot: OwnBot) => void] {
+/**
+ * The caller's bots for the list (`page` 0) or a bot's page, with a way to
+ * reload and to apply a changed bot locally. The first list comes through Suspense, started by the route with the
+ * console's code (messaging-root.tsx), so the page shows once.
+ */
+function useMyBots(page: number): [Load<OwnBot[]>, () => void, (bot: OwnBot) => void] {
 	const { bots } = useServices();
-	const [state, setState] = useState<Loaded<OwnBot[]>>({ status: "loading" });
-	const [attempt, setAttempt] = useState(0);
-	useEffect(() => {
-		let active = true;
-		bots.mine().then(
-			(value) => {
-				if (active) setState({ status: "ready", value });
-			},
-			() => {
-				if (active) setState({ status: "error" });
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [bots, attempt]);
-	const reload = () => {
-		setState({ status: "loading" });
-		setAttempt((n) => n + 1);
-	};
-	const put = (bot: OwnBot) =>
-		setState((current) => (current.status === "ready" ? { status: "ready", value: current.value.map((b) => (b.id === bot.id ? bot : b)) } : current));
+	const [state, reload, update] = useLoad(myBotsData(bots, page));
+	const put = (bot: OwnBot) => update((value) => value.map((b) => (b.id === bot.id ? bot : b)));
 	return [state, reload, put];
 }
 
@@ -99,13 +83,8 @@ function ConsoleHead({ back, backLabel, parent, current }: { back: string; backL
 	);
 }
 
-function LoadState({ state, onRetry }: { state: Loaded<unknown>; onRetry: () => void }) {
+function LoadError({ onRetry }: { onRetry: () => void }) {
 	const copy = useCopy();
-	if (state.status === "loading") {
-		return (
-			<BrandLoader label={copy.common.loading} />
-		);
-	}
 	return (
 		<div className="banner error" role="alert">
 			<Icon name="alert" small />
@@ -122,7 +101,9 @@ function LoadState({ state, onRetry }: { state: Loaded<unknown>; onRetry: () => 
 function BotList() {
 	const t = useBotsCopy();
 	const { locale } = useI18n();
-	const [state, reload] = useMyBots();
+	const copy = useCopy();
+	const [state, reload] = useMyBots(0);
+	const loader = useLoader(state.status === "loading", copy.common.loading);
 	const org = orgDomain(window.location.host);
 	const titleId = useDomId("bots");
 	const bots = state.status === "ready" ? state.value : [];
@@ -141,8 +122,8 @@ function BotList() {
 					)}
 				</div>
 				{full && <p className="note">{t.console.limitReached(BOTS_MAX)}</p>}
-				{state.status !== "ready" ? (
-					<LoadState state={state} onRetry={reload} />
+				{loader ?? (state.status === "error" ? (
+					<LoadError onRetry={reload} />
 				) : bots.length === 0 ? (
 					<div className="card pad">
 						<div className="empty">
@@ -194,7 +175,7 @@ function BotList() {
 							</tbody>
 						</table>
 					</div>
-				)}
+				))}
 			</div>
 		</section>
 	);
@@ -203,6 +184,25 @@ function BotList() {
 // ---------------------------------------------------------------- create
 
 type UsernameCheck = "idle" | "checking" | "ok" | "taken";
+
+/**
+ * What may go in a username, applied as it is typed: Vietnamese folded to
+ * plain letters (đ to d), lower case, spaces and dashes to "_", anything else
+ * dropped.
+ */
+export function normalizeUsername(text: string): string {
+	return fold(text.replace(/[\s-]+/gu, "_"))
+		.replace(/[^a-z0-9_]/g, "")
+		.slice(0, BOT_LIMITS.usernameMax);
+}
+
+/** The username offered for a display name: "Deploy Thử" to "deploy_thu_bot"; empty when the name has no usable letters. */
+export function usernameFromName(name: string): string {
+	const stem = normalizeUsername(name).replace(/_+/g, "_").replace(/^_|_$/g, "");
+	if (stem === "") return "";
+	if (stem.endsWith("bot")) return stem;
+	return `${stem.slice(0, BOT_LIMITS.usernameMax - "_bot".length).replace(/_$/, "")}_bot`;
+}
 
 /** Two other usernames to try when one is taken: same stem, still ending in "bot". */
 export function usernameSuggestions(username: string): string[] {
@@ -218,6 +218,8 @@ function CreateBot() {
 	const { bots, toasts } = useServices();
 	const [name, setName] = useState("");
 	const [username, setUsername] = useState("");
+	// Until the username is typed in, it follows the display name.
+	const [usernameEdited, setUsernameEdited] = useState(false);
 	const [description, setDescription] = useState("");
 	const [privacy, setPrivacy] = useState(true);
 	const [check, setCheck] = useState<UsernameCheck>("idle");
@@ -230,15 +232,14 @@ function CreateBot() {
 	const descId = useDomId("cb-desc");
 	const formId = useDomId("cb-form");
 
-	const lowered = username.trim().toLowerCase();
-	const problem = lowered === "" ? null : usernameProblem(lowered);
+	const problem = username === "" ? null : usernameProblem(username);
 
 	useEffect(() => {
-		if (lowered === "" || problem !== null) return;
+		if (username === "" || problem !== null) return;
 		let active = true;
 		const timer = setTimeout(() => {
 			setCheck("checking");
-			bots.usernameTaken(lowered).then(
+			bots.usernameTaken(username).then(
 				(taken) => {
 					if (active) setCheck(taken ? "taken" : "ok");
 				},
@@ -252,11 +253,11 @@ function CreateBot() {
 			active = false;
 			clearTimeout(timer);
 		};
-	}, [bots, lowered, problem]);
+	}, [bots, username, problem]);
 
 	const usernameError = problem !== null ? t.create.usernameProblem[problem] : check === "taken" ? t.create.usernameProblem.taken : "";
 	const nameError = touched && name.trim() === "" ? t.create.nameRequired : "";
-	const canSubmit = !busy && name.trim() !== "" && lowered !== "" && usernameError === "";
+	const canSubmit = !busy && name.trim() !== "" && username !== "" && usernameError === "";
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -265,7 +266,7 @@ function CreateBot() {
 		setBusy(true);
 		setError("");
 		try {
-			let bot = await bots.create(lowered, name.trim());
+			let bot = await bots.create(username, name.trim());
 			if (description.trim() !== "" || !privacy) bot = await bots.update(bot.id, { description: description.trim(), privacy });
 			toasts.show(t.create.created);
 			navigate(paths.consoleBot(bot.id, "token"));
@@ -294,7 +295,13 @@ function CreateBot() {
 								maxLength={BOT_LIMITS.name}
 								autoComplete="off"
 								aria-invalid={nameError !== ""}
-								onChange={(event) => setName(event.target.value)}
+								onChange={(event) => {
+									setName(event.target.value);
+									if (!usernameEdited) {
+										setUsername(usernameFromName(event.target.value));
+										setCheck("idle");
+									}
+								}}
 								onBlur={() => setTouched(true)}
 							/>
 							{nameError !== "" && <span className="error-text">{nameError}</span>}
@@ -314,7 +321,8 @@ function CreateBot() {
 									aria-invalid={usernameError !== ""}
 									aria-describedby={`${userId}-msg ${userId}-hint`}
 									onChange={(event) => {
-										setUsername(event.target.value);
+										setUsername(normalizeUsername(event.target.value));
+										setUsernameEdited(true);
 										setCheck("idle");
 									}}
 								/>
@@ -325,13 +333,14 @@ function CreateBot() {
 							{check === "taken" && (
 								<div className="suggest">
 									{t.create.suggest}
-									{usernameSuggestions(lowered).map((candidate) => (
+									{usernameSuggestions(username).map((candidate) => (
 										<button
 											key={candidate}
 											type="button"
 											className="btn btn-sm mono"
 											onClick={() => {
 												setUsername(candidate);
+												setUsernameEdited(true);
 												setCheck("idle");
 											}}
 										>
@@ -412,7 +421,9 @@ export function reauthUrl(locale: string, botId: number, tab: ConsoleTab, after:
 
 function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 	const t = useBotsCopy();
-	const [state, reload, put] = useMyBots();
+	const copy = useCopy();
+	const [state, reload, put] = useMyBots(botId);
+	const loader = useLoader(state.status === "loading", copy.common.loading);
 	// ?after= is taken once per navigation: the tab opens its confirmation
 	// (remounted for a new one) and marks it shown, and the parameter leaves
 	// the URL, so neither a tab switch nor a reload asks again.
@@ -432,10 +443,8 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 	return (
 		<section className="console" aria-labelledby={titleId}>
 			<ConsoleHead back={paths.console()} backLabel={t.console.backToList} parent={t.console.title} current={bot?.name ?? t.console.myBots} />
-			{state.status !== "ready" ? (
-				<div className="c-body">
-					<LoadState state={state} onRetry={reload} />
-				</div>
+			{loader !== null || state.status !== "ready" ? (
+				<div className="c-body">{loader ?? <LoadError onRetry={reload} />}</div>
 			) : bot === null ? (
 				<div className="c-body">
 					<div className="empty">

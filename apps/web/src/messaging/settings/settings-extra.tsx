@@ -2,15 +2,17 @@
 // #blocked, #notifications, #appearance, #shortcuts).
 import type { NotificationSettings as CoreNotificationSettings, NotificationSound } from "@app/core";
 import { requestNotificationPermission } from "@app/platform-web";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import { FONT_MAX, FONT_MIN, setFontSize, setTheme, storedFontSize, storedTheme, type Theme } from "../../appearance.ts";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
+import { useLoad } from "../../components/preload.ts";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import { Link, paths, type SettingsTab } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useContacts } from "../data/contacts.ts";
 import { clock } from "../data/format.ts";
+import { blockedData, notificationSettingsData, privacyData } from "../data/screen-data.ts";
 import type { Audience, BlockedPerson, Privacy } from "../data/remote.ts";
 import { setSoundInChat, useSoundInChat } from "../data/device-settings.ts";
 import { useNotificationSettings, useServices } from "../data/services.tsx";
@@ -63,68 +65,48 @@ function ContactsDefinition() {
 
 type AudienceKey = "lastSeen" | "profilePhoto" | "findByEmail" | "findByUsername" | "addToGroups" | "sendMessages";
 
+/** A failed load with a way to try again, in place of a tab's content. */
+function LoadFailed({ onRetry }: { onRetry: () => void }) {
+	const copy = useScreensCopy();
+	return (
+		<div className="set-body">
+			<div className="banner error" role="alert">
+				<Icon name="alert" small />
+				<span className="grow">{copy.common.loadFailed}</span>
+				<button type="button" className="btn btn-sm" onClick={onRetry}>
+					{copy.common.retry}
+				</button>
+			</div>
+		</div>
+	);
+}
+
 function PrivacySettings() {
 	const copy = useScreensCopy();
 	const { remote, toasts } = useServices();
-	const [privacy, setPrivacy] = useState<Privacy | null>(null);
-	const [failed, setFailed] = useState(false);
-	const [attempt, setAttempt] = useState(0);
+	// The first load is started by the route with this tab's code (messaging-root.tsx).
+	const [load, reload, update] = useLoad(privacyData(remote));
+	const loader = useLoader(load.status === "loading", copy.common.loading);
 	const t = copy.privacy;
 
-	useEffect(() => {
-		let active = true;
-		remote.privacy().then(
-			(value) => {
-				if (active) setPrivacy(value);
-			},
-			() => {
-				if (active) setFailed(true);
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [remote, attempt]);
+	if (loader !== null) return loader;
+	if (load.status !== "ready") return <LoadFailed onRetry={reload} />;
+	const privacy = load.value;
 
 	const save = (change: Partial<Privacy>) => {
-		if (privacy === null) return;
 		const previous = privacy;
-		setPrivacy({ ...privacy, ...change });
+		update((current) => ({ ...current, ...change }));
 		remote.setPrivacy(change).then(
 			(saved) => {
-				setPrivacy(saved);
+				update(() => saved);
 				toasts.show(t.saved);
 			},
 			() => {
-				setPrivacy(previous);
+				update(() => previous);
 				toasts.show(copy.common.failed);
 			},
 		);
 	};
-
-	if (privacy === null) {
-		if (!failed) return <BrandLoader label={copy.common.loading} />;
-		return (
-			<div className="set-body">
-				{failed && (
-					<div className="banner error" role="alert">
-						<Icon name="alert" small />
-						<span className="grow">{copy.common.loadFailed}</span>
-						<button
-							type="button"
-							className="btn btn-sm"
-							onClick={() => {
-								setFailed(false);
-								setAttempt((n) => n + 1);
-							}}
-						>
-							{copy.common.retry}
-						</button>
-					</div>
-				)}
-			</div>
-		);
-	}
 
 	const options = [
 		{ value: "everyone" as const, label: t.everyone },
@@ -177,41 +159,20 @@ function PrivacySettings() {
 	);
 }
 
-type BlockedState =
-	| { readonly status: "loading" }
-	| { readonly status: "error" }
-	| { readonly status: "ready"; readonly people: readonly BlockedPerson[]; readonly cursor: string };
-
 /** People you blocked, most recent first (GetBlockedUsers), with Bỏ chặn. */
 function BlockedSettings() {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
 	const { remote, toasts } = useServices();
-	const [state, setState] = useState<BlockedState>({ status: "loading" });
-	const [attempt, setAttempt] = useState(0);
+	const [state, reload, update] = useLoad(blockedData(remote));
+	const loader = useLoader(state.status === "loading", copy.common.loading);
 	const [busy, setBusy] = useState(0);
 	const t = copy.blocked;
 
-	useEffect(() => {
-		let active = true;
-		remote.blockedUsers().then(
-			(page) => {
-				if (active) setState({ status: "ready", people: page.items, cursor: page.nextCursor });
-			},
-			() => {
-				if (active) setState({ status: "error" });
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [remote, attempt]);
-
 	const more = () => {
-		if (state.status !== "ready" || state.cursor === "") return;
-		remote.blockedUsers(state.cursor).then(
-			(page) =>
-				setState((current) => (current.status === "ready" ? { status: "ready", people: [...current.people, ...page.items], cursor: page.nextCursor } : current)),
+		if (state.status !== "ready" || state.value.nextCursor === "") return;
+		remote.blockedUsers(state.value.nextCursor).then(
+			(page) => update((current) => ({ items: [...current.items, ...page.items], nextCursor: page.nextCursor })),
 			() => toasts.show(copy.common.failed),
 		);
 	};
@@ -220,7 +181,7 @@ function BlockedSettings() {
 		setBusy(person.id);
 		remote.unblock(person.id).then(
 			() => {
-				setState((current) => (current.status === "ready" ? { ...current, people: current.people.filter((item) => item.person.id !== person.id) } : current));
+				update((current) => ({ ...current, items: current.items.filter((item) => item.person.id !== person.id) }));
 				toasts.show(t.unblocked(person.name));
 				setBusy(0);
 			},
@@ -231,28 +192,21 @@ function BlockedSettings() {
 		);
 	};
 
-	if (state.status === "loading") return <BrandLoader label={copy.common.loading} />;
+	if (loader !== null) return loader;
 	return (
 		<div className="set-body">
 			<div className="card">
-				{state.status === "error" ? (
+				{state.status !== "ready" ? (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
 						<span className="grow">{copy.common.loadFailed}</span>
-						<button
-							type="button"
-							className="btn btn-sm"
-							onClick={() => {
-								setState({ status: "loading" });
-								setAttempt((n) => n + 1);
-							}}
-						>
+						<button type="button" className="btn btn-sm" onClick={reload}>
 							{copy.common.retry}
 						</button>
 					</div>
-				) : state.people.length > 0 ? (
+				) : state.value.items.length > 0 ? (
 					<ul className="plain">
-						{state.people.map((entry) => (
+						{state.value.items.map((entry) => (
 							<li className="row pad-x" key={entry.person.id}>
 								<ChatAvatar id={entry.person.id} name={entry.person.name} bot={entry.person.isBot} />
 								<span className="grow">
@@ -270,7 +224,7 @@ function BlockedSettings() {
 								</button>
 							</li>
 						))}
-						{state.cursor !== "" && (
+						{state.value.nextCursor !== "" && (
 							<li className="pad-x">
 								<button type="button" className="see-all" onClick={more}>
 									{t.more}
@@ -339,8 +293,6 @@ function NotificationSettings() {
 	);
 }
 
-type SettingsLoad = "loading" | "ready" | "error";
-
 const CHAT_TYPES = [
 	{ icon: "user", enabled: "privateEnabled", preview: "privatePreview" },
 	{ icon: "users", enabled: "groupsEnabled", preview: "groupsPreview" },
@@ -353,50 +305,15 @@ function NotificationOptions() {
 	const { store, self, toasts } = useServices();
 	const synced = useNotificationSettings();
 	const inChat = useSoundInChat(self.id);
-	const [load, setLoad] = useState<SettingsLoad>("loading");
-	const [attempt, setAttempt] = useState(0);
+	// The store keeps the settings; the first load is started by the route (messaging-root.tsx).
+	const [load, reload] = useLoad(notificationSettingsData(store));
+	const loader = useLoader(load.status === "loading", copy.common.loading);
 	// Changes on their way to the server, shown at once.
 	const [pending, setPending] = useState<Partial<CoreNotificationSettings>>({});
 	const t = copy.notifications;
 
-	useEffect(() => {
-		let active = true;
-		store.loadNotificationSettings().then(
-			() => {
-				if (active) setLoad("ready");
-			},
-			() => {
-				if (active) setLoad("error");
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [store, attempt]);
-
-	if (load !== "ready") {
-		if (load !== "error") return <BrandLoader label={copy.common.loading} />;
-		return (
-			<div className="set-body">
-				{load === "error" && (
-					<div className="banner error" role="alert">
-						<Icon name="alert" small />
-						<span className="grow">{copy.common.loadFailed}</span>
-						<button
-							type="button"
-							className="btn btn-sm"
-							onClick={() => {
-								setLoad("loading");
-								setAttempt((n) => n + 1);
-							}}
-						>
-							{copy.common.retry}
-						</button>
-					</div>
-				)}
-			</div>
-		);
-	}
+	if (loader !== null) return loader;
+	if (load.status !== "ready") return <LoadFailed onRetry={reload} />;
 
 	const settings: CoreNotificationSettings = { ...synced, ...pending };
 	const save = (change: Partial<CoreNotificationSettings>) => {

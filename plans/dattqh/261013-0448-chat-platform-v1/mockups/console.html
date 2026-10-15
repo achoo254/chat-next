@@ -261,7 +261,7 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 <section class="shot" id="create-bot">
 	<div class="shot-head">
 		<h2>Tạo bot</h2><span class="phase">Phase 15</span>
-		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định. Thử gõ lại username trong khung.</p>
+		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Username tự đề xuất từ Tên hiển thị: bỏ dấu tiếng Việt (đ thành d), chữ thường, khoảng trắng và gạch ngang thành "_", bỏ ký tự khác, thêm đuôi "_bot" ("Deploy Thử" thành deploy_thu_bot). Đề xuất đi theo tên cho đến khi người dùng tự sửa username; khi gõ tay, username cũng được chuẩn hoá ngay (gõ "Báo-Cáo" thành bao_cao). Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định. Thử gõ lại tên hoặc username trong khung.</p>
 	</div>
 	<div class="frame">
 		<div class="console">
@@ -280,9 +280,9 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 						</div>
 						<div class="field">
 							<label for="cb-user">Username</label>
-							<div class="prefixed"><span>@</span><input class="input mono" id="cb-user" value="report_bot" autocomplete="off" spellcheck="false" aria-invalid="true" aria-describedby="cb-user-msg cb-user-hint"></div>
+							<div class="prefixed"><span>@</span><input class="input mono" id="cb-user" value="bao_cao_bot" autocomplete="off" spellcheck="false" aria-invalid="true" aria-describedby="cb-user-msg cb-user-hint"></div>
 							<span class="error-text" id="cb-user-msg" role="status">username đã có người dùng</span>
-							<div class="suggest" id="cb-suggest">Thử: <button type="button" class="btn btn-sm">report_daily_bot</button><button type="button" class="btn btn-sm">baocao_bot</button></div>
+							<div class="suggest" id="cb-suggest">Thử: <button type="button" class="btn btn-sm">bao_cao_team_bot</button><button type="button" class="btn btn-sm">bao_cao2_bot</button></div>
 							<span class="hint" id="cb-user-hint">Kết thúc bằng "bot". Chỉ a–z, 0–9 và dấu gạch dưới. Không đổi được sau khi tạo.</span>
 						</div>
 						<div class="field">
@@ -636,25 +636,39 @@ Authorization: Bearer &lt;token&gt;</pre>
 	// Doc links are placeholders: only the toast fires.
 	$$('a[href="#"]').forEach((a) => a.addEventListener("click", (e) => e.preventDefault()));
 
-	// Create bot: live username validation.
-	const TAKEN = ["report_bot", "deploy_bot", "oncall_bot", "report_daily_bot"];
+	// Create bot: username suggested from the name, normalised as typed, checked live.
+	const TAKEN = ["report_bot", "deploy_bot", "oncall_bot", "report_daily_bot", "bao_cao_bot"];
 	const user = $("#cb-user");
+	const name = $("#cb-name");
 	const msg = $("#cb-user-msg");
+	let edited = false;
+	const fold = (text) => text.normalize("NFD").replace(/\p{Mn}/gu, "").replaceAll("đ", "d").replaceAll("Đ", "d").toLowerCase();
+	const normalize = (text) => fold(text.replace(/[\s-]+/gu, "_")).replace(/[^a-z0-9_]/g, "").slice(0, 32);
+	const fromName = (text) => {
+		const stem = normalize(text).replace(/_+/g, "_").replace(/^_|_$/g, "");
+		if (stem === "") return "";
+		return stem.endsWith("bot") ? stem : `${stem.slice(0, 28).replace(/_$/, "")}_bot`;
+	};
+	const suggest = (v) => {
+		const stem = v.replace(/_?bot$/, "").replace(/_+$/, "") || "my";
+		const buttons = $$("#cb-suggest button");
+		[`${stem}_team_bot`, `${stem}2_bot`].forEach((candidate, i) => { buttons[i].textContent = candidate; });
+	};
 	const validate = () => {
-		const v = user.value.trim();
+		const v = user.value;
 		let error = "";
-		if (!/^[a-z0-9_]*$/.test(v)) error = "Chỉ dùng a–z, 0–9 và dấu gạch dưới";
-		else if (!v.endsWith("bot")) error = "Username phải kết thúc bằng bot";
+		if (!v.endsWith("bot")) error = "Username phải kết thúc bằng bot";
 		else if (TAKEN.includes(v)) error = "username đã có người dùng";
 		user.setAttribute("aria-invalid", String(error !== ""));
 		msg.className = error ? "error-text" : "hint-ok";
 		msg.textContent = error || "Dùng được";
+		if (error === "username đã có người dùng") suggest(v);
 		$("#cb-suggest").hidden = error !== "username đã có người dùng";
-		$("#cb-submit").disabled = error !== "" || $("#cb-name").value.trim() === "";
+		$("#cb-submit").disabled = error !== "" || name.value.trim() === "";
 	};
-	user.addEventListener("input", validate);
-	$("#cb-name").addEventListener("input", validate);
-	$$("#cb-suggest button").forEach((b) => b.addEventListener("click", () => { user.value = b.textContent; validate(); }));
+	user.addEventListener("input", () => { edited = true; user.value = normalize(user.value); validate(); });
+	name.addEventListener("input", () => { if (!edited) user.value = fromName(name.value); validate(); });
+	$$("#cb-suggest button").forEach((b) => b.addEventListener("click", () => { edited = true; user.value = b.textContent; validate(); }));
 	$("#cb-submit").addEventListener("click", (e) => {
 		const b = e.currentTarget;
 		b.setAttribute("aria-busy", "true"); b.textContent = "Đang tạo…";

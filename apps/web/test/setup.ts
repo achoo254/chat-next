@@ -9,6 +9,12 @@ if (typeof URL.createObjectURL !== "function") {
 	URL.revokeObjectURL = () => undefined;
 }
 
+// The idle prefetch of secondary screens' code (components/preload.ts) only
+// warms a cache; in tests it would load modules at a random point of a test
+// and shift its timing, so the browser is never idle here.
+window.requestIdleCallback = () => 0;
+window.cancelIdleCallback = () => undefined;
+
 // Screens and menus load lazily; shared CI runners are about twice as slow
 // as a laptop, so async queries wait up to 5 s before failing.
 configure({ asyncUtilTimeout: 5000 });

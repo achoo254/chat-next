@@ -1,52 +1,38 @@
 // The chat's webhooks (mockups/integrations.html#hooks-list): name, format,
 // creator, last request and status (running, rotating its secret, turned
 // off or turned off by the server), then the chat's webhook log.
-import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
-import { BrandLoader } from "../../components/brand-loader.tsx";
+import { useLoader } from "../../components/delayed-loader.tsx";
+import { useLoad } from "../../components/preload.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
+import { hooksData } from "../data/screen-data.ts";
 import { useServices } from "../data/services.tsx";
 import { HOOKS_PER_CHAT_MAX, type Hook, type HookNames } from "./api.ts";
 import { HookAudit } from "./hook-audit.tsx";
 import { formatLabel, HookAvatar, stateView, useNow, whenText } from "./hook-parts.tsx";
 import { useHooksCopy } from "./use-hooks-copy.ts";
 
-interface ListState {
-	readonly hooks: readonly Hook[];
-	readonly names: HookNames;
-	readonly status: "loading" | "ready" | "error";
-}
+const NO_HOOKS: readonly Hook[] = [];
+const NO_NAMES: HookNames = new Map();
 
 export function HookList({ chat }: { chat: Chat }) {
 	const copy = useCopy();
 	const t = useHooksCopy();
 	const { locale } = useI18n();
 	const { integrations, store } = useServices();
-	const [state, setState] = useState<ListState>({ hooks: [], names: new Map(), status: "loading" });
-	const [attempt, setAttempt] = useState(0);
+	// The first load is started by the chat screen with this page's code (chat-screen.tsx).
+	const [state, reload] = useLoad(hooksData(integrations, chat.id));
+	const loader = useLoader(state.status === "loading", copy.common.loading);
+	const hooks = state.status === "ready" ? state.value.hooks : NO_HOOKS;
+	const names = state.status === "ready" ? state.value.names : NO_NAMES;
 	const now = useNow(false);
 	const channel = chat.type === "channel";
 
-	useEffect(() => {
-		let active = true;
-		integrations.hooks(chat.id).then(
-			({ hooks, names }) => {
-				if (active) setState({ hooks, names, status: "ready" });
-			},
-			() => {
-				if (active) setState((current) => ({ ...current, status: "error" }));
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [integrations, chat.id, attempt]);
-
-	const nameOf = (userId: number) => (userId === store.selfId ? copy.common.you : (state.names.get(userId) ?? copy.message.unknownUser));
-	const full = state.hooks.length >= HOOKS_PER_CHAT_MAX;
+	const nameOf = (userId: number) => (userId === store.selfId ? copy.common.you : (names.get(userId) ?? copy.message.unknownUser));
+	const full = hooks.length >= HOOKS_PER_CHAT_MAX;
 	return (
 		<div className="hooks-body">
 			<div className="hooks-title">
@@ -59,33 +45,28 @@ export function HookList({ chat }: { chat: Chat }) {
 				)}
 			</div>
 			{full && <p className="note">{t.limitReached(HOOKS_PER_CHAT_MAX)}</p>}
-			{state.status === "loading" && (
-				<BrandLoader label={copy.common.loading} />
-			)}
-			{state.status === "error" && (
+			{loader}
+			{loader === null && state.status === "error" && (
 				<div className="banner error" role="alert">
 					<Icon name="alert" small />
 					<span className="grow">{copy.common.loadFailed}</span>
 					<button
 						type="button"
 						className="btn btn-sm"
-						onClick={() => {
-							setState((current) => ({ ...current, status: "loading" }));
-							setAttempt((n) => n + 1);
-						}}
+						onClick={reload}
 					>
 						{copy.common.retry}
 					</button>
 				</div>
 			)}
-			{state.status === "ready" && state.hooks.length === 0 && (
+			{loader === null && state.status === "ready" && hooks.length === 0 && (
 				<div className="card empty">
 					<Icon name="webhook" />
 					<strong>{t.emptyTitle}</strong>
 					<span>{t.emptyBody(channel)}</span>
 				</div>
 			)}
-			{state.hooks.length > 0 && (
+			{loader === null && hooks.length > 0 && (
 				<div className="card table-card">
 					<table className="data hook-table">
 						<thead>
@@ -101,7 +82,7 @@ export function HookList({ chat }: { chat: Chat }) {
 							</tr>
 						</thead>
 						<tbody>
-							{state.hooks.map((hook) => {
+							{hooks.map((hook) => {
 								const view = stateView(hook, now, t, channel);
 								return (
 									<tr key={hook.id}>

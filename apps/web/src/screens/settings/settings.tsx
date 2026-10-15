@@ -1,5 +1,6 @@
 import { Fragment, useEffect, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
+import { LoaderBoundary } from "../../components/delayed-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -109,7 +110,8 @@ export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) 
 				<header className="set-head">
 					<h1>{t.settings[tab]}</h1>
 				</header>
-				{content}
+				{/* A tab that loads shows one loader under the header; the first showing waits for it (messaging-root.tsx). */}
+				<LoaderBoundary key={tab}>{content}</LoaderBoundary>
 			</main>
 		</div>
 	);

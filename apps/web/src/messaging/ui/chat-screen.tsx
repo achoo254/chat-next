@@ -5,11 +5,14 @@
 // narrow behaviour itself (info-panel.tsx). Screen-wide shortcuts
 // (settings.html#shortcuts): ⌘/Ctrl+K or F search, ⌘/Ctrl+1…5 pick a folder,
 // ⌘/Ctrl+/ opens the shortcut list.
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
+import { LoaderBoundary, LoaderScope, Ready } from "../../components/delayed-loader.tsx";
+import { preloadable } from "../../components/preload.ts";
 import { navigate, paths, useSearch, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
+import { hookData, hooksData } from "../data/screen-data.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatListColumn } from "./chat-list.tsx";
 import { Conversation, EmptyConversation } from "./conversation.tsx";
@@ -24,11 +27,21 @@ const TopicListColumn = lazy(() => import("./topic-list.tsx").then((m) => ({ def
 const InfoPanel = lazy(() => import("./info-panel.tsx").then((m) => ({ default: m.InfoPanel })));
 const ChatAdmin = lazy(() => import("./chat-admin.tsx").then((m) => ({ default: m.ChatAdmin })));
 const BannedList = lazy(() => import("./banned-list.tsx").then((m) => ({ default: m.BannedList })));
-const IntegrationsPage = lazy(() => import("../integrations/integrations-page.tsx"));
+const integrationsCode = preloadable(() => import("../integrations/integrations-page.tsx"));
+const IntegrationsPage = integrationsCode.Component;
 const InviteDialog = lazy(() => import("./invite-dialog.tsx").then((m) => ({ default: m.InviteDialog })));
-const ContactsView = lazy(() => import("./contacts.tsx").then((m) => ({ default: m.ContactsView })));
+const contactsCode = preloadable(async () => ({ default: (await import("./contacts.tsx")).ContactsView }));
+const ContactsView = contactsCode.Component;
 const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
 const BotLinkDialog = lazy(() => import("../bots/bot-link-dialog.tsx"));
+
+/** Panes whose code is fetched when the browser is idle after startup (messaging-root.tsx). */
+export const chatPanePreloads: readonly (() => Promise<void>)[] = [integrationsCode.preload, contactsCode.preload];
+
+/** The admin column's box around a loader (before the page itself renders one). */
+function adminFrame(loader: ReactNode): ReactNode {
+	return <section className="admin-page">{loader}</section>;
+}
 
 function initialInfoOpen(): boolean {
 	return typeof window.matchMedia !== "function" || window.matchMedia(WIDE_QUERY).matches;
@@ -38,7 +51,7 @@ type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "i
 
 export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }) {
 	const copy = useCopy();
-	const { source, store } = useServices();
+	const { source, store, remote, integrations } = useServices();
 	const [folder, setFolder] = useState<Folder>("all");
 	const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
 	const [visible, setVisible] = useState<readonly number[]>([]);
@@ -117,6 +130,24 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 		setFolder(next);
 		if (contacts) navigate(paths.home);
 	};
+	// Webhook pages: their data starts with their code, so the page shows once (components/preload.ts).
+	const hookId = route.name === "chat" ? (route.hookId ?? "") : "";
+	const paneParts =
+		panel === "hooks"
+			? [integrationsCode.preload(), hooksData(integrations, chatId).promise]
+			: panel === "hook" && hookId !== ""
+				? [integrationsCode.preload(), hookData(integrations, hookId).promise]
+				: panel === "hook-new"
+					? [integrationsCode.preload()]
+					: [];
+	// Contacts: the list starts loading with the view's code (the store module stays out of startup).
+	useEffect(() => {
+		if (!contacts) return;
+		import("../data/contacts.ts")
+			.then(({ contactsOf }) => contactsOf(remote).load())
+			.catch(() => undefined);
+	}, [contacts, remote]);
+
 	const open = chatId !== 0 || (contacts && route.userId !== 0);
 	const adminMode = panel !== "chat";
 	const classes = ["app", "folders", showInfo ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
@@ -126,9 +157,9 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 			<div className={classes} ref={appRef}>
 				<FolderRail self={self} folder={contacts ? null : folder} onFolder={pickFolder} />
 				{contacts ? (
-					<Suspense fallback={<section className="list" aria-busy="true" />}>
+					<LoaderBoundary frame={(loader) => <section className="list">{loader}</section>}>
 						<ContactsView userId={route.userId} />
-					</Suspense>
+					</LoaderBoundary>
 				) : (
 					<>
 						{topics !== null && chat != null && panel === "chat" ? (
@@ -141,17 +172,21 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 						{chatId === 0 ? (
 							<EmptyConversation />
 						) : adminMode ? (
-							<Suspense fallback={<section className="admin-page" aria-busy="true" />}>
-								{panel === "banned" ? (
-									<BannedList chatId={chatId} />
-								) : panel === "admin" ? (
-									<ChatAdmin chatId={chatId} />
-								) : (
-									<IntegrationsPage chatId={chatId} panel={panel} hookId={route.name === "chat" ? (route.hookId ?? "") : ""} />
-								)}
-							</Suspense>
+							<LoaderBoundary frame={adminFrame}>
+								<Ready parts={paneParts} frame={adminFrame}>
+									{panel === "banned" ? (
+										<BannedList chatId={chatId} />
+									) : panel === "admin" ? (
+										<ChatAdmin chatId={chatId} />
+									) : (
+										<IntegrationsPage chatId={chatId} panel={panel} hookId={hookId} />
+									)}
+								</Ready>
+							</LoaderBoundary>
 						) : (
-							<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />
+							<LoaderScope>
+								<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />
+							</LoaderScope>
 						)}
 						{showInfo && chat != null && (
 							<Suspense fallback={<aside className="info" aria-busy="true" />}>
