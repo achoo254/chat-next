@@ -71,7 +71,15 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "readBy":
 			return <ReadByDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "addFailed":
-			return <AddFailedDialog chatId={request.chatId} failures={request.failures} addedIds={request.addedIds} onClose={close} />;
+			return (
+				<AddFailedDialog
+					chatId={request.chatId}
+					failures={request.failures}
+					addedIds={request.addedIds}
+					pickedNames={request.pickedNames}
+					onClose={close}
+				/>
+			);
 		case "members":
 			return <MembersDialog chatId={request.chatId} onClose={close} />;
 		case "removeMember":

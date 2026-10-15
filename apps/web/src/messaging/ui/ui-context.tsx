@@ -30,7 +30,14 @@ export type DialogRequest =
 	| { readonly kind: "link"; readonly url: string; readonly text: string; readonly fromId: number }
 	| { readonly kind: "readBy"; readonly chatId: number; readonly seq: number }
 	/** People the server did not add, each with the reason, and what still works for them. */
-	| { readonly kind: "addFailed"; readonly chatId: number; readonly failures: readonly AddFailure[]; readonly addedIds: readonly number[] }
+	| {
+			readonly kind: "addFailed";
+			readonly chatId: number;
+			readonly failures: readonly AddFailure[];
+			readonly addedIds: readonly number[];
+			/** Names shown in the picker, for people GetUsers does not return to you yet. */
+			readonly pickedNames: ReadonlyMap<number, string>;
+	  }
 	| { readonly kind: "members"; readonly chatId: number }
 	/** `back`: return to the member list when done. */
 	| { readonly kind: "removeMember"; readonly chatId: number; readonly userId: number; readonly back: boolean }

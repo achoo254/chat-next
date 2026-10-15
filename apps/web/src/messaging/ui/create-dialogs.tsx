@@ -259,6 +259,10 @@ function Chips({ items, onRemove }: { items: readonly Candidate[]; onRemove: (it
 	);
 }
 
+function pickedNames(selected: ReadonlyMap<number, Candidate>): ReadonlyMap<number, string> {
+	return new Map([...selected].map(([userId, candidate]) => [userId, candidate.name]));
+}
+
 function useSelection(): [ReadonlyMap<number, Candidate>, (candidate: Candidate) => void] {
 	const [selected, setSelected] = useState<ReadonlyMap<number, Candidate>>(new Map());
 	const toggle = (candidate: Candidate) =>
@@ -319,7 +323,7 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 			const refused = realFailures(failures);
 			if (refused.length > 0) {
 				const added = ids.filter((userId) => !failures.some((failure) => failure.userId === userId));
-				ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added });
+				ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added, pickedNames: pickedNames(selected) });
 			} else onClose();
 		} catch {
 			setBusy(false);
@@ -396,7 +400,7 @@ export function AddMembersDialog({ chatId, onClose }: CloseProps & { chatId: num
 			(failures) => {
 				const added = ids.filter((userId) => !failures.some((failure) => failure.userId === userId));
 				if (realFailures(failures).length > 0) {
-					ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added });
+					ui.dialog.set({ kind: "addFailed", chatId, failures, addedIds: added, pickedNames: pickedNames(selected) });
 					return;
 				}
 				toasts.show(copy.info.added(added.length));
@@ -615,6 +619,7 @@ interface AddFailedProps extends CloseProps {
 	chatId: number;
 	failures: readonly AddFailure[];
 	addedIds: readonly number[];
+	pickedNames: ReadonlyMap<number, string>;
 }
 
 /**
@@ -626,7 +631,7 @@ interface AddFailedProps extends CloseProps {
  * for you to send another way. People you blocked: unblock. Banned: admins
  * unban and add. Unknown accounts and a full chat: the reason only.
  */
-export function AddFailedDialog({ chatId, failures, addedIds, onClose }: AddFailedProps) {
+export function AddFailedDialog({ chatId, failures, addedIds, pickedNames, onClose }: AddFailedProps) {
 	const copy = useScreensCopy();
 	const { remote, source, toasts } = useServices();
 	const chat = useChat(chatId);
@@ -655,7 +660,9 @@ export function AddFailedDialog({ chatId, failures, addedIds, onClose }: AddFail
 	}, [remote, failures, addedIds]);
 
 	const setState = (userId: number, state: RowState) => setStates((current) => new Map(current).set(userId, state));
-	const nameOf = (userId: number) => people.get(userId)?.name ?? copy.message.unknownUser;
+	// Someone who refused you is often not visible through GetUsers yet; the
+	// picker already showed you their name.
+	const nameOf = (userId: number) => people.get(userId)?.name ?? pickedNames.get(userId) ?? copy.message.unknownUser;
 	const inviteLink = async (): Promise<string> => {
 		const existing = inviteLinks.list(chatId).find((invite) => isActiveInvite(invite, Date.now()));
 		if (existing !== undefined) return existing.link;
@@ -773,9 +780,9 @@ export function AddFailedDialog({ chatId, failures, addedIds, onClose }: AddFail
 						return (
 							<li key={userId}>
 								<div className="row">
-									<ChatAvatar id={userId} name={person?.name ?? "?"} bot={person?.isBot === true} />
+									<ChatAvatar id={userId} name={person?.name ?? pickedNames.get(userId) ?? "?"} bot={person?.isBot === true} />
 									<span className="grow">
-										{person?.name ?? copy.message.unknownUser}
+										{nameOf(userId)}
 										<small>{reasonText(failure)}</small>
 									</span>
 								</div>
