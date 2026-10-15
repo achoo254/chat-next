@@ -19,9 +19,10 @@ import (
 	"connectrpc.com/connect"
 )
 
-// The Developer Console sets a webhook over RPC; the api process POSTs
-// the user's /start to it and runs the sendMessage the webhook answers
-// with; the Console reads the delivery state, and only the owner may.
+// The Developer Console sets a webhook over RPC after a recent sign-in; the
+// api process POSTs the user's /start to it and runs the sendMessage the
+// webhook answers with; the Console reads the delivery state, and only the
+// owner may.
 func TestBotWebhookThroughTheConsole(t *testing.T) {
 	e := newEnv(t, func(c *config.Config, _ *api.Options) { c.BotWebhookLocal = true })
 	ctx := context.Background()
@@ -50,6 +51,15 @@ func TestBotWebhookThroughTheConsole(t *testing.T) {
 	}))
 	defer rcv.Close()
 
+	// Like a token, the webhook gets all of the bot's traffic: a plain
+	// sign-in is not recent enough to set it.
+	_, err = admin.SetBotWebhook(ctx, connect.NewRequest(&appv1.SetBotWebhookRequest{BotId: botID, Url: rcv.URL, Secret: "console_secret"}))
+	if codeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "reauth_required") {
+		t.Fatalf("webhook without a recent sign-in: %v", err)
+	}
+	if resp, body := e.signIn(t, browser, "?reauth=1"); resp.StatusCode != http.StatusOK {
+		t.Fatalf("reauth sign-in: %d %q", resp.StatusCode, body)
+	}
 	_, err = admin.SetBotWebhook(ctx, connect.NewRequest(&appv1.SetBotWebhookRequest{BotId: botID, Url: "https://10.0.0.1/hook", Secret: "s"}))
 	if codeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "url_blocked") {
 		t.Fatalf("private URL: %v", err)

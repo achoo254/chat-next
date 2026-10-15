@@ -1,14 +1,16 @@
 // Developer Console (mockups/console.html), opened from Settings on the chat
 // session: the caller's bots, a new bot, and one bot's profile, token and
-// commands. A token is shown once, right after it is issued; issuing one or
-// deleting a bot needs a recent sign-in, so the console sends the browser to
-// /auth/login?reauth=1 and, back on the same page, asks once more
-// (`?after=token` or `?after=delete` opens the confirmation; only its button
-// acts, so a link carrying the parameter cannot issue a token by itself).
-// The delivery tabs (Nhận update, Update lỗi, Số liệu) live in delivery.tsx.
+// commands. A token is shown once, right after it is issued; issuing one,
+// deleting a bot or setting its webhook needs a recent sign-in, so the
+// console sends the browser to /auth/login?reauth=1 and, back on the same
+// page, asks once more (`?after=token`, `?after=delete` or `?after=webhook`
+// opens the confirmation; only its button acts, so a link carrying the
+// parameter cannot issue a token by itself). The delivery tabs (Nhận update,
+// Update lỗi, Số liệu) live in delivery.tsx, the shared dialogs in
+// dialogs.tsx.
 // Loaded on demand with its own styles.
-import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
-import { fold, signInUrl } from "@app/core";
+import { useEffect, useState, type FormEvent } from "react";
+import { fold } from "@app/core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad, type Load } from "../../components/preload.ts";
 import { Icon } from "../../components/icon.tsx";
@@ -18,9 +20,10 @@ import { useCopy } from "../copy/use-copy.ts";
 import { orgDomain } from "../data/format.ts";
 import { myBotsData } from "../data/screen-data.ts";
 import { useServices } from "../data/services.tsx";
-import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "../ui/parts.tsx";
+import { ChatAvatar, copyText, Switch, useDomId } from "../ui/parts.tsx";
 import { BOT_LIMITS, botErrorKind, EDITABLE_SCOPES, usernameProblem, validCommand, type BotCommand, type CommandScope, type CommandSets, type OwnBot } from "./api.ts";
 import { DeadLettersTab, StatsTab, UpdatesTab, when } from "./delivery.tsx";
+import { ConfirmDialog, ReauthDialog, reauthUrl, useConfirmShown, type After, type TabProps } from "./dialogs.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import type { BotsCopy } from "./copy-vi.ts";
 import "./console.css";
@@ -399,20 +402,13 @@ function CreateBot() {
 
 // ------------------------------------------------------------- one bot
 
-/** What to ask again on coming back from the reauth sign-in (?after=…). */
-type After = "token" | "delete" | null;
-
-/** The `?after=` of `search` when it belongs to `tab` (token on Token, delete on Hồ sơ); null otherwise. */
-function afterOf(search: string, tab: ConsoleTab): After {
+/** The `?after=` of `search` when it belongs to `tab` (token on Token, delete on Hồ sơ, webhook on Nhận update); null otherwise. */
+function afterOf(search: string, tab: ConsoleTab): After | null {
 	const after = new URLSearchParams(search).get("after");
 	if (after === "token" && tab === "token") return "token";
 	if (after === "delete" && tab === "profile") return "delete";
+	if (after === "webhook" && tab === "updates") return "webhook";
 	return null;
-}
-
-/** Where the reauth sign-in sends the browser, coming back to `tab` to carry on with `after`. */
-export function reauthUrl(locale: string, botId: number, tab: ConsoleTab, after: Exclude<After, null>): string {
-	return signInUrl(locale, { reauth: true, returnTo: `${paths.consoleBot(botId, tab)}?after=${after}` });
 }
 
 function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
@@ -473,7 +469,7 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 						) : tab === "token" ? (
 							<TokenTab key={taken.round} bot={bot} onIssued={put} confirmNow={taken.after === "token"} onConfirmShown={shown} />
 						) : tab === "updates" ? (
-							<UpdatesTab bot={bot} onChanged={put} />
+							<UpdatesTab key={taken.round} bot={bot} onChanged={put} confirmNow={taken.after === "webhook"} onConfirmShown={shown} />
 						) : tab === "dead-letters" ? (
 							<DeadLettersTab bot={bot} />
 						) : tab === "stats" ? (
@@ -488,90 +484,7 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 	);
 }
 
-/** "Đăng nhập lại để tiếp tục" (mockups/console.html#token): a link to the reauth sign-in. */
-function ReauthDialog({ body, warning, href, onClose }: { body: string; warning: string; href: string; onClose: () => void }) {
-	const t = useBotsCopy();
-	const copy = useCopy();
-	const id = useDomId("reauth");
-	return (
-		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={t.reauth.title} onClose={onClose} />
-			<div className="dlg-body stack">
-				<p className="dlg-lede">{body}</p>
-				<p className="note">{t.reauth.away}</p>
-				{warning !== "" && (
-					<div className="banner warn">
-						<Icon name="alert" small />
-						<span className="grow">{warning}</span>
-					</div>
-				)}
-			</div>
-			<div className="dlg-foot">
-				<button type="button" className="btn" onClick={onClose}>
-					{copy.common.cancel}
-				</button>
-				<a className="btn btn-primary" href={href}>
-					{t.reauth.signIn}
-					<Icon name="external" small />
-				</a>
-			</div>
-		</Modal>
-	);
-}
-
-function ConfirmDialog({
-	title,
-	body,
-	action,
-	busyLabel,
-	busy,
-	danger,
-	onConfirm,
-	onClose,
-}: {
-	title: string;
-	body: ReactNode;
-	action: string;
-	busyLabel: string;
-	busy: boolean;
-	danger: boolean;
-	onConfirm: () => void;
-	onClose: () => void;
-}) {
-	const copy = useCopy();
-	const id = useDomId("confirm");
-	return (
-		<Modal labelledBy={id} onClose={onClose}>
-			<DialogHead id={id} title={title} onClose={onClose} />
-			<div className="dlg-body stack">{body}</div>
-			<div className="dlg-foot">
-				<button type="button" className="btn" onClick={onClose}>
-					{copy.common.cancel}
-				</button>
-				<button type="button" className={danger ? "btn btn-danger" : "btn btn-primary"} disabled={busy} aria-busy={busy} onClick={onConfirm}>
-					{busy ? busyLabel : action}
-				</button>
-			</div>
-		</Modal>
-	);
-}
-
 // ---------------------------------------------------------------- profile
-
-/** `confirmNow`: back from the reauth sign-in, open the tab's confirmation (delete or issue), then call `onConfirmShown`. */
-interface TabProps {
-	bot: OwnBot;
-	confirmNow: boolean;
-	onConfirmShown: () => void;
-}
-
-/** Marks a confirmation opened from ?after= as shown, once the tab has it on screen. */
-function useConfirmShown(confirmNow: boolean, onConfirmShown: () => void): void {
-	const report = useEffectEvent(onConfirmShown);
-	useEffect(() => {
-		if (confirmNow) report();
-	}, [confirmNow]);
-}
 
 function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { onSaved: (bot: OwnBot) => void }) {
 	const t = useBotsCopy();
@@ -759,7 +672,6 @@ function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { on
 	};
 
 	const masked = `${bot.id}:${"•".repeat(24)}`;
-	const snippet = `GET ${apiBase()}/updates?offset=<update_id + 1>&timeout=50\nAuthorization: Bearer <token>`;
 	return (
 		<div className="c-grid">
 			<div className="card form" role="group" aria-labelledby={titleId}>
@@ -833,9 +745,13 @@ function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { on
 					</>
 				) : (
 					<>
-						<p>{bot.lastUpdateAt > 0 ? t.token.lastUpdate(when(bot.lastUpdateAt, locale)) : t.token.neverUpdated}</p>
 						<p>{t.token.pollNote}</p>
-						<pre className="snippet">{snippet}</pre>
+						<p>{bot.lastUpdateAt > 0 ? t.token.lastUpdate(when(bot.lastUpdateAt, locale)) : t.token.neverUpdated}</p>
+						<div>
+							<Link to={paths.consoleBot(bot.id, "updates")} className="btn btn-sm">
+								{t.token.howToReceive}
+							</Link>
+						</div>
 					</>
 				)}
 			</div>

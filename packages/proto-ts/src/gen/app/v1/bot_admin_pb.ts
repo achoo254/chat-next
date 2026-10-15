@@ -494,7 +494,9 @@ export const BotDeliveryStatusSchema: GenMessage<BotDeliveryStatus> = /*@__PURE_
   messageDesc(file_app_v1_bot_admin, 16);
 
 /**
- * Delivery counters of the last 24 hours (whole hours).
+ * Delivery numbers of the last 24 hours: the larger of the hourly counters
+ * and what the stored updates show (counters started with webhook delivery;
+ * stored updates are kept 24 hours, callbacks 15 minutes).
  *
  * @generated from message app.v1.BotDeliveryStats
  */
@@ -580,7 +582,9 @@ export type SetBotWebhookRequest = Message<"app.v1.SetBotWebhookRequest"> & {
   /**
    * 1 to 256 characters of A-Z, a-z, 0-9, _ and -, sent in the
    * X-Bot-Api-Secret-Token header and keying the X-Bot-Signature HMAC.
-   * Empty keeps the current secret (required when no webhook is set).
+   * Empty keeps the current secret, only when the webhook stays at the same
+   * URL (secret_required when no webhook is set or the URL changes, so a
+   * new URL never receives the secret the previous one trusts).
    *
    * @generated from field: string secret = 3;
    */
@@ -970,8 +974,8 @@ export const BotAdminService: GenService<{
   },
   /**
    * Deletes the bot: its token stops working and its pending updates are
-   * dropped; its messages stay. The username stays reserved. Needs a recent
-   * sign-in.
+   * dropped; its messages stay. Its username is released for another bot.
+   * Needs a recent sign-in.
    *
    * @generated from rpc app.v1.BotAdminService.DeleteBot
    */
@@ -993,7 +997,8 @@ export const BotAdminService: GenService<{
   },
   /**
    * Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
-   * POSTed to it and long polls get 409 conflict.
+   * POSTed to it and long polls get 409 conflict. Needs a recent sign-in:
+   * the webhook gets all of the bot's updates and may answer as the bot.
    *
    * @generated from rpc app.v1.BotAdminService.SetBotWebhook
    */

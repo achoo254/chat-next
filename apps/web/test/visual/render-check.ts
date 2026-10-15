@@ -43,6 +43,12 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"search-error": "?open=search-error",
 	"search-in-chat": "?at=ops&open=search-in-chat",
 	"search-in-chat-sender": "?at=ops&open=search-in-chat-sender",
+	// Developer Console tabs (mockups/console.html): Hồ sơ, Token, Nhận update (webhook, long poll), Số liệu.
+	"console-profile": "?at=console-profile",
+	"console-token": "?at=console-token",
+	"console-webhook": "?at=console-webhook",
+	"console-poll": "?at=console-poll",
+	"console-stats": "?at=console-stats",
 };
 
 export const VIEWPORTS = [

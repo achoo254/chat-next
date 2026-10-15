@@ -574,7 +574,8 @@ func (s *Service) Poll(ctx context.Context, botID, offset int64, limit int, time
 		// outbox rows must find them (see the package comment).
 		if _, err := s.pool.Exec(ctx, `
 			WITH a AS (
-				UPDATE bot_updates SET acked = true WHERE bot_id = $1 AND update_id < $2 AND NOT acked RETURNING dead_at
+				UPDATE bot_updates SET acked = true, delivered_at = CASE WHEN dead_at IS NULL THEN now() END
+				WHERE bot_id = $1 AND update_id < $2 AND NOT acked RETURNING dead_at
 			)
 			INSERT INTO bot_delivery_counters (bot_id, hour, delivered)
 			SELECT $1, date_trunc('hour', now()), count(*) FROM a WHERE dead_at IS NULL HAVING count(*) > 0

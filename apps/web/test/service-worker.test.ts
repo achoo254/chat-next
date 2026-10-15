@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CACHE_PREFIX, shellRoute, staleCaches } from "../src/sw/shell-routes.ts";
 import { appShell, SERVICE_WORKER_FILE } from "../vite-service-worker.ts";
@@ -69,5 +71,46 @@ describe("app shell of a build", () => {
 		expect(appShell(output("<html>")).version).toBe(a);
 		expect(appShell(output("<html lang=vi>")).version).not.toBe(a);
 		expect(a).toMatch(/^[0-9a-f]{16}$/);
+	});
+});
+
+/** A file of the repository as text (vitest runs in apps/web). */
+function repoFile(path: string): string {
+	return readFileSync(resolve(process.cwd(), "../..", path), "utf8");
+}
+
+describe("service worker kill switch (infra/chat/sw-kill-switch.js)", () => {
+	type Listener = (event: { waitUntil(promise: Promise<unknown>): void }) => void;
+
+	it("takes over at once, deletes the shell caches, unregisters, and leaves requests to the network", async () => {
+		const source = repoFile("infra/chat/sw-kill-switch.js");
+		const listeners = new Map<string, Listener>();
+		const calls: string[] = [];
+		const keys = [`${CACHE_PREFIX}0123456789abcdef`, `${CACHE_PREFIX}fedcba9876543210`, "other-cache"];
+		const scope = {
+			addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
+			skipWaiting: () => calls.push("skipWaiting"),
+			registration: { unregister: () => Promise.resolve(calls.push("unregister") > 0) },
+		};
+		const cacheStorage = {
+			keys: () => Promise.resolve(keys),
+			delete: (key: string) => Promise.resolve(calls.push(`delete ${key}`) > 0),
+		};
+		new Function("self", "caches", source)(scope, cacheStorage);
+		expect([...listeners.keys()].sort()).toEqual(["activate", "install"]);
+
+		listeners.get("install")?.({ waitUntil: () => undefined });
+		const pending: Promise<unknown>[] = [];
+		listeners.get("activate")?.({ waitUntil: (promise) => pending.push(promise) });
+		await Promise.all(pending);
+		expect(calls).toEqual(["skipWaiting", `delete ${keys[0]}`, `delete ${keys[1]}`, "unregister"]);
+	});
+
+	it("is served by nginx in place of a missing worker file, never index.html", () => {
+		const conf = repoFile("infra/chat/nginx/chat.hoandat.com.conf");
+		const location = /location = \/sw\.js \{([^}]*)\}/.exec(conf)?.[1] ?? "";
+		expect(location).toContain("try_files /sw-override/sw.js /current/web/sw.js =404;");
+		expect(location).toContain('Cache-Control "no-cache"');
+		expect(location).not.toContain("index.html");
 	});
 });

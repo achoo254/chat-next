@@ -72,6 +72,10 @@ a.btn:not(.btn-primary) { color: var(--c-text); }
 .secret { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle); }
 .secret code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.875rem; overflow-wrap: anywhere; }
 .snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A runnable command: lines break at the shell's "\" (and, when narrow, at spaces or after "/"), never inside a word; the button copies it as shown. */
+.command { display: grid; gap: var(--space-2); }
+.command .snippet { overflow-wrap: normal; word-break: normal; }
+.command > div { display: flex; justify-content: flex-end; }
 .kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); margin: 0; font-size: 0.875rem; }
 .kv dt { color: var(--c-text-muted); }
 .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
@@ -261,7 +265,7 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 <section class="shot" id="create-bot">
 	<div class="shot-head">
 		<h2>Tạo bot</h2><span class="phase">Phase 15</span>
-		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Username tự đề xuất từ Tên hiển thị: bỏ dấu tiếng Việt (đ thành d), chữ thường, khoảng trắng và gạch ngang thành "_", bỏ ký tự khác, thêm đuôi "_bot" ("Deploy Thử" thành deploy_thu_bot). Đề xuất đi theo tên cho đến khi người dùng tự sửa username; khi gõ tay, username cũng được chuẩn hoá ngay (gõ "Báo-Cáo" thành bao_cao). Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định. Thử gõ lại tên hoặc username trong khung.</p>
+		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Username tự đề xuất từ Tên hiển thị: bỏ dấu tiếng Việt (đ thành d), chữ thường, khoảng trắng và gạch ngang thành "_", bỏ ký tự khác, thêm đuôi "_bot" ("Deploy Thử" thành deploy_thu_bot). Đề xuất đi theo tên cho đến khi người dùng tự sửa username; khi gõ tay, username cũng được chuẩn hoá ngay (gõ "Báo-Cáo" thành bao_cao). Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định. Thử gõ lại tên hoặc username trong khung. Tab Hồ sơ của bot đã tạo dùng cùng form, cạnh đó là thẻ "Xoá bot": "Token ngừng hoạt động ngay, update đang chờ bị bỏ. Tin bot đã gửi vẫn còn; username được trả lại để dùng cho bot khác."</p>
 	</div>
 	<div class="frame">
 		<div class="console">
@@ -318,7 +322,7 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 <section class="shot" id="token">
 	<div class="shot-head">
 		<h2>Token</h2><span class="phase">Phase 15</span>
-		<p>Trái: token hiện đúng một lần ngay sau khi tạo hoặc cấp lại, có nút sao chép; server chỉ giữ hash. Phải: những lần sau token bị che. Cấp lại token (và xoá bot) cần đăng nhập hoandat trong 10 phút gần đây (ADR 0006), nên Console chuyển sang auth.hoandat.com rồi quay về. Quay về, Console mở lại hộp xác nhận ("Cấp token cho Báo cáo Bot?" khi bot chưa có token, "Cấp lại token?" khi đã có) và chỉ cấp khi bạn bấm nút trong hộp; một link có sẵn tham số quay về không tự cấp token, và chuyển tab hay tải lại trang không hỏi lại. Xoá bot cũng vậy. Token cũ ngừng hoạt động ngay, khoá ký Mini App đổi theo. Thẻ "Nhận update" ghi "Lần cuối nhận update: 15/10 16:40" (lần gần nhất bot gọi long poll, chính xác tới khoảng 30 giây) hoặc "Bot chưa nhận update lần nào"; chat riêng của chủ bot với bot dẫn tới đây bằng "Xem hướng dẫn" khi bot chưa chạy (<a href="bots.html#bot-not-running">Bot chưa chạy</a>).</p>
+		<p>Trái: token hiện đúng một lần ngay sau khi tạo hoặc cấp lại, có nút sao chép; server chỉ giữ hash. Phải: những lần sau token bị che. Cấp lại token (và xoá bot) cần đăng nhập hoandat trong 10 phút gần đây (ADR 0006), nên Console chuyển sang auth.hoandat.com rồi quay về. Quay về, Console mở lại hộp xác nhận ("Cấp token cho Báo cáo Bot?" khi bot chưa có token, "Cấp lại token?" khi đã có) và chỉ cấp khi bạn bấm nút trong hộp; một link có sẵn tham số quay về không tự cấp token, và chuyển tab hay tải lại trang không hỏi lại. Xoá bot cũng vậy. Token cũ ngừng hoạt động ngay, khoá ký Mini App đổi theo. Thẻ "Nhận update" ghi "Lần cuối nhận update: 15/10 16:40" (lần gần nhất bot gọi long poll, chính xác tới khoảng 30 giây) hoặc "Bot chưa nhận update lần nào", và nút "Cách nhận update" mở tab Nhận update (lệnh mẫu chỉ nằm ở tab đó, không lặp ở đây); khi đặt webhook, thẻ ghi "Bot nhận update qua webhook." và nút "Cài đặt nhận update"; chat riêng của chủ bot với bot dẫn tới đây bằng "Xem hướng dẫn" khi bot chưa chạy (<a href="bots.html#bot-not-running">Bot chưa chạy</a>).</p>
 	</div>
 	<div class="frame">
 		<div class="panes">
@@ -353,8 +357,9 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 						</div>
 						<div class="card">
 							<h4>Nhận update</h4>
+							<p>Bot nhận update bằng long poll.</p>
 							<p>Lần cuối nhận update: 15/10 16:40</p>
-							<p class="muted">Bot nhận update bằng long poll: server của bạn tự gọi lấy update, mỗi request chờ tối đa 50 giây. Khi đặt webhook, thẻ này ghi "Bot nhận update qua webhook" và nút "Cài đặt nhận update" mở tab Nhận update.</p>
+							<div><a class="btn btn-sm" href="#webhook">Cách nhận update</a></div>
 						</div>
 					</div>
 				</div>
@@ -381,7 +386,7 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 <section class="shot" id="webhook">
 	<div class="shot-head">
 		<h2>Nhận update</h2><span class="phase">Phase 15</span>
-		<p>Chọn webhook hoặc long poll (thử bấm). Webhook: URL https, secret, loại update, số kết nối song song, có thể bỏ update đang chờ. Chỉ liệt kê loại update server đã giao được; không chọn loại nào là nhận mọi loại. Secret không bao giờ được gửi lại cho trình duyệt: khi webhook đã đặt, ô secret để trống nghĩa là giữ secret đang dùng; "Tạo mới" điền một secret ngẫu nhiên (hiện rõ để bạn sao chép sang server của mình) và chỉ có hiệu lực khi bấm Lưu. Cột phải là trạng thái thật của lần giao: lỗi gần nhất kèm giờ và mã HTTP, số update chờ, lần giao thành công gần nhất và độ trễ của nó, số kết nối đang mở; tự làm mới mỗi vài giây khi tab đang mở. Server gọi URL qua lớp chặn địa chỉ nội bộ, nên URL nội bộ bị từ chối ngay khi lưu ("URL trỏ tới địa chỉ nội bộ"). Chọn Long poll rồi Lưu thì gỡ webhook; update đang chờ vẫn giữ để bot lấy bằng long poll (trừ khi bật "Bỏ update đang chờ").</p>
+		<p>Chọn webhook hoặc long poll (thử bấm). Webhook: URL https, secret, loại update, số kết nối song song, có thể bỏ update đang chờ. Chỉ liệt kê loại update server đã giao được; không chọn loại nào là nhận mọi loại. Secret không bao giờ được gửi lại cho trình duyệt: khi webhook đã đặt, ô secret để trống nghĩa là giữ secret đang dùng; "Tạo mới" điền một secret ngẫu nhiên (hiện rõ để bạn sao chép sang server của mình) và chỉ có hiệu lực khi bấm Lưu. Cột phải là trạng thái thật của lần giao: lỗi gần nhất kèm giờ và mã HTTP, số update chờ, lần giao thành công gần nhất và độ trễ của nó, số kết nối đang mở; tự làm mới mỗi vài giây khi tab đang mở. Server gọi URL qua lớp chặn địa chỉ nội bộ (gồm cả địa chỉ của chính server), nên URL nội bộ bị từ chối ngay khi lưu ("URL trỏ tới địa chỉ nội bộ"). Đổi URL thì phải có secret mới: ô secret ghi "URL mới cần secret mới: nhập hoặc bấm Tạo mới" và báo lỗi nếu để trống, để URL mới không nhận secret mà URL cũ tin. Lưu webhook (đặt mới hay đổi) cần đăng nhập hoandat trong 10 phút gần đây như cấp lại token: Console mở hộp "Đăng nhập lại để tiếp tục" ("Đặt hoặc đổi webhook cần đăng nhập trong 10 phút gần đây. Những gì bạn vừa nhập được giữ trong tab này."), quay về thì mở hộp "Lưu webhook?" với URL đã nhập và chỉ lưu khi bấm Lưu trong hộp; link có sẵn tham số quay về không tự lưu gì. Chọn Long poll rồi Lưu thì gỡ webhook (không cần đăng nhập lại); update đang chờ vẫn giữ để bot lấy bằng long poll (trừ khi bật "Bỏ update đang chờ"). Ở Long poll, lệnh curl chạy được ngay (thay &lt;token&gt;), xuống dòng bằng "\" ở các chỗ hợp lý, nút Sao chép chép đúng lệnh; khung hẹp thì chỉ ngắt ở khoảng trắng hoặc sau "/", không ngắt giữa từ, không cuộn ngang.</p>
 	</div>
 	<div class="frame auto">
 		<div class="console">
@@ -434,8 +439,15 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 						</div>
 						<div class="form" id="mode-poll" hidden>
 							<p class="sub" style="margin:0">Server của bạn tự gọi lấy update. Mỗi request chờ tối đa 50 giây; hai request cùng lúc thì request trước nhận 409. Webhook đang đặt sẽ bị gỡ khi lưu; khi webhook còn đặt, long poll nhận 409.</p>
-							<pre class="snippet">GET https://chat.hoandat.com/bot/v1/updates?offset=884246&amp;timeout=50
-Authorization: Bearer &lt;token&gt;</pre>
+							<div class="command">
+								<pre class="snippet">curl -sS -G \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -d offset=0 \
+  -d timeout=50 \
+  https://chat.hoandat.com/<wbr>bot/<wbr>v1/<wbr>updates</pre>
+								<div><button type="button" class="btn btn-sm" data-toast="Đã sao chép lệnh"><svg class="icon icon-sm"><use href="#i-copy"/></svg>Sao chép</button></div>
+							</div>
+							<p class="sub" style="margin:0">Thay &lt;token&gt; bằng token của bot. Lần sau gửi offset = update_id cuối cùng + 1 để xác nhận các update đã nhận.</p>
 							<div class="setting">
 								<div><strong>Bỏ update đang chờ khi lưu</strong><small>12 update đang chờ sẽ bị bỏ, không giao nữa.</small></div>
 								<button type="button" class="switch" role="switch" aria-checked="false" aria-label="Bỏ update đang chờ khi lưu"></button>
@@ -454,7 +466,7 @@ Authorization: Bearer &lt;token&gt;</pre>
 							<dt>Update lỗi (dead-letter)</dt><dd><a class="btn btn-sm" href="#dead-letter">Xem 4 update</a></dd>
 						</dl>
 						<p class="sub">Trạng thái khác: "Đang hoạt động" (lần giao gần nhất thành công), "Chưa giao update nào". Lỗi hiện bằng lời: "HTTP 502", "Hết thời gian chờ sau 10 giây", "Lỗi TLS (chứng chỉ)", "Không kết nối được", "Không tìm thấy tên miền", "URL trỏ tới địa chỉ nội bộ". Webhook trả 2xx là đã giao, kể cả khi phần thân trả lời quá lớn (khi đó phương thức trong phần thân bị bỏ qua). Ở chế độ long poll cột này chỉ ghi số update đang chờ và lần cuối bot lấy update.</p>
-						<p class="sub">Thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, theo Retry-After nếu có. Sau 10 lần, update chuyển sang dead-letter để các update sau của cùng chat vẫn được giao.</p>
+						<p class="sub">Thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, theo Retry-After nếu có (ít nhất 1 giây). Sau 10 lần, update chuyển sang dead-letter để các update sau của cùng chat vẫn được giao.</p>
 					</div>
 				</div>
 			</div>
@@ -495,7 +507,7 @@ Authorization: Bearer &lt;token&gt;</pre>
 <section class="shot" id="stats">
 	<div class="shot-head">
 		<h2>Số liệu gửi</h2><span class="phase">Phase 15</span>
-		<p>Bộ đếm giao update tới bot trong 24 giờ qua, tổng theo bot (không có dòng theo từng người). Bốn ô: update server tạo cho bot, đã giao (webhook trả 2xx hoặc bot xác nhận qua long poll), lần giao lỗi (mỗi lần thử không thành công), chuyển sang dead-letter. Dưới là tầng rate limit hiện tại. Gửi hàng loạt (<code class="mono">messages:bulk</code>) có số liệu riêng khi tính năng đó ra mắt; trang này không hiện chỗ trống cho nó.</p>
+		<p>Số liệu giao update tới bot trong 24 giờ qua, tổng theo bot (không có dòng theo từng người), tính từ chính các update server còn lưu 24 giờ (kể cả trước khi bộ đếm theo giờ có), lấy số lớn hơn khi bộ đếm theo giờ ghi nhiều hơn (update callback chỉ lưu 15 phút). Bốn ô: update server tạo cho bot, đã giao (webhook trả 2xx hoặc bot xác nhận qua long poll), lần giao lỗi (mỗi lần thử không thành công), chuyển sang dead-letter. Dưới là tầng rate limit hiện tại. Gửi hàng loạt (<code class="mono">messages:bulk</code>) có số liệu riêng khi tính năng đó ra mắt; trang này không hiện chỗ trống cho nó.</p>
 	</div>
 	<div class="frame">
 		<div class="console">

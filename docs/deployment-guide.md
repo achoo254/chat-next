@@ -57,7 +57,17 @@ Release R5 lát B1 (webhook tới bot, migration `0015_bot_webhooks`) không đ�
 - Server gọi ra URL webhook của bot (cổng 443/80/8443, chỉ địa chỉ công khai, chặn lúc kết nối). Đổi `SESSION_KEY` làm secret webhook không mở được: mỗi lần giao lỗi `secret_unreadable` tới khi chủ bot lưu lại webhook.
 - Rollback code về lát A: binary cũ bỏ qua webhook, nên bot có webhook chỉ nhận update nếu chuyển sang long poll (binary cũ không trả `409` cho chúng); lên lại lát B1 thì webhook giao tiếp các update còn chờ.
 
-Bản mở app khi offline (service worker `/sw.js` chỉ cache app shell: `index.html`, file trong `/assets/`, icon, manifest; không bao giờ `/rpc`, `/ws`, `/auth`, `/hook`, `/bot` hay host media) không đổi nginx, script hay biến môi trường, deploy như các lần sau. `location /` của `chat.hoandat.com.conf` đã trả `Cache-Control: no-cache` cho `/sw.js` và `index.html`, và CSP đã có `worker-src 'self'`; nếu sau này tách location riêng cho hai file này thì phải giữ `no-cache`, nếu không trình duyệt có thể giữ worker cũ lâu hơn. Mỗi build có một `sw.js` riêng (phiên bản là hash nội dung các file); worker mới cài xong thì chờ đến khi không còn tab nào của bản cũ mới thay và xoá cache cũ. Rollback code không cần gì thêm: lần tải trang online tiếp theo lấy `index.html` mới từ server rồi cài worker của bản đó.
+Bản mở app khi offline (service worker `/sw.js` chỉ cache app shell: `index.html`, file trong `/assets/`, icon, manifest; không bao giờ `/rpc`, `/ws`, `/auth`, `/hook`, `/bot` hay host media) không đổi nginx, script hay biến môi trường, deploy như các lần sau. `location /` của `chat.hoandat.com.conf` đã trả `Cache-Control: no-cache` cho `/sw.js` và `index.html`, và CSP đã có `worker-src 'self'`; nếu sau này tách location riêng cho hai file này thì phải giữ `no-cache`, nếu không trình duyệt có thể giữ worker cũ lâu hơn. Mỗi build có một `sw.js` riêng (phiên bản là hash nội dung các file); worker mới cài xong thì chờ đến khi không còn tab nào của bản cũ mới thay và xoá cache cũ.
+
+- Rollback code về một release cũng có `sw.js`: lần kiểm tra cập nhật tiếp theo (mỗi lần tải trang online) lấy `sw.js` của release đó, khác nội dung nên trình duyệt cài worker của bản đó; không cần làm gì thêm.
+- Rollback về release **không có** `sw.js` (trước bản này): conf nginx của release đó trả `index.html` (200, `text/html`) cho `/sw.js`, nên lần kiểm tra cập nhật lỗi vì sai MIME và trình duyệt **giữ** worker đang có vô thời hạn. Worker đó vẫn lấy trang từ mạng trước, nhưng phục vụ manifest, icon, font từ cache và mở shell của build không còn trên server khi offline. Ngay sau `switch-release.sh`, đặt kill switch vào chính release đó: `install -m 644 /opt/chat/infra/sw-kill-switch.js /opt/chat/current/web/sw.js` (xem [Service worker: kill switch](#service-worker-kill-switch)).
+- Từ bản hardening webhook (dưới), conf nginx có `location = /sw.js`: file thiếu thì `404`, không bao giờ `index.html`.
+
+Bản hardening webhook và service worker (sau review 2026-10-15) **phải deploy bằng root một lần** vì đổi conf nginx (`location = /sw.js`, xem trên) và thêm file `infra/chat/sw-kill-switch.js`; deploy tự động chỉ dùng conf trong `/opt/chat/infra/nginx`. Không có migration, không cần DNS hay chứng chỉ mới.
+
+- Biến môi trường mới `OUTBOUND_DENY_CIDRS` (tuỳ chọn, nhưng production phải đặt): IP hoặc dải CIDR mà webhook của bot và xem trước link không bao giờ gọi tới. Thêm vào `/opt/chat/.env` trước khi deploy: `OUTBOUND_DENY_CIDRS=103.72.98.65` (`activate-release.sh` reload pm2 với `--update-env`, nên process mới đọc ngay). Thiếu biến thì server vẫn chạy và vẫn chặn địa chỉ công khai trên network interface của máy; log khởi động `outbound requests refuse these ranges` liệt kê dải đang chặn, nên kiểm sau deploy rằng có `103.72.98.65/32`. Lý do: không có biến này, URL webhook trỏ thẳng vào `.65` (bản ghi DNS không proxy của app khác cùng máy) đi ra từ chính `.65`, qua được luật "chỉ IP Cloudflare" và các `allow <IP server>` của vhost khác.
+- Developer Console: đặt hay đổi webhook (`SetBotWebhook`) cần đăng nhập IdP trong 10 phút như cấp lại token; quay về từ trang đăng nhập, Console mở hộp xác nhận với những gì đã nhập (giữ trong `sessionStorage` của tab, dùng một lần) và chỉ lưu khi bấm nút. `PUT /bot/v1/webhook` của Bot API không đổi (đã cần token). Đổi URL webhook ở Console cần secret mới.
+- Webhook: câu trả lời 2xx chỉ đọc tối đa 64 KiB cho hành động; cả process tối đa 256 request đang chạy, chia đều giữa các bot; `Retry-After: 0` vẫn chờ 1 giây; bot rảnh không đọc DB theo đồng hồ. Số liệu 24 giờ của Console tính cả từ update còn lưu, nên có số từ trước khi bộ đếm ra đời.
 
 ## Các lần sau
 
@@ -135,12 +145,26 @@ Vận hành:
 
 ## Bảo mật mạng
 
-- Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này.
+- Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này. Cả hai không gọi được chính `.65` (`OUTBOUND_DENY_CIDRS`, xem trên), nên luật này không bị vượt bằng một URL trỏ về chính server.
+
+## Service worker: kill switch
+
+Khi một worker lỗi đã tới trình duyệt (trang trắng, file cũ, không thoát được), thay `/sw.js` bằng bản tự gỡ [`infra/chat/sw-kill-switch.js`](../infra/chat/sw-kill-switch.js): worker này cài ngay (`skipWaiting`), xoá mọi cache `app-shell-*`, tự `unregister`, không có `fetch` handler nên request đi thẳng ra mạng. Tab đang mở không bị tải lại; từ lần tải sau chạy không có worker. Trình duyệt chỉ nhận khi kiểm tra cập nhật, tức lần tải trang online kế tiếp của từng người (`/sw.js` là `no-cache`).
+
+1. Bật (root, không cần reload nginx, giữ qua các lần deploy):
+   ```bash
+   install -d -m 755 /opt/chat/sw-override
+   install -m 644 /opt/chat/infra/sw-kill-switch.js /opt/chat/sw-override/sw.js
+   curl -sI https://chat.hoandat.com/sw.js | grep -i -e '^HTTP' -e content-type -e cache-control   # 200, javascript, no-cache
+   curl -s https://chat.hoandat.com/sw.js | head -3                                                   # dòng đầu "Kill switch for the web app's service worker"
+   ```
+   `location = /sw.js` lấy `/opt/chat/sw-override/sw.js` trước `current/web/sw.js`. Release cũ hơn bản hardening webhook không có location này: khi đang chạy release như vậy, chép thẳng vào release đó (`install -m 644 /opt/chat/infra/sw-kill-switch.js /opt/chat/current/web/sw.js`; mất ở lần deploy sau).
+2. Tắt (khi build đã sửa worker được deploy): `rm /opt/chat/sw-override/sw.js`. Lần tải trang sau, app đăng ký lại worker của release hiện tại. Trong lúc kill switch còn đó, mỗi lần tải trang app đăng ký lại `/sw.js` và kill switch lại tự gỡ: vô hại.
 
 ## Rollback
 
 - Media: release trước R3 bỏ qua các bảng media; file trong `/opt/chat/media` giữ nguyên. Tắt media mà không rollback: xoá `MEDIA_PUBLIC_URL` khỏi `/opt/chat/.env` rồi reload (tin có media vẫn hiển thị thumb trong tin, nhưng không tải được bản đầy đủ).
-- Code: `bash /opt/chat/infra/switch-release.sh <release-id>` (danh sách: `ls /opt/chat/releases`). Không đảo ngược dữ liệu.
+- Code: `bash /opt/chat/infra/switch-release.sh <release-id>` (danh sách: `ls /opt/chat/releases`). Không đảo ngược dữ liệu. Về release không có `sw.js` (trước bản mở app khi offline) thì đặt kill switch ngay sau đó ([Service worker: kill switch](#service-worker-kill-switch)).
 - Dữ liệu: dừng `chat-api`, `pg_restore --clean --if-exists` từ bản trong `/opt/chat/backups` với kết nối từ `pg-env.sh`, **tăng `server_epoch`** (`UPDATE server_meta SET server_epoch = server_epoch + 1;` qua [`psql.sh`](../infra/chat/psql.sh)), rồi chạy lại. Bản restore làm `pts`/`seq` lùi về lúc backup; epoch mới báo cho client rằng vị trí đồng bộ của nó không còn đúng, để client tự đồng bộ lại thay vì bỏ sót tin (ADR 0002). Process đang chạy đọc lại epoch mỗi 30 giây và yêu cầu mọi socket kết nối lại.
 
 ## Dữ liệu đồng bộ

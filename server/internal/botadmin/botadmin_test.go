@@ -157,6 +157,16 @@ func TestTokenNeedsRecentSignIn(t *testing.T) {
 		if codeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "reauth_required") {
 			t.Fatalf("delete with sign-in at %v: %v", authTime, err)
 		}
+		_, err = env.Admin.OwnedRecent(ctx, owner, authTime, botID)
+		if codeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "reauth_required") {
+			t.Fatalf("webhook change with sign-in at %v: %v", authTime, err)
+		}
+	}
+	if b, err := env.Admin.OwnedRecent(ctx, owner, time.Now(), botID); err != nil || b.ID != botID {
+		t.Fatalf("webhook change after a recent sign-in: %v, %v", b, err)
+	}
+	if _, err := env.Admin.OwnedRecent(ctx, env.User("intruder"), time.Now(), botID); codeOf(err) != connect.CodeNotFound {
+		t.Fatalf("webhook change by another user: %v", err)
 	}
 	if _, err := env.Admin.Authenticate(ctx, token); err != nil {
 		t.Fatalf("token after refused reset: %v", err)

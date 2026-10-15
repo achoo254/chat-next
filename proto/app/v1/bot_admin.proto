@@ -17,10 +17,10 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // is shown once, by ResetBotToken, and can never be read again.
 //
 // Errors besides the usual codes:
-// - failed_precondition "reauth_required: ...": ResetBotToken and DeleteBot
-//   need an IdP sign-in within the last 10 minutes (ADR 0006). The web
-//   sends the browser to /auth/login?reauth=1&return_to=<path> (the IdP
-//   asks for the password again) and retries after it comes back.
+// - failed_precondition "reauth_required: ...": ResetBotToken, DeleteBot and
+//   SetBotWebhook need an IdP sign-in within the last 10 minutes (ADR 0006).
+//   The web sends the browser to /auth/login?reauth=1&return_to=<path> (the
+//   IdP asks for the password again) and retries after it comes back.
 // - failed_precondition "bots_limit: ...": the owner already has 20 bots.
 // - already_exists "username_taken: ...": the username belongs to a user or
 //   bot of the tenant.
@@ -43,14 +43,15 @@ service BotAdminService {
   // working at once. Needs a recent sign-in.
   rpc ResetBotToken(ResetBotTokenRequest) returns (ResetBotTokenResponse);
   // Deletes the bot: its token stops working and its pending updates are
-  // dropped; its messages stay. The username stays reserved. Needs a recent
-  // sign-in.
+  // dropped; its messages stay. Its username is released for another bot.
+  // Needs a recent sign-in.
   rpc DeleteBot(DeleteBotRequest) returns (DeleteBotResponse);
   // How the bot receives updates (webhook or long poll), the delivery
   // state and the counters of the last 24 hours.
   rpc GetBotDelivery(GetBotDeliveryRequest) returns (GetBotDeliveryResponse);
   // Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
-  // POSTed to it and long polls get 409 conflict.
+  // POSTed to it and long polls get 409 conflict. Needs a recent sign-in:
+  // the webhook gets all of the bot's updates and may answer as the bot.
   rpc SetBotWebhook(SetBotWebhookRequest) returns (SetBotWebhookResponse);
   // Removes the webhook; the bot fetches updates by long poll again.
   rpc DeleteBotWebhook(DeleteBotWebhookRequest) returns (DeleteBotWebhookResponse);
@@ -210,7 +211,9 @@ message BotDeliveryStatus {
   int32 open_connections = 7;
 }
 
-// Delivery counters of the last 24 hours (whole hours).
+// Delivery numbers of the last 24 hours: the larger of the hourly counters
+// and what the stored updates show (counters started with webhook delivery;
+// stored updates are kept 24 hours, callbacks 15 minutes).
 message BotDeliveryStats {
   // Updates stored for the bot.
   int64 received = 1 [jstype = JS_NUMBER];
@@ -234,7 +237,9 @@ message SetBotWebhookRequest {
   string url = 2;
   // 1 to 256 characters of A-Z, a-z, 0-9, _ and -, sent in the
   // X-Bot-Api-Secret-Token header and keying the X-Bot-Signature HMAC.
-  // Empty keeps the current secret (required when no webhook is set).
+  // Empty keeps the current secret, only when the webhook stays at the same
+  // URL (secret_required when no webhook is set or the URL changes, so a
+  // new URL never receives the secret the previous one trusts).
   string secret = 3;
   repeated string allowed_updates = 4;
   // 1 to 100; 0 is 40.

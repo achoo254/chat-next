@@ -6,13 +6,17 @@
 // name actually resolved to: every address of the name must be public
 // unicast (no private, loopback, link-local, CGNAT, multicast, unspecified,
 // documentation or reserved range, no cloud metadata address, no IPv6 form
-// that embeds an IPv4 address: IPv4-mapped, IPv4-compatible, NAT64, 6to4,
-// Teredo), then the dialer connects to the checked address itself and
-// checks the connected address once more. A name that resolves to a public
+// that embeds an IPv4 address: IPv4-mapped, IPv4-compatible,
+// IPv4-translated, NAT64, 6to4, Teredo), then the dialer connects to the
+// checked address itself and checks the connected address once more. A name that resolves to a public
 // address when a URL is saved and to a private one later (DNS rebinding) is
 // refused at that later dial. Kept-alive connections are reused only to the
 // address that passed the check, at most IdleTimeout after their last use, so
 // a DNS change takes effect with the next dial.
+//
+// Options.Deny refuses more ranges on top of those (the server's own public
+// addresses, so a URL cannot reach other sites hosted on the same machine
+// through it).
 //
 // Redirects are never followed (the 3xx answer is returned), only the
 // configured ports are dialed, https is required unless the client is built
@@ -79,6 +83,7 @@ var blockedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("5f00::/16"),       // SRv6 SIDs
 	netip.MustParsePrefix("fec0::/10"),       // site-local (deprecated)
 	netip.MustParsePrefix("fd00:ec2::/32"),   // AWS IMDS over IPv6 (fd00:ec2::254), also inside fc00::/7
+	netip.MustParsePrefix("::ffff:0:0:0/96"), // IPv4-translated (SIIT, embeds IPv4)
 }
 
 // PublicIP reports whether a is a public unicast address. An IPv4-mapped
@@ -121,6 +126,8 @@ type Options struct {
 	// TLS replaces the TLS settings (tests trust their own CA with it);
 	// certificates are always verified.
 	TLS *tls.Config
+	// Deny refuses these ranges too, also in development (see Denied).
+	Deny []netip.Prefix
 }
 
 // Client sends requests under the policy.
@@ -130,11 +137,12 @@ type Client struct {
 	dev      bool
 	resolver Resolver
 	timeout  time.Duration
+	deny     []netip.Prefix
 }
 
 // New returns a Client with its own connection pool.
 func New(o Options) *Client {
-	c := &Client{ports: o.Ports, dev: o.Development, resolver: o.Resolver, timeout: o.Timeout}
+	c := &Client{ports: o.Ports, dev: o.Development, resolver: o.Resolver, timeout: o.Timeout, deny: o.Deny}
 	if len(c.ports) == 0 {
 		c.ports = DefaultPorts
 	}
@@ -250,10 +258,51 @@ func (c *Client) portAllowed(p uint16) bool {
 	return c.dev || slices.Contains(c.ports, p)
 }
 
-// allowed is the address policy: public unicast, plus loopback in
-// development.
+// allowed is the address policy: public unicast and not denied, plus
+// loopback in development.
 func (c *Client) allowed(a netip.Addr) bool {
+	if Denied(c.deny, a) {
+		return false
+	}
 	return PublicIP(a) || (c.dev && a.Unmap().IsLoopback())
+}
+
+// Denied reports whether a (an IPv4-mapped address as its IPv4 address) is
+// in one of the ranges.
+func Denied(ranges []netip.Prefix, a netip.Addr) bool {
+	a = a.Unmap()
+	for _, p := range ranges {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
+// HostAddresses returns the public unicast addresses of this machine's
+// network interfaces, each as a single-address prefix. A host behind NAT
+// does not see its public address here; list it in the configuration.
+func HostAddresses() ([]netip.Prefix, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("safehttp: interface addresses: %w", err)
+	}
+	var out []netip.Prefix
+	for _, a := range addrs {
+		ipNet, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip, ok := netip.AddrFromSlice(ipNet.IP)
+		if !ok {
+			continue
+		}
+		ip = ip.Unmap()
+		if PublicIP(ip) {
+			out = append(out, netip.PrefixFrom(ip, ip.BitLen()))
+		}
+	}
+	return out, nil
 }
 
 // addresses resolves host (an IP literal stands for itself) and refuses the

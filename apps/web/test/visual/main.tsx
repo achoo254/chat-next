@@ -198,6 +198,33 @@ if (params.get("open") === "upload") {
 	media.http.put = (url, body, signal) => (++parts <= 3 ? put(url, body, signal) : new Promise(() => undefined));
 }
 
+// Developer Console (mockups/console.html): a bot on a failing webhook, one on long poll.
+const consoleNow = Math.floor(Date.now() / 1000);
+const hookedBot = f.bots.seed("Deploy Ops Bot", "deploy_ops_bot", {
+	tokenSecret: "s",
+	tokenIssuedAt: f.bots.now,
+	webhookUrl: "https://deploy.hoandat.com/chat/updates",
+	webhookSecret: "s",
+	delivery: {
+		pending: 12,
+		lastError: "http_502",
+		lastErrorAt: consoleNow - 60,
+		lastSuccessAt: consoleNow - 120,
+		lastSuccessMs: 84,
+		openConnections: 3,
+		received: 12480,
+		delivered: 12431,
+		failed: 37,
+		deadLettered: 4,
+	},
+});
+const pollingBot = f.bots.seed("Báo cáo doanh thu hằng ngày", "report_daily_bot", {
+	tokenSecret: "s",
+	tokenIssuedAt: f.bots.now,
+	lastUpdateAt: consoleNow - 300,
+	description: "Gửi báo cáo doanh thu mỗi sáng cho nhóm Kinh doanh.",
+});
+
 // ?at= names a screen whose path holds an id the seed assigns.
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
@@ -219,6 +246,11 @@ const SCREENS: Record<string, string> = {
 	report: "/moderation/20481",
 	"report-actions": "/moderation/20481/actions",
 	media: `/c/${design}`,
+	"console-profile": `/console/${pollingBot}`,
+	"console-token": `/console/${pollingBot}/token`,
+	"console-webhook": `/console/${hookedBot}/updates`,
+	"console-poll": `/console/${pollingBot}/updates`,
+	"console-stats": `/console/${hookedBot}/stats`,
 };
 const at = params.get("at");
 const screenPath = at === null ? undefined : SCREENS[at];

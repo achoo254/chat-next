@@ -323,7 +323,7 @@ webhooks:
           status, redirect, timeout, TLS or connection error) is retried
           after 1 s, doubling per failure up to a random 60 to 120 s, or
           after the answer's `Retry-After` (seconds or HTTP date, clamped to
-          0 to 3600 s). After 10 failed attempts the update is dead-lettered
+          1 to 3600 s: `0` or a past date still waits 1 s). After 10 failed attempts the update is dead-lettered
           and the next update of the chat goes on; the bot's owner can
           retry or drop it in the Developer Console. Updates expire after
           24 hours (callbacks 15 minutes).
@@ -797,7 +797,7 @@ components:
         ignored. The `random_id` of `sendMessage` is replaced by one derived
         from the bot and the update, so a redelivered update never sends
         the reply twice. Any other body (empty, `{}`, `{"ok": true}`) is no
-        action.
+        action, and so is a body over 64 KiB (the delivery still counts).
       oneOf:
         - type: object
           required: [method, chat_id, text]

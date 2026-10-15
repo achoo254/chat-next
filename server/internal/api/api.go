@@ -33,6 +33,7 @@ import (
 	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/rpc"
+	"app.local/server/internal/safehttp"
 	"app.local/server/internal/store"
 )
 
@@ -102,7 +103,14 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
-	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{Allow: opts.LinkPreviewAllow}), logger)
+	deny := outboundDeny(cfg, logger)
+	previewAllow := opts.LinkPreviewAllow
+	if previewAllow == nil {
+		previewAllow = func(ap netip.AddrPort) bool {
+			return linkpreview.PublicAddress(ap) && !safehttp.Denied(deny, ap.Addr())
+		}
+	}
+	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{Allow: previewAllow}), logger)
 	limiter := ratelimit.NewMemory()
 	mediaSvc, err := newMedia(cfg, st, limiter, logger, opts.MediaObjects)
 	if err != nil {
@@ -145,7 +153,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	// Webhooks of bots: outbound requests through safehttp; actions in their
 	// answers run through the Bot API's own checks.
 	if err := botUpdates.EnableWebhooks(botupdates.WebhookOptions{
-		TenantID: cfg.TenantID, SessionKey: cfg.SessionKey, Local: cfg.BotWebhookLocal, Reply: botAPI.WebhookReply,
+		TenantID: cfg.TenantID, SessionKey: cfg.SessionKey, Local: cfg.BotWebhookLocal, Reply: botAPI.WebhookReply, Deny: deny,
 	}); err != nil {
 		return nil, err
 	}
@@ -189,6 +197,25 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		}()
 	}
 	return app, nil
+}
+
+// outboundDeny is what URLs chosen by users and bots (webhooks, link
+// previews) may not reach: OUTBOUND_DENY_CIDRS and the public addresses of
+// this host's interfaces. A failure to list the interfaces is logged, not
+// fatal: the configured list still applies.
+func outboundDeny(cfg config.Config, logger *slog.Logger) []netip.Prefix {
+	deny := append([]netip.Prefix(nil), cfg.OutboundDeny...)
+	host, err := safehttp.HostAddresses()
+	if err != nil {
+		logger.Warn("listing this host's addresses failed; only OUTBOUND_DENY_CIDRS is refused", "err", err)
+	}
+	deny = append(deny, host...)
+	ranges := make([]string, len(deny))
+	for i, p := range deny {
+		ranges[i] = p.String()
+	}
+	logger.Info("outbound requests refuse these ranges", "configured", len(cfg.OutboundDeny), "ranges", ranges)
+	return deny
 }
 
 // newMedia builds the media service when storage is configured.

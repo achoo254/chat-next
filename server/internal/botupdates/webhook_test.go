@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"slices"
 	"strconv"
 	"sync"
@@ -278,6 +279,8 @@ func TestFailingUpdateIsDeadLetteredAndTheChatGoesOn(t *testing.T) {
 	ctx := context.Background()
 	botID, user, group := talkativeBot(t, env, "deadbot")
 	env.CatchUp()
+	// Retry-After 0 still waits the minimum backoff, shortened here.
+	botupdates.SetRetryFloor(env.Updates, 20*time.Millisecond)
 	setHook(t, env, botID, "http://127.0.0.1:1/unused", botupdates.WebhookSettings{DropPending: true})
 	var mu sync.Mutex
 	failText := "poison"
@@ -286,7 +289,7 @@ func TestFailingUpdateIsDeadLetteredAndTheChatGoesOn(t *testing.T) {
 		fail := d.Text == failText
 		mu.Unlock()
 		if fail {
-			// Retry-After 0 is honoured: the next attempt comes at once.
+			// Retry-After 0: the next attempt comes after the minimum wait.
 			w.Header().Set("Retry-After", "0")
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
@@ -519,18 +522,35 @@ func TestWebhookSettingsAreChecked(t *testing.T) {
 		}
 	}
 	// Valid: public address on 8443, max 100, a subset of kinds (duplicates
-	// collapse); an empty secret then keeps the stored one.
+	// collapse); an empty secret then keeps the stored one for the same URL
+	// only: a new URL must not get the secret the old one trusts.
 	if err := prod.SetWebhook(ctx, botID, botupdates.WebhookSettings{
 		URL: "https://93.184.216.34:8443/hook", Secret: "s", MaxConnections: 100, AllowedUpdates: []string{"callback", "callback"},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := prod.SetWebhook(ctx, botID, botupdates.WebhookSettings{URL: "https://93.184.216.34/other"}); err != nil {
+	if err := prod.SetWebhook(ctx, botID, botupdates.WebhookSettings{URL: " https://93.184.216.34:8443/hook "}); err != nil {
 		t.Fatalf("keeping the secret: %v", err)
+	}
+	if got := code(prod.SetWebhook(ctx, botID, botupdates.WebhookSettings{URL: "https://93.184.216.34/other"})); got != "secret_required" {
+		t.Fatalf("new URL without a new secret = %s", got)
+	}
+	if err := prod.SetWebhook(ctx, botID, botupdates.WebhookSettings{URL: "https://93.184.216.34/other", Secret: "s2"}); err != nil {
+		t.Fatalf("new URL with a new secret: %v", err)
 	}
 	i, err := prod.WebhookInfo(ctx, botID)
 	if err != nil || i.URL != "https://93.184.216.34/other" || i.MaxConnections != botupdates.MaxConnectionsDefault || len(i.AllowedUpdates) != 0 {
 		t.Fatalf("info = %+v, %v", i, err)
+	}
+	// The server's own addresses (WebhookOptions.Deny) are refused like private ones.
+	self := bottest.NewUpdates(t, env.Store, env.Chat)
+	if err := self.EnableWebhooks(botupdates.WebhookOptions{
+		TenantID: bottest.TenantID, SessionKey: bottest.WebhookKey, Deny: []netip.Prefix{netip.MustParsePrefix("93.184.216.34/32")},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := code(self.SetWebhook(ctx, botID, botupdates.WebhookSettings{URL: "https://93.184.216.34/hook", Secret: "s"})); got != "url_blocked" {
+		t.Fatalf("the server's own address = %s", got)
 	}
 	// The secret is sealed, never stored as is.
 	var stored []byte

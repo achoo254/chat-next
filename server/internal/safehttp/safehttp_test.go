@@ -38,6 +38,8 @@ func TestPublicIP(t *testing.T) {
 		"::10.0.0.1":            false, // IPv4-compatible
 		"64:ff9b::a00:1":        false, // NAT64 of 10.0.0.1
 		"2002:a00:1::1":         false, // 6to4
+		"::ffff:0:7f00:1":       false, // IPv4-translated (SIIT) 127.0.0.1
+		"::ffff:0:5db8:d822":    false, // IPv4-translated, even of a public IPv4
 		"2001:0:4136:e378::1":   false, // Teredo
 		"198.18.0.1":            false,
 		"255.255.255.255":       false,
@@ -102,6 +104,42 @@ func TestDirectPrivateAddressIsRefused(t *testing.T) {
 		}
 		if _, err := post(t, c, raw); !errors.Is(err, ErrBlocked) {
 			t.Errorf("Do(%s) = %v, want ErrBlocked", raw, err)
+		}
+	}
+}
+
+func TestDeniedRangesAreRefused(t *testing.T) {
+	deny := []netip.Prefix{netip.MustParsePrefix("93.184.216.34/32"), netip.MustParsePrefix("2606:4700::/32")}
+	c := New(Options{Deny: deny, Resolver: &fakeResolver{answers: [][]string{{"8.8.8.8", "93.184.216.34"}}}})
+	for _, raw := range []string{"https://93.184.216.34/hook", "https://[::ffff:93.184.216.34]/", "https://[2606:4700::1111]/", "https://self.example/"} {
+		if _, err := c.CheckURL(context.Background(), raw); !errors.Is(err, ErrBlocked) {
+			t.Errorf("CheckURL(%s) = %v, want ErrBlocked", raw, err)
+		}
+		if _, err := post(t, c, raw); !errors.Is(err, ErrBlocked) {
+			t.Errorf("Do(%s) = %v, want ErrBlocked", raw, err)
+		}
+	}
+	if _, err := c.CheckURL(context.Background(), "https://8.8.8.8/"); err != nil {
+		t.Errorf("an address outside the ranges: %v", err)
+	}
+	// Development allows loopback but still refuses denied ranges.
+	dev := New(Options{Development: true, Deny: []netip.Prefix{netip.MustParsePrefix("127.0.0.2/32")}})
+	if _, err := dev.CheckURL(context.Background(), "http://127.0.0.1:9/"); err != nil {
+		t.Errorf("development loopback: %v", err)
+	}
+	if _, err := dev.CheckURL(context.Background(), "http://127.0.0.2:9/"); !errors.Is(err, ErrBlocked) {
+		t.Errorf("development denied loopback = %v", err)
+	}
+}
+
+func TestHostAddressesArePublicSingleAddresses(t *testing.T) {
+	list, err := HostAddresses()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range list {
+		if !p.IsSingleIP() || !PublicIP(p.Addr()) {
+			t.Errorf("HostAddresses returned %v", p)
 		}
 	}
 }

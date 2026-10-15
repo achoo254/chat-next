@@ -257,6 +257,16 @@ func (s *Service) Owned(ctx context.Context, owner, botID int64) (*Bot, error) {
 	return s.ownedBot(ctx, s.pool, owner, botID, false)
 }
 
+// OwnedRecent is Owned for changes that hand over the bot's traffic (its
+// webhook): like issuing a token, they need a recent IdP sign-in (authTime,
+// ADR 0006), refused with reauth_required before anything is read.
+func (s *Service) OwnedRecent(ctx context.Context, owner int64, authTime time.Time, botID int64) (*Bot, error) {
+	if err := s.requireRecentSignIn(authTime); err != nil {
+		return nil, err
+	}
+	return s.Owned(ctx, owner, botID)
+}
+
 // Live returns a live bot of the tenant; NotFound otherwise.
 func (s *Service) Live(ctx context.Context, botID int64) (*Bot, error) {
 	b, err := scanBot(s.pool.QueryRow(ctx, `SELECT `+botColumns+` FROM `+botFrom+`

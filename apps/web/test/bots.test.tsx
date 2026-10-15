@@ -10,7 +10,8 @@ import { BotCommandScope } from "@app/proto-ts/bot_admin";
 import { ChatType } from "@app/proto-ts/chats";
 import { matchCommands } from "../src/messaging/bots/bot-chat.tsx";
 import { startCommand } from "../src/messaging/bots/bot-link-dialog.tsx";
-import { normalizeUsername, reauthUrl, usernameFromName, usernameSuggestions } from "../src/messaging/bots/console.tsx";
+import { normalizeUsername, usernameFromName, usernameSuggestions } from "../src/messaging/bots/console.tsx";
+import { reauthUrl } from "../src/messaging/bots/dialogs.tsx";
 import { usernameProblem, validStartParam } from "../src/messaging/bots/api.ts";
 import { inAppBotLink } from "../src/messaging/ui/rich-text.tsx";
 import { matchRoute, navigate, returnPathFor } from "../src/router.tsx";
@@ -172,8 +173,10 @@ describe("Developer Console", () => {
 		await userEvent.click(within(confirm).getByRole("button", { name: "Cấp lại token" }));
 		expect(await screen.findByTestId("bot-token", {}, LONG)).toBeTruthy();
 		expect(resets()).toBe(2);
-		// The poll line explains how updates arrive.
-		expect(screen.getByText(/GET http:\/\/localhost(:\d+)?\/bot\/v1\/updates/)).toBeTruthy();
+		// The side card points to Nhận update instead of repeating its command.
+		expect(screen.getByText("Bot nhận update bằng long poll.")).toBeTruthy();
+		expect(screen.queryByText(/bot\/v1\/updates/)).toBeNull();
+		expect(screen.getByRole("link", { name: "Cách nhận update" }).getAttribute("href")).toBe(`/console/${botId}/updates`);
 		// Another tab and back: the return from the sign-in is not acted on again.
 		await userEvent.click(screen.getByRole("link", { name: "Hồ sơ" }));
 		await screen.findByRole("form", { name: "Hồ sơ bot" }, LONG);

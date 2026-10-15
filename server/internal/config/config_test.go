@@ -225,3 +225,29 @@ func TestLoadBotWebhookAllowLocal(t *testing.T) {
 		t.Fatalf("default: %+v, %v", c.BotWebhookLocal, err)
 	}
 }
+
+func TestLoadOutboundDeny(t *testing.T) {
+	env := validEnv()
+	c, err := Load(lookupFrom(env))
+	if err != nil || len(c.OutboundDeny) != 0 {
+		t.Fatalf("default: %v, %v", c.OutboundDeny, err)
+	}
+	env["OUTBOUND_DENY_CIDRS"] = " 103.72.98.65, 10.9.0.0/16 ,, 2001:db8::1, ::ffff:198.51.100.7, 192.0.2.77/24"
+	c, err = Load(lookupFrom(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, p := range c.OutboundDeny {
+		got = append(got, p.String())
+	}
+	if want := "103.72.98.65/32 10.9.0.0/16 2001:db8::1/128 198.51.100.7/32 192.0.2.0/24"; strings.Join(got, " ") != want {
+		t.Fatalf("OutboundDeny = %v, want %s", got, want)
+	}
+	for _, bad := range []string{"103.72.98", "10.0.0.0/33", "fe80::1%eth0", "host.example"} {
+		env["OUTBOUND_DENY_CIDRS"] = bad
+		if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "OUTBOUND_DENY_CIDRS") || strings.Contains(err.Error(), bad) {
+			t.Fatalf("%q: err = %v", bad, err)
+		}
+	}
+}

@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { BotTier } from "@app/proto-ts/bot_admin";
 import { BotError } from "../src/messaging/bots/api.ts";
-import { newSecret, validSecret, webhookProblem, webhookUrlProblem } from "../src/messaging/bots/delivery.tsx";
+import { breakAfterSlashes, newSecret, pollCommand, readDraft, validSecret, webhookProblem, webhookUrlProblem } from "../src/messaging/bots/delivery.tsx";
 import { matchRoute } from "../src/router.tsx";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
@@ -42,6 +42,34 @@ describe("delivery helpers", () => {
 		expect(webhookProblem(new BotError("invalid", "url_blocked: private address"))).toBe("url_blocked");
 		expect(webhookProblem(new BotError("invalid", "something else"))).toBeNull();
 		expect(webhookProblem(new BotError("other", "url_blocked: x"))).toBeNull();
+	});
+
+	it("write the long poll as a runnable command that wraps only between words", () => {
+		const command = pollCommand("https://chat.hoandat.com");
+		expect(command).toBe(
+			["curl -sS -G \\", '  -H "Authorization: Bearer <token>" \\', "  -d offset=0 \\", "  -d timeout=50 \\", "  https://chat.hoandat.com/bot/v1/updates"].join("\n"),
+		);
+		// Every line but the last continues with " \\"; the only placeholder is quoted, so the shell never reads "<" as a redirect.
+		const lines = command.split("\n");
+		expect(lines.slice(0, -1).every((line) => line.endsWith(" \\"))).toBe(true);
+		expect(command.replace(/"[^"]*"/g, "")).not.toContain("<");
+		// Break chances only after "/" inside the path, not in "https://".
+		const parts = breakAfterSlashes("  https://chat.hoandat.com/bot/v1/updates").filter((part) => typeof part === "string");
+		expect(parts).toEqual(["  https://chat.hoandat.com/", "bot/", "v1/", "updates"]);
+	});
+
+	it("read back only a well-formed, recent webhook draft", () => {
+		const key = "console:webhook-draft:7";
+		const draft = { url: "https://x.example/h", secret: "s", kinds: ["message"], maxText: "5", drop: false };
+		sessionStorage.setItem(key, JSON.stringify({ ...draft, at: Date.now() }));
+		expect(readDraft(7)).toEqual(draft);
+		sessionStorage.setItem(key, JSON.stringify({ ...draft, at: Date.now() - 16 * 60_000 }));
+		expect(readDraft(7)).toBeNull();
+		sessionStorage.setItem(key, JSON.stringify({ ...draft, kinds: ["inline_query"], at: Date.now() }));
+		expect(readDraft(7)).toBeNull();
+		sessionStorage.setItem(key, "{not json");
+		expect(readDraft(7)).toBeNull();
+		expect(readDraft(8)).toBeNull();
 	});
 });
 
@@ -149,13 +177,28 @@ describe("Developer Console delivery", () => {
 		const form = screen.getByRole("form", { name: "Nhận update" });
 		const save = within(form).getByRole("button", { name: "Lưu" });
 		expect(save.hasAttribute("disabled")).toBe(true);
-		// A changed URL with the secret field left empty keeps the secret.
-		const url = within(form).getByLabelText("URL webhook");
+		// Same URL, empty secret field: the secret in use stays.
+		const secret = within(form).getByLabelText<HTMLInputElement>("Secret token");
+		expect(secret.placeholder).toBe("Để trống để giữ secret đang dùng");
+		await userEvent.click(within(form).getByRole("button", { name: "message" }));
+		await userEvent.click(save);
+		await waitFor(() => expect(fake.bots.get(botId)?.allowedUpdates).toEqual(["message"]), LONG);
+		expect(fake.bots.get(botId)?.webhookSecret).toBe("old_secret");
+		// A new URL never gets the old secret: the form asks for a new one before sending.
+		const form2 = await screen.findByRole("form", { name: "Nhận update" }, LONG);
+		const url = within(form2).getByLabelText("URL webhook");
 		await userEvent.clear(url);
 		await userEvent.type(url, "https://deploy.example.com/v2");
-		await userEvent.click(save);
+		expect(within(form2).getByLabelText<HTMLInputElement>("Secret token").placeholder).toBe("URL mới cần secret mới: nhập hoặc bấm Tạo mới");
+		const calls = fake.calls.length;
+		await userEvent.click(within(form2).getByRole("button", { name: "Lưu" }));
+		expect(await within(form2).findByText("Đổi URL cần secret mới: nhập hoặc bấm Tạo mới")).toBeTruthy();
+		expect(fake.calls.slice(calls).some((c) => c.startsWith("SetBotWebhook"))).toBe(false);
+		await userEvent.click(within(form2).getByRole("button", { name: "Tạo mới" }));
+		const fresh = within(form2).getByLabelText<HTMLInputElement>("Secret token").value;
+		await userEvent.click(within(form2).getByRole("button", { name: "Lưu" }));
 		await waitFor(() => expect(fake.bots.get(botId)?.webhookUrl).toBe("https://deploy.example.com/v2"), LONG);
-		expect(fake.bots.get(botId)?.webhookSecret).toBe("old_secret");
+		expect(fake.bots.get(botId)?.webhookSecret).toBe(fresh);
 
 		const again = await screen.findByRole("form", { name: "Nhận update" }, LONG);
 		await userEvent.click(within(again).getByRole("button", { name: "Long poll" }));
@@ -166,6 +209,62 @@ describe("Developer Console delivery", () => {
 		await waitFor(() => expect(fake.calls).toContain(`DeleteBotWebhook ${botId} true`), LONG);
 		expect(fake.bots.get(botId)?.webhookUrl).toBe("");
 		expect(await screen.findByRole("heading", { name: "Trạng thái long poll" }, LONG)).toBeTruthy();
+	});
+
+	it("asks for a recent sign-in to save a webhook, then saves what was entered only from the confirmation", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		fake.recentSignIn = false;
+		const botId = fake.seed("Deploy Bot", "deployer_bot", { tokenSecret: "s", tokenIssuedAt: fake.now });
+		const sets = () => fake.calls.filter((c) => c.startsWith(`SetBotWebhook ${botId}`)).length;
+		const view = renderMessaging(demo.fixture, `/console/${botId}/updates`);
+		const form = await screen.findByRole("form", { name: "Nhận update" }, LONG);
+		await userEvent.click(within(form).getByRole("button", { name: "Webhook" }));
+		await userEvent.type(within(form).getByLabelText("URL webhook"), "https://deploy.example.com/hook");
+		await userEvent.type(within(form).getByLabelText("Secret token"), "typed_secret");
+		await userEvent.click(within(form).getByRole("button", { name: "callback" }));
+		await userEvent.click(within(form).getByRole("button", { name: "Lưu" }));
+		const reauth = await screen.findByRole("dialog", { name: "Đăng nhập lại để tiếp tục" }, LONG);
+		expect(within(reauth).getByText(/Đặt hoặc đổi webhook cần đăng nhập trong 10 phút gần đây/)).toBeTruthy();
+		const href = within(reauth).getByRole("link", { name: "Đăng nhập lại" }).getAttribute("href") ?? "";
+		expect(new URL(href, "http://x").searchParams.get("return_to")).toBe(`/console/${botId}/updates?after=webhook`);
+		expect(sets()).toBe(1);
+		expect(fake.bots.get(botId)?.webhookUrl).toBe("");
+		view.unmount();
+
+		// Back from the sign-in: the form as entered, saved only from the confirmation.
+		fake.recentSignIn = true;
+		const back = renderMessaging(demo.fixture, `/console/${botId}/updates?after=webhook`);
+		const ask = await screen.findByRole("dialog", { name: "Lưu webhook?" }, LONG);
+		expect(within(ask).getByText("https://deploy.example.com/hook")).toBeTruthy();
+		await waitFor(() => expect(window.location.search).toBe(""));
+		expect(sessionStorage.getItem(`console:webhook-draft:${botId}`)).toBeNull();
+		expect(sets()).toBe(1);
+		await userEvent.click(within(ask).getByRole("button", { name: "Lưu" }));
+		await waitFor(() => expect(toastText()).toContain("Đã lưu cách nhận update"), LONG);
+		expect(fake.bots.get(botId)).toMatchObject({ webhookUrl: "https://deploy.example.com/hook", webhookSecret: "typed_secret", allowedUpdates: ["callback"] });
+		back.unmount();
+
+		// The same link again, with nothing kept: no confirmation, nothing saved.
+		renderMessaging(demo.fixture, `/console/${botId}/updates?after=webhook`);
+		await screen.findByRole("form", { name: "Nhận update" }, LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(sets()).toBe(2);
+	});
+
+	it("shows a runnable long poll command with a copy button", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.bots;
+		const botId = fake.seed("Deploy Bot", "deployer_bot", { tokenSecret: "s", tokenIssuedAt: fake.now });
+		const written: string[] = [];
+		Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (text: string) => Promise.resolve(void written.push(text)) } });
+		renderMessaging(demo.fixture, `/console/${botId}/updates`);
+		const form = await screen.findByRole("form", { name: "Nhận update" }, LONG);
+		const command = within(form).getByLabelText("Lệnh lấy update");
+		expect(command.textContent).toBe(pollCommand(window.location.origin));
+		await userEvent.click(within(form).getByRole("button", { name: "Sao chép" }));
+		await waitFor(() => expect(toastText()).toContain("Đã sao chép lệnh"), LONG);
+		expect(written).toEqual([pollCommand(window.location.origin)]);
 	});
 
 	it("retries one dead letter and drops the rest, then shows the empty state", async () => {

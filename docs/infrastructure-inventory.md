@@ -39,7 +39,7 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 
 ### Biến trong `/opt/chat/.env` (chỉ tên)
 
-`CHAT_ENV`, `CHAT_LISTEN_ADDR`, `CHAT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `TENANT_ID`, `TENANT_DOMAIN`, `SESSION_KEY`, `DATABASE_URL`, `MEDIA_PUBLIC_URL`, `MEDIA_STORAGE`, `MEDIA_ROOT`, `MEDIA_MIN_FREE_BYTES`, `MEDIA_UPLOAD_MAX_BYTES`, `MEDIA_USER_QUOTA_BYTES`. Mẫu và ý nghĩa: [`infra/chat/.env.production.example`](../infra/chat/.env.production.example). Chưa đặt: `CHAT_OPERATOR_USER_IDS` (không ai có quyền kiểm duyệt), `MEDIA_FFMPEG_PATH`. File `.env.bak-*` là bản sao trước mỗi lần sửa tay.
+`CHAT_ENV`, `CHAT_LISTEN_ADDR`, `CHAT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `TENANT_ID`, `TENANT_DOMAIN`, `SESSION_KEY`, `DATABASE_URL`, `MEDIA_PUBLIC_URL`, `MEDIA_STORAGE`, `MEDIA_ROOT`, `MEDIA_MIN_FREE_BYTES`, `MEDIA_UPLOAD_MAX_BYTES`, `MEDIA_USER_QUOTA_BYTES`, `OUTBOUND_DENY_CIDRS` (`103.72.98.65`, đặt ngày 2026-10-15: webhook bot và xem trước link không gọi về chính máy). Mẫu và ý nghĩa: [`infra/chat/.env.production.example`](../infra/chat/.env.production.example). Chưa đặt: `CHAT_OPERATOR_USER_IDS` (không ai có quyền kiểm duyệt), `MEDIA_FFMPEG_PATH`. File `.env.bak-*` là bản sao trước mỗi lần sửa tay.
 
 ### Tiến trình (pm2 dùng chung, daemon chạy bằng root)
 
@@ -52,7 +52,7 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 | File | Vai trò |
 |---|---|
 | `chat-http.conf` | Cấp `http`: log format không ghi query, zone rate limit `chat_auth`, `chat_rpc` (cài một lần bằng `setup-server.sh`) |
-| `chat.hoandat.com.conf` | Web tĩnh, `/rpc/`, `/auth/`, `/ws`, `/hook/` (log che secret), `/bot/` (Bot API, R5: không cookie, body 1 MiB, đọc 65 s cho long poll, zone `chat_bot` 600 r/s mỗi IP burst 1200 trên tầng cao nhất của bot, vượt thì `429` JSON; method do app kiểm, `405` JSON), `/healthz`; zone `chat_ws`, `chat_hook`, `chat_bot` khai báo trong file này |
+| `chat.hoandat.com.conf` | Web tĩnh, `/rpc/`, `/auth/`, `/ws`, `/hook/` (log che secret), `/bot/` (Bot API, R5: không cookie, body 1 MiB, đọc 65 s cho long poll, zone `chat_bot` 600 r/s mỗi IP burst 1200 trên tầng cao nhất của bot, vượt thì `429` JSON; method do app kiểm, `405` JSON), `/healthz`, `/sw.js` (từ bản hardening webhook: `/opt/chat/sw-override/sw.js` nếu có, không thì của release, thiếu thì `404`; xem kill switch trong deployment guide); zone `chat_ws`, `chat_hook`, `chat_bot` khai báo trong file này |
 | `media-chat.hoandat.com.conf` | Host media, proxy tới app (app stream file, Range) |
 | `*.prev` | Bản trước, do `activate-release.sh` giữ để tự trả lại khi `nginx -t` lỗi |
 

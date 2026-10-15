@@ -1,11 +1,12 @@
 // In-memory BotAdminService and BotsService for tests and the visual
 // harness, with the server's rules the screens depend on: usernames ending
 // in "bot" and unique, 20 bots per owner, a token shown once by
-// ResetBotToken, a recent sign-in for ResetBotToken and DeleteBot
-// (reauth_required otherwise), and StartBot opening the private chat with
-// "/start [param]". Callback presses answer what the test queued. Update
-// delivery: a webhook (https, no internal address, a secret the first time),
-// its status and counters as seeded, and dead letters to retry or drop.
+// ResetBotToken, a recent sign-in for ResetBotToken, DeleteBot and
+// SetBotWebhook (reauth_required otherwise), and StartBot opening the
+// private chat with "/start [param]". Callback presses answer what the test
+// queued. Update delivery: a webhook (https, no internal address, a secret
+// the first time and with every new URL), its status and counters as seeded,
+// and dead letters to retry or drop.
 // Never imported by production code.
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { BotAdminService, BotCommandScope, BotTier, type BotCommandSet } from "@app/proto-ts/bot_admin";
@@ -108,7 +109,7 @@ export class FakeBots {
 	readonly calls: string[] = [];
 	/** CreateBot answers resource_exhausted (the server's creation rate limit). */
 	createLimited = false;
-	/** Whether the session signed in recently enough for ResetBotToken and DeleteBot. */
+	/** Whether the session signed in recently enough for ResetBotToken, DeleteBot and SetBotWebhook. */
 	recentSignIn = true;
 	readonly now = 1_760_500_000;
 	/** PressInlineButton requests: chat, seq and the callback data as text. */
@@ -214,6 +215,9 @@ export class FakeBots {
 		if (parsed.hostname.endsWith(".invalid")) throw new ConnectError("url_unresolved: the url's host name does not resolve", Code.InvalidArgument);
 		if (secret !== "" && !/^[A-Za-z0-9_-]{1,256}$/.test(secret)) throw new ConnectError("secret_invalid: bad secret", Code.InvalidArgument);
 		if (secret === "" && bot.webhookSecret === "") throw new ConnectError("secret_required: a secret is required", Code.InvalidArgument);
+		if (secret === "" && url !== bot.webhookUrl) {
+			throw new ConnectError("secret_required: a new secret is required when the url changes", Code.InvalidArgument);
+		}
 		if (maxConnections < 0 || maxConnections > 100) throw new ConnectError("max_connections_invalid: 1 to 100", Code.InvalidArgument);
 	}
 
@@ -306,6 +310,7 @@ export class FakeBots {
 			setBotWebhook: (req) => {
 				const bot = this.own(num(req.botId));
 				this.calls.push(`SetBotWebhook ${bot.id} ${req.url}`);
+				this.needRecentSignIn();
 				this.checkWebhook(bot, req.url, req.secret, req.maxConnections);
 				bot.webhookUrl = req.url;
 				if (req.secret !== "") bot.webhookSecret = req.secret;

@@ -1116,7 +1116,9 @@ func (x *BotDeliveryStatus) GetOpenConnections() int32 {
 	return 0
 }
 
-// Delivery counters of the last 24 hours (whole hours).
+// Delivery numbers of the last 24 hours: the larger of the hourly counters
+// and what the stored updates show (counters started with webhook delivery;
+// stored updates are kept 24 hours, callbacks 15 minutes).
 type BotDeliveryStats struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Updates stored for the bot.
@@ -1256,7 +1258,9 @@ type SetBotWebhookRequest struct {
 	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
 	// 1 to 256 characters of A-Z, a-z, 0-9, _ and -, sent in the
 	// X-Bot-Api-Secret-Token header and keying the X-Bot-Signature HMAC.
-	// Empty keeps the current secret (required when no webhook is set).
+	// Empty keeps the current secret, only when the webhook stays at the same
+	// URL (secret_required when no webhook is set or the URL changes, so a
+	// new URL never receives the secret the previous one trusts).
 	Secret         string   `protobuf:"bytes,3,opt,name=secret,proto3" json:"secret,omitempty"`
 	AllowedUpdates []string `protobuf:"bytes,4,rep,name=allowed_updates,json=allowedUpdates,proto3" json:"allowed_updates,omitempty"`
 	// 1 to 100; 0 is 40.

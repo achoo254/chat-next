@@ -81,14 +81,15 @@ type BotAdminServiceClient interface {
 	// working at once. Needs a recent sign-in.
 	ResetBotToken(context.Context, *connect.Request[v1.ResetBotTokenRequest]) (*connect.Response[v1.ResetBotTokenResponse], error)
 	// Deletes the bot: its token stops working and its pending updates are
-	// dropped; its messages stay. The username stays reserved. Needs a recent
-	// sign-in.
+	// dropped; its messages stay. Its username is released for another bot.
+	// Needs a recent sign-in.
 	DeleteBot(context.Context, *connect.Request[v1.DeleteBotRequest]) (*connect.Response[v1.DeleteBotResponse], error)
 	// How the bot receives updates (webhook or long poll), the delivery
 	// state and the counters of the last 24 hours.
 	GetBotDelivery(context.Context, *connect.Request[v1.GetBotDeliveryRequest]) (*connect.Response[v1.GetBotDeliveryResponse], error)
 	// Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
-	// POSTed to it and long polls get 409 conflict.
+	// POSTed to it and long polls get 409 conflict. Needs a recent sign-in:
+	// the webhook gets all of the bot's updates and may answer as the bot.
 	SetBotWebhook(context.Context, *connect.Request[v1.SetBotWebhookRequest]) (*connect.Response[v1.SetBotWebhookResponse], error)
 	// Removes the webhook; the bot fetches updates by long poll again.
 	DeleteBotWebhook(context.Context, *connect.Request[v1.DeleteBotWebhookRequest]) (*connect.Response[v1.DeleteBotWebhookResponse], error)
@@ -265,14 +266,15 @@ type BotAdminServiceHandler interface {
 	// working at once. Needs a recent sign-in.
 	ResetBotToken(context.Context, *connect.Request[v1.ResetBotTokenRequest]) (*connect.Response[v1.ResetBotTokenResponse], error)
 	// Deletes the bot: its token stops working and its pending updates are
-	// dropped; its messages stay. The username stays reserved. Needs a recent
-	// sign-in.
+	// dropped; its messages stay. Its username is released for another bot.
+	// Needs a recent sign-in.
 	DeleteBot(context.Context, *connect.Request[v1.DeleteBotRequest]) (*connect.Response[v1.DeleteBotResponse], error)
 	// How the bot receives updates (webhook or long poll), the delivery
 	// state and the counters of the last 24 hours.
 	GetBotDelivery(context.Context, *connect.Request[v1.GetBotDeliveryRequest]) (*connect.Response[v1.GetBotDeliveryResponse], error)
 	// Sets the bot's webhook (the same as PUT /bot/v1/webhook): updates are
-	// POSTed to it and long polls get 409 conflict.
+	// POSTed to it and long polls get 409 conflict. Needs a recent sign-in:
+	// the webhook gets all of the bot's updates and may answer as the bot.
 	SetBotWebhook(context.Context, *connect.Request[v1.SetBotWebhookRequest]) (*connect.Response[v1.SetBotWebhookResponse], error)
 	// Removes the webhook; the bot fetches updates by long poll again.
 	DeleteBotWebhook(context.Context, *connect.Request[v1.DeleteBotWebhookRequest]) (*connect.Response[v1.DeleteBotWebhookResponse], error)

@@ -12,6 +12,7 @@ import (
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/store"
 	"connectrpc.com/connect"
 )
 
@@ -62,8 +63,8 @@ func (s *botsService) OpenMiniApp(context.Context, *connect.Request[appv1.OpenMi
 }
 
 // botAdminService implements BotAdminService (Developer Console). Token
-// reveal and deletion pass the session's IdP auth_time for the recent
-// sign-in rule of ADR 0006.
+// reveal, deletion and setting the webhook pass the session's IdP auth_time
+// for the recent sign-in rule of ADR 0006.
 type botAdminService struct {
 	appv1connect.UnimplementedBotAdminServiceHandler
 	bots    *botadmin.Service
@@ -182,24 +183,37 @@ func (s *botAdminService) GetBotDelivery(ctx context.Context, req *connect.Reque
 	})
 }
 
+// SetBotWebhook needs a recent sign-in like ResetBotToken: the webhook
+// receives all of the bot's updates and may send as the bot in its answers.
+// (The Bot API's PUT /webhook needs the token itself, which is as much.)
 func (s *botAdminService) SetBotWebhook(ctx context.Context, req *connect.Request[appv1.SetBotWebhookRequest]) (*connect.Response[appv1.SetBotWebhookResponse], error) {
-	return call(ctx, s.logger, req, func(me int64, m *appv1.SetBotWebhookRequest) (*appv1.SetBotWebhookResponse, error) {
-		if _, err := s.bots.Owned(ctx, me, m.GetBotId()); err != nil {
-			return nil, err
-		}
-		err := s.updates.SetWebhook(ctx, m.GetBotId(), botupdates.WebhookSettings{
-			URL: m.GetUrl(), Secret: m.GetSecret(), AllowedUpdates: m.GetAllowedUpdates(),
-			MaxConnections: int(m.GetMaxConnections()), DropPending: m.GetDropPending(),
-		})
-		if err != nil {
-			return nil, deliveryError(err)
-		}
-		info, err := s.updates.WebhookInfo(ctx, m.GetBotId())
-		if err != nil {
-			return nil, deliveryError(err)
-		}
-		return &appv1.SetBotWebhookResponse{Webhook: renderWebhook(info)}, nil
+	sess, err := mustSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.setWebhook(ctx, sess, req.Msg)
+	if err != nil {
+		return nil, fail(ctx, s.logger, req.Spec().Procedure, err)
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (s *botAdminService) setWebhook(ctx context.Context, sess store.Session, m *appv1.SetBotWebhookRequest) (*appv1.SetBotWebhookResponse, error) {
+	if _, err := s.bots.OwnedRecent(ctx, sess.UserID, sess.AuthTime, m.GetBotId()); err != nil {
+		return nil, err
+	}
+	err := s.updates.SetWebhook(ctx, m.GetBotId(), botupdates.WebhookSettings{
+		URL: m.GetUrl(), Secret: m.GetSecret(), AllowedUpdates: m.GetAllowedUpdates(),
+		MaxConnections: int(m.GetMaxConnections()), DropPending: m.GetDropPending(),
 	})
+	if err != nil {
+		return nil, deliveryError(err)
+	}
+	info, err := s.updates.WebhookInfo(ctx, m.GetBotId())
+	if err != nil {
+		return nil, deliveryError(err)
+	}
+	return &appv1.SetBotWebhookResponse{Webhook: renderWebhook(info)}, nil
 }
 
 func (s *botAdminService) DeleteBotWebhook(ctx context.Context, req *connect.Request[appv1.DeleteBotWebhookRequest]) (*connect.Response[appv1.DeleteBotWebhookResponse], error) {

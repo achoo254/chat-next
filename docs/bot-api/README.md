@@ -37,7 +37,7 @@ curl -s -H "Authorization: Bearer $BOT_TOKEN" -H 'Content-Type: application/json
 
 ## 3. Nhận update qua webhook
 
-Đặt webhook bằng API (hoặc tab **Nhận update** trong Developer Console):
+Đặt webhook bằng API (hoặc tab **Nhận update** trong Developer Console; ở Console, đặt hay đổi webhook cần đăng nhập lại nếu lần đăng nhập gần nhất đã quá 10 phút, và đổi URL thì phải kèm secret mới):
 
 ```sh
 curl -s -X PUT -H "Authorization: Bearer $BOT_TOKEN" -H 'Content-Type: application/json' \
@@ -50,7 +50,7 @@ curl -s -X DELETE -H "Authorization: Bearer $BOT_TOKEN" $API/webhook  # về lon
 - Khi webhook đang đặt, `GET /updates` trả `409`.
 - Mỗi update là một `POST` JSON, giống một phần tử của `GET /updates`. Trả 2xx trong 10 giây là thành công.
 - Tuần tự trong từng chat, song song giữa các chat tới `max_connections`.
-- Lỗi thì thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, hoặc theo `Retry-After`. Sau 10 lần, update vào dead-letter (xem và thử lại ở tab **Update lỗi**), các update sau của chat vẫn được giao.
+- Lỗi thì thử lại sau 1 giây, nhân đôi tới trần 60–120 giây, hoặc theo `Retry-After` (ít nhất 1 giây, tối đa 1 giờ). Sau 10 lần, update vào dead-letter (xem và thử lại ở tab **Update lỗi**), các update sau của chat vẫn được giao.
 - Có thể giao hơn một lần (mất câu trả lời, server khởi động lại): bỏ trùng theo `update_id`.
 
 ### Kiểm request
@@ -63,19 +63,25 @@ Mỗi request có ba header:
 | `X-Bot-Timestamp` | Giây Unix lúc ký |
 | `X-Bot-Signature` | `v1=` + hex(HMAC-SHA256(khoá = secret, nội dung = timestamp + `.` + body gốc)) |
 
-So sánh chữ ký bằng hàm hằng thời gian và bỏ request có timestamp lệch quá 5 phút. Vector thử: secret `my_secret`, timestamp `1760500000`, body `{"update_id":1}` cho `v1=12ce7a96902e36f654800624244c841b5b6ce24b50f42f876fa551d508a6e8e1`.
+So sánh secret và chữ ký bằng hàm hằng thời gian (không dùng `===`/`==`) và bỏ request có timestamp lệch quá 5 phút. Vector thử: secret `my_secret`, timestamp `1760500000`, body `{"update_id":1}` cho `v1=12ce7a96902e36f654800624244c841b5b6ce24b50f42f876fa551d508a6e8e1`.
 
 Node.js:
 
 ```js
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+// Constant time for equal lengths; the length itself is not secret.
+function same(got, want) {
+  const a = Buffer.from(String(got ?? ""));
+  const b = Buffer.from(want);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function verify(secret, headers, rawBody) {
-  const ts = headers["x-bot-timestamp"] ?? "";
-  const sig = Buffer.from(headers["x-bot-signature"] ?? "");
-  const want = Buffer.from("v1=" + createHmac("sha256", secret).update(`${ts}.`).update(rawBody).digest("hex"));
-  const fresh = Math.abs(Date.now() / 1000 - Number(ts)) < 300;
-  return fresh && headers["x-bot-api-secret-token"] === secret && sig.length === want.length && timingSafeEqual(sig, want);
+  const ts = String(headers["x-bot-timestamp"] ?? "");
+  const want = "v1=" + createHmac("sha256", secret).update(`${ts}.`).update(rawBody).digest("hex");
+  const fresh = /^\d+$/.test(ts) && Math.abs(Date.now() / 1000 - Number(ts)) < 300;
+  return fresh && same(headers["x-bot-api-secret-token"], secret) && same(headers["x-bot-signature"], want);
 }
 ```
 
@@ -86,10 +92,12 @@ import hashlib, hmac, time
 
 def verify(secret: str, headers, raw_body: bytes) -> bool:
     ts = headers.get("X-Bot-Timestamp", "")
+    if not (ts.isascii() and ts.isdigit()) or abs(time.time() - int(ts)) >= 300:
+        return False
     want = "v1=" + hmac.new(secret.encode(), ts.encode() + b"." + raw_body, hashlib.sha256).hexdigest()
-    fresh = ts.isdigit() and abs(time.time() - int(ts)) < 300
-    return (fresh and hmac.compare_digest(headers.get("X-Bot-Api-Secret-Token", ""), secret)
-            and hmac.compare_digest(headers.get("X-Bot-Signature", ""), want))
+    # Bytes: compare_digest refuses non-ASCII str instead of answering False.
+    return (hmac.compare_digest(headers.get("X-Bot-Api-Secret-Token", "").encode(), secret.encode())
+            and hmac.compare_digest(headers.get("X-Bot-Signature", "").encode(), want.encode()))
 ```
 
 Go:
@@ -117,4 +125,4 @@ Body của câu trả lời 2xx có thể mang một phương thức để serve
 {"method": "sendMessage", "chat_id": 42, "text": "Đã nhận"}
 ```
 
-Chỉ hỗ trợ `sendMessage` và `answerCallback` (`callback_id`, `text`, `show_alert`, `url`). Kết quả không được báo lại; lỗi bị bỏ qua. `random_id` của tin được server tự đặt theo bot và update, nên update giao lại không làm bot gửi trùng.
+Chỉ hỗ trợ `sendMessage` và `answerCallback` (`callback_id`, `text`, `show_alert`, `url`). Body tối đa 64 KiB; lớn hơn thì update vẫn tính là đã giao nhưng phương thức bị bỏ qua. Kết quả không được báo lại; lỗi bị bỏ qua. `random_id` của tin được server tự đặt theo bot và update, nên update giao lại không làm bot gửi trùng.

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -56,6 +57,12 @@ type Config struct {
 	// port (BOT_WEBHOOK_ALLOW_LOCAL, development only: a local receiver in
 	// development and end-to-end tests).
 	BotWebhookLocal bool
+	// OutboundDeny are addresses (or CIDR ranges) that requests to URLs
+	// chosen by users and bots never reach (OUTBOUND_DENY_CIDRS): the
+	// server's own public addresses, so a bot webhook or a link preview
+	// cannot call other sites hosted on the same machine. The public
+	// addresses of the host's interfaces are refused as well (api role).
+	OutboundDeny []netip.Prefix
 	// Media is nil when MEDIA_S3_ENDPOINT is unset: media RPCs then answer
 	// failed_precondition and AppConfig.upload_size_max_bytes is 0.
 	Media *Media
@@ -219,6 +226,14 @@ func Load(lookup Lookup) (Config, error) {
 		errs = append(errs, invalid("BOT_WEBHOOK_ALLOW_LOCAL", "must be true or false"))
 	}
 
+	if raw := get("OUTBOUND_DENY_CIDRS"); raw != "" {
+		deny, err := parsePrefixes(raw)
+		if err != nil {
+			errs = append(errs, invalid("OUTBOUND_DENY_CIDRS", err.Error()))
+		}
+		c.OutboundDeny = deny
+	}
+
 	media, mediaErrs := loadMedia(get, production, c.PublicURL)
 	errs = append(errs, mediaErrs...)
 	c.Media = media
@@ -255,6 +270,44 @@ func parseUserIDs(raw string) ([]int64, error) {
 		return nil, fmt.Errorf("at most %d user ids", operatorIDsMax)
 	}
 	return ids, nil
+}
+
+// outboundDenyMax bounds OUTBOUND_DENY_CIDRS.
+const outboundDenyMax = 100
+
+// parsePrefixes reads a comma-separated list of IP addresses and CIDR
+// ranges (an address is a range of one), ignoring empty items. IPv4-mapped
+// IPv6 forms are stored as IPv4.
+func parsePrefixes(raw string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for item := range strings.SplitSeq(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		var p netip.Prefix
+		if strings.Contains(item, "/") {
+			parsed, err := netip.ParsePrefix(item)
+			if err != nil {
+				return nil, errors.New("must be a comma-separated list of IP addresses or CIDR ranges")
+			}
+			p = parsed
+		} else {
+			a, err := netip.ParseAddr(item)
+			if err != nil || a.Zone() != "" {
+				return nil, errors.New("must be a comma-separated list of IP addresses or CIDR ranges")
+			}
+			p = netip.PrefixFrom(a, a.BitLen())
+		}
+		if p.Addr().Is4In6() && p.Bits() >= 96 {
+			p = netip.PrefixFrom(p.Addr().Unmap(), p.Bits()-96)
+		}
+		out = append(out, p.Masked())
+	}
+	if len(out) > outboundDenyMax {
+		return nil, fmt.Errorf("at most %d items", outboundDenyMax)
+	}
+	return out, nil
 }
 
 // LoadDatabaseURL reads only DATABASE_URL, for the migrate role.

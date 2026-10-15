@@ -36,8 +36,10 @@ const (
 
 // Dispatcher timings and limits.
 const (
-	// replyMax bounds the body of a 2xx answer that is read for an action.
-	replyMax = 1 << 20
+	// replyMax bounds the body of a 2xx answer that is read for an action
+	// (the two allowed methods carry at most 4096 characters of text and
+	// their entities).
+	replyMax = 64 << 10
 	// discardMax bounds what is read of other answers.
 	discardMax = 64 << 10
 	// breakerAfter consecutive failures of a bot's webhook drop its
@@ -46,10 +48,17 @@ const (
 	breakerAfter = 5
 	// headsMax bounds the queues looked at per round.
 	headsMax = 1000
+	// inflightMax bounds the webhook requests in flight across all bots of
+	// the process (each may hold a reply of up to replyMax); see slots.
+	inflightMax = 256
 	// rescanEvery is how often the bots with a webhook are listed again.
 	rescanEvery = 5 * time.Second
-	// workerRecheck bounds how long a worker trusts its wake-ups alone.
-	workerRecheck = 2 * time.Second
+	// idleRecheck bounds how long a worker with nothing due trusts its
+	// wake-ups alone (new updates, webhook changes, freed slots and
+	// finished requests wake it).
+	idleRecheck = time.Minute
+	// workerRetry is the wait after a failed database read.
+	workerRetry = 2 * time.Second
 	// drainTimeout is how long in-flight requests may finish at shutdown
 	// before they are cancelled (cancelled updates stay pending).
 	drainTimeout = 5 * time.Second
@@ -65,20 +74,30 @@ const (
 
 // dispatcher POSTs pending updates to the webhooks of the tenant's bots:
 // one worker goroutine per bot with a webhook, one request at a time per
-// queue (chat, or presser for callbacks), up to max_connections per bot.
-// Bots share nothing but the database pool, which no request holds while
-// it waits on a webhook, so a slow bot only slows its own queues.
+// queue (chat, or presser for callbacks), up to max_connections per bot
+// and inflightMax for the process, shared fairly between the bots that
+// want more (slots). No request holds a database connection while it waits
+// on a webhook, so a slow bot only slows its own queues. A worker reads the
+// database when something happened (updates stored, its webhook changed, a
+// request ended, a slot freed, a retry fell due), not on a timer while
+// idle.
 type dispatcher struct {
 	s        *Service
 	tenantID string
 	client   *safehttp.Client
 	logger   *slog.Logger
 	reply    atomic.Pointer[ReplyFunc]
+	slots    *slots
+	// retryFloor is the shortest wait before another attempt, also when
+	// the answer said Retry-After: 0 (retryFirst; tests shorten it).
+	retryFloor time.Duration
 
 	// beforeAck runs after the answer's action and before the update is
 	// acknowledged; returning true abandons the request as if the process
 	// died there (tests).
 	beforeAck func(botID, updateID int64) bool
+	// reads counts the workers' rounds of database reads (tests).
+	reads atomic.Int64
 
 	mu      sync.Mutex
 	running bool
@@ -129,7 +148,8 @@ type head struct {
 }
 
 func newDispatcher(s *Service, tenantID string, client *safehttp.Client, logger *slog.Logger) *dispatcher {
-	return &dispatcher{s: s, tenantID: tenantID, client: client, logger: logger, workers: map[int64]*worker{}, hooked: map[int64]bool{}}
+	return &dispatcher{s: s, tenantID: tenantID, client: client, logger: logger, slots: newSlots(inflightMax), retryFloor: retryFirst,
+		workers: map[int64]*worker{}, hooked: map[int64]bool{}}
 }
 
 func (d *dispatcher) setReply(fn ReplyFunc) {
@@ -189,6 +209,13 @@ func (d *dispatcher) rescan(ctx context.Context) {
 		d.hooked[id] = true
 		d.startLocked(id)
 	}
+	// A webhook gone without changed() (the bot was deleted): its worker
+	// finds no webhook and ends.
+	for id, w := range d.workers {
+		if !d.hooked[id] {
+			w.poke()
+		}
+	}
 }
 
 // startLocked starts the bot's worker unless it runs; d.mu is held.
@@ -215,10 +242,15 @@ func (d *dispatcher) wake(botID int64) {
 	}
 	d.mu.Unlock()
 	if w != nil {
-		select {
-		case w.wake <- struct{}{}:
-		default:
-		}
+		w.poke()
+	}
+}
+
+// poke makes the worker look at the database again; it never blocks.
+func (w *worker) poke() {
+	select {
+	case w.wake <- struct{}{}:
+	default:
 	}
 }
 
@@ -253,29 +285,34 @@ func (d *dispatcher) work(ctx context.Context, w *worker) {
 	stop := ctx.Done()
 	stopping := false
 	for {
-		next := workerRecheck
+		next := idleRecheck
 		if !stopping {
+			d.reads.Add(1)
 			cfg, err := d.config(ctx, w.bot)
 			switch {
 			case err != nil:
+				next = workerRetry
 				if ctx.Err() == nil {
 					d.logger.Warn("loading a bot webhook failed", "bot_id", w.bot, "err", err)
 				}
 			case cfg == nil:
 				if len(w.inflight) == 0 && d.retire(w) {
+					d.slots.forget(w.bot)
 					return
 				}
 			default:
 				if wait, err := d.launch(ctx, w, cfg); err != nil {
+					next = workerRetry
 					if ctx.Err() == nil {
 						d.logger.Warn("reading a bot's pending updates failed", "bot_id", w.bot, "err", err)
 					}
 				} else {
-					next = min(next, wait)
+					next = wait
 				}
 			}
 		} else if len(w.inflight) == 0 {
 			d.retireNow(w)
+			d.slots.forget(w.bot)
 			return
 		}
 		if !timer.Stop() {
@@ -357,8 +394,9 @@ func (d *dispatcher) config(ctx context.Context, botID int64) (*hookConfig, erro
 }
 
 // launch starts a request for the head of every due queue that has none
-// in flight, within the bot's parallelism, and returns when the next
-// queue becomes due.
+// in flight, within the bot's parallelism and the slots it gets, and
+// returns when the next queue becomes due (idleRecheck when none waits on
+// time: finished requests and freed slots wake the worker).
 func (d *dispatcher) launch(ctx context.Context, w *worker, cfg *hookConfig) (time.Duration, error) {
 	heads, err := d.heads(ctx, w.bot)
 	if err != nil {
@@ -369,7 +407,7 @@ func (d *dispatcher) launch(ctx context.Context, w *worker, cfg *hookConfig) (ti
 		limit = 1
 	}
 	now := time.Now()
-	next := workerRecheck
+	next := idleRecheck
 	var due []head
 	for _, h := range heads {
 		if _, busy := w.inflight[h.queue]; busy {
@@ -385,9 +423,17 @@ func (d *dispatcher) launch(ctx context.Context, w *worker, cfg *hookConfig) (ti
 		due = append(due, h)
 	}
 	if len(due) == 0 {
+		d.slots.forget(w.bot)
+		return next, nil
+	}
+	due = due[:d.slots.acquire(w.bot, len(due), w.poke)]
+	if len(due) == 0 {
 		return next, nil
 	}
 	if err := d.payloads(ctx, w.bot, due); err != nil {
+		for range due {
+			d.slots.release(w.bot)
+		}
 		return 0, err
 	}
 	d.mu.Lock()
@@ -395,20 +441,41 @@ func (d *dispatcher) launch(ctx context.Context, w *worker, cfg *hookConfig) (ti
 	d.mu.Unlock()
 	for _, h := range due {
 		w.inflight[h.queue] = h.id
-		go func() { w.done <- d.send(sendCtx, w, cfg, h) }()
+		go func() {
+			r := d.send(sendCtx, w, cfg, h)
+			d.slots.release(w.bot)
+			w.done <- r
+		}()
 	}
 	w.openReqs.Store(int32(len(w.inflight)))
 	return next, nil
 }
 
+// headsQuery reads the oldest pending update of each queue of bot $1,
+// oldest first, at most $2. It walks bot_updates_pending_idx queue by queue
+// (a skip scan: one index probe per queue, then the queue's first live row),
+// so its cost follows the number of queues, not the bot's backlog.
+const headsQuery = `
+	WITH RECURSIVE q(queue_key) AS (
+		(SELECT queue_key FROM bot_updates WHERE bot_id = $1 AND NOT acked AND dead_at IS NULL ORDER BY queue_key LIMIT 1)
+		UNION ALL
+		SELECT (SELECT u.queue_key FROM bot_updates u
+			WHERE u.bot_id = $1 AND NOT u.acked AND u.dead_at IS NULL AND u.queue_key > q.queue_key
+			ORDER BY u.queue_key LIMIT 1)
+		FROM q WHERE q.queue_key IS NOT NULL
+	)
+	SELECT h.update_id, h.queue_key, h.kind, h.attempts, h.next_attempt_at
+	FROM q CROSS JOIN LATERAL (
+		SELECT update_id, queue_key, kind, attempts, next_attempt_at FROM bot_updates u
+		WHERE u.bot_id = $1 AND NOT u.acked AND u.dead_at IS NULL AND u.queue_key = q.queue_key AND u.expires_at > now()
+		ORDER BY u.update_id LIMIT 1
+	) h
+	WHERE q.queue_key IS NOT NULL
+	ORDER BY h.update_id LIMIT $2`
+
 // heads returns the oldest pending update of each queue, oldest first.
 func (d *dispatcher) heads(ctx context.Context, botID int64) ([]head, error) {
-	rows, err := d.s.pool.Query(ctx, `
-		SELECT update_id, queue_key, kind, attempts, next_attempt_at FROM (
-			SELECT DISTINCT ON (queue_key) update_id, queue_key, kind, attempts, next_attempt_at FROM bot_updates
-			WHERE bot_id = $1 AND NOT acked AND dead_at IS NULL AND expires_at > now()
-			ORDER BY queue_key, update_id
-		) h ORDER BY update_id LIMIT $2`, botID, headsMax)
+	rows, err := d.s.pool.Query(ctx, headsQuery, botID, headsMax)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +647,7 @@ func (d *dispatcher) delivered(botID, updateID int64, elapsed time.Duration) {
 // backoff, or dead-lettered after MaxAttempts.
 func (d *dispatcher) failed(botID int64, h head, reason string, retryAfter time.Duration, hasRetryAfter bool) {
 	attempts := h.attempts + 1
-	delay := retryDelay(attempts, retryAfter, hasRetryAfter)
+	delay := retryDelay(attempts, retryAfter, hasRetryAfter, d.retryFloor)
 	ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
 	defer cancel()
 	var dead bool
@@ -610,11 +677,12 @@ func (d *dispatcher) failed(botID int64, h head, reason string, retryAfter time.
 }
 
 // retryDelay is the wait before the next attempt after attempts failures:
-// the answer's Retry-After (clamped to 0..1 hour) when it had one, else 1 s
-// doubling per failure, capped at a random 60 to 120 s.
-func retryDelay(attempts int, retryAfter time.Duration, hasRetryAfter bool) time.Duration {
+// the answer's Retry-After when it had one, at least floor (so Retry-After
+// 0 or a past date cannot burn through the attempts at once) and at most
+// an hour; else 1 s doubling per failure, capped at a random 60 to 120 s.
+func retryDelay(attempts int, retryAfter time.Duration, hasRetryAfter bool, floor time.Duration) time.Duration {
 	if hasRetryAfter {
-		return min(max(retryAfter, 0), retryAfterMax)
+		return min(max(retryAfter, floor), retryAfterMax)
 	}
 	d := retryFirst << min(max(attempts-1, 0), 16)
 	if d > retryCapLow {

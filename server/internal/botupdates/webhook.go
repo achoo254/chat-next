@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"regexp"
 	"slices"
 	"strings"
@@ -72,6 +73,9 @@ type WebhookOptions struct {
 	Reply ReplyFunc
 	// Timeout bounds one request; safehttp.DefaultTimeout (10 s) when zero.
 	Timeout time.Duration
+	// Deny lists more address ranges webhooks may not reach (the server's
+	// own addresses; safehttp.Options.Deny).
+	Deny []netip.Prefix
 	// HTTP replaces the outbound client (tests).
 	HTTP *safehttp.Client
 }
@@ -87,7 +91,7 @@ func (s *Service) EnableWebhooks(o WebhookOptions) error {
 	}
 	client := o.HTTP
 	if client == nil {
-		client = safehttp.New(safehttp.Options{Timeout: o.Timeout, Development: o.Local})
+		client = safehttp.New(safehttp.Options{Timeout: o.Timeout, Development: o.Local, Deny: o.Deny})
 	}
 	s.box = box
 	s.webhooks = newDispatcher(s, o.TenantID, client, s.logger.With("part", "webhook"))
@@ -113,7 +117,8 @@ func (s *Service) requireWebhooks() error {
 type WebhookSettings struct {
 	URL string
 	// Secret is sent in a header and keys the HMAC signature. Empty keeps
-	// the current secret (only when a webhook is set).
+	// the current secret, only when a webhook is set to the same URL: a new
+	// URL must not receive the secret the previous one trusts.
 	Secret string
 	// AllowedUpdates limits the kinds stored for the bot; empty is every
 	// kind.
@@ -179,17 +184,21 @@ func (s *Service) SetWebhook(ctx context.Context, botID int64, w WebhookSettings
 		sealed = s.box.Seal([]byte(w.Secret), secretAAD(botID))
 	}
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var hasSecret bool
-		err := tx.QueryRow(ctx, `SELECT webhook_secret IS NOT NULL FROM bots WHERE user_id = $1 AND deleted_at IS NULL FOR UPDATE`,
-			botID).Scan(&hasSecret)
+		var current *string
+		err := tx.QueryRow(ctx, `SELECT webhook_url FROM bots WHERE user_id = $1 AND deleted_at IS NULL FOR UPDATE`,
+			botID).Scan(&current)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoBot
 		}
 		if err != nil {
 			return fmt.Errorf("botupdates: load webhook: %w", err)
 		}
-		if sealed == nil && !hasSecret {
+		switch {
+		case sealed != nil:
+		case current == nil:
 			return &WebhookError{"secret_required", "a secret is required"}
+		case *current != w.URL:
+			return &WebhookError{"secret_required", "a new secret is required when the url changes"}
 		}
 		kinds := w.AllowedUpdates
 		if kinds == nil {
@@ -415,13 +424,30 @@ type Stats struct {
 // StatsWindow is the period Stats covers.
 const StatsWindow = 24 * time.Hour
 
-// Stats sums the bot's counters of the last StatsWindow (whole hours,
-// including the current one).
+// Stats counts the bot's delivery over the last StatsWindow from two
+// sources and keeps the larger count of each: the hourly counters (whole
+// hours including the current one; they only exist since webhook delivery
+// shipped) and the updates still stored (kept 24 hours, but callbacks only
+// 15 minutes; delivered_at is set by a webhook's 2xx or a poll's
+// acknowledgement, attempts counts failed attempts). Each source can only
+// miss events, never invent them, so the larger is the closer one. The
+// stored updates are read through the bot's primary key range: at most a
+// day of its updates.
 func (s *Service) Stats(ctx context.Context, botID int64) (Stats, error) {
 	var st Stats
 	err := s.pool.QueryRow(ctx, `
-		SELECT coalesce(sum(received), 0), coalesce(sum(delivered), 0), coalesce(sum(failed), 0), coalesce(sum(dead_lettered), 0)
-		FROM bot_delivery_counters WHERE bot_id = $1 AND hour > date_trunc('hour', now()) - make_interval(secs => $2)`,
+		SELECT greatest(c.received, u.received), greatest(c.delivered, u.delivered), greatest(c.failed, u.failed),
+			greatest(c.dead_lettered, u.dead_lettered)
+		FROM (
+			SELECT coalesce(sum(received), 0) AS received, coalesce(sum(delivered), 0) AS delivered,
+				coalesce(sum(failed), 0) AS failed, coalesce(sum(dead_lettered), 0) AS dead_lettered
+			FROM bot_delivery_counters WHERE bot_id = $1 AND hour > date_trunc('hour', now()) - make_interval(secs => $2)
+		) c, (
+			SELECT count(*) AS received, count(*) FILTER (WHERE delivered_at IS NOT NULL) AS delivered,
+				coalesce(sum(attempts), 0) AS failed,
+				count(*) FILTER (WHERE dead_at > now() - make_interval(secs => $2)) AS dead_lettered
+			FROM bot_updates WHERE bot_id = $1 AND created_at > now() - make_interval(secs => $2)
+		) u`,
 		botID, StatsWindow.Seconds()).Scan(&st.Received, &st.Delivered, &st.Failed, &st.DeadLettered)
 	if err != nil {
 		return Stats{}, fmt.Errorf("botupdates: stats: %w", err)

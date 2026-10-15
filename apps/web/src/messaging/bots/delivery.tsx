@@ -3,8 +3,12 @@
 // with the live delivery state, the updates given up after 10 attempts with
 // Thử lại / Bỏ, and the counters of the last 24 hours. Part of the console's
 // lazily loaded code. A webhook secret is never read back: the field stays
-// empty to keep the secret in use, "Tạo mới" fills in a random one to copy.
-import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
+// empty to keep the secret in use (same URL only; a new URL needs a new
+// secret), "Tạo mới" fills in a random one to copy. Saving a webhook needs a
+// recent sign-in: what was entered waits in the tab's sessionStorage during
+// the sign-in, and `?after=webhook` brings it back in a confirmation that
+// saves only from its button.
+import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { resource, useLoad } from "../../components/preload.ts";
 import { Icon } from "../../components/icon.tsx";
@@ -13,9 +17,10 @@ import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { clock, shortDate } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
-import { Switch, useDomId } from "../ui/parts.tsx";
+import { copyText, Switch, useDomId } from "../ui/parts.tsx";
 import {
 	BotError,
+	botErrorKind,
 	type BotDelivery,
 	type Bots,
 	type BotWebhook,
@@ -23,6 +28,7 @@ import {
 	type OwnBot,
 	type UpdateKind,
 } from "./api.ts";
+import { ConfirmDialog, ReauthDialog, reauthUrl, useConfirmShown, type TabProps } from "./dialogs.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
 
 /** Update kinds a bot can receive, in the Console's order. */
@@ -85,6 +91,93 @@ export function webhookUrlProblem(url: string): "empty" | "scheme" | "invalid" |
 	return null;
 }
 
+/**
+ * The long poll as a shell command anyone can run once <token> is
+ * replaced, one option per line (a trailing "\" continues it): the first
+ * call takes every pending update, waiting up to 50 seconds for one.
+ */
+export function pollCommand(origin: string): string {
+	return ["curl -sS -G \\", '  -H "Authorization: Bearer <token>" \\', "  -d offset=0 \\", "  -d timeout=50 \\", `  ${origin}/bot/v1/updates`].join("\n");
+}
+
+/** `text` with a line-break opportunity after each "/" inside a path (not in "://"), so a narrow box wraps a URL between its parts, never inside a word. */
+export function breakAfterSlashes(text: string): ReactNode[] {
+	const out: ReactNode[] = [];
+	let start = 0;
+	for (let i = 1; i < text.length - 1; i++) {
+		const inPath = text[i] === "/" && text[i - 1] !== "/" && text[i - 1] !== ":" && text[i + 1] !== "/" && text[i + 1]?.trim() !== "";
+		if (inPath) {
+			out.push(text.slice(start, i + 1), <wbr key={i} />);
+			start = i + 1;
+		}
+	}
+	out.push(text.slice(start));
+	return out;
+}
+
+/** What the webhook form had when SetBotWebhook asked for a recent sign-in, kept in this tab until the user comes back. */
+interface WebhookDraft {
+	readonly url: string;
+	readonly secret: string;
+	readonly kinds: readonly string[];
+	readonly maxText: string;
+	readonly drop: boolean;
+}
+
+/** A draft older than this (an abandoned sign-in) is not offered again. */
+const DRAFT_TTL_MS = 15 * 60_000;
+
+function draftKey(botId: number): string {
+	return `console:webhook-draft:${botId}`;
+}
+
+/**
+ * Keeps the form for the reauth round trip. sessionStorage: this tab only,
+ * gone with it; the secret is the bot owner's own (their server holds it
+ * too), and the entry is removed as soon as the page reads it back.
+ */
+function keepDraft(botId: number, draft: WebhookDraft): void {
+	try {
+		sessionStorage.setItem(draftKey(botId), JSON.stringify({ ...draft, at: Date.now() }));
+	} catch {
+		// Storage refused (private mode, quota): the user enters it again.
+	}
+}
+
+/** The kept draft of the bot, or null (none, too old, or not one of ours). Does not remove it. */
+export function readDraft(botId: number): WebhookDraft | null {
+	let value: unknown;
+	try {
+		value = JSON.parse(sessionStorage.getItem(draftKey(botId)) ?? "null");
+	} catch {
+		return null;
+	}
+	if (typeof value !== "object" || value === null) return null;
+	const d = value as Record<string, unknown>;
+	const kinds = d.kinds;
+	if (
+		typeof d.url !== "string" ||
+		typeof d.secret !== "string" ||
+		typeof d.maxText !== "string" ||
+		typeof d.drop !== "boolean" ||
+		typeof d.at !== "number" ||
+		!Array.isArray(kinds) ||
+		!kinds.every((k): k is UpdateKind => (UPDATE_KINDS as readonly unknown[]).includes(k)) ||
+		Date.now() - d.at > DRAFT_TTL_MS
+	) {
+		return null;
+	}
+	return { url: d.url, secret: d.secret, kinds, maxText: d.maxText, drop: d.drop };
+}
+
+function dropDraft(botId: number): void {
+	try {
+		sessionStorage.removeItem(draftKey(botId));
+	} catch {
+		// Nothing kept, or storage unavailable.
+	}
+}
+
 /** How often an open delivery tab reads the state again. */
 export const DELIVERY_REFRESH_MS = 5000;
 
@@ -132,8 +225,8 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
 
 // ----------------------------------------------------------------- updates
 
-/** "Nhận update": choose webhook or long poll, with the delivery state beside. */
-export function UpdatesTab({ bot, onChanged }: { bot: OwnBot; onChanged: (bot: OwnBot) => void }) {
+/** "Nhận update": choose webhook or long poll, with the delivery state beside; `confirmNow` (back from the reauth sign-in) offers the kept webhook once. */
+export function UpdatesTab({ bot, onChanged, confirmNow, onConfirmShown }: TabProps & { onChanged: (bot: OwnBot) => void }) {
 	const copy = useCopy();
 	const { state, reload, update, refreshNow } = useDelivery(bot.id);
 	const loader = useLoader(state.status === "loading", copy.common.loading);
@@ -150,6 +243,8 @@ export function UpdatesTab({ bot, onChanged }: { bot: OwnBot; onChanged: (bot: O
 				key={round}
 				bot={bot}
 				delivery={delivery}
+				confirmNow={round === 0 && confirmNow}
+				onConfirmShown={onConfirmShown}
 				onSaved={(webhook, dropped) => {
 					update((value) => ({ ...value, webhook, status: dropped ? { ...value.status, pending: 0 } : value.status }));
 					onChanged({ ...bot, webhook: webhook.url !== "" });
@@ -164,19 +259,33 @@ export function UpdatesTab({ bot, onChanged }: { bot: OwnBot; onChanged: (bot: O
 
 type Mode = "webhook" | "poll";
 
-function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDelivery; onSaved: (webhook: BotWebhook, dropped: boolean) => void }) {
+function DeliveryForm({
+	bot,
+	delivery,
+	onSaved,
+	confirmNow,
+	onConfirmShown,
+}: TabProps & { delivery: BotDelivery; onSaved: (webhook: BotWebhook, dropped: boolean) => void }) {
 	const t = useBotsCopy();
 	const copy = useCopy();
+	const { locale } = useI18n();
 	const { bots, toasts } = useServices();
 	const saved = delivery.webhook;
 	const hasWebhook = saved.url !== "";
-	const [mode, setMode] = useState<Mode>(hasWebhook ? "webhook" : "poll");
-	const [url, setUrl] = useState(saved.url);
-	const [secret, setSecret] = useState("");
+	// Back from the reauth sign-in: the form as it was, and its confirmation.
+	const [draft] = useState(() => (confirmNow ? readDraft(bot.id) : null));
+	useEffect(() => {
+		if (confirmNow) dropDraft(bot.id);
+	}, [confirmNow, bot.id]);
+	useConfirmShown(confirmNow, onConfirmShown);
+	const [mode, setMode] = useState<Mode>(draft !== null || hasWebhook ? "webhook" : "poll");
+	const [url, setUrl] = useState(draft?.url ?? saved.url);
+	const [secret, setSecret] = useState(draft?.secret ?? "");
 	const [showSecret, setShowSecret] = useState(false);
-	const [kinds, setKinds] = useState<readonly string[]>(saved.allowedUpdates);
-	const [maxText, setMaxText] = useState(String(hasWebhook ? saved.maxConnections : WEBHOOK_LIMITS.maxConnectionsDefault));
-	const [drop, setDrop] = useState(false);
+	const [kinds, setKinds] = useState<readonly string[]>(draft?.kinds ?? saved.allowedUpdates);
+	const [maxText, setMaxText] = useState(draft?.maxText ?? String(hasWebhook ? saved.maxConnections : WEBHOOK_LIMITS.maxConnectionsDefault));
+	const [drop, setDrop] = useState(draft?.drop ?? false);
+	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(draft !== null ? "confirm" : null);
 	const [saving, setSaving] = useState(false);
 	const [touched, setTouched] = useState(false);
 	const [serverError, setServerError] = useState<{ field: "url" | "secret" | "max" | "form"; text: string } | null>(null);
@@ -190,8 +299,10 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 	const maxConnections = Number(maxText);
 	const urlProblem = mode === "webhook" ? webhookUrlProblem(url) : null;
 	const urlError = urlProblem === null ? "" : t.delivery.urlProblem[urlProblem];
-	const secretError =
-		mode !== "webhook" ? "" : secret === "" ? (hasWebhook ? "" : t.delivery.secretRequired) : validSecret(secret) ? "" : t.delivery.secretBad;
+	// The secret in use stays only with the URL it was set for.
+	const keepsSecret = hasWebhook && url.trim() === saved.url;
+	const secretMissing = !hasWebhook ? t.delivery.secretRequired : keepsSecret ? "" : t.delivery.secretNewUrl;
+	const secretError = mode !== "webhook" ? "" : secret === "" ? secretMissing : validSecret(secret) ? "" : t.delivery.secretBad;
 	const maxError =
 		mode === "webhook" && (!Number.isInteger(maxConnections) || maxConnections < 1 || maxConnections > WEBHOOK_LIMITS.maxConnectionsMax)
 			? t.delivery.maxBad
@@ -212,10 +323,8 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 		setKinds((now) => (now.includes(kind) ? now.filter((k) => k !== kind) : UPDATE_KINDS.filter((k) => k === kind || now.includes(k))));
 	};
 
-	const save = async (event: FormEvent) => {
-		event.preventDefault();
-		setTouched(true);
-		if (invalid || !dirty || saving) return;
+	/** Sends what the form holds; a refusal is shown on its field, a missing recent sign-in asks for one (keeping the form). */
+	const send = async () => {
 		setSaving(true);
 		setServerError(null);
 		try {
@@ -231,16 +340,23 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 			} else {
 				await bots.deleteWebhook(bot.id, drop);
 			}
+			setDialog(null);
 			toasts.show(t.delivery.saved);
 			onSaved(webhook, drop);
 		} catch (err) {
+			if (botErrorKind(err) === "reauth_required") {
+				keepDraft(bot.id, { url, secret, kinds, maxText, drop });
+				setDialog("reauth");
+				return;
+			}
+			setDialog(null);
 			const problem = webhookProblem(err);
 			if (problem === "url_invalid" || problem === "url_blocked" || problem === "url_unresolved") {
 				setServerError({ field: "url", text: t.delivery.urlProblem[problem] });
 			} else if (problem === "secret_invalid") {
 				setServerError({ field: "secret", text: t.delivery.secretBad });
 			} else if (problem === "secret_required") {
-				setServerError({ field: "secret", text: t.delivery.secretRequired });
+				setServerError({ field: "secret", text: secretMissing === "" ? t.delivery.secretRequired : secretMissing });
 			} else if (problem === "max_connections_invalid") {
 				setServerError({ field: "max", text: t.delivery.maxBad });
 			} else {
@@ -251,12 +367,19 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 		}
 	};
 
+	const save = (event: FormEvent) => {
+		event.preventDefault();
+		setTouched(true);
+		if (invalid || !dirty || saving) return;
+		void send();
+	};
+
 	const urlShown = shownError("url", urlError, url.trim() !== "");
 	const secretShown = shownError("secret", secretError, secret !== "");
 	const maxShown = shownError("max", maxError, true);
 	const pending = delivery.status.pending;
 	return (
-		<form className="card form" aria-labelledby={formId} onSubmit={(event) => void save(event)} noValidate>
+		<form className="card form" aria-labelledby={formId} onSubmit={save} noValidate>
 			<h2 id={formId}>{t.console.tab.updates}</h2>
 			<div className="field">
 				<span className="label" id={modeId}>
@@ -306,7 +429,7 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 								maxLength={WEBHOOK_LIMITS.secretMax}
 								spellCheck={false}
 								autoComplete="off"
-								placeholder={hasWebhook ? t.delivery.secretKeep : t.delivery.secretNew}
+								placeholder={keepsSecret ? t.delivery.secretKeep : hasWebhook ? t.delivery.secretForNewUrl : t.delivery.secretNew}
 								aria-invalid={secretShown !== ""}
 								aria-describedby={`${secretId}-msg`}
 								onChange={(event) => {
@@ -374,7 +497,8 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 			) : (
 				<>
 					<p className="note">{t.delivery.pollNote}</p>
-					<pre className="snippet">{`GET ${window.location.origin}/bot/v1/updates?offset=<update_id + 1>&timeout=50\nAuthorization: Bearer <token>`}</pre>
+					<PollCommand />
+					<p className="note">{t.delivery.pollNext}</p>
 				</>
 			)}
 			<div className="setting">
@@ -396,7 +520,54 @@ function DeliveryForm({ bot, delivery, onSaved }: { bot: OwnBot; delivery: BotDe
 					{saving ? t.delivery.saving : t.delivery.save}
 				</button>
 			</div>
+			{dialog === "confirm" && (
+				<ConfirmDialog
+					title={t.delivery.confirmTitle}
+					body={
+						<>
+							<p className="dlg-lede">{t.delivery.confirmBody(bot.name)}</p>
+							<p className="mono confirm-url">{url.trim()}</p>
+						</>
+					}
+					action={t.delivery.save}
+					busyLabel={t.delivery.saving}
+					busy={saving}
+					danger={false}
+					onConfirm={() => void send()}
+					onClose={() => setDialog(null)}
+				/>
+			)}
+			{dialog === "reauth" && (
+				<ReauthDialog body={t.reauth.bodyWebhook} warning="" href={reauthUrl(locale, bot.id, "updates", "webhook")} onClose={() => setDialog(null)} />
+			)}
 		</form>
+	);
+}
+
+/** The long poll command with "Sao chép" (mockups/console.html#webhook). */
+function PollCommand() {
+	const t = useBotsCopy();
+	const copy = useCopy();
+	const { toasts } = useServices();
+	const command = pollCommand(window.location.origin);
+	return (
+		<div className="command">
+			<pre className="snippet" aria-label={t.delivery.command}>
+				{breakAfterSlashes(command)}
+			</pre>
+			<div>
+				<button
+					type="button"
+					className="btn btn-sm"
+					onClick={() => {
+						void copyText(command).then((ok) => toasts.show(ok ? t.delivery.commandCopied : copy.common.failed));
+					}}
+				>
+					<Icon name="copy" small />
+					{t.delivery.copyCommand}
+				</button>
+			</div>
+		</div>
 	);
 }
 

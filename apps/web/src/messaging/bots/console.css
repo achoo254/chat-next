@@ -57,6 +57,11 @@
 .console .secret { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle); }
 .console .secret code { flex: 1 1 16ch; min-width: 0; font-family: var(--font-mono); font-size: 0.875rem; overflow-wrap: anywhere; }
 .console .snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A runnable command: lines break at the shell's "\" and, when narrow, at spaces or after "/" (<wbr>); a word is split only if it cannot fit a line at all. */
+.console .command { display: grid; gap: var(--space-2); }
+.console .command .snippet { overflow-wrap: break-word; }
+.console .command > div { display: flex; justify-content: flex-end; }
+.confirm-url { margin: 0; overflow-wrap: anywhere; }
 
 /* Commands */
 .console .scope-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--c-border-subtle); }
