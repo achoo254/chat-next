@@ -513,3 +513,5 @@ Từ 16:43, user giao: AI tự review từng màn hình và tính năng trên Ch
 Đã thử và gỡ: nhường quyền tab chính cho bản mới (khoá OPFS không nhả khi đóng DB; review dựng lại trên Chromium).
 
 Còn lại của R5: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
+
+Quyết định 2026-10-15 23:20: user chọn PWA + Web Push trước, app native R7 (Capacitor) và R8 (Tauri) làm sau khi có tài khoản Apple Developer, Google Play, Firebase. Jev chọn làm PWA + Web Push trước các mục R9 (0,99).
