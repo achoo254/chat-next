@@ -386,4 +386,5 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Backup media mỗi đêm ra ngoài server, cùng lúc với dump DB: 1.00. Nơi nhận backup chưa chọn, script tắt cho tới khi đặt đích.
   - Có ngưỡng đĩa trống tối thiểu: hết chỗ thì từ chối upload, để không làm đầy đĩa của server dùng chung.
 - Bucket `chat-media` và danh tính `chat-api` trên OneDash không còn dùng. MCP không có tool xoá; user xoá trên web nếu muốn.
+- User quyết (2026-10-15): chưa làm backup ra ngoài server. `.65` là nơi lưu trung tâm cho mọi thứ (DB, media) tới khi có người dùng thật; lúc đó mới thiết kế lưu trữ và backup bên ngoài. Thay cho quyết định backup media mỗi đêm ở trên.
 
