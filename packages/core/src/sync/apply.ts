@@ -74,6 +74,10 @@ export function requiredEntities(body: UpdateBody, selfId: number): { users: num
 				users: [...body.userIds, body.inviterId].filter((id) => id !== 0),
 				chats: body.userIds.includes(selfId) ? [body.chatId] : [],
 			};
+		case "pinned_dialogs":
+			// A pinned chat can be new to this device, e.g. "Cloud của tôi"
+			// created for an account that existed before it.
+			return { users: [], chats: [...body.chatIds] };
 		default:
 			return { users: [], chats: [] };
 	}
@@ -179,6 +183,7 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			putMute(w, body.chatId, body.muteUntil);
 			return;
 		case "pinned_dialogs":
+			for (const chatId of body.chatIds) ensureDialog(w, chatId);
 			putPinnedOrder(w, body.chatIds);
 			return;
 		case "chat_deleted":

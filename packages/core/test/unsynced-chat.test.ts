@@ -45,3 +45,24 @@ describe("a chat this device never synced", () => {
 		expect(await core.chat(9_999)).toBeNull();
 	});
 });
+
+describe("a pinned chat this device never synced", () => {
+	// The server creates "Cloud của tôi" for accounts that existed before it
+	// and announces it only by pinning it, to sessions that already synced.
+	it("appears in the dialog list when a pinned_dialogs update names it", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("An");
+		const sql = new MemorySqlFactory();
+		const { core } = await startTestApp(server, self, sql);
+		await settle(core);
+		expect(await core.dialogs()).toHaveLength(0);
+
+		const saved = server.createChat(ChatType.PRIVATE, "", [self]);
+		server.pinDialogs(self, [saved]);
+		await settle(core);
+
+		const dialogs = await core.dialogs();
+		expect(dialogs.map((view) => view.chat?.id)).toEqual([saved]);
+		expect(dialogs[0]?.dialog.pinned).toBe(true);
+	});
+});
