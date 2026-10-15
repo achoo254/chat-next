@@ -688,8 +688,11 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 
 /* Quick actions on a hovered message: Thả cảm xúc · Trả lời · Chuyển tiếp · more. */
 .msg { position: relative; }
-.msg-actions { position: absolute; top: calc(-1 * var(--space-4)); right: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
-.msg.mine .msg-actions { right: auto; left: var(--space-2); }
+/* The bar grows into the free side of the list: rightwards from the start of other people's
+   messages, leftwards from the end of your own. Anchored the other way, a short bubble at the
+   list's edge pushed the (invisible) bar past it and the list scrolled sideways. */
+.msg-actions { position: absolute; top: calc(-1 * var(--space-4)); left: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+.msg.mine .msg-actions { left: auto; right: var(--space-2); }
 .msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; pointer-events: auto; }
 .msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
 .msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }
