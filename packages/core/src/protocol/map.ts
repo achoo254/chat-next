@@ -233,6 +233,8 @@ export function toChat(chat: WireChat): Chat {
 		myRole: ROLES[chat.myRole] ?? "unknown",
 		myPermissions: chat.myPermissions,
 		left: chat.left,
+		// The wire chat does not say why; member_removed does (repo LEFT_REMOVED).
+		removed: false,
 		forum: chat.forum,
 	};
 }

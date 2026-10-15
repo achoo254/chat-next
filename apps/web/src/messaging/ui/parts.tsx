@@ -42,7 +42,26 @@ interface ModalProps {
 	children: ReactNode;
 }
 
-/** Modal dialog on the native <dialog>: focus trap, Esc and backdrop from the browser. */
+/** Open modals, the topmost last: Esc closes only the topmost one. */
+const openModals: HTMLDialogElement[] = [];
+/**
+ * Where focus goes once no modal is open: the control that opened the first
+ * of a chain of dialogs. A dialog opened while focus is nowhere (the member
+ * list coming back after its removal confirm) keeps the target of the one
+ * it replaced.
+ */
+let returnFocusTo: HTMLElement | null = null;
+
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Modal dialog on the native <dialog>: focus trap and backdrop from the
+ * browser. Esc is handled here rather than left to the browser, whose close
+ * request may skip the cancel event (a dialog opened without a user gesture,
+ * as after a confirm's request finished) and close the element behind
+ * React's back. Focus moves into the dialog when it opens and back to the
+ * opener when the last one closes.
+ */
 export function Modal({ labelledBy, onClose, className, children }: ModalProps) {
 	const ref = useRef<HTMLDialogElement>(null);
 	const closeRef = useRef(onClose);
@@ -52,20 +71,51 @@ export function Modal({ labelledBy, onClose, className, children }: ModalProps) 
 	useEffect(() => {
 		const dialog = ref.current;
 		if (dialog === null) return;
+		const active = document.activeElement;
+		if (active instanceof HTMLElement && active !== document.body && active.closest("dialog") === null) {
+			returnFocusTo = active;
+		}
 		if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal();
 		else dialog.setAttribute("open", "");
+		openModals.push(dialog);
+		if (!dialog.contains(document.activeElement)) (dialog.querySelector<HTMLElement>(FOCUSABLE) ?? dialog).focus();
+		const onKey = (event: KeyboardEvent) => {
+			// Menus and pickers inside the dialog take Esc first (they prevent it).
+			if (event.key !== "Escape" || event.defaultPrevented || openModals[openModals.length - 1] !== dialog) return;
+			event.preventDefault();
+			closeRef.current();
+		};
+		document.addEventListener("keydown", onKey);
 		return () => {
+			document.removeEventListener("keydown", onKey);
+			openModals.splice(openModals.indexOf(dialog), 1);
 			if (typeof dialog.close === "function" && dialog.open) dialog.close();
+			// Another dialog may open in the same commit; restore only when none did.
+			queueMicrotask(() => {
+				if (openModals.length > 0) return;
+				const target = returnFocusTo;
+				const focus = document.activeElement;
+				const lost = focus === null || focus === document.body || !focus.isConnected;
+				if (target !== null && target.isConnected && lost) target.focus();
+			});
 		};
 	}, []);
 	return (
 		<dialog
 			ref={ref}
+			tabIndex={-1}
 			className={className === undefined ? "modal" : `modal ${className}`}
 			aria-labelledby={labelledBy}
 			onCancel={(event) => {
 				event.preventDefault();
 				closeRef.current();
+			}}
+			onClose={() => {
+				// Closed by the browser without a cancel event: keep React in step.
+				// A close event queued by an earlier cleanup (StrictMode mounts
+				// effects twice) arrives while the dialog is open again: ignore it.
+				const dialog = ref.current;
+				if (dialog !== null && !dialog.open && openModals.includes(dialog)) closeRef.current();
 			}}
 			onClick={(event) => {
 				// A click on the backdrop lands on the <dialog> element itself.

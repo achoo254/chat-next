@@ -14,6 +14,7 @@
 import type { Timers } from "@app/platform";
 import { HistoryDirection } from "@app/proto-ts/messages";
 import type {
+	Chat,
 	ChatDifference,
 	ChatSyncState,
 	Difference,
@@ -27,9 +28,10 @@ import type {
 	SyncState,
 	Update,
 	UpdateBatch,
+	User,
 } from "../model/types.ts";
 import { purgeChat } from "../purge/index.ts";
-import { classifyFailure, type RemoteApi } from "../protocol/api.ts";
+import { classifyFailure, isChatRefusal, type RemoteApi } from "../protocol/api.ts";
 import {
 	toChat,
 	toChatDifference,
@@ -504,6 +506,54 @@ export class SyncEngine {
 		}
 	}
 
+	/**
+	 * After the server refused a call about the chat (permission_denied or
+	 * not_found), asks for the chat itself: when the user is no longer a
+	 * member, or the chat is gone, it is purged as member_removed would
+	 * have done. A chat the user still belongs to is left untouched.
+	 * Failures are reported, not thrown.
+	 */
+	async confirmMembership(chatId: number): Promise<void> {
+		let left: Chat | null = null;
+		let users: User[] = [];
+		try {
+			const response = await this.options.api.chats.getChat({ chatId: toWireId(chatId) });
+			if (response.chat === undefined) return;
+			const chat = toChat(response.chat);
+			if (!chat.left || (await this.options.repo.chat(chatId))?.left === true) return;
+			left = chat;
+			users = response.users.map(toUser);
+		} catch (err) {
+			if (classifyFailure(err) === "unauthenticated") {
+				this.options.onSessionEnded("unknown");
+				return;
+			}
+			if (!isChatRefusal(err)) {
+				this.report(err, "confirm membership");
+				return;
+			}
+			// Nothing of it here (a link to a chat that does not exist), or
+			// purged already: writing would only wake the views to ask again.
+			const local = await this.options.repo.chat(chatId);
+			if (local === null || local.left) return;
+		}
+		if (this.stopped) return;
+		try {
+			await this.queue.run(async () => {
+				const w = new WriteBatch();
+				if (left !== null) {
+					this.putEntities({ users, chats: [left] }, w, newEffects());
+				} else {
+					purgeChat(w, chatId);
+					this.forgetChat(chatId);
+				}
+				await this.commit(w);
+			});
+		} catch (err) {
+			this.report(err, "confirm membership");
+		}
+	}
+
 	/** refreshChat for an API without GetPeerDialogs: the chat entity only. */
 	private async refreshChatEntity(chatId: number): Promise<void> {
 		const response = await this.options.api.chats.getChat({ chatId: toWireId(chatId) });
@@ -838,9 +888,13 @@ export class SyncEngine {
 			return;
 		}
 		this.report(err, `GetChatDifference ${chatId}`);
-		// A refused chat (no longer a member) is purged by member_removed in
-		// the per-user log; retrying would only repeat the refusal.
-		if (kind === "permanent" || this.stopped) return;
+		// A refused chat (no longer a member) is normally purged by
+		// member_removed; retrying would only repeat the refusal. When that
+		// update was missed, the membership check purges it.
+		if (kind === "permanent" || this.stopped) {
+			if (kind === "permanent" && isChatRefusal(err)) void this.confirmMembership(chatId);
+			return;
+		}
 		const attempt = this.chatAttempts.get(chatId) ?? 0;
 		this.chatAttempts.set(chatId, attempt + 1);
 		const handle = this.options.timers.setTimeout(() => {

@@ -262,7 +262,13 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 						<span className="spin" aria-hidden="true" />
 					</span>
 				)}
-				{window_.failure !== null && keys.length === 0 ? (
+				{window_.failure === "permanent" && keys.length === 0 && chat?.left !== true ? (
+					// Refused by the server, not a network problem: retrying cannot help.
+					<div className="banner error" role="alert">
+						<Icon name="alert" small />
+						<span className="grow">{copy.convo.refused}</span>
+					</div>
+				) : window_.failure !== null && keys.length === 0 && chat?.left !== true ? (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
 						<span className="grow">{copy.convo.loadFailed}</span>

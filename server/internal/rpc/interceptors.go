@@ -102,15 +102,27 @@ func authInterceptor(sessions *auth.Sessions, logger *slog.Logger) connect.Unary
 				return nil, errUnauthenticated()
 			}
 			if err != nil {
-				return nil, internal(logger, procedure, err)
+				return nil, internal(ctx, logger, procedure, err)
 			}
 			return next(context.WithValue(ctx, sessionKey{}, s), req)
 		}
 	}
 }
 
-// internal logs err and returns an opaque Internal error.
-func internal(logger *slog.Logger, procedure string, err error) error {
+// internal logs err and returns an opaque Internal error. A call whose
+// request context ended (the client aborted it or its deadline passed)
+// failed because of the client, not the server: it is logged at Debug and
+// answered Canceled or DeadlineExceeded rather than Internal. A deadline
+// the server set on its own work leaves ctx alive and stays an error.
+func internal(ctx context.Context, logger *slog.Logger, procedure string, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		code := connect.CodeCanceled
+		if errors.Is(ctxErr, context.DeadlineExceeded) {
+			code = connect.CodeDeadlineExceeded
+		}
+		logger.Debug("rpc ended by the client", "procedure", procedure, "code", code.String(), "err", err)
+		return connect.NewError(code, ctxErr)
+	}
 	logger.Error("rpc failed", "procedure", procedure, "err", err)
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }

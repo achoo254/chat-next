@@ -16,7 +16,7 @@ import type {
 } from "../model/types.ts";
 import { searchText } from "../vifold/index.ts";
 import { encodeLinkPreview, encodeMediaRef } from "../media/codec.ts";
-import { flag } from "./rows.ts";
+import { flag, LEFT_REMOVED } from "./rows.ts";
 
 export class WriteBatch {
 	readonly statements: SqlStatement[] = [];
@@ -79,7 +79,9 @@ export function putChat(w: WriteBatch, chat: Chat): void {
 			history_shared = excluded.history_shared, member_count = excluded.member_count,
 			default_permissions = excluded.default_permissions, pinned_seq = excluded.pinned_seq,
 			created_at = excluded.created_at, my_role = excluded.my_role,
-			my_permissions = excluded.my_permissions, left_chat = excluded.left_chat, forum = excluded.forum`,
+			my_permissions = excluded.my_permissions,
+			left_chat = CASE WHEN excluded.left_chat <> 0 AND chats.left_chat = ${LEFT_REMOVED} THEN chats.left_chat ELSE excluded.left_chat END,
+			forum = excluded.forum`,
 		[
 			chat.id,
 			chat.type,

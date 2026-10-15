@@ -14,7 +14,8 @@ export function purgeChat(w: WriteBatch, chatId: number): void {
 	w.add("DELETE FROM read_states WHERE chat_id = ?", [chatId]);
 	w.add("DELETE FROM chat_sync_state WHERE chat_id = ?", [chatId]);
 	w.add("DELETE FROM outbox WHERE chat_id = ?", [chatId]);
-	w.add("UPDATE chats SET left_chat = 1, pinned_seq = 0 WHERE id = ?", [chatId]);
+	// No longer a member: no role or rights either (as the server renders it).
+	w.add("UPDATE chats SET left_chat = max(left_chat, 1), pinned_seq = 0, my_role = 'member', my_permissions = 0 WHERE id = ?", [chatId]);
 	w.emit(EventKeys.dialogs, EventKeys.dialog(chatId), EventKeys.chat(chatId), EventKeys.history(chatId), EventKeys.outbox);
 }
 

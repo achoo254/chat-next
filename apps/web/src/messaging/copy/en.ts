@@ -91,7 +91,14 @@ export const en: MessagingCopy = {
 		notFound: "This chat cannot be opened",
 		notFoundBody: "The chat is no longer in your list, or you are no longer a member.",
 		left: "You are no longer a member of this chat.",
+		/** The user left a group or channel, or the cause is unknown (no longer a member). */
+		leftChat: (channel: boolean) => (channel ? "You are no longer subscribed to this channel." : "You are no longer a member of this group."),
+		/** An admin removed the user (by default with a ban). */
+		removedChat: (channel: boolean) => (channel ? "You were removed from this channel." : "You were removed from this group."),
+		closeChat: "Close chat",
 		loadFailed: "Could not load messages. Check your connection and try again.",
+		/** The server refused the history (not a network problem); retrying cannot help. */
+		refused: "You cannot view the messages of this chat.",
 		toBottom: (n: number) => (n > 0 ? `Jump to latest, ${plural(n, "unread message", "unread messages")}` : "Jump to latest"),
 		toMention: (n: number) => `Go to mention, ${plural(n, "message", "messages")}`,
 		unreadDivider: "Unread messages",

@@ -274,7 +274,8 @@ function GroupMembers({ chat }: { chat: Chat }) {
 		<div className="info-sec">
 			<div className="sec-head">
 				<h3>{copy.info.membersHead(chat.memberCount, channel)}</h3>
-				{status === "ready" && (
+				{/* Kept while the list reloads, so it stays where focus returns from the dialog. */}
+				{status !== "error" && (
 					<button type="button" className="see-all" aria-label={copy.info.seeAllLabel(chat.memberCount, channel)} onClick={() => ui.dialog.set({ kind: "members", chatId: chat.id })}>
 						{copy.info.seeAll}
 					</button>
@@ -378,15 +379,16 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 					)}
 				</QuickActions>
 			)}
-			{(!channel || admin) && <GroupMembers chat={chat} />}
+			{/* No longer a member: the server refuses the members and media of the chat. */}
+			{(!channel || admin) && !chat.left && <GroupMembers chat={chat} />}
 			{canAdd && !chat.left && (
 				<div className="info-sec">
 					<h3>{copy.info.inviteLink}</h3>
 					<InviteRow chat={chat} />
 				</div>
 			)}
-			<SharedRows chatId={chat.id} onShared={onShared} />
-			<PinnedBarRow chat={chat} />
+			{!chat.left && <SharedRows chatId={chat.id} onShared={onShared} />}
+			{!chat.left && <PinnedBarRow chat={chat} />}
 			{admin && (
 				<div className="info-sec">
 					<Link to={paths.chatAdmin(chat.id)} className="row link-row">

@@ -723,6 +723,11 @@ export class FakeServer {
 		chat.members.delete(userId);
 	}
 
+	/** Ends a membership without writing member_removed anywhere (an update the client missed). */
+	dropMemberSilently(chatId: number, userId: number): void {
+		this.chat(chatId).members.delete(userId);
+	}
+
 	/** The user muted (until > 0) or unmuted a chat on another session. */
 	muteDialog(userId: number, chatId: number, until: number): void {
 		const user = this.user(userId);

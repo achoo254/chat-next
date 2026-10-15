@@ -43,7 +43,7 @@ func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.G
 	}
 	u, err := s.store.UserByID(ctx, s.tenantID, sess.UserID)
 	if err != nil {
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	// Every app start makes sure "Cloud của tôi" exists, so accounts created
 	// before it get it without signing in again. A failure only delays it to
@@ -82,7 +82,7 @@ func (s *usersService) UpdateProfile(ctx context.Context, req *connect.Request[a
 	}
 	u, err := s.store.UpdateProfile(ctx, s.tenantID, sess.UserID, name, bio)
 	if err != nil {
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.UpdateProfileResponse{User: selfUser(u)}), nil
 }
@@ -104,7 +104,7 @@ func (s *usersService) SetUsername(ctx context.Context, req *connect.Request[app
 	case errors.Is(err, store.ErrUsernameTaken):
 		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("username is taken"))
 	case err != nil:
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.SetUsernameResponse{User: selfUser(u)}), nil
 }

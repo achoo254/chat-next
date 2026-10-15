@@ -65,7 +65,7 @@ func (s *authService) SignOut(ctx context.Context, req *connect.Request[appv1.Si
 		return nil, err
 	}
 	if err := s.sessions.Revoke(ctx, sess.UserID, sess.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.SignOutResponse{}), nil
 }
@@ -78,7 +78,7 @@ func (s *authService) ListSessions(ctx context.Context, req *connect.Request[app
 	}
 	list, err := s.store.ListActiveSessions(ctx, s.tenantID, sess.UserID)
 	if err != nil {
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	now := time.Now()
 	out := make([]*appv1.Session, 0, len(list))
@@ -124,7 +124,7 @@ func (s *authService) RevokeSession(ctx context.Context, req *connect.Request[ap
 	case errors.Is(err, store.ErrNotFound):
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("session not found"))
 	case err != nil:
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.RevokeSessionResponse{}), nil
 }
@@ -137,7 +137,7 @@ func (s *authService) RevokeOtherSessions(ctx context.Context, req *connect.Requ
 	}
 	n, err := s.sessions.RevokeOthers(ctx, sess.UserID, sess.ID)
 	if err != nil {
-		return nil, internal(s.logger, req.Spec().Procedure, err)
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.RevokeOtherSessionsResponse{RevokedCount: int32(min(n, math.MaxInt32))}), nil
 }

@@ -19,6 +19,7 @@ import {
 	putUnreadMark,
 	type WriteBatch,
 } from "../repo/writes.ts";
+import { LEFT_REMOVED } from "../repo/rows.ts";
 
 export interface Effects {
 	/** Incoming messages applied from realtime (candidates for a notification). */
@@ -135,11 +136,17 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			// The chat entity was fetched before this update was applied
 			// (requiredEntities); its history loads when the chat is opened.
 			if (body.userIds.includes(selfId)) ensureDialog(w, body.chatId);
+			// Someone else joined: the member count changed on the server.
+			else effects.refreshChats.add(body.chatId);
 			return;
 		case "member_removed":
 			if (body.userId === selfId) {
 				purgeChat(w, body.chatId);
+				// Removed by an admin rather than leaving: the chat says so.
+				if (body.actorId !== selfId) w.add("UPDATE chats SET left_chat = ? WHERE id = ?", [LEFT_REMOVED, body.chatId]);
 				effects.purgedChats.add(body.chatId);
+			} else {
+				effects.refreshChats.add(body.chatId);
 			}
 			return;
 		case "member_permissions":

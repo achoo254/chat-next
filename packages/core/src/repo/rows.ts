@@ -42,6 +42,12 @@ function optionalStr(row: SqlRow, column: string): string | null {
 	return typeof value === "string" ? value : null;
 }
 
+/**
+ * chats.left_chat: 0 a member, 1 no longer a member (left, or the cause is
+ * unknown), LEFT_REMOVED removed by someone else.
+ */
+export const LEFT_REMOVED = 2;
+
 function bool(row: SqlRow, column: string): boolean {
 	return num(row, column) !== 0;
 }
@@ -272,6 +278,7 @@ export function rowToChat(row: SqlRow): Chat {
 		myRole: ROLES.has(role as MemberRole) ? (role as MemberRole) : "unknown",
 		myPermissions: num(row, "my_permissions"),
 		left: bool(row, "left_chat"),
+		removed: num(row, "left_chat") === LEFT_REMOVED,
 		forum: bool(row, "forum"),
 	};
 }

@@ -90,7 +90,14 @@ export const vi = {
 		notFound: "Không mở được chat này",
 		notFoundBody: "Chat không còn trong danh sách của bạn, hoặc bạn không còn là thành viên.",
 		left: "Bạn không còn là thành viên của chat này.",
+		/** The user left a group or channel, or the cause is unknown (no longer a member). */
+		leftChat: (channel: boolean): string => (channel ? "Bạn không còn là người đăng ký của kênh này." : "Bạn không còn là thành viên của nhóm này."),
+		/** An admin removed the user (by default with a ban). */
+		removedChat: (channel: boolean): string => (channel ? "Bạn đã bị xoá khỏi kênh này." : "Bạn đã bị xoá khỏi nhóm này."),
+		closeChat: "Đóng chat",
 		loadFailed: "Không tải được tin nhắn. Kiểm tra kết nối mạng rồi thử lại.",
+		/** The server refused the history (not a network problem); retrying cannot help. */
+		refused: "Bạn không có quyền xem tin nhắn của chat này.",
 		toBottom: (n: number) => (n > 0 ? `Xuống tin mới nhất, ${n} tin chưa đọc` : "Xuống tin mới nhất"),
 		toMention: (n: number) => `Tới tin nhắc bạn, ${n} tin`,
 		unreadDivider: "Tin chưa đọc",

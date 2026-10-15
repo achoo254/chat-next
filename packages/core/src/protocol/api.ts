@@ -91,6 +91,15 @@ export function classifyFailure(err: unknown): FailureKind {
 	return RETRYABLE.has(code) ? "retryable" : "permanent";
 }
 
+/**
+ * The server refused a call about one chat because the caller may not see
+ * it (no longer a member) or it is gone, as opposed to a network fault.
+ */
+export function isChatRefusal(err: unknown): boolean {
+	const code = ConnectError.from(err).code;
+	return code === Code.PermissionDenied || code === Code.NotFound;
+}
+
 /** Thrown inside the core when the server says the session is gone. */
 export class SessionEndedError extends Error {
 	constructor(message = "session ended") {

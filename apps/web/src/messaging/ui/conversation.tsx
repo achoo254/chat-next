@@ -168,6 +168,27 @@ function ChannelBar({ chatId }: { chatId: number }) {
 	);
 }
 
+/**
+ * In place of the composer once the user is no longer in a group or channel
+ * (removed, banned or left): why, and a way out. The chat is already gone
+ * from the list and its messages from this device.
+ */
+function LeftBar({ chat }: { chat: Chat }) {
+	const copy = useCopy();
+	const channel = chat.type === "channel";
+	const text =
+		chat.type !== "group" && !channel ? copy.convo.left : chat.removed ? copy.convo.removedChat(channel) : copy.convo.leftChat(channel);
+	return (
+		<div className="closed-bar">
+			<Icon name={chat.removed ? "ban" : "lock"} small />
+			<span role="status">{text}</span>
+			<button type="button" className="btn btn-sm" onClick={() => navigate(paths.home)}>
+				{copy.convo.closeChat}
+			</button>
+		</div>
+	);
+}
+
 interface ConversationProps {
 	chatId: number;
 	topicId: number;
@@ -286,7 +307,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					<Icon name="info" />
 				</button>
 			</header>
-			{(topics === null || topic !== null) && ((view?.dialog.pinnedMessageCount ?? 0) > 0 || chat.pinnedSeq !== 0) && (
+			{!chat.left && (topics === null || topic !== null) && ((view?.dialog.pinnedMessageCount ?? 0) > 0 || chat.pinnedSeq !== 0) && (
 				<Suspense fallback={null}>
 					<PinnedBar key={effectiveTopic} chat={chat} topicId={effectiveTopic} />
 				</Suspense>
@@ -294,9 +315,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 			<OfflineBanner chatId={chatId} />
 			<MessageList chatId={chatId} topicId={effectiveTopic} chat={chat} dialog={view} />
 			{chat.left ? (
-				<div className="closed-bar" role="status">
-					{copy.convo.left}
-				</div>
+				<LeftBar chat={chat} />
 			) : topic !== null && topic.closed && !admin ? (
 				<div className="closed-bar" role="status">
 					<Icon name="lock" small />

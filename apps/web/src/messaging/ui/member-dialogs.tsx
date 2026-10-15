@@ -3,7 +3,7 @@
 // asks how: "Xoá và cấm vào lại" (the default: no invite link or re-adding
 // works until an admin unbans, the person's invite links are revoked) or
 // "Chỉ xoá" (they may come back with a link). Channels follow the same rules.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
@@ -38,6 +38,11 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 	const canRemove = (member: Member) =>
 		admin && member.person.id !== store.selfId && member.role !== "owner" && (member.role !== "admin" || myRole === "owner");
 	const canPromote = (member: Member) => admin && member.role === "member" && !member.person.isBot;
+	const left = chat?.left === true;
+	// Removed while looking at the list: the server no longer shows it to you.
+	useEffect(() => {
+		if (left) onClose();
+	}, [left, onClose]);
 
 	const message = (member: Member) => {
 		remote.createPrivate(member.person.id).then(

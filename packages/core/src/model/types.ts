@@ -33,6 +33,11 @@ export interface Chat {
 	readonly myPermissions: number;
 	/** The user is no longer a member. */
 	readonly left: boolean;
+	/**
+	 * Left because someone else (an admin) removed the user, as told by
+	 * member_removed; false when the user left or the cause is unknown.
+	 */
+	readonly removed: boolean;
 	/** Groups only: messages are organised in forum topics. */
 	readonly forum: boolean;
 }

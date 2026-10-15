@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Invite, Member, Remote } from "../data/remote.ts";
 import type { ChatSource } from "../data/source.ts";
-import { useServices } from "../data/services.tsx";
+import { useChat, useServices } from "../data/services.tsx";
 import { rememberPresence } from "./presence.tsx";
 
 /** "k đang hoạt động" is refreshed this often while the chat is on screen. */
@@ -101,7 +101,11 @@ export interface MembersState {
 	readonly hasMore: boolean;
 }
 
-/** Members of a chat, filtered by `query` on the server, with paging. */
+/**
+ * Members of a chat, filtered by `query` on the server, with paging. The
+ * list reloads when the member count changes (someone else added or removed
+ * a member) and when this UI changes the members.
+ */
 export function useMembers(chatId: number, query = "", enabled = true): MembersState & { more: () => void; reload: () => void } {
 	const { remote } = useServices();
 	const [state, setState] = useState<MembersState & { key: string; cursor: string }>({
@@ -113,7 +117,8 @@ export function useMembers(chatId: number, query = "", enabled = true): MembersS
 	});
 	const [attempt, setAttempt] = useState(0);
 	const changes = useSyncExternalStore(subscribeChanges, () => memberChanges.get(chatId) ?? 0);
-	const key = `${chatId}|${query}|${attempt}|${changes}`;
+	const memberCount = useChat(chatId)?.memberCount ?? 0;
+	const key = `${chatId}|${query}|${attempt}|${changes}|${memberCount}`;
 
 	useEffect(() => {
 		if (!enabled) return;

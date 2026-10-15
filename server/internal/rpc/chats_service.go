@@ -27,7 +27,7 @@ func call[Req, Resp any](ctx context.Context, logger *slog.Logger, req *connect.
 	}
 	resp, err := fn(sess.UserID, req.Msg)
 	if err != nil {
-		return nil, fail(logger, req.Spec().Procedure, err)
+		return nil, fail(ctx, logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(resp), nil
 }

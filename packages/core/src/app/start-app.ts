@@ -21,7 +21,7 @@ import { DEFAULT_MEDIA_LIMITS, MediaLimitsSource, type MediaLimits } from "../me
 import { cacheKey, LARGE_FILE_BYTES, MediaCache } from "../media/media-cache.ts";
 import { MediaLoader, type MediaFile, type MediaRequest, type MediaUrl } from "../media/media-loader.ts";
 import { UploadQueue, type UploadProgress } from "../media/upload-queue.ts";
-import { classifyFailure, SessionEndedError, type FailureKind, type RemoteApi } from "../protocol/api.ts";
+import { classifyFailure, isChatRefusal, SessionEndedError, type FailureKind, type RemoteApi } from "../protocol/api.ts";
 import { toUser } from "../protocol/map.ts";
 import { migrate } from "../repo/migrations.ts";
 import { Repository, type DialogView, type StoredMessage } from "../repo/repository.ts";
@@ -454,13 +454,16 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		const topSeq = dialog?.topSeq ?? 0;
 		const newestLocal = messages[messages.length - 1]?.seq ?? offsetSeq;
 		const reachesTop = direction !== "newer" ? offsetSeq === 0 || direction === "around" : true;
+		// The server refuses the history of a chat the user is no longer in.
+		const left = (await repo.chat(chatId))?.left === true;
 		const needsServer =
-			messages.some((m) => m.stale) ||
+			!left &&
+			(messages.some((m) => m.stale) ||
 			(direction !== "newer" && messages.length < limit && dialog?.historyStart !== true) ||
 			(reachesTop && newestLocal < topSeq) ||
-			(direction === "newer" && messages.length < limit && newestLocal < topSeq);
+			(direction === "newer" && messages.length < limit && newestLocal < topSeq));
 		let failure: FailureKind | null = null;
-		let hasOlder = messages.length === limit || dialog?.historyStart !== true;
+		let hasOlder = !left && (messages.length === limit || dialog?.historyStart !== true);
 		let hasNewer = newestLocal < topSeq;
 		if (needsServer) {
 			try {
@@ -471,7 +474,17 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 			} catch (err) {
 				failure = classifyFailure(err);
 				if (failure === "unauthenticated") sessionEnded("unauthenticated");
-				else report(err, `history ${chatId}`);
+				else if (isChatRefusal(err)) {
+					// No longer a member (a missed member_removed): purge the chat
+					// now, so the caller sees it as left rather than as a failed load.
+					await engine.confirmMembership(chatId);
+					if ((await repo.chat(chatId))?.left === true) {
+						failure = null;
+						messages = await read();
+						hasOlder = false;
+						hasNewer = false;
+					}
+				} else report(err, `history ${chatId}`);
 			}
 		}
 		if (direction === "older" && offsetSeq === 0) hasNewer = false;
