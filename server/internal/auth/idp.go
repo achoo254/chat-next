@@ -209,7 +209,9 @@ func (p *IdP) AuthCodeURL(r AuthRequest) (string, error) {
 	return st.oauth.AuthCodeURL(r.State, opts...), nil
 }
 
-// IDClaims are the ID token claims the chat server uses.
+// IDClaims are the claims the chat server uses: those of the ID token,
+// completed from the userinfo endpoint (the IdP may leave the profile and
+// email claims out of the ID token).
 type IDClaims struct {
 	Subject           string
 	SessionID         string // sid
@@ -218,19 +220,56 @@ type IDClaims struct {
 	Name              string
 	Email             string
 	EmailVerified     bool
+	// EmailKnown reports that the IdP stated the email state: the ID token
+	// carried the email claim, or userinfo answered. When false, Email and
+	// EmailVerified say nothing and the stored email must be kept.
+	EmailKnown bool
 }
 
+// rawIDClaims are the claims read from an ID token or a userinfo response.
 type rawIDClaims struct {
 	SID               string          `json:"sid"`
 	PreferredUsername string          `json:"preferred_username"`
 	Name              string          `json:"name"`
-	Email             string          `json:"email"`
+	Email             *string         `json:"email"`
 	EmailVerified     json.RawMessage `json:"email_verified"`
 }
 
+// profile returns the profile and email claims; email is known when the
+// email claim is present.
+func (c rawIDClaims) profile(subject string) IDClaims {
+	out := IDClaims{
+		Subject: subject, SessionID: c.SID,
+		PreferredUsername: c.PreferredUsername, Name: c.Name,
+		EmailVerified: parseBool(c.EmailVerified), EmailKnown: c.Email != nil,
+	}
+	if c.Email != nil {
+		out.Email = *c.Email
+	}
+	return out
+}
+
+// mergeUserInfo completes ID token claims with userinfo claims of the same
+// subject: a userinfo value replaces the ID token's when it is not empty,
+// and the userinfo answer always states the email (an absent email claim
+// there means the account has none to share).
+func mergeUserInfo(id, info IDClaims) IDClaims {
+	if info.PreferredUsername != "" {
+		id.PreferredUsername = info.PreferredUsername
+	}
+	if info.Name != "" {
+		id.Name = info.Name
+	}
+	id.Email, id.EmailVerified, id.EmailKnown = info.Email, info.EmailVerified, true
+	return id
+}
+
 // parseBool accepts a JSON boolean or the strings "true"/"false" some
-// providers send.
+// providers send; anything else, including an absent claim, is false.
 func parseBool(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return false
+	}
 	var b bool
 	if json.Unmarshal(raw, &b) == nil {
 		return b
@@ -248,13 +287,17 @@ type Tokens struct {
 	Claims       IDClaims
 	// ClaimsErr is set by Refresh when the token endpoint succeeded but the
 	// ID token or userinfo could not be verified (JWKS or userinfo outage, bad
-	// token). IDToken and Claims are then empty, while RefreshToken is valid
-	// and must still be stored: the IdP rotates it on every refresh.
+	// token, userinfo of another subject). IDToken and Claims are then empty,
+	// while RefreshToken is valid and must still be stored: the IdP rotates it
+	// on every refresh.
 	ClaimsErr error
 }
 
-// Exchange redeems an authorization code with its PKCE verifier and verifies
-// the returned ID token (iss, aud, ES256, exp). The caller checks the nonce.
+// Exchange redeems an authorization code with its PKCE verifier, verifies
+// the returned ID token (iss, aud, ES256, exp) and completes its claims from
+// userinfo. A userinfo answer for another subject fails the exchange
+// (ErrInvalidToken); a userinfo outage does not: the ID token claims are
+// used alone, with a warning. The caller checks the nonce.
 func (p *IdP) Exchange(ctx context.Context, code, verifier string) (Tokens, error) {
 	st, err := p.ready()
 	if err != nil {
@@ -272,7 +315,41 @@ func (p *IdP) Exchange(ctx context.Context, code, verifier string) (Tokens, erro
 	if err != nil {
 		return Tokens{}, err
 	}
+	info, err := p.userInfo(ctx, st, tok)
+	switch {
+	case errors.Is(err, errUserInfoSubject):
+		return Tokens{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	case err == nil && info.Subject != claims.Subject:
+		return Tokens{}, fmt.Errorf("%w: %w", ErrInvalidToken, errUserInfoSubject)
+	case err != nil:
+		p.cfg.Logger.Warn("IdP userinfo unavailable at sign-in; using the ID token claims alone", "err", err)
+	default:
+		claims = mergeUserInfo(claims, info)
+	}
 	return Tokens{AccessToken: tok.AccessToken, RefreshToken: tok.RefreshToken, IDToken: raw, Claims: claims}, nil
+}
+
+// errUserInfoSubject: the userinfo response has no subject or another
+// subject than the ID token (OpenID Connect Core 1.0 §5.3.2).
+var errUserInfoSubject = errors.New("auth: userinfo subject does not match the ID token")
+
+// userInfo reads the claims of the userinfo endpoint with tok's access
+// token. Its errors carry no token: go-oidc reports the HTTP status and the
+// IdP's error body, or a decoding failure.
+func (p *IdP) userInfo(ctx context.Context, st *idpState, tok *oauth2.Token) (IDClaims, error) {
+	info, err := st.provider.UserInfo(p.clientContext(ctx), oauth2.StaticTokenSource(tok))
+	if err != nil {
+		return IDClaims{}, fmt.Errorf("auth: userinfo: %w", err)
+	}
+	if info.Subject == "" {
+		return IDClaims{}, errUserInfoSubject
+	}
+	var c rawIDClaims
+	if err := info.Claims(&c); err != nil {
+		return IDClaims{}, fmt.Errorf("auth: userinfo claims: %w", err)
+	}
+	c.SID = ""
+	return c.profile(info.Subject), nil
 }
 
 func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDClaims, error) {
@@ -287,15 +364,9 @@ func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDCl
 	if idt.Subject == "" {
 		return IDClaims{}, fmt.Errorf("%w: no sub", ErrInvalidToken)
 	}
-	return IDClaims{
-		Subject:           idt.Subject,
-		SessionID:         c.SID,
-		Nonce:             idt.Nonce,
-		PreferredUsername: c.PreferredUsername,
-		Name:              c.Name,
-		Email:             c.Email,
-		EmailVerified:     parseBool(c.EmailVerified),
-	}, nil
+	claims := c.profile(idt.Subject)
+	claims.Nonce = idt.Nonce
+	return claims, nil
 }
 
 // Refresh redeems a refresh token. ErrGrantEnded means the IdP answered
@@ -304,8 +375,9 @@ func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDCl
 // token endpoint succeeded the error is nil: the returned RefreshToken is the
 // rotated token (or the old one when the IdP did not rotate) and must be
 // stored even when Tokens.ClaimsErr reports that the claims could not be
-// verified. When the response carries an ID token it is verified; otherwise
-// the claims are read from userinfo.
+// verified. When the response carries an ID token it is verified and its
+// claims are completed from userinfo, which must answer for the same
+// subject; otherwise the claims are read from userinfo alone.
 func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) {
 	st, err := p.ready()
 	if err != nil {
@@ -326,21 +398,30 @@ func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) 
 		return Tokens{}, fmt.Errorf("auth: refresh: %w", describeTokenError(err))
 	}
 	out := Tokens{AccessToken: tok.AccessToken, RefreshToken: tok.RefreshToken}
-	if raw, _ := tok.Extra("id_token").(string); raw != "" {
-		claims, err := p.verifyIDToken(ctx, st, raw)
-		if err != nil {
+	raw, _ := tok.Extra("id_token").(string)
+	var idClaims IDClaims
+	if raw != "" {
+		if idClaims, err = p.verifyIDToken(ctx, st, raw); err != nil {
 			out.ClaimsErr = err
 			return out, nil
 		}
-		out.IDToken, out.Claims = raw, claims
-		return out, nil
 	}
-	info, err := st.provider.UserInfo(cctx, oauth2.StaticTokenSource(tok))
+	// A userinfo outage leaves the claims unknown rather than falling back to
+	// an ID token without the email claim, which would clear a stored email.
+	info, err := p.userInfo(ctx, st, tok)
 	if err != nil {
-		out.ClaimsErr = fmt.Errorf("auth: userinfo after refresh: %w", err)
+		out.ClaimsErr = fmt.Errorf("after refresh: %w", err)
 		return out, nil
 	}
-	out.Claims = IDClaims{Subject: info.Subject, Email: info.Email, EmailVerified: info.EmailVerified}
+	if raw == "" {
+		out.Claims = mergeUserInfo(IDClaims{Subject: info.Subject}, info)
+		return out, nil
+	}
+	if info.Subject != idClaims.Subject {
+		out.ClaimsErr = fmt.Errorf("%w: %w", ErrInvalidToken, errUserInfoSubject)
+		return out, nil
+	}
+	out.IDToken, out.Claims = raw, mergeUserInfo(idClaims, info)
 	return out, nil
 }
 

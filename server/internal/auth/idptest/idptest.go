@@ -5,6 +5,9 @@
 // rotating single-use refresh tokens), revocation, end_session and userinfo.
 // It also signs back-channel logout tokens.
 //
+// Like hoandat-auth, ID tokens carry preferred_username but not the name and
+// email claims, which only the userinfo endpoint returns.
+//
 // Serve runs the same provider outside a test, on a fixed address, with a
 // page to pick which of several accounts signs in: the local multi-user
 // end-to-end stack (cmd/e2e-stack) uses it so several browsers sign in as
@@ -25,6 +28,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -45,6 +49,18 @@ const (
 	// RefreshBadIDToken rotates the refresh token normally but returns an ID
 	// token signed by a key that is not in the JWKS.
 	RefreshBadIDToken
+)
+
+// UserInfoMode selects how the userinfo endpoint answers.
+type UserInfoMode int
+
+// Userinfo modes.
+const (
+	UserInfoOK UserInfoMode = iota
+	// UserInfoServerError answers 500.
+	UserInfoServerError
+	// UserInfoOtherSubject answers for another subject than the token's.
+	UserInfoOtherSubject
 )
 
 // Account is the user the provider signs in.
@@ -87,10 +103,12 @@ type Provider struct {
 	refreshGate   chan struct{}   // non-nil: refresh grants wait for it to close
 	refreshArrive chan struct{}   // receives one value per gated refresh grant
 	refreshTokens map[string]bool // issued token -> still valid
+	userInfoMode  UserInfoMode
 	// accounts is the picker's list (Serve only); nil means the provider
 	// always signs in account.
 	accounts     []Account
 	tokenAccount map[string]Account // refresh token -> account it was issued to
+	accessTokens map[string]Account // access token -> account it was issued to
 	codes        map[string]codeGrant
 	authorizes   []Authorize
 	revoked      []string
@@ -146,6 +164,7 @@ func newProvider(clientID, clientSecret string) (*Provider, error) {
 		},
 		refreshTokens: map[string]bool{},
 		tokenAccount:  map[string]Account{},
+		accessTokens:  map[string]Account{},
 		codes:         map[string]codeGrant{},
 	}, nil
 }
@@ -216,6 +235,13 @@ func (p *Provider) HoldRefresh(t testing.TB) (arrived <-chan struct{}, release f
 	}
 	t.Cleanup(release)
 	return arrive, release
+}
+
+// SetUserInfo selects how the userinfo endpoint answers.
+func (p *Provider) SetUserInfo(mode UserInfoMode) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.userInfoMode = mode
 }
 
 // RefreshCalls is the number of refresh_token grants received.
@@ -435,17 +461,17 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 // issueTokens answers a successful grant with a new refresh token; with
 // foreignKey the ID token is signed by a key outside the JWKS.
 func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, foreignKey bool) {
-	rt := "rt-" + randomString()
+	rt, at := "rt-"+randomString(), "at-"+randomString()
 	p.mu.Lock()
 	p.refreshTokens[rt] = true
 	p.tokenAccount[rt] = a
+	p.accessTokens[at] = a
 	p.mu.Unlock()
 	now := time.Now()
 	claims := map[string]any{
 		"iss": p.Issuer(), "aud": p.ClientID, "sub": a.Sub, "sid": a.SID,
 		"iat": now.Unix(), "exp": now.Add(time.Hour).Unix(),
-		"preferred_username": a.PreferredUsername, "name": a.Name,
-		"email": a.Email, "email_verified": a.EmailVerified,
+		"preferred_username": a.PreferredUsername,
 	}
 	if nonce != "" {
 		claims["nonce"] = nonce
@@ -465,7 +491,7 @@ func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, f
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"access_token": "at-" + randomString(), "token_type": "Bearer", "expires_in": 900,
+		"access_token": at, "token_type": "Bearer", "expires_in": 900,
 		"refresh_token": rt, "id_token": idToken, "scope": "openid profile email",
 	})
 }
@@ -486,11 +512,30 @@ func (p *Provider) revoke(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (p *Provider) userinfo(w http.ResponseWriter, _ *http.Request) {
+// userinfo answers for the account the bearer access token was issued to;
+// without a known token it answers for the current account.
+func (p *Provider) userinfo(w http.ResponseWriter, r *http.Request) {
+	token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	p.mu.Lock()
-	a := p.account
+	a, ok := p.accessTokens[token]
+	if !ok {
+		a = p.account
+	}
+	mode := p.userInfoMode
 	p.mu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]any{"sub": a.Sub, "email": a.Email, "email_verified": a.EmailVerified})
+	sub := a.Sub
+	switch mode {
+	case UserInfoServerError:
+		tokenError(w, http.StatusInternalServerError, "server_error")
+		return
+	case UserInfoOtherSubject:
+		sub = "other-" + a.Sub
+	case UserInfoOK:
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"sub": sub, "preferred_username": a.PreferredUsername, "name": a.Name,
+		"email": a.Email, "email_verified": a.EmailVerified,
+	})
 }
 
 // Sign returns a compact ES256 JWS of claims with the given typ header

@@ -75,6 +75,70 @@ func TestUpsertIdPUser(t *testing.T) {
 	}
 }
 
+func TestUpsertIdPUserNameFromIdP(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	verified := store.IdPEmail{Email: "an@example.com", Verified: true}
+
+	// First sign-in without a display name: the name falls back to the
+	// preferred username.
+	u, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_an", PreferredUsername: "AnNguyen", Email: verified})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Username != "annguyen" || u.Name != "AnNguyen" {
+		t.Fatalf("created user = %+v", u)
+	}
+
+	// The IdP now reports a name: it replaces the fallback.
+	u, err = s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_an", PreferredUsername: "AnNguyen", Name: " Nguyễn Văn An ", Email: verified})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Name != "Nguyễn Văn An" || u.Email != "an@example.com" {
+		t.Fatalf("fallback name not replaced: %+v", u)
+	}
+
+	// A name the user chose is never overwritten.
+	if _, err := s.UpdateProfile(ctx, tenant, u.ID, ptr("Anh An"), nil); err != nil {
+		t.Fatal(err)
+	}
+	u, err = s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_an", PreferredUsername: "AnNguyen", Name: "Nguyễn Văn An", Email: verified})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Name != "Anh An" {
+		t.Fatalf("user-chosen name overwritten: %+v", u)
+	}
+
+	// A name equal to the username is still the fallback; an unknown email
+	// state keeps the stored email.
+	if _, err := s.UpdateProfile(ctx, tenant, u.ID, ptr("annguyen"), nil); err != nil {
+		t.Fatal(err)
+	}
+	u, err = s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_an", PreferredUsername: "AnNguyen", Name: "Nguyễn Văn An", EmailUnknown: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Name != "Nguyễn Văn An" || u.Email != "an@example.com" || !u.EmailVerified {
+		t.Fatalf("username-equal name or unknown email: %+v", u)
+	}
+
+	// No IdP name (or only blanks) keeps the stored name.
+	if _, err := s.UpdateProfile(ctx, tenant, u.ID, ptr("annguyen"), nil); err != nil {
+		t.Fatal(err)
+	}
+	u, err = s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_an", PreferredUsername: "AnNguyen", Name: " \t", Email: verified})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Name != "annguyen" {
+		t.Fatalf("blank IdP name applied: %+v", u)
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
 func TestUpsertIdPUserConcurrentFirstSignIn(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
@@ -287,13 +351,13 @@ func TestCheckGrantOutcomes(t *testing.T) {
 		if c.IdPSub != "acc_o" || string(c.RefreshTokenEnc) != "rt-o" {
 			t.Errorf("candidate = %+v", c)
 		}
-		return store.GrantOutcome{Result: store.GrantAlive, Email: &store.IdPEmail{}}
+		return store.GrantOutcome{Result: store.GrantAlive, Profile: &store.IdPProfile{Sub: "acc_o", PreferredUsername: "outcome", Name: "Outcome Person"}}
 	})
 	if err != nil || !ran {
 		t.Fatalf("alive: %v, %v", ran, err)
 	}
-	if got, _ := s.UserByID(ctx, tenant, u.ID); got.Email != "" || got.EmailVerified {
-		t.Fatalf("email kept after the IdP removed it: %+v", got)
+	if got, _ := s.UserByID(ctx, tenant, u.ID); got.Email != "" || got.EmailVerified || got.Name != "Outcome Person" {
+		t.Fatalf("user after the IdP removed the email and reported a name: %+v", got)
 	}
 
 	// Retry backdates the check so it is due again after RetryAfter.

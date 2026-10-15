@@ -147,10 +147,7 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := tokens.Claims
-	user, err := h.cfg.Store.UpsertIdPUser(ctx, h.cfg.TenantID, store.IdPProfile{
-		Sub: c.Subject, PreferredUsername: c.PreferredUsername, Name: c.Name,
-		Email: store.IdPEmail{Email: c.Email, Verified: c.EmailVerified},
-	})
+	user, err := h.cfg.Store.UpsertIdPUser(ctx, h.cfg.TenantID, c.idpProfile())
 	if err != nil {
 		fail(http.StatusInternalServerError, msgSignInFailed, "upsert user", err)
 		return
@@ -166,6 +163,15 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	h.cfg.Logger.Info("signed in", "user_id", user.ID, "session_id", sessionID)
 	setSessionCookie(w, token)
 	writeInterstitial(w, st.ReturnTo)
+}
+
+// idpProfile is what the claims tell the store about the user.
+func (c IDClaims) idpProfile() store.IdPProfile {
+	return store.IdPProfile{
+		Sub: c.Subject, PreferredUsername: c.PreferredUsername, Name: c.Name,
+		Email:        store.IdPEmail{Email: c.Email, Verified: c.EmailVerified},
+		EmailUnknown: !c.EmailKnown,
+	}
 }
 
 // handleLogout ends the browser's session and sends it to the IdP

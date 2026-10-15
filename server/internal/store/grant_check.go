@@ -55,11 +55,13 @@ const (
 // lease.
 type GrantOutcome struct {
 	Result GrantResult
-	// For GrantAlive: the rotated tokens (nil keeps the stored value) and the
-	// email state the IdP reported (nil keeps it).
+	// For GrantAlive: the rotated tokens (nil keeps the stored value) and
+	// what the IdP reported about the user (nil keeps the user unchanged),
+	// applied like a sign-in does (UpsertIdPUser). Profile.Sub must be the
+	// session user's subject.
 	RefreshTokenEnc []byte
 	IDTokenEnc      []byte
-	Email           *IdPEmail
+	Profile         *IdPProfile
 	// For GrantRetry.
 	RetryAfter time.Duration
 }
@@ -134,10 +136,14 @@ func (s *Store) finishGrantCheck(ctx context.Context, c GrantCandidate, lease ti
 			if tag.RowsAffected() == 0 {
 				return ErrGrantNotApplied
 			}
-			if out.Email != nil {
-				return updateUserEmail(ctx, tx, c.TenantID, c.UserID, *out.Email)
+			if out.Profile == nil {
+				return nil
 			}
-			return nil
+			if out.Profile.Sub != c.IdPSub {
+				return errors.New("grant check profile is not the session user's")
+			}
+			_, err = refreshIdPUser(ctx, tx, c.TenantID, *out.Profile)
+			return err
 		})
 	case GrantEnded:
 		return s.execLeased(ctx, `

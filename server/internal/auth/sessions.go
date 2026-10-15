@@ -308,7 +308,7 @@ func (m *Sessions) refreshGrant(ctx context.Context, c store.GrantCandidate) (st
 	}
 	if tokens.ClaimsErr != nil {
 		// The IdP already rotated the refresh token: store it, keep the email.
-		log.Warn("IdP refresh claims could not be verified; tokens rotated, email unchanged", "err", tokens.ClaimsErr)
+		log.Warn("IdP refresh claims could not be verified; tokens rotated, profile unchanged", "err", tokens.ClaimsErr)
 		return out, tokens.RefreshToken
 	}
 	if tokens.IDToken != "" {
@@ -319,7 +319,8 @@ func (m *Sessions) refreshGrant(ctx context.Context, c store.GrantCandidate) (st
 			log.Error("IdP refresh returned another subject; session revoked")
 			return store.GrantOutcome{Result: store.GrantEnded}, tokens.RefreshToken
 		}
-		out.Email = &store.IdPEmail{Email: tokens.Claims.Email, Verified: tokens.Claims.EmailVerified}
+		profile := tokens.Claims.idpProfile()
+		out.Profile = &profile
 	}
 	return out, tokens.RefreshToken
 }
