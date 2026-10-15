@@ -31,7 +31,7 @@ import type {
 	ReplyMarkup as WireReplyMarkup,
 	SyncAck as WireSyncAck,
 } from "@app/proto-ts/messages";
-import { EntityType as WireEntityType } from "@app/proto-ts/messages";
+import { EntityType as WireEntityType, IncomingHookStopReason } from "@app/proto-ts/messages";
 import type { HelloFrame, UpdateFrame } from "@app/proto-ts/realtime";
 import type {
 	ChatState as WireChatState,
@@ -58,6 +58,7 @@ import type {
 	ForwardHeader,
 	Hello,
 	HistoryPage,
+	HookStopReason,
 	LargeChatState,
 	LinkPreview,
 	MediaKind,
@@ -306,6 +307,13 @@ function toForward(forward: WireForward | undefined): ForwardHeader | null {
 	};
 }
 
+const HOOK_STOP_REASONS: Partial<Record<IncomingHookStopReason, HookStopReason>> = {
+	[IncomingHookStopReason.DISABLED]: "disabled",
+	[IncomingHookStopReason.DELETED]: "deleted",
+	[IncomingHookStopReason.CREATOR_NOT_ADMIN]: "creator_not_admin",
+	[IncomingHookStopReason.CREATOR_LEFT]: "creator_left",
+};
+
 function toAction(action: WireAction | undefined): MessageAction | null {
 	if (action === undefined) return null;
 	const kind = action.kind;
@@ -332,6 +340,8 @@ function toAction(action: WireAction | undefined): MessageAction | null {
 			return { kind: "chat_mode_changed" };
 		case "joinedByInvite":
 			return { kind: "joined_by_invite" };
+		case "incomingHookStopped":
+			return { kind: "incoming_hook_stopped", hookName: kind.value.hookName, reason: HOOK_STOP_REASONS[kind.value.reason] ?? "unknown" };
 		case undefined:
 			return { kind: "unsupported" };
 	}
@@ -360,6 +370,7 @@ export function toMessage(message: WireMessage): Message {
 		topicId: id(message.topicId),
 		linkPreview: toLinkPreview(message.linkPreview),
 		recalled: message.recalled,
+		silent: message.silent,
 	};
 }
 

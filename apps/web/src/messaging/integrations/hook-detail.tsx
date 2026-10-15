@@ -1,9 +1,10 @@
 // One webhook (mockups/integrations.html#rotate, #hook-stats,
-// #hook-disabled): its settings and on/off switch, taking it over after
+// #hook-disabled): its settings (name, alert priority and silent sending
+// editable with the fields of #create-hook) and on/off switch, taking it over after
 // the server turned it off, the secret with its 7-day grace period
 // (rotate, revoke the old one now), counters and failed requests, a
 // connection guide for its format, its log, and deleting it.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { Chat } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -12,7 +13,7 @@ import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { Glyph } from "../ui/glyphs.tsx";
 import { DialogHead, Modal, Switch, useDomId } from "../ui/parts.tsx";
-import { GRACE_SECONDS, type Hook, type HookNames, type HookWithUrl } from "./api.ts";
+import { GRACE_SECONDS, HOOK_NAME_MAX, type Hook, type HookNames, type HookWithUrl } from "./api.ts";
 import { DeadLettersCard, StatsCard } from "./hook-activity.tsx";
 import { HookAudit } from "./hook-audit.tsx";
 import { HookGuide } from "./hook-guide.tsx";
@@ -145,7 +146,8 @@ export function HookDetail({ chat, hookId }: { chat: Chat; hookId: string }) {
 				</div>
 				<div className="hook-col">
 					<HookGuide hook={hook} chatTitle={chat.title} />
-					<HookAudit key={`${hook.state}:${hook.secretCreatedAt}:${hook.previousSecretExpiresAt}`} chatId={chat.id} hookId={hook.id} />
+					<HookAudit
+						key={`${hook.state}:${hook.secretCreatedAt}:${hook.previousSecretExpiresAt}:${hook.name}:${hook.allowAlert}:${hook.silent}`} chatId={chat.id} hookId={hook.id} />
 					<DangerCard hook={hook} chatId={chat.id} />
 				</div>
 			</div>
@@ -176,6 +178,7 @@ function InfoCard({ hook, nameOf, now, onHook, onNeedTakeOver }: CardProps & { o
 	const { locale } = useI18n();
 	const { integrations, toasts } = useServices();
 	const [busy, setBusy] = useState(false);
+	const [editing, setEditing] = useState(false);
 	const id = useDomId("hook-info");
 	const toggle = (enabled: boolean) => {
 		setBusy(true);
@@ -228,7 +231,122 @@ function InfoCard({ hook, nameOf, now, onHook, onNeedTakeOver }: CardProps & { o
 					<Switch checked={hook.state === "active"} label={t.detail.receiving} describedBy={`${id}-recv`} disabled={busy} onChange={toggle} />
 				</div>
 			)}
+			<div className="card-foot">
+				<button type="button" className="btn" onClick={() => setEditing(true)}>
+					<Icon name="edit" />
+					{t.editDialog.open}
+				</button>
+			</div>
+			{editing && (
+				<EditHookDialog
+					hook={hook}
+					onClose={() => setEditing(false)}
+					onSaved={(next) => {
+						setEditing(false);
+						onHook(next);
+					}}
+				/>
+			)}
 		</section>
+	);
+}
+
+/** Name, alert priority and silent sending, as on the create form; the format stays (it is part of the URL). */
+function EditHookDialog({ hook, onClose, onSaved }: { hook: Hook; onClose: () => void; onSaved: (hook: Hook) => void }) {
+	const copy = useCopy();
+	const t = useHooksCopy();
+	const { integrations, toasts } = useServices();
+	const [name, setName] = useState(hook.name);
+	const [allowAlert, setAllowAlert] = useState(hook.allowAlert);
+	const [silent, setSilent] = useState(hook.silent);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const id = useDomId("hook-edit");
+	const trimmed = name.trim();
+	// Code points, as the server counts the name.
+	const length = Array.from(trimmed).length;
+	const nameError = length === 0 ? t.form.nameRequired : length > HOOK_NAME_MAX ? t.form.nameTooLong(HOOK_NAME_MAX) : "";
+	const unchanged = trimmed === hook.name && allowAlert === hook.allowAlert && silent === hook.silent;
+
+	const submit = (event: FormEvent) => {
+		event.preventDefault();
+		if (busy) return;
+		if (unchanged) {
+			onClose();
+			return;
+		}
+		if (nameError !== "") return;
+		setBusy(true);
+		setError("");
+		integrations.update(hook.id, { name: trimmed, allowAlert, silent }).then(
+			(next) => {
+				toasts.show(t.editDialog.saved(next.name));
+				onSaved(next);
+			},
+			(err: unknown) => {
+				setBusy(false);
+				if (hookErrorCode(err) === "invalid") setError(t.form.invalid);
+				else toasts.show(copy.common.failed);
+			},
+		);
+	};
+
+	return (
+		<Modal labelledBy={id} onClose={onClose} className="narrow">
+			<form onSubmit={submit} noValidate>
+				<DialogHead id={id} title={t.editDialog.title(hook.name)} onClose={onClose} />
+				<div className="dlg-body stack">
+					<div className="field">
+						<label htmlFor={`${id}-name`}>{t.form.name}</label>
+						<input
+							id={`${id}-name`}
+							className="input"
+							value={name}
+							autoComplete="off"
+							maxLength={HOOK_NAME_MAX * 2}
+							aria-invalid={nameError !== ""}
+							aria-describedby={`${id}-name-hint`}
+							onChange={(event) => setName(event.target.value)}
+						/>
+						<span className="hint" id={`${id}-name-hint`}>
+							{nameError !== "" ? <span className="field-error">{nameError}</span> : t.editDialog.nameHint}
+						</span>
+					</div>
+					<div className="setting">
+						<div>
+							<strong>{t.form.allowAlert}</strong>
+							<small id={`${id}-alert`}>{t.form.allowAlertNote}</small>
+						</div>
+						<Switch checked={allowAlert} label={t.form.allowAlert} describedBy={`${id}-alert`} onChange={setAllowAlert} />
+					</div>
+					<div className="setting">
+						<div>
+							<strong>{t.form.silent}</strong>
+							<small id={`${id}-silent`}>{t.form.silentNote}</small>
+						</div>
+						<Switch checked={silent} label={t.form.silent} describedBy={`${id}-silent`} onChange={setSilent} />
+					</div>
+					<p className="note">
+						<Icon name="info" />
+						<span>{t.editDialog.formatNote(formatLabel(hook.format, t))}</span>
+					</p>
+					{error !== "" && (
+						<div className="banner error" role="alert">
+							<Icon name="alert" small />
+							<span className="grow">{error}</span>
+						</div>
+					)}
+				</div>
+				<div className="dlg-foot">
+					<button type="button" className="btn" onClick={onClose}>
+						{copy.common.cancel}
+					</button>
+					<button type="submit" className="btn btn-primary" aria-busy={busy} disabled={busy || (nameError !== "" && !unchanged)}>
+						{busy ? t.editDialog.saving : t.editDialog.save}
+					</button>
+				</div>
+			</form>
+		</Modal>
 	);
 }
 

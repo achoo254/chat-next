@@ -79,7 +79,16 @@ export type HookAuditAction =
 	| "auto_disabled"
 	| "taken_over"
 	| "deleted"
+	| "updated"
 	| "unknown";
+
+/** What an "updated" audit entry changed; null for a setting it left alone. */
+export interface HookChanges {
+	/** The name before (the entry's hookName is the new one). */
+	readonly renamedFrom: string | null;
+	readonly allowAlert: boolean | null;
+	readonly silent: boolean | null;
+}
 
 export interface HookAuditEntry {
 	readonly id: number;
@@ -93,11 +102,15 @@ export interface HookAuditEntry {
 	readonly detail: string;
 }
 
-export interface NewHook {
+/** What an admin can change after creating a hook (the format is fixed by its URL). */
+export interface HookSettings {
 	readonly name: string;
-	readonly format: HookFormat;
 	readonly allowAlert: boolean;
 	readonly silent: boolean;
+}
+
+export interface NewHook extends HookSettings {
+	readonly format: HookFormat;
 }
 
 /** A hook with its full URL, returned once (create, rotate, take over with a new secret). */
@@ -129,6 +142,8 @@ export interface Integrations {
 	/** Makes the caller the creator and turns the hook on; `rotateSecret` returns a new URL. */
 	takeOver(hookId: string, rotateSecret: boolean): Promise<HookWithUrl>;
 	remove(hookId: string): Promise<void>;
+	/** InvalidArgument for a name that is empty or longer than HOOK_NAME_MAX. */
+	update(hookId: string, settings: HookSettings): Promise<Hook>;
 	stats(hookId: string, hours: number): Promise<HookStats>;
 	/** Newest first; `beforeId` 0 for the newest page. */
 	deadLetters(hookId: string, beforeId: number, limit: number): Promise<HookDeadLetter[]>;
@@ -161,6 +176,7 @@ export function createIntegrations(transport: Transport, onUnauthenticated: () =
 		setEnabled: (hookId, enabled) => load().then((api) => api.setEnabled(hookId, enabled)),
 		takeOver: (hookId, rotateSecret) => load().then((api) => api.takeOver(hookId, rotateSecret)),
 		remove: (hookId) => load().then((api) => api.remove(hookId)),
+		update: (hookId, settings) => load().then((api) => api.update(hookId, settings)),
 		stats: (hookId, hours) => load().then((api) => api.stats(hookId, hours)),
 		deadLetters: (hookId, beforeId, limit) => load().then((api) => api.deadLetters(hookId, beforeId, limit)),
 		audit: (chatId, hookId, beforeId, limit) => load().then((api) => api.audit(chatId, hookId, beforeId, limit)),

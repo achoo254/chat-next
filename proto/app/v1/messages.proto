@@ -226,6 +226,28 @@ message ActionChatModeChanged {}
 // The message author joined through an invite link.
 message ActionJoinedByInvite {}
 
+// Why an incoming webhook of the chat stopped posting.
+enum IncomingHookStopReason {
+  INCOMING_HOOK_STOP_REASON_UNSPECIFIED = 0;
+  // An admin (Message.from_id) turned it off.
+  INCOMING_HOOK_STOP_REASON_DISABLED = 1;
+  // An admin (Message.from_id) deleted it.
+  INCOMING_HOOK_STOP_REASON_DELETED = 2;
+  // The server turned it off (from_id 0): its creator is no longer an
+  // admin of the chat.
+  INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN = 3;
+  // The server turned it off (from_id 0): its creator left or was removed.
+  INCOMING_HOOK_STOP_REASON_CREATOR_LEFT = 4;
+}
+
+// An incoming webhook of the group stopped posting, so members know why its
+// messages no longer arrive. Posted in groups only (not in channels).
+message ActionIncomingHookStopped {
+  // Hook name at the time (its integration label).
+  string hook_name = 1;
+  IncomingHookStopReason reason = 2;
+}
+
 // Service event shown inline in the history (system message). The actor is
 // Message.from_id.
 message MessageAction {
@@ -241,6 +263,7 @@ message MessageAction {
     ActionHistoryVisibilityChanged history_visibility_changed = 9;
     ActionChatModeChanged chat_mode_changed = 10;
     ActionJoinedByInvite joined_by_invite = 11;
+    ActionIncomingHookStopped incoming_hook_stopped = 12;
   }
 }
 
@@ -287,7 +310,7 @@ message Message {
   // searched, replied to, edited, pinned or forwarded.
   bool recalled = 21;
   // Posted without a notification (incoming webhooks marked silent);
-  // clients do not notify for it.
+  // clients do not notify or play a sound for it and may mark it as silent.
   bool silent = 22;
 }
 

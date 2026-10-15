@@ -705,7 +705,7 @@ func (t *txn) removeMember(ctx context.Context, c *chatRow, actor, userID int64,
 		t.toUsers(ev, []int64{userID}, removed)
 	}
 	ev.Forget = append(ev.Forget, userID)
-	return nil
+	return t.announceHooksOff(ctx, c, userID)
 }
 
 // SetMemberPermissions restricts one member (admins only). The member's
@@ -792,7 +792,10 @@ func (t *txn) setRole(ctx context.Context, c *chatRow, actor, userID int64, role
 		return fmt.Errorf("chat: set role: %w", err)
 	}
 	target.Role, target.Perms = role, nil
-	return t.announceMember(ctx, c, actor, target)
+	if err := t.announceMember(ctx, c, actor, target); err != nil {
+		return err
+	}
+	return t.announceHooksOff(ctx, c, userID)
 }
 
 func (t *txn) announceMember(ctx context.Context, c *chatRow, actor int64, target *memberRow) error {

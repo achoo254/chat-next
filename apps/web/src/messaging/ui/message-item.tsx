@@ -85,11 +85,16 @@ function useRichContext(fromId: number): RichContext {
 	};
 }
 
-/** `edited`: "đã sửa" or "đã cập nhật" before the time; "" for none. */
-function Stamp({ date, edited, children }: { date: number; edited: string; children?: ReactNode }) {
+/**
+ * `edited`: "đã sửa" or "đã cập nhật" before the time; "" for none.
+ * `silent`: the bell-off mark of a message posted without a notification
+ * (mockups/integrations.html#alert-grouping), with this accessible name; "" for none.
+ */
+function Stamp({ date, edited, silent = "", children }: { date: number; edited: string; silent?: string; children?: ReactNode }) {
 	const { locale } = useI18n();
 	return (
 		<span className="stamp">
+			{silent !== "" && <LabelledIcon name="bell-off" label={silent} className="silent-mark" />}
 			{edited !== "" ? `${edited} ${clock(date, locale)}` : clock(date, locale)}
 			{children}
 		</span>
@@ -329,7 +334,11 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const edited = message.editDate !== 0 && !recalled;
 	// Alerts edited in place by their webhook read "đã cập nhật", not "đã sửa".
 	const stamp = (
-		<Stamp date={edited ? message.editDate : message.date} edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}>
+		<Stamp
+			date={edited ? message.editDate : message.date}
+			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
+			silent={message.silent && !recalled ? copy.message.silent : ""}
+		>
 			{mine && !channel && !recalled && (
 				<LabelledIcon
 					name={read ? "checks" : "check"}

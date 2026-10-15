@@ -1,13 +1,16 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
-import type { MessageEntity } from "@app/core";
+import type { HookStopReason, MessageEntity } from "@app/core";
 import type { Hook } from "../src/messaging/integrations/api.ts";
 import { enHooks } from "../src/messaging/integrations/copy-en.ts";
 import { viHooks } from "../src/messaging/integrations/copy-vi.ts";
 import { chatSlug } from "../src/messaging/integrations/hook-guide.tsx";
 import { countdown, formatLabel, hookErrorCode, stateView } from "../src/messaging/integrations/hook-parts.tsx";
 import { guideSnippet, sampleCommand, samplePayload, sampleResponse, shellQuote } from "../src/messaging/integrations/samples.ts";
-import { integrationTone } from "../src/messaging/data/format.ts";
+import { en } from "../src/messaging/copy/en.ts";
+import { vi } from "../src/messaging/copy/vi.ts";
+import { actionText, integrationTone } from "../src/messaging/data/format.ts";
+import { parseHookChanges } from "../src/messaging/integrations/hook-audit.tsx";
 import { sliceRich, splitAlert } from "../src/messaging/ui/alert-text.ts";
 import { matchRoute, paths } from "../src/router.tsx";
 
@@ -146,5 +149,43 @@ describe("webhook routes and copy", () => {
 			);
 		expect(keys(enHooks).sort()).toEqual(keys(viHooks).sort());
 		expect(enHooks.guides.alertmanager).toHaveLength(viHooks.guides.alertmanager.length);
+	});
+});
+
+describe("webhook edits and stops", () => {
+	it("reads what an update changed from its audit detail", () => {
+		expect(parseHookChanges('name (was "Jenkins"), allow_alert on, silent off')).toEqual({ renamedFrom: "Jenkins", allowAlert: true, silent: false });
+		expect(parseHookChanges("silent on")).toEqual({ renamedFrom: null, allowAlert: null, silent: true });
+		// Quotes and commas inside the old name survive (Go %q quoting).
+		expect(parseHookChanges('name (was "Ops, \\"prod\\" ✓")')).toEqual({ renamedFrom: 'Ops, "prod" ✓', allowAlert: null, silent: null });
+		expect(parseHookChanges('name (was "a\\x01b"), silent on')).toEqual({ renamedFrom: "a\\x01b", allowAlert: null, silent: true });
+		expect(parseHookChanges("")).toEqual({ renamedFrom: null, allowAlert: null, silent: null });
+		expect(parseHookChanges("color blue, silent maybe")).toEqual({ renamedFrom: null, allowAlert: null, silent: null });
+	});
+
+	it("words an update in both languages", () => {
+		const all = { renamedFrom: "Jenkins", allowAlert: false, silent: true };
+		expect(viHooks.audit.updated("Bạn", "Jenkins build", all)).toBe(
+			"Bạn đã sửa Jenkins build: đổi tên “Jenkins” thành “Jenkins build”, bỏ cho phép tin Cảnh báo, bật gửi im lặng",
+		);
+		expect(enHooks.audit.updated("You", "Jenkins build", all)).toBe(
+			"You edited Jenkins build: renamed “Jenkins” to “Jenkins build”, stopped allowing Alert priority, turned on silent sending",
+		);
+		const none = { renamedFrom: null, allowAlert: null, silent: null };
+		expect(viHooks.audit.updated("Lan Anh", "Grafana", none)).toBe("Lan Anh đã sửa Grafana");
+		expect(viHooks.audit.action("updated", "Lan Anh", "Grafana", "")).toBe("Lan Anh đã sửa Grafana");
+	});
+
+	it("words the system line of a stopped webhook", () => {
+		const line = (reason: HookStopReason, copy = vi, channel = false) =>
+			actionText({ kind: "incoming_hook_stopped", hookName: "Grafana prod", reason }, "Quang Huy", () => "", copy, channel);
+		expect(line("creator_not_admin")).toBe("Webhook “Grafana prod” đã tự tắt vì người tạo không còn là admin");
+		expect(line("creator_left")).toBe("Webhook “Grafana prod” đã tự tắt vì người tạo đã rời nhóm");
+		expect(line("creator_left", vi, true)).toBe("Webhook “Grafana prod” đã tự tắt vì người tạo đã rời kênh");
+		expect(line("disabled")).toBe("Quang Huy đã tắt webhook “Grafana prod”");
+		expect(line("deleted")).toBe("Quang Huy đã xoá webhook “Grafana prod”");
+		expect(line("unknown")).toBe("Webhook “Grafana prod” đã tắt");
+		expect(line("creator_not_admin", en)).toBe("The webhook “Grafana prod” turned off because its creator is no longer an admin");
+		expect(line("deleted", en)).toBe("Quang Huy deleted the webhook “Grafana prod”");
 	});
 });

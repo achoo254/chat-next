@@ -9,8 +9,7 @@
 // then audits horizontal overflow (auditOverflow) and logs offenders as errors.
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
 import { IncomingHookAuditAction, IncomingHookFormat } from "@app/proto-ts/integrations";
-import { EntityType } from "@app/proto-ts/messages";
-import { createRouterTransport } from "@connectrpc/connect";
+import { EntityType, IncomingHookStopReason } from "@app/proto-ts/messages";
 import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.ts";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -20,6 +19,7 @@ import "../../src/styles/tokens.css";
 import "../../src/styles/app.css";
 import { entity, seedDemo } from "../support/demo-data.ts";
 import { fixtureConnector } from "../support/fake-chat.ts";
+import { routerFetch } from "../support/router-fetch.ts";
 
 const params = new URLSearchParams(window.location.search);
 // Every page holds its load event until the scenario (if any) and the overflow audit ran.
@@ -113,6 +113,10 @@ const rotating = hooks.seed(alerts, { name: "Alertmanager prod", format: Incomin
 const gitlab = hooks.seed(alerts, { name: "GitLab ops/deploy", format: IncomingHookFormat.GITLAB, createdBy: demo.ids.users.minh, lastUsedAt: hooks.now - 26 * 3600 });
 hooks.autoDisable(gitlab);
 hooks.seed(alerts, { name: "Jenkins build", format: IncomingHookFormat.NATIVE, silent: true, lastUsedAt: hooks.now - 120 });
+// An admin turned a webhook off (#hook-disabled, right pane: the system line of a stopped webhook).
+f.server.postService(alerts, demo.ids.users.lan, {
+	kind: { case: "incomingHookStopped", value: { hookName: "Uptime Kuma", reason: IncomingHookStopReason.DISABLED } },
+});
 hooks.counters.set(grafana, {
 	accepted: 1284,
 	delivered: 1201,
@@ -161,7 +165,7 @@ if (container === null) throw new Error("harness is missing #root");
 createRoot(container).render(
 	<StrictMode>
 		<App
-			transport={createRouterTransport((router) => f.routes(router))}
+			rpcFetch={routerFetch((router) => f.routes(router))}
 			messagingConnector={fixtureConnector(f, openMemoryFactory)}
 		/>
 	</StrictMode>,
@@ -228,6 +232,11 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click("button", "Xoay secret");
 		await click("dialog button", "Xoay secret");
 		await find(() => byName("dialog h2", /^URL mới của /));
+	},
+	// Editing a webhook's name, alert priority and silent sending (fields of #create-hook).
+	"hook-edit": async () => {
+		await click("button", "Sửa cài đặt");
+		await find(() => byName("dialog h2", /^Sửa webhook /));
 	},
 	// The alert with fields, code blocks and buttons (#alert-message), scrolled to its top.
 	"alert-message": async () => {

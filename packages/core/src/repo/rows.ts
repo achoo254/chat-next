@@ -12,6 +12,7 @@ import type {
 	MemberRole,
 	LinkPreview,
 	Message,
+	HookStopReason,
 	MessageAction,
 	MessageButton,
 	MessageEntity,
@@ -131,6 +132,12 @@ function parseForward(json: string | null): ForwardHeader | null {
 	};
 }
 
+const HOOK_STOP_REASONS: readonly HookStopReason[] = ["disabled", "deleted", "creator_not_admin", "creator_left", "unknown"];
+
+function hookStopReason(value: unknown): HookStopReason {
+	return HOOK_STOP_REASONS.find((reason) => reason === value) ?? "unknown";
+}
+
 function parseAction(json: string | null): MessageAction | null {
 	const value = parseJson(json);
 	if (!isRecord(value)) return null;
@@ -159,6 +166,12 @@ function parseAction(json: string | null): MessageAction | null {
 			return { kind: "chat_mode_changed" };
 		case "joined_by_invite":
 			return { kind: "joined_by_invite" };
+		case "incoming_hook_stopped":
+			return {
+				kind: "incoming_hook_stopped",
+				hookName: text(value, "hookName"),
+				reason: hookStopReason(value.reason),
+			};
 		default:
 			return { kind: "unsupported" };
 	}
@@ -215,6 +228,7 @@ export function rowToMessage(row: SqlRow): Message {
 		topicId: num(row, "topic_id"),
 		linkPreview: parseLinkPreview(optionalStr(row, "link_preview")),
 		recalled: bool(row, "recalled"),
+		silent: bool(row, "silent"),
 	};
 }
 

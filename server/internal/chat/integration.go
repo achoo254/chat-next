@@ -38,9 +38,10 @@ type IntegrationButton struct {
 	URL  string
 }
 
-// IntegrationTx is the transaction of one webhook request into a chat. The
-// chat row is locked, so every request into the chat (and every membership
-// change, which may disable the hook) is serialized with it.
+// IntegrationTx is a transaction on a chat's integrations: one webhook
+// request into the chat, or an admin managing its hooks. The chat row is
+// locked, so every request into the chat (and every membership change,
+// which may disable the hook) is serialized with it.
 type IntegrationTx struct {
 	t         *txn
 	c         *chatRow
@@ -179,13 +180,78 @@ func (it *IntegrationTx) Edit(ctx context.Context, seq int64, msg IntegrationMes
 	return true, nil
 }
 
+// HookStopped posts the service message of an incoming webhook that stopped
+// posting: actor is the admin who turned it off or deleted it. Channels get
+// none (see hookStopped).
+func (it *IntegrationTx) HookStopped(ctx context.Context, actor int64, hookName string, reason appv1.IncomingHookStopReason) error {
+	return it.t.hookStopped(ctx, it.c, actor, hookName, reason)
+}
+
+// hookStopped posts ActionIncomingHookStopped in a group, from actor (0 for
+// the server). Channels get no service message, as for membership changes:
+// their subscribers do not see how the channel is run.
+func (t *txn) hookStopped(ctx context.Context, c *chatRow, actor int64, hookName string, reason appv1.IncomingHookStopReason) error {
+	if c.Type != typeGroup {
+		return nil
+	}
+	members, err := t.fanoutMembers(ctx, c)
+	if err != nil {
+		return err
+	}
+	action := &appv1.MessageAction{Kind: &appv1.MessageAction_IncomingHookStopped{IncomingHookStopped: &appv1.ActionIncomingHookStopped{
+		HookName: hookName, Reason: reason,
+	}}}
+	ev := t.event(kindMessageNew, c.ID, actor)
+	_, err = t.postMessage(ctx, ev, c, members, newMessage{fromID: actor, content: &appv1.Message{Action: action}})
+	return err
+}
+
+// hookStopReasons maps the disabled_reason the membership trigger writes.
+var hookStopReasons = map[string]appv1.IncomingHookStopReason{
+	"creator_not_admin": appv1.IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN,
+	"creator_left":      appv1.IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_CREATOR_LEFT,
+}
+
+// announceHooksOff posts, as the server, the service message of each hook
+// created by userID that the membership trigger (migration 0007) turned off
+// in this transaction, right after userID was demoted or left. The trigger
+// stamps disabled_at with now(), the transaction's start time, which tells
+// these hooks apart from ones turned off earlier.
+func (t *txn) announceHooksOff(ctx context.Context, c *chatRow, userID int64) error {
+	if c.Type != typeGroup {
+		return nil
+	}
+	rows, err := t.tx.Query(ctx, `
+		SELECT name, disabled_reason FROM incoming_hooks
+		WHERE chat_id = $1 AND created_by = $2 AND state = 'auto_disabled' AND disabled_at = now()
+		ORDER BY created_at, id`, c.ID, userID)
+	if err != nil {
+		return fmt.Errorf("chat: hooks turned off: %w", err)
+	}
+	type stopped struct{ name, reason string }
+	hooks, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (stopped, error) {
+		var h stopped
+		err := r.Scan(&h.name, &h.reason)
+		return h, err
+	})
+	if err != nil {
+		return fmt.Errorf("chat: hooks turned off: %w", err)
+	}
+	for _, h := range hooks {
+		if err := t.hookStopped(ctx, c, 0, h.name, hookStopReasons[h.reason]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ------------------------------------------------------- admin transactions
 
 // WithChatAdmin runs fn in a transaction holding the lock of chatID when me
 // is a current admin (or the owner) of the group or channel and not
 // restricted: NotFound when the chat is unknown to me, PermissionDenied for
 // other members.
-func (s *Service) WithChatAdmin(ctx context.Context, chatID, me int64, fn func(tx pgx.Tx) error) error {
+func (s *Service) WithChatAdmin(ctx context.Context, chatID, me int64, fn func(it *IntegrationTx) error) error {
 	if err := s.allow(limitWrite, "write", me); err != nil {
 		return err
 	}
@@ -200,7 +266,7 @@ func (s *Service) WithChatAdmin(ctx context.Context, chatID, me int64, fn func(t
 		if err := s.checkUnrestricted(ctx, t.tx, me); err != nil {
 			return err
 		}
-		return fn(t.tx)
+		return fn(&IntegrationTx{t: t, c: c})
 	})
 	return err
 }

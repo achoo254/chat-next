@@ -1,6 +1,7 @@
 // Vietnamese copy of the messaging UI (release R1), taken from the approved
 // mockups. Loaded with the messaging chunk so the R0 shell stays small;
 // en.ts must provide the same keys.
+import type { HookStopReason } from "@app/core";
 
 /** The chat kind in copy that names it: channels are never called groups. */
 const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");
@@ -109,6 +110,8 @@ export const vi = {
 		sending: "Đang gửi",
 		queued: "Chờ gửi",
 		sentTick: "Đã gửi",
+		/** Bell-off mark on the time of a silent message (an incoming webhook posting without a notification). */
+		silent: "Gửi im lặng, không thông báo",
 		read: "Đã xem",
 		failed: "Chưa gửi được",
 		notSent: "Chưa gửi được",
@@ -155,6 +158,21 @@ export const vi = {
 		historyOff: (actor: string) => `${actor} đã tắt: thành viên mới xem được lịch sử`,
 		modeChanged: "Nhóm đã chuyển sang chế độ nhóm lớn (hơn 200 thành viên)",
 		joinedByInvite: (actor: string) => `${actor} đã tham gia bằng link mời`,
+		/** An incoming webhook stopped (mockups/integrations.html#hook-disabled); `actor` is the admin, unused when the server turned it off. */
+		hookStopped: (actor: string, name: string, reason: HookStopReason, channel: boolean): string => {
+			switch (reason) {
+				case "disabled":
+					return `${actor} đã tắt webhook “${name}”`;
+				case "deleted":
+					return `${actor} đã xoá webhook “${name}”`;
+				case "creator_not_admin":
+					return `Webhook “${name}” đã tự tắt vì người tạo không còn là admin`;
+				case "creator_left":
+					return `Webhook “${name}” đã tự tắt vì người tạo đã rời ${kind(channel)}`;
+				case "unknown":
+					return `Webhook “${name}” đã tắt`;
+			}
+		},
 		unsupported: "Sự kiện mà bản app này chưa hiển thị được",
 		and: " và ",
 	},

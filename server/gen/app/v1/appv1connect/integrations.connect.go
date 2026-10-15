@@ -57,6 +57,9 @@ const (
 	// IntegrationsServiceDeleteIncomingHookProcedure is the fully-qualified name of the
 	// IntegrationsService's DeleteIncomingHook RPC.
 	IntegrationsServiceDeleteIncomingHookProcedure = "/app.v1.IntegrationsService/DeleteIncomingHook"
+	// IntegrationsServiceUpdateIncomingHookProcedure is the fully-qualified name of the
+	// IntegrationsService's UpdateIncomingHook RPC.
+	IntegrationsServiceUpdateIncomingHookProcedure = "/app.v1.IntegrationsService/UpdateIncomingHook"
 	// IntegrationsServiceGetIncomingHookStatsProcedure is the fully-qualified name of the
 	// IntegrationsService's GetIncomingHookStats RPC.
 	IntegrationsServiceGetIncomingHookStatsProcedure = "/app.v1.IntegrationsService/GetIncomingHookStats"
@@ -82,13 +85,19 @@ type IntegrationsServiceClient interface {
 	RevokePreviousHookSecret(context.Context, *connect.Request[v1.RevokePreviousHookSecretRequest]) (*connect.Response[v1.RevokePreviousHookSecretResponse], error)
 	// Turns a hook off or on. Turning on needs its creator to still be an
 	// admin of the chat (failed_precondition "creator_not_admin" otherwise:
-	// take it over instead).
+	// take it over instead). Turning an active hook off posts
+	// ActionIncomingHookStopped (disabled) in a group.
 	SetIncomingHookEnabled(context.Context, *connect.Request[v1.SetIncomingHookEnabledRequest]) (*connect.Response[v1.SetIncomingHookEnabledResponse], error)
 	// Makes the caller the hook's creator and turns it on, keeping its URL
 	// unless rotate_secret (then the old URL stops at once and the new URL is
 	// returned once).
 	TakeOverIncomingHook(context.Context, *connect.Request[v1.TakeOverIncomingHookRequest]) (*connect.Response[v1.TakeOverIncomingHookResponse], error)
+	// Deleting a hook posts ActionIncomingHookStopped (deleted) in a group.
 	DeleteIncomingHook(context.Context, *connect.Request[v1.DeleteIncomingHookRequest]) (*connect.Response[v1.DeleteIncomingHookResponse], error)
+	// Changes a hook's name, allow_alert and silent (the settings chosen at
+	// creation; the format is fixed by its URL). Audited as "updated"; a new
+	// name labels the hook's next messages, earlier ones keep their label.
+	UpdateIncomingHook(context.Context, *connect.Request[v1.UpdateIncomingHookRequest]) (*connect.Response[v1.UpdateIncomingHookResponse], error)
 	// Aggregated counters of the last hours; no per-recipient delivery state.
 	GetIncomingHookStats(context.Context, *connect.Request[v1.GetIncomingHookStatsRequest]) (*connect.Response[v1.GetIncomingHookStatsResponse], error)
 	// Requests the hook could not process (kept 30 days), newest first.
@@ -156,6 +165,12 @@ func NewIntegrationsServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(integrationsServiceMethods.ByName("DeleteIncomingHook")),
 			connect.WithClientOptions(opts...),
 		),
+		updateIncomingHook: connect.NewClient[v1.UpdateIncomingHookRequest, v1.UpdateIncomingHookResponse](
+			httpClient,
+			baseURL+IntegrationsServiceUpdateIncomingHookProcedure,
+			connect.WithSchema(integrationsServiceMethods.ByName("UpdateIncomingHook")),
+			connect.WithClientOptions(opts...),
+		),
 		getIncomingHookStats: connect.NewClient[v1.GetIncomingHookStatsRequest, v1.GetIncomingHookStatsResponse](
 			httpClient,
 			baseURL+IntegrationsServiceGetIncomingHookStatsProcedure,
@@ -187,6 +202,7 @@ type integrationsServiceClient struct {
 	setIncomingHookEnabled     *connect.Client[v1.SetIncomingHookEnabledRequest, v1.SetIncomingHookEnabledResponse]
 	takeOverIncomingHook       *connect.Client[v1.TakeOverIncomingHookRequest, v1.TakeOverIncomingHookResponse]
 	deleteIncomingHook         *connect.Client[v1.DeleteIncomingHookRequest, v1.DeleteIncomingHookResponse]
+	updateIncomingHook         *connect.Client[v1.UpdateIncomingHookRequest, v1.UpdateIncomingHookResponse]
 	getIncomingHookStats       *connect.Client[v1.GetIncomingHookStatsRequest, v1.GetIncomingHookStatsResponse]
 	getIncomingHookDeadLetters *connect.Client[v1.GetIncomingHookDeadLettersRequest, v1.GetIncomingHookDeadLettersResponse]
 	getIncomingHookAudit       *connect.Client[v1.GetIncomingHookAuditRequest, v1.GetIncomingHookAuditResponse]
@@ -232,6 +248,11 @@ func (c *integrationsServiceClient) DeleteIncomingHook(ctx context.Context, req 
 	return c.deleteIncomingHook.CallUnary(ctx, req)
 }
 
+// UpdateIncomingHook calls app.v1.IntegrationsService.UpdateIncomingHook.
+func (c *integrationsServiceClient) UpdateIncomingHook(ctx context.Context, req *connect.Request[v1.UpdateIncomingHookRequest]) (*connect.Response[v1.UpdateIncomingHookResponse], error) {
+	return c.updateIncomingHook.CallUnary(ctx, req)
+}
+
 // GetIncomingHookStats calls app.v1.IntegrationsService.GetIncomingHookStats.
 func (c *integrationsServiceClient) GetIncomingHookStats(ctx context.Context, req *connect.Request[v1.GetIncomingHookStatsRequest]) (*connect.Response[v1.GetIncomingHookStatsResponse], error) {
 	return c.getIncomingHookStats.CallUnary(ctx, req)
@@ -261,13 +282,19 @@ type IntegrationsServiceHandler interface {
 	RevokePreviousHookSecret(context.Context, *connect.Request[v1.RevokePreviousHookSecretRequest]) (*connect.Response[v1.RevokePreviousHookSecretResponse], error)
 	// Turns a hook off or on. Turning on needs its creator to still be an
 	// admin of the chat (failed_precondition "creator_not_admin" otherwise:
-	// take it over instead).
+	// take it over instead). Turning an active hook off posts
+	// ActionIncomingHookStopped (disabled) in a group.
 	SetIncomingHookEnabled(context.Context, *connect.Request[v1.SetIncomingHookEnabledRequest]) (*connect.Response[v1.SetIncomingHookEnabledResponse], error)
 	// Makes the caller the hook's creator and turns it on, keeping its URL
 	// unless rotate_secret (then the old URL stops at once and the new URL is
 	// returned once).
 	TakeOverIncomingHook(context.Context, *connect.Request[v1.TakeOverIncomingHookRequest]) (*connect.Response[v1.TakeOverIncomingHookResponse], error)
+	// Deleting a hook posts ActionIncomingHookStopped (deleted) in a group.
 	DeleteIncomingHook(context.Context, *connect.Request[v1.DeleteIncomingHookRequest]) (*connect.Response[v1.DeleteIncomingHookResponse], error)
+	// Changes a hook's name, allow_alert and silent (the settings chosen at
+	// creation; the format is fixed by its URL). Audited as "updated"; a new
+	// name labels the hook's next messages, earlier ones keep their label.
+	UpdateIncomingHook(context.Context, *connect.Request[v1.UpdateIncomingHookRequest]) (*connect.Response[v1.UpdateIncomingHookResponse], error)
 	// Aggregated counters of the last hours; no per-recipient delivery state.
 	GetIncomingHookStats(context.Context, *connect.Request[v1.GetIncomingHookStatsRequest]) (*connect.Response[v1.GetIncomingHookStatsResponse], error)
 	// Requests the hook could not process (kept 30 days), newest first.
@@ -331,6 +358,12 @@ func NewIntegrationsServiceHandler(svc IntegrationsServiceHandler, opts ...conne
 		connect.WithSchema(integrationsServiceMethods.ByName("DeleteIncomingHook")),
 		connect.WithHandlerOptions(opts...),
 	)
+	integrationsServiceUpdateIncomingHookHandler := connect.NewUnaryHandler(
+		IntegrationsServiceUpdateIncomingHookProcedure,
+		svc.UpdateIncomingHook,
+		connect.WithSchema(integrationsServiceMethods.ByName("UpdateIncomingHook")),
+		connect.WithHandlerOptions(opts...),
+	)
 	integrationsServiceGetIncomingHookStatsHandler := connect.NewUnaryHandler(
 		IntegrationsServiceGetIncomingHookStatsProcedure,
 		svc.GetIncomingHookStats,
@@ -367,6 +400,8 @@ func NewIntegrationsServiceHandler(svc IntegrationsServiceHandler, opts ...conne
 			integrationsServiceTakeOverIncomingHookHandler.ServeHTTP(w, r)
 		case IntegrationsServiceDeleteIncomingHookProcedure:
 			integrationsServiceDeleteIncomingHookHandler.ServeHTTP(w, r)
+		case IntegrationsServiceUpdateIncomingHookProcedure:
+			integrationsServiceUpdateIncomingHookHandler.ServeHTTP(w, r)
 		case IntegrationsServiceGetIncomingHookStatsProcedure:
 			integrationsServiceGetIncomingHookStatsHandler.ServeHTTP(w, r)
 		case IntegrationsServiceGetIncomingHookDeadLettersProcedure:
@@ -412,6 +447,10 @@ func (UnimplementedIntegrationsServiceHandler) TakeOverIncomingHook(context.Cont
 
 func (UnimplementedIntegrationsServiceHandler) DeleteIncomingHook(context.Context, *connect.Request[v1.DeleteIncomingHookRequest]) (*connect.Response[v1.DeleteIncomingHookResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.IntegrationsService.DeleteIncomingHook is not implemented"))
+}
+
+func (UnimplementedIntegrationsServiceHandler) UpdateIncomingHook(context.Context, *connect.Request[v1.UpdateIncomingHookRequest]) (*connect.Response[v1.UpdateIncomingHookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.IntegrationsService.UpdateIncomingHook is not implemented"))
 }
 
 func (UnimplementedIntegrationsServiceHandler) GetIncomingHookStats(context.Context, *connect.Request[v1.GetIncomingHookStatsRequest]) (*connect.Response[v1.GetIncomingHookStatsResponse], error) {

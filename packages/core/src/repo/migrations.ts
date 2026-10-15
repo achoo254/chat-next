@@ -191,6 +191,14 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE messages ADD COLUMN buttons TEXT",
 		],
 	},
+	{
+		version: 6,
+		statements: [
+			// Posted without a notification (silent incoming webhooks). Older
+			// cached messages count as not silent; they never notify again anyway.
+			"ALTER TABLE messages ADD COLUMN silent INTEGER NOT NULL DEFAULT 0",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

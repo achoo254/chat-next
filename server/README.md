@@ -45,6 +45,8 @@ Server nghe trên loopback sau nginx: `X-Real-IP` chỉ được tin khi peer l�
 | `GET /ws` | WebSocket realtime, xem [Realtime](#realtime-ws) |
 | `POST /hook/{id}/{secret}[/slack\|/alertmanager\|/grafana\|/gitlab]` | Webhook gửi tin vào nhóm, không cookie, không `Origin`; xem [Webhook](#webhook-incoming-package-internalhooks) |
 
+RPC nhận cả mã hoá binary lẫn JSON của Connect. Web gọi `GetSelf` bằng JSON (request đầu tiên của mỗi lần mở app, trước khi tải runtime protobuf; `TestGetSelfOverJSON` giữ hợp đồng này), các RPC khác bằng binary; proxy phía trước không được chặn `Content-Type: application/json` trên `/rpc/`.
+
 Mọi RPC cần `Origin` trong allowlist (`CHAT_PUBLIC_URL`, cộng `DEV_ORIGINS` khi development), nếu không trả `permission_denied`. Trừ `GetAuthConfig`, `ExchangeNativeCode` và `GetAppConfig`, mọi RPC cần cookie phiên, nếu không trả `unauthenticated`. Còn `unimplemented`: `ExchangeNativeCode` (app native), `SendMedia`, `SendAlbum` (media, R3), `PressInlineButton` (bot, R5), ảnh hồ sơ và ảnh chat, cùng `MediaService`, `SearchService`, `BotsService`.
 
 ## Nhắn tin (package `internal/chat`)
@@ -93,14 +95,15 @@ Quản lý (`IntegrationsService`, chỉ admin hoặc chủ của nhóm/kênh đ
 | `GetIncomingHooks`, `GetIncomingHook` | Hook kèm người tạo và người cấp secret hiện tại, trạng thái, lý do tắt, lần nhận gần nhất, hạn của secret cũ |
 | `RotateIncomingHookSecret` | Secret mới (trả URL một lần); secret cũ vẫn nhận thêm 7 ngày, hai secret song song, trừ khi `revoke_previous` |
 | `RevokePreviousHookSecret` | Thu hồi ngay secret cũ đang trong thời gian ân hạn (`failed_precondition` `no_previous_secret` nếu không có) |
-| `SetIncomingHookEnabled` | Tắt; bật lại chỉ khi người tạo còn là admin (`failed_precondition` `creator_not_admin`, khi đó phải nhận lại) |
+| `SetIncomingHookEnabled` | Tắt; bật lại chỉ khi người tạo còn là admin (`failed_precondition` `creator_not_admin`, khi đó phải nhận lại). Tắt một hook đang chạy đăng tin hệ thống `incoming_hook_stopped` (lý do `DISABLED`, `from_id` là admin) |
 | `TakeOverIncomingHook` | Người gọi thành người tạo, hook chạy lại ngay, mặc định giữ URL; `rotate_secret` thì URL cũ hết hiệu lực ngay và URL mới trả một lần |
-| `DeleteIncomingHook` | Xoá hook cùng nhóm cảnh báo và khoá idempotency; nhật ký vẫn giữ |
+| `DeleteIncomingHook` | Xoá hook cùng nhóm cảnh báo và khoá idempotency; nhật ký vẫn giữ. Đăng tin hệ thống `incoming_hook_stopped` (lý do `DELETED`, `from_id` là admin), kể cả khi hook đang tắt |
+| `UpdateIncomingHook` | Sửa tên (1–64 ký tự), `allow_alert`, `silent`; định dạng gắn với URL nên không sửa được. Nhật ký `updated`, `detail` liệt kê phần đổi, ví dụ `name (was "Jenkins"), allow_alert on, silent off`; không đổi gì thì không ghi. Tên mới là nhãn của các tin sau, tin đã gửi giữ nhãn cũ |
 | `GetIncomingHookStats` | Tổng `accepted`, `delivered_realtime` (đã đẩy tới ít nhất một phiên online), `failed` và lý do lỗi trong `hours` giờ gần nhất (mặc định 24, tối đa 720); không có trạng thái giao tới từng người |
 | `GetIncomingHookDeadLetters` | Request không xử lý được (lý do, mô tả, mã HTTP, content type, body tối đa 16 KiB), mới nhất trước, giữ 30 ngày |
 | `GetIncomingHookAudit` | Nhật ký quản lý của mọi hook trong chat (kể cả hook đã xoá): tạo, xoay, thu hồi secret cũ, tắt, bật, tự tắt (actor 0), nhận lại, xoá |
 
-Secret: 32 ký tự base62 (khoảng 190 bit), DB chỉ giữ SHA-256, so sánh hằng thời gian. `hook_id` là `hk_` + 12 ký tự base62. Đường dẫn (chứa secret) không bao giờ vào log của app; lỗi chỉ ghi `hook_id`. Hook tự tắt (`auto_disabled`) khi người tạo bị gỡ admin, rời hoặc bị xoá khỏi chat, hay chat bị xoá: một trigger trên `chat_members` làm việc này trong cùng transaction với thay đổi thành viên và ghi nhật ký với actor 0, nên request kế tiếp bị từ chối ngay.
+Secret: 32 ký tự base62 (khoảng 190 bit), DB chỉ giữ SHA-256, so sánh hằng thời gian. `hook_id` là `hk_` + 12 ký tự base62. Đường dẫn (chứa secret) không bao giờ vào log của app; lỗi chỉ ghi `hook_id`. Hook tự tắt (`auto_disabled`) khi người tạo bị gỡ admin, rời hoặc bị xoá khỏi chat, hay chat bị xoá: một trigger trên `chat_members` làm việc này trong cùng transaction với thay đổi thành viên và ghi nhật ký với actor 0, nên request kế tiếp bị từ chối ngay. Ngay sau khi gỡ admin hoặc cho rời nhóm, cũng trong transaction đó, server đăng một tin hệ thống `incoming_hook_stopped` cho mỗi hook vừa tự tắt (`from_id` 0, lý do `CREATOR_NOT_ADMIN` hoặc `CREATOR_LEFT`, nhận ra bằng `disabled_at = now()` do trigger ghi). Tin hệ thống về hook chỉ có ở nhóm; kênh không có, như các tin về thành viên.
 
 Định dạng (đuôi URL; chọn khi tạo, quyết định URL được hiển thị):
 

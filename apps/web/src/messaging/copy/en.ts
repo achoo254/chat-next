@@ -1,4 +1,5 @@
 // English copy of the messaging UI; keys mirror vi.ts.
+import type { HookStopReason } from "@app/core";
 import type { MessagingCopy } from "./vi.ts";
 
 export const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
@@ -110,6 +111,7 @@ export const en: MessagingCopy = {
 		sending: "Sending",
 		queued: "Waiting to send",
 		sentTick: "Sent",
+		silent: "Sent silently, no notification",
 		read: "Seen",
 		failed: "Not sent",
 		notSent: "Not sent",
@@ -154,6 +156,20 @@ export const en: MessagingCopy = {
 		historyOff: (actor: string) => `${actor} turned off: new members can see history`,
 		modeChanged: "The group switched to large group mode (more than 200 members)",
 		joinedByInvite: (actor: string) => `${actor} joined with an invite link`,
+		hookStopped: (actor: string, name: string, reason: HookStopReason, channel: boolean): string => {
+			switch (reason) {
+				case "disabled":
+					return `${actor} turned off the webhook “${name}”`;
+				case "deleted":
+					return `${actor} deleted the webhook “${name}”`;
+				case "creator_not_admin":
+					return `The webhook “${name}” turned off because its creator is no longer an admin`;
+				case "creator_left":
+					return `The webhook “${name}” turned off because its creator left the ${kind(channel)}`;
+				case "unknown":
+					return `The webhook “${name}” turned off`;
+			}
+		},
 		unsupported: "An event this version cannot show yet",
 		and: " and ",
 	},

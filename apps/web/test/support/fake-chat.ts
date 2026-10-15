@@ -87,11 +87,6 @@ export interface FixtureReport {
 	note: string;
 }
 
-/** Webhook messages come from user 0, which the real server never lists. */
-function withoutUserZero(users: WireUser[]): WireUser[] {
-	return users.filter((user) => user.id !== 0n);
-}
-
 /** A method FakeServer always offers (optional in RemoteApi only for older doubles). */
 function offered<T>(method: T | undefined, name: string): T {
 	if (method === undefined) throw new Error(`FakeServer lacks ${name}`);
@@ -111,6 +106,7 @@ export class ChatFixture {
 	readonly selfUsername: string;
 	readonly names = new Map<number, string>();
 	readonly members = new Map<number, number[]>();
+	private readonly chatTypes = new Map<number, ChatType>();
 	readonly roles = new Map<string, MemberRole>();
 	readonly notifications: NotificationRequest[] = [];
 	private readonly messageExtras = new Map<string, MessageExtras>();
@@ -191,12 +187,6 @@ export class ChatFixture {
 		this.selfName = selfName;
 		this.selfUsername = selfUsername;
 		this.selfId = this.addUser(selfName, { username: selfUsername });
-		// Webhook messages have from_id 0. The real server never lists user 0
-		// with a message; the core's in-memory server looks it up and fails the
-		// whole GetHistory page. Answer user 0 with an empty user here and drop
-		// it from history responses (see api()), as the server would.
-		const wireUser = this.server.wireUser.bind(this.server);
-		this.server.wireUser = (id, viewer) => (id === 0 ? create(UserSchema, { id: 0n }) : wireUser(id, viewer));
 		this.integrations = new FakeIntegrations({
 			selfId: this.selfId,
 			roleOf: (chatId) => (this.members.get(chatId)?.includes(this.selfId) === true ? (this.chatExtras.get(chatId)?.myRole ?? MemberRole.MEMBER) : null),
@@ -205,6 +195,11 @@ export class ChatFixture {
 				return role === MemberRole.ADMIN || role === MemberRole.OWNER;
 			},
 			wireUsers: (ids) => ids.filter((id) => this.names.has(id)).map((id) => this.wireUser(id)),
+			// Like the server: a service message in groups only, from the admin or (0) the server.
+			hookStopped: (chatId, actorId, hookName, reason) => {
+				if (this.chatTypes.get(chatId) !== ChatType.GROUP) return;
+				this.server.postService(chatId, actorId, { kind: { case: "incomingHookStopped", value: { hookName, reason } } });
+			},
 		});
 	}
 
@@ -217,6 +212,7 @@ export class ChatFixture {
 
 	createChat(type: ChatType, title: string, members: readonly number[], extras: ChatExtras = {}): number {
 		const id = this.server.createChat(type, title, members);
+		this.chatTypes.set(id, type);
 		this.members.set(id, [...members]);
 		this.chatExtras.set(id, { myRole: MemberRole.MEMBER, myPermissions: 0x1f, defaultPermissions: 0x1d, historyVisibility: HistoryVisibility.SHARED, ...extras });
 		return id;
@@ -351,7 +347,6 @@ export class ChatFixture {
 					const result = response.result;
 					if (result.case === "slice" || result.case === "full") {
 						this.patchUpdates(result.value.updates);
-						result.value.users = withoutUserZero(result.value.users);
 						users(result.value.users);
 						chats(result.value.chats);
 					}
@@ -362,7 +357,6 @@ export class ChatFixture {
 					const result = response.result;
 					if (result.case === "slice" || result.case === "full") {
 						this.patchUpdates(result.value.updates);
-						result.value.users = withoutUserZero(result.value.users);
 						users(result.value.users);
 						chats(result.value.chats);
 					}
@@ -405,7 +399,6 @@ export class ChatFixture {
 				getHistory: async (request) => {
 					const response = await base.messages.getHistory(request);
 					response.messages.forEach((m) => this.patchMessage(m));
-					response.users = withoutUserZero(response.users);
 					users(response.users);
 					return response;
 				},
@@ -413,7 +406,6 @@ export class ChatFixture {
 					this.pinnedRequests.push({ chatId: num(request.chatId ?? 0n), topicId: num(request.topicId ?? 0n) });
 					const response = await offered(base.messages.getPinnedMessages, "getPinnedMessages")(request);
 					response.messages.forEach((m) => this.patchMessage(m));
-					response.users = withoutUserZero(response.users);
 					users(response.users);
 					return response;
 				},
@@ -444,7 +436,6 @@ export class ChatFixture {
 					const frame = fromBinary(ServerFrameSchema, data);
 					if (frame.frame.case === "update") {
 						this.patchUpdates(frame.frame.value.updates);
-						frame.frame.value.users = withoutUserZero(frame.frame.value.users);
 						frame.frame.value.users.forEach((u) => this.patchUser(u));
 						frame.frame.value.chats.forEach((c) => this.patchChat(c));
 						handlers.onMessage(toBinary(ServerFrameSchema, frame));

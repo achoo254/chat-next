@@ -187,6 +187,7 @@ var (
 		"auto_disabled":           appv1.IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED,
 		"taken_over":              appv1.IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER,
 		"deleted":                 appv1.IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_DELETED,
+		"updated":                 appv1.IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_UPDATED,
 	}
 )
 

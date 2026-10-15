@@ -66,6 +66,12 @@ func (s *integrationsService) DeleteIncomingHook(ctx context.Context, req *conne
 	})
 }
 
+func (s *integrationsService) UpdateIncomingHook(ctx context.Context, req *connect.Request[appv1.UpdateIncomingHookRequest]) (*connect.Response[appv1.UpdateIncomingHookResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.UpdateIncomingHookRequest) (*appv1.UpdateIncomingHookResponse, error) {
+		return s.hooks.UpdateIncomingHook(ctx, me, m)
+	})
+}
+
 func (s *integrationsService) GetIncomingHookStats(ctx context.Context, req *connect.Request[appv1.GetIncomingHookStatsRequest]) (*connect.Response[appv1.GetIncomingHookStatsResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetIncomingHookStatsRequest) (*appv1.GetIncomingHookStatsResponse, error) {
 		return s.hooks.GetIncomingHookStats(ctx, me, m)

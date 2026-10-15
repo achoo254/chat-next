@@ -5,7 +5,6 @@
 // production build. The client core runs on this page's main thread (the
 // production app runs it in a worker), so the numbers are pessimistic.
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
-import { createRouterTransport } from "@connectrpc/connect";
 import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.ts";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -17,6 +16,7 @@ import type { MessagingConnector } from "../../src/messaging/data/connector.ts";
 import type { ChatSource } from "../../src/messaging/data/source.ts";
 import { PERF_SEED, type OpenSample, type PerfHarness, type ScrollSample } from "../perf/perf-api.ts";
 import { ChatFixture, fixtureConnector } from "../support/fake-chat.ts";
+import { routerFetch } from "../support/router-fetch.ts";
 
 const TIMEOUT_MS = 60_000;
 const PEOPLE = 40;
@@ -309,7 +309,7 @@ const connector: MessagingConnector = async (options) => {
 createRoot(container).render(
 	<StrictMode>
 		<App
-			transport={createRouterTransport((router) => f.routes(router))}
+			rpcFetch={routerFetch((router) => f.routes(router))}
 			messagingConnector={connector}
 		/>
 	</StrictMode>,

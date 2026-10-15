@@ -36,13 +36,19 @@ service IntegrationsService {
   rpc RevokePreviousHookSecret(RevokePreviousHookSecretRequest) returns (RevokePreviousHookSecretResponse);
   // Turns a hook off or on. Turning on needs its creator to still be an
   // admin of the chat (failed_precondition "creator_not_admin" otherwise:
-  // take it over instead).
+  // take it over instead). Turning an active hook off posts
+  // ActionIncomingHookStopped (disabled) in a group.
   rpc SetIncomingHookEnabled(SetIncomingHookEnabledRequest) returns (SetIncomingHookEnabledResponse);
   // Makes the caller the hook's creator and turns it on, keeping its URL
   // unless rotate_secret (then the old URL stops at once and the new URL is
   // returned once).
   rpc TakeOverIncomingHook(TakeOverIncomingHookRequest) returns (TakeOverIncomingHookResponse);
+  // Deleting a hook posts ActionIncomingHookStopped (deleted) in a group.
   rpc DeleteIncomingHook(DeleteIncomingHookRequest) returns (DeleteIncomingHookResponse);
+  // Changes a hook's name, allow_alert and silent (the settings chosen at
+  // creation; the format is fixed by its URL). Audited as "updated"; a new
+  // name labels the hook's next messages, earlier ones keep their label.
+  rpc UpdateIncomingHook(UpdateIncomingHookRequest) returns (UpdateIncomingHookResponse);
   // Aggregated counters of the last hours; no per-recipient delivery state.
   rpc GetIncomingHookStats(GetIncomingHookStatsRequest) returns (GetIncomingHookStatsResponse);
   // Requests the hook could not process (kept 30 days), newest first.
@@ -194,6 +200,18 @@ message DeleteIncomingHookRequest {
 
 message DeleteIncomingHookResponse {}
 
+message UpdateIncomingHookRequest {
+  string hook_id = 1;
+  // 1 to 64 characters.
+  string name = 2;
+  bool allow_alert = 3;
+  bool silent = 4;
+}
+
+message UpdateIncomingHookResponse {
+  IncomingHook hook = 1;
+}
+
 message GetIncomingHookStatsRequest {
   string hook_id = 1;
   // Window in hours, 1 to 720; 0 means 24.
@@ -259,6 +277,9 @@ enum IncomingHookAuditAction {
   INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED = 6;
   INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER = 7;
   INCOMING_HOOK_AUDIT_ACTION_DELETED = 8;
+  // Name, allow_alert or silent changed; detail lists what changed, as
+  // "name (was \"<old name>\"), allow_alert on, silent off".
+  INCOMING_HOOK_AUDIT_ACTION_UPDATED = 9;
 }
 
 message IncomingHookAuditEntry {

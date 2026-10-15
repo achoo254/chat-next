@@ -1,4 +1,4 @@
-// Webhook log (GetIncomingHookAudit): who created, rotated, turned off or
+// Webhook log (GetIncomingHookAudit): who created, edited, rotated, turned off or
 // on, took over or deleted a webhook, and when the server turned one off.
 // The whole chat's log on the list (deleted webhooks included), one
 // webhook's on its page; newest first, a page at a time.
@@ -6,11 +6,45 @@ import type { ReactNode } from "react";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";
-import type { HookAuditEntry } from "./api.ts";
+import type { HookAuditEntry, HookChanges } from "./api.ts";
 import { usePaged, useNow, whenText } from "./hook-parts.tsx";
 import { useHooksCopy } from "./use-hooks-copy.ts";
 
 const AUDIT_PAGE = 20;
+
+// The server writes `name (was "<old>")` with Go's %q quoting (JSON-compatible
+// for printable text), then `allow_alert on|off` and `silent on|off`.
+const RENAMED = /^name \(was ("(?:[^"\\]|\\.)*")\)(?:, |$)/;
+
+function unquote(quoted: string): string {
+	try {
+		const value: unknown = JSON.parse(quoted);
+		if (typeof value === "string") return value;
+	} catch {
+		// Escapes JSON does not know (\x..): show the text between the quotes.
+	}
+	return quoted.slice(1, -1);
+}
+
+/** Reads the detail of an "updated" audit entry; unknown parts are ignored. */
+export function parseHookChanges(detail: string): HookChanges {
+	let rest = detail;
+	let renamedFrom: string | null = null;
+	const renamed = RENAMED.exec(rest);
+	if (renamed?.[1] !== undefined) {
+		renamedFrom = unquote(renamed[1]);
+		rest = rest.slice(renamed[0].length);
+	}
+	let allowAlert: boolean | null = null;
+	let silent: boolean | null = null;
+	for (const part of rest.split(", ")) {
+		const [setting, state] = part.split(" ");
+		if (state !== "on" && state !== "off") continue;
+		if (setting === "allow_alert") allowAlert = state === "on";
+		if (setting === "silent") silent = state === "on";
+	}
+	return { renamedFrom, allowAlert, silent };
+}
 
 /** Names arrive with each page, so each entry keeps its actor's name ("" when the server sent none). */
 type Named = HookAuditEntry & { readonly actorName: string };
@@ -50,7 +84,11 @@ export function HookAudit({ chatId, hookId }: { chatId: number; hookId: string }
 			<ul className="audit-list">
 				{page.items.map((entry) => (
 					<li key={entry.id}>
-						<span>{t.audit.action(entry.action, actorOf(entry), entry.hookName, entry.detail)}</span>
+						<span>
+							{entry.action === "updated"
+								? t.audit.updated(actorOf(entry), entry.hookName, parseHookChanges(entry.detail))
+								: t.audit.action(entry.action, actorOf(entry), entry.hookName, entry.detail)}
+						</span>
 						<time dateTime={new Date(entry.date * 1000).toISOString()}>{whenText(entry.date, now, locale, copy)}</time>
 					</li>
 				))}

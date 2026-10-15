@@ -18,9 +18,17 @@ import {
 	type IncomingHookDeadLetter,
 	type IncomingHookFailure,
 } from "@app/proto-ts/integrations";
+import { IncomingHookStopReason } from "@app/proto-ts/messages";
 import type { User as WireUser } from "@app/proto-ts/users";
 
 const GRACE_SECONDS = 7 * 86_400;
+
+/** Hook names are trimmed, 1 to 64 code points. */
+function validName(raw: string): string {
+	const name = raw.trim();
+	if (name === "" || [...name].length > 64) throw new ConnectError("name must have 1 to 64 characters", Code.InvalidArgument);
+	return name;
+}
 const HOOKS_MAX = 20;
 const SUFFIX: Record<IncomingHookFormat, string> = {
 	[IncomingHookFormat.UNSPECIFIED]: "",
@@ -39,6 +47,8 @@ export interface HookHost {
 	/** Whether a user (the creator) is still an admin of a chat. */
 	isAdmin(chatId: number, userId: number): boolean;
 	wireUsers(ids: readonly number[]): WireUser[];
+	/** The service message the server posts in a group when a hook stops (actor 0: the server). */
+	hookStopped(chatId: number, actorId: number, hookName: string, reason: IncomingHookStopReason): void;
 }
 
 export interface HookSeed {
@@ -151,7 +161,14 @@ export class FakeIntegrations {
 		hook.state = IncomingHookState.AUTO_DISABLED;
 		hook.disabledReason = reason;
 		hook.disabledAt = BigInt(this.now);
-		this.log(hook, 0, IncomingHookAuditAction.AUTO_DISABLED, reason === IncomingHookDisabledReason.CREATOR_LEFT ? "creator_left" : "creator_not_admin");
+		const left = reason === IncomingHookDisabledReason.CREATOR_LEFT;
+		this.log(hook, 0, IncomingHookAuditAction.AUTO_DISABLED, left ? "creator_left" : "creator_not_admin");
+		this.host.hookStopped(
+			Number(hook.chatId),
+			0,
+			hook.name,
+			left ? IncomingHookStopReason.CREATOR_LEFT : IncomingHookStopReason.CREATOR_NOT_ADMIN,
+		);
 	}
 
 	private usersOf(ids: readonly bigint[]): WireUser[] {
@@ -165,8 +182,7 @@ export class FakeIntegrations {
 				const chatId = Number(req.chatId);
 				this.calls.push(`CreateIncomingHook ${chatId}`);
 				this.requireAdmin(chatId);
-				const name = req.name.trim();
-				if (name === "" || [...name].length > 64) throw new ConnectError("name must be 1 to 64 characters", Code.InvalidArgument);
+				const name = validName(req.name);
 				if (req.format === IncomingHookFormat.UNSPECIFIED) throw new ConnectError("format is required", Code.InvalidArgument);
 				const count = [...this.hooks.values()].filter((hook) => Number(hook.chatId) === chatId).length;
 				if (count >= HOOKS_MAX) throw new ConnectError(`hooks_limit: a chat has at most ${HOOKS_MAX} webhooks`, Code.FailedPrecondition);
@@ -216,6 +232,7 @@ export class FakeIntegrations {
 						hook.disabledReason = IncomingHookDisabledReason.BY_ADMIN;
 						hook.disabledAt = BigInt(this.now);
 						this.log(hook, self, IncomingHookAuditAction.DISABLED);
+						this.host.hookStopped(Number(hook.chatId), self, hook.name, IncomingHookStopReason.DISABLED);
 					}
 					return { hook };
 				}
@@ -253,7 +270,23 @@ export class FakeIntegrations {
 				const hook = this.adminHook(req.hookId);
 				this.log(hook, self, IncomingHookAuditAction.DELETED);
 				this.hooks.delete(hook.id);
+				this.host.hookStopped(Number(hook.chatId), self, hook.name, IncomingHookStopReason.DELETED);
 				return {};
+			},
+			updateIncomingHook: (req) => {
+				this.calls.push(`UpdateIncomingHook ${req.hookId}`);
+				const hook = this.adminHook(req.hookId);
+				const name = validName(req.name);
+				const changes: string[] = [];
+				if (name !== hook.name) changes.push(`name (was ${JSON.stringify(hook.name)})`);
+				if (req.allowAlert !== hook.allowAlert) changes.push(`allow_alert ${req.allowAlert ? "on" : "off"}`);
+				if (req.silent !== hook.silent) changes.push(`silent ${req.silent ? "on" : "off"}`);
+				if (changes.length === 0) return { hook };
+				hook.name = name;
+				hook.allowAlert = req.allowAlert;
+				hook.silent = req.silent;
+				this.log(hook, self, IncomingHookAuditAction.UPDATED, changes.join(", "));
+				return { hook };
 			},
 			getIncomingHookStats: (req) => {
 				this.adminHook(req.hookId);

@@ -51,6 +51,7 @@ const ACTIONS: Partial<Record<WireAction, HookAuditAction>> = {
 	[WireAction.AUTO_DISABLED]: "auto_disabled",
 	[WireAction.TAKEN_OVER]: "taken_over",
 	[WireAction.DELETED]: "deleted",
+	[WireAction.UPDATED]: "updated",
 };
 
 /** A hook in a state this client does not know is shown as turned off (requests may be refused). */
@@ -162,6 +163,13 @@ export function createIntegrationsClient(transport: Transport, onUnauthenticated
 			call(async () => {
 				await service.deleteIncomingHook({ hookId });
 			}),
+		update: (hookId, settings) =>
+			call(async () =>
+				requireHook(
+					(await service.updateIncomingHook({ hookId, name: settings.name, allowAlert: settings.allowAlert, silent: settings.silent })).hook,
+					"UpdateIncomingHook",
+				),
+			),
 		stats: (hookId, hours) =>
 			call(async () => {
 				const response = await service.getIncomingHookStats({ hookId, hours });

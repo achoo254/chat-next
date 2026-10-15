@@ -226,6 +226,8 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .spoiler.revealed { filter: none; background: none; cursor: auto; }
 .stamp { display: inline-flex; align-items: center; gap: 2px; float: right; margin: 6px 0 0 var(--space-3); font-size: 0.6875rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .stamp [role="img"] { display: inline-flex; }
+/* Silent message (no notification): bell-off before the time, mock #alert-grouping. */
+.stamp .silent-mark { margin-right: 2px; }
 .stamp .icon-sm { width: 14px; height: 14px; }
 .stamp .read { color: var(--c-primary); }
 .stamp .fail { color: var(--c-error); }

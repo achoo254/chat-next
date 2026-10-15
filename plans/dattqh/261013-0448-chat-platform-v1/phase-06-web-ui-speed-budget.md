@@ -80,7 +80,7 @@ Create:
 
 ## Todo
 
-- [ ] React 19 + Compiler + Vite (React 19 + Vite xong; code đã sẵn sàng cho React Compiler: 179/179 component biên dịch được, lint `react-hooks` recommended-latest bật mọi rule của compiler. Plugin đã nối trong `apps/web/vite-react.ts` nhưng tắt mặc định, bật bằng `REACT_COMPILER=1`. Chưa bật vì hai việc chặn, xem ghi chú bên dưới)
+- [x] React 19 + Compiler + Vite (React Compiler bật mặc định từ 2026-10-15 trong `apps/web/vite-react.ts`; `REACT_COMPILER=0` để build hoặc test không có compiler khi cần so sánh)
 - [x] Hook hạt mịn + scheduler (store ngoài React, `useSyncExternalStore` theo id, event bus gom theo frame)
 - [x] Virtual list message + chat list (cửa sổ trượt tin nhắn, hàng chat cao cố định định vị bằng translateY)
 - [x] Composer + optimistic send (trả lời, sửa, emoji, bỏ xem trước link)
@@ -94,7 +94,22 @@ Ghi chú perf gate và React Compiler (2026-10-15):
 - Bundle: JS lúc khởi động sau đăng nhập (entry + `messaging-root` + `web-client` cùng import tĩnh của chúng) là 146,4 KiB gzip so với ngưỡng 150; CSS 13,7 KiB so với ngưỡng 20 (ngưỡng CSS tự đặt, plan chưa có).
 - Trình duyệt (Playwright Chromium headless shell, trang `apps/web/test/visual/perf.html`, 1.000 chat, chat 5.000 tin): mở chat từ cache p50 17–18 ms, p99 29–33 ms; cuộn danh sách 1.000 chat và cuộn ngược 1.000 tin đều 60 fps, không frame nào quá 32 ms, không long task. Hồ sơ CPU chậm 4× chỉ báo số, chưa chặn CI. Ba lần chạy liên tiếp trên máy dev đều đạt.
 - Chưa đo trong CI: cold start tới khi danh sách chat hiện từ cache (harness dùng SQLite trong bộ nhớ, không có cache bền), mở chat lần đầu khi cache chưa đủ tin, React Profiler (một tin mới chỉ render lại đúng item và dòng dialog), axe.
-- Việc chặn bật React Compiler: (1) nhiều component đọc trạng thái thay đổi được thẳng từ `store`/`backend` lúc render sau một hook chỉ để ép render lại; compiler ghi nhớ các lệnh gọi đó nên UI cũ đi, 5 test messaging hỏng khi bật compiler. Cần chuyển mọi chỗ đọc sang hook subscribe theo id. (2) Compiler làm JS khởi động thành 165,8 KiB, vượt ngưỡng 150; cần tách bớt (ví dụ lazy Settings khỏi `messaging-root`, xem lại protobuf trong entry).
+- Việc chặn bật React Compiler (đã gỡ, xem ghi chú 2026-10-15 bên dưới): (1) nhiều component đọc trạng thái thay đổi được thẳng từ `store`/`backend` lúc render sau một hook chỉ để ép render lại; compiler ghi nhớ các lệnh gọi đó nên UI cũ đi, 5 test messaging hỏng khi bật compiler. Cần chuyển mọi chỗ đọc sang hook subscribe theo id. (2) Compiler làm JS khởi động thành 165,8 KiB, vượt ngưỡng 150; cần tách bớt (ví dụ lazy Settings khỏi `messaging-root`, xem lại protobuf trong entry).
+
+Ghi chú ngân sách JS và React Compiler (2026-10-15, sau R2):
+
+- JS khởi động lúc R2 lên prod là 149,1/150 KiB. Phần lớn đến từ runtime protobuf và Connect trong entry (bootstrap `descriptor.proto`, registry, codec JSON) chỉ để gọi `GetSelf`.
+- Đã tách:
+  - `GetSelf` đi bằng JSON của Connect qua `fetch` (`apps/web/src/api/get-self.ts`).
+  - Transport Connect-Web, schema sinh mã và các RPC tài khoản khác chỉ tải ở lần gọi đầu (`api/client.ts`, `api/account-client.ts`).
+  - Mọi RPC đi qua một hàm `fetch` (`App rpcFetch`). Test và harness phục vụ RPC trong bộ nhớ qua `test/support/router-fetch.ts`, nên `GetSelf` trong test cũng đi qua codec JSON thật.
+  - Kết quả: JS khởi động còn 112,5 KiB khi không có compiler (giảm 36,6 KiB).
+- Code phía worker không nằm trong bundle chính: `sqlite-worker` và `sqlite3-worker1` là file riêng, không thuộc chunk khởi động. Settings, Moderation và các hộp thoại vốn đã lazy.
+- Bật React Compiler: JS khởi động 130,7/150 KiB (entry 77,5; `messaging-root` 39,3). 176 test web đều qua khi bật compiler.
+- `pnpm perf` trên máy dev khi bật compiler:
+  - mở chat từ cache p50 18 ms, p99 32–38 ms (hai lần chạy);
+  - cuộn danh sách chat và lịch sử 60 fps, không frame nào quá 32 ms, không long task;
+  - hồ sơ CPU chậm 4×: p50 50–51 ms, p99 58–61 ms.
 
 ## Success Criteria
 

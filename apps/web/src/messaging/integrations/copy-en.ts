@@ -195,6 +195,15 @@ export const enHooks: HooksCopy = {
 		confirm: "Delete webhook",
 		deleted: (name) => `Webhook ${name} deleted`,
 	},
+	editDialog: {
+		open: "Edit settings",
+		title: (name) => `Edit webhook ${name}`,
+		nameHint: 'The new name labels its next messages as "Integration: <name>"; messages already posted keep the old one.',
+		formatNote: (format) => `The ${format} format is part of the URL, so it cannot change. Create another webhook for a different format.`,
+		save: "Save",
+		saving: "Saving…",
+		saved: (name) => `Saved the settings of ${name}`,
+	},
 	audit: {
 		title: "Log",
 		chatNote: "Every change to this chat's webhooks, deleted ones included.",
@@ -218,9 +227,18 @@ export const enHooks: HooksCopy = {
 					return `${actor} took over ${hook}`;
 				case "deleted":
 					return `${actor} deleted ${hook}`;
+				case "updated":
+					return `${actor} edited ${hook}`;
 				case "unknown":
 					return `${actor} changed ${hook}`;
 			}
+		},
+		updated: (actor, hook, changes) => {
+			const parts: string[] = [];
+			if (changes.renamedFrom !== null) parts.push(`renamed “${changes.renamedFrom}” to “${hook}”`);
+			if (changes.allowAlert !== null) parts.push(changes.allowAlert ? "allowed Alert priority" : "stopped allowing Alert priority");
+			if (changes.silent !== null) parts.push(changes.silent ? "turned on silent sending" : "turned off silent sending");
+			return parts.length === 0 ? `${actor} edited ${hook}` : `${actor} edited ${hook}: ${parts.join(", ")}`;
 		},
 	},
 	time: {

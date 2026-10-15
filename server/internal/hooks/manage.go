@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -24,7 +25,7 @@ func (s *Service) audit(ctx context.Context, tx pgx.Tx, h *hookRow, actor int64,
 
 // manage runs fn on the hook, locked, in a transaction that also holds the
 // chat lock, when me is an admin of the hook's chat.
-func (s *Service) manage(ctx context.Context, me int64, hookID string, fn func(tx pgx.Tx, h *hookRow) error) (*hookRow, error) {
+func (s *Service) manage(ctx context.Context, me int64, hookID string, fn func(it *chat.IntegrationTx, h *hookRow) error) (*hookRow, error) {
 	h, err := s.loadHook(ctx, s.pool, hookID, false)
 	if err != nil {
 		return nil, err
@@ -33,15 +34,15 @@ func (s *Service) manage(ctx context.Context, me int64, hookID string, fn func(t
 		return nil, errNotFound()
 	}
 	var out *hookRow
-	err = s.chat.WithChatAdmin(ctx, h.ChatID, me, func(tx pgx.Tx) error {
-		locked, err := s.loadHook(ctx, tx, hookID, true)
+	err = s.chat.WithChatAdmin(ctx, h.ChatID, me, func(it *chat.IntegrationTx) error {
+		locked, err := s.loadHook(ctx, it.Tx(), hookID, true)
 		if err != nil {
 			return err
 		}
 		if locked == nil {
 			return errNotFound()
 		}
-		if err := fn(tx, locked); err != nil {
+		if err := fn(it, locked); err != nil {
 			return err
 		}
 		out = locked
@@ -101,7 +102,8 @@ func (s *Service) CreateIncomingHook(ctx context.Context, me int64, req *appv1.C
 		return nil, err
 	}
 	var h *hookRow
-	err = s.chat.WithChatAdmin(ctx, req.GetChatId(), me, func(tx pgx.Tx) error {
+	err = s.chat.WithChatAdmin(ctx, req.GetChatId(), me, func(it *chat.IntegrationTx) error {
+		tx := it.Tx()
 		var count int
 		if err := tx.QueryRow(ctx, `SELECT count(*) FROM incoming_hooks WHERE chat_id = $1`, req.GetChatId()).Scan(&count); err != nil {
 			return fmt.Errorf("hooks: count hooks: %w", err)
@@ -198,9 +200,9 @@ func (s *Service) rotate(ctx context.Context, tx pgx.Tx, h *hookRow, me int64, r
 // RotateIncomingHookSecret issues a new secret.
 func (s *Service) RotateIncomingHookSecret(ctx context.Context, me int64, req *appv1.RotateIncomingHookSecretRequest) (*appv1.RotateIncomingHookSecretResponse, error) {
 	var secret string
-	h, err := s.manage(ctx, me, req.GetHookId(), func(tx pgx.Tx, h *hookRow) error {
+	h, err := s.manage(ctx, me, req.GetHookId(), func(it *chat.IntegrationTx, h *hookRow) error {
 		var err error
-		secret, err = s.rotate(ctx, tx, h, me, req.GetRevokePrevious())
+		secret, err = s.rotate(ctx, it.Tx(), h, me, req.GetRevokePrevious())
 		return err
 	})
 	if err != nil {
@@ -211,7 +213,8 @@ func (s *Service) RotateIncomingHookSecret(ctx context.Context, me int64, req *a
 
 // RevokePreviousHookSecret ends the grace period of the previous secret.
 func (s *Service) RevokePreviousHookSecret(ctx context.Context, me int64, hookID string) (*appv1.RevokePreviousHookSecretResponse, error) {
-	h, err := s.manage(ctx, me, hookID, func(tx pgx.Tx, h *hookRow) error {
+	h, err := s.manage(ctx, me, hookID, func(it *chat.IntegrationTx, h *hookRow) error {
+		tx := it.Tx()
 		if h.PrevHash == nil || h.PrevExpiresAt == nil || !h.PrevExpiresAt.After(time.Now()) {
 			return errPrecondition("no_previous_secret: the hook has no previous secret in its grace period")
 		}
@@ -231,12 +234,16 @@ func (s *Service) RevokePreviousHookSecret(ctx context.Context, me int64, hookID
 // SetIncomingHookEnabled turns a hook off, or on when its creator is still
 // an admin of the chat.
 func (s *Service) SetIncomingHookEnabled(ctx context.Context, me int64, req *appv1.SetIncomingHookEnabledRequest) (*appv1.SetIncomingHookEnabledResponse, error) {
-	h, err := s.manage(ctx, me, req.GetHookId(), func(tx pgx.Tx, h *hookRow) error {
+	h, err := s.manage(ctx, me, req.GetHookId(), func(it *chat.IntegrationTx, h *hookRow) error {
+		tx := it.Tx()
 		if !req.GetEnabled() {
 			if h.State != "active" {
 				return nil
 			}
-			return s.setState(ctx, tx, h, me, "disabled", "by_admin", "disabled")
+			if err := s.setState(ctx, tx, h, me, "disabled", "by_admin", "disabled"); err != nil {
+				return err
+			}
+			return it.HookStopped(ctx, me, h.Name, appv1.IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_DISABLED)
 		}
 		if h.State == "active" {
 			return nil
@@ -272,7 +279,8 @@ func (s *Service) setState(ctx context.Context, tx pgx.Tx, h *hookRow, me int64,
 // with rotateSecret the old URL stops at once.
 func (s *Service) TakeOverIncomingHook(ctx context.Context, me int64, req *appv1.TakeOverIncomingHookRequest) (*appv1.TakeOverIncomingHookResponse, error) {
 	var secret string
-	h, err := s.manage(ctx, me, req.GetHookId(), func(tx pgx.Tx, h *hookRow) error {
+	h, err := s.manage(ctx, me, req.GetHookId(), func(it *chat.IntegrationTx, h *hookRow) error {
+		tx := it.Tx()
 		previous := h.CreatedBy
 		row, err := scanHook(tx.QueryRow(ctx, `
 			UPDATE incoming_hooks SET created_by = $2, state = 'active', disabled_reason = '', disabled_at = NULL, updated_at = now()
@@ -302,13 +310,68 @@ func (s *Service) TakeOverIncomingHook(ctx context.Context, me int64, req *appv1
 // DeleteIncomingHook deletes a hook with its alert groups and idempotency
 // keys; its audit entries stay.
 func (s *Service) DeleteIncomingHook(ctx context.Context, me int64, hookID string) error {
-	_, err := s.manage(ctx, me, hookID, func(tx pgx.Tx, h *hookRow) error {
+	_, err := s.manage(ctx, me, hookID, func(it *chat.IntegrationTx, h *hookRow) error {
+		tx := it.Tx()
 		if _, err := tx.Exec(ctx, `DELETE FROM incoming_hooks WHERE id = $1`, h.ID); err != nil {
 			return fmt.Errorf("hooks: delete hook: %w", err)
 		}
-		return s.audit(ctx, tx, h, me, "deleted", "")
+		if err := s.audit(ctx, tx, h, me, "deleted", ""); err != nil {
+			return err
+		}
+		return it.HookStopped(ctx, me, h.Name, appv1.IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_DELETED)
 	})
 	return err
+}
+
+// UpdateIncomingHook changes the name, allow_alert and silent of a hook.
+// Nothing changes (and nothing is audited) when they are already set.
+func (s *Service) UpdateIncomingHook(ctx context.Context, me int64, req *appv1.UpdateIncomingHookRequest) (*appv1.UpdateIncomingHookResponse, error) {
+	name, err := cleanName(req.GetName())
+	if err != nil {
+		return nil, err
+	}
+	h, err := s.manage(ctx, me, req.GetHookId(), func(it *chat.IntegrationTx, h *hookRow) error {
+		changes := settingChanges(h, name, req.GetAllowAlert(), req.GetSilent())
+		if len(changes) == 0 {
+			return nil
+		}
+		tx := it.Tx()
+		row, err := scanHook(tx.QueryRow(ctx, `
+			UPDATE incoming_hooks SET name = $2, allow_alert = $3, silent = $4, updated_at = now()
+			WHERE id = $1 RETURNING `+hookColumns, h.ID, name, req.GetAllowAlert(), req.GetSilent()))
+		if err != nil {
+			return fmt.Errorf("hooks: update hook: %w", err)
+		}
+		*h = *row
+		return s.audit(ctx, tx, h, me, "updated", strings.Join(changes, ", "))
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.counters.overlayLastUsed([]*hookRow{h})
+	return &appv1.UpdateIncomingHookResponse{Hook: h.render(time.Now())}, nil
+}
+
+// settingChanges describes, for the audit log, how the settings differ from
+// h: `name (was "Old")`, `allow_alert on`, `silent off`.
+func settingChanges(h *hookRow, name string, allowAlert, silent bool) []string {
+	onOff := func(on bool) string {
+		if on {
+			return "on"
+		}
+		return "off"
+	}
+	var changes []string
+	if name != h.Name {
+		changes = append(changes, fmt.Sprintf("name (was %q)", h.Name))
+	}
+	if allowAlert != h.AllowAlert {
+		changes = append(changes, "allow_alert "+onOff(allowAlert))
+	}
+	if silent != h.Silent {
+		changes = append(changes, "silent "+onOff(silent))
+	}
+	return changes
 }
 
 // GetIncomingHookStats returns the counters of the last hours.

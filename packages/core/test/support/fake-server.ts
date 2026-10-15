@@ -31,6 +31,7 @@ import {
 	GetHistoryResponseSchema,
 	GetPinnedMessagesResponseSchema,
 	HistoryDirection,
+	MessageActionSchema,
 	MessageSchema,
 	ReadHistoryResponseSchema,
 	ReactionCountSchema,
@@ -501,6 +502,22 @@ export class FakeServer {
 		return seq;
 	}
 
+	/** A service message (system line) in the chat from `from`; 0 for the server itself. */
+	postService(chatId: number, from: number, action: MessageInitShape<typeof MessageActionSchema>): number {
+		const chat = this.chat(chatId);
+		const seq = chat.nextSeq++;
+		const record: MessageRecord = {
+			message: create(MessageSchema, { chatId: big(chatId), seq: big(seq), fromId: big(from), date: big(this.now()), action }),
+			deleted: false,
+			reactors: new Map(),
+			sender: from,
+			randomId: 0,
+		};
+		chat.messages.set(seq, record);
+		this.pushChat(chatId, (viewer) => ({ case: "messageNew", value: { message: this.view(record, viewer) } }));
+		return seq;
+	}
+
 	/** Updates an integration alert in place; notify when its state changed. */
 	editIntegration(chatId: number, seq: number, text: string, notify: boolean): void {
 		const record = this.record(chatId, seq);
@@ -906,6 +923,17 @@ export class FakeServer {
 		return result;
 	}
 
+	/**
+	 * The authors of a page of messages, as the server lists them: messages of
+	 * incoming webhooks and server service messages come from user 0, which is
+	 * never listed.
+	 */
+	private senders(page: readonly MessageRecord[], viewer: number): WireUser[] {
+		const ids = new Set(page.map((r) => r.sender));
+		ids.delete(0);
+		return [...ids].map((id) => this.wireUser(id, viewer));
+	}
+
 	private entities(viewer: number, updates: readonly WireUpdate[]): { users: WireUser[]; chats: WireChat[] } {
 		const chatIds = new Set<number>();
 		for (const update of updates) {
@@ -1145,7 +1173,7 @@ export class FakeServer {
 						const pivot = first ?? (request.direction === HistoryDirection.NEWER ? offset + 1 : offset);
 						return create(GetHistoryResponseSchema, {
 							messages: page.map((r) => this.view(r, userId)),
-							users: [...new Set(page.map((r) => r.sender))].map((id) => this.wireUser(id, userId)),
+							users: this.senders(page, userId),
 							hasOlder: seqs.some((s) => s < pivot),
 							hasNewer: seqs.some((s) => s > (last ?? (offset === 0 ? Number.MAX_SAFE_INTEGER : offset - 1))),
 						});
@@ -1164,7 +1192,7 @@ export class FakeServer {
 						const page = after.slice(0, limit);
 						return create(GetPinnedMessagesResponseSchema, {
 							messages: page.map((r) => this.view(r, userId)),
-							users: [...new Set(page.map((r) => r.sender))].map((id) => this.wireUser(id, userId)),
+							users: this.senders(page, userId),
 							count: pinned.length,
 							hasMore: after.length > limit,
 						});

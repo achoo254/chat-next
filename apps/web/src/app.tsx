@@ -2,7 +2,7 @@ import { Code, type Transport } from "@connectrpc/connect";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { SelfUser } from "./api/adapters.ts";
 import { ApiContext } from "./api/api-context.tsx";
-import { createApi, errorCode } from "./api/client.ts";
+import { createApi, createWebTransport, errorCode, sameOriginFetch, type RpcFetch } from "./api/client.ts";
 import { Icon } from "./components/icon.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
 import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
@@ -13,7 +13,8 @@ import type { MessagingConnector } from "./messaging/data/connector.ts";
 const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
 
 export interface AppProps {
-	transport: Transport;
+	/** How RPCs reach the server; tests and the visual harness serve them in memory. */
+	rpcFetch?: RpcFetch | undefined;
 	/** Tests and the visual harness provide the chat client; production uses the web worker. */
 	messagingConnector?: MessagingConnector | undefined;
 }
@@ -24,19 +25,20 @@ type Boot =
 	| { status: "error" }
 	| { status: "ready"; self: SelfUser };
 
-export function App({ transport, messagingConnector }: AppProps) {
+export function App({ rpcFetch = sameOriginFetch, messagingConnector }: AppProps) {
 	return (
 		<I18nProvider>
-			<Root transport={transport} messagingConnector={messagingConnector} />
+			<Root rpcFetch={rpcFetch} messagingConnector={messagingConnector} />
 		</I18nProvider>
 	);
 }
 
-function Root({ transport, messagingConnector }: AppProps) {
+function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingConnector: MessagingConnector | undefined }) {
 	const [boot, setBoot] = useState<Boot>({ status: "loading" });
 	const [attempt, setAttempt] = useState(0);
 	const signedOut = useCallback(() => setBoot({ status: "signedOut" }), []);
-	const api = useMemo(() => createApi(transport, signedOut), [transport, signedOut]);
+	const transport = useMemo(() => createWebTransport(rpcFetch), [rpcFetch]);
+	const api = useMemo(() => createApi(transport, rpcFetch, signedOut), [transport, rpcFetch, signedOut]);
 
 	useEffect(() => {
 		let active = true;

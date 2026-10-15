@@ -30,6 +30,8 @@ Release sửa lỗi bảo mật sau R1 (migration `0004_messaging_hardening`) l�
 
 Release R2 (webhook, migration `0007_incoming_hooks`) đổi conf nginx (location `/hook/`, zone `chat_hook`, log format `chat_hook`), `activate-release.sh` (thêm bước kiểm `/hook/`) và `smoke.sh`, nên cũng phải deploy bằng root một lần. Không cần DNS mới, không cần chứng chỉ mới, không cần cài lại `chat-http.conf`, không có biến môi trường mới.
 
+Bản bù R2 (sửa webhook, tin hệ thống khi webhook tắt, migration `0008_hook_audit_updated`) không đổi nginx hay biến môi trường, deploy như các lần sau. Từ bản này web gọi `GetSelf` bằng JSON của Connect (`Content-Type: application/json`) trên `/rpc/`; nếu sau này thêm lọc request ở nginx hay Cloudflare cho `/rpc/`, phải cho qua cả JSON lẫn `application/proto`.
+
 ## Các lần sau
 
 Mặc định deploy tự động: mỗi lần `ci` xanh trên `main`, workflow [`deploy`](../.github/workflows/deploy.yml) build release trong một job không có key deploy, rồi job deploy tải lên `/opt/chat/incoming/<id>` bằng user `chat-deploy` rồi gọi lệnh sudo duy nhất user này có, `/usr/local/sbin/chat-activate-incoming <id>` ([`activate-incoming.sh`](../infra/chat/activate-incoming.sh)). Lệnh đó chuyển bản upload vào `/opt/chat/staging` (chỉ root), đổi chủ sang root rồi mới kiểm (từ chối symlink và file đặc biệt), chuyển sang `/opt/chat/releases`, thay conf nginx bằng bản trong `/opt/chat/infra/nginx` (bản upload không đổi được nginx), rồi chạy `activate-release.sh`; cuối cùng workflow chạy `smoke.sh`.

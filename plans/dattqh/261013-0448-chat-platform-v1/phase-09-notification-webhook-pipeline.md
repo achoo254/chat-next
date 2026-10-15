@@ -118,6 +118,18 @@ Create:
 - Đo POST → 200 trên máy dev (embedded PostgreSQL, loopback, 2.000 request): p50 0,33 ms, p99 0,68 ms một luồng; 8 luồng p50 1,5 ms, p99 8,1 ms. Đo lại trên `.65` ở Phase 14.
 - Còn thiếu: UI quản lý hook và cách hiển thị nút, khối lệnh trong tin (web), ảnh đại diện của hook (cần media R3), tin hệ thống "Webhook … đã tắt" trong chat, `parse_mode` HTML, IP allowlist theo hook, docs từng công cụ, thử với instance thật của Grafana, Alertmanager, GitLab, Uptime Kuma, Jenkins, canary.
 
+## Bù các thiếu sót của R2 (2026-10-15, chưa deploy)
+
+- Tin hệ thống khi webhook ngừng (`MessageAction.incoming_hook_stopped`, thêm vào proto, không phá tương thích):
+  - Server tự tắt hook vì người tạo bị gỡ admin hoặc rời nhóm: tin có `from_id` 0. Tin được đăng ngay sau khi trigger tắt hook, trong cùng transaction thay đổi thành viên.
+  - Admin tắt hoặc xoá hook: tin có `from_id` là admin đó.
+  - Chỉ đăng ở nhóm; kênh không có, như tin về thành viên.
+  - Web hiện: "Webhook “X” đã tự tắt vì người tạo không còn là admin", "… vì người tạo đã rời nhóm", "Lan Anh đã tắt webhook “X”", "… đã xoá webhook “X”".
+- Trường `silent` có trong `Message` của core (DB local schema v6). Tin im lặng có chuông gạch trước giờ gửi, theo mock `#alert-grouping`, và không phát âm báo khi đang mở chat.
+- RPC `UpdateIncomingHook` sửa tên, `allow_alert`, `silent` (chỉ admin). Nhật ký ghi `updated` kèm phần đã đổi (migration `0008_hook_audit_updated` chỉ nới check). Trang chi tiết hook có hộp thoại "Sửa cài đặt" dùng lại các trường của mock `#create-hook`; mock chưa có màn sửa riêng.
+- Fake server của core không còn lỗi khi lịch sử có tin `from_id` 0. Bỏ cách lách trong fixture web.
+- Còn thiếu: ảnh webhook (cần media R3), `parse_mode` HTML, IP allowlist theo hook, docs từng công cụ, thử với instance thật, canary.
+
 ## Success Criteria
 
 - Grafana, Alertmanager, GitLab (qua Mattermost), Uptime Kuma, Jenkins gửi được thông báo vào chat không cần plugin riêng (instance thật ở dev); link mrkdwn hiển thị đúng.

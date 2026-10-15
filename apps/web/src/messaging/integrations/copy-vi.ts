@@ -1,6 +1,6 @@
 // Vietnamese copy of the incoming webhook screens (mockups/integrations.html).
 // Loaded with those screens only; copy-en.ts must provide the same keys.
-import type { HookAuditAction, HookFormat } from "./api.ts";
+import type { HookAuditAction, HookChanges, HookFormat } from "./api.ts";
 
 /** The chat kind in copy that names it: channels are never called groups. */
 const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");
@@ -198,6 +198,15 @@ export const viHooks = {
 		confirm: "Xoá webhook",
 		deleted: (name: string) => `Đã xoá webhook ${name}`,
 	},
+	editDialog: {
+		open: "Sửa cài đặt",
+		title: (name: string) => `Sửa webhook ${name}`,
+		nameHint: 'Tên mới hiện ở nhãn "Tích hợp: <tên>" của các tin sau; tin đã gửi giữ tên cũ.',
+		formatNote: (format: string) => `Định dạng ${format} gắn với URL nên không đổi được. Cần định dạng khác thì tạo webhook mới.`,
+		save: "Lưu",
+		saving: "Đang lưu…",
+		saved: (name: string) => `Đã lưu cài đặt của ${name}`,
+	},
 	audit: {
 		title: "Nhật ký",
 		chatNote: "Mọi thao tác trên webhook của chat, cả webhook đã xoá.",
@@ -221,9 +230,19 @@ export const viHooks = {
 					return `${actor} đã nhận lại ${hook}`;
 				case "deleted":
 					return `${actor} đã xoá ${hook}`;
+				case "updated":
+					return `${actor} đã sửa ${hook}`;
 				case "unknown":
 					return `${actor} đã thay đổi ${hook}`;
 			}
+		},
+		/** An "updated" entry with what changed (see parseHookChanges); `hook` is the new name. */
+		updated: (actor: string, hook: string, changes: HookChanges): string => {
+			const parts: string[] = [];
+			if (changes.renamedFrom !== null) parts.push(`đổi tên “${changes.renamedFrom}” thành “${hook}”`);
+			if (changes.allowAlert !== null) parts.push(changes.allowAlert ? "cho phép tin Cảnh báo" : "bỏ cho phép tin Cảnh báo");
+			if (changes.silent !== null) parts.push(changes.silent ? "bật gửi im lặng" : "tắt gửi im lặng");
+			return parts.length === 0 ? `${actor} đã sửa ${hook}` : `${actor} đã sửa ${hook}: ${parts.join(", ")}`;
 		},
 	},
 	time: {

@@ -210,6 +210,9 @@ const (
 	IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED IncomingHookAuditAction = 6
 	IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER    IncomingHookAuditAction = 7
 	IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_DELETED       IncomingHookAuditAction = 8
+	// Name, allow_alert or silent changed; detail lists what changed, as
+	// "name (was \"<old name>\"), allow_alert on, silent off".
+	IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_UPDATED IncomingHookAuditAction = 9
 )
 
 // Enum value maps for IncomingHookAuditAction.
@@ -224,6 +227,7 @@ var (
 		6: "INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED",
 		7: "INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER",
 		8: "INCOMING_HOOK_AUDIT_ACTION_DELETED",
+		9: "INCOMING_HOOK_AUDIT_ACTION_UPDATED",
 	}
 	IncomingHookAuditAction_value = map[string]int32{
 		"INCOMING_HOOK_AUDIT_ACTION_UNSPECIFIED":             0,
@@ -235,6 +239,7 @@ var (
 		"INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED":           6,
 		"INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER":              7,
 		"INCOMING_HOOK_AUDIT_ACTION_DELETED":                 8,
+		"INCOMING_HOOK_AUDIT_ACTION_UPDATED":                 9,
 	}
 )
 
@@ -1228,6 +1233,119 @@ func (*DeleteIncomingHookResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_integrations_proto_rawDescGZIP(), []int{16}
 }
 
+type UpdateIncomingHookRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	HookId string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
+	// 1 to 64 characters.
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	AllowAlert    bool   `protobuf:"varint,3,opt,name=allow_alert,json=allowAlert,proto3" json:"allow_alert,omitempty"`
+	Silent        bool   `protobuf:"varint,4,opt,name=silent,proto3" json:"silent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateIncomingHookRequest) Reset() {
+	*x = UpdateIncomingHookRequest{}
+	mi := &file_app_v1_integrations_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateIncomingHookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateIncomingHookRequest) ProtoMessage() {}
+
+func (x *UpdateIncomingHookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_integrations_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateIncomingHookRequest.ProtoReflect.Descriptor instead.
+func (*UpdateIncomingHookRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *UpdateIncomingHookRequest) GetHookId() string {
+	if x != nil {
+		return x.HookId
+	}
+	return ""
+}
+
+func (x *UpdateIncomingHookRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateIncomingHookRequest) GetAllowAlert() bool {
+	if x != nil {
+		return x.AllowAlert
+	}
+	return false
+}
+
+func (x *UpdateIncomingHookRequest) GetSilent() bool {
+	if x != nil {
+		return x.Silent
+	}
+	return false
+}
+
+type UpdateIncomingHookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hook          *IncomingHook          `protobuf:"bytes,1,opt,name=hook,proto3" json:"hook,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateIncomingHookResponse) Reset() {
+	*x = UpdateIncomingHookResponse{}
+	mi := &file_app_v1_integrations_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateIncomingHookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateIncomingHookResponse) ProtoMessage() {}
+
+func (x *UpdateIncomingHookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_integrations_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateIncomingHookResponse.ProtoReflect.Descriptor instead.
+func (*UpdateIncomingHookResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *UpdateIncomingHookResponse) GetHook() *IncomingHook {
+	if x != nil {
+		return x.Hook
+	}
+	return nil
+}
+
 type GetIncomingHookStatsRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	HookId string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
@@ -1239,7 +1357,7 @@ type GetIncomingHookStatsRequest struct {
 
 func (x *GetIncomingHookStatsRequest) Reset() {
 	*x = GetIncomingHookStatsRequest{}
-	mi := &file_app_v1_integrations_proto_msgTypes[17]
+	mi := &file_app_v1_integrations_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1251,7 +1369,7 @@ func (x *GetIncomingHookStatsRequest) String() string {
 func (*GetIncomingHookStatsRequest) ProtoMessage() {}
 
 func (x *GetIncomingHookStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[17]
+	mi := &file_app_v1_integrations_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1264,7 +1382,7 @@ func (x *GetIncomingHookStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIncomingHookStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetIncomingHookStatsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{17}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetIncomingHookStatsRequest) GetHookId() string {
@@ -1295,7 +1413,7 @@ type IncomingHookFailure struct {
 
 func (x *IncomingHookFailure) Reset() {
 	*x = IncomingHookFailure{}
-	mi := &file_app_v1_integrations_proto_msgTypes[18]
+	mi := &file_app_v1_integrations_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1307,7 +1425,7 @@ func (x *IncomingHookFailure) String() string {
 func (*IncomingHookFailure) ProtoMessage() {}
 
 func (x *IncomingHookFailure) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[18]
+	mi := &file_app_v1_integrations_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1320,7 +1438,7 @@ func (x *IncomingHookFailure) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IncomingHookFailure.ProtoReflect.Descriptor instead.
 func (*IncomingHookFailure) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{18}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *IncomingHookFailure) GetReason() string {
@@ -1361,7 +1479,7 @@ type GetIncomingHookStatsResponse struct {
 
 func (x *GetIncomingHookStatsResponse) Reset() {
 	*x = GetIncomingHookStatsResponse{}
-	mi := &file_app_v1_integrations_proto_msgTypes[19]
+	mi := &file_app_v1_integrations_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1373,7 +1491,7 @@ func (x *GetIncomingHookStatsResponse) String() string {
 func (*GetIncomingHookStatsResponse) ProtoMessage() {}
 
 func (x *GetIncomingHookStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[19]
+	mi := &file_app_v1_integrations_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1386,7 +1504,7 @@ func (x *GetIncomingHookStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIncomingHookStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetIncomingHookStatsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{19}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetIncomingHookStatsResponse) GetHours() int32 {
@@ -1443,7 +1561,7 @@ type IncomingHookDeadLetter struct {
 
 func (x *IncomingHookDeadLetter) Reset() {
 	*x = IncomingHookDeadLetter{}
-	mi := &file_app_v1_integrations_proto_msgTypes[20]
+	mi := &file_app_v1_integrations_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1455,7 +1573,7 @@ func (x *IncomingHookDeadLetter) String() string {
 func (*IncomingHookDeadLetter) ProtoMessage() {}
 
 func (x *IncomingHookDeadLetter) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[20]
+	mi := &file_app_v1_integrations_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1468,7 +1586,7 @@ func (x *IncomingHookDeadLetter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IncomingHookDeadLetter.ProtoReflect.Descriptor instead.
 func (*IncomingHookDeadLetter) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{20}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *IncomingHookDeadLetter) GetId() int64 {
@@ -1540,7 +1658,7 @@ type GetIncomingHookDeadLettersRequest struct {
 
 func (x *GetIncomingHookDeadLettersRequest) Reset() {
 	*x = GetIncomingHookDeadLettersRequest{}
-	mi := &file_app_v1_integrations_proto_msgTypes[21]
+	mi := &file_app_v1_integrations_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1552,7 +1670,7 @@ func (x *GetIncomingHookDeadLettersRequest) String() string {
 func (*GetIncomingHookDeadLettersRequest) ProtoMessage() {}
 
 func (x *GetIncomingHookDeadLettersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[21]
+	mi := &file_app_v1_integrations_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1565,7 +1683,7 @@ func (x *GetIncomingHookDeadLettersRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetIncomingHookDeadLettersRequest.ProtoReflect.Descriptor instead.
 func (*GetIncomingHookDeadLettersRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{21}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetIncomingHookDeadLettersRequest) GetHookId() string {
@@ -1598,7 +1716,7 @@ type GetIncomingHookDeadLettersResponse struct {
 
 func (x *GetIncomingHookDeadLettersResponse) Reset() {
 	*x = GetIncomingHookDeadLettersResponse{}
-	mi := &file_app_v1_integrations_proto_msgTypes[22]
+	mi := &file_app_v1_integrations_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1610,7 +1728,7 @@ func (x *GetIncomingHookDeadLettersResponse) String() string {
 func (*GetIncomingHookDeadLettersResponse) ProtoMessage() {}
 
 func (x *GetIncomingHookDeadLettersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[22]
+	mi := &file_app_v1_integrations_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1623,7 +1741,7 @@ func (x *GetIncomingHookDeadLettersResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetIncomingHookDeadLettersResponse.ProtoReflect.Descriptor instead.
 func (*GetIncomingHookDeadLettersResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{22}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetIncomingHookDeadLettersResponse) GetDeadLetters() []*IncomingHookDeadLetter {
@@ -1650,7 +1768,7 @@ type IncomingHookAuditEntry struct {
 
 func (x *IncomingHookAuditEntry) Reset() {
 	*x = IncomingHookAuditEntry{}
-	mi := &file_app_v1_integrations_proto_msgTypes[23]
+	mi := &file_app_v1_integrations_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1662,7 +1780,7 @@ func (x *IncomingHookAuditEntry) String() string {
 func (*IncomingHookAuditEntry) ProtoMessage() {}
 
 func (x *IncomingHookAuditEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[23]
+	mi := &file_app_v1_integrations_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1675,7 +1793,7 @@ func (x *IncomingHookAuditEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IncomingHookAuditEntry.ProtoReflect.Descriptor instead.
 func (*IncomingHookAuditEntry) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{23}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *IncomingHookAuditEntry) GetId() int64 {
@@ -1741,7 +1859,7 @@ type GetIncomingHookAuditRequest struct {
 
 func (x *GetIncomingHookAuditRequest) Reset() {
 	*x = GetIncomingHookAuditRequest{}
-	mi := &file_app_v1_integrations_proto_msgTypes[24]
+	mi := &file_app_v1_integrations_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1753,7 +1871,7 @@ func (x *GetIncomingHookAuditRequest) String() string {
 func (*GetIncomingHookAuditRequest) ProtoMessage() {}
 
 func (x *GetIncomingHookAuditRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[24]
+	mi := &file_app_v1_integrations_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1766,7 +1884,7 @@ func (x *GetIncomingHookAuditRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIncomingHookAuditRequest.ProtoReflect.Descriptor instead.
 func (*GetIncomingHookAuditRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{24}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetIncomingHookAuditRequest) GetChatId() int64 {
@@ -1807,7 +1925,7 @@ type GetIncomingHookAuditResponse struct {
 
 func (x *GetIncomingHookAuditResponse) Reset() {
 	*x = GetIncomingHookAuditResponse{}
-	mi := &file_app_v1_integrations_proto_msgTypes[25]
+	mi := &file_app_v1_integrations_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1819,7 +1937,7 @@ func (x *GetIncomingHookAuditResponse) String() string {
 func (*GetIncomingHookAuditResponse) ProtoMessage() {}
 
 func (x *GetIncomingHookAuditResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_integrations_proto_msgTypes[25]
+	mi := &file_app_v1_integrations_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1832,7 +1950,7 @@ func (x *GetIncomingHookAuditResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIncomingHookAuditResponse.ProtoReflect.Descriptor instead.
 func (*GetIncomingHookAuditResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_integrations_proto_rawDescGZIP(), []int{25}
+	return file_app_v1_integrations_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetIncomingHookAuditResponse) GetEntries() []*IncomingHookAuditEntry {
@@ -1919,7 +2037,15 @@ const file_app_v1_integrations_proto_rawDesc = "" +
 	"\x03url\x18\x02 \x01(\tR\x03url\"4\n" +
 	"\x19DeleteIncomingHookRequest\x12\x17\n" +
 	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"\x1c\n" +
-	"\x1aDeleteIncomingHookResponse\"L\n" +
+	"\x1aDeleteIncomingHookResponse\"\x81\x01\n" +
+	"\x19UpdateIncomingHookRequest\x12\x17\n" +
+	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vallow_alert\x18\x03 \x01(\bR\n" +
+	"allowAlert\x12\x16\n" +
+	"\x06silent\x18\x04 \x01(\bR\x06silent\"F\n" +
+	"\x1aUpdateIncomingHookResponse\x12(\n" +
+	"\x04hook\x18\x01 \x01(\v2\x14.app.v1.IncomingHookR\x04hook\"L\n" +
 	"\x1bGetIncomingHookStatsRequest\x12\x17\n" +
 	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12\x14\n" +
 	"\x05hours\x18\x02 \x01(\x05R\x05hours\"d\n" +
@@ -1981,7 +2107,7 @@ const file_app_v1_integrations_proto_rawDesc = "" +
 	")INCOMING_HOOK_DISABLED_REASON_UNSPECIFIED\x10\x00\x12*\n" +
 	"&INCOMING_HOOK_DISABLED_REASON_BY_ADMIN\x10\x01\x123\n" +
 	"/INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN\x10\x02\x12.\n" +
-	"*INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT\x10\x03*\xa6\x03\n" +
+	"*INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT\x10\x03*\xce\x03\n" +
 	"\x17IncomingHookAuditAction\x12*\n" +
 	"&INCOMING_HOOK_AUDIT_ACTION_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"INCOMING_HOOK_AUDIT_ACTION_CREATED\x10\x01\x12-\n" +
@@ -1991,7 +2117,8 @@ const file_app_v1_integrations_proto_rawDesc = "" +
 	"\"INCOMING_HOOK_AUDIT_ACTION_ENABLED\x10\x05\x12,\n" +
 	"(INCOMING_HOOK_AUDIT_ACTION_AUTO_DISABLED\x10\x06\x12)\n" +
 	"%INCOMING_HOOK_AUDIT_ACTION_TAKEN_OVER\x10\a\x12&\n" +
-	"\"INCOMING_HOOK_AUDIT_ACTION_DELETED\x10\b2\xdf\b\n" +
+	"\"INCOMING_HOOK_AUDIT_ACTION_DELETED\x10\b\x12&\n" +
+	"\"INCOMING_HOOK_AUDIT_ACTION_UPDATED\x10\t2\xbc\t\n" +
 	"\x13IntegrationsService\x12[\n" +
 	"\x12CreateIncomingHook\x12!.app.v1.CreateIncomingHookRequest\x1a\".app.v1.CreateIncomingHookResponse\x12U\n" +
 	"\x10GetIncomingHooks\x12\x1f.app.v1.GetIncomingHooksRequest\x1a .app.v1.GetIncomingHooksResponse\x12R\n" +
@@ -2000,7 +2127,8 @@ const file_app_v1_integrations_proto_rawDesc = "" +
 	"\x18RevokePreviousHookSecret\x12'.app.v1.RevokePreviousHookSecretRequest\x1a(.app.v1.RevokePreviousHookSecretResponse\x12g\n" +
 	"\x16SetIncomingHookEnabled\x12%.app.v1.SetIncomingHookEnabledRequest\x1a&.app.v1.SetIncomingHookEnabledResponse\x12a\n" +
 	"\x14TakeOverIncomingHook\x12#.app.v1.TakeOverIncomingHookRequest\x1a$.app.v1.TakeOverIncomingHookResponse\x12[\n" +
-	"\x12DeleteIncomingHook\x12!.app.v1.DeleteIncomingHookRequest\x1a\".app.v1.DeleteIncomingHookResponse\x12a\n" +
+	"\x12DeleteIncomingHook\x12!.app.v1.DeleteIncomingHookRequest\x1a\".app.v1.DeleteIncomingHookResponse\x12[\n" +
+	"\x12UpdateIncomingHook\x12!.app.v1.UpdateIncomingHookRequest\x1a\".app.v1.UpdateIncomingHookResponse\x12a\n" +
 	"\x14GetIncomingHookStats\x12#.app.v1.GetIncomingHookStatsRequest\x1a$.app.v1.GetIncomingHookStatsResponse\x12s\n" +
 	"\x1aGetIncomingHookDeadLetters\x12).app.v1.GetIncomingHookDeadLettersRequest\x1a*.app.v1.GetIncomingHookDeadLettersResponse\x12a\n" +
 	"\x14GetIncomingHookAudit\x12#.app.v1.GetIncomingHookAuditRequest\x1a$.app.v1.GetIncomingHookAuditResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
@@ -2018,7 +2146,7 @@ func file_app_v1_integrations_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_integrations_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_app_v1_integrations_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_app_v1_integrations_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_app_v1_integrations_proto_goTypes = []any{
 	(IncomingHookFormat)(0),                    // 0: app.v1.IncomingHookFormat
 	(IncomingHookState)(0),                     // 1: app.v1.IncomingHookState
@@ -2041,16 +2169,18 @@ var file_app_v1_integrations_proto_goTypes = []any{
 	(*TakeOverIncomingHookResponse)(nil),       // 18: app.v1.TakeOverIncomingHookResponse
 	(*DeleteIncomingHookRequest)(nil),          // 19: app.v1.DeleteIncomingHookRequest
 	(*DeleteIncomingHookResponse)(nil),         // 20: app.v1.DeleteIncomingHookResponse
-	(*GetIncomingHookStatsRequest)(nil),        // 21: app.v1.GetIncomingHookStatsRequest
-	(*IncomingHookFailure)(nil),                // 22: app.v1.IncomingHookFailure
-	(*GetIncomingHookStatsResponse)(nil),       // 23: app.v1.GetIncomingHookStatsResponse
-	(*IncomingHookDeadLetter)(nil),             // 24: app.v1.IncomingHookDeadLetter
-	(*GetIncomingHookDeadLettersRequest)(nil),  // 25: app.v1.GetIncomingHookDeadLettersRequest
-	(*GetIncomingHookDeadLettersResponse)(nil), // 26: app.v1.GetIncomingHookDeadLettersResponse
-	(*IncomingHookAuditEntry)(nil),             // 27: app.v1.IncomingHookAuditEntry
-	(*GetIncomingHookAuditRequest)(nil),        // 28: app.v1.GetIncomingHookAuditRequest
-	(*GetIncomingHookAuditResponse)(nil),       // 29: app.v1.GetIncomingHookAuditResponse
-	(*User)(nil),                               // 30: app.v1.User
+	(*UpdateIncomingHookRequest)(nil),          // 21: app.v1.UpdateIncomingHookRequest
+	(*UpdateIncomingHookResponse)(nil),         // 22: app.v1.UpdateIncomingHookResponse
+	(*GetIncomingHookStatsRequest)(nil),        // 23: app.v1.GetIncomingHookStatsRequest
+	(*IncomingHookFailure)(nil),                // 24: app.v1.IncomingHookFailure
+	(*GetIncomingHookStatsResponse)(nil),       // 25: app.v1.GetIncomingHookStatsResponse
+	(*IncomingHookDeadLetter)(nil),             // 26: app.v1.IncomingHookDeadLetter
+	(*GetIncomingHookDeadLettersRequest)(nil),  // 27: app.v1.GetIncomingHookDeadLettersRequest
+	(*GetIncomingHookDeadLettersResponse)(nil), // 28: app.v1.GetIncomingHookDeadLettersResponse
+	(*IncomingHookAuditEntry)(nil),             // 29: app.v1.IncomingHookAuditEntry
+	(*GetIncomingHookAuditRequest)(nil),        // 30: app.v1.GetIncomingHookAuditRequest
+	(*GetIncomingHookAuditResponse)(nil),       // 31: app.v1.GetIncomingHookAuditResponse
+	(*User)(nil),                               // 32: app.v1.User
 }
 var file_app_v1_integrations_proto_depIdxs = []int32{
 	0,  // 0: app.v1.IncomingHook.format:type_name -> app.v1.IncomingHookFormat
@@ -2059,45 +2189,48 @@ var file_app_v1_integrations_proto_depIdxs = []int32{
 	0,  // 3: app.v1.CreateIncomingHookRequest.format:type_name -> app.v1.IncomingHookFormat
 	4,  // 4: app.v1.CreateIncomingHookResponse.hook:type_name -> app.v1.IncomingHook
 	4,  // 5: app.v1.GetIncomingHooksResponse.hooks:type_name -> app.v1.IncomingHook
-	30, // 6: app.v1.GetIncomingHooksResponse.users:type_name -> app.v1.User
+	32, // 6: app.v1.GetIncomingHooksResponse.users:type_name -> app.v1.User
 	4,  // 7: app.v1.GetIncomingHookResponse.hook:type_name -> app.v1.IncomingHook
-	30, // 8: app.v1.GetIncomingHookResponse.users:type_name -> app.v1.User
+	32, // 8: app.v1.GetIncomingHookResponse.users:type_name -> app.v1.User
 	4,  // 9: app.v1.RotateIncomingHookSecretResponse.hook:type_name -> app.v1.IncomingHook
 	4,  // 10: app.v1.RevokePreviousHookSecretResponse.hook:type_name -> app.v1.IncomingHook
 	4,  // 11: app.v1.SetIncomingHookEnabledResponse.hook:type_name -> app.v1.IncomingHook
 	4,  // 12: app.v1.TakeOverIncomingHookResponse.hook:type_name -> app.v1.IncomingHook
-	22, // 13: app.v1.GetIncomingHookStatsResponse.failures:type_name -> app.v1.IncomingHookFailure
-	24, // 14: app.v1.GetIncomingHookDeadLettersResponse.dead_letters:type_name -> app.v1.IncomingHookDeadLetter
-	3,  // 15: app.v1.IncomingHookAuditEntry.action:type_name -> app.v1.IncomingHookAuditAction
-	27, // 16: app.v1.GetIncomingHookAuditResponse.entries:type_name -> app.v1.IncomingHookAuditEntry
-	30, // 17: app.v1.GetIncomingHookAuditResponse.users:type_name -> app.v1.User
-	5,  // 18: app.v1.IntegrationsService.CreateIncomingHook:input_type -> app.v1.CreateIncomingHookRequest
-	7,  // 19: app.v1.IntegrationsService.GetIncomingHooks:input_type -> app.v1.GetIncomingHooksRequest
-	9,  // 20: app.v1.IntegrationsService.GetIncomingHook:input_type -> app.v1.GetIncomingHookRequest
-	11, // 21: app.v1.IntegrationsService.RotateIncomingHookSecret:input_type -> app.v1.RotateIncomingHookSecretRequest
-	13, // 22: app.v1.IntegrationsService.RevokePreviousHookSecret:input_type -> app.v1.RevokePreviousHookSecretRequest
-	15, // 23: app.v1.IntegrationsService.SetIncomingHookEnabled:input_type -> app.v1.SetIncomingHookEnabledRequest
-	17, // 24: app.v1.IntegrationsService.TakeOverIncomingHook:input_type -> app.v1.TakeOverIncomingHookRequest
-	19, // 25: app.v1.IntegrationsService.DeleteIncomingHook:input_type -> app.v1.DeleteIncomingHookRequest
-	21, // 26: app.v1.IntegrationsService.GetIncomingHookStats:input_type -> app.v1.GetIncomingHookStatsRequest
-	25, // 27: app.v1.IntegrationsService.GetIncomingHookDeadLetters:input_type -> app.v1.GetIncomingHookDeadLettersRequest
-	28, // 28: app.v1.IntegrationsService.GetIncomingHookAudit:input_type -> app.v1.GetIncomingHookAuditRequest
-	6,  // 29: app.v1.IntegrationsService.CreateIncomingHook:output_type -> app.v1.CreateIncomingHookResponse
-	8,  // 30: app.v1.IntegrationsService.GetIncomingHooks:output_type -> app.v1.GetIncomingHooksResponse
-	10, // 31: app.v1.IntegrationsService.GetIncomingHook:output_type -> app.v1.GetIncomingHookResponse
-	12, // 32: app.v1.IntegrationsService.RotateIncomingHookSecret:output_type -> app.v1.RotateIncomingHookSecretResponse
-	14, // 33: app.v1.IntegrationsService.RevokePreviousHookSecret:output_type -> app.v1.RevokePreviousHookSecretResponse
-	16, // 34: app.v1.IntegrationsService.SetIncomingHookEnabled:output_type -> app.v1.SetIncomingHookEnabledResponse
-	18, // 35: app.v1.IntegrationsService.TakeOverIncomingHook:output_type -> app.v1.TakeOverIncomingHookResponse
-	20, // 36: app.v1.IntegrationsService.DeleteIncomingHook:output_type -> app.v1.DeleteIncomingHookResponse
-	23, // 37: app.v1.IntegrationsService.GetIncomingHookStats:output_type -> app.v1.GetIncomingHookStatsResponse
-	26, // 38: app.v1.IntegrationsService.GetIncomingHookDeadLetters:output_type -> app.v1.GetIncomingHookDeadLettersResponse
-	29, // 39: app.v1.IntegrationsService.GetIncomingHookAudit:output_type -> app.v1.GetIncomingHookAuditResponse
-	29, // [29:40] is the sub-list for method output_type
-	18, // [18:29] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	4,  // 13: app.v1.UpdateIncomingHookResponse.hook:type_name -> app.v1.IncomingHook
+	24, // 14: app.v1.GetIncomingHookStatsResponse.failures:type_name -> app.v1.IncomingHookFailure
+	26, // 15: app.v1.GetIncomingHookDeadLettersResponse.dead_letters:type_name -> app.v1.IncomingHookDeadLetter
+	3,  // 16: app.v1.IncomingHookAuditEntry.action:type_name -> app.v1.IncomingHookAuditAction
+	29, // 17: app.v1.GetIncomingHookAuditResponse.entries:type_name -> app.v1.IncomingHookAuditEntry
+	32, // 18: app.v1.GetIncomingHookAuditResponse.users:type_name -> app.v1.User
+	5,  // 19: app.v1.IntegrationsService.CreateIncomingHook:input_type -> app.v1.CreateIncomingHookRequest
+	7,  // 20: app.v1.IntegrationsService.GetIncomingHooks:input_type -> app.v1.GetIncomingHooksRequest
+	9,  // 21: app.v1.IntegrationsService.GetIncomingHook:input_type -> app.v1.GetIncomingHookRequest
+	11, // 22: app.v1.IntegrationsService.RotateIncomingHookSecret:input_type -> app.v1.RotateIncomingHookSecretRequest
+	13, // 23: app.v1.IntegrationsService.RevokePreviousHookSecret:input_type -> app.v1.RevokePreviousHookSecretRequest
+	15, // 24: app.v1.IntegrationsService.SetIncomingHookEnabled:input_type -> app.v1.SetIncomingHookEnabledRequest
+	17, // 25: app.v1.IntegrationsService.TakeOverIncomingHook:input_type -> app.v1.TakeOverIncomingHookRequest
+	19, // 26: app.v1.IntegrationsService.DeleteIncomingHook:input_type -> app.v1.DeleteIncomingHookRequest
+	21, // 27: app.v1.IntegrationsService.UpdateIncomingHook:input_type -> app.v1.UpdateIncomingHookRequest
+	23, // 28: app.v1.IntegrationsService.GetIncomingHookStats:input_type -> app.v1.GetIncomingHookStatsRequest
+	27, // 29: app.v1.IntegrationsService.GetIncomingHookDeadLetters:input_type -> app.v1.GetIncomingHookDeadLettersRequest
+	30, // 30: app.v1.IntegrationsService.GetIncomingHookAudit:input_type -> app.v1.GetIncomingHookAuditRequest
+	6,  // 31: app.v1.IntegrationsService.CreateIncomingHook:output_type -> app.v1.CreateIncomingHookResponse
+	8,  // 32: app.v1.IntegrationsService.GetIncomingHooks:output_type -> app.v1.GetIncomingHooksResponse
+	10, // 33: app.v1.IntegrationsService.GetIncomingHook:output_type -> app.v1.GetIncomingHookResponse
+	12, // 34: app.v1.IntegrationsService.RotateIncomingHookSecret:output_type -> app.v1.RotateIncomingHookSecretResponse
+	14, // 35: app.v1.IntegrationsService.RevokePreviousHookSecret:output_type -> app.v1.RevokePreviousHookSecretResponse
+	16, // 36: app.v1.IntegrationsService.SetIncomingHookEnabled:output_type -> app.v1.SetIncomingHookEnabledResponse
+	18, // 37: app.v1.IntegrationsService.TakeOverIncomingHook:output_type -> app.v1.TakeOverIncomingHookResponse
+	20, // 38: app.v1.IntegrationsService.DeleteIncomingHook:output_type -> app.v1.DeleteIncomingHookResponse
+	22, // 39: app.v1.IntegrationsService.UpdateIncomingHook:output_type -> app.v1.UpdateIncomingHookResponse
+	25, // 40: app.v1.IntegrationsService.GetIncomingHookStats:output_type -> app.v1.GetIncomingHookStatsResponse
+	28, // 41: app.v1.IntegrationsService.GetIncomingHookDeadLetters:output_type -> app.v1.GetIncomingHookDeadLettersResponse
+	31, // 42: app.v1.IntegrationsService.GetIncomingHookAudit:output_type -> app.v1.GetIncomingHookAuditResponse
+	31, // [31:43] is the sub-list for method output_type
+	19, // [19:31] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_integrations_proto_init() }
@@ -2112,7 +2245,7 @@ func file_app_v1_integrations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_integrations_proto_rawDesc), len(file_app_v1_integrations_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   26,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

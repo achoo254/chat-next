@@ -1,10 +1,15 @@
-// Typed façade over the Connect services used by the web app. Components call
-// these methods and only ever see client models from ./adapters.
-import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
-import { AuthService } from "@app/proto-ts/auth";
-import { UsersService, type User } from "@app/proto-ts/users";
-import { toSelfUser, toSessionView, type SelfUser, type SessionView } from "./adapters.ts";
+// Typed façade over the account calls of the web app (GetSelf, profile,
+// sessions). Components call these methods and only ever see client models
+// from ./adapters.
+//
+// Startup carries no protobuf runtime: GetSelf, the one call every start
+// makes, goes over the Connect protocol's JSON encoding with plain fetch
+// (get-self.ts), and the Connect transport, the generated schemas and the
+// other account calls load on their first use (account-client.ts). Every
+// RPC goes through one fetch function, so tests serve them all in memory.
+import { Code, type Transport } from "@connectrpc/connect";
+import type { SelfUser, SessionView } from "./adapters.ts";
+import { fetchSelf, RPC_BASE_URL } from "./get-self.ts";
 
 export interface ProfileChanges {
 	name?: string;
@@ -21,35 +26,64 @@ export interface Api {
 	revokeOtherSessions(): Promise<number>;
 }
 
-/** Same-origin Connect transport; the HttpOnly session cookie rides along. */
-export function createWebTransport(): Transport {
-	return createConnectTransport({
-		baseUrl: "/rpc",
-		useBinaryFormat: true,
-		fetch: (input, init) => fetch(input, { ...init, credentials: "same-origin" }),
-	});
-}
+/** The account calls other than GetSelf, implemented in account-client.ts. */
+export type AccountCalls = Omit<Api, "getSelf">;
 
-/** The Connect error code of `err`, or Unknown for anything else that was thrown. */
-export function errorCode(err: unknown): Code {
-	return ConnectError.from(err).code;
-}
+/** How the app reaches the server: fetch for same-origin /rpc requests. */
+export type RpcFetch = typeof globalThis.fetch;
 
-function requireUser(user: User | undefined, method: string, isOperator = false): SelfUser {
-	if (!user) {
-		throw new ConnectError(`${method} returned no user`, Code.Internal);
-	}
-	return toSelfUser(user, isOperator);
+/** Same-origin requests; the HttpOnly session cookie rides along. */
+export const sameOriginFetch: RpcFetch = (input, init) => fetch(input, { ...init, credentials: "same-origin" });
+
+/** Loads `load()` once; a failed load is tried again on the next call. */
+function once<T>(load: () => Promise<T>): () => Promise<T> {
+	let loading: Promise<T> | null = null;
+	return () =>
+		(loading ??= load().catch((err: unknown) => {
+			loading = null;
+			throw err;
+		}));
 }
 
 /**
- * Builds the API on `transport`. `onUnauthenticated` runs whenever the server
- * says the session is gone (signed out, revoked, expired), so the app can drop
- * back to the welcome screen from any call site; the error is still rethrown.
+ * Connect transport (binary encoding) at /rpc over `rpcFetch`. Connect-Web
+ * and the protobuf runtime load with the first call made through it.
  */
-export function createApi(transport: Transport, onUnauthenticated: () => void): Api {
-	const users = createClient(UsersService, transport);
-	const auth = createClient(AuthService, transport);
+export function createWebTransport(rpcFetch: RpcFetch): Transport {
+	const load = once(() =>
+		import("@connectrpc/connect-web").then(({ createConnectTransport }) =>
+			createConnectTransport({ baseUrl: RPC_BASE_URL, useBinaryFormat: true, fetch: rpcFetch }),
+		),
+	);
+	return {
+		unary: (method, signal, timeoutMs, header, input, contextValues) =>
+			load().then((transport) => transport.unary(method, signal, timeoutMs, header, input, contextValues)),
+		stream: (method, signal, timeoutMs, header, input, contextValues) =>
+			load().then((transport) => transport.stream(method, signal, timeoutMs, header, input, contextValues)),
+	};
+}
+
+/**
+ * The Connect error code of `err`, or Unknown for anything else that was
+ * thrown. Both ConnectError (the generated clients) and RpcError (GetSelf)
+ * carry a numeric `code`; checking the shape keeps ConnectError, and the
+ * protobuf runtime it pulls in, out of the startup bundle.
+ */
+export function errorCode(err: unknown): Code {
+	if (err instanceof Error && "code" in err && typeof err.code === "number" && Code[err.code] !== undefined) {
+		// A numeric Code member, checked just above.
+		return err.code as Code;
+	}
+	return Code.Unknown;
+}
+
+/**
+ * Builds the API. `onUnauthenticated` runs whenever the server says the
+ * session is gone (signed out, revoked, expired), so the app can drop back
+ * to the welcome screen from any call site; the error is still rethrown.
+ */
+export function createApi(transport: Transport, rpcFetch: RpcFetch, onUnauthenticated: () => void): Api {
+	const account = once(() => import("./account-client.ts").then((module) => module.createAccountCalls(transport)));
 
 	async function call<T>(run: () => Promise<T>): Promise<T> {
 		try {
@@ -61,21 +95,11 @@ export function createApi(transport: Transport, onUnauthenticated: () => void): 
 	}
 
 	return {
-		getSelf: () =>
-			call(async () => {
-				const response = await users.getSelf({});
-				return requireUser(response.user, "GetSelf", response.isOperator);
-			}),
-		updateProfile: (changes) =>
-			call(async () => requireUser((await users.updateProfile(changes)).user, "UpdateProfile")),
-		setUsername: (username) =>
-			call(async () => requireUser((await users.setUsername({ username })).user, "SetUsername")),
-		listSessions: () =>
-			call(async () => (await auth.listSessions({})).sessions.map(toSessionView)),
-		revokeSession: (id) =>
-			call(async () => {
-				await auth.revokeSession({ sessionId: BigInt(id) });
-			}),
-		revokeOtherSessions: () => call(async () => (await auth.revokeOtherSessions({})).revokedCount),
+		getSelf: () => call(() => fetchSelf(rpcFetch)),
+		updateProfile: (changes) => call(async () => (await account()).updateProfile(changes)),
+		setUsername: (username) => call(async () => (await account()).setUsername(username)),
+		listSessions: () => call(async () => (await account()).listSessions()),
+		revokeSession: (id) => call(async () => (await account()).revokeSession(id)),
+		revokeOtherSessions: () => call(async () => (await account()).revokeOtherSessions()),
 	};
 }

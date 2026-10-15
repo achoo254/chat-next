@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createWebTransport } from "./api/client.ts";
 import { App } from "./app.tsx";
 import { applyStoredAppearance } from "./appearance.ts";
 import "./styles/fonts.css";
@@ -14,6 +13,6 @@ if (!container) throw new Error("index.html is missing #root");
 
 createRoot(container).render(
 	<StrictMode>
-		<App transport={createWebTransport()} />
+		<App />
 	</StrictMode>,
 );

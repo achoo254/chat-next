@@ -2,7 +2,9 @@ package api_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -262,5 +264,54 @@ func TestModerationRPCsNeedAnOperator(t *testing.T) {
 	chats := appv1connect.NewChatsServiceClient(c, e.srv.URL+"/rpc", withOrigin(e.srv.URL))
 	if _, err := chats.GetCommonChats(ctx, connect.NewRequest(&appv1.GetCommonChatsRequest{UserId: self.Msg.GetUser().GetId()})); codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("GetCommonChats with oneself: %v", err)
+	}
+}
+
+// The web app's first request is GetSelf in the Connect protocol's JSON
+// encoding (apps/web/src/api/get-self.ts), sent before the protobuf runtime
+// loads; it relies on these field names and error bodies.
+func TestGetSelfOverJSON(t *testing.T) {
+	e := newEnv(t)
+	post := func(c *http.Client) (int, map[string]any) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, e.srv.URL+"/rpc/app.v1.UsersService/GetSelf", strings.NewReader("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Connect-Protocol-Version", "1")
+		req.Header.Set("Origin", e.srv.URL)
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]any
+		if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+			t.Fatalf("GetSelf JSON body: %v", err)
+		}
+		return resp.StatusCode, body
+	}
+
+	status, body := post(e.browser(t))
+	if status != http.StatusUnauthorized || body["code"] != "unauthenticated" {
+		t.Fatalf("signed out: %d %v", status, body)
+	}
+
+	cl, c := e.signedIn(t)
+	want, err := getSelf(t, cl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, body = post(c)
+	user, ok := body["user"].(map[string]any)
+	if status != http.StatusOK || !ok {
+		t.Fatalf("signed in: %d %v", status, body)
+	}
+	// int64 travels as a decimal string; names are lowerCamelCase.
+	if user["id"] != strconv.FormatInt(want.GetId(), 10) || user["name"] != want.GetName() || user["email"] != want.GetEmail() {
+		t.Fatalf("user %v, want %v", user, want)
+	}
+	if _, present := body["isOperator"]; present {
+		t.Fatalf("isOperator should be omitted when false: %v", body)
 	}
 }

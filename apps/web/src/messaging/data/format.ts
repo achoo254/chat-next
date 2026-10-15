@@ -151,6 +151,8 @@ export function actionText(action: MessageAction, actor: string, nameOf: NameOf,
 			return t.modeChanged;
 		case "joined_by_invite":
 			return t.joinedByInvite(actor);
+		case "incoming_hook_stopped":
+			return t.hookStopped(actor, action.hookName, action.reason, channel);
 		case "unsupported":
 			return t.unsupported;
 	}

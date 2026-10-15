@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { MessageSchema } from "@app/proto-ts/messages";
+import { IncomingHookStopReason, MessageSchema } from "@app/proto-ts/messages";
 import { UpdateSchema } from "@app/proto-ts/updates";
 import { ChatType } from "@app/proto-ts/chats";
 import { toUpdate } from "../src/protocol/map.ts";
@@ -53,6 +53,73 @@ describe("integration (incoming webhook) messages", () => {
 		expect(edited.body).toMatchObject({ kind: "message_edit", notify: true });
 		const plain = toUpdate(create(UpdateSchema, { kind: { case: "messageNew", value: { message: create(MessageSchema, { text: "x" }) } } }));
 		expect(plain.body).toMatchObject({ notify: true, message: { buttons: [], integrationLabel: "" } });
+	});
+
+	it("maps the hook-stopped service message and its reasons", () => {
+		const stopped = (reason: IncomingHookStopReason) =>
+			toUpdate(
+				create(UpdateSchema, {
+					kind: {
+						case: "messageNew",
+						value: {
+							message: create(MessageSchema, {
+								chatId: big(5),
+								seq: big(3),
+								fromId: big(9),
+								action: { kind: { case: "incomingHookStopped", value: { hookName: "Grafana prod", reason } } },
+							}),
+						},
+					},
+				}),
+			).body;
+		expect(stopped(IncomingHookStopReason.DISABLED)).toMatchObject({
+			kind: "message_new",
+			message: { fromId: 9, silent: false, action: { kind: "incoming_hook_stopped", hookName: "Grafana prod", reason: "disabled" } },
+		});
+		expect(stopped(IncomingHookStopReason.DELETED)).toMatchObject({ message: { action: { reason: "deleted" } } });
+		expect(stopped(IncomingHookStopReason.CREATOR_NOT_ADMIN)).toMatchObject({ message: { action: { reason: "creator_not_admin" } } });
+		expect(stopped(IncomingHookStopReason.CREATOR_LEFT)).toMatchObject({ message: { action: { reason: "creator_left" } } });
+		expect(stopped(IncomingHookStopReason.UNSPECIFIED)).toMatchObject({ message: { action: { reason: "unknown" } } });
+		expect(stopped(42 as IncomingHookStopReason)).toMatchObject({ message: { action: { reason: "unknown" } } });
+	});
+
+	it("loads webhook and server messages (from_id 0) through history and keeps silent and the action locally", async () => {
+		const server = new FakeServer();
+		const self = server.addUser("Tôi");
+		const admin = server.addUser("Quang Huy");
+		const chat = server.createChat(ChatType.GROUP, "Vận hành", [self, admin]);
+		const silent = server.postIntegration(chat, "Jenkins build", "Build #318 thành công", { silent: true });
+		const loud = server.postIntegration(chat, "Grafana prod", "Firing CPU cao");
+		const auto = server.postService(chat, 0, {
+			kind: { case: "incomingHookStopped", value: { hookName: "GitLab ops/deploy", reason: IncomingHookStopReason.CREATOR_NOT_ADMIN } },
+		});
+		const byAdmin = server.postService(chat, admin, {
+			kind: { case: "incomingHookStopped", value: { hookName: "Grafana prod", reason: IncomingHookStopReason.DELETED } },
+		});
+		const sql = new MemorySqlFactory();
+		const { core } = await startTestApp(server, self, sql);
+		await settle(core);
+
+		const expected = [
+			{ seq: silent, fromId: 0, silent: true, integrationLabel: "Jenkins build", action: null },
+			{ seq: loud, fromId: 0, silent: false, integrationLabel: "Grafana prod", action: null },
+			{
+				seq: auto,
+				fromId: 0,
+				silent: false,
+				action: { kind: "incoming_hook_stopped", hookName: "GitLab ops/deploy", reason: "creator_not_admin" },
+			},
+			{ seq: byAdmin, fromId: admin, action: { kind: "incoming_hook_stopped", hookName: "Grafana prod", reason: "deleted" } },
+		];
+		const view = await core.history(chat);
+		expect(view.messages.filter((m) => m.seq >= silent)).toMatchObject(expected);
+		await core.close();
+
+		// Both come back from the local database after a restart.
+		server.online = false;
+		const again = await startTestApp(server, self, sql, { userIdHint: self });
+		expect((await again.core.history(chat)).messages.filter((m) => m.seq >= silent)).toMatchObject(expected);
+		await again.core.close();
 	});
 
 	it("notifies under the hook label, skips silent posts, notifies a state change and keeps buttons locally", async () => {

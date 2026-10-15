@@ -1,8 +1,9 @@
-import { createRouterTransport, type ConnectRouter } from "@connectrpc/connect";
+import type { ConnectRouter } from "@connectrpc/connect";
 import { render, type RenderResult } from "@testing-library/react";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { App } from "../src/app.tsx";
 import { ChatFixture, fixtureConnector } from "./support/fake-chat.ts";
+import { routerFetch } from "./support/router-fetch.ts";
 
 /**
  * Renders the app against an in-memory Connect server built from `routes`
@@ -11,12 +12,12 @@ import { ChatFixture, fixtureConnector } from "./support/fake-chat.ts";
 export function renderApp(routes: (router: ConnectRouter) => void, path = "/"): RenderResult {
 	window.history.replaceState(null, "", path);
 	const fixture = new ChatFixture();
-	const transport = createRouterTransport((router) => {
+	const rpcFetch = routerFetch((router) => {
 		routes(router);
 		fixture.chatRoutes(router);
 	});
 	const connector = fixtureConnector(fixture, async () => new MemorySqlFactory());
-	return render(<App transport={transport} messagingConnector={connector} />);
+	return render(<App rpcFetch={rpcFetch} messagingConnector={connector} />);
 }
 export const SELF = {
 	id: 42n,

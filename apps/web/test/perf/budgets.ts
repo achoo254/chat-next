@@ -12,7 +12,12 @@ export const STARTUP_MODULES = [
 ] as const;
 
 export const BUNDLE_BUDGET = {
-	/** Phase 06: initial JS (gzip) at most 150 KB; the rest loads lazily. 146.4 KB when the gate started. */
+	/**
+	 * Phase 06: initial JS (gzip) at most 150 KB; the rest loads lazily. 146.4 KB
+	 * when the gate started, 149.1 KB at the R2 release. 112.5 KB once GetSelf went
+	 * over JSON and the Connect transport, protobuf runtime and schemas left the
+	 * startup chunks; 130.7 KB with React Compiler, which is on since then.
+	 */
 	startupJsGzip: 150 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,

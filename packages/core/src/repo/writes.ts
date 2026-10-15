@@ -117,8 +117,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 	w.add(
 		`INSERT INTO messages (chat_id, seq, from_id, date, text, entities, media_kind, reply_to_seq, forward,
 			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, buttons, action,
-			search_text, topic_id, link_preview, recalled, stale)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+			search_text, topic_id, link_preview, recalled, silent, stale)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
 		ON CONFLICT (chat_id, seq) DO UPDATE SET from_id = excluded.from_id, date = excluded.date,
 			text = excluded.text, entities = excluded.entities, media_kind = excluded.media_kind,
 			reply_to_seq = excluded.reply_to_seq, forward = excluded.forward, edit_date = excluded.edit_date,
@@ -127,7 +127,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			grouped_id = excluded.grouped_id, via_bot_id = excluded.via_bot_id, reactions = excluded.reactions,
 			integration_label = excluded.integration_label, buttons = excluded.buttons, action = excluded.action,
 			search_text = excluded.search_text, topic_id = excluded.topic_id, link_preview = excluded.link_preview,
-			recalled = excluded.recalled, stale = 0
+			recalled = excluded.recalled, silent = excluded.silent, stale = 0
 		WHERE messages.stale = 1 OR (excluded.recalled >= messages.recalled
 			AND (excluded.edit_version >= messages.edit_version OR excluded.recalled > messages.recalled))`,
 		[
@@ -153,6 +153,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			message.topicId,
 			message.linkPreview === null ? null : JSON.stringify(message.linkPreview),
 			flag(message.recalled),
+			flag(message.silent),
 		],
 	);
 	w.emit(EventKeys.history(message.chatId), EventKeys.message(message.chatId, message.seq));

@@ -198,6 +198,12 @@ export interface ForwardHeader {
 	readonly date: number;
 }
 
+/**
+ * Why an incoming webhook stopped: an admin turned it off or deleted it, or
+ * the server turned it off because its creator lost admin rights or left.
+ */
+export type HookStopReason = "disabled" | "deleted" | "creator_not_admin" | "creator_left" | "unknown";
+
 /** System message shown inline in the history. */
 export type MessageAction =
 	| { readonly kind: "chat_created"; readonly title: string }
@@ -211,6 +217,8 @@ export type MessageAction =
 	| { readonly kind: "history_visibility_changed"; readonly visible: boolean }
 	| { readonly kind: "chat_mode_changed" }
 	| { readonly kind: "joined_by_invite" }
+	/** An incoming webhook stopped posting; fromId is the admin, or 0 when the server turned it off. */
+	| { readonly kind: "incoming_hook_stopped"; readonly hookName: string; readonly reason: HookStopReason }
 	/** A kind this client does not know yet: rendered as "unsupported". */
 	| { readonly kind: "unsupported" };
 
@@ -247,6 +255,8 @@ export interface Message {
 	 * the message's place, with no content, reactions or reply.
 	 */
 	readonly recalled: boolean;
+	/** Posted without a notification (silent incoming webhooks): no notification, no sound. */
+	readonly silent: boolean;
 }
 
 export type SessionRevokeReason =
