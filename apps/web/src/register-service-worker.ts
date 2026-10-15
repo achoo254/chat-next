@@ -7,7 +7,9 @@
 // tab asks it which build it caches; a different one shows the
 // "Đã có bản mới · Tải lại" bar (components/update-bar.tsx). The app never
 // reloads on its own: a draft or an open dialog would be lost.
+import { navigate, paths } from "./router.tsx";
 import { answerBuild, askBuild, isBuildQuery, type MessageTarget } from "./sw/build-messages.ts";
+import { openChatId } from "./sw/push-messages.ts";
 
 /** Browsers check /sw.js on each page load; an open tab also checks this often… */
 const UPDATE_CHECK_MS = 60 * 60_000;
@@ -57,6 +59,9 @@ export interface WorkerContainerLike {
 export function watchAppUpdates(container: WorkerContainerLike, entry: string, replyTimeoutMs?: number): void {
 	container.addEventListener("message", (event) => {
 		if (isBuildQuery(event.data)) answerBuild(event.ports[0], entry);
+		// A click on a push notification focused this tab: open the chat.
+		const chatId = openChatId(event.data);
+		if (chatId !== null) navigate(paths.chat(chatId));
 	});
 	container.startMessages();
 	let controlled = container.controller !== null;

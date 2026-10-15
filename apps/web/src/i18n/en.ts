@@ -36,6 +36,7 @@ export const en: Messages = {
 		notifications: "Notifications",
 		appearance: "Appearance",
 		shortcuts: "Keyboard shortcuts",
+		app: "Install the app",
 		moderation: "Moderation",
 		console: "Developer Console",
 		signOut: "Sign out",

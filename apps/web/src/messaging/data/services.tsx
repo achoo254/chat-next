@@ -13,6 +13,7 @@ import type { PendingBackend, Topic } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";
 import type { ChatSource } from "./source.ts";
 import type { ChatStore, ChatWindow, ListEntry, ListStatus, UnreadTotals, WindowItem } from "./store.ts";
+import type { WebPush } from "../push/web-push.ts";
 
 /** Short confirmation shown at the bottom of the screen (mockups: .toast). */
 export class Toasts {
@@ -55,6 +56,8 @@ export interface Services {
 	readonly integrations: Integrations;
 	/** Developer Console, starting bots, their menus and callback buttons. */
 	readonly bots: Bots;
+	/** Web Push of this device (notifications while the app is closed). */
+	readonly webPush: WebPush;
 	readonly backend: PendingBackend;
 	readonly toasts: Toasts;
 	readonly drafts: Drafts;

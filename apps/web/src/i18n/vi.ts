@@ -34,6 +34,7 @@ export const vi = {
 		notifications: "Thông báo",
 		appearance: "Giao diện",
 		shortcuts: "Phím tắt",
+		app: "Cài ứng dụng",
 		moderation: "Kiểm duyệt",
 		console: "Developer Console",
 		signOut: "Đăng xuất",

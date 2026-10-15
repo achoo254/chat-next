@@ -1,8 +1,12 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -249,5 +253,58 @@ func TestLoadOutboundDeny(t *testing.T) {
 		if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "OUTBOUND_DENY_CIDRS") || strings.Contains(err.Error(), bad) {
 			t.Fatalf("%q: err = %v", bad, err)
 		}
+	}
+}
+
+func TestLoadWebPush(t *testing.T) {
+	c, err := Load(lookupFrom(validEnv()))
+	if err != nil || c.WebPush != nil {
+		t.Fatalf("without a key: %+v, %v", c.WebPush, err)
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := key.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vapidSecret := base64.RawURLEncoding.EncodeToString(raw)
+	env := validEnv()
+	env["WEB_PUSH_VAPID_PRIVATE_KEY"] = vapidSecret
+	c, err = Load(lookupFrom(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.WebPush.VAPIDKey.Equal(key) || c.WebPush.Subject != c.PublicOrigin() || c.WebPush.AllowLocal {
+		t.Fatalf("web push %+v", c.WebPush)
+	}
+	env["WEB_PUSH_SUBJECT"] = "mailto:ops@example.com"
+	if c, err = Load(lookupFrom(env)); err != nil || c.WebPush.Subject != "mailto:ops@example.com" {
+		t.Fatalf("subject: %+v, %v", c.WebPush, err)
+	}
+	for name, change := range map[string]map[string]string{
+		"WEB_PUSH_VAPID_PRIVATE_KEY": {"WEB_PUSH_VAPID_PRIVATE_KEY": vapidSecret[:20]},
+		"WEB_PUSH_SUBJECT":           {"WEB_PUSH_SUBJECT": "ops@example.com"},
+		"WEB_PUSH_ALLOW_LOCAL":       {"WEB_PUSH_ALLOW_LOCAL": "true"},
+	} {
+		bad := validEnv()
+		bad["WEB_PUSH_VAPID_PRIVATE_KEY"] = vapidSecret
+		maps.Copy(bad, change)
+		_, err := Load(lookupFrom(bad))
+		if err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		if strings.Contains(err.Error(), vapidSecret[:20]) {
+			t.Errorf("%s: error shows the key", name)
+		}
+	}
+	dev := validEnv()
+	dev["CHAT_ENV"] = EnvDevelopment
+	dev["WEB_PUSH_VAPID_PRIVATE_KEY"] = vapidSecret
+	dev["WEB_PUSH_ALLOW_LOCAL"] = "true"
+	if c, err = Load(lookupFrom(dev)); err != nil || !c.WebPush.AllowLocal {
+		t.Fatalf("development: %+v, %v", c.WebPush, err)
 	}
 }

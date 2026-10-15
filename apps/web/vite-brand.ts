@@ -63,6 +63,9 @@ export function brandAssets(): Plugin {
 		`<link rel="icon" href="/${FAVICON_SVG}" type="image/svg+xml">`,
 		`<link rel="apple-touch-icon" href="/${appleTouch.file}" sizes="${appleTouch.size}x${appleTouch.size}">`,
 		`<link rel="manifest" href="/${MANIFEST_PATH}">`,
+		// Browser chrome and the iOS home screen name follow the brand (installing: settings "Cài ứng dụng").
+		`<meta name="theme-color" content="${escapeHtml(brand.colors.primary)}">`,
+		`<meta name="apple-mobile-web-app-title" content="${escapeHtml(brand.shortName)}">`,
 	].join("\n");
 
 	return {

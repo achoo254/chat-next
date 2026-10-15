@@ -49,6 +49,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"console-webhook": "?at=console-webhook",
 	"console-poll": "?at=console-poll",
 	"console-stats": "?at=console-stats",
+	"settings-notifications": "?at=settings-notifications",
+	"settings-app": "?at=settings-app",
 };
 
 export const VIEWPORTS = [

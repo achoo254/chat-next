@@ -1,6 +1,8 @@
 // Applies the user's notification settings to a notification the core asks
 // for (settings.html#notifications): per chat type on or off, the message
-// shown or hidden, the sound, and per-chat mutes. Pure, so it is unit-tested
+// shown or hidden, the sound, and per-chat mutes. On a device that gets Web
+// Push, a message arriving while no window of the app is visible is left to
+// the push (the server sends it exactly then), so it is not shown twice. Pure, so it is unit-tested
 // directly; the web client calls it on the main thread before showing one.
 import { isMuted, type DialogView, type NotificationSettings } from "@app/core";
 
@@ -9,6 +11,8 @@ export interface NotificationInput {
 	readonly body: string;
 	readonly tag: string;
 	readonly chatId: number;
+	/** No window of the app was visible (NotificationRequest.background). */
+	readonly background?: boolean;
 }
 
 export interface NotificationDecision extends NotificationInput {
@@ -43,7 +47,7 @@ function allowed(settings: NotificationSettings, group: ChatGroup): { enabled: b
 /**
  * What to show for `request`, or null for nothing. A chat not in the list
  * yet gets the strictest of the three chat types. `hiddenBody` replaces the
- * message when its preview is off.
+ * message when its preview is off. `pushOnDevice`: this device gets Web Push.
  */
 export function decideNotification(
 	request: NotificationInput,
@@ -51,7 +55,9 @@ export function decideNotification(
 	settings: NotificationSettings,
 	nowSeconds: number,
 	hiddenBody: string,
+	pushOnDevice = false,
 ): NotificationDecision | null {
+	if (pushOnDevice && request.background === true) return null;
 	let rule: { enabled: boolean; preview: boolean };
 	if (view === undefined) {
 		const all = (["private", "groups", "channels"] as const).map((group) => allowed(settings, group));

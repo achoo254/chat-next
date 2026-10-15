@@ -321,7 +321,7 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 			const senderName = message.integrationLabel !== "" ? message.integrationLabel : (sender?.name ?? "");
 			const title = chat !== null && chat.title !== "" ? chat.title : senderName;
 			const body = chat !== null && chat.type !== "private" && senderName !== "" ? `${senderName}: ${preview(message)}` : preview(message);
-			platform.notify.show({ title, body, tag: `chat:${message.chatId}`, chatId: message.chatId });
+			platform.notify.show({ title, body, tag: `chat:${message.chatId}`, chatId: message.chatId, background: !platform.lifecycle.isForeground() });
 		}
 	};
 

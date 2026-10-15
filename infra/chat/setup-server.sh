@@ -43,6 +43,8 @@ set_default TENANT_ID primary
 set_default TENANT_DOMAIN hoandat.com
 grep -q '^OIDC_CLIENT_SECRET=' "$ENV_FILE" || die "OIDC_CLIENT_SECRET missing: copy CHAT_WEB_CLIENT_SECRET from the IdP .env (see docs/deployment-guide.md)"
 grep -q '^SESSION_KEY=' "$ENV_FILE" || printf 'SESSION_KEY=%s\n' "$(openssl rand -base64 48 | tr -d '\n')" >>"$ENV_FILE"
+# Web Push (PWA notifications): VAPID key, generated once and never replaced.
+bash "$(dirname "$0")/generate-vapid-key.sh" "$ENV_FILE"
 
 echo "== postgres role and database"
 if ! grep -q '^DATABASE_URL=' "$ENV_FILE"; then

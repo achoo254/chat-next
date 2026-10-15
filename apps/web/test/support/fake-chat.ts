@@ -31,6 +31,7 @@ import { MediaKind, MediaRefSchema, MediaSizeType, type MediaRef as WireMediaRef
 import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
 import { FakeBots } from "./fake-bots.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";
+import { FakePush } from "./fake-push.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
 import type { ChatSource } from "../../src/messaging/data/source.ts";
@@ -239,6 +240,8 @@ export class ChatFixture {
 	readonly integrations: FakeIntegrations;
 	/** The signed-in user's bots and starting bots (BotAdminService, BotsService). */
 	readonly bots: FakeBots;
+	/** PushService: this session's Web Push registration. */
+	readonly push = new FakePush();
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
@@ -653,6 +656,7 @@ export class ChatFixture {
 		this.chatRoutes(router);
 		this.integrations.routes(router);
 		this.bots.routes(router);
+		this.push.routes(router);
 	}
 
 	/** The private chat of the signed-in user with `userId`, created when missing. */

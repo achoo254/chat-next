@@ -27,7 +27,8 @@ func TestEmbeddedNamesMatchTheBrandConfig(t *testing.T) {
 }
 
 func TestParseRefusesMissingNames(t *testing.T) {
-	for _, body := range []string{`{}`, `{"appName":"A"}`, `{"appName":" ","shortName":"B"}`, `not json`} {
+	for _, body := range []string{`{}`, `{"appName":"A"}`, `{"appName":" ","shortName":"B","pushSenderName":"C"}`,
+		`{"appName":"A","shortName":"B"}`, `not json`} {
 		if _, err := parse([]byte(body)); err == nil {
 			t.Errorf("parse(%s) accepted", body)
 		}

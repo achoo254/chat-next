@@ -1,4 +1,5 @@
 {
   "appName": "Chat",
-  "shortName": "Chat"
+  "shortName": "Chat",
+  "pushSenderName": "Chat"
 }

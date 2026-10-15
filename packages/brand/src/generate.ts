@@ -8,22 +8,28 @@ export interface GeneratedManifests {
 	readonly "tauri.json": Record<string, unknown>;
 }
 
-/** The names the Go server shows users (server/internal/brand/brand.json). */
-export function serverBrandNames(brand: BrandConfig): { appName: string; shortName: string } {
-	return { appName: brand.appName, shortName: brand.shortName };
+/** The names the Go server shows users (server/internal/brand/brand.json); pushSenderName titles notifications that hide the message. */
+export function serverBrandNames(brand: BrandConfig): { appName: string; shortName: string; pushSenderName: string } {
+	return { appName: brand.appName, shortName: brand.shortName, pushSenderName: brand.pushSenderName };
 }
 
 export function generateManifests(brand: BrandConfig): GeneratedManifests {
 	return {
 		"web.webmanifest.json": {
+			// A stable identity: browsers treat the installed app as the same one across start_url changes.
+			id: "/",
 			name: brand.appName,
 			short_name: brand.shortName,
 			description: brand.description,
+			lang: "vi",
+			dir: "ltr",
 			start_url: "/",
 			scope: "/",
 			display: "standalone",
 			theme_color: brand.colors.primary,
 			background_color: brand.colors.background,
+			categories: ["social"],
+			prefer_related_applications: false,
 			icons: manifestIcons(),
 		},
 		"capacitor.json": {

@@ -39,7 +39,7 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 
 ### Biến trong `/opt/chat/.env` (chỉ tên)
 
-`CHAT_ENV`, `CHAT_LISTEN_ADDR`, `CHAT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `TENANT_ID`, `TENANT_DOMAIN`, `SESSION_KEY`, `DATABASE_URL`, `MEDIA_PUBLIC_URL`, `MEDIA_STORAGE`, `MEDIA_ROOT`, `MEDIA_MIN_FREE_BYTES`, `MEDIA_UPLOAD_MAX_BYTES`, `MEDIA_USER_QUOTA_BYTES`, `OUTBOUND_DENY_CIDRS` (`103.72.98.65`, đặt ngày 2026-10-15: webhook bot và xem trước link không gọi về chính máy). Mẫu và ý nghĩa: [`infra/chat/.env.production.example`](../infra/chat/.env.production.example). `CHAT_OPERATOR_USER_IDS` (`1` = `@achoo254`, chủ sản phẩm, đặt ngày 2026-10-15 theo quyết định của user: xem hàng đợi kiểm duyệt và góp ý). Chưa đặt: `MEDIA_FFMPEG_PATH`. File `.env.bak-*` là bản sao trước mỗi lần sửa tay.
+`CHAT_ENV`, `CHAT_LISTEN_ADDR`, `CHAT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `TENANT_ID`, `TENANT_DOMAIN`, `SESSION_KEY`, `DATABASE_URL`, `MEDIA_PUBLIC_URL`, `MEDIA_STORAGE`, `MEDIA_ROOT`, `MEDIA_MIN_FREE_BYTES`, `MEDIA_UPLOAD_MAX_BYTES`, `MEDIA_USER_QUOTA_BYTES`, `OUTBOUND_DENY_CIDRS` (`103.72.98.65`, đặt ngày 2026-10-15: webhook bot và xem trước link không gọi về chính máy). Mẫu và ý nghĩa: [`infra/chat/.env.production.example`](../infra/chat/.env.production.example). `CHAT_OPERATOR_USER_IDS` (`1` = `@achoo254`, chủ sản phẩm, đặt ngày 2026-10-15 theo quyết định của user: xem hàng đợi kiểm duyệt và góp ý). Chưa đặt: `MEDIA_FFMPEG_PATH`; `WEB_PUSH_VAPID_PRIVATE_KEY` (Web Push tắt tới khi đặt; sinh trên server bằng `infra/chat/generate-vapid-key.sh`, không bao giờ thay, xem [deployment guide](deployment-guide.md#web-push-và-cài-ứng-dụng-pwa)), `WEB_PUSH_SUBJECT` (tuỳ chọn). File `.env.bak-*` là bản sao trước mỗi lần sửa tay.
 
 ### Tiến trình (pm2 dùng chung, daemon chạy bằng root)
 
@@ -84,6 +84,7 @@ Chat không đổi tường lửa. Cổng 443 đang mở cho mọi IP (cấu hì
 | Cloudflare, zone `hoandat.com` | `chat.hoandat.com` (A, proxied), `media-chat.hoandat.com` (A, proxied, tạo bằng `infra/chat/ensure-dns.sh`) | Không dùng host hai cấp như `hook.chat.…` vì SSL miễn phí chỉ phủ một cấp; webhook nằm ở `chat.<d>/hook/…` |
 | IdP `hoandat-auth` (cùng server) | Client OIDC `chat-web`, `chat-mobile`, `chat-desktop`; biến `CHAT_WEB_URL`, `CHAT_WEB_CLIENT_SECRET` trong `/var/www/hoandat-auth/.env` (`CHAT_MOBILE_REDIRECT_URI` để mặc định trong code) | Secret sinh trên server, cùng giá trị với `OIDC_CLIENT_SECRET` của chat |
 | GitHub `achoo254/chat-next` | Workflow `ci`, `deploy`; secret `CHAT_DEPLOY_SSH_KEY`, `CHAT_DEPLOY_KNOWN_HOSTS`; environment `production` | Key ed25519 của `chat-deploy` chỉ nằm trong secret |
+| Dịch vụ push của trình duyệt (Google FCM, Mozilla, Microsoft WNS, Apple) | Không tạo gì: không tài khoản, không project; xác thực bằng khoá VAPID của chính server | `chat-api` gọi ra https tới `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `*.notify.windows.com`, `web.push.apple.com` (chỉ các host này, allowlist trong code) khi Web Push bật; nội dung đã mã hoá theo từng trình duyệt |
 | OneDash (hệ nb), dịch vụ `dattqh-test` | Bucket `chat-media`, danh tính `chat-api` (quyền `write`) | **Không dùng** (media chuyển về đĩa `.65`); có thể xoá trên web OneDash |
 
 ## Đổi gì thì cập nhật gì

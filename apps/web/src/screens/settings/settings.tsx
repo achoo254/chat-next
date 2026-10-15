@@ -26,13 +26,14 @@ const MESSAGING_GROUPS: readonly (readonly { tab: SettingsTab; icon: IconName }[
 		{ tab: "notifications", icon: "bell" },
 		{ tab: "appearance", icon: "sun" },
 		{ tab: "shortcuts", icon: "command" },
+		{ tab: "app", icon: "download" },
 	],
 	[{ tab: "sessions", icon: "laptop" }],
 ];
 
 /** Settings added by the messaging UI (release R1). */
 export interface MessagingSettings {
-	/** Renders the privacy, blocked, notifications, appearance and shortcuts tabs. */
+	/** Renders the privacy, blocked, notifications, appearance, shortcuts and app tabs. */
 	render: (tab: SettingsTab) => ReactNode;
 	/** Wipes the local chat data before the sign-out route. */
 	onSignOut: () => void;

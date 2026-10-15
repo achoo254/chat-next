@@ -25,6 +25,8 @@ import { decideNotification, type NotificationInput } from "./data/notification-
 import { createRemote, loadRemoteClient } from "./data/remote.ts";
 import { createIntegrations, loadIntegrationsClient } from "./integrations/api.ts";
 import { createBots, loadBotsClient } from "./bots/api.ts";
+import { pushOnDevice } from "./push/push-device.ts";
+import { createWebPush, loadWebPushClient } from "./push/web-push.ts";
 import { blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
@@ -82,9 +84,12 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 					warm(loadConnectWeb, loadRemoteClient);
 					return [settingsCode.preload(), settingsExtraCode.preload(), blockedData(services.remote).promise];
 				case "notifications":
+					// The device card asks PushService: fetch its client with the screen.
+					warm(loadConnectWeb, loadWebPushClient);
 					return [settingsCode.preload(), settingsExtraCode.preload(), notificationSettingsData(services.store).promise];
 				case "appearance":
 				case "shortcuts":
+				case "app":
 					return [settingsCode.preload(), settingsExtraCode.preload()];
 			}
 			break;
@@ -146,7 +151,14 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					// Until the store exists the settings are unknown: nothing is shown.
 					if (store === null) return null;
 					const settings = store.notificationSettings();
-					const decision = decideNotification(request, store.dialog(request.chatId), settings, Math.floor(Date.now() / 1000), hiddenBody);
+					const decision = decideNotification(
+						request,
+						store.dialog(request.chatId),
+						settings,
+						Math.floor(Date.now() / 1000),
+						hiddenBody,
+						pushOnDevice(self.id),
+					);
 					// The soft tone loads on first use; the system notification itself is silent.
 					if (decision !== null && settings.sound === "soft") void import("./data/sound.ts").then((sound) => sound.playTone("soft"));
 					return decision;
@@ -177,6 +189,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					remote,
 					integrations: createIntegrations(transport, () => signedOut()),
 					bots: createBots(transport, () => signedOut()),
+					webPush: createWebPush(transport, self.id, () => signedOut()),
 					backend,
 					toasts: new Toasts(),
 					drafts,
@@ -222,6 +235,17 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 	// Fetch the code of secondary screens once startup is over.
 	const started = start.status === "ready";
 	useEffect(() => (started ? prefetchWhenIdle(IDLE_PREFETCH) : undefined), [started]);
+
+	// Keep this device's Web Push registration in step with the session (a
+	// browser that never allowed notifications has nothing to sync).
+	const { locale } = useI18n();
+	const pushLocale = useEffectEvent(() => locale);
+	useEffect(() => {
+		if (start.status !== "ready") return;
+		const granted = typeof Notification !== "undefined" && Notification.permission === "granted";
+		if (!granted && !pushOnDevice(self.id)) return;
+		start.services.webPush.sync(pushLocale()).catch((err: unknown) => reportError("web push", err instanceof Error ? err.message : String(err)));
+	}, [start, self.id]);
 
 	// One services object per client and profile, so context readers re-render rarely.
 	const services = useMemo(() => (start.status === "ready" ? { ...start.services, self } : null), [start, self]);

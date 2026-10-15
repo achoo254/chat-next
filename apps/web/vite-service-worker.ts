@@ -3,9 +3,10 @@
 // them (index.html, the hashed assets, fonts, icons, the manifest), hashes
 // their contents into the build's version and finds the entry script
 // index.html loads (the build's name in build messages); all three are
-// compiled into the worker, so every build ships a worker of its own and a new build installs
+// compiled into the worker, with the brand's push sender name, so every build ships a worker of its own and a new build installs
 // as an update. The dev server has no worker.
 import { createHash } from "node:crypto";
+import { loadBrandConfig } from "@app/brand";
 import { fileURLToPath } from "node:url";
 import { build, type Plugin } from "vite";
 import type { AppShellBuild } from "./src/sw/app-shell-worker.ts";
@@ -53,7 +54,7 @@ export function serviceWorker(): Plugin {
 				configFile: false,
 				logLevel: "warn",
 				publicDir: false,
-				define: { __APP_SHELL__: JSON.stringify(shell) },
+				define: { __APP_SHELL__: JSON.stringify(shell), __PUSH_APP_NAME__: JSON.stringify(loadBrandConfig().pushSenderName) },
 				build: {
 					outDir,
 					emptyOutDir: false,

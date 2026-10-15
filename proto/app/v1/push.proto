@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package app.v1;
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+
+// Push delivery to the device of the calling session, while the app is
+// closed. A registration belongs to the chat session that made it: it ends
+// when the session is revoked or expires, so a signed-out device gets no
+// more pushes. Each session holds at most one registration.
+service PushService {
+  // The application server key to subscribe with and this session's
+  // registration, if any.
+  rpc GetWebPushConfig(GetWebPushConfigRequest) returns (GetWebPushConfigResponse);
+  // Stores the browser's Web Push subscription for this session, replacing
+  // the session's earlier one. Fails with failed_precondition
+  // "web_push_disabled" when the server has no VAPID key, and with
+  // invalid_argument when the endpoint is not a known browser push service
+  // or the keys are malformed.
+  rpc RegisterWebPush(RegisterWebPushRequest) returns (RegisterWebPushResponse);
+  // Removes this session's registration; succeeds when there is none.
+  rpc UnregisterWebPush(UnregisterWebPushRequest) returns (UnregisterWebPushResponse);
+}
+
+message GetWebPushConfigRequest {}
+
+message GetWebPushConfigResponse {
+  // VAPID public key (uncompressed P-256 point, 65 bytes), the
+  // applicationServerKey of PushManager.subscribe. Empty when Web Push is
+  // off on this server: clients then hide the option.
+  bytes application_server_key = 1;
+  // Endpoint registered by this session; empty when none.
+  string endpoint = 2;
+}
+
+message RegisterWebPushRequest {
+  // PushSubscription.endpoint: https on a browser vendor's push service.
+  string endpoint = 1;
+  // PushSubscription.getKey("p256dh"): uncompressed P-256 point, 65 bytes.
+  bytes p256dh = 2;
+  // PushSubscription.getKey("auth"): 16 bytes.
+  bytes auth = 3;
+  // Language of the notification text: "vi" or "en". Empty keeps the
+  // registration's current language ("vi" for a new one).
+  string locale = 4;
+}
+
+message RegisterWebPushResponse {}
+
+message UnregisterWebPushRequest {}
+
+message UnregisterWebPushResponse {}

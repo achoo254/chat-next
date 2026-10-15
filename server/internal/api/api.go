@@ -33,10 +33,12 @@ import (
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
+	"app.local/server/internal/push"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/rpc"
 	"app.local/server/internal/safehttp"
 	"app.local/server/internal/store"
+	"app.local/server/internal/webpush"
 )
 
 const (
@@ -62,6 +64,9 @@ type App struct {
 	// Assistant is the tenant's official bot; nil when it could not be set
 	// up (its username belongs to someone else).
 	Assistant *assistant.Service
+	// Push holds Web Push registrations and sends pushes (off without a
+	// VAPID key).
+	Push *push.Service
 
 	logger   *slog.Logger
 	cancel   context.CancelFunc
@@ -149,7 +154,14 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
-	chatSvc.SetCommitObserver(botUpdates.Kick)
+	pushSvc, err := newPush(cfg, st, chatSvc, hub, logger)
+	if err != nil {
+		return nil, err
+	}
+	chatSvc.SetCommitObserver(func() {
+		botUpdates.Kick()
+		pushSvc.Kick()
+	})
 	botAPI, err := botapi.New(botapi.Config{TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme},
 		chatSvc, botAdmin, botUpdates, limiter, logger.With("component", "botapi"))
 	if err != nil {
@@ -176,8 +188,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
-		Bots: botAdmin, BotUpdates: botUpdates, Feedback: feedback, TenantID: cfg.TenantID, TenantName: cfg.TenantDomain,
-		Logger: logger,
+		Bots: botAdmin, BotUpdates: botUpdates, Push: pushSvc, Feedback: feedback, TenantID: cfg.TenantID,
+		TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {
 		return nil, err
@@ -198,9 +210,10 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
-		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, logger: logger, cancel: cancel}
+		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, Push: pushSvc, logger: logger, cancel: cancel}
 	loops := []func(context.Context){
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
+		pushSvc.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
 	}
 	if assistantSvc != nil {
@@ -218,6 +231,30 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		}()
 	}
 	return app, nil
+}
+
+// newPush sets up Web Push: off (registrations refused, no consumer)
+// without WEB_PUSH_VAPID_PRIVATE_KEY.
+func newPush(cfg config.Config, st *store.Store, chatSvc *chat.Service, hub *gateway.Hub, logger *slog.Logger) (*push.Service, error) {
+	names, err := brand.Load()
+	if err != nil {
+		return nil, err
+	}
+	var sender *webpush.Sender
+	if wp := cfg.WebPush; wp != nil {
+		vapid, err := webpush.NewVAPID(wp.VAPIDKey, wp.Subject)
+		if err != nil {
+			return nil, err
+		}
+		if sender, err = webpush.NewSender(vapid, webpush.SenderOptions{AllowLocal: wp.AllowLocal, PadTo: push.PadTo}); err != nil {
+			return nil, err
+		}
+	}
+	logger.Info("web push", "enabled", sender != nil)
+	return push.New(st.Pool(), chatSvc, hub, push.Config{
+		TenantID: cfg.TenantID, AppName: names.PushSenderName, Sender: sender,
+		SessionIdleTimeout: store.SessionIdleTimeout, SessionMaxAge: store.SessionMaxAge,
+	}, logger.With("component", "push"))
 }
 
 // newAssistant sets up the tenant's assistant bot. When another account

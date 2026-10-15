@@ -1,5 +1,6 @@
 // Package brand holds the product names the server shows to users (the
-// assistant bot's name and messages). They come from brand.config.json at
+// assistant bot's name and messages, the title of push notifications that
+// hide the message). They come from brand.config.json at
 // the repository root, copied into brand.json by `pnpm brand:gen` because
 // a Go module cannot embed files outside itself; a test fails when the
 // copy is stale. Renaming the product needs brand.config.json, brand:gen
@@ -22,6 +23,8 @@ type Names struct {
 	AppName string `json:"appName"`
 	// ShortName is the name where space is short (bot names).
 	ShortName string `json:"shortName"`
+	// PushSenderName titles push notifications that hide the message.
+	PushSenderName string `json:"pushSenderName"`
 }
 
 // Load returns the embedded names.
@@ -35,8 +38,9 @@ func parse(b []byte) (Names, error) {
 		return Names{}, fmt.Errorf("brand: decode brand.json: %w", err)
 	}
 	n.AppName, n.ShortName = strings.TrimSpace(n.AppName), strings.TrimSpace(n.ShortName)
-	if n.AppName == "" || n.ShortName == "" {
-		return Names{}, fmt.Errorf("brand: brand.json needs appName and shortName")
+	n.PushSenderName = strings.TrimSpace(n.PushSenderName)
+	if n.AppName == "" || n.ShortName == "" || n.PushSenderName == "" {
+		return Names{}, fmt.Errorf("brand: brand.json needs appName, shortName and pushSenderName")
 	}
 	return n, nil
 }

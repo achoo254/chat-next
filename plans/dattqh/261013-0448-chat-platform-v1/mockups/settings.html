@@ -158,7 +158,7 @@
 
 	<!-- ============ Notifications ============ -->
 	<section class="shot" id="notifications">
-		<div class="shot-head"><h2>Thông báo</h2><span class="phase">Phase 6, 10, 11</span><p>Bật tắt theo loại chat, âm thanh, và nút thao tác trên thông báo của bản desktop. Badge mặc định không đếm chat đã tắt thông báo. Trình duyệt chưa cấp quyền thì báo ngay ở đầu trang kèm nút xin quyền.</p></div>
+		<div class="shot-head"><h2>Thông báo</h2><span class="phase">Phase 3, 6, 10, 11</span><p>Bật tắt theo loại chat, âm thanh, và nút thao tác trên thông báo của bản desktop. Badge mặc định không đếm chat đã tắt thông báo. Trình duyệt chưa cấp quyền thì báo ngay ở đầu trang kèm nút xin quyền. "Thiết bị này" bật thông báo đẩy (Web Push) cho riêng trình duyệt hoặc app đã cài này: tin mới vẫn báo khi đã đóng tab hoặc app; bật lần đầu thì trình duyệt hỏi quyền. Không báo khi bạn đang mở app ở thiết bị khác. Tắt "Hiện nội dung tin" thì thông báo đẩy chỉ ghi tên app và "Bạn có tin nhắn mới". Khung dưới: các trạng thái khác của thẻ này.</p></div>
 		<div class="frame tall"><div class="set">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<nav class="set-nav" data-active="notifications" aria-label="Danh mục cài đặt"></nav>
@@ -166,6 +166,10 @@
 				<header class="set-head"><h3>Thông báo</h3></header>
 				<div class="banner warn"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span class="grow">Trình duyệt này chưa cho phép thông báo.</span><button type="button" class="btn btn-sm" data-toast="Trình duyệt hỏi quyền hiển thị thông báo">Cho phép</button></div>
 				<div class="set-body">
+					<div class="card">
+						<h4 class="card-title">Thiết bị này</h4>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-bell"/></svg></span><span class="grow">Thông báo khi đã đóng app<small>Báo tin mới trên trình duyệt này cả khi đã đóng tab hoặc app</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thông báo khi đã đóng app"></button></div>
+					</div>
 					<div class="card">
 						<h4 class="card-title">Theo loại chat</h4>
 						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-user"/></svg></span><span class="grow">Chat riêng tư<small>Tin từ một người hoặc bot</small></span><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Thông báo chat riêng tư"></button></div>
@@ -194,6 +198,25 @@
 				</div>
 			</div>
 		</div></div>
+		<div class="frame auto">
+			<div class="set-main solo">
+				<header class="set-head"><h3>Thiết bị này</h3><span class="muted">Các trạng thái khác</span></header>
+				<div class="set-body">
+					<div class="card">
+						<h4 class="card-title">iPhone, iPad: chưa thêm vào Màn hình chính</h4>
+						<div class="row pad-x wrap-row"><span class="device"><svg class="icon"><use href="#i-mobile"/></svg></span><span class="grow">Thông báo khi đã đóng app<small>Trên iPhone và iPad, thêm app vào Màn hình chính rồi mở từ đó để nhận thông báo</small></span><a class="btn btn-sm" href="#app">Cách cài</a></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Trình duyệt đang chặn thông báo</h4>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-bell-off"/></svg></span><span class="grow">Thông báo khi đã đóng app<small>Bật lại quyền thông báo trong cài đặt trang của trình duyệt</small></span><button type="button" class="switch" role="switch" aria-checked="false" aria-disabled="true" disabled aria-label="Thông báo khi đã đóng app"></button></div>
+					</div>
+					<div class="card">
+						<h4 class="card-title">Trình duyệt không hỗ trợ</h4>
+						<div class="row pad-x"><span class="device"><svg class="icon"><use href="#i-bell-off"/></svg></span><span class="grow">Thông báo khi đã đóng app<small>Trình duyệt này không báo tin khi đã đóng tab. Thông báo vẫn hiện khi tab đang mở.</small></span></div>
+					</div>
+				</div>
+			</div>
+		</div>
 	</section>
 
 	<!-- ============ Appearance ============ -->
@@ -261,6 +284,56 @@
 				</div>
 			</div>
 		</div></div>
+	</section>
+
+	<!-- ============ Install the app ============ -->
+	<section class="shot" id="app">
+		<div class="shot-head"><h2>Cài ứng dụng</h2><span class="phase">PWA</span><p>Cài web app thành ứng dụng: mở từ màn hình chính hoặc thanh tác vụ, chạy trong cửa sổ riêng và nhận thông báo cả khi đã đóng. Mỗi trình duyệt chỉ thấy cách cài của nó: Chrome, Edge và trình duyệt Android có nút "Cài ứng dụng" (hộp xác nhận là của trình duyệt); Safari trên iPhone, iPad cần làm tay theo ba bước. Đang mở app đã cài thì chỉ còn dòng "Đã cài". Khung dưới: iPhone, đã cài, và trình duyệt không tự cài được.</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="app" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Cài ứng dụng</h3></header>
+				<div class="set-body">
+					<div class="card pad install-card">
+						<span class="install-logo" aria-hidden="true"><svg class="icon"><use href="#i-message"/></svg></span>
+						<div class="grow">
+							<b>Chat</b>
+							<p class="note">Mở nhanh từ màn hình chính hoặc thanh tác vụ, chạy trong cửa sổ riêng và báo tin mới cả khi đã đóng.</p>
+						</div>
+						<button type="button" class="btn btn-primary" data-toast="Trình duyệt hỏi: Cài đặt ứng dụng Chat?"><svg class="icon"><use href="#i-download"/></svg>Cài ứng dụng</button>
+					</div>
+					<p class="note">Cài xong, bật "Thông báo khi đã đóng app" trong <a class="link" href="#notifications">Cài đặt › Thông báo</a> của ứng dụng.</p>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame auto">
+			<div class="set-main solo">
+				<header class="set-head"><h3>Cài ứng dụng</h3><span class="muted">Safari trên iPhone, iPad</span></header>
+				<div class="set-body">
+					<div class="card pad stack">
+						<b>Thêm vào Màn hình chính</b>
+						<ol class="steps">
+							<li>Bấm nút Chia sẻ (ô vuông có mũi tên lên) trên thanh của Safari.</li>
+							<li>Chọn "Thêm vào Màn hình chính", rồi bấm "Thêm".</li>
+							<li>Mở Chat từ Màn hình chính, rồi bật "Thông báo khi đã đóng app" trong Cài đặt › Thông báo.</li>
+						</ol>
+						<p class="note">Thông báo khi đã đóng app cần iOS 16.4 trở lên và chỉ có ở app mở từ Màn hình chính.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="frame auto">
+			<div class="set-main solo">
+				<header class="set-head"><h3>Cài ứng dụng</h3><span class="muted">Đã cài, và trình duyệt không tự cài được</span></header>
+				<div class="set-body">
+					<div class="banner ok" role="status"><svg class="icon icon-sm"><use href="#i-check"/></svg><span class="grow">Bạn đang dùng Chat đã cài trên thiết bị này.</span></div>
+					<div class="card pad">
+						<p class="note">Mở menu của trình duyệt và chọn "Cài đặt ứng dụng" hoặc "Thêm vào màn hình chính". Không thấy mục này thì mở trang bằng Chrome, Edge, hoặc Safari trên iPhone.</p>
+					</div>
+				</div>
+			</div>
+		</div>
 	</section>
 
 	<!-- ============ Storage ============ -->
@@ -514,6 +587,13 @@
 .plain .row + .row { border-top: 1px solid var(--c-border-subtle); }
 .note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 .note .icon { vertical-align: -3px; }
+/* Install the app: logo, name and pitch, button; wraps under on narrow screens. */
+.install-card { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); }
+.install-card .grow { flex: 1 1 220px; min-width: 0; }
+.install-card .grow p { margin-top: var(--space-1); }
+.install-logo { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--c-primary-solid); color: var(--c-on-primary); }
+.steps { display: grid; gap: var(--space-2); margin: 0; padding-left: var(--space-5); }
+.steps .icon { vertical-align: -3px; }
 /* Keyboard shortcuts list: action on the left, keys on the right; wraps under on narrow screens. */
 .keys { margin: 0; }
 .key-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-height: 48px; padding: var(--space-2) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
@@ -731,7 +811,7 @@ a.btn { color: var(--c-text); text-decoration: none; }
 		<a class="icon-btn" href="#profile" aria-current="page" aria-label="Cài đặt">${icon("settings")}</a>`;
 	const NAV = [
 		["profile", "Hồ sơ", "user"], ["privacy", "Quyền riêng tư", "eye-off"], ["blocked", "Người đã chặn", "ban"], null,
-		["notifications", "Thông báo", "bell"], ["appearance", "Giao diện", "sun"], ["shortcuts", "Phím tắt", "command"], ["storage", "Dữ liệu và bộ nhớ", "database"], null,
+		["notifications", "Thông báo", "bell"], ["appearance", "Giao diện", "sun"], ["shortcuts", "Phím tắt", "command"], ["app", "Cài ứng dụng", "download"], ["storage", "Dữ liệu và bộ nhớ", "database"], null,
 		["sessions", "Phiên đăng nhập", "laptop"], ["tenant", "Tổ chức", "globe"], null,
 		["console.html", "Developer Console", "code"], ["export-delete", "Tài khoản", "key"],
 	];

@@ -99,6 +99,11 @@ Create:
 
 - 2026-10-15: hub có `OnlineUsers()` (cho `GetChatOnlineCount`); update theo người dùng mới `dialog_unread_mark`, `notification_settings` đi qua outbox như `dialog_mute`. Cài đặt thông báo mới chỉ được lưu và đồng bộ; áp vào push khi làm push (R7).
 
+### Kết quả PWA + Web Push (2026-10-16, chưa deploy)
+
+- Web Push cho trình duyệt và app cài từ trình duyệt: `PushService` (đăng ký gắn phiên chat, thu hồi phiên thì xoá), consumer outbox `push` gửi ngay sau commit, bỏ qua người đang dùng app ở foreground, tôn trọng tắt thông báo, loại chat, chặn, "Hiện nội dung tin" (tắt thì chỉ tên app và "Bạn có tin nhắn mới"); payload mã hoá RFC 8291, VAPID tự cài (stdlib Go), endpoint chỉ trên allowlist dịch vụ push của trình duyệt. Chi tiết: `server/README.md` mục Web Push.
+- Còn cho R7/R8: APNs, FCM native, làn và quota, badge counter, xoá thông báo chéo thiết bị bằng push (web chỉ đóng thông báo của chat khi app mở chat đó hoặc đọc ở thiết bị khác).
+
 ## Success Criteria
 
 - Người nhận online thấy tin < 150 ms p50 (dev), chat large 100k p99 ≤ 2 s (Phase 14 đo).

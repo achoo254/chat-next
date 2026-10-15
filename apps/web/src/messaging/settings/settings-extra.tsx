@@ -17,6 +17,8 @@ import type { Audience, BlockedPerson, Privacy } from "../data/remote.ts";
 import { setSoundInChat, useSoundInChat } from "../data/device-settings.ts";
 import { useNotificationSettings, useServices } from "../data/services.tsx";
 import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
+import { DevicePush, usePushOnDevice } from "./device-push.tsx";
+import { InstallSettings } from "./install-app.tsx";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
 
 export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
@@ -31,6 +33,8 @@ export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
 			return <AppearanceSettings />;
 		case "shortcuts":
 			return <ShortcutSettings />;
+		case "app":
+			return <InstallSettings />;
 		default:
 			return null;
 	}
@@ -288,7 +292,7 @@ function NotificationSettings() {
 					<span className="grow">{t.granted}</span>
 				</div>
 			)}
-			<NotificationOptions />
+			<NotificationOptions onPermission={setPermission} />
 		</>
 	);
 }
@@ -299,12 +303,13 @@ const CHAT_TYPES = [
 	{ icon: "megaphone", enabled: "channelsEnabled", preview: "channelsPreview" },
 ] as const satisfies readonly { icon: IconName; enabled: keyof CoreNotificationSettings; preview: keyof CoreNotificationSettings }[];
 
-/** The synced settings (Get/SetNotificationSettings) and the device-only sound in the open chat. */
-function NotificationOptions() {
+/** This device's Web Push, the synced settings (Get/SetNotificationSettings) and the device-only sound in the open chat. */
+function NotificationOptions({ onPermission }: { onPermission: (permission: NotificationPermission) => void }) {
 	const copy = useScreensCopy();
 	const { store, self, toasts } = useServices();
 	const synced = useNotificationSettings();
 	const inChat = useSoundInChat(self.id);
+	const pushed = usePushOnDevice(self.id);
 	// The store keeps the settings; the first load is started by the route (messaging-root.tsx).
 	const [load, reload] = useLoad(notificationSettingsData(store));
 	const loader = useLoader(load.status === "loading", copy.common.loading);
@@ -340,6 +345,7 @@ function NotificationOptions() {
 	];
 	return (
 		<div className="set-body">
+			<DevicePush onPermission={onPermission} />
 			<div className="card">
 				<h2 className="card-title">{t.byType}</h2>
 				{CHAT_TYPES.map((type, index) => {
@@ -395,7 +401,7 @@ function NotificationOptions() {
 					<Switch checked={settings.badgeMuted} label={t.badgeMuted} onChange={(on) => save({ badgeMuted: on })} />
 				</div>
 			</div>
-			<p className="note">{t.whileOpen}</p>
+			<p className="note">{pushed ? t.whileClosed : t.whileOpen}</p>
 		</div>
 	);
 }

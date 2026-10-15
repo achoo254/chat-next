@@ -17,6 +17,8 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
 	"flag"
@@ -107,6 +109,10 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 	}
 
 	secret, sessionKey := randomBase64(24), randomBase64(32)
+	vapidKey, err := newVAPIDKey()
+	if err != nil {
+		return err
+	}
 	idp, err := idptest.Serve(idpAddr, clientID, secret, Accounts)
 	if err != nil {
 		return fmt.Errorf("fake IdP: %w", err)
@@ -132,6 +138,10 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 		// The bots scenario runs its webhook receiver on loopback over http.
 		"BOT_WEBHOOK_ALLOW_LOCAL": "true",
 		"CHAT_OPERATOR_USER_IDS":  strconv.FormatInt(operator, 10),
+		// The web push scenario receives pushes on loopback over http.
+		"WEB_PUSH_VAPID_PRIVATE_KEY": vapidKey,
+		"WEB_PUSH_SUBJECT":           "mailto:e2e@example.test",
+		"WEB_PUSH_ALLOW_LOCAL":       "true",
 	}
 	cfg, err := config.Load(func(name string) (string, bool) { v, ok := env[name]; return v, ok })
 	if err != nil {
@@ -196,6 +206,20 @@ func mediaURL(apiAddr string) string {
 
 // randomBase64 is URL-safe so the client secret survives the form-encoding
 // of client_secret_basic unchanged.
+// newVAPIDKey returns a fresh VAPID private key in the form of
+// WEB_PUSH_VAPID_PRIVATE_KEY.
+func newVAPIDKey() (string, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return "", fmt.Errorf("vapid key: %w", err)
+	}
+	raw, err := key.Bytes()
+	if err != nil {
+		return "", fmt.Errorf("vapid key: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
 func randomBase64(n int) string {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)

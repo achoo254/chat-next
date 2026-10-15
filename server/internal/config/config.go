@@ -4,6 +4,7 @@
 package config
 
 import (
+	"crypto/ecdsa"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"app.local/server/internal/webpush"
 )
 
 // Environments.
@@ -66,6 +69,22 @@ type Config struct {
 	// Media is nil when MEDIA_S3_ENDPOINT is unset: media RPCs then answer
 	// failed_precondition and AppConfig.upload_size_max_bytes is 0.
 	Media *Media
+	// WebPush is nil when WEB_PUSH_VAPID_PRIVATE_KEY is unset: PushService
+	// then reports no key and refuses registrations.
+	WebPush *WebPush
+}
+
+// WebPush configures notifications to closed browser apps (package push).
+type WebPush struct {
+	// VAPIDKey is the VAPID private key (WEB_PUSH_VAPID_PRIVATE_KEY): the
+	// 32-byte P-256 scalar, base64url. Its public key is derived from it.
+	VAPIDKey *ecdsa.PrivateKey
+	// Subject is the operator contact push services see (WEB_PUSH_SUBJECT,
+	// mailto: or https:); CHAT_PUBLIC_URL by default.
+	Subject string
+	// AllowLocal accepts loopback endpoints (WEB_PUSH_ALLOW_LOCAL,
+	// development only: the end-to-end tests' push receiver).
+	AllowLocal bool
 }
 
 // Development reports whether the server runs in the development environment.
@@ -238,6 +257,10 @@ func Load(lookup Lookup) (Config, error) {
 	errs = append(errs, mediaErrs...)
 	c.Media = media
 
+	webPush, webPushErrs := loadWebPush(get, production, c.PublicURL)
+	errs = append(errs, webPushErrs...)
+	c.WebPush = webPush
+
 	if len(errs) > 0 {
 		return Config{}, errors.Join(errs...)
 	}
@@ -343,4 +366,44 @@ func decodeKey(s string) ([]byte, error) {
 		}
 	}
 	return nil, errors.New("not base64")
+}
+
+// loadWebPush reads the WEB_PUSH_* variables; nil without a VAPID key.
+func loadWebPush(get func(string) string, production bool, public *url.URL) (*WebPush, []error) {
+	var errs []error
+	allowLocal := false
+	switch raw := get("WEB_PUSH_ALLOW_LOCAL"); raw {
+	case "", "false", "0":
+	case "true", "1":
+		if production {
+			errs = append(errs, invalid("WEB_PUSH_ALLOW_LOCAL", "is only allowed when CHAT_ENV=development"))
+		}
+		allowLocal = !production
+	default:
+		errs = append(errs, invalid("WEB_PUSH_ALLOW_LOCAL", "must be true or false"))
+	}
+	raw := get("WEB_PUSH_VAPID_PRIVATE_KEY")
+	if raw == "" {
+		if get("WEB_PUSH_SUBJECT") != "" {
+			errs = append(errs, invalid("WEB_PUSH_SUBJECT", "needs WEB_PUSH_VAPID_PRIVATE_KEY"))
+		}
+		return nil, errs
+	}
+	key, err := webpush.ParseVAPIDKey(raw)
+	if err != nil {
+		errs = append(errs, invalid("WEB_PUSH_VAPID_PRIVATE_KEY", "must be a base64url P-256 private key (32 bytes)"))
+	}
+	subject := get("WEB_PUSH_SUBJECT")
+	switch {
+	case subject != "" && !strings.HasPrefix(subject, "mailto:") && !strings.HasPrefix(subject, "https://"):
+		errs = append(errs, invalid("WEB_PUSH_SUBJECT", "must be a mailto: or https: URI"))
+	case subject == "" && public != nil && public.Scheme == "https":
+		subject = public.String()
+	case subject == "":
+		errs = append(errs, invalid("WEB_PUSH_SUBJECT", "is required when CHAT_PUBLIC_URL is not https"))
+	}
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	return &WebPush{VAPIDKey: key, Subject: subject, AllowLocal: allowLocal}, nil
 }

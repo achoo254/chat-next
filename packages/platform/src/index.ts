@@ -55,6 +55,12 @@ export interface NotificationRequest {
 	/** Replaces an earlier notification with the same tag (one per chat). */
 	readonly tag: string;
 	readonly chatId: number;
+	/**
+	 * No window of the app was visible when the message arrived (what the
+	 * server sees as not foreground): a device with background push lets the
+	 * push show it instead.
+	 */
+	readonly background?: boolean;
 }
 
 /** User-visible notifications while the app runs. */

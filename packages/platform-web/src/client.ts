@@ -92,6 +92,18 @@ function readUserId(storage: Storage): number | undefined {
 	return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
+/** Closes the notifications the service worker showed from pushes with this tag (the chat was read or opened). */
+function closeWorkerNotifications(tag: string): void {
+	if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+	navigator.serviceWorker
+		.getRegistration()
+		.then((registration) => registration?.getNotifications({ tag }))
+		.then((shown) => {
+			for (const notification of shown ?? []) notification.close();
+		})
+		.catch(() => undefined);
+}
+
 export function createWebChat(options: WebChatOptions): WebChat {
 	const storage = options.storage ?? window.localStorage;
 	const worker = options.createWorker();
@@ -168,6 +180,7 @@ export function createWebChat(options: WebChatOptions): WebChat {
 			case "notify-clear":
 				notifications.get(message.tag)?.close();
 				notifications.delete(message.tag);
+				closeWorkerNotifications(message.tag);
 				return;
 			case "error":
 				options.onError?.(message.context, message.message);

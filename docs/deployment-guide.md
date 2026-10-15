@@ -163,6 +163,18 @@ Vận hành:
 
 - Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này. Cả hai không gọi được chính `.65` (`OUTBOUND_DENY_CIDRS`, xem trên), nên luật này không bị vượt bằng một URL trỏ về chính server.
 
+## Web Push và cài ứng dụng (PWA)
+
+Từ bản PWA + Web Push (2026-10-16): app cài được từ trình duyệt (Cài đặt › Cài ứng dụng) và báo tin mới khi đã đóng (Cài đặt › Thông báo › Thiết bị này). Giao thức ở [`server/README.md`](../server/README.md#web-push-package-internalpush-internalwebpush). Không đổi nginx (`sw.js`, `manifest.webmanifest` và icon đã được phục vụ; push đi ra từ server tới dịch vụ push của trình duyệt qua https, không có route mới). Migration `0018_web_push.sql` chạy cùng deploy (chỉ thêm bảng, trigger, cursor `push`). Bản này có đổi `infra/chat/` (thêm `generate-vapid-key.sh`, `setup-server.sh` gọi nó), nên deploy bằng root một lần để đồng bộ `/opt/chat/infra`.
+
+Bật Web Push trên production (một lần, bằng root):
+
+1. Sinh khoá VAPID vào `/opt/chat/.env`: `bash /opt/chat/infra/generate-vapid-key.sh /opt/chat/.env`. Script chỉ thêm `WEB_PUSH_VAPID_PRIVATE_KEY=` khi chưa có (không bao giờ thay khoá cũ: mọi trình duyệt đã đăng ký sẽ ngừng nhận push tới khi mở app lại), không in khoá riêng, in khoá công khai để đối chiếu. `setup-server.sh` cũng gọi script này. Tuỳ chọn `WEB_PUSH_SUBJECT=mailto:<email vận hành>` (mặc định là `CHAT_PUBLIC_URL`).
+2. `pm2 startOrReload /opt/chat/infra/ecosystem.config.cjs --only chat-api --update-env`; log khởi động có `"msg":"web push","enabled":true`.
+3. Kiểm: đăng nhập trên Chrome, Cài đặt › Thông báo có thẻ "Thiết bị này"; bật "Thông báo khi đã đóng app", đóng tab, nhắn từ tài khoản khác: thông báo hiện, bấm vào mở đúng chat. Trên iPhone (iOS 16.4+) phải thêm vào Màn hình chính rồi mở từ đó mới bật được. Lỗi gửi xem trong log `chat-api` (`push rejected`, `push not delivered`, kèm host dịch vụ push).
+
+Chưa có khoá thì Web Push tắt và app ẩn thẻ "Thiết bị này"; thông báo khi tab đang mở vẫn như trước. Tắt lại: xoá dòng khỏi `.env` rồi reload (subscription còn trong DB nhưng không được gửi; giữ nguyên dòng cũ nếu muốn bật lại mà không bắt người dùng đăng ký lại).
+
 ## Service worker: cập nhật
 
 Từ bản sửa cập nhật service worker (2026-10-15), deploy như thường: không đổi nginx, script hay biến môi trường. Hành vi ([`app-shell-worker.ts`](../apps/web/src/sw/app-shell-worker.ts)):

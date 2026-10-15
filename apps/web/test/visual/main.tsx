@@ -15,6 +15,7 @@ import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "../../src/app.tsx";
+import { captureInstallPrompt } from "../../src/install-prompt.ts";
 import "../../src/styles/fonts.css";
 import "../../src/styles/tokens.css";
 import "../../src/styles/app.css";
@@ -251,8 +252,21 @@ const SCREENS: Record<string, string> = {
 	"console-webhook": `/console/${hookedBot}/updates`,
 	"console-poll": `/console/${pollingBot}/updates`,
 	"console-stats": `/console/${hookedBot}/stats`,
+	// Settings › Thông báo with the device's Web Push card; Settings › Cài ứng dụng with the browser's offer.
+	"settings-notifications": "/settings/notifications",
+	"settings-app": "/settings/app",
 };
 const at = params.get("at");
+if (at === "settings-app") {
+	// The browser offers to install (beforeinstallprompt); the harness has no manifest to make it do so.
+	captureInstallPrompt();
+	window.dispatchEvent(
+		Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+			prompt: () => Promise.resolve(),
+			userChoice: Promise.resolve({ outcome: "dismissed" }),
+		}),
+	);
+}
 const screenPath = at === null ? undefined : SCREENS[at];
 if (screenPath !== undefined) window.history.replaceState(null, "", `${screenPath}${window.location.search}`);
 

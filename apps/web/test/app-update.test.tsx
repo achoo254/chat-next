@@ -4,6 +4,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILD_QUERY, BUILD_REPLY, type MessageTarget } from "../src/sw/build-messages.ts";
+import { OPEN_CHAT } from "../src/sw/push-messages.ts";
 
 type Module = typeof import("../src/register-service-worker.ts");
 
@@ -95,6 +96,16 @@ describe("following app updates", () => {
 		const port = { postMessage: vi.fn() };
 		container.listeners.get("message")?.(new MessageEvent("message", { data: { type: BUILD_QUERY }, ports: [port as unknown as MessagePort] }));
 		expect(port.postMessage).toHaveBeenCalledWith({ type: BUILD_REPLY, entry: MINE });
+	});
+
+	it("opens the chat of a push notification the worker focused this tab for", () => {
+		const container = new FakeContainer(worker(MINE));
+		mod.watchAppUpdates(container, MINE, 20);
+		window.history.replaceState(null, "", "/settings/profile");
+		container.listeners.get("message")?.(new MessageEvent("message", { data: { type: OPEN_CHAT, chatId: 12 } }));
+		expect(window.location.pathname).toBe("/c/12");
+		container.listeners.get("message")?.(new MessageEvent("message", { data: { type: OPEN_CHAT, chatId: "12" } }));
+		expect(window.location.pathname).toBe("/c/12");
 	});
 
 	it("finds this tab's entry script in the page", () => {
