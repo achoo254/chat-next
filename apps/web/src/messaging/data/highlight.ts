@@ -1,6 +1,10 @@
 // Accent-insensitive highlighting for search results: "tieng viet" marks
-// "Tiếng Việt". Each code point is folded on its own so positions map back
-// to the original text (vifold's whole-string fold collapses whitespace).
+// "Tiếng Việt", and "uan" marks "uần" inside "tuần". Each code point is folded
+// on its own so positions map back to the original text (vifold's
+// whole-string fold collapses whitespace). Marks follow the search rule
+// (@app/core textMatch): every occurrence of a query token, or only those
+// that start a word when every token is shorter than SUBSTRING_MIN_CHARS.
+import { matchesSubstrings, searchText } from "@app/core";
 
 export interface Segment {
 	readonly text: string;
@@ -13,16 +17,25 @@ function foldChar(char: string): string {
 		.replace(/\p{Mn}/gu, "")
 		.replaceAll("đ", "d")
 		.replaceAll("Đ", "d")
-		.toLowerCase();
+		.toLowerCase()
+		.replaceAll("ς", "σ");
+}
+
+const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
+
+/** Whether `index` of the folded text begins a word (no letter or digit just before it). */
+function startsWord(folded: string, index: number): boolean {
+	const before = [...folded.slice(Math.max(0, index - 2), index)].pop() ?? "";
+	return !LETTER_OR_NUMBER.test(before);
 }
 
 /** Splits `text` into marked and plain runs for every token of `query`. */
 export function highlight(text: string, query: string): Segment[] {
-	const tokens = query
-		.split(/\s+/)
-		.map((token) => [...token].map(foldChar).join(""))
+	const tokens = searchText(query)
+		.split(" ")
 		.filter((token) => token !== "");
 	if (tokens.length === 0 || text === "") return [{ text, match: false }];
+	const anywhere = matchesSubstrings(tokens);
 
 	// Folded text plus, for each folded UTF-16 unit, the original index it came from.
 	let folded = "";
@@ -40,10 +53,14 @@ export function highlight(text: string, query: string): Segment[] {
 	for (const token of tokens) {
 		let from = folded.indexOf(token);
 		while (from !== -1) {
-			const start = origin[from] ?? 0;
-			const end = origin[from + token.length] ?? text.length;
-			for (let i = start; i < end; i++) marked[i] = true;
-			from = folded.indexOf(token, from + token.length);
+			if (anywhere || startsWord(folded, from)) {
+				const start = origin[from] ?? 0;
+				const end = origin[from + token.length] ?? text.length;
+				for (let i = start; i < end; i++) marked[i] = true;
+				from = folded.indexOf(token, from + token.length);
+			} else {
+				from = folded.indexOf(token, from + 1);
+			}
 		}
 	}
 

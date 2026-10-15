@@ -1,6 +1,7 @@
 // Message search across people (release R4): a message is found without
-// accents by the person it was sent to, also from the server on a device
-// that never synced it, and never by someone outside the chat.
+// accents by the person it was sent to, also by the inside of its words
+// ("uần" in "tuần"), also from the server on a device that never synced it,
+// and never by someone outside the chat.
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { Browser } from "playwright";
@@ -46,7 +47,16 @@ scenario("Bình finds An's message without accents, also from the server on a ne
 	await hit.waitFor();
 	await hit.locator("mark", { hasText: "Lịch" }).waitFor();
 
+	// Inside a word, highlighted where it matched.
+	const inside = (await searchMessages(binh, "uần")).getByRole("button").filter({ hasText: AN_MESSAGE });
+	await inside.waitFor();
+	await inside.locator("mark", { hasText: /^uần$/ }).waitFor();
+
 	binhNew = await signIn(browser, "binh");
+	// Inside words, from the server: this device never synced the message.
+	const insideFromServer = (await searchMessages(binhNew, "ruc tu")).getByRole("button").filter({ hasText: AN_MESSAGE });
+	await insideFromServer.getByText("từ server").waitFor();
+	await insideFromServer.locator("mark", { hasText: /^rực$/ }).waitFor();
 	const fromServer = (await searchMessages(binhNew, "lich truc")).getByRole("button").filter({ hasText: AN_MESSAGE });
 	await fromServer.getByText("từ server").waitFor();
 	// Opening it jumps to the message in the chat.
@@ -58,4 +68,7 @@ scenario("Bình finds An's message without accents, also from the server on a ne
 	await searchMessages(chi, "lich truc");
 	await chi.page.getByText("Không có kết quả cho “lich truc”").waitFor();
 	assert.equal(await chi.page.getByRole("list", { name: "Kết quả tìm kiếm" }).count(), 0, "Chi sees message results");
+	await searchMessages(chi, "uần");
+	await chi.page.getByText("Không có kết quả cho “uần”").waitFor();
+	assert.equal(await chi.page.getByRole("list", { name: "Kết quả tìm kiếm" }).count(), 0, "Chi sees results inside words");
 });

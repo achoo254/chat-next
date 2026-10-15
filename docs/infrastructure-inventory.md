@@ -61,7 +61,7 @@ Thông tin IP thật của client lấy từ cấu hình real-IP Cloudflare có 
 ### PostgreSQL (dùng chung, cổng 5432, chỉ localhost)
 
 - Database `chat`, role `chat` (scram-sha-256), hai dòng `pg_hba.conf` 117–118 đặt trước các dòng `ident` chung; bản sao trước khi sửa là `pg_hba.conf.bak-20261014-090118` cạnh file.
-- Migration goose 0001–0011 (bảng `goose_db_version`). Extension: `pg_trgm` có sẵn từ 2026-10-15, được tạo trong DB `chat` bởi migration của tìm kiếm chuỗi con.
+- Migration goose 0001–0012 (bảng `goose_db_version`). Extension `pg_trgm` (gói `postgresql-contrib`) do migration 0012 tạo trong DB `chat`, chủ là role `chat` (chủ database, không phải superuser). Index trigram `gin_trgm_ops` trên `messages.search_text`.
 - Không sửa `postgresql.conf` hay cấu hình chung nào.
 
 ### Cron, sudo, chứng chỉ

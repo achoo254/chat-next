@@ -41,23 +41,48 @@ func (h *harness) foundIn(me, chatID int64, query string, filter *appv1.SearchFi
 	return out
 }
 
-func TestSearchIgnoresAccentsAndMatchesWordStarts(t *testing.T) {
+func TestSearchIgnoresAccentsAndMatchesSubstrings(t *testing.T) {
 	h := newHarness(t, nil)
 	alice, bob := h.user("alice"), h.user("bob")
 	chatID := h.group(alice, bob)
 	h.send(alice, chatID, "Người đẹp Đà Nẵng")
 	h.send(alice, chatID, "Ưu đãi tháng 10: giảm 1.250.000₫")
+	h.send(alice, chatID, "Lịch trực tuần này")
+	h.send(alice, chatID, "điện thoại khoan")
+	h.send(alice, chatID, "đi ăn trưa")
 
-	for _, q := range []string{"nguoi dep da nang", "Người đẹp", "NGUOI DEP", "da nan", "dep  da", "Đà Nẵ"} {
+	for _, q := range []string{"nguoi dep da nang", "Người đẹp", "NGUOI DEP", "da nan", "dep  da", "Đà Nẵ", "guoi", "ƯỜI ẸP", "uoi ep da"} {
 		if got := h.found(bob, q); !slices.Equal(got, []string{"Người đẹp Đà Nẵng"}) {
+			t.Errorf("%q found %q", q, got)
+		}
+	}
+	// Inside words, with or without accents; short words then match inside too.
+	for _, q := range []string{"uần", "uan", "truc tu", "ịch ực", "rực tuầ"} {
+		if got := h.found(bob, q); !slices.Equal(got, []string{"Lịch trực tuần này"}) {
 			t.Errorf("%q found %q", q, got)
 		}
 	}
 	if got := h.found(bob, "uu dai 1.250.000"); len(got) != 1 {
 		t.Errorf("number token: %q", got)
 	}
-	// Inside a word, or words of different messages, match nothing.
-	for _, q := range []string{"guoi", "nang uu", "dep thang"} {
+	if got := h.found(bob, "250"); len(got) != 1 {
+		t.Errorf("inside a number: %q", got)
+	}
+	// Words shorter than three letters only: word starts, the last one may
+	// be typed in part. "an" is not inside "khoan" or "Nẵng" then.
+	for q, want := range map[string][]string{
+		"di an": {"đi ăn trưa"},
+		"an":    {"đi ăn trưa"},
+		"di":    {"đi ăn trưa", "điện thoại khoan"},
+		"ng":    {"Người đẹp Đà Nẵng"},
+		"ơi":    nil,
+	} {
+		if got := h.found(bob, q); !slices.Equal(got, want) {
+			t.Errorf("%q found %q, want %q", q, got, want)
+		}
+	}
+	// Words of different messages, or across a space, match nothing.
+	for _, q := range []string{"nang uu", "dep thang", "ichtruc", "h tr"} {
 		if got := h.found(bob, q); len(got) != 0 {
 			t.Errorf("%q found %q", q, got)
 		}
@@ -65,6 +90,21 @@ func TestSearchIgnoresAccentsAndMatchesWordStarts(t *testing.T) {
 	// Nothing to match and no filter: no results, no error.
 	if got := h.found(bob, "  ?! "); len(got) != 0 {
 		t.Errorf("punctuation found %q", got)
+	}
+}
+
+func TestSearchSubstringRanksExactAccentsFirst(t *testing.T) {
+	h := newHarness(t, nil)
+	alice, bob := h.user("alice"), h.user("bob")
+	chatID := h.group(alice, bob)
+	for _, text := range []string{"mã nguồn mới", "sườn xào chua ngọt", "buồn ngủ quá"} {
+		h.send(alice, chatID, text)
+	}
+	if got, want := h.found(bob, "uồn"), []string{"buồn ngủ quá", "mã nguồn mới", "sườn xào chua ngọt"}; !slices.Equal(got, want) {
+		t.Fatalf("uồn:\n got %q\nwant %q", got, want)
+	}
+	if got, want := h.found(bob, "uon"), []string{"buồn ngủ quá", "sườn xào chua ngọt", "mã nguồn mới"}; !slices.Equal(got, want) {
+		t.Fatalf("uon:\n got %q\nwant %q", got, want)
 	}
 }
 
@@ -81,8 +121,10 @@ func TestSearchVisibility(t *testing.T) {
 	recalled := h.send(alice, chatID, "kế hoạch thu hồi").GetMessage().GetSeq()
 
 	// A non-member finds nothing and may not search the chat.
-	if got := h.found(carol, "ke hoach"); len(got) != 0 {
-		t.Fatalf("non-member found %q", got)
+	for _, q := range []string{"ke hoach", "oach uy"} {
+		if got := h.found(carol, q); len(got) != 0 {
+			t.Fatalf("non-member found %q with %q", got, q)
+		}
 	}
 	if _, err := h.svc.SearchChatMessages(ctx, carol, &appv1.SearchChatMessagesRequest{ChatId: chatID, Query: "ke hoach"}); err == nil {
 		t.Fatal("non-member searched the chat")
@@ -98,6 +140,9 @@ func TestSearchVisibility(t *testing.T) {
 	if got := h.found(bob, "ke hoach"); !slices.Equal(got, []string{"kế hoạch quý một"}) {
 		t.Fatalf("bob found %q", got)
 	}
+	if got := h.found(bob, "oạch"); !slices.Equal(got, []string{"kế hoạch quý một"}) {
+		t.Fatalf("bob found %q inside words", got)
+	}
 	if got := h.found(alice, "ke hoach"); !slices.Equal(got, []string{"kế hoạch bí mật", "kế hoạch quý một"}) {
 		t.Fatalf("alice found %q", got)
 	}
@@ -110,8 +155,10 @@ func TestSearchVisibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.send(alice, chatID, "kế hoạch quý hai")
-	if got := h.found(dave, "ke hoach"); !slices.Equal(got, []string{"kế hoạch quý hai"}) {
-		t.Fatalf("late member found %q", got)
+	for _, q := range []string{"ke hoach", "oach"} {
+		if got := h.found(dave, q); !slices.Equal(got, []string{"kế hoạch quý hai"}) {
+			t.Fatalf("late member found %q with %q", got, q)
+		}
 	}
 
 	// After leaving, nothing of the chat is found.
@@ -137,6 +184,9 @@ func TestSearchVisibility(t *testing.T) {
 	}
 	if got := h.found(alice, "ke hoach"); len(got) != 0 {
 		t.Fatalf("secret chat searched: %q", got)
+	}
+	if got := h.found(alice, "oach"); len(got) != 0 {
+		t.Fatalf("secret chat searched inside words: %q", got)
 	}
 }
 
@@ -261,6 +311,10 @@ func TestSearchCursorPagesWithoutRepeats(t *testing.T) {
 		if got, want := pages(t, h, bob, "bao cao", limit), pages(t, h, bob, "bao cao", 50); !slices.Equal(got, want) || len(got) != 11 {
 			t.Fatalf("unaccented limit %d: %q", limit, got)
 		}
+		// Inside words: the same hits in the same order.
+		if got := pages(t, h, bob, "áo cáo", limit); !slices.Equal(got, whole) {
+			t.Fatalf("inside words, limit %d:\n got %q\nwant %q", limit, got, whole)
+		}
 	}
 
 	// A cursor only continues its own search.
@@ -352,7 +406,7 @@ func TestSearchBackfillIndexesOldRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	// As rows written before the migration (or by the previous binary).
-	if _, err := h.st.Pool().Exec(ctx, `UPDATE messages SET search_tsv = NULL WHERE chat_id = $1`, chatID); err != nil {
+	if _, err := h.st.Pool().Exec(ctx, `UPDATE messages SET search_tsv = NULL, search_text = NULL WHERE chat_id = $1`, chatID); err != nil {
 		t.Fatal(err)
 	}
 	if got := h.found(bob, "di an trua"); len(got) != 0 {
@@ -366,11 +420,29 @@ func TestSearchBackfillIndexesOldRows(t *testing.T) {
 		t.Fatalf("after backfill: %q", got)
 	}
 	var empty int
-	if err := h.st.Pool().QueryRow(ctx, `SELECT count(*) FROM messages WHERE chat_id = $1 AND search_tsv IS NULL`, chatID).Scan(&empty); err != nil || empty != 0 {
+	if err := h.st.Pool().QueryRow(ctx, `SELECT count(*) FROM messages WHERE chat_id = $1 AND (search_tsv IS NULL OR search_text IS NULL)`, chatID).Scan(&empty); err != nil || empty != 0 {
 		t.Fatalf("rows left unindexed: %d, %v", empty, err)
 	}
 	if n, err := search.Backfill(ctx, h.st.Pool(), quiet); err != nil || n != 0 {
 		t.Fatalf("second backfill = %d, %v", n, err)
+	}
+	// A row the previous binary wrote after the migration: search_tsv set,
+	// no search_text. The backfill fills the search text alone.
+	if _, err := h.st.Pool().Exec(ctx, `UPDATE messages SET search_text = NULL WHERE chat_id = $1`, chatID); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.found(bob, "ăn trư"); len(got) != 0 {
+		t.Fatalf("row without search text found: %q", got)
+	}
+	if n, err := search.Backfill(ctx, h.st.Pool(), quiet); err != nil || n < 3 {
+		t.Fatalf("backfill of search text = %d, %v", n, err)
+	}
+	if got := h.found(bob, "ăn trư"); !slices.Equal(got, []string{"Đi ăn trưa không"}) {
+		t.Fatalf("after search text backfill: %q", got)
+	}
+	var recalledText string
+	if err := h.st.Pool().QueryRow(ctx, `SELECT search_text FROM messages WHERE chat_id = $1 AND seq = $2`, chatID, gone).Scan(&recalledText); err != nil || recalledText != "" {
+		t.Fatalf("recalled message search text %q, %v", recalledText, err)
 	}
 }
 

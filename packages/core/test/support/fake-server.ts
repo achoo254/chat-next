@@ -58,6 +58,7 @@ import {
 	SearchMessagesResponseSchema,
 	SearchFilterSchema,
 } from "@app/proto-ts/search";
+import { matchesSubstrings } from "../../src/search/index.ts";
 import { searchText } from "../../src/vifold/index.ts";
 import type { RemoteApi } from "../../src/protocol/api.ts";
 import type { MediaRef as WireMediaRef } from "@app/proto-ts/media";
@@ -343,8 +344,10 @@ export class FakeServer {
 	}
 
 	/**
-	 * SearchService over the visible messages: every query token starts a
-	 * word, the last may be cut short; newest first; the cursor is an offset.
+	 * SearchService over the visible messages, by the server's rule: every
+	 * query token inside the search text, or, when every token is short,
+	 * every token a word and the last one possibly cut short; newest first;
+	 * the cursor is an offset.
 	 */
 	private searchPage(
 		viewer: number,
@@ -372,7 +375,9 @@ export class FakeServer {
 				if (maxDate !== 0 && num(m.date) > maxDate) return false;
 				if (filter?.hasLink === true && m.linkPreview === undefined && !/https?:\/\//i.test(m.text)) return false;
 				if (tokens.length === 0) return m.text !== "" || m.media !== undefined;
-				const words = searchText(`${m.text}\n${m.media?.fileName ?? ""}`).split(" ");
+				const text = searchText(`${m.text}\n${m.media?.fileName ?? ""}`);
+				if (matchesSubstrings(tokens)) return tokens.every((token) => text.includes(token));
+				const words = text.split(" ");
 				return tokens.every((token, index) =>
 					index === tokens.length - 1 ? words.some((word) => word.startsWith(token)) : words.includes(token),
 				);

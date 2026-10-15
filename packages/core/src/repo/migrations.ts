@@ -255,6 +255,34 @@ export const MIGRATIONS: readonly Migration[] = [
 			END`,
 		],
 	},
+	{
+		version: 8,
+		statements: [
+			// Substring search (the server's rule, search/index.ts): a trigram
+			// FTS5 table over the same vifold search text, kept in step by
+			// triggers like messages_fts, which stays for queries of short
+			// words. case_sensitive 1: the text and the query are already
+			// folded, so a match is exactly a substring, as on the server.
+			`CREATE VIRTUAL TABLE messages_trigram USING fts5(
+				search_text,
+				content = 'messages',
+				content_rowid = 'id',
+				tokenize = 'trigram case_sensitive 1'
+			)`,
+			`CREATE TRIGGER messages_trigram_insert AFTER INSERT ON messages BEGIN
+				INSERT INTO messages_trigram (rowid, search_text) VALUES (new.id, new.search_text);
+			END`,
+			`CREATE TRIGGER messages_trigram_delete AFTER DELETE ON messages BEGIN
+				INSERT INTO messages_trigram (messages_trigram, rowid, search_text) VALUES ('delete', old.id, old.search_text);
+			END`,
+			`CREATE TRIGGER messages_trigram_update AFTER UPDATE OF search_text ON messages BEGIN
+				INSERT INTO messages_trigram (messages_trigram, rowid, search_text) VALUES ('delete', old.id, old.search_text);
+				INSERT INTO messages_trigram (rowid, search_text) VALUES (new.id, new.search_text);
+			END`,
+			// Index the messages already cached.
+			"INSERT INTO messages_trigram (messages_trigram) VALUES ('rebuild')",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -33,8 +34,8 @@ func TestFieldsFollowSharedVectors(t *testing.T) {
 	}
 	for i, v := range vectors {
 		f := FieldsOf("group", v.Input, nil)
-		if f.Lexemes != strings.Join(v.Tokens, " ") {
-			t.Errorf("#%d FieldsOf(%q).Lexemes = %q, want %q", i, v.Input, f.Lexemes, strings.Join(v.Tokens, " "))
+		if want := strings.Join(v.Tokens, " "); f.Lexemes != want || f.Text != want {
+			t.Errorf("#%d FieldsOf(%q) = %q / %q, want %q", i, v.Input, f.Text, f.Lexemes, want)
 			continue
 		}
 		q, err := parseQuery(v.Input)
@@ -44,10 +45,24 @@ func TestFieldsFollowSharedVectors(t *testing.T) {
 			}
 			t.Fatalf("#%d parseQuery(%q): %v", i, v.Input, err)
 		}
-		if !matchesLexemes(f.Lexemes, q.tokens) {
-			t.Errorf("#%d query %q does not find its own lexemes %q", i, v.Input, f.Lexemes)
+		if !matches(f, q) {
+			t.Errorf("#%d query %q does not find its own text %q", i, v.Input, f.Text)
 		}
 	}
+}
+
+// matches evaluates the condition of fetch in Go: every token inside the
+// search text, or for a query of short tokens only, the tsquery.
+func matches(f Fields, q query) bool {
+	if !q.substring {
+		return matchesLexemes(f.Lexemes, q.tokens)
+	}
+	for _, tok := range q.tokens {
+		if !strings.Contains(f.Text, tok) {
+			return false
+		}
+	}
+	return true
 }
 
 // matchesLexemes evaluates the tsquery of fetch in Go: every token a
@@ -77,14 +92,14 @@ func TestFieldsOf(t *testing.T) {
 		content  *appv1.Message
 		want     Fields
 	}{
-		{"text", "group", "Người đẹp Đà Nẵng", nil, Fields{Lexemes: "nguoi dep da nang"}},
-		{"caption and file name", "private", "Bản cuối", photo, Fields{Lexemes: "ban cuoi thiet ke_man v2 fig", MediaKind: 5}},
-		{"file without caption", "group", "", photo, Fields{Lexemes: "thiet ke_man v2 fig", MediaKind: 5}},
+		{"text", "group", "Người đẹp Đà Nẵng", nil, Fields{Text: "nguoi dep da nang", Lexemes: "nguoi dep da nang"}},
+		{"caption and file name", "private", "Bản cuối", photo, Fields{Text: "ban cuoi thiet ke_man v2 fig", Lexemes: "ban cuoi thiet ke_man v2 fig", MediaKind: 5}},
+		{"file without caption", "group", "", photo, Fields{Text: "thiet ke_man v2 fig", Lexemes: "thiet ke_man v2 fig", MediaKind: 5}},
 		{"service message", "group", "", &appv1.Message{Action: &appv1.MessageAction{}}, Fields{}},
 		{"secret chat", "secret", "Người đẹp", photo, Fields{}},
-		{"bare URL", "group", "xem https://example.test", nil, Fields{Lexemes: "xem https example.test", HasLink: true}},
-		{"text link", "group", "bấm đây", &appv1.Message{Entities: []*appv1.MessageEntity{{Type: appv1.EntityType_ENTITY_TYPE_TEXT_LINK}}}, Fields{Lexemes: "bam day", HasLink: true}},
-		{"preview", "group", "trang", &appv1.Message{LinkPreview: &appv1.LinkPreview{}}, Fields{Lexemes: "trang", HasLink: true}},
+		{"bare URL", "group", "xem https://example.test", nil, Fields{Text: "xem https example.test", Lexemes: "xem https example.test", HasLink: true}},
+		{"text link", "group", "bấm đây", &appv1.Message{Entities: []*appv1.MessageEntity{{Type: appv1.EntityType_ENTITY_TYPE_TEXT_LINK}}}, Fields{Text: "bam day", Lexemes: "bam day", HasLink: true}},
+		{"preview", "group", "trang", &appv1.Message{LinkPreview: &appv1.LinkPreview{}}, Fields{Text: "trang", Lexemes: "trang", HasLink: true}},
 		{"emoji only", "group", "👍🏽", nil, Fields{}},
 	}
 	for _, c := range cases {
@@ -98,6 +113,10 @@ func TestLongTokensAreCut(t *testing.T) {
 	f := FieldsOf("group", "x "+strings.Repeat("đ", 300), nil)
 	if got := strings.Split(f.Lexemes, " ")[1]; len(got) != LexemeMaxBytes {
 		t.Fatalf("lexeme of %d bytes", len(got))
+	}
+	// The search text keeps the whole token, so any part of it is found.
+	if f.Text != "x "+strings.Repeat("d", 300) {
+		t.Fatalf("search text %q", f.Text)
 	}
 	cut, wasCut := capLexeme(strings.Repeat("日", 100))
 	if !wasCut || len(cut) > LexemeMaxBytes || len(cut)%3 != 0 {
@@ -152,6 +171,62 @@ func TestParseQuery(t *testing.T) {
 	}
 	if _, err := parseQuery(strings.Repeat("á", QueryMaxRunes+1)); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("too long: %v", err)
+	}
+}
+
+func TestShortTokensMatchWordStarts(t *testing.T) {
+	cases := map[string]bool{
+		"uần":       true,  // three letters: a substring
+		"truc tu":   true,  // one long token makes every token a substring
+		"di an":     false, // two short tokens: word starts
+		"ng":        false,
+		"1.2":       true,  // three characters, whatever they are
+		"日本":        false, // two one-character tokens
+		"ab cd ef":  false,
+		"  ?! ":     false,
+		"Đường đi":  true,
+		"ĐƯỜNG":     true,
+		"a b c abc": true,
+	}
+	for text, want := range cases {
+		q, err := parseQuery(text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if q.substring != want {
+			t.Errorf("parseQuery(%q).substring = %t, want %t", text, q.substring, want)
+		}
+	}
+}
+
+func TestMatchCondition(t *testing.T) {
+	cases := []struct {
+		query string
+		sql   string
+		args  []any
+	}{
+		{"", "(length(m.search_tsv) > 0 OR m.media_kind <> 0)", nil},
+		{"uần", "m.search_text LIKE $1", []any{"%uan%"}},
+		{"truc tu", "m.search_text LIKE $1 AND strpos(m.search_text, $2) > 0", []any{"%truc%", "tu"}},
+		{"di an", "m.search_tsv @@ $1::tsquery", []any{"'di' & 'an':*"}},
+		// LIKE wildcards in a token are literal.
+		{"ke_man 100%", `m.search_text LIKE $1 AND m.search_text LIKE $2`, []any{`%ke\_man%`, "%100%"}},
+	}
+	for _, c := range cases {
+		q, err := parseQuery(c.query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		st := &statement{}
+		if got := q.match(st); got != c.sql || !slices.Equal(st.args, c.args) {
+			t.Errorf("match(%q) = %s %q, want %s %q", c.query, got, st.args, c.sql, c.args)
+		}
+	}
+}
+
+func TestLikeEscaper(t *testing.T) {
+	if got := likeEscaper.Replace(`a\b%c_d`); got != `a\\b\%c\_d` {
+		t.Fatalf("escaped %s", got)
 	}
 }
 

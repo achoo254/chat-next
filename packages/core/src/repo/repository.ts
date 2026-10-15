@@ -2,13 +2,14 @@
 import type { SqlDriver, SqlRow } from "@app/platform";
 import type { EventBus } from "../events/bus.ts";
 import type { Chat, Dialog, Message, NotificationSettings, SearchFilters, SyncState, User } from "../model/types.ts";
+import type { TextMatch } from "../search/index.ts";
 import { num, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
 import { CHAT_TOPIC, placeholders, type WriteBatch } from "./writes.ts";
 
 /** What Repository.search looks for. */
 export interface LocalSearchRequest {
-	/** FTS5 MATCH expression; null lists every message with content (filters only). */
-	readonly match: string | null;
+	/** How the query's tokens match; null lists every message with content (filters only). */
+	readonly match: TextMatch | null;
 	/** 0 = every chat. */
 	readonly chatId: number;
 	/** 0 = every topic. */
@@ -247,12 +248,21 @@ export class Repository {
 		const where: string[] = ["m.action IS NULL", "m.recalled = 0"];
 		const params: (string | number)[] = [];
 		let from = "messages m";
-		if (request.match !== null) {
+		const match = request.match;
+		if (match === null) {
+			where.push("(m.search_text <> '' OR m.media_kind IS NOT NULL)");
+		} else if (match.kind === "words") {
 			from = "messages_fts f JOIN messages m ON m.id = f.rowid";
 			where.push("messages_fts MATCH ?");
-			params.push(request.match);
+			params.push(match.fts);
 		} else {
-			where.push("(m.search_text <> '' OR m.media_kind IS NOT NULL)");
+			from = "messages_trigram t JOIN messages m ON m.id = t.rowid";
+			where.push("messages_trigram MATCH ?");
+			params.push(match.trigram);
+			for (const token of match.contains) {
+				where.push("instr(m.search_text, ?) > 0");
+				params.push(token);
+			}
 		}
 		if (request.chatId !== 0) {
 			where.push("m.chat_id = ?");

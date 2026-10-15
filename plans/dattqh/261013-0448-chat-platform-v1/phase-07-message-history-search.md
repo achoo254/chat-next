@@ -33,6 +33,15 @@ Tìm tin trong một chat và trên toàn bộ chat của người dùng: p50 �
 - Đo trên 200k tin trong 3.000 chat: p50 11,8 ms, p99 16,6 ms.
 - Phần dưới đây là thiết kế cho giai đoạn scale.
 
+## Tìm chuỗi con bằng pg_trgm (2026-10-15, chưa deploy)
+
+Người vận hành đã cài `postgresql-contrib` 16.8 trên `.65` (`pg_trgm` 1.6 có trong `pg_available_extensions`), nên bỏ giới hạn "khớp đầu từ":
+- Migration 0012 (chỉ thêm): `CREATE EXTENSION IF NOT EXISTS pg_trgm`, cột `messages.search_text` (chuỗi vifold của text, caption, tên file), GIN `gin_trgm_ops`; ghi cùng transaction gửi/sửa, xoá trắng khi thu hồi, backfill như `search_tsv`. `search_tsv` giữ lại: binary R4 vẫn đọc, và truy vấn toàn từ ngắn dùng nó.
+- Quy tắc (server và client như nhau): có ít nhất một từ ≥ 3 ký tự thì mọi từ là chuỗi con ("uần" ra "tuần", "truc tu" ra "trực tuần"); mọi từ < 3 ký tự thì khớp đầu từ như cũ. ACL, cursor, xếp hạng đúng dấu, bộ lọc không đổi.
+- Client: bảng FTS5 `messages_trigram` (tokenizer `trigram case_sensitive 1`, migration local 8, dựng lại từ cache khi nâng cấp); highlight web theo cùng quy tắc.
+- Role `chat` là chủ database nên tạo được extension trusted; thiếu quyền thì migrate lỗi 42501 và release cũ tiếp tục chạy (deployment-guide).
+- Đo trên 200k tin trong 3.000 chat (16 probe, 413 lần tìm, hai lần chạy): p50 15,2 / 14,7 ms, p99 35,4 / 33,5 ms; ngân sách p50 ≤ 100 ms, p99 ≤ 500 ms.
+
 ## Key Insights
 
 - Postgres là nguồn sự thật; index luôn dựng lại được.

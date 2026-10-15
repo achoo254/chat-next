@@ -15,10 +15,14 @@ const LexemeMaxBytes = 255
 // Fields are the search columns of a message row, written in the same
 // transaction as its content.
 type Fields struct {
-	// Lexemes are the vifold tokens of the text, caption and file name,
-	// each at most LexemeMaxBytes, joined by single spaces (tokens never
-	// contain one); "" when the message has nothing searchable. Store them
-	// with TSVector.
+	// Text is the vifold search text of the text, caption and file name
+	// (vifold.SearchText: the tokens joined by single spaces); "" when the
+	// message has nothing searchable. It fills search_text, which query
+	// words match as substrings through a trigram index.
+	Text string
+	// Lexemes are the same tokens, each cut to at most LexemeMaxBytes. Store
+	// them with TSVector; queries of short words only match them as word
+	// starts.
 	Lexemes   string
 	MediaKind int16
 	HasLink   bool
@@ -43,10 +47,12 @@ func FieldsOf(chatType, text string, content *appv1.Message) Fields {
 		source += "\n" + name
 	}
 	tokens := vifold.Tokens(source)
+	searchText := strings.Join(tokens, " ")
 	for i, t := range tokens {
 		tokens[i], _ = capLexeme(t)
 	}
 	return Fields{
+		Text:      searchText,
 		Lexemes:   strings.Join(tokens, " "),
 		MediaKind: int16(content.GetMedia().GetKind()),
 		HasLink:   hasLink(text, content),

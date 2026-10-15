@@ -1,9 +1,10 @@
 // Permission-driven purge (ADR 0009): when the user leaves or is removed
 // from a chat, or messages are hidden, the local copy goes too; recalled
 // messages keep only a placeholder.
-// The messages_fts triggers remove the search rows with the message rows, so
-// nothing purged stays searchable. Cached media follows through triggers on
-// messages (media_cache_refs) and the cache's orphan sweep.
+// The messages_fts and messages_trigram triggers remove the search rows with
+// the message rows, so nothing purged stays searchable. Cached media follows
+// through triggers on messages (media_cache_refs) and the cache's orphan
+// sweep.
 import { EventKeys } from "../events/bus.ts";
 import { CHAT_TOPIC, placeholders, retopDialog, type WriteBatch } from "../repo/writes.ts";
 

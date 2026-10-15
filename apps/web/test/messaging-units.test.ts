@@ -97,6 +97,22 @@ describe("highlight", () => {
 		expect(segments.map((s) => s.text).join("")).toBe("Build iOS lỗi ký số, đang xem");
 	});
 
+	it("marks matches inside words, and only word starts for short words alone", () => {
+		const marks = (text: string, query: string) =>
+			highlight(text, query)
+				.filter((s) => s.match)
+				.map((s) => s.text);
+		expect(marks("Lịch trực tuần này", "uần")).toEqual(["uần"]);
+		expect(marks("Lịch trực tuần này", "truc tu")).toEqual(["trực", "tu"]);
+		expect(marks("Lịch trực tuần này", "ich uc")).toEqual(["ịch", "ực"]);
+		// Short words alone match word starts only, as the search does.
+		expect(marks("Người trong nhóm", "ng")).toEqual(["Ng"]);
+		expect(marks("đi ăn trưa, khoan", "di an")).toEqual(["đi", "ăn"]);
+		// Punctuation of the query is not part of a word.
+		expect(marks("Giá 1.250.000 ₫", "1.250.000₫")).toEqual(["1.250.000"]);
+		expect(highlight("Lịch trực tuần này", "uần").map((s) => s.text).join("")).toBe("Lịch trực tuần này");
+	});
+
 	it("returns the text unmarked for an empty query", () => {
 		expect(highlight("Xin chào", " ")).toEqual([{ text: "Xin chào", match: false }]);
 	});

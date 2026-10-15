@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -225,6 +226,39 @@ func tsQuery(tokens []string) string {
 	return strings.Join(parts, " & ")
 }
 
+// likeEscaper escapes the LIKE wildcards and its escape character (the
+// default, a backslash) of a token.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// match is the condition on the search columns of m that the query's tokens
+// impose, its values added to st.
+//   - No token (filters alone): any message with content, not service
+//     messages. search_tsv tells, since the previous binary writes it too.
+//   - Substring: search_text contains every token. A token of at least
+//     SubstringMinRunes is a LIKE '%token%' the trigram index answers; a
+//     shorter one is a strpos the index ignores (a pattern without a whole
+//     trigram would scan all of it), checked on the rows the long ones
+//     found.
+//   - Word starts: the tsquery of the tokens on search_tsv.
+func (q query) match(st *statement) string {
+	switch {
+	case len(q.tokens) == 0:
+		return "(length(m.search_tsv) > 0 OR m.media_kind <> 0)"
+	case q.substring:
+		conds := make([]string, len(q.tokens))
+		for i, t := range q.tokens {
+			if utf8.RuneCountInString(t) >= SubstringMinRunes {
+				conds[i] = "m.search_text LIKE " + st.arg("%"+likeEscaper.Replace(t)+"%")
+			} else {
+				conds[i] = "strpos(m.search_text, " + st.arg(t) + ") > 0"
+			}
+		}
+		return strings.Join(conds, " AND ")
+	default:
+		return "m.search_tsv @@ " + st.arg(tsQuery(q.tokens)) + "::tsquery"
+	}
+}
+
 // fetch returns up to limit matches older than after (nil: from the newest)
 // and not older than bound (nil: no bound), newest first. withText loads the
 // text for the exact-accent ranking.
@@ -238,12 +272,7 @@ func (s scan) fetch(ctx context.Context, after, bound *key, limit int, withText 
 	st.and("m.deleted_at IS NULL")
 	st.and("m.seq >= cm.visible_from_seq")
 	st.and(`NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = ` + user + ` AND h.chat_id = m.chat_id AND h.seq = m.seq)`)
-	if len(s.q.tokens) > 0 {
-		st.and("m.search_tsv @@ " + st.arg(tsQuery(s.q.tokens)) + "::tsquery")
-	} else {
-		// Filters alone: any message with content (not service messages).
-		st.and("(length(m.search_tsv) > 0 OR m.media_kind <> 0)")
-	}
+	st.and(s.q.match(st))
 	if s.req.ChatID != 0 {
 		st.and("m.chat_id = " + st.arg(s.req.ChatID))
 	}

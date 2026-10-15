@@ -102,13 +102,21 @@ Server lấy link web đầu tiên của tin (entity `url`/`text_link`, hoặc U
 ## Tìm kiếm tin nhắn (package `internal/search`, R4)
 
 - `SearchMessages` tìm trên mọi chat người gọi đang là thành viên, `SearchChatMessages` trong một chat hoặc một topic. Lọc theo người gửi, loại media, có link, khoảng ngày; phân trang bằng cursor mờ (một trang hoặc đủ, hoặc là trang cuối; không lặp tin giữa các trang; cursor chỉ dùng được cho đúng truy vấn đã cấp nó).
-- Chỉ mục nằm ngay trong bảng `messages` (migration `0011_message_search`): `search_tsv` là tsvector dựng thẳng từ token vifold của chữ, chú thích và tên file (`array_to_tsvector`, không qua parser của Postgres), cùng `media_kind`, `has_link`; ghi trong cùng transaction với gửi, sửa, thu hồi (thu hồi xoá trắng). Chat `secret` không được đánh chỉ mục. Truy vấn: mọi token của câu tìm là một lexeme, token cuối khớp tiền tố, giống FTS5 ở client. Không dùng `pg_trgm` vì Postgres trên `.65` không có contrib.
+- Chỉ mục nằm ngay trong bảng `messages`, ghi trong cùng transaction với gửi, sửa, thu hồi (thu hồi xoá trắng); chat `secret` không được đánh chỉ mục:
+  - `search_text` (migration `0012_message_search_substring`): chuỗi tìm kiếm vifold (`SearchText`: token của chữ, chú thích và tên file nối bằng một khoảng trắng), GIN index `gin_trgm_ops` của extension `pg_trgm`.
+  - `search_tsv` (migration `0011_message_search`): tsvector dựng thẳng từ cùng các token (`array_to_tsvector`, không qua parser của Postgres), cùng `media_kind`, `has_link`.
+- Quy tắc khớp (giống hệt FTS5 ở client, xem `packages/core/src/search`): câu tìm được fold bằng vifold rồi tách token.
+  - Có ít nhất một token dài từ 3 ký tự (`SubstringMinRunes`, đếm code point): **mọi** token phải nằm đâu đó trong `search_text` (khớp chuỗi con, AND giữa các token). "uần" tìm ra "tuần", "truc tu" tìm ra "Lịch trực tuần". Token từ 3 ký tự là `search_text LIKE '%token%'` (escape `%`, `_`, `\`), được trigram index phục vụ; token ngắn hơn là `strpos(...) > 0`, chỉ lọc trên các dòng token dài đã tìm (mẫu không đủ một trigram sẽ buộc quét cả index).
+  - Mọi token đều ngắn hơn 3 ký tự ("ng", "di an"): chuỗi con 1–2 ký tự khớp gần như mọi tin và không có trigram, nên quay về khớp đầu từ trên `search_tsv`: mỗi token là một từ, token cuối khớp tiền tố (tsquery `'di' & 'an':*`).
+  - Token không bao giờ chứa khoảng trắng nên không khớp vắt qua hai từ ("ichtruc" không ra "lịch trực").
 - Quyền xem kiểm ngay trong SQL: thành viên hiện tại của chat chưa xoá thuộc tenant, `seq >= visible_from_seq`, không bị ẩn cho người gọi, không bị thu hồi. Tin trong topic bị ẩn vẫn tìm được.
 - Xếp hạng toàn cục: trong 500 kết quả mới nhất, tin chứa đúng dấu của câu tìm lên trước (so ở Go trên chữ gốc), sau đó tới các tin còn lại, mới nhất trước. Câu tìm không dấu và tìm trong chat chỉ xếp theo thời gian.
 - `Searcher` là interface để thay Postgres bằng Meilisearch hay OpenSearch sau này mà không đổi RPC.
-- Tin chưa có chỉ mục (`search_tsv IS NULL`: dòng có trước migration, hoặc do binary cũ ghi sau migration) được `search.Backfill` đánh chỉ mục mỗi lần chạy `-role migrate`.
+- Tin chưa có chỉ mục (`search_tsv` hoặc `search_text` là `NULL`: dòng có trước migration, hoặc do binary cũ ghi sau migration) được `search.Backfill` đánh chỉ mục mỗi lần chạy `-role migrate`.
+- `pg_trgm` có trong gói `postgresql-contrib` và là extension trusted (Postgres ≥ 13): role có quyền `CREATE` trên database (chủ database, như role `chat`) tự tạo được, không cần superuser (`TestMigrateCreatesTrigramExtensionAsDatabaseOwner`). Thiếu quyền đó thì migration 0012 báo `permission denied to create extension "pg_trgm"` (SQLSTATE 42501) và không đổi gì (`TestMigrateWithoutCreateOnDatabaseFails`); cách xử lý ở [deployment-guide](../docs/deployment-guide.md). Down của 0012 bỏ index và cột, giữ lại extension.
+- Trigram của `pg_trgm` chỉ lấy từ ký tự chữ/số theo `LC_CTYPE` của database. Chữ Việt sau fold là ASCII nên luôn có trigram; với `LC_CTYPE=C`, chữ ngoài ASCII (Hán, Kirin...) không sinh trigram, truy vấn vẫn đúng (Postgres kiểm lại `LIKE` trên từng dòng) nhưng quét cả index.
 - `SearchUsers` so tên đã bỏ dấu bằng hàm SQL `chat_fold_name`.
-- Đo tải: `CHAT_SEARCH_PERF=1 go test -run TestSearchLatency -v ./internal/search/` (200.000 tin, 3.000 chat của một người).
+- Đo tải: `CHAT_SEARCH_PERF=1 go test -run TestSearchLatency -v ./internal/search/` (200.000 tin, 3.000 chat của một người). Với tìm chuỗi con (2026-10-15, máy dev): p50 khoảng 15 ms, p99 khoảng 35 ms trên toàn bộ probe; trước đó chỉ khớp đầu từ: p50 11,8 ms, p99 16,6 ms.
 
 ## Media (package `internal/media`)
 

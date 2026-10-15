@@ -9,9 +9,12 @@
 // messages deleted for everyone, the tenant, and never a secret chat.
 //
 // Matching follows ADR 0005: the query is folded with vifold, so unaccented
-// input finds accented text. Every query token must start a word of the
-// message (its text, caption or file name); the last token may be the
-// beginning of a word, so results follow typing.
+// input finds accented text. Every query token must appear inside the
+// message (its text, caption or file name): "uan" finds "tuần". When every
+// token is shorter than SubstringMinRunes, a substring would match almost
+// every message and no trigram serves it, so the tokens must be words of
+// the message instead, the last one the beginning of a word, so results
+// follow typing ("di an" finds "đi ăn", not "điện thoại khoan").
 package search
 
 import (
@@ -35,6 +38,9 @@ const (
 	// PageDefault and PageMax bound a page of hits.
 	PageDefault = 20
 	PageMax     = 50
+	// SubstringMinRunes is the shortest token matched as a substring
+	// (a trigram); a query with no token this long matches word starts.
+	SubstringMinRunes = 3
 )
 
 // Order is how hits are ranked.
@@ -121,8 +127,11 @@ func (e *invalidError) Unwrap() error { return ErrInvalid }
 
 // query is a parsed request text.
 type query struct {
-	// tokens are the vifold tokens every hit must contain as word starts.
+	// tokens are the vifold tokens every hit must contain.
 	tokens []string
+	// substring: the tokens match anywhere in the search text (some token
+	// has SubstringMinRunes); otherwise as words, the last as a prefix.
+	substring bool
 	// words are the query's words in lower case with their accents, for the
 	// exact-accent ranking; accented is set when any word has a mark.
 	words    []string
@@ -137,6 +146,11 @@ func parseQuery(text string) (query, error) {
 	q := query{tokens: vifold.Tokens(text)}
 	if len(q.tokens) > TokensMax {
 		return query{}, invalid("the query has too many words")
+	}
+	for _, t := range q.tokens {
+		if utf8.RuneCountInString(t) >= SubstringMinRunes {
+			q.substring = true
+		}
 	}
 	for _, w := range strings.Fields(lowerNFC(text)) {
 		w = strings.TrimFunc(w, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) })

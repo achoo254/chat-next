@@ -104,6 +104,9 @@ Search engine không nhận danh sách token mà tự tách lại chuỗi đư�
 
 - **Cột được đánh chỉ mục và mọi truy vấn đều dùng `searchText(text)`**, không dùng `fold(text)` hay văn bản gốc. `searchText` chỉ chứa nội dung token và U+0020: dấu câu, emoji và mọi ký tự nằm giữa các token đã bị bỏ, và văn bản đã fold không còn khoảng trắng nào khác (bước 8 của `fold`).
 - Engine phải được cấu hình sao cho token của `searchText(x)` đúng bằng `tokens(x)`: chỉ U+0020 là ký tự tách, mọi ký tự khác là ký tự token.
+- **Quy tắc khớp**, giống nhau ở server và client: gọi `T = tokens(query)`.
+  - Nếu có ít nhất một token trong `T` dài từ 3 code point trở lên (`SUBSTRING_MIN_CHARS` trong TS, `SubstringMinRunes` trong Go): tin khớp khi **mọi** token của `T` là chuỗi con của `searchText` của tin (so đúng từng ký tự, không phân biệt gì thêm vì cả hai đã fold). Token không chứa U+0020 nên không khớp vắt qua hai token.
+  - Nếu mọi token đều ngắn hơn 3 code point: tin khớp khi mọi token trừ token cuối là một token của tin, và token cuối là tiền tố của một token của tin. Chuỗi con 1–2 ký tự khớp gần như mọi tin và không có trigram nào để dùng index.
 
 ### 4.1. SQLite FTS5 (DB local)
 
@@ -123,7 +126,18 @@ CREATE VIRTUAL TABLE message_fts USING fts5(
 - `tokenchars '<U+180E>'`: bảng của SQLite (Unicode 6.1) xếp U+180E vào `Zs`, còn Unicode hiện hành xếp vào `Cf` (không phải `White_Space`), nên `fold` giữ nó và nó có thể nằm trong token. Sau khi thêm, các ký tự tách còn lại đúng bằng các ký tự `White_Space` mà bảng SQLite xếp vào `Z*`.
 - Quy tắc trích dẫn: giá trị `tokenize` là một chuỗi SQL bọc bằng `"`, mỗi `"` bên trong viết thành `""`. Đối số của tokenizer bọc bằng `'`, mỗi `'` bên trong viết thành `''`. Ví dụ `tokenize = "unicode61 tokenchars '''.""'"` cho các ký tự token `'`, `.` và `"` (đã kiểm chứng). Cấu hình ở trên không cần `'` hay `"` trong `tokenchars` vì `P*` đã gồm chúng.
 
-Truy vấn: lấy `searchText(query)`, tách theo U+0020, đặt mỗi token vào biểu thức `MATCH` dưới dạng chuỗi FTS5 `"..."` (mỗi `"` trong token viết thành `""`), nối các chuỗi bằng khoảng trắng (AND ngầm định). Không đưa văn bản người dùng gõ trực tiếp vào `MATCH`.
+Truy vấn khớp đầu từ (mọi token ngắn): lấy `searchText(query)`, tách theo U+0020, đặt mỗi token vào biểu thức `MATCH` dưới dạng chuỗi FTS5 `"..."` (mỗi `"` trong token viết thành `""`), token cuối thêm `*`, nối các chuỗi bằng khoảng trắng (AND ngầm định). Không đưa văn bản người dùng gõ trực tiếp vào `MATCH`.
+
+Khớp chuỗi con dùng bảng FTS5 thứ hai trên cùng cột, tokenizer `trigram case_sensitive 1` (cần SQLite ≥ 3.34; `case_sensitive 1` vì văn bản và truy vấn đã fold, nên khớp đúng bằng phép so chuỗi con của server):
+
+```sql
+CREATE VIRTUAL TABLE messages_trigram USING fts5(
+  search_text, content = 'messages', content_rowid = 'id',
+  tokenize = 'trigram case_sensitive 1'
+);
+```
+
+Truy vấn: các token dài từ 3 code point vào `MATCH` của bảng trigram, mỗi token một chuỗi FTS5 `"..."` như trên (không có `*`); các token ngắn hơn kiểm bằng `instr(search_text, token) > 0` trên các dòng bảng trigram trả về. Kiểm chứng: [`packages/core/test/local-store.test.ts`](../../packages/core/test/local-store.test.ts) tìm lại mọi vector bằng chính câu của nó và bằng phần sau ký tự đầu của một token dài.
 
 Kiểm chứng: [`packages/core/test/vifold-fts5.test.ts`](../../packages/core/test/vifold-fts5.test.ts) chạy `node:sqlite` (SQLite 3.53.1 trong Node 24.18) với ba bài: index `searchText` của mọi vector và đòi token FTS5 (bảng `fts5vocab` kiểu `instance`) bằng `tokens`; tìm lại mọi vector bằng truy vấn dựng như trên; quét mọi code point không phải `White_Space` để chắc chắn nó là ký tự token dưới cấu hình này. Mỗi bản SQLite đóng gói cho web, iOS, Android và desktop phải qua cùng bài kiểm này trước khi dùng (cần FTS5 và tuỳ chọn `categories` của `unicode61`).
 
@@ -131,7 +145,9 @@ Sai khác còn lại (đã đo trên toàn bộ code point có thể nằm trong
 
 ### 4.2. Postgres (server)
 
-Server lưu `Tokens` của chữ, chú thích và tên file thành tsvector bằng `array_to_tsvector(string_to_array(SearchText, ' '))`: không qua parser hay từ điển của Postgres, nên lexeme đúng bằng token (mỗi token cắt còn tối đa 255 byte, vì lexeme của tsvector có giới hạn độ dài). Truy vấn là tsquery dạng nhập (ép kiểu `::tsquery`, không dùng `to_tsquery`) của `Tokens(query)`, mỗi token đặt trong nháy đơn, token cuối khớp tiền tố (`:*`). Kiểm chứng: [`server/internal/search/postgres_test.go`](../../server/internal/search/postgres_test.go) (`TestLexemesFollowSharedVectors`) đòi lexeme Postgres lưu bằng `tokens` và truy vấn của mỗi vector tìm lại được chính nó trên mọi vector. Nếu sau này thay Postgres bằng search engine khác (Meilisearch, OpenSearch), engine đó phải được cấu hình sao cho token của nó khớp `tokens` và qua cùng bài kiểm này.
+Server lưu `Tokens` của chữ, chú thích và tên file thành tsvector bằng `array_to_tsvector(string_to_array(SearchText, ' '))`: không qua parser hay từ điển của Postgres, nên lexeme đúng bằng token (mỗi token cắt còn tối đa 255 byte, vì lexeme của tsvector có giới hạn độ dài). Truy vấn khớp đầu từ (mọi token ngắn) là tsquery dạng nhập (ép kiểu `::tsquery`, không dùng `to_tsquery`) của `Tokens(query)`, mỗi token đặt trong nháy đơn, token cuối khớp tiền tố (`:*`).
+
+Khớp chuỗi con dùng cột `search_text` (chính `SearchText`, không cắt token) với GIN index `gin_trgm_ops` của `pg_trgm`: token dài từ 3 code point là `search_text LIKE '%token%'` (escape `\`, `%`, `_` của token), token ngắn hơn là `strpos(search_text, token) > 0`. `LIKE` phân biệt hoa thường, đúng với văn bản đã fold; trigram chỉ để lọc ứng viên, Postgres kiểm lại điều kiện trên từng dòng nên kết quả không phụ thuộc cách `pg_trgm` tách từ. Kiểm chứng: [`server/internal/search/postgres_test.go`](../../server/internal/search/postgres_test.go) (`TestLexemesFollowSharedVectors`) đòi lexeme Postgres lưu bằng `tokens` và điều kiện tìm kiếm thật (chuỗi con hoặc đầu từ) của mỗi vector tìm lại được chính nó trên mọi vector. Nếu sau này thay Postgres bằng search engine khác (Meilisearch, OpenSearch), engine đó phải được cấu hình sao cho token của nó khớp `tokens` và qua cùng bài kiểm này.
 
 ### 4.3. Phiên bản fold trong DB local
 
@@ -140,7 +156,7 @@ Server lưu `Tokens` của chữ, chú thích và tên file thành tsvector bằ
 - phiên bản đặc tả (ở đầu file này);
 - phiên bản Unicode/ICU của runtime: Node và Electron dùng `process.versions.unicode` và `process.versions.icu`; web và WebView không có API nào trả về phiên bản ICU (`Intl` cũng không), nên dùng phiên bản engine trong user agent và chấp nhận dựng lại thừa khi engine cập nhật; runtime native xác định khi có app native.
 
-Khi mở DB, nếu chuỗi đã lưu khác chuỗi hiện tại thì tính lại `searchText` cho mọi dòng và dựng lại bảng FTS5 trước khi cho tìm kiếm, rồi lưu chuỗi mới.
+Khi mở DB, nếu chuỗi đã lưu khác chuỗi hiện tại thì tính lại `searchText` cho mọi dòng và dựng lại cả hai bảng FTS5 (`messages_fts` và `messages_trigram`) trước khi cho tìm kiếm, rồi lưu chuỗi mới.
 
 ## 5. Hệ quả đã biết
 

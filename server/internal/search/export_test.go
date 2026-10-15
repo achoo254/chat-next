@@ -14,3 +14,15 @@ func TSQueryOf(text string) (string, error) {
 	}
 	return tsQuery(q.tokens), nil
 }
+
+// MatchSQL is the condition Search puts on the search columns of m for the
+// query text, with its values as $1, $2 and so on.
+func MatchSQL(text string) (string, []any, error) {
+	q, err := parseQuery(text)
+	if err != nil {
+		return "", nil, err
+	}
+	st := &statement{}
+	cond := q.match(st)
+	return cond, st.args, nil
+}

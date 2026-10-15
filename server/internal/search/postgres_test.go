@@ -158,10 +158,95 @@ func TestLexemesFollowSharedVectors(t *testing.T) {
 		if !slices.Equal(stored, want) || !found {
 			t.Errorf("#%d %q: lexemes %q (want %q), found by %s: %t", i, v.Input, stored, want, query, found)
 		}
+		// The condition Search runs, on the columns as the write paths
+		// store them.
+		cond, args, err := search.MatchSQL(v.Input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := len(args)
+		args = append(args, f.Text, f.Lexemes)
+		var matched bool
+		if err := pool.QueryRow(ctx, fmt.Sprintf(`SELECT %s FROM (SELECT $%d::text AS search_text, %s AS search_tsv, 0::smallint AS media_kind) m`,
+			cond, n+1, search.TSVector(fmt.Sprintf("$%d", n+2))), args...).Scan(&matched); err != nil {
+			t.Fatalf("#%d %q: %v", i, v.Input, err)
+		}
+		if !matched {
+			t.Errorf("#%d %q: not found by %s %q", i, v.Input, cond, args[:n])
+		}
 		checked++
 	}
 	if checked < 250 {
 		t.Fatalf("only %d vectors checked", checked)
+	}
+}
+
+// Query words match inside the words of the search text through the
+// trigram index; LIKE wildcards in a word are literal, and a query of short
+// words only matches word starts.
+func TestSubstringSearch(t *testing.T) {
+	start := time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
+	texts := []string{"Lịch trực tuần này", "thiết kế_màn v2", "thiết kế-màn v3", "kexman", "đi ăn trưa", "điện thoại khoan"}
+	var messages []seedMessage
+	for i, text := range texts {
+		messages = append(messages, seedMessage{chatIdx: i % 2, date: start.Add(time.Duration(i) * time.Minute), text: text})
+	}
+	s := seed(t, 2, messages)
+	p := search.NewPostgres(s.pool)
+	textOf := map[search.Hit]string{}
+	seqs := map[int]int64{}
+	for i, m := range messages {
+		seqs[m.chatIdx]++
+		textOf[search.Hit{ChatID: s.chats[m.chatIdx], Seq: seqs[m.chatIdx]}] = texts[i]
+	}
+	cases := map[string][]string{
+		"uần":     {"Lịch trực tuần này"},
+		"truc tu": {"Lịch trực tuần này"},
+		"e_m":     {"thiết kế_màn v2"},
+		"ke_man":  {"thiết kế_màn v2"},
+		"kế-mà":   {"thiết kế-màn v3"},
+		"xma":     {"kexman"},
+		"oan":     {"điện thoại khoan"},
+		"an":      {"đi ăn trưa"},
+		"di":      {"điện thoại khoan", "đi ăn trưa"},
+		"%":       nil,
+		"_ma":     {"thiết kế_màn v2"},
+	}
+	for query, want := range cases {
+		var got []string
+		for _, h := range s.all(t, p, search.Request{Query: query, Limit: 2}) {
+			got = append(got, textOf[h])
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%q found %q, want %q", query, got, want)
+		}
+	}
+
+	// The trigram index serves a substring condition (the planner would
+	// scan a table this small).
+	cond, args, err := search.MatchSQL("tuần trực")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, "SET LOCAL enable_seqscan = off"); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := tx.Query(ctx, "EXPLAIN SELECT chat_id, seq FROM messages m WHERE "+cond, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan := strings.Join(lines, "\n"); !strings.Contains(plan, "_search_text_idx") {
+		t.Fatalf("plan without the trigram index:\n%s", plan)
 	}
 }
 
@@ -277,6 +362,10 @@ func TestSearchLatency(t *testing.T) {
 		{"phrase unaccented", search.Request{Query: "lich truc tuan"}},
 		{"phrase accented", search.Request{Query: "kế hoạch triển khai"}},
 		{"prefix while typing", search.Request{Query: "ng"}},
+		{"inside a word", search.Request{Query: "uần"}},
+		{"inside words, pair", search.Request{Query: "oach rien"}},
+		{"long and short word", search.Request{Query: "truc tu"}},
+		{"rare inside a word", search.Request{Query: "ostgr"}},
 		{"word pair", search.Request{Query: "sinh nhat"}},
 		{"place", search.Request{Query: "da nang"}},
 		{"no match", search.Request{Query: "khongtontai"}},

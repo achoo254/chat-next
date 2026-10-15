@@ -11,8 +11,10 @@ import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../src/repo/migrations.ts";
 import { Repository } from "../src/repo/repository.ts";
 import { putMessage, putNewMessage, WriteBatch } from "../src/repo/writes.ts";
 import { purgeChat } from "../src/purge/index.ts";
-import { ftsQuery, searchLocal } from "../src/search/index.ts";
+import { ftsQuery, searchLocal, SUBSTRING_MIN_CHARS, textMatch } from "../src/search/index.ts";
+import { searchText } from "../src/vifold/index.ts";
 import { buildSnapshot, parseSnapshot } from "../src/snapshot/snapshot.ts";
+import { loadFoldVectors } from "./load-json.ts";
 import { MemorySqlFactory } from "./support/node-sql.ts";
 
 const TOO_BIG = 2n ** 53n;
@@ -64,6 +66,20 @@ describe("migrations", () => {
 		const rows = await driver.query("PRAGMA user_version");
 		expect(Number(rows[0]?.user_version)).toBe(SCHEMA_VERSION);
 		expect(MIGRATIONS.length).toBeGreaterThan(0);
+	});
+
+	it("index for substring search the messages cached before it existed", async () => {
+		const sql = new MemorySqlFactory();
+		const driver = await sql.open("m.sqlite3");
+		for (const migration of MIGRATIONS.filter((m) => m.version <= 7)) {
+			await driver.batch([...migration.statements.map((statement) => ({ sql: statement })), { sql: `PRAGMA user_version = ${migration.version}` }]);
+		}
+		const repo = new Repository(driver, new EventBus((cb) => cb()));
+		const w = new WriteBatch();
+		putMessage(w, message(1, 1, "Lịch trực tuần này"));
+		await repo.commit(w);
+		expect(await migrate(driver)).toBe("ready");
+		expect((await searchLocal(repo, "uần")).map((m) => m.seq)).toEqual([1]);
 	});
 
 	it("ask for a reset when the database comes from a newer build", async () => {
@@ -146,6 +162,62 @@ describe("local search (FTS5 + vifold)", () => {
 		expect(await searchLocal(repo, "   ")).toEqual([]);
 		// Every token is quoted, so user input cannot inject FTS5 syntax.
 		expect(ftsQuery('a" OR b*')).toBe('"a" "or" "b"*');
+		expect(textMatch('a" OR b*')).toEqual({ kind: "words", fts: '"a" "or" "b"*' });
+		expect(textMatch('tuần "AND" x ab')).toEqual({ kind: "substring", trigram: '"tuan" "and"', contains: ["x", "ab"] });
+		expect(textMatch(" ?! ")).toBeNull();
+	});
+
+	it("finds every shared vector by its own query and by the inside of its words", async () => {
+		const { repo } = await store();
+		const vectors = loadFoldVectors();
+		const w = new WriteBatch();
+		vectors.forEach((vector, index) => putMessage(w, message(1, index + 1, vector.input)));
+		await repo.commit(w);
+		const seqs = async (query: string) => (await searchLocal(repo, query, { limit: 500 })).map((m) => m.seq);
+		let inside = 0;
+		for (const [index, vector] of vectors.entries()) {
+			if (vector.tokens.length === 0) continue;
+			expect(await seqs(vector.input), JSON.stringify(vector.input)).toContain(index + 1);
+			// A long token without its first character is still found, when that
+			// rest is a query token of its own (not ".14" of "3.14").
+			const rest = vector.tokens
+				.filter((token) => [...token].length > SUBSTRING_MIN_CHARS)
+				.map((token) => [...token].slice(1).join(""))
+				.find((part) => searchText(part) === part);
+			if (rest !== undefined) {
+				expect(await seqs(rest), `${JSON.stringify(vector.input)} by ${rest}`).toContain(index + 1);
+				inside++;
+			}
+		}
+		expect(inside).toBeGreaterThan(100);
+	});
+
+	it("finds words inside words like the server, and word starts for short words only", async () => {
+		const { repo } = await store();
+		const w = new WriteBatch();
+		putMessage(w, message(1, 1, "Lịch trực tuần này"));
+		putMessage(w, message(1, 2, "điện thoại khoan"));
+		putMessage(w, message(1, 3, "đi ăn trưa"));
+		putMessage(w, message(1, 4, "thiết kế_màn v2"));
+		putMessage(w, message(1, 5, "kexman"));
+		await repo.commit(w);
+		const texts = async (query: string) => (await searchLocal(repo, query)).map((m) => m.text);
+		for (const query of ["uần", "uan", "truc tu", "ịch ực", "rực tuầ"]) {
+			expect(await texts(query), query).toEqual(["Lịch trực tuần này"]);
+		}
+		expect(await texts("oan")).toEqual(["điện thoại khoan"]);
+		expect(await texts("e_m")).toEqual(["thiết kế_màn v2"]);
+		expect(await texts("xma")).toEqual(["kexman"]);
+		// Short words only: word starts, the last one may be typed in part.
+		expect(await texts("di an")).toEqual(["đi ăn trưa"]);
+		expect(await texts("an")).toEqual(["đi ăn trưa"]);
+		expect(await texts("di")).toEqual(["đi ăn trưa", "điện thoại khoan"]);
+		// Not across a space or across messages.
+		expect(await texts("ichtruc")).toEqual([]);
+		expect(await texts("tuan khoan")).toEqual([]);
+		// The short words of a long query are substrings too.
+		expect(await texts("thoai oa")).toEqual(["điện thoại khoan"]);
+		expect(await texts("thoai ua")).toEqual([]);
 	});
 
 	it("forgets edited, deleted and purged text", async () => {
@@ -159,7 +231,9 @@ describe("local search (FTS5 + vifold)", () => {
 		purgeChat(edit, 2);
 		await repo.commit(edit);
 		expect(await searchLocal(repo, "mat")).toEqual([]);
+		expect(await searchLocal(repo, "hẩu")).toEqual([]);
 		expect(await searchLocal(repo, "da sua")).toHaveLength(1);
+		expect(await searchLocal(repo, "ã sửa")).toHaveLength(1);
 	});
 });
 

@@ -71,10 +71,10 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 	sf := search.FieldsOf(c.Type, m.Text, nm.content)
 	if _, err := t.tx.Exec(ctx, `
 		INSERT INTO messages (chat_id, seq, id, topic_id, from_id, random_id, date, text, content, reply_to_seq, grouped_id,
-			search_tsv, media_kind, has_link)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, `+search.TSVector("$12")+`, $13, $14)`,
+			search_tsv, search_text, media_kind, has_link)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, `+search.TSVector("$12")+`, $13, $14, $15)`,
 		m.ChatID, m.Seq, id, m.TopicID, m.FromID, m.RandomID, m.Date, m.Text, content, m.ReplyToSeq, m.GroupedID,
-		sf.Lexemes, sf.MediaKind, sf.HasLink); err != nil {
+		sf.Lexemes, sf.Text, sf.MediaKind, sf.HasLink); err != nil {
 		return nil, fmt.Errorf("chat: insert message: %w", err)
 	}
 	if c.Forum {
@@ -610,9 +610,9 @@ func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *me
 	if err := t.tx.QueryRow(ctx, `
 		UPDATE messages SET text = $3, content = $4, edit_version = edit_version + 1,
 			edit_date = CASE WHEN $5 THEN now() ELSE edit_date END, changed_at = now(),
-			search_tsv = `+search.TSVector("$6")+`, media_kind = $7, has_link = $8
+			search_tsv = `+search.TSVector("$6")+`, search_text = $7, media_kind = $8, has_link = $9
 		WHERE chat_id = $1 AND seq = $2 RETURNING edit_version, edit_date, changed_at`,
-		m.ChatID, m.Seq, text, raw, markEdited, sf.Lexemes, sf.MediaKind, sf.HasLink).Scan(&m.EditVersion, &m.EditDate, &m.ChangedAt); err != nil {
+		m.ChatID, m.Seq, text, raw, markEdited, sf.Lexemes, sf.Text, sf.MediaKind, sf.HasLink).Scan(&m.EditVersion, &m.EditDate, &m.ChangedAt); err != nil {
 		return fmt.Errorf("chat: edit message: %w", err)
 	}
 	m.Text, m.Content = text, raw
@@ -789,7 +789,7 @@ func (t *txn) hideMessages(ctx context.Context, c *chatRow, m *memberRow, me int
 // stay as recalled placeholders in everyone's history.
 func (t *txn) deleteMessages(ctx context.Context, c *chatRow, anyone bool, me int64, seqs []int64) error {
 	rows, err := t.tx.Query(ctx, `
-		UPDATE messages SET deleted_at = now(), text = '', content = NULL, search_tsv = ''::tsvector, media_kind = 0, has_link = false
+		UPDATE messages SET deleted_at = now(), text = '', content = NULL, search_tsv = ''::tsvector, search_text = '', media_kind = 0, has_link = false
 		WHERE chat_id = $1 AND seq = ANY($2) AND deleted_at IS NULL AND ($3 OR from_id = $4)
 		RETURNING seq, topic_id`, c.ID, seqs, anyone, me)
 	if err != nil {
