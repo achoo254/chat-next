@@ -8,7 +8,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "perf": "node test/perf/perf-gate.ts"
+    "perf": "node test/perf/perf-gate.ts",
+    "render-check": "node test/visual/render-check.ts"
   },
   "dependencies": {
     "@app/core": "workspace:*",

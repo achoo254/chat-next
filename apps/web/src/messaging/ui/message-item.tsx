@@ -7,8 +7,8 @@
 // webhooks (mockups/integrations.html#alert-message, #alert-grouping) carry
 // the "Tích hợp: <tên>" label, a Firing/Resolved chip when their first line
 // starts with one, URL buttons, and "đã cập nhật" when edited in place.
-import { memo, type ReactNode } from "react";
-import type { Chat, MessageButton, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
+import { Suspense, lazy, memo, type ReactNode } from "react";
+import type { Chat, MediaKind, MessageButton, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -18,12 +18,57 @@ import { useChat, useConnection, useItem, useMessage, useServices, useUser } fro
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
+import { pillContent } from "./reaction-pill.ts";
 import { isAllowedLink, linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { useIntent, useUi } from "./ui-context.tsx";
+import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
+
+// Photos, files, voice and uploads render with the media chunk, loaded the
+// first time a chat shows one; until then their box is reserved (box.ts).
+const mediaChunk = () => import("../media/media-content.tsx");
+const MessageMedia = lazy(() => mediaChunk().then((m) => ({ default: m.MessageMedia })));
+const AlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.AlbumMedia })));
+const PendingMediaView = lazy(() => mediaChunk().then((m) => ({ default: m.PendingMediaView })));
+const PendingAlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.PendingAlbumMedia })));
+const LinkPhoto = lazy(() => mediaChunk().then((m) => ({ default: m.LinkPhoto })));
+
+interface Shape {
+	readonly kind: MediaKind;
+	readonly width: number;
+	readonly height: number;
+}
+
+/** The box a message's media will fill, shown while the media chunk loads. */
+function MediaReserve({ shape, count, visual }: { shape: Shape; count: number; visual: boolean }) {
+	if (count > 1 && visual) return <span className="media-box" style={boxStyle(albumBox(count))} />;
+	if (count > 1) {
+		return (
+			<span className="media-slot">
+				{Array.from({ length: count }, (_, index) => (
+					<span key={index} className="media-box card" />
+				))}
+			</span>
+		);
+	}
+	if (isVisual(shape)) return <span className="media-box" style={boxStyle(mediaBox(shape.width, shape.height))} />;
+	return <span className="media-box card" />;
+}
+
+/** Keys of an album's messages joined by "," (the list passes a string so memo holds). */
+function splitKeys(albumKeys: string): string[] {
+	return albumKeys === "" ? [] : albumKeys.split(",");
+}
+
+/** Whether every message of an album is a photo or video (a grid) rather than files (a stack). */
+function visualAlbum(items: readonly ({ readonly kind: MediaKind } | undefined)[]): boolean {
+	return items.every((media) => media === undefined || isVisual(media));
+}
 
 interface MessageItemProps {
 	chatId: number;
 	itemKey: string;
+	/** Albums: every message's key joined by "," (this item is the first); "" for a single message. */
+	albumKeys?: string;
 	chat: Chat | null;
 	/** Read position of the other side, for the read ticks. */
 	readOutboxMaxSeq: number;
@@ -31,17 +76,27 @@ interface MessageItemProps {
 	tabbable: boolean;
 }
 
-export const MessageItem = memo(function MessageItem({ chatId, itemKey, chat, readOutboxMaxSeq, tabbable }: MessageItemProps) {
-	const item = useItem(chatId, itemKey);
+export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKeys = "", chat, readOutboxMaxSeq, tabbable }: MessageItemProps) {
+	const { store } = useServices();
+	const keys = splitKeys(albumKeys);
+	// An album's caption, reactions and menu belong to the message carrying the text (else the first).
+	const captionKey =
+		keys.find((key) => {
+			const candidate = store.item(chatId, key);
+			return candidate?.kind === "message" ? candidate.message.text !== "" : candidate?.kind === "pending" && candidate.pending.text !== "";
+		}) ?? itemKey;
+	const item = useItem(chatId, captionKey);
 	if (item === undefined) return null;
 	if (item.kind === "pending") {
-		return <PendingBubble chatId={chatId} itemKey={itemKey} pending={item.pending} chat={chat} tabbable={tabbable} />;
+		return <PendingBubble chatId={chatId} itemKey={captionKey} rowKey={itemKey} albumKeys={keys} pending={item.pending} chat={chat} tabbable={tabbable} />;
 	}
 	if (item.message.action !== null) return <SystemLine message={item.message} channel={chat?.type === "channel"} />;
 	return (
 		<MessageBubble
 			chatId={chatId}
-			itemKey={itemKey}
+			itemKey={captionKey}
+			rowKey={itemKey}
+			albumKeys={keys}
 			message={item.message}
 			chat={chat}
 			readOutboxMaxSeq={readOutboxMaxSeq}
@@ -139,8 +194,8 @@ function ForwardLine({ message }: { message: StoredMessage }) {
 	);
 }
 
-/** The latest reactors of a chip (up to 3, newest first), as avatars. */
-function ReactorAvatars({ ids }: { ids: readonly number[] }) {
+/** The faces of a pill: up to 3 latest people who reacted, newest first, "+N" for the rest. */
+function ReactorAvatars({ ids, more }: { ids: readonly number[]; more: number }) {
 	const { self } = useServices();
 	const nameOf = useNameOf(ids);
 	return (
@@ -149,31 +204,39 @@ function ReactorAvatars({ ids }: { ids: readonly number[] }) {
 				// Your own avatar shows your initials, not "Bạn".
 				<ChatAvatar key={id} id={id} name={id === self.id ? self.name : nameOf(id)} size="xs" />
 			))}
+			{more > 0 && <span className="r-n">+{more}</span>}
 		</span>
 	);
 }
 
 /**
- * One reaction chip: a click toggles yours; the context menu lists who
- * reacted with it. With the latest reactors known (channels: admins only)
- * it shows their avatars, and the count only when more people reacted.
+ * One reaction pill (Zalo placement, mockups/chat.html#rich-messages): a
+ * click toggles yours; right click, a long press or the menu keys list who
+ * reacted. Private chats and small groups show faces, others the count.
  */
-function ReactionChip({ message, reaction }: { message: StoredMessage; reaction: ReactionCount }) {
+function ReactionChip({ message, reaction, chat }: { message: StoredMessage; reaction: ReactionCount; chat: Chat | null }) {
 	const copy = useCopy();
-	const { remote, toasts } = useServices();
+	const { remote, toasts, self } = useServices();
 	const ui = useUi();
 	const { emoji, count, chosen } = reaction;
-	const reactors = reaction.recentUserIds.slice(0, 3);
-	const nameOf = useNameOf(reactors);
+	const content = pillContent(chat, reaction);
+	const faces = content.kind === "avatars" ? content.ids : [];
+	const nameOf = useNameOf(faces);
 	const trigger = useContextTrigger(() => ui.dialog.set({ kind: "reactors", chatId: message.chatId, seq: message.seq, emoji }), true);
-	const label = reactors.length > 0 ? copy.message.reactionBy(emoji, reactors.map(nameOf), count) : copy.message.reaction(emoji, count);
+	const label =
+		content.kind === "avatars"
+			? copy.message.reactionBy(
+					emoji,
+					faces.map((id) => (id === self.id ? copy.message.youInList : nameOf(id))),
+					count,
+				)
+			: copy.message.reaction(emoji, count, chosen);
 	return (
 		<button
 			type="button"
 			className="reaction"
 			aria-pressed={chosen}
 			aria-label={label}
-			title={copy.message.whoReacted(emoji)}
 			onClick={() => {
 				remote.setReaction(message.chatId, message.seq, chosen ? "" : emoji).catch(() => toasts.show(copy.common.failed));
 			}}
@@ -193,26 +256,50 @@ function ReactionChip({ message, reaction }: { message: StoredMessage; reaction:
 				trigger.onKeyDown(event);
 			}}
 		>
-			<span aria-hidden="true">{emoji}</span>
-			{reactors.length > 0 && <ReactorAvatars ids={reactors} />}
-			{count > reactors.length && <span aria-hidden="true">{count}</span>}
+			<span className="r-emoji" aria-hidden="true">
+				{emoji}
+			</span>
+			{content.kind === "avatars" ? (
+				<ReactorAvatars ids={content.ids} more={content.more} />
+			) : (
+				<span className="r-n" aria-hidden="true">
+					{count}
+				</span>
+			)}
 		</button>
 	);
 }
 
-function Reactions({ message }: { message: StoredMessage }) {
+/** The pill group floats over the bubble's bottom edge (yours: bottom-left, others': bottom-right). */
+function Reactions({ message, chat }: { message: StoredMessage; chat: Chat | null }) {
+	const copy = useCopy();
 	if (message.reactions.length === 0) return null;
 	return (
-		<div className="reactions">
+		<div className="reactions" role="group" aria-label={copy.message.reactions} title={copy.message.reactionsHint}>
 			{message.reactions.map((reaction) => (
-				<ReactionChip key={reaction.emoji} message={message} reaction={reaction} />
+				<ReactionChip key={reaction.emoji} message={message} reaction={reaction} chat={chat} />
 			))}
 		</div>
 	);
 }
 
 /** Buttons that show when the pointer is over a message (#context-menu); the keyboard has the menu. */
-function QuickActions({ chatId, itemKey, seq, label, canReply }: { chatId: number; itemKey: string; seq: number; label: string; canReply: boolean }) {
+function QuickActions({
+	chatId,
+	itemKey,
+	seq,
+	seqs,
+	label,
+	canReply,
+}: {
+	chatId: number;
+	itemKey: string;
+	seq: number;
+	/** Every message of an album, forwarded together. */
+	seqs: readonly number[];
+	label: string;
+	canReply: boolean;
+}) {
 	const copy = useCopy();
 	const ui = useUi();
 	return (
@@ -225,7 +312,7 @@ function QuickActions({ chatId, itemKey, seq, label, canReply }: { chatId: numbe
 					<Icon name="reply" small />
 				</button>
 			)}
-			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq })}>
+			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
 				<Icon name="forward" small />
 			</button>
 			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={() => ui.menu.set({ chatId, key: itemKey })}>
@@ -273,10 +360,11 @@ function MessageButtons({ rows, ctx }: { rows: readonly (readonly MessageButton[
 	);
 }
 
-function LinkPreviewCard({ preview, ctx }: { preview: LinkPreview; ctx: RichContext }) {
+function LinkPreviewCard({ preview, message, ctx }: { preview: LinkPreview; message: StoredMessage; ctx: RichContext }) {
+	const photo = message.linkPreview?.photo !== undefined;
 	return (
 		<a
-			className="lp"
+			className={photo ? "lp has-thumb" : "lp"}
 			href={preview.url}
 			target="_blank"
 			rel="noopener noreferrer"
@@ -288,6 +376,11 @@ function LinkPreviewCard({ preview, ctx }: { preview: LinkPreview; ctx: RichCont
 			<span className="site">{preview.site}</span>
 			<b>{preview.title}</b>
 			{preview.description !== "" && <span className="desc">{preview.description}</span>}
+			{photo && (
+				<Suspense fallback={<span className="thumb" aria-hidden="true" />}>
+					<LinkPhoto message={message} />
+				</Suspense>
+			)}
 		</a>
 	);
 }
@@ -295,6 +388,10 @@ function LinkPreviewCard({ preview, ctx }: { preview: LinkPreview; ctx: RichCont
 interface BubbleProps {
 	chatId: number;
 	itemKey: string;
+	/** Key of the list row (an album's first message); the item key otherwise. */
+	rowKey?: string;
+	/** Keys of an album's messages; empty for a single message. */
+	albumKeys?: readonly string[];
 	message: StoredMessage;
 	chat: Chat | null;
 	readOutboxMaxSeq: number;
@@ -303,7 +400,31 @@ interface BubbleProps {
 	inert?: boolean;
 }
 
-export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq, tabbable, inert = false }: BubbleProps) {
+/** The media of a message or album, in its reserved box until the media chunk is there. */
+function MediaSlot({ chatId, message, albumKeys }: { chatId: number; message: StoredMessage; albumKeys: readonly string[] }) {
+	const { store } = useServices();
+	if (albumKeys.length > 1) {
+		const shapes = albumKeys.map((key) => {
+			const item = store.item(chatId, key);
+			return item?.kind === "message" ? item.message.media : undefined;
+		});
+		const visual = visualAlbum(shapes);
+		return (
+			<Suspense fallback={<MediaReserve shape={message.media ?? { kind: "document", width: 0, height: 0 }} count={albumKeys.length} visual={visual} />}>
+				<AlbumMedia chatId={chatId} keys={albumKeys} visual={visual} />
+			</Suspense>
+		);
+	}
+	const media = message.media;
+	if (media === undefined) return null;
+	return (
+		<Suspense fallback={<MediaReserve shape={media} count={1} visual={isVisual(media)} />}>
+			<MessageMedia message={message} />
+		</Suspense>
+	);
+}
+
+export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [], message, chat, readOutboxMaxSeq, tabbable, inert = false }: BubbleProps) {
 	const copy = useCopy();
 	const { store, self, backend } = useServices();
 	const ui = useUi();
@@ -312,8 +433,9 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const preview = backend.features.has("linkPreview") ? backend.linkPreview(message) : null;
 	const integration = message.integrationLabel !== "";
 	const alert = integration ? splitAlert(message.text, message.entities) : null;
-	// With a preview card, buttons or reactions the time goes on its own line at the end (mock #rich-messages).
-	const trailingStamp = !message.recalled && (preview !== null || message.reactions.length > 0 || message.buttons.length > 0);
+	// With a preview card or buttons the time goes on its own line at the end (mock #rich-messages);
+	// reactions float over the bubble's edge and take no line.
+	const trailingStamp = !message.recalled && (preview !== null || message.buttons.length > 0);
 	const trigger = useMenuTrigger(chatId, itemKey);
 	const mine = message.fromId === store.selfId;
 	const channel = chat?.type === "channel";
@@ -324,6 +446,14 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	const atMe = !mine && mentionsSelf(message.text, message.entities, self.id, self.username);
 	const recalled = message.recalled;
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
+	const album = albumKeys.length > 1;
+	const hasMedia = message.media !== undefined || album;
+	const seqs = album
+		? albumKeys.flatMap((key) => {
+				const item = store.item(chatId, key);
+				return item?.kind === "message" ? [item.message.seq] : [];
+			})
+		: [message.seq];
 	const read = mine && readOutboxMaxSeq >= message.seq;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 	// A recalled message keeps its place only: nothing to reply to, react to or forward.
@@ -352,7 +482,7 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 	return (
 		<div
 			className={classes}
-			data-key={itemKey}
+			data-key={rowKey}
 			data-seq={message.seq}
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
 			{...(inert ? {} : trigger)}
@@ -402,7 +532,7 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 					</div>
 				</div>
 			) : (
-				<div className={integration ? `bubble integration${alert === null ? "" : ` ${alert.status}`}` : "bubble"}>
+				<div className={integration ? `bubble integration${alert === null ? "" : ` ${alert.status}`}` : hasMedia ? "bubble media" : "bubble"}>
 					{integration && (
 						<span className="int-label">
 							<Icon name="webhook" />
@@ -412,7 +542,8 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 					{showSender && !integration && <span className={`who s-${tone}`}>{senderName}</span>}
 					<ForwardLine message={message} />
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
-					{message.mediaKind !== null && <p className="via">{copy.message.media}</p>}
+					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
+					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} />}
 					{alert === null ? (
 						<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
 					) : (
@@ -432,18 +563,19 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 						</>
 					)}
 					<MessageButtons rows={message.buttons} ctx={ctx} />
-					{preview !== null && <LinkPreviewCard preview={preview} ctx={ctx} />}
-					<Reactions message={message} />
+					{preview !== null && <LinkPreviewCard preview={preview} message={message} ctx={ctx} />}
 					{trailingStamp && <p>{stamp}</p>}
 					{!inert && (
 						<QuickActions
 							chatId={chatId}
 							itemKey={itemKey}
 							seq={message.seq}
+							seqs={seqs}
 							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
 							canReply={canReply}
 						/>
 					)}
+					<Reactions message={message} chat={chat} />
 				</div>
 			)}
 		</div>
@@ -453,15 +585,44 @@ export function MessageBubble({ chatId, itemKey, message, chat, readOutboxMaxSeq
 interface PendingProps {
 	chatId: number;
 	itemKey: string;
+	/** Key of the list row (an album's first message); the item key otherwise. */
+	rowKey?: string;
+	/** Keys of an album being sent; empty for a single message. */
+	albumKeys?: readonly string[];
 	pending: PendingMessage;
 	chat: Chat | null;
 	tabbable: boolean;
 	inert?: boolean;
 }
 
-export function PendingBubble({ chatId, itemKey, pending, chat, tabbable, inert = false }: PendingProps) {
+function PendingMediaSlot({ chatId, pending, albumKeys }: { chatId: number; pending: PendingMessage; albumKeys: readonly string[] }) {
+	const { store } = useServices();
+	if (albumKeys.length > 1) {
+		const shapes = albumKeys.map((key) => {
+			const item = store.item(chatId, key);
+			return item?.kind === "pending" ? item.pending.media : undefined;
+		});
+		const visual = visualAlbum(shapes);
+		return (
+			<Suspense fallback={<MediaReserve shape={pending.media ?? { kind: "document", width: 0, height: 0 }} count={albumKeys.length} visual={visual} />}>
+				<PendingAlbumMedia chatId={chatId} keys={albumKeys} visual={visual} />
+			</Suspense>
+		);
+	}
+	const media = pending.media;
+	if (media === undefined) return null;
+	return (
+		<Suspense fallback={<MediaReserve shape={media} count={1} visual={isVisual(media)} />}>
+			<PendingMediaView pending={pending} />
+		</Suspense>
+	);
+}
+
+export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [], pending, chat, tabbable, inert = false }: PendingProps) {
 	const copy = useCopy();
 	const { source, toasts, self } = useServices();
+	// Media sends show their upload state (progress, cancel, retry) on the file itself.
+	const hasMedia = pending.media !== undefined || albumKeys.length > 1;
 	const connection = useConnection();
 	const ctx = useRichContext(self.id);
 	const trigger = useMenuTrigger(chatId, itemKey);
@@ -475,19 +636,20 @@ export function PendingBubble({ chatId, itemKey, pending, chat, tabbable, inert 
 		</Stamp>
 	);
 	const bubble = (
-		<div className="bubble">
+		<div className={hasMedia ? "bubble media" : "bubble"}>
 			{pending.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={pending.replyToSeq} />}
+			{hasMedia && <PendingMediaSlot chatId={chatId} pending={pending} albumKeys={albumKeys} />}
 			<RichText text={pending.text} entities={pending.entities} ctx={ctx} tail={stamp} />
 		</div>
 	);
 	return (
 		<div
 			className={chat?.type === "channel" ? "msg mine post" : "msg mine"}
-			data-key={itemKey}
+			data-key={rowKey}
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
 			{...(inert ? {} : trigger)}
 		>
-			{failed ? (
+			{failed && !hasMedia ? (
 				<div className="msg-stack">
 					{bubble}
 					{!inert && (

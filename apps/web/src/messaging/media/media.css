@@ -1,0 +1,168 @@
+/* Media screens (mockups/media.html): pictures in fixed boxes, albums, file
+   cards, voice, uploads, the attach tray, the voice recorder, the viewer and
+   shared media. Colours come only from tokens.css; loaded with the media
+   chunk only. */
+
+/* ---------- Pictures ---------- */
+.media-pic { position: relative; display: block; max-width: 100%; height: auto; overflow: hidden; border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
+.media-pic.video { background: var(--c-bar-track); }
+.pic-thumb, .pic-full { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The inline thumb is a few hundred bytes: upscaled and blurred until the real image lands on top. */
+.pic-thumb { filter: blur(12px); transform: scale(1.12); }
+.pic-open { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; padding: 0; border: 0; background: none; color: var(--c-on-primary); cursor: zoom-in; }
+.media-pic.video .pic-open { cursor: pointer; }
+.pic-open:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -4px; }
+.pic-state { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.pic-state > * { pointer-events: auto; }
+.round-btn { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-full); border: 0; background: var(--c-backdrop); color: var(--c-on-primary); }
+button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, transparent); }
+.round-btn .icon { width: 22px; height: 22px; }
+.round-btn .spin { width: 18px; height: 18px; }
+.chip-on-media { position: absolute; left: var(--space-2); bottom: var(--space-2); display: inline-flex; align-items: center; gap: var(--space-1); max-width: calc(100% - 2 * var(--space-2)); padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--c-text); color: var(--c-surface); font-size: 0.75rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.chip-on-media.top { top: var(--space-2); bottom: auto; }
+.chip-on-media.err { background: var(--c-error); color: var(--c-on-tone); }
+.ring { --p: 0; display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-full);
+	background: conic-gradient(var(--c-on-primary) calc(var(--p) * 1%), color-mix(in srgb, var(--c-on-primary) 25%, transparent) 0); }
+.ring .round-btn { width: 46px; height: 46px; }
+
+/* A message deleted for everyone keeps its box (no layout shift). */
+.media-pic.gone { display: grid; place-items: center; align-content: center; gap: var(--space-1); padding: var(--space-3); text-align: center; border: 1px dashed var(--c-border); color: var(--c-text-muted); font-size: 0.8125rem; }
+.media-pic.gone .icon { width: 28px; height: 28px; }
+.media-pic.gone strong { color: var(--c-text); font-weight: 600; font-size: 0.875rem; }
+
+/* Albums: a fixed 300px grid, squares (a wide first cell for three). */
+.album { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; width: 300px; max-width: 100%; border-radius: var(--radius-sm); overflow: hidden; }
+.album.n5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.album > * { aspect-ratio: 1 / 1; min-width: 0; }
+.album.n3 > :first-child { grid-column: span 2; aspect-ratio: 2 / 1; }
+.album .media-pic { width: 100%; height: 100%; border-radius: 0; }
+.album .media-pic.gone { padding: var(--space-1); font-size: 0.75rem; }
+.album .media-pic.gone strong { font-size: 0.75rem; }
+.file-stack { display: grid; gap: var(--space-1); }
+
+/* ---------- File cards ---------- */
+.file-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1); width: min(300px, 100%); }
+.file-ext { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--c-selected); color: var(--c-primary); font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 500; }
+.file-ext.grey { background: var(--c-bar-track); color: var(--c-text-muted); }
+.fc-text { display: grid; min-width: 0; }
+.fc-text b { display: block; font-weight: 500; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-text small { display: flex; align-items: center; gap: var(--space-1); font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.fc-text small.warn-text { color: var(--c-warning-text); }
+.fc-text small.err-text { color: var(--c-error-text); }
+.up-bar { display: block; height: 4px; margin-top: var(--space-1); border-radius: var(--radius-full); background: var(--c-bar-track); overflow: hidden; }
+.up-bar > span { display: block; height: 100%; border-radius: var(--radius-full); background: var(--c-primary-solid); transition: width var(--dur-base) var(--ease-standard); }
+.up-bar.waiting > span { background: var(--c-warning); }
+
+/* ---------- Voice ---------- */
+.voice { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: center; padding: var(--space-1); width: min(280px, 100%); }
+.voice .play { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: var(--radius-full); border: 0; background: var(--c-primary-solid); color: var(--c-on-primary); }
+.voice .play:hover:not(:disabled) { background: var(--c-primary-solid-hover); }
+.voice .play:disabled { opacity: 0.6; }
+.voice .play .spin { width: 16px; height: 16px; }
+.voice.gone-voice .play { background: var(--c-bar-track); color: var(--c-text-muted); }
+.voice-body { display: grid; gap: 2px; min-width: 0; }
+.wave { display: flex; align-items: center; gap: 2px; height: 28px; border-radius: var(--radius-xs); cursor: pointer; }
+.wave i { display: block; flex: 1; max-width: 3px; min-height: 3px; border-radius: 2px; background: var(--c-border-strong); }
+.wave i.on { background: var(--c-primary-solid); }
+.voice small { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- Attach tray (files waiting in the composer) ---------- */
+.attach-tray { display: grid; gap: var(--space-2); }
+.tray-head { display: flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+.tray-head span { flex: 1; min-width: 0; }
+.tray-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.tray-item { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; width: min(240px, 100%); padding: var(--space-1); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); background: var(--c-surface); }
+.tray-item .tray-pic { position: relative; width: 40px; height: 40px; border-radius: var(--radius-xs); overflow: hidden; background: var(--c-surface-subtle); }
+.tray-item .tray-pic img { width: 100%; height: 100%; object-fit: cover; }
+.tray-item .file-ext { width: 40px; height: 40px; }
+.tray-item b { display: block; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tray-item small { display: block; font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.tray-opts { display: flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; }
+.tray-opts label { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 32px; }
+
+/* ---------- Voice recorder ---------- */
+.recorder { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.recorder .rec-dot { width: 10px; height: 10px; flex: none; border-radius: var(--radius-full); background: var(--c-error); animation: rec-pulse 1.2s ease-in-out infinite; }
+@keyframes rec-pulse { 50% { opacity: 0.35; } }
+.recorder .rec-time { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 44px; }
+.recorder .rec-wave { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 2px; height: 28px; overflow: hidden; }
+.recorder .rec-wave i { display: block; flex: none; width: 3px; min-height: 3px; border-radius: 2px; background: var(--c-primary-solid); }
+.recorder .rec-note { flex: 1; min-width: 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.recorder .rec-note.err { color: var(--c-error-text); }
+
+/* ---------- Viewer: always dark, whatever the app theme ---------- */
+dialog.modal.viewer {
+	--v-bg: var(--c-text); --v-fg: var(--c-surface); --v-muted: color-mix(in srgb, var(--v-fg) 72%, var(--v-bg)); --v-btn: color-mix(in srgb, var(--v-fg) 12%, var(--v-bg));
+	width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border-radius: 0; overflow: hidden;
+	display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--v-bg); color: var(--v-fg); box-shadow: none;
+}
+:root[data-theme="dark"] dialog.modal.viewer { --v-bg: var(--c-bg); --v-fg: var(--c-text); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) dialog.modal.viewer { --v-bg: var(--c-bg); --v-fg: var(--c-text); } }
+.v-top { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); min-width: 0; }
+.v-top .who { flex: 1; min-width: 0; display: grid; }
+.v-top .who strong { font-weight: 600; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-top .who span { font-size: 0.8125rem; color: var(--v-muted); }
+.viewer .icon-btn { color: var(--v-fg); }
+.viewer .icon-btn:hover { background: var(--v-btn); color: var(--v-fg); }
+.viewer .icon-btn:disabled:hover { background: transparent; color: var(--v-fg); }
+.viewer :focus-visible { outline-color: var(--v-fg); }
+.v-zoom { min-width: 48px; text-align: center; font-size: 0.8125rem; color: var(--v-muted); font-variant-numeric: tabular-nums; }
+.v-stage { position: relative; container-type: size; display: grid; place-items: center; min-height: 0; overflow: hidden; padding: var(--space-2) var(--space-8); touch-action: pan-y pinch-zoom; }
+.v-stage.zoomed { cursor: grab; touch-action: none; }
+.v-frame { position: relative; display: block; overflow: hidden; max-width: 100%; max-height: 100%; transition: transform var(--dur-base) var(--ease-standard); }
+.v-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.v-frame .pic-thumb { object-fit: cover; }
+.v-stage video { display: block; max-width: 100%; max-height: 100%; background: var(--v-bg); }
+.v-nav { position: absolute; top: 50%; translate: 0 -50%; width: 48px; height: 48px; border-radius: var(--radius-full); background: var(--v-btn); }
+.v-nav.prev { left: var(--space-4); }
+.v-nav.next { right: var(--space-4); }
+.v-bottom { display: grid; gap: var(--space-2); justify-items: center; padding: var(--space-2) var(--space-4) var(--space-4); min-width: 0; }
+.v-bottom p { margin: 0; max-width: 72ch; font-size: 0.875rem; text-align: center; overflow-wrap: anywhere; }
+.v-bottom .count { font-size: 0.75rem; color: var(--v-muted); font-variant-numeric: tabular-nums; }
+.v-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); max-width: 100%; }
+.v-strip button { position: relative; width: 44px; height: 44px; padding: 0; border: 2px solid transparent; border-radius: var(--radius-xs); background: var(--v-btn); overflow: hidden; opacity: 0.6; }
+.v-strip button[aria-current="true"] { border-color: var(--v-fg); opacity: 1; }
+.v-strip img { width: 100%; height: 100%; object-fit: cover; }
+.v-gone { display: grid; justify-items: center; gap: var(--space-2); text-align: center; max-width: 42ch; }
+.v-gone .icon { width: 40px; height: 40px; color: var(--v-muted); }
+.v-gone strong { font-size: 1.125rem; font-weight: 600; }
+.v-gone span { color: var(--v-muted); font-size: 0.875rem; }
+.viewer .btn { background: var(--v-btn); border-color: transparent; color: var(--v-fg); }
+.viewer .spin { width: 24px; height: 24px; }
+
+/* ---------- Shared media (info column) ---------- */
+.info .media-rows .num { margin-left: auto; font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.sm-view .tabs { padding-top: var(--space-1); }
+.sm-view .tabs button { flex: 1; }
+.sm-body { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.sm-body h4 { margin: var(--space-2) 0 0; font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.sm-body h4:first-child { margin-top: 0; }
+.sm-body .note { font-size: 0.75rem; color: var(--c-text-muted); margin: 0; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.grid3 .media-pic { width: 100%; aspect-ratio: 1 / 1; border-radius: 0; }
+.grid3 .chip-on-media { left: var(--space-1); bottom: var(--space-1); padding: 0 var(--space-1); font-size: 0.6875rem; }
+.sm-list { display: grid; gap: 2px; margin: 0 calc(-1 * var(--space-2)); padding: 0; list-style: none; }
+.sm-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2); border-radius: var(--radius-sm); min-height: 56px; }
+.sm-row:hover { background: var(--c-hover); }
+.sm-row b { display: block; font-weight: 500; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-row small { display: block; font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-row .domain { font-family: var(--font-mono); color: var(--c-primary); }
+a.sm-row { color: inherit; text-decoration: none; }
+.link-tile { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); color: var(--c-icon-muted); }
+
+/* ---------- Narrow screens and touch ---------- */
+@media (max-width: 760px) {
+	.v-stage { padding: var(--space-2) var(--space-3); }
+	.v-nav { top: auto; bottom: var(--space-2); translate: none; }
+	.v-top { flex-wrap: wrap; padding: var(--space-2); gap: var(--space-1); }
+	.v-top .who { flex-basis: calc(100% - 56px); }
+	.v-zoom { min-width: 40px; }
+	.tray-item { width: 100%; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.tray-opts label { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.recorder .rec-dot { animation: none; }
+	.v-frame, .up-bar > span { transition: none; }
+}

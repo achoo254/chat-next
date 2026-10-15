@@ -1,6 +1,6 @@
 // The open chat or topic (mockups/chat.html#app, #channel, #topics,
 // #topic-states, #connection-states).
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type DragEvent } from "react";
 import type { Chat } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
@@ -9,7 +9,10 @@ import type { MessagingCopy } from "../copy/vi.ts";
 import { chatKind, dialogTitle } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
-import { useChat, useConnection, useDialog, useListEntry, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
+import { useChat, useConnection, useDialog, useListEntry, useMediaLimits, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
+import { addAttachments, dragHasFiles, viewer } from "../media/media-state.ts";
+import { sizeLimitLabel } from "./composer.tsx";
+import { useI18n } from "../../i18n/i18n.tsx";
 import { Composer } from "./composer.tsx";
 import { useOnlineCount } from "./members.ts";
 import { useIncomingSound } from "./incoming-sound.ts";
@@ -20,6 +23,38 @@ import { TopicIco } from "./topic-ico.tsx";
 import { useCell, useUi } from "./ui-context.tsx";
 
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
+const MediaViewer = lazy(() => import("../media/viewer.tsx"));
+
+/** The photo and video viewer of this chat (mockups/media.html#viewer), loaded when first opened. */
+function ViewerLayer({ chatId }: { chatId: number }) {
+	const target = useCell(viewer);
+	if (target === null || target.chatId !== chatId) return null;
+	return (
+		<Suspense fallback={null}>
+			<MediaViewer key={`${target.chatId}:${target.seq}`} chatId={target.chatId} seq={target.seq} onClose={() => viewer.set(null)} />
+		</Suspense>
+	);
+}
+
+/** Files dragged over the chat (#attach, right pane): what happens when they are dropped. */
+function DropZone({ count, maxBytes }: { count: number; maxBytes: number }) {
+	const copy = useCopy();
+	const { locale } = useI18n();
+	return (
+		<div className="drop-zone" role="status">
+			<Icon name="upload" />
+			<strong>{copy.composer.dropTitle}</strong>
+			<span>{copy.composer.dropBody(count, sizeLimitLabel(maxBytes, locale))}</span>
+		</div>
+	);
+}
+
+/** Whether the user may send media in the chat (groups: the SEND_MEDIA permission). */
+function canSendMedia(chat: Chat): boolean {
+	const admin = chat.myRole === "admin" || chat.myRole === "owner";
+	if (chat.type === "group") return admin || (chat.myPermissions & Permission.sendMedia) !== 0;
+	return true;
+}
 
 /** The message menu loads on first use. */
 function MessageMenu({ chat, readOutboxMaxSeq }: { chat: Chat; readOutboxMaxSeq: number }) {
@@ -147,6 +182,9 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const topics = useTopics(chatId, chat?.forum === true);
 	const topic = topics === null ? null : (topics.find((t) => t.id === topicId) ?? topics.find((t) => t.general) ?? topics[0] ?? null);
 	const effectiveTopic = topic?.id ?? 0;
+	const limits = useMediaLimits();
+	const [dragging, setDragging] = useState<number | null>(null);
+	const dragDepth = useRef(0);
 	useIncomingSound(chatId);
 
 	useEffect(() => {
@@ -188,8 +226,37 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const closedForMe = topic !== null && topic.closed && !admin;
 	const sendable = canSend(chat) && !closedForMe;
+	const mediaAllowed = sendable && canSendMedia(chat) && limits !== null && limits.uploadSizeMax > 0;
+	// Files dragged anywhere over the chat go to the composer's tray when dropped.
+	const dragHandlers = mediaAllowed
+		? {
+				onDragEnter: (event: DragEvent<HTMLElement>) => {
+					if (!dragHasFiles([...event.dataTransfer.types])) return;
+					event.preventDefault();
+					dragDepth.current++;
+					setDragging(event.dataTransfer.items.length);
+				},
+				onDragOver: (event: DragEvent<HTMLElement>) => {
+					if (!dragHasFiles([...event.dataTransfer.types])) return;
+					event.preventDefault();
+					event.dataTransfer.dropEffect = "copy";
+				},
+				onDragLeave: () => {
+					dragDepth.current = Math.max(0, dragDepth.current - 1);
+					if (dragDepth.current === 0) setDragging(null);
+				},
+				onDrop: (event: DragEvent<HTMLElement>) => {
+					if (!dragHasFiles([...event.dataTransfer.types])) return;
+					event.preventDefault();
+					dragDepth.current = 0;
+					setDragging(null);
+					addAttachments(chatId, effectiveTopic, [...event.dataTransfer.files]);
+					document.querySelector<HTMLTextAreaElement>(".convo .composer textarea")?.focus();
+				},
+			}
+		: {};
 	return (
-		<section className="convo" aria-label={topic?.title ?? title}>
+		<section className="convo" aria-label={topic?.title ?? title} {...dragHandlers}>
 			<header className="convo-head">
 				<button type="button" className="icon-btn narrow-only" aria-label={copy.convo.backToList} onClick={() => navigate(paths.home)}>
 					<Icon name="back" />
@@ -239,6 +306,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					channel={chat.type === "channel"}
 					label={chat.type === "channel" ? copy.composer.channelLabel : copy.composer.label(topic?.title ?? title)}
 					placeholder={placeholderFor(chat, topic, title, copy)}
+					media={canSendMedia(chat)}
 				/>
 			) : (
 				<div className="closed-bar" role="status">
@@ -247,6 +315,8 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</div>
 			)}
 			<MessageMenu chat={chat} readOutboxMaxSeq={view?.dialog.readOutboxMaxSeq ?? 0} />
+			<ViewerLayer chatId={chatId} />
+			{dragging !== null && limits !== null && <DropZone count={dragging} maxBytes={limits.uploadSizeMax} />}
 		</section>
 	);
 }

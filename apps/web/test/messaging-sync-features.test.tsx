@@ -147,20 +147,20 @@ describe("reaction chips", () => {
 		const f = demo.fixture;
 		const { huy, ha } = demo.ids.users;
 		const log = await openChat(demo, demo.ids.ops, "Dashboard ổn định.");
-		const chip = within(log).getByRole("button", { name: "👍 Bạn, Minh, Lan Anh" });
+		const chip = within(log).getByRole("button", { name: "👍 3 người: bạn, Minh, Lan Anh" });
 		expect(chip.querySelectorAll(".r-avs .avatar")).toHaveLength(3);
 		expect(chip.textContent).toBe("👍ĐTMLA");
 
 		f.react(huy, demo.ids.ops, Number(messageOf(log, "Dashboard ổn định.").dataset.seq), "🔥");
 		f.react(ha, demo.ids.ops, Number(messageOf(log, "Dashboard ổn định.").dataset.seq), "🔥");
-		const fire = await within(log).findByRole("button", { name: "🔥 Thu Hà, Quang Huy" }, LONG);
+		const fire = await within(log).findByRole("button", { name: "🔥 2 người: Thu Hà, Quang Huy" }, LONG);
 		expect(fire.textContent).toBe("🔥THQH");
 
 		const upgrade = within(log).getByText(/Sáng nay mình sẽ nâng cấp/).closest<HTMLElement>(".msg");
 		f.react(ha, demo.ids.ops, Number(upgrade?.dataset.seq), "👍");
-		const four = await within(log).findByRole("button", { name: "👍 Thu Hà, Bạn, Minh và 1 người khác" }, LONG);
+		const four = await within(log).findByRole("button", { name: "👍 4 người: Thu Hà, bạn, Minh và 1 người khác" }, LONG);
 		expect(four.querySelectorAll(".r-avs .avatar")).toHaveLength(3);
-		expect(four.textContent?.endsWith("4")).toBe(true);
+		expect(four.textContent?.endsWith("+1")).toBe(true);
 	});
 
 	it("falls back to the count when the server sends no reactors", async () => {
@@ -168,7 +168,7 @@ describe("reaction chips", () => {
 		const f = demo.fixture;
 		f.anonymousReactions.add(demo.ids.ops);
 		const log = await openChat(demo, demo.ids.ops, "Dashboard ổn định.");
-		const chip = within(log).getByRole("button", { name: "👍 3" });
+		const chip = within(log).getByRole("button", { name: "👍 3 người, gồm bạn" });
 		expect(chip.querySelector(".r-avs")).toBeNull();
 		expect(chip.textContent).toBe("👍3");
 	});

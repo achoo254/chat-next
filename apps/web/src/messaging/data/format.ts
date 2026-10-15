@@ -168,7 +168,11 @@ export function messagePreview(message: Message, nameOf: NameOf, copy: Messaging
 	if (message.action !== null) return actionText(message.action, nameOf(message.fromId), nameOf, copy, channel);
 	if (message.recalled) return copy.message.recalled;
 	if (message.text !== "") return oneLine(message.text);
-	if (message.mediaKind !== null) return copy.message.mediaPreview;
+	if (message.mediaKind !== null) {
+		const name = message.media?.fileName ?? "";
+		const kind = copy.message.mediaKind[message.mediaKind];
+		return message.mediaKind === "document" && name !== "" ? `${kind}: ${name}` : kind;
+	}
 	return copy.message.unsupportedTitle;
 }
 

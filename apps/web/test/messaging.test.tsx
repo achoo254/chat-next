@@ -107,7 +107,7 @@ describe("message rendering", () => {
 		expect(log.querySelector(".msg.at-me .mention.me")?.textContent).toBe("@ductrung");
 		expect(within(log).getByText(/^đã sửa/)).toBeTruthy();
 		expect(within(log).getByText("Nâng cấp Postgres gần như không gián đoạn")).toBeTruthy();
-		expect(within(log).getByRole("button", { name: "👍 Bạn, Minh, Lan Anh" }).getAttribute("aria-pressed")).toBe("true");
+		expect(within(log).getByRole("button", { name: "👍 3 người: bạn, Minh, Lan Anh" }).getAttribute("aria-pressed")).toBe("true");
 		expect(within(log).getByText("Lan Anh đã thêm Deploy Bot")).toBeTruthy();
 		expect((await within(log).findByRole("separator", {}, LONG)).textContent).toBe("Tin chưa đọc");
 		expect(within(log).getAllByRole("img", { name: "Đã xem" }).length).toBeGreaterThan(0);

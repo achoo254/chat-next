@@ -133,7 +133,7 @@ describe("messages", () => {
 
 	it("lists who reacted, per emoji", async () => {
 		const { log } = await openChat(`/c/${seedDemo().ids.ops}`, "Dashboard ổn định.");
-		fireEvent.contextMenu(within(log).getByRole("button", { name: "👍 Bạn, Minh, Lan Anh" }));
+		fireEvent.contextMenu(within(log).getByRole("button", { name: "👍 3 người: bạn, Minh, Lan Anh" }));
 		const dialog = await screen.findByRole("dialog", { name: "Ai đã thả cảm xúc" }, LONG);
 		// Only the chip's list opens, not the message's own menu.
 		expect(screen.queryByRole("menu", { name: "Thao tác với tin" })).toBeNull();

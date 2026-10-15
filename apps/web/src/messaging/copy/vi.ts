@@ -124,16 +124,23 @@ export const vi = {
 		reload: "Tải lại để cập nhật",
 		media: "Bản app này chưa hiển thị được ảnh, video và file. Nội dung đi kèm ở bên dưới.",
 		mediaPreview: "Ảnh, video hoặc file",
+		/** List and quote previews of a message without text, by kind of file. */
+		mediaKind: { photo: "Ảnh", video: "Video", voice: "Tin thoại", audio: "Âm thanh", document: "File", unknown: "File" },
 		integration: (label: string) => `Tích hợp: ${label}`,
 		/** An integration alert edited in place (firing → resolved), instead of "đã sửa". */
 		updated: "đã cập nhật",
 		alertFiring: "Firing",
 		alertResolved: "Resolved",
 		opensExternal: "(mở trang ngoài)",
-		reaction: (emoji: string, count: number) => `${emoji} ${count}`,
-		/** Names of the latest reactors (up to 3), "và n người khác" for the rest. */
+		/** A reaction pill shown as a count: "👍 3 người, gồm bạn". */
+		reaction: (emoji: string, count: number, mine: boolean) => `${emoji} ${count} người${mine ? ", gồm bạn" : ""}`,
+		/** A reaction pill with faces: the latest people (up to 3; "bạn" for you), "và n người khác" for the rest. */
 		reactionBy: (emoji: string, names: readonly string[], count: number) =>
-			`${emoji} ${names.join(", ")}${count > names.length ? ` và ${count - names.length} người khác` : ""}`,
+			`${emoji} ${count} người: ${names.join(", ")}${count > names.length ? ` và ${count - names.length} người khác` : ""}`,
+		/** You, inside a list of names. */
+		youInList: "bạn",
+		reactions: "Biểu cảm",
+		reactionsHint: "Bấm để thả hoặc bỏ · chuột phải hoặc nhấn giữ để xem ai đã thả",
 		recalled: "Tin nhắn đã thu hồi",
 		unknownUser: "Người dùng",
 		deleted: "Tin nhắn đã thu hồi",
@@ -143,7 +150,6 @@ export const vi = {
 		reply: "Trả lời",
 		forward: "Chuyển tiếp",
 		more: "Thêm thao tác",
-		whoReacted: (emoji: string) => `Xem ai đã thả ${emoji}`,
 	},
 	system: {
 		chatCreated: (actor: string, title: string, channel: boolean) => `${actor} đã tạo ${kind(channel)} “${title}”`,
@@ -193,6 +199,17 @@ export const vi = {
 		noPreviewDone: "Tin sẽ gửi không kèm xem trước link",
 		tooLong: (max: number) => `Tin dài quá ${max} ký tự`,
 		sendFailed: "Không lưu được tin để gửi. Thử lại.",
+		attach: "Đính kèm",
+		attachMenu: "Đính kèm",
+		attachMedia: "Ảnh hoặc video",
+		attachFile: "File",
+		attachMax: (size: string) => `tối đa ${size}`,
+		record: "Ghi âm tin thoại",
+		caption: "Thêm chú thích…",
+		dropTitle: "Thả file để gửi",
+		dropBody: (n: number, size: string) =>
+			`${n > 0 ? `${n} file · ` : ""}ảnh và video gửi thành album, file khác gửi dạng tài liệu. Tối đa ${size} mỗi file.`,
+		mediaFailed: "Chưa gửi được file, thử lại sau ít phút.",
 	},
 	info: {
 		online: "Đang hoạt động",

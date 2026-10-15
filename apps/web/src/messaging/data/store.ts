@@ -12,6 +12,7 @@ import {
 	type DialogView,
 	type FailureKind,
 	type HistoryRequest,
+	type MediaLimits,
 	type NotificationSettings,
 	type PendingMessage,
 	type ScreenSnapshot,
@@ -92,13 +93,16 @@ export function pendingKey(pending: PendingMessage): string {
 
 function messageSignature(message: StoredMessage): string {
 	const reactions = message.reactions.map((r) => `${r.emoji}:${r.count}:${r.chosen ? 1 : 0}:${r.recentUserIds.join("/")}`).join(",");
-	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${message.recalled ? 1 : 0}|${reactions}|${message.text}`;
+	// The server fills in media (poster, waveform) and link preview photos with edits that keep edit_version.
+	const media = message.media === undefined ? "" : `${message.media.fileId}:${message.media.sizes.length}:${message.media.waveform.length}:${message.media.inlineThumb.length}`;
+	const preview = message.linkPreview === null ? "" : `${message.linkPreview.title}:${message.linkPreview.photo?.fileId ?? ""}`;
+	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${message.recalled ? 1 : 0}|${reactions}|${media}|${preview}|${message.text}`;
 }
 
 function itemSignature(item: WindowItem): string {
 	return item.kind === "message"
 		? `m${messageSignature(item.message)}`
-		: `p${item.pending.outboxId}|${item.pending.failure ?? ""}|${item.pending.text}`;
+		: `p${item.pending.outboxId}|${item.pending.failure ?? ""}|${item.pending.albumId ?? 0}|${item.pending.text}`;
 }
 
 function sameKeys<T>(a: readonly T[], b: readonly T[]): boolean {
@@ -163,6 +167,9 @@ export class ChatStore {
 	private readonly lookups = new Map<string, StoredMessage | null>();
 	private readonly lookupsInFlight = new Set<string>();
 	private connection: ConnectionState = "connecting";
+	/** AppConfig media limits; null until read once. */
+	private limits: MediaLimits | null = null;
+	private readonly limitsRefresh = new Coalescer(() => this.loadLimits());
 	private readonly wantedUsers = new Set<number>();
 	private usersScheduled = false;
 	private readonly dialogRefresh = new Coalescer(() => this.loadDialogs());
@@ -192,6 +199,7 @@ export class ChatStore {
 		this.unsubscribe = source.events.subscribeBatches((keys) => this.onKeys(keys));
 		this.dialogRefresh.run();
 		this.settingsRefresh.run();
+		this.limitsRefresh.run();
 		this.refreshConnection();
 	}
 
@@ -546,9 +554,33 @@ export class ChatStore {
 				if (this.disposed || state === this.connection) return;
 				this.connection = state;
 				this.emit("connection");
+				// Limits read offline are the defaults: ask the server again once connected.
+				if (state === "connected" && this.limits?.fromServer !== true) this.limitsRefresh.run();
 			},
 			(err: unknown) => this.reportError(err, "connection state"),
 		);
+	}
+
+	// ------------------------------------------------------------- media limits
+
+	/** Upload limits (AppConfig); null until read. uploadSizeMax 0: media is off on this server. */
+	mediaLimits(): MediaLimits | null {
+		return this.limits;
+	}
+
+	private async loadLimits(): Promise<void> {
+		try {
+			const limits = await this.source.mediaLimits();
+			if (this.disposed) return;
+			const previous = this.limits;
+			if (previous !== null && previous.uploadSizeMax === limits.uploadSizeMax && previous.albumSizeMax === limits.albumSizeMax && previous.fromServer === limits.fromServer) {
+				return;
+			}
+			this.limits = limits;
+			this.emit("mediaLimits");
+		} catch (err) {
+			this.reportError(err, "media limits");
+		}
 	}
 
 	// ------------------------------------------------------------- message windows

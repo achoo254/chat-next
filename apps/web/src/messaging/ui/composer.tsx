@@ -1,24 +1,57 @@
-// Composer (R1: text, emoji, reply, edit; attachments arrive with R3).
+// Composer: text, emoji, reply, edit, and (R3) files and voice messages.
 // Enter sends, Shift+Enter breaks the line, Esc cancels reply or edit, ↑ in
 // an empty composer edits your last message (mockups/chat.html#composer-states,
 // settings.html#shortcuts). The placeholder says where the message goes; the
 // key hint under it shows until the first message sent on this device.
 // Sending is optimistic: the core shows the message at once with a clock.
 // Dropping the link preview sends the message with no_link_preview, so the
-// server attaches none.
-import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
+// server attaches none. The paper clip (shown when the server takes media)
+// picks photos and videos or any file; pasted images and files dropped on
+// the chat join them in the tray above the text, which becomes the caption
+// (mockups/media.html#attach). With nothing typed the send button turns
+// into the microphone, which records a voice message.
+import {
+	Suspense,
+	lazy,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+	type ChangeEvent,
+	type ClipboardEvent,
+	type FormEvent,
+	type KeyboardEvent,
+} from "react";
 import { codePointLength } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
+import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
-import { useConnection, useMessage, useServices } from "../data/services.tsx";
-import { useIntent, useUi } from "./ui-context.tsx";
+import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
+import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
+import { PopupMenu } from "./popup-menu.tsx";
+import { useCell, useIntent, useUi } from "./ui-context.tsx";
 
 const EmojiPicker = lazy(() => import("./emoji-picker.tsx").then((m) => ({ default: m.EmojiPicker })));
 // The reply/edit and link preview bars load the first time one shows.
 const bars = () => import("./composer-bars.tsx");
 const ComposeBar = lazy(() => bars().then((m) => ({ default: m.ComposeBar })));
 const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
+// Files waiting to be sent and the voice recorder load with the first use.
+const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
+const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
+
+/** Whether this browser can record a voice message (MediaRecorder and a microphone API). */
+function canRecord(): boolean {
+	return typeof MediaRecorder !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function";
+}
+
+/** "2 GB", "512 MB": the per-file limit next to "File" in the attach menu. */
+export function sizeLimitLabel(bytes: number, locale: string): string {
+	const gb = bytes / 2 ** 30;
+	if (gb >= 1) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(gb)} GB`;
+	return `${Math.round(bytes / 2 ** 20)} MB`;
+}
 
 const MAX_HEIGHT_PX = 160;
 const PREVIEW_DELAY_MS = 400;
@@ -50,10 +83,23 @@ interface ComposerProps {
 	label: string;
 	placeholder: string;
 	disabled?: boolean;
+	/** The chat lets this user send media (the server's limit is checked here). */
+	media?: boolean;
 }
 
-export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false }: ComposerProps) {
+export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false }: ComposerProps) {
 	const copy = useCopy();
+	const { locale } = useI18n();
+	const limits = useMediaLimits();
+	const files = useCell(attachments(chatId, topicId));
+	const [attachOpen, setAttachOpen] = useState(false);
+	const [recording, setRecording] = useState(false);
+	const pickMedia = useRef<HTMLInputElement>(null);
+	const pickFiles = useRef<HTMLInputElement>(null);
+	const attachButton = useRef<HTMLButtonElement>(null);
+	const attachAnchor = useRef<HTMLDivElement>(null);
+	// Media is off on the server (upload_size_max 0) or the chat does not allow it: no clip, no mic.
+	const mediaOn = media && limits !== null && limits.uploadSizeMax > 0 && !disabled;
 	const { source, remote, backend, drafts, store, toasts } = useServices();
 	const [hint, setHint] = useState(() => !hintDone());
 	const ui = useUi();
@@ -132,10 +178,41 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 		area.current?.focus();
 	};
 
+	const sendAttached = async (caption: string) => {
+		if (limits === null) return;
+		const current = intent;
+		const replyToSeq = current?.mode === "reply" ? current.seq : 0;
+		const picked = files;
+		const cell = attachments(chatId, topicId);
+		const asFiles = sendAsFiles(chatId, topicId);
+		cell.set([]);
+		setText("");
+		drafts.set(chatId, "", topicId);
+		try {
+			const [{ sendFiles }, { releasePreviews }] = await Promise.all([import("../media/send-media.ts"), import("../media/attach-tray.tsx")]);
+			const outcome = await sendFiles(source, { chatId, topicId, replyToSeq }, picked, caption, limits, asFiles.get());
+			releasePreviews(picked);
+			asFiles.set(false);
+			// Refused files stay in the tray with their reason.
+			if (outcome.refused.length > 0) cell.set(outcome.refused.map((entry) => entry.file));
+			cancelIntent();
+		} catch {
+			cell.set(picked);
+			setText(caption);
+			drafts.set(chatId, caption, topicId);
+			toasts.show(copy.composer.mediaFailed);
+		}
+	};
+
 	const submit = async (event?: FormEvent) => {
 		event?.preventDefault();
 		const value = text.trim();
-		if (value === "" || disabled) return;
+		if (disabled) return;
+		if (files.length > 0 && intent?.mode !== "edit") {
+			await sendAttached(value);
+			return;
+		}
+		if (value === "") return;
 		const limits = await remote.limits().catch(() => ({ messageLengthMax: 0 }));
 		if (limits.messageLengthMax > 0 && codePointLength(value) > limits.messageLengthMax) {
 			setError(copy.composer.tooLong(limits.messageLengthMax));
@@ -198,6 +275,28 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 		);
 	};
 
+	// A pasted image (screenshot) or file joins the tray; pasted text stays text.
+	const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+		if (!mediaOn || intent?.mode === "edit") return;
+		const pasted = [...event.clipboardData.files];
+		if (pasted.length === 0 || event.clipboardData.getData("text/plain") !== "") return;
+		event.preventDefault();
+		addAttachments(chatId, topicId, pasted);
+	};
+
+	const onPicked = (event: ChangeEvent<HTMLInputElement>) => {
+		const picked = [...(event.target.files ?? [])];
+		// Picking the same file again must fire change again.
+		event.target.value = "";
+		addAttachments(chatId, topicId, picked);
+		area.current?.focus();
+	};
+
+	const openPicker = (input: HTMLInputElement | null) => {
+		setAttachOpen(false);
+		input?.click();
+	};
+
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
@@ -230,12 +329,37 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	};
 
 	const offline = connection === "offline" || connection === "waiting";
-	const shownPlaceholder = offline && !disabled ? copy.composer.placeholderOffline : placeholder;
-	const empty = text.trim() === "";
 	const editing = intent?.mode === "edit";
+	const withFiles = files.length > 0 && !editing;
+	const shownPlaceholder = withFiles ? copy.composer.caption : offline && !disabled ? copy.composer.placeholderOffline : placeholder;
+	const empty = text.trim() === "" && !withFiles;
+	// With nothing to send the send button becomes the microphone (where recording works).
+	const showMic = mediaOn && empty && !editing && canRecord();
+	if (recording) {
+		return (
+			<div className="composer-wrap">
+				<Suspense fallback={null}>
+					<VoiceRecorder
+						target={{ chatId, topicId, replyToSeq: intent?.mode === "reply" ? intent.seq : 0 }}
+						onClose={() => {
+							setRecording(false);
+							cancelIntent();
+						}}
+					/>
+				</Suspense>
+			</div>
+		);
+	}
 	return (
 		<div className="composer-wrap">
-			{shownPreview !== null && !editing && (
+			{withFiles && limits !== null && (
+				<div className="compose-extras">
+					<Suspense fallback={null}>
+						<AttachTray chatId={chatId} topicId={topicId} limits={limits} />
+					</Suspense>
+				</div>
+			)}
+			{shownPreview !== null && !editing && !withFiles && (
 				<div className="compose-extras">
 					<Suspense fallback={null}>
 						<PreviewBar
@@ -261,6 +385,46 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 				</div>
 			)}
 			<form className="composer" onSubmit={(event) => void submit(event)}>
+				{mediaOn && limits !== null && (
+					<div className="menu-anchor attach-anchor" ref={attachAnchor}>
+						<button
+							ref={attachButton}
+							type="button"
+							className="icon-btn"
+							aria-label={copy.composer.attach}
+							aria-haspopup="menu"
+							aria-expanded={attachOpen}
+							aria-pressed={attachOpen}
+							disabled={editing}
+							onClick={() => setAttachOpen((open) => !open)}
+						>
+							<Icon name="clip" />
+						</button>
+						{attachOpen && (
+							<PopupMenu
+								className="attach-menu"
+								label={copy.composer.attachMenu}
+								boundary={attachAnchor}
+								onClose={() => {
+									setAttachOpen(false);
+									attachButton.current?.focus();
+								}}
+							>
+								<button type="button" role="menuitem" onClick={() => openPicker(pickMedia.current)}>
+									<Icon name="photo" />
+									{copy.composer.attachMedia}
+								</button>
+								<button type="button" role="menuitem" onClick={() => openPicker(pickFiles.current)}>
+									<Icon name="file" />
+									{copy.composer.attachFile}
+									<small>{copy.composer.attachMax(sizeLimitLabel(limits.uploadSizeMax, locale))}</small>
+								</button>
+							</PopupMenu>
+						)}
+						<input ref={pickMedia} type="file" accept="image/*,video/*" multiple hidden tabIndex={-1} aria-hidden="true" onChange={onPicked} data-testid="pick-media" />
+						<input ref={pickFiles} type="file" multiple hidden tabIndex={-1} aria-hidden="true" onChange={onPicked} data-testid="pick-files" />
+					</div>
+				)}
 				<label className="sr-only" htmlFor={`draft-${chatId}-${topicId}`}>
 					{label}
 				</label>
@@ -273,6 +437,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					disabled={disabled}
 					onChange={(event: ChangeEvent<HTMLTextAreaElement>) => update(event.target.value)}
 					onKeyDown={onKeyDown}
+					onPaste={onPaste}
 					aria-invalid={error !== ""}
 				/>
 				<div className="emoji-anchor">
@@ -294,14 +459,20 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						</Suspense>
 					)}
 				</div>
-				<button
-					type="submit"
-					className="send"
-					aria-label={editing ? copy.composer.save : channel ? copy.composer.post : copy.composer.send}
-					disabled={empty || disabled}
-				>
-					<Icon name={editing ? "check" : "send"} />
-				</button>
+				{showMic ? (
+					<button type="button" className="send" aria-label={copy.composer.record} onClick={() => setRecording(true)}>
+						<Icon name="mic" />
+					</button>
+				) : (
+					<button
+						type="submit"
+						className="send"
+						aria-label={editing ? copy.composer.save : channel ? copy.composer.post : copy.composer.send}
+						disabled={empty || disabled}
+					>
+						<Icon name={editing ? "check" : "send"} />
+					</button>
+				)}
 			</form>
 			{hint && !editing && !disabled && <p className="composer-hint">{copy.composer.hint}</p>}
 		</div>

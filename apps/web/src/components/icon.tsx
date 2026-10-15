@@ -168,6 +168,20 @@ const PATHS = {
 			<path d="M4 6v6a8 3 0 0 0 16 0V6M4 12v6a8 3 0 0 0 16 0v-6" />
 		</>
 	),
+	clip: <path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3L18 10a3 3 0 0 0-6-6l-6.5 6.5a4.5 4.5 0 0 0 9 9L21 13" />,
+	photo: (
+		<>
+			<rect x="3" y="3" width="18" height="18" rx="3" />
+			<path d="M15 8h.01M3 16l5-5c.9-.9 2.1-.9 3 0l5 5M14 14l1-1c.9-.9 2.1-.9 3 0l3 3" />
+		</>
+	),
+	mic: (
+		<>
+			<rect x="9" y="2" width="6" height="11" rx="3" />
+			<path d="M5 10a7 7 0 0 0 14 0M8 21h8M12 17v4" />
+		</>
+	),
+	upload: <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 9l5-5 5 5M12 4v12" />,
 } satisfies Record<string, ReactElement>;
 
 export type IconName = keyof typeof PATHS;

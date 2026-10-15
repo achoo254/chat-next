@@ -49,7 +49,7 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 		case "addMembers":
 			return <AddMembersDialog chatId={request.chatId} onClose={close} />;
 		case "forward":
-			return <ForwardDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
+			return <ForwardDialog chatId={request.chatId} seq={request.seq} seqs={request.seqs ?? [request.seq]} onClose={close} />;
 		case "delete":
 			return <DeleteDialog chatId={request.chatId} seq={request.seq} recall={request.recall} onClose={close} />;
 		case "deleteChat":

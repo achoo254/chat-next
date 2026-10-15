@@ -18,6 +18,10 @@ import "../../src/styles/fonts.css";
 import "../../src/styles/tokens.css";
 import "../../src/styles/app.css";
 import { entity, seedDemo } from "../support/demo-data.ts";
+import * as pictures from "../support/demo-images.ts";
+import type { FixtureFile } from "../support/fake-chat.ts";
+import { MediaKind } from "@app/proto-ts/media";
+import { addAttachments } from "../../src/messaging/media/media-state.ts";
 import { fixtureConnector } from "../support/fake-chat.ts";
 import { routerFetch } from "../support/router-fetch.ts";
 
@@ -42,6 +46,12 @@ const owned = f.createChat(ChatType.GROUP, "Nhóm đọc sách", [f.selfId, demo
 f.setRole(owned, f.selfId, MemberRole.OWNER);
 f.send(demo.ids.users.minh, owned, "Tuần này đọc chương 3");
 f.ownerNeedsAdmin.add(owned);
+// Reaction pills on short messages (Zalo placement): faces in this small group, at both list edges.
+const okSeq = f.send(demo.ids.users.minh, owned, "ok");
+const cSeq = f.send(f.selfId, owned, "c");
+for (const user of [demo.ids.users.minh, demo.ids.users.ha]) f.react(user, owned, cSeq, "👍");
+f.react(demo.ids.users.ha, owned, okSeq, "❤️");
+f.react(f.selfId, owned, okSeq, "😂");
 // A link whose text names another domain (#external-link, right frame).
 const lure = "Khuyến mãi ở hoandat.com/khuyen-mai nhé";
 f.send(demo.ids.users.minh, demo.ids.ops, lure, {
@@ -60,6 +70,17 @@ f.setRole(announcements, f.selfId, MemberRole.OWNER);
 f.setRole(announcements, demo.ids.users.minh, MemberRole.ADMIN);
 f.send(f.selfId, announcements, "", { action: { kind: { case: "chatCreated", value: { title: "Thông báo vận hành hệ thống" } } } });
 f.send(f.selfId, announcements, "Tối thứ Bảy 22:00 bảo trì cụm lưu trữ, dự kiến 30 phút.");
+// Short own posts, an emoji-only post and one with a link preview: their hover
+// actions must stay inside the message list (no horizontal scrollbar).
+const shortPosts = ["c", "csa", "asd", "🎉"].map((text) => f.send(f.selfId, announcements, text));
+// Channel pills show counts; several emoji on the shortest post.
+for (const emoji of ["👍", "❤️", "😂"]) f.react(demo.ids.users.minh, announcements, shortPosts[0] ?? 0, emoji);
+f.react(demo.ids.users.ha, announcements, shortPosts[1] ?? 0, "🙏");
+const appLink = "https://chat.hoandat.com";
+f.send(f.selfId, announcements, appLink, {
+	entities: [entity(EntityType.URL, appLink, appLink)],
+	linkPreview: { url: appLink, siteName: "chat.hoandat.com", title: "Chat", description: "Nhắn tin nhanh trong hệ sinh thái hoandat." },
+});
 f.inviteLinks.set(announcements, [
 	{
 		$typeName: "app.v1.InviteLink",
@@ -135,6 +156,46 @@ hooks.seedAudit(grafana, [
 ]);
 hooks.seedAudit(rotating, [{ actorId: demo.ids.users.lan, action: IncomingHookAuditAction.SECRET_ROTATED, ago: 3600 }]);
 
+// Media (mockups/media.html): a group with photos, a video, an album, a
+// file, a voice message, a link preview with its photo and a recalled
+// photo. Pictures are small generated PNGs; ?open=upload keeps uploads
+// running (parts after the third never finish) and refuses videos.
+const media = f.enableMedia();
+const decode = (base64: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+const PICS = [
+	[pictures.PICTURE_0_FULL, pictures.PICTURE_0_THUMB],
+	[pictures.PICTURE_1_FULL, pictures.PICTURE_1_THUMB],
+	[pictures.PICTURE_2_FULL, pictures.PICTURE_2_THUMB],
+	[pictures.PICTURE_3_FULL, pictures.PICTURE_3_THUMB],
+] as const;
+const picture = (index: number, width = 1200, height = 900): FixtureFile => {
+	const [full = "", thumb = ""] = PICS[index % PICS.length] ?? [];
+	return { kind: "photo", mimeType: "image/png", bytes: decode(full), inlineThumb: decode(thumb), width, height, sizes: ["s", "m", "x"] };
+};
+const design = f.createChat(ChatType.GROUP, "Thiết kế sản phẩm", [f.selfId, demo.ids.users.lan, demo.ids.users.huy, demo.ids.users.minh], { myRole: MemberRole.ADMIN });
+f.send(demo.ids.users.lan, design, "Gửi mọi người ảnh chụp màn đăng nhập mới nhé.");
+f.sendFile(demo.ids.users.lan, design, picture(0), "Dashboard sau nâng cấp.");
+f.sendFile(demo.ids.users.huy, design, { ...picture(2, 1280, 720), kind: "video", mimeType: "video/mp4", duration: 134_000, sizes: ["m"] }, "Demo luồng đăng nhập mới.");
+for (const index of [0, 1, 2, 3]) f.sendFile(demo.ids.users.lan, design, picture(index), index === 0 ? "Bốn màn trước khi nâng cấp." : "", 4242);
+f.sendFile(demo.ids.users.minh, design, { kind: "document", name: "bao-cao-van-hanh-q3.pdf", mimeType: "application/pdf", bytes: new Uint8Array(2_516_582) });
+const wave = Uint8Array.from({ length: 100 }, (_, i) => Math.round(128 + 120 * Math.sin(i / 3) * Math.cos(i / 11)));
+f.sendFile(demo.ids.users.huy, design, { kind: "voice", mimeType: "audio/ogg", bytes: new Uint8Array(4000), duration: 27_000, waveform: wave });
+const statusUrl = "https://status.example.com";
+f.send(f.selfId, design, statusUrl, {
+	entities: [entity(EntityType.URL, statusUrl, statusUrl)],
+	linkPreview: { url: statusUrl, siteName: "status.example.com", title: "Trạng thái dịch vụ", description: "Mọi hệ thống hoạt động bình thường.", photo: f.addFile(0, picture(1)) },
+});
+f.sendFile(f.selfId, design, picture(1, 900, 1600), "Màn hình điện thoại");
+// Recalled last: the fixture numbers the next message after the newest one left.
+const recalledPhoto = f.sendFile(demo.ids.users.minh, design, picture(3), "Ảnh gửi nhầm");
+f.server.deleteMessages(demo.ids.users.minh, design, [recalledPhoto]);
+if (params.get("open") === "upload") {
+	media.refuse.add(MediaKind.VIDEO);
+	const put = media.http.put;
+	let parts = 0;
+	media.http.put = (url, body, signal) => (++parts <= 3 ? put(url, body, signal) : new Promise(() => undefined));
+}
+
 // ?at= names a screen whose path holds an id the seed assigns.
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
@@ -155,6 +216,7 @@ const SCREENS: Record<string, string> = {
 	"hook-disabled": `/c/${alerts}/admin/hooks/${gitlab}`,
 	report: "/moderation/20481",
 	"report-actions": "/moderation/20481/actions",
+	media: `/c/${design}`,
 };
 const at = params.get("at");
 const screenPath = at === null ? undefined : SCREENS[at];
@@ -212,6 +274,13 @@ async function type(selector: string, text: string): Promise<void> {
 	const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
 	setter?.call(input, text);
 	input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** Every message's hover actions shown at once; the list must still not scroll sideways. */
+async function showAllActions(): Promise<void> {
+	await find(() => document.querySelector(".messages .msg.mine .msg-actions"));
+	for (const actions of document.querySelectorAll<HTMLElement>(".messages .msg-actions")) actions.style.setProperty("opacity", "1");
+	document.querySelector(".messages .lp")?.scrollIntoView({ block: "center" });
 }
 
 async function openInfo(): Promise<void> {
@@ -374,10 +443,52 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		chip.scrollIntoView({ block: "center" });
 	},
 	reactors: async () => {
-		const chip = await find(() => byName(".messages .reaction", "👍 Bạn, Minh, Lan Anh"));
+		const chip = await find(() => byName(".messages .reaction", "👍 3 người: bạn, Minh, Lan Anh"));
 		const rect = chip.getBoundingClientRect();
 		chip.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left + 4, clientY: rect.top + 4 }));
 		await find(() => document.querySelector("dialog .react-tabs"));
+	},
+	// Every message's hover actions shown at once, with the info column open: none may overflow the list.
+	"hover-all": async () => {
+		await openInfo();
+		await showAllActions();
+	},
+	// The same with the info column closed (it covers the list below 1100px).
+	"hover-bare": showAllActions,
+	// Uploads in progress, one refused (#upload).
+	upload: async () => {
+		await find(() => byName("button", "Đính kèm"));
+		const file = (name: string, size: number, type: string) => new File([new Uint8Array(size)], name, { type });
+		addAttachments(design, 0, [file("bao-cao-van-hanh-q3.pdf", 18 * 64 * 1024, "application/pdf")]);
+		await click("form button", "Gửi");
+		addAttachments(design, 0, [new File([decode(pictures.PICTURE_2_FULL)], "man-dang-nhap.png", { type: "image/png" })]);
+		await click("form button", "Gửi");
+		addAttachments(design, 0, [file("demo-dang-nhap.mp4", 1000, "video/mp4")]);
+		await click("form button", "Gửi");
+		await find(() => document.querySelector(".messages .chip-on-media.err"));
+		document.querySelector(".messages .up-bar")?.scrollIntoView({ block: "center" });
+	},
+	// The attach menu over the tray of picked files, one over the limit (#attach).
+	attach: async () => {
+		await find(() => byName("button", "Đính kèm"));
+		addAttachments(design, 0, [
+			new File([decode(pictures.PICTURE_0_FULL)], "dashboard.png", { type: "image/png" }),
+			new File([new Uint8Array(1000)], "bao-cao-van-hanh-q3-ban-cuoi-cung-da-duyet.pdf", { type: "application/pdf" }),
+			new File([new Uint8Array(0)], "trong.txt", { type: "text/plain" }),
+		]);
+		await click("button", "Đính kèm");
+		await find(() => document.querySelector(".attach-menu"));
+	},
+	// The viewer on the album's second picture (#viewer).
+	viewer: async () => {
+		await click(".messages .album button", "Ảnh 2");
+		await find(() => document.querySelector("dialog.viewer .v-frame img:not(.pic-thumb)"));
+	},
+	// Shared media in the info column (#shared-media).
+	"shared-media": async () => {
+		await openInfo();
+		await click("aside.info .media-rows button", /Ảnh và video/);
+		await find(() => document.querySelector("aside.info .grid3 .media-pic"));
 	},
 	"quick-actions": async () => {
 		const message = await find(() => [...document.querySelectorAll<HTMLElement>(".messages .msg")].find((m) => m.textContent?.includes("Dashboard ổn định.")));

@@ -13,6 +13,7 @@ import { countLabel, dayLabel, sameDay } from "../data/format.ts";
 import { useBackendValue, useServices, useWindow } from "../data/services.tsx";
 import type { ChatStore, WindowItem } from "../data/store.ts";
 import { MessageItem } from "./message-item.tsx";
+import { pendingTopics } from "../media/media-state.ts";
 import { mentionsSelf } from "./rich-text.tsx";
 
 const EDGE_PX = 240;
@@ -24,6 +25,27 @@ interface MessageListProps {
 	topicId: number;
 	chat: Chat | null;
 	dialog: DialogView | undefined;
+}
+
+/** What groups an item into an album: grouped_id of a message, the outbox entry of a pending album; "" for none. */
+function albumOf(item: WindowItem | undefined): string {
+	if (item === undefined) return "";
+	if (item.kind === "pending") return item.pending.albumId === undefined ? "" : `p${item.pending.albumId}`;
+	const message = item.message;
+	if (message.groupedId === 0 || message.recalled || message.action !== null) return "";
+	return `g${message.fromId}:${message.groupedId}`;
+}
+
+/** List rows: one per message, an album's consecutive messages in one row (keyed by its first). */
+export function groupRows(keys: readonly string[], itemOf: (key: string) => WindowItem | undefined): { key: string; keys: string[] }[] {
+	const rows: { key: string; keys: string[]; album: string }[] = [];
+	for (const key of keys) {
+		const album = albumOf(itemOf(key));
+		const last = rows[rows.length - 1];
+		if (album !== "" && last !== undefined && last.album === album) last.keys.push(key);
+		else rows.push({ key, keys: [key], album });
+	}
+	return rows.map(({ key, keys: members }) => ({ key, keys: members }));
 }
 
 function itemDate(item: WindowItem | undefined): number {
@@ -66,11 +88,16 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 	const [atBottom, setAtBottom] = useState(true);
 	const [focused, setFocused] = useState<string | null>(null);
 
-	const keys = (window_?.keys ?? []).filter((key) => {
+	const allKeys = (window_?.keys ?? []).filter((key) => {
 		if (topicId === 0 || !topicsLoaded) return topicId === 0;
 		const item = store.item(chatId, key);
+		// Media sends to a topic show there while they upload (text sends to topics are not queued).
+		if (item?.kind === "pending") return pendingTopics.get(item.pending.randomId) === topicId;
 		return item?.kind === "message" && backend.messageTopic(item.message) === topicId;
 	});
+	const groups = groupRows(allKeys, (key) => store.item(chatId, key));
+	// One row per message or album: keyboard moves between rows.
+	const keys = groups.map((group) => group.key);
 	const lastKey = keys[keys.length - 1] ?? "";
 	const unreadFrom = window_?.unreadFromSeq ?? 0;
 	const readOutbox = dialog?.dialog.readOutboxMaxSeq ?? 0;
@@ -167,7 +194,7 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 	const rows: ReactNode[] = [];
 	let previousDate = 0;
 	let dividerShown = false;
-	for (const key of keys) {
+	for (const { key, keys: members } of groups) {
 		const item = store.item(chatId, key);
 		const date = itemDate(item);
 		if (date !== 0 && (previousDate === 0 || !sameDay(previousDate, date))) {
@@ -197,6 +224,7 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 				key={key}
 				chatId={chatId}
 				itemKey={key}
+				albumKeys={members.length > 1 ? members.join(",") : ""}
 				chat={chat}
 				readOutboxMaxSeq={readOutbox}
 				tabbable={key === tabKey}

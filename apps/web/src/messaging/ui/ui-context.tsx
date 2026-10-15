@@ -11,7 +11,8 @@ export type DialogRequest =
 	/** `withUserId`: opened from a profile, that person is picked already (0: nobody). */
 	| { readonly kind: "newGroup"; readonly withUserId: number }
 	| { readonly kind: "newChannel" }
-	| { readonly kind: "forward"; readonly chatId: number; readonly seq: number }
+	/** `seqs`: every message of an album (the server keeps their files, nothing is uploaded again). */
+	| { readonly kind: "forward"; readonly chatId: number; readonly seq: number; readonly seqs?: readonly number[] }
 	/** `recall`: your own message, removed for everyone ("Thu hồi"); otherwise hidden for you only. */
 	| { readonly kind: "delete"; readonly chatId: number; readonly seq: number; readonly recall: boolean }
 	/** Private chat: deleted for you; group or channel: deleted for everyone by its owner. */

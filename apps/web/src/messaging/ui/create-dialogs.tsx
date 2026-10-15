@@ -502,7 +502,7 @@ function canPost(view: DialogView): boolean {
 	return true;
 }
 
-export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: number; seq: number }) {
+export function ForwardDialog({ chatId, seq, seqs, onClose }: CloseProps & { chatId: number; seq: number; seqs: readonly number[] }) {
 	const copy = useScreensCopy();
 	const { remote, source, store, toasts } = useServices();
 	const order = useDialogOrder();
@@ -533,7 +533,7 @@ export function ForwardDialog({ chatId, seq, onClose }: CloseProps & { chatId: n
 	const forwardAll = async (text: string) => {
 		for (const target of selected.keys()) {
 			if (text !== "") await source.sendText(target, text);
-			await remote.forward(chatId, [seq], target);
+			await remote.forward(chatId, seqs, target);
 		}
 	};
 	const send = async () => {

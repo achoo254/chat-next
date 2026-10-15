@@ -1,0 +1,117 @@
+// English copy of the media screens; the keys follow copy-vi.ts.
+import type { MediaCopy } from "./copy-vi.ts";
+
+function words(ms: number): string {
+	const total = Math.max(0, Math.round(ms / 1000));
+	const minutes = Math.floor(total / 60);
+	const seconds = total % 60;
+	if (minutes === 0) return `${seconds} seconds`;
+	return seconds === 0 ? `${minutes} minutes` : `${minutes} minutes ${seconds} seconds`;
+}
+
+export const enMedia: MediaCopy = {
+	tray: {
+		label: "Files to send",
+		count: (n, album) => (album ? `${n} files · sent as an album` : n === 1 ? "1 file" : `${n} files`),
+		hint: "Photos and videos go as an album, other files as documents.",
+		asFiles: "Send as files (uncompressed)",
+		remove: (name) => `Remove ${name}`,
+		clear: "Remove all",
+		tooLarge: (name, size, max) => `Cannot send ${name} (${size}): each file is limited to ${max}.`,
+		empty: (name) => `Cannot send ${name}: the file is empty.`,
+		mediaOff: "This server does not take photos and files yet.",
+		sendFailed: "The files were not sent. Try again in a few minutes.",
+		dismiss: "Dismiss",
+	},
+	upload: {
+		progress: "Upload progress",
+		preparing: "Preparing",
+		waiting: "Offline — will resume",
+		failed: "Upload failed",
+		retry: "Retry",
+		retrying: "Uploading again",
+		cancel: "Cancel upload",
+		cancelled: "Cancelled; the uploaded part is cleaned up later",
+		photo: "Photo uploading",
+		video: "Video uploading",
+	},
+	media: {
+		photo: "Photo",
+		photoOf: (name) => `Photo from ${name}`,
+		open: "View photo",
+		video: "Video",
+		playVideo: (ms) => (ms > 0 ? `Play video, ${words(ms)}` : "Play video"),
+		album: (n) => `Album of ${n} photos and videos`,
+		albumItem: (index, video) => (video ? `Video ${index}` : `Photo ${index}`),
+		download: (name) => `Download ${name}`,
+		downloading: "Downloading",
+		fileMeta: (size, ext) => `${size} · ${ext}`,
+		gone: "This media is no longer available",
+		goneBody: "The sender deleted it for everyone.",
+		fileGone: "This file is no longer available",
+		downloadUnavailable: "Download unavailable",
+		loadFailed: "Could not load",
+		retry: "Reload",
+		loading: "Loading",
+		voice: "Voice message",
+		playing: "Playing",
+		playVoice: (ms) => (ms > 0 ? `Play voice message, ${words(ms)}` : "Play voice message"),
+		pauseVoice: "Pause voice message",
+		seek: "Seek voice message",
+		voiceFailed: "Could not play the voice message",
+		linkPhoto: "Page preview image",
+	},
+	viewer: {
+		label: "Photo viewer",
+		videoLabel: "Video viewer",
+		zoomIn: "Zoom in",
+		zoomOut: "Zoom out",
+		zoom: (percent) => `${percent}%`,
+		download: "Download",
+		forward: "Forward",
+		close: "Close",
+		prev: "Previous",
+		next: "Next",
+		counter: (index, count) => `${index} / ${count}`,
+		strip: "Photos in the album",
+		at: (date, time) => `${date} at ${time}`,
+		goneBody: (name) => `${name} deleted this message for everyone. The photo was removed from this device.`,
+		goneCount: "No longer in the album",
+		videoFailed: "This video cannot be played.",
+		keys: "← → to move, Esc to close",
+	},
+	recorder: {
+		record: "Record a voice message",
+		recording: "Recording",
+		asking: "Waiting for microphone permission…",
+		send: "Send voice message",
+		cancel: "Cancel recording",
+		cancelled: "Recording cancelled",
+		denied: "No permission to use the microphone. Allow it in the browser settings and try again.",
+		noMic: "No microphone was found on this device.",
+		unsupported: "This browser cannot record audio.",
+		failed: "Recording failed. Try again.",
+		tooShort: "The voice message is too short. Record a little longer.",
+		level: "Sound level",
+	},
+	shared: {
+		section: "Photos, files, links",
+		photos: "Photos and videos",
+		files: "Files",
+		links: "Links",
+		title: "Shared media",
+		back: "Back to chat info",
+		tabs: "Media type",
+		tabPhotos: "Photos/Videos",
+		tabFiles: "Files",
+		tabLinks: "Links",
+		month: (month, year, current) => {
+			const name = new Date(year, month - 1, 1).toLocaleString("en", { month: "long" });
+			return current ? name : `${name} ${year}`;
+		},
+		fileLine: (size, date) => `${size} · ${date}`,
+		scanned: (n) => `In the latest ${n} messages`,
+		loading: "Looking for media…",
+		openLink: (host) => `Open ${host}`,
+	},
+};

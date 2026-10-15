@@ -3,12 +3,18 @@
 // is asynchronous); tests wrap an in-process ChatCore. Fast-changing data is
 // never passed through React context: components subscribe to ChatStore.
 import type {
+	AlbumItemInput,
 	Chat,
 	ConnectionState,
 	DialogView,
 	EventBus,
 	HistoryRequest,
 	HistoryView,
+	MediaFile,
+	MediaInput,
+	MediaLimits,
+	MediaRequest,
+	MediaUrl,
 	MessageEntity,
 	NotificationSettings,
 	PendingMessage,
@@ -16,8 +22,11 @@ import type {
 	PinnedMessagesRequest,
 	SearchOptions,
 	ScreenSnapshot,
+	SendAlbumOptions,
+	SendMediaOptions,
 	SendTextOptions,
 	StoredMessage,
+	UploadProgress,
 	User,
 } from "@app/core";
 
@@ -43,6 +52,20 @@ export interface ChatSource {
 	onlineCount(chatId: number): Promise<number>;
 	/** The app badge: unread messages and chats, muted chats per the user's setting. */
 	unreadTotals(): Promise<{ readonly messages: number; readonly chats: number }>;
+	/** Queues a file with an optional caption; the pending message shows at once and uploads in the background. */
+	sendMedia(chatId: number, file: Blob, media: MediaInput, options?: SendMediaOptions): Promise<PendingMessage | null>;
+	/** Queues 2 to MediaLimits.albumSizeMax files as one album. */
+	sendAlbum(chatId: number, items: readonly AlbumItemInput[], options?: SendAlbumOptions): Promise<PendingMessage[]>;
+	/** Upload state of a pending media send; changes arrive as EventKeys.upload(uploadKey). */
+	uploadProgress(uploadKey: string): Promise<UploadProgress | null>;
+	/** The local file of a pending media send (shown before the upload ends). */
+	pendingFile(uploadKey: string): Promise<Blob | null>;
+	/** A message's file or rendition, from the media cache or downloaded into it. */
+	mediaFile(request: MediaRequest): Promise<MediaFile>;
+	/** A short-lived URL of a message's file (video, downloads); `refresh` after a 401/403. null: the message is gone. */
+	mediaUrl(request: MediaRequest, refresh?: boolean): Promise<MediaUrl | null>;
+	/** Upload limits from AppConfig; uploadSizeMax 0 means media is off on the server. */
+	mediaLimits(): Promise<MediaLimits>;
 	retryOutbox(outboxId: number): Promise<void>;
 	discardOutbox(outboxId: number): Promise<void>;
 	search(query: string, options?: SearchOptions): Promise<StoredMessage[]>;

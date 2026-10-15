@@ -26,6 +26,8 @@ import type { Update as WireUpdate } from "@app/proto-ts/updates";
 import { ModerationAction, ModerationService, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
 import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
+import { FakeMedia, MemoryBlobs } from "../../../../packages/core/test/support/fake-media.ts";
+import { MediaKind, MediaRefSchema, MediaSizeType, type MediaRef as WireMediaRef } from "@app/proto-ts/media";
 import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
@@ -99,8 +101,41 @@ function assign(target: object, patch: object): void {
 	Object.assign(target as Record<string, unknown>, patch as Record<string, unknown>);
 }
 
+/** A file another user sends in the fixture (MediaService keeps its bytes). */
+export interface FixtureFile {
+	readonly kind: "photo" | "video" | "voice" | "document" | "audio";
+	readonly name?: string;
+	readonly mimeType: string;
+	readonly bytes: Uint8Array;
+	readonly width?: number;
+	readonly height?: number;
+	/** Milliseconds. */
+	readonly duration?: number;
+	readonly inlineThumb?: Uint8Array;
+	readonly waveform?: Uint8Array;
+	/** Renditions the server made (photos: "s", "m", "x"). */
+	readonly sizes?: readonly ("s" | "m" | "x")[];
+}
+
+const WIRE_KINDS: Record<FixtureFile["kind"], MediaKind> = {
+	photo: MediaKind.PHOTO,
+	video: MediaKind.VIDEO,
+	voice: MediaKind.VOICE,
+	document: MediaKind.DOCUMENT,
+	audio: MediaKind.AUDIO,
+};
+const WIRE_SIZES = { s: MediaSizeType.S, m: MediaSizeType.M, x: MediaSizeType.X } as const;
+
+/** AppConfig of a server with media off (upload_size_max 0): the composer hides attaching. */
+const MEDIA_OFF_CONFIG = new FakeMedia().configApi(0, { size: 0, large: 0, ageSeconds: 0 });
+
 export class ChatFixture {
 	readonly server = new FakeServer(7);
+	/** Pending upload files and the media cache of the signed-in user's client. */
+	readonly blobs = new MemoryBlobs();
+	/** CreateUpload requests of the signed-in user's client (the fake storage keeps no duration or waveform). */
+	readonly uploadRequests: { kind: number; fileName: string; mimeType: string; duration: number; waveform: number }[] = [];
+	private nextFile = 1;
 	readonly selfId: number;
 	readonly selfName: string;
 	readonly selfUsername: string;
@@ -201,6 +236,52 @@ export class ChatFixture {
 				this.server.postService(chatId, actorId, { kind: { case: "incomingHookStopped", value: { hookName, reason } } });
 			},
 		});
+	}
+
+	/** Turns media on (MediaService, uploads, downloads) with this per-file limit. */
+	enableMedia(uploadSizeMax = 2000 * 2 ** 20): FakeMedia {
+		const media = new FakeMedia();
+		media.partSize = 64 * 1024;
+		media.putDelayMs = 0;
+		this.server.media = media;
+		this.mediaConfig = media.configApi(uploadSizeMax, { size: 2 ** 30, large: 2 ** 29, ageSeconds: 30 * 86_400 });
+		return media;
+	}
+
+	private mediaConfig: NonNullable<RemoteApi["config"]> = MEDIA_OFF_CONFIG;
+
+	/** Stores a file on the fake server and returns its MediaRef (as the server would after CompleteUpload). */
+	addFile(owner: number, file: FixtureFile): WireMediaRef {
+		const media = this.server.media;
+		if (media === null) throw new Error("enableMedia() first");
+		const fileId = `fx${this.nextFile++}`;
+		const ref = create(MediaRefSchema, {
+			fileId,
+			fileHash: fileId,
+			kind: WIRE_KINDS[file.kind],
+			mimeType: file.mimeType,
+			size: BigInt(file.bytes.length),
+			fileName: file.name ?? "",
+			width: file.width ?? 0,
+			height: file.height ?? 0,
+			duration: file.duration ?? 0,
+			inlineThumb: file.inlineThumb ?? new Uint8Array(),
+			waveform: file.waveform ?? new Uint8Array(),
+			sizes: (file.sizes ?? []).map((type) => ({ type: WIRE_SIZES[type], width: file.width ?? 0, height: file.height ?? 0, size: BigInt(file.bytes.length) })),
+		});
+		media.files.set(fileId, { ref, bytes: file.bytes, owner });
+		return ref;
+	}
+
+	/** A message with a file (and caption) from `from`; `groupedId` puts it in an album. */
+	sendFile(from: number, chatId: number, file: FixtureFile, caption = "", groupedId = 0): number {
+		const seq = this.peekSeq(chatId);
+		const sent = this.server.sendMessage(from, chatId, caption, 0, {
+			media: this.addFile(from, file),
+			...(groupedId === 0 ? {} : { groupedId: BigInt(groupedId) }),
+		}).seq;
+		if (sent !== seq) throw new Error(`fixture expected seq ${seq}, server gave ${sent}`);
+		return sent;
 	}
 
 	addUser(name: string, extras: UserExtras = {}): number {
@@ -410,7 +491,21 @@ export class ChatFixture {
 					return response;
 				},
 				unpinAllMessages: (request) => offered(base.messages.unpinAllMessages, "unpinAllMessages")(request),
+				sendMedia: (request) => offered(base.messages.sendMedia, "sendMedia")(request),
+				sendAlbum: (request) => offered(base.messages.sendAlbum, "sendAlbum")(request),
 			},
+			config: this.mediaConfig,
+			...(base.media === undefined
+				? {}
+				: {
+						media: {
+							...base.media,
+							createUpload: (request) => {
+								this.uploadRequests.push({ kind: request.kind ?? 0, fileName: request.fileName ?? "", mimeType: request.mimeType ?? "", duration: request.duration ?? 0, waveform: request.waveform?.length ?? 0 });
+								return base.media?.createUpload(request) ?? Promise.reject(new Error("no media"));
+							},
+						},
+					}),
 			users: {
 				getSelf: async (request) => {
 					const response = await base.users.getSelf(request);
@@ -476,6 +571,7 @@ export class ChatFixture {
 			timers: systemTimers,
 			frame: (callback) => setTimeout(callback, 0),
 			randomId: () => this.selfId * 1_000_000 + nextRandom++,
+			...(this.server.media === null ? {} : { http: this.server.media.http, blobs: this.blobs }),
 		};
 		const result = await startApp(platform, {
 			api: this.api(),
@@ -991,6 +1087,13 @@ export function toSource(core: ChatCore): ChatSource {
 		unpinAllMessages: (chatId, topicId) => core.unpinAllMessages(chatId, topicId),
 		onlineCount: (chatId) => core.onlineCount(chatId),
 		unreadTotals: () => core.unreadTotals(),
+		sendMedia: (chatId, file, media, options) => core.sendMedia(chatId, file, media, options),
+		sendAlbum: (chatId, items, options) => core.sendAlbum(chatId, items, options),
+		uploadProgress: (key) => core.uploadProgress(key),
+		pendingFile: (key) => core.pendingFile(key),
+		mediaFile: (request) => core.mediaFile(request),
+		mediaUrl: (request, refresh) => core.mediaUrl(request, refresh),
+		mediaLimits: () => core.mediaLimits(),
 		retryOutbox: (id) => core.retryOutbox(id),
 		discardOutbox: (id) => core.discardOutbox(id),
 		search: (query, options) => core.search(query, options),

@@ -1,0 +1,117 @@
+// Vietnamese copy of the media screens (mockups/media.html), loaded with
+// them; copy-en.ts must provide the same keys. Spelling: "Huỷ", "Xoá".
+
+/** "2 phút 14 giây", "27 giây". */
+function words(ms: number): string {
+	const total = Math.max(0, Math.round(ms / 1000));
+	const minutes = Math.floor(total / 60);
+	const seconds = total % 60;
+	if (minutes === 0) return `${seconds} giây`;
+	return seconds === 0 ? `${minutes} phút` : `${minutes} phút ${seconds} giây`;
+}
+
+export const viMedia = {
+	tray: {
+		label: "File sắp gửi",
+		count: (n: number, album: boolean) => (album ? `${n} file · gửi thành album` : `${n} file`),
+		hint: "Ảnh và video gửi thành album, file khác gửi dạng tài liệu.",
+		asFiles: "Gửi dạng file (không nén)",
+		remove: (name: string) => `Bỏ ${name}`,
+		clear: "Bỏ tất cả",
+		tooLarge: (name: string, size: string, max: string) => `Không gửi được ${name} (${size}): mỗi file tối đa ${max}.`,
+		empty: (name: string) => `Không gửi được ${name}: file rỗng.`,
+		mediaOff: "Máy chủ này chưa bật gửi ảnh và file.",
+		sendFailed: "Chưa gửi được file, thử lại sau ít phút.",
+		dismiss: "Đóng thông báo",
+	},
+	upload: {
+		progress: "Tiến độ tải lên",
+		preparing: "Đang chuẩn bị",
+		waiting: "Mất mạng — sẽ tiếp tục",
+		failed: "Tải lên lỗi",
+		retry: "Thử lại",
+		retrying: "Đang tải lên lại",
+		cancel: "Huỷ tải lên",
+		cancelled: "Đã huỷ, phần đã tải được dọn sau",
+		photo: "Ảnh đang tải lên",
+		video: "Video đang tải lên",
+	},
+	media: {
+		photo: "Ảnh",
+		photoOf: (name: string) => `Ảnh của ${name}`,
+		open: "Xem ảnh",
+		video: "Video",
+		playVideo: (ms: number) => (ms > 0 ? `Phát video, ${words(ms)}` : "Phát video"),
+		album: (n: number) => `Album ${n} ảnh và video`,
+		albumItem: (index: number, video: boolean) => (video ? `Video ${index}` : `Ảnh ${index}`),
+		download: (name: string) => `Tải xuống ${name}`,
+		downloading: "Đang tải xuống",
+		fileMeta: (size: string, ext: string) => `${size} · ${ext}`,
+		gone: "Media này không còn",
+		goneBody: "Người gửi đã xoá tin cho mọi người.",
+		fileGone: "File này không còn",
+		downloadUnavailable: "Tải xuống không khả dụng",
+		loadFailed: "Không tải được",
+		retry: "Tải lại",
+		loading: "Đang tải",
+		voice: "Tin thoại",
+		playing: "Đang phát",
+		playVoice: (ms: number) => (ms > 0 ? `Phát tin thoại ${words(ms)}` : "Phát tin thoại"),
+		pauseVoice: "Tạm dừng tin thoại",
+		seek: "Tua tin thoại",
+		voiceFailed: "Không phát được tin thoại",
+		linkPhoto: "Ảnh xem trước của trang",
+	},
+	viewer: {
+		label: "Trình xem ảnh",
+		videoLabel: "Trình xem video",
+		zoomIn: "Phóng to",
+		zoomOut: "Thu nhỏ",
+		zoom: (percent: number) => `${percent}%`,
+		download: "Tải xuống",
+		forward: "Chuyển tiếp",
+		close: "Đóng",
+		prev: "Ảnh trước",
+		next: "Ảnh sau",
+		counter: (index: number, count: number) => `${index} / ${count}`,
+		strip: "Ảnh trong album",
+		at: (date: string, time: string) => `${date} lúc ${time}`,
+		goneBody: (name: string) => `${name} đã xoá tin này cho mọi người. Ảnh đã được gỡ khỏi máy của bạn.`,
+		goneCount: "Không còn trong album",
+		videoFailed: "Không phát được video này.",
+		keys: "← → để chuyển ảnh, Esc để đóng",
+	},
+	recorder: {
+		record: "Ghi âm tin thoại",
+		recording: "Đang ghi âm",
+		asking: "Đang chờ quyền dùng micro…",
+		send: "Gửi tin thoại",
+		cancel: "Huỷ ghi âm",
+		cancelled: "Đã huỷ ghi âm",
+		denied: "Chưa có quyền dùng micro. Cho phép micro trong cài đặt trình duyệt rồi thử lại.",
+		noMic: "Không tìm thấy micro trên máy này.",
+		unsupported: "Trình duyệt này chưa ghi âm được.",
+		failed: "Không ghi âm được, thử lại.",
+		tooShort: "Tin thoại quá ngắn, giữ ghi âm lâu hơn một chút.",
+		level: "Mức âm thanh",
+	},
+	shared: {
+		section: "Ảnh, file, link",
+		photos: "Ảnh và video",
+		files: "File",
+		links: "Link",
+		title: "Media đã chia sẻ",
+		back: "Quay lại thông tin chat",
+		tabs: "Loại media",
+		tabPhotos: "Ảnh/Video",
+		tabFiles: "File",
+		tabLinks: "Link",
+		month: (month: number, year: number, current: boolean) => (current ? `Tháng ${month}` : `Tháng ${month}/${year}`),
+		fileLine: (size: string, date: string) => `${size} · ${date}`,
+		scanned: (n: number) => `Trong ${n} tin gần nhất`,
+		loading: "Đang tìm media…",
+		openLink: (host: string) => `Mở ${host}`,
+	},
+};
+
+export type MediaCopy = typeof viMedia;

@@ -5,9 +5,11 @@
 // "Xem tất cả"; invite link; Quản lý; leave, delete and report. Opened with
 // the "i" button, closed with X; an overlay below 1100px takes focus when it
 // opens (#info-overlay), and below 760px it fills the screen with a back
-// arrow (#narrow). Shared media is not listed: messages carry no media yet.
+// arrow (#narrow). "Ảnh, file, link" lists the kinds of shared media the
+// chat has and opens them in the column, one tab per kind (R3).
 import { PINNED_DIALOGS_MAX, type Chat, type User } from "@app/core";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
+import type { SharedTab } from "../media/shared-media.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -26,6 +28,10 @@ import { ChatAvatar, CopyButton, Switch } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useUi, type Ui } from "./ui-context.tsx";
+
+const sharedChunk = () => import("../media/shared-media.tsx");
+const SharedMediaSection = lazy(() => sharedChunk().then((m) => ({ default: m.SharedMediaSection })));
+const SharedMediaView = lazy(() => sharedChunk().then((m) => ({ default: m.SharedMediaView })));
 
 /** Members shown in the column; "Xem tất cả" opens the rest. */
 const MEMBERS_SHOWN = 5;
@@ -329,7 +335,15 @@ function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }
 }
 
 /** Groups and channels, in the order people know from Zalo (#info-panels). */
-function GroupInfo({ chat }: { chat: Chat }) {
+function SharedRows({ chatId, onShared }: { chatId: number; onShared: (tab: SharedTab) => void }) {
+	return (
+		<Suspense fallback={null}>
+			<SharedMediaSection chatId={chatId} onOpen={onShared} />
+		</Suspense>
+	);
+}
+
+function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) => void }) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { backend } = useServices();
@@ -371,6 +385,7 @@ function GroupInfo({ chat }: { chat: Chat }) {
 					<InviteRow chat={chat} />
 				</div>
 			)}
+			<SharedRows chatId={chat.id} onShared={onShared} />
 			<PinnedBarRow chat={chat} />
 			{admin && (
 				<div className="info-sec">
@@ -415,7 +430,7 @@ function GroupInfo({ chat }: { chat: Chat }) {
 }
 
 /** The other person of a private chat, or a bot (#info-panels). */
-function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
+function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined; onShared: (tab: SharedTab) => void }) {
 	const copy = useScreensCopy();
 	const { remote, backend, toasts } = useServices();
 	const ui = useUi();
@@ -471,6 +486,7 @@ function UserInfo({ chat, peer }: { chat: Chat; peer: User | undefined }) {
 					)}
 				</div>
 			)}
+			<SharedRows chatId={chat.id} onShared={onShared} />
 			{peer !== undefined && !peer.isSelf && <CommonChatsSection userId={peer.id} bot={bot} />}
 			<PinnedBarRow chat={chat} />
 			<div className="info-sec">
@@ -563,7 +579,22 @@ interface InfoPanelProps {
 
 export function InfoPanel({ chat, peer, topic, title }: InfoPanelProps) {
 	useColumnBehaviour(useUi());
+	const [shared, setShared] = useState<{ readonly chatId: number; readonly tab: SharedTab } | null>(null);
+	const openShared = (tab: SharedTab) => setShared({ chatId: chat.id, tab });
+	if (shared !== null && shared.chatId === chat.id) {
+		const back = () => {
+			setShared(null);
+			requestAnimationFrame(() => document.querySelector<HTMLElement>("aside.info .media-rows button")?.focus());
+		};
+		return (
+			<aside className="info sm-view" aria-label={title}>
+				<Suspense fallback={null}>
+					<SharedMediaView chatId={chat.id} tab={shared.tab} onBack={back} />
+				</Suspense>
+			</aside>
+		);
+	}
 	if (topic !== null) return <TopicInfo chat={chat} topic={topic} groupTitle={title} />;
-	if (chat.type === "group" || chat.type === "channel") return <GroupInfo chat={chat} />;
-	return <UserInfo chat={chat} peer={peer} />;
+	if (chat.type === "group" || chat.type === "channel") return <GroupInfo chat={chat} onShared={openShared} />;
+	return <UserInfo chat={chat} peer={peer} onShared={openShared} />;
 }

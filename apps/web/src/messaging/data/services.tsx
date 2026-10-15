@@ -2,7 +2,7 @@
 // start-up, so a context is fine for it; everything that changes often is
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
-import type { Chat, ConnectionState, DialogView, NotificationSettings, StoredMessage, User } from "@app/core";
+import type { Chat, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
 import type { Integrations } from "../integrations/api.ts";
 import type { Drafts } from "./drafts.ts";
@@ -179,6 +179,12 @@ export function useUserNames(ids: readonly number[]): ReadonlyMap<number, string
 		}
 		return names;
 	}, [snapshot]);
+}
+
+/** Upload limits from AppConfig (null until read); uploadSizeMax 0 hides attaching. */
+export function useMediaLimits(): MediaLimits | null {
+	const { store } = useServices();
+	return useStoreKey("mediaLimits", () => store.mediaLimits());
 }
 
 export function useConnection(): ConnectionState {

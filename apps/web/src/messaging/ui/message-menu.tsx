@@ -126,6 +126,24 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 		if (canWrite) entries.push({ label: copy.menu.reply, icon: "reply", run: () => ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq }) });
 		entries.push({ label: copy.menu.forward, icon: "forward", run: () => ui.dialog.set({ kind: "forward", chatId, seq: message.seq }) });
 		if (message.text !== "") entries.push(copyEntry);
+		const media = message.media;
+		if (media !== undefined) {
+			entries.push({
+				label: copy.menu.download,
+				icon: "arrow-down",
+				run: () => {
+					toasts.show(copy.menu.downloading);
+					void import("../media/download.ts")
+						.then(({ downloadMedia }) => downloadMedia(source, chatId, message.seq, media))
+						.then(
+							(ok) => {
+								if (!ok) toasts.show(copy.menu.mediaGone);
+							},
+							failure,
+						);
+				},
+			});
+		}
 		if (canEdit(message, store.selfId, limits)) {
 			entries.push({ label: copy.menu.edit, icon: "edit", run: () => ui.intents.cell(chatId).set({ mode: "edit", seq: message.seq }) });
 		}
