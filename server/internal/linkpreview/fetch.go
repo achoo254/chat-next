@@ -1,5 +1,6 @@
-// Package linkpreview builds text-only previews (site, title, description)
-// of web pages linked in messages, from their Open Graph tags.
+// Package linkpreview builds previews (site, title, description, image
+// URL) of web pages linked in messages, from their Open Graph tags, and
+// fetches the preview image through the same guard.
 //
 // Fetching a URL a user typed is a server-side request forgery risk, so the
 // fetcher only talks to public addresses: the check runs on the address
@@ -40,12 +41,15 @@ const (
 	maxDescriptionRunes = 1024
 )
 
-// Preview is the text of a page preview.
+// Preview is the text of a page preview and its image URL.
 type Preview struct {
 	URL         string
 	SiteName    string
 	Title       string
 	Description string
+	// ImageURL is the page's og:image, absolute and normalized; "" when
+	// none.
+	ImageURL string
 }
 
 // Empty reports a preview with nothing to show.
@@ -62,6 +66,9 @@ var (
 	ErrBlockedAddress = errors.New("linkpreview: address not allowed")
 	// ErrNotHTML reports a response that is not an HTML page.
 	ErrNotHTML = errors.New("linkpreview: not an HTML page")
+	// ErrNotImage reports a preview image response that is not a raster
+	// image or is too large.
+	ErrNotImage = errors.New("linkpreview: not a usable image")
 )
 
 // blockedPrefixes are special-purpose ranges netip has no predicate for.
@@ -243,18 +250,60 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (Preview, error) {
 	if err != nil {
 		return Preview{}, fmt.Errorf("linkpreview: charset: %w", err)
 	}
-	p := parse(body)
+	p, image := parse(body)
 	p.URL = rawURL
 	if p.SiteName == "" {
 		p.SiteName = strings.TrimPrefix(resp.Request.URL.Hostname(), "www.")
 	}
+	if image != "" {
+		if ref, err := resp.Request.URL.Parse(image); err == nil {
+			if u, err := NormalizeURL(ref.String()); err == nil {
+				p.ImageURL = u
+			}
+		}
+	}
 	return p, nil
+}
+
+// FetchImage downloads a preview image (normalized URL) of at most
+// maxBytes with the same address, redirect and time limits as pages. The
+// caller still checks the bytes are an image.
+func (f *Fetcher) FetchImage(ctx context.Context, rawURL string, maxBytes int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, ErrInvalidURL
+	}
+	req.Header.Set("User-Agent", f.userAgent)
+	req.Header.Set("Accept", "image/webp,image/png,image/jpeg,image/gif;q=0.9")
+	resp, err := f.client.Do(req)
+	if err != nil {
+		if errors.Is(err, ErrBlockedAddress) {
+			return nil, ErrBlockedAddress
+		}
+		return nil, fmt.Errorf("linkpreview: fetch image: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("linkpreview: image status %d", resp.StatusCode)
+	}
+	mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if !strings.HasPrefix(mediaType, "image/") || resp.ContentLength > maxBytes {
+		return nil, ErrNotImage
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("linkpreview: read image: %w", err)
+	}
+	if int64(len(b)) > maxBytes {
+		return nil, ErrNotImage
+	}
+	return b, nil
 }
 
 // parse reads the head of an HTML document: og:site_name, og:title and
 // og:description, falling back to twitter:* tags, <meta name=description>
-// and <title>.
-func parse(r io.Reader) Preview {
+// and <title>; and the image URL as written (og:image, twitter:image).
+func parse(r io.Reader) (Preview, string) {
 	z := html.NewTokenizer(r)
 	meta := map[string]string{}
 	var title strings.Builder
@@ -263,12 +312,12 @@ func parse(r io.Reader) Preview {
 		tt := z.Next()
 		switch tt {
 		case html.ErrorToken:
-			return finish(meta, title.String())
+			return finish(meta, title.String()), imageOf(meta)
 		case html.StartTagToken, html.SelfClosingTagToken:
 			name, hasAttr := z.TagName()
 			switch string(name) {
 			case "body":
-				return finish(meta, title.String())
+				return finish(meta, title.String()), imageOf(meta)
 			case "title":
 				inTitle = tt == html.StartTagToken
 			case "meta":
@@ -280,7 +329,7 @@ func parse(r io.Reader) Preview {
 			name, _ := z.TagName()
 			switch string(name) {
 			case "head":
-				return finish(meta, title.String())
+				return finish(meta, title.String()), imageOf(meta)
 			case "title":
 				inTitle = false
 			}
@@ -314,6 +363,15 @@ func readMeta(z *html.Tokenizer, meta map[string]string) {
 			meta[key] = content
 		}
 	}
+}
+
+func imageOf(meta map[string]string) string {
+	for _, k := range []string{"og:image:secure_url", "og:image", "og:image:url", "twitter:image", "twitter:image:src"} {
+		if v := strings.TrimSpace(meta[k]); v != "" && len(v) <= MaxURLLength {
+			return v
+		}
+	}
+	return ""
 }
 
 func finish(meta map[string]string, title string) Preview {

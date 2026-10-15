@@ -91,14 +91,16 @@ Create:
 
 ## Todo
 
-- [ ] Schema files/file_refs
-- [ ] Create/complete/abort + resume
-- [ ] Strip EXIF đồng bộ + kiểm MIME + chống bomb
-- [ ] ACL `file_id`
-- [ ] Worker sandbox
-- [ ] Token edge + purge
-- [ ] Client thumb + upload
-- [ ] Lifecycle + GC
+- [x] Schema files/file_refs (migration `0009_media`: `files`, `uploads`, `message_files`, `media_jobs`, `link_preview_photos`)
+- [x] Create/complete/abort + resume
+- [x] Strip EXIF đồng bộ + kiểm MIME + chống bomb
+- [x] ACL `file_id`
+- [x] Worker (trong process `api`, ffmpeg tuỳ chọn; xem ghi chú)
+- [x] Token tải + thu hồi khi xoá tin (purge CDN: không có, dùng `s-maxage=50`)
+- [x] Client thumb + upload (core; UI làm ở bước sau)
+- [x] Lifecycle + GC
+- [ ] UI web (composer, trình xem) theo mock
+- [ ] Test thủ công tua video trên 4 engine
 
 ## Success Criteria
 
@@ -128,6 +130,14 @@ Create:
 ## Rollback
 
 Module riêng; worker lỗi thì tin vẫn gửi với thumb client và bản đã strip, các cỡ khác sinh lại sau.
+
+## Ghi chú thực hiện (2026-10-15, backend và core R3)
+
+- Lưu trữ: Jev quyết lưu trên chính server `.65` (driver `filesystem`, `/opt/chat/media`), giữ driver S3 trong code để chuyển sau (`MEDIA_STORAGE=s3`). Upload đi qua API (part 8 MiB `PUT` tới host media), không URL S3 ký sẵn, không CORS. Tải do app stream có Range (không `X-Accel-Redirect`). Backup media ra ngoài server để sau, khi có người dùng thật.
+- Host media `media-chat.hoandat.com` (Cloudflare proxied, chứng chỉ riêng), cấu hình qua `MEDIA_PUBLIC_URL`; trước R9 chuyển sang domain đăng ký riêng.
+- Khác plan gốc: không có "pod sandbox" ở giai đoạn 1; ảnh được giải mã bằng thư viện Go thuần (không CGO, an toàn bộ nhớ) trong process `api` với giới hạn pixel và ngân sách bộ nhớ, ffmpeg (tuỳ chọn) chạy tiến trình con với môi trường rỗng, demuxer cố định, chỉ giao thức của input. Strip metadata không mã hoá lại (giữ Orientation); thumb inline do server tạo cho ảnh, client gửi cho video khi không có ffmpeg.
+- Chi tiết giao thức: [`server/README.md`](../../../server/README.md#media-package-internalmedia); vận hành: [`docs/deployment-guide.md`](../../../docs/deployment-guide.md#media-r3).
+- Còn thiếu: UI web, ảnh hồ sơ/ảnh chat, ảnh cho webhook, poster video và waveform khi server chưa có ffmpeg, metadata trong WebM không bị bỏ, giữ `grouped_id` khi chuyển tiếp album.
 
 ## Next Steps
 

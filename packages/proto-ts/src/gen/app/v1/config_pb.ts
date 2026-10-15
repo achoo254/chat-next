@@ -144,6 +144,8 @@ export type AppConfig = Message<"app.v1.AppConfig"> & {
   mediaCacheLargeFilesBytes: bigint;
 
   /**
+   * 0 when media storage is not configured: clients hide attaching files.
+   *
    * @generated from field: int64 upload_size_max_bytes = 11 [jstype = JS_NUMBER];
    */
   uploadSizeMaxBytes: bigint;

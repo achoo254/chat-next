@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/media.proto.
  */
 export const file_app_v1_media: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcHAvdjEvbWVkaWEucHJvdG8SBmFwcC52MSJhCglNZWRpYVNpemUSIwoEdHlwZRgBIAEoDjIVLmFwcC52MS5NZWRpYVNpemVUeXBlEg0KBXdpZHRoGAIgASgFEg4KBmhlaWdodBgDIAEoBRIQCgRzaXplGAQgASgDQgIwAiKCAgoITWVkaWFSZWYSDwoHZmlsZV9pZBgBIAEoCRIRCglmaWxlX2hhc2gYAiABKAkSHwoEa2luZBgDIAEoDjIRLmFwcC52MS5NZWRpYUtpbmQSEQoJbWltZV90eXBlGAQgASgJEhAKBHNpemUYBSABKANCAjACEhEKCWZpbGVfbmFtZRgGIAEoCRINCgV3aWR0aBgHIAEoBRIOCgZoZWlnaHQYCCABKAUSEAoIZHVyYXRpb24YCSABKAUSFAoMaW5saW5lX3RodW1iGAogASgMEiAKBXNpemVzGAsgAygLMhEuYXBwLnYxLk1lZGlhU2l6ZRIQCgh3YXZlZm9ybRgMIAEoDCIxCg1VcGxvYWRQYXJ0VXJsEhMKC3BhcnRfbnVtYmVyGAEgASgFEgsKA3VybBgCIAEoCSIyCg1Db21wbGV0ZWRQYXJ0EhMKC3BhcnRfbnVtYmVyGAEgASgFEgwKBGV0YWcYAiABKAki7QEKE0NyZWF0ZVVwbG9hZFJlcXVlc3QSEQoJdXBsb2FkX2lkGAEgASgJEh8KBGtpbmQYAiABKA4yES5hcHAudjEuTWVkaWFLaW5kEhEKCWZpbGVfbmFtZRgDIAEoCRIRCgltaW1lX3R5cGUYBCABKAkSEAoEc2l6ZRgFIAEoA0ICMAISEQoJZmlsZV9oYXNoGAYgASgJEg0KBXdpZHRoGAcgASgFEg4KBmhlaWdodBgIIAEoBRIQCghkdXJhdGlvbhgJIAEoBRIUCgxpbmxpbmVfdGh1bWIYCiABKAwSEAoId2F2ZWZvcm0YCyABKAwibwoUQ3JlYXRlVXBsb2FkUmVzcG9uc2USJAoIZXhpc3RpbmcYASABKAsyEC5hcHAudjEuTWVkaWFSZWZIABInCgZ1cGxvYWQYAiABKAsyFS5hcHAudjEuVXBsb2FkU2Vzc2lvbkgAQggKBnJlc3VsdCKrAQoNVXBsb2FkU2Vzc2lvbhIRCgl1cGxvYWRfaWQYASABKAkSFQoJcGFydF9zaXplGAIgASgDQgIwAhIkCgVwYXJ0cxgDIAMoCzIVLmFwcC52MS5VcGxvYWRQYXJ0VXJsEi4KD2NvbXBsZXRlZF9wYXJ0cxgEIAMoCzIVLmFwcC52MS5Db21wbGV0ZWRQYXJ0EhoKDnVybHNfZXhwaXJlX2F0GAUgASgDQgIwAiJQChVDb21wbGV0ZVVwbG9hZFJlcXVlc3QSEQoJdXBsb2FkX2lkGAEgASgJEiQKBXBhcnRzGAIgAygLMhUuYXBwLnYxLkNvbXBsZXRlZFBhcnQiOQoWQ29tcGxldGVVcGxvYWRSZXNwb25zZRIfCgVtZWRpYRgBIAEoCzIQLmFwcC52MS5NZWRpYVJlZiInChJBYm9ydFVwbG9hZFJlcXVlc3QSEQoJdXBsb2FkX2lkGAEgASgJIhUKE0Fib3J0VXBsb2FkUmVzcG9uc2UiOgoSTWVzc2FnZUZpbGVDb250ZXh0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIivQEKEUdldEZpbGVVcmxSZXF1ZXN0Eg8KB2ZpbGVfaWQYASABKAkSIwoEc2l6ZRgCIAEoDjIVLmFwcC52MS5NZWRpYVNpemVUeXBlEi0KB21lc3NhZ2UYAyABKAsyGi5hcHAudjEuTWVzc2FnZUZpbGVDb250ZXh0SAASGwoNdXNlcl9waG90b19vZhgEIAEoA0ICMAJIABIbCg1jaGF0X3Bob3RvX29mGAUgASgDQgIwAkgAQgkKB2NvbnRleHQiOQoSR2V0RmlsZVVybFJlc3BvbnNlEgsKA3VybBgBIAEoCRIWCgpleHBpcmVzX2F0GAIgASgDQgIwAiqYAQoJTWVkaWFLaW5kEhoKFk1FRElBX0tJTkRfVU5TUEVDSUZJRUQQABIUChBNRURJQV9LSU5EX1BIT1RPEAESFAoQTUVESUFfS0lORF9WSURFTxACEhQKEE1FRElBX0tJTkRfQVVESU8QAxIUChBNRURJQV9LSU5EX1ZPSUNFEAQSFwoTTUVESUFfS0lORF9ET0NVTUVOVBAFKnUKDU1lZGlhU2l6ZVR5cGUSHwobTUVESUFfU0laRV9UWVBFX1VOU1BFQ0lGSUVEEAASFQoRTUVESUFfU0laRV9UWVBFX1MQARIVChFNRURJQV9TSVpFX1RZUEVfTRACEhUKEU1FRElBX1NJWkVfVFlQRV9YEAMytwIKDE1lZGlhU2VydmljZRJJCgxDcmVhdGVVcGxvYWQSGy5hcHAudjEuQ3JlYXRlVXBsb2FkUmVxdWVzdBocLmFwcC52MS5DcmVhdGVVcGxvYWRSZXNwb25zZRJPCg5Db21wbGV0ZVVwbG9hZBIdLmFwcC52MS5Db21wbGV0ZVVwbG9hZFJlcXVlc3QaHi5hcHAudjEuQ29tcGxldGVVcGxvYWRSZXNwb25zZRJGCgtBYm9ydFVwbG9hZBIaLmFwcC52MS5BYm9ydFVwbG9hZFJlcXVlc3QaGy5hcHAudjEuQWJvcnRVcGxvYWRSZXNwb25zZRJDCgpHZXRGaWxlVXJsEhkuYXBwLnYxLkdldEZpbGVVcmxSZXF1ZXN0GhouYXBwLnYxLkdldEZpbGVVcmxSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
+  fileDesc("ChJhcHAvdjEvbWVkaWEucHJvdG8SBmFwcC52MSJhCglNZWRpYVNpemUSIwoEdHlwZRgBIAEoDjIVLmFwcC52MS5NZWRpYVNpemVUeXBlEg0KBXdpZHRoGAIgASgFEg4KBmhlaWdodBgDIAEoBRIQCgRzaXplGAQgASgDQgIwAiKCAgoITWVkaWFSZWYSDwoHZmlsZV9pZBgBIAEoCRIRCglmaWxlX2hhc2gYAiABKAkSHwoEa2luZBgDIAEoDjIRLmFwcC52MS5NZWRpYUtpbmQSEQoJbWltZV90eXBlGAQgASgJEhAKBHNpemUYBSABKANCAjACEhEKCWZpbGVfbmFtZRgGIAEoCRINCgV3aWR0aBgHIAEoBRIOCgZoZWlnaHQYCCABKAUSEAoIZHVyYXRpb24YCSABKAUSFAoMaW5saW5lX3RodW1iGAogASgMEiAKBXNpemVzGAsgAygLMhEuYXBwLnYxLk1lZGlhU2l6ZRIQCgh3YXZlZm9ybRgMIAEoDCIxCg1VcGxvYWRQYXJ0VXJsEhMKC3BhcnRfbnVtYmVyGAEgASgFEgsKA3VybBgCIAEoCSIyCg1Db21wbGV0ZWRQYXJ0EhMKC3BhcnRfbnVtYmVyGAEgASgFEgwKBGV0YWcYAiABKAki7QEKE0NyZWF0ZVVwbG9hZFJlcXVlc3QSEQoJdXBsb2FkX2lkGAEgASgJEh8KBGtpbmQYAiABKA4yES5hcHAudjEuTWVkaWFLaW5kEhEKCWZpbGVfbmFtZRgDIAEoCRIRCgltaW1lX3R5cGUYBCABKAkSEAoEc2l6ZRgFIAEoA0ICMAISEQoJZmlsZV9oYXNoGAYgASgJEg0KBXdpZHRoGAcgASgFEg4KBmhlaWdodBgIIAEoBRIQCghkdXJhdGlvbhgJIAEoBRIUCgxpbmxpbmVfdGh1bWIYCiABKAwSEAoId2F2ZWZvcm0YCyABKAwibwoUQ3JlYXRlVXBsb2FkUmVzcG9uc2USJAoIZXhpc3RpbmcYASABKAsyEC5hcHAudjEuTWVkaWFSZWZIABInCgZ1cGxvYWQYAiABKAsyFS5hcHAudjEuVXBsb2FkU2Vzc2lvbkgAQggKBnJlc3VsdCKrAQoNVXBsb2FkU2Vzc2lvbhIRCgl1cGxvYWRfaWQYASABKAkSFQoJcGFydF9zaXplGAIgASgDQgIwAhIkCgVwYXJ0cxgDIAMoCzIVLmFwcC52MS5VcGxvYWRQYXJ0VXJsEi4KD2NvbXBsZXRlZF9wYXJ0cxgEIAMoCzIVLmFwcC52MS5Db21wbGV0ZWRQYXJ0EhoKDnVybHNfZXhwaXJlX2F0GAUgASgDQgIwAiJQChVDb21wbGV0ZVVwbG9hZFJlcXVlc3QSEQoJdXBsb2FkX2lkGAEgASgJEiQKBXBhcnRzGAIgAygLMhUuYXBwLnYxLkNvbXBsZXRlZFBhcnQiOQoWQ29tcGxldGVVcGxvYWRSZXNwb25zZRIfCgVtZWRpYRgBIAEoCzIQLmFwcC52MS5NZWRpYVJlZiInChJBYm9ydFVwbG9hZFJlcXVlc3QSEQoJdXBsb2FkX2lkGAEgASgJIhUKE0Fib3J0VXBsb2FkUmVzcG9uc2UiOgoSTWVzc2FnZUZpbGVDb250ZXh0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIivQEKEUdldEZpbGVVcmxSZXF1ZXN0Eg8KB2ZpbGVfaWQYASABKAkSIwoEc2l6ZRgCIAEoDjIVLmFwcC52MS5NZWRpYVNpemVUeXBlEi0KB21lc3NhZ2UYAyABKAsyGi5hcHAudjEuTWVzc2FnZUZpbGVDb250ZXh0SAASGwoNdXNlcl9waG90b19vZhgEIAEoA0ICMAJIABIbCg1jaGF0X3Bob3RvX29mGAUgASgDQgIwAkgAQgkKB2NvbnRleHQiXgoSR2V0RmlsZVVybFJlc3BvbnNlEgsKA3VybBgBIAEoCRIWCgpleHBpcmVzX2F0GAIgASgDQgIwAhIjCgRzaXplGAMgASgOMhUuYXBwLnYxLk1lZGlhU2l6ZVR5cGUiQQoSR2V0RmlsZVVybHNSZXF1ZXN0EisKCHJlcXVlc3RzGAEgAygLMhkuYXBwLnYxLkdldEZpbGVVcmxSZXF1ZXN0Im4KDUZpbGVVcmxSZXN1bHQSCwoDdXJsGAEgASgJEhYKCmV4cGlyZXNfYXQYAiABKANCAjACEiMKBHNpemUYAyABKA4yFS5hcHAudjEuTWVkaWFTaXplVHlwZRITCgt1bmF2YWlsYWJsZRgEIAEoCCI9ChNHZXRGaWxlVXJsc1Jlc3BvbnNlEiYKB3Jlc3VsdHMYASADKAsyFS5hcHAudjEuRmlsZVVybFJlc3VsdCqYAQoJTWVkaWFLaW5kEhoKFk1FRElBX0tJTkRfVU5TUEVDSUZJRUQQABIUChBNRURJQV9LSU5EX1BIT1RPEAESFAoQTUVESUFfS0lORF9WSURFTxACEhQKEE1FRElBX0tJTkRfQVVESU8QAxIUChBNRURJQV9LSU5EX1ZPSUNFEAQSFwoTTUVESUFfS0lORF9ET0NVTUVOVBAFKnUKDU1lZGlhU2l6ZVR5cGUSHwobTUVESUFfU0laRV9UWVBFX1VOU1BFQ0lGSUVEEAASFQoRTUVESUFfU0laRV9UWVBFX1MQARIVChFNRURJQV9TSVpFX1RZUEVfTRACEhUKEU1FRElBX1NJWkVfVFlQRV9YEAMy/wIKDE1lZGlhU2VydmljZRJJCgxDcmVhdGVVcGxvYWQSGy5hcHAudjEuQ3JlYXRlVXBsb2FkUmVxdWVzdBocLmFwcC52MS5DcmVhdGVVcGxvYWRSZXNwb25zZRJPCg5Db21wbGV0ZVVwbG9hZBIdLmFwcC52MS5Db21wbGV0ZVVwbG9hZFJlcXVlc3QaHi5hcHAudjEuQ29tcGxldGVVcGxvYWRSZXNwb25zZRJGCgtBYm9ydFVwbG9hZBIaLmFwcC52MS5BYm9ydFVwbG9hZFJlcXVlc3QaGy5hcHAudjEuQWJvcnRVcGxvYWRSZXNwb25zZRJDCgpHZXRGaWxlVXJsEhkuYXBwLnYxLkdldEZpbGVVcmxSZXF1ZXN0GhouYXBwLnYxLkdldEZpbGVVcmxSZXNwb25zZRJGCgtHZXRGaWxlVXJscxIaLmFwcC52MS5HZXRGaWxlVXJsc1JlcXVlc3QaGy5hcHAudjEuR2V0RmlsZVVybHNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
 
 /**
  * @generated from message app.v1.MediaSize
@@ -340,6 +340,10 @@ export type CompleteUploadRequest = Message<"app.v1.CompleteUploadRequest"> & {
   uploadId: string;
 
   /**
+   * Informational: the server completes the upload from the parts the
+   * storage holds, so a lost etag does not fail the upload. Every part must
+   * be uploaded (FAILED_PRECONDITION lists none; resume with CreateUpload).
+   *
    * @generated from field: repeated app.v1.CompletedPart parts = 2;
    */
   parts: CompletedPart[];
@@ -477,6 +481,10 @@ export const GetFileUrlRequestSchema: GenMessage<GetFileUrlRequest> = /*@__PURE_
  */
 export type GetFileUrlResponse = Message<"app.v1.GetFileUrlResponse"> & {
   /**
+   * Signed URL on the media domain, bound to the tenant, the file, the
+   * caller and the context. It answers 403 once expired (ask again with the
+   * same context) and 404 once the message is deleted for everyone.
+   *
    * @generated from field: string url = 1;
    */
   url: string;
@@ -485,6 +493,14 @@ export type GetFileUrlResponse = Message<"app.v1.GetFileUrlResponse"> & {
    * @generated from field: int64 expires_at = 2 [jstype = JS_NUMBER];
    */
   expiresAt: bigint;
+
+  /**
+   * The rendition served: the requested size, or the original
+   * (UNSPECIFIED) when the file has no such rendition.
+   *
+   * @generated from field: app.v1.MediaSizeType size = 3;
+   */
+  size: MediaSizeType;
 };
 
 /**
@@ -493,6 +509,77 @@ export type GetFileUrlResponse = Message<"app.v1.GetFileUrlResponse"> & {
  */
 export const GetFileUrlResponseSchema: GenMessage<GetFileUrlResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_media, 13);
+
+/**
+ * @generated from message app.v1.GetFileUrlsRequest
+ */
+export type GetFileUrlsRequest = Message<"app.v1.GetFileUrlsRequest"> & {
+  /**
+   * @generated from field: repeated app.v1.GetFileUrlRequest requests = 1;
+   */
+  requests: GetFileUrlRequest[];
+};
+
+/**
+ * Describes the message app.v1.GetFileUrlsRequest.
+ * Use `create(GetFileUrlsRequestSchema)` to create a new message.
+ */
+export const GetFileUrlsRequestSchema: GenMessage<GetFileUrlsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_media, 14);
+
+/**
+ * @generated from message app.v1.FileUrlResult
+ */
+export type FileUrlResult = Message<"app.v1.FileUrlResult"> & {
+  /**
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * @generated from field: int64 expires_at = 2 [jstype = JS_NUMBER];
+   */
+  expiresAt: bigint;
+
+  /**
+   * @generated from field: app.v1.MediaSizeType size = 3;
+   */
+  size: MediaSizeType;
+
+  /**
+   * The file cannot be reached from this context (message deleted or not
+   * visible, unknown file): url is empty.
+   *
+   * @generated from field: bool unavailable = 4;
+   */
+  unavailable: boolean;
+};
+
+/**
+ * Describes the message app.v1.FileUrlResult.
+ * Use `create(FileUrlResultSchema)` to create a new message.
+ */
+export const FileUrlResultSchema: GenMessage<FileUrlResult> = /*@__PURE__*/
+  messageDesc(file_app_v1_media, 15);
+
+/**
+ * @generated from message app.v1.GetFileUrlsResponse
+ */
+export type GetFileUrlsResponse = Message<"app.v1.GetFileUrlsResponse"> & {
+  /**
+   * One per request, same order.
+   *
+   * @generated from field: repeated app.v1.FileUrlResult results = 1;
+   */
+  results: FileUrlResult[];
+};
+
+/**
+ * Describes the message app.v1.GetFileUrlsResponse.
+ * Use `create(GetFileUrlsResponseSchema)` to create a new message.
+ */
+export const GetFileUrlsResponseSchema: GenMessage<GetFileUrlsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_media, 16);
 
 /**
  * @generated from enum app.v1.MediaKind
@@ -616,6 +703,18 @@ export const MediaService: GenService<{
     methodKind: "unary";
     input: typeof GetFileUrlRequestSchema;
     output: typeof GetFileUrlResponseSchema;
+  },
+  /**
+   * GetFileUrl for up to 100 files at once (a screen of media), answered in
+   * request order; a file that cannot be reached is marked unavailable
+   * instead of failing the whole call.
+   *
+   * @generated from rpc app.v1.MediaService.GetFileUrls
+   */
+  getFileUrls: {
+    methodKind: "unary";
+    input: typeof GetFileUrlsRequestSchema;
+    output: typeof GetFileUrlsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_media, 0);

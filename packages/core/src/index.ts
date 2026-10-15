@@ -22,10 +22,29 @@ export {
 	Outbox,
 	OutboxError,
 	parseOperation,
+	type AlbumItemInput,
+	type MediaInput,
 	type OutboxOperation,
+	type PendingMedia,
 	type PendingMessage,
+	type SendAlbumOptions,
+	type SendMediaOptions,
 	type SendTextOptions,
 } from "./outbox/outbox.ts";
+export { decodeMediaRef, encodeMediaRef, fromBase64, toBase64 } from "./media/codec.ts";
+export { Sha256, sha256Blob } from "./media/sha256.ts";
+export { DEFAULT_MEDIA_LIMITS, type MediaLimits } from "./media/limits.ts";
+export { cacheKey, LARGE_FILE_BYTES, MediaCache, type CacheLimits } from "./media/media-cache.ts";
+export { MediaLoader, URLS_PER_CALL, type MediaFile, type MediaRequest, type MediaUrl } from "./media/media-loader.ts";
+export {
+	AdaptiveConcurrency,
+	DEFAULT_CONCURRENCY,
+	UploadQueue,
+	type ConcurrencyPolicy,
+	type UploadProgress,
+	type UploadSpec,
+	type UploadState,
+} from "./media/upload-queue.ts";
 export { buildSnapshot, parseSnapshot, SNAPSHOT_VERSION, type ScreenSnapshot, type SnapshotDialog } from "./snapshot/snapshot.ts";
 export { databaseName, isReturnPath, signInUrl, SIGN_OUT_PATH, type SessionEndReason } from "./auth/web.ts";
 export { DirectActions, UnsupportedApiError, type PinnedMessagesRequest } from "./app/direct-actions.ts";

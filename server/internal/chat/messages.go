@@ -13,6 +13,7 @@ import (
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/entities"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/media"
 	"github.com/jackc/pgx/v5"
 	"github.com/rivo/uniseg"
 	"google.golang.org/protobuf/proto"
@@ -80,6 +81,11 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 	}
 	if err := t.recordMentions(ctx, c, m, nm.content, false); err != nil {
 		return nil, err
+	}
+	if len(media.MessageFiles(nm.content)) > 0 {
+		if err := media.IndexMessage(ctx, t.tx, t.s.cfg.TenantID, m.ChatID, m.Seq, nm.content, false); err != nil {
+			return nil, err
+		}
 	}
 	c.LastSeq = m.Seq
 	ev.TopSeq = m.Seq
@@ -256,7 +262,20 @@ func (s *Service) cachedPreview(ctx context.Context, url string) (*appv1.LinkPre
 	if p.Empty() {
 		return nil, false
 	}
-	return &appv1.LinkPreview{Url: p.URL, SiteName: p.SiteName, Title: p.Title, Description: p.Description}, false
+	lp := &appv1.LinkPreview{Url: p.URL, SiteName: p.SiteName, Title: p.Title, Description: p.Description}
+	if p.ImageURL == "" || s.media == nil {
+		return lp, false
+	}
+	photo, known, err := s.media.CachedPreviewPhoto(ctx, p.ImageURL)
+	if err != nil {
+		s.logger.Warn("link preview photo cache read failed", "err", err)
+		return lp, false
+	}
+	if photo != nil {
+		lp.Photo = photo.Ref()
+	}
+	// Text now; the photo is fetched after the message is stored.
+	return lp, !known
 }
 
 // ------------------------------------------------------------------- send
@@ -529,6 +548,14 @@ func (s *Service) attachPreviewLater(chatID, seq int64, version int32, url strin
 			return
 		}
 		lp := &appv1.LinkPreview{Url: p.URL, SiteName: p.SiteName, Title: p.Title, Description: p.Description}
+		if p.ImageURL != "" && s.media != nil {
+			photo, err := s.media.PreviewPhoto(ctx, p.ImageURL, s.previews.FetchImage)
+			if err != nil {
+				s.logger.Warn("link preview photo failed", "err", err)
+			} else if photo != nil {
+				lp.Photo = photo.Ref()
+			}
+		}
 		if err := s.setPreview(ctx, chatID, seq, version, lp); err != nil {
 			s.logger.Warn("attaching link preview failed", "chat_id", chatID, "seq", seq, "err", err)
 		}
@@ -553,6 +580,9 @@ func (s *Service) setPreview(ctx context.Context, chatID, seq int64, version int
 			if err := proto.Unmarshal(m.Content, content); err != nil {
 				return fmt.Errorf("chat: decode message: %w", err)
 			}
+		}
+		if proto.Equal(content.GetLinkPreview(), lp) {
+			return nil
 		}
 		content.LinkPreview = lp
 		return t.rewriteMessage(ctx, c, m.FromID, m, m.Text, content, false, false)
@@ -580,6 +610,10 @@ func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *me
 		return fmt.Errorf("chat: edit message: %w", err)
 	}
 	m.Text, m.Content = text, raw
+	// The files the message carries may change (a link preview photo).
+	if err := media.IndexMessage(ctx, t.tx, t.s.cfg.TenantID, m.ChatID, m.Seq, content, true); err != nil {
+		return err
+	}
 	if markEdited {
 		if err := t.recordMentions(ctx, c, m, content, true); err != nil {
 			return err
@@ -600,7 +634,9 @@ func (t *txn) rewriteMessage(ctx context.Context, c *chatRow, actor int64, m *me
 // EditMessage changes the text of one of my messages within the edit
 // window.
 func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMessageRequest) (*appv1.EditMessageResponse, error) {
-	text, ents, err := s.validateText(req.GetText(), req.GetEntities(), false)
+	// May be empty: a media message's caption can be removed (checked
+	// below once the message is loaded).
+	text, ents, err := s.validateText(req.GetText(), req.GetEntities(), true)
 	if err != nil {
 		return nil, err
 	}
@@ -644,8 +680,17 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 		if content.GetAction() != nil {
 			return errInvalid("service messages cannot be edited")
 		}
+		if content.GetMedia() != nil {
+			// Captions have their own limit and never get a link preview.
+			if _, _, err := s.validateCaption(text, ents); err != nil {
+				return err
+			}
+			preview, fetchLater = nil, false
+		} else if strings.TrimSpace(text) == "" {
+			return errInvalid("message text is empty")
+		}
 		if m.Text == text && proto.Equal(&appv1.Message{Entities: content.GetEntities()}, &appv1.Message{Entities: ents}) &&
-			(req.GetNoLinkPreview() == (content.GetLinkPreview() == nil)) {
+			(content.GetMedia() != nil || req.GetNoLinkPreview() == (content.GetLinkPreview() == nil)) {
 			edited = m
 			return nil
 		}
@@ -772,6 +817,10 @@ func (t *txn) deleteMessages(ctx context.Context, c *chatRow, anyone bool, me in
 		deletedTopics = append(deletedTopics, g.topic)
 	}
 	slices.Sort(done)
+	// Download URLs of the messages' files stop working with this commit.
+	if err := media.UnindexMessages(ctx, t.tx, c.ID, done); err != nil {
+		return err
+	}
 	if _, err := t.tx.Exec(ctx, `DELETE FROM message_reactions WHERE chat_id = $1 AND seq = ANY($2)`, c.ID, done); err != nil {
 		return fmt.Errorf("chat: delete reactions: %w", err)
 	}

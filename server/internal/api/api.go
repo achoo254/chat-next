@@ -1,9 +1,10 @@
 // Package api assembles the HTTP server of the api role: /healthz, the web
 // sign-in routes under /auth, the Connect services under /rpc, the
 // realtime WebSocket at /ws (the gateway runs inside the api process in
-// stage 1) and the incoming webhook endpoint POST /hook/... (in the same
+// stage 1), the incoming webhook endpoint POST /hook/... (in the same
 // process, so a hook message reaches the in-memory gateway right after
-// commit).
+// commit) and, on the media host only, media downloads and proxied upload
+// parts.
 package api
 
 import (
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,6 +27,7 @@ import (
 	"app.local/server/internal/gateway"
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/rpc"
 	"app.local/server/internal/store"
@@ -44,7 +47,9 @@ type App struct {
 	Sessions *auth.Sessions
 	Chat     *chat.Service
 	Hooks    *hooks.Service
-	Hub      *gateway.Hub
+	// Media is nil when no storage is configured.
+	Media *media.Service
+	Hub   *gateway.Hub
 
 	logger   *slog.Logger
 	cancel   context.CancelFunc
@@ -57,6 +62,8 @@ type Options struct {
 	// LinkPreviewAllow replaces the public-address policy of the link
 	// preview fetcher (tests reach a local page with it).
 	LinkPreviewAllow func(netip.AddrPort) bool
+	// MediaObjects replaces the S3 client (tests use an in-process fake).
+	MediaObjects media.Objects
 }
 
 // New wires the api role on an open store and starts its background loops
@@ -91,11 +98,18 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	}
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{Allow: opts.LinkPreviewAllow}), logger)
 	limiter := ratelimit.NewMemory()
-	chatSvc, err := chat.New(chat.Config{
-		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme, Operators: cfg.OperatorUserIDs,
-	}, chat.Deps{Pool: st.Pool(), IDs: ids, Previews: previews, Limiter: limiter, Logger: logger})
+	mediaSvc, err := newMedia(cfg, st, limiter, logger, opts.MediaObjects)
 	if err != nil {
 		return nil, err
+	}
+	chatSvc, err := chat.New(chat.Config{
+		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme, Operators: cfg.OperatorUserIDs,
+	}, chat.Deps{Pool: st.Pool(), IDs: ids, Previews: previews, Media: mediaSvc, Limiter: limiter, Logger: logger})
+	if err != nil {
+		return nil, err
+	}
+	if mediaSvc != nil {
+		mediaSvc.SetRefresher(chatSvc)
 	}
 	hub := gateway.NewHub(chatSvc, logger)
 	chatSvc.SetRealtime(hub, hub)
@@ -109,7 +123,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		return nil, err
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
-		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc,
+		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
 		TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {
@@ -129,11 +143,17 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	}
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Hub: hub, logger: logger, cancel: cancel}
-	for _, loop := range []func(context.Context){
+	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
+		logger: logger, cancel: cancel}
+	loops := []func(context.Context){
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
-	} {
+	}
+	if mediaSvc != nil {
+		app.Handler = byHost(cfg.Media.PublicURL.Host, mediaSvc.Handler(), mux)
+		loops = append(loops, mediaSvc.RunLifecycle, mediaSvc.RunWorker)
+	}
+	for _, loop := range loops {
 		app.loops.Add(1)
 		go func() {
 			defer app.loops.Done()
@@ -141,6 +161,48 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		}()
 	}
 	return app, nil
+}
+
+// newMedia builds the media service when storage is configured.
+func newMedia(cfg config.Config, st *store.Store, limiter ratelimit.Limiter, logger *slog.Logger, objects media.Objects) (*media.Service, error) {
+	m := cfg.Media
+	if m == nil {
+		return nil, nil
+	}
+	if objects == nil {
+		var err error
+		switch m.Storage {
+		case config.StorageS3:
+			objects, err = media.NewS3(media.S3Config{
+				Endpoint: m.Endpoint, PublicEndpoint: m.PublicEndpoint, Region: m.Region, Bucket: m.Bucket,
+				AccessKey: m.AccessKey, SecretKey: m.SecretKey, PathStyle: m.PathStyle, Prefix: m.Prefix,
+			})
+		default:
+			objects, err = media.NewFilesystem(m.Root)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return media.New(media.Config{
+		TenantID: cfg.TenantID, PublicOrigin: m.PublicOrigin(), UploadMaxBytes: m.UploadMaxBytes,
+		UserQuotaBytes: m.UserQuotaBytes, UploadMode: m.UploadMode, FFmpegPath: m.FFmpegPath, SessionKey: cfg.SessionKey,
+		MinFreeBytes: m.MinFreeBytes,
+	}, st.Pool(), objects, limiter, logger.With("component", "media"))
+}
+
+// byHost sends requests for the media host to the media handler and
+// everything else to the app: no app route (cookies, RPC) answers on the
+// media host, and no media route on the app's hosts.
+func byHost(mediaHost string, mediaHandler, app http.Handler) http.Handler {
+	mediaHost = strings.ToLower(mediaHost)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.EqualFold(r.Host, mediaHost) {
+			mediaHandler.ServeHTTP(w, r)
+			return
+		}
+		app.ServeHTTP(w, r)
+	})
 }
 
 func runEvery(ctx context.Context, every time.Duration, fn func()) {

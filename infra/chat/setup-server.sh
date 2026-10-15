@@ -21,6 +21,8 @@ echo "== user and directories"
 id "$APP" >/dev/null 2>&1 || useradd --system --home-dir "$ROOT" --shell /sbin/nologin "$APP"
 install -d -m 755 "$ROOT" "$ROOT/releases" "$ROOT/infra"
 install -d -m 750 -o root -g "$APP" "$ROOT/backups"
+# Media files (MEDIA_ROOT): private to the app user.
+install -d -m 750 -o "$APP" -g "$APP" "$ROOT/media"
 # Root-owned: the root pm2 daemon and the root backup cron append here, and
 # an app-writable directory would let the app swap a log for a symlink.
 install -d -m 755 -o root -g root "$LOG_DIR"

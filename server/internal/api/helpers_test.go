@@ -64,7 +64,7 @@ func (b *syncBuffer) String() string {
 	return b.buf.String()
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T, mods ...func(*config.Config, *api.Options)) *env {
 	t.Helper()
 	ctx := context.Background()
 	st := testdb.Open(t)
@@ -90,9 +90,13 @@ func newEnv(t *testing.T) *env {
 		TenantID:         tenantID,
 		TenantDomain:     "hoandat.com",
 	}
+	opts := api.Options{LinkPreviewAllow: e2eAllow}
+	for _, mod := range mods {
+		mod(&cfg, &opts)
+	}
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewTextHandler(io.MultiWriter(t.Output(), logs), nil))
-	app, err := api.New(ctx, cfg, st, idp.Server.Client(), logger, api.Options{LinkPreviewAllow: e2eAllow})
+	app, err := api.New(ctx, cfg, st, idp.Server.Client(), logger, opts)
 	if err != nil {
 		t.Fatal(err)
 	}

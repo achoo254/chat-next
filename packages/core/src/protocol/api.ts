@@ -2,6 +2,8 @@
 // production client and the test fake implement the same contract.
 import { Code, ConnectError, createClient, type Client, type Transport } from "@connectrpc/connect";
 import { ChatsService } from "@app/proto-ts/chats";
+import { ConfigService } from "@app/proto-ts/config";
+import { MediaService } from "@app/proto-ts/media";
 import { MessagesService } from "@app/proto-ts/messages";
 import { ModerationService } from "@app/proto-ts/moderation";
 import { UpdatesService } from "@app/proto-ts/updates";
@@ -33,11 +35,23 @@ export interface RemoteApi {
 		Client<typeof MessagesService>,
 		"sendMessage" | "editMessage" | "deleteMessages" | "readHistory" | "getHistory"
 	> &
-		Partial<Pick<Client<typeof MessagesService>, "getMessageReactions" | "getPinnedMessages" | "unpinAllMessages">>;
+		Partial<
+			Pick<
+				Client<typeof MessagesService>,
+				"getMessageReactions" | "getPinnedMessages" | "unpinAllMessages" | "sendMedia" | "sendAlbum"
+			>
+		>;
 	readonly users: Pick<Client<typeof UsersService>, "getSelf" | "getUsers"> &
 		Partial<Pick<Client<typeof UsersService>, "getBlockedUsers" | "getContacts">>;
 	/** Operators only (GetSelfResponse.is_operator); others get permission_denied. */
 	readonly moderation?: Client<typeof ModerationService>;
+	/** Uploads and download URLs (R3). */
+	readonly media?: Pick<
+		Client<typeof MediaService>,
+		"createUpload" | "completeUpload" | "abortUpload" | "getFileUrls"
+	>;
+	/** Server-issued limits (AppConfig). */
+	readonly config?: Pick<Client<typeof ConfigService>, "getAppConfig">;
 }
 
 export function createRemoteApi(transport: Transport): RemoteApi {
@@ -47,6 +61,8 @@ export function createRemoteApi(transport: Transport): RemoteApi {
 		messages: createClient(MessagesService, transport),
 		users: createClient(UsersService, transport),
 		moderation: createClient(ModerationService, transport),
+		media: createClient(MediaService, transport),
+		config: createClient(ConfigService, transport),
 	};
 }
 

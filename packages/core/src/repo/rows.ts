@@ -9,6 +9,7 @@ import type {
 	EntityType,
 	ForwardHeader,
 	MediaKind,
+	MediaRef,
 	MemberRole,
 	LinkPreview,
 	Message,
@@ -21,6 +22,7 @@ import type {
 	User,
 } from "../model/types.ts";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "../model/types.ts";
+import { decodeMediaRef } from "../media/codec.ts";
 
 export function num(row: SqlRow, column: string): number {
 	const value = row[column];
@@ -192,11 +194,13 @@ function parseButtons(raw: string | null): MessageButton[][] {
 function parseLinkPreview(raw: string | null): LinkPreview | null {
 	const value = parseJson(raw);
 	if (!isRecord(value)) return null;
+	const photo = decodeMediaRef(value.photo);
 	return {
 		url: text(value, "url"),
 		siteName: text(value, "siteName"),
 		title: text(value, "title"),
 		description: text(value, "description"),
+		...(photo === null ? {} : { photo }),
 	};
 }
 
@@ -229,7 +233,13 @@ export function rowToMessage(row: SqlRow): Message {
 		linkPreview: parseLinkPreview(optionalStr(row, "link_preview")),
 		recalled: bool(row, "recalled"),
 		silent: bool(row, "silent"),
+		...mediaOf(optionalStr(row, "media")),
 	};
+}
+
+function mediaOf(raw: string | null): { media?: MediaRef } {
+	const media = decodeMediaRef(parseJson(raw));
+	return media === null ? {} : { media };
 }
 
 export function rowToUser(row: SqlRow): User {

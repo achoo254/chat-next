@@ -25,6 +25,8 @@ export const EventKeys = {
 	session: "session",
 	/** A fresh cold-start snapshot is available. */
 	snapshot: "snapshot",
+	/** Progress or state of one upload changed (key: PendingMedia.uploadKey). */
+	upload: (uploadKey: string): string => `upload:${uploadKey}`,
 } as const;
 
 export type KeyListener = () => void;

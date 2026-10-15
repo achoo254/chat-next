@@ -2,7 +2,8 @@
 // from a chat, or messages are hidden, the local copy goes too; recalled
 // messages keep only a placeholder.
 // The messages_fts triggers remove the search rows with the message rows, so
-// nothing purged stays searchable. Media cache purge joins here with R3.
+// nothing purged stays searchable. Cached media follows through triggers on
+// messages (media_cache_refs) and the cache's orphan sweep.
 import { EventKeys } from "../events/bus.ts";
 import { CHAT_TOPIC, placeholders, retopDialog, type WriteBatch } from "../repo/writes.ts";
 
@@ -36,7 +37,7 @@ export function recallMessages(w: WriteBatch, chatId: number, seqs: readonly num
 	w.add(
 		`UPDATE messages SET text = '', entities = '[]', media_kind = NULL, reply_to_seq = 0, forward = NULL,
 			edit_date = 0, via_bot_id = 0, reactions = '[]', integration_label = '', buttons = NULL, action = NULL, search_text = '',
-			link_preview = NULL, recalled = 1, silent = 0
+			link_preview = NULL, media = NULL, recalled = 1, silent = 0
 		WHERE chat_id = ? AND seq IN (${list})`,
 		[chatId, ...seqs],
 	);

@@ -24,6 +24,10 @@ service MediaService {
   // Issues a short-lived download URL on the media domain. Access is proven by
   // the context (a message the caller can see, or a profile photo owner).
   rpc GetFileUrl(GetFileUrlRequest) returns (GetFileUrlResponse);
+  // GetFileUrl for up to 100 files at once (a screen of media), answered in
+  // request order; a file that cannot be reached is marked unavailable
+  // instead of failing the whole call.
+  rpc GetFileUrls(GetFileUrlsRequest) returns (GetFileUrlsResponse);
 }
 
 enum MediaKind {
@@ -127,6 +131,9 @@ message UploadSession {
 
 message CompleteUploadRequest {
   string upload_id = 1;
+  // Informational: the server completes the upload from the parts the
+  // storage holds, so a lost etag does not fail the upload. Every part must
+  // be uploaded (FAILED_PRECONDITION lists none; resume with CreateUpload).
   repeated CompletedPart parts = 2;
 }
 
@@ -159,6 +166,30 @@ message GetFileUrlRequest {
 }
 
 message GetFileUrlResponse {
+  // Signed URL on the media domain, bound to the tenant, the file, the
+  // caller and the context. It answers 403 once expired (ask again with the
+  // same context) and 404 once the message is deleted for everyone.
   string url = 1;
   int64 expires_at = 2 [jstype = JS_NUMBER];
+  // The rendition served: the requested size, or the original
+  // (UNSPECIFIED) when the file has no such rendition.
+  MediaSizeType size = 3;
+}
+
+message GetFileUrlsRequest {
+  repeated GetFileUrlRequest requests = 1;
+}
+
+message FileUrlResult {
+  string url = 1;
+  int64 expires_at = 2 [jstype = JS_NUMBER];
+  MediaSizeType size = 3;
+  // The file cannot be reached from this context (message deleted or not
+  // visible, unknown file): url is empty.
+  bool unavailable = 4;
+}
+
+message GetFileUrlsResponse {
+  // One per request, same order.
+  repeated FileUrlResult results = 1;
 }

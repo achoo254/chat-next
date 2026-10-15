@@ -11,8 +11,8 @@ import (
 	"connectrpc.com/connect"
 )
 
-// messagesService implements MessagesService on the chat core. Media,
-// albums and inline buttons wait for their phases and stay Unimplemented.
+// messagesService implements MessagesService on the chat core. Inline
+// buttons wait for the bot phase and stay Unimplemented.
 type messagesService struct {
 	appv1connect.UnimplementedMessagesServiceHandler
 	chat   *chat.Service
@@ -25,12 +25,16 @@ func (s *messagesService) SendMessage(ctx context.Context, req *connect.Request[
 	})
 }
 
-func (s *messagesService) SendMedia(context.Context, *connect.Request[appv1.SendMediaRequest]) (*connect.Response[appv1.SendMediaResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("media messages are not available yet"))
+func (s *messagesService) SendMedia(ctx context.Context, req *connect.Request[appv1.SendMediaRequest]) (*connect.Response[appv1.SendMediaResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SendMediaRequest) (*appv1.SendMediaResponse, error) {
+		return s.chat.SendMedia(ctx, me, m)
+	})
 }
 
-func (s *messagesService) SendAlbum(context.Context, *connect.Request[appv1.SendAlbumRequest]) (*connect.Response[appv1.SendAlbumResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("albums are not available yet"))
+func (s *messagesService) SendAlbum(ctx context.Context, req *connect.Request[appv1.SendAlbumRequest]) (*connect.Response[appv1.SendAlbumResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SendAlbumRequest) (*appv1.SendAlbumResponse, error) {
+		return s.chat.SendAlbum(ctx, me, m)
+	})
 }
 
 func (s *messagesService) ForwardMessages(ctx context.Context, req *connect.Request[appv1.ForwardMessagesRequest]) (*connect.Response[appv1.ForwardMessagesResponse], error) {

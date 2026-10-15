@@ -204,10 +204,11 @@ type AppConfig struct {
 	MediaCacheMaxAgeSeconds int32 `protobuf:"varint,9,opt,name=media_cache_max_age_seconds,json=mediaCacheMaxAgeSeconds,proto3" json:"media_cache_max_age_seconds,omitempty"`
 	// Separate budget for large files and video inside the media cache.
 	MediaCacheLargeFilesBytes int64 `protobuf:"varint,10,opt,name=media_cache_large_files_bytes,json=mediaCacheLargeFilesBytes,proto3" json:"media_cache_large_files_bytes,omitempty"`
-	UploadSizeMaxBytes        int64 `protobuf:"varint,11,opt,name=upload_size_max_bytes,json=uploadSizeMaxBytes,proto3" json:"upload_size_max_bytes,omitempty"`
-	AlbumSizeMax              int32 `protobuf:"varint,12,opt,name=album_size_max,json=albumSizeMax,proto3" json:"album_size_max,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// 0 when media storage is not configured: clients hide attaching files.
+	UploadSizeMaxBytes int64 `protobuf:"varint,11,opt,name=upload_size_max_bytes,json=uploadSizeMaxBytes,proto3" json:"upload_size_max_bytes,omitempty"`
+	AlbumSizeMax       int32 `protobuf:"varint,12,opt,name=album_size_max,json=albumSizeMax,proto3" json:"album_size_max,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AppConfig) Reset() {

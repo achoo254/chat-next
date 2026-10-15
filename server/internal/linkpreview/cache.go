@@ -21,6 +21,11 @@ const (
 	retention = 7 * 24 * time.Hour
 )
 
+// FetchImage downloads a preview image through the fetcher's guard.
+func (s *Service) FetchImage(ctx context.Context, url string, maxBytes int64) ([]byte, error) {
+	return s.fetcher.FetchImage(ctx, url, maxBytes)
+}
+
 // Service serves previews from the link_previews cache, fetching on a miss.
 // Concurrent misses of one URL share a single fetch.
 type Service struct {
@@ -42,8 +47,8 @@ func (s *Service) Cached(ctx context.Context, normalized string) (p Preview, fou
 	var ok bool
 	var fetchedAt time.Time
 	err = s.pool.QueryRow(ctx, `
-		SELECT ok, site_name, title, description, fetched_at FROM link_previews WHERE url = $1`, normalized).
-		Scan(&ok, &p.SiteName, &p.Title, &p.Description, &fetchedAt)
+		SELECT ok, site_name, title, description, image_url, fetched_at FROM link_previews WHERE url = $1`, normalized).
+		Scan(&ok, &p.SiteName, &p.Title, &p.Description, &p.ImageURL, &fetchedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Preview{}, false, nil
 	}
@@ -82,11 +87,12 @@ func (s *Service) Get(ctx context.Context, normalized string) (Preview, error) {
 		}
 		ok := ferr == nil && !p.Empty()
 		if _, err := s.pool.Exec(fctx, `
-			INSERT INTO link_previews (url, ok, site_name, title, description, fetched_at)
-			VALUES ($1, $2, $3, $4, $5, now())
+			INSERT INTO link_previews (url, ok, site_name, title, description, image_url, fetched_at)
+			VALUES ($1, $2, $3, $4, $5, $6, now())
 			ON CONFLICT (url) DO UPDATE SET ok = excluded.ok, site_name = excluded.site_name,
-				title = excluded.title, description = excluded.description, fetched_at = excluded.fetched_at`,
-			normalized, ok, p.SiteName, p.Title, p.Description); err != nil {
+				title = excluded.title, description = excluded.description, image_url = excluded.image_url,
+				fetched_at = excluded.fetched_at`,
+			normalized, ok, p.SiteName, p.Title, p.Description, p.ImageURL); err != nil {
 			return Preview{}, fmt.Errorf("linkpreview: write cache: %w", err)
 		}
 		if !ok {

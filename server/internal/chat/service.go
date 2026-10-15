@@ -21,6 +21,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
@@ -41,7 +42,11 @@ type Config struct {
 	LargeChatThreshold int
 	// MessageLengthMax counts code points (AppConfig.message_length_max).
 	MessageLengthMax int
-	EditTimeLimit    time.Duration
+	// CaptionLengthMax bounds media captions (AppConfig.caption_length_max).
+	CaptionLengthMax int
+	// AlbumSizeMax bounds the items of an album (AppConfig.album_size_max).
+	AlbumSizeMax  int
+	EditTimeLimit time.Duration
 	// Read receipts per member: groups up to this size, messages this young.
 	ReadReceiptsMemberMax int
 	ReadReceiptsMaxAge    time.Duration
@@ -59,6 +64,8 @@ func DefaultConfig() Config {
 	return Config{
 		LargeChatThreshold:    200,
 		MessageLengthMax:      4096,
+		CaptionLengthMax:      1024,
+		AlbumSizeMax:          10,
 		EditTimeLimit:         48 * time.Hour,
 		ReadReceiptsMemberMax: 100,
 		ReadReceiptsMaxAge:    7 * 24 * time.Hour,
@@ -107,8 +114,10 @@ type Service struct {
 	cfg      Config
 	ids      IDSource
 	previews *linkpreview.Service
-	limiter  ratelimit.Limiter
-	logger   *slog.Logger
+	// media is nil when no storage is configured.
+	media   *media.Service
+	limiter ratelimit.Limiter
+	logger  *slog.Logger
 	// operators is Config.Operators as a set.
 	operators map[int64]bool
 
@@ -135,8 +144,11 @@ type Deps struct {
 	Pool     *pgxpool.Pool
 	IDs      IDSource
 	Previews *linkpreview.Service
-	Limiter  ratelimit.Limiter
-	Logger   *slog.Logger
+	// Media is optional: without it media sends answer media_disabled and
+	// link previews have no photos.
+	Media   *media.Service
+	Limiter ratelimit.Limiter
+	Logger  *slog.Logger
 }
 
 // New returns the Service; call Start before serving.
@@ -150,6 +162,12 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if cfg.MessageLengthMax <= 0 {
 		cfg.MessageLengthMax = def.MessageLengthMax
+	}
+	if cfg.CaptionLengthMax <= 0 {
+		cfg.CaptionLengthMax = def.CaptionLengthMax
+	}
+	if cfg.AlbumSizeMax <= 0 {
+		cfg.AlbumSizeMax = def.AlbumSizeMax
 	}
 	if cfg.EditTimeLimit <= 0 {
 		cfg.EditTimeLimit = def.EditTimeLimit
@@ -170,7 +188,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 		return nil, errors.New("chat: missing dependency")
 	}
 	s := &Service{
-		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, limiter: d.Limiter, logger: d.Logger,
+		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, media: d.Media, limiter: d.Limiter, logger: d.Logger,
 		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{},
 	}
 	for _, id := range cfg.Operators {
@@ -182,6 +200,10 @@ func New(cfg Config, d Deps) (*Service, error) {
 	s.stopCtx, s.stopAll = context.WithCancel(context.Background())
 	s.dispatch = newDispatcher(s)
 	return s, nil
+}
+
+func (s *Service) mediaEnabled() bool {
+	return s.media != nil
 }
 
 // Config returns the effective configuration.

@@ -18,7 +18,8 @@ import {
 	SyncMode as WireSyncMode,
 } from "@app/proto-ts/chats";
 import { SessionRevokeReason as WireRevokeReason } from "@app/proto-ts/auth";
-import { MediaKind as WireMediaKind } from "@app/proto-ts/media";
+import { MediaKind as WireMediaKind, MediaSizeType as WireSizeType } from "@app/proto-ts/media";
+import type { MediaRef as WireMediaRef, MediaSize as WireMediaSize } from "@app/proto-ts/media";
 import type {
 	GetHistoryResponse,
 	GetPinnedMessagesResponse,
@@ -62,6 +63,9 @@ import type {
 	LargeChatState,
 	LinkPreview,
 	MediaKind,
+	MediaRef,
+	MediaSize,
+	MediaSizeType,
 	MemberRole,
 	Message,
 	MessageAction,
@@ -129,6 +133,61 @@ const MEDIA_KINDS: Record<number, MediaKind> = {
 	[WireMediaKind.VOICE]: "voice",
 	[WireMediaKind.DOCUMENT]: "document",
 };
+
+const WIRE_MEDIA_KINDS = new Map<MediaKind, WireMediaKind>(
+	Object.entries(MEDIA_KINDS).map(([wire, local]) => [local, Number(wire) as WireMediaKind]),
+);
+
+/** Protocol kind from a client kind; "unknown" has none. */
+export function toWireMediaKind(kind: MediaKind): WireMediaKind {
+	return WIRE_MEDIA_KINDS.get(kind) ?? WireMediaKind.UNSPECIFIED;
+}
+
+const SIZE_TYPES: Record<number, MediaSizeType> = {
+	[WireSizeType.UNSPECIFIED]: "original",
+	[WireSizeType.S]: "s",
+	[WireSizeType.M]: "m",
+	[WireSizeType.X]: "x",
+};
+
+const WIRE_SIZE_TYPES: Record<MediaSizeType, WireSizeType> = {
+	original: WireSizeType.UNSPECIFIED,
+	s: WireSizeType.S,
+	m: WireSizeType.M,
+	x: WireSizeType.X,
+};
+
+/** Rendition from the protocol; one this client does not know is treated as the original. */
+export function toSizeType(type: WireSizeType): MediaSizeType {
+	return SIZE_TYPES[type] ?? "original";
+}
+
+export function toWireSizeType(type: MediaSizeType): WireSizeType {
+	return WIRE_SIZE_TYPES[type];
+}
+
+function toMediaSize(size: WireMediaSize): MediaSize | null {
+	const type = SIZE_TYPES[size.type];
+	if (type === undefined || type === "original") return null;
+	return { type, width: size.width, height: size.height, size: id(size.size) };
+}
+
+export function toMediaRef(media: WireMediaRef): MediaRef {
+	return {
+		fileId: media.fileId,
+		fileHash: media.fileHash,
+		kind: MEDIA_KINDS[media.kind] ?? "unknown",
+		mimeType: media.mimeType,
+		size: id(media.size),
+		fileName: media.fileName,
+		width: media.width,
+		height: media.height,
+		duration: media.duration,
+		inlineThumb: media.inlineThumb,
+		sizes: media.sizes.flatMap((s) => toMediaSize(s) ?? []),
+		waveform: media.waveform,
+	};
+}
 
 const REVOKE_REASONS: Record<number, SessionRevokeReason> = {
 	[WireRevokeReason.SIGNED_OUT]: "signed_out",
@@ -203,7 +262,13 @@ function toButtons(markup: WireReplyMarkup | undefined): MessageButton[][] {
 
 function toLinkPreview(preview: WireLinkPreview | undefined): LinkPreview | null {
 	if (preview === undefined) return null;
-	return { url: preview.url, siteName: preview.siteName, title: preview.title, description: preview.description };
+	return {
+		url: preview.url,
+		siteName: preview.siteName,
+		title: preview.title,
+		description: preview.description,
+		...(preview.photo === undefined ? {} : { photo: toMediaRef(preview.photo) }),
+	};
 }
 
 export function toDialog(dialog: WireDialog): Dialog {
@@ -371,6 +436,7 @@ export function toMessage(message: WireMessage): Message {
 		linkPreview: toLinkPreview(message.linkPreview),
 		recalled: message.recalled,
 		silent: message.silent,
+		...(message.media === undefined ? {} : { media: toMediaRef(message.media) }),
 	};
 }
 

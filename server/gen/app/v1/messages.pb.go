@@ -854,14 +854,18 @@ func (*ReplyMarkup_InlineKeyboard) isReplyMarkup_Kind() {}
 
 func (*ReplyMarkup_Remove) isReplyMarkup_Kind() {}
 
-// Text-only preview of the first web link of a message, fetched by the
-// server (Open Graph). Thumbnails come with media.
+// Preview of the first web link of a message, fetched by the server (Open
+// Graph).
 type LinkPreview struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	SiteName      string                 `protobuf:"bytes,2,opt,name=site_name,json=siteName,proto3" json:"site_name,omitempty"`
-	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Url         string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	SiteName    string                 `protobuf:"bytes,2,opt,name=site_name,json=siteName,proto3" json:"site_name,omitempty"`
+	Title       string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Description string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	// The page's og:image, fetched through the same SSRF guard and stored as
+	// a server-owned photo; unset when the page has none or it could not be
+	// fetched. Download it with GetFileUrl in the message's context.
+	Photo         *MediaRef `protobuf:"bytes,5,opt,name=photo,proto3" json:"photo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -922,6 +926,13 @@ func (x *LinkPreview) GetDescription() string {
 		return x.Description
 	}
 	return ""
+}
+
+func (x *LinkPreview) GetPhoto() *MediaRef {
+	if x != nil {
+		return x.Photo
+	}
+	return nil
 }
 
 type ForwardHeader struct {
@@ -2322,11 +2333,13 @@ type SendMediaRequest struct {
 	// A file the caller owns or can see in a message.
 	FileId string `protobuf:"bytes,2,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
 	// Caption.
-	Text          string           `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	Entities      []*MessageEntity `protobuf:"bytes,4,rep,name=entities,proto3" json:"entities,omitempty"`
-	ReplyToSeq    int64            `protobuf:"varint,5,opt,name=reply_to_seq,json=replyToSeq,proto3" json:"reply_to_seq,omitempty"`
-	RandomId      int64            `protobuf:"varint,6,opt,name=random_id,json=randomId,proto3" json:"random_id,omitempty"`
-	Silent        bool             `protobuf:"varint,7,opt,name=silent,proto3" json:"silent,omitempty"`
+	Text       string           `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	Entities   []*MessageEntity `protobuf:"bytes,4,rep,name=entities,proto3" json:"entities,omitempty"`
+	ReplyToSeq int64            `protobuf:"varint,5,opt,name=reply_to_seq,json=replyToSeq,proto3" json:"reply_to_seq,omitempty"`
+	RandomId   int64            `protobuf:"varint,6,opt,name=random_id,json=randomId,proto3" json:"random_id,omitempty"`
+	Silent     bool             `protobuf:"varint,7,opt,name=silent,proto3" json:"silent,omitempty"`
+	// Forum groups: topic to post in; 0 = General.
+	TopicId       int64 `protobuf:"varint,8,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2408,6 +2421,13 @@ func (x *SendMediaRequest) GetSilent() bool {
 		return x.Silent
 	}
 	return false
+}
+
+func (x *SendMediaRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
 }
 
 type SendMediaResponse struct {
@@ -2530,12 +2550,16 @@ func (x *AlbumItem) GetRandomId() int64 {
 	return 0
 }
 
+// 2 to AppConfig.album_size_max items: photos and videos mixed, or only
+// documents, or only audio files.
 type SendAlbumRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	Items         []*AlbumItem           `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
-	ReplyToSeq    int64                  `protobuf:"varint,3,opt,name=reply_to_seq,json=replyToSeq,proto3" json:"reply_to_seq,omitempty"`
-	Silent        bool                   `protobuf:"varint,4,opt,name=silent,proto3" json:"silent,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	ChatId     int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	Items      []*AlbumItem           `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
+	ReplyToSeq int64                  `protobuf:"varint,3,opt,name=reply_to_seq,json=replyToSeq,proto3" json:"reply_to_seq,omitempty"`
+	Silent     bool                   `protobuf:"varint,4,opt,name=silent,proto3" json:"silent,omitempty"`
+	// Forum groups: topic to post in; 0 = General.
+	TopicId       int64 `protobuf:"varint,5,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2596,6 +2620,13 @@ func (x *SendAlbumRequest) GetSilent() bool {
 		return x.Silent
 	}
 	return false
+}
+
+func (x *SendAlbumRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
 }
 
 type SendAlbumResponse struct {
@@ -4612,12 +4643,13 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\bkeyboard\x18\x01 \x01(\v2\x15.app.v1.ReplyKeyboardH\x00R\bkeyboard\x12A\n" +
 	"\x0finline_keyboard\x18\x02 \x01(\v2\x16.app.v1.InlineKeyboardH\x00R\x0einlineKeyboard\x125\n" +
 	"\x06remove\x18\x03 \x01(\v2\x1b.app.v1.ReplyKeyboardRemoveH\x00R\x06removeB\x06\n" +
-	"\x04kind\"t\n" +
+	"\x04kind\"\x9c\x01\n" +
 	"\vLinkPreview\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x1b\n" +
 	"\tsite_name\x18\x02 \x01(\tR\bsiteName\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\"\xaf\x01\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12&\n" +
+	"\x05photo\x18\x05 \x01(\v2\x10.app.v1.MediaRefR\x05photo\"\xaf\x01\n" +
 	"\rForwardHeader\x12$\n" +
 	"\ffrom_user_id\x18\x01 \x01(\x03B\x020\x02R\n" +
 	"fromUserId\x12$\n" +
@@ -4714,7 +4746,7 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x0fno_link_preview\x18\b \x01(\bR\rnoLinkPreview\"c\n" +
 	"\x13SendMessageResponse\x12)\n" +
 	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\x12!\n" +
-	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"\xee\x01\n" +
+	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"\x8d\x02\n" +
 	"\x10SendMediaRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x17\n" +
 	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12\x12\n" +
@@ -4723,7 +4755,8 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\freply_to_seq\x18\x05 \x01(\x03B\x020\x02R\n" +
 	"replyToSeq\x12\x1f\n" +
 	"\trandom_id\x18\x06 \x01(\x03B\x020\x02R\brandomId\x12\x16\n" +
-	"\x06silent\x18\a \x01(\bR\x06silent\"a\n" +
+	"\x06silent\x18\a \x01(\bR\x06silent\x12\x1d\n" +
+	"\btopic_id\x18\b \x01(\x03B\x020\x02R\atopicId\"a\n" +
 	"\x11SendMediaResponse\x12)\n" +
 	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\x12!\n" +
 	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"\x8c\x01\n" +
@@ -4731,13 +4764,14 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x121\n" +
 	"\bentities\x18\x03 \x03(\v2\x15.app.v1.MessageEntityR\bentities\x12\x1f\n" +
-	"\trandom_id\x18\x04 \x01(\x03B\x020\x02R\brandomId\"\x96\x01\n" +
+	"\trandom_id\x18\x04 \x01(\x03B\x020\x02R\brandomId\"\xb5\x01\n" +
 	"\x10SendAlbumRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12'\n" +
 	"\x05items\x18\x02 \x03(\v2\x11.app.v1.AlbumItemR\x05items\x12$\n" +
 	"\freply_to_seq\x18\x03 \x01(\x03B\x020\x02R\n" +
 	"replyToSeq\x12\x16\n" +
-	"\x06silent\x18\x04 \x01(\bR\x06silent\"c\n" +
+	"\x06silent\x18\x04 \x01(\bR\x06silent\x12\x1d\n" +
+	"\btopic_id\x18\x05 \x01(\x03B\x020\x02R\atopicId\"c\n" +
 	"\x11SendAlbumResponse\x12+\n" +
 	"\bmessages\x18\x01 \x03(\v2\x0f.app.v1.MessageR\bmessages\x12!\n" +
 	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"\xd7\x01\n" +
@@ -5023,103 +5057,104 @@ var file_app_v1_messages_proto_depIdxs = []int32{
 	6,  // 5: app.v1.ReplyMarkup.keyboard:type_name -> app.v1.ReplyKeyboard
 	9,  // 6: app.v1.ReplyMarkup.inline_keyboard:type_name -> app.v1.InlineKeyboard
 	10, // 7: app.v1.ReplyMarkup.remove:type_name -> app.v1.ReplyKeyboardRemove
-	69, // 8: app.v1.ActionPhotoChanged.photo:type_name -> app.v1.MediaRef
-	1,  // 9: app.v1.ActionIncomingHookStopped.reason:type_name -> app.v1.IncomingHookStopReason
-	15, // 10: app.v1.MessageAction.chat_created:type_name -> app.v1.ActionChatCreated
-	16, // 11: app.v1.MessageAction.members_added:type_name -> app.v1.ActionMembersAdded
-	17, // 12: app.v1.MessageAction.member_left:type_name -> app.v1.ActionMemberLeft
-	18, // 13: app.v1.MessageAction.member_removed:type_name -> app.v1.ActionMemberRemoved
-	19, // 14: app.v1.MessageAction.title_changed:type_name -> app.v1.ActionTitleChanged
-	20, // 15: app.v1.MessageAction.photo_changed:type_name -> app.v1.ActionPhotoChanged
-	21, // 16: app.v1.MessageAction.photo_removed:type_name -> app.v1.ActionPhotoRemoved
-	22, // 17: app.v1.MessageAction.message_pinned:type_name -> app.v1.ActionMessagePinned
-	23, // 18: app.v1.MessageAction.history_visibility_changed:type_name -> app.v1.ActionHistoryVisibilityChanged
-	24, // 19: app.v1.MessageAction.chat_mode_changed:type_name -> app.v1.ActionChatModeChanged
-	25, // 20: app.v1.MessageAction.joined_by_invite:type_name -> app.v1.ActionJoinedByInvite
-	26, // 21: app.v1.MessageAction.incoming_hook_stopped:type_name -> app.v1.ActionIncomingHookStopped
-	3,  // 22: app.v1.Message.entities:type_name -> app.v1.MessageEntity
-	69, // 23: app.v1.Message.media:type_name -> app.v1.MediaRef
-	13, // 24: app.v1.Message.forward_from:type_name -> app.v1.ForwardHeader
-	11, // 25: app.v1.Message.reply_markup:type_name -> app.v1.ReplyMarkup
-	14, // 26: app.v1.Message.reactions:type_name -> app.v1.ReactionCount
-	27, // 27: app.v1.Message.action:type_name -> app.v1.MessageAction
-	12, // 28: app.v1.Message.link_preview:type_name -> app.v1.LinkPreview
-	3,  // 29: app.v1.SendMessageRequest.entities:type_name -> app.v1.MessageEntity
-	28, // 30: app.v1.SendMessageResponse.message:type_name -> app.v1.Message
-	29, // 31: app.v1.SendMessageResponse.ack:type_name -> app.v1.SyncAck
-	3,  // 32: app.v1.SendMediaRequest.entities:type_name -> app.v1.MessageEntity
-	28, // 33: app.v1.SendMediaResponse.message:type_name -> app.v1.Message
-	29, // 34: app.v1.SendMediaResponse.ack:type_name -> app.v1.SyncAck
-	3,  // 35: app.v1.AlbumItem.entities:type_name -> app.v1.MessageEntity
-	34, // 36: app.v1.SendAlbumRequest.items:type_name -> app.v1.AlbumItem
-	28, // 37: app.v1.SendAlbumResponse.messages:type_name -> app.v1.Message
-	29, // 38: app.v1.SendAlbumResponse.ack:type_name -> app.v1.SyncAck
-	28, // 39: app.v1.ForwardMessagesResponse.messages:type_name -> app.v1.Message
-	29, // 40: app.v1.ForwardMessagesResponse.ack:type_name -> app.v1.SyncAck
-	3,  // 41: app.v1.CopyMessageRequest.entities:type_name -> app.v1.MessageEntity
-	28, // 42: app.v1.CopyMessageResponse.message:type_name -> app.v1.Message
-	29, // 43: app.v1.CopyMessageResponse.ack:type_name -> app.v1.SyncAck
-	3,  // 44: app.v1.EditMessageRequest.entities:type_name -> app.v1.MessageEntity
-	28, // 45: app.v1.EditMessageResponse.message:type_name -> app.v1.Message
-	29, // 46: app.v1.EditMessageResponse.ack:type_name -> app.v1.SyncAck
-	29, // 47: app.v1.DeleteMessagesResponse.ack:type_name -> app.v1.SyncAck
-	29, // 48: app.v1.ReadHistoryResponse.ack:type_name -> app.v1.SyncAck
-	29, // 49: app.v1.PinMessageResponse.ack:type_name -> app.v1.SyncAck
-	29, // 50: app.v1.UnpinMessageResponse.ack:type_name -> app.v1.SyncAck
-	29, // 51: app.v1.UnpinAllMessagesResponse.ack:type_name -> app.v1.SyncAck
-	28, // 52: app.v1.GetPinnedMessagesResponse.messages:type_name -> app.v1.Message
-	70, // 53: app.v1.GetPinnedMessagesResponse.users:type_name -> app.v1.User
-	14, // 54: app.v1.SetReactionResponse.reactions:type_name -> app.v1.ReactionCount
-	29, // 55: app.v1.SetReactionResponse.ack:type_name -> app.v1.SyncAck
-	2,  // 56: app.v1.GetHistoryRequest.direction:type_name -> app.v1.HistoryDirection
-	28, // 57: app.v1.GetHistoryResponse.messages:type_name -> app.v1.Message
-	70, // 58: app.v1.GetHistoryResponse.users:type_name -> app.v1.User
-	12, // 59: app.v1.GetLinkPreviewResponse.preview:type_name -> app.v1.LinkPreview
-	70, // 60: app.v1.GetMessageReadersResponse.users:type_name -> app.v1.User
-	65, // 61: app.v1.GetMessageReadersResponse.readers:type_name -> app.v1.MessageReader
-	67, // 62: app.v1.GetMessageReactionsResponse.reactors:type_name -> app.v1.MessageReactor
-	70, // 63: app.v1.GetMessageReactionsResponse.users:type_name -> app.v1.User
-	30, // 64: app.v1.MessagesService.SendMessage:input_type -> app.v1.SendMessageRequest
-	32, // 65: app.v1.MessagesService.SendMedia:input_type -> app.v1.SendMediaRequest
-	35, // 66: app.v1.MessagesService.SendAlbum:input_type -> app.v1.SendAlbumRequest
-	37, // 67: app.v1.MessagesService.ForwardMessages:input_type -> app.v1.ForwardMessagesRequest
-	39, // 68: app.v1.MessagesService.CopyMessage:input_type -> app.v1.CopyMessageRequest
-	41, // 69: app.v1.MessagesService.EditMessage:input_type -> app.v1.EditMessageRequest
-	43, // 70: app.v1.MessagesService.DeleteMessages:input_type -> app.v1.DeleteMessagesRequest
-	45, // 71: app.v1.MessagesService.ReadHistory:input_type -> app.v1.ReadHistoryRequest
-	47, // 72: app.v1.MessagesService.PinMessage:input_type -> app.v1.PinMessageRequest
-	49, // 73: app.v1.MessagesService.UnpinMessage:input_type -> app.v1.UnpinMessageRequest
-	51, // 74: app.v1.MessagesService.UnpinAllMessages:input_type -> app.v1.UnpinAllMessagesRequest
-	53, // 75: app.v1.MessagesService.GetPinnedMessages:input_type -> app.v1.GetPinnedMessagesRequest
-	55, // 76: app.v1.MessagesService.SetReaction:input_type -> app.v1.SetReactionRequest
-	57, // 77: app.v1.MessagesService.GetHistory:input_type -> app.v1.GetHistoryRequest
-	59, // 78: app.v1.MessagesService.PressInlineButton:input_type -> app.v1.PressInlineButtonRequest
-	61, // 79: app.v1.MessagesService.GetLinkPreview:input_type -> app.v1.GetLinkPreviewRequest
-	63, // 80: app.v1.MessagesService.GetMessageReaders:input_type -> app.v1.GetMessageReadersRequest
-	66, // 81: app.v1.MessagesService.GetMessageReactions:input_type -> app.v1.GetMessageReactionsRequest
-	31, // 82: app.v1.MessagesService.SendMessage:output_type -> app.v1.SendMessageResponse
-	33, // 83: app.v1.MessagesService.SendMedia:output_type -> app.v1.SendMediaResponse
-	36, // 84: app.v1.MessagesService.SendAlbum:output_type -> app.v1.SendAlbumResponse
-	38, // 85: app.v1.MessagesService.ForwardMessages:output_type -> app.v1.ForwardMessagesResponse
-	40, // 86: app.v1.MessagesService.CopyMessage:output_type -> app.v1.CopyMessageResponse
-	42, // 87: app.v1.MessagesService.EditMessage:output_type -> app.v1.EditMessageResponse
-	44, // 88: app.v1.MessagesService.DeleteMessages:output_type -> app.v1.DeleteMessagesResponse
-	46, // 89: app.v1.MessagesService.ReadHistory:output_type -> app.v1.ReadHistoryResponse
-	48, // 90: app.v1.MessagesService.PinMessage:output_type -> app.v1.PinMessageResponse
-	50, // 91: app.v1.MessagesService.UnpinMessage:output_type -> app.v1.UnpinMessageResponse
-	52, // 92: app.v1.MessagesService.UnpinAllMessages:output_type -> app.v1.UnpinAllMessagesResponse
-	54, // 93: app.v1.MessagesService.GetPinnedMessages:output_type -> app.v1.GetPinnedMessagesResponse
-	56, // 94: app.v1.MessagesService.SetReaction:output_type -> app.v1.SetReactionResponse
-	58, // 95: app.v1.MessagesService.GetHistory:output_type -> app.v1.GetHistoryResponse
-	60, // 96: app.v1.MessagesService.PressInlineButton:output_type -> app.v1.PressInlineButtonResponse
-	62, // 97: app.v1.MessagesService.GetLinkPreview:output_type -> app.v1.GetLinkPreviewResponse
-	64, // 98: app.v1.MessagesService.GetMessageReaders:output_type -> app.v1.GetMessageReadersResponse
-	68, // 99: app.v1.MessagesService.GetMessageReactions:output_type -> app.v1.GetMessageReactionsResponse
-	82, // [82:100] is the sub-list for method output_type
-	64, // [64:82] is the sub-list for method input_type
-	64, // [64:64] is the sub-list for extension type_name
-	64, // [64:64] is the sub-list for extension extendee
-	0,  // [0:64] is the sub-list for field type_name
+	69, // 8: app.v1.LinkPreview.photo:type_name -> app.v1.MediaRef
+	69, // 9: app.v1.ActionPhotoChanged.photo:type_name -> app.v1.MediaRef
+	1,  // 10: app.v1.ActionIncomingHookStopped.reason:type_name -> app.v1.IncomingHookStopReason
+	15, // 11: app.v1.MessageAction.chat_created:type_name -> app.v1.ActionChatCreated
+	16, // 12: app.v1.MessageAction.members_added:type_name -> app.v1.ActionMembersAdded
+	17, // 13: app.v1.MessageAction.member_left:type_name -> app.v1.ActionMemberLeft
+	18, // 14: app.v1.MessageAction.member_removed:type_name -> app.v1.ActionMemberRemoved
+	19, // 15: app.v1.MessageAction.title_changed:type_name -> app.v1.ActionTitleChanged
+	20, // 16: app.v1.MessageAction.photo_changed:type_name -> app.v1.ActionPhotoChanged
+	21, // 17: app.v1.MessageAction.photo_removed:type_name -> app.v1.ActionPhotoRemoved
+	22, // 18: app.v1.MessageAction.message_pinned:type_name -> app.v1.ActionMessagePinned
+	23, // 19: app.v1.MessageAction.history_visibility_changed:type_name -> app.v1.ActionHistoryVisibilityChanged
+	24, // 20: app.v1.MessageAction.chat_mode_changed:type_name -> app.v1.ActionChatModeChanged
+	25, // 21: app.v1.MessageAction.joined_by_invite:type_name -> app.v1.ActionJoinedByInvite
+	26, // 22: app.v1.MessageAction.incoming_hook_stopped:type_name -> app.v1.ActionIncomingHookStopped
+	3,  // 23: app.v1.Message.entities:type_name -> app.v1.MessageEntity
+	69, // 24: app.v1.Message.media:type_name -> app.v1.MediaRef
+	13, // 25: app.v1.Message.forward_from:type_name -> app.v1.ForwardHeader
+	11, // 26: app.v1.Message.reply_markup:type_name -> app.v1.ReplyMarkup
+	14, // 27: app.v1.Message.reactions:type_name -> app.v1.ReactionCount
+	27, // 28: app.v1.Message.action:type_name -> app.v1.MessageAction
+	12, // 29: app.v1.Message.link_preview:type_name -> app.v1.LinkPreview
+	3,  // 30: app.v1.SendMessageRequest.entities:type_name -> app.v1.MessageEntity
+	28, // 31: app.v1.SendMessageResponse.message:type_name -> app.v1.Message
+	29, // 32: app.v1.SendMessageResponse.ack:type_name -> app.v1.SyncAck
+	3,  // 33: app.v1.SendMediaRequest.entities:type_name -> app.v1.MessageEntity
+	28, // 34: app.v1.SendMediaResponse.message:type_name -> app.v1.Message
+	29, // 35: app.v1.SendMediaResponse.ack:type_name -> app.v1.SyncAck
+	3,  // 36: app.v1.AlbumItem.entities:type_name -> app.v1.MessageEntity
+	34, // 37: app.v1.SendAlbumRequest.items:type_name -> app.v1.AlbumItem
+	28, // 38: app.v1.SendAlbumResponse.messages:type_name -> app.v1.Message
+	29, // 39: app.v1.SendAlbumResponse.ack:type_name -> app.v1.SyncAck
+	28, // 40: app.v1.ForwardMessagesResponse.messages:type_name -> app.v1.Message
+	29, // 41: app.v1.ForwardMessagesResponse.ack:type_name -> app.v1.SyncAck
+	3,  // 42: app.v1.CopyMessageRequest.entities:type_name -> app.v1.MessageEntity
+	28, // 43: app.v1.CopyMessageResponse.message:type_name -> app.v1.Message
+	29, // 44: app.v1.CopyMessageResponse.ack:type_name -> app.v1.SyncAck
+	3,  // 45: app.v1.EditMessageRequest.entities:type_name -> app.v1.MessageEntity
+	28, // 46: app.v1.EditMessageResponse.message:type_name -> app.v1.Message
+	29, // 47: app.v1.EditMessageResponse.ack:type_name -> app.v1.SyncAck
+	29, // 48: app.v1.DeleteMessagesResponse.ack:type_name -> app.v1.SyncAck
+	29, // 49: app.v1.ReadHistoryResponse.ack:type_name -> app.v1.SyncAck
+	29, // 50: app.v1.PinMessageResponse.ack:type_name -> app.v1.SyncAck
+	29, // 51: app.v1.UnpinMessageResponse.ack:type_name -> app.v1.SyncAck
+	29, // 52: app.v1.UnpinAllMessagesResponse.ack:type_name -> app.v1.SyncAck
+	28, // 53: app.v1.GetPinnedMessagesResponse.messages:type_name -> app.v1.Message
+	70, // 54: app.v1.GetPinnedMessagesResponse.users:type_name -> app.v1.User
+	14, // 55: app.v1.SetReactionResponse.reactions:type_name -> app.v1.ReactionCount
+	29, // 56: app.v1.SetReactionResponse.ack:type_name -> app.v1.SyncAck
+	2,  // 57: app.v1.GetHistoryRequest.direction:type_name -> app.v1.HistoryDirection
+	28, // 58: app.v1.GetHistoryResponse.messages:type_name -> app.v1.Message
+	70, // 59: app.v1.GetHistoryResponse.users:type_name -> app.v1.User
+	12, // 60: app.v1.GetLinkPreviewResponse.preview:type_name -> app.v1.LinkPreview
+	70, // 61: app.v1.GetMessageReadersResponse.users:type_name -> app.v1.User
+	65, // 62: app.v1.GetMessageReadersResponse.readers:type_name -> app.v1.MessageReader
+	67, // 63: app.v1.GetMessageReactionsResponse.reactors:type_name -> app.v1.MessageReactor
+	70, // 64: app.v1.GetMessageReactionsResponse.users:type_name -> app.v1.User
+	30, // 65: app.v1.MessagesService.SendMessage:input_type -> app.v1.SendMessageRequest
+	32, // 66: app.v1.MessagesService.SendMedia:input_type -> app.v1.SendMediaRequest
+	35, // 67: app.v1.MessagesService.SendAlbum:input_type -> app.v1.SendAlbumRequest
+	37, // 68: app.v1.MessagesService.ForwardMessages:input_type -> app.v1.ForwardMessagesRequest
+	39, // 69: app.v1.MessagesService.CopyMessage:input_type -> app.v1.CopyMessageRequest
+	41, // 70: app.v1.MessagesService.EditMessage:input_type -> app.v1.EditMessageRequest
+	43, // 71: app.v1.MessagesService.DeleteMessages:input_type -> app.v1.DeleteMessagesRequest
+	45, // 72: app.v1.MessagesService.ReadHistory:input_type -> app.v1.ReadHistoryRequest
+	47, // 73: app.v1.MessagesService.PinMessage:input_type -> app.v1.PinMessageRequest
+	49, // 74: app.v1.MessagesService.UnpinMessage:input_type -> app.v1.UnpinMessageRequest
+	51, // 75: app.v1.MessagesService.UnpinAllMessages:input_type -> app.v1.UnpinAllMessagesRequest
+	53, // 76: app.v1.MessagesService.GetPinnedMessages:input_type -> app.v1.GetPinnedMessagesRequest
+	55, // 77: app.v1.MessagesService.SetReaction:input_type -> app.v1.SetReactionRequest
+	57, // 78: app.v1.MessagesService.GetHistory:input_type -> app.v1.GetHistoryRequest
+	59, // 79: app.v1.MessagesService.PressInlineButton:input_type -> app.v1.PressInlineButtonRequest
+	61, // 80: app.v1.MessagesService.GetLinkPreview:input_type -> app.v1.GetLinkPreviewRequest
+	63, // 81: app.v1.MessagesService.GetMessageReaders:input_type -> app.v1.GetMessageReadersRequest
+	66, // 82: app.v1.MessagesService.GetMessageReactions:input_type -> app.v1.GetMessageReactionsRequest
+	31, // 83: app.v1.MessagesService.SendMessage:output_type -> app.v1.SendMessageResponse
+	33, // 84: app.v1.MessagesService.SendMedia:output_type -> app.v1.SendMediaResponse
+	36, // 85: app.v1.MessagesService.SendAlbum:output_type -> app.v1.SendAlbumResponse
+	38, // 86: app.v1.MessagesService.ForwardMessages:output_type -> app.v1.ForwardMessagesResponse
+	40, // 87: app.v1.MessagesService.CopyMessage:output_type -> app.v1.CopyMessageResponse
+	42, // 88: app.v1.MessagesService.EditMessage:output_type -> app.v1.EditMessageResponse
+	44, // 89: app.v1.MessagesService.DeleteMessages:output_type -> app.v1.DeleteMessagesResponse
+	46, // 90: app.v1.MessagesService.ReadHistory:output_type -> app.v1.ReadHistoryResponse
+	48, // 91: app.v1.MessagesService.PinMessage:output_type -> app.v1.PinMessageResponse
+	50, // 92: app.v1.MessagesService.UnpinMessage:output_type -> app.v1.UnpinMessageResponse
+	52, // 93: app.v1.MessagesService.UnpinAllMessages:output_type -> app.v1.UnpinAllMessagesResponse
+	54, // 94: app.v1.MessagesService.GetPinnedMessages:output_type -> app.v1.GetPinnedMessagesResponse
+	56, // 95: app.v1.MessagesService.SetReaction:output_type -> app.v1.SetReactionResponse
+	58, // 96: app.v1.MessagesService.GetHistory:output_type -> app.v1.GetHistoryResponse
+	60, // 97: app.v1.MessagesService.PressInlineButton:output_type -> app.v1.PressInlineButtonResponse
+	62, // 98: app.v1.MessagesService.GetLinkPreview:output_type -> app.v1.GetLinkPreviewResponse
+	64, // 99: app.v1.MessagesService.GetMessageReaders:output_type -> app.v1.GetMessageReadersResponse
+	68, // 100: app.v1.MessagesService.GetMessageReactions:output_type -> app.v1.GetMessageReactionsResponse
+	83, // [83:101] is the sub-list for method output_type
+	65, // [65:83] is the sub-list for method input_type
+	65, // [65:65] is the sub-list for extension type_name
+	65, // [65:65] is the sub-list for extension extendee
+	0,  // [0:65] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_messages_proto_init() }

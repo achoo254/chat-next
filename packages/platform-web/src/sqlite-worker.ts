@@ -7,6 +7,7 @@ import { createRemoteApi, SessionEndedError, startApp, type ChatCore } from "@ap
 import { cryptoRandomId, systemTimers, type Platform } from "@app/platform";
 import { openSahpoolFactory } from "./driver.ts";
 import { LeaderLock } from "./leader.ts";
+import { cacheBlobStores, canvasImageProbe, fetchHttp } from "./media-platform.ts";
 import { serializeError, type CoreMethod, type FromWorker, type ToWorker, type WorkerConfig } from "./protocol.ts";
 import { TabHub, type LeaderCore } from "./tab-hub.ts";
 import { RelayedLifecycle, webSocketFactory } from "./worker-platform.ts";
@@ -66,6 +67,7 @@ function startHub(config: WorkerConfig): TabHub {
 					fetch: (input, init) => fetch(input, { ...init, credentials: "same-origin" }),
 				}),
 			);
+			const blobs = cacheBlobStores();
 			const platform: Platform = {
 				sql,
 				lifecycle,
@@ -80,6 +82,9 @@ function startHub(config: WorkerConfig): TabHub {
 					setTimeout(callback, 0);
 				},
 				randomId: cryptoRandomId,
+				http: fetchHttp,
+				imageProbe: canvasImageProbe,
+				...(blobs === undefined ? {} : { blobs }),
 			};
 			const result = await startApp(platform, {
 				api,

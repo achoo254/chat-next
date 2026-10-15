@@ -147,13 +147,17 @@ message ReplyMarkup {
   }
 }
 
-// Text-only preview of the first web link of a message, fetched by the
-// server (Open Graph). Thumbnails come with media.
+// Preview of the first web link of a message, fetched by the server (Open
+// Graph).
 message LinkPreview {
   string url = 1;
   string site_name = 2;
   string title = 3;
   string description = 4;
+  // The page's og:image, fetched through the same SSRF guard and stored as
+  // a server-owned photo; unset when the page has none or it could not be
+  // fetched. Download it with GetFileUrl in the message's context.
+  MediaRef photo = 5;
 }
 
 message ForwardHeader {
@@ -357,6 +361,8 @@ message SendMediaRequest {
   int64 reply_to_seq = 5 [jstype = JS_NUMBER];
   int64 random_id = 6 [jstype = JS_NUMBER];
   bool silent = 7;
+  // Forum groups: topic to post in; 0 = General.
+  int64 topic_id = 8 [jstype = JS_NUMBER];
 }
 
 message SendMediaResponse {
@@ -371,11 +377,15 @@ message AlbumItem {
   int64 random_id = 4 [jstype = JS_NUMBER];
 }
 
+// 2 to AppConfig.album_size_max items: photos and videos mixed, or only
+// documents, or only audio files.
 message SendAlbumRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   repeated AlbumItem items = 2;
   int64 reply_to_seq = 3 [jstype = JS_NUMBER];
   bool silent = 4;
+  // Forum groups: topic to post in; 0 = General.
+  int64 topic_id = 5 [jstype = JS_NUMBER];
 }
 
 message SendAlbumResponse {

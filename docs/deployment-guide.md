@@ -6,11 +6,13 @@ Giai đoạn 1 của hạ tầng: app chat chạy chung server `103.72.98.65` v�
 
 | Thành phần | Vị trí |
 |---|---|
-| DNS (Cloudflare, zone `hoandat.com`) | `chat` → `103.72.98.65`, proxied. Webhook không cần bản ghi riêng: nằm ở `https://chat.hoandat.com/hook/…`, vì Universal SSL miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, không phủ host cấp hai như `hook.chat.hoandat.com` (quyết định 2026-10-15). `*.chat` (bot) thêm khi có release cần |
-| TLS | Let's Encrypt `chat.hoandat.com` + `*.chat.hoandat.com`, DNS-01 Cloudflare với token Zone:DNS:Edit đã có trên server (`/etc/letsencrypt/cloudflare-localman.ini`), gia hạn bằng timer certbot kèm `systemctl reload nginx` ([`issue-cert.sh`](../infra/chat/issue-cert.sh)) |
+| DNS (Cloudflare, zone `hoandat.com`) | `chat` → `103.72.98.65`, proxied. Webhook không cần bản ghi riêng: nằm ở `https://chat.hoandat.com/hook/…`, vì Universal SSL miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, không phủ host cấp hai như `hook.chat.hoandat.com` (quyết định 2026-10-15). `*.chat` (bot) thêm khi có release cần. `media-chat` → `103.72.98.65`, proxied: host media tạm thời (R3), host cấp một nên Universal SSL phủ được; trước R9 chuyển sang domain đăng ký riêng (ADR 0010) |
+| TLS | Let's Encrypt `chat.hoandat.com` + `*.chat.hoandat.com`, DNS-01 Cloudflare với token Zone:DNS:Edit đã có trên server (`/etc/letsencrypt/cloudflare-localman.ini`), gia hạn bằng timer certbot kèm `systemctl reload nginx` ([`issue-cert.sh`](../infra/chat/issue-cert.sh)). Chứng chỉ trên không phủ `media-chat.hoandat.com`: host này có chứng chỉ Let's Encrypt riêng ở `/etc/letsencrypt/live/media-chat.hoandat.com/` (đã cấp 2026-10-15) |
 | Release | `/opt/chat/releases/<id>/{server,web,nginx}`, id = giờ UTC + commit 12 ký tự (+`-dirty`), symlink `/opt/chat/current`; giữ 5 bản |
-| Process | pm2 `chat-api` ([`ecosystem.config.cjs`](../infra/chat/ecosystem.config.cjs)), một instance, user hệ thống `chat`, binary Go tĩnh `server -role api -env-file /opt/chat/.env`, nghe `127.0.0.1:4600`, restart khi vượt 300 MB. Gateway realtime (WebSocket `/ws`) chạy trong chính process này, không có process hay cổng riêng |
+| Process | pm2 `chat-api` ([`ecosystem.config.cjs`](../infra/chat/ecosystem.config.cjs)), một instance, user hệ thống `chat`, binary Go tĩnh `server -role api -env-file /opt/chat/.env`, nghe `127.0.0.1:4600`, restart khi vượt 700 MB (`GOMEMLIMIT=450MiB`; ảnh được giải mã trong process với ngân sách 256 MiB, xem [Media](#media-r3)). Gateway realtime (WebSocket `/ws`) chạy trong chính process này, không có process hay cổng riêng |
 | nginx | `/etc/nginx/conf.d/chat-http.conf` (log format bỏ query, zone rate limit; cài một lần) và `/etc/nginx/conf.d/chat.hoandat.com.conf` (mỗi release mang bản của nó, [`nginx/`](../infra/chat/nginx/)). Web tĩnh từ `current/web`, `/rpc/` và `/auth/` tới API, `/ws` tới API với header `Upgrade`/`Connection` (timeout đọc 75 s, rate limit handshake theo zone riêng `chat_ws` 10 r/s, burst 200, khai báo ngay trong conf của site nên không phải cài lại `chat-http.conf`; đừng khai báo `chat_ws` lần nữa ở `chat-http.conf`), `/healthz` công khai. `/hook/` (webhook) chỉ nhận `POST`, tới API không kèm cookie, zone rate limit riêng `chat_hook` 50 r/s mỗi IP (burst 200, khai báo trong conf của site như `chat_ws`), body tối đa 128 KiB ở nginx (app giới hạn 64 KiB và tự trả 413 để còn đếm), access log ghi `/hook/<id>/[redacted]` thay cho đường dẫn chứa secret (log format `chat_hook`), error log của nginx tắt cho location này vì nginx chép dòng request vào đó. CSP `connect-src` có `wss://chat.hoandat.com`; `script-src` có `'wasm-unsafe-eval'` và có `worker-src 'self'` (SQLite wasm với OPFS chạy trong worker cùng origin) |
+| nginx media | `/etc/nginx/conf.d/media-chat.hoandat.com.conf` ([bản trong repo](../infra/chat/nginx/media-chat.hoandat.com.conf)), chỉ được cài khi chứng chỉ của host đã có. Chỉ mở `GET/HEAD /f/<token>` (tải, Range, không buffer, zone `chat_media` 100 r/s, tối đa 64 kết nối mỗi IP), `PUT /u/<token>` (part upload ở chế độ proxy, tối đa 16 MiB, zone `chat_media_upload`), `/healthz`; còn lại 404. Không cookie hai chiều; access log ghi `/f/[token]` (log format `chat_media`), error log tắt cho hai location có token. File do app đọc và stream sau khi kiểm token (nginx không đọc thư mục media, không dùng `X-Accel-Redirect`). CSP của `chat.hoandat.com` cho phép `img-src`/`media-src`/`connect-src` tới `https://media-chat.hoandat.com` |
+| Lưu media | Thư mục `/opt/chat/media` trên chính server (`MEDIA_ROOT`, `chat:chat` 0750, file 0640): `objects/` (file và các cỡ ảnh), `uploads/` (part của upload dở), `tmp/` (file đang ghi; ghi xong mới `fsync` và đổi tên). Tên file do server sinh (uuid), không lấy từ người dùng. Driver S3 (iNET Object Storage) vẫn có trong code, bật bằng `MEDIA_STORAGE=s3` khi chuyển |
 | Realtime | WebSocket cùng origin `wss://chat.hoandat.com/ws`, qua Cloudflare (proxied, WebSocket bật sẵn, cắt kết nối im lặng sau 100 s; heartbeat của app là 25 s). Handshake kiểm `Origin` và cookie phiên như `/rpc`; giao thức ở [`server/README.md`](../server/README.md#realtime-ws) |
 | Database | PostgreSQL 16.8 dùng chung của server (cổng 5432, chỉ localhost), database và role `chat` riêng, hai dòng `pg_hba` scram-sha-256 của chat đặt trước các dòng `ident` chung |
 | Cấu hình | `/opt/chat/.env` (root:chat, 640), mẫu [`.env.production.example`](../infra/chat/.env.production.example); không bao giờ sync từ máy dev |
@@ -31,6 +33,8 @@ Release sửa lỗi bảo mật sau R1 (migration `0004_messaging_hardening`) l�
 Release R2 (webhook, migration `0007_incoming_hooks`) đổi conf nginx (location `/hook/`, zone `chat_hook`, log format `chat_hook`), `activate-release.sh` (thêm bước kiểm `/hook/`) và `smoke.sh`, nên cũng phải deploy bằng root một lần. Không cần DNS mới, không cần chứng chỉ mới, không cần cài lại `chat-http.conf`, không có biến môi trường mới.
 
 Bản bù R2 (sửa webhook, tin hệ thống khi webhook tắt, migration `0008_hook_audit_updated`) không đổi nginx hay biến môi trường, deploy như các lần sau. Từ bản này web gọi `GetSelf` bằng JSON của Connect (`Content-Type: application/json`) trên `/rpc/`; nếu sau này thêm lọc request ở nginx hay Cloudflare cho `/rpc/`, phải cho qua cả JSON lẫn `application/proto`.
+
+Release R3 (media, migration `0009_media`) thêm conf nginx `media-chat.hoandat.com.conf`, đổi CSP của `chat.hoandat.com.conf`, `activate-release.sh` (tạo thư mục media, cài conf media khi có chứng chỉ, kiểm host media), `setup-server.sh` (thư mục media), `smoke.sh`, `ecosystem.config.cjs` (trần bộ nhớ 700 MB, `GOMEMLIMIT`) và thêm biến `MEDIA_*`, nên phải deploy bằng root một lần. Các bước của người vận hành ở [Media](#media-r3).
 
 ## Các lần sau
 
@@ -61,7 +65,7 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 
 ## Kiểm tra sau deploy
 
-`infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`. Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
+`infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`; khi đã cấu hình media: `https://media-chat.hoandat.com/healthz` báo `"storage":"reachable"`, `/f/<token sai>` trả 404 có `nosniff` và không `Set-Cookie`, route của app trên host media trả 404 (chưa cấu hình thì bỏ qua và in thông báo). Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
 
 ## Webhook (incoming)
 
@@ -74,12 +78,34 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 - URL lộ: admin xoay secret trong app với "thu hồi ngay", hoặc tắt webhook. Người vận hành tắt khẩn cấp: `UPDATE incoming_hooks SET state = 'disabled', disabled_reason = 'by_admin', disabled_at = now() WHERE id = '<hook_id>';` (có hiệu lực ở request kế tiếp).
 - Dọn mỗi giờ: khoá idempotency quá 24 giờ; nhóm cảnh báo (`notify_groups`), bộ đếm và dead letter quá 30 ngày.
 
+## Media (R3)
+
+Giao thức và giới hạn ở [`server/README.md`](../server/README.md#media-package-internalmedia). Chưa có `MEDIA_PUBLIC_URL` trong `/opt/chat/.env` thì media tắt: app chạy bình thường, `AppConfig.upload_size_max_bytes = 0` nên client ẩn nút đính kèm, RPC media trả `failed_precondition` `media_disabled`.
+
+Media lưu trên chính server `.65` (Jev quyết 2026-10-15): upload đi qua API của app (từng part 8 MiB `PUT https://media-chat.hoandat.com/u/<token>`, tiếp tục được), không có URL S3 ký sẵn, không cần CORS; tải xuống do app stream có Range tại `MEDIA_PUBLIC_URL`.
+
+Bật media (một lần):
+
+1. DNS `media-chat.hoandat.com` proxied và chứng chỉ ở `/etc/letsencrypt/live/media-chat.hoandat.com/` (đã có từ 2026-10-15), gia hạn bằng timer certbot như chứng chỉ của chat. Cloudflare để SSL "Full (strict)".
+2. Thêm khối `MEDIA_*` của [`.env.production.example`](../infra/chat/.env.production.example) vào `/opt/chat/.env`: `MEDIA_PUBLIC_URL`, `MEDIA_ROOT=/opt/chat/media`, `MEDIA_MIN_FREE_BYTES` (mặc định 5 GiB), `MEDIA_UPLOAD_MAX_BYTES=536870912` (512 MiB cho server dùng chung; code mặc định 2000 MiB), `MEDIA_USER_QUOTA_BYTES` (mẫu 10 GiB; code mặc định 20 GiB).
+3. Tuỳ chọn: `apt install ffmpeg` rồi `MEDIA_FFMPEG_PATH=/usr/bin/ffmpeg` để server tạo poster video và waveform voice (ffmpeg đọc file cục bộ, chỉ được dùng giao thức `file`); không có thì dùng thumb, thời lượng và waveform client gửi.
+4. Deploy bằng root (để có conf nginx media và thư mục `/opt/chat/media`), hoặc nếu release đã có thì `pm2 startOrReload /opt/chat/infra/ecosystem.config.cjs --only chat-api --update-env`. Kiểm: `curl -s https://media-chat.hoandat.com/healthz` trả `{"status":"ok","storage":"reachable"}`, rồi `bash infra/chat/smoke.sh`.
+
+Vận hành:
+- Dung lượng đĩa: app từ chối upload mới (`resource_exhausted` "server storage is full") và log `Error` `media disk almost full` khi upload làm chỗ trống trên đĩa của `MEDIA_ROOT` còn dưới `MEDIA_MIN_FREE_BYTES`; việc dọn mỗi 10 phút cũng log dòng này khi đĩa đã dưới ngưỡng. Xem nhanh: `df -h /opt/chat/media`, `du -sh /opt/chat/media/objects`.
+- Dọn trong app mỗi 10 phút: upload dở quá 24 giờ bị huỷ (xoá part và file staging), file tạm sót lại quá 24 giờ bị xoá, file không còn tin nào và không còn xem trước link nào tham chiếu quá 24 giờ bị xoá cả bản gốc lẫn các cỡ. Tra cứu qua [`psql.sh`](../infra/chat/psql.sh): `SELECT count(*), pg_size_pretty(sum(size)) FROM files;`, `SELECT count(*) FROM uploads WHERE completed_at IS NULL;`, `SELECT * FROM media_jobs;`.
+- Thu hồi: xoá tin cho mọi người làm URL tải của file trong tin đó trả 404 trong vòng 5 giây (app) và tối đa 50 giây nếu CDN đã cache (`s-maxage=50`). Cloudflare chỉ cache khi có Cache Rule cho host media (mặc định không cache vì URL không có đuôi file); bật thì giữ "Respect origin TTL".
+- Người dùng báo "ảnh không tải được": URL hết hạn sau khoảng một giờ (403, client tự xin URL mới); 404 là tin đã bị xoá hoặc người xem không còn quyền. Log của app ghi `media storage unreachable` khi thư mục media không ghi được.
+- Backup: dump DB hằng đêm như cũ; sao lưu media ra ngoài server để sau, khi có người dùng thật (Jev quyết 2026-10-15).
+- Chuyển sang S3 sau này: `MEDIA_STORAGE=s3` cùng `MEDIA_S3_ENDPOINT`, `MEDIA_S3_REGION`, `MEDIA_S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (mẫu trong env). Identity chỉ cần `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket`, `s3:AbortMultipartUpload`. `MEDIA_UPLOAD_MODE=proxy` chạy ngay; `direct` (trình duyệt PUT thẳng tới storage) cần người có quyền cấu hình bucket đặt CORS (`AllowedOrigins` `https://chat.hoandat.com`, `AllowedMethods` `PUT`, `AllowedHeaders` `*`, `ExposeHeaders` `ETag`) và thêm origin storage vào CSP `connect-src`. File đã có trên đĩa phải được chép sang bucket trước khi đổi: `objects/<p>/<xx>/<tên>` thành key `<p>/<tên>` (bỏ thư mục chia nhỏ `<xx>`, hai ký tự đầu của tên).
+
 ## Bảo mật mạng
 
 - Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác.
 
 ## Rollback
 
+- Media: release trước R3 bỏ qua các bảng media; file trong `/opt/chat/media` giữ nguyên. Tắt media mà không rollback: xoá `MEDIA_PUBLIC_URL` khỏi `/opt/chat/.env` rồi reload (tin có media vẫn hiển thị thumb trong tin, nhưng không tải được bản đầy đủ).
 - Code: `bash /opt/chat/infra/switch-release.sh <release-id>` (danh sách: `ls /opt/chat/releases`). Không đảo ngược dữ liệu.
 - Dữ liệu: dừng `chat-api`, `pg_restore --clean --if-exists` từ bản trong `/opt/chat/backups` với kết nối từ `pg-env.sh`, **tăng `server_epoch`** (`UPDATE server_meta SET server_epoch = server_epoch + 1;` qua [`psql.sh`](../infra/chat/psql.sh)), rồi chạy lại. Bản restore làm `pts`/`seq` lùi về lúc backup; epoch mới báo cho client rằng vị trí đồng bộ của nó không còn đúng, để client tự đồng bộ lại thay vì bỏ sót tin (ADR 0002). Process đang chạy đọc lại epoch mỗi 30 giây và yêu cầu mọi socket kết nối lại.
 

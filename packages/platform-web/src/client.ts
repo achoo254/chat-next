@@ -214,6 +214,14 @@ export function createWebChat(options: WebChatOptions): WebChat {
 		// changes while the call is in flight.
 		sendText: (chatId, text, sendOptions) =>
 			remote.sendText(chatId, text, { ...sendOptions, randomId: sendOptions?.randomId ?? cryptoRandomId() }),
+		sendMedia: (chatId, file, media, sendOptions) =>
+			remote.sendMedia(chatId, file, media, { ...sendOptions, randomId: sendOptions?.randomId ?? cryptoRandomId() }),
+		sendAlbum: (chatId, items, albumOptions) =>
+			remote.sendAlbum(
+				chatId,
+				items.map((item) => ({ ...item, randomId: item.randomId ?? cryptoRandomId() })),
+				albumOptions,
+			),
 		events,
 		role: () => role,
 		coldSnapshot: () => {

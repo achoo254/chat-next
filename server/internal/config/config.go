@@ -52,6 +52,9 @@ type Config struct {
 	// OperatorUserIDs may use the moderation queue (CHAT_OPERATOR_USER_IDS);
 	// empty by default, so nobody can.
 	OperatorUserIDs []int64
+	// Media is nil when MEDIA_S3_ENDPOINT is unset: media RPCs then answer
+	// failed_precondition and AppConfig.upload_size_max_bytes is 0.
+	Media *Media
 }
 
 // Development reports whether the server runs in the development environment.
@@ -200,6 +203,10 @@ func Load(lookup Lookup) (Config, error) {
 		}
 		c.OperatorUserIDs = ids
 	}
+
+	media, mediaErrs := loadMedia(get, production, c.PublicURL)
+	errs = append(errs, mediaErrs...)
+	c.Media = media
 
 	if len(errs) > 0 {
 		return Config{}, errors.Join(errs...)

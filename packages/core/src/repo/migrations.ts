@@ -199,6 +199,62 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE messages ADD COLUMN silent INTEGER NOT NULL DEFAULT 0",
 		],
 	},
+	{
+		version: 7,
+		statements: [
+			// The attached file of a message (JSON of MediaRef; NULL = none);
+			// media_kind stays for list previews and older readers.
+			"ALTER TABLE messages ADD COLUMN media TEXT",
+			// Files being uploaded for queued media sends (the file itself is in
+			// the platform BlobStore under upload:<key>). parts: JSON of the
+			// uploaded parts with their ETags; media: the MediaRef once complete.
+			`CREATE TABLE uploads (
+				key TEXT PRIMARY KEY,
+				kind TEXT NOT NULL,
+				file_name TEXT NOT NULL,
+				mime_type TEXT NOT NULL,
+				size INTEGER NOT NULL,
+				width INTEGER NOT NULL,
+				height INTEGER NOT NULL,
+				duration INTEGER NOT NULL,
+				inline_thumb BLOB,
+				waveform BLOB,
+				file_hash TEXT,
+				upload_id TEXT,
+				part_size INTEGER NOT NULL DEFAULT 0,
+				parts TEXT NOT NULL DEFAULT '[]',
+				media TEXT,
+				failure TEXT,
+				created_at INTEGER NOT NULL
+			)`,
+			// Downloaded media (blob in the BlobStore under cache:<key>), with
+			// LRU and age bookkeeping. large counts against the separate
+			// large-file budget.
+			`CREATE TABLE media_cache (
+				key TEXT PRIMARY KEY,
+				bytes INTEGER NOT NULL,
+				large INTEGER NOT NULL,
+				last_access INTEGER NOT NULL,
+				created_at INTEGER NOT NULL
+			)`,
+			"CREATE INDEX media_cache_by_access ON media_cache (last_access)",
+			// Messages a cached file was fetched for. A file whose messages all
+			// went (deleted, recalled, hidden, chat left) is evicted.
+			`CREATE TABLE media_cache_refs (
+				key TEXT NOT NULL,
+				chat_id INTEGER NOT NULL,
+				seq INTEGER NOT NULL,
+				PRIMARY KEY (key, chat_id, seq)
+			) WITHOUT ROWID`,
+			"CREATE INDEX media_cache_refs_by_message ON media_cache_refs (chat_id, seq)",
+			`CREATE TRIGGER media_refs_message_delete AFTER DELETE ON messages BEGIN
+				DELETE FROM media_cache_refs WHERE chat_id = old.chat_id AND seq = old.seq;
+			END`,
+			`CREATE TRIGGER media_refs_message_recall AFTER UPDATE OF recalled ON messages WHEN new.recalled = 1 BEGIN
+				DELETE FROM media_cache_refs WHERE chat_id = new.chat_id AND seq = new.seq;
+			END`,
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

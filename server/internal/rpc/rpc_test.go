@@ -80,11 +80,11 @@ func TestDeviceName(t *testing.T) {
 }
 
 func TestAppConfigHashIsStable(t *testing.T) {
-	a, err := newAppConfig()
+	a, err := newAppConfig(2000 << 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _ := newAppConfig()
+	b, _ := newAppConfig(2000 << 20)
 	if a.GetHash() == "" || a.GetHash() != b.GetHash() {
 		t.Fatalf("hashes %q / %q", a.GetHash(), b.GetHash())
 	}

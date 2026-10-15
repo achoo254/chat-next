@@ -10,7 +10,9 @@
 import type { Timers } from "@app/platform";
 import { codePointLength, validateEntities } from "../entities/index.ts";
 import { EventKeys } from "../events/bus.ts";
-import type { MessageEntity, SyncAck } from "../model/types.ts";
+import type { MediaKind, MediaRef, Message, MessageEntity, SyncAck } from "../model/types.ts";
+import { fromBase64, toBase64 } from "../media/codec.ts";
+import type { UploadQueue, UploadSpec } from "../media/upload-queue.ts";
 import { purgeMessages, recallMessages } from "../purge/index.ts";
 import { classifyFailure, type RemoteApi } from "../protocol/api.ts";
 import { toMessage, toSyncAck, toWireEntity, toWireId } from "../protocol/map.ts";
@@ -40,7 +42,95 @@ export type OutboxOperation =
 	  }
 	| { readonly kind: "edit"; readonly seq: number; readonly text: string; readonly entities: readonly MessageEntity[] }
 	| { readonly kind: "delete"; readonly seqs: readonly number[]; readonly forEveryone: boolean }
-	| { readonly kind: "read"; readonly maxSeq: number };
+	| { readonly kind: "read"; readonly maxSeq: number }
+	| {
+			readonly kind: "send_media";
+			readonly text: string;
+			readonly entities: readonly MessageEntity[];
+			readonly replyToSeq: number;
+			readonly date: number;
+			readonly topicId: number;
+			readonly silent: boolean;
+			readonly media: PendingMedia;
+	  }
+	| {
+			readonly kind: "send_album";
+			readonly replyToSeq: number;
+			readonly date: number;
+			readonly topicId: number;
+			readonly silent: boolean;
+			readonly items: readonly AlbumOperationItem[];
+	  };
+
+/** A file of a queued media send, as shown before the server confirms it. */
+export interface PendingMedia {
+	/** Key of the upload (progress, local file); equals the item's random_id. */
+	readonly uploadKey: string;
+	readonly kind: MediaKind;
+	readonly fileName: string;
+	readonly mimeType: string;
+	readonly size: number;
+	readonly width: number;
+	readonly height: number;
+	/** Milliseconds. */
+	readonly duration: number;
+	/** Tiny thumbnail made on this device; empty when none. */
+	readonly inlineThumb: Uint8Array;
+}
+
+export interface AlbumOperationItem {
+	readonly randomId: number;
+	readonly text: string;
+	readonly entities: readonly MessageEntity[];
+	readonly media: PendingMedia;
+}
+
+/** Describes a file to send; what the caller does not know stays 0/empty and the server measures what it can. */
+export interface MediaInput {
+	readonly kind: Exclude<MediaKind, "unknown">;
+	readonly fileName?: string;
+	readonly mimeType?: string;
+	readonly width?: number;
+	readonly height?: number;
+	/** Milliseconds (video, audio, voice). */
+	readonly duration?: number;
+	/** Tiny JPEG/PNG/WebP (<= 2048 bytes, <= 64x64) shown before upload ends. */
+	readonly inlineThumb?: Uint8Array;
+	/** Voice waveform, one byte per sample (<= 256). */
+	readonly waveform?: Uint8Array;
+}
+
+/** Options of {@link Outbox.sendMedia}. */
+export interface SendMediaOptions {
+	/** Caption. */
+	readonly text?: string;
+	readonly entities?: readonly MessageEntity[];
+	readonly replyToSeq?: number;
+	readonly randomId?: number;
+	/** Forum groups: the topic (0 = General). */
+	readonly topicId?: number;
+	readonly silent?: boolean;
+}
+
+/** One file of an album. */
+export interface AlbumItemInput {
+	readonly file: Blob;
+	readonly media: MediaInput;
+	readonly text?: string;
+	readonly entities?: readonly MessageEntity[];
+	readonly randomId?: number;
+}
+
+/** Options of {@link Outbox.sendAlbum}. */
+export interface SendAlbumOptions {
+	readonly replyToSeq?: number;
+	readonly topicId?: number;
+	readonly silent?: boolean;
+}
+
+/** Most bytes of a client-made inline thumbnail and of a waveform the server accepts. */
+export const INLINE_THUMB_MAX = 2048;
+export const WAVEFORM_MAX = 256;
 
 /** Options of {@link Outbox.sendText}. */
 export interface SendTextOptions {
@@ -69,6 +159,10 @@ export interface PendingMessage {
 	 * after confirmed ones and never collide with a real seq.
 	 */
 	readonly localSeq: number;
+	/** Media sends: the file being uploaded. */
+	readonly media?: PendingMedia;
+	/** Album items: the outbox id shared by the album's messages. */
+	readonly albumId?: number;
 }
 
 export interface OutboxOptions {
@@ -82,6 +176,12 @@ export interface OutboxOptions {
 	readonly backoff?: BackoffPolicy;
 	/** Upper bound on message text, in code points (AppConfig.message_length_max). */
 	readonly maxTextLength?: number;
+	/** Upper bound on a caption, in code points (AppConfig.caption_length_max). */
+	readonly maxCaptionLength?: number;
+	/** Media sends wait for these uploads; without them sendMedia is refused. */
+	readonly uploads?: UploadQueue;
+	/** After a media send is confirmed: the uploaded file can move into the media cache. */
+	readonly afterMediaSent?: (uploadKey: string, message: Message) => Promise<void>;
 	readonly onSessionEnded: () => void;
 	readonly onError?: (error: unknown, context: string) => void;
 }
@@ -137,14 +237,93 @@ export function parseOperation(kind: string, payload: string): OutboxOperation |
 		}
 		case "read":
 			return isNumber(value.maxSeq) ? { kind, maxSeq: value.maxSeq } : null;
+		case "send_media": {
+			const entities = decodeEntities(value.entities);
+			const media = decodePendingMedia(value.media);
+			if (typeof value.text !== "string" || entities === null || media === null) return null;
+			if (!isNumber(value.replyToSeq) || !isNumber(value.date) || !isNumber(value.topicId)) return null;
+			return {
+				kind,
+				text: value.text,
+				entities,
+				replyToSeq: value.replyToSeq,
+				date: value.date,
+				topicId: value.topicId,
+				silent: value.silent === true,
+				media,
+			};
+		}
+		case "send_album": {
+			if (!Array.isArray(value.items) || !isNumber(value.replyToSeq) || !isNumber(value.date) || !isNumber(value.topicId)) {
+				return null;
+			}
+			const items: AlbumOperationItem[] = [];
+			for (const raw of value.items as unknown[]) {
+				if (!isRecord(raw)) return null;
+				const entities = decodeEntities(raw.entities);
+				const media = decodePendingMedia(raw.media);
+				if (!isNumber(raw.randomId) || typeof raw.text !== "string" || entities === null || media === null) return null;
+				items.push({ randomId: raw.randomId, text: raw.text, entities, media });
+			}
+			return { kind, replyToSeq: value.replyToSeq, date: value.date, topicId: value.topicId, silent: value.silent === true, items };
+		}
 		default:
 			return null;
 	}
 }
 
+const MEDIA_KINDS = new Set<string>(["photo", "video", "audio", "voice", "document"]);
+
+function decodePendingMedia(value: unknown): PendingMedia | null {
+	if (!isRecord(value)) return null;
+	const { uploadKey, kind, fileName, mimeType, size, width, height, duration, inlineThumb } = value;
+	if (typeof uploadKey !== "string" || typeof kind !== "string" || !MEDIA_KINDS.has(kind)) return null;
+	if (typeof fileName !== "string" || typeof mimeType !== "string" || typeof inlineThumb !== "string") return null;
+	if (!isNumber(size) || !isNumber(width) || !isNumber(height) || !isNumber(duration)) return null;
+	return {
+		uploadKey,
+		kind: kind as MediaKind,
+		fileName,
+		mimeType,
+		size,
+		width,
+		height,
+		duration,
+		inlineThumb: fromBase64(inlineThumb) ?? new Uint8Array(),
+	};
+}
+
+function pendingMediaJson(media: PendingMedia): Record<string, unknown> {
+	return { ...media, inlineThumb: toBase64(media.inlineThumb) };
+}
+
 function payloadOf(operation: OutboxOperation): string {
-	const { kind: _kind, ...rest } = operation;
-	return JSON.stringify(rest);
+	switch (operation.kind) {
+		case "send_media": {
+			const { kind: _kind, media, ...rest } = operation;
+			return JSON.stringify({ ...rest, media: pendingMediaJson(media) });
+		}
+		case "send_album": {
+			const { kind: _kind, items, ...rest } = operation;
+			return JSON.stringify({ ...rest, items: items.map((item) => ({ ...item, media: pendingMediaJson(item.media) })) });
+		}
+		default: {
+			const { kind: _kind, ...rest } = operation;
+			return JSON.stringify(rest);
+		}
+	}
+}
+
+/** Upload keys an operation waits for. */
+export function uploadKeysOf(operation: OutboxOperation): string[] {
+	switch (operation.kind) {
+		case "send_media":
+			return [operation.media.uploadKey];
+		case "send_album":
+			return operation.items.map((item) => item.media.uploadKey);
+		default:
+			return [];
+	}
 }
 
 type Outcome = "done" | "retry_later" | "stopped";
@@ -240,6 +419,151 @@ export class Outbox {
 		throw new OutboxError("pending message vanished before it was read back");
 	}
 
+	/**
+	 * Queues a file with an optional caption: the pending message shows at
+	 * once (with the local thumbnail), the upload starts, and the send goes
+	 * out in chat order once the upload completed. Returns null when
+	 * `randomId` was already confirmed.
+	 */
+	async sendMedia(chatId: number, file: Blob, input: MediaInput, options: SendMediaOptions = {}): Promise<PendingMessage | null> {
+		const uploads = this.requireUploads();
+		assertSafeId(chatId);
+		const text = options.text ?? "";
+		const entities = options.entities ?? [];
+		this.checkCaption(text, entities);
+		const randomId = options.randomId === undefined ? this.options.randomId() : assertSafeId(options.randomId);
+		if (randomId === 0) throw new OutboxError("random_id must not be 0");
+		const media = this.pendingMedia(String(randomId), file, input);
+		const operation: OutboxOperation = {
+			kind: "send_media",
+			text,
+			entities,
+			replyToSeq: assertSafeId(options.replyToSeq ?? 0),
+			date: Math.floor(this.options.timers.now() / 1000),
+			topicId: assertSafeId(options.topicId ?? 0),
+			silent: options.silent === true,
+			media,
+		};
+		let confirmed = false;
+		let queued = false;
+		await this.options.engine.commitLocal(async (w) => {
+			const seen = await this.seen(chatId, [randomId]);
+			confirmed = seen.confirmed;
+			if (seen.any) return;
+			await uploads.prepare(this.uploadSpec(media, input), file, w, this.options.timers.now());
+			this.insert(w, chatId, operation, randomId);
+			queued = true;
+		});
+		if (confirmed) return null;
+		if (queued) uploads.schedule(media.uploadKey);
+		const pending = (await this.pendingMessages(chatId)).find((p) => p.randomId === randomId) ?? null;
+		this.kick(chatId);
+		if (pending !== null) return pending;
+		const sent = await this.options.repo.driver.query("SELECT 1 FROM messages WHERE chat_id = ? AND random_id = ?", [
+			chatId,
+			randomId,
+		]);
+		if (sent.length > 0) return null;
+		throw new OutboxError("pending message vanished before it was read back");
+	}
+
+	/**
+	 * Queues 2 or more files sent together (one album, captions per item).
+	 * The caller checks the album rules (size, mix of kinds); the server
+	 * enforces them too. Returns the pending messages, in order.
+	 */
+	async sendAlbum(chatId: number, inputs: readonly AlbumItemInput[], options: SendAlbumOptions = {}): Promise<PendingMessage[]> {
+		const uploads = this.requireUploads();
+		assertSafeId(chatId);
+		if (inputs.length < 2) throw new OutboxError("an album needs at least 2 files");
+		const items: AlbumOperationItem[] = inputs.map((input) => {
+			const text = input.text ?? "";
+			const entities = input.entities ?? [];
+			this.checkCaption(text, entities);
+			const randomId = input.randomId === undefined ? this.options.randomId() : assertSafeId(input.randomId);
+			if (randomId === 0) throw new OutboxError("random_id must not be 0");
+			return { randomId, text, entities, media: this.pendingMedia(String(randomId), input.file, input.media) };
+		});
+		if (new Set(items.map((i) => i.randomId)).size !== items.length) throw new OutboxError("album random_ids must differ");
+		const first = items[0]?.randomId ?? 0;
+		const operation: OutboxOperation = {
+			kind: "send_album",
+			replyToSeq: assertSafeId(options.replyToSeq ?? 0),
+			date: Math.floor(this.options.timers.now() / 1000),
+			topicId: assertSafeId(options.topicId ?? 0),
+			silent: options.silent === true,
+			items,
+		};
+		let queued = false;
+		await this.options.engine.commitLocal(async (w) => {
+			const seen = await this.seen(chatId, items.map((i) => i.randomId));
+			if (seen.any) return;
+			for (const [index, item] of items.entries()) {
+				const input = inputs[index];
+				if (input === undefined) continue;
+				await uploads.prepare(this.uploadSpec(item.media, input.media), input.file, w, this.options.timers.now());
+			}
+			this.insert(w, chatId, operation, first);
+			queued = true;
+		});
+		if (queued) for (const item of items) uploads.schedule(item.media.uploadKey);
+		const keys = new Set(items.map((i) => i.randomId));
+		const pending = (await this.pendingMessages(chatId)).filter((p) => keys.has(p.randomId));
+		this.kick(chatId);
+		return pending;
+	}
+
+	private requireUploads(): UploadQueue {
+		const uploads = this.options.uploads;
+		if (uploads === undefined) throw new OutboxError("sending media is not available");
+		return uploads;
+	}
+
+	/** Whether any of the random_ids is queued or confirmed in the chat, and whether one is confirmed. */
+	private async seen(chatId: number, randomIds: readonly number[]): Promise<{ any: boolean; confirmed: boolean }> {
+		const list = randomIds.map(() => "?").join(", ");
+		const rows = await this.options.repo.driver.query(
+			`SELECT 'messages' AS place FROM messages WHERE chat_id = ? AND random_id IN (${list})
+			UNION ALL SELECT 'outbox' FROM outbox WHERE chat_id = ? AND kind IN ('send_media', 'send_album') AND random_id IN (${list})`,
+			[chatId, ...randomIds, chatId, ...randomIds],
+		);
+		return { any: rows.length > 0, confirmed: rows.some((row) => row.place === "messages") };
+	}
+
+	private pendingMedia(uploadKey: string, file: Blob, input: MediaInput): PendingMedia {
+		if (file.size <= 0) throw new OutboxError("the file is empty");
+		const thumb = input.inlineThumb ?? new Uint8Array();
+		if (thumb.length > INLINE_THUMB_MAX) throw new OutboxError(`inline thumbnail is larger than ${INLINE_THUMB_MAX} bytes`);
+		if ((input.waveform?.length ?? 0) > WAVEFORM_MAX) throw new OutboxError(`waveform is longer than ${WAVEFORM_MAX} samples`);
+		const blobName = (file as Blob & { name?: unknown }).name;
+		return {
+			uploadKey,
+			kind: input.kind,
+			fileName: input.fileName ?? (typeof blobName === "string" ? blobName : ""),
+			mimeType: input.mimeType ?? file.type,
+			size: file.size,
+			width: Math.max(0, Math.round(input.width ?? 0)),
+			height: Math.max(0, Math.round(input.height ?? 0)),
+			duration: Math.max(0, Math.round(input.duration ?? 0)),
+			inlineThumb: thumb,
+		};
+	}
+
+	private uploadSpec(media: PendingMedia, input: MediaInput): UploadSpec {
+		return {
+			key: media.uploadKey,
+			kind: media.kind,
+			fileName: media.fileName,
+			mimeType: media.mimeType,
+			size: media.size,
+			width: media.width,
+			height: media.height,
+			duration: media.duration,
+			inlineThumb: media.inlineThumb,
+			waveform: input.waveform ?? new Uint8Array(),
+		};
+	}
+
 	async editText(chatId: number, seq: number, text: string, entities: readonly MessageEntity[] = []): Promise<void> {
 		assertSafeId(chatId);
 		assertSafeId(seq);
@@ -313,30 +637,73 @@ export class Outbox {
 			w.add("DELETE FROM outbox WHERE id = ?", [outboxId]);
 			w.emit(EventKeys.outbox, EventKeys.history(row.chatId));
 		});
+		const operation = parseOperation(row.kind, row.payload);
+		const keys = operation === null ? [] : uploadKeysOf(operation);
+		if (keys.length > 0) await this.options.uploads?.remove(keys);
+	}
+
+	/** Upload keys of every queued operation (to drop uploads whose send is gone). */
+	async uploadKeys(): Promise<Set<string>> {
+		const keys = new Set<string>();
+		for (const row of await this.options.repo.outbox()) {
+			const operation = parseOperation(row.kind, row.payload);
+			if (operation !== null) for (const key of uploadKeysOf(operation)) keys.add(key);
+		}
+		return keys;
 	}
 
 	/** Pending sends of a chat, in send order, positioned after the newest real seq. */
 	async pendingMessages(chatId: number): Promise<PendingMessage[]> {
-		const rows = (await this.options.repo.outbox(chatId)).filter((row) => row.kind === "send");
+		const rows = (await this.options.repo.outbox(chatId)).filter(
+			(row) => row.kind === "send" || row.kind === "send_media" || row.kind === "send_album",
+		);
 		if (rows.length === 0) return [];
 		const top = await this.options.repo.maxSeq(chatId);
-		const pending: PendingMessage[] = [];
-		rows.forEach((row, index) => {
+		type Entry = Omit<PendingMessage, "localSeq">;
+		const entries: Entry[] = [];
+		for (const row of rows) {
 			const operation = parseOperation(row.kind, row.payload);
-			if (operation?.kind !== "send") return;
-			pending.push({
-				outboxId: row.id,
-				chatId,
-				randomId: row.randomId,
-				text: operation.text,
-				entities: operation.entities,
-				replyToSeq: operation.replyToSeq,
-				date: operation.date,
-				failure: row.failure,
-				localSeq: top + (index + 1) / (rows.length + 1),
-			});
-		});
-		return pending;
+			const base = { outboxId: row.id, chatId, failure: row.failure };
+			switch (operation?.kind) {
+				case "send":
+					entries.push({
+						...base,
+						randomId: row.randomId,
+						text: operation.text,
+						entities: operation.entities,
+						replyToSeq: operation.replyToSeq,
+						date: operation.date,
+					});
+					break;
+				case "send_media":
+					entries.push({
+						...base,
+						randomId: row.randomId,
+						text: operation.text,
+						entities: operation.entities,
+						replyToSeq: operation.replyToSeq,
+						date: operation.date,
+						media: operation.media,
+					});
+					break;
+				case "send_album":
+					for (const item of operation.items) {
+						entries.push({
+							...base,
+							randomId: item.randomId,
+							text: item.text,
+							entities: item.entities,
+							replyToSeq: operation.replyToSeq,
+							date: operation.date,
+							media: item.media,
+							albumId: row.id,
+						});
+					}
+					break;
+				default:
+			}
+		}
+		return entries.map((entry, index) => ({ ...entry, localSeq: top + (index + 1) / (entries.length + 1) }));
 	}
 
 	// ------------------------------------------------------------- execution
@@ -347,6 +714,13 @@ export class Outbox {
 		if (max !== undefined && codePointLength(text) > max) {
 			throw new OutboxError(`message text is longer than ${max} characters`);
 		}
+		const errors = validateEntities(text, entities);
+		if (errors.length > 0) throw new OutboxError(`invalid entity #${errors[0]?.index ?? 0}: ${errors[0]?.code ?? ""}`);
+	}
+
+	private checkCaption(text: string, entities: readonly MessageEntity[]): void {
+		const max = this.options.maxCaptionLength;
+		if (max !== undefined && codePointLength(text) > max) throw new OutboxError(`caption is longer than ${max} characters`);
 		const errors = validateEntities(text, entities);
 		if (errors.length > 0) throw new OutboxError(`invalid entity #${errors[0]?.index ?? 0}: ${errors[0]?.code ?? ""}`);
 	}
@@ -507,6 +881,81 @@ export class Outbox {
 				await engine.commitMutation(row.chatId, finish, toSyncAck(response.ack));
 				return;
 			}
+			case "send_media": {
+				const sendMedia = api.messages.sendMedia;
+				const uploads = this.options.uploads;
+				if (sendMedia === undefined || uploads === undefined) throw new OutboxError("sending media is not available");
+				const media = await uploads.waitFor(operation.media.uploadKey);
+				const response = await sendMedia({
+					chatId,
+					fileId: media.fileId,
+					text: operation.text,
+					entities: operation.entities.flatMap((e) => toWireEntity(e) ?? []),
+					replyToSeq: toWireId(operation.replyToSeq),
+					randomId: toWireId(row.randomId),
+					silent: operation.silent,
+					topicId: toWireId(operation.topicId),
+				});
+				if (response.message === undefined) throw new OutboxError("SendMedia returned no message");
+				const message = toMessage(response.message);
+				await engine.commitMutation(
+					row.chatId,
+					(w) => {
+						putNewMessage(w, message, selfId);
+						finish(w);
+					},
+					toSyncAck(response.ack),
+				);
+				await this.mediaSent(operation.media.uploadKey, message);
+				return;
+			}
+			case "send_album": {
+				const sendAlbum = api.messages.sendAlbum;
+				const uploads = this.options.uploads;
+				if (sendAlbum === undefined || uploads === undefined) throw new OutboxError("sending media is not available");
+				const files: MediaRef[] = [];
+				for (const item of operation.items) files.push(await uploads.waitFor(item.media.uploadKey));
+				const response = await sendAlbum({
+					chatId,
+					items: operation.items.map((item, index) => ({
+						fileId: files[index]?.fileId ?? "",
+						text: item.text,
+						entities: item.entities.flatMap((e) => toWireEntity(e) ?? []),
+						randomId: toWireId(item.randomId),
+					})),
+					replyToSeq: toWireId(operation.replyToSeq),
+					silent: operation.silent,
+					topicId: toWireId(operation.topicId),
+				});
+				const messages = response.messages.map(toMessage);
+				await engine.commitMutation(
+					row.chatId,
+					(w) => {
+						for (const message of messages) putNewMessage(w, message, selfId);
+						finish(w);
+					},
+					toSyncAck(response.ack),
+				);
+				for (const [index, item] of operation.items.entries()) {
+					const message = messages[index];
+					if (message !== undefined) await this.mediaSent(item.media.uploadKey, message);
+				}
+				return;
+			}
+		}
+	}
+
+	/** Hands a confirmed upload's file over (media cache), then forgets the upload. */
+	private async mediaSent(uploadKey: string, message: Message): Promise<void> {
+		try {
+			await this.options.afterMediaSent?.(uploadKey, message);
+		} catch (err) {
+			this.options.onError?.(err, `media sent ${uploadKey}`);
+		}
+		try {
+			await this.options.uploads?.remove([uploadKey], false);
+		} catch (err) {
+			this.options.onError?.(err, `drop upload ${uploadKey}`);
 		}
 	}
 }

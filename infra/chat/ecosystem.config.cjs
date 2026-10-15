@@ -14,7 +14,11 @@ module.exports = {
 			gid: "chat",
 			instances: 1,
 			exec_mode: "fork",
-			max_memory_restart: "300M",
+			// Photos are decoded in-process within a 256 MiB budget
+			// (server/README.md, Media); GOMEMLIMIT makes the Go GC return
+			// that memory before pm2's cap is near.
+			max_memory_restart: "700M",
+			env: { GOMEMLIMIT: "450MiB" },
 			// Above the server's graceful shutdown budget (67 s, server/README.md).
 			kill_timeout: 70000,
 			out_file: "/var/log/chat/api.out.log",

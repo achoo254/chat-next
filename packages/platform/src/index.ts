@@ -93,6 +93,58 @@ export interface Timers {
 /** Runs `callback` before the next frame is drawn (or soon, off the main thread). */
 export type FrameScheduler = (callback: () => void) => void;
 
+/** Result of an HTTP PUT of an upload part. */
+export interface HttpPutResult {
+	readonly status: number;
+	/** The ETag response header ("" when absent or not exposed by CORS). */
+	readonly etag: string;
+}
+
+/** Result of an HTTP GET; body is set for 2xx answers only. */
+export interface HttpGetResult {
+	readonly status: number;
+	readonly body: Blob | null;
+}
+
+/**
+ * Plain HTTP for media: upload parts go straight to presigned storage URLs
+ * and downloads come from the media host. No cookies are sent; the URLs
+ * carry their own credentials. Network failures reject; HTTP errors resolve
+ * with their status.
+ */
+export interface Http {
+	put(url: string, body: Blob, signal?: AbortSignal): Promise<HttpPutResult>;
+	get(url: string, signal?: AbortSignal): Promise<HttpGetResult>;
+}
+
+/** Durable key -> Blob storage (pending uploads, media cache). */
+export interface BlobStore {
+	get(key: string): Promise<Blob | null>;
+	put(key: string, blob: Blob): Promise<void>;
+	delete(key: string): Promise<void>;
+	/** Deletes every blob of this store (sign-out, revoked session). */
+	destroy(): Promise<void>;
+}
+
+/** Opens blob stores; `name` encodes the (tenant, user) pair like the database name (ADR 0009). */
+export interface BlobStoreFactory {
+	open(name: string): Promise<BlobStore>;
+}
+
+/** Layout data of an image measured on the device before upload. */
+export interface ImageInfo {
+	readonly width: number;
+	readonly height: number;
+	/** Tiny JPEG (longest side <= 40 px, a few hundred bytes) shown before download; null when it could not be made. */
+	readonly thumb: Uint8Array | null;
+}
+
+/** Measures images on the device (decoding happens off the UI thread where possible). */
+export interface ImageProbe {
+	/** null when the blob is not an image this platform can decode. */
+	probe(blob: Blob): Promise<ImageInfo | null>;
+}
+
 /** Everything the core needs from the platform it runs on. */
 export interface Platform {
 	readonly sql: SqlDriverFactory;
@@ -103,6 +155,12 @@ export interface Platform {
 	readonly frame: FrameScheduler;
 	/** Cryptographically strong random integer in [0, 2^53) for random_id. */
 	readonly randomId: () => number;
+	/** Media upload and download; without it (or blobs) sending and fetching media is unavailable. */
+	readonly http?: Http;
+	/** Pending upload files and the media cache. */
+	readonly blobs?: BlobStoreFactory;
+	/** Image dimensions and inline thumbnails for photos the caller did not measure. */
+	readonly imageProbe?: ImageProbe;
 }
 
 /** Timers backed by the global clock. */

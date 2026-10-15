@@ -740,9 +740,12 @@ func (x *UploadSession) GetUrlsExpireAt() int64 {
 }
 
 type CompleteUploadRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UploadId      string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
-	Parts         []*CompletedPart       `protobuf:"bytes,2,rep,name=parts,proto3" json:"parts,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	UploadId string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	// Informational: the server completes the upload from the parts the
+	// storage holds, so a lost etag does not fail the upload. Every part must
+	// be uploaded (FAILED_PRECONDITION lists none; resume with CreateUpload).
+	Parts         []*CompletedPart `protobuf:"bytes,2,rep,name=parts,proto3" json:"parts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1085,9 +1088,15 @@ func (*GetFileUrlRequest_UserPhotoOf) isGetFileUrlRequest_Context() {}
 func (*GetFileUrlRequest_ChatPhotoOf) isGetFileUrlRequest_Context() {}
 
 type GetFileUrlResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	ExpiresAt     int64                  `protobuf:"varint,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Signed URL on the media domain, bound to the tenant, the file, the
+	// caller and the context. It answers 403 once expired (ask again with the
+	// same context) and 404 once the message is deleted for everyone.
+	Url       string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	ExpiresAt int64  `protobuf:"varint,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// The rendition served: the requested size, or the original
+	// (UNSPECIFIED) when the file has no such rendition.
+	Size          MediaSizeType `protobuf:"varint,3,opt,name=size,proto3,enum=app.v1.MediaSizeType" json:"size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1134,6 +1143,172 @@ func (x *GetFileUrlResponse) GetExpiresAt() int64 {
 		return x.ExpiresAt
 	}
 	return 0
+}
+
+func (x *GetFileUrlResponse) GetSize() MediaSizeType {
+	if x != nil {
+		return x.Size
+	}
+	return MediaSizeType_MEDIA_SIZE_TYPE_UNSPECIFIED
+}
+
+type GetFileUrlsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Requests      []*GetFileUrlRequest   `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFileUrlsRequest) Reset() {
+	*x = GetFileUrlsRequest{}
+	mi := &file_app_v1_media_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFileUrlsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFileUrlsRequest) ProtoMessage() {}
+
+func (x *GetFileUrlsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_media_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFileUrlsRequest.ProtoReflect.Descriptor instead.
+func (*GetFileUrlsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_media_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetFileUrlsRequest) GetRequests() []*GetFileUrlRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
+type FileUrlResult struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Url       string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	ExpiresAt int64                  `protobuf:"varint,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Size      MediaSizeType          `protobuf:"varint,3,opt,name=size,proto3,enum=app.v1.MediaSizeType" json:"size,omitempty"`
+	// The file cannot be reached from this context (message deleted or not
+	// visible, unknown file): url is empty.
+	Unavailable   bool `protobuf:"varint,4,opt,name=unavailable,proto3" json:"unavailable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileUrlResult) Reset() {
+	*x = FileUrlResult{}
+	mi := &file_app_v1_media_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileUrlResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileUrlResult) ProtoMessage() {}
+
+func (x *FileUrlResult) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_media_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileUrlResult.ProtoReflect.Descriptor instead.
+func (*FileUrlResult) Descriptor() ([]byte, []int) {
+	return file_app_v1_media_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *FileUrlResult) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *FileUrlResult) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+func (x *FileUrlResult) GetSize() MediaSizeType {
+	if x != nil {
+		return x.Size
+	}
+	return MediaSizeType_MEDIA_SIZE_TYPE_UNSPECIFIED
+}
+
+func (x *FileUrlResult) GetUnavailable() bool {
+	if x != nil {
+		return x.Unavailable
+	}
+	return false
+}
+
+type GetFileUrlsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One per request, same order.
+	Results       []*FileUrlResult `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFileUrlsResponse) Reset() {
+	*x = GetFileUrlsResponse{}
+	mi := &file_app_v1_media_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFileUrlsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFileUrlsResponse) ProtoMessage() {}
+
+func (x *GetFileUrlsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_media_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFileUrlsResponse.ProtoReflect.Descriptor instead.
+func (*GetFileUrlsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_media_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetFileUrlsResponse) GetResults() []*FileUrlResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
 }
 
 var File_app_v1_media_proto protoreflect.FileDescriptor
@@ -1208,11 +1383,22 @@ const file_app_v1_media_proto_rawDesc = "" +
 	"\amessage\x18\x03 \x01(\v2\x1a.app.v1.MessageFileContextH\x00R\amessage\x12(\n" +
 	"\ruser_photo_of\x18\x04 \x01(\x03B\x020\x02H\x00R\vuserPhotoOf\x12(\n" +
 	"\rchat_photo_of\x18\x05 \x01(\x03B\x020\x02H\x00R\vchatPhotoOfB\t\n" +
-	"\acontext\"I\n" +
+	"\acontext\"t\n" +
 	"\x12GetFileUrlResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12!\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\x03B\x020\x02R\texpiresAt*\x98\x01\n" +
+	"expires_at\x18\x02 \x01(\x03B\x020\x02R\texpiresAt\x12)\n" +
+	"\x04size\x18\x03 \x01(\x0e2\x15.app.v1.MediaSizeTypeR\x04size\"K\n" +
+	"\x12GetFileUrlsRequest\x125\n" +
+	"\brequests\x18\x01 \x03(\v2\x19.app.v1.GetFileUrlRequestR\brequests\"\x91\x01\n" +
+	"\rFileUrlResult\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12!\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\x03B\x020\x02R\texpiresAt\x12)\n" +
+	"\x04size\x18\x03 \x01(\x0e2\x15.app.v1.MediaSizeTypeR\x04size\x12 \n" +
+	"\vunavailable\x18\x04 \x01(\bR\vunavailable\"F\n" +
+	"\x13GetFileUrlsResponse\x12/\n" +
+	"\aresults\x18\x01 \x03(\v2\x15.app.v1.FileUrlResultR\aresults*\x98\x01\n" +
 	"\tMediaKind\x12\x1a\n" +
 	"\x16MEDIA_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MEDIA_KIND_PHOTO\x10\x01\x12\x14\n" +
@@ -1224,13 +1410,14 @@ const file_app_v1_media_proto_rawDesc = "" +
 	"\x1bMEDIA_SIZE_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11MEDIA_SIZE_TYPE_S\x10\x01\x12\x15\n" +
 	"\x11MEDIA_SIZE_TYPE_M\x10\x02\x12\x15\n" +
-	"\x11MEDIA_SIZE_TYPE_X\x10\x032\xb7\x02\n" +
+	"\x11MEDIA_SIZE_TYPE_X\x10\x032\xff\x02\n" +
 	"\fMediaService\x12I\n" +
 	"\fCreateUpload\x12\x1b.app.v1.CreateUploadRequest\x1a\x1c.app.v1.CreateUploadResponse\x12O\n" +
 	"\x0eCompleteUpload\x12\x1d.app.v1.CompleteUploadRequest\x1a\x1e.app.v1.CompleteUploadResponse\x12F\n" +
 	"\vAbortUpload\x12\x1a.app.v1.AbortUploadRequest\x1a\x1b.app.v1.AbortUploadResponse\x12C\n" +
 	"\n" +
-	"GetFileUrl\x12\x19.app.v1.GetFileUrlRequest\x1a\x1a.app.v1.GetFileUrlResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"GetFileUrl\x12\x19.app.v1.GetFileUrlRequest\x1a\x1a.app.v1.GetFileUrlResponse\x12F\n" +
+	"\vGetFileUrls\x12\x1a.app.v1.GetFileUrlsRequest\x1a\x1b.app.v1.GetFileUrlsResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_media_proto_rawDescOnce sync.Once
@@ -1245,7 +1432,7 @@ func file_app_v1_media_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_media_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_app_v1_media_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_app_v1_media_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_app_v1_media_proto_goTypes = []any{
 	(MediaKind)(0),                 // 0: app.v1.MediaKind
 	(MediaSizeType)(0),             // 1: app.v1.MediaSizeType
@@ -1263,6 +1450,9 @@ var file_app_v1_media_proto_goTypes = []any{
 	(*MessageFileContext)(nil),     // 13: app.v1.MessageFileContext
 	(*GetFileUrlRequest)(nil),      // 14: app.v1.GetFileUrlRequest
 	(*GetFileUrlResponse)(nil),     // 15: app.v1.GetFileUrlResponse
+	(*GetFileUrlsRequest)(nil),     // 16: app.v1.GetFileUrlsRequest
+	(*FileUrlResult)(nil),          // 17: app.v1.FileUrlResult
+	(*GetFileUrlsResponse)(nil),    // 18: app.v1.GetFileUrlsResponse
 }
 var file_app_v1_media_proto_depIdxs = []int32{
 	1,  // 0: app.v1.MediaSize.type:type_name -> app.v1.MediaSizeType
@@ -1277,19 +1467,25 @@ var file_app_v1_media_proto_depIdxs = []int32{
 	3,  // 9: app.v1.CompleteUploadResponse.media:type_name -> app.v1.MediaRef
 	1,  // 10: app.v1.GetFileUrlRequest.size:type_name -> app.v1.MediaSizeType
 	13, // 11: app.v1.GetFileUrlRequest.message:type_name -> app.v1.MessageFileContext
-	6,  // 12: app.v1.MediaService.CreateUpload:input_type -> app.v1.CreateUploadRequest
-	9,  // 13: app.v1.MediaService.CompleteUpload:input_type -> app.v1.CompleteUploadRequest
-	11, // 14: app.v1.MediaService.AbortUpload:input_type -> app.v1.AbortUploadRequest
-	14, // 15: app.v1.MediaService.GetFileUrl:input_type -> app.v1.GetFileUrlRequest
-	7,  // 16: app.v1.MediaService.CreateUpload:output_type -> app.v1.CreateUploadResponse
-	10, // 17: app.v1.MediaService.CompleteUpload:output_type -> app.v1.CompleteUploadResponse
-	12, // 18: app.v1.MediaService.AbortUpload:output_type -> app.v1.AbortUploadResponse
-	15, // 19: app.v1.MediaService.GetFileUrl:output_type -> app.v1.GetFileUrlResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	1,  // 12: app.v1.GetFileUrlResponse.size:type_name -> app.v1.MediaSizeType
+	14, // 13: app.v1.GetFileUrlsRequest.requests:type_name -> app.v1.GetFileUrlRequest
+	1,  // 14: app.v1.FileUrlResult.size:type_name -> app.v1.MediaSizeType
+	17, // 15: app.v1.GetFileUrlsResponse.results:type_name -> app.v1.FileUrlResult
+	6,  // 16: app.v1.MediaService.CreateUpload:input_type -> app.v1.CreateUploadRequest
+	9,  // 17: app.v1.MediaService.CompleteUpload:input_type -> app.v1.CompleteUploadRequest
+	11, // 18: app.v1.MediaService.AbortUpload:input_type -> app.v1.AbortUploadRequest
+	14, // 19: app.v1.MediaService.GetFileUrl:input_type -> app.v1.GetFileUrlRequest
+	16, // 20: app.v1.MediaService.GetFileUrls:input_type -> app.v1.GetFileUrlsRequest
+	7,  // 21: app.v1.MediaService.CreateUpload:output_type -> app.v1.CreateUploadResponse
+	10, // 22: app.v1.MediaService.CompleteUpload:output_type -> app.v1.CompleteUploadResponse
+	12, // 23: app.v1.MediaService.AbortUpload:output_type -> app.v1.AbortUploadResponse
+	15, // 24: app.v1.MediaService.GetFileUrl:output_type -> app.v1.GetFileUrlResponse
+	18, // 25: app.v1.MediaService.GetFileUrls:output_type -> app.v1.GetFileUrlsResponse
+	21, // [21:26] is the sub-list for method output_type
+	16, // [16:21] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_media_proto_init() }
@@ -1312,7 +1508,7 @@ func file_app_v1_media_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_media_proto_rawDesc), len(file_app_v1_media_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   14,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -44,6 +44,9 @@ const (
 	MediaServiceAbortUploadProcedure = "/app.v1.MediaService/AbortUpload"
 	// MediaServiceGetFileUrlProcedure is the fully-qualified name of the MediaService's GetFileUrl RPC.
 	MediaServiceGetFileUrlProcedure = "/app.v1.MediaService/GetFileUrl"
+	// MediaServiceGetFileUrlsProcedure is the fully-qualified name of the MediaService's GetFileUrls
+	// RPC.
+	MediaServiceGetFileUrlsProcedure = "/app.v1.MediaService/GetFileUrls"
 )
 
 // MediaServiceClient is a client for the app.v1.MediaService service.
@@ -59,6 +62,10 @@ type MediaServiceClient interface {
 	// Issues a short-lived download URL on the media domain. Access is proven by
 	// the context (a message the caller can see, or a profile photo owner).
 	GetFileUrl(context.Context, *connect.Request[v1.GetFileUrlRequest]) (*connect.Response[v1.GetFileUrlResponse], error)
+	// GetFileUrl for up to 100 files at once (a screen of media), answered in
+	// request order; a file that cannot be reached is marked unavailable
+	// instead of failing the whole call.
+	GetFileUrls(context.Context, *connect.Request[v1.GetFileUrlsRequest]) (*connect.Response[v1.GetFileUrlsResponse], error)
 }
 
 // NewMediaServiceClient constructs a client for the app.v1.MediaService service. By default, it
@@ -96,6 +103,12 @@ func NewMediaServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(mediaServiceMethods.ByName("GetFileUrl")),
 			connect.WithClientOptions(opts...),
 		),
+		getFileUrls: connect.NewClient[v1.GetFileUrlsRequest, v1.GetFileUrlsResponse](
+			httpClient,
+			baseURL+MediaServiceGetFileUrlsProcedure,
+			connect.WithSchema(mediaServiceMethods.ByName("GetFileUrls")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -105,6 +118,7 @@ type mediaServiceClient struct {
 	completeUpload *connect.Client[v1.CompleteUploadRequest, v1.CompleteUploadResponse]
 	abortUpload    *connect.Client[v1.AbortUploadRequest, v1.AbortUploadResponse]
 	getFileUrl     *connect.Client[v1.GetFileUrlRequest, v1.GetFileUrlResponse]
+	getFileUrls    *connect.Client[v1.GetFileUrlsRequest, v1.GetFileUrlsResponse]
 }
 
 // CreateUpload calls app.v1.MediaService.CreateUpload.
@@ -127,6 +141,11 @@ func (c *mediaServiceClient) GetFileUrl(ctx context.Context, req *connect.Reques
 	return c.getFileUrl.CallUnary(ctx, req)
 }
 
+// GetFileUrls calls app.v1.MediaService.GetFileUrls.
+func (c *mediaServiceClient) GetFileUrls(ctx context.Context, req *connect.Request[v1.GetFileUrlsRequest]) (*connect.Response[v1.GetFileUrlsResponse], error) {
+	return c.getFileUrls.CallUnary(ctx, req)
+}
+
 // MediaServiceHandler is an implementation of the app.v1.MediaService service.
 type MediaServiceHandler interface {
 	// Starts a resumable multipart upload, or resumes one when upload_id is set.
@@ -140,6 +159,10 @@ type MediaServiceHandler interface {
 	// Issues a short-lived download URL on the media domain. Access is proven by
 	// the context (a message the caller can see, or a profile photo owner).
 	GetFileUrl(context.Context, *connect.Request[v1.GetFileUrlRequest]) (*connect.Response[v1.GetFileUrlResponse], error)
+	// GetFileUrl for up to 100 files at once (a screen of media), answered in
+	// request order; a file that cannot be reached is marked unavailable
+	// instead of failing the whole call.
+	GetFileUrls(context.Context, *connect.Request[v1.GetFileUrlsRequest]) (*connect.Response[v1.GetFileUrlsResponse], error)
 }
 
 // NewMediaServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -173,6 +196,12 @@ func NewMediaServiceHandler(svc MediaServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(mediaServiceMethods.ByName("GetFileUrl")),
 		connect.WithHandlerOptions(opts...),
 	)
+	mediaServiceGetFileUrlsHandler := connect.NewUnaryHandler(
+		MediaServiceGetFileUrlsProcedure,
+		svc.GetFileUrls,
+		connect.WithSchema(mediaServiceMethods.ByName("GetFileUrls")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.MediaService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MediaServiceCreateUploadProcedure:
@@ -183,6 +212,8 @@ func NewMediaServiceHandler(svc MediaServiceHandler, opts ...connect.HandlerOpti
 			mediaServiceAbortUploadHandler.ServeHTTP(w, r)
 		case MediaServiceGetFileUrlProcedure:
 			mediaServiceGetFileUrlHandler.ServeHTTP(w, r)
+		case MediaServiceGetFileUrlsProcedure:
+			mediaServiceGetFileUrlsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -206,4 +237,8 @@ func (UnimplementedMediaServiceHandler) AbortUpload(context.Context, *connect.Re
 
 func (UnimplementedMediaServiceHandler) GetFileUrl(context.Context, *connect.Request[v1.GetFileUrlRequest]) (*connect.Response[v1.GetFileUrlResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MediaService.GetFileUrl is not implemented"))
+}
+
+func (UnimplementedMediaServiceHandler) GetFileUrls(context.Context, *connect.Request[v1.GetFileUrlsRequest]) (*connect.Response[v1.GetFileUrlsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MediaService.GetFileUrls is not implemented"))
 }

@@ -68,6 +68,8 @@ export interface LinkPreview {
 	readonly siteName: string;
 	readonly title: string;
 	readonly description: string;
+	/** The page's image, a server-owned photo fetched in the message's context. */
+	readonly photo?: MediaRef;
 }
 
 export interface Dialog {
@@ -224,6 +226,40 @@ export type MessageAction =
 
 export type MediaKind = "photo" | "video" | "audio" | "voice" | "document" | "unknown";
 
+/** Rendition of a file: the stored original, or a size made by the server (longest side S 320, M 800, X 1280). */
+export type MediaSizeType = "original" | "s" | "m" | "x";
+
+export interface MediaSize {
+	readonly type: MediaSizeType;
+	readonly width: number;
+	readonly height: number;
+	/** Bytes. */
+	readonly size: number;
+}
+
+/** A file attached to a message: everything to lay it out and fetch it. */
+export interface MediaRef {
+	/** Opaque id bound to the owner and source chat; the cache key. */
+	readonly fileId: string;
+	/** Hex SHA-256 of the content. */
+	readonly fileHash: string;
+	readonly kind: MediaKind;
+	readonly mimeType: string;
+	/** Bytes of the original. */
+	readonly size: number;
+	readonly fileName: string;
+	readonly width: number;
+	readonly height: number;
+	/** Milliseconds (video, audio, voice). */
+	readonly duration: number;
+	/** Tiny thumbnail rendered before anything is downloaded; empty when none. */
+	readonly inlineThumb: Uint8Array;
+	/** Renditions besides the original. */
+	readonly sizes: readonly MediaSize[];
+	/** Voice waveform, one byte per sample; empty when none. */
+	readonly waveform: Uint8Array;
+}
+
 export interface Message {
 	readonly chatId: number;
 	readonly seq: number;
@@ -231,8 +267,10 @@ export interface Message {
 	readonly date: number;
 	readonly text: string;
 	readonly entities: readonly MessageEntity[];
-	/** Media arrives with release R3; until then only its kind is kept. */
+	/** Kind of the attached file, null for text; same as media.kind. */
 	readonly mediaKind: MediaKind | null;
+	/** The attached file (photo, video, file, voice); absent for text. */
+	readonly media?: MediaRef;
 	readonly replyToSeq: number;
 	readonly forward: ForwardHeader | null;
 	readonly editDate: number;

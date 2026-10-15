@@ -3,8 +3,8 @@
 #   bash /opt/chat/infra/activate-release.sh <release-id>
 # Steps: back up the database, run migrations with the new binary, install the
 # release's nginx conf, switch /opt/chat/current, start or reload pm2
-# `chat-api`, wait for /healthz, the realtime route /ws and the webhook route
-# /hook/. Any failure after the switch restores the
+# `chat-api`, wait for /healthz, the realtime route /ws, the webhook route
+# /hook/ and (when configured) the media host. Any failure after the switch restores the
 # previous release and nginx conf. Migrations are expand-only (backward
 # compatible), so the previous binary keeps working on the migrated schema.
 # Keeps the newest 5 releases.
@@ -16,12 +16,23 @@ ID="${1:?usage: activate-release.sh <release-id>}"
 NEW="$ROOT/releases/$ID"
 [ -x "$NEW/server" ] || { echo "release $ID not found or incomplete" >&2; exit 2; }
 CONF=/etc/nginx/conf.d/chat.hoandat.com.conf
+# The media host conf goes in only once its certificate exists (nginx -t
+# fails on a missing certificate file).
+MEDIA_CONF=/etc/nginx/conf.d/media-chat.hoandat.com.conf
+MEDIA_CERT=/etc/letsencrypt/live/media-chat.hoandat.com/fullchain.pem
 PREV="$(readlink "$ROOT/current" 2>/dev/null || true)"
 
 chmod -R a+rX "$NEW"
 
 echo "== backup database"
 bash "$ROOT/infra/backup-chat-db.sh"
+
+echo "== media directory"
+# The app cannot create it under root-owned /opt/chat; files stay private
+# to the chat user (0750 directories, 0640 files).
+MEDIA_ROOT="$(sed -n 's/^MEDIA_ROOT=//p' "$ROOT/.env" | tail -n 1)"
+MEDIA_ROOT="${MEDIA_ROOT:-$ROOT/media}"
+install -d -m 750 -o chat -g chat "$MEDIA_ROOT"
 
 echo "== migrate"
 sudo -u chat "$NEW/server" -role migrate -env-file "$ROOT/.env"
@@ -51,11 +62,31 @@ hooks() {
 		"https://chat.hoandat.com$probe" | grep -q '"hook_not_found"'
 }
 
+# With media configured (MEDIA_PUBLIC_URL in .env) the media host answers
+# /healthz with the storage state, through the app and through nginx. A
+# storage outage does not roll back a release: chat keeps working, media
+# calls fail until the storage answers; it is reported as a warning.
+media() {
+	grep -q '^MEDIA_PUBLIC_URL=.' "$ROOT/.env" || { echo "media not configured; skipping media checks"; return 0; }
+	local direct
+	direct="$(curl -s --max-time 5 -H 'Host: media-chat.hoandat.com' http://127.0.0.1:4600/healthz)"
+	case "$direct" in *'"storage"'*) ;; *) return 1 ;; esac
+	case "$direct" in *'"reachable"'*) ;; *) echo "WARNING: media storage unreachable: $direct" >&2 ;; esac
+	[ -f "$MEDIA_CONF" ] || { echo "WARNING: media host conf not installed (certificate missing)" >&2; return 0; }
+	[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 --resolve media-chat.hoandat.com:443:127.0.0.1 \
+		https://media-chat.hoandat.com/f/smokeprobe)" = 404 ]
+}
+
 rollback() {
 	echo "!! activation failed, restoring ${PREV:-nothing}" >&2
 	if [ -n "$PREV" ]; then
 		ln -sfn "$PREV" "$ROOT/current"
 		[ -f "$PREV/nginx/chat.hoandat.com.conf" ] && install -m 644 "$PREV/nginx/chat.hoandat.com.conf" "$CONF"
+		if [ -f "$PREV/nginx/media-chat.hoandat.com.conf" ] && [ -f "$MEDIA_CERT" ]; then
+			install -m 644 "$PREV/nginx/media-chat.hoandat.com.conf" "$MEDIA_CONF"
+		else
+			rm -f "$MEDIA_CONF"
+		fi
 		nginx -t && systemctl reload nginx || true
 		pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || true
 	fi
@@ -64,9 +95,16 @@ rollback() {
 
 echo "== nginx"
 cp -p "$CONF" "$CONF.prev" 2>/dev/null || true
+cp -p "$MEDIA_CONF" "$MEDIA_CONF.prev" 2>/dev/null || rm -f "$MEDIA_CONF.prev"
 install -m 644 "$NEW/nginx/chat.hoandat.com.conf" "$CONF"
+if [ -f "$NEW/nginx/media-chat.hoandat.com.conf" ] && [ -f "$MEDIA_CERT" ]; then
+	install -m 644 "$NEW/nginx/media-chat.hoandat.com.conf" "$MEDIA_CONF"
+elif [ -f "$NEW/nginx/media-chat.hoandat.com.conf" ]; then
+	echo "WARNING: $MEDIA_CERT missing; media host not served (see docs/deployment-guide.md)" >&2
+fi
 if ! nginx -t; then
 	if [ -f "$CONF.prev" ]; then mv "$CONF.prev" "$CONF"; else rm -f "$CONF"; fi
+	if [ -f "$MEDIA_CONF.prev" ]; then mv "$MEDIA_CONF.prev" "$MEDIA_CONF"; else rm -f "$MEDIA_CONF"; fi
 	echo "nginx -t failed; release not activated" >&2
 	exit 1
 fi
@@ -81,6 +119,7 @@ pm2 save >/dev/null
 health || rollback
 realtime || rollback
 hooks || rollback
+media || rollback
 
 echo "== prune"
 ls -1dt "$ROOT"/releases/*/ | tail -n +6 | xargs -r rm -rf

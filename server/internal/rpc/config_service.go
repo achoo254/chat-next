@@ -25,8 +25,9 @@ const (
 )
 
 // newAppConfig returns the static configuration with its hash: SHA-256 of
-// the deterministic encoding of every other field.
-func newAppConfig() (*appv1.AppConfig, error) {
+// the deterministic encoding of every other field. uploadMax is 0 when
+// media storage is not configured.
+func newAppConfig(uploadMax int64) (*appv1.AppConfig, error) {
 	c := &appv1.AppConfig{
 		MessageLengthMax:          4096,
 		CaptionLengthMax:          1024,
@@ -37,7 +38,7 @@ func newAppConfig() (*appv1.AppConfig, error) {
 		MediaCacheSizeBytes:       2 * gib,
 		MediaCacheMaxAgeSeconds:   30 * 24 * 3600,
 		MediaCacheLargeFilesBytes: 1 * gib,
-		UploadSizeMaxBytes:        2000 * mib,
+		UploadSizeMaxBytes:        uploadMax,
 		AlbumSizeMax:              10,
 	}
 	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(c)

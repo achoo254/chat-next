@@ -35,6 +35,8 @@ import {
 	MessageSchema,
 	ReadHistoryResponseSchema,
 	ReactionCountSchema,
+	SendAlbumResponseSchema,
+	SendMediaResponseSchema,
 	SendMessageResponseSchema,
 	SyncAckSchema,
 	UnpinAllMessagesResponseSchema,
@@ -52,6 +54,8 @@ import {
 } from "@app/proto-ts/updates";
 import { GetSelfResponseSchema, GetUsersResponseSchema, UserSchema, type User as WireUser } from "@app/proto-ts/users";
 import type { RemoteApi } from "../../src/protocol/api.ts";
+import type { MediaRef as WireMediaRef } from "@app/proto-ts/media";
+import type { FakeMedia } from "./fake-media.ts";
 import { toMessage } from "../../src/protocol/map.ts";
 import type { Message } from "../../src/model/types.ts";
 
@@ -175,6 +179,10 @@ export class FakeServer {
 	framesLost = 0;
 	framesReordered = 0;
 	heartbeatMs = 25_000;
+
+	/** MediaService and storage; set it to give the clients media. */
+	media: FakeMedia | null = null;
+	private nextGroupedId = 1;
 
 	private readonly users = new Map<number, UserRecord>();
 	private readonly chats = new Map<number, ChatRecord>();
@@ -441,7 +449,13 @@ export class FakeServer {
 
 	// ---------------------------------------------------------- mutations
 
-	sendMessage(from: number, chatId: number, text: string, randomId = 0): { seq: number; ack: WireSyncAck } {
+	sendMessage(
+		from: number,
+		chatId: number,
+		text: string,
+		randomId = 0,
+		extra: { readonly media?: WireMediaRef; readonly groupedId?: bigint; readonly replyToSeq?: bigint } = {},
+	): { seq: number; ack: WireSyncAck } {
 		const chat = this.chat(chatId);
 		if (!chat.members.has(from)) throw new ConnectError("not a member", Code.PermissionDenied);
 		const sender = this.user(from);
@@ -457,6 +471,7 @@ export class FakeServer {
 				fromId: big(from),
 				date: big(this.now()),
 				text,
+				...extra,
 			}),
 			deleted: false,
 			reactors: new Map(),
@@ -1112,7 +1127,44 @@ export class FakeServer {
 								});
 							}),
 					},
+			...(this.media === null ? {} : { media: this.media.apiFor(userId) }),
 			messages: {
+				sendMedia: (request) =>
+					this.rpc(userId, "sendMedia", () => {
+						const media = this.media;
+						if (media === null) throw new ConnectError("no media", Code.Unimplemented);
+						const chatId = num(request.chatId ?? 0n);
+						const file = media.file(request.fileId ?? "");
+						const { seq, ack } = this.sendMessage(userId, chatId, request.text ?? "", num(request.randomId ?? 0n), {
+							media: file,
+							replyToSeq: request.replyToSeq ?? 0n,
+						});
+						return create(SendMediaResponseSchema, { message: this.view(this.record(chatId, seq), userId), ack });
+					}),
+				sendAlbum: (request) =>
+					this.rpc(userId, "sendAlbum", () => {
+						const media = this.media;
+						if (media === null) throw new ConnectError("no media", Code.Unimplemented);
+						const chatId = num(request.chatId ?? 0n);
+						const items = request.items ?? [];
+						if (items.length < 2) throw new ConnectError("album too small", Code.InvalidArgument);
+						const files = items.map((item) => media.file(item.fileId ?? ""));
+						const groupedId = big(this.nextGroupedId++);
+						let ack: WireSyncAck | undefined;
+						const seqs = items.map((item, index) => {
+							const file = files[index];
+							const sent = this.sendMessage(userId, chatId, item.text ?? "", num(item.randomId ?? 0n), {
+								...(file === undefined ? {} : { media: file }),
+								groupedId,
+							});
+							ack = sent.ack;
+							return sent.seq;
+						});
+						return create(SendAlbumResponseSchema, {
+							messages: seqs.map((seq) => this.view(this.record(chatId, seq), userId)),
+							...(ack === undefined ? {} : { ack }),
+						});
+					}),
 				sendMessage: (request) =>
 					this.rpc(userId, "sendMessage", () => {
 						const chatId = num(request.chatId ?? 0n);

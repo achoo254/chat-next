@@ -46,6 +46,7 @@ message AppConfig {
   int32 media_cache_max_age_seconds = 9;
   // Separate budget for large files and video inside the media cache.
   int64 media_cache_large_files_bytes = 10 [jstype = JS_NUMBER];
+  // 0 when media storage is not configured: clients hide attaching files.
   int64 upload_size_max_bytes = 11 [jstype = JS_NUMBER];
   int32 album_size_max = 12;
 }
