@@ -79,18 +79,18 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | Done (Compose dev chưa chạy: máy không có Docker) |
 | 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | In progress (R1 lên prod; còn tenant theo Host, test hot user/failover) |
 | 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | In progress (WS gateway R1 lên prod; push ở R7) |
-| 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | Pending |
+| 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | In progress (R3 lên prod: lưu trên đĩa .65; còn tạm dừng upload, grouped_id khi chuyển tiếp, ffmpeg) |
 | 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
 | 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI R1 lên prod; còn React Compiler, perf gate CI) |
-| 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres tsvector; Meilisearch để giai đoạn scale) |
+| 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres pg_trgm chuỗi con + tsvector; Meilisearch để giai đoạn scale) |
 | 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | Pending |
 | 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | Pending |
 | 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | Pending |
-| 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | Pending |
+| 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 lên prod: incoming webhook; phần bot ở R5) |
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Pending |
 | 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Pending |
-| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (phần tối thiểu R1) |
-| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65: pm2, nginx, TLS, CI/CD) |
+| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1: danh bạ, cấm, chặn, báo cáo, hàng đợi kiểm duyệt cho operator) |
+| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65: pm2, nginx, TLS, CI/CD qua chat-deploy, perf gate) |
 | 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
 
 Phase là luồng việc kỹ thuật; thứ tự làm và đưa lên prod theo mục "Lộ trình phát hành" dưới đây. Mỗi release lấy đúng phần cần của các phase liên quan. Phase 15 mang số 15 vì được tách ra sau; về logic nó là 8b.
@@ -435,4 +435,54 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Kiểm tra: E2E 16/16, core 751 test, web 223 test, JS khởi động 138,2/150 KiB.
   - Muốn tìm theo chuỗi con thì phải cài `postgresql-16` contrib trên `.65`. Đó là thay đổi máy dùng chung, cần user quyết.
 - Tiếp theo theo lộ trình: R5 (bot, Developer Console, SDK).
+
+## Bàn giao (2026-10-15 13:50) — đọc mục này trước khi làm tiếp
+
+### Đang chạy trên prod (https://chat.hoandat.com, release `20261015-064105-400abbd84883`, commit `400abbd`)
+- **R0:** đăng nhập qua `hoandat-auth`. Tên và email lấy từ userinfo, user tự đổi tên thì không bị ghi đè.
+- **R1 nhắn tin:**
+  - chat 1-1, nhóm, nhóm có topic, kênh;
+  - trả lời, sửa, thu hồi, xoá ở phía tôi, chuyển tiếp, cảm xúc kiểu Zalo, đã xem, ghim nhiều tin;
+  - link mời `/join/`, danh bạ tường minh, kick là cấm, chặn, báo cáo;
+  - tắt thông báo, ghim chat, đánh dấu chưa đọc, cài đặt thông báo;
+  - hàng đợi kiểm duyệt cho operator (`CHAT_OPERATOR_USER_IDS` hiện trống).
+- **R2:** incoming webhook tại `chat.<d>/hook/{id}/{secret}`, định dạng JSON riêng, Slack, Alertmanager, Grafana, GitLab.
+- **R3:** media lưu trên đĩa `.65` tại `/opt/chat/media`, phục vụ qua `media-chat.hoandat.com`.
+- **R3b** (phiên `chat-next-85`): "Cloud của tôi", màn trống mời đồng đội.
+- **R4:** tìm không dấu theo chuỗi con. Server dùng Postgres `pg_trgm` (migration 0012), máy khách dùng FTS5 trigram.
+- **Kiểm tra cuối:** Go 21 package (race), golangci-lint 0 issues; test core 754, web 224, platform-web 17; E2E `pnpm e2e` 16/16; perf gate (JS khởi động 138,2/150 KiB); React Compiler đang bật.
+
+### Cách làm việc đã chốt với user (bộ nhớ dự án lưu đủ)
+- Push thẳng `main`, không tạo nhánh. CI xanh thì workflow `deploy` tự deploy prod qua user `chat-deploy`.
+  - Đổi `infra/chat/` thì phải rsync lên `/opt/chat/infra` trước khi push; xem `docs/deployment-guide.md`.
+- Quyết định kỹ thuật và phạm vi gửi Jev (TypeSafe, key ở `$ACCESS_TOKENS_JSON` mục `api.typesafe.ai`). Thực hiện ngay theo lựa chọn của Jev, báo user kèm xác suất. Mua bán, thay đổi máy dùng chung hoặc cấp quyền dữ liệu thì hỏi user.
+- Mock là đặc tả UI: sửa mock trước, code sau. Không dùng feature flag, không hiện nhãn lộ trình hay nút mờ. Không có thanh cuộn ngang; kiểm ở 1333x780 và 390x844.
+- Hướng UI: Telegram cho cấu trúc, Zalo cho thuật ngữ tiếng Việt ([báo cáo](../reports/rea-261014-2340-chat-ui-ux-telegram-zalo.md)).
+- Mọi thứ lưu trên `.65`, chưa backup ra ngoài cho tới khi có người dùng thật.
+- Mọi thay đổi hạ tầng ghi vào `docs/infrastructure-inventory.md` trong cùng commit.
+- Gitleaks phải chặn commit; không pipe lệnh kiểm qua `tail`.
+- Máy dev 16 GB: mỗi lúc chỉ một job nặng, vitest `--maxWorkers=2`.
+- Có thể có phiên Claude khác (`chat-next-*`) làm cùng thư mục. Báo trước khi push, mỗi bên chỉ stage phần của mình, không commit thay đổi của phiên khác.
+
+### Còn mở
+- **R3:**
+  - tạm dừng upload;
+  - giữ `grouped_id` khi chuyển tiếp album;
+  - poster video và sóng âm phía server (cần ffmpeg trên `.65`, chưa cài);
+  - chỉ mục media theo chat (hiện chỉ quét 600 tin);
+  - `topicId` của tin media đang gửi.
+- **R1:**
+  - cờ "bị cấm" trong `UpdateMemberRemoved`, để tách câu thông báo bị xoá và bị cấm;
+  - kiểm duyệt nâng cao: gộp báo cáo, cảnh cáo, nhật ký.
+- **Mock:** chưa có màn sửa webhook.
+- **Hạ tầng:**
+  - cổng 443 của `.65` mở cho mọi IP;
+  - SSL Cloudflare của zone nên ở "Full (strict)", chưa kiểm;
+  - bucket `chat-media` và danh tính `chat-api` trên OneDash không còn dùng.
+- **Phase 13:** chưa có metrics, tracing hay canary.
+
+### Việc tiếp theo
+**R5:** bot, Developer Console, SDK TS/Python/Go, thông báo qua bot, bot chào người dùng mới (Phase 8, 15, phần bot của Phase 9).
+- Trước khi code: đọc Phase 8 và 15, mock `bots.html` và `console.html`, báo cáo `researcher-261013-1120-telegram-bot-platform.md`.
+- Cần quyết host cho Bot API: `bot.chat.<d>` không proxy được qua SSL miễn phí của Cloudflare, cùng vấn đề webhook đã gặp. Gửi Jev, phương án gần nhất là đường dẫn trên `chat.<d>`.
 
