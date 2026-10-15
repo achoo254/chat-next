@@ -464,7 +464,8 @@ func (x *OpenMiniAppResponse) GetInitData() string {
 type StartBotRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
-	// Deep-link start parameter; may be empty.
+	// Deep-link start parameter; may be empty. Up to 64 characters of
+	// A-Z, a-z, 0-9, _ and -. The bot receives "/start <param>" (or "/start").
 	StartParam string `protobuf:"bytes,2,opt,name=start_param,json=startParam,proto3" json:"start_param,omitempty"`
 	// Client-generated (< 2^53) dedupe key for the start message.
 	RandomId      int64 `protobuf:"varint,3,opt,name=random_id,json=randomId,proto3" json:"random_id,omitempty"`
@@ -591,11 +592,135 @@ func (x *StartBotResponse) GetAck() *SyncAck {
 	return nil
 }
 
+type GetBotInfoRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// Chat the menu is for: 0 (or the private chat with the bot) for the
+	// private scope, a group for the group scopes.
+	ChatId        int64 `protobuf:"varint,2,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotInfoRequest) Reset() {
+	*x = GetBotInfoRequest{}
+	mi := &file_app_v1_bots_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotInfoRequest) ProtoMessage() {}
+
+func (x *GetBotInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotInfoRequest.ProtoReflect.Descriptor instead.
+func (*GetBotInfoRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetBotInfoRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *GetBotInfoRequest) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+type GetBotInfoResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	User        *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	About       string                 `protobuf:"bytes,3,opt,name=about,proto3" json:"about,omitempty"`
+	// The command menu for the caller in chat_id: the most specific list set
+	// (GROUP_ADMIN for admins, GROUP or PRIVATE, then DEFAULT).
+	Commands      []*BotCommand `protobuf:"bytes,4,rep,name=commands,proto3" json:"commands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotInfoResponse) Reset() {
+	*x = GetBotInfoResponse{}
+	mi := &file_app_v1_bots_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotInfoResponse) ProtoMessage() {}
+
+func (x *GetBotInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotInfoResponse.ProtoReflect.Descriptor instead.
+func (*GetBotInfoResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetBotInfoResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+func (x *GetBotInfoResponse) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *GetBotInfoResponse) GetAbout() string {
+	if x != nil {
+		return x.About
+	}
+	return ""
+}
+
+func (x *GetBotInfoResponse) GetCommands() []*BotCommand {
+	if x != nil {
+		return x.Commands
+	}
+	return nil
+}
+
 var File_app_v1_bots_proto protoreflect.FileDescriptor
 
 const file_app_v1_bots_proto_rawDesc = "" +
 	"\n" +
-	"\x11app/v1/bots.proto\x12\x06app.v1\x1a\x12app/v1/chats.proto\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\xd1\x01\n" +
+	"\x11app/v1/bots.proto\x12\x06app.v1\x1a\x16app/v1/bot_admin.proto\x1a\x12app/v1/chats.proto\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\xd1\x01\n" +
 	"\fInlineResult\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x18.app.v1.InlineResultKindR\x04kind\x12\x14\n" +
@@ -638,7 +763,15 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x04chat\x18\x01 \x01(\v2\f.app.v1.ChatR\x04chat\x12)\n" +
 	"\amessage\x18\x02 \x01(\v2\x0f.app.v1.MessageR\amessage\x12\"\n" +
 	"\x05users\x18\x03 \x03(\v2\f.app.v1.UserR\x05users\x12!\n" +
-	"\x03ack\x18\x04 \x01(\v2\x0f.app.v1.SyncAckR\x03ack*\xef\x01\n" +
+	"\x03ack\x18\x04 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"K\n" +
+	"\x11GetBotInfoRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1b\n" +
+	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\x9e\x01\n" +
+	"\x12GetBotInfoResponse\x12 \n" +
+	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
+	"\x05about\x18\x03 \x01(\tR\x05about\x12.\n" +
+	"\bcommands\x18\x04 \x03(\v2\x12.app.v1.BotCommandR\bcommands*\xef\x01\n" +
 	"\x10InlineResultKind\x12\"\n" +
 	"\x1eINLINE_RESULT_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aINLINE_RESULT_KIND_ARTICLE\x10\x01\x12\x1c\n" +
@@ -646,11 +779,13 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x18INLINE_RESULT_KIND_VIDEO\x10\x03\x12\x1c\n" +
 	"\x18INLINE_RESULT_KIND_AUDIO\x10\x04\x12\x1c\n" +
 	"\x18INLINE_RESULT_KIND_VOICE\x10\x05\x12\x1f\n" +
-	"\x1bINLINE_RESULT_KIND_DOCUMENT\x10\x062\xdc\x01\n" +
+	"\x1bINLINE_RESULT_KIND_DOCUMENT\x10\x062\xa1\x02\n" +
 	"\vBotsService\x12F\n" +
 	"\vInlineQuery\x12\x1a.app.v1.InlineQueryRequest\x1a\x1b.app.v1.InlineQueryResponse\x12F\n" +
 	"\vOpenMiniApp\x12\x1a.app.v1.OpenMiniAppRequest\x1a\x1b.app.v1.OpenMiniAppResponse\x12=\n" +
-	"\bStartBot\x12\x17.app.v1.StartBotRequest\x1a\x18.app.v1.StartBotResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\bStartBot\x12\x17.app.v1.StartBotRequest\x1a\x18.app.v1.StartBotResponse\x12C\n" +
+	"\n" +
+	"GetBotInfo\x12\x19.app.v1.GetBotInfoRequest\x1a\x1a.app.v1.GetBotInfoResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_bots_proto_rawDescOnce sync.Once
@@ -665,7 +800,7 @@ func file_app_v1_bots_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_bots_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_app_v1_bots_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_app_v1_bots_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_app_v1_bots_proto_goTypes = []any{
 	(InlineResultKind)(0),       // 0: app.v1.InlineResultKind
 	(*InlineResult)(nil),        // 1: app.v1.InlineResult
@@ -675,33 +810,40 @@ var file_app_v1_bots_proto_goTypes = []any{
 	(*OpenMiniAppResponse)(nil), // 5: app.v1.OpenMiniAppResponse
 	(*StartBotRequest)(nil),     // 6: app.v1.StartBotRequest
 	(*StartBotResponse)(nil),    // 7: app.v1.StartBotResponse
-	nil,                         // 8: app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	(*MediaRef)(nil),            // 9: app.v1.MediaRef
-	(*Chat)(nil),                // 10: app.v1.Chat
-	(*Message)(nil),             // 11: app.v1.Message
-	(*User)(nil),                // 12: app.v1.User
-	(*SyncAck)(nil),             // 13: app.v1.SyncAck
+	(*GetBotInfoRequest)(nil),   // 8: app.v1.GetBotInfoRequest
+	(*GetBotInfoResponse)(nil),  // 9: app.v1.GetBotInfoResponse
+	nil,                         // 10: app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	(*MediaRef)(nil),            // 11: app.v1.MediaRef
+	(*Chat)(nil),                // 12: app.v1.Chat
+	(*Message)(nil),             // 13: app.v1.Message
+	(*User)(nil),                // 14: app.v1.User
+	(*SyncAck)(nil),             // 15: app.v1.SyncAck
+	(*BotCommand)(nil),          // 16: app.v1.BotCommand
 }
 var file_app_v1_bots_proto_depIdxs = []int32{
 	0,  // 0: app.v1.InlineResult.kind:type_name -> app.v1.InlineResultKind
-	9,  // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
+	11, // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
 	1,  // 2: app.v1.InlineQueryResponse.results:type_name -> app.v1.InlineResult
-	8,  // 3: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	10, // 4: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
-	11, // 5: app.v1.StartBotResponse.message:type_name -> app.v1.Message
-	12, // 6: app.v1.StartBotResponse.users:type_name -> app.v1.User
-	13, // 7: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
-	2,  // 8: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
-	4,  // 9: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
-	6,  // 10: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
-	3,  // 11: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
-	5,  // 12: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
-	7,  // 13: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	10, // 3: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	12, // 4: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
+	13, // 5: app.v1.StartBotResponse.message:type_name -> app.v1.Message
+	14, // 6: app.v1.StartBotResponse.users:type_name -> app.v1.User
+	15, // 7: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
+	14, // 8: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
+	16, // 9: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
+	2,  // 10: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
+	4,  // 11: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
+	6,  // 12: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
+	8,  // 13: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
+	3,  // 14: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
+	5,  // 15: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
+	7,  // 16: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
+	9,  // 17: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
+	14, // [14:18] is the sub-list for method output_type
+	10, // [10:14] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_bots_proto_init() }
@@ -709,6 +851,7 @@ func file_app_v1_bots_proto_init() {
 	if File_app_v1_bots_proto != nil {
 		return
 	}
+	file_app_v1_bot_admin_proto_init()
 	file_app_v1_chats_proto_init()
 	file_app_v1_media_proto_init()
 	file_app_v1_messages_proto_init()
@@ -719,7 +862,7 @@ func file_app_v1_bots_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_bots_proto_rawDesc), len(file_app_v1_bots_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

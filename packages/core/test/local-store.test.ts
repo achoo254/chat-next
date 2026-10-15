@@ -74,10 +74,16 @@ describe("migrations", () => {
 		for (const migration of MIGRATIONS.filter((m) => m.version <= 7)) {
 			await driver.batch([...migration.statements.map((statement) => ({ sql: statement })), { sql: `PRAGMA user_version = ${migration.version}` }]);
 		}
+		// A row as a version 7 build wrote it: putMessage writes today's columns.
+		await driver.batch([
+			{
+				sql: `INSERT INTO messages (chat_id, seq, topic_id, from_id, date, text, entities, reply_to_seq, edit_date, edit_version,
+					random_id, grouped_id, via_bot_id, reactions, integration_label, search_text)
+				VALUES (1, 1, 0, 7, 1000, ?, '[]', 0, 0, 0, 0, 0, 0, '[]', '', ?)`,
+				params: ["Lịch trực tuần này", searchText("Lịch trực tuần này")],
+			},
+		]);
 		const repo = new Repository(driver, new EventBus((cb) => cb()));
-		const w = new WriteBatch();
-		putMessage(w, message(1, 1, "Lịch trực tuần này"));
-		await repo.commit(w);
 		expect(await migrate(driver)).toBe("ready");
 		expect((await searchLocal(repo, "uần")).map((m) => m.seq)).toEqual([1]);
 	});

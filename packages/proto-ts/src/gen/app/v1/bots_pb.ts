@@ -4,6 +4,8 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { BotCommand } from "./bot_admin_pb.ts";
+import { file_app_v1_bot_admin } from "./bot_admin_pb.ts";
 import type { Chat } from "./chats_pb.ts";
 import { file_app_v1_chats } from "./chats_pb.ts";
 import type { MediaRef } from "./media_pb.ts";
@@ -18,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bots.proto.
  */
 export const file_app_v1_bots: GenFile = /*@__PURE__*/
-  fileDesc("ChFhcHAvdjEvYm90cy5wcm90bxIGYXBwLnYxIp4BCgxJbmxpbmVSZXN1bHQSCgoCaWQYASABKAkSJgoEa2luZBgCIAEoDjIYLmFwcC52MS5JbmxpbmVSZXN1bHRLaW5kEg0KBXRpdGxlGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEh8KBW1lZGlhGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhUKDXRodW1ibmFpbF91cmwYBiABKAkiXAoSSW5saW5lUXVlcnlSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoHY2hhdF9pZBgCIAEoA0ICMAISDQoFcXVlcnkYAyABKAkSDgoGb2Zmc2V0GAQgASgJIpABChNJbmxpbmVRdWVyeVJlc3BvbnNlEhAKCHF1ZXJ5X2lkGAEgASgJEiUKB3Jlc3VsdHMYAiADKAsyFC5hcHAudjEuSW5saW5lUmVzdWx0EhMKC25leHRfb2Zmc2V0GAMgASgJEg8KB2dhbGxlcnkYBCABKAgSGgoSY2FjaGVfdGltZV9zZWNvbmRzGAUgASgFIucBChJPcGVuTWluaUFwcFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgdjaGF0X2lkGAIgASgDQgIwAhIPCgNzZXEYAyABKANCAjACEgsKA3VybBgEIAEoCRITCgtzdGFydF9wYXJhbRgFIAEoCRJBCgx0aGVtZV9wYXJhbXMYBiADKAsyKy5hcHAudjEuT3Blbk1pbmlBcHBSZXF1ZXN0LlRoZW1lUGFyYW1zRW50cnkaMgoQVGhlbWVQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjUKE09wZW5NaW5pQXBwUmVzcG9uc2USCwoDdXJsGAEgASgJEhEKCWluaXRfZGF0YRgCIAEoCSJRCg9TdGFydEJvdFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgtzdGFydF9wYXJhbRgCIAEoCRIVCglyYW5kb21faWQYAyABKANCAjACIosBChBTdGFydEJvdFJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIgCgdtZXNzYWdlGAIgASgLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAyADKAsyDC5hcHAudjEuVXNlchIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjayrvAQoQSW5saW5lUmVzdWx0S2luZBIiCh5JTkxJTkVfUkVTVUxUX0tJTkRfVU5TUEVDSUZJRUQQABIeChpJTkxJTkVfUkVTVUxUX0tJTkRfQVJUSUNMRRABEhwKGElOTElORV9SRVNVTFRfS0lORF9QSE9UTxACEhwKGElOTElORV9SRVNVTFRfS0lORF9WSURFTxADEhwKGElOTElORV9SRVNVTFRfS0lORF9BVURJTxAEEhwKGElOTElORV9SRVNVTFRfS0lORF9WT0lDRRAFEh8KG0lOTElORV9SRVNVTFRfS0lORF9ET0NVTUVOVBAGMtwBCgtCb3RzU2VydmljZRJGCgtJbmxpbmVRdWVyeRIaLmFwcC52MS5JbmxpbmVRdWVyeVJlcXVlc3QaGy5hcHAudjEuSW5saW5lUXVlcnlSZXNwb25zZRJGCgtPcGVuTWluaUFwcBIaLmFwcC52MS5PcGVuTWluaUFwcFJlcXVlc3QaGy5hcHAudjEuT3Blbk1pbmlBcHBSZXNwb25zZRI9CghTdGFydEJvdBIXLmFwcC52MS5TdGFydEJvdFJlcXVlc3QaGC5hcHAudjEuU3RhcnRCb3RSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChFhcHAvdjEvYm90cy5wcm90bxIGYXBwLnYxIp4BCgxJbmxpbmVSZXN1bHQSCgoCaWQYASABKAkSJgoEa2luZBgCIAEoDjIYLmFwcC52MS5JbmxpbmVSZXN1bHRLaW5kEg0KBXRpdGxlGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEh8KBW1lZGlhGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhUKDXRodW1ibmFpbF91cmwYBiABKAkiXAoSSW5saW5lUXVlcnlSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoHY2hhdF9pZBgCIAEoA0ICMAISDQoFcXVlcnkYAyABKAkSDgoGb2Zmc2V0GAQgASgJIpABChNJbmxpbmVRdWVyeVJlc3BvbnNlEhAKCHF1ZXJ5X2lkGAEgASgJEiUKB3Jlc3VsdHMYAiADKAsyFC5hcHAudjEuSW5saW5lUmVzdWx0EhMKC25leHRfb2Zmc2V0GAMgASgJEg8KB2dhbGxlcnkYBCABKAgSGgoSY2FjaGVfdGltZV9zZWNvbmRzGAUgASgFIucBChJPcGVuTWluaUFwcFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgdjaGF0X2lkGAIgASgDQgIwAhIPCgNzZXEYAyABKANCAjACEgsKA3VybBgEIAEoCRITCgtzdGFydF9wYXJhbRgFIAEoCRJBCgx0aGVtZV9wYXJhbXMYBiADKAsyKy5hcHAudjEuT3Blbk1pbmlBcHBSZXF1ZXN0LlRoZW1lUGFyYW1zRW50cnkaMgoQVGhlbWVQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjUKE09wZW5NaW5pQXBwUmVzcG9uc2USCwoDdXJsGAEgASgJEhEKCWluaXRfZGF0YRgCIAEoCSJRCg9TdGFydEJvdFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgtzdGFydF9wYXJhbRgCIAEoCRIVCglyYW5kb21faWQYAyABKANCAjACIosBChBTdGFydEJvdFJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIgCgdtZXNzYWdlGAIgASgLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAyADKAsyDC5hcHAudjEuVXNlchIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjayI8ChFHZXRCb3RJbmZvUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACInoKEkdldEJvdEluZm9SZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXISEwoLZGVzY3JpcHRpb24YAiABKAkSDQoFYWJvdXQYAyABKAkSJAoIY29tbWFuZHMYBCADKAsyEi5hcHAudjEuQm90Q29tbWFuZCrvAQoQSW5saW5lUmVzdWx0S2luZBIiCh5JTkxJTkVfUkVTVUxUX0tJTkRfVU5TUEVDSUZJRUQQABIeChpJTkxJTkVfUkVTVUxUX0tJTkRfQVJUSUNMRRABEhwKGElOTElORV9SRVNVTFRfS0lORF9QSE9UTxACEhwKGElOTElORV9SRVNVTFRfS0lORF9WSURFTxADEhwKGElOTElORV9SRVNVTFRfS0lORF9BVURJTxAEEhwKGElOTElORV9SRVNVTFRfS0lORF9WT0lDRRAFEh8KG0lOTElORV9SRVNVTFRfS0lORF9ET0NVTUVOVBAGMqECCgtCb3RzU2VydmljZRJGCgtJbmxpbmVRdWVyeRIaLmFwcC52MS5JbmxpbmVRdWVyeVJlcXVlc3QaGy5hcHAudjEuSW5saW5lUXVlcnlSZXNwb25zZRJGCgtPcGVuTWluaUFwcBIaLmFwcC52MS5PcGVuTWluaUFwcFJlcXVlc3QaGy5hcHAudjEuT3Blbk1pbmlBcHBSZXNwb25zZRI9CghTdGFydEJvdBIXLmFwcC52MS5TdGFydEJvdFJlcXVlc3QaGC5hcHAudjEuU3RhcnRCb3RSZXNwb25zZRJDCgpHZXRCb3RJbmZvEhkuYXBwLnYxLkdldEJvdEluZm9SZXF1ZXN0GhouYXBwLnYxLkdldEJvdEluZm9SZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_bot_admin, file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.InlineResult
@@ -234,7 +236,8 @@ export type StartBotRequest = Message<"app.v1.StartBotRequest"> & {
   botId: bigint;
 
   /**
-   * Deep-link start parameter; may be empty.
+   * Deep-link start parameter; may be empty. Up to 64 characters of
+   * A-Z, a-z, 0-9, _ and -. The bot receives "/start <param>" (or "/start").
    *
    * @generated from field: string start_param = 2;
    */
@@ -286,6 +289,66 @@ export type StartBotResponse = Message<"app.v1.StartBotResponse"> & {
  */
 export const StartBotResponseSchema: GenMessage<StartBotResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_bots, 6);
+
+/**
+ * @generated from message app.v1.GetBotInfoRequest
+ */
+export type GetBotInfoRequest = Message<"app.v1.GetBotInfoRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * Chat the menu is for: 0 (or the private chat with the bot) for the
+   * private scope, a group for the group scopes.
+   *
+   * @generated from field: int64 chat_id = 2 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+};
+
+/**
+ * Describes the message app.v1.GetBotInfoRequest.
+ * Use `create(GetBotInfoRequestSchema)` to create a new message.
+ */
+export const GetBotInfoRequestSchema: GenMessage<GetBotInfoRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 7);
+
+/**
+ * @generated from message app.v1.GetBotInfoResponse
+ */
+export type GetBotInfoResponse = Message<"app.v1.GetBotInfoResponse"> & {
+  /**
+   * @generated from field: app.v1.User user = 1;
+   */
+  user?: User | undefined;
+
+  /**
+   * @generated from field: string description = 2;
+   */
+  description: string;
+
+  /**
+   * @generated from field: string about = 3;
+   */
+  about: string;
+
+  /**
+   * The command menu for the caller in chat_id: the most specific list set
+   * (GROUP_ADMIN for admins, GROUP or PRIVATE, then DEFAULT).
+   *
+   * @generated from field: repeated app.v1.BotCommand commands = 4;
+   */
+  commands: BotCommand[];
+};
+
+/**
+ * Describes the message app.v1.GetBotInfoResponse.
+ * Use `create(GetBotInfoResponseSchema)` to create a new message.
+ */
+export const GetBotInfoResponseSchema: GenMessage<GetBotInfoResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 8);
 
 /**
  * @generated from enum app.v1.InlineResultKind
@@ -362,6 +425,9 @@ export const BotsService: GenService<{
   /**
    * Records the user's consent, opens the private chat with the bot and
    * sends the start message (after the client confirmed a deep link).
+   * Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
+   * the client resolves the username with UsersService.ResolveUsername
+   * (User.is_bot must be set), shows GetBotInfo and asks before starting.
    *
    * @generated from rpc app.v1.BotsService.StartBot
    */
@@ -369,6 +435,17 @@ export const BotsService: GenService<{
     methodKind: "unary";
     input: typeof StartBotRequestSchema;
     output: typeof StartBotResponseSchema;
+  },
+  /**
+   * Public profile of a bot: description, about and the command menu for
+   * a chat.
+   *
+   * @generated from rpc app.v1.BotsService.GetBotInfo
+   */
+  getBotInfo: {
+    methodKind: "unary";
+    input: typeof GetBotInfoRequestSchema;
+    output: typeof GetBotInfoResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_bots, 0);

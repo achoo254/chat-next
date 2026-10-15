@@ -33,6 +33,9 @@ const (
 	kindChatDeleted       = "chat_deleted"
 	kindDialogUnreadMark  = "dialog_unread_mark"
 	kindNotifySettings    = "notification_settings"
+	// kindInlineButton: a user pressed a bot's callback button; the row
+	// carries no log entries, the press is in bot_callbacks.
+	kindInlineButton = "inline_button"
 )
 
 // userEntry is one update in a user's log.
@@ -94,6 +97,9 @@ type txn struct {
 	beforeWrite []func(ctx context.Context) error
 	// chatPts is the newest chat_pts written per chat in this transaction.
 	chatPts map[int64]int64
+	// afterOutbox runs once the outbox rows are written (Event.OutboxID
+	// is set), still inside the transaction.
+	afterOutbox []func(ctx context.Context) error
 }
 
 // event starts the outbox row of a mutation; entries queued afterwards
@@ -270,6 +276,11 @@ func (t *txn) flush(ctx context.Context) error {
 			if err := t.tx.QueryRow(ctx, `SELECT last_seq FROM chats WHERE id = $1`, ev.ChatID).Scan(&ev.TopSeq); err != nil {
 				return fmt.Errorf("chat: read top seq: %w", err)
 			}
+		}
+	}
+	for _, fn := range t.afterOutbox {
+		if err := fn(ctx); err != nil {
+			return err
 		}
 	}
 	return nil

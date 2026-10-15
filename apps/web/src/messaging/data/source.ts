@@ -45,6 +45,8 @@ export interface ChatSource {
 	markRead(chatId: number, maxSeq: number): Promise<void>;
 	/** "Đánh dấu chưa đọc", synced to the user's other sessions (online only). */
 	setDialogUnreadMark(chatId: number, unread: boolean): Promise<void>;
+	/** Hides or shows a bot message's reply keyboard on this device (kept locally). */
+	setKeyboardHidden(chatId: number, seq: number, hidden: boolean): Promise<void>;
 	notificationSettings(): Promise<NotificationSettings>;
 	setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings>;
 	/** Pinned messages of a chat or forum topic, newest first (online only). */

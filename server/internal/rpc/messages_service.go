@@ -2,20 +2,21 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
+	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
 	"connectrpc.com/connect"
 )
 
-// messagesService implements MessagesService on the chat core. Inline
-// buttons wait for the bot phase and stay Unimplemented.
+// messagesService implements MessagesService on the chat core; inline
+// button presses wait for the bot's answer through botupdates.
 type messagesService struct {
 	appv1connect.UnimplementedMessagesServiceHandler
 	chat   *chat.Service
+	bots   *botupdates.Service
 	logger *slog.Logger
 }
 
@@ -107,8 +108,24 @@ func (s *messagesService) GetHistory(ctx context.Context, req *connect.Request[a
 	})
 }
 
-func (s *messagesService) PressInlineButton(context.Context, *connect.Request[appv1.PressInlineButtonRequest]) (*connect.Response[appv1.PressInlineButtonResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("bots are not available yet"))
+// PressInlineButton hands the press to the bot and waits up to
+// botupdates.AnswerTimeout for its answer; without one it answers
+// timed_out (the press still reached the bot).
+func (s *messagesService) PressInlineButton(ctx context.Context, req *connect.Request[appv1.PressInlineButtonRequest]) (*connect.Response[appv1.PressInlineButtonResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.PressInlineButtonRequest) (*appv1.PressInlineButtonResponse, error) {
+		press, err := s.chat.PressInlineButton(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		a, answered, err := s.bots.AwaitAnswer(ctx, press.CallbackID, botupdates.AnswerTimeout)
+		if err != nil {
+			return nil, err
+		}
+		if !answered {
+			return &appv1.PressInlineButtonResponse{TimedOut: true}, nil
+		}
+		return &appv1.PressInlineButtonResponse{Text: a.Text, ShowAlert: a.ShowAlert, Url: a.URL}, nil
+	})
 }
 
 func (s *messagesService) GetLinkPreview(ctx context.Context, req *connect.Request[appv1.GetLinkPreviewRequest]) (*connect.Response[appv1.GetLinkPreviewResponse], error) {

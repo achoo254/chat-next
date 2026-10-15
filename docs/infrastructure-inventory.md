@@ -45,14 +45,14 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 
 | App | Lệnh | Ghi chú |
 |---|---|---|
-| `chat-api` | `/opt/chat/current/server -role api -env-file /opt/chat/.env` | Một instance, uid `chat`, nghe `127.0.0.1:4600`; gồm cả gateway WebSocket, webhook, media, worker media và dọn rác; `kill_timeout` 70 s, restart khi vượt 700 MB, `GOMEMLIMIT=450MiB` |
+| `chat-api` | `/opt/chat/current/server -role api -env-file /opt/chat/.env` | Một instance, uid `chat`, nghe `127.0.0.1:4600`; gồm cả gateway WebSocket, webhook, Bot API (`/bot/v1/`, consumer outbox `bots`), media, worker media và dọn rác; `kill_timeout` 70 s, restart khi vượt 700 MB, `GOMEMLIMIT=450MiB` |
 
 ### nginx (`/etc/nginx/conf.d/`)
 
 | File | Vai trò |
 |---|---|
 | `chat-http.conf` | Cấp `http`: log format không ghi query, zone rate limit `chat_auth`, `chat_rpc` (cài một lần bằng `setup-server.sh`) |
-| `chat.hoandat.com.conf` | Web tĩnh, `/rpc/`, `/auth/`, `/ws`, `/hook/` (log che secret), `/healthz`; zone `chat_ws`, `chat_hook` khai báo trong file này |
+| `chat.hoandat.com.conf` | Web tĩnh, `/rpc/`, `/auth/`, `/ws`, `/hook/` (log che secret), `/bot/` (Bot API, R5: không cookie, body 1 MiB, đọc 65 s cho long poll, zone `chat_bot` 600 r/s mỗi IP burst 1200 trên tầng cao nhất của bot, vượt thì `429` JSON; method do app kiểm, `405` JSON), `/healthz`; zone `chat_ws`, `chat_hook`, `chat_bot` khai báo trong file này |
 | `media-chat.hoandat.com.conf` | Host media, proxy tới app (app stream file, Range) |
 | `*.prev` | Bản trước, do `activate-release.sh` giữ để tự trả lại khi `nginx -t` lỗi |
 

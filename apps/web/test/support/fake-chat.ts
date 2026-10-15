@@ -29,6 +29,7 @@ import { FakeServer } from "../../../../packages/core/test/support/fake-server.t
 import { FakeMedia, MemoryBlobs } from "../../../../packages/core/test/support/fake-media.ts";
 import { MediaKind, MediaRefSchema, MediaSizeType, type MediaRef as WireMediaRef } from "@app/proto-ts/media";
 import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
+import { FakeBots } from "./fake-bots.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
@@ -39,7 +40,7 @@ type MessageExtras = Pick<
 	MessageInit,
 	"entities" | "replyToSeq" | "forwardFrom" | "editDate" | "editVersion" | "action" | "integrationLabel" | "topicId" | "linkPreview" | "replyMarkup"
 >;
-type UserExtras = { isBot?: boolean; username?: string; bio?: string };
+type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string };
 type ChatExtras = {
 	myRole?: MemberRole;
 	myPermissions?: number;
@@ -221,6 +222,8 @@ export class ChatFixture {
 	private pinnedChats: number[] = [];
 	/** Incoming webhooks of the fixture's chats (IntegrationsService). */
 	readonly integrations: FakeIntegrations;
+	/** The signed-in user's bots and starting bots (BotAdminService, BotsService). */
+	readonly bots: FakeBots;
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
@@ -238,6 +241,21 @@ export class ChatFixture {
 			hookStopped: (chatId, actorId, hookName, reason) => {
 				if (this.chatTypes.get(chatId) !== ChatType.GROUP) return;
 				this.server.postService(chatId, actorId, { kind: { case: "incomingHookStopped", value: { hookName, reason } } });
+			},
+		});
+		this.bots = new FakeBots({
+			selfId: this.selfId,
+			addBotUser: (name, username) => this.addUser(name, { username, isBot: true }),
+			rename: (userId, name) => {
+				this.names.set(userId, name);
+				this.userExtras.set(userId, { ...this.userExtras.get(userId), name });
+			},
+			usernameTaken: (username) => [...this.names.keys()].some((id) => this.wireUser(id).username === username),
+			wireUser: (id) => this.wireUser(id),
+			privateChat: (userId) => this.privateChatWith(userId),
+			wireChat: (chatId) => this.server.wireChat(chatId, this.selfId),
+			sendAsSelf: (chatId, text) => {
+				this.send(this.selfId, chatId, text);
 			},
 		});
 	}
@@ -614,6 +632,15 @@ export class ChatFixture {
 		this.userRoutes(router);
 		this.chatRoutes(router);
 		this.integrations.routes(router);
+		this.bots.routes(router);
+	}
+
+	/** The private chat of the signed-in user with `userId`, created when missing. */
+	privateChatWith(userId: number): number {
+		const existing = [...this.members.entries()].find(
+			([id, list]) => this.server.wireChat(id, this.selfId).type === ChatType.PRIVATE && list.includes(userId) && list.includes(this.selfId),
+		);
+		return existing?.[0] ?? this.createChat(ChatType.PRIVATE, "", [this.selfId, userId]);
 	}
 
 	/** UsersService only: tests of the account screens bring their own. */
@@ -622,6 +649,12 @@ export class ChatFixture {
 		router.service(UsersService, {
 			getSelf: () => ({ user: self(), isOperator: this.operator }),
 			getUsers: (req) => ({ users: req.userIds.map((id) => this.wireUser(num(id))) }),
+			resolveUsername: (req) => {
+				const name = req.username.replace(/^@/, "").toLowerCase();
+				const id = [...this.names.keys()].find((userId) => this.wireUser(userId).username === name);
+				if (id === undefined) throw new ConnectError("user not found", Code.NotFound);
+				return { user: this.wireUser(id) };
+			},
 			searchUsers: (req) => {
 				const q = req.query.toLowerCase();
 				const ids = [...this.names.keys()].filter((id) => id !== this.selfId);
@@ -731,6 +764,10 @@ export class ChatFixture {
 				if (topic !== undefined) topic.unreadCount = 0;
 				this.server.readHistory(this.selfId, chatId, num(req.maxSeq));
 				return {};
+			},
+			pressInlineButton: async (req) => {
+				const answer = await this.bots.press(num(req.chatId), num(req.seq), new TextDecoder().decode(req.callbackData));
+				return { text: answer.text ?? "", showAlert: answer.showAlert ?? false, url: answer.url ?? "", timedOut: answer.timedOut ?? false };
 			},
 			getLinkPreview: (req) => {
 				const preview = this.previews.find((p) => p.url === req.url);
@@ -899,6 +936,12 @@ export class ChatFixture {
 			deleteChat: (req) => {
 				const chatId = num(req.chatId);
 				this.deletedChats.push(chatId);
+				// "Cloud của tôi" is cleared, not deleted: the server keeps the chat and its pin.
+				const members = this.members.get(chatId) ?? [];
+				if (members.length === 1 && members[0] === this.selfId) {
+					this.server.clearSavedChat(this.selfId, chatId);
+					return {};
+				}
 				this.server.deleteChat(chatId);
 				this.members.delete(chatId);
 				return {};
@@ -1105,6 +1148,7 @@ export function toSource(core: ChatCore): ChatSource {
 		deleteMessages: (chatId, seqs, forEveryone) => core.deleteMessages(chatId, seqs, forEveryone),
 		markRead: (chatId, maxSeq) => core.markRead(chatId, maxSeq),
 		setDialogUnreadMark: (chatId, unread) => core.setDialogUnreadMark(chatId, unread),
+		setKeyboardHidden: (chatId, seq, hidden) => core.setKeyboardHidden(chatId, seq, hidden),
 		notificationSettings: () => core.notificationSettings(),
 		setNotificationSettings: (change) => core.setNotificationSettings(change),
 		pinnedMessages: (chatId, request) => core.pinnedMessages(chatId, request),

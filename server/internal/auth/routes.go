@@ -68,7 +68,9 @@ func (h *Routes) Register(mux *http.ServeMux) {
 }
 
 // handleLogin starts Code + PKCE: ?locale= becomes ui_locales,
-// ?prompt=create opens the IdP sign-up page, and ?return_to= (a same-origin
+// ?prompt=create opens the IdP sign-up page, ?reauth=1 makes the IdP ask
+// for the credentials again (prompt=login, max_age; the new session then
+// has a recent auth_time for ADR 0006 sensitive actions), and ?return_to= (a same-origin
 // path, CleanReturnTo; anything else is ignored) is where the callback sends
 // the browser after sign-in.
 func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +86,7 @@ func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	target, err := h.cfg.IdP.AuthCodeURL(AuthRequest{
 		State: st.State, Nonce: st.Nonce, Verifier: st.Verifier,
-		Locale: locale, Create: q.Get("prompt") == "create",
+		Locale: locale, Create: q.Get("prompt") == "create", Reauth: q.Get("reauth") == "1",
 	})
 	if err != nil {
 		h.cfg.Logger.Warn("sign-in unavailable", "err", err)
@@ -154,7 +156,7 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	token, sessionID, err := h.cfg.Sessions.Create(ctx, NewSessionData{
 		UserID: user.ID, IdPSID: c.SessionID, RefreshToken: tokens.RefreshToken, IDToken: tokens.IDToken,
-		UserAgent: r.UserAgent(), IP: ClientIP(r.RemoteAddr, r.Header),
+		UserAgent: r.UserAgent(), IP: ClientIP(r.RemoteAddr, r.Header), AuthTime: c.AuthTime,
 	})
 	if err != nil {
 		fail(http.StatusInternalServerError, msgSignInFailed, "create session", err)

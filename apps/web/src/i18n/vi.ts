@@ -31,6 +31,7 @@ export const vi = {
 		appearance: "Giao diện",
 		shortcuts: "Phím tắt",
 		moderation: "Kiểm duyệt",
+		console: "Developer Console",
 		signOut: "Đăng xuất",
 	},
 	profile: {

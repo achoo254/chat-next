@@ -42,7 +42,9 @@ export type DialogRequest =
 	| { readonly kind: "members"; readonly chatId: number }
 	/** `back`: return to the member list when done. */
 	| { readonly kind: "removeMember"; readonly chatId: number; readonly userId: number; readonly back: boolean }
-	| { readonly kind: "addContact" };
+	| { readonly kind: "addContact" }
+	/** A bot's answer to a callback button that asked for a dialog (show_alert). */
+	| { readonly kind: "botAlert"; readonly botId: number; readonly text: string };
 
 export type ComposerIntent =
 	| { readonly mode: "reply"; readonly seq: number }

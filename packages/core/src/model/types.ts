@@ -59,14 +59,41 @@ export interface ForumTopic {
 
 /** Text-only preview of the first web link of a message. */
 /**
- * A button under a message (inline keyboard). Incoming webhooks post URL
- * buttons; url is null for kinds this client does not handle yet (bot
- * callbacks, Mini Apps, inline queries).
+ * A button under a message (inline keyboard). Incoming webhooks and bots post
+ * URL buttons; bots also post callback buttons, whose data goes back to the
+ * bot through PressInlineButton. url is null and callbackData absent for
+ * kinds this client does not handle yet (Mini Apps, inline queries).
  */
 export interface MessageButton {
 	readonly text: string;
 	readonly url: string | null;
+	/** Bot callback button: its callback_data as standard base64 (1 to 64 bytes). */
+	readonly callbackData?: string;
 }
+
+/**
+ * The reply keyboard a bot message sets for the chat (Telegram's reply
+ * markup): rows of button texts that replace the composer's keyboard, or the
+ * request to remove the one shown. Tapping a button sends its text as the
+ * user's own message.
+ */
+export type ReplyKeyboard =
+	| {
+			readonly kind: "keyboard";
+			readonly rows: readonly (readonly string[])[];
+			/** Hide the keyboard after one tap. */
+			readonly oneTime: boolean;
+			/** Placeholder for the composer while the keyboard shows; "" for the default. */
+			readonly placeholder: string;
+			/**
+			 * Hidden on this device (a one-time keyboard after its tap, or the
+			 * user's toggle); kept locally, never from the server.
+			 */
+			readonly hidden: boolean;
+			/** Only for users mentioned in the text or the replied-to message's author. */
+			readonly selective: boolean;
+	  }
+	| { readonly kind: "remove"; readonly selective: boolean };
 
 export interface LinkPreview {
 	readonly url: string;
@@ -289,6 +316,8 @@ export interface Message {
 	readonly integrationLabel: string;
 	/** Rows of inline buttons; empty when none. */
 	readonly buttons: readonly (readonly MessageButton[])[];
+	/** Bot messages: the reply keyboard they set or remove; absent otherwise. */
+	readonly keyboard?: ReplyKeyboard;
 	readonly action: MessageAction | null;
 	/** Forum groups: the message's topic; 0 elsewhere. */
 	readonly topicId: number;

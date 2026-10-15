@@ -1,0 +1,90 @@
+/* Developer Console (mockups/console.html). Loaded with the console only;
+   every rule is scoped to .console. Colours come only from tokens. */
+
+.console { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; background: var(--c-bg); }
+.console .c-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-4); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.console .crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-1); font-size: 0.875rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console .crumbs > span, .console .crumbs > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.console .crumbs b { color: var(--c-text); font-weight: 600; }
+.console .crumbs .icon { flex: none; }
+.console .who-chip { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; }
+.console .c-bot { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5) 0; background: var(--c-surface); }
+.console .c-bot > div { min-width: 0; }
+.console .c-bot h1 { margin: 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.console .c-bot small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.console .c-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: 0 var(--space-5); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.console .c-tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-2); white-space: nowrap; text-decoration: none; font-weight: 500; font-size: 0.875rem; color: var(--c-text-muted); border-bottom: 2px solid transparent; }
+.console .c-tabs a:hover { color: var(--c-text); }
+.console .c-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+.console .c-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-content: start; width: 100%; max-width: 1200px; padding: var(--space-5); }
+.console .c-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.console .c-title h1 { flex: 1 1 12ch; min-width: 0; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.console .c-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.console .card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+.console .card.table-card { padding: 0; overflow: hidden; }
+.console .card h2 { margin: 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.console .card > p { margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.console .card ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); font-size: 0.875rem; overflow-wrap: anywhere; }
+.console .card-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); padding-top: var(--space-2); }
+.console .form { gap: var(--space-4); }
+.console .banner { align-items: flex-start; border: 1px solid var(--c-border-subtle); }
+.console .banner .icon { flex: none; margin-top: 2px; }
+.console .hint-ok { font-size: 0.8125rem; color: var(--c-success-text); }
+.console .hint-ok:empty, .console .error-text:empty { display: none; }
+.console .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+.console .mono { font-family: var(--font-mono); }
+.console .muted { color: var(--c-text-muted); }
+.console a.btn { text-decoration: none; }
+.console a.btn:not(.btn-primary) { color: var(--c-text); }
+.console .setting { display: flex; align-items: flex-start; gap: var(--space-3); }
+.console .setting > div { flex: 1; min-width: 0; }
+.console .setting strong { display: block; font-weight: 500; font-size: 0.875rem; }
+.console .setting small { display: block; font-size: 0.8125rem; color: var(--c-text-muted); }
+.console .empty { display: grid; justify-items: center; gap: var(--space-2); text-align: center; }
+.console .empty .icon { width: 32px; height: 32px; color: var(--c-icon-muted); }
+.console .status { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--c-text-muted); }
+
+/* Bot list */
+.console table.data { min-width: 0; }
+.console .table-card table.data th, .console .table-card table.data td { padding-left: var(--space-4); padding-right: var(--space-4); }
+.console .bot-cell { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; text-align: left; }
+.console .bot-cell > span:last-child { display: grid; min-width: 0; }
+.console .bot-cell strong { font-weight: 600; overflow-wrap: anywhere; }
+.console .cell-sub { display: block; font-size: 0.8125rem; color: var(--c-text-muted); font-weight: 400; overflow-wrap: anywhere; }
+.console .actions-cell { text-align: right; white-space: nowrap; }
+
+/* Token */
+.console .secret { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface-subtle); }
+.console .secret code { flex: 1 1 16ch; min-width: 0; font-family: var(--font-mono); font-size: 0.875rem; overflow-wrap: anywhere; }
+.console .snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Commands */
+.console .scope-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--c-border-subtle); }
+.console .scope-tabs button { border: 0; background: none; min-height: 44px; padding: 0 var(--space-3); font: inherit; font-weight: 500; color: var(--c-text-muted); border-bottom: 2px solid transparent; }
+.console .scope-tabs button[aria-selected="true"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+.console .cmd-rows { display: grid; gap: var(--space-2); }
+.console .cmd-row { display: grid; grid-template-columns: 240px minmax(0, 1fr) 44px; gap: var(--space-2); align-items: start; }
+.console .cmd-row .field { gap: 2px; }
+.console .preview-menu { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.console .preview-menu div { display: grid; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.console .preview-menu div:last-child { border-bottom: 0; }
+.console .preview-menu b { font-family: var(--font-mono); font-size: 0.875rem; font-weight: 500; overflow-wrap: anywhere; }
+.console .preview-menu span { font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) {
+	.console .c-grid { grid-template-columns: minmax(0, 1fr); }
+	.console .actions-cell { text-align: left; }
+}
+@media (max-width: 760px) {
+	.console .who-chip { display: none; }
+	.console .c-body { padding: var(--space-3); }
+	.console .c-bot, .console .c-tabs { padding-left: var(--space-3); padding-right: var(--space-3); }
+	.console .card { padding: var(--space-3); }
+	.console .cmd-row { grid-template-columns: minmax(0, 1fr) 44px; padding-bottom: var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
+	.console .cmd-row > .field:nth-child(2) { grid-column: 1; }
+	.console .cmd-row > .icon-btn { grid-row: 1; grid-column: 2; }
+	.console .card-foot .btn { flex: 1 1 auto; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.console .btn-sm, .console .scope-tabs button { min-height: 44px; }
+}

@@ -24,7 +24,7 @@ import { UploadQueue, type UploadProgress } from "../media/upload-queue.ts";
 import { classifyFailure, isChatRefusal, SessionEndedError, type FailureKind, type RemoteApi } from "../protocol/api.ts";
 import { toUser } from "../protocol/map.ts";
 import { migrate } from "../repo/migrations.ts";
-import { putUser } from "../repo/writes.ts";
+import { putKeyboardHidden, putUser, WriteBatch } from "../repo/writes.ts";
 import { Repository, type DialogView, type StoredMessage } from "../repo/repository.ts";
 import { searchLocal, type SearchOptions } from "../search/index.ts";
 import { fetchServerSearch, type ServerSearchRequest } from "../search/server.ts";
@@ -104,6 +104,8 @@ export interface ChatCore {
 	markRead(chatId: number, maxSeq: number): Promise<void>;
 	/** Marks a chat as unread, or clears the mark, on every session (online only). */
 	setDialogUnreadMark(chatId: number, unread: boolean): Promise<void>;
+	/** Hides or shows a bot message's reply keyboard on this device (kept locally). */
+	setKeyboardHidden(chatId: number, seq: number, hidden: boolean): Promise<void>;
 	/** The user's notification settings, synced from the server. */
 	notificationSettings(): Promise<NotificationSettings>;
 	/** Changes some notification settings (online only); returns all of them. */
@@ -545,6 +547,12 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		setDialogUnreadMark: async (chatId, unread) => {
 			active();
 			await actions.setDialogUnreadMark(assertSafeId(chatId), unread);
+		},
+		setKeyboardHidden: async (chatId, seq, hidden) => {
+			active();
+			const w = new WriteBatch();
+			putKeyboardHidden(w, assertSafeId(chatId), assertSafeId(seq), hidden);
+			await repo.commit(w);
 		},
 		notificationSettings: async () => {
 			active();

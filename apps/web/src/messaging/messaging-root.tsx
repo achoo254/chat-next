@@ -18,6 +18,7 @@ import type { PendingBackend } from "./data/pending-backend.ts";
 import { decideNotification, type NotificationInput } from "./data/notification-filter.ts";
 import { createRemote } from "./data/remote.ts";
 import { createIntegrations } from "./integrations/api.ts";
+import { createBots } from "./bots/api.ts";
 import { ServicesContext, Toasts, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen } from "./ui/chat-screen.tsx";
@@ -28,6 +29,7 @@ import { Toast } from "./ui/parts.tsx";
 const Settings = lazy(() => import("../screens/settings/settings.tsx").then((m) => ({ default: m.Settings })));
 const SettingsExtra = lazy(() => import("./settings/settings-extra.tsx"));
 const Moderation = lazy(() => import("./moderation/moderation.tsx"));
+const DeveloperConsole = lazy(() => import("./bots/console.tsx"));
 
 export interface MessagingRootProps {
 	self: SelfUser;
@@ -101,6 +103,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					store,
 					remote,
 					integrations: createIntegrations(transport, () => signedOut()),
+					bots: createBots(transport, () => signedOut()),
 					backend,
 					toasts: new Toasts(),
 					drafts,
@@ -185,6 +188,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		case "chat":
 		case "invite":
 		case "contacts":
+		case "bot":
 			return <ChatScreen self={self} route={route} />;
 		case "settings":
 			return (
@@ -204,6 +208,14 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 								),
 							}}
 						/>
+					</Suspense>
+				</Shell>
+			);
+		case "console":
+			return (
+				<Shell self={self} route={route} nav={<ContactsLink />}>
+					<Suspense fallback={<Loading />}>
+						<DeveloperConsole view={route.view} />
 					</Suspense>
 				</Shell>
 			);

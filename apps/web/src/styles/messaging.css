@@ -143,6 +143,8 @@
 .chat-row .meta .line { display: inline-flex; align-items: center; gap: var(--space-1); }
 .preview .from { color: var(--c-text); font-weight: 500; }
 .preview .draft { color: var(--c-error); font-weight: 500; }
+/* Photo or video as the last message: a small square of its inline thumbnail before the caption. */
+.preview .pv-thumb { display: inline-block; width: 1.125rem; height: 1.125rem; margin-right: var(--space-1); vertical-align: -0.25rem; border-radius: var(--radius-xs); object-fit: cover; }
 .preview.two-line { display: grid; white-space: normal; }
 .preview.two-line > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview .topics-line { color: var(--c-text); }
@@ -282,13 +284,18 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .sev.resolved { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
 .keyboard { display: grid; gap: var(--space-1); margin-top: var(--space-2); clear: both; }
 .kb-row { display: flex; gap: var(--space-1); }
-.kb-row a {
+.kb-row a, .kb-row button {
 	flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); min-height: 36px; padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-primary); font-size: 0.875rem; font-weight: 500; text-align: center; text-decoration: none;
 }
-.kb-row a > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.kb-row a > span:first-child, .kb-row button > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.kb-row button { font-family: inherit; cursor: pointer; }
 .kb-row a .icon { flex: none; }
-.kb-row a:hover { background: var(--c-selected); }
+.kb-row a:hover, .kb-row button:hover { background: var(--c-selected); }
+/* A callback button waiting for the bot: a spinner before its text, the others stay usable. */
+.kb-row button[aria-busy="true"] { color: var(--c-text-muted); cursor: progress; }
+.kb-row button[aria-busy="true"]::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: var(--radius-full); border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite; }
+.who .tag { margin-left: var(--space-1); vertical-align: 1px; }
 .int-label { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); margin-bottom: var(--space-1); }
 .int-label .icon { width: 14px; height: 14px; }
 .bubble.unsupported { display: flex; gap: var(--space-2); align-items: flex-start; border-style: dashed; }
@@ -338,6 +345,9 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 	flex: 1; min-height: 44px; max-height: 160px; resize: none; padding: var(--space-2) var(--space-3);
 	border-radius: var(--radius-md); border: 1px solid var(--c-border); background: var(--c-surface); line-height: 1.45;
 }
+/* The placeholder never wraps: one line, cut with "…" (mockups/bots.html#reply-keyboard). */
+.composer textarea:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .composer textarea:focus { outline: none; border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
 .composer textarea[aria-invalid="true"] { border-color: var(--c-error); }
 .send { width: 44px; height: 44px; flex: none; border-radius: var(--radius-full); border: 0; display: grid; place-items: center; background: var(--c-primary-solid); color: var(--c-on-primary); }
@@ -854,6 +864,10 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.mod-side { display: none; }
 }
 /* Narrow: one column at a time; the filter tabs stand in for the folder rail. */
+/* Narrow screens: a bot keyboard's toggle takes the emoji button's place (emoji stay on the system keyboard). */
+@media (max-width: 760px) {
+	.composer.with-bot-kb .emoji-anchor { display: none; }
+}
 @media (max-width: 760px) {
 	.narrow-only { display: inline-grid; }
 	.n-head.narrow-only { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2); min-height: var(--topbar-h); border-bottom: 1px solid var(--c-border-subtle); }
@@ -890,7 +904,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 /* Touch: every control reaches 44px; the switch keeps its drawn track inside a transparent border. */
 @media (max-width: 760px), (pointer: coarse) {
 	.switch { width: 60px; height: 44px; margin: -10px; border: 10px solid transparent; background-clip: padding-box; }
-	.choice button, .menu button, .react-picker button, .reaction, .chip, .icon-btn, .see-all, .kb-row a { min-height: 44px; }
+	.choice button, .menu button, .react-picker button, .reaction, .chip, .icon-btn, .see-all, .kb-row a, .kb-row button { min-height: 44px; }
 	/* The sender's avatar keeps its drawn size; the padding makes the target 44px. */
 	.avatar-btn { padding: 6px; margin: -6px; }
 	.icon-btn { min-width: 44px; }
@@ -906,6 +920,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 }
 @media (prefers-reduced-motion: reduce) {
 	.sk { animation: none; }
+	.kb-row button[aria-busy="true"]::before { animation: none; }
 	.toast { transition: none; }
 }
 

@@ -306,12 +306,8 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 	if err := s.checkUnrestricted(ctx, q, me); err != nil {
 		return 0, err
 	}
-	blocked, err := peerBlockedMe(ctx, q, c, me)
-	if err != nil {
+	if err := checkPrivatePeer(ctx, q, c, me); err != nil {
 		return 0, err
-	}
-	if blocked {
-		return 0, errDenied("this user does not accept your messages")
 	}
 	if !c.Forum {
 		if topicID != 0 {
@@ -323,7 +319,7 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 		topicID = generalTopicID
 	}
 	var closed bool
-	err = q.QueryRow(ctx, `SELECT closed FROM forum_topics WHERE chat_id = $1 AND id = $2`, c.ID, topicID).Scan(&closed)
+	err := q.QueryRow(ctx, `SELECT closed FROM forum_topics WHERE chat_id = $1 AND id = $2`, c.ID, topicID).Scan(&closed)
 	if isNoRows(err) {
 		return 0, errNotFound("topic")
 	}
@@ -339,6 +335,13 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 // SendMessage posts a text message. A retry with the same random_id returns
 // the first message and its ack instead of posting again.
 func (s *Service) SendMessage(ctx context.Context, me int64, req *appv1.SendMessageRequest) (*appv1.SendMessageResponse, error) {
+	return s.sendMessage(ctx, me, req, "")
+}
+
+// sendMessage is SendMessage; a non-empty consent records, in the posting
+// transaction, me's consent of that source for the bot peer of a private
+// chat (StartBot).
+func (s *Service) sendMessage(ctx context.Context, me int64, req *appv1.SendMessageRequest, consent string) (*appv1.SendMessageResponse, error) {
 	text, ents, err := s.validateText(req.GetText(), req.GetEntities(), false)
 	if err != nil {
 		return nil, err
@@ -349,12 +352,33 @@ func (s *Service) SendMessage(ctx context.Context, me int64, req *appv1.SendMess
 	if err := s.allow(limitSend, "send", me); err != nil {
 		return nil, err
 	}
+	return s.postText(ctx, me, textPost{
+		chatID: req.GetChatId(), topicID: req.GetTopicId(), randomID: req.GetRandomId(), replyTo: req.GetReplyToSeq(),
+		text: text, ents: ents, noPreview: req.GetNoLinkPreview(), consent: consent,
+	})
+}
+
+// textPost is a validated text message to post.
+type textPost struct {
+	chatID, topicID, randomID, replyTo int64
+	text                               string
+	ents                               []*appv1.MessageEntity
+	noPreview                          bool
+	// markup: keyboards of bot messages.
+	markup *appv1.ReplyMarkup
+	// consent: see sendMessage.
+	consent string
+}
+
+// postText posts a validated text message as me; a retry with the same
+// random_id returns the first message and its ack instead of posting again.
+func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.SendMessageResponse, error) {
 	url := ""
-	if !req.GetNoLinkPreview() {
-		url = s.previewURL(text, ents)
+	if !p.noPreview {
+		url = s.previewURL(p.text, p.ents)
 	}
 	preview, fetchLater := s.cachedPreview(ctx, url)
-	chatID := req.GetChatId()
+	chatID := p.chatID
 	var (
 		posted    *messageRow
 		duplicate *sendDedupe
@@ -365,14 +389,19 @@ func (s *Service) SendMessage(ctx context.Context, me int64, req *appv1.SendMess
 		if err != nil {
 			return err
 		}
-		if duplicate, err = t.claimRandomID(ctx, me, req.GetRandomId(), chatID); err != nil || duplicate != nil {
+		if duplicate, err = t.claimRandomID(ctx, me, p.randomID, chatID); err != nil || duplicate != nil {
 			return err
 		}
-		topicID, err := s.postable(ctx, t.tx, c, m, me, req.GetTopicId())
+		if p.consent != "" && c.Type == typePrivate {
+			if err := recordConsent(ctx, t.tx, c.peerOf(me), me, p.consent); err != nil {
+				return err
+			}
+		}
+		topicID, err := s.postable(ctx, t.tx, c, m, me, p.topicID)
 		if err != nil {
 			return err
 		}
-		if err := s.checkReply(ctx, t.tx, chatID, req.GetReplyToSeq()); err != nil {
+		if err := s.checkReply(ctx, t.tx, chatID, p.replyTo); err != nil {
 			return err
 		}
 		members, err := t.fanoutMembers(ctx, c)
@@ -381,13 +410,13 @@ func (s *Service) SendMessage(ctx context.Context, me int64, req *appv1.SendMess
 		}
 		ev := t.event(kindMessageNew, chatID, me)
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
-			fromID: me, topicID: topicID, randomID: req.GetRandomId(), replyTo: req.GetReplyToSeq(), text: text,
-			content: &appv1.Message{Entities: ents, LinkPreview: preview},
+			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
+			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup},
 		})
 		if err != nil {
 			return err
 		}
-		t.recordRandomID(me, req.GetRandomId(), posted.Seq, chatID)
+		t.recordRandomID(me, p.randomID, posted.Seq, chatID)
 		return nil
 	})
 	if err != nil {

@@ -33,6 +33,7 @@ export const en: Messages = {
 		appearance: "Appearance",
 		shortcuts: "Keyboard shortcuts",
 		moderation: "Moderation",
+		console: "Developer Console",
 		signOut: "Sign out",
 	},
 	profile: {

@@ -126,8 +126,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 	w.add(
 		`INSERT INTO messages (chat_id, seq, from_id, date, text, entities, media_kind, reply_to_seq, forward,
 			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, buttons, action,
-			search_text, topic_id, link_preview, recalled, silent, media, stale)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+			search_text, topic_id, link_preview, recalled, silent, media, reply_keyboard, stale)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
 		ON CONFLICT (chat_id, seq) DO UPDATE SET from_id = excluded.from_id, date = excluded.date,
 			text = excluded.text, entities = excluded.entities, media_kind = excluded.media_kind,
 			reply_to_seq = excluded.reply_to_seq, forward = excluded.forward, edit_date = excluded.edit_date,
@@ -136,7 +136,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			grouped_id = excluded.grouped_id, via_bot_id = excluded.via_bot_id, reactions = excluded.reactions,
 			integration_label = excluded.integration_label, buttons = excluded.buttons, action = excluded.action,
 			search_text = excluded.search_text, topic_id = excluded.topic_id, link_preview = excluded.link_preview,
-			recalled = excluded.recalled, silent = excluded.silent, media = excluded.media, stale = 0
+			recalled = excluded.recalled, silent = excluded.silent, media = excluded.media,
+			reply_keyboard = excluded.reply_keyboard, stale = 0
 		WHERE messages.stale = 1 OR (excluded.recalled >= messages.recalled
 			AND (excluded.edit_version >= messages.edit_version OR excluded.recalled > messages.recalled))`,
 		[
@@ -164,6 +165,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			flag(message.recalled),
 			flag(message.silent),
 			message.media === undefined ? null : encodeMediaRef(message.media),
+			message.keyboard === undefined ? null : JSON.stringify(message.keyboard),
 		],
 	);
 	w.emit(EventKeys.history(message.chatId), EventKeys.message(message.chatId, message.seq));
@@ -176,6 +178,15 @@ export function putReactions(w: WriteBatch, chatId: number, seq: number, reactio
 
 /** Read state of the chat as a whole; forum topics get their own topic_id. */
 export const CHAT_TOPIC = 0;
+
+/**
+ * Hides or shows a bot message's reply keyboard on this device. Its own
+ * column, so the server's copy of the message (edits, history) never resets it.
+ */
+export function putKeyboardHidden(w: WriteBatch, chatId: number, seq: number, hidden: boolean): void {
+	w.add("UPDATE messages SET keyboard_hidden = ? WHERE chat_id = ? AND seq = ?", [flag(hidden), chatId, seq]);
+	w.emit(EventKeys.history(chatId), EventKeys.message(chatId, seq));
+}
 
 export function putUnreadMark(w: WriteBatch, chatId: number, unread: boolean): void {
 	w.add("UPDATE dialogs SET unread_mark = ? WHERE chat_id = ?", [flag(unread), chatId]);

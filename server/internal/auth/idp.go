@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -191,7 +192,15 @@ type AuthRequest struct {
 	Verifier string
 	Locale   string // ui_locales; empty to omit
 	Create   bool   // prompt=create opens the IdP sign-up page
+	// Reauth asks the IdP to authenticate the user again (prompt=login,
+	// max_age=ReauthMaxAge), so the ID token's auth_time is recent; ADR 0006
+	// sensitive actions check it.
+	Reauth bool
 }
+
+// ReauthMaxAge is the max_age sent with a reauthentication request, in
+// seconds; it matches the recent sign-in window of sensitive actions.
+const ReauthMaxAge = 600
 
 // AuthCodeURL builds the authorization URL (Code + PKCE S256).
 func (p *IdP) AuthCodeURL(r AuthRequest) (string, error) {
@@ -203,7 +212,11 @@ func (p *IdP) AuthCodeURL(r AuthRequest) (string, error) {
 	if r.Locale != "" {
 		opts = append(opts, oauth2.SetAuthURLParam("ui_locales", r.Locale))
 	}
-	if r.Create {
+	switch {
+	case r.Reauth:
+		opts = append(opts, oauth2.SetAuthURLParam("prompt", "login"),
+			oauth2.SetAuthURLParam("max_age", strconv.Itoa(ReauthMaxAge)))
+	case r.Create:
 		opts = append(opts, oauth2.SetAuthURLParam("prompt", "create"))
 	}
 	return st.oauth.AuthCodeURL(r.State, opts...), nil
@@ -224,6 +237,9 @@ type IDClaims struct {
 	// carried the email claim, or userinfo answered. When false, Email and
 	// EmailVerified say nothing and the stored email must be kept.
 	EmailKnown bool
+	// AuthTime is the ID token's auth_time (when the user last entered
+	// credentials at the IdP); zero when the token has none.
+	AuthTime time.Time
 }
 
 // rawIDClaims are the claims read from an ID token or a userinfo response.
@@ -233,6 +249,7 @@ type rawIDClaims struct {
 	Name              string          `json:"name"`
 	Email             *string         `json:"email"`
 	EmailVerified     json.RawMessage `json:"email_verified"`
+	AuthTime          *float64        `json:"auth_time"`
 }
 
 // profile returns the profile and email claims; email is known when the
@@ -366,6 +383,9 @@ func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDCl
 	}
 	claims := c.profile(idt.Subject)
 	claims.Nonce = idt.Nonce
+	if c.AuthTime != nil && *c.AuthTime > 0 {
+		claims.AuthTime = numericDate(*c.AuthTime)
+	}
 	return claims, nil
 }
 

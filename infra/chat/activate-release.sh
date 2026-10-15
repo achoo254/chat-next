@@ -4,7 +4,7 @@
 # Steps: back up the database, run migrations with the new binary, install the
 # release's nginx conf, switch /opt/chat/current, start or reload pm2
 # `chat-api`, wait for /healthz, the realtime route /ws, the webhook route
-# /hook/ and (when configured) the media host. Any failure after the switch restores the
+# /hook/, the Bot API /bot/ and (when configured) the media host. Any failure after the switch restores the
 # previous release and nginx conf. Migrations are expand-only (backward
 # compatible), so the previous binary keeps working on the migrated schema.
 # Keeps the newest 5 releases.
@@ -60,6 +60,14 @@ hooks() {
 	curl -s -X POST --max-time 2 -H 'Content-Type: application/json' --data '{}' "http://127.0.0.1:4600$probe" | grep -q '"hook_not_found"' || return 1
 	curl -s -X POST --max-time 5 --resolve chat.hoandat.com:443:127.0.0.1 -H 'Content-Type: application/json' --data '{}' \
 		"https://chat.hoandat.com$probe" | grep -q '"hook_not_found"'
+}
+
+# The Bot API answers a call without a token with 401 and the code
+# unauthorized in its JSON envelope (nginx's own errors have no such body),
+# through the app and through nginx.
+bots() {
+	curl -s --max-time 2 -H 'Host: chat.hoandat.com' http://127.0.0.1:4600/bot/v1/me | grep -q '"unauthorized"' || return 1
+	curl -s --max-time 5 --resolve chat.hoandat.com:443:127.0.0.1 https://chat.hoandat.com/bot/v1/me | grep -q '"unauthorized"'
 }
 
 # With media configured (MEDIA_PUBLIC_URL in .env) the media host answers
@@ -119,6 +127,7 @@ pm2 save >/dev/null
 health || rollback
 realtime || rollback
 hooks || rollback
+bots || rollback
 media || rollback
 
 echo "== prune"

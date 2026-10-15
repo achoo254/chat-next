@@ -19,6 +19,7 @@ import type {
 	MessageEntity,
 	NotificationSettings,
 	ReactionCount,
+	ReplyKeyboard,
 	User,
 } from "../model/types.ts";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "../model/types.ts";
@@ -191,10 +192,39 @@ function parseButtons(raw: string | null): MessageButton[][] {
 	const rows: MessageButton[][] = [];
 	for (const row of value) {
 		if (!Array.isArray(row)) continue;
-		const buttons = row.filter(isRecord).map((b) => ({ text: text(b, "text"), url: typeof b.url === "string" ? b.url : null }));
+		const buttons = row.filter(isRecord).map(parseButton);
 		if (buttons.length > 0) rows.push(buttons);
 	}
 	return rows;
+}
+
+function parseButton(b: Record<string, unknown>): MessageButton {
+	const button = { text: text(b, "text"), url: typeof b.url === "string" ? b.url : null };
+	return typeof b.callbackData === "string" && b.callbackData !== "" ? { ...button, callbackData: b.callbackData } : button;
+}
+
+/** `hidden`: the local keyboard_hidden column (the JSON holds what the bot sent). */
+function parseKeyboard(raw: string | null, hidden: boolean): { keyboard?: ReplyKeyboard } {
+	const value = parseJson(raw);
+	if (!isRecord(value)) return {};
+	const selective = value.selective === true;
+	if (value.kind === "remove") return { keyboard: { kind: "remove", selective } };
+	if (value.kind !== "keyboard" || !Array.isArray(value.rows)) return {};
+	const rows = value.rows
+		.filter((row): row is unknown[] => Array.isArray(row))
+		.map((row) => row.filter((label): label is string => typeof label === "string" && label !== ""))
+		.filter((row) => row.length > 0);
+	if (rows.length === 0) return {};
+	return {
+		keyboard: {
+			kind: "keyboard",
+			rows,
+			oneTime: value.oneTime === true,
+			placeholder: typeof value.placeholder === "string" ? value.placeholder : "",
+			selective,
+			hidden,
+		},
+	};
 }
 
 function parseLinkPreview(raw: string | null): LinkPreview | null {
@@ -240,6 +270,7 @@ export function rowToMessage(row: SqlRow): Message {
 		recalled: bool(row, "recalled"),
 		silent: bool(row, "silent"),
 		...mediaOf(optionalStr(row, "media")),
+		...parseKeyboard(optionalStr(row, "reply_keyboard"), bool(row, "keyboard_hidden")),
 	};
 }
 

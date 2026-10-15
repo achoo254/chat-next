@@ -9,7 +9,9 @@
 // picks photos and videos or any file; pasted images and files dropped on
 // the chat join them in the tray above the text, which becomes the caption
 // (mockups/media.html#attach). With nothing typed the send button turns
-// into the microphone, which records a voice message.
+// into the microphone, which records a voice message. In a private chat with
+// a bot the bot layer (bots/bot-chat.tsx, loaded with the first bot chat)
+// adds the command menu and the bot's reply keyboard.
 import {
 	Suspense,
 	lazy,
@@ -40,6 +42,23 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 // Files waiting to be sent and the voice recorder load with the first use.
 const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
 const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
+const BotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotLayer })));
+
+/** The bot layer's state for the composer's buttons (bots/bot-chat.tsx BotBar); empty until it loads. */
+interface BotBar {
+	readonly menu: boolean | null;
+	readonly keyboard: boolean | null;
+	readonly placeholder: string | null;
+}
+
+const NO_BOT_BAR: BotBar = { menu: null, keyboard: null, placeholder: null };
+
+/** What the composer calls in the bot layer (bots/bot-chat.tsx BotActions). */
+interface BotActions {
+	toggleMenu(): void;
+	toggleKeyboard(): void;
+	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
+}
 
 /** Whether this browser can record a voice message (MediaRecorder and a microphone API). */
 function canRecord(): boolean {
@@ -85,9 +104,11 @@ interface ComposerProps {
 	disabled?: boolean;
 	/** The chat lets this user send media (the server's limit is checked here). */
 	media?: boolean;
+	/** Private chat with a bot: the bot's user id (its command menu and reply keyboard); 0 otherwise. */
+	botId?: number;
 }
 
-export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false }: ComposerProps) {
+export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false, botId = 0 }: ComposerProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const limits = useMediaLimits();
@@ -114,6 +135,9 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	const [editingSeq, setEditingSeq] = useState(0);
 	const area = useRef<HTMLTextAreaElement>(null);
 	const caret = useRef<number | null>(null);
+	// The bot layer: its buttons' state, and its key handling (command menu) asked before the composer's own.
+	const [botBar, setBotBar] = useState<BotBar>(NO_BOT_BAR);
+	const botActions = useRef<BotActions | null>(null);
 
 	// Starting an edit loads the message text; leaving it brings the draft back.
 	if (intent?.mode === "edit" && editTarget != null && editingSeq !== intent.seq) {
@@ -251,6 +275,11 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 		}
 	};
 
+	/** A bot command or reply keyboard button: sent as typed by the user, the draft left alone. */
+	const sendBotText = (value: string) => {
+		source.sendText(chatId, value).catch(() => toasts.show(copy.composer.sendFailed));
+	};
+
 	/** ↑ in an empty composer: edit your newest message, when it can still be edited. */
 	const editLast = () => {
 		const own = store
@@ -298,6 +327,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	};
 
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (botActions.current?.onKey(event) === true) return;
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
 			cancelByUser();
@@ -384,7 +414,20 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					{error}
 				</div>
 			)}
-			<form className="composer" onSubmit={(event) => void submit(event)}>
+		<form className={botBar.keyboard === null ? "composer" : "composer with-bot-kb"} onSubmit={(event) => void submit(event)}>
+				{botBar.menu !== null && (
+					<button
+						type="button"
+						className="icon-btn"
+						aria-label={copy.bot.menu}
+						aria-pressed={botBar.menu}
+						aria-expanded={botBar.menu}
+						aria-controls={`bot-cmds-${chatId}`}
+						onClick={() => botActions.current?.toggleMenu()}
+					>
+						<Icon name="command" />
+					</button>
+				)}
 				{mediaOn && limits !== null && (
 					<div className="menu-anchor attach-anchor" ref={attachAnchor}>
 						<button
@@ -432,7 +475,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					ref={area}
 					id={`draft-${chatId}-${topicId}`}
 					rows={1}
-					placeholder={shownPlaceholder}
+					placeholder={botBar.placeholder ?? shownPlaceholder}
 					value={text}
 					disabled={disabled}
 					onChange={(event: ChangeEvent<HTMLTextAreaElement>) => update(event.target.value)}
@@ -459,6 +502,17 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						</Suspense>
 					)}
 				</div>
+				{botBar.keyboard !== null && (
+					<button
+						type="button"
+						className="icon-btn"
+						aria-pressed={botBar.keyboard}
+						aria-label={botBar.keyboard ? copy.bot.hideKeyboard : copy.bot.showKeyboard}
+						onClick={() => botActions.current?.toggleKeyboard()}
+					>
+						<Icon name="keyboard" />
+					</button>
+				)}
 				{showMic ? (
 					<button type="button" className="send" aria-label={copy.composer.record} onClick={() => setRecording(true)}>
 						<Icon name="mic" />
@@ -474,6 +528,23 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					</button>
 				)}
 			</form>
+			{botId !== 0 && (
+				<Suspense fallback={null}>
+					<BotLayer
+						chatId={chatId}
+						botId={botId}
+						text={text}
+						setText={(value) => {
+							caret.current = value.length;
+							update(value);
+						}}
+						send={sendBotText}
+						focus={() => area.current?.focus()}
+						onBar={setBotBar}
+						actionsRef={botActions}
+					/>
+				</Suspense>
+			)}
 			{hint && !editing && !disabled && <p className="composer-hint">{copy.composer.hint}</p>}
 		</div>
 	);

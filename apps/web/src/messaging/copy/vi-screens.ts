@@ -764,6 +764,12 @@ export const viScreens = {
 		typeAfter: "để xác nhận",
 		deleteGroup: (channel: boolean): string => `Xoá ${kind(channel)}`,
 		deletedGroup: (title: string, channel: boolean): string => `Đã xoá ${kind(channel)} ${title}`,
+		/** "Cloud của tôi" (mockups/chat.html#delete-chat): every note goes, the chat stays. */
+		clearSaved: "Xoá toàn bộ tin nhắn",
+		savedTitle: "Xoá toàn bộ tin trong Cloud của tôi?",
+		savedNote: "Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở đầu danh sách.",
+		savedAction: "Xoá toàn bộ",
+		savedDone: "Đã xoá toàn bộ tin trong Cloud của tôi",
 	},
 	link: {
 		title: "Mở link ngoài?",

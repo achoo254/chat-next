@@ -28,12 +28,13 @@ const IntegrationsPage = lazy(() => import("../integrations/integrations-page.ts
 const InviteDialog = lazy(() => import("./invite-dialog.tsx").then((m) => ({ default: m.InviteDialog })));
 const ContactsView = lazy(() => import("./contacts.tsx").then((m) => ({ default: m.ContactsView })));
 const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
+const BotLinkDialog = lazy(() => import("../bots/bot-link-dialog.tsx"));
 
 function initialInfoOpen(): boolean {
 	return typeof window.matchMedia !== "function" || window.matchMedia(WIDE_QUERY).matches;
 }
 
-type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" } | { name: "contacts" }>;
+type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" } | { name: "contacts" } | { name: "bot" }>;
 
 export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }) {
 	const copy = useCopy();
@@ -164,6 +165,11 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 			{route.name === "invite" && (
 				<Suspense fallback={null}>
 					<InviteDialog token={route.token} />
+				</Suspense>
+			)}
+			{route.name === "bot" && (
+				<Suspense fallback={null}>
+					<BotLinkDialog key={route.username} username={route.username} startParam={new URLSearchParams(window.location.search).get("start") ?? ""} />
 				</Suspense>
 			)}
 		</UiContext>

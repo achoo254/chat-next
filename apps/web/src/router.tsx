@@ -9,6 +9,14 @@ export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "noti
  */
 export type ChatPanel = "chat" | "admin" | "banned" | "hooks" | "hook-new" | "hook";
 
+/** Developer Console pages: the bot list, a new bot, or one bot's section. */
+export type ConsolePage =
+	| { readonly page: "list" }
+	| { readonly page: "new" }
+	| { readonly page: "bot"; readonly botId: number; readonly tab: ConsoleTab };
+
+export type ConsoleTab = "profile" | "token" | "commands";
+
 export type Route =
 	| { name: "home" }
 	| { name: "settings"; tab: SettingsTab }
@@ -18,7 +26,10 @@ export type Route =
 	| { name: "invite"; token: string }
 	/** userId 0: the list without a profile open. */
 	| { name: "contacts"; userId: number }
-	| { name: "moderation"; reportId: string | null; actions: boolean };
+	| { name: "moderation"; reportId: string | null; actions: boolean }
+	| { name: "console"; view: ConsolePage }
+	/** A bot deep link (/b/<username>?start=<param>); the start parameter is read from the query. */
+	| { name: "bot"; username: string };
 
 /** Tabs that exist before messaging ships (release R0). */
 const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "appearance", "shortcuts", "sessions"];
@@ -36,6 +47,10 @@ export const paths = {
 	contacts: (userId = 0) => (userId === 0 ? "/contacts" : `/contacts/${userId}`),
 	/** The link the server hands out (…/join/<token>); "/+<token>" still opens. */
 	invite: (token: string) => `/join/${token}`,
+	console: () => "/console",
+	consoleNew: () => "/console/new",
+	consoleBot: (botId: number, tab: ConsoleTab = "profile") => (tab === "profile" ? `/console/${botId}` : `/console/${botId}/${tab}`),
+	botLink: (username: string, startParam = "") => (startParam === "" ? `/b/${username}` : `/b/${username}?start=${encodeURIComponent(startParam)}`),
 	moderation: (reportId?: string, actions = false) =>
 		reportId === undefined ? "/moderation" : `/moderation/${encodeURIComponent(reportId)}${actions ? "/actions" : ""}`,
 } as const;
@@ -45,6 +60,9 @@ const INVITE = /^\/(?:join\/|\+)([A-Za-z0-9_-]{4,128})$/;
 const REPORT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** Public hook ids: "hk_" and letters or digits. */
 const HOOK_ID = /^hk_[A-Za-z0-9]{1,32}$/;
+/** Bot usernames in deep links (any case; the server stores them lowercase). */
+const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
+const CONSOLE_TABS: readonly ConsoleTab[] = ["token", "commands"];
 
 function parseId(value: string | undefined): number | null {
 	if (value === undefined || !ID.test(value)) return null;
@@ -79,6 +97,20 @@ function matchMessaging(path: string): Route | null {
 		if (parts.length === 4 && parts[2] === "t" && topicId !== null) {
 			return { name: "chat", chatId, topicId, panel: "chat" };
 		}
+		return null;
+	}
+	if (parts[0] === "b" && parts.length === 2) {
+		const username = parts[1] ?? "";
+		return BOT_USERNAME.test(username) ? { name: "bot", username } : null;
+	}
+	if (parts[0] === "console") {
+		if (parts.length === 1) return { name: "console", view: { page: "list" } };
+		if (parts.length === 2 && parts[1] === "new") return { name: "console", view: { page: "new" } };
+		const botId = parseId(parts[1]);
+		if (botId === null) return null;
+		if (parts.length === 2) return { name: "console", view: { page: "bot", botId, tab: "profile" } };
+		const tab = CONSOLE_TABS.find((candidate) => candidate === parts[2]);
+		if (parts.length === 3 && tab !== undefined) return { name: "console", view: { page: "bot", botId, tab } };
 		return null;
 	}
 	if (parts[0] === "moderation") {
@@ -118,9 +150,11 @@ export function matchRoute(pathname: string): Route | null {
  * known route other than home; undefined otherwise. The server validates the
  * path again and keeps it across tabs, so the IdP may finish in another tab.
  */
-export function returnPathFor(pathname: string): string | undefined {
+export function returnPathFor(pathname: string, search = ""): string | undefined {
 	const route = matchRoute(pathname);
-	return route === null || route.name === "home" ? undefined : pathname;
+	if (route === null || route.name === "home") return undefined;
+	// A bot link carries its start parameter in the query.
+	return route.name === "bot" && search !== "" ? pathname + search : pathname;
 }
 
 const listeners = new Set<() => void>();
@@ -134,8 +168,9 @@ function subscribe(listener: () => void): () => void {
 	};
 }
 
+/** `path` may carry a query ("/b/x?start=1"); the same path and query is a no-op. */
 export function navigate(path: string, options: { replace?: boolean } = {}): void {
-	if (path === window.location.pathname) return;
+	if (path === window.location.pathname + window.location.search) return;
 	if (options.replace) window.history.replaceState(null, "", path);
 	else window.history.pushState(null, "", path);
 	for (const listener of listeners) listener();

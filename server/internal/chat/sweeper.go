@@ -71,7 +71,8 @@ func (s *idSet) prune(floor int64, cutoff time.Time) {
 	}
 }
 
-type outboxRow struct {
+// OutboxRow is one outbox row (ADR 0003) as consumers read it.
+type OutboxRow struct {
 	ID        int64
 	CreatedAt time.Time
 	Kind      string
@@ -187,7 +188,7 @@ func (s *Service) sweep(ctx context.Context, st *sweepState) error {
 	return nil
 }
 
-func (s *Service) readOutbox(ctx context.Context, where string, arg any) ([]outboxRow, error) {
+func (s *Service) readOutbox(ctx context.Context, where string, arg any) ([]OutboxRow, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, created_at, kind, chat_id, actor_id, session_id, reason, user_ids, pts, chat_pts
 		FROM outbox WHERE `+where, arg)
@@ -195,9 +196,9 @@ func (s *Service) readOutbox(ctx context.Context, where string, arg any) ([]outb
 		return nil, fmt.Errorf("chat: read outbox: %w", err)
 	}
 	defer rows.Close()
-	var out []outboxRow
+	var out []OutboxRow
 	for rows.Next() {
-		var r outboxRow
+		var r OutboxRow
 		if err := rows.Scan(&r.ID, &r.CreatedAt, &r.Kind, &r.ChatID, &r.ActorID, &r.SessionID, &r.Reason,
 			&r.UserIDs, &r.Pts, &r.ChatPts); err != nil {
 			return nil, fmt.Errorf("chat: read outbox: %w", err)
@@ -211,7 +212,7 @@ func (s *Service) readOutbox(ctx context.Context, where string, arg any) ([]outb
 }
 
 // rebuildEvent turns an outbox row back into an Event from the logs.
-func (s *Service) rebuildEvent(ctx context.Context, r outboxRow) (*Event, error) {
+func (s *Service) rebuildEvent(ctx context.Context, r OutboxRow) (*Event, error) {
 	ev := &Event{OutboxID: r.ID, Kind: r.Kind, ChatID: r.ChatID, ActorID: r.ActorID}
 	if r.Kind == kindSessionRevoked {
 		ev.SessionID = r.SessionID

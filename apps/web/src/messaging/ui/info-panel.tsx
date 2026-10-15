@@ -188,11 +188,12 @@ function PinAction({ chatId, title }: { chatId: number; title: string }) {
 }
 
 /** Three evenly shared quick actions: mute, pin and one that depends on the chat. */
-function QuickActions({ chatId, title, children }: { chatId: number; title: string; children?: ReactNode }) {
+/** `mute` false: "Cloud của tôi", whose messages are your own, has nothing to mute. */
+function QuickActions({ chatId, title, children, mute = true }: { chatId: number; title: string; children?: ReactNode; mute?: boolean }) {
 	const copy = useScreensCopy();
 	return (
 		<div className="quick-acts" role="group" aria-label={copy.info.quickActions}>
-			<MuteAction chatId={chatId} title={title} />
+			{mute && <MuteAction chatId={chatId} title={title} />}
 			<PinAction chatId={chatId} title={title} />
 			{children}
 		</div>
@@ -444,13 +445,13 @@ function SavedInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 				<h2>{name}</h2>
 				<span className="muted">{copy.convo.savedSubtitle}</span>
 			</div>
-			<QuickActions chatId={chat.id} title={name} />
+			<QuickActions chatId={chat.id} title={name} mute={false} />
 			<SharedRows chatId={chat.id} onShared={onShared} />
 			<PinnedBarRow chat={chat} />
 			<div className="info-sec">
 				<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
 					<Icon name="trash" />
-					<span className="grow">{copy.info.deleteChat}</span>
+					<span className="grow">{copy.deleteChat.clearSaved}</span>
 				</button>
 			</div>
 		</aside>

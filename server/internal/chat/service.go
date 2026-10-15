@@ -126,7 +126,10 @@ type Service struct {
 	mu       sync.RWMutex
 	sink     Sink
 	presence Presence
-	epoch    int64
+	// committed, when set, learns that a transaction wrote outbox rows
+	// (the bot update consumer cuts them right away).
+	committed func()
+	epoch     int64
 	// previewSlots bounds the link preview fetches running after sends.
 	previewSlots chan struct{}
 
@@ -226,6 +229,20 @@ func (s *Service) SetRealtime(sink Sink, presence Presence) {
 	defer s.mu.Unlock()
 	s.sink = sink
 	s.presence = presence
+}
+
+// SetCommitObserver registers fn, called after every commit that wrote
+// outbox rows. It must not block: the bot update consumer only wakes up.
+func (s *Service) SetCommitObserver(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.committed = fn
+}
+
+func (s *Service) commitObserver() func() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.committed
 }
 
 func (s *Service) realtime() (Sink, Presence) {
@@ -359,6 +376,9 @@ func (s *Service) inTx(ctx context.Context, fn func(t *txn) error) (*txn, error)
 		if err == nil {
 			for _, ev := range t.events {
 				s.dispatch.enqueue(ev)
+			}
+			if fn := s.commitObserver(); fn != nil && len(t.events) > 0 {
+				fn()
 			}
 			return t, nil
 		}

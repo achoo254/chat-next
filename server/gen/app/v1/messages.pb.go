@@ -4088,7 +4088,10 @@ type PressInlineButtonResponse struct {
 	Text      string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
 	ShowAlert bool   `protobuf:"varint,2,opt,name=show_alert,json=showAlert,proto3" json:"show_alert,omitempty"`
 	// URL the bot asks the client to open (scheme allowlist applies).
-	Url           string `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	Url string `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	// The bot did not answer within 10 seconds; the client shows "the bot is
+	// not responding". The press still reached the bot.
+	TimedOut      bool `protobuf:"varint,4,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4142,6 +4145,13 @@ func (x *PressInlineButtonResponse) GetUrl() string {
 		return x.Url
 	}
 	return ""
+}
+
+func (x *PressInlineButtonResponse) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
 }
 
 type GetLinkPreviewRequest struct {
@@ -4875,12 +4885,13 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x18PressInlineButtonRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12#\n" +
-	"\rcallback_data\x18\x03 \x01(\fR\fcallbackData\"`\n" +
+	"\rcallback_data\x18\x03 \x01(\fR\fcallbackData\"}\n" +
 	"\x19PressInlineButtonResponse\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1d\n" +
 	"\n" +
 	"show_alert\x18\x02 \x01(\bR\tshowAlert\x12\x10\n" +
-	"\x03url\x18\x03 \x01(\tR\x03url\")\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x1b\n" +
+	"\ttimed_out\x18\x04 \x01(\bR\btimedOut\")\n" +
 	"\x15GetLinkPreviewRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\"G\n" +
 	"\x16GetLinkPreviewResponse\x12-\n" +

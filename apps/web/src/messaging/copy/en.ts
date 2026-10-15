@@ -193,6 +193,7 @@ export const en: MessagingCopy = {
 	composer: {
 		label: (name: string) => `Message to ${name}`,
 		placeholder: (name: string) => `Message ${name}`,
+		placeholderSaved: "Write a note to My Cloud",
 		placeholderGroup: (name: string) => `Type @ to mention, message ${name}`,
 		hint: "Enter to send · Shift+Enter for a new line",
 		placeholderOffline: "Messages send when you are back online",
@@ -259,6 +260,15 @@ export const en: MessagingCopy = {
 		shownDone: (name: string) => `Topic ${name} is visible again`,
 		hiddenBy: (name: string, date: string) => `Hidden by ${name} · ${date}`,
 		empty: "No messages in this topic yet",
+	},
+	bot: {
+		tag: "bot",
+		subtitle: (username: string) => (username === "" ? "bot" : `@${username} · bot`),
+		waiting: "Waiting for the bot",
+		notResponding: "The bot is not responding",
+		menu: "Bot commands",
+		hideKeyboard: "Hide the bot keyboard",
+		showKeyboard: "Show the bot keyboard",
 	},
 	notify: {
 		hiddenBody: "You have a new message",

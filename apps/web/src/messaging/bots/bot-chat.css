@@ -1,0 +1,72 @@
+/* Bot parts of the chat screen (mockups/bots.html): the bot's profile in its
+   empty chat, "Bắt đầu", the command menu, the reply keyboard, the deep-link
+   dialog and the alert popup. Loaded with them only. Colours come only from
+   tokens. */
+
+.bot-card {
+	align-self: center; display: grid; justify-items: center; gap: var(--space-2); width: min(100%, 420px);
+	margin: auto; padding: var(--space-6) var(--space-5); text-align: center;
+	background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-lg);
+}
+.bot-card h3 { margin: var(--space-1) 0 0; font-size: 1.125rem; font-weight: 600; overflow-wrap: anywhere; }
+.bot-card p { margin: 0; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.bot-card ul { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); text-align: left; width: 100%; font-size: 0.875rem; }
+.bot-card li { display: grid; grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr); gap: var(--space-2); }
+.bot-card li code { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text); overflow-wrap: anywhere; }
+.bot-card .muted { color: var(--c-text-muted); overflow-wrap: anywhere; }
+.consent-note {
+	display: flex; gap: var(--space-2); width: 100%; margin-top: var(--space-2); padding: var(--space-3);
+	border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle);
+	font-size: 0.8125rem; color: var(--c-text-muted); text-align: left;
+}
+.consent-note .icon { flex: none; margin-top: 2px; }
+.start-bar { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border-top: 1px solid var(--c-border-subtle); }
+.start-bar .btn { width: 100%; }
+.start-bar small { text-align: center; color: var(--c-text-muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
+
+/* Command menu above the composer. */
+.composer-wrap:has(> .cmd-menu) { position: relative; }
+.cmd-menu {
+	position: absolute; left: var(--space-4); right: var(--space-4); bottom: calc(100% + var(--space-2)); max-width: 560px; z-index: 3;
+	background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-md); overflow: hidden;
+}
+.cmd-menu .menu-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-subtle); }
+.cmd-menu ul { list-style: none; margin: 0; padding: var(--space-1); max-height: 280px; overflow-y: auto; }
+.cmd-menu li[role="option"] {
+	display: grid; grid-template-columns: var(--avatar-sm) minmax(0, 1fr); gap: var(--space-3); align-items: center;
+	min-height: 48px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); cursor: pointer;
+}
+.cmd-menu li[role="option"]:hover { background: var(--c-hover); }
+.cmd-menu li[aria-selected="true"] { background: var(--c-selected); }
+.cmd-menu li > span:last-child { min-width: 0; }
+.cmd-menu .cmd { font-family: var(--font-mono); font-size: 0.875rem; font-weight: 500; }
+.cmd-menu .desc { display: block; font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.cmd-menu .menu-foot { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); font-size: 0.75rem; color: var(--c-text-muted); }
+
+/* Reply keyboard in place of the system keyboard, under the composer. */
+.reply-kb { display: grid; gap: var(--space-2); padding: var(--space-2) var(--space-4) var(--space-4); background: var(--c-surface); max-height: 40vh; overflow-y: auto; }
+.reply-row { display: flex; gap: var(--space-2); }
+.reply-row button {
+	flex: 1 1 0; min-width: 0; min-height: 52px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--c-border);
+	background: var(--c-surface-subtle); color: var(--c-text); font: inherit; font-weight: 500; overflow-wrap: anywhere;
+	transition: background var(--dur-fast) var(--ease-standard);
+}
+.reply-row button:hover { background: var(--c-hover); border-color: var(--c-border-strong); }
+
+/* Deep-link dialog and the alert popup. */
+.bot-line { display: flex; align-items: center; gap: var(--space-3); }
+.bot-line > div { min-width: 0; }
+.bot-line strong { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.bot-line small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.bot-desc { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.param { display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.modal.popup { width: min(360px, calc(100vw - 2 * var(--space-4))); }
+.alert-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+	.cmd-menu { left: var(--space-2); right: var(--space-2); }
+	.reply-kb { padding: var(--space-2) var(--space-3) var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.reply-row button { transition: none; }
+}

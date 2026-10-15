@@ -43,6 +43,9 @@ export default defineConfig({
 			"/rpc": API_ORIGIN,
 			"/auth": API_ORIGIN,
 			"/healthz": API_ORIGIN,
+			// HTTP Bot API (bots call it; the e2e scenarios play a bot through it). It
+			// answers only on the app's own host, so the Host header stays as sent.
+			"/bot/": { target: API_ORIGIN, changeOrigin: false },
 			// Realtime gateway (same origin as in production).
 			"/ws": { target: API_ORIGIN, ws: true },
 		},

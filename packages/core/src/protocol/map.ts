@@ -24,6 +24,7 @@ import type {
 	GetHistoryResponse,
 	GetPinnedMessagesResponse,
 	ForwardHeader as WireForward,
+	InlineButton as WireInlineButton,
 	LinkPreview as WireLinkPreview,
 	Message as WireMessage,
 	MessageAction as WireAction,
@@ -45,6 +46,7 @@ import type {
 } from "@app/proto-ts/updates";
 import type { User as WireUser } from "@app/proto-ts/users";
 import { assertSafeId } from "../ids/index.ts";
+import { toBase64 } from "../media/codec.ts";
 import type {
 	Chat,
 	ChatDifference,
@@ -75,6 +77,7 @@ import type {
 	NotificationSound,
 	PinnedMessagesPage,
 	ReactionCount,
+	ReplyKeyboard,
 	SessionRevokeReason,
 	SyncAck,
 	SyncMode,
@@ -254,12 +257,28 @@ export function toForumTopic(topic: WireForumTopic): ForumTopic {
 	};
 }
 
-/** Inline keyboard rows; other markups (reply keyboards) are for bots in private chats, not kept. */
+/** One inline button: URL and bot callback buttons; other kinds keep only their text. */
+function toButton(button: WireInlineButton): MessageButton {
+	const action = button.action;
+	if (action.case === "url") return { text: button.text, url: action.value };
+	if (action.case === "callbackData") return { text: button.text, url: null, callbackData: toBase64(action.value) };
+	return { text: button.text, url: null };
+}
+
+/** Inline keyboard rows under the message; empty for other markups. */
 function toButtons(markup: WireReplyMarkup | undefined): MessageButton[][] {
 	if (markup?.kind.case !== "inlineKeyboard") return [];
-	return markup.kind.value.rows
-		.map((row) => row.buttons.map((button) => ({ text: button.text, url: button.action.case === "url" ? button.action.value : null })))
-		.filter((row) => row.length > 0);
+	return markup.kind.value.rows.map((row) => row.buttons.map(toButton)).filter((row) => row.length > 0);
+}
+
+/** The reply keyboard a bot message sets or removes; undefined for other markups. */
+function toKeyboard(markup: WireReplyMarkup | undefined): ReplyKeyboard | undefined {
+	const kind = markup?.kind;
+	if (kind?.case === "remove") return { kind: "remove", selective: kind.value.selective };
+	if (kind?.case !== "keyboard") return undefined;
+	const rows = kind.value.rows.map((row) => row.buttons.map((button) => button.text).filter((text) => text !== "")).filter((row) => row.length > 0);
+	if (rows.length === 0) return undefined;
+	return { kind: "keyboard", rows, oneTime: kind.value.oneTime, placeholder: kind.value.placeholder, selective: kind.value.selective, hidden: false };
 }
 
 function toLinkPreview(preview: WireLinkPreview | undefined): LinkPreview | null {
@@ -439,7 +458,13 @@ export function toMessage(message: WireMessage): Message {
 		recalled: message.recalled,
 		silent: message.silent,
 		...(message.media === undefined ? {} : { media: toMediaRef(message.media) }),
+		...keyboardOf(message.replyMarkup),
 	};
+}
+
+function keyboardOf(markup: WireReplyMarkup | undefined): { keyboard?: ReplyKeyboard } {
+	const keyboard = toKeyboard(markup);
+	return keyboard === undefined ? {} : { keyboard };
 }
 
 function toBody(update: WireUpdate): UpdateBody {

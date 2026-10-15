@@ -230,6 +230,9 @@ func (s *Service) DeleteChat(ctx context.Context, me, chatID int64) (*appv1.Sync
 		if err != nil {
 			return err
 		}
+		if c.Type == typePrivate && c.peerOf(me) == me {
+			return t.clearSaved(ctx, c, m, me)
+		}
 		if c.Type == typePrivate {
 			return t.clearPrivate(ctx, c, me)
 		}
@@ -249,9 +252,21 @@ func (s *Service) DeleteChat(ctx context.Context, me, chatID int64) (*appv1.Sync
 // (and my pins) until a new message arrives, and my sessions get
 // chat_deleted.
 func (t *txn) clearPrivate(ctx context.Context, c *chatRow, me int64) error {
+	if err := t.hideHistory(ctx, c, me, true); err != nil {
+		return err
+	}
+	ev := t.event(kindChatDeleted, c.ID, me)
+	t.toUsers(ev, []int64{me}, &appv1.Update{Kind: &appv1.Update_ChatDeleted{ChatDeleted: &appv1.UpdateChatDeleted{ChatId: c.ID}}})
+	return nil
+}
+
+// hideHistory makes me see only messages after the newest one of a
+// private chat, with nothing unread; unpin also drops my pin.
+func (t *txn) hideHistory(ctx context.Context, c *chatRow, me int64, unpin bool) error {
 	if _, err := t.tx.Exec(ctx, `
-		UPDATE chat_members SET visible_from_seq = $3 + 1, pin_rank = NULL WHERE chat_id = $1 AND user_id = $2`,
-		c.ID, me, c.LastSeq); err != nil {
+		UPDATE chat_members SET visible_from_seq = $3 + 1, pin_rank = CASE WHEN $4 THEN NULL ELSE pin_rank END
+		WHERE chat_id = $1 AND user_id = $2`,
+		c.ID, me, c.LastSeq, unpin); err != nil {
 		return fmt.Errorf("chat: clear private chat: %w", err)
 	}
 	if _, err := t.tx.Exec(ctx, `
@@ -261,8 +276,31 @@ func (t *txn) clearPrivate(ctx context.Context, c *chatRow, me int64) error {
 		c.ID, me, c.LastSeq); err != nil {
 		return fmt.Errorf("chat: clear private chat: %w", err)
 	}
-	ev := t.event(kindChatDeleted, c.ID, me)
-	t.toUsers(ev, []int64{me}, &appv1.Update{Kind: &appv1.Update_ChatDeleted{ChatDeleted: &appv1.UpdateChatDeleted{ChatId: c.ID}}})
+	return nil
+}
+
+// clearSaved clears the history of my saved chat ("Cloud của tôi") like
+// clearPrivate, but the chat stays in my list and keeps its pin. My
+// sessions get, in order: chat_deleted (drop the local history), then
+// chat_updated (the chat as I see it, still a member) and, when it is
+// pinned, pinned_dialogs (the dialog and the pin order come back), which
+// clients already apply without a new update kind.
+func (t *txn) clearSaved(ctx context.Context, c *chatRow, m *memberRow, me int64) error {
+	if err := t.hideHistory(ctx, c, me, false); err != nil {
+		return err
+	}
+	deleted := t.event(kindChatDeleted, c.ID, me)
+	t.toUsers(deleted, []int64{me}, &appv1.Update{Kind: &appv1.Update_ChatDeleted{ChatDeleted: &appv1.UpdateChatDeleted{ChatId: c.ID}}})
+	// Rendered for me on delivery, as chatChanged does.
+	updated := t.event(kindChatUpdated, c.ID, me)
+	t.toUsers(updated, []int64{me}, &appv1.Update{Kind: &appv1.Update_ChatUpdated{ChatUpdated: &appv1.UpdateChatUpdated{
+		Chat: &appv1.Chat{Id: c.ID},
+	}}})
+	if m.PinRank != 0 {
+		if _, err := t.s.announcePins(ctx, t, me); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

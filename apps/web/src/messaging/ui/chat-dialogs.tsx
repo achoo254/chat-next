@@ -11,6 +11,7 @@ import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { isSavedChat } from "../data/format.ts";
 import type { Member, Reactor } from "../data/remote.ts";
 import { useChat, useDialog, useMessage, useServices, useUser } from "../data/services.tsx";
 import { Quote } from "./dialogs.tsx";
@@ -268,11 +269,41 @@ function PickAdmin({ chatId, channel, memberCount, onBack, onDone, onClose }: Pi
 /** Deletes a private chat for you, or (owner) a group or channel for everyone after typing its name. */
 export function DeleteChatDialog({ chatId, onClose }: CloseProps & { chatId: number }) {
 	const chat = useChat(chatId);
+	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
 	if (chat == null) return null;
-	return chat.type === "group" || chat.type === "channel" ? <DeleteGroup chat={chat} onClose={onClose} /> : <DeletePrivate chat={chat} onClose={onClose} />;
+	if (chat.type === "group" || chat.type === "channel") return <DeleteGroup chat={chat} onClose={onClose} />;
+	return isSavedChat(chat, peer) ? <ClearSaved chat={chat} onClose={onClose} /> : <DeletePrivate chat={chat} onClose={onClose} />;
 }
 
-function useDelete(chatId: number, done: string, onClose: () => void): { busy: boolean; run: () => void } {
+/** "Cloud của tôi" (mockups/chat.html#delete-chat): every message goes on all your devices; the chat stays. */
+function ClearSaved({ chat, onClose }: CloseProps & { chat: Chat }) {
+	const copy = useScreensCopy();
+	const id = useDomId("clear-saved");
+	const t = copy.deleteChat;
+	const { busy, run } = useDelete(chat.id, t.savedDone, onClose, false);
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<DialogHead id={id} title={t.savedTitle} onClose={onClose} />
+			<div className="dlg-body stack">
+				<p className="note">
+					<Icon name="trash" />
+					<span>{t.savedNote}</span>
+				</p>
+			</div>
+			<div className="dlg-foot">
+				<button type="button" className="btn" onClick={onClose}>
+					{copy.common.cancel}
+				</button>
+				<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy} onClick={run}>
+					{t.savedAction}
+				</button>
+			</div>
+		</Modal>
+	);
+}
+
+/** `leave` false keeps the chat open (clearing "Cloud của tôi" leaves an empty chat, not a gone one). */
+function useDelete(chatId: number, done: string, onClose: () => void, leave = true): { busy: boolean; run: () => void } {
 	const copy = useScreensCopy();
 	const { remote, toasts } = useServices();
 	const [busy, setBusy] = useState(false);
@@ -282,7 +313,7 @@ function useDelete(chatId: number, done: string, onClose: () => void): { busy: b
 			() => {
 				toasts.show(done);
 				onClose();
-				leaveChatScreen(chatId);
+				if (leave) leaveChatScreen(chatId);
 			},
 			() => {
 				setBusy(false);

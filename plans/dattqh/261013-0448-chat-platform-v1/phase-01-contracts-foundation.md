@@ -91,7 +91,7 @@ Host theo tenant (`<d>` là domain của tenant, `hoandat.com` với tenant chí
 | Host | Việc |
 |---|---|
 | `chat.<d>` | Web app, RPC, WS, callback OIDC, back-channel logout, deep link `/b/<username>` |
-| `bot.chat.<d>` | Bot API |
+| `chat.<d>/bot/v1/*` | Bot API trên host chat (quyết định 2026-10-15, cùng lý do với webhook) |
 | `chat.<d>/hook/*` | Incoming webhook trên host chat (location riêng ở nginx, redact `/hook/*`); không dùng `hook.chat.<d>` vì SSL miễn phí của Cloudflare chỉ phủ một cấp subdomain |
 | `b<bot_id>.{{miniapp_domain}}` | Origin riêng cho từng Mini App; domain đăng ký riêng, dùng chung mọi tenant (`bot_id` unique toàn hệ thống) |
 | `{{media_domain}}` | Media; domain đăng ký riêng, dùng chung mọi tenant, cookieless, token tải xuống có `tenant_id` |

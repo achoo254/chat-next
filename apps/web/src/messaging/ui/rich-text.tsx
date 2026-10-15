@@ -6,6 +6,7 @@ import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNod
 import { isAllowedUrl, normalizeLinkUrl, type MessageEntity } from "@app/core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
+import { matchRoute, navigate } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { hostOf, isTrustedHost } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
@@ -243,10 +244,27 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 	return <>{blocks}</>;
 }
 
-/** Link opening with the trusted-host rule; `ask` shows the confirmation. */
+/** A bot link of this app (/b/<username>?start=…): its path and query, opened in place; null otherwise. */
+export function inAppBotLink(url: string, origin: string): string | null {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return null;
+	}
+	if (parsed.origin !== origin || matchRoute(parsed.pathname)?.name !== "bot") return null;
+	return parsed.pathname + parsed.search;
+}
+
+/** Link opening with the trusted-host rule; `ask` shows the confirmation. Bot links of this app open in place. */
 export function linkOpener(ask: (url: string, shown: string) => void): (url: string, shown?: string) => void {
 	return (url, shown = "") => {
 		if (!isAllowedUrl(url, APP_SCHEME)) return;
+		const botLink = inAppBotLink(url, window.location.origin);
+		if (botLink !== null) {
+			navigate(botLink);
+			return;
+		}
 		if (url.startsWith("mailto:") || isTrustedHost(hostOf(url), window.location.host)) {
 			window.open(url, "_blank", "noopener,noreferrer");
 			return;

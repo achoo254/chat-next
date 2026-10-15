@@ -283,6 +283,25 @@ export const MIGRATIONS: readonly Migration[] = [
 			"INSERT INTO messages_trigram (messages_trigram) VALUES ('rebuild')",
 		],
 	},
+	{
+		version: 9,
+		statements: [
+			// The reply keyboard a bot message sets or removes (JSON of
+			// ReplyKeyboard; NULL = none). Callback buttons ride in the existing
+			// buttons JSON. Cached bot messages had neither: the next history
+			// load brings them, as older messages never show a keyboard anyway.
+			"ALTER TABLE messages ADD COLUMN reply_keyboard TEXT",
+		],
+	},
+	{
+		version: 10,
+		statements: [
+			// A bot's reply keyboard hidden on this device (a one-time keyboard
+			// after its tap, or the user's toggle), so it stays hidden after a
+			// reload. Local only: upserts from the server leave it alone.
+			"ALTER TABLE messages ADD COLUMN keyboard_hidden INTEGER NOT NULL DEFAULT 0",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

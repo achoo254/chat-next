@@ -4,7 +4,7 @@
 // click, a long press, the menu key or the "…" button that shows on hover
 // opens the row menu (#list-menu).
 import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from "react";
-import type { DialogView } from "@app/core";
+import { toBase64, type DialogView, type Message } from "@app/core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
@@ -126,6 +126,26 @@ export function useNameOf(ids: readonly number[]): (userId: number) => string {
 	return (userId: number) => (userId === store.selfId ? copy.common.you : names.get(userId) || copy.message.unknownUser);
 }
 
+/**
+ * The small square picture before a photo or video preview (mockups/chat.html
+ * #list-states .pv-thumb), from the message's inline thumbnail; null without
+ * one. Its alt names the kind only when a caption follows (otherwise the
+ * preview text already says "Ảnh" or "Video").
+ */
+export function PreviewThumb({ message }: { message: Message }) {
+	const copy = useCopy();
+	const media = message.media;
+	if (message.recalled || message.action !== null || media === undefined || media.inlineThumb.length === 0) return null;
+	if (message.mediaKind !== "photo" && message.mediaKind !== "video") return null;
+	return (
+		<img
+			className="pv-thumb"
+			src={`data:image/jpeg;base64,${toBase64(media.inlineThumb)}`}
+			alt={message.text === "" ? "" : copy.message.mediaKind[message.mediaKind]}
+		/>
+	);
+}
+
 function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
 	const copy = useCopy();
 	const { store } = useServices();
@@ -144,12 +164,16 @@ function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
 		const text = messagePreview(top, nameOf, copy, kind === "channel");
 		const showFrom = top.action === null && !saved && (kind === "group" || kind === "forum" || top.fromId === store.selfId);
 		const from = top.integrationLabel !== "" ? top.integrationLabel : nameOf(top.fromId);
-		line = showFrom ? (
+		line = (
 			<>
-				<span className="from">{from}:</span> {text}
+				{showFrom && (
+					<>
+						<span className="from">{from}:</span>{" "}
+					</>
+				)}
+				<PreviewThumb message={top} />
+				{text}
 			</>
-		) : (
-			text
 		);
 	}
 	if (topics !== null) {

@@ -79,11 +79,11 @@ func (p IdPProfile) fallbackName() string {
 	return profile.InitialName("", p.PreferredUsername, profile.UsernameBase(p.PreferredUsername))
 }
 
-const userColumns = `id, tenant_id, idp_sub, username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at`
+const userColumns = `id, tenant_id, coalesce(idp_sub, ''), username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at`
 
 // qualifiedUserColumns is userColumns for statements that join users (as u)
 // with another relation.
-const qualifiedUserColumns = `u.id, u.tenant_id, u.idp_sub, u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at`
+const qualifiedUserColumns = `u.id, u.tenant_id, coalesce(u.idp_sub, ''), u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
@@ -108,13 +108,9 @@ func (s *Store) UpsertIdPUser(ctx context.Context, tenantID string, p IdPProfile
 	base := profile.UsernameBase(p.PreferredUsername)
 	name := profile.InitialName(p.Name, p.PreferredUsername, base)
 	for attempt := range maxUsernameAttempts {
-		var local int64
-		if err := s.pool.QueryRow(ctx, `SELECT nextval('user_local_id_seq')`).Scan(&local); err != nil {
-			return User{}, fmt.Errorf("store: next user id: %w", err)
-		}
-		id, err := ids.MakeSharded(userShard, local)
+		id, err := NextUserID(ctx, s.pool)
 		if err != nil {
-			return User{}, fmt.Errorf("store: user id: %w", err)
+			return User{}, err
 		}
 		// No conflict target: a clash on either unique key returns no row.
 		u, err := scanUser(s.pool.QueryRow(ctx, `
@@ -140,6 +136,19 @@ func (s *Store) UpsertIdPUser(ctx context.Context, tenantID string, p IdPProfile
 
 type queryRower interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// NextUserID issues the id of a new user (accounts and bots alike).
+func NextUserID(ctx context.Context, db queryRower) (int64, error) {
+	var local int64
+	if err := db.QueryRow(ctx, `SELECT nextval('user_local_id_seq')`).Scan(&local); err != nil {
+		return 0, fmt.Errorf("store: next user id: %w", err)
+	}
+	id, err := ids.MakeSharded(userShard, local)
+	if err != nil {
+		return 0, fmt.Errorf("store: user id: %w", err)
+	}
+	return id, nil
 }
 
 // refreshIdPUser applies what the IdP reports to the existing user of

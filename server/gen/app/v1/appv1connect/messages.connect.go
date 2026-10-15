@@ -115,7 +115,10 @@ type MessagesServiceClient interface {
 	// Seq-cursor history; respects visible_from_seq and messages hidden for the
 	// caller.
 	GetHistory(context.Context, *connect.Request[v1.GetHistoryRequest]) (*connect.Response[v1.GetHistoryResponse], error)
-	// Sends an inline keyboard callback to the bot and waits for its answer.
+	// Sends an inline keyboard callback to the bot and waits up to 10 s for
+	// its answer. The message must carry a callback button with exactly this
+	// callback_data; pressing a button in a private chat with the bot counts
+	// as consent for the bot to write to the caller.
 	PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error)
 	// Text-only preview of a web page for the composer; empty preview when the
 	// page has none or cannot be fetched.
@@ -389,7 +392,10 @@ type MessagesServiceHandler interface {
 	// Seq-cursor history; respects visible_from_seq and messages hidden for the
 	// caller.
 	GetHistory(context.Context, *connect.Request[v1.GetHistoryRequest]) (*connect.Response[v1.GetHistoryResponse], error)
-	// Sends an inline keyboard callback to the bot and waits for its answer.
+	// Sends an inline keyboard callback to the bot and waits up to 10 s for
+	// its answer. The message must carry a callback button with exactly this
+	// callback_data; pressing a button in a private chat with the bot counts
+	// as consent for the bot to write to the caller.
 	PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error)
 	// Text-only preview of a web page for the composer; empty preview when the
 	// page has none or cannot be fetched.

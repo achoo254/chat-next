@@ -1,0 +1,649 @@
+openapi: 3.1.0
+info:
+  title: Chat Bot API
+  version: 1.0.0
+  summary: HTTP API for bots of the chat platform (release R5, slice A).
+  description: |
+    Bots talk to the chat server of their tenant over HTTPS with JSON.
+    This API is our own and is not compatible with the Telegram Bot API.
+
+    - Base URL: `https://chat.<domain>/bot/v1` (the tenant's chat host; any
+      other host answers 404). A bot belongs to one tenant and only sees
+      users and chats of that tenant.
+    - Authentication: `Authorization: Bearer <bot_id>:<secret>`. The token is
+      shown once in the Developer Console (BotAdminService.ResetBotToken);
+      the server keeps only a hash. A reset token stops working at once.
+    - Every answer is an envelope: `{"ok": true, "result": ...}` or
+      `{"ok": false, "error": {"code", "description", "retry_after"}}`.
+      Clients branch on `error.code`, never on `description`.
+    - Ids (`chat_id`, `seq`, user ids, `update_id`, `random_id`) are integers
+      below 2^53. A message is addressed by `(chat_id, seq)`.
+    - Text follows ADR 0004: plain `text` plus `entities` whose `offset` and
+      `length` count UTF-16 code units; length limits count code points
+      (4096 for a message). Links in entities and buttons allow only `http`,
+      `https`, `mailto` and the app's own scheme. `parse_mode` (`markdown`,
+      `html`) is described in `format.md` next to this file.
+    - Consent: a bot writes into a private chat only after the user started
+      it, followed its deep link, pressed one of its buttons or wrote to it
+      (`403 no_consent` otherwise). In groups it needs membership and the
+      permission to send. Bots never open private chats themselves and never
+      join secret chats.
+    - Rate limits depend on the bot's tier (`default`, `verified`,
+      `internal`): every call, every send, and sends into one chat (default
+      tier: 30 calls/s, 30 sends/s, 1 send/s per chat with bursts of 20).
+      Exceeding one answers `429 rate_limited` with `retry_after` seconds
+      (also in the `Retry-After` header). After 20 failed authentications
+      from one address, further failed authentications from it answer
+      `429 rate_limited` (`retry_after` 60) for 60 seconds; requests with a
+      valid token are never refused by this. The edge also caps one address
+      at 600 requests per second (`429 rate_limited`, same envelope).
+    - `503 unavailable` means the server is restarting or dropped the
+      request; retry after `retry_after` seconds when given, else after a
+      short pause.
+    - Request bodies are `application/json`, at most 1 MiB; unknown fields
+      are rejected.
+
+    Later versions only add methods, fields and update kinds; bots must
+    ignore fields and update kinds they do not know.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://chat.{domain}/bot/v1
+    variables:
+      domain:
+        default: hoandat.com
+        description: Domain of the bot's tenant.
+security:
+  - botToken: []
+tags:
+  - name: bot
+    description: The bot itself.
+  - name: messages
+    description: Sending messages.
+  - name: updates
+    description: Receiving updates and answering callbacks.
+  - name: chats
+    description: Chats the bot is in.
+paths:
+  /me:
+    get:
+      tags: [bot]
+      operationId: getMe
+      summary: The bot's own profile.
+      responses:
+        '200':
+          description: The bot.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/Me'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:
+    post:
+      tags: [messages]
+      operationId: sendMessage
+      summary: Sends a text message.
+      description: |
+        Posts a text message into a chat the bot is in. A private chat needs
+        the user's consent. With `random_id` a retry returns the first
+        message instead of posting again (kept 7 days per bot; reusing it
+        in another chat is an error).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SendMessageRequest'}
+      responses:
+        '200':
+          description: The posted message.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/Message'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /updates:
+    get:
+      tags: [updates]
+      operationId: getUpdates
+      summary: Long poll for updates.
+      description: |
+        Returns pending updates with `update_id >= offset`, oldest first. A
+        request with `offset` acknowledges every update below it, so pass
+        the last `update_id + 1`; acknowledged updates are never returned
+        again, even for a lower `offset`. When none are pending the request
+        waits up to `timeout` seconds for the first one. Only one poll per
+        bot runs at a time: a newer request ends the older one with
+        `409 conflict`. While the server restarts a waiting poll ends with
+        an empty list and new polls answer `503 unavailable` with
+        `retry_after`. Updates are kept 24 hours (callbacks 15 minutes).
+        `update_id` strictly increases per bot.
+      parameters:
+        - name: offset
+          in: query
+          description: First update to return; every lower update is acknowledged.
+          schema: {type: integer, minimum: 0, maximum: 9007199254740991, default: 0}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 100}
+        - name: timeout
+          in: query
+          description: Seconds to wait for the first update; 0 answers at once.
+          schema: {type: integer, minimum: 0, maximum: 50, default: 0}
+      responses:
+        '200':
+          description: Pending updates (possibly none).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result:
+                    type: array
+                    items: {$ref: '#/components/schemas/Update'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /callbacks/{callback_id}:answer:
+    post:
+      tags: [updates]
+      operationId: answerCallback
+      summary: Answers a button press.
+      description: |
+        Answers the `callback` update `callback_id`, once. The user's client
+        waits up to 10 seconds for the answer and shows `text` as a toast
+        (or a dialog with `show_alert`); without an answer it shows that the
+        bot is not responding. A press stays answerable for 15 minutes.
+      parameters:
+        - name: callback_id
+          in: path
+          required: true
+          schema: {type: string, maxLength: 64}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AnswerCallbackRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /commands:
+    put:
+      tags: [bot]
+      operationId: setCommands
+      summary: Sets the command menu of one scope.
+      description: |
+        Replaces the commands of `scope` (default `default`); an empty list
+        removes the scope. Clients show the most specific list set:
+        `group_admin` (group admins), then `group` or `private`, then
+        `default`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SetCommandsRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /chats/{chat_id}:
+    get:
+      tags: [chats]
+      operationId: getChat
+      summary: A chat the bot is a member of.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 9007199254740991}
+      responses:
+        '200':
+          description: The chat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/Chat'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+components:
+  securitySchemes:
+    botToken:
+      type: http
+      scheme: bearer
+      description: The bot token "<bot_id>:<secret>".
+  responses:
+    'True':
+      description: Done.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok, result]
+            properties:
+              ok: {const: true}
+              result: {const: true}
+    BadRequest:
+      description: The request is invalid (`bad_request`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    Unauthorized:
+      description: Missing, malformed, unknown or revoked token (`unauthorized`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    Forbidden:
+      description: |
+        `no_consent`: the user has not started a chat with the bot.
+        `forbidden`: the bot may not send there (permissions, the user
+        blocked the bot, a closed topic).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    NotFound:
+      description: Unknown method, chat, message or callback, or the bot is not a member (`not_found`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    Conflict:
+      description: A newer getUpdates request of this bot ended this one (`conflict`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    PayloadTooLarge:
+      description: The body is larger than 1 MiB (`payload_too_large`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    UnsupportedMediaType:
+      description: The body is not `application/json` (`unsupported_media_type`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    RateLimited:
+      description: |
+        A rate limit was exceeded (`rate_limited`): the bot's tier, the
+        address's failed authentications, or the per-address flood limit.
+        Retry after `retry_after` seconds.
+      headers:
+        Retry-After:
+          description: Seconds to wait.
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    Unavailable:
+      description: |
+        The server is restarting or dropped the request (`unavailable`).
+        Retry after `retry_after` seconds when given.
+      headers:
+        Retry-After:
+          description: Seconds to wait, when known.
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: {const: false}
+        error:
+          type: object
+          required: [code, description]
+          properties:
+            code:
+              type: string
+              description: Stable error code; new codes may be added.
+              examples: [bad_request, unauthorized, forbidden, no_consent, not_found, method_not_allowed, conflict,
+                payload_too_large, unsupported_media_type, rate_limited, internal, unavailable]
+            description:
+              type: string
+              description: Human-readable detail; do not parse.
+            retry_after:
+              type: integer
+              minimum: 1
+              description: Seconds to wait before retrying (`rate_limited`, and `unavailable` when known).
+    Id:
+      type: integer
+      minimum: 1
+      maximum: 9007199254740991
+    User:
+      type: object
+      required: [id, is_bot, name]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        is_bot: {type: boolean}
+        name: {type: string}
+        username:
+          type: string
+          description: Unique in the tenant; absent when the user has none.
+    Me:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required: [privacy, tier]
+          properties:
+            privacy:
+              type: boolean
+              description: Privacy mode in groups (default on).
+            tier:
+              type: string
+              enum: [default, verified, internal]
+            description: {type: string}
+            about: {type: string}
+    Chat:
+      type: object
+      required: [id, type]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        type:
+          type: string
+          description: New chat types may be added.
+          examples: [private, group, channel]
+        title:
+          type: string
+          description: Groups and channels.
+        about: {type: string}
+        member_count: {type: integer}
+        forum:
+          type: boolean
+          description: The group has topics; messages carry topic_id.
+        user:
+          $ref: '#/components/schemas/User'
+          description: Private chats; the user the bot talks to.
+    EntityType:
+      type: string
+      enum: [bold, italic, underline, strike, spoiler, code, pre, text_link, mention, mention_name, hashtag, url, email,
+        bot_command]
+    Entity:
+      type: object
+      required: [type, offset, length]
+      properties:
+        type: {$ref: '#/components/schemas/EntityType'}
+        offset:
+          type: integer
+          minimum: 0
+          description: UTF-16 code units.
+        length:
+          type: integer
+          minimum: 1
+          description: UTF-16 code units.
+        url:
+          type: string
+          description: text_link only.
+        user_id:
+          $ref: '#/components/schemas/Id'
+          description: mention_name only.
+        language:
+          type: string
+          maxLength: 32
+          description: pre only.
+    InlineButton:
+      type: object
+      required: [text]
+      description: Exactly one of callback_data and url.
+      properties:
+        text: {type: string, minLength: 1, maxLength: 64}
+        callback_data:
+          type: string
+          description: 1 to 64 bytes, sent back in the callback update when pressed.
+        url:
+          type: string
+          maxLength: 2048
+          description: Opened by the client (http, https, mailto or the app scheme).
+    KeyboardButton:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Sent as the user's message when pressed.
+    ReplyMarkup:
+      description: Exactly one of inline_keyboard, keyboard and remove_keyboard.
+      oneOf:
+        - type: object
+          title: InlineKeyboardMarkup
+          required: [inline_keyboard]
+          properties:
+            inline_keyboard:
+              type: array
+              minItems: 1
+              maxItems: 8
+              items:
+                type: array
+                minItems: 1
+                maxItems: 8
+                items: {$ref: '#/components/schemas/InlineButton'}
+        - type: object
+          title: ReplyKeyboardMarkup
+          required: [keyboard]
+          properties:
+            keyboard:
+              type: array
+              minItems: 1
+              maxItems: 12
+              items:
+                type: array
+                minItems: 1
+                maxItems: 12
+                items: {$ref: '#/components/schemas/KeyboardButton'}
+            resize: {type: boolean}
+            one_time: {type: boolean}
+            placeholder: {type: string, maxLength: 64}
+            selective:
+              type: boolean
+              description: Only for users mentioned in the text and the author of the replied-to message.
+        - type: object
+          title: ReplyKeyboardRemove
+          required: [remove_keyboard]
+          properties:
+            remove_keyboard: {const: true}
+            selective: {type: boolean}
+    Media:
+      type: object
+      required: [kind]
+      description: The file of a media message; file methods come in a later version.
+      properties:
+        kind:
+          type: string
+          examples: [photo, video, audio, voice, document]
+        mime_type: {type: string}
+        size: {type: integer}
+        file_name: {type: string}
+        width: {type: integer}
+        height: {type: integer}
+        duration:
+          type: integer
+          description: Milliseconds.
+    Action:
+      type: object
+      required: [type]
+      description: Service message.
+      properties:
+        type:
+          type: string
+          description: New types may be added; unknown ones arrive as "other".
+          examples: [chat_created, members_added, member_left, member_removed, title_changed, photo_changed,
+            photo_removed, message_pinned, joined_by_invite, other]
+        user_ids:
+          type: array
+          items: {$ref: '#/components/schemas/Id'}
+        title: {type: string}
+        seq: {$ref: '#/components/schemas/Id'}
+    ForwardFrom:
+      type: object
+      required: [date]
+      properties:
+        user_id: {$ref: '#/components/schemas/Id'}
+        chat_id: {$ref: '#/components/schemas/Id'}
+        name: {type: string}
+        date: {type: integer}
+    Message:
+      type: object
+      required: [chat, seq, date]
+      properties:
+        chat: {$ref: '#/components/schemas/Chat'}
+        seq: {$ref: '#/components/schemas/Id'}
+        from:
+          $ref: '#/components/schemas/User'
+          description: Absent for messages of incoming webhooks and the server.
+        date:
+          type: integer
+          description: Unix seconds.
+        topic_id: {$ref: '#/components/schemas/Id'}
+        text:
+          type: string
+          description: The text, or the caption of a media message.
+        entities:
+          type: array
+          items: {$ref: '#/components/schemas/Entity'}
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        edit_date:
+          type: integer
+          description: Unix seconds of the last edit.
+        reply_markup: {$ref: '#/components/schemas/ReplyMarkup'}
+        media: {$ref: '#/components/schemas/Media'}
+        action: {$ref: '#/components/schemas/Action'}
+        forward_from: {$ref: '#/components/schemas/ForwardFrom'}
+        integration_label:
+          type: string
+          description: Name of the incoming webhook that posted the message.
+        random_id:
+          type: integer
+          description: Echoed to the sender only.
+    Callback:
+      type: object
+      required: [id, from, message, data]
+      properties:
+        id:
+          type: string
+          description: Pass to answerCallback.
+        from: {$ref: '#/components/schemas/User'}
+        message:
+          $ref: '#/components/schemas/Message'
+          description: The bot's message whose button was pressed.
+        data:
+          type: string
+          description: callback_data of the pressed button.
+    Update:
+      type: object
+      required: [update_id]
+      description: |
+        Exactly one update kind besides update_id. Version 1.0 sends
+        `message` (new messages in private chats and groups the bot is in;
+        in groups with privacy mode only commands addressed to the bot,
+        replies to its messages and service messages; never the bot's own
+        messages nor messages of other bots), `message_edited` (the author
+        edited the message; server-side changes such as an attached link
+        preview are not edits) and `callback` (a press of the bot's button
+        on a message that still exists). Later versions add kinds; ignore
+        unknown ones.
+      properties:
+        update_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        message: {$ref: '#/components/schemas/Message'}
+        message_edited: {$ref: '#/components/schemas/Message'}
+        callback: {$ref: '#/components/schemas/Callback'}
+      minProperties: 2
+      maxProperties: 2
+    SendMessageRequest:
+      type: object
+      required: [chat_id, text]
+      additionalProperties: false
+      properties:
+        chat_id: {$ref: '#/components/schemas/Id'}
+        topic_id:
+          $ref: '#/components/schemas/Id'
+          description: Forum groups; default General.
+        text:
+          type: string
+          description: Up to 4096 characters after parsing.
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+          description: Exclusive with parse_mode.
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+          description: See format.md.
+        reply_to_seq: {$ref: '#/components/schemas/Id'}
+        reply_markup: {$ref: '#/components/schemas/ReplyMarkup'}
+        random_id:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Dedupe key; 0 or absent disables dedupe.
+        disable_link_preview: {type: boolean}
+    AnswerCallbackRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        text: {type: string, maxLength: 200}
+        show_alert: {type: boolean}
+        url:
+          type: string
+          maxLength: 2048
+          description: Opened by the client (http, https, mailto or the app scheme).
+    Command:
+      type: object
+      required: [command, description]
+      properties:
+        command:
+          type: string
+          pattern: '^/?[A-Za-z0-9_]{1,32}$'
+          description: Stored lowercase without the slash.
+        description: {type: string, minLength: 1, maxLength: 256}
+    SetCommandsRequest:
+      type: object
+      required: [commands]
+      additionalProperties: false
+      properties:
+        scope:
+          type: string
+          enum: [default, private, group, group_admin]
+          default: default
+        commands:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Command'}

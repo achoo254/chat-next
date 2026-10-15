@@ -1073,7 +1073,10 @@ func decodeDialogCursor(s string) (time.Time, int64, error) {
 // dialogListed is the condition of a membership m (chat c) that shows in
 // the dialog list: current, and not a private chat deleted for oneself
 // (visible_from_seq past the newest message) until a new message arrives.
-const dialogListed = `m.left_at IS NULL AND NOT (c.type = 'private' AND m.visible_from_seq > c.last_seq)`
+// The saved chat ("Cloud của tôi") stays listed after its history is
+// cleared.
+const dialogListed = `m.left_at IS NULL AND NOT (c.type = 'private' AND m.visible_from_seq > c.last_seq
+	AND NOT EXISTS (SELECT 1 FROM private_chats sp WHERE sp.chat_id = c.id AND sp.user_low = sp.user_high))`
 
 // GetDialogs lists the caller's chats: on the first page every pinned chat
 // (pinned order) and then the others, newest activity first.

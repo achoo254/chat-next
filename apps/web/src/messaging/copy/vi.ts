@@ -199,6 +199,8 @@ export const vi = {
 	composer: {
 		label: (name: string) => `Tin nhắn tới ${name}`,
 		placeholder: (name: string) => `Nhập tin nhắn tới ${name}`,
+		/** "Cloud của tôi" (mockups/chat.html#first-run). */
+		placeholderSaved: "Ghi chú vào Cloud của tôi",
 		placeholderGroup: (name: string) => `Nhập @ để nhắc tên, tin nhắn tới ${name}`,
 		hint: "Enter gửi · Shift+Enter xuống dòng",
 		placeholderOffline: "Tin sẽ gửi khi có mạng",
@@ -268,6 +270,19 @@ export const vi = {
 	},
 	time: {
 		weekdays: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
+	},
+	bot: {
+		/** Tag after a bot's name in group messages (mockups/chat.html). */
+		tag: "bot",
+		/** Header subtitle of a private chat with a bot: "@deploy_bot · bot". */
+		subtitle: (username: string) => (username === "" ? "bot" : `@${username} · bot`),
+		/** A callback button while the bot has not answered (mockups/bots.html#inline-keyboard). */
+		waiting: "Đang chờ bot",
+		notResponding: "Bot không phản hồi",
+		/** Composer of a bot chat (mockups/bots.html#commands, #reply-keyboard). */
+		menu: "Lệnh của bot",
+		hideKeyboard: "Ẩn bàn phím của bot",
+		showKeyboard: "Hiện bàn phím của bot",
 	},
 	notify: {
 		/** Shown instead of the message when its preview is off. */

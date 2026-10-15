@@ -2,7 +2,7 @@
 // Pure with respect to the database: it only appends statements to the
 // batch and records follow-up effects for the engine to run after commit.
 import { EventKeys } from "../events/bus.ts";
-import type { Message, SessionRevokeReason, UpdateBody } from "../model/types.ts";
+import type { Chat, Message, SessionRevokeReason, UpdateBody } from "../model/types.ts";
 import { purgeChat, purgeMessages, recallMessages } from "../purge/index.ts";
 import {
 	ensureDialog,
@@ -82,6 +82,11 @@ export function requiredEntities(body: UpdateBody, selfId: number): { users: num
 		default:
 			return { users: [], chats: [] };
 	}
+}
+
+/** The user's chat with themselves ("Cloud của tôi"): a private chat whose only member is the user. */
+function isSavedChat(chat: Chat, selfId: number): boolean {
+	return chat.type === "private" && (chat.peerUserId === selfId || chat.memberCount === 1);
 }
 
 export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
@@ -172,6 +177,10 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			if (body.chat.left) {
 				purgeChat(w, body.chat.id);
 				effects.purgedChats.add(body.chat.id);
+			} else if (isSavedChat(body.chat, selfId)) {
+				// Clearing "Cloud của tôi" sends chat_deleted then chat_updated: the
+				// chat stays in the list, empty, even when it is not pinned.
+				ensureDialog(w, body.chat.id);
 			}
 			return;
 		case "topic_changed":

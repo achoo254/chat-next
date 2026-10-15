@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Chat, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
+import type { Bots } from "../bots/api.ts";
 import type { Integrations } from "../integrations/api.ts";
 import type { Drafts } from "./drafts.ts";
 import type { Folder } from "./format.ts";
@@ -51,6 +52,8 @@ export interface Services {
 	readonly remote: Remote;
 	/** Incoming webhooks of groups and channels (admins only). */
 	readonly integrations: Integrations;
+	/** Developer Console, starting bots, their menus and callback buttons. */
+	readonly bots: Bots;
 	readonly backend: PendingBackend;
 	readonly toasts: Toasts;
 	readonly drafts: Drafts;

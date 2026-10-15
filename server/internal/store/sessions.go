@@ -46,15 +46,22 @@ type Session struct {
 	LastSeenAt   time.Time
 	UserAgent    string
 	IP           string
+	// AuthTime is when the user last authenticated at the IdP for this
+	// session (the ID token's auth_time at sign-in); zero when unknown.
+	AuthTime time.Time
 }
 
 const sessionColumns = `s.id, s.tenant_id, s.user_id, s.token_hash, coalesce(s.idp_sid, ''), s.idp_client_id,
-	s.idp_checked_at, s.created_at, s.last_seen_at, s.user_agent, coalesce(host(s.ip), '')`
+	s.idp_checked_at, s.created_at, s.last_seen_at, s.user_agent, coalesce(host(s.ip), ''), s.auth_time`
 
 func scanSession(row pgx.Row) (Session, error) {
 	var x Session
+	var authTime *time.Time
 	err := row.Scan(&x.ID, &x.TenantID, &x.UserID, &x.TokenHash, &x.IdPSID, &x.IdPClientID,
-		&x.IdPCheckedAt, &x.CreatedAt, &x.LastSeenAt, &x.UserAgent, &x.IP)
+		&x.IdPCheckedAt, &x.CreatedAt, &x.LastSeenAt, &x.UserAgent, &x.IP, &authTime)
+	if authTime != nil {
+		x.AuthTime = *authTime
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrNotFound
 	}
@@ -73,6 +80,8 @@ type NewSession struct {
 	IDTokenEnc      []byte
 	UserAgent       string
 	IP              string // empty when unknown
+	// AuthTime is the ID token's auth_time; zero when it had none.
+	AuthTime time.Time
 }
 
 // CreateSession inserts a session and returns its id.
@@ -84,13 +93,18 @@ func (s *Store) CreateSession(ctx context.Context, n NewSession) (int64, error) 
 	if n.IP != "" {
 		ip = &n.IP
 	}
+	var authTime *time.Time
+	if !n.AuthTime.IsZero() {
+		authTime = &n.AuthTime
+	}
 	var id int64
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO user_sessions (token_hash, tenant_id, user_id, idp_sid, idp_client_id,
-			refresh_token_enc, id_token_enc, user_agent, ip)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::inet)
+			refresh_token_enc, id_token_enc, user_agent, ip, auth_time)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::inet, $10)
 		RETURNING id`,
-		n.TokenHash, n.TenantID, n.UserID, sid, n.IdPClientID, n.RefreshTokenEnc, n.IDTokenEnc, n.UserAgent, ip).Scan(&id)
+		n.TokenHash, n.TenantID, n.UserID, sid, n.IdPClientID, n.RefreshTokenEnc, n.IDTokenEnc, n.UserAgent, ip,
+		authTime).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("store: create session: %w", err)
 	}

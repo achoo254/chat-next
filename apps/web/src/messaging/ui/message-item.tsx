@@ -6,9 +6,11 @@
 // menu key on a reaction lists who reacted with it. Messages of incoming
 // webhooks (mockups/integrations.html#alert-message, #alert-grouping) carry
 // the "Tích hợp: <tên>" label, a Firing/Resolved chip when their first line
-// starts with one, URL buttons, and "đã cập nhật" when edited in place.
+// starts with one, URL buttons, and "đã cập nhật" when edited in place. Bot
+// messages carry callback buttons too (mockups/bots.html#inline-keyboard):
+// the pressed one waits for the bot's answer while the others stay usable.
 import { Suspense, lazy, memo, type ReactNode } from "react";
-import type { Chat, MediaKind, MessageButton, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
+import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -20,7 +22,7 @@ import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { isAllowedLink, linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
-import { useIntent, useUi } from "./ui-context.tsx";
+import { Cell, useCell, useIntent, useUi } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
 // Photos, files, voice and uploads render with the media chunk, loaded the
@@ -219,7 +221,8 @@ function ReactionChip({ message, reaction, chat }: { message: StoredMessage; rea
 	const { remote, toasts, self } = useServices();
 	const ui = useUi();
 	const { emoji, count, chosen } = reaction;
-	const content = pillContent(chat, reaction);
+	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
+	const content = pillContent(chat, reaction, isSavedChat(chat, peer));
 	const faces = content.kind === "avatars" ? content.ids : [];
 	const nameOf = useNameOf(faces);
 	const trigger = useContextTrigger(() => ui.dialog.set({ kind: "reactors", chatId: message.chatId, seq: message.seq, emoji }), true);
@@ -322,38 +325,99 @@ function QuickActions({
 	);
 }
 
+/** A button as shown: a bot callback or an allowed link. */
+type ShownButton =
+	| { readonly kind: "callback"; readonly text: string; readonly data: string; readonly key: string }
+	| { readonly kind: "url"; readonly text: string; readonly url: string; readonly key: string };
+
+/** Callback buttons waiting for the bot's answer ("chatId:seq:row:column"), across the screen. */
+const pressing = new Cell<ReadonlySet<string>>(new Set());
+
+function setPressing(key: string, on: boolean): void {
+	const next = new Set(pressing.get());
+	if (on) next.add(key);
+	else next.delete(key);
+	pressing.set(next);
+}
+
 /**
- * URL buttons under a message (webhooks and bots), row by row. Only links
- * the scheme allowlist accepts are shown; links off the tenant's sites ask
- * before opening, like links in the text.
+ * Buttons under a message (webhooks and bots), row by row. Only links the
+ * scheme allowlist accepts are shown; links off the tenant's sites ask
+ * before opening, like links in the text. A bot's callback button sends its
+ * data to the bot (PressInlineButton) and shows the answer as a toast, or a
+ * dialog when the bot asks for one; no answer in 10 seconds reads "Bot không
+ * phản hồi".
  */
-function MessageButtons({ rows, ctx }: { rows: readonly (readonly MessageButton[])[]; ctx: RichContext }) {
+function MessageButtons({ message, ctx }: { message: StoredMessage; ctx: RichContext }) {
 	const copy = useCopy();
-	const links = rows
-		.map((row) => row.flatMap((button) => (button.url !== null && isAllowedLink(button.url) ? [{ text: button.text, url: button.url }] : [])))
+	const ui = useUi();
+	const { bots, toasts } = useServices();
+	const waiting = useCell(pressing);
+	const { chatId, seq, fromId } = message;
+	const rows = message.buttons
+		.map((row, rowIndex) =>
+			row.flatMap((button, column): ShownButton[] => {
+				if (button.callbackData !== undefined) return [{ kind: "callback", text: button.text, data: button.callbackData, key: `${chatId}:${seq}:${rowIndex}:${column}` }];
+				if (button.url !== null && isAllowedLink(button.url)) return [{ kind: "url", text: button.text, url: button.url, key: `${rowIndex}:${column}` }];
+				return [];
+			}),
+		)
 		.filter((row) => row.length > 0);
-	if (links.length === 0) return null;
+	if (rows.length === 0) return null;
+	const press = (key: string, data: string) => {
+		if (pressing.get().has(key)) return;
+		setPressing(key, true);
+		bots
+			.press(chatId, seq, data)
+			.then(
+				(answer) => {
+					if (answer.timedOut) {
+						toasts.show(copy.bot.notResponding);
+						return;
+					}
+					if (answer.text !== "") {
+						if (answer.showAlert) ui.dialog.set({ kind: "botAlert", botId: fromId, text: answer.text });
+						else toasts.show(answer.text);
+					}
+					if (answer.url !== "") ctx.openLink(answer.url);
+				},
+				() => toasts.show(copy.common.failed),
+			)
+			.finally(() => setPressing(key, false));
+	};
 	return (
 		<div className="keyboard">
-			{links.map((row, rowIndex) => (
+			{rows.map((row, rowIndex) => (
 				<div className="kb-row" key={rowIndex}>
-					{row.map((button, index) => (
-						<a
-							key={index}
-							href={button.url}
-							target="_blank"
-							rel="noopener noreferrer"
-							onClick={(event) => {
-								if (button.url.startsWith("mailto:")) return;
-								event.preventDefault();
-								ctx.openLink(button.url, button.text);
-							}}
-						>
-							<span>{button.text}</span>
-							<Icon name="external" small />
-							<span className="sr-only">{copy.message.opensExternal}</span>
-						</a>
-					))}
+					{row.map((button) =>
+						button.kind === "callback" ? (
+							<button
+								key={button.key}
+								type="button"
+								aria-busy={waiting.has(button.key)}
+								onClick={() => press(button.key, button.data)}
+							>
+								<span>{button.text}</span>
+								{waiting.has(button.key) && <span className="sr-only">{copy.bot.waiting}</span>}
+							</button>
+						) : (
+							<a
+								key={button.key}
+								href={button.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								onClick={(event) => {
+									if (button.url.startsWith("mailto:")) return;
+									event.preventDefault();
+									ctx.openLink(button.url, button.text);
+								}}
+							>
+								<span>{button.text}</span>
+								<Icon name="external" small />
+								<span className="sr-only">{copy.message.opensExternal}</span>
+							</a>
+						),
+					)}
 				</div>
 			))}
 		</div>
@@ -539,7 +603,12 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 							{copy.message.integration(message.integrationLabel)}
 						</span>
 					)}
-					{showSender && !integration && <span className={`who s-${tone}`}>{senderName}</span>}
+					{showSender && !integration && (
+						<span className={`who s-${tone}`}>
+							{senderName}
+							{sender?.isBot === true && <span className="tag">{copy.bot.tag}</span>}
+						</span>
+					)}
 					<ForwardLine message={message} />
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
 					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
@@ -562,7 +631,7 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 							)}
 						</>
 					)}
-					<MessageButtons rows={message.buttons} ctx={ctx} />
+					<MessageButtons message={message} ctx={ctx} />
 					{preview !== null && <LinkPreviewCard preview={preview} message={message} ctx={ctx} />}
 					{trailingStamp && <p>{stamp}</p>}
 					{!inert && (

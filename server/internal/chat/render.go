@@ -285,6 +285,7 @@ type userRow struct {
 	Bio      string
 	Email    string
 	LastSeen *time.Time
+	IsBot    bool
 }
 
 func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (map[int64]*userRow, error) {
@@ -293,7 +294,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 		return out, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT id, username, name, bio, coalesce(email, ''), last_seen_at FROM users WHERE tenant_id = $1 AND id = ANY($2)`,
+		SELECT id, username, name, bio, coalesce(email, ''), last_seen_at, is_bot FROM users WHERE tenant_id = $1 AND id = ANY($2)`,
 		tenantID, ids)
 	if err != nil {
 		return nil, fmt.Errorf("chat: load users: %w", err)
@@ -301,7 +302,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u
@@ -310,7 +311,8 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 }
 
 func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
-	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked}
+	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked,
+		IsBot: u.IsBot}
 	if u.ID == viewer {
 		out.Email = u.Email
 	}

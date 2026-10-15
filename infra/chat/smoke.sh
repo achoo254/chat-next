@@ -4,7 +4,8 @@
 # Checks the web app, the API health, that sign-in redirects to the IdP with
 # the chat-web client, and that the realtime route refuses a socket without a
 # session, and that the webhook route answers an unknown hook with
-# hook_not_found, and (when configured) that the media host answers with
+# hook_not_found, that the Bot API answers a call without a token with 401
+# unauthorized, and (when configured) that the media host answers with
 # storage reachable and strict headers. Exits non-zero on the first failure.
 set -euo pipefail
 BASE="${1:-https://chat.hoandat.com}"
@@ -30,6 +31,8 @@ code="$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: $BASE" "$BASE/ws")"
 [ "$code" = 401 ] || fail "/ws without a session -> $code (want 401)"
 hook="$(curl -s -X POST -H 'Content-Type: application/json' --data '{}' "$BASE/hook/hk_AAAAAAAAAAAA/smokeprobe0000000000")"
 case "$hook" in *'"hook_not_found"'*) ;; *) fail "/hook/ unknown hook -> $hook (want hook_not_found)" ;; esac
+bot="$(curl -s -w ' %{http_code}' "$BASE/bot/v1/me")"
+case "$bot" in *'"unauthorized"'*' 401') ;; *) fail "/bot/v1/me without a token -> $bot (want 401 unauthorized)" ;; esac
 # Media host (when media is configured): storage reachable, unknown tokens
 # 404, no cookie and strict headers.
 MEDIA="${MEDIA_BASE:-https://media-chat.hoandat.com}"

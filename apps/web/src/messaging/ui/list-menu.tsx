@@ -10,7 +10,7 @@ import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { dialogTitle } from "../data/format.ts";
+import { dialogTitle, isSavedChat } from "../data/format.ts";
 import type { MuteFor } from "../data/remote.ts";
 import { useDialog, useListEntries, useListEntry, useServices } from "../data/services.tsx";
 import { muteEnd, MuteDurations, pinLimitReached, useMute } from "./dialog-settings.tsx";
@@ -135,7 +135,7 @@ export function ListMenu({ target, onClose }: { target: ListMenuTarget; onClose:
 							}}
 						>
 							<Icon name="trash" />
-							{privateChat ? t.deleteChat : copy.info.deleteGroup(view.chat?.type === "channel")}
+							{isSavedChat(view.chat, view.peer) ? copy.deleteChat.clearSaved : privateChat ? t.deleteChat : copy.info.deleteGroup(view.chat?.type === "channel")}
 						</button>
 					</>
 				)}

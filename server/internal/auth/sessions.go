@@ -128,6 +128,8 @@ type NewSessionData struct {
 	IDToken      string
 	UserAgent    string
 	IP           string
+	// AuthTime is the ID token's auth_time; zero when unknown.
+	AuthTime time.Time
 }
 
 // Create issues a session and returns its opaque token (only its hash is
@@ -149,6 +151,7 @@ func (m *Sessions) Create(ctx context.Context, d NewSessionData) (token string, 
 		IDTokenEnc:      m.idTokens.Seal([]byte(d.IDToken), hash),
 		UserAgent:       truncate(d.UserAgent, maxStoredTextBytes),
 		IP:              d.IP,
+		AuthTime:        d.AuthTime,
 	})
 	if err != nil {
 		return "", 0, err

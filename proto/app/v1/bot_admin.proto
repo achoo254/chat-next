@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+//
+// Bot management for the Developer Console. A bot is a user with is_bot
+// owned by the caller, in the caller's tenant; it has no IdP account and
+// talks to the server through the HTTP Bot API
+// (https://chat.<domain>/bot/v1/..., spec/bot-api/openapi.yaml) with a token
+// "<bot_id>:<secret>". The server keeps only a hash of the secret, so a token
+// is shown once, by ResetBotToken, and can never be read again.
+//
+// Errors besides the usual codes:
+// - failed_precondition "reauth_required: ...": ResetBotToken and DeleteBot
+//   need an IdP sign-in within the last 10 minutes (ADR 0006). The web
+//   sends the browser to /auth/login?reauth=1&return_to=<path> (the IdP
+//   asks for the password again) and retries after it comes back.
+// - failed_precondition "bots_limit: ...": the owner already has 20 bots.
+// - already_exists "username_taken: ...": the username belongs to a user or
+//   bot of the tenant.
+// - not_found: the bot does not exist, is deleted or belongs to someone else.
+
+// Developer Console: the caller's own bots.
+service BotAdminService {
+  // The caller's bots, oldest first.
+  rpc ListMyBots(ListMyBotsRequest) returns (ListMyBotsResponse);
+  // Creates a bot without a token; ResetBotToken issues the first one.
+  rpc CreateBot(CreateBotRequest) returns (CreateBotResponse);
+  // Changes the fields that are set; commands, when set, replace every
+  // command list of the bot.
+  rpc UpdateBot(UpdateBotRequest) returns (UpdateBotResponse);
+  // Issues a new token and returns it once; the previous token stops
+  // working at once. Needs a recent sign-in.
+  rpc ResetBotToken(ResetBotTokenRequest) returns (ResetBotTokenResponse);
+  // Deletes the bot: its token stops working and its pending updates are
+  // dropped; its messages stay. The username stays reserved. Needs a recent
+  // sign-in.
+  rpc DeleteBot(DeleteBotRequest) returns (DeleteBotResponse);
+}
+
+// Rate limit tier of a bot; only the operations team changes it.
+enum BotTier {
+  BOT_TIER_UNSPECIFIED = 0;
+  BOT_TIER_DEFAULT = 1;
+  BOT_TIER_VERIFIED = 2;
+  BOT_TIER_INTERNAL = 3;
+}
+
+// Where a command list applies. A client shows the most specific list
+// that is set: GROUP_ADMIN (group admins), then GROUP (groups) or PRIVATE
+// (the private chat with the bot), then DEFAULT.
+enum BotCommandScope {
+  BOT_COMMAND_SCOPE_UNSPECIFIED = 0;
+  BOT_COMMAND_SCOPE_DEFAULT = 1;
+  BOT_COMMAND_SCOPE_PRIVATE = 2;
+  BOT_COMMAND_SCOPE_GROUP = 3;
+  BOT_COMMAND_SCOPE_GROUP_ADMIN = 4;
+}
+
+message BotCommand {
+  // 1 to 32 characters of a-z, 0-9 and _, without the leading slash.
+  string command = 1;
+  // 1 to 256 characters.
+  string description = 2;
+}
+
+message BotCommandSet {
+  BotCommandScope scope = 1;
+  // Up to 100 commands, unique within the set, in menu order.
+  repeated BotCommand commands = 2;
+}
+
+message BotCommandSets {
+  // At most one set per scope; an empty list removes every command.
+  repeated BotCommandSet sets = 1;
+}
+
+message Bot {
+  // The bot's user (is_bot set).
+  User user = 1;
+  // Shown in the empty chat before the user starts the bot; up to 512
+  // characters.
+  string description = 2;
+  // Profile text; up to 120 characters.
+  string about = 3;
+  // Privacy mode (default on): in groups the bot only receives commands,
+  // replies to its own messages and service messages.
+  bool privacy = 4;
+  repeated BotCommandSet commands = 5;
+  BotTier tier = 6;
+  // A token was issued and is valid (ResetBotToken shows a new one).
+  bool has_token = 7;
+  // Unix seconds.
+  int64 created_at = 8 [jstype = JS_NUMBER];
+  // Unix seconds when the current token was issued; 0 without a token.
+  int64 token_issued_at = 9 [jstype = JS_NUMBER];
+}
+
+message ListMyBotsRequest {}
+
+message ListMyBotsResponse {
+  repeated Bot bots = 1;
+}
+
+message CreateBotRequest {
+  // 5 to 32 characters of a-z, 0-9 and _ ending in "bot" (any case; stored
+  // lowercase), unique among the users and bots of the tenant.
+  string username = 1;
+  // Display name, 1 to 64 characters.
+  string name = 2;
+}
+
+message CreateBotResponse {
+  Bot bot = 1;
+}
+
+message UpdateBotRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  optional string name = 2;
+  optional string description = 3;
+  optional string about = 4;
+  optional bool privacy = 5;
+  // Set to replace every command list.
+  BotCommandSets commands = 6;
+}
+
+message UpdateBotResponse {
+  Bot bot = 1;
+}
+
+message ResetBotTokenRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+}
+
+message ResetBotTokenResponse {
+  Bot bot = 1;
+  // "<bot_id>:<secret>", shown once. Bots send it as
+  // "Authorization: Bearer <token>".
+  string token = 2;
+}
+
+message DeleteBotRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+}
+
+message DeleteBotResponse {}

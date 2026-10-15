@@ -15,6 +15,7 @@ export const CORE_METHODS = [
 	"deleteMessages",
 	"markRead",
 	"setDialogUnreadMark",
+	"setKeyboardHidden",
 	"notificationSettings",
 	"setNotificationSettings",
 	"pinnedMessages",

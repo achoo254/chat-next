@@ -27,6 +27,7 @@ const MembersDialog = lazy(() => members().then((m) => ({ default: m.MembersDial
 const RemoveMemberDialog = lazy(() => members().then((m) => ({ default: m.RemoveMemberDialog })));
 const PinnedListDialog = lazy(() => import("./pinned-dialogs.tsx").then((m) => ({ default: m.PinnedListDialog })));
 const AddContactDialog = lazy(() => import("./contact-add.tsx").then((m) => ({ default: m.AddContactDialog })));
+const BotAlertDialog = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotAlertDialog })));
 
 export function DialogHost() {
 	const ui = useUi();
@@ -89,5 +90,7 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 			return <RemoveMemberDialog chatId={request.chatId} userId={request.userId} back={request.back} onClose={close} />;
 		case "addContact":
 			return <AddContactDialog onClose={close} />;
+		case "botAlert":
+			return <BotAlertDialog botId={request.botId} text={request.text} onClose={close} />;
 	}
 }

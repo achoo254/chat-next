@@ -24,6 +24,10 @@ import { useCell, useUi } from "./ui-context.tsx";
 
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
 const MediaViewer = lazy(() => import("../media/viewer.tsx"));
+// A bot's profile and "Bắt đầu" load with the first bot chat opened before it was started.
+const botChat = () => import("../bots/bot-chat.tsx");
+const BotProfileCard = lazy(() => botChat().then((m) => ({ default: m.BotProfileCard })));
+const BotStartBar = lazy(() => botChat().then((m) => ({ default: m.BotStartBar })));
 
 /** The photo and video viewer of this chat (mockups/media.html#viewer), loaded when first opened. */
 function ViewerLayer({ chatId }: { chatId: number }) {
@@ -129,7 +133,7 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 		case "group":
 			return <span>{online === null ? copy.convo.members(chat.memberCount) : copy.convo.membersOnline(chat.memberCount, online)}</span>;
 		default:
-			if (peer?.isBot === true) return <span>{copy.info.bot}</span>;
+			if (peer?.isBot === true) return <span>{copy.bot.subtitle(peer.username)}</span>;
 			return <span>{presence === null ? "" : presenceText(presence, copy)}</span>;
 	}
 }
@@ -143,7 +147,8 @@ function canSend(chat: Chat): boolean {
 }
 
 /** Says where the message goes (#composer-states): a person, a group (with the @ hint) or a topic. */
-function placeholderFor(chat: Chat, topic: Topic | null, title: string, copy: MessagingCopy): string {
+function placeholderFor(chat: Chat, topic: Topic | null, title: string, copy: MessagingCopy, saved: boolean): string {
+	if (saved) return copy.composer.placeholderSaved;
 	if (chat.type === "channel") return copy.composer.channelPlaceholder;
 	if (topic !== null) return topic.closed ? copy.topics.closedPlaceholder : copy.composer.placeholderGroup(topic.title);
 	if (chat.type === "group") return copy.composer.placeholderGroup(title);
@@ -208,6 +213,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const topic = topics === null ? null : (topics.find((t) => t.id === topicId) ?? topics.find((t) => t.general) ?? topics[0] ?? null);
 	const effectiveTopic = topic?.id ?? 0;
 	const limits = useMediaLimits();
+	const window_ = useWindow(chatId);
 	const [dragging, setDragging] = useState<number | null>(null);
 	const dragDepth = useRef(0);
 	// The search bar in place of the header, for the chat (and topic) it was opened in.
@@ -250,6 +256,16 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	}
 
 	const title = dialogTitle({ chat, peer: view?.peer ?? peer ?? null }, copy);
+	const botPeer = chat.type === "private" ? (view?.peer ?? peer ?? null) : null;
+	const botId = botPeer?.isBot === true ? botPeer.id : 0;
+	// A bot chat with no message yet: the bot cannot write until the user starts it (mockups/bots.html#bot-start).
+	const notStarted =
+		botId !== 0 &&
+		window_?.status === "ready" &&
+		window_.failure === null &&
+		window_.keys.length === 0 &&
+		!window_.hasOlder &&
+		(view?.dialog.topSeq ?? 0) === 0;
 	const kind = chatKind(chat, view?.peer ?? null, topics !== null);
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const closedForMe = topic !== null && topic.closed && !admin;
@@ -329,7 +345,19 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</Suspense>
 			)}
 			<OfflineBanner chatId={chatId} />
-			<MessageList chatId={chatId} topicId={effectiveTopic} chat={chat} dialog={view} />
+			<MessageList
+				chatId={chatId}
+				topicId={effectiveTopic}
+				chat={chat}
+				dialog={view}
+				empty={
+					botId === 0 ? undefined : (
+						<Suspense fallback={null}>
+							<BotProfileCard botId={botId} chatId={chatId} />
+						</Suspense>
+					)
+				}
+			/>
 			{chat.left ? (
 				<LeftBar chat={chat} />
 			) : topic !== null && topic.closed && !admin ? (
@@ -339,6 +367,10 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</div>
 			) : chat.type === "channel" && !admin ? (
 				<ChannelBar chatId={chatId} />
+			) : sendable && notStarted ? (
+				<Suspense fallback={null}>
+					<BotStartBar botId={botId} />
+				</Suspense>
 			) : sendable ? (
 				<Composer
 					key={`${chatId}:${effectiveTopic}`}
@@ -346,8 +378,9 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					topicId={effectiveTopic}
 					channel={chat.type === "channel"}
 					label={chat.type === "channel" ? copy.composer.channelLabel : copy.composer.label(topic?.title ?? title)}
-					placeholder={placeholderFor(chat, topic, title, copy)}
+					placeholder={placeholderFor(chat, topic, title, copy, isSavedChat(chat, view?.peer ?? peer ?? null))}
 					media={canSendMedia(chat)}
+					botId={botId}
 				/>
 			) : (
 				<div className="closed-bar" role="status">

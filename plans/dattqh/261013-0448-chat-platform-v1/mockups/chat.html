@@ -680,7 +680,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 2. List states ======================= -->
 <section class="shot" id="list-states">
 	<div class="shot-head"><h2>Trạng thái danh sách chat</h2><span class="phase">R1 · Phase 6</span>
-		<p>Chat ghim luôn ở đầu (biểu tượng ghim cạnh giờ, tối đa 5 chat). Chat đã tắt thông báo có chuông gạch và badge số màu xám để không giành sự chú ý; khi có người nhắc bạn, badge "@" vẫn hiện riêng bằng màu nhấn. Preview ưu tiên: đang gõ (màu tím) &gt; bản nháp (chữ "Nháp:" màu đỏ) &gt; tin cuối. Năm bộ lọc có sẵn giống cột thư mục; "Chưa đọc" lọc ở client, chat vừa đọc vẫn ở lại tới khi bạn đổi bộ lọc để danh sách không nhảy. Bộ lọc trống có trạng thái riêng. Khung skeleton chỉ xuất hiện ở lần đầu đăng nhập trên máy, những lần sau danh sách mở từ cache.</p></div>
+		<p>Chat ghim luôn ở đầu (biểu tượng ghim cạnh giờ, tối đa 5 chat). Chat đã tắt thông báo có chuông gạch và badge số màu xám để không giành sự chú ý; khi có người nhắc bạn, badge "@" vẫn hiện riêng bằng màu nhấn. Preview ưu tiên: đang gõ (màu tím) &gt; bản nháp (chữ "Nháp:" màu đỏ) &gt; tin cuối. Tin cuối là ảnh hoặc video thì có ảnh nhỏ vuông bo góc đứng trước chú thích (không chú thích thì chữ "Ảnh"/"Video"); file và tin thoại dùng chữ "File: tên file", "Tin thoại". Năm bộ lọc có sẵn giống cột thư mục; "Chưa đọc" lọc ở client, chat vừa đọc vẫn ở lại tới khi bạn đổi bộ lọc để danh sách không nhảy. Bộ lọc trống có trạng thái riêng. Khung skeleton chỉ xuất hiện ở lần đầu đăng nhập trên máy, những lần sau danh sách mở từ cache.</p></div>
 	<div class="frame">
 		<div class="split lists four">
 			<section class="pane list" aria-label="Danh sách chat, bộ lọc Tất cả">
@@ -723,7 +723,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 					</li>
 					<li class="chat-row">
 						<span class="avatar av-amber">MN</span>
-						<div><div class="name"><span class="title-text">Minh</span></div><div class="preview">Bạn: Ok, cảm ơn nhé</div></div>
+						<div><div class="name"><span class="title-text">Minh</span></div><div class="preview">Bạn: <span class="pv-thumb" role="img" aria-label="Ảnh"></span>Ảnh chụp lỗi trên staging</div></div>
 						<div class="meta"><span class="line"><svg class="icon icon-sm" role="img" aria-label="Đã xem"><use href="#i-checks"/></svg>Hôm qua</span></div>
 					</li>
 					<li class="chat-row">
@@ -812,7 +812,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 2a. First run: Cloud của tôi, invite the team ======================= -->
 <section class="shot" id="first-run">
 	<div class="shot-head"><h2>Người dùng mới: Cloud của tôi và mời đồng đội</h2><span class="phase">R3b · Phase 2, 6</span>
-		<p>Tài khoản mới không bao giờ thấy danh sách trống hoàn toàn. "Cloud của tôi" là chat với chính mình, có sẵn và ghim đầu danh sách từ lần đăng nhập đầu; bỏ ghim được và không tính vào giới hạn 5 chat ghim. Tin trong đó đồng bộ mọi máy: ghi chú, link, và từ R3 là ảnh, file để chuyển giữa máy tính và điện thoại. Menu của một tin có thêm "Lưu vào Cloud của tôi" (chuyển tiếp, giữ dòng "Chuyển tiếp từ"). Chat này không có "Đã xem", không có trạng thái hoạt động; thuộc bộ lọc Cá nhân. Khi danh sách chỉ có Cloud của tôi, phần dưới là lời mời: nút chính "Tạo nhóm và mời" mở hộp thoại Tạo nhóm thường (có ô tìm người) nhưng cho phép tạo khi chưa chọn ai: khi đó tên nhóm là bắt buộc và nút chính ghi "Tạo nhóm"; tạo xong (dù có chọn người hay không) mà nhóm chỉ có mình bạn thì hiện ngay link mời của nhóm để sao chép hoặc chia sẻ. "Nhắn cho một người" mở Chat mới. Lời mời tự ẩn khi đã có chat thứ hai.</p></div>
+		<p>Tài khoản mới không bao giờ thấy danh sách trống hoàn toàn. "Cloud của tôi" là chat với chính mình, có sẵn và ghim đầu danh sách từ lần đăng nhập đầu; bỏ ghim được và không tính vào giới hạn 5 chat ghim. Tin trong đó đồng bộ mọi máy: ghi chú, link, và từ R3 là ảnh, file để chuyển giữa máy tính và điện thoại. Menu của một tin có thêm "Lưu vào Cloud của tôi" (chuyển tiếp, giữ dòng "Chuyển tiếp từ"). Chat này không có "Đã xem", không có trạng thái hoạt động; thuộc bộ lọc Cá nhân. Khi danh sách chỉ có Cloud của tôi, phần dưới là lời mời: nút chính "Tạo nhóm và mời" mở hộp thoại Tạo nhóm thường (có ô tìm người) nhưng cho phép tạo khi chưa chọn ai: khi đó tên nhóm là bắt buộc và nút chính ghi "Tạo nhóm"; tạo xong (dù có chọn người hay không) mà nhóm chỉ có mình bạn thì hiện ngay link mời của nhóm để sao chép hoặc chia sẻ. "Nhắn cho một người" mở Chat mới. Lời mời tự ẩn khi đã có chat thứ hai. Ô soạn ghi "Ghi chú vào Cloud của tôi". Biểu cảm trên tin trong Cloud chỉ hiện emoji, không kèm ảnh đại diện của chính bạn. Cột thông tin của Cloud xem ở <a href="#info-panels">Cột thông tin</a>, hộp xoá ở <a href="#delete-chat">Xoá chat</a>.</p></div>
 	<div class="frame">
 		<div class="split lists two">
 			<section class="pane list" aria-label="Danh sách chat của tài khoản mới">
@@ -868,7 +868,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				<form class="composer">
 					<a class="icon-btn" href="media.html#attach" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></a>
 					<label class="sr-only" for="fr-input">Ghi chú vào Cloud của tôi</label>
-					<textarea id="fr-input" rows="1" placeholder="Ghi chú cho chính bạn"></textarea>
+					<textarea id="fr-input" rows="1" placeholder="Ghi chú vào Cloud của tôi"></textarea>
 					<a class="icon-btn" href="#emoji-picker" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></a>
 					<button type="button" class="send" aria-label="Gửi" data-toast="Đã lưu vào Cloud của tôi"><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
@@ -2279,7 +2279,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 14f. Delete a chat, group or channel ======================= -->
 <section class="shot" id="delete-chat">
 	<div class="shot-head"><h2>Xoá chat, xoá nhóm và xoá kênh</h2><span class="phase">R1 · Phase 2</span>
-		<p>Chat riêng: "Xoá chat" ở menu danh sách hoặc cột thông tin chỉ xoá lịch sử và hàng chat ở phía bạn; người kia vẫn giữ toàn bộ, và chat hiện lại khi có tin mới. Nhóm và kênh: chỉ trưởng nhóm (chủ kênh) thấy "Xoá nhóm" ("Xoá kênh"), ở Quản lý nhóm và trong hộp rời nhóm. Xoá nhóm gỡ nhóm, tin và media cho mọi thành viên, link mời ngừng hoạt động; phải gõ tên nhóm để bật nút xoá. Thành viên khác chỉ có "Rời nhóm".</p></div>
+		<p>Chat riêng: "Xoá chat" ở menu danh sách hoặc cột thông tin chỉ xoá lịch sử và hàng chat ở phía bạn; người kia vẫn giữ toàn bộ, và chat hiện lại khi có tin mới. Nhóm và kênh: chỉ trưởng nhóm (chủ kênh) thấy "Xoá nhóm" ("Xoá kênh"), ở Quản lý nhóm và trong hộp rời nhóm. Xoá nhóm gỡ nhóm, tin và media cho mọi thành viên, link mời ngừng hoạt động; phải gõ tên nhóm để bật nút xoá. Thành viên khác chỉ có "Rời nhóm". Cloud của tôi: mục là "Xoá toàn bộ tin nhắn", xoá mọi tin và file trong Cloud trên mọi thiết bị của bạn; Cloud vẫn nằm ở đầu danh sách.</p></div>
 	<div class="frame dlg-frame" data-ghost>
 		<div class="static-dialog pair">
 			<div class="panel" role="group" aria-labelledby="dc1-title">
@@ -2301,6 +2301,17 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 					<div class="field"><label for="dc-confirm">Gõ <b>Team Mobile</b> để xác nhận</label><input class="input" id="dc-confirm" autocomplete="off" spellcheck="false"></div>
 				</div>
 				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-danger" id="dc-submit" disabled data-press="Đã xoá nhóm Team Mobile">Xoá nhóm</button></div>
+			</div>
+		</div>
+	</div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog">
+			<div class="panel" role="group" aria-labelledby="dc3-title">
+				<div class="dlg-head"><h2 id="dc3-title">Xoá toàn bộ tin trong Cloud của tôi?</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<p class="note"><svg class="icon"><use href="#i-trash"/></svg><span>Xoá trên mọi thiết bị của bạn, không khôi phục được. Cloud của tôi vẫn ở đầu danh sách.</span></p>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-danger" data-press="Đã xoá toàn bộ tin trong Cloud của tôi">Xoá toàn bộ</button></div>
 			</div>
 		</div>
 	</div>
@@ -2370,7 +2381,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 16. Info panels ======================= -->
 <section class="shot" id="info-panels">
 	<div class="shot-head"><h2>Cột thông tin: nhóm, kênh, người, bot</h2><span class="phase">R1 · Phase 2, 6, 12</span>
-		<p>Cột phải mở bằng nút "i" trên khung chat và đóng được. Thứ tự theo thói quen người Việt: ảnh, tên, trạng thái và mô tả → ba nút nhanh → thành viên (5 người đầu + "Xem tất cả") → link mời → Ảnh, file, link → Quản lý → Rời / Báo cáo. Ba nút nhanh chia đều hàng, chữ được xuống dòng: nhóm "Tắt thông báo · Ghim · Thêm thành viên"; kênh "Tắt thông báo · Ghim · Thêm người đăng ký"; chat riêng "Tắt thông báo · Ghim · Tạo nhóm". "Tắt thông báo" mở chọn thời hạn (1 giờ, 8 giờ, 1 ngày, 1 tuần, Cho đến khi bật lại; bấm thử); "Ghim" đưa chat lên đầu danh sách, tối đa 5 chat. Khối "Ảnh, file, link" chỉ có mục nào đã có nội dung, không hiện mục rỗng. Dòng trạng thái: nhóm "{n} thành viên · {k} đang hoạt động"; người "Đang hoạt động", "Vừa truy cập", "Truy cập {x} phút trước" hoặc mức gần đúng theo cài đặt riêng tư. Nhóm dùng "Trưởng nhóm" và "Phó nhóm"; kênh giữ "Chủ kênh" và "Admin", "người đăng ký" thay "thành viên". Link mời dài thì giữ đầu và cuối với "…" ở giữa, cột không bao giờ cuộn ngang. Bot trong nhóm ở chế độ riêng tư ghi rõ "không đọc được tin nhắn". Cột của bot lên prod cùng R5.</p></div>
+		<p>Cột phải mở bằng nút "i" trên khung chat và đóng được. Thứ tự theo thói quen người Việt: ảnh, tên, trạng thái và mô tả → ba nút nhanh → thành viên (5 người đầu + "Xem tất cả") → link mời → Ảnh, file, link → Quản lý → Rời / Báo cáo. Ba nút nhanh chia đều hàng, chữ được xuống dòng: nhóm "Tắt thông báo · Ghim · Thêm thành viên"; kênh "Tắt thông báo · Ghim · Thêm người đăng ký"; chat riêng "Tắt thông báo · Ghim · Tạo nhóm"; Cloud của tôi chỉ có "Ghim"/"Bỏ ghim" (tin trong Cloud do chính bạn gửi nên không có "Tắt thông báo"), và cuối cột là "Xoá toàn bộ tin nhắn" thay cho "Xoá chat". "Tắt thông báo" mở chọn thời hạn (1 giờ, 8 giờ, 1 ngày, 1 tuần, Cho đến khi bật lại; bấm thử); "Ghim" đưa chat lên đầu danh sách, tối đa 5 chat. Khối "Ảnh, file, link" chỉ có mục nào đã có nội dung, không hiện mục rỗng. Dòng trạng thái: nhóm "{n} thành viên · {k} đang hoạt động"; người "Đang hoạt động", "Vừa truy cập", "Truy cập {x} phút trước" hoặc mức gần đúng theo cài đặt riêng tư. Nhóm dùng "Trưởng nhóm" và "Phó nhóm"; kênh giữ "Chủ kênh" và "Admin", "người đăng ký" thay "thành viên". Link mời dài thì giữ đầu và cuối với "…" ở giữa, cột không bao giờ cuộn ngang. Bot trong nhóm ở chế độ riêng tư ghi rõ "không đọc được tin nhắn". Cột của bot lên prod cùng R5.</p></div>
 	<div class="frame auto">
 		<div class="split infos">
 			<aside class="info" aria-label="Thông tin nhóm Vận hành hệ thống">
@@ -2514,6 +2525,27 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 				<div class="info-sec">
 					<button type="button" class="row link-row danger" data-press="Đã dừng bot, bot không nhắn cho bạn được nữa"><svg class="icon"><use href="#i-ban"/></svg><span class="grow">Dừng bot</span></button>
 					<a class="row link-row" href="settings.html#report"><svg class="icon"><use href="#i-flag"/></svg><span class="grow">Báo cáo bot</span></a>
+				</div>
+			</aside>
+
+			<aside class="info" aria-label="Thông tin Cloud của tôi">
+				<div class="pane-cap">Cloud của tôi</div>
+				<div class="info-head"><span>Thông tin</span><button type="button" class="icon-btn" aria-label="Đóng cột thông tin"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="info-hero">
+					<span class="avatar lg av-blue"><svg class="icon"><use href="#i-cloud"/></svg></span>
+					<h2>Cloud của tôi</h2>
+					<span class="muted">Chỉ mình bạn thấy · đồng bộ mọi máy</span>
+				</div>
+				<div class="quick-acts">
+					<button type="button" aria-pressed="true" data-pin-chat><span class="qa-ico"><svg class="icon"><use href="#i-pin"/></svg></span><span class="qa-label">Bỏ ghim</span></button>
+				</div>
+				<div class="info-sec">
+					<h3>Ảnh, file, link</h3>
+					<a class="row link-row" href="media.html#shared-media"><svg class="icon"><use href="#i-photo"/></svg><span class="grow">Ảnh và video</span><span class="num">8</span></a>
+					<a class="row link-row" href="media.html#shared-media"><svg class="icon"><use href="#i-file"/></svg><span class="grow">File</span><span class="num">3</span></a>
+				</div>
+				<div class="info-sec">
+					<a class="row link-row danger" href="#delete-chat"><svg class="icon"><use href="#i-trash"/></svg><span class="grow">Xoá toàn bộ tin nhắn</span></a>
 				</div>
 			</aside>
 		</div>

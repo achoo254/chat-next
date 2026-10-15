@@ -13,8 +13,8 @@ const LANGUAGES: { locale: Locale; label: string }[] = [
  * Sign-in URL handled by the server; it redirects to the IdP with ui_locales
  * and, after sign-in, back to the page this visitor opened (return_to).
  */
-export function loginUrl(locale: Locale, create = false, pathname = window.location.pathname): string {
-	const returnTo = returnPathFor(pathname);
+export function loginUrl(locale: Locale, create = false, pathname = window.location.pathname, search = window.location.search): string {
+	const returnTo = returnPathFor(pathname, search);
 	return signInUrl(locale, { create, ...(returnTo === undefined ? {} : { returnTo }) });
 }
 

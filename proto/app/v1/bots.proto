@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package app.v1;
 
+import "app/v1/bot_admin.proto";
 import "app/v1/chats.proto";
 import "app/v1/media.proto";
 import "app/v1/messages.proto";
@@ -24,7 +25,13 @@ service BotsService {
   rpc OpenMiniApp(OpenMiniAppRequest) returns (OpenMiniAppResponse);
   // Records the user's consent, opens the private chat with the bot and
   // sends the start message (after the client confirmed a deep link).
+  // Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
+  // the client resolves the username with UsersService.ResolveUsername
+  // (User.is_bot must be set), shows GetBotInfo and asks before starting.
   rpc StartBot(StartBotRequest) returns (StartBotResponse);
+  // Public profile of a bot: description, about and the command menu for
+  // a chat.
+  rpc GetBotInfo(GetBotInfoRequest) returns (GetBotInfoResponse);
 }
 
 enum InlineResultKind {
@@ -92,7 +99,8 @@ message OpenMiniAppResponse {
 
 message StartBotRequest {
   int64 bot_id = 1 [jstype = JS_NUMBER];
-  // Deep-link start parameter; may be empty.
+  // Deep-link start parameter; may be empty. Up to 64 characters of
+  // A-Z, a-z, 0-9, _ and -. The bot receives "/start <param>" (or "/start").
   string start_param = 2;
   // Client-generated (< 2^53) dedupe key for the start message.
   int64 random_id = 3 [jstype = JS_NUMBER];
@@ -103,4 +111,20 @@ message StartBotResponse {
   Message message = 2;
   repeated User users = 3;
   SyncAck ack = 4;
+}
+
+message GetBotInfoRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // Chat the menu is for: 0 (or the private chat with the bot) for the
+  // private scope, a group for the group scopes.
+  int64 chat_id = 2 [jstype = JS_NUMBER];
+}
+
+message GetBotInfoResponse {
+  User user = 1;
+  string description = 2;
+  string about = 3;
+  // The command menu for the caller in chat_id: the most specific list set
+  // (GROUP_ADMIN for admins, GROUP or PRIVATE, then DEFAULT).
+  repeated BotCommand commands = 4;
 }

@@ -45,6 +45,12 @@ Bản tìm kiếm chuỗi con (migration `0012_message_search_substring`: từ k
 - Expand/contract: chỉ thêm cột `messages.search_text` (nullable) và GIN index trigram, giữ `search_tsv`. Binary R4 vẫn chạy trên schema mới (không đọc cột mới); tin nó ghi trong lúc chuyển có `search_text` `NULL`, chưa tìm được bằng chuỗi con cho tới lần `-role migrate` sau (backfill). Bước migrate của bản này điền `search_text` cho mọi tin cũ (`search.Backfill`, đo trên máy dev: 200.000 tin trong khoảng 6,4 giây, gồm cả cập nhật GIN index).
 - Rollback code (`switch-release.sh`) về R4 không cần đụng dữ liệu. Down của migration bỏ index và cột, giữ extension. Backup `pg_dump` có thêm lệnh tạo extension; restore bằng role `chat` vẫn tạo được vì extension trusted.
 
+Release R5 lát A (Bot API lõi, migration `0013_bots`) đổi conf nginx (location `/bot/`, zone `chat_bot` 600 r/s mỗi IP, burst 1200, khai báo trong `chat.hoandat.com.conf`; vượt thì `429` cùng envelope JSON của Bot API qua `@bot_rate_limited`), `activate-release.sh` (thêm bước kiểm `/bot/v1/me` không token trả `401 unauthorized`) và `smoke.sh`, nên phải deploy bằng root một lần như R2: deploy tự động dùng conf nginx và script trong `/opt/chat/infra`, chưa có `/bot/`, nên `/bot/…` sẽ rơi vào web tĩnh. Không cần DNS mới, chứng chỉ mới, biến môi trường mới hay cài lại `chat-http.conf`; Bot API nằm trên host chat sẵn có (`https://chat.hoandat.com/bot/v1/…`) và chạy trong process `chat-api`, không thêm process pm2.
+
+- Migration chỉ thêm: cột `users.is_bot`, `idp_sub` được phép `NULL` cho bot (kèm `CHECK (is_bot OR idp_sub IS NOT NULL)`), cột `user_sessions.auth_time`, bảng `bots`, `bot_user_consent`, `bot_callbacks`, `bot_updates`, cursor `bots` trong `outbox_cursors` đặt ở đầu log hiện tại. Binary R4 vẫn chạy trên schema mới (không đọc bot nào: bot không có phiên).
+- Cấp lại token và xoá bot cần đăng nhập IdP trong 10 phút gần đây (ADR 0006): web gửi `/auth/login?reauth=1`, server gửi `prompt=login` và `max_age=600` rồi lưu `auth_time` của ID token vào phiên mới. IdP (`oidc-provider`) có `auth_time` khi request có `max_age`; sau deploy kiểm một lần bằng "Cấp lại token" trong Developer Console. Nếu IdP không trả `auth_time`, mọi lần cấp lại token đều trả `reauth_required`.
+- Rollback code (`switch-release.sh`) về R4 không cần đụng dữ liệu; bot ngừng hoạt động (R4 không có `/bot/`).
+
 ## Các lần sau
 
 Mặc định deploy tự động: mỗi lần `ci` xanh trên `main`, workflow [`deploy`](../.github/workflows/deploy.yml) build release trong một job không có key deploy, rồi job deploy tải lên `/opt/chat/incoming/<id>` bằng user `chat-deploy` rồi gọi lệnh sudo duy nhất user này có, `/usr/local/sbin/chat-activate-incoming <id>` ([`activate-incoming.sh`](../infra/chat/activate-incoming.sh)). Lệnh đó chuyển bản upload vào `/opt/chat/staging` (chỉ root), đổi chủ sang root rồi mới kiểm (từ chối symlink và file đặc biệt), chuyển sang `/opt/chat/releases`, thay conf nginx bằng bản trong `/opt/chat/infra/nginx` (bản upload không đổi được nginx), rồi chạy `activate-release.sh`; cuối cùng workflow chạy `smoke.sh`.
@@ -74,7 +80,7 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 
 ## Kiểm tra sau deploy
 
-`infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`; khi đã cấu hình media: `https://media-chat.hoandat.com/healthz` báo `"storage":"reachable"`, `/f/<token sai>` trả 404 có `nosniff` và không `Set-Cookie`, route của app trên host media trả 404 (chưa cấu hình thì bỏ qua và in thông báo). Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
+`infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`, `GET /bot/v1/me` không token trả 401 `unauthorized`; khi đã cấu hình media: `https://media-chat.hoandat.com/healthz` báo `"storage":"reachable"`, `/f/<token sai>` trả 404 có `nosniff` và không `Set-Cookie`, route của app trên host media trả 404 (chưa cấu hình thì bỏ qua và in thông báo). Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
 
 ## Webhook (incoming)
 
@@ -86,6 +92,17 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
   - lịch sử quản lý: `SELECT * FROM hook_audit WHERE hook_id = '<hook_id>' ORDER BY id;` (bảng chỉ thêm, trigger chặn sửa và xoá).
 - URL lộ: admin xoay secret trong app với "thu hồi ngay", hoặc tắt webhook. Người vận hành tắt khẩn cấp: `UPDATE incoming_hooks SET state = 'disabled', disabled_reason = 'by_admin', disabled_at = now() WHERE id = '<hook_id>';` (có hiệu lực ở request kế tiếp).
 - Dọn mỗi giờ: khoá idempotency quá 24 giờ; nhóm cảnh báo (`notify_groups`), bộ đếm và dead letter quá 30 ngày.
+
+## Bot API (R5)
+
+- Bot do người dùng tạo trong Developer Console (`BotAdminService`, giao thức ở [`server/README.md`](../server/README.md#bot-api-r5-package-internalbotapi)); bot gọi `https://chat.hoandat.com/bot/v1/…` với `Authorization: Bearer <bot_id>:<secret>`. DB chỉ giữ SHA-256 của secret; token không vào log nào (chỉ nằm trong header, log format của nginx chỉ ghi `$uri`).
+- Tra cứu khi có người báo "bot không nhận tin" (qua [`psql.sh`](../infra/chat/psql.sh)):
+  - bot: `SELECT b.user_id, u.username, b.owner_id, b.deleted_at, b.token_hash IS NOT NULL AS has_token, b.privacy, b.next_update_id FROM bots b JOIN users u ON u.id = b.user_id WHERE u.username = '<username>';`
+  - update đang chờ: `SELECT kind, count(*), min(created_at) FROM bot_updates WHERE bot_id = <id> GROUP BY kind;` (bot không gọi `getUpdates` thì update hết hạn sau 24 giờ, callback 15 phút);
+  - consumer: `SELECT last_id, updated_at FROM outbox_cursors WHERE consumer = 'bots';` so với `SELECT max(id) FROM outbox;` (lệch lâu là consumer kẹt, xem log `bot update consumer failed`);
+  - consent: `SELECT source, created_at FROM bot_user_consent WHERE bot_id = <id> AND user_id = <user>;` (bot gửi riêng cho người chưa có dòng này nhận `403 no_consent`).
+- Tầng `verified`/`internal` (rate limit cao hơn) chỉ đội vận hành đặt: `UPDATE bots SET verified = true WHERE user_id = <id>;`.
+- Token lộ: chủ bot cấp lại token trong app. Người vận hành vô hiệu hoá khẩn cấp: `UPDATE bots SET token_hash = NULL WHERE user_id = <id>;` (có hiệu lực ở request kế tiếp).
 
 ## Media (R3)
 

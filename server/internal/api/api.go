@@ -3,7 +3,7 @@
 // realtime WebSocket at /ws (the gateway runs inside the api process in
 // stage 1), the incoming webhook endpoint POST /hook/... (in the same
 // process, so a hook message reaches the in-memory gateway right after
-// commit) and, on the media host only, media downloads and proxied upload
+// commit), the Bot API under /bot/v1/ and, on the media host only, media downloads and proxied upload
 // parts.
 package api
 
@@ -22,6 +22,9 @@ import (
 	"time"
 
 	"app.local/server/internal/auth"
+	"app.local/server/internal/botadmin"
+	"app.local/server/internal/botapi"
+	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/config"
 	"app.local/server/internal/gateway"
@@ -50,6 +53,9 @@ type App struct {
 	// Media is nil when no storage is configured.
 	Media *media.Service
 	Hub   *gateway.Hub
+	// BotAdmin manages bots; BotUpdates feeds the Bot API's getUpdates.
+	BotAdmin   *botadmin.Service
+	BotUpdates *botupdates.Service
 
 	logger   *slog.Logger
 	cancel   context.CancelFunc
@@ -122,9 +128,23 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	botAdmin, err := botadmin.New(st.Pool(), cfg.TenantID, limiter, logger)
+	if err != nil {
+		return nil, err
+	}
+	botUpdates, err := botupdates.New(st.Pool(), chatSvc, cfg.AppURLScheme, logger.With("component", "botupdates"))
+	if err != nil {
+		return nil, err
+	}
+	chatSvc.SetCommitObserver(botUpdates.Kick)
+	botAPI, err := botapi.New(botapi.Config{TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme},
+		chatSvc, botAdmin, botUpdates, limiter, logger.With("component", "botapi"))
+	if err != nil {
+		return nil, err
+	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
-		TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
+		Bots: botAdmin, BotUpdates: botUpdates, TenantID: cfg.TenantID, TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {
 		return nil, err
@@ -141,12 +161,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	for _, route := range hooks.Routes {
 		mux.Handle(route, hookSvc)
 	}
+	mux.Handle(botapi.Prefix, botAPI)
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
-		logger: logger, cancel: cancel}
+		BotAdmin: botAdmin, BotUpdates: botUpdates, logger: logger, cancel: cancel}
 	loops := []func(context.Context){
-		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run,
+		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
 	}
 	if mediaSvc != nil {
@@ -286,6 +307,9 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		IdleTimeout:       120 * time.Second,
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelWarn),
 	}
+	// Long polls of the Bot API end at once on shutdown instead of holding
+	// the drain for up to 50 seconds.
+	srv.RegisterOnShutdown(app.BotUpdates.ReleasePolls)
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", cfg.ListenAddr, "public_origin", cfg.PublicOrigin(), "env", cfg.Env,

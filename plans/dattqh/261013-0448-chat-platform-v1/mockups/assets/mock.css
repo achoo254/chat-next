@@ -414,6 +414,7 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .preview .from { color: var(--c-text); font-weight: 500; }
 .preview .typing-text { color: var(--c-primary); }
 .preview .draft { color: var(--c-error); font-weight: 500; }
+.preview .pv-thumb { display: inline-block; width: 1.125rem; height: 1.125rem; margin-right: 0.25rem; vertical-align: -0.25rem; border-radius: 0.25rem; background: linear-gradient(135deg, #6b8fb8, #3d5a80); }
 .preview.two-line { display: grid; white-space: normal; }
 .preview.two-line > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview .topics-line { color: var(--c-text); }

@@ -80,6 +80,12 @@ export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) 
 						))}
 					</Fragment>
 				))}
+				{messaging !== undefined && (
+					<Link to={paths.console()}>
+						<Icon name="robot" />
+						<span>{t.settings.console}</span>
+					</Link>
+				)}
 				{messaging?.moderation === true && (
 					<Link to={paths.moderation()}>
 						<Icon name="shield" />

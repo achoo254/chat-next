@@ -15,12 +15,11 @@ Hệ sinh thái hoandat có tenant theo domain (ADR 0006 của `hoandat-auth`): 
 
 | Host | Việc |
 |---|---|
-| `chat.<d>` | Web app, RPC, WebSocket, callback OIDC, back-channel logout, deep link `/b/<username>` |
-| `bot.chat.<d>` | Bot API |
-| `hook.chat.<d>` | Incoming webhook |
+| `chat.<d>` | Web app, RPC, WebSocket, callback OIDC, back-channel logout, deep link `/b/<username>`, Bot API ở `/bot/v1/`, incoming webhook ở `/hook/` |
 | `b<bot_id>.{{miniapp_domain}}` | Origin riêng cho từng Mini App |
 | `{{media_domain}}` | Media |
 
+- Bot API và incoming webhook là đường dẫn trên `chat.<d>`, không có host riêng (quyết định 2026-10-15): Universal SSL miễn phí của Cloudflare chỉ phủ một cấp dưới `<d>`, nên host hai cấp như `bot.chat.<d>` được proxy sẽ lỗi TLS.
 - Host của tenant nằm trong `chat.<d>` và `*.chat.<d>` (một cấp), cùng quy ước với `localman.<d>` và `*.localman.<d>` của hệ sinh thái, nên dùng chung cơ chế cấp chứng chỉ theo tenant.
 - Mini App và media nằm trên domain đăng ký riêng, dùng chung cho mọi tenant, cố ý không nằm dưới `<d>`. `bot_id` duy nhất trên toàn hệ thống nên origin Mini App không trùng giữa các tenant.
 - `{{media_domain}}` không dùng cookie; token tải xuống mang `tenant_id` và chủ thể, và edge từ chối token của tenant bị đình chỉ.

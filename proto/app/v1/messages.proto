@@ -43,7 +43,10 @@ service MessagesService {
   // Seq-cursor history; respects visible_from_seq and messages hidden for the
   // caller.
   rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
-  // Sends an inline keyboard callback to the bot and waits for its answer.
+  // Sends an inline keyboard callback to the bot and waits up to 10 s for
+  // its answer. The message must carry a callback button with exactly this
+  // callback_data; pressing a button in a private chat with the bot counts
+  // as consent for the bot to write to the caller.
   rpc PressInlineButton(PressInlineButtonRequest) returns (PressInlineButtonResponse);
   // Text-only preview of a web page for the composer; empty preview when the
   // page has none or cannot be fetched.
@@ -568,6 +571,9 @@ message PressInlineButtonResponse {
   bool show_alert = 2;
   // URL the bot asks the client to open (scheme allowlist applies).
   string url = 3;
+  // The bot did not answer within 10 seconds; the client shows "the bot is
+  // not responding". The press still reached the bot.
+  bool timed_out = 4;
 }
 
 message GetLinkPreviewRequest {

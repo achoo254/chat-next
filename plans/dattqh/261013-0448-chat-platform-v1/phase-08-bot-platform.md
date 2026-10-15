@@ -15,6 +15,7 @@ principles: [6, 2, 3, 5]
 <!-- Updated: REA Telegram Desktop 2026-10-14 - bridge Mini App: enum sự kiện v1, trần kích thước, schema, chặn điều hướng ngoài origin -->
 <!-- Updated: Validation Session 8 2026-10-14 - Mini App chuyển sang Phase 16, file của Bot API làm cùng Phase 4 (cả hai làm sau cùng) -->
 <!-- Updated: Validation Session 9 2026-10-14 - lên prod ở release R5; file Bot API trả về phase này vì media đã có từ R3 -->
+<!-- Updated: R5 lát A 2026-10-15 - Bot API ở đường dẫn https://chat.<d>/bot/v1/ trong process api (không host bot.chat.<d>, không role riêng); lát A đã làm: spec, quản lý bot, consent, gửi tin + bàn phím, long poll, callback, lệnh -->
 
 ## Goal
 
@@ -36,7 +37,7 @@ Cung cấp Bot API của riêng sản phẩm, mạnh ngang bot Telegram về kh�
 
 ## Requirements
 
-Functional — API v1 (`https://bot.chat.<d>/bot/v1/...`, `Authorization: Bearer <token>`, JSON, error envelope thống nhất), đặc tả trong `spec/bot-api/openapi.yaml`:
+Functional — API v1 (`https://chat.<d>/bot/v1/...` trên host chat của tenant, như webhook; `bot.chat.<d>` không dùng vì SSL miễn phí của Cloudflare chỉ phủ một cấp; `Authorization: Bearer <token>`, JSON, error envelope thống nhất), đặc tả trong `spec/bot-api/openapi.yaml`:
 - Bot thuộc một tenant (ADR 0010): username bot unique trong tenant, token chỉ dùng được ở host Bot API của tenant đó, bot chỉ thấy và nhắn được user/chat cùng tenant. Bot không có tài khoản ở IdP; chủ bot là user chat.
 - Quản lý bot (backend cho Developer Console Phase 15): tạo, đổi tên/mô tả/ảnh, lệnh, privacy mode, cấp lại token, xoá; RPC trong `bots.proto`. Proto v1 chưa có các RPC này, cùng `SendInlineResult` và menu lệnh bot; thêm ở phase này (thêm mới không phá contract).
 - Tin nhắn: gửi text (entities hoặc Markdown/HTML subset theo `spec/bot-api/format.md`), sửa, xoá, chuyển tiếp, sao chép, ảnh/file/video/audio/voice/album, "đang gõ", reaction, ghim.
@@ -59,8 +60,10 @@ Non-functional:
 
 ## Architecture
 
+Giai đoạn 1 (một server): gateway Bot API chạy trong process `api` (mux `/bot/v1/`), gọi thẳng lõi; tách role `botapi` khi scale.
+
 ```
-bot ──HTTPS──> botapi gateway (role=botapi) ──RPC──> core (consent, quyền, rate limit)
+bot ──HTTPS──> botapi gateway (trong api; role=botapi khi scale) ──> core (consent, quyền, rate limit)
 outbox (cursor bot, shard theo bot_id) ──> cấp update_id ──> bot_updates
    ├──> webhook dispatcher (per bot: concurrency, circuit breaker, safehttp, HMAC header)
    └──> long poll
@@ -98,13 +101,14 @@ Create:
 
 ## Todo
 
-- [ ] OpenAPI + format spec
-- [ ] Router + auth + envelope + rate limit tầng
-- [ ] Consent invariant
-- [ ] Mapping + validate OpenAPI
-- [ ] Parser + allowlist scheme + fuzz
-- [ ] update_id một writer + bot_updates
-- [ ] Long poll + dispatcher + dead-letter + dedupe action
+- [x] OpenAPI + format spec (lát A: me, messages, updates, callbacks answer, commands, chats; các lát sau thêm method)
+- [x] Router + auth + envelope + rate limit tầng
+- [x] Consent invariant
+- [ ] Mapping + validate OpenAPI (lát A: mapping xong ở `internal/botapi/wire`; chưa có test validate response theo OpenAPI)
+- [x] Parser + allowlist scheme + fuzz
+- [x] update_id một writer + bot_updates
+- [ ] Long poll + dispatcher + dead-letter + dedupe action (lát A: long poll + 409 xong; webhook dispatcher, dead-letter, action trong body ở lát sau)
+- [x] Quản lý bot (`BotAdminService`) + StartBot/GetBotInfo + PressInlineButton (lát A)
 - [ ] safehttp
 - [ ] Bulk có consent
 - [ ] Inline mode
@@ -141,7 +145,7 @@ Create:
 
 ## Rollback
 
-Role riêng; tắt role chỉ dừng bot. Dữ liệu bot ở bảng riêng.
+Giai đoạn 1 Bot API chạy trong process `api`: rollback code về R4 (`switch-release.sh`) gỡ `/bot/` mà không đụng dữ liệu; tắt khẩn cấp một bot bằng cách bỏ `token_hash`. Khi tách role `botapi`, tắt role chỉ dừng bot. Dữ liệu bot ở bảng riêng.
 
 ## Next Steps
 

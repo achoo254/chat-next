@@ -34,7 +34,7 @@ Vì sản phẩm độc lập, không có hệ sinh thái thư viện sẵn. Pha
 ## Requirements
 
 Functional:
-- SDK TS (Node LTS), Python (3.11+), Go: base URL cấu hình được theo tenant (mặc định `https://bot.chat.hoandat.com`), client có kiểu, long poll, webhook handler (kiểm HMAC + timestamp), router lệnh/callback/inline, upload file, bulk. Helper xác thực dữ liệu khởi tạo Mini App thêm ở Phase 16.
+- SDK TS (Node LTS), Python (3.11+), Go: base URL cấu hình được theo tenant (mặc định `https://chat.hoandat.com/bot/v1`), client có kiểu, long poll, webhook handler (kiểm HMAC + timestamp), router lệnh/callback/inline, upload file, bulk. Helper xác thực dữ liệu khởi tạo Mini App thêm ở Phase 16.
 - Ví dụ chạy được cho mỗi SDK: echo, bàn phím + callback, file, lệnh, inline (ví dụ Mini App thêm ở Phase 16).
 - Developer Console (trong `packages/ui`, truy cập từ cài đặt, dùng phiên chat; bot tạo trong tenant của người dùng): xem/cấp lại token và xoá bot cần đăng nhập IdP trong 10 phút gần đây (ADR 0006); tạo bot, đổi tên/mô tả/ảnh, lệnh, privacy mode, xem/cấp lại token (hiển thị một lần), cấu hình webhook, xem trạng thái webhook, dead-letter, bộ đếm gửi, tầng rate limit hiện tại.
 - Docs: bắt đầu nhanh, tham chiếu sinh từ OpenAPI, hướng dẫn bảo mật webhook (Mini App thêm ở Phase 16).

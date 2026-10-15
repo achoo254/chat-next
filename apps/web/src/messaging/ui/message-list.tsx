@@ -25,6 +25,8 @@ interface MessageListProps {
 	topicId: number;
 	chat: Chat | null;
 	dialog: DialogView | undefined;
+	/** Shown in place of the messages while the chat has none (a bot's profile before it is started). */
+	empty?: ReactNode;
 }
 
 /** What groups an item into an album: grouped_id of a message, the outbox entry of a pending album; "" for none. */
@@ -73,7 +75,7 @@ function firstMention(store: ChatStore, chatId: number, readInbox: number, self:
 	return 0;
 }
 
-export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps) {
+export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const { store, source, backend, self } = useServices();
@@ -278,6 +280,8 @@ export function MessageList({ chatId, topicId, chat, dialog }: MessageListProps)
 					</div>
 				) : keys.length === 0 && topicId !== 0 ? (
 					<span className="system">{copy.topics.empty}</span>
+				) : keys.length === 0 && empty !== undefined ? (
+					empty
 				) : (
 					rows
 				)}

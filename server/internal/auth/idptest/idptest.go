@@ -83,6 +83,10 @@ type codeGrant struct {
 	nonce     string
 	redirect  string
 	account   Account
+	// authTime: the request carried max_age, so the ID token states
+	// auth_time (as oidc-provider does); the fake IdP always authenticates
+	// at the authorize request.
+	authTime time.Time
 }
 
 // Provider is a running fake IdP.
@@ -322,7 +326,11 @@ func (p *Provider) authorize(w http.ResponseWriter, r *http.Request) {
 	}
 	code := randomString()
 	p.mu.Lock()
-	p.codes[code] = codeGrant{challenge: q.Get("code_challenge"), nonce: q.Get("nonce"), redirect: q.Get("redirect_uri"), account: account}
+	g := codeGrant{challenge: q.Get("code_challenge"), nonce: q.Get("nonce"), redirect: q.Get("redirect_uri"), account: account}
+	if q.Get("max_age") != "" {
+		g.authTime = time.Now()
+	}
+	p.codes[code] = g
 	p.mu.Unlock()
 	back, err := url.Parse(q.Get("redirect_uri"))
 	if err != nil {
@@ -416,7 +424,7 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request) {
 	if override != nil {
 		nonce = *override
 	}
-	p.issueTokens(w, account, nonce, false)
+	p.issueTokens(w, account, nonce, false, g.authTime)
 }
 
 func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
@@ -455,12 +463,13 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 		tokenError(w, http.StatusBadRequest, "invalid_grant")
 		return
 	}
-	p.issueTokens(w, account, "", mode == RefreshBadIDToken)
+	p.issueTokens(w, account, "", mode == RefreshBadIDToken, time.Time{})
 }
 
 // issueTokens answers a successful grant with a new refresh token; with
-// foreignKey the ID token is signed by a key outside the JWKS.
-func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, foreignKey bool) {
+// foreignKey the ID token is signed by a key outside the JWKS. A non-zero
+// authTime becomes the auth_time claim.
+func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, foreignKey bool, authTime time.Time) {
 	rt, at := "rt-"+randomString(), "at-"+randomString()
 	p.mu.Lock()
 	p.refreshTokens[rt] = true
@@ -475,6 +484,9 @@ func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, f
 	}
 	if nonce != "" {
 		claims["nonce"] = nonce
+	}
+	if !authTime.IsZero() {
+		claims["auth_time"] = authTime.Unix()
 	}
 	key := p.key
 	if foreignKey {

@@ -1,0 +1,1009 @@
+// Developer Console (mockups/console.html), opened from Settings on the chat
+// session: the caller's bots, a new bot, and one bot's profile, token and
+// commands. A token is shown once, right after it is issued; issuing one or
+// deleting a bot needs a recent sign-in, so the console sends the browser to
+// /auth/login?reauth=1 and, back on the same page, carries on with the
+// action (`?after=token` issues the token, `?after=delete` asks again).
+// Bots receive updates by long polling only for now. Loaded on demand with
+// its own styles.
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { signInUrl } from "@app/core";
+import { Icon } from "../../components/icon.tsx";
+import { useI18n } from "../../i18n/i18n.tsx";
+import { Link, navigate, paths, type ConsolePage, type ConsoleTab } from "../../router.tsx";
+import { useCopy } from "../copy/use-copy.ts";
+import { clock, orgDomain, shortDate } from "../data/format.ts";
+import { useServices } from "../data/services.tsx";
+import { ChatAvatar, copyText, DialogHead, Modal, Switch, useDomId } from "../ui/parts.tsx";
+import { BOT_LIMITS, botErrorKind, EDITABLE_SCOPES, usernameProblem, validCommand, type BotCommand, type CommandScope, type CommandSets, type OwnBot } from "./api.ts";
+import { useBotsCopy } from "./use-bots-copy.ts";
+import type { BotsCopy } from "./copy-vi.ts";
+import "./console.css";
+
+/** An owner has at most this many bots (bot_admin.proto). */
+const BOTS_MAX = 20;
+const USERNAME_CHECK_DELAY_MS = 400;
+
+type Loaded<T> = { readonly status: "loading" } | { readonly status: "error" } | { readonly status: "ready"; readonly value: T };
+
+/** The caller's bots, with a way to reload and to apply a changed bot locally. */
+function useMyBots(): [Loaded<OwnBot[]>, () => void, (bot: OwnBot) => void] {
+	const { bots } = useServices();
+	const [state, setState] = useState<Loaded<OwnBot[]>>({ status: "loading" });
+	const [attempt, setAttempt] = useState(0);
+	useEffect(() => {
+		let active = true;
+		bots.mine().then(
+			(value) => {
+				if (active) setState({ status: "ready", value });
+			},
+			() => {
+				if (active) setState({ status: "error" });
+			},
+		);
+		return () => {
+			active = false;
+		};
+	}, [bots, attempt]);
+	const reload = () => {
+		setState({ status: "loading" });
+		setAttempt((n) => n + 1);
+	};
+	const put = (bot: OwnBot) =>
+		setState((current) => (current.status === "ready" ? { status: "ready", value: current.value.map((b) => (b.id === bot.id ? bot : b)) } : current));
+	return [state, reload, put];
+}
+
+/** "02/10 14:20" in the user's time zone. */
+function when(unixSeconds: number, locale: string): string {
+	return `${shortDate(unixSeconds, locale)} ${clock(unixSeconds, locale)}`;
+}
+
+/** The Bot API base of this tenant. */
+function apiBase(): string {
+	return `${window.location.origin}/bot/v1`;
+}
+
+export default function DeveloperConsole({ view }: { view: ConsolePage }) {
+	switch (view.page) {
+		case "list":
+			return <BotList />;
+		case "new":
+			return <CreateBot />;
+		case "bot":
+			return <BotPage key={view.botId} botId={view.botId} tab={view.tab} />;
+	}
+}
+
+function ConsoleHead({ back, backLabel, parent, current }: { back: string; backLabel: string; parent: string; current: string }) {
+	const { self } = useServices();
+	return (
+		<header className="c-head">
+			<Link to={back} className="icon-btn" aria-label={backLabel}>
+				<Icon name="back" />
+			</Link>
+			<span className="crumbs">
+				<span>{parent}</span>
+				<Icon name="chevron-right" small />
+				<b>{current}</b>
+			</span>
+			<span className="who-chip">
+				<ChatAvatar id={self.id} name={self.name} size="sm" />
+				<span>
+					{self.name} · {orgDomain(window.location.host)}
+				</span>
+			</span>
+		</header>
+	);
+}
+
+function LoadState({ state, onRetry }: { state: Loaded<unknown>; onRetry: () => void }) {
+	const copy = useCopy();
+	if (state.status === "loading") {
+		return (
+			<p className="status">
+				<span className="spin" aria-hidden="true" />
+				{copy.common.loading}
+			</p>
+		);
+	}
+	return (
+		<div className="banner error" role="alert">
+			<Icon name="alert" small />
+			<span className="grow">{copy.common.loadFailed}</span>
+			<button type="button" className="btn btn-sm" onClick={onRetry}>
+				{copy.common.retry}
+			</button>
+		</div>
+	);
+}
+
+// ------------------------------------------------------------------ list
+
+function BotList() {
+	const t = useBotsCopy();
+	const { locale } = useI18n();
+	const [state, reload] = useMyBots();
+	const org = orgDomain(window.location.host);
+	const titleId = useDomId("bots");
+	const bots = state.status === "ready" ? state.value : [];
+	const full = bots.length >= BOTS_MAX;
+	return (
+		<section className="console" aria-labelledby={titleId}>
+			<ConsoleHead back={paths.settings("profile")} backLabel={t.console.backToSettings} parent={t.console.settings} current={t.console.title} />
+			<div className="c-body">
+				<div className="c-title">
+					<h1 id={titleId}>{t.console.myBots}</h1>
+					{state.status === "ready" && bots.length > 0 && !full && (
+						<Link to={paths.consoleNew()} className="btn btn-primary">
+							<Icon name="plus" />
+							{t.console.create}
+						</Link>
+					)}
+				</div>
+				{full && <p className="note">{t.console.limitReached(BOTS_MAX)}</p>}
+				{state.status !== "ready" ? (
+					<LoadState state={state} onRetry={reload} />
+				) : bots.length === 0 ? (
+					<div className="card pad">
+						<div className="empty">
+							<Icon name="robot" />
+							<strong>{t.console.emptyTitle}</strong>
+							<span>{t.console.emptyBody(org)}</span>
+							<Link to={paths.consoleNew()} className="btn btn-primary">
+								<Icon name="plus" />
+								{t.console.createFirst}
+							</Link>
+						</div>
+					</div>
+				) : (
+					<div className="card table-card">
+						<table className="data">
+							<thead>
+								<tr>
+									<th>{t.console.columns.bot}</th>
+									<th>{t.console.columns.updates}</th>
+									<th>{t.console.columns.token}</th>
+									<th>
+										<span className="sr-only">{t.console.columns.actions}</span>
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{bots.map((bot) => (
+									<tr key={bot.id}>
+										<td>
+											<span className="bot-cell">
+												<ChatAvatar id={bot.id} name={bot.name} size="sm" bot />
+												<span>
+													<strong>{bot.name}</strong>
+													<span className="cell-sub mono">@{bot.username}</span>
+												</span>
+											</span>
+										</td>
+										<td data-label={t.console.columns.updates}>{t.console.longPoll}</td>
+										<td data-label={t.console.columns.token}>
+											{bot.hasToken ? t.console.tokenIssued(when(bot.tokenIssuedAt, locale)) : <span className="muted">{t.console.noToken}</span>}
+										</td>
+										<td className="actions-cell">
+											<Link to={paths.consoleBot(bot.id)} className="btn btn-sm" aria-label={t.console.manageName(bot.name)}>
+												{t.console.manage}
+											</Link>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+			</div>
+		</section>
+	);
+}
+
+// ---------------------------------------------------------------- create
+
+type UsernameCheck = "idle" | "checking" | "ok" | "taken";
+
+/** Two other usernames to try when one is taken: same stem, still ending in "bot". */
+export function usernameSuggestions(username: string): string[] {
+	const stem = username.replace(/_?bot$/, "").replace(/_+$/, "") || "my";
+	return [`${stem}_team_bot`, `${stem}2_bot`]
+		.map((candidate) => (candidate.length > BOT_LIMITS.usernameMax ? `${stem.slice(0, BOT_LIMITS.usernameMax - 9)}_team_bot` : candidate))
+		.filter((candidate) => usernameProblem(candidate) === null && candidate !== username);
+}
+
+function CreateBot() {
+	const t = useBotsCopy();
+	const copy = useCopy();
+	const { bots, toasts } = useServices();
+	const [name, setName] = useState("");
+	const [username, setUsername] = useState("");
+	const [description, setDescription] = useState("");
+	const [privacy, setPrivacy] = useState(true);
+	const [check, setCheck] = useState<UsernameCheck>("idle");
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const [touched, setTouched] = useState(false);
+	const org = orgDomain(window.location.host);
+	const nameId = useDomId("cb-name");
+	const userId = useDomId("cb-user");
+	const descId = useDomId("cb-desc");
+	const formId = useDomId("cb-form");
+
+	const lowered = username.trim().toLowerCase();
+	const problem = lowered === "" ? null : usernameProblem(lowered);
+
+	useEffect(() => {
+		if (lowered === "" || problem !== null) return;
+		let active = true;
+		const timer = setTimeout(() => {
+			setCheck("checking");
+			bots.usernameTaken(lowered).then(
+				(taken) => {
+					if (active) setCheck(taken ? "taken" : "ok");
+				},
+				() => {
+					// Unknown: the server checks again on create.
+					if (active) setCheck("idle");
+				},
+			);
+		}, USERNAME_CHECK_DELAY_MS);
+		return () => {
+			active = false;
+			clearTimeout(timer);
+		};
+	}, [bots, lowered, problem]);
+
+	const usernameError = problem !== null ? t.create.usernameProblem[problem] : check === "taken" ? t.create.usernameProblem.taken : "";
+	const nameError = touched && name.trim() === "" ? t.create.nameRequired : "";
+	const canSubmit = !busy && name.trim() !== "" && lowered !== "" && usernameError === "";
+
+	const submit = async (event: FormEvent) => {
+		event.preventDefault();
+		setTouched(true);
+		if (!canSubmit) return;
+		setBusy(true);
+		setError("");
+		try {
+			let bot = await bots.create(lowered, name.trim());
+			if (description.trim() !== "" || !privacy) bot = await bots.update(bot.id, { description: description.trim(), privacy });
+			toasts.show(t.create.created);
+			navigate(paths.consoleBot(bot.id, "token"));
+		} catch (err) {
+			setBusy(false);
+			const kind = botErrorKind(err);
+			if (kind === "username_taken") setCheck("taken");
+			else setError(kind === "bots_limit" ? t.console.limitReached(BOTS_MAX) : kind === "rate_limited" ? t.create.rateLimited : copy.common.failed);
+		}
+	};
+
+	const hint = usernameError !== "" ? null : check === "checking" ? t.create.checking : check === "ok" ? t.create.usernameOk : null;
+	return (
+		<section className="console" aria-labelledby={formId}>
+			<ConsoleHead back={paths.console()} backLabel={t.console.backToList} parent={t.console.title} current={t.console.create} />
+			<div className="c-body">
+				<div className="c-grid">
+					<form className="card form" aria-labelledby={formId} onSubmit={(event) => void submit(event)} noValidate>
+						<h2 id={formId}>{t.create.title}</h2>
+						<div className="field">
+							<label htmlFor={nameId}>{t.create.name}</label>
+							<input
+								id={nameId}
+								className="input"
+								value={name}
+								maxLength={BOT_LIMITS.name}
+								autoComplete="off"
+								aria-invalid={nameError !== ""}
+								onChange={(event) => setName(event.target.value)}
+								onBlur={() => setTouched(true)}
+							/>
+							{nameError !== "" && <span className="error-text">{nameError}</span>}
+						</div>
+						<div className="field">
+							<label htmlFor={userId}>{t.create.username}</label>
+							<div className={usernameError === "" ? "affix" : "affix invalid"}>
+								<span aria-hidden="true">@</span>
+								<input
+									id={userId}
+									className="input"
+									value={username}
+									maxLength={BOT_LIMITS.usernameMax}
+									autoComplete="off"
+									autoCapitalize="off"
+									spellCheck={false}
+									aria-invalid={usernameError !== ""}
+									aria-describedby={`${userId}-msg ${userId}-hint`}
+									onChange={(event) => {
+										setUsername(event.target.value);
+										setCheck("idle");
+									}}
+								/>
+							</div>
+							<span id={`${userId}-msg`} role="status" className={usernameError !== "" ? "error-text" : "hint-ok"}>
+								{usernameError !== "" ? usernameError : (hint ?? "")}
+							</span>
+							{check === "taken" && (
+								<div className="suggest">
+									{t.create.suggest}
+									{usernameSuggestions(lowered).map((candidate) => (
+										<button
+											key={candidate}
+											type="button"
+											className="btn btn-sm mono"
+											onClick={() => {
+												setUsername(candidate);
+												setCheck("idle");
+											}}
+										>
+											{candidate}
+										</button>
+									))}
+								</div>
+							)}
+							<span className="hint" id={`${userId}-hint`}>
+								{t.create.usernameHint}
+							</span>
+						</div>
+						<div className="field">
+							<label htmlFor={descId}>{t.create.description}</label>
+							<textarea
+								id={descId}
+								className="input"
+								rows={3}
+								value={description}
+								maxLength={BOT_LIMITS.description}
+								onChange={(event) => setDescription(event.target.value)}
+							/>
+							<span className="hint">{t.create.descriptionHint}</span>
+						</div>
+						<div className="setting">
+							<div>
+								<strong>{t.create.privacy}</strong>
+								<small>{t.create.privacyHint}</small>
+							</div>
+							<Switch checked={privacy} label={t.create.privacy} onChange={setPrivacy} />
+						</div>
+						{error !== "" && (
+							<div className="banner error" role="alert">
+								<Icon name="alert" small />
+								<span className="grow">{error}</span>
+							</div>
+						)}
+						<div className="card-foot">
+							<Link to={paths.console()} className="btn">
+								{copy.common.cancel}
+							</Link>
+							<button type="submit" className="btn btn-primary" disabled={!canSubmit} aria-busy={busy}>
+								{busy ? t.create.creating : t.create.submit}
+							</button>
+						</div>
+					</form>
+					<div className="card side-card">
+						<h2>{t.create.orgTitle(org)}</h2>
+						<ul>
+							{t.create.rules(org, apiBase()).map((rule) => (
+								<li key={rule}>{rule}</li>
+							))}
+						</ul>
+					</div>
+				</div>
+			</div>
+		</section>
+	);
+}
+
+// ------------------------------------------------------------- one bot
+
+/** What to do on coming back from the reauth sign-in (?after=…). */
+type After = "token" | "delete" | null;
+
+function takeAfter(): After {
+	const params = new URLSearchParams(window.location.search);
+	const after = params.get("after");
+	if (after === null) return null;
+	// Done once: a reload must not issue another token.
+	window.history.replaceState(null, "", window.location.pathname);
+	return after === "token" || after === "delete" ? after : null;
+}
+
+/** Where the reauth sign-in sends the browser, coming back to `tab` to carry on with `after`. */
+export function reauthUrl(locale: string, botId: number, tab: ConsoleTab, after: Exclude<After, null>): string {
+	return signInUrl(locale, { reauth: true, returnTo: `${paths.consoleBot(botId, tab)}?after=${after}` });
+}
+
+function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
+	const t = useBotsCopy();
+	const [state, reload, put] = useMyBots();
+	const [after] = useState(takeAfter);
+	const bot = state.status === "ready" ? (state.value.find((b) => b.id === botId) ?? null) : null;
+	const titleId = useDomId("bot");
+	const TABS: readonly ConsoleTab[] = ["profile", "token", "commands"];
+	return (
+		<section className="console" aria-labelledby={titleId}>
+			<ConsoleHead back={paths.console()} backLabel={t.console.backToList} parent={t.console.title} current={bot?.name ?? t.console.myBots} />
+			{state.status !== "ready" ? (
+				<div className="c-body">
+					<LoadState state={state} onRetry={reload} />
+				</div>
+			) : bot === null ? (
+				<div className="c-body">
+					<div className="empty">
+						<Icon name="robot" />
+						<strong>{t.console.notFound}</strong>
+						<Link to={paths.console()} className="btn">
+							{t.console.backToList}
+						</Link>
+					</div>
+				</div>
+			) : (
+				<>
+					<div className="c-bot">
+						<ChatAvatar id={bot.id} name={bot.name} size="sm" bot />
+						<div>
+							<h1 id={titleId}>{bot.name}</h1>
+							<small className="mono">@{bot.username}</small>
+						</div>
+					</div>
+					<nav className="c-tabs" aria-label={t.console.tabs}>
+						{TABS.map((item) => (
+							<Link key={item} to={paths.consoleBot(bot.id, item)} current={item === tab}>
+								{t.console.tab[item]}
+							</Link>
+						))}
+					</nav>
+					<div className="c-body">
+						{tab === "profile" ? (
+							<ProfileTab bot={bot} onSaved={put} deleteNow={after === "delete"} />
+						) : tab === "token" ? (
+							<TokenTab bot={bot} onIssued={put} issueNow={after === "token"} />
+						) : (
+							<CommandsTab bot={bot} onSaved={put} />
+						)}
+					</div>
+				</>
+			)}
+		</section>
+	);
+}
+
+/** "Đăng nhập lại để tiếp tục" (mockups/console.html#token): a link to the reauth sign-in. */
+function ReauthDialog({ body, warning, href, onClose }: { body: string; warning: string; href: string; onClose: () => void }) {
+	const t = useBotsCopy();
+	const copy = useCopy();
+	const id = useDomId("reauth");
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<DialogHead id={id} title={t.reauth.title} onClose={onClose} />
+			<div className="dlg-body stack">
+				<p className="dlg-lede">{body}</p>
+				<p className="note">{t.reauth.away}</p>
+				{warning !== "" && (
+					<div className="banner warn">
+						<Icon name="alert" small />
+						<span className="grow">{warning}</span>
+					</div>
+				)}
+			</div>
+			<div className="dlg-foot">
+				<button type="button" className="btn" onClick={onClose}>
+					{copy.common.cancel}
+				</button>
+				<a className="btn btn-primary" href={href}>
+					{t.reauth.signIn}
+					<Icon name="external" small />
+				</a>
+			</div>
+		</Modal>
+	);
+}
+
+function ConfirmDialog({
+	title,
+	body,
+	action,
+	busyLabel,
+	busy,
+	danger,
+	onConfirm,
+	onClose,
+}: {
+	title: string;
+	body: ReactNode;
+	action: string;
+	busyLabel: string;
+	busy: boolean;
+	danger: boolean;
+	onConfirm: () => void;
+	onClose: () => void;
+}) {
+	const copy = useCopy();
+	const id = useDomId("confirm");
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<DialogHead id={id} title={title} onClose={onClose} />
+			<div className="dlg-body stack">{body}</div>
+			<div className="dlg-foot">
+				<button type="button" className="btn" onClick={onClose}>
+					{copy.common.cancel}
+				</button>
+				<button type="button" className={danger ? "btn btn-danger" : "btn btn-primary"} disabled={busy} aria-busy={busy} onClick={onConfirm}>
+					{busy ? busyLabel : action}
+				</button>
+			</div>
+		</Modal>
+	);
+}
+
+// ---------------------------------------------------------------- profile
+
+function ProfileTab({ bot, onSaved, deleteNow }: { bot: OwnBot; onSaved: (bot: OwnBot) => void; deleteNow: boolean }) {
+	const t = useBotsCopy();
+	const copy = useCopy();
+	const { locale } = useI18n();
+	const { bots, toasts } = useServices();
+	const [name, setName] = useState(bot.name);
+	const [description, setDescription] = useState(bot.description);
+	const [about, setAbout] = useState(bot.about);
+	const [privacy, setPrivacy] = useState(bot.privacy);
+	const [saving, setSaving] = useState(false);
+	const [error, setError] = useState("");
+	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(deleteNow ? "confirm" : null);
+	const [deleting, setDeleting] = useState(false);
+	const formId = useDomId("profile");
+	const nameId = useDomId("pf-name");
+	const descId = useDomId("pf-desc");
+	const aboutId = useDomId("pf-about");
+	const userId = useDomId("pf-user");
+
+	const changes = {
+		...(name.trim() !== bot.name ? { name: name.trim() } : {}),
+		...(description.trim() !== bot.description ? { description: description.trim() } : {}),
+		...(about.trim() !== bot.about ? { about: about.trim() } : {}),
+		...(privacy !== bot.privacy ? { privacy } : {}),
+	};
+	const dirty = Object.keys(changes).length > 0;
+	const nameError = name.trim() === "" ? t.create.nameRequired : "";
+
+	const save = async (event: FormEvent) => {
+		event.preventDefault();
+		if (!dirty || nameError !== "" || saving) return;
+		setSaving(true);
+		setError("");
+		try {
+			const saved = await bots.update(bot.id, changes);
+			onSaved(saved);
+			toasts.show(t.profile.saved);
+		} catch {
+			setError(copy.common.failed);
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const remove = async () => {
+		setDeleting(true);
+		try {
+			await bots.remove(bot.id);
+			toasts.show(t.profile.deleted(bot.name));
+			navigate(paths.console());
+		} catch (err) {
+			setDeleting(false);
+			if (botErrorKind(err) === "reauth_required") setDialog("reauth");
+			else {
+				setDialog(null);
+				toasts.show(copy.common.failed);
+			}
+		}
+	};
+
+	return (
+		<div className="c-grid">
+			<form className="card form" aria-labelledby={formId} onSubmit={(event) => void save(event)} noValidate>
+				<h2 id={formId}>{t.profile.title}</h2>
+				<div className="field">
+					<label htmlFor={nameId}>{t.create.name}</label>
+					<input
+						id={nameId}
+						className="input"
+						value={name}
+						maxLength={BOT_LIMITS.name}
+						autoComplete="off"
+						aria-invalid={nameError !== ""}
+						onChange={(event) => setName(event.target.value)}
+					/>
+					{nameError !== "" && <span className="error-text">{nameError}</span>}
+				</div>
+				<div className="field">
+					<span className="label" id={userId}>
+						{t.create.username}
+					</span>
+					<span className="mono" aria-labelledby={userId}>
+						@{bot.username}
+					</span>
+					<span className="hint">{t.profile.usernameFixed}</span>
+				</div>
+				<div className="field">
+					<label htmlFor={descId}>{t.create.description}</label>
+					<textarea
+						id={descId}
+						className="input"
+						rows={3}
+						value={description}
+						maxLength={BOT_LIMITS.description}
+						onChange={(event) => setDescription(event.target.value)}
+					/>
+					<span className="hint">{t.create.descriptionHint}</span>
+				</div>
+				<div className="field">
+					<label htmlFor={aboutId}>{t.profile.about}</label>
+					<input id={aboutId} className="input" value={about} maxLength={BOT_LIMITS.about} onChange={(event) => setAbout(event.target.value)} />
+					<span className="hint">{t.profile.aboutHint}</span>
+				</div>
+				<div className="setting">
+					<div>
+						<strong>{t.create.privacy}</strong>
+						<small>{t.create.privacyHint}</small>
+					</div>
+					<Switch checked={privacy} label={t.create.privacy} onChange={setPrivacy} />
+				</div>
+				{error !== "" && (
+					<div className="banner error" role="alert">
+						<Icon name="alert" small />
+						<span className="grow">{error}</span>
+					</div>
+				)}
+				<div className="card-foot">
+					<button type="submit" className="btn btn-primary" disabled={!dirty || nameError !== "" || saving} aria-busy={saving}>
+						{saving ? t.profile.saving : t.profile.save}
+					</button>
+				</div>
+			</form>
+			<div className="card side-card">
+				<h2>{t.profile.deleteTitle}</h2>
+				<p>{t.profile.deleteBody}</p>
+				<div className="card-foot">
+					<button type="button" className="btn btn-danger" onClick={() => setDialog("confirm")}>
+						<Icon name="trash" small />
+						{t.profile.deleteAction}
+					</button>
+				</div>
+			</div>
+			{dialog === "confirm" && (
+				<ConfirmDialog
+					title={t.profile.confirmTitle(bot.name)}
+					body={<p className="dlg-lede">{t.profile.confirmBody(bot.name)}</p>}
+					action={t.profile.deleteAction}
+					busyLabel={t.profile.deleting}
+					busy={deleting}
+					danger
+					onConfirm={() => void remove()}
+					onClose={() => setDialog(null)}
+				/>
+			)}
+			{dialog === "reauth" && (
+				<ReauthDialog body={t.reauth.bodyDelete} warning="" href={reauthUrl(locale, bot.id, "profile", "delete")} onClose={() => setDialog(null)} />
+			)}
+		</div>
+	);
+}
+
+// ------------------------------------------------------------------ token
+
+function TokenTab({ bot, onIssued, issueNow }: { bot: OwnBot; onIssued: (bot: OwnBot) => void; issueNow: boolean }) {
+	const t = useBotsCopy();
+	const copy = useCopy();
+	const { locale } = useI18n();
+	const { bots, toasts } = useServices();
+	const [token, setToken] = useState("");
+	const [busy, setBusy] = useState(false);
+	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(null);
+	const titleId = useDomId("token");
+
+	const issue = async () => {
+		setBusy(true);
+		try {
+			const result = await bots.resetToken(bot.id);
+			onIssued(result.bot);
+			setToken(result.token);
+			setDialog(null);
+			toasts.show(t.token.issued);
+		} catch (err) {
+			if (botErrorKind(err) === "reauth_required") setDialog("reauth");
+			else {
+				setDialog(null);
+				toasts.show(copy.common.failed);
+			}
+		} finally {
+			setBusy(false);
+		}
+	};
+	const issueOnReturn = useEffectEvent(() => void issue());
+
+	// Back from the reauth sign-in: the user already asked for the token.
+	const started = useRef(false);
+	useEffect(() => {
+		if (!issueNow || started.current) return;
+		started.current = true;
+		issueOnReturn();
+	}, [issueNow]);
+
+	const masked = `${bot.id}:${"•".repeat(24)}`;
+	const snippet = `GET ${apiBase()}/updates?offset=<update_id + 1>&timeout=50\nAuthorization: Bearer <token>`;
+	return (
+		<div className="c-grid">
+			<div className="card form" role="group" aria-labelledby={titleId}>
+				<h2 id={titleId}>{t.token.title}</h2>
+				{token !== "" ? (
+					<>
+						<div className="banner warn">
+							<Icon name="alert" small />
+							<span className="grow">{t.token.onceWarning}</span>
+						</div>
+						<div className="secret">
+							<code data-testid="bot-token">{token}</code>
+							<button
+								type="button"
+								className="btn btn-sm"
+								onClick={() => {
+									void copyText(token).then((ok) => toasts.show(ok ? t.token.copied : copy.common.failed));
+								}}
+							>
+								<Icon name="copy" small />
+								{t.token.copy}
+							</button>
+						</div>
+						<p className="note">{t.token.hashNote}</p>
+						<div className="card-foot">
+							<button
+								type="button"
+								className="btn btn-primary"
+								onClick={() => {
+									setToken("");
+									toasts.show(t.token.hidden);
+								}}
+							>
+								{t.token.savedIt}
+							</button>
+						</div>
+					</>
+				) : bot.hasToken ? (
+					<>
+						<div className="secret">
+							<code aria-label={t.token.title}>{masked}</code>
+						</div>
+						<p className="note">{t.token.issuedAt(when(bot.tokenIssuedAt, locale))}</p>
+						<div className="card-foot">
+							<button type="button" className="btn btn-danger" disabled={busy} onClick={() => setDialog("confirm")}>
+								{t.token.reissue}
+							</button>
+						</div>
+					</>
+				) : (
+					<>
+						<p className="note">{t.token.none}</p>
+						<div className="card-foot">
+							<button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} onClick={() => void issue()}>
+								{busy ? t.token.issuing : t.token.issue}
+							</button>
+						</div>
+					</>
+				)}
+			</div>
+			<div className="card side-card">
+				<h2>{t.token.pollTitle}</h2>
+				<p>{t.token.pollNote}</p>
+				<pre className="snippet">{snippet}</pre>
+			</div>
+			{dialog === "confirm" && (
+				<ConfirmDialog
+					title={t.token.confirmTitle}
+					body={
+						<div className="banner warn">
+							<Icon name="alert" small />
+							<span className="grow">{t.token.confirmBody(bot.name)}</span>
+						</div>
+					}
+					action={t.token.reissue}
+					busyLabel={t.token.issuing}
+					busy={busy}
+					danger
+					onConfirm={() => void issue()}
+					onClose={() => setDialog(null)}
+				/>
+			)}
+			{dialog === "reauth" && (
+				<ReauthDialog
+					body={t.reauth.bodyToken}
+					warning={bot.hasToken ? t.reauth.tokenWarning(bot.name) : ""}
+					href={reauthUrl(locale, bot.id, "token", "token")}
+					onClose={() => setDialog(null)}
+				/>
+			)}
+		</div>
+	);
+}
+
+// --------------------------------------------------------------- commands
+
+interface CommandRow {
+	readonly key: number;
+	readonly command: string;
+	readonly description: string;
+}
+
+type Editable = Exclude<CommandScope, "default">;
+type Drafts = Readonly<Record<Editable, readonly CommandRow[]>>;
+
+let nextRowKey = 1;
+
+function rowsOf(commands: readonly BotCommand[] | undefined): CommandRow[] {
+	return (commands ?? []).map((c) => ({ key: nextRowKey++, command: c.command, description: c.description }));
+}
+
+/** What is wrong with a command row; "" when it can be saved. */
+export function commandProblem(row: CommandRow, rows: readonly CommandRow[], t: BotsCopy): { command: string; description: string } {
+	const command = row.command.trim();
+	let commandError = "";
+	if (!validCommand(command)) commandError = t.commands.badCommand;
+	else if (rows.some((other) => other.key !== row.key && other.command.trim() === command && other.key < row.key)) commandError = t.commands.duplicate;
+	const description = row.description.trim();
+	const descriptionError = description === "" || [...description].length > BOT_LIMITS.commandDescription ? t.commands.descriptionRequired : "";
+	return { command: commandError, description: descriptionError };
+}
+
+function CommandsTab({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: OwnBot) => void }) {
+	const t = useBotsCopy();
+	const copy = useCopy();
+	const { bots, toasts } = useServices();
+	const [scope, setScope] = useState<Editable>("private");
+	const [drafts, setDrafts] = useState<Drafts>(() => ({
+		private: rowsOf(bot.commands.private),
+		group: rowsOf(bot.commands.group),
+		group_admin: rowsOf(bot.commands.group_admin),
+	}));
+	const [saving, setSaving] = useState(false);
+	const [showErrors, setShowErrors] = useState(false);
+	const [error, setError] = useState("");
+	const formId = useDomId("cmds");
+	const rows = drafts[scope];
+
+	const setRows = (next: readonly CommandRow[]) => setDrafts((current) => ({ ...current, [scope]: next }));
+	const edit = (key: number, change: Partial<Pick<CommandRow, "command" | "description">>) =>
+		setRows(rows.map((row) => (row.key === key ? { ...row, ...change } : row)));
+
+	const invalid = (EDITABLE_SCOPES as readonly Editable[]).some((s) =>
+		drafts[s].some((row) => {
+			const problem = commandProblem(row, drafts[s], t);
+			return problem.command !== "" || problem.description !== "";
+		}),
+	);
+
+	const save = async (event: FormEvent) => {
+		event.preventDefault();
+		if (saving) return;
+		if (invalid) {
+			setShowErrors(true);
+			setError(t.commands.fixFirst);
+			return;
+		}
+		setSaving(true);
+		setError("");
+		// The default scope is kept as the bot set it through the API.
+		const sets: Partial<Record<CommandScope, readonly BotCommand[]>> = { ...(bot.commands.default === undefined ? {} : { default: bot.commands.default }) };
+		for (const s of EDITABLE_SCOPES as readonly Editable[]) {
+			sets[s] = drafts[s].map((row) => ({ command: row.command.trim(), description: row.description.trim() }));
+		}
+		try {
+			const saved = await bots.update(bot.id, { commands: sets as CommandSets });
+			onSaved(saved);
+			toasts.show(t.commands.saved);
+		} catch {
+			setError(copy.common.failed);
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const valid = rows.filter((row) => validCommand(row.command.trim()) && row.description.trim() !== "");
+	return (
+		<div className="c-grid">
+			<form className="card form" aria-labelledby={formId} onSubmit={(event) => void save(event)} noValidate>
+				<h2 id={formId} className="sr-only">
+					{t.console.tab.commands}
+				</h2>
+				<div className="scope-tabs" role="tablist" aria-label={t.commands.scopesLabel}>
+					{(EDITABLE_SCOPES as readonly Editable[]).map((s) => (
+						<button key={s} type="button" role="tab" aria-selected={s === scope} onClick={() => setScope(s)}>
+							{t.commands.scope[s]}
+						</button>
+					))}
+				</div>
+				<div className="cmd-rows" role="tabpanel" aria-label={t.commands.scope[scope]}>
+					{rows.map((row) => {
+						const problem = commandProblem(row, rows, t);
+						const commandError = showErrors || row.command !== "" ? problem.command : "";
+						const descriptionError = showErrors ? problem.description : "";
+						return (
+							<div className="cmd-row" key={row.key}>
+								<div className="field">
+									<div className={commandError === "" ? "affix" : "affix invalid"}>
+										<span aria-hidden="true">/</span>
+										<input
+											className="input"
+											value={row.command}
+											aria-label={t.commands.command}
+											aria-invalid={commandError !== ""}
+											placeholder={t.commands.commandPlaceholder}
+											maxLength={32}
+											autoCapitalize="off"
+											spellCheck={false}
+											onChange={(event) => edit(row.key, { command: event.target.value })}
+										/>
+									</div>
+									{commandError !== "" && <span className="error-text">{commandError}</span>}
+								</div>
+								<div className="field">
+									<input
+										className="input"
+										value={row.description}
+										aria-label={t.commands.description}
+										aria-invalid={descriptionError !== ""}
+										placeholder={t.commands.descriptionPlaceholder}
+										maxLength={BOT_LIMITS.commandDescription}
+										onChange={(event) => edit(row.key, { description: event.target.value })}
+									/>
+									{descriptionError !== "" && <span className="error-text">{descriptionError}</span>}
+								</div>
+								<button type="button" className="icon-btn" aria-label={t.commands.remove} onClick={() => setRows(rows.filter((r) => r.key !== row.key))}>
+									<Icon name="trash" />
+								</button>
+							</div>
+						);
+					})}
+				</div>
+				<div>
+					<button
+						type="button"
+						className="btn btn-sm"
+						disabled={rows.length >= BOT_LIMITS.commandsPerScope}
+						onClick={() => setRows([...rows, { key: nextRowKey++, command: "", description: "" }])}
+					>
+						<Icon name="plus" small />
+						{t.commands.add}
+					</button>
+				</div>
+				{rows.length >= BOT_LIMITS.commandsPerScope && <p className="note">{t.commands.tooMany(BOT_LIMITS.commandsPerScope)}</p>}
+				{error !== "" && (
+					<div className="banner error" role="alert">
+						<Icon name="alert" small />
+						<span className="grow">{error}</span>
+					</div>
+				)}
+				<div className="card-foot">
+					<button type="submit" className="btn btn-primary" disabled={saving} aria-busy={saving}>
+						{saving ? t.commands.saving : t.commands.save}
+					</button>
+				</div>
+			</form>
+			<div className="card side-card">
+				<h2>{t.commands.preview}</h2>
+				<p>{t.commands.previewNote[scope]}</p>
+				<div className="preview-menu">
+					{valid.length === 0 ? (
+						<div>
+							<span>{t.commands.noValid}</span>
+						</div>
+					) : (
+						valid.map((row) => (
+							<div key={row.key}>
+								<b>/{row.command.trim()}</b>
+								<span>{row.description.trim()}</span>
+							</div>
+						))
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}

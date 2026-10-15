@@ -36,13 +36,16 @@ function hasControlChar(value: string): boolean {
 
 /**
  * URL that starts sign-in at the tenant's IdP. `create` opens the IdP's
- * sign-up page (prompt=create); `locale` becomes ui_locales on the server;
+ * sign-up page (prompt=create); `reauth` makes the IdP ask for the password
+ * again, so the session gets a fresh sign-in time for actions that need a
+ * recent sign-in (ADR 0006); `locale` becomes ui_locales on the server;
  * `returnTo` (a path, see isReturnPath) is where the browser lands after
  * sign-in instead of "/".
  */
-export function signInUrl(locale: string, options: { create?: boolean; returnTo?: string } = {}): string {
+export function signInUrl(locale: string, options: { create?: boolean; reauth?: boolean; returnTo?: string } = {}): string {
 	const params = new URLSearchParams();
 	if (options.create === true) params.set("prompt", "create");
+	if (options.reauth === true) params.set("reauth", "1");
 	if (LOCALE.test(locale)) params.set("locale", locale.toLowerCase());
 	if (options.returnTo !== undefined && options.returnTo !== "/" && isReturnPath(options.returnTo)) {
 		params.set("return_to", options.returnTo);

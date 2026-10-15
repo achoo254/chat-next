@@ -35,6 +35,7 @@ import {
 	MessageSchema,
 	ReadHistoryResponseSchema,
 	ReactionCountSchema,
+	ReplyMarkupSchema,
 	SendAlbumResponseSchema,
 	SendMediaResponseSchema,
 	SendMessageResponseSchema,
@@ -517,7 +518,13 @@ export class FakeServer {
 		chatId: number,
 		text: string,
 		randomId = 0,
-		extra: { readonly media?: WireMediaRef; readonly groupedId?: bigint; readonly replyToSeq?: bigint } = {},
+		extra: {
+			readonly media?: WireMediaRef;
+			readonly groupedId?: bigint;
+			readonly replyToSeq?: bigint;
+			/** Bot messages: an inline keyboard, a reply keyboard or its removal. */
+			readonly replyMarkup?: MessageInitShape<typeof ReplyMarkupSchema>;
+		} = {},
 	): { seq: number; ack: WireSyncAck } {
 		const chat = this.chat(chatId);
 		if (!chat.members.has(from)) throw new ConnectError("not a member", Code.PermissionDenied);
@@ -812,6 +819,18 @@ export class FakeServer {
 			this.pushUser(member, { case: "chatDeleted", value: { chatId: big(chatId), forEveryone: true } }, 0);
 		}
 		this.chats.delete(chatId);
+	}
+
+	/**
+	 * The user cleared their saved chat ("Cloud của tôi"), as the server does
+	 * it: history gone, the chat kept: chat_deleted, then chat_updated.
+	 */
+	clearSavedChat(userId: number, chatId: number): void {
+		const chat = this.chat(chatId);
+		const hidden = this.user(userId).hidden;
+		for (const seq of chat.messages.keys()) hidden.add(`${chatId}:${seq}`);
+		this.pushUser(userId, { case: "chatDeleted", value: { chatId: big(chatId), forEveryone: false } }, 0);
+		this.pushUser(userId, { case: "chatUpdated", value: { chat: this.wireChat(chatId, userId) } }, 0);
 	}
 
 	/** One-way switch to sync_mode=large (ADR 0002). */

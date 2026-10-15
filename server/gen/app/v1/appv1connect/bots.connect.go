@@ -39,6 +39,8 @@ const (
 	BotsServiceOpenMiniAppProcedure = "/app.v1.BotsService/OpenMiniApp"
 	// BotsServiceStartBotProcedure is the fully-qualified name of the BotsService's StartBot RPC.
 	BotsServiceStartBotProcedure = "/app.v1.BotsService/StartBot"
+	// BotsServiceGetBotInfoProcedure is the fully-qualified name of the BotsService's GetBotInfo RPC.
+	BotsServiceGetBotInfoProcedure = "/app.v1.BotsService/GetBotInfo"
 )
 
 // BotsServiceClient is a client for the app.v1.BotsService service.
@@ -49,7 +51,13 @@ type BotsServiceClient interface {
 	OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error)
 	// Records the user's consent, opens the private chat with the bot and
 	// sends the start message (after the client confirmed a deep link).
+	// Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
+	// the client resolves the username with UsersService.ResolveUsername
+	// (User.is_bot must be set), shows GetBotInfo and asks before starting.
 	StartBot(context.Context, *connect.Request[v1.StartBotRequest]) (*connect.Response[v1.StartBotResponse], error)
+	// Public profile of a bot: description, about and the command menu for
+	// a chat.
+	GetBotInfo(context.Context, *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error)
 }
 
 // NewBotsServiceClient constructs a client for the app.v1.BotsService service. By default, it uses
@@ -81,6 +89,12 @@ func NewBotsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(botsServiceMethods.ByName("StartBot")),
 			connect.WithClientOptions(opts...),
 		),
+		getBotInfo: connect.NewClient[v1.GetBotInfoRequest, v1.GetBotInfoResponse](
+			httpClient,
+			baseURL+BotsServiceGetBotInfoProcedure,
+			connect.WithSchema(botsServiceMethods.ByName("GetBotInfo")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -89,6 +103,7 @@ type botsServiceClient struct {
 	inlineQuery *connect.Client[v1.InlineQueryRequest, v1.InlineQueryResponse]
 	openMiniApp *connect.Client[v1.OpenMiniAppRequest, v1.OpenMiniAppResponse]
 	startBot    *connect.Client[v1.StartBotRequest, v1.StartBotResponse]
+	getBotInfo  *connect.Client[v1.GetBotInfoRequest, v1.GetBotInfoResponse]
 }
 
 // InlineQuery calls app.v1.BotsService.InlineQuery.
@@ -106,6 +121,11 @@ func (c *botsServiceClient) StartBot(ctx context.Context, req *connect.Request[v
 	return c.startBot.CallUnary(ctx, req)
 }
 
+// GetBotInfo calls app.v1.BotsService.GetBotInfo.
+func (c *botsServiceClient) GetBotInfo(ctx context.Context, req *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error) {
+	return c.getBotInfo.CallUnary(ctx, req)
+}
+
 // BotsServiceHandler is an implementation of the app.v1.BotsService service.
 type BotsServiceHandler interface {
 	// Forwards an inline query to the bot and returns its results.
@@ -114,7 +134,13 @@ type BotsServiceHandler interface {
 	OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error)
 	// Records the user's consent, opens the private chat with the bot and
 	// sends the start message (after the client confirmed a deep link).
+	// Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
+	// the client resolves the username with UsersService.ResolveUsername
+	// (User.is_bot must be set), shows GetBotInfo and asks before starting.
 	StartBot(context.Context, *connect.Request[v1.StartBotRequest]) (*connect.Response[v1.StartBotResponse], error)
+	// Public profile of a bot: description, about and the command menu for
+	// a chat.
+	GetBotInfo(context.Context, *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error)
 }
 
 // NewBotsServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -142,6 +168,12 @@ func NewBotsServiceHandler(svc BotsServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(botsServiceMethods.ByName("StartBot")),
 		connect.WithHandlerOptions(opts...),
 	)
+	botsServiceGetBotInfoHandler := connect.NewUnaryHandler(
+		BotsServiceGetBotInfoProcedure,
+		svc.GetBotInfo,
+		connect.WithSchema(botsServiceMethods.ByName("GetBotInfo")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.BotsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BotsServiceInlineQueryProcedure:
@@ -150,6 +182,8 @@ func NewBotsServiceHandler(svc BotsServiceHandler, opts ...connect.HandlerOption
 			botsServiceOpenMiniAppHandler.ServeHTTP(w, r)
 		case BotsServiceStartBotProcedure:
 			botsServiceStartBotHandler.ServeHTTP(w, r)
+		case BotsServiceGetBotInfoProcedure:
+			botsServiceGetBotInfoHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -169,4 +203,8 @@ func (UnimplementedBotsServiceHandler) OpenMiniApp(context.Context, *connect.Req
 
 func (UnimplementedBotsServiceHandler) StartBot(context.Context, *connect.Request[v1.StartBotRequest]) (*connect.Response[v1.StartBotResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.StartBot is not implemented"))
+}
+
+func (UnimplementedBotsServiceHandler) GetBotInfo(context.Context, *connect.Request[v1.GetBotInfoRequest]) (*connect.Response[v1.GetBotInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.GetBotInfo is not implemented"))
 }
