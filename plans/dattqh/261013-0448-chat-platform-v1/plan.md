@@ -499,3 +499,17 @@ Lát A lên prod, release `20261015-083208-4affc40f9568` (commit `4affc40`, depl
 Quyết định của Jev (`jev-1.13.0`): host đường dẫn trên `chat.<d>` (0,92); chạy trong process `api` (1,0); lát đầu Console + long poll (0,67); update từ consumer outbox (0,99); năm sửa màn Cloud (0,59–0,91); ô soạn 390px ẩn emoji khi có bàn phím bot (0,80 làm trước deploy); lưu bàn phím một lần (0,56); menu lệnh bot trong nhóm để sau (0,13).
 
 Còn lại của R5: webhook ra ngoài + `safehttp` + dead-letter + HMAC; file/media, sửa/xoá/chuyển tiếp, quản trị nhóm; bulk; inline mode; menu lệnh trong nhóm; SDK TS/Python/Go + docs; bot chào người dùng mới; kiểm response theo OpenAPI tự động. Kiểm một lần trên prod: "Cấp lại token" (IdP phải trả `auth_time`).
+
+## Tiến độ (2026-10-15 23:15)
+
+Từ 16:43, user giao: AI tự review từng màn hình và tính năng trên Chrome đã đăng nhập, mọi đề xuất gửi Jev quyết, làm tuần tự tới hết plan, ưu tiên app vận hành cơ bản ngay.
+
+Đã lên prod (release cuối `99c2ab5`):
+- Logo, favicon, màn chờ có hiệu ứng; một loader trễ 320 ms cho mỗi màn, tải trước màn phụ khi rảnh.
+- Sửa sau review trình duyệt và QA nhiều người dùng: bài đăng kênh, phiên đăng nhập lại thay phiên cũ, ngày tương đối, hộp Chat mới mở ngay, username ngắn đệm số, trạng thái mất mạng, service worker (mở offline, tiếp quản ngay, thanh "Đã có bản mới · Tải lại"), nhóm có chủ đề, câu trung tính khi không nhắn được.
+- R5: webhook ra ngoài (safehttp, HMAC, dead-letter, cần đăng nhập lại khi đổi webhook, chặn IP của chính server), đủ method Bot API trừ inline và bulk, menu lệnh trong nhóm, test hợp đồng OpenAPI, bot trợ lý `tro_ly_bot` chào người dùng mới và nhận góp ý vào Kiểm duyệt > Góp ý.
+- Vận hành: `OUTBOUND_DENY_CIDRS=103.72.98.65`, `CHAT_OPERATOR_USER_IDS=1` (@achoo254, user cho phép).
+
+Đã thử và gỡ: nhường quyền tab chính cho bản mới (khoá OPFS không nhả khi đóng DB; review dựng lại trên Chromium).
+
+Còn lại của R5: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
