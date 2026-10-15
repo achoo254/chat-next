@@ -406,3 +406,15 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Bot chính thức chào người dùng mới ở R5: 0.68.
   - Kênh công khai của sản phẩm gợi ý cho người mới: 0.41, chưa làm.
   - Đã thêm release R3b vào lộ trình, mục todo vào Phase 2, 6, 8, 14 và màn `chat.html#first-run` (mock 110 màn).
+- R3 lên prod (2026-10-15).
+  - Backend media: commit `8239fd0`, migration 0009, lưu ở `/opt/chat/media`, host `media-chat.hoandat.com`.
+  - UI media và chip cảm xúc kiểu Zalo: commit `0b19d79`, 207 test web, JS khởi động 136,6/150 KiB, render-check 84 lượt 0 lỗi.
+- R3 còn thiếu:
+  - tạm dừng upload;
+  - `topicId` cho tin đang gửi;
+  - chỉ mục media theo chat (hiện chỉ quét 600 tin gần nhất);
+  - giữ `grouped_id` khi chuyển tiếp album;
+  - poster và waveform phía server (cần ffmpeg trên `.65`);
+  - bộ lọc tìm theo loại media (Phase 7).
+- Phiên `chat-next-85` làm song song trên cùng thư mục repo (E2E nhiều người dùng, "Cloud của tôi"). E2E của phiên đó bắt được lỗi: tạo chat riêng xong mở `/c/1` báo "Không mở được chat này", client gọi `GetHistory` lặp liên tục. Phiên đó đang điều tra.
+
