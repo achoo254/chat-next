@@ -43,11 +43,14 @@ describe("the assistant chat of an existing account", () => {
 		await expectStartableBotChat();
 	});
 
-	it("fetches the bot for a device that stored the chat without it", async () => {
+	it.each([
+		["without the bot", ""],
+		["with no other person (peer 0)", "UPDATE chats SET peer_user_id = 0 WHERE id = ?"],
+	])("repairs a device that stored the chat %s", async (_, corrupt) => {
 		const demo = seedDemo();
 		const f = demo.fixture;
 		const bot = f.bots.seed(BOT, "tro_ly_bot", { description: "Trợ lý của bạn.", owned: false });
-		f.createChat(ChatType.PRIVATE, "", [f.selfId, bot]);
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, bot]);
 		const sql = new MemorySqlFactory();
 		const first = renderMessaging(f, "/", sql);
 		const list = await screen.findByRole("list", { name: /Danh sách chat|Chats/ }, LONG);
@@ -55,7 +58,10 @@ describe("the assistant chat of an existing account", () => {
 		first.unmount();
 
 		// What an older build left behind: the chat and its dialog, no bot.
-		for (const db of sql.files.values()) db.prepare("DELETE FROM users WHERE id = ?").run(bot);
+		for (const db of sql.files.values()) {
+			db.prepare("DELETE FROM users WHERE id = ?").run(bot);
+			if (corrupt !== "") db.prepare(corrupt).run(chat);
+		}
 		renderMessaging(f, "/", sql);
 
 		await expectStartableBotChat();

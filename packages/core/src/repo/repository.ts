@@ -104,6 +104,25 @@ export class Repository {
 		return row === undefined ? null : rowToChat(row);
 	}
 
+	/**
+	 * Dialogs this device cannot show: no chat stored, or a private chat
+	 * whose other person is 0, not stored, or the user themselves while the
+	 * chat has more than one member (only "Cloud của tôi" has the user as
+	 * its own peer).
+	 */
+	async dialogsToRepair(selfId: number): Promise<number[]> {
+		const rows = await this.driver.query(
+			`SELECT d.chat_id FROM dialogs d
+			LEFT JOIN chats c ON c.id = d.chat_id
+			LEFT JOIN users u ON u.id = c.peer_user_id
+			WHERE c.id IS NULL
+				OR (c.type = 'private' AND (c.peer_user_id = 0 OR u.id IS NULL OR (c.peer_user_id = ? AND c.member_count > 1)))
+			ORDER BY d.chat_id`,
+			[selfId],
+		);
+		return rows.map((row) => num(row, "chat_id"));
+	}
+
 	/** Ids from `ids` that have no row in `table`. */
 	async missing(table: "users" | "chats", ids: Iterable<number>): Promise<number[]> {
 		const wanted = [...new Set(ids)].filter((id) => id !== 0);

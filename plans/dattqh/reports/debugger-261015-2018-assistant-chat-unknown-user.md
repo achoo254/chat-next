@@ -59,3 +59,55 @@ Evidence that user 1's device took the update through a path without the refresh
 
 - Which client build or tab of user 1 applied the update is unconfirmed, because production logs were not read. The fix covers every path either way.
 - User 1's device repairs itself once it runs this release; no data change is needed on the server.
+
+## Follow-up: still "Chat đã xoá" after fb29dac
+
+Reported on prod: the device runs the fb29dac bundle and still shows chat 7 as deleted. The server returns the right data for GetChat, GetPeerDialogs and GetUsers.
+
+**What the original update carried.** The server put the right peer in it, so the server needed no change.
+- I rendered `member_added` from `EnsureSystemBotChat` for the recipient through both paths:
+  - the realtime sink frame;
+  - `GetDifference`, before and after fb29dac.
+- Both gave `chats:{type:PRIVATE peer_user_id:<bot>}`. The realtime frame after fb29dac also carries the bot user.
+- `chatRow.render` takes `peer_user_id` from `peerOf(viewer)` over `chats LEFT JOIN private_chats`. It is never the inviter or self for this chat.
+- The only client code that writes `peer_user_id` is `putChat`, which writes whatever server Chat it is given.
+
+**Why the fb29dac repair could not help.** It only fetches the user named by the stored `peer_user_id`, and only when that id is not 0.
+- This matches the symptoms: the list shows "Chat đã xoá", the header shows presence for an unknown person, and no GetPeerDialogs or GetChat call is made on load.
+- So the stored chat (or dialog) is unusable in a way that fetching a user cannot fix: peer 0, a peer id the server does not know, self as peer of a two-member chat, or a dialog with no chat row (for example a chat purged as `left` while its dialog stayed).
+- I could not read the device's database, so which of these it is remains unproven.
+
+**Fix.** The repair now reloads the chat itself.
+- `Repository.dialogsToRepair(selfId)` lists the dialogs that cannot be shown:
+  - no chat row;
+  - a private chat whose peer is 0;
+  - a peer with no stored user;
+  - the user as peer while `member_count > 1`. Only Cloud của tôi has the user as its own peer, and it has one member.
+- Once per start, after the first successful GetDifference, `SyncEngine.repairDialogs` reloads those chats with GetPeerDialogs, 100 per call. It overwrites the stored chat, dialog and users through the existing `refreshChat` path, now `refreshChats(ids)`. Without GetPeerDialogs it falls back to GetChat. Failures are reported, not thrown.
+- Chats that show fine cause no call.
+
+**Tests.**
+- Core `private-chat-peer.test.ts`: 4 new restart cases fail without the repair (4 failed / 3 passed) and pass with it. Each one damages the device database, removes the bot user, restarts the app on the same database, and expects the chat with peer = bot, `memberCount` 2, and the bot user. The cases are:
+  - peer 0;
+  - self as peer;
+  - an unknown peer id;
+  - no chat row.
+- Core `private-chat-peer.test.ts`: 1 more case checks that a healthy device makes no GetPeerDialogs call on start.
+- Web `assistant-chat.test.tsx`: a new "peer 0" restart case fails without the repair and passes with it. The list names the bot and "Bắt đầu" shows.
+
+**Gates.**
+- vitest (`--maxWorkers=2`): core 773/773, web 339/339.
+- `pnpm lint`: clean.
+- `pnpm typecheck`: every project passes except apps/web, which has 3 errors in `test/service-worker.test.ts` (lines 46-48). That file is in another agent's uncommitted service-worker work (`src/sw/*`), not my change.
+- `pnpm e2e`: 23/24. "an existing account gets the assistant on its next start and live on its other device" passes. The one failure is the other agent's in-progress scenario in `bots.e2e.ts:264` ("the bot edits its message…", waiting for the "Xem kết quả" button), which is unrelated.
+- gitleaks: no leaks found.
+- No Go change in this round.
+
+**Files changed in this round:**
+- `packages/core/src/sync/engine.ts`
+- `packages/core/src/repo/repository.ts`
+- `packages/core/test/private-chat-peer.test.ts`
+- `apps/web/test/assistant-chat.test.tsx`
+- `plans/dattqh/reports/debugger-261015-2018-assistant-chat-unknown-user.md`
+
+**Unresolved.** The exact damaged state of user 1's database (peer 0, an unknown id, or no chat row) is unproven without reading it. The repair covers all of them. After this deploy, one reload should show chat 7 named with "Bắt đầu"; if it does not, the next step is to read chat 7's local `chats` row on that device.

@@ -94,6 +94,8 @@ export interface SyncEngineOptions {
 const MAX_DIALOG_PAGES = 100;
 const DIALOG_PAGE_SIZE = 100;
 const MAX_TOO_LONG_IN_A_ROW = 3;
+/** Chats per GetPeerDialogs when repairing the dialog list. */
+const REPAIR_BATCH = 100;
 
 /** Inclusive range of seqs a history response speaks for. */
 function coveredRange(
@@ -153,6 +155,8 @@ export class SyncEngine {
 	private differenceRunning = false;
 	private differenceAgain = false;
 	private differenceAttempt = 0;
+	/** repairDialogs ran (or runs) in this start. */
+	private repairStarted = false;
 	private differenceRetry: unknown = null;
 	private accountBuffer: UpdateBatch[] = [];
 
@@ -483,13 +487,19 @@ export class SyncEngine {
 	 * reported, not thrown; a chat the server does not return stays absent.
 	 */
 	async refreshChat(chatId: number): Promise<void> {
+		await this.refreshChats([chatId]);
+	}
+
+	/** refreshChat for several chats in one GetPeerDialogs. */
+	private async refreshChats(chatIds: readonly number[]): Promise<void> {
+		if (chatIds.length === 0) return;
 		try {
 			const getPeerDialogs = this.options.api.chats.getPeerDialogs;
 			if (getPeerDialogs === undefined) {
-				await this.refreshChatEntity(chatId);
+				for (const chatId of chatIds) await this.refreshChatEntity(chatId);
 				return;
 			}
-			const page = toPeerDialogs(await getPeerDialogs({ chatIds: [toWireId(chatId)] }));
+			const page = toPeerDialogs(await getPeerDialogs({ chatIds: chatIds.map(toWireId) }));
 			await this.queue.run(async () => {
 				const w = new WriteBatch();
 				const effects = newEffects();
@@ -566,6 +576,22 @@ export class SyncEngine {
 			this.putEntities({ users: response.users.map(toUser), chats: [toChat(chat)] }, w, newEffects());
 			await this.commit(w);
 		});
+	}
+
+	/**
+	 * Once per start, after the first catch-up: reloads from the server the
+	 * dialogs this device cannot show, i.e. with no chat stored, or a
+	 * private chat whose other person is unknown, missing or wrong (a chat
+	 * an older build stored from an update without its peer). Overwrites
+	 * the stored chat, its dialog and its users.
+	 */
+	private async repairDialogs(): Promise<void> {
+		try {
+			const chatIds = await this.options.repo.dialogsToRepair(this.options.selfId);
+			for (let i = 0; i < chatIds.length; i += REPAIR_BATCH) await this.refreshChats(chatIds.slice(i, i + REPAIR_BATCH));
+		} catch (err) {
+			this.report(err, "repair dialogs");
+		}
 	}
 
 	/**
@@ -669,6 +695,10 @@ export class SyncEngine {
 				}
 			} while (this.differenceAgain && !this.stopped);
 			this.differenceAttempt = 0;
+			if (!this.repairStarted && !this.stopped) {
+				this.repairStarted = true;
+				void this.repairDialogs();
+			}
 		} catch (err) {
 			this.differenceFailed(err);
 		} finally {

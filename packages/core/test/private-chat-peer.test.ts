@@ -63,4 +63,43 @@ describe("the peer of a private chat", () => {
 		await core.users([bot, self]);
 		expect(server.calls.get("getUsers") ?? 0).toBe(before + 1);
 	});
+
+	// What an older build may have stored for the assistant chat; the
+	// next start reloads the chat itself from the server.
+	it.each([
+		["a peer of 0", "UPDATE chats SET peer_user_id = 0 WHERE id = ?"],
+		["the user as peer of a two-member chat", "UPDATE chats SET peer_user_id = (SELECT id FROM users WHERE is_self = 1) WHERE id = ?"],
+		["a peer nobody knows", "UPDATE chats SET peer_user_id = 987654 WHERE id = ?"],
+		["no chat at all", "DELETE FROM chats WHERE id = ?"],
+	])("is repaired on the next start for a device that stored %s", async (_, corrupt) => {
+		const { server, core, sql, self, bot } = await existingUser();
+		const chatId = server.createChat(ChatType.PRIVATE, "", [self, bot]);
+		server.addMember(chatId, self, self);
+		await settle(core);
+		await core.close();
+		const db = sql.db(dbName(self));
+		db.prepare(corrupt).run(chatId);
+		db.prepare("DELETE FROM users WHERE id = ?").run(bot);
+
+		const { core: restarted } = await startTestApp(server, self, sql);
+		await settle(restarted);
+
+		const view = (await restarted.dialogs()).find((d) => d.dialog.chatId === chatId);
+		expect(view?.chat).toMatchObject({ type: "private", peerUserId: bot, memberCount: 2 });
+		expect(view?.peer).toMatchObject({ id: bot, name: "Trợ lý" });
+	});
+
+	it("leaves chats that show fine alone on start", async () => {
+		const { server, core, sql, self, bot } = await existingUser();
+		const chatId = server.createChat(ChatType.PRIVATE, "", [self, bot]);
+		server.addMember(chatId, self, self);
+		await settle(core);
+		await core.close();
+		const before = server.calls.get("getPeerDialogs") ?? 0;
+
+		const { core: restarted } = await startTestApp(server, self, sql);
+		await settle(restarted);
+
+		expect(server.calls.get("getPeerDialogs") ?? 0).toBe(before);
+	});
 });
