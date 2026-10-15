@@ -417,4 +417,11 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - poster và waveform phía server (cần ffmpeg trên `.65`);
   - bộ lọc tìm theo loại media (Phase 7).
 - Phiên `chat-next-85` làm song song trên cùng thư mục repo (E2E nhiều người dùng, "Cloud của tôi"). E2E của phiên đó bắt được lỗi: tạo chat riêng xong mở `/c/1` báo "Không mở được chat này", client gọi `GetHistory` lặp liên tục. Phiên đó đang điều tra.
+- Lỗi chat riêng đã sửa và lên prod (commit `30952bc` của phiên `chat-next-85`).
+  - Nguyên nhân: server chưa ghi update cho chat riêng cho tới tin đầu tiên, còn core chỉ đọc DB local.
+  - Cách sửa: khi thiếu chat, core gọi `refreshChat` qua `GetPeerDialogs`.
+- Ba lỗi E2E còn lại đang được agent của phiên này sửa:
+  - người bị xoá khỏi nhóm thấy báo lỗi mạng;
+  - Esc không đóng hộp thoại Thành viên;
+  - log ERROR "context canceled" khi client tự huỷ request.
 
