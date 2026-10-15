@@ -352,6 +352,8 @@ export class ChatStore {
 				this.dialogs.set(id, view);
 				if (view.chat !== null) this.chats.set(id, view.chat);
 				if (view.peer !== null) this.users.set(view.peer.id, view.peer);
+				// A private chat stored without its peer: fetch it so the row is not shown as deleted.
+				else if (view.chat?.type === "private" && view.chat.peerUserId !== 0) this.wantUser(view.chat.peerUserId);
 				if (this.unreadTracking.has(id)) this.lateUnread(id, view);
 				const from = view.topMessage?.fromId ?? 0;
 				if (from !== 0 && from !== this.selfId) this.wantUser(from);

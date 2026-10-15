@@ -448,6 +448,8 @@ export class SyncEngine {
 			for (const id of need.users) userIds.add(id);
 			for (const id of need.chats) chatIds.add(id);
 		}
+		// A private chat is shown by its peer (getChat below brings its own).
+		for (const chat of batch.chats) if (chat.peerUserId !== 0) userIds.add(chat.peerUserId);
 		for (const user of batch.users) userIds.delete(user.id);
 		for (const chat of batch.chats) chatIds.delete(chat.id);
 		const missingUsers = await this.options.repo.missing("users", userIds);
@@ -564,6 +566,27 @@ export class SyncEngine {
 			this.putEntities({ users: response.users.map(toUser), chats: [toChat(chat)] }, w, newEffects());
 			await this.commit(w);
 		});
+	}
+
+	/**
+	 * Fetches users this device has never stored, e.g. the peer of a chat
+	 * that arrived without it. Failures are reported, not thrown; a user the
+	 * server does not return stays unknown.
+	 */
+	async fetchUsers(userIds: readonly number[]): Promise<void> {
+		if (userIds.length === 0) return;
+		try {
+			const response = await this.options.api.users.getUsers({ userIds: userIds.map(toWireId) });
+			if (response.users.length === 0) return;
+			await this.queue.run(async () => {
+				const w = new WriteBatch();
+				for (const user of response.users) putUser(w, toUser(user));
+				await this.commit(w);
+			});
+		} catch (err) {
+			if (classifyFailure(err) === "unauthenticated") this.options.onSessionEnded("unknown");
+			else this.report(err, "fetch users");
+		}
 	}
 
 	// ------------------------------------------------------------ gap timers

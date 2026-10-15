@@ -18,6 +18,8 @@ export const ACCOUNTS = {
 	dung: { name: "Dũng", username: "dung" },
 	/** A brand-new account for the assistant bot scenario. */
 	giang: { name: "Giang", username: "giang" },
+	/** Signs in before the assistant exists, then gets it as an existing account. */
+	hanh: { name: "Hạnh", username: "hanh" },
 } as const;
 export type AccountKey = keyof typeof ACCOUNTS;
 

@@ -179,6 +179,11 @@ export class FakeServer {
 	online = true;
 	/** When true the server sends nothing at all (dead socket). */
 	silent = false;
+	/**
+	 * When true realtime frames carry only the viewer as a user, like a
+	 * server that left the peer of a private chat out of member_added.
+	 */
+	framesWithoutPeers = false;
 	readonly network: NetworkConditions = { lossRate: 0, reorderRate: 0, latencyMs: 1 };
 	readonly faults: RpcFault[] = [];
 	readonly calls = new Map<string, number>();
@@ -1003,6 +1008,7 @@ export class FakeServer {
 	 */
 	private sendUpdates(session: Session, updates: WireUpdate[], chatId: number, lossy: boolean): void {
 		const entities = this.entitiesForChats(session.userId, chatId === 0 ? [] : [chatId]);
+		if (this.framesWithoutPeers) entities.users = [this.wireUser(session.userId, session.userId)];
 		this.sendFrame(session, { case: "update", value: { updates, ...entities } }, lossy);
 	}
 

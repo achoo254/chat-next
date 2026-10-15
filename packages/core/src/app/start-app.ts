@@ -574,7 +574,15 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		history,
 		users: async (ids) => {
 			active();
-			return repo.users(ids.map(assertSafeId));
+			const wanted = ids.map(assertSafeId);
+			const stored = await repo.users(wanted);
+			// A user the device never received (e.g. the peer of a chat that
+			// came without it) is asked from the server once wanted.
+			const known = new Set(stored.map((user) => user.id));
+			const missing = [...new Set(wanted)].filter((id) => id !== 0 && !known.has(id));
+			if (missing.length === 0) return stored;
+			await engine.fetchUsers(missing);
+			return repo.users(wanted);
 		},
 		chat: async (chatId) => {
 			active();

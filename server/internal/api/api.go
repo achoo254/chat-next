@@ -362,9 +362,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 }
 
 // RunWrapped is Run with the app's handler passed through wrap (nil leaves
-// it as is). The local end-to-end stack uses it to cut realtime sockets on
-// demand; production runs plain Run.
-func RunWrapped(ctx context.Context, cfg config.Config, logger *slog.Logger, wrap func(http.Handler) http.Handler) error {
+// it as is); wrap also gets the app. The local end-to-end stack uses it to
+// cut realtime sockets and switch the assistant on demand; production runs
+// plain Run.
+func RunWrapped(ctx context.Context, cfg config.Config, logger *slog.Logger, wrap func(*App, http.Handler) http.Handler) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -384,7 +385,7 @@ func RunWrapped(ctx context.Context, cfg config.Config, logger *slog.Logger, wra
 
 	handler := app.Handler
 	if wrap != nil {
-		handler = wrap(handler)
+		handler = wrap(app, handler)
 	}
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

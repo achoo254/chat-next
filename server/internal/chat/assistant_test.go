@@ -139,3 +139,37 @@ func TestFeedbackQueue(t *testing.T) {
 		t.Fatal("an over-long answer passed")
 	}
 }
+
+// The assistant chat reaches an existing client only as member_added: the
+// frame must carry the bot, or the client shows a nameless chat.
+func TestSystemBotChatUpdateCarriesTheBot(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	user := h.user("lan")
+	bot := h.bot(user, "tro_ly_bot")
+	h.svc.SetSystemBot(bot)
+	if err := h.svc.EnsureSystemBotChat(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+	chatID := h.assistantChat(user, bot)
+	resp, err := h.svc.GetDifference(ctx, user, &appv1.GetDifferenceRequest{Pts: 0, ServerEpoch: h.svc.Epoch()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := resp.GetFull()
+	if full == nil || len(full.GetUpdates()) != 1 || full.GetUpdates()[0].GetMemberAdded().GetChatId() != chatID {
+		t.Fatalf("difference = %v", resp)
+	}
+	var peer *appv1.User
+	for _, u := range full.GetUsers() {
+		if u.GetId() == bot {
+			peer = u
+		}
+	}
+	if peer == nil || !peer.GetIsBot() || peer.GetUsername() != "tro_ly_bot" {
+		t.Fatalf("the frame's users miss the bot: %v", full.GetUsers())
+	}
+	if len(full.GetChats()) != 1 || full.GetChats()[0].GetPeerUserId() != bot {
+		t.Fatalf("frame chats = %v", full.GetChats())
+	}
+}

@@ -688,10 +688,32 @@ type renderedEntities struct {
 }
 
 // render loads every referenced user and chat once and renders them for
-// each viewer.
+// each viewer. A private chat comes with its peer: the client names and
+// shows the chat by that user, and has no other way to learn who it is.
 func (e *entitySet) render(ctx context.Context, q querier, tenantID string) (*renderedEntities, error) {
-	var viewers, userIDs, chatIDs []int64
-	seenV, seenU, seenC := map[int64]bool{}, map[int64]bool{}, map[int64]bool{}
+	var chatIDs []int64
+	seenC := map[int64]bool{}
+	for _, set := range e.chats {
+		for id := range set {
+			if !seenC[id] {
+				seenC[id] = true
+				chatIDs = append(chatIDs, id)
+			}
+		}
+	}
+	chats, err := loadChats(ctx, q, tenantID, chatIDs)
+	if err != nil {
+		return nil, err
+	}
+	for v, set := range e.chats {
+		for id := range set {
+			if c, ok := chats[id]; ok && c.Type == typePrivate {
+				e.addUsers(v, c.peerOf(v))
+			}
+		}
+	}
+	var viewers, userIDs []int64
+	seenV, seenU := map[int64]bool{}, map[int64]bool{}
 	for v, set := range e.users {
 		if !seenV[v] {
 			seenV[v] = true
@@ -704,16 +726,10 @@ func (e *entitySet) render(ctx context.Context, q querier, tenantID string) (*re
 			}
 		}
 	}
-	for v, set := range e.chats {
+	for v := range e.chats {
 		if !seenV[v] {
 			seenV[v] = true
 			viewers = append(viewers, v)
-		}
-		for id := range set {
-			if !seenC[id] {
-				seenC[id] = true
-				chatIDs = append(chatIDs, id)
-			}
 		}
 	}
 	users, err := loadUsers(ctx, q, tenantID, userIDs)
@@ -721,10 +737,6 @@ func (e *entitySet) render(ctx context.Context, q querier, tenantID string) (*re
 		return nil, err
 	}
 	blocks, err := loadBlocks(ctx, q, viewers, userIDs)
-	if err != nil {
-		return nil, err
-	}
-	chats, err := loadChats(ctx, q, tenantID, chatIDs)
 	if err != nil {
 		return nil, err
 	}
