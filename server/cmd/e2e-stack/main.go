@@ -39,6 +39,8 @@ var Accounts = []idptest.Account{
 	{Sub: "acc_e2e_an", SID: "sid-an", PreferredUsername: "an", Name: "An", Email: "an@e2e.test", EmailVerified: true},
 	{Sub: "acc_e2e_binh", SID: "sid-binh", PreferredUsername: "binh", Name: "Bình", Email: "binh@e2e.test", EmailVerified: true},
 	{Sub: "acc_e2e_chi", SID: "sid-chi", PreferredUsername: "chi", Name: "Chi", Email: "chi@e2e.test", EmailVerified: true},
+	// Kept for scenarios that need an account nobody has talked to yet.
+	{Sub: "acc_e2e_dung", SID: "sid-dung", PreferredUsername: "dung", Name: "Dũng", Email: "dung@e2e.test", EmailVerified: true},
 }
 
 const clientID = "chat-web"
@@ -126,7 +128,7 @@ func announceReady(ctx context.Context, apiAddr, public, issuer string) {
 		if err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
-				fmt.Printf("e2e-stack ready: open %s (fake IdP %s; accounts an, binh, chi)\n", public, issuer)
+				fmt.Printf("e2e-stack ready: open %s (fake IdP %s; accounts an, binh, chi, dung)\n", public, issuer)
 				return
 			}
 		}

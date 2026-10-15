@@ -151,7 +151,8 @@ func (s *Service) SetDialogPinned(ctx context.Context, me, chatID int64, pinned 
 			if err := t.tx.QueryRow(ctx, `
 				SELECT count(*) FILTER (WHERE `+dialogListed+`), coalesce(max(m.pin_rank), 0)
 				FROM chat_members m JOIN chats c ON c.id = m.chat_id
-				WHERE m.user_id = $1 AND m.pin_rank IS NOT NULL AND m.left_at IS NULL`, me).Scan(&count, &top); err != nil {
+				WHERE m.user_id = $1 AND m.pin_rank IS NOT NULL AND m.left_at IS NULL
+				AND NOT EXISTS (SELECT 1 FROM private_chats p WHERE p.chat_id = c.id AND p.user_low = p.user_high)`, me).Scan(&count, &top); err != nil {
 				return fmt.Errorf("chat: count pinned dialogs: %w", err)
 			}
 			if count >= pinnedDialogsMax {

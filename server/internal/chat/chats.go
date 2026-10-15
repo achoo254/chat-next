@@ -123,10 +123,18 @@ func (s *Service) insertChat(ctx context.Context, t *txn, c *chatRow) error {
 // ------------------------------------------------------------------ create
 
 // CreatePrivate returns the private chat between me and peer, creating it
-// when needed. No update is written until the first message.
+// when needed. No update is written until the first message. With peer ==
+// me it returns the caller's saved chat (EnsureSavedChat).
 func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Chat, []*appv1.User, error) {
-	if peer <= 0 || peer == me {
-		return nil, nil, errInvalid("user_id must be another user")
+	if peer <= 0 {
+		return nil, nil, errInvalid("user_id must be a user")
+	}
+	if peer == me {
+		chatID, err := s.EnsureSavedChat(ctx, me)
+		if err != nil {
+			return nil, nil, err
+		}
+		return s.GetChat(ctx, me, chatID)
 	}
 	if err := s.allow(limitCreate, "create", me); err != nil {
 		return nil, nil, err
@@ -179,6 +187,68 @@ func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Cha
 		return nil, nil, err
 	}
 	return s.GetChat(ctx, me, chatID)
+}
+
+// savedChatID finds the caller's chat with themselves; 0 when it does not
+// exist yet.
+func (s *Service) savedChatID(ctx context.Context, q querier, me int64) (int64, error) {
+	var chatID int64
+	err := q.QueryRow(ctx, `SELECT chat_id FROM private_chats WHERE tenant_id = $1 AND user_low = $2 AND user_high = $2`,
+		s.cfg.TenantID, me).Scan(&chatID)
+	if isNoRows(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("chat: find saved chat: %w", err)
+	}
+	return chatID, nil
+}
+
+// EnsureSavedChat returns the caller's private chat with themselves ("Cloud
+// của tôi"), creating it the first time pinned at the top of their list.
+// Its pin writes a pinned_dialogs update, so every session of the user
+// loads it without signing in again. The pin never counts toward
+// pinnedDialogsMax.
+func (s *Service) EnsureSavedChat(ctx context.Context, me int64) (int64, error) {
+	if chatID, err := s.savedChatID(ctx, s.pool, me); err != nil || chatID != 0 {
+		return chatID, err
+	}
+	var chatID int64
+	_, err := s.inTx(ctx, func(t *txn) error {
+		// Serializes concurrent first calls of the same user (two tabs opening).
+		if err := lockPins(ctx, t, me); err != nil {
+			return err
+		}
+		var err error
+		if chatID, err = s.savedChatID(ctx, t.tx, me); err != nil || chatID != 0 {
+			return err
+		}
+		if chatID, err = s.newChatID(ctx, t.tx); err != nil {
+			return err
+		}
+		if err := s.insertChat(ctx, t, &chatRow{ID: chatID, Type: typePrivate, CreatorID: me, DefaultPerms: privatePerms}); err != nil {
+			return err
+		}
+		if _, err := t.tx.Exec(ctx, `INSERT INTO private_chats (tenant_id, user_low, user_high, chat_id) VALUES ($1, $2, $2, $3)`,
+			s.cfg.TenantID, me, chatID); err != nil {
+			return fmt.Errorf("chat: create saved chat: %w", err)
+		}
+		if _, err := t.tx.Exec(ctx, `
+			INSERT INTO chat_members (chat_id, user_id, role, pin_rank)
+			SELECT $1, $2, 'member', coalesce(max(pin_rank), 0) + 1 FROM chat_members WHERE user_id = $2`,
+			chatID, me); err != nil {
+			return fmt.Errorf("chat: add saved chat member: %w", err)
+		}
+		if _, err := t.tx.Exec(ctx, `UPDATE chats SET member_count = 1 WHERE id = $1`, chatID); err != nil {
+			return fmt.Errorf("chat: saved chat member count: %w", err)
+		}
+		_, err = s.announcePins(ctx, t, me)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	return chatID, nil
 }
 
 // CreateGroup creates a group owned by me with the users that allow it.

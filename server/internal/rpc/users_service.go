@@ -45,6 +45,12 @@ func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.G
 	if err != nil {
 		return nil, internal(s.logger, req.Spec().Procedure, err)
 	}
+	// Every app start makes sure "Cloud của tôi" exists, so accounts created
+	// before it get it without signing in again. A failure only delays it to
+	// the next start.
+	if _, err := s.chat.EnsureSavedChat(ctx, sess.UserID); err != nil {
+		s.logger.WarnContext(ctx, "saved chat", "user_id", sess.UserID, "err", err)
+	}
 	return connect.NewResponse(&appv1.GetSelfResponse{User: selfUser(u), IsOperator: s.chat.IsOperator(sess.UserID)}), nil
 }
 
