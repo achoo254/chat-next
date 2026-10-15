@@ -39,7 +39,7 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 
 ### Biến trong `/opt/chat/.env` (chỉ tên)
 
-`CHAT_ENV`, `CHAT_LISTEN_ADDR`, `CHAT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `TENANT_ID`, `TENANT_DOMAIN`, `SESSION_KEY`, `DATABASE_URL`, `MEDIA_PUBLIC_URL`, `MEDIA_STORAGE`, `MEDIA_ROOT`, `MEDIA_MIN_FREE_BYTES`, `MEDIA_UPLOAD_MAX_BYTES`, `MEDIA_USER_QUOTA_BYTES`, `OUTBOUND_DENY_CIDRS` (`103.72.98.65`, đặt ngày 2026-10-15: webhook bot và xem trước link không gọi về chính máy). Mẫu và ý nghĩa: [`infra/chat/.env.production.example`](../infra/chat/.env.production.example). Chưa đặt: `CHAT_OPERATOR_USER_IDS` (không ai có quyền kiểm duyệt), `MEDIA_FFMPEG_PATH`. File `.env.bak-*` là bản sao trước mỗi lần sửa tay.
+`CHAT_ENV`, `CHAT_LISTEN_ADDR`, `CHAT_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `TENANT_ID`, `TENANT_DOMAIN`, `SESSION_KEY`, `DATABASE_URL`, `MEDIA_PUBLIC_URL`, `MEDIA_STORAGE`, `MEDIA_ROOT`, `MEDIA_MIN_FREE_BYTES`, `MEDIA_UPLOAD_MAX_BYTES`, `MEDIA_USER_QUOTA_BYTES`, `OUTBOUND_DENY_CIDRS` (`103.72.98.65`, đặt ngày 2026-10-15: webhook bot và xem trước link không gọi về chính máy). Mẫu và ý nghĩa: [`infra/chat/.env.production.example`](../infra/chat/.env.production.example). `CHAT_OPERATOR_USER_IDS` (`1` = `@achoo254`, chủ sản phẩm, đặt ngày 2026-10-15 theo quyết định của user: xem hàng đợi kiểm duyệt và góp ý). Chưa đặt: `MEDIA_FFMPEG_PATH`. File `.env.bak-*` là bản sao trước mỗi lần sửa tay.
 
 ### Tiến trình (pm2 dùng chung, daemon chạy bằng root)
 
