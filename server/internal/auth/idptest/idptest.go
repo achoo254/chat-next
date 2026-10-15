@@ -4,6 +4,11 @@
 // endpoint (authorization_code with PKCE S256 and client_secret_basic, and
 // rotating single-use refresh tokens), revocation, end_session and userinfo.
 // It also signs back-channel logout tokens.
+//
+// Serve runs the same provider outside a test, on a fixed address, with a
+// page to pick which of several accounts signs in: the local multi-user
+// end-to-end stack (cmd/e2e-stack) uses it so several browsers sign in as
+// different people through the real OIDC code path.
 package idptest
 
 import (
@@ -13,7 +18,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"html/template"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -58,6 +66,7 @@ type codeGrant struct {
 	challenge string
 	nonce     string
 	redirect  string
+	account   Account
 }
 
 // Provider is a running fake IdP.
@@ -78,19 +87,57 @@ type Provider struct {
 	refreshGate   chan struct{}   // non-nil: refresh grants wait for it to close
 	refreshArrive chan struct{}   // receives one value per gated refresh grant
 	refreshTokens map[string]bool // issued token -> still valid
-	codes         map[string]codeGrant
-	authorizes    []Authorize
-	revoked       []string
+	// accounts is the picker's list (Serve only); nil means the provider
+	// always signs in account.
+	accounts     []Account
+	tokenAccount map[string]Account // refresh token -> account it was issued to
+	codes        map[string]codeGrant
+	authorizes   []Authorize
+	revoked      []string
 }
 
 // New starts a provider for the given client; it stops with the test.
 func New(t testing.TB, clientID, clientSecret string) *Provider {
 	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	p, err := newProvider(clientID, clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &Provider{
+	p.Server = httptest.NewServer(p.routes())
+	t.Cleanup(p.Server.Close)
+	return p
+}
+
+// Serve starts a provider listening on addr whose authorize endpoint shows
+// a page to pick one of accounts; each refresh token keeps the account it
+// was issued to. Close it with p.Server.Close.
+func Serve(addr, clientID, clientSecret string, accounts []Account) (*Provider, error) {
+	if len(accounts) == 0 {
+		return nil, errors.New("idptest: Serve needs at least one account")
+	}
+	p, err := newProvider(clientID, clientSecret)
+	if err != nil {
+		return nil, err
+	}
+	p.accounts = append([]Account(nil), accounts...)
+	p.account = accounts[0]
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	p.Server = httptest.NewUnstartedServer(p.routes())
+	_ = p.Server.Listener.Close()
+	p.Server.Listener = l
+	p.Server.Start()
+	return p, nil
+}
+
+func newProvider(clientID, clientSecret string) (*Provider, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return &Provider{
 		ClientID: clientID, ClientSecret: clientSecret,
 		key: key, kid: "test-key-1",
 		account: Account{
@@ -98,19 +145,31 @@ func New(t testing.TB, clientID, clientSecret string) *Provider {
 			Email: "tester@example.com", EmailVerified: true,
 		},
 		refreshTokens: map[string]bool{},
+		tokenAccount:  map[string]Account{},
 		codes:         map[string]codeGrant{},
-	}
+	}, nil
+}
+
+func (p *Provider) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/openid-configuration", p.discovery)
 	mux.HandleFunc("GET /jwks", p.jwks)
 	mux.HandleFunc("GET /authorize", p.authorize)
 	mux.HandleFunc("POST /token", p.token)
 	mux.HandleFunc("POST /revoke", p.revoke)
-	mux.HandleFunc("GET /session/end", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.HandleFunc("GET /session/end", p.endSession)
 	mux.HandleFunc("GET /me", p.userinfo)
-	p.Server = httptest.NewServer(mux)
-	t.Cleanup(p.Server.Close)
-	return p
+	return mux
+}
+
+// endSession answers the RP-initiated logout; with the picker it sends the
+// browser back to post_logout_redirect_uri like the real IdP.
+func (p *Provider) endSession(w http.ResponseWriter, r *http.Request) {
+	if back := r.URL.Query().Get("post_logout_redirect_uri"); p.accounts != nil && back != "" {
+		http.Redirect(w, r, back, http.StatusFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // Issuer is the provider's issuer URL.
@@ -224,9 +283,20 @@ func (p *Provider) authorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid authorization request", http.StatusBadRequest)
 		return
 	}
+	p.mu.Lock()
+	account, accounts := p.account, p.accounts
+	p.mu.Unlock()
+	if accounts != nil {
+		picked, ok := pickAccount(accounts, q.Get("account"))
+		if !ok {
+			renderPicker(w, q, accounts)
+			return
+		}
+		account = picked
+	}
 	code := randomString()
 	p.mu.Lock()
-	p.codes[code] = codeGrant{challenge: q.Get("code_challenge"), nonce: q.Get("nonce"), redirect: q.Get("redirect_uri")}
+	p.codes[code] = codeGrant{challenge: q.Get("code_challenge"), nonce: q.Get("nonce"), redirect: q.Get("redirect_uri"), account: account}
 	p.mu.Unlock()
 	back, err := url.Parse(q.Get("redirect_uri"))
 	if err != nil {
@@ -238,6 +308,43 @@ func (p *Provider) authorize(w http.ResponseWriter, r *http.Request) {
 	bq.Set("state", q.Get("state"))
 	back.RawQuery = bq.Encode()
 	http.Redirect(w, r, back.String(), http.StatusFound)
+}
+
+func pickAccount(accounts []Account, sub string) (Account, bool) {
+	for _, a := range accounts {
+		if sub != "" && a.Sub == sub {
+			return a, true
+		}
+	}
+	return Account{}, false
+}
+
+type pickerEntry struct {
+	Name, Username, Href string
+}
+
+var pickerPage = template.Must(template.New("picker").Parse(`<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chọn tài khoản thử</title>
+<style>body{font:16px system-ui,sans-serif;max-width:420px;margin:48px auto;padding:0 16px}a{display:block;padding:12px 16px;margin:8px 0;border:1px solid #ccc;border-radius:8px;color:inherit;text-decoration:none}small{color:#666}</style>
+</head><body><h1>Chọn tài khoản thử</h1><p><small>IdP giả của môi trường E2E local, không phải trang đăng nhập thật.</small></p>
+{{range .}}<a href="{{.Href}}">Đăng nhập là {{.Name}} <small>@{{.Username}}</small></a>
+{{end}}</body></html>`))
+
+// renderPicker lists accounts as links that repeat the authorization
+// request with the chosen account.
+func renderPicker(w http.ResponseWriter, q url.Values, accounts []Account) {
+	entries := make([]pickerEntry, 0, len(accounts))
+	for _, a := range accounts {
+		pq := url.Values{}
+		for k, v := range q {
+			pq[k] = v
+		}
+		pq.Set("account", a.Sub)
+		entries = append(entries, pickerEntry{Name: a.Name, Username: a.PreferredUsername, Href: "/authorize?" + pq.Encode()})
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = pickerPage.Execute(w, entries)
 }
 
 func tokenError(w http.ResponseWriter, status int, code string) {
@@ -270,6 +377,9 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request) {
 	g, ok := p.codes[code]
 	delete(p.codes, code)
 	account, override := p.account, p.nonceOverride
+	if p.accounts != nil {
+		account = g.account
+	}
 	p.mu.Unlock()
 	sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
 	if !ok || base64.RawURLEncoding.EncodeToString(sum[:]) != g.challenge || r.PostForm.Get("redirect_uri") != g.redirect {
@@ -311,6 +421,9 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 	valid := p.refreshTokens[rt]
 	// Single use: a replayed token fails (the real IdP also ends the grant).
 	p.refreshTokens[rt] = false
+	if bound, ok := p.tokenAccount[rt]; ok && p.accounts != nil {
+		account = bound
+	}
 	p.mu.Unlock()
 	if !valid {
 		tokenError(w, http.StatusBadRequest, "invalid_grant")
@@ -325,6 +438,7 @@ func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, f
 	rt := "rt-" + randomString()
 	p.mu.Lock()
 	p.refreshTokens[rt] = true
+	p.tokenAccount[rt] = a
 	p.mu.Unlock()
 	now := time.Now()
 	claims := map[string]any{

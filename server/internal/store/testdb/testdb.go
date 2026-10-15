@@ -6,6 +6,9 @@
 // ~/.embedded-postgres-go.
 // When that download is impossible (no network on first run) the tests that
 // need a database skip with the reason; any other failure fails the package.
+//
+// Start runs the same server outside tests (the local end-to-end stack,
+// cmd/e2e-stack).
 package testdb
 
 import (
@@ -54,7 +57,7 @@ func Main(m *testing.M) int {
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 
-	pg, err := start(dir)
+	srv, err := Start(dir, 0)
 	if err != nil {
 		if unavailable == "" {
 			fmt.Fprintln(os.Stderr, "testdb:", err)
@@ -64,20 +67,42 @@ func Main(m *testing.M) int {
 		return m.Run()
 	}
 	defer func() {
-		if err := pg.Stop(); err != nil {
+		if err := srv.Stop(); err != nil {
 			fmt.Fprintln(os.Stderr, "testdb: stop:", err)
 		}
 	}()
-	if err := prepareTemplate(); err != nil {
+	baseURL = srv.BaseURL
+	if err := prepareTemplate(srv); err != nil {
 		fmt.Fprintln(os.Stderr, "testdb:", err)
 		return 1
 	}
 	return m.Run()
 }
 
-// start launches the server under dir. Starts of concurrent test packages
-// are serialized by a file lock so the shared binary download happens once.
-func start(dir string) (*embeddedpostgres.EmbeddedPostgres, error) {
+// Server is a running PostgreSQL started by Start.
+type Server struct {
+	pg *embeddedpostgres.EmbeddedPostgres
+	// BaseURL is the server URL without a database name.
+	BaseURL string
+}
+
+// Stop shuts the server down.
+func (s *Server) Stop() error { return s.pg.Stop() }
+
+// CreateMigrated creates database name, applies every migration and returns
+// the database URL.
+func (s *Server) CreateMigrated(ctx context.Context, name string, logger *slog.Logger) (string, error) {
+	if err := exec(ctx, s.BaseURL, "CREATE DATABASE "+name); err != nil {
+		return "", err
+	}
+	url := s.BaseURL + name
+	return url, store.Migrate(ctx, url, logger)
+}
+
+// Start launches the server with its data under dir, listening on port of
+// 127.0.0.1 (0 picks a free port). Concurrent starts are serialized by a
+// file lock so the shared binary download happens once.
+func Start(dir string, port uint32) (*Server, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -102,9 +127,10 @@ func start(dir string) (*embeddedpostgres.EmbeddedPostgres, error) {
 			return nil, err
 		}
 	}
-	port, err := freePort()
-	if err != nil {
-		return nil, err
+	if port == 0 {
+		if port, err = freePort(); err != nil {
+			return nil, err
+		}
 	}
 	var logs bytes.Buffer
 	pg := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
@@ -128,8 +154,7 @@ func start(dir string) (*embeddedpostgres.EmbeddedPostgres, error) {
 		_ = pg.Stop()
 		return nil, err
 	}
-	baseURL = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/", user, password, port)
-	return pg, nil
+	return &Server{pg: pg, BaseURL: fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/", user, password, port)}, nil
 }
 
 func lockFile(path string) (func(), error) {
@@ -160,18 +185,15 @@ func freePort() (uint32, error) {
 	return uint32(addr.Port), nil
 }
 
-func prepareTemplate() error {
+func prepareTemplate(srv *Server) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	if err := exec(ctx, "CREATE DATABASE "+templateName); err != nil {
-		return err
-	}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return store.Migrate(ctx, baseURL+templateName, logger)
+	_, err := srv.CreateMigrated(ctx, templateName, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return err
 }
 
-func exec(ctx context.Context, sql string) error {
-	conn, err := pgx.Connect(ctx, baseURL+"postgres")
+func exec(ctx context.Context, base, sql string) error {
+	conn, err := pgx.Connect(ctx, base+"postgres")
 	if err != nil {
 		return err
 	}
@@ -194,11 +216,11 @@ func New(t testing.TB) string {
 	_, _ = rand.Read(suffix[:])
 	name := "t_" + hex.EncodeToString(suffix[:])
 	ctx := context.Background()
-	if err := exec(ctx, "CREATE DATABASE "+name+" TEMPLATE "+templateName); err != nil {
+	if err := exec(ctx, baseURL, "CREATE DATABASE "+name+" TEMPLATE "+templateName); err != nil {
 		t.Fatalf("testdb: create database: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := exec(context.Background(), "DROP DATABASE "+name+" WITH (FORCE)"); err != nil {
+		if err := exec(context.Background(), baseURL, "DROP DATABASE "+name+" WITH (FORCE)"); err != nil {
 			t.Errorf("testdb: drop database: %v", err)
 		}
 	})
