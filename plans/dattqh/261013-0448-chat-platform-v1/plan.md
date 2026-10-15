@@ -372,4 +372,9 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - JS khởi động từ 149,1 xuống 112,5 KiB; React Compiler bật mặc định, JS khởi động 130,7/150 KiB.
 - Việc mock còn thiếu: màn sửa webhook (UI đang dùng lại các trường của `#create-hook`).
 - Tiếp theo: R3 media (Phase 4).
+- R3, Jev quyết:
+  - Lưu trữ dùng iNET Object Storage (S3, Ceph RGW): 0.70. MinIO trên `.65`: 0.27.
+  - Media tạm phục vụ từ `media-chat.hoandat.com` qua Cloudflare; chuyển sang domain đăng ký riêng trước R9: 0.92.
+  - Hiện chưa có gói storage dùng được cho prod: gói test 1 GB còn hạn, gói PRO 100 GB đã hết hạn 03/09/2026. Mua hoặc gia hạn gói cần user quyết.
+  - Code R3 viết theo S3 chung, cấu hình qua env, nên không phải chờ gói.
 
