@@ -11,8 +11,8 @@ import (
 	"testing"
 )
 
-// secretMarker is text planted in metadata; it must never survive.
-const secretMarker = "GPS-21.0285N-105.8542E-secret"
+// gpsMarker is text planted in metadata; it must never survive.
+const gpsMarker = "GPS-21.0285N-105.8542E-marker"
 
 // testImage is a w x h gradient.
 func testImage(w, h int) *image.RGBA {
@@ -26,9 +26,9 @@ func testImage(w, h int) *image.RGBA {
 }
 
 // exifBlock is an APP1 EXIF segment with Orientation and an
-// ImageDescription holding secretMarker.
+// ImageDescription holding gpsMarker.
 func exifBlock(orientation int) []byte {
-	desc := []byte(secretMarker + "\x00")
+	desc := []byte(gpsMarker + "\x00")
 	tiff := []byte{'M', 'M', 0, 42, 0, 0, 0, 8}
 	tiff = binary.BigEndian.AppendUint16(tiff, 2)
 	// Orientation SHORT.
@@ -54,17 +54,17 @@ func jpegWithExif(t *testing.T, w, h, orientation int) []byte {
 		t.Fatal(err)
 	}
 	b := buf.Bytes()
-	xmp := append([]byte("http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta>"), secretMarker...)
+	xmp := append([]byte("http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta>"), gpsMarker...)
 	xmpSeg := []byte{0xFF, 0xE1, 0, 0}
 	binary.BigEndian.PutUint16(xmpSeg[2:], uint16(len(xmp)+2))
 	xmpSeg = append(xmpSeg, xmp...)
-	com := append([]byte{0xFF, 0xFE, 0, byte(len(secretMarker) + 2)}, secretMarker...)
+	com := append([]byte{0xFF, 0xFE, 0, byte(len(gpsMarker) + 2)}, gpsMarker...)
 	out := append([]byte{}, b[:2]...)
 	out = append(out, exifBlock(orientation)...)
 	out = append(out, xmpSeg...)
 	out = append(out, com...)
 	out = append(out, b[2:]...)
-	return append(out, []byte("\xFF\xD8\xFF\xE1trailing "+secretMarker)...)
+	return append(out, []byte("\xFF\xD8\xFF\xE1trailing "+gpsMarker)...)
 }
 
 func pngChunk(typ string, data []byte) []byte {
@@ -74,7 +74,7 @@ func pngChunk(typ string, data []byte) []byte {
 	return binary.BigEndian.AppendUint32(c, crc32.ChecksumIEEE(append([]byte(typ), data...)))
 }
 
-// pngWithText is a PNG with a tEXt chunk holding secretMarker.
+// pngWithText is a PNG with a tEXt chunk holding gpsMarker.
 func pngWithText(t *testing.T, w, h int) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -84,7 +84,7 @@ func pngWithText(t *testing.T, w, h int) []byte {
 	b := buf.Bytes()
 	// After the signature and IHDR (8 + 25 bytes).
 	out := append([]byte{}, b[:33]...)
-	out = append(out, pngChunk("tEXt", append([]byte("Comment\x00"), secretMarker...))...)
+	out = append(out, pngChunk("tEXt", append([]byte("Comment\x00"), gpsMarker...))...)
 	return append(out, b[33:]...)
 }
 
@@ -119,9 +119,9 @@ func testMP4(mdatSize int) []byte {
 	binary.BigEndian.PutUint32(tkhd[80:], 1080<<16)
 	hdlr := make([]byte, 24)
 	copy(hdlr[8:], "vide")
-	trak := box("trak", box("tkhd", tkhd), box("mdia", box("hdlr", hdlr)), box("udta", []byte(secretMarker)))
-	moov := box("moov", box("mvhd", mvhd), trak, box("udta", box("\xa9xyz", []byte(secretMarker))),
-		box("meta", []byte("location "+secretMarker)))
+	trak := box("trak", box("tkhd", tkhd), box("mdia", box("hdlr", hdlr)), box("udta", []byte(gpsMarker)))
+	moov := box("moov", box("mvhd", mvhd), trak, box("udta", box("\xa9xyz", []byte(gpsMarker))),
+		box("meta", []byte("location "+gpsMarker)))
 	ftyp := box("ftyp", []byte("isom\x00\x00\x02\x00isomiso2mp41"))
 	return append(append(ftyp, moov...), box("mdat", make([]byte, mdatSize))...)
 }

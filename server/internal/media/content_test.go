@@ -63,7 +63,7 @@ func TestStripJPEGKeepsOnlyOrientation(t *testing.T) {
 	if orientation != 6 {
 		t.Fatalf("orientation = %d", orientation)
 	}
-	if bytes.Contains(out, []byte(secretMarker)) || bytes.Contains(out, []byte("xmpmeta")) {
+	if bytes.Contains(out, []byte(gpsMarker)) || bytes.Contains(out, []byte("xmpmeta")) {
 		t.Fatal("metadata survived")
 	}
 	if !bytes.HasSuffix(out, []byte{0xFF, 0xD9}) {
@@ -85,7 +85,7 @@ func TestStripJPEGKeepsOnlyOrientation(t *testing.T) {
 
 func TestStripPNGWebPGIF(t *testing.T) {
 	out, _, err := stripImage(mimePNG, pngWithText(t, 10, 10))
-	if err != nil || bytes.Contains(out, []byte(secretMarker)) {
+	if err != nil || bytes.Contains(out, []byte(gpsMarker)) {
 		t.Fatalf("png: %v", err)
 	}
 	if _, err := imageConfig(mimePNG, out); err != nil {
@@ -93,16 +93,16 @@ func TestStripPNGWebPGIF(t *testing.T) {
 	}
 	// WebP with an EXIF chunk and the EXIF flag set.
 	vp8x := append([]byte("VP8X"), 10, 0, 0, 0, 0x08, 0, 0, 0, 9, 0, 0, 9, 0, 0)
-	exif := append([]byte("EXIF"), byte(len(secretMarker)), 0, 0, 0)
-	exif = append(exif, secretMarker...)
-	if len(secretMarker)%2 == 1 {
+	exif := append([]byte("EXIF"), byte(len(gpsMarker)), 0, 0, 0)
+	exif = append(exif, gpsMarker...)
+	if len(gpsMarker)%2 == 1 {
 		exif = append(exif, 0)
 	}
 	body := append(append([]byte("WEBP"), vp8x...), exif...)
 	webp := append([]byte("RIFF"), byte(len(body)), 0, 0, 0)
 	webp = append(webp, body...)
 	out, err = stripWebP(webp)
-	if err != nil || bytes.Contains(out, []byte(secretMarker)) || out[20]&0x08 != 0 {
+	if err != nil || bytes.Contains(out, []byte(gpsMarker)) || out[20]&0x08 != 0 {
 		t.Fatalf("webp: %v %x", err, out)
 	}
 	if int(out[4])+8 != len(out) {
@@ -110,12 +110,12 @@ func TestStripPNGWebPGIF(t *testing.T) {
 	}
 	// GIF with a comment extension.
 	gif := []byte("GIF89a\x01\x00\x01\x00\x00\x00\x00")
-	gif = append(gif, 0x21, 0xFE, byte(len(secretMarker)))
-	gif = append(gif, secretMarker...)
+	gif = append(gif, 0x21, 0xFE, byte(len(gpsMarker)))
+	gif = append(gif, gpsMarker...)
 	gif = append(gif, 0, 0x2C, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 0x4C, 0x01, 0, 0x3B)
 	gif = append(gif, "after trailer"...)
 	out, err = stripGIF(gif)
-	if err != nil || bytes.Contains(out, []byte(secretMarker)) || out[len(out)-1] != 0x3B {
+	if err != nil || bytes.Contains(out, []byte(gpsMarker)) || out[len(out)-1] != 0x3B {
 		t.Fatalf("gif: %v %q", err, out)
 	}
 	if _, _, err := stripImage(mimeJPEG, []byte("\xFF\xD8\xFF\xE1\x00")); !errors.Is(err, errMalformed) {

@@ -34,7 +34,7 @@ import (
 
 const (
 	mediaHost = "media.test"
-	secret    = "GPS-21.0285N-105.8542E-secret"
+	gpsMarker = "GPS-21.0285N-105.8542E-marker"
 )
 
 type mediaEnv struct {
@@ -225,7 +225,7 @@ func photoWithGPS(t *testing.T, w, h int) []byte {
 	if err := jpeg.Encode(&buf, img, nil); err != nil {
 		t.Fatal(err)
 	}
-	desc := []byte(secret + "\x00")
+	desc := []byte(gpsMarker + "\x00")
 	tiff := []byte{'M', 'M', 0, 42, 0, 0, 0, 8, 0, 2, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0, 0x01, 0x0E, 0, 2}
 	tiff = binary.BigEndian.AppendUint32(tiff, uint32(len(desc)))
 	tiff = binary.BigEndian.AppendUint32(tiff, 38)
@@ -234,7 +234,7 @@ func photoWithGPS(t *testing.T, w, h int) []byte {
 	seg := binary.BigEndian.AppendUint16([]byte{0xFF, 0xE1}, uint16(len(payload)+2))
 	b := buf.Bytes()
 	out := append(append(append([]byte{}, b[:2]...), seg...), payload...)
-	return append(append(out, b[2:]...), secret...)
+	return append(append(out, b[2:]...), gpsMarker...)
 }
 
 func pngChunk(typ string, data []byte) []byte {
@@ -302,7 +302,7 @@ func TestMediaPhotoUploadSendDownloadRevoke(t *testing.T) {
 		if strings.HasPrefix(k, "staging/") {
 			t.Fatalf("staging object left: %s", k)
 		}
-		if bytes.Contains(obj, []byte(secret)) {
+		if bytes.Contains(obj, []byte(gpsMarker)) {
 			t.Fatalf("object %s still holds the metadata", k)
 		}
 	}
@@ -508,7 +508,7 @@ func testMovie(mdat int) []byte {
 	hdlr := make([]byte, 24)
 	copy(hdlr[8:], "vide")
 	moov := b("moov", b("mvhd", mvhd), b("trak", b("tkhd", tkhd), b("mdia", b("hdlr", hdlr))),
-		b("udta", b("\xa9xyz", []byte(secret))))
+		b("udta", b("\xa9xyz", []byte(gpsMarker))))
 	return append(append(b("ftyp", []byte("isom\x00\x00\x02\x00isomiso2mp41")), moov...), b("mdat", make([]byte, mdat))...)
 }
 
@@ -705,7 +705,7 @@ func TestLinkPreviewPhoto(t *testing.T) {
 	}
 	u := fileURL(t, bob, e.env, photo, chatID, seq, appv1.MediaSizeType_MEDIA_SIZE_TYPE_S)
 	resp := e.fetch(t, http.MethodGet, u.GetUrl(), nil, nil)
-	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || strings.Contains(body, secret) {
+	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || strings.Contains(body, gpsMarker) {
 		t.Fatalf("preview photo download: %d", resp.StatusCode)
 	}
 }
