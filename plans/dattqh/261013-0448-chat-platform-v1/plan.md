@@ -387,4 +387,9 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Có ngưỡng đĩa trống tối thiểu: hết chỗ thì từ chối upload, để không làm đầy đĩa của server dùng chung.
 - Bucket `chat-media` và danh tính `chat-api` trên OneDash không còn dùng. MCP không có tool xoá; user xoá trên web nếu muốn.
 - User quyết (2026-10-15): chưa làm backup ra ngoài server. `.65` là nơi lưu trung tâm cho mọi thứ (DB, media) tới khi có người dùng thật; lúc đó mới thiết kế lưu trữ và backup bên ngoài. Thay cho quyết định backup media mỗi đêm ở trên.
+- Thanh cuộn ngang trong khung tin: hàng nút hiện khi rê chuột lên tin của mình bung sang phải, vượt mép danh sách. Đã sửa: bung về phía còn trống (commit `e1c186d`).
+- Phản hồi của user: chip cảm xúc trông cồng kềnh so với Zalo và Telegram. Jev quyết:
+  - Vị trí kiểu Zalo, chip nổi đè lên mép dưới bong bóng: 0.53. Kiểu Telegram, cùng hàng với giờ gửi: 0.47, sát ngưỡng. Giữ hàng riêng như hiện tại: 0.
+  - Avatar trong chip chỉ hiện ở chat riêng và nhóm từ 10 người trở xuống; nhóm lớn hơn hiện emoji kèm số: 0.83.
+  - Sửa mock trước, rồi code UI.
 
