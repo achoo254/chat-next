@@ -70,6 +70,9 @@ func (s *Service) SendMedia(ctx context.Context, me int64, req *appv1.SendMediaR
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkMentions(ctx, me, ents); err != nil {
+		return nil, err
+	}
 	if req.GetRandomId() < 0 {
 		return nil, errInvalid("random_id must not be negative")
 	}
@@ -193,6 +196,9 @@ func (s *Service) SendAlbum(ctx context.Context, me int64, req *appv1.SendAlbumR
 	for i, it := range items {
 		text, ents, err := s.validateCaption(it.GetText(), it.GetEntities())
 		if err != nil {
+			return nil, err
+		}
+		if err := s.checkMentions(ctx, me, ents); err != nil {
 			return nil, err
 		}
 		r := it.GetRandomId()

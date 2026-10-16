@@ -131,6 +131,15 @@ func (s *botAdminService) ResetBotToken(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, fail(ctx, s.logger, req.Spec().Procedure, err)
 	}
+	// Whoever held the old token may have set the webhook: it goes with the
+	// token, so nothing keeps receiving updates or answering as the bot.
+	// Failing here, the owner resets again (the token is already new).
+	if bot.GetWebhook() {
+		if err := s.updates.DeleteWebhook(ctx, req.Msg.GetBotId(), false); err != nil {
+			return nil, fail(ctx, s.logger, req.Spec().Procedure, err)
+		}
+		bot.Webhook = false
+	}
 	return connect.NewResponse(&appv1.ResetBotTokenResponse{Bot: bot, Token: token}), nil
 }
 

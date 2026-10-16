@@ -82,13 +82,17 @@ func (s *Service) WithIntegration(ctx context.Context, chatID int64, delivered f
 	return err
 }
 
-// content validates msg and returns the stored text and content.
-func (it *IntegrationTx) content(msg IntegrationMessage) (string, *appv1.Message, error) {
+// content validates msg and returns the stored text and content. An
+// integration has no account of its own: it mentions members of its chat.
+func (it *IntegrationTx) content(ctx context.Context, msg IntegrationMessage) (string, *appv1.Message, error) {
 	if msg.Label == "" || utf8.RuneCountInString(msg.Label) > integrationLabelMax {
 		return "", nil, errInvalid("integration label must have 1 to %d characters", integrationLabelMax)
 	}
 	text, ents, err := it.t.s.validateText(msg.Text, msg.Entities, false)
 	if err != nil {
+		return "", nil, err
+	}
+	if err := it.t.s.checkChatMentions(ctx, it.t.tx, it.c.ID, ents); err != nil {
 		return "", nil, err
 	}
 	markup, err := it.t.s.inlineURLKeyboard(msg.Buttons)
@@ -129,7 +133,7 @@ func (s *Service) inlineURLKeyboard(rows [][]IntegrationButton) (*appv1.ReplyMar
 // Post posts msg as a new message of the integration (from_id 0; General
 // topic in a forum) and returns its seq.
 func (it *IntegrationTx) Post(ctx context.Context, msg IntegrationMessage) (int64, error) {
-	text, content, err := it.content(msg)
+	text, content, err := it.content(ctx, msg)
 	if err != nil {
 		return 0, err
 	}
@@ -157,7 +161,7 @@ func (it *IntegrationTx) Post(ctx context.Context, msg IntegrationMessage) (int6
 // nothing, when the message is gone (deleted, recalled) or not an
 // integration message.
 func (it *IntegrationTx) Edit(ctx context.Context, seq int64, msg IntegrationMessage, notify bool) (bool, error) {
-	text, content, err := it.content(msg)
+	text, content, err := it.content(ctx, msg)
 	if err != nil {
 		return false, err
 	}

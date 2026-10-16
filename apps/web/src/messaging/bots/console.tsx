@@ -762,7 +762,7 @@ function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { on
 						body={
 							<div className="banner warn">
 								<Icon name="alert" small />
-								<span className="grow">{t.token.confirmBody(bot.name)}</span>
+								<span className="grow">{t.token.confirmBody(bot.name, bot.webhook)}</span>
 							</div>
 						}
 						action={t.token.reissue}

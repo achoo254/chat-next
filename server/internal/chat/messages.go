@@ -346,6 +346,9 @@ func (s *Service) sendMessage(ctx context.Context, me int64, req *appv1.SendMess
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkMentions(ctx, me, ents); err != nil {
+		return nil, err
+	}
 	if req.GetRandomId() < 0 {
 		return nil, errInvalid("random_id must not be negative")
 	}
@@ -675,6 +678,9 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkMentions(ctx, me, ents); err != nil {
+		return nil, err
+	}
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
@@ -946,6 +952,9 @@ func (s *Service) CopyMessage(ctx context.Context, me int64, req *appv1.CopyMess
 		if err != nil {
 			return nil, err
 		}
+		if err := s.checkMentions(ctx, me, ents); err != nil {
+			return nil, err
+		}
 		override = &textOverride{text: text, entities: ents, replyTo: req.GetReplyToSeq()}
 	} else if req.GetReplyToSeq() != 0 {
 		override = &textOverride{keep: true, replyTo: req.GetReplyToSeq()}
@@ -1002,6 +1011,9 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 		}
 		sources = append(sources, m)
 		authors[m.FromID] = ""
+	}
+	if err := s.checkPrivateBotSources(ctx, src, me, sources); err != nil {
+		return nil, err
 	}
 	users, err := loadUsers(ctx, s.pool, s.cfg.TenantID, sortedKeys(boolSet(authors)))
 	if err != nil {

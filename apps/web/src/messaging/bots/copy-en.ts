@@ -94,7 +94,9 @@ export const enBots: BotsCopy = {
 		issueTitle: (name) => `Issue a token for ${name}?`,
 		issueBody: "The token is shown only once, right after it is issued; have a place to store it ready.",
 		confirmTitle: "Issue a new token?",
-		confirmBody: (name) => `The old token stops working at once: ${name} gets 401 errors until you update it.`,
+		confirmBody: (name, webhook) =>
+			`The old token stops working at once: ${name} gets 401 errors until you update it.` +
+			(webhook ? " The webhook is removed too: set it again with the new token." : ""),
 		issued: "New token issued",
 	},
 	delivery: {

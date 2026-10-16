@@ -97,7 +97,9 @@ export const viBots = {
 		issueTitle: (name: string) => `Cấp token cho ${name}?`,
 		issueBody: "Token chỉ hiện một lần ngay sau khi cấp; chuẩn bị chỗ lưu trước khi bấm.",
 		confirmTitle: "Cấp lại token?",
-		confirmBody: (name: string) => `Token cũ ngừng hoạt động ngay: ${name} sẽ nhận lỗi 401 tới khi bạn cập nhật token mới.`,
+		confirmBody: (name: string, webhook: boolean) =>
+			`Token cũ ngừng hoạt động ngay: ${name} sẽ nhận lỗi 401 tới khi bạn cập nhật token mới.` +
+			(webhook ? " Webhook đang đặt cũng bị gỡ: đặt lại bằng token mới." : ""),
 		issued: "Đã cấp token mới",
 	},
 	delivery: {

@@ -54,6 +54,9 @@ func (s *Service) EditBotMessage(ctx context.Context, botID int64, e BotEdit) (*
 		if text, ents, err = s.validateText(*e.Text, e.Entities, true); err != nil {
 			return nil, err
 		}
+		if err := s.checkMentions(ctx, botID, ents); err != nil {
+			return nil, err
+		}
 	}
 	if e.SetMarkup && e.Markup != nil {
 		if e.Markup.GetInlineKeyboard() == nil {

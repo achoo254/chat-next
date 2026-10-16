@@ -148,9 +148,18 @@ func TestDeleteForwardAndCopy(t *testing.T) {
 	group := h.Group(owner, other, botID)
 	_, private := h.started(botID, "lan")
 
-	theirs := h.userSends(other, group, "tin của member")
+	// In privacy mode the bot reposts only what it could receive: a command
+	// for it, not a plain message.
+	plain := h.userSends(other, group, "tin thường")
+	theirs := h.userSends(other, group, "/note tin của member")
 	var mine fullMessage
 	h.send(token, group, `"text": "tin của bot"`).into(t, &mine)
+	h.post(token, "/bot/v1/messages:forward", map[string]any{"from_chat_id": group, "seqs": []int64{plain.GetSeq()}, "chat_id": private}).
+		fails(t, http.StatusNotFound, "not_found")
+	h.post(token, "/bot/v1/messages:copy", map[string]any{"from_chat_id": group, "seq": plain.GetSeq(), "chat_id": private}).
+		fails(t, http.StatusNotFound, "not_found")
+	var own fullMessage
+	h.post(token, "/bot/v1/messages:copy", map[string]any{"from_chat_id": group, "seq": mine.Seq, "chat_id": private}).into(t, &own)
 
 	// Forward and copy before anything is deleted.
 	var forwarded []fullMessage

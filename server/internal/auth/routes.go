@@ -131,20 +131,23 @@ func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	st, err := readLoginCookie(r, h.login, h.now())
-	// The login state is single use whatever happens next.
-	clearCookie(w, LoginCookieName, http.SameSiteLaxMode)
 	fail := func(status int, msg, reason string, err error) {
 		h.cfg.Logger.Warn("sign-in callback rejected", "reason", reason, "err", err)
 		writeErrorPage(w, status, msg, st.Locale, st.ReturnTo)
 	}
 	if err != nil {
+		clearCookie(w, LoginCookieName, http.SameSiteLaxMode)
 		fail(http.StatusBadRequest, msgSignInFailed, "login state", err)
 		return
 	}
+	// A callback whose state is not this sign-in's (a page that sent the
+	// browser here) leaves the sign-in in progress alone; once the state
+	// matches, the login state is single use whatever happens next.
 	if subtle.ConstantTimeCompare([]byte(q.Get("state")), []byte(st.State)) != 1 {
 		fail(http.StatusBadRequest, msgSignInFailed, "state mismatch", nil)
 		return
 	}
+	clearCookie(w, LoginCookieName, http.SameSiteLaxMode)
 	if idpErr := q.Get("error"); idpErr != "" {
 		fail(http.StatusBadRequest, msgSignInFailed, "IdP error "+truncate(idpErr, 64), nil)
 		return

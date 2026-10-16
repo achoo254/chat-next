@@ -48,7 +48,7 @@ func TestBotConsentInCore(t *testing.T) {
 	}
 	// Forwards (like media) go through the same check: postable.
 	group := h.group(owner, bot)
-	posted := h.send(owner, group, "news")
+	posted := h.send(owner, group, "/news") // a command: privacy mode lets the bot repost it
 	_, err = h.svc.ForwardMessages(ctx, bot, &appv1.ForwardMessagesRequest{
 		FromChatId: group, ToChatId: c.GetId(), Seqs: []int64{posted.GetMessage().GetSeq()},
 	})

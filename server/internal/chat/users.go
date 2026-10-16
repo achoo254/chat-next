@@ -756,3 +756,56 @@ func (s *Service) Report(ctx context.Context, me int64, req *appv1.ReportRequest
 	s.logger.Info("report filed", "reporter_id", me, "target_user_id", userID, "target_chat_id", chatID, "reason", reason.String())
 	return nil
 }
+
+// errMentionHidden refuses a mention_name of a user the sender cannot see:
+// a rendered mention shows the user's name, username and bio, so mentions
+// must not reveal users that GetUsers would not.
+var errMentionHidden = errInvalid("a mention names a user you share no chat or contact with")
+
+// mentionedUsers returns the users of the mention_name entities, but self.
+func mentionedUsers(ents []*appv1.MessageEntity, self int64) []int64 {
+	var ids []int64
+	for _, e := range ents {
+		if id := e.GetUserId(); e.GetType() == appv1.EntityType_ENTITY_TYPE_MENTION_NAME && id != self && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// checkMentions lets actor mention only users related to it (a shared chat
+// or a contact).
+func (s *Service) checkMentions(ctx context.Context, actor int64, ents []*appv1.MessageEntity) error {
+	ids := mentionedUsers(ents, actor)
+	if len(ids) == 0 {
+		return nil
+	}
+	related, err := relatedTo(ctx, s.pool, actor, ids)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if !related[id] {
+			return errMentionHidden
+		}
+	}
+	return nil
+}
+
+// checkChatMentions lets a message without an author account (an
+// integration) mention only current members of its chat.
+func (s *Service) checkChatMentions(ctx context.Context, q querier, chatID int64, ents []*appv1.MessageEntity) error {
+	ids := mentionedUsers(ents, 0)
+	if len(ids) == 0 {
+		return nil
+	}
+	var n int
+	if err := q.QueryRow(ctx, `SELECT count(*) FROM chat_members WHERE chat_id = $1 AND user_id = ANY($2) AND left_at IS NULL`,
+		chatID, ids).Scan(&n); err != nil {
+		return fmt.Errorf("chat: mentioned members: %w", err)
+	}
+	if n != len(ids) {
+		return errMentionHidden
+	}
+	return nil
+}

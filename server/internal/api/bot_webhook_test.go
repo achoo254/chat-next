@@ -159,4 +159,16 @@ func TestBotWebhookThroughTheConsole(t *testing.T) {
 	if err != nil || d.Msg.GetWebhook().GetUrl() != "" {
 		t.Fatalf("after delete: %v, %v", d, err)
 	}
+
+	// A new token removes the webhook: whoever held the old token may have set it.
+	if _, err := admin.SetBotWebhook(ctx, connect.NewRequest(&appv1.SetBotWebhookRequest{BotId: botID, Url: rcv.URL, Secret: "console_secret"})); err != nil {
+		t.Fatal(err)
+	}
+	reset, err := admin.ResetBotToken(ctx, connect.NewRequest(&appv1.ResetBotTokenRequest{BotId: botID}))
+	if err != nil || reset.Msg.GetBot().GetWebhook() {
+		t.Fatalf("reset: %v, %v", reset, err)
+	}
+	if d, err := admin.GetBotDelivery(ctx, connect.NewRequest(&appv1.GetBotDeliveryRequest{BotId: botID})); err != nil || d.Msg.GetWebhook().GetUrl() != "" {
+		t.Fatalf("webhook after a token reset: %v, %v", d, err)
+	}
 }

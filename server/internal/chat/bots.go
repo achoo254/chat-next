@@ -190,6 +190,9 @@ func (s *Service) SendBotMessage(ctx context.Context, botID int64, m BotMessage)
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkMentions(ctx, botID, ents); err != nil {
+		return nil, err
+	}
 	if m.RandomID < 0 {
 		return nil, errInvalid("random_id must not be negative")
 	}
@@ -1044,6 +1047,44 @@ func eachLogEntry(rows pgx.Rows, fn func(id, pos int64, u *appv1.Update)) error 
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("chat: bot log entries: %w", err)
+	}
+	return nil
+}
+
+// checkPrivateBotSources lets a bot in privacy mode repost from a group
+// only the messages it could have received as updates, or wrote: privacy
+// mode limits what the bot reads, not only what is pushed to it.
+func (s *Service) checkPrivateBotSources(ctx context.Context, c *chatRow, me int64, sources []*messageRow) error {
+	if c.Type != typeGroup {
+		return nil
+	}
+	members, err := s.botMembers(ctx, []int64{c.ID})
+	if err != nil {
+		return err
+	}
+	var bot *botMember
+	for i := range members[c.ID] {
+		if members[c.ID][i].botID == me {
+			bot = &members[c.ID][i]
+		}
+	}
+	if bot == nil || !bot.privacy {
+		return nil
+	}
+	replies := map[int64][]int64{}
+	for _, m := range sources {
+		if m.ReplyToSeq != 0 {
+			replies[m.ChatID] = append(replies[m.ChatID], m.ReplyToSeq)
+		}
+	}
+	replied, err := loadMessages(ctx, s.pool, replies)
+	if err != nil {
+		return err
+	}
+	for _, m := range sources {
+		if m.FromID != me && !s.reachesPrivateBot(m, bot, replied) {
+			return errNotFound("message")
+		}
 	}
 	return nil
 }

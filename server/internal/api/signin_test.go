@@ -122,12 +122,14 @@ func TestSignInPromptCreateAndLocale(t *testing.T) {
 
 func TestCallbackRejectsStateMismatch(t *testing.T) {
 	e := newEnv(t)
-	c := noRedirect(e.browser(t))
+	browser := e.browser(t)
+	c := noRedirect(browser)
 	resp, err := c.Get(e.srv.URL + "/auth/login")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = resp.Body.Close()
+	authorize := resp.Header.Get("Location")
 	if e.cookie(t, c, auth.LoginCookieName) == nil {
 		t.Fatal("login cookie not set")
 	}
@@ -142,8 +144,20 @@ func TestCallbackRejectsStateMismatch(t *testing.T) {
 	if e.cookie(t, c, auth.SessionCookieName) != nil {
 		t.Fatal("session cookie set after a state mismatch")
 	}
+	// A forged callback (a page that sent the browser there) does not end
+	// the sign-in in progress: it still completes.
+	if e.cookie(t, c, auth.LoginCookieName) == nil {
+		t.Fatal("a forged callback cleared the login cookie")
+	}
+	resp, err = browser.Get(authorize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body := readBody(t, resp); resp.StatusCode != http.StatusOK || e.cookie(t, c, auth.SessionCookieName) == nil {
+		t.Fatalf("sign-in after a forged callback: status %d body %q", resp.StatusCode, body)
+	}
 	if e.cookie(t, c, auth.LoginCookieName) != nil {
-		t.Fatal("login cookie survived a failed callback")
+		t.Fatal("login cookie survived a completed sign-in")
 	}
 
 	// Without any login cookie the callback is rejected too.
