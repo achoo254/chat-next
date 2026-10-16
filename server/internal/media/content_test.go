@@ -218,6 +218,14 @@ func TestTokens(t *testing.T) {
 	if _, err := s.openPart(tok, now); !errors.Is(err, errBadToken) {
 		t.Fatal("download token accepted as part token")
 	}
+	// After a key rotation, tokens of the previous key verify while it is set.
+	rotated := newSigner(bytes.Repeat([]byte{2}, 32), bytes.Repeat([]byte{1}, 32))
+	if got, err := rotated.openDownload(tok, now); err != nil || got != g {
+		t.Fatalf("previous key: %+v %v", got, err)
+	}
+	if _, err := newSigner(bytes.Repeat([]byte{1}, 32)).openDownload(rotated.download(g), now); !errors.Is(err, errBadToken) {
+		t.Fatal("a rotated signer signs with the previous key")
+	}
 	pt := s.part(partGrant{uploadID: "abc", part: 3, expires: now.Add(time.Hour)})
 	if p, err := s.openPart(pt, now); err != nil || p.part != 3 || p.uploadID != "abc" {
 		t.Fatalf("part: %+v %v", p, err)

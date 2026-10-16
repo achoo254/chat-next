@@ -4,6 +4,7 @@
 package config
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"errors"
@@ -46,8 +47,11 @@ type Config struct {
 	OIDCClientID     string
 	OIDCClientSecret string
 	SessionKey       []byte
-	TenantID         string
-	TenantDomain     string
+	// SessionKeyPrevious (SESSION_KEY_PREVIOUS, optional) still opens values
+	// sealed and tokens signed before a key rotation; nothing new uses it.
+	SessionKeyPrevious []byte
+	TenantID           string
+	TenantDomain       string
 	// AppURLScheme is the app's own scheme allowed in message links
 	// (ADR 0004).
 	AppURLScheme string
@@ -259,6 +263,19 @@ func Load(lookup Lookup) (Config, error) {
 			errs = append(errs, invalid("SESSION_KEY", fmt.Sprintf("must decode to at least %d bytes", SessionKeyMinLen)))
 		default:
 			c.SessionKey = key
+		}
+	}
+	if raw := get("SESSION_KEY_PREVIOUS"); raw != "" {
+		key, err := decodeKey(raw)
+		switch {
+		case err != nil:
+			errs = append(errs, invalid("SESSION_KEY_PREVIOUS", "must be base64"))
+		case len(key) < SessionKeyMinLen:
+			errs = append(errs, invalid("SESSION_KEY_PREVIOUS", fmt.Sprintf("must decode to at least %d bytes", SessionKeyMinLen)))
+		case bytes.Equal(key, c.SessionKey):
+			errs = append(errs, invalid("SESSION_KEY_PREVIOUS", "must differ from SESSION_KEY"))
+		default:
+			c.SessionKeyPrevious = key
 		}
 	}
 

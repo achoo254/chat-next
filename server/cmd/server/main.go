@@ -3,6 +3,7 @@
 //
 //	server -role api [-env-file /etc/chat/chat.env]
 //	server -role migrate [-env-file /etc/chat/chat.env]
+//	server -role reseal [-env-file /etc/chat/chat.env]
 //
 // Configuration comes from environment variables (see internal/config);
 // -env-file loads KEY=VALUE lines without overriding variables already set.
@@ -25,7 +26,7 @@ import (
 )
 
 // Roles are the processes the binary can run.
-var Roles = []string{"api", "migrate", "gateway", "worker", "botapi", "webhook"}
+var Roles = []string{"api", "migrate", "reseal", "gateway", "worker", "botapi", "webhook"}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stderr))
@@ -77,6 +78,24 @@ func run(args []string, stderr io.Writer) int {
 			return 1
 		}
 		logger.Info("migrations up to date")
+		return 0
+	case "reseal":
+		cfg, err := config.Load(os.LookupEnv)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "invalid configuration:\n%v\n", err)
+			return 1
+		}
+		unreadable, err := reseal(ctx, cfg, logger)
+		if err != nil {
+			logger.Error("reseal failed", "err", err)
+			return 1
+		}
+		if unreadable > 0 {
+			// Those values open under neither key: keep SESSION_KEY_PREVIOUS
+			// until the cause is known (docs/operations/key-rotation.md).
+			logger.Warn("reseal left unreadable values", "unreadable", unreadable)
+			return 1
+		}
 		return 0
 	default:
 		_, _ = fmt.Fprintf(stderr, "role %q is not implemented\n", *role)

@@ -22,6 +22,13 @@ func TestDownloadTokens(t *testing.T) {
 	if _, err := other.open(token, now); err == nil {
 		t.Fatal("a token of another key opened")
 	}
+	rotated := newSigner(bytes.Repeat([]byte{8}, 32), bytes.Repeat([]byte{7}, 32))
+	if _, err := rotated.open(token, now); err != nil {
+		t.Fatalf("a token of the previous key: %v", err)
+	}
+	if _, err := s.open(rotated.token(g), now); err == nil {
+		t.Fatal("a rotated signer signs with the previous key")
+	}
 	for _, bad := range []string{"", "x", token[:len(token)-2] + "AA", token + "A", "!!!!"} {
 		if _, err := s.open(bad, now); err == nil {
 			t.Fatalf("token %q opened", bad)

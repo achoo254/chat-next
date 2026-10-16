@@ -26,20 +26,27 @@ var (
 )
 
 // signer signs short-lived media tokens with a key derived from the
-// session key, so no new secret is needed; rotating SESSION_KEY also
-// invalidates every outstanding media URL.
+// session key, so no new secret is needed. After a rotation, tokens signed
+// under the previous session key verify while SESSION_KEY_PREVIOUS is set.
 type signer struct {
-	key []byte
+	keys [][]byte // current first
 }
 
-func newSigner(sessionKey []byte) signer {
-	mac := hmac.New(sha256.New, sessionKey)
-	mac.Write([]byte("chat media tokens v1"))
-	return signer{key: mac.Sum(nil)}
+func newSigner(sessionKey []byte, previous ...[]byte) signer {
+	var s signer
+	for i, k := range append([][]byte{sessionKey}, previous...) {
+		if i > 0 && len(k) == 0 {
+			continue
+		}
+		mac := hmac.New(sha256.New, k)
+		mac.Write([]byte("chat media tokens v1"))
+		s.keys = append(s.keys, mac.Sum(nil))
+	}
+	return s
 }
 
 func (s signer) seal(payload []byte) string {
-	mac := hmac.New(sha256.New, s.key)
+	mac := hmac.New(sha256.New, s.keys[0])
 	mac.Write(payload)
 	return base64.RawURLEncoding.EncodeToString(append(payload, mac.Sum(nil)[:macLen]...))
 }
@@ -53,12 +60,14 @@ func (s signer) open(token string, version byte) ([]byte, error) {
 		return nil, errBadToken
 	}
 	payload, sum := raw[:len(raw)-macLen], raw[len(raw)-macLen:]
-	mac := hmac.New(sha256.New, s.key)
-	mac.Write(payload)
-	if !hmac.Equal(sum, mac.Sum(nil)[:macLen]) {
-		return nil, errBadToken
+	for _, key := range s.keys {
+		mac := hmac.New(sha256.New, key)
+		mac.Write(payload)
+		if hmac.Equal(sum, mac.Sum(nil)[:macLen]) {
+			return payload, nil
+		}
 	}
-	return payload, nil
+	return nil, errBadToken
 }
 
 // downloadGrant is what a download token proves: viewer may read the

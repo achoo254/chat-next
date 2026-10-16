@@ -30,6 +30,10 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 
 - [Danh mục dữ liệu cá nhân](./privacy/data-inventory.md): dữ liệu app chat giữ, nơi lưu, thời hạn, cơ sở pháp lý (Nghị định 13), xuất và xoá dữ liệu.
 
+## Vận hành
+
+- [Xoay vòng khoá](./operations/key-rotation.md): đổi `SESSION_KEY` không đăng xuất ai (`SESSION_KEY_PREVIOUS`, role `reseal`), đổi secret OIDC, mật khẩu database, và các khoá không được đổi.
+
 ## Kế hoạch
 
 Kế hoạch triển khai và nhật ký quyết định nằm ở [`plans/dattqh/261013-0448-chat-platform-v1/plan.md`](../plans/dattqh/261013-0448-chat-platform-v1/plan.md). Đó là bản ghi theo thời điểm, không phải tài liệu thường trực; khi plan và ADR khác nhau, ADR là quyết định hiện hành.

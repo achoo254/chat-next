@@ -298,19 +298,41 @@ const (
 var errBadToken = errors.New("privacy: invalid download token")
 
 // signer signs download tokens with a key derived from SESSION_KEY (its
-// own label, so a media token never opens an export and the reverse).
-type signer struct{ key []byte }
+// own label, so a media token never opens an export and the reverse);
+// tokens signed under SESSION_KEY_PREVIOUS still verify.
+type signer struct{ keys [][]byte } // current first
 
-func newSigner(sessionKey []byte) signer {
-	mac := hmac.New(sha256.New, sessionKey)
-	mac.Write([]byte("chat data export tokens v1"))
-	return signer{key: mac.Sum(nil)}
+func newSigner(sessionKey []byte, previous ...[]byte) signer {
+	var s signer
+	for i, k := range append([][]byte{sessionKey}, previous...) {
+		if i > 0 && len(k) == 0 {
+			continue
+		}
+		mac := hmac.New(sha256.New, k)
+		mac.Write([]byte("chat data export tokens v1"))
+		s.keys = append(s.keys, mac.Sum(nil))
+	}
+	return s
 }
 
 func (s signer) mac(payload []byte) []byte {
-	m := hmac.New(sha256.New, s.key)
+	return macWith(s.keys[0], payload)
+}
+
+func macWith(key, payload []byte) []byte {
+	m := hmac.New(sha256.New, key)
 	m.Write(payload)
 	return m.Sum(nil)[:macLen]
+}
+
+// verify reports whether sum is payload's MAC under any key.
+func (s signer) verify(payload, sum []byte) bool {
+	for _, k := range s.keys {
+		if hmac.Equal(sum, macWith(k, payload)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s signer) token(g downloadGrant) string {
@@ -331,7 +353,7 @@ func (s signer) open(token string, now time.Time) (downloadGrant, error) {
 		return downloadGrant{}, errBadToken
 	}
 	payload, sum := raw[:len(raw)-macLen], raw[len(raw)-macLen:]
-	if !hmac.Equal(sum, s.mac(payload)) {
+	if !s.verify(payload, sum) {
 		return downloadGrant{}, errBadToken
 	}
 	g := downloadGrant{expires: time.Unix(int64(binary.BigEndian.Uint32(payload[1:5])), 0)}

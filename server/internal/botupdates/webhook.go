@@ -15,7 +15,6 @@ import (
 
 	"app.local/server/internal/chat"
 	"app.local/server/internal/safehttp"
-	"app.local/server/internal/sealbox"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -78,6 +77,8 @@ type WebhookOptions struct {
 	TenantID string
 	// SessionKey seals the webhook secrets at rest.
 	SessionKey []byte
+	// SessionKeyPrevious still opens secrets sealed before a key rotation.
+	SessionKeyPrevious []byte
 	// Local allows http URLs, loopback addresses and any port (development
 	// and end-to-end tests only).
 	Local bool
@@ -98,7 +99,7 @@ func (s *Service) EnableWebhooks(o WebhookOptions) error {
 	if o.TenantID == "" {
 		return errors.New("botupdates: webhooks need the tenant id")
 	}
-	box, err := sealbox.New(o.SessionKey, "bot-webhook-secret")
+	box, err := newSecretBox(o.SessionKey, o.SessionKeyPrevious)
 	if err != nil {
 		return fmt.Errorf("botupdates: webhook secrets: %w", err)
 	}

@@ -100,7 +100,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		HTTPClient:   httpClient,
 		Logger:       logger,
 	})
-	sessions, err := auth.NewSessions(st, idp, cfg.SessionKey, cfg.TenantID, logger)
+	sessions, err := auth.NewSessions(st, idp, cfg.SessionKey, cfg.SessionKeyPrevious, cfg.TenantID, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	limiter := ratelimit.NewMemory()
 	routes, err := auth.NewRoutes(auth.RoutesConfig{
 		IdP: idp, Sessions: sessions, Store: st, Origins: origins,
-		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, SessionKey: cfg.SessionKey, Logger: logger,
+		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, SessionKey: cfg.SessionKey,
+		SessionKeyPrevious: cfg.SessionKeyPrevious, Logger: logger,
 		Limiter: limiter, SignupsPerIPHour: cfg.Abuse.SignupsPerIPHour, SignupsPer10Min: cfg.Abuse.SignupsPer10Min,
 	})
 	if err != nil {
@@ -182,7 +183,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	// Webhooks of bots: outbound requests through safehttp; actions in their
 	// answers run through the Bot API's own checks.
 	if err := botUpdates.EnableWebhooks(botupdates.WebhookOptions{
-		TenantID: cfg.TenantID, SessionKey: cfg.SessionKey, Local: cfg.BotWebhookLocal, Reply: botAPI.WebhookReply, Deny: deny,
+		TenantID: cfg.TenantID, SessionKey: cfg.SessionKey, SessionKeyPrevious: cfg.SessionKeyPrevious, Local: cfg.BotWebhookLocal, Reply: botAPI.WebhookReply, Deny: deny,
 	}); err != nil {
 		return nil, err
 	}
@@ -283,7 +284,7 @@ func newPush(cfg config.Config, st *store.Store, chatSvc *chat.Service, hub *gat
 // filesystem media root); without them only deletion works.
 func newPrivacy(cfg config.Config, st *store.Store, chatSvc *chat.Service, sessions *auth.Sessions, bots *botadmin.Service,
 	mediaSvc *media.Service, logger *slog.Logger) (*privacy.Service, error) {
-	pc := privacy.Config{TenantID: cfg.TenantID, SessionKey: cfg.SessionKey}
+	pc := privacy.Config{TenantID: cfg.TenantID, SessionKey: cfg.SessionKey, SessionKeyPrevious: cfg.SessionKeyPrevious}
 	deps := privacy.Deps{Pool: st.Pool(), Chat: chatSvc, Sessions: sessions, Bots: bots, Logger: logger.With("component", "privacy")}
 	if m := cfg.Media; m != nil && mediaSvc != nil {
 		pc.ExportDir, pc.MediaOrigin, pc.MinFreeBytes = m.ExportDir, m.PublicOrigin(), m.MinFreeBytes
@@ -378,7 +379,7 @@ func newMedia(cfg config.Config, st *store.Store, limiter ratelimit.Limiter, log
 	return media.New(media.Config{
 		TenantID: cfg.TenantID, PublicOrigin: m.PublicOrigin(), UploadMaxBytes: m.UploadMaxBytes,
 		UserQuotaBytes: m.UserQuotaBytes, UploadMode: m.UploadMode, FFmpegPath: m.FFmpegPath, SessionKey: cfg.SessionKey,
-		MinFreeBytes: m.MinFreeBytes,
+		SessionKeyPrevious: cfg.SessionKeyPrevious, MinFreeBytes: m.MinFreeBytes,
 	}, st.Pool(), objects, limiter, logger.With("component", "media"))
 }
 

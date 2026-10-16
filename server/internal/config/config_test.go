@@ -77,10 +77,13 @@ func TestLoadErrorsNameVariablesWithoutValues(t *testing.T) {
 		"OIDC_ISSUER":        func(e map[string]string) { e["OIDC_ISSUER"] = "http://auth.hoandat.com" },
 		"OIDC_CLIENT_SECRET": func(e map[string]string) { e["OIDC_CLIENT_SECRET"] = " " },
 		"SESSION_KEY":        func(e map[string]string) { e["SESSION_KEY"] = base64.StdEncoding.EncodeToString([]byte(secret)) },
-		"TENANT_ID":          func(e map[string]string) { e["TENANT_ID"] = "Bad Tenant" },
-		"TENANT_DOMAIN":      func(e map[string]string) { e["TENANT_DOMAIN"] = "not a domain" },
-		"CHAT_LISTEN_ADDR":   func(e map[string]string) { e["CHAT_LISTEN_ADDR"] = "4600" },
-		"APP_URL_SCHEME":     func(e map[string]string) { e["APP_URL_SCHEME"] = "https" },
+		"SESSION_KEY_PREVIOUS": func(e map[string]string) {
+			e["SESSION_KEY_PREVIOUS"] = base64.StdEncoding.EncodeToString([]byte(secret))
+		},
+		"TENANT_ID":        func(e map[string]string) { e["TENANT_ID"] = "Bad Tenant" },
+		"TENANT_DOMAIN":    func(e map[string]string) { e["TENANT_DOMAIN"] = "not a domain" },
+		"CHAT_LISTEN_ADDR": func(e map[string]string) { e["CHAT_LISTEN_ADDR"] = "4600" },
+		"APP_URL_SCHEME":   func(e map[string]string) { e["APP_URL_SCHEME"] = "https" },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -337,5 +340,20 @@ func TestLoadAbuse(t *testing.T) {
 		if !errors.As(err, &ve) || ve.Name != "ABUSE_REPORTERS" {
 			t.Errorf("%q: err = %v", bad, err)
 		}
+	}
+}
+
+func TestSessionKeyPrevious(t *testing.T) {
+	env := validEnv()
+	prev := []byte(strings.Repeat("p", 32))
+	env["SESSION_KEY_PREVIOUS"] = base64.StdEncoding.EncodeToString(prev)
+	c, err := Load(lookupFrom(env))
+	if err != nil || string(c.SessionKeyPrevious) != string(prev) {
+		t.Fatalf("previous key = %q, %v", c.SessionKeyPrevious, err)
+	}
+	env["SESSION_KEY_PREVIOUS"] = env["SESSION_KEY"]
+	var ve *VarError
+	if _, err := Load(lookupFrom(env)); !errors.As(err, &ve) || ve.Name != "SESSION_KEY_PREVIOUS" {
+		t.Fatalf("same key twice: %v", err)
 	}
 }

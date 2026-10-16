@@ -45,7 +45,9 @@ type RoutesConfig struct {
 	TenantID     string
 	PublicOrigin string // e.g. https://chat.hoandat.com
 	SessionKey   []byte
-	Logger       *slog.Logger
+	// SessionKeyPrevious still opens login cookies sealed before a rotation.
+	SessionKeyPrevious []byte
+	Logger             *slog.Logger
 	// Limiter and the Signups* caps limit the chat accounts first sign-ins
 	// create, per client address in an hour and per tenant in ten minutes;
 	// a nil Limiter or a 0 cap turns that limit off.
@@ -64,7 +66,7 @@ type Routes struct {
 
 // NewRoutes builds the handlers.
 func NewRoutes(cfg RoutesConfig) (*Routes, error) {
-	box, err := sealbox.New(cfg.SessionKey, "login cookie")
+	box, err := sealbox.New(cfg.SessionKey, "login cookie", cfg.SessionKeyPrevious)
 	if err != nil {
 		return nil, err
 	}

@@ -395,6 +395,11 @@ func (d *dispatcher) config(ctx context.Context, botID int64) (*hookConfig, erro
 	cfg.maxConnections = int(maxConn)
 	if cfg.secret, err = d.s.box.Open(sealed, secretAAD(botID)); err != nil {
 		cfg.secretErr = true
+	} else if d.s.box.Stale(sealed) {
+		// Still sealed under the previous SESSION_KEY: move it to the current one.
+		if _, err := replaceSecret(ctx, d.s.pool, botID, sealed, d.s.box.Seal(cfg.secret, secretAAD(botID))); err != nil {
+			d.logger.Warn("resealing a webhook secret failed", "bot_id", botID, "err", err)
+		}
 	}
 	return &cfg, nil
 }

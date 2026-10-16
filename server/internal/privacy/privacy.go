@@ -74,6 +74,8 @@ type Config struct {
 	MediaOrigin string
 	// SessionKey derives the key of download tokens.
 	SessionKey []byte
+	// SessionKeyPrevious still verifies tokens signed before a key rotation.
+	SessionKeyPrevious []byte
 	// ExportMaxBytes bounds one ZIP (0: DefaultExportMaxBytes); the files
 	// that would pass it are listed as left out instead of copied.
 	ExportMaxBytes int64
@@ -132,7 +134,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	return &Service{
 		cfg: cfg, pool: d.Pool, chat: d.Chat, revoke: d.Sessions, bots: d.Bots, media: d.Media, logger: d.Logger,
-		sign: newSigner(cfg.SessionKey), now: time.Now, kick: make(chan struct{}, 1),
+		sign: newSigner(cfg.SessionKey, cfg.SessionKeyPrevious), now: time.Now, kick: make(chan struct{}, 1),
 	}, nil
 }
 

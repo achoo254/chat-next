@@ -96,6 +96,8 @@ type Config struct {
 	MinFreeBytes int64
 	// SessionKey derives the token key.
 	SessionKey []byte
+	// SessionKeyPrevious still verifies tokens signed before a key rotation.
+	SessionKeyPrevious []byte
 }
 
 // Refresher rewrites the messages carrying a file after the worker
@@ -142,7 +144,7 @@ func New(cfg Config, pool *pgxpool.Pool, objects Objects, limiter ratelimit.Limi
 	cfg.PublicOrigin = strings.TrimSuffix(cfg.PublicOrigin, "/")
 	return &Service{
 		cfg: cfg, pool: pool, objects: objects, limiter: limiter, logger: logger,
-		sign: newSigner(cfg.SessionKey), decode: newDecoder(), now: time.Now, access: newAccessCache(),
+		sign: newSigner(cfg.SessionKey, cfg.SessionKeyPrevious), decode: newDecoder(), now: time.Now, access: newAccessCache(),
 	}, nil
 }
 

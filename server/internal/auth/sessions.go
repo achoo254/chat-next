@@ -69,13 +69,10 @@ type Sessions struct {
 	checking map[int64]struct{}
 }
 
-// NewSessions builds the manager. sessionKey is SESSION_KEY.
-func NewSessions(st *store.Store, idp *IdP, sessionKey []byte, tenantID string, logger *slog.Logger) (*Sessions, error) {
-	refresh, err := sealbox.New(sessionKey, "idp refresh token")
-	if err != nil {
-		return nil, err
-	}
-	idTokens, err := sealbox.New(sessionKey, "idp id token")
+// NewSessions builds the manager. sessionKey is SESSION_KEY and
+// previousKey SESSION_KEY_PREVIOUS (nil when unset).
+func NewSessions(st *store.Store, idp *IdP, sessionKey, previousKey []byte, tenantID string, logger *slog.Logger) (*Sessions, error) {
+	refresh, idTokens, err := sessionBoxes(sessionKey, previousKey)
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +303,9 @@ func (m *Sessions) refreshGrant(ctx context.Context, c store.GrantCandidate) (st
 		return retry, ""
 	}
 	out := store.GrantOutcome{Result: store.GrantAlive}
+	// oauth2 hands back the sent refresh token when the IdP keeps it, so a
+	// successful check also moves a token sealed under SESSION_KEY_PREVIOUS
+	// to SESSION_KEY.
 	if tokens.RefreshToken != "" {
 		out.RefreshTokenEnc = m.refresh.Seal([]byte(tokens.RefreshToken), c.TokenHash)
 	}
