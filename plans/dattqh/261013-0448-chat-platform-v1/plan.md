@@ -515,3 +515,5 @@ Từ 16:43, user giao: AI tự review từng màn hình và tính năng trên Ch
 Còn lại của R5: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
 
 Quyết định 2026-10-15 23:20: user chọn PWA + Web Push trước, app native R7 (Capacitor) và R8 (Tauri) làm sau khi có tài khoản Apple Developer, Google Play, Firebase. Jev chọn làm PWA + Web Push trước các mục R9 (0,99).
+
+Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trên macOS (dịch vụ push của Microsoft) và PWA trên iPhone (web.push.apple.com) đều hiện thông báo. Apple từ chối header `Topic` của RFC 8030 (`BadWebPushTopic`), nên server bỏ header này khi gửi tới Apple (commit `d3ce914`).
