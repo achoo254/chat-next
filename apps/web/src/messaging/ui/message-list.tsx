@@ -195,7 +195,9 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	const now = new Date();
 	const rows: ReactNode[] = [];
 	let previousDate = 0;
-	let dividerShown = false;
+	// Once the reader answers (a message of theirs after the divider, sent or
+	// still pending) the divider has done its job and goes away.
+	let dividerShown = unreadFrom === 0 || answeredSince(groups.map(({ key }) => store.item(chatId, key)), unreadFrom, store.selfId);
 	for (const { key, keys: members } of groups) {
 		const item = store.item(chatId, key);
 		const date = itemDate(item);
@@ -313,4 +315,9 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 			</div>
 		</div>
 	);
+}
+
+/** True when the reader has a message after the unread divider at `from`. */
+function answeredSince(items: readonly (WindowItem | undefined)[], from: number, selfId: number): boolean {
+	return items.some((item) => item?.kind === "pending" || (item?.kind === "message" && item.message.seq >= from && item.message.fromId === selfId));
 }

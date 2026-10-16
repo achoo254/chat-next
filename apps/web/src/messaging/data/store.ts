@@ -710,7 +710,8 @@ export class ChatStore {
 			if (this.disposed || this.windows.get(chatId) !== state) return;
 			const dialog = this.dialogs.get(chatId)?.dialog;
 			if (existing === undefined) this.unreadTracking.add(chatId);
-			const unreadFromSeq = existing === undefined && dialog !== undefined && dialog.unreadCount > 0 ? dialog.readInboxMaxSeq + 1 : state.window.unreadFromSeq;
+			// Every opening recomputes the divider, so it is gone once the chat was read.
+			const unreadFromSeq = dialog !== undefined && dialog.unreadCount > 0 ? dialog.readInboxMaxSeq + 1 : 0;
 			if (unreadFromSeq !== state.window.unreadFromSeq) state.window = { ...state.window, unreadFromSeq };
 			const anchor = focusSeq !== 0 ? focusSeq : unreadFromSeq;
 			if (anchor !== 0) {

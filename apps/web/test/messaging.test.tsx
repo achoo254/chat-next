@@ -118,6 +118,13 @@ describe("message rendering", () => {
 		expect((await screen.findByRole("button", { name: "Nhảy tới tin ghim" }, LONG)).textContent).toContain("Checklist sau nâng cấp");
 	});
 
+	it("drops the unread divider once the reader sends a message", async () => {
+		const { log } = await openOps();
+		expect((await within(log).findByRole("separator", {}, LONG)).textContent).toBe("Tin chưa đọc");
+		await userEvent.type(screen.getByRole("textbox", { name: /^Tin nhắn tới / }), "Mình đọc rồi{Enter}");
+		await waitFor(() => expect(within(log).queryByRole("separator")).toBeNull(), LONG);
+	});
+
 	it("reveals a spoiler and hides the pinned bar on this device", async () => {
 		const { log } = await openOps();
 		await userEvent.click(within(log).getByRole("button", { name: "Nội dung ẩn, bấm để hiện" }));
