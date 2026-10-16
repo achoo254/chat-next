@@ -49,9 +49,19 @@ import type { ChatSource } from "../../src/messaging/data/source.ts";
 type MessageInit = Exclude<MessageInitShape<typeof MessageSchema>, { $typeName: string }>;
 type MessageExtras = Pick<
 	MessageInit,
-	"entities" | "replyToSeq" | "forwardFrom" | "editDate" | "editVersion" | "action" | "integrationLabel" | "topicId" | "linkPreview" | "replyMarkup"
+	| "entities"
+	| "replyToSeq"
+	| "forwardFrom"
+	| "editDate"
+	| "editVersion"
+	| "action"
+	| "integrationLabel"
+	| "topicId"
+	| "linkPreview"
+	| "replyMarkup"
+	| "viaBotId"
 >;
-type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string; deleted?: boolean };
+type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string; deleted?: boolean; botInlinePlaceholder?: string };
 type ChatExtras = {
 	myRole?: MemberRole;
 	myPermissions?: number;
@@ -372,6 +382,11 @@ export class ChatFixture {
 		}).seq;
 		if (sent !== seq) throw new Error(`fixture expected seq ${seq}, server gave ${sent}`);
 		return sent;
+	}
+
+	/** Turns a bot's inline mode on (User.bot_inline_placeholder). */
+	setInlinePlaceholder(userId: number, placeholder: string): void {
+		this.userExtras.set(userId, { ...this.userExtras.get(userId), botInlinePlaceholder: placeholder });
 	}
 
 	addUser(name: string, extras: UserExtras = {}): number {
@@ -846,6 +861,12 @@ export class ChatFixture {
 				const topic = this.topics.get(chatId)?.find((t) => t.id === num(req.topicId));
 				if (topic !== undefined) topic.unreadCount = 0;
 				this.server.readHistory(this.selfId, chatId, num(req.maxSeq));
+				return {};
+			},
+			sendInlineResult: (req) => {
+				const result = this.bots.inlineAnswers.get(req.queryId)?.find((r) => r.id === req.resultId);
+				if (result === undefined) throw new ConnectError("inline result not found", Code.NotFound);
+				this.send(this.selfId, num(req.chatId), result.text, { viaBotId: BigInt(result.botId) });
 				return {};
 			},
 			pressInlineButton: async (req) => {

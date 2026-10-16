@@ -128,6 +128,12 @@ func (s *messagesService) PressInlineButton(ctx context.Context, req *connect.Re
 	})
 }
 
+func (s *messagesService) SendInlineResult(ctx context.Context, req *connect.Request[appv1.SendInlineResultRequest]) (*connect.Response[appv1.SendInlineResultResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SendInlineResultRequest) (*appv1.SendInlineResultResponse, error) {
+		return s.chat.SendInlineResult(ctx, me, m)
+	})
+}
+
 func (s *messagesService) GetLinkPreview(ctx context.Context, req *connect.Request[appv1.GetLinkPreviewRequest]) (*connect.Response[appv1.GetLinkPreviewResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetLinkPreviewRequest) (*appv1.GetLinkPreviewResponse, error) {
 		return s.chat.GetLinkPreview(ctx, me, m.GetUrl())

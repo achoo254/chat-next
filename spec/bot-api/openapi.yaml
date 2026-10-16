@@ -629,6 +629,45 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
+  /inline/{inline_query_id}:answer:
+    post:
+      tags: [updates]
+      operationId: answerInlineQuery
+      summary: Answers an inline query.
+      description: |
+        Answers the `inline_query` update `inline_query_id`, once, within a
+        minute (the user's client waits 10 seconds, then shows that the bot
+        is not responding). Up to 50 results: an `article` posts `text`
+        (with `entities` or `parse_mode`); a `photo`, `video` or `document`
+        posts the bot's file `file_id` (a file the bot sent or can see) with
+        an optional `caption`. Every result may carry an inline keyboard
+        of URL buttons (no callback buttons: the posted message is the
+        user's, in a chat the bot may not be in), and an article a
+        `thumbnail_file_id` (a photo of the bot). The
+        result the user picks is posted by the user, labelled "via" the bot.
+        The answer is reused for the same query and offset for `cache_time`
+        seconds (default 300, at most 3600), for every user unless
+        `is_personal`. `next_offset` is sent back as `offset` when the user
+        scrolls for more.
+      parameters:
+        - name: inline_query_id
+          in: path
+          required: true
+          schema: {type: string, maxLength: 64}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AnswerInlineQueryRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/True'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /commands:
     put:
       tags: [bot]
@@ -1336,6 +1375,23 @@ components:
         data:
           type: string
           description: callback_data of the pressed button.
+    InlineQuery:
+      type: object
+      required: [id, from, query, offset, chat_type]
+      description: The bot sees the query, the user and the kind of chat, never the chat's messages.
+      properties:
+        id:
+          type: string
+          description: Pass to answerInlineQuery.
+        from: {$ref: '#/components/schemas/User'}
+        query: {type: string, maxLength: 256}
+        offset:
+          type: string
+          description: next_offset of the previous answer; empty for the first page.
+        chat_type:
+          type: string
+          enum: [sender, private, group, channel]
+          description: sender is the user's private chat with the bot.
     Update:
       type: object
       required: [update_id]
@@ -1353,7 +1409,9 @@ components:
         is created with it, removed, left, promoted, demoted or restricted)
         and `reaction` (a person set, changed or removed a reaction on one of
         the bot's messages; opt-in: only when `allowed_updates` lists it).
-        When the bot leaves or is removed from a chat, its pending updates
+        Version 1.2 adds `inline_query` (a user typed @username of a bot
+        with inline mode on, which the owner turns on in the Developer
+        Console). When the bot leaves or is removed from a chat, its pending updates
         of that chat are dropped, except the `member_changed` telling it so.
         Later versions add kinds; ignore unknown ones.
       properties:
@@ -1367,11 +1425,12 @@ components:
         callback: {$ref: '#/components/schemas/Callback'}
         member_changed: {$ref: '#/components/schemas/MemberChanged'}
         reaction: {$ref: '#/components/schemas/Reaction'}
+        inline_query: {$ref: '#/components/schemas/InlineQuery'}
       minProperties: 2
       maxProperties: 2
     UpdateKind:
       type: string
-      enum: [message, message_edited, channel_post, callback, member_changed, reaction]
+      enum: [message, message_edited, channel_post, callback, member_changed, reaction, inline_query]
     ChatMember:
       type: object
       required: [user, status, permissions]
@@ -1828,6 +1887,71 @@ components:
           description: Server errors; not retried (rate limits and outages are retried).
         created_at: {type: integer, description: Unix seconds.}
         finished_at: {type: integer, description: Unix seconds.}
+    InlineQueryResult:
+      type: object
+      required: [type, id]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [article, photo, video, document]
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Unique within the answer.
+        title:
+          type: string
+          maxLength: 128
+          description: Required for an article; one line.
+        description: {type: string, maxLength: 256}
+        thumbnail_file_id:
+          type: string
+          description: An article's preview image, a photo of the bot.
+        file_id:
+          type: string
+          description: The file of a photo, video or document result, of the matching kind.
+        text:
+          type: string
+          description: The message of an article, up to 4096 characters after parsing.
+        caption:
+          type: string
+          description: The caption of a photo, video or document.
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+          description: Of text or caption; exclusive with parse_mode.
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+        reply_markup:
+          $ref: '#/components/schemas/ReplyMarkup'
+          description: An inline keyboard of URL buttons only.
+        disable_link_preview: {type: boolean}
+    AnswerInlineQueryRequest:
+      type: object
+      required: [results]
+      additionalProperties: false
+      properties:
+        results:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/InlineQueryResult'}
+        cache_time:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          description: Seconds the answer is reused; 0 or absent is 300.
+        is_personal:
+          type: boolean
+          description: Reuse the answer for this user only.
+        next_offset:
+          type: string
+          maxLength: 64
+        gallery:
+          type: boolean
+          description: Show the results as a grid of media instead of a list.
     AnswerCallbackRequest:
       type: object
       additionalProperties: false

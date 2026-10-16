@@ -130,6 +130,7 @@ export const vi = {
 	message: {
 		edited: "đã sửa",
 		forwardedFrom: "Chuyển tiếp từ",
+		viaBot: "qua",
 		sending: "Đang gửi",
 		queued: "Chờ gửi",
 		sentTick: "Đã gửi",

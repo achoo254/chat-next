@@ -131,6 +131,9 @@ message Bot {
   // Updates are POSTed to a webhook (GetBotDelivery has the details);
   // false when the bot fetches them by long poll.
   bool webhook = 11;
+  // Inline mode: the composer hint shown once a user typed @username and a
+  // space; empty when inline mode is off.
+  string inline_placeholder = 12;
 }
 
 message ListMyBotsRequest {}
@@ -159,6 +162,9 @@ message UpdateBotRequest {
   optional bool privacy = 5;
   // Set to replace every command list.
   BotCommandSets commands = 6;
+  // Turns inline mode on with this hint (1 to 64 characters), or off with
+  // an empty string.
+  optional string inline_placeholder = 7;
 }
 
 message UpdateBotResponse {

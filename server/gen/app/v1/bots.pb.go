@@ -91,8 +91,12 @@ type InlineResult struct {
 	Description string           `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	// File-backed results.
 	Media *MediaRef `protobuf:"bytes,5,opt,name=media,proto3" json:"media,omitempty"`
-	// Article preview image from the bot (http/https only).
-	ThumbnailUrl  string `protobuf:"bytes,6,opt,name=thumbnail_url,json=thumbnailUrl,proto3" json:"thumbnail_url,omitempty"`
+	// Not used: article thumbnails come as thumbnail.
+	ThumbnailUrl string `protobuf:"bytes,6,opt,name=thumbnail_url,json=thumbnailUrl,proto3" json:"thumbnail_url,omitempty"`
+	// Preview image of an article (a photo of the bot); file-backed results
+	// preview their media. Download with GetFileUrl in the inline_query_id
+	// context of this query.
+	Thumbnail     *MediaRef `protobuf:"bytes,7,opt,name=thumbnail,proto3" json:"thumbnail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -167,6 +171,13 @@ func (x *InlineResult) GetThumbnailUrl() string {
 		return x.ThumbnailUrl
 	}
 	return ""
+}
+
+func (x *InlineResult) GetThumbnail() *MediaRef {
+	if x != nil {
+		return x.Thumbnail
+	}
+	return nil
 }
 
 type InlineQueryRequest struct {
@@ -905,14 +916,15 @@ var File_app_v1_bots_proto protoreflect.FileDescriptor
 
 const file_app_v1_bots_proto_rawDesc = "" +
 	"\n" +
-	"\x11app/v1/bots.proto\x12\x06app.v1\x1a\x16app/v1/bot_admin.proto\x1a\x12app/v1/chats.proto\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\xd1\x01\n" +
+	"\x11app/v1/bots.proto\x12\x06app.v1\x1a\x16app/v1/bot_admin.proto\x1a\x12app/v1/chats.proto\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\x81\x02\n" +
 	"\fInlineResult\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x18.app.v1.InlineResultKindR\x04kind\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12&\n" +
 	"\x05media\x18\x05 \x01(\v2\x10.app.v1.MediaRefR\x05media\x12#\n" +
-	"\rthumbnail_url\x18\x06 \x01(\tR\fthumbnailUrl\"z\n" +
+	"\rthumbnail_url\x18\x06 \x01(\tR\fthumbnailUrl\x12.\n" +
+	"\tthumbnail\x18\a \x01(\v2\x10.app.v1.MediaRefR\tthumbnail\"z\n" +
 	"\x12InlineQueryRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1b\n" +
 	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
@@ -1024,32 +1036,33 @@ var file_app_v1_bots_proto_goTypes = []any{
 var file_app_v1_bots_proto_depIdxs = []int32{
 	0,  // 0: app.v1.InlineResult.kind:type_name -> app.v1.InlineResultKind
 	14, // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
-	1,  // 2: app.v1.InlineQueryResponse.results:type_name -> app.v1.InlineResult
-	13, // 3: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	15, // 4: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
-	16, // 5: app.v1.StartBotResponse.message:type_name -> app.v1.Message
-	17, // 6: app.v1.StartBotResponse.users:type_name -> app.v1.User
-	18, // 7: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
-	17, // 8: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
-	19, // 9: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
-	17, // 10: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
-	19, // 11: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
-	11, // 12: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
-	2,  // 13: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
-	4,  // 14: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
-	6,  // 15: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
-	8,  // 16: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
-	10, // 17: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
-	3,  // 18: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
-	5,  // 19: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
-	7,  // 20: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
-	9,  // 21: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
-	12, // 22: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
-	18, // [18:23] is the sub-list for method output_type
-	13, // [13:18] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	14, // 2: app.v1.InlineResult.thumbnail:type_name -> app.v1.MediaRef
+	1,  // 3: app.v1.InlineQueryResponse.results:type_name -> app.v1.InlineResult
+	13, // 4: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	15, // 5: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
+	16, // 6: app.v1.StartBotResponse.message:type_name -> app.v1.Message
+	17, // 7: app.v1.StartBotResponse.users:type_name -> app.v1.User
+	18, // 8: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
+	17, // 9: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
+	19, // 10: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
+	17, // 11: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
+	19, // 12: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
+	11, // 13: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
+	2,  // 14: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
+	4,  // 15: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
+	6,  // 16: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
+	8,  // 17: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
+	10, // 18: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
+	3,  // 19: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
+	5,  // 20: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
+	7,  // 21: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
+	9,  // 22: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
+	12, // 23: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
+	19, // [19:24] is the sub-list for method output_type
+	14, // [14:19] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_bots_proto_init() }

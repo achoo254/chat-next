@@ -99,7 +99,7 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewIntegrationsServiceHandler(&integrationsService{hooks: d.Hooks, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewMediaServiceHandler(&mediaService{media: d.Media, chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewSearchServiceHandler(&searchService{chat: d.Chat, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewBotsServiceHandler(&botsService{chat: d.Chat, bots: d.Bots, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewBotsServiceHandler(&botsService{chat: d.Chat, bots: d.Bots, updates: d.BotUpdates, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewBotAdminServiceHandler(&botAdminService{bots: d.Bots, updates: d.BotUpdates, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewPushServiceHandler(&pushService{push: d.Push, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{

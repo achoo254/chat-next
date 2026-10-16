@@ -484,6 +484,8 @@ type BotUpdate struct {
 	Member *BotMemberChange
 	// Reaction: reaction only (Message is nil).
 	Reaction *BotReaction
+	// Inline: inline_query only (Chat and Message are nil).
+	Inline *BotInlineQuery
 }
 
 // Seq is the message the update is about (0 for member_changed).
@@ -541,7 +543,7 @@ type botRef struct {
 // channels the bots administer, and presses of their buttons. Rows that
 // concern no bot cost one query in total.
 func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate, error) {
-	var chatIDs, pressRows []int64
+	var chatIDs, pressRows, inlineRows []int64
 	var eventRows []OutboxRow
 	for _, r := range rows {
 		switch r.Kind {
@@ -560,6 +562,8 @@ func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate
 			}
 		case kindInlineButton:
 			pressRows = append(pressRows, r.ID)
+		case kindInlineQuery:
+			inlineRows = append(inlineRows, r.ID)
 		default:
 		}
 	}
@@ -594,6 +598,13 @@ func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate
 			return nil, err
 		}
 		out = append(out, presses...)
+	}
+	if len(inlineRows) > 0 {
+		asks, err := s.botInlineUpdates(ctx, rows, inlineRows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, asks...)
 	}
 	slices.SortStableFunc(out, func(a, b BotUpdate) int {
 		return cmp.Or(cmp.Compare(a.OutboxID, b.OutboxID), cmp.Compare(a.Seq(), b.Seq()))

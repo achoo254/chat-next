@@ -146,8 +146,13 @@ func plain(w http.ResponseWriter, status int) {
 	_, _ = io.WriteString(w, http.StatusText(status)+"\n")
 }
 
+// InlineQueryTTL is how long the asker of an inline query may download the
+// files of its results.
+const InlineQueryTTL = time.Hour
+
 // authorize checks a download token against the database: the message
-// still carries the file and the viewer may still see the message.
+// still carries the file and the viewer may still see the message, or the
+// viewer's inline query (chat 0) still lives and shows the file.
 func (s *Service) authorize(ctx context.Context, token string) (*target, int) {
 	now := s.now()
 	g, err := s.sign.openDownload(token, now)
@@ -169,13 +174,23 @@ func (s *Service) authorize(ctx context.Context, token string) (*target, int) {
 	}
 	t := &target{}
 	var kind, sizes string
-	err = s.pool.QueryRow(ctx, `
-		SELECT f.object_key, f.mime_type, f.file_name, f.file_hash, f.kind, f.size, f.sizes::text
-		FROM files f
+	// A message the viewer can see that carries the file; chat 0 is an
+	// inline query of the viewer (seq its number) whose results show it.
+	args := []any{g.fileID, g.chatID, g.seq, g.viewer, g.tenant}
+	through := `
 		JOIN message_files mf ON mf.file_id = f.id AND mf.chat_id = $2 AND mf.seq = $3
 		JOIN chat_members cm ON cm.chat_id = $2 AND cm.user_id = $4 AND cm.visible_from_seq <= $3
-			AND (cm.left_at IS NULL OR cm.left_seq >= $3)
-		WHERE f.id = $1 AND f.tenant_id = $5`, g.fileID, g.chatID, g.seq, g.viewer, g.tenant).
+			AND (cm.left_at IS NULL OR cm.left_seq >= $3)`
+	if g.chatID == 0 {
+		through = `
+		JOIN bot_inline_queries q ON q.num = $3 AND q.user_id = $4 AND q.tenant_id = $5 AND $2::bigint = 0
+			AND q.created_at > now() - $6::interval AND f.id = ANY(q.file_ids)`
+		args = append(args, InlineQueryTTL.String())
+	}
+	err = s.pool.QueryRow(ctx, `
+		SELECT f.object_key, f.mime_type, f.file_name, f.file_hash, f.kind, f.size, f.sizes::text
+		FROM files f`+through+`
+		WHERE f.id = $1 AND f.tenant_id = $5`, args...).
 		Scan(&t.key, &t.mime, &t.name, &t.hash, &kind, &t.size, &sizes)
 	if errors.Is(err, pgx.ErrNoRows) {
 		s.access.put(token, nil, now)

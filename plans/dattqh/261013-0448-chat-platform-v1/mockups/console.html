@@ -265,7 +265,7 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 <section class="shot" id="create-bot">
 	<div class="shot-head">
 		<h2>Tạo bot</h2><span class="phase">Phase 15</span>
-		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Username tự đề xuất từ Tên hiển thị: bỏ dấu tiếng Việt (đ thành d), chữ thường, khoảng trắng và gạch ngang thành "_", bỏ ký tự khác, thêm đuôi "_bot" ("Deploy Thử" thành deploy_thu_bot). Đề xuất đi theo tên cho đến khi người dùng tự sửa username; khi gõ tay, username cũng được chuẩn hoá ngay (gõ "Báo-Cáo" thành bao_cao). Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định. Thử gõ lại tên hoặc username trong khung. Tab Hồ sơ của bot đã tạo dùng cùng form, cạnh đó là thẻ "Xoá bot": "Token ngừng hoạt động ngay, update đang chờ bị bỏ. Tin bot đã gửi vẫn còn; username được trả lại để dùng cho bot khác."</p>
+		<p>Username phải kết thúc bằng "bot" và là duy nhất trong tổ chức (ADR 0010); kiểm ngay khi gõ, có gợi ý khi trùng. Username tự đề xuất từ Tên hiển thị: bỏ dấu tiếng Việt (đ thành d), chữ thường, khoảng trắng và gạch ngang thành "_", bỏ ký tự khác, thêm đuôi "_bot" ("Deploy Thử" thành deploy_thu_bot). Đề xuất đi theo tên cho đến khi người dùng tự sửa username; khi gõ tay, username cũng được chuẩn hoá ngay (gõ "Báo-Cáo" thành bao_cao). Nút Tạo bot tắt khi còn lỗi. Chế độ riêng tư trong nhóm bật mặc định; chế độ inline tắt mặc định, bật thì nhập chữ gợi ý (bắt buộc, tối đa 64 ký tự). Thử gõ lại tên hoặc username trong khung. Tab Hồ sơ của bot đã tạo dùng cùng form, cạnh đó là thẻ "Xoá bot": "Token ngừng hoạt động ngay, update đang chờ bị bỏ. Tin bot đã gửi vẫn còn; username được trả lại để dùng cho bot khác."</p>
 	</div>
 	<div class="frame">
 		<div class="console">
@@ -297,6 +297,15 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 						<div class="setting">
 							<div><strong>Chế độ riêng tư trong nhóm</strong><small>Bot chỉ thấy lệnh gửi cho nó và tin trả lời nó. Nên bật.</small></div>
 							<button type="button" class="switch" role="switch" aria-checked="true" aria-label="Chế độ riêng tư trong nhóm"></button>
+						</div>
+						<div class="setting">
+							<div><strong>Chế độ inline</strong><small>Người dùng gõ @username_bot trong bất kỳ chat nào để lấy kết quả của bot (update inline_query). Bot chỉ nhận từ khoá, không thấy tin trong chat.</small></div>
+							<button type="button" class="switch" role="switch" aria-checked="true" aria-label="Chế độ inline" aria-controls="cb-inline"></button>
+						</div>
+						<div class="field" id="cb-inline">
+							<label for="cb-inline-ph">Chữ gợi ý trong ô soạn tin</label>
+							<input class="input" id="cb-inline-ph" maxlength="64" value="Tên báo cáo hoặc ngày…">
+							<span class="hint">Hiện khi người dùng mới gõ @username_bot và dấu cách. Tối đa 64 ký tự.</span>
 						</div>
 						<div class="card-foot">
 							<a class="btn" href="#bots-list">Huỷ</a>

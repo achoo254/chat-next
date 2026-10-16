@@ -19,7 +19,12 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 
 // Client interactions with bots.
 service BotsService {
-  // Forwards an inline query to the bot and returns its results.
+  // Forwards an inline query to a bot with inline mode on (User.
+  // bot_inline_placeholder not empty) and waits up to 10 s for its results.
+  // The bot gets the query, the offset, the caller and the kind of chat,
+  // never the chat's messages. The caller must be able to send messages in
+  // chat_id. A bot that does not answer in time gives failed_precondition
+  // "bot_timeout"; a bot without inline mode "inline_off".
   rpc InlineQuery(InlineQueryRequest) returns (InlineQueryResponse);
   // Returns the Mini App URL and signed init data for the container.
   rpc OpenMiniApp(OpenMiniAppRequest) returns (OpenMiniAppResponse);
@@ -57,8 +62,12 @@ message InlineResult {
   string description = 4;
   // File-backed results.
   MediaRef media = 5;
-  // Article preview image from the bot (http/https only).
+  // Not used: article thumbnails come as thumbnail.
   string thumbnail_url = 6;
+  // Preview image of an article (a photo of the bot); file-backed results
+  // preview their media. Download with GetFileUrl in the inline_query_id
+  // context of this query.
+  MediaRef thumbnail = 7;
 }
 
 message InlineQueryRequest {

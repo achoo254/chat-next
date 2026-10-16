@@ -99,7 +99,9 @@ func TestBotPlatformEndToEnd(t *testing.T) {
 	if _, err := bots.GetBotInfo(ctx, connect.NewRequest(&appv1.GetBotInfoRequest{BotId: botID})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := bots.InlineQuery(ctx, connect.NewRequest(&appv1.InlineQueryRequest{BotId: botID})); codeOf(err) != connect.CodeUnimplemented {
+	// Inline mode is off until the owner sets a placeholder.
+	if _, err := bots.InlineQuery(ctx, connect.NewRequest(&appv1.InlineQueryRequest{BotId: botID})); codeOf(err) != connect.CodeFailedPrecondition ||
+		!strings.Contains(err.Error(), "inline_off") {
 		t.Fatalf("inline query: %v", err)
 	}
 	started, err := bots.StartBot(ctx, connect.NewRequest(&appv1.StartBotRequest{BotId: botID, StartParam: "hello", RandomId: 1}))

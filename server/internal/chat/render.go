@@ -288,6 +288,8 @@ type userRow struct {
 	Email    string
 	LastSeen *time.Time
 	IsBot    bool
+	// InlinePlaceholder: a bot with inline mode on ("" when off).
+	InlinePlaceholder string
 	// Deleted: the account waits for deletion or was erased; others see a
 	// deleted account without profile.
 	Deleted bool
@@ -299,9 +301,10 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 		return out, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT id, username, name, bio, coalesce(email, ''), last_seen_at, is_bot,
-			deletion_requested_at IS NOT NULL OR deleted_at IS NOT NULL
-		FROM users WHERE tenant_id = $1 AND id = ANY($2)`,
+		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot,
+			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, '')
+		FROM users u LEFT JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
+		WHERE u.tenant_id = $1 AND u.id = ANY($2)`,
 		tenantID, ids)
 	if err != nil {
 		return nil, fmt.Errorf("chat: load users: %w", err)
@@ -309,7 +312,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.Deleted); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.Deleted, &u.InlinePlaceholder); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u
@@ -322,7 +325,7 @@ func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
 		return &appv1.User{Id: u.ID, Deleted: true, IsBlocked: blocked, IsBot: u.IsBot}
 	}
 	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked,
-		IsBot: u.IsBot}
+		IsBot: u.IsBot, BotInlinePlaceholder: u.InlinePlaceholder}
 	if u.ID == viewer {
 		out.Email = u.Email
 	}
@@ -640,6 +643,7 @@ func referencedUsers(m *appv1.Message) []int64 {
 	if f := m.GetForwardFrom(); f != nil {
 		ids = append(ids, f.GetFromUserId())
 	}
+	ids = append(ids, m.GetViaBotId())
 	for _, e := range m.GetEntities() {
 		ids = append(ids, e.GetUserId())
 	}

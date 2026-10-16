@@ -241,6 +241,8 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .stamp .read { color: var(--c-primary); }
 .stamp .fail { color: var(--c-error); }
 .fwd { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-primary); }
+.via-bot { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-text-muted); }
+.via-bot b { color: var(--c-primary); font-weight: 600; }
 .fwd b { font-weight: 600; }
 .fwd .avatar.xs { display: inline-grid; width: 18px; height: 18px; font-size: 0.5625rem; vertical-align: -4px; margin: 0 2px; }
 .reply {
@@ -334,7 +336,7 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .bubble.media { padding: var(--space-1); }
 .bubble.media > p, .bubble.media > .who, .bubble.media > .fwd, .bubble.media > .reply { margin-left: var(--space-2); margin-right: var(--space-2); }
 .bubble.media > p { padding: var(--space-1) 0; }
-.bubble.media > .who, .bubble.media > .fwd { padding-top: var(--space-1); }
+.bubble.media > .who, .bubble.media > .fwd, .bubble.media > .via-bot { padding-top: var(--space-1); }
 .media-box { display: block; max-width: 100%; height: auto; border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
 .media-box.card { width: min(300px, 100%); height: 52px; }
 .media-slot { display: grid; justify-items: start; gap: var(--space-1); min-width: 0; }

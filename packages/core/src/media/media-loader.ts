@@ -12,11 +12,13 @@ import type { RemoteApi } from "../protocol/api.ts";
 import { toSizeType, toWireId, toWireSizeType } from "../protocol/map.ts";
 import { cacheKey, LARGE_FILE_BYTES, type MediaCache } from "./media-cache.ts";
 
-/** A file of a message to fetch. */
+/** A file of a message to fetch, or of an inline query's results (chatId and seq 0). */
 export interface MediaRequest {
 	readonly chatId: number;
 	readonly seq: number;
 	readonly fileId: string;
+	/** A result of the caller's inline query: the file's context instead of a message. */
+	readonly inlineQueryId?: string;
 	/** Rendition wanted; the original when absent. */
 	readonly size?: MediaSizeType;
 	/** Video counts against the large-file cache budget whatever its size. */
@@ -56,7 +58,7 @@ interface Pending {
 }
 
 function urlKey(r: MediaRequest): string {
-	return `${r.fileId}:${r.size ?? "original"}:${r.chatId}:${r.seq}`;
+	return `${r.fileId}:${r.size ?? "original"}:${r.chatId}:${r.seq}:${r.inlineQueryId ?? ""}`;
 }
 
 export class MediaLoader {
@@ -139,7 +141,10 @@ export class MediaLoader {
 					requests: chunk.map(({ request }) => ({
 						fileId: request.fileId,
 						size: toWireSizeType(request.size ?? "original"),
-						context: { case: "message", value: { chatId: toWireId(request.chatId), seq: toWireId(request.seq) } },
+						context:
+							request.inlineQueryId === undefined
+								? { case: "message", value: { chatId: toWireId(request.chatId), seq: toWireId(request.seq) } }
+								: { case: "inlineQueryId", value: request.inlineQueryId },
 					})),
 				});
 				chunk.forEach((pending, index) => {

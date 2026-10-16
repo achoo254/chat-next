@@ -517,7 +517,7 @@ func TestWebhookSettingsAreChecked(t *testing.T) {
 		{botupdates.WebhookSettings{URL: "https://93.184.216.34/hook", Secret: string(make([]byte, 257))}, "secret_invalid"},
 		{botupdates.WebhookSettings{URL: "https://93.184.216.34/hook"}, "secret_required"},
 		{botupdates.WebhookSettings{URL: "https://93.184.216.34/hook", Secret: "s", MaxConnections: 101}, "max_connections_invalid"},
-		{botupdates.WebhookSettings{URL: "https://93.184.216.34/hook", Secret: "s", AllowedUpdates: []string{"inline_query"}}, "allowed_updates_invalid"},
+		{botupdates.WebhookSettings{URL: "https://93.184.216.34/hook", Secret: "s", AllowedUpdates: []string{"shipping_query"}}, "allowed_updates_invalid"},
 	} {
 		if got := code(prod.SetWebhook(ctx, botID, c.w)); got != c.want {
 			t.Errorf("SetWebhook(%+v) = %s, want %s", c.w, got, c.want)

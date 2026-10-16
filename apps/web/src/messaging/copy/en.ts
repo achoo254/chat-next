@@ -128,6 +128,7 @@ export const en: MessagingCopy = {
 	message: {
 		edited: "edited",
 		forwardedFrom: "Forwarded from",
+		viaBot: "via",
 		sending: "Sending",
 		queued: "Waiting to send",
 		sentTick: "Sent",

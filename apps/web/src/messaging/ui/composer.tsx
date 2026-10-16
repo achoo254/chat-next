@@ -44,6 +44,8 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
 const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
 const BotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotLayer })));
+// A draft starting with "@": inline mode when it is "@bot_username query".
+const InlineResults = lazy(() => import("../bots/inline-results.tsx"));
 const GroupBotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.GroupBotLayer })));
 
 /** The bot layer's state for the composer's buttons (bots/bot-chat.tsx BotBar); empty until it loads. */
@@ -388,6 +390,19 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	}
 	return (
 		<div className="composer-wrap">
+			{text[0] === "@" && !editing && !withFiles && (
+				<Suspense fallback={null}>
+					<InlineResults
+						chatId={chatId}
+						topicId={topicId}
+						draft={text}
+						onSent={() => {
+							update("");
+							area.current?.focus();
+						}}
+					/>
+				</Suspense>
+			)}
 			{withFiles && limits !== null && (
 				<div className="compose-extras">
 					<Suspense fallback={null}>

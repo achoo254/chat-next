@@ -162,6 +162,9 @@ message GetFileUrlRequest {
     int64 user_photo_of = 4 [jstype = JS_NUMBER];
     // Photo of this chat.
     int64 chat_photo_of = 5 [jstype = JS_NUMBER];
+    // A result of the caller's inline query (InlineQueryResponse.query_id),
+    // while the query lives (1 hour).
+    string inline_query_id = 6;
   }
 }
 

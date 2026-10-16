@@ -980,6 +980,7 @@ type GetFileUrlRequest struct {
 	//	*GetFileUrlRequest_Message
 	//	*GetFileUrlRequest_UserPhotoOf
 	//	*GetFileUrlRequest_ChatPhotoOf
+	//	*GetFileUrlRequest_InlineQueryId
 	Context       isGetFileUrlRequest_Context `protobuf_oneof:"context"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1063,6 +1064,15 @@ func (x *GetFileUrlRequest) GetChatPhotoOf() int64 {
 	return 0
 }
 
+func (x *GetFileUrlRequest) GetInlineQueryId() string {
+	if x != nil {
+		if x, ok := x.Context.(*GetFileUrlRequest_InlineQueryId); ok {
+			return x.InlineQueryId
+		}
+	}
+	return ""
+}
+
 type isGetFileUrlRequest_Context interface {
 	isGetFileUrlRequest_Context()
 }
@@ -1081,11 +1091,19 @@ type GetFileUrlRequest_ChatPhotoOf struct {
 	ChatPhotoOf int64 `protobuf:"varint,5,opt,name=chat_photo_of,json=chatPhotoOf,proto3,oneof"`
 }
 
+type GetFileUrlRequest_InlineQueryId struct {
+	// A result of the caller's inline query (InlineQueryResponse.query_id),
+	// while the query lives (1 hour).
+	InlineQueryId string `protobuf:"bytes,6,opt,name=inline_query_id,json=inlineQueryId,proto3,oneof"`
+}
+
 func (*GetFileUrlRequest_Message) isGetFileUrlRequest_Context() {}
 
 func (*GetFileUrlRequest_UserPhotoOf) isGetFileUrlRequest_Context() {}
 
 func (*GetFileUrlRequest_ChatPhotoOf) isGetFileUrlRequest_Context() {}
+
+func (*GetFileUrlRequest_InlineQueryId) isGetFileUrlRequest_Context() {}
 
 type GetFileUrlResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1376,13 +1394,14 @@ const file_app_v1_media_proto_rawDesc = "" +
 	"\x13AbortUploadResponse\"G\n" +
 	"\x12MessageFileContext\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
-	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\"\xee\x01\n" +
+	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\"\x98\x02\n" +
 	"\x11GetFileUrlRequest\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12)\n" +
 	"\x04size\x18\x02 \x01(\x0e2\x15.app.v1.MediaSizeTypeR\x04size\x126\n" +
 	"\amessage\x18\x03 \x01(\v2\x1a.app.v1.MessageFileContextH\x00R\amessage\x12(\n" +
 	"\ruser_photo_of\x18\x04 \x01(\x03B\x020\x02H\x00R\vuserPhotoOf\x12(\n" +
-	"\rchat_photo_of\x18\x05 \x01(\x03B\x020\x02H\x00R\vchatPhotoOfB\t\n" +
+	"\rchat_photo_of\x18\x05 \x01(\x03B\x020\x02H\x00R\vchatPhotoOf\x12(\n" +
+	"\x0finline_query_id\x18\x06 \x01(\tH\x00R\rinlineQueryIdB\t\n" +
 	"\acontext\"t\n" +
 	"\x12GetFileUrlResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12!\n" +
@@ -1501,6 +1520,7 @@ func file_app_v1_media_proto_init() {
 		(*GetFileUrlRequest_Message)(nil),
 		(*GetFileUrlRequest_UserPhotoOf)(nil),
 		(*GetFileUrlRequest_ChatPhotoOf)(nil),
+		(*GetFileUrlRequest_InlineQueryId)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -194,6 +194,15 @@ type update struct {
 		} `json:"from"`
 		Message sentMessage `json:"message"`
 	} `json:"callback"`
+	InlineQuery *struct {
+		ID   string `json:"id"`
+		From struct {
+			ID int64 `json:"id"`
+		} `json:"from"`
+		Query    string `json:"query"`
+		Offset   string `json:"offset"`
+		ChatType string `json:"chat_type"`
+	} `json:"inline_query"`
 }
 
 func (h *harness) send(token string, chatID int64, body string) answer {

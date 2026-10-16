@@ -17,13 +17,14 @@ import (
 )
 
 // botsService implements BotsService, the client side of bots: starting a
-// bot and its public profile. Inline mode and Mini Apps come in later
-// releases.
+// bot and its public profile, inline queries. Mini Apps come in a later
+// release.
 type botsService struct {
 	appv1connect.UnimplementedBotsServiceHandler
-	chat   *chat.Service
-	bots   *botadmin.Service
-	logger *slog.Logger
+	chat    *chat.Service
+	bots    *botadmin.Service
+	updates *botupdates.Service
+	logger  *slog.Logger
 }
 
 func (s *botsService) StartBot(ctx context.Context, req *connect.Request[appv1.StartBotRequest]) (*connect.Response[appv1.StartBotResponse], error) {
@@ -74,8 +75,27 @@ func (s *botsService) GetChatBotCommands(ctx context.Context, req *connect.Reque
 	})
 }
 
-func (s *botsService) InlineQuery(context.Context, *connect.Request[appv1.InlineQueryRequest]) (*connect.Response[appv1.InlineQueryResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("inline_mode_unavailable: inline mode comes in a later release"))
+// InlineQuery hands the query to the bot and waits for its results as a
+// button press waits for its answer.
+func (s *botsService) InlineQuery(ctx context.Context, req *connect.Request[appv1.InlineQueryRequest]) (*connect.Response[appv1.InlineQueryResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.InlineQueryRequest) (*appv1.InlineQueryResponse, error) {
+		ask, err := s.chat.InlineQuery(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		if !ask.Answered {
+			answered, err := s.updates.Await(ctx, ask.ID, botupdates.AnswerTimeout, func() (bool, error) {
+				return s.chat.InlineAnswered(ctx, ask.ID)
+			})
+			if err != nil {
+				return nil, err
+			}
+			if !answered {
+				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("bot_timeout: the bot did not answer in time"))
+			}
+		}
+		return s.chat.InlineResults(ctx, me, ask.ID)
+	})
 }
 
 func (s *botsService) OpenMiniApp(context.Context, *connect.Request[appv1.OpenMiniAppRequest]) (*connect.Response[appv1.OpenMiniAppResponse], error) {

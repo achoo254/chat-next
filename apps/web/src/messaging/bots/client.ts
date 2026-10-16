@@ -1,6 +1,6 @@
 // Connect implementation of Bots (see api.ts), loaded on first use.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { assertSafeId, fromBase64 } from "@app/core";
+import { assertSafeId, fromBase64, toMediaRef } from "@app/core";
 import {
 	BotAdminService,
 	BotCommandScope as WireScope,
@@ -12,11 +12,19 @@ import {
 	type BotWebhook as WireWebhook,
 	type GetBotDeliveryResponse,
 } from "@app/proto-ts/bot_admin";
-import { BotsService, type GetBotInfoResponse, type GetChatBotCommandsResponse } from "@app/proto-ts/bots";
+import {
+	BotsService,
+	InlineResultKind,
+	type GetBotInfoResponse,
+	type GetChatBotCommandsResponse,
+	type InlineResult as WireInlineResult,
+} from "@app/proto-ts/bots";
 import { MessagesService } from "@app/proto-ts/messages";
 import { UsersService } from "@app/proto-ts/users";
 import {
 	BotError,
+	type InlineItem,
+	type InlineKind,
 	type BotChanges,
 	type BotCommand,
 	type BotDelivery,
@@ -85,6 +93,28 @@ export function toOwnBot(bot: WireBot | undefined, method: string): OwnBot {
 		lastUpdateAt: assertSafeId(bot.lastUpdateAt),
 		webhook: bot.webhook,
 		tier: TIERS[bot.tier] ?? "default",
+		inlinePlaceholder: bot.inlinePlaceholder,
+	};
+}
+
+const INLINE_KINDS: Partial<Record<InlineResultKind, InlineKind>> = {
+	[InlineResultKind.ARTICLE]: "article",
+	[InlineResultKind.PHOTO]: "photo",
+	[InlineResultKind.VIDEO]: "video",
+	[InlineResultKind.DOCUMENT]: "document",
+};
+
+/** A result the client knows how to show; null for a newer kind. */
+function toInlineItem(r: WireInlineResult): InlineItem | null {
+	const kind = INLINE_KINDS[r.kind];
+	if (kind === undefined) return null;
+	return {
+		id: r.id,
+		kind,
+		title: r.title,
+		description: r.description,
+		...(r.media === undefined ? {} : { media: toMediaRef(r.media) }),
+		...(r.thumbnail === undefined ? {} : { thumbnail: toMediaRef(r.thumbnail) }),
 	};
 }
 
@@ -139,6 +169,7 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 		commands: response.commands.map(toCommand),
 		isOwner: response.isOwner,
 		notRunning: response.isOwner && response.notRunning,
+		inlinePlaceholder: user.botInlinePlaceholder,
 	};
 }
 
@@ -159,6 +190,8 @@ export function errorKindOf(err: ConnectError): BotErrorKind {
 		case Code.FailedPrecondition:
 			if (message.startsWith("reauth_required")) return "reauth_required";
 			if (message.startsWith("bots_limit")) return "bots_limit";
+			if (message.startsWith("bot_timeout")) return "bot_timeout";
+			if (message.startsWith("inline_off")) return "inline_off";
 			return "other";
 		case Code.AlreadyExists:
 			return message.startsWith("username_taken") || message === "" ? "username_taken" : "other";
@@ -227,6 +260,7 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 					...(changes.about === undefined ? {} : { about: changes.about }),
 					...(changes.privacy === undefined ? {} : { privacy: changes.privacy }),
 					...(changes.commands === undefined ? {} : { commands: wireSets(changes.commands) }),
+					...(changes.inlinePlaceholder === undefined ? {} : { inlinePlaceholder: changes.inlinePlaceholder }),
 				});
 				return toOwnBot(response.bot, "UpdateBot");
 			}),
@@ -255,6 +289,25 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 				const chat = response.chat;
 				if (chat === undefined) throw new BotError("other", "StartBot returned no chat");
 				return assertSafeId(chat.id);
+			}),
+		inlineQuery: (botId, chatId, query) =>
+			call(async () => {
+				const response = await bots.inlineQuery({ botId: BigInt(botId), chatId: BigInt(chatId), query, offset: "" });
+				return {
+					queryId: response.queryId,
+					items: response.results.flatMap((r) => toInlineItem(r) ?? []),
+					gallery: response.gallery,
+				};
+			}),
+		sendInlineResult: (chatId, topicId, queryId, resultId, randomId) =>
+			call(async () => {
+				await messages.sendInlineResult({
+					chatId: BigInt(chatId),
+					topicId: BigInt(topicId),
+					queryId,
+					resultId,
+					randomId: BigInt(randomId),
+				});
 			}),
 		press: (chatId, seq, callbackData) =>
 			call(async () => {

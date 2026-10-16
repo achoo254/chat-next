@@ -79,21 +79,42 @@ func (s *Service) SendMedia(ctx context.Context, me int64, req *appv1.SendMediaR
 	if err := s.allow(ctx, limitSend, "send", me); err != nil {
 		return nil, err
 	}
-	chatID := req.GetChatId()
+	return s.postMedia(ctx, me, mediaPost{
+		chatID: req.GetChatId(), topicID: req.GetTopicId(), replyTo: req.GetReplyToSeq(), randomID: req.GetRandomId(),
+		text: text, ents: ents,
+		file: func(t *txn) (*media.File, error) { return t.attachableFile(ctx, me, req.GetFileId()) },
+	})
+}
+
+// mediaPost is a validated media message to post; file picks (and locks)
+// the file inside the posting transaction.
+type mediaPost struct {
+	chatID, topicID, replyTo, randomID int64
+	text                               string
+	ents                               []*appv1.MessageEntity
+	file                               func(t *txn) (*media.File, error)
+	markup                             *appv1.ReplyMarkup
+	viaBot                             int64
+}
+
+// postMedia posts a media message as me; a retry with the same random_id
+// returns the first message and its ack.
+func (s *Service) postMedia(ctx context.Context, me int64, p mediaPost) (*appv1.SendMediaResponse, error) {
+	chatID := p.chatID
 	var (
 		posted    *messageRow
 		duplicate *sendDedupe
 	)
 	t, err := s.inTx(ctx, func(t *txn) error {
 		posted, duplicate = nil, nil
-		c, _, topicID, err := t.mediaTarget(ctx, me, chatID, req.GetTopicId(), req.GetReplyToSeq())
+		c, _, topicID, err := t.mediaTarget(ctx, me, chatID, p.topicID, p.replyTo)
 		if err != nil {
 			return err
 		}
-		if duplicate, err = t.claimRandomID(ctx, me, req.GetRandomId(), chatID); err != nil || duplicate != nil {
+		if duplicate, err = t.claimRandomID(ctx, me, p.randomID, chatID); err != nil || duplicate != nil {
 			return err
 		}
-		f, err := t.attachableFile(ctx, me, req.GetFileId())
+		f, err := p.file(t)
 		if err != nil {
 			return err
 		}
@@ -103,13 +124,13 @@ func (s *Service) SendMedia(ctx context.Context, me int64, req *appv1.SendMediaR
 		}
 		ev := t.event(kindMessageNew, chatID, me)
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
-			fromID: me, topicID: topicID, randomID: req.GetRandomId(), replyTo: req.GetReplyToSeq(), text: text,
-			content: &appv1.Message{Entities: ents, Media: f.Ref()},
+			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
+			content: &appv1.Message{Entities: p.ents, Media: f.Ref(), ReplyMarkup: p.markup, ViaBotId: p.viaBot},
 		})
 		if err != nil {
 			return err
 		}
-		t.recordRandomID(me, req.GetRandomId(), posted.Seq, chatID)
+		t.recordRandomID(me, p.randomID, posted.Seq, chatID)
 		return nil
 	})
 	if err != nil {
@@ -302,6 +323,9 @@ func (s *Service) AuthorizeFiles(ctx context.Context, viewer int64, reqs []*appv
 		seqs = append(seqs, msg.GetSeq())
 		index = append(index, int64(i))
 	}
+	if err := s.inlineFileAccess(ctx, viewer, reqs, out); err != nil {
+		return nil, err
+	}
 	if len(ids) == 0 {
 		return out, nil
 	}
@@ -335,18 +359,8 @@ func (s *Service) AuthorizeFiles(ctx context.Context, viewer int64, reqs []*appv
 	return out, nil
 }
 
-// indexedRow prefixes a row with an index column for media.ScanFile.
-type indexedRow struct {
-	rows pgx.Rows
-	i    *int64
-}
-
-func (r indexedRow) Scan(dest ...any) error {
-	return r.rows.Scan(append([]any{r.i}, dest...)...)
-}
-
 func scanIndexedFile(rows pgx.Rows, i *int64) (*media.File, error) {
-	return media.ScanFile(indexedRow{rows: rows, i: i})
+	return media.ScanFile(prefixedRow{row: rows, head: []any{i}})
 }
 
 // RefreshFile rewrites the messages carrying a file as their media after

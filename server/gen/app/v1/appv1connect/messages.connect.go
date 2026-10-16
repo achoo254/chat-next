@@ -78,6 +78,9 @@ const (
 	// MessagesServicePressInlineButtonProcedure is the fully-qualified name of the MessagesService's
 	// PressInlineButton RPC.
 	MessagesServicePressInlineButtonProcedure = "/app.v1.MessagesService/PressInlineButton"
+	// MessagesServiceSendInlineResultProcedure is the fully-qualified name of the MessagesService's
+	// SendInlineResult RPC.
+	MessagesServiceSendInlineResultProcedure = "/app.v1.MessagesService/SendInlineResult"
 	// MessagesServiceGetLinkPreviewProcedure is the fully-qualified name of the MessagesService's
 	// GetLinkPreview RPC.
 	MessagesServiceGetLinkPreviewProcedure = "/app.v1.MessagesService/GetLinkPreview"
@@ -120,6 +123,11 @@ type MessagesServiceClient interface {
 	// callback_data; pressing a button in a private chat with the bot counts
 	// as consent for the bot to write to the caller.
 	PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error)
+	// Posts the chosen result of an inline query (BotsService.InlineQuery) as
+	// the caller's message "via" the bot (Message.via_bot_id). The query
+	// must be the caller's, answered and at most 1 hour old; the same rules
+	// as SendMessage and SendMedia apply in the chat.
+	SendInlineResult(context.Context, *connect.Request[v1.SendInlineResultRequest]) (*connect.Response[v1.SendInlineResultResponse], error)
 	// Text-only preview of a web page for the composer; empty preview when the
 	// page has none or cannot be fetched.
 	GetLinkPreview(context.Context, *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error)
@@ -233,6 +241,12 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("PressInlineButton")),
 			connect.WithClientOptions(opts...),
 		),
+		sendInlineResult: connect.NewClient[v1.SendInlineResultRequest, v1.SendInlineResultResponse](
+			httpClient,
+			baseURL+MessagesServiceSendInlineResultProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("SendInlineResult")),
+			connect.WithClientOptions(opts...),
+		),
 		getLinkPreview: connect.NewClient[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse](
 			httpClient,
 			baseURL+MessagesServiceGetLinkPreviewProcedure,
@@ -271,6 +285,7 @@ type messagesServiceClient struct {
 	setReaction         *connect.Client[v1.SetReactionRequest, v1.SetReactionResponse]
 	getHistory          *connect.Client[v1.GetHistoryRequest, v1.GetHistoryResponse]
 	pressInlineButton   *connect.Client[v1.PressInlineButtonRequest, v1.PressInlineButtonResponse]
+	sendInlineResult    *connect.Client[v1.SendInlineResultRequest, v1.SendInlineResultResponse]
 	getLinkPreview      *connect.Client[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse]
 	getMessageReaders   *connect.Client[v1.GetMessageReadersRequest, v1.GetMessageReadersResponse]
 	getMessageReactions *connect.Client[v1.GetMessageReactionsRequest, v1.GetMessageReactionsResponse]
@@ -351,6 +366,11 @@ func (c *messagesServiceClient) PressInlineButton(ctx context.Context, req *conn
 	return c.pressInlineButton.CallUnary(ctx, req)
 }
 
+// SendInlineResult calls app.v1.MessagesService.SendInlineResult.
+func (c *messagesServiceClient) SendInlineResult(ctx context.Context, req *connect.Request[v1.SendInlineResultRequest]) (*connect.Response[v1.SendInlineResultResponse], error) {
+	return c.sendInlineResult.CallUnary(ctx, req)
+}
+
 // GetLinkPreview calls app.v1.MessagesService.GetLinkPreview.
 func (c *messagesServiceClient) GetLinkPreview(ctx context.Context, req *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error) {
 	return c.getLinkPreview.CallUnary(ctx, req)
@@ -397,6 +417,11 @@ type MessagesServiceHandler interface {
 	// callback_data; pressing a button in a private chat with the bot counts
 	// as consent for the bot to write to the caller.
 	PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error)
+	// Posts the chosen result of an inline query (BotsService.InlineQuery) as
+	// the caller's message "via" the bot (Message.via_bot_id). The query
+	// must be the caller's, answered and at most 1 hour old; the same rules
+	// as SendMessage and SendMedia apply in the chat.
+	SendInlineResult(context.Context, *connect.Request[v1.SendInlineResultRequest]) (*connect.Response[v1.SendInlineResultResponse], error)
 	// Text-only preview of a web page for the composer; empty preview when the
 	// page has none or cannot be fetched.
 	GetLinkPreview(context.Context, *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error)
@@ -506,6 +531,12 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("PressInlineButton")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceSendInlineResultHandler := connect.NewUnaryHandler(
+		MessagesServiceSendInlineResultProcedure,
+		svc.SendInlineResult,
+		connect.WithSchema(messagesServiceMethods.ByName("SendInlineResult")),
+		connect.WithHandlerOptions(opts...),
+	)
 	messagesServiceGetLinkPreviewHandler := connect.NewUnaryHandler(
 		MessagesServiceGetLinkPreviewProcedure,
 		svc.GetLinkPreview,
@@ -556,6 +587,8 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServiceGetHistoryHandler.ServeHTTP(w, r)
 		case MessagesServicePressInlineButtonProcedure:
 			messagesServicePressInlineButtonHandler.ServeHTTP(w, r)
+		case MessagesServiceSendInlineResultProcedure:
+			messagesServiceSendInlineResultHandler.ServeHTTP(w, r)
 		case MessagesServiceGetLinkPreviewProcedure:
 			messagesServiceGetLinkPreviewHandler.ServeHTTP(w, r)
 		case MessagesServiceGetMessageReadersProcedure:
@@ -629,6 +662,10 @@ func (UnimplementedMessagesServiceHandler) GetHistory(context.Context, *connect.
 
 func (UnimplementedMessagesServiceHandler) PressInlineButton(context.Context, *connect.Request[v1.PressInlineButtonRequest]) (*connect.Response[v1.PressInlineButtonResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.PressInlineButton is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) SendInlineResult(context.Context, *connect.Request[v1.SendInlineResultRequest]) (*connect.Response[v1.SendInlineResultResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.SendInlineResult is not implemented"))
 }
 
 func (UnimplementedMessagesServiceHandler) GetLinkPreview(context.Context, *connect.Request[v1.GetLinkPreviewRequest]) (*connect.Response[v1.GetLinkPreviewResponse], error) {

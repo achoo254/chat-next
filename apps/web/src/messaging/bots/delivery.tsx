@@ -32,7 +32,7 @@ import { ConfirmDialog, ReauthDialog, reauthUrl, useConfirmShown, type TabProps 
 import { useBotsCopy } from "./use-bots-copy.ts";
 
 /** Update kinds a bot can receive, in the Console's order. */
-export const UPDATE_KINDS: readonly UpdateKind[] = ["message", "message_edited", "channel_post", "callback", "member_changed", "reaction"];
+export const UPDATE_KINDS: readonly UpdateKind[] = ["message", "message_edited", "channel_post", "callback", "member_changed", "reaction", "inline_query"];
 
 /** Webhook limits (bot_admin.proto SetBotWebhookRequest). */
 export const WEBHOOK_LIMITS = { secretMax: 256, maxConnectionsMax: 100, maxConnectionsDefault: 40, urlMax: 2048 } as const;

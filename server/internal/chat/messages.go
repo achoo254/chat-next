@@ -367,8 +367,10 @@ type textPost struct {
 	text                               string
 	ents                               []*appv1.MessageEntity
 	noPreview                          bool
-	// markup: keyboards of bot messages.
+	// markup: keyboards of bot messages (and of inline results).
 	markup *appv1.ReplyMarkup
+	// viaBot: the bot whose inline result this is (Message.via_bot_id).
+	viaBot int64
 	// consent: see sendMessage.
 	consent string
 }
@@ -414,7 +416,7 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 		ev := t.event(kindMessageNew, chatID, me)
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
 			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
-			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup},
+			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup, ViaBotId: p.viaBot},
 		})
 		if err != nil {
 			return err

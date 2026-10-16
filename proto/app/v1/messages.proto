@@ -48,6 +48,11 @@ service MessagesService {
   // callback_data; pressing a button in a private chat with the bot counts
   // as consent for the bot to write to the caller.
   rpc PressInlineButton(PressInlineButtonRequest) returns (PressInlineButtonResponse);
+  // Posts the chosen result of an inline query (BotsService.InlineQuery) as
+  // the caller's message "via" the bot (Message.via_bot_id). The query
+  // must be the caller's, answered and at most 1 hour old; the same rules
+  // as SendMessage and SendMedia apply in the chat.
+  rpc SendInlineResult(SendInlineResultRequest) returns (SendInlineResultResponse);
   // Text-only preview of a web page for the composer; empty preview when the
   // page has none or cannot be fetched.
   rpc GetLinkPreview(GetLinkPreviewRequest) returns (GetLinkPreviewResponse);
@@ -565,6 +570,22 @@ message PressInlineButtonRequest {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   int64 seq = 2 [jstype = JS_NUMBER];
   bytes callback_data = 3;
+}
+
+message SendInlineResultRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+  int64 reply_to_seq = 3 [jstype = JS_NUMBER];
+  // InlineQueryResponse.query_id and InlineResult.id.
+  string query_id = 4;
+  string result_id = 5;
+  // Dedupe key as in SendMessage; 0 disables it.
+  int64 random_id = 6 [jstype = JS_NUMBER];
+}
+
+message SendInlineResultResponse {
+  Message message = 1;
+  SyncAck ack = 2;
 }
 
 message PressInlineButtonResponse {

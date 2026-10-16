@@ -317,9 +317,12 @@ type Bot struct {
 	LastUpdateAt int64 `protobuf:"varint,10,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
 	// Updates are POSTed to a webhook (GetBotDelivery has the details);
 	// false when the bot fetches them by long poll.
-	Webhook       bool `protobuf:"varint,11,opt,name=webhook,proto3" json:"webhook,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Webhook bool `protobuf:"varint,11,opt,name=webhook,proto3" json:"webhook,omitempty"`
+	// Inline mode: the composer hint shown once a user typed @username and a
+	// space; empty when inline mode is off.
+	InlinePlaceholder string `protobuf:"bytes,12,opt,name=inline_placeholder,json=inlinePlaceholder,proto3" json:"inline_placeholder,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Bot) Reset() {
@@ -427,6 +430,13 @@ func (x *Bot) GetWebhook() bool {
 		return x.Webhook
 	}
 	return false
+}
+
+func (x *Bot) GetInlinePlaceholder() string {
+	if x != nil {
+		return x.InlinePlaceholder
+	}
+	return ""
 }
 
 type ListMyBotsRequest struct {
@@ -616,9 +626,12 @@ type UpdateBotRequest struct {
 	About       *string                `protobuf:"bytes,4,opt,name=about,proto3,oneof" json:"about,omitempty"`
 	Privacy     *bool                  `protobuf:"varint,5,opt,name=privacy,proto3,oneof" json:"privacy,omitempty"`
 	// Set to replace every command list.
-	Commands      *BotCommandSets `protobuf:"bytes,6,opt,name=commands,proto3" json:"commands,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Commands *BotCommandSets `protobuf:"bytes,6,opt,name=commands,proto3" json:"commands,omitempty"`
+	// Turns inline mode on with this hint (1 to 64 characters), or off with
+	// an empty string.
+	InlinePlaceholder *string `protobuf:"bytes,7,opt,name=inline_placeholder,json=inlinePlaceholder,proto3,oneof" json:"inline_placeholder,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *UpdateBotRequest) Reset() {
@@ -691,6 +704,13 @@ func (x *UpdateBotRequest) GetCommands() *BotCommandSets {
 		return x.Commands
 	}
 	return nil
+}
+
+func (x *UpdateBotRequest) GetInlinePlaceholder() string {
+	if x != nil && x.InlinePlaceholder != nil {
+		return *x.InlinePlaceholder
+	}
+	return ""
 }
 
 type UpdateBotResponse struct {
@@ -1885,7 +1905,7 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x05scope\x18\x01 \x01(\x0e2\x17.app.v1.BotCommandScopeR\x05scope\x12.\n" +
 	"\bcommands\x18\x02 \x03(\v2\x12.app.v1.BotCommandR\bcommands\";\n" +
 	"\x0eBotCommandSets\x12)\n" +
-	"\x04sets\x18\x01 \x03(\v2\x15.app.v1.BotCommandSetR\x04sets\"\x81\x03\n" +
+	"\x04sets\x18\x01 \x03(\v2\x15.app.v1.BotCommandSetR\x04sets\"\xb0\x03\n" +
 	"\x03Bot\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
@@ -1899,7 +1919,8 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x0ftoken_issued_at\x18\t \x01(\x03B\x020\x02R\rtokenIssuedAt\x12(\n" +
 	"\x0elast_update_at\x18\n" +
 	" \x01(\x03B\x020\x02R\flastUpdateAt\x12\x18\n" +
-	"\awebhook\x18\v \x01(\bR\awebhook\"\x13\n" +
+	"\awebhook\x18\v \x01(\bR\awebhook\x12-\n" +
+	"\x12inline_placeholder\x18\f \x01(\tR\x11inlinePlaceholder\"\x13\n" +
 	"\x11ListMyBotsRequest\"5\n" +
 	"\x12ListMyBotsResponse\x12\x1f\n" +
 	"\x04bots\x18\x01 \x03(\v2\v.app.v1.BotR\x04bots\"B\n" +
@@ -1907,19 +1928,21 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"2\n" +
 	"\x11CreateBotResponse\x12\x1d\n" +
-	"\x03bot\x18\x01 \x01(\v2\v.app.v1.BotR\x03bot\"\x8a\x02\n" +
+	"\x03bot\x18\x01 \x01(\v2\v.app.v1.BotR\x03bot\"\xd5\x02\n" +
 	"\x10UpdateBotRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
 	"\vdescription\x18\x03 \x01(\tH\x01R\vdescription\x88\x01\x01\x12\x19\n" +
 	"\x05about\x18\x04 \x01(\tH\x02R\x05about\x88\x01\x01\x12\x1d\n" +
 	"\aprivacy\x18\x05 \x01(\bH\x03R\aprivacy\x88\x01\x01\x122\n" +
-	"\bcommands\x18\x06 \x01(\v2\x16.app.v1.BotCommandSetsR\bcommandsB\a\n" +
+	"\bcommands\x18\x06 \x01(\v2\x16.app.v1.BotCommandSetsR\bcommands\x122\n" +
+	"\x12inline_placeholder\x18\a \x01(\tH\x04R\x11inlinePlaceholder\x88\x01\x01B\a\n" +
 	"\x05_nameB\x0e\n" +
 	"\f_descriptionB\b\n" +
 	"\x06_aboutB\n" +
 	"\n" +
-	"\b_privacy\"2\n" +
+	"\b_privacyB\x15\n" +
+	"\x13_inline_placeholder\"2\n" +
 	"\x11UpdateBotResponse\x12\x1d\n" +
 	"\x03bot\x18\x01 \x01(\v2\v.app.v1.BotR\x03bot\"1\n" +
 	"\x14ResetBotTokenRequest\x12\x19\n" +

@@ -65,7 +65,7 @@ describe("delivery helpers", () => {
 		expect(readDraft(7)).toEqual(draft);
 		sessionStorage.setItem(key, JSON.stringify({ ...draft, at: Date.now() - 16 * 60_000 }));
 		expect(readDraft(7)).toBeNull();
-		sessionStorage.setItem(key, JSON.stringify({ ...draft, kinds: ["inline_query"], at: Date.now() }));
+		sessionStorage.setItem(key, JSON.stringify({ ...draft, kinds: ["shipping_query"], at: Date.now() }));
 		expect(readDraft(7)).toBeNull();
 		sessionStorage.setItem(key, "{not json");
 		expect(readDraft(7)).toBeNull();

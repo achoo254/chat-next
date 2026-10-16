@@ -48,7 +48,12 @@ const (
 
 // BotsServiceClient is a client for the app.v1.BotsService service.
 type BotsServiceClient interface {
-	// Forwards an inline query to the bot and returns its results.
+	// Forwards an inline query to a bot with inline mode on (User.
+	// bot_inline_placeholder not empty) and waits up to 10 s for its results.
+	// The bot gets the query, the offset, the caller and the kind of chat,
+	// never the chat's messages. The caller must be able to send messages in
+	// chat_id. A bot that does not answer in time gives failed_precondition
+	// "bot_timeout"; a bot without inline mode "inline_off".
 	InlineQuery(context.Context, *connect.Request[v1.InlineQueryRequest]) (*connect.Response[v1.InlineQueryResponse], error)
 	// Returns the Mini App URL and signed init data for the container.
 	OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error)
@@ -148,7 +153,12 @@ func (c *botsServiceClient) GetChatBotCommands(ctx context.Context, req *connect
 
 // BotsServiceHandler is an implementation of the app.v1.BotsService service.
 type BotsServiceHandler interface {
-	// Forwards an inline query to the bot and returns its results.
+	// Forwards an inline query to a bot with inline mode on (User.
+	// bot_inline_placeholder not empty) and waits up to 10 s for its results.
+	// The bot gets the query, the offset, the caller and the kind of chat,
+	// never the chat's messages. The caller must be able to send messages in
+	// chat_id. A bot that does not answer in time gives failed_precondition
+	// "bot_timeout"; a bot without inline mode "inline_off".
 	InlineQuery(context.Context, *connect.Request[v1.InlineQueryRequest]) (*connect.Response[v1.InlineQueryResponse], error)
 	// Returns the Mini App URL and signed init data for the container.
 	OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error)

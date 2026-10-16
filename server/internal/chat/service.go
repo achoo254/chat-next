@@ -345,6 +345,8 @@ var (
 	limitReport  = ratelimit.Rule{Rate: 1.0 / 360, Burst: 10}
 	limitPreview = ratelimit.Rule{Rate: 1, Burst: 20}
 	limitSearch  = ratelimit.Rule{Rate: 1, Burst: 20}
+	// limitInline: inline queries (the client asks as the user types).
+	limitInline = ratelimit.Rule{Rate: 2, Burst: 20}
 	// User search of an account younger than youngSearchAge: looking people
 	// up is what a fresh spam account does first.
 	limitSearchYoung = ratelimit.Rule{Rate: 0.2, Burst: 10}

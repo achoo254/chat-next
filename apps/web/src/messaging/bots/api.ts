@@ -5,6 +5,7 @@
 // bigint and leave as number). The Connect client and the generated schemas
 // load on the first call (client.ts), so the first screen does not carry them.
 // A token is only ever returned by resetToken, never kept here.
+import type { MediaRef } from "@app/core";
 import type { Transport } from "@connectrpc/connect";
 
 /** Where a command list applies (BotCommandScope); the Console edits private, group and group_admin. */
@@ -43,12 +44,14 @@ export interface OwnBot {
 	readonly webhook: boolean;
 	/** Rate limit tier; only the operations team changes it. */
 	readonly tier: BotTierName;
+	/** Inline mode: the composer hint; "" when off. */
+	readonly inlinePlaceholder: string;
 }
 
 export type BotTierName = "new" | "default" | "verified" | "internal" | "restricted";
 
 /** Update kinds a bot can receive; "reaction" only when listed. */
-export type UpdateKind = "message" | "message_edited" | "channel_post" | "callback" | "member_changed" | "reaction";
+export type UpdateKind = "message" | "message_edited" | "channel_post" | "callback" | "member_changed" | "reaction" | "inline_query";
 
 /** The bot's webhook as set; the secret never comes back. */
 export interface BotWebhook {
@@ -116,6 +119,8 @@ export interface BotChanges {
 	readonly privacy?: boolean;
 	/** Replaces every command list (scopes left out lose theirs). */
 	readonly commands?: CommandSets;
+	/** Inline mode on with this hint, or off with "". */
+	readonly inlinePlaceholder?: string;
 }
 
 /** A bot's public profile and its command menu for one chat (GetBotInfo). */
@@ -130,6 +135,30 @@ export interface BotInfo {
 	readonly isOwner: boolean;
 	/** Owner only: the server saw no update fetch from the bot lately (by its own clock); false for anyone else. */
 	readonly notRunning: boolean;
+	/** Inline mode: the composer hint once @username and a space are typed; "" when off. */
+	readonly inlinePlaceholder: string;
+}
+
+export type InlineKind = "article" | "photo" | "video" | "document";
+
+/** One result of an inline query, as the composer lists it. */
+export interface InlineItem {
+	readonly id: string;
+	readonly kind: InlineKind;
+	readonly title: string;
+	readonly description: string;
+	/** The photo, video or file of a media result. */
+	readonly media?: MediaRef;
+	/** An article's preview image. */
+	readonly thumbnail?: MediaRef;
+}
+
+/** A bot's answer to an inline query; its media download through queryId. */
+export interface InlineAnswer {
+	readonly queryId: string;
+	readonly items: readonly InlineItem[];
+	/** Show the results as a grid of media. */
+	readonly gallery: boolean;
 }
 
 /** One bot's command menu in a group (GetChatBotCommands). */
@@ -164,6 +193,7 @@ export const BOT_LIMITS = {
 	name: 64,
 	description: 512,
 	about: 120,
+	inlinePlaceholder: 64,
 	commandDescription: 256,
 	commandsPerScope: 100,
 	usernameMin: 5,
@@ -182,6 +212,10 @@ export type BotErrorKind =
 	| "username_taken"
 	| "invalid"
 	| "not_found"
+	/** An inline query the bot did not answer within 10 seconds. */
+	| "bot_timeout"
+	/** The bot does not use inline mode. */
+	| "inline_off"
 	| "other";
 
 /** A failed bot call; `kind` decides what the screen says. */
@@ -228,6 +262,10 @@ export interface Bots {
 	 * an answer within 15 seconds (a stalled connection) answers timedOut.
 	 */
 	press(chatId: number, seq: number, callbackData: string): Promise<PressAnswer>;
+	/** BotError "bot_timeout" when the bot did not answer, "inline_off" without inline mode. */
+	inlineQuery(botId: number, chatId: number, query: string): Promise<InlineAnswer>;
+	/** Posts the result as the caller's message via the bot. */
+	sendInlineResult(chatId: number, topicId: number, queryId: string, resultId: string, randomId: number): Promise<void>;
 	/** Webhook, delivery state and 24-hour counters. */
 	delivery(botId: number): Promise<BotDelivery>;
 	/** BotError "invalid" with a webhookProblem() code when refused. */
@@ -260,26 +298,41 @@ export function createBots(transport: Transport, onUnauthenticated: () => void):
 			});
 		return client;
 	};
-	return {
-		mine: () => load().then((api) => api.mine()),
-		create: (username, name) => load().then((api) => api.create(username, name)),
-		update: (botId, changes) => load().then((api) => api.update(botId, changes)),
-		resetToken: (botId) => load().then((api) => api.resetToken(botId)),
-		remove: (botId) => load().then((api) => api.remove(botId)),
-		resolve: (username) => load().then((api) => api.resolve(username)),
-		usernameTaken: (username) => load().then((api) => api.usernameTaken(username)),
-		info: (botId, chatId) => load().then((api) => api.info(botId, chatId)),
-		chatMenus: (chatId) => load().then((api) => api.chatMenus(chatId)),
-		start: (botId, startParam, randomId) => load().then((api) => api.start(botId, startParam, randomId)),
-		press: (chatId, seq, callbackData) => load().then((api) => api.press(chatId, seq, callbackData)),
-		delivery: (botId) => load().then((api) => api.delivery(botId)),
-		setWebhook: (botId, changes) => load().then((api) => api.setWebhook(botId, changes)),
-		deleteWebhook: (botId, dropPending) => load().then((api) => api.deleteWebhook(botId, dropPending)),
-		deadLetters: (botId) => load().then((api) => api.deadLetters(botId)),
-		retryDeadLetters: (botId, ids) => load().then((api) => api.retryDeadLetters(botId, ids)),
-		discardDeadLetters: (botId, ids) => load().then((api) => api.discardDeadLetters(botId, ids)),
-	};
+	// Each method waits for the client and passes its arguments through
+	// unchanged, so the forwarder keeps the signature of the method it
+	// stands for (checked against Bots by BOTS_METHODS).
+	const forward =
+		(method: (typeof BOTS_METHODS)[number]) =>
+		(...args: unknown[]): Promise<unknown> =>
+			load().then((api): unknown => Reflect.apply(api[method], api, args));
+	return Object.fromEntries(BOTS_METHODS.map((method) => [method, forward(method)])) as unknown as Bots;
 }
+
+const BOTS_METHODS = [
+	"mine",
+	"create",
+	"update",
+	"resetToken",
+	"remove",
+	"resolve",
+	"usernameTaken",
+	"info",
+	"chatMenus",
+	"start",
+	"press",
+	"inlineQuery",
+	"sendInlineResult",
+	"delivery",
+	"setWebhook",
+	"deleteWebhook",
+	"deadLetters",
+	"retryDeadLetters",
+	"discardDeadLetters",
+] as const satisfies readonly (keyof Bots)[];
+
+// Fails to compile when a Bots method is missing from BOTS_METHODS.
+const everyBotsMethodForwarded: [Exclude<keyof Bots, (typeof BOTS_METHODS)[number]>] extends [never] ? true : never = true;
+void everyBotsMethodForwarded;
 
 /** Bot usernames: 5 to 32 of a-z, 0-9 and _ ending in "bot" (any case on the wire, lowercase here). */
 export function usernameProblem(username: string): "chars" | "suffix" | "length" | null {

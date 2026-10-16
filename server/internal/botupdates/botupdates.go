@@ -354,7 +354,7 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 			continue
 		}
 		ttl := MessageTTL
-		if u.Kind == chat.BotUpdateCallback {
+		if u.Kind == chat.BotUpdateCallback || u.Kind == chat.BotUpdateInlineQuery {
 			ttl = CallbackTTL
 		}
 		tag, err := tx.Exec(ctx, `
@@ -394,10 +394,14 @@ func (s *Service) store(ctx context.Context, tx pgx.Tx, updates []chat.BotUpdate
 
 // queueKey is the delivery queue of an update: updates of one queue reach a
 // webhook one at a time, in update_id order. Messages queue by chat,
-// button presses by the user who pressed (negative, apart from chat ids).
+// button presses and inline queries by the user (negative, apart from chat
+// ids).
 func queueKey(u chat.BotUpdate) int64 {
-	if u.Kind == chat.BotUpdateCallback && u.Callback != nil {
+	switch {
+	case u.Kind == chat.BotUpdateCallback && u.Callback != nil:
 		return -u.Callback.FromID
+	case u.Kind == chat.BotUpdateInlineQuery && u.Inline != nil:
+		return -u.Inline.FromID
 	}
 	return u.Chat.GetId()
 }
@@ -476,6 +480,9 @@ func payloadOf(u chat.BotUpdate) ([]byte, error) {
 			mc.From = &from
 		}
 		v = mc
+	case u.Kind == chat.BotUpdateInlineQuery && u.Inline != nil:
+		q := u.Inline
+		v = wire.InlineQuery{ID: q.ID, From: users.UserOf(q.FromID), Query: q.Query, Offset: q.Offset, ChatType: q.ChatType}
 	case u.Kind == chat.BotUpdateReaction && u.Reaction != nil:
 		v = wire.Reaction{Chat: c, Seq: u.Reaction.Seq, User: users.UserOf(u.Reaction.UserID), Emoji: u.Reaction.Emoji, Date: u.At.Unix()}
 	case u.Message == nil:
@@ -497,6 +504,7 @@ func (s *Service) cleanup(ctx context.Context) {
 	for _, sql := range []string{
 		`DELETE FROM bot_updates WHERE expires_at < now()`,
 		`DELETE FROM bot_callbacks WHERE created_at < now() - interval '1 day'`,
+		`DELETE FROM bot_inline_queries WHERE created_at < now() - interval '1 day'`,
 		fmt.Sprintf(`DELETE FROM bot_delivery_counters WHERE hour < now() - interval '%d seconds'`, int(countersKept.Seconds())),
 	} {
 		if _, err := s.pool.Exec(ctx, sql); err != nil && ctx.Err() == nil {
@@ -697,44 +705,56 @@ func (s *Service) Answer(ctx context.Context, botID int64, callbackID string, a 
 			return ErrCallbackNotFound
 		}
 	}
-	s.mu.Lock()
-	if ch := s.answers[callbackID]; ch != nil {
-		close(ch)
-		delete(s.answers, callbackID)
-	}
-	s.mu.Unlock()
+	s.Wake(callbackID)
 	return nil
 }
 
 // AwaitAnswer waits up to timeout for the answer to a press; answered is
 // false when the bot did not answer in time.
 func (s *Service) AwaitAnswer(ctx context.Context, callbackID string, timeout time.Duration) (a Answer, answered bool, err error) {
+	answered, err = s.Await(ctx, callbackID, timeout, func() (bool, error) {
+		err := s.pool.QueryRow(ctx, `
+			SELECT answer_text, answer_alert, answer_url FROM bot_callbacks WHERE id = $1 AND answered_at IS NOT NULL`,
+			callbackID).Scan(&a.Text, &a.ShowAlert, &a.URL)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, fmt.Errorf("botupdates: read answer: %w", err)
+		}
+		return true, nil
+	})
+	if err != nil || !answered {
+		return Answer{}, false, err
+	}
+	return a, true, nil
+}
+
+// Await waits up to timeout until answered reports true, checking again
+// when Wake(id) runs in this process or every recheck (an answer that
+// reached another process).
+func (s *Service) Await(ctx context.Context, id string, timeout time.Duration, answered func() (bool, error)) (bool, error) {
 	deadline := time.Now().Add(timeout)
 	defer func() {
 		s.mu.Lock()
-		delete(s.answers, callbackID)
+		delete(s.answers, id)
 		s.mu.Unlock()
 	}()
 	for {
 		s.mu.Lock()
-		ch := s.answers[callbackID]
+		ch := s.answers[id]
 		if ch == nil {
 			ch = make(chan struct{})
-			s.answers[callbackID] = ch
+			s.answers[id] = ch
 		}
 		s.mu.Unlock()
-		err := s.pool.QueryRow(ctx, `
-			SELECT answer_text, answer_alert, answer_url FROM bot_callbacks WHERE id = $1 AND answered_at IS NOT NULL`,
-			callbackID).Scan(&a.Text, &a.ShowAlert, &a.URL)
-		if err == nil {
-			return a, true, nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return Answer{}, false, fmt.Errorf("botupdates: read answer: %w", err)
+		ok, err := answered()
+		if err != nil || ok {
+			return ok, err
 		}
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
-			return Answer{}, false, nil
+			return false, nil
 		}
 		timer := time.NewTimer(min(remaining, recheck))
 		select {
@@ -742,8 +762,18 @@ func (s *Service) AwaitAnswer(ctx context.Context, callbackID string, timeout ti
 		case <-timer.C:
 		case <-ctx.Done():
 			timer.Stop()
-			return Answer{}, false, ctx.Err()
+			return false, ctx.Err()
 		}
 		timer.Stop()
+	}
+}
+
+// Wake ends the Await of id in this process.
+func (s *Service) Wake(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ch := s.answers[id]; ch != nil {
+		close(ch)
+		delete(s.answers, id)
 	}
 }

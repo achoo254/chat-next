@@ -325,7 +325,8 @@ describe("webhook messages", () => {
 		expect(within(bubble).getByRole("button", { name: "Sao chép đoạn code" })).toBeTruthy();
 		// Only allowed schemes become buttons; an external link asks first.
 		expect(within(bubble).queryByText("Bỏ qua")).toBeNull();
-		await userEvent.click(within(bubble).getByRole("link", { name: /Mở runbook/ }));
+		// The buttons load with the first message that has some.
+		await userEvent.click(await within(bubble).findByRole("link", { name: /Mở runbook/ }));
 		const confirm = await screen.findByRole("dialog", { name: "Mở link ngoài?" });
 		expect(within(confirm).getByText("runbook.example.com")).toBeTruthy();
 		await userEvent.click(within(confirm).getByRole("button", { name: "Huỷ" }));

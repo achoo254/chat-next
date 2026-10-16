@@ -37,7 +37,7 @@ const (
 // UpdateKinds are the update kinds a bot can receive, in the order the
 // Console lists them.
 var UpdateKinds = []string{chat.BotUpdateMessage, chat.BotUpdateMessageEdited, chat.BotUpdateChannelPost, chat.BotUpdateCallback,
-	chat.BotUpdateMemberChanged, chat.BotUpdateReaction}
+	chat.BotUpdateMemberChanged, chat.BotUpdateReaction, chat.BotUpdateInlineQuery}
 
 // optInKinds are only stored for a bot that lists them in allowed_updates;
 // an empty allowed_updates means every other kind.

@@ -93,8 +93,21 @@
 /* In flow, not floating: the chat above stays readable while picking a result. */
 .inline-results { margin: 0 var(--space-4) var(--space-2); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .inline-head b { color: var(--c-text); }
-.inline-grid { display: grid; grid-auto-flow: column; grid-auto-columns: 112px; gap: var(--space-2); padding: var(--space-3); overflow-x: auto; }
-.inline-grid button { display: grid; gap: var(--space-1); padding: var(--space-1); border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font-size: 0.75rem; color: var(--c-text-muted); text-align: left; }
+/* Wraps and scrolls vertically: never a horizontal strip. */
+.inline-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: var(--space-2); padding: var(--space-3); max-height: 232px; overflow-y: auto; }
+.inline-grid button { display: grid; padding: var(--space-1); border: 1px solid transparent; border-radius: var(--radius-sm); background: none; }
+.inline-list { list-style: none; margin: 0; padding: var(--space-1) 0; max-height: 232px; overflow-y: auto; }
+.inline-list button { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-2) var(--space-3); border: 0; background: none; text-align: left; color: var(--c-text); }
+.inline-list button:hover, .inline-list button:focus-visible { background: var(--c-hover); }
+.inline-text { display: grid; min-width: 0; }
+.inline-text span { color: var(--c-text-muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.thumb.sm { width: 40px; flex: none; }
+.thumb { position: relative; }
+.thumb-tag { position: absolute; right: 4px; bottom: 4px; padding: 0 4px; border-radius: var(--radius-xs); background: var(--c-surface); font-size: 0.6875rem; }
+.inline-hint { margin: 0; padding: var(--space-3); }
+.inline-hint small { display: block; margin-top: var(--space-1); font-size: 0.75rem; }
+.inline-states { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.inline-states .inline-results { margin: 0; }
 .inline-grid button:hover { border-color: var(--c-border); background: var(--c-hover); }
 .thumb { aspect-ratio: 1; border-radius: var(--radius-xs); background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-amber) 30%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-cyan) 22%, var(--c-surface-subtle))); }
 .inline-grid button:nth-child(2n) .thumb { background: linear-gradient(135deg, color-mix(in srgb, var(--c-viz-violet) 22%, var(--c-surface-subtle)), color-mix(in srgb, var(--c-viz-amber) 24%, var(--c-surface-subtle))); }
@@ -506,9 +519,43 @@
 <section class="shot" id="inline-mode">
 	<div class="shot-head">
 		<h2>Chế độ inline</h2><span class="phase">Phase 8</span>
-		<p>Trong chat với Quang Huy (bot không phải thành viên), gõ <code class="mono">@gif_bot mèo</code>: kết quả của bot hiện thành dải phía trên ô soạn tin. Bot chỉ nhận từ khoá bạn gõ, không thấy tin trong chat. Chọn một kết quả gửi tin dưới tên bạn, kèm nhãn "qua @gif_bot" để người nhận biết nguồn.</p>
+		<p>Trong bất kỳ chat nào gửi được tin, gõ <code class="mono">@ten_bot</code> rồi dấu cách: ô soạn tin hiện chữ gợi ý của bot (chủ bot đặt trong Developer Console), gõ tiếp từ khoá thì kết quả hiện thành bảng ngay trên ô soạn tin, không che chat. Bot chỉ nhận từ khoá, loại chat (riêng, nhóm, kênh) và người hỏi; không thấy tin trong chat. Kết quả dạng bài viết hiện thành danh sách (ảnh nhỏ nếu bot có, tiêu đề, mô tả); kết quả ảnh, video, tệp hiện thành lưới khi bot chọn kiểu lưới. Lưới xuống dòng và cuộn dọc, không cuộn ngang. Chọn một kết quả gửi tin dưới tên bạn, kèm nhãn "qua @ten_bot". Chỉ bot đã bật chế độ inline mới được hỏi; bot không trả lời trong 10 giây thì hiện "Bot chưa trả lời".</p>
 	</div>
-	<div class="frame">
+	<div class="frame"><div class="duo">
+		<section class="convo" aria-label="Team Mobile">
+			<header class="convo-head">
+				<span class="avatar av-violet">TM</span>
+				<div class="title"><strong>Team Mobile</strong><span>12 thành viên</span></div>
+			</header>
+			<div class="messages">
+				<div class="msg">
+					<span class="avatar sm av-cyan">QH</span>
+					<div class="bubble"><p>Tối nay đi xem phim không mọi người?<span class="stamp">19:02</span></p></div>
+				</div>
+				<div class="msg mine">
+					<div class="bubble">
+						<span class="via-bot">qua <b>@lich_chieu_bot</b></span>
+						<p><b>Dune: Phần Hai</b> · 20:15 · CGV Vincom Bà Triệu<br>Còn 18 ghế. <a href="#">Đặt vé</a><span class="stamp">19:03 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p>
+					</div>
+				</div>
+			</div>
+			<div class="composer-wrap">
+				<div class="inline-results" role="region" aria-label="Kết quả từ @lich_chieu_bot">
+					<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Kết quả từ <b>@lich_chieu_bot</b></span></div>
+					<ul class="inline-list">
+						<li><button type="button" data-toast="Đã gửi qua @lich_chieu_bot"><span class="thumb sm"></span><span class="inline-text"><b>Dune: Phần Hai</b><span>20:15 · CGV Vincom Bà Triệu · còn 18 ghế</span></span></button></li>
+						<li><button type="button" data-toast="Đã gửi qua @lich_chieu_bot"><span class="thumb sm"></span><span class="inline-text"><b>Lật Mặt 8</b><span>20:40 · Lotte Cinema Đống Đa · còn 6 ghế</span></span></button></li>
+						<li><button type="button" data-toast="Đã gửi qua @lich_chieu_bot"><span class="inline-text"><b>Xem tất cả suất chiếu tối nay</b><span>Gửi danh sách 12 suất kèm nút đặt vé</span></span></button></li>
+					</ul>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="im-draft">Tin nhắn</label>
+					<textarea id="im-draft" rows="1">@lich_chieu_bot phim tối nay</textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+		</section>
 		<section class="convo" aria-label="Quang Huy">
 			<header class="convo-head">
 				<span class="avatar av-cyan">QH</span>
@@ -519,35 +566,47 @@
 					<span class="avatar sm av-cyan">QH</span>
 					<div class="bubble"><p>Deploy xong chưa, mình chờ cả sáng rồi.<span class="stamp">09:48</span></p></div>
 				</div>
-				<div class="msg mine">
-					<div class="bubble">
-						<span class="via-bot">qua <b>@gif_bot</b></span>
-						<div class="gif photo"><span class="gif-tag">GIF</span></div>
-						<p>Đang lên production đây.<span class="stamp">09:49 <svg class="icon icon-sm read"><use href="#i-checks"/></svg></span></p>
-					</div>
-				</div>
 			</div>
 			<div class="composer-wrap">
-				<div class="inline-results" role="region" aria-label="Kết quả từ @gif_bot">
-					<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Kết quả từ <b>@gif_bot</b> cho “mèo”</span></div>
+				<div class="inline-results" role="region" aria-label="Kết quả từ @anh_meo_bot">
+					<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Kết quả từ <b>@anh_meo_bot</b></span></div>
 					<div class="inline-grid">
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo gõ phím</button>
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo ngủ gật</button>
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo chờ deploy</button>
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo hoảng hốt</button>
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo ăn mừng</button>
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo lăn tròn</button>
-						<button type="button" data-toast="Đã gửi GIF qua @gif_bot"><span class="thumb"></span>mèo vẫy tay</button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo gõ phím"><span class="thumb"></span></button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo ngủ gật"><span class="thumb"></span></button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo chờ deploy"><span class="thumb"></span></button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo hoảng hốt"><span class="thumb"></span></button>
+						<button type="button" data-toast="Đã gửi video qua @anh_meo_bot" aria-label="mèo ăn mừng, video"><span class="thumb"><span class="thumb-tag">0:07</span></span></button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo lăn tròn"><span class="thumb"></span></button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo vẫy tay"><span class="thumb"></span></button>
+						<button type="button" data-toast="Đã gửi ảnh qua @anh_meo_bot" aria-label="mèo đeo kính"><span class="thumb"></span></button>
 					</div>
 				</div>
 				<form class="composer" onsubmit="return false">
 					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
-					<label class="sr-only" for="im-draft">Tin nhắn</label>
-					<textarea id="im-draft" rows="1">@gif_bot mèo</textarea>
+					<label class="sr-only" for="im-draft2">Tin nhắn</label>
+					<textarea id="im-draft2" rows="1">@anh_meo_bot mèo</textarea>
 					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
 				</form>
 			</div>
 		</section>
+	</div></div>
+	<div class="inline-states">
+		<div class="inline-results" role="region" aria-label="Gợi ý của bot">
+			<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Mới gõ <b>@lich_chieu_bot</b> và dấu cách: gợi ý của bot</span></div>
+			<p class="inline-hint">Tên phim hoặc rạp…<small class="muted">@lich_chieu_bot nhận chữ bạn gõ sau tên bot.</small></p>
+		</div>
+		<div class="inline-results" role="region" aria-label="Đang hỏi bot">
+			<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Đang hỏi <b>@lich_chieu_bot</b>…</span></div>
+			<p class="inline-hint muted">Đang tải kết quả</p>
+		</div>
+		<div class="inline-results" role="region" aria-label="Không có kết quả">
+			<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span><b>@lich_chieu_bot</b></span></div>
+			<p class="inline-hint muted">Không có kết quả cho “phim ma”</p>
+		</div>
+		<div class="inline-results" role="region" aria-label="Bot chưa trả lời">
+			<div class="inline-head"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span><b>@lich_chieu_bot</b></span></div>
+			<p class="inline-hint muted">Bot chưa trả lời. Gõ tiếp để thử lại.</p>
+		</div>
 	</div>
 </section>
 

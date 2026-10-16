@@ -10,7 +10,7 @@
 // Never imported by production code.
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { BotAdminService, BotCommandScope, BotTier, type BotCommandSet } from "@app/proto-ts/bot_admin";
-import { BotsService } from "@app/proto-ts/bots";
+import { BotsService, InlineResultKind } from "@app/proto-ts/bots";
 import type { Chat as WireChat } from "@app/proto-ts/chats";
 import type { User as WireUser } from "@app/proto-ts/users";
 
@@ -103,6 +103,14 @@ export interface PressAnswerSeed {
 const num = (value: bigint): number => Number(value);
 const BOTS_MAX = 20;
 
+/** An article result of a fake bot's inline answer; text is the message it posts. */
+export interface FakeInlineResult {
+	readonly id: string;
+	readonly title: string;
+	readonly description: string;
+	readonly text: string;
+}
+
 export class FakeBots {
 	readonly bots = new Map<number, FakeBot>();
 	/** Requests in order ("CreateBot deploy_bot", "ResetBotToken 12", …). */
@@ -126,6 +134,12 @@ export class FakeBots {
 	failInfo = 0;
 	/** The bots in each group, as GetChatBotCommands lists them (none unless set). */
 	readonly chatBots = new Map<number, number[]>();
+	/** Inline mode: a bot's results for a query ("timeout": the bot does not answer). */
+	readonly inline = new Map<number, (query: string) => readonly FakeInlineResult[] | "timeout">();
+	/** Answers given, by query id (SendInlineResult posts from them). */
+	readonly inlineAnswers = new Map<string, (FakeInlineResult & { botId: number })[]>();
+	/** InlineQuery requests: bot and query. */
+	readonly inlineQueries: { botId: number; query: string }[] = [];
 	private serial = 0;
 
 	constructor(private readonly host: BotHost) {}
@@ -371,6 +385,20 @@ export class FakeBots {
 			},
 		});
 		router.service(BotsService, {
+			inlineQuery: (req) => {
+				const botId = num(req.botId);
+				this.inlineQueries.push({ botId, query: req.query });
+				const answer = this.inline.get(botId);
+				if (answer === undefined) throw new ConnectError("inline_off: the bot does not use inline mode", Code.FailedPrecondition);
+				const results = answer(req.query);
+				if (results === "timeout") throw new ConnectError("bot_timeout: the bot did not answer in time", Code.FailedPrecondition);
+				const queryId = `q${this.inlineAnswers.size + 1}`;
+				this.inlineAnswers.set(queryId, results.map((r) => ({ ...r, botId })));
+				return {
+					queryId,
+					results: results.map((r) => ({ id: r.id, kind: InlineResultKind.ARTICLE, title: r.title, description: r.description })),
+				};
+			},
 			getChatBotCommands: (req) => {
 				const chatId = num(req.chatId);
 				this.calls.push(`GetChatBotCommands ${chatId}`);

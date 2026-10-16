@@ -129,6 +129,16 @@ type Callback struct {
 	Data    string  `json:"data"`
 }
 
+// InlineQuery is a user's inline query: chat_type is sender (the private
+// chat with the bot), private, group or channel.
+type InlineQuery struct {
+	ID       string `json:"id"`
+	From     User   `json:"from"`
+	Query    string `json:"query"`
+	Offset   string `json:"offset"`
+	ChatType string `json:"chat_type"`
+}
+
 // ChatMember is a member of a group or channel; status is owner, admin,
 // member, left or banned.
 type ChatMember struct {

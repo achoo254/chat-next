@@ -212,3 +212,23 @@ curl -s -X DELETE -H "Authorization: Bearer $BOT_TOKEN" $API/bulk/12  # dừng s
 - Số người nhận trong 24 giờ có trần theo tầng: bot mới 1.000, mặc định 10.000, đã xác minh 1.000.000, bị hạn chế 0. Vượt trần trả `429 bulk_quota`; tối đa 5 lượt chưa xong cùng lúc (`429 bulk_busy`).
 - Lượt dừng sớm khi bot bị xoá (`reason: bot_deleted`) hoặc bị hạn chế (`bot_restricted`).
 - Gửi hàng loạt không tính vào giới hạn gửi từng tin ở mục 4.
+
+## 10. Chế độ inline
+
+Người dùng gõ `@username_bot từ khoá` ở đầu ô soạn tin trong bất kỳ chat nào; bot nhận update `inline_query` và trả về kết quả, người dùng chọn một kết quả để gửi dưới tên mình kèm nhãn "qua @username_bot". Bật chế độ này trong Developer Console (tab Hồ sơ → Chế độ inline, kèm chữ gợi ý hiện trong ô soạn tin). Bot chỉ nhận từ khoá, người hỏi và loại chat (`sender`, `private`, `group`, `channel`), không thấy tin trong chat.
+
+```sh
+# update: {"update_id": 9, "inline_query": {"id": "Qx…", "from": {...}, "query": "mèo", "offset": "", "chat_type": "group"}}
+curl -s ... -d '{
+  "cache_time": 60,
+  "results": [
+    {"type": "article", "id": "a1", "title": "Mèo gõ phím", "description": "Ảnh và bài", "text": "*Mèo* gõ phím",
+     "parse_mode": "markdown", "thumbnail_file_id": "FILE_ID_ANH",
+     "reply_markup": {"inline_keyboard": [[{"text": "Xem", "url": "https://hoandat.com"}]]}},
+    {"type": "photo", "id": "p1", "file_id": "FILE_ID_ANH", "caption": "Ảnh mèo"}
+  ]}' $API/inline/Qx…:answer
+```
+
+- Trả lời trong 1 phút; người dùng chờ tối đa 10 giây, quá thì app báo bot chưa trả lời.
+- Tối đa 50 kết quả. `article` gửi `text`; `photo`, `video`, `document` gửi file `file_id` của bot (file bot đã gửi hoặc thấy được) kèm `caption`. Mọi kết quả có thể kèm bàn phím inline chỉ gồm nút link (không có nút callback, vì tin là của người dùng, trong chat bot có thể không tham gia); `thumbnail_file_id` là ảnh nhỏ của bài viết.
+- `cache_time` (mặc định 300 giây, tối đa 3600): câu trả lời được dùng lại cho cùng từ khoá với mọi người, trừ khi `is_personal`. `gallery: true` hiện kết quả dạng lưới.

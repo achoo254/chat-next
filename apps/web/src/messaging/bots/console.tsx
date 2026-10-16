@@ -221,6 +221,7 @@ function CreateBot() {
 	const [usernameEdited, setUsernameEdited] = useState(false);
 	const [description, setDescription] = useState("");
 	const [privacy, setPrivacy] = useState(true);
+	const [inline, setInline] = useState({ on: false, placeholder: "" });
 	const [check, setCheck] = useState<UsernameCheck>("idle");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
@@ -256,7 +257,7 @@ function CreateBot() {
 
 	const usernameError = problem !== null ? t.create.usernameProblem[problem] : check === "taken" ? t.create.usernameProblem.taken : "";
 	const nameError = touched && name.trim() === "" ? t.create.nameRequired : "";
-	const canSubmit = !busy && name.trim() !== "" && username !== "" && usernameError === "";
+	const canSubmit = !busy && name.trim() !== "" && username !== "" && usernameError === "" && !(inline.on && inline.placeholder.trim() === "");
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -266,7 +267,10 @@ function CreateBot() {
 		setError("");
 		try {
 			let bot = await bots.create(username, name.trim());
-			if (description.trim() !== "" || !privacy) bot = await bots.update(bot.id, { description: description.trim(), privacy });
+			const inlinePlaceholder = inline.on ? inline.placeholder.trim() : "";
+			if (description.trim() !== "" || !privacy || inlinePlaceholder !== "") {
+				bot = await bots.update(bot.id, { description: description.trim(), privacy, inlinePlaceholder });
+			}
 			toasts.show(t.create.created);
 			navigate(paths.consoleBot(bot.id, "token"));
 		} catch (err) {
@@ -371,6 +375,7 @@ function CreateBot() {
 							</div>
 							<Switch checked={privacy} label={t.create.privacy} onChange={setPrivacy} />
 						</div>
+						<InlineSetting value={inline} onChange={setInline} />
 						{error !== "" && (
 							<div className="banner error" role="alert">
 								<Icon name="alert" small />
@@ -486,6 +491,48 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 
 // ---------------------------------------------------------------- profile
 
+
+interface InlineValue {
+	readonly on: boolean;
+	readonly placeholder: string;
+}
+
+/** The hint to save: "" turns inline mode off. */
+function inlineValue(value: InlineValue): string {
+	return value.on ? value.placeholder.trim() : "";
+}
+
+/** Inline mode: on with a composer hint (required), off without. */
+function InlineSetting({ value, onChange }: { value: InlineValue; onChange: (value: InlineValue) => void }) {
+	const t = useBotsCopy();
+	const id = useDomId("inline-ph");
+	const missing = value.on && value.placeholder.trim() === "";
+	return (
+		<>
+			<div className="setting">
+				<div>
+					<strong>{t.create.inline}</strong>
+					<small>{t.create.inlineHint}</small>
+				</div>
+				<Switch checked={value.on} label={t.create.inline} onChange={(on) => onChange({ ...value, on })} />
+			</div>
+			{value.on && (
+				<div className="field">
+					<label htmlFor={id}>{t.create.inlinePlaceholder}</label>
+					<input
+						id={id}
+						className="input"
+						value={value.placeholder}
+						maxLength={BOT_LIMITS.inlinePlaceholder}
+						aria-invalid={missing}
+						onChange={(event) => onChange({ ...value, placeholder: event.target.value })}
+					/>
+					<span className={missing ? "error-text" : "hint"}>{missing ? t.create.inlinePlaceholderRequired : t.create.inlinePlaceholderHint}</span>
+				</div>
+			)}
+		</>
+	);
+}
 function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { onSaved: (bot: OwnBot) => void }) {
 	const t = useBotsCopy();
 	const copy = useCopy();
@@ -495,6 +542,7 @@ function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { o
 	const [description, setDescription] = useState(bot.description);
 	const [about, setAbout] = useState(bot.about);
 	const [privacy, setPrivacy] = useState(bot.privacy);
+	const [inline, setInline] = useState({ on: bot.inlinePlaceholder !== "", placeholder: bot.inlinePlaceholder });
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState("");
 	const [dialog, setDialog] = useState<"confirm" | "reauth" | null>(confirmNow ? "confirm" : null);
@@ -511,13 +559,15 @@ function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { o
 		...(description.trim() !== bot.description ? { description: description.trim() } : {}),
 		...(about.trim() !== bot.about ? { about: about.trim() } : {}),
 		...(privacy !== bot.privacy ? { privacy } : {}),
+		...(inlineValue(inline) !== bot.inlinePlaceholder ? { inlinePlaceholder: inlineValue(inline) } : {}),
 	};
 	const dirty = Object.keys(changes).length > 0;
 	const nameError = name.trim() === "" ? t.create.nameRequired : "";
+	const inlineError = inline.on && inline.placeholder.trim() === "";
 
 	const save = async (event: FormEvent) => {
 		event.preventDefault();
-		if (!dirty || nameError !== "" || saving) return;
+		if (!dirty || nameError !== "" || inlineError || saving) return;
 		setSaving(true);
 		setError("");
 		try {
@@ -597,6 +647,7 @@ function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { o
 					</div>
 					<Switch checked={privacy} label={t.create.privacy} onChange={setPrivacy} />
 				</div>
+				<InlineSetting value={inline} onChange={setInline} />
 				{error !== "" && (
 					<div className="banner error" role="alert">
 						<Icon name="alert" small />
@@ -604,7 +655,7 @@ function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { o
 					</div>
 				)}
 				<div className="card-foot">
-					<button type="submit" className="btn btn-primary" disabled={!dirty || nameError !== "" || saving} aria-busy={saving}>
+					<button type="submit" className="btn btn-primary" disabled={!dirty || nameError !== "" || inlineError || saving} aria-busy={saving}>
 						{saving ? t.profile.saving : t.profile.save}
 					</button>
 				</div>

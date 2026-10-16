@@ -44,9 +44,11 @@ const (
 	RecentSignIn   = 10 * time.Minute
 	secretLen      = 40
 	descriptionMax = 512
-	aboutMax       = 120
-	commandsMax    = 100
-	commandDescMax = 256
+	// inlinePlaceholderMax bounds the composer hint of inline mode.
+	inlinePlaceholderMax = 64
+	aboutMax             = 120
+	commandsMax          = 100
+	commandDescMax       = 256
 )
 
 // limitCreate bounds bot creations per owner (on top of BotsPerOwnerMax
@@ -103,18 +105,20 @@ type CommandSet struct {
 
 // Bot is a bot as stored.
 type Bot struct {
-	ID            int64
-	Username      string
-	Name          string
-	OwnerID       int64
-	Description   string
-	About         string
-	Privacy       bool
-	Verified      bool
-	Internal      bool
-	Commands      []CommandSet
-	CreatedAt     time.Time
-	TokenIssuedAt *time.Time
+	ID          int64
+	Username    string
+	Name        string
+	OwnerID     int64
+	Description string
+	About       string
+	Privacy     bool
+	// InlinePlaceholder is the composer hint of inline mode; "" is off.
+	InlinePlaceholder string
+	Verified          bool
+	Internal          bool
+	Commands          []CommandSet
+	CreatedAt         time.Time
+	TokenIssuedAt     *time.Time
 	// LastUpdateAt is when the bot last asked for updates (RecordUpdateFetch);
 	// nil when it never did.
 	LastUpdateAt *time.Time
@@ -232,7 +236,7 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
 	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.is_system, b.restricted_at,
-	b.token_hash`
+	b.token_hash, b.inline_placeholder`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -240,7 +244,8 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	b := &Bot{}
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
-		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.RestrictedAt, &b.tokenHash)
+		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.RestrictedAt, &b.tokenHash,
+		&b.InlinePlaceholder)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +315,8 @@ func (b *Bot) Render() *appv1.Bot {
 	}
 	out.LastUpdateAt = b.lastUpdateUnix()
 	out.Webhook = b.Webhook
+	out.InlinePlaceholder = b.InlinePlaceholder
+	out.User.BotInlinePlaceholder = b.InlinePlaceholder
 	for _, set := range b.Commands {
 		out.Commands = append(out.Commands, renderSet(set))
 	}
@@ -445,6 +452,17 @@ func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateB
 		}
 		about = &v
 	}
+	var inline *string
+	if req.InlinePlaceholder != nil {
+		v, err := cleanText(req.GetInlinePlaceholder(), inlinePlaceholderMax, "inline_placeholder")
+		if err != nil {
+			return nil, err
+		}
+		if strings.Contains(v, "\n") {
+			return nil, errInvalid("inline_placeholder is one line")
+		}
+		inline = &v
+	}
 	var commands []byte
 	if req.GetCommands() != nil {
 		sets, err := commandSetsOf(req.GetCommands().GetSets())
@@ -467,8 +485,9 @@ func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateB
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE bots SET description = coalesce($2, description), about = coalesce($3, about),
-				privacy = coalesce($4, privacy), commands = coalesce($5::jsonb, commands), updated_at = now()
-			WHERE user_id = $1`, req.GetBotId(), description, about, req.Privacy, commands); err != nil {
+				privacy = coalesce($4, privacy), commands = coalesce($5::jsonb, commands),
+				inline_placeholder = coalesce($6, inline_placeholder), updated_at = now()
+			WHERE user_id = $1`, req.GetBotId(), description, about, req.Privacy, commands, inline); err != nil {
 			return fmt.Errorf("botadmin: update bot: %w", err)
 		}
 		var err error

@@ -110,11 +110,10 @@ func asConnect(err error) error {
 // operator's announcement); a syntax error is invalid_argument.
 func (s *Service) ParseMarkdown(text string) (string, []*appv1.MessageEntity, error) {
 	out, ents, err := s.parseText(text, nil, "markdown")
-	var ae *apiError
-	if errors.As(err, &ae) {
-		return "", nil, connect.NewError(connect.CodeInvalidArgument, errors.New(ae.description))
+	if err != nil {
+		return "", nil, connect.NewError(connect.CodeInvalidArgument, errors.New(errorDescription(err)))
 	}
-	return out, ents, err
+	return out, ents, nil
 }
 
 // InternalBulk is the bulk pace and daily cap of the internal tier (the

@@ -163,6 +163,7 @@ func New(cfg Config, chatSvc *chat.Service, admin *botadmin.Service, updates *bo
 	s.mux.Handle("/bot/v1/files/{file_id}", s.method(http.MethodGet, s.getFile))
 	s.mux.Handle("/bot/v1/updates", s.method(http.MethodGet, s.getUpdates))
 	s.mux.Handle("/bot/v1/callbacks/{action}", s.method(http.MethodPost, s.answerCallback))
+	s.mux.Handle("/bot/v1/inline/{action}", s.method(http.MethodPost, s.answerInline))
 	s.mux.Handle("/bot/v1/commands", s.method(http.MethodPut, s.setCommands))
 	s.mux.Handle("/bot/v1/chats/{chat_id}", s.methods(map[string]call{
 		http.MethodGet: s.getChat, http.MethodPatch: s.editChat, http.MethodPost: s.leaveChat,
