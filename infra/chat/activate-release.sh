@@ -24,7 +24,9 @@ MEDIA_CERT=/etc/letsencrypt/live/media-chat.hoandat.com/fullchain.pem
 # block, built from the release's conf, needs hoandat-auth's $tenant_cert
 # map.
 TENANTS_DIR="$ROOT/tenants"
-TENANTS_CONF=/etc/nginx/conf.d/chat-tenants.conf
+# Named to load after chat.hoandat.com.conf, which declares the log formats
+# and zones the tenant block uses.
+TENANTS_CONF=/etc/nginx/conf.d/chat.tenants.conf
 TENANT_CERT_MAP=/etc/nginx/conf.d/00-tenants-http.conf
 PREV="$(readlink "$ROOT/current" 2>/dev/null || true)"
 

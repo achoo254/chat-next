@@ -544,7 +544,7 @@ https://chat.hoandat.com, release `20261016-050911-16edf3a179ca` (commit `16edf3
 ### Việc tiếp theo (thứ tự Jev đã xếp, độ tin thấp nên có thể hỏi lại)
 1. ~~Cắt JS khởi động về ≤150 KB~~ xong 2026-10-16.
 2. R9: ~~chống lạm dụng đầy đủ (Phase 12)~~ xong 2026-10-16 (commit `356ee4c`, release `20261016-073022-356ee4cd1ba3`, migration 20, backup `chat-20261016-073048.dump`; chi tiết ở Phase 12). Tenant thứ hai `inetdev.io.vn` (chỉ để nghiệm thu mô hình tenant, các app khác không cần):
-     - Phía chat xong 2026-10-16: outbox và con trỏ theo tenant (`3bd5afc`), test cô lập tenant, process `chat-api-<id>` theo `/opt/chat/tenants/<id>.env`, conf nginx `chat-tenants.conf` dựng từ conf chính (`3ac6fee`). File `inetdev.env` đã có trên server (cổng 4601).
+     - Phía chat xong 2026-10-16: outbox và con trỏ theo tenant (`3bd5afc`), test cô lập tenant, process `chat-api-<id>` theo `/opt/chat/tenants/<id>.env`, conf nginx `chat.tenants.conf` dựng từ conf chính (`3ac6fee`). File `inetdev.env` đã có trên server (cổng 4601).
      - DNS `chat.inetdev.io.vn` user đã tạo (Proxied; zone đang SSL Flexible).
      - Chờ phiên `hoandat-auth`: hỗ trợ host Proxied và DNS only ở mọi chế độ SSL, kể cả Flexible (quyết định của user); chứng chỉ tenant có `chat.`; secret `chat-web` ghi vào `inetdev.env`. Xong thì deploy chat để bật và nghiệm thu.
    - Còn: load test lượt 1; ở Phase 12 còn redact log, xoay vòng khoá, STRIDE, đánh giá ND13.
