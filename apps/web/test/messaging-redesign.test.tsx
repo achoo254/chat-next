@@ -388,7 +388,7 @@ describe("moderation", () => {
 		expect(await screen.findByText("Chưa gửi thông báo nào", {}, LONG)).toBeTruthy();
 		const box = screen.getByRole("textbox", { name: /Nội dung/ });
 		await userEvent.type(box, "*Mới");
-		expect(await screen.findByText(/unclosed \*/, {}, LONG)).toBeTruthy();
+		expect(await screen.findByText(/^Sai cú pháp/, {}, LONG)).toBeTruthy();
 		await userEvent.type(box, ":* gửi album");
 		const preview = await screen.findByLabelText("Người dùng sẽ thấy", {}, LONG);
 		expect(within(preview).getByText("Mới:").tagName).toBe("B");

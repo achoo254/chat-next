@@ -28,7 +28,7 @@ function sendFailure(err: unknown, t: FullCopy["moderation"], fallback: string):
 	const error = ConnectError.from(err);
 	if (error.code === Code.FailedPrecondition && error.rawMessage.startsWith("no_recipients")) return t.announceNoRecipients;
 	if (error.code === Code.FailedPrecondition && error.rawMessage.startsWith("busy")) return t.announceBusy;
-	if (error.code === Code.InvalidArgument) return error.rawMessage;
+	if (error.code === Code.InvalidArgument) return t.announceSyntax;
 	return fallback;
 }
 
@@ -171,7 +171,7 @@ export default function Announcements() {
 					)}
 					<div className="an-foot">
 						<span className="muted">{t.announceAudience(number.format(audience))}</span>
-						<button type="submit" className="btn btn-primary" disabled={draft !== "" && current === null}>
+						<button type="submit" className="btn btn-primary" disabled={draft !== "" && (current === null || current.error !== "")}>
 							<Icon name="megaphone" small />
 							{t.announceSend}
 						</button>

@@ -516,6 +516,7 @@ export const viScreens = {
 		announceLabel: "Nội dung",
 		announceHint: "(*đậm*, _nghiêng_, [chữ](liên kết))",
 		announceRequired: "Nhập nội dung trước khi gửi.",
+		announceSyntax: "Sai cú pháp: kiểm lại các dấu *, _, ~, ` và [chữ](liên kết) đã đóng đủ chưa.",
 		announcePreview: "Người dùng sẽ thấy",
 		announceAudience: (n: string) => `Gửi tới ${n} người đã bắt đầu Trợ lý`,
 		announceSend: "Gửi thông báo",

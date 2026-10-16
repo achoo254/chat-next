@@ -514,6 +514,7 @@ export const enScreens: ScreensCopy = {
 		announceLabel: "Message",
 		announceHint: "(*bold*, _italic_, [text](link))",
 		announceRequired: "Write the message first.",
+		announceSyntax: "Formatting error: check that every *, _, ~, ` and [text](link) is closed.",
 		announcePreview: "People will see",
 		announceAudience: (n) => `Goes to ${n} people who started the Assistant`,
 		announceSend: "Send announcement",
