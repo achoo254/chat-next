@@ -384,6 +384,18 @@ func newCallbackID() (string, error) {
 
 // ----------------------------------------------------- outbox consumers
 
+// primaryTenant is the tenant whose outbox consumers kept the cursor names
+// from before several tenants shared the database.
+const primaryTenant = "primary"
+
+// CursorName is the outbox_cursors row of consumer base for this tenant.
+func (s *Service) CursorName(base string) string {
+	if s.cfg.TenantID == primaryTenant {
+		return base
+	}
+	return base + ":" + s.cfg.TenantID
+}
+
 // ReadOutbox returns outbox rows with id above afterID, in id order, at
 // most limit.
 func (s *Service) ReadOutbox(ctx context.Context, afterID int64, limit int) ([]OutboxRow, error) {

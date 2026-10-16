@@ -75,7 +75,7 @@ func (s *Service) pass(ctx context.Context) (int, error) {
 	var read int
 	var jobs []job
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		persisted, err := lockCursor(ctx, tx)
+		persisted, err := lockCursor(ctx, tx, s.chat.CursorName(cursorName))
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func (s *Service) pass(ctx context.Context) (int, error) {
 		}
 		if low != persisted {
 			if _, err := tx.Exec(ctx, `UPDATE outbox_cursors SET last_id = $2, updated_at = now() WHERE consumer = $1`,
-				cursorName, low); err != nil {
+				s.chat.CursorName(cursorName), low); err != nil {
 				return fmt.Errorf("push: save cursor: %w", err)
 			}
 		}
@@ -143,16 +143,16 @@ func (s *Service) pass(ctx context.Context) (int, error) {
 	return read, nil
 }
 
-// lockCursor returns the persisted cursor under its row lock, creating it
+// lockCursor returns the persisted cursor name under its row lock, creating it
 // at the outbox head when missing.
-func lockCursor(ctx context.Context, tx pgx.Tx) (int64, error) {
+func lockCursor(ctx context.Context, tx pgx.Tx, name string) (int64, error) {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO outbox_cursors (consumer, last_id) SELECT $1, coalesce(max(id), 0) FROM outbox
-		ON CONFLICT (consumer) DO NOTHING`, cursorName); err != nil {
+		ON CONFLICT (consumer) DO NOTHING`, name); err != nil {
 		return 0, fmt.Errorf("push: create cursor: %w", err)
 	}
 	var last int64
-	if err := tx.QueryRow(ctx, `SELECT last_id FROM outbox_cursors WHERE consumer = $1 FOR UPDATE`, cursorName).Scan(&last); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT last_id FROM outbox_cursors WHERE consumer = $1 FOR UPDATE`, name).Scan(&last); err != nil {
 		return 0, fmt.Errorf("push: lock cursor: %w", err)
 	}
 	return last, nil
