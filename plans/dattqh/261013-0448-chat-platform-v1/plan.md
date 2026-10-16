@@ -536,13 +536,13 @@ https://chat.hoandat.com, release `20261016-050911-16edf3a179ca` (commit `16edf3
 - Nhiều agent cùng sửa một cây code: commit theo đường dẫn, không `git add -A` khi còn agent đang làm.
 
 ### Nợ kỹ thuật cần xử lý sớm
-- Ngân sách JS khởi động tạm nâng 155 KB (`apps/web/test/perf/budgets.ts`), hiện 150,6 KB: phải cắt về ≤150 KB ở lượt kế (Jev "raise_then_trim").
+- ~~Ngân sách JS khởi động tạm nâng 155 KB~~ Đã xong 2026-10-16 (commit `a766e42`, release `20261016-061427-a766e425133f`): chuỗi giao diện tiếng Anh nạp khi cần, JS khởi động 149,8 KB, ngân sách về 150 KB. Chỉ còn dư 0,2 KB; lần vượt sau thì tách icon hoặc phần ít dùng của `message-item.tsx` (Jev: deploy ngay, tách tiếp khi vượt, 0,95).
 - Ba consumer outbox (push, bots, sweeper realtime) lặp logic cursor; gộp lại.
 - Nhóm thấy "Tài khoản đã xoá" chỉ khi người đó xuất hiện lại trong update (muốn ngay cần loại update mới).
 - `docs/privacy/nd13-assessment.md` (đánh giá chuyển dữ liệu ra nước ngoài) chưa viết.
 
 ### Việc tiếp theo (thứ tự Jev đã xếp, độ tin thấp nên có thể hỏi lại)
-1. Cắt JS khởi động về ≤150 KB (nợ ở trên).
+1. ~~Cắt JS khởi động về ≤150 KB~~ xong 2026-10-16.
 2. R9: chống lạm dụng đầy đủ (Phase 12), tenant thứ hai `inetdev.io.vn` (cần sửa repo `hoandat-auth`), load test lượt 1.
 3. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
 4. R6 Mini App web.
