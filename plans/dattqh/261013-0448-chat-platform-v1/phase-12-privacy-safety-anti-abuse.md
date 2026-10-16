@@ -89,7 +89,7 @@ Create:
 - [x] Chống spam tài khoản/bot/webhook (2026-10-16, migration 0020; gửi hàng loạt của bot mới giới hạn khi có tính năng bulk)
 - [x] Xoá/tự huỷ/xuất dữ liệu (R9, 2026-10-16, migration 0019)
 - [x] Redact PII + secret trong log (2026-10-16: `server/internal/logging/redact` gắn vào logger mọi role; test `api` quét log của mọi luồng nó chạy — đăng nhập, refresh, logout, back-channel, Bot API, webhook bot, hook — tìm secret và email; secret dạng chuỗi trần không nhận ra được theo hình dạng nên code phải ghi dưới khoá nhạy cảm hoặc không ghi)
-- [ ] Xoay vòng khoá + runbook
+- [x] Xoay vòng khoá + runbook (2026-10-16: `SESSION_KEY_PREVIOUS`, key id trong `sealbox`, role `reseal`, `infra/chat/rotate-session-key.sh`, [`docs/operations/key-rotation.md`](../../../docs/operations/key-rotation.md); prod đã reseal sang định dạng có key id. Khoá OTA, APNs/FCM, Mini App thêm vào runbook khi có)
 - [ ] Review STRIDE + security scan
 
 ### Hàng đợi kiểm duyệt R1 (2026-10-14, migration 0005)
