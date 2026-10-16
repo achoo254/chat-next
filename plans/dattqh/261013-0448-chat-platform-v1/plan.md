@@ -89,7 +89,7 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 lên prod: incoming webhook; phần bot ở R5) |
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Hoãn (user 2026-10-15: PWA + Web Push trước; Capacitor khi cần App Store/Play) |
 | 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Hoãn (cùng quyết định với Phase 10) |
-| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1 + xuất dữ liệu, xoá tài khoản ân hạn 30 ngày, tự xoá khi không dùng lên prod 2026-10-16; còn chống lạm dụng đầy đủ, đánh giá ND13) |
+| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1, xuất/xoá dữ liệu và chống lạm dụng đầy đủ lên prod 2026-10-16; còn redact log, xoay vòng khoá, STRIDE, đánh giá ND13) |
 | 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65; CI GitHub Actions đang bị chặn vì thanh toán, deploy bằng root) |
 | 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
 
@@ -543,7 +543,7 @@ https://chat.hoandat.com, release `20261016-050911-16edf3a179ca` (commit `16edf3
 
 ### Việc tiếp theo (thứ tự Jev đã xếp, độ tin thấp nên có thể hỏi lại)
 1. ~~Cắt JS khởi động về ≤150 KB~~ xong 2026-10-16.
-2. R9: chống lạm dụng đầy đủ (Phase 12), tenant thứ hai `inetdev.io.vn` (cần sửa repo `hoandat-auth`), load test lượt 1.
+2. R9: ~~chống lạm dụng đầy đủ (Phase 12)~~ xong 2026-10-16 (commit `356ee4c`, release `20261016-073022-356ee4cd1ba3`, migration 20, backup `chat-20261016-073048.dump`; chi tiết ở Phase 12). Còn: tenant thứ hai `inetdev.io.vn` (cần sửa repo `hoandat-auth` và DNS, chờ user đồng ý), load test lượt 1; ở Phase 12 còn redact log, xoay vòng khoá, STRIDE, đánh giá ND13.
 3. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
 4. R6 Mini App web.
 5. R7/R8 native khi user có tài khoản Apple Developer, Google Play, Firebase; Android có thể đóng gói PWA bằng Trusted Web Activity.

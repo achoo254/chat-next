@@ -120,6 +120,8 @@ Quyết định (Jev `jev-1.13.0`, xác suất trong ngoặc): làm lát A trư�
   - Ngưỡng nằm trong env `ABUSE_*`, 0 là tắt (0,84).
 - **B. Bot và webhook:** cấp/thu hồi xác minh; tầng Hạn chế, tự hạ khi ≥ 5% người nhận chặn trong 24 giờ (tối thiểu 20 người nhận) hoặc người nhận mới tăng 10 lần; kiểm duyệt giữ hoặc khôi phục; tầng bot mới (< 14 ngày); hành động Tắt webhook (tìm hook cùng chat theo tên nhãn, 0,42).
 - **C. Công cụ kiểm duyệt:** hàng đợi gộp theo đối tượng, xử lý thì đóng mọi báo cáo đang mở của đối tượng (0,72); tín hiệu người gửi trong chi tiết; Cảnh cáo và thông báo cho người bị xử lý qua bot trợ lý, kể cả khi họ chưa bấm Bắt đầu (0,80); màn Nhật ký kiểm duyệt + xuất CSV. Phạm vi chủ tenant làm cùng tenant thứ hai.
+- Sau review của agent (2026-10-16), có bằng chứng mới nên đổi so với quyết định ban đầu: tắt webhook theo `hook_id` lưu ở bảng `hook_posts` thay cho khớp tên, vì tên có thể trùng hoặc bị đổi; tin cũ chỉ khớp tên khi chat có đúng một hook mang tên đó. Luật chặn của bot cần ít nhất 5 người chặn, và chỉ tính người đã dùng bot. Luật đột biến chỉ áp cho bot trên 8 ngày tuổi. Báo cáo do chính tài khoản gửi không tính vào ngưỡng tạm dừng của tài khoản đó. IPv6 tính theo /64. CSV vô hiệu hoá công thức.
+- Lên prod 2026-10-16, release `20261016-073022-356ee4cd1ba3`.
 
 ## Success Criteria
 
