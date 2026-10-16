@@ -1,11 +1,29 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { en } from "./en.ts";
+import { createContext, use, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { vi, type Messages } from "./vi.ts";
 
 export type Locale = "vi" | "en";
 
-const MESSAGES: Record<Locale, Messages> = { vi, en };
 const STORAGE_KEY = "locale";
+
+// Vietnamese is the default and ships with the first screen; English is
+// fetched the first time it is needed. Once in, it is read synchronously, so
+// later renders never suspend.
+let english: Messages | null = null;
+let englishLoad: Promise<Messages> | null = null;
+
+function loadEnglish(): Promise<Messages> {
+	englishLoad ??= import("./en.ts").then((module) => {
+		english = module.en;
+		return module.en;
+	});
+	return englishLoad;
+}
+
+/** Messages for `locale`; suspends only while English is first fetched. */
+function useMessages(locale: Locale): Messages {
+	if (locale === "vi") return vi;
+	return english ?? use(loadEnglish());
+}
 
 function isLocale(value: unknown): value is Locale {
 	return value === "vi" || value === "en";
@@ -40,6 +58,7 @@ const I18nContext = createContext<I18n | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
 	const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
+	const t = useMessages(locale);
 
 	useEffect(() => {
 		document.documentElement.lang = locale;
@@ -48,13 +67,24 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 	const value = useMemo<I18n>(
 		() => ({
 			locale,
-			t: MESSAGES[locale],
+			t,
 			setLocale: (next) => {
-				storeLocale(next);
-				setLocaleState(next);
+				const apply = () => {
+					storeLocale(next);
+					setLocaleState(next);
+				};
+				if (next === "vi" || english !== null) {
+					apply();
+					return;
+				}
+				// Switch once the copy is in, so the screen never blanks while it
+				// loads; when it cannot load (offline), the language stays as it was.
+				loadEnglish().then(apply, () => {
+					englishLoad = null;
+				});
 			},
 		}),
-		[locale],
+		[locale, t],
 	);
 	return <I18nContext value={value}>{children}</I18nContext>;
 }

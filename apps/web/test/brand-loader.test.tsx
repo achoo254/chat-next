@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import { Suspense } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import logoSvg from "virtual:brand-logo";
 import brandConfig from "../../../brand.config.json";
@@ -66,19 +67,26 @@ describe("loaders", () => {
 		expect(screen.getByText("Đang tải…")).toBeTruthy();
 	});
 
-	it("leaves the index.html splash running and puts its text in the UI language", () => {
+	it("leaves the index.html splash running and puts its text in the UI language", async () => {
 		const splash = document.createElement("div");
 		splash.id = "splash";
 		splash.innerHTML = '<p class="brand-loader-text">Đang tải…</p>';
 		document.body.append(splash);
 		window.localStorage.setItem("locale", "en");
-		const { container } = render(
-			<I18nProvider>
-				<PageLoader />
-			</I18nProvider>,
-		);
-		expect(container.childElementCount).toBe(0);
+		// English copy loads on first use; the splash keeps its text until then.
+		// An awaited act lets React retry the provider once the copy is in.
+		let container = document.body;
+		await act(async () => {
+			container = render(
+				<Suspense fallback={null}>
+					<I18nProvider>
+						<PageLoader />
+					</I18nProvider>
+				</Suspense>,
+			).container;
+		});
 		expect(splash.textContent).toBe("Loading…");
+		expect(container.childElementCount).toBe(0);
 	});
 });
 

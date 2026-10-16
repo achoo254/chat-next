@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { UsersService } from "@app/proto-ts/users";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import brandConfig from "../../../brand.config.json";
@@ -27,13 +27,14 @@ describe("boot", () => {
 
 		await userEvent.click(screen.getByRole("button", { name: "English" }));
 
-		expect(screen.getByRole("link", { name: "Sign in with your hoandat account" }).getAttribute("href")).toBe(
+		// English copy loads on first use, so the switch lands a moment later.
+		expect((await screen.findByRole("link", { name: "Sign in with your hoandat account" })).getAttribute("href")).toBe(
 			"/auth/login?locale=en",
 		);
 		expect(screen.getByRole("link", { name: "Create account" }).getAttribute("href")).toBe(
 			"/auth/login?prompt=create&locale=en",
 		);
-		expect(document.documentElement.lang).toBe("en");
+		await waitFor(() => expect(document.documentElement.lang).toBe("en"));
 		expect(window.localStorage.getItem("locale")).toBe("en");
 	});
 

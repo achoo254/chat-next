@@ -33,10 +33,14 @@ type Boot =
 
 export function App({ rpcFetch = sameOriginFetch, messagingConnector }: AppProps) {
 	return (
-		<I18nProvider>
-			<Root rpcFetch={rpcFetch} messagingConnector={messagingConnector} />
-			<UpdateBar />
-		</I18nProvider>
+		// The provider suspends only when the remembered language is English and
+		// its copy is still loading; the page's own splash stays up meanwhile.
+		<Suspense fallback={null}>
+			<I18nProvider>
+				<Root rpcFetch={rpcFetch} messagingConnector={messagingConnector} />
+				<UpdateBar />
+			</I18nProvider>
+		</Suspense>
 	);
 }
 
