@@ -521,7 +521,7 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 ## Bàn giao (2026-10-16 16:15) — đọc mục này trước khi làm tiếp
 
 ### Đang chạy trên prod
-- https://chat.hoandat.com (tenant chính), release `20261016-094918-f017677426a4` (commit `f017677`, deploy bằng root), migration 20. Backup gần nhất trước migration: `chat-20261016-073048.dump`.
+- https://chat.hoandat.com (tenant chính), release `20261016-101548-7f6f8c940c22` (commit `7f6f8c9`, deploy bằng root), migration 20. Backup gần nhất trước migration: `chat-20261016-073048.dump`.
 - https://chat.inetdev.io.vn (tenant nghiệm thu `inetdev`), process `chat-api-inetdev` cổng 4601, cùng release và cùng database.
 - R0–R4 như mục bàn giao cũ; R3b Cloud của tôi.
 - R5 bot: Bot API `chat.<d>/bot/v1/`, long poll + webhook, Developer Console, bot trợ lý `tro_ly_bot`. Tầng bot mới: `new` (dưới 14 ngày) và `restricted`.
@@ -573,7 +573,7 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 2. **Phase 12 còn lại (làm tiếp từ đây).** Hiện trạng đo 2026-10-16:
    - ~~**Lọc PII và secret khỏi log**~~ xong 2026-10-16 (`server/internal/logging/redact`, test quét log ở harness `api`).
    - ~~**Xoay vòng khoá + runbook**~~ xong 2026-10-16 (commit `f017677`, release `20261016-094918-f017677426a4`): `SESSION_KEY_PREVIOUS`, role `reseal`, `infra/chat/rotate-session-key.sh`, `docs/operations/key-rotation.md`. Prod đã chạy `reseal` (backup `chat-20261016-094948.dump`): tenant chính 5 phiên, `inetdev` 1 phiên, 0 không đọc được.
-   - **Review STRIDE + security scan:** chưa làm; dùng skill `ak-security` trên toàn repo. Review lần này (agent sonnet) đã sửa các lỗi của phần chống lạm dụng.
+   - ~~**Review STRIDE + security scan**~~ xong 2026-10-16: [báo cáo](../reports/security-261016-1715-phase12-stride-review.md), sửa đã lên prod (commit `b0b9acd`, `7f6f8c9`). Phần IdP: phiên `hoandat-auth` sẽ bỏ `set_real_ip_from 127.0.0.1` ở cấp http (chat đã tự khai ở cấp server).
    - **Đánh giá Nghị định 13:** `docs/privacy/nd13-assessment.md` chưa viết. `docs/privacy/data-inventory.md` đã có. Push đi qua FCM, APNs, Mozilla, WNS.
 3. R9: load test lượt 1 trên `.65` (Phase 14). Máy dùng chung, đo RAM trống trước khi chạy.
 4. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
