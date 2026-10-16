@@ -151,7 +151,7 @@ Trạng thái ngày 2026-10-14:
 - [ ] Failover Postgres không làm mất tin đã ack, từ khi lên cụm riêng; trên `.65` khôi phục PITR mất tối đa khoảng WAL chưa archive (Phase 2, 13, 14).
 - [ ] Đổi tên sản phẩm chỉ bằng `brand.config.json` + build lại (Phase 1, 10, 11).
 - [ ] Đăng nhập web, mobile và desktop qua `hoandat-auth`; đăng xuất hoặc thu hồi ở `/account` của IdP thì phiên chat bị thu hồi (web ≤ 1 s); IdP sập không làm gián đoạn phiên đang có (Phase 2, 3, 14).
-- [ ] Tenant `inetdev.io.vn` chạy ở `chat.inetdev.io.vn`, không thấy dữ liệu của `hoandat.com` qua bất kỳ API nào (Phase 12, 13).
+- [x] Tenant `inetdev.io.vn` chạy ở `chat.inetdev.io.vn`, không thấy dữ liệu của `hoandat.com` qua bất kỳ API nào (Phase 12, 13). Nghiệm thu 2026-10-16: user đăng nhập thật, Cloud của tôi và bot Trợ lý chạy; ma trận test cô lập tenant đạt; trên prod không có thành viên, tin, consent bot hay phiên nào lệch tenant.
 
 ## Non-goals (v1)
 
@@ -544,7 +544,8 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 - DNS `chat.inetdev.io.vn` do user tạo (Proxied, zone SSL Flexible).
 - Phía IdP do phiên `hoandat-auth` làm (commit `ecea962`): hỗ trợ host Proxied và DNS only ở mọi chế độ SSL, kể cả Flexible (quyết định của user); chứng chỉ tenant có `chat.`; secret `chat-web` đã ghi.
 - User đã đăng nhập thật (`quocdat254`, user 8, tenant `inetdev`). Database đúng: 2 chat riêng (Cloud của tôi, bot Trợ lý), không thành viên hay phiên nào lệch tenant.
-- **Đang chặn:** danh sách chat trống, vì WebSocket bị cắt ở đoạn chuyển tiếp Flexible cổng 80 (`tenants-acme.conf`, file của `hoandat-auth`). Khung từ 8 byte trở lên làm đứt kết nối, khung 7 byte thì qua; nghi `proxy_request_buffering off`. Đã gửi bằng chứng cho phiên `hoandat-auth`. Phía chat đã thêm log khi socket đóng trước khung chào (`0d4f775`). Sửa xong thì nghiệm thu lại: danh sách hiện đủ, không thấy dữ liệu của `hoandat.com`.
+- **Nghiệm thu đạt 2026-10-16 16:00.** Danh sách hiện Cloud của tôi và bot Trợ lý (chào sau `/start`); dữ liệu prod không lệch tenant.
+- Lỗi gặp trên đường: Cloudflare ở SSL Flexible cắt WebSocket khi khung từ 8 byte trở lên (phiên `hoandat-auth` bắt gói tin xác nhận), nên app không đồng bộ. Sửa bằng Configuration Rule đặt Full (strict) riêng cho `chat.inetdev.io.vn` (quyết định của user), zone vẫn Flexible; ghi ở `docs/deployment-guide.md`. Phía chat thêm log khi socket đóng trước khung chào (`0d4f775`).
 
 ### Cách làm việc (bộ nhớ dự án có đủ)
 - AI tự review từng màn trên Chrome của user, đề xuất gửi Jev quyết rồi làm luôn; mock trước, code sau; không cuộn ngang; báo user ngay khi deploy xong.
@@ -562,7 +563,7 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 - `docs/privacy/nd13-assessment.md` chưa viết.
 
 ### Việc tiếp theo
-1. Nghiệm thu tenant `inetdev` khi IdP sửa xong đoạn chuyển tiếp Flexible.
+1. ~~Nghiệm thu tenant `inetdev`~~ đạt 2026-10-16.
 2. Phase 12 còn lại: lọc PII và secret khỏi log, xoay vòng khoá + runbook, review STRIDE + security scan, hồ sơ đánh giá Nghị định 13.
 3. R9: load test lượt 1 trên `.65`.
 4. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).

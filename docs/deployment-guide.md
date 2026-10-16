@@ -123,6 +123,8 @@ Mỗi tenant khác tenant chính chạy một process `chat-api-<id>` riêng tr�
 3. Ghi secret `chat-web` của tenant (suy ra ở IdP từ `APP_CLIENT_SECRET_KEY`) vào `OIDC_CLIENT_SECRET` của file đó, không in ra màn hình.
 4. Deploy release như thường lệ. `activate-release.sh` dựng `/etc/nginx/conf.d/chat.tenants.conf` bằng [`render-tenants-nginx.sh`](../infra/chat/render-tenants-nginx.sh) (block regex `chat.<tenant>` dựng từ conf chính), khởi động hoặc reload `chat-api-<id>`, rồi kiểm `/healthz` ở cổng của tenant. Tenant chưa có `OIDC_CLIENT_SECRET` thì chưa được khởi động; tenant lỗi chỉ in cảnh báo (`WARNING:` trong log deploy) và không rollback release của tenant chính. Thiếu `00-tenants-http.conf` thì tenant không được phục vụ và cũng chỉ có cảnh báo.
 
+Host `chat.<domain>` để Proxied qua Cloudflare thì phải dùng SSL Full hoặc Full (strict) cho host đó. Ở chế độ Flexible, Cloudflare cắt WebSocket ngay khi client gửi khung từ 8 byte trở lên (đo ngày 2026-10-16), nên app không đồng bộ được. Zone vẫn để Flexible được: chỉ cần một Configuration Rule của Cloudflare đặt Full (strict) riêng cho `chat.<domain>` (tenant `inetdev` đang dùng cách này).
+
 Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` trong file của tenant (user id của chính tenant đó). Log nằm ở `/var/log/chat/api-<id>.*.log`.
 
 ## Kiểm tra sau deploy
