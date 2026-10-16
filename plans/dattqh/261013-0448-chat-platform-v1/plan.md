@@ -436,7 +436,7 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Muốn tìm theo chuỗi con thì phải cài `postgresql-16` contrib trên `.65`. Đó là thay đổi máy dùng chung, cần user quyết.
 - Tiếp theo theo lộ trình: R5 (bot, Developer Console, SDK).
 
-## Bàn giao (2026-10-15 13:50) — đã cũ, xem mục "Bàn giao (2026-10-16 15:45)" ở cuối
+## Bàn giao (2026-10-15 13:50) — đã cũ, xem mục "Bàn giao (2026-10-16 16:15)" ở cuối
 
 ### Đang chạy trên prod (https://chat.hoandat.com, release `20261015-064105-400abbd84883`, commit `400abbd`)
 - **R0:** đăng nhập qua `hoandat-auth`. Tên và email lấy từ userinfo, user tự đổi tên thì không bị ghi đè.
@@ -518,7 +518,7 @@ Quyết định 2026-10-15 23:20: user chọn PWA + Web Push trước, app nativ
 
 Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trên macOS (dịch vụ push của Microsoft) và PWA trên iPhone (web.push.apple.com) đều hiện thông báo. Apple từ chối header `Topic` của RFC 8030 (`BadWebPushTopic`), nên server bỏ header này khi gửi tới Apple (commit `d3ce914`).
 
-## Bàn giao (2026-10-16 15:45) — đọc mục này trước khi làm tiếp
+## Bàn giao (2026-10-16 16:15) — đọc mục này trước khi làm tiếp
 
 ### Đang chạy trên prod
 - https://chat.hoandat.com (tenant chính), release `20261016-082156-0d4f7750ce61` (commit `0d4f775`, deploy bằng root), migration 20. Backup gần nhất trước migration: `chat-20261016-073048.dump`.
@@ -562,10 +562,20 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 - Giới hạn chat với người chưa quen có thể vượt vài đơn vị khi nhiều request chạy song song (review chấp nhận).
 - `docs/privacy/nd13-assessment.md` chưa viết.
 
+### Bắt đầu phiên mới
+1. Đọc mục bàn giao này và file Phase 12 (`phase-12-privacy-safety-anti-abuse.md`, mục "Chống lạm dụng đầy đủ R9").
+2. Việc chạm prod (deploy, log, psql) đi qua skill `chat-ops-prod`. Cổng Jev chạy trước mọi bước: key Jev ở `$ACCESS_TOKENS_JSON` (`.tokens[]`, `service == "api.typesafe.ai"`, trường `.token`), gửi qua header từ file descriptor. Sau đó gọi skill AgentKit Jev chọn.
+3. Gate trên máy dev như ở "Cách làm việc" (CI vẫn bị chặn vì thanh toán), rồi deploy bằng `infra/chat/deploy.sh`. Sau deploy chạy `bash infra/chat/smoke.sh` cho cả `https://chat.hoandat.com` và `https://chat.inetdev.io.vn`. Máy dev có thể chưa phân giải được host tenant, khi đó chạy smoke trên server: `prod-ssh.sh 'bash -s https://chat.inetdev.io.vn' < infra/chat/smoke.sh`.
+4. Phần IdP (`hoandat-auth`) thuộc phiên của repo đó: chỉ gửi bàn giao qua tin nhắn giữa phiên (`ListAgents`, `SendMessage`), không sửa file của IdP.
+
 ### Việc tiếp theo
 1. ~~Nghiệm thu tenant `inetdev`~~ đạt 2026-10-16.
-2. Phase 12 còn lại: lọc PII và secret khỏi log, xoay vòng khoá + runbook, review STRIDE + security scan, hồ sơ đánh giá Nghị định 13.
-3. R9: load test lượt 1 trên `.65`.
+2. **Phase 12 còn lại (làm tiếp từ đây).** Hiện trạng đo 2026-10-16:
+   - **Lọc PII và secret khỏi log:** chưa có. `server/cmd/server/main.go` dùng `slog.NewJSONHandler(stderr, nil)` không `ReplaceAttr`. Cần một handler lọc theo tên khoá (token, secret, cookie, code, email, authorization…), cộng test quét log của các luồng đăng nhập, webhook và Bot API. Nginx đã che query của `/auth/callback` và secret trong `/hook/`.
+   - **Xoay vòng khoá + runbook:** `SESSION_KEY` là một khoá duy nhất cho mọi `sealbox`: refresh token và ID token của IdP (`auth/sessions.go`), cookie đăng nhập (`auth/routes.go`), secret webhook bot (`botupdates/webhook.go`). Chưa có id khoá hay khoá cũ để giải mã. VAPID không bao giờ thay (đã ghi). Chưa có `docs/operations/`.
+   - **Review STRIDE + security scan:** chưa làm; dùng skill `ak-security` trên toàn repo. Review lần này (agent sonnet) đã sửa các lỗi của phần chống lạm dụng.
+   - **Đánh giá Nghị định 13:** `docs/privacy/nd13-assessment.md` chưa viết. `docs/privacy/data-inventory.md` đã có. Push đi qua FCM, APNs, Mozilla, WNS.
+3. R9: load test lượt 1 trên `.65` (Phase 14). Máy dùng chung, đo RAM trống trước khi chạy.
 4. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
 5. R6 Mini App web.
 6. R7/R8 native khi user có tài khoản Apple Developer, Google Play, Firebase; Android có thể đóng gói PWA bằng Trusted Web Activity.
