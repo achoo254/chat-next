@@ -1,6 +1,7 @@
 #!/bin/bash
 # Smoke test of production from outside (run after every deploy):
 #   bash infra/chat/smoke.sh [https://chat.hoandat.com]
+#   bash infra/chat/smoke.sh https://chat.inetdev.io.vn     another tenant
 # Checks the web app, the API health, that sign-in redirects to the IdP with
 # the chat-web client, and that the realtime route refuses a socket without a
 # session, and that the webhook route answers an unknown hook with
@@ -10,6 +11,8 @@
 set -euo pipefail
 BASE="${1:-https://chat.hoandat.com}"
 fail() { echo "smoke: FAIL $*" >&2; exit 1; }
+# The tenant's domain: its IdP is auth.<domain>, its media host media-chat.<domain>.
+DOMAIN="${BASE#https://chat.}"
 
 code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"
 [ "$code" = 200 ] || fail "GET / -> $code"
@@ -20,7 +23,7 @@ login_ok=""
 for _ in $(seq 1 15); do
 	loc="$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/auth/login")"
 	case "$loc" in
-	https://auth.hoandat.com/*client_id=chat-web*) login_ok=1; break ;;
+	"https://auth.$DOMAIN/"*client_id=chat-web*) login_ok=1; break ;;
 	esac
 	sleep 2
 done
@@ -35,7 +38,7 @@ bot="$(curl -s -w ' %{http_code}' "$BASE/bot/v1/me")"
 case "$bot" in *'"unauthorized"'*' 401') ;; *) fail "/bot/v1/me without a token -> $bot (want 401 unauthorized)" ;; esac
 # Media host (when media is configured): storage reachable, unknown tokens
 # 404, no cookie and strict headers.
-MEDIA="${MEDIA_BASE:-https://media-chat.hoandat.com}"
+MEDIA="${MEDIA_BASE:-https://media-chat.$DOMAIN}"
 media="$(curl -s --max-time 10 "$MEDIA/healthz" || true)"
 case "$media" in
 *'"storage":"reachable"'*)
