@@ -31,7 +31,9 @@ func (s *Service) MemberChats(ctx context.Context, userID int64, chatIDs []int64
 	rows, err := s.pool.Query(ctx, `
 		SELECT x.id, x.large, x.type, x.default_permissions, x.role, x.permissions, x.peer,
 			EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = x.peer AND b.blocked_id = $1),
-			EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = x.peer)
+			EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = x.peer),
+			EXISTS (SELECT 1 FROM users u WHERE u.id = x.peer AND x.peer <> $1
+				AND (u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL))
 		FROM (
 			SELECT c.id, c.sync_mode = 'large' AS large, c.type, c.default_permissions, m.role, m.permissions,
 				CASE WHEN p.user_low = $1 THEN p.user_high WHEN p.user_high = $1 THEN p.user_low ELSE 0 END AS peer
@@ -46,8 +48,8 @@ func (s *Service) MemberChats(ctx context.Context, userID int64, chatIDs []int64
 		c, m := &chatRow{}, &memberRow{UserID: userID}
 		var defaults int32
 		var perms *int32
-		var peerBlockedMe, iBlocked bool
-		if err := r.Scan(&a.ChatID, &a.Large, &c.Type, &defaults, &m.Role, &perms, &a.PeerID, &peerBlockedMe, &iBlocked); err != nil {
+		var peerBlockedMe, iBlocked, peerDeleted bool
+		if err := r.Scan(&a.ChatID, &a.Large, &c.Type, &defaults, &m.Role, &perms, &a.PeerID, &peerBlockedMe, &iBlocked, &peerDeleted); err != nil {
 			return a, err
 		}
 		c.DefaultPerms = uint32(defaults)
@@ -55,7 +57,7 @@ func (s *Service) MemberChats(ctx context.Context, userID int64, chatIDs []int64
 			p := uint32(*perms)
 			m.Perms = &p
 		}
-		a.CanSend = c.can(m, permSend) && !peerBlockedMe
+		a.CanSend = c.can(m, permSend) && !peerBlockedMe && !peerDeleted
 		a.Blocked = peerBlockedMe || iBlocked
 		return a, nil
 	})

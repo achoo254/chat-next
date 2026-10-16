@@ -33,6 +33,7 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 | `/opt/chat/infra` | root:root 755 | Bản sao `infra/chat/` (script, conf nginx) |
 | `/opt/chat/backups` | root:chat 750 | Dump DB (`backup-chat-db.sh`, giữ 14 bản) |
 | `/opt/chat/media` | chat:chat 750 | File media (driver filesystem); không cho nginx đọc trực tiếp |
+| `/opt/chat/media/exports` | chat:chat 750 | Bản xuất dữ liệu cá nhân (ZIP, giữ 30 ngày); app tự tạo khi chạy bản có migration 0019, không do script hay tay tạo |
 | `/opt/chat/incoming` | chat-deploy 750 | Nơi CI upload release |
 | `/opt/chat/staging` | root 700 | Bản upload được đổi chủ sang root rồi mới kiểm |
 | `/var/log/chat` | root:root 755 | Log pm2 của `chat-api` và log backup (thuộc root để app không thay log bằng symlink) |

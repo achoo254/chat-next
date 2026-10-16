@@ -59,7 +59,8 @@ interface SettingsProps {
 export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) {
 	const { t } = useI18n();
 	const groups = tabGroups(messaging);
-	const available = groups.some((group) => group.some((item) => item.tab === tab));
+	// "Tài khoản" (export and deletion) follows the Developer Console link (mockups/settings.html#export-delete).
+	const available = groups.some((group) => group.some((item) => item.tab === tab)) || (messaging !== undefined && tab === "account");
 	useEffect(() => {
 		if (!available) navigate(paths.settings("profile"), { replace: true });
 	}, [available]);
@@ -83,10 +84,16 @@ export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) 
 					</Fragment>
 				))}
 				{messaging !== undefined && (
-					<Link to={paths.console()}>
-						<Icon name="robot" />
-						<span>{t.settings.console}</span>
-					</Link>
+					<>
+						<Link to={paths.console()}>
+							<Icon name="robot" />
+							<span>{t.settings.console}</span>
+						</Link>
+						<Link to={paths.settings("account")} current={tab === "account"}>
+							<Icon name="key" />
+							<span>{t.settings.account}</span>
+						</Link>
+					</>
 				)}
 				{messaging?.moderation === true && (
 					<Link to={paths.moderation()}>

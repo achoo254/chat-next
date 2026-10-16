@@ -9,7 +9,7 @@ import { EntityType } from "@app/proto-ts/messages";
 import { FeedbackStatus, ModerationAction } from "@app/proto-ts/moderation";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { entity, seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 import { newChatDialog } from "./support/new-chat-dialog.ts";
@@ -112,9 +112,16 @@ describe("messages", () => {
 		const text = "@ductrung nhờ bạn duyệt bản phát hành.";
 		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, text, { entities: [entity(EntityType.MENTION, text, "@ductrung")] });
 		demo.fixture.mentions(demo.ids.ops, 1);
-		const { log } = await openChat(`/c/${demo.ids.ops}`, /nhờ bạn duyệt bản phát hành/, demo);
-		await userEvent.click(await screen.findByRole("button", { name: "Tới tin nhắc bạn, 1 tin" }, LONG));
-		await waitFor(() => expect(log.querySelector(".msg.flash")?.textContent).toContain("nhờ bạn duyệt bản phát hành"), LONG);
+		// Opened in a background tab, nothing is read yet (an open chat at its
+		// newest message reads the mention, and the "@" goes away).
+		const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+		try {
+			const { log } = await openChat(`/c/${demo.ids.ops}`, /nhờ bạn duyệt bản phát hành/, demo);
+			await userEvent.click(await screen.findByRole("button", { name: "Tới tin nhắc bạn, 1 tin" }, LONG));
+			await waitFor(() => expect(log.querySelector(".msg.flash")?.textContent).toContain("nhờ bạn duyệt bản phát hành"), LONG);
+		} finally {
+			visibility.mockRestore();
+		}
 	});
 
 	it("pins quietly when 'Thông báo cho mọi thành viên' is off", async () => {

@@ -62,17 +62,20 @@ func checkPrivatePeer(ctx context.Context, q querier, c *chatRow, me int64) erro
 	if peer == me || peer == 0 {
 		return nil
 	}
-	var blocked, meBot, peerBot, peerGone, consent bool
+	var blocked, meBot, peerBot, peerGone, peerDeleted, consent bool
 	if err := q.QueryRow(ctx, `
 		SELECT EXISTS (SELECT 1 FROM blocks WHERE blocker_id = $1 AND blocked_id = $2),
 			EXISTS (SELECT 1 FROM users WHERE id = $2 AND is_bot),
 			EXISTS (SELECT 1 FROM users WHERE id = $1 AND is_bot),
 			EXISTS (SELECT 1 FROM bots WHERE user_id = $1 AND deleted_at IS NOT NULL),
+			EXISTS (SELECT 1 FROM users WHERE id = $1 AND (deletion_requested_at IS NOT NULL OR deleted_at IS NOT NULL)),
 			EXISTS (SELECT 1 FROM bot_user_consent WHERE (bot_id = $2 AND user_id = $1) OR (bot_id = $1 AND user_id = $2))`,
-		peer, me).Scan(&blocked, &meBot, &peerBot, &peerGone, &consent); err != nil {
+		peer, me).Scan(&blocked, &meBot, &peerBot, &peerGone, &peerDeleted, &consent); err != nil {
 		return fmt.Errorf("chat: check private peer: %w", err)
 	}
 	switch {
+	case peerDeleted:
+		return errPrecondition("account_deleted: this account was deleted")
 	case blocked:
 		return errDenied("this user does not accept your messages")
 	case peerGone:

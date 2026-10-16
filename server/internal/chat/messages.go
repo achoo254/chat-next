@@ -1417,7 +1417,7 @@ func (t *txn) read(ctx context.Context, c *chatRow, m *memberRow, maxSeq, topicI
 		if err != nil {
 			return err
 		}
-		inbox.UnreadCount, inbox.TopSeq = rs.unread, rs.topSeq
+		inbox.UnreadCount, inbox.UnreadMentionsCount, inbox.TopSeq = rs.unread, rs.mentions, rs.topSeq
 		if c.SyncMode == syncLarge {
 			inbox.ChatPts = rs.chatPts
 		}

@@ -302,6 +302,15 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE messages ADD COLUMN keyboard_hidden INTEGER NOT NULL DEFAULT 0",
 		],
 	},
+	{
+		version: 11,
+		statements: [
+			// User.deleted: the account was deleted (or waits for deletion).
+			// Cached users were all live; the server's next copy of a deleted
+			// one sets it.
+			"ALTER TABLE users ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

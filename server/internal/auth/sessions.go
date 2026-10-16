@@ -383,6 +383,18 @@ func (m *Sessions) RevokeOthers(ctx context.Context, userID, keepID int64) (int,
 	return len(list), nil
 }
 
+// RevokeAll revokes every session of the user (the account entered its
+// deletion grace period) and, in the background, their IdP refresh tokens,
+// which ends the app's grants at the IdP. It returns how many.
+func (m *Sessions) RevokeAll(ctx context.Context, userID int64) (int, error) {
+	list, err := m.store.RevokeAllSessions(ctx, m.tenantID, userID)
+	if err != nil {
+		return 0, err
+	}
+	m.revokeAtIdP(list)
+	return len(list), nil
+}
+
 // EndForLogout ends the session of token for RP-initiated logout and returns
 // the ID token to send as id_token_hint ("" when none is left). ErrNoSession
 // when the token matches no session.

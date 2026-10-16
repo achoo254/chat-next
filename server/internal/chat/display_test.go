@@ -52,8 +52,28 @@ func TestUnreadMentionsAreCounted(t *testing.T) {
 	if n := dialog(b).GetUnreadMentionsCount(); n != 2 {
 		t.Fatalf("after the edit bob's unread mentions = %d, want 2", n)
 	}
+	// The read update carries the mentions left, so bob's other sessions
+	// clear the "@" badge without asking for the dialog again.
+	readMentions := func() int32 {
+		t.Helper()
+		log := h.logOf(b)
+		r := log[len(log)-1].GetRead()
+		if r == nil || r.GetOutbox() {
+			t.Fatalf("last update of bob = %v, want an inbox read", log[len(log)-1])
+		}
+		return r.GetUnreadMentionsCount()
+	}
+	if _, err := h.svc.ReadHistory(ctx, b, chatID, mine+1, 0); err != nil {
+		t.Fatal(err)
+	}
+	if n := readMentions(); n != 1 {
+		t.Fatalf("read update after the @bob message: mentions = %d, want 1 (the reply)", n)
+	}
 	if _, err := h.svc.ReadHistory(ctx, b, chatID, last, 0); err != nil {
 		t.Fatal(err)
+	}
+	if n := readMentions(); n != 0 {
+		t.Fatalf("read update after reading everything: mentions = %d, want 0", n)
 	}
 	if n := dialog(b).GetUnreadMentionsCount(); n != 0 {
 		t.Fatalf("after reading, mentions = %d", n)

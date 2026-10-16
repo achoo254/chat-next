@@ -514,29 +514,88 @@ func (s *Service) DeleteBot(ctx context.Context, owner int64, authTime time.Time
 		if _, err := s.ownedBot(ctx, tx, owner, botID, true); err != nil {
 			return err
 		}
-		for _, sql := range []string{
-			`UPDATE bots SET deleted_at = now(), token_hash = NULL, token_issued_at = NULL, updated_at = now() WHERE user_id = $1`,
-			`DELETE FROM bot_updates WHERE bot_id = $1`,
-			`DELETE FROM bot_callbacks WHERE bot_id = $1`,
-		} {
-			if _, err := tx.Exec(ctx, sql, botID); err != nil {
-				return fmt.Errorf("botadmin: delete bot: %w", err)
-			}
-		}
-		nobody := int16(appv1.PrivacyAudience_PRIVACY_AUDIENCE_NOBODY)
-		if _, err := tx.Exec(ctx, `
-			UPDATE privacy_settings SET find_by_username = $2, find_by_email = $2, add_to_groups = $2, send_messages = $2,
-				updated_at = now()
-			WHERE user_id = $1`, botID, nobody); err != nil {
-			return fmt.Errorf("botadmin: hide deleted bot: %w", err)
-		}
-		return s.releaseUsername(ctx, tx, botID)
+		return s.deleteBot(ctx, tx, botID)
 	})
 	if err != nil {
 		return err
 	}
 	s.logger.Info("bot deleted", "bot_id", botID, "owner_id", owner)
 	return nil
+}
+
+// deleteBot deletes a bot whose row the transaction has locked.
+func (s *Service) deleteBot(ctx context.Context, tx pgx.Tx, botID int64) error {
+	for _, sql := range []string{
+		`UPDATE bots SET deleted_at = now(), token_hash = NULL, token_issued_at = NULL, updated_at = now() WHERE user_id = $1`,
+		`DELETE FROM bot_updates WHERE bot_id = $1`,
+		`DELETE FROM bot_callbacks WHERE bot_id = $1`,
+	} {
+		if _, err := tx.Exec(ctx, sql, botID); err != nil {
+			return fmt.Errorf("botadmin: delete bot: %w", err)
+		}
+	}
+	nobody := int16(appv1.PrivacyAudience_PRIVACY_AUDIENCE_NOBODY)
+	if _, err := tx.Exec(ctx, `
+		UPDATE privacy_settings SET find_by_username = $2, find_by_email = $2, add_to_groups = $2, send_messages = $2,
+			updated_at = now()
+		WHERE user_id = $1`, botID, nobody); err != nil {
+		return fmt.Errorf("botadmin: hide deleted bot: %w", err)
+	}
+	return s.releaseUsername(ctx, tx, botID)
+}
+
+// OwnedBots lists the live bots of owner (the tenant's assistant is never
+// one), oldest first, whatever the state of the owner's account.
+func (s *Service) OwnedBots(ctx context.Context, owner int64) ([]*appv1.OwnedBot, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT b.user_id, u.name, u.username FROM `+botFrom+`
+		WHERE b.owner_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL AND NOT b.is_system
+		ORDER BY b.created_at, b.user_id`, owner, s.tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("botadmin: owned bots: %w", err)
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*appv1.OwnedBot, error) {
+		b := &appv1.OwnedBot{}
+		err := r.Scan(&b.BotId, &b.Name, &b.Username)
+		return b, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("botadmin: owned bots: %w", err)
+	}
+	return list, nil
+}
+
+// DeleteOwnedBots deletes every bot of owner, as DeleteBot does, when the
+// owner's account is erased (no recent sign-in needed: the owner confirmed
+// the account deletion with one). It returns how many.
+func (s *Service) DeleteOwnedBots(ctx context.Context, owner int64) (int, error) {
+	n := 0
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT user_id FROM bots WHERE owner_id = $1 AND tenant_id = $2 AND deleted_at IS NULL AND NOT is_system
+			ORDER BY user_id FOR UPDATE`, owner, s.tenantID)
+		if err != nil {
+			return fmt.Errorf("botadmin: bots of owner: %w", err)
+		}
+		ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+		if err != nil {
+			return fmt.Errorf("botadmin: bots of owner: %w", err)
+		}
+		for _, id := range ids {
+			if err := s.deleteBot(ctx, tx, id); err != nil {
+				return err
+			}
+		}
+		n = len(ids)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if n > 0 {
+		s.logger.Info("bots deleted with their owner's account", "owner_id", owner, "bots", n)
+	}
+	return n, nil
 }
 
 // releaseUsername renames a deleted bot to deleted_<id> so its username
@@ -756,14 +815,18 @@ func (s *Service) RecordUpdateFetch(ctx context.Context, botID int64) error {
 var ErrBadToken = errors.New("botadmin: invalid token")
 
 // Authenticate returns the live bot whose token is token; ErrBadToken when
-// the token is malformed, unknown, revoked or the bot is deleted.
+// the token is malformed, unknown, revoked, the bot is deleted or its
+// owner's account waits for deletion (the bot is stopped until the owner
+// cancels).
 func (s *Service) Authenticate(ctx context.Context, token string) (*Bot, error) {
 	botID, secret, ok := ParseToken(token)
 	if !ok {
 		return nil, ErrBadToken
 	}
 	b, err := scanBot(s.pool.QueryRow(ctx, `SELECT `+botColumns+` FROM `+botFrom+`
-		WHERE b.user_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL AND b.token_hash IS NOT NULL`, botID, s.tenantID))
+		WHERE b.user_id = $1 AND b.tenant_id = $2 AND b.deleted_at IS NULL AND b.token_hash IS NOT NULL
+			AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id = b.owner_id AND o.deletion_requested_at IS NOT NULL)`,
+		botID, s.tenantID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrBadToken
 	}

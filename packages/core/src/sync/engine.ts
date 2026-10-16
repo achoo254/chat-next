@@ -1127,6 +1127,10 @@ export class SyncEngine {
 			limit,
 		});
 		const page = toHistoryPage(response);
+		// A chat this device has no dialog for yet (opened by a link before
+		// the dialog list synced): its read position comes from the server
+		// first, so the page is not counted as unread from its first message.
+		if (page.messages.length > 0 && (await this.options.repo.dialog(chatId)) === null) await this.refreshChats([chatId]);
 		await this.queue.run(async () => {
 			const w = new WriteBatch();
 			for (const user of page.users) putUser(w, user);

@@ -34,6 +34,10 @@ const (
 	contactsPageMax  = 500
 )
 
+// liveUser is the SQL predicate (alias u) of an account that is neither
+// waiting for deletion nor erased: only those can be found.
+const liveUser = `u.deletion_requested_at IS NULL AND u.deleted_at IS NULL`
+
 type privacyRow struct {
 	LastSeen, ProfilePhoto, FindByEmail, FindByUsername, AddToGroups, SendMessages int16
 	NotificationPreview                                                            bool
@@ -139,7 +143,7 @@ func (s *Service) checkCanMessage(ctx context.Context, q querier, me, peer int64
 	if err != nil {
 		return err
 	}
-	if users[peer] == nil {
+	if users[peer] == nil || users[peer].Deleted {
 		return errNotFound("user")
 	}
 	blocks, err := loadBlocks(ctx, q, []int64{peer}, []int64{me})
@@ -188,7 +192,7 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 	}
 	for _, id := range ids {
 		switch {
-		case users[id] == nil:
+		case users[id] == nil || users[id].Deleted:
 			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_NOT_FOUND})
 		case blocks[blockKey{id, me}]:
 			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_BLOCKED})
@@ -204,7 +208,7 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 // statusOf renders a user's presence for viewer after privacy rules; a
 // user who blocked the viewer shows nothing.
 func statusOf(u *userRow, viewer int64, p privacyRow, contact, blockedViewer, online bool, now time.Time) *appv1.UserStatus {
-	if blockedViewer && u.ID != viewer {
+	if (blockedViewer || u.Deleted) && u.ID != viewer {
 		return &appv1.UserStatus{}
 	}
 	exact := u.ID == viewer || allowedBy(p.LastSeen, contact)
@@ -334,11 +338,11 @@ func (s *Service) findable(ctx context.Context, me int64, username, email string
 	if email != "" {
 		err = s.pool.QueryRow(ctx, `
 			SELECT u.id, coalesce(p.find_by_email, $3) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2)`, s.cfg.TenantID, email, audNobody).Scan(&id, &audience)
+			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND `+liveUser, s.cfg.TenantID, email, audNobody).Scan(&id, &audience)
 	} else {
 		err = s.pool.QueryRow(ctx, `
 			SELECT u.id, coalesce(p.find_by_username, $3) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND u.username = $2`, s.cfg.TenantID, username, audEveryone).Scan(&id, &audience)
+			WHERE u.tenant_id = $1 AND u.username = $2 AND `+liveUser, s.cfg.TenantID, username, audEveryone).Scan(&id, &audience)
 	}
 	if isNoRows(err) {
 		return 0, errNotFound("user")
@@ -403,12 +407,13 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	if email {
 		rows, err = s.pool.Query(ctx, `
 			SELECT u.id, coalesce(p.find_by_email, $4) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND u.id <> $3`, s.cfg.TenantID, query, me, audNobody)
+			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND u.id <> $3 AND `+liveUser, s.cfg.TenantID, query, me, audNobody)
 	} else {
 		q := strings.ToLower(strings.TrimPrefix(query, "@"))
 		rows, err = s.pool.Query(ctx, `
 			SELECT u.id, coalesce(p.find_by_username, $5) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND u.id <> $4 AND (u.username LIKE $2 || '%' OR chat_fold_name(u.name) LIKE '%' || $3 || '%')
+			WHERE u.tenant_id = $1 AND u.id <> $4 AND `+liveUser+`
+				AND (u.username LIKE $2 || '%' OR chat_fold_name(u.name) LIKE '%' || $3 || '%')
 			ORDER BY (u.username = $2) DESC, u.username LIMIT $6`,
 			s.cfg.TenantID, escapeLike(q), escapeLike(vifold.Fold(query)), me, audEveryone, limit*2)
 	}

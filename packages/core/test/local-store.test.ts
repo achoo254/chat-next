@@ -2,14 +2,15 @@
 import { describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import { MessageSchema } from "@app/proto-ts/messages";
+import { UserSchema } from "@app/proto-ts/users";
 import { UpdateFrameSchema } from "@app/proto-ts/realtime";
 import { UpdateSchema } from "@app/proto-ts/updates";
 import { EventBus, EventKeys } from "../src/events/bus.ts";
 import type { Message } from "../src/model/types.ts";
-import { toMessage, toUpdateBatch, toWireId } from "../src/protocol/map.ts";
+import { toMessage, toUpdateBatch, toUser, toWireId } from "../src/protocol/map.ts";
 import { MIGRATIONS, migrate, SCHEMA_VERSION } from "../src/repo/migrations.ts";
 import { Repository } from "../src/repo/repository.ts";
-import { putMessage, putNewMessage, WriteBatch } from "../src/repo/writes.ts";
+import { putMessage, putNewMessage, putUser, WriteBatch } from "../src/repo/writes.ts";
 import { purgeChat } from "../src/purge/index.ts";
 import { ftsQuery, searchLocal, SUBSTRING_MIN_CHARS, textMatch } from "../src/search/index.ts";
 import { searchText } from "../src/vifold/index.ts";
@@ -54,6 +55,28 @@ describe("protocol mapping (ADR 0001)", () => {
 		expect(batch.updates[0]?.body).toEqual({ kind: "unknown" });
 		const unsupported = toMessage(create(MessageSchema, { chatId: 1n, seq: 1n, action: {} }));
 		expect(unsupported.action).toEqual({ kind: "unsupported" });
+	});
+});
+
+describe("deleted accounts", () => {
+	it("keep the deleted flag from the wire through the local store", async () => {
+		const gone = toUser(create(UserSchema, { id: 12n, deleted: true }));
+		const live = toUser(create(UserSchema, { id: 13n, username: "binh", name: "Bình" }));
+		expect(gone).toMatchObject({ id: 12, name: "", deleted: true });
+		expect(live.deleted).toBeUndefined();
+		const { repo } = await store();
+		const w = new WriteBatch();
+		putUser(w, gone);
+		putUser(w, live);
+		await repo.commit(w);
+		expect((await repo.user(12))?.deleted).toBe(true);
+		expect((await repo.user(13))?.deleted).toBeUndefined();
+		// Restored (deletion cancelled): the next copy clears it.
+		const restore = new WriteBatch();
+		putUser(restore, { ...gone, deleted: false, name: "An" });
+		await repo.commit(restore);
+		expect(await repo.user(12)).toMatchObject({ name: "An" });
+		expect((await repo.user(12))?.deleted).toBeUndefined();
 	});
 });
 

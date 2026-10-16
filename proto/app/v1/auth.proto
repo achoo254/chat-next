@@ -59,6 +59,10 @@ enum SessionRevokeReason {
   // action) and now holds the new session's cookie: clients keep their local
   // data and reconnect, which picks up the new session.
   SESSION_REVOKE_REASON_REPLACED = 6;
+  // The user deleted the chat account (or it was scheduled for deletion
+  // after a long time unused): every session ends and the IdP grant is
+  // revoked. Clients wipe local data like for any other revocation.
+  SESSION_REVOKE_REASON_ACCOUNT_DELETED = 7;
 }
 
 message GetAuthConfigRequest {

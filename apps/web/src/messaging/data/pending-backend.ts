@@ -23,6 +23,10 @@ export interface Topic {
 	readonly closed: boolean;
 	readonly hidden: boolean;
 	readonly muted: boolean;
+	/** Newest message of the topic. */
+	readonly topSeq: number;
+	/** The reader's read position in this topic (a forum keeps one per topic). */
+	readonly readInboxMaxSeq: number;
 	/** Counted up to 1000 by the server (shown as "999+"). */
 	readonly unreadCount: number;
 	readonly unreadMentions: number;

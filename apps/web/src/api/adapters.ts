@@ -15,6 +15,16 @@ export interface SelfUser {
 	email: string;
 	/** May use the moderation queue (GetSelfResponse.is_operator). */
 	isOperator: boolean;
+	/** Set while the account waits for deletion (GetSelfResponse.deletion): the app then only offers to cancel it. */
+	deletion?: AccountDeletionInfo;
+}
+
+/** An account in its deletion grace period. */
+export interface AccountDeletionInfo {
+	/** Unix seconds when the account is erased unless cancelled. */
+	purgeAt: number;
+	/** "user": the user asked for it; "inactive": unused for the auto-delete period. */
+	reason: "user" | "inactive";
 }
 
 export type SessionPlatform = "web" | "ios" | "android" | "desktop" | "unknown";

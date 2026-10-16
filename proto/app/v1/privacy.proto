@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/users.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+//
+// The user's rights over their chat data (Nghị định 13/2023/NĐ-CP):
+// a downloadable export, deletion when unused, and deletion of the chat
+// account. Only chat data is concerned: the hoandat account and its sign-in
+// methods belong to the IdP. Inventory and retention:
+// docs/privacy/data-inventory.md.
+service PrivacyService {
+  // The latest export and when a new one may be requested.
+  rpc GetDataExport(GetDataExportRequest) returns (GetDataExportResponse);
+  // Starts a new export, built in the background. At most one per 7 days
+  // (failed ones do not count): resource_exhausted "export_rate_limited"
+  // otherwise. failed_precondition "export_unavailable" when the server has
+  // no export storage.
+  rpc RequestDataExport(RequestDataExportRequest) returns (RequestDataExportResponse);
+  // A short-lived download URL on the media host for a ready export.
+  rpc GetDataExportUrl(GetDataExportUrlRequest) returns (GetDataExportUrlResponse);
+  // What deleting the account involves: what blocks it, the bots it stops,
+  // the auto-delete setting and when the session last signed in at the IdP.
+  rpc GetAccountDeletion(GetAccountDeletionRequest) returns (GetAccountDeletionResponse);
+  // Auto-delete after this many months without use: 0 (off), 6, 12 or 24.
+  rpc SetAutoDelete(SetAutoDeleteRequest) returns (SetAutoDeleteResponse);
+  // Sensitive (ADR 0006): requires an IdP sign-in within the last 10
+  // minutes (failed_precondition "reauth_required" otherwise) and the
+  // caller's username as confirmation. Refused with failed_precondition
+  // "owns_chats" while the caller owns a group or channel. The account is
+  // locked at once (every session revoked with ACCOUNT_DELETED, IdP grants
+  // revoked, bots stopped, shown to others as deleted) and erased after the
+  // grace period unless cancelled.
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+  // Ends the grace period of the caller's account: everything works again.
+  rpc CancelAccountDeletion(CancelAccountDeletionRequest) returns (CancelAccountDeletionResponse);
+}
+
+enum DataExportStatus {
+  DATA_EXPORT_STATUS_UNSPECIFIED = 0;
+  DATA_EXPORT_STATUS_PENDING = 1;
+  DATA_EXPORT_STATUS_RUNNING = 2;
+  DATA_EXPORT_STATUS_READY = 3;
+  DATA_EXPORT_STATUS_FAILED = 4;
+  // Past its 30 days: the file is gone.
+  DATA_EXPORT_STATUS_EXPIRED = 5;
+}
+
+message DataExport {
+  int64 id = 1 [jstype = JS_NUMBER];
+  DataExportStatus status = 2;
+  // 0 to 100 while RUNNING.
+  int32 progress = 3;
+  // Bytes of the ZIP once READY.
+  int64 size = 4 [jstype = JS_NUMBER];
+  // Name the download carries, e.g. chat-export-dattqh-20261016.zip.
+  string file_name = 5;
+  // Unix seconds; ready_at and expires_at are 0 until READY.
+  int64 created_at = 6 [jstype = JS_NUMBER];
+  int64 ready_at = 7 [jstype = JS_NUMBER];
+  int64 expires_at = 8 [jstype = JS_NUMBER];
+}
+
+message GetDataExportRequest {}
+
+message GetDataExportResponse {
+  // The newest export; unset when the user never asked for one.
+  DataExport export = 1;
+  // Unix seconds from which RequestDataExport is accepted; 0 when now.
+  int64 next_request_at = 2 [jstype = JS_NUMBER];
+  // False when the server has no export storage (RequestDataExport fails).
+  bool available = 3;
+}
+
+message RequestDataExportRequest {}
+
+message RequestDataExportResponse {
+  DataExport export = 1;
+  int64 next_request_at = 2 [jstype = JS_NUMBER];
+}
+
+message GetDataExportUrlRequest {
+  int64 export_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetDataExportUrlResponse {
+  string url = 1;
+  // Unix seconds.
+  int64 expires_at = 2 [jstype = JS_NUMBER];
+}
+
+message GetAccountDeletionRequest {}
+
+// A group or channel the caller owns: it blocks DeleteAccount until its
+// ownership passes to someone else or it is deleted.
+message OwnedChat {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  string title = 2;
+  bool is_channel = 3;
+  int32 member_count = 4;
+}
+
+// A bot of the caller: stopped during the grace period, deleted with the
+// account.
+message OwnedBot {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  string name = 2;
+  string username = 3;
+}
+
+message GetAccountDeletionResponse {
+  repeated OwnedChat owned_chats = 1;
+  repeated OwnedBot bots = 2;
+  // 0 (off), 6, 12 or 24.
+  int32 auto_delete_months = 3;
+  // Unix seconds of this session's IdP sign-in; 0 when unknown.
+  // DeleteAccount needs it within the last 10 minutes.
+  int64 signed_in_at = 4 [jstype = JS_NUMBER];
+  // Days between DeleteAccount and the erasure.
+  int32 grace_days = 5;
+}
+
+message SetAutoDeleteRequest {
+  int32 months = 1;
+}
+
+message SetAutoDeleteResponse {
+  int32 months = 1;
+}
+
+message DeleteAccountRequest {
+  // The caller's username, typed by the user.
+  string confirmation = 1;
+}
+
+message DeleteAccountResponse {
+  // Unix seconds when the account is erased unless cancelled.
+  int64 purge_at = 1 [jstype = JS_NUMBER];
+}
+
+message CancelAccountDeletionRequest {}
+
+message CancelAccountDeletionResponse {
+  User user = 1;
+}

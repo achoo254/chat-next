@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/users.proto.
  */
 export const file_app_v1_users: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiLsAQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJIioKDkdldFNlbGZSZXF1ZXN0EhgKEGFsbG93X3NpZ25lZF9vdXQYASABKAgiQgoPR2V0U2VsZlJlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlchITCgtpc19vcGVyYXRvchgCIAEoCCInCg9HZXRVc2Vyc1JlcXVlc3QSFAoIdXNlcl9pZHMYASADKANCAjACIi8KEEdldFVzZXJzUmVzcG9uc2USGwoFdXNlcnMYASADKAsyDC5hcHAudjEuVXNlciJ6ChRVcGRhdGVQcm9maWxlUmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESEAoDYmlvGAIgASgJSAGIAQESGgoNcGhvdG9fZmlsZV9pZBgDIAEoCUgCiAEBQgcKBV9uYW1lQgYKBF9iaW9CEAoOX3Bob3RvX2ZpbGVfaWQiMwoVVXBkYXRlUHJvZmlsZVJlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlciImChJTZXRVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiMQoTU2V0VXNlcm5hbWVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiKgoWUmVzb2x2ZVVzZXJuYW1lUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCSI1ChdSZXNvbHZlVXNlcm5hbWVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiMgoSU2VhcmNoVXNlcnNSZXF1ZXN0Eg0KBXF1ZXJ5GAEgASgJEg0KBWxpbWl0GAIgASgFIjIKE1NlYXJjaFVzZXJzUmVzcG9uc2USGwoFdXNlcnMYASADKAsyDC5hcHAudjEuVXNlciIjCgxCbG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiDwoNQmxvY2tSZXNwb25zZSIlCg5VbmJsb2NrUmVxdWVzdBITCgd1c2VyX2lkGAEgASgDQgIwAiIRCg9VbmJsb2NrUmVzcG9uc2UizgIKD1ByaXZhY3lTZXR0aW5ncxIqCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDXByb2ZpbGVfcGhvdG8YAiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDWZpbmRfYnlfZW1haWwYAyABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEjEKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDWFkZF90b19ncm91cHMYBSABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDXNlbmRfbWVzc2FnZXMYBiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEhwKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgIIhMKEUdldFByaXZhY3lSZXF1ZXN0Ij8KEkdldFByaXZhY3lSZXNwb25zZRIpCghzZXR0aW5ncxgBIAEoCzIXLmFwcC52MS5Qcml2YWN5U2V0dGluZ3Mi9wMKEVNldFByaXZhY3lSZXF1ZXN0Ei8KCWxhc3Rfc2VlbhgBIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAIgBARIzCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgBiAEBEjMKDWZpbmRfYnlfZW1haWwYAyABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAKIAQESNgoQZmluZF9ieV91c2VybmFtZRgEIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIA4gBARIzCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgEiAEBEjMKDXNlbmRfbWVzc2FnZXMYBiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAWIAQESIQoUbm90aWZpY2F0aW9uX3ByZXZpZXcYByABKAhIBogBAUIMCgpfbGFzdF9zZWVuQhAKDl9wcm9maWxlX3Bob3RvQhAKDl9maW5kX2J5X2VtYWlsQhMKEV9maW5kX2J5X3VzZXJuYW1lQhAKDl9hZGRfdG9fZ3JvdXBzQhAKDl9zZW5kX21lc3NhZ2VzQhcKFV9ub3RpZmljYXRpb25fcHJldmlldyI/ChJTZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIjkKEFJlcG9ydGVkTWVzc2FnZXMSEwoHY2hhdF9pZBgBIAEoA0ICMAISEAoEc2VxcxgCIAMoA0ICMAIirAEKDVJlcG9ydFJlcXVlc3QSFQoHdXNlcl9pZBgBIAEoA0ICMAJIABIVCgdjaGF0X2lkGAIgASgDQgIwAkgAEiwKCG1lc3NhZ2VzGAMgASgLMhguYXBwLnYxLlJlcG9ydGVkTWVzc2FnZXNIABIkCgZyZWFzb24YBCABKA4yFC5hcHAudjEuUmVwb3J0UmVhc29uEg8KB2NvbW1lbnQYBSABKAlCCAoGdGFyZ2V0IhAKDlJlcG9ydFJlc3BvbnNlIlkKEUFkZENvbnRhY3RSZXF1ZXN0EhUKB3VzZXJfaWQYASABKANCAjACSAASEgoIdXNlcm5hbWUYAiABKAlIABIPCgVlbWFpbBgDIAEoCUgAQggKBnRhcmdldCIwChJBZGRDb250YWN0UmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIisKFERlbGV0ZUNvbnRhY3RSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIhcKFURlbGV0ZUNvbnRhY3RSZXNwb25zZSIzChJHZXRDb250YWN0c1JlcXVlc3QSDgoGY3Vyc29yGAEgASgJEg0KBWxpbWl0GAIgASgFImoKE0dldENvbnRhY3RzUmVzcG9uc2USGwoFdXNlcnMYASADKAsyDC5hcHAudjEuVXNlchITCgtuZXh0X2N1cnNvchgCIAEoCRIhCghjb250YWN0cxgDIAMoCzIPLmFwcC52MS5Db250YWN0IjQKB0NvbnRhY3QSEwoHdXNlcl9pZBgBIAEoA0ICMAISFAoIYWRkZWRfYXQYAiABKANCAjACIjcKFkdldEJsb2NrZWRVc2Vyc1JlcXVlc3QSDgoGY3Vyc29yGAEgASgJEg0KBWxpbWl0GAIgASgFIjoKC0Jsb2NrZWRVc2VyEhMKB3VzZXJfaWQYASABKANCAjACEhYKCmJsb2NrZWRfYXQYAiABKANCAjACInEKF0dldEJsb2NrZWRVc2Vyc1Jlc3BvbnNlEiQKB2Jsb2NrZWQYASADKAsyEy5hcHAudjEuQmxvY2tlZFVzZXISGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchITCgtuZXh0X2N1cnNvchgDIAEoCSrNAQoOVXNlclN0YXR1c0tpbmQSIAocVVNFUl9TVEFUVVNfS0lORF9VTlNQRUNJRklFRBAAEhsKF1VTRVJfU1RBVFVTX0tJTkRfT05MSU5FEAESHAoYVVNFUl9TVEFUVVNfS0lORF9PRkZMSU5FEAISHQoZVVNFUl9TVEFUVVNfS0lORF9SRUNFTlRMWRADEh4KGlVTRVJfU1RBVFVTX0tJTkRfTEFTVF9XRUVLEAQSHwobVVNFUl9TVEFUVVNfS0lORF9MQVNUX01PTlRIEAUqjgEKD1ByaXZhY3lBdWRpZW5jZRIgChxQUklWQUNZX0FVRElFTkNFX1VOU1BFQ0lGSUVEEAASHQoZUFJJVkFDWV9BVURJRU5DRV9FVkVSWU9ORRABEh0KGVBSSVZBQ1lfQVVESUVOQ0VfQ09OVEFDVFMQAhIbChdQUklWQUNZX0FVRElFTkNFX05PQk9EWRADKocCCgxSZXBvcnRSZWFzb24SHQoZUkVQT1JUX1JFQVNPTl9VTlNQRUNJRklFRBAAEhYKElJFUE9SVF9SRUFTT05fU1BBTRABEhoKFlJFUE9SVF9SRUFTT05fVklPTEVOQ0UQAhIdChlSRVBPUlRfUkVBU09OX0NISUxEX0FCVVNFEAMSGQoVUkVQT1JUX1JFQVNPTl9JTExFR0FMEAQSHwobUkVQT1JUX1JFQVNPTl9QRVJTT05BTF9EQVRBEAUSFwoTUkVQT1JUX1JFQVNPTl9PVEhFUhAGEhYKElJFUE9SVF9SRUFTT05fU0NBTRAHEhgKFFJFUE9SVF9SRUFTT05fU0VYVUFMEAgynwgKDFVzZXJzU2VydmljZRI6CgdHZXRTZWxmEhYuYXBwLnYxLkdldFNlbGZSZXF1ZXN0GhcuYXBwLnYxLkdldFNlbGZSZXNwb25zZRI9CghHZXRVc2VycxIXLmFwcC52MS5HZXRVc2Vyc1JlcXVlc3QaGC5hcHAudjEuR2V0VXNlcnNSZXNwb25zZRJMCg1VcGRhdGVQcm9maWxlEhwuYXBwLnYxLlVwZGF0ZVByb2ZpbGVSZXF1ZXN0Gh0uYXBwLnYxLlVwZGF0ZVByb2ZpbGVSZXNwb25zZRJGCgtTZXRVc2VybmFtZRIaLmFwcC52MS5TZXRVc2VybmFtZVJlcXVlc3QaGy5hcHAudjEuU2V0VXNlcm5hbWVSZXNwb25zZRJSCg9SZXNvbHZlVXNlcm5hbWUSHi5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVxdWVzdBofLmFwcC52MS5SZXNvbHZlVXNlcm5hbWVSZXNwb25zZRJGCgtTZWFyY2hVc2VycxIaLmFwcC52MS5TZWFyY2hVc2Vyc1JlcXVlc3QaGy5hcHAudjEuU2VhcmNoVXNlcnNSZXNwb25zZRI0CgVCbG9jaxIULmFwcC52MS5CbG9ja1JlcXVlc3QaFS5hcHAudjEuQmxvY2tSZXNwb25zZRI6CgdVbmJsb2NrEhYuYXBwLnYxLlVuYmxvY2tSZXF1ZXN0GhcuYXBwLnYxLlVuYmxvY2tSZXNwb25zZRJDCgpHZXRQcml2YWN5EhkuYXBwLnYxLkdldFByaXZhY3lSZXF1ZXN0GhouYXBwLnYxLkdldFByaXZhY3lSZXNwb25zZRJDCgpTZXRQcml2YWN5EhkuYXBwLnYxLlNldFByaXZhY3lSZXF1ZXN0GhouYXBwLnYxLlNldFByaXZhY3lSZXNwb25zZRI3CgZSZXBvcnQSFS5hcHAudjEuUmVwb3J0UmVxdWVzdBoWLmFwcC52MS5SZXBvcnRSZXNwb25zZRJDCgpBZGRDb250YWN0EhkuYXBwLnYxLkFkZENvbnRhY3RSZXF1ZXN0GhouYXBwLnYxLkFkZENvbnRhY3RSZXNwb25zZRJMCg1EZWxldGVDb250YWN0EhwuYXBwLnYxLkRlbGV0ZUNvbnRhY3RSZXF1ZXN0Gh0uYXBwLnYxLkRlbGV0ZUNvbnRhY3RSZXNwb25zZRJGCgtHZXRDb250YWN0cxIaLmFwcC52MS5HZXRDb250YWN0c1JlcXVlc3QaGy5hcHAudjEuR2V0Q29udGFjdHNSZXNwb25zZRJSCg9HZXRCbG9ja2VkVXNlcnMSHi5hcHAudjEuR2V0QmxvY2tlZFVzZXJzUmVxdWVzdBofLmFwcC52MS5HZXRCbG9ja2VkVXNlcnNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_media]);
+  fileDesc("ChJhcHAvdjEvdXNlcnMucHJvdG8SBmFwcC52MSJeCgpVc2VyU3RhdHVzEiQKBGtpbmQYASABKA4yFi5hcHAudjEuVXNlclN0YXR1c0tpbmQSFQoJbGFzdF9zZWVuGAIgASgDQgIwAhITCgdleHBpcmVzGAMgASgDQgIwAiL9AQoEVXNlchIOCgJpZBgBIAEoA0ICMAISEAoIdXNlcm5hbWUYAiABKAkSDAoEbmFtZRgDIAEoCRILCgNiaW8YBCABKAkSHwoFcGhvdG8YBSABKAsyEC5hcHAudjEuTWVkaWFSZWYSDgoGaXNfYm90GAYgASgIEg8KB2lzX3NlbGYYByABKAgSEgoKaXNfYmxvY2tlZBgIIAEoCBIiCgZzdGF0dXMYCSABKAsyEi5hcHAudjEuVXNlclN0YXR1cxINCgVlbWFpbBgKIAEoCRIeChZib3RfaW5saW5lX3BsYWNlaG9sZGVyGAsgASgJEg8KB2RlbGV0ZWQYDCABKAgiKgoOR2V0U2VsZlJlcXVlc3QSGAoQYWxsb3dfc2lnbmVkX291dBgBIAEoCCJtCg9HZXRTZWxmUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyEhMKC2lzX29wZXJhdG9yGAIgASgIEikKCGRlbGV0aW9uGAMgASgLMhcuYXBwLnYxLkFjY291bnREZWxldGlvbiJwCg9BY2NvdW50RGVsZXRpb24SGAoMcmVxdWVzdGVkX2F0GAEgASgDQgIwAhIUCghwdXJnZV9hdBgCIAEoA0ICMAISLQoGcmVhc29uGAMgASgOMh0uYXBwLnYxLkFjY291bnREZWxldGlvblJlYXNvbiInCg9HZXRVc2Vyc1JlcXVlc3QSFAoIdXNlcl9pZHMYASADKANCAjACIi8KEEdldFVzZXJzUmVzcG9uc2USGwoFdXNlcnMYASADKAsyDC5hcHAudjEuVXNlciJ6ChRVcGRhdGVQcm9maWxlUmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESEAoDYmlvGAIgASgJSAGIAQESGgoNcGhvdG9fZmlsZV9pZBgDIAEoCUgCiAEBQgcKBV9uYW1lQgYKBF9iaW9CEAoOX3Bob3RvX2ZpbGVfaWQiMwoVVXBkYXRlUHJvZmlsZVJlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlciImChJTZXRVc2VybmFtZVJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkiMQoTU2V0VXNlcm5hbWVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiKgoWUmVzb2x2ZVVzZXJuYW1lUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCSI1ChdSZXNvbHZlVXNlcm5hbWVSZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIiMgoSU2VhcmNoVXNlcnNSZXF1ZXN0Eg0KBXF1ZXJ5GAEgASgJEg0KBWxpbWl0GAIgASgFIjIKE1NlYXJjaFVzZXJzUmVzcG9uc2USGwoFdXNlcnMYASADKAsyDC5hcHAudjEuVXNlciIjCgxCbG9ja1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAIiDwoNQmxvY2tSZXNwb25zZSIlCg5VbmJsb2NrUmVxdWVzdBITCgd1c2VyX2lkGAEgASgDQgIwAiIRCg9VbmJsb2NrUmVzcG9uc2UizgIKD1ByaXZhY3lTZXR0aW5ncxIqCglsYXN0X3NlZW4YASABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDXByb2ZpbGVfcGhvdG8YAiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDWZpbmRfYnlfZW1haWwYAyABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEjEKEGZpbmRfYnlfdXNlcm5hbWUYBCABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDWFkZF90b19ncm91cHMYBSABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEi4KDXNlbmRfbWVzc2FnZXMYBiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlEhwKFG5vdGlmaWNhdGlvbl9wcmV2aWV3GAcgASgIIhMKEUdldFByaXZhY3lSZXF1ZXN0Ij8KEkdldFByaXZhY3lSZXNwb25zZRIpCghzZXR0aW5ncxgBIAEoCzIXLmFwcC52MS5Qcml2YWN5U2V0dGluZ3Mi9wMKEVNldFByaXZhY3lSZXF1ZXN0Ei8KCWxhc3Rfc2VlbhgBIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIAIgBARIzCg1wcm9maWxlX3Bob3RvGAIgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgBiAEBEjMKDWZpbmRfYnlfZW1haWwYAyABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAKIAQESNgoQZmluZF9ieV91c2VybmFtZRgEIAEoDjIXLmFwcC52MS5Qcml2YWN5QXVkaWVuY2VIA4gBARIzCg1hZGRfdG9fZ3JvdXBzGAUgASgOMhcuYXBwLnYxLlByaXZhY3lBdWRpZW5jZUgEiAEBEjMKDXNlbmRfbWVzc2FnZXMYBiABKA4yFy5hcHAudjEuUHJpdmFjeUF1ZGllbmNlSAWIAQESIQoUbm90aWZpY2F0aW9uX3ByZXZpZXcYByABKAhIBogBAUIMCgpfbGFzdF9zZWVuQhAKDl9wcm9maWxlX3Bob3RvQhAKDl9maW5kX2J5X2VtYWlsQhMKEV9maW5kX2J5X3VzZXJuYW1lQhAKDl9hZGRfdG9fZ3JvdXBzQhAKDl9zZW5kX21lc3NhZ2VzQhcKFV9ub3RpZmljYXRpb25fcHJldmlldyI/ChJTZXRQcml2YWN5UmVzcG9uc2USKQoIc2V0dGluZ3MYASABKAsyFy5hcHAudjEuUHJpdmFjeVNldHRpbmdzIjkKEFJlcG9ydGVkTWVzc2FnZXMSEwoHY2hhdF9pZBgBIAEoA0ICMAISEAoEc2VxcxgCIAMoA0ICMAIirAEKDVJlcG9ydFJlcXVlc3QSFQoHdXNlcl9pZBgBIAEoA0ICMAJIABIVCgdjaGF0X2lkGAIgASgDQgIwAkgAEiwKCG1lc3NhZ2VzGAMgASgLMhguYXBwLnYxLlJlcG9ydGVkTWVzc2FnZXNIABIkCgZyZWFzb24YBCABKA4yFC5hcHAudjEuUmVwb3J0UmVhc29uEg8KB2NvbW1lbnQYBSABKAlCCAoGdGFyZ2V0IhAKDlJlcG9ydFJlc3BvbnNlIlkKEUFkZENvbnRhY3RSZXF1ZXN0EhUKB3VzZXJfaWQYASABKANCAjACSAASEgoIdXNlcm5hbWUYAiABKAlIABIPCgVlbWFpbBgDIAEoCUgAQggKBnRhcmdldCIwChJBZGRDb250YWN0UmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyIisKFERlbGV0ZUNvbnRhY3RSZXF1ZXN0EhMKB3VzZXJfaWQYASABKANCAjACIhcKFURlbGV0ZUNvbnRhY3RSZXNwb25zZSIzChJHZXRDb250YWN0c1JlcXVlc3QSDgoGY3Vyc29yGAEgASgJEg0KBWxpbWl0GAIgASgFImoKE0dldENvbnRhY3RzUmVzcG9uc2USGwoFdXNlcnMYASADKAsyDC5hcHAudjEuVXNlchITCgtuZXh0X2N1cnNvchgCIAEoCRIhCghjb250YWN0cxgDIAMoCzIPLmFwcC52MS5Db250YWN0IjQKB0NvbnRhY3QSEwoHdXNlcl9pZBgBIAEoA0ICMAISFAoIYWRkZWRfYXQYAiABKANCAjACIjcKFkdldEJsb2NrZWRVc2Vyc1JlcXVlc3QSDgoGY3Vyc29yGAEgASgJEg0KBWxpbWl0GAIgASgFIjoKC0Jsb2NrZWRVc2VyEhMKB3VzZXJfaWQYASABKANCAjACEhYKCmJsb2NrZWRfYXQYAiABKANCAjACInEKF0dldEJsb2NrZWRVc2Vyc1Jlc3BvbnNlEiQKB2Jsb2NrZWQYASADKAsyEy5hcHAudjEuQmxvY2tlZFVzZXISGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchITCgtuZXh0X2N1cnNvchgDIAEoCSrNAQoOVXNlclN0YXR1c0tpbmQSIAocVVNFUl9TVEFUVVNfS0lORF9VTlNQRUNJRklFRBAAEhsKF1VTRVJfU1RBVFVTX0tJTkRfT05MSU5FEAESHAoYVVNFUl9TVEFUVVNfS0lORF9PRkZMSU5FEAISHQoZVVNFUl9TVEFUVVNfS0lORF9SRUNFTlRMWRADEh4KGlVTRVJfU1RBVFVTX0tJTkRfTEFTVF9XRUVLEAQSHwobVVNFUl9TVEFUVVNfS0lORF9MQVNUX01PTlRIEAUqiAEKFUFjY291bnREZWxldGlvblJlYXNvbhInCiNBQ0NPVU5UX0RFTEVUSU9OX1JFQVNPTl9VTlNQRUNJRklFRBAAEiAKHEFDQ09VTlRfREVMRVRJT05fUkVBU09OX1VTRVIQARIkCiBBQ0NPVU5UX0RFTEVUSU9OX1JFQVNPTl9JTkFDVElWRRACKo4BCg9Qcml2YWN5QXVkaWVuY2USIAocUFJJVkFDWV9BVURJRU5DRV9VTlNQRUNJRklFRBAAEh0KGVBSSVZBQ1lfQVVESUVOQ0VfRVZFUllPTkUQARIdChlQUklWQUNZX0FVRElFTkNFX0NPTlRBQ1RTEAISGwoXUFJJVkFDWV9BVURJRU5DRV9OT0JPRFkQAyqHAgoMUmVwb3J0UmVhc29uEh0KGVJFUE9SVF9SRUFTT05fVU5TUEVDSUZJRUQQABIWChJSRVBPUlRfUkVBU09OX1NQQU0QARIaChZSRVBPUlRfUkVBU09OX1ZJT0xFTkNFEAISHQoZUkVQT1JUX1JFQVNPTl9DSElMRF9BQlVTRRADEhkKFVJFUE9SVF9SRUFTT05fSUxMRUdBTBAEEh8KG1JFUE9SVF9SRUFTT05fUEVSU09OQUxfREFUQRAFEhcKE1JFUE9SVF9SRUFTT05fT1RIRVIQBhIWChJSRVBPUlRfUkVBU09OX1NDQU0QBxIYChRSRVBPUlRfUkVBU09OX1NFWFVBTBAIMp8ICgxVc2Vyc1NlcnZpY2USOgoHR2V0U2VsZhIWLmFwcC52MS5HZXRTZWxmUmVxdWVzdBoXLmFwcC52MS5HZXRTZWxmUmVzcG9uc2USPQoIR2V0VXNlcnMSFy5hcHAudjEuR2V0VXNlcnNSZXF1ZXN0GhguYXBwLnYxLkdldFVzZXJzUmVzcG9uc2USTAoNVXBkYXRlUHJvZmlsZRIcLmFwcC52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBodLmFwcC52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2USRgoLU2V0VXNlcm5hbWUSGi5hcHAudjEuU2V0VXNlcm5hbWVSZXF1ZXN0GhsuYXBwLnYxLlNldFVzZXJuYW1lUmVzcG9uc2USUgoPUmVzb2x2ZVVzZXJuYW1lEh4uYXBwLnYxLlJlc29sdmVVc2VybmFtZVJlcXVlc3QaHy5hcHAudjEuUmVzb2x2ZVVzZXJuYW1lUmVzcG9uc2USRgoLU2VhcmNoVXNlcnMSGi5hcHAudjEuU2VhcmNoVXNlcnNSZXF1ZXN0GhsuYXBwLnYxLlNlYXJjaFVzZXJzUmVzcG9uc2USNAoFQmxvY2sSFC5hcHAudjEuQmxvY2tSZXF1ZXN0GhUuYXBwLnYxLkJsb2NrUmVzcG9uc2USOgoHVW5ibG9jaxIWLmFwcC52MS5VbmJsb2NrUmVxdWVzdBoXLmFwcC52MS5VbmJsb2NrUmVzcG9uc2USQwoKR2V0UHJpdmFjeRIZLmFwcC52MS5HZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5HZXRQcml2YWN5UmVzcG9uc2USQwoKU2V0UHJpdmFjeRIZLmFwcC52MS5TZXRQcml2YWN5UmVxdWVzdBoaLmFwcC52MS5TZXRQcml2YWN5UmVzcG9uc2USNwoGUmVwb3J0EhUuYXBwLnYxLlJlcG9ydFJlcXVlc3QaFi5hcHAudjEuUmVwb3J0UmVzcG9uc2USQwoKQWRkQ29udGFjdBIZLmFwcC52MS5BZGRDb250YWN0UmVxdWVzdBoaLmFwcC52MS5BZGRDb250YWN0UmVzcG9uc2USTAoNRGVsZXRlQ29udGFjdBIcLmFwcC52MS5EZWxldGVDb250YWN0UmVxdWVzdBodLmFwcC52MS5EZWxldGVDb250YWN0UmVzcG9uc2USRgoLR2V0Q29udGFjdHMSGi5hcHAudjEuR2V0Q29udGFjdHNSZXF1ZXN0GhsuYXBwLnYxLkdldENvbnRhY3RzUmVzcG9uc2USUgoPR2V0QmxvY2tlZFVzZXJzEh4uYXBwLnYxLkdldEJsb2NrZWRVc2Vyc1JlcXVlc3QaHy5hcHAudjEuR2V0QmxvY2tlZFVzZXJzUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_media]);
 
 /**
  * @generated from message app.v1.UserStatus
@@ -114,6 +114,15 @@ export type User = Message<"app.v1.User"> & {
    * @generated from field: string bot_inline_placeholder = 11;
    */
   botInlinePlaceholder: string;
+
+  /**
+   * The account was deleted or waits for deletion (PrivacyService): clients
+   * show it as a deleted account. username, name, bio and email are then
+   * empty and nobody can write to it. Never set for the caller's own user.
+   *
+   * @generated from field: bool deleted = 12;
+   */
+  deleted: boolean;
 };
 
 /**
@@ -161,6 +170,16 @@ export type GetSelfResponse = Message<"app.v1.GetSelfResponse"> & {
    * @generated from field: bool is_operator = 2;
    */
   isOperator: boolean;
+
+  /**
+   * Set while the caller's account waits for deletion. Such a session may
+   * only call GetSelf, PrivacyService.CancelAccountDeletion and
+   * AuthService.SignOut; every other call fails with failed_precondition
+   * "account_pending_deletion".
+   *
+   * @generated from field: app.v1.AccountDeletion deletion = 3;
+   */
+  deletion?: AccountDeletion | undefined;
 };
 
 /**
@@ -169,6 +188,38 @@ export type GetSelfResponse = Message<"app.v1.GetSelfResponse"> & {
  */
 export const GetSelfResponseSchema: GenMessage<GetSelfResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_users, 3);
+
+/**
+ * An account in its grace period: locked, shown to others as deleted, and
+ * erased at purge_at unless the user cancels.
+ *
+ * @generated from message app.v1.AccountDeletion
+ */
+export type AccountDeletion = Message<"app.v1.AccountDeletion"> & {
+  /**
+   * Unix seconds.
+   *
+   * @generated from field: int64 requested_at = 1 [jstype = JS_NUMBER];
+   */
+  requestedAt: bigint;
+
+  /**
+   * @generated from field: int64 purge_at = 2 [jstype = JS_NUMBER];
+   */
+  purgeAt: bigint;
+
+  /**
+   * @generated from field: app.v1.AccountDeletionReason reason = 3;
+   */
+  reason: AccountDeletionReason;
+};
+
+/**
+ * Describes the message app.v1.AccountDeletion.
+ * Use `create(AccountDeletionSchema)` to create a new message.
+ */
+export const AccountDeletionSchema: GenMessage<AccountDeletion> = /*@__PURE__*/
+  messageDesc(file_app_v1_users, 4);
 
 /**
  * @generated from message app.v1.GetUsersRequest
@@ -185,7 +236,7 @@ export type GetUsersRequest = Message<"app.v1.GetUsersRequest"> & {
  * Use `create(GetUsersRequestSchema)` to create a new message.
  */
 export const GetUsersRequestSchema: GenMessage<GetUsersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 4);
+  messageDesc(file_app_v1_users, 5);
 
 /**
  * @generated from message app.v1.GetUsersResponse
@@ -207,7 +258,7 @@ export type GetUsersResponse = Message<"app.v1.GetUsersResponse"> & {
  * Use `create(GetUsersResponseSchema)` to create a new message.
  */
 export const GetUsersResponseSchema: GenMessage<GetUsersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 5);
+  messageDesc(file_app_v1_users, 6);
 
 /**
  * @generated from message app.v1.UpdateProfileRequest
@@ -238,7 +289,7 @@ export type UpdateProfileRequest = Message<"app.v1.UpdateProfileRequest"> & {
  * Use `create(UpdateProfileRequestSchema)` to create a new message.
  */
 export const UpdateProfileRequestSchema: GenMessage<UpdateProfileRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 6);
+  messageDesc(file_app_v1_users, 7);
 
 /**
  * @generated from message app.v1.UpdateProfileResponse
@@ -255,7 +306,7 @@ export type UpdateProfileResponse = Message<"app.v1.UpdateProfileResponse"> & {
  * Use `create(UpdateProfileResponseSchema)` to create a new message.
  */
 export const UpdateProfileResponseSchema: GenMessage<UpdateProfileResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 7);
+  messageDesc(file_app_v1_users, 8);
 
 /**
  * @generated from message app.v1.SetUsernameRequest
@@ -272,7 +323,7 @@ export type SetUsernameRequest = Message<"app.v1.SetUsernameRequest"> & {
  * Use `create(SetUsernameRequestSchema)` to create a new message.
  */
 export const SetUsernameRequestSchema: GenMessage<SetUsernameRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 8);
+  messageDesc(file_app_v1_users, 9);
 
 /**
  * @generated from message app.v1.SetUsernameResponse
@@ -289,7 +340,7 @@ export type SetUsernameResponse = Message<"app.v1.SetUsernameResponse"> & {
  * Use `create(SetUsernameResponseSchema)` to create a new message.
  */
 export const SetUsernameResponseSchema: GenMessage<SetUsernameResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 9);
+  messageDesc(file_app_v1_users, 10);
 
 /**
  * @generated from message app.v1.ResolveUsernameRequest
@@ -309,7 +360,7 @@ export type ResolveUsernameRequest = Message<"app.v1.ResolveUsernameRequest"> & 
  * Use `create(ResolveUsernameRequestSchema)` to create a new message.
  */
 export const ResolveUsernameRequestSchema: GenMessage<ResolveUsernameRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 10);
+  messageDesc(file_app_v1_users, 11);
 
 /**
  * @generated from message app.v1.ResolveUsernameResponse
@@ -326,7 +377,7 @@ export type ResolveUsernameResponse = Message<"app.v1.ResolveUsernameResponse"> 
  * Use `create(ResolveUsernameResponseSchema)` to create a new message.
  */
 export const ResolveUsernameResponseSchema: GenMessage<ResolveUsernameResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 11);
+  messageDesc(file_app_v1_users, 12);
 
 /**
  * @generated from message app.v1.SearchUsersRequest
@@ -348,7 +399,7 @@ export type SearchUsersRequest = Message<"app.v1.SearchUsersRequest"> & {
  * Use `create(SearchUsersRequestSchema)` to create a new message.
  */
 export const SearchUsersRequestSchema: GenMessage<SearchUsersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 12);
+  messageDesc(file_app_v1_users, 13);
 
 /**
  * @generated from message app.v1.SearchUsersResponse
@@ -365,7 +416,7 @@ export type SearchUsersResponse = Message<"app.v1.SearchUsersResponse"> & {
  * Use `create(SearchUsersResponseSchema)` to create a new message.
  */
 export const SearchUsersResponseSchema: GenMessage<SearchUsersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 13);
+  messageDesc(file_app_v1_users, 14);
 
 /**
  * @generated from message app.v1.BlockRequest
@@ -382,7 +433,7 @@ export type BlockRequest = Message<"app.v1.BlockRequest"> & {
  * Use `create(BlockRequestSchema)` to create a new message.
  */
 export const BlockRequestSchema: GenMessage<BlockRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 14);
+  messageDesc(file_app_v1_users, 15);
 
 /**
  * @generated from message app.v1.BlockResponse
@@ -395,7 +446,7 @@ export type BlockResponse = Message<"app.v1.BlockResponse"> & {
  * Use `create(BlockResponseSchema)` to create a new message.
  */
 export const BlockResponseSchema: GenMessage<BlockResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 15);
+  messageDesc(file_app_v1_users, 16);
 
 /**
  * @generated from message app.v1.UnblockRequest
@@ -412,7 +463,7 @@ export type UnblockRequest = Message<"app.v1.UnblockRequest"> & {
  * Use `create(UnblockRequestSchema)` to create a new message.
  */
 export const UnblockRequestSchema: GenMessage<UnblockRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 16);
+  messageDesc(file_app_v1_users, 17);
 
 /**
  * @generated from message app.v1.UnblockResponse
@@ -425,7 +476,7 @@ export type UnblockResponse = Message<"app.v1.UnblockResponse"> & {
  * Use `create(UnblockResponseSchema)` to create a new message.
  */
 export const UnblockResponseSchema: GenMessage<UnblockResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 17);
+  messageDesc(file_app_v1_users, 18);
 
 /**
  * @generated from message app.v1.PrivacySettings
@@ -474,7 +525,7 @@ export type PrivacySettings = Message<"app.v1.PrivacySettings"> & {
  * Use `create(PrivacySettingsSchema)` to create a new message.
  */
 export const PrivacySettingsSchema: GenMessage<PrivacySettings> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 18);
+  messageDesc(file_app_v1_users, 19);
 
 /**
  * @generated from message app.v1.GetPrivacyRequest
@@ -487,7 +538,7 @@ export type GetPrivacyRequest = Message<"app.v1.GetPrivacyRequest"> & {
  * Use `create(GetPrivacyRequestSchema)` to create a new message.
  */
 export const GetPrivacyRequestSchema: GenMessage<GetPrivacyRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 19);
+  messageDesc(file_app_v1_users, 20);
 
 /**
  * @generated from message app.v1.GetPrivacyResponse
@@ -504,7 +555,7 @@ export type GetPrivacyResponse = Message<"app.v1.GetPrivacyResponse"> & {
  * Use `create(GetPrivacyResponseSchema)` to create a new message.
  */
 export const GetPrivacyResponseSchema: GenMessage<GetPrivacyResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 20);
+  messageDesc(file_app_v1_users, 21);
 
 /**
  * @generated from message app.v1.SetPrivacyRequest
@@ -553,7 +604,7 @@ export type SetPrivacyRequest = Message<"app.v1.SetPrivacyRequest"> & {
  * Use `create(SetPrivacyRequestSchema)` to create a new message.
  */
 export const SetPrivacyRequestSchema: GenMessage<SetPrivacyRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 21);
+  messageDesc(file_app_v1_users, 22);
 
 /**
  * @generated from message app.v1.SetPrivacyResponse
@@ -570,7 +621,7 @@ export type SetPrivacyResponse = Message<"app.v1.SetPrivacyResponse"> & {
  * Use `create(SetPrivacyResponseSchema)` to create a new message.
  */
 export const SetPrivacyResponseSchema: GenMessage<SetPrivacyResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 22);
+  messageDesc(file_app_v1_users, 23);
 
 /**
  * @generated from message app.v1.ReportedMessages
@@ -592,7 +643,7 @@ export type ReportedMessages = Message<"app.v1.ReportedMessages"> & {
  * Use `create(ReportedMessagesSchema)` to create a new message.
  */
 export const ReportedMessagesSchema: GenMessage<ReportedMessages> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 23);
+  messageDesc(file_app_v1_users, 24);
 
 /**
  * @generated from message app.v1.ReportRequest
@@ -639,7 +690,7 @@ export type ReportRequest = Message<"app.v1.ReportRequest"> & {
  * Use `create(ReportRequestSchema)` to create a new message.
  */
 export const ReportRequestSchema: GenMessage<ReportRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 24);
+  messageDesc(file_app_v1_users, 25);
 
 /**
  * @generated from message app.v1.ReportResponse
@@ -652,7 +703,7 @@ export type ReportResponse = Message<"app.v1.ReportResponse"> & {
  * Use `create(ReportResponseSchema)` to create a new message.
  */
 export const ReportResponseSchema: GenMessage<ReportResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 25);
+  messageDesc(file_app_v1_users, 26);
 
 /**
  * @generated from message app.v1.AddContactRequest
@@ -695,7 +746,7 @@ export type AddContactRequest = Message<"app.v1.AddContactRequest"> & {
  * Use `create(AddContactRequestSchema)` to create a new message.
  */
 export const AddContactRequestSchema: GenMessage<AddContactRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 26);
+  messageDesc(file_app_v1_users, 27);
 
 /**
  * @generated from message app.v1.AddContactResponse
@@ -712,7 +763,7 @@ export type AddContactResponse = Message<"app.v1.AddContactResponse"> & {
  * Use `create(AddContactResponseSchema)` to create a new message.
  */
 export const AddContactResponseSchema: GenMessage<AddContactResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 27);
+  messageDesc(file_app_v1_users, 28);
 
 /**
  * @generated from message app.v1.DeleteContactRequest
@@ -729,7 +780,7 @@ export type DeleteContactRequest = Message<"app.v1.DeleteContactRequest"> & {
  * Use `create(DeleteContactRequestSchema)` to create a new message.
  */
 export const DeleteContactRequestSchema: GenMessage<DeleteContactRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 28);
+  messageDesc(file_app_v1_users, 29);
 
 /**
  * @generated from message app.v1.DeleteContactResponse
@@ -742,7 +793,7 @@ export type DeleteContactResponse = Message<"app.v1.DeleteContactResponse"> & {
  * Use `create(DeleteContactResponseSchema)` to create a new message.
  */
 export const DeleteContactResponseSchema: GenMessage<DeleteContactResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 29);
+  messageDesc(file_app_v1_users, 30);
 
 /**
  * @generated from message app.v1.GetContactsRequest
@@ -766,7 +817,7 @@ export type GetContactsRequest = Message<"app.v1.GetContactsRequest"> & {
  * Use `create(GetContactsRequestSchema)` to create a new message.
  */
 export const GetContactsRequestSchema: GenMessage<GetContactsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 30);
+  messageDesc(file_app_v1_users, 31);
 
 /**
  * @generated from message app.v1.GetContactsResponse
@@ -797,7 +848,7 @@ export type GetContactsResponse = Message<"app.v1.GetContactsResponse"> & {
  * Use `create(GetContactsResponseSchema)` to create a new message.
  */
 export const GetContactsResponseSchema: GenMessage<GetContactsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 31);
+  messageDesc(file_app_v1_users, 32);
 
 /**
  * @generated from message app.v1.Contact
@@ -821,7 +872,7 @@ export type Contact = Message<"app.v1.Contact"> & {
  * Use `create(ContactSchema)` to create a new message.
  */
 export const ContactSchema: GenMessage<Contact> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 32);
+  messageDesc(file_app_v1_users, 33);
 
 /**
  * @generated from message app.v1.GetBlockedUsersRequest
@@ -847,7 +898,7 @@ export type GetBlockedUsersRequest = Message<"app.v1.GetBlockedUsersRequest"> & 
  * Use `create(GetBlockedUsersRequestSchema)` to create a new message.
  */
 export const GetBlockedUsersRequestSchema: GenMessage<GetBlockedUsersRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 33);
+  messageDesc(file_app_v1_users, 34);
 
 /**
  * @generated from message app.v1.BlockedUser
@@ -869,7 +920,7 @@ export type BlockedUser = Message<"app.v1.BlockedUser"> & {
  * Use `create(BlockedUserSchema)` to create a new message.
  */
 export const BlockedUserSchema: GenMessage<BlockedUser> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 34);
+  messageDesc(file_app_v1_users, 35);
 
 /**
  * @generated from message app.v1.GetBlockedUsersResponse
@@ -898,7 +949,7 @@ export type GetBlockedUsersResponse = Message<"app.v1.GetBlockedUsersResponse"> 
  * Use `create(GetBlockedUsersResponseSchema)` to create a new message.
  */
 export const GetBlockedUsersResponseSchema: GenMessage<GetBlockedUsersResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_users, 35);
+  messageDesc(file_app_v1_users, 36);
 
 /**
  * Presence as visible to the caller after privacy rules are applied.
@@ -950,6 +1001,38 @@ export const UserStatusKindSchema: GenEnum<UserStatusKind> = /*@__PURE__*/
   enumDesc(file_app_v1_users, 0);
 
 /**
+ * Why an account waits for deletion.
+ *
+ * @generated from enum app.v1.AccountDeletionReason
+ */
+export enum AccountDeletionReason {
+  /**
+   * @generated from enum value: ACCOUNT_DELETION_REASON_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The user asked for it (PrivacyService.DeleteAccount).
+   *
+   * @generated from enum value: ACCOUNT_DELETION_REASON_USER = 1;
+   */
+  USER = 1,
+
+  /**
+   * Nobody used the account for the auto-delete period the user chose.
+   *
+   * @generated from enum value: ACCOUNT_DELETION_REASON_INACTIVE = 2;
+   */
+  INACTIVE = 2,
+}
+
+/**
+ * Describes the enum app.v1.AccountDeletionReason.
+ */
+export const AccountDeletionReasonSchema: GenEnum<AccountDeletionReason> = /*@__PURE__*/
+  enumDesc(file_app_v1_users, 1);
+
+/**
  * Who a privacy rule applies to.
  *
  * @generated from enum app.v1.PrivacyAudience
@@ -980,7 +1063,7 @@ export enum PrivacyAudience {
  * Describes the enum app.v1.PrivacyAudience.
  */
 export const PrivacyAudienceSchema: GenEnum<PrivacyAudience> = /*@__PURE__*/
-  enumDesc(file_app_v1_users, 1);
+  enumDesc(file_app_v1_users, 2);
 
 /**
  * @generated from enum app.v1.ReportReason
@@ -1036,7 +1119,7 @@ export enum ReportReason {
  * Describes the enum app.v1.ReportReason.
  */
 export const ReportReasonSchema: GenEnum<ReportReason> = /*@__PURE__*/
-  enumDesc(file_app_v1_users, 2);
+  enumDesc(file_app_v1_users, 3);
 
 /**
  * Profiles, usernames, blocking and privacy settings.

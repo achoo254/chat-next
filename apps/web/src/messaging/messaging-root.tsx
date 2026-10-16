@@ -27,7 +27,8 @@ import { createIntegrations, loadIntegrationsClient } from "./integrations/api.t
 import { createBots, loadBotsClient } from "./bots/api.ts";
 import { pushOnDevice } from "./push/push-device.ts";
 import { createWebPush, loadWebPushClient } from "./push/web-push.ts";
-import { blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
+import { loadPrivacyClient } from "./settings/privacy-api.ts";
+import { accountData, blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
@@ -91,6 +92,9 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 				case "shortcuts":
 				case "app":
 					return [settingsCode.preload(), settingsExtraCode.preload()];
+				case "account":
+					warm(loadConnectWeb, loadPrivacyClient);
+					return [settingsCode.preload(), settingsExtraCode.preload(), accountData(services.transport).promise];
 			}
 			break;
 		case "console":
@@ -131,6 +135,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 	const signedOut = useEffectEvent(() => onSignedOut());
 	const currentSelf = useEffectEvent(() => self);
 	const copy = useCopy();
+	const deletedName = useEffectEvent(() => copy.message.deletedAccount);
 	// Notifications arrive outside React: they read the store and the copy through this ref.
 	const notify = useRef<{ store: ChatStore | null; hiddenBody: string }>({ store: null, hiddenBody: copy.notify.hiddenBody });
 	useEffect(() => {
@@ -169,7 +174,12 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 				const remote = createRemote(transport, () => signedOut());
 				const store = new ChatStore(
 					client.source,
-					{ selfId: self.id, onError: (err, context) => reportError(context, String(err)), fetchUsers: async (ids) => (await remote.people(ids)).map(({ presence: _presence, ...user }) => user) },
+					{
+						selfId: self.id,
+						deletedName: deletedName(),
+						onError: (err, context) => reportError(context, String(err)),
+						fetchUsers: async (ids) => (await remote.people(ids)).map(({ presence: _presence, ...user }) => user),
+					},
 					client.coldSnapshot(),
 				);
 				const backend = client.createBackend(remote, client.source);
@@ -190,6 +200,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					integrations: createIntegrations(transport, () => signedOut()),
 					bots: createBots(transport, () => signedOut()),
 					webPush: createWebPush(transport, self.id, () => signedOut()),
+					transport,
 					backend,
 					toasts: new Toasts(),
 					drafts,
@@ -330,7 +341,8 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 /**
  * The app badge: unread messages in the tab title and, where the browser has
  * it, on the installed app's icon. Muted chats count only when the user chose
- * so (core unreadTotals with NotificationSettings.badgeMuted).
+ * so (NotificationSettings.badgeMuted). Counted by ChatStore from the same
+ * dialogs as the chat list and folder badges, so they always agree.
  */
 function AppBadge() {
 	const { messages } = useUnreadTotals();

@@ -61,10 +61,10 @@ export function putChatPts(w: WriteBatch, chatId: number, chatPts: number): void
 
 export function putUser(w: WriteBatch, user: User): void {
 	w.add(
-		`INSERT INTO users (id, username, name, bio, is_bot, is_self, is_blocked) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO users (id, username, name, bio, is_bot, is_self, is_blocked, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET username = excluded.username, name = excluded.name, bio = excluded.bio,
-			is_bot = excluded.is_bot, is_self = excluded.is_self, is_blocked = excluded.is_blocked`,
-		[user.id, user.username, user.name, user.bio, flag(user.isBot), flag(user.isSelf), flag(user.isBlocked)],
+			is_bot = excluded.is_bot, is_self = excluded.is_self, is_blocked = excluded.is_blocked, deleted = excluded.deleted`,
+		[user.id, user.username, user.name, user.bio, flag(user.isBot), flag(user.isSelf), flag(user.isBlocked), flag(user.deleted === true)],
 	);
 	w.emit(EventKeys.user(user.id));
 }
@@ -314,6 +314,7 @@ export function putNewMessage(w: WriteBatch, message: Message, selfId: number): 
 		// The chat row, and the topic row of a forum message when the client
 		// keeps one.
 		const topics = message.topicId === CHAT_TOPIC ? [CHAT_TOPIC] : [CHAT_TOPIC, message.topicId];
+		const mention = mentionTest(message, selfId);
 		for (const topic of topics) {
 			w.add(
 				`UPDATE read_states SET unread_count = unread_count + 1
@@ -321,10 +322,47 @@ export function putNewMessage(w: WriteBatch, message: Message, selfId: number): 
 					AND NOT EXISTS (SELECT 1 FROM messages WHERE chat_id = ?1 AND seq = ?3 AND stale = 0)`,
 				[message.chatId, topic, message.seq],
 			);
+			if (mention !== null) {
+				w.add(
+					`UPDATE read_states SET unread_mentions_count = unread_mentions_count + 1
+					WHERE chat_id = ?1 AND topic_id = ?2 AND read_inbox_max_seq < ?3 AND counted_through < ?3
+						AND NOT EXISTS (SELECT 1 FROM messages WHERE chat_id = ?1 AND seq = ?3 AND stale = 0)
+						AND (${mention.sql})`,
+					[message.chatId, topic, message.seq, ...mention.params],
+				);
+			}
 		}
 	}
 	putMessage(w, message);
 	raiseTop(w, message);
+}
+
+/**
+ * SQL condition (parameters from ?4) that an incoming message mentions the
+ * user the way the server counts unread mentions (message_mentions): by id,
+ * by @username, or as a reply to one of the user's messages. null when it
+ * cannot.
+ */
+function mentionTest(message: Message, selfId: number): { sql: string; params: (number | string)[] } | null {
+	const byId = message.entities.some((entity) => entity.type === "mention_name" && entity.userId === selfId);
+	if (byId) return { sql: "1", params: [] };
+	const names = message.entities
+		.filter((entity) => entity.type === "mention")
+		.map((entity) => message.text.slice(entity.offset + 1, entity.offset + entity.length).toLowerCase())
+		.filter((name) => name !== "");
+	const tests: string[] = [];
+	const params: (number | string)[] = [selfId];
+	if (message.replyToSeq !== 0) {
+		params.push(message.replyToSeq);
+		tests.push("EXISTS (SELECT 1 FROM messages WHERE chat_id = ?1 AND seq = ?5 AND from_id = ?4)");
+	}
+	if (names.length > 0) {
+		const first = params.length + 4;
+		params.push(...names);
+		const list = names.map((_, index) => `?${first + index}`).join(", ");
+		tests.push(`EXISTS (SELECT 1 FROM users WHERE id = ?4 AND username <> '' AND lower(username) IN (${list}))`);
+	}
+	return tests.length === 0 ? null : { sql: tests.join(" OR "), params };
 }
 
 /** Moves the dialog top forward to `message` when it is newer; counters untouched. */
@@ -349,12 +387,18 @@ export function retopDialog(w: WriteBatch, chatId: number): void {
 	);
 }
 
-/** Optimistic local read: the position and an unread count taken locally. */
-export function putLocalRead(w: WriteBatch, chatId: number, maxSeq: number, unreadCount: number): void {
+/**
+ * Optimistic local read: the position and the unread and mention counts
+ * taken from the messages this device holds. The server's read update for
+ * this read is not applied here (the ack moves past it), so these counts
+ * stay until the next dialog fetch; the mention count only goes down.
+ */
+export function putLocalRead(w: WriteBatch, chatId: number, maxSeq: number, unreadCount: number, unreadMentions: number): void {
 	w.add(
-		`UPDATE read_states SET read_inbox_max_seq = ?, unread_count = ?
-		WHERE chat_id = ? AND topic_id = ? AND read_inbox_max_seq <= ?`,
-		[maxSeq, unreadCount, chatId, CHAT_TOPIC, maxSeq],
+		`UPDATE read_states SET read_inbox_max_seq = ?1, unread_count = ?2,
+			unread_mentions_count = min(unread_mentions_count, ?5)
+		WHERE chat_id = ?3 AND topic_id = ?4 AND read_inbox_max_seq <= ?1`,
+		[maxSeq, unreadCount, chatId, CHAT_TOPIC, unreadMentions],
 	);
 	w.emit(EventKeys.dialog(chatId));
 }
@@ -380,9 +424,9 @@ export function putRead(w: WriteBatch, read: Extract<UpdateBody, { kind: "read" 
 		WHERE chat_id = ?1 AND seq > ?2 AND from_id <> ?3 AND stale = 0 AND recalled = 0`;
 	w.add(
 		`UPDATE read_states SET read_inbox_max_seq = max(read_inbox_max_seq, ?4),
-			unread_count = ?5 + (${beyond}), counted_through = ?2
+			unread_count = ?5 + (${beyond}), unread_mentions_count = ?7, counted_through = ?2
 		WHERE chat_id = ?1 AND topic_id = ?6 AND counted_through <= ?2`,
-		[chatId, read.topSeq, selfId, maxSeq, read.unreadCount, CHAT_TOPIC],
+		[chatId, read.topSeq, selfId, maxSeq, read.unreadCount, CHAT_TOPIC, read.unreadMentionsCount],
 	);
 	if (read.topicId !== CHAT_TOPIC) {
 		w.add(

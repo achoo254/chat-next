@@ -3,7 +3,8 @@ import type { SqlDriver, SqlRow } from "@app/platform";
 import type { EventBus } from "../events/bus.ts";
 import type { Chat, Dialog, Message, NotificationSettings, SearchFilters, SyncState, User } from "../model/types.ts";
 import type { TextMatch } from "../search/index.ts";
-import { num, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
+import { mentionsUser } from "../entities/index.ts";
+import { num, parseEntities, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
 import { CHAT_TOPIC, placeholders, type WriteBatch } from "./writes.ts";
 
 /** What Repository.search looks for. */
@@ -234,6 +235,27 @@ export class Repository {
 	async maxSeq(chatId: number): Promise<number> {
 		const rows = await this.driver.query("SELECT max(seq) AS seq FROM messages WHERE chat_id = ?", [chatId]);
 		return num(rows[0] ?? {}, "seq");
+	}
+
+	/**
+	 * Incoming messages after `seq` that mention the user or reply to them
+	 * (the "@" count after reading up to it); placeholders do not count.
+	 */
+	async countMentionsAfter(chatId: number, seq: number, selfId: number): Promise<number> {
+		const self = await this.driver.query("SELECT username FROM users WHERE id = ?", [selfId]);
+		const username = str(self[0] ?? {}, "username");
+		const rows = await this.driver.query(
+			`SELECT m.text, m.entities, EXISTS (
+				SELECT 1 FROM messages o WHERE o.chat_id = m.chat_id AND o.seq = m.reply_to_seq AND o.from_id = ?3
+			) AS reply_to_me
+			FROM messages m WHERE m.chat_id = ?1 AND m.seq > ?2 AND m.from_id <> ?3 AND m.recalled = 0`,
+			[chatId, seq, selfId],
+		);
+		return rows.filter(
+			(row) =>
+				num(row, "reply_to_me") !== 0 ||
+				mentionsUser(str(row, "text"), parseEntities(str(row, "entities")), selfId, username),
+		).length;
 	}
 
 	/** Incoming messages after `seq` (the unread count after reading up to it); placeholders do not count. */

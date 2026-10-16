@@ -110,6 +110,7 @@ export const en: MessagingCopy = {
 		mute: "Turn off notifications",
 		unmute: "Turn on notifications",
 		readOnly: "You cannot send messages in this chat.",
+		deletedPeer: "You cannot message a deleted account.",
 		savedSubtitle: "Only you · synced on every device",
 	},
 	pinned: {
@@ -155,6 +156,8 @@ export const en: MessagingCopy = {
 		reactionsHint: "Click to add or remove · right-click or press and hold to see who reacted",
 		recalled: "Message recalled",
 		unknownUser: "User",
+		/** An account deleted by its owner (or waiting for deletion). */
+		deletedAccount: "Deleted account",
 		deleted: "Message unsent",
 		quickActions: (name: string) => `Quick actions for ${name}'s message`,
 		quickActionsMine: "Quick actions for your message",

@@ -26,6 +26,10 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 - [Fold tiếng Việt](../spec/vi-fold/SPEC.md): đặc tả và bộ test vector mà bản TypeScript và Go cùng phải pass.
 - [Bot API](../spec/bot-api/openapi.yaml) (OpenAPI 3.1, kèm [`format.md`](../spec/bot-api/format.md)); bắt đầu nhanh cho người viết bot: [`bot-api/`](./bot-api/README.md) (token, long poll, webhook, kiểm chữ ký HMAC).
 
+## Quyền riêng tư
+
+- [Danh mục dữ liệu cá nhân](./privacy/data-inventory.md): dữ liệu app chat giữ, nơi lưu, thời hạn, cơ sở pháp lý (Nghị định 13), xuất và xoá dữ liệu.
+
 ## Kế hoạch
 
 Kế hoạch triển khai và nhật ký quyết định nằm ở [`plans/dattqh/261013-0448-chat-platform-v1/plan.md`](../plans/dattqh/261013-0448-chat-platform-v1/plan.md). Đó là bản ghi theo thời điểm, không phải tài liệu thường trực; khi plan và ADR khác nhau, ADR là quyết định hiện hành.

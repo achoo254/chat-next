@@ -543,6 +543,16 @@ aside.info { display: flex; flex-direction: column; min-width: 0; overflow-y: au
 .ban-list .row .grow { flex: 1 1 160px; }
 .ban-list .row + .row { border-top: 1px solid var(--c-border-subtle); }
 .danger-zone .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+/* Settings > Tài khoản (mockups/settings.html#export-delete). */
+.danger-zone .card-title { color: var(--c-error); }
+.ticks { margin: 0; padding-top: var(--space-1); padding-bottom: var(--space-3); list-style: none; display: grid; gap: var(--space-2); font-size: 0.875rem; }
+.ticks li { position: relative; padding-left: var(--space-4); }
+.ticks li::before { content: ""; position: absolute; left: 2px; top: 0.6em; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.grow > progress.meter { display: block; margin-top: var(--space-2); }
+.break { overflow-wrap: anywhere; }
+/* The export's file name stays on one line on a phone; the button goes below. */
+.row.export-file { flex-wrap: wrap; }
+.set-body .row.export-file > .grow { flex: 1 1 220px; }
 
 /* ---------- Dialogs (native <dialog>) ---------- */
 dialog.modal {

@@ -218,6 +218,7 @@ export function toUser(user: WireUser): User {
 		isBot: user.isBot,
 		isSelf: user.isSelf,
 		isBlocked: user.isBlocked,
+		...(user.deleted ? { deleted: true } : {}),
 	};
 }
 
@@ -506,6 +507,7 @@ function toBody(update: WireUpdate): UpdateBody {
 				topicUnreadCount: kind.value.topicUnreadCount,
 				topSeq: id(kind.value.topSeq),
 				chatPts: id(kind.value.chatPts),
+				unreadMentionsCount: kind.value.unreadMentionsCount,
 			};
 		case "pin":
 			return {

@@ -20,6 +20,8 @@ export const ACCOUNTS = {
 	giang: { name: "Giang", username: "giang" },
 	/** Signs in before the assistant exists, then gets it as an existing account. */
 	hanh: { name: "Hạnh", username: "hanh" },
+	/** Deleted by the account scenario (and signed in again as a new account). */
+	khoa: { name: "Khoa", username: "khoa" },
 } as const;
 export type AccountKey = keyof typeof ACCOUNTS;
 
@@ -125,6 +127,20 @@ export async function send(person: Person, text: string): Promise<void> {
 	await box.press("Enter");
 	await message(person, text).waitFor();
 	await message(person, text).getByRole("img", { name: "Đang gửi" }).waitFor({ state: "detached" });
+}
+
+/**
+ * Opens the open chat's info column (named `name`) when it is closed. The
+ * toggle's pressed state says whether it is open: on a wide screen the
+ * column opens by default and may still be loading (unnamed), and a click
+ * then would close it.
+ */
+export async function chatInfo(person: Person, name: string | RegExp): Promise<Locator> {
+	const info = person.page.getByRole("complementary", { name });
+	const toggle = person.page.getByRole("button", { name: "Thông tin chat" });
+	if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
+	await info.waitFor();
+	return info;
 }
 
 /** Opens the action menu of the message containing text (right click). */

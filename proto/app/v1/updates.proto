@@ -136,6 +136,10 @@ message UpdateRead {
   // unread_count covers incoming messages up to it; later ones are unread on
   // top of it.
   int64 top_seq = 8 [jstype = JS_NUMBER];
+  // Inbox only: unread messages that mention the user or reply to them,
+  // left after this read over the whole chat (counted like
+  // Dialog.unread_mentions_count, up to 1000).
+  int32 unread_mentions_count = 9;
 }
 
 // A message was pinned or unpinned; the caller's Dialog pinned count and

@@ -35,6 +35,11 @@ type User struct {
 	EmailVerified bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	// DeletionRequestedAt starts the deletion grace period (nil when the
+	// account is not waiting for deletion); DeletionReason is then "user"
+	// or "inactive".
+	DeletionRequestedAt *time.Time
+	DeletionReason      string
 }
 
 // IdPEmail is the email state the IdP reports; only a verified address is
@@ -79,15 +84,18 @@ func (p IdPProfile) fallbackName() string {
 	return profile.InitialName("", p.PreferredUsername, profile.UsernameBase(p.PreferredUsername))
 }
 
-const userColumns = `id, tenant_id, coalesce(idp_sub, ''), username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at`
+const userColumns = `id, tenant_id, coalesce(idp_sub, ''), username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at,
+	deletion_requested_at, coalesce(deletion_reason, '')`
 
 // qualifiedUserColumns is userColumns for statements that join users (as u)
 // with another relation.
-const qualifiedUserColumns = `u.id, u.tenant_id, coalesce(u.idp_sub, ''), u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at`
+const qualifiedUserColumns = `u.id, u.tenant_id, coalesce(u.idp_sub, ''), u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at,
+	u.deletion_requested_at, coalesce(u.deletion_reason, '')`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.TenantID, &u.IdPSub, &u.Username, &u.Name, &u.Bio, &u.Email, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.TenantID, &u.IdPSub, &u.Username, &u.Name, &u.Bio, &u.Email, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt,
+		&u.DeletionRequestedAt, &u.DeletionReason)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}

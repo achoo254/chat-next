@@ -111,6 +111,7 @@ export const vi = {
 		mute: "Tắt thông báo",
 		unmute: "Bật thông báo",
 		readOnly: "Bạn không có quyền gửi tin trong chat này.",
+		deletedPeer: "Không nhắn tin được cho tài khoản đã xoá.",
 		savedSubtitle: "Chỉ mình bạn thấy · đồng bộ mọi máy",
 	},
 	pinned: {
@@ -162,6 +163,8 @@ export const vi = {
 		reactionsHint: "Bấm để thả hoặc bỏ · chuột phải hoặc nhấn giữ để xem ai đã thả",
 		recalled: "Tin nhắn đã thu hồi",
 		unknownUser: "Người dùng",
+		/** An account deleted by its owner (or waiting for deletion). */
+		deletedAccount: "Tài khoản đã xoá",
 		deleted: "Tin nhắn đã thu hồi",
 		quickActions: (name: string) => `Thao tác nhanh với tin của ${name}`,
 		quickActionsMine: "Thao tác nhanh với tin của bạn",

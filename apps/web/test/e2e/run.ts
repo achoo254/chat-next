@@ -1,5 +1,5 @@
 // Multi-user end-to-end runner: starts the local backend (server/cmd/e2e-stack:
-// throwaway PostgreSQL, fake IdP with the test accounts An, Bình, Chi (operator), Dũng, Giang and Hạnh,
+// throwaway PostgreSQL, fake IdP with the test accounts An, Bình, Chi (operator), Dũng, Giang, Hạnh and Khoa,
 // the real api) and the Vite dev server, runs the *.e2e.ts files with
 // node:test, then stops everything it started.
 //

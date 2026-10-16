@@ -19,6 +19,7 @@ import { useNotificationSettings, useServices } from "../data/services.tsx";
 import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
 import { DevicePush, usePushOnDevice } from "./device-push.tsx";
 import { InstallSettings } from "./install-app.tsx";
+import { AccountSettings } from "./account-settings.tsx";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
 
 export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
@@ -35,6 +36,8 @@ export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
 			return <ShortcutSettings />;
 		case "app":
 			return <InstallSettings />;
+		case "account":
+			return <AccountSettings />;
 		default:
 			return null;
 	}

@@ -82,12 +82,12 @@ Create:
 
 ## Todo
 
-- [ ] Data inventory + đánh giá ND13
+- [ ] Data inventory + đánh giá ND13 (inventory xong: [`docs/privacy/data-inventory.md`](../../../docs/privacy/data-inventory.md); còn hồ sơ đánh giá chuyển dữ liệu ra nước ngoài)
 - [ ] Cài đặt riêng tư + áp dụng toàn hệ thống (R1: danh bạ tường minh, ai thêm vào nhóm/last seen/nhắn tin; còn hoàn thiện ở R9)
 - [ ] Giới hạn dò tìm
 - [ ] Chặn/báo cáo/kiểm duyệt + công cụ vận hành (R1: chặn, báo cáo, kick = cấm; còn hàng đợi kiểm duyệt có RPC)
 - [ ] Chống spam tài khoản/bot/webhook
-- [ ] Xoá/tự huỷ/xuất dữ liệu
+- [x] Xoá/tự huỷ/xuất dữ liệu (R9, 2026-10-16, migration 0019)
 - [ ] Redact PII + secret trong log
 - [ ] Xoay vòng khoá + runbook
 - [ ] Review STRIDE + security scan
@@ -98,6 +98,14 @@ Create:
 - Hành động: bỏ qua, xoá tin, cấm tác giả khỏi chat, khoá tài khoản chat có thời hạn hoặc tới khi gỡ (thu hồi mọi phiên, chặn mọi thao tác ghi). Ghi chú bắt buộc; mọi hành động vào `moderation_log` chỉ thêm.
 - Chưa có: gộp báo cáo theo đối tượng, người đang xem, cảnh cáo, gửi thông báo cho người bị xử lý, tắt webhook, dấu xác minh bot (theo R2/R5).
 - Cách cấp quyền: [`docs/deployment-guide.md`](../../../docs/deployment-guide.md#tài-khoản-vận-hành-kiểm-duyệt).
+
+### Xuất và xoá dữ liệu R9 (2026-10-16, migration 0019)
+
+- `PrivacyService` (`proto/app/v1/privacy.proto`), package `server/internal/privacy`, tab Cài đặt › Tài khoản (`mockups/settings.html#export-delete`).
+- Xuất: ZIP JSON + `index.html` + `media/`, chỉ dữ liệu của chính người dùng (tin mình gửi, Cloud của tôi; không tin của người khác), dựng nền từng cái một, giới hạn 4 GB file, giữ 30 ngày ở `MEDIA_ROOT/exports`, mỗi 7 ngày một lần (lần lỗi không tính), tải qua link ký 10 phút trên host media (`/f/export/…`, không đổi nginx).
+- Xoá (quyết định của Jev): tin gửi trong chat người khác giữ lại với người gửi "Tài khoản đã xoá"; chặn khi còn là chủ nhóm/kênh; xác nhận (đăng nhập IdP ≤ 10 phút + gõ username) khoá ngay: thu hồi mọi phiên và grant IdP, bot dừng (token bị từ chối, webhook tạm dừng), người khác thấy "Tài khoản đã xoá"; đăng nhập lại trong 30 ngày chỉ có "Huỷ xoá tài khoản"; hết 30 ngày job hằng giờ xoá hẳn (rời nhóm, xoá Cloud của tôi và chat riêng không còn ai giữ, xoá danh bạ/chặn/cài đặt/phiên/push/bot, nhả username, xoá `idp_sub`). Đăng nhập lại sau đó tạo tài khoản mới.
+- Tự xoá: Tắt/6/12/24 tháng tính từ lần cuối một phiên được dùng; đến hạn đi cùng đường xoá (30 ngày chờ, lý do hiện ở lần đăng nhập sau). Riêng đường này, chủ nhóm/kênh được chuyển quyền tự động (phó nhóm lâu nhất, không có thì thành viên lâu nhất; nhóm không còn ai thì xoá).
+- Thành viên chung nhóm thấy tên mới khi người đó xuất hiện lại trong update hoặc tra cứu; người chat riêng được báo ngay (`chat_updated`).
 
 ## Success Criteria
 

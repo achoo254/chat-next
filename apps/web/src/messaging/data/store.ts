@@ -7,6 +7,7 @@ import {
 	EventKeys,
 	isMuted,
 	MUTE_FOREVER,
+	unreadTotals,
 	type Chat,
 	type ConnectionState,
 	type DialogView,
@@ -45,6 +46,8 @@ export interface ChatWindow {
 	readonly focusSeq: number;
 	/** Bumps on every jump so the list scrolls even to the same seq. */
 	readonly focusToken: number;
+	/** Bumps on every opening of the chat, so the list goes to the unread divider again. */
+	readonly openings: number;
 	/** Messages of this chat still in the outbox (the offline banner counts them). */
 	readonly pendingCount: number;
 }
@@ -116,6 +119,11 @@ function sameKeys<T>(a: readonly T[], b: readonly T[]): boolean {
 	return a.length === b.length && a.every((key, index) => key === b[index]);
 }
 
+/** Where the unread divider of a chat goes: after its read position while something is unread; 0 for none. */
+function unreadFrom(view: DialogView): number {
+	return view.dialog.unreadCount > 0 ? view.dialog.readInboxMaxSeq + 1 : 0;
+}
+
 /** Runs `task` at most once at a time; calls made meanwhile collapse into one rerun. */
 class Coalescer {
 	private running = false;
@@ -161,6 +169,8 @@ export interface StoreOptions {
 	 * user); this tab then fills them in itself.
 	 */
 	readonly fetchUsers?: (ids: readonly number[]) => Promise<User[]>;
+	/** The name a deleted account shows under ("Tài khoản đã xoá"); the server sends none. */
+	readonly deletedName?: string;
 }
 
 export class ChatStore {
@@ -174,7 +184,6 @@ export class ChatStore {
 	private settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
 	private totals: UnreadTotals = { messages: 0, chats: 0 };
 	private readonly settingsRefresh = new Coalescer(() => this.loadSettings());
-	private readonly totalsRefresh = new Coalescer(() => this.loadTotals());
 	private muteTimer: ReturnType<typeof setTimeout> | undefined;
 	private listStatus: ListStatus = "loading";
 	private readonly users = new Map<number, User>();
@@ -191,11 +200,22 @@ export class ChatStore {
 	private readonly dialogRefresh = new Coalescer(() => this.loadDialogs());
 	private readyWaiters: (() => void)[] = [];
 	/**
-	 * Windows whose unread divider still follows the dialog's read position:
-	 * during a sync the read state can land after the messages. Tracking ends
-	 * when this client marks the chat read (settleUnread).
+	 * Open windows whose unread divider follows the dialog's read position:
+	 * during a sync the server's read state can land after the messages.
+	 * Moves caused by this client's own reading (ownReads) leave it where
+	 * the reader found it.
 	 */
 	private readonly unreadTracking = new Set<number>();
+	/** Newest seq this client marked read in each chat since it was opened. */
+	private readonly ownReads = new Map<number, number>();
+	/**
+	 * Chats read live: open in a visible tab with their newest message on
+	 * screen. New messages there are read as they arrive and never show as
+	 * unread in between; the value is the newest seq already marked read.
+	 */
+	private readonly liveRead = new Map<number, number>();
+	/** What the source reported for each dialog, before live reading hid its unread messages. */
+	private readonly sourceViews = new Map<number, DialogView>();
 	private readonly unsubscribe: () => void;
 	private disposed = false;
 
@@ -211,7 +231,7 @@ export class ChatStore {
 		dropLegacyUnreadMarks(options.selfId);
 		if (snapshot !== null && snapshot.userId === options.selfId && snapshot.dialogs.length > 0) {
 			this.applyDialogs(snapshot.dialogs.map((d) => ({ ...d, topMessage: d.topMessage === null ? null : { ...d.topMessage, stale: true } })));
-			for (const user of snapshot.users) this.users.set(user.id, user);
+			for (const user of snapshot.users) this.users.set(user.id, this.shown(user));
 		}
 		this.unsubscribe = source.events.subscribeBatches((keys) => this.onKeys(keys));
 		this.dialogRefresh.run();
@@ -333,13 +353,58 @@ export class ChatStore {
 	private lateUnread(chatId: number, view: DialogView): void {
 		const state = this.windows.get(chatId);
 		if (state === undefined) return;
-		const unreadFromSeq = view.dialog.unreadCount === 0 ? 0 : view.dialog.readInboxMaxSeq + 1;
-		this.setWindow(state, { ...state.window, unreadFromSeq });
+		const own = this.ownReads.get(chatId) ?? 0;
+		if (own !== 0 && view.dialog.readInboxMaxSeq >= own) return;
+		this.setWindow(state, { ...state.window, unreadFromSeq: unreadFrom(view) });
 	}
 
-	/** Freezes the unread divider (the reader is about to mark the chat read). */
-	settleUnread(chatId: number): void {
-		this.unreadTracking.delete(chatId);
+	/**
+	 * The open chat shows its newest message in a visible tab (`live`), or no
+	 * longer does. While it does, what arrives is read at once: the chat's
+	 * row, the folder badges and the app badge never count it.
+	 */
+	setLiveRead(chatId: number, live: boolean): void {
+		if (live === this.liveRead.has(chatId)) return;
+		if (live) {
+			this.liveRead.set(chatId, 0);
+		} else {
+			this.liveRead.delete(chatId);
+		}
+		this.reapplyDialogs();
+	}
+
+	/** Applies the source's dialogs again (live reading started or ended). */
+	private reapplyDialogs(): void {
+		const views: DialogView[] = [];
+		for (const chatId of this.order) {
+			const view = this.sourceViews.get(chatId);
+			if (view !== undefined) views.push(view);
+		}
+		if (views.length > 0) this.applyDialogs(views);
+	}
+
+	/** The dialog as a live-read chat shows it: everything read; the read is sent once per newest seq. */
+	private readLive(view: DialogView): DialogView {
+		const { dialog } = view;
+		const marked = this.liveRead.get(dialog.chatId);
+		if (marked === undefined || (dialog.unreadCount === 0 && dialog.unreadMentionsCount === 0)) return view;
+		if (dialog.topSeq > marked && dialog.topSeq > dialog.readInboxMaxSeq) {
+			this.liveRead.set(dialog.chatId, dialog.topSeq);
+			this.noteRead(dialog.chatId, dialog.topSeq);
+			this.source.markRead(dialog.chatId, dialog.topSeq).catch((err: unknown) => {
+				if (this.liveRead.get(dialog.chatId) === dialog.topSeq) this.liveRead.set(dialog.chatId, 0);
+				this.reportError(err, "mark read");
+			});
+		}
+		return {
+			...view,
+			dialog: { ...dialog, readInboxMaxSeq: Math.max(dialog.readInboxMaxSeq, dialog.topSeq), unreadCount: 0, unreadMentionsCount: 0 },
+		};
+	}
+
+	/** This client marks the chat read up to `seq`: the unread divider does not move for it. */
+	noteRead(chatId: number, seq: number): void {
+		this.ownReads.set(chatId, Math.max(this.ownReads.get(chatId) ?? 0, seq));
 	}
 
 	/** Resolves once the dialog list (local database or snapshot) has been read. */
@@ -350,20 +415,20 @@ export class ChatStore {
 
 	private applyDialogs(views: readonly DialogView[]): void {
 		const seen = new Set<number>();
-		let changed = false;
-		for (const view of views) {
-			const id = view.dialog.chatId;
+		for (const sourceView of views) {
+			const id = sourceView.dialog.chatId;
 			seen.add(id);
+			this.sourceViews.set(id, sourceView);
+			if (this.unreadTracking.has(id)) this.lateUnread(id, sourceView);
+			const view = this.readLive(sourceView);
 			const json = JSON.stringify(view);
 			if (this.dialogJson.get(id) !== json) {
-				changed = true;
 				this.dialogJson.set(id, json);
 				this.dialogs.set(id, this.withKnownPeer(view));
 				if (view.chat !== null) this.chats.set(id, view.chat);
-				if (view.peer !== null) this.users.set(view.peer.id, view.peer);
+				if (view.peer !== null) this.users.set(view.peer.id, this.shown(view.peer));
 				// A private chat stored without its peer: fetch it so the row is not shown as deleted.
 				else if (view.chat?.type === "private" && view.chat.peerUserId !== 0) this.wantUser(view.chat.peerUserId);
-				if (this.unreadTracking.has(id)) this.lateUnread(id, view);
 				const from = view.topMessage?.fromId ?? 0;
 				if (from !== 0 && from !== this.selfId) this.wantUser(from);
 				this.emit(`dialog:${id}`);
@@ -371,9 +436,9 @@ export class ChatStore {
 		}
 		for (const id of [...this.dialogs.keys()]) {
 			if (!seen.has(id)) {
-				changed = true;
 				this.dialogs.delete(id);
 				this.dialogJson.delete(id);
+				this.sourceViews.delete(id);
 				this.emit(`dialog:${id}`);
 			}
 		}
@@ -383,7 +448,6 @@ export class ChatStore {
 			this.emit("list");
 		}
 		this.refreshEntries();
-		if (changed) this.totalsRefresh.run();
 		if (views.length > 0 && this.listStatus === "loading") this.markListReady();
 	}
 
@@ -416,7 +480,11 @@ export class ChatStore {
 		return saved;
 	}
 
-	/** Unread messages and chats of the app badge (core unreadTotals, muted chats per the settings). */
+	/**
+	 * Unread messages and chats of the app badge (tab title, installed app
+	 * icon), from the same dialogs as the list and folder badges; muted chats
+	 * count when the settings say so.
+	 */
 	unreadTotals(): UnreadTotals {
 		return this.totals;
 	}
@@ -442,21 +510,7 @@ export class ChatStore {
 		const badgeChanged = settings.badgeMuted !== this.settings.badgeMuted;
 		this.settings = settings;
 		this.emit("settings");
-		if (badgeChanged) {
-			this.refreshEntries();
-			this.totalsRefresh.run();
-		}
-	}
-
-	private async loadTotals(): Promise<void> {
-		try {
-			const totals = await this.source.unreadTotals();
-			if (this.disposed || (totals.messages === this.totals.messages && totals.chats === this.totals.chats)) return;
-			this.totals = totals;
-			this.emit("totals");
-		} catch (err) {
-			this.reportError(err, "unread totals");
-		}
+		if (badgeChanged) this.refreshEntries();
 	}
 
 	/** Rebuilds the list entries and folder counts; listeners hear only of real changes. */
@@ -515,6 +569,18 @@ export class ChatStore {
 		if (FOLDERS.some((folder) => counts[folder] !== this.folderUnread[folder])) {
 			this.folderUnread = counts;
 			this.emit("folders");
+		}
+		const totals = unreadTotals(
+			this.order.flatMap((chatId) => {
+				const dialog = this.dialogs.get(chatId)?.dialog;
+				return dialog === undefined ? [] : [dialog];
+			}),
+			now,
+			this.settings.badgeMuted,
+		);
+		if (totals.messages !== this.totals.messages || totals.chats !== this.totals.chats) {
+			this.totals = totals;
+			this.emit("totals");
 		}
 		// A mute that ends while the app is open: unmute the row then.
 		clearTimeout(this.muteTimer);
@@ -583,7 +649,7 @@ export class ChatStore {
 	private putUsers(users: readonly User[]): void {
 		if (users.length === 0) return;
 		for (const user of users) {
-			this.users.set(user.id, user);
+			this.users.set(user.id, this.shown(user));
 			this.emit(`user:${user.id}`);
 		}
 		// Dialog rows waiting for one of them.
@@ -598,9 +664,19 @@ export class ChatStore {
 		if (changed) this.refreshEntries();
 	}
 
-	/** The view with its private chat's peer from the users this store knows, when the source had none. */
+	/** A deleted account under the name the UI shows for it. */
+	private shown(user: User): User {
+		const name = this.options.deletedName;
+		return user.deleted === true && name !== undefined && user.name !== name ? { ...user, name } : user;
+	}
+
+	/** The view with its private chat's peer from the users this store knows, when the source had none (and a deleted peer named). */
 	private withKnownPeer(view: DialogView): DialogView {
-		if (view.peer !== null || view.chat?.type !== "private" || view.chat.peerUserId === 0) return view;
+		if (view.peer !== null) {
+			const peer = this.shown(view.peer);
+			return peer === view.peer ? view : { ...view, peer };
+		}
+		if (view.chat?.type !== "private" || view.chat.peerUserId === 0) return view;
 		const peer = this.users.get(view.chat.peerUserId);
 		return peer === undefined ? view : { ...view, peer };
 	}
@@ -676,8 +752,19 @@ export class ChatStore {
 			// Most recently used last, so the oldest cached window is dropped first.
 			this.windows.delete(chatId);
 			this.windows.set(chatId, existing);
-			existing.refresh.run();
-			return;
+			// A kept window was read, or got new messages, since it was last
+			// open: the divider goes after the read position again. The window
+			// is kept only when it holds the newest messages and the divider.
+			const view = this.sourceViews.get(chatId);
+			const unreadFromSeq = view === undefined ? 0 : unreadFrom(view);
+			const first = this.firstSeq(existing);
+			if (this.listStatus === "ready" && existing.window.live && (unreadFromSeq === 0 || (first !== 0 && first <= unreadFromSeq))) {
+				this.unreadTracking.add(chatId);
+				this.ownReads.delete(chatId);
+				this.setWindow(existing, { ...existing.window, unreadFromSeq, openings: existing.window.openings + 1 });
+				existing.refresh.run();
+				return;
+			}
 		}
 		const state: WindowState = existing ?? {
 			window: {
@@ -692,6 +779,7 @@ export class ChatStore {
 				unreadFromSeq: 0,
 				focusSeq: 0,
 				focusToken: 0,
+				openings: 0,
 				pendingCount: 0,
 			},
 			items: new Map(),
@@ -708,11 +796,12 @@ export class ChatStore {
 		// The unread divider needs the read position, which comes with the dialog list.
 		void this.whenListReady().then(() => {
 			if (this.disposed || this.windows.get(chatId) !== state) return;
-			const dialog = this.dialogs.get(chatId)?.dialog;
-			if (existing === undefined) this.unreadTracking.add(chatId);
+			const view = this.sourceViews.get(chatId);
+			this.unreadTracking.add(chatId);
+			this.ownReads.delete(chatId);
 			// Every opening recomputes the divider, so it is gone once the chat was read.
-			const unreadFromSeq = dialog !== undefined && dialog.unreadCount > 0 ? dialog.readInboxMaxSeq + 1 : 0;
-			if (unreadFromSeq !== state.window.unreadFromSeq) state.window = { ...state.window, unreadFromSeq };
+			const unreadFromSeq = view === undefined ? 0 : unreadFrom(view);
+			state.window = { ...state.window, unreadFromSeq, openings: state.window.openings + 1 };
 			const anchor = focusSeq !== 0 ? focusSeq : unreadFromSeq;
 			if (anchor !== 0) {
 				void this.load(chatId, { direction: "around", offsetSeq: anchor, limit: FIRST_PAGE }, "replace", focusSeq);

@@ -12,6 +12,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { countLabel, dayLabel, sameDay } from "../data/format.ts";
 import { useBackendValue, useServices, useWindow } from "../data/services.tsx";
+import type { Topic } from "../data/pending-backend.ts";
 import type { ChatStore, WindowItem } from "../data/store.ts";
 import { MessageItem } from "./message-item.tsx";
 import { pendingTopics } from "../media/media-state.ts";
@@ -24,6 +25,8 @@ interface MessageListProps {
 	chatId: number;
 	/** 0: the whole chat; otherwise only this topic's messages. */
 	topicId: number;
+	/** The open forum topic (its own read position); null outside forums. */
+	topic: Topic | null;
 	chat: Chat | null;
 	dialog: DialogView | undefined;
 	/** Shown in place of the messages while the chat has none (a bot's profile before it is started). */
@@ -51,6 +54,52 @@ export function groupRows(keys: readonly string[], itemOf: (key: string) => Wind
 	return rows.map(({ key, keys: members }) => ({ key, keys: members }));
 }
 
+/**
+ * The row the unread divider sits above: the first incoming message from
+ * `from` on. Once the reader has answered below it (a message of theirs,
+ * sent or still pending) the divider has done its job: "" then, and when
+ * there is none.
+ */
+export function dividerRow(rows: readonly { key: string }[], itemOf: (key: string) => WindowItem | undefined, from: number, selfId: number): string {
+	if (from === 0) return "";
+	let found = "";
+	for (const { key } of rows) {
+		const item = itemOf(key);
+		if (found === "") {
+			if (item?.kind === "message" && item.message.seq >= from && item.message.fromId !== selfId) found = key;
+		} else if (item?.kind === "pending" || (item?.kind === "message" && item.message.fromId === selfId)) {
+			return "";
+		}
+	}
+	return found;
+}
+
+/**
+ * The newest message the reader sees: the last one whose first half (or
+ * first half screen, for a tall one) is inside the list's visible area.
+ */
+function newestShown(element: HTMLElement): number {
+	const view = element.getBoundingClientRect();
+	let newest = 0;
+	for (const node of element.querySelectorAll<HTMLElement>("[data-seq]")) {
+		const rect = node.getBoundingClientRect();
+		if (rect.top + Math.min(rect.height, view.height) / 2 > view.bottom) break;
+		newest = Math.max(newest, Number(node.dataset.seq));
+	}
+	return newest;
+}
+
+/** Whether the page is shown (not a background tab or a minimised window). */
+function usePageVisible(): boolean {
+	const [visible, setVisible] = useState(() => document.visibilityState === "visible");
+	useEffect(() => {
+		const update = () => setVisible(document.visibilityState === "visible");
+		document.addEventListener("visibilitychange", update);
+		return () => document.removeEventListener("visibilitychange", update);
+	}, []);
+	return visible;
+}
+
 function itemDate(item: WindowItem | undefined): number {
 	if (item === undefined) return 0;
 	return item.kind === "message" ? item.message.date : item.pending.date;
@@ -76,7 +125,7 @@ function firstMention(store: ChatStore, chatId: number, readInbox: number, self:
 	return 0;
 }
 
-export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageListProps) {
+export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: MessageListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const { store, source, backend, self } = useServices();
@@ -86,9 +135,14 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	const scroller = useRef<HTMLDivElement>(null);
 	const anchor = useRef<{ key: string; offset: number } | null>(null);
 	const stick = useRef(true);
-	const positioned = useRef(0);
+	const positioned = useRef("");
 	const lastRead = useRef(0);
 	const [atBottom, setAtBottom] = useState(true);
+	// Newest message on screen; messages are read as they come into view.
+	const [shownSeq, setShownSeq] = useState(0);
+	const visible = usePageVisible();
+	// A topic's divider: where its own reading stood when it was opened.
+	const [topicUnreadFrom] = useState(() => (topic !== null && topic.unreadCount > 0 ? topic.readInboxMaxSeq + 1 : 0));
 	const [focused, setFocused] = useState<string | null>(null);
 
 	const allKeys = (window_?.keys ?? []).filter((key) => {
@@ -103,7 +157,7 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	const keys = groups.map((group) => group.key);
 	const loader = useLoader(window_ === undefined || (window_.status === "loading" && keys.length === 0), copy.common.loading);
 	const lastKey = keys[keys.length - 1] ?? "";
-	const unreadFrom = window_?.unreadFromSeq ?? 0;
+	const unreadFrom = topic !== null ? topicUnreadFrom : (window_?.unreadFromSeq ?? 0);
 	const readOutbox = dialog?.dialog.readOutboxMaxSeq ?? 0;
 	const tabKey = focused !== null && keys.includes(focused) ? focused : lastKey;
 
@@ -111,8 +165,11 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	useLayoutEffect(() => {
 		const element = scroller.current;
 		if (element === null || window_ === undefined || window_.status !== "ready") return;
-		if (positioned.current !== window_.focusToken + 1) {
-			positioned.current = window_.focusToken + 1;
+		setShownSeq(newestShown(element));
+		// Every opening and every jump places the view once.
+		const placement = `${window_.openings}:${window_.focusToken}`;
+		if (positioned.current !== placement) {
+			positioned.current = placement;
 			const target =
 				window_.focusSeq !== 0
 					? element.querySelector<HTMLElement>(`[data-seq="${window_.focusSeq}"]`)
@@ -149,28 +206,36 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 			(node) => node.offsetTop + node.offsetHeight > element.scrollTop,
 		);
 		anchor.current = first === undefined ? null : { key: first.dataset.key ?? "", offset: first.offsetTop - element.scrollTop };
+		setShownSeq(newestShown(element));
 		if (element.scrollTop < EDGE_PX && window_.hasOlder) store.loadOlder(chatId);
 		if (fromBottom < EDGE_PX && window_.hasNewer) store.loadNewer(chatId);
 	};
 
-	// Mark as read while the newest messages are on screen and the tab is visible.
-	const topSeq = dialog?.dialog.topSeq ?? 0;
-	const readInbox = dialog?.dialog.readInboxMaxSeq ?? 0;
+	// This view's reading: the chat's, or in a forum the open topic's own.
+	const readInbox = topic !== null ? topic.readInboxMaxSeq : (dialog?.dialog.readInboxMaxSeq ?? 0);
+	const topSeq = topic !== null ? topic.topSeq : (dialog?.dialog.topSeq ?? 0);
+	const reading = visible && window_?.status === "ready";
+	const atNewest = atBottom && window_?.live === true;
+	// The newest message on screen in a chat: the store reads what arrives
+	// at once, so no unread badge shows in between (not for forum topics,
+	// whose counts are their own).
+	const liveRead = reading && atNewest && topicId === 0 && chat?.forum !== true;
 	useEffect(() => {
-		const mark = () => {
-			if (document.visibilityState !== "visible" || !atBottom || window_?.live !== true) return;
-			if (topSeq <= readInbox || topSeq <= lastRead.current) return;
-			lastRead.current = topSeq;
-			store.settleUnread(chatId);
-			const done = topicId !== 0 ? backend.readTopic(chatId, topicId, topSeq) : source.markRead(chatId, topSeq);
-			done.catch(() => {
-				lastRead.current = 0;
-			});
-		};
-		mark();
-		document.addEventListener("visibilitychange", mark);
-		return () => document.removeEventListener("visibilitychange", mark);
-	}, [atBottom, window_?.live, topSeq, readInbox, chatId, topicId, source, backend, store]);
+		store.setLiveRead(chatId, liveRead);
+		return () => store.setLiveRead(chatId, false);
+	}, [store, chatId, liveRead]);
+	// Otherwise messages are read as they come into view, in a visible tab.
+	useEffect(() => {
+		if (!reading || liveRead) return;
+		const target = atNewest ? Math.max(topSeq, shownSeq) : shownSeq;
+		if (target <= readInbox || target <= lastRead.current) return;
+		lastRead.current = target;
+		store.noteRead(chatId, target);
+		const done = topicId !== 0 ? backend.readTopic(chatId, topicId, target) : source.markRead(chatId, target);
+		done.catch(() => {
+			lastRead.current = 0;
+		});
+	}, [reading, liveRead, atNewest, shownSeq, topSeq, readInbox, chatId, topicId, source, backend, store]);
 
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
@@ -195,9 +260,7 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 	const now = new Date();
 	const rows: ReactNode[] = [];
 	let previousDate = 0;
-	// Once the reader answers (a message of theirs after the divider, sent or
-	// still pending) the divider has done its job and goes away.
-	let dividerShown = unreadFrom === 0 || answeredSince(groups.map(({ key }) => store.item(chatId, key)), unreadFrom, store.selfId);
+	const divider = dividerRow(groups, (key) => store.item(chatId, key), unreadFrom, store.selfId);
 	for (const { key, keys: members } of groups) {
 		const item = store.item(chatId, key);
 		const date = itemDate(item);
@@ -209,14 +272,7 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 			);
 		}
 		previousDate = date || previousDate;
-		if (
-			!dividerShown &&
-			unreadFrom !== 0 &&
-			item?.kind === "message" &&
-			item.message.seq >= unreadFrom &&
-			item.message.fromId !== store.selfId
-		) {
-			dividerShown = true;
+		if (key === divider) {
 			rows.push(
 				<div className="unread-div" role="separator" key="unread">
 					{topicId !== 0 ? copy.convo.unreadDividerTopic : copy.convo.unreadDivider}
@@ -236,7 +292,7 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 		);
 	}
 
-	const unread = dialog?.dialog.unreadCount ?? 0;
+	const unread = topic !== null ? topic.unreadCount : (dialog?.dialog.unreadCount ?? 0);
 	const mentions = topicId === 0 ? (dialog?.dialog.unreadMentionsCount ?? 0) : 0;
 	const toMention = () => {
 		// Messages unread when the chat was opened count, even if reading it since moved the read mark.
@@ -315,9 +371,4 @@ export function MessageList({ chatId, topicId, chat, dialog, empty }: MessageLis
 			</div>
 		</div>
 	);
-}
-
-/** True when the reader has a message after the unread divider at `from`. */
-function answeredSince(items: readonly (WindowItem | undefined)[], from: number, selfId: number): boolean {
-	return items.some((item) => item?.kind === "pending" || (item?.kind === "message" && item.message.seq >= from && item.message.fromId === selfId));
 }

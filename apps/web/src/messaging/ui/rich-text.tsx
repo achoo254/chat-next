@@ -3,7 +3,7 @@
 // every link goes through the scheme allowlist, and links off the tenant's
 // own sites ask before opening.
 import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { isAllowedUrl, normalizeLinkUrl, type MessageEntity } from "@app/core";
+import { isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@app/core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { matchRoute, navigate } from "../../router.tsx";
@@ -184,13 +184,9 @@ function RichNode({ text, node, ctx }: { text: string; node: Node; ctx: RichCont
 	}
 }
 
-/** True when the text mentions the reader (@username or a name mention). */
+/** True when the text mentions the reader (@username or a name mention), as the server counts mentions. */
 export function mentionsSelf(text: string, entities: readonly MessageEntity[], selfId: number, selfUsername: string): boolean {
-	return entities.some((entity) => {
-		if (entity.type === "mention_name") return entity.userId === selfId;
-		if (entity.type !== "mention" || selfUsername === "") return false;
-		return text.slice(entity.offset, entity.offset + entity.length).toLowerCase() === `@${selfUsername.toLowerCase()}`;
-	});
+	return mentionsUser(text, entities, selfId, selfUsername);
 }
 
 interface RichTextProps {

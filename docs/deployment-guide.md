@@ -159,6 +159,14 @@ Vận hành:
 - Backup: dump DB hằng đêm như cũ; sao lưu media ra ngoài server để sau, khi có người dùng thật (Jev quyết 2026-10-15).
 - Chuyển sang S3 sau này: `MEDIA_STORAGE=s3` cùng `MEDIA_S3_ENDPOINT`, `MEDIA_S3_REGION`, `MEDIA_S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (mẫu trong env). Identity chỉ cần `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket`, `s3:AbortMultipartUpload`. `MEDIA_UPLOAD_MODE=proxy` chạy ngay; `direct` (trình duyệt PUT thẳng tới storage) cần người có quyền cấu hình bucket đặt CORS (`AllowedOrigins` `https://chat.hoandat.com`, `AllowedMethods` `PUT`, `AllowedHeaders` `*`, `ExposeHeaders` `ETag`) và thêm origin storage vào CSP `connect-src`. File đã có trên đĩa phải được chép sang bucket trước khi đổi: `objects/<p>/<xx>/<tên>` thành key `<p>/<tên>` (bỏ thư mục chia nhỏ `<xx>`, hai ký tự đầu của tên).
 
+## Xuất và xoá dữ liệu (Phase 12, R9)
+
+Người dùng tự xuất dữ liệu, bật tự xoá và xoá tài khoản chat ở Cài đặt › Tài khoản; danh mục dữ liệu và thời hạn: [`docs/privacy/data-inventory.md`](privacy/data-inventory.md). Migration `0019_account_deletion_export.sql` chạy cùng deploy (chỉ thêm cột, bảng, index, nới một CHECK). Không đổi nginx: link tải nằm dưới `/f/export/` của host media, đã đi qua location `/f/` (log che token). Không cần biến mới: bản xuất nằm ở `/opt/chat/media/exports` (app tự tạo, `chat:chat` 0750); đặt `DATA_EXPORT_DIR` chỉ khi muốn chỗ khác (S3 thì bắt buộc, không thì xuất dữ liệu tắt). Log khởi động có `"msg":"data exports","enabled":true`.
+
+Vận hành:
+- Bản xuất dựng từng cái một trong `chat-api`, giới hạn 4 GB file đính kèm, giữ chỗ trống `MEDIA_MIN_FREE_BYTES` trên đĩa (thiếu thì bản xuất `failed`, `error = 'disk_full'`); hết 30 ngày bị xoá trong job hằng giờ. Xem: `du -sh /opt/chat/media/exports`, `SELECT status, count(*), pg_size_pretty(sum(size_bytes)) FROM data_exports GROUP BY 1;`.
+- Tài khoản đang chờ xoá: `SELECT id, deletion_reason, deletion_requested_at + interval '30 days' AS purge_at FROM users WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL;`. Job hằng giờ xoá hẳn tài khoản quá 30 ngày (log `deleted account erased`) và lên lịch xoá tài khoản bật tự xoá mà không dùng đủ số tháng (log `unused account scheduled for deletion`). Dữ liệu đã xoá còn trong bản sao lưu DB tối đa 14 ngày.
+
 ## Bảo mật mạng
 
 - Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này. Cả hai không gọi được chính `.65` (`OUTBOUND_DENY_CIDRS`, xem trên), nên luật này không bị vượt bằng một URL trỏ về chính server.

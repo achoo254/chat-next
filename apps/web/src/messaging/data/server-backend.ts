@@ -136,11 +136,19 @@ export class ServerBackend implements PendingBackend {
 
 	async readTopic(chatId: number, topicId: number, maxSeq: number): Promise<void> {
 		await this.remote.readTopic(chatId, topicId, maxSeq);
+		// The reload that the read update starts brings the exact counts; a
+		// topic read to its newest message has none left meanwhile.
 		const cached = this.cache.get(chatId);
 		if (cached !== undefined) {
 			this.cache.set(chatId, {
 				...cached,
-				topics: cached.topics.map((topic) => (topic.id === topicId ? { ...topic, unreadCount: 0, unreadMentions: 0 } : topic)),
+				topics: cached.topics.map((topic) =>
+					topic.id !== topicId
+						? topic
+						: maxSeq >= topic.topSeq
+							? { ...topic, readInboxMaxSeq: Math.max(topic.readInboxMaxSeq, maxSeq), unreadCount: 0, unreadMentions: 0 }
+							: { ...topic, readInboxMaxSeq: Math.max(topic.readInboxMaxSeq, maxSeq) },
+				),
 			});
 			this.emit();
 		}

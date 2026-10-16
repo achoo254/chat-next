@@ -100,6 +100,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	if sess.AccountLocked {
+		// Waiting for deletion: no realtime until the user cancels it.
+		http.Error(w, "account pending deletion", http.StatusForbidden)
+		return
+	}
 	// The api server's read/write timeouts must not cut a long-lived socket.
 	rc := http.NewResponseController(w)
 	_ = rc.SetReadDeadline(time.Time{})

@@ -39,6 +39,7 @@ export const en: Messages = {
 		app: "Install the app",
 		moderation: "Moderation",
 		console: "Developer Console",
+		account: "Account",
 		signOut: "Sign out",
 	},
 	profile: {

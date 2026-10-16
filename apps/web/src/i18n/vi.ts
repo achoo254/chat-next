@@ -37,6 +37,7 @@ export const vi = {
 		app: "Cài ứng dụng",
 		moderation: "Kiểm duyệt",
 		console: "Developer Console",
+		account: "Tài khoản",
 		signOut: "Đăng xuất",
 	},
 	profile: {

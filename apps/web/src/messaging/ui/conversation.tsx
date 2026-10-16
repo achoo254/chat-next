@@ -1,6 +1,6 @@
 // The open chat or topic (mockups/chat.html#app, #channel, #topics,
 // #topic-states, #connection-states).
-import { Suspense, lazy, useEffect, useRef, useState, type DragEvent } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
 import type { Chat } from "@app/core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
@@ -225,7 +225,9 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	// Shares one loader timing with the message list (LoaderScope in chat-screen.tsx).
 	const loader = useLoader(chat === undefined);
 
-	useEffect(() => {
+	// Before the message list's own effects, which start reading the chat:
+	// the unread divider is placed from the read position the reader found.
+	useLayoutEffect(() => {
 		store.openWindow(chatId);
 		// Opening a chat ends "marked as unread" (on every session). Marking the
 		// open chat unread from the list keeps the mark until it is opened again.
@@ -271,7 +273,9 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const kind = chatKind(chat, view?.peer ?? null, topics !== null);
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const closedForMe = topic !== null && topic.closed && !admin;
-	const sendable = canSend(chat) && !closedForMe;
+	// A deleted account takes no messages (the server refuses them too).
+	const peerDeleted = (view?.peer ?? peer)?.deleted === true;
+	const sendable = canSend(chat) && !closedForMe && !peerDeleted;
 	const mediaAllowed = sendable && canSendMedia(chat) && limits !== null && limits.uploadSizeMax > 0;
 	// Files dragged anywhere over the chat go to the composer's tray when dropped.
 	const dragHandlers = mediaAllowed
@@ -353,8 +357,12 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</Suspense>
 			)}
 			<MessageList
+				// One list per chat and topic: its scroll position and what it
+				// marked read never carry over to the next chat.
+				key={`list:${chatId}:${effectiveTopic}`}
 				chatId={chatId}
 				topicId={effectiveTopic}
+				topic={topic}
 				chat={chat}
 				dialog={view}
 				empty={
@@ -393,7 +401,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 			) : (
 				<div className="closed-bar" role="status">
 					<Icon name="lock" small />
-					{copy.convo.readOnly}
+					{peerDeleted ? copy.convo.deletedPeer : copy.convo.readOnly}
 				</div>
 			)}
 			<MessageMenu chat={chat} readOutboxMaxSeq={view?.dialog.readOutboxMaxSeq ?? 0} />

@@ -1,8 +1,8 @@
 // Three people in a group: create it, invite by link, real-time delivery to
 // every member, a pinned announcement, and removing a member.
 import { after, before } from "node:test";
-import type { Browser } from "playwright";
-import { composer, launch, message, messageMenu, scenario, send, signIn, WEB_ORIGIN, type Person } from "./people.ts";
+import type { Browser, Locator } from "playwright";
+import { chatInfo, composer, launch, message, messageMenu, scenario, send, signIn, WEB_ORIGIN, type Person } from "./people.ts";
 
 const GROUP = "Đội Vận hành E2E";
 let browser: Browser;
@@ -21,11 +21,8 @@ after(async () => {
 });
 
 /** Opens the group's info column when it is closed. */
-async function groupInfo(person: Person) {
-	const info = person.page.getByRole("complementary", { name: "Thông tin nhóm" });
-	if (!(await info.isVisible())) await person.page.getByRole("button", { name: "Thông tin chat" }).click();
-	await info.waitFor();
-	return info;
+function groupInfo(person: Person): Promise<Locator> {
+	return chatInfo(person, "Thông tin nhóm");
 }
 
 scenario("Bình's privacy keeps An from adding him directly", () => [an, binh], async () => {

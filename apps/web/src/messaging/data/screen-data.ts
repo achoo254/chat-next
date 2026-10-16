@@ -4,6 +4,8 @@
 import { resource, type Resource } from "../../components/preload.ts";
 import type { Bots, OwnBot } from "../bots/api.ts";
 import type { Hook, HookNames, Integrations } from "../integrations/api.ts";
+import type { Transport } from "@connectrpc/connect";
+import { loadPrivacyClient, type AccountData } from "../settings/privacy-api.ts";
 import type { BlockedPerson, Page, Privacy, Remote } from "./remote.ts";
 import type { ChatStore } from "./store.ts";
 
@@ -37,4 +39,9 @@ export function hooksData(integrations: Integrations, chatId: number): Resource<
 /** One webhook. */
 export function hookData(integrations: Integrations, hookId: string): Resource<{ hook: Hook; names: HookNames }> {
 	return resource(integrations, `hook:${hookId}`, () => integrations.hook(hookId));
+}
+
+/** The "Tài khoản" tab: the latest export and what deleting the account involves. */
+export function accountData(transport: Transport): Resource<AccountData> {
+	return resource(transport, "account", () => loadPrivacyClient().then((module) => module.privacyClient(transport).account()));
 }

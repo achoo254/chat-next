@@ -690,3 +690,37 @@ func lastSeq(t *testing.T, env *bottest.Env, user, chatID int64) int64 {
 	}
 	return seq
 }
+
+// While the owner's account waits for deletion the bot is stopped: its
+// webhook gets nothing and updates queue; cancelling the deletion resumes
+// delivery on its own.
+func TestWebhookPausedWhileTheOwnerAccountWaitsForDeletion(t *testing.T) {
+	env := bottest.New(t)
+	ctx := context.Background()
+	botID, owner, group := talkativeBot(t, env, "pausebot")
+	env.CatchUp()
+	setHook(t, env, botID, "http://127.0.0.1:1/unused", botupdates.WebhookSettings{DropPending: true})
+	rcv := newReceiver(t, nil)
+	setHook(t, env, botID, rcv.srv.URL+"/hook", botupdates.WebhookSettings{})
+	send(t, env, owner, group, "before")
+	if d := rcv.wait(10 * time.Second); d.Text != "before" {
+		t.Fatalf("delivery = %+v", d)
+	}
+
+	if _, err := env.Store.Pool().Exec(ctx, `UPDATE users SET deletion_requested_at = now(), deletion_reason = 'user' WHERE id = $1`, owner); err != nil {
+		t.Fatal(err)
+	}
+	send(t, env, owner, group, "during")
+	eventually(t, "the update queued", func() bool { return info(t, env, botID).Pending == 1 })
+	time.Sleep(6 * time.Second) // longer than the dispatcher's rescan
+	if got := rcv.list(); len(got) != 1 {
+		t.Fatalf("delivered while the owner waits for deletion: %+v", got)
+	}
+
+	if _, err := env.Store.Pool().Exec(ctx, `UPDATE users SET deletion_requested_at = NULL, deletion_reason = NULL WHERE id = $1`, owner); err != nil {
+		t.Fatal(err)
+	}
+	if d := rcv.wait(15 * time.Second); d.Text != "during" {
+		t.Fatalf("delivery after cancelling = %+v", d)
+	}
+}

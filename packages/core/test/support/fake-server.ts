@@ -28,6 +28,8 @@ import {
 import {
 	DeleteMessagesResponseSchema,
 	EditMessageResponseSchema,
+	EntityType,
+	MessageEntitySchema,
 	GetHistoryResponseSchema,
 	GetPinnedMessagesResponseSchema,
 	HistoryDirection,
@@ -343,6 +345,20 @@ export class FakeServer {
 		});
 	}
 
+	/** Unread messages that mention `viewer` by id or reply to them, after `after` (the server's message_mentions). */
+	private unreadMentions(chatId: number, viewer: number, after: number): number {
+		const messages = this.visibleMessages(chatId, viewer);
+		const own = new Set(messages.filter((r) => r.sender === viewer).map((r) => num(r.message.seq)));
+		return messages.filter(
+			(r) =>
+				!r.deleted &&
+				r.sender !== viewer &&
+				num(r.message.seq) > after &&
+				(own.has(num(r.message.replyToSeq)) ||
+					r.message.entities.some((e) => e.type === EntityType.MENTION_NAME && num(e.userId) === viewer)),
+		).length;
+	}
+
 	private visibleMessages(chatId: number, viewer: number): MessageRecord[] {
 		return [...this.chat(chatId).messages.values()]
 			.filter((record) => this.visible(record, viewer))
@@ -422,6 +438,7 @@ export class FakeServer {
 			readInboxMaxSeq: big(read.inbox),
 			readOutboxMaxSeq: big(read.outbox),
 			unreadCount: unread,
+			unreadMentionsCount: this.unreadMentions(chatId, viewer, read.inbox),
 			chatPts: big(chat.syncMode === SyncMode.LARGE ? chat.chatPts : 0),
 			muteUntil: big(this.user(viewer).mutes.get(chatId) ?? 0),
 			pinned: this.user(viewer).pins.includes(chatId),
@@ -529,6 +546,7 @@ export class FakeServer {
 			readonly media?: WireMediaRef;
 			readonly groupedId?: bigint;
 			readonly replyToSeq?: bigint;
+			readonly entities?: MessageInitShape<typeof MessageEntitySchema>[];
 			/** Bot messages: an inline keyboard, a reply keyboard or its removal. */
 			readonly replyMarkup?: MessageInitShape<typeof ReplyMarkupSchema>;
 		} = {},
@@ -710,6 +728,7 @@ export class FakeServer {
 					maxSeq: big(read.inbox),
 					outbox: false,
 					unreadCount: unread,
+					unreadMentionsCount: this.unreadMentions(chatId, userId, read.inbox),
 					// The count covers every message up to the chat's newest seq,
 					// with the large chat's log at chatPts.
 					topSeq: big(chat.nextSeq - 1),

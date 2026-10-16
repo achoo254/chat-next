@@ -611,8 +611,10 @@ export class Outbox {
 			if (dialog === null || (dialog.readInboxMaxSeq >= maxSeq && !dialog.unreadMark) || maxSeq === 0) return;
 			if (dialog.unreadMark) putUnreadMark(w, chatId, false);
 			if (dialog.readInboxMaxSeq < maxSeq) {
-				const unread = await this.options.repo.countIncomingAfter(chatId, maxSeq, this.options.selfId);
-				putLocalRead(w, chatId, maxSeq, unread);
+				const { repo, selfId } = this.options;
+				const unread = await repo.countIncomingAfter(chatId, maxSeq, selfId);
+				const mentions = unread === 0 ? 0 : await repo.countMentionsAfter(chatId, maxSeq, selfId);
+				putLocalRead(w, chatId, maxSeq, unread, mentions);
 			}
 			w.add("DELETE FROM outbox WHERE chat_id = ? AND kind = 'read' AND failure IS NULL", [chatId]);
 			this.insert(w, chatId, { kind: "read", maxSeq }, 0);

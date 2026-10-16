@@ -40,6 +40,9 @@ func TestMediaFilesystemDefaults(t *testing.T) {
 		m.PublicOrigin() != "https://media-chat.hoandat.com" {
 		t.Fatalf("media = %+v", m)
 	}
+	if m.ExportDir != DefaultMediaRoot+"/exports" {
+		t.Fatalf("export dir = %q", m.ExportDir)
+	}
 	env := mediaEnv()
 	env["MEDIA_ROOT"] = "/srv/chat-media"
 	env["MEDIA_MIN_FREE_BYTES"] = "1073741824"
@@ -88,5 +91,21 @@ func TestMediaConfigErrors(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), name) || strings.Contains(err.Error(), secret) {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+}
+
+func TestDataExportDir(t *testing.T) {
+	env := s3Env()
+	c, err := Load(lookupFrom(env))
+	if err != nil || c.Media.ExportDir != "" {
+		t.Fatalf("s3 without DATA_EXPORT_DIR: %q %v", c.Media.ExportDir, err)
+	}
+	env["DATA_EXPORT_DIR"] = "/srv/chat-exports"
+	if c, err = Load(lookupFrom(env)); err != nil || c.Media.ExportDir != "/srv/chat-exports" {
+		t.Fatalf("explicit: %+v %v", c.Media, err)
+	}
+	env["DATA_EXPORT_DIR"] = "exports"
+	if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "DATA_EXPORT_DIR") {
+		t.Fatalf("relative: %v", err)
 	}
 }

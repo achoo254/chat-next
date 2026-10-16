@@ -73,6 +73,11 @@ type Media struct {
 	// FFmpegPath enables video posters and voice waveforms; empty disables
 	// them (clients then provide thumbs, durations and waveforms).
 	FFmpegPath string
+	// ExportDir holds the personal data exports (ZIP files, kept 30 days)
+	// on this server's disk: DATA_EXPORT_DIR, by default the directory
+	// "exports" under MEDIA_ROOT with the filesystem storage. Empty (S3
+	// storage without DATA_EXPORT_DIR) turns exports off.
+	ExportDir string
 }
 
 var s3PrefixPattern = regexp.MustCompile(`^([a-z0-9][a-z0-9._-]{0,62}/){0,4}$`)
@@ -171,6 +176,13 @@ func loadMedia(get func(string) string, production bool, chatURL *url.URL) (*Med
 		} else {
 			m.FFmpegPath = raw
 		}
+	}
+	m.ExportDir = get("DATA_EXPORT_DIR")
+	if m.ExportDir == "" && m.Storage == StorageFilesystem {
+		m.ExportDir = filepath.Join(m.Root, "exports")
+	}
+	if m.ExportDir != "" && (!filepath.IsAbs(m.ExportDir) || filepath.Clean(m.ExportDir) == "/") {
+		errs = append(errs, invalid("DATA_EXPORT_DIR", "must be an absolute directory other than /"))
 	}
 	if len(errs) > 0 {
 		return nil, errs

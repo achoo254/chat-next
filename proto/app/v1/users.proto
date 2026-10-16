@@ -76,6 +76,10 @@ message User {
   string email = 10;
   // Bots with inline mode enabled: placeholder shown in the input field.
   string bot_inline_placeholder = 11;
+  // The account was deleted or waits for deletion (PrivacyService): clients
+  // show it as a deleted account. username, name, bio and email are then
+  // empty and nobody can write to it. Never set for the caller's own user.
+  bool deleted = 12;
 }
 
 message GetSelfRequest {
@@ -90,6 +94,29 @@ message GetSelfResponse {
   User user = 1;
   // The caller may use ModerationService.
   bool is_operator = 2;
+  // Set while the caller's account waits for deletion. Such a session may
+  // only call GetSelf, PrivacyService.CancelAccountDeletion and
+  // AuthService.SignOut; every other call fails with failed_precondition
+  // "account_pending_deletion".
+  AccountDeletion deletion = 3;
+}
+
+// Why an account waits for deletion.
+enum AccountDeletionReason {
+  ACCOUNT_DELETION_REASON_UNSPECIFIED = 0;
+  // The user asked for it (PrivacyService.DeleteAccount).
+  ACCOUNT_DELETION_REASON_USER = 1;
+  // Nobody used the account for the auto-delete period the user chose.
+  ACCOUNT_DELETION_REASON_INACTIVE = 2;
+}
+
+// An account in its grace period: locked, shown to others as deleted, and
+// erased at purge_at unless the user cancels.
+message AccountDeletion {
+  // Unix seconds.
+  int64 requested_at = 1 [jstype = JS_NUMBER];
+  int64 purge_at = 2 [jstype = JS_NUMBER];
+  AccountDeletionReason reason = 3;
 }
 
 message GetUsersRequest {

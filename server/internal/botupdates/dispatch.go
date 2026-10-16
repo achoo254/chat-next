@@ -186,9 +186,15 @@ func (d *dispatcher) run(ctx context.Context) {
 	}
 }
 
+// ownerActive is the SQL predicate (on bots) of a bot whose owner's account
+// is not waiting for deletion: during the grace period the webhook is
+// paused (updates keep queuing until they expire) and it resumes on its own
+// at the next rescan when the owner cancels.
+const ownerActive = `NOT EXISTS (SELECT 1 FROM users o WHERE o.id = bots.owner_id AND o.deletion_requested_at IS NOT NULL)`
+
 func (d *dispatcher) rescan(ctx context.Context) {
 	rows, err := d.s.pool.Query(ctx, `
-		SELECT user_id FROM bots WHERE webhook_url IS NOT NULL AND deleted_at IS NULL AND tenant_id = $1`, d.tenantID)
+		SELECT user_id FROM bots WHERE webhook_url IS NOT NULL AND deleted_at IS NULL AND tenant_id = $1 AND `+ownerActive, d.tenantID)
 	if err != nil {
 		if ctx.Err() == nil {
 			d.logger.Warn("listing bots with a webhook failed", "err", err)
@@ -378,7 +384,7 @@ func (d *dispatcher) config(ctx context.Context, botID int64) (*hookConfig, erro
 	var maxConn int16
 	err := d.s.pool.QueryRow(ctx, `
 		SELECT webhook_url, webhook_secret, webhook_max_connections FROM bots
-		WHERE user_id = $1 AND deleted_at IS NULL AND webhook_url IS NOT NULL AND tenant_id = $2`, botID, d.tenantID).
+		WHERE user_id = $1 AND deleted_at IS NULL AND webhook_url IS NOT NULL AND tenant_id = $2 AND `+ownerActive, botID, d.tenantID).
 		Scan(&cfg.url, &sealed, &maxConn)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

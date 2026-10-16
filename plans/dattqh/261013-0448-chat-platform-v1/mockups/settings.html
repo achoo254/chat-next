@@ -456,7 +456,7 @@
 
 	<!-- ============ Export and delete ============ -->
 	<section class="shot" id="export-delete">
-		<div class="shot-head"><h2>Xuất và xoá dữ liệu</h2><span class="phase">Phase 12</span><p>Xuất dữ liệu cá nhân chạy nền; app không gửi email, bản xuất hiện ngay ở đây để tải. Tự xoá khi không dùng N tháng. Xoá tài khoản chat cần đăng nhập lại gần đây và chỉ xoá dữ liệu chat: tài khoản hoandat vẫn còn, quản lý ở IdP; đăng nhập lại sau này sẽ tạo một tài khoản chat mới, trống.</p></div>
+		<div class="shot-head"><h2>Xuất và xoá dữ liệu</h2><span class="phase">Phase 12</span><p>Xuất dữ liệu cá nhân chạy nền; app không gửi email, bản xuất hiện ngay ở đây để tải (ZIP: JSON đọc bằng máy, trang HTML xem offline, thư mục media). Giữ 30 ngày, mỗi 7 ngày yêu cầu một lần. Tự xoá khi không dùng N tháng (mặc định tắt). Xoá tài khoản chat cần đăng nhập lại trong 10 phút gần nhất và gõ username; bị chặn khi bạn còn là chủ sở hữu nhóm hoặc kênh. Xác nhận xong, tài khoản bị khoá ngay (mọi phiên đăng xuất, bot ngừng chạy, người khác thấy "Tài khoản đã xoá") và được giữ 30 ngày: đăng nhập lại trong thời gian đó để huỷ. Sau 30 ngày chỉ dữ liệu chat bị xoá; tài khoản hoandat vẫn còn, đăng nhập lại sẽ tạo một tài khoản chat mới, trống.</p></div>
 		<div class="frame tall"><div class="set">
 			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
 			<nav class="set-nav" data-active="export-delete" aria-label="Danh mục cài đặt"></nav>
@@ -465,21 +465,28 @@
 				<div class="set-body">
 					<div class="card">
 						<h4 class="card-title">Xuất dữ liệu cá nhân</h4>
-						<p class="note pad-x">Hồ sơ, danh sách chat, tin bạn gửi và media bạn tải lên. Khi xong, file nằm ở đây 30 ngày.</p>
-						<div class="row pad-x top-line"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span class="grow"><span class="mono">chat-export-dattqh-20261014.zip</span><small>248 MB · sẵn sàng · hết hạn 21/10/2026</small></span><button type="button" class="btn btn-sm" data-toast="Đang tải bản xuất qua link ký có hạn"><svg class="icon icon-sm"><use href="#i-download"/></svg>Tải xuống</button></div>
+						<p class="note pad-x">Hồ sơ, cài đặt, danh bạ, người đã chặn, danh sách chat, tin bạn gửi, Cloud của tôi và file bạn gửi. Tin của người khác không có trong bản xuất. Khi xong, file nằm ở đây 30 ngày.</p>
+						<div class="row pad-x top-line"><span class="device"><svg class="icon"><use href="#i-file"/></svg></span><span class="grow"><span class="mono">chat-export-dattqh-20261014.zip</span><small>248 MB · sẵn sàng · hết hạn 13/11/2026</small></span><button type="button" class="btn btn-sm" data-toast="Đang tải bản xuất qua link ký có hạn"><svg class="icon icon-sm"><use href="#i-download"/></svg>Tải xuống</button></div>
 						<div class="row pad-x top-line"><span class="grow">Yêu cầu bản xuất mới<small>Mỗi 7 ngày một lần. Lần sau: 21/10/2026 09:30</small></span><button type="button" class="btn btn-sm" disabled>Yêu cầu</button></div>
 					</div>
 					<div class="card">
-						<div class="row opt-row"><span class="grow">Tự xoá tài khoản chat nếu không dùng<small>Tính từ lần cuối có thiết bị nào kết nối</small></span><div class="choice" role="group" aria-label="Tự xoá nếu không dùng"><button type="button" aria-pressed="true">Tắt</button><button type="button" aria-pressed="false">6 tháng</button><button type="button" aria-pressed="false">12 tháng</button><button type="button" aria-pressed="false">24 tháng</button></div></div>
+						<div class="row opt-row"><span class="grow">Tự xoá tài khoản chat nếu không dùng<small>Tính từ lần cuối có thiết bị nào dùng tài khoản. Đến hạn, tài khoản được giữ thêm 30 ngày trước khi xoá hẳn.</small></span><div class="choice" role="group" aria-label="Tự xoá nếu không dùng"><button type="button" aria-pressed="true">Tắt</button><button type="button" aria-pressed="false">6 tháng</button><button type="button" aria-pressed="false">12 tháng</button><button type="button" aria-pressed="false">24 tháng</button></div></div>
 					</div>
 					<div class="card danger-zone">
 						<h4 class="card-title">Xoá tài khoản chat</h4>
 						<ul class="ticks pad-x">
-							<li>Xoá hồ sơ, username và lịch sử chat của bạn trên chat.hoandat.com; bạn rời mọi nhóm và kênh.</li>
+							<li>Xoá hồ sơ, username, danh bạ, người đã chặn, Cloud của tôi, cài đặt và các phiên đăng nhập; bạn rời mọi nhóm và kênh.</li>
+							<li>Tin bạn đã gửi trong chat của người khác vẫn còn, người gửi hiện là "Tài khoản đã xoá".</li>
+							<li>Tài khoản bị khoá ngay và xoá hẳn sau 30 ngày. Đăng nhập lại trong 30 ngày để huỷ.</li>
 							<li>Tài khoản hoandat vẫn còn: Localman, Tunelo dùng bình thường. Quản lý hoặc xoá nó ở auth.hoandat.com/account.</li>
-							<li>Đăng nhập chat lại sau này sẽ tạo một tài khoản chat mới, trống.</li>
 						</ul>
-						<div class="row pad-x"><span class="grow"><small>Cần đăng nhập lại ở hoandat trong 10 phút gần nhất.</small></span><button type="button" class="btn btn-danger" data-toast="Chuyển sang auth.hoandat.com để đăng nhập lại (xem khung dưới)">Xoá tài khoản chat</button></div>
+						<div class="banner warn blocker"><svg class="icon icon-sm"><use href="#i-alert"/></svg><span class="grow">Bạn đang là chủ sở hữu 2 nhóm và kênh. Chuyển quyền sở hữu hoặc xoá chúng trước.</span></div>
+						<ul class="plain owned">
+							<li class="row pad-x"><span class="device"><svg class="icon"><use href="#i-users"/></svg></span><span class="grow">Trực sự cố<small>Nhóm · 12 thành viên</small></span><a class="btn btn-sm" href="chat.html#group-admin">Mở nhóm</a></li>
+							<li class="row pad-x"><span class="device"><svg class="icon"><use href="#i-megaphone"/></svg></span><span class="grow">Thông báo vận hành<small>Kênh · 48 người theo dõi</small></span><a class="btn btn-sm" href="chat.html#group-admin">Mở kênh</a></li>
+						</ul>
+						<div class="callout pad-x"><svg class="icon icon-sm"><use href="#i-robot"/></svg><p>2 bot của bạn (Deploy Bot, Alert Bot) ngừng chạy ngay: token bị từ chối, webhook tạm dừng. Chúng bị xoá cùng tài khoản và chạy lại nếu bạn huỷ xoá.</p></div>
+						<div class="row pad-x"><span class="grow"><small>Cần đăng nhập lại ở hoandat trong 10 phút gần nhất.</small></span><button type="button" class="btn btn-danger" disabled title="Chuyển quyền sở hữu hoặc xoá nhóm và kênh trước">Xoá tài khoản chat</button></div>
 					</div>
 				</div>
 			</div>
@@ -487,19 +494,39 @@
 		<div class="frame confirm-frame">
 			<div class="static-dialog">
 				<form class="panel narrow" onsubmit="return false">
-					<div class="dlg-head"><h2>Xoá tài khoản chat</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-head"><h2>Xoá tài khoản chat?</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
 					<div class="banner ok"><svg class="icon icon-sm"><use href="#i-check"/></svg>Đã xác nhận lại ở auth.hoandat.com lúc 14:20</div>
 					<div class="dlg-body flow">
-						<p>Không hoàn tác được. Tài khoản hoandat của bạn không bị xoá.</p>
+						<p>Tài khoản bị khoá ngay, mọi thiết bị đăng xuất. Dữ liệu chat bị xoá hẳn vào <b>13/11/2026</b>; đăng nhập lại trước ngày đó để huỷ. Tài khoản hoandat của bạn không bị xoá.</p>
 						<div class="field">
 							<label for="del-confirm">Gõ <span class="mono">dattqh</span> để xác nhận</label>
 							<input id="del-confirm" class="input" autocomplete="off" spellcheck="false" placeholder="dattqh">
 						</div>
 					</div>
-					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-danger" id="del-submit" disabled data-press="Đã xoá tài khoản chat, phiên trên mọi thiết bị đã đăng xuất">Xoá vĩnh viễn</button></div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-danger" id="del-submit" disabled data-press="Đã khoá tài khoản chat, phiên trên mọi thiết bị đã đăng xuất">Xoá tài khoản</button></div>
 				</form>
 			</div>
 		</div>
+		<div class="shot-head"><h2>Đang tạo bản xuất</h2><p>Sau khi yêu cầu: tiến độ cập nhật vài giây một lần, không cần ở lại màn hình. Lỗi thì hiện "Không tạo được bản xuất" và cho yêu cầu lại ngay (lỗi không tính vào giới hạn 7 ngày).</p></div>
+		<div class="frame auto"><div class="set-body">
+			<div class="card">
+				<h4 class="card-title">Xuất dữ liệu cá nhân</h4>
+				<div class="row pad-x top-line"><span class="device"><svg class="icon"><use href="#i-clock"/></svg></span><span class="grow">Đang tạo bản xuất… 42%<small>Bắt đầu lúc 09:30. Bạn có thể đóng app, file sẽ hiện ở đây.</small><span class="progress" role="progressbar" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100" aria-label="Tiến độ bản xuất"><span style="width: 42%"></span></span></span></div>
+			</div>
+		</div></div>
+		<div class="shot-head"><h2>Đăng nhập lại trong 30 ngày</h2><p>Màn hình thay cho app khi tài khoản đang chờ xoá: không mở chat, không kết nối realtime. "Huỷ xoá tài khoản" mở lại tài khoản như cũ (bot chạy lại). Khi lịch xoá do không dùng (cài đặt tự xoá), dòng giải thích nói rõ lý do; app không gửi email nên đây là nơi duy nhất báo.</p></div>
+		<div class="frame auto"><div class="pending-del">
+			<div class="card pad flow">
+				<h3>Tài khoản chat đang chờ xoá</h3>
+				<p>Bạn đã yêu cầu xoá tài khoản chat <span class="mono">@dattqh</span>. Dữ liệu chat sẽ bị xoá hẳn vào <b>13/11/2026</b>.</p>
+				<p class="note">Lịch do không dùng: "Tài khoản chưa được dùng trong 12 tháng nên đã được lên lịch xoá theo cài đặt Tự xoá của bạn."</p>
+				<div class="row-actions"><button type="button" class="btn btn-primary" data-toast="Đã huỷ xoá tài khoản, mọi thứ như cũ">Huỷ xoá tài khoản</button><button type="button" class="btn" data-toast="Đã đăng xuất">Đăng xuất</button></div>
+			</div>
+		</div></div>
+		<div class="shot-head"><h2>Người khác thấy</h2><p>Trong chat, tin của tài khoản đã xoá vẫn còn; tên hiện "Tài khoản đã xoá", không có ảnh, username hay hồ sơ, không nhắn tiếp được.</p></div>
+		<div class="frame auto"><div class="set-body">
+			<div class="card"><div class="row pad-x"><span class="avatar sm" aria-hidden="true"><svg class="icon icon-sm"><use href="#i-user"/></svg></span><span class="grow">Tài khoản đã xoá<small>Không nhắn tin được cho tài khoản này</small></span></div></div>
+		</div></div>
 	</section>
 
 	<!-- ============ Report ============ -->
@@ -792,6 +819,13 @@ a.btn { color: var(--c-text); text-decoration: none; }
 	.switch, .switch[aria-checked="true"] { background-clip: content-box; }
 	.switch::after { top: 13px; left: 9px; }
 }
+.owned { border-top: 1px solid var(--c-border-subtle); }
+.blocker { border-top: 1px solid var(--c-border-subtle); }
+.pending-del { display: grid; place-items: center; padding: var(--space-6) var(--space-4); }
+.pending-del .card { width: min(480px, 100%); }
+.pending-del h3 { margin: 0; font-size: 1.125rem; }
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.top-line .progress { margin-top: var(--space-2); }
 @media (prefers-reduced-motion: reduce) {
 	.usage-bar span { transition: none; }
 }

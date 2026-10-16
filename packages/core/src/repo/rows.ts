@@ -112,7 +112,7 @@ export function decodeEntities(value: unknown): MessageEntity[] | null {
 	return entities;
 }
 
-function parseEntities(json: string | null): MessageEntity[] {
+export function parseEntities(json: string | null): MessageEntity[] {
 	return decodeEntities(parseJson(json)) ?? [];
 }
 
@@ -288,6 +288,7 @@ export function rowToUser(row: SqlRow): User {
 		isBot: bool(row, "is_bot"),
 		isSelf: bool(row, "is_self"),
 		isBlocked: bool(row, "is_blocked"),
+		...(bool(row, "deleted") ? { deleted: true } : {}),
 	};
 }
 

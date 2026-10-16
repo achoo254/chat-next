@@ -28,6 +28,21 @@ var signedOutProcedures = map[string]bool{
 	appv1connect.UsersServiceGetSelfProcedure: true,
 }
 
+// lockedProcedures are what a session of an account waiting for deletion
+// may call: see who it is (GetSelf carries the deletion), cancel the
+// deletion, or sign out. Everything else fails with failed_precondition
+// "account_pending_deletion".
+var lockedProcedures = map[string]bool{
+	appv1connect.UsersServiceGetSelfProcedure:                 true,
+	appv1connect.PrivacyServiceCancelAccountDeletionProcedure: true,
+	appv1connect.AuthServiceSignOutProcedure:                  true,
+}
+
+func errAccountPendingDeletion() error {
+	return connect.NewError(connect.CodeFailedPrecondition,
+		errors.New("account_pending_deletion: this account waits for deletion; cancel the deletion to use it"))
+}
+
 type sessionKey struct{}
 
 // sessionFrom returns the session the auth interceptor attached.
@@ -116,6 +131,9 @@ func authInterceptor(sessions *auth.Sessions, logger *slog.Logger) connect.Unary
 			}
 			if err != nil {
 				return nil, internal(ctx, logger, procedure, err)
+			}
+			if s.AccountLocked && !lockedProcedures[procedure] {
+				return nil, errAccountPendingDeletion()
 			}
 			return next(context.WithValue(ctx, sessionKey{}, s), req)
 		}

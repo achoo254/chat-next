@@ -15,6 +15,7 @@ import (
 	"app.local/server/internal/chat"
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/media"
+	"app.local/server/internal/privacy"
 	"app.local/server/internal/push"
 	"app.local/server/internal/store"
 	"connectrpc.com/connect"
@@ -44,6 +45,8 @@ type Deps struct {
 	Media *media.Service
 	// Push holds the sessions' Web Push registrations (PushService).
 	Push *push.Service
+	// Privacy runs data exports and account deletion (PrivacyService).
+	Privacy *privacy.Service
 	// Feedback answers feedback through the tenant's assistant bot; nil
 	// when the assistant is off (ReplyFeedback then fails).
 	Feedback   FeedbackReplier
@@ -55,11 +58,11 @@ type Deps struct {
 // NewHandler returns the Connect handler for AuthService, UsersService,
 // ConfigService, ChatsService, MessagesService, UpdatesService,
 // ModerationService, IntegrationsService, MediaService, SearchService,
-// BotsService, BotAdminService and PushService. Every call passes the Origin check, the id-contract check
+// BotsService, BotAdminService, PushService and PrivacyService. Every call passes the Origin check, the id-contract check
 // on request and response, and (except public procedures) the session check.
 func NewHandler(d Deps) (http.Handler, error) {
-	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.Push == nil {
-		return nil, errors.New("rpc: chat, hooks, bot and push services are required")
+	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.Push == nil || d.Privacy == nil {
+		return nil, errors.New("rpc: chat, hooks, bot, push and privacy services are required")
 	}
 	var uploadMax int64
 	if d.Media != nil {
@@ -96,5 +99,8 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewBotsServiceHandler(&botsService{chat: d.Chat, bots: d.Bots, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewBotAdminServiceHandler(&botAdminService{bots: d.Bots, updates: d.BotUpdates, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewPushServiceHandler(&pushService{push: d.Push, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{
+		privacy: d.Privacy, store: d.Store, tenantID: d.TenantID, logger: d.Logger,
+	}, opts...))
 	return mux, nil
 }

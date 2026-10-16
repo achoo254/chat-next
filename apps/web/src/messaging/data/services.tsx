@@ -1,6 +1,7 @@
 // Long-lived services of the messaging UI. The object never changes after
 // start-up, so a context is fine for it; everything that changes often is
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
+import type { Transport } from "@connectrpc/connect";
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Chat, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
@@ -58,6 +59,8 @@ export interface Services {
 	readonly bots: Bots;
 	/** Web Push of this device (notifications while the app is closed). */
 	readonly webPush: WebPush;
+	/** How the screens' own Connect clients reach the server (the "Tài khoản" tab's). */
+	readonly transport: Transport;
 	readonly backend: PendingBackend;
 	readonly toasts: Toasts;
 	readonly drafts: Drafts;

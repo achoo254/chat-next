@@ -6,7 +6,7 @@
 // (https://connectrpc.com/docs/protocol, unary requests).
 import { Code } from "@connectrpc/connect";
 import { assertSafeId } from "@app/core";
-import type { SelfUser } from "./adapters.ts";
+import type { AccountDeletionInfo, SelfUser } from "./adapters.ts";
 
 export const RPC_BASE_URL = "/rpc";
 const GET_SELF_URL = `${RPC_BASE_URL}/app.v1.UsersService/GetSelf`;
@@ -90,7 +90,7 @@ export function parseGetSelf(body: unknown): SelfUser {
 	const user = body.user;
 	const isOperator = body.isOperator ?? false;
 	if (typeof isOperator !== "boolean") throw new RpcError(Code.Internal, "GetSelf: isOperator is not a boolean");
-	return {
+	const self: SelfUser = {
 		id: int64(user, "id"),
 		username: text(user, "username"),
 		name: text(user, "name"),
@@ -98,6 +98,15 @@ export function parseGetSelf(body: unknown): SelfUser {
 		email: text(user, "email"),
 		isOperator,
 	};
+	const deletion = parseDeletion(body.deletion);
+	return deletion === null ? self : { ...self, deletion };
+}
+
+/** GetSelfResponse.deletion; null when the account is not waiting for deletion. */
+function parseDeletion(value: unknown): AccountDeletionInfo | null {
+	if (value === undefined) return null;
+	if (!isRecord(value)) throw new RpcError(Code.Internal, "GetSelf: deletion is not an object");
+	return { purgeAt: int64(value, "purgeAt"), reason: value.reason === "ACCOUNT_DELETION_REASON_INACTIVE" ? "inactive" : "user" };
 }
 
 /**

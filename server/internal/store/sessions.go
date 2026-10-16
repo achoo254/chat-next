@@ -32,6 +32,8 @@ const (
 	reasonRevokedByUser = "2"
 	reasonGrantEnded    = "3"
 	reasonReplaced      = "6"
+	// ReasonAccountDeleted: the account entered its deletion grace period.
+	reasonAccountDeleted = "7"
 )
 
 // Session is a chat session without its secrets.
@@ -50,6 +52,10 @@ type Session struct {
 	// AuthTime is when the user last authenticated at the IdP for this
 	// session (the ID token's auth_time at sign-in); zero when unknown.
 	AuthTime time.Time
+	// AccountLocked: the user's account waits for deletion. Only
+	// ActiveSession fills it; such a session may only cancel the deletion
+	// or sign out.
+	AccountLocked bool
 }
 
 const sessionColumns = `s.id, s.tenant_id, s.user_id, s.token_hash, coalesce(s.idp_sid, ''), s.idp_client_id,
@@ -112,16 +118,27 @@ func (s *Store) CreateSession(ctx context.Context, n NewSession) (int64, error) 
 	return id, nil
 }
 
-// ActiveSession returns the usable session whose token hashes to tokenHash.
+// ActiveSession returns the usable session whose token hashes to tokenHash,
+// with the deletion lock of its account. A session of an erased account is
+// never usable.
 func (s *Store) ActiveSession(ctx context.Context, tenantID string, tokenHash []byte) (Session, error) {
-	x, err := scanSession(s.pool.QueryRow(ctx, `
-		SELECT `+sessionColumns+` FROM user_sessions s
-		WHERE s.tenant_id = $1 AND s.token_hash = $2 AND `+activeSession,
-		tenantID, tokenHash))
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	var x Session
+	var authTime *time.Time
+	err := s.pool.QueryRow(ctx, `
+		SELECT `+sessionColumns+`, u.deletion_requested_at IS NOT NULL FROM user_sessions s JOIN users u ON u.id = s.user_id
+		WHERE s.tenant_id = $1 AND s.token_hash = $2 AND u.deleted_at IS NULL AND `+activeSession,
+		tenantID, tokenHash).Scan(&x.ID, &x.TenantID, &x.UserID, &x.TokenHash, &x.IdPSID, &x.IdPClientID,
+		&x.IdPCheckedAt, &x.CreatedAt, &x.LastSeenAt, &x.UserAgent, &x.IP, &authTime, &x.AccountLocked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNotFound
+	}
+	if err != nil {
 		return Session{}, fmt.Errorf("store: active session: %w", err)
 	}
-	return x, err
+	if authTime != nil {
+		x.AuthTime = *authTime
+	}
+	return x, nil
 }
 
 // SessionStatus is what TouchSession found out about a session.
@@ -251,6 +268,30 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, tenantID string, userID
 	list, err := collectRevoked(rows)
 	if err != nil {
 		return nil, fmt.Errorf("store: revoke other sessions: %w", err)
+	}
+	return list, nil
+}
+
+// RevokeAllSessions revokes every session of the user that is not revoked
+// yet (expired ones too, so a native refresh token still held is revoked at
+// the IdP) because the account entered its deletion grace period.
+func (s *Store) RevokeAllSessions(ctx context.Context, tenantID string, userID int64) ([]RevokedSession, error) {
+	rows, err := s.pool.Query(ctx, `
+		WITH target AS (
+			SELECT s.id, s.token_hash, s.refresh_token_enc FROM user_sessions s
+			WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL
+			FOR UPDATE)
+		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
+			revoke_reason = `+reasonAccountDeleted+`
+		FROM target WHERE u.id = target.id
+		RETURNING u.id, target.token_hash, target.refresh_token_enc`,
+		tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("store: revoke all sessions: %w", err)
+	}
+	list, err := collectRevoked(rows)
+	if err != nil {
+		return nil, fmt.Errorf("store: revoke all sessions: %w", err)
 	}
 	return list, nil
 }

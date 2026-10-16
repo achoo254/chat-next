@@ -32,6 +32,7 @@ import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
 import { FakeBots } from "./fake-bots.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";
 import { FakePush } from "./fake-push.ts";
+import { FakePrivacy } from "./fake-privacy.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
 import type { ChatSource } from "../../src/messaging/data/source.ts";
@@ -41,7 +42,7 @@ type MessageExtras = Pick<
 	MessageInit,
 	"entities" | "replyToSeq" | "forwardFrom" | "editDate" | "editVersion" | "action" | "integrationLabel" | "topicId" | "linkPreview" | "replyMarkup"
 >;
-type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string };
+type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string; deleted?: boolean };
 type ChatExtras = {
 	myRole?: MemberRole;
 	myPermissions?: number;
@@ -242,11 +243,14 @@ export class ChatFixture {
 	readonly bots: FakeBots;
 	/** PushService: this session's Web Push registration. */
 	readonly push = new FakePush();
+	/** PrivacyService: data export and account deletion. */
+	readonly privacy = new FakePrivacy();
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
 		this.selfUsername = selfUsername;
 		this.selfId = this.addUser(selfName, { username: selfUsername });
+		this.privacy.username = selfUsername;
 		this.integrations = new FakeIntegrations({
 			selfId: this.selfId,
 			roleOf: (chatId) => (this.members.get(chatId)?.includes(this.selfId) === true ? (this.chatExtras.get(chatId)?.myRole ?? MemberRole.MEMBER) : null),
@@ -498,6 +502,14 @@ export class ChatFixture {
 					chats(response.chats);
 					return response;
 				},
+				getPeerDialogs: async (request) => {
+					const response = await offered(base.chats.getPeerDialogs, "getPeerDialogs")(request);
+					response.messages.forEach((m) => this.patchMessage(m));
+					response.dialogs.forEach((d) => this.patchDialog(d));
+					users(response.users);
+					chats(response.chats);
+					return response;
+				},
 				getChat: async (request) => {
 					const response = await base.chats.getChat(request);
 					if (response.chat !== undefined) this.patchChat(response.chat);
@@ -657,6 +669,7 @@ export class ChatFixture {
 		this.integrations.routes(router);
 		this.bots.routes(router);
 		this.push.routes(router);
+		this.privacy.routes(router);
 	}
 
 	/** The private chat of the signed-in user with `userId`, created when missing. */
@@ -1237,7 +1250,6 @@ export function toSource(core: ChatCore): ChatSource {
 		pinnedMessages: (chatId, request) => core.pinnedMessages(chatId, request),
 		unpinAllMessages: (chatId, topicId) => core.unpinAllMessages(chatId, topicId),
 		onlineCount: (chatId) => core.onlineCount(chatId),
-		unreadTotals: () => core.unreadTotals(),
 		sendMedia: (chatId, file, media, options) => core.sendMedia(chatId, file, media, options),
 		sendAlbum: (chatId, items, options) => core.sendAlbum(chatId, items, options),
 		uploadProgress: (key) => core.uploadProgress(key),

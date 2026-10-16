@@ -250,3 +250,22 @@ export function normalizeLinkUrl(text: string, appScheme: string): string | unde
 	const url = hasScheme(trimmed) ? trimmed : `https://${trimmed}`;
 	return isAllowedUrl(url, appScheme) ? url : undefined;
 }
+
+/**
+ * Whether a text mentions the user the way the server records unread
+ * mentions (server/internal/chat message_mentions): a mention_name entity of
+ * the user, or a mention entity "@username" in any case. A reply to one of
+ * the user's messages counts as a mention too; callers check that apart.
+ */
+export function mentionsUser(
+	text: string,
+	entities: readonly { readonly type: string; readonly offset: number; readonly length: number; readonly userId?: number }[],
+	userId: number,
+	username: string,
+): boolean {
+	return entities.some((entity) => {
+		if (entity.type === "mention_name") return entity.userId === userId;
+		if (entity.type !== "mention" || username === "") return false;
+		return text.slice(entity.offset, entity.offset + entity.length).toLowerCase() === `@${username.toLowerCase()}`;
+	});
+}

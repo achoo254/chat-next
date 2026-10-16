@@ -873,9 +873,13 @@ type UpdateRead struct {
 	// Inbox only: the chat's newest seq when unread_count was computed.
 	// unread_count covers incoming messages up to it; later ones are unread on
 	// top of it.
-	TopSeq        int64 `protobuf:"varint,8,opt,name=top_seq,json=topSeq,proto3" json:"top_seq,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	TopSeq int64 `protobuf:"varint,8,opt,name=top_seq,json=topSeq,proto3" json:"top_seq,omitempty"`
+	// Inbox only: unread messages that mention the user or reply to them,
+	// left after this read over the whole chat (counted like
+	// Dialog.unread_mentions_count, up to 1000).
+	UnreadMentionsCount int32 `protobuf:"varint,9,opt,name=unread_mentions_count,json=unreadMentionsCount,proto3" json:"unread_mentions_count,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *UpdateRead) Reset() {
@@ -960,6 +964,13 @@ func (x *UpdateRead) GetTopicUnreadCount() int32 {
 func (x *UpdateRead) GetTopSeq() int64 {
 	if x != nil {
 		return x.TopSeq
+	}
+	return 0
+}
+
+func (x *UpdateRead) GetUnreadMentionsCount() int32 {
+	if x != nil {
+		return x.UnreadMentionsCount
 	}
 	return 0
 }
@@ -2481,7 +2492,7 @@ const file_app_v1_updates_proto_rawDesc = "" +
 	"\x0eUpdateReaction\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x123\n" +
-	"\treactions\x18\x03 \x03(\v2\x15.app.v1.ReactionCountR\treactions\"\x8a\x02\n" +
+	"\treactions\x18\x03 \x03(\v2\x15.app.v1.ReactionCountR\treactions\"\xbe\x02\n" +
 	"\n" +
 	"UpdateRead\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
@@ -2491,7 +2502,8 @@ const file_app_v1_updates_proto_rawDesc = "" +
 	"\btopic_id\x18\x05 \x01(\x03B\x020\x02R\atopicId\x12\x1d\n" +
 	"\bchat_pts\x18\x06 \x01(\x03B\x020\x02R\achatPts\x12,\n" +
 	"\x12topic_unread_count\x18\a \x01(\x05R\x10topicUnreadCount\x12\x1b\n" +
-	"\atop_seq\x18\b \x01(\x03B\x020\x02R\x06topSeq\"n\n" +
+	"\atop_seq\x18\b \x01(\x03B\x020\x02R\x06topSeq\x122\n" +
+	"\x15unread_mentions_count\x18\t \x01(\x05R\x13unreadMentionsCount\"n\n" +
 	"\tUpdatePin\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12\x16\n" +

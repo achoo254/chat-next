@@ -51,6 +51,8 @@ export function toTopic(chatId: number, topic: ServerTopic, tops: ReadonlyMap<nu
 		closed: topic.closed,
 		hidden: topic.hidden,
 		muted: false,
+		topSeq: topic.topSeq,
+		readInboxMaxSeq: topic.readInboxMaxSeq,
 		unreadCount: topic.unreadCount,
 		unreadMentions: topic.unreadMentions,
 		messageCount: topic.messageCount,

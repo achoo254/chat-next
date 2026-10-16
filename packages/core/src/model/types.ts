@@ -13,6 +13,8 @@ export interface User {
 	readonly isBot: boolean;
 	readonly isSelf: boolean;
 	readonly isBlocked: boolean;
+	/** The account was deleted (or waits for deletion): username, name and bio are empty; show it as a deleted account. */
+	readonly deleted?: boolean;
 }
 
 export interface Chat {
@@ -396,6 +398,8 @@ export type UpdateBody =
 			readonly topSeq: number;
 			/** Inbox, sync_mode=large: the chat log position of the counts. */
 			readonly chatPts: number;
+			/** Inbox: unread messages that mention the user or reply to them, after the read. */
+			readonly unreadMentionsCount: number;
 	  }
 	/** seqs: unpin all (pinned false, seq 0); otherwise empty. */
 	| {

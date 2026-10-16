@@ -33,6 +33,7 @@ import (
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
+	"app.local/server/internal/privacy"
 	"app.local/server/internal/push"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/rpc"
@@ -67,6 +68,8 @@ type App struct {
 	// Push holds Web Push registrations and sends pushes (off without a
 	// VAPID key).
 	Push *push.Service
+	// Privacy builds data exports and deletes accounts.
+	Privacy *privacy.Service
 
 	logger   *slog.Logger
 	cancel   context.CancelFunc
@@ -182,13 +185,17 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	privacySvc, err := newPrivacy(cfg, st, chatSvc, sessions, botAdmin, mediaSvc, logger)
+	if err != nil {
+		return nil, err
+	}
 	var feedback rpc.FeedbackReplier
 	if assistantSvc != nil {
 		feedback = assistantSvc
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
-		Bots: botAdmin, BotUpdates: botUpdates, Push: pushSvc, Feedback: feedback, TenantID: cfg.TenantID,
+		Bots: botAdmin, BotUpdates: botUpdates, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, TenantID: cfg.TenantID,
 		TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {
@@ -210,17 +217,18 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
-		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, Push: pushSvc, logger: logger, cancel: cancel}
+		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, Push: pushSvc, Privacy: privacySvc, logger: logger,
+		cancel: cancel}
 	loops := []func(context.Context){
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
-		pushSvc.Run,
+		pushSvc.Run, privacySvc.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
 	}
 	if assistantSvc != nil {
 		loops = append(loops, assistantSvc.Run)
 	}
 	if mediaSvc != nil {
-		app.Handler = byHost(cfg.Media.PublicURL.Host, mediaSvc.Handler(), mux)
+		app.Handler = byHost(cfg.Media.PublicURL.Host, withExportDownloads(privacySvc, mediaSvc.Handler()), mux)
 		loops = append(loops, mediaSvc.RunLifecycle, mediaSvc.RunWorker)
 	}
 	for _, loop := range loops {
@@ -255,6 +263,37 @@ func newPush(cfg config.Config, st *store.Store, chatSvc *chat.Service, hub *gat
 		TenantID: cfg.TenantID, AppName: names.PushSenderName, Sender: sender,
 		SessionIdleTimeout: store.SessionIdleTimeout, SessionMaxAge: store.SessionMaxAge,
 	}, logger.With("component", "push"))
+}
+
+// newPrivacy sets up data exports and account deletion. Exports need the
+// media host (downloads) and an export directory (by default under the
+// filesystem media root); without them only deletion works.
+func newPrivacy(cfg config.Config, st *store.Store, chatSvc *chat.Service, sessions *auth.Sessions, bots *botadmin.Service,
+	mediaSvc *media.Service, logger *slog.Logger) (*privacy.Service, error) {
+	pc := privacy.Config{TenantID: cfg.TenantID, SessionKey: cfg.SessionKey}
+	deps := privacy.Deps{Pool: st.Pool(), Chat: chatSvc, Sessions: sessions, Bots: bots, Logger: logger.With("component", "privacy")}
+	if m := cfg.Media; m != nil && mediaSvc != nil {
+		pc.ExportDir, pc.MediaOrigin, pc.MinFreeBytes = m.ExportDir, m.PublicOrigin(), m.MinFreeBytes
+		deps.Media = mediaSvc
+	}
+	svc, err := privacy.New(pc, deps)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("data exports", "enabled", svc.ExportsEnabled())
+	return svc, nil
+}
+
+// withExportDownloads serves the data export downloads (privacy.
+// DownloadPrefix) on the media host in front of the media handler.
+func withExportDownloads(p *privacy.Service, media http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, privacy.DownloadPrefix) {
+			p.ServeDownload(w, r)
+			return
+		}
+		media.ServeHTTP(w, r)
+	})
 }
 
 // newAssistant sets up the tenant's assistant bot. When another account

@@ -56,8 +56,6 @@ export interface ChatSource {
 	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
 	/** Members of a group online now, counted by the server (online only). */
 	onlineCount(chatId: number): Promise<number>;
-	/** The app badge: unread messages and chats, muted chats per the user's setting. */
-	unreadTotals(): Promise<{ readonly messages: number; readonly chats: number }>;
 	/** Queues a file with an optional caption; the pending message shows at once and uploads in the background. */
 	sendMedia(chatId: number, file: Blob, media: MediaInput, options?: SendMediaOptions): Promise<PendingMessage | null>;
 	/** Queues 2 to MediaLimits.albumSizeMax files as one album. */

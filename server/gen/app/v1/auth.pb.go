@@ -95,6 +95,10 @@ const (
 	// action) and now holds the new session's cookie: clients keep their local
 	// data and reconnect, which picks up the new session.
 	SessionRevokeReason_SESSION_REVOKE_REASON_REPLACED SessionRevokeReason = 6
+	// The user deleted the chat account (or it was scheduled for deletion
+	// after a long time unused): every session ends and the IdP grant is
+	// revoked. Clients wipe local data like for any other revocation.
+	SessionRevokeReason_SESSION_REVOKE_REASON_ACCOUNT_DELETED SessionRevokeReason = 7
 )
 
 // Enum value maps for SessionRevokeReason.
@@ -107,6 +111,7 @@ var (
 		4: "SESSION_REVOKE_REASON_EXPIRED",
 		5: "SESSION_REVOKE_REASON_ADMIN",
 		6: "SESSION_REVOKE_REASON_REPLACED",
+		7: "SESSION_REVOKE_REASON_ACCOUNT_DELETED",
 	}
 	SessionRevokeReason_value = map[string]int32{
 		"SESSION_REVOKE_REASON_UNSPECIFIED":     0,
@@ -116,6 +121,7 @@ var (
 		"SESSION_REVOKE_REASON_EXPIRED":         4,
 		"SESSION_REVOKE_REASON_ADMIN":           5,
 		"SESSION_REVOKE_REASON_REPLACED":        6,
+		"SESSION_REVOKE_REASON_ACCOUNT_DELETED": 7,
 	}
 )
 
@@ -896,7 +902,7 @@ const file_app_v1_auth_proto_rawDesc = "" +
 	"\x13CLIENT_PLATFORM_WEB\x10\x01\x12\x17\n" +
 	"\x13CLIENT_PLATFORM_IOS\x10\x02\x12\x1b\n" +
 	"\x17CLIENT_PLATFORM_ANDROID\x10\x03\x12\x1b\n" +
-	"\x17CLIENT_PLATFORM_DESKTOP\x10\x04*\xa0\x02\n" +
+	"\x17CLIENT_PLATFORM_DESKTOP\x10\x04*\xcb\x02\n" +
 	"\x13SessionRevokeReason\x12%\n" +
 	"!SESSION_REVOKE_REASON_UNSPECIFIED\x10\x00\x12$\n" +
 	" SESSION_REVOKE_REASON_SIGNED_OUT\x10\x01\x12)\n" +
@@ -904,7 +910,8 @@ const file_app_v1_auth_proto_rawDesc = "" +
 	"%SESSION_REVOKE_REASON_IDP_GRANT_ENDED\x10\x03\x12!\n" +
 	"\x1dSESSION_REVOKE_REASON_EXPIRED\x10\x04\x12\x1f\n" +
 	"\x1bSESSION_REVOKE_REASON_ADMIN\x10\x05\x12\"\n" +
-	"\x1eSESSION_REVOKE_REASON_REPLACED\x10\x062\xed\x03\n" +
+	"\x1eSESSION_REVOKE_REASON_REPLACED\x10\x06\x12)\n" +
+	"%SESSION_REVOKE_REASON_ACCOUNT_DELETED\x10\a2\xed\x03\n" +
 	"\vAuthService\x12L\n" +
 	"\rGetAuthConfig\x12\x1c.app.v1.GetAuthConfigRequest\x1a\x1d.app.v1.GetAuthConfigResponse\x12[\n" +
 	"\x12ExchangeNativeCode\x12!.app.v1.ExchangeNativeCodeRequest\x1a\".app.v1.ExchangeNativeCodeResponse\x12:\n" +
