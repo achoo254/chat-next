@@ -114,6 +114,17 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 
 Luật bot chạy 10 phút một lần trong `chat-api`: bot có ít nhất 20 người nhận trong 24 giờ mà từ 5% trong đó chặn bot, hoặc có từ 50 người dùng mới trong 24 giờ và gấp 10 lần trung bình tuần trước, bị hạ xuống tầng `restricted` và hiện ở đầu hàng đợi chờ xem xét. Ngưỡng này nằm trong code (`server/internal/chat/moderation_bots.go`).
 
+## Tenant khác (nghiệm thu `inetdev.io.vn`)
+
+Mỗi tenant khác tenant chính chạy một process `chat-api-<id>` riêng trên cùng database, ở `https://chat.<domain>`. Process nào chỉ đọc outbox và dữ liệu của tenant mình. Tenant `inetdev.io.vn` chỉ dùng để nghiệm thu mô hình tenant; các app khác không cần làm theo.
+
+1. Phía IdP (`hoandat-auth`): tenant đã có ở `auth.<domain>`. Chứng chỉ của tenant (`/etc/letsencrypt-tenants/live/<domain>/`) phải có `chat.<domain>`, và map `$tenant_cert` trong `00-tenants-http.conf` phải nhận nhãn `chat.`. Host `chat.<domain>` để DNS only hay Proxied qua Cloudflare đều được.
+2. Trên server, với quyền root: `bash /opt/chat/infra/setup-tenant.sh <id> <domain> <cổng 4601–4699>`, ví dụ `setup-tenant.sh inetdev inetdev.io.vn 4601`. Script tạo `/opt/chat/tenants/<id>.env` một lần (`SESSION_KEY` mới; media và Web Push tắt).
+3. Ghi secret `chat-web` của tenant (suy ra ở IdP từ `APP_CLIENT_SECRET_KEY`) vào `OIDC_CLIENT_SECRET` của file đó, không in ra màn hình.
+4. Deploy release như thường lệ. `activate-release.sh` dựng `/etc/nginx/conf.d/chat-tenants.conf` bằng [`render-tenants-nginx.sh`](../infra/chat/render-tenants-nginx.sh) (block regex `chat.<tenant>` dựng từ conf chính), khởi động hoặc reload `chat-api-<id>`, rồi kiểm `/healthz` ở cổng của tenant; lỗi thì tự rollback. Thiếu `00-tenants-http.conf` thì chỉ bỏ qua tenant và in cảnh báo.
+
+Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` trong file của tenant (user id của chính tenant đó). Log nằm ở `/var/log/chat/api-<id>.*.log`.
+
 ## Kiểm tra sau deploy
 
 `infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`, `GET /bot/v1/me` không token trả 401 `unauthorized`; khi đã cấu hình media: `https://media-chat.hoandat.com/healthz` báo `"storage":"reachable"`, `/f/<token sai>` trả 404 có `nosniff` và không `Set-Cookie`, route của app trên host media trả 404 (chưa cấu hình thì bỏ qua và in thông báo). Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).

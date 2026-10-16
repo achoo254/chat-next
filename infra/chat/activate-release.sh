@@ -20,6 +20,12 @@ CONF=/etc/nginx/conf.d/chat.hoandat.com.conf
 # fails on a missing certificate file).
 MEDIA_CONF=/etc/nginx/conf.d/media-chat.hoandat.com.conf
 MEDIA_CERT=/etc/letsencrypt/live/media-chat.hoandat.com/fullchain.pem
+# Chat tenants other than the primary one (setup-tenant.sh): their nginx
+# block, built from the release's conf, needs hoandat-auth's $tenant_cert
+# map.
+TENANTS_DIR="$ROOT/tenants"
+TENANTS_CONF=/etc/nginx/conf.d/chat-tenants.conf
+TENANT_CERT_MAP=/etc/nginx/conf.d/00-tenants-http.conf
 PREV="$(readlink "$ROOT/current" 2>/dev/null || true)"
 
 chmod -R a+rX "$NEW"
@@ -85,6 +91,56 @@ media() {
 		https://media-chat.hoandat.com/f/smokeprobe)" = 404 ]
 }
 
+# Each tenant's process answers /healthz with the database connected.
+tenants_health() {
+	local id port i
+	for id in $(tenant_ids); do
+		port="$(tenant_port "$id")"
+		for i in $(seq 1 30); do
+			curl -fsS --max-time 2 "http://127.0.0.1:$port/healthz" | grep -q '"db":"connected"' && continue 2
+			sleep 1
+		done
+		echo "tenant $id did not become healthy on port $port" >&2
+		return 1
+	done
+}
+
+# Tenant ids, one per /opt/chat/tenants/<id>.env.
+tenant_ids() {
+	local file
+	for file in "$TENANTS_DIR"/*.env; do
+		[ -f "$file" ] && basename "$file" .env
+	done
+	return 0
+}
+
+tenant_port() { sed -n 's/^CHAT_LISTEN_ADDR=127\.0\.0\.1://p' "$TENANTS_DIR/$1.env" | tail -n 1; }
+
+# Writes the tenants' nginx conf from the release nginx directory $1 (none
+# when there is no tenant, or no $tenant_cert map yet).
+install_tenants_conf() {
+	local rendered
+	rendered="$(bash "$ROOT/infra/render-tenants-nginx.sh" "$1" "$TENANTS_DIR")" || return 1
+	if [ -z "$rendered" ]; then
+		rm -f "$TENANTS_CONF"
+	elif [ ! -f "$TENANT_CERT_MAP" ]; then
+		echo "WARNING: $TENANT_CERT_MAP missing (hoandat-auth); chat tenants not served" >&2
+		rm -f "$TENANTS_CONF"
+	else
+		printf '%s\n' "$rendered" >"$TENANTS_CONF"
+		chmod 644 "$TENANTS_CONF"
+	fi
+}
+
+# Starts or reloads chat-api and every tenant's process.
+start_all() {
+	local id
+	pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || return 1
+	for id in $(tenant_ids); do
+		pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only "chat-api-$id" --update-env || return 1
+	done
+}
+
 rollback() {
 	echo "!! activation failed, restoring ${PREV:-nothing}" >&2
 	if [ -n "$PREV" ]; then
@@ -95,8 +151,9 @@ rollback() {
 		else
 			rm -f "$MEDIA_CONF"
 		fi
+		install_tenants_conf "$PREV/nginx" || rm -f "$TENANTS_CONF"
 		nginx -t && systemctl reload nginx || true
-		pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || true
+		start_all || true
 	fi
 	exit 1
 }
@@ -104,14 +161,17 @@ rollback() {
 echo "== nginx"
 cp -p "$CONF" "$CONF.prev" 2>/dev/null || true
 cp -p "$MEDIA_CONF" "$MEDIA_CONF.prev" 2>/dev/null || rm -f "$MEDIA_CONF.prev"
+cp -p "$TENANTS_CONF" "$TENANTS_CONF.prev" 2>/dev/null || rm -f "$TENANTS_CONF.prev"
 install -m 644 "$NEW/nginx/chat.hoandat.com.conf" "$CONF"
 if [ -f "$NEW/nginx/media-chat.hoandat.com.conf" ] && [ -f "$MEDIA_CERT" ]; then
 	install -m 644 "$NEW/nginx/media-chat.hoandat.com.conf" "$MEDIA_CONF"
 elif [ -f "$NEW/nginx/media-chat.hoandat.com.conf" ]; then
 	echo "WARNING: $MEDIA_CERT missing; media host not served (see docs/deployment-guide.md)" >&2
 fi
+install_tenants_conf "$NEW/nginx" || { echo "rendering the tenants' nginx conf failed; release not activated" >&2; exit 1; }
 if ! nginx -t; then
 	if [ -f "$CONF.prev" ]; then mv "$CONF.prev" "$CONF"; else rm -f "$CONF"; fi
+	if [ -f "$TENANTS_CONF.prev" ]; then mv "$TENANTS_CONF.prev" "$TENANTS_CONF"; else rm -f "$TENANTS_CONF"; fi
 	if [ -f "$MEDIA_CONF.prev" ]; then mv "$MEDIA_CONF.prev" "$MEDIA_CONF"; else rm -f "$MEDIA_CONF"; fi
 	echo "nginx -t failed; release not activated" >&2
 	exit 1
@@ -122,13 +182,14 @@ ln -sfn "$NEW" "$ROOT/current"
 systemctl reload nginx
 # Through the ecosystem file, so option changes (kill_timeout, memory cap)
 # apply on every deploy.
-pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || rollback
+start_all || rollback
 pm2 save >/dev/null
 health || rollback
 realtime || rollback
 hooks || rollback
 bots || rollback
 media || rollback
+tenants_health || rollback
 
 echo "== prune"
 ls -1dt "$ROOT"/releases/*/ | tail -n +6 | xargs -r rm -rf
