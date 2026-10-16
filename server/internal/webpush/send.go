@@ -28,6 +28,11 @@ const (
 
 // topicPattern: RFC 8030 section 5.4, at most 32 characters of the URL and
 // filename safe base64 alphabet.
+// appleHost is Apple's push service, which refuses RFC 8030 Topic headers
+// with {"reason":"BadWebPushTopic"} (seen on prod with "chat4"); the
+// notification tag in the service worker still collapses per chat there.
+const appleHost = "push.apple.com"
+
 // reasonMax caps how much of a refusal body is kept for the log.
 const reasonMax = 256
 
@@ -160,7 +165,7 @@ func (s *Sender) Send(ctx context.Context, endpoint string, keys Keys, m Message
 	if m.Urgency != "" {
 		req.Header.Set("Urgency", m.Urgency)
 	}
-	if m.Topic != "" {
+	if m.Topic != "" && !strings.HasSuffix(u.Hostname(), appleHost) {
 		req.Header.Set("Topic", m.Topic)
 	}
 	req.Header.Set("Authorization", auth)

@@ -388,3 +388,23 @@ func TestSender(t *testing.T) {
 		t.Fatalf("unreachable push service: %+v, %v", res, err)
 	}
 }
+
+// Apple's push service refuses Topic headers ({"reason":"BadWebPushTopic"}),
+// so the header is left out for it and kept for the others.
+func TestSenderLeavesTopicOutForApple(t *testing.T) {
+	ps := &pushService{status: http.StatusCreated}
+	srv := httptest.NewTLSServer(ps)
+	defer srv.Close()
+	sender, err := NewSender(newTestVAPID(t), SenderOptions{Client: routedClient(srv), PadTo: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := newBrowser(t)
+	msg := Message{Payload: []byte(`{}`), TTL: time.Hour, Urgency: UrgencyHigh, Topic: "chat4"}
+	if _, err := sender.Send(context.Background(), "https://web.push.apple.com/QGuQyavXutnMUZ", b.keys, msg); err != nil {
+		t.Fatal(err)
+	}
+	if req := ps.requests[0]; req.Header.Get("Topic") != "" || req.Header.Get("Urgency") != "high" {
+		t.Fatalf("apple request headers %v", req.Header)
+	}
+}
