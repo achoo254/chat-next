@@ -767,3 +767,18 @@ func (s *Service) LiftRestriction(ctx context.Context, me, userID int64, note st
 	})
 	return err
 }
+
+// OperatorUsers renders users for an operator's moderation screens (the
+// operators who sent an announcement), whoever they are related to.
+func (s *Service) OperatorUsers(ctx context.Context, me int64, ids []int64) ([]*appv1.User, error) {
+	if err := s.requireOperator(me); err != nil {
+		return nil, err
+	}
+	ents := newEntitySet()
+	ents.addUsers(me, ids...)
+	rendered, err := ents.render(ctx, s.pool, s.cfg.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	return rendered.users[me], nil
+}

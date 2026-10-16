@@ -20,10 +20,18 @@ import {
 } from "@app/proto-ts/chats";
 import type { InviteLink } from "@app/proto-ts/chats";
 import { ConfigService } from "@app/proto-ts/config";
-import { MessageSchema, MessagesService, type Message as WireMessage } from "@app/proto-ts/messages";
+import { EntityType, MessageSchema, MessagesService, type Message as WireMessage } from "@app/proto-ts/messages";
 import { ServerFrameSchema } from "@app/proto-ts/realtime";
 import type { Update as WireUpdate } from "@app/proto-ts/updates";
-import { FeedbackKind, FeedbackStatus, ModerationAction, ModerationService, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
+import {
+	AnnouncementState,
+	FeedbackKind,
+	FeedbackStatus,
+	ModerationAction,
+	ModerationService,
+	ReportStatus,
+	ReportTargetKind,
+} from "@app/proto-ts/moderation";
 import { BotTier } from "@app/proto-ts/bot_admin";
 import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
@@ -260,6 +268,9 @@ export class ChatFixture {
 	operator = false;
 	readonly reportQueue: FixtureReport[] = [];
 	readonly feedbackQueue: FixtureFeedback[] = [];
+	/** SendAnnouncement texts as sent, and the users who started the assistant. */
+	readonly announcements: { id: number; text: string; state: AnnouncementState; sent: number }[] = [];
+	announceAudience = 3;
 	/** Users restricted by moderation, with the end (0: until lifted). */
 	readonly restrictions = new Map<number, number>();
 	readonly lifted: number[] = [];
@@ -1180,6 +1191,30 @@ export class ChatFixture {
 			repliedAt: BigInt(f.replyText === "" ? 0 : f.createdAt + 600),
 			repliedBy: BigInt(f.replyText === "" ? 0 : f.handledBy),
 		});
+		// The server's markdown, reduced to *bold*: an odd number of * is an error.
+		const parseBold = (text: string) => {
+			if ((text.match(/\*/g) ?? []).length % 2 === 1) throw new ConnectError("unclosed * at byte " + text.indexOf("*"), Code.InvalidArgument);
+			const entities: { type: EntityType; offset: number; length: number }[] = [];
+			let out = "";
+			for (const [i, part] of text.split("*").entries()) {
+				if (i % 2 === 1) entities.push({ type: EntityType.BOLD, offset: out.length, length: part.length });
+				out += part;
+			}
+			return { text: out, entities };
+		};
+		const announcement = (a: { id: number; text: string; state: AnnouncementState; sent: number }) => ({
+			id: BigInt(a.id),
+			...parseBold(a.text),
+			state: a.state,
+			reason: a.state === AnnouncementState.CANCELLED ? "cancelled" : "",
+			total: this.announceAudience,
+			sent: a.sent,
+			skipped: 0,
+			failed: 0,
+			createdAt: 1_760_000_000n,
+			finishedAt: a.state === AnnouncementState.RUNNING ? 0n : 1_760_000_100n,
+			createdBy: BigInt(this.selfId),
+		});
 		const findFeedback = (id: bigint): FixtureFeedback => {
 			const found = this.feedbackQueue.find((f) => f.id === num(id));
 			if (found === undefined) throw new ConnectError("no such feedback", Code.NotFound);
@@ -1371,6 +1406,32 @@ export class ChatFixture {
 					f.handledBy = this.selfId;
 				}
 				return { feedback: feedback(f) };
+			},
+			previewAnnouncement: (req) => {
+				operator();
+				return { ...parseBold(req.text), audience: this.announceAudience };
+			},
+			sendAnnouncement: (req) => {
+				operator();
+				parseBold(req.text);
+				const a = { id: this.announcements.length + 1, text: req.text, state: AnnouncementState.RUNNING, sent: 1 };
+				this.announcements.push(a);
+				return { announcement: announcement(a) };
+			},
+			getAnnouncements: () => {
+				operator();
+				return {
+					announcements: [...this.announcements].reverse().map(announcement),
+					users: usersOf([this.selfId]),
+					audience: this.announceAudience,
+				};
+			},
+			cancelAnnouncement: (req) => {
+				operator();
+				const a = this.announcements.find((x) => x.id === num(req.announcementId));
+				if (a === undefined) throw new ConnectError("announcement not found", Code.NotFound);
+				if (a.state === AnnouncementState.RUNNING) a.state = AnnouncementState.CANCELLED;
+				return { announcement: announcement(a) };
 			},
 			replyFeedback: (req) => {
 				operator();

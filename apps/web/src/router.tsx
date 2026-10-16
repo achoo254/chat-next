@@ -29,6 +29,8 @@ export type Route =
 	| { name: "moderation"; reportId: string | null; actions: boolean }
 	/** The feedback users sent the assistant bot, in the moderation screen. */
 	| { name: "feedback" }
+	/** Operators' announcements through the assistant bot. */
+	| { name: "announcements" }
 	/** The moderation log, and one bot as the operators review it. */
 	| { name: "moderationLog" }
 	| { name: "moderationBot"; botId: number }
@@ -59,6 +61,7 @@ export const paths = {
 	moderation: (reportId?: string, actions = false) =>
 		reportId === undefined ? "/moderation" : `/moderation/${encodeURIComponent(reportId)}${actions ? "/actions" : ""}`,
 	feedback: () => "/moderation/feedback",
+	announcements: () => "/moderation/announcements",
 	moderationLog: () => "/moderation/log",
 	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
 } as const;
@@ -124,6 +127,7 @@ function matchMessaging(path: string): Route | null {
 	if (parts[0] === "moderation") {
 		if (parts.length === 1) return { name: "moderation", reportId: null, actions: false };
 		if (parts.length === 2 && parts[1] === "feedback") return { name: "feedback" };
+		if (parts.length === 2 && parts[1] === "announcements") return { name: "announcements" };
 		if (parts.length === 2 && parts[1] === "log") return { name: "moderationLog" };
 		if (parts.length === 3 && parts[1] === "bots") {
 			const botId = parseId(parts[2]);

@@ -27,6 +27,7 @@ import (
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botapi"
 	"app.local/server/internal/botapi/wire"
+	"app.local/server/internal/botbulk"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/brand"
 	"app.local/server/internal/chat"
@@ -52,6 +53,7 @@ type Service struct {
 	admin   *botadmin.Service
 	updates *botupdates.Service
 	api     *botapi.Service
+	bulk    *botbulk.Service // announcements; nil turns them off (UseBulk)
 	logger  *slog.Logger
 	copy    copyText
 	botID   int64

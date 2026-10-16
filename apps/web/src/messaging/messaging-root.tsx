@@ -104,6 +104,7 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
 		case "moderation":
 		case "feedback":
+		case "announcements":
 		case "moderationLog":
 		case "moderationBot":
 			return [moderationCode.preload()];
@@ -329,6 +330,9 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			break;
 		case "feedback":
 			screen = <Moderation view={{ page: "feedback" }} />;
+			break;
+		case "announcements":
+			screen = <Moderation view={{ page: "announcements" }} />;
 			break;
 		case "moderationLog":
 			screen = <Moderation view={{ page: "log" }} />;

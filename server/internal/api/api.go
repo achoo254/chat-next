@@ -194,18 +194,22 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	if assistantSvc != nil {
+		assistantSvc.UseBulk(bulk)
+	}
 	privacySvc, err := newPrivacy(cfg, st, chatSvc, sessions, botAdmin, mediaSvc, logger)
 	if err != nil {
 		return nil, err
 	}
 	var feedback rpc.FeedbackReplier
+	var announcer rpc.Announcer
 	if assistantSvc != nil {
-		feedback = assistantSvc
+		feedback, announcer = assistantSvc, assistantSvc
 		chatSvc.SetNotifier(assistantSvc)
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
-		Bots: botAdmin, BotUpdates: botUpdates, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, TenantID: cfg.TenantID,
+		Bots: botAdmin, BotUpdates: botUpdates, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
 		TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {

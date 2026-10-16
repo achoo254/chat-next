@@ -1,7 +1,7 @@
 // Connect implementation of Remote (see remote.ts), with the protocol
 // mapping (ADR 0001: every int64 arrives as a bigint and leaves as a number).
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { assertSafeId } from "@app/core";
+import { assertSafeId, fromWireEntity } from "@app/core";
 import { cryptoRandomId } from "@app/platform";
 import {
 	AddMemberFailureReason,
@@ -22,6 +22,8 @@ import {
 	FeedbackStatus as WireFeedbackStatus,
 	ModerationAction as WireAction,
 	ModerationService,
+	AnnouncementState as WireAnnouncementState,
+	type Announcement as WireAnnouncement,
 	type Feedback as WireFeedback,
 	ReportStatus as WireStatus,
 	ReportTargetKind,
@@ -40,6 +42,8 @@ import {
 } from "@app/proto-ts/users";
 import type { ReportReason } from "./pending-backend.ts";
 import type {
+	Announcement,
+	AnnouncementState,
 	AddFailure,
 	AddFailureReason,
 	Audience,
@@ -284,6 +288,31 @@ const WIRE_FEEDBACK_STATUSES: Record<FeedbackStatus, WireFeedbackStatus> = {
 	open: WireFeedbackStatus.OPEN,
 	handled: WireFeedbackStatus.HANDLED,
 };
+
+const ANNOUNCEMENT_STATES: Partial<Record<WireAnnouncementState, AnnouncementState>> = {
+	[WireAnnouncementState.QUEUED]: "queued",
+	[WireAnnouncementState.RUNNING]: "running",
+	[WireAnnouncementState.DONE]: "done",
+	[WireAnnouncementState.CANCELLED]: "cancelled",
+};
+
+function toAnnouncement(a: WireAnnouncement | undefined, method: string): Announcement {
+	if (a === undefined) throw new ConnectError(`${method} returned no announcement`, Code.Internal);
+	return {
+		id: assertSafeId(a.id),
+		text: a.text,
+		entities: a.entities.map(fromWireEntity),
+		state: ANNOUNCEMENT_STATES[a.state] ?? "queued",
+		reason: a.reason,
+		total: a.total,
+		sent: a.sent,
+		skipped: a.skipped,
+		failed: a.failed,
+		createdAt: assertSafeId(a.createdAt),
+		finishedAt: assertSafeId(a.finishedAt),
+		createdBy: assertSafeId(a.createdBy),
+	};
+}
 
 function toFeedback(item: WireFeedback): FeedbackItem {
 	return {
@@ -821,6 +850,24 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				if (response.feedback === undefined) throw new ConnectError("ResolveFeedback returned no item", Code.Internal);
 				return toFeedback(response.feedback);
 			}),
+		previewAnnouncement: (text) =>
+			call(async () => {
+				const response = await moderation.previewAnnouncement({ text });
+				return { text: response.text, entities: response.entities.map(fromWireEntity), audience: response.audience };
+			}),
+		sendAnnouncement: (text) =>
+			call(async () => toAnnouncement((await moderation.sendAnnouncement({ text })).announcement, "SendAnnouncement")),
+		announcements: () =>
+			call(async () => {
+				const response = await moderation.getAnnouncements({});
+				return {
+					items: response.announcements.map((a) => toAnnouncement(a, "GetAnnouncements")),
+					people: peopleOf(response.users),
+					audience: response.audience,
+				};
+			}),
+		cancelAnnouncement: (id) =>
+			call(async () => toAnnouncement((await moderation.cancelAnnouncement({ announcementId: BigInt(id) })).announcement, "CancelAnnouncement")),
 		replyFeedback: (feedbackId, text) =>
 			call(async () => {
 				const response = await moderation.replyFeedback({ feedbackId: BigInt(feedbackId), text });

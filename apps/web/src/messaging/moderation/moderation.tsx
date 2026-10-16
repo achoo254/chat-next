@@ -8,9 +8,9 @@
 // review (keep or restore), operators grant or revoke the verified badge,
 // and the moderation log lists every action, the automatic rules included.
 // The feedback users sent the assistant bot (#feedback) sits next to the
-// reports. Everyone else sees "no access"; the server refuses them too.
+// reports, and the operators' announcements (#announce, announcements.tsx). Everyone else sees "no access"; the server refuses them too.
 import { Code, ConnectError } from "@connectrpc/connect";
-import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useLoader as useDelayedLoader } from "../../components/delayed-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -41,12 +41,15 @@ import type {
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, Choice, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 import "./moderation.css";
+import { useLoad } from "./use-load.ts";
+import Announcements from "./announcements.tsx";
 
 /** Which moderation screen is open. */
 export type ModerationView =
 	| { readonly page: "queue" }
 	| { readonly page: "report"; readonly reportId: string; readonly actions: boolean }
 	| { readonly page: "feedback" }
+	| { readonly page: "announcements" }
 	| { readonly page: "log" }
 	| { readonly page: "bot"; readonly botId: number };
 
@@ -70,30 +73,6 @@ const DURATIONS: readonly LockDuration[] = ["day", "week", "month", "forever"];
 const HOT_REPORTS = 10;
 /** An account younger than this is marked new in the sender signals. */
 const NEW_ACCOUNT_SECONDS = 7 * 86_400;
-
-type Loaded<T> = { status: "loading" } | { status: "error" } | { status: "ready"; value: T };
-
-function useLoad<T>(load: () => Promise<T>, key: string): [Loaded<T>, () => void] {
-	const [state, setState] = useState<Loaded<T> & { key: string }>({ status: "loading", key });
-	const [attempt, setAttempt] = useState(0);
-	// `load` is recreated per render; `key` identifies what it loads.
-	const run = useEffectEvent(load);
-	useEffect(() => {
-		let active = true;
-		run().then(
-			(value) => {
-				if (active) setState({ status: "ready", value, key });
-			},
-			() => {
-				if (active) setState({ status: "error", key });
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [key, attempt]);
-	return [state.key === key ? state : { status: "loading" }, () => setAttempt((n) => n + 1)];
-}
 
 /** Report ids in the path are decimal; anything else is not a report. */
 function parseReportId(value: string): number | null {
@@ -140,10 +119,11 @@ export default function Moderation({ view }: { view: ModerationView }) {
 	const { self } = useServices();
 	const scope = orgDomain(window.location.host);
 	const t = copy.moderation;
-	const section = view.page === "feedback" ? "feedback" : view.page === "log" ? "log" : "queue";
+	const section = view.page === "feedback" || view.page === "announcements" || view.page === "log" ? view.page : "queue";
 	const nav = [
 		{ to: paths.moderation(), icon: "inbox" as const, label: t.queue, current: section === "queue" },
 		{ to: paths.feedback(), icon: "message-dot" as const, label: t.feedback, current: section === "feedback" },
+		{ to: paths.announcements(), icon: "megaphone" as const, label: t.announcements, current: section === "announcements" },
 		{ to: paths.moderationLog(), icon: "clock" as const, label: t.logNav, current: section === "log" },
 	];
 	return (
@@ -196,6 +176,8 @@ function Page({ view, scope }: { view: ModerationView; scope: string }) {
 			return <Queue scope={scope} />;
 		case "feedback":
 			return <FeedbackQueue />;
+		case "announcements":
+			return <Announcements />;
 		case "log":
 			return <ModerationLog />;
 		case "bot":

@@ -87,11 +87,16 @@ type Request struct {
 	// hours (Unlimited, or 0 for none at all).
 	Pace int
 	Cap  int
+	// CreatedBy is the operator who queued an announcement; 0 for a bot.
+	CreatedBy int64
 }
 
 // Job is a job's state.
 type Job struct {
 	ID         int64
+	Text       string
+	Content    []byte // entities and keyboard (app.v1.Message), may be empty
+	CreatedBy  int64
 	State      string
 	Reason     string
 	Total      int
@@ -170,11 +175,12 @@ func (s *Service) Create(ctx context.Context, req Request) (*Job, error) {
 		if req.Cap != Unlimited && used+total > req.Cap {
 			return &QuotaError{Cap: req.Cap, Left: max(req.Cap-used, 0)}
 		}
-		job = &Job{State: StateQueued, Total: total}
+		job = &Job{State: StateQueued, Total: total, Text: text, Content: content, CreatedBy: req.CreatedBy}
 		return tx.QueryRow(ctx, `
-			INSERT INTO bot_bulk_jobs (tenant_id, bot_id, audience, user_ids, text, content, no_link_preview, pace, total)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at`,
-			s.tenant, req.BotID, audience, ids, text, content, req.Message.NoLinkPreview, req.Pace, total).Scan(&job.ID, &job.CreatedAt)
+			INSERT INTO bot_bulk_jobs (tenant_id, bot_id, audience, user_ids, text, content, no_link_preview, pace, total, created_by)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, created_at`,
+			s.tenant, req.BotID, audience, ids, text, content, req.Message.NoLinkPreview, req.Pace, total, req.CreatedBy).
+			Scan(&job.ID, &job.CreatedAt)
 	})
 	if err != nil {
 		return nil, err
@@ -182,11 +188,12 @@ func (s *Service) Create(ctx context.Context, req Request) (*Job, error) {
 	return job, nil
 }
 
-const jobColumns = `id, state, reason, total, sent, skipped, failed, created_at, finished_at`
+const jobColumns = `id, text, content, created_by, state, reason, total, sent, skipped, failed, created_at, finished_at`
 
 func scanJob(row pgx.Row) (*Job, error) {
 	j := &Job{}
-	err := row.Scan(&j.ID, &j.State, &j.Reason, &j.Total, &j.Sent, &j.Skipped, &j.Failed, &j.CreatedAt, &j.FinishedAt)
+	err := row.Scan(&j.ID, &j.Text, &j.Content, &j.CreatedBy, &j.State, &j.Reason, &j.Total, &j.Sent, &j.Skipped, &j.Failed,
+		&j.CreatedAt, &j.FinishedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoJob
 	}
@@ -200,6 +207,38 @@ func scanJob(row pgx.Row) (*Job, error) {
 func (s *Service) Get(ctx context.Context, botID, id int64) (*Job, error) {
 	return scanJob(s.pool.QueryRow(ctx, `SELECT `+jobColumns+` FROM bot_bulk_jobs WHERE id = $1 AND bot_id = $2 AND tenant_id = $3`,
 		id, botID, s.tenant))
+}
+
+// List returns the bot's newest jobs, at most limit.
+func (s *Service) List(ctx context.Context, botID int64, limit int) ([]*Job, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+jobColumns+` FROM bot_bulk_jobs WHERE bot_id = $1 AND tenant_id = $2
+		ORDER BY id DESC LIMIT $3`, botID, s.tenant, limit)
+	if err != nil {
+		return nil, fmt.Errorf("botbulk: list: %w", err)
+	}
+	defer rows.Close()
+	var out []*Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("botbulk: list: %w", err)
+	}
+	return out, nil
+}
+
+// Audience counts the users who started the bot (the recipients of an
+// "all" job queued now).
+func (s *Service) Audience(ctx context.Context, botID int64) (int, error) {
+	var n int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM bot_user_consent WHERE bot_id = $1`, botID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("botbulk: audience: %w", err)
+	}
+	return n, nil
 }
 
 // Cancel stops an unfinished job of the bot (a batch being sent finishes)

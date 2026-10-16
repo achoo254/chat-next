@@ -258,6 +258,12 @@ func TestModerationRPCsNeedAnOperator(t *testing.T) {
 	if _, err := mod.GetReports(ctx, connect.NewRequest(&appv1.GetReportsRequest{})); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("GetReports by a user: %v", err)
 	}
+	if _, err := mod.SendAnnouncement(ctx, connect.NewRequest(&appv1.SendAnnouncementRequest{Text: "x"})); codeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("SendAnnouncement by a user: %v", err)
+	}
+	if _, err := mod.GetAnnouncements(ctx, connect.NewRequest(&appv1.GetAnnouncementsRequest{})); codeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("GetAnnouncements by a user: %v", err)
+	}
 	blocked, err := cl.users.GetBlockedUsers(ctx, connect.NewRequest(&appv1.GetBlockedUsersRequest{}))
 	if err != nil || len(blocked.Msg.GetBlocked()) != 0 {
 		t.Fatalf("GetBlockedUsers = %v, %v", blocked, err)

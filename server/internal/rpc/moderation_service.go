@@ -15,9 +15,84 @@ import (
 // checks that the caller is an operator.
 type moderationService struct {
 	appv1connect.UnimplementedModerationServiceHandler
-	chat     *chat.Service
-	feedback FeedbackReplier
-	logger   *slog.Logger
+	chat      *chat.Service
+	feedback  FeedbackReplier
+	announcer Announcer
+	logger    *slog.Logger
+}
+
+// Announcer sends operators' announcements through the assistant bot.
+type Announcer interface {
+	PreviewAnnouncement(ctx context.Context, text string) (*appv1.PreviewAnnouncementResponse, error)
+	SendAnnouncement(ctx context.Context, operator int64, text string) (*appv1.Announcement, error)
+	Announcements(ctx context.Context) ([]*appv1.Announcement, []int64, int, error)
+	CancelAnnouncement(ctx context.Context, operator, id int64) (*appv1.Announcement, error)
+}
+
+// errNoAnnouncer answers announcement calls when the assistant is off.
+var errNoAnnouncer = connect.NewError(connect.CodeUnavailable, errors.New("announcements need the assistant bot"))
+
+// announcing checks that me may announce and that announcements are on.
+func (s *moderationService) announcing(me int64) error {
+	if !s.chat.IsOperator(me) {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("moderation is for operators only"))
+	}
+	if s.announcer == nil {
+		return errNoAnnouncer
+	}
+	return nil
+}
+
+func (s *moderationService) PreviewAnnouncement(ctx context.Context, req *connect.Request[appv1.PreviewAnnouncementRequest]) (*connect.Response[appv1.PreviewAnnouncementResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.PreviewAnnouncementRequest) (*appv1.PreviewAnnouncementResponse, error) {
+		if err := s.announcing(me); err != nil {
+			return nil, err
+		}
+		return s.announcer.PreviewAnnouncement(ctx, m.GetText())
+	})
+}
+
+func (s *moderationService) SendAnnouncement(ctx context.Context, req *connect.Request[appv1.SendAnnouncementRequest]) (*connect.Response[appv1.SendAnnouncementResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SendAnnouncementRequest) (*appv1.SendAnnouncementResponse, error) {
+		if err := s.announcing(me); err != nil {
+			return nil, err
+		}
+		a, err := s.announcer.SendAnnouncement(ctx, me, m.GetText())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SendAnnouncementResponse{Announcement: a}, nil
+	})
+}
+
+func (s *moderationService) GetAnnouncements(ctx context.Context, req *connect.Request[appv1.GetAnnouncementsRequest]) (*connect.Response[appv1.GetAnnouncementsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, _ *appv1.GetAnnouncementsRequest) (*appv1.GetAnnouncementsResponse, error) {
+		if err := s.announcing(me); err != nil {
+			return nil, err
+		}
+		list, operators, audience, err := s.announcer.Announcements(ctx)
+		if err != nil {
+			return nil, err
+		}
+		users, err := s.chat.OperatorUsers(ctx, me, operators)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetAnnouncementsResponse{Announcements: list, Users: users, Audience: int32(audience)}, nil
+	})
+}
+
+func (s *moderationService) CancelAnnouncement(ctx context.Context, req *connect.Request[appv1.CancelAnnouncementRequest]) (*connect.Response[appv1.CancelAnnouncementResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.CancelAnnouncementRequest) (*appv1.CancelAnnouncementResponse, error) {
+		if err := s.announcing(me); err != nil {
+			return nil, err
+		}
+		a, err := s.announcer.CancelAnnouncement(ctx, me, m.GetAnnouncementId())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.CancelAnnouncementResponse{Announcement: a}, nil
+	})
 }
 
 // FeedbackReplier sends an operator's answer to a feedback item (the

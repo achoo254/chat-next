@@ -334,6 +334,61 @@ func (FeedbackKind) EnumDescriptor() ([]byte, []int) {
 	return file_app_v1_moderation_proto_rawDescGZIP(), []int{4}
 }
 
+type AnnouncementState int32
+
+const (
+	AnnouncementState_ANNOUNCEMENT_STATE_UNSPECIFIED AnnouncementState = 0
+	AnnouncementState_ANNOUNCEMENT_STATE_QUEUED      AnnouncementState = 1
+	AnnouncementState_ANNOUNCEMENT_STATE_RUNNING     AnnouncementState = 2
+	AnnouncementState_ANNOUNCEMENT_STATE_DONE        AnnouncementState = 3
+	AnnouncementState_ANNOUNCEMENT_STATE_CANCELLED   AnnouncementState = 4
+)
+
+// Enum value maps for AnnouncementState.
+var (
+	AnnouncementState_name = map[int32]string{
+		0: "ANNOUNCEMENT_STATE_UNSPECIFIED",
+		1: "ANNOUNCEMENT_STATE_QUEUED",
+		2: "ANNOUNCEMENT_STATE_RUNNING",
+		3: "ANNOUNCEMENT_STATE_DONE",
+		4: "ANNOUNCEMENT_STATE_CANCELLED",
+	}
+	AnnouncementState_value = map[string]int32{
+		"ANNOUNCEMENT_STATE_UNSPECIFIED": 0,
+		"ANNOUNCEMENT_STATE_QUEUED":      1,
+		"ANNOUNCEMENT_STATE_RUNNING":     2,
+		"ANNOUNCEMENT_STATE_DONE":        3,
+		"ANNOUNCEMENT_STATE_CANCELLED":   4,
+	}
+)
+
+func (x AnnouncementState) Enum() *AnnouncementState {
+	p := new(AnnouncementState)
+	*p = x
+	return p
+}
+
+func (x AnnouncementState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AnnouncementState) Descriptor() protoreflect.EnumDescriptor {
+	return file_app_v1_moderation_proto_enumTypes[5].Descriptor()
+}
+
+func (AnnouncementState) Type() protoreflect.EnumType {
+	return &file_app_v1_moderation_proto_enumTypes[5]
+}
+
+func (x AnnouncementState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AnnouncementState.Descriptor instead.
+func (AnnouncementState) EnumDescriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{5}
+}
+
 type Report struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	Id         int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -2913,6 +2968,526 @@ func (x *ReplyFeedbackResponse) GetFeedback() *Feedback {
 	return nil
 }
 
+type Announcement struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	// As users get it.
+	Text     string            `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Entities []*MessageEntity  `protobuf:"bytes,3,rep,name=entities,proto3" json:"entities,omitempty"`
+	State    AnnouncementState `protobuf:"varint,4,opt,name=state,proto3,enum=app.v1.AnnouncementState" json:"state,omitempty"`
+	// Why a cancelled announcement stopped: "cancelled" (an operator),
+	// "bot_deleted", "bot_restricted".
+	Reason string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Recipients when it was queued, and the outcome so far: skipped users
+	// blocked the assistant or were deleted.
+	Total      int32 `protobuf:"varint,6,opt,name=total,proto3" json:"total,omitempty"`
+	Sent       int32 `protobuf:"varint,7,opt,name=sent,proto3" json:"sent,omitempty"`
+	Skipped    int32 `protobuf:"varint,8,opt,name=skipped,proto3" json:"skipped,omitempty"`
+	Failed     int32 `protobuf:"varint,9,opt,name=failed,proto3" json:"failed,omitempty"`
+	CreatedAt  int64 `protobuf:"varint,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	FinishedAt int64 `protobuf:"varint,11,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	// The operator who sent it.
+	CreatedBy     int64 `protobuf:"varint,12,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Announcement) Reset() {
+	*x = Announcement{}
+	mi := &file_app_v1_moderation_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Announcement) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Announcement) ProtoMessage() {}
+
+func (x *Announcement) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Announcement.ProtoReflect.Descriptor instead.
+func (*Announcement) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *Announcement) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *Announcement) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *Announcement) GetEntities() []*MessageEntity {
+	if x != nil {
+		return x.Entities
+	}
+	return nil
+}
+
+func (x *Announcement) GetState() AnnouncementState {
+	if x != nil {
+		return x.State
+	}
+	return AnnouncementState_ANNOUNCEMENT_STATE_UNSPECIFIED
+}
+
+func (x *Announcement) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Announcement) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *Announcement) GetSent() int32 {
+	if x != nil {
+		return x.Sent
+	}
+	return 0
+}
+
+func (x *Announcement) GetSkipped() int32 {
+	if x != nil {
+		return x.Skipped
+	}
+	return 0
+}
+
+func (x *Announcement) GetFailed() int32 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *Announcement) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *Announcement) GetFinishedAt() int64 {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return 0
+}
+
+func (x *Announcement) GetCreatedBy() int64 {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return 0
+}
+
+type PreviewAnnouncementRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Bot API markdown (*bold*, _italic_, [text](url)…), up to 4096
+	// characters once parsed.
+	Text          string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewAnnouncementRequest) Reset() {
+	*x = PreviewAnnouncementRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewAnnouncementRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewAnnouncementRequest) ProtoMessage() {}
+
+func (x *PreviewAnnouncementRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewAnnouncementRequest.ProtoReflect.Descriptor instead.
+func (*PreviewAnnouncementRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *PreviewAnnouncementRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type PreviewAnnouncementResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Text     string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Entities []*MessageEntity       `protobuf:"bytes,2,rep,name=entities,proto3" json:"entities,omitempty"`
+	// The users who started the assistant now.
+	Audience      int32 `protobuf:"varint,3,opt,name=audience,proto3" json:"audience,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewAnnouncementResponse) Reset() {
+	*x = PreviewAnnouncementResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewAnnouncementResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewAnnouncementResponse) ProtoMessage() {}
+
+func (x *PreviewAnnouncementResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewAnnouncementResponse.ProtoReflect.Descriptor instead.
+func (*PreviewAnnouncementResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *PreviewAnnouncementResponse) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *PreviewAnnouncementResponse) GetEntities() []*MessageEntity {
+	if x != nil {
+		return x.Entities
+	}
+	return nil
+}
+
+func (x *PreviewAnnouncementResponse) GetAudience() int32 {
+	if x != nil {
+		return x.Audience
+	}
+	return 0
+}
+
+type SendAnnouncementRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendAnnouncementRequest) Reset() {
+	*x = SendAnnouncementRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendAnnouncementRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendAnnouncementRequest) ProtoMessage() {}
+
+func (x *SendAnnouncementRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendAnnouncementRequest.ProtoReflect.Descriptor instead.
+func (*SendAnnouncementRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *SendAnnouncementRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type SendAnnouncementResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Announcement  *Announcement          `protobuf:"bytes,1,opt,name=announcement,proto3" json:"announcement,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendAnnouncementResponse) Reset() {
+	*x = SendAnnouncementResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendAnnouncementResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendAnnouncementResponse) ProtoMessage() {}
+
+func (x *SendAnnouncementResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendAnnouncementResponse.ProtoReflect.Descriptor instead.
+func (*SendAnnouncementResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *SendAnnouncementResponse) GetAnnouncement() *Announcement {
+	if x != nil {
+		return x.Announcement
+	}
+	return nil
+}
+
+type GetAnnouncementsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAnnouncementsRequest) Reset() {
+	*x = GetAnnouncementsRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAnnouncementsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAnnouncementsRequest) ProtoMessage() {}
+
+func (x *GetAnnouncementsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAnnouncementsRequest.ProtoReflect.Descriptor instead.
+func (*GetAnnouncementsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{42}
+}
+
+type GetAnnouncementsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The newest 50.
+	Announcements []*Announcement `protobuf:"bytes,1,rep,name=announcements,proto3" json:"announcements,omitempty"`
+	// The operators who sent them.
+	Users []*User `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	// The users who started the assistant now.
+	Audience      int32 `protobuf:"varint,3,opt,name=audience,proto3" json:"audience,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAnnouncementsResponse) Reset() {
+	*x = GetAnnouncementsResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAnnouncementsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAnnouncementsResponse) ProtoMessage() {}
+
+func (x *GetAnnouncementsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAnnouncementsResponse.ProtoReflect.Descriptor instead.
+func (*GetAnnouncementsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *GetAnnouncementsResponse) GetAnnouncements() []*Announcement {
+	if x != nil {
+		return x.Announcements
+	}
+	return nil
+}
+
+func (x *GetAnnouncementsResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *GetAnnouncementsResponse) GetAudience() int32 {
+	if x != nil {
+		return x.Audience
+	}
+	return 0
+}
+
+type CancelAnnouncementRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AnnouncementId int64                  `protobuf:"varint,1,opt,name=announcement_id,json=announcementId,proto3" json:"announcement_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CancelAnnouncementRequest) Reset() {
+	*x = CancelAnnouncementRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAnnouncementRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAnnouncementRequest) ProtoMessage() {}
+
+func (x *CancelAnnouncementRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAnnouncementRequest.ProtoReflect.Descriptor instead.
+func (*CancelAnnouncementRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *CancelAnnouncementRequest) GetAnnouncementId() int64 {
+	if x != nil {
+		return x.AnnouncementId
+	}
+	return 0
+}
+
+type CancelAnnouncementResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Announcement  *Announcement          `protobuf:"bytes,1,opt,name=announcement,proto3" json:"announcement,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelAnnouncementResponse) Reset() {
+	*x = CancelAnnouncementResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAnnouncementResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAnnouncementResponse) ProtoMessage() {}
+
+func (x *CancelAnnouncementResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAnnouncementResponse.ProtoReflect.Descriptor instead.
+func (*CancelAnnouncementResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *CancelAnnouncementResponse) GetAnnouncement() *Announcement {
+	if x != nil {
+		return x.Announcement
+	}
+	return nil
+}
+
 var File_app_v1_moderation_proto protoreflect.FileDescriptor
 
 const file_app_v1_moderation_proto_rawDesc = "" +
@@ -3133,7 +3708,43 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"feedbackId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\"E\n" +
 	"\x15ReplyFeedbackResponse\x12,\n" +
-	"\bfeedback\x18\x01 \x01(\v2\x10.app.v1.FeedbackR\bfeedback*~\n" +
+	"\bfeedback\x18\x01 \x01(\v2\x10.app.v1.FeedbackR\bfeedback\"\xf9\x02\n" +
+	"\fAnnouncement\x12\x12\n" +
+	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x121\n" +
+	"\bentities\x18\x03 \x03(\v2\x15.app.v1.MessageEntityR\bentities\x12/\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x19.app.v1.AnnouncementStateR\x05state\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x14\n" +
+	"\x05total\x18\x06 \x01(\x05R\x05total\x12\x12\n" +
+	"\x04sent\x18\a \x01(\x05R\x04sent\x12\x18\n" +
+	"\askipped\x18\b \x01(\x05R\askipped\x12\x16\n" +
+	"\x06failed\x18\t \x01(\x05R\x06failed\x12!\n" +
+	"\n" +
+	"created_at\x18\n" +
+	" \x01(\x03B\x020\x02R\tcreatedAt\x12#\n" +
+	"\vfinished_at\x18\v \x01(\x03B\x020\x02R\n" +
+	"finishedAt\x12!\n" +
+	"\n" +
+	"created_by\x18\f \x01(\x03B\x020\x02R\tcreatedBy\"0\n" +
+	"\x1aPreviewAnnouncementRequest\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"\x80\x01\n" +
+	"\x1bPreviewAnnouncementResponse\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x121\n" +
+	"\bentities\x18\x02 \x03(\v2\x15.app.v1.MessageEntityR\bentities\x12\x1a\n" +
+	"\baudience\x18\x03 \x01(\x05R\baudience\"-\n" +
+	"\x17SendAnnouncementRequest\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"T\n" +
+	"\x18SendAnnouncementResponse\x128\n" +
+	"\fannouncement\x18\x01 \x01(\v2\x14.app.v1.AnnouncementR\fannouncement\"\x19\n" +
+	"\x17GetAnnouncementsRequest\"\x96\x01\n" +
+	"\x18GetAnnouncementsResponse\x12:\n" +
+	"\rannouncements\x18\x01 \x03(\v2\x14.app.v1.AnnouncementR\rannouncements\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\x1a\n" +
+	"\baudience\x18\x03 \x01(\x05R\baudience\"H\n" +
+	"\x19CancelAnnouncementRequest\x12+\n" +
+	"\x0fannouncement_id\x18\x01 \x01(\x03B\x020\x02R\x0eannouncementId\"V\n" +
+	"\x1aCancelAnnouncementResponse\x128\n" +
+	"\fannouncement\x18\x01 \x01(\v2\x14.app.v1.AnnouncementR\fannouncement*~\n" +
 	"\fReportStatus\x12\x1d\n" +
 	"\x19REPORT_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12REPORT_STATUS_OPEN\x10\x01\x12\x1a\n" +
@@ -3169,7 +3780,13 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\fFeedbackKind\x12\x1d\n" +
 	"\x19FEEDBACK_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12FEEDBACK_KIND_IDEA\x10\x01\x12\x15\n" +
-	"\x11FEEDBACK_KIND_BUG\x10\x022\x9e\b\n" +
+	"\x11FEEDBACK_KIND_BUG\x10\x02*\xb5\x01\n" +
+	"\x11AnnouncementState\x12\"\n" +
+	"\x1eANNOUNCEMENT_STATE_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19ANNOUNCEMENT_STATE_QUEUED\x10\x01\x12\x1e\n" +
+	"\x1aANNOUNCEMENT_STATE_RUNNING\x10\x02\x12\x1b\n" +
+	"\x17ANNOUNCEMENT_STATE_DONE\x10\x03\x12 \n" +
+	"\x1cANNOUNCEMENT_STATE_CANCELLED\x10\x042\x89\v\n" +
 	"\x11ModerationService\x12C\n" +
 	"\n" +
 	"GetReports\x12\x19.app.v1.GetReportsRequest\x1a\x1a.app.v1.GetReportsResponse\x12@\n" +
@@ -3184,7 +3801,11 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\fGetBotReview\x12\x1b.app.v1.GetBotReviewRequest\x1a\x1c.app.v1.GetBotReviewResponse\x12L\n" +
 	"\rGetBotReviews\x12\x1c.app.v1.GetBotReviewsRequest\x1a\x1d.app.v1.GetBotReviewsResponse\x12O\n" +
 	"\x0eSetBotVerified\x12\x1d.app.v1.SetBotVerifiedRequest\x1a\x1e.app.v1.SetBotVerifiedResponse\x12a\n" +
-	"\x14ReviewBotRestriction\x12#.app.v1.ReviewBotRestrictionRequest\x1a$.app.v1.ReviewBotRestrictionResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\x14ReviewBotRestriction\x12#.app.v1.ReviewBotRestrictionRequest\x1a$.app.v1.ReviewBotRestrictionResponse\x12^\n" +
+	"\x13PreviewAnnouncement\x12\".app.v1.PreviewAnnouncementRequest\x1a#.app.v1.PreviewAnnouncementResponse\x12U\n" +
+	"\x10SendAnnouncement\x12\x1f.app.v1.SendAnnouncementRequest\x1a .app.v1.SendAnnouncementResponse\x12U\n" +
+	"\x10GetAnnouncements\x12\x1f.app.v1.GetAnnouncementsRequest\x1a .app.v1.GetAnnouncementsResponse\x12[\n" +
+	"\x12CancelAnnouncement\x12!.app.v1.CancelAnnouncementRequest\x1a\".app.v1.CancelAnnouncementResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_moderation_proto_rawDescOnce sync.Once
@@ -3198,140 +3819,166 @@ func file_app_v1_moderation_proto_rawDescGZIP() []byte {
 	return file_app_v1_moderation_proto_rawDescData
 }
 
-var file_app_v1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_app_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_app_v1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_app_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_app_v1_moderation_proto_goTypes = []any{
 	(ReportStatus)(0),                    // 0: app.v1.ReportStatus
 	(ReportTargetKind)(0),                // 1: app.v1.ReportTargetKind
 	(ModerationAction)(0),                // 2: app.v1.ModerationAction
 	(FeedbackStatus)(0),                  // 3: app.v1.FeedbackStatus
 	(FeedbackKind)(0),                    // 4: app.v1.FeedbackKind
-	(*Report)(nil),                       // 5: app.v1.Report
-	(*ReportedMessage)(nil),              // 6: app.v1.ReportedMessage
-	(*ModerationLogEntry)(nil),           // 7: app.v1.ModerationLogEntry
-	(*AccountRestriction)(nil),           // 8: app.v1.AccountRestriction
-	(*GetReportsRequest)(nil),            // 9: app.v1.GetReportsRequest
-	(*GetReportsResponse)(nil),           // 10: app.v1.GetReportsResponse
-	(*GetReportRequest)(nil),             // 11: app.v1.GetReportRequest
-	(*GetReportResponse)(nil),            // 12: app.v1.GetReportResponse
-	(*ReportGroupSummary)(nil),           // 13: app.v1.ReportGroupSummary
-	(*ReasonCount)(nil),                  // 14: app.v1.ReasonCount
-	(*SenderSignals)(nil),                // 15: app.v1.SenderSignals
-	(*ModeratedHook)(nil),                // 16: app.v1.ModeratedHook
-	(*ReportGroup)(nil),                  // 17: app.v1.ReportGroup
-	(*GetReportGroupsRequest)(nil),       // 18: app.v1.GetReportGroupsRequest
-	(*GetReportGroupsResponse)(nil),      // 19: app.v1.GetReportGroupsResponse
-	(*GetModerationLogRequest)(nil),      // 20: app.v1.GetModerationLogRequest
-	(*GetModerationLogResponse)(nil),     // 21: app.v1.GetModerationLogResponse
-	(*BotReview)(nil),                    // 22: app.v1.BotReview
-	(*GetBotReviewRequest)(nil),          // 23: app.v1.GetBotReviewRequest
-	(*GetBotReviewResponse)(nil),         // 24: app.v1.GetBotReviewResponse
-	(*GetBotReviewsRequest)(nil),         // 25: app.v1.GetBotReviewsRequest
-	(*GetBotReviewsResponse)(nil),        // 26: app.v1.GetBotReviewsResponse
-	(*SetBotVerifiedRequest)(nil),        // 27: app.v1.SetBotVerifiedRequest
-	(*SetBotVerifiedResponse)(nil),       // 28: app.v1.SetBotVerifiedResponse
-	(*ReviewBotRestrictionRequest)(nil),  // 29: app.v1.ReviewBotRestrictionRequest
-	(*ReviewBotRestrictionResponse)(nil), // 30: app.v1.ReviewBotRestrictionResponse
-	(*ResolveReportRequest)(nil),         // 31: app.v1.ResolveReportRequest
-	(*ResolveReportResponse)(nil),        // 32: app.v1.ResolveReportResponse
-	(*LiftRestrictionRequest)(nil),       // 33: app.v1.LiftRestrictionRequest
-	(*LiftRestrictionResponse)(nil),      // 34: app.v1.LiftRestrictionResponse
-	(*Feedback)(nil),                     // 35: app.v1.Feedback
-	(*GetFeedbackRequest)(nil),           // 36: app.v1.GetFeedbackRequest
-	(*GetFeedbackResponse)(nil),          // 37: app.v1.GetFeedbackResponse
-	(*ResolveFeedbackRequest)(nil),       // 38: app.v1.ResolveFeedbackRequest
-	(*ResolveFeedbackResponse)(nil),      // 39: app.v1.ResolveFeedbackResponse
-	(*ReplyFeedbackRequest)(nil),         // 40: app.v1.ReplyFeedbackRequest
-	(*ReplyFeedbackResponse)(nil),        // 41: app.v1.ReplyFeedbackResponse
-	(ReportReason)(0),                    // 42: app.v1.ReportReason
-	(*User)(nil),                         // 43: app.v1.User
-	(*Chat)(nil),                         // 44: app.v1.Chat
-	(*Message)(nil),                      // 45: app.v1.Message
-	(BotTier)(0),                         // 46: app.v1.BotTier
+	(AnnouncementState)(0),               // 5: app.v1.AnnouncementState
+	(*Report)(nil),                       // 6: app.v1.Report
+	(*ReportedMessage)(nil),              // 7: app.v1.ReportedMessage
+	(*ModerationLogEntry)(nil),           // 8: app.v1.ModerationLogEntry
+	(*AccountRestriction)(nil),           // 9: app.v1.AccountRestriction
+	(*GetReportsRequest)(nil),            // 10: app.v1.GetReportsRequest
+	(*GetReportsResponse)(nil),           // 11: app.v1.GetReportsResponse
+	(*GetReportRequest)(nil),             // 12: app.v1.GetReportRequest
+	(*GetReportResponse)(nil),            // 13: app.v1.GetReportResponse
+	(*ReportGroupSummary)(nil),           // 14: app.v1.ReportGroupSummary
+	(*ReasonCount)(nil),                  // 15: app.v1.ReasonCount
+	(*SenderSignals)(nil),                // 16: app.v1.SenderSignals
+	(*ModeratedHook)(nil),                // 17: app.v1.ModeratedHook
+	(*ReportGroup)(nil),                  // 18: app.v1.ReportGroup
+	(*GetReportGroupsRequest)(nil),       // 19: app.v1.GetReportGroupsRequest
+	(*GetReportGroupsResponse)(nil),      // 20: app.v1.GetReportGroupsResponse
+	(*GetModerationLogRequest)(nil),      // 21: app.v1.GetModerationLogRequest
+	(*GetModerationLogResponse)(nil),     // 22: app.v1.GetModerationLogResponse
+	(*BotReview)(nil),                    // 23: app.v1.BotReview
+	(*GetBotReviewRequest)(nil),          // 24: app.v1.GetBotReviewRequest
+	(*GetBotReviewResponse)(nil),         // 25: app.v1.GetBotReviewResponse
+	(*GetBotReviewsRequest)(nil),         // 26: app.v1.GetBotReviewsRequest
+	(*GetBotReviewsResponse)(nil),        // 27: app.v1.GetBotReviewsResponse
+	(*SetBotVerifiedRequest)(nil),        // 28: app.v1.SetBotVerifiedRequest
+	(*SetBotVerifiedResponse)(nil),       // 29: app.v1.SetBotVerifiedResponse
+	(*ReviewBotRestrictionRequest)(nil),  // 30: app.v1.ReviewBotRestrictionRequest
+	(*ReviewBotRestrictionResponse)(nil), // 31: app.v1.ReviewBotRestrictionResponse
+	(*ResolveReportRequest)(nil),         // 32: app.v1.ResolveReportRequest
+	(*ResolveReportResponse)(nil),        // 33: app.v1.ResolveReportResponse
+	(*LiftRestrictionRequest)(nil),       // 34: app.v1.LiftRestrictionRequest
+	(*LiftRestrictionResponse)(nil),      // 35: app.v1.LiftRestrictionResponse
+	(*Feedback)(nil),                     // 36: app.v1.Feedback
+	(*GetFeedbackRequest)(nil),           // 37: app.v1.GetFeedbackRequest
+	(*GetFeedbackResponse)(nil),          // 38: app.v1.GetFeedbackResponse
+	(*ResolveFeedbackRequest)(nil),       // 39: app.v1.ResolveFeedbackRequest
+	(*ResolveFeedbackResponse)(nil),      // 40: app.v1.ResolveFeedbackResponse
+	(*ReplyFeedbackRequest)(nil),         // 41: app.v1.ReplyFeedbackRequest
+	(*ReplyFeedbackResponse)(nil),        // 42: app.v1.ReplyFeedbackResponse
+	(*Announcement)(nil),                 // 43: app.v1.Announcement
+	(*PreviewAnnouncementRequest)(nil),   // 44: app.v1.PreviewAnnouncementRequest
+	(*PreviewAnnouncementResponse)(nil),  // 45: app.v1.PreviewAnnouncementResponse
+	(*SendAnnouncementRequest)(nil),      // 46: app.v1.SendAnnouncementRequest
+	(*SendAnnouncementResponse)(nil),     // 47: app.v1.SendAnnouncementResponse
+	(*GetAnnouncementsRequest)(nil),      // 48: app.v1.GetAnnouncementsRequest
+	(*GetAnnouncementsResponse)(nil),     // 49: app.v1.GetAnnouncementsResponse
+	(*CancelAnnouncementRequest)(nil),    // 50: app.v1.CancelAnnouncementRequest
+	(*CancelAnnouncementResponse)(nil),   // 51: app.v1.CancelAnnouncementResponse
+	(ReportReason)(0),                    // 52: app.v1.ReportReason
+	(*User)(nil),                         // 53: app.v1.User
+	(*Chat)(nil),                         // 54: app.v1.Chat
+	(*Message)(nil),                      // 55: app.v1.Message
+	(BotTier)(0),                         // 56: app.v1.BotTier
+	(*MessageEntity)(nil),                // 57: app.v1.MessageEntity
 }
 var file_app_v1_moderation_proto_depIdxs = []int32{
 	1,  // 0: app.v1.Report.target_kind:type_name -> app.v1.ReportTargetKind
-	42, // 1: app.v1.Report.reason:type_name -> app.v1.ReportReason
+	52, // 1: app.v1.Report.reason:type_name -> app.v1.ReportReason
 	0,  // 2: app.v1.Report.status:type_name -> app.v1.ReportStatus
 	2,  // 3: app.v1.Report.actions:type_name -> app.v1.ModerationAction
 	2,  // 4: app.v1.ModerationLogEntry.action:type_name -> app.v1.ModerationAction
 	0,  // 5: app.v1.GetReportsRequest.status:type_name -> app.v1.ReportStatus
-	42, // 6: app.v1.GetReportsRequest.reason:type_name -> app.v1.ReportReason
+	52, // 6: app.v1.GetReportsRequest.reason:type_name -> app.v1.ReportReason
 	1,  // 7: app.v1.GetReportsRequest.target_kind:type_name -> app.v1.ReportTargetKind
-	5,  // 8: app.v1.GetReportsResponse.reports:type_name -> app.v1.Report
-	43, // 9: app.v1.GetReportsResponse.users:type_name -> app.v1.User
-	44, // 10: app.v1.GetReportsResponse.chats:type_name -> app.v1.Chat
-	5,  // 11: app.v1.GetReportResponse.report:type_name -> app.v1.Report
-	6,  // 12: app.v1.GetReportResponse.evidence:type_name -> app.v1.ReportedMessage
-	45, // 13: app.v1.GetReportResponse.context:type_name -> app.v1.Message
-	43, // 14: app.v1.GetReportResponse.users:type_name -> app.v1.User
-	44, // 15: app.v1.GetReportResponse.chat:type_name -> app.v1.Chat
-	7,  // 16: app.v1.GetReportResponse.history:type_name -> app.v1.ModerationLogEntry
-	8,  // 17: app.v1.GetReportResponse.restrictions:type_name -> app.v1.AccountRestriction
-	13, // 18: app.v1.GetReportResponse.group:type_name -> app.v1.ReportGroupSummary
-	15, // 19: app.v1.GetReportResponse.signals:type_name -> app.v1.SenderSignals
-	16, // 20: app.v1.GetReportResponse.hooks:type_name -> app.v1.ModeratedHook
-	14, // 21: app.v1.ReportGroupSummary.reasons:type_name -> app.v1.ReasonCount
-	42, // 22: app.v1.ReasonCount.reason:type_name -> app.v1.ReportReason
-	5,  // 23: app.v1.ReportGroup.report:type_name -> app.v1.Report
-	42, // 24: app.v1.ReportGroup.main_reason:type_name -> app.v1.ReportReason
+	6,  // 8: app.v1.GetReportsResponse.reports:type_name -> app.v1.Report
+	53, // 9: app.v1.GetReportsResponse.users:type_name -> app.v1.User
+	54, // 10: app.v1.GetReportsResponse.chats:type_name -> app.v1.Chat
+	6,  // 11: app.v1.GetReportResponse.report:type_name -> app.v1.Report
+	7,  // 12: app.v1.GetReportResponse.evidence:type_name -> app.v1.ReportedMessage
+	55, // 13: app.v1.GetReportResponse.context:type_name -> app.v1.Message
+	53, // 14: app.v1.GetReportResponse.users:type_name -> app.v1.User
+	54, // 15: app.v1.GetReportResponse.chat:type_name -> app.v1.Chat
+	8,  // 16: app.v1.GetReportResponse.history:type_name -> app.v1.ModerationLogEntry
+	9,  // 17: app.v1.GetReportResponse.restrictions:type_name -> app.v1.AccountRestriction
+	14, // 18: app.v1.GetReportResponse.group:type_name -> app.v1.ReportGroupSummary
+	16, // 19: app.v1.GetReportResponse.signals:type_name -> app.v1.SenderSignals
+	17, // 20: app.v1.GetReportResponse.hooks:type_name -> app.v1.ModeratedHook
+	15, // 21: app.v1.ReportGroupSummary.reasons:type_name -> app.v1.ReasonCount
+	52, // 22: app.v1.ReasonCount.reason:type_name -> app.v1.ReportReason
+	6,  // 23: app.v1.ReportGroup.report:type_name -> app.v1.Report
+	52, // 24: app.v1.ReportGroup.main_reason:type_name -> app.v1.ReportReason
 	0,  // 25: app.v1.GetReportGroupsRequest.status:type_name -> app.v1.ReportStatus
-	42, // 26: app.v1.GetReportGroupsRequest.reason:type_name -> app.v1.ReportReason
+	52, // 26: app.v1.GetReportGroupsRequest.reason:type_name -> app.v1.ReportReason
 	1,  // 27: app.v1.GetReportGroupsRequest.target_kind:type_name -> app.v1.ReportTargetKind
-	17, // 28: app.v1.GetReportGroupsResponse.groups:type_name -> app.v1.ReportGroup
-	43, // 29: app.v1.GetReportGroupsResponse.users:type_name -> app.v1.User
-	44, // 30: app.v1.GetReportGroupsResponse.chats:type_name -> app.v1.Chat
+	18, // 28: app.v1.GetReportGroupsResponse.groups:type_name -> app.v1.ReportGroup
+	53, // 29: app.v1.GetReportGroupsResponse.users:type_name -> app.v1.User
+	54, // 30: app.v1.GetReportGroupsResponse.chats:type_name -> app.v1.Chat
 	2,  // 31: app.v1.GetModerationLogRequest.action:type_name -> app.v1.ModerationAction
-	7,  // 32: app.v1.GetModerationLogResponse.entries:type_name -> app.v1.ModerationLogEntry
-	43, // 33: app.v1.GetModerationLogResponse.users:type_name -> app.v1.User
-	44, // 34: app.v1.GetModerationLogResponse.chats:type_name -> app.v1.Chat
-	46, // 35: app.v1.BotReview.tier:type_name -> app.v1.BotTier
-	22, // 36: app.v1.GetBotReviewResponse.review:type_name -> app.v1.BotReview
-	43, // 37: app.v1.GetBotReviewResponse.users:type_name -> app.v1.User
-	22, // 38: app.v1.GetBotReviewsResponse.reviews:type_name -> app.v1.BotReview
-	43, // 39: app.v1.GetBotReviewsResponse.users:type_name -> app.v1.User
-	22, // 40: app.v1.SetBotVerifiedResponse.review:type_name -> app.v1.BotReview
-	22, // 41: app.v1.ReviewBotRestrictionResponse.review:type_name -> app.v1.BotReview
+	8,  // 32: app.v1.GetModerationLogResponse.entries:type_name -> app.v1.ModerationLogEntry
+	53, // 33: app.v1.GetModerationLogResponse.users:type_name -> app.v1.User
+	54, // 34: app.v1.GetModerationLogResponse.chats:type_name -> app.v1.Chat
+	56, // 35: app.v1.BotReview.tier:type_name -> app.v1.BotTier
+	23, // 36: app.v1.GetBotReviewResponse.review:type_name -> app.v1.BotReview
+	53, // 37: app.v1.GetBotReviewResponse.users:type_name -> app.v1.User
+	23, // 38: app.v1.GetBotReviewsResponse.reviews:type_name -> app.v1.BotReview
+	53, // 39: app.v1.GetBotReviewsResponse.users:type_name -> app.v1.User
+	23, // 40: app.v1.SetBotVerifiedResponse.review:type_name -> app.v1.BotReview
+	23, // 41: app.v1.ReviewBotRestrictionResponse.review:type_name -> app.v1.BotReview
 	2,  // 42: app.v1.ResolveReportRequest.actions:type_name -> app.v1.ModerationAction
-	5,  // 43: app.v1.ResolveReportResponse.report:type_name -> app.v1.Report
+	6,  // 43: app.v1.ResolveReportResponse.report:type_name -> app.v1.Report
 	4,  // 44: app.v1.Feedback.kind:type_name -> app.v1.FeedbackKind
 	3,  // 45: app.v1.Feedback.status:type_name -> app.v1.FeedbackStatus
 	3,  // 46: app.v1.GetFeedbackRequest.status:type_name -> app.v1.FeedbackStatus
-	35, // 47: app.v1.GetFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	43, // 48: app.v1.GetFeedbackResponse.users:type_name -> app.v1.User
-	35, // 49: app.v1.ResolveFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	35, // 50: app.v1.ReplyFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	9,  // 51: app.v1.ModerationService.GetReports:input_type -> app.v1.GetReportsRequest
-	11, // 52: app.v1.ModerationService.GetReport:input_type -> app.v1.GetReportRequest
-	31, // 53: app.v1.ModerationService.ResolveReport:input_type -> app.v1.ResolveReportRequest
-	33, // 54: app.v1.ModerationService.LiftRestriction:input_type -> app.v1.LiftRestrictionRequest
-	36, // 55: app.v1.ModerationService.GetFeedback:input_type -> app.v1.GetFeedbackRequest
-	38, // 56: app.v1.ModerationService.ResolveFeedback:input_type -> app.v1.ResolveFeedbackRequest
-	40, // 57: app.v1.ModerationService.ReplyFeedback:input_type -> app.v1.ReplyFeedbackRequest
-	18, // 58: app.v1.ModerationService.GetReportGroups:input_type -> app.v1.GetReportGroupsRequest
-	20, // 59: app.v1.ModerationService.GetModerationLog:input_type -> app.v1.GetModerationLogRequest
-	23, // 60: app.v1.ModerationService.GetBotReview:input_type -> app.v1.GetBotReviewRequest
-	25, // 61: app.v1.ModerationService.GetBotReviews:input_type -> app.v1.GetBotReviewsRequest
-	27, // 62: app.v1.ModerationService.SetBotVerified:input_type -> app.v1.SetBotVerifiedRequest
-	29, // 63: app.v1.ModerationService.ReviewBotRestriction:input_type -> app.v1.ReviewBotRestrictionRequest
-	10, // 64: app.v1.ModerationService.GetReports:output_type -> app.v1.GetReportsResponse
-	12, // 65: app.v1.ModerationService.GetReport:output_type -> app.v1.GetReportResponse
-	32, // 66: app.v1.ModerationService.ResolveReport:output_type -> app.v1.ResolveReportResponse
-	34, // 67: app.v1.ModerationService.LiftRestriction:output_type -> app.v1.LiftRestrictionResponse
-	37, // 68: app.v1.ModerationService.GetFeedback:output_type -> app.v1.GetFeedbackResponse
-	39, // 69: app.v1.ModerationService.ResolveFeedback:output_type -> app.v1.ResolveFeedbackResponse
-	41, // 70: app.v1.ModerationService.ReplyFeedback:output_type -> app.v1.ReplyFeedbackResponse
-	19, // 71: app.v1.ModerationService.GetReportGroups:output_type -> app.v1.GetReportGroupsResponse
-	21, // 72: app.v1.ModerationService.GetModerationLog:output_type -> app.v1.GetModerationLogResponse
-	24, // 73: app.v1.ModerationService.GetBotReview:output_type -> app.v1.GetBotReviewResponse
-	26, // 74: app.v1.ModerationService.GetBotReviews:output_type -> app.v1.GetBotReviewsResponse
-	28, // 75: app.v1.ModerationService.SetBotVerified:output_type -> app.v1.SetBotVerifiedResponse
-	30, // 76: app.v1.ModerationService.ReviewBotRestriction:output_type -> app.v1.ReviewBotRestrictionResponse
-	64, // [64:77] is the sub-list for method output_type
-	51, // [51:64] is the sub-list for method input_type
-	51, // [51:51] is the sub-list for extension type_name
-	51, // [51:51] is the sub-list for extension extendee
-	0,  // [0:51] is the sub-list for field type_name
+	36, // 47: app.v1.GetFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	53, // 48: app.v1.GetFeedbackResponse.users:type_name -> app.v1.User
+	36, // 49: app.v1.ResolveFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	36, // 50: app.v1.ReplyFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	57, // 51: app.v1.Announcement.entities:type_name -> app.v1.MessageEntity
+	5,  // 52: app.v1.Announcement.state:type_name -> app.v1.AnnouncementState
+	57, // 53: app.v1.PreviewAnnouncementResponse.entities:type_name -> app.v1.MessageEntity
+	43, // 54: app.v1.SendAnnouncementResponse.announcement:type_name -> app.v1.Announcement
+	43, // 55: app.v1.GetAnnouncementsResponse.announcements:type_name -> app.v1.Announcement
+	53, // 56: app.v1.GetAnnouncementsResponse.users:type_name -> app.v1.User
+	43, // 57: app.v1.CancelAnnouncementResponse.announcement:type_name -> app.v1.Announcement
+	10, // 58: app.v1.ModerationService.GetReports:input_type -> app.v1.GetReportsRequest
+	12, // 59: app.v1.ModerationService.GetReport:input_type -> app.v1.GetReportRequest
+	32, // 60: app.v1.ModerationService.ResolveReport:input_type -> app.v1.ResolveReportRequest
+	34, // 61: app.v1.ModerationService.LiftRestriction:input_type -> app.v1.LiftRestrictionRequest
+	37, // 62: app.v1.ModerationService.GetFeedback:input_type -> app.v1.GetFeedbackRequest
+	39, // 63: app.v1.ModerationService.ResolveFeedback:input_type -> app.v1.ResolveFeedbackRequest
+	41, // 64: app.v1.ModerationService.ReplyFeedback:input_type -> app.v1.ReplyFeedbackRequest
+	19, // 65: app.v1.ModerationService.GetReportGroups:input_type -> app.v1.GetReportGroupsRequest
+	21, // 66: app.v1.ModerationService.GetModerationLog:input_type -> app.v1.GetModerationLogRequest
+	24, // 67: app.v1.ModerationService.GetBotReview:input_type -> app.v1.GetBotReviewRequest
+	26, // 68: app.v1.ModerationService.GetBotReviews:input_type -> app.v1.GetBotReviewsRequest
+	28, // 69: app.v1.ModerationService.SetBotVerified:input_type -> app.v1.SetBotVerifiedRequest
+	30, // 70: app.v1.ModerationService.ReviewBotRestriction:input_type -> app.v1.ReviewBotRestrictionRequest
+	44, // 71: app.v1.ModerationService.PreviewAnnouncement:input_type -> app.v1.PreviewAnnouncementRequest
+	46, // 72: app.v1.ModerationService.SendAnnouncement:input_type -> app.v1.SendAnnouncementRequest
+	48, // 73: app.v1.ModerationService.GetAnnouncements:input_type -> app.v1.GetAnnouncementsRequest
+	50, // 74: app.v1.ModerationService.CancelAnnouncement:input_type -> app.v1.CancelAnnouncementRequest
+	11, // 75: app.v1.ModerationService.GetReports:output_type -> app.v1.GetReportsResponse
+	13, // 76: app.v1.ModerationService.GetReport:output_type -> app.v1.GetReportResponse
+	33, // 77: app.v1.ModerationService.ResolveReport:output_type -> app.v1.ResolveReportResponse
+	35, // 78: app.v1.ModerationService.LiftRestriction:output_type -> app.v1.LiftRestrictionResponse
+	38, // 79: app.v1.ModerationService.GetFeedback:output_type -> app.v1.GetFeedbackResponse
+	40, // 80: app.v1.ModerationService.ResolveFeedback:output_type -> app.v1.ResolveFeedbackResponse
+	42, // 81: app.v1.ModerationService.ReplyFeedback:output_type -> app.v1.ReplyFeedbackResponse
+	20, // 82: app.v1.ModerationService.GetReportGroups:output_type -> app.v1.GetReportGroupsResponse
+	22, // 83: app.v1.ModerationService.GetModerationLog:output_type -> app.v1.GetModerationLogResponse
+	25, // 84: app.v1.ModerationService.GetBotReview:output_type -> app.v1.GetBotReviewResponse
+	27, // 85: app.v1.ModerationService.GetBotReviews:output_type -> app.v1.GetBotReviewsResponse
+	29, // 86: app.v1.ModerationService.SetBotVerified:output_type -> app.v1.SetBotVerifiedResponse
+	31, // 87: app.v1.ModerationService.ReviewBotRestriction:output_type -> app.v1.ReviewBotRestrictionResponse
+	45, // 88: app.v1.ModerationService.PreviewAnnouncement:output_type -> app.v1.PreviewAnnouncementResponse
+	47, // 89: app.v1.ModerationService.SendAnnouncement:output_type -> app.v1.SendAnnouncementResponse
+	49, // 90: app.v1.ModerationService.GetAnnouncements:output_type -> app.v1.GetAnnouncementsResponse
+	51, // 91: app.v1.ModerationService.CancelAnnouncement:output_type -> app.v1.CancelAnnouncementResponse
+	75, // [75:92] is the sub-list for method output_type
+	58, // [58:75] is the sub-list for method input_type
+	58, // [58:58] is the sub-list for extension type_name
+	58, // [58:58] is the sub-list for extension extendee
+	0,  // [0:58] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_moderation_proto_init() }
@@ -3348,8 +3995,8 @@ func file_app_v1_moderation_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_moderation_proto_rawDesc), len(file_app_v1_moderation_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   37,
+			NumEnums:      6,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

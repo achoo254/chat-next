@@ -4,6 +4,7 @@ export * from "./vifold/index.ts";
 export * from "./model/types.ts";
 export { EventBus, EventKeys, type BatchListener, type KeyListener } from "./events/bus.ts";
 export { createRemoteApi, classifyFailure, SessionEndedError, type FailureKind, type RemoteApi } from "./protocol/api.ts";
+export { fromWireEntity } from "./protocol/map.ts";
 export { MIGRATIONS, SCHEMA_VERSION, migrate, type Migration, type MigrationOutcome } from "./repo/migrations.ts";
 export { Repository, type DialogView, type OutboxRow, type StoredMessage } from "./repo/repository.ts";
 export {

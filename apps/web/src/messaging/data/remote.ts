@@ -3,6 +3,7 @@
 // privacy, per-chat settings (mute, pinned chats, delete) and the moderation
 // queue. Their results reach the local database through the core's update
 // stream; these calls only return what the UI needs right away.
+import type { MessageEntity } from "@app/core";
 import type { Transport } from "@connectrpc/connect";
 import type { ReportReason, ReportTarget } from "./pending-backend.ts";
 
@@ -254,6 +255,41 @@ export interface FeedbackPage {
 	readonly nextCursor: string;
 }
 
+export type AnnouncementState = "queued" | "running" | "done" | "cancelled";
+
+/** An operators' announcement, sent by the assistant bot to everyone who started it. */
+export interface Announcement {
+	readonly id: number;
+	readonly text: string;
+	readonly entities: readonly MessageEntity[];
+	readonly state: AnnouncementState;
+	/** Why a cancelled one stopped: "cancelled", "bot_deleted", "bot_restricted". */
+	readonly reason: string;
+	readonly total: number;
+	readonly sent: number;
+	readonly skipped: number;
+	readonly failed: number;
+	readonly createdAt: number;
+	/** 0 while it is being sent. */
+	readonly finishedAt: number;
+	readonly createdBy: number;
+}
+
+export interface AnnouncementList {
+	readonly items: readonly Announcement[];
+	/** The operators who sent them. */
+	readonly people: ReadonlyMap<number, Person>;
+	/** Users who started the assistant now. */
+	readonly audience: number;
+}
+
+/** An announcement as users would get it. */
+export interface AnnouncementPreview {
+	readonly text: string;
+	readonly entities: readonly MessageEntity[];
+	readonly audience: number;
+}
+
 /** The reports about one target, with its newest report. */
 export interface ReportGroup {
 	readonly report: ModerationReport;
@@ -468,6 +504,12 @@ export interface Remote {
 	resolveFeedback(feedbackId: number): Promise<FeedbackItem>;
 	/** FailedPrecondition "already_replied…" for an item already answered. */
 	replyFeedback(feedbackId: number, text: string): Promise<FeedbackItem>;
+	/** InvalidArgument with the position of a markdown error. */
+	previewAnnouncement(text: string): Promise<AnnouncementPreview>;
+	/** FailedPrecondition "no_recipients…" when nobody started the assistant, "busy…" with 5 being sent. */
+	sendAnnouncement(text: string): Promise<Announcement>;
+	announcements(): Promise<AnnouncementList>;
+	cancelAnnouncement(id: number): Promise<Announcement>;
 }
 
 const METHODS = [
@@ -530,6 +572,10 @@ const METHODS = [
 	"reviewBotRestriction",
 	"resolveFeedback",
 	"replyFeedback",
+	"previewAnnouncement",
+	"sendAnnouncement",
+	"announcements",
+	"cancelAnnouncement",
 ] as const satisfies readonly (keyof Remote)[];
 
 // Fails to compile when a Remote method is missing from METHODS.

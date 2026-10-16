@@ -55,6 +55,18 @@ service ModerationService {
   rpc SetBotVerified(SetBotVerifiedRequest) returns (SetBotVerifiedResponse);
   // Keeps a restricted bot restricted, or restores its previous tier.
   rpc ReviewBotRestriction(ReviewBotRestrictionRequest) returns (ReviewBotRestrictionResponse);
+  // Parses an announcement (Bot API markdown) as SendAnnouncement would and
+  // counts its recipients, without sending; a syntax error gives
+  // invalid_argument with its position.
+  rpc PreviewAnnouncement(PreviewAnnouncementRequest) returns (PreviewAnnouncementResponse);
+  // Sends an announcement through the assistant bot to every user of the
+  // tenant who started it, in the background (a bulk send at the internal
+  // tier's pace, each user once).
+  rpc SendAnnouncement(SendAnnouncementRequest) returns (SendAnnouncementResponse);
+  // The tenant's announcements, newest first, with their progress.
+  rpc GetAnnouncements(GetAnnouncementsRequest) returns (GetAnnouncementsResponse);
+  // Stops an announcement being sent; messages already sent stay.
+  rpc CancelAnnouncement(CancelAnnouncementRequest) returns (CancelAnnouncementResponse);
 }
 
 enum ReportStatus {
@@ -450,4 +462,73 @@ message ReplyFeedbackRequest {
 
 message ReplyFeedbackResponse {
   Feedback feedback = 1;
+}
+
+enum AnnouncementState {
+  ANNOUNCEMENT_STATE_UNSPECIFIED = 0;
+  ANNOUNCEMENT_STATE_QUEUED = 1;
+  ANNOUNCEMENT_STATE_RUNNING = 2;
+  ANNOUNCEMENT_STATE_DONE = 3;
+  ANNOUNCEMENT_STATE_CANCELLED = 4;
+}
+
+message Announcement {
+  int64 id = 1 [jstype = JS_NUMBER];
+  // As users get it.
+  string text = 2;
+  repeated MessageEntity entities = 3;
+  AnnouncementState state = 4;
+  // Why a cancelled announcement stopped: "cancelled" (an operator),
+  // "bot_deleted", "bot_restricted".
+  string reason = 5;
+  // Recipients when it was queued, and the outcome so far: skipped users
+  // blocked the assistant or were deleted.
+  int32 total = 6;
+  int32 sent = 7;
+  int32 skipped = 8;
+  int32 failed = 9;
+  int64 created_at = 10 [jstype = JS_NUMBER];
+  int64 finished_at = 11 [jstype = JS_NUMBER];
+  // The operator who sent it.
+  int64 created_by = 12 [jstype = JS_NUMBER];
+}
+
+message PreviewAnnouncementRequest {
+  // Bot API markdown (*bold*, _italic_, [text](url)…), up to 4096
+  // characters once parsed.
+  string text = 1;
+}
+
+message PreviewAnnouncementResponse {
+  string text = 1;
+  repeated MessageEntity entities = 2;
+  // The users who started the assistant now.
+  int32 audience = 3;
+}
+
+message SendAnnouncementRequest {
+  string text = 1;
+}
+
+message SendAnnouncementResponse {
+  Announcement announcement = 1;
+}
+
+message GetAnnouncementsRequest {}
+
+message GetAnnouncementsResponse {
+  // The newest 50.
+  repeated Announcement announcements = 1;
+  // The operators who sent them.
+  repeated User users = 2;
+  // The users who started the assistant now.
+  int32 audience = 3;
+}
+
+message CancelAnnouncementRequest {
+  int64 announcement_id = 1 [jstype = JS_NUMBER];
+}
+
+message CancelAnnouncementResponse {
+  Announcement announcement = 1;
 }

@@ -105,3 +105,21 @@ func asConnect(err error) error {
 	}
 	return connect.NewError(code, errors.New(ae.description))
 }
+
+// ParseMarkdown parses text written in the Bot API's markdown (an
+// operator's announcement); a syntax error is invalid_argument.
+func (s *Service) ParseMarkdown(text string) (string, []*appv1.MessageEntity, error) {
+	out, ents, err := s.parseText(text, nil, "markdown")
+	var ae *apiError
+	if errors.As(err, &ae) {
+		return "", nil, connect.NewError(connect.CodeInvalidArgument, errors.New(ae.description))
+	}
+	return out, ents, err
+}
+
+// InternalBulk is the bulk pace and daily cap of the internal tier (the
+// assistant's announcements).
+func InternalBulk() (pace, daily int) {
+	r := bulkTiers[botadmin.TierInternal]
+	return r.pace, r.daily
+}

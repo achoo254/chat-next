@@ -72,6 +72,18 @@ const (
 	// ModerationServiceReviewBotRestrictionProcedure is the fully-qualified name of the
 	// ModerationService's ReviewBotRestriction RPC.
 	ModerationServiceReviewBotRestrictionProcedure = "/app.v1.ModerationService/ReviewBotRestriction"
+	// ModerationServicePreviewAnnouncementProcedure is the fully-qualified name of the
+	// ModerationService's PreviewAnnouncement RPC.
+	ModerationServicePreviewAnnouncementProcedure = "/app.v1.ModerationService/PreviewAnnouncement"
+	// ModerationServiceSendAnnouncementProcedure is the fully-qualified name of the ModerationService's
+	// SendAnnouncement RPC.
+	ModerationServiceSendAnnouncementProcedure = "/app.v1.ModerationService/SendAnnouncement"
+	// ModerationServiceGetAnnouncementsProcedure is the fully-qualified name of the ModerationService's
+	// GetAnnouncements RPC.
+	ModerationServiceGetAnnouncementsProcedure = "/app.v1.ModerationService/GetAnnouncements"
+	// ModerationServiceCancelAnnouncementProcedure is the fully-qualified name of the
+	// ModerationService's CancelAnnouncement RPC.
+	ModerationServiceCancelAnnouncementProcedure = "/app.v1.ModerationService/CancelAnnouncement"
 )
 
 // ModerationServiceClient is a client for the app.v1.ModerationService service.
@@ -113,6 +125,18 @@ type ModerationServiceClient interface {
 	SetBotVerified(context.Context, *connect.Request[v1.SetBotVerifiedRequest]) (*connect.Response[v1.SetBotVerifiedResponse], error)
 	// Keeps a restricted bot restricted, or restores its previous tier.
 	ReviewBotRestriction(context.Context, *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error)
+	// Parses an announcement (Bot API markdown) as SendAnnouncement would and
+	// counts its recipients, without sending; a syntax error gives
+	// invalid_argument with its position.
+	PreviewAnnouncement(context.Context, *connect.Request[v1.PreviewAnnouncementRequest]) (*connect.Response[v1.PreviewAnnouncementResponse], error)
+	// Sends an announcement through the assistant bot to every user of the
+	// tenant who started it, in the background (a bulk send at the internal
+	// tier's pace, each user once).
+	SendAnnouncement(context.Context, *connect.Request[v1.SendAnnouncementRequest]) (*connect.Response[v1.SendAnnouncementResponse], error)
+	// The tenant's announcements, newest first, with their progress.
+	GetAnnouncements(context.Context, *connect.Request[v1.GetAnnouncementsRequest]) (*connect.Response[v1.GetAnnouncementsResponse], error)
+	// Stops an announcement being sent; messages already sent stay.
+	CancelAnnouncement(context.Context, *connect.Request[v1.CancelAnnouncementRequest]) (*connect.Response[v1.CancelAnnouncementResponse], error)
 }
 
 // NewModerationServiceClient constructs a client for the app.v1.ModerationService service. By
@@ -204,6 +228,30 @@ func NewModerationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(moderationServiceMethods.ByName("ReviewBotRestriction")),
 			connect.WithClientOptions(opts...),
 		),
+		previewAnnouncement: connect.NewClient[v1.PreviewAnnouncementRequest, v1.PreviewAnnouncementResponse](
+			httpClient,
+			baseURL+ModerationServicePreviewAnnouncementProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("PreviewAnnouncement")),
+			connect.WithClientOptions(opts...),
+		),
+		sendAnnouncement: connect.NewClient[v1.SendAnnouncementRequest, v1.SendAnnouncementResponse](
+			httpClient,
+			baseURL+ModerationServiceSendAnnouncementProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("SendAnnouncement")),
+			connect.WithClientOptions(opts...),
+		),
+		getAnnouncements: connect.NewClient[v1.GetAnnouncementsRequest, v1.GetAnnouncementsResponse](
+			httpClient,
+			baseURL+ModerationServiceGetAnnouncementsProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("GetAnnouncements")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelAnnouncement: connect.NewClient[v1.CancelAnnouncementRequest, v1.CancelAnnouncementResponse](
+			httpClient,
+			baseURL+ModerationServiceCancelAnnouncementProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("CancelAnnouncement")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -222,6 +270,10 @@ type moderationServiceClient struct {
 	getBotReviews        *connect.Client[v1.GetBotReviewsRequest, v1.GetBotReviewsResponse]
 	setBotVerified       *connect.Client[v1.SetBotVerifiedRequest, v1.SetBotVerifiedResponse]
 	reviewBotRestriction *connect.Client[v1.ReviewBotRestrictionRequest, v1.ReviewBotRestrictionResponse]
+	previewAnnouncement  *connect.Client[v1.PreviewAnnouncementRequest, v1.PreviewAnnouncementResponse]
+	sendAnnouncement     *connect.Client[v1.SendAnnouncementRequest, v1.SendAnnouncementResponse]
+	getAnnouncements     *connect.Client[v1.GetAnnouncementsRequest, v1.GetAnnouncementsResponse]
+	cancelAnnouncement   *connect.Client[v1.CancelAnnouncementRequest, v1.CancelAnnouncementResponse]
 }
 
 // GetReports calls app.v1.ModerationService.GetReports.
@@ -289,6 +341,26 @@ func (c *moderationServiceClient) ReviewBotRestriction(ctx context.Context, req 
 	return c.reviewBotRestriction.CallUnary(ctx, req)
 }
 
+// PreviewAnnouncement calls app.v1.ModerationService.PreviewAnnouncement.
+func (c *moderationServiceClient) PreviewAnnouncement(ctx context.Context, req *connect.Request[v1.PreviewAnnouncementRequest]) (*connect.Response[v1.PreviewAnnouncementResponse], error) {
+	return c.previewAnnouncement.CallUnary(ctx, req)
+}
+
+// SendAnnouncement calls app.v1.ModerationService.SendAnnouncement.
+func (c *moderationServiceClient) SendAnnouncement(ctx context.Context, req *connect.Request[v1.SendAnnouncementRequest]) (*connect.Response[v1.SendAnnouncementResponse], error) {
+	return c.sendAnnouncement.CallUnary(ctx, req)
+}
+
+// GetAnnouncements calls app.v1.ModerationService.GetAnnouncements.
+func (c *moderationServiceClient) GetAnnouncements(ctx context.Context, req *connect.Request[v1.GetAnnouncementsRequest]) (*connect.Response[v1.GetAnnouncementsResponse], error) {
+	return c.getAnnouncements.CallUnary(ctx, req)
+}
+
+// CancelAnnouncement calls app.v1.ModerationService.CancelAnnouncement.
+func (c *moderationServiceClient) CancelAnnouncement(ctx context.Context, req *connect.Request[v1.CancelAnnouncementRequest]) (*connect.Response[v1.CancelAnnouncementResponse], error) {
+	return c.cancelAnnouncement.CallUnary(ctx, req)
+}
+
 // ModerationServiceHandler is an implementation of the app.v1.ModerationService service.
 type ModerationServiceHandler interface {
 	// Reports, newest first.
@@ -328,6 +400,18 @@ type ModerationServiceHandler interface {
 	SetBotVerified(context.Context, *connect.Request[v1.SetBotVerifiedRequest]) (*connect.Response[v1.SetBotVerifiedResponse], error)
 	// Keeps a restricted bot restricted, or restores its previous tier.
 	ReviewBotRestriction(context.Context, *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error)
+	// Parses an announcement (Bot API markdown) as SendAnnouncement would and
+	// counts its recipients, without sending; a syntax error gives
+	// invalid_argument with its position.
+	PreviewAnnouncement(context.Context, *connect.Request[v1.PreviewAnnouncementRequest]) (*connect.Response[v1.PreviewAnnouncementResponse], error)
+	// Sends an announcement through the assistant bot to every user of the
+	// tenant who started it, in the background (a bulk send at the internal
+	// tier's pace, each user once).
+	SendAnnouncement(context.Context, *connect.Request[v1.SendAnnouncementRequest]) (*connect.Response[v1.SendAnnouncementResponse], error)
+	// The tenant's announcements, newest first, with their progress.
+	GetAnnouncements(context.Context, *connect.Request[v1.GetAnnouncementsRequest]) (*connect.Response[v1.GetAnnouncementsResponse], error)
+	// Stops an announcement being sent; messages already sent stay.
+	CancelAnnouncement(context.Context, *connect.Request[v1.CancelAnnouncementRequest]) (*connect.Response[v1.CancelAnnouncementResponse], error)
 }
 
 // NewModerationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -415,6 +499,30 @@ func NewModerationServiceHandler(svc ModerationServiceHandler, opts ...connect.H
 		connect.WithSchema(moderationServiceMethods.ByName("ReviewBotRestriction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	moderationServicePreviewAnnouncementHandler := connect.NewUnaryHandler(
+		ModerationServicePreviewAnnouncementProcedure,
+		svc.PreviewAnnouncement,
+		connect.WithSchema(moderationServiceMethods.ByName("PreviewAnnouncement")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceSendAnnouncementHandler := connect.NewUnaryHandler(
+		ModerationServiceSendAnnouncementProcedure,
+		svc.SendAnnouncement,
+		connect.WithSchema(moderationServiceMethods.ByName("SendAnnouncement")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceGetAnnouncementsHandler := connect.NewUnaryHandler(
+		ModerationServiceGetAnnouncementsProcedure,
+		svc.GetAnnouncements,
+		connect.WithSchema(moderationServiceMethods.ByName("GetAnnouncements")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceCancelAnnouncementHandler := connect.NewUnaryHandler(
+		ModerationServiceCancelAnnouncementProcedure,
+		svc.CancelAnnouncement,
+		connect.WithSchema(moderationServiceMethods.ByName("CancelAnnouncement")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.ModerationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModerationServiceGetReportsProcedure:
@@ -443,6 +551,14 @@ func NewModerationServiceHandler(svc ModerationServiceHandler, opts ...connect.H
 			moderationServiceSetBotVerifiedHandler.ServeHTTP(w, r)
 		case ModerationServiceReviewBotRestrictionProcedure:
 			moderationServiceReviewBotRestrictionHandler.ServeHTTP(w, r)
+		case ModerationServicePreviewAnnouncementProcedure:
+			moderationServicePreviewAnnouncementHandler.ServeHTTP(w, r)
+		case ModerationServiceSendAnnouncementProcedure:
+			moderationServiceSendAnnouncementHandler.ServeHTTP(w, r)
+		case ModerationServiceGetAnnouncementsProcedure:
+			moderationServiceGetAnnouncementsHandler.ServeHTTP(w, r)
+		case ModerationServiceCancelAnnouncementProcedure:
+			moderationServiceCancelAnnouncementHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -502,4 +618,20 @@ func (UnimplementedModerationServiceHandler) SetBotVerified(context.Context, *co
 
 func (UnimplementedModerationServiceHandler) ReviewBotRestriction(context.Context, *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.ReviewBotRestriction is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) PreviewAnnouncement(context.Context, *connect.Request[v1.PreviewAnnouncementRequest]) (*connect.Response[v1.PreviewAnnouncementResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.PreviewAnnouncement is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) SendAnnouncement(context.Context, *connect.Request[v1.SendAnnouncementRequest]) (*connect.Response[v1.SendAnnouncementResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.SendAnnouncement is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) GetAnnouncements(context.Context, *connect.Request[v1.GetAnnouncementsRequest]) (*connect.Response[v1.GetAnnouncementsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.GetAnnouncements is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) CancelAnnouncement(context.Context, *connect.Request[v1.CancelAnnouncementRequest]) (*connect.Response[v1.CancelAnnouncementResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.CancelAnnouncement is not implemented"))
 }

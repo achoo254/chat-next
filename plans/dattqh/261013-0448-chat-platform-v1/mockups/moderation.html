@@ -264,7 +264,7 @@
 		<div class="frame"><div class="mod">
 			<nav class="mod-side" data-active="feedback" data-scope="all" aria-label="Kiểm duyệt"></nav>
 			<div class="mod-main">
-				<nav class="mod-tabs" aria-label="Kiểm duyệt (màn hẹp)"><a href="#queue">Hàng đợi báo cáo</a><a href="#feedback" aria-current="page">Góp ý</a></nav>
+				<nav class="mod-tabs" aria-label="Kiểm duyệt (màn hẹp)"><a href="#queue">Hàng đợi báo cáo</a><a href="#feedback" aria-current="page">Góp ý</a><a href="#announce">Thông báo</a></nav>
 				<header class="mod-head"><h3>Góp ý</h3><span class="scope-lock hide-narrow"><svg class="icon icon-sm"><use href="#i-robot"/></svg>Gửi qua bot Trợ lý</span></header>
 				<div class="mod-body">
 					<div class="tabs" role="tablist" aria-label="Trạng thái góp ý">
@@ -316,6 +316,63 @@
 					</div>
 					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-primary" id="fr-send">Gửi trả lời</button></div>
 				</form>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ Announcements ============ -->
+	<section class="shot" id="announce">
+		<div class="shot-head"><h2>Thông báo</h2><span class="phase">Phase 8</span><p>Đội vận hành báo tính năng mới cho mọi người đã bắt đầu bot Trợ lý: soạn tin (markdown như Bot API: *đậm*, _nghiêng_, [chữ](liên kết); tối đa 4096 ký tự), xem trước đúng như người dùng thấy (server dựng bản xem trước, lỗi cú pháp hiện ngay dưới ô), xác nhận số người nhận rồi gửi. Bot Trợ lý gửi nền theo nhịp của tầng nội bộ, mỗi người một lần; danh sách bên dưới cho thấy tiến độ từng lượt (đã gửi, bỏ qua vì người đó đã chặn bot hoặc xoá tài khoản, lỗi) và nút Dừng cho lượt đang chạy. Chỉ tài khoản vận hành thấy mục này; mỗi tenant gửi cho người dùng của tenant đó.</p></div>
+		<div class="frame"><div class="mod">
+			<nav class="mod-side" data-active="announce" data-scope="all" aria-label="Kiểm duyệt"></nav>
+			<div class="mod-main">
+				<nav class="mod-tabs" aria-label="Kiểm duyệt (màn hẹp)"><a href="#queue">Hàng đợi báo cáo</a><a href="#feedback">Góp ý</a><a href="#announce" aria-current="page">Thông báo</a></nav>
+				<header class="mod-head"><h3>Thông báo</h3><span class="scope-lock hide-narrow"><svg class="icon icon-sm"><use href="#i-robot"/></svg>Gửi qua bot Trợ lý</span></header>
+				<div class="mod-body flow">
+					<form class="an-compose" onsubmit="return false" aria-labelledby="an-title">
+						<h4 id="an-title">Thông báo mới</h4>
+						<div class="field">
+							<label for="an-text">Nội dung <span class="muted">(*đậm*, _nghiêng_, [chữ](liên kết))</span></label>
+							<textarea id="an-text" class="input" rows="5" maxlength="4096" aria-describedby="an-err">*Mới:* gửi album tối đa 10 ảnh và video trong một tin. Mở một chat, bấm 📎 rồi chọn nhiều tệp.</textarea>
+							<span class="error-text" id="an-err" hidden>Nhập nội dung trước khi gửi.</span>
+						</div>
+						<div class="an-preview" aria-label="Xem trước">
+							<span class="an-preview-label muted">Người dùng sẽ thấy</span>
+							<div class="an-bubble"><b>Mới:</b> gửi album tối đa 10 ảnh và video trong một tin. Mở một chat, bấm 📎 rồi chọn nhiều tệp.</div>
+						</div>
+						<div class="an-foot"><span class="muted">Gửi tới <b>2.418</b> người đã bắt đầu Trợ lý</span><button type="submit" class="btn btn-primary" id="an-send"><svg class="icon icon-sm"><use href="#i-megaphone"/></svg>Gửi thông báo</button></div>
+					</form>
+					<h4>Đã gửi</h4>
+					<ul class="an-list">
+						<li class="an-item">
+							<div class="an-head"><span class="pill review">Đang gửi</span><span class="an-time mono muted">Hôm nay 20:40 · Đức Thắng</span><button type="button" class="btn btn-sm" data-stop>Dừng</button></div>
+							<p class="an-text">Tìm kiếm giờ tìm được cả tin nhắn cũ hơn 1 năm, kể cả tiếng Việt không dấu.</p>
+							<div class="progress" aria-label="Tiến độ"><span style="width: 62%"></span></div>
+							<span class="an-stats mono muted">1.499 / 2.418 đã gửi · 12 bỏ qua · 0 lỗi</span>
+						</li>
+						<li class="an-item">
+							<div class="an-head"><span class="pill done">Xong</span><span class="an-time mono muted">12/10 09:00 · Minh</span></div>
+							<p class="an-text">Có chế độ tối theo giờ: Cài đặt → Giao diện → Theo giờ.</p>
+							<span class="an-stats mono muted">2.371 đã gửi · 18 bỏ qua · 0 lỗi</span>
+						</li>
+						<li class="an-item">
+							<div class="an-head"><span class="pill skip">Đã dừng</span><span class="an-time mono muted">10/10 15:12 · Đức Thắng</span></div>
+							<p class="an-text">Thử nghiệm thông báo.</p>
+							<span class="an-stats mono muted">40 đã gửi · 0 bỏ qua · 0 lỗi</span>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div></div>
+		<div class="frame confirm-frame">
+			<div class="static-dialog">
+				<div class="panel" role="dialog" aria-labelledby="ac-title">
+					<div class="dlg-head"><h2 id="ac-title">Gửi thông báo?</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-body flow">
+						<p>Bot Trợ lý gửi tin này cho <b>2.418</b> người đã bắt đầu Trợ lý trong hoandat.com. Tin đã gửi không thu hồi được hàng loạt.</p>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary">Gửi cho 2.418 người</button></div>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -547,6 +604,19 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .mod-tabs a { flex: 1; display: grid; place-items: center; min-height: 44px; color: var(--c-text-muted); font-weight: 500; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
 .mod-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
 @media (max-width: 900px) { .mod-tabs { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); } }
+.an-compose { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); }
+.an-compose h4, .mod-body > h4 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.an-preview { display: grid; gap: var(--space-1); }
+.an-preview-label { font-size: 0.8125rem; }
+.an-bubble { justify-self: start; max-width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); white-space: pre-wrap; overflow-wrap: anywhere; }
+.an-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.an-foot .btn .icon { margin-right: var(--space-1); }
+.an-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.an-item { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
+.an-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.an-time { font-size: 0.8125rem; flex: 1; min-width: 0; }
+.an-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.an-stats { font-size: 0.8125rem; overflow-wrap: anywhere; }
 .fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .fb-item { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
 .fb-item[hidden], .fb-empty[hidden] { display: none; }
@@ -623,7 +693,7 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 	const icon = (id, cls = "icon") => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
 
 	// Shared side navigation: same items in every frame, with the current place marked.
-	const NAV = [["queue", "Hàng đợi báo cáo", "inbox", "#queue", 5], ["feedback", "Góp ý", "message-dot", "#feedback", 3], ["bots", "Bot và xác minh", "robot", "#bot-verified"], ["audit", "Nhật ký kiểm duyệt", "file", "#audit-log"]];
+	const NAV = [["queue", "Hàng đợi báo cáo", "inbox", "#queue", 5], ["feedback", "Góp ý", "message-dot", "#feedback", 3], ["bots", "Bot và xác minh", "robot", "#bot-verified"], ["announce", "Thông báo", "megaphone", "#announce"], ["audit", "Nhật ký kiểm duyệt", "file", "#audit-log"]];
 	$$(".mod-side").forEach((side, i) => {
 		const id = `scope-${i}`;
 		side.innerHTML = `<div class="mod-brand">${icon("shield")}<span>Kiểm duyệt</span></div>

@@ -343,7 +343,8 @@ export function toWireSound(sound: NotificationSound): WireSound {
 	return WIRE_SOUNDS[sound];
 }
 
-function toEntity(entity: WireEntity): MessageEntity {
+/** Client entity from a protocol entity; unknown types become "unknown". */
+export function fromWireEntity(entity: WireEntity): MessageEntity {
 	const type = ENTITY_TYPES[entity.type] ?? "unknown";
 	return {
 		type,
@@ -444,7 +445,7 @@ export function toMessage(message: WireMessage): Message {
 		fromId: id(message.fromId),
 		date: id(message.date),
 		text: message.text,
-		entities: message.entities.map(toEntity),
+		entities: message.entities.map(fromWireEntity),
 		mediaKind: message.media === undefined ? null : (MEDIA_KINDS[message.media.kind] ?? "unknown"),
 		replyToSeq: id(message.replyToSeq),
 		forward: toForward(message.forwardFrom),

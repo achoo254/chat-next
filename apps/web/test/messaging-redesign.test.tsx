@@ -381,6 +381,33 @@ describe("moderation", () => {
 		expect(screen.getAllByText(/^Đã trả lời ·/).length).toBe(2);
 	});
 
+	it("previews, sends and stops an announcement through the assistant", async () => {
+		const demo = seedDemo();
+		demo.fixture.operator = true;
+		renderMessaging(demo.fixture, "/moderation/announcements");
+		expect(await screen.findByText("Chưa gửi thông báo nào", {}, LONG)).toBeTruthy();
+		const box = screen.getByRole("textbox", { name: /Nội dung/ });
+		await userEvent.type(box, "*Mới");
+		expect(await screen.findByText(/unclosed \*/, {}, LONG)).toBeTruthy();
+		await userEvent.type(box, ":* gửi album");
+		const preview = await screen.findByLabelText("Người dùng sẽ thấy", {}, LONG);
+		expect(within(preview).getByText("Mới:").tagName).toBe("B");
+		expect(screen.getByText("Gửi tới 3 người đã bắt đầu Trợ lý")).toBeTruthy();
+
+		await userEvent.click(screen.getByRole("button", { name: "Gửi thông báo" }));
+		const dialog = await screen.findByRole("dialog", { name: "Gửi thông báo?" }, LONG);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi cho 3 người" }));
+		expect(await screen.findByText("Đã bắt đầu gửi thông báo", {}, LONG)).toBeTruthy();
+		expect(demo.fixture.announcements.map((a) => a.text)).toEqual(["*Mới:* gửi album"]);
+		const item = (await screen.findByText("1 / 3 đã gửi · 0 bỏ qua · 0 lỗi", {}, LONG)).closest("li");
+		if (item === null) throw new Error("announcement not listed");
+		expect(within(item).getByText("Đang gửi")).toBeTruthy();
+
+		await userEvent.click(within(item).getByRole("button", { name: "Dừng" }));
+		expect(await screen.findByText("Đã dừng thông báo", {}, LONG)).toBeTruthy();
+		expect(await screen.findByText("Đã dừng", { selector: ".pill" }, LONG)).toBeTruthy();
+	});
+
 	it("shows closed reports under their status", async () => {
 		const demo = seedDemo();
 		demo.fixture.operator = true;
