@@ -77,7 +77,7 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | # | Phase | Tier | Phụ thuộc | Nguyên tắc | Status |
 |---|---|---|---|---|---|
 | 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | Done (Compose dev chưa chạy: máy không có Docker) |
-| 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | In progress (R1 lên prod; còn tenant theo Host, test hot user/failover) |
+| 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | In progress (R1 lên prod; tenant thứ hai chạy bằng process riêng thay cho chọn tenant theo Host; còn test hot user/failover) |
 | 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | In progress (WS gateway R1; Web Push cho PWA lên prod 2026-10-16; push native ở R7) |
 | 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | In progress (R3 lên prod: lưu trên đĩa .65; còn tạm dừng upload, grouped_id khi chuyển tiếp, ffmpeg) |
 | 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
@@ -90,7 +90,7 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Hoãn (user 2026-10-15: PWA + Web Push trước; Capacitor khi cần App Store/Play) |
 | 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Hoãn (cùng quyết định với Phase 10) |
 | 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1, xuất/xoá dữ liệu và chống lạm dụng đầy đủ lên prod 2026-10-16; còn redact log, xoay vòng khoá, STRIDE, đánh giá ND13) |
-| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65; CI GitHub Actions đang bị chặn vì thanh toán, deploy bằng root) |
+| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65; tenant `inetdev` chạy process riêng từ 2026-10-16; CI GitHub Actions đang bị chặn vì thanh toán, deploy bằng root) |
 | 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
 
 Phase là luồng việc kỹ thuật; thứ tự làm và đưa lên prod theo mục "Lộ trình phát hành" dưới đây. Mỗi release lấy đúng phần cần của các phase liên quan. Phase 15 mang số 15 vì được tách ra sau; về logic nó là 8b.
@@ -436,7 +436,7 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Muốn tìm theo chuỗi con thì phải cài `postgresql-16` contrib trên `.65`. Đó là thay đổi máy dùng chung, cần user quyết.
 - Tiếp theo theo lộ trình: R5 (bot, Developer Console, SDK).
 
-## Bàn giao (2026-10-15 13:50) — đã cũ, xem mục "Bàn giao (2026-10-16 13:00)" ở cuối
+## Bàn giao (2026-10-15 13:50) — đã cũ, xem mục "Bàn giao (2026-10-16 15:45)" ở cuối
 
 ### Đang chạy trên prod (https://chat.hoandat.com, release `20261015-064105-400abbd84883`, commit `400abbd`)
 - **R0:** đăng nhập qua `hoandat-auth`. Tên và email lấy từ userinfo, user tự đổi tên thì không bị ghi đè.
@@ -518,37 +518,53 @@ Quyết định 2026-10-15 23:20: user chọn PWA + Web Push trước, app nativ
 
 Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trên macOS (dịch vụ push của Microsoft) và PWA trên iPhone (web.push.apple.com) đều hiện thông báo. Apple từ chối header `Topic` của RFC 8030 (`BadWebPushTopic`), nên server bỏ header này khi gửi tới Apple (commit `d3ce914`).
 
-## Bàn giao (2026-10-16 13:00) — đọc mục này trước khi làm tiếp
+## Bàn giao (2026-10-16 15:45) — đọc mục này trước khi làm tiếp
 
 ### Đang chạy trên prod
-https://chat.hoandat.com, release `20261016-050911-16edf3a179ca` (commit `16edf3a`, deploy bằng root), migration 19.
-- R0–R4 như mục bàn giao cũ; R3b Cloud của tôi (xoá toàn bộ tin vẫn giữ Cloud, ghim).
-- R5 bot: Bot API ở `chat.<d>/bot/v1/` trong process `chat-api`; long poll + webhook (safehttp chặn IP nội bộ và IP của .65, HMAC, dead-letter, đổi webhook cần đăng nhập lại); đủ method trừ inline mode và bulk; menu lệnh trong nhóm; Developer Console; bot trợ lý `tro_ly_bot` chào sau "Bắt đầu", góp ý vào Kiểm duyệt > Góp ý.
-- PWA cài được + Web Push (đã kiểm Edge macOS và iPhone; Apple không nhận header Topic nên bỏ khi gửi tới Apple).
-- Xuất dữ liệu (ZIP JSON + HTML + media, 30 ngày, 1 lần/7 ngày), xoá tài khoản chat (ân hạn 30 ngày, chặn khi còn làm chủ nhóm/kênh, bot dừng), tự xoá khi không dùng 6/12/24 tháng; `docs/privacy/data-inventory.md`.
-- Đã sửa sau review trình duyệt: logo, favicon, màn chờ; một loader trễ cho mỗi màn; bài đăng kênh; phiên đăng nhập lại thay phiên cũ; trạng thái mất mạng; service worker tiếp quản ngay + thanh "Đã có bản mới · Tải lại"; badge và thanh "Tin chưa đọc"; nhóm có chủ đề; username ngắn đệm số.
-- `.env` prod có thêm: `OUTBOUND_DENY_CIDRS`, `CHAT_OPERATOR_USER_IDS=1` (@achoo254, user cho phép), `WEB_PUSH_VAPID_PRIVATE_KEY` (không bao giờ thay). Ghi ở `docs/infrastructure-inventory.md`.
+- https://chat.hoandat.com (tenant chính), release `20261016-082156-0d4f7750ce61` (commit `0d4f775`, deploy bằng root), migration 20. Backup gần nhất trước migration: `chat-20261016-073048.dump`.
+- https://chat.inetdev.io.vn (tenant nghiệm thu `inetdev`), process `chat-api-inetdev` cổng 4601, cùng release và cùng database.
+- R0–R4 như mục bàn giao cũ; R3b Cloud của tôi.
+- R5 bot: Bot API `chat.<d>/bot/v1/`, long poll + webhook, Developer Console, bot trợ lý `tro_ly_bot`. Tầng bot mới: `new` (dưới 14 ngày) và `restricted`.
+- PWA + Web Push (Edge macOS, iPhone).
+- Xuất và xoá dữ liệu, tự xoá khi không dùng; `docs/privacy/data-inventory.md`.
+- Chống lạm dụng đầy đủ (Phase 12, migration 20):
+  - giới hạn chat với người chưa quen, tài khoản mới theo IP, tìm người với tài khoản mới; ngưỡng `ABUSE_*`;
+  - hàng đợi gộp theo đối tượng, tín hiệu người gửi, cảnh cáo và thông báo qua bot Trợ lý, tắt webhook theo `hook_id`;
+  - luật tự hạ bot, xét duyệt và xác minh bot, nhật ký kiểm duyệt + CSV.
+- JS khởi động 149,7/150 KB: tiếng Anh và màn Chào mừng chỉ nạp khi cần.
+- `.env` prod có thêm: `OUTBOUND_DENY_CIDRS`, `CHAT_OPERATOR_USER_IDS=1` (@achoo254), `WEB_PUSH_VAPID_PRIVATE_KEY` (không bao giờ thay). Tenant khác ở `/opt/chat/tenants/<id>.env`. Ghi ở `docs/infrastructure-inventory.md`.
+
+### Tenant nghiệm thu `inetdev.io.vn` (chỉ để nghiệm thu mô hình tenant, các app khác không cần)
+- Phía chat xong:
+  - outbox và con trỏ theo tenant (`3bd5afc`); ma trận test cô lập tenant;
+  - mỗi tenant một process (`setup-tenant.sh`, `ecosystem.config.cjs`), conf `chat.tenants.conf` dựng từ conf chính (`render-tenants-nginx.sh`);
+  - tenant thiếu secret hoặc lỗi chỉ cảnh báo, không chặn release tenant chính;
+  - `smoke.sh` chạy được cho mọi tenant.
+- Jev chọn mỗi tenant một process thay cho chọn tenant theo Host (0,90).
+- DNS `chat.inetdev.io.vn` do user tạo (Proxied, zone SSL Flexible).
+- Phía IdP do phiên `hoandat-auth` làm (commit `ecea962`): hỗ trợ host Proxied và DNS only ở mọi chế độ SSL, kể cả Flexible (quyết định của user); chứng chỉ tenant có `chat.`; secret `chat-web` đã ghi.
+- User đã đăng nhập thật (`quocdat254`, user 8, tenant `inetdev`). Database đúng: 2 chat riêng (Cloud của tôi, bot Trợ lý), không thành viên hay phiên nào lệch tenant.
+- **Đang chặn:** danh sách chat trống, vì WebSocket bị cắt ở đoạn chuyển tiếp Flexible cổng 80 (`tenants-acme.conf`, file của `hoandat-auth`). Khung từ 8 byte trở lên làm đứt kết nối, khung 7 byte thì qua; nghi `proxy_request_buffering off`. Đã gửi bằng chứng cho phiên `hoandat-auth`. Phía chat đã thêm log khi socket đóng trước khung chào (`0d4f775`). Sửa xong thì nghiệm thu lại: danh sách hiện đủ, không thấy dữ liệu của `hoandat.com`.
 
 ### Cách làm việc (bộ nhớ dự án có đủ)
-- AI tự review từng màn trên Chrome đã đăng nhập của user, mọi đề xuất gửi Jev quyết rồi làm luôn; mock trước, code sau; không cuộn ngang; báo user ngay khi deploy xong để họ test.
-- Push thẳng `main`. **CI GitHub Actions đang bị chặn vì thanh toán** (job không chạy: "recent account payments have failed or your spending limit needs to be increased"); push không còn tự deploy. Cho tới khi user sửa billing: chạy đủ gate trên máy dev (lint, typecheck, vitest từng package `--maxWorkers=2`, `pnpm perf`, `pnpm e2e`, `go test -race -p 2 ./...`, golangci-lint, proto, gitleaks) rồi deploy bằng root (`infra/chat/deploy.sh`, cách nạp key ở skill `chat-ops-prod`).
-- Agent con chạy model Opus đã chạm giới hạn tuần (mở lại 2026-10-21 07:00); trước đó tự làm trực tiếp hoặc dùng agent model khác.
-- Nhiều agent cùng sửa một cây code: commit theo đường dẫn, không `git add -A` khi còn agent đang làm.
+- AI tự review từng màn trên Chrome của user, đề xuất gửi Jev quyết rồi làm luôn; mock trước, code sau; không cuộn ngang; báo user ngay khi deploy xong.
+- Push thẳng `main`. **CI GitHub Actions vẫn bị chặn vì thanh toán**, nên chạy đủ gate trên máy dev rồi deploy bằng root (`infra/chat/deploy.sh`, cách nạp key ở skill `chat-ops-prod`). Gate gồm lint, typecheck, vitest `--maxWorkers=2`, `pnpm perf`, `pnpm e2e`, `go test -race -p 2 ./...`, golangci-lint, proto, gitleaks.
+- `pnpm perf` dùng cổng 5174, cổng này hay bị dev server của dự án `one-scribe` chiếm. Không tắt server đó; tạm đổi `HARNESS_PORT` khi chạy rồi trả lại.
+- Phần IdP (`hoandat-auth`) làm ở phiên riêng của repo đó; phiên chat gửi bàn giao qua tin nhắn giữa phiên, không sửa file của IdP.
+- Agent con model Opus chạm giới hạn tuần (mở lại 2026-10-21 07:00); dùng model khác (review lần này dùng sonnet).
+- Nhiều phiên cùng sửa: commit theo đường dẫn, không `git add -A`.
 
-### Nợ kỹ thuật cần xử lý sớm
-- ~~Ngân sách JS khởi động tạm nâng 155 KB~~ Đã xong 2026-10-16 (commit `a766e42`, release `20261016-061427-a766e425133f`): chuỗi giao diện tiếng Anh nạp khi cần, JS khởi động 149,8 KB, ngân sách về 150 KB. Chỉ còn dư 0,2 KB; lần vượt sau thì tách icon hoặc phần ít dùng của `message-item.tsx` (Jev: deploy ngay, tách tiếp khi vượt, 0,95).
-- Ba consumer outbox (push, bots, sweeper realtime) lặp logic cursor; gộp lại.
-- Nhóm thấy "Tài khoản đã xoá" chỉ khi người đó xuất hiện lại trong update (muốn ngay cần loại update mới).
-- `docs/privacy/nd13-assessment.md` (đánh giá chuyển dữ liệu ra nước ngoài) chưa viết.
+### Nợ kỹ thuật
+- Ngân sách JS khởi động chỉ dư 0,3 KB; lần vượt sau thì tách icon hoặc phần ít dùng của `message-item.tsx`.
+- Ba consumer outbox (push, bots, sweeper realtime) lặp logic con trỏ; gộp lại.
+- Nhóm thấy "Tài khoản đã xoá" chỉ khi người đó xuất hiện lại trong update.
+- Giới hạn chat với người chưa quen có thể vượt vài đơn vị khi nhiều request chạy song song (review chấp nhận).
+- `docs/privacy/nd13-assessment.md` chưa viết.
 
-### Việc tiếp theo (thứ tự Jev đã xếp, độ tin thấp nên có thể hỏi lại)
-1. ~~Cắt JS khởi động về ≤150 KB~~ xong 2026-10-16.
-2. R9: ~~chống lạm dụng đầy đủ (Phase 12)~~ xong 2026-10-16 (commit `356ee4c`, release `20261016-073022-356ee4cd1ba3`, migration 20, backup `chat-20261016-073048.dump`; chi tiết ở Phase 12). Tenant thứ hai `inetdev.io.vn` (chỉ để nghiệm thu mô hình tenant, các app khác không cần):
-     - Phía chat xong 2026-10-16: outbox và con trỏ theo tenant (`3bd5afc`), test cô lập tenant, process `chat-api-<id>` theo `/opt/chat/tenants/<id>.env`, conf nginx `chat.tenants.conf` dựng từ conf chính (`3ac6fee`). File `inetdev.env` đã có trên server (cổng 4601).
-     - DNS `chat.inetdev.io.vn` user đã tạo (Proxied; zone đang SSL Flexible).
-     - Phía IdP xong 2026-10-16 (phiên `hoandat-auth`, commit `ecea962`): host Proxied và DNS only ở mọi chế độ SSL, kể cả Flexible (quyết định của user); chứng chỉ tenant có `chat.`; secret `chat-web` đã ghi.
-     - `chat-api-inetdev` chạy từ 15:07; `smoke.sh https://chat.inetdev.io.vn` đạt (đăng nhập chuyển về `auth.inetdev.io.vn`); IP client thật được giữ qua Cloudflare Flexible. Còn: user đăng nhập thật ở tenant để nghiệm thu "không thấy dữ liệu của hoandat.com".
-   - Còn: load test lượt 1; ở Phase 12 còn redact log, xoay vòng khoá, STRIDE, đánh giá ND13.
-3. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
-4. R6 Mini App web.
-5. R7/R8 native khi user có tài khoản Apple Developer, Google Play, Firebase; Android có thể đóng gói PWA bằng Trusted Web Activity.
+### Việc tiếp theo
+1. Nghiệm thu tenant `inetdev` khi IdP sửa xong đoạn chuyển tiếp Flexible.
+2. Phase 12 còn lại: lọc PII và secret khỏi log, xoay vòng khoá + runbook, review STRIDE + security scan, hồ sơ đánh giá Nghị định 13.
+3. R9: load test lượt 1 trên `.65`.
+4. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
+5. R6 Mini App web.
+6. R7/R8 native khi user có tài khoản Apple Developer, Google Play, Firebase; Android có thể đóng gói PWA bằng Trusted Web Activity.
