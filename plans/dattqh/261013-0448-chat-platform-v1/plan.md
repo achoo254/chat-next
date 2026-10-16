@@ -78,19 +78,19 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 |---|---|---|---|---|---|
 | 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | Done (Compose dev chưa chạy: máy không có Docker) |
 | 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | In progress (R1 lên prod; còn tenant theo Host, test hot user/failover) |
-| 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | In progress (WS gateway R1 lên prod; push ở R7) |
+| 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | In progress (WS gateway R1; Web Push cho PWA lên prod 2026-10-16; push native ở R7) |
 | 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | In progress (R3 lên prod: lưu trên đĩa .65; còn tạm dừng upload, grouped_id khi chuyển tiếp, ffmpeg) |
 | 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
 | 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI R1 lên prod; còn React Compiler, perf gate CI) |
 | 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres pg_trgm chuỗi con + tsvector; Meilisearch để giai đoạn scale) |
-| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | In progress (R5 lát A lên prod: quản lý bot, consent, tin chữ + bàn phím, long poll, callback) |
-| 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | In progress (Console lát A lên prod; còn webhook, dead-letter, số liệu, SDK) |
+| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | In progress (R5 lên prod: đủ method trừ inline mode và bulk; webhook, safehttp, dead-letter, test hợp đồng OpenAPI, bot trợ lý) |
+| 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | In progress (Console lên prod: hồ sơ, token, nhận update, update lỗi, số liệu, lệnh; còn SDK TS/Python/Go) |
 | 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | Pending |
 | 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 lên prod: incoming webhook; phần bot ở R5) |
-| 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Pending |
-| 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Pending |
-| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1: danh bạ, cấm, chặn, báo cáo, hàng đợi kiểm duyệt cho operator) |
-| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65: pm2, nginx, TLS, CI/CD qua chat-deploy, perf gate) |
+| 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Hoãn (user 2026-10-15: PWA + Web Push trước; Capacitor khi cần App Store/Play) |
+| 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Hoãn (cùng quyết định với Phase 10) |
+| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1 + xuất dữ liệu, xoá tài khoản ân hạn 30 ngày, tự xoá khi không dùng lên prod 2026-10-16; còn chống lạm dụng đầy đủ, đánh giá ND13) |
+| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65; CI GitHub Actions đang bị chặn vì thanh toán, deploy bằng root) |
 | 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
 
 Phase là luồng việc kỹ thuật; thứ tự làm và đưa lên prod theo mục "Lộ trình phát hành" dưới đây. Mỗi release lấy đúng phần cần của các phase liên quan. Phase 15 mang số 15 vì được tách ra sau; về logic nó là 8b.
@@ -436,7 +436,7 @@ Jev (`jev-1.13.0`) quyết bảy câu hỏi phát sinh khi làm mock; đã áp v
   - Muốn tìm theo chuỗi con thì phải cài `postgresql-16` contrib trên `.65`. Đó là thay đổi máy dùng chung, cần user quyết.
 - Tiếp theo theo lộ trình: R5 (bot, Developer Console, SDK).
 
-## Bàn giao (2026-10-15 13:50) — đọc mục này trước khi làm tiếp
+## Bàn giao (2026-10-15 13:50) — đã cũ, xem mục "Bàn giao (2026-10-16 13:00)" ở cuối
 
 ### Đang chạy trên prod (https://chat.hoandat.com, release `20261015-064105-400abbd84883`, commit `400abbd`)
 - **R0:** đăng nhập qua `hoandat-auth`. Tên và email lấy từ userinfo, user tự đổi tên thì không bị ghi đè.
@@ -517,3 +517,33 @@ Còn lại của R5: gửi hàng loạt + thông báo qua bot + operator báo t�
 Quyết định 2026-10-15 23:20: user chọn PWA + Web Push trước, app native R7 (Capacitor) và R8 (Tauri) làm sau khi có tài khoản Apple Developer, Google Play, Firebase. Jev chọn làm PWA + Web Push trước các mục R9 (0,99).
 
 Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trên macOS (dịch vụ push của Microsoft) và PWA trên iPhone (web.push.apple.com) đều hiện thông báo. Apple từ chối header `Topic` của RFC 8030 (`BadWebPushTopic`), nên server bỏ header này khi gửi tới Apple (commit `d3ce914`).
+
+## Bàn giao (2026-10-16 13:00) — đọc mục này trước khi làm tiếp
+
+### Đang chạy trên prod
+https://chat.hoandat.com, release `20261016-050911-16edf3a179ca` (commit `16edf3a`, deploy bằng root), migration 19.
+- R0–R4 như mục bàn giao cũ; R3b Cloud của tôi (xoá toàn bộ tin vẫn giữ Cloud, ghim).
+- R5 bot: Bot API ở `chat.<d>/bot/v1/` trong process `chat-api`; long poll + webhook (safehttp chặn IP nội bộ và IP của .65, HMAC, dead-letter, đổi webhook cần đăng nhập lại); đủ method trừ inline mode và bulk; menu lệnh trong nhóm; Developer Console; bot trợ lý `tro_ly_bot` chào sau "Bắt đầu", góp ý vào Kiểm duyệt > Góp ý.
+- PWA cài được + Web Push (đã kiểm Edge macOS và iPhone; Apple không nhận header Topic nên bỏ khi gửi tới Apple).
+- Xuất dữ liệu (ZIP JSON + HTML + media, 30 ngày, 1 lần/7 ngày), xoá tài khoản chat (ân hạn 30 ngày, chặn khi còn làm chủ nhóm/kênh, bot dừng), tự xoá khi không dùng 6/12/24 tháng; `docs/privacy/data-inventory.md`.
+- Đã sửa sau review trình duyệt: logo, favicon, màn chờ; một loader trễ cho mỗi màn; bài đăng kênh; phiên đăng nhập lại thay phiên cũ; trạng thái mất mạng; service worker tiếp quản ngay + thanh "Đã có bản mới · Tải lại"; badge và thanh "Tin chưa đọc"; nhóm có chủ đề; username ngắn đệm số.
+- `.env` prod có thêm: `OUTBOUND_DENY_CIDRS`, `CHAT_OPERATOR_USER_IDS=1` (@achoo254, user cho phép), `WEB_PUSH_VAPID_PRIVATE_KEY` (không bao giờ thay). Ghi ở `docs/infrastructure-inventory.md`.
+
+### Cách làm việc (bộ nhớ dự án có đủ)
+- AI tự review từng màn trên Chrome đã đăng nhập của user, mọi đề xuất gửi Jev quyết rồi làm luôn; mock trước, code sau; không cuộn ngang; báo user ngay khi deploy xong để họ test.
+- Push thẳng `main`. **CI GitHub Actions đang bị chặn vì thanh toán** (job không chạy: "recent account payments have failed or your spending limit needs to be increased"); push không còn tự deploy. Cho tới khi user sửa billing: chạy đủ gate trên máy dev (lint, typecheck, vitest từng package `--maxWorkers=2`, `pnpm perf`, `pnpm e2e`, `go test -race -p 2 ./...`, golangci-lint, proto, gitleaks) rồi deploy bằng root (`infra/chat/deploy.sh`, cách nạp key ở skill `chat-ops-prod`).
+- Agent con chạy model Opus đã chạm giới hạn tuần (mở lại 2026-10-21 07:00); trước đó tự làm trực tiếp hoặc dùng agent model khác.
+- Nhiều agent cùng sửa một cây code: commit theo đường dẫn, không `git add -A` khi còn agent đang làm.
+
+### Nợ kỹ thuật cần xử lý sớm
+- Ngân sách JS khởi động tạm nâng 155 KB (`apps/web/test/perf/budgets.ts`), hiện 150,6 KB: phải cắt về ≤150 KB ở lượt kế (Jev "raise_then_trim").
+- Ba consumer outbox (push, bots, sweeper realtime) lặp logic cursor; gộp lại.
+- Nhóm thấy "Tài khoản đã xoá" chỉ khi người đó xuất hiện lại trong update (muốn ngay cần loại update mới).
+- `docs/privacy/nd13-assessment.md` (đánh giá chuyển dữ liệu ra nước ngoài) chưa viết.
+
+### Việc tiếp theo (thứ tự Jev đã xếp, độ tin thấp nên có thể hỏi lại)
+1. Cắt JS khởi động về ≤150 KB (nợ ở trên).
+2. R9: chống lạm dụng đầy đủ (Phase 12), tenant thứ hai `inetdev.io.vn` (cần sửa repo `hoandat-auth`), load test lượt 1.
+3. R5 còn lại: gửi hàng loạt + thông báo qua bot + operator báo tính năng mới; inline mode; SDK TS/Python/Go; chỉ báo "đang gõ" (Jev: chưa làm).
+4. R6 Mini App web.
+5. R7/R8 native khi user có tài khoản Apple Developer, Google Play, Firebase; Android có thể đóng gói PWA bằng Trusted Web Activity.
