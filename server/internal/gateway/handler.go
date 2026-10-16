@@ -133,11 +133,15 @@ func (g *Gateway) serve(ws *websocket.Conn, sess store.Session) {
 	typ, data, err := ws.Read(hctx)
 	hcancel()
 	if err != nil {
+		if !isNormalClose(err) {
+			g.logger.Warn("websocket closed before hello", "session_id", sess.ID, "err", err)
+		}
 		_ = ws.Close(websocket.StatusPolicyViolation, "hello expected")
 		return
 	}
 	f := &appv1.ClientFrame{}
 	if typ != websocket.MessageBinary || proto.Unmarshal(data, f) != nil || f.GetHello() == nil {
+		g.logger.Warn("websocket first frame is not a hello", "session_id", sess.ID, "binary", typ == websocket.MessageBinary, "bytes", len(data))
 		_ = ws.Close(websocket.StatusPolicyViolation, "hello expected")
 		return
 	}
@@ -153,6 +157,7 @@ func (g *Gateway) serve(ws *websocket.Conn, sess store.Session) {
 		_ = ws.Close(websocket.StatusTryAgainLater, "server restarting")
 		return
 	case registerTooMany:
+		g.logger.Warn("websocket refused: too many connections", "session_id", sess.ID, "user_id", sess.UserID)
 		_ = ws.Close(websocket.StatusPolicyViolation, "too many connections")
 		return
 	default:
