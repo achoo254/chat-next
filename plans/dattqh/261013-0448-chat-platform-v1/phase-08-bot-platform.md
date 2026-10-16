@@ -112,12 +112,12 @@ Create:
 - [x] Long poll + dispatcher + dead-letter + dedupe action (lát A: long poll + 409; lát B1: webhook dispatcher, retry/Retry-After, dead-letter, circuit breaker, action trong body với `random_id` dẫn xuất, bot rời chat thì bỏ update chờ, `channel_post`)
 - [x] Quản lý bot (`BotAdminService`) + StartBot/GetBotInfo + PressInlineButton (lát A)
 - [x] safehttp (lát B1; link preview dùng chung chính sách địa chỉ)
-- [ ] Bulk có consent
+- [x] Bulk có consent (2026-10-16, migration 0021: `POST /bot/v1/messages:bulk` theo danh sách tới 10.000 id hoặc mọi người đã bắt đầu bot, `GET`/`DELETE /bot/v1/bulk/{id}`; job nền theo nhịp tầng, mỗi bot một lô mỗi giây, `random_id` theo (job, người) nên không gửi trùng; trần 24 giờ theo tầng; dừng khi bot bị xoá hay hạn chế; dọn sau 30 ngày. Làn ưu tiên push chờ R7)
 - [ ] Inline mode
 - [x] Contract test (lát B2: Go test HTTP thô trong `go test ./...`, kiểm mọi response thành công và lỗi theo `openapi.yaml`, chạy đủ gói thì đòi mọi operation và mọi loại update đều có response được kiểm; thay cho `pnpm conformance:contract`)
 - [x] Method đầy đủ ngoài inline/bulk (lát B2): sửa chữ và bàn phím inline, xoá, chuyển tiếp, sao chép, reaction, ghim/bỏ ghim, "đang gõ" (frame typing realtime; web chưa hiển thị), file (multipart ≤ 50 MiB hoặc `file_id`, album, `GET /files` với URL ngắn hạn; không gửi theo URL), quản trị nhóm (admin, thành viên, cấm/bỏ cấm/giới hạn, đổi tên/mô tả, rời); update `member_changed`, `reaction` (opt-in); menu lệnh của bot trong nhóm ở web (`GetChatBotCommands`)
 - [x] Bot chính thức chào người dùng mới (R5): tự có chat với bot ở lần đăng nhập đầu, hướng dẫn dùng app, nhận góp ý (bot hệ thống `tro_ly_bot` chạy trong `chat-api`, chat trống + "Bắt đầu", góp ý vào Kiểm duyệt > Góp ý, người vận hành trả lời qua bot)
-- [ ] Bot chính thức báo tính năng mới (gửi thông báo cho người đã bắt đầu Trợ lý; chưa làm)
+- [x] Bot chính thức báo tính năng mới (2026-10-16, migration 0022: mục Thông báo trong màn Kiểm duyệt, markdown của Bot API, xem trước do server dựng, gửi qua bulk của Trợ lý ở tầng internal, danh sách tiến độ và nút Dừng)
 
 ## Success Criteria
 
