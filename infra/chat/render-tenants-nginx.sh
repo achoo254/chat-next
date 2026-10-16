@@ -39,7 +39,7 @@ HEAD
 # The HTTPS server block of the primary conf (its second server block),
 # with the tenant's host, certificate, upstream and policy origins.
 awk '/^server \{/ { n++ } n >= 2' "$SRC" | sed \
-	-e 's|^\tserver_name chat\.hoandat\.com;|\tserver_name ~^chat\\.(?<tenant>.+)$;\n\n\tif ($chat_tenant_port = "") {\n\t\treturn 421;\n\t}|' \
+	-e 's|^\tserver_name chat\.hoandat\.com;|\tserver_name ~^chat\\.(?<tenant>.+)$;\n\n\tif ($chat_tenant_port = "") {\n\t\treturn 421;\n\t}\n\n\t# HTTP-01 challenges of the tenant certificate (hoandat-auth provisioner)\n\t# that reach 443: a proxied host under Full with Always Use HTTPS.\n\tlocation ^~ /.well-known/acme-challenge/ {\n\t\troot /var/lib/hoandat-tenant-acme;\n\t\tdefault_type text/plain;\n\t\ttry_files $uri =404;\n\t}|' \
 	-e 's|/etc/letsencrypt/live/chat\.hoandat\.com/|/etc/letsencrypt-tenants/live/$tenant_cert/|' \
 	-e 's|/var/log/nginx/chat\.hoandat\.com\.|/var/log/nginx/chat-tenants.|' \
 	-e 's|http://127\.0\.0\.1:4600|http://127.0.0.1:$chat_tenant_port|g' \
