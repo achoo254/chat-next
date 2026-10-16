@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,9 @@ const (
 
 // topicPattern: RFC 8030 section 5.4, at most 32 characters of the URL and
 // filename safe base64 alphabet.
+// reasonMax caps how much of a refusal body is kept for the log.
+const reasonMax = 256
+
 var topicPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
 
 // Message is one push message before encryption.
@@ -64,6 +68,10 @@ type Result struct {
 	Outcome Outcome
 	// Status is the HTTP status; 0 when no answer came.
 	Status int
+	// Reason is the start of the body of a non-2xx answer (push services
+	// explain refusals there, e.g. Apple's {"reason":"BadJwtToken"}); it
+	// never holds message content.
+	Reason string
 }
 
 // Sender POSTs encrypted messages to push services.
@@ -160,9 +168,14 @@ func (s *Sender) Send(ctx context.Context, endpoint string, keys Keys, m Message
 	if err != nil {
 		return Result{Outcome: Failed}, nil
 	}
+	res := Result{Outcome: classify(resp.StatusCode), Status: resp.StatusCode}
+	if res.Outcome != Delivered {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, reasonMax))
+		res.Reason = strings.TrimSpace(string(body))
+	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, discardMax))
 	_ = resp.Body.Close()
-	return Result{Outcome: classify(resp.StatusCode), Status: resp.StatusCode}, nil
+	return res, nil
 }
 
 func classify(status int) Outcome {

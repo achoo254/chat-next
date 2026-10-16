@@ -115,11 +115,11 @@ func (d *deliveries) send(ctx context.Context, j job) {
 	case webpush.Gone:
 		d.drop(t)
 	case webpush.Rejected:
-		d.s.logger.Info("push rejected", "subscription_id", t.SubscriptionID, "host", host(t.Endpoint), "status", res.Status)
+		d.s.logger.Info("push rejected", "subscription_id", t.SubscriptionID, "host", host(t.Endpoint), "status", res.Status, "reason", res.Reason)
 		d.rejected(t)
 	case webpush.Throttled, webpush.Failed:
 		if ctx.Err() == nil {
-			d.s.logger.Info("push not delivered", "subscription_id", t.SubscriptionID, "host", host(t.Endpoint), "status", res.Status)
+			d.s.logger.Info("push not delivered", "subscription_id", t.SubscriptionID, "host", host(t.Endpoint), "status", res.Status, "reason", res.Reason)
 		}
 	}
 }
