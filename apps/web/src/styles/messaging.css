@@ -255,8 +255,8 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 /* Reactions, Zalo placement (mockups/chat.html#rich-messages): one pill group floats over the bubble's
    bottom edge, about half outside. The group is the bubble's last child with zero height, so the bubble
    keeps its height but is never narrower than the pills (they cannot leave the list). Others' messages:
-   bottom-right; yours: bottom-left. Each emoji is a 32px-tall button drawn as a 24px pill segment, with
-   a 44px-tall hit area. The row makes room below only when it has reactions. */
+   bottom-right; yours: bottom-left. Each emoji is a 32px-tall button (44px on touch) drawn as a 24px pill
+   segment, with a 44px-tall hit area. The row makes room below only when it has reactions. */
 .reactions { clear: both; display: flex; justify-content: flex-end; align-items: center; height: 0; transform: translateY(calc(var(--space-2) + 2px)); }
 .msg.mine .reactions { justify-content: flex-start; }
 .msg:has(.reactions) { margin-bottom: var(--space-4); }
@@ -265,7 +265,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 	min-width: 44px; min-height: 32px; padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted);
 	font-size: 0.75rem; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.reaction::before { content: ""; position: absolute; inset: var(--space-1) 0; z-index: -1; background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-left-width: 0; transition: background var(--dur-fast) var(--ease-standard); }
+.reaction::before { content: ""; position: absolute; inset: calc(50% - 12px) 0; z-index: -1; background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-left-width: 0; transition: background var(--dur-fast) var(--ease-standard); }
 .reaction:first-child::before { border-left-width: 1px; border-radius: var(--radius-full) 0 0 var(--radius-full); }
 .reaction:last-child::before { border-radius: 0 var(--radius-full) var(--radius-full) 0; }
 .reaction:only-child::before { border-radius: var(--radius-full); }
@@ -956,6 +956,9 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 @media (max-width: 760px), (pointer: coarse) {
 	.switch { width: 60px; height: 44px; margin: -10px; border: 10px solid transparent; background-clip: padding-box; }
 	.choice button, .menu button, .react-picker button, .reaction, .chip, .icon-btn, .see-all, .kb-row a, .kb-row button { min-height: 44px; }
+	/* The 44px reaction button is its own hit area (the pill stays 24px); the row below makes room for it. */
+	.reaction::after { content: none; }
+	.msg:has(.reactions) { margin-bottom: var(--space-5); }
 	/* The sender's avatar keeps its drawn size; the padding makes the target 44px. */
 	.avatar-btn { padding: 6px; margin: -6px; }
 	.icon-btn { min-width: 44px; }
