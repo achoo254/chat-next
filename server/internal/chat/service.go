@@ -409,7 +409,7 @@ func (s *Service) inTx(ctx context.Context, fn func(t *txn) error) (*txn, error)
 		if !errors.As(err, &pgErr) || (pgErr.Code != "40P01" && pgErr.Code != "40001") {
 			return nil, err
 		}
-		s.logger.Warn("transaction retried", "code", pgErr.Code)
+		s.logger.Warn("transaction retried", "sqlstate", pgErr.Code)
 	}
 	return nil, err
 }

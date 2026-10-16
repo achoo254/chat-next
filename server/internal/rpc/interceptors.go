@@ -151,7 +151,7 @@ func internal(ctx context.Context, logger *slog.Logger, procedure string, err er
 		if errors.Is(ctxErr, context.DeadlineExceeded) {
 			code = connect.CodeDeadlineExceeded
 		}
-		logger.Debug("rpc ended by the client", "procedure", procedure, "code", code.String(), "err", err)
+		logger.Debug("rpc ended by the client", "procedure", procedure, "rpc_code", code.String(), "err", err)
 		return connect.NewError(code, ctxErr)
 	}
 	logger.Error("rpc failed", "procedure", procedure, "err", err)

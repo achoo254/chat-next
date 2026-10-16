@@ -20,6 +20,7 @@ import (
 
 	"app.local/server/internal/api"
 	"app.local/server/internal/config"
+	"app.local/server/internal/logging/redact"
 	"app.local/server/internal/store"
 )
 
@@ -50,7 +51,7 @@ func run(args []string, stderr io.Writer) int {
 			return 1
 		}
 	}
-	logger := slog.New(slog.NewJSONHandler(stderr, nil)).With("role", *role)
+	logger := slog.New(slog.NewJSONHandler(stderr, redact.HandlerOptions(slog.LevelInfo))).With("role", *role)
 	ctx := context.Background()
 
 	switch *role {

@@ -571,7 +571,7 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 ### Việc tiếp theo
 1. ~~Nghiệm thu tenant `inetdev`~~ đạt 2026-10-16.
 2. **Phase 12 còn lại (làm tiếp từ đây).** Hiện trạng đo 2026-10-16:
-   - **Lọc PII và secret khỏi log:** chưa có. `server/cmd/server/main.go` dùng `slog.NewJSONHandler(stderr, nil)` không `ReplaceAttr`. Cần một handler lọc theo tên khoá (token, secret, cookie, code, email, authorization…), cộng test quét log của các luồng đăng nhập, webhook và Bot API. Nginx đã che query của `/auth/callback` và secret trong `/hook/`.
+   - ~~**Lọc PII và secret khỏi log**~~ xong 2026-10-16 (`server/internal/logging/redact`, test quét log ở harness `api`).
    - **Xoay vòng khoá + runbook:** `SESSION_KEY` là một khoá duy nhất cho mọi `sealbox`: refresh token và ID token của IdP (`auth/sessions.go`), cookie đăng nhập (`auth/routes.go`), secret webhook bot (`botupdates/webhook.go`). Chưa có id khoá hay khoá cũ để giải mã. VAPID không bao giờ thay (đã ghi). Chưa có `docs/operations/`.
    - **Review STRIDE + security scan:** chưa làm; dùng skill `ak-security` trên toàn repo. Review lần này (agent sonnet) đã sửa các lỗi của phần chống lạm dụng.
    - **Đánh giá Nghị định 13:** `docs/privacy/nd13-assessment.md` chưa viết. `docs/privacy/data-inventory.md` đã có. Push đi qua FCM, APNs, Mozilla, WNS.

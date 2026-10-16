@@ -88,7 +88,7 @@ Create:
 - [x] Chặn/báo cáo/kiểm duyệt + công cụ vận hành (2026-10-16: gộp báo cáo, tín hiệu người gửi, cảnh cáo, tắt webhook, xác minh và xét duyệt bot, nhật ký + CSV; phạm vi chủ tenant làm cùng tenant thứ hai)
 - [x] Chống spam tài khoản/bot/webhook (2026-10-16, migration 0020; gửi hàng loạt của bot mới giới hạn khi có tính năng bulk)
 - [x] Xoá/tự huỷ/xuất dữ liệu (R9, 2026-10-16, migration 0019)
-- [ ] Redact PII + secret trong log
+- [x] Redact PII + secret trong log (2026-10-16: `server/internal/logging/redact` gắn vào logger mọi role; test `api` quét log của mọi luồng nó chạy — đăng nhập, refresh, logout, back-channel, Bot API, webhook bot, hook — tìm secret và email; secret dạng chuỗi trần không nhận ra được theo hình dạng nên code phải ghi dưới khoá nhạy cảm hoặc không ghi)
 - [ ] Xoay vòng khoá + runbook
 - [ ] Review STRIDE + security scan
 

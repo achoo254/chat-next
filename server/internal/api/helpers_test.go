@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,7 @@ import (
 	"app.local/server/internal/api"
 	"app.local/server/internal/auth/idptest"
 	"app.local/server/internal/config"
+	"app.local/server/internal/logging/redact"
 	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
 	"connectrpc.com/connect"
@@ -95,7 +97,10 @@ func newEnv(t *testing.T, mods ...func(*config.Config, *api.Options)) *env {
 		mod(&cfg, &opts)
 	}
 	logs := &syncBuffer{}
-	logger := slog.New(slog.NewTextHandler(io.MultiWriter(t.Output(), logs), nil))
+	// The server logs through the same redaction as in production; the scan
+	// runs after Shutdown (cleanups run last-registered first).
+	logger := slog.New(slog.NewTextHandler(io.MultiWriter(t.Output(), logs), redact.HandlerOptions(slog.LevelInfo)))
+	t.Cleanup(func() { scanLogs(t, logs.String()) })
 	app, err := api.New(ctx, cfg, st, idp.Server.Client(), logger, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +112,73 @@ func newEnv(t *testing.T, mods ...func(*config.Config, *api.Options)) *env {
 	}
 	srv.Config.Handler = app.Handler
 	return &env{srv: srv, idp: idp, app: app, store: st, logs: logs}
+}
+
+// leaks are the secrets and personal data the test flows hand the server:
+// the client secret, the fake IdP's tokens, codes and accounts, bot tokens,
+// webhook secrets and incoming hook URLs.
+var leaks = []*regexp.Regexp{
+	regexp.MustCompile(regexp.QuoteMeta(clientSecret)),
+	regexp.MustCompile(`\b(rt|at)-[A-Za-z0-9_-]{8,}`),
+	regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.`),
+	regexp.MustCompile(`(?i)[?&\s](code|state|token)=[^\[&\s]`),
+	regexp.MustCompile(`[A-Za-z0-9._%+-]+@example\.(com|test)`),
+	regexp.MustCompile(`\b[1-9][0-9]*:[A-Za-z0-9_-]{35,}`),
+	regexp.MustCompile(`/hook/[^/\s"]+/[^\[/\s"]`),
+	regexp.MustCompile(`console_secret`),
+}
+
+// scanLogs fails t when the server logged any of the leaks: every flow the
+// api tests drive (sign-in, refresh, logout, back-channel logout, Bot API,
+// bot webhooks, incoming hooks) is checked this way.
+func scanLogs(t *testing.T, logs string) {
+	t.Helper()
+	for _, l := range leaked(logs) {
+		t.Errorf("the server logged a secret or personal data:\n%s", l)
+	}
+}
+
+// leaked returns the lines of logs that hold one of the leaks.
+func leaked(logs string) []string {
+	var out []string
+	for l := range strings.Lines(logs) {
+		for _, re := range leaks {
+			if re.MatchString(l) {
+				out = append(out, l)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// The scan finds each kind of leak. Shaped secrets are also hidden by the
+// production redaction; an opaque one (a client secret, a refresh token or a
+// webhook secret alone in the text) has no shape to find, so only its key
+// or this scan keeps it out of the logs.
+func TestLogScanAndRedaction(t *testing.T) {
+	shaped := []string{
+		"logout token eyJhbGciOiJFUzI1NiJ9.eyJzaWQiOiIxIn0.c2ln\n",
+		"GET /auth/callback?code=abc&state=def\n",
+		"signed in tester@example.com\n",
+		"bot token 7:AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-xy\n",
+		`Post "https://chat.example/hook/h1/s3cret" failed` + "\n",
+	}
+	opaque := []string{
+		"exchange failed: invalid_client " + clientSecret + "\n",
+		"refresh rt-AbCdEfGhIjKl rejected\n",
+		"webhook secret console_secret\n",
+	}
+	for _, l := range append(shaped, opaque...) {
+		if len(leaked(l)) != 1 {
+			t.Errorf("the scan misses %q", l)
+		}
+	}
+	for _, l := range shaped {
+		if got := leaked(redact.String(l)); len(got) != 0 {
+			t.Errorf("redaction leaves %q", got)
+		}
+	}
 }
 
 // browser returns an HTTP client with its own cookie jar that trusts the

@@ -33,7 +33,7 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | Báo cáo đã gửi, nhật ký kiểm duyệt | `reports`, `moderation_log` (chỉ thêm) | Giữ sau khi xoá tài khoản (người báo cáo thành tài khoản đã xoá) để xử lý khiếu nại | NV |
 | Bản xuất dữ liệu (ZIP) | `/opt/chat/media/exports` (mặc định; `DATA_EXPORT_DIR`) + `data_exports` | 30 ngày sau khi xong; xoá ngay khi xoá tài khoản | HĐ |
 | Bản sao lưu DB | `/opt/chat/backups` | 14 bản hằng ngày: dữ liệu đã xoá còn trong bản sao lưu tối đa 14 ngày | NV |
-| Log ứng dụng, nginx | `/var/log/chat`, `/var/log/nginx` | Theo pm2-logrotate và logrotate của server; app chỉ ghi id, không ghi nội dung tin, email, token | NV |
+| Log ứng dụng, nginx | `/var/log/chat`, `/var/log/nginx` | Theo pm2-logrotate và logrotate của server; app chỉ ghi id, không ghi nội dung tin, email, token; mọi logger của server qua bộ lọc `server/internal/logging/redact` (che giá trị dưới khoá nhạy cảm và các dạng token, JWT, bot token, URL hook, `code=`/`state=`, email trong chữ) | NV |
 
 ## Quyền của người dùng
 
