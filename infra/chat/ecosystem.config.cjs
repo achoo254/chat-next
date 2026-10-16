@@ -37,7 +37,11 @@ function app(name, envFile, log) {
 function tenantApps() {
 	let files = [];
 	try {
-		files = fs.readdirSync(TENANTS).filter((file) => /^[a-z][a-z0-9]{1,30}\.env$/.test(file));
+		files = fs
+			.readdirSync(TENANTS)
+			.filter((file) => /^[a-z][a-z0-9]{1,30}\.env$/.test(file))
+			// A tenant starts once its OIDC client secret is in (setup-tenant.sh).
+			.filter((file) => /^OIDC_CLIENT_SECRET=./m.test(fs.readFileSync(path.join(TENANTS, file), "utf8")));
 	} catch {
 		return [];
 	}

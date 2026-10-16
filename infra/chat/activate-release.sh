@@ -91,7 +91,9 @@ media() {
 		https://media-chat.hoandat.com/f/smokeprobe)" = 404 ]
 }
 
-# Each tenant's process answers /healthz with the database connected.
+# Each tenant's process answers /healthz with the database connected. A
+# tenant that does not is reported, without rolling back the primary
+# tenant's release: the other tenants only serve acceptance for now.
 tenants_health() {
 	local id port i
 	for id in $(tenant_ids); do
@@ -100,16 +102,22 @@ tenants_health() {
 			curl -fsS --max-time 2 "http://127.0.0.1:$port/healthz" | grep -q '"db":"connected"' && continue 2
 			sleep 1
 		done
-		echo "tenant $id did not become healthy on port $port" >&2
-		return 1
+		echo "WARNING: tenant $id did not become healthy on port $port (pm2 logs chat-api-$id)" >&2
 	done
+	return 0
 }
 
-# Tenant ids, one per /opt/chat/tenants/<id>.env.
+# Tenant ids, one per /opt/chat/tenants/<id>.env that has its OIDC client
+# secret (setup-tenant.sh leaves it empty until the IdP's value is in).
 tenant_ids() {
 	local file
 	for file in "$TENANTS_DIR"/*.env; do
-		[ -f "$file" ] && basename "$file" .env
+		[ -f "$file" ] || continue
+		if grep -q '^OIDC_CLIENT_SECRET=.' "$file"; then
+			basename "$file" .env
+		else
+			echo "WARNING: $file has no OIDC_CLIENT_SECRET; tenant not started" >&2
+		fi
 	done
 	return 0
 }
@@ -137,7 +145,8 @@ start_all() {
 	local id
 	pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only chat-api --update-env || return 1
 	for id in $(tenant_ids); do
-		pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only "chat-api-$id" --update-env || return 1
+		pm2 startOrReload "$ROOT/infra/ecosystem.config.cjs" --only "chat-api-$id" --update-env ||
+			echo "WARNING: starting chat-api-$id failed" >&2
 	done
 }
 
@@ -189,7 +198,7 @@ realtime || rollback
 hooks || rollback
 bots || rollback
 media || rollback
-tenants_health || rollback
+tenants_health
 
 echo "== prune"
 ls -1dt "$ROOT"/releases/*/ | tail -n +6 | xargs -r rm -rf
