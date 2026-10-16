@@ -1,0 +1,7 @@
+# Test fixtures that look like keys (fake values used only by tests).
+8239fd060c9fd3169112ea7a50d87dec82de076b:server/internal/media/fixtures_test.go:generic-api-key:15
+8239fd060c9fd3169112ea7a50d87dec82de076b:server/internal/api/media_test.go:generic-api-key:37
+549219c690e38fdbe63bf6e69ccc3f971eb2d165:apps/web/test/app.test.tsx:generic-api-key:40
+549219c690e38fdbe63bf6e69ccc3f971eb2d165:apps/web/test/messaging-units.test.ts:generic-api-key:99
+apps/web/test/app.test.tsx:generic-api-key:42
+apps/web/test/messaging-units.test.ts:generic-api-key:165

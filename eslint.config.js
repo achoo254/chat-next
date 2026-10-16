@@ -43,5 +43,7 @@ export default tseslint.config(
 			sourceType: "commonjs",
 			globals: { module: "writable", require: "readonly" },
 		},
+		// pm2 loads them with require(): CommonJS imports are the only kind.
+		rules: { "@typescript-eslint/no-require-imports": "off" },
 	},
 );

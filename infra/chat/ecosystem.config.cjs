@@ -35,7 +35,7 @@ function app(name, envFile, log) {
 }
 
 function tenantApps() {
-	let files = [];
+	let files;
 	try {
 		files = fs
 			.readdirSync(TENANTS)
