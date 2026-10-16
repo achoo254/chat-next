@@ -195,3 +195,20 @@ curl -s -H "Authorization: Bearer $BOT_TOKEN" "$API/updates?allowed_updates=mess
 ## 8. Menu lệnh trong nhóm
 
 Đặt lệnh theo phạm vi bằng `PUT $API/commands` (`scope`: `default`, `private`, `group`, `group_admin`). Trong nhóm, nút menu lệnh ở ô soạn tin liệt kê lệnh của mọi bot trong nhóm (admin thấy danh sách `group_admin`). Nhóm có từ hai bot trở lên thì lệnh chọn từ menu được gửi dạng `/lệnh@username_bot`, nên ở chế độ riêng tư chỉ đúng bot đó nhận.
+
+## 9. Gửi hàng loạt
+
+Một tin cho nhiều người, mỗi người nhận trong chat riêng với bot. Chỉ người đã bắt đầu bot mới nhận; người chưa bắt đầu, đã chặn bot hay đã xoá tài khoản được bỏ qua (đếm ở `skipped`).
+
+```sh
+# Theo danh sách (tối đa 10.000 user id) hoặc mọi người đã bắt đầu bot ("all": true)
+curl -s ... -d '{"all": true, "text": "*Bản mới* đã có", "parse_mode": "markdown"}' $API/messages:bulk
+# → {"ok": true, "result": {"bulk_id": 12, "state": "queued", "total": 840, "sent": 0, "skipped": 0, "failed": 0, ...}}
+curl -s -H "Authorization: Bearer $BOT_TOKEN" $API/bulk/12            # tiến độ
+curl -s -X DELETE -H "Authorization: Bearer $BOT_TOKEN" $API/bulk/12  # dừng sau lô đang gửi; tin đã gửi giữ nguyên
+```
+
+- Server gửi nền theo nhịp của tầng bot (bot mới 2 tin/giây, mặc định 10, đã xác minh 50; các lượt của cùng một bot chia nhau nhịp này) và không gửi trùng cho ai, kể cả khi server khởi động lại.
+- Số người nhận trong 24 giờ có trần theo tầng: bot mới 1.000, mặc định 10.000, đã xác minh 1.000.000, bị hạn chế 0. Vượt trần trả `429 bulk_quota`; tối đa 5 lượt chưa xong cùng lúc (`429 bulk_busy`).
+- Lượt dừng sớm khi bot bị xoá (`reason: bot_deleted`) hoặc bị hạn chế (`bot_restricted`).
+- Gửi hàng loạt không tính vào giới hạn gửi từng tin ở mục 4.

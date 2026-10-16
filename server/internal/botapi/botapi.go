@@ -35,6 +35,7 @@ import (
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botapi/format"
 	"app.local/server/internal/botapi/wire"
+	"app.local/server/internal/botbulk"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/media"
@@ -123,6 +124,8 @@ type Service struct {
 	// them. Both are set before serving (UseMedia, UseTyper).
 	media *media.Service
 	typer Typer
+	// bulk sends messages:bulk; nil answers 503 (UseBulk).
+	bulk *botbulk.Service
 
 	blockMu sync.Mutex
 	blocked map[string]time.Time
@@ -153,6 +156,10 @@ func New(cfg Config, chatSvc *chat.Service, admin *botadmin.Service, updates *bo
 	s.mux.Handle("/bot/v1/messages:unpin", s.method(http.MethodPost, s.unpin))
 	s.mux.Handle("/bot/v1/messages:sendMedia", s.method(http.MethodPost, s.sendMedia))
 	s.mux.Handle("/bot/v1/messages:sendAlbum", s.method(http.MethodPost, s.sendAlbum))
+	s.mux.Handle("/bot/v1/messages:bulk", s.method(http.MethodPost, s.sendBulk))
+	s.mux.Handle("/bot/v1/bulk/{bulk_id}", s.methods(map[string]call{
+		http.MethodGet: s.getBulk, http.MethodDelete: s.cancelBulk,
+	}))
 	s.mux.Handle("/bot/v1/files/{file_id}", s.method(http.MethodGet, s.getFile))
 	s.mux.Handle("/bot/v1/updates", s.method(http.MethodGet, s.getUpdates))
 	s.mux.Handle("/bot/v1/callbacks/{action}", s.method(http.MethodPost, s.answerCallback))

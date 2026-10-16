@@ -186,17 +186,8 @@ type BotMessage struct {
 // in private chats; the Bot API applies the bot's rate limit tier, so the
 // per-user send bucket does not apply here.
 func (s *Service) SendBotMessage(ctx context.Context, botID int64, m BotMessage) (*appv1.SendMessageResponse, error) {
-	text, ents, err := s.validateText(m.Text, m.Entities, false)
+	text, ents, err := s.CheckBotMessage(ctx, botID, m)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.checkMentions(ctx, botID, ents); err != nil {
-		return nil, err
-	}
-	if m.RandomID < 0 {
-		return nil, errInvalid("random_id must not be negative")
-	}
-	if err := s.validateBotMarkup(m.Markup); err != nil {
 		return nil, err
 	}
 	ok, err := s.liveBot(ctx, s.pool, botID)
@@ -210,6 +201,41 @@ func (s *Service) SendBotMessage(ctx context.Context, botID int64, m BotMessage)
 		chatID: m.ChatID, topicID: m.TopicID, randomID: m.RandomID, replyTo: m.ReplyTo,
 		text: text, ents: ents, noPreview: m.NoLinkPreview, markup: m.Markup,
 	})
+}
+
+// CheckBotMessage checks the content of m as SendBotMessage does, without
+// sending (a bulk send checks its message once, before it is queued), and
+// returns the normalized text and entities.
+func (s *Service) CheckBotMessage(ctx context.Context, botID int64, m BotMessage) (string, []*appv1.MessageEntity, error) {
+	text, ents, err := s.validateText(m.Text, m.Entities, false)
+	if err != nil {
+		return "", nil, err
+	}
+	if err := s.checkMentions(ctx, botID, ents); err != nil {
+		return "", nil, err
+	}
+	if m.RandomID < 0 {
+		return "", nil, errInvalid("random_id must not be negative")
+	}
+	if err := s.validateBotMarkup(m.Markup); err != nil {
+		return "", nil, err
+	}
+	return text, ents, nil
+}
+
+// BotPrivateChat returns the private chat of the bot with user, 0 when
+// there is none.
+func (s *Service) BotPrivateChat(ctx context.Context, botID, user int64) (int64, error) {
+	var chatID int64
+	err := s.pool.QueryRow(ctx, `SELECT chat_id FROM private_chats WHERE tenant_id = $1 AND user_low = $2 AND user_high = $3`,
+		s.cfg.TenantID, min(botID, user), max(botID, user)).Scan(&chatID)
+	if isNoRows(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("chat: bot private chat: %w", err)
+	}
+	return chatID, nil
 }
 
 // validateBotMarkup checks a bot keyboard: inline keyboards of callback and

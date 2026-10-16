@@ -25,6 +25,7 @@ import (
 	"app.local/server/internal/auth"
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botapi"
+	"app.local/server/internal/botbulk"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/brand"
 	"app.local/server/internal/chat"
@@ -180,6 +181,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		botAPI.UseMedia(mediaSvc)
 	}
 	botAPI.UseTyper(hub)
+	bulk := botbulk.New(st.Pool(), chatSvc, cfg.TenantID, logger.With("component", "botbulk"))
+	botAPI.UseBulk(bulk)
 	// Webhooks of bots: outbound requests through safehttp; actions in their
 	// answers run through the Bot API's own checks.
 	if err := botUpdates.EnableWebhooks(botupdates.WebhookOptions{
@@ -238,6 +241,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 			})
 		},
 	}
+	loops = append(loops, bulk.Run)
 	if assistantSvc != nil {
 		loops = append(loops, assistantSvc.Run)
 	}

@@ -387,6 +387,69 @@ paths:
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
+  /messages:bulk:
+    post:
+      tags: [messages]
+      operationId: sendBulk
+      summary: Sends one message to many users.
+      description: |
+        Queues one text message for the listed users, or for every user
+        who started the bot (`all`). Each user gets it in their private
+        chat with the bot; users without consent, who blocked the bot or
+        were deleted are skipped. The job runs in the background at the
+        bot tier's pace (new 2, default 10, verified 50, internal 200
+        messages per second, shared by the bot's jobs) and reaches each
+        user at most once, also when the server restarts. Recipients in 24 hours are capped by
+        tier (new 1,000, default 10,000, verified 1,000,000, internal
+        none, restricted 0): over the cap the request answers `429
+        bulk_quota`. A bot has at most 5 unfinished jobs (`429
+        bulk_busy`). A job stops early when the bot is deleted
+        (`bot_deleted`) or restricted (`bot_restricted`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BulkRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/BulkResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /bulk/{bulk_id}:
+    parameters:
+      - name: bulk_id
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/Id'}
+    get:
+      tags: [messages]
+      operationId: getBulk
+      summary: Progress of a bulk send.
+      responses:
+        '200': {$ref: '#/components/responses/BulkResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+    delete:
+      tags: [messages]
+      operationId: cancelBulk
+      summary: Stops a bulk send.
+      description: |
+        No new batch starts; the batch being sent (at most one second of
+        the pace) still finishes. Messages already sent stay; a finished
+        job is returned unchanged.
+      responses:
+        '200': {$ref: '#/components/responses/BulkResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /files/{file_id}:
     get:
       tags: [files]
@@ -932,6 +995,16 @@ components:
             properties:
               ok: {const: true}
               result: {$ref: '#/components/schemas/Message'}
+    BulkResult:
+      description: The bulk send.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok, result]
+            properties:
+              ok: {const: true}
+              result: {$ref: '#/components/schemas/BulkJob'}
     MessagesResult:
       description: The messages, in seq order.
       content:
@@ -1702,6 +1775,59 @@ components:
           maximum: 9007199254740991
           description: Dedupe key; 0 or absent disables dedupe.
         disable_link_preview: {type: boolean}
+    BulkRequest:
+      type: object
+      required: [text]
+      additionalProperties: false
+      description: Exactly one of user_ids and all.
+      properties:
+        user_ids:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items: {$ref: '#/components/schemas/Id'}
+          description: Duplicates are sent once.
+        all:
+          type: boolean
+          description: Every user who started the bot.
+        text:
+          type: string
+          description: Up to 4096 characters after parsing.
+        entities:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Entity'}
+          description: Exclusive with parse_mode.
+        parse_mode:
+          type: string
+          enum: [markdown, html]
+          description: See format.md.
+        reply_markup: {$ref: '#/components/schemas/ReplyMarkup'}
+        disable_link_preview: {type: boolean}
+    BulkJob:
+      type: object
+      required: [bulk_id, state, total, sent, skipped, failed, created_at]
+      properties:
+        bulk_id: {$ref: '#/components/schemas/Id'}
+        state:
+          type: string
+          enum: [queued, running, done, cancelled]
+        reason:
+          type: string
+          enum: [cancelled, bot_deleted, bot_restricted]
+          description: Why a cancelled job stopped.
+        total:
+          type: integer
+          description: Recipients when queued (for all, the users who had started the bot then).
+        sent: {type: integer}
+        skipped:
+          type: integer
+          description: No private chat or consent, blocked, deleted.
+        failed:
+          type: integer
+          description: Server errors; not retried (rate limits and outages are retried).
+        created_at: {type: integer, description: Unix seconds.}
+        finished_at: {type: integer, description: Unix seconds.}
     AnswerCallbackRequest:
       type: object
       additionalProperties: false

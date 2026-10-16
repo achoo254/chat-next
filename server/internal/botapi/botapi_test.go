@@ -13,6 +13,7 @@ import (
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/botbulk"
 	"app.local/server/internal/bottest"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/store/testdb"
@@ -26,6 +27,7 @@ type harness struct {
 	*bottest.Env
 	api   *Service
 	typer *fakeTyper
+	bulk  *botbulk.Service
 }
 
 func newHarness(t *testing.T) *harness {
@@ -46,7 +48,9 @@ func newHarnessWith(t *testing.T, o bottest.Options) *harness {
 	}
 	typer := &fakeTyper{}
 	api.UseTyper(typer)
-	return &harness{Env: env, api: api, typer: typer}
+	bulk := botbulk.New(env.Store.Pool(), env.Chat, bottest.TenantID, bottest.Quiet)
+	api.UseBulk(bulk)
+	return &harness{Env: env, api: api, typer: typer, bulk: bulk}
 }
 
 // fakeTyper records the chat actions relayed to the realtime gateway.

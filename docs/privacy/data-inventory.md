@@ -30,6 +30,7 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | Log cập nhật đồng bộ | `user_updates`, `chat_updates`, `outbox` | Partition theo ngày, xoá sau 30 ngày; của người dùng bị xoá thì xoá ngay | HĐ |
 | Bot của người dùng | `bots`, `users` (is_bot) | Dừng ngay khi bắt đầu xoá tài khoản, xoá cùng tài khoản | HĐ |
 | Góp ý gửi trợ lý | `feedback` | Tới khi xoá tài khoản | HĐ |
+| Gửi hàng loạt của bot (danh sách user id nhận, nội dung tin) | `bot_bulk_jobs` | 30 ngày sau khi job xong hoặc bị huỷ (dọn tự động); chỉ gửi cho người đã bắt đầu bot | ĐY (người nhận đã bắt đầu bot) |
 | Báo cáo đã gửi, nhật ký kiểm duyệt | `reports`, `moderation_log` (chỉ thêm) | Giữ sau khi xoá tài khoản (người báo cáo thành tài khoản đã xoá) để xử lý khiếu nại | NV |
 | Bản xuất dữ liệu (ZIP) | `/opt/chat/media/exports` (mặc định; `DATA_EXPORT_DIR`) + `data_exports` | 30 ngày sau khi xong; xoá ngay khi xoá tài khoản | HĐ |
 | Bản sao lưu DB | `/opt/chat/backups` | 14 bản hằng ngày: dữ liệu đã xoá còn trong bản sao lưu tối đa 14 ngày | NV |
