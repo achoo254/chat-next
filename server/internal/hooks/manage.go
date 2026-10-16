@@ -248,6 +248,9 @@ func (s *Service) SetIncomingHookEnabled(ctx context.Context, me int64, req *app
 		if h.State == "active" {
 			return nil
 		}
+		if h.DisabledReason == reasonByModerator {
+			return errDisabledByModerator()
+		}
 		admin, err := chat.IsChatAdmin(ctx, tx, h.ChatID, h.CreatedBy)
 		if err != nil {
 			return err
@@ -281,6 +284,9 @@ func (s *Service) TakeOverIncomingHook(ctx context.Context, me int64, req *appv1
 	var secret string
 	h, err := s.manage(ctx, me, req.GetHookId(), func(it *chat.IntegrationTx, h *hookRow) error {
 		tx := it.Tx()
+		if h.DisabledReason == reasonByModerator {
+			return errDisabledByModerator()
+		}
 		previous := h.CreatedBy
 		row, err := scanHook(tx.QueryRow(ctx, `
 			UPDATE incoming_hooks SET created_by = $2, state = 'active', disabled_reason = '', disabled_at = NULL, updated_at = now()
@@ -502,3 +508,11 @@ func (s *Service) GetIncomingHookAudit(ctx context.Context, me int64, req *appv1
 // errHookOff: the hook was turned off between authentication and the
 // delivery transaction.
 var errHookOff = errors.New("hook is not active")
+
+// reasonByModerator is the disabled_reason of a hook the moderation team
+// turned off (chat.ResolveReport); chat admins cannot turn it back on.
+const reasonByModerator = "by_moderator"
+
+func errDisabledByModerator() error {
+	return errPrecondition("disabled_by_moderator: the moderation team turned this webhook off")
+}

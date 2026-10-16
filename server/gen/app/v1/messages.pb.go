@@ -125,6 +125,8 @@ const (
 	IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN IncomingHookStopReason = 3
 	// The server turned it off (from_id 0): its creator left or was removed.
 	IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_CREATOR_LEFT IncomingHookStopReason = 4
+	// The moderation team turned it off (from_id 0).
+	IncomingHookStopReason_INCOMING_HOOK_STOP_REASON_BY_MODERATOR IncomingHookStopReason = 5
 )
 
 // Enum value maps for IncomingHookStopReason.
@@ -135,6 +137,7 @@ var (
 		2: "INCOMING_HOOK_STOP_REASON_DELETED",
 		3: "INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN",
 		4: "INCOMING_HOOK_STOP_REASON_CREATOR_LEFT",
+		5: "INCOMING_HOOK_STOP_REASON_BY_MODERATOR",
 	}
 	IncomingHookStopReason_value = map[string]int32{
 		"INCOMING_HOOK_STOP_REASON_UNSPECIFIED":       0,
@@ -142,6 +145,7 @@ var (
 		"INCOMING_HOOK_STOP_REASON_DELETED":           2,
 		"INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN": 3,
 		"INCOMING_HOOK_STOP_REASON_CREATOR_LEFT":      4,
+		"INCOMING_HOOK_STOP_REASON_BY_MODERATOR":      5,
 	}
 )
 
@@ -4938,13 +4942,14 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x13ENTITY_TYPE_HASHTAG\x10\v\x12\x13\n" +
 	"\x0fENTITY_TYPE_URL\x10\f\x12\x15\n" +
 	"\x11ENTITY_TYPE_EMAIL\x10\r\x12\x1b\n" +
-	"\x17ENTITY_TYPE_BOT_COMMAND\x10\x0e*\xef\x01\n" +
+	"\x17ENTITY_TYPE_BOT_COMMAND\x10\x0e*\x9b\x02\n" +
 	"\x16IncomingHookStopReason\x12)\n" +
 	"%INCOMING_HOOK_STOP_REASON_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"INCOMING_HOOK_STOP_REASON_DISABLED\x10\x01\x12%\n" +
 	"!INCOMING_HOOK_STOP_REASON_DELETED\x10\x02\x12/\n" +
 	"+INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN\x10\x03\x12*\n" +
-	"&INCOMING_HOOK_STOP_REASON_CREATOR_LEFT\x10\x04*\x8d\x01\n" +
+	"&INCOMING_HOOK_STOP_REASON_CREATOR_LEFT\x10\x04\x12*\n" +
+	"&INCOMING_HOOK_STOP_REASON_BY_MODERATOR\x10\x05*\x8d\x01\n" +
 	"\x10HistoryDirection\x12!\n" +
 	"\x1dHISTORY_DIRECTION_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17HISTORY_DIRECTION_OLDER\x10\x01\x12\x1b\n" +

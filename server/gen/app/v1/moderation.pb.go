@@ -82,6 +82,10 @@ const (
 	ReportTargetKind_REPORT_TARGET_KIND_USER        ReportTargetKind = 1
 	ReportTargetKind_REPORT_TARGET_KIND_CHAT        ReportTargetKind = 2
 	ReportTargetKind_REPORT_TARGET_KIND_MESSAGES    ReportTargetKind = 3
+	// A report about a bot account (filed as USER).
+	ReportTargetKind_REPORT_TARGET_KIND_BOT ReportTargetKind = 4
+	// A report about messages an incoming webhook posted (filed as MESSAGES).
+	ReportTargetKind_REPORT_TARGET_KIND_WEBHOOK ReportTargetKind = 5
 )
 
 // Enum value maps for ReportTargetKind.
@@ -91,12 +95,16 @@ var (
 		1: "REPORT_TARGET_KIND_USER",
 		2: "REPORT_TARGET_KIND_CHAT",
 		3: "REPORT_TARGET_KIND_MESSAGES",
+		4: "REPORT_TARGET_KIND_BOT",
+		5: "REPORT_TARGET_KIND_WEBHOOK",
 	}
 	ReportTargetKind_value = map[string]int32{
 		"REPORT_TARGET_KIND_UNSPECIFIED": 0,
 		"REPORT_TARGET_KIND_USER":        1,
 		"REPORT_TARGET_KIND_CHAT":        2,
 		"REPORT_TARGET_KIND_MESSAGES":    3,
+		"REPORT_TARGET_KIND_BOT":         4,
+		"REPORT_TARGET_KIND_WEBHOOK":     5,
 	}
 )
 
@@ -145,25 +153,57 @@ const (
 	ModerationAction_MODERATION_ACTION_RESTRICT_ACCOUNT ModerationAction = 4
 	// LiftRestriction (log entries only).
 	ModerationAction_MODERATION_ACTION_LIFT_RESTRICTION ModerationAction = 5
+	// The assistant bot sends the reported users (or the authors of the
+	// reported messages) the note as a warning.
+	ModerationAction_MODERATION_ACTION_WARN ModerationAction = 6
+	// WEBHOOK: turn off the hooks of the chat that posted the reported
+	// messages (GetReportResponse.hooks).
+	ModerationAction_MODERATION_ACTION_DISABLE_WEBHOOK ModerationAction = 7
+	// Log entries only: a bot moved to the restricted tier (by the automatic
+	// rule, operator_id 0), kept there or restored after review, verified or
+	// unverified, and a user's new chats with strangers stopped by the
+	// automatic rule.
+	ModerationAction_MODERATION_ACTION_RESTRICT_BOT         ModerationAction = 8
+	ModerationAction_MODERATION_ACTION_RESTORE_BOT_TIER     ModerationAction = 9
+	ModerationAction_MODERATION_ACTION_KEEP_BOT_RESTRICTED  ModerationAction = 10
+	ModerationAction_MODERATION_ACTION_VERIFY_BOT           ModerationAction = 11
+	ModerationAction_MODERATION_ACTION_UNVERIFY_BOT         ModerationAction = 12
+	ModerationAction_MODERATION_ACTION_LIMIT_STRANGER_CHATS ModerationAction = 13
 )
 
 // Enum value maps for ModerationAction.
 var (
 	ModerationAction_name = map[int32]string{
-		0: "MODERATION_ACTION_UNSPECIFIED",
-		1: "MODERATION_ACTION_DISMISS",
-		2: "MODERATION_ACTION_DELETE_MESSAGES",
-		3: "MODERATION_ACTION_BAN_FROM_CHAT",
-		4: "MODERATION_ACTION_RESTRICT_ACCOUNT",
-		5: "MODERATION_ACTION_LIFT_RESTRICTION",
+		0:  "MODERATION_ACTION_UNSPECIFIED",
+		1:  "MODERATION_ACTION_DISMISS",
+		2:  "MODERATION_ACTION_DELETE_MESSAGES",
+		3:  "MODERATION_ACTION_BAN_FROM_CHAT",
+		4:  "MODERATION_ACTION_RESTRICT_ACCOUNT",
+		5:  "MODERATION_ACTION_LIFT_RESTRICTION",
+		6:  "MODERATION_ACTION_WARN",
+		7:  "MODERATION_ACTION_DISABLE_WEBHOOK",
+		8:  "MODERATION_ACTION_RESTRICT_BOT",
+		9:  "MODERATION_ACTION_RESTORE_BOT_TIER",
+		10: "MODERATION_ACTION_KEEP_BOT_RESTRICTED",
+		11: "MODERATION_ACTION_VERIFY_BOT",
+		12: "MODERATION_ACTION_UNVERIFY_BOT",
+		13: "MODERATION_ACTION_LIMIT_STRANGER_CHATS",
 	}
 	ModerationAction_value = map[string]int32{
-		"MODERATION_ACTION_UNSPECIFIED":      0,
-		"MODERATION_ACTION_DISMISS":          1,
-		"MODERATION_ACTION_DELETE_MESSAGES":  2,
-		"MODERATION_ACTION_BAN_FROM_CHAT":    3,
-		"MODERATION_ACTION_RESTRICT_ACCOUNT": 4,
-		"MODERATION_ACTION_LIFT_RESTRICTION": 5,
+		"MODERATION_ACTION_UNSPECIFIED":          0,
+		"MODERATION_ACTION_DISMISS":              1,
+		"MODERATION_ACTION_DELETE_MESSAGES":      2,
+		"MODERATION_ACTION_BAN_FROM_CHAT":        3,
+		"MODERATION_ACTION_RESTRICT_ACCOUNT":     4,
+		"MODERATION_ACTION_LIFT_RESTRICTION":     5,
+		"MODERATION_ACTION_WARN":                 6,
+		"MODERATION_ACTION_DISABLE_WEBHOOK":      7,
+		"MODERATION_ACTION_RESTRICT_BOT":         8,
+		"MODERATION_ACTION_RESTORE_BOT_TIER":     9,
+		"MODERATION_ACTION_KEEP_BOT_RESTRICTED":  10,
+		"MODERATION_ACTION_VERIFY_BOT":           11,
+		"MODERATION_ACTION_UNVERIFY_BOT":         12,
+		"MODERATION_ACTION_LIMIT_STRANGER_CHATS": 13,
 	}
 )
 
@@ -536,8 +576,12 @@ type ModerationLogEntry struct {
 	TargetChatId int64            `protobuf:"varint,6,opt,name=target_chat_id,json=targetChatId,proto3" json:"target_chat_id,omitempty"`
 	Note         string           `protobuf:"bytes,7,opt,name=note,proto3" json:"note,omitempty"`
 	// RESTRICT_ACCOUNT: end of the restriction; 0 = until lifted.
-	Until         int64 `protobuf:"varint,8,opt,name=until,proto3" json:"until,omitempty"`
-	CreatedAt     int64 `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Until     int64 `protobuf:"varint,8,opt,name=until,proto3" json:"until,omitempty"`
+	CreatedAt int64 `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// DELETE_MESSAGES: the deleted messages of target_chat_id.
+	Seqs []int64 `protobuf:"varint,10,rep,packed,name=seqs,proto3" json:"seqs,omitempty"`
+	// DISABLE_WEBHOOK: the hook turned off, and its name.
+	HookId        string `protobuf:"bytes,11,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -633,6 +677,20 @@ func (x *ModerationLogEntry) GetCreatedAt() int64 {
 		return x.CreatedAt
 	}
 	return 0
+}
+
+func (x *ModerationLogEntry) GetSeqs() []int64 {
+	if x != nil {
+		return x.Seqs
+	}
+	return nil
+}
+
+func (x *ModerationLogEntry) GetHookId() string {
+	if x != nil {
+		return x.HookId
+	}
+	return ""
 }
 
 type AccountRestriction struct {
@@ -914,7 +972,14 @@ type GetReportResponse struct {
 	// reported messages), newest first, at most 20.
 	History []*ModerationLogEntry `protobuf:"bytes,6,rep,name=history,proto3" json:"history,omitempty"`
 	// Active restrictions of those users.
-	Restrictions  []*AccountRestriction `protobuf:"bytes,7,rep,name=restrictions,proto3" json:"restrictions,omitempty"`
+	Restrictions []*AccountRestriction `protobuf:"bytes,7,rep,name=restrictions,proto3" json:"restrictions,omitempty"`
+	// The reports about the same target with the same status as this one.
+	Group *ReportGroupSummary `protobuf:"bytes,8,opt,name=group,proto3" json:"group,omitempty"`
+	// What the reported users did lately, one entry per user.
+	Signals []*SenderSignals `protobuf:"bytes,9,rep,name=signals,proto3" json:"signals,omitempty"`
+	// WEBHOOK: the hooks of the chat whose name is the label of the reported
+	// messages, the ones DISABLE_WEBHOOK turns off.
+	Hooks         []*ModeratedHook `protobuf:"bytes,10,rep,name=hooks,proto3" json:"hooks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -998,6 +1063,1206 @@ func (x *GetReportResponse) GetRestrictions() []*AccountRestriction {
 	return nil
 }
 
+func (x *GetReportResponse) GetGroup() *ReportGroupSummary {
+	if x != nil {
+		return x.Group
+	}
+	return nil
+}
+
+func (x *GetReportResponse) GetSignals() []*SenderSignals {
+	if x != nil {
+		return x.Signals
+	}
+	return nil
+}
+
+func (x *GetReportResponse) GetHooks() []*ModeratedHook {
+	if x != nil {
+		return x.Hooks
+	}
+	return nil
+}
+
+type ReportGroupSummary struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ReportCount int32                  `protobuf:"varint,1,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	// Distinct reporters.
+	ReporterCount int32 `protobuf:"varint,2,opt,name=reporter_count,json=reporterCount,proto3" json:"reporter_count,omitempty"`
+	// Report counts by reason, the most frequent first.
+	Reasons []*ReasonCount `protobuf:"bytes,3,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	// Reporters' comments, newest first, at most 10.
+	Comments      []string `protobuf:"bytes,4,rep,name=comments,proto3" json:"comments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportGroupSummary) Reset() {
+	*x = ReportGroupSummary{}
+	mi := &file_app_v1_moderation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportGroupSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportGroupSummary) ProtoMessage() {}
+
+func (x *ReportGroupSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportGroupSummary.ProtoReflect.Descriptor instead.
+func (*ReportGroupSummary) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ReportGroupSummary) GetReportCount() int32 {
+	if x != nil {
+		return x.ReportCount
+	}
+	return 0
+}
+
+func (x *ReportGroupSummary) GetReporterCount() int32 {
+	if x != nil {
+		return x.ReporterCount
+	}
+	return 0
+}
+
+func (x *ReportGroupSummary) GetReasons() []*ReasonCount {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+func (x *ReportGroupSummary) GetComments() []string {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+type ReasonCount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reason        ReportReason           `protobuf:"varint,1,opt,name=reason,proto3,enum=app.v1.ReportReason" json:"reason,omitempty"`
+	Count         int32                  `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReasonCount) Reset() {
+	*x = ReasonCount{}
+	mi := &file_app_v1_moderation_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReasonCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReasonCount) ProtoMessage() {}
+
+func (x *ReasonCount) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReasonCount.ProtoReflect.Descriptor instead.
+func (*ReasonCount) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ReasonCount) GetReason() ReportReason {
+	if x != nil {
+		return x.Reason
+	}
+	return ReportReason_REPORT_REASON_UNSPECIFIED
+}
+
+func (x *ReasonCount) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+type SenderSignals struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Age of the chat account.
+	AccountAgeSeconds int64 `protobuf:"varint,2,opt,name=account_age_seconds,json=accountAgeSeconds,proto3" json:"account_age_seconds,omitempty"`
+	// Private chats the user started in the last 24 hours with people who do
+	// not know them (not their contact, no shared group or channel).
+	StrangerChats_24H int32 `protobuf:"varint,3,opt,name=stranger_chats_24h,json=strangerChats24h,proto3" json:"stranger_chats_24h,omitempty"`
+	// People who blocked the user.
+	BlockedBy int32 `protobuf:"varint,4,opt,name=blocked_by,json=blockedBy,proto3" json:"blocked_by,omitempty"`
+	// Groups and channels the user joined in the last 24 hours.
+	ChatsJoined_24H int32 `protobuf:"varint,5,opt,name=chats_joined_24h,json=chatsJoined24h,proto3" json:"chats_joined_24h,omitempty"`
+	// Open reports about the user other than this report's group.
+	OtherOpenReports int32 `protobuf:"varint,6,opt,name=other_open_reports,json=otherOpenReports,proto3" json:"other_open_reports,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *SenderSignals) Reset() {
+	*x = SenderSignals{}
+	mi := &file_app_v1_moderation_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SenderSignals) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SenderSignals) ProtoMessage() {}
+
+func (x *SenderSignals) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SenderSignals.ProtoReflect.Descriptor instead.
+func (*SenderSignals) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SenderSignals) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *SenderSignals) GetAccountAgeSeconds() int64 {
+	if x != nil {
+		return x.AccountAgeSeconds
+	}
+	return 0
+}
+
+func (x *SenderSignals) GetStrangerChats_24H() int32 {
+	if x != nil {
+		return x.StrangerChats_24H
+	}
+	return 0
+}
+
+func (x *SenderSignals) GetBlockedBy() int32 {
+	if x != nil {
+		return x.BlockedBy
+	}
+	return 0
+}
+
+func (x *SenderSignals) GetChatsJoined_24H() int32 {
+	if x != nil {
+		return x.ChatsJoined_24H
+	}
+	return 0
+}
+
+func (x *SenderSignals) GetOtherOpenReports() int32 {
+	if x != nil {
+		return x.OtherOpenReports
+	}
+	return 0
+}
+
+type ModeratedHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Disabled      bool                   `protobuf:"varint,3,opt,name=disabled,proto3" json:"disabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModeratedHook) Reset() {
+	*x = ModeratedHook{}
+	mi := &file_app_v1_moderation_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModeratedHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModeratedHook) ProtoMessage() {}
+
+func (x *ModeratedHook) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModeratedHook.ProtoReflect.Descriptor instead.
+func (*ModeratedHook) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ModeratedHook) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ModeratedHook) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ModeratedHook) GetDisabled() bool {
+	if x != nil {
+		return x.Disabled
+	}
+	return false
+}
+
+type ReportGroup struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The newest report of the group.
+	Report      *Report `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	ReportCount int32   `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	// The most frequent reason.
+	MainReason    ReportReason `protobuf:"varint,3,opt,name=main_reason,json=mainReason,proto3,enum=app.v1.ReportReason" json:"main_reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportGroup) Reset() {
+	*x = ReportGroup{}
+	mi := &file_app_v1_moderation_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportGroup) ProtoMessage() {}
+
+func (x *ReportGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportGroup.ProtoReflect.Descriptor instead.
+func (*ReportGroup) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ReportGroup) GetReport() *Report {
+	if x != nil {
+		return x.Report
+	}
+	return nil
+}
+
+func (x *ReportGroup) GetReportCount() int32 {
+	if x != nil {
+		return x.ReportCount
+	}
+	return 0
+}
+
+func (x *ReportGroup) GetMainReason() ReportReason {
+	if x != nil {
+		return x.MainReason
+	}
+	return ReportReason_REPORT_REASON_UNSPECIFIED
+}
+
+type GetReportGroupsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// As in GetReportsRequest.
+	Status     ReportStatus     `protobuf:"varint,1,opt,name=status,proto3,enum=app.v1.ReportStatus" json:"status,omitempty"`
+	Reason     ReportReason     `protobuf:"varint,2,opt,name=reason,proto3,enum=app.v1.ReportReason" json:"reason,omitempty"`
+	TargetKind ReportTargetKind `protobuf:"varint,3,opt,name=target_kind,json=targetKind,proto3,enum=app.v1.ReportTargetKind" json:"target_kind,omitempty"`
+	Cursor     string           `protobuf:"bytes,4,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// Default 50, at most 200.
+	Limit         int32 `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReportGroupsRequest) Reset() {
+	*x = GetReportGroupsRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReportGroupsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReportGroupsRequest) ProtoMessage() {}
+
+func (x *GetReportGroupsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReportGroupsRequest.ProtoReflect.Descriptor instead.
+func (*GetReportGroupsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetReportGroupsRequest) GetStatus() ReportStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ReportStatus_REPORT_STATUS_UNSPECIFIED
+}
+
+func (x *GetReportGroupsRequest) GetReason() ReportReason {
+	if x != nil {
+		return x.Reason
+	}
+	return ReportReason_REPORT_REASON_UNSPECIFIED
+}
+
+func (x *GetReportGroupsRequest) GetTargetKind() ReportTargetKind {
+	if x != nil {
+		return x.TargetKind
+	}
+	return ReportTargetKind_REPORT_TARGET_KIND_UNSPECIFIED
+}
+
+func (x *GetReportGroupsRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *GetReportGroupsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetReportGroupsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Groups        []*ReportGroup         `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty"`
+	Users         []*User                `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	Chats         []*Chat                `protobuf:"bytes,3,rep,name=chats,proto3" json:"chats,omitempty"`
+	NextCursor    string                 `protobuf:"bytes,4,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReportGroupsResponse) Reset() {
+	*x = GetReportGroupsResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReportGroupsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReportGroupsResponse) ProtoMessage() {}
+
+func (x *GetReportGroupsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReportGroupsResponse.ProtoReflect.Descriptor instead.
+func (*GetReportGroupsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetReportGroupsResponse) GetGroups() []*ReportGroup {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+func (x *GetReportGroupsResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *GetReportGroupsResponse) GetChats() []*Chat {
+	if x != nil {
+		return x.Chats
+	}
+	return nil
+}
+
+func (x *GetReportGroupsResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
+type GetModerationLogRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional filters: one operator (or 0 with automatic_only for the
+	// automatic rules), one action, entries since a time (Unix seconds).
+	OperatorId    int64            `protobuf:"varint,1,opt,name=operator_id,json=operatorId,proto3" json:"operator_id,omitempty"`
+	AutomaticOnly bool             `protobuf:"varint,2,opt,name=automatic_only,json=automaticOnly,proto3" json:"automatic_only,omitempty"`
+	Action        ModerationAction `protobuf:"varint,3,opt,name=action,proto3,enum=app.v1.ModerationAction" json:"action,omitempty"`
+	Since         int64            `protobuf:"varint,4,opt,name=since,proto3" json:"since,omitempty"`
+	Cursor        string           `protobuf:"bytes,5,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// Default 50, at most 500.
+	Limit         int32 `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetModerationLogRequest) Reset() {
+	*x = GetModerationLogRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetModerationLogRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetModerationLogRequest) ProtoMessage() {}
+
+func (x *GetModerationLogRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetModerationLogRequest.ProtoReflect.Descriptor instead.
+func (*GetModerationLogRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetModerationLogRequest) GetOperatorId() int64 {
+	if x != nil {
+		return x.OperatorId
+	}
+	return 0
+}
+
+func (x *GetModerationLogRequest) GetAutomaticOnly() bool {
+	if x != nil {
+		return x.AutomaticOnly
+	}
+	return false
+}
+
+func (x *GetModerationLogRequest) GetAction() ModerationAction {
+	if x != nil {
+		return x.Action
+	}
+	return ModerationAction_MODERATION_ACTION_UNSPECIFIED
+}
+
+func (x *GetModerationLogRequest) GetSince() int64 {
+	if x != nil {
+		return x.Since
+	}
+	return 0
+}
+
+func (x *GetModerationLogRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *GetModerationLogRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetModerationLogResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Entries []*ModerationLogEntry  `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	// Operators and targets of these entries.
+	Users         []*User `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	Chats         []*Chat `protobuf:"bytes,3,rep,name=chats,proto3" json:"chats,omitempty"`
+	NextCursor    string  `protobuf:"bytes,4,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetModerationLogResponse) Reset() {
+	*x = GetModerationLogResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetModerationLogResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetModerationLogResponse) ProtoMessage() {}
+
+func (x *GetModerationLogResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetModerationLogResponse.ProtoReflect.Descriptor instead.
+func (*GetModerationLogResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetModerationLogResponse) GetEntries() []*ModerationLogEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *GetModerationLogResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *GetModerationLogResponse) GetChats() []*Chat {
+	if x != nil {
+		return x.Chats
+	}
+	return nil
+}
+
+func (x *GetModerationLogResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
+// A bot as the operators review it.
+type BotReview struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	BotId     int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	OwnerId   int64                  `protobuf:"varint,2,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	CreatedAt int64                  `protobuf:"varint,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Tier      BotTier                `protobuf:"varint,4,opt,name=tier,proto3,enum=app.v1.BotTier" json:"tier,omitempty"`
+	Verified  bool                   `protobuf:"varint,5,opt,name=verified,proto3" json:"verified,omitempty"`
+	// Restricted tier: since when, why, and whether by the automatic rule.
+	RestrictedAt            int64  `protobuf:"varint,6,opt,name=restricted_at,json=restrictedAt,proto3" json:"restricted_at,omitempty"`
+	RestrictedReason        string `protobuf:"bytes,7,opt,name=restricted_reason,json=restrictedReason,proto3" json:"restricted_reason,omitempty"`
+	RestrictedAutomatically bool   `protobuf:"varint,8,opt,name=restricted_automatically,json=restrictedAutomatically,proto3" json:"restricted_automatically,omitempty"`
+	// An operator kept the restriction after review.
+	RestrictionReviewed bool `protobuf:"varint,9,opt,name=restriction_reviewed,json=restrictionReviewed,proto3" json:"restriction_reviewed,omitempty"`
+	// Users who started the bot.
+	Users int32 `protobuf:"varint,10,opt,name=users,proto3" json:"users,omitempty"`
+	// Messages the bot sent in the last 7 days.
+	Messages_7D int32 `protobuf:"varint,11,opt,name=messages_7d,json=messages7d,proto3" json:"messages_7d,omitempty"`
+	// Of the users the bot wrote to in the last 24 hours, the share (per
+	// thousand) who blocked it.
+	BlockedPermille_24H int32 `protobuf:"varint,12,opt,name=blocked_permille_24h,json=blockedPermille24h,proto3" json:"blocked_permille_24h,omitempty"`
+	OpenReports         int32 `protobuf:"varint,13,opt,name=open_reports,json=openReports,proto3" json:"open_reports,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *BotReview) Reset() {
+	*x = BotReview{}
+	mi := &file_app_v1_moderation_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BotReview) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BotReview) ProtoMessage() {}
+
+func (x *BotReview) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BotReview.ProtoReflect.Descriptor instead.
+func (*BotReview) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *BotReview) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *BotReview) GetOwnerId() int64 {
+	if x != nil {
+		return x.OwnerId
+	}
+	return 0
+}
+
+func (x *BotReview) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *BotReview) GetTier() BotTier {
+	if x != nil {
+		return x.Tier
+	}
+	return BotTier_BOT_TIER_UNSPECIFIED
+}
+
+func (x *BotReview) GetVerified() bool {
+	if x != nil {
+		return x.Verified
+	}
+	return false
+}
+
+func (x *BotReview) GetRestrictedAt() int64 {
+	if x != nil {
+		return x.RestrictedAt
+	}
+	return 0
+}
+
+func (x *BotReview) GetRestrictedReason() string {
+	if x != nil {
+		return x.RestrictedReason
+	}
+	return ""
+}
+
+func (x *BotReview) GetRestrictedAutomatically() bool {
+	if x != nil {
+		return x.RestrictedAutomatically
+	}
+	return false
+}
+
+func (x *BotReview) GetRestrictionReviewed() bool {
+	if x != nil {
+		return x.RestrictionReviewed
+	}
+	return false
+}
+
+func (x *BotReview) GetUsers() int32 {
+	if x != nil {
+		return x.Users
+	}
+	return 0
+}
+
+func (x *BotReview) GetMessages_7D() int32 {
+	if x != nil {
+		return x.Messages_7D
+	}
+	return 0
+}
+
+func (x *BotReview) GetBlockedPermille_24H() int32 {
+	if x != nil {
+		return x.BlockedPermille_24H
+	}
+	return 0
+}
+
+func (x *BotReview) GetOpenReports() int32 {
+	if x != nil {
+		return x.OpenReports
+	}
+	return 0
+}
+
+type GetBotReviewRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BotId         int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotReviewRequest) Reset() {
+	*x = GetBotReviewRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotReviewRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotReviewRequest) ProtoMessage() {}
+
+func (x *GetBotReviewRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotReviewRequest.ProtoReflect.Descriptor instead.
+func (*GetBotReviewRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetBotReviewRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+type GetBotReviewResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Review *BotReview             `protobuf:"bytes,1,opt,name=review,proto3" json:"review,omitempty"`
+	// The bot and its owner.
+	Users         []*User `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotReviewResponse) Reset() {
+	*x = GetBotReviewResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotReviewResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotReviewResponse) ProtoMessage() {}
+
+func (x *GetBotReviewResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotReviewResponse.ProtoReflect.Descriptor instead.
+func (*GetBotReviewResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetBotReviewResponse) GetReview() *BotReview {
+	if x != nil {
+		return x.Review
+	}
+	return nil
+}
+
+func (x *GetBotReviewResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type GetBotReviewsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotReviewsRequest) Reset() {
+	*x = GetBotReviewsRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotReviewsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotReviewsRequest) ProtoMessage() {}
+
+func (x *GetBotReviewsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotReviewsRequest.ProtoReflect.Descriptor instead.
+func (*GetBotReviewsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{20}
+}
+
+type GetBotReviewsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reviews       []*BotReview           `protobuf:"bytes,1,rep,name=reviews,proto3" json:"reviews,omitempty"`
+	Users         []*User                `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBotReviewsResponse) Reset() {
+	*x = GetBotReviewsResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBotReviewsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBotReviewsResponse) ProtoMessage() {}
+
+func (x *GetBotReviewsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBotReviewsResponse.ProtoReflect.Descriptor instead.
+func (*GetBotReviewsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetBotReviewsResponse) GetReviews() []*BotReview {
+	if x != nil {
+		return x.Reviews
+	}
+	return nil
+}
+
+func (x *GetBotReviewsResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type SetBotVerifiedRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	BotId    int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	Verified bool                   `protobuf:"varint,2,opt,name=verified,proto3" json:"verified,omitempty"`
+	// Why, recorded in the log; required.
+	Note          string `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBotVerifiedRequest) Reset() {
+	*x = SetBotVerifiedRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBotVerifiedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBotVerifiedRequest) ProtoMessage() {}
+
+func (x *SetBotVerifiedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBotVerifiedRequest.ProtoReflect.Descriptor instead.
+func (*SetBotVerifiedRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SetBotVerifiedRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *SetBotVerifiedRequest) GetVerified() bool {
+	if x != nil {
+		return x.Verified
+	}
+	return false
+}
+
+func (x *SetBotVerifiedRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type SetBotVerifiedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Review        *BotReview             `protobuf:"bytes,1,opt,name=review,proto3" json:"review,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBotVerifiedResponse) Reset() {
+	*x = SetBotVerifiedResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBotVerifiedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBotVerifiedResponse) ProtoMessage() {}
+
+func (x *SetBotVerifiedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBotVerifiedResponse.ProtoReflect.Descriptor instead.
+func (*SetBotVerifiedResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *SetBotVerifiedResponse) GetReview() *BotReview {
+	if x != nil {
+		return x.Review
+	}
+	return nil
+}
+
+type ReviewBotRestrictionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// true restores the bot's tier; false keeps it restricted.
+	Restore       bool   `protobuf:"varint,2,opt,name=restore,proto3" json:"restore,omitempty"`
+	Note          string `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewBotRestrictionRequest) Reset() {
+	*x = ReviewBotRestrictionRequest{}
+	mi := &file_app_v1_moderation_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewBotRestrictionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewBotRestrictionRequest) ProtoMessage() {}
+
+func (x *ReviewBotRestrictionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewBotRestrictionRequest.ProtoReflect.Descriptor instead.
+func (*ReviewBotRestrictionRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ReviewBotRestrictionRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *ReviewBotRestrictionRequest) GetRestore() bool {
+	if x != nil {
+		return x.Restore
+	}
+	return false
+}
+
+func (x *ReviewBotRestrictionRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ReviewBotRestrictionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Review        *BotReview             `protobuf:"bytes,1,opt,name=review,proto3" json:"review,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewBotRestrictionResponse) Reset() {
+	*x = ReviewBotRestrictionResponse{}
+	mi := &file_app_v1_moderation_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewBotRestrictionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewBotRestrictionResponse) ProtoMessage() {}
+
+func (x *ReviewBotRestrictionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_moderation_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewBotRestrictionResponse.ProtoReflect.Descriptor instead.
+func (*ReviewBotRestrictionResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ReviewBotRestrictionResponse) GetReview() *BotReview {
+	if x != nil {
+		return x.Review
+	}
+	return nil
+}
+
 type ResolveReportRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ReportId int64                  `protobuf:"varint,1,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
@@ -1006,13 +2271,16 @@ type ResolveReportRequest struct {
 	Note string `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
 	// RESTRICT_ACCOUNT: length in seconds, up to 366 days; 0 = until lifted.
 	RestrictSeconds int32 `protobuf:"varint,4,opt,name=restrict_seconds,json=restrictSeconds,proto3" json:"restrict_seconds,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The assistant bot also tells the reported users what was done and why
+	// (the note); WARN always does.
+	Notify        bool `protobuf:"varint,5,opt,name=notify,proto3" json:"notify,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ResolveReportRequest) Reset() {
 	*x = ResolveReportRequest{}
-	mi := &file_app_v1_moderation_proto_msgTypes[8]
+	mi := &file_app_v1_moderation_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1024,7 +2292,7 @@ func (x *ResolveReportRequest) String() string {
 func (*ResolveReportRequest) ProtoMessage() {}
 
 func (x *ResolveReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[8]
+	mi := &file_app_v1_moderation_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1037,7 +2305,7 @@ func (x *ResolveReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveReportRequest.ProtoReflect.Descriptor instead.
 func (*ResolveReportRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{8}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ResolveReportRequest) GetReportId() int64 {
@@ -1068,6 +2336,13 @@ func (x *ResolveReportRequest) GetRestrictSeconds() int32 {
 	return 0
 }
 
+func (x *ResolveReportRequest) GetNotify() bool {
+	if x != nil {
+		return x.Notify
+	}
+	return false
+}
+
 type ResolveReportResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Report        *Report                `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
@@ -1077,7 +2352,7 @@ type ResolveReportResponse struct {
 
 func (x *ResolveReportResponse) Reset() {
 	*x = ResolveReportResponse{}
-	mi := &file_app_v1_moderation_proto_msgTypes[9]
+	mi := &file_app_v1_moderation_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1089,7 +2364,7 @@ func (x *ResolveReportResponse) String() string {
 func (*ResolveReportResponse) ProtoMessage() {}
 
 func (x *ResolveReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[9]
+	mi := &file_app_v1_moderation_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1102,7 +2377,7 @@ func (x *ResolveReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveReportResponse.ProtoReflect.Descriptor instead.
 func (*ResolveReportResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{9}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ResolveReportResponse) GetReport() *Report {
@@ -1123,7 +2398,7 @@ type LiftRestrictionRequest struct {
 
 func (x *LiftRestrictionRequest) Reset() {
 	*x = LiftRestrictionRequest{}
-	mi := &file_app_v1_moderation_proto_msgTypes[10]
+	mi := &file_app_v1_moderation_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1135,7 +2410,7 @@ func (x *LiftRestrictionRequest) String() string {
 func (*LiftRestrictionRequest) ProtoMessage() {}
 
 func (x *LiftRestrictionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[10]
+	mi := &file_app_v1_moderation_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1148,7 +2423,7 @@ func (x *LiftRestrictionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LiftRestrictionRequest.ProtoReflect.Descriptor instead.
 func (*LiftRestrictionRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{10}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *LiftRestrictionRequest) GetUserId() int64 {
@@ -1173,7 +2448,7 @@ type LiftRestrictionResponse struct {
 
 func (x *LiftRestrictionResponse) Reset() {
 	*x = LiftRestrictionResponse{}
-	mi := &file_app_v1_moderation_proto_msgTypes[11]
+	mi := &file_app_v1_moderation_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1185,7 +2460,7 @@ func (x *LiftRestrictionResponse) String() string {
 func (*LiftRestrictionResponse) ProtoMessage() {}
 
 func (x *LiftRestrictionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[11]
+	mi := &file_app_v1_moderation_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1198,7 +2473,7 @@ func (x *LiftRestrictionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LiftRestrictionResponse.ProtoReflect.Descriptor instead.
 func (*LiftRestrictionResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{11}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{29}
 }
 
 // One message a user sent the assistant bot as feedback.
@@ -1223,7 +2498,7 @@ type Feedback struct {
 
 func (x *Feedback) Reset() {
 	*x = Feedback{}
-	mi := &file_app_v1_moderation_proto_msgTypes[12]
+	mi := &file_app_v1_moderation_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1235,7 +2510,7 @@ func (x *Feedback) String() string {
 func (*Feedback) ProtoMessage() {}
 
 func (x *Feedback) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[12]
+	mi := &file_app_v1_moderation_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1248,7 +2523,7 @@ func (x *Feedback) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Feedback.ProtoReflect.Descriptor instead.
 func (*Feedback) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{12}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Feedback) GetId() int64 {
@@ -1342,7 +2617,7 @@ type GetFeedbackRequest struct {
 
 func (x *GetFeedbackRequest) Reset() {
 	*x = GetFeedbackRequest{}
-	mi := &file_app_v1_moderation_proto_msgTypes[13]
+	mi := &file_app_v1_moderation_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1354,7 +2629,7 @@ func (x *GetFeedbackRequest) String() string {
 func (*GetFeedbackRequest) ProtoMessage() {}
 
 func (x *GetFeedbackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[13]
+	mi := &file_app_v1_moderation_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1367,7 +2642,7 @@ func (x *GetFeedbackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeedbackRequest.ProtoReflect.Descriptor instead.
 func (*GetFeedbackRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{13}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *GetFeedbackRequest) GetStatus() FeedbackStatus {
@@ -1404,7 +2679,7 @@ type GetFeedbackResponse struct {
 
 func (x *GetFeedbackResponse) Reset() {
 	*x = GetFeedbackResponse{}
-	mi := &file_app_v1_moderation_proto_msgTypes[14]
+	mi := &file_app_v1_moderation_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1416,7 +2691,7 @@ func (x *GetFeedbackResponse) String() string {
 func (*GetFeedbackResponse) ProtoMessage() {}
 
 func (x *GetFeedbackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[14]
+	mi := &file_app_v1_moderation_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1429,7 +2704,7 @@ func (x *GetFeedbackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeedbackResponse.ProtoReflect.Descriptor instead.
 func (*GetFeedbackResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{14}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetFeedbackResponse) GetFeedback() []*Feedback {
@@ -1462,7 +2737,7 @@ type ResolveFeedbackRequest struct {
 
 func (x *ResolveFeedbackRequest) Reset() {
 	*x = ResolveFeedbackRequest{}
-	mi := &file_app_v1_moderation_proto_msgTypes[15]
+	mi := &file_app_v1_moderation_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1474,7 +2749,7 @@ func (x *ResolveFeedbackRequest) String() string {
 func (*ResolveFeedbackRequest) ProtoMessage() {}
 
 func (x *ResolveFeedbackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[15]
+	mi := &file_app_v1_moderation_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1487,7 +2762,7 @@ func (x *ResolveFeedbackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveFeedbackRequest.ProtoReflect.Descriptor instead.
 func (*ResolveFeedbackRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{15}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ResolveFeedbackRequest) GetFeedbackId() int64 {
@@ -1506,7 +2781,7 @@ type ResolveFeedbackResponse struct {
 
 func (x *ResolveFeedbackResponse) Reset() {
 	*x = ResolveFeedbackResponse{}
-	mi := &file_app_v1_moderation_proto_msgTypes[16]
+	mi := &file_app_v1_moderation_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1518,7 +2793,7 @@ func (x *ResolveFeedbackResponse) String() string {
 func (*ResolveFeedbackResponse) ProtoMessage() {}
 
 func (x *ResolveFeedbackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[16]
+	mi := &file_app_v1_moderation_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1531,7 +2806,7 @@ func (x *ResolveFeedbackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveFeedbackResponse.ProtoReflect.Descriptor instead.
 func (*ResolveFeedbackResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{16}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ResolveFeedbackResponse) GetFeedback() *Feedback {
@@ -1552,7 +2827,7 @@ type ReplyFeedbackRequest struct {
 
 func (x *ReplyFeedbackRequest) Reset() {
 	*x = ReplyFeedbackRequest{}
-	mi := &file_app_v1_moderation_proto_msgTypes[17]
+	mi := &file_app_v1_moderation_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1564,7 +2839,7 @@ func (x *ReplyFeedbackRequest) String() string {
 func (*ReplyFeedbackRequest) ProtoMessage() {}
 
 func (x *ReplyFeedbackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[17]
+	mi := &file_app_v1_moderation_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1577,7 +2852,7 @@ func (x *ReplyFeedbackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplyFeedbackRequest.ProtoReflect.Descriptor instead.
 func (*ReplyFeedbackRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{17}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ReplyFeedbackRequest) GetFeedbackId() int64 {
@@ -1603,7 +2878,7 @@ type ReplyFeedbackResponse struct {
 
 func (x *ReplyFeedbackResponse) Reset() {
 	*x = ReplyFeedbackResponse{}
-	mi := &file_app_v1_moderation_proto_msgTypes[18]
+	mi := &file_app_v1_moderation_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1615,7 +2890,7 @@ func (x *ReplyFeedbackResponse) String() string {
 func (*ReplyFeedbackResponse) ProtoMessage() {}
 
 func (x *ReplyFeedbackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_moderation_proto_msgTypes[18]
+	mi := &file_app_v1_moderation_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1628,7 +2903,7 @@ func (x *ReplyFeedbackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplyFeedbackResponse.ProtoReflect.Descriptor instead.
 func (*ReplyFeedbackResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{18}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ReplyFeedbackResponse) GetFeedback() *Feedback {
@@ -1642,7 +2917,7 @@ var File_app_v1_moderation_proto protoreflect.FileDescriptor
 
 const file_app_v1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"\x17app/v1/moderation.proto\x12\x06app.v1\x1a\x12app/v1/chats.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\xa8\x04\n" +
+	"\x17app/v1/moderation.proto\x12\x06app.v1\x1a\x16app/v1/bot_admin.proto\x1a\x12app/v1/chats.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"\xa8\x04\n" +
 	"\x06Report\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x129\n" +
 	"\vtarget_kind\x18\x02 \x01(\x0e2\x18.app.v1.ReportTargetKindR\n" +
@@ -1669,7 +2944,7 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\afrom_id\x18\x02 \x01(\x03B\x020\x02R\x06fromId\x12\x16\n" +
 	"\x04date\x18\x03 \x01(\x03B\x020\x02R\x04date\x12\x12\n" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x18\n" +
-	"\adeleted\x18\x05 \x01(\bR\adeleted\"\xc5\x02\n" +
+	"\adeleted\x18\x05 \x01(\bR\adeleted\"\xf6\x02\n" +
 	"\x12ModerationLogEntry\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12#\n" +
 	"\voperator_id\x18\x02 \x01(\x03B\x020\x02R\n" +
@@ -1681,7 +2956,10 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\x04note\x18\a \x01(\tR\x04note\x12\x18\n" +
 	"\x05until\x18\b \x01(\x03B\x020\x02R\x05until\x12!\n" +
 	"\n" +
-	"created_at\x18\t \x01(\x03B\x020\x02R\tcreatedAt\"\x86\x01\n" +
+	"created_at\x18\t \x01(\x03B\x020\x02R\tcreatedAt\x12\x16\n" +
+	"\x04seqs\x18\n" +
+	" \x03(\x03B\x020\x02R\x04seqs\x12\x17\n" +
+	"\ahook_id\x18\v \x01(\tR\x06hookId\"\x86\x01\n" +
 	"\x12AccountRestriction\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12\x18\n" +
 	"\x05until\x18\x02 \x01(\x03B\x020\x02R\x05until\x12\x16\n" +
@@ -1702,7 +2980,7 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\vnext_cursor\x18\x04 \x01(\tR\n" +
 	"nextCursor\"3\n" +
 	"\x10GetReportRequest\x12\x1f\n" +
-	"\treport_id\x18\x01 \x01(\x03B\x020\x02R\breportId\"\xd7\x02\n" +
+	"\treport_id\x18\x01 \x01(\x03B\x020\x02R\breportId\"\xe7\x03\n" +
 	"\x11GetReportResponse\x12&\n" +
 	"\x06report\x18\x01 \x01(\v2\x0e.app.v1.ReportR\x06report\x123\n" +
 	"\bevidence\x18\x02 \x03(\v2\x17.app.v1.ReportedMessageR\bevidence\x12)\n" +
@@ -1710,12 +2988,107 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\x05users\x18\x04 \x03(\v2\f.app.v1.UserR\x05users\x12 \n" +
 	"\x04chat\x18\x05 \x01(\v2\f.app.v1.ChatR\x04chat\x124\n" +
 	"\ahistory\x18\x06 \x03(\v2\x1a.app.v1.ModerationLogEntryR\ahistory\x12>\n" +
-	"\frestrictions\x18\a \x03(\v2\x1a.app.v1.AccountRestrictionR\frestrictions\"\xaa\x01\n" +
+	"\frestrictions\x18\a \x03(\v2\x1a.app.v1.AccountRestrictionR\frestrictions\x120\n" +
+	"\x05group\x18\b \x01(\v2\x1a.app.v1.ReportGroupSummaryR\x05group\x12/\n" +
+	"\asignals\x18\t \x03(\v2\x15.app.v1.SenderSignalsR\asignals\x12+\n" +
+	"\x05hooks\x18\n" +
+	" \x03(\v2\x15.app.v1.ModeratedHookR\x05hooks\"\xa9\x01\n" +
+	"\x12ReportGroupSummary\x12!\n" +
+	"\freport_count\x18\x01 \x01(\x05R\vreportCount\x12%\n" +
+	"\x0ereporter_count\x18\x02 \x01(\x05R\rreporterCount\x12-\n" +
+	"\areasons\x18\x03 \x03(\v2\x13.app.v1.ReasonCountR\areasons\x12\x1a\n" +
+	"\bcomments\x18\x04 \x03(\tR\bcomments\"Q\n" +
+	"\vReasonCount\x12,\n" +
+	"\x06reason\x18\x01 \x01(\x0e2\x14.app.v1.ReportReasonR\x06reason\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count\"\x85\x02\n" +
+	"\rSenderSignals\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x122\n" +
+	"\x13account_age_seconds\x18\x02 \x01(\x03B\x020\x02R\x11accountAgeSeconds\x12,\n" +
+	"\x12stranger_chats_24h\x18\x03 \x01(\x05R\x10strangerChats24h\x12\x1d\n" +
+	"\n" +
+	"blocked_by\x18\x04 \x01(\x05R\tblockedBy\x12(\n" +
+	"\x10chats_joined_24h\x18\x05 \x01(\x05R\x0echatsJoined24h\x12,\n" +
+	"\x12other_open_reports\x18\x06 \x01(\x05R\x10otherOpenReports\"O\n" +
+	"\rModeratedHook\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
+	"\bdisabled\x18\x03 \x01(\bR\bdisabled\"\x8f\x01\n" +
+	"\vReportGroup\x12&\n" +
+	"\x06report\x18\x01 \x01(\v2\x0e.app.v1.ReportR\x06report\x12!\n" +
+	"\freport_count\x18\x02 \x01(\x05R\vreportCount\x125\n" +
+	"\vmain_reason\x18\x03 \x01(\x0e2\x14.app.v1.ReportReasonR\n" +
+	"mainReason\"\xdd\x01\n" +
+	"\x16GetReportGroupsRequest\x12,\n" +
+	"\x06status\x18\x01 \x01(\x0e2\x14.app.v1.ReportStatusR\x06status\x12,\n" +
+	"\x06reason\x18\x02 \x01(\x0e2\x14.app.v1.ReportReasonR\x06reason\x129\n" +
+	"\vtarget_kind\x18\x03 \x01(\x0e2\x18.app.v1.ReportTargetKindR\n" +
+	"targetKind\x12\x16\n" +
+	"\x06cursor\x18\x04 \x01(\tR\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\x05R\x05limit\"\xaf\x01\n" +
+	"\x17GetReportGroupsResponse\x12+\n" +
+	"\x06groups\x18\x01 \x03(\v2\x13.app.v1.ReportGroupR\x06groups\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\"\n" +
+	"\x05chats\x18\x03 \x03(\v2\f.app.v1.ChatR\x05chats\x12\x1f\n" +
+	"\vnext_cursor\x18\x04 \x01(\tR\n" +
+	"nextCursor\"\xdf\x01\n" +
+	"\x17GetModerationLogRequest\x12#\n" +
+	"\voperator_id\x18\x01 \x01(\x03B\x020\x02R\n" +
+	"operatorId\x12%\n" +
+	"\x0eautomatic_only\x18\x02 \x01(\bR\rautomaticOnly\x120\n" +
+	"\x06action\x18\x03 \x01(\x0e2\x18.app.v1.ModerationActionR\x06action\x12\x18\n" +
+	"\x05since\x18\x04 \x01(\x03B\x020\x02R\x05since\x12\x16\n" +
+	"\x06cursor\x18\x05 \x01(\tR\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\x05R\x05limit\"\xb9\x01\n" +
+	"\x18GetModerationLogResponse\x124\n" +
+	"\aentries\x18\x01 \x03(\v2\x1a.app.v1.ModerationLogEntryR\aentries\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\"\n" +
+	"\x05chats\x18\x03 \x03(\v2\f.app.v1.ChatR\x05chats\x12\x1f\n" +
+	"\vnext_cursor\x18\x04 \x01(\tR\n" +
+	"nextCursor\"\xf9\x03\n" +
+	"\tBotReview\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1d\n" +
+	"\bowner_id\x18\x02 \x01(\x03B\x020\x02R\aownerId\x12!\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\x03B\x020\x02R\tcreatedAt\x12#\n" +
+	"\x04tier\x18\x04 \x01(\x0e2\x0f.app.v1.BotTierR\x04tier\x12\x1a\n" +
+	"\bverified\x18\x05 \x01(\bR\bverified\x12'\n" +
+	"\rrestricted_at\x18\x06 \x01(\x03B\x020\x02R\frestrictedAt\x12+\n" +
+	"\x11restricted_reason\x18\a \x01(\tR\x10restrictedReason\x129\n" +
+	"\x18restricted_automatically\x18\b \x01(\bR\x17restrictedAutomatically\x121\n" +
+	"\x14restriction_reviewed\x18\t \x01(\bR\x13restrictionReviewed\x12\x14\n" +
+	"\x05users\x18\n" +
+	" \x01(\x05R\x05users\x12\x1f\n" +
+	"\vmessages_7d\x18\v \x01(\x05R\n" +
+	"messages7d\x120\n" +
+	"\x14blocked_permille_24h\x18\f \x01(\x05R\x12blockedPermille24h\x12!\n" +
+	"\fopen_reports\x18\r \x01(\x05R\vopenReports\"0\n" +
+	"\x13GetBotReviewRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\"e\n" +
+	"\x14GetBotReviewResponse\x12)\n" +
+	"\x06review\x18\x01 \x01(\v2\x11.app.v1.BotReviewR\x06review\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\"\x16\n" +
+	"\x14GetBotReviewsRequest\"h\n" +
+	"\x15GetBotReviewsResponse\x12+\n" +
+	"\areviews\x18\x01 \x03(\v2\x11.app.v1.BotReviewR\areviews\x12\"\n" +
+	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\"b\n" +
+	"\x15SetBotVerifiedRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1a\n" +
+	"\bverified\x18\x02 \x01(\bR\bverified\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"C\n" +
+	"\x16SetBotVerifiedResponse\x12)\n" +
+	"\x06review\x18\x01 \x01(\v2\x11.app.v1.BotReviewR\x06review\"f\n" +
+	"\x1bReviewBotRestrictionRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x18\n" +
+	"\arestore\x18\x02 \x01(\bR\arestore\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"I\n" +
+	"\x1cReviewBotRestrictionResponse\x12)\n" +
+	"\x06review\x18\x01 \x01(\v2\x11.app.v1.BotReviewR\x06review\"\xc2\x01\n" +
 	"\x14ResolveReportRequest\x12\x1f\n" +
 	"\treport_id\x18\x01 \x01(\x03B\x020\x02R\breportId\x122\n" +
 	"\aactions\x18\x02 \x03(\x0e2\x18.app.v1.ModerationActionR\aactions\x12\x12\n" +
 	"\x04note\x18\x03 \x01(\tR\x04note\x12)\n" +
-	"\x10restrict_seconds\x18\x04 \x01(\x05R\x0frestrictSeconds\"?\n" +
+	"\x10restrict_seconds\x18\x04 \x01(\x05R\x0frestrictSeconds\x12\x16\n" +
+	"\x06notify\x18\x05 \x01(\bR\x06notify\"?\n" +
 	"\x15ResolveReportResponse\x12&\n" +
 	"\x06report\x18\x01 \x01(\v2\x0e.app.v1.ReportR\x06report\"I\n" +
 	"\x16LiftRestrictionRequest\x12\x1b\n" +
@@ -1765,19 +3138,30 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\x19REPORT_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12REPORT_STATUS_OPEN\x10\x01\x12\x1a\n" +
 	"\x16REPORT_STATUS_RESOLVED\x10\x02\x12\x1b\n" +
-	"\x17REPORT_STATUS_DISMISSED\x10\x03*\x91\x01\n" +
+	"\x17REPORT_STATUS_DISMISSED\x10\x03*\xcd\x01\n" +
 	"\x10ReportTargetKind\x12\"\n" +
 	"\x1eREPORT_TARGET_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17REPORT_TARGET_KIND_USER\x10\x01\x12\x1b\n" +
 	"\x17REPORT_TARGET_KIND_CHAT\x10\x02\x12\x1f\n" +
-	"\x1bREPORT_TARGET_KIND_MESSAGES\x10\x03*\xf0\x01\n" +
+	"\x1bREPORT_TARGET_KIND_MESSAGES\x10\x03\x12\x1a\n" +
+	"\x16REPORT_TARGET_KIND_BOT\x10\x04\x12\x1e\n" +
+	"\x1aREPORT_TARGET_KIND_WEBHOOK\x10\x05*\x9c\x04\n" +
 	"\x10ModerationAction\x12!\n" +
 	"\x1dMODERATION_ACTION_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19MODERATION_ACTION_DISMISS\x10\x01\x12%\n" +
 	"!MODERATION_ACTION_DELETE_MESSAGES\x10\x02\x12#\n" +
 	"\x1fMODERATION_ACTION_BAN_FROM_CHAT\x10\x03\x12&\n" +
 	"\"MODERATION_ACTION_RESTRICT_ACCOUNT\x10\x04\x12&\n" +
-	"\"MODERATION_ACTION_LIFT_RESTRICTION\x10\x05*h\n" +
+	"\"MODERATION_ACTION_LIFT_RESTRICTION\x10\x05\x12\x1a\n" +
+	"\x16MODERATION_ACTION_WARN\x10\x06\x12%\n" +
+	"!MODERATION_ACTION_DISABLE_WEBHOOK\x10\a\x12\"\n" +
+	"\x1eMODERATION_ACTION_RESTRICT_BOT\x10\b\x12&\n" +
+	"\"MODERATION_ACTION_RESTORE_BOT_TIER\x10\t\x12)\n" +
+	"%MODERATION_ACTION_KEEP_BOT_RESTRICTED\x10\n" +
+	"\x12 \n" +
+	"\x1cMODERATION_ACTION_VERIFY_BOT\x10\v\x12\"\n" +
+	"\x1eMODERATION_ACTION_UNVERIFY_BOT\x10\f\x12*\n" +
+	"&MODERATION_ACTION_LIMIT_STRANGER_CHATS\x10\r*h\n" +
 	"\x0eFeedbackStatus\x12\x1f\n" +
 	"\x1bFEEDBACK_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14FEEDBACK_STATUS_OPEN\x10\x01\x12\x1b\n" +
@@ -1785,7 +3169,7 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\fFeedbackKind\x12\x1d\n" +
 	"\x19FEEDBACK_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12FEEDBACK_KIND_IDEA\x10\x01\x12\x15\n" +
-	"\x11FEEDBACK_KIND_BUG\x10\x022\xa6\x04\n" +
+	"\x11FEEDBACK_KIND_BUG\x10\x022\x9e\b\n" +
 	"\x11ModerationService\x12C\n" +
 	"\n" +
 	"GetReports\x12\x19.app.v1.GetReportsRequest\x1a\x1a.app.v1.GetReportsResponse\x12@\n" +
@@ -1794,7 +3178,13 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\x0fLiftRestriction\x12\x1e.app.v1.LiftRestrictionRequest\x1a\x1f.app.v1.LiftRestrictionResponse\x12F\n" +
 	"\vGetFeedback\x12\x1a.app.v1.GetFeedbackRequest\x1a\x1b.app.v1.GetFeedbackResponse\x12R\n" +
 	"\x0fResolveFeedback\x12\x1e.app.v1.ResolveFeedbackRequest\x1a\x1f.app.v1.ResolveFeedbackResponse\x12L\n" +
-	"\rReplyFeedback\x12\x1c.app.v1.ReplyFeedbackRequest\x1a\x1d.app.v1.ReplyFeedbackResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\rReplyFeedback\x12\x1c.app.v1.ReplyFeedbackRequest\x1a\x1d.app.v1.ReplyFeedbackResponse\x12R\n" +
+	"\x0fGetReportGroups\x12\x1e.app.v1.GetReportGroupsRequest\x1a\x1f.app.v1.GetReportGroupsResponse\x12U\n" +
+	"\x10GetModerationLog\x12\x1f.app.v1.GetModerationLogRequest\x1a .app.v1.GetModerationLogResponse\x12I\n" +
+	"\fGetBotReview\x12\x1b.app.v1.GetBotReviewRequest\x1a\x1c.app.v1.GetBotReviewResponse\x12L\n" +
+	"\rGetBotReviews\x12\x1c.app.v1.GetBotReviewsRequest\x1a\x1d.app.v1.GetBotReviewsResponse\x12O\n" +
+	"\x0eSetBotVerified\x12\x1d.app.v1.SetBotVerifiedRequest\x1a\x1e.app.v1.SetBotVerifiedResponse\x12a\n" +
+	"\x14ReviewBotRestriction\x12#.app.v1.ReviewBotRestrictionRequest\x1a$.app.v1.ReviewBotRestrictionResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_moderation_proto_rawDescOnce sync.Once
@@ -1809,84 +3199,139 @@ func file_app_v1_moderation_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_app_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_app_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_app_v1_moderation_proto_goTypes = []any{
-	(ReportStatus)(0),               // 0: app.v1.ReportStatus
-	(ReportTargetKind)(0),           // 1: app.v1.ReportTargetKind
-	(ModerationAction)(0),           // 2: app.v1.ModerationAction
-	(FeedbackStatus)(0),             // 3: app.v1.FeedbackStatus
-	(FeedbackKind)(0),               // 4: app.v1.FeedbackKind
-	(*Report)(nil),                  // 5: app.v1.Report
-	(*ReportedMessage)(nil),         // 6: app.v1.ReportedMessage
-	(*ModerationLogEntry)(nil),      // 7: app.v1.ModerationLogEntry
-	(*AccountRestriction)(nil),      // 8: app.v1.AccountRestriction
-	(*GetReportsRequest)(nil),       // 9: app.v1.GetReportsRequest
-	(*GetReportsResponse)(nil),      // 10: app.v1.GetReportsResponse
-	(*GetReportRequest)(nil),        // 11: app.v1.GetReportRequest
-	(*GetReportResponse)(nil),       // 12: app.v1.GetReportResponse
-	(*ResolveReportRequest)(nil),    // 13: app.v1.ResolveReportRequest
-	(*ResolveReportResponse)(nil),   // 14: app.v1.ResolveReportResponse
-	(*LiftRestrictionRequest)(nil),  // 15: app.v1.LiftRestrictionRequest
-	(*LiftRestrictionResponse)(nil), // 16: app.v1.LiftRestrictionResponse
-	(*Feedback)(nil),                // 17: app.v1.Feedback
-	(*GetFeedbackRequest)(nil),      // 18: app.v1.GetFeedbackRequest
-	(*GetFeedbackResponse)(nil),     // 19: app.v1.GetFeedbackResponse
-	(*ResolveFeedbackRequest)(nil),  // 20: app.v1.ResolveFeedbackRequest
-	(*ResolveFeedbackResponse)(nil), // 21: app.v1.ResolveFeedbackResponse
-	(*ReplyFeedbackRequest)(nil),    // 22: app.v1.ReplyFeedbackRequest
-	(*ReplyFeedbackResponse)(nil),   // 23: app.v1.ReplyFeedbackResponse
-	(ReportReason)(0),               // 24: app.v1.ReportReason
-	(*User)(nil),                    // 25: app.v1.User
-	(*Chat)(nil),                    // 26: app.v1.Chat
-	(*Message)(nil),                 // 27: app.v1.Message
+	(ReportStatus)(0),                    // 0: app.v1.ReportStatus
+	(ReportTargetKind)(0),                // 1: app.v1.ReportTargetKind
+	(ModerationAction)(0),                // 2: app.v1.ModerationAction
+	(FeedbackStatus)(0),                  // 3: app.v1.FeedbackStatus
+	(FeedbackKind)(0),                    // 4: app.v1.FeedbackKind
+	(*Report)(nil),                       // 5: app.v1.Report
+	(*ReportedMessage)(nil),              // 6: app.v1.ReportedMessage
+	(*ModerationLogEntry)(nil),           // 7: app.v1.ModerationLogEntry
+	(*AccountRestriction)(nil),           // 8: app.v1.AccountRestriction
+	(*GetReportsRequest)(nil),            // 9: app.v1.GetReportsRequest
+	(*GetReportsResponse)(nil),           // 10: app.v1.GetReportsResponse
+	(*GetReportRequest)(nil),             // 11: app.v1.GetReportRequest
+	(*GetReportResponse)(nil),            // 12: app.v1.GetReportResponse
+	(*ReportGroupSummary)(nil),           // 13: app.v1.ReportGroupSummary
+	(*ReasonCount)(nil),                  // 14: app.v1.ReasonCount
+	(*SenderSignals)(nil),                // 15: app.v1.SenderSignals
+	(*ModeratedHook)(nil),                // 16: app.v1.ModeratedHook
+	(*ReportGroup)(nil),                  // 17: app.v1.ReportGroup
+	(*GetReportGroupsRequest)(nil),       // 18: app.v1.GetReportGroupsRequest
+	(*GetReportGroupsResponse)(nil),      // 19: app.v1.GetReportGroupsResponse
+	(*GetModerationLogRequest)(nil),      // 20: app.v1.GetModerationLogRequest
+	(*GetModerationLogResponse)(nil),     // 21: app.v1.GetModerationLogResponse
+	(*BotReview)(nil),                    // 22: app.v1.BotReview
+	(*GetBotReviewRequest)(nil),          // 23: app.v1.GetBotReviewRequest
+	(*GetBotReviewResponse)(nil),         // 24: app.v1.GetBotReviewResponse
+	(*GetBotReviewsRequest)(nil),         // 25: app.v1.GetBotReviewsRequest
+	(*GetBotReviewsResponse)(nil),        // 26: app.v1.GetBotReviewsResponse
+	(*SetBotVerifiedRequest)(nil),        // 27: app.v1.SetBotVerifiedRequest
+	(*SetBotVerifiedResponse)(nil),       // 28: app.v1.SetBotVerifiedResponse
+	(*ReviewBotRestrictionRequest)(nil),  // 29: app.v1.ReviewBotRestrictionRequest
+	(*ReviewBotRestrictionResponse)(nil), // 30: app.v1.ReviewBotRestrictionResponse
+	(*ResolveReportRequest)(nil),         // 31: app.v1.ResolveReportRequest
+	(*ResolveReportResponse)(nil),        // 32: app.v1.ResolveReportResponse
+	(*LiftRestrictionRequest)(nil),       // 33: app.v1.LiftRestrictionRequest
+	(*LiftRestrictionResponse)(nil),      // 34: app.v1.LiftRestrictionResponse
+	(*Feedback)(nil),                     // 35: app.v1.Feedback
+	(*GetFeedbackRequest)(nil),           // 36: app.v1.GetFeedbackRequest
+	(*GetFeedbackResponse)(nil),          // 37: app.v1.GetFeedbackResponse
+	(*ResolveFeedbackRequest)(nil),       // 38: app.v1.ResolveFeedbackRequest
+	(*ResolveFeedbackResponse)(nil),      // 39: app.v1.ResolveFeedbackResponse
+	(*ReplyFeedbackRequest)(nil),         // 40: app.v1.ReplyFeedbackRequest
+	(*ReplyFeedbackResponse)(nil),        // 41: app.v1.ReplyFeedbackResponse
+	(ReportReason)(0),                    // 42: app.v1.ReportReason
+	(*User)(nil),                         // 43: app.v1.User
+	(*Chat)(nil),                         // 44: app.v1.Chat
+	(*Message)(nil),                      // 45: app.v1.Message
+	(BotTier)(0),                         // 46: app.v1.BotTier
 }
 var file_app_v1_moderation_proto_depIdxs = []int32{
 	1,  // 0: app.v1.Report.target_kind:type_name -> app.v1.ReportTargetKind
-	24, // 1: app.v1.Report.reason:type_name -> app.v1.ReportReason
+	42, // 1: app.v1.Report.reason:type_name -> app.v1.ReportReason
 	0,  // 2: app.v1.Report.status:type_name -> app.v1.ReportStatus
 	2,  // 3: app.v1.Report.actions:type_name -> app.v1.ModerationAction
 	2,  // 4: app.v1.ModerationLogEntry.action:type_name -> app.v1.ModerationAction
 	0,  // 5: app.v1.GetReportsRequest.status:type_name -> app.v1.ReportStatus
-	24, // 6: app.v1.GetReportsRequest.reason:type_name -> app.v1.ReportReason
+	42, // 6: app.v1.GetReportsRequest.reason:type_name -> app.v1.ReportReason
 	1,  // 7: app.v1.GetReportsRequest.target_kind:type_name -> app.v1.ReportTargetKind
 	5,  // 8: app.v1.GetReportsResponse.reports:type_name -> app.v1.Report
-	25, // 9: app.v1.GetReportsResponse.users:type_name -> app.v1.User
-	26, // 10: app.v1.GetReportsResponse.chats:type_name -> app.v1.Chat
+	43, // 9: app.v1.GetReportsResponse.users:type_name -> app.v1.User
+	44, // 10: app.v1.GetReportsResponse.chats:type_name -> app.v1.Chat
 	5,  // 11: app.v1.GetReportResponse.report:type_name -> app.v1.Report
 	6,  // 12: app.v1.GetReportResponse.evidence:type_name -> app.v1.ReportedMessage
-	27, // 13: app.v1.GetReportResponse.context:type_name -> app.v1.Message
-	25, // 14: app.v1.GetReportResponse.users:type_name -> app.v1.User
-	26, // 15: app.v1.GetReportResponse.chat:type_name -> app.v1.Chat
+	45, // 13: app.v1.GetReportResponse.context:type_name -> app.v1.Message
+	43, // 14: app.v1.GetReportResponse.users:type_name -> app.v1.User
+	44, // 15: app.v1.GetReportResponse.chat:type_name -> app.v1.Chat
 	7,  // 16: app.v1.GetReportResponse.history:type_name -> app.v1.ModerationLogEntry
 	8,  // 17: app.v1.GetReportResponse.restrictions:type_name -> app.v1.AccountRestriction
-	2,  // 18: app.v1.ResolveReportRequest.actions:type_name -> app.v1.ModerationAction
-	5,  // 19: app.v1.ResolveReportResponse.report:type_name -> app.v1.Report
-	4,  // 20: app.v1.Feedback.kind:type_name -> app.v1.FeedbackKind
-	3,  // 21: app.v1.Feedback.status:type_name -> app.v1.FeedbackStatus
-	3,  // 22: app.v1.GetFeedbackRequest.status:type_name -> app.v1.FeedbackStatus
-	17, // 23: app.v1.GetFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	25, // 24: app.v1.GetFeedbackResponse.users:type_name -> app.v1.User
-	17, // 25: app.v1.ResolveFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	17, // 26: app.v1.ReplyFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	9,  // 27: app.v1.ModerationService.GetReports:input_type -> app.v1.GetReportsRequest
-	11, // 28: app.v1.ModerationService.GetReport:input_type -> app.v1.GetReportRequest
-	13, // 29: app.v1.ModerationService.ResolveReport:input_type -> app.v1.ResolveReportRequest
-	15, // 30: app.v1.ModerationService.LiftRestriction:input_type -> app.v1.LiftRestrictionRequest
-	18, // 31: app.v1.ModerationService.GetFeedback:input_type -> app.v1.GetFeedbackRequest
-	20, // 32: app.v1.ModerationService.ResolveFeedback:input_type -> app.v1.ResolveFeedbackRequest
-	22, // 33: app.v1.ModerationService.ReplyFeedback:input_type -> app.v1.ReplyFeedbackRequest
-	10, // 34: app.v1.ModerationService.GetReports:output_type -> app.v1.GetReportsResponse
-	12, // 35: app.v1.ModerationService.GetReport:output_type -> app.v1.GetReportResponse
-	14, // 36: app.v1.ModerationService.ResolveReport:output_type -> app.v1.ResolveReportResponse
-	16, // 37: app.v1.ModerationService.LiftRestriction:output_type -> app.v1.LiftRestrictionResponse
-	19, // 38: app.v1.ModerationService.GetFeedback:output_type -> app.v1.GetFeedbackResponse
-	21, // 39: app.v1.ModerationService.ResolveFeedback:output_type -> app.v1.ResolveFeedbackResponse
-	23, // 40: app.v1.ModerationService.ReplyFeedback:output_type -> app.v1.ReplyFeedbackResponse
-	34, // [34:41] is the sub-list for method output_type
-	27, // [27:34] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	13, // 18: app.v1.GetReportResponse.group:type_name -> app.v1.ReportGroupSummary
+	15, // 19: app.v1.GetReportResponse.signals:type_name -> app.v1.SenderSignals
+	16, // 20: app.v1.GetReportResponse.hooks:type_name -> app.v1.ModeratedHook
+	14, // 21: app.v1.ReportGroupSummary.reasons:type_name -> app.v1.ReasonCount
+	42, // 22: app.v1.ReasonCount.reason:type_name -> app.v1.ReportReason
+	5,  // 23: app.v1.ReportGroup.report:type_name -> app.v1.Report
+	42, // 24: app.v1.ReportGroup.main_reason:type_name -> app.v1.ReportReason
+	0,  // 25: app.v1.GetReportGroupsRequest.status:type_name -> app.v1.ReportStatus
+	42, // 26: app.v1.GetReportGroupsRequest.reason:type_name -> app.v1.ReportReason
+	1,  // 27: app.v1.GetReportGroupsRequest.target_kind:type_name -> app.v1.ReportTargetKind
+	17, // 28: app.v1.GetReportGroupsResponse.groups:type_name -> app.v1.ReportGroup
+	43, // 29: app.v1.GetReportGroupsResponse.users:type_name -> app.v1.User
+	44, // 30: app.v1.GetReportGroupsResponse.chats:type_name -> app.v1.Chat
+	2,  // 31: app.v1.GetModerationLogRequest.action:type_name -> app.v1.ModerationAction
+	7,  // 32: app.v1.GetModerationLogResponse.entries:type_name -> app.v1.ModerationLogEntry
+	43, // 33: app.v1.GetModerationLogResponse.users:type_name -> app.v1.User
+	44, // 34: app.v1.GetModerationLogResponse.chats:type_name -> app.v1.Chat
+	46, // 35: app.v1.BotReview.tier:type_name -> app.v1.BotTier
+	22, // 36: app.v1.GetBotReviewResponse.review:type_name -> app.v1.BotReview
+	43, // 37: app.v1.GetBotReviewResponse.users:type_name -> app.v1.User
+	22, // 38: app.v1.GetBotReviewsResponse.reviews:type_name -> app.v1.BotReview
+	43, // 39: app.v1.GetBotReviewsResponse.users:type_name -> app.v1.User
+	22, // 40: app.v1.SetBotVerifiedResponse.review:type_name -> app.v1.BotReview
+	22, // 41: app.v1.ReviewBotRestrictionResponse.review:type_name -> app.v1.BotReview
+	2,  // 42: app.v1.ResolveReportRequest.actions:type_name -> app.v1.ModerationAction
+	5,  // 43: app.v1.ResolveReportResponse.report:type_name -> app.v1.Report
+	4,  // 44: app.v1.Feedback.kind:type_name -> app.v1.FeedbackKind
+	3,  // 45: app.v1.Feedback.status:type_name -> app.v1.FeedbackStatus
+	3,  // 46: app.v1.GetFeedbackRequest.status:type_name -> app.v1.FeedbackStatus
+	35, // 47: app.v1.GetFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	43, // 48: app.v1.GetFeedbackResponse.users:type_name -> app.v1.User
+	35, // 49: app.v1.ResolveFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	35, // 50: app.v1.ReplyFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	9,  // 51: app.v1.ModerationService.GetReports:input_type -> app.v1.GetReportsRequest
+	11, // 52: app.v1.ModerationService.GetReport:input_type -> app.v1.GetReportRequest
+	31, // 53: app.v1.ModerationService.ResolveReport:input_type -> app.v1.ResolveReportRequest
+	33, // 54: app.v1.ModerationService.LiftRestriction:input_type -> app.v1.LiftRestrictionRequest
+	36, // 55: app.v1.ModerationService.GetFeedback:input_type -> app.v1.GetFeedbackRequest
+	38, // 56: app.v1.ModerationService.ResolveFeedback:input_type -> app.v1.ResolveFeedbackRequest
+	40, // 57: app.v1.ModerationService.ReplyFeedback:input_type -> app.v1.ReplyFeedbackRequest
+	18, // 58: app.v1.ModerationService.GetReportGroups:input_type -> app.v1.GetReportGroupsRequest
+	20, // 59: app.v1.ModerationService.GetModerationLog:input_type -> app.v1.GetModerationLogRequest
+	23, // 60: app.v1.ModerationService.GetBotReview:input_type -> app.v1.GetBotReviewRequest
+	25, // 61: app.v1.ModerationService.GetBotReviews:input_type -> app.v1.GetBotReviewsRequest
+	27, // 62: app.v1.ModerationService.SetBotVerified:input_type -> app.v1.SetBotVerifiedRequest
+	29, // 63: app.v1.ModerationService.ReviewBotRestriction:input_type -> app.v1.ReviewBotRestrictionRequest
+	10, // 64: app.v1.ModerationService.GetReports:output_type -> app.v1.GetReportsResponse
+	12, // 65: app.v1.ModerationService.GetReport:output_type -> app.v1.GetReportResponse
+	32, // 66: app.v1.ModerationService.ResolveReport:output_type -> app.v1.ResolveReportResponse
+	34, // 67: app.v1.ModerationService.LiftRestriction:output_type -> app.v1.LiftRestrictionResponse
+	37, // 68: app.v1.ModerationService.GetFeedback:output_type -> app.v1.GetFeedbackResponse
+	39, // 69: app.v1.ModerationService.ResolveFeedback:output_type -> app.v1.ResolveFeedbackResponse
+	41, // 70: app.v1.ModerationService.ReplyFeedback:output_type -> app.v1.ReplyFeedbackResponse
+	19, // 71: app.v1.ModerationService.GetReportGroups:output_type -> app.v1.GetReportGroupsResponse
+	21, // 72: app.v1.ModerationService.GetModerationLog:output_type -> app.v1.GetModerationLogResponse
+	24, // 73: app.v1.ModerationService.GetBotReview:output_type -> app.v1.GetBotReviewResponse
+	26, // 74: app.v1.ModerationService.GetBotReviews:output_type -> app.v1.GetBotReviewsResponse
+	28, // 75: app.v1.ModerationService.SetBotVerified:output_type -> app.v1.SetBotVerifiedResponse
+	30, // 76: app.v1.ModerationService.ReviewBotRestriction:output_type -> app.v1.ReviewBotRestrictionResponse
+	64, // [64:77] is the sub-list for method output_type
+	51, // [51:64] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_moderation_proto_init() }
@@ -1894,6 +3339,7 @@ func file_app_v1_moderation_proto_init() {
 	if File_app_v1_moderation_proto != nil {
 		return
 	}
+	file_app_v1_bot_admin_proto_init()
 	file_app_v1_chats_proto_init()
 	file_app_v1_messages_proto_init()
 	file_app_v1_users_proto_init()
@@ -1903,7 +3349,7 @@ func file_app_v1_moderation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_moderation_proto_rawDesc), len(file_app_v1_moderation_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   19,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -54,6 +54,24 @@ const (
 	// ModerationServiceReplyFeedbackProcedure is the fully-qualified name of the ModerationService's
 	// ReplyFeedback RPC.
 	ModerationServiceReplyFeedbackProcedure = "/app.v1.ModerationService/ReplyFeedback"
+	// ModerationServiceGetReportGroupsProcedure is the fully-qualified name of the ModerationService's
+	// GetReportGroups RPC.
+	ModerationServiceGetReportGroupsProcedure = "/app.v1.ModerationService/GetReportGroups"
+	// ModerationServiceGetModerationLogProcedure is the fully-qualified name of the ModerationService's
+	// GetModerationLog RPC.
+	ModerationServiceGetModerationLogProcedure = "/app.v1.ModerationService/GetModerationLog"
+	// ModerationServiceGetBotReviewProcedure is the fully-qualified name of the ModerationService's
+	// GetBotReview RPC.
+	ModerationServiceGetBotReviewProcedure = "/app.v1.ModerationService/GetBotReview"
+	// ModerationServiceGetBotReviewsProcedure is the fully-qualified name of the ModerationService's
+	// GetBotReviews RPC.
+	ModerationServiceGetBotReviewsProcedure = "/app.v1.ModerationService/GetBotReviews"
+	// ModerationServiceSetBotVerifiedProcedure is the fully-qualified name of the ModerationService's
+	// SetBotVerified RPC.
+	ModerationServiceSetBotVerifiedProcedure = "/app.v1.ModerationService/SetBotVerified"
+	// ModerationServiceReviewBotRestrictionProcedure is the fully-qualified name of the
+	// ModerationService's ReviewBotRestriction RPC.
+	ModerationServiceReviewBotRestrictionProcedure = "/app.v1.ModerationService/ReviewBotRestriction"
 )
 
 // ModerationServiceClient is a client for the app.v1.ModerationService service.
@@ -63,7 +81,8 @@ type ModerationServiceClient interface {
 	// One report with the reported messages as filed, the messages around
 	// them as they are now, and earlier actions on the reported user.
 	GetReport(context.Context, *connect.Request[v1.GetReportRequest]) (*connect.Response[v1.GetReportResponse], error)
-	// Closes an open report with one or more actions; a closed report gives
+	// Closes an open report, and every other open report about the same
+	// target, with one or more actions; a closed report gives
 	// failed_precondition.
 	ResolveReport(context.Context, *connect.Request[v1.ResolveReportRequest]) (*connect.Response[v1.ResolveReportResponse], error)
 	// Ends an account restriction before its time.
@@ -78,6 +97,22 @@ type ModerationServiceClient interface {
 	// reply to their message) and marks the item handled. One answer per
 	// item: a second gives failed_precondition "already_replied".
 	ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error)
+	// Reports grouped by target (the same user, chat, or messages), the
+	// groups with the most reports first; each group carries its newest
+	// report. ResolveReport on that report closes the whole open group.
+	GetReportGroups(context.Context, *connect.Request[v1.GetReportGroupsRequest]) (*connect.Response[v1.GetReportGroupsResponse], error)
+	// The tenant's moderation log, newest first, including the automatic
+	// rules (operator_id 0).
+	GetModerationLog(context.Context, *connect.Request[v1.GetModerationLogRequest]) (*connect.Response[v1.GetModerationLogResponse], error)
+	// What an operator needs to judge a bot: tier, verification, automatic
+	// restriction and usage.
+	GetBotReview(context.Context, *connect.Request[v1.GetBotReviewRequest]) (*connect.Response[v1.GetBotReviewResponse], error)
+	// Bots the automatic rule restricted that no operator has reviewed yet.
+	GetBotReviews(context.Context, *connect.Request[v1.GetBotReviewsRequest]) (*connect.Response[v1.GetBotReviewsResponse], error)
+	// Grants or revokes a bot's verified badge (and its higher tier).
+	SetBotVerified(context.Context, *connect.Request[v1.SetBotVerifiedRequest]) (*connect.Response[v1.SetBotVerifiedResponse], error)
+	// Keeps a restricted bot restricted, or restores its previous tier.
+	ReviewBotRestriction(context.Context, *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error)
 }
 
 // NewModerationServiceClient constructs a client for the app.v1.ModerationService service. By
@@ -133,18 +168,60 @@ func NewModerationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(moderationServiceMethods.ByName("ReplyFeedback")),
 			connect.WithClientOptions(opts...),
 		),
+		getReportGroups: connect.NewClient[v1.GetReportGroupsRequest, v1.GetReportGroupsResponse](
+			httpClient,
+			baseURL+ModerationServiceGetReportGroupsProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("GetReportGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		getModerationLog: connect.NewClient[v1.GetModerationLogRequest, v1.GetModerationLogResponse](
+			httpClient,
+			baseURL+ModerationServiceGetModerationLogProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("GetModerationLog")),
+			connect.WithClientOptions(opts...),
+		),
+		getBotReview: connect.NewClient[v1.GetBotReviewRequest, v1.GetBotReviewResponse](
+			httpClient,
+			baseURL+ModerationServiceGetBotReviewProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("GetBotReview")),
+			connect.WithClientOptions(opts...),
+		),
+		getBotReviews: connect.NewClient[v1.GetBotReviewsRequest, v1.GetBotReviewsResponse](
+			httpClient,
+			baseURL+ModerationServiceGetBotReviewsProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("GetBotReviews")),
+			connect.WithClientOptions(opts...),
+		),
+		setBotVerified: connect.NewClient[v1.SetBotVerifiedRequest, v1.SetBotVerifiedResponse](
+			httpClient,
+			baseURL+ModerationServiceSetBotVerifiedProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("SetBotVerified")),
+			connect.WithClientOptions(opts...),
+		),
+		reviewBotRestriction: connect.NewClient[v1.ReviewBotRestrictionRequest, v1.ReviewBotRestrictionResponse](
+			httpClient,
+			baseURL+ModerationServiceReviewBotRestrictionProcedure,
+			connect.WithSchema(moderationServiceMethods.ByName("ReviewBotRestriction")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // moderationServiceClient implements ModerationServiceClient.
 type moderationServiceClient struct {
-	getReports      *connect.Client[v1.GetReportsRequest, v1.GetReportsResponse]
-	getReport       *connect.Client[v1.GetReportRequest, v1.GetReportResponse]
-	resolveReport   *connect.Client[v1.ResolveReportRequest, v1.ResolveReportResponse]
-	liftRestriction *connect.Client[v1.LiftRestrictionRequest, v1.LiftRestrictionResponse]
-	getFeedback     *connect.Client[v1.GetFeedbackRequest, v1.GetFeedbackResponse]
-	resolveFeedback *connect.Client[v1.ResolveFeedbackRequest, v1.ResolveFeedbackResponse]
-	replyFeedback   *connect.Client[v1.ReplyFeedbackRequest, v1.ReplyFeedbackResponse]
+	getReports           *connect.Client[v1.GetReportsRequest, v1.GetReportsResponse]
+	getReport            *connect.Client[v1.GetReportRequest, v1.GetReportResponse]
+	resolveReport        *connect.Client[v1.ResolveReportRequest, v1.ResolveReportResponse]
+	liftRestriction      *connect.Client[v1.LiftRestrictionRequest, v1.LiftRestrictionResponse]
+	getFeedback          *connect.Client[v1.GetFeedbackRequest, v1.GetFeedbackResponse]
+	resolveFeedback      *connect.Client[v1.ResolveFeedbackRequest, v1.ResolveFeedbackResponse]
+	replyFeedback        *connect.Client[v1.ReplyFeedbackRequest, v1.ReplyFeedbackResponse]
+	getReportGroups      *connect.Client[v1.GetReportGroupsRequest, v1.GetReportGroupsResponse]
+	getModerationLog     *connect.Client[v1.GetModerationLogRequest, v1.GetModerationLogResponse]
+	getBotReview         *connect.Client[v1.GetBotReviewRequest, v1.GetBotReviewResponse]
+	getBotReviews        *connect.Client[v1.GetBotReviewsRequest, v1.GetBotReviewsResponse]
+	setBotVerified       *connect.Client[v1.SetBotVerifiedRequest, v1.SetBotVerifiedResponse]
+	reviewBotRestriction *connect.Client[v1.ReviewBotRestrictionRequest, v1.ReviewBotRestrictionResponse]
 }
 
 // GetReports calls app.v1.ModerationService.GetReports.
@@ -182,6 +259,36 @@ func (c *moderationServiceClient) ReplyFeedback(ctx context.Context, req *connec
 	return c.replyFeedback.CallUnary(ctx, req)
 }
 
+// GetReportGroups calls app.v1.ModerationService.GetReportGroups.
+func (c *moderationServiceClient) GetReportGroups(ctx context.Context, req *connect.Request[v1.GetReportGroupsRequest]) (*connect.Response[v1.GetReportGroupsResponse], error) {
+	return c.getReportGroups.CallUnary(ctx, req)
+}
+
+// GetModerationLog calls app.v1.ModerationService.GetModerationLog.
+func (c *moderationServiceClient) GetModerationLog(ctx context.Context, req *connect.Request[v1.GetModerationLogRequest]) (*connect.Response[v1.GetModerationLogResponse], error) {
+	return c.getModerationLog.CallUnary(ctx, req)
+}
+
+// GetBotReview calls app.v1.ModerationService.GetBotReview.
+func (c *moderationServiceClient) GetBotReview(ctx context.Context, req *connect.Request[v1.GetBotReviewRequest]) (*connect.Response[v1.GetBotReviewResponse], error) {
+	return c.getBotReview.CallUnary(ctx, req)
+}
+
+// GetBotReviews calls app.v1.ModerationService.GetBotReviews.
+func (c *moderationServiceClient) GetBotReviews(ctx context.Context, req *connect.Request[v1.GetBotReviewsRequest]) (*connect.Response[v1.GetBotReviewsResponse], error) {
+	return c.getBotReviews.CallUnary(ctx, req)
+}
+
+// SetBotVerified calls app.v1.ModerationService.SetBotVerified.
+func (c *moderationServiceClient) SetBotVerified(ctx context.Context, req *connect.Request[v1.SetBotVerifiedRequest]) (*connect.Response[v1.SetBotVerifiedResponse], error) {
+	return c.setBotVerified.CallUnary(ctx, req)
+}
+
+// ReviewBotRestriction calls app.v1.ModerationService.ReviewBotRestriction.
+func (c *moderationServiceClient) ReviewBotRestriction(ctx context.Context, req *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error) {
+	return c.reviewBotRestriction.CallUnary(ctx, req)
+}
+
 // ModerationServiceHandler is an implementation of the app.v1.ModerationService service.
 type ModerationServiceHandler interface {
 	// Reports, newest first.
@@ -189,7 +296,8 @@ type ModerationServiceHandler interface {
 	// One report with the reported messages as filed, the messages around
 	// them as they are now, and earlier actions on the reported user.
 	GetReport(context.Context, *connect.Request[v1.GetReportRequest]) (*connect.Response[v1.GetReportResponse], error)
-	// Closes an open report with one or more actions; a closed report gives
+	// Closes an open report, and every other open report about the same
+	// target, with one or more actions; a closed report gives
 	// failed_precondition.
 	ResolveReport(context.Context, *connect.Request[v1.ResolveReportRequest]) (*connect.Response[v1.ResolveReportResponse], error)
 	// Ends an account restriction before its time.
@@ -204,6 +312,22 @@ type ModerationServiceHandler interface {
 	// reply to their message) and marks the item handled. One answer per
 	// item: a second gives failed_precondition "already_replied".
 	ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error)
+	// Reports grouped by target (the same user, chat, or messages), the
+	// groups with the most reports first; each group carries its newest
+	// report. ResolveReport on that report closes the whole open group.
+	GetReportGroups(context.Context, *connect.Request[v1.GetReportGroupsRequest]) (*connect.Response[v1.GetReportGroupsResponse], error)
+	// The tenant's moderation log, newest first, including the automatic
+	// rules (operator_id 0).
+	GetModerationLog(context.Context, *connect.Request[v1.GetModerationLogRequest]) (*connect.Response[v1.GetModerationLogResponse], error)
+	// What an operator needs to judge a bot: tier, verification, automatic
+	// restriction and usage.
+	GetBotReview(context.Context, *connect.Request[v1.GetBotReviewRequest]) (*connect.Response[v1.GetBotReviewResponse], error)
+	// Bots the automatic rule restricted that no operator has reviewed yet.
+	GetBotReviews(context.Context, *connect.Request[v1.GetBotReviewsRequest]) (*connect.Response[v1.GetBotReviewsResponse], error)
+	// Grants or revokes a bot's verified badge (and its higher tier).
+	SetBotVerified(context.Context, *connect.Request[v1.SetBotVerifiedRequest]) (*connect.Response[v1.SetBotVerifiedResponse], error)
+	// Keeps a restricted bot restricted, or restores its previous tier.
+	ReviewBotRestriction(context.Context, *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error)
 }
 
 // NewModerationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -255,6 +379,42 @@ func NewModerationServiceHandler(svc ModerationServiceHandler, opts ...connect.H
 		connect.WithSchema(moderationServiceMethods.ByName("ReplyFeedback")),
 		connect.WithHandlerOptions(opts...),
 	)
+	moderationServiceGetReportGroupsHandler := connect.NewUnaryHandler(
+		ModerationServiceGetReportGroupsProcedure,
+		svc.GetReportGroups,
+		connect.WithSchema(moderationServiceMethods.ByName("GetReportGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceGetModerationLogHandler := connect.NewUnaryHandler(
+		ModerationServiceGetModerationLogProcedure,
+		svc.GetModerationLog,
+		connect.WithSchema(moderationServiceMethods.ByName("GetModerationLog")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceGetBotReviewHandler := connect.NewUnaryHandler(
+		ModerationServiceGetBotReviewProcedure,
+		svc.GetBotReview,
+		connect.WithSchema(moderationServiceMethods.ByName("GetBotReview")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceGetBotReviewsHandler := connect.NewUnaryHandler(
+		ModerationServiceGetBotReviewsProcedure,
+		svc.GetBotReviews,
+		connect.WithSchema(moderationServiceMethods.ByName("GetBotReviews")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceSetBotVerifiedHandler := connect.NewUnaryHandler(
+		ModerationServiceSetBotVerifiedProcedure,
+		svc.SetBotVerified,
+		connect.WithSchema(moderationServiceMethods.ByName("SetBotVerified")),
+		connect.WithHandlerOptions(opts...),
+	)
+	moderationServiceReviewBotRestrictionHandler := connect.NewUnaryHandler(
+		ModerationServiceReviewBotRestrictionProcedure,
+		svc.ReviewBotRestriction,
+		connect.WithSchema(moderationServiceMethods.ByName("ReviewBotRestriction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.ModerationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModerationServiceGetReportsProcedure:
@@ -271,6 +431,18 @@ func NewModerationServiceHandler(svc ModerationServiceHandler, opts ...connect.H
 			moderationServiceResolveFeedbackHandler.ServeHTTP(w, r)
 		case ModerationServiceReplyFeedbackProcedure:
 			moderationServiceReplyFeedbackHandler.ServeHTTP(w, r)
+		case ModerationServiceGetReportGroupsProcedure:
+			moderationServiceGetReportGroupsHandler.ServeHTTP(w, r)
+		case ModerationServiceGetModerationLogProcedure:
+			moderationServiceGetModerationLogHandler.ServeHTTP(w, r)
+		case ModerationServiceGetBotReviewProcedure:
+			moderationServiceGetBotReviewHandler.ServeHTTP(w, r)
+		case ModerationServiceGetBotReviewsProcedure:
+			moderationServiceGetBotReviewsHandler.ServeHTTP(w, r)
+		case ModerationServiceSetBotVerifiedProcedure:
+			moderationServiceSetBotVerifiedHandler.ServeHTTP(w, r)
+		case ModerationServiceReviewBotRestrictionProcedure:
+			moderationServiceReviewBotRestrictionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -306,4 +478,28 @@ func (UnimplementedModerationServiceHandler) ResolveFeedback(context.Context, *c
 
 func (UnimplementedModerationServiceHandler) ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.ReplyFeedback is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) GetReportGroups(context.Context, *connect.Request[v1.GetReportGroupsRequest]) (*connect.Response[v1.GetReportGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.GetReportGroups is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) GetModerationLog(context.Context, *connect.Request[v1.GetModerationLogRequest]) (*connect.Response[v1.GetModerationLogResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.GetModerationLog is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) GetBotReview(context.Context, *connect.Request[v1.GetBotReviewRequest]) (*connect.Response[v1.GetBotReviewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.GetBotReview is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) GetBotReviews(context.Context, *connect.Request[v1.GetBotReviewsRequest]) (*connect.Response[v1.GetBotReviewsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.GetBotReviews is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) SetBotVerified(context.Context, *connect.Request[v1.SetBotVerifiedRequest]) (*connect.Response[v1.SetBotVerifiedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.SetBotVerified is not implemented"))
+}
+
+func (UnimplementedModerationServiceHandler) ReviewBotRestriction(context.Context, *connect.Request[v1.ReviewBotRestrictionRequest]) (*connect.Response[v1.ReviewBotRestrictionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ModerationService.ReviewBotRestriction is not implemented"))
 }

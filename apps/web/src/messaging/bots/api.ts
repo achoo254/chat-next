@@ -45,7 +45,7 @@ export interface OwnBot {
 	readonly tier: BotTierName;
 }
 
-export type BotTierName = "default" | "verified" | "internal";
+export type BotTierName = "new" | "default" | "verified" | "internal" | "restricted";
 
 /** Update kinds a bot can receive; "reaction" only when listed. */
 export type UpdateKind = "message" | "message_edited" | "channel_post" | "callback" | "member_changed" | "reaction";

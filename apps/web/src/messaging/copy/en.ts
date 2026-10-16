@@ -19,6 +19,8 @@ export const en: MessagingCopy = {
 		failed: "That did not work. Try again in a few minutes.",
 		privateRefused: "You cannot message this person right now.",
 		privateRefusedInviteHint: "You can invite them to a group with an invite link.",
+		strangerLimit: "You have started many chats with people you do not know today. Try again later, or ask them to add you to their contacts.",
+		strangerPaused: "For now you cannot start chats with people you do not know: the moderation team is reviewing your account.",
 		loadFailed: "Could not load data. Check your connection and try again.",
 		loading: "Loading…",
 	},
@@ -189,6 +191,8 @@ export const en: MessagingCopy = {
 					return `The webhook “${name}” turned off because its creator is no longer an admin`;
 				case "creator_left":
 					return `The webhook “${name}” turned off because its creator left the ${kind(channel)}`;
+				case "by_moderator":
+					return `The moderation team turned off webhook “${name}”`;
 				case "unknown":
 					return `The webhook “${name}” turned off`;
 			}

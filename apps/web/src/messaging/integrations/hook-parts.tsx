@@ -83,7 +83,9 @@ export function stateView(hook: Hook, nowSeconds: number, t: HooksCopy, channel:
 			sub: hook.disabledReason === "creator_left" ? t.stateSub.creatorLeft(channel) : t.stateSub.creatorNotAdmin,
 		};
 	}
-	if (hook.state === "disabled") return { label: t.state.disabled, tone: "off", sub: t.stateSub.byAdmin };
+	if (hook.state === "disabled") {
+		return { label: t.state.disabled, tone: "off", sub: hook.disabledReason === "by_moderator" ? t.stateSub.byModerator : t.stateSub.byAdmin };
+	}
 	const grace = hook.previousSecretExpiresAt - nowSeconds;
 	if (grace > 0) return { label: t.state.rotating, tone: "warn", sub: t.stateSub.oldUrl(roughly(grace, t)) };
 	return { label: t.state.active, tone: "ok", sub: hook.silent ? t.stateSub.silent : "" };

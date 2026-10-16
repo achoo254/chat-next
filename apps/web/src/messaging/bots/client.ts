@@ -22,6 +22,7 @@ import {
 	type BotDelivery,
 	type BotErrorKind,
 	type BotInfo,
+	type BotTierName,
 	type Bots,
 	type BotWebhook,
 	type ChatMenus,
@@ -43,6 +44,14 @@ const WIRE_SCOPES: Record<CommandScope, WireScope> = {
 	private: WireScope.PRIVATE,
 	group: WireScope.GROUP,
 	group_admin: WireScope.GROUP_ADMIN,
+};
+
+const TIERS: Partial<Record<BotTier, BotTierName>> = {
+	[BotTier.NEW]: "new",
+	[BotTier.DEFAULT]: "default",
+	[BotTier.VERIFIED]: "verified",
+	[BotTier.INTERNAL]: "internal",
+	[BotTier.RESTRICTED]: "restricted",
 };
 
 function toCommand(command: WireCommand): BotCommand {
@@ -75,7 +84,7 @@ export function toOwnBot(bot: WireBot | undefined, method: string): OwnBot {
 		tokenIssuedAt: assertSafeId(bot.tokenIssuedAt),
 		lastUpdateAt: assertSafeId(bot.lastUpdateAt),
 		webhook: bot.webhook,
-		tier: bot.tier === BotTier.INTERNAL ? "internal" : bot.tier === BotTier.VERIFIED ? "verified" : "default",
+		tier: TIERS[bot.tier] ?? "default",
 	};
 }
 

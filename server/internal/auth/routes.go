@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/sealbox"
 	"app.local/server/internal/store"
 	"golang.org/x/oauth2"
@@ -45,6 +46,12 @@ type RoutesConfig struct {
 	PublicOrigin string // e.g. https://chat.hoandat.com
 	SessionKey   []byte
 	Logger       *slog.Logger
+	// Limiter and the Signups* caps limit the chat accounts first sign-ins
+	// create, per client address in an hour and per tenant in ten minutes;
+	// a nil Limiter or a 0 cap turns that limit off.
+	Limiter          ratelimit.Limiter
+	SignupsPerIPHour int
+	SignupsPer10Min  int
 }
 
 // Routes serves /auth/login, /auth/callback, /auth/logout and
@@ -162,14 +169,19 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := tokens.Claims
-	user, err := h.cfg.Store.UpsertIdPUser(ctx, h.cfg.TenantID, c.idpProfile())
+	ip := ClientIP(r.RemoteAddr, r.Header)
+	user, err := h.cfg.Store.UpsertIdPUserAdmitting(ctx, h.cfg.TenantID, c.idpProfile(), func() bool { return h.admitSignup(ip) })
+	if errors.Is(err, store.ErrSignupLimited) {
+		fail(http.StatusTooManyRequests, msgSignupLimited, "new account limit", nil)
+		return
+	}
 	if err != nil {
 		fail(http.StatusInternalServerError, msgSignInFailed, "upsert user", err)
 		return
 	}
 	token, sessionID, err := h.cfg.Sessions.Create(ctx, NewSessionData{
 		UserID: user.ID, IdPSID: c.SessionID, RefreshToken: tokens.RefreshToken, IDToken: tokens.IDToken,
-		UserAgent: r.UserAgent(), IP: ClientIP(r.RemoteAddr, r.Header), AuthTime: c.AuthTime,
+		UserAgent: r.UserAgent(), IP: ip, AuthTime: c.AuthTime,
 	})
 	if err != nil {
 		fail(http.StatusInternalServerError, msgSignInFailed, "create session", err)
@@ -292,4 +304,30 @@ func ClientIP(remoteAddr string, h http.Header) string {
 		}
 	}
 	return peer.Unmap().String()
+}
+
+// admitSignup takes one new-account token of ip and of the tenant.
+func (h *Routes) admitSignup(ip string) bool {
+	if h.cfg.Limiter == nil {
+		return true
+	}
+	if n := float64(h.cfg.SignupsPerIPHour); n > 0 && !h.cfg.Limiter.Allow(ratelimit.Rule{Rate: n / 3600, Burst: n}, "signup-ip:"+signupNetwork(ip)) {
+		return false
+	}
+	n := float64(h.cfg.SignupsPer10Min)
+	return n == 0 || h.cfg.Limiter.Allow(ratelimit.Rule{Rate: n / 600, Burst: n}, "signup-tenant")
+}
+
+// signupNetwork is the address the per-address sign-up limit counts: an
+// IPv6 address by its /64 (one subscriber gets a whole /64), IPv4 as is.
+func signupNetwork(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.Is4() {
+		return ip
+	}
+	prefix, err := addr.Prefix(64)
+	if err != nil {
+		return ip
+	}
+	return prefix.String()
 }

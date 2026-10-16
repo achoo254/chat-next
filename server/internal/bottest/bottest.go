@@ -202,6 +202,11 @@ func (e *Env) Bot(owner int64, username string) (int64, string) {
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	// Tests run on the default tier: the bot is older than the new tier's 14 days.
+	if _, err := e.Store.Pool().Exec(ctx, `UPDATE bots SET created_at = now() - interval '30 days' WHERE user_id = $1`,
+		bot.GetUser().GetId()); err != nil {
+		e.T.Fatal(err)
+	}
 	_, token, err := e.Admin.ResetBotToken(ctx, owner, time.Now(), bot.GetUser().GetId())
 	if err != nil {
 		e.T.Fatal(err)

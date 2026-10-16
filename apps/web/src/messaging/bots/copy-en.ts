@@ -209,9 +209,11 @@ export const enBots: BotsCopy = {
 		deadHint: "Failed 10 times",
 		tierTitle: "Rate limit tier",
 		tierBody: {
+			new: "Bot younger than 14 days: up to 10 calls and 5 messages per second, 1 per second into one chat (bursts of 10).",
 			default: "Up to 30 calls and 30 messages per second, 1 message per second into one chat (bursts of 20).",
 			verified: "Verified bot: up to 100 calls and 100 messages per second, 5 per second into one chat.",
 			internal: "Internal bot: up to 500 calls and 500 messages per second, 20 per second into one chat.",
+			restricted: "Restricted because many people blocked or reported it: up to 5 calls and 1 message per second, one message every 5 seconds into one chat.",
 		},
 		tierNote: "The operations team sets the tier in the moderation tool.",
 	},

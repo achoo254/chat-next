@@ -32,6 +32,7 @@ export const viHooks = {
 		creatorNotAdmin: "Người tạo không còn là admin",
 		creatorLeft: (channel: boolean): string => `Người tạo đã rời ${kind(channel)}`,
 		byAdmin: "Admin đã tắt",
+		byModerator: "Đội kiểm duyệt đã tắt",
 		silent: "Gửi im lặng",
 		oldUrl: (left: string) => `URL cũ hết hạn sau ${left}`,
 	},
@@ -97,6 +98,7 @@ export const viHooks = {
 		autoDisabledBanner: (creator: string, when: string, left: boolean, channel: boolean): string =>
 			`Webhook đã tự tắt vì ${creator} ${left ? `đã rời ${kind(channel)}` : `không còn là admin ${kind(channel)}`} (${when}). Request tới URL này đang bị từ chối.`,
 		disabledBanner: (when: string) => `Webhook đang tắt từ ${when}. Request tới URL này bị từ chối cho tới khi bật lại.`,
+		moderatorBanner: (when: string) => `Đội kiểm duyệt đã tắt webhook này lúc ${when}. Admin không bật lại hay nhận lại được.`,
 		takeOver: "Nhận lại webhook",
 		takeOverNote: "Bạn thành người tạo mới; webhook chạy lại ngay với định dạng và cài đặt cũ.",
 		rotateOnTakeOver: "Xoay secret khi nhận lại",
@@ -221,7 +223,7 @@ export const viHooks = {
 				case "previous_secret_revoked":
 					return `${actor} đã thu hồi secret cũ của ${hook}`;
 				case "disabled":
-					return `${actor} đã tắt ${hook}`;
+					return detail === "by_moderator" ? `Đội kiểm duyệt đã tắt ${hook}` : `${actor} đã tắt ${hook}`;
 				case "enabled":
 					return `${actor} đã bật ${hook}`;
 				case "auto_disabled":

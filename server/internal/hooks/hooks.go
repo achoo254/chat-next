@@ -177,6 +177,7 @@ var (
 		"by_admin":          appv1.IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_BY_ADMIN,
 		"creator_not_admin": appv1.IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN,
 		"creator_left":      appv1.IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT,
+		"by_moderator":      appv1.IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR,
 	}
 	auditActionOf = map[string]appv1.IncomingHookAuditAction{
 		"created":                 appv1.IncomingHookAuditAction_INCOMING_HOOK_AUDIT_ACTION_CREATED,

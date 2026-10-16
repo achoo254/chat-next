@@ -244,7 +244,7 @@ export interface ForwardHeader {
  * Why an incoming webhook stopped: an admin turned it off or deleted it, or
  * the server turned it off because its creator lost admin rights or left.
  */
-export type HookStopReason = "disabled" | "deleted" | "creator_not_admin" | "creator_left" | "unknown";
+export type HookStopReason = "disabled" | "deleted" | "creator_not_admin" | "creator_left" | "by_moderator" | "unknown";
 
 /** System message shown inline in the history. */
 export type MessageAction =

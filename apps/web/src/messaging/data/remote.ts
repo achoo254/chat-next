@@ -180,9 +180,28 @@ export interface Reactor {
 export type MuteFor = number | "forever";
 
 export type ReportStatus = "open" | "resolved" | "dismissed";
-export type ReportKind = "user" | "chat" | "messages";
-/** What an operator can do with a report (ModerationService.ResolveReport). */
-export type ModerationAction = "dismiss" | "delete_messages" | "ban_from_chat" | "restrict_account" | "lift_restriction";
+export type ReportKind = "user" | "bot" | "chat" | "messages" | "webhook";
+/**
+ * What an operator does with a report (ModerationService.ResolveReport), and
+ * what the moderation log records besides: lifted restrictions, bot reviews
+ * and the automatic rules.
+ */
+export type ModerationAction =
+	| "dismiss"
+	| "delete_messages"
+	| "ban_from_chat"
+	| "restrict_account"
+	| "warn"
+	| "disable_webhook"
+	| "lift_restriction"
+	| "restrict_bot"
+	| "restore_bot_tier"
+	| "keep_bot_restricted"
+	| "verify_bot"
+	| "unverify_bot"
+	| "limit_stranger_chats";
+/** The actions ResolveReport takes. */
+export type ResolveAction = Extract<ModerationAction, "dismiss" | "delete_messages" | "ban_from_chat" | "restrict_account" | "warn" | "disable_webhook">;
 
 /** A chat as the moderation screens name it. */
 export interface ChatBrief {
@@ -235,8 +254,15 @@ export interface FeedbackPage {
 	readonly nextCursor: string;
 }
 
-export interface ReportsPage {
-	readonly reports: readonly ModerationReport[];
+/** The reports about one target, with its newest report. */
+export interface ReportGroup {
+	readonly report: ModerationReport;
+	readonly count: number;
+	readonly mainReason: ReportReason;
+}
+
+export interface ReportGroupsPage {
+	readonly groups: readonly ReportGroup[];
 	readonly people: ReadonlyMap<number, Person>;
 	readonly chats: ReadonlyMap<number, ChatBrief>;
 	readonly nextCursor: string;
@@ -250,15 +276,71 @@ export interface ContextMessage {
 	readonly text: string;
 }
 
+/** One entry of the moderation log; operatorId 0 is an automatic rule. */
 export interface ModerationEntry {
 	readonly id: number;
 	readonly operatorId: number;
+	readonly reportId: number;
 	readonly action: ModerationAction;
 	readonly targetUserId: number;
+	readonly targetChatId: number;
+	readonly seqs: readonly number[];
+	/** disable_webhook: the hook turned off. */
+	readonly hookId: string;
 	readonly note: string;
 	/** Restrictions: when it ends; 0 = until lifted. */
 	readonly until: number;
 	readonly createdAt: number;
+}
+
+export interface ModerationLogFilter {
+	/** "auto": the automatic rules; a number: one operator. */
+	readonly actor: "all" | "auto" | number;
+	readonly action: ModerationAction | "all";
+	/** Unix seconds; 0 = any time. */
+	readonly since: number;
+}
+
+export interface ModerationLogPage {
+	readonly entries: readonly ModerationEntry[];
+	readonly people: ReadonlyMap<number, Person>;
+	readonly chats: ReadonlyMap<number, ChatBrief>;
+	readonly nextCursor: string;
+}
+
+/** What a reported user did lately (GetReport). */
+export interface SenderSignals {
+	readonly userId: number;
+	readonly accountAgeSeconds: number;
+	readonly strangerChats24h: number;
+	readonly blockedBy: number;
+	readonly chatsJoined24h: number;
+	readonly otherOpenReports: number;
+}
+
+export type BotTierName = "new" | "default" | "verified" | "internal" | "restricted";
+
+/** A bot as the operators review it. */
+export interface BotReview {
+	readonly botId: number;
+	readonly ownerId: number;
+	readonly createdAt: number;
+	readonly tier: BotTierName;
+	readonly verified: boolean;
+	/** Restricted tier: since when (0 = not restricted), why, by the rule or an operator, reviewed. */
+	readonly restrictedAt: number;
+	readonly restrictedReason: string;
+	readonly restrictedAutomatically: boolean;
+	readonly restrictionReviewed: boolean;
+	readonly users: number;
+	readonly messages7d: number;
+	readonly blockedPermille24h: number;
+	readonly openReports: number;
+}
+
+export interface BotReviews {
+	readonly reviews: readonly BotReview[];
+	readonly people: ReadonlyMap<number, Person>;
 }
 
 export interface Restriction {
@@ -278,6 +360,16 @@ export interface ReportDetail {
 	readonly chat: ChatBrief | null;
 	readonly history: readonly ModerationEntry[];
 	readonly restrictions: readonly Restriction[];
+	/** The reports about the same target with the same status. */
+	readonly group: {
+		readonly reportCount: number;
+		readonly reporterCount: number;
+		readonly reasons: readonly { readonly reason: ReportReason; readonly count: number }[];
+		readonly comments: readonly string[];
+	};
+	readonly signals: readonly SenderSignals[];
+	/** Webhook reports: the hooks "disable webhook" turns off. */
+	readonly hooks: readonly { readonly id: string; readonly name: string; readonly disabled: boolean }[];
 }
 
 /** Who to add to the contact list: a user you can see, an exact username or an exact email. */
@@ -360,12 +452,19 @@ export interface Remote {
 	/** Who reacted to a message, newest first; `emoji` "" lists every reaction. */
 	reactions(chatId: number, seq: number, emoji: string, cursor?: string): Promise<Page<Reactor>>;
 	blockedUsers(cursor?: string): Promise<Page<BlockedPerson>>;
-	moderationReports(status: ReportStatus, cursor?: string): Promise<ReportsPage>;
+	moderationGroups(status: ReportStatus, cursor?: string): Promise<ReportGroupsPage>;
 	moderationReport(reportId: number): Promise<ReportDetail>;
 	/** `restrictSeconds` 0 restricts until lifted (restrict_account only). */
-	resolveReport(reportId: number, actions: readonly ModerationAction[], note: string, restrictSeconds: number): Promise<ModerationReport>;
+	/** notify: the assistant bot tells the reported users (warn always does). */
+	resolveReport(reportId: number, actions: readonly ResolveAction[], note: string, restrictSeconds: number, notify: boolean): Promise<ModerationReport>;
 	liftRestriction(userId: number, note: string): Promise<void>;
 	moderationFeedback(status: FeedbackStatus, cursor?: string): Promise<FeedbackPage>;
+	moderationLog(filter: ModerationLogFilter, cursor?: string, limit?: number): Promise<ModerationLogPage>;
+	botReview(botId: number): Promise<BotReviews>;
+	/** Bots the automatic rule restricted that no operator reviewed yet. */
+	botReviews(): Promise<BotReviews>;
+	setBotVerified(botId: number, verified: boolean, note: string): Promise<BotReview>;
+	reviewBotRestriction(botId: number, restore: boolean, note: string): Promise<BotReview>;
 	resolveFeedback(feedbackId: number): Promise<FeedbackItem>;
 	/** FailedPrecondition "already_replied…" for an item already answered. */
 	replyFeedback(feedbackId: number, text: string): Promise<FeedbackItem>;
@@ -419,11 +518,16 @@ const METHODS = [
 	"commonChats",
 	"reactions",
 	"blockedUsers",
-	"moderationReports",
+	"moderationGroups",
 	"moderationReport",
 	"resolveReport",
 	"liftRestriction",
 	"moderationFeedback",
+	"moderationLog",
+	"botReview",
+	"botReviews",
+	"setBotVerified",
+	"reviewBotRestriction",
 	"resolveFeedback",
 	"replyFeedback",
 ] as const satisfies readonly (keyof Remote)[];

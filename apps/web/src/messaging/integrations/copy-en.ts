@@ -28,6 +28,7 @@ export const enHooks: HooksCopy = {
 	stateSub: {
 		creatorNotAdmin: "Its creator is no longer an admin",
 		creatorLeft: (channel) => `Its creator left the ${kind(channel)}`,
+		byModerator: "Turned off by the moderation team",
 		byAdmin: "Turned off by an admin",
 		silent: "Sends silently",
 		oldUrl: (left) => `Old URL expires in ${left}`,
@@ -94,6 +95,7 @@ export const enHooks: HooksCopy = {
 		autoDisabledBanner: (creator, when, left, channel) =>
 			`The webhook turned off because ${creator} ${left ? `left the ${kind(channel)}` : `is no longer an admin of the ${kind(channel)}`} (${when}). Requests to its URL are refused.`,
 		disabledBanner: (when) => `The webhook has been off since ${when}. Requests to its URL are refused until it is turned on.`,
+		moderatorBanner: (when) => `The moderation team turned this webhook off at ${when}. Admins cannot turn it back on or take it over.`,
 		takeOver: "Take over webhook",
 		takeOverNote: "You become its creator; the webhook runs again at once with its format and settings.",
 		rotateOnTakeOver: "Rotate the secret when taking over",
@@ -218,7 +220,7 @@ export const enHooks: HooksCopy = {
 				case "previous_secret_revoked":
 					return `${actor} revoked the old secret of ${hook}`;
 				case "disabled":
-					return `${actor} turned off ${hook}`;
+					return detail === "by_moderator" ? `The moderation team turned off ${hook}` : `${actor} turned off ${hook}`;
 				case "enabled":
 					return `${actor} turned on ${hook}`;
 				case "auto_disabled":

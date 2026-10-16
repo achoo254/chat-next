@@ -40,6 +40,7 @@ const REASONS: Partial<Record<WireReason, HookDisabledReason>> = {
 	[WireReason.BY_ADMIN]: "by_admin",
 	[WireReason.CREATOR_NOT_ADMIN]: "creator_not_admin",
 	[WireReason.CREATOR_LEFT]: "creator_left",
+	[WireReason.BY_MODERATOR]: "by_moderator",
 };
 
 const ACTIONS: Partial<Record<WireAction, HookAuditAction>> = {

@@ -110,6 +110,7 @@ func CleanReturnTo(raw string) string {
 const (
 	msgSignInFailed   = "Không hoàn tất được đăng nhập. Vui lòng thử lại."
 	msgIdPUnavailable = "Máy chủ đăng nhập đang tạm thời không phản hồi. Vui lòng thử lại sau ít phút."
+	msgSignupLimited  = "Vừa có quá nhiều tài khoản mới được tạo từ mạng của bạn. Vui lòng thử lại sau ít phút."
 )
 
 func writeErrorPage(w http.ResponseWriter, status int, message, locale, returnTo string) {

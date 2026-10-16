@@ -141,7 +141,7 @@ function parseForward(json: string | null): ForwardHeader | null {
 	};
 }
 
-const HOOK_STOP_REASONS: readonly HookStopReason[] = ["disabled", "deleted", "creator_not_admin", "creator_left", "unknown"];
+const HOOK_STOP_REASONS: readonly HookStopReason[] = ["disabled", "deleted", "creator_not_admin", "creator_left", "by_moderator", "unknown"];
 
 function hookStopReason(value: unknown): HookStopReason {
 	return HOOK_STOP_REASONS.find((reason) => reason === value) ?? "unknown";

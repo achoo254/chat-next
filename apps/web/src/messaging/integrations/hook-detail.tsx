@@ -101,7 +101,9 @@ export function HookDetail({ chat, hookId }: { chat: Chat; hookId: string }) {
 			{hook.state === "disabled" && (
 				<div className="banner warn" role="status">
 					<Icon name="alert" small />
-					<span className="grow">{t.detail.disabledBanner(whenText(hook.disabledAt, now, locale, copy))}</span>
+					<span className="grow">
+						{(hook.disabledReason === "by_moderator" ? t.detail.moderatorBanner : t.detail.disabledBanner)(whenText(hook.disabledAt, now, locale, copy))}
+					</span>
 				</div>
 			)}
 			<div className="hook-grid">
@@ -200,7 +202,7 @@ function InfoCard({ hook, nameOf, now, onHook, onNeedTakeOver }: CardProps & { o
 					<dd>{hook.allowAlert ? t.detail.allowed : t.detail.notAllowed}</dd>
 				</div>
 			</dl>
-			{hook.state !== "auto_disabled" && (
+			{hook.state !== "auto_disabled" && hook.disabledReason !== "by_moderator" && (
 				<div className="setting">
 					<div>
 						<strong>{t.detail.receiving}</strong>

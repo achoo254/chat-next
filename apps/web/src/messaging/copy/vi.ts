@@ -19,6 +19,9 @@ export const vi = {
 		/** A private chat the person's settings refuse; never says which setting (or a block). */
 		privateRefused: "Không thể nhắn tin cho người này lúc này.",
 		privateRefusedInviteHint: "Bạn có thể mời họ vào nhóm bằng link mời.",
+		/** Anti-spam: the daily cap on new chats with strangers, and the pause while reports are reviewed. */
+		strangerLimit: "Hôm nay bạn đã bắt đầu nhiều chat với người chưa quen. Hãy thử lại sau, hoặc nhờ họ thêm bạn vào danh bạ.",
+		strangerPaused: "Tạm thời bạn chưa bắt đầu được chat với người chưa quen vì tài khoản đang được đội kiểm duyệt xem xét.",
 		loadFailed: "Không tải được dữ liệu. Kiểm tra kết nối mạng rồi thử lại.",
 		loading: "Đang tải…",
 	},
@@ -197,6 +200,8 @@ export const vi = {
 					return `Webhook “${name}” đã tự tắt vì người tạo không còn là admin`;
 				case "creator_left":
 					return `Webhook “${name}” đã tự tắt vì người tạo đã rời ${kind(channel)}`;
+				case "by_moderator":
+					return `Webhook “${name}” đã bị đội kiểm duyệt tắt`;
 				case "unknown":
 					return `Webhook “${name}” đã tắt`;
 			}

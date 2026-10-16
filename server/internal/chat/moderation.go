@@ -43,6 +43,25 @@ var actionNames = map[appv1.ModerationAction]string{
 	appv1.ModerationAction_MODERATION_ACTION_BAN_FROM_CHAT:    "ban_from_chat",
 	appv1.ModerationAction_MODERATION_ACTION_RESTRICT_ACCOUNT: "restrict_account",
 	appv1.ModerationAction_MODERATION_ACTION_LIFT_RESTRICTION: "lift_restriction",
+	appv1.ModerationAction_MODERATION_ACTION_WARN:             "warn",
+	appv1.ModerationAction_MODERATION_ACTION_DISABLE_WEBHOOK:  "disable_webhook",
+	// Log entries only.
+	appv1.ModerationAction_MODERATION_ACTION_RESTRICT_BOT:         "restrict_bot",
+	appv1.ModerationAction_MODERATION_ACTION_RESTORE_BOT_TIER:     "restore_bot_tier",
+	appv1.ModerationAction_MODERATION_ACTION_KEEP_BOT_RESTRICTED:  "keep_bot_restricted",
+	appv1.ModerationAction_MODERATION_ACTION_VERIFY_BOT:           "verify_bot",
+	appv1.ModerationAction_MODERATION_ACTION_UNVERIFY_BOT:         "unverify_bot",
+	appv1.ModerationAction_MODERATION_ACTION_LIMIT_STRANGER_CHATS: "limit_stranger_chats",
+}
+
+// resolveActions are the actions ResolveReport accepts.
+var resolveActions = map[appv1.ModerationAction]bool{
+	appv1.ModerationAction_MODERATION_ACTION_DISMISS:          true,
+	appv1.ModerationAction_MODERATION_ACTION_DELETE_MESSAGES:  true,
+	appv1.ModerationAction_MODERATION_ACTION_BAN_FROM_CHAT:    true,
+	appv1.ModerationAction_MODERATION_ACTION_RESTRICT_ACCOUNT: true,
+	appv1.ModerationAction_MODERATION_ACTION_WARN:             true,
+	appv1.ModerationAction_MODERATION_ACTION_DISABLE_WEBHOOK:  true,
 }
 
 func actionOf(name string) appv1.ModerationAction {
@@ -110,28 +129,83 @@ type reportRow struct {
 	ResolvedBy                                 *string
 	Actions                                    []string
 	Note                                       string
+	// TargetBot: the reported user is a bot. ByHook: every reported message
+	// was posted by an incoming webhook (from_id 0).
+	TargetBot, ByHook bool
 }
 
-const reportColumns = `id, reporter_id, target_user_id, target_chat_id, seqs, reason, comment, evidence, status,
-	created_at, resolved_at, resolved_by, actions, resolution_note`
+// Conditions on a report row r: about a bot, and about webhook messages.
+const (
+	reportOnBotSQL = `(r.target_user_id <> 0 AND EXISTS (SELECT 1 FROM users bu WHERE bu.id = r.target_user_id AND bu.is_bot))`
+	// Every reported message came from an incoming webhook (not a service
+	// message, which has from_id 0 too).
+	reportOnHookSQL = `(cardinality(r.seqs) > 0 AND NOT EXISTS (
+		SELECT 1 FROM jsonb_array_elements(r.evidence) e WHERE coalesce((e ->> 'hook')::boolean, false) IS NOT TRUE))`
+)
 
-func scanReport(row pgx.Row) (*reportRow, error) {
+// reportColumns are read from reports r.
+const reportColumns = `r.id, r.reporter_id, r.target_user_id, r.target_chat_id, r.seqs, r.reason, r.comment, r.evidence,
+	r.status, r.created_at, r.resolved_at, r.resolved_by, r.actions, r.resolution_note, ` + reportOnBotSQL + `, ` + reportOnHookSQL
+
+func scanReport(row pgx.Row, extra ...any) (*reportRow, error) {
 	r := &reportRow{}
-	err := row.Scan(&r.ID, &r.ReporterID, &r.TargetUserID, &r.TargetChatID, &r.Seqs, &r.Reason, &r.Comment, &r.Evidence,
-		&r.Status, &r.CreatedAt, &r.ResolvedAt, &r.ResolvedBy, &r.Actions, &r.Note)
+	err := row.Scan(append([]any{&r.ID, &r.ReporterID, &r.TargetUserID, &r.TargetChatID, &r.Seqs, &r.Reason, &r.Comment,
+		&r.Evidence, &r.Status, &r.CreatedAt, &r.ResolvedAt, &r.ResolvedBy, &r.Actions, &r.Note, &r.TargetBot, &r.ByHook}, extra...)...)
 	return r, err
 }
 
 func (r *reportRow) kind() appv1.ReportTargetKind {
 	switch {
+	case r.ByHook:
+		return appv1.ReportTargetKind_REPORT_TARGET_KIND_WEBHOOK
 	case len(r.Seqs) > 0:
 		return appv1.ReportTargetKind_REPORT_TARGET_KIND_MESSAGES
 	case r.TargetChatID != 0:
 		return appv1.ReportTargetKind_REPORT_TARGET_KIND_CHAT
+	case r.TargetBot:
+		return appv1.ReportTargetKind_REPORT_TARGET_KIND_BOT
 	default:
 		return appv1.ReportTargetKind_REPORT_TARGET_KIND_USER
 	}
 }
+
+// kindCondition is the SQL condition on reports r of a target kind filter.
+func kindCondition(kind appv1.ReportTargetKind) (string, error) {
+	switch kind {
+	case appv1.ReportTargetKind_REPORT_TARGET_KIND_UNSPECIFIED:
+		return "true", nil
+	case appv1.ReportTargetKind_REPORT_TARGET_KIND_USER:
+		return "r.target_user_id <> 0 AND NOT " + reportOnBotSQL, nil
+	case appv1.ReportTargetKind_REPORT_TARGET_KIND_BOT:
+		return reportOnBotSQL, nil
+	case appv1.ReportTargetKind_REPORT_TARGET_KIND_CHAT:
+		return "r.target_chat_id <> 0 AND cardinality(r.seqs) = 0", nil
+	case appv1.ReportTargetKind_REPORT_TARGET_KIND_MESSAGES:
+		return "cardinality(r.seqs) > 0 AND NOT " + reportOnHookSQL, nil
+	case appv1.ReportTargetKind_REPORT_TARGET_KIND_WEBHOOK:
+		return reportOnHookSQL, nil
+	default:
+		return "", errInvalid("unknown target_kind")
+	}
+}
+
+// reportStatusOf maps a status filter; UNSPECIFIED is open.
+func reportStatusOf(status appv1.ReportStatus) (string, error) {
+	switch status {
+	case appv1.ReportStatus_REPORT_STATUS_UNSPECIFIED, appv1.ReportStatus_REPORT_STATUS_OPEN:
+		return statusOpen, nil
+	case appv1.ReportStatus_REPORT_STATUS_RESOLVED:
+		return statusResolved, nil
+	case appv1.ReportStatus_REPORT_STATUS_DISMISSED:
+		return statusDismissed, nil
+	default:
+		return "", errInvalid("unknown status")
+	}
+}
+
+// sameTargetSQL matches the reports r about the same target as report $1
+// (same user, chat and messages): the group a report belongs to.
+const sameTargetSQL = `(r.target_user_id, r.target_chat_id, r.seqs) = (SELECT g.target_user_id, g.target_chat_id, g.seqs FROM reports g WHERE g.id = $1)`
 
 func (r *reportRow) resolver() int64 {
 	if r.ResolvedBy == nil {
@@ -186,27 +260,13 @@ func (s *Service) GetReports(ctx context.Context, me int64, req *appv1.GetReport
 	if err := s.requireOperator(me); err != nil {
 		return nil, err
 	}
-	status := statusOpen
-	switch req.GetStatus() {
-	case appv1.ReportStatus_REPORT_STATUS_UNSPECIFIED, appv1.ReportStatus_REPORT_STATUS_OPEN:
-	case appv1.ReportStatus_REPORT_STATUS_RESOLVED:
-		status = statusResolved
-	case appv1.ReportStatus_REPORT_STATUS_DISMISSED:
-		status = statusDismissed
-	default:
-		return nil, errInvalid("unknown status")
+	status, err := reportStatusOf(req.GetStatus())
+	if err != nil {
+		return nil, err
 	}
-	kindCond := "true"
-	switch req.GetTargetKind() {
-	case appv1.ReportTargetKind_REPORT_TARGET_KIND_UNSPECIFIED:
-	case appv1.ReportTargetKind_REPORT_TARGET_KIND_USER:
-		kindCond = "target_user_id <> 0"
-	case appv1.ReportTargetKind_REPORT_TARGET_KIND_CHAT:
-		kindCond = "target_chat_id <> 0 AND cardinality(seqs) = 0"
-	case appv1.ReportTargetKind_REPORT_TARGET_KIND_MESSAGES:
-		kindCond = "cardinality(seqs) > 0"
-	default:
-		return nil, errInvalid("unknown target_kind")
+	kindCond, err := kindCondition(req.GetTargetKind())
+	if err != nil {
+		return nil, err
 	}
 	if _, ok := appv1.ReportReason_name[int32(req.GetReason())]; !ok {
 		return nil, errInvalid("unknown reason")
@@ -221,9 +281,9 @@ func (s *Service) GetReports(ctx context.Context, me int64, req *appv1.GetReport
 	}
 	limit := pageLimit(req.GetLimit(), reportsPageDef, reportsPageMax)
 	rows, err := s.pool.Query(ctx, `
-		SELECT `+reportColumns+` FROM reports
-		WHERE tenant_id = $1 AND status = $2 AND ($3 = 0 OR reason = $3) AND id < $4 AND `+kindCond+`
-		ORDER BY id DESC LIMIT $5`, s.cfg.TenantID, status, int16(req.GetReason()), before, limit+1)
+		SELECT `+reportColumns+` FROM reports r
+		WHERE r.tenant_id = $1 AND r.status = $2 AND ($3 = 0 OR r.reason = $3) AND r.id < $4 AND `+kindCond+`
+		ORDER BY r.id DESC LIMIT $5`, s.cfg.TenantID, status, int16(req.GetReason()), before, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("chat: list reports: %w", err)
 	}
@@ -254,9 +314,9 @@ func (s *Service) loadReport(ctx context.Context, q querier, id int64, lock bool
 	if id <= 0 {
 		return nil, errInvalid("report_id is required")
 	}
-	sql := `SELECT ` + reportColumns + ` FROM reports WHERE id = $1 AND tenant_id = $2`
+	sql := `SELECT ` + reportColumns + ` FROM reports r WHERE r.id = $1 AND r.tenant_id = $2`
 	if lock {
-		sql += ` FOR UPDATE`
+		sql += ` FOR UPDATE OF r`
 	}
 	r, err := scanReport(q.QueryRow(ctx, sql, id, s.cfg.TenantID))
 	if isNoRows(err) {
@@ -358,6 +418,17 @@ func (s *Service) GetReport(ctx context.Context, me, reportID int64) (*appv1.Get
 		if resp.Restrictions, err = s.activeRestrictions(ctx, targets); err != nil {
 			return nil, err
 		}
+		if resp.Signals, err = s.senderSignals(ctx, targets, r.ID); err != nil {
+			return nil, err
+		}
+	}
+	if resp.Group, err = s.groupSummary(ctx, r); err != nil {
+		return nil, err
+	}
+	if r.ByHook {
+		if resp.Hooks, err = s.reportedHooks(ctx, r); err != nil {
+			return nil, err
+		}
 	}
 	rendered, err := ents.render(ctx, s.pool, s.cfg.TenantID)
 	if err != nil {
@@ -372,24 +443,12 @@ func (s *Service) GetReport(ctx context.Context, me, reportID int64) (*appv1.Get
 
 func (s *Service) moderationHistory(ctx context.Context, users []int64) ([]*appv1.ModerationLogEntry, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, operator_id, report_id, action, target_user_id, target_chat_id, note, until, created_at
-		FROM moderation_log WHERE tenant_id = $1 AND target_user_id = ANY($2) ORDER BY id DESC LIMIT $3`,
+		SELECT `+logColumns+` FROM moderation_log WHERE tenant_id = $1 AND target_user_id = ANY($2) ORDER BY id DESC LIMIT $3`,
 		s.cfg.TenantID, users, historyMax)
 	if err != nil {
 		return nil, fmt.Errorf("chat: moderation history: %w", err)
 	}
-	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*appv1.ModerationLogEntry, error) {
-		e := &appv1.ModerationLogEntry{}
-		var action string
-		var until *time.Time
-		var at time.Time
-		err := r.Scan(&e.Id, &e.OperatorId, &e.ReportId, &action, &e.TargetUserId, &e.TargetChatId, &e.Note, &until, &at)
-		e.Action, e.CreatedAt = actionOf(action), at.Unix()
-		if until != nil {
-			e.Until = until.Unix()
-		}
-		return e, err
-	})
+	list, err := pgx.CollectRows(rows, scanLogEntry)
 	if err != nil {
 		return nil, fmt.Errorf("chat: moderation history: %w", err)
 	}
@@ -425,16 +484,9 @@ func (s *Service) activeRestrictions(ctx context.Context, users []int64) ([]*app
 func (t *txn) logModeration(ctx context.Context, operator, reportID int64, action appv1.ModerationAction,
 	userID, chatID int64, seqs []int64, note string, until *time.Time,
 ) error {
-	if seqs == nil {
-		seqs = []int64{}
-	}
-	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO moderation_log (tenant_id, operator_id, report_id, action, target_user_id, target_chat_id, seqs, note, until)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		t.s.cfg.TenantID, operator, reportID, actionNames[action], userID, chatID, seqs, note, until); err != nil {
-		return fmt.Errorf("chat: moderation log: %w", err)
-	}
-	return nil
+	return insertLog(ctx, t.tx, t.s.cfg.TenantID, moderationEntry{
+		operator: operator, reportID: reportID, action: action, userID: userID, chatID: chatID, seqs: seqs, note: note, until: until,
+	})
 }
 
 // cleanActions validates the actions of a resolution: known, no
@@ -447,7 +499,7 @@ func cleanActions(actions []appv1.ModerationAction) ([]appv1.ModerationAction, e
 	slices.Sort(out)
 	out = slices.Compact(out)
 	for _, a := range out {
-		if _, ok := actionNames[a]; !ok || a == appv1.ModerationAction_MODERATION_ACTION_LIFT_RESTRICTION {
+		if !resolveActions[a] {
 			return nil, errInvalid("unknown action")
 		}
 	}
@@ -457,7 +509,10 @@ func cleanActions(actions []appv1.ModerationAction) ([]appv1.ModerationAction, e
 	return out, nil
 }
 
-// ResolveReport closes an open report with the given actions.
+// ResolveReport closes an open report, and the other open reports about the
+// same target, with the given actions. The reported users hear about it
+// from the assistant (Notifier) after the commit when the actions include
+// WARN or req.notify is set.
 func (s *Service) ResolveReport(ctx context.Context, me int64, req *appv1.ResolveReportRequest) (*appv1.ResolveReportResponse, error) {
 	if err := s.requireOperator(me); err != nil {
 		return nil, err
@@ -476,6 +531,7 @@ func (s *Service) ResolveReport(ctx context.Context, me int64, req *appv1.Resolv
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
+	var notice moderationNotice
 	_, err = s.inTx(ctx, func(t *txn) error {
 		r, err := s.loadReport(ctx, t.tx, req.GetReportId(), true)
 		if err != nil {
@@ -483,6 +539,16 @@ func (s *Service) ResolveReport(ctx context.Context, me int64, req *appv1.Resolv
 		}
 		if r.Status != statusOpen {
 			return errPrecondition("report_closed: this report was already closed")
+		}
+		rows, err := t.tx.Query(ctx, `
+			SELECT r.id FROM reports r WHERE r.tenant_id = $2 AND r.status = 'open' AND `+sameTargetSQL+`
+			ORDER BY r.id FOR UPDATE OF r`, r.ID, s.cfg.TenantID)
+		if err != nil {
+			return fmt.Errorf("chat: lock report group: %w", err)
+		}
+		group, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+		if err != nil {
+			return fmt.Errorf("chat: lock report group: %w", err)
 		}
 		targets, err := s.reportedUsers(ctx, t.tx, r)
 		if err != nil {
@@ -501,14 +567,24 @@ func (s *Service) ResolveReport(ctx context.Context, me int64, req *appv1.Resolv
 		}
 		if _, err := t.tx.Exec(ctx, `
 			UPDATE reports SET status = $2, resolved_at = now(), resolved_by = $3, actions = $4, resolution_note = $5
-			WHERE id = $1`, r.ID, status, strconv.FormatInt(me, 10), names, note); err != nil {
-			return fmt.Errorf("chat: close report: %w", err)
+			WHERE id = ANY($1)`, group, status, strconv.FormatInt(me, 10), names, note); err != nil {
+			return fmt.Errorf("chat: close reports: %w", err)
+		}
+		if status == statusResolved && (req.GetNotify() || slices.Contains(actions, appv1.ModerationAction_MODERATION_ACTION_WARN)) {
+			notice = moderationNotice{ModerationNotice: ModerationNotice{Actions: actions, Note: note}}
+			if notice.users, err = humansOf(ctx, t.tx, targets); err != nil {
+				return err
+			}
+			if req.GetRestrictSeconds() > 0 {
+				notice.Until = time.Now().Add(time.Duration(req.GetRestrictSeconds()) * time.Second)
+			}
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	s.sendNotice(ctx, notice)
 	r, err := s.loadReport(ctx, s.pool, req.GetReportId(), false)
 	if err != nil {
 		return nil, err
@@ -579,6 +655,21 @@ func (t *txn) applyModeration(ctx context.Context, me int64, r *reportRow, actio
 			}
 		}
 		return nil
+	case appv1.ModerationAction_MODERATION_ACTION_WARN:
+		if len(targets) == 0 {
+			return errInvalid("warn needs a report about a user or messages")
+		}
+		for _, uid := range targets {
+			if err := t.logModeration(ctx, me, r.ID, action, uid, r.TargetChatID, nil, note, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	case appv1.ModerationAction_MODERATION_ACTION_DISABLE_WEBHOOK:
+		if !r.ByHook {
+			return errInvalid("disable_webhook needs a report about webhook messages")
+		}
+		return t.disableReportedHooks(ctx, me, r, note)
 	default:
 		return errInvalid("unknown action")
 	}

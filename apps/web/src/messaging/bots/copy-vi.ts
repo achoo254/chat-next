@@ -212,9 +212,11 @@ export const viBots = {
 		deadHint: "Lỗi 10 lần",
 		tierTitle: "Tầng rate limit",
 		tierBody: {
+			new: "Bot dưới 14 ngày tuổi: mỗi giây tối đa 10 lần gọi và 5 tin, 1 tin vào cùng một chat (dồn được 10).",
 			default: "Mỗi giây tối đa 30 lần gọi và 30 tin, 1 tin vào cùng một chat (dồn được 20).",
 			verified: "Bot đã xác minh: mỗi giây tối đa 100 lần gọi và 100 tin, 5 tin vào cùng một chat.",
 			internal: "Bot nội bộ: mỗi giây tối đa 500 lần gọi và 500 tin, 20 tin vào cùng một chat.",
+			restricted: "Bot bị hạ tầng vì nhiều người chặn hoặc báo cáo: mỗi giây tối đa 5 lần gọi và 1 tin, cùng một chat 5 giây một tin.",
 		} as Record<BotTierName, string>,
 		tierNote: "Tầng do đội vận hành cấp ở công cụ kiểm duyệt.",
 	},

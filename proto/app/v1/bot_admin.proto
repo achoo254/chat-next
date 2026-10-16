@@ -71,6 +71,10 @@ enum BotTier {
   BOT_TIER_DEFAULT = 1;
   BOT_TIER_VERIFIED = 2;
   BOT_TIER_INTERNAL = 3;
+  // Lowered by the automatic anti-abuse rule or an operator.
+  BOT_TIER_RESTRICTED = 4;
+  // A bot younger than 14 days.
+  BOT_TIER_NEW = 5;
 }
 
 // Where a command list applies. A client shows the most specific list

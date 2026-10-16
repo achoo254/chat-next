@@ -12,6 +12,7 @@ import (
 	"app.local/server/internal/botapi"
 	"app.local/server/internal/bottest"
 	"app.local/server/internal/brand"
+	"app.local/server/internal/chat"
 	"app.local/server/internal/store/testdb"
 	"connectrpc.com/connect"
 )
@@ -278,5 +279,37 @@ func TestEnsureIsIdempotentAndHidden(t *testing.T) {
 	}
 	if _, err := w.env.Admin.Owned(ctx, again.BotID(), again.BotID()); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("the assistant is manageable: %v", err)
+	}
+}
+
+func TestModerationNoticeReachesAUserWhoNeverStarted(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	user := w.env.User("binh")
+	until := time.Date(2026, 10, 23, 7, 30, 0, 0, time.UTC)
+	if err := w.assistant.NotifyModeration(ctx, user, chat.ModerationNotice{
+		Actions: []appv1.ModerationAction{appv1.ModerationAction_MODERATION_ACTION_WARN, appv1.ModerationAction_MODERATION_ACTION_RESTRICT_ACCOUNT},
+		Note:    "spam vào nhóm", Until: until,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	chatID, err := w.env.Chat.SystemBotNoticeChat(ctx, user)
+	if err != nil || chatID == 0 {
+		t.Fatalf("notice chat = %d, %v", chatID, err)
+	}
+	m := w.waitBotMessage(t, user, chatID, 1)
+	for _, want := range []string{"cảnh cáo", "14:30 23/10/2026", "Lý do: spam vào nhóm"} {
+		if !strings.Contains(m.GetText(), want) {
+			t.Fatalf("notice %q lacks %q", m.GetText(), want)
+		}
+	}
+	// Actions that do not concern the user say nothing.
+	if err := w.assistant.NotifyModeration(ctx, user, chat.ModerationNotice{
+		Actions: []appv1.ModerationAction{appv1.ModerationAction_MODERATION_ACTION_DISABLE_WEBHOOK}, Note: "x",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(w.history(t, user, chatID)); n != 1 {
+		t.Fatalf("%d messages after a notice about nothing", n)
 	}
 }

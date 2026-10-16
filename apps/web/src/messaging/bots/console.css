@@ -102,6 +102,7 @@
 .console .stat span { font-size: 0.8125rem; color: var(--c-text-muted); }
 .console .tier { display: inline-flex; align-items: center; padding: 0 var(--space-2); border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 600; background: var(--c-bar-track); color: var(--c-text-muted); }
 .console .tier.verified, .console .tier.internal { background: color-mix(in srgb, var(--c-info) 12%, transparent); color: var(--c-info-text); }
+.console .tier.restricted { background: color-mix(in srgb, var(--c-error) 12%, transparent); color: var(--c-error-text); }
 .console .card .grow { flex: 1; min-width: 0; }
 .console .actions { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); justify-content: flex-end; }
 .console .btn-ghost { border-color: transparent; background: none; }

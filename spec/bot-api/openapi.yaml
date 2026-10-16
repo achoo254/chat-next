@@ -28,9 +28,14 @@ info:
       (`403 no_consent` otherwise). In groups it needs membership and the
       permission to send. Bots never open private chats themselves and never
       join secret chats.
-    - Rate limits depend on the bot's tier (`default`, `verified`,
-      `internal`): every call, every send, and sends into one chat (default
-      tier: 30 calls/s, 30 sends/s, 1 send/s per chat with bursts of 20).
+    - Rate limits depend on the bot's tier (`new`, `default`, `verified`,
+      `internal`, `restricted`): every call, every send, and sends into one
+      chat (default tier: 30 calls/s, 30 sends/s, 1 send/s per chat with
+      bursts of 20). A bot younger than 14 days that is not verified runs on
+      `new` (10 calls/s, 5 sends/s, 1 send/s per chat with bursts of 10);
+      the anti-abuse rules or the operators can move a bot whose users block
+      or report it to `restricted` (5 calls/s, 1 send/s, one send per 5 s per
+      chat with bursts of 3).
       Exceeding one answers `429 rate_limited` with `retry_after` seconds
       (also in the `Retry-After` header). After 20 failed authentications
       from one address, further failed authentications from it answer
@@ -1049,7 +1054,7 @@ components:
               description: Privacy mode in groups (default on).
             tier:
               type: string
-              enum: [default, verified, internal]
+              enum: [new, default, verified, internal, restricted]
             description: {type: string}
             about: {type: string}
     Chat:

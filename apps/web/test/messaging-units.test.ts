@@ -153,6 +153,9 @@ describe("routes", () => {
 		expect(matchRoute("/settings/privacy")).toEqual({ name: "settings", tab: "privacy" });
 		expect(matchRoute(paths.moderation("R-1", true))).toEqual({ name: "moderation", reportId: "R-1", actions: true });
 		expect(matchRoute(paths.feedback())).toEqual({ name: "feedback" });
+		expect(matchRoute(paths.moderationLog())).toEqual({ name: "moderationLog" });
+		expect(matchRoute(paths.moderationBot(7001))).toEqual({ name: "moderationBot", botId: 7001 });
+		expect(matchRoute("/moderation/bots/x")).toBeNull();
 		expect(matchRoute("/c/0")).toBeNull();
 		expect(matchRoute("/c/12345678901234567")).toBeNull();
 		expect(matchRoute("/moderation/%E0")).toBeNull();

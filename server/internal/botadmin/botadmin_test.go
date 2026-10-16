@@ -47,7 +47,7 @@ func TestCreateBotRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bot.GetUser().GetUsername() != "weather_bot" || !bot.GetUser().GetIsBot() || bot.GetHasToken() || !bot.GetPrivacy() ||
-		bot.GetTier() != appv1.BotTier_BOT_TIER_DEFAULT {
+		bot.GetTier() != appv1.BotTier_BOT_TIER_NEW {
 		t.Fatalf("bot = %v", bot)
 	}
 	if _, err := env.Admin.CreateBot(ctx, owner, "weather_bot", "Again"); codeOf(err) != connect.CodeAlreadyExists {
@@ -336,5 +336,25 @@ func TestRecordUpdateFetchAndNotRunning(t *testing.T) {
 	}
 	if age := stored(); age < 5*time.Second {
 		t.Fatalf("a recent record was written again (record %v old)", age)
+	}
+}
+
+func TestBotTierOrder(t *testing.T) {
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	now := time.Now()
+	cases := []struct {
+		bot  botadmin.Bot
+		want string
+	}{
+		{botadmin.Bot{CreatedAt: now}, botadmin.TierNew},
+		{botadmin.Bot{CreatedAt: old}, botadmin.TierDefault},
+		{botadmin.Bot{CreatedAt: now, Verified: true}, botadmin.TierVerified},
+		{botadmin.Bot{CreatedAt: old, Verified: true, RestrictedAt: &now}, botadmin.TierRestricted},
+		{botadmin.Bot{CreatedAt: old, Internal: true, RestrictedAt: &now}, botadmin.TierInternal},
+	}
+	for i, c := range cases {
+		if got := c.bot.Tier(); got != c.want {
+			t.Errorf("case %d: tier = %s, want %s", i, got, c.want)
+		}
 	}
 }

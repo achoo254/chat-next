@@ -102,7 +102,17 @@ Hàng đợi kiểm duyệt (`ModerationService`) chỉ mở cho các user id gh
 2. Thêm vào `/opt/chat/.env` (nhiều id cách nhau bằng dấu phẩy, tối đa 100): `CHAT_OPERATOR_USER_IDS=<id>[,<id>…]`.
 3. `pm2 startOrReload /opt/chat/infra/ecosystem.config.cjs --only chat-api --update-env` (process đọc lại `-env-file` khi khởi động); log khởi động ghi `operators=<số id>`. `GetSelf` của người đó trả `is_operator: true`.
 
-Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệt (bỏ qua, xoá tin, cấm khỏi chat, khoá tài khoản chat, gỡ khoá) ghi vào bảng `moderation_log` chỉ cho thêm (trigger chặn sửa và xoá).
+Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệt (bỏ qua, xoá tin, cấm khỏi chat, khoá tài khoản chat, cảnh cáo, tắt webhook, gỡ khoá, xét duyệt và xác minh bot) và mọi lần luật tự động ra tay (`operator_id = 0`) ghi vào bảng `moderation_log` chỉ cho thêm (trigger chặn sửa và xoá); người vận hành xem ở Kiểm duyệt > Nhật ký và xuất CSV được.
+
+### Ngưỡng chống spam
+
+Đặt trong `/opt/chat/.env` (tuỳ chọn, giá trị mặc định ở [`.env.production.example`](../infra/chat/.env.production.example)); `0` tắt luật đó, đổi xong reload `chat-api` với `--update-env`:
+
+- `ABUSE_STRANGER_CHATS_NEW` (20) và `ABUSE_STRANGER_CHATS` (50): số chat riêng mới với người chưa quen (chưa thêm mình vào danh bạ, không chung nhóm hay kênh) mỗi 24 giờ, cho tài khoản dưới `ABUSE_NEW_ACCOUNT_DAYS` (7) ngày tuổi và tài khoản lâu hơn.
+- `ABUSE_REPORTERS` (3): đủ số người có báo cáo đang mở trong 30 ngày thì tài khoản tạm không nhắn được người chưa quen, tới khi kiểm duyệt đóng báo cáo.
+- `ABUSE_SIGNUPS_PER_IP_HOUR` (30) và `ABUSE_SIGNUPS_PER_10MIN` (300): số tài khoản chat mới tạo ở lần đăng nhập đầu, theo IP mỗi giờ và theo tenant mỗi 10 phút; vượt thì trang đăng nhập báo thử lại sau. Bộ đếm nằm trong bộ nhớ process, restart thì đếm lại.
+
+Luật bot chạy 10 phút một lần trong `chat-api`: bot có ít nhất 20 người nhận trong 24 giờ mà từ 5% trong đó chặn bot, hoặc có từ 50 người dùng mới trong 24 giờ và gấp 10 lần trung bình tuần trước, bị hạ xuống tầng `restricted` và hiện ở đầu hàng đợi chờ xem xét. Ngưỡng này nằm trong code (`server/internal/chat/moderation_bots.go`).
 
 ## Kiểm tra sau deploy
 

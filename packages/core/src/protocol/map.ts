@@ -401,6 +401,7 @@ const HOOK_STOP_REASONS: Partial<Record<IncomingHookStopReason, HookStopReason>>
 	[IncomingHookStopReason.DELETED]: "deleted",
 	[IncomingHookStopReason.CREATOR_NOT_ADMIN]: "creator_not_admin",
 	[IncomingHookStopReason.CREATOR_LEFT]: "creator_left",
+	[IncomingHookStopReason.BY_MODERATOR]: "by_moderator",
 };
 
 function toAction(action: WireAction | undefined): MessageAction | null {

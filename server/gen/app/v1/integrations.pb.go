@@ -151,6 +151,9 @@ const (
 	IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_BY_ADMIN          IncomingHookDisabledReason = 1
 	IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN IncomingHookDisabledReason = 2
 	IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT      IncomingHookDisabledReason = 3
+	// Turned off by the moderation team; chat admins cannot turn it back on
+	// or take it over (failed_precondition "disabled_by_moderator").
+	IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR IncomingHookDisabledReason = 4
 )
 
 // Enum value maps for IncomingHookDisabledReason.
@@ -160,12 +163,14 @@ var (
 		1: "INCOMING_HOOK_DISABLED_REASON_BY_ADMIN",
 		2: "INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN",
 		3: "INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT",
+		4: "INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR",
 	}
 	IncomingHookDisabledReason_value = map[string]int32{
 		"INCOMING_HOOK_DISABLED_REASON_UNSPECIFIED":       0,
 		"INCOMING_HOOK_DISABLED_REASON_BY_ADMIN":          1,
 		"INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN": 2,
 		"INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT":      3,
+		"INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR":      4,
 	}
 )
 
@@ -2102,12 +2107,13 @@ const file_app_v1_integrations_proto_rawDesc = "" +
 	"\x1fINCOMING_HOOK_STATE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aINCOMING_HOOK_STATE_ACTIVE\x10\x01\x12 \n" +
 	"\x1cINCOMING_HOOK_STATE_DISABLED\x10\x02\x12%\n" +
-	"!INCOMING_HOOK_STATE_AUTO_DISABLED\x10\x03*\xdc\x01\n" +
+	"!INCOMING_HOOK_STATE_AUTO_DISABLED\x10\x03*\x8c\x02\n" +
 	"\x1aIncomingHookDisabledReason\x12-\n" +
 	")INCOMING_HOOK_DISABLED_REASON_UNSPECIFIED\x10\x00\x12*\n" +
 	"&INCOMING_HOOK_DISABLED_REASON_BY_ADMIN\x10\x01\x123\n" +
 	"/INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN\x10\x02\x12.\n" +
-	"*INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT\x10\x03*\xce\x03\n" +
+	"*INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT\x10\x03\x12.\n" +
+	"*INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR\x10\x04*\xce\x03\n" +
 	"\x17IncomingHookAuditAction\x12*\n" +
 	"&INCOMING_HOOK_AUDIT_ACTION_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"INCOMING_HOOK_AUDIT_ACTION_CREATED\x10\x01\x12-\n" +

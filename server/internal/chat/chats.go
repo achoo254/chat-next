@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -156,6 +157,9 @@ func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Cha
 		if err := s.checkCanMessage(ctx, t.tx, me, peer); err != nil {
 			return err
 		}
+		if err := s.checkStrangerChat(ctx, t.tx, me, peer); err != nil {
+			return err
+		}
 		if chatID, err = s.newChatID(ctx, t.tx); err != nil {
 			return err
 		}
@@ -182,6 +186,9 @@ func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Cha
 	})
 	if isRetry(err) {
 		return s.CreatePrivate(ctx, me, peer)
+	}
+	if refusal := (*strangerRefusal)(nil); errors.As(err, &refusal) {
+		s.logStrangerRefusal(ctx, me, refusal)
 	}
 	if err != nil {
 		return nil, nil, err

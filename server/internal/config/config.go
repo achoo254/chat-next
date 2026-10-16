@@ -72,6 +72,67 @@ type Config struct {
 	// WebPush is nil when WEB_PUSH_VAPID_PRIVATE_KEY is unset: PushService
 	// then reports no key and refuses registrations.
 	WebPush *WebPush
+	// Abuse holds the anti-spam thresholds (ABUSE_*).
+	Abuse Abuse
+}
+
+// Abuse holds the anti-spam thresholds. Each comes from its ABUSE_*
+// variable, defaults to the value in DefaultAbuse, and 0 turns its rule off.
+type Abuse struct {
+	// StrangerChatsNew caps the private chats a young account starts with
+	// strangers in 24 hours (ABUSE_STRANGER_CHATS_NEW).
+	StrangerChatsNew int
+	// StrangerChats is the same cap for older accounts (ABUSE_STRANGER_CHATS).
+	StrangerChats int
+	// NewAccountDays is the age below which an account is young
+	// (ABUSE_NEW_ACCOUNT_DAYS).
+	NewAccountDays int
+	// Reporters is how many distinct people with open reports against an
+	// account in 30 days stop its new chats with strangers until a moderator
+	// reviews them (ABUSE_REPORTERS).
+	Reporters int
+	// SignupsPerIPHour caps the chat accounts created at first sign-in from
+	// one address in an hour (ABUSE_SIGNUPS_PER_IP_HOUR).
+	SignupsPerIPHour int
+	// SignupsPer10Min caps the chat accounts the tenant creates in ten
+	// minutes (ABUSE_SIGNUPS_PER_10MIN).
+	SignupsPer10Min int
+}
+
+// DefaultAbuse are the thresholds used when ABUSE_* are unset.
+func DefaultAbuse() Abuse {
+	return Abuse{StrangerChatsNew: 20, StrangerChats: 50, NewAccountDays: 7, Reporters: 3, SignupsPerIPHour: 30, SignupsPer10Min: 300}
+}
+
+// abuseValueMax bounds every ABUSE_* value.
+const abuseValueMax = 1_000_000
+
+func loadAbuse(get func(string) string) (Abuse, []error) {
+	a := DefaultAbuse()
+	var errs []error
+	for _, v := range []struct {
+		name string
+		dst  *int
+	}{
+		{"ABUSE_STRANGER_CHATS_NEW", &a.StrangerChatsNew},
+		{"ABUSE_STRANGER_CHATS", &a.StrangerChats},
+		{"ABUSE_NEW_ACCOUNT_DAYS", &a.NewAccountDays},
+		{"ABUSE_REPORTERS", &a.Reporters},
+		{"ABUSE_SIGNUPS_PER_IP_HOUR", &a.SignupsPerIPHour},
+		{"ABUSE_SIGNUPS_PER_10MIN", &a.SignupsPer10Min},
+	} {
+		raw := get(v.name)
+		if raw == "" {
+			continue
+		}
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > abuseValueMax {
+			errs = append(errs, invalid(v.name, fmt.Sprintf("must be a whole number from 0 to %d", abuseValueMax)))
+			continue
+		}
+		*v.dst = n
+	}
+	return a, errs
 }
 
 // WebPush configures notifications to closed browser apps (package push).
@@ -260,6 +321,10 @@ func Load(lookup Lookup) (Config, error) {
 	webPush, webPushErrs := loadWebPush(get, production, c.PublicURL)
 	errs = append(errs, webPushErrs...)
 	c.WebPush = webPush
+
+	abuse, abuseErrs := loadAbuse(get)
+	errs = append(errs, abuseErrs...)
+	c.Abuse = abuse
 
 	if len(errs) > 0 {
 		return Config{}, errors.Join(errs...)

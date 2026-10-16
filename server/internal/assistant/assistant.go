@@ -298,3 +298,48 @@ func (s *Service) Reply(ctx context.Context, operator, feedbackID int64, text st
 	}
 	return s.chat.MarkFeedbackReplied(ctx, operator, item.ID, text)
 }
+
+// vietnam is the time zone of the dates the assistant writes (no DST).
+var vietnam = time.FixedZone("ICT", 7*60*60)
+
+// NotifyModeration tells userID what the moderation team decided, in the
+// assistant's chat (chat.Notifier). The chat is opened for them when they
+// never pressed Start.
+func (s *Service) NotifyModeration(ctx context.Context, userID int64, n chat.ModerationNotice) error {
+	text := s.copy.noticeText(n)
+	if text == "" {
+		return nil
+	}
+	chatID, err := s.chat.SystemBotNoticeChat(ctx, userID)
+	if err != nil || chatID == 0 {
+		return err
+	}
+	_, err = s.api.SendAsSystemBot(ctx, s.botID, botapi.OutgoingMessage{ChatID: chatID, Text: text})
+	return err
+}
+
+// noticeText is the notice of n; empty when none of its actions concerns
+// the user.
+func (c copyText) noticeText(n chat.ModerationNotice) string {
+	var lines []string
+	for _, a := range n.Actions {
+		switch a {
+		case appv1.ModerationAction_MODERATION_ACTION_WARN:
+			lines = append(lines, c.modWarn)
+		case appv1.ModerationAction_MODERATION_ACTION_DELETE_MESSAGES:
+			lines = append(lines, c.modDeleted)
+		case appv1.ModerationAction_MODERATION_ACTION_BAN_FROM_CHAT:
+			lines = append(lines, c.modBanned)
+		case appv1.ModerationAction_MODERATION_ACTION_RESTRICT_ACCOUNT:
+			if n.Until.IsZero() {
+				lines = append(lines, c.modLocked)
+			} else {
+				lines = append(lines, fmt.Sprintf(c.modLockedUntil, n.Until.In(vietnam).Format("15:04 02/01/2006")))
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return c.modHead + "\n\n" + strings.Join(lines, "\n") + "\n\n" + fmt.Sprintf(c.modReason, n.Note)
+}

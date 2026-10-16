@@ -245,6 +245,8 @@ enum IncomingHookStopReason {
   INCOMING_HOOK_STOP_REASON_CREATOR_NOT_ADMIN = 3;
   // The server turned it off (from_id 0): its creator left or was removed.
   INCOMING_HOOK_STOP_REASON_CREATOR_LEFT = 4;
+  // The moderation team turned it off (from_id 0).
+  INCOMING_HOOK_STOP_REASON_BY_MODERATOR = 5;
 }
 
 // An incoming webhook of the group stopped posting, so members know why its

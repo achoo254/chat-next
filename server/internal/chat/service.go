@@ -59,6 +59,8 @@ type Config struct {
 	// Operators are the user ids allowed to use the moderation queue; none
 	// by default.
 	Operators []int64
+	// Abuse limits cold outreach; the zero value turns it off.
+	Abuse AbuseLimits
 }
 
 // DefaultConfig returns the stage 1 limits; they match rpc.newAppConfig.
@@ -127,6 +129,8 @@ type Service struct {
 	mu       sync.RWMutex
 	sink     Sink
 	presence Presence
+	// notifier tells users about moderation decisions (SetNotifier).
+	notifier Notifier
 	// committed, when set, learns that a transaction wrote outbox rows
 	// (the bot update consumer cuts them right away).
 	committed func()
@@ -341,6 +345,9 @@ var (
 	limitReport  = ratelimit.Rule{Rate: 1.0 / 360, Burst: 10}
 	limitPreview = ratelimit.Rule{Rate: 1, Burst: 20}
 	limitSearch  = ratelimit.Rule{Rate: 1, Burst: 20}
+	// User search of an account younger than youngSearchAge: looking people
+	// up is what a fresh spam account does first.
+	limitSearchYoung = ratelimit.Rule{Rate: 0.2, Burst: 10}
 	// Message search: one call per pause in typing, plus paging.
 	limitMessageSearch = ratelimit.Rule{Rate: 2, Burst: 30}
 )

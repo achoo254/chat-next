@@ -29,6 +29,9 @@ export type Route =
 	| { name: "moderation"; reportId: string | null; actions: boolean }
 	/** The feedback users sent the assistant bot, in the moderation screen. */
 	| { name: "feedback" }
+	/** The moderation log, and one bot as the operators review it. */
+	| { name: "moderationLog" }
+	| { name: "moderationBot"; botId: number }
 	| { name: "console"; view: ConsolePage }
 	/** A bot deep link (/b/<username>?start=<param>); the start parameter is read from the query. */
 	| { name: "bot"; username: string };
@@ -56,6 +59,8 @@ export const paths = {
 	moderation: (reportId?: string, actions = false) =>
 		reportId === undefined ? "/moderation" : `/moderation/${encodeURIComponent(reportId)}${actions ? "/actions" : ""}`,
 	feedback: () => "/moderation/feedback",
+	moderationLog: () => "/moderation/log",
+	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
 } as const;
 
 const ID = /^[1-9][0-9]{0,15}$/;
@@ -119,6 +124,11 @@ function matchMessaging(path: string): Route | null {
 	if (parts[0] === "moderation") {
 		if (parts.length === 1) return { name: "moderation", reportId: null, actions: false };
 		if (parts.length === 2 && parts[1] === "feedback") return { name: "feedback" };
+		if (parts.length === 2 && parts[1] === "log") return { name: "moderationLog" };
+		if (parts.length === 3 && parts[1] === "bots") {
+			const botId = parseId(parts[2]);
+			return botId === null ? null : { name: "moderationBot", botId };
+		}
 		const reportId = parts[1] === undefined ? "" : decodeURIComponent(parts[1]);
 		if (!REPORT_ID.test(reportId)) return null;
 		if (parts.length === 2) return { name: "moderation", reportId, actions: false };

@@ -24,6 +24,7 @@ import { MessageSchema, MessagesService, type Message as WireMessage } from "@ap
 import { ServerFrameSchema } from "@app/proto-ts/realtime";
 import type { Update as WireUpdate } from "@app/proto-ts/updates";
 import { FeedbackKind, FeedbackStatus, ModerationAction, ModerationService, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
+import { BotTier } from "@app/proto-ts/bot_admin";
 import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
 import { FakeMedia, MemoryBlobs } from "../../../../packages/core/test/support/fake-media.ts";
@@ -90,6 +91,30 @@ export interface FixtureReport {
 	createdAt: number;
 	actions: ModerationAction[];
 	note: string;
+}
+
+/** One entry of the moderation log; operatorId 0 is an automatic rule. */
+export interface FixtureLogEntry {
+	id: number;
+	operatorId: number;
+	action: ModerationAction;
+	targetUserId: number;
+	targetChatId: number;
+	note: string;
+	createdAt: number;
+}
+
+/** A bot under review (ModerationService.GetBotReview). */
+export interface FixtureBotReview {
+	botId: number;
+	ownerId: number;
+	tier: BotTier;
+	verified: boolean;
+	restrictedAt: number;
+	restrictedReason: string;
+	reviewed: boolean;
+	users: number;
+	blockedPermille: number;
 }
 
 /** Feedback a user sent the assistant bot (ModerationService.GetFeedback). */
@@ -186,6 +211,8 @@ export class ChatFixture {
 	readonly refusesGroups = new Set<number>();
 	/** Users whose privacy refuses a new private chat with this user ("message me": contacts). */
 	readonly refusesMessages = new Set<number>();
+	/** The anti-spam refusal (server message prefix) CreatePrivate answers, when set. */
+	strangerRefusal: "stranger_chat_limit" | "stranger_chat_paused" | null = null;
 	/** Texts of SendMessage requests that asked for no link preview. */
 	readonly sentWithoutPreview: string[] = [];
 	/** Server message searches the core made (query, chat; 0 = global). */
@@ -236,6 +263,14 @@ export class ChatFixture {
 	/** Users restricted by moderation, with the end (0: until lifted). */
 	readonly restrictions = new Map<number, number>();
 	readonly lifted: number[] = [];
+	/** ResolveReport requests: actions and whether the people were told. */
+	readonly resolutions: { reportIds: number[]; actions: ModerationAction[]; notify: boolean }[] = [];
+	/** GetReport's hooks of webhook reports, by report id. */
+	readonly reportHooks = new Map<number, { id: string; name: string; disabled: boolean }[]>();
+	/** The moderation log (GetModerationLog), newest first. */
+	readonly moderationLog: FixtureLogEntry[] = [];
+	/** Bots as the operators review them (GetBotReview, GetBotReviews). */
+	readonly botReviews = new Map<number, FixtureBotReview>();
 	private pinnedChats: number[] = [];
 	/** Incoming webhooks of the fixture's chats (IntegrationsService). */
 	readonly integrations: FakeIntegrations;
@@ -857,6 +892,7 @@ export class ChatFixture {
 			createPrivate: (req) => {
 				const userId = num(req.userId);
 				if (this.refusesMessages.has(userId)) throw new ConnectError("the user only takes messages from contacts", Code.PermissionDenied);
+				if (this.strangerRefusal !== null) throw new ConnectError(`${this.strangerRefusal}: anti-spam`, Code.ResourceExhausted);
 				const existing = [...this.members.entries()].find(
 					([id, list]) => this.server.wireChat(id, this.selfId).type === ChatType.PRIVATE && list.includes(userId),
 				);
@@ -1151,7 +1187,107 @@ export class ChatFixture {
 		};
 		const chatsOf = (ids: readonly number[]) => ids.filter((id) => id !== 0 && this.members.has(id)).map((id) => this.server.wireChat(id, this.selfId));
 		const usersOf = (ids: readonly number[]) => [...new Set(ids)].filter((id) => this.names.has(id)).map((id) => this.wireUser(id));
+		const sameTarget = (a: FixtureReport, b: FixtureReport) =>
+			a.targetUserId === b.targetUserId && a.targetChatId === b.targetChatId && a.seqs.join() === b.seqs.join();
+		const botReview = (b: FixtureBotReview) => ({
+			botId: BigInt(b.botId),
+			ownerId: BigInt(b.ownerId),
+			createdAt: 1_759_000_000n,
+			tier: b.restrictedAt !== 0 ? BotTier.RESTRICTED : b.verified ? BotTier.VERIFIED : b.tier,
+			verified: b.verified,
+			restrictedAt: BigInt(b.restrictedAt),
+			restrictedReason: b.restrictedReason,
+			restrictedAutomatically: b.restrictedAt !== 0,
+			restrictionReviewed: b.reviewed,
+			users: b.users,
+			messages7d: 100,
+			blockedPermille24h: b.blockedPermille,
+			openReports: 0,
+		});
+		const findBot = (id: bigint): FixtureBotReview => {
+			const found = this.botReviews.get(num(id));
+			if (found === undefined) throw new ConnectError("no such bot", Code.NotFound);
+			return found;
+		};
+		const log = (action: ModerationAction, targetUserId: number, note: string) =>
+			this.moderationLog.unshift({ id: this.moderationLog.length + 1, operatorId: this.selfId, action, targetUserId, targetChatId: 0, note, createdAt: 1_760_000_000 });
 		router.service(ModerationService, {
+			getReportGroups: (req) => {
+				operator();
+				const status = req.status === ReportStatus.UNSPECIFIED ? ReportStatus.OPEN : req.status;
+				const groups: FixtureReport[][] = [];
+				for (const r of this.reportQueue.filter((r) => r.status === status)) {
+					const group = groups.find((g) => g[0] !== undefined && sameTarget(g[0], r));
+					if (group === undefined) groups.push([r]);
+					else group.push(r);
+				}
+				const newest = (g: FixtureReport[]) => g.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
+				const sorted = groups.sort((a, b) => b.length - a.length || newest(b).createdAt - newest(a).createdAt);
+				const all = sorted.flat();
+				return {
+					groups: sorted.map((g) => {
+						const counts = new Map<ReportReason, number>();
+						for (const r of g) counts.set(r.reason, (counts.get(r.reason) ?? 0) + 1);
+						const main = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ReportReason.OTHER;
+						return { report: report(newest(g)), reportCount: g.length, mainReason: main };
+					}),
+					users: usersOf(all.flatMap((r) => [r.reporterId, r.targetUserId])),
+					chats: chatsOf(all.map((r) => r.targetChatId)),
+					nextCursor: "",
+				};
+			},
+			getModerationLog: (req) => {
+				operator();
+				const list = this.moderationLog.filter(
+					(e) =>
+						(req.action === ModerationAction.UNSPECIFIED || e.action === req.action) &&
+						(!req.automaticOnly || e.operatorId === 0) &&
+						(req.operatorId === 0n || e.operatorId === num(req.operatorId)),
+				);
+				return {
+					entries: list.map((e) => ({
+						id: BigInt(e.id),
+						operatorId: BigInt(e.operatorId),
+						action: e.action,
+						targetUserId: BigInt(e.targetUserId),
+						targetChatId: BigInt(e.targetChatId),
+						note: e.note,
+						createdAt: BigInt(e.createdAt),
+					})),
+					users: usersOf(list.flatMap((e) => [e.operatorId, e.targetUserId])),
+					chats: chatsOf(list.map((e) => e.targetChatId)),
+					nextCursor: "",
+				};
+			},
+			getBotReview: (req) => {
+				operator();
+				const b = findBot(req.botId);
+				return { review: botReview(b), users: usersOf([b.botId, b.ownerId]) };
+			},
+			getBotReviews: () => {
+				operator();
+				const list = [...this.botReviews.values()].filter((b) => b.restrictedAt !== 0 && !b.reviewed);
+				return { reviews: list.map(botReview), users: usersOf(list.flatMap((b) => [b.botId, b.ownerId])) };
+			},
+			setBotVerified: (req) => {
+				operator();
+				const b = findBot(req.botId);
+				b.verified = req.verified;
+				log(req.verified ? ModerationAction.VERIFY_BOT : ModerationAction.UNVERIFY_BOT, b.botId, req.note);
+				return { review: botReview(b) };
+			},
+			reviewBotRestriction: (req) => {
+				operator();
+				const b = findBot(req.botId);
+				if (b.restrictedAt === 0) throw new ConnectError("not_restricted: this bot is not restricted", Code.FailedPrecondition);
+				if (req.restore) {
+					b.restrictedAt = 0;
+					b.restrictedReason = "";
+				}
+				b.reviewed = true;
+				log(req.restore ? ModerationAction.RESTORE_BOT_TIER : ModerationAction.KEEP_BOT_RESTRICTED, b.botId, req.note);
+				return { review: botReview(b) };
+			},
 			getReports: (req) => {
 				operator();
 				const status = req.status === ReportStatus.UNSPECIFIED ? ReportStatus.OPEN : req.status;
@@ -1176,6 +1312,22 @@ export class ChatFixture {
 					...(r.targetChatId === 0 || !this.members.has(r.targetChatId) ? {} : { chat: this.server.wireChat(r.targetChatId, this.selfId) }),
 					history: [],
 					restrictions: [...this.restrictions].map(([userId, until]) => ({ userId: BigInt(userId), until: BigInt(until), reason: "", createdAt: 1_760_000_000n })),
+					group: (() => {
+						const group = this.reportQueue.filter((other) => other.status === r.status && sameTarget(other, r));
+						const counts = new Map<ReportReason, number>();
+						for (const other of group) counts.set(other.reason, (counts.get(other.reason) ?? 0) + 1);
+						return {
+							reportCount: group.length,
+							reporterCount: new Set(group.map((other) => other.reporterId)).size,
+							reasons: [...counts].sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({ reason, count })),
+							comments: group.map((other) => other.comment).filter((comment) => comment !== ""),
+						};
+					})(),
+					signals:
+						r.targetUserId === 0
+							? []
+							: [{ userId: BigInt(r.targetUserId), accountAgeSeconds: 2n * 86_400n, strangerChats24h: 148, blockedBy: 21, chatsJoined24h: 6, otherOpenReports: 1 }],
+					hooks: this.reportHooks.get(r.id) ?? [],
 				};
 			},
 			resolveReport: (req) => {
@@ -1183,9 +1335,13 @@ export class ChatFixture {
 				const r = find(req.reportId);
 				if (r.status !== ReportStatus.OPEN) throw new ConnectError("report closed", Code.FailedPrecondition);
 				if (req.note.trim() === "") throw new ConnectError("note required", Code.InvalidArgument);
-				r.status = req.actions.includes(ModerationAction.DISMISS) ? ReportStatus.DISMISSED : ReportStatus.RESOLVED;
-				r.actions = [...req.actions];
-				r.note = req.note;
+				const group = this.reportQueue.filter((other) => other.status === ReportStatus.OPEN && sameTarget(other, r));
+				for (const other of group) {
+					other.status = req.actions.includes(ModerationAction.DISMISS) ? ReportStatus.DISMISSED : ReportStatus.RESOLVED;
+					other.actions = [...req.actions];
+					other.note = req.note;
+				}
+				this.resolutions.push({ reportIds: group.map((other) => other.id), actions: [...req.actions], notify: req.notify });
 				if (req.actions.includes(ModerationAction.RESTRICT_ACCOUNT) && r.targetUserId !== 0) {
 					this.restrictions.set(r.targetUserId, req.restrictSeconds === 0 ? 0 : 1_760_000_000 + req.restrictSeconds);
 				}

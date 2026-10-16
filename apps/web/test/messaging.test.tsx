@@ -588,6 +588,33 @@ describe("a private chat the person refuses", () => {
 	});
 });
 
+describe("a private chat stopped by anti-spam", () => {
+	async function messageStranger(refusal: "stranger_chat_limit" | "stranger_chat_paused"): Promise<void> {
+		const fixture = new ChatFixture();
+		fixture.addUser("Hoàng Nam", { username: "hoangnam" });
+		fixture.strangerRefusal = refusal;
+		renderMessaging(fixture);
+		await userEvent.click((await screen.findAllByRole("button", { name: "Tạo chat mới" }, LONG))[0] as HTMLElement);
+		const dialog = await newChatDialog();
+		await userEvent.type(within(dialog).getByRole("searchbox", { name: "Tìm người" }), "hoangnam");
+		await userEvent.click(await within(dialog).findByRole("button", { name: "Nhắn tin" }, LONG));
+	}
+
+	it("explains the daily limit on chats with strangers", async () => {
+		await messageStranger("stranger_chat_limit");
+		expect(
+			await screen.findByText("Hôm nay bạn đã bắt đầu nhiều chat với người chưa quen. Hãy thử lại sau, hoặc nhờ họ thêm bạn vào danh bạ.", {}, LONG),
+		).toBeTruthy();
+	});
+
+	it("explains the pause while the account is reviewed", async () => {
+		await messageStranger("stranger_chat_paused");
+		expect(
+			await screen.findByText("Tạm thời bạn chưa bắt đầu được chat với người chưa quen vì tài khoản đang được đội kiểm duyệt xem xét.", {}, LONG),
+		).toBeTruthy();
+	});
+});
+
 describe("nothing without server support", () => {
 	it("shows no shared media, group photo or disabled placeholders", async () => {
 		const demo = seedDemo();

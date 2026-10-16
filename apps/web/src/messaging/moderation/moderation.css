@@ -1,0 +1,55 @@
+/* Moderation screens beyond the queue (mockups/moderation.html): loaded with
+   the moderation chunk, so the first screen's CSS stays small. */
+/* Report group, sender signals and webhooks (mockups/moderation.html#report-detail) */
+.person { display: flex; align-items: center; gap: var(--space-3); }
+.person > div { display: grid; min-width: 0; }
+.person b { font-weight: 600; }
+.person .mono { overflow-wrap: anywhere; }
+.facts { margin: 0; border-top: 1px solid var(--c-border-subtle); }
+.facts > div { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); min-height: 40px; }
+.facts > div + div { border-top: 1px solid var(--c-border-subtle); }
+.facts dt { font-size: 0.875rem; color: var(--c-text-muted); }
+.facts dd { margin: 0; display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Bot review (mockups/moderation.html#bot-verified) */
+.bot-hero { display: flex; align-items: center; gap: var(--space-4); }
+.bot-hero .grow, .bot-row .grow { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.bot-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 1.125rem; font-weight: 600; }
+.verified { display: inline-flex; align-items: center; gap: 2px; padding: 1px var(--space-2); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success-text); font-size: 0.75rem; font-weight: 600; }
+.mod .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.mod .stat { display: grid; gap: 2px; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.mod .stat b { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mod .stat span { font-size: 0.8125rem; color: var(--c-text-muted); }
+.tiers tbody tr[aria-current="true"] { background: var(--c-selected); }
+.tiers tbody tr[aria-current="true"] td:first-child { font-weight: 600; }
+.here { margin-left: var(--space-2); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c-primary); }
+.downgraded { align-items: flex-start; flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+.downgraded p { flex: 1 1 320px; margin: 0; }
+.downgraded .icon { margin-top: 2px; }
+.bot-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bot-row b { display: flex; align-items: center; gap: var(--space-2); font-weight: 600; }
+
+/* Moderation log (mockups/moderation.html#audit-log) */
+.append-only { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: auto; font-size: 0.8125rem; }
+.audit td { vertical-align: top; }
+.audit td.mono { white-space: nowrap; }
+.audit .why { max-width: 260px; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.by-rule { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--c-text-muted); white-space: nowrap; }
+.act-tag { display: inline-block; padding: 1px var(--space-2); border-radius: var(--radius-xs); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.t-remove, .t-lock { background: color-mix(in srgb, var(--c-error) 12%, var(--c-surface)); color: var(--c-error-text); }
+.t-warn { background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); }
+.t-skip { background: var(--c-bar-track); color: var(--c-text-muted); }
+.t-ok { background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); color: var(--c-success-text); }
+
+@media (max-width: 1100px) {
+	.mod .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+	.append-only { margin-left: 0; }
+	.bot-hero { flex-wrap: wrap; }
+	.bot-hero .grow, .bot-row .grow { flex: 1 1 200px; }
+	.audit .why { max-width: none; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+	.facts dd .link { display: inline-flex; align-items: center; min-height: 44px; }
+}

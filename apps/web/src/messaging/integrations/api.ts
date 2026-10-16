@@ -13,7 +13,7 @@ export const HOOK_FORMATS: readonly HookFormat[] = ["native", "slack", "alertman
 /** active; disabled by an admin; auto_disabled by the server when the creator lost admin rights or left. */
 export type HookState = "active" | "disabled" | "auto_disabled";
 
-export type HookDisabledReason = "none" | "by_admin" | "creator_not_admin" | "creator_left";
+export type HookDisabledReason = "none" | "by_admin" | "creator_not_admin" | "creator_left" | "by_moderator";
 
 export interface Hook {
 	/** Public id, part of the URL ("hk_…"). */

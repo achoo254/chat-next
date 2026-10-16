@@ -29,6 +29,10 @@ const (
 	BotTier_BOT_TIER_DEFAULT     BotTier = 1
 	BotTier_BOT_TIER_VERIFIED    BotTier = 2
 	BotTier_BOT_TIER_INTERNAL    BotTier = 3
+	// Lowered by the automatic anti-abuse rule or an operator.
+	BotTier_BOT_TIER_RESTRICTED BotTier = 4
+	// A bot younger than 14 days.
+	BotTier_BOT_TIER_NEW BotTier = 5
 )
 
 // Enum value maps for BotTier.
@@ -38,12 +42,16 @@ var (
 		1: "BOT_TIER_DEFAULT",
 		2: "BOT_TIER_VERIFIED",
 		3: "BOT_TIER_INTERNAL",
+		4: "BOT_TIER_RESTRICTED",
+		5: "BOT_TIER_NEW",
 	}
 	BotTier_value = map[string]int32{
 		"BOT_TIER_UNSPECIFIED": 0,
 		"BOT_TIER_DEFAULT":     1,
 		"BOT_TIER_VERIFIED":    2,
 		"BOT_TIER_INTERNAL":    3,
+		"BOT_TIER_RESTRICTED":  4,
+		"BOT_TIER_NEW":         5,
 	}
 )
 
@@ -1986,12 +1994,14 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\n" +
 	"update_ids\x18\x02 \x03(\x03B\x020\x02R\tupdateIds\"=\n" +
 	"\x1dDiscardBotDeadLettersResponse\x12\x1c\n" +
-	"\tdiscarded\x18\x01 \x01(\x05R\tdiscarded*g\n" +
+	"\tdiscarded\x18\x01 \x01(\x05R\tdiscarded*\x92\x01\n" +
 	"\aBotTier\x12\x18\n" +
 	"\x14BOT_TIER_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10BOT_TIER_DEFAULT\x10\x01\x12\x15\n" +
 	"\x11BOT_TIER_VERIFIED\x10\x02\x12\x15\n" +
-	"\x11BOT_TIER_INTERNAL\x10\x03*\xb2\x01\n" +
+	"\x11BOT_TIER_INTERNAL\x10\x03\x12\x17\n" +
+	"\x13BOT_TIER_RESTRICTED\x10\x04\x12\x10\n" +
+	"\fBOT_TIER_NEW\x10\x05*\xb2\x01\n" +
 	"\x0fBotCommandScope\x12!\n" +
 	"\x1dBOT_COMMAND_SCOPE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19BOT_COMMAND_SCOPE_DEFAULT\x10\x01\x12\x1d\n" +

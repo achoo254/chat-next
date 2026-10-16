@@ -619,3 +619,26 @@ func TestSecretsNeverReachTheLogs(t *testing.T) {
 		t.Fatalf("logs contain the secret or the hook path:\n%s", logs)
 	}
 }
+
+func TestModeratorDisabledHookStaysOff(t *testing.T) {
+	h := newHarness(t, allowAll{})
+	ctx := context.Background()
+	owner := h.user("owner")
+	chatID := h.group(owner)
+	hook, _ := h.create(owner, chatID, "Spammy", appv1.IncomingHookFormat_INCOMING_HOOK_FORMAT_NATIVE)
+	if _, err := h.st.Pool().Exec(ctx, `
+		UPDATE incoming_hooks SET state = 'disabled', disabled_reason = 'by_moderator', disabled_at = now() WHERE id = $1`,
+		hook.GetId()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.hooks.SetIncomingHookEnabled(ctx, owner, &appv1.SetIncomingHookEnabledRequest{HookId: hook.GetId(), Enabled: true}); codeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("enable a moderator-disabled hook: %v", err)
+	}
+	if _, err := h.hooks.TakeOverIncomingHook(ctx, owner, &appv1.TakeOverIncomingHookRequest{HookId: hook.GetId()}); codeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("take over a moderator-disabled hook: %v", err)
+	}
+	got, err := h.hooks.GetIncomingHook(ctx, owner, hook.GetId())
+	if err != nil || got.GetHook().GetDisabledReason() != appv1.IncomingHookDisabledReason_INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR {
+		t.Fatalf("hook = %v, %v", got, err)
+	}
+}

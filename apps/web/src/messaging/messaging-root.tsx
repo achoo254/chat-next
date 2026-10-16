@@ -104,6 +104,8 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
 		case "moderation":
 		case "feedback":
+		case "moderationLog":
+		case "moderationBot":
 			return [moderationCode.preload()];
 	}
 	return [];
@@ -323,10 +325,16 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			screen = <DeveloperConsole view={route.view} />;
 			break;
 		case "moderation":
-			screen = <Moderation reportId={route.reportId} actions={route.actions} />;
+			screen = <Moderation view={route.reportId === null ? { page: "queue" } : { page: "report", reportId: route.reportId, actions: route.actions }} />;
 			break;
 		case "feedback":
-			screen = <Moderation reportId={null} actions={false} feedback />;
+			screen = <Moderation view={{ page: "feedback" }} />;
+			break;
+		case "moderationLog":
+			screen = <Moderation view={{ page: "log" }} />;
+			break;
+		case "moderationBot":
+			screen = <Moderation view={{ page: "bot", botId: route.botId }} />;
 			break;
 	}
 	return (

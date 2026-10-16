@@ -31,6 +31,9 @@ const (
 	ConsentDeepLink = "deep_link"
 	ConsentButton   = "button"
 	ConsentMessage  = "message"
+	// ConsentNotice: the assistant opened its chat to tell the user about a
+	// moderation decision.
+	ConsentNotice = "notice"
 )
 
 // Limits of bot messages and buttons.

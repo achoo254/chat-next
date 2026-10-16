@@ -105,9 +105,11 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		return nil, err
 	}
 	origins := auth.NewOrigins(publicOrigin, cfg.DevOrigins...)
+	limiter := ratelimit.NewMemory()
 	routes, err := auth.NewRoutes(auth.RoutesConfig{
 		IdP: idp, Sessions: sessions, Store: st, Origins: origins,
 		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, SessionKey: cfg.SessionKey, Logger: logger,
+		Limiter: limiter, SignupsPerIPHour: cfg.Abuse.SignupsPerIPHour, SignupsPer10Min: cfg.Abuse.SignupsPer10Min,
 	})
 	if err != nil {
 		return nil, err
@@ -124,13 +126,16 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		}
 	}
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{Allow: previewAllow}), logger)
-	limiter := ratelimit.NewMemory()
 	mediaSvc, err := newMedia(cfg, st, limiter, logger, opts.MediaObjects)
 	if err != nil {
 		return nil, err
 	}
 	chatSvc, err := chat.New(chat.Config{
 		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme, Operators: cfg.OperatorUserIDs,
+		Abuse: chat.AbuseLimits{
+			StrangerChatsNew: cfg.Abuse.StrangerChatsNew, StrangerChats: cfg.Abuse.StrangerChats,
+			NewAccountAge: time.Duration(cfg.Abuse.NewAccountDays) * 24 * time.Hour, Reporters: cfg.Abuse.Reporters,
+		},
 	}, chat.Deps{Pool: st.Pool(), IDs: ids, Previews: previews, Media: mediaSvc, Limiter: limiter, Logger: logger})
 	if err != nil {
 		return nil, err
@@ -192,6 +197,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	var feedback rpc.FeedbackReplier
 	if assistantSvc != nil {
 		feedback = assistantSvc
+		chatSvc.SetNotifier(assistantSvc)
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
@@ -223,6 +229,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
 		pushSvc.Run, privacySvc.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
+		func(ctx context.Context) {
+			runEvery(ctx, botAbuseRuleEvery, func() {
+				if err := chatSvc.ApplyBotAbuseRule(ctx); err != nil && ctx.Err() == nil {
+					logger.Warn("bot anti-abuse rule failed", "err", err)
+				}
+			})
+		},
 	}
 	if assistantSvc != nil {
 		loops = append(loops, assistantSvc.Run)
@@ -382,6 +395,9 @@ func byHost(mediaHost string, mediaHandler, app http.Handler) http.Handler {
 		app.ServeHTTP(w, r)
 	})
 }
+
+// botAbuseRuleEvery is how often the bot anti-abuse rule runs.
+const botAbuseRuleEvery = 10 * time.Minute
 
 func runEvery(ctx context.Context, every time.Duration, fn func()) {
 	ticker := time.NewTicker(every)

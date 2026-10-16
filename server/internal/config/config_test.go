@@ -308,3 +308,34 @@ func TestLoadWebPush(t *testing.T) {
 		t.Fatalf("development: %+v, %v", c.WebPush, err)
 	}
 }
+
+func TestLoadAbuse(t *testing.T) {
+	c, err := Load(lookupFrom(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Abuse != DefaultAbuse() {
+		t.Fatalf("abuse by default = %+v", c.Abuse)
+	}
+	// A new account is stopped well before its 50th stranger.
+	if d := DefaultAbuse(); d.StrangerChatsNew == 0 || d.StrangerChatsNew >= 50 {
+		t.Fatalf("default young allowance = %d", d.StrangerChatsNew)
+	}
+	env := validEnv()
+	env["ABUSE_STRANGER_CHATS_NEW"] = "0"
+	env["ABUSE_SIGNUPS_PER_IP_HOUR"] = " 12 "
+	if c, err = Load(lookupFrom(env)); err != nil {
+		t.Fatal(err)
+	}
+	if c.Abuse.StrangerChatsNew != 0 || c.Abuse.SignupsPerIPHour != 12 || c.Abuse.StrangerChats != DefaultAbuse().StrangerChats {
+		t.Fatalf("abuse = %+v", c.Abuse)
+	}
+	for _, bad := range []string{"-1", "x", "1.5", "1000001"} {
+		env["ABUSE_REPORTERS"] = bad
+		_, err := Load(lookupFrom(env))
+		var ve *VarError
+		if !errors.As(err, &ve) || ve.Name != "ABUSE_REPORTERS" {
+			t.Errorf("%q: err = %v", bad, err)
+		}
+	}
+}

@@ -109,8 +109,22 @@ func scanUser(row pgx.Row) (User, error) {
 // display name only while its name is still the fallback taken from the
 // username; a name the user chose is never overwritten.
 func (s *Store) UpsertIdPUser(ctx context.Context, tenantID string, p IdPProfile) (User, error) {
+	return s.UpsertIdPUserAdmitting(ctx, tenantID, p, nil)
+}
+
+// ErrSignupLimited: the sign-in would create a new user and admitNew
+// refused it.
+var ErrSignupLimited = errors.New("store: too many new users")
+
+// UpsertIdPUserAdmitting is UpsertIdPUser that asks admitNew (when not
+// nil) before creating a user; a refusal returns ErrSignupLimited and
+// existing users are unaffected.
+func (s *Store) UpsertIdPUserAdmitting(ctx context.Context, tenantID string, p IdPProfile, admitNew func() bool) (User, error) {
 	if u, err := refreshIdPUser(ctx, s.pool, tenantID, p); !errors.Is(err, ErrNotFound) {
 		return u, err
+	}
+	if admitNew != nil && !admitNew() {
+		return User{}, ErrSignupLimited
 	}
 	email, verified := p.Email.stored()
 	base := profile.UsernameBase(p.PreferredUsername)

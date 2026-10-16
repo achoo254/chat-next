@@ -176,7 +176,7 @@ func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 // group in place, in one transaction holding the chat lock: idempotency
 // keys and alert groups of the hook are therefore never raced.
 func (s *Service) deliver(ctx context.Context, h *hookRow, n *format.Notification) (int64, error) {
-	msg := chat.IntegrationMessage{Label: h.Name, Text: n.Text, Entities: n.Entities, Silent: n.Silent || h.Silent}
+	msg := chat.IntegrationMessage{Label: h.Name, Text: n.Text, Entities: n.Entities, Silent: n.Silent || h.Silent, HookID: h.ID}
 	for _, row := range n.Buttons {
 		var out []chat.IntegrationButton
 		for _, b := range row {

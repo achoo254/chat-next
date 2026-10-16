@@ -9,6 +9,9 @@ import { useServices } from "../data/services.tsx";
 
 /** The server's prefix for the caller's own account restriction, also a PermissionDenied. */
 const ACCOUNT_RESTRICTED = "account_restricted";
+/** The server's prefixes for its anti-spam refusals (ResourceExhausted). */
+const STRANGER_LIMIT = "stranger_chat_limit";
+const STRANGER_PAUSED = "stranger_chat_paused";
 
 /** CreatePrivate was refused by the other person, not by the caller's own account state. */
 export function isPrivateChatRefused(err: unknown): boolean {
@@ -21,6 +24,15 @@ export function usePrivateChatFailure(): (err: unknown, userId: number) => void 
 	const copy = useCopy();
 	const { store, remote, toasts } = useServices();
 	return (err, userId) => {
+		const error = ConnectError.from(err);
+		if (error.code === Code.ResourceExhausted && error.rawMessage.startsWith(STRANGER_LIMIT)) {
+			toasts.show(copy.common.strangerLimit);
+			return;
+		}
+		if (error.code === Code.ResourceExhausted && error.rawMessage.startsWith(STRANGER_PAUSED)) {
+			toasts.show(copy.common.strangerPaused);
+			return;
+		}
 		if (!isPrivateChatRefused(err)) {
 			toasts.show(copy.common.failed);
 			return;

@@ -85,3 +85,30 @@ func (s *Service) EnsureSystemBotChat(ctx context.Context, me int64) error {
 
 // errAssistantChatExists rolls back a creation that lost a race.
 var errAssistantChatExists = errors.New("chat: assistant chat already exists")
+
+// SystemBotNoticeChat returns the chat of the assistant with userID for a
+// moderation notice, creating it when the user never had one, and records
+// the notice as consent (source "notice") so the assistant may write even
+// to a user who never pressed Start. 0 when there is no assistant.
+func (s *Service) SystemBotNoticeChat(ctx context.Context, userID int64) (int64, error) {
+	bot := s.SystemBot()
+	if bot == 0 || bot == userID {
+		return 0, nil
+	}
+	if err := s.EnsureSystemBotChat(ctx, userID); err != nil {
+		return 0, err
+	}
+	var chatID int64
+	err := s.pool.QueryRow(ctx, `SELECT chat_id FROM private_chats WHERE tenant_id = $1 AND user_low = $2 AND user_high = $3`,
+		s.cfg.TenantID, min(userID, bot), max(userID, bot)).Scan(&chatID)
+	if isNoRows(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("chat: find assistant chat: %w", err)
+	}
+	if err := recordConsent(ctx, s.pool, bot, userID, ConsentNotice); err != nil {
+		return 0, err
+	}
+	return chatID, nil
+}

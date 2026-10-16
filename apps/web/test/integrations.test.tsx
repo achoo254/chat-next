@@ -285,6 +285,22 @@ describe("webhook management", () => {
 	});
 });
 
+describe("a webhook the moderation team turned off", () => {
+	it("says so and offers no way to turn it back on", async () => {
+		const demo = seedDemo();
+		const fake = demo.fixture.integrations;
+		const hookId = fake.seed(demo.ids.ops, {
+			name: "CI Alerts",
+			state: IncomingHookState.DISABLED,
+			disabledReason: IncomingHookDisabledReason.BY_MODERATOR,
+		});
+		renderMessaging(demo.fixture, `/c/${demo.ids.ops}/admin/hooks/${hookId}`);
+		expect(await screen.findByText(/^Đội kiểm duyệt đã tắt webhook này lúc .+\. Admin không bật lại hay nhận lại được\.$/, {}, LONG)).toBeTruthy();
+		expect(screen.queryByRole("switch", { name: "Nhận tin" })).toBeNull();
+		expect(screen.queryByRole("button", { name: /Nhận lại/ })).toBeNull();
+	});
+});
+
 describe("webhook messages", () => {
 	it("render the label, the alert state, code blocks and URL buttons, and update in place", async () => {
 		const demo = seedDemo();

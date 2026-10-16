@@ -63,10 +63,16 @@ var (
 
 // Tier names.
 const (
-	TierDefault  = "default"
-	TierVerified = "verified"
-	TierInternal = "internal"
+	TierDefault    = "default"
+	TierVerified   = "verified"
+	TierInternal   = "internal"
+	TierRestricted = "restricted"
+	TierNew        = "new"
 )
+
+// NewBotAge is the age below which a bot that is not verified runs on the
+// new tier.
+const NewBotAge = 14 * 24 * time.Hour
 
 // Command scopes as stored and as the Bot API names them.
 const (
@@ -116,8 +122,11 @@ type Bot struct {
 	Webhook bool
 	// System marks the tenant's assistant: no human owner (OwnerID is the
 	// bot itself), no token, run inside the api process.
-	System    bool
-	tokenHash []byte
+	System bool
+	// RestrictedAt is when the anti-abuse rule or an operator moved the bot
+	// to the restricted tier; nil when it is not restricted.
+	RestrictedAt *time.Time
+	tokenHash    []byte
 }
 
 // Tier is the bot's rate limit tier.
@@ -125,8 +134,12 @@ func (b *Bot) Tier() string {
 	switch {
 	case b.Internal:
 		return TierInternal
+	case b.RestrictedAt != nil:
+		return TierRestricted
 	case b.Verified:
 		return TierVerified
+	case time.Since(b.CreatedAt) < NewBotAge:
+		return TierNew
 	default:
 		return TierDefault
 	}
@@ -218,7 +231,8 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 // ------------------------------------------------------------------- rows
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
-	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.is_system, b.token_hash`
+	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.is_system, b.restricted_at,
+	b.token_hash`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -226,7 +240,7 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	b := &Bot{}
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
-		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.tokenHash)
+		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.RestrictedAt, &b.tokenHash)
 	if err != nil {
 		return nil, err
 	}
@@ -290,12 +304,7 @@ func (b *Bot) Render() *appv1.Bot {
 		Description: b.Description, About: b.About, Privacy: b.Privacy,
 		Tier: appv1.BotTier_BOT_TIER_DEFAULT, HasToken: b.tokenHash != nil, CreatedAt: b.CreatedAt.Unix(),
 	}
-	switch b.Tier() {
-	case TierInternal:
-		out.Tier = appv1.BotTier_BOT_TIER_INTERNAL
-	case TierVerified:
-		out.Tier = appv1.BotTier_BOT_TIER_VERIFIED
-	}
+	out.Tier = TierOf(b.Tier())
 	if b.TokenIssuedAt != nil && b.tokenHash != nil {
 		out.TokenIssuedAt = b.TokenIssuedAt.Unix()
 	}
@@ -925,4 +934,20 @@ func (s *Service) Menus(ctx context.Context, ids []int64, role ChatRole) ([]*app
 		}
 	}
 	return out, nil
+}
+
+// TierOf maps a tier name to the wire enum.
+func TierOf(tier string) appv1.BotTier {
+	switch tier {
+	case TierInternal:
+		return appv1.BotTier_BOT_TIER_INTERNAL
+	case TierVerified:
+		return appv1.BotTier_BOT_TIER_VERIFIED
+	case TierRestricted:
+		return appv1.BotTier_BOT_TIER_RESTRICTED
+	case TierNew:
+		return appv1.BotTier_BOT_TIER_NEW
+	default:
+		return appv1.BotTier_BOT_TIER_DEFAULT
+	}
 }

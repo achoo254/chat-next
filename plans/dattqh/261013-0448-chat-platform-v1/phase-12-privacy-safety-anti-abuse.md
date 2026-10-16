@@ -84,9 +84,9 @@ Create:
 
 - [ ] Data inventory + đánh giá ND13 (inventory xong: [`docs/privacy/data-inventory.md`](../../../docs/privacy/data-inventory.md); còn hồ sơ đánh giá chuyển dữ liệu ra nước ngoài)
 - [ ] Cài đặt riêng tư + áp dụng toàn hệ thống (R1: danh bạ tường minh, ai thêm vào nhóm/last seen/nhắn tin; còn hoàn thiện ở R9)
-- [ ] Giới hạn dò tìm
-- [ ] Chặn/báo cáo/kiểm duyệt + công cụ vận hành (R1: chặn, báo cáo, kick = cấm; còn hàng đợi kiểm duyệt có RPC)
-- [ ] Chống spam tài khoản/bot/webhook
+- [x] Giới hạn dò tìm (email khớp chính xác; tài khoản dưới 24 giờ tuổi tìm chậm hơn; 2026-10-16)
+- [x] Chặn/báo cáo/kiểm duyệt + công cụ vận hành (2026-10-16: gộp báo cáo, tín hiệu người gửi, cảnh cáo, tắt webhook, xác minh và xét duyệt bot, nhật ký + CSV; phạm vi chủ tenant làm cùng tenant thứ hai)
+- [x] Chống spam tài khoản/bot/webhook (2026-10-16, migration 0020; gửi hàng loạt của bot mới giới hạn khi có tính năng bulk)
 - [x] Xoá/tự huỷ/xuất dữ liệu (R9, 2026-10-16, migration 0019)
 - [ ] Redact PII + secret trong log
 - [ ] Xoay vòng khoá + runbook
@@ -106,6 +106,20 @@ Create:
 - Xoá (quyết định của Jev): tin gửi trong chat người khác giữ lại với người gửi "Tài khoản đã xoá"; chặn khi còn là chủ nhóm/kênh; xác nhận (đăng nhập IdP ≤ 10 phút + gõ username) khoá ngay: thu hồi mọi phiên và grant IdP, bot dừng (token bị từ chối, webhook tạm dừng), người khác thấy "Tài khoản đã xoá"; đăng nhập lại trong 30 ngày chỉ có "Huỷ xoá tài khoản"; hết 30 ngày job hằng giờ xoá hẳn (rời nhóm, xoá Cloud của tôi và chat riêng không còn ai giữ, xoá danh bạ/chặn/cài đặt/phiên/push/bot, nhả username, xoá `idp_sub`). Đăng nhập lại sau đó tạo tài khoản mới.
 - Tự xoá: Tắt/6/12/24 tháng tính từ lần cuối một phiên được dùng; đến hạn đi cùng đường xoá (30 ngày chờ, lý do hiện ở lần đăng nhập sau). Riêng đường này, chủ nhóm/kênh được chuyển quyền tự động (phó nhóm lâu nhất, không có thì thành viên lâu nhất; nhóm không còn ai thì xoá).
 - Thành viên chung nhóm thấy tên mới khi người đó xuất hiện lại trong update hoặc tra cứu; người chat riêng được báo ngay (`chat_updated`).
+
+### Chống lạm dụng đầy đủ R9 (2026-10-16, migration 0020)
+
+Quyết định (Jev `jev-1.13.0`, xác suất trong ngoặc): làm lát A trước (0,93), gộp A+B+C vào một lần deploy (0,72), làm đủ 8 mục B/C (0,53–0,79).
+
+- **A. Spam tài khoản:**
+  - Người chưa quen = chưa thêm mình vào danh bạ và không cùng nhóm/kênh (0,67).
+  - Mỗi 24 giờ được tạo tối đa 20 chat riêng với người chưa quen nếu tài khoản dưới 7 ngày tuổi, 50 nếu lâu hơn (0,81). Đếm bằng truy vấn Postgres (0,97).
+  - Tạm dừng nhắn người chưa quen khi ≥ 3 người có báo cáo đang mở trong 30 ngày (0,65), tới khi kiểm duyệt đóng báo cáo.
+  - Tài khoản chat mới lúc đăng nhập lần đầu: tối đa 30 mỗi IP mỗi giờ (0,55) và 300 mỗi tenant mỗi 10 phút.
+  - Tìm người: tài khoản dưới 24 giờ tuổi 1 lần/5 s, burst 10 (0,69).
+  - Ngưỡng nằm trong env `ABUSE_*`, 0 là tắt (0,84).
+- **B. Bot và webhook:** cấp/thu hồi xác minh; tầng Hạn chế, tự hạ khi ≥ 5% người nhận chặn trong 24 giờ (tối thiểu 20 người nhận) hoặc người nhận mới tăng 10 lần; kiểm duyệt giữ hoặc khôi phục; tầng bot mới (< 14 ngày); hành động Tắt webhook (tìm hook cùng chat theo tên nhãn, 0,42).
+- **C. Công cụ kiểm duyệt:** hàng đợi gộp theo đối tượng, xử lý thì đóng mọi báo cáo đang mở của đối tượng (0,72); tín hiệu người gửi trong chi tiết; Cảnh cáo và thông báo cho người bị xử lý qua bot trợ lý, kể cả khi họ chưa bấm Bắt đầu (0,80); màn Nhật ký kiểm duyệt + xuất CSV. Phạm vi chủ tenant làm cùng tenant thứ hai.
 
 ## Success Criteria
 

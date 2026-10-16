@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package app.v1;
 
+import "app/v1/bot_admin.proto";
 import "app/v1/chats.proto";
 import "app/v1/messages.proto";
 import "app/v1/users.proto";
@@ -22,7 +23,8 @@ service ModerationService {
   // One report with the reported messages as filed, the messages around
   // them as they are now, and earlier actions on the reported user.
   rpc GetReport(GetReportRequest) returns (GetReportResponse);
-  // Closes an open report with one or more actions; a closed report gives
+  // Closes an open report, and every other open report about the same
+  // target, with one or more actions; a closed report gives
   // failed_precondition.
   rpc ResolveReport(ResolveReportRequest) returns (ResolveReportResponse);
   // Ends an account restriction before its time.
@@ -37,6 +39,22 @@ service ModerationService {
   // reply to their message) and marks the item handled. One answer per
   // item: a second gives failed_precondition "already_replied".
   rpc ReplyFeedback(ReplyFeedbackRequest) returns (ReplyFeedbackResponse);
+  // Reports grouped by target (the same user, chat, or messages), the
+  // groups with the most reports first; each group carries its newest
+  // report. ResolveReport on that report closes the whole open group.
+  rpc GetReportGroups(GetReportGroupsRequest) returns (GetReportGroupsResponse);
+  // The tenant's moderation log, newest first, including the automatic
+  // rules (operator_id 0).
+  rpc GetModerationLog(GetModerationLogRequest) returns (GetModerationLogResponse);
+  // What an operator needs to judge a bot: tier, verification, automatic
+  // restriction and usage.
+  rpc GetBotReview(GetBotReviewRequest) returns (GetBotReviewResponse);
+  // Bots the automatic rule restricted that no operator has reviewed yet.
+  rpc GetBotReviews(GetBotReviewsRequest) returns (GetBotReviewsResponse);
+  // Grants or revokes a bot's verified badge (and its higher tier).
+  rpc SetBotVerified(SetBotVerifiedRequest) returns (SetBotVerifiedResponse);
+  // Keeps a restricted bot restricted, or restores its previous tier.
+  rpc ReviewBotRestriction(ReviewBotRestrictionRequest) returns (ReviewBotRestrictionResponse);
 }
 
 enum ReportStatus {
@@ -53,6 +71,10 @@ enum ReportTargetKind {
   REPORT_TARGET_KIND_USER = 1;
   REPORT_TARGET_KIND_CHAT = 2;
   REPORT_TARGET_KIND_MESSAGES = 3;
+  // A report about a bot account (filed as USER).
+  REPORT_TARGET_KIND_BOT = 4;
+  // A report about messages an incoming webhook posted (filed as MESSAGES).
+  REPORT_TARGET_KIND_WEBHOOK = 5;
 }
 
 enum ModerationAction {
@@ -71,6 +93,22 @@ enum ModerationAction {
   MODERATION_ACTION_RESTRICT_ACCOUNT = 4;
   // LiftRestriction (log entries only).
   MODERATION_ACTION_LIFT_RESTRICTION = 5;
+  // The assistant bot sends the reported users (or the authors of the
+  // reported messages) the note as a warning.
+  MODERATION_ACTION_WARN = 6;
+  // WEBHOOK: turn off the hooks of the chat that posted the reported
+  // messages (GetReportResponse.hooks).
+  MODERATION_ACTION_DISABLE_WEBHOOK = 7;
+  // Log entries only: a bot moved to the restricted tier (by the automatic
+  // rule, operator_id 0), kept there or restored after review, verified or
+  // unverified, and a user's new chats with strangers stopped by the
+  // automatic rule.
+  MODERATION_ACTION_RESTRICT_BOT = 8;
+  MODERATION_ACTION_RESTORE_BOT_TIER = 9;
+  MODERATION_ACTION_KEEP_BOT_RESTRICTED = 10;
+  MODERATION_ACTION_VERIFY_BOT = 11;
+  MODERATION_ACTION_UNVERIFY_BOT = 12;
+  MODERATION_ACTION_LIMIT_STRANGER_CHATS = 13;
 }
 
 message Report {
@@ -117,6 +155,10 @@ message ModerationLogEntry {
   // RESTRICT_ACCOUNT: end of the restriction; 0 = until lifted.
   int64 until = 8 [jstype = JS_NUMBER];
   int64 created_at = 9 [jstype = JS_NUMBER];
+  // DELETE_MESSAGES: the deleted messages of target_chat_id.
+  repeated int64 seqs = 10 [jstype = JS_NUMBER];
+  // DISABLE_WEBHOOK: the hook turned off, and its name.
+  string hook_id = 11;
 }
 
 message AccountRestriction {
@@ -168,6 +210,156 @@ message GetReportResponse {
   repeated ModerationLogEntry history = 6;
   // Active restrictions of those users.
   repeated AccountRestriction restrictions = 7;
+  // The reports about the same target with the same status as this one.
+  ReportGroupSummary group = 8;
+  // What the reported users did lately, one entry per user.
+  repeated SenderSignals signals = 9;
+  // WEBHOOK: the hooks of the chat whose name is the label of the reported
+  // messages, the ones DISABLE_WEBHOOK turns off.
+  repeated ModeratedHook hooks = 10;
+}
+
+message ReportGroupSummary {
+  int32 report_count = 1;
+  // Distinct reporters.
+  int32 reporter_count = 2;
+  // Report counts by reason, the most frequent first.
+  repeated ReasonCount reasons = 3;
+  // Reporters' comments, newest first, at most 10.
+  repeated string comments = 4;
+}
+
+message ReasonCount {
+  ReportReason reason = 1;
+  int32 count = 2;
+}
+
+message SenderSignals {
+  int64 user_id = 1 [jstype = JS_NUMBER];
+  // Age of the chat account.
+  int64 account_age_seconds = 2 [jstype = JS_NUMBER];
+  // Private chats the user started in the last 24 hours with people who do
+  // not know them (not their contact, no shared group or channel).
+  int32 stranger_chats_24h = 3;
+  // People who blocked the user.
+  int32 blocked_by = 4;
+  // Groups and channels the user joined in the last 24 hours.
+  int32 chats_joined_24h = 5;
+  // Open reports about the user other than this report's group.
+  int32 other_open_reports = 6;
+}
+
+message ModeratedHook {
+  string id = 1;
+  string name = 2;
+  bool disabled = 3;
+}
+
+message ReportGroup {
+  // The newest report of the group.
+  Report report = 1;
+  int32 report_count = 2;
+  // The most frequent reason.
+  ReportReason main_reason = 3;
+}
+
+message GetReportGroupsRequest {
+  // As in GetReportsRequest.
+  ReportStatus status = 1;
+  ReportReason reason = 2;
+  ReportTargetKind target_kind = 3;
+  string cursor = 4;
+  // Default 50, at most 200.
+  int32 limit = 5;
+}
+
+message GetReportGroupsResponse {
+  repeated ReportGroup groups = 1;
+  repeated User users = 2;
+  repeated Chat chats = 3;
+  string next_cursor = 4;
+}
+
+message GetModerationLogRequest {
+  // Optional filters: one operator (or 0 with automatic_only for the
+  // automatic rules), one action, entries since a time (Unix seconds).
+  int64 operator_id = 1 [jstype = JS_NUMBER];
+  bool automatic_only = 2;
+  ModerationAction action = 3;
+  int64 since = 4 [jstype = JS_NUMBER];
+  string cursor = 5;
+  // Default 50, at most 500.
+  int32 limit = 6;
+}
+
+message GetModerationLogResponse {
+  repeated ModerationLogEntry entries = 1;
+  // Operators and targets of these entries.
+  repeated User users = 2;
+  repeated Chat chats = 3;
+  string next_cursor = 4;
+}
+
+// A bot as the operators review it.
+message BotReview {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  int64 owner_id = 2 [jstype = JS_NUMBER];
+  int64 created_at = 3 [jstype = JS_NUMBER];
+  BotTier tier = 4;
+  bool verified = 5;
+  // Restricted tier: since when, why, and whether by the automatic rule.
+  int64 restricted_at = 6 [jstype = JS_NUMBER];
+  string restricted_reason = 7;
+  bool restricted_automatically = 8;
+  // An operator kept the restriction after review.
+  bool restriction_reviewed = 9;
+  // Users who started the bot.
+  int32 users = 10;
+  // Messages the bot sent in the last 7 days.
+  int32 messages_7d = 11;
+  // Of the users the bot wrote to in the last 24 hours, the share (per
+  // thousand) who blocked it.
+  int32 blocked_permille_24h = 12;
+  int32 open_reports = 13;
+}
+
+message GetBotReviewRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+}
+
+message GetBotReviewResponse {
+  BotReview review = 1;
+  // The bot and its owner.
+  repeated User users = 2;
+}
+
+message GetBotReviewsRequest {}
+
+message GetBotReviewsResponse {
+  repeated BotReview reviews = 1;
+  repeated User users = 2;
+}
+
+message SetBotVerifiedRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  bool verified = 2;
+  // Why, recorded in the log; required.
+  string note = 3;
+}
+
+message SetBotVerifiedResponse {
+  BotReview review = 1;
+}
+
+message ReviewBotRestrictionRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // true restores the bot's tier; false keeps it restricted.
+  bool restore = 2;
+  string note = 3;
+}
+
+message ReviewBotRestrictionResponse {
+  BotReview review = 1;
 }
 
 message ResolveReportRequest {
@@ -177,6 +369,9 @@ message ResolveReportRequest {
   string note = 3;
   // RESTRICT_ACCOUNT: length in seconds, up to 366 days; 0 = until lifted.
   int32 restrict_seconds = 4;
+  // The assistant bot also tells the reported users what was done and why
+  // (the note); WARN always does.
+  bool notify = 5;
 }
 
 message ResolveReportResponse {

@@ -370,7 +370,7 @@ func (s *Service) ResolveUsername(ctx context.Context, me int64, username string
 	if !profile.ValidUsername(name) {
 		return nil, errInvalid("invalid username")
 	}
-	if err := s.allow(ctx, limitSearch, "search", me); err != nil {
+	if err := s.allowSearch(ctx, me); err != nil {
 		return nil, err
 	}
 	id, err := s.findable(ctx, me, name, "")
@@ -398,7 +398,7 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	if limit <= 0 || limit > searchMax {
 		limit = 20
 	}
-	if err := s.allow(ctx, limitSearch, "search", me); err != nil {
+	if err := s.allowSearch(ctx, me); err != nil {
 		return nil, err
 	}
 	var rows pgx.Rows
@@ -475,7 +475,7 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 		if !profile.ValidUsername(name) {
 			return nil, errInvalid("invalid username")
 		}
-		if err := s.allow(ctx, limitSearch, "search", me); err != nil {
+		if err := s.allowSearch(ctx, me); err != nil {
 			return nil, err
 		}
 		var err error
@@ -487,7 +487,7 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 		if email == "" || len(email) > 320 || !strings.Contains(email, "@") {
 			return nil, errInvalid("invalid email")
 		}
-		if err := s.allow(ctx, limitSearch, "search", me); err != nil {
+		if err := s.allowSearch(ctx, me); err != nil {
 			return nil, err
 		}
 		var err error
@@ -732,9 +732,13 @@ func (s *Service) Report(ctx context.Context, me int64, req *appv1.ReportRequest
 			if !ok || row.Seq < m.VisibleFrom {
 				return errNotFound("message")
 			}
-			evidence = append(evidence, map[string]any{
+			item := map[string]any{
 				"seq": row.Seq, "from_id": row.FromID, "date": row.Date.Unix(), "text": row.Text, "deleted": row.Deleted,
-			})
+			}
+			if row.FromID == 0 && isIntegration(row) {
+				item["hook"] = true
+			}
+			evidence = append(evidence, item)
 		}
 	default:
 		return errInvalid("a report target is required")

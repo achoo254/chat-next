@@ -504,3 +504,25 @@ func TestLatestMigrationRollsBack(t *testing.T) {
 		t.Fatalf("rolled back version %d", v)
 	}
 }
+
+func TestUpsertIdPUserAdmittingRefusesOnlyNewUsers(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	known, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_known", PreferredUsername: "known"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	asked := 0
+	refuse := func() bool { asked++; return false }
+	again, err := s.UpsertIdPUserAdmitting(ctx, tenant, store.IdPProfile{Sub: "acc_known", PreferredUsername: "known"}, refuse)
+	if err != nil || again.ID != known.ID || asked != 0 {
+		t.Fatalf("existing user: %+v, %v, asked %d", again, err, asked)
+	}
+	if _, err := s.UpsertIdPUserAdmitting(ctx, tenant, store.IdPProfile{Sub: "acc_new", PreferredUsername: "fresh"}, refuse); !errors.Is(err, store.ErrSignupLimited) || asked != 1 {
+		t.Fatalf("new user: err = %v, asked %d", err, asked)
+	}
+	var n int
+	if err := s.Pool().QueryRow(ctx, `SELECT count(*) FROM users WHERE idp_sub = 'acc_new'`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("refused user stored: %d, %v", n, err)
+	}
+}

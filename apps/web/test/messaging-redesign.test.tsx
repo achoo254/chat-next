@@ -6,7 +6,9 @@
 // grouped search, keyboard shortcuts, the list width handle and the composer.
 import { ChatType, MemberRole } from "@app/proto-ts/chats";
 import { EntityType } from "@app/proto-ts/messages";
-import { FeedbackStatus, ModerationAction } from "@app/proto-ts/moderation";
+import { BotTier } from "@app/proto-ts/bot_admin";
+import { FeedbackStatus, ModerationAction, ReportTargetKind } from "@app/proto-ts/moderation";
+import { ReportReason } from "@app/proto-ts/users";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -387,6 +389,149 @@ describe("moderation", () => {
 		const queue = await screen.findByRole("table", {}, LONG);
 		expect(await within(queue).findByRole("link", { name: /Thông báo hoandat/ }, LONG)).toBeTruthy();
 		expect(within(queue).getByText("Đã xử lý")).toBeTruthy();
+	});
+});
+
+describe("moderation tools", () => {
+	it("groups reports by target and closes the group, telling the person when asked", async () => {
+		const demo = seedDemo();
+		demo.fixture.operator = true;
+		const userReport = demo.fixture.reportQueue.find((report) => report.id === 20477);
+		if (userReport === undefined) throw new Error("no user report");
+		const witness = demo.fixture.addUser("Mai Phương", { username: "maiphuong" });
+		demo.fixture.reportQueue.push({ ...userReport, id: 20490, reporterId: witness, comment: "Nhắn tin rác hàng loạt", createdAt: userReport.createdAt + 60 });
+		renderMessaging(demo.fixture, "/moderation");
+		const queue = await screen.findByRole("table", {}, LONG);
+		const row = (await within(queue).findByRole("link", { name: /Nhận quà 24h/ }, LONG)).closest("tr");
+		if (row === null) throw new Error("no row");
+		expect(within(row).getByText("2")).toBeTruthy();
+		expect(within(queue).getAllByRole("link", { name: /Nhận quà 24h/ })).toHaveLength(1);
+
+		await userEvent.click(within(row).getByRole("link", { name: /Nhận quà 24h/ }));
+		expect(await screen.findByRole("heading", { name: "2 người báo cáo · 1 ghi chú" }, LONG)).toBeTruthy();
+		expect(screen.getByText("“Nhắn tin rác hàng loạt”")).toBeTruthy();
+		const signals = screen.getByRole("heading", { name: "Tín hiệu về người gửi" }).closest(".card");
+		if (!(signals instanceof HTMLElement)) throw new Error("no signals card");
+		expect(within(signals).getByText("2 ngày")).toBeTruthy();
+		expect(within(signals).getByText("Mới")).toBeTruthy();
+		expect(within(signals).getByText("21 người")).toBeTruthy();
+
+		await userEvent.click(screen.getByRole("link", { name: "Hành động" }));
+		const warn = await screen.findByRole("checkbox", { name: /Cảnh cáo/ }, LONG);
+		expect(warn).toHaveProperty("checked", true);
+		expect(screen.getByRole("checkbox", { name: /Tắt webhook/ })).toHaveProperty("disabled", true);
+		await userEvent.click(warn);
+		await userEvent.click(screen.getByRole("checkbox", { name: /Khoá tài khoản chat/ }));
+		await userEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+		const confirm = await screen.findByRole("dialog", { name: "Xác nhận hành động" }, LONG);
+		expect(within(confirm).getByText("Đóng cả 2 báo cáo về đối tượng này")).toBeTruthy();
+		expect(within(confirm).getByRole("checkbox", { name: /Gửi thông báo/ })).toHaveProperty("checked", true);
+		await userEvent.type(within(confirm).getByRole("textbox", { name: /Lý do/ }), "Spam nhận quà");
+		await userEvent.click(within(confirm).getByRole("button", { name: "Xác nhận" }));
+		await waitFor(() => expect(demo.fixture.resolutions).toHaveLength(1), LONG);
+		expect(demo.fixture.resolutions[0]).toEqual({ reportIds: [20477, 20490], actions: [ModerationAction.RESTRICT_ACCOUNT], notify: true });
+	});
+
+	it("turns off the webhook behind a reported message", async () => {
+		const demo = seedDemo();
+		demo.fixture.operator = true;
+		const messageReport = demo.fixture.reportQueue.find((report) => report.id === 20481);
+		if (messageReport === undefined) throw new Error("no message report");
+		demo.fixture.reportQueue.push({ ...messageReport, id: 20500, kind: ReportTargetKind.WEBHOOK, seqs: [1], reason: ReportReason.SPAM, comment: "" });
+		demo.fixture.reportHooks.set(20500, [{ id: "hk_abcdefghijkl", name: "CI Alerts", disabled: false }]);
+		renderMessaging(demo.fixture, "/moderation/20500");
+		const hooks = (await screen.findByRole("heading", { name: "Webhook đã gửi tin này" }, LONG)).closest(".card");
+		if (!(hooks instanceof HTMLElement)) throw new Error("no hooks card");
+		expect(within(hooks).getByText("CI Alerts")).toBeTruthy();
+		expect(within(hooks).getByText("Đang chạy")).toBeTruthy();
+		await userEvent.click(screen.getByRole("link", { name: "Hành động" }));
+		expect(await screen.findByRole("checkbox", { name: /Tắt webhook/ }, LONG)).toHaveProperty("checked", true);
+		expect(screen.getByRole("checkbox", { name: /Cảnh cáo/ })).toHaveProperty("disabled", true);
+		await userEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+		const confirm = await screen.findByRole("dialog", { name: "Xác nhận hành động" }, LONG);
+		expect(within(confirm).getByText("Tắt webhook CI Alerts")).toBeTruthy();
+		expect(within(confirm).queryByRole("checkbox", { name: /Gửi thông báo/ })).toBeNull();
+		await userEvent.type(within(confirm).getByRole("textbox", { name: /Lý do/ }), "Vòng lặp 3.000 tin mỗi giờ");
+		await userEvent.click(within(confirm).getByRole("button", { name: "Xác nhận" }));
+		await waitFor(() => expect(demo.fixture.resolutions[0]?.actions).toEqual([ModerationAction.DISABLE_WEBHOOK]), LONG);
+	});
+
+	it("reviews a bot the anti-abuse rule restricted and verifies another", async () => {
+		const demo = seedDemo();
+		demo.fixture.operator = true;
+		const owner = demo.fixture.addUser("Shop Deal", { username: "shopdeal" });
+		const promo = demo.fixture.addUser("Promo Blast", { username: "promoblast_bot", isBot: true });
+		demo.fixture.botReviews.set(promo, {
+			botId: promo, ownerId: owner, tier: BotTier.NEW, verified: false, restrictedAt: 1_760_000_000,
+			restrictedReason: "18% người nhận đã chặn bot trong 24 giờ (ngưỡng 5%)", reviewed: false, users: 300, blockedPermille: 180,
+		});
+		renderMessaging(demo.fixture, "/moderation");
+		expect(await screen.findByText("1 bot bị luật chống lạm dụng hạ xuống tầng Hạn chế, chờ xem xét", {}, LONG)).toBeTruthy();
+		await userEvent.click(screen.getByRole("link", { name: "Xem xét" }));
+		await waitFor(() => expect(window.location.pathname).toBe(`/moderation/bots/${promo}`), LONG);
+		expect(await screen.findByText(/Luật chống lạm dụng: 18% người nhận đã chặn bot/, {}, LONG)).toBeTruthy();
+		expect(screen.getByText("18%")).toBeTruthy();
+		const current = screen.getByRole("table").querySelector('tr[aria-current="true"]');
+		expect(current?.textContent).toContain("Hạn chế");
+
+		await userEvent.click(screen.getByRole("button", { name: "Khôi phục tầng trước" }));
+		const restore = await screen.findByRole("dialog", { name: "Khôi phục tầng của Promo Blast?" }, LONG);
+		await userEvent.type(within(restore).getByRole("textbox", { name: /Lý do/ }), "Ngày ra mắt");
+		await userEvent.click(within(restore).getByRole("button", { name: "Khôi phục tầng trước" }));
+		expect(await screen.findByText("Đã cập nhật, đã ghi nhật ký", {}, LONG)).toBeTruthy();
+		await waitFor(() => expect(screen.queryByRole("button", { name: "Khôi phục tầng trước" })).toBeNull(), LONG);
+
+		await userEvent.click(screen.getByRole("button", { name: "Cấp xác minh" }));
+		const verify = await screen.findByRole("dialog", { name: "Cấp xác minh cho Promo Blast?" }, LONG);
+		await userEvent.type(within(verify).getByRole("textbox", { name: /Lý do/ }), "Bot của đối tác");
+		await userEvent.click(within(verify).getByRole("button", { name: "Cấp xác minh" }));
+		await waitFor(() => expect(document.querySelector(".bot-hero .verified")?.textContent).toBe("Đã xác minh"), LONG);
+		expect(screen.getByRole("button", { name: "Thu hồi xác minh" })).toBeTruthy();
+		expect(demo.fixture.botReviews.get(promo)?.verified).toBe(true);
+		expect(demo.fixture.moderationLog.map((entry) => entry.action)).toEqual([ModerationAction.VERIFY_BOT, ModerationAction.RESTORE_BOT_TIER]);
+	});
+
+	it("lists the moderation log with the automatic rules and exports it", async () => {
+		const demo = seedDemo();
+		demo.fixture.operator = true;
+		const spammer = demo.fixture.reportQueue.find((report) => report.id === 20477)?.targetUserId ?? 0;
+		demo.fixture.moderationLog.push(
+			{ id: 2, operatorId: demo.fixture.selfId, action: ModerationAction.WARN, targetUserId: spammer, targetChatId: 0, note: "Spam vào nhóm", createdAt: 1_760_000_000 },
+			{ id: 1, operatorId: 0, action: ModerationAction.LIMIT_STRANGER_CHATS, targetUserId: spammer, targetChatId: 0, note: "Tài khoản 1 ngày tuổi, 20 chat với người chưa quen trong 24 giờ", createdAt: 1_759_990_000 },
+		);
+		renderMessaging(demo.fixture, "/moderation");
+		const [logLink] = await screen.findAllByRole("link", { name: "Nhật ký" }, LONG);
+		if (logLink === undefined) throw new Error("no log link");
+		await userEvent.click(logLink);
+		const table = await screen.findByRole("table", {}, LONG);
+		expect(await within(table).findByText("Spam vào nhóm", {}, LONG)).toBeTruthy();
+		expect(within(table).getByText("Giới hạn chat với người chưa quen")).toBeTruthy();
+		expect(within(table).getAllByText("@nhanqua24h")).toHaveLength(2);
+
+		const created: Blob[] = [];
+		const createObjectURL = URL.createObjectURL;
+		URL.createObjectURL = (blob: Blob | MediaSource) => {
+			if (blob instanceof Blob) created.push(blob);
+			return "blob:test/log";
+		};
+		try {
+			await userEvent.click(screen.getByRole("button", { name: "Xuất CSV" }));
+			await waitFor(() => expect(created).toHaveLength(1), LONG);
+		} finally {
+			URL.createObjectURL = createObjectURL;
+		}
+		const file = created[0];
+		if (file === undefined) throw new Error("no CSV");
+		// UTF-8 byte order mark first, so spreadsheet apps read the accents.
+		expect([...new Uint8Array(await file.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+		const csv = await file.text();
+		expect(csv.split("\n")[0]).toBe("Thời gian,Người thực hiện,Hành động,Đối tượng,Lý do");
+		// Usernames start with @: written as text, never as a spreadsheet formula.
+		expect(csv).toContain("Luật tự động,Giới hạn chat với người chưa quen,'@nhanqua24h");
+
+		await userEvent.click(within(screen.getByRole("group", { name: "Người thực hiện" })).getByRole("button", { name: "Luật tự động" }));
+		await waitFor(() => expect(within(screen.getByRole("table")).queryByText("Spam vào nhóm")).toBeNull(), LONG);
+		expect(within(screen.getByRole("table")).getByText(/Tài khoản 1 ngày tuổi/)).toBeTruthy();
 	});
 });
 

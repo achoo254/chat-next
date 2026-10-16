@@ -17,7 +17,9 @@ export const BUNDLE_BUDGET = {
 	 * when the gate started, 149.1 KB at the R2 release. 112.5 KB once GetSelf went
 	 * over JSON and the Connect transport, protobuf runtime and schemas left the
 	 * startup chunks; 130.7 KB with React Compiler, which is on since then.
-	 * 149.9 KB once English UI copy loaded on first use instead of at startup.
+	 * 149.9 KB once English UI copy loaded on first use instead of at startup;
+	 * 149.7 KB with the anti-abuse copy once the signed-out welcome screen
+	 * loaded only when shown.
 	 */
 	startupJsGzip: 150 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */

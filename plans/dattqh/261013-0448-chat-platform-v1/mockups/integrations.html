@@ -534,7 +534,7 @@ Default enabled:   bật</pre>
 <section class="shot" id="hook-disabled">
 	<div class="shot-head">
 		<h2>Webhook tự tắt</h2><span class="phase">Phase 9</span>
-		<p>Người tạo hook bị gỡ admin hoặc rời nhóm thì hook ngừng nhận trong vài giây. Trái: admin khác thấy lý do và nhận lại hook về mình (mặc định giữ nguyên URL để công cụ giám sát chạy tiếp; muốn chặn người cũ thì bật xoay secret). Phải: trong chat có tin hệ thống để cả nhóm biết vì sao cảnh báo ngừng về.</p>
+		<p>Người tạo hook bị gỡ admin hoặc rời nhóm thì hook ngừng nhận trong vài giây. Trái: admin khác thấy lý do và nhận lại hook về mình (mặc định giữ nguyên URL để công cụ giám sát chạy tiếp; muốn chặn người cũ thì bật xoay secret). Phải: trong chat có tin hệ thống để cả nhóm biết vì sao cảnh báo ngừng về. Webhook bị đội kiểm duyệt tắt (từ báo cáo về tin của nó): trạng thái "Đã tắt", dòng phụ "Đội kiểm duyệt đã tắt"; banner "Đội kiểm duyệt đã tắt webhook này lúc … Admin không bật lại hay nhận lại được."; không có công tắc Nhận request và không có Nhận lại. Nhóm thấy tin hệ thống "Webhook “…” đã bị đội kiểm duyệt tắt".</p>
 	</div>
 	<div class="frame">
 		<div class="panes">

@@ -4,6 +4,8 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { BotTier } from "./bot_admin_pb.ts";
+import { file_app_v1_bot_admin } from "./bot_admin_pb.ts";
 import type { Chat } from "./chats_pb.ts";
 import { file_app_v1_chats } from "./chats_pb.ts";
 import type { Message as Message$1 } from "./messages_pb.ts";
@@ -16,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/moderation.proto.
  */
 export const file_app_v1_moderation: GenFile = /*@__PURE__*/
-  fileDesc("ChdhcHAvdjEvbW9kZXJhdGlvbi5wcm90bxIGYXBwLnYxIpUDCgZSZXBvcnQSDgoCaWQYASABKANCAjACEi0KC3RhcmdldF9raW5kGAIgASgOMhguYXBwLnYxLlJlcG9ydFRhcmdldEtpbmQSFwoLcmVwb3J0ZXJfaWQYAyABKANCAjACEhoKDnRhcmdldF91c2VyX2lkGAQgASgDQgIwAhIaCg50YXJnZXRfY2hhdF9pZBgFIAEoA0ICMAISEAoEc2VxcxgGIAMoA0ICMAISJAoGcmVhc29uGAcgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAggASgJEiQKBnN0YXR1cxgJIAEoDjIULmFwcC52MS5SZXBvcnRTdGF0dXMSFgoKY3JlYXRlZF9hdBgKIAEoA0ICMAISFwoLcmVzb2x2ZWRfYXQYCyABKANCAjACEhcKC3Jlc29sdmVkX2J5GAwgASgDQgIwAhIpCgdhY3Rpb25zGA0gAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SFwoPcmVzb2x1dGlvbl9ub3RlGA4gASgJImgKD1JlcG9ydGVkTWVzc2FnZRIPCgNzZXEYASABKANCAjACEhMKB2Zyb21faWQYAiABKANCAjACEhAKBGRhdGUYAyABKANCAjACEgwKBHRleHQYBCABKAkSDwoHZGVsZXRlZBgFIAEoCCLvAQoSTW9kZXJhdGlvbkxvZ0VudHJ5Eg4KAmlkGAEgASgDQgIwAhIXCgtvcGVyYXRvcl9pZBgCIAEoA0ICMAISFQoJcmVwb3J0X2lkGAMgASgDQgIwAhIoCgZhY3Rpb24YBCABKA4yGC5hcHAudjEuTW9kZXJhdGlvbkFjdGlvbhIaCg50YXJnZXRfdXNlcl9pZBgFIAEoA0ICMAISGgoOdGFyZ2V0X2NoYXRfaWQYBiABKANCAjACEgwKBG5vdGUYByABKAkSEQoFdW50aWwYCCABKANCAjACEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACImQKEkFjY291bnRSZXN0cmljdGlvbhITCgd1c2VyX2lkGAEgASgDQgIwAhIRCgV1bnRpbBgCIAEoA0ICMAISDgoGcmVhc29uGAMgASgJEhYKCmNyZWF0ZWRfYXQYBCABKANCAjACIq0BChFHZXRSZXBvcnRzUmVxdWVzdBIkCgZzdGF0dXMYASABKA4yFC5hcHAudjEuUmVwb3J0U3RhdHVzEiQKBnJlYXNvbhgCIAEoDjIULmFwcC52MS5SZXBvcnRSZWFzb24SLQoLdGFyZ2V0X2tpbmQYAyABKA4yGC5hcHAudjEuUmVwb3J0VGFyZ2V0S2luZBIOCgZjdXJzb3IYBCABKAkSDQoFbGltaXQYBSABKAUihAEKEkdldFJlcG9ydHNSZXNwb25zZRIfCgdyZXBvcnRzGAEgAygLMg4uYXBwLnYxLlJlcG9ydBIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhsKBWNoYXRzGAMgAygLMgwuYXBwLnYxLkNoYXQSEwoLbmV4dF9jdXJzb3IYBCABKAkiKQoQR2V0UmVwb3J0UmVxdWVzdBIVCglyZXBvcnRfaWQYASABKANCAjACIpgCChFHZXRSZXBvcnRSZXNwb25zZRIeCgZyZXBvcnQYASABKAsyDi5hcHAudjEuUmVwb3J0EikKCGV2aWRlbmNlGAIgAygLMhcuYXBwLnYxLlJlcG9ydGVkTWVzc2FnZRIgCgdjb250ZXh0GAMgAygLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYBCADKAsyDC5hcHAudjEuVXNlchIaCgRjaGF0GAUgASgLMgwuYXBwLnYxLkNoYXQSKwoHaGlzdG9yeRgGIAMoCzIaLmFwcC52MS5Nb2RlcmF0aW9uTG9nRW50cnkSMAoMcmVzdHJpY3Rpb25zGAcgAygLMhouYXBwLnYxLkFjY291bnRSZXN0cmljdGlvbiKAAQoUUmVzb2x2ZVJlcG9ydFJlcXVlc3QSFQoJcmVwb3J0X2lkGAEgASgDQgIwAhIpCgdhY3Rpb25zGAIgAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SDAoEbm90ZRgDIAEoCRIYChByZXN0cmljdF9zZWNvbmRzGAQgASgFIjcKFVJlc29sdmVSZXBvcnRSZXNwb25zZRIeCgZyZXBvcnQYASABKAsyDi5hcHAudjEuUmVwb3J0IjsKFkxpZnRSZXN0cmljdGlvblJlcXVlc3QSEwoHdXNlcl9pZBgBIAEoA0ICMAISDAoEbm90ZRgCIAEoCSIZChdMaWZ0UmVzdHJpY3Rpb25SZXNwb25zZSKVAgoIRmVlZGJhY2sSDgoCaWQYASABKANCAjACEhMKB3VzZXJfaWQYAiABKANCAjACEiIKBGtpbmQYAyABKA4yFC5hcHAudjEuRmVlZGJhY2tLaW5kEgwKBHRleHQYBCABKAkSJgoGc3RhdHVzGAUgASgOMhYuYXBwLnYxLkZlZWRiYWNrU3RhdHVzEhYKCmNyZWF0ZWRfYXQYBiABKANCAjACEhYKCmhhbmRsZWRfYXQYByABKANCAjACEhYKCmhhbmRsZWRfYnkYCCABKANCAjACEhIKCnJlcGx5X3RleHQYCSABKAkSFgoKcmVwbGllZF9hdBgKIAEoA0ICMAISFgoKcmVwbGllZF9ieRgLIAEoA0ICMAIiWwoSR2V0RmVlZGJhY2tSZXF1ZXN0EiYKBnN0YXR1cxgBIAEoDjIWLmFwcC52MS5GZWVkYmFja1N0YXR1cxIOCgZjdXJzb3IYAiABKAkSDQoFbGltaXQYAyABKAUiawoTR2V0RmVlZGJhY2tSZXNwb25zZRIiCghmZWVkYmFjaxgBIAMoCzIQLmFwcC52MS5GZWVkYmFjaxIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhMKC25leHRfY3Vyc29yGAMgASgJIjEKFlJlc29sdmVGZWVkYmFja1JlcXVlc3QSFwoLZmVlZGJhY2tfaWQYASABKANCAjACIj0KF1Jlc29sdmVGZWVkYmFja1Jlc3BvbnNlEiIKCGZlZWRiYWNrGAEgASgLMhAuYXBwLnYxLkZlZWRiYWNrIj0KFFJlcGx5RmVlZGJhY2tSZXF1ZXN0EhcKC2ZlZWRiYWNrX2lkGAEgASgDQgIwAhIMCgR0ZXh0GAIgASgJIjsKFVJlcGx5RmVlZGJhY2tSZXNwb25zZRIiCghmZWVkYmFjaxgBIAEoCzIQLmFwcC52MS5GZWVkYmFjayp+CgxSZXBvcnRTdGF0dXMSHQoZUkVQT1JUX1NUQVRVU19VTlNQRUNJRklFRBAAEhYKElJFUE9SVF9TVEFUVVNfT1BFThABEhoKFlJFUE9SVF9TVEFUVVNfUkVTT0xWRUQQAhIbChdSRVBPUlRfU1RBVFVTX0RJU01JU1NFRBADKpEBChBSZXBvcnRUYXJnZXRLaW5kEiIKHlJFUE9SVF9UQVJHRVRfS0lORF9VTlNQRUNJRklFRBAAEhsKF1JFUE9SVF9UQVJHRVRfS0lORF9VU0VSEAESGwoXUkVQT1JUX1RBUkdFVF9LSU5EX0NIQVQQAhIfChtSRVBPUlRfVEFSR0VUX0tJTkRfTUVTU0FHRVMQAyrwAQoQTW9kZXJhdGlvbkFjdGlvbhIhCh1NT0RFUkFUSU9OX0FDVElPTl9VTlNQRUNJRklFRBAAEh0KGU1PREVSQVRJT05fQUNUSU9OX0RJU01JU1MQARIlCiFNT0RFUkFUSU9OX0FDVElPTl9ERUxFVEVfTUVTU0FHRVMQAhIjCh9NT0RFUkFUSU9OX0FDVElPTl9CQU5fRlJPTV9DSEFUEAMSJgoiTU9ERVJBVElPTl9BQ1RJT05fUkVTVFJJQ1RfQUNDT1VOVBAEEiYKIk1PREVSQVRJT05fQUNUSU9OX0xJRlRfUkVTVFJJQ1RJT04QBSpoCg5GZWVkYmFja1N0YXR1cxIfChtGRUVEQkFDS19TVEFUVVNfVU5TUEVDSUZJRUQQABIYChRGRUVEQkFDS19TVEFUVVNfT1BFThABEhsKF0ZFRURCQUNLX1NUQVRVU19IQU5ETEVEEAIqXAoMRmVlZGJhY2tLaW5kEh0KGUZFRURCQUNLX0tJTkRfVU5TUEVDSUZJRUQQABIWChJGRUVEQkFDS19LSU5EX0lERUEQARIVChFGRUVEQkFDS19LSU5EX0JVRxACMqYEChFNb2RlcmF0aW9uU2VydmljZRJDCgpHZXRSZXBvcnRzEhkuYXBwLnYxLkdldFJlcG9ydHNSZXF1ZXN0GhouYXBwLnYxLkdldFJlcG9ydHNSZXNwb25zZRJACglHZXRSZXBvcnQSGC5hcHAudjEuR2V0UmVwb3J0UmVxdWVzdBoZLmFwcC52MS5HZXRSZXBvcnRSZXNwb25zZRJMCg1SZXNvbHZlUmVwb3J0EhwuYXBwLnYxLlJlc29sdmVSZXBvcnRSZXF1ZXN0Gh0uYXBwLnYxLlJlc29sdmVSZXBvcnRSZXNwb25zZRJSCg9MaWZ0UmVzdHJpY3Rpb24SHi5hcHAudjEuTGlmdFJlc3RyaWN0aW9uUmVxdWVzdBofLmFwcC52MS5MaWZ0UmVzdHJpY3Rpb25SZXNwb25zZRJGCgtHZXRGZWVkYmFjaxIaLmFwcC52MS5HZXRGZWVkYmFja1JlcXVlc3QaGy5hcHAudjEuR2V0RmVlZGJhY2tSZXNwb25zZRJSCg9SZXNvbHZlRmVlZGJhY2sSHi5hcHAudjEuUmVzb2x2ZUZlZWRiYWNrUmVxdWVzdBofLmFwcC52MS5SZXNvbHZlRmVlZGJhY2tSZXNwb25zZRJMCg1SZXBseUZlZWRiYWNrEhwuYXBwLnYxLlJlcGx5RmVlZGJhY2tSZXF1ZXN0Gh0uYXBwLnYxLlJlcGx5RmVlZGJhY2tSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_chats, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChdhcHAvdjEvbW9kZXJhdGlvbi5wcm90bxIGYXBwLnYxIpUDCgZSZXBvcnQSDgoCaWQYASABKANCAjACEi0KC3RhcmdldF9raW5kGAIgASgOMhguYXBwLnYxLlJlcG9ydFRhcmdldEtpbmQSFwoLcmVwb3J0ZXJfaWQYAyABKANCAjACEhoKDnRhcmdldF91c2VyX2lkGAQgASgDQgIwAhIaCg50YXJnZXRfY2hhdF9pZBgFIAEoA0ICMAISEAoEc2VxcxgGIAMoA0ICMAISJAoGcmVhc29uGAcgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhIPCgdjb21tZW50GAggASgJEiQKBnN0YXR1cxgJIAEoDjIULmFwcC52MS5SZXBvcnRTdGF0dXMSFgoKY3JlYXRlZF9hdBgKIAEoA0ICMAISFwoLcmVzb2x2ZWRfYXQYCyABKANCAjACEhcKC3Jlc29sdmVkX2J5GAwgASgDQgIwAhIpCgdhY3Rpb25zGA0gAygOMhguYXBwLnYxLk1vZGVyYXRpb25BY3Rpb24SFwoPcmVzb2x1dGlvbl9ub3RlGA4gASgJImgKD1JlcG9ydGVkTWVzc2FnZRIPCgNzZXEYASABKANCAjACEhMKB2Zyb21faWQYAiABKANCAjACEhAKBGRhdGUYAyABKANCAjACEgwKBHRleHQYBCABKAkSDwoHZGVsZXRlZBgFIAEoCCKSAgoSTW9kZXJhdGlvbkxvZ0VudHJ5Eg4KAmlkGAEgASgDQgIwAhIXCgtvcGVyYXRvcl9pZBgCIAEoA0ICMAISFQoJcmVwb3J0X2lkGAMgASgDQgIwAhIoCgZhY3Rpb24YBCABKA4yGC5hcHAudjEuTW9kZXJhdGlvbkFjdGlvbhIaCg50YXJnZXRfdXNlcl9pZBgFIAEoA0ICMAISGgoOdGFyZ2V0X2NoYXRfaWQYBiABKANCAjACEgwKBG5vdGUYByABKAkSEQoFdW50aWwYCCABKANCAjACEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACEhAKBHNlcXMYCiADKANCAjACEg8KB2hvb2tfaWQYCyABKAkiZAoSQWNjb3VudFJlc3RyaWN0aW9uEhMKB3VzZXJfaWQYASABKANCAjACEhEKBXVudGlsGAIgASgDQgIwAhIOCgZyZWFzb24YAyABKAkSFgoKY3JlYXRlZF9hdBgEIAEoA0ICMAIirQEKEUdldFJlcG9ydHNSZXF1ZXN0EiQKBnN0YXR1cxgBIAEoDjIULmFwcC52MS5SZXBvcnRTdGF0dXMSJAoGcmVhc29uGAIgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhItCgt0YXJnZXRfa2luZBgDIAEoDjIYLmFwcC52MS5SZXBvcnRUYXJnZXRLaW5kEg4KBmN1cnNvchgEIAEoCRINCgVsaW1pdBgFIAEoBSKEAQoSR2V0UmVwb3J0c1Jlc3BvbnNlEh8KB3JlcG9ydHMYASADKAsyDi5hcHAudjEuUmVwb3J0EhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISGwoFY2hhdHMYAyADKAsyDC5hcHAudjEuQ2hhdBITCgtuZXh0X2N1cnNvchgEIAEoCSIpChBHZXRSZXBvcnRSZXF1ZXN0EhUKCXJlcG9ydF9pZBgBIAEoA0ICMAIikQMKEUdldFJlcG9ydFJlc3BvbnNlEh4KBnJlcG9ydBgBIAEoCzIOLmFwcC52MS5SZXBvcnQSKQoIZXZpZGVuY2UYAiADKAsyFy5hcHAudjEuUmVwb3J0ZWRNZXNzYWdlEiAKB2NvbnRleHQYAyADKAsyDy5hcHAudjEuTWVzc2FnZRIbCgV1c2VycxgEIAMoCzIMLmFwcC52MS5Vc2VyEhoKBGNoYXQYBSABKAsyDC5hcHAudjEuQ2hhdBIrCgdoaXN0b3J5GAYgAygLMhouYXBwLnYxLk1vZGVyYXRpb25Mb2dFbnRyeRIwCgxyZXN0cmljdGlvbnMYByADKAsyGi5hcHAudjEuQWNjb3VudFJlc3RyaWN0aW9uEikKBWdyb3VwGAggASgLMhouYXBwLnYxLlJlcG9ydEdyb3VwU3VtbWFyeRImCgdzaWduYWxzGAkgAygLMhUuYXBwLnYxLlNlbmRlclNpZ25hbHMSJAoFaG9va3MYCiADKAsyFS5hcHAudjEuTW9kZXJhdGVkSG9vayJ6ChJSZXBvcnRHcm91cFN1bW1hcnkSFAoMcmVwb3J0X2NvdW50GAEgASgFEhYKDnJlcG9ydGVyX2NvdW50GAIgASgFEiQKB3JlYXNvbnMYAyADKAsyEy5hcHAudjEuUmVhc29uQ291bnQSEAoIY29tbWVudHMYBCADKAkiQgoLUmVhc29uQ291bnQSJAoGcmVhc29uGAEgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhINCgVjb3VudBgCIAEoBSKrAQoNU2VuZGVyU2lnbmFscxITCgd1c2VyX2lkGAEgASgDQgIwAhIfChNhY2NvdW50X2FnZV9zZWNvbmRzGAIgASgDQgIwAhIaChJzdHJhbmdlcl9jaGF0c18yNGgYAyABKAUSEgoKYmxvY2tlZF9ieRgEIAEoBRIYChBjaGF0c19qb2luZWRfMjRoGAUgASgFEhoKEm90aGVyX29wZW5fcmVwb3J0cxgGIAEoBSI7Cg1Nb2RlcmF0ZWRIb29rEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIZGlzYWJsZWQYAyABKAgibgoLUmVwb3J0R3JvdXASHgoGcmVwb3J0GAEgASgLMg4uYXBwLnYxLlJlcG9ydBIUCgxyZXBvcnRfY291bnQYAiABKAUSKQoLbWFpbl9yZWFzb24YAyABKA4yFC5hcHAudjEuUmVwb3J0UmVhc29uIrIBChZHZXRSZXBvcnRHcm91cHNSZXF1ZXN0EiQKBnN0YXR1cxgBIAEoDjIULmFwcC52MS5SZXBvcnRTdGF0dXMSJAoGcmVhc29uGAIgASgOMhQuYXBwLnYxLlJlcG9ydFJlYXNvbhItCgt0YXJnZXRfa2luZBgDIAEoDjIYLmFwcC52MS5SZXBvcnRUYXJnZXRLaW5kEg4KBmN1cnNvchgEIAEoCRINCgVsaW1pdBgFIAEoBSKNAQoXR2V0UmVwb3J0R3JvdXBzUmVzcG9uc2USIwoGZ3JvdXBzGAEgAygLMhMuYXBwLnYxLlJlcG9ydEdyb3VwEhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISGwoFY2hhdHMYAyADKAsyDC5hcHAudjEuQ2hhdBITCgtuZXh0X2N1cnNvchgEIAEoCSKmAQoXR2V0TW9kZXJhdGlvbkxvZ1JlcXVlc3QSFwoLb3BlcmF0b3JfaWQYASABKANCAjACEhYKDmF1dG9tYXRpY19vbmx5GAIgASgIEigKBmFjdGlvbhgDIAEoDjIYLmFwcC52MS5Nb2RlcmF0aW9uQWN0aW9uEhEKBXNpbmNlGAQgASgDQgIwAhIOCgZjdXJzb3IYBSABKAkSDQoFbGltaXQYBiABKAUilgEKGEdldE1vZGVyYXRpb25Mb2dSZXNwb25zZRIrCgdlbnRyaWVzGAEgAygLMhouYXBwLnYxLk1vZGVyYXRpb25Mb2dFbnRyeRIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhsKBWNoYXRzGAMgAygLMgwuYXBwLnYxLkNoYXQSEwoLbmV4dF9jdXJzb3IYBCABKAkizAIKCUJvdFJldmlldxISCgZib3RfaWQYASABKANCAjACEhQKCG93bmVyX2lkGAIgASgDQgIwAhIWCgpjcmVhdGVkX2F0GAMgASgDQgIwAhIdCgR0aWVyGAQgASgOMg8uYXBwLnYxLkJvdFRpZXISEAoIdmVyaWZpZWQYBSABKAgSGQoNcmVzdHJpY3RlZF9hdBgGIAEoA0ICMAISGQoRcmVzdHJpY3RlZF9yZWFzb24YByABKAkSIAoYcmVzdHJpY3RlZF9hdXRvbWF0aWNhbGx5GAggASgIEhwKFHJlc3RyaWN0aW9uX3Jldmlld2VkGAkgASgIEg0KBXVzZXJzGAogASgFEhMKC21lc3NhZ2VzXzdkGAsgASgFEhwKFGJsb2NrZWRfcGVybWlsbGVfMjRoGAwgASgFEhQKDG9wZW5fcmVwb3J0cxgNIAEoBSIpChNHZXRCb3RSZXZpZXdSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAIiVgoUR2V0Qm90UmV2aWV3UmVzcG9uc2USIQoGcmV2aWV3GAEgASgLMhEuYXBwLnYxLkJvdFJldmlldxIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyIhYKFEdldEJvdFJldmlld3NSZXF1ZXN0IlgKFUdldEJvdFJldmlld3NSZXNwb25zZRIiCgdyZXZpZXdzGAEgAygLMhEuYXBwLnYxLkJvdFJldmlldxIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyIksKFVNldEJvdFZlcmlmaWVkUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhAKCHZlcmlmaWVkGAIgASgIEgwKBG5vdGUYAyABKAkiOwoWU2V0Qm90VmVyaWZpZWRSZXNwb25zZRIhCgZyZXZpZXcYASABKAsyES5hcHAudjEuQm90UmV2aWV3IlAKG1Jldmlld0JvdFJlc3RyaWN0aW9uUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEg8KB3Jlc3RvcmUYAiABKAgSDAoEbm90ZRgDIAEoCSJBChxSZXZpZXdCb3RSZXN0cmljdGlvblJlc3BvbnNlEiEKBnJldmlldxgBIAEoCzIRLmFwcC52MS5Cb3RSZXZpZXcikAEKFFJlc29sdmVSZXBvcnRSZXF1ZXN0EhUKCXJlcG9ydF9pZBgBIAEoA0ICMAISKQoHYWN0aW9ucxgCIAMoDjIYLmFwcC52MS5Nb2RlcmF0aW9uQWN0aW9uEgwKBG5vdGUYAyABKAkSGAoQcmVzdHJpY3Rfc2Vjb25kcxgEIAEoBRIOCgZub3RpZnkYBSABKAgiNwoVUmVzb2x2ZVJlcG9ydFJlc3BvbnNlEh4KBnJlcG9ydBgBIAEoCzIOLmFwcC52MS5SZXBvcnQiOwoWTGlmdFJlc3RyaWN0aW9uUmVxdWVzdBITCgd1c2VyX2lkGAEgASgDQgIwAhIMCgRub3RlGAIgASgJIhkKF0xpZnRSZXN0cmljdGlvblJlc3BvbnNlIpUCCghGZWVkYmFjaxIOCgJpZBgBIAEoA0ICMAISEwoHdXNlcl9pZBgCIAEoA0ICMAISIgoEa2luZBgDIAEoDjIULmFwcC52MS5GZWVkYmFja0tpbmQSDAoEdGV4dBgEIAEoCRImCgZzdGF0dXMYBSABKA4yFi5hcHAudjEuRmVlZGJhY2tTdGF0dXMSFgoKY3JlYXRlZF9hdBgGIAEoA0ICMAISFgoKaGFuZGxlZF9hdBgHIAEoA0ICMAISFgoKaGFuZGxlZF9ieRgIIAEoA0ICMAISEgoKcmVwbHlfdGV4dBgJIAEoCRIWCgpyZXBsaWVkX2F0GAogASgDQgIwAhIWCgpyZXBsaWVkX2J5GAsgASgDQgIwAiJbChJHZXRGZWVkYmFja1JlcXVlc3QSJgoGc3RhdHVzGAEgASgOMhYuYXBwLnYxLkZlZWRiYWNrU3RhdHVzEg4KBmN1cnNvchgCIAEoCRINCgVsaW1pdBgDIAEoBSJrChNHZXRGZWVkYmFja1Jlc3BvbnNlEiIKCGZlZWRiYWNrGAEgAygLMhAuYXBwLnYxLkZlZWRiYWNrEhsKBXVzZXJzGAIgAygLMgwuYXBwLnYxLlVzZXISEwoLbmV4dF9jdXJzb3IYAyABKAkiMQoWUmVzb2x2ZUZlZWRiYWNrUmVxdWVzdBIXCgtmZWVkYmFja19pZBgBIAEoA0ICMAIiPQoXUmVzb2x2ZUZlZWRiYWNrUmVzcG9uc2USIgoIZmVlZGJhY2sYASABKAsyEC5hcHAudjEuRmVlZGJhY2siPQoUUmVwbHlGZWVkYmFja1JlcXVlc3QSFwoLZmVlZGJhY2tfaWQYASABKANCAjACEgwKBHRleHQYAiABKAkiOwoVUmVwbHlGZWVkYmFja1Jlc3BvbnNlEiIKCGZlZWRiYWNrGAEgASgLMhAuYXBwLnYxLkZlZWRiYWNrKn4KDFJlcG9ydFN0YXR1cxIdChlSRVBPUlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASFgoSUkVQT1JUX1NUQVRVU19PUEVOEAESGgoWUkVQT1JUX1NUQVRVU19SRVNPTFZFRBACEhsKF1JFUE9SVF9TVEFUVVNfRElTTUlTU0VEEAMqzQEKEFJlcG9ydFRhcmdldEtpbmQSIgoeUkVQT1JUX1RBUkdFVF9LSU5EX1VOU1BFQ0lGSUVEEAASGwoXUkVQT1JUX1RBUkdFVF9LSU5EX1VTRVIQARIbChdSRVBPUlRfVEFSR0VUX0tJTkRfQ0hBVBACEh8KG1JFUE9SVF9UQVJHRVRfS0lORF9NRVNTQUdFUxADEhoKFlJFUE9SVF9UQVJHRVRfS0lORF9CT1QQBBIeChpSRVBPUlRfVEFSR0VUX0tJTkRfV0VCSE9PSxAFKpwEChBNb2RlcmF0aW9uQWN0aW9uEiEKHU1PREVSQVRJT05fQUNUSU9OX1VOU1BFQ0lGSUVEEAASHQoZTU9ERVJBVElPTl9BQ1RJT05fRElTTUlTUxABEiUKIU1PREVSQVRJT05fQUNUSU9OX0RFTEVURV9NRVNTQUdFUxACEiMKH01PREVSQVRJT05fQUNUSU9OX0JBTl9GUk9NX0NIQVQQAxImCiJNT0RFUkFUSU9OX0FDVElPTl9SRVNUUklDVF9BQ0NPVU5UEAQSJgoiTU9ERVJBVElPTl9BQ1RJT05fTElGVF9SRVNUUklDVElPThAFEhoKFk1PREVSQVRJT05fQUNUSU9OX1dBUk4QBhIlCiFNT0RFUkFUSU9OX0FDVElPTl9ESVNBQkxFX1dFQkhPT0sQBxIiCh5NT0RFUkFUSU9OX0FDVElPTl9SRVNUUklDVF9CT1QQCBImCiJNT0RFUkFUSU9OX0FDVElPTl9SRVNUT1JFX0JPVF9USUVSEAkSKQolTU9ERVJBVElPTl9BQ1RJT05fS0VFUF9CT1RfUkVTVFJJQ1RFRBAKEiAKHE1PREVSQVRJT05fQUNUSU9OX1ZFUklGWV9CT1QQCxIiCh5NT0RFUkFUSU9OX0FDVElPTl9VTlZFUklGWV9CT1QQDBIqCiZNT0RFUkFUSU9OX0FDVElPTl9MSU1JVF9TVFJBTkdFUl9DSEFUUxANKmgKDkZlZWRiYWNrU3RhdHVzEh8KG0ZFRURCQUNLX1NUQVRVU19VTlNQRUNJRklFRBAAEhgKFEZFRURCQUNLX1NUQVRVU19PUEVOEAESGwoXRkVFREJBQ0tfU1RBVFVTX0hBTkRMRUQQAipcCgxGZWVkYmFja0tpbmQSHQoZRkVFREJBQ0tfS0lORF9VTlNQRUNJRklFRBAAEhYKEkZFRURCQUNLX0tJTkRfSURFQRABEhUKEUZFRURCQUNLX0tJTkRfQlVHEAIynggKEU1vZGVyYXRpb25TZXJ2aWNlEkMKCkdldFJlcG9ydHMSGS5hcHAudjEuR2V0UmVwb3J0c1JlcXVlc3QaGi5hcHAudjEuR2V0UmVwb3J0c1Jlc3BvbnNlEkAKCUdldFJlcG9ydBIYLmFwcC52MS5HZXRSZXBvcnRSZXF1ZXN0GhkuYXBwLnYxLkdldFJlcG9ydFJlc3BvbnNlEkwKDVJlc29sdmVSZXBvcnQSHC5hcHAudjEuUmVzb2x2ZVJlcG9ydFJlcXVlc3QaHS5hcHAudjEuUmVzb2x2ZVJlcG9ydFJlc3BvbnNlElIKD0xpZnRSZXN0cmljdGlvbhIeLmFwcC52MS5MaWZ0UmVzdHJpY3Rpb25SZXF1ZXN0Gh8uYXBwLnYxLkxpZnRSZXN0cmljdGlvblJlc3BvbnNlEkYKC0dldEZlZWRiYWNrEhouYXBwLnYxLkdldEZlZWRiYWNrUmVxdWVzdBobLmFwcC52MS5HZXRGZWVkYmFja1Jlc3BvbnNlElIKD1Jlc29sdmVGZWVkYmFjaxIeLmFwcC52MS5SZXNvbHZlRmVlZGJhY2tSZXF1ZXN0Gh8uYXBwLnYxLlJlc29sdmVGZWVkYmFja1Jlc3BvbnNlEkwKDVJlcGx5RmVlZGJhY2sSHC5hcHAudjEuUmVwbHlGZWVkYmFja1JlcXVlc3QaHS5hcHAudjEuUmVwbHlGZWVkYmFja1Jlc3BvbnNlElIKD0dldFJlcG9ydEdyb3VwcxIeLmFwcC52MS5HZXRSZXBvcnRHcm91cHNSZXF1ZXN0Gh8uYXBwLnYxLkdldFJlcG9ydEdyb3Vwc1Jlc3BvbnNlElUKEEdldE1vZGVyYXRpb25Mb2cSHy5hcHAudjEuR2V0TW9kZXJhdGlvbkxvZ1JlcXVlc3QaIC5hcHAudjEuR2V0TW9kZXJhdGlvbkxvZ1Jlc3BvbnNlEkkKDEdldEJvdFJldmlldxIbLmFwcC52MS5HZXRCb3RSZXZpZXdSZXF1ZXN0GhwuYXBwLnYxLkdldEJvdFJldmlld1Jlc3BvbnNlEkwKDUdldEJvdFJldmlld3MSHC5hcHAudjEuR2V0Qm90UmV2aWV3c1JlcXVlc3QaHS5hcHAudjEuR2V0Qm90UmV2aWV3c1Jlc3BvbnNlEk8KDlNldEJvdFZlcmlmaWVkEh0uYXBwLnYxLlNldEJvdFZlcmlmaWVkUmVxdWVzdBoeLmFwcC52MS5TZXRCb3RWZXJpZmllZFJlc3BvbnNlEmEKFFJldmlld0JvdFJlc3RyaWN0aW9uEiMuYXBwLnYxLlJldmlld0JvdFJlc3RyaWN0aW9uUmVxdWVzdBokLmFwcC52MS5SZXZpZXdCb3RSZXN0cmljdGlvblJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_bot_admin, file_app_v1_chats, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.Report
@@ -203,6 +205,20 @@ export type ModerationLogEntry = Message<"app.v1.ModerationLogEntry"> & {
    * @generated from field: int64 created_at = 9 [jstype = JS_NUMBER];
    */
   createdAt: bigint;
+
+  /**
+   * DELETE_MESSAGES: the deleted messages of target_chat_id.
+   *
+   * @generated from field: repeated int64 seqs = 10 [jstype = JS_NUMBER];
+   */
+  seqs: bigint[];
+
+  /**
+   * DISABLE_WEBHOOK: the hook turned off, and its name.
+   *
+   * @generated from field: string hook_id = 11;
+   */
+  hookId: string;
 };
 
 /**
@@ -396,6 +412,28 @@ export type GetReportResponse = Message<"app.v1.GetReportResponse"> & {
    * @generated from field: repeated app.v1.AccountRestriction restrictions = 7;
    */
   restrictions: AccountRestriction[];
+
+  /**
+   * The reports about the same target with the same status as this one.
+   *
+   * @generated from field: app.v1.ReportGroupSummary group = 8;
+   */
+  group?: ReportGroupSummary | undefined;
+
+  /**
+   * What the reported users did lately, one entry per user.
+   *
+   * @generated from field: repeated app.v1.SenderSignals signals = 9;
+   */
+  signals: SenderSignals[];
+
+  /**
+   * WEBHOOK: the hooks of the chat whose name is the label of the reported
+   * messages, the ones DISABLE_WEBHOOK turns off.
+   *
+   * @generated from field: repeated app.v1.ModeratedHook hooks = 10;
+   */
+  hooks: ModeratedHook[];
 };
 
 /**
@@ -404,6 +442,589 @@ export type GetReportResponse = Message<"app.v1.GetReportResponse"> & {
  */
 export const GetReportResponseSchema: GenMessage<GetReportResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_moderation, 7);
+
+/**
+ * @generated from message app.v1.ReportGroupSummary
+ */
+export type ReportGroupSummary = Message<"app.v1.ReportGroupSummary"> & {
+  /**
+   * @generated from field: int32 report_count = 1;
+   */
+  reportCount: number;
+
+  /**
+   * Distinct reporters.
+   *
+   * @generated from field: int32 reporter_count = 2;
+   */
+  reporterCount: number;
+
+  /**
+   * Report counts by reason, the most frequent first.
+   *
+   * @generated from field: repeated app.v1.ReasonCount reasons = 3;
+   */
+  reasons: ReasonCount[];
+
+  /**
+   * Reporters' comments, newest first, at most 10.
+   *
+   * @generated from field: repeated string comments = 4;
+   */
+  comments: string[];
+};
+
+/**
+ * Describes the message app.v1.ReportGroupSummary.
+ * Use `create(ReportGroupSummarySchema)` to create a new message.
+ */
+export const ReportGroupSummarySchema: GenMessage<ReportGroupSummary> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 8);
+
+/**
+ * @generated from message app.v1.ReasonCount
+ */
+export type ReasonCount = Message<"app.v1.ReasonCount"> & {
+  /**
+   * @generated from field: app.v1.ReportReason reason = 1;
+   */
+  reason: ReportReason;
+
+  /**
+   * @generated from field: int32 count = 2;
+   */
+  count: number;
+};
+
+/**
+ * Describes the message app.v1.ReasonCount.
+ * Use `create(ReasonCountSchema)` to create a new message.
+ */
+export const ReasonCountSchema: GenMessage<ReasonCount> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 9);
+
+/**
+ * @generated from message app.v1.SenderSignals
+ */
+export type SenderSignals = Message<"app.v1.SenderSignals"> & {
+  /**
+   * @generated from field: int64 user_id = 1 [jstype = JS_NUMBER];
+   */
+  userId: bigint;
+
+  /**
+   * Age of the chat account.
+   *
+   * @generated from field: int64 account_age_seconds = 2 [jstype = JS_NUMBER];
+   */
+  accountAgeSeconds: bigint;
+
+  /**
+   * Private chats the user started in the last 24 hours with people who do
+   * not know them (not their contact, no shared group or channel).
+   *
+   * @generated from field: int32 stranger_chats_24h = 3;
+   */
+  strangerChats24h: number;
+
+  /**
+   * People who blocked the user.
+   *
+   * @generated from field: int32 blocked_by = 4;
+   */
+  blockedBy: number;
+
+  /**
+   * Groups and channels the user joined in the last 24 hours.
+   *
+   * @generated from field: int32 chats_joined_24h = 5;
+   */
+  chatsJoined24h: number;
+
+  /**
+   * Open reports about the user other than this report's group.
+   *
+   * @generated from field: int32 other_open_reports = 6;
+   */
+  otherOpenReports: number;
+};
+
+/**
+ * Describes the message app.v1.SenderSignals.
+ * Use `create(SenderSignalsSchema)` to create a new message.
+ */
+export const SenderSignalsSchema: GenMessage<SenderSignals> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 10);
+
+/**
+ * @generated from message app.v1.ModeratedHook
+ */
+export type ModeratedHook = Message<"app.v1.ModeratedHook"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: bool disabled = 3;
+   */
+  disabled: boolean;
+};
+
+/**
+ * Describes the message app.v1.ModeratedHook.
+ * Use `create(ModeratedHookSchema)` to create a new message.
+ */
+export const ModeratedHookSchema: GenMessage<ModeratedHook> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 11);
+
+/**
+ * @generated from message app.v1.ReportGroup
+ */
+export type ReportGroup = Message<"app.v1.ReportGroup"> & {
+  /**
+   * The newest report of the group.
+   *
+   * @generated from field: app.v1.Report report = 1;
+   */
+  report?: Report | undefined;
+
+  /**
+   * @generated from field: int32 report_count = 2;
+   */
+  reportCount: number;
+
+  /**
+   * The most frequent reason.
+   *
+   * @generated from field: app.v1.ReportReason main_reason = 3;
+   */
+  mainReason: ReportReason;
+};
+
+/**
+ * Describes the message app.v1.ReportGroup.
+ * Use `create(ReportGroupSchema)` to create a new message.
+ */
+export const ReportGroupSchema: GenMessage<ReportGroup> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 12);
+
+/**
+ * @generated from message app.v1.GetReportGroupsRequest
+ */
+export type GetReportGroupsRequest = Message<"app.v1.GetReportGroupsRequest"> & {
+  /**
+   * As in GetReportsRequest.
+   *
+   * @generated from field: app.v1.ReportStatus status = 1;
+   */
+  status: ReportStatus;
+
+  /**
+   * @generated from field: app.v1.ReportReason reason = 2;
+   */
+  reason: ReportReason;
+
+  /**
+   * @generated from field: app.v1.ReportTargetKind target_kind = 3;
+   */
+  targetKind: ReportTargetKind;
+
+  /**
+   * @generated from field: string cursor = 4;
+   */
+  cursor: string;
+
+  /**
+   * Default 50, at most 200.
+   *
+   * @generated from field: int32 limit = 5;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message app.v1.GetReportGroupsRequest.
+ * Use `create(GetReportGroupsRequestSchema)` to create a new message.
+ */
+export const GetReportGroupsRequestSchema: GenMessage<GetReportGroupsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 13);
+
+/**
+ * @generated from message app.v1.GetReportGroupsResponse
+ */
+export type GetReportGroupsResponse = Message<"app.v1.GetReportGroupsResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.ReportGroup groups = 1;
+   */
+  groups: ReportGroup[];
+
+  /**
+   * @generated from field: repeated app.v1.User users = 2;
+   */
+  users: User[];
+
+  /**
+   * @generated from field: repeated app.v1.Chat chats = 3;
+   */
+  chats: Chat[];
+
+  /**
+   * @generated from field: string next_cursor = 4;
+   */
+  nextCursor: string;
+};
+
+/**
+ * Describes the message app.v1.GetReportGroupsResponse.
+ * Use `create(GetReportGroupsResponseSchema)` to create a new message.
+ */
+export const GetReportGroupsResponseSchema: GenMessage<GetReportGroupsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 14);
+
+/**
+ * @generated from message app.v1.GetModerationLogRequest
+ */
+export type GetModerationLogRequest = Message<"app.v1.GetModerationLogRequest"> & {
+  /**
+   * Optional filters: one operator (or 0 with automatic_only for the
+   * automatic rules), one action, entries since a time (Unix seconds).
+   *
+   * @generated from field: int64 operator_id = 1 [jstype = JS_NUMBER];
+   */
+  operatorId: bigint;
+
+  /**
+   * @generated from field: bool automatic_only = 2;
+   */
+  automaticOnly: boolean;
+
+  /**
+   * @generated from field: app.v1.ModerationAction action = 3;
+   */
+  action: ModerationAction;
+
+  /**
+   * @generated from field: int64 since = 4 [jstype = JS_NUMBER];
+   */
+  since: bigint;
+
+  /**
+   * @generated from field: string cursor = 5;
+   */
+  cursor: string;
+
+  /**
+   * Default 50, at most 500.
+   *
+   * @generated from field: int32 limit = 6;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message app.v1.GetModerationLogRequest.
+ * Use `create(GetModerationLogRequestSchema)` to create a new message.
+ */
+export const GetModerationLogRequestSchema: GenMessage<GetModerationLogRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 15);
+
+/**
+ * @generated from message app.v1.GetModerationLogResponse
+ */
+export type GetModerationLogResponse = Message<"app.v1.GetModerationLogResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.ModerationLogEntry entries = 1;
+   */
+  entries: ModerationLogEntry[];
+
+  /**
+   * Operators and targets of these entries.
+   *
+   * @generated from field: repeated app.v1.User users = 2;
+   */
+  users: User[];
+
+  /**
+   * @generated from field: repeated app.v1.Chat chats = 3;
+   */
+  chats: Chat[];
+
+  /**
+   * @generated from field: string next_cursor = 4;
+   */
+  nextCursor: string;
+};
+
+/**
+ * Describes the message app.v1.GetModerationLogResponse.
+ * Use `create(GetModerationLogResponseSchema)` to create a new message.
+ */
+export const GetModerationLogResponseSchema: GenMessage<GetModerationLogResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 16);
+
+/**
+ * A bot as the operators review it.
+ *
+ * @generated from message app.v1.BotReview
+ */
+export type BotReview = Message<"app.v1.BotReview"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * @generated from field: int64 owner_id = 2 [jstype = JS_NUMBER];
+   */
+  ownerId: bigint;
+
+  /**
+   * @generated from field: int64 created_at = 3 [jstype = JS_NUMBER];
+   */
+  createdAt: bigint;
+
+  /**
+   * @generated from field: app.v1.BotTier tier = 4;
+   */
+  tier: BotTier;
+
+  /**
+   * @generated from field: bool verified = 5;
+   */
+  verified: boolean;
+
+  /**
+   * Restricted tier: since when, why, and whether by the automatic rule.
+   *
+   * @generated from field: int64 restricted_at = 6 [jstype = JS_NUMBER];
+   */
+  restrictedAt: bigint;
+
+  /**
+   * @generated from field: string restricted_reason = 7;
+   */
+  restrictedReason: string;
+
+  /**
+   * @generated from field: bool restricted_automatically = 8;
+   */
+  restrictedAutomatically: boolean;
+
+  /**
+   * An operator kept the restriction after review.
+   *
+   * @generated from field: bool restriction_reviewed = 9;
+   */
+  restrictionReviewed: boolean;
+
+  /**
+   * Users who started the bot.
+   *
+   * @generated from field: int32 users = 10;
+   */
+  users: number;
+
+  /**
+   * Messages the bot sent in the last 7 days.
+   *
+   * @generated from field: int32 messages_7d = 11;
+   */
+  messages7d: number;
+
+  /**
+   * Of the users the bot wrote to in the last 24 hours, the share (per
+   * thousand) who blocked it.
+   *
+   * @generated from field: int32 blocked_permille_24h = 12;
+   */
+  blockedPermille24h: number;
+
+  /**
+   * @generated from field: int32 open_reports = 13;
+   */
+  openReports: number;
+};
+
+/**
+ * Describes the message app.v1.BotReview.
+ * Use `create(BotReviewSchema)` to create a new message.
+ */
+export const BotReviewSchema: GenMessage<BotReview> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 17);
+
+/**
+ * @generated from message app.v1.GetBotReviewRequest
+ */
+export type GetBotReviewRequest = Message<"app.v1.GetBotReviewRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+};
+
+/**
+ * Describes the message app.v1.GetBotReviewRequest.
+ * Use `create(GetBotReviewRequestSchema)` to create a new message.
+ */
+export const GetBotReviewRequestSchema: GenMessage<GetBotReviewRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 18);
+
+/**
+ * @generated from message app.v1.GetBotReviewResponse
+ */
+export type GetBotReviewResponse = Message<"app.v1.GetBotReviewResponse"> & {
+  /**
+   * @generated from field: app.v1.BotReview review = 1;
+   */
+  review?: BotReview | undefined;
+
+  /**
+   * The bot and its owner.
+   *
+   * @generated from field: repeated app.v1.User users = 2;
+   */
+  users: User[];
+};
+
+/**
+ * Describes the message app.v1.GetBotReviewResponse.
+ * Use `create(GetBotReviewResponseSchema)` to create a new message.
+ */
+export const GetBotReviewResponseSchema: GenMessage<GetBotReviewResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 19);
+
+/**
+ * @generated from message app.v1.GetBotReviewsRequest
+ */
+export type GetBotReviewsRequest = Message<"app.v1.GetBotReviewsRequest"> & {
+};
+
+/**
+ * Describes the message app.v1.GetBotReviewsRequest.
+ * Use `create(GetBotReviewsRequestSchema)` to create a new message.
+ */
+export const GetBotReviewsRequestSchema: GenMessage<GetBotReviewsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 20);
+
+/**
+ * @generated from message app.v1.GetBotReviewsResponse
+ */
+export type GetBotReviewsResponse = Message<"app.v1.GetBotReviewsResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.BotReview reviews = 1;
+   */
+  reviews: BotReview[];
+
+  /**
+   * @generated from field: repeated app.v1.User users = 2;
+   */
+  users: User[];
+};
+
+/**
+ * Describes the message app.v1.GetBotReviewsResponse.
+ * Use `create(GetBotReviewsResponseSchema)` to create a new message.
+ */
+export const GetBotReviewsResponseSchema: GenMessage<GetBotReviewsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 21);
+
+/**
+ * @generated from message app.v1.SetBotVerifiedRequest
+ */
+export type SetBotVerifiedRequest = Message<"app.v1.SetBotVerifiedRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * @generated from field: bool verified = 2;
+   */
+  verified: boolean;
+
+  /**
+   * Why, recorded in the log; required.
+   *
+   * @generated from field: string note = 3;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message app.v1.SetBotVerifiedRequest.
+ * Use `create(SetBotVerifiedRequestSchema)` to create a new message.
+ */
+export const SetBotVerifiedRequestSchema: GenMessage<SetBotVerifiedRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 22);
+
+/**
+ * @generated from message app.v1.SetBotVerifiedResponse
+ */
+export type SetBotVerifiedResponse = Message<"app.v1.SetBotVerifiedResponse"> & {
+  /**
+   * @generated from field: app.v1.BotReview review = 1;
+   */
+  review?: BotReview | undefined;
+};
+
+/**
+ * Describes the message app.v1.SetBotVerifiedResponse.
+ * Use `create(SetBotVerifiedResponseSchema)` to create a new message.
+ */
+export const SetBotVerifiedResponseSchema: GenMessage<SetBotVerifiedResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 23);
+
+/**
+ * @generated from message app.v1.ReviewBotRestrictionRequest
+ */
+export type ReviewBotRestrictionRequest = Message<"app.v1.ReviewBotRestrictionRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * true restores the bot's tier; false keeps it restricted.
+   *
+   * @generated from field: bool restore = 2;
+   */
+  restore: boolean;
+
+  /**
+   * @generated from field: string note = 3;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message app.v1.ReviewBotRestrictionRequest.
+ * Use `create(ReviewBotRestrictionRequestSchema)` to create a new message.
+ */
+export const ReviewBotRestrictionRequestSchema: GenMessage<ReviewBotRestrictionRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 24);
+
+/**
+ * @generated from message app.v1.ReviewBotRestrictionResponse
+ */
+export type ReviewBotRestrictionResponse = Message<"app.v1.ReviewBotRestrictionResponse"> & {
+  /**
+   * @generated from field: app.v1.BotReview review = 1;
+   */
+  review?: BotReview | undefined;
+};
+
+/**
+ * Describes the message app.v1.ReviewBotRestrictionResponse.
+ * Use `create(ReviewBotRestrictionResponseSchema)` to create a new message.
+ */
+export const ReviewBotRestrictionResponseSchema: GenMessage<ReviewBotRestrictionResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_moderation, 25);
 
 /**
  * @generated from message app.v1.ResolveReportRequest
@@ -432,6 +1053,14 @@ export type ResolveReportRequest = Message<"app.v1.ResolveReportRequest"> & {
    * @generated from field: int32 restrict_seconds = 4;
    */
   restrictSeconds: number;
+
+  /**
+   * The assistant bot also tells the reported users what was done and why
+   * (the note); WARN always does.
+   *
+   * @generated from field: bool notify = 5;
+   */
+  notify: boolean;
 };
 
 /**
@@ -439,7 +1068,7 @@ export type ResolveReportRequest = Message<"app.v1.ResolveReportRequest"> & {
  * Use `create(ResolveReportRequestSchema)` to create a new message.
  */
 export const ResolveReportRequestSchema: GenMessage<ResolveReportRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 8);
+  messageDesc(file_app_v1_moderation, 26);
 
 /**
  * @generated from message app.v1.ResolveReportResponse
@@ -456,7 +1085,7 @@ export type ResolveReportResponse = Message<"app.v1.ResolveReportResponse"> & {
  * Use `create(ResolveReportResponseSchema)` to create a new message.
  */
 export const ResolveReportResponseSchema: GenMessage<ResolveReportResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 9);
+  messageDesc(file_app_v1_moderation, 27);
 
 /**
  * @generated from message app.v1.LiftRestrictionRequest
@@ -480,7 +1109,7 @@ export type LiftRestrictionRequest = Message<"app.v1.LiftRestrictionRequest"> & 
  * Use `create(LiftRestrictionRequestSchema)` to create a new message.
  */
 export const LiftRestrictionRequestSchema: GenMessage<LiftRestrictionRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 10);
+  messageDesc(file_app_v1_moderation, 28);
 
 /**
  * @generated from message app.v1.LiftRestrictionResponse
@@ -493,7 +1122,7 @@ export type LiftRestrictionResponse = Message<"app.v1.LiftRestrictionResponse"> 
  * Use `create(LiftRestrictionResponseSchema)` to create a new message.
  */
 export const LiftRestrictionResponseSchema: GenMessage<LiftRestrictionResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 11);
+  messageDesc(file_app_v1_moderation, 29);
 
 /**
  * One message a user sent the assistant bot as feedback.
@@ -566,7 +1195,7 @@ export type Feedback = Message<"app.v1.Feedback"> & {
  * Use `create(FeedbackSchema)` to create a new message.
  */
 export const FeedbackSchema: GenMessage<Feedback> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 12);
+  messageDesc(file_app_v1_moderation, 30);
 
 /**
  * @generated from message app.v1.GetFeedbackRequest
@@ -599,7 +1228,7 @@ export type GetFeedbackRequest = Message<"app.v1.GetFeedbackRequest"> & {
  * Use `create(GetFeedbackRequestSchema)` to create a new message.
  */
 export const GetFeedbackRequestSchema: GenMessage<GetFeedbackRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 13);
+  messageDesc(file_app_v1_moderation, 31);
 
 /**
  * @generated from message app.v1.GetFeedbackResponse
@@ -630,7 +1259,7 @@ export type GetFeedbackResponse = Message<"app.v1.GetFeedbackResponse"> & {
  * Use `create(GetFeedbackResponseSchema)` to create a new message.
  */
 export const GetFeedbackResponseSchema: GenMessage<GetFeedbackResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 14);
+  messageDesc(file_app_v1_moderation, 32);
 
 /**
  * @generated from message app.v1.ResolveFeedbackRequest
@@ -647,7 +1276,7 @@ export type ResolveFeedbackRequest = Message<"app.v1.ResolveFeedbackRequest"> & 
  * Use `create(ResolveFeedbackRequestSchema)` to create a new message.
  */
 export const ResolveFeedbackRequestSchema: GenMessage<ResolveFeedbackRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 15);
+  messageDesc(file_app_v1_moderation, 33);
 
 /**
  * @generated from message app.v1.ResolveFeedbackResponse
@@ -664,7 +1293,7 @@ export type ResolveFeedbackResponse = Message<"app.v1.ResolveFeedbackResponse"> 
  * Use `create(ResolveFeedbackResponseSchema)` to create a new message.
  */
 export const ResolveFeedbackResponseSchema: GenMessage<ResolveFeedbackResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 16);
+  messageDesc(file_app_v1_moderation, 34);
 
 /**
  * @generated from message app.v1.ReplyFeedbackRequest
@@ -688,7 +1317,7 @@ export type ReplyFeedbackRequest = Message<"app.v1.ReplyFeedbackRequest"> & {
  * Use `create(ReplyFeedbackRequestSchema)` to create a new message.
  */
 export const ReplyFeedbackRequestSchema: GenMessage<ReplyFeedbackRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 17);
+  messageDesc(file_app_v1_moderation, 35);
 
 /**
  * @generated from message app.v1.ReplyFeedbackResponse
@@ -705,7 +1334,7 @@ export type ReplyFeedbackResponse = Message<"app.v1.ReplyFeedbackResponse"> & {
  * Use `create(ReplyFeedbackResponseSchema)` to create a new message.
  */
 export const ReplyFeedbackResponseSchema: GenMessage<ReplyFeedbackResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_moderation, 18);
+  messageDesc(file_app_v1_moderation, 36);
 
 /**
  * @generated from enum app.v1.ReportStatus
@@ -765,6 +1394,20 @@ export enum ReportTargetKind {
    * @generated from enum value: REPORT_TARGET_KIND_MESSAGES = 3;
    */
   MESSAGES = 3,
+
+  /**
+   * A report about a bot account (filed as USER).
+   *
+   * @generated from enum value: REPORT_TARGET_KIND_BOT = 4;
+   */
+  BOT = 4,
+
+  /**
+   * A report about messages an incoming webhook posted (filed as MESSAGES).
+   *
+   * @generated from enum value: REPORT_TARGET_KIND_WEBHOOK = 5;
+   */
+  WEBHOOK = 5,
 }
 
 /**
@@ -820,6 +1463,57 @@ export enum ModerationAction {
    * @generated from enum value: MODERATION_ACTION_LIFT_RESTRICTION = 5;
    */
   LIFT_RESTRICTION = 5,
+
+  /**
+   * The assistant bot sends the reported users (or the authors of the
+   * reported messages) the note as a warning.
+   *
+   * @generated from enum value: MODERATION_ACTION_WARN = 6;
+   */
+  WARN = 6,
+
+  /**
+   * WEBHOOK: turn off the hooks of the chat that posted the reported
+   * messages (GetReportResponse.hooks).
+   *
+   * @generated from enum value: MODERATION_ACTION_DISABLE_WEBHOOK = 7;
+   */
+  DISABLE_WEBHOOK = 7,
+
+  /**
+   * Log entries only: a bot moved to the restricted tier (by the automatic
+   * rule, operator_id 0), kept there or restored after review, verified or
+   * unverified, and a user's new chats with strangers stopped by the
+   * automatic rule.
+   *
+   * @generated from enum value: MODERATION_ACTION_RESTRICT_BOT = 8;
+   */
+  RESTRICT_BOT = 8,
+
+  /**
+   * @generated from enum value: MODERATION_ACTION_RESTORE_BOT_TIER = 9;
+   */
+  RESTORE_BOT_TIER = 9,
+
+  /**
+   * @generated from enum value: MODERATION_ACTION_KEEP_BOT_RESTRICTED = 10;
+   */
+  KEEP_BOT_RESTRICTED = 10,
+
+  /**
+   * @generated from enum value: MODERATION_ACTION_VERIFY_BOT = 11;
+   */
+  VERIFY_BOT = 11,
+
+  /**
+   * @generated from enum value: MODERATION_ACTION_UNVERIFY_BOT = 12;
+   */
+  UNVERIFY_BOT = 12,
+
+  /**
+   * @generated from enum value: MODERATION_ACTION_LIMIT_STRANGER_CHATS = 13;
+   */
+  LIMIT_STRANGER_CHATS = 13,
 }
 
 /**
@@ -915,7 +1609,8 @@ export const ModerationService: GenService<{
     output: typeof GetReportResponseSchema;
   },
   /**
-   * Closes an open report with one or more actions; a closed report gives
+   * Closes an open report, and every other open report about the same
+   * target, with one or more actions; a closed report gives
    * failed_precondition.
    *
    * @generated from rpc app.v1.ModerationService.ResolveReport
@@ -968,6 +1663,70 @@ export const ModerationService: GenService<{
     methodKind: "unary";
     input: typeof ReplyFeedbackRequestSchema;
     output: typeof ReplyFeedbackResponseSchema;
+  },
+  /**
+   * Reports grouped by target (the same user, chat, or messages), the
+   * groups with the most reports first; each group carries its newest
+   * report. ResolveReport on that report closes the whole open group.
+   *
+   * @generated from rpc app.v1.ModerationService.GetReportGroups
+   */
+  getReportGroups: {
+    methodKind: "unary";
+    input: typeof GetReportGroupsRequestSchema;
+    output: typeof GetReportGroupsResponseSchema;
+  },
+  /**
+   * The tenant's moderation log, newest first, including the automatic
+   * rules (operator_id 0).
+   *
+   * @generated from rpc app.v1.ModerationService.GetModerationLog
+   */
+  getModerationLog: {
+    methodKind: "unary";
+    input: typeof GetModerationLogRequestSchema;
+    output: typeof GetModerationLogResponseSchema;
+  },
+  /**
+   * What an operator needs to judge a bot: tier, verification, automatic
+   * restriction and usage.
+   *
+   * @generated from rpc app.v1.ModerationService.GetBotReview
+   */
+  getBotReview: {
+    methodKind: "unary";
+    input: typeof GetBotReviewRequestSchema;
+    output: typeof GetBotReviewResponseSchema;
+  },
+  /**
+   * Bots the automatic rule restricted that no operator has reviewed yet.
+   *
+   * @generated from rpc app.v1.ModerationService.GetBotReviews
+   */
+  getBotReviews: {
+    methodKind: "unary";
+    input: typeof GetBotReviewsRequestSchema;
+    output: typeof GetBotReviewsResponseSchema;
+  },
+  /**
+   * Grants or revokes a bot's verified badge (and its higher tier).
+   *
+   * @generated from rpc app.v1.ModerationService.SetBotVerified
+   */
+  setBotVerified: {
+    methodKind: "unary";
+    input: typeof SetBotVerifiedRequestSchema;
+    output: typeof SetBotVerifiedResponseSchema;
+  },
+  /**
+   * Keeps a restricted bot restricted, or restores its previous tier.
+   *
+   * @generated from rpc app.v1.ModerationService.ReviewBotRestriction
+   */
+  reviewBotRestriction: {
+    methodKind: "unary";
+    input: typeof ReviewBotRestrictionRequestSchema;
+    output: typeof ReviewBotRestrictionResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_moderation, 0);

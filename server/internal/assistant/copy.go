@@ -37,6 +37,9 @@ type copyText struct {
 	thanks, textOnly         string
 	unknownCommand           string
 	replyPrefix              string
+	// Moderation notices.
+	modHead, modWarn, modDeleted, modBanned string
+	modLockedUntil, modLocked, modReason    string
 }
 
 func newCopy(b brand.Names) copyText {
@@ -63,6 +66,13 @@ func newCopy(b brand.Names) copyText {
 		textOnly:       "Mình chỉ nhận góp ý bằng chữ, bạn nhắn lại giúp mình nhé.",
 		unknownCommand: "Mình chưa hiểu lệnh này. Gõ /huongdan để xem hướng dẫn hoặc /gopy để gửi góp ý.",
 		replyPrefix:    fmt.Sprintf("Phản hồi từ đội ngũ %s:\n\n", b.AppName),
+		modHead:        fmt.Sprintf("Thông báo từ đội kiểm duyệt %s.", b.AppName),
+		modWarn:        "Bạn bị cảnh cáo vì vi phạm quy định sử dụng.",
+		modDeleted:     "Tin nhắn vi phạm của bạn đã bị gỡ.",
+		modBanned:      "Bạn đã bị cấm khỏi chat nơi có tin vi phạm.",
+		modLockedUntil: "Tài khoản chat của bạn bị khoá tới %s.",
+		modLocked:      "Tài khoản chat của bạn bị khoá cho tới khi đội kiểm duyệt gỡ.",
+		modReason:      "Lý do: %s",
 	}
 }
 

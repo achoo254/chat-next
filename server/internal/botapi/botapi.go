@@ -77,6 +77,16 @@ var tiers = map[string]tierRules{
 		calls: ratelimit.Rule{Rate: 500, Burst: 1000}, send: ratelimit.Rule{Rate: 500, Burst: 500},
 		perChat: ratelimit.Rule{Rate: 20, Burst: 200},
 	},
+	// A bot younger than 14 days, until it is verified.
+	botadmin.TierNew: {
+		calls: ratelimit.Rule{Rate: 10, Burst: 20}, send: ratelimit.Rule{Rate: 5, Burst: 10},
+		perChat: ratelimit.Rule{Rate: 1, Burst: 10},
+	},
+	// Lowered by the anti-abuse rule or an operator.
+	botadmin.TierRestricted: {
+		calls: ratelimit.Rule{Rate: 5, Burst: 10}, send: ratelimit.Rule{Rate: 1, Burst: 3},
+		perChat: ratelimit.Rule{Rate: 0.2, Burst: 3},
+	},
 }
 
 // limitAuthFailures is the failed-auth budget of one client address.

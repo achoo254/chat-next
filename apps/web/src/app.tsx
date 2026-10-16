@@ -9,13 +9,14 @@ import { Icon } from "./components/icon.tsx";
 import { UpdateBar } from "./components/update-bar.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
 import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
-import { Welcome } from "./screens/welcome.tsx";
 import type { MessagingConnector } from "./messaging/data/connector.ts";
 
 // The signed-in app is its own chunk, so the welcome screen stays small.
 const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
 // Shown instead of the app while the account waits for deletion.
 const DeletionPending = lazy(() => import("./screens/deletion-pending.tsx"));
+// Only a signed-out start shows it, so a signed-in start does not load it.
+const Welcome = lazy(() => import("./screens/welcome.tsx").then((module) => ({ default: module.Welcome })));
 
 export interface AppProps {
 	/** How RPCs reach the server; tests and the visual harness serve them in memory. */
@@ -100,7 +101,11 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 		case "loading":
 			return <PageLoader />;
 		case "signedOut":
-			return <Welcome />;
+			return (
+				<Suspense fallback={<PageLoader />}>
+					<Welcome />
+				</Suspense>
+			);
 		case "error":
 			return <BootError onRetry={retry} />;
 		case "deletionPending":

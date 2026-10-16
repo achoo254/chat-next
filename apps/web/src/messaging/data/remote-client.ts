@@ -25,9 +25,11 @@ import {
 	type Feedback as WireFeedback,
 	ReportStatus as WireStatus,
 	ReportTargetKind,
+	type BotReview as WireBotReview,
 	type ModerationLogEntry,
 	type Report as WireReport,
 } from "@app/proto-ts/moderation";
+import { BotTier } from "@app/proto-ts/bot_admin";
 import {
 	PrivacyAudience,
 	ReportReason as WireReason,
@@ -47,9 +49,13 @@ import type {
 	Invite,
 	Limits,
 	Member,
+	BotReview,
+	BotTierName,
 	ModerationAction,
 	ModerationEntry,
+	ModerationLogFilter,
 	ModerationReport,
+	ReportKind,
 	Person,
 	Presence,
 	Privacy,
@@ -67,6 +73,7 @@ const REACTIONS_PAGE = 100;
 const COMMON_PAGE = 100;
 const REPORTS_PAGE = 100;
 const FEEDBACK_PAGE = 100;
+const LOG_PAGE = 100;
 /** SetDialogMute takes at most 366 days; longer means until turned back on. */
 const MUTE_MAX_SECONDS = 31_622_400;
 
@@ -193,25 +200,63 @@ const WIRE_STATUSES: Record<ReportStatus, WireStatus> = {
 	dismissed: WireStatus.DISMISSED,
 };
 
-const ACTIONS: Partial<Record<WireAction, ModerationAction>> = {
-	[WireAction.DISMISS]: "dismiss",
-	[WireAction.DELETE_MESSAGES]: "delete_messages",
-	[WireAction.BAN_FROM_CHAT]: "ban_from_chat",
-	[WireAction.RESTRICT_ACCOUNT]: "restrict_account",
-	[WireAction.LIFT_RESTRICTION]: "lift_restriction",
-};
-
 const WIRE_ACTIONS: Record<ModerationAction, WireAction> = {
 	dismiss: WireAction.DISMISS,
 	delete_messages: WireAction.DELETE_MESSAGES,
 	ban_from_chat: WireAction.BAN_FROM_CHAT,
 	restrict_account: WireAction.RESTRICT_ACCOUNT,
+	warn: WireAction.WARN,
+	disable_webhook: WireAction.DISABLE_WEBHOOK,
 	lift_restriction: WireAction.LIFT_RESTRICTION,
+	restrict_bot: WireAction.RESTRICT_BOT,
+	restore_bot_tier: WireAction.RESTORE_BOT_TIER,
+	keep_bot_restricted: WireAction.KEEP_BOT_RESTRICTED,
+	verify_bot: WireAction.VERIFY_BOT,
+	unverify_bot: WireAction.UNVERIFY_BOT,
+	limit_stranger_chats: WireAction.LIMIT_STRANGER_CHATS,
 };
+
+const ACTIONS = new Map<WireAction, ModerationAction>(
+	(Object.entries(WIRE_ACTIONS) as [ModerationAction, WireAction][]).map(([action, wire]) => [wire, action]),
+);
+
+const KINDS: Partial<Record<ReportTargetKind, ReportKind>> = {
+	[ReportTargetKind.USER]: "user",
+	[ReportTargetKind.BOT]: "bot",
+	[ReportTargetKind.CHAT]: "chat",
+	[ReportTargetKind.MESSAGES]: "messages",
+	[ReportTargetKind.WEBHOOK]: "webhook",
+};
+
+const TIERS: Partial<Record<BotTier, BotTierName>> = {
+	[BotTier.NEW]: "new",
+	[BotTier.DEFAULT]: "default",
+	[BotTier.VERIFIED]: "verified",
+	[BotTier.INTERNAL]: "internal",
+	[BotTier.RESTRICTED]: "restricted",
+};
+
+function toBotReview(review: WireBotReview): BotReview {
+	return {
+		botId: assertSafeId(review.botId),
+		ownerId: assertSafeId(review.ownerId),
+		createdAt: assertSafeId(review.createdAt),
+		tier: TIERS[review.tier] ?? "default",
+		verified: review.verified,
+		restrictedAt: assertSafeId(review.restrictedAt),
+		restrictedReason: review.restrictedReason,
+		restrictedAutomatically: review.restrictedAutomatically,
+		restrictionReviewed: review.restrictionReviewed,
+		users: review.users,
+		messages7d: review.messages7d,
+		blockedPermille24h: review.blockedPermille24h,
+		openReports: review.openReports,
+	};
+}
 
 function toActions(actions: readonly WireAction[]): ModerationAction[] {
 	return actions.flatMap((action) => {
-		const mapped = ACTIONS[action];
+		const mapped = ACTIONS.get(action);
 		return mapped === undefined ? [] : [mapped];
 	});
 }
@@ -219,7 +264,7 @@ function toActions(actions: readonly WireAction[]): ModerationAction[] {
 function toReport(report: WireReport): ModerationReport {
 	return {
 		id: assertSafeId(report.id),
-		kind: report.targetKind === ReportTargetKind.USER ? "user" : report.targetKind === ReportTargetKind.CHAT ? "chat" : "messages",
+		kind: KINDS[report.targetKind] ?? "messages",
 		reporterId: assertSafeId(report.reporterId),
 		targetUserId: assertSafeId(report.targetUserId),
 		targetChatId: assertSafeId(report.targetChatId),
@@ -256,16 +301,30 @@ function toFeedback(item: WireFeedback): FeedbackItem {
 	};
 }
 
-function toEntry(entry: ModerationLogEntry): ModerationEntry {
+/** A log entry; null for an action this client does not know (newer server). */
+function toEntry(entry: ModerationLogEntry): ModerationEntry | null {
+	const action = ACTIONS.get(entry.action);
+	if (action === undefined) return null;
 	return {
 		id: assertSafeId(entry.id),
 		operatorId: assertSafeId(entry.operatorId),
-		action: ACTIONS[entry.action] ?? "dismiss",
+		reportId: assertSafeId(entry.reportId),
+		action,
 		targetUserId: assertSafeId(entry.targetUserId),
+		targetChatId: assertSafeId(entry.targetChatId),
+		seqs: entry.seqs.map(assertSafeId),
+		hookId: entry.hookId,
 		note: entry.note,
 		until: assertSafeId(entry.until),
 		createdAt: assertSafeId(entry.createdAt),
 	};
+}
+
+function knownEntries(entries: readonly ModerationLogEntry[]): ModerationEntry[] {
+	return entries.flatMap((entry) => {
+		const mapped = toEntry(entry);
+		return mapped === null ? [] : [mapped];
+	});
 }
 
 function toChatBrief(chat: WireChat): ChatBrief {
@@ -636,11 +695,15 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				});
 				return { items, nextCursor: response.nextCursor };
 			}),
-		moderationReports: (status, cursor = "") =>
+		moderationGroups: (status, cursor = "") =>
 			call(async () => {
-				const response = await moderation.getReports({ status: WIRE_STATUSES[status], cursor, limit: REPORTS_PAGE });
+				const response = await moderation.getReportGroups({ status: WIRE_STATUSES[status], cursor, limit: REPORTS_PAGE });
 				return {
-					reports: response.reports.map(toReport),
+					groups: response.groups.flatMap((group) =>
+						group.report === undefined
+							? []
+							: [{ report: toReport(group.report), count: group.reportCount, mainReason: WIRE_REASONS[group.mainReason] ?? "other" }],
+					),
 					people: peopleOf(response.users),
 					chats: new Map(response.chats.map((chat) => [assertSafeId(chat.id), toChatBrief(chat)])),
 					nextCursor: response.nextCursor,
@@ -667,22 +730,38 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					})),
 					people: peopleOf(response.users),
 					chat: response.chat === undefined ? null : toChatBrief(response.chat),
-					history: response.history.map(toEntry),
+					history: knownEntries(response.history),
 					restrictions: response.restrictions.map((restriction) => ({
 						userId: assertSafeId(restriction.userId),
 						until: assertSafeId(restriction.until),
 						reason: restriction.reason,
 						createdAt: assertSafeId(restriction.createdAt),
 					})),
+					group: {
+						reportCount: response.group?.reportCount ?? 1,
+						reporterCount: response.group?.reporterCount ?? 1,
+						reasons: (response.group?.reasons ?? []).map((entry) => ({ reason: WIRE_REASONS[entry.reason] ?? "other", count: entry.count })),
+						comments: response.group?.comments ?? [],
+					},
+					signals: response.signals.map((signal) => ({
+						userId: assertSafeId(signal.userId),
+						accountAgeSeconds: assertSafeId(signal.accountAgeSeconds),
+						strangerChats24h: signal.strangerChats24h,
+						blockedBy: signal.blockedBy,
+						chatsJoined24h: signal.chatsJoined24h,
+						otherOpenReports: signal.otherOpenReports,
+					})),
+					hooks: response.hooks.map((hook) => ({ id: hook.id, name: hook.name, disabled: hook.disabled })),
 				};
 			}),
-		resolveReport: (reportId, actions, note, restrictSeconds) =>
+		resolveReport: (reportId, actions, note, restrictSeconds, notify) =>
 			call(async () => {
 				const response = await moderation.resolveReport({
 					reportId: BigInt(reportId),
 					actions: actions.map((action) => WIRE_ACTIONS[action]),
 					note,
 					restrictSeconds,
+					notify,
 				});
 				if (response.report === undefined) throw new ConnectError("ResolveReport returned no report", Code.Internal);
 				return toReport(response.report);
@@ -695,6 +774,46 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				const response = await moderation.getFeedback({ status: WIRE_FEEDBACK_STATUSES[status], cursor, limit: FEEDBACK_PAGE });
 				return { items: response.feedback.map(toFeedback), people: peopleOf(response.users), nextCursor: response.nextCursor };
+			}),
+		moderationLog: (filter: ModerationLogFilter, cursor = "", limit = LOG_PAGE) =>
+			call(async () => {
+				const response = await moderation.getModerationLog({
+					operatorId: typeof filter.actor === "number" ? BigInt(filter.actor) : 0n,
+					automaticOnly: filter.actor === "auto",
+					action: filter.action === "all" ? WireAction.UNSPECIFIED : WIRE_ACTIONS[filter.action],
+					since: BigInt(filter.since),
+					cursor,
+					limit,
+				});
+				return {
+					entries: knownEntries(response.entries),
+					people: peopleOf(response.users),
+					chats: new Map(response.chats.map((chat) => [assertSafeId(chat.id), toChatBrief(chat)])),
+					nextCursor: response.nextCursor,
+				};
+			}),
+		botReview: (botId) =>
+			call(async () => {
+				const response = await moderation.getBotReview({ botId: BigInt(botId) });
+				if (response.review === undefined) throw new ConnectError("GetBotReview returned no review", Code.Internal);
+				return { reviews: [toBotReview(response.review)], people: peopleOf(response.users) };
+			}),
+		botReviews: () =>
+			call(async () => {
+				const response = await moderation.getBotReviews({});
+				return { reviews: response.reviews.map(toBotReview), people: peopleOf(response.users) };
+			}),
+		setBotVerified: (botId, verified, note) =>
+			call(async () => {
+				const response = await moderation.setBotVerified({ botId: BigInt(botId), verified, note });
+				if (response.review === undefined) throw new ConnectError("SetBotVerified returned no review", Code.Internal);
+				return toBotReview(response.review);
+			}),
+		reviewBotRestriction: (botId, restore, note) =>
+			call(async () => {
+				const response = await moderation.reviewBotRestriction({ botId: BigInt(botId), restore, note });
+				if (response.review === undefined) throw new ConnectError("ReviewBotRestriction returned no review", Code.Internal);
+				return toBotReview(response.review);
 			}),
 		resolveFeedback: (feedbackId) =>
 			call(async () => {

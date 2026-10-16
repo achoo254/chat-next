@@ -91,6 +91,9 @@ enum IncomingHookDisabledReason {
   INCOMING_HOOK_DISABLED_REASON_BY_ADMIN = 1;
   INCOMING_HOOK_DISABLED_REASON_CREATOR_NOT_ADMIN = 2;
   INCOMING_HOOK_DISABLED_REASON_CREATOR_LEFT = 3;
+  // Turned off by the moderation team; chat admins cannot turn it back on
+  // or take it over (failed_precondition "disabled_by_moderator").
+  INCOMING_HOOK_DISABLED_REASON_BY_MODERATOR = 4;
 }
 
 message IncomingHook {

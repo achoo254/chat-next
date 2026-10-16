@@ -30,6 +30,8 @@ type IntegrationMessage struct {
 	// Buttons are rows of URL buttons (no callbacks: a hook has no bot).
 	Buttons [][]IntegrationButton
 	Silent  bool
+	// HookID is the hook that posts it, kept for moderation (hook_posts).
+	HookID string
 }
 
 // IntegrationButton opens URL.
@@ -140,6 +142,12 @@ func (it *IntegrationTx) Post(ctx context.Context, msg IntegrationMessage) (int6
 	posted, err := it.t.postMessage(ctx, ev, it.c, members, newMessage{text: text, content: content})
 	if err != nil {
 		return 0, err
+	}
+	if msg.HookID != "" {
+		if _, err := it.t.tx.Exec(ctx, `INSERT INTO hook_posts (chat_id, seq, hook_id) VALUES ($1, $2, $3)`,
+			it.c.ID, posted.Seq, msg.HookID); err != nil {
+			return 0, fmt.Errorf("chat: record hook post: %w", err)
+		}
 	}
 	return posted.Seq, nil
 }

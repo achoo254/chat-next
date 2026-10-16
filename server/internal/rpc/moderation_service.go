@@ -81,3 +81,47 @@ func (s *moderationService) ReplyFeedback(ctx context.Context, req *connect.Requ
 		return &appv1.ReplyFeedbackResponse{Feedback: f}, nil
 	})
 }
+
+func (s *moderationService) GetReportGroups(ctx context.Context, req *connect.Request[appv1.GetReportGroupsRequest]) (*connect.Response[appv1.GetReportGroupsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetReportGroupsRequest) (*appv1.GetReportGroupsResponse, error) {
+		return s.chat.GetReportGroups(ctx, me, m)
+	})
+}
+
+func (s *moderationService) GetModerationLog(ctx context.Context, req *connect.Request[appv1.GetModerationLogRequest]) (*connect.Response[appv1.GetModerationLogResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetModerationLogRequest) (*appv1.GetModerationLogResponse, error) {
+		return s.chat.GetModerationLog(ctx, me, m)
+	})
+}
+
+func (s *moderationService) GetBotReview(ctx context.Context, req *connect.Request[appv1.GetBotReviewRequest]) (*connect.Response[appv1.GetBotReviewResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetBotReviewRequest) (*appv1.GetBotReviewResponse, error) {
+		return s.chat.GetBotReview(ctx, me, m.GetBotId())
+	})
+}
+
+func (s *moderationService) GetBotReviews(ctx context.Context, req *connect.Request[appv1.GetBotReviewsRequest]) (*connect.Response[appv1.GetBotReviewsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, _ *appv1.GetBotReviewsRequest) (*appv1.GetBotReviewsResponse, error) {
+		return s.chat.GetBotReviews(ctx, me)
+	})
+}
+
+func (s *moderationService) SetBotVerified(ctx context.Context, req *connect.Request[appv1.SetBotVerifiedRequest]) (*connect.Response[appv1.SetBotVerifiedResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetBotVerifiedRequest) (*appv1.SetBotVerifiedResponse, error) {
+		review, err := s.chat.SetBotVerified(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SetBotVerifiedResponse{Review: review}, nil
+	})
+}
+
+func (s *moderationService) ReviewBotRestriction(ctx context.Context, req *connect.Request[appv1.ReviewBotRestrictionRequest]) (*connect.Response[appv1.ReviewBotRestrictionResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ReviewBotRestrictionRequest) (*appv1.ReviewBotRestrictionResponse, error) {
+		review, err := s.chat.ReviewBotRestriction(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.ReviewBotRestrictionResponse{Review: review}, nil
+	})
+}
