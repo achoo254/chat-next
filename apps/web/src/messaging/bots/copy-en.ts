@@ -266,7 +266,7 @@ export const enBots: BotsCopy = {
 		botLine: (username, org) => `@${username} · bot of ${org}`,
 		ask: (command, name) => `Send ${command} to ${name}?`,
 		fine: "The bot will know you came from this link and may message you afterwards.",
-		send: (command) => `Send ${command}`,
+		send: "Send /start",
 		sending: "Sending…",
 		cancelled: "Cancelled, nothing was sent to the bot",
 		notFound: "This bot was not found",

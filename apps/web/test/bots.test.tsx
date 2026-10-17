@@ -342,9 +342,9 @@ describe("bots in chats", () => {
 		expect(within(dialog).getByText("Theo dõi pipeline và đẩy bản phát hành.")).toBeTruthy();
 		// The first answer is lost: pressing again repeats the same request, not a second /start.
 		fake.loseNextStartAnswer = true;
-		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi /start release-241" }));
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi /start" }));
 		await waitFor(() => expect(toastText()).toBe("Không thực hiện được, thử lại sau ít phút."));
-		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi /start release-241" }));
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi /start" }));
 		await waitFor(() => expect(window.location.pathname).toBe(`/c/${demo.ids.bot}`), LONG);
 		expect(fake.calls.filter((call) => call === `StartBot ${deployBot} release-241`)).toHaveLength(2);
 		expect(new Set(fake.startRandomIds).size).toBe(1);
@@ -357,10 +357,10 @@ describe("bots in chats", () => {
 		const demo = seedDemo();
 		demo.fixture.bots.adopt(demo.ids.users.deployBot, "Deploy Bot", "deploy_bot", { owned: false });
 		renderMessaging(demo.fixture, "/b/deploy_bot?start=release-241");
-		expect(await screen.findByRole("button", { name: "Gửi /start release-241" }, LONG)).toBeTruthy();
+		expect(await screen.findByText("Gửi /start release-241 cho Deploy Bot?", {}, LONG)).toBeTruthy();
 		act(() => navigate("/b/deploy_bot?start=release-242"));
-		expect(await screen.findByRole("button", { name: "Gửi /start release-242" }, LONG)).toBeTruthy();
-		expect(screen.queryByRole("button", { name: "Gửi /start release-241" })).toBeNull();
+		expect(await screen.findByText("Gửi /start release-242 cho Deploy Bot?", {}, LONG)).toBeTruthy();
+		expect(screen.queryByText("Gửi /start release-241 cho Deploy Bot?")).toBeNull();
 	});
 
 	it("cancelling a bot link sends nothing", async () => {

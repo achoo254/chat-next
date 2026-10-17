@@ -85,7 +85,7 @@ export default function BotLinkDialog({ username, startParam }: { username: stri
 					</div>
 				</div>
 				{bot.description !== "" && <p className="bot-desc">{bot.description}</p>}
-				<p>
+				<p className="link-ask">
 					<strong>{t.link.ask(command, bot.name)}</strong>
 				</p>
 				<code className="param">{command}</code>
@@ -99,7 +99,7 @@ export default function BotLinkDialog({ username, startParam }: { username: stri
 					{copy.common.cancel}
 				</button>
 				<button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} onClick={() => void send()}>
-					{busy ? t.link.sending : t.link.send(command)}
+					{busy ? t.link.sending : t.link.send}
 				</button>
 			</div>
 		</Modal>

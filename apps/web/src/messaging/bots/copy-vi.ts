@@ -272,7 +272,8 @@ export const viBots = {
 		botLine: (username: string, org: string) => `@${username} · bot của ${org}`,
 		ask: (command: string, name: string) => `Gửi ${command} cho ${name}?`,
 		fine: "Bot sẽ biết bạn mở từ link này và được phép nhắn cho bạn sau đó.",
-		send: (command: string) => `Gửi ${command}`,
+		/** The button: the parameter is shown above it (mockups/bots.html#deep-link). */
+		send: "Gửi /start",
 		sending: "Đang gửi…",
 		cancelled: "Đã huỷ, không gửi gì cho bot",
 		notFound: "Không tìm thấy bot này",

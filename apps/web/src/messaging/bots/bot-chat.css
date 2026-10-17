@@ -59,6 +59,8 @@
 .bot-line strong { display: block; font-weight: 600; overflow-wrap: anywhere; }
 .bot-line small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
 .bot-desc { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+/* A long start parameter wraps instead of widening the dialog. */
+.link-ask { overflow-wrap: anywhere; }
 .param { display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); overflow-wrap: anywhere; }
 .modal.popup { width: min(360px, calc(100vw - 2 * var(--space-4))); }
 .alert-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
