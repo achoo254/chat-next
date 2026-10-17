@@ -4,7 +4,7 @@
 // (overflow-anchor: none); the list restores the position of the first
 // visible message itself after a prepend. Floating buttons go to the newest
 // message and, while someone's mention of you is unread, to that message.
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import type { Chat, DialogView } from "@app/core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
@@ -44,6 +44,21 @@ function albumOf(item: WindowItem | undefined): string {
 }
 
 /** List rows: one per message, an album's consecutive messages in one row (keyed by its first). */
+/**
+ * Puts the hovered message's quick actions beside its bubble when the list
+ * has room for them there, otherwise above it (styles: .msg-actions).
+ */
+function placeQuickActions(event: PointerEvent<HTMLDivElement>): void {
+	const msg = (event.target as Element).closest<HTMLElement>(".msg");
+	const actions = msg?.querySelector<HTMLElement>(".msg-actions");
+	const bubble = actions?.parentElement;
+	if (msg === null || msg === undefined || actions === null || actions === undefined || bubble === null || bubble === undefined) return;
+	const list = event.currentTarget.getBoundingClientRect();
+	const box = bubble.getBoundingClientRect();
+	const room = msg.classList.contains("mine") ? box.left - list.left : list.left + event.currentTarget.clientWidth - box.right;
+	msg.dataset.actions = room >= actions.offsetWidth + 8 ? "beside" : "above";
+}
+
 export function groupRows(keys: readonly string[], itemOf: (key: string) => WindowItem | undefined): { key: string; keys: string[] }[] {
 	const rows: { key: string; keys: string[]; album: string }[] = [];
 	for (const key of keys) {
@@ -310,6 +325,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 				className="messages"
 				ref={scroller}
 				onScroll={onScroll}
+				onPointerOver={placeQuickActions}
 				onKeyDown={onKeyDown}
 				onFocus={(event) => {
 					const key = (event.target as HTMLElement).dataset.key;

@@ -802,8 +802,16 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 /* The bar grows into the free side of the list: rightwards from the start of other people's
    messages, leftwards from the end of your own. Anchored the other way, a short bubble at the
    list's edge pushed the (invisible) bar past it and the list scrolled sideways. */
-.msg-actions { position: absolute; top: calc(-1 * var(--space-4)); left: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+/* Quick actions never cover the hovered message (chat.html#context-menu): beside the bubble at its top edge when the
+   row has room (the message list sets data-actions="beside" on hover), otherwise wholly above the bubble. The ::before
+   strip bridges the gap, so moving the pointer from the bubble to the row keeps it open. */
+.msg-actions { position: absolute; bottom: calc(100% + var(--space-1)); left: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
 .msg.mine .msg-actions { left: auto; right: var(--space-2); }
+.msg-actions::before { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--space-1) + 2px); }
+.msg[data-actions="beside"] .msg-actions { bottom: auto; top: 0; left: calc(100% + var(--space-1)); right: auto; }
+.msg.mine[data-actions="beside"] .msg-actions { left: auto; right: calc(100% + var(--space-1)); }
+.msg[data-actions="beside"] .msg-actions::before { top: 0; bottom: 0; height: auto; left: auto; right: 100%; width: calc(var(--space-1) + 2px); }
+.msg.mine[data-actions="beside"] .msg-actions::before { right: auto; left: 100%; }
 .msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; pointer-events: auto; }
 .msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
 .msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }

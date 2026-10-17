@@ -520,8 +520,11 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 
 /* Quick actions on a hovered bubble: Biểu cảm · Trả lời · Chuyển tiếp · more. */
 .msg { position: relative; }
-.msg-actions { position: absolute; top: calc(-1 * var(--space-4)); right: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
-.msg.mine .msg-actions { right: auto; left: var(--space-2); }
+.msg-actions { position: absolute; top: 0; left: calc(100% + var(--space-1)); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+.msg.mine .msg-actions { left: auto; right: calc(100% + var(--space-1)); }
+/* No room beside the bubble: the row sits wholly above its top edge. */
+.msg.actions-above .msg-actions { top: auto; bottom: calc(100% + var(--space-1)); left: var(--space-2); right: auto; }
+.msg.mine.actions-above .msg-actions { left: auto; right: var(--space-2); }
 .msg:hover .msg-actions, .msg:focus-within .msg-actions, .msg.show-actions .msg-actions { opacity: 1; pointer-events: auto; }
 .msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
 .msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }
