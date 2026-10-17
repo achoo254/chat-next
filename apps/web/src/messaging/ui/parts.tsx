@@ -2,6 +2,7 @@
 // approved mockups (mock.css: .avatar, .switch, .choice, dialog, .toast).
 // The small leaf components skip the compiler's memoization ("use no memo"):
 // they are cheap to render, and memoizing them only grows the startup bundle.
+import type { Chat, User } from "@app/core";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/icon.tsx";
@@ -23,13 +24,22 @@ interface ChatAvatarProps {
 	saved?: boolean;
 	online?: boolean;
 	tone?: Tone;
-	/** The user whose profile photo to show (the bot of a bot chat) and its file_id (User.photoId); "" for none. */
+	/** The user whose profile photo to show (the peer of a private chat) and its file_id (User.photoId); "" for none. */
 	photoOf?: number;
+	/** A group or channel whose photo to show, with photoId its Chat.photoId; instead of photoOf. */
+	chatPhotoOf?: number;
 	photoId?: string | undefined;
 }
 
+/** The photo props of a chat's avatar: a group's or channel's own photo, the peer's for a private chat, none for the saved chat. */
+export function chatPhoto(chat: Pick<Chat, "id" | "type" | "peerUserId" | "photoId">, peer: Pick<User, "photoId"> | null | undefined, saved = false): Pick<ChatAvatarProps, "photoOf" | "chatPhotoOf" | "photoId"> {
+	if (saved) return {};
+	if (chat.type === "group" || chat.type === "channel") return { chatPhotoOf: chat.id, photoId: chat.photoId ?? "" };
+	return { photoOf: chat.peerUserId, photoId: peer?.photoId ?? "" };
+}
+
 /** Soft avatar with initials (robot icon for bots, cloud for the saved chat); colour follows the id. */
-export function ChatAvatar({ id, name, size = "md", bot = false, saved = false, online = false, tone, photoOf = 0, photoId = "" }: ChatAvatarProps) {
+export function ChatAvatar({ id, name, size = "md", bot = false, saved = false, online = false, tone, photoOf = 0, chatPhotoOf = 0, photoId = "" }: ChatAvatarProps) {
 	"use no memo";
 	const classes = ["avatar", size === "md" ? "" : size, `av-${tone ?? (saved ? "blue" : toneOf(id))}`, online ? "online" : ""];
 	const small = size === "xs" || size === "sm";
@@ -39,9 +49,13 @@ export function ChatAvatar({ id, name, size = "md", bot = false, saved = false, 
 	return (
 		<span className={classes.filter(Boolean).join(" ")} aria-hidden="true">
 			{face}
-			{photoId !== "" && photoOf !== 0 && (
+			{photoId !== "" && (photoOf !== 0 || chatPhotoOf !== 0) && (
 				<Suspense fallback={null}>
-					<AvatarPhoto userId={photoOf} fileId={photoId} large={size === "lg" || size === "xl"} />
+					<AvatarPhoto
+						of={chatPhotoOf !== 0 ? { chat: chatPhotoOf } : { user: photoOf }}
+						fileId={photoId}
+						large={size === "lg" || size === "xl"}
+					/>
 				</Suspense>
 			)}
 		</span>

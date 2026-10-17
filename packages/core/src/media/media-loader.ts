@@ -23,6 +23,8 @@ export interface MediaRequest {
 	readonly inlineQueryId?: string;
 	/** The profile photo of this user (User.photoId): the file's context instead of a message. */
 	readonly userPhotoOf?: number;
+	/** The photo of this group or channel (Chat.photoId): the file's context instead of a message. */
+	readonly chatPhotoOf?: number;
 	/** Rendition wanted; the original when absent. */
 	readonly size?: MediaSizeType;
 	/** Video counts against the large-file cache budget whatever its size. */
@@ -62,7 +64,7 @@ interface Pending {
 }
 
 function urlKey(r: MediaRequest): string {
-	return `${r.fileId}:${r.size ?? "original"}:${r.chatId}:${r.seq}:${r.inlineQueryId ?? ""}:${r.userPhotoOf ?? 0}`;
+	return `${r.fileId}:${r.size ?? "original"}:${r.chatId}:${r.seq}:${r.inlineQueryId ?? ""}:${r.userPhotoOf ?? 0}:${r.chatPhotoOf ?? 0}`;
 }
 
 export class MediaLoader {
@@ -163,9 +165,10 @@ export class MediaLoader {
 	}
 }
 
-/** Where the file is seen: a message, an inline query's results or a profile photo. */
+/** Where the file is seen: a message, an inline query's results, a profile photo or a chat's photo. */
 function fileContext(request: MediaRequest): NonNullable<MessageInitShape<typeof GetFileUrlRequestSchema>["context"]> {
 	if (request.userPhotoOf !== undefined) return { case: "userPhotoOf", value: toWireId(request.userPhotoOf) };
+	if (request.chatPhotoOf !== undefined) return { case: "chatPhotoOf", value: toWireId(request.chatPhotoOf) };
 	if (request.inlineQueryId !== undefined) return { case: "inlineQueryId", value: request.inlineQueryId };
 	return { case: "message", value: { chatId: toWireId(request.chatId), seq: toWireId(request.seq) } };
 }

@@ -61,7 +61,7 @@ export function AddContactDialog({ onClose }: { onClose: () => void }) {
 			<div className="result-list">
 				{people.map((person) => (
 					<div className="result" key={person.id}>
-						<ChatAvatar id={person.id} name={person.name} bot={person.isBot} />
+						<ChatAvatar id={person.id} name={person.name} photoOf={person.id} photoId={person.photoId} bot={person.isBot} />
 						<span>
 							<b>{person.name}</b>
 							{person.username !== "" && <small>@{person.username}</small>}

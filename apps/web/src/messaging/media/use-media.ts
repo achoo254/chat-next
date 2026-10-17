@@ -16,7 +16,7 @@ export type FileState =
 const LOADING: FileState = { status: "loading" };
 
 function requestKey(request: MediaRequest): string {
-	return `${request.chatId}:${request.seq}:${request.fileId}:${request.size ?? "original"}:${request.inlineQueryId ?? ""}:${request.userPhotoOf ?? 0}`;
+	return `${request.chatId}:${request.seq}:${request.fileId}:${request.size ?? "original"}:${request.inlineQueryId ?? ""}:${request.userPhotoOf ?? 0}:${request.chatPhotoOf ?? 0}`;
 }
 
 /**
@@ -36,11 +36,12 @@ export function useMediaFile(request: MediaRequest | null, enabled = true): { re
 	const kind = request?.kind;
 	const inlineQueryId = request?.inlineQueryId;
 	const userPhotoOf = request?.userPhotoOf;
+	const chatPhotoOf = request?.chatPhotoOf;
 	useEffect(() => {
 		if (key === "" || !enabled) return;
 		let active = true;
 		let url: string | null = null;
-		// The file's context: a message, an inline query's results or a profile photo.
+		// The file's context: a message, an inline query's results, a profile photo or a chat's photo.
 		const wanted: MediaRequest = {
 			chatId,
 			seq,
@@ -49,6 +50,7 @@ export function useMediaFile(request: MediaRequest | null, enabled = true): { re
 			...(kind === undefined ? {} : { kind }),
 			...(inlineQueryId === undefined ? {} : { inlineQueryId }),
 			...(userPhotoOf === undefined ? {} : { userPhotoOf }),
+			...(chatPhotoOf === undefined ? {} : { chatPhotoOf }),
 		};
 		source.mediaFile(wanted).then(
 			(file) => {
@@ -69,7 +71,7 @@ export function useMediaFile(request: MediaRequest | null, enabled = true): { re
 			active = false;
 			if (url !== null) URL.revokeObjectURL(url);
 		};
-	}, [source, store, key, enabled, chatId, seq, fileId, size, kind, inlineQueryId, userPhotoOf]);
+	}, [source, store, key, enabled, chatId, seq, fileId, size, kind, inlineQueryId, userPhotoOf, chatPhotoOf]);
 	const retry = useCallback(() => setAttempt((n) => n + 1), []);
 	const state = result !== null && result.key === key ? result.state : LOADING;
 	return { state, retry };

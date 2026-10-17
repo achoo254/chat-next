@@ -86,6 +86,8 @@ export class FakeMedia {
 	readonly revoked = new Set<string>();
 	/** Profile photos by user (user_photo_of context). */
 	readonly photos = new Map<number, string>();
+	/** Groups' and channels' photos by chat (chat_photo_of context). */
+	readonly chatPhotos = new Map<number, string>();
 	/** Upload ids the server forgot (expired). */
 	readonly expired = new Set<string>();
 	inFlight = 0;
@@ -239,11 +241,13 @@ export class FakeMedia {
 				this.count("getFileUrls");
 				const results = (request.requests ?? []).map((r) => {
 					const context = r.context;
-					if (context?.case === "userPhotoOf") {
-						const user = Number(context.value);
-						if (this.photos.get(user) !== r.fileId) return { unavailable: true };
+					if (context?.case === "userPhotoOf" || context?.case === "chatPhotoOf") {
+						const owner = Number(context.value);
+						const photos = context.case === "userPhotoOf" ? this.photos : this.chatPhotos;
+						if (photos.get(owner) !== r.fileId) return { unavailable: true };
 						const expires = this.clock() + this.urlTtl;
-						return { url: `https://media.test/f/${r.fileId ?? ""}/photo/${user}/${expires}`, expiresAt: BigInt(expires), size: r.size ?? MediaSizeType.UNSPECIFIED };
+						const path = context.case === "userPhotoOf" ? "photo" : "chatphoto";
+						return { url: `https://media.test/f/${r.fileId ?? ""}/${path}/${owner}/${expires}`, expiresAt: BigInt(expires), size: r.size ?? MediaSizeType.UNSPECIFIED };
 					}
 					if (context?.case !== "message" || !this.files.has(r.fileId ?? "")) return { unavailable: true };
 					const chatId = Number(context.value.chatId ?? 0n);
@@ -313,11 +317,12 @@ export class FakeMedia {
 		get: async (url): Promise<HttpGetResult> => {
 			await Promise.resolve();
 			this.gets.push(url);
-			const photo = /^https:\/\/media\.test\/f\/([^/]+)\/photo\/(\d+)\/(\d+)$/.exec(url);
+			const photo = /^https:\/\/media\.test\/f\/([^/]+)\/(photo|chatphoto)\/(\d+)\/(\d+)$/.exec(url);
 			if (photo !== null) {
-				const [, fileId = "", user = "", expires = "0"] = photo;
+				const [, fileId = "", path = "", owner = "", expires = "0"] = photo;
 				const file = this.files.get(fileId);
-				if (file === undefined || this.photos.get(Number(user)) !== fileId) return { status: 404, body: null };
+				const photos = path === "photo" ? this.photos : this.chatPhotos;
+				if (file === undefined || photos.get(Number(owner)) !== fileId) return { status: 404, body: null };
 				if (Number(expires) < this.clock()) return { status: 403, body: null };
 				return { status: 200, body: new Blob([file.bytes.slice()], { type: file.ref.mimeType }) };
 			}

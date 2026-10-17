@@ -273,6 +273,7 @@ export function toChat(chat: WireChat): Chat {
 		// The wire chat does not say why; member_removed does (repo LEFT_REMOVED).
 		removed: false,
 		forum: chat.forum,
+		...(chat.photo !== undefined && chat.photo.fileId !== "" ? { photoId: chat.photo.fileId } : {}),
 	};
 }
 

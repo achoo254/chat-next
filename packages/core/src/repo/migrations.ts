@@ -314,9 +314,17 @@ export const MIGRATIONS: readonly Migration[] = [
 	{
 		version: 12,
 		statements: [
-			// User.photoId: the profile photo's file_id (bots so far); cached
+			// User.photoId: the profile photo's file_id; cached
 			// users get it with the server's next copy.
 			"ALTER TABLE users ADD COLUMN photo_id TEXT NOT NULL DEFAULT ''",
+		],
+	},
+	{
+		version: 13,
+		statements: [
+			// Chat.photoId: a group's or channel's photo file_id; cached chats
+			// get it with the server's next copy.
+			"ALTER TABLE chats ADD COLUMN photo_id TEXT NOT NULL DEFAULT ''",
 		],
 	},
 ];

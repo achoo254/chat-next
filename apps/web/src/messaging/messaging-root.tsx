@@ -74,7 +74,7 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 		case "settings":
 			switch (route.tab) {
 				case "profile":
-					return [settingsCode.preload()];
+					return [settingsCode.preload(), settingsExtraCode.preload()];
 				case "sessions":
 					warm(loadConnectWeb, loadAccountClient);
 					return [settingsCode.preload(), sessionsData(api).promise];
@@ -318,6 +318,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 						onSignOut,
 						moderation: moderator,
 						render: (tab: SettingsTab): ReactNode => <SettingsExtra tab={tab} />,
+						photo: <SettingsExtra tab="profile" self={self} onSelfChange={onSelfChange} />,
 					}}
 				/>
 			);

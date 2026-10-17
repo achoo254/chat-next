@@ -18,7 +18,7 @@ import { Composer } from "./composer.tsx";
 import { useOnlineCount } from "./members.ts";
 import { useIncomingSound } from "./incoming-sound.ts";
 import { MessageList } from "./message-list.tsx";
-import { ChatAvatar } from "./parts.tsx";
+import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useCell, useUi } from "./ui-context.tsx";
@@ -44,6 +44,7 @@ function ViewerLayer({ chatId }: { chatId: number }) {
 
 /** Files dragged over the chat (#attach, right pane): what happens when they are dropped. */
 function DropZone({ count, maxBytes }: { count: number; maxBytes: number }) {
+	"use no memo";
 	const copy = useCopy();
 	const { locale } = useI18n();
 	return (
@@ -324,8 +325,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 							name={title}
 							bot={kind === "bot"}
 							saved={isSavedChat(chat, view?.peer ?? peer ?? null)}
-							photoOf={kind === "bot" ? chat.peerUserId : 0}
-							photoId={botPeer?.photoId}
+							{...chatPhoto(chat, botPeer, isSavedChat(chat, view?.peer ?? peer ?? null))}
 						/>
 					)}
 					<div className="title">

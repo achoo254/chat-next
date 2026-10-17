@@ -13,7 +13,7 @@ import type { MessagingCopy } from "../copy/vi.ts";
 import { chatKind, countLabel, dialogTitle, inlineThumbUrl, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
-import { ChatAvatar } from "./parts.tsx";
+import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { useTypingText } from "./typing.ts";
 import { useUi } from "./ui-context.tsx";
 
@@ -86,6 +86,7 @@ export function useContextTrigger(open: (x: number, y: number) => void, own = fa
 
 /** Decorative-by-default icon with an accessible name (mock: svg role="img"). */
 export function LabelledIcon({ name, label, className }: { name: IconName; label: string; className?: string | undefined }) {
+	"use no memo";
 	return (
 		<span role="img" aria-label={label} className={className}>
 			<Icon name={name} small />
@@ -134,6 +135,7 @@ export function useNameOf(ids: readonly number[]): (userId: number) => string {
  * preview text already says "Ảnh" or "Video").
  */
 export function PreviewThumb({ message }: { message: Message }) {
+	"use no memo";
 	const copy = useCopy();
 	const media = message.media;
 	if (message.recalled || message.action !== null || media === undefined || media.inlineThumb.length === 0) return null;
@@ -232,8 +234,7 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 					name={title}
 					bot={kind === "bot"}
 					saved={saved}
-					photoOf={kind === "bot" ? (view.peer?.id ?? 0) : 0}
-					photoId={view.peer?.photoId ?? ""}
+					{...(view.chat === null ? {} : chatPhoto(view.chat, view.peer, saved))}
 				/>
 				<span className="tx">
 					<span className="name">

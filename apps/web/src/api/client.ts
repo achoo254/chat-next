@@ -14,6 +14,8 @@ import { fetchSelf, RPC_BASE_URL } from "./get-self.ts";
 export interface ProfileChanges {
 	name?: string;
 	bio?: string;
+	/** A photo the user uploaded; "" removes the photo. */
+	photoFileId?: string;
 }
 
 export interface Api {

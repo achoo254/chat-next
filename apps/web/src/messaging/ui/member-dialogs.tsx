@@ -85,7 +85,7 @@ export function MembersDialog({ chatId, onClose }: CloseProps & { chatId: number
 						return (
 							<li key={member.person.id}>
 								<div className="row">
-									<ChatAvatar id={member.person.id} name={member.person.name} size="sm" bot={member.person.isBot} online={online} />
+									<ChatAvatar id={member.person.id} name={member.person.name} photoOf={member.person.id} photoId={member.person.photoId} size="sm" bot={member.person.isBot} online={online} />
 									<span className="grow">
 										{self ? copy.common.you : member.person.name}
 										<small className={online ? "on" : undefined}>{presence}</small>

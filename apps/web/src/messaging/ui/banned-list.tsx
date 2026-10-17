@@ -133,7 +133,7 @@ export function BannedList({ chatId }: { chatId: number }) {
 									const working = busy === item.person.id;
 									return (
 										<li className="row" key={item.person.id}>
-											<ChatAvatar id={item.person.id} name={item.person.name} bot={item.person.isBot} />
+											<ChatAvatar id={item.person.id} name={item.person.name} photoOf={item.person.id} photoId={item.person.photoId} bot={item.person.isBot} />
 											<span className="grow">
 												{item.person.name}
 												<small>{t.detail(item.person.username, by, fullDate(item.bannedAt, locale))}</small>

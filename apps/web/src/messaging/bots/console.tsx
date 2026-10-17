@@ -74,7 +74,7 @@ function ConsoleHead({ back, backLabel, parent, current }: { back: string; backL
 				<b>{current}</b>
 			</span>
 			<span className="who-chip">
-				<ChatAvatar id={self.id} name={self.name} size="sm" />
+				<ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} size="sm" />
 				<span>
 					{self.name} · {orgDomain(window.location.host)}
 				</span>

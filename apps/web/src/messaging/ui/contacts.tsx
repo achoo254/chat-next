@@ -89,7 +89,7 @@ export function ContactsView({ userId }: { userId: number }) {
 								</span>
 							)}
 							<Link to={paths.contacts(person.id)} className="chat-row contact-row" current={person.id === userId}>
-								<ChatAvatar id={person.id} name={person.name} bot={person.isBot} online={online} />
+								<ChatAvatar id={person.id} name={person.name} photoOf={person.id} photoId={person.photoId} bot={person.isBot} online={online} />
 								<span className="tx">
 									<span className="name">
 										<span className="title-text">{person.name}</span>

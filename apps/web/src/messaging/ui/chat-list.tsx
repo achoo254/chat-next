@@ -100,6 +100,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 }
 
 function Skeleton() {
+	"use no memo";
 	const copy = useCopy();
 	const widths = [
 		["w60", "w85"],

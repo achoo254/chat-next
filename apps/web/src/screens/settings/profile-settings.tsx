@@ -1,5 +1,5 @@
 import { Code } from "@connectrpc/connect";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { useApi } from "../../api/api-context.tsx";
 import { errorCode, type ProfileChanges } from "../../api/client.ts";
@@ -29,9 +29,11 @@ type SaveResult = { kind: "saved" } | { kind: "error"; message: string } | null;
 interface ProfileSettingsProps {
 	self: SelfUser;
 	onSelfChange: (self: SelfUser) => void;
+	/** The messaging UI's photo field (change, remove), in place of the plain avatar. */
+	photo?: ReactNode;
 }
 
-export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
+export function ProfileSettings({ self, onSelfChange, photo }: ProfileSettingsProps) {
 	const api = useApi();
 	const { t } = useI18n();
 	const ids = useId();
@@ -105,11 +107,15 @@ export function ProfileSettings({ self, onSelfChange }: ProfileSettingsProps) {
 	return (
 		<form className="set-body" onSubmit={(event) => void save(event)} noValidate aria-busy={saving}>
 			<div className="card pad photo-row">
-				<Avatar name={self.name} size="xl" />
-				<div>
-					<b>{self.name}</b>
-					{self.username && <MiddleTruncate className="muted" text={`@${self.username}`} tail={4} />}
-				</div>
+				{photo ?? (
+					<>
+						<Avatar name={self.name} size="xl" />
+						<div>
+							<b>{self.name}</b>
+							{self.username && <MiddleTruncate className="muted" text={`@${self.username}`} tail={4} />}
+						</div>
+					</>
+				)}
 			</div>
 
 			<div className="card pad stack">

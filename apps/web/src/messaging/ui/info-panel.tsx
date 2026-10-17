@@ -24,7 +24,7 @@ import { ContactRow } from "./contact-row.tsx";
 import { hiddenPins, usePinHidden } from "./pinned-bar.tsx";
 import { MuteDurations, pinLimitReached, useMute } from "./dialog-settings.tsx";
 import { displayLink, inviteLinks, isActiveInvite, useInviteLinks, useMembers, useOnlineCount } from "./members.ts";
-import { ChatAvatar, CopyButton, Switch } from "./parts.tsx";
+import { ChatAvatar, chatPhoto, CopyButton, Switch } from "./parts.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useUi, type Ui } from "./ui-context.tsx";
@@ -93,7 +93,8 @@ function useColumnBehaviour(ui: Ui): void {
 	}, [ui]);
 }
 
-function InfoHead({ title }: { title: string }) {
+/** `edit`: the pencil beside the close button (#edit-chat), for those allowed to change a group's or channel's info. */
+function InfoHead({ title, edit }: { title: string; edit?: { label: string; onClick: () => void } }) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const back = useRef<HTMLButtonElement>(null);
@@ -109,6 +110,11 @@ function InfoHead({ title }: { title: string }) {
 				<Icon name="back" />
 			</button>
 			<span>{title}</span>
+			{edit !== undefined && (
+				<button type="button" className="icon-btn" aria-label={edit.label} title={edit.label} onClick={edit.onClick}>
+					<Icon name="edit" />
+				</button>
+			)}
 			<button
 				ref={close}
 				type="button"
@@ -322,13 +328,13 @@ function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }
 	const ui = useUi();
 	const { store } = useServices();
 	const known = usePresence(isBot || userId === store.selfId ? 0 : userId);
-	const member = useUser(isBot ? userId : 0);
+	const member = useUser(userId);
 	const text = usePresenceText(known, copy);
 	const online = presence || known?.kind === "online";
 	const label = isBot ? copy.info.bot : userId === store.selfId ? copy.info.online : text;
 	return (
 		<button type="button" className="row member-row" onClick={() => ui.dialog.set({ kind: "profile", userId })}>
-			<ChatAvatar id={userId} name={avatarName} size="sm" bot={isBot} online={online && !isBot} photoOf={isBot ? userId : 0} photoId={member?.photoId} />
+			<ChatAvatar id={userId} name={avatarName} size="sm" bot={isBot} online={online && !isBot} photoOf={userId} photoId={member?.photoId} />
 			<span className="grow">
 				{name}
 				<small className={online && !isBot ? "on" : undefined}>{label}</small>
@@ -356,6 +362,7 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	const owner = chat.myRole === "owner";
 	const canAdd = admin || (!channel && (chat.myPermissions & Permission.addMembers) !== 0);
+	const canEdit = !chat.left && (admin || (chat.myPermissions & Permission.changeInfo) !== 0);
 	const online = useOnlineCount(channel || chat.left ? 0 : chat.id);
 	const subtitle = channel
 		? copy.info.channel(chat.memberCount)
@@ -364,9 +371,12 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 			: copy.convo.membersOnline(chat.memberCount, online);
 	return (
 		<aside className="info" aria-label={channel ? copy.info.channelTitle : copy.info.groupTitle}>
-			<InfoHead title={channel ? copy.info.channelTitle : copy.info.groupTitle} />
+			<InfoHead
+				title={channel ? copy.info.channelTitle : copy.info.groupTitle}
+				{...(canEdit ? { edit: { label: copy.editChat.open(channel), onClick: () => ui.dialog.set({ kind: "editChat", chatId: chat.id }) } } : {})}
+			/>
 			<div className="info-hero">
-				<ChatAvatar id={chat.id} name={chat.title} size="lg" />
+				<ChatAvatar id={chat.id} name={chat.title} size="lg" {...chatPhoto(chat, null)} />
 				<h2>{chat.title}</h2>
 				<span className="muted">{subtitle}</span>
 				{chat.about !== "" && <p>{chat.about}</p>}
@@ -488,7 +498,7 @@ function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined
 		<aside className="info" aria-label={title}>
 			<InfoHead title={title} />
 			<div className="info-hero">
-				<ChatAvatar id={chat.id} name={name} size="lg" bot={bot} online={online} photoOf={bot ? chat.peerUserId : 0} photoId={peer?.photoId} />
+				<ChatAvatar id={chat.id} name={name} size="lg" bot={bot} online={online} {...chatPhoto(chat, peer)} />
 				<h2>{name}</h2>
 				<span className={online ? "muted on" : "muted"}>{bot ? copy.info.botLine(peer?.username ?? "") : presenceLabel}</span>
 				{peer !== undefined && peer.bio !== "" && <p>{peer.bio}</p>}

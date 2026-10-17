@@ -15,7 +15,7 @@ export interface User {
 	readonly isBlocked: boolean;
 	/** The account was deleted (or waits for deletion): username, name and bio are empty; show it as a deleted account. */
 	readonly deleted?: boolean;
-	/** file_id of the profile photo (bots so far); fetch it with MediaRequest.userPhotoOf. Absent without one. */
+	/** file_id of the profile photo the viewer may see; fetch it with MediaRequest.userPhotoOf. Absent without one. */
 	readonly photoId?: string;
 }
 
@@ -44,6 +44,8 @@ export interface Chat {
 	readonly removed: boolean;
 	/** Groups only: messages are organised in forum topics. */
 	readonly forum: boolean;
+	/** Groups and channels: file_id of the chat's photo, fetched with MediaRequest.chatPhotoOf; absent without one. */
+	readonly photoId?: string;
 }
 
 /** Topic of a forum group; topic 1 is the default "General" topic. */

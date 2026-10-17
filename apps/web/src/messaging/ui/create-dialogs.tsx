@@ -22,6 +22,7 @@ import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar, CopyButton, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
 import { usePrivateChatFailure } from "./private-chat-failure.ts";
+import { usePhotoDraft, useUploadPhoto } from "./photo-crop.tsx";
 
 interface CloseProps {
 	onClose: () => void;
@@ -56,6 +57,8 @@ interface Candidate {
 	readonly name: string;
 	readonly detail: string;
 	readonly isBot: boolean;
+	/** The profile photo the viewer may see (User.photoId). */
+	readonly photoId?: string | undefined;
 }
 
 export function NewChatDialog({ onClose }: CloseProps) {
@@ -93,7 +96,7 @@ export function NewChatDialog({ onClose }: CloseProps) {
 			<div className="result-list">
 				{people.map((person) => (
 					<div className="result" key={person.id}>
-						<ChatAvatar id={person.id} name={person.name} bot={person.isBot} />
+						<ChatAvatar id={person.id} name={person.name} photoOf={person.id} photoId={person.photoId} bot={person.isBot} />
 						<span>
 							<b>{person.name}</b>
 							{person.username !== "" && <small>@{person.username}</small>}
@@ -171,13 +174,13 @@ function useSuggestedPeople(): Candidate[] {
 	return useMemo(() => {
 		const people = new Map<number, Candidate>();
 		for (const { person } of contacts.entries) {
-			people.set(person.id, { id: person.id, name: person.name, detail: personDetail(person, copy), isBot: person.isBot });
+			people.set(person.id, { id: person.id, name: person.name, detail: personDetail(person, copy), isBot: person.isBot, photoId: person.photoId });
 		}
 		for (const chatId of order) {
 			const view = store.dialog(chatId);
 			const peer = view?.peer;
 			if (view?.chat?.type !== "private" || peer == null || peer.isSelf || people.has(peer.id)) continue;
-			people.set(peer.id, { id: peer.id, name: peer.name, detail: peer.isBot ? copy.newGroup.bot : peer.username === "" ? "" : `@${peer.username}`, isBot: peer.isBot });
+			people.set(peer.id, { id: peer.id, name: peer.name, detail: peer.isBot ? copy.newGroup.bot : peer.username === "" ? "" : `@${peer.username}`, isBot: peer.isBot, photoId: peer.photoId });
 		}
 		return [...people.values()];
 	}, [contacts, order, store, copy]);
@@ -205,7 +208,7 @@ function PeoplePicker({ selected, onToggle, exclude }: PickerProps) {
 	const needle = fold(query.trim().replace(/^@/, ""));
 	// Suggestions that match show at once; the server's matches join them.
 	const local = suggested.filter((c) => needle === "" || fold(c.name).includes(needle) || c.detail.toLowerCase().includes(`@${needle}`));
-	const remoteMatches = (people ?? []).map((p) => ({ id: p.id, name: p.name, detail: personDetail(p, copy), isBot: p.isBot }));
+	const remoteMatches = (people ?? []).map((p) => ({ id: p.id, name: p.name, detail: personDetail(p, copy), isBot: p.isBot, photoId: p.photoId }));
 	const candidates = searching ? [...local, ...remoteMatches.filter((c) => !local.some((l) => l.id === c.id))] : local;
 	// Picked people stay on the list even when the search moves on.
 	const shown = [...[...selected.values()].filter((c) => !candidates.some((x) => x.id === c.id)), ...candidates].filter((c) => exclude?.has(c.id) !== true);
@@ -227,7 +230,7 @@ function PeoplePicker({ selected, onToggle, exclude }: PickerProps) {
 						aria-checked={selected.has(candidate.id)}
 						onClick={() => onToggle(candidate)}
 					>
-						<ChatAvatar id={candidate.id} name={candidate.name} bot={candidate.isBot} />
+						<ChatAvatar id={candidate.id} name={candidate.name} photoOf={candidate.id} photoId={candidate.photoId} bot={candidate.isBot} />
 						<span>
 							<b>{candidate.name}</b>
 							{candidate.detail !== "" && <small>{candidate.detail}</small>}
@@ -253,7 +256,7 @@ function Chips({ items, onRemove }: { items: readonly Candidate[]; onRemove: (it
 		<div className="chips" aria-live="polite">
 			{items.map((item) => (
 				<button key={item.id} type="button" className="chip" aria-label={copy.forward.unselect(item.name)} onClick={() => onRemove(item)}>
-					<ChatAvatar id={item.id} name={item.name} size="xs" bot={item.isBot} />
+					<ChatAvatar id={item.id} name={item.name} photoOf={item.id} photoId={item.photoId} size="xs" bot={item.isBot} />
 					{item.name}
 					<Icon name="x" />
 				</button>
@@ -307,10 +310,12 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 	const [history, setHistory] = useState(true);
 	const [topics, setTopics] = useState(false);
 	const [busy, setBusy] = useState(false);
+	const photo = usePhotoDraft("pick-group-photo");
+	const upload = useUploadPhoto();
 	const id = useDomId("ng");
 	if (!presetDone && preset !== undefined) {
 		setPresetDone(true);
-		toggle({ id: preset.id, name: preset.name, detail: preset.username === "" ? "" : `@${preset.username}`, isBot: preset.isBot });
+		toggle({ id: preset.id, name: preset.name, detail: preset.username === "" ? "" : `@${preset.username}`, isBot: preset.isBot, photoId: preset.photoId });
 	}
 	const auto = autoGroupName([...selected.values()].map((candidate) => candidate.name));
 
@@ -323,6 +328,12 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 			const ids = [...selected.keys()];
 			const { chatId, failures } = await remote.createGroup(title, ids, topics);
 			if (!history) await remote.setHistoryShared(chatId, false).catch(() => undefined);
+			// The group exists already: a photo that fails to go up is only reported.
+			if (photo.draft !== null) {
+				await upload(photo.draft.blob)
+					.then((photoFileId) => remote.updateChatInfo(chatId, { photoFileId }))
+					.catch(() => toasts.show(copy.common.failed));
+			}
 			toasts.show(copy.newGroup.created(title));
 			navigate(paths.chat(chatId));
 			const refused = realFailures(failures);
@@ -349,23 +360,33 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 				onClose={onClose}
 			/>
 			<div className="dlg-body stack">
-				<div className="field">
-					<label htmlFor={`${id}-name`}>
-						{copy.newGroup.name} <span className="muted">{copy.newGroup.optional}</span>
-					</label>
-					<input
-						id={`${id}-name`}
-						className="input"
-						maxLength={TITLE_MAX}
-						value={name}
-						placeholder={auto}
-						aria-describedby={`${id}-hint`}
-						onChange={(event) => setName(event.target.value)}
-					/>
-					<span className="hint" id={`${id}-hint`}>
-						{copy.newGroup.nameHint}
-					</span>
+				<div className="name-row">
+					<button type="button" className="photo-pick" aria-label={(name.trim() || auto) === "" ? copy.photo.choose : copy.photo.pick(name.trim() || auto)} onClick={photo.open}>
+						{photo.draft !== null ? <img className="avatar-photo" src={photo.draft.url} alt="" /> : <Icon name="camera" />}
+					</button>
+					<div className="field">
+						<label htmlFor={`${id}-name`}>
+							{copy.newGroup.name} <span className="muted">{copy.newGroup.optional}</span>
+						</label>
+						<input
+							id={`${id}-name`}
+							className="input"
+							maxLength={TITLE_MAX}
+							value={name}
+							placeholder={auto}
+							aria-describedby={`${id}-hint`}
+							onChange={(event) => setName(event.target.value)}
+						/>
+						<span className="hint" id={`${id}-hint`}>
+							{copy.newGroup.nameHint}
+						</span>
+					</div>
 				</div>
+				{photo.error !== "" && (
+					<span className="error-text" role="alert">
+						{photo.error}
+					</span>
+				)}
 				<PeoplePicker selected={selected} onToggle={toggle} />
 				<div className="row">
 					<span className="grow">
@@ -400,6 +421,7 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 					{copy.newGroup.create(selected.size)}
 				</button>
 			</div>
+			{photo.elements}
 		</Modal>
 	);
 }

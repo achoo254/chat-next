@@ -1001,3 +1001,18 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 /* A profile photo covers the avatar's initials or icon once it loaded. */
 .avatar:has(> .avatar-photo) { position: relative; }
 .avatar-photo { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+
+/* Choosing a photo: bots, the user's own, groups and channels (console.html#bot-photo, chat.html#edit-chat). */
+.photo-actions { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; min-width: 0; }
+.photo-actions > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.crop-stage { position: relative; width: min(320px, 100%); aspect-ratio: 1; margin-inline: auto; border-radius: var(--radius-md); overflow: hidden; background: var(--c-surface-subtle); touch-action: none; cursor: grab; }
+.crop-stage:focus-visible { outline: 2px solid var(--c-focus, var(--c-primary)); outline-offset: 2px; }
+.crop-stage img { position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; user-select: none; pointer-events: none; }
+.crop-stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.55); outline: 2px solid rgb(255 255 255 / 0.9); pointer-events: none; }
+.crop-zoom { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.crop-zoom input { flex: 1; min-width: 0; }
+.name-row { display: flex; align-items: center; gap: var(--space-4); }
+.name-row > .field { flex: 1; min-width: 0; }
+.photo-pick { position: relative; display: grid; place-items: center; width: 72px; height: 72px; flex: none; padding: 0; border-radius: var(--radius-full); border: 1.5px dashed var(--c-border-strong); background: var(--c-surface-subtle); color: var(--c-icon-muted); cursor: pointer; }
+.photo-pick:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.photo-pick:has(> .avatar-photo) { border-style: solid; }

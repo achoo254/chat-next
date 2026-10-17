@@ -141,7 +141,7 @@ function AdminRow({ chat, member, canDemote, onChanged }: { chat: Chat; member: 
 				: copy.admin.adminPlain(channel);
 	return (
 		<div className="row">
-			<ChatAvatar id={member.person.id} name={member.person.name} size="sm" />
+			<ChatAvatar id={member.person.id} name={member.person.name} photoOf={member.person.id} photoId={member.person.photoId} size="sm" />
 			<span className="grow">
 				{name}
 				<small>{detail}</small>
@@ -212,7 +212,7 @@ function AdminsCard({ chat }: { chat: Chat }) {
 					<strong>{copy.admin.addAdminTitle(channel)}</strong>
 					{others.map((member) => (
 						<div className="row" key={member.person.id}>
-							<ChatAvatar id={member.person.id} name={member.person.name} size="sm" />
+							<ChatAvatar id={member.person.id} name={member.person.name} photoOf={member.person.id} photoId={member.person.photoId} size="sm" />
 							<span className="grow">{member.person.name}</span>
 							<button
 								type="button"

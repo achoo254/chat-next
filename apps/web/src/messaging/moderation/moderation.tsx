@@ -140,7 +140,7 @@ export default function Moderation({ view }: { view: ModerationView }) {
 					</Link>
 				))}
 				<div className="me">
-					<ChatAvatar id={self.id} name={self.name} size="sm" />
+					<ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} size="sm" />
 					<span>
 						{self.name}
 						<small>{t.scopeNote(scope)}</small>

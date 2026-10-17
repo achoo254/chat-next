@@ -20,10 +20,15 @@ import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
 import { DevicePush, usePushOnDevice } from "./device-push.tsx";
 import { InstallSettings } from "./install-app.tsx";
 import { AccountSettings } from "./account-settings.tsx";
+import ProfilePhotoField from "./profile-photo.tsx";
+import type { SelfUser } from "../../api/adapters.ts";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
 
-export default function SettingsExtra({ tab }: { tab: SettingsTab }) {
+/** `self` and `onSelfChange`: the Profile tab's photo field, the only part of that tab drawn here. */
+export default function SettingsExtra({ tab, self, onSelfChange }: { tab: SettingsTab; self?: SelfUser; onSelfChange?: (self: SelfUser) => void }) {
 	switch (tab) {
+		case "profile":
+			return self === undefined || onSelfChange === undefined ? null : <ProfilePhotoField self={self} onSelfChange={onSelfChange} />;
 		case "privacy":
 			return <PrivacySettings />;
 		case "blocked":
@@ -139,7 +144,7 @@ function PrivacySettings() {
 			<div className="card">
 				<h2 className="card-title">{t.whoSees}</h2>
 				{row("lastSeen", t.lastSeen, t.whoLastSeen, t.lastSeenHint)}
-				{row("profilePhoto", t.photo, t.whoPhoto)}
+				{row("profilePhoto", t.photo, t.whoPhoto, t.photoHint)}
 			</div>
 			<div className="card">
 				<h2 className="card-title">{t.whoFinds}</h2>
@@ -150,13 +155,13 @@ function PrivacySettings() {
 			</div>
 			<div className="card">
 				<h2 className="card-title">{t.notifications}</h2>
-				<div className="row pad-x">
+				<Link to={paths.settings("notifications")} className="row link-row pad-x">
 					<span className="grow">
 						{t.preview}
 						<small>{t.previewHint}</small>
 					</span>
-					<Switch checked={privacy.notificationPreview} label={t.preview} onChange={(on) => save({ notificationPreview: on })} />
-				</div>
+					<Icon name="chevron-right" small />
+				</Link>
 				<div className="callout pad-x">
 					<Icon name="lock" small />
 					<p>{t.pushNote}</p>
@@ -215,7 +220,7 @@ function BlockedSettings() {
 					<ul className="plain">
 						{state.value.items.map((entry) => (
 							<li className="row pad-x" key={entry.person.id}>
-								<ChatAvatar id={entry.person.id} name={entry.person.name} bot={entry.person.isBot} />
+								<ChatAvatar id={entry.person.id} name={entry.person.name} photoOf={entry.person.id} photoId={entry.person.photoId} bot={entry.person.isBot} />
 								<span className="grow">
 									{entry.person.name} {entry.person.isBot && <span className="tag">{copy.info.bot}</span>}
 									<small>{t.blockedOn(entry.person.username, fullDate(entry.blockedAt, locale))}</small>

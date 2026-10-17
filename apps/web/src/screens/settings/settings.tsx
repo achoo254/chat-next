@@ -39,6 +39,8 @@ export interface MessagingSettings {
 	onSignOut: () => void;
 	/** Shows the link to the moderation queue (operators only). */
 	moderation: boolean;
+	/** The profile photo field of the Profile tab. */
+	photo?: ReactNode;
 }
 
 type TabGroups = readonly (readonly { tab: SettingsTab; icon: IconName }[])[];
@@ -65,7 +67,7 @@ export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) 
 		if (!available) navigate(paths.settings("profile"), { replace: true });
 	}, [available]);
 	let content: ReactNode;
-	if (tab === "profile") content = <ProfileSettings self={self} onSelfChange={onSelfChange} />;
+	if (tab === "profile") content = <ProfileSettings self={self} onSelfChange={onSelfChange} photo={messaging?.photo} />;
 	else if (tab === "sessions") content = <SessionsSettings />;
 	else content = messaging?.render(tab) ?? null;
 	return (

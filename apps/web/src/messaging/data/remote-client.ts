@@ -128,6 +128,7 @@ export function toPerson(user: WireUser): Person {
 		isSelf: user.isSelf,
 		isBlocked: user.isBlocked,
 		presence: presenceOf(user),
+		...(user.photo !== undefined && user.photo.fileId !== "" ? { photoId: user.photo.fileId } : {}),
 	};
 }
 
@@ -530,6 +531,10 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 		setDefaultPermissions: (chatId, permissions) =>
 			call(async () => {
 				await chats.updateChatInfo({ chatId: BigInt(chatId), defaultPermissions: permissions });
+			}),
+		updateChatInfo: (chatId, changes) =>
+			call(async () => {
+				await chats.updateChatInfo({ chatId: BigInt(chatId), ...changes });
 			}),
 		setHistoryShared: (chatId, shared) =>
 			call(async () => {

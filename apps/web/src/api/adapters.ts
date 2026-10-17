@@ -15,6 +15,8 @@ export interface SelfUser {
 	email: string;
 	/** May use the moderation queue (GetSelfResponse.is_operator). */
 	isOperator: boolean;
+	/** file_id of the profile photo; absent without one. */
+	photoId?: string;
 	/** Set while the account waits for deletion (GetSelfResponse.deletion): the app then only offers to cancel it. */
 	deletion?: AccountDeletionInfo;
 }
@@ -52,6 +54,7 @@ export function toSelfUser(user: User, isOperator = false): SelfUser {
 		bio: user.bio,
 		email: user.email,
 		isOperator,
+		...(user.photo !== undefined && user.photo.fileId !== "" ? { photoId: user.photo.fileId } : {}),
 	};
 }
 

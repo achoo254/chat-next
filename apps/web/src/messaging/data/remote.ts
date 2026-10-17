@@ -22,9 +22,18 @@ export interface Person {
 	readonly isSelf: boolean;
 	readonly isBlocked: boolean;
 	readonly presence: Presence;
+	/** file_id of the profile photo the viewer may see; absent without one. */
+	readonly photoId?: string;
 }
 
 export type Role = "member" | "admin" | "owner";
+
+/** What UpdateChatInfo changes; unset fields stay. */
+export interface ChatInfoChanges {
+	readonly title?: string;
+	readonly about?: string;
+	readonly photoFileId?: string;
+}
 
 export interface Member {
 	readonly person: Person;
@@ -446,6 +455,8 @@ export interface Remote {
 	leaveChat(chatId: number, newOwnerId?: number): Promise<void>;
 	setAdmin(chatId: number, userId: number, admin: boolean): Promise<void>;
 	setDefaultPermissions(chatId: number, permissions: number): Promise<void>;
+	/** Changes a group's or channel's name, description and/or photo (an uploaded file_id; "" removes it). */
+	updateChatInfo(chatId: number, changes: ChatInfoChanges): Promise<void>;
 	setHistoryShared(chatId: number, shared: boolean): Promise<void>;
 	/** Turns forum topics on for a group (admins; it cannot be turned off). */
 	enableTopics(chatId: number): Promise<void>;
@@ -529,6 +540,7 @@ const METHODS = [
 	"leaveChat",
 	"setAdmin",
 	"setDefaultPermissions",
+	"updateChatInfo",
 	"setHistoryShared",
 	"enableTopics",
 	"exportInvite",

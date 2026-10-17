@@ -69,7 +69,13 @@ type ChatExtras = {
 	about?: string;
 	historyVisibility?: HistoryVisibility;
 	forum?: boolean;
+	title?: string;
+	photo?: WireMediaRef;
 };
+
+function photoRef(fileId: string): WireMediaRef {
+	return create(MediaRefSchema, { fileId, kind: MediaKind.PHOTO });
+}
 
 /** Server-side state of a forum topic in the fixture. */
 export interface FixtureTopic {
@@ -215,7 +221,7 @@ export class ChatFixture {
 	readonly sent: { chatId: number; text: string; replyToSeq: number; topicId: number }[] = [];
 	readonly topics = new Map<number, FixtureTopic[]>();
 	/** UpdateChatInfo calls, in order (forum: what the call asked for). */
-	readonly updatedChats: { chatId: number; forum: boolean | undefined }[] = [];
+	readonly updatedChats: { chatId: number; forum: boolean | undefined; title?: string; about?: string; photoFileId?: string }[] = [];
 	private readonly messageTopics = new Map<string, number>();
 	readonly previews: FixturePreview[] = [];
 	readonly inviteChecks = new Map<
@@ -685,6 +691,17 @@ export class ChatFixture {
 	/** Profile photos by user (bots' photos set in the Developer Console). */
 	readonly photos = new Map<number, string>();
 
+	/** Sets (or with "" removes) a group's or channel's photo, downloadable with the chat_photo_of context. */
+	setChatPhoto(chatId: number, fileId: string): void {
+		const next: ChatExtras = { ...(this.chatExtras.get(chatId) ?? {}) };
+		if (fileId === "") delete next.photo;
+		else next.photo = photoRef(fileId);
+		this.chatExtras.set(chatId, next);
+		const media = this.server.media;
+		if (media !== null && fileId === "") media.chatPhotos.delete(chatId);
+		else if (media !== null) media.chatPhotos.set(chatId, fileId);
+	}
+
 	/** Sets (or with "" removes) a user's profile photo, downloadable with the user_photo_of context. */
 	setPhoto(userId: number, fileId: string): void {
 		if (fileId === "") this.photos.delete(userId);
@@ -1093,7 +1110,18 @@ export class ChatFixture {
 					this.topics.set(chatId, [this.generalTopic()]);
 					this.server.announceChat(chatId);
 				}
-				this.updatedChats.push({ chatId, forum: req.forum });
+				const info = {
+					...(req.title === undefined ? {} : { title: req.title }),
+					...(req.about === undefined ? {} : { about: req.about }),
+					...(req.photoFileId === undefined ? {} : { photoFileId: req.photoFileId }),
+				};
+				this.updatedChats.push({ chatId, forum: req.forum, ...info });
+				if (Object.keys(info).length > 0) {
+					const { photoFileId, ...text } = info;
+					this.chatExtras.set(chatId, { ...(this.chatExtras.get(chatId) ?? {}), ...text });
+					if (photoFileId !== undefined) this.setChatPhoto(chatId, photoFileId);
+					this.server.announceChat(chatId);
+				}
 				return { chat: this.server.wireChat(chatId, this.selfId) };
 			},
 			setHistoryVisibility: () => ({}),

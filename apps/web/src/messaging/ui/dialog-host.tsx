@@ -30,6 +30,7 @@ const MembersDialog = lazy(() => members().then((m) => ({ default: m.MembersDial
 const RemoveMemberDialog = lazy(() => members().then((m) => ({ default: m.RemoveMemberDialog })));
 const PinnedListDialog = lazy(() => import("./pinned-dialogs.tsx").then((m) => ({ default: m.PinnedListDialog })));
 const AddContactDialog = lazy(() => import("./contact-add.tsx").then((m) => ({ default: m.AddContactDialog })));
+const EditChatDialog = lazy(() => import("./edit-chat-dialog.tsx"));
 const BotAlertDialog = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotAlertDialog })));
 
 export function DialogHost() {
@@ -91,6 +92,8 @@ function Dialog({ request, close }: { request: DialogRequest; close: () => void 
 			return <ReportDialog target={request.target} name={request.name} blockUserId={request.blockUserId} onClose={close} />;
 		case "profile":
 			return <ProfileDialog userId={request.userId} onClose={close} />;
+		case "editChat":
+			return <EditChatDialog chatId={request.chatId} onClose={close} />;
 		case "readBy":
 			return <ReadByDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "addFailed":

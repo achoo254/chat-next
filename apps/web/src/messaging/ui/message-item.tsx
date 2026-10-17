@@ -44,6 +44,7 @@ interface Shape {
 
 /** The box a message's media will fill, shown while the media chunk loads. */
 function MediaReserve({ shape, count, visual }: { shape: Shape; count: number; visual: boolean }) {
+	"use no memo";
 	if (count > 1 && visual) return <span className="media-box" style={boxStyle(albumBox(count))} />;
 	if (count > 1) {
 		return (
@@ -150,6 +151,7 @@ function useRichContext(fromId: number): RichContext {
  * (mockups/integrations.html#alert-grouping), with this accessible name; "" for none.
  */
 function Stamp({ date, edited, silent = "", children }: { date: number; edited: string; silent?: string; children?: ReactNode }) {
+	"use no memo";
 	const { locale } = useI18n();
 	return (
 		<span className="stamp">
@@ -184,6 +186,7 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 }
 
 function ForwardLine({ message }: { message: StoredMessage }) {
+	"use no memo";
 	const copy = useCopy();
 	const forward = message.forward;
 	const user = useUser(forward?.fromUserId ?? 0);
@@ -200,6 +203,7 @@ function ForwardLine({ message }: { message: StoredMessage }) {
 
 /** "via @bot": the bot whose inline result the message is. */
 function ViaLine({ botId }: { botId: number }) {
+	"use no memo";
 	const copy = useCopy();
 	const bot = useUser(botId);
 	if (botId === 0 || bot === undefined || bot.username === "") return null;
@@ -496,7 +500,7 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 						name={senderName}
 						size="sm"
 						bot={sender?.isBot === true}
-						photoOf={sender?.isBot === true ? message.fromId : 0}
+						photoOf={message.fromId}
 						photoId={sender?.photoId ?? ""}
 					/>
 				</button>

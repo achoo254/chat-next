@@ -475,7 +475,7 @@ export function ReadByDialog({ chatId, seq, onClose }: CloseProps & { chatId: nu
 					<div>
 						{list.map(({ person, readAt }) => (
 							<div className="row" key={person.id}>
-								<ChatAvatar id={person.id} name={person.name} size="sm" bot={person.isBot} />
+								<ChatAvatar id={person.id} name={person.name} photoOf={person.id} photoId={person.photoId} size="sm" bot={person.isBot} />
 								<span className="grow">{person.name}</span>
 								{readAt > 0 && <span className="role">{clock(readAt, locale)}</span>}
 							</div>

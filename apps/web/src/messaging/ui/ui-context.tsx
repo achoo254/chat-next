@@ -25,6 +25,8 @@ export type DialogRequest =
 	| { readonly kind: "reactors"; readonly chatId: number; readonly seq: number; readonly emoji: string }
 	| { readonly kind: "report"; readonly target: ReportTarget; readonly name: string; readonly blockUserId: number }
 	| { readonly kind: "profile"; readonly userId: number }
+	/** A group's or channel's name, description and photo (#edit-chat). */
+	| { readonly kind: "editChat"; readonly chatId: number }
 	| { readonly kind: "leave"; readonly chatId: number }
 	| { readonly kind: "addMembers"; readonly chatId: number }
 	/** `text`: what the message shows for the link ("" when it is the address itself); `fromId`: the sender. */

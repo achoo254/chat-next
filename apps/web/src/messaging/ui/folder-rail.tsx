@@ -26,7 +26,7 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 	return (
 		<nav className="folder-rail" aria-label={copy.folders.nav}>
 			<span className="folder me" title={copy.folders.account}>
-				<ChatAvatar id={self.id} name={self.name} size="sm" />
+				<ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} size="sm" />
 				<span className="sr-only">{copy.folders.account}</span>
 			</span>
 			{FOLDERS.map((item) => (

@@ -146,7 +146,7 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 										aria-checked={heir?.person.id === member.person.id}
 										onClick={() => setHeirId(member.person.id)}
 									>
-										<ChatAvatar id={member.person.id} name={member.person.name} />
+										<ChatAvatar id={member.person.id} name={member.person.name} photoOf={member.person.id} photoId={member.person.photoId} />
 										<span>
 											<b>{member.person.name}</b>
 											<small>
@@ -238,7 +238,7 @@ function PickAdmin({ chatId, channel, memberCount, onBack, onDone, onClose }: Pi
 							aria-checked={picked?.person.id === member.person.id}
 							onClick={() => setPicked(member)}
 						>
-							<ChatAvatar id={member.person.id} name={member.person.name} />
+							<ChatAvatar id={member.person.id} name={member.person.name} photoOf={member.person.id} photoId={member.person.photoId} />
 							<span>
 								<b>{member.person.name}</b>
 								<small>{member.person.username === "" ? t.pickRole(channel) : `@${member.person.username} · ${t.pickRole(channel)}`}</small>
@@ -527,7 +527,7 @@ export function ReactorsDialog({ chatId, seq, emoji, onClose }: CloseProps & { c
 							const self = reactor.person.id === store.selfId;
 							return (
 								<div className="row" key={`${reactor.person.id}:${reactor.emoji}`}>
-									<ChatAvatar id={reactor.person.id} name={reactor.person.name} size="sm" bot={reactor.person.isBot} />
+									<ChatAvatar id={reactor.person.id} name={reactor.person.name} photoOf={reactor.person.id} photoId={reactor.person.photoId} size="sm" bot={reactor.person.isBot} />
 									<span className="grow">
 										{self ? copy.common.you : reactor.person.name}
 										{self && <small>{t.tap}</small>}
