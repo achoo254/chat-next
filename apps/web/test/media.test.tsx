@@ -66,7 +66,8 @@ describe("attaching", () => {
 		const { f, chat } = setup(true);
 		await open(f, chat);
 		await userEvent.click(await screen.findByRole("button", { name: "Đính kèm" }, LONG));
-		const menu = screen.getByRole("menu", { name: "Đính kèm" });
+		// The menu loads on first use.
+		const menu = await screen.findByRole("menu", { name: "Đính kèm" }, LONG);
 		expect(within(menu).getByRole("menuitem", { name: "Ảnh hoặc video" })).toBeTruthy();
 		expect(within(menu).getByRole("menuitem", { name: /File.*tối đa 2 GB/ })).toBeTruthy();
 		await userEvent.keyboard("{Escape}");

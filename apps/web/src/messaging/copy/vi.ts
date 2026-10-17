@@ -52,6 +52,16 @@ export const vi = {
 		inviteCreateGroup: "Tạo nhóm và mời",
 		inviteMessageOne: "Nhắn cho một người",
 	},
+	/** "đang gõ…" (#list-states): private chats say what the person does, groups who does it. */
+	typing: {
+		typing: "đang gõ…",
+		voice: "đang ghi âm…",
+		photo: "đang gửi ảnh…",
+		video: "đang gửi video…",
+		document: "đang gửi file…",
+		who: (names: readonly string[], action: string): string =>
+			names.length > 2 ? `${names.length} người đang gõ…` : `${names.join(" và ")} ${action}`,
+	},
 	list: {
 		label: "Danh sách chat",
 		search: "Tìm chat và tin nhắn",

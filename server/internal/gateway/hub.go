@@ -17,13 +17,22 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// activityInterval coalesces chat_activity hints of large chats.
-const activityInterval = time.Second
+const (
+	// activityInterval coalesces chat_activity hints of large chats.
+	activityInterval = time.Second
+	// typingLookupTimeout bounds the database lookup of a typing frame's viewers.
+	typingLookupTimeout = 2 * time.Second
+	// typingCacheTTL keeps a typing audience; a member who leaves drops it at once.
+	typingCacheTTL = 3 * time.Second
+	// typingCacheMax bounds the cache; it is cleared when full.
+	typingCacheMax = 10_000
+)
 
 // Backend is what the hub needs from the chat service.
 type Backend interface {
 	MemberChats(ctx context.Context, userID int64, chatIDs []int64) ([]chat.ChatAccess, error)
 	MembersAmong(ctx context.Context, chatID int64, userIDs []int64) ([]int64, error)
+	TypingViewers(ctx context.Context, chatID, typer int64, bot bool, viewing []int64) ([]int64, bool, error)
 	PrivatePeers(ctx context.Context, userID int64) (map[int64]int64, error)
 	UserStatus(ctx context.Context, viewer, userID int64, online bool) (*appv1.UserStatus, error)
 	SetLastSeen(ctx context.Context, userID int64, at time.Time) error
@@ -48,6 +57,9 @@ type Hub struct {
 	actMu    sync.Mutex
 	activity map[int64]activity
 
+	typingMu    sync.Mutex
+	typingCache map[typingKey]typingAudience
+
 	conns sync.WaitGroup
 }
 
@@ -56,7 +68,7 @@ func NewHub(backend Backend, logger *slog.Logger) *Hub {
 	return &Hub{
 		backend: backend, logger: logger,
 		byUser: map[int64]map[*conn]struct{}{}, bySession: map[int64]map[*conn]struct{}{},
-		activity: map[int64]activity{},
+		activity: map[int64]activity{}, typingCache: map[typingKey]typingAudience{},
 	}
 }
 
@@ -321,6 +333,7 @@ func (h *Hub) RevokeSession(sessionID int64, reason appv1.SessionRevokeReason) {
 
 // ForgetChat implements chat.Sink.
 func (h *Hub) ForgetChat(userID, chatID int64) {
+	h.forgetTyping(chatID)
 	for _, c := range h.connsOf(userID) {
 		c.forget(chatID)
 	}
@@ -407,15 +420,14 @@ func (h *Hub) presenceChanged(userID int64, online bool) {
 	}()
 }
 
-// typing forwards a typing frame to the other users who have the chat open.
+// typing forwards a person's typing frame (see typingFrom).
 func (h *Hub) typing(from *conn, chatID int64, b []byte) {
-	h.typingFrom(from.userID, chatID, b)
+	h.typingFrom(from.ctx, from.userID, chatID, false, b)
 }
 
 // BotTyping relays a bot's chat action (Bot API POST /chats/{id}/actions,
-// already checked: the bot may post there) to the users who have the chat
-// open, as a typing frame of the bot. Clients drop it after about 5
-// seconds unless it comes again.
+// already checked: the bot may post there) as a typing frame of the bot.
+// Clients drop it after about 5 seconds unless it comes again.
 func (h *Hub) BotTyping(botID, chatID, topicID int64, action appv1.TypingAction) {
 	b, err := encodeFrame(&appv1.ServerFrame{Frame: &appv1.ServerFrame_Typing{Typing: &appv1.TypingFrame{
 		ChatId: chatID, UserId: botID, Action: action, TopicId: topicID,
@@ -423,24 +435,73 @@ func (h *Hub) BotTyping(botID, chatID, topicID int64, action appv1.TypingAction)
 	if err != nil {
 		return
 	}
-	h.typingFrom(botID, chatID, b)
+	h.typingFrom(context.Background(), botID, chatID, true, b)
 }
 
-func (h *Hub) typingFrom(userID, chatID int64, b []byte) {
-	h.mu.RLock()
-	var targets []*conn
-	for user, set := range h.byUser {
-		if user == userID {
-			continue
+type typingKey struct{ chatID, typer int64 }
+
+// typingAudience is who sees one person's typing in one chat, kept for
+// typingCacheTTL so typing every few seconds costs one lookup.
+type typingAudience struct {
+	viewers []int64
+	large   bool
+	until   time.Time
+}
+
+// typingFrom sends a typing frame to the connected members allowed to see
+// it (Backend.TypingViewers): in a large chat the sockets that have it open
+// or in their list, in other chats every socket, so the dialog list shows it.
+func (h *Hub) typingFrom(ctx context.Context, userID, chatID int64, bot bool, b []byte) {
+	key := typingKey{chatID, userID}
+	h.typingMu.Lock()
+	audience, cached := h.typingCache[key]
+	h.typingMu.Unlock()
+	if !cached || time.Now().After(audience.until) {
+		h.mu.RLock()
+		var viewing []int64
+		for user, set := range h.byUser {
+			if user == userID {
+				continue
+			}
+			for c := range set {
+				if c.openChatID() == chatID || c.views(chatID) {
+					viewing = append(viewing, user)
+					break
+				}
+			}
 		}
-		for c := range set {
-			if c.openChatID() == chatID {
-				targets = append(targets, c)
+		h.mu.RUnlock()
+		ctx, cancel := context.WithTimeout(ctx, typingLookupTimeout)
+		defer cancel()
+		viewers, large, err := h.backend.TypingViewers(ctx, chatID, userID, bot, viewing)
+		if err != nil {
+			h.logger.Warn("typing: viewers lookup failed", "chat_id", chatID, "err", err)
+			return
+		}
+		audience = typingAudience{viewers: viewers, large: large, until: time.Now().Add(typingCacheTTL)}
+		h.typingMu.Lock()
+		if len(h.typingCache) >= typingCacheMax {
+			clear(h.typingCache)
+		}
+		h.typingCache[key] = audience
+		h.typingMu.Unlock()
+	}
+	for _, u := range audience.viewers {
+		for _, c := range h.connsOf(u) {
+			if !audience.large || c.openChatID() == chatID || c.views(chatID) {
+				c.enqueue(b)
 			}
 		}
 	}
-	h.mu.RUnlock()
-	for _, c := range targets {
-		c.enqueue(b)
+}
+
+// forgetTyping drops the cached typing audiences of a chat (a member left).
+func (h *Hub) forgetTyping(chatID int64) {
+	h.typingMu.Lock()
+	defer h.typingMu.Unlock()
+	for key := range h.typingCache {
+		if key.chatID == chatID {
+			delete(h.typingCache, key)
+		}
 	}
 }

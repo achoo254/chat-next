@@ -181,7 +181,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" $API/chats/77:leave
 
 `status` của thành viên: `owner`, `admin`, `member`, `left`, `banned`; `permissions` là bitmask: 1 nhắn tin, 2 gửi media, 4 thêm người, 8 ghim, 16 đổi thông tin nhóm, 32 quản lý chủ đề. Cấm, bỏ cấm và giới hạn cần bot là admin; đổi tên và mô tả cần quyền đổi thông tin.
 
-"Đang gõ": `POST $API/chats/77/actions` với `{"action": "typing"}` (hoặc `upload_photo`, `upload_video`, `upload_document`, `record_voice`, `cancel`). Người đang mở chat thấy khoảng 5 giây; lặp lại khi còn làm việc. Lưu ý: app web chưa hiển thị trạng thái này, API vẫn nhận để bot không phải sửa sau.
+"Đang gõ": `POST $API/chats/77/actions` với `{"action": "typing"}` (hoặc `upload_photo`, `upload_video`, `upload_document`, `record_voice`, `cancel`). Thành viên thấy "đang gõ…" (hoặc "đang gửi ảnh…") trong chat và ở danh sách chat khoảng 6 giây; lặp lại khoảng 4 giây một lần khi còn làm việc. Tin bot gửi tới thì dòng này tắt ngay.
 
 ## 7. Update về thành viên và reaction
 

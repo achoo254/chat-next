@@ -21,6 +21,8 @@ export const EventKeys = {
 	notificationSettings: "notification_settings",
 	outbox: "outbox",
 	connection: "connection",
+	/** Who is typing changed (ChatCore.typing). */
+	typing: "typing",
 	/** The session ended; local data is gone. */
 	session: "session",
 	/** A fresh cold-start snapshot is available. */

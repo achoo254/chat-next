@@ -9,6 +9,7 @@ import {
 	MUTE_FOREVER,
 	unreadTotals,
 	type Chat,
+	type ChatTyping,
 	type ConnectionState,
 	type DialogView,
 	type FailureKind,
@@ -81,6 +82,7 @@ function dropLegacyUnreadMarks(selfId: number): void {
 	}
 }
 
+const NO_TYPING: readonly ChatTyping[] = [];
 const MAX_WINDOW = 120;
 const PAGE = 40;
 const FIRST_PAGE = 60;
@@ -192,6 +194,8 @@ export class ChatStore {
 	private readonly lookups = new Map<string, StoredMessage | null>();
 	private readonly lookupsInFlight = new Set<string>();
 	private readonly connection: ConnectionStatus;
+	/** Who is typing, per chat (ChatSource.typing). */
+	private typingByChat = new Map<number, ChatTyping[]>();
 	/** AppConfig media limits; null until read once. */
 	private limits: MediaLimits | null = null;
 	private readonly limitsRefresh = new Coalescer(() => this.loadLimits());
@@ -293,6 +297,7 @@ export class ChatStore {
 			else if (key.startsWith("message:")) histories.add(Number(key.split(":")[1]));
 			else if (key === "outbox") for (const id of this.windows.keys()) histories.add(id);
 			else if (key === "connection") this.refreshConnection();
+			else if (key === EventKeys.typing) this.loadTyping();
 			else if (key === EventKeys.notificationSettings) this.settingsRefresh.run();
 		}
 		if (dialogs) this.dialogRefresh.run();
@@ -679,6 +684,25 @@ export class ChatStore {
 		if (view.chat?.type !== "private" || view.chat.peerUserId === 0) return view;
 		const peer = this.users.get(view.chat.peerUserId);
 		return peer === undefined ? view : { ...view, peer };
+	}
+
+	// ------------------------------------------------------------- typing
+
+	/** Who is typing in the chat now; changes emit "typing". */
+	typing(chatId: number): readonly ChatTyping[] {
+		return this.typingByChat.get(chatId) ?? NO_TYPING;
+	}
+
+	private loadTyping(): void {
+		this.source.typing().then(
+			(list) => {
+				const byChat = new Map<number, ChatTyping[]>();
+				for (const typing of list) byChat.set(typing.chatId, [...(byChat.get(typing.chatId) ?? []), typing]);
+				this.typingByChat = byChat;
+				this.emit(EventKeys.typing);
+			},
+			(err: unknown) => this.reportError(err, "typing"),
+		);
 	}
 
 	// ------------------------------------------------------------- connection

@@ -46,7 +46,7 @@ import {
 	type Message as WireMessage,
 	type SyncAck as WireSyncAck,
 } from "@app/proto-ts/messages";
-import { ClientFrameSchema, ResyncReason, ServerFrameSchema } from "@app/proto-ts/realtime";
+import { ClientFrameSchema, ResyncReason, ServerFrameSchema, TypingAction } from "@app/proto-ts/realtime";
 import {
 	GetChatDifferenceResponseSchema,
 	GetDifferenceResponseSchema,
@@ -192,6 +192,8 @@ export class FakeServer {
 	/** Updates written for each user (both logs), for the chaos budget. */
 	readonly updatesFor = new Map<number, number>();
 	framesLost = 0;
+	/** Typing frames clients sent for their open chat. */
+	readonly typingSent: { userId: number; chatId: number; action: TypingAction }[] = [];
 	framesReordered = 0;
 	heartbeatMs = 25_000;
 
@@ -979,6 +981,15 @@ export class FakeServer {
 		};
 	}
 
+	/** Relays someone's typing to the other members' sessions. */
+	typing(userId: number, chatId: number, action: TypingAction, topicId = 0): void {
+		const members = this.chat(chatId).members;
+		for (const session of this.sessions) {
+			if (session.userId === userId || !members.has(session.userId)) continue;
+			this.sendFrame(session, { case: "typing", value: { chatId: big(chatId), userId: big(userId), action, topicId: big(topicId) } }, false);
+		}
+	}
+
 	sessionCount(userId: number): number {
 		return [...this.sessions].filter((s) => s.userId === userId).length;
 	}
@@ -1016,6 +1027,14 @@ export class FakeServer {
 				session.openChat = num(frame.value.chatId);
 				session.visible = new Set(frame.value.visibleChatIds.map(num));
 				return;
+			case "typing": {
+				// Like the gateway: only for the open chat, to the other members.
+				const chatId = num(frame.value.chatId);
+				if (chatId !== session.openChat) return;
+				this.typingSent.push({ userId: session.userId, chatId, action: frame.value.action });
+				this.typing(session.userId, chatId, frame.value.action, num(frame.value.topicId));
+				return;
+			}
 			default:
 				return;
 		}

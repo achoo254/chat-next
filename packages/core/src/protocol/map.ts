@@ -34,7 +34,7 @@ import type {
 	SyncAck as WireSyncAck,
 } from "@app/proto-ts/messages";
 import { EntityType as WireEntityType, IncomingHookStopReason } from "@app/proto-ts/messages";
-import type { HelloFrame, UpdateFrame } from "@app/proto-ts/realtime";
+import { TypingAction as WireTypingAction, type HelloFrame, type TypingFrame, type UpdateFrame } from "@app/proto-ts/realtime";
 import type {
 	ChatState as WireChatState,
 	DifferenceUpdates,
@@ -51,6 +51,7 @@ import type {
 	Chat,
 	ChatDifference,
 	ChatSyncState,
+	ChatTyping,
 	ChatType,
 	Dialog,
 	DialogsPage,
@@ -81,6 +82,7 @@ import type {
 	SessionRevokeReason,
 	SyncAck,
 	SyncMode,
+	TypingAction,
 	SyncState,
 	Update,
 	UpdateBatch,
@@ -200,6 +202,35 @@ const REVOKE_REASONS: Record<number, SessionRevokeReason> = {
 	[WireRevokeReason.ADMIN]: "admin",
 	[WireRevokeReason.REPLACED]: "replaced",
 };
+
+const TYPING_ACTIONS: Record<number, TypingAction> = {
+	[WireTypingAction.TYPING]: "typing",
+	[WireTypingAction.RECORDING_VOICE]: "voice",
+	[WireTypingAction.UPLOADING_PHOTO]: "photo",
+	[WireTypingAction.UPLOADING_VIDEO]: "video",
+	[WireTypingAction.UPLOADING_DOCUMENT]: "document",
+};
+
+/** A typing frame from the server; action null ends the typing (cancel, or an unknown action). */
+export type TypingChange = Omit<ChatTyping, "action"> & { readonly action: TypingAction | null };
+
+export function toTyping(frame: TypingFrame): TypingChange {
+	return { chatId: id(frame.chatId), userId: id(frame.userId), topicId: id(frame.topicId), action: TYPING_ACTIONS[frame.action] ?? null };
+}
+
+const WIRE_TYPING_ACTIONS: Record<TypingAction | "cancel", WireTypingAction> = {
+	typing: WireTypingAction.TYPING,
+	voice: WireTypingAction.RECORDING_VOICE,
+	photo: WireTypingAction.UPLOADING_PHOTO,
+	video: WireTypingAction.UPLOADING_VIDEO,
+	document: WireTypingAction.UPLOADING_DOCUMENT,
+	cancel: WireTypingAction.CANCEL,
+};
+
+/** The wire action of a typing frame the client sends; "cancel" ends it early. */
+export function toWireTypingAction(action: TypingAction | "cancel"): WireTypingAction {
+	return WIRE_TYPING_ACTIONS[action];
+}
 
 function syncMode(mode: WireSyncMode): SyncMode {
 	return mode === WireSyncMode.LARGE ? "large" : "small";

@@ -3,7 +3,7 @@
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
 import type { Transport } from "@connectrpc/connect";
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
-import type { Chat, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
+import type { Chat, ChatTyping, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
 import type { SelfUser } from "../../api/adapters.ts";
 import { useCopy } from "../copy/use-copy.ts";
 import type { Bots } from "../bots/api.ts";
@@ -195,6 +195,12 @@ export function useUserNames(ids: readonly number[]): ReadonlyMap<number, string
 export function useMediaLimits(): MediaLimits | null {
 	const { store } = useServices();
 	return useStoreKey("mediaLimits", () => store.mediaLimits());
+}
+
+/** Who is typing in the chat now (ChatStore.typing). */
+export function useTyping(chatId: number): readonly ChatTyping[] {
+	const { store } = useServices();
+	return useStoreKey("typing", () => store.typing(chatId));
 }
 
 export function useConnection(): ConnectionState {

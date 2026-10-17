@@ -1488,6 +1488,8 @@ export function toSource(core: ChatCore): ChatSource {
 		pinnedMessages: (chatId, request) => core.pinnedMessages(chatId, request),
 		unpinAllMessages: (chatId, topicId) => core.unpinAllMessages(chatId, topicId),
 		onlineCount: (chatId) => core.onlineCount(chatId),
+		typing: async () => core.typing(),
+		sendTyping: async (chatId, topicId, action) => core.sendTyping(chatId, topicId, action),
 		sendMedia: (chatId, file, media, options) => core.sendMedia(chatId, file, media, options),
 		sendAlbum: (chatId, items, options) => core.sendAlbum(chatId, items, options),
 		uploadProgress: (key) => core.uploadProgress(key),

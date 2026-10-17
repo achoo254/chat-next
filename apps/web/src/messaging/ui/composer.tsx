@@ -32,9 +32,9 @@ import { useCopy } from "../copy/use-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
-import { PopupMenu } from "./popup-menu.tsx";
 import { useCell, useIntent, useUi } from "./ui-context.tsx";
 
+const AttachMenu = lazy(() => import("./attach-menu.tsx"));
 const EmojiPicker = lazy(() => import("./emoji-picker.tsx").then((m) => ({ default: m.EmojiPicker })));
 // The reply/edit and link preview bars load the first time one shows.
 const bars = () => import("./composer-bars.tsx");
@@ -193,7 +193,10 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	const update = (value: string) => {
 		setText(value);
 		setError("");
-		if (intent?.mode !== "edit") drafts.set(chatId, value, topicId);
+		if (intent?.mode === "edit") return;
+		drafts.set(chatId, value, topicId);
+		// Channels post without "đang gõ…"; clearing the draft ends it at once.
+		if (!channel) void source.sendTyping(chatId, topicId, value.trim() === "" ? "cancel" : "typing").catch(() => undefined);
 	};
 
 	const cancelIntent = () => {
@@ -465,25 +468,18 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 							<Icon name="clip" />
 						</button>
 						{attachOpen && (
-							<PopupMenu
-								className="attach-menu"
-								label={copy.composer.attachMenu}
-								boundary={attachAnchor}
-								onClose={() => {
-									setAttachOpen(false);
-									attachButton.current?.focus();
-								}}
-							>
-								<button type="button" role="menuitem" onClick={() => openPicker(pickMedia.current)}>
-									<Icon name="photo" />
-									{copy.composer.attachMedia}
-								</button>
-								<button type="button" role="menuitem" onClick={() => openPicker(pickFiles.current)}>
-									<Icon name="file" />
-									{copy.composer.attachFile}
-									<small>{copy.composer.attachMax(sizeLimitLabel(limits.uploadSizeMax, locale))}</small>
-								</button>
-							</PopupMenu>
+							<Suspense fallback={null}>
+								<AttachMenu
+									boundary={attachAnchor}
+									limit={sizeLimitLabel(limits.uploadSizeMax, locale)}
+									onMedia={() => openPicker(pickMedia.current)}
+									onFiles={() => openPicker(pickFiles.current)}
+									onClose={() => {
+										setAttachOpen(false);
+										attachButton.current?.focus();
+									}}
+								/>
+							</Suspense>
 						)}
 						<input ref={pickMedia} type="file" accept="image/*,video/*" multiple hidden tabIndex={-1} aria-hidden="true" onChange={onPicked} data-testid="pick-media" />
 						<input ref={pickFiles} type="file" multiple hidden tabIndex={-1} aria-hidden="true" onChange={onPicked} data-testid="pick-files" />

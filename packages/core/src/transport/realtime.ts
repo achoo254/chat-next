@@ -11,8 +11,8 @@ import {
 	ServerFrameSchema,
 	type ServerFrame,
 } from "@app/proto-ts/realtime";
-import type { Hello, SessionRevokeReason, UpdateBatch } from "../model/types.ts";
-import { toHello, toRevokeReason, toUpdateBatch, toWireId } from "../protocol/map.ts";
+import type { Hello, SessionRevokeReason, TypingAction, UpdateBatch } from "../model/types.ts";
+import { toHello, toRevokeReason, toTyping, toUpdateBatch, toWireId, toWireTypingAction, type TypingChange } from "../protocol/map.ts";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffPolicy } from "./backoff.ts";
 
 type ClientFrameInit = MessageInitShape<typeof ClientFrameSchema>;
@@ -27,6 +27,8 @@ export interface RealtimeHandlers {
 	/** A socket closed before the server accepted the session. */
 	onHandshakeFailed(): void;
 	onStateChange(state: ConnectionState): void;
+	/** Someone types in a chat, or stopped (action null). */
+	onTyping?(change: TypingChange): void;
 }
 
 export interface RealtimeOptions {
@@ -129,6 +131,13 @@ export class RealtimeConnection {
 		}
 	}
 
+	/** Tells the open chat's members what the user is doing; false (dropped) while not connected. */
+	sendTyping(chatId: number, topicId: number, action: TypingAction | "cancel"): boolean {
+		if (this.state !== "connected") return false;
+		this.send({ case: "typing", value: { chatId: toWireId(chatId), topicId: toWireId(topicId), action: toWireTypingAction(action) } });
+		return true;
+	}
+
 	private open(): void {
 		const generation = ++this.generation;
 		this.setState("connecting");
@@ -214,12 +223,14 @@ export class RealtimeConnection {
 			case "error":
 				if (f.value.code === FrameErrorCode.UNAUTHENTICATED) this.handlers.onSessionEnded("unknown");
 				return;
-			case "pong":
 			case "typing":
+				this.handlers.onTyping?.(toTyping(f.value));
+				return;
+			case "pong":
 			case "presence":
 			case undefined:
-				// Typing and presence are rendered by the UI layer (phase 6);
-				// receiving them already proved the socket alive above.
+				// Presence is read through GetUsers; receiving a frame already
+				// proved the socket alive above.
 				return;
 		}
 	}

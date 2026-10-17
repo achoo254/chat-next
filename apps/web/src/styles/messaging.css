@@ -149,6 +149,7 @@
 .chat-row .meta .line { display: inline-flex; align-items: center; gap: var(--space-1); }
 .preview .from { color: var(--c-text); font-weight: 500; }
 .preview .draft { color: var(--c-error); font-weight: 500; }
+.preview .typing-text { color: var(--c-primary); }
 /* Photo or video as the last message: a small square of its inline thumbnail before the caption. */
 .preview .pv-thumb { display: inline-block; width: 1.125rem; height: 1.125rem; margin-right: var(--space-1); vertical-align: -0.25rem; border-radius: var(--radius-xs); object-fit: cover; }
 .preview.two-line { display: grid; white-space: normal; }
@@ -208,6 +209,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .messages > :first-child { margin-top: auto; }
 .day { align-self: center; margin: var(--space-3) 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: var(--c-surface); border: 1px solid var(--c-border-subtle); font-size: 0.75rem; color: var(--c-text-muted); }
 .system { align-self: center; text-align: center; font-size: 0.8125rem; color: var(--c-text-muted); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
+.messages > .typing { align-self: flex-start; font-size: 0.8125rem; color: var(--c-text-muted); padding: var(--space-1) var(--space-2); }
 .msg { display: flex; gap: var(--space-2); align-items: flex-end; max-width: var(--bubble-max); border-radius: var(--radius-md); }
 .msg.mine { align-self: flex-end; flex-direction: row-reverse; }
 .msg:focus-visible { outline-offset: 4px; }

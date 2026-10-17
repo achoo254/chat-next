@@ -51,6 +51,15 @@ export const en: MessagingCopy = {
 		inviteCreateGroup: "Create group and invite",
 		inviteMessageOne: "Message someone",
 	},
+	typing: {
+		typing: "typing…",
+		voice: "recording a voice message…",
+		photo: "sending a photo…",
+		video: "sending a video…",
+		document: "sending a file…",
+		who: (names, action) =>
+			names.length > 2 ? `${names.length} people are typing…` : `${names.join(" and ")} ${names.length === 2 ? "are" : "is"} ${action}`,
+	},
 	list: {
 		label: "Chat list",
 		search: "Search chats and messages",

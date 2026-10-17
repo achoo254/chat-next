@@ -5,6 +5,7 @@
 // X cancels. A refused or missing microphone, or a browser without
 // MediaRecorder, says so and leaves the composer as it was.
 import { useEffect, useRef, useState } from "react";
+import { TYPING_REPEAT_MS } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useServices } from "../data/services.tsx";
 import { formatDuration } from "./media-format.ts";
@@ -117,6 +118,19 @@ export default function VoiceRecorder({ target, onClose }: { target: SendTarget;
 			session.current = null;
 		};
 	}, [copy]);
+
+	// "đang ghi âm…" for the chat while recording; the core drops repeats.
+	const recording = phase.kind === "recording";
+	useEffect(() => {
+		if (!recording) return;
+		const say = (action: "voice" | "cancel") => void source.sendTyping(target.chatId, target.topicId, action).catch(() => undefined);
+		say("voice");
+		const timer = setInterval(() => say("voice"), TYPING_REPEAT_MS);
+		return () => {
+			clearInterval(timer);
+			say("cancel");
+		};
+	}, [recording, source, target.chatId, target.topicId]);
 
 	useEffect(() => {
 		if (phase.kind === "recording") sendButton.current?.focus();

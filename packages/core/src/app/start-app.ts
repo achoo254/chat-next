@@ -6,7 +6,7 @@ import { ClientPlatform } from "@app/proto-ts/auth";
 import { databaseName, type SessionEndReason } from "../auth/web.ts";
 import { EventBus, EventKeys } from "../events/bus.ts";
 import { assertSafeId } from "../ids/index.ts";
-import type { Chat, Message, MessageEntity, NotificationSettings, PinnedMessagesPage, User } from "../model/types.ts";
+import type { Chat, ChatTyping, Message, MessageEntity, NotificationSettings, PinnedMessagesPage, TypingAction, User } from "../model/types.ts";
 import {
 	Outbox,
 	OutboxError,
@@ -32,6 +32,7 @@ import type { ServerSearchResult } from "../search/session.ts";
 import { buildSnapshot, type ScreenSnapshot } from "../snapshot/snapshot.ts";
 import { SyncEngine, type HistoryDirectionName } from "../sync/engine.ts";
 import { RealtimeConnection, type ConnectionState } from "../transport/realtime.ts";
+import { TypingTracker } from "./typing.ts";
 import { DirectActions, UnsupportedApiError, type PinnedMessagesRequest } from "./direct-actions.ts";
 
 export type ClientKind = "web" | "ios" | "android" | "desktop";
@@ -122,6 +123,13 @@ export interface ChatCore {
 	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
 	/** Members of a group online now, counted by the server (online only). */
 	onlineCount(chatId: number): Promise<number>;
+	/** Who is typing in which chat now (people the server lets this user see); changes: EventKeys.typing. */
+	typing(): ChatTyping[];
+	/**
+	 * Tells the open chat what the user is doing; call it on every keystroke
+	 * (repeats are throttled) and with "cancel" when the draft is cleared.
+	 */
+	sendTyping(chatId: number, topicId: number, action: TypingAction | "cancel"): void;
 	/** The app badge: unread messages and chats, muted chats per the user's setting. */
 	unreadTotals(): Promise<{ readonly messages: number; readonly chats: number }>;
 	/**
@@ -238,6 +246,7 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		ended = reason;
 		for (const unsubscribe of unsubscribeLifecycle) unsubscribe();
 		connection.stop();
+		typing.dispose();
 		outbox.stop();
 		uploads?.stop();
 		engine.stop();
@@ -416,6 +425,11 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		}
 	};
 
+	const typing = new TypingTracker(
+		platform.timers,
+		() => bus.emit(EventKeys.typing),
+		(chatId, topicId, action) => connection.sendTyping(chatId, topicId, action),
+	);
 	const connection = new RealtimeConnection(
 		{
 			url: options.realtimeUrl,
@@ -434,7 +448,14 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 				engine.onConnected(hello);
 				outbox.retryNow().catch((err: unknown) => report(err, "outbox retry"));
 			},
-			onUpdates: (batch) => engine.ingest(batch),
+			onUpdates: (batch) => {
+				// Posting ends the author's typing at once, not when it expires.
+				for (const update of batch.updates) {
+					if (update.body.kind === "message_new") typing.end(update.body.message.chatId, update.body.message.fromId);
+				}
+				engine.ingest(batch);
+			},
+			onTyping: (change) => typing.receive(change),
 			onSessionEnded: (reason) => sessionEnded(reason),
 			onHandshakeFailed: () => {
 				void probeSession();
@@ -566,6 +587,8 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		userId,
 		events: bus,
 		connectionState: () => connection.connectionState,
+		typing: () => typing.list(),
+		sendTyping: (chatId, topicId, action) => typing.sendTyping(assertSafeId(chatId), assertSafeId(topicId), action),
 		sessionEnded: () => ended,
 		dialogs: async (limit = 100) => {
 			active();
@@ -596,6 +619,7 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		},
 		sendText: async (chatId, text, sendOptions) => {
 			active();
+			typing.posted(chatId);
 			return outbox.sendText(chatId, text, sendOptions);
 		},
 		editText: async (chatId, seq, text, entities) => {
@@ -652,11 +676,13 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		sendMedia: async (chatId, file, media, sendOptions) => {
 			active();
 			requireMedia(uploads);
+			typing.posted(chatId);
 			return outbox.sendMedia(chatId, file, await prepareMedia(file, media), sendOptions);
 		},
 		sendAlbum: async (chatId, items, albumOptions) => {
 			active();
 			requireMedia(uploads);
+			typing.posted(chatId);
 			const max = (limits.current.fromServer ? limits.current : await limits.load().catch(() => limits.current)).albumSizeMax;
 			if (items.length > max) throw new OutboxError(`an album holds at most ${max} files`);
 			const prepared = [];
@@ -726,6 +752,7 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		},
 		openChat: (chatId, anchorSeq = 0, visibleChatIds = []) => {
 			openChatId = assertSafeId(chatId);
+			typing.opening(openChatId);
 			engine.setOpenChat(openChatId, assertSafeId(anchorSeq));
 			connection.setOpenChat(openChatId, visibleChatIds.map(assertSafeId));
 			if (openChatId !== 0) platform.notify.clear(`chat:${openChatId}`);

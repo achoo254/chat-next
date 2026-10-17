@@ -349,6 +349,18 @@ export type SessionRevokeReason =
 	| "replaced"
 	| "unknown";
 
+/** What someone is doing in a chat: "typing…", recording a voice message, sending a file. */
+export type TypingAction = "typing" | "voice" | "photo" | "video" | "document";
+
+/** Someone typing in a chat (TypingFrame), shown until it expires or they post. */
+export interface ChatTyping {
+	readonly chatId: number;
+	readonly userId: number;
+	/** Forum groups: the topic as the sender gave it (the web sends 1 for General; 0 = not given). */
+	readonly topicId: number;
+	readonly action: TypingAction;
+}
+
 /** Position of an update in the per-user log (pts) or a per-chat log (chatPts). */
 export interface UpdatePosition {
 	readonly pts: number;

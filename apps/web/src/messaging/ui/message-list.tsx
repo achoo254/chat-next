@@ -17,6 +17,7 @@ import type { ChatStore, WindowItem } from "../data/store.ts";
 import { MessageItem } from "./message-item.tsx";
 import { pendingTopics } from "../media/media-state.ts";
 import { mentionsSelf } from "./rich-text.tsx";
+import { useTypingText } from "./typing.ts";
 
 const EDGE_PX = 240;
 const BOTTOM_PX = 48;
@@ -130,6 +131,8 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const { locale } = useI18n();
 	const { store, source, backend, self } = useServices();
 	const window_ = useWindow(chatId);
+	// Under the newest message, with names even in a private chat (mockups/chat.html #app).
+	const typing = useTypingText(chatId, true, chat?.forum === true ? topicId : null);
 	// A message's topic is known once the forum's topics are loaded.
 	const topicsLoaded = useBackendValue((pending) => pending.topics(chatId) !== null);
 	const scroller = useRef<HTMLDivElement>(null);
@@ -194,7 +197,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		if (saved === null) return;
 		const node = element.querySelector<HTMLElement>(`[data-key="${saved.key}"]`);
 		if (node !== null) element.scrollTop = node.offsetTop - saved.offset;
-	}, [window_, keys.length, lastKey]);
+	}, [window_, keys.length, lastKey, typing]);
 
 	const onScroll = () => {
 		const element = scroller.current;
@@ -343,6 +346,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 				) : (
 					rows
 				)}
+				{window_.live && typing !== "" && <span className="typing">{typing}</span>}
 			</div>
 			<div className="jump-stack">
 				{mentions > 0 && (

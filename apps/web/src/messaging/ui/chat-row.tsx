@@ -14,6 +14,7 @@ import { chatKind, countLabel, dialogTitle, inlineThumbUrl, isSavedChat, listTim
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
 import { ChatAvatar } from "./parts.tsx";
+import { useTypingText } from "./typing.ts";
 import { useUi } from "./ui-context.tsx";
 
 const LONG_PRESS_MS = 500;
@@ -151,8 +152,11 @@ function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
 	const { store } = useServices();
 	const top = view.topMessage;
 	const nameOf = useNameOf(top === null ? [] : namedUserIds(top));
+	const typing = useTypingText(view.dialog.chatId, kind === "group" || kind === "forum");
 	let line: ReactNode;
-	if (draft !== "") {
+	if (typing !== "") {
+		line = <span className="typing-text">{typing}</span>;
+	} else if (draft !== "") {
 		line = (
 			<>
 				<span className="draft">{copy.list.draft}</span> {draft.replace(/\s+/g, " ")}

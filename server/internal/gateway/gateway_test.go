@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -27,6 +28,8 @@ type fakeBackend struct {
 	large   map[int64]bool
 	// readOnly: members who may not post in the chat.
 	readOnly map[int64]map[int64]bool
+	// hideTyping: typer -> viewers their privacy settings hide typing from.
+	hideTyping map[int64]map[int64]bool
 }
 
 func (f *fakeBackend) MemberChats(_ context.Context, userID int64, chatIDs []int64) ([]chat.ChatAccess, error) {
@@ -55,6 +58,19 @@ func (f *fakeBackend) MembersAmong(_ context.Context, chatID int64, userIDs []in
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeBackend) TypingViewers(_ context.Context, chatID, typer int64, bot bool, viewing []int64) ([]int64, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []int64
+	for _, m := range f.members[chatID] {
+		if m == typer || (f.large[chatID] && !slices.Contains(viewing, m)) || (!bot && f.hideTyping[typer][m]) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out, f.large[chatID], nil
 }
 
 func (f *fakeBackend) PrivatePeers(context.Context, int64) (map[int64]int64, error) { return nil, nil }
@@ -111,7 +127,7 @@ type testGateway struct {
 
 func newTestGateway(t *testing.T) *testGateway {
 	t.Helper()
-	be := &fakeBackend{members: map[int64][]int64{}, large: map[int64]bool{}, readOnly: map[int64]map[int64]bool{}}
+	be := &fakeBackend{members: map[int64][]int64{}, large: map[int64]bool{}, readOnly: map[int64]map[int64]bool{}, hideTyping: map[int64]map[int64]bool{}}
 	hub := NewHub(be, quiet)
 	srv := httptest.NewServer(nil)
 	touch := &fakeToucher{revoked: map[int64]bool{}}
@@ -287,6 +303,35 @@ func TestLargeChatFanoutAndActivityHints(t *testing.T) {
 	tg.hub.ForgetChat(2, 50)
 	if v := tg.hub.ChatViewers(50); len(v) != 1 {
 		t.Fatalf("viewers after forget = %v", v)
+	}
+}
+
+func TestTypingReachesTheListAndFollowsPrivacy(t *testing.T) {
+	tg := newTestGateway(t)
+	tg.be.members[70] = []int64{1, 2, 3, 9}
+	tg.be.hideTyping[1] = map[int64]bool{3: true}
+	typer, lister, hidden := tg.connect(t, 1), tg.connect(t, 2), tg.connect(t, 3)
+	outsider := tg.connect(t, 4)
+	typer.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_OpenChat{OpenChat: &appv1.OpenChatFrame{ChatId: 70}}})
+	time.Sleep(50 * time.Millisecond)
+	typer.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_Typing{Typing: &appv1.TypingFrame{ChatId: 70, Action: appv1.TypingAction_TYPING_ACTION_TYPING}}})
+	// A member of a small chat sees it in the dialog list without opening the chat.
+	if ty := lister.read(t).GetTyping(); ty.GetUserId() != 1 || ty.GetChatId() != 70 {
+		t.Fatalf("typing in the list = %v", ty)
+	}
+	// Nothing reaches a member the typer's privacy excludes, or a non-member:
+	// their next frame is the answer to a ping sent after the typing.
+	for _, c := range []*client{hidden, outsider} {
+		c.send(t, &appv1.ClientFrame{RequestId: 11, Frame: &appv1.ClientFrame_Ping{Ping: &appv1.PingFrame{}}})
+		if f := c.read(t); f.GetPong().GetRequestId() != 11 {
+			t.Fatalf("next frame = %v, want the pong", f)
+		}
+	}
+	// A bot's chat action reaches every member.
+	tg.be.hideTyping[9] = map[int64]bool{3: true}
+	tg.hub.BotTyping(9, 70, 0, appv1.TypingAction_TYPING_ACTION_UPLOADING_PHOTO)
+	if ty := hidden.read(t).GetTyping(); ty.GetAction() != appv1.TypingAction_TYPING_ACTION_UPLOADING_PHOTO {
+		t.Fatalf("bot action = %v", ty)
 	}
 }
 

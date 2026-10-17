@@ -72,6 +72,7 @@ export {
 export { buildSnapshot, parseSnapshot, SNAPSHOT_VERSION, type ScreenSnapshot, type SnapshotDialog } from "./snapshot/snapshot.ts";
 export { databaseName, isReturnPath, signInUrl, SIGN_OUT_PATH, type SessionEndReason } from "./auth/web.ts";
 export { DirectActions, UnsupportedApiError, type PinnedMessagesRequest } from "./app/direct-actions.ts";
+export { TYPING_REPEAT_MS, TYPING_SHOWN_MS } from "./app/typing.ts";
 export {
 	startApp,
 	type ChatCore,

@@ -22,6 +22,8 @@ export const CORE_METHODS = [
 	"pinnedMessages",
 	"unpinAllMessages",
 	"onlineCount",
+	"typing",
+	"sendTyping",
 	"unreadTotals",
 	"sendMedia",
 	"sendAlbum",

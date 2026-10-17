@@ -104,3 +104,42 @@ func (s *Service) PrivatePeers(ctx context.Context, userID int64) (map[int64]int
 	}
 	return out, rows.Err()
 }
+
+// TypingViewers returns the members of the chat who may see typer typing,
+// and whether the chat is large: a person's typing follows their activity
+// status setting (last_seen); a bot's chat actions reach every member; no
+// typing crosses a block in either direction. In a large chat only viewing
+// (users who have it open or in their list) are considered; in other chats
+// every member is.
+func (s *Service) TypingViewers(ctx context.Context, chatID, typer int64, bot bool, viewing []int64) ([]int64, bool, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT c.sync_mode = 'large', m.user_id
+		FROM chats c
+		JOIN chat_members m ON m.chat_id = c.id AND m.left_at IS NULL AND m.user_id <> $2
+		LEFT JOIN privacy_settings p ON p.user_id = $2
+		WHERE c.id = $1 AND c.tenant_id = $3
+			AND (c.sync_mode <> 'large' OR m.user_id = ANY($4))
+			AND ($5 OR coalesce(p.last_seen, $6) = $7
+				OR (coalesce(p.last_seen, $6) = $8 AND EXISTS (
+					SELECT 1 FROM contacts k WHERE k.owner_id = $2 AND k.contact_id = m.user_id)))
+			AND NOT EXISTS (SELECT 1 FROM blocks b
+				WHERE (b.blocker_id = $2 AND b.blocked_id = m.user_id) OR (b.blocker_id = m.user_id AND b.blocked_id = $2))`,
+		chatID, typer, s.cfg.TenantID, viewing, bot, defaultPrivacy().LastSeen, audEveryone, audContacts)
+	if err != nil {
+		return nil, false, fmt.Errorf("chat: typing viewers: %w", err)
+	}
+	defer rows.Close()
+	var viewers []int64
+	var large bool
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&large, &id); err != nil {
+			return nil, false, fmt.Errorf("chat: typing viewers: %w", err)
+		}
+		viewers = append(viewers, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("chat: typing viewers: %w", err)
+	}
+	return viewers, large, nil
+}

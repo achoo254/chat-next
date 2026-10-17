@@ -5,6 +5,7 @@
 import type {
 	AlbumItemInput,
 	Chat,
+	ChatTyping,
 	ConnectionState,
 	DialogView,
 	EventBus,
@@ -28,6 +29,7 @@ import type {
 	SendMediaOptions,
 	SendTextOptions,
 	StoredMessage,
+	TypingAction,
 	UploadProgress,
 	User,
 } from "@app/core";
@@ -56,6 +58,10 @@ export interface ChatSource {
 	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
 	/** Members of a group online now, counted by the server (online only). */
 	onlineCount(chatId: number): Promise<number>;
+	/** Who is typing in which chat; changes arrive as EventKeys.typing. */
+	typing(): Promise<ChatTyping[]>;
+	/** Tells the open chat the user types ("cancel": the draft was cleared); repeats are throttled. */
+	sendTyping(chatId: number, topicId: number, action: TypingAction | "cancel"): Promise<void>;
 	/** Queues a file with an optional caption; the pending message shows at once and uploads in the background. */
 	sendMedia(chatId: number, file: Blob, media: MediaInput, options?: SendMediaOptions): Promise<PendingMessage | null>;
 	/** Queues 2 to MediaLimits.albumSizeMax files as one album. */
