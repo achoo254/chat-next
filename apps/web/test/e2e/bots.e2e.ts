@@ -113,7 +113,7 @@ scenario("create a bot, start it from a link, press its buttons", () => [an], as
 	await page.goto(`${WEB_ORIGIN}/b/e2e_echo_bot?start=hello`);
 	const link = page.getByRole("dialog", { name: "Mở Echo Bot" });
 	await link.getByText("Gửi /start hello cho Echo Bot?").waitFor();
-	await link.getByRole("button", { name: "Gửi /start hello" }).click();
+	await link.getByRole("button", { name: "Gửi /start" }).click();
 	await message(an, "/start hello").waitFor();
 	const start = await bot.next((update) => update.message?.text === "/start hello");
 	const chatId = start.message?.chat.id ?? 0;
