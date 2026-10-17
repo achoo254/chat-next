@@ -28,10 +28,10 @@
 						<span class="avatar xl av-violet">ĐT</span>
 						<div class="photo-actions">
 							<div class="btn-row">
-								<button type="button" class="btn" data-toast="Chọn ảnh: JPG hoặc PNG, cắt vuông trước khi tải lên"><svg class="icon"><use href="#i-camera"/></svg>Đổi ảnh</button>
+								<button type="button" class="btn" data-toast="Chọn ảnh rồi mở hộp Cắt ảnh như ở Sửa thông tin nhóm"><svg class="icon"><use href="#i-camera"/></svg>Đổi ảnh</button>
 								<button type="button" class="btn-danger-text" data-toast="Đã xoá ảnh, hồ sơ dùng chữ cái đầu">Xoá ảnh</button>
 							</div>
-							<p class="note">JPG hoặc PNG, tối đa 5 MB. Ảnh ban đầu lấy từ tài khoản hoandat, đổi ở đây không ảnh hưởng app khác.</p>
+							<p class="note">JPEG, PNG hoặc WebP, tối đa 5 MB, cắt vuông trước khi tải lên. Ai thấy ảnh đặt ở Quyền riêng tư.</p>
 						</div>
 					</div>
 					<div class="card pad stack">
@@ -91,7 +91,7 @@
 							<div class="choice" role="group" aria-label="Ai thấy trạng thái hoạt động"><button type="button" aria-pressed="false">Mọi người</button><button type="button" aria-pressed="true">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
 						</div>
 						<div class="row opt-row">
-							<span class="grow">Ảnh đại diện</span>
+							<span class="grow">Ảnh đại diện<small>Người không được thấy và người bạn đã chặn chỉ thấy chữ cái đầu.</small></span>
 							<div class="choice" role="group" aria-label="Ai thấy ảnh đại diện"><button type="button" aria-pressed="true">Mọi người</button><button type="button" aria-pressed="false">Danh bạ</button><button type="button" aria-pressed="false">Không ai</button></div>
 						</div>
 					</div>
@@ -116,10 +116,7 @@
 					</div>
 					<div class="card">
 						<h4 class="card-title">Thông báo</h4>
-						<div class="row pad-x">
-							<span class="grow">Xem trước nội dung trong thông báo<small>Tắt thì thông báo chỉ hiện "Bạn có tin nhắn mới"</small></span>
-							<button type="button" class="switch" role="switch" aria-checked="true" aria-label="Xem trước nội dung trong thông báo"></button>
-						</div>
+						<a class="row link-row pad-x" href="#notifications"><span class="grow">Xem trước nội dung trong thông báo<small>Bật, tắt riêng cho chat riêng, nhóm và kênh ở Thông báo</small></span><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></a>
 						<div class="callout pad-x"><svg class="icon icon-sm"><use href="#i-lock"/></svg><p>Thông báo đẩy trên điện thoại đi qua máy chủ của Apple hoặc Google. Khi bật xem trước, nội dung được mã hoá riêng cho từng thiết bị trước khi gửi đi, nên Apple và Google không đọc được.</p></div>
 					</div>
 				</div>

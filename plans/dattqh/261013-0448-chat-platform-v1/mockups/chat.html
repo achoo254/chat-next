@@ -216,6 +216,11 @@ a.btn-primary { color: var(--c-on-primary); }
 .photo-pick:hover { border-color: var(--c-primary); color: var(--c-primary); }
 .name-row { display: flex; align-items: center; gap: var(--space-4); }
 .name-row .field { flex: 1; min-width: 0; }
+.ec-photo { background: linear-gradient(135deg, #5b7cfa, #2bb5a0); }
+.ec-crop { position: relative; width: min(280px, 100%); aspect-ratio: 1; margin-inline: auto; border-radius: var(--radius-md); overflow: hidden; background: linear-gradient(135deg, #5b7cfa, #2bb5a0 60%, #f5b83d); }
+.ec-crop::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.55); outline: 2px solid rgb(255 255 255 / 0.9); }
+.ec-zoom { display: flex; align-items: center; gap: var(--space-3); }
+.ec-zoom input { flex: 1; min-width: 0; }
 .prefix-input { display: flex; align-items: center; min-height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); overflow: hidden; }
 .prefix-input:focus-within { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
 .prefix-input span { padding: 0 var(--space-2) 0 var(--space-3); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; }
@@ -1830,7 +1835,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 <!-- ======================= 10. New group ======================= -->
 <section class="shot" id="new-group">
 	<div class="shot-head"><h2>Tạo nhóm: một màn, tên không bắt buộc</h2><span class="phase">R1 · Phase 2, 12</span>
-		<p>Một hộp duy nhất: ảnh và "Tên nhóm" ở trên (không bắt buộc; để trống thì nhóm lấy tên ba thành viên đầu, ô hiện sẵn tên đó làm gợi ý), ô tìm và danh sách chọn người ở dưới, người đã chọn thành chip (bấm chip để bỏ). Nút chính đếm số người và tắt khi chưa chọn ai. Mở từ hồ sơ một người bằng "Tạo nhóm với người này" thì người đó đã được chọn sẵn (khung phải). Người đặt "Thêm tôi vào nhóm: Danh bạ" chỉ cho những người nằm trong danh bạ của họ thêm vào; nếu bạn không có trong danh bạ của họ, hàng của họ hiện mờ kèm lý do, không lộ thêm gì, và có hai lối khác: "Gửi link mời" (link gửi trong chat riêng khi nhóm được tạo) và "Nhắn riêng". Người còn đặt "Nhắn tin cho tôi: Danh bạ" (như Hoàng Nam) thì "Gửi link mời" bị tắt kèm lý do, thay bằng "Sao chép link": link mời được tạo cùng nhóm và chép sẵn khi bấm Tạo nhóm. Bạn là trưởng nhóm của nhóm mới. "Thành viên mới xem được lịch sử" mặc định bật; trưởng nhóm, phó nhóm đổi được sau trong Quản lý nhóm. "Nhóm có chủ đề" mặc định tắt: bật thì nhóm tạo ra đã chia tin theo chủ đề, có sẵn chủ đề "Chung" (xem màn Nhóm có chủ đề); bật rồi không tắt được, nên công tắc nói rõ điều đó.</p></div>
+		<p>Một hộp duy nhất: ảnh (bấm vòng tròn để chọn ảnh, mở hộp "Cắt ảnh" như ở màn Sửa thông tin nhóm; chọn rồi vòng tròn hiện ảnh, bấm lại để đổi) và "Tên nhóm" ở trên (không bắt buộc; để trống thì nhóm lấy tên ba thành viên đầu, ô hiện sẵn tên đó làm gợi ý), ô tìm và danh sách chọn người ở dưới, người đã chọn thành chip (bấm chip để bỏ). Nút chính đếm số người và tắt khi chưa chọn ai. Mở từ hồ sơ một người bằng "Tạo nhóm với người này" thì người đó đã được chọn sẵn (khung phải). Người đặt "Thêm tôi vào nhóm: Danh bạ" chỉ cho những người nằm trong danh bạ của họ thêm vào; nếu bạn không có trong danh bạ của họ, hàng của họ hiện mờ kèm lý do, không lộ thêm gì, và có hai lối khác: "Gửi link mời" (link gửi trong chat riêng khi nhóm được tạo) và "Nhắn riêng". Người còn đặt "Nhắn tin cho tôi: Danh bạ" (như Hoàng Nam) thì "Gửi link mời" bị tắt kèm lý do, thay bằng "Sao chép link": link mời được tạo cùng nhóm và chép sẵn khi bấm Tạo nhóm. Bạn là trưởng nhóm của nhóm mới. "Thành viên mới xem được lịch sử" mặc định bật; trưởng nhóm, phó nhóm đổi được sau trong Quản lý nhóm. "Nhóm có chủ đề" mặc định tắt: bật thì nhóm tạo ra đã chia tin theo chủ đề, có sẵn chủ đề "Chung" (xem màn Nhóm có chủ đề); bật rồi không tắt được, nên công tắc nói rõ điều đó.</p></div>
 	<div class="frame dlg-frame" data-ghost>
 		<div class="static-dialog pair">
 			<div class="panel" role="group" aria-labelledby="ng1-title">
@@ -2418,7 +2423,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 		<div class="split infos">
 			<aside class="info" aria-label="Thông tin nhóm Vận hành hệ thống">
 				<div class="pane-cap">Nhóm · bạn là phó nhóm</div>
-				<div class="info-head"><span>Thông tin nhóm</span><button type="button" class="icon-btn" aria-label="Đóng cột thông tin"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="info-head"><span>Thông tin nhóm</span><a class="icon-btn" href="#edit-chat" aria-label="Sửa tên, ảnh, mô tả nhóm"><svg class="icon"><use href="#i-edit"/></svg></a><button type="button" class="icon-btn" aria-label="Đóng cột thông tin"><svg class="icon"><use href="#i-x"/></svg></button></div>
 				<div class="info-hero">
 					<span class="avatar lg av-blue">VH</span>
 					<h2>Vận hành hệ thống</h2>
@@ -2459,7 +2464,7 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 
 			<aside class="info" aria-label="Thông tin kênh Thông báo vận hành hệ thống">
 				<div class="pane-cap">Kênh · bạn là chủ kênh</div>
-				<div class="info-head"><span>Thông tin kênh</span><button type="button" class="icon-btn" aria-label="Đóng cột thông tin"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="info-head"><span>Thông tin kênh</span><a class="icon-btn" href="#edit-chat" aria-label="Sửa tên, ảnh, mô tả kênh"><svg class="icon"><use href="#i-edit"/></svg></a><button type="button" class="icon-btn" aria-label="Đóng cột thông tin"><svg class="icon"><use href="#i-x"/></svg></button></div>
 				<div class="info-hero">
 					<span class="avatar lg av-cyan">TT</span>
 					<h2>Thông báo vận hành hệ thống</h2>
@@ -2587,6 +2592,38 @@ cpu_usage: 93% (ngưỡng 90%) trong 5 phút</div>
 	</div>
 </section>
 
+<!-- ======================= Edit chat info ======================= -->
+<section class="shot" id="edit-chat">
+	<div class="shot-head"><h2>Sửa thông tin nhóm, kênh</h2><span class="phase">R9 · Phase 12</span>
+		<p>Nút bút chì cạnh nút đóng ở cột thông tin nhóm, kênh. Chỉ hiện với người được đổi: trưởng nhóm, phó nhóm và thành viên được bật quyền "Đổi tên, ảnh, mô tả nhóm"; kênh thì chủ kênh và admin. Hộp có ảnh, tên, mô tả. "Đổi ảnh" chọn file (JPEG, PNG hoặc WebP, tối đa 5 MB) rồi mở hộp "Cắt ảnh" như ảnh bot ở Console: kéo để đặt, thanh trượt để phóng to, vòng tròn là phần mọi người thấy, "Dùng ảnh này" cắt vuông 640×640 trên máy. "Xoá ảnh" đưa về avatar chữ cái. Bấm "Lưu" mới tải ảnh lên và đổi; tên để trống thì không lưu được. Mỗi thay đổi thành một dòng hệ thống trong chat: "Lan Anh đã đổi ảnh nhóm", "Lan Anh đã xoá ảnh nhóm", "Lan Anh đã đổi tên nhóm thành …". Ảnh nhóm, kênh chỉ thành viên thấy; ảnh mới hiện ngay ở danh sách chat, đầu chat và cột thông tin của mọi thành viên.</p></div>
+	<div class="frame dlg-frame" data-ghost>
+		<div class="static-dialog pair">
+			<div class="panel" role="group" aria-labelledby="ec-title">
+				<div class="dlg-head"><h2 id="ec-title">Sửa thông tin nhóm</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="name-row">
+						<span class="avatar xl ec-photo" aria-hidden="true"></span>
+						<div class="btn-row">
+							<a class="btn" href="#edit-chat-crop"><svg class="icon"><use href="#i-camera"/></svg>Đổi ảnh</a>
+							<button type="button" class="btn-danger-text" data-toast="Ảnh sẽ được xoá khi bấm Lưu">Xoá ảnh</button>
+						</div>
+					</div>
+					<div class="field"><label for="ec-name">Tên nhóm</label><input class="input" id="ec-name" maxlength="128" value="Vận hành hệ thống"></div>
+					<div class="field"><label for="ec-about">Mô tả <span class="muted">(không bắt buộc)</span></label><textarea class="input" id="ec-about" rows="3" maxlength="255">Kênh trực sự cố của đội vận hành. Cảnh báo tự động vào đây.</textarea></div>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã lưu thông tin nhóm">Lưu</button></div>
+			</div>
+			<div class="panel" role="group" aria-labelledby="ec-crop-title" id="edit-chat-crop">
+				<div class="dlg-head"><h2 id="ec-crop-title">Cắt ảnh</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body stack">
+					<div class="ec-crop" aria-label="Kéo để đặt ảnh"></div>
+					<label class="ec-zoom"><span class="sr-only">Phóng to</span><svg class="icon icon-sm"><use href="#i-search"/></svg><input type="range" min="100" max="300" value="140"></label>
+				</div>
+				<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="button" class="btn btn-primary" data-press="Đã chọn ảnh, bấm Lưu để đổi">Dùng ảnh này</button></div>
+			</div>
+		</div>
+	</div>
+</section>
 <!-- ======================= 17. Topics ======================= -->
 <section class="shot" id="topics">
 	<div class="shot-head"><h2>Nhóm có chủ đề</h2><span class="phase">R1 · Phase 2, 6</span>
