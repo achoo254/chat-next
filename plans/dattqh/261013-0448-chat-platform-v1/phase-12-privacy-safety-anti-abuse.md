@@ -83,7 +83,7 @@ Create:
 ## Todo
 
 - [ ] Data inventory + đánh giá ND13 (inventory xong: [`docs/privacy/data-inventory.md`](../../../docs/privacy/data-inventory.md); còn hồ sơ đánh giá chuyển dữ liệu ra nước ngoài)
-- [ ] Cài đặt riêng tư + áp dụng toàn hệ thống (R1: danh bạ tường minh, ai thêm vào nhóm/last seen/nhắn tin; còn hoàn thiện ở R9)
+- [x] Cài đặt riêng tư + áp dụng toàn hệ thống (R1: danh bạ tường minh, ai thêm vào nhóm/last seen/nhắn tin; 2026-10-17: ảnh đại diện người dùng theo luật "Ai thấy ảnh đại diện", ẩn với người bị chặn, ảnh nhóm/kênh chỉ thành viên thấy; công tắc "xem trước trong thông báo" của màn Riêng tư bỏ (Jev 0,95), xem trước đặt theo loại chat ở Thông báo)
 - [x] Giới hạn dò tìm (email khớp chính xác; tài khoản dưới 24 giờ tuổi tìm chậm hơn; 2026-10-16)
 - [x] Chặn/báo cáo/kiểm duyệt + công cụ vận hành (2026-10-16: gộp báo cáo, tín hiệu người gửi, cảnh cáo, tắt webhook, xác minh và xét duyệt bot, nhật ký + CSV; phạm vi chủ tenant làm cùng tenant thứ hai)
 - [x] Chống spam tài khoản/bot/webhook (2026-10-16, migration 0020; gửi hàng loạt của bot mới giới hạn khi có tính năng bulk)
