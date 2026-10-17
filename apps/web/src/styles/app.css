@@ -51,6 +51,7 @@ button { cursor: pointer; }
 	border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-text); font-weight: 500; text-decoration: none;
 	transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
+.btn-danger-text { border: 0; background: none; color: var(--c-error); font-weight: 500; min-height: 44px; padding: 0 var(--space-2); cursor: pointer; }
 .btn:hover { background: var(--c-surface-subtle); border-color: var(--c-border-strong); }
 .btn-primary { background: var(--c-primary-solid); border-color: var(--c-primary-solid); color: var(--c-on-primary); }
 .btn-primary:hover { background: var(--c-primary-solid-hover); border-color: var(--c-primary-solid-hover); }

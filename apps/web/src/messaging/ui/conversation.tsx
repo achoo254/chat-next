@@ -88,6 +88,7 @@ const PinnedBar = lazy(() => import("./pinned-bar.tsx"));
 const InChatSearch = lazy(() => import("../search/in-chat-search.tsx"));
 
 function OfflineBanner({ chatId }: { chatId: number }) {
+	"use no memo";
 	const copy = useCopy();
 	const connection = useConnection();
 	const pending = useWindow(chatId)?.pendingCount ?? 0;
@@ -184,6 +185,7 @@ function ChannelBar({ chatId }: { chatId: number }) {
  * from the list and its messages from this device.
  */
 function LeftBar({ chat }: { chat: Chat }) {
+	"use no memo";
 	const copy = useCopy();
 	const channel = chat.type === "channel";
 	const text =

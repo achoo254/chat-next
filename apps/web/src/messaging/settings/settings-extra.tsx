@@ -155,7 +155,7 @@ function PrivacySettings() {
 			</div>
 			<div className="card">
 				<h2 className="card-title">{t.notifications}</h2>
-				<Link to={paths.settings("notifications")} className="row link-row pad-x">
+				<Link to={paths.settings("notifications")} className="row pad-x row-link">
 					<span className="grow">
 						{t.preview}
 						<small>{t.previewHint}</small>

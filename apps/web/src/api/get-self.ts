@@ -98,6 +98,8 @@ export function parseGetSelf(body: unknown): SelfUser {
 		email: text(user, "email"),
 		isOperator,
 	};
+	const photoId = isRecord(user.photo) ? text(user.photo, "fileId") : "";
+	if (photoId !== "") self.photoId = photoId;
 	const deletion = parseDeletion(body.deletion);
 	return deletion === null ? self : { ...self, deletion };
 }

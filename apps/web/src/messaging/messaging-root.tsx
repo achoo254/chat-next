@@ -33,7 +33,7 @@ import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } 
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
-import { Toast } from "./ui/parts.tsx";
+import { ChatAvatar, Toast } from "./ui/parts.tsx";
 import { forgetSelf } from "../api/offline-self.ts";
 
 // Settings, the console and moderation load when opened, keeping the first
@@ -343,7 +343,12 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			break;
 	}
 	return (
-		<Shell self={self} route={route} nav={<ContactsLink />}>
+		<Shell
+			self={self}
+			route={route}
+			nav={<ContactsLink />}
+			avatar={<ChatAvatar id={self.id} name={self.name} size="sm" photoOf={self.id} photoId={self.photoId} />}
+		>
 			<LoaderBoundary key={route.name}>
 				<Ready parts={parts}>{screen}</Ready>
 			</LoaderBoundary>

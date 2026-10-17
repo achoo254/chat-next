@@ -25,6 +25,8 @@ describe("account route and GetSelf", () => {
 		expect(matchRoute("/settings/account")).toEqual({ name: "settings", tab: "account" });
 		const base = { user: { id: "42", username: "thang_dt", name: "Thắng" } };
 		expect(parseGetSelf(base).deletion).toBeUndefined();
+		expect(parseGetSelf(base).photoId).toBeUndefined();
+		expect(parseGetSelf({ user: { ...base.user, photo: { fileId: "AbC123", kind: "MEDIA_KIND_PHOTO" } } }).photoId).toBe("AbC123");
 		expect(parseGetSelf({ ...base, deletion: { purgeAt: "1800000000", reason: "ACCOUNT_DELETION_REASON_INACTIVE" } }).deletion).toEqual({
 			purgeAt: 1_800_000_000,
 			reason: "inactive",

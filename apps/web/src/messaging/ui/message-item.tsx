@@ -216,6 +216,7 @@ function ViaLine({ botId }: { botId: number }) {
 
 /** The faces of a pill: up to 3 latest people who reacted, newest first, "+N" for the rest. */
 function ReactorAvatars({ ids, more }: { ids: readonly number[]; more: number }) {
+	"use no memo";
 	const { self } = useServices();
 	const nameOf = useNameOf(ids);
 	return (

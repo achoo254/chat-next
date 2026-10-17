@@ -10,17 +10,19 @@ interface ShellProps {
 	route: Route;
 	/** Extra rail links after Chats (the messaging UI adds Contacts). */
 	nav?: ReactNode;
+	/** The user's avatar with their photo (the messaging UI), in place of the initials. */
+	avatar?: ReactNode;
 	children: ReactNode;
 }
 
 /** Signed-in frame: navigation rail plus the active screen. */
-export function Shell({ self, route, nav, children }: ShellProps) {
+export function Shell({ self, route, nav, avatar, children }: ShellProps) {
 	const { t } = useI18n();
 	return (
 		<div className="shell">
 			<nav className="rail" aria-label={t.shell.nav}>
 				<span title={t.shell.account(self.name)}>
-					<Avatar name={self.name} size="sm" />
+					{avatar ?? <Avatar name={self.name} size="sm" />}
 					<span className="sr-only">{t.shell.account(self.name)}</span>
 				</span>
 				<Link to={paths.home} className="icon-btn" current={route.name === "home"} aria-label={t.shell.chats}>
