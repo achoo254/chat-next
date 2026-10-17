@@ -49,10 +49,10 @@ type Hub struct {
 	backend Backend
 	logger  *slog.Logger
 
-	mu        sync.RWMutex
-	byUser    map[int64]map[*conn]struct{}
+	mu     sync.RWMutex
+	byUser map[int64]map[*conn]struct{}
 	// maxUsers caps the people online (SetMaxOnlineUsers); 0: no cap.
-	maxUsers int
+	maxUsers  int
 	bySession map[int64]map[*conn]struct{}
 	closing   bool
 

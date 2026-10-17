@@ -8,6 +8,7 @@ import (
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/media"
 	"app.local/server/internal/privacy"
 	"app.local/server/internal/profile"
 	"app.local/server/internal/store"
@@ -26,7 +27,7 @@ type usersService struct {
 
 // selfUser renders the caller's own user.
 func selfUser(u store.User) *appv1.User {
-	return &appv1.User{
+	out := &appv1.User{
 		Id:       u.ID,
 		Username: u.Username,
 		Name:     u.Name,
@@ -34,6 +35,10 @@ func selfUser(u store.User) *appv1.User {
 		IsSelf:   true,
 		Email:    u.Email,
 	}
+	if u.PhotoID != "" {
+		out.Photo = media.PhotoRef(u.PhotoID)
+	}
+	return out
 }
 
 // GetSelf returns the caller's own user. Without a session it answers
@@ -69,17 +74,14 @@ func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.G
 	return connect.NewResponse(&appv1.GetSelfResponse{User: selfUser(u), IsOperator: s.chat.IsOperator(sess.UserID)}), nil
 }
 
-// UpdateProfile changes the name and/or bio. Profile photos need media
-// uploads, which do not exist yet.
+// UpdateProfile changes the name, bio and/or photo (a photo the caller
+// uploaded; an empty file_id removes it).
 func (s *usersService) UpdateProfile(ctx context.Context, req *connect.Request[appv1.UpdateProfileRequest]) (*connect.Response[appv1.UpdateProfileResponse], error) {
 	sess, err := mustSession(ctx)
 	if err != nil {
 		return nil, err
 	}
 	m := req.Msg
-	if m.PhotoFileId != nil && m.GetPhotoFileId() != "" {
-		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("profile photos are not supported yet"))
-	}
 	var name, bio *string
 	if m.Name != nil {
 		v, err := profile.CleanName(m.GetName())
@@ -94,6 +96,11 @@ func (s *usersService) UpdateProfile(ctx context.Context, req *connect.Request[a
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		bio = &v
+	}
+	if m.PhotoFileId != nil {
+		if err := s.chat.SetProfilePhoto(ctx, sess.UserID, m.GetPhotoFileId()); err != nil {
+			return nil, fail(ctx, s.logger, req.Spec().Procedure, err)
+		}
 	}
 	u, err := s.store.UpdateProfile(ctx, s.tenantID, sess.UserID, name, bio)
 	if err != nil {

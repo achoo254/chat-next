@@ -40,6 +40,8 @@ type User struct {
 	// or "inactive".
 	DeletionRequestedAt *time.Time
 	DeletionReason      string
+	// PhotoID is the file_id of the profile photo ("" without one).
+	PhotoID string
 }
 
 // IdPEmail is the email state the IdP reports; only a verified address is
@@ -85,17 +87,17 @@ func (p IdPProfile) fallbackName() string {
 }
 
 const userColumns = `id, tenant_id, coalesce(idp_sub, ''), username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at,
-	deletion_requested_at, coalesce(deletion_reason, '')`
+	deletion_requested_at, coalesce(deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = photo_file_id), '')`
 
 // qualifiedUserColumns is userColumns for statements that join users (as u)
 // with another relation.
 const qualifiedUserColumns = `u.id, u.tenant_id, coalesce(u.idp_sub, ''), u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at,
-	u.deletion_requested_at, coalesce(u.deletion_reason, '')`
+	u.deletion_requested_at, coalesce(u.deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = u.photo_file_id), '')`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.TenantID, &u.IdPSub, &u.Username, &u.Name, &u.Bio, &u.Email, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt,
-		&u.DeletionRequestedAt, &u.DeletionReason)
+		&u.DeletionRequestedAt, &u.DeletionReason, &u.PhotoID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}

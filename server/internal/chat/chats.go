@@ -14,6 +14,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/ids"
+	"app.local/server/internal/media"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -927,12 +928,9 @@ func (s *Service) SetHistoryVisibility(ctx context.Context, me, chatID int64, vi
 	return t.ack(me, chatID), nil
 }
 
-// UpdateChatInfo changes title, description, default permissions or turns
-// forum topics on.
+// UpdateChatInfo changes title, description, photo, default permissions or
+// turns forum topics on.
 func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.UpdateChatInfoRequest) (*appv1.UpdateChatInfoResponse, error) {
-	if req.PhotoFileId != nil {
-		return nil, errPrecondition("chat photos need media uploads, which are not available yet")
-	}
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
@@ -945,9 +943,9 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 		if c.Type == typePrivate {
 			return errInvalid("private chats have no info to change")
 		}
-		var action *appv1.MessageAction
+		var actions []*appv1.MessageAction
 		changed := false
-		if req.Title != nil || req.About != nil {
+		if req.Title != nil || req.About != nil || req.PhotoFileId != nil {
 			if !c.can(m, permChangeInfo) {
 				return errDenied("you cannot change this chat's info")
 			}
@@ -959,7 +957,23 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 			}
 			if title != c.Title {
 				c.Title, changed = title, true
-				action = &appv1.MessageAction{Kind: &appv1.MessageAction_TitleChanged{TitleChanged: &appv1.ActionTitleChanged{Title: title}}}
+				actions = append(actions, &appv1.MessageAction{Kind: &appv1.MessageAction_TitleChanged{TitleChanged: &appv1.ActionTitleChanged{Title: title}}})
+			}
+		}
+		if req.PhotoFileId != nil && req.GetPhotoFileId() != c.PhotoID {
+			photo, err := ownPhoto(ctx, t.tx, s.cfg.TenantID, me, req.GetPhotoFileId())
+			if err != nil {
+				return err
+			}
+			if _, err := t.tx.Exec(ctx, `UPDATE chats SET photo_file_id = $2 WHERE id = $1`, chatID, photo); err != nil {
+				return fmt.Errorf("chat: set chat photo: %w", err)
+			}
+			c.PhotoID, changed = req.GetPhotoFileId(), true
+			if photo == nil {
+				actions = append(actions, &appv1.MessageAction{Kind: &appv1.MessageAction_PhotoRemoved{PhotoRemoved: &appv1.ActionPhotoRemoved{}}})
+			} else {
+				actions = append(actions, &appv1.MessageAction{Kind: &appv1.MessageAction_PhotoChanged{
+					PhotoChanged: &appv1.ActionPhotoChanged{Photo: media.PhotoRef(c.PhotoID)}}})
 			}
 		}
 		if req.About != nil {
@@ -1010,7 +1024,7 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 			chatID, c.Title, c.About, int32(c.DefaultPerms), c.Forum); err != nil {
 			return fmt.Errorf("chat: update chat info: %w", err)
 		}
-		return t.chatChanged(ctx, c, me, action)
+		return t.chatChanged(ctx, c, me, actions...)
 	})
 	if err != nil {
 		return nil, err
@@ -1022,14 +1036,14 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 	return &appv1.UpdateChatInfoResponse{Chat: chat, Ack: t.ack(me, chatID)}, nil
 }
 
-// chatChanged posts an optional service message and chat_updated.
-func (t *txn) chatChanged(ctx context.Context, c *chatRow, actor int64, action *appv1.MessageAction) error {
+// chatChanged posts a service message per action and chat_updated.
+func (t *txn) chatChanged(ctx context.Context, c *chatRow, actor int64, actions ...*appv1.MessageAction) error {
 	members, err := activeMembers(ctx, t.tx, c.ID)
 	if err != nil {
 		return err
 	}
 	ev := t.event(kindChatUpdated, c.ID, actor)
-	if action != nil {
+	for _, action := range actions {
 		if _, err := t.postMessage(ctx, ev, c, members, newMessage{fromID: actor, content: &appv1.Message{Action: action}}); err != nil {
 			return err
 		}

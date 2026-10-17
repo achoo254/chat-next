@@ -147,7 +147,7 @@ func TestProfileRPCs(t *testing.T) {
 		t.Fatalf("clear bio = %v, %v", u, err)
 	}
 	photo := "file-1"
-	if _, err := alice.users.UpdateProfile(ctx, connect.NewRequest(&appv1.UpdateProfileRequest{PhotoFileId: &photo})); codeOf(err) != connect.CodeUnimplemented {
+	if _, err := alice.users.UpdateProfile(ctx, connect.NewRequest(&appv1.UpdateProfileRequest{PhotoFileId: &photo})); codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("photo: %v", err)
 	}
 	got, err := alice.users.GetUsers(ctx, connect.NewRequest(&appv1.GetUsersRequest{UserIds: []int64{u.GetId(), 999999}}))

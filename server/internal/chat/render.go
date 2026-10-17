@@ -70,11 +70,14 @@ type chatRow struct {
 	LastMessageAt time.Time
 	// Private chats: the two participants.
 	UserLow, UserHigh int64
+	// PhotoID is the file_id of the group's or channel's photo ("" without one).
+	PhotoID string
 }
 
 const chatColumns = `c.id, c.tenant_id, c.type, c.title, c.about, c.creator_id, c.sync_mode, c.history_visibility,
 	c.default_permissions, c.forum, c.last_seq, c.chat_pts, c.last_topic_id, c.member_count, c.pinned_seq, c.created_at,
-	c.last_message_at, coalesce(p.user_low, 0), coalesce(p.user_high, 0)`
+	c.last_message_at, coalesce(p.user_low, 0), coalesce(p.user_high, 0),
+	coalesce((SELECT cf.public_id FROM files cf WHERE cf.id = c.photo_file_id), '')`
 
 const chatFrom = `chats c LEFT JOIN private_chats p ON p.chat_id = c.id`
 
@@ -83,7 +86,7 @@ func scanChat(row pgx.Row) (*chatRow, error) {
 	var perms int32
 	err := row.Scan(&c.ID, &c.TenantID, &c.Type, &c.Title, &c.About, &c.CreatorID, &c.SyncMode, &c.HistoryVisibility,
 		&perms, &c.Forum, &c.LastSeq, &c.ChatPts, &c.LastTopicID, &c.MemberCount, &c.PinnedSeq, &c.CreatedAt,
-		&c.LastMessageAt, &c.UserLow, &c.UserHigh)
+		&c.LastMessageAt, &c.UserLow, &c.UserHigh, &c.PhotoID)
 	c.DefaultPerms = uint32(perms)
 	return c, err
 }
@@ -229,6 +232,10 @@ func (c *chatRow) render(viewer int64, m *memberRow) *appv1.Chat {
 		out.Title, out.About = "", ""
 		out.PeerUserId = c.peerOf(viewer)
 	}
+	// Only members fetch the photo (chat_photo_of).
+	if c.PhotoID != "" && c.Type != typePrivate && m.active() {
+		out.Photo = media.PhotoRef(c.PhotoID)
+	}
 	if m.active() {
 		out.MyRole = memberRoles[m.Role]
 	}
@@ -296,6 +303,34 @@ type userRow struct {
 	Deleted bool
 	// PhotoID is the file_id of the profile photo ("" without one).
 	PhotoID string
+	// photoSeenBy: viewers the owner's privacy shows a person's photo to
+	// (seePhotos); bots' photos everyone sees.
+	photoSeenBy map[int64]bool
+}
+
+// seePhotos records which viewers may see the photos of users: wanted
+// lists, per viewer, the users they will render.
+func seePhotos(ctx context.Context, q querier, users map[int64]*userRow, wanted map[int64][]int64) error {
+	var pairs []photoPair
+	for viewer, ids := range wanted {
+		for _, id := range ids {
+			if u := users[id]; u != nil && u.PhotoID != "" && !u.IsBot && id != viewer {
+				pairs = append(pairs, photoPair{owner: id, viewer: viewer})
+			}
+		}
+	}
+	seen, err := photoSeen(ctx, q, pairs)
+	if err != nil {
+		return err
+	}
+	for p := range seen {
+		u := users[p.owner]
+		if u.photoSeenBy == nil {
+			u.photoSeenBy = map[int64]bool{}
+		}
+		u.photoSeenBy[p.viewer] = true
+	}
+	return nil
 }
 
 func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (map[int64]*userRow, error) {
@@ -331,8 +366,7 @@ func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
 	}
 	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked,
 		IsBot: u.IsBot, BotInlinePlaceholder: u.InlinePlaceholder}
-	// Only bots have photos so far (people's need the profile_photo rule).
-	if u.PhotoID != "" && u.IsBot {
+	if u.PhotoID != "" && (u.IsBot || u.ID == viewer || u.photoSeenBy[viewer]) {
 		out.Photo = media.PhotoRef(u.PhotoID)
 	}
 	if u.ID == viewer {
@@ -763,6 +797,15 @@ func (e *entitySet) render(ctx context.Context, q querier, tenantID string) (*re
 	}
 	members, err := loadMembers(ctx, q, chatIDs, viewers)
 	if err != nil {
+		return nil, err
+	}
+	wanted := map[int64][]int64{}
+	for v, set := range e.users {
+		for id := range set {
+			wanted[v] = append(wanted[v], id)
+		}
+	}
+	if err := seePhotos(ctx, q, users, wanted); err != nil {
 		return nil, err
 	}
 	out := &renderedEntities{users: map[int64][]*appv1.User{}, chats: map[int64][]*appv1.Chat{}}

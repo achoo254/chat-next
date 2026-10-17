@@ -257,6 +257,9 @@ func (s *Service) usersWithStatus(ctx context.Context, me int64, ids []int64) ([
 	if err != nil {
 		return nil, err
 	}
+	if err := seePhotos(ctx, s.pool, users, map[int64][]int64{me: ids}); err != nil {
+		return nil, err
+	}
 	contacts, err := listedBy(ctx, s.pool, me, ids)
 	if err != nil {
 		return nil, err

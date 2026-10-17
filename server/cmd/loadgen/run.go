@@ -52,7 +52,9 @@ func percentile(sorted []time.Duration, p float64) time.Duration {
 	return sorted[i]
 }
 
-func ms(d time.Duration) string { return strconv.FormatFloat(float64(d)/float64(time.Millisecond), 'f', 1, 64) }
+func ms(d time.Duration) string {
+	return strconv.FormatFloat(float64(d)/float64(time.Millisecond), 'f', 1, 64)
+}
 
 // rssMB is the resident memory of process pid (ps works on macOS and Linux).
 func rssMB(pid int) string {

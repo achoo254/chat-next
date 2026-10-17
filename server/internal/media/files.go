@@ -167,6 +167,10 @@ func LockFile(ctx context.Context, tx Querier, tenant, publicID string) (*File, 
 // reaches (it would be the last local id of the last shard).
 const PhotoChat = 1<<53 - 1
 
+// ChatPhotoChat is the chat id of download grants for a group's or
+// channel's photo (their seq is the chat), next below PhotoChat.
+const ChatPhotoChat = PhotoChat - 1
+
 // PhotoRef is a profile photo as clients see it: they fetch it with
 // GetFileUrl's user_photo_of context, in the size they show.
 func PhotoRef(fileID string) *appv1.MediaRef {

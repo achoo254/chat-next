@@ -116,12 +116,12 @@ type Bot struct {
 	// InlinePlaceholder is the composer hint of inline mode; "" is off.
 	InlinePlaceholder string
 	// PhotoID is the file_id of the bot's photo; "" without one.
-	PhotoID string
-	Verified          bool
-	Internal          bool
-	Commands          []CommandSet
-	CreatedAt         time.Time
-	TokenIssuedAt     *time.Time
+	PhotoID       string
+	Verified      bool
+	Internal      bool
+	Commands      []CommandSet
+	CreatedAt     time.Time
+	TokenIssuedAt *time.Time
 	// LastUpdateAt is when the bot last asked for updates (RecordUpdateFetch);
 	// nil when it never did.
 	LastUpdateAt *time.Time

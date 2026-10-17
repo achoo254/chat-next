@@ -293,7 +293,7 @@ func (s *Service) Erase(ctx context.Context, userID int64) error {
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE users SET username = $2, name = '', bio = '', email = NULL, email_verified = false, idp_sub = NULL,
-				last_seen_at = NULL, auto_delete_months = 0, deleted_at = now(), updated_at = now()
+				last_seen_at = NULL, auto_delete_months = 0, photo_file_id = NULL, deleted_at = now(), updated_at = now()
 			WHERE id = $1`, userID, name); err != nil {
 			return fmt.Errorf("privacy: erase profile: %w", err)
 		}
