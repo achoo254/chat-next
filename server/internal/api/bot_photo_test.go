@@ -58,6 +58,12 @@ func TestBotPhoto(t *testing.T) {
 	if err != nil || resolved.Msg.GetUser().GetPhoto().GetFileId() != photo.GetFileId() {
 		t.Fatalf("resolve: %v, %v", resolved, err)
 	}
+	// The bot's profile (the composer and the bot link use it) carries it too.
+	viewerBots := appv1connect.NewBotsServiceClient(other.http, e.srv.URL+"/rpc", opt)
+	info, err := viewerBots.GetBotInfo(ctx, connect.NewRequest(&appv1.GetBotInfoRequest{BotId: botID}))
+	if err != nil || info.Msg.GetUser().GetPhoto().GetFileId() != photo.GetFileId() {
+		t.Fatalf("bot info: %v, %v", info, err)
+	}
 	photoURL := func(user int64, fileID string) *appv1.FileUrlResult {
 		t.Helper()
 		resp, err := other.media(e.env).GetFileUrls(ctx, connect.NewRequest(&appv1.GetFileUrlsRequest{Requests: []*appv1.GetFileUrlRequest{{

@@ -35,10 +35,8 @@ export function BotPhotoField({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: Ow
 		if (file.size > MAX_BYTES) return setError(t.tooBig);
 		const url = URL.createObjectURL(file);
 		const image = new Image();
-		image.onload = () => {
-			URL.revokeObjectURL(url);
-			setCropping(image);
-		};
+		// The URL stays valid while the crop dialog shows the image.
+		image.onload = () => setCropping(image);
 		image.onerror = () => {
 			URL.revokeObjectURL(url);
 			setError(t.unreadable);
@@ -100,7 +98,17 @@ export function BotPhotoField({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: Ow
 					}}
 				/>
 			</div>
-			{cropping !== null && <CropDialog bot={bot} image={cropping} onSaved={onSaved} onClose={() => setCropping(null)} />}
+			{cropping !== null && (
+				<CropDialog
+					bot={bot}
+					image={cropping}
+					onSaved={onSaved}
+					onClose={() => {
+						URL.revokeObjectURL(cropping.src);
+						setCropping(null);
+					}}
+				/>
+			)}
 			{removing !== null && (
 				<ConfirmDialog
 					title={t.removeTitle(bot.name)}

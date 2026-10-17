@@ -305,10 +305,19 @@ func (s *Service) Live(ctx context.Context, botID int64) (*Bot, error) {
 	return b, nil
 }
 
+// User is the bot's user as everyone sees it: name, inline mode hint and photo.
+func (b *Bot) User() *appv1.User {
+	u := &appv1.User{Id: b.ID, Username: b.Username, Name: b.Name, IsBot: true, BotInlinePlaceholder: b.InlinePlaceholder}
+	if b.PhotoID != "" {
+		u.Photo = media.PhotoRef(b.PhotoID)
+	}
+	return u
+}
+
 // Render returns the bot for its owner.
 func (b *Bot) Render() *appv1.Bot {
 	out := &appv1.Bot{
-		User:        &appv1.User{Id: b.ID, Username: b.Username, Name: b.Name, IsBot: true},
+		User:        b.User(),
 		Description: b.Description, About: b.About, Privacy: b.Privacy,
 		Tier: appv1.BotTier_BOT_TIER_DEFAULT, HasToken: b.tokenHash != nil, CreatedAt: b.CreatedAt.Unix(),
 	}
@@ -319,10 +328,6 @@ func (b *Bot) Render() *appv1.Bot {
 	out.LastUpdateAt = b.lastUpdateUnix()
 	out.Webhook = b.Webhook
 	out.InlinePlaceholder = b.InlinePlaceholder
-	out.User.BotInlinePlaceholder = b.InlinePlaceholder
-	if b.PhotoID != "" {
-		out.User.Photo = media.PhotoRef(b.PhotoID)
-	}
 	for _, set := range b.Commands {
 		out.Commands = append(out.Commands, renderSet(set))
 	}
@@ -921,7 +926,7 @@ func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) 
 		return nil, err
 	}
 	resp := &appv1.GetBotInfoResponse{
-		User:        &appv1.User{Id: b.ID, Username: b.Username, Name: b.Name, IsBot: true},
+		User:        b.User(),
 		Description: b.Description, About: b.About,
 	}
 	if b.OwnerID == caller {

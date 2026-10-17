@@ -83,4 +83,9 @@ func TestInlineQueryOverRPC(t *testing.T) {
 	if err != nil || resolved.Msg.GetUser().GetBotInlinePlaceholder() != "Tìm…" {
 		t.Fatalf("resolve: %v, %v", resolved, err)
 	}
+	// The web looks the bot up with GetBotInfo before showing inline results.
+	info, err := bots.GetBotInfo(ctx, connect.NewRequest(&appv1.GetBotInfoRequest{BotId: botID}))
+	if err != nil || info.Msg.GetUser().GetBotInlinePlaceholder() != "Tìm…" {
+		t.Fatalf("bot info: %v, %v", info, err)
+	}
 }
