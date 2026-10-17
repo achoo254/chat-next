@@ -276,7 +276,7 @@ const (
 // errors, certificate), and in the main tenant's process those of the
 // machine (memory, disk, backups, the other tenants' processes).
 func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookSvc *hooks.Service, logger *slog.Logger) *watch.Watcher {
-	checks := []watch.Check{watch.Outbox(st.Pool(), time.Now), watch.Errors(watch.Process)}
+	checks := []watch.Check{watch.Outbox(st.Pool(), cfg.TenantID, []string{chatSvc.CursorName("bots"), chatSvc.CursorName("push")}, time.Now), watch.Errors(watch.Process)}
 	if cfg.PublicURL != nil && cfg.PublicURL.Scheme == "https" {
 		checks = append(checks, watch.Cert(cfg.PublicURL.Hostname(), time.Now))
 	}

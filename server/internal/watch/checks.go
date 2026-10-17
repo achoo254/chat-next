@@ -232,13 +232,15 @@ func envValue(path, key string) string {
 	return v
 }
 
-// Outbox reports updates waiting longer than two minutes for a consumer
-// (realtime, push, bot updates).
-func Outbox(pool *pgxpool.Pool, now func() time.Time) Check {
+// Outbox reports updates of tenant waiting longer than two minutes for one
+// of its consumers (the outbox_cursors rows named in consumers). Tenants
+// share the outbox and each consumer reads its own tenant's rows only, so
+// another tenant's rows past a cursor wait for nobody.
+func Outbox(pool *pgxpool.Pool, tenant string, consumers []string, now func() time.Time) Check {
 	return func(ctx context.Context) ([]Problem, error) {
 		rows, err := pool.Query(ctx, `
-			SELECT c.consumer, (SELECT o.created_at FROM outbox o WHERE o.id > c.last_id ORDER BY o.id LIMIT 1)
-			FROM outbox_cursors c`)
+			SELECT c.consumer, (SELECT o.created_at FROM outbox o WHERE o.id > c.last_id AND o.tenant_id = $1 ORDER BY o.id LIMIT 1)
+			FROM outbox_cursors c WHERE c.consumer = ANY($2)`, tenant, consumers)
 		if err != nil {
 			return nil, fmt.Errorf("watch: outbox: %w", err)
 		}
