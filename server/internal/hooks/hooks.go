@@ -282,3 +282,35 @@ func cleanName(name string) (string, error) {
 	}
 	return name, nil
 }
+
+// PostAlertmanager posts an Alertmanager webhook payload through hook id
+// as if the hook had received it: the server's own alerts (package watch),
+// without a URL or secret.
+func (s *Service) PostAlertmanager(ctx context.Context, id string, body []byte) error {
+	n, err := format.Parse(format.Alertmanager, "application/json", body, s.opts)
+	if err != nil {
+		return err
+	}
+	h, err := s.loadHook(ctx, s.pool, id, false)
+	if err != nil {
+		return err
+	}
+	if h == nil {
+		return errNotFound()
+	}
+	_, err = s.deliver(ctx, h, n)
+	return err
+}
+
+// Active reports whether hook id exists and posts.
+func (s *Service) Active(ctx context.Context, id string) (bool, error) {
+	var state string
+	err := s.pool.QueryRow(ctx, `SELECT state FROM incoming_hooks WHERE id = $1 AND tenant_id = $2`, id, s.cfg.TenantID).Scan(&state)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("hooks: hook state: %w", err)
+	}
+	return state == "active", nil
+}

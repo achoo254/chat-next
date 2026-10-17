@@ -23,6 +23,7 @@ import (
 	"app.local/server/internal/config"
 	"app.local/server/internal/logging/redact"
 	"app.local/server/internal/store"
+	"app.local/server/internal/watch"
 )
 
 // Roles are the processes the binary can run.
@@ -52,7 +53,8 @@ func run(args []string, stderr io.Writer) int {
 			return 1
 		}
 	}
-	logger := slog.New(slog.NewJSONHandler(stderr, redact.HandlerOptions(slog.LevelInfo))).With("role", *role)
+	// The watchdog counts this process's error records (package watch).
+	logger := slog.New(watch.Process.Handler(slog.NewJSONHandler(stderr, redact.HandlerOptions(slog.LevelInfo)))).With("role", *role)
 	ctx := context.Background()
 
 	switch *role {

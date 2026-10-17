@@ -106,7 +106,7 @@ Giai đoạn 2 (bắt đầu khi chạm ngưỡng chuyển):
 - [ ] GĐ1: staging trên `.65` + đo RAM nền
 - [ ] GĐ1: pm2/nginx + Postgres/WAL/PITR + Redis/Meilisearch loopback + S3 ngoài máy (xong: pm2, nginx, TLS, Postgres dùng chung + pg_dump hằng ngày; còn WAL/PITR, Redis, Meilisearch, S3)
 - [ ] GĐ1: secret + credentials API nội bộ IdP + host/chứng chỉ theo tenant
-- [ ] GĐ1: tracing + RUM + dashboard/alert (gồm RAM)
+- [ ] GĐ1: tracing + RUM + dashboard/alert (gồm RAM) (2026-10-17: watchdog trong `chat-api` báo vào nhóm "Vận hành chat" qua incoming hook: outbox dồn, lỗi log, chứng chỉ, RAM, ổ đĩa, backup, tenant khác; Jev 0,99/0,96; cảnh báo cấp máy và "chat sập" đặt ở OneDash; còn tracing, RUM, dashboard)
 - [ ] GĐ1: canary + CI/CD + runbook (xong: CI/CD tự deploy từ main qua user `chat-deploy`, smoke + tự rollback, runbook `docs/deployment-guide.md`; còn canary)
 - [ ] GĐ2: chart theo role + autoscale
 - [ ] GĐ2: Postgres HA quorum + Redis/Meilisearch/S3/CDN HA

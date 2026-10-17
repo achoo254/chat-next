@@ -40,6 +40,7 @@ import (
 	"app.local/server/internal/rpc"
 	"app.local/server/internal/safehttp"
 	"app.local/server/internal/store"
+	"app.local/server/internal/watch"
 	"app.local/server/internal/webpush"
 )
 
@@ -246,7 +247,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 			})
 		},
 	}
-	loops = append(loops, bulk.Run)
+	loops = append(loops, bulk.Run, newWatcher(cfg, st, chatSvc, hookSvc, logger).Run)
 	if assistantSvc != nil {
 		loops = append(loops, assistantSvc.Run)
 	}
@@ -262,6 +263,35 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		}()
 	}
 	return app, nil
+}
+
+// Production layout of the shared server (infra/chat): the watchdog checks
+// these when they exist.
+const (
+	backupDir  = "/opt/chat/backups"
+	tenantsDir = "/opt/chat/tenants"
+)
+
+// newWatcher sets up the watchdog: problems of this tenant (outbox, log
+// errors, certificate), and in the main tenant's process those of the
+// machine (memory, disk, backups, the other tenants' processes).
+func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookSvc *hooks.Service, logger *slog.Logger) *watch.Watcher {
+	checks := []watch.Check{watch.Outbox(st.Pool(), time.Now), watch.Errors(watch.Process)}
+	if cfg.PublicURL != nil && cfg.PublicURL.Scheme == "https" {
+		checks = append(checks, watch.Cert(cfg.PublicURL.Hostname(), time.Now))
+	}
+	if cfg.TenantID == config.DefaultTenantID {
+		disks := []string{"/"}
+		if cfg.Media != nil && cfg.Media.Root != "" {
+			disks = append(disks, cfg.Media.Root)
+		}
+		checks = append(checks, watch.Memory(), watch.Disk(disks...), watch.Backup(backupDir, time.Now),
+			watch.Tenants(tenantsDir, &http.Client{Timeout: 10 * time.Second}))
+	}
+	return watch.New(watch.Config{
+		TenantID: cfg.TenantID, Operators: cfg.OperatorUserIDs, Pool: st.Pool(),
+		Chats: chatSvc, Hooks: hookSvc, Checks: checks, Logger: logger.With("component", "watch"),
+	})
 }
 
 // newPush sets up Web Push: off (registrations refused, no consumer)

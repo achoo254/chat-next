@@ -128,6 +128,22 @@ Host `chat.<domain>` để Proxied qua Cloudflare thì phải dùng SSL Full ho�
 
 Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` trong file của tenant (user id của chính tenant đó). Log nằm ở `/var/log/chat/api-<id>.*.log`.
 
+## Cảnh báo vận hành (watchdog)
+
+`chat-api` tự kiểm mỗi phút ([`server/internal/watch`](../server/internal/watch)). Một vấn đề phải còn ở hai lần kiểm liên tiếp mới báo, nên lúc deploy khởi động lại sẽ không báo nhầm. Cảnh báo vào nhóm **"Vận hành chat"**: lần đầu có vấn đề, watchdog tự tạo nhóm với operator đầu tiên trong `CHAT_OPERATOR_USER_IDS` làm trưởng nhóm, kèm nguồn cảnh báo "Giám sát" kiểu Alertmanager. Tin báo đổi tại chỗ từ firing sang resolved. Operator khác vào nhóm bằng link mời. Không có operator thì cảnh báo chỉ ghi vào log (`watch: alert firing`).
+
+| Cảnh báo | Kiểm | Ngưỡng |
+|---|---|---|
+| `OutboxBacklog` | update chờ một consumer (realtime, push, bot) | quá 2 phút |
+| `ErrorsInLog` | bản ghi mức ERROR của process | từ 10 trong 5 phút |
+| `CertExpiring` | chứng chỉ TLS của host tenant | dưới 14 ngày (dưới 3 ngày: critical) |
+| `MemoryLow` | RAM khả dụng của máy (chỉ process tenant chính) | dưới 30% (dưới 15%: critical) |
+| `DiskLow` | ổ chứa `/` và `MEDIA_ROOT` (chỉ tenant chính) | dưới 15% trống (dưới 5%: critical) |
+| `BackupStale` | bản mới nhất trong `/opt/chat/backups` (chỉ tenant chính) | cũ hơn 26 giờ |
+| `TenantDown` | `/healthz` của từng tenant trong `/opt/chat/tenants` (chỉ tenant chính) | không trả lời 200 |
+
+Watchdog không báo được khi chính `chat-api` sập. Cảnh báo cấp máy và "chat không trả lời" từ bên ngoài đặt trong OneDash (máy đã có `onedash-agent`, `vmagent`). Trạng thái cảnh báo nằm ở bảng `ops_alerts`, nguồn cảnh báo ở `ops_alert_hooks`.
+
 ## Kiểm tra sau deploy
 
 `infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`, `GET /bot/v1/me` không token trả 401 `unauthorized`; khi đã cấu hình media: `https://media-chat.hoandat.com/healthz` báo `"storage":"reachable"`, `/f/<token sai>` trả 404 có `nosniff` và không `Set-Cookie`, route của app trên host media trả 404 (chưa cấu hình thì bỏ qua và in thông báo). Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).
