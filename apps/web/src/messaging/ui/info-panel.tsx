@@ -322,12 +322,13 @@ function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }
 	const ui = useUi();
 	const { store } = useServices();
 	const known = usePresence(isBot || userId === store.selfId ? 0 : userId);
+	const member = useUser(isBot ? userId : 0);
 	const text = usePresenceText(known, copy);
 	const online = presence || known?.kind === "online";
 	const label = isBot ? copy.info.bot : userId === store.selfId ? copy.info.online : text;
 	return (
 		<button type="button" className="row member-row" onClick={() => ui.dialog.set({ kind: "profile", userId })}>
-			<ChatAvatar id={userId} name={avatarName} size="sm" bot={isBot} online={online && !isBot} />
+			<ChatAvatar id={userId} name={avatarName} size="sm" bot={isBot} online={online && !isBot} photoOf={isBot ? userId : 0} photoId={member?.photoId} />
 			<span className="grow">
 				{name}
 				<small className={online && !isBot ? "on" : undefined}>{label}</small>
@@ -487,7 +488,7 @@ function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined
 		<aside className="info" aria-label={title}>
 			<InfoHead title={title} />
 			<div className="info-hero">
-				<ChatAvatar id={chat.id} name={name} size="lg" bot={bot} online={online} />
+				<ChatAvatar id={chat.id} name={name} size="lg" bot={bot} online={online} photoOf={bot ? chat.peerUserId : 0} photoId={peer?.photoId} />
 				<h2>{name}</h2>
 				<span className={online ? "muted on" : "muted"}>{bot ? copy.info.botLine(peer?.username ?? "") : presenceLabel}</span>
 				{peer !== undefined && peer.bio !== "" && <p>{peer.bio}</p>}

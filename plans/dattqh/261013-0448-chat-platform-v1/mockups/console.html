@@ -32,6 +32,14 @@
 .c-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); display: grid; gap: var(--space-4); align-content: start; }
 .c-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .c-title h3 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.photo-row { display: flex; align-items: center; gap: var(--space-4); }
+.photo-row .avatar.xl { width: 72px; height: 72px; font-size: 1.5rem; }
+.photo-row .photo-actions { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.photo-row .photo-actions > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.crop-stage { position: relative; width: min(320px, 100%); aspect-ratio: 1; margin-inline: auto; border-radius: var(--radius-md); overflow: hidden; background: linear-gradient(135deg, #5b7cfa, #9b5de5 60%, #f15bb5); touch-action: none; }
+.crop-stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.55); outline: 2px solid rgb(255 255 255 / 0.9); }
+.crop-zoom { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.crop-zoom input { flex: 1; min-width: 0; }
 .c-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
 .card { display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-5); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
 .card > h4 { margin: 0; font-size: 1rem; font-weight: 600; }
@@ -326,6 +334,73 @@ tr[aria-busy="true"] td { color: var(--c-text-muted); }
 		</div>
 	</div>
 </section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="bot-photo">
+	<div class="shot-head">
+		<h2>Ảnh của bot</h2><span class="phase">Phase 15</span>
+		<p>Tab Hồ sơ của bot có ô ảnh trên cùng: chưa có ảnh thì hiện avatar chữ cái như hiện nay và nút "Chọn ảnh"; có ảnh thì "Đổi ảnh" và "Xoá ảnh". Chọn file (JPEG, PNG hoặc WebP, tối đa 5 MB) mở hộp "Cắt ảnh": kéo để đặt, thanh trượt để phóng to; vòng tròn là phần mọi người thấy. "Lưu ảnh" cắt vuông 640×640 trên máy rồi tải lên; ảnh mới hiện ngay ở danh sách chat, đầu chat, tin của bot và Console. Xoá ảnh hỏi lại một lần. Ảnh bot ai trong tổ chức cũng thấy (bot không có cài đặt riêng tư). Chỉ có ở Console; ảnh người dùng và nhóm làm sau.</p>
+	</div>
+	<div class="frame">
+		<div class="console">
+			<header class="c-head">
+				<a class="icon-btn" href="#bots-list" aria-label="Về Bot của tôi"><svg class="icon"><use href="#i-back"/></svg></a>
+				<span class="crumbs">Developer Console <svg class="icon"><use href="#i-chevron-right"/></svg> <b>Báo cáo Bot</b></span>
+				<span class="who-chip"><span class="avatar sm av-violet">ĐT</span>Đức Thắng · hoandat.com</span>
+			</header>
+			<div class="c-body">
+				<div class="c-grid">
+					<form class="card form" onsubmit="return false" novalidate>
+						<h4>Hồ sơ</h4>
+						<div class="field">
+							<span class="label">Ảnh</span>
+							<div class="photo-row">
+								<span class="avatar xl av-amber"><svg class="icon"><use href="#i-robot"/></svg></span>
+								<div class="photo-actions">
+									<div>
+										<button type="button" class="btn btn-sm" data-toast="Mở hộp chọn file">Chọn ảnh</button>
+									</div>
+									<span class="hint">JPEG, PNG hoặc WebP, tối đa 5 MB. Ảnh được cắt vuông.</span>
+								</div>
+							</div>
+						</div>
+						<div class="field">
+							<label for="bp-name">Tên hiển thị</label>
+							<input class="input" id="bp-name" value="Báo cáo Bot" autocomplete="off">
+						</div>
+					</form>
+					<div class="card">
+						<h4>Có ảnh</h4>
+						<div class="photo-row">
+							<span class="avatar xl" style="background: linear-gradient(135deg, #5b7cfa, #9b5de5 60%, #f15bb5)" role="img" aria-label="Ảnh của Báo cáo Bot"></span>
+							<div class="photo-actions">
+								<div>
+									<button type="button" class="btn btn-sm" data-toast="Mở hộp chọn file">Đổi ảnh</button>
+									<button type="button" class="btn btn-sm btn-danger-text" data-toast="Hỏi lại: Xoá ảnh của Báo cáo Bot?">Xoá ảnh</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="static-dialog">
+			<div class="panel" role="group" aria-labelledby="bp-crop-title">
+				<div class="dlg-head"><h2 id="bp-crop-title">Cắt ảnh</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+				<div class="dlg-body">
+					<div class="crop-stage" role="img" aria-label="Ảnh đang cắt; kéo để đặt"></div>
+					<label class="crop-zoom"><svg class="icon icon-sm"><use href="#i-search"/></svg><span class="sr-only">Phóng to</span><input type="range" min="1" max="4" step="0.01" value="1.4"></label>
+					<p class="hint">Kéo để đặt ảnh; vòng tròn là phần mọi người thấy.</p>
+				</div>
+				<div class="dlg-foot">
+					<button type="button" class="btn">Huỷ</button>
+					<button type="button" class="btn btn-primary" data-toast="Đã lưu ảnh">Lưu ảnh</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
 
 <!-- ===================================================================== -->
 <section class="shot" id="token">
@@ -646,7 +721,7 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 	const { $, $$, toast, escapeHtml } = window.Mock;
 
 	// Bot section tabs, shared by every bot-level screen (each tab links to its shot).
-	const TABS = [["create-bot", "Hồ sơ"], ["token", "Token"], ["webhook", "Nhận update"], ["dead-letter", "Update lỗi"], ["stats", "Số liệu"], ["commands-editor", "Lệnh"], ["mini-app-settings", "Mini App"]];
+	const TABS = [["create-bot", "Hồ sơ"], ["bot-photo", "Ảnh"], ["token", "Token"], ["webhook", "Nhận update"], ["dead-letter", "Update lỗi"], ["stats", "Số liệu"], ["commands-editor", "Lệnh"], ["mini-app-settings", "Mini App"]];
 	$$(".c-tabs").forEach((nav) => {
 		nav.innerHTML = TABS.map(([id, label]) => `<a href="#${id}"${id === nav.dataset.active ? ' aria-current="page"' : ""}>${label}</a>`).join("");
 	});

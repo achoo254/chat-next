@@ -630,8 +630,11 @@ type UpdateBotRequest struct {
 	// Turns inline mode on with this hint (1 to 64 characters), or off with
 	// an empty string.
 	InlinePlaceholder *string `protobuf:"bytes,7,opt,name=inline_placeholder,json=inlinePlaceholder,proto3,oneof" json:"inline_placeholder,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// file_id of a photo the owner uploaded (MediaService): the bot's profile
+	// photo, seen by everyone in the tenant; an empty string removes it.
+	PhotoFileId   *string `protobuf:"bytes,8,opt,name=photo_file_id,json=photoFileId,proto3,oneof" json:"photo_file_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateBotRequest) Reset() {
@@ -709,6 +712,13 @@ func (x *UpdateBotRequest) GetCommands() *BotCommandSets {
 func (x *UpdateBotRequest) GetInlinePlaceholder() string {
 	if x != nil && x.InlinePlaceholder != nil {
 		return *x.InlinePlaceholder
+	}
+	return ""
+}
+
+func (x *UpdateBotRequest) GetPhotoFileId() string {
+	if x != nil && x.PhotoFileId != nil {
+		return *x.PhotoFileId
 	}
 	return ""
 }
@@ -1928,7 +1938,7 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"2\n" +
 	"\x11CreateBotResponse\x12\x1d\n" +
-	"\x03bot\x18\x01 \x01(\v2\v.app.v1.BotR\x03bot\"\xd5\x02\n" +
+	"\x03bot\x18\x01 \x01(\v2\v.app.v1.BotR\x03bot\"\x90\x03\n" +
 	"\x10UpdateBotRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
@@ -1936,13 +1946,15 @@ const file_app_v1_bot_admin_proto_rawDesc = "" +
 	"\x05about\x18\x04 \x01(\tH\x02R\x05about\x88\x01\x01\x12\x1d\n" +
 	"\aprivacy\x18\x05 \x01(\bH\x03R\aprivacy\x88\x01\x01\x122\n" +
 	"\bcommands\x18\x06 \x01(\v2\x16.app.v1.BotCommandSetsR\bcommands\x122\n" +
-	"\x12inline_placeholder\x18\a \x01(\tH\x04R\x11inlinePlaceholder\x88\x01\x01B\a\n" +
+	"\x12inline_placeholder\x18\a \x01(\tH\x04R\x11inlinePlaceholder\x88\x01\x01\x12'\n" +
+	"\rphoto_file_id\x18\b \x01(\tH\x05R\vphotoFileId\x88\x01\x01B\a\n" +
 	"\x05_nameB\x0e\n" +
 	"\f_descriptionB\b\n" +
 	"\x06_aboutB\n" +
 	"\n" +
 	"\b_privacyB\x15\n" +
-	"\x13_inline_placeholder\"2\n" +
+	"\x13_inline_placeholderB\x10\n" +
+	"\x0e_photo_file_id\"2\n" +
 	"\x11UpdateBotResponse\x12\x1d\n" +
 	"\x03bot\x18\x01 \x01(\v2\v.app.v1.BotR\x03bot\"1\n" +
 	"\x14ResetBotTokenRequest\x12\x19\n" +

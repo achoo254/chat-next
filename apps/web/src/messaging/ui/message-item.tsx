@@ -491,7 +491,14 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 					tabIndex={inert ? -1 : undefined}
 					onClick={() => ui.dialog.set({ kind: "profile", userId: message.fromId })}
 				>
-					<ChatAvatar id={message.fromId} name={senderName} size="sm" bot={sender?.isBot === true} />
+					<ChatAvatar
+						id={message.fromId}
+						name={senderName}
+						size="sm"
+						bot={sender?.isBot === true}
+						photoOf={sender?.isBot === true ? message.fromId : 0}
+						photoId={sender?.photoId ?? ""}
+					/>
 				</button>
 			)}
 			{recalled ? (

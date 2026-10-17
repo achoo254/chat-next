@@ -289,6 +289,7 @@ export function rowToUser(row: SqlRow): User {
 		isSelf: bool(row, "is_self"),
 		isBlocked: bool(row, "is_blocked"),
 		...(bool(row, "deleted") ? { deleted: true } : {}),
+		...(str(row, "photo_id") !== "" ? { photoId: str(row, "photo_id") } : {}),
 	};
 }
 

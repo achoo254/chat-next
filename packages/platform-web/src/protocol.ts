@@ -24,6 +24,7 @@ export const CORE_METHODS = [
 	"onlineCount",
 	"typing",
 	"sendTyping",
+	"uploadPhoto",
 	"unreadTotals",
 	"sendMedia",
 	"sendAlbum",

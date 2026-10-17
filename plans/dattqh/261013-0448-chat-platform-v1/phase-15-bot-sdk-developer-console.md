@@ -64,7 +64,7 @@ Create:
 
 - [x] Sinh model từ OpenAPI (3 ngôn ngữ): `server/cmd/sdkgen` sinh model và đủ 33 method; `go test ./cmd/sdkgen` đỏ khi spec đổi mà chưa sinh lại
 - [x] Runtime + ví dụ TS/Python/Go (2026-10-17, chỉ stdlib; test: TS 39, Python 65, Go 35 + 10 subtest)
-- [ ] Developer Console (lát A: tạo bot, hồ sơ, token, lệnh; lát B1: nhận update webhook/long poll, trạng thái, update lỗi, số liệu 24 giờ, tầng rate limit; còn: ảnh bot)
+- [x] Developer Console (lát A: tạo bot, hồ sơ, token, lệnh; lát B1: nhận update webhook/long poll, trạng thái, update lỗi, số liệu 24 giờ, tầng rate limit; ảnh bot 2026-10-17: chọn, cắt vuông 640×640 trên máy, đổi, xoá; hiện ở mọi avatar bot)
 - [x] Conformance 3 SDK × 2 chế độ (`pnpm conformance:sdk`, test Go `TestSDKConformance` với server thật: 30/30 kịch bản)
 - [ ] Docs (lát B1: `docs/bot-api/README.md` bắt đầu nhanh + kiểm HMAC Node/Python/Go; còn: tham chiếu sinh từ OpenAPI)
 - [ ] Phát hành registry (Jev 0,81: chưa làm; SDK nằm trong repo, dựng registry khi ra mắt)

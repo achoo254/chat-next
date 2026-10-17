@@ -9,7 +9,9 @@ import { MessageSchema } from "@app/proto-ts/messages";
 import { EventBus } from "../src/events/bus.ts";
 import { cacheKey, MediaCache, type CacheLimits } from "../src/media/media-cache.ts";
 import { MediaLoader, URLS_PER_CALL } from "../src/media/media-loader.ts";
-import { toMessage } from "../src/protocol/map.ts";
+import { uploadPhotoNow } from "../src/media/direct-upload.ts";
+import { UserSchema } from "@app/proto-ts/users";
+import { toMessage, toUser } from "../src/protocol/map.ts";
 import { purgeMessages, recallMessages } from "../src/purge/index.ts";
 import { migrate } from "../src/repo/migrations.ts";
 import { Repository } from "../src/repo/repository.ts";
@@ -249,5 +251,44 @@ describe("media loader", () => {
 		expect(other).not.toBeNull();
 		media.revoked.add("5:2");
 		expect((await l.file({ chatId: 5, seq: 2, fileId })).status).toBe("unavailable");
+	});
+});
+
+describe("profile photos", () => {
+	it("are fetched in the user_photo_of context and cached like other files", async () => {
+		const s = await store();
+		s.limits = { sizeBytes: 1 << 20, largeBytes: 1 << 20, maxAgeMs: 1e12 };
+		const media = new FakeMedia();
+		const api = media.apiFor(1);
+		const session = await api.createUpload({ kind: MediaKind.PHOTO, size: 3n, fileHash: "h", mimeType: "image/png" });
+		if (session.result.case !== "upload") throw new Error("no session");
+		const put = await media.http.put(session.result.value.parts[0]?.url ?? "", new Blob([new Uint8Array([7, 8, 9])]));
+		const done = await api.completeUpload({ uploadId: session.result.value.uploadId, parts: [{ partNumber: 1, etag: put.etag }] });
+		const fileId = done.media?.fileId ?? "";
+		const l = new MediaLoader({ api, http: media.http, cache: s.cache, now: () => Date.now() });
+		// Not that user's photo: unavailable.
+		expect((await l.file({ chatId: 0, seq: 0, fileId, userPhotoOf: 42, size: "s" })).status).toBe("unavailable");
+		media.photos.set(42, fileId);
+		const got = await l.file({ chatId: 0, seq: 0, fileId, userPhotoOf: 42, size: "s" });
+		expect(got.status).toBe("ok");
+		await l.file({ chatId: 0, seq: 0, fileId, userPhotoOf: 42, size: "s" });
+		expect(media.gets.filter((u) => u.includes("/photo/42/"))).toHaveLength(1);
+	});
+
+	it("maps the user's photo to photoId", () => {
+		expect(toUser(create(UserSchema, { id: 5n, name: "Bot", isBot: true, photo: { fileId: "AbCdEfGhIjKlMnOpQrStUv" } })).photoId).toBe("AbCdEfGhIjKlMnOpQrStUv");
+		expect(toUser(create(UserSchema, { id: 6n, name: "Người" })).photoId).toBeUndefined();
+	});
+});
+
+describe("direct photo upload", () => {
+	it("uploads a photo outside the outbox and reuses the user's same bytes", async () => {
+		const media = new FakeMedia();
+		const api = media.apiFor(1);
+		const photo = new Blob([new Uint8Array([1, 2, 3, 4])], { type: "image/jpeg" });
+		const fileId = await uploadPhotoNow(api, media.http, photo, "bot.jpg");
+		expect(fileId).not.toBe("");
+		expect(await uploadPhotoNow(api, media.http, photo, "bot.jpg")).toBe(fileId);
+		expect(media.calls.get("completeUpload")).toBe(1);
 	});
 });

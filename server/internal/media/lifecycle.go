@@ -106,8 +106,8 @@ func (s *Service) AbortExpiredUploads(ctx context.Context) (int, error) {
 	return done, nil
 }
 
-// CollectFiles deletes files older than the grace period that no message
-// and no link preview references. The row goes first, in a statement that
+// CollectFiles deletes files older than the grace period that no message,
+// no link preview and no profile photo references. The row goes first, in a statement that
 // skips rows locked by a send (LockFile) and re-checks the references; its
 // objects are deleted after.
 func (s *Service) CollectFiles(ctx context.Context) (int, error) {
@@ -117,12 +117,14 @@ func (s *Service) CollectFiles(ctx context.Context) (int, error) {
 			WHERE f.tenant_id = $1 AND f.created_at < now() - $2::interval
 				AND NOT EXISTS (SELECT 1 FROM message_files mf WHERE mf.file_id = f.id)
 				AND NOT EXISTS (SELECT 1 FROM link_preview_photos p WHERE p.file_id = f.id)
+				AND NOT EXISTS (SELECT 1 FROM users u WHERE u.photo_file_id = f.id)
 			ORDER BY f.id LIMIT $3
 			FOR UPDATE SKIP LOCKED)
 		DELETE FROM files f USING doomed d
 		WHERE f.id = d.id
 			AND NOT EXISTS (SELECT 1 FROM message_files mf WHERE mf.file_id = f.id)
 			AND NOT EXISTS (SELECT 1 FROM link_preview_photos p WHERE p.file_id = f.id)
+			AND NOT EXISTS (SELECT 1 FROM users u WHERE u.photo_file_id = f.id)
 		RETURNING f.object_key, f.sizes::text`, s.cfg.TenantID, unreferencedGrace, gcBatch)
 	if err != nil {
 		return 0, fmt.Errorf("media: collect files: %w", err)

@@ -152,7 +152,8 @@ const InlineQueryTTL = time.Hour
 
 // authorize checks a download token against the database: the message
 // still carries the file and the viewer may still see the message, or the
-// viewer's inline query (chat 0) still lives and shows the file.
+// viewer's inline query (chat 0) still lives and shows the file, or the
+// file is still the profile photo of the bot named (chat PhotoChat).
 func (s *Service) authorize(ctx context.Context, token string) (*target, int) {
 	now := s.now()
 	g, err := s.sign.openDownload(token, now)
@@ -181,7 +182,13 @@ func (s *Service) authorize(ctx context.Context, token string) (*target, int) {
 		JOIN message_files mf ON mf.file_id = f.id AND mf.chat_id = $2 AND mf.seq = $3
 		JOIN chat_members cm ON cm.chat_id = $2 AND cm.user_id = $4 AND cm.visible_from_seq <= $3
 			AND (cm.left_at IS NULL OR cm.left_seq >= $3)`
-	if g.chatID == 0 {
+	switch g.chatID {
+	case PhotoChat:
+		// A profile photo (seq is its user): still that bot's photo.
+		through = `
+		JOIN users u ON u.id = $3 AND u.photo_file_id = f.id AND u.is_bot AND $2::bigint > 0 AND $4::bigint > 0
+		JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL`
+	case 0:
 		through = `
 		JOIN bot_inline_queries q ON q.num = $3 AND q.user_id = $4 AND q.tenant_id = $5 AND $2::bigint = 0
 			AND q.created_at > now() - $6::interval AND f.id = ANY(q.file_ids)`

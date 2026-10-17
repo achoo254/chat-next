@@ -227,7 +227,14 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	return (
 		<li className="chat-slot" style={style} aria-setsize={total} aria-posinset={position} {...trigger}>
 			<Link to={paths.chat(chatId)} className="chat-row" current={current}>
-				<ChatAvatar id={chatId} name={title} bot={kind === "bot"} saved={saved} />
+				<ChatAvatar
+					id={chatId}
+					name={title}
+					bot={kind === "bot"}
+					saved={saved}
+					photoOf={kind === "bot" ? (view.peer?.id ?? 0) : 0}
+					photoId={view.peer?.photoId ?? ""}
+				/>
 				<span className="tx">
 					<span className="name">
 						{kindIcon !== undefined && (

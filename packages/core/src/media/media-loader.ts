@@ -5,20 +5,24 @@
 // media host answers 401/403 (expired) — once, without bothering the user.
 // A 404 or an "unavailable" answer means the message is gone or no longer
 // visible: its cached files are dropped.
+import type { MessageInitShape } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { Http } from "@app/platform";
+import type { GetFileUrlRequestSchema } from "@app/proto-ts/media";
 import type { MediaKind, MediaSizeType } from "../model/types.ts";
 import type { RemoteApi } from "../protocol/api.ts";
 import { toSizeType, toWireId, toWireSizeType } from "../protocol/map.ts";
 import { cacheKey, LARGE_FILE_BYTES, type MediaCache } from "./media-cache.ts";
 
-/** A file of a message to fetch, or of an inline query's results (chatId and seq 0). */
+/** A file of a message to fetch, of an inline query's results or a profile photo (chatId and seq 0). */
 export interface MediaRequest {
 	readonly chatId: number;
 	readonly seq: number;
 	readonly fileId: string;
 	/** A result of the caller's inline query: the file's context instead of a message. */
 	readonly inlineQueryId?: string;
+	/** The profile photo of this user (User.photoId): the file's context instead of a message. */
+	readonly userPhotoOf?: number;
 	/** Rendition wanted; the original when absent. */
 	readonly size?: MediaSizeType;
 	/** Video counts against the large-file cache budget whatever its size. */
@@ -58,7 +62,7 @@ interface Pending {
 }
 
 function urlKey(r: MediaRequest): string {
-	return `${r.fileId}:${r.size ?? "original"}:${r.chatId}:${r.seq}:${r.inlineQueryId ?? ""}`;
+	return `${r.fileId}:${r.size ?? "original"}:${r.chatId}:${r.seq}:${r.inlineQueryId ?? ""}:${r.userPhotoOf ?? 0}`;
 }
 
 export class MediaLoader {
@@ -141,10 +145,7 @@ export class MediaLoader {
 					requests: chunk.map(({ request }) => ({
 						fileId: request.fileId,
 						size: toWireSizeType(request.size ?? "original"),
-						context:
-							request.inlineQueryId === undefined
-								? { case: "message", value: { chatId: toWireId(request.chatId), seq: toWireId(request.seq) } }
-								: { case: "inlineQueryId", value: request.inlineQueryId },
+						context: fileContext(request),
 					})),
 				});
 				chunk.forEach((pending, index) => {
@@ -160,4 +161,11 @@ export class MediaLoader {
 			}
 		}
 	}
+}
+
+/** Where the file is seen: a message, an inline query's results or a profile photo. */
+function fileContext(request: MediaRequest): NonNullable<MessageInitShape<typeof GetFileUrlRequestSchema>["context"]> {
+	if (request.userPhotoOf !== undefined) return { case: "userPhotoOf", value: toWireId(request.userPhotoOf) };
+	if (request.inlineQueryId !== undefined) return { case: "inlineQueryId", value: request.inlineQueryId };
+	return { case: "message", value: { chatId: toWireId(request.chatId), seq: toWireId(request.seq) } };
 }

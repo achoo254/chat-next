@@ -165,6 +165,9 @@ message UpdateBotRequest {
   // Turns inline mode on with this hint (1 to 64 characters), or off with
   // an empty string.
   optional string inline_placeholder = 7;
+  // file_id of a photo the owner uploaded (MediaService): the bot's profile
+  // photo, seen by everyone in the tenant; an empty string removes it.
+  optional string photo_file_id = 8;
 }
 
 message UpdateBotResponse {

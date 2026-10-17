@@ -326,6 +326,9 @@ func (s *Service) AuthorizeFiles(ctx context.Context, viewer int64, reqs []*appv
 	if err := s.inlineFileAccess(ctx, viewer, reqs, out); err != nil {
 		return nil, err
 	}
+	if err := s.photoFileAccess(ctx, reqs, out); err != nil {
+		return nil, err
+	}
 	if len(ids) == 0 {
 		return out, nil
 	}
@@ -459,4 +462,42 @@ type prefixedRow struct {
 
 func (r prefixedRow) Scan(dest ...any) error {
 	return r.row.Scan(append(r.head, dest...)...)
+}
+
+// photoFileAccess grants the profile photos asked for (user_photo_of): a
+// bot's current photo, which everyone in the tenant may see. People's
+// photos wait for the profile_photo privacy rule.
+func (s *Service) photoFileAccess(ctx context.Context, reqs []*appv1.GetFileUrlRequest, out []*media.Access) error {
+	var ids []string
+	var users, index []int64
+	for i, r := range reqs {
+		if u := r.GetUserPhotoOf(); u > 0 && media.ValidPublicID(r.GetFileId()) {
+			ids, users, index = append(ids, r.GetFileId()), append(users, u), append(index, int64(i))
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT x.i, x.user_id, `+media.FileColumns+`
+		FROM unnest($1::text[], $2::bigint[], $3::bigint[]) AS x(public_id, user_id, i)
+		JOIN users u ON u.id = x.user_id AND u.tenant_id = $4 AND u.is_bot
+		JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
+		JOIN files f ON f.id = u.photo_file_id AND f.public_id = x.public_id`,
+		ids, users, index, s.cfg.TenantID)
+	if err != nil {
+		return fmt.Errorf("chat: authorize photos: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var i, user int64
+		f, err := media.ScanFile(prefixedRow{row: rows, head: []any{&i, &user}})
+		if err != nil {
+			return fmt.Errorf("chat: authorize photos: %w", err)
+		}
+		if i >= 0 && int(i) < len(out) {
+			out[i] = &media.Access{File: f, ChatID: media.PhotoChat, Seq: user}
+		}
+	}
+	return rows.Err()
 }

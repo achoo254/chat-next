@@ -26,7 +26,8 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | Cài đặt quyền riêng tư, thông báo, tự xoá | `privacy_settings`, `notification_settings`, `users.auto_delete_months` | Tới khi xoá tài khoản | HĐ |
 | Danh bạ, người đã chặn | `contacts`, `blocks` | Tới khi người dùng gỡ hoặc xoá tài khoản (cả hai chiều) | HĐ |
 | Tin nhắn, cảm xúc, ghim, trạng thái đọc | `messages`, `message_reactions`, `chat_read_states`, `read_receipts` (7 ngày) | Tới khi thu hồi/xoá chat. Khi xoá tài khoản: tin gửi trong chat **của người khác** còn lại, người gửi hiện "Tài khoản đã xoá"; Cloud của tôi và chat riêng không còn ai giữ (bên kia là bot hoặc đã xoá) bị xoá | HĐ |
-| File media (ảnh, video, file, voice) | `/opt/chat/media` + bảng `files` | Tới khi không còn tin nào dùng, rồi thêm 1 ngày (dọn tự động) | HĐ |
+| File media (ảnh, video, file, voice) | `/opt/chat/media` + bảng `files` | Tới khi không còn tin nào dùng và không còn là ảnh đại diện, rồi thêm 1 ngày (dọn tự động) | HĐ |
+| Ảnh đại diện của bot | `users.photo_file_id` (file trong bảng `files`, chủ bot tải lên ở Developer Console) | Tới khi chủ bot đổi hoặc xoá ảnh | HĐ |
 | Log cập nhật đồng bộ | `user_updates`, `chat_updates`, `outbox` | Partition theo ngày, xoá sau 30 ngày; của người dùng bị xoá thì xoá ngay | HĐ |
 | Bot của người dùng | `bots`, `users` (is_bot) | Dừng ngay khi bắt đầu xoá tài khoản, xoá cùng tài khoản | HĐ |
 | Góp ý gửi trợ lý | `feedback` | Tới khi xoá tài khoản | HĐ |

@@ -162,6 +162,17 @@ func LockFile(ctx context.Context, tx Querier, tenant, publicID string) (*File, 
 	return f, nil
 }
 
+// PhotoChat is the chat id of download grants for a profile photo (their
+// seq is the photo's user): the largest id a token holds, which no chat
+// reaches (it would be the last local id of the last shard).
+const PhotoChat = 1<<53 - 1
+
+// PhotoRef is a profile photo as clients see it: they fetch it with
+// GetFileUrl's user_photo_of context, in the size they show.
+func PhotoRef(fileID string) *appv1.MediaRef {
+	return &appv1.MediaRef{FileId: fileID, Kind: appv1.MediaKind_MEDIA_KIND_PHOTO}
+}
+
 // LoadFiles loads files of tenant by file_id.
 func LoadFiles(ctx context.Context, q Querier, tenant string, publicIDs []string) (map[string]*File, error) {
 	out := map[string]*File{}

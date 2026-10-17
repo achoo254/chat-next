@@ -127,7 +127,7 @@ export function BotProfileCard({ botId, chatId }: { botId: number; chatId: numbe
 	const name = info?.name ?? user?.name ?? "";
 	return (
 		<div className="bot-card">
-			<ChatAvatar id={botId} name={name} size="lg" bot />
+			<ChatAvatar id={botId} name={name} size="lg" bot photoOf={botId} photoId={info?.photoId ?? user?.photoId ?? ""} />
 			<h3>{name}</h3>
 			{info !== null && info.description !== "" && <p>{info.description}</p>}
 			{info !== null && info.commands.length > 0 && (

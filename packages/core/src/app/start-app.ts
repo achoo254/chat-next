@@ -33,6 +33,7 @@ import { buildSnapshot, type ScreenSnapshot } from "../snapshot/snapshot.ts";
 import { SyncEngine, type HistoryDirectionName } from "../sync/engine.ts";
 import { RealtimeConnection, type ConnectionState } from "../transport/realtime.ts";
 import { TypingTracker } from "./typing.ts";
+import { uploadPhotoNow } from "../media/direct-upload.ts";
 import { DirectActions, UnsupportedApiError, type PinnedMessagesRequest } from "./direct-actions.ts";
 
 export type ClientKind = "web" | "ios" | "android" | "desktop";
@@ -123,6 +124,8 @@ export interface ChatCore {
 	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
 	/** Members of a group online now, counted by the server (online only). */
 	onlineCount(chatId: number): Promise<number>;
+	/** Uploads a photo now (not as a message; a bot's profile photo) and returns its file_id (online only). */
+	uploadPhoto(file: Blob, fileName: string): Promise<string>;
 	/** Who is typing in which chat now (people the server lets this user see); changes: EventKeys.typing. */
 	typing(): ChatTyping[];
 	/**
@@ -588,6 +591,11 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		events: bus,
 		connectionState: () => connection.connectionState,
 		typing: () => typing.list(),
+		uploadPhoto: async (file, fileName) => {
+			active();
+			if (platform.http === undefined || mediaApi === undefined) throw new UnsupportedApiError("CreateUpload");
+			return uploadPhotoNow(mediaApi, platform.http, file, fileName);
+		},
 		sendTyping: (chatId, topicId, action) => typing.sendTyping(assertSafeId(chatId), assertSafeId(topicId), action),
 		sessionEnded: () => ended,
 		dialogs: async (limit = 100) => {

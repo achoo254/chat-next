@@ -27,6 +27,7 @@ import (
 	"unicode/utf8"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/media"
 	"app.local/server/internal/profile"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
@@ -114,6 +115,8 @@ type Bot struct {
 	Privacy     bool
 	// InlinePlaceholder is the composer hint of inline mode; "" is off.
 	InlinePlaceholder string
+	// PhotoID is the file_id of the bot's photo; "" without one.
+	PhotoID string
 	Verified          bool
 	Internal          bool
 	Commands          []CommandSet
@@ -236,7 +239,7 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
 	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.is_system, b.restricted_at,
-	b.token_hash, b.inline_placeholder`
+	b.token_hash, b.inline_placeholder, coalesce((SELECT f.public_id FROM files f WHERE f.id = u.photo_file_id), '')`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -245,7 +248,7 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
 		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.RestrictedAt, &b.tokenHash,
-		&b.InlinePlaceholder)
+		&b.InlinePlaceholder, &b.PhotoID)
 	if err != nil {
 		return nil, err
 	}
@@ -317,6 +320,9 @@ func (b *Bot) Render() *appv1.Bot {
 	out.Webhook = b.Webhook
 	out.InlinePlaceholder = b.InlinePlaceholder
 	out.User.BotInlinePlaceholder = b.InlinePlaceholder
+	if b.PhotoID != "" {
+		out.User.Photo = media.PhotoRef(b.PhotoID)
+	}
 	for _, set := range b.Commands {
 		out.Commands = append(out.Commands, renderSet(set))
 	}
@@ -483,6 +489,11 @@ func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateB
 				return fmt.Errorf("botadmin: rename bot: %w", err)
 			}
 		}
+		if req.PhotoFileId != nil {
+			if err := s.setPhoto(ctx, tx, owner, req.GetBotId(), req.GetPhotoFileId()); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE bots SET description = coalesce($2, description), about = coalesce($3, about),
 				privacy = coalesce($4, privacy), commands = coalesce($5::jsonb, commands),
@@ -498,6 +509,28 @@ func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateB
 		return nil, err
 	}
 	return bot.Render(), nil
+}
+
+// setPhoto makes fileID (a photo the owner uploaded) the bot's profile
+// photo, or removes it when fileID is "".
+func (s *Service) setPhoto(ctx context.Context, tx pgx.Tx, owner, botID int64, fileID string) error {
+	var photo *int64
+	if fileID != "" {
+		var id int64
+		err := tx.QueryRow(ctx, `SELECT id FROM files WHERE public_id = $1 AND tenant_id = $2 AND owner_id = $3 AND kind = 'photo'`,
+			fileID, s.tenantID, owner).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errInvalid("photo_file_id: not a photo you uploaded")
+		}
+		if err != nil {
+			return fmt.Errorf("botadmin: photo: %w", err)
+		}
+		photo = &id
+	}
+	if _, err := tx.Exec(ctx, `UPDATE users SET photo_file_id = $2, updated_at = now() WHERE id = $1`, botID, photo); err != nil {
+		return fmt.Errorf("botadmin: set photo: %w", err)
+	}
+	return nil
 }
 
 // ResetBotToken issues a new token (the previous one stops working at

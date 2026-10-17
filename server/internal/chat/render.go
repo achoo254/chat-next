@@ -9,6 +9,7 @@ import (
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/media"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 )
@@ -293,6 +294,8 @@ type userRow struct {
 	// Deleted: the account waits for deletion or was erased; others see a
 	// deleted account without profile.
 	Deleted bool
+	// PhotoID is the file_id of the profile photo ("" without one).
+	PhotoID string
 }
 
 func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (map[int64]*userRow, error) {
@@ -302,8 +305,10 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	}
 	rows, err := q.Query(ctx, `
 		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot,
-			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, '')
+			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, ''),
+			coalesce(pf.public_id, '')
 		FROM users u LEFT JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
+			LEFT JOIN files pf ON pf.id = u.photo_file_id
 		WHERE u.tenant_id = $1 AND u.id = ANY($2)`,
 		tenantID, ids)
 	if err != nil {
@@ -312,7 +317,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.Deleted, &u.InlinePlaceholder); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u
@@ -326,6 +331,10 @@ func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
 	}
 	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked,
 		IsBot: u.IsBot, BotInlinePlaceholder: u.InlinePlaceholder}
+	// Only bots have photos so far (people's need the profile_photo rule).
+	if u.PhotoID != "" && u.IsBot {
+		out.Photo = media.PhotoRef(u.PhotoID)
+	}
 	if u.ID == viewer {
 		out.Email = u.Email
 	}

@@ -20,6 +20,8 @@ export interface BotHost {
 	/** Adds a bot user (is_bot) and returns its id. */
 	addBotUser(name: string, username: string): number;
 	rename(userId: number, name: string): void;
+	/** Sets or ("") removes a user's profile photo. */
+	setPhoto(userId: number, fileId: string): void;
 	usernameTaken(username: string): boolean;
 	wireUser(id: number): WireUser;
 	/** The private chat of the signed-in user with `userId`, created when missing. */
@@ -289,6 +291,7 @@ export class FakeBots {
 				if (req.about !== undefined) bot.about = req.about;
 				if (req.privacy !== undefined) bot.privacy = req.privacy;
 				if (req.commands !== undefined) bot.commands = req.commands.sets;
+				if (req.photoFileId !== undefined) this.host.setPhoto(bot.id, req.photoFileId);
 				return { bot: this.wireBot(bot) };
 			},
 			resetBotToken: (req) => {

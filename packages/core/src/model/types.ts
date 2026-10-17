@@ -15,6 +15,8 @@ export interface User {
 	readonly isBlocked: boolean;
 	/** The account was deleted (or waits for deletion): username, name and bio are empty; show it as a deleted account. */
 	readonly deleted?: boolean;
+	/** file_id of the profile photo (bots so far); fetch it with MediaRequest.userPhotoOf. Absent without one. */
+	readonly photoId?: string;
 }
 
 export interface Chat {

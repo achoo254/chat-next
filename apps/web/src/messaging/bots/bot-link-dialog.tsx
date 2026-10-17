@@ -78,7 +78,7 @@ export default function BotLinkDialog({ username, startParam }: { username: stri
 			<DialogHead id={id} title={t.link.title(bot.name)} onClose={cancel} />
 			<div className="dlg-body stack">
 				<div className="bot-line">
-					<ChatAvatar id={bot.id} name={bot.name} bot />
+					<ChatAvatar id={bot.id} name={bot.name} bot photoOf={bot.id} photoId={bot.photoId} />
 					<div>
 						<strong>{bot.name}</strong>
 						<small>{t.link.botLine(bot.username, orgDomain(window.location.host))}</small>

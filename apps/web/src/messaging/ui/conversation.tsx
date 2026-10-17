@@ -319,7 +319,14 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					{topic !== null ? (
 						<TopicIco topic={topic} size="sm" />
 					) : (
-						<ChatAvatar id={chatId} name={title} bot={kind === "bot"} saved={isSavedChat(chat, view?.peer ?? peer ?? null)} />
+						<ChatAvatar
+							id={chatId}
+							name={title}
+							bot={kind === "bot"}
+							saved={isSavedChat(chat, view?.peer ?? peer ?? null)}
+							photoOf={kind === "bot" ? chat.peerUserId : 0}
+							photoId={botPeer?.photoId}
+						/>
 					)}
 					<div className="title">
 						<strong>{topic?.title ?? title}</strong>

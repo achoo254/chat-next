@@ -61,10 +61,21 @@ export function putChatPts(w: WriteBatch, chatId: number, chatPts: number): void
 
 export function putUser(w: WriteBatch, user: User): void {
 	w.add(
-		`INSERT INTO users (id, username, name, bio, is_bot, is_self, is_blocked, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO users (id, username, name, bio, is_bot, is_self, is_blocked, deleted, photo_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET username = excluded.username, name = excluded.name, bio = excluded.bio,
-			is_bot = excluded.is_bot, is_self = excluded.is_self, is_blocked = excluded.is_blocked, deleted = excluded.deleted`,
-		[user.id, user.username, user.name, user.bio, flag(user.isBot), flag(user.isSelf), flag(user.isBlocked), flag(user.deleted === true)],
+			is_bot = excluded.is_bot, is_self = excluded.is_self, is_blocked = excluded.is_blocked, deleted = excluded.deleted,
+			photo_id = excluded.photo_id`,
+		[
+			user.id,
+			user.username,
+			user.name,
+			user.bio,
+			flag(user.isBot),
+			flag(user.isSelf),
+			flag(user.isBlocked),
+			flag(user.deleted === true),
+			user.photoId ?? "",
+		],
 	);
 	w.emit(EventKeys.user(user.id));
 }

@@ -328,6 +328,7 @@ export class ChatFixture {
 				this.names.set(userId, name);
 				this.userExtras.set(userId, { ...this.userExtras.get(userId), name });
 			},
+			setPhoto: (userId, fileId) => this.setPhoto(userId, fileId),
 			usernameTaken: (username) => [...this.names.keys()].some((id) => this.wireUser(id).username === username),
 			wireUser: (id) => this.wireUser(id),
 			privateChat: (userId) => this.privateChatWith(userId),
@@ -502,6 +503,8 @@ export class ChatFixture {
 	patchUser(user: WireUser): void {
 		const extras = this.userExtras.get(num(user.id));
 		if (extras !== undefined) assign(user, create(UserSchema, { ...user, ...extras, isBlocked: this.blocked.has(num(user.id)) }));
+		const photo = this.photos.get(num(user.id));
+		user.photo = photo === undefined ? undefined : create(MediaRefSchema, { fileId: photo, kind: MediaKind.PHOTO });
 	}
 
 	patchChat(chat: WireChat): void {
@@ -677,6 +680,20 @@ export class ChatFixture {
 					handlers.onMessage(data);
 				},
 			});
+	}
+
+	/** Profile photos by user (bots' photos set in the Developer Console). */
+	readonly photos = new Map<number, string>();
+
+	/** Sets (or with "" removes) a user's profile photo, downloadable with the user_photo_of context. */
+	setPhoto(userId: number, fileId: string): void {
+		if (fileId === "") this.photos.delete(userId);
+		else this.photos.set(userId, fileId);
+		const media = this.server.media;
+		if (media !== null) {
+			if (fileId === "") media.photos.delete(userId);
+			else media.photos.set(userId, fileId);
+		}
 	}
 
 	wireUser(id: number): WireUser {
@@ -1489,6 +1506,7 @@ export function toSource(core: ChatCore): ChatSource {
 		unpinAllMessages: (chatId, topicId) => core.unpinAllMessages(chatId, topicId),
 		onlineCount: (chatId) => core.onlineCount(chatId),
 		typing: async () => core.typing(),
+		uploadPhoto: (file, fileName) => core.uploadPhoto(file, fileName),
 		sendTyping: async (chatId, topicId, action) => core.sendTyping(chatId, topicId, action),
 		sendMedia: (chatId, file, media, options) => core.sendMedia(chatId, file, media, options),
 		sendAlbum: (chatId, items, options) => core.sendAlbum(chatId, items, options),

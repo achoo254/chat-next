@@ -58,6 +58,8 @@ export interface ChatSource {
 	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;
 	/** Members of a group online now, counted by the server (online only). */
 	onlineCount(chatId: number): Promise<number>;
+	/** Uploads a photo now (a bot's profile photo, not a message) and returns its file_id. */
+	uploadPhoto(file: Blob, fileName: string): Promise<string>;
 	/** Who is typing in which chat; changes arrive as EventKeys.typing. */
 	typing(): Promise<ChatTyping[]>;
 	/** Tells the open chat the user types ("cancel": the draft was cleared); repeats are throttled. */

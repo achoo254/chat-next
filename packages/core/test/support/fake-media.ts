@@ -84,6 +84,8 @@ export class FakeMedia {
 	readonly refuse = new Set<MediaKind>();
 	/** Messages deleted for everyone: their URLs answer 404. */
 	readonly revoked = new Set<string>();
+	/** Profile photos by user (user_photo_of context). */
+	readonly photos = new Map<number, string>();
 	/** Upload ids the server forgot (expired). */
 	readonly expired = new Set<string>();
 	inFlight = 0;
@@ -237,6 +239,12 @@ export class FakeMedia {
 				this.count("getFileUrls");
 				const results = (request.requests ?? []).map((r) => {
 					const context = r.context;
+					if (context?.case === "userPhotoOf") {
+						const user = Number(context.value);
+						if (this.photos.get(user) !== r.fileId) return { unavailable: true };
+						const expires = this.clock() + this.urlTtl;
+						return { url: `https://media.test/f/${r.fileId ?? ""}/photo/${user}/${expires}`, expiresAt: BigInt(expires), size: r.size ?? MediaSizeType.UNSPECIFIED };
+					}
 					if (context?.case !== "message" || !this.files.has(r.fileId ?? "")) return { unavailable: true };
 					const chatId = Number(context.value.chatId ?? 0n);
 					const seq = Number(context.value.seq ?? 0n);
@@ -305,6 +313,14 @@ export class FakeMedia {
 		get: async (url): Promise<HttpGetResult> => {
 			await Promise.resolve();
 			this.gets.push(url);
+			const photo = /^https:\/\/media\.test\/f\/([^/]+)\/photo\/(\d+)\/(\d+)$/.exec(url);
+			if (photo !== null) {
+				const [, fileId = "", user = "", expires = "0"] = photo;
+				const file = this.files.get(fileId);
+				if (file === undefined || this.photos.get(Number(user)) !== fileId) return { status: 404, body: null };
+				if (Number(expires) < this.clock()) return { status: 403, body: null };
+				return { status: 200, body: new Blob([file.bytes.slice()], { type: file.ref.mimeType }) };
+			}
 			const match = /^https:\/\/media\.test\/f\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/.exec(url);
 			if (match === null) return { status: 404, body: null };
 			const [, fileId = "", , chatId = "", seq = "", expires = "0"] = match;

@@ -24,6 +24,7 @@ import { ChatAvatar, copyText, Switch, useDomId } from "../ui/parts.tsx";
 import { BOT_LIMITS, botErrorKind, EDITABLE_SCOPES, usernameProblem, validCommand, type BotCommand, type CommandScope, type CommandSets, type OwnBot } from "./api.ts";
 import { DeadLettersTab, StatsTab, UpdatesTab, when } from "./delivery.tsx";
 import { ConfirmDialog, ReauthDialog, reauthUrl, useConfirmShown, type After, type TabProps } from "./dialogs.tsx";
+import { BotPhotoField } from "./bot-photo.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import type { BotsCopy } from "./copy-vi.ts";
 import "./console.css";
@@ -153,7 +154,7 @@ function BotList() {
 									<tr key={bot.id}>
 										<td>
 											<span className="bot-cell">
-												<ChatAvatar id={bot.id} name={bot.name} size="sm" bot />
+												<ChatAvatar id={bot.id} name={bot.name} size="sm" bot photoOf={bot.id} photoId={bot.photoId} />
 												<span>
 													<strong>{bot.name}</strong>
 													<span className="cell-sub mono">@{bot.username}</span>
@@ -455,7 +456,7 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 			) : (
 				<>
 					<div className="c-bot">
-						<ChatAvatar id={bot.id} name={bot.name} size="sm" bot />
+						<ChatAvatar id={bot.id} name={bot.name} size="sm" bot photoOf={bot.id} photoId={bot.photoId} />
 						<div>
 							<h1 id={titleId}>{bot.name}</h1>
 							<small className="mono">@{bot.username}</small>
@@ -601,6 +602,7 @@ function ProfileTab({ bot, onSaved, confirmNow, onConfirmShown }: TabProps & { o
 		<div className="c-grid">
 			<form className="card form" aria-labelledby={formId} onSubmit={(event) => void save(event)} noValidate>
 				<h2 id={formId}>{t.profile.title}</h2>
+				<BotPhotoField bot={bot} onSaved={onSaved} />
 				<div className="field">
 					<label htmlFor={nameId}>{t.create.name}</label>
 					<input

@@ -1,6 +1,8 @@
 // Small building blocks shared by the messaging screens, ported from the
 // approved mockups (mock.css: .avatar, .switch, .choice, dialog, .toast).
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+// The small leaf components skip the compiler's memoization ("use no memo"):
+// they are cheap to render, and memoizing them only grows the startup bundle.
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -8,7 +10,9 @@ import { toneOf } from "../data/format.ts";
 import type { Tone } from "../data/pending-backend.ts";
 import { useServices, useToast } from "../data/services.tsx";
 
-export type AvatarSize = "xs" | "sm" | "md" | "lg";
+const AvatarPhoto = lazy(() => import("./avatar-photo.tsx"));
+
+export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
 
 interface ChatAvatarProps {
 	id: number;
@@ -19,18 +23,27 @@ interface ChatAvatarProps {
 	saved?: boolean;
 	online?: boolean;
 	tone?: Tone;
+	/** The user whose profile photo to show (the bot of a bot chat) and its file_id (User.photoId); "" for none. */
+	photoOf?: number;
+	photoId?: string | undefined;
 }
 
 /** Soft avatar with initials (robot icon for bots, cloud for the saved chat); colour follows the id. */
-export function ChatAvatar({ id, name, size = "md", bot = false, saved = false, online = false, tone }: ChatAvatarProps) {
+export function ChatAvatar({ id, name, size = "md", bot = false, saved = false, online = false, tone, photoOf = 0, photoId = "" }: ChatAvatarProps) {
+	"use no memo";
 	const classes = ["avatar", size === "md" ? "" : size, `av-${tone ?? (saved ? "blue" : toneOf(id))}`, online ? "online" : ""];
-	const small = size !== "md" && size !== "lg";
+	const small = size === "xs" || size === "sm";
 	let face: ReactNode = initials(name);
 	if (saved) face = <Icon name="cloud" small={small} />;
 	else if (bot) face = <Icon name="robot" small={small} />;
 	return (
 		<span className={classes.filter(Boolean).join(" ")} aria-hidden="true">
 			{face}
+			{photoId !== "" && photoOf !== 0 && (
+				<Suspense fallback={null}>
+					<AvatarPhoto userId={photoOf} fileId={photoId} large={size === "lg" || size === "xl"} />
+				</Suspense>
+			)}
 		</span>
 	);
 }
@@ -138,6 +151,7 @@ interface DialogHeadProps {
 }
 
 export function DialogHead({ id, title, onClose, onBack, backLabel, step }: DialogHeadProps) {
+	"use no memo";
 	const copy = useCopy();
 	return (
 		<div className="dlg-head">
@@ -166,6 +180,7 @@ interface SwitchProps {
 }
 
 export function Switch({ checked, label, onChange, disabled = false, describedBy }: SwitchProps) {
+	"use no memo";
 	return (
 		<button
 			type="button"
@@ -190,6 +205,7 @@ interface ChoiceProps<T extends string> {
 
 /** Segmented choice (mockups: .choice with aria-pressed buttons). */
 export function Choice<T extends string>({ label, value, options, onChange, disabled = false }: ChoiceProps<T>) {
+	"use no memo";
 	return (
 		<div className="choice" role="group" aria-label={label}>
 			{options.map((option) => (

@@ -311,6 +311,14 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE users ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0",
 		],
 	},
+	{
+		version: 12,
+		statements: [
+			// User.photoId: the profile photo's file_id (bots so far); cached
+			// users get it with the server's next copy.
+			"ALTER TABLE users ADD COLUMN photo_id TEXT NOT NULL DEFAULT ''",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

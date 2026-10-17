@@ -46,6 +46,8 @@ export interface OwnBot {
 	readonly tier: BotTierName;
 	/** Inline mode: the composer hint; "" when off. */
 	readonly inlinePlaceholder: string;
+	/** file_id of the bot's photo; "" without one. */
+	readonly photoId: string;
 }
 
 export type BotTierName = "new" | "default" | "verified" | "internal" | "restricted";
@@ -121,6 +123,8 @@ export interface BotChanges {
 	readonly commands?: CommandSets;
 	/** Inline mode on with this hint, or off with "". */
 	readonly inlinePlaceholder?: string;
+	/** A photo the owner uploaded becomes the bot's photo; "" removes it. */
+	readonly photoFileId?: string;
 }
 
 /** A bot's public profile and its command menu for one chat (GetBotInfo). */
@@ -137,6 +141,8 @@ export interface BotInfo {
 	readonly notRunning: boolean;
 	/** Inline mode: the composer hint once @username and a space are typed; "" when off. */
 	readonly inlinePlaceholder: string;
+	/** file_id of the bot's photo; "" without one. */
+	readonly photoId: string;
 }
 
 export type InlineKind = "article" | "photo" | "video" | "document";

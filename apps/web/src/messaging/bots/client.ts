@@ -94,6 +94,7 @@ export function toOwnBot(bot: WireBot | undefined, method: string): OwnBot {
 		webhook: bot.webhook,
 		tier: TIERS[bot.tier] ?? "default",
 		inlinePlaceholder: bot.inlinePlaceholder,
+		photoId: user.photo?.fileId ?? "",
 	};
 }
 
@@ -170,6 +171,7 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 		isOwner: response.isOwner,
 		notRunning: response.isOwner && response.notRunning,
 		inlinePlaceholder: user.botInlinePlaceholder,
+		photoId: user.photo?.fileId ?? "",
 	};
 }
 
@@ -261,6 +263,7 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 					...(changes.privacy === undefined ? {} : { privacy: changes.privacy }),
 					...(changes.commands === undefined ? {} : { commands: wireSets(changes.commands) }),
 					...(changes.inlinePlaceholder === undefined ? {} : { inlinePlaceholder: changes.inlinePlaceholder }),
+					...(changes.photoFileId === undefined ? {} : { photoFileId: changes.photoFileId }),
 				});
 				return toOwnBot(response.bot, "UpdateBot");
 			}),

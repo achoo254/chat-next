@@ -126,3 +126,14 @@
 @media (max-width: 760px), (pointer: coarse) {
 	.console .btn-sm, .console .scope-tabs button, .console .chips button, .console .choice button { min-height: 44px; }
 }
+
+/* The bot's photo (console.html#bot-photo). */
+.photo-row { display: flex; align-items: center; gap: var(--space-4); }
+.photo-actions { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; min-width: 0; }
+.photo-actions > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.crop-stage { position: relative; width: min(320px, 100%); aspect-ratio: 1; margin-inline: auto; border-radius: var(--radius-md); overflow: hidden; background: var(--c-surface-subtle); touch-action: none; cursor: grab; }
+.crop-stage:focus-visible { outline: 2px solid var(--c-focus, var(--c-primary)); outline-offset: 2px; }
+.crop-stage img { position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; user-select: none; pointer-events: none; }
+.crop-stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.55); outline: 2px solid rgb(255 255 255 / 0.9); pointer-events: none; }
+.crop-zoom { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.crop-zoom input { flex: 1; min-width: 0; }

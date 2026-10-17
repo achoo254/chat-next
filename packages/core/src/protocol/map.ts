@@ -250,6 +250,7 @@ export function toUser(user: WireUser): User {
 		isSelf: user.isSelf,
 		isBlocked: user.isBlocked,
 		...(user.deleted ? { deleted: true } : {}),
+		...(user.photo !== undefined && user.photo.fileId !== "" ? { photoId: user.photo.fileId } : {}),
 	};
 }
 
