@@ -146,6 +146,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		mediaSvc.SetRefresher(chatSvc)
 	}
 	hub := gateway.NewHub(chatSvc, logger)
+	hub.SetMaxOnlineUsers(cfg.MaxOnlineUsers)
 	chatSvc.SetRealtime(hub, hub)
 	ws, err := gateway.New(gateway.Config{Hub: hub, Sessions: sessions, Toucher: st, Origins: origins, Logger: logger})
 	if err != nil {

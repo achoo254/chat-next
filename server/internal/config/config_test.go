@@ -357,3 +357,18 @@ func TestSessionKeyPrevious(t *testing.T) {
 		t.Fatalf("same key twice: %v", err)
 	}
 }
+
+func TestLoadMaxOnlineUsers(t *testing.T) {
+	env := validEnv()
+	if c, err := Load(lookupFrom(env)); err != nil || c.MaxOnlineUsers != DefaultMaxOnlineUsers {
+		t.Fatalf("default: %d, %v", c.MaxOnlineUsers, err)
+	}
+	env["CHAT_MAX_ONLINE_USERS"] = "0"
+	if c, err := Load(lookupFrom(env)); err != nil || c.MaxOnlineUsers != 0 {
+		t.Fatalf("no cap: %d, %v", c.MaxOnlineUsers, err)
+	}
+	env["CHAT_MAX_ONLINE_USERS"] = "-5"
+	if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "CHAT_MAX_ONLINE_USERS") {
+		t.Fatalf("negative: %v", err)
+	}
+}

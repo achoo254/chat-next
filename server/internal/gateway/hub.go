@@ -51,6 +51,8 @@ type Hub struct {
 
 	mu        sync.RWMutex
 	byUser    map[int64]map[*conn]struct{}
+	// maxUsers caps the people online (SetMaxOnlineUsers); 0: no cap.
+	maxUsers int
 	bySession map[int64]map[*conn]struct{}
 	closing   bool
 
@@ -61,6 +63,14 @@ type Hub struct {
 	typingCache map[typingKey]typingAudience
 
 	conns sync.WaitGroup
+}
+
+// SetMaxOnlineUsers caps the people with an open socket (0: no cap); call
+// it before serving.
+func (h *Hub) SetMaxOnlineUsers(n int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.maxUsers = n
 }
 
 // NewHub returns an empty hub.
@@ -94,6 +104,8 @@ const (
 	registered registerResult = iota
 	registerClosing
 	registerTooMany
+	// registerBusy: the process already has MaxOnlineUsers people online.
+	registerBusy
 )
 
 // register adds a connection, unless the hub is shutting down or the
@@ -107,6 +119,11 @@ func (h *Hub) register(c *conn) registerResult {
 	if len(h.bySession[c.sessionID]) >= maxSocketsPerSession || len(h.byUser[c.userID]) >= maxSocketsPerUser {
 		h.mu.Unlock()
 		return registerTooMany
+	}
+	// Someone already online may open another device.
+	if h.maxUsers > 0 && h.byUser[c.userID] == nil && len(h.byUser) >= h.maxUsers {
+		h.mu.Unlock()
+		return registerBusy
 	}
 	wasOnline := h.onlineLocked(c.userID)
 	if h.byUser[c.userID] == nil {

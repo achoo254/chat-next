@@ -451,3 +451,14 @@ func TestTypingNeedsSendPermission(t *testing.T) {
 		t.Fatalf("typing = %v", ty)
 	}
 }
+
+func TestOnlineCapRefusesNewPeopleOnly(t *testing.T) {
+	tg := newTestGateway(t)
+	tg.hub.SetMaxOnlineUsers(1)
+	tg.connect(t, 1)
+	// Someone online may open another device; a new person waits.
+	tg.connect(t, 1)
+	if code := tg.dialHello(t, 2).closeStatus(t); code != websocket.StatusTryAgainLater {
+		t.Fatalf("over the cap: close %v, want try again later", code)
+	}
+}

@@ -46,8 +46,12 @@ Bước 3000 không tin được: máy dev đã dùng 7,1/8 GB swap và process 
 
 - Update có thể tới trước `Hello` trên socket mới. Đây là thiết kế có chủ ý: gateway đăng ký kết nối trước rồi mới chào, và `GetDifference` bù phần còn lại. Client core xử lý theo `pts`, nên đây không phải lỗi.
 
+## Quyết định sau lượt 1
+
+- User 2026-10-17: đặt trần người online. Jev chọn trần theo số người khác nhau có socket realtime trên mỗi process (0,99), là 1000 người (0,61); người vượt trần không có thông báo riêng mà app giữ "Đang kết nối…" và tự thử lại (0,84). Đã làm: `CHAT_MAX_ONLINE_USERS`, mặc định 1000.
+- Không có máy nào khác ngoài `.65` để chạy công cụ tải (user 2026-10-17): mọi lượt đo sau vẫn chạy chung máy, nên số đo là cận dưới.
+
 ## Còn lại của Phase 14
 
-- Đo lại với công cụ tải chạy ở máy khác, để tách CPU của công cụ khỏi máy được đo.
 - Tìm nguyên nhân dồn hàng khi 1500 người vào cùng lúc (bộ phát update khi CPU bão hoà).
 - Các kịch bản chưa chạy: chat lớn (10k, 100k), chuyển chế độ 200 sang 201, người dùng trong 100 nhóm, bot trong 5000 nhóm, upload media, webhook dồn 2000 req/s, gửi hàng loạt 100k, chaos, đo trên thiết bị thật, checklist phát hành.

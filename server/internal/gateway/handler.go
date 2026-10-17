@@ -156,6 +156,11 @@ func (g *Gateway) serve(ws *websocket.Conn, sess store.Session) {
 	case registerClosing:
 		_ = ws.Close(websocket.StatusTryAgainLater, "server restarting")
 		return
+	case registerBusy:
+		// The client keeps "connecting" and retries with backoff.
+		g.logger.Info("websocket refused: online cap reached", "user_id", sess.UserID)
+		_ = ws.Close(websocket.StatusTryAgainLater, "server busy")
+		return
 	case registerTooMany:
 		g.logger.Warn("websocket refused: too many connections", "session_id", sess.ID, "user_id", sess.UserID)
 		_ = ws.Close(websocket.StatusPolicyViolation, "too many connections")

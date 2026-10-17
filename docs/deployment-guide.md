@@ -111,6 +111,7 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 - `ABUSE_STRANGER_CHATS_NEW` (20) và `ABUSE_STRANGER_CHATS` (50): số chat riêng mới với người chưa quen (chưa thêm mình vào danh bạ, không chung nhóm hay kênh) mỗi 24 giờ, cho tài khoản dưới `ABUSE_NEW_ACCOUNT_DAYS` (7) ngày tuổi và tài khoản lâu hơn.
 - `ABUSE_REPORTERS` (3): đủ số người có báo cáo đang mở trong 30 ngày thì tài khoản tạm không nhắn được người chưa quen, tới khi kiểm duyệt đóng báo cáo.
 - `ABUSE_SIGNUPS_PER_IP_HOUR` (30) và `ABUSE_SIGNUPS_PER_10MIN` (300): số tài khoản chat mới tạo ở lần đăng nhập đầu, theo IP mỗi giờ và theo tenant mỗi 10 phút; vượt thì trang đăng nhập báo thử lại sau. Bộ đếm nằm trong bộ nhớ process, restart thì đếm lại.
+- `CHAT_MAX_ONLINE_USERS` (1000, `0` là không giới hạn): số người khác nhau đang mở socket realtime trong một process (mỗi tenant một process). Người đã online mở thêm thiết bị vẫn được; người mới vượt trần bị gateway đóng socket với mã "try again later", app giữ trạng thái "Đang kết nối…" và tự thử lại, các RPC (gửi tin, lịch sử) vẫn chạy. Con số lấy từ load test lượt 1 trên `.65` ([báo cáo](../plans/dattqh/reports/load-test-261017-1102-round1.md)).
 
 Luật bot chạy 10 phút một lần trong `chat-api`: bot có ít nhất 20 người nhận trong 24 giờ mà từ 5% trong đó chặn bot, hoặc có từ 50 người dùng mới trong 24 giờ và gấp 10 lần trung bình tuần trước, bị hạ xuống tầng `restricted` và hiện ở đầu hàng đợi chờ xem xét. Ngưỡng này nằm trong code (`server/internal/chat/moderation_bots.go`).
 

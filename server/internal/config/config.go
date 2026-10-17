@@ -60,6 +60,10 @@ type Config struct {
 	// OperatorUserIDs may use the moderation queue (CHAT_OPERATOR_USER_IDS);
 	// empty by default, so nobody can.
 	OperatorUserIDs []int64
+	// MaxOnlineUsers caps the people with an open realtime socket in this
+	// process (CHAT_MAX_ONLINE_USERS, default DefaultMaxOnlineUsers; 0: no
+	// cap). Someone over it keeps "connecting" and retries; RPC still works.
+	MaxOnlineUsers int
 	// BotWebhookLocal lets bot webhooks use http, loopback addresses and any
 	// port (BOT_WEBHOOK_ALLOW_LOCAL, development only: a local receiver in
 	// development and end-to-end tests).
@@ -107,6 +111,10 @@ type Abuse struct {
 func DefaultAbuse() Abuse {
 	return Abuse{StrangerChatsNew: 20, StrangerChats: 50, NewAccountDays: 7, Reporters: 3, SignupsPerIPHour: 30, SignupsPer10Min: 300}
 }
+
+// DefaultMaxOnlineUsers is the load test's safe level on the shared server
+// (plans/dattqh/reports/load-test-261017-1102-round1.md).
+const DefaultMaxOnlineUsers = 1000
 
 // abuseValueMax bounds every ABUSE_* value.
 const abuseValueMax = 1_000_000
@@ -310,6 +318,16 @@ func Load(lookup Lookup) (Config, error) {
 			errs = append(errs, invalid("CHAT_OPERATOR_USER_IDS", err.Error()))
 		}
 		c.OperatorUserIDs = ids
+	}
+
+	c.MaxOnlineUsers = DefaultMaxOnlineUsers
+	if raw := get("CHAT_MAX_ONLINE_USERS"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > abuseValueMax {
+			errs = append(errs, invalid("CHAT_MAX_ONLINE_USERS", fmt.Sprintf("must be a whole number from 0 to %d", abuseValueMax)))
+		} else {
+			c.MaxOnlineUsers = n
+		}
 	}
 
 	switch raw := get("BOT_WEBHOOK_ALLOW_LOCAL"); raw {

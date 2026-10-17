@@ -103,6 +103,8 @@ func stack(ctx context.Context, apiAddr, idpAddr string, pgPort uint32, n int, l
 		// Every fake person signs up from this machine.
 		"ABUSE_SIGNUPS_PER_IP_HOUR": "0",
 		"ABUSE_SIGNUPS_PER_10MIN":   "0",
+		// The load test measures past the online cap.
+		"CHAT_MAX_ONLINE_USERS": "0",
 	}
 	cfg, err := config.Load(func(name string) (string, bool) { v, ok := env[name]; return v, ok })
 	if err != nil {
