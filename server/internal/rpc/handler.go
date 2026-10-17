@@ -58,6 +58,9 @@ type Deps struct {
 	Logger     *slog.Logger
 }
 
+// compressMinBytes: smaller answers go out uncompressed.
+const compressMinBytes = 1024
+
 // NewHandler returns the Connect handler for AuthService, UsersService,
 // ConfigService, ChatsService, MessagesService, UpdatesService,
 // ModerationService, IntegrationsService, MediaService, SearchService,
@@ -82,6 +85,9 @@ func NewHandler(d Deps) (http.Handler, error) {
 			authInterceptor(d.Sessions, d.Logger),
 		),
 		connect.WithReadMaxBytes(maxRequestBytes),
+		// Most answers are a few hundred bytes: gzip costs more CPU than it
+		// saves there (about 7% of the api's CPU under load).
+		connect.WithCompressMinBytes(compressMinBytes),
 	}
 	mux := http.NewServeMux()
 	mux.Handle(appv1connect.NewAuthServiceHandler(&authService{
