@@ -15,7 +15,9 @@
     "proto:lint": "buf lint proto",
     "proto:breaking": "buf breaking proto --against '.git#branch=main,subdir=proto'",
     "proto:gen": "buf generate proto --template proto/buf.gen.yaml",
-    "brand:gen": "pnpm --filter @app/brand generate"
+    "brand:gen": "pnpm --filter @app/brand generate",
+    "sdk:gen": "cd server && go run ./cmd/sdkgen",
+    "conformance:sdk": "cd server && SDK_CONFORMANCE=1 go test -count=1 -run TestSDKConformance ./internal/api/"
   },
   "devDependencies": {
     "@bufbuild/buf": "1.73.0",

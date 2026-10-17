@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	appv1 "app.local/server/gen/app/v1"
+	chatsvc "app.local/server/internal/chat"
 )
 
 // User is a user or bot as a bot sees it.
@@ -292,6 +293,15 @@ func FromMessage(m *appv1.Message, chat Chat, users Users) Message {
 		Text: m.GetText(), ReplyToSeq: m.GetReplyToSeq(), EditDate: m.GetEditDate(),
 		IntegrationLabel: m.GetIntegrationLabel(), RandomID: m.GetRandomId(), GroupedID: m.GetGroupedId(),
 	}
+	// Clients do not mark commands; like the server's own /start, a command
+	// at the start of the text gets its bot_command entity here.
+	if name, target, ok := chatsvc.CommandOf(m.GetText()); ok && !startsWithEntity(m.GetEntities()) {
+		length := 1 + len(name)
+		if target != "" {
+			length += 1 + len(target)
+		}
+		out.Entities = append(out.Entities, Entity{Type: "bot_command", Length: int32(length)})
+	}
 	for _, e := range m.GetEntities() {
 		out.Entities = append(out.Entities, Entity{
 			Type: entityNames[e.GetType()], Offset: e.GetOffset(), Length: e.GetLength(),
@@ -312,6 +322,15 @@ func FromMessage(m *appv1.Message, chat Chat, users Users) Message {
 		out.ForwardFrom = &ForwardFrom{UserID: f.GetFromUserId(), ChatID: f.GetFromChatId(), Name: f.GetFromName(), Date: f.GetDate()}
 	}
 	return out
+}
+
+func startsWithEntity(list []*appv1.MessageEntity) bool {
+	for _, e := range list {
+		if e.GetOffset() == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func fromAction(a *appv1.MessageAction) *Action {

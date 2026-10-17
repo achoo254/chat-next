@@ -1,7 +1,7 @@
 ---
 phase: 15
 title: "Phase 15 (8b): SDK bot và Developer Console"
-status: pending
+status: in-progress
 priority: P1
 effort: "L"
 dependencies: [8]
@@ -62,12 +62,12 @@ Create:
 
 ## Todo
 
-- [ ] Sinh model từ OpenAPI (3 ngôn ngữ)
-- [ ] Runtime + ví dụ TS/Python/Go
+- [x] Sinh model từ OpenAPI (3 ngôn ngữ): `server/cmd/sdkgen` sinh model và đủ 33 method; `go test ./cmd/sdkgen` đỏ khi spec đổi mà chưa sinh lại
+- [x] Runtime + ví dụ TS/Python/Go (2026-10-17, chỉ stdlib; test: TS 39, Python 65, Go 35 + 10 subtest)
 - [ ] Developer Console (lát A: tạo bot, hồ sơ, token, lệnh; lát B1: nhận update webhook/long poll, trạng thái, update lỗi, số liệu 24 giờ, tầng rate limit; còn: ảnh bot)
-- [ ] Conformance 3 SDK × 2 chế độ
+- [x] Conformance 3 SDK × 2 chế độ (`pnpm conformance:sdk`, test Go `TestSDKConformance` với server thật: 30/30 kịch bản)
 - [ ] Docs (lát B1: `docs/bot-api/README.md` bắt đầu nhanh + kiểm HMAC Node/Python/Go; còn: tham chiếu sinh từ OpenAPI)
-- [ ] Phát hành registry nội bộ
+- [ ] Phát hành registry (Jev 0,81: chưa làm; SDK nằm trong repo, dựng registry khi ra mắt)
 
 ## Success Criteria
 

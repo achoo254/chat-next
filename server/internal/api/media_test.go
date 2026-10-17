@@ -45,7 +45,7 @@ type mediaEnv struct {
 
 // newMediaEnv is an env with media on a temporary directory (the
 // production setup), or with storage "s3" on an in-process S3 fake.
-func newMediaEnv(t *testing.T, storage string, mod func(*config.Media)) *mediaEnv {
+func newMediaEnv(t *testing.T, storage string, mod func(*config.Media), more ...func(*config.Config, *api.Options)) *mediaEnv {
 	t.Helper()
 	me := &mediaEnv{}
 	var objects media.Objects
@@ -78,6 +78,9 @@ func newMediaEnv(t *testing.T, storage string, mod func(*config.Media)) *mediaEn
 			mod(c.Media)
 		}
 		o.MediaObjects = objects
+		for _, m := range more {
+			m(c, o)
+		}
 	})
 	return me
 }

@@ -232,3 +232,17 @@ curl -s ... -d '{
 - Trả lời trong 1 phút; người dùng chờ tối đa 10 giây, quá thì app báo bot chưa trả lời.
 - Tối đa 50 kết quả. `article` gửi `text`; `photo`, `video`, `document` gửi file `file_id` của bot (file bot đã gửi hoặc thấy được) kèm `caption`. Mọi kết quả có thể kèm bàn phím inline chỉ gồm nút link (không có nút callback, vì tin là của người dùng, trong chat bot có thể không tham gia); `thumbnail_file_id` là ảnh nhỏ của bài viết.
 - `cache_time` (mặc định 300 giây, tối đa 3600): câu trả lời được dùng lại cho cùng từ khoá với mọi người, trừ khi `is_personal`. `gallery: true` hiện kết quả dạng lưới.
+
+## 11. SDK chính thức
+
+Ba SDK trong repo, chỉ dùng thư viện chuẩn, cùng hành vi (bộ conformance chạy cả ba với server thật):
+
+| Ngôn ngữ | Thư mục | Cài |
+|---|---|---|
+| TypeScript (Node ≥ 22) | [`sdk/ts`](../../sdk/ts/README.md) | package `@app/sdk` trong workspace |
+| Python ≥ 3.11 | [`sdk/python`](../../sdk/python/README.md) | `pip install ./sdk/python`, import `chatbot` |
+| Go ≥ 1.24 | [`sdk/go`](../../sdk/go/README.md) | module `github.com/achoo254/chat-next/sdk/go` (repo riêng tư: đặt `GOPRIVATE`) |
+
+Mỗi SDK có client cho mọi method (sinh từ `spec/bot-api/openapi.yaml`), tự thử lại khi `429`/`503` theo `retry_after`, long poll, handler webhook đã kiểm HMAC và timestamp, router lệnh, nút và inline, cùng 5 bot mẫu (`echo`, `keyboard`, `files`, `commands`, `inline`) chạy được ở cả long poll lẫn webhook qua biến môi trường `BOT_TOKEN`, `BOT_API`, `BOT_MODE`.
+
+Người phát triển SDK: đổi OpenAPI thì chạy `pnpm sdk:gen` (`go test ./cmd/sdkgen` trong `server/` đỏ nếu quên); `pnpm conformance:sdk` chạy 3 SDK × 2 chế độ × 5 bot mẫu (cần `node`, `python3`, `go`). Hợp đồng chung: [`phase-15-sdk-contract.md`](../../plans/dattqh/261013-0448-chat-platform-v1/phase-15-sdk-contract.md).

@@ -170,6 +170,8 @@ importers:
         specifier: 2.16.0
         version: 2.16.0
 
+  sdk/ts: {}
+
 packages:
 
   '@asamuzakjp/css-color@7.1.5':
