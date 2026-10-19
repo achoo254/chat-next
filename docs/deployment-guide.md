@@ -77,6 +77,8 @@ Release R5 bot chính thức (Trợ lý, migration `0016_system_bot_feedback`) k
 - Góp ý gửi cho Trợ lý nằm ở Kiểm duyệt > Góp ý, chỉ tài khoản vận hành thấy: đặt `CHAT_OPERATOR_USER_IDS` như ở [Tài khoản vận hành](#tài-khoản-vận-hành-kiểm-duyệt). Chưa đặt thì góp ý vẫn được lưu, chỉ chưa ai đọc được.
 - Rollback code về bản trước: chat với Trợ lý vẫn hiện (là chat với một bot), bấm "Bắt đầu" không có trả lời; góp ý đã lưu giữ nguyên.
 
+Release R6 Mini App (migration `0028_bot_mini_app`) đổi CSP của `chat.hoandat.com.conf` (thêm `frame-src https:` để mở Mini App từ URL https của nhà phát triển bot), nên **phải deploy bằng root một lần**: deploy tự động dùng conf trong `/opt/chat/infra/nginx`, chưa có `frame-src`, nên trình duyệt chặn mọi iframe Mini App (app vẫn chạy bình thường). Không cần DNS, chứng chỉ hay biến môi trường mới; khoá ký init data dẫn xuất từ `SESSION_KEY` sẵn có. Migration chỉ thêm cột `bots.mini_app_url` (mặc định rỗng, binary cũ bỏ qua); rollback code về bản trước thì nút Mini App không mở được, dữ liệu giữ nguyên.
+
 ## Các lần sau
 
 Mặc định deploy tự động: mỗi lần `ci` xanh trên `main`, workflow [`deploy`](../.github/workflows/deploy.yml) build release trong một job không có key deploy, rồi job deploy tải lên `/opt/chat/incoming/<id>` bằng user `chat-deploy` rồi gọi lệnh sudo duy nhất user này có, `/usr/local/sbin/chat-activate-incoming <id>` ([`activate-incoming.sh`](../infra/chat/activate-incoming.sh)). Lệnh đó chuyển bản upload vào `/opt/chat/staging` (chỉ root), đổi chủ sang root rồi mới kiểm (từ chối symlink và file đặc biệt), chuyển sang `/opt/chat/releases`, thay conf nginx bằng bản trong `/opt/chat/infra/nginx` (bản upload không đổi được nginx), rồi chạy `activate-release.sh`; cuối cùng workflow chạy `smoke.sh`.
