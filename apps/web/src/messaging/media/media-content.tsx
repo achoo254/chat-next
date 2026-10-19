@@ -313,6 +313,7 @@ interface UploadView {
 	readonly text: string;
 	readonly failed: boolean;
 	readonly waiting: boolean;
+	readonly paused: boolean;
 }
 
 function useUploadView(pending: PendingMessage, media: PendingMedia): UploadView {
@@ -321,19 +322,22 @@ function useUploadView(pending: PendingMessage, media: PendingMedia): UploadView
 	const progress = useUploadProgress(media.uploadKey);
 	const connection = useConnection();
 	const failed = pending.failure !== null || progress?.state === "failed";
-	const waiting = !failed && (connection === "offline" || connection === "waiting");
+	const paused = !failed && progress?.state === "paused";
+	const waiting = !failed && !paused && (connection === "offline" || connection === "waiting");
 	// No upload row: the file is stored and the message is on its way.
 	const sent = progress === null ? media.size : progress.sentBytes;
 	const total = progress === null ? media.size : progress.totalBytes;
 	const pct = percent(sent, total);
 	let text = `${formatProgress(sent, total, locale)} · ${pct}%`;
 	if (failed) text = `${copy.upload.failed} · ${formatBytes(total, locale)}`;
+	else if (paused) text = `${copy.upload.paused} · ${formatProgress(sent, total, locale)}`;
 	else if (waiting) text = `${copy.upload.waiting} · ${formatProgress(sent, total, locale)}`;
 	else if (progress !== null && (progress.state === "queued" || progress.state === "hashing") && sent === 0) text = copy.upload.preparing;
-	return { pct, text, failed, waiting };
+	return { pct, text, failed, waiting, paused };
 }
 
-function UploadActions({ pending, view, round }: { pending: PendingMessage; view: UploadView; round: boolean }) {
+/** Retry after a failure, cancel while offline, otherwise pause or resume (mockups/media.html#upload); cancel is also in the message menu. */
+function UploadActions({ pending, media, view, round }: { pending: PendingMessage; media: PendingMedia; view: UploadView; round: boolean }) {
 	const copy = useMediaCopy();
 	const { source, toasts } = useServices();
 	if (view.failed) {
@@ -351,15 +355,29 @@ function UploadActions({ pending, view, round }: { pending: PendingMessage; view
 			</button>
 		);
 	}
-	const cancel = () => {
-		source.discardOutbox(pending.outboxId).then(
-			() => toasts.show(copy.upload.cancelled),
+	if (view.waiting) {
+		const cancel = () => {
+			source.discardOutbox(pending.outboxId).then(
+				() => toasts.show(copy.upload.cancelled),
+				() => toasts.show(copy.tray.sendFailed),
+			);
+		};
+		return (
+			<button type="button" className={round ? "round-btn" : "icon-btn"} aria-label={copy.upload.cancel} onClick={cancel}>
+				<Icon name="x" />
+			</button>
+		);
+	}
+	const toggle = () => {
+		const done = view.paused ? source.resumeUpload(media.uploadKey) : source.pauseUpload(media.uploadKey);
+		done.then(
+			() => toasts.show(view.paused ? copy.upload.resumedToast : copy.upload.pausedToast),
 			() => toasts.show(copy.tray.sendFailed),
 		);
 	};
 	return (
-		<button type="button" className={round ? "round-btn" : "icon-btn"} aria-label={copy.upload.cancel} onClick={cancel}>
-			<Icon name="x" />
+		<button type="button" className={round ? "round-btn" : "icon-btn"} aria-label={view.paused ? copy.upload.resume : copy.upload.pause} onClick={toggle}>
+			{view.paused ? <Icon name="upload" /> : <MediaIcon name="pause" />}
 		</button>
 	);
 }
@@ -367,7 +385,7 @@ function UploadActions({ pending, view, round }: { pending: PendingMessage; view
 function ProgressBar({ view, label }: { view: UploadView; label: string }) {
 	return (
 		<span
-			className={view.failed ? "up-bar failed" : view.waiting ? "up-bar waiting" : "up-bar"}
+			className={view.failed ? "up-bar failed" : view.waiting ? "up-bar waiting" : view.paused ? "up-bar paused" : "up-bar"}
 			role="progressbar"
 			aria-label={label}
 			aria-valuemin={0}
@@ -390,7 +408,7 @@ function PendingPicture({ pending, media, cell = false }: { pending: PendingMess
 			<PictureLayers thumb={inlineThumbUrl(media.inlineThumb)} url={local} />
 			<span className="pic-state">
 				{view.failed ? (
-					<UploadActions pending={pending} view={view} round />
+					<UploadActions pending={pending} media={media} view={view} round />
 				) : (
 					<span
 						className="ring"
@@ -401,7 +419,7 @@ function PendingPicture({ pending, media, cell = false }: { pending: PendingMess
 						aria-valuemax={100}
 						aria-valuenow={view.pct}
 					>
-						<UploadActions pending={pending} view={view} round />
+						<UploadActions pending={pending} media={media} view={view} round />
 					</span>
 				)}
 			</span>
@@ -429,7 +447,7 @@ function PendingCard({ pending, media }: { pending: PendingMessage; media: Pendi
 				</small>
 				{!view.failed && <ProgressBar view={view} label={copy.upload.progress} />}
 			</span>
-			<UploadActions pending={pending} view={view} round={false} />
+			<UploadActions pending={pending} media={media} view={view} round={false} />
 		</div>
 	);
 }

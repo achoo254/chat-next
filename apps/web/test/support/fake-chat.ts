@@ -1539,6 +1539,8 @@ export function toSource(core: ChatCore): ChatSource {
 		sendMedia: (chatId, file, media, options) => core.sendMedia(chatId, file, media, options),
 		sendAlbum: (chatId, items, options) => core.sendAlbum(chatId, items, options),
 		uploadProgress: (key) => core.uploadProgress(key),
+		pauseUpload: (key) => core.pauseUpload(key),
+		resumeUpload: (key) => core.resumeUpload(key),
 		pendingFile: (key) => core.pendingFile(key),
 		mediaFile: (request) => core.mediaFile(request),
 		mediaUrl: (request, refresh) => core.mediaUrl(request, refresh),

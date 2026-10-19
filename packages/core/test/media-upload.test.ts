@@ -179,6 +179,41 @@ describe("upload queue", () => {
 		expect(r.media.puts.slice(stored).toSorted((a, b) => a - b)).toEqual([4, 5, 6]);
 	});
 
+	it("pauses an upload, keeps its parts across a reload and resumes from them", async () => {
+		const r = await rig();
+		r.media.putFault = (part) => (part > 3 ? 500 : null);
+		const first = r.queue();
+		await first.start();
+		const data = bytes(24, 3);
+		await r.add(first, { key: "p" }, data);
+		const sent = first.waitFor("p");
+		await until(async () => {
+			const row = (await r.driver.query("SELECT parts FROM uploads WHERE key = 'p'"))[0];
+			return typeof row?.parts === "string" && (JSON.parse(row.parts) as unknown[]).length === 3;
+		});
+		await first.pause("p");
+		expect(await first.progress("p")).toMatchObject({ state: "paused", sentBytes: 12, totalBytes: 24 });
+		// Paused stays paused: scheduling (a retry, the queue restarting) does not start it.
+		r.media.putFault = null;
+		first.schedule("p");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(r.media.puts.length).toBe(3);
+		first.stop();
+		await expect(sent).rejects.toThrow("uploads stopped");
+
+		// After a reload it is still paused, then resumes with only the missing parts.
+		const second = r.queue();
+		await second.start();
+		expect(await second.progress("p")).toMatchObject({ state: "paused" });
+		const media = second.waitFor("p");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(r.media.puts.length).toBe(3);
+		await second.resume("p");
+		expect(r.media.bytesOf((await media).fileId)).toEqual(data);
+		expect(r.media.puts.slice(3).toSorted((a, b) => a - b)).toEqual([4, 5, 6]);
+		expect(await second.progress("p")).toMatchObject({ state: "done" });
+	});
+
 	it("refreshes part URLs answered with 403 and retries the part", async () => {
 		const r = await rig();
 		r.media.putFault = (part, attempt) => (part === 2 && attempt === 1 ? 403 : null);

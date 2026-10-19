@@ -137,7 +137,8 @@ Module riêng; worker lỗi thì tin vẫn gửi với thumb client và bản đ
 - Host media `media-chat.hoandat.com` (Cloudflare proxied, chứng chỉ riêng), cấu hình qua `MEDIA_PUBLIC_URL`; trước R9 chuyển sang domain đăng ký riêng.
 - Khác plan gốc: không có "pod sandbox" ở giai đoạn 1; ảnh được giải mã bằng thư viện Go thuần (không CGO, an toàn bộ nhớ) trong process `api` với giới hạn pixel và ngân sách bộ nhớ, ffmpeg (tuỳ chọn) chạy tiến trình con với môi trường rỗng, demuxer cố định, chỉ giao thức của input. Strip metadata không mã hoá lại (giữ Orientation); thumb inline do server tạo cho ảnh, client gửi cho video khi không có ffmpeg.
 - Chi tiết giao thức: [`server/README.md`](../../../server/README.md#media-package-internalmedia); vận hành: [`docs/deployment-guide.md`](../../../docs/deployment-guide.md#media-r3).
-- Còn thiếu: UI web, ảnh hồ sơ/ảnh chat, ảnh cho webhook, poster video và waveform khi server chưa có ffmpeg, metadata trong WebM không bị bỏ, giữ `grouped_id` khi chuyển tiếp album.
+- 2026-10-19: MP4 bỏ cả ruột hộp metadata (trước chỉ đổi tên hộp); WebM/MKV bỏ metadata bằng phần tử Void cùng độ dài; album chuyển tiếp giữ nhóm; tạm dừng/tiếp tục upload từng file. Không có ffmpeg: video giữ thumb 40 px của client, khung thay thế khi không đo được (Jev 0,87).
+- Còn thiếu: ảnh cho webhook, waveform cho file âm thanh chọn từ máy.
 
 ## Next Steps
 

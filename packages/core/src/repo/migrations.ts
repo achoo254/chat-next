@@ -327,6 +327,14 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE chats ADD COLUMN photo_id TEXT NOT NULL DEFAULT ''",
 		],
 	},
+	{
+		version: 14,
+		statements: [
+			// UploadQueue.pause: a paused upload keeps its stored parts and
+			// does not restart with the queue until it is resumed.
+			"ALTER TABLE uploads ADD COLUMN paused INTEGER NOT NULL DEFAULT 0",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

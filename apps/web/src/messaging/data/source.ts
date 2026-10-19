@@ -70,6 +70,8 @@ export interface ChatSource {
 	sendAlbum(chatId: number, items: readonly AlbumItemInput[], options?: SendAlbumOptions): Promise<PendingMessage[]>;
 	/** Upload state of a pending media send; changes arrive as EventKeys.upload(uploadKey). */
 	uploadProgress(uploadKey: string): Promise<UploadProgress | null>;
+	pauseUpload(uploadKey: string): Promise<void>;
+	resumeUpload(uploadKey: string): Promise<void>;
 	/** The local file of a pending media send (shown before the upload ends). */
 	pendingFile(uploadKey: string): Promise<Blob | null>;
 	/** A message's file or rendition, from the media cache or downloaded into it. */

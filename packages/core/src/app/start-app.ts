@@ -146,6 +146,9 @@ export interface ChatCore {
 	sendAlbum(chatId: number, items: readonly AlbumItemInput[], options?: SendAlbumOptions): Promise<PendingMessage[]>;
 	/** State of a pending media send's upload (PendingMedia.uploadKey); events: EventKeys.upload(key). */
 	uploadProgress(uploadKey: string): Promise<UploadProgress | null>;
+	/** Pauses a pending media send's upload (its parts stay); its message waits until resumed. */
+	pauseUpload(uploadKey: string): Promise<void>;
+	resumeUpload(uploadKey: string): Promise<void>;
 	/** The local file of a pending media send, to show it before the upload ends. */
 	pendingFile(uploadKey: string): Promise<Blob | null>;
 	/** A message's file (or one rendition), from the media cache or downloaded into it. */
@@ -700,6 +703,14 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		uploadProgress: async (uploadKey) => {
 			active();
 			return requireMedia(uploads).progress(uploadKey);
+		},
+		pauseUpload: async (uploadKey) => {
+			active();
+			await requireMedia(uploads).pause(uploadKey);
+		},
+		resumeUpload: async (uploadKey) => {
+			active();
+			await requireMedia(uploads).resume(uploadKey);
 		},
 		pendingFile: async (uploadKey) => {
 			active();

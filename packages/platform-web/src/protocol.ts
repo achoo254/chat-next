@@ -29,6 +29,8 @@ export const CORE_METHODS = [
 	"sendMedia",
 	"sendAlbum",
 	"uploadProgress",
+	"pauseUpload",
+	"resumeUpload",
 	"pendingFile",
 	"mediaFile",
 	"mediaUrl",

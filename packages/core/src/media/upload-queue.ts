@@ -38,7 +38,8 @@ export interface UploadSpec {
 	readonly waveform: Uint8Array;
 }
 
-export type UploadState = "queued" | "hashing" | "uploading" | "completing" | "done" | "failed";
+/** paused: the user paused it (UploadQueue.pause); the parts stored so far are kept. */
+export type UploadState = "queued" | "hashing" | "uploading" | "completing" | "paused" | "done" | "failed";
 
 export interface UploadProgress {
 	readonly key: string;
@@ -213,6 +214,8 @@ export class UploadQueue {
 	private readonly jobs = new Map<string, Job>();
 	private readonly waiting: string[] = [];
 	private readonly waiters = new Map<string, Waiter[]>();
+	/** Uploads the user paused; they wait (and their sends with them) until resumed. */
+	private readonly paused = new Set<string>();
 	private readonly random: () => number;
 	private readonly backoff: BackoffPolicy;
 	private readonly maxFiles: number;
@@ -232,8 +235,12 @@ export class UploadQueue {
 	/** Resumes every unfinished upload (after a start or a reconnect). */
 	async start(): Promise<void> {
 		this.running = true;
-		const rows = await this.options.db.query("SELECT key FROM uploads WHERE media IS NULL AND failure IS NULL ORDER BY created_at");
-		for (const row of rows) this.schedule(str(row, "key"));
+		const rows = await this.options.db.query("SELECT key, paused FROM uploads WHERE media IS NULL AND failure IS NULL ORDER BY created_at");
+		for (const row of rows) {
+			const key = str(row, "key");
+			if (row.paused === 1) this.paused.add(key);
+			else this.schedule(key);
+		}
 	}
 
 	/** Stops every transfer; waiting callers get a retryable error. */
@@ -273,9 +280,9 @@ export class UploadQueue {
 		);
 	}
 
-	/** Starts (or queues) the upload of `key` unless it runs already. */
+	/** Starts (or queues) the upload of `key` unless it runs already or is paused. */
 	schedule(key: string): void {
-		if (!this.running || this.jobs.has(key) || this.waiting.includes(key)) return;
+		if (!this.running || this.paused.has(key) || this.jobs.has(key) || this.waiting.includes(key)) return;
 		this.waiting.push(key);
 		this.pump();
 	}
@@ -304,15 +311,44 @@ export class UploadQueue {
 		return done;
 	}
 
+	/**
+	 * Pauses an unfinished upload: its transfer stops, the parts stored so
+	 * far stay (the server keeps the session for 24 h), and its send waits.
+	 */
+	async pause(key: string): Promise<void> {
+		const row = await this.load(key);
+		if (row === null || row.media !== null || this.paused.has(key)) return;
+		this.paused.add(key);
+		await this.options.db.commit((w) => {
+			w.add("UPDATE uploads SET paused = 1 WHERE key = ?", [key]);
+		});
+		const index = this.waiting.indexOf(key);
+		if (index >= 0) this.waiting.splice(index, 1);
+		this.jobs.get(key)?.abort.abort();
+		this.options.emit(key);
+	}
+
+	/** Resumes a paused upload from the parts it stored. */
+	async resume(key: string): Promise<void> {
+		if (!this.paused.delete(key)) return;
+		await this.options.db.commit((w) => {
+			w.add("UPDATE uploads SET paused = 0 WHERE key = ?", [key]);
+		});
+		this.schedule(key);
+		this.options.emit(key);
+	}
+
 	async progress(key: string): Promise<UploadProgress | null> {
 		const job = this.jobs.get(key);
-		if (job !== undefined) {
+		// A paused job may still be winding down: report it paused at once.
+		if (job !== undefined && !this.paused.has(key)) {
 			return { key, state: job.state, sentBytes: job.sentBytes, totalBytes: job.totalBytes, failure: null };
 		}
 		const row = await this.load(key);
 		if (row === null) return null;
 		const sent = row.media !== null ? row.size : this.storedBytes(row);
-		const state: UploadState = row.media !== null ? "done" : row.failure !== null ? "failed" : "queued";
+		const state: UploadState =
+			row.media !== null ? "done" : row.failure !== null ? "failed" : this.paused.has(key) ? "paused" : "queued";
 		return { key, state, sentBytes: sent, totalBytes: row.size, failure: row.failure };
 	}
 
@@ -330,6 +366,7 @@ export class UploadQueue {
 			const row = await this.load(key);
 			const job = this.jobs.get(key);
 			job?.abort.abort();
+			this.paused.delete(key);
 			const index = this.waiting.indexOf(key);
 			if (index >= 0) this.waiting.splice(index, 1);
 			for (const waiter of this.waiters.get(key) ?? []) waiter.reject(permanent("upload canceled"));

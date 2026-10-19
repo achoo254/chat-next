@@ -52,6 +52,7 @@ button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, trans
 .up-bar { display: block; height: 4px; margin-top: var(--space-1); border-radius: var(--radius-full); background: var(--c-bar-track); overflow: hidden; }
 .up-bar > span { display: block; height: 100%; border-radius: var(--radius-full); background: var(--c-primary-solid); transition: width var(--dur-base) var(--ease-standard); }
 .up-bar.waiting > span { background: var(--c-warning); }
+.up-bar.paused > span { background: var(--c-border-strong); }
 
 /* ---------- Voice ---------- */
 .voice { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: center; padding: var(--space-1); width: min(280px, 100%); }

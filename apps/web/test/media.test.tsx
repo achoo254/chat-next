@@ -94,7 +94,7 @@ describe("attaching", () => {
 		expect([...(server?.files.values() ?? [])].some((stored) => stored.ref.fileName === "bao-cao-q3.pdf")).toBe(true);
 	});
 
-	it("shows progress while uploading and cancels the upload", async () => {
+	it("shows progress while uploading, pauses and resumes", async () => {
 		const { f, chat, server } = setup(true);
 		if (server === null) throw new Error("media");
 		// The storage keeps failing: the upload backs off and stays pending.
@@ -107,9 +107,29 @@ describe("attaching", () => {
 		const bar = await within(log).findByRole("progressbar", { name: "Tiến độ tải lên" }, LONG);
 		expect(bar.getAttribute("aria-valuemax")).toBe("100");
 		expect(within(log).getByText("ban-thiet-ke.zip")).toBeTruthy();
-		await userEvent.click(within(log).getByRole("button", { name: "Huỷ tải lên" }));
-		await waitFor(() => expect(within(log).queryByText("ban-thiet-ke.zip")).toBeNull(), LONG);
-		expect(await screen.findByText("Đã huỷ, phần đã tải được dọn sau")).toBeTruthy();
+		// Paused, it says so and offers to resume; resumed, it finishes once storage works.
+		await userEvent.click(within(log).getByRole("button", { name: "Tạm dừng tải lên" }));
+		expect(await within(log).findByText(/^Đã tạm dừng · /, {}, LONG)).toBeTruthy();
+		expect(await screen.findByText("Đã tạm dừng, phần đã tải được giữ lại")).toBeTruthy();
+		server.putFault = null;
+		await userEvent.click(within(log).getByRole("button", { name: "Tiếp tục tải lên" }));
+		expect(await screen.findByText("Tiếp tục từ phần đã tải")).toBeTruthy();
+		expect(await within(log).findByRole("button", { name: "Tải xuống ban-thiet-ke.zip" }, LONG)).toBeTruthy();
+	});
+
+	it("cancels an upload from the message menu", async () => {
+		const { f, chat, server } = setup(true);
+		if (server === null) throw new Error("media");
+		server.putFault = () => 503;
+		const log = await open(f, chat);
+		await screen.findByRole("button", { name: "Đính kèm" }, LONG);
+		pick([file("ban-nhap.zip", 200_000, "application/zip")]);
+		await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
+		await userEvent.click(screen.getByRole("button", { name: "Gửi" }));
+		const name = await within(log).findByText("ban-nhap.zip", {}, LONG);
+		fireEvent.contextMenu(name);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Xoá" }));
+		await waitFor(() => expect(within(log).queryByText("ban-nhap.zip")).toBeNull(), LONG);
 	});
 
 	it("marks a refused upload failed and sends it on retry", async () => {
