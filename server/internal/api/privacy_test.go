@@ -499,3 +499,42 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+// Members of the groups of a person who deletes the account learn it at
+// once (user_changed with the user as they see it now), not only when that
+// person shows up again in an update.
+func TestAccountDeletionTellsGroupMembers(t *testing.T) {
+	e := newEnv(t)
+	an, binh, chi := e.member(t, "annguyen"), e.member(t, "binhtran"), e.member(t, "chile")
+	ctx := t.Context()
+	for _, m := range []*chatClients{an, chi} {
+		if _, err := m.users.AddContact(ctx, connect.NewRequest(&appv1.AddContactRequest{Target: &appv1.AddContactRequest_Username{Username: "binhtran"}})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	group, err := binh.chats.CreateGroup(ctx, connect.NewRequest(&appv1.CreateGroupRequest{Title: "Trực ca", UserIds: []int64{an.userID, chi.userID}}))
+	if err != nil || len(group.Msg.GetFailures()) != 0 {
+		t.Fatalf("group: %v, %v", group, err)
+	}
+	start := rpcOK(t, chi.updates.GetState, &appv1.GetStateRequest{}).GetState()
+	e.reauth(t, an, "annguyen")
+	if _, err := an.privacy(e).DeleteAccount(ctx, connect.NewRequest(&appv1.DeleteAccountRequest{Confirmation: "annguyen"})); err != nil {
+		t.Fatal(err)
+	}
+	diff := rpcOK(t, chi.updates.GetDifference, &appv1.GetDifferenceRequest{Pts: start.GetPts(), ServerEpoch: start.GetServerEpoch()}).GetFull()
+	told := false
+	for _, u := range diff.GetUpdates() {
+		if u.GetUserChanged().GetUserId() == an.userID {
+			told = true
+		}
+	}
+	deleted := false
+	for _, u := range diff.GetUsers() {
+		if u.GetId() == an.userID {
+			deleted = u.GetDeleted() && u.GetName() == ""
+		}
+	}
+	if !told || !deleted {
+		t.Fatalf("chi's difference: told %v, deleted %v: %v", told, deleted, diff)
+	}
+}

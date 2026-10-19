@@ -33,6 +33,7 @@ const (
 	kindChatDeleted       = "chat_deleted"
 	kindDialogUnreadMark  = "dialog_unread_mark"
 	kindNotifySettings    = "notification_settings"
+	kindUserChanged       = "user_changed"
 	// kindInlineButton: a user pressed a bot's callback button; the row
 	// carries no log entries, the press is in bot_callbacks.
 	kindInlineButton = "inline_button"

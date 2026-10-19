@@ -955,6 +955,8 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 				ents.addUsers(viewer, k.MemberRemoved.GetUserId(), k.MemberRemoved.GetActorId())
 			case *appv1.Update_MemberPermissions:
 				ents.addUsers(viewer, k.MemberPermissions.GetUserId())
+			case *appv1.Update_UserChanged:
+				ents.addUsers(viewer, k.UserChanged.GetUserId())
 			default:
 			}
 		}

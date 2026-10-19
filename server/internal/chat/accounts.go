@@ -60,11 +60,12 @@ func (s *Service) privatePeers(ctx context.Context, q querier, userID int64) (ma
 	return out, nil
 }
 
-// AnnounceUserChanged tells the other participant of every private chat of
-// userID that the account changed (it waits for deletion, was restored or
-// was erased): each gets chat_updated, which carries the user as they see
-// it now. Members of shared groups learn it the next time the user comes
-// with an update or a lookup.
+// AnnounceUserChanged tells others that the account of userID changed (it
+// waits for deletion, was restored or was erased): the other participant of
+// each private chat gets chat_updated, and the members of its groups and
+// channels get user_changed; both carry the user as they see it now.
+// Channels and groups of the large sync mode are left out: their members
+// get the user with its next update there.
 func (s *Service) AnnounceUserChanged(ctx context.Context, userID int64) error {
 	_, err := s.inTx(ctx, func(t *txn) error {
 		peers, err := s.privatePeers(ctx, t.tx, userID)
@@ -74,10 +75,31 @@ func (s *Service) AnnounceUserChanged(ctx context.Context, userID int64) error {
 		for chatID, peer := range peers {
 			t.announceChatTo(chatID, userID, peer)
 		}
+		rows, err := t.tx.Query(ctx, `
+			SELECT DISTINCT o.user_id FROM chat_members m
+			JOIN chats c ON c.id = m.chat_id AND c.type IN ('group', 'channel') AND c.sync_mode = $3 AND c.deleted_at IS NULL
+				AND c.tenant_id = $2
+			JOIN chat_members o ON o.chat_id = m.chat_id AND o.left_at IS NULL AND o.user_id <> $1
+			WHERE m.user_id = $1 AND m.left_at IS NULL
+			LIMIT $4`, userID, s.cfg.TenantID, syncSmall, userChangedMax)
+		if err != nil {
+			return fmt.Errorf("chat: members to tell: %w", err)
+		}
+		members, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+		if err != nil {
+			return fmt.Errorf("chat: members to tell: %w", err)
+		}
+		t.toUsers(t.event(kindUserChanged, 0, userID), members, &appv1.Update{Kind: &appv1.Update_UserChanged{
+			UserChanged: &appv1.UpdateUserChanged{UserId: userID},
+		}})
 		return nil
 	})
 	return err
 }
+
+// userChangedMax bounds the people one user_changed reaches; the rest get
+// the user with their next update about them.
+const userChangedMax = 20000
 
 // announceChatTo queues chat_updated of chatID for user (rendered for them
 // on delivery).

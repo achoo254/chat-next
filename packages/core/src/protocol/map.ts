@@ -616,7 +616,9 @@ function toBody(update: WireUpdate): UpdateBody {
 				? { kind: "unknown" }
 				: { kind: "notification_settings", settings: toNotificationSettings(settings) };
 		}
+		case "userChanged":
 		case undefined:
+			// userChanged: the changed user comes with the frame's users, which every frame stores.
 			return { kind: "unknown" };
 	}
 }

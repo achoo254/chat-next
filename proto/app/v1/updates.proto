@@ -76,6 +76,7 @@ message Update {
     UpdateChatDeleted chat_deleted = 27;
     UpdateDialogUnreadMark dialog_unread_mark = 28;
     UpdateNotificationSettings notification_settings = 29;
+    UpdateUserChanged user_changed = 30;
   }
 }
 
@@ -228,6 +229,13 @@ message UpdateChatDeleted {
 message UpdateDialogUnreadMark {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   bool unread = 2;
+}
+
+// A user changed in a way others see (their account waits for deletion,
+// was restored or erased); the frame carries the user as the receiver
+// sees them now.
+message UpdateUserChanged {
+  int64 user_id = 1 [jstype = JS_NUMBER];
 }
 
 // The user's notification settings after a change, complete.
