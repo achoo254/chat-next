@@ -75,7 +75,8 @@
 				// No referrer: opened outside a chat app.
 			}
 			var script = document.createElement("script");
-			script.src = chatOrigin + "/miniapp/sdk.js";
+			// "?v=2" skips copies browsers kept for 4 hours before the script was served with "no-cache".
+			script.src = chatOrigin + "/miniapp/sdk.js?v=2";
 			script.onload = start;
 			script.onerror = function () {
 				note("Không nạp được " + script.src);
