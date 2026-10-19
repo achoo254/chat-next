@@ -72,7 +72,7 @@ Handler kiểm chữ ký trước khi đọc JSON (`401` khi sai), từ chối b
 
 ## Bot mẫu
 
-`examples/echo`, `keyboard`, `files`, `commands`, `inline` (hành vi trong [hợp đồng SDK](../../plans/dattqh/261013-0448-chat-platform-v1/phase-15-sdk-contract.md)). Biến môi trường: `BOT_TOKEN`, `BOT_API`, `BOT_MODE` (`poll` mặc định, hoặc `webhook` với `WEBHOOK_PORT`, `WEBHOOK_SECRET`, `WEBHOOK_URL`). Bot in một dòng `ready` khi sẵn sàng.
+`examples/echo`, `keyboard`, `files`, `commands`, `inline`, `miniapp` (hành vi trong [hợp đồng SDK](../../plans/dattqh/261013-0448-chat-platform-v1/phase-15-sdk-contract.md)). Biến môi trường: `BOT_TOKEN`, `BOT_API`, `BOT_MODE` (`poll` mặc định, hoặc `webhook` với `WEBHOOK_PORT`, `WEBHOOK_SECRET`, `WEBHOOK_URL`). `miniapp` thêm `MINI_APP_URL` (URL https của Mini App, trên domain của bạn) và `MINI_APP_PORT` (backend `POST /verify`, mặc định 8081). Bot in một dòng `ready` khi sẵn sàng.
 
 ```sh
 cd sdk/go

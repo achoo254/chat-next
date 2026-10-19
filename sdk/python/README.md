@@ -79,8 +79,11 @@ signature of a Mini App's init data (key from `client.get_mini_app_key()`), its 
 
 ## Examples
 
-`examples/` holds `echo`, `keyboard`, `files`, `commands` and `inline`. Run them from this directory
-without installing:
+`examples/` holds `echo`, `keyboard`, `files`, `commands`, `inline` and `miniapp`. Run them from this
+directory without installing. `miniapp` sends a button that opens the Mini App at `MINI_APP_URL` (https,
+on your own domain) and serves the Mini App's backend on `MINI_APP_PORT` (default 8081): `POST /verify`
+takes the raw init data and answers `{"user_id", "chat_type"}` or `401`. It needs the `miniapp` extra
+(`cryptography`); the SDK conformance suite runs it with `PYTHON` set to an interpreter that has it.
 
 ```sh
 BOT_TOKEN=... BOT_API=https://chat.hoandat.com/bot/v1 python3 examples/echo.py

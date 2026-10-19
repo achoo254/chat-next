@@ -3,10 +3,14 @@ package api_test
 import (
 	"bufio"
 	"bytes"
+	"cmp"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,7 +31,10 @@ import (
 // webhook mode, answer a user driving the app the same way (the contract:
 // plans/dattqh/261013-0448-chat-platform-v1/phase-15-sdk-contract.md).
 // Opt-in because it needs node, python3 and go: SDK_CONFORMANCE=1, or
-// `pnpm conformance:sdk` from the repository root.
+// `pnpm conformance:sdk` from the repository root. The Python miniapp
+// example needs the optional cryptography package: PYTHON names an
+// interpreter that has it (a venv with `pip install './sdk/python[miniapp]'`),
+// python3 by default.
 
 // conformanceSDK starts one example bot of an SDK.
 type conformanceSDK struct {
@@ -38,7 +45,11 @@ type conformanceSDK struct {
 	prepare func(t *testing.T, examples []string)
 }
 
-var conformanceExamples = []string{"echo", "keyboard", "files", "commands", "inline"}
+var conformanceExamples = []string{"echo", "keyboard", "files", "commands", "inline", "miniapp"}
+
+// conformanceMiniAppURL is the miniapp example's button URL: the server only
+// takes https URLs on a public domain outside the app's own.
+const conformanceMiniAppURL = "https://shop.example.com/app"
 
 func conformanceSDKs(t *testing.T) []conformanceSDK {
 	root, err := filepath.Abs("../../../sdk")
@@ -46,12 +57,13 @@ func conformanceSDKs(t *testing.T) []conformanceSDK {
 		t.Fatal(err)
 	}
 	goBin := t.TempDir()
+	python := cmp.Or(os.Getenv("PYTHON"), "python3")
 	return []conformanceSDK{
 		{name: "ts", dir: filepath.Join(root, "ts"), command: func(ex string) *exec.Cmd {
 			return exec.Command("node", filepath.Join("examples", ex+".ts"))
 		}},
 		{name: "python", dir: filepath.Join(root, "python"), command: func(ex string) *exec.Cmd {
-			return exec.Command("python3", filepath.Join("examples", ex+".py"))
+			return exec.Command(python, filepath.Join("examples", ex+".py"))
 		}},
 		{name: "go", dir: filepath.Join(root, "go"), command: func(ex string) *exec.Cmd {
 			return exec.Command(filepath.Join(goBin, ex))
@@ -79,6 +91,22 @@ type conformanceEnv struct {
 	admin appv1connect.BotAdminServiceClient
 	user  *chatClients
 	bots  appv1connect.BotsServiceClient
+	// miniApp is the base URL of the miniapp example's backend.
+	miniApp string
+}
+
+// forExample returns the env and the extra environment of an example's
+// process: the miniapp example gets its button URL and a port for its
+// backend.
+func (e *conformanceEnv) forExample(t *testing.T, example string) (*conformanceEnv, []string) {
+	t.Helper()
+	if example != "miniapp" {
+		return e, nil
+	}
+	port := freePort(t)
+	with := *e
+	with.miniApp = "http://127.0.0.1:" + port
+	return &with, []string{"MINI_APP_URL=" + conformanceMiniAppURL, "MINI_APP_PORT=" + port}
 }
 
 // as returns the env acting with a new owner and user.
@@ -141,11 +169,11 @@ func (e *conformanceEnv) newBot(t *testing.T, username string) (int64, string) {
 
 // runBot starts an example and waits for its "ready" line; the process is
 // stopped when the test ends and its output logged when the test failed.
-func runBot(t *testing.T, sdk conformanceSDK, example, mode, token string, front string) {
+func runBot(t *testing.T, sdk conformanceSDK, example, mode, token, front string, extraEnv []string) {
 	t.Helper()
 	cmd := sdk.command(example)
 	cmd.Dir = sdk.dir
-	env := []string{"BOT_TOKEN=" + token, "BOT_API=" + front + "/bot/v1", "BOT_MODE=" + mode}
+	env := append([]string{"BOT_TOKEN=" + token, "BOT_API=" + front + "/bot/v1", "BOT_MODE=" + mode}, extraEnv...)
 	if mode == "webhook" {
 		port := freePort(t)
 		env = append(env, "WEBHOOK_PORT="+port, "WEBHOOK_SECRET=conformance-secret-"+example,
@@ -341,9 +369,67 @@ var conformanceScenarios = map[string]func(t *testing.T, e *conformanceEnv, botI
 			t.Fatalf("inline: %v, %v", res, err)
 		}
 	},
+	"miniapp": func(t *testing.T, e *conformanceEnv, botID int64) {
+		chatID := e.start(t, botID)
+		m := e.botMessage(t, chatID, botID, func(m *appv1.Message) bool { return m.GetReplyMarkup().GetInlineKeyboard() != nil })
+		rows := m.GetReplyMarkup().GetInlineKeyboard().GetRows()
+		if len(rows) != 1 || len(rows[0].GetButtons()) != 1 || rows[0].GetButtons()[0].GetText() != "Mở cửa hàng" ||
+			rows[0].GetButtons()[0].GetMiniAppUrl() != conformanceMiniAppURL {
+			t.Fatalf("keyboard = %v", m.GetReplyMarkup())
+		}
+		opened, err := e.bots.OpenMiniApp(t.Context(), connect.NewRequest(&appv1.OpenMiniAppRequest{
+			BotId: botID, ChatId: chatID, Seq: m.GetSeq(), Url: conformanceMiniAppURL,
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		status, body := e.verifyMiniApp(t, opened.Msg.GetInitData())
+		var who struct {
+			UserID   int64  `json:"user_id"`
+			ChatType string `json:"chat_type"`
+		}
+		if status != http.StatusOK || json.Unmarshal(body, &who) != nil || who.UserID != e.user.userID || who.ChatType != "private" {
+			t.Fatalf("verify: %d %s", status, body)
+		}
+		tampered, err := url.ParseQuery(opened.Msg.GetInitData())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tampered.Set("chat_type", "group")
+		if status, body := e.verifyMiniApp(t, tampered.Encode()); status != http.StatusUnauthorized {
+			t.Fatalf("verify tampered init data: %d %s", status, body)
+		}
+		if _, err := e.bots.SendMiniAppData(t.Context(), connect.NewRequest(&appv1.SendMiniAppDataRequest{
+			BotId: botID, Data: "order-42", ButtonText: "Mở cửa hàng",
+		})); err != nil {
+			t.Fatal(err)
+		}
+		e.botMessage(t, chatID, botID, text("Đã nhận đơn: order-42"))
+	},
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// verifyMiniApp posts init data to the miniapp example's backend, as a Mini
+// App would, and returns the status and body.
+func (e *conformanceEnv) verifyMiniApp(t *testing.T, initData string) (int, []byte) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, e.miniApp+"/verify", strings.NewReader(initData))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "text/plain")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, body
+}
 
 func TestSDKConformance(t *testing.T) {
 	if os.Getenv("SDK_CONFORMANCE") == "" {
@@ -361,7 +447,8 @@ func TestSDKConformance(t *testing.T) {
 					for _, ex := range conformanceExamples {
 						t.Run(ex, func(t *testing.T) {
 							botID, token := e.newBot(t, fmt.Sprintf("%s_%s_%s_bot", sdk.name, mode, ex))
-							runBot(t, sdk, ex, mode, token, e.front)
+							e, env := e.forExample(t, ex)
+							runBot(t, sdk, ex, mode, token, e.front, env)
 							conformanceScenarios[ex](t, e, botID)
 						})
 					}

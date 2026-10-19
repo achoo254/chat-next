@@ -57,7 +57,7 @@ Handler kiểm `X-Bot-Api-Secret-Token` và chữ ký HMAC trước khi đọc J
 
 ## Bot mẫu
 
-`examples/` có 5 bot (`echo`, `keyboard`, `files`, `commands`, `inline`) dùng cho conformance; chạy bằng Node ≥ 22.18:
+`examples/` có 6 bot (`echo`, `keyboard`, `files`, `commands`, `inline`, `miniapp`) dùng cho conformance; chạy bằng Node ≥ 22.18. `miniapp` gửi nút mở Mini App (`MINI_APP_URL`, https trên domain của bạn) và chạy backend của Mini App ở `MINI_APP_PORT` (mặc định 8081): `POST /verify` nhận nguyên chuỗi init data, trả `{"user_id", "chat_type"}` hoặc `401`.
 
 ```sh
 BOT_TOKEN=... BOT_API=https://chat.hoandat.com/bot/v1 node examples/echo.ts
