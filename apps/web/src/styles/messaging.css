@@ -935,7 +935,12 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.narrow-only { display: inline-grid; }
 	.n-head.narrow-only { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2); min-height: var(--topbar-h); border-bottom: 1px solid var(--c-border-subtle); }
 	.n-head h2 { flex: 1; margin: 0 0 0 var(--space-1); font-size: 1.125rem; font-weight: 600; }
-	.app .list .list-head { padding: var(--space-3) var(--space-3) var(--space-2); }
+	.app .list .list-head { max-height: 80px; overflow: hidden; padding: var(--space-3) var(--space-3) var(--space-2); transition: max-height var(--dur-base) var(--ease-standard), padding var(--dur-base) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard); }
+	/* Scrolled down (chat-list.tsx collapseHead): the search box folds away and the header slims to one small title row. */
+	.app .list.scrolled .list-head { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; visibility: hidden; }
+	.n-head.narrow-only { transition: min-height var(--dur-base) var(--ease-standard); }
+	.list.scrolled .n-head.narrow-only { min-height: 48px; padding-block: 0; }
+	.list.scrolled .n-head h2 { font-size: 1rem; }
 	.app, .app.no-info { grid-template-columns: minmax(0, 1fr); }
 	.folder-rail { display: none; }
 	.app .list .folder-tabs { display: flex; overflow-x: auto; }

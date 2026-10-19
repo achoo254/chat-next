@@ -31,7 +31,7 @@ export function Shell({ self, route, nav, avatar, children }: ShellProps) {
 				{nav}
 				<span className="spacer" />
 				<Link
-					to={paths.settings("profile")}
+					to={paths.settingsList}
 					className="icon-btn"
 					current={route.name === "settings"}
 					aria-label={t.shell.settings}

@@ -19,7 +19,8 @@ export type ConsoleTab = "profile" | "token" | "updates" | "dead-letters" | "sta
 
 export type Route =
 	| { name: "home" }
-	| { name: "settings"; tab: SettingsTab }
+	/** list: "/settings" itself, which phones show as the category list (desktop shows the tab). */
+	| { name: "settings"; tab: SettingsTab; list?: boolean }
 	/** topicId 0: the chat itself (or the default topic of a group with topics). */
 	/** hookId: set for the "hook" panel only. */
 	| { name: "chat"; chatId: number; topicId: number; panel: ChatPanel; hookId?: string }
@@ -44,6 +45,8 @@ const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", 
 export const paths = {
 	home: "/",
 	settings: (tab: SettingsTab) => `/settings/${tab}`,
+	/** The category list on phones; the profile tab elsewhere. */
+	settingsList: "/settings",
 	chat: (chatId: number) => `/c/${chatId}`,
 	topic: (chatId: number, topicId: number) => `/c/${chatId}/t/${topicId}`,
 	chatAdmin: (chatId: number) => `/c/${chatId}/admin`,
@@ -148,7 +151,7 @@ function matchMessaging(path: string): Route | null {
 export function matchRoute(pathname: string): Route | null {
 	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 	if (path === "/") return { name: "home" };
-	if (path === "/settings") return { name: "settings", tab: "profile" };
+	if (path === "/settings") return { name: "settings", tab: "profile", list: true };
 	if (path.startsWith("/settings/")) {
 		const tab = path.slice("/settings/".length);
 		const found = SETTINGS_TABS.find((candidate) => candidate === tab);

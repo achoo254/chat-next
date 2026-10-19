@@ -53,7 +53,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 	return (
 		<section className="list" aria-label={copy.list.label}>
 			<header className="n-head narrow-only">
-				<Link to={paths.settings("profile")} className="icon-btn" aria-label={copy.folders.settings}>
+				<Link to={paths.settingsList} className="icon-btn" aria-label={copy.folders.settings}>
 					<Icon name="settings" />
 				</Link>
 				<h2>{brand.appName}</h2>
@@ -138,6 +138,17 @@ interface DialogsProps {
 	onVisibleChats: (chatIds: readonly number[]) => void;
 }
 
+/**
+ * Phones (mockups/mobile.html#list): scrolling the chats down folds the
+ * search box and shrinks the header (styles: .list.scrolled); back at the
+ * top it unfolds. A list too short to scroll past the fold never folds.
+ */
+function collapseHead(chats: HTMLElement): void {
+	const list = chats.closest(".list");
+	if (chats.scrollTop <= 0) list?.classList.remove("scrolled");
+	else if (chats.scrollTop > 24 && chats.scrollHeight - chats.clientHeight > 120) list?.classList.add("scrolled");
+}
+
 function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsProps) {
 	const copy = useCopy();
 	const entries = useListEntries();
@@ -145,6 +156,11 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 	const scroller = useRef<HTMLDivElement>(null);
 	const [scrollTop, setScrollTop] = useState(0);
 	const [viewport, setViewport] = useState(640);
+	// A search or another folder starts at the top: the search box shows again.
+	useEffect(() => {
+		const list = scroller.current?.closest(".list");
+		return () => list?.classList.remove("scrolled");
+	}, []);
 	const [kept, setKept] = useState<Kept>({ folder, ids: new Set() });
 	if (kept.folder !== folder) setKept({ folder, ids: new Set() });
 	// Forums whose topics are loaded show a second line (the topics), so their rows are taller.
@@ -233,7 +249,11 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 	// bot's chat) so far: the rest of the list invites the team (#first-run).
 	const alone = folder === "all" && entries.every((entry) => entry.saved || entry.kind === "bot");
 	return (
-		<div className={alone ? "chats alone" : "chats"} ref={scroller} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
+		<div className={alone ? "chats alone" : "chats"} ref={scroller} onScroll={(event) => {
+				setScrollTop(event.currentTarget.scrollTop);
+				collapseHead(event.currentTarget);
+			}}
+		>
 			<ul className="chat-rows" aria-label={copy.list.label} style={{ height: rows.total }}>
 				{visible.map((chatId, index) => {
 					const position = first + index;
@@ -259,6 +279,7 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 
 /** The empty list of a new account: bring the team in with a group invite link. */
 function InviteTeam() {
+	"use no memo";
 	const copy = useCopy();
 	const ui = useUi();
 	return (

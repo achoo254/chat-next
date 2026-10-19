@@ -95,6 +95,7 @@ export function LabelledIcon({ name, label, className }: { name: IconName; label
 }
 
 function TopicsLine({ topics }: { topics: readonly Topic[] }) {
+	"use no memo";
 	const recent = topics
 		.filter((topic) => !topic.hidden && topic.lastMessage !== null)
 		.sort((a, b) => (b.lastMessage?.date ?? 0) - (a.lastMessage?.date ?? 0))

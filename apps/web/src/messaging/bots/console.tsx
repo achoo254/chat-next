@@ -110,7 +110,7 @@ function BotList() {
 	const full = bots.length >= BOTS_MAX;
 	return (
 		<section className="console" aria-labelledby={titleId}>
-			<ConsoleHead back={paths.settings("profile")} backLabel={t.console.backToSettings} parent={t.console.settings} current={t.console.title} />
+			<ConsoleHead back={paths.settingsList} backLabel={t.console.backToSettings} parent={t.console.settings} current={t.console.title} />
 			<div className="c-body">
 				<div className="c-title">
 					<h1 id={titleId}>{t.console.myBots}</h1>

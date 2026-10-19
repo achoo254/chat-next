@@ -29,6 +29,7 @@ export const en: Messages = {
 	settings: {
 		title: "Settings",
 		categories: "Settings categories",
+		back: "Back to Settings",
 		profile: "Profile",
 		sessions: "Sessions",
 		privacy: "Privacy",

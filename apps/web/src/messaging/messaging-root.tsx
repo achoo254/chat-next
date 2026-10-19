@@ -312,6 +312,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			screen = (
 				<Settings
 					tab={route.tab}
+					list={route.list === true}
 					self={self}
 					onSelfChange={onSelfChange}
 					messaging={{
@@ -319,6 +320,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 						moderation: moderator,
 						render: (tab: SettingsTab): ReactNode => <SettingsExtra tab={tab} />,
 						photo: <SettingsExtra tab="profile" self={self} onSelfChange={onSelfChange} />,
+						avatar: <ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} />,
 					}}
 				/>
 			);

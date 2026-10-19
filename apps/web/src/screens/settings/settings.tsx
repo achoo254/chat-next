@@ -1,5 +1,6 @@
 import { Fragment, useEffect, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
+import { Avatar } from "../../components/avatar.tsx";
 import { LoaderBoundary } from "../../components/delayed-loader.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
@@ -41,6 +42,8 @@ export interface MessagingSettings {
 	moderation: boolean;
 	/** The profile photo field of the Profile tab. */
 	photo?: ReactNode;
+	/** The user's avatar with their photo, on the phone category list's account card. */
+	avatar?: ReactNode;
 }
 
 type TabGroups = readonly (readonly { tab: SettingsTab; icon: IconName }[])[];
@@ -55,10 +58,12 @@ interface SettingsProps {
 	self: SelfUser;
 	onSelfChange: (self: SelfUser) => void;
 	messaging?: MessagingSettings;
+	/** "/settings" itself: phones show only the category list (mockups/mobile.html#settings). */
+	list?: boolean;
 }
 
-/** Settings: category list plus the selected category. */
-export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) {
+/** Settings: category list plus the selected category; on phones one of the two at a time. */
+export function Settings({ tab, self, onSelfChange, messaging, list = false }: SettingsProps) {
 	const { t } = useI18n();
 	const groups = tabGroups(messaging);
 	// "Tài khoản" (export and deletion) follows the Developer Console link (mockups/settings.html#export-delete).
@@ -71,9 +76,17 @@ export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) 
 	else if (tab === "sessions") content = <SessionsSettings />;
 	else content = messaging?.render(tab) ?? null;
 	return (
-		<div className="set">
+		<div className="set" data-view={list ? "list" : "page"}>
 			<nav className="set-nav" aria-label={t.settings.categories}>
 				<h2>{t.settings.title}</h2>
+				<Link to={paths.settings("profile")} className="set-account">
+					{messaging?.avatar ?? <Avatar name={self.name} size="sm" />}
+					<span className="grow">
+						<b>{self.name}</b>
+						{self.username !== "" && <small>@{self.username}</small>}
+					</span>
+					<Icon name="chevron-right" small />
+				</Link>
 				{groups.map((group, index) => (
 					<Fragment key={group[0]?.tab ?? index}>
 						{index > 0 && <hr />}
@@ -118,6 +131,9 @@ export function Settings({ tab, self, onSelfChange, messaging }: SettingsProps) 
 			</nav>
 			<main className="set-main">
 				<header className="set-head">
+					<Link to={paths.settingsList} className="icon-btn set-back" aria-label={t.settings.back}>
+						<Icon name="back" />
+					</Link>
 					<h1>{t.settings[tab]}</h1>
 				</header>
 				{/* A tab that loads shows one loader under the header; the first showing waits for it (messaging-root.tsx). */}

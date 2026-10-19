@@ -27,6 +27,7 @@ export const vi = {
 	settings: {
 		title: "Cài đặt",
 		categories: "Danh mục cài đặt",
+		back: "Quay lại Cài đặt",
 		profile: "Hồ sơ",
 		sessions: "Phiên đăng nhập",
 		privacy: "Quyền riêng tư",

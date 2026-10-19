@@ -167,6 +167,8 @@ button { cursor: pointer; }
 .set-nav a[aria-current="page"] .icon { color: var(--c-primary); }
 .set-nav hr { width: 100%; border: 0; border-top: 1px solid var(--c-border-subtle); margin: var(--space-2) 0; }
 .set-nav form { margin: 0; }
+/* Phones only (mockups/mobile.html#settings): the account card heads the category list, the back button the category. */
+.set .set-account, .set .set-back { display: none; }
 .set-main { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }
 .set-head { display: flex; align-items: center; gap: var(--space-3); min-height: var(--topbar-h); padding: var(--space-2) var(--space-6); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
 .set-head h1 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
@@ -223,10 +225,18 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 	.home { grid-template-columns: minmax(0, 1fr); }
 	.home .convo { display: none; }
 	.list { border-right: 0; }
-	.set { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-	.set-nav { flex-direction: row; flex-wrap: wrap; align-items: center; padding: var(--space-2); border-right: 0; border-bottom: 1px solid var(--c-border-subtle); }
-	.set-nav h2, .set-nav hr { display: none; }
-	.set-nav a, .set-nav button { width: auto; }
+	/* One screen at a time: "/settings" is the category list, a category opens full screen with a back button. */
+	.set { grid-template-columns: minmax(0, 1fr); }
+	.set[data-view="list"] .set-main, .set[data-view="page"] .set-nav { display: none; }
+	.set-nav { padding: var(--space-3); border-right: 0; background: var(--c-bg); }
+	.set-nav a[aria-current="page"] { background: none; color: var(--c-text); font-weight: 400; }
+	.set-nav a[aria-current="page"] .icon { color: var(--c-icon-muted); }
+	.set-nav a[href$="/settings/profile"]:not(.set-account) { display: none; }
+	.set-nav .set-account { display: flex; gap: var(--space-3); min-height: 64px; margin-bottom: var(--space-2); border: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+	.set-account .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+	.set-account b { display: block; font-weight: 600; }
+	.set-account small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
+	.set .set-back { display: grid; margin-left: calc(-1 * var(--space-2)); }
 	.set-head { padding: var(--space-2) var(--space-3); }
 	.set-body { padding: var(--space-4) var(--space-3) var(--space-5); }
 	.row:has(> .btn), .row:has(> form) { flex-wrap: wrap; }

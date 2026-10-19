@@ -126,7 +126,7 @@ describe("boot", () => {
 		const links = await screen.findAllByRole("link", { name: "Cài đặt" }, { timeout: 5000 });
 		await userEvent.click(links[0] as HTMLElement);
 
-		expect(window.location.pathname).toBe("/settings/profile");
+		expect(window.location.pathname).toBe("/settings");
 		expect(await screen.findByRole("heading", { level: 1, name: "Hồ sơ" })).toBeTruthy();
 	});
 });

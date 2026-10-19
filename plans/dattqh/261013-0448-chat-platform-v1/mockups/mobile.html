@@ -137,6 +137,8 @@
 .set-group li + li { border-top: 1px solid var(--c-border-subtle); }
 .set-row { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: 0 var(--space-3); color: var(--c-text); text-decoration: none; }
 .set-row:hover { background: var(--c-hover); }
+.set-row .label small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
+li.set-row { padding-block: var(--space-2); }
 .set-row > .icon:first-child { color: var(--c-icon-muted); }
 .set-row .label { flex: 1; min-width: 0; }
 .set-row .val { font-size: 0.8125rem; color: var(--c-text-muted); }
@@ -152,7 +154,7 @@
 <main class="shots">
 
 <section class="shot" id="list">
-	<div class="shot-head"><h2>Danh sách chat</h2><span class="phase">Phase 5, 10</span><p>Mở thẳng từ DB local (SQLCipher) trong ≤ 1 s, không chờ mạng; dòng "Đang cập nhật…" chỉ báo app đang bắt kịp bằng GetDifference sau khi mở lại. Tài khoản mới chưa có chat thì thấy trạng thái trống với một việc cần làm.</p></div>
+	<div class="shot-head"><h2>Danh sách chat</h2><span class="phase">Phase 5, 10</span><p>Mở thẳng từ DB local (SQLCipher) trong ≤ 1 s, không chờ mạng; dòng "Đang cập nhật…" chỉ báo app đang bắt kịp bằng GetDifference sau khi mở lại. Tài khoản mới chưa có chat thì thấy trạng thái trống với một việc cần làm. Bản web trên điện thoại cuộn kiểu iOS: kéo danh sách xuống thì ô tìm kiếm thu lại và đầu trang gọn thành một hàng tiêu đề nhỏ, hàng lọc (Tất cả · Cá nhân · Nhóm · Bot · Chưa đọc) vẫn ghim; cuộn về đầu danh sách thì ô tìm kiếm hiện lại đủ cỡ. Danh sách ngắn, không cuộn được thì không thu.</p></div>
 	<div class="phones">
 		<figure class="phone-wrap">
 			<div class="phone">
@@ -461,7 +463,7 @@
 </section>
 
 <section class="shot" id="settings">
-	<div class="shot-head"><h2>Cài đặt</h2><span class="phase">Phase 6, 10</span><p>Danh mục cài đặt trên mobile: thẻ tài khoản ở trên cùng (tên, username, tổ chức đang dùng), các nhóm mục có giá trị hiện tại bên phải để khỏi phải mở từng mục. Mỗi dòng mở đúng màn trong trang Cài đặt.</p></div>
+	<div class="shot-head"><h2>Cài đặt</h2><span class="phase">Phase 6, 10</span><p>Danh mục cài đặt trên mobile: thẻ tài khoản ở trên cùng (ảnh, tên, username) mở Hồ sơ, rồi các nhóm mục, mỗi dòng có mũi tên. Mỗi dòng mở màn đó toàn màn hình, đầu màn có nút quay lại danh mục; không còn lưới danh mục chiếm nửa trên màn hình. Bản web làm đúng như vậy với các mục của trang Cài đặt; trên máy tính vẫn là cột danh mục bên trái.</p></div>
 	<div class="phones">
 		<figure class="phone-wrap">
 			<div class="phone">
@@ -477,21 +479,21 @@
 						<h3>Tài khoản</h3>
 						<ul>
 							<li><a class="set-row" href="settings.html#privacy"><svg class="icon"><use href="#i-lock"/></svg><span class="label">Quyền riêng tư</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
-							<li><a class="set-row" href="settings.html#sessions"><svg class="icon"><use href="#i-laptop"/></svg><span class="label">Phiên đăng nhập</span><span class="val">3 thiết bị</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#sessions"><svg class="icon"><use href="#i-laptop"/></svg><span class="label">Phiên đăng nhập</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
 						</ul>
 					</div>
 					<div class="set-group">
 						<h3>Ứng dụng</h3>
 						<ul>
-							<li><a class="set-row" href="settings.html#notifications"><svg class="icon"><use href="#i-bell"/></svg><span class="label">Thông báo</span><span class="val">Có xem trước</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
-							<li><a class="set-row" href="settings.html#appearance"><svg class="icon"><use href="#i-sun"/></svg><span class="label">Giao diện</span><span class="val">Theo hệ thống</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
-							<li><a class="set-row" href="settings.html#storage"><svg class="icon"><use href="#i-database"/></svg><span class="label">Dữ liệu và bộ nhớ</span><span class="val">1,2 GB</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#notifications"><svg class="icon"><use href="#i-bell"/></svg><span class="label">Thông báo</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#appearance"><svg class="icon"><use href="#i-sun"/></svg><span class="label">Giao diện</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#storage"><svg class="icon"><use href="#i-database"/></svg><span class="label">Dữ liệu và bộ nhớ</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
 						</ul>
 					</div>
 					<div class="set-group">
 						<h3>Tổ chức và dữ liệu</h3>
 						<ul>
-							<li><a class="set-row" href="settings.html#tenant"><svg class="icon"><use href="#i-globe"/></svg><span class="label">Tổ chức</span><span class="val">hoandat.com</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
+							<li><a class="set-row" href="settings.html#tenant"><svg class="icon"><use href="#i-globe"/></svg><span class="label">Tổ chức</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
 							<li><a class="set-row" href="settings.html#export-delete"><svg class="icon"><use href="#i-download"/></svg><span class="label">Xuất và xoá dữ liệu</span><svg class="icon"><use href="#i-chevron-right"/></svg></a></li>
 							<li><a class="set-row danger" href="auth.html#signed-out"><svg class="icon"><use href="#i-logout"/></svg><span class="label">Đăng xuất</span></a></li>
 						</ul>
@@ -504,6 +506,25 @@
 				</nav>
 			</div>
 			<figcaption>Danh mục cài đặt</figcaption>
+		</figure>
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:56</span><span>5G</span></div>
+				<div class="m-head">
+					<a class="icon-btn" href="#settings" aria-label="Quay lại Cài đặt"><svg class="icon"><use href="#i-back"/></svg></a>
+					<div class="m-title"><h2>Quyền riêng tư</h2></div>
+				</div>
+				<div class="m-body">
+					<div class="set-group">
+						<h3>Ai thấy</h3>
+						<ul>
+							<li class="set-row"><span class="label">Trạng thái hoạt động<small>Mọi người · <b>Danh bạ</b> · Không ai</small></span></li>
+							<li class="set-row"><span class="label">Ảnh đại diện<small><b>Mọi người</b> · Danh bạ · Không ai</small></span></li>
+						</ul>
+					</div>
+				</div>
+			</div>
+			<figcaption>Một mục mở toàn màn, có nút quay lại</figcaption>
 		</figure>
 	</div>
 </section>

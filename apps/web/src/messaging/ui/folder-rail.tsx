@@ -51,7 +51,7 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 				<ContactsGlyph />
 				{copy.folders.contacts}
 			</Link>
-			<Link to={paths.settings("profile")} className="folder">
+			<Link to={paths.settingsList} className="folder">
 				<Icon name="settings" />
 				{copy.folders.settings}
 			</Link>
