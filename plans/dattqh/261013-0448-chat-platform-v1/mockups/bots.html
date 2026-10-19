@@ -614,7 +614,7 @@
 <section class="shot" id="mini-app">
 	<div class="shot-head">
 		<h2>Mini App</h2><span class="phase">R6 · Phase 16</span>
-		<p>Nút "Mở bảng phát hành" của bot mở Mini App trong khung riêng bên phải (mobile: toàn màn hình). Đầu khung do app vẽ: tên bot, origin thật của Mini App, quay lại, đóng. Nội dung chạy trong iframe sandbox trên origin riêng <code class="mono">b&lt;bot_id&gt;.chat-apps.invalid</code> (placeholder cho domain Mini App dùng chung, không cùng site với chat.hoandat.com): không đọc được cookie hay dữ liệu của app, chỉ nói chuyện qua bridge. Nút chính ở đáy cũng do app vẽ, Mini App chỉ đặt chữ và bật tắt.</p>
+		<p>Nút "Mở bảng phát hành" của bot mở Mini App trong khung riêng bên phải (mobile: toàn màn hình). Đầu khung do app vẽ: tên bot, origin thật của Mini App, quay lại, đóng. Nội dung chạy trong iframe sandbox ở URL của chủ bot, trên domain của họ (như Telegram; URL dưới domain của app hay của tổ chức bị từ chối khi đăng ký), nên không cùng site với chat.hoandat.com: không đọc được cookie hay dữ liệu của app, chỉ nói chuyện qua bridge. Bridge bản đầu có: sẵn sàng, đóng, giao diện sáng/tối, nút chính, mở link ngoài, xin quyền nhắn tin, gửi dữ liệu về bot. Nút chính ở đáy cũng do app vẽ, Mini App chỉ đặt chữ và bật tắt.</p>
 	</div>
 	<div class="frame">
 		<div class="duo">
@@ -643,7 +643,7 @@
 			<section class="miniapp" aria-label="Mini App của Deploy Bot">
 				<header class="ma-head">
 					<button type="button" class="icon-btn" aria-label="Quay lại trong Mini App" data-toast="Mini App nhận sự kiện back_button"><svg class="icon"><use href="#i-back"/></svg></button>
-					<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>b7302114.chat-apps.invalid</span></div>
+					<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
 					<button type="button" class="icon-btn" aria-label="Thêm thao tác"><svg class="icon"><use href="#i-dots"/></svg></button>
 					<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 				</header>
@@ -674,7 +674,7 @@
 				<section class="miniapp" aria-label="Mini App của Deploy Bot">
 					<header class="ma-head">
 						<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
-						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>b7302114.chat-apps.invalid</span></div>
+						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
 						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 					</header>
 					<div class="ma-frame"><h4>Theo dõi bản 2.4.1</h4><span class="muted">Nhận tin khi deploy xong hoặc lỗi.</span></div>
@@ -699,7 +699,7 @@
 				<section class="miniapp" aria-label="Mini App của Deploy Bot">
 					<header class="ma-head">
 						<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
-						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>b7302114.chat-apps.invalid</span></div>
+						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
 						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 					</header>
 					<div class="ma-frame"><h4>Báo cáo phát hành</h4><span class="muted">Bản đầy đủ nằm ở trang ngoài.</span></div>

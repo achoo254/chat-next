@@ -419,10 +419,14 @@ func (x *OpenMiniAppRequest) GetThemeParams() map[string]string {
 
 type OpenMiniAppResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// URL on b<bot_id>.<miniapp domain>; the container blocks navigation away
-	// from this origin.
+	// The https URL to load, on the bot owner's domain (validated when the bot
+	// set it); the container talks only to this URL's origin.
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	// Signed init data (carries tenant_id and auth_date) handed over the bridge.
+	// Init data for the Mini App, a query string (user, chat_type, chat_instance,
+	// start_param, auth_date, bot_id, tenant_id) signed with Ed25519 in
+	// `signature` (base64url) over "<bot_id>:WebAppData\n" followed by the
+	// other fields as sorted key=value lines; verify with the platform public
+	// key (Bot API getMiniAppKey) and the SDK helpers.
 	InitData      string `protobuf:"bytes,2,opt,name=init_data,json=initData,proto3" json:"init_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -472,6 +476,184 @@ func (x *OpenMiniAppResponse) GetInitData() string {
 	return ""
 }
 
+type AllowMiniAppWriteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BotId         int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AllowMiniAppWriteRequest) Reset() {
+	*x = AllowMiniAppWriteRequest{}
+	mi := &file_app_v1_bots_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllowMiniAppWriteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllowMiniAppWriteRequest) ProtoMessage() {}
+
+func (x *AllowMiniAppWriteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllowMiniAppWriteRequest.ProtoReflect.Descriptor instead.
+func (*AllowMiniAppWriteRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AllowMiniAppWriteRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+type AllowMiniAppWriteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AllowMiniAppWriteResponse) Reset() {
+	*x = AllowMiniAppWriteResponse{}
+	mi := &file_app_v1_bots_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllowMiniAppWriteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllowMiniAppWriteResponse) ProtoMessage() {}
+
+func (x *AllowMiniAppWriteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllowMiniAppWriteResponse.ProtoReflect.Descriptor instead.
+func (*AllowMiniAppWriteResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{6}
+}
+
+type SendMiniAppDataRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
+	// Up to 4096 bytes.
+	Data string `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	// Text of the button that opened the Mini App ("" for the main one).
+	ButtonText    string `protobuf:"bytes,3,opt,name=button_text,json=buttonText,proto3" json:"button_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendMiniAppDataRequest) Reset() {
+	*x = SendMiniAppDataRequest{}
+	mi := &file_app_v1_bots_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendMiniAppDataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendMiniAppDataRequest) ProtoMessage() {}
+
+func (x *SendMiniAppDataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendMiniAppDataRequest.ProtoReflect.Descriptor instead.
+func (*SendMiniAppDataRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SendMiniAppDataRequest) GetBotId() int64 {
+	if x != nil {
+		return x.BotId
+	}
+	return 0
+}
+
+func (x *SendMiniAppDataRequest) GetData() string {
+	if x != nil {
+		return x.Data
+	}
+	return ""
+}
+
+func (x *SendMiniAppDataRequest) GetButtonText() string {
+	if x != nil {
+		return x.ButtonText
+	}
+	return ""
+}
+
+type SendMiniAppDataResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendMiniAppDataResponse) Reset() {
+	*x = SendMiniAppDataResponse{}
+	mi := &file_app_v1_bots_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendMiniAppDataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendMiniAppDataResponse) ProtoMessage() {}
+
+func (x *SendMiniAppDataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bots_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendMiniAppDataResponse.ProtoReflect.Descriptor instead.
+func (*SendMiniAppDataResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{8}
+}
+
 type StartBotRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	BotId int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
@@ -486,7 +668,7 @@ type StartBotRequest struct {
 
 func (x *StartBotRequest) Reset() {
 	*x = StartBotRequest{}
-	mi := &file_app_v1_bots_proto_msgTypes[5]
+	mi := &file_app_v1_bots_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -498,7 +680,7 @@ func (x *StartBotRequest) String() string {
 func (*StartBotRequest) ProtoMessage() {}
 
 func (x *StartBotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[5]
+	mi := &file_app_v1_bots_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -511,7 +693,7 @@ func (x *StartBotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartBotRequest.ProtoReflect.Descriptor instead.
 func (*StartBotRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{5}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StartBotRequest) GetBotId() int64 {
@@ -547,7 +729,7 @@ type StartBotResponse struct {
 
 func (x *StartBotResponse) Reset() {
 	*x = StartBotResponse{}
-	mi := &file_app_v1_bots_proto_msgTypes[6]
+	mi := &file_app_v1_bots_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +741,7 @@ func (x *StartBotResponse) String() string {
 func (*StartBotResponse) ProtoMessage() {}
 
 func (x *StartBotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[6]
+	mi := &file_app_v1_bots_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +754,7 @@ func (x *StartBotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartBotResponse.ProtoReflect.Descriptor instead.
 func (*StartBotResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{6}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *StartBotResponse) GetChat() *Chat {
@@ -615,7 +797,7 @@ type GetBotInfoRequest struct {
 
 func (x *GetBotInfoRequest) Reset() {
 	*x = GetBotInfoRequest{}
-	mi := &file_app_v1_bots_proto_msgTypes[7]
+	mi := &file_app_v1_bots_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +809,7 @@ func (x *GetBotInfoRequest) String() string {
 func (*GetBotInfoRequest) ProtoMessage() {}
 
 func (x *GetBotInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[7]
+	mi := &file_app_v1_bots_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +822,7 @@ func (x *GetBotInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBotInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetBotInfoRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{7}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetBotInfoRequest) GetBotId() int64 {
@@ -673,14 +855,16 @@ type GetBotInfoResponse struct {
 	LastUpdateAt int64 `protobuf:"varint,6,opt,name=last_update_at,json=lastUpdateAt,proto3" json:"last_update_at,omitempty"`
 	// Owner only: the bot has not asked for updates in the last 2 minutes (or
 	// never did), judged by the server's clock; false for anyone else.
-	NotRunning    bool `protobuf:"varint,7,opt,name=not_running,json=notRunning,proto3" json:"not_running,omitempty"`
+	NotRunning bool `protobuf:"varint,7,opt,name=not_running,json=notRunning,proto3" json:"not_running,omitempty"`
+	// The bot's main Mini App ("Mở app" in its chat and profile); "" without one.
+	MiniAppUrl    string `protobuf:"bytes,8,opt,name=mini_app_url,json=miniAppUrl,proto3" json:"mini_app_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetBotInfoResponse) Reset() {
 	*x = GetBotInfoResponse{}
-	mi := &file_app_v1_bots_proto_msgTypes[8]
+	mi := &file_app_v1_bots_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -692,7 +876,7 @@ func (x *GetBotInfoResponse) String() string {
 func (*GetBotInfoResponse) ProtoMessage() {}
 
 func (x *GetBotInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[8]
+	mi := &file_app_v1_bots_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,7 +889,7 @@ func (x *GetBotInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBotInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetBotInfoResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{8}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetBotInfoResponse) GetUser() *User {
@@ -757,6 +941,13 @@ func (x *GetBotInfoResponse) GetNotRunning() bool {
 	return false
 }
 
+func (x *GetBotInfoResponse) GetMiniAppUrl() string {
+	if x != nil {
+		return x.MiniAppUrl
+	}
+	return ""
+}
+
 type GetChatBotCommandsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
@@ -766,7 +957,7 @@ type GetChatBotCommandsRequest struct {
 
 func (x *GetChatBotCommandsRequest) Reset() {
 	*x = GetChatBotCommandsRequest{}
-	mi := &file_app_v1_bots_proto_msgTypes[9]
+	mi := &file_app_v1_bots_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +969,7 @@ func (x *GetChatBotCommandsRequest) String() string {
 func (*GetChatBotCommandsRequest) ProtoMessage() {}
 
 func (x *GetChatBotCommandsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[9]
+	mi := &file_app_v1_bots_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +982,7 @@ func (x *GetChatBotCommandsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatBotCommandsRequest.ProtoReflect.Descriptor instead.
 func (*GetChatBotCommandsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{9}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetChatBotCommandsRequest) GetChatId() int64 {
@@ -813,7 +1004,7 @@ type ChatBotCommands struct {
 
 func (x *ChatBotCommands) Reset() {
 	*x = ChatBotCommands{}
-	mi := &file_app_v1_bots_proto_msgTypes[10]
+	mi := &file_app_v1_bots_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -825,7 +1016,7 @@ func (x *ChatBotCommands) String() string {
 func (*ChatBotCommands) ProtoMessage() {}
 
 func (x *ChatBotCommands) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[10]
+	mi := &file_app_v1_bots_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -838,7 +1029,7 @@ func (x *ChatBotCommands) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatBotCommands.ProtoReflect.Descriptor instead.
 func (*ChatBotCommands) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{10}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ChatBotCommands) GetBot() *User {
@@ -870,7 +1061,7 @@ type GetChatBotCommandsResponse struct {
 
 func (x *GetChatBotCommandsResponse) Reset() {
 	*x = GetChatBotCommandsResponse{}
-	mi := &file_app_v1_bots_proto_msgTypes[11]
+	mi := &file_app_v1_bots_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -882,7 +1073,7 @@ func (x *GetChatBotCommandsResponse) String() string {
 func (*GetChatBotCommandsResponse) ProtoMessage() {}
 
 func (x *GetChatBotCommandsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bots_proto_msgTypes[11]
+	mi := &file_app_v1_bots_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -895,7 +1086,7 @@ func (x *GetChatBotCommandsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatBotCommandsResponse.ProtoReflect.Descriptor instead.
 func (*GetChatBotCommandsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bots_proto_rawDescGZIP(), []int{11}
+	return file_app_v1_bots_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetChatBotCommandsResponse) GetBots() []*ChatBotCommands {
@@ -950,7 +1141,16 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"D\n" +
 	"\x13OpenMiniAppResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x1b\n" +
-	"\tinit_data\x18\x02 \x01(\tR\binitData\"n\n" +
+	"\tinit_data\x18\x02 \x01(\tR\binitData\"5\n" +
+	"\x18AllowMiniAppWriteRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\"\x1b\n" +
+	"\x19AllowMiniAppWriteResponse\"h\n" +
+	"\x16SendMiniAppDataRequest\x12\x19\n" +
+	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\tR\x04data\x12\x1f\n" +
+	"\vbutton_text\x18\x03 \x01(\tR\n" +
+	"buttonText\"\x19\n" +
+	"\x17SendMiniAppDataResponse\"n\n" +
 	"\x0fStartBotRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1f\n" +
 	"\vstart_param\x18\x02 \x01(\tR\n" +
@@ -963,7 +1163,7 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x03ack\x18\x04 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"K\n" +
 	"\x11GetBotInfoRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1b\n" +
-	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\x84\x02\n" +
+	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\xa6\x02\n" +
 	"\x12GetBotInfoResponse\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
@@ -972,7 +1172,9 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\bis_owner\x18\x05 \x01(\bR\aisOwner\x12(\n" +
 	"\x0elast_update_at\x18\x06 \x01(\x03B\x020\x02R\flastUpdateAt\x12\x1f\n" +
 	"\vnot_running\x18\a \x01(\bR\n" +
-	"notRunning\"8\n" +
+	"notRunning\x12 \n" +
+	"\fmini_app_url\x18\b \x01(\tR\n" +
+	"miniAppUrl\"8\n" +
 	"\x19GetChatBotCommandsRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\"a\n" +
 	"\x0fChatBotCommands\x12\x1e\n" +
@@ -988,10 +1190,12 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x18INLINE_RESULT_KIND_VIDEO\x10\x03\x12\x1c\n" +
 	"\x18INLINE_RESULT_KIND_AUDIO\x10\x04\x12\x1c\n" +
 	"\x18INLINE_RESULT_KIND_VOICE\x10\x05\x12\x1f\n" +
-	"\x1bINLINE_RESULT_KIND_DOCUMENT\x10\x062\xfe\x02\n" +
+	"\x1bINLINE_RESULT_KIND_DOCUMENT\x10\x062\xac\x04\n" +
 	"\vBotsService\x12F\n" +
 	"\vInlineQuery\x12\x1a.app.v1.InlineQueryRequest\x1a\x1b.app.v1.InlineQueryResponse\x12F\n" +
-	"\vOpenMiniApp\x12\x1a.app.v1.OpenMiniAppRequest\x1a\x1b.app.v1.OpenMiniAppResponse\x12=\n" +
+	"\vOpenMiniApp\x12\x1a.app.v1.OpenMiniAppRequest\x1a\x1b.app.v1.OpenMiniAppResponse\x12X\n" +
+	"\x11AllowMiniAppWrite\x12 .app.v1.AllowMiniAppWriteRequest\x1a!.app.v1.AllowMiniAppWriteResponse\x12R\n" +
+	"\x0fSendMiniAppData\x12\x1e.app.v1.SendMiniAppDataRequest\x1a\x1f.app.v1.SendMiniAppDataResponse\x12=\n" +
 	"\bStartBot\x12\x17.app.v1.StartBotRequest\x1a\x18.app.v1.StartBotResponse\x12C\n" +
 	"\n" +
 	"GetBotInfo\x12\x19.app.v1.GetBotInfoRequest\x1a\x1a.app.v1.GetBotInfoResponse\x12[\n" +
@@ -1010,7 +1214,7 @@ func file_app_v1_bots_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_bots_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_app_v1_bots_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_app_v1_bots_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_app_v1_bots_proto_goTypes = []any{
 	(InlineResultKind)(0),              // 0: app.v1.InlineResultKind
 	(*InlineResult)(nil),               // 1: app.v1.InlineResult
@@ -1018,48 +1222,56 @@ var file_app_v1_bots_proto_goTypes = []any{
 	(*InlineQueryResponse)(nil),        // 3: app.v1.InlineQueryResponse
 	(*OpenMiniAppRequest)(nil),         // 4: app.v1.OpenMiniAppRequest
 	(*OpenMiniAppResponse)(nil),        // 5: app.v1.OpenMiniAppResponse
-	(*StartBotRequest)(nil),            // 6: app.v1.StartBotRequest
-	(*StartBotResponse)(nil),           // 7: app.v1.StartBotResponse
-	(*GetBotInfoRequest)(nil),          // 8: app.v1.GetBotInfoRequest
-	(*GetBotInfoResponse)(nil),         // 9: app.v1.GetBotInfoResponse
-	(*GetChatBotCommandsRequest)(nil),  // 10: app.v1.GetChatBotCommandsRequest
-	(*ChatBotCommands)(nil),            // 11: app.v1.ChatBotCommands
-	(*GetChatBotCommandsResponse)(nil), // 12: app.v1.GetChatBotCommandsResponse
-	nil,                                // 13: app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	(*MediaRef)(nil),                   // 14: app.v1.MediaRef
-	(*Chat)(nil),                       // 15: app.v1.Chat
-	(*Message)(nil),                    // 16: app.v1.Message
-	(*User)(nil),                       // 17: app.v1.User
-	(*SyncAck)(nil),                    // 18: app.v1.SyncAck
-	(*BotCommand)(nil),                 // 19: app.v1.BotCommand
+	(*AllowMiniAppWriteRequest)(nil),   // 6: app.v1.AllowMiniAppWriteRequest
+	(*AllowMiniAppWriteResponse)(nil),  // 7: app.v1.AllowMiniAppWriteResponse
+	(*SendMiniAppDataRequest)(nil),     // 8: app.v1.SendMiniAppDataRequest
+	(*SendMiniAppDataResponse)(nil),    // 9: app.v1.SendMiniAppDataResponse
+	(*StartBotRequest)(nil),            // 10: app.v1.StartBotRequest
+	(*StartBotResponse)(nil),           // 11: app.v1.StartBotResponse
+	(*GetBotInfoRequest)(nil),          // 12: app.v1.GetBotInfoRequest
+	(*GetBotInfoResponse)(nil),         // 13: app.v1.GetBotInfoResponse
+	(*GetChatBotCommandsRequest)(nil),  // 14: app.v1.GetChatBotCommandsRequest
+	(*ChatBotCommands)(nil),            // 15: app.v1.ChatBotCommands
+	(*GetChatBotCommandsResponse)(nil), // 16: app.v1.GetChatBotCommandsResponse
+	nil,                                // 17: app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	(*MediaRef)(nil),                   // 18: app.v1.MediaRef
+	(*Chat)(nil),                       // 19: app.v1.Chat
+	(*Message)(nil),                    // 20: app.v1.Message
+	(*User)(nil),                       // 21: app.v1.User
+	(*SyncAck)(nil),                    // 22: app.v1.SyncAck
+	(*BotCommand)(nil),                 // 23: app.v1.BotCommand
 }
 var file_app_v1_bots_proto_depIdxs = []int32{
 	0,  // 0: app.v1.InlineResult.kind:type_name -> app.v1.InlineResultKind
-	14, // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
-	14, // 2: app.v1.InlineResult.thumbnail:type_name -> app.v1.MediaRef
+	18, // 1: app.v1.InlineResult.media:type_name -> app.v1.MediaRef
+	18, // 2: app.v1.InlineResult.thumbnail:type_name -> app.v1.MediaRef
 	1,  // 3: app.v1.InlineQueryResponse.results:type_name -> app.v1.InlineResult
-	13, // 4: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
-	15, // 5: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
-	16, // 6: app.v1.StartBotResponse.message:type_name -> app.v1.Message
-	17, // 7: app.v1.StartBotResponse.users:type_name -> app.v1.User
-	18, // 8: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
-	17, // 9: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
-	19, // 10: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
-	17, // 11: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
-	19, // 12: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
-	11, // 13: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
+	17, // 4: app.v1.OpenMiniAppRequest.theme_params:type_name -> app.v1.OpenMiniAppRequest.ThemeParamsEntry
+	19, // 5: app.v1.StartBotResponse.chat:type_name -> app.v1.Chat
+	20, // 6: app.v1.StartBotResponse.message:type_name -> app.v1.Message
+	21, // 7: app.v1.StartBotResponse.users:type_name -> app.v1.User
+	22, // 8: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
+	21, // 9: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
+	23, // 10: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
+	21, // 11: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
+	23, // 12: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
+	15, // 13: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
 	2,  // 14: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
 	4,  // 15: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
-	6,  // 16: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
-	8,  // 17: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
-	10, // 18: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
-	3,  // 19: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
-	5,  // 20: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
-	7,  // 21: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
-	9,  // 22: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
-	12, // 23: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
-	19, // [19:24] is the sub-list for method output_type
-	14, // [14:19] is the sub-list for method input_type
+	6,  // 16: app.v1.BotsService.AllowMiniAppWrite:input_type -> app.v1.AllowMiniAppWriteRequest
+	8,  // 17: app.v1.BotsService.SendMiniAppData:input_type -> app.v1.SendMiniAppDataRequest
+	10, // 18: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
+	12, // 19: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
+	14, // 20: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
+	3,  // 21: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
+	5,  // 22: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
+	7,  // 23: app.v1.BotsService.AllowMiniAppWrite:output_type -> app.v1.AllowMiniAppWriteResponse
+	9,  // 24: app.v1.BotsService.SendMiniAppData:output_type -> app.v1.SendMiniAppDataResponse
+	11, // 25: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
+	13, // 26: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
+	16, // 27: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
+	21, // [21:28] is the sub-list for method output_type
+	14, // [14:21] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
 	14, // [14:14] is the sub-list for extension extendee
 	0,  // [0:14] is the sub-list for field type_name
@@ -1081,7 +1293,7 @@ func file_app_v1_bots_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_bots_proto_rawDesc), len(file_app_v1_bots_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

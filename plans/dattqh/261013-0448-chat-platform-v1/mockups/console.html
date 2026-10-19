@@ -666,7 +666,7 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 <section class="shot" id="mini-app-settings">
 	<div class="shot-head">
 		<h2>Mini App</h2><span class="phase">R6 · Phase 16</span>
-		<p>Đăng ký URL Mini App: chỉ https (thử gõ http:// để thấy lỗi). Console cho xem trước origin riêng mà người dùng sẽ thấy ở đầu khung, <code class="mono">chat-apps.invalid</code> là placeholder cho domain Mini App dùng chung. Server của bot phải xác thực initData bằng SDK trước khi tin danh tính người dùng.</p>
+		<p>Đăng ký URL Mini App trên domain của chủ bot, như Telegram: chỉ https, không chứa thông tin đăng nhập, không trỏ vào IP nội bộ, không nằm dưới domain của app chat hay của tổ chức (thử gõ http:// để thấy lỗi). Đầu khung cho người dùng thấy domain thật của Mini App. Bot có một Mini App chính (nút "Mở app" ở chat với bot) và có thể mở URL khác trên cùng domain qua nút trên tin. Server của bot phải xác thực initData bằng SDK trước khi tin danh tính người dùng.</p>
 	</div>
 	<div class="frame">
 		<div class="console">
@@ -678,19 +678,14 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 						<h4>Mini App</h4>
 						<div class="field">
 							<label for="ma-url">URL Mini App</label>
-							<input class="input mono" id="ma-url" value="https://release.deploy.hoandat.com/app" spellcheck="false" aria-describedby="ma-url-msg">
-							<span class="hint" id="ma-url-msg">Chỉ https. Trang được nạp trong khung sandbox, không có cookie của app chat.</span>
-						</div>
-						<div class="field">
-							<label for="ma-short">Tên ngắn</label>
-							<input class="input mono" id="ma-short" value="release" spellcheck="false" style="max-width: 240px">
-							<span class="hint">Dùng trong link mở Mini App. Chữ thường, số, dấu gạch dưới.</span>
+							<input class="input mono" id="ma-url" value="https://release.deploytools.vn/app" spellcheck="false" aria-describedby="ma-url-msg">
+							<span class="hint" id="ma-url-msg">Chỉ https, trên domain của bạn. Trang được nạp trong khung sandbox, không có cookie của app chat.</span>
 						</div>
 						<div class="field">
 							<span class="label">Xem trước đầu khung</span>
 							<div class="ma-preview">
-								<div class="bar"><svg class="icon"><use href="#i-back"/></svg><div style="flex:1;min-width:0"><strong>Deploy Bot</strong><span>b7302114.chat-apps.invalid</span></div><svg class="icon"><use href="#i-x"/></svg></div>
-								<div class="body">Nội dung từ <span class="mono" id="ma-preview-url">https://release.deploy.hoandat.com/app</span></div>
+								<div class="bar"><svg class="icon"><use href="#i-back"/></svg><div style="flex:1;min-width:0"><strong>Deploy Bot</strong><span id="ma-preview-host">release.deploytools.vn</span></div><svg class="icon"><use href="#i-x"/></svg></div>
+								<div class="body">Nội dung từ <span class="mono" id="ma-preview-url">https://release.deploytools.vn/app</span></div>
 							</div>
 						</div>
 						<div class="card-foot"><button type="submit" class="btn btn-primary" id="ma-save" data-press="Đã lưu Mini App">Lưu</button></div>
@@ -698,9 +693,8 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 					<div class="card">
 						<h4>Xác thực initData ở server</h4>
 						<ul>
-							<li>Mini App nhận initData có chữ ký (HMAC, hoặc Ed25519 với khoá công khai của nền tảng), kèm <code class="mono">tenant_id</code> và <code class="mono">auth_date</code>.</li>
-							<li>Kiểm chữ ký bằng hàm xác thực của SDK trước khi tin id người dùng; từ chối <code class="mono">auth_date</code> quá 1 giờ.</li>
-							<li>Cấp lại token đổi khoá ký, initData cũ hết hiệu lực.</li>
+							<li>Mini App nhận initData ký bằng Ed25519 với khoá công khai của nền tảng (lấy bằng method <code class="mono">getMiniAppKey</code>), kèm id bot, <code class="mono">tenant_id</code> và <code class="mono">auth_date</code>.</li>
+							<li>Kiểm chữ ký bằng hàm xác thực của SDK trước khi tin id người dùng; từ chối initData của bot khác và <code class="mono">auth_date</code> quá 1 giờ.</li>
 						</ul>
 						<div class="sdks" style="grid-template-columns: minmax(0, 1fr)">
 							<a class="sdk" href="#" data-toast="Mở hướng dẫn Mini App cho TypeScript"><b>TypeScript <svg class="icon"><use href="#i-external"/></svg></b><span>Xác thực initData trong Node</span></a>
@@ -848,9 +842,12 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 		const ok = /^https:\/\/[^\s/]+\.[^\s/]+/.test(v);
 		maUrl.setAttribute("aria-invalid", String(!ok));
 		$("#ma-url-msg").className = ok ? "hint" : "error-text";
-		$("#ma-url-msg").textContent = ok ? "Chỉ https. Trang được nạp trong khung sandbox, không có cookie của app chat." : "URL phải bắt đầu bằng https:// và có tên miền";
+		$("#ma-url-msg").textContent = ok ? "Chỉ https, trên domain của bạn. Trang được nạp trong khung sandbox, không có cookie của app chat." : "URL phải bắt đầu bằng https:// và có tên miền";
 		$("#ma-save").disabled = !ok;
-		if (ok) $("#ma-preview-url").textContent = v;
+		if (ok) {
+			$("#ma-preview-url").textContent = v;
+			$("#ma-preview-host").textContent = new URL(v).host;
+		}
 	});
 })();
 </script>

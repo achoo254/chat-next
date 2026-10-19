@@ -20,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bots.proto.
  */
 export const file_app_v1_bots: GenFile = /*@__PURE__*/
-  fileDesc("ChFhcHAvdjEvYm90cy5wcm90bxIGYXBwLnYxIsMBCgxJbmxpbmVSZXN1bHQSCgoCaWQYASABKAkSJgoEa2luZBgCIAEoDjIYLmFwcC52MS5JbmxpbmVSZXN1bHRLaW5kEg0KBXRpdGxlGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEh8KBW1lZGlhGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhUKDXRodW1ibmFpbF91cmwYBiABKAkSIwoJdGh1bWJuYWlsGAcgASgLMhAuYXBwLnYxLk1lZGlhUmVmIlwKEklubGluZVF1ZXJ5UmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACEg0KBXF1ZXJ5GAMgASgJEg4KBm9mZnNldBgEIAEoCSKQAQoTSW5saW5lUXVlcnlSZXNwb25zZRIQCghxdWVyeV9pZBgBIAEoCRIlCgdyZXN1bHRzGAIgAygLMhQuYXBwLnYxLklubGluZVJlc3VsdBITCgtuZXh0X29mZnNldBgDIAEoCRIPCgdnYWxsZXJ5GAQgASgIEhoKEmNhY2hlX3RpbWVfc2Vjb25kcxgFIAEoBSLnAQoST3Blbk1pbmlBcHBSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoHY2hhdF9pZBgCIAEoA0ICMAISDwoDc2VxGAMgASgDQgIwAhILCgN1cmwYBCABKAkSEwoLc3RhcnRfcGFyYW0YBSABKAkSQQoMdGhlbWVfcGFyYW1zGAYgAygLMisuYXBwLnYxLk9wZW5NaW5pQXBwUmVxdWVzdC5UaGVtZVBhcmFtc0VudHJ5GjIKEFRoZW1lUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI1ChNPcGVuTWluaUFwcFJlc3BvbnNlEgsKA3VybBgBIAEoCRIRCglpbml0X2RhdGEYAiABKAkiUQoPU3RhcnRCb3RSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoLc3RhcnRfcGFyYW0YAiABKAkSFQoJcmFuZG9tX2lkGAMgASgDQgIwAiKLAQoQU3RhcnRCb3RSZXNwb25zZRIaCgRjaGF0GAEgASgLMgwuYXBwLnYxLkNoYXQSIAoHbWVzc2FnZRgCIAEoCzIPLmFwcC52MS5NZXNzYWdlEhsKBXVzZXJzGAMgAygLMgwuYXBwLnYxLlVzZXISHAoDYWNrGAQgASgLMg8uYXBwLnYxLlN5bmNBY2siPAoRR2V0Qm90SW5mb1JlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgdjaGF0X2lkGAIgASgDQgIwAiK9AQoSR2V0Qm90SW5mb1Jlc3BvbnNlEhoKBHVzZXIYASABKAsyDC5hcHAudjEuVXNlchITCgtkZXNjcmlwdGlvbhgCIAEoCRINCgVhYm91dBgDIAEoCRIkCghjb21tYW5kcxgEIAMoCzISLmFwcC52MS5Cb3RDb21tYW5kEhAKCGlzX293bmVyGAUgASgIEhoKDmxhc3RfdXBkYXRlX2F0GAYgASgDQgIwAhITCgtub3RfcnVubmluZxgHIAEoCCIwChlHZXRDaGF0Qm90Q29tbWFuZHNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACIlIKD0NoYXRCb3RDb21tYW5kcxIZCgNib3QYASABKAsyDC5hcHAudjEuVXNlchIkCghjb21tYW5kcxgCIAMoCzISLmFwcC52MS5Cb3RDb21tYW5kIlYKGkdldENoYXRCb3RDb21tYW5kc1Jlc3BvbnNlEiUKBGJvdHMYASADKAsyFy5hcHAudjEuQ2hhdEJvdENvbW1hbmRzEhEKCWJvdF9jb3VudBgCIAEoBSrvAQoQSW5saW5lUmVzdWx0S2luZBIiCh5JTkxJTkVfUkVTVUxUX0tJTkRfVU5TUEVDSUZJRUQQABIeChpJTkxJTkVfUkVTVUxUX0tJTkRfQVJUSUNMRRABEhwKGElOTElORV9SRVNVTFRfS0lORF9QSE9UTxACEhwKGElOTElORV9SRVNVTFRfS0lORF9WSURFTxADEhwKGElOTElORV9SRVNVTFRfS0lORF9BVURJTxAEEhwKGElOTElORV9SRVNVTFRfS0lORF9WT0lDRRAFEh8KG0lOTElORV9SRVNVTFRfS0lORF9ET0NVTUVOVBAGMv4CCgtCb3RzU2VydmljZRJGCgtJbmxpbmVRdWVyeRIaLmFwcC52MS5JbmxpbmVRdWVyeVJlcXVlc3QaGy5hcHAudjEuSW5saW5lUXVlcnlSZXNwb25zZRJGCgtPcGVuTWluaUFwcBIaLmFwcC52MS5PcGVuTWluaUFwcFJlcXVlc3QaGy5hcHAudjEuT3Blbk1pbmlBcHBSZXNwb25zZRI9CghTdGFydEJvdBIXLmFwcC52MS5TdGFydEJvdFJlcXVlc3QaGC5hcHAudjEuU3RhcnRCb3RSZXNwb25zZRJDCgpHZXRCb3RJbmZvEhkuYXBwLnYxLkdldEJvdEluZm9SZXF1ZXN0GhouYXBwLnYxLkdldEJvdEluZm9SZXNwb25zZRJbChJHZXRDaGF0Qm90Q29tbWFuZHMSIS5hcHAudjEuR2V0Q2hhdEJvdENvbW1hbmRzUmVxdWVzdBoiLmFwcC52MS5HZXRDaGF0Qm90Q29tbWFuZHNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_bot_admin, file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChFhcHAvdjEvYm90cy5wcm90bxIGYXBwLnYxIsMBCgxJbmxpbmVSZXN1bHQSCgoCaWQYASABKAkSJgoEa2luZBgCIAEoDjIYLmFwcC52MS5JbmxpbmVSZXN1bHRLaW5kEg0KBXRpdGxlGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEh8KBW1lZGlhGAUgASgLMhAuYXBwLnYxLk1lZGlhUmVmEhUKDXRodW1ibmFpbF91cmwYBiABKAkSIwoJdGh1bWJuYWlsGAcgASgLMhAuYXBwLnYxLk1lZGlhUmVmIlwKEklubGluZVF1ZXJ5UmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACEg0KBXF1ZXJ5GAMgASgJEg4KBm9mZnNldBgEIAEoCSKQAQoTSW5saW5lUXVlcnlSZXNwb25zZRIQCghxdWVyeV9pZBgBIAEoCRIlCgdyZXN1bHRzGAIgAygLMhQuYXBwLnYxLklubGluZVJlc3VsdBITCgtuZXh0X29mZnNldBgDIAEoCRIPCgdnYWxsZXJ5GAQgASgIEhoKEmNhY2hlX3RpbWVfc2Vjb25kcxgFIAEoBSLnAQoST3Blbk1pbmlBcHBSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISEwoHY2hhdF9pZBgCIAEoA0ICMAISDwoDc2VxGAMgASgDQgIwAhILCgN1cmwYBCABKAkSEwoLc3RhcnRfcGFyYW0YBSABKAkSQQoMdGhlbWVfcGFyYW1zGAYgAygLMisuYXBwLnYxLk9wZW5NaW5pQXBwUmVxdWVzdC5UaGVtZVBhcmFtc0VudHJ5GjIKEFRoZW1lUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI1ChNPcGVuTWluaUFwcFJlc3BvbnNlEgsKA3VybBgBIAEoCRIRCglpbml0X2RhdGEYAiABKAkiLgoYQWxsb3dNaW5pQXBwV3JpdGVSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAIiGwoZQWxsb3dNaW5pQXBwV3JpdGVSZXNwb25zZSJPChZTZW5kTWluaUFwcERhdGFSZXF1ZXN0EhIKBmJvdF9pZBgBIAEoA0ICMAISDAoEZGF0YRgCIAEoCRITCgtidXR0b25fdGV4dBgDIAEoCSIZChdTZW5kTWluaUFwcERhdGFSZXNwb25zZSJRCg9TdGFydEJvdFJlcXVlc3QSEgoGYm90X2lkGAEgASgDQgIwAhITCgtzdGFydF9wYXJhbRgCIAEoCRIVCglyYW5kb21faWQYAyABKANCAjACIosBChBTdGFydEJvdFJlc3BvbnNlEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdBIgCgdtZXNzYWdlGAIgASgLMg8uYXBwLnYxLk1lc3NhZ2USGwoFdXNlcnMYAyADKAsyDC5hcHAudjEuVXNlchIcCgNhY2sYBCABKAsyDy5hcHAudjEuU3luY0FjayI8ChFHZXRCb3RJbmZvUmVxdWVzdBISCgZib3RfaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACItMBChJHZXRCb3RJbmZvUmVzcG9uc2USGgoEdXNlchgBIAEoCzIMLmFwcC52MS5Vc2VyEhMKC2Rlc2NyaXB0aW9uGAIgASgJEg0KBWFib3V0GAMgASgJEiQKCGNvbW1hbmRzGAQgAygLMhIuYXBwLnYxLkJvdENvbW1hbmQSEAoIaXNfb3duZXIYBSABKAgSGgoObGFzdF91cGRhdGVfYXQYBiABKANCAjACEhMKC25vdF9ydW5uaW5nGAcgASgIEhQKDG1pbmlfYXBwX3VybBgIIAEoCSIwChlHZXRDaGF0Qm90Q29tbWFuZHNSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACIlIKD0NoYXRCb3RDb21tYW5kcxIZCgNib3QYASABKAsyDC5hcHAudjEuVXNlchIkCghjb21tYW5kcxgCIAMoCzISLmFwcC52MS5Cb3RDb21tYW5kIlYKGkdldENoYXRCb3RDb21tYW5kc1Jlc3BvbnNlEiUKBGJvdHMYASADKAsyFy5hcHAudjEuQ2hhdEJvdENvbW1hbmRzEhEKCWJvdF9jb3VudBgCIAEoBSrvAQoQSW5saW5lUmVzdWx0S2luZBIiCh5JTkxJTkVfUkVTVUxUX0tJTkRfVU5TUEVDSUZJRUQQABIeChpJTkxJTkVfUkVTVUxUX0tJTkRfQVJUSUNMRRABEhwKGElOTElORV9SRVNVTFRfS0lORF9QSE9UTxACEhwKGElOTElORV9SRVNVTFRfS0lORF9WSURFTxADEhwKGElOTElORV9SRVNVTFRfS0lORF9BVURJTxAEEhwKGElOTElORV9SRVNVTFRfS0lORF9WT0lDRRAFEh8KG0lOTElORV9SRVNVTFRfS0lORF9ET0NVTUVOVBAGMqwECgtCb3RzU2VydmljZRJGCgtJbmxpbmVRdWVyeRIaLmFwcC52MS5JbmxpbmVRdWVyeVJlcXVlc3QaGy5hcHAudjEuSW5saW5lUXVlcnlSZXNwb25zZRJGCgtPcGVuTWluaUFwcBIaLmFwcC52MS5PcGVuTWluaUFwcFJlcXVlc3QaGy5hcHAudjEuT3Blbk1pbmlBcHBSZXNwb25zZRJYChFBbGxvd01pbmlBcHBXcml0ZRIgLmFwcC52MS5BbGxvd01pbmlBcHBXcml0ZVJlcXVlc3QaIS5hcHAudjEuQWxsb3dNaW5pQXBwV3JpdGVSZXNwb25zZRJSCg9TZW5kTWluaUFwcERhdGESHi5hcHAudjEuU2VuZE1pbmlBcHBEYXRhUmVxdWVzdBofLmFwcC52MS5TZW5kTWluaUFwcERhdGFSZXNwb25zZRI9CghTdGFydEJvdBIXLmFwcC52MS5TdGFydEJvdFJlcXVlc3QaGC5hcHAudjEuU3RhcnRCb3RSZXNwb25zZRJDCgpHZXRCb3RJbmZvEhkuYXBwLnYxLkdldEJvdEluZm9SZXF1ZXN0GhouYXBwLnYxLkdldEJvdEluZm9SZXNwb25zZRJbChJHZXRDaGF0Qm90Q29tbWFuZHMSIS5hcHAudjEuR2V0Q2hhdEJvdENvbW1hbmRzUmVxdWVzdBoiLmFwcC52MS5HZXRDaGF0Qm90Q29tbWFuZHNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_bot_admin, file_app_v1_chats, file_app_v1_media, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.InlineResult
@@ -213,15 +213,19 @@ export const OpenMiniAppRequestSchema: GenMessage<OpenMiniAppRequest> = /*@__PUR
  */
 export type OpenMiniAppResponse = Message<"app.v1.OpenMiniAppResponse"> & {
   /**
-   * URL on b<bot_id>.<miniapp domain>; the container blocks navigation away
-   * from this origin.
+   * The https URL to load, on the bot owner's domain (validated when the bot
+   * set it); the container talks only to this URL's origin.
    *
    * @generated from field: string url = 1;
    */
   url: string;
 
   /**
-   * Signed init data (carries tenant_id and auth_date) handed over the bridge.
+   * Init data for the Mini App, a query string (user, chat_type, chat_instance,
+   * start_param, auth_date, bot_id, tenant_id) signed with Ed25519 in
+   * `signature` (base64url) over "<bot_id>:WebAppData\n" followed by the
+   * other fields as sorted key=value lines; verify with the platform public
+   * key (Bot API getMiniAppKey) and the SDK helpers.
    *
    * @generated from field: string init_data = 2;
    */
@@ -234,6 +238,80 @@ export type OpenMiniAppResponse = Message<"app.v1.OpenMiniAppResponse"> & {
  */
 export const OpenMiniAppResponseSchema: GenMessage<OpenMiniAppResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_bots, 4);
+
+/**
+ * @generated from message app.v1.AllowMiniAppWriteRequest
+ */
+export type AllowMiniAppWriteRequest = Message<"app.v1.AllowMiniAppWriteRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+};
+
+/**
+ * Describes the message app.v1.AllowMiniAppWriteRequest.
+ * Use `create(AllowMiniAppWriteRequestSchema)` to create a new message.
+ */
+export const AllowMiniAppWriteRequestSchema: GenMessage<AllowMiniAppWriteRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 5);
+
+/**
+ * @generated from message app.v1.AllowMiniAppWriteResponse
+ */
+export type AllowMiniAppWriteResponse = Message<"app.v1.AllowMiniAppWriteResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.AllowMiniAppWriteResponse.
+ * Use `create(AllowMiniAppWriteResponseSchema)` to create a new message.
+ */
+export const AllowMiniAppWriteResponseSchema: GenMessage<AllowMiniAppWriteResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 6);
+
+/**
+ * @generated from message app.v1.SendMiniAppDataRequest
+ */
+export type SendMiniAppDataRequest = Message<"app.v1.SendMiniAppDataRequest"> & {
+  /**
+   * @generated from field: int64 bot_id = 1 [jstype = JS_NUMBER];
+   */
+  botId: bigint;
+
+  /**
+   * Up to 4096 bytes.
+   *
+   * @generated from field: string data = 2;
+   */
+  data: string;
+
+  /**
+   * Text of the button that opened the Mini App ("" for the main one).
+   *
+   * @generated from field: string button_text = 3;
+   */
+  buttonText: string;
+};
+
+/**
+ * Describes the message app.v1.SendMiniAppDataRequest.
+ * Use `create(SendMiniAppDataRequestSchema)` to create a new message.
+ */
+export const SendMiniAppDataRequestSchema: GenMessage<SendMiniAppDataRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 7);
+
+/**
+ * @generated from message app.v1.SendMiniAppDataResponse
+ */
+export type SendMiniAppDataResponse = Message<"app.v1.SendMiniAppDataResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.SendMiniAppDataResponse.
+ * Use `create(SendMiniAppDataResponseSchema)` to create a new message.
+ */
+export const SendMiniAppDataResponseSchema: GenMessage<SendMiniAppDataResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bots, 8);
 
 /**
  * @generated from message app.v1.StartBotRequest
@@ -265,7 +343,7 @@ export type StartBotRequest = Message<"app.v1.StartBotRequest"> & {
  * Use `create(StartBotRequestSchema)` to create a new message.
  */
 export const StartBotRequestSchema: GenMessage<StartBotRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 5);
+  messageDesc(file_app_v1_bots, 9);
 
 /**
  * @generated from message app.v1.StartBotResponse
@@ -297,7 +375,7 @@ export type StartBotResponse = Message<"app.v1.StartBotResponse"> & {
  * Use `create(StartBotResponseSchema)` to create a new message.
  */
 export const StartBotResponseSchema: GenMessage<StartBotResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 6);
+  messageDesc(file_app_v1_bots, 10);
 
 /**
  * @generated from message app.v1.GetBotInfoRequest
@@ -322,7 +400,7 @@ export type GetBotInfoRequest = Message<"app.v1.GetBotInfoRequest"> & {
  * Use `create(GetBotInfoRequestSchema)` to create a new message.
  */
 export const GetBotInfoRequestSchema: GenMessage<GetBotInfoRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 7);
+  messageDesc(file_app_v1_bots, 11);
 
 /**
  * @generated from message app.v1.GetBotInfoResponse
@@ -374,6 +452,13 @@ export type GetBotInfoResponse = Message<"app.v1.GetBotInfoResponse"> & {
    * @generated from field: bool not_running = 7;
    */
   notRunning: boolean;
+
+  /**
+   * The bot's main Mini App ("Mở app" in its chat and profile); "" without one.
+   *
+   * @generated from field: string mini_app_url = 8;
+   */
+  miniAppUrl: string;
 };
 
 /**
@@ -381,7 +466,7 @@ export type GetBotInfoResponse = Message<"app.v1.GetBotInfoResponse"> & {
  * Use `create(GetBotInfoResponseSchema)` to create a new message.
  */
 export const GetBotInfoResponseSchema: GenMessage<GetBotInfoResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 8);
+  messageDesc(file_app_v1_bots, 12);
 
 /**
  * @generated from message app.v1.GetChatBotCommandsRequest
@@ -398,7 +483,7 @@ export type GetChatBotCommandsRequest = Message<"app.v1.GetChatBotCommandsReques
  * Use `create(GetChatBotCommandsRequestSchema)` to create a new message.
  */
 export const GetChatBotCommandsRequestSchema: GenMessage<GetChatBotCommandsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 9);
+  messageDesc(file_app_v1_bots, 13);
 
 /**
  * One bot's command menu in a group.
@@ -424,7 +509,7 @@ export type ChatBotCommands = Message<"app.v1.ChatBotCommands"> & {
  * Use `create(ChatBotCommandsSchema)` to create a new message.
  */
 export const ChatBotCommandsSchema: GenMessage<ChatBotCommands> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 10);
+  messageDesc(file_app_v1_bots, 14);
 
 /**
  * @generated from message app.v1.GetChatBotCommandsResponse
@@ -453,7 +538,7 @@ export type GetChatBotCommandsResponse = Message<"app.v1.GetChatBotCommandsRespo
  * Use `create(GetChatBotCommandsResponseSchema)` to create a new message.
  */
 export const GetChatBotCommandsResponseSchema: GenMessage<GetChatBotCommandsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bots, 11);
+  messageDesc(file_app_v1_bots, 15);
 
 /**
  * @generated from enum app.v1.InlineResultKind
@@ -523,7 +608,10 @@ export const BotsService: GenService<{
     output: typeof InlineQueryResponseSchema;
   },
   /**
-   * Returns the Mini App URL and signed init data for the container.
+   * Returns the Mini App URL and signed init data for the container. The
+   * URL must be the bot's main Mini App (url empty) or the mini_app_url of
+   * an inline button of the message at chat_id/seq, which the caller can
+   * see; anything else is invalid_argument.
    *
    * @generated from rpc app.v1.BotsService.OpenMiniApp
    */
@@ -531,6 +619,31 @@ export const BotsService: GenService<{
     methodKind: "unary";
     input: typeof OpenMiniAppRequestSchema;
     output: typeof OpenMiniAppResponseSchema;
+  },
+  /**
+   * The Mini App asked to message the user (bridge request_write_access) and
+   * the user agreed: records the user's consent for the bot, as pressing
+   * Bắt đầu does, without sending a start message.
+   *
+   * @generated from rpc app.v1.BotsService.AllowMiniAppWrite
+   */
+  allowMiniAppWrite: {
+    methodKind: "unary";
+    input: typeof AllowMiniAppWriteRequestSchema;
+    output: typeof AllowMiniAppWriteResponseSchema;
+  },
+  /**
+   * The Mini App sent data to its bot (bridge data_send). Posts a message
+   * from the caller to the private chat with the bot carrying
+   * ActionMiniAppData; the bot gets it as web_app_data. Only for a Mini App
+   * opened from the bot's private chat or its profile.
+   *
+   * @generated from rpc app.v1.BotsService.SendMiniAppData
+   */
+  sendMiniAppData: {
+    methodKind: "unary";
+    input: typeof SendMiniAppDataRequestSchema;
+    output: typeof SendMiniAppDataResponseSchema;
   },
   /**
    * Records the user's consent, opens the private chat with the bot and

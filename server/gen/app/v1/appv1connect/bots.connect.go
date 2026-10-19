@@ -37,6 +37,12 @@ const (
 	BotsServiceInlineQueryProcedure = "/app.v1.BotsService/InlineQuery"
 	// BotsServiceOpenMiniAppProcedure is the fully-qualified name of the BotsService's OpenMiniApp RPC.
 	BotsServiceOpenMiniAppProcedure = "/app.v1.BotsService/OpenMiniApp"
+	// BotsServiceAllowMiniAppWriteProcedure is the fully-qualified name of the BotsService's
+	// AllowMiniAppWrite RPC.
+	BotsServiceAllowMiniAppWriteProcedure = "/app.v1.BotsService/AllowMiniAppWrite"
+	// BotsServiceSendMiniAppDataProcedure is the fully-qualified name of the BotsService's
+	// SendMiniAppData RPC.
+	BotsServiceSendMiniAppDataProcedure = "/app.v1.BotsService/SendMiniAppData"
 	// BotsServiceStartBotProcedure is the fully-qualified name of the BotsService's StartBot RPC.
 	BotsServiceStartBotProcedure = "/app.v1.BotsService/StartBot"
 	// BotsServiceGetBotInfoProcedure is the fully-qualified name of the BotsService's GetBotInfo RPC.
@@ -55,8 +61,20 @@ type BotsServiceClient interface {
 	// chat_id. A bot that does not answer in time gives failed_precondition
 	// "bot_timeout"; a bot without inline mode "inline_off".
 	InlineQuery(context.Context, *connect.Request[v1.InlineQueryRequest]) (*connect.Response[v1.InlineQueryResponse], error)
-	// Returns the Mini App URL and signed init data for the container.
+	// Returns the Mini App URL and signed init data for the container. The
+	// URL must be the bot's main Mini App (url empty) or the mini_app_url of
+	// an inline button of the message at chat_id/seq, which the caller can
+	// see; anything else is invalid_argument.
 	OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error)
+	// The Mini App asked to message the user (bridge request_write_access) and
+	// the user agreed: records the user's consent for the bot, as pressing
+	// Bắt đầu does, without sending a start message.
+	AllowMiniAppWrite(context.Context, *connect.Request[v1.AllowMiniAppWriteRequest]) (*connect.Response[v1.AllowMiniAppWriteResponse], error)
+	// The Mini App sent data to its bot (bridge data_send). Posts a message
+	// from the caller to the private chat with the bot carrying
+	// ActionMiniAppData; the bot gets it as web_app_data. Only for a Mini App
+	// opened from the bot's private chat or its profile.
+	SendMiniAppData(context.Context, *connect.Request[v1.SendMiniAppDataRequest]) (*connect.Response[v1.SendMiniAppDataResponse], error)
 	// Records the user's consent, opens the private chat with the bot and
 	// sends the start message (after the client confirmed a deep link).
 	// Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
@@ -96,6 +114,18 @@ func NewBotsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(botsServiceMethods.ByName("OpenMiniApp")),
 			connect.WithClientOptions(opts...),
 		),
+		allowMiniAppWrite: connect.NewClient[v1.AllowMiniAppWriteRequest, v1.AllowMiniAppWriteResponse](
+			httpClient,
+			baseURL+BotsServiceAllowMiniAppWriteProcedure,
+			connect.WithSchema(botsServiceMethods.ByName("AllowMiniAppWrite")),
+			connect.WithClientOptions(opts...),
+		),
+		sendMiniAppData: connect.NewClient[v1.SendMiniAppDataRequest, v1.SendMiniAppDataResponse](
+			httpClient,
+			baseURL+BotsServiceSendMiniAppDataProcedure,
+			connect.WithSchema(botsServiceMethods.ByName("SendMiniAppData")),
+			connect.WithClientOptions(opts...),
+		),
 		startBot: connect.NewClient[v1.StartBotRequest, v1.StartBotResponse](
 			httpClient,
 			baseURL+BotsServiceStartBotProcedure,
@@ -121,6 +151,8 @@ func NewBotsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type botsServiceClient struct {
 	inlineQuery        *connect.Client[v1.InlineQueryRequest, v1.InlineQueryResponse]
 	openMiniApp        *connect.Client[v1.OpenMiniAppRequest, v1.OpenMiniAppResponse]
+	allowMiniAppWrite  *connect.Client[v1.AllowMiniAppWriteRequest, v1.AllowMiniAppWriteResponse]
+	sendMiniAppData    *connect.Client[v1.SendMiniAppDataRequest, v1.SendMiniAppDataResponse]
 	startBot           *connect.Client[v1.StartBotRequest, v1.StartBotResponse]
 	getBotInfo         *connect.Client[v1.GetBotInfoRequest, v1.GetBotInfoResponse]
 	getChatBotCommands *connect.Client[v1.GetChatBotCommandsRequest, v1.GetChatBotCommandsResponse]
@@ -134,6 +166,16 @@ func (c *botsServiceClient) InlineQuery(ctx context.Context, req *connect.Reques
 // OpenMiniApp calls app.v1.BotsService.OpenMiniApp.
 func (c *botsServiceClient) OpenMiniApp(ctx context.Context, req *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error) {
 	return c.openMiniApp.CallUnary(ctx, req)
+}
+
+// AllowMiniAppWrite calls app.v1.BotsService.AllowMiniAppWrite.
+func (c *botsServiceClient) AllowMiniAppWrite(ctx context.Context, req *connect.Request[v1.AllowMiniAppWriteRequest]) (*connect.Response[v1.AllowMiniAppWriteResponse], error) {
+	return c.allowMiniAppWrite.CallUnary(ctx, req)
+}
+
+// SendMiniAppData calls app.v1.BotsService.SendMiniAppData.
+func (c *botsServiceClient) SendMiniAppData(ctx context.Context, req *connect.Request[v1.SendMiniAppDataRequest]) (*connect.Response[v1.SendMiniAppDataResponse], error) {
+	return c.sendMiniAppData.CallUnary(ctx, req)
 }
 
 // StartBot calls app.v1.BotsService.StartBot.
@@ -160,8 +202,20 @@ type BotsServiceHandler interface {
 	// chat_id. A bot that does not answer in time gives failed_precondition
 	// "bot_timeout"; a bot without inline mode "inline_off".
 	InlineQuery(context.Context, *connect.Request[v1.InlineQueryRequest]) (*connect.Response[v1.InlineQueryResponse], error)
-	// Returns the Mini App URL and signed init data for the container.
+	// Returns the Mini App URL and signed init data for the container. The
+	// URL must be the bot's main Mini App (url empty) or the mini_app_url of
+	// an inline button of the message at chat_id/seq, which the caller can
+	// see; anything else is invalid_argument.
 	OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error)
+	// The Mini App asked to message the user (bridge request_write_access) and
+	// the user agreed: records the user's consent for the bot, as pressing
+	// Bắt đầu does, without sending a start message.
+	AllowMiniAppWrite(context.Context, *connect.Request[v1.AllowMiniAppWriteRequest]) (*connect.Response[v1.AllowMiniAppWriteResponse], error)
+	// The Mini App sent data to its bot (bridge data_send). Posts a message
+	// from the caller to the private chat with the bot carrying
+	// ActionMiniAppData; the bot gets it as web_app_data. Only for a Mini App
+	// opened from the bot's private chat or its profile.
+	SendMiniAppData(context.Context, *connect.Request[v1.SendMiniAppDataRequest]) (*connect.Response[v1.SendMiniAppDataResponse], error)
 	// Records the user's consent, opens the private chat with the bot and
 	// sends the start message (after the client confirmed a deep link).
 	// Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
@@ -197,6 +251,18 @@ func NewBotsServiceHandler(svc BotsServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(botsServiceMethods.ByName("OpenMiniApp")),
 		connect.WithHandlerOptions(opts...),
 	)
+	botsServiceAllowMiniAppWriteHandler := connect.NewUnaryHandler(
+		BotsServiceAllowMiniAppWriteProcedure,
+		svc.AllowMiniAppWrite,
+		connect.WithSchema(botsServiceMethods.ByName("AllowMiniAppWrite")),
+		connect.WithHandlerOptions(opts...),
+	)
+	botsServiceSendMiniAppDataHandler := connect.NewUnaryHandler(
+		BotsServiceSendMiniAppDataProcedure,
+		svc.SendMiniAppData,
+		connect.WithSchema(botsServiceMethods.ByName("SendMiniAppData")),
+		connect.WithHandlerOptions(opts...),
+	)
 	botsServiceStartBotHandler := connect.NewUnaryHandler(
 		BotsServiceStartBotProcedure,
 		svc.StartBot,
@@ -221,6 +287,10 @@ func NewBotsServiceHandler(svc BotsServiceHandler, opts ...connect.HandlerOption
 			botsServiceInlineQueryHandler.ServeHTTP(w, r)
 		case BotsServiceOpenMiniAppProcedure:
 			botsServiceOpenMiniAppHandler.ServeHTTP(w, r)
+		case BotsServiceAllowMiniAppWriteProcedure:
+			botsServiceAllowMiniAppWriteHandler.ServeHTTP(w, r)
+		case BotsServiceSendMiniAppDataProcedure:
+			botsServiceSendMiniAppDataHandler.ServeHTTP(w, r)
 		case BotsServiceStartBotProcedure:
 			botsServiceStartBotHandler.ServeHTTP(w, r)
 		case BotsServiceGetBotInfoProcedure:
@@ -242,6 +312,14 @@ func (UnimplementedBotsServiceHandler) InlineQuery(context.Context, *connect.Req
 
 func (UnimplementedBotsServiceHandler) OpenMiniApp(context.Context, *connect.Request[v1.OpenMiniAppRequest]) (*connect.Response[v1.OpenMiniAppResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.OpenMiniApp is not implemented"))
+}
+
+func (UnimplementedBotsServiceHandler) AllowMiniAppWrite(context.Context, *connect.Request[v1.AllowMiniAppWriteRequest]) (*connect.Response[v1.AllowMiniAppWriteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.AllowMiniAppWrite is not implemented"))
+}
+
+func (UnimplementedBotsServiceHandler) SendMiniAppData(context.Context, *connect.Request[v1.SendMiniAppDataRequest]) (*connect.Response[v1.SendMiniAppDataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BotsService.SendMiniAppData is not implemented"))
 }
 
 func (UnimplementedBotsServiceHandler) StartBot(context.Context, *connect.Request[v1.StartBotRequest]) (*connect.Response[v1.StartBotResponse], error) {

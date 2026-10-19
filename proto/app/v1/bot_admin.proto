@@ -134,6 +134,8 @@ message Bot {
   // Inline mode: the composer hint shown once a user typed @username and a
   // space; empty when inline mode is off.
   string inline_placeholder = 12;
+  // The bot's main Mini App, an https URL on the owner's domain; "" for none.
+  string mini_app_url = 13;
 }
 
 message ListMyBotsRequest {}
@@ -168,6 +170,9 @@ message UpdateBotRequest {
   // file_id of a photo the owner uploaded (MediaService): the bot's profile
   // photo, seen by everyone in the tenant; an empty string removes it.
   optional string photo_file_id = 8;
+  // https only, not under the app's or any tenant's domain, no credentials,
+  // no IP address host; "" removes the Mini App.
+  optional string mini_app_url = 9;
 }
 
 message UpdateBotResponse {

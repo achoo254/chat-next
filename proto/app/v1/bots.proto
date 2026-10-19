@@ -26,8 +26,20 @@ service BotsService {
   // chat_id. A bot that does not answer in time gives failed_precondition
   // "bot_timeout"; a bot without inline mode "inline_off".
   rpc InlineQuery(InlineQueryRequest) returns (InlineQueryResponse);
-  // Returns the Mini App URL and signed init data for the container.
+  // Returns the Mini App URL and signed init data for the container. The
+  // URL must be the bot's main Mini App (url empty) or the mini_app_url of
+  // an inline button of the message at chat_id/seq, which the caller can
+  // see; anything else is invalid_argument.
   rpc OpenMiniApp(OpenMiniAppRequest) returns (OpenMiniAppResponse);
+  // The Mini App asked to message the user (bridge request_write_access) and
+  // the user agreed: records the user's consent for the bot, as pressing
+  // Bắt đầu does, without sending a start message.
+  rpc AllowMiniAppWrite(AllowMiniAppWriteRequest) returns (AllowMiniAppWriteResponse);
+  // The Mini App sent data to its bot (bridge data_send). Posts a message
+  // from the caller to the private chat with the bot carrying
+  // ActionMiniAppData; the bot gets it as web_app_data. Only for a Mini App
+  // opened from the bot's private chat or its profile.
+  rpc SendMiniAppData(SendMiniAppDataRequest) returns (SendMiniAppDataResponse);
   // Records the user's consent, opens the private chat with the bot and
   // sends the start message (after the client confirmed a deep link).
   // Deep links have the form https://chat.<domain>/b/<username>?start=<param>:
@@ -104,12 +116,32 @@ message OpenMiniAppRequest {
 }
 
 message OpenMiniAppResponse {
-  // URL on b<bot_id>.<miniapp domain>; the container blocks navigation away
-  // from this origin.
+  // The https URL to load, on the bot owner's domain (validated when the bot
+  // set it); the container talks only to this URL's origin.
   string url = 1;
-  // Signed init data (carries tenant_id and auth_date) handed over the bridge.
+  // Init data for the Mini App, a query string (user, chat_type, chat_instance,
+  // start_param, auth_date, bot_id, tenant_id) signed with Ed25519 in
+  // `signature` (base64url) over "<bot_id>:WebAppData\n" followed by the
+  // other fields as sorted key=value lines; verify with the platform public
+  // key (Bot API getMiniAppKey) and the SDK helpers.
   string init_data = 2;
 }
+
+message AllowMiniAppWriteRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+}
+
+message AllowMiniAppWriteResponse {}
+
+message SendMiniAppDataRequest {
+  int64 bot_id = 1 [jstype = JS_NUMBER];
+  // Up to 4096 bytes.
+  string data = 2;
+  // Text of the button that opened the Mini App ("" for the main one).
+  string button_text = 3;
+}
+
+message SendMiniAppDataResponse {}
 
 message StartBotRequest {
   int64 bot_id = 1 [jstype = JS_NUMBER];
@@ -150,6 +182,8 @@ message GetBotInfoResponse {
   // Owner only: the bot has not asked for updates in the last 2 minutes (or
   // never did), judged by the server's clock; false for anyone else.
   bool not_running = 7;
+  // The bot's main Mini App ("Mở app" in its chat and profile); "" without one.
+  string mini_app_url = 8;
 }
 
 message GetChatBotCommandsRequest {

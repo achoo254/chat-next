@@ -126,7 +126,7 @@ message InlineButton {
     bytes callback_data = 2;
     // Allowed schemes per ADR 0004.
     string url = 3;
-    // Opens the bot's Mini App at this URL on b<bot_id>.<miniapp domain>.
+    // Opens the bot's Mini App at this https URL (BotsService.OpenMiniApp).
     string mini_app_url = 4;
     // Opens inline mode with this query in a chat the user picks.
     string switch_inline_query = 5;
@@ -238,6 +238,13 @@ message ActionChatModeChanged {}
 // The message author joined through an invite link.
 message ActionJoinedByInvite {}
 
+// The sender's Mini App sent data to the bot (BotsService.SendMiniAppData);
+// clients show "Đã gửi dữ liệu từ <button_text> tới bot".
+message ActionMiniAppData {
+  string data = 1;
+  string button_text = 2;
+}
+
 // Why an incoming webhook of the chat stopped posting.
 enum IncomingHookStopReason {
   INCOMING_HOOK_STOP_REASON_UNSPECIFIED = 0;
@@ -278,6 +285,7 @@ message MessageAction {
     ActionChatModeChanged chat_mode_changed = 10;
     ActionJoinedByInvite joined_by_invite = 11;
     ActionIncomingHookStopped incoming_hook_stopped = 12;
+    ActionMiniAppData mini_app_data = 13;
   }
 }
 
