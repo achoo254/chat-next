@@ -99,6 +99,8 @@ export const vi = {
 		info: "Thông tin chat",
 		members: (n: number) => `${n} thành viên`,
 		membersOnline: (n: number, online: number) => `${n} thành viên · ${online} đang hoạt động`,
+		/** The online part of the group header, left out on phones. */
+		onlinePart: (online: number) => ` · ${online} đang hoạt động`,
 		subscribers: (n: number) => `Kênh · ${n} người đăng ký`,
 		channelAdmin: "Kênh · bạn là admin",
 		channelOwner: "Kênh · bạn là chủ kênh",

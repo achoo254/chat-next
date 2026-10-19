@@ -192,6 +192,8 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 /* Header lines stay on one line; what does not fit ends in "…". */
 .convo-head .title > span:not(.status-line), .topic-head .title > span, .admin-head .title > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .convo-head .title span { font-size: 0.8125rem; color: var(--c-text-muted); }
+/* Phones: "12 thành viên" alone fits beside the header buttons; the info panel keeps the online count. */
+@media (max-width: 480px) { .convo-head .online-part { display: none; } }
 .status-line { display: inline-flex; align-items: center; gap: var(--space-1); }
 .app .banner { border-radius: 0; border-bottom: 1px solid var(--c-border-subtle); }
 .pinned {

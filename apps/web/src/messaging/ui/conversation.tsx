@@ -139,7 +139,12 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 				</span>
 			);
 		case "group":
-			return <span>{online === null ? copy.convo.members(chat.memberCount) : copy.convo.membersOnline(chat.memberCount, online)}</span>;
+			return (
+				<span>
+					{copy.convo.members(chat.memberCount)}
+					{online !== null && <span className="online-part">{copy.convo.onlinePart(online)}</span>}
+				</span>
+			);
 		default:
 			if (peer?.isBot === true) return <span>{copy.bot.subtitle(peer.username)}</span>;
 			return <span>{presence === null ? "" : presenceText(presence, copy)}</span>;

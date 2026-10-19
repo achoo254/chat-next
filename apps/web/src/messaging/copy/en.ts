@@ -96,6 +96,8 @@ export const en: MessagingCopy = {
 		info: "Chat info",
 		members: (n: number) => plural(n, "member", "members"),
 		membersOnline: (n: number, online: number) => `${plural(n, "member", "members")} · ${online} online`,
+		/** The online part of the group header, left out on phones. */
+		onlinePart: (online: number) => ` · ${online} online`,
 		subscribers: (n: number) => `Channel · ${plural(n, "subscriber", "subscribers")}`,
 		channelAdmin: "Channel · you are an admin",
 		channelOwner: "Channel · you own it",
