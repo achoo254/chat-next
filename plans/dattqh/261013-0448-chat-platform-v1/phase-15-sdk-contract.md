@@ -53,7 +53,7 @@ Sinh lại mã: `cd server && go run ./cmd/sdkgen`; `go test ./cmd/sdkgen` đỏ
 
 ## Bot mẫu (dùng cho conformance)
 
-Mỗi SDK có `examples/` với 5 bot, cùng hành vi y hệt; chạy bằng biến môi trường: `BOT_TOKEN`, `BOT_API` (base URL), `BOT_MODE` = `poll` (mặc định) hoặc `webhook`; ở `webhook`: `WEBHOOK_PORT`, `WEBHOOK_SECRET`, `WEBHOOK_URL` (URL công khai, bot tự `setWebhook` với URL + secret khi khởi động; `poll` thì gọi `deleteWebhook` trước). In đúng một dòng `ready` ra stdout khi đã sẵn sàng nhận update.
+Mỗi SDK có `examples/` với 6 bot, cùng hành vi y hệt; chạy bằng biến môi trường: `BOT_TOKEN`, `BOT_API` (base URL), `BOT_MODE` = `poll` (mặc định) hoặc `webhook`; ở `webhook`: `WEBHOOK_PORT`, `WEBHOOK_SECRET`, `WEBHOOK_URL` (URL công khai, bot tự `setWebhook` với URL + secret khi khởi động; `poll` thì gọi `deleteWebhook` trước). In đúng một dòng `ready` ra stdout khi đã sẵn sàng nhận update.
 
 | Bot | Hành vi |
 |---|---|
@@ -62,6 +62,7 @@ Mỗi SDK có `examples/` với 5 bot, cùng hành vi y hệt; chạy bằng bi�
 | `files` | `/file` → gửi document tải lên `hello.txt`, nội dung `xin chào` (UTF-8, 9 byte), chú thích `Tệp mẫu`. Tin có `media` → `getFile`, tải về, trả lời `Nhận <file_name hoặc kind>: <số byte tải được> byte`. |
 | `commands` | Khi khởi động `setCommands` với `start` (`Bắt đầu`) và `help` (`Trợ giúp`). `/help` → `Lệnh: /start, /help`. `/start` → `Sẵn sàng.` |
 | `inline` | `inline_query` → `answerInlineQuery` một kết quả article id `1`, tiêu đề = query viết hoa, nội dung = query, `cache_time` 1 (0 nghĩa là mặc định 300); query rỗng thì không có kết quả. |
+| `miniapp` | `/start` → tin có nút inline `Mở cửa hàng` mở `MINI_APP_URL` (`web_app`). Server nhỏ ở `MINI_APP_PORT`: `POST /verify` (body là init data) kiểm bằng helper SDK với id bot từ `getMe` và khoá `getMiniAppKey` (cache, lấy lại một lần khi sai) → 200 `{user_id, chat_type}` hoặc 401. Tin có `web_app_data` → trả `Đã nhận đơn: <data>`. Python cần extra `cryptography`. |
 
 ## Chất lượng
 

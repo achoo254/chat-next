@@ -85,7 +85,7 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres pg_trgm chuỗi con + tsvector; Meilisearch để giai đoạn scale) |
 | 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | In progress (R5 lên prod: đủ method trừ inline mode và bulk; webhook, safehttp, dead-letter, test hợp đồng OpenAPI, bot trợ lý) |
 | 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | In progress (Console lên prod; SDK TS/Python/Go + conformance và ảnh bot xong 2026-10-17; còn registry khi ra mắt) |
-| 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | Pending |
+| 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | In progress (web R6 xong code) |
 | 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 lên prod: incoming webhook; phần bot ở R5) |
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Hoãn (user 2026-10-15: PWA + Web Push trước; Capacitor khi cần App Store/Play) |
 | 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Hoãn (cùng quyết định với Phase 10) |

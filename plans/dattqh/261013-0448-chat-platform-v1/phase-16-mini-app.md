@@ -1,7 +1,7 @@
 ---
 phase: 16
 title: "Phase 16: Mini App"
-status: pending
+status: in-progress
 priority: P1
 effort: "L"
 dependencies: [8, 15]
@@ -61,12 +61,24 @@ Quyết định của Jev: URL của người viết bot (0,95); chỉ ký Ed255
 
 ## Todo
 
-- [ ] Kiểm URL Mini App (https, không dưới domain app/tenant, không IP riêng)
-- [ ] Ký/xác thực dữ liệu khởi tạo + khoá theo token bot
-- [ ] Bridge SDK + giới hạn kích thước + schema + chặn điều hướng
-- [ ] Container web, in-app browser mobile, cửa sổ desktop
-- [ ] Console: URL Mini App; SDK: helper + ví dụ + conformance
-- [ ] STRIDE + test cô lập
+- [x] Kiểm URL Mini App (https, không dưới domain đăng ký của app hay tenant, không IP, không user:pass); kiểm lại khi mở
+- [x] Ký/xác thực dữ liệu khởi tạo — đổi so với bản đầu: chỉ Ed25519, khoá dẫn xuất từ `SESSION_KEY` (không theo token bot, không HMAC; Jev 0,98)
+- [x] Bridge (`/miniapp/sdk.js`) + trần 4 KB + schema + không `allow-top-navigation`; link ngoài qua allowlist và hỏi trước
+- [x] Container web (R6); in-app browser mobile (R7), cửa sổ desktop (R8) còn lại
+- [x] Console: URL Mini App; SDK: helper xác thực ở TS/Python/Go
+- [x] SDK: ví dụ `miniapp` ở TS/Python/Go + kịch bản conformance (ts, python, go × poll, webhook)
+- [x] STRIDE (dưới) + test: server (`internal/miniapp`, `internal/api/miniapp_test.go`), web (`test/mini-app.test.tsx`), e2e trình duyệt thật (`bots.e2e.ts`: mở từ nút, xác thực init data bằng SDK, sửa một trường thì hỏng, nút chính gửi dữ liệu về bot)
+- [ ] Deploy root một lần (CSP `frame-src https:`) và kiểm trên prod
+
+## STRIDE (R6 web, 2026-10-19)
+
+- **Giả mạo:** init data ký Ed25519 trên mọi trường, gắn `bot_id`, `auth_date` quá 1 giờ bị SDK từ chối; app chỉ nghe tin từ đúng iframe (`event.source`) ở đúng origin của URL (`event.origin`) và chỉ gửi xuống origin đó.
+- **Sửa đổi:** URL nút phải đúng `mini_app_url` của một nút trên tin `chat_id/seq` người gọi thấy được, của chính bot đó; server kiểm lại URL khi mở (tenant mới thêm sau cũng chặn được). Tin bridge sai schema, quá 4 KB hoặc kiểu lạ bị bỏ.
+- **Chối bỏ:** `data_send` thành tin của người dùng trong chat riêng với bot ("Đã gửi dữ liệu từ … tới bot"), có trong lịch sử.
+- **Lộ thông tin:** Mini App ở site khác app (kiểm URL theo domain đăng ký), nên không có cookie SameSite hay storage của app; init data nằm trong fragment (không tới server hay log của ai); `chat_instance` là HMAC, không lộ id chat; `user` chỉ có id, tên, username.
+- **Từ chối dịch vụ:** `SendMiniAppData` đi qua giới hạn gửi tin, `AllowMiniAppWrite` qua giới hạn ghi; dữ liệu tối đa 4096 byte.
+- **Leo quyền:** iframe không có `allow-top-navigation`; mở link phải qua allowlist ADR 0004 và người dùng bấm; quyền nhắn tin chỉ sau khi người dùng bấm "Cho phép"; `data_send` chỉ khi mở từ chat riêng với bot hoặc hồ sơ bot (client kiểm; phía server đây là lời gọi của chính người dùng vào chat riêng của họ, không vượt quyền).
+- **Còn lại:** khoá ký đổi khi xoay `SESSION_KEY` (bot lấy lại khoá qua `getMiniAppKey` khi chữ ký không khớp); Python cần gói `cryptography` (extra tuỳ chọn).
 
 ## Success Criteria
 
