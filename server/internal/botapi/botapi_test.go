@@ -415,6 +415,9 @@ func TestSendMessageOptions(t *testing.T) {
 
 func TestSendRateLimitPerChat(t *testing.T) {
 	h := newHarness(t)
+	// A stopped clock: a slow run (race detector, CI) must not refill the bucket.
+	stopped := time.Now()
+	h.Limiter.SetClock(func() time.Time { return stopped })
 	owner := h.User("owner")
 	botID, token := h.Bot(owner, "busybot")
 	private := h.privateWith(owner, botID)

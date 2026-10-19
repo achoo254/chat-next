@@ -44,6 +44,14 @@ func NewMemory() *Memory {
 	return &Memory{buckets: map[bucketKey]*bucket{}, now: time.Now}
 }
 
+// SetClock replaces the clock (tests that must not refill buckets while
+// they run).
+func (m *Memory) SetClock(now func() time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.now = now
+}
+
 // Allow implements Limiter.
 func (m *Memory) Allow(rule Rule, key string) bool {
 	m.mu.Lock()
