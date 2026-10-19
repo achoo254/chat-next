@@ -15,7 +15,7 @@ import { addAttachments, dragHasFiles, viewer } from "../media/media-state.ts";
 import { sizeLimitLabel } from "./composer.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Composer } from "./composer.tsx";
-import { useOnlineCount } from "./members.ts";
+import { useOnlineCount } from "./online-count.ts";
 import { useIncomingSound } from "./incoming-sound.ts";
 import { MessageList } from "./message-list.tsx";
 import { ChatAvatar, chatPhoto } from "./parts.tsx";
