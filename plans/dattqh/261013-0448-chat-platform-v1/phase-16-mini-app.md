@@ -68,7 +68,8 @@ Quyết định của Jev: URL của người viết bot (0,95); chỉ ký Ed255
 - [x] Console: URL Mini App; SDK: helper xác thực ở TS/Python/Go
 - [x] SDK: ví dụ `miniapp` ở TS/Python/Go + kịch bản conformance (ts, python, go × poll, webhook)
 - [x] STRIDE (dưới) + test: server (`internal/miniapp`, `internal/api/miniapp_test.go`), web (`test/mini-app.test.tsx`), e2e trình duyệt thật (`bots.e2e.ts`: mở từ nút, xác thực init data bằng SDK, sửa một trường thì hỏng, nút chính gửi dữ liệu về bot)
-- [ ] Deploy root một lần (CSP `frame-src https:`) và kiểm trên prod
+- [x] Deploy root một lần (CSP `frame-src https:`, release `20261019-044627-2be451944f61`, migration 28, backup `chat-20261019-044646.dump`); kiểm CSP ở cả hai tenant, `/miniapp/sdk.js` 200, `/bot/v1/miniAppKey` không token 401, smoke ok
+- [ ] Người dùng thử một Mini App thật trên prod
 
 ## STRIDE (R6 web, 2026-10-19)
 

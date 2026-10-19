@@ -588,17 +588,18 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 - Lỗi CI, deploy, kết nối DB hay đăng nhập: báo phiên `inet-gitlab-ba` (đang rà bảo mật các repo public) kèm lỗi nguyên văn.
 
 ### Đang chạy trên prod
-- Release `20261019-020333-6b7cda614b5f`, migration 26, cả tenant chính và `inetdev`.
+- Release `20261019-044627-2be451944f61`, migration 28, cả tenant chính và `inetdev`.
 - Thêm từ 2026-10-17:
   - watchdog cảnh báo vận hành vào nhóm "Vận hành chat" (`internal/watch`, migration 25); check outbox chỉ đếm dòng của tenant mình;
   - ảnh đại diện người dùng theo luật "Ai thấy ảnh đại diện" (ẩn với người bị chặn), ảnh nhóm/kênh chỉ thành viên thấy, hộp "Sửa thông tin nhóm" ở cột thông tin, ô ảnh khi tạo nhóm (migration 26); công tắc xem trước của màn Riêng tư bỏ;
   - hàng nút thao tác nhanh nằm cạnh bong bóng, không che chữ;
+  - Mini App web (R6, Phase 16): nút `web_app` và "Mở app", init data ký Ed25519 (`getMiniAppKey`), bridge `/miniapp/sdk.js`, Console đặt URL, ví dụ `miniapp` ở 3 SDK; CSP `frame-src https:`;
   - điện thoại: danh sách chat thu ô tìm kiếm khi cuộn, Cài đặt dạng danh mục → mục có nút quay lại, không có "Phím tắt" trên máy chỉ cảm ứng.
 - JS khởi động 149,8/150 KB.
 
 ### Việc tiếp theo
 1. **Media còn dở (Jev 0,44, đang làm):** giữ nhóm album khi chuyển tiếp, tạm dừng upload, bỏ metadata WebM/MKV, poster video và waveform khi server không có ffmpeg.
 2. Gọn ngân sách JS khởi động (Jev 0,37): tách phần ít dùng của `message-item.tsx` và bộ icon.
-3. Mini App web (R6): không còn chờ domain. Jev 0,95 (2026-10-19) chọn cách Telegram: Mini App chạy từ URL https của người viết bot, từ chối URL dưới domain app hay tenant (ADR 0010, Phase 16 đã sửa).
+3. Mini App web (R6) đã lên prod 2026-10-19; còn chờ người dùng thử một Mini App thật. Mobile (R7) và desktop (R8) theo phase của chúng.
 4. Đánh giá Nghị định 13: user bảo bỏ qua; test tải lớn: bỏ qua tới khi có người dùng thật.
 
