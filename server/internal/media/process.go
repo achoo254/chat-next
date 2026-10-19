@@ -230,15 +230,7 @@ func (s *Service) rewrite(ctx context.Context, src, dst string, size int64, patc
 		return nil
 	}
 	block := max(int64(rewriteBlock), (size+maxParts-1)/maxParts)
-	apply := func(b []byte, start int64) {
-		for _, p := range patches {
-			for i, c := range p.data {
-				if off := p.offset + int64(i) - start; off >= 0 && off < int64(len(b)) {
-					b[off] = c
-				}
-			}
-		}
-	}
+	apply := func(b []byte, start int64) { applyPatches(b, start, patches) }
 	if size <= block {
 		data, err := s.readAll(ctx, src, 0, size)
 		if err != nil {
@@ -265,7 +257,7 @@ func (s *Service) rewrite(ctx context.Context, src, dst string, size int64, patc
 		length := min(block, size-start)
 		patched := false
 		for _, p := range patches {
-			if p.offset < start+length && p.offset+int64(len(p.data)) > start {
+			if p.offset < start+length && p.end() > start {
 				patched = true
 			}
 		}
@@ -289,4 +281,20 @@ func (s *Service) rewrite(ctx context.Context, src, dst string, size int64, patc
 		return fail(err)
 	}
 	return nil
+}
+
+// applyPatches writes the patches into b, the object's bytes from start.
+func applyPatches(b []byte, start int64, patches []patch) {
+	end := start + int64(len(b))
+	for _, p := range patches {
+		for i, c := range p.data {
+			if off := p.offset + int64(i) - start; off >= 0 && off < int64(len(b)) {
+				b[off] = c
+			}
+		}
+		from, to := max(p.offset+int64(len(p.data)), start), min(p.end(), end)
+		if from < to {
+			clear(b[from-start : to-start])
+		}
+	}
 }

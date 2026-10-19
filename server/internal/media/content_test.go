@@ -137,11 +137,26 @@ func TestScanMP4BlanksMetadata(t *testing.T) {
 		t.Fatalf("info = %+v", info)
 	}
 	out := bytes.Clone(data)
-	for _, p := range info.patches {
-		copy(out[p.offset:], p.data)
-	}
+	applyPatches(out, 0, info.patches)
 	if bytes.Contains(out, []byte("udta")) || bytes.Contains(out, []byte("meta")) || len(out) != len(data) {
 		t.Fatalf("metadata boxes left: %d patches", len(info.patches))
+	}
+	// The boxes' contents go too, not only their names.
+	if bytes.Contains(out, []byte(gpsMarker)) || bytes.Contains(out, []byte("location")) {
+		t.Fatal("metadata contents left in the movie")
+	}
+	// Still a valid movie: the same scan finds the same facts, no metadata left to blank.
+	again, err := scanMP4(func(off, n int64) ([]byte, error) { return bytes.Clone(out[off:min(off+n, int64(len(out)))]), nil }, int64(len(out)))
+	if err != nil || again.durationMS != 12500 || again.width != 1080 || len(again.patches) != 0 {
+		t.Fatalf("rescan = %+v, %v", again, err)
+	}
+	// Patches applied block by block give the same bytes.
+	blocks := bytes.Clone(data)
+	for start := 0; start < len(blocks); start += 37 {
+		applyPatches(blocks[start:min(start+37, len(blocks))], int64(start), info.patches)
+	}
+	if !bytes.Equal(blocks, out) {
+		t.Fatal("blockwise patching differs")
 	}
 	if _, err := scanMP4(read, 7); err == nil {
 		t.Fatal("truncated movie accepted")

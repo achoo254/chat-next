@@ -25,16 +25,22 @@ var errNoMoov = errors.New("media: video has no movie header")
 // xmpUUID is the uuid box type Adobe XMP is stored in.
 var xmpUUID = []byte{0xBE, 0x7A, 0xCF, 0xCB, 0x97, 0xA9, 0x42, 0xE8, 0x9C, 0x71, 0x99, 0x94, 0x91, 0xE3, 0xAF, 0xAC}
 
-// patch overwrites bytes of an object at an offset.
+// patch overwrites bytes of an object at an offset: data, or zero bytes
+// set to 0 (a box body, which may be large, is blanked without holding it).
 type patch struct {
 	offset int64
 	data   []byte
+	zero   int64
 }
+
+// end is the offset just past the bytes the patch writes.
+func (p patch) end() int64 { return p.offset + int64(len(p.data)) + p.zero }
 
 // mp4Info is what the scan learned about a movie.
 type mp4Info struct {
-	// patches rename metadata boxes (udta, meta, XMP uuid) to "free", so
-	// players skip them; sizes never change.
+	// patches rename metadata boxes (udta, meta, XMP uuid) to "free" and
+	// zero their bodies, so players skip them and nothing of them is
+	// served; sizes never change.
 	patches    []patch
 	durationMS int64
 	// Display size of the first video track (rotation applied); 0 for
@@ -103,10 +109,10 @@ func scanMP4(read readAtFunc, size int64) (*mp4Info, error) {
 			hh := h
 			moov = &hh
 		case "udta", "meta":
-			info.patches = append(info.patches, renameFree(h))
+			info.patches = append(info.patches, blank(h.offset, h.size, h.headerSize)...)
 		case "uuid":
 			if len(head) >= 24 && bytes.Equal(head[8:24], xmpUUID) {
-				info.patches = append(info.patches, renameFree(h))
+				info.patches = append(info.patches, blank(h.offset, h.size, h.headerSize)...)
 			}
 		}
 		offset += h.size
@@ -130,10 +136,11 @@ func scanMP4(read readAtFunc, size int64) (*mp4Info, error) {
 	return info, nil
 }
 
-func renameFree(h boxHeader) patch {
-	// "uuid" boxes keep their extended type after the header, which is
-	// harmless inside a free box.
-	return patch{offset: h.offset + 4, data: []byte("free")}
+// blank turns the box at offset (size bytes, header headerSize bytes) into
+// a free box of the same size with a zeroed body. The size fields of the
+// header stay; a uuid box's extended type, in the body, is zeroed too.
+func blank(offset, size, headerSize int64) []patch {
+	return []patch{{offset: offset + 4, data: []byte("free")}, {offset: offset + headerSize, zero: size - headerSize}}
 }
 
 // trackState collects one trak's facts while walking it.
@@ -161,10 +168,10 @@ func walkMoov(b []byte, base, start int64, depth int, info *mp4Info, parent stri
 		body := b[off+h.headerSize : off+h.size]
 		switch h.typ {
 		case "udta", "meta":
-			info.patches = append(info.patches, patch{offset: base + off + 4, data: []byte("free")})
+			info.patches = append(info.patches, blank(base+off, h.size, h.headerSize)...)
 		case "uuid":
 			if h.size >= 24 && bytes.Equal(b[off+8:off+24], xmpUUID) {
-				info.patches = append(info.patches, patch{offset: base + off + 4, data: []byte("free")})
+				info.patches = append(info.patches, blank(base+off, h.size, h.headerSize)...)
 			}
 		case "mvhd":
 			info.durationMS = mvhdDuration(body)
