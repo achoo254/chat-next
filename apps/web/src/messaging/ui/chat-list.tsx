@@ -141,12 +141,14 @@ interface DialogsProps {
 /**
  * Phones (mockups/mobile.html#list): scrolling the chats down folds the
  * search box and shrinks the header (styles: .list.scrolled); back at the
- * top it unfolds. A list too short to scroll past the fold never folds.
+ * top it unfolds. It folds only when the chats still overflow once the
+ * search box is gone, so the list never jumps back to the top.
  */
 function collapseHead(chats: HTMLElement): void {
 	const list = chats.closest(".list");
+	const search = list?.querySelector<HTMLElement>(".list-head")?.offsetHeight ?? 0;
 	if (chats.scrollTop <= 0) list?.classList.remove("scrolled");
-	else if (chats.scrollTop > 24 && chats.scrollHeight - chats.clientHeight > 120) list?.classList.add("scrolled");
+	else if (chats.scrollTop > 24 && chats.scrollHeight - chats.clientHeight > search + 24) list?.classList.add("scrolled");
 }
 
 function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsProps) {
