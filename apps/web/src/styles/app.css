@@ -244,6 +244,10 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 	.welcome { padding: var(--space-4) var(--space-3); }
 	.welcome-card { padding: var(--space-5) var(--space-4); }
 }
+/* Phones and tablets without a keyboard have no use for the shortcuts page. */
+@media (pointer: coarse) and (hover: none) {
+	.set-nav a[href$="/settings/shortcuts"] { display: none; }
+}
 /* Touch screens: every control reaches the 44px target. */
 @media (max-width: 760px), (pointer: coarse) {
 	.btn-sm { min-height: 44px; }
