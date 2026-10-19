@@ -99,14 +99,15 @@ type ModerationServiceClient interface {
 	ResolveReport(context.Context, *connect.Request[v1.ResolveReportRequest]) (*connect.Response[v1.ResolveReportResponse], error)
 	// Ends an account restriction before its time.
 	LiftRestriction(context.Context, *connect.Request[v1.LiftRestrictionRequest]) (*connect.Response[v1.LiftRestrictionResponse], error)
-	// Feedback users sent the tenant's assistant bot ("Góp ý" and "Báo lỗi"),
-	// newest first.
+	// Feedback users sent the tenant's assistant bot or from Settings › Góp
+	// ý ("Góp ý" and "Báo lỗi"), newest first.
 	GetFeedback(context.Context, *connect.Request[v1.GetFeedbackRequest]) (*connect.Response[v1.GetFeedbackResponse], error)
 	// Marks a feedback item handled; an item already handled is returned as
 	// is.
 	ResolveFeedback(context.Context, *connect.Request[v1.ResolveFeedbackRequest]) (*connect.Response[v1.ResolveFeedbackResponse], error)
 	// Sends the operator's answer to the user through the assistant bot (as a
-	// reply to their message) and marks the item handled. One answer per
+	// reply to their message; feedback sent from Settings gets a new message
+	// quoting it) and marks the item handled. One answer per
 	// item: a second gives failed_precondition "already_replied".
 	ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error)
 	// Reports grouped by target (the same user, chat, or messages), the
@@ -374,14 +375,15 @@ type ModerationServiceHandler interface {
 	ResolveReport(context.Context, *connect.Request[v1.ResolveReportRequest]) (*connect.Response[v1.ResolveReportResponse], error)
 	// Ends an account restriction before its time.
 	LiftRestriction(context.Context, *connect.Request[v1.LiftRestrictionRequest]) (*connect.Response[v1.LiftRestrictionResponse], error)
-	// Feedback users sent the tenant's assistant bot ("Góp ý" and "Báo lỗi"),
-	// newest first.
+	// Feedback users sent the tenant's assistant bot or from Settings › Góp
+	// ý ("Góp ý" and "Báo lỗi"), newest first.
 	GetFeedback(context.Context, *connect.Request[v1.GetFeedbackRequest]) (*connect.Response[v1.GetFeedbackResponse], error)
 	// Marks a feedback item handled; an item already handled is returned as
 	// is.
 	ResolveFeedback(context.Context, *connect.Request[v1.ResolveFeedbackRequest]) (*connect.Response[v1.ResolveFeedbackResponse], error)
 	// Sends the operator's answer to the user through the assistant bot (as a
-	// reply to their message) and marks the item handled. One answer per
+	// reply to their message; feedback sent from Settings gets a new message
+	// quoting it) and marks the item handled. One answer per
 	// item: a second gives failed_precondition "already_replied".
 	ReplyFeedback(context.Context, *connect.Request[v1.ReplyFeedbackRequest]) (*connect.Response[v1.ReplyFeedbackResponse], error)
 	// Reports grouped by target (the same user, chat, or messages), the

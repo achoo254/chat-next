@@ -45,6 +45,9 @@ const (
 	// pendingTTL is how long a "Gửi góp ý" / "Báo lỗi" press labels the
 	// user's next message.
 	pendingTTL = time.Hour
+	// quoteMax bounds the quote of feedback sent from Settings in the
+	// answer, in characters.
+	quoteMax = 140
 )
 
 // Service is the assistant of one tenant.
@@ -289,9 +292,22 @@ func (s *Service) Reply(ctx context.Context, operator, feedbackID int64, text st
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.api.SendAsSystemBot(ctx, s.botID, botapi.OutgoingMessage{
+	out := botapi.OutgoingMessage{
 		ChatID: item.ChatID, Text: s.copy.replyPrefix + text, ReplyToSeq: item.Seq, RandomID: randomID("feedback", item.ID),
-	}); err != nil {
+	}
+	if item.FromSettings() {
+		// No message of the user's to reply to: a new one quoting it.
+		chatID, err := s.chat.SystemBotNoticeChat(ctx, item.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if chatID == 0 {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("user_unreachable: the user has no chat with the assistant"))
+		}
+		out.ChatID, out.ReplyToSeq = chatID, 0
+		out.Text = fmt.Sprintf(s.copy.replySettingsPrefix, chat.Excerpt(item.Text, quoteMax)) + text
+	}
+	if _, err := s.api.SendAsSystemBot(ctx, s.botID, out); err != nil {
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
 			return nil, connect.NewError(connect.CodeFailedPrecondition,
 				fmt.Errorf("user_unreachable: the user blocked the assistant or cannot receive its messages: %w", err))

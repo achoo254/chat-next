@@ -257,7 +257,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 			})
 		},
 	}
-	loops = append(loops, bulk.Run, newWatcher(cfg, st, chatSvc, hookSvc, logger).Run)
+	opsGroup := watch.NewGroup(watch.GroupConfig{
+		TenantID: cfg.TenantID, Operators: cfg.OperatorUserIDs, Pool: st.Pool(), Chats: chatSvc, Hooks: hookSvc,
+		Logger: logger.With("component", "watch"),
+	})
+	chatSvc.SetOpsSignals(watch.NewSignals(opsGroup, publicOrigin))
+	digest := watch.NewDigest(watch.DigestConfig{TenantID: cfg.TenantID, Pool: st.Pool(), Group: opsGroup, Logger: logger.With("component", "watch")})
+	loops = append(loops, bulk.Run, newWatcher(cfg, st, chatSvc, hookSvc, opsGroup, logger).Run, digest.Run)
 	if assistantSvc != nil {
 		loops = append(loops, assistantSvc.Run)
 	}
@@ -285,7 +291,7 @@ const (
 // newWatcher sets up the watchdog: problems of this tenant (outbox, log
 // errors, certificate), and in the main tenant's process those of the
 // machine (memory, disk, backups, the other tenants' processes).
-func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookSvc *hooks.Service, logger *slog.Logger) *watch.Watcher {
+func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookSvc *hooks.Service, group *watch.Group, logger *slog.Logger) *watch.Watcher {
 	checks := []watch.Check{watch.Outbox(st.Pool(), cfg.TenantID, []string{chatSvc.CursorName("bots"), chatSvc.CursorName("push")}, time.Now), watch.Errors(watch.Process)}
 	if cfg.PublicURL != nil && cfg.PublicURL.Scheme == "https" {
 		checks = append(checks, watch.Cert(cfg.PublicURL.Hostname(), time.Now))
@@ -300,7 +306,7 @@ func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookS
 	}
 	return watch.New(watch.Config{
 		TenantID: cfg.TenantID, Operators: cfg.OperatorUserIDs, Pool: st.Pool(),
-		Chats: chatSvc, Hooks: hookSvc, Checks: checks, Logger: logger.With("component", "watch"),
+		Chats: chatSvc, Hooks: hookSvc, Checks: checks, Logger: logger.With("component", "watch"), Group: group,
 	})
 }
 

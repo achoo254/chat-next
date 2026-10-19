@@ -16,9 +16,11 @@ import {
 	type InviteLink,
 } from "@app/proto-ts/chats";
 import { ConfigService } from "@app/proto-ts/config";
+import { FeedbackService } from "@app/proto-ts/feedback";
 import { MessagesService } from "@app/proto-ts/messages";
 import {
 	FeedbackKind as WireFeedbackKind,
+	FeedbackSource as WireFeedbackSource,
 	FeedbackStatus as WireFeedbackStatus,
 	ModerationAction as WireAction,
 	ModerationService,
@@ -320,6 +322,7 @@ function toFeedback(item: WireFeedback): FeedbackItem {
 		id: assertSafeId(item.id),
 		userId: assertSafeId(item.userId),
 		kind: item.kind === WireFeedbackKind.BUG ? "bug" : "idea",
+		source: item.source === WireFeedbackSource.SETTINGS ? "settings" : "assistant",
 		text: item.text,
 		status: item.status === WireFeedbackStatus.HANDLED ? "handled" : "open",
 		createdAt: assertSafeId(item.createdAt),
@@ -414,6 +417,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 	const users = createClient(UsersService, transport);
 	const config = createClient(ConfigService, transport);
 	const moderation = createClient(ModerationService, transport);
+	const feedback = createClient(FeedbackService, transport);
 	let limits: Promise<Limits> | null = null;
 
 	async function call<T>(run: () => Promise<T>): Promise<T> {
@@ -656,6 +660,10 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 							? { case: "chatId" as const, value: BigInt(target.chatId) }
 							: { case: "messages" as const, value: { chatId: BigInt(target.chatId), seqs: [BigInt(target.seq)] } };
 				await users.report({ target: wireTarget, reason: REPORT_REASONS[reason], comment });
+			}),
+		sendFeedback: (kind, text) =>
+			call(async () => {
+				await feedback.sendFeedback({ kind: kind === "bug" ? WireFeedbackKind.BUG : WireFeedbackKind.IDEA, text });
 			}),
 		checkInvite: (link) =>
 			call(async () => {

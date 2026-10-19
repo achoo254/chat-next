@@ -26,6 +26,8 @@ var publicProcedures = map[string]bool{
 // session gets it attached as for every other procedure.
 var signedOutProcedures = map[string]bool{
 	appv1connect.UsersServiceGetSelfProcedure: true,
+	// Errors of the sign-in screen count too.
+	appv1connect.FeedbackServiceReportClientErrorProcedure: true,
 }
 
 // lockedProcedures are what a session of an account waiting for deletion

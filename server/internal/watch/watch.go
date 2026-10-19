@@ -14,14 +14,12 @@ package watch
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -53,6 +51,7 @@ type Hooks interface {
 	CreateIncomingHook(ctx context.Context, me int64, req *appv1.CreateIncomingHookRequest) (*appv1.CreateIncomingHookResponse, error)
 	Active(ctx context.Context, id string) (bool, error)
 	PostAlertmanager(ctx context.Context, id string, body []byte) error
+	PostNative(ctx context.Context, id string, body []byte) error
 }
 
 // Config wires a watcher.
@@ -66,12 +65,16 @@ type Config struct {
 	Logger    *slog.Logger
 	// Now is the clock (tests).
 	Now func() time.Time
+	// Group is the operators' group shared with the notices and the
+	// digest; nil builds one from the fields above.
+	Group *Group
 }
 
 // Watcher runs the checks and keeps the alerts.
 type Watcher struct {
-	cfg  Config
-	seen map[string]int // problem key -> checks in a row it showed in
+	cfg   Config
+	group *Group
+	seen  map[string]int // problem key -> checks in a row it showed in
 }
 
 // New returns a watcher.
@@ -79,7 +82,13 @@ func New(cfg Config) *Watcher {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Watcher{cfg: cfg, seen: map[string]int{}}
+	group := cfg.Group
+	if group == nil {
+		group = NewGroup(GroupConfig{
+			TenantID: cfg.TenantID, Operators: cfg.Operators, Pool: cfg.Pool, Chats: cfg.Chats, Hooks: cfg.Hooks, Logger: cfg.Logger,
+		})
+	}
+	return &Watcher{cfg: cfg, group: group, seen: map[string]int{}}
 }
 
 // Run checks every minute until ctx ends.
@@ -207,7 +216,7 @@ type amPayload struct {
 
 // post sends one problem as an Alertmanager group of one alert.
 func (w *Watcher) post(ctx context.Context, p Problem, status string, started, ended time.Time) error {
-	hook, err := w.hook(ctx)
+	hook, err := w.group.Hook(ctx)
 	if err != nil || hook == "" {
 		return err
 	}
@@ -231,42 +240,4 @@ func (w *Watcher) post(ctx context.Context, p Problem, status string, started, e
 		return fmt.Errorf("watch: post %s: %w", p.Key, err)
 	}
 	return nil
-}
-
-// hook is the incoming hook of the operators' group, created on first use;
-// "" without operators (alerts then only reach the log).
-func (w *Watcher) hook(ctx context.Context) (string, error) {
-	if len(w.cfg.Operators) == 0 {
-		return "", nil
-	}
-	var id string
-	err := w.cfg.Pool.QueryRow(ctx, `SELECT hook_id FROM ops_alert_hooks WHERE tenant_id = $1`, w.cfg.TenantID).Scan(&id)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", fmt.Errorf("watch: alert hook: %w", err)
-	}
-	if id != "" {
-		active, err := w.cfg.Hooks.Active(ctx, id)
-		if err != nil || active {
-			return id, err
-		}
-	}
-	owner := w.cfg.Operators[0]
-	group, err := w.cfg.Chats.CreateGroup(ctx, owner, "Vận hành chat", nil, false)
-	if err != nil {
-		return "", fmt.Errorf("watch: create the operators' group: %w", err)
-	}
-	created, err := w.cfg.Hooks.CreateIncomingHook(ctx, owner, &appv1.CreateIncomingHookRequest{
-		ChatId: group.GetChat().GetId(), Name: "Giám sát", Format: appv1.IncomingHookFormat_INCOMING_HOOK_FORMAT_ALERTMANAGER,
-		AllowAlert: true,
-	})
-	if err != nil {
-		return "", fmt.Errorf("watch: create the alert hook: %w", err)
-	}
-	id = created.GetHook().GetId()
-	if _, err := w.cfg.Pool.Exec(ctx, `INSERT INTO ops_alert_hooks (tenant_id, hook_id) VALUES ($1, $2)
-		ON CONFLICT (tenant_id) DO UPDATE SET hook_id = excluded.hook_id`, w.cfg.TenantID, id); err != nil {
-		return "", fmt.Errorf("watch: store the alert hook: %w", err)
-	}
-	w.cfg.Logger.Info("watch: created the operators' alert group", "chat_id", group.GetChat().GetId())
-	return id, nil
 }

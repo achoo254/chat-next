@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"fmt"
+	"strings"
 
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botapi/wire"
@@ -37,6 +38,8 @@ type copyText struct {
 	thanks, textOnly         string
 	unknownCommand           string
 	replyPrefix              string
+	// replySettingsPrefix quotes (%s) feedback sent from Settings.
+	replySettingsPrefix string
 	// Moderation notices.
 	modHead, modWarn, modDeleted, modBanned string
 	modLockedUntil, modLocked, modReason    string
@@ -66,6 +69,8 @@ func newCopy(b brand.Names) copyText {
 		textOnly:       "Mình chỉ nhận góp ý bằng chữ, bạn nhắn lại giúp mình nhé.",
 		unknownCommand: "Mình chưa hiểu lệnh này. Gõ /huongdan để xem hướng dẫn hoặc /gopy để gửi góp ý.",
 		replyPrefix:    fmt.Sprintf("Phản hồi từ đội ngũ %s:\n\n", b.AppName),
+		replySettingsPrefix: fmt.Sprintf("Phản hồi từ đội ngũ %s cho góp ý của bạn trong Cài đặt:\n«%%s»\n\n",
+			strings.ReplaceAll(b.AppName, "%", "%%")),
 		modHead:        fmt.Sprintf("Thông báo từ đội kiểm duyệt %s.", b.AppName),
 		modWarn:        "Bạn bị cảnh cáo vì vi phạm quy định sử dụng.",
 		modDeleted:     "Tin nhắn vi phạm của bạn đã bị gỡ.",

@@ -334,6 +334,58 @@ func (FeedbackKind) EnumDescriptor() ([]byte, []int) {
 	return file_app_v1_moderation_proto_rawDescGZIP(), []int{4}
 }
 
+// Where a feedback item was sent from.
+type FeedbackSource int32
+
+const (
+	FeedbackSource_FEEDBACK_SOURCE_UNSPECIFIED FeedbackSource = 0
+	// A message to the assistant bot.
+	FeedbackSource_FEEDBACK_SOURCE_ASSISTANT FeedbackSource = 1
+	// The "Góp ý" dialog of Settings (FeedbackService.SendFeedback).
+	FeedbackSource_FEEDBACK_SOURCE_SETTINGS FeedbackSource = 2
+)
+
+// Enum value maps for FeedbackSource.
+var (
+	FeedbackSource_name = map[int32]string{
+		0: "FEEDBACK_SOURCE_UNSPECIFIED",
+		1: "FEEDBACK_SOURCE_ASSISTANT",
+		2: "FEEDBACK_SOURCE_SETTINGS",
+	}
+	FeedbackSource_value = map[string]int32{
+		"FEEDBACK_SOURCE_UNSPECIFIED": 0,
+		"FEEDBACK_SOURCE_ASSISTANT":   1,
+		"FEEDBACK_SOURCE_SETTINGS":    2,
+	}
+)
+
+func (x FeedbackSource) Enum() *FeedbackSource {
+	p := new(FeedbackSource)
+	*p = x
+	return p
+}
+
+func (x FeedbackSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FeedbackSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_app_v1_moderation_proto_enumTypes[5].Descriptor()
+}
+
+func (FeedbackSource) Type() protoreflect.EnumType {
+	return &file_app_v1_moderation_proto_enumTypes[5]
+}
+
+func (x FeedbackSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FeedbackSource.Descriptor instead.
+func (FeedbackSource) EnumDescriptor() ([]byte, []int) {
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{5}
+}
+
 type AnnouncementState int32
 
 const (
@@ -373,11 +425,11 @@ func (x AnnouncementState) String() string {
 }
 
 func (AnnouncementState) Descriptor() protoreflect.EnumDescriptor {
-	return file_app_v1_moderation_proto_enumTypes[5].Descriptor()
+	return file_app_v1_moderation_proto_enumTypes[6].Descriptor()
 }
 
 func (AnnouncementState) Type() protoreflect.EnumType {
-	return &file_app_v1_moderation_proto_enumTypes[5]
+	return &file_app_v1_moderation_proto_enumTypes[6]
 }
 
 func (x AnnouncementState) Number() protoreflect.EnumNumber {
@@ -386,7 +438,7 @@ func (x AnnouncementState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AnnouncementState.Descriptor instead.
 func (AnnouncementState) EnumDescriptor() ([]byte, []int) {
-	return file_app_v1_moderation_proto_rawDescGZIP(), []int{5}
+	return file_app_v1_moderation_proto_rawDescGZIP(), []int{6}
 }
 
 type Report struct {
@@ -2531,7 +2583,7 @@ func (*LiftRestrictionResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_moderation_proto_rawDescGZIP(), []int{29}
 }
 
-// One message a user sent the assistant bot as feedback.
+// One feedback item a user sent the team.
 type Feedback struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Id        int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -2544,9 +2596,10 @@ type Feedback struct {
 	HandledAt int64 `protobuf:"varint,7,opt,name=handled_at,json=handledAt,proto3" json:"handled_at,omitempty"`
 	HandledBy int64 `protobuf:"varint,8,opt,name=handled_by,json=handledBy,proto3" json:"handled_by,omitempty"`
 	// The operator's answer sent to the user; empty when none was sent.
-	ReplyText     string `protobuf:"bytes,9,opt,name=reply_text,json=replyText,proto3" json:"reply_text,omitempty"`
-	RepliedAt     int64  `protobuf:"varint,10,opt,name=replied_at,json=repliedAt,proto3" json:"replied_at,omitempty"`
-	RepliedBy     int64  `protobuf:"varint,11,opt,name=replied_by,json=repliedBy,proto3" json:"replied_by,omitempty"`
+	ReplyText     string         `protobuf:"bytes,9,opt,name=reply_text,json=replyText,proto3" json:"reply_text,omitempty"`
+	RepliedAt     int64          `protobuf:"varint,10,opt,name=replied_at,json=repliedAt,proto3" json:"replied_at,omitempty"`
+	RepliedBy     int64          `protobuf:"varint,11,opt,name=replied_by,json=repliedBy,proto3" json:"replied_by,omitempty"`
+	Source        FeedbackSource `protobuf:"varint,12,opt,name=source,proto3,enum=app.v1.FeedbackSource" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2656,6 +2709,13 @@ func (x *Feedback) GetRepliedBy() int64 {
 		return x.RepliedBy
 	}
 	return 0
+}
+
+func (x *Feedback) GetSource() FeedbackSource {
+	if x != nil {
+		return x.Source
+	}
+	return FeedbackSource_FEEDBACK_SOURCE_UNSPECIFIED
 }
 
 type GetFeedbackRequest struct {
@@ -3669,7 +3729,7 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\x16LiftRestrictionRequest\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\"\x19\n" +
-	"\x17LiftRestrictionResponse\"\xf7\x02\n" +
+	"\x17LiftRestrictionResponse\"\xa7\x03\n" +
 	"\bFeedback\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x1b\n" +
 	"\auser_id\x18\x02 \x01(\x03B\x020\x02R\x06userId\x12(\n" +
@@ -3688,7 +3748,8 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"replied_at\x18\n" +
 	" \x01(\x03B\x020\x02R\trepliedAt\x12!\n" +
 	"\n" +
-	"replied_by\x18\v \x01(\x03B\x020\x02R\trepliedBy\"r\n" +
+	"replied_by\x18\v \x01(\x03B\x020\x02R\trepliedBy\x12.\n" +
+	"\x06source\x18\f \x01(\x0e2\x16.app.v1.FeedbackSourceR\x06source\"r\n" +
 	"\x12GetFeedbackRequest\x12.\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x16.app.v1.FeedbackStatusR\x06status\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x14\n" +
@@ -3780,7 +3841,11 @@ const file_app_v1_moderation_proto_rawDesc = "" +
 	"\fFeedbackKind\x12\x1d\n" +
 	"\x19FEEDBACK_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12FEEDBACK_KIND_IDEA\x10\x01\x12\x15\n" +
-	"\x11FEEDBACK_KIND_BUG\x10\x02*\xb5\x01\n" +
+	"\x11FEEDBACK_KIND_BUG\x10\x02*n\n" +
+	"\x0eFeedbackSource\x12\x1f\n" +
+	"\x1bFEEDBACK_SOURCE_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19FEEDBACK_SOURCE_ASSISTANT\x10\x01\x12\x1c\n" +
+	"\x18FEEDBACK_SOURCE_SETTINGS\x10\x02*\xb5\x01\n" +
 	"\x11AnnouncementState\x12\"\n" +
 	"\x1eANNOUNCEMENT_STATE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19ANNOUNCEMENT_STATE_QUEUED\x10\x01\x12\x1e\n" +
@@ -3819,7 +3884,7 @@ func file_app_v1_moderation_proto_rawDescGZIP() []byte {
 	return file_app_v1_moderation_proto_rawDescData
 }
 
-var file_app_v1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_app_v1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
 var file_app_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_app_v1_moderation_proto_goTypes = []any{
 	(ReportStatus)(0),                    // 0: app.v1.ReportStatus
@@ -3827,158 +3892,160 @@ var file_app_v1_moderation_proto_goTypes = []any{
 	(ModerationAction)(0),                // 2: app.v1.ModerationAction
 	(FeedbackStatus)(0),                  // 3: app.v1.FeedbackStatus
 	(FeedbackKind)(0),                    // 4: app.v1.FeedbackKind
-	(AnnouncementState)(0),               // 5: app.v1.AnnouncementState
-	(*Report)(nil),                       // 6: app.v1.Report
-	(*ReportedMessage)(nil),              // 7: app.v1.ReportedMessage
-	(*ModerationLogEntry)(nil),           // 8: app.v1.ModerationLogEntry
-	(*AccountRestriction)(nil),           // 9: app.v1.AccountRestriction
-	(*GetReportsRequest)(nil),            // 10: app.v1.GetReportsRequest
-	(*GetReportsResponse)(nil),           // 11: app.v1.GetReportsResponse
-	(*GetReportRequest)(nil),             // 12: app.v1.GetReportRequest
-	(*GetReportResponse)(nil),            // 13: app.v1.GetReportResponse
-	(*ReportGroupSummary)(nil),           // 14: app.v1.ReportGroupSummary
-	(*ReasonCount)(nil),                  // 15: app.v1.ReasonCount
-	(*SenderSignals)(nil),                // 16: app.v1.SenderSignals
-	(*ModeratedHook)(nil),                // 17: app.v1.ModeratedHook
-	(*ReportGroup)(nil),                  // 18: app.v1.ReportGroup
-	(*GetReportGroupsRequest)(nil),       // 19: app.v1.GetReportGroupsRequest
-	(*GetReportGroupsResponse)(nil),      // 20: app.v1.GetReportGroupsResponse
-	(*GetModerationLogRequest)(nil),      // 21: app.v1.GetModerationLogRequest
-	(*GetModerationLogResponse)(nil),     // 22: app.v1.GetModerationLogResponse
-	(*BotReview)(nil),                    // 23: app.v1.BotReview
-	(*GetBotReviewRequest)(nil),          // 24: app.v1.GetBotReviewRequest
-	(*GetBotReviewResponse)(nil),         // 25: app.v1.GetBotReviewResponse
-	(*GetBotReviewsRequest)(nil),         // 26: app.v1.GetBotReviewsRequest
-	(*GetBotReviewsResponse)(nil),        // 27: app.v1.GetBotReviewsResponse
-	(*SetBotVerifiedRequest)(nil),        // 28: app.v1.SetBotVerifiedRequest
-	(*SetBotVerifiedResponse)(nil),       // 29: app.v1.SetBotVerifiedResponse
-	(*ReviewBotRestrictionRequest)(nil),  // 30: app.v1.ReviewBotRestrictionRequest
-	(*ReviewBotRestrictionResponse)(nil), // 31: app.v1.ReviewBotRestrictionResponse
-	(*ResolveReportRequest)(nil),         // 32: app.v1.ResolveReportRequest
-	(*ResolveReportResponse)(nil),        // 33: app.v1.ResolveReportResponse
-	(*LiftRestrictionRequest)(nil),       // 34: app.v1.LiftRestrictionRequest
-	(*LiftRestrictionResponse)(nil),      // 35: app.v1.LiftRestrictionResponse
-	(*Feedback)(nil),                     // 36: app.v1.Feedback
-	(*GetFeedbackRequest)(nil),           // 37: app.v1.GetFeedbackRequest
-	(*GetFeedbackResponse)(nil),          // 38: app.v1.GetFeedbackResponse
-	(*ResolveFeedbackRequest)(nil),       // 39: app.v1.ResolveFeedbackRequest
-	(*ResolveFeedbackResponse)(nil),      // 40: app.v1.ResolveFeedbackResponse
-	(*ReplyFeedbackRequest)(nil),         // 41: app.v1.ReplyFeedbackRequest
-	(*ReplyFeedbackResponse)(nil),        // 42: app.v1.ReplyFeedbackResponse
-	(*Announcement)(nil),                 // 43: app.v1.Announcement
-	(*PreviewAnnouncementRequest)(nil),   // 44: app.v1.PreviewAnnouncementRequest
-	(*PreviewAnnouncementResponse)(nil),  // 45: app.v1.PreviewAnnouncementResponse
-	(*SendAnnouncementRequest)(nil),      // 46: app.v1.SendAnnouncementRequest
-	(*SendAnnouncementResponse)(nil),     // 47: app.v1.SendAnnouncementResponse
-	(*GetAnnouncementsRequest)(nil),      // 48: app.v1.GetAnnouncementsRequest
-	(*GetAnnouncementsResponse)(nil),     // 49: app.v1.GetAnnouncementsResponse
-	(*CancelAnnouncementRequest)(nil),    // 50: app.v1.CancelAnnouncementRequest
-	(*CancelAnnouncementResponse)(nil),   // 51: app.v1.CancelAnnouncementResponse
-	(ReportReason)(0),                    // 52: app.v1.ReportReason
-	(*User)(nil),                         // 53: app.v1.User
-	(*Chat)(nil),                         // 54: app.v1.Chat
-	(*Message)(nil),                      // 55: app.v1.Message
-	(BotTier)(0),                         // 56: app.v1.BotTier
-	(*MessageEntity)(nil),                // 57: app.v1.MessageEntity
+	(FeedbackSource)(0),                  // 5: app.v1.FeedbackSource
+	(AnnouncementState)(0),               // 6: app.v1.AnnouncementState
+	(*Report)(nil),                       // 7: app.v1.Report
+	(*ReportedMessage)(nil),              // 8: app.v1.ReportedMessage
+	(*ModerationLogEntry)(nil),           // 9: app.v1.ModerationLogEntry
+	(*AccountRestriction)(nil),           // 10: app.v1.AccountRestriction
+	(*GetReportsRequest)(nil),            // 11: app.v1.GetReportsRequest
+	(*GetReportsResponse)(nil),           // 12: app.v1.GetReportsResponse
+	(*GetReportRequest)(nil),             // 13: app.v1.GetReportRequest
+	(*GetReportResponse)(nil),            // 14: app.v1.GetReportResponse
+	(*ReportGroupSummary)(nil),           // 15: app.v1.ReportGroupSummary
+	(*ReasonCount)(nil),                  // 16: app.v1.ReasonCount
+	(*SenderSignals)(nil),                // 17: app.v1.SenderSignals
+	(*ModeratedHook)(nil),                // 18: app.v1.ModeratedHook
+	(*ReportGroup)(nil),                  // 19: app.v1.ReportGroup
+	(*GetReportGroupsRequest)(nil),       // 20: app.v1.GetReportGroupsRequest
+	(*GetReportGroupsResponse)(nil),      // 21: app.v1.GetReportGroupsResponse
+	(*GetModerationLogRequest)(nil),      // 22: app.v1.GetModerationLogRequest
+	(*GetModerationLogResponse)(nil),     // 23: app.v1.GetModerationLogResponse
+	(*BotReview)(nil),                    // 24: app.v1.BotReview
+	(*GetBotReviewRequest)(nil),          // 25: app.v1.GetBotReviewRequest
+	(*GetBotReviewResponse)(nil),         // 26: app.v1.GetBotReviewResponse
+	(*GetBotReviewsRequest)(nil),         // 27: app.v1.GetBotReviewsRequest
+	(*GetBotReviewsResponse)(nil),        // 28: app.v1.GetBotReviewsResponse
+	(*SetBotVerifiedRequest)(nil),        // 29: app.v1.SetBotVerifiedRequest
+	(*SetBotVerifiedResponse)(nil),       // 30: app.v1.SetBotVerifiedResponse
+	(*ReviewBotRestrictionRequest)(nil),  // 31: app.v1.ReviewBotRestrictionRequest
+	(*ReviewBotRestrictionResponse)(nil), // 32: app.v1.ReviewBotRestrictionResponse
+	(*ResolveReportRequest)(nil),         // 33: app.v1.ResolveReportRequest
+	(*ResolveReportResponse)(nil),        // 34: app.v1.ResolveReportResponse
+	(*LiftRestrictionRequest)(nil),       // 35: app.v1.LiftRestrictionRequest
+	(*LiftRestrictionResponse)(nil),      // 36: app.v1.LiftRestrictionResponse
+	(*Feedback)(nil),                     // 37: app.v1.Feedback
+	(*GetFeedbackRequest)(nil),           // 38: app.v1.GetFeedbackRequest
+	(*GetFeedbackResponse)(nil),          // 39: app.v1.GetFeedbackResponse
+	(*ResolveFeedbackRequest)(nil),       // 40: app.v1.ResolveFeedbackRequest
+	(*ResolveFeedbackResponse)(nil),      // 41: app.v1.ResolveFeedbackResponse
+	(*ReplyFeedbackRequest)(nil),         // 42: app.v1.ReplyFeedbackRequest
+	(*ReplyFeedbackResponse)(nil),        // 43: app.v1.ReplyFeedbackResponse
+	(*Announcement)(nil),                 // 44: app.v1.Announcement
+	(*PreviewAnnouncementRequest)(nil),   // 45: app.v1.PreviewAnnouncementRequest
+	(*PreviewAnnouncementResponse)(nil),  // 46: app.v1.PreviewAnnouncementResponse
+	(*SendAnnouncementRequest)(nil),      // 47: app.v1.SendAnnouncementRequest
+	(*SendAnnouncementResponse)(nil),     // 48: app.v1.SendAnnouncementResponse
+	(*GetAnnouncementsRequest)(nil),      // 49: app.v1.GetAnnouncementsRequest
+	(*GetAnnouncementsResponse)(nil),     // 50: app.v1.GetAnnouncementsResponse
+	(*CancelAnnouncementRequest)(nil),    // 51: app.v1.CancelAnnouncementRequest
+	(*CancelAnnouncementResponse)(nil),   // 52: app.v1.CancelAnnouncementResponse
+	(ReportReason)(0),                    // 53: app.v1.ReportReason
+	(*User)(nil),                         // 54: app.v1.User
+	(*Chat)(nil),                         // 55: app.v1.Chat
+	(*Message)(nil),                      // 56: app.v1.Message
+	(BotTier)(0),                         // 57: app.v1.BotTier
+	(*MessageEntity)(nil),                // 58: app.v1.MessageEntity
 }
 var file_app_v1_moderation_proto_depIdxs = []int32{
 	1,  // 0: app.v1.Report.target_kind:type_name -> app.v1.ReportTargetKind
-	52, // 1: app.v1.Report.reason:type_name -> app.v1.ReportReason
+	53, // 1: app.v1.Report.reason:type_name -> app.v1.ReportReason
 	0,  // 2: app.v1.Report.status:type_name -> app.v1.ReportStatus
 	2,  // 3: app.v1.Report.actions:type_name -> app.v1.ModerationAction
 	2,  // 4: app.v1.ModerationLogEntry.action:type_name -> app.v1.ModerationAction
 	0,  // 5: app.v1.GetReportsRequest.status:type_name -> app.v1.ReportStatus
-	52, // 6: app.v1.GetReportsRequest.reason:type_name -> app.v1.ReportReason
+	53, // 6: app.v1.GetReportsRequest.reason:type_name -> app.v1.ReportReason
 	1,  // 7: app.v1.GetReportsRequest.target_kind:type_name -> app.v1.ReportTargetKind
-	6,  // 8: app.v1.GetReportsResponse.reports:type_name -> app.v1.Report
-	53, // 9: app.v1.GetReportsResponse.users:type_name -> app.v1.User
-	54, // 10: app.v1.GetReportsResponse.chats:type_name -> app.v1.Chat
-	6,  // 11: app.v1.GetReportResponse.report:type_name -> app.v1.Report
-	7,  // 12: app.v1.GetReportResponse.evidence:type_name -> app.v1.ReportedMessage
-	55, // 13: app.v1.GetReportResponse.context:type_name -> app.v1.Message
-	53, // 14: app.v1.GetReportResponse.users:type_name -> app.v1.User
-	54, // 15: app.v1.GetReportResponse.chat:type_name -> app.v1.Chat
-	8,  // 16: app.v1.GetReportResponse.history:type_name -> app.v1.ModerationLogEntry
-	9,  // 17: app.v1.GetReportResponse.restrictions:type_name -> app.v1.AccountRestriction
-	14, // 18: app.v1.GetReportResponse.group:type_name -> app.v1.ReportGroupSummary
-	16, // 19: app.v1.GetReportResponse.signals:type_name -> app.v1.SenderSignals
-	17, // 20: app.v1.GetReportResponse.hooks:type_name -> app.v1.ModeratedHook
-	15, // 21: app.v1.ReportGroupSummary.reasons:type_name -> app.v1.ReasonCount
-	52, // 22: app.v1.ReasonCount.reason:type_name -> app.v1.ReportReason
-	6,  // 23: app.v1.ReportGroup.report:type_name -> app.v1.Report
-	52, // 24: app.v1.ReportGroup.main_reason:type_name -> app.v1.ReportReason
+	7,  // 8: app.v1.GetReportsResponse.reports:type_name -> app.v1.Report
+	54, // 9: app.v1.GetReportsResponse.users:type_name -> app.v1.User
+	55, // 10: app.v1.GetReportsResponse.chats:type_name -> app.v1.Chat
+	7,  // 11: app.v1.GetReportResponse.report:type_name -> app.v1.Report
+	8,  // 12: app.v1.GetReportResponse.evidence:type_name -> app.v1.ReportedMessage
+	56, // 13: app.v1.GetReportResponse.context:type_name -> app.v1.Message
+	54, // 14: app.v1.GetReportResponse.users:type_name -> app.v1.User
+	55, // 15: app.v1.GetReportResponse.chat:type_name -> app.v1.Chat
+	9,  // 16: app.v1.GetReportResponse.history:type_name -> app.v1.ModerationLogEntry
+	10, // 17: app.v1.GetReportResponse.restrictions:type_name -> app.v1.AccountRestriction
+	15, // 18: app.v1.GetReportResponse.group:type_name -> app.v1.ReportGroupSummary
+	17, // 19: app.v1.GetReportResponse.signals:type_name -> app.v1.SenderSignals
+	18, // 20: app.v1.GetReportResponse.hooks:type_name -> app.v1.ModeratedHook
+	16, // 21: app.v1.ReportGroupSummary.reasons:type_name -> app.v1.ReasonCount
+	53, // 22: app.v1.ReasonCount.reason:type_name -> app.v1.ReportReason
+	7,  // 23: app.v1.ReportGroup.report:type_name -> app.v1.Report
+	53, // 24: app.v1.ReportGroup.main_reason:type_name -> app.v1.ReportReason
 	0,  // 25: app.v1.GetReportGroupsRequest.status:type_name -> app.v1.ReportStatus
-	52, // 26: app.v1.GetReportGroupsRequest.reason:type_name -> app.v1.ReportReason
+	53, // 26: app.v1.GetReportGroupsRequest.reason:type_name -> app.v1.ReportReason
 	1,  // 27: app.v1.GetReportGroupsRequest.target_kind:type_name -> app.v1.ReportTargetKind
-	18, // 28: app.v1.GetReportGroupsResponse.groups:type_name -> app.v1.ReportGroup
-	53, // 29: app.v1.GetReportGroupsResponse.users:type_name -> app.v1.User
-	54, // 30: app.v1.GetReportGroupsResponse.chats:type_name -> app.v1.Chat
+	19, // 28: app.v1.GetReportGroupsResponse.groups:type_name -> app.v1.ReportGroup
+	54, // 29: app.v1.GetReportGroupsResponse.users:type_name -> app.v1.User
+	55, // 30: app.v1.GetReportGroupsResponse.chats:type_name -> app.v1.Chat
 	2,  // 31: app.v1.GetModerationLogRequest.action:type_name -> app.v1.ModerationAction
-	8,  // 32: app.v1.GetModerationLogResponse.entries:type_name -> app.v1.ModerationLogEntry
-	53, // 33: app.v1.GetModerationLogResponse.users:type_name -> app.v1.User
-	54, // 34: app.v1.GetModerationLogResponse.chats:type_name -> app.v1.Chat
-	56, // 35: app.v1.BotReview.tier:type_name -> app.v1.BotTier
-	23, // 36: app.v1.GetBotReviewResponse.review:type_name -> app.v1.BotReview
-	53, // 37: app.v1.GetBotReviewResponse.users:type_name -> app.v1.User
-	23, // 38: app.v1.GetBotReviewsResponse.reviews:type_name -> app.v1.BotReview
-	53, // 39: app.v1.GetBotReviewsResponse.users:type_name -> app.v1.User
-	23, // 40: app.v1.SetBotVerifiedResponse.review:type_name -> app.v1.BotReview
-	23, // 41: app.v1.ReviewBotRestrictionResponse.review:type_name -> app.v1.BotReview
+	9,  // 32: app.v1.GetModerationLogResponse.entries:type_name -> app.v1.ModerationLogEntry
+	54, // 33: app.v1.GetModerationLogResponse.users:type_name -> app.v1.User
+	55, // 34: app.v1.GetModerationLogResponse.chats:type_name -> app.v1.Chat
+	57, // 35: app.v1.BotReview.tier:type_name -> app.v1.BotTier
+	24, // 36: app.v1.GetBotReviewResponse.review:type_name -> app.v1.BotReview
+	54, // 37: app.v1.GetBotReviewResponse.users:type_name -> app.v1.User
+	24, // 38: app.v1.GetBotReviewsResponse.reviews:type_name -> app.v1.BotReview
+	54, // 39: app.v1.GetBotReviewsResponse.users:type_name -> app.v1.User
+	24, // 40: app.v1.SetBotVerifiedResponse.review:type_name -> app.v1.BotReview
+	24, // 41: app.v1.ReviewBotRestrictionResponse.review:type_name -> app.v1.BotReview
 	2,  // 42: app.v1.ResolveReportRequest.actions:type_name -> app.v1.ModerationAction
-	6,  // 43: app.v1.ResolveReportResponse.report:type_name -> app.v1.Report
+	7,  // 43: app.v1.ResolveReportResponse.report:type_name -> app.v1.Report
 	4,  // 44: app.v1.Feedback.kind:type_name -> app.v1.FeedbackKind
 	3,  // 45: app.v1.Feedback.status:type_name -> app.v1.FeedbackStatus
-	3,  // 46: app.v1.GetFeedbackRequest.status:type_name -> app.v1.FeedbackStatus
-	36, // 47: app.v1.GetFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	53, // 48: app.v1.GetFeedbackResponse.users:type_name -> app.v1.User
-	36, // 49: app.v1.ResolveFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	36, // 50: app.v1.ReplyFeedbackResponse.feedback:type_name -> app.v1.Feedback
-	57, // 51: app.v1.Announcement.entities:type_name -> app.v1.MessageEntity
-	5,  // 52: app.v1.Announcement.state:type_name -> app.v1.AnnouncementState
-	57, // 53: app.v1.PreviewAnnouncementResponse.entities:type_name -> app.v1.MessageEntity
-	43, // 54: app.v1.SendAnnouncementResponse.announcement:type_name -> app.v1.Announcement
-	43, // 55: app.v1.GetAnnouncementsResponse.announcements:type_name -> app.v1.Announcement
-	53, // 56: app.v1.GetAnnouncementsResponse.users:type_name -> app.v1.User
-	43, // 57: app.v1.CancelAnnouncementResponse.announcement:type_name -> app.v1.Announcement
-	10, // 58: app.v1.ModerationService.GetReports:input_type -> app.v1.GetReportsRequest
-	12, // 59: app.v1.ModerationService.GetReport:input_type -> app.v1.GetReportRequest
-	32, // 60: app.v1.ModerationService.ResolveReport:input_type -> app.v1.ResolveReportRequest
-	34, // 61: app.v1.ModerationService.LiftRestriction:input_type -> app.v1.LiftRestrictionRequest
-	37, // 62: app.v1.ModerationService.GetFeedback:input_type -> app.v1.GetFeedbackRequest
-	39, // 63: app.v1.ModerationService.ResolveFeedback:input_type -> app.v1.ResolveFeedbackRequest
-	41, // 64: app.v1.ModerationService.ReplyFeedback:input_type -> app.v1.ReplyFeedbackRequest
-	19, // 65: app.v1.ModerationService.GetReportGroups:input_type -> app.v1.GetReportGroupsRequest
-	21, // 66: app.v1.ModerationService.GetModerationLog:input_type -> app.v1.GetModerationLogRequest
-	24, // 67: app.v1.ModerationService.GetBotReview:input_type -> app.v1.GetBotReviewRequest
-	26, // 68: app.v1.ModerationService.GetBotReviews:input_type -> app.v1.GetBotReviewsRequest
-	28, // 69: app.v1.ModerationService.SetBotVerified:input_type -> app.v1.SetBotVerifiedRequest
-	30, // 70: app.v1.ModerationService.ReviewBotRestriction:input_type -> app.v1.ReviewBotRestrictionRequest
-	44, // 71: app.v1.ModerationService.PreviewAnnouncement:input_type -> app.v1.PreviewAnnouncementRequest
-	46, // 72: app.v1.ModerationService.SendAnnouncement:input_type -> app.v1.SendAnnouncementRequest
-	48, // 73: app.v1.ModerationService.GetAnnouncements:input_type -> app.v1.GetAnnouncementsRequest
-	50, // 74: app.v1.ModerationService.CancelAnnouncement:input_type -> app.v1.CancelAnnouncementRequest
-	11, // 75: app.v1.ModerationService.GetReports:output_type -> app.v1.GetReportsResponse
-	13, // 76: app.v1.ModerationService.GetReport:output_type -> app.v1.GetReportResponse
-	33, // 77: app.v1.ModerationService.ResolveReport:output_type -> app.v1.ResolveReportResponse
-	35, // 78: app.v1.ModerationService.LiftRestriction:output_type -> app.v1.LiftRestrictionResponse
-	38, // 79: app.v1.ModerationService.GetFeedback:output_type -> app.v1.GetFeedbackResponse
-	40, // 80: app.v1.ModerationService.ResolveFeedback:output_type -> app.v1.ResolveFeedbackResponse
-	42, // 81: app.v1.ModerationService.ReplyFeedback:output_type -> app.v1.ReplyFeedbackResponse
-	20, // 82: app.v1.ModerationService.GetReportGroups:output_type -> app.v1.GetReportGroupsResponse
-	22, // 83: app.v1.ModerationService.GetModerationLog:output_type -> app.v1.GetModerationLogResponse
-	25, // 84: app.v1.ModerationService.GetBotReview:output_type -> app.v1.GetBotReviewResponse
-	27, // 85: app.v1.ModerationService.GetBotReviews:output_type -> app.v1.GetBotReviewsResponse
-	29, // 86: app.v1.ModerationService.SetBotVerified:output_type -> app.v1.SetBotVerifiedResponse
-	31, // 87: app.v1.ModerationService.ReviewBotRestriction:output_type -> app.v1.ReviewBotRestrictionResponse
-	45, // 88: app.v1.ModerationService.PreviewAnnouncement:output_type -> app.v1.PreviewAnnouncementResponse
-	47, // 89: app.v1.ModerationService.SendAnnouncement:output_type -> app.v1.SendAnnouncementResponse
-	49, // 90: app.v1.ModerationService.GetAnnouncements:output_type -> app.v1.GetAnnouncementsResponse
-	51, // 91: app.v1.ModerationService.CancelAnnouncement:output_type -> app.v1.CancelAnnouncementResponse
-	75, // [75:92] is the sub-list for method output_type
-	58, // [58:75] is the sub-list for method input_type
-	58, // [58:58] is the sub-list for extension type_name
-	58, // [58:58] is the sub-list for extension extendee
-	0,  // [0:58] is the sub-list for field type_name
+	5,  // 46: app.v1.Feedback.source:type_name -> app.v1.FeedbackSource
+	3,  // 47: app.v1.GetFeedbackRequest.status:type_name -> app.v1.FeedbackStatus
+	37, // 48: app.v1.GetFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	54, // 49: app.v1.GetFeedbackResponse.users:type_name -> app.v1.User
+	37, // 50: app.v1.ResolveFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	37, // 51: app.v1.ReplyFeedbackResponse.feedback:type_name -> app.v1.Feedback
+	58, // 52: app.v1.Announcement.entities:type_name -> app.v1.MessageEntity
+	6,  // 53: app.v1.Announcement.state:type_name -> app.v1.AnnouncementState
+	58, // 54: app.v1.PreviewAnnouncementResponse.entities:type_name -> app.v1.MessageEntity
+	44, // 55: app.v1.SendAnnouncementResponse.announcement:type_name -> app.v1.Announcement
+	44, // 56: app.v1.GetAnnouncementsResponse.announcements:type_name -> app.v1.Announcement
+	54, // 57: app.v1.GetAnnouncementsResponse.users:type_name -> app.v1.User
+	44, // 58: app.v1.CancelAnnouncementResponse.announcement:type_name -> app.v1.Announcement
+	11, // 59: app.v1.ModerationService.GetReports:input_type -> app.v1.GetReportsRequest
+	13, // 60: app.v1.ModerationService.GetReport:input_type -> app.v1.GetReportRequest
+	33, // 61: app.v1.ModerationService.ResolveReport:input_type -> app.v1.ResolveReportRequest
+	35, // 62: app.v1.ModerationService.LiftRestriction:input_type -> app.v1.LiftRestrictionRequest
+	38, // 63: app.v1.ModerationService.GetFeedback:input_type -> app.v1.GetFeedbackRequest
+	40, // 64: app.v1.ModerationService.ResolveFeedback:input_type -> app.v1.ResolveFeedbackRequest
+	42, // 65: app.v1.ModerationService.ReplyFeedback:input_type -> app.v1.ReplyFeedbackRequest
+	20, // 66: app.v1.ModerationService.GetReportGroups:input_type -> app.v1.GetReportGroupsRequest
+	22, // 67: app.v1.ModerationService.GetModerationLog:input_type -> app.v1.GetModerationLogRequest
+	25, // 68: app.v1.ModerationService.GetBotReview:input_type -> app.v1.GetBotReviewRequest
+	27, // 69: app.v1.ModerationService.GetBotReviews:input_type -> app.v1.GetBotReviewsRequest
+	29, // 70: app.v1.ModerationService.SetBotVerified:input_type -> app.v1.SetBotVerifiedRequest
+	31, // 71: app.v1.ModerationService.ReviewBotRestriction:input_type -> app.v1.ReviewBotRestrictionRequest
+	45, // 72: app.v1.ModerationService.PreviewAnnouncement:input_type -> app.v1.PreviewAnnouncementRequest
+	47, // 73: app.v1.ModerationService.SendAnnouncement:input_type -> app.v1.SendAnnouncementRequest
+	49, // 74: app.v1.ModerationService.GetAnnouncements:input_type -> app.v1.GetAnnouncementsRequest
+	51, // 75: app.v1.ModerationService.CancelAnnouncement:input_type -> app.v1.CancelAnnouncementRequest
+	12, // 76: app.v1.ModerationService.GetReports:output_type -> app.v1.GetReportsResponse
+	14, // 77: app.v1.ModerationService.GetReport:output_type -> app.v1.GetReportResponse
+	34, // 78: app.v1.ModerationService.ResolveReport:output_type -> app.v1.ResolveReportResponse
+	36, // 79: app.v1.ModerationService.LiftRestriction:output_type -> app.v1.LiftRestrictionResponse
+	39, // 80: app.v1.ModerationService.GetFeedback:output_type -> app.v1.GetFeedbackResponse
+	41, // 81: app.v1.ModerationService.ResolveFeedback:output_type -> app.v1.ResolveFeedbackResponse
+	43, // 82: app.v1.ModerationService.ReplyFeedback:output_type -> app.v1.ReplyFeedbackResponse
+	21, // 83: app.v1.ModerationService.GetReportGroups:output_type -> app.v1.GetReportGroupsResponse
+	23, // 84: app.v1.ModerationService.GetModerationLog:output_type -> app.v1.GetModerationLogResponse
+	26, // 85: app.v1.ModerationService.GetBotReview:output_type -> app.v1.GetBotReviewResponse
+	28, // 86: app.v1.ModerationService.GetBotReviews:output_type -> app.v1.GetBotReviewsResponse
+	30, // 87: app.v1.ModerationService.SetBotVerified:output_type -> app.v1.SetBotVerifiedResponse
+	32, // 88: app.v1.ModerationService.ReviewBotRestriction:output_type -> app.v1.ReviewBotRestrictionResponse
+	46, // 89: app.v1.ModerationService.PreviewAnnouncement:output_type -> app.v1.PreviewAnnouncementResponse
+	48, // 90: app.v1.ModerationService.SendAnnouncement:output_type -> app.v1.SendAnnouncementResponse
+	50, // 91: app.v1.ModerationService.GetAnnouncements:output_type -> app.v1.GetAnnouncementsResponse
+	52, // 92: app.v1.ModerationService.CancelAnnouncement:output_type -> app.v1.CancelAnnouncementResponse
+	76, // [76:93] is the sub-list for method output_type
+	59, // [59:76] is the sub-list for method input_type
+	59, // [59:59] is the sub-list for extension type_name
+	59, // [59:59] is the sub-list for extension extendee
+	0,  // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_moderation_proto_init() }
@@ -3995,7 +4062,7 @@ func file_app_v1_moderation_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_moderation_proto_rawDesc), len(file_app_v1_moderation_proto_rawDesc)),
-			NumEnums:      6,
+			NumEnums:      7,
 			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,

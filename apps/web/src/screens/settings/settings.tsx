@@ -1,4 +1,4 @@
-import { Fragment, useEffect, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { Avatar } from "../../components/avatar.tsx";
 import { LoaderBoundary } from "../../components/delayed-loader.tsx";
@@ -44,6 +44,8 @@ export interface MessagingSettings {
 	photo?: ReactNode;
 	/** The user's avatar with their photo, on the phone category list's account card. */
 	avatar?: ReactNode;
+	/** The "Góp ý" dialog (mockups/settings.html#feedback), shown over the current tab until closed. */
+	feedback?: (onClose: () => void) => ReactNode;
 }
 
 type TabGroups = readonly (readonly { tab: SettingsTab; icon: IconName }[])[];
@@ -66,6 +68,7 @@ interface SettingsProps {
 export function Settings({ tab, self, onSelfChange, messaging, list = false }: SettingsProps) {
 	const { t } = useI18n();
 	const groups = tabGroups(messaging);
+	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	// "Tài khoản" (export and deletion) follows the Developer Console link (mockups/settings.html#export-delete).
 	const available = groups.some((group) => group.some((item) => item.tab === tab)) || (messaging !== undefined && tab === "account");
 	useEffect(() => {
@@ -110,6 +113,12 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 						</Link>
 					</>
 				)}
+				{messaging?.feedback !== undefined && (
+					<button type="button" onClick={() => setFeedbackOpen(true)} aria-haspopup="dialog">
+						<Icon name="message-dot" />
+						<span>{t.settings.feedback}</span>
+					</button>
+				)}
 				{messaging?.moderation === true && (
 					<Link to={paths.moderation()}>
 						<Icon name="shield" />
@@ -139,6 +148,7 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 				{/* A tab that loads shows one loader under the header; the first showing waits for it (messaging-root.tsx). */}
 				<LoaderBoundary key={tab}>{content}</LoaderBoundary>
 			</main>
+			{feedbackOpen && messaging?.feedback?.(() => setFeedbackOpen(false))}
 		</div>
 	);
 }

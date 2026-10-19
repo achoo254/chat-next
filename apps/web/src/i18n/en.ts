@@ -41,6 +41,7 @@ export const en: Messages = {
 		moderation: "Moderation",
 		console: "Developer Console",
 		account: "Account",
+		feedback: "Feedback",
 		signOut: "Sign out",
 	},
 	profile: {

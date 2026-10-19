@@ -158,3 +158,18 @@ func (g *Snowflake) LastUnixMs() int64 {
 	}
 	return g.lastMs + SnowflakeEpoch.UnixMilli()
 }
+
+// SnowflakeFloor is the smallest id issued at the instant t or later by
+// any worker, so the ids issued within [a, b) lie in [SnowflakeFloor(a),
+// SnowflakeFloor(b)): a range of the id index by time. 0 before the epoch,
+// the largest time field past its end.
+func SnowflakeFloor(t time.Time) int64 {
+	ms := t.UnixMilli() - SnowflakeEpoch.UnixMilli()
+	switch {
+	case ms < 0:
+		return 0
+	case ms > maxSnowflakeTime:
+		ms = maxSnowflakeTime
+	}
+	return ms << (snowflakeWorkerBits + snowflakeSequenceBits)
+}

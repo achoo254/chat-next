@@ -12,9 +12,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Feedback is what users send the tenant's assistant bot ("Góp ý", "Báo
-// lỗi"). The assistant records it here; operators list it in the moderation
-// queue, mark it handled and answer through the assistant.
+// Feedback is what users send the team ("Góp ý", "Báo lỗi"): to the
+// tenant's assistant bot, which records it here, or from Settings › Góp ý
+// (SendFeedback). Operators list it in the moderation queue, mark it
+// handled and answer through the assistant; each new item is also posted
+// into the operators' group (OpsSignals).
+//
+// An item sent from Settings has no message in the assistant's chat: it is
+// stored with chat_id 0 and seq = -id (unique, so feedback_message_key
+// holds), and the answer goes out as a new message quoting it.
 
 // Feedback kinds as stored.
 const (
@@ -28,6 +34,8 @@ const (
 	feedbackPageMax = 200
 	// FeedbackReplyMax bounds an operator's answer, in characters.
 	FeedbackReplyMax = 2000
+	// FeedbackTextMax bounds feedback sent from Settings, in characters.
+	FeedbackTextMax = 2000
 )
 
 const (
@@ -38,6 +46,12 @@ const (
 var feedbackKinds = map[string]appv1.FeedbackKind{
 	FeedbackIdea: appv1.FeedbackKind_FEEDBACK_KIND_IDEA,
 	FeedbackBug:  appv1.FeedbackKind_FEEDBACK_KIND_BUG,
+}
+
+// FromSettings reports whether the item was sent from Settings › Góp ý
+// (it has no message in the assistant's chat).
+func (f *FeedbackItem) FromSettings() bool {
+	return f.ChatID == 0
 }
 
 // FeedbackItem is one stored feedback message.
@@ -82,10 +96,14 @@ func (f *FeedbackItem) Render() *appv1.Feedback {
 	if f.Status == feedbackHandled {
 		status = appv1.FeedbackStatus_FEEDBACK_STATUS_HANDLED
 	}
+	source := appv1.FeedbackSource_FEEDBACK_SOURCE_ASSISTANT
+	if f.FromSettings() {
+		source = appv1.FeedbackSource_FEEDBACK_SOURCE_SETTINGS
+	}
 	return &appv1.Feedback{
 		Id: f.ID, UserId: f.UserID, Kind: feedbackKinds[f.Kind], Text: f.Text, Status: status,
 		CreatedAt: f.CreatedAt.Unix(), HandledAt: unixOrZero(f.HandledAt), HandledBy: idOrZero(f.HandledBy),
-		ReplyText: f.ReplyText, RepliedAt: unixOrZero(f.RepliedAt), RepliedBy: idOrZero(f.RepliedBy),
+		ReplyText: f.ReplyText, RepliedAt: unixOrZero(f.RepliedAt), RepliedBy: idOrZero(f.RepliedBy), Source: source,
 	}
 }
 
@@ -100,13 +118,51 @@ func (s *Service) RecordFeedback(ctx context.Context, userID, chatID, seq int64,
 	if text == "" || userID <= 0 || chatID <= 0 || seq <= 0 {
 		return false, errInvalid("feedback needs a user, a message and its text")
 	}
-	tag, err := s.pool.Exec(ctx, `
+	var id int64
+	err = s.pool.QueryRow(ctx, `
 		INSERT INTO feedback (tenant_id, user_id, kind, text, chat_id, seq) VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (chat_id, seq) DO NOTHING`, s.cfg.TenantID, userID, kind, text, chatID, seq)
+		ON CONFLICT (chat_id, seq) DO NOTHING RETURNING id`, s.cfg.TenantID, userID, kind, text, chatID, seq).Scan(&id)
+	if isNoRows(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("chat: record feedback: %w", err)
 	}
-	return tag.RowsAffected() == 1, nil
+	s.signalFeedback(ctx, FeedbackSignal{ID: id, Kind: kind, Text: text, From: Filer{ID: userID}})
+	return true, nil
+}
+
+// SendFeedback files feedback me typed in Settings › Góp ý (an idea when
+// kind is unspecified) and tells the operators' group.
+func (s *Service) SendFeedback(ctx context.Context, me int64, req *appv1.SendFeedbackRequest) error {
+	kind := FeedbackIdea
+	switch req.GetKind() {
+	case appv1.FeedbackKind_FEEDBACK_KIND_UNSPECIFIED, appv1.FeedbackKind_FEEDBACK_KIND_IDEA:
+	case appv1.FeedbackKind_FEEDBACK_KIND_BUG:
+		kind = FeedbackBug
+	default:
+		return errInvalid("unknown feedback kind")
+	}
+	text := strings.TrimSpace(strings.ToValidUTF8(req.GetText(), ""))
+	if text == "" {
+		return errInvalid("text is required")
+	}
+	if utf8.RuneCountInString(text) > FeedbackTextMax {
+		return errInvalid("text is longer than %d characters", FeedbackTextMax)
+	}
+	if err := s.allow(ctx, limitFeedback, "feedback", me); err != nil {
+		return err
+	}
+	var id int64
+	if err := s.pool.QueryRow(ctx, `
+		WITH n AS (SELECT nextval(pg_get_serial_sequence('feedback', 'id')) AS id)
+		INSERT INTO feedback (id, tenant_id, user_id, kind, text, chat_id, seq)
+		SELECT n.id, $1, $2, $3, $4, 0, -n.id FROM n RETURNING id`, s.cfg.TenantID, me, kind, text).Scan(&id); err != nil {
+		return fmt.Errorf("chat: send feedback: %w", err)
+	}
+	s.logger.Info("feedback sent from settings", "feedback_id", id, "user_id", me, "kind", kind)
+	s.signalFeedback(ctx, FeedbackSignal{ID: id, Kind: kind, Text: text, FromSettings: true, From: Filer{ID: me}})
+	return nil
 }
 
 // GetFeedback lists the tenant's feedback of one status, newest first, for

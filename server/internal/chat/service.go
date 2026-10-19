@@ -134,6 +134,9 @@ type Service struct {
 	presence Presence
 	// notifier tells users about moderation decisions (SetNotifier).
 	notifier Notifier
+	// signals tells the operators about new feedback and reports
+	// (SetOpsSignals).
+	signals OpsSignals
 	// committed, when set, learns that a transaction wrote outbox rows
 	// (the bot update consumer cuts them right away).
 	committed func()
@@ -359,6 +362,11 @@ var (
 	limitSearchYoung = ratelimit.Rule{Rate: 0.2, Burst: 10}
 	// Message search: one call per pause in typing, plus paging.
 	limitMessageSearch = ratelimit.Rule{Rate: 2, Burst: 30}
+	// Feedback from Settings: a few in a row, then one a minute.
+	limitFeedback = ratelimit.Rule{Rate: 1.0 / 60, Burst: 5}
+	// Client error reports per user or address: one load's worth (the app
+	// sends at most 5), then one a minute.
+	limitClientError = ratelimit.Rule{Rate: 1.0 / 60, Burst: 10}
 )
 
 type botCallKey struct{}

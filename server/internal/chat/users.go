@@ -750,13 +750,22 @@ func (s *Service) Report(ctx context.Context, me int64, req *appv1.ReportRequest
 	if err != nil {
 		return fmt.Errorf("chat: report evidence: %w", err)
 	}
-	if _, err := s.pool.Exec(ctx, `
+	var reportID int64
+	if err := s.pool.QueryRow(ctx, `
 		INSERT INTO reports (tenant_id, reporter_id, target_user_id, target_chat_id, seqs, reason, comment, evidence)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		s.cfg.TenantID, me, userID, chatID, append([]int64{}, seqs...), int16(reason), comment, ev); err != nil {
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		s.cfg.TenantID, me, userID, chatID, append([]int64{}, seqs...), int16(reason), comment, ev).Scan(&reportID); err != nil {
 		return fmt.Errorf("chat: file report: %w", err)
 	}
 	s.logger.Info("report filed", "reporter_id", me, "target_user_id", userID, "target_chat_id", chatID, "reason", reason.String())
+	target := "user"
+	switch {
+	case len(seqs) > 0:
+		target = "messages"
+	case chatID != 0:
+		target = "chat"
+	}
+	s.signalReport(ctx, ReportSignal{ID: reportID, Reason: reason, Target: target, Messages: len(seqs), From: Filer{ID: me}})
 	return nil
 }
 

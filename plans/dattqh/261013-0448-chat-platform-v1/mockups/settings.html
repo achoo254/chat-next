@@ -571,6 +571,32 @@
 			</div>
 		</div>
 	</section>
+	<!-- ============ Feedback ============ -->
+	<section class="shot" id="feedback">
+		<div class="shot-head"><h2>Góp ý</h2><span class="phase">Nghiệm thu</span><p>Mục "Góp ý" trong danh mục cài đặt (avatar › Cài đặt › Góp ý: hai lần bấm) mở hộp gửi góp ý ngay, không rời trang đang xem. Chọn Góp ý hoặc Báo lỗi (mặc định Góp ý), viết tối đa 2000 ký tự; nút gửi bật khi đã có chữ. Gửi xong hộp đóng, toast "Đã gửi góp ý. Cảm ơn bạn!". Góp ý vào Kiểm duyệt › Góp ý (moderation.html#feedback, ghi "qua Cài đặt") cùng chỗ với góp ý gửi cho bot Trợ lý, và báo ngay vào nhóm "Vận hành chat" của người vận hành; câu trả lời (nếu có) đến qua bot Trợ lý. Gửi quá nhanh: "Bạn gửi hơi nhanh, thử lại sau ít phút nhé."</p></div>
+		<div class="frame tall"><div class="set">
+			<nav class="rail" data-rail aria-label="Điều hướng"></nav>
+			<nav class="set-nav" data-active="feedback" aria-label="Danh mục cài đặt"></nav>
+			<div class="set-main">
+				<header class="set-head"><h3>Hồ sơ</h3></header>
+			</div>
+			<div class="static-dialog feedback-overlay">
+				<form class="panel" id="feedback-form" onsubmit="return false" aria-labelledby="fb-title">
+					<div class="dlg-head"><h2 id="fb-title">Góp ý cho đội ngũ</h2><button type="button" class="icon-btn" aria-label="Đóng"><svg class="icon"><use href="#i-x"/></svg></button></div>
+					<div class="dlg-body flow">
+						<div class="choice" role="group" aria-label="Loại góp ý"><button type="button" aria-pressed="true" data-fb-kind="idea">Góp ý</button><button type="button" aria-pressed="false" data-fb-kind="bug">Báo lỗi</button></div>
+						<div class="field">
+							<label for="fb-text">Nội dung</label>
+							<textarea id="fb-text" class="input" rows="5" maxlength="2000" placeholder="Bạn muốn đội ngũ cải thiện điều gì?" aria-describedby="fb-hint fb-count"></textarea>
+							<span class="hint" id="fb-hint">Đội ngũ đọc mọi góp ý. Câu trả lời (nếu có) sẽ đến qua bot Trợ lý.</span>
+							<span class="hint counter" id="fb-count">0/2000</span>
+						</div>
+					</div>
+					<div class="dlg-foot"><button type="button" class="btn">Huỷ</button><button type="submit" class="btn btn-primary" id="fb-send" disabled>Gửi góp ý</button></div>
+				</form>
+			</div>
+		</div></div>
+	</section>
 </main>
 
 <style>
@@ -755,6 +781,7 @@ a.btn { color: var(--c-text); text-decoration: none; }
 .bubble.reported { border-color: var(--c-error); box-shadow: 0 0 0 1px var(--c-error); }
 .frame .report-overlay { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: var(--space-5); padding: var(--space-5); }
 .report-overlay .panel { width: min(420px, 100%); }
+.feedback-overlay > .panel { width: min(480px, 100%); }
 .quote { margin: 0; padding: var(--space-2) var(--space-3); border-left: 3px solid var(--c-error); border-radius: var(--radius-xs); background: var(--c-surface-subtle); font-size: 0.875rem; }
 .quote b { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
 .opts { margin: 0; padding: 0; border: 0; display: grid; gap: 2px; }
@@ -844,7 +871,7 @@ a.btn { color: var(--c-text); text-decoration: none; }
 		["profile", "Hồ sơ", "user"], ["privacy", "Quyền riêng tư", "eye-off"], ["blocked", "Người đã chặn", "ban"], null,
 		["notifications", "Thông báo", "bell"], ["appearance", "Giao diện", "sun"], ["shortcuts", "Phím tắt", "command"], ["app", "Cài ứng dụng", "download"], ["storage", "Dữ liệu và bộ nhớ", "database"], null,
 		["sessions", "Phiên đăng nhập", "laptop"], ["tenant", "Tổ chức", "globe"], null,
-		["console.html", "Developer Console", "code"], ["export-delete", "Tài khoản", "key"],
+		["console.html", "Developer Console", "code"], ["export-delete", "Tài khoản", "key"], ["feedback", "Góp ý", "message-dot"],
 	];
 	$$("[data-rail]").forEach((el) => { el.innerHTML = RAIL; });
 	$$(".set-nav").forEach((nav) => {
@@ -952,6 +979,19 @@ a.btn { color: var(--c-text); text-decoration: none; }
 	const form = $("#report-form");
 	form.addEventListener("change", () => { $("#rp-submit").disabled = !form.querySelector("input[name=reason]:checked"); });
 	$("#rp-submit").addEventListener("click", () => toast("Đã gửi báo cáo, xem trạng thái bên phải"));
+
+	// Feedback: kind toggle, counter, send enabled once there is text.
+	const fbText = $("#fb-text");
+	const fbSend = $("#fb-send");
+	$$("[data-fb-kind]").forEach((b) => b.addEventListener("click", () => {
+		$$("[data-fb-kind]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+		fbText.placeholder = b.dataset.fbKind === "bug" ? "Bạn gặp lỗi gì? Bạn đang làm gì và điều gì xảy ra?" : "Bạn muốn đội ngũ cải thiện điều gì?";
+	}));
+	fbText.addEventListener("input", () => {
+		$("#fb-count").textContent = `${fbText.value.length}/2000`;
+		fbSend.disabled = fbText.value.trim() === "";
+	});
+	fbSend.addEventListener("click", () => { toast("Đã gửi góp ý. Cảm ơn bạn!"); fbText.value = ""; fbSend.disabled = true; $("#fb-count").textContent = "0/2000"; });
 })();
 </script>
 </body>

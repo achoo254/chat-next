@@ -287,7 +287,18 @@ func cleanName(name string) (string, error) {
 // as if the hook had received it: the server's own alerts (package watch),
 // without a URL or secret.
 func (s *Service) PostAlertmanager(ctx context.Context, id string, body []byte) error {
-	n, err := format.Parse(format.Alertmanager, "application/json", body, s.opts)
+	return s.postAs(ctx, id, format.Alertmanager, body)
+}
+
+// PostNative posts a payload of the native JSON format through hook id,
+// whatever the hook's own format: the server's own notices to operators
+// (package watch: new feedback and reports, the daily digest).
+func (s *Service) PostNative(ctx context.Context, id string, body []byte) error {
+	return s.postAs(ctx, id, format.Native, body)
+}
+
+func (s *Service) postAs(ctx context.Context, id string, kind format.Kind, body []byte) error {
+	n, err := format.Parse(kind, "application/json", body, s.opts)
 	if err != nil {
 		return err
 	}

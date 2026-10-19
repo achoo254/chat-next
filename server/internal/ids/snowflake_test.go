@@ -251,3 +251,19 @@ func TestNewSnowflakeAfterStartsLater(t *testing.T) {
 		t.Fatalf("fresh LastUnixMs = %d", fresh.LastUnixMs())
 	}
 }
+
+// The ids of a time range lie between the floors of its ends, whatever the
+// worker and sequence.
+func TestSnowflakeFloor(t *testing.T) {
+	epoch := SnowflakeEpoch.UnixMilli()
+	clock := &fakeClock{ms: epoch + 5000}
+	g := newTestSnowflake(t, MaxWorker, clock)
+	id := mustNext(t, g)
+	at := time.UnixMilli(epoch + 5000)
+	if lo, hi := SnowflakeFloor(at), SnowflakeFloor(at.Add(time.Millisecond)); id < lo || id >= hi {
+		t.Fatalf("id %d outside [%d, %d)", id, lo, hi)
+	}
+	if got := SnowflakeFloor(SnowflakeEpoch.Add(-time.Hour)); got != 0 {
+		t.Fatalf("floor before the epoch = %d, want 0", got)
+	}
+}

@@ -3,7 +3,7 @@
 // core once per signed-in session and keeps it alive across the chat, settings
 // and moderation screens.
 import type { Transport } from "@connectrpc/connect";
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { useApi } from "../api/api-context.tsx";
 import { loadAccountClient, loadConnectWeb, type Api } from "../api/client.ts";
@@ -43,10 +43,12 @@ const settingsCode = preloadable(async () => ({ default: (await import("../scree
 const settingsExtraCode = preloadable(() => import("./settings/settings-extra.tsx"));
 const moderationCode = preloadable(() => import("./moderation/moderation.tsx"));
 const consoleCode = preloadable(() => import("./bots/console.tsx"));
+const feedbackDialogCode = preloadable(() => import("./settings/feedback-dialog.tsx"));
 const Settings = settingsCode.Component;
 const SettingsExtra = settingsExtraCode.Component;
 const Moderation = moderationCode.Component;
 const DeveloperConsole = consoleCode.Component;
+const FeedbackDialog = feedbackDialogCode.Component;
 
 /**
  * Secondary screens (and the rarer parts of messages) whose code is fetched
@@ -56,6 +58,7 @@ const DeveloperConsole = consoleCode.Component;
 const IDLE_PREFETCH = [
 	settingsCode.preload,
 	settingsExtraCode.preload,
+	feedbackDialogCode.preload,
 	consoleCode.preload,
 	...chatPanePreloads,
 	...messageExtrasPreloads,
@@ -323,6 +326,11 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 						render: (tab: SettingsTab): ReactNode => <SettingsExtra tab={tab} />,
 						photo: <SettingsExtra tab="profile" self={self} onSelfChange={onSelfChange} />,
 						avatar: <ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} />,
+						feedback: (onClose) => (
+							<Suspense fallback={null}>
+								<FeedbackDialog onClose={onClose} />
+							</Suspense>
+						),
 					}}
 				/>
 			);

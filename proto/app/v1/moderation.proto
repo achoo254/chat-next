@@ -29,14 +29,15 @@ service ModerationService {
   rpc ResolveReport(ResolveReportRequest) returns (ResolveReportResponse);
   // Ends an account restriction before its time.
   rpc LiftRestriction(LiftRestrictionRequest) returns (LiftRestrictionResponse);
-  // Feedback users sent the tenant's assistant bot ("Góp ý" and "Báo lỗi"),
-  // newest first.
+  // Feedback users sent the tenant's assistant bot or from Settings › Góp
+  // ý ("Góp ý" and "Báo lỗi"), newest first.
   rpc GetFeedback(GetFeedbackRequest) returns (GetFeedbackResponse);
   // Marks a feedback item handled; an item already handled is returned as
   // is.
   rpc ResolveFeedback(ResolveFeedbackRequest) returns (ResolveFeedbackResponse);
   // Sends the operator's answer to the user through the assistant bot (as a
-  // reply to their message) and marks the item handled. One answer per
+  // reply to their message; feedback sent from Settings gets a new message
+  // quoting it) and marks the item handled. One answer per
   // item: a second gives failed_precondition "already_replied".
   rpc ReplyFeedback(ReplyFeedbackRequest) returns (ReplyFeedbackResponse);
   // Reports grouped by target (the same user, chat, or messages), the
@@ -412,7 +413,16 @@ enum FeedbackKind {
   FEEDBACK_KIND_BUG = 2;
 }
 
-// One message a user sent the assistant bot as feedback.
+// Where a feedback item was sent from.
+enum FeedbackSource {
+  FEEDBACK_SOURCE_UNSPECIFIED = 0;
+  // A message to the assistant bot.
+  FEEDBACK_SOURCE_ASSISTANT = 1;
+  // The "Góp ý" dialog of Settings (FeedbackService.SendFeedback).
+  FEEDBACK_SOURCE_SETTINGS = 2;
+}
+
+// One feedback item a user sent the team.
 message Feedback {
   int64 id = 1 [jstype = JS_NUMBER];
   int64 user_id = 2 [jstype = JS_NUMBER];
@@ -427,6 +437,7 @@ message Feedback {
   string reply_text = 9;
   int64 replied_at = 10 [jstype = JS_NUMBER];
   int64 replied_by = 11 [jstype = JS_NUMBER];
+  FeedbackSource source = 12;
 }
 
 message GetFeedbackRequest {

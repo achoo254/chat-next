@@ -39,6 +39,7 @@ export const vi = {
 		moderation: "Kiểm duyệt",
 		console: "Developer Console",
 		account: "Tài khoản",
+		feedback: "Góp ý",
 		signOut: "Đăng xuất",
 	},
 	profile: {

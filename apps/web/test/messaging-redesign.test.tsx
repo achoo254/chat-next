@@ -355,6 +355,10 @@ describe("moderation", () => {
 		await waitFor(() => expect(window.location.pathname).toBe("/moderation/feedback"), LONG);
 		expect(await screen.findByText("Gửi ảnh trong nhóm bị treo ở 99%.", {}, LONG)).toBeTruthy();
 		expect(screen.getByText("Báo lỗi")).toBeTruthy();
+		expect(screen.getByText("Từ Cài đặt hoặc bot Trợ lý")).toBeTruthy();
+		// Where each item came from.
+		expect(within(screen.getByText("Gửi ảnh trong nhóm bị treo ở 99%.").closest("li") as HTMLElement).getByText("qua Cài đặt")).toBeTruthy();
+		expect(within(screen.getByText("Cho mình chọn chế độ tối theo giờ nhé.").closest("li") as HTMLElement).getByText("qua Trợ lý")).toBeTruthy();
 		expect(screen.queryByText("Nút gửi hơi nhỏ trên điện thoại.")).toBeNull();
 
 		const idea = screen.getByText("Cho mình chọn chế độ tối theo giờ nhé.").closest("li");
@@ -368,6 +372,7 @@ describe("moderation", () => {
 		if (bug === null) throw new Error("item not found");
 		await userEvent.click(within(bug).getByRole("button", { name: "Trả lời" }));
 		const dialog = await screen.findByRole("dialog", { name: /Trả lời/ }, LONG);
+		expect(within(dialog).getByText("(bot Trợ lý gửi cho họ, kèm trích góp ý)")).toBeTruthy();
 		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi trả lời" }));
 		expect(within(dialog).getByText("Nhập câu trả lời trước khi gửi.")).toBeTruthy();
 		await userEvent.type(within(dialog).getByRole("textbox", { name: /Câu trả lời/ }), "Đã sửa, cảm ơn bạn");

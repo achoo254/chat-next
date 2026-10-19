@@ -20,12 +20,14 @@ import {
 } from "@app/proto-ts/chats";
 import type { InviteLink } from "@app/proto-ts/chats";
 import { ConfigService } from "@app/proto-ts/config";
+import { FeedbackService } from "@app/proto-ts/feedback";
 import { EntityType, MessageSchema, MessagesService, type Message as WireMessage } from "@app/proto-ts/messages";
 import { ServerFrameSchema } from "@app/proto-ts/realtime";
 import type { Update as WireUpdate } from "@app/proto-ts/updates";
 import {
 	AnnouncementState,
 	FeedbackKind,
+	FeedbackSource,
 	FeedbackStatus,
 	ModerationAction,
 	ModerationService,
@@ -151,6 +153,8 @@ export interface FixtureFeedback {
 	createdAt: number;
 	handledBy: number;
 	replyText: string;
+	/** Settings › Góp ý or the assistant bot (default). */
+	source?: FeedbackSource;
 }
 
 /** A method FakeServer always offers (optional in RemoteApi only for older doubles). */
@@ -284,6 +288,8 @@ export class ChatFixture {
 	operator = false;
 	readonly reportQueue: FixtureReport[] = [];
 	readonly feedbackQueue: FixtureFeedback[] = [];
+	/** FeedbackService.SendFeedback answers resource_exhausted while set. */
+	feedbackRateLimited = false;
 	/** SendAnnouncement texts as sent, and the users who started the assistant. */
 	readonly announcements: { id: number; text: string; state: AnnouncementState; sent: number }[] = [];
 	announceAudience = 3;
@@ -1259,6 +1265,27 @@ export class ChatFixture {
 			replyText: f.replyText,
 			repliedAt: BigInt(f.replyText === "" ? 0 : f.createdAt + 600),
 			repliedBy: BigInt(f.replyText === "" ? 0 : f.handledBy),
+			source: f.source ?? FeedbackSource.ASSISTANT,
+		});
+		router.service(FeedbackService, {
+			sendFeedback: (req) => {
+				if (this.feedbackRateLimited) throw new ConnectError("too many requests; slow down", Code.ResourceExhausted);
+				const text = req.text.trim();
+				if (text === "") throw new ConnectError("text is required", Code.InvalidArgument);
+				this.feedbackQueue.unshift({
+					id: this.feedbackQueue.length + 1,
+					userId: this.selfId,
+					kind: req.kind === FeedbackKind.BUG ? FeedbackKind.BUG : FeedbackKind.IDEA,
+					text,
+					status: FeedbackStatus.OPEN,
+					createdAt: 1_760_000_000,
+					handledBy: 0,
+					replyText: "",
+					source: FeedbackSource.SETTINGS,
+				});
+				return {};
+			},
+			reportClientError: () => ({}),
 		});
 		// The server's markdown, reduced to *bold*: an odd number of * is an error.
 		const parseBold = (text: string) => {

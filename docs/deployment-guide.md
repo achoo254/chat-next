@@ -146,6 +146,14 @@ Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` tro
 
 Watchdog không báo được khi chính `chat-api` sập. Cảnh báo cấp máy và "chat không trả lời" từ bên ngoài đặt trong OneDash (máy đã có `onedash-agent`, `vmagent`). Trạng thái cảnh báo nằm ở bảng `ops_alerts`, nguồn cảnh báo ở `ops_alert_hooks`.
 
+### Tín hiệu phản hồi trong nhóm "Vận hành chat"
+
+Cùng nhóm, cùng nguồn "Giám sát" (tin dạng native qua `hooks.PostNative`), mỗi tenant chỉ vào nhóm của tenant đó; không có operator thì bỏ qua, chỉ ghi log mức Info (`watch: no operators' group`). Không cần biến môi trường hay nginx mới.
+
+- **Góp ý mới** (Cài đặt › Góp ý qua `FeedbackService.SendFeedback`, hoặc gửi bot Trợ lý) và **báo cáo vi phạm mới** (`UsersService.Report`) báo ngay khi ghi xong: loại, tên và @username người gửi, nguồn, trích tối đa 140 ký tự của góp ý (che email, số điện thoại, token), nút mở Kiểm duyệt › Góp ý hoặc Kiểm duyệt. Báo cáo chỉ có lý do và loại đối tượng, không có nội dung tin bị báo cáo hay ghi chú của người báo cáo. Lỗi khi đăng tin chỉ ghi log Warn, góp ý và báo cáo vẫn được lưu.
+- **Bản tin hằng ngày** lúc **08:00 giờ Việt Nam** (Asia/Saigon) cho ngày hôm trước: người dùng mới, số người gửi tin, số tin (của người, có chữ hoặc file), góp ý mới và số đang mở, báo cáo mới, lỗi phía trình duyệt (tổng và 3 lỗi nhiều nhất). Bảng `ops_digests` giữ ngày đã đăng nên restart không đăng lại; process tắt qua 08:00 thì lúc chạy lại đăng đúng một bản, cho ngày gần nhất bị lỡ (không đăng bù từng ngày).
+- **Lỗi phía trình duyệt** (`FeedbackService.ReportClientError`, nhận cả khi chưa đăng nhập): web gửi lỗi `error`, `unhandledrejection` và lỗi render (tối đa 5 mỗi lần tải trang, mỗi loại một lần). Server che dữ liệu cá nhân (bộ lọc `logging/redact`, rồi URL, số điện thoại, số), giới hạn theo user hoặc địa chỉ, chỉ giữ số đếm theo loại lỗi và ngày ở bảng `client_errors` (tối đa 500 loại mỗi ngày, xoá sau 90 ngày).
+
 ## Kiểm tra sau deploy
 
 `infra/chat/smoke.sh`: `/` trả 200, `/healthz` báo `"db":"connected"`, `/auth/login` chuyển tới `auth.hoandat.com` với `client_id=chat-web`, `GetSelf` không có phiên trả 401, `/ws` không có phiên trả 401, `POST /hook/` với hook không tồn tại trả `hook_not_found`, `GET /bot/v1/me` không token trả 401 `unauthorized`; khi đã cấu hình media: `https://media-chat.hoandat.com/healthz` báo `"storage":"reachable"`, `/f/<token sai>` trả 404 có `nosniff` và không `Set-Cookie`, route của app trên host media trả 404 (chưa cấu hình thì bỏ qua và in thông báo). Sau đó đăng nhập thật trên trình duyệt và xem `pm2 describe chat-api` (số `restarts` không tăng).

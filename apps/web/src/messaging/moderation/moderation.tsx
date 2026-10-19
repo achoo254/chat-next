@@ -7,7 +7,7 @@
 // report about the same target. Bots the anti-abuse rule restricted wait for
 // review (keep or restore), operators grant or revoke the verified badge,
 // and the moderation log lists every action, the automatic rules included.
-// The feedback users sent the assistant bot (#feedback) sits next to the
+// The feedback users sent from Settings or to the assistant bot (#feedback) sits next to the
 // reports, and the operators' announcements (#announce, announcements.tsx). Everyone else sees "no access"; the server refuses them too.
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useState, type FormEvent } from "react";
@@ -1006,8 +1006,8 @@ function FeedbackQueue() {
 			<header className="mod-head">
 				<h1>{t.feedback}</h1>
 				<span className="scope-lock hide-narrow">
-					<Icon name="robot" small />
-					{t.feedbackVia}
+					<Icon name="message-dot" small />
+					{t.feedbackSources}
 				</span>
 			</header>
 			<div className="mod-body">
@@ -1041,6 +1041,7 @@ function FeedbackQueue() {
 											{person !== undefined && person.username !== "" && <span className="mono muted">@{person.username}</span>}
 										</span>
 										<span className={item.kind === "bug" ? "pill review" : "pill new"}>{t.feedbackKinds[item.kind] ?? item.kind}</span>
+										<span className="fb-src muted">{t.feedbackSource[item.source]}</span>
 										<span className="fb-time mono muted">{listTime(item.createdAt, now, locale, copy)}</span>
 									</div>
 									<p className="fb-text">{item.text}</p>
@@ -1144,7 +1145,7 @@ function ReplyDialog({ item, name, onClose, onDone }: { item: FeedbackItem; name
 					<blockquote className="fb-quote">{item.text}</blockquote>
 					<div className="field">
 						<label htmlFor={`${id}-text`}>
-							{t.replyLabel} <span className="muted">{t.replyHint}</span>
+							{t.replyLabel} <span className="muted">{item.source === "settings" ? t.replyHintSettings : t.replyHint}</span>
 						</label>
 						<textarea
 							id={`${id}-text`}

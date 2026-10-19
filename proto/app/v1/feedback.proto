@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/moderation.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// What users and their apps tell the team: feedback typed in Settings ›
+// Góp ý, and the app's own error reports. Both land with the tenant's
+// operators (Kiểm duyệt › Góp ý, the "Vận hành chat" group and its daily
+// digest).
+service FeedbackService {
+  // Files feedback from the "Góp ý" dialog of Settings into the moderation
+  // queue (as ModerationService.GetFeedback lists it) and tells the
+  // operators' group at once. Rate limited per user (resource_exhausted).
+  rpc SendFeedback(SendFeedbackRequest) returns (SendFeedbackResponse);
+  // Counts one error the web app caught (window error, unhandled
+  // rejection, render error). Also accepted without a session (the sign-in
+  // screen). The server scrubs personal data and secrets, keeps only a
+  // count per kind of error and day, and rate limits per user or address;
+  // a report over the limit is dropped silently (the answer is the same).
+  rpc ReportClientError(ReportClientErrorRequest) returns (ReportClientErrorResponse);
+}
+
+message SendFeedbackRequest {
+  // UNSPECIFIED files an idea.
+  FeedbackKind kind = 1;
+  // Required, up to 2000 code points.
+  string text = 2;
+}
+
+message SendFeedbackResponse {}
+
+enum ClientErrorKind {
+  CLIENT_ERROR_KIND_UNSPECIFIED = 0;
+  // window "error" event.
+  CLIENT_ERROR_KIND_ERROR = 1;
+  // window "unhandledrejection" event.
+  CLIENT_ERROR_KIND_UNHANDLED_REJECTION = 2;
+  // An error caught by a React error boundary.
+  CLIENT_ERROR_KIND_RENDER = 3;
+}
+
+message ReportClientErrorRequest {
+  ClientErrorKind kind = 1;
+  // The error's name and message, normalized by the client; up to 300
+  // code points (longer is cut).
+  string message = 2;
+  // Top stack frame in the app's own bundle as "path:line[:column]"
+  // (no origin, no query); empty when none.
+  string location = 3;
+  // The app build (the entry chunk name); up to 64 characters of
+  // [A-Za-z0-9._-].
+  string release = 4;
+  // The route name (chat, settings, ...), never ids or a query; up to 32
+  // characters of [A-Za-z0-9_-].
+  string route = 5;
+}
+
+message ReportClientErrorResponse {}

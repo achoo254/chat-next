@@ -241,11 +241,15 @@ export interface ModerationReport {
 export type FeedbackStatus = "open" | "handled";
 export type FeedbackKind = "idea" | "bug";
 
-/** What a user sent the assistant bot ("Góp ý" or "Báo lỗi"), with the operator's answer. */
+/** Where feedback was sent from: Settings › Góp ý or a message to the assistant bot. */
+export type FeedbackSource = "settings" | "assistant";
+
+/** What a user sent the team ("Góp ý" or "Báo lỗi"), with the operator's answer. */
 export interface FeedbackItem {
 	readonly id: number;
 	readonly userId: number;
 	readonly kind: FeedbackKind;
+	readonly source: FeedbackSource;
 	readonly text: string;
 	readonly status: FeedbackStatus;
 	readonly createdAt: number;
@@ -482,6 +486,8 @@ export interface Remote {
 	readTopic(chatId: number, topicId: number, maxSeq: number): Promise<void>;
 	linkPreview(url: string): Promise<WebPreview | null>;
 	report(target: ReportTarget, reason: ReportReason, comment: string): Promise<void>;
+	/** Feedback from Settings › Góp ý; ResourceExhausted when sent too fast. */
+	sendFeedback(kind: FeedbackKind, text: string): Promise<void>;
 	/** PermissionDenied when the caller is banned from the chat; NotFound when the link no longer admits anyone. */
 	checkInvite(link: string): Promise<InviteCheck>;
 	inviteLinks(chatId: number): Promise<Invite[]>;
@@ -562,6 +568,7 @@ const METHODS = [
 	"readTopic",
 	"linkPreview",
 	"report",
+	"sendFeedback",
 	"checkInvite",
 	"inviteLinks",
 	"revokeInvite",

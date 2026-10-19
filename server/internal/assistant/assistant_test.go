@@ -314,3 +314,44 @@ func TestModerationNoticeReachesAUserWhoNeverStarted(t *testing.T) {
 		t.Fatalf("%d messages after a notice about nothing", n)
 	}
 }
+
+// Feedback sent from Settings has no message to reply to: the answer is a
+// new message in the assistant's chat quoting it, and the queue tells its
+// source.
+func TestReplyToFeedbackFromSettings(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	user := w.env.User("mai")
+	if err := w.env.Chat.SendFeedback(ctx, user, &appv1.SendFeedbackRequest{Kind: appv1.FeedbackKind_FEEDBACK_KIND_BUG, Text: "Ảnh không tải được"}); err != nil {
+		t.Fatal(err)
+	}
+	open, err := w.env.Chat.GetFeedback(ctx, w.operator, &appv1.GetFeedbackRequest{})
+	if err != nil || len(open.GetFeedback()) != 1 {
+		t.Fatalf("queue = %v, %v", open, err)
+	}
+	item := open.GetFeedback()[0]
+	if item.GetSource() != appv1.FeedbackSource_FEEDBACK_SOURCE_SETTINGS || item.GetKind() != appv1.FeedbackKind_FEEDBACK_KIND_BUG {
+		t.Fatalf("item = %v", item)
+	}
+	answered, err := w.assistant.Reply(ctx, w.operator, item.GetId(), "Đã sửa, bạn thử lại nhé.")
+	if err != nil || answered.GetStatus() != appv1.FeedbackStatus_FEEDBACK_STATUS_HANDLED {
+		t.Fatalf("reply = %v, %v", answered, err)
+	}
+	chatID, err := w.env.Chat.SystemBotNoticeChat(ctx, user)
+	if err != nil || chatID == 0 {
+		t.Fatalf("assistant chat = %d, %v", chatID, err)
+	}
+	m := w.waitBotMessage(t, user, chatID, 1)
+	for _, want := range []string{"trong Cài đặt", "«Ảnh không tải được»", "Đã sửa, bạn thử lại nhé."} {
+		if !strings.Contains(m.GetText(), want) {
+			t.Fatalf("answer %q lacks %q", m.GetText(), want)
+		}
+	}
+	if m.GetReplyToSeq() != 0 {
+		t.Fatalf("answer replies to seq %d", m.GetReplyToSeq())
+	}
+	// The assistant's own feedback keeps its source.
+	if (&chat.FeedbackItem{ChatID: 5, Seq: 2}).Render().GetSource() != appv1.FeedbackSource_FEEDBACK_SOURCE_ASSISTANT {
+		t.Fatal("assistant feedback source")
+	}
+}
