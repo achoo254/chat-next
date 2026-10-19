@@ -946,6 +946,24 @@ func (s *Service) ForwardMessages(ctx context.Context, me int64, req *appv1.Forw
 }
 
 // CopyMessage re-posts a message's content without a forward header,
+// regroup gives each album that two or more of sources belong to a new
+// album id, so the copies show as an album too; other messages map to 0.
+func regroup(sources []*messageRow) map[int64]int64 {
+	count := map[int64]int{}
+	for _, m := range sources {
+		if m.GroupedID != 0 {
+			count[m.GroupedID]++
+		}
+	}
+	out := map[int64]int64{}
+	for id, n := range count {
+		if n >= 2 {
+			out[id] = newGroupedID()
+		}
+	}
+	return out
+}
+
 // optionally with new text.
 func (s *Service) CopyMessage(ctx context.Context, me int64, req *appv1.CopyMessageRequest) (*appv1.CopyMessageResponse, error) {
 	var override *textOverride
@@ -1037,6 +1055,7 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 		if err != nil {
 			return err
 		}
+		albums := regroup(sources)
 		for i, src0 := range sources {
 			var randomID int64
 			if i < len(randomIDs) {
@@ -1089,6 +1108,7 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 			ev := t.event(kindMessageNew, toChat, me)
 			p, err := t.postMessage(ctx, ev, c, members, newMessage{
 				fromID: me, topicID: topicID, randomID: randomID, replyTo: replyTo, text: text, content: content,
+				groupedID: albums[src0.GroupedID],
 			})
 			if err != nil {
 				return err

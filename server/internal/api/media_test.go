@@ -556,6 +556,22 @@ func TestMediaLargeVideoProxyUploadAlbum(t *testing.T) {
 		msgs[1].GetMedia().GetKind() != appv1.MediaKind_MEDIA_KIND_VIDEO {
 		t.Fatalf("album = %v", msgs)
 	}
+	// Forwarded together, the copies form a new album; one forwarded alone is a single message.
+	fwd, err := bob.messages.ForwardMessages(ctx, connect.NewRequest(&appv1.ForwardMessagesRequest{
+		FromChatId: chatID, Seqs: []int64{msgs[0].GetSeq(), msgs[1].GetSeq()}, ToChatId: chatID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	copies := fwd.Msg.GetMessages()
+	if len(copies) != 2 || copies[0].GetGroupedId() == 0 || copies[0].GetGroupedId() != copies[1].GetGroupedId() ||
+		copies[0].GetGroupedId() == msgs[0].GetGroupedId() {
+		t.Fatalf("forwarded album = %v", copies)
+	}
+	one, err := bob.messages.ForwardMessages(ctx, connect.NewRequest(&appv1.ForwardMessagesRequest{
+		FromChatId: chatID, Seqs: []int64{msgs[0].GetSeq()}, ToChatId: chatID}))
+	if err != nil || len(one.Msg.GetMessages()) != 1 || one.Msg.GetMessages()[0].GetGroupedId() != 0 {
+		t.Fatalf("forwarded single = %v, %v", one, err)
+	}
 	// Bob streams the video with a Range from the middle.
 	u := fileURL(t, bob, e.env, ref, chatID, msgs[1].GetSeq(), 0)
 	resp := e.fetch(t, http.MethodGet, u.GetUrl(), http.Header{"Range": {"bytes=10485760-10485859"}}, nil)
