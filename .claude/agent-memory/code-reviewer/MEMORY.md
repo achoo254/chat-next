@@ -1,0 +1,3 @@
+- [IdP refresh rotation](idp-refresh-rotation-reuse-revokes-grant.md) — hoandat-auth revokes grant on refresh-token reuse; pm2 root daemon writes /var/log/chat
+- [IdP same-site](idp-same-site-as-chat.md) — auth.hoandat.com is same-site with chat; Strict cookies reach callback and sibling-subdomain navs
+- [OPFS sahpool close](opfs-sahpool-close-keeps-handles.md) — db.close keeps OPFS handles; next leader needs pauseVfs or worker death

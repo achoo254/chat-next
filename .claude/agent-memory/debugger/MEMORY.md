@@ -1,0 +1,1 @@
+- [Stale leader tab](stale-leader-tab.md) — prod client fix "not working": an old-bundle tab may own the DB lock; check navigator.locks first
