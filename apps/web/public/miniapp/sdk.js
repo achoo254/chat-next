@@ -98,6 +98,8 @@
 		initData: params.get("chatAppData") || "",
 		/** "light" or "dark", kept up to date. */
 		theme: params.get("chatAppTheme") === "dark" ? "dark" : "light",
+		/** false while the user has the Mini App minimized (it keeps running, hidden). */
+		isActive: true,
 		MainButton: MainButton,
 		/** The page is ready to show. */
 		ready: function () {
@@ -120,7 +122,7 @@
 			if (typeof callback === "function") writeCallbacks.push(callback);
 			post("request_write_access");
 		},
-		/** Events: "theme" ({scheme}), "main_button_pressed", "write_access" ({granted}). */
+		/** Events: "theme" ({scheme}), "main_button_pressed", "write_access" ({granted}), "deactivated" (minimized), "activated" (shown again). */
 		onEvent: on,
 	};
 
@@ -144,6 +146,14 @@
 				writeCallbacks = [];
 				for (var i = 0; i < callbacks.length; i++) call(callbacks[i], granted);
 				emit("write_access", { granted: granted });
+				return;
+			}
+			case "deactivated":
+			case "activated": {
+				var active = message.type === "activated";
+				if (ChatApp.isActive === active) return;
+				ChatApp.isActive = active;
+				emit(message.type);
 				return;
 			}
 		}

@@ -21,7 +21,19 @@ import { Conversation, EmptyConversation } from "./conversation.tsx";
 import { DialogHost } from "./dialog-host.tsx";
 import { FolderRail } from "./folder-rail.tsx";
 import { ListResizer } from "./list-resizer.tsx";
-import { Cell, ComposerIntents, UiContext, useCell, type DialogRequest, type ListMenuTarget, type MenuTarget, type MiniAppRequest, type Ui } from "./ui-context.tsx";
+import { MiniAppChipSlot, MiniAppLayer } from "./mini-app-slot.tsx";
+import {
+	Cell,
+	ComposerIntents,
+	UiContext,
+	minimizeMiniApp,
+	useCell,
+	type DialogRequest,
+	type ListMenuTarget,
+	type MenuTarget,
+	type OpenMiniApp,
+	type Ui,
+} from "./ui-context.tsx";
 
 const WIDE_QUERY = "(min-width: 1101px)";
 
@@ -36,7 +48,6 @@ const contactsCode = preloadable(async () => ({ default: (await import("./contac
 const ContactsView = contactsCode.Component;
 const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
 const BotLinkDialog = lazy(() => import("../bots/bot-link-dialog.tsx"));
-const MiniApp = lazy(() => import("../bots/mini-app.tsx"));
 
 /** Panes whose code is fetched when the browser is idle after startup (messaging-root.tsx). */
 export const chatPanePreloads: readonly (() => Promise<void>)[] = [integrationsCode.preload, contactsCode.preload];
@@ -62,18 +73,27 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 	const appRef = useRef<HTMLDivElement>(null);
 	const contacts = route.name === "contacts";
 
-	const ui = useMemo<Ui>(
-		() => ({
+	const ui = useMemo<Ui>(() => {
+		const miniApp = new Cell<OpenMiniApp | null>(null);
+		return {
 			dialog: new Cell<DialogRequest | null>(null),
 			menu: new Cell<MenuTarget | null>(null),
 			listMenu: new Cell<ListMenuTarget | null>(null),
-			miniApp: new Cell<MiniAppRequest | null>(null),
+			miniApp,
 			intents: new ComposerIntents(),
 			focusSearch: () => searchRef.current?.focus(),
-			toggleInfo: (open?: boolean) => setInfoOpen((current) => open ?? !current),
-		}),
-		[],
-	);
+			toggleInfo: (open?: boolean) => {
+				// One slot: showing the chat's info minimizes a Mini App docked there.
+				const docked = miniApp.get();
+				if (docked !== null && !docked.minimized && open !== false) {
+					minimizeMiniApp(miniApp, docked.request.id, true);
+					setInfoOpen(true);
+					return;
+				}
+				setInfoOpen((current) => open ?? !current);
+			},
+		};
+	}, []);
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
@@ -128,7 +148,10 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 	const onVisibleChats = useCallback((ids: readonly number[]) => setVisible(ids), []);
 	// A bot link's start parameter: another one in place (same path) opens a new dialog.
 	const startParam = new URLSearchParams(useSearch()).get("start") ?? "";
-	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts;
+	// A Mini App shown takes the info column's place; minimized or closed, the column is back as it was.
+	const miniApp = useCell(ui.miniApp);
+	const miniAppDocked = miniApp !== null && !miniApp.minimized;
+	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts && !miniAppDocked;
 
 	const pickFolder = (next: Folder) => {
 		setFolder(next);
@@ -156,7 +179,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 
 	const open = chatId !== 0 || (contacts && route.userId !== 0);
 	const adminMode = panel !== "chat";
-	const classes = ["app", "folders", showInfo ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
+	const classes = ["app", "folders", showInfo || miniAppDocked ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
 
 	return (
 		<UiContext value={ui}>
@@ -202,10 +225,11 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 					</>
 				)}
 				<ListResizer app={appRef} />
+				<MiniAppLayer ui={ui} />
 			</div>
+			{(chatId === 0 || adminMode) && <MiniAppChipSlot place="screen" />}
 			<DialogHost />
 			<RowMenu ui={ui} />
-			<MiniAppLayer ui={ui} />
 			{route.name === "invite" && (
 				<Suspense fallback={null}>
 					<InviteDialog token={route.token} />
@@ -217,17 +241,6 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 				</Suspense>
 			)}
 		</UiContext>
-	);
-}
-
-/** The open Mini App's container, loaded on first use. */
-function MiniAppLayer({ ui }: { ui: Ui }) {
-	const request = useCell(ui.miniApp);
-	if (request === null) return null;
-	return (
-		<Suspense fallback={null}>
-			<MiniApp key={request.id} request={request} onClose={() => ui.miniApp.set(null)} />
-		</Suspense>
 	);
 }
 

@@ -153,6 +153,8 @@ const PATHS = {
 	cloud: <path d="M7 18a4.6 4.4 0 0 1 0-8.8 5 4.5 0 0 1 9.8 1H18a3.5 3.5 0 0 1 0 7.8H7z" />,
 	"chevron-right": <path d="M9 6l6 6-6 6" />,
 	"chevron-down": <path d="M6 9l6 6 6-6" />,
+	refresh: <path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />,
+	minimize: <path d="M5 18h14" />,
 	"message-dot": (
 		<>
 			<path d="M8 9h5M8 13h6M14 4H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h2v3l5-3h5a3 3 0 0 0 3-3v-4" />

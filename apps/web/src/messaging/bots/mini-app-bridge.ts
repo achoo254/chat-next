@@ -27,7 +27,10 @@ export type BridgeMessage =
 export type BridgeEvent =
 	| { readonly type: "theme"; readonly data: { readonly scheme: ColorScheme } }
 	| { readonly type: "main_button_pressed" }
-	| { readonly type: "write_access"; readonly data: { readonly granted: boolean } };
+	| { readonly type: "write_access"; readonly data: { readonly granted: boolean } }
+	/** Minimized (still running, hidden) and shown again. */
+	| { readonly type: "deactivated" }
+	| { readonly type: "activated" };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -3,7 +3,9 @@
 // in-memory server and the fake bot services: the Console's Mini App URL,
 // opening from an inline button and from "Mở app", the container and its
 // bridge (origin and source checks, close, main button, write access, links,
-// data back to the bot, theme), and the history line of the data sent.
+// data back to the bot, theme), its "⋯" menu (reload, minimize, the bot's
+// profile, report), minimizing to the chip and back, docking in the info
+// column's place, and the history line of the data sent.
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +14,7 @@ import { BRIDGE_MAX_BYTES, miniAppFrameSrc, miniAppTarget, parseBridgeMessage } 
 import { en } from "../src/messaging/copy/en.ts";
 import { vi as viCopy } from "../src/messaging/copy/vi.ts";
 import { actionText } from "../src/messaging/data/format.ts";
-import { matchRoute } from "../src/router.tsx";
+import { matchRoute, navigate, paths } from "../src/router.tsx";
 import { seedDemo, type Demo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 
@@ -184,7 +186,8 @@ describe("Mini App container", () => {
 		expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-same-origin allow-popups");
 		expect(frame.getAttribute("sandbox")).not.toContain("allow-top-navigation");
 		expect(within(panel).getByText("release.deploytools.vn")).toBeTruthy();
-		expect(within(panel).getByText("Nội dung bên dưới do Deploy Bot cung cấp")).toBeTruthy();
+		// The real host in the header says whose content it is; no provider line under it.
+		expect(within(panel).queryByText(/Nội dung bên dưới do/)).toBeNull();
 	});
 
 	it("hears only its own frame at the Mini App's origin; draws the main button and closes when asked", async () => {
@@ -310,3 +313,169 @@ describe("Mini App container", () => {
 		expect(screen.queryByRole("button", { name: "Mở app" })).toBeNull();
 	});
 });
+
+/** The open chat screen's grid and info column, for the Mini App's place in it. */
+function appGrid(): HTMLElement {
+	const app = document.querySelector<HTMLElement>(".app");
+	if (app === null) throw new Error("no chat screen");
+	return app;
+}
+
+async function openMenu(panel: HTMLElement): Promise<HTMLElement> {
+	await userEvent.click(within(panel).getByRole("button", { name: "Thêm thao tác" }));
+	return within(panel).getByRole("menu", { name: "Thao tác với Mini App" });
+}
+
+describe("Mini App menu, minimize and place", () => {
+	it("draws the header's menu: reload, minimize, the bot's profile and report", async () => {
+		const demo = seedDemo();
+		const { panel } = await openFromButton(demo);
+		const more = within(panel).getByRole("button", { name: "Thêm thao tác" });
+		expect(more.getAttribute("aria-haspopup")).toBe("menu");
+		expect(more.getAttribute("aria-expanded")).toBe("false");
+		const menu = await openMenu(panel);
+		expect(more.getAttribute("aria-expanded")).toBe("true");
+		expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Tải lại", "Thu nhỏ", "Hồ sơ bot", "Báo cáo bot"]);
+		expect(document.activeElement?.textContent).toBe("Tải lại");
+
+		await userEvent.keyboard("{Escape}");
+		expect(within(panel).queryByRole("menu")).toBeNull();
+		// Esc closed the menu only, not the Mini App.
+		expect(screen.getByRole("region", { name: "Mini App của Deploy Bot" })).toBe(panel);
+		expect(document.activeElement).toBe(more);
+
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Hồ sơ bot" }));
+		const profile = await screen.findByRole("dialog", { name: "Thông tin · Deploy Bot" }, LONG);
+		await userEvent.click(within(profile).getByRole("button", { name: /Đóng/ }));
+		await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thông tin · Deploy Bot" })).toBeNull());
+
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Báo cáo bot" }));
+		expect(await screen.findByRole("dialog", { name: "Báo cáo Deploy Bot" }, LONG)).toBeTruthy();
+		expect(screen.getByRole("region", { name: "Mini App của Deploy Bot" })).toBe(panel);
+	});
+
+	it("reloads: opens the same Mini App again with fresh init data, in a new frame", async () => {
+		const demo = seedDemo();
+		const { seq, panel, frame } = await openFromButton(demo);
+		const botId = demo.ids.users.deployBot;
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Tải lại" }));
+		await waitFor(() => expect(demo.fixture.bots.miniAppOpens).toHaveLength(2));
+		expect(demo.fixture.bots.miniAppOpens[1]).toEqual({ botId, chatId: demo.ids.bot, seq, url: APP_URL });
+		const again = await screen.findByRole("region", { name: "Mini App của Deploy Bot" }, LONG);
+		const frameAgain = await waitFor(() => {
+			const next = within(again).getByTitle<HTMLIFrameElement>("Mini App của Deploy Bot");
+			expect(next).not.toBe(frame);
+			return next;
+		});
+		expect(frameAgain.isConnected).toBe(true);
+		expect(frame.isConnected).toBe(false);
+		expect(frameAgain.getAttribute("src")?.startsWith(`${APP_URL}#chatAppData=`)).toBe(true);
+	});
+
+	it("says when it cannot reload, and keeps the Mini App open", async () => {
+		const demo = seedDemo();
+		const { panel, frame } = await openFromButton(demo);
+		await fromApp(frame, { type: "ready" });
+		demo.fixture.bots.failOpenMiniApp = 1;
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Tải lại" }));
+		await waitFor(() => expect(toastText()).toBe("Không tải lại được Mini App"));
+		expect(frame.isConnected).toBe(true);
+		expect(within(panel).queryByRole("status")).toBeNull();
+	});
+
+	it("minimizes to a chip with the frame still mounted, tells the Mini App, and restores it", async () => {
+		const demo = seedDemo();
+		const { panel, frame, posted } = await openFromButton(demo);
+		await fromApp(frame, { type: "ready" });
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Thu nhỏ" }));
+
+		expect(panel.hidden).toBe(true);
+		expect(frame.isConnected).toBe(true);
+		expect(screen.queryByRole("region", { name: "Mini App của Deploy Bot" })).toBeNull();
+		expect(posted).toHaveBeenCalledWith({ type: "deactivated" }, ORIGIN);
+		const restore = await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG);
+		expect(restore.textContent).toBe("Deploy Bot · Mini App");
+		await waitFor(() => expect(document.activeElement).toBe(restore));
+
+		// A minimized Mini App keeps talking to the app.
+		await fromApp(frame, { type: "main_button", data: { text: "Phát hành", visible: true, enabled: true } });
+
+		await userEvent.click(restore);
+		expect(screen.getByRole("region", { name: "Mini App của Deploy Bot" })).toBe(panel);
+		expect(within(panel).getByTitle("Mini App của Deploy Bot")).toBe(frame);
+		expect(within(panel).getByRole("button", { name: "Phát hành" })).toBeTruthy();
+		expect(posted).toHaveBeenCalledWith({ type: "activated" }, ORIGIN);
+		expect(posted.mock.calls.filter((call: unknown[]) => isActivation(call[0])).map((call: unknown[]) => call[0])).toEqual([
+			{ type: "deactivated" },
+			{ type: "activated" },
+		]);
+		expect(screen.queryByRole("button", { name: "Mở lại Deploy Bot · Mini App" })).toBeNull();
+		expect(document.activeElement).toBe(within(panel).getByRole("button", { name: "Đóng Mini App" }));
+	});
+
+	it("keeps the chip in every chat until it is closed with its x", async () => {
+		const demo = seedDemo();
+		const { panel } = await openFromButton(demo);
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Thu nhỏ" }));
+		await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG);
+
+		act(() => navigate(paths.chat(demo.ids.ops)));
+		await waitFor(() => expect(document.querySelector(".convo")?.getAttribute("aria-label")).not.toBe("Deploy Bot"));
+		const chip = (await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG)).parentElement;
+		if (chip === null) throw new Error("no chip");
+		await userEvent.click(within(chip).getByRole("button", { name: "Đóng Mini App" }));
+		await waitFor(() => expect(screen.queryByRole("button", { name: "Mở lại Deploy Bot · Mini App" })).toBeNull());
+		expect(panel.isConnected).toBe(false);
+	});
+
+	it("docks in the info column's place and gives it back as it was", async () => {
+		const demo = seedDemo();
+		const { panel } = await openFromButton(demo);
+		// Wide screen, info column open before: the Mini App takes its place.
+		expect(document.querySelector("aside.info")).toBeNull();
+		expect(appGrid().classList.contains("no-info")).toBe(false);
+		expect(panel.parentElement).toBe(appGrid());
+
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Thu nhỏ" }));
+		await waitFor(() => expect(document.querySelector("aside.info")).not.toBeNull());
+		expect(appGrid().classList.contains("no-info")).toBe(false);
+
+		// The chat's info button while the Mini App shows: the info column comes back, the Mini App minimizes.
+		await userEvent.click(await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG));
+		expect(document.querySelector("aside.info")).toBeNull();
+		const infoButton = screen.getByRole("button", { name: "Thông tin chat" });
+		expect(infoButton.getAttribute("aria-pressed")).toBe("false");
+		await userEvent.click(infoButton);
+		await waitFor(() => expect(document.querySelector("aside.info")).not.toBeNull());
+		expect(panel.hidden).toBe(true);
+		expect(screen.getByRole("button", { name: "Thông tin chat" }).getAttribute("aria-pressed")).toBe("true");
+
+		// Info column closed before: it opens for the Mini App and closes again with it.
+		await userEvent.click(screen.getByRole("button", { name: "Thông tin chat" }));
+		await waitFor(() => expect(appGrid().classList.contains("no-info")).toBe(true));
+		await userEvent.click(await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG));
+		expect(appGrid().classList.contains("no-info")).toBe(false);
+		expect(document.querySelector("aside.info")).toBeNull();
+		await userEvent.click(within(panel).getByRole("button", { name: "Đóng Mini App" }));
+		await waitFor(() => expect(panel.isConnected).toBe(false));
+		expect(appGrid().classList.contains("no-info")).toBe(true);
+		expect(document.querySelector("aside.info")).toBeNull();
+	});
+
+	it("opening another Mini App replaces the open one, minimized or not", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		f.bots.adopt(demo.ids.users.deployBot, "Deploy Bot", "deploy_bot", { owned: false, miniAppUrl: "https://release.deploytools.vn/main" });
+		const { panel, log } = await openFromButton(demo);
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Thu nhỏ" }));
+		await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG);
+		await userEvent.click(within(log).getByRole("button", { name: "Mở bảng phát hành" }));
+		await waitFor(() => expect(panel.isConnected).toBe(false));
+		expect(screen.getAllByRole("region", { name: "Mini App của Deploy Bot" })).toHaveLength(1);
+		expect(screen.queryByRole("button", { name: "Mở lại Deploy Bot · Mini App" })).toBeNull();
+	});
+});
+
+function isActivation(event: unknown): boolean {
+	return typeof event === "object" && event !== null && "type" in event && (event.type === "activated" || event.type === "deactivated");
+}

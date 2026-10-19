@@ -44,6 +44,7 @@
 	<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M10.4 3.6L2.3 17.1A1.9 1.9 0 0 0 3.9 20h16.2a1.9 1.9 0 0 0 1.6-2.9L13.6 3.6a1.9 1.9 0 0 0-3.2 0zM12 16h.01"/></symbol>
 	<symbol id="i-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></symbol>
 	<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></symbol>
+	<symbol id="i-minimize" viewBox="0 0 24 24"><path d="M5 18h14"/></symbol>
 	<symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="M12 18h.01M9.2 15.2a4 4 0 0 1 5.6 0M6.3 12.3a8 8 0 0 1 3.9-2.1M14.4 10.4a8 8 0 0 1 3.3 2M3.5 9.5a12 12 0 0 1 3.5-2.4M10.2 6.1a12 12 0 0 1 10.3 3.4M3 3l18 18"/></symbol>
 	<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 5a5 5 0 0 1 7 0 5 5 0 0 0 7 0v9a5 5 0 0 1-7 0 5 5 0 0 0-7 0V5zM5 21v-7"/></symbol>
 	<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.7 5.7l12.6 12.6"/></symbol>

@@ -135,14 +135,24 @@
 .url-line { display: block; margin-top: var(--space-2); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
 
 /* ---- Mini App container ---- */
-.miniapp { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--c-surface); border-left: 1px solid var(--c-border-subtle); }
+/* Docked in the info column's place (width --info-w in the app); the chat column narrows, nothing covers it. */
+.miniapp { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--c-surface); border-left: 1px solid var(--c-border-subtle); }
 .pane > .miniapp { border-left: 0; }
-.ma-head { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
-.ma-title { flex: 1; min-width: 0; padding: 0 var(--space-1); }
+.ma-head { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.ma-title { flex: 1; min-width: 0; }
 .ma-title strong { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ma-origin { display: flex; align-items: center; gap: var(--space-1); font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ma-origin .icon { width: 12px; height: 12px; }
-.ma-strip { padding: var(--space-1) var(--space-3); font-size: 0.75rem; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+/* "⋯": Tải lại, Thu nhỏ, Hồ sơ bot, Báo cáo bot. */
+.ma-more { position: relative; display: inline-flex; }
+.ma-more .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 3; }
+/* Minimized: the Mini App keeps running; a chip at the top of the conversation brings it back or closes it. */
+.ma-chip { display: flex; align-items: center; align-self: center; max-width: calc(100% - 2 * var(--space-4)); margin: var(--space-2) var(--space-4) 0; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface); box-shadow: var(--shadow-sm); }
+.ma-chip .ma-chip-open { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: 36px; padding: 0 var(--space-2) 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text); font-size: 0.875rem; font-weight: 500; }
+.ma-chip .ma-chip-open span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-chip .ma-chip-open:hover { background: var(--c-hover); }
+.ma-chip .icon-btn { width: 36px; height: 36px; }
+.duo.ma-min { grid-template-columns: minmax(0, 1fr); }
 /* The sandboxed iframe area: content here belongs to the bot, not to the app. */
 .ma-frame { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4); background: var(--c-bg); display: grid; gap: var(--space-3); align-content: start; }
 .ma-frame h4 { margin: 0; font-size: 1rem; font-weight: 600; }
@@ -614,15 +624,19 @@
 <section class="shot" id="mini-app">
 	<div class="shot-head">
 		<h2>Mini App</h2><span class="phase">R6 · Phase 16</span>
-		<p>Nút "Mở bảng phát hành" của bot mở Mini App trong khung riêng bên phải (mobile: toàn màn hình). Đầu khung do app vẽ: tên bot, origin thật của Mini App, quay lại, đóng. Nội dung chạy trong iframe sandbox ở URL của chủ bot, trên domain của họ (như Telegram; URL dưới domain của app hay của tổ chức bị từ chối khi đăng ký), nên không cùng site với chat.hoandat.com: không đọc được cookie hay dữ liệu của app, chỉ nói chuyện qua bridge. Bridge bản đầu có: sẵn sàng, đóng, giao diện sáng/tối, nút chính, mở link ngoài, xin quyền nhắn tin, gửi dữ liệu về bot. Nút chính ở đáy cũng do app vẽ, Mini App chỉ đặt chữ và bật tắt.</p>
+		<p>Nút "Mở bảng phát hành" của bot mở Mini App ở chỗ của cột thông tin (rộng bằng cột đó): cột chat hẹp lại, không có gì che tin nhắn; cột thông tin đang đóng thì mở ra cho Mini App, đóng hoặc thu nhỏ Mini App thì cột trở lại như trước. Mỗi lúc một Mini App, mở cái khác thì thay. Màn hẹp (≤ 760px): toàn màn hình (xem mobile.html#mini-app). Đầu khung do app vẽ: tên bot, host thật kèm ổ khoá, "⋯" (Tải lại, Thu nhỏ, Hồ sơ bot, Báo cáo bot), đóng. Không có dòng "Nội dung bên dưới do … cung cấp": host thật trên đầu khung đã nói nội dung là của ai. Bấm "⋯" rồi "Thu nhỏ" để xem chip ở đầu khung chat. Nội dung chạy trong iframe sandbox ở URL của chủ bot, trên domain của họ (như Telegram; URL dưới domain của app hay của tổ chức bị từ chối khi đăng ký), nên không cùng site với chat.hoandat.com: không đọc được cookie hay dữ liệu của app, chỉ nói chuyện qua bridge. Bridge bản đầu có: sẵn sàng, đóng, giao diện sáng/tối, nút chính, mở link ngoài, xin quyền nhắn tin, gửi dữ liệu về bot, báo Mini App bị thu nhỏ (<code class="mono">deactivated</code>) và mở lại (<code class="mono">activated</code>). Nút chính ở đáy cũng do app vẽ, Mini App chỉ đặt chữ và bật tắt.</p>
 	</div>
 	<div class="frame">
-		<div class="duo">
+		<div class="duo" id="ma-duo">
 			<section class="convo" aria-label="Deploy Bot">
 				<header class="convo-head">
 					<span class="avatar av-violet"><svg class="icon"><use href="#i-robot"/></svg></span>
 					<div class="title"><strong>Deploy Bot</strong><span>@deploy_bot · bot</span></div>
 				</header>
+				<div class="ma-chip" id="ma-chip" hidden>
+					<button type="button" class="ma-chip-open" aria-label="Mở lại Deploy Bot · Mini App"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Deploy Bot · Mini App</span></button>
+					<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+				</div>
 				<div class="messages">
 					<div class="msg">
 						<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
@@ -642,12 +656,18 @@
 			</section>
 			<section class="miniapp" aria-label="Mini App của Deploy Bot">
 				<header class="ma-head">
-					<button type="button" class="icon-btn" aria-label="Quay lại trong Mini App" data-toast="Mini App nhận sự kiện back_button"><svg class="icon"><use href="#i-back"/></svg></button>
 					<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
-					<button type="button" class="icon-btn" aria-label="Thêm thao tác"><svg class="icon"><use href="#i-dots"/></svg></button>
-					<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+					<div class="ma-more">
+						<button type="button" class="icon-btn" id="ma-more" aria-label="Thêm thao tác" aria-haspopup="menu" aria-expanded="false"><svg class="icon"><use href="#i-dots"/></svg></button>
+						<div class="menu" role="menu" aria-label="Thao tác với Mini App" id="ma-menu" hidden>
+							<button type="button" role="menuitem" data-toast="Mở lại Mini App với initData mới"><svg class="icon"><use href="#i-refresh"/></svg>Tải lại</button>
+							<button type="button" role="menuitem" id="ma-minimize"><svg class="icon"><use href="#i-minimize"/></svg>Thu nhỏ</button>
+							<button type="button" role="menuitem" data-toast="Mở hồ sơ Deploy Bot"><svg class="icon"><use href="#i-user"/></svg>Hồ sơ bot</button>
+							<button type="button" role="menuitem" class="danger" data-toast="Mở hộp Báo cáo Deploy Bot"><svg class="icon"><use href="#i-flag"/></svg>Báo cáo bot</button>
+						</div>
+					</div>
+					<button type="button" class="icon-btn" id="ma-close" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 				</header>
-				<div class="ma-strip">Nội dung bên dưới do Deploy Bot cung cấp</div>
 				<div class="ma-frame" role="radiogroup" aria-label="Chọn bản phát hành">
 					<h4>Chọn bản phát hành</h4>
 					<span class="muted">Môi trường đích: production</span>
@@ -673,8 +693,8 @@
 				<div class="pane-cap">Xin quyền nhắn tin</div>
 				<section class="miniapp" aria-label="Mini App của Deploy Bot">
 					<header class="ma-head">
-						<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
 						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
+						<button type="button" class="icon-btn" aria-label="Thêm thao tác" aria-haspopup="menu" aria-expanded="false"><svg class="icon"><use href="#i-dots"/></svg></button>
 						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 					</header>
 					<div class="ma-frame"><h4>Theo dõi bản 2.4.1</h4><span class="muted">Nhận tin khi deploy xong hoặc lỗi.</span></div>
@@ -698,8 +718,8 @@
 				<div class="pane-cap">Mở link ngoài</div>
 				<section class="miniapp" aria-label="Mini App của Deploy Bot">
 					<header class="ma-head">
-						<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
 						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
+						<button type="button" class="icon-btn" aria-label="Thêm thao tác" aria-haspopup="menu" aria-expanded="false"><svg class="icon"><use href="#i-dots"/></svg></button>
 						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 					</header>
 					<div class="ma-frame"><h4>Báo cáo phát hành</h4><span class="muted">Bản đầy đủ nằm ở trang ngoài.</span></div>
@@ -719,6 +739,60 @@
 						</div>
 					</div>
 				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="shot" id="mini-app-minimized">
+	<div class="shot-head">
+		<h2>Mini App: menu và thu nhỏ</h2><span class="phase">R6 · Phase 16</span>
+		<p>Trái: menu "⋯" trên đầu khung (role="menu", mũi tên lên xuống, Esc đóng). "Tải lại" xin initData mới rồi nạp lại iframe; "Hồ sơ bot" mở hộp hồ sơ như ở chỗ khác; "Báo cáo bot" mở hộp Báo cáo có sẵn (chỉ khi server bật báo cáo). Phải: thu nhỏ, Mini App vẫn chạy (iframe giữ nguyên, ẩn đi, nhận <code class="mono">deactivated</code>); cột thông tin trở lại như trước khi mở, chip "Deploy Bot · Mini App" nằm ở đầu khung chat (mọi chat, tới khi đóng). Bấm chip để mở lại (Mini App nhận <code class="mono">activated</code>), bấm x để đóng hẳn.</p>
+	</div>
+	<div class="frame">
+		<div class="panes">
+			<div class="pane">
+				<div class="pane-cap">Menu ⋯</div>
+				<section class="miniapp" aria-label="Mini App của Deploy Bot">
+					<header class="ma-head">
+						<div class="ma-title"><strong>Deploy Bot</strong><span class="ma-origin"><svg class="icon"><use href="#i-lock"/></svg>release.deploytools.vn</span></div>
+						<div class="ma-more">
+							<button type="button" class="icon-btn" aria-label="Thêm thao tác" aria-haspopup="menu" aria-expanded="true"><svg class="icon"><use href="#i-dots"/></svg></button>
+							<div class="menu" role="menu" aria-label="Thao tác với Mini App">
+								<button type="button" role="menuitem" data-toast="Mở lại Mini App với initData mới"><svg class="icon"><use href="#i-refresh"/></svg>Tải lại</button>
+								<button type="button" role="menuitem" data-toast="Đã thu nhỏ Mini App"><svg class="icon"><use href="#i-minimize"/></svg>Thu nhỏ</button>
+								<button type="button" role="menuitem" data-toast="Mở hồ sơ Deploy Bot"><svg class="icon"><use href="#i-user"/></svg>Hồ sơ bot</button>
+								<button type="button" role="menuitem" class="danger" data-toast="Mở hộp Báo cáo Deploy Bot"><svg class="icon"><use href="#i-flag"/></svg>Báo cáo bot</button>
+							</div>
+						</div>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+					</header>
+					<div class="ma-frame"><h4>Chọn bản phát hành</h4><span class="muted">Môi trường đích: production</span></div>
+					<div class="ma-main"><button type="button" class="btn btn-primary">Phát hành 2.4.1 lên production</button></div>
+				</section>
+			</div>
+			<div class="pane">
+				<div class="pane-cap">Đã thu nhỏ</div>
+				<section class="convo" aria-label="Vận hành hệ thống">
+					<header class="convo-head">
+						<span class="avatar av-blue">VH</span>
+						<div class="title"><strong>Vận hành hệ thống</strong><span>12 thành viên, 2 bot</span></div>
+						<button type="button" class="icon-btn" aria-pressed="false" aria-label="Thông tin chat"><svg class="icon"><use href="#i-info"/></svg></button>
+					</header>
+					<div class="ma-chip">
+						<button type="button" class="ma-chip-open" aria-label="Mở lại Deploy Bot · Mini App" data-toast="Mở lại Mini App"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Deploy Bot · Mini App</span></button>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+					</div>
+					<div class="messages">
+						<div class="msg"><span class="avatar sm av-green">LA</span><div class="bubble"><span class="who">Lan Anh</span><p>Bản 2.4.1 lên production chưa anh?<span class="stamp">10:02</span></p></div></div>
+					</div>
+					<form class="composer" onsubmit="return false">
+						<label class="sr-only" for="ma-min-draft">Tin nhắn</label>
+						<textarea id="ma-min-draft" rows="1" placeholder="Nhập tin nhắn tới Vận hành hệ thống"></textarea>
+						<button type="submit" class="send" aria-label="Gửi" disabled><svg class="icon"><use href="#i-send"/></svg></button>
+					</form>
+				</section>
 			</div>
 		</div>
 	</div>
@@ -852,6 +926,48 @@
 		list.insertAdjacentHTML("beforeend", `<div class="msg mine"><div class="bubble"><p>${escapeHtml(b.textContent)}<span class="stamp">${now} <svg class="icon icon-sm"><use href="#i-check"/></svg></span></p></div></div>`);
 		list.scrollTop = list.scrollHeight;
 	}));
+
+	// Mini App "⋯" menu, minimize to the chip and back, close.
+	const maMore = $("#ma-more");
+	const maMenu = $("#ma-menu");
+	const maDuo = $("#ma-duo");
+	const maPanel = $(".miniapp", maDuo);
+	const maChip = $("#ma-chip");
+	const setMenu = (open) => {
+		maMenu.hidden = !open;
+		maMore.setAttribute("aria-expanded", String(open));
+		if (open) $("[role=menuitem]", maMenu).focus();
+	};
+	const setMinimized = (minimized) => {
+		setMenu(false);
+		maPanel.hidden = minimized;
+		maDuo.classList.toggle("ma-min", minimized);
+		maChip.hidden = !minimized;
+		if (minimized) $(".ma-chip-open", maChip).focus();
+		else maMore.focus();
+	};
+	maMore.addEventListener("click", () => setMenu(maMenu.hidden));
+	maMenu.addEventListener("keydown", (e) => {
+		const items = $$("[role=menuitem]", maMenu);
+		const i = items.indexOf(document.activeElement);
+		if (e.key === "Escape") { setMenu(false); maMore.focus(); }
+		else if (e.key === "ArrowDown") items[(i + 1) % items.length].focus();
+		else if (e.key === "ArrowUp") items[(i + items.length - 1) % items.length].focus();
+		else return;
+		e.preventDefault();
+	});
+	$$("[data-toast]", maMenu).forEach((b) => b.addEventListener("click", () => setMenu(false)));
+	$("#ma-minimize").addEventListener("click", () => setMinimized(true));
+	$(".ma-chip-open", maChip).addEventListener("click", () => setMinimized(false));
+	const closeMa = () => {
+		setMenu(false);
+		maPanel.hidden = true;
+		maDuo.classList.add("ma-min");
+		maChip.hidden = true;
+		window.Mock.toast("Đã đóng Mini App");
+	};
+	$("#ma-close").addEventListener("click", closeMa);
+	$(".icon-btn", maChip).addEventListener("click", closeMa);
 
 	// Mini App sample content: a single-choice list.
 	$$(".rel").forEach((r) => r.addEventListener("click", () => {

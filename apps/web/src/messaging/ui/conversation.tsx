@@ -18,6 +18,7 @@ import { Composer } from "./composer.tsx";
 import { useOnlineCount } from "./online-count.ts";
 import { useIncomingSound } from "./incoming-sound.ts";
 import { MessageList } from "./message-list.tsx";
+import { MiniAppChipSlot } from "./mini-app-slot.tsx";
 import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
@@ -365,6 +366,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					<BotNotRunningBanner botId={botId} chatId={chatId} />
 				</Suspense>
 			)}
+			<MiniAppChipSlot place="top" />
 			<MessageList
 				// One list per chat and topic: its scroll position and what it
 				// marked read never carry over to the next chat.
@@ -382,6 +384,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					)
 				}
 			/>
+			<MiniAppChipSlot place="bar" />
 			{chat.left ? (
 				<LeftBar chat={chat} />
 			) : topic !== null && topic.closed && !admin ? (

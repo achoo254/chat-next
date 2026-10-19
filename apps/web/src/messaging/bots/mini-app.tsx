@@ -1,7 +1,11 @@
-// The Mini App container (mockups/bots.html#mini-app, #mini-app-permission;
-// phase-16 "Hợp đồng R6 web"): a panel on the right (full screen when
-// narrow) whose header the app draws, so the Mini App cannot fake it: the
-// bot's name, the real host of the URL and close. The Mini App runs in a
+// The Mini App container (mockups/bots.html#mini-app, #mini-app-permission,
+// #mini-app-minimized, mobile.html#mini-app; phase-16 "Hợp đồng R6 web"):
+// docked in the info column's place (full screen when narrow, placed by
+// ui/mini-app-slot.tsx) with a header the app draws, so the Mini App cannot
+// fake it: the bot's name, the real host of the URL, the "⋯" menu (reload,
+// minimize, the bot's profile, report) and close. Minimized, it keeps running
+// hidden and a chip brings it back; the Mini App hears "deactivated" and
+// "activated" down the bridge. The Mini App runs in a
 // sandboxed iframe on the bot owner's own domain, never on the app's, so it
 // reads none of the app's cookies or storage and cannot navigate the app
 // (no allow-top-navigation). It talks to the app only through the bridge
@@ -13,9 +17,11 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { Icon } from "../../components/icon.tsx";
 import { useChat, useServices, useUser } from "../data/services.tsx";
 import { ChatAvatar, useDomId } from "../ui/parts.tsx";
+import { PopupMenu } from "../ui/popup-menu.tsx";
 import { isAllowedLink } from "../ui/rich-text.tsx";
-import type { MiniAppRequest } from "../ui/ui-context.tsx";
+import { closeMiniApp, minimizeMiniApp, useUi, type MiniAppRequest } from "../ui/ui-context.tsx";
 import { miniAppFrameSrc, miniAppTarget, parseBridgeMessage, type BridgeEvent, type BridgeMessage, type ColorScheme } from "./mini-app-bridge.ts";
+import { launchMiniApp } from "./mini-app-launch.ts";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import "./mini-app.css";
 
@@ -59,9 +65,11 @@ function linkHost(url: string): string {
 	}
 }
 
-export default function MiniApp({ request, onClose }: { request: MiniAppRequest; onClose: () => void }) {
+/** `minimized`: kept mounted (the frame keeps its state) but hidden. */
+export default function MiniApp({ request, minimized }: { request: MiniAppRequest; minimized: boolean }) {
 	const t = useBotsCopy().miniApp;
-	const { bots, toasts } = useServices();
+	const { bots, toasts, backend } = useServices();
+	const ui = useUi();
 	const user = useUser(request.botId);
 	const name = user?.name ?? "";
 	// Data goes to the bot only from a Mini App opened in the private chat
@@ -74,6 +82,11 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 	const [src] = useState(() => (target === null ? "" : miniAppFrameSrc(request.url, request.initData, currentScheme())));
 	const frame = useRef<HTMLIFrameElement>(null);
 	const closeButton = useRef<HTMLButtonElement>(null);
+	const moreButton = useRef<HTMLButtonElement>(null);
+	const moreAnchor = useRef<HTMLDivElement>(null);
+	const [menuOpen, setMenuOpen] = useState(false);
+	// "Tải lại": OpenMiniApp in flight; its answer opens the Mini App afresh in this one's place.
+	const [reloading, setReloading] = useState(false);
 	const [loaded, setLoaded] = useState(false);
 	const [main, setMain] = useState<MainButton | null>(null);
 	const [popup, setPopup] = useState<Popup | null>(null);
@@ -87,12 +100,14 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 		if (target !== null) frame.current?.contentWindow?.postMessage(event, target.origin);
 	};
 
+	const close = () => closeMiniApp(ui.miniApp, request.id);
+
 	// The server only hands out https URLs; anything else is not loaded.
 	useEffect(() => {
 		if (target !== null) return;
 		toasts.show(t.openFailed);
-		onClose();
-	}, [target, toasts, t, onClose]);
+		closeMiniApp(ui.miniApp, request.id);
+	}, [target, toasts, t, ui, request.id]);
 
 	useEffect(() => {
 		closeButton.current?.focus();
@@ -106,13 +121,22 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 		post({ type: "theme", data: { scheme } });
 	});
 
+	// Minimized and shown again: the Mini App hears it, and focus comes back to the header.
+	const sentShown = useRef(!minimized);
+	useEffect(() => {
+		if (sentShown.current === !minimized) return;
+		sentShown.current = !minimized;
+		post({ type: minimized ? "deactivated" : "activated" });
+		if (!minimized) closeButton.current?.focus();
+	});
+
 	const handle = (message: BridgeMessage) => {
 		switch (message.type) {
 			case "ready":
 				setLoaded(true);
 				return;
 			case "close":
-				onClose();
+				close();
 				return;
 			case "main_button":
 				setMain({ text: message.text, visible: message.visible, enabled: message.enabled });
@@ -131,7 +155,7 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 			case "data_send":
 				if (busy || !maySend) return;
 				setBusy(true);
-				bots.sendMiniAppData(request.botId, message.data, request.buttonText).then(onClose, () => {
+				bots.sendMiniAppData(request.botId, message.data, request.buttonText).then(close, () => {
 					toasts.show(t.sendFailed);
 					setBusy(false);
 				});
@@ -186,14 +210,40 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 	const onKey = (event: KeyboardEvent<HTMLElement>) => {
 		if (event.key !== "Escape" || event.defaultPrevented) return;
 		event.preventDefault();
-		if (popup === null) onClose();
+		if (popup === null) close();
 		else if (!busy) dismissPopup();
+	};
+
+	const closeMenu = () => {
+		setMenuOpen(false);
+		moreButton.current?.focus();
+	};
+	const reload = () => {
+		setMenuOpen(false);
+		setReloading(true);
+		const again = { botId: request.botId, chatId: request.chatId, seq: request.seq, url: request.buttonUrl, buttonText: request.buttonText };
+		launchMiniApp(bots, ui, again).catch(() => {
+			setReloading(false);
+			toasts.show(t.reloadFailed);
+		});
+	};
+	const minimize = () => {
+		setMenuOpen(false);
+		minimizeMiniApp(ui.miniApp, request.id, true);
+	};
+	const openProfile = () => {
+		setMenuOpen(false);
+		ui.dialog.set({ kind: "profile", userId: request.botId });
+	};
+	const report = () => {
+		setMenuOpen(false);
+		ui.dialog.set({ kind: "report", target: { kind: "user", userId: request.botId }, name, blockUserId: request.botId });
 	};
 
 	if (target === null) return null;
 	const covered = popup !== null;
 	return (
-		<section className="mini-app" aria-label={t.label(name)} onKeyDown={onKey}>
+		<section className="mini-app" aria-label={t.label(name)} hidden={minimized} onKeyDown={onKey}>
 			<header className="ma-head" inert={covered}>
 				<div className="ma-title">
 					<strong>{name}</strong>
@@ -202,15 +252,47 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 						<span>{target.host}</span>
 					</span>
 				</div>
-				<button ref={closeButton} type="button" className="icon-btn" aria-label={t.close} onClick={onClose}>
+				<div className="menu-anchor" ref={moreAnchor}>
+					<button
+						ref={moreButton}
+						type="button"
+						className="icon-btn"
+						aria-label={t.more}
+						aria-haspopup="menu"
+						aria-expanded={menuOpen}
+						onClick={() => setMenuOpen((open) => !open)}
+					>
+						<Icon name="dots" />
+					</button>
+					{menuOpen && !minimized && (
+						<PopupMenu label={t.menu} className="ma-menu" boundary={moreAnchor} onClose={closeMenu}>
+							<button type="button" role="menuitem" disabled={reloading || busy} onClick={reload}>
+								<Icon name="refresh" />
+								{t.reload}
+							</button>
+							<button type="button" role="menuitem" onClick={minimize}>
+								<Icon name="minimize" />
+								{t.minimize}
+							</button>
+							<button type="button" role="menuitem" onClick={openProfile}>
+								<Icon name="user" />
+								{t.profile}
+							</button>
+							{backend.features.has("report") && (
+								<button type="button" role="menuitem" className="danger" onClick={report}>
+									<Icon name="flag" />
+									{t.report}
+								</button>
+							)}
+						</PopupMenu>
+					)}
+				</div>
+				<button ref={closeButton} type="button" className="icon-btn" aria-label={t.close} onClick={close}>
 					<Icon name="x" />
 				</button>
 			</header>
-			<div className="ma-strip" inert={covered}>
-				{t.strip(name)}
-			</div>
 			<div className="ma-frame" inert={covered}>
-				{!loaded && (
+				{(!loaded || reloading) && (
 					<div className="ma-loading" role="status">
 						{t.loading}
 					</div>
@@ -273,5 +355,33 @@ export default function MiniApp({ request, onClose }: { request: MiniAppRequest;
 				</div>
 			)}
 		</section>
+	);
+}
+
+/**
+ * A minimized Mini App (mockups/bots.html#mini-app-minimized): click to show
+ * it again, x to close it. `floating`: the narrow screens' pill above the
+ * composer, or on the screen when no conversation shows.
+ */
+export function MiniAppChip({ request, floating }: { request: MiniAppRequest; floating: boolean }) {
+	const t = useBotsCopy().miniApp;
+	const ui = useUi();
+	const name = useUser(request.botId)?.name ?? "";
+	const restoreButton = useRef<HTMLButtonElement>(null);
+	// Minimizing hid the focused control: focus moves here instead of being lost.
+	useEffect(() => {
+		const active = document.activeElement;
+		if (active === null || active === document.body || active.closest(".mini-app") !== null) restoreButton.current?.focus();
+	}, []);
+	return (
+		<div className={floating ? "ma-chip floating" : "ma-chip"}>
+			<button ref={restoreButton} type="button" className="ma-chip-open" aria-label={t.restore(name)} onClick={() => minimizeMiniApp(ui.miniApp, request.id, false)}>
+				<Icon name="robot" small />
+				<span>{t.chip(name)}</span>
+			</button>
+			<button type="button" className="icon-btn" aria-label={t.close} onClick={() => closeMiniApp(ui.miniApp, request.id)}>
+				<Icon name="x" small />
+			</button>
+		</div>
 	);
 }

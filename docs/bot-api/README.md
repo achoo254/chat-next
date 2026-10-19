@@ -235,7 +235,7 @@ curl -s ... -d '{
 
 ## 11. Mini App
 
-Mini App là trang web https do bạn tự chạy trên domain của mình, mở trong khung bên phải của app (màn hẹp thì toàn màn hình). Có hai cách mở:
+Mini App là trang web https do bạn tự chạy trên domain của mình, mở ở chỗ cột thông tin bên phải của app (màn hẹp thì toàn màn hình), mỗi lúc một Mini App. Đầu khung do app vẽ: tên bot, host thật, menu "⋯" (Tải lại, Thu nhỏ, Hồ sơ bot, Báo cáo bot) và nút đóng. Có hai cách mở:
 
 - **Mini App chính**: đặt URL ở Developer Console. Người dùng thấy nút "Mở app" trong chat với bot và trong hồ sơ bot.
 - **Nút inline** `web_app`, chỉ trên tin của bot (không dùng được trong kết quả inline):
@@ -247,7 +247,7 @@ curl -s ... -d '{"chat_id": 42, "text": "Mở cửa hàng",
 
 URL phải là `https`, không chứa user:pass hay `#…`, host là tên miền công khai (không phải địa chỉ IP, `localhost` hay tên một nhãn), không nằm dưới domain của app (`hoandat.com`) hay domain của tenant nào, dài tối đa 512 byte. URL sai trả `400` với mô tả `mini_app_url_not_allowed: …`. App kiểm lại URL mỗi lần mở.
 
-**Thử nhanh.** Trang Mini App mẫu [`sdk/miniapp-demo`](../../sdk/miniapp-demo/index.html) được phát hành ở `https://achoo254.github.io/chat-next/miniapp-demo/`: đặt URL đó cho bot ở Developer Console (tab Mini App) rồi bấm "Mở app" trong chat với bot. Trang hiện initData (chưa xác thực, vì không có server), đổi giao diện theo app, có nút chính gửi dữ liệu cho bot, xin quyền nhắn tin và mở link ngoài. Lưu ý: `https://chat.<domain>/miniapp/sdk.js` là script để nạp trong trang, không phải URL Mini App.
+**Thử nhanh.** Trang Mini App mẫu [`sdk/miniapp-demo`](../../sdk/miniapp-demo/index.html) được phát hành ở `https://achoo254.github.io/chat-next/miniapp-demo/`: đặt URL đó cho bot ở Developer Console (tab Mini App) rồi bấm "Mở app" trong chat với bot. Trang hiện initData (chưa xác thực, vì không có server), đổi giao diện theo app, có nút chính gửi dữ liệu cho bot, xin quyền nhắn tin, mở link ngoài và ghi lại khi bị thu nhỏ hay mở lại. Lưu ý: `https://chat.<domain>/miniapp/sdk.js` là script để nạp trong trang, không phải URL Mini App.
 
 **Dữ liệu khởi tạo.** App mở `URL#chatAppData=<init_data mã hoá URL>&chatAppTheme=<light|dark>`; script `https://chat.<domain>/miniapp/sdk.js` (đối tượng `ChatApp`) đọc sẵn và lo phần trao đổi với app qua `postMessage`. `init_data` là query string gồm `user` (JSON `{id, first_name, username}`), `chat_type` (`private`, `group`, `channel`, hoặc `sender` khi mở từ hồ sơ bot), `chat_instance` (chuỗi ổn định theo cặp chat và bot, không lộ id chat), `start_param` (chỉ có khi được truyền), `auth_date`, `bot_id`, `tenant_id` và `signature`.
 
@@ -274,6 +274,8 @@ auth_date=1760850000&bot_id=1234567&chat_instance=jkvivnNpwnmKUPzV&chat_type=pri
 ```
 
 `button_text` rỗng khi mở Mini App chính. Người dùng gửi dữ liệu tức là đã nhắn cho bot, nên bot trả lời được ngay.
+
+**Thu nhỏ và mở lại.** Người dùng có thể thu nhỏ Mini App: trang vẫn chạy (iframe giữ nguyên, ẩn đi) và một chip "<bot> · Mini App" cho phép mở lại hoặc đóng. App gửi `deactivated` khi thu nhỏ và `activated` khi mở lại; với `sdk.js`, nghe bằng `ChatApp.onEvent("deactivated", …)` / `ChatApp.onEvent("activated", …)` và đọc `ChatApp.isActive` (tạm dừng hẹn giờ, video… khi bị ẩn). "Tải lại" mở lại Mini App với `init_data` mới (`auth_date` mới), trang được nạp lại từ đầu.
 
 **Xin quyền nhắn.** `request_write_access` qua bridge làm app hỏi người dùng; đồng ý thì bot được nhắn cho họ như khi họ bấm Bắt đầu (không có tin `/start`), và chat riêng với bot được mở để bot gửi vào.
 

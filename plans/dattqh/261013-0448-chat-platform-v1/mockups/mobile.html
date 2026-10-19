@@ -108,6 +108,21 @@
 .checks .icon { color: var(--c-success); }
 .mini-main { padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
 .mini-main .btn { width: 100%; }
+/* Mini App full screen (narrow web, like Zalo): the app's own bar on top, the bot's page below. */
+.ma-full { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ma-bar { position: relative; display: flex; align-items: center; gap: var(--space-1); min-height: 56px; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.ma-bar .icon-btn { width: 44px; height: 44px; }
+.ma-bar .grow { flex: 1; min-width: 0; }
+.ma-bar b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-bar .origin { display: flex; min-width: 0; }
+.ma-bar .menu { position: absolute; right: var(--space-2); top: calc(100% - var(--space-1)); z-index: 3; }
+.ma-bar .menu button { min-height: 44px; }
+/* Minimized: a small floating pill just above the composer, never over the send button. */
+.pill-dock { position: relative; height: 0; }
+.ma-pill { position: absolute; right: var(--space-3); bottom: var(--space-2); display: flex; align-items: center; max-width: calc(100% - 2 * var(--space-3)); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface); box-shadow: var(--shadow-md); }
+.ma-pill .open { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: 44px; padding: 0 var(--space-1) 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text); font-size: 0.875rem; font-weight: 500; }
+.ma-pill .open span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-pill .icon-btn { width: 44px; height: 44px; }
 
 /* Attach sheet. */
 .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 0 var(--space-3); }
@@ -390,23 +405,16 @@ li.set-row { padding-block: var(--space-2); }
 </section>
 
 <section class="shot" id="mini-app">
-	<div class="shot-head"><h2>Mini App</h2><span class="phase">R7 · Phase 16</span><p>Mini App mở trong trình duyệt trong app tách biệt, không chạy trong WebView chính. Thanh trên luôn của Chat: tên bot, origin thật của Mini App (domain riêng, không nằm dưới domain của tenant) và nút đóng, để Mini App không giả được giao diện của app. Nội dung bên dưới do bot vẽ.</p></div>
+	<div class="shot-head"><h2>Mini App</h2><span class="phase">R6 web hẹp · R7 · Phase 16</span><p>Màn hẹp (≤ 760px) mở Mini App toàn màn hình, như Zalo; app di động (R7) mở cùng kiểu trong trình duyệt trong app tách biệt, không chạy trong WebView chính. Thanh trên luôn của Chat: tên bot, host thật của Mini App kèm ổ khoá (domain riêng, không nằm dưới domain của tenant), "⋯" và đóng, để Mini App không giả được giao diện của app. Menu "⋯": Tải lại, Thu nhỏ, Hồ sơ bot, Báo cáo bot (khi server bật báo cáo). Thu nhỏ: Mini App vẫn chạy, ẩn đi, còn lại một viên nhỏ nổi ngay trên ô soạn tin (không che nút gửi); chạm để mở lại, x để đóng. Nội dung bên dưới thanh trên do bot vẽ.</p></div>
 	<div class="phones">
 		<figure class="phone-wrap">
 			<div class="phone">
 				<div class="statusbar"><span>09:50</span><span>5G</span></div>
-				<div class="m-head" aria-hidden="true">
-					<span class="icon-btn"><svg class="icon"><use href="#i-back"/></svg></span>
-					<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
-					<div class="m-title"><strong>Deploy Bot</strong><span>bot</span></div>
-				</div>
-				<div class="scrim"></div>
-				<div class="sheet tall" role="group" aria-label="Mini App của Deploy Bot">
-					<div class="grabber"></div>
-					<div class="sheet-bar">
-						<button type="button" class="icon-btn" aria-label="Đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+				<div class="ma-full" role="region" aria-label="Mini App của Deploy Bot">
+					<div class="ma-bar">
 						<div class="grow"><b>Deploy Bot</b><span class="origin"><svg class="icon"><use href="#i-lock"/></svg>b4821.chatapps.vn</span></div>
-						<button type="button" class="icon-btn" aria-label="Thêm: tải lại, mở bằng trình duyệt"><svg class="icon"><use href="#i-dots"/></svg></button>
+						<button type="button" class="icon-btn" aria-label="Thêm thao tác" aria-haspopup="menu" aria-expanded="false"><svg class="icon"><use href="#i-dots"/></svg></button>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
 					</div>
 					<div class="mini-body">
 						<h3>Triển khai</h3>
@@ -420,8 +428,66 @@ li.set-row { padding-block: var(--space-2); }
 					</div>
 					<div class="mini-main"><button type="button" class="btn btn-primary" data-press="Bot đã nhận yêu cầu đẩy 2.4.1">Đẩy 2.4.1 lên production</button></div>
 				</div>
+				<div class="home-bar"></div>
 			</div>
-			<figcaption>Trình duyệt trong app, thanh trên của Chat</figcaption>
+			<figcaption>Toàn màn hình, thanh trên của Chat</figcaption>
+		</figure>
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:50</span><span>5G</span></div>
+				<div class="ma-full" role="region" aria-label="Mini App của Deploy Bot (menu mở)">
+					<div class="ma-bar">
+						<div class="grow"><b>Deploy Bot</b><span class="origin"><svg class="icon"><use href="#i-lock"/></svg>b4821.chatapps.vn</span></div>
+						<button type="button" class="icon-btn" aria-label="Thêm thao tác" aria-haspopup="menu" aria-expanded="true"><svg class="icon"><use href="#i-dots"/></svg></button>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon"><use href="#i-x"/></svg></button>
+						<div class="menu" role="menu" aria-label="Thao tác với Mini App">
+							<button type="button" role="menuitem" data-toast="Mở lại Mini App với initData mới"><svg class="icon"><use href="#i-refresh"/></svg>Tải lại</button>
+							<button type="button" role="menuitem" data-toast="Đã thu nhỏ Mini App"><svg class="icon"><use href="#i-minimize"/></svg>Thu nhỏ</button>
+							<button type="button" role="menuitem" data-toast="Mở hồ sơ Deploy Bot"><svg class="icon"><use href="#i-user"/></svg>Hồ sơ bot</button>
+							<button type="button" role="menuitem" class="danger" data-toast="Mở hộp Báo cáo Deploy Bot"><svg class="icon"><use href="#i-flag"/></svg>Báo cáo bot</button>
+						</div>
+					</div>
+					<div class="mini-body">
+						<h3>Triển khai</h3>
+						<p>Chọn bản để đẩy lên production.</p>
+						<div class="env"><b>staging</b><span class="state ok">Đang chạy</span><span class="mono">2.4.1 · 08:55</span></div>
+						<div class="env"><b>production</b><span class="state old">Bản cũ</span><span class="mono">2.4.0 · hôm qua</span></div>
+						<ul class="checks">
+							<li><svg class="icon icon-sm"><use href="#i-check"/></svg>Test 128/128 đạt</li>
+							<li><svg class="icon icon-sm"><use href="#i-check"/></svg>Không có migration</li>
+						</ul>
+					</div>
+					<div class="mini-main"><button type="button" class="btn btn-primary" data-press="Bot đã nhận yêu cầu đẩy 2.4.1">Đẩy 2.4.1 lên production</button></div>
+				</div>
+				<div class="home-bar"></div>
+			</div>
+			<figcaption>Menu ⋯</figcaption>
+		</figure>
+		<figure class="phone-wrap">
+			<div class="phone">
+				<div class="statusbar"><span>09:51</span><span>5G</span></div>
+				<div class="m-head">
+					<button type="button" class="icon-btn" aria-label="Quay lại"><svg class="icon"><use href="#i-back"/></svg></button>
+					<span class="avatar sm av-violet"><svg class="icon icon-sm"><use href="#i-robot"/></svg></span>
+					<div class="m-title"><strong>Deploy Bot</strong><span>bot</span></div>
+				</div>
+				<div class="messages m-body">
+					<div class="msg"><div class="bubble"><span class="who">Deploy Bot</span><p>Có 2 bản chờ phát hành. Mở bảng để chọn.<span class="stamp">09:49</span></p></div></div>
+				</div>
+				<div class="pill-dock">
+					<div class="ma-pill">
+						<button type="button" class="open" aria-label="Mở lại Deploy Bot · Mini App" data-toast="Mở lại Mini App"><svg class="icon icon-sm"><use href="#i-robot"/></svg><span>Deploy Bot · Mini App</span></button>
+						<button type="button" class="icon-btn" aria-label="Đóng Mini App" data-toast="Đã đóng Mini App"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+					</div>
+				</div>
+				<form class="composer" onsubmit="return false">
+					<button type="button" class="icon-btn" aria-label="Đính kèm"><svg class="icon"><use href="#i-clip"/></svg></button>
+					<label class="sr-only" for="m-draft-ma">Tin nhắn tới Deploy Bot</label>
+					<textarea id="m-draft-ma" rows="1" placeholder="Tin nhắn tới Deploy Bot"></textarea>
+					<button type="submit" class="send" aria-label="Gửi"><svg class="icon"><use href="#i-send"/></svg></button>
+				</form>
+			</div>
+			<figcaption>Đã thu nhỏ: viên nổi trên ô soạn tin</figcaption>
 		</figure>
 	</div>
 </section>

@@ -1,6 +1,6 @@
 // Opening a Mini App: the server checks the request and signs the init data
 // (BotsService.OpenMiniApp), then the screen shows the container
-// (mini-app.tsx). Shared by inline Mini App buttons and "Mở app".
+// (mini-app.tsx). Shared by inline Mini App buttons, "Mở app" and "Tải lại".
 import type { Ui } from "../ui/ui-context.tsx";
 import type { Bots } from "./api.ts";
 
@@ -21,5 +21,9 @@ let serial = 0;
 export async function launchMiniApp(bots: Bots, ui: Ui, target: MiniAppTarget): Promise<void> {
 	const launch = await bots.openMiniApp(target.botId, target.chatId, target.seq, target.url);
 	serial += 1;
-	ui.miniApp.set({ ...target, id: serial, url: launch.url, initData: launch.initData });
+	// Opening a Mini App replaces the one open, minimized or not.
+	ui.miniApp.set({
+		request: { ...target, id: serial, buttonUrl: target.url, url: launch.url, initData: launch.initData },
+		minimized: false,
+	});
 }

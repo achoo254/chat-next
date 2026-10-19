@@ -69,9 +69,28 @@ export interface MiniAppRequest {
 	readonly seq: number;
 	/** Text of the button that opened it; "" for the main Mini App. */
 	readonly buttonText: string;
+	/** The button's Mini App URL as asked of OpenMiniApp ("" for the main one), to open it again ("Tải lại"). */
+	readonly buttonUrl: string;
 	/** The https URL to load and the signed init data, from OpenMiniApp. */
 	readonly url: string;
 	readonly initData: string;
+}
+
+/** The one Mini App open on the screen; minimized, it keeps running hidden behind a chip. */
+export interface OpenMiniApp {
+	readonly request: MiniAppRequest;
+	readonly minimized: boolean;
+}
+
+/** Closes the Mini App `id`; one opened since (another, or the same reloaded) stays. */
+export function closeMiniApp(cell: Cell<OpenMiniApp | null>, id: number): void {
+	if (cell.get()?.request.id === id) cell.set(null);
+}
+
+/** Minimizes or restores the Mini App `id`, if it is still the open one. */
+export function minimizeMiniApp(cell: Cell<OpenMiniApp | null>, id: number, minimized: boolean): void {
+	const open = cell.get();
+	if (open !== null && open.request.id === id && open.minimized !== minimized) cell.set({ request: open.request, minimized });
 }
 
 /** The chat list's row menu (mockups/chat.html#list-menu), opened at a point of the viewport. */
@@ -119,7 +138,7 @@ export interface Ui {
 	readonly dialog: Cell<DialogRequest | null>;
 	readonly menu: Cell<MenuTarget | null>;
 	readonly listMenu: Cell<ListMenuTarget | null>;
-	readonly miniApp: Cell<MiniAppRequest | null>;
+	readonly miniApp: Cell<OpenMiniApp | null>;
 	readonly intents: ComposerIntents;
 	/** Focuses the search box of the chat list (⌘K, header search button). */
 	readonly focusSearch: () => void;

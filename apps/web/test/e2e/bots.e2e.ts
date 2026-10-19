@@ -11,7 +11,9 @@
 // switches the bot back to long polling there. Last, the bot edits its
 // message and inline keyboard, uploads a photo, and An uses its command menu
 // in a group (screenshots of the menu when E2E_SHOTS_DIR is set), and opens
-// the bot's Mini App from an inline button.
+// the bot's Mini App from an inline button: docked in the info column's place,
+// its "⋯" menu, minimized to the chip and back (the Mini App hears it) at
+// 1280×720, 1366×768 and 390×844, with screenshots when E2E_SHOTS_DIR is set.
 import assert from "node:assert/strict";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -337,6 +339,17 @@ scenario("the bot edits its message, sends a photo, and offers its commands in a
 	assert.equal(ping.message?.chat.id, groupId);
 });
 
+/** Nothing on the screen, the Mini App's header, its menu or chip scrolls sideways. */
+async function noMiniAppSideScroll(person: Person): Promise<void> {
+	const wide = await person.page.evaluate(() =>
+		[document.scrollingElement, ...document.querySelectorAll(".mini-app:not([hidden]) .ma-head, .ma-head .menu, .ma-chip")]
+			.filter((element) => element !== null)
+			.filter((element) => element.scrollWidth > element.clientWidth)
+			.map((element) => element.className || element.nodeName),
+	);
+	assert.deepEqual(wide, [], "something scrolls sideways");
+}
+
 /** The developer's Mini App: served by the browser context at an https origin of its own. */
 const SHOP = "https://shop.example.com";
 const SHOP_PAGE = `<!doctype html>
@@ -344,8 +357,12 @@ const SHOP_PAGE = `<!doctype html>
 <title>Cửa hàng</title>
 <script src="${SHOP}/sdk.js"></script>
 <p id="init"></p>
+<p id="events"></p>
 <script>
 	document.getElementById("init").textContent = ChatApp.initData;
+	for (const type of ["deactivated", "activated"]) {
+		ChatApp.onEvent(type, () => (document.getElementById("events").textContent += \`\${type}:\${ChatApp.isActive} \`));
+	}
 	ChatApp.MainButton.setText("Đặt hàng").show().onClick(() => ChatApp.sendData("order-42"));
 	ChatApp.ready();
 </script>`;
@@ -388,6 +405,64 @@ scenario("open a Mini App from a button, check its init data, send data to the b
 	assert.equal(verified.chat_type, "private");
 	assert.equal(verified.user.first_name, "An");
 	assert.equal(verifyMiniAppInitData(initData.replace("chat_type=private", "chat_type=group"), botId, key), null);
+
+	// Docked in the info column's place, its menu, minimized to the chip (or the pill when narrow) and back.
+	const shots = process.env.E2E_SHOTS_DIR;
+	const chipRestore = page.getByRole("button", { name: "Mở lại Echo Bot · Mini App" });
+	const events = app.locator("#events");
+	let expected = "";
+	for (const [width, height] of [[1280, 720], [1366, 768], [390, 844]] as const) {
+		await page.setViewportSize({ width, height });
+		const size = `${width}x${height}`;
+		await panel.waitFor();
+		await noMiniAppSideScroll(an);
+		if (width > 760) {
+			// The chat column narrows beside it: the panel and the conversation do not overlap.
+			const [panelBox, convoBox] = await Promise.all([panel.boundingBox(), page.locator(".app > .convo").boundingBox()]);
+			assert.ok(panelBox !== null && convoBox !== null);
+			assert.ok(convoBox.x + convoBox.width <= panelBox.x + 1, `the Mini App covers the conversation at ${size}`);
+		} else {
+			const box = await panel.boundingBox();
+			assert.deepEqual(box === null ? null : [box.width, box.height], [width, height], "full screen when narrow");
+		}
+		if (shots !== undefined && shots !== "") await page.screenshot({ path: join(shots, `mini-app-open-${size}.png`) });
+
+		await panel.getByRole("button", { name: "Thêm thao tác" }).click();
+		const menu = panel.getByRole("menu", { name: "Thao tác với Mini App" });
+		assert.deepEqual(await menu.getByRole("menuitem").allTextContents(), ["Tải lại", "Thu nhỏ", "Hồ sơ bot", "Báo cáo bot"]);
+		await noMiniAppSideScroll(an);
+		if (shots !== undefined && shots !== "") await page.screenshot({ path: join(shots, `mini-app-menu-${size}.png`) });
+
+		await menu.getByRole("menuitem", { name: "Thu nhỏ" }).click();
+		await panel.waitFor({ state: "hidden" });
+		await chipRestore.waitFor();
+		// The frame is hidden now, still running: its page logged the event.
+		expected += "deactivated:false ";
+		await app.locator("#events", { hasText: expected }).waitFor({ state: "attached" });
+		await noMiniAppSideScroll(an);
+		if (shots !== undefined && shots !== "") await page.screenshot({ path: join(shots, `mini-app-minimized-${size}.png`) });
+		if (width <= 760) {
+			// The info column left open by the wide layout came back over the chat; back to the chat,
+			// the pill floats just above the composer, clear of its send button.
+			const back = page.getByRole("button", { name: "Về khung chat" });
+			if (await back.isVisible()) await back.click();
+			await page.getByRole("complementary", { name: "Thông tin bot" }).waitFor({ state: "detached" });
+			const [pill, bar] = await Promise.all([page.locator(".ma-chip").boundingBox(), page.locator(".composer").boundingBox()]);
+			assert.ok(pill !== null && bar !== null);
+			assert.ok(pill.y + pill.height <= bar.y, "the pill covers the composer");
+			await noMiniAppSideScroll(an);
+			if (shots !== undefined && shots !== "") await page.screenshot({ path: join(shots, `mini-app-minimized-chat-${size}.png`) });
+		}
+
+		await chipRestore.click();
+		await panel.waitFor();
+		expected += "activated:true ";
+		await app.locator("#events", { hasText: expected }).waitFor({ state: "attached" });
+		// The frame kept running: same page, same init data.
+		assert.equal(await app.locator("#init").textContent(), initData);
+	}
+	assert.equal(await events.textContent(), expected);
+	await page.setViewportSize({ width: 1280, height: 800 });
 
 	// The container draws the Mini App's main button; pressing it sends the data as An and closes the panel.
 	const sent = bot.next((update) => update.message?.web_app_data !== undefined);
