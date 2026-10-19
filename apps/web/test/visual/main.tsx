@@ -81,7 +81,7 @@ f.react(demo.ids.users.ha, announcements, shortPosts[1] ?? 0, "🙏");
 const appLink = "https://chat.hoandat.com";
 f.send(f.selfId, announcements, appLink, {
 	entities: [entity(EntityType.URL, appLink, appLink)],
-	linkPreview: { url: appLink, siteName: "chat.hoandat.com", title: "Chat", description: "Nhắn tin nhanh trong hệ sinh thái hoandat." },
+	linkPreview: { url: appLink, siteName: "chat.hoandat.com", title: "Chat", description: "Nhắn tin nhanh trên web, điện thoại và máy tính." },
 });
 f.inviteLinks.set(announcements, [
 	{

@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Chat",
   "short_name": "Chat",
-  "description": "Nhắn tin nhanh trong hệ sinh thái hoandat.",
+  "description": "Nhắn tin nhanh trên web, điện thoại và máy tính.",
   "lang": "vi",
   "dir": "ltr",
   "start_url": "/",

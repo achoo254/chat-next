@@ -2,7 +2,7 @@
   "$schema": "./brand.config.schema.json",
   "appName": "Chat",
   "shortName": "Chat",
-  "description": "Nhắn tin nhanh trong hệ sinh thái hoandat.",
+  "description": "Nhắn tin nhanh trên web, điện thoại và máy tính.",
   "colors": {
     "primary": "#6e56cf",
     "background": "#f9f9fb",
