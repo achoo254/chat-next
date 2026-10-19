@@ -34,6 +34,7 @@ const BotNotRunningBanner = lazy(() => botChat().then((m) => ({ default: m.BotNo
 
 /** The photo and video viewer of this chat (mockups/media.html#viewer), loaded when first opened. */
 function ViewerLayer({ chatId }: { chatId: number }) {
+	"use no memo";
 	const target = useCell(viewer);
 	if (target === null || target.chatId !== chatId) return null;
 	return (
@@ -66,6 +67,7 @@ function canSendMedia(chat: Chat): boolean {
 
 /** The message menu loads on first use. */
 function MessageMenu({ chat, readOutboxMaxSeq }: { chat: Chat; readOutboxMaxSeq: number }) {
+	"use no memo";
 	const ui = useUi();
 	const target = useCell(ui.menu);
 	if (target === null) return null;
@@ -103,6 +105,7 @@ function OfflineBanner({ chatId }: { chatId: number }) {
 }
 
 function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null; groupTitle: string }) {
+	"use no memo";
 	const copy = useCopy();
 	const connection = useConnection();
 	const peer = useUser(chat.type === "private" ? chat.peerUserId : 0);
@@ -162,6 +165,7 @@ function placeholderFor(chat: Chat, topic: Topic | null, title: string, copy: Me
 
 /** Subscribers of a channel get a notifications switch in place of the composer. */
 function ChannelBar({ chatId }: { chatId: number }) {
+	"use no memo";
 	const copy = useCopy();
 	const { remote, toasts } = useServices();
 	const muted = useListEntry(chatId)?.muted === true;
@@ -424,6 +428,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 }
 
 export function EmptyConversation() {
+	"use no memo";
 	const copy = useCopy();
 	return (
 		<section className="convo">

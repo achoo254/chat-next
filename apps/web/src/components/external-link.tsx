@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useI18n } from "../i18n/i18n.tsx";
-import { Icon } from "./icon.tsx";
+import { Icon } from "./screen-icons.tsx";
 
 /** Link to another site (the IdP), opened in a new tab without an opener. */
 export function ExternalLink({ href, className, children }: { href: string; className: string; children: ReactNode }) {

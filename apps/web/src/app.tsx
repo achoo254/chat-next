@@ -162,6 +162,7 @@ function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnect
 }
 
 function BootError({ onRetry }: { onRetry: () => void }) {
+	"use no memo";
 	const { t } = useI18n();
 	return (
 		<main className="welcome">

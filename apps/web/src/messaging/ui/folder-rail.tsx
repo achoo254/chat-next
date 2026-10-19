@@ -21,6 +21,7 @@ interface FolderProps {
 
 /** `folder` null: the contacts list is open instead of a folder. */
 export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder: Folder | null; onFolder: (folder: Folder) => void }) {
+	"use no memo";
 	const copy = useCopy();
 	const counts = useFolderCounts();
 	return (
@@ -61,6 +62,7 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 
 /** The compact filter row that stands in for the rail on narrow screens. */
 export function FolderTabs({ folder, onFolder }: FolderProps) {
+	"use no memo";
 	const copy = useCopy();
 	return (
 		<div className="tabs folder-tabs" role="tablist" aria-label={copy.folders.filterTabs}>

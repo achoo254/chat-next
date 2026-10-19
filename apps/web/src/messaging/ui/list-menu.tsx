@@ -6,7 +6,7 @@
 // sync to the user's other sessions through the server.
 import { MUTE_FOREVER, PINNED_DIALOGS_MAX } from "@app/core";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

@@ -2,7 +2,7 @@
 // to or editing a message (the quote jumps to it, X or Esc cancels) and the
 // link preview of the text being typed (X sends without it). Loaded the first
 // time one shows.
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { messagePreview, namedUserIds } from "../data/format.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";

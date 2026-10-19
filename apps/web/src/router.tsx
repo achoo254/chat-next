@@ -217,6 +217,7 @@ interface LinkProps {
 
 /** In-app link: plain clicks navigate without a reload, modified clicks keep browser behaviour. */
 export function Link({ to, className, current, title, children, ...rest }: LinkProps) {
+	"use no memo";
 	const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
 		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		event.preventDefault();

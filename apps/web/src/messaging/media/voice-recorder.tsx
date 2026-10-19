@@ -6,7 +6,7 @@
 // MediaRecorder, says so and leaves the composer as it was.
 import { useEffect, useRef, useState } from "react";
 import { TYPING_REPEAT_MS } from "@app/core";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useServices } from "../data/services.tsx";
 import { formatDuration } from "./media-format.ts";
 import { MediaIcon } from "./media-icons.tsx";

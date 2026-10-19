@@ -151,6 +151,7 @@ export function PreviewThumb({ message }: { message: Message }) {
 }
 
 function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
+	"use no memo";
 	const copy = useCopy();
 	const { store } = useServices();
 	const top = view.topMessage;

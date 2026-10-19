@@ -19,7 +19,9 @@ export const BUNDLE_BUDGET = {
 	 * startup chunks; 130.7 KB with React Compiler, which is on since then.
 	 * 149.9 KB once English UI copy loaded on first use instead of at startup;
 	 * 149.7 KB with the anti-abuse copy once the signed-out welcome screen
-	 * loaded only when shown.
+	 * loaded only when shown. 142.5 KB once icons only lazy screens draw, the
+	 * dialog switch and service, forward and via-bot lines loaded on demand,
+	 * and more leaf components skipped the compiler's memoization.
 	 */
 	startupJsGzip: 150 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */

@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from "react";
 import { brand } from "../../brand.ts";
 import { BrandLogo } from "../../components/brand-loader.tsx";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { installState, promptInstall, subscribeInstall } from "../../install-prompt.ts";
 import { Link, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

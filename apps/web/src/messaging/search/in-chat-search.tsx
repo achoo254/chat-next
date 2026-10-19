@@ -7,7 +7,7 @@
 // keeps the position.
 import { fold, hitKey } from "@app/core";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { highlight } from "../data/highlight.ts";
 import { useServices } from "../data/services.tsx";

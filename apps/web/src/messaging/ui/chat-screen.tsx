@@ -18,7 +18,7 @@ import { hookData, hooksData } from "../data/screen-data.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatListColumn } from "./chat-list.tsx";
 import { Conversation, EmptyConversation } from "./conversation.tsx";
-import { DialogHost } from "./dialog-host.tsx";
+import { DialogHost, dialogPreload } from "./dialog-host.tsx";
 import { FolderRail } from "./folder-rail.tsx";
 import { ListResizer } from "./list-resizer.tsx";
 import { MiniAppChipSlot, MiniAppLayer } from "./mini-app-slot.tsx";
@@ -49,8 +49,8 @@ const ContactsView = contactsCode.Component;
 const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
 const BotLinkDialog = lazy(() => import("../bots/bot-link-dialog.tsx"));
 
-/** Panes whose code is fetched when the browser is idle after startup (messaging-root.tsx). */
-export const chatPanePreloads: readonly (() => Promise<void>)[] = [integrationsCode.preload, contactsCode.preload];
+/** Panes (and the dialog switch) whose code is fetched when the browser is idle after startup (messaging-root.tsx). */
+export const chatPanePreloads: readonly (() => Promise<void>)[] = [integrationsCode.preload, contactsCode.preload, dialogPreload];
 
 /** The admin column's box around a loader (before the page itself renders one). */
 function adminFrame(loader: ReactNode): ReactNode {
@@ -246,6 +246,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 
 /** The chat list's row menu, loaded on first use. */
 function RowMenu({ ui }: { ui: Ui }) {
+	"use no memo";
 	const target = useCell(ui.listMenu);
 	if (target === null) return null;
 	return (

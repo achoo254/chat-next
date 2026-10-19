@@ -11,7 +11,7 @@
 import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { resource, useLoad } from "../../components/preload.ts";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";

@@ -33,6 +33,7 @@ import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } 
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
+import { messageExtrasPreloads } from "./ui/message-item.tsx";
 import { ChatAvatar, Toast } from "./ui/parts.tsx";
 import { forgetSelf } from "../api/offline-self.ts";
 
@@ -48,15 +49,16 @@ const Moderation = moderationCode.Component;
 const DeveloperConsole = consoleCode.Component;
 
 /**
- * Secondary screens whose code is fetched when the browser is idle after
- * startup, with the clients their first data loads on demand and the
- * transport those calls go through.
+ * Secondary screens (and the rarer parts of messages) whose code is fetched
+ * when the browser is idle after startup, with the clients their first data
+ * loads on demand and the transport those calls go through.
  */
 const IDLE_PREFETCH = [
 	settingsCode.preload,
 	settingsExtraCode.preload,
 	consoleCode.preload,
 	...chatPanePreloads,
+	...messageExtrasPreloads,
 	loadConnectWeb,
 	loadAccountClient,
 	loadRemoteClient,
@@ -385,6 +387,7 @@ function AppBadge() {
 
 /** The rail link to the contacts list (mockups/settings.html rail). */
 function ContactsLink() {
+	"use no memo";
 	const copy = useCopy();
 	return (
 		<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
@@ -394,6 +397,7 @@ function ContactsLink() {
 }
 
 function StartFailed({ onRetry }: { onRetry: () => void }) {
+	"use no memo";
 	const { t } = useI18n();
 	const copy = useCopy();
 	return (

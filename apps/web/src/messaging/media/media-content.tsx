@@ -7,7 +7,7 @@
 // is no longer available keeps its box and says so.
 import type { MediaRef, MediaRequest, MediaSizeType, PendingMedia, PendingMessage, StoredMessage } from "@app/core";
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
 import { useConnection, useItem, useServices } from "../data/services.tsx";

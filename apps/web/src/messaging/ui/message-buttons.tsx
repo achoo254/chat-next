@@ -1,7 +1,7 @@
 // Buttons under webhook and bot messages (split from message-item.tsx: most
 // messages have none).
 import type { StoredMessage } from "@app/core";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { launchMiniApp } from "../bots/mini-app-launch.ts";

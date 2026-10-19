@@ -4,7 +4,7 @@
 // works until an admin unbans, the person's invite links are revoked) or
 // "Chỉ xoá" (they may come back with a link). Channels follow the same rules.
 import { useEffect, useState } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

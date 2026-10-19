@@ -13,9 +13,10 @@ import { Suspense, lazy, memo, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
+import { preloadable } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { actionText, clock, integrationTone, isSavedChat, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
+import { clock, integrationTone, isSavedChat, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
@@ -35,6 +36,29 @@ const AlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.AlbumMedia 
 const PendingMediaView = lazy(() => mediaChunk().then((m) => ({ default: m.PendingMediaView })));
 const PendingAlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.PendingAlbumMedia })));
 const LinkPhoto = lazy(() => mediaChunk().then((m) => ({ default: m.LinkPhoto })));
+// Service lines and the forward and via-bot headers load with the first
+// message that has one, or once the app is idle (messaging-root.tsx); until
+// then a blank line holds their place.
+const extras = () => import("./message-extras.tsx");
+const systemLine = preloadable(async () => ({ default: (await extras()).SystemLine }));
+const forwardLine = preloadable(async () => ({ default: (await extras()).ForwardLine }));
+const viaLine = preloadable(async () => ({ default: (await extras()).ViaLine }));
+const SystemLine = systemLine.Component;
+const ForwardLine = forwardLine.Component;
+const ViaLine = viaLine.Component;
+export const messageExtrasPreloads: readonly (() => Promise<void>)[] = [systemLine.preload, forwardLine.preload, viaLine.preload];
+
+const RESERVED = { visibility: "hidden" } as const;
+
+/** An empty line of the given class in place of one whose code is still loading. */
+function LineReserve({ className, seq }: { className: string; seq?: number }) {
+	"use no memo";
+	return (
+		<span className={className} data-seq={seq} style={RESERVED} aria-hidden="true">
+			{"\u00a0"}
+		</span>
+	);
+}
 
 interface Shape {
 	readonly kind: MediaKind;
@@ -95,7 +119,13 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKey
 	if (item.kind === "pending") {
 		return <PendingBubble chatId={chatId} itemKey={captionKey} rowKey={itemKey} albumKeys={keys} pending={item.pending} chat={chat} tabbable={tabbable} />;
 	}
-	if (item.message.action !== null) return <SystemLine message={item.message} channel={chat?.type === "channel"} />;
+	if (item.message.action !== null) {
+		return (
+			<Suspense fallback={<LineReserve className="system" seq={item.message.seq} />}>
+				<SystemLine message={item.message} channel={chat?.type === "channel"} />
+			</Suspense>
+		);
+	}
 	return (
 		<MessageBubble
 			chatId={chatId}
@@ -109,24 +139,6 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKey
 		/>
 	);
 });
-
-function SystemLine({ message, channel }: { message: StoredMessage; channel: boolean }) {
-	const copy = useCopy();
-	const pinnedSeq = message.action?.kind === "message_pinned" ? message.action.seq : 0;
-	const pinned = useMessage(message.chatId, pinnedSeq);
-	const nameOf = useNameOf([...namedUserIds(message), ...(pinned == null ? [] : namedUserIds(pinned))]);
-	if (message.action === null) return null;
-	const actorName = nameOf(message.fromId);
-	const text =
-		message.action.kind === "message_pinned"
-			? copy.system.pinned(actorName, pinned == null ? "" : messagePreview(pinned, nameOf, copy, channel).slice(0, 60))
-			: actionText(message.action, actorName, nameOf, copy, channel);
-	return (
-		<span className="system" data-seq={message.seq}>
-			{text}
-		</span>
-	);
-}
 
 /** Context menu on right click, long press or the keyboard (Enter, Shift+F10, Menu key). */
 function useMenuTrigger(chatId: number, itemKey: string) {
@@ -163,6 +175,7 @@ function Stamp({ date, edited, silent = "", children }: { date: number; edited: 
 }
 
 function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
+	"use no memo";
 	const copy = useCopy();
 	const { store } = useServices();
 	const target = useMessage(chatId, seq);
@@ -182,35 +195,6 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 			<b>{name}</b>
 			<span className="q">{messagePreview(target, nameOf, copy, channel)}</span>
 		</button>
-	);
-}
-
-function ForwardLine({ message }: { message: StoredMessage }) {
-	"use no memo";
-	const copy = useCopy();
-	const forward = message.forward;
-	const user = useUser(forward?.fromUserId ?? 0);
-	const sourceChat = useChat(forward?.fromChatId ?? 0);
-	if (forward === null) return null;
-	const name = forward.fromName || user?.name || sourceChat?.title || copy.message.unknownUser;
-	const id = forward.fromChatId !== 0 ? forward.fromChatId : forward.fromUserId;
-	return (
-		<span className="fwd">
-			{copy.message.forwardedFrom} <ChatAvatar id={id} name={name} size="xs" /> <b>{name}</b>
-		</span>
-	);
-}
-
-/** "via @bot": the bot whose inline result the message is. */
-function ViaLine({ botId }: { botId: number }) {
-	"use no memo";
-	const copy = useCopy();
-	const bot = useUser(botId);
-	if (botId === 0 || bot === undefined || bot.username === "") return null;
-	return (
-		<span className="via-bot">
-			{copy.message.viaBot} <b>@{bot.username}</b>
-		</span>
 	);
 }
 
@@ -236,6 +220,7 @@ function ReactorAvatars({ ids, more }: { ids: readonly number[]; more: number })
  * reacted. Private chats and small groups show faces, others the count.
  */
 function ReactionChip({ message, reaction, chat }: { message: StoredMessage; reaction: ReactionCount; chat: Chat | null }) {
+	"use no memo";
 	const copy = useCopy();
 	const { remote, toasts, self } = useServices();
 	const ui = useUi();
@@ -294,6 +279,7 @@ function ReactionChip({ message, reaction, chat }: { message: StoredMessage; rea
 
 /** The pill group floats over the bubble's bottom edge (yours: bottom-left, others': bottom-right). */
 function Reactions({ message, chat }: { message: StoredMessage; chat: Chat | null }) {
+	"use no memo";
 	const copy = useCopy();
 	if (message.reactions.length === 0) return null;
 	return (
@@ -322,6 +308,7 @@ function QuickActions({
 	label: string;
 	canReply: boolean;
 }) {
+	"use no memo";
 	const copy = useCopy();
 	const ui = useUi();
 	return (
@@ -346,6 +333,7 @@ function QuickActions({
 
 
 function LinkPreviewCard({ preview, message, ctx }: { preview: LinkPreview; message: StoredMessage; ctx: RichContext }) {
+	"use no memo";
 	const photo = message.linkPreview?.photo !== undefined;
 	return (
 		<a
@@ -387,6 +375,7 @@ interface BubbleProps {
 
 /** The media of a message or album, in its reserved box until the media chunk is there. */
 function MediaSlot({ chatId, message, albumKeys }: { chatId: number; message: StoredMessage; albumKeys: readonly string[] }) {
+	"use no memo";
 	const { store } = useServices();
 	if (albumKeys.length > 1) {
 		const shapes = albumKeys.map((key) => {
@@ -539,8 +528,16 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 							{sender?.isBot === true && <span className="tag">{copy.bot.tag}</span>}
 						</span>
 					)}
-					<ForwardLine message={message} />
-					<ViaLine botId={message.viaBotId} />
+					{message.forward !== null && (
+						<Suspense fallback={<LineReserve className="fwd" />}>
+							<ForwardLine message={message} />
+						</Suspense>
+					)}
+					{message.viaBotId !== 0 && (
+						<Suspense fallback={<LineReserve className="via-bot" />}>
+							<ViaLine botId={message.viaBotId} />
+						</Suspense>
+					)}
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
 					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
 					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} />}
@@ -600,6 +597,7 @@ interface PendingProps {
 }
 
 function PendingMediaSlot({ chatId, pending, albumKeys }: { chatId: number; pending: PendingMessage; albumKeys: readonly string[] }) {
+	"use no memo";
 	const { store } = useServices();
 	if (albumKeys.length > 1) {
 		const shapes = albumKeys.map((key) => {

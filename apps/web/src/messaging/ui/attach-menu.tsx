@@ -1,7 +1,7 @@
 // The composer's attach menu (mockups/media.html #attach): photos and
 // videos, or any file up to the server's limit. Loaded when first opened.
 import type { RefObject } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { PopupMenu } from "./popup-menu.tsx";
 

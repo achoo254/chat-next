@@ -6,7 +6,7 @@ import { Fragment, useState } from "react";
 import { FONT_MAX, FONT_MIN, setFontSize, setTheme, storedFontSize, storedTheme, type Theme } from "../../appearance.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import { Link, paths, type SettingsTab } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

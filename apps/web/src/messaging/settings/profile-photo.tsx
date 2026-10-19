@@ -5,7 +5,7 @@
 import { useRef, useState } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { useApi } from "../../api/api-context.tsx";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useServices } from "../data/services.tsx";

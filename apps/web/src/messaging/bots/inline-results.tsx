@@ -6,7 +6,7 @@
 // usernames of people, show nothing. Loaded with the first such draft.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cryptoRandomId } from "@app/platform";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
 import { useMediaFile } from "../media/use-media.ts";

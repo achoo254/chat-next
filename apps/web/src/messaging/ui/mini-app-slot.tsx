@@ -26,6 +26,7 @@ function subscribeNarrow(listener: () => void): () => void {
 
 /** The open Mini App's container; stays mounted while minimized so its frame keeps running. */
 export function MiniAppLayer({ ui }: { ui: Ui }) {
+	"use no memo";
 	const open = useCell(ui.miniApp);
 	if (open === null) return null;
 	return (
@@ -41,6 +42,7 @@ export function MiniAppLayer({ ui }: { ui: Ui }) {
  * conversation shows. Each renders only where it applies, so one chip shows.
  */
 export function MiniAppChipSlot({ place }: { place: "top" | "bar" | "screen" }) {
+	"use no memo";
 	const ui = useUi();
 	const open = useCell(ui.miniApp);
 	const narrow = useSyncExternalStore(subscribeNarrow, isNarrow);

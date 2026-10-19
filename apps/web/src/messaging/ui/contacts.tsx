@@ -8,7 +8,7 @@
 import { fold } from "@app/core";
 import { useState, type ReactNode } from "react";
 import { useLoader } from "../../components/delayed-loader.tsx";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";

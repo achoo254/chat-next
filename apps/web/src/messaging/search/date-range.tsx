@@ -2,7 +2,7 @@
 // calendar where two clicks pick a range (weeks start on Monday, no future
 // days). Applied only with "Áp dụng"; "Xoá" removes the filter.
 import { useState } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { addDays, rangeLabel, startOfDay } from "./filters.ts";

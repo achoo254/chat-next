@@ -8,7 +8,7 @@
 // only "Xoá ở phía tôi", without the reaction row.
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Chat, StoredMessage } from "@app/core";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { isSavedChat } from "../data/format.ts";

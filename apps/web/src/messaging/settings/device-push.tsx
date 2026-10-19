@@ -3,7 +3,7 @@
 // home screen app on iPhone, blocked by the browser, not supported). Hidden
 // when the server has Web Push off.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

@@ -4,7 +4,7 @@
 // longer admits anyone reads as gone.
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useState } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { InvitePreview } from "../data/pending-backend.ts";

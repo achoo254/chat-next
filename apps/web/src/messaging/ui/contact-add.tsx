@@ -4,7 +4,7 @@
 // tìm thấy" as no account at all. Email never shows in results.
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useState, type ReactNode } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { contactsOf, useContacts } from "../data/contacts.ts";

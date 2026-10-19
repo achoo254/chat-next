@@ -4,6 +4,7 @@ import { Icon } from "../../components/icon.tsx";
 import type { Topic } from "../data/pending-backend.ts";
 
 export function TopicIco({ topic, size }: { topic: Topic; size?: "sm" | "lg" }) {
+	"use no memo";
 	return (
 		<span className={["topic-ico", size ?? "", `av-${topic.tone}`].filter(Boolean).join(" ")} aria-hidden="true">
 			<Icon name={topic.icon} />

@@ -4,7 +4,7 @@
 // only from its own button.
 import { useEffect, useEffectEvent, type ReactNode } from "react";
 import { signInUrl } from "@app/core";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { paths, type ConsoleTab } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { DialogHead, Modal, useDomId } from "../ui/parts.tsx";

@@ -7,7 +7,7 @@
 // for everyone while it is open says so instead of retrying.
 import type { MediaRef, StoredMessage } from "@app/core";
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type TouchEvent } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { clock, inlineThumbUrl, shortDate } from "../data/format.ts";
 import { useItem, useMessage, useServices, useUser, useWindow } from "../data/services.tsx";

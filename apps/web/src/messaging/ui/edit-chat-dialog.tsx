@@ -3,7 +3,7 @@
 // The photo is chosen and cropped at once but uploaded only on "Lưu"; each
 // change becomes a service message in the chat.
 import { useState } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { ChatInfoChanges } from "../data/remote.ts";
 import { useChat, useServices } from "../data/services.tsx";

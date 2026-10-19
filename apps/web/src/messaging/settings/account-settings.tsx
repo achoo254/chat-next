@@ -8,7 +8,7 @@ import { signInUrl } from "@app/core";
 import { useEffect, useEffectEvent, useState } from "react";
 import { brand } from "../../brand.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useLoad } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch } from "../../router.tsx";

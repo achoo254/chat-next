@@ -56,6 +56,7 @@ export interface RichContext {
 }
 
 function Spoiler({ children }: { children: ReactNode }) {
+	"use no memo";
 	const copy = useCopy();
 	const [revealed, setRevealed] = useState(false);
 	if (revealed) return <span className="spoiler revealed">{children}</span>;
@@ -73,6 +74,7 @@ function Spoiler({ children }: { children: ReactNode }) {
 }
 
 function MessageLink({ url, shown = "", ctx, children }: { url: string; shown?: string; ctx: RichContext; children: ReactNode }) {
+	"use no memo";
 	const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
 		if (url.startsWith("mailto:")) return;
 		event.preventDefault();
@@ -86,6 +88,7 @@ function MessageLink({ url, shown = "", ctx, children }: { url: string; shown?: 
 }
 
 export function CodeBlock({ code, language }: { code: string; language: string }) {
+	"use no memo";
 	const copy = useCopy();
 	const { toasts } = useServices();
 	const [copied, setCopied] = useState(false);

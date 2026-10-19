@@ -4,7 +4,7 @@
 // seen a message (#read-by). Chat-level dialogs (leave, delete chat, pin,
 // reactions) are in chat-dialogs.tsx.
 import { useEffect, useState, type FormEvent } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";

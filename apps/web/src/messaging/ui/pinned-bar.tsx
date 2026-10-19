@@ -3,7 +3,7 @@
 // on this device (the info panel turns them back on).
 import { useState, useSyncExternalStore } from "react";
 import type { Chat } from "@app/core";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { messagePreview, namedUserIds } from "../data/format.ts";
 import { pinnedLists, usePinned } from "../data/pinned.ts";

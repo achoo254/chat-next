@@ -2,7 +2,7 @@
 // times, the hook avatar, paged lists and the one-time URL dialog.
 import { useEffect, useEffectEvent, useState } from "react";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";

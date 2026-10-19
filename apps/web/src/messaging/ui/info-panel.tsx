@@ -10,7 +10,7 @@
 import { PINNED_DIALOGS_MAX, type Chat, type User } from "@app/core";
 import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import type { SharedTab } from "../media/shared-media.tsx";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";

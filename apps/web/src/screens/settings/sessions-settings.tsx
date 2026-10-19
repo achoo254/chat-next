@@ -7,7 +7,7 @@ import { brand } from "../../brand.ts";
 import { ExternalLink } from "../../components/external-link.tsx";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
 import type { Messages } from "../../i18n/vi.ts";

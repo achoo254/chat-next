@@ -9,6 +9,7 @@ export function initials(name: string): string {
 }
 
 export function Avatar({ name, size }: { name: string; size: "sm" | "xl" }) {
+	"use no memo";
 	return (
 		<span className={`avatar ${size} av-violet`} aria-hidden="true">
 			{initials(name)}

@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import type { Chat } from "@app/core";
 import { useLoader } from "../../components/delayed-loader.tsx";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";

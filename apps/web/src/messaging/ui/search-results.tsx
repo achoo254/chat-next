@@ -9,7 +9,7 @@
 // ↑/↓ in the search box move between results, Enter opens one.
 import { fold, type SearchHit, type StoredMessage } from "@app/core";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy, type FullCopy } from "../copy/use-screens-copy.ts";

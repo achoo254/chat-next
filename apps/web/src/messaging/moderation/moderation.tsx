@@ -12,7 +12,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useState, type FormEvent } from "react";
 import { useLoader as useDelayedLoader } from "../../components/delayed-loader.tsx";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useScreensCopy, type FullCopy } from "../copy/use-screens-copy.ts";

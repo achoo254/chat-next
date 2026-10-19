@@ -104,12 +104,13 @@ describe("message rendering", () => {
 		expect(log.querySelector(".code-block pre code")?.textContent).toContain("pg_upgrade -b");
 		const wiki = within(log).getByRole("link", { name: "wiki vận hành" });
 		expect(wiki.getAttribute("rel")).toBe("noopener noreferrer");
-		expect(within(log).getByText(/Chuyển tiếp từ/)).toBeTruthy();
+		// Forward headers and service lines load with the first message that has one.
+		expect(await within(log).findByText(/Chuyển tiếp từ/, {}, LONG)).toBeTruthy();
 		expect(log.querySelector(".msg.at-me .mention.me")?.textContent).toBe("@ductrung");
 		expect(within(log).getByText(/^đã sửa/)).toBeTruthy();
 		expect(within(log).getByText("Nâng cấp Postgres gần như không gián đoạn")).toBeTruthy();
 		expect(within(log).getByRole("button", { name: "👍 3 người: bạn, Minh, Lan Anh" }).getAttribute("aria-pressed")).toBe("true");
-		expect(within(log).getByText("Lan Anh đã thêm Deploy Bot")).toBeTruthy();
+		expect(await within(log).findByText("Lan Anh đã thêm Deploy Bot", {}, LONG)).toBeTruthy();
 		expect((await within(log).findByRole("separator", {}, LONG)).textContent).toBe("Tin chưa đọc");
 		expect(within(log).getAllByRole("img", { name: "Đã xem" }).length).toBeGreaterThan(0);
 		// Reply quote of your own message names the quoted author.

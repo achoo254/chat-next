@@ -3,7 +3,7 @@
 // failed requests kept for 30 days (dead letters) with their bodies.
 // There is no per-member delivery state, by design.
 import { useEffect, useState, type ReactNode } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";

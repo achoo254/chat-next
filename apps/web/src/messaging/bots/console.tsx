@@ -14,7 +14,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { fold } from "@app/core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad, type Load } from "../../components/preload.ts";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch, type ConsolePage, type ConsoleTab } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";

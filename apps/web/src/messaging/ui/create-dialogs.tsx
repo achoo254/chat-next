@@ -5,7 +5,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { fold, type DialogView } from "@app/core";
 import { brand } from "../../brand.ts";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

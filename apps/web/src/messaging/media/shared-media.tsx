@@ -8,7 +8,7 @@
 // chat's history changes.
 import { EventKeys, type MessageEntity, type StoredMessage } from "@app/core";
 import { useEffect, useState, type KeyboardEvent } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { hostOf, shortDate } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";

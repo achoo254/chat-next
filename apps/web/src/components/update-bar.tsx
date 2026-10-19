@@ -4,6 +4,7 @@ import { appUpdateReady, subscribeAppUpdate } from "../register-service-worker.t
 
 /** "Đã có bản mới · Tải lại" once a newer build has taken over (register-service-worker.ts). */
 export function UpdateBar() {
+	"use no memo";
 	const ready = useSyncExternalStore(subscribeAppUpdate, appUpdateReady, () => false);
 	const { t } = useI18n();
 	if (!ready) return null;

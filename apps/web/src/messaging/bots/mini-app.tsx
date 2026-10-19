@@ -14,7 +14,7 @@
 // the popups asking for permission or before opening a link are drawn by
 // the app too. Loaded with the first Mini App opened, with its own styles.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useChat, useServices, useUser } from "../data/services.tsx";
 import { ChatAvatar, useDomId } from "../ui/parts.tsx";
 import { PopupMenu } from "../ui/popup-menu.tsx";

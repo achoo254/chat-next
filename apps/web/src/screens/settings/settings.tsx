@@ -2,7 +2,7 @@ import { Fragment, useEffect, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { Avatar } from "../../components/avatar.tsx";
 import { LoaderBoundary } from "../../components/delayed-loader.tsx";
-import { Icon, type IconName } from "../../components/icon.tsx";
+import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, type SettingsTab } from "../../router.tsx";

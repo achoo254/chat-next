@@ -1,7 +1,7 @@
 import { signInUrl } from "@app/core";
 import { brand } from "../brand.ts";
 import { BrandLogo } from "../components/brand-loader.tsx";
-import { Icon } from "../components/icon.tsx";
+import { Icon } from "../components/screen-icons.tsx";
 import { useI18n, type Locale } from "../i18n/i18n.tsx";
 import { returnPathFor } from "../router.tsx";
 

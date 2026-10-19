@@ -256,6 +256,7 @@ interface CopyButtonProps {
 
 /** Icon button that copies `text`; the icon turns into a tick for a moment. */
 export function CopyButton({ text, label, copiedLabel, small = false }: CopyButtonProps) {
+	"use no memo";
 	const { toasts } = useServices();
 	const copy = useCopy();
 	const [copied, setCopied] = useState(false);
@@ -285,6 +286,7 @@ export function CopyButton({ text, label, copiedLabel, small = false }: CopyButt
 
 /** Bottom toast, announced politely to screen readers. */
 export function Toast() {
+	"use no memo";
 	const text = useToast();
 	return (
 		<div className={text === "" ? "toast" : "toast show"} role="status" aria-live="polite">
