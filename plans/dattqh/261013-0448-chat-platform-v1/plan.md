@@ -518,7 +518,7 @@ Quyết định 2026-10-15 23:20: user chọn PWA + Web Push trước, app nativ
 
 Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trên macOS (dịch vụ push của Microsoft) và PWA trên iPhone (web.push.apple.com) đều hiện thông báo. Apple từ chối header `Topic` của RFC 8030 (`BadWebPushTopic`), nên server bỏ header này khi gửi tới Apple (commit `d3ce914`).
 
-## Bàn giao (2026-10-16 16:15) — đọc mục này trước khi làm tiếp
+## Bàn giao (2026-10-16 16:15) — đã cũ, xem mục "Bàn giao (2026-10-19)" ở cuối
 
 ### Đang chạy trên prod
 - https://chat.hoandat.com (tenant chính), release `20261016-194840-236b4ec3f0a9` (commit `236b4ec`, deploy bằng root), migration 23. Backup gần nhất trước migration: `chat-20261016-073048.dump`.
@@ -579,3 +579,26 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 4. R5 còn lại: ~~gửi hàng loạt~~ và ~~operator báo tính năng mới qua Trợ lý~~ xong 2026-10-16 (commit `fcf35be`, `e2dda00`, `bf23c67`; migration 21, 22); ~~inline mode~~ xong 2026-10-17 (commit `236b4ec`, migration 23); ~~chỉ báo "đang gõ"~~ xong 2026-10-17 theo yêu cầu user (commit `bef199c`: danh sách chat và dưới tin mới nhất; người theo cài đặt "Trạng thái hoạt động", bot tới mọi thành viên; không qua chặn); ~~SDK TS/Python/Go~~ xong 2026-10-17 (bộ sinh mã `server/cmd/sdkgen`, hợp đồng [phase-15-sdk-contract.md](./phase-15-sdk-contract.md), conformance 30/30 `pnpm conformance:sdk`; registry để khi ra mắt). R5 chỉ còn: bài thử "bot echo trong 10 phút" với người ngoài đội (Phase 14). Ngân sách JS khởi động 149,9/150 KB sau "đang gõ" (menu đính kèm nạp lười).
 5. R6 Mini App web.
 6. R7/R8 native khi user có tài khoản Apple Developer, Google Play, Firebase; Android có thể đóng gói PWA bằng Trusted Web Activity.
+
+## Bàn giao (2026-10-19) — đọc mục này trước khi làm tiếp
+
+### Thay đổi về cách deploy
+- Từ 2026-10-17 repo `github.com/achoo254/chat-next` **public** (quyết định của user, để GitHub Actions chạy miễn phí). Mọi commit, issue, log Actions đều công khai: không commit secret ở bất kỳ đâu, kể cả docs và plans; hook gitleaks giữ nguyên; không viết lại lịch sử, không force-push.
+- Push lên `main` thì `ci.yml` chạy (typescript, go, web-perf, proto), xanh thì `deploy.yml` deploy qua user `chat-deploy` (backup, migrate, smoke, rollback trên server). Sau khi push, theo dõi `gh run list -R achoo254/chat-next` thay vì chạy thêm `infra/chat/deploy.sh`; chỉ deploy tay khi Actions hỏng.
+- Lỗi CI, deploy, kết nối DB hay đăng nhập: báo phiên `inet-gitlab-ba` (đang rà bảo mật các repo public) kèm lỗi nguyên văn.
+
+### Đang chạy trên prod
+- Release `20261019-020333-6b7cda614b5f`, migration 26, cả tenant chính và `inetdev`.
+- Thêm từ 2026-10-17:
+  - watchdog cảnh báo vận hành vào nhóm "Vận hành chat" (`internal/watch`, migration 25); check outbox chỉ đếm dòng của tenant mình;
+  - ảnh đại diện người dùng theo luật "Ai thấy ảnh đại diện" (ẩn với người bị chặn), ảnh nhóm/kênh chỉ thành viên thấy, hộp "Sửa thông tin nhóm" ở cột thông tin, ô ảnh khi tạo nhóm (migration 26); công tắc xem trước của màn Riêng tư bỏ;
+  - hàng nút thao tác nhanh nằm cạnh bong bóng, không che chữ;
+  - điện thoại: danh sách chat thu ô tìm kiếm khi cuộn, Cài đặt dạng danh mục → mục có nút quay lại, không có "Phím tắt" trên máy chỉ cảm ứng.
+- JS khởi động 149,8/150 KB.
+
+### Việc tiếp theo
+1. **Media còn dở (Jev 0,44, đang làm):** giữ nhóm album khi chuyển tiếp, tạm dừng upload, bỏ metadata WebM/MKV, poster video và waveform khi server không có ffmpeg.
+2. Gọn ngân sách JS khởi động (Jev 0,37): tách phần ít dùng của `message-item.tsx` và bộ icon.
+3. Mini App web (R6) chờ user đăng ký domain riêng.
+4. Đánh giá Nghị định 13: user bảo bỏ qua; test tải lớn: bỏ qua tới khi có người dùng thật.
+
