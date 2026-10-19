@@ -316,6 +316,11 @@ func TestFailingUpdateIsDeadLetteredAndTheChatGoesOn(t *testing.T) {
 		dead[0].ChatID != group || dead[0].ChatTitle != "group" || dead[0].Kind != "message" {
 		t.Fatalf("dead letters = %+v (total %d), %v", dead, total, err)
 	}
+	// The receiver answers before the consumer records the delivery: wait for the count.
+	eventually(t, "the delivery counted", func() bool {
+		st, _ := env.Updates.Stats(ctx, botID)
+		return st.Delivered == 1
+	})
 	st, _ := env.Updates.Stats(ctx, botID)
 	if st.Failed != int64(botupdates.MaxAttempts) || st.DeadLettered != 1 || st.Delivered != 1 {
 		t.Fatalf("stats = %+v", st)
