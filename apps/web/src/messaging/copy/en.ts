@@ -191,6 +191,7 @@ export const en: MessagingCopy = {
 		historyOff: (actor: string) => `${actor} turned off: new members can see history`,
 		modeChanged: "The group switched to large group mode (more than 200 members)",
 		joinedByInvite: (actor: string) => `${actor} joined with an invite link`,
+		miniAppData: (button: string) => (button === "" ? "Data sent to the bot" : `Data from “${button}” sent to the bot`),
 		hookStopped: (actor: string, name: string, reason: HookStopReason, channel: boolean): string => {
 			switch (reason) {
 				case "disabled":

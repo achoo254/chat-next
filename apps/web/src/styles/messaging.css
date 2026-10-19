@@ -300,9 +300,9 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 	flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); min-height: 36px; padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius-sm); border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-primary); font-size: 0.875rem; font-weight: 500; text-align: center; text-decoration: none;
 }
-.kb-row a > span:first-child, .kb-row button > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.kb-row a > span:first-child, .kb-row button > span:first-child, .kb-row .app-button > span { min-width: 0; overflow-wrap: anywhere; }
 .kb-row button { font-family: inherit; cursor: pointer; }
-.kb-row a .icon { flex: none; }
+.kb-row a .icon, .kb-row button .icon { flex: none; }
 .kb-row a:hover, .kb-row button:hover { background: var(--c-selected); }
 /* A callback button waiting for the bot: a spinner before its text, the others stay usable. */
 .kb-row button[aria-busy="true"] { color: var(--c-text-muted); cursor: progress; }

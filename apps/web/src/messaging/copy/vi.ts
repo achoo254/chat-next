@@ -200,6 +200,8 @@ export const vi = {
 		historyOff: (actor: string) => `${actor} đã tắt: thành viên mới xem được lịch sử`,
 		modeChanged: "Nhóm đã chuyển sang chế độ nhóm lớn (hơn 200 thành viên)",
 		joinedByInvite: (actor: string) => `${actor} đã tham gia bằng link mời`,
+		/** The user's Mini App sent data to the bot; `button` is "" for the bot's main Mini App. */
+		miniAppData: (button: string) => (button === "" ? "Đã gửi dữ liệu tới bot" : `Đã gửi dữ liệu từ “${button}” tới bot`),
 		/** An incoming webhook stopped (mockups/integrations.html#hook-disabled); `actor` is the admin, unused when the server turned it off. */
 		hookStopped: (actor: string, name: string, reason: HookStopReason, channel: boolean): string => {
 			switch (reason) {

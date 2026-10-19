@@ -181,6 +181,8 @@ function parseAction(json: string | null): MessageAction | null {
 				hookName: text(value, "hookName"),
 				reason: hookStopReason(value.reason),
 			};
+		case "mini_app_data":
+			return { kind: "mini_app_data", buttonText: text(value, "buttonText") };
 		default:
 			return { kind: "unsupported" };
 	}
@@ -200,7 +202,9 @@ function parseButtons(raw: string | null): MessageButton[][] {
 
 function parseButton(b: Record<string, unknown>): MessageButton {
 	const button = { text: text(b, "text"), url: typeof b.url === "string" ? b.url : null };
-	return typeof b.callbackData === "string" && b.callbackData !== "" ? { ...button, callbackData: b.callbackData } : button;
+	if (typeof b.callbackData === "string" && b.callbackData !== "") return { ...button, callbackData: b.callbackData };
+	if (typeof b.miniAppUrl === "string" && b.miniAppUrl !== "") return { ...button, miniAppUrl: b.miniAppUrl };
+	return button;
 }
 
 /** `hidden`: the local keyboard_hidden column (the JSON holds what the bot sent). */

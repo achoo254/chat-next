@@ -4,7 +4,9 @@
 // (#commands) and the reply keyboard the bot set (#reply-keyboard). In a
 // group the composer gets the command menu of the group's bots (#commands):
 // a picked command carries "@username" when the group has more than one
-// bot. Loaded with the first bot chat or group opened, with its own styles.
+// bot. A bot with a main Mini App gets "Mở app" in the composer of its
+// private chat. Loaded with the first bot chat or group opened, with its own
+// styles.
 import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@app/core";
 import { cryptoRandomId } from "@app/platform";
@@ -13,10 +15,12 @@ import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices, useUser } from "../data/services.tsx";
 import { ChatAvatar, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
+import { useUi } from "../ui/ui-context.tsx";
 
 /** Id of a chat's command menu, which the composer's menu button controls. */
 export const BOT_MENU_ID = (chatId: number): string => `bot-cmds-${chatId}`;
 import type { BotCommand, BotInfo, Bots, ChatMenus } from "./api.ts";
+import { launchMiniApp } from "./mini-app-launch.ts";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import "./bot-chat.css";
 
@@ -250,12 +254,17 @@ export interface BotBar {
 	readonly keyboard: boolean | null;
 	/** The bot's placeholder while its keyboard shows; null for the composer's own. */
 	readonly placeholder: string | null;
+	/** The label of the button opening the bot's main Mini App; null without one. */
+	readonly app: string | null;
 }
+
+const NO_BAR: BotBar = { menu: null, keyboard: null, placeholder: null, app: null };
 
 /** What the composer's buttons and keys call in the bot layer. */
 export interface BotActions {
 	toggleMenu(): void;
 	toggleKeyboard(): void;
+	openApp(): void;
 	/** Asked first on every key in the text box; true when the menu used the key. */
 	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
 }
@@ -401,7 +410,8 @@ function CommandMenu({ chatId, menu, head, owners }: { chatId: number; menu: Com
 /** Command menu and reply keyboard around the composer of a private chat with a bot. */
 export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, actionsRef }: BotLayerProps) {
 	const t = useBotsCopy();
-	const { source, toasts } = useServices();
+	const { bots, source, toasts } = useServices();
+	const ui = useUi();
 	const copy = useCopy();
 	const user = useUser(botId);
 	const info = useBotInfo(botId, chatId);
@@ -425,8 +435,16 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 	const toggleKeyboard = () => {
 		if (active !== null) setHidden(active.seq, padShown);
 	};
+	const [opening, setOpening] = useState(false);
+	const openApp = () => {
+		if (opening) return;
+		setOpening(true);
+		launchMiniApp(bots, ui, { botId, chatId, seq: 0, url: "", buttonText: "" })
+			.catch(() => toasts.show(t.miniApp.openFailed))
+			.finally(() => setOpening(false));
+	};
 	useLayoutEffect(() => {
-		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard, onKey: menu.onKey };
+		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard, openApp, onKey: menu.onKey };
 		return () => {
 			actionsRef.current = null;
 		};
@@ -435,10 +453,11 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 	const menuState = entries.length > 0 ? menu.open : null;
 	const keyboardState = active === null ? null : padShown;
 	const placeholder = padShown && active.keyboard.placeholder !== "" ? active.keyboard.placeholder : null;
+	const app = info !== null && info.miniAppUrl !== "" ? t.miniApp.open : null;
 	useLayoutEffect(() => {
-		onBar({ menu: menuState, keyboard: keyboardState, placeholder });
-	}, [onBar, menuState, keyboardState, placeholder]);
-	useLayoutEffect(() => () => onBar({ menu: null, keyboard: null, placeholder: null }), [onBar]);
+		onBar({ menu: menuState, keyboard: keyboardState, placeholder, app });
+	}, [onBar, menuState, keyboardState, placeholder, app]);
+	useLayoutEffect(() => () => onBar(NO_BAR), [onBar]);
 
 	return (
 		<>
@@ -506,16 +525,16 @@ export function GroupBotLayer({ chatId, text, setText, send, focus, onBar, actio
 	const entries = loaded !== null && loaded.chatId === chatId ? loaded.entries : NO_ENTRIES;
 	const menu = useCommandMenu(entries, text, setText, send, focus);
 	useLayoutEffect(() => {
-		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard: () => {}, onKey: menu.onKey };
+		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard: () => {}, openApp: () => {}, onKey: menu.onKey };
 		return () => {
 			actionsRef.current = null;
 		};
 	});
 	const menuState = entries.length > 0 ? menu.open : null;
 	useLayoutEffect(() => {
-		onBar({ menu: menuState, keyboard: null, placeholder: null });
+		onBar({ ...NO_BAR, menu: menuState });
 	}, [onBar, menuState]);
-	useLayoutEffect(() => () => onBar({ menu: null, keyboard: null, placeholder: null }), [onBar]);
+	useLayoutEffect(() => () => onBar(NO_BAR), [onBar]);
 	return <CommandMenu chatId={chatId} menu={menu} head={t.menu.groupHead} owners />;
 }
 

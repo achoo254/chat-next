@@ -53,14 +53,16 @@ interface BotBar {
 	readonly menu: boolean | null;
 	readonly keyboard: boolean | null;
 	readonly placeholder: string | null;
+	readonly app: string | null;
 }
 
-const NO_BOT_BAR: BotBar = { menu: null, keyboard: null, placeholder: null };
+const NO_BOT_BAR: BotBar = { menu: null, keyboard: null, placeholder: null, app: null };
 
 /** What the composer calls in the bot layer (bots/bot-chat.tsx BotActions). */
 interface BotActions {
 	toggleMenu(): void;
 	toggleKeyboard(): void;
+	openApp(): void;
 	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
 }
 
@@ -450,6 +452,11 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						onClick={() => botActions.current?.toggleMenu()}
 					>
 						<Icon name="command" />
+					</button>
+				)}
+				{botBar.app !== null && (
+					<button type="button" className="btn btn-sm app-open" onClick={() => botActions.current?.openApp()}>
+						{botBar.app}
 					</button>
 				)}
 				{mediaOn && limits !== null && (

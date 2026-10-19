@@ -67,14 +67,17 @@ export interface ForumTopic {
 /**
  * A button under a message (inline keyboard). Incoming webhooks and bots post
  * URL buttons; bots also post callback buttons, whose data goes back to the
- * bot through PressInlineButton. url is null and callbackData absent for
- * kinds this client does not handle yet (Mini Apps, inline queries).
+ * bot through PressInlineButton, and Mini App buttons (BotsService.OpenMiniApp).
+ * url is null and callbackData and miniAppUrl absent for kinds this client
+ * does not handle yet (inline queries).
  */
 export interface MessageButton {
 	readonly text: string;
 	readonly url: string | null;
 	/** Bot callback button: its callback_data as standard base64 (1 to 64 bytes). */
 	readonly callbackData?: string;
+	/** Mini App button: the https URL the bot's Mini App opens at. */
+	readonly miniAppUrl?: string;
 }
 
 /**
@@ -265,6 +268,8 @@ export type MessageAction =
 	| { readonly kind: "joined_by_invite" }
 	/** An incoming webhook stopped posting; fromId is the admin, or 0 when the server turned it off. */
 	| { readonly kind: "incoming_hook_stopped"; readonly hookName: string; readonly reason: HookStopReason }
+	/** The sender's Mini App sent data to the bot; buttonText is the button that opened it ("" for the main Mini App). */
+	| { readonly kind: "mini_app_data"; readonly buttonText: string }
 	/** A kind this client does not know yet: rendered as "unsupported". */
 	| { readonly kind: "unsupported" };
 

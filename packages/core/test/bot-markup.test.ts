@@ -20,7 +20,7 @@ const big = BigInt;
 const utf8 = new TextEncoder();
 
 describe("bot reply markup", () => {
-	it("maps callback and URL buttons, keeping the callback data as base64", () => {
+	it("maps callback, URL and Mini App buttons, keeping the callback data as base64", () => {
 		const message = toMessage(
 			create(MessageSchema, {
 				chatId: big(5),
@@ -52,7 +52,7 @@ describe("bot reply markup", () => {
 				{ text: "Hoãn", url: null, callbackData: "AP8H" },
 			],
 			[{ text: "Xem changelog", url: "https://gitlab.example.invalid/r" }],
-			[{ text: "Mini App", url: null }],
+			[{ text: "Mini App", url: null, miniAppUrl: "https://app.example.invalid" }],
 		]);
 		expect(fromBase64(message.buttons[0]?.[1]?.callbackData ?? "")).toEqual(new Uint8Array([0, 255, 7]));
 		expect(message.keyboard).toBeUndefined();
@@ -90,7 +90,7 @@ describe("bot reply markup", () => {
 		expect(empty.keyboard).toBeUndefined();
 	});
 
-	it("keeps callback buttons and reply keyboards in the local database across a restart", async () => {
+	it("keeps callback and Mini App buttons, Mini App data and reply keyboards in the local database across a restart", async () => {
 		const server = new FakeServer();
 		const self = server.addUser("Tôi");
 		const bot = server.addUser("Deploy Bot");
@@ -103,17 +103,27 @@ describe("bot reply markup", () => {
 			replyMarkup: {
 				kind: {
 					case: "inlineKeyboard",
-					value: { rows: [{ buttons: [{ text: "Lên production", action: { case: "callbackData", value: utf8.encode("go") } }] }] },
+					value: {
+						rows: [
+							{ buttons: [{ text: "Lên production", action: { case: "callbackData", value: utf8.encode("go") } }] },
+							{ buttons: [{ text: "Mở bảng", action: { case: "miniAppUrl", value: "https://app.example.invalid/p" } }] },
+						],
+					},
 				},
 			},
 		}).seq;
+		const sent = server.postService(chat, self, { kind: { case: "miniAppData", value: { data: "{\"v\":1}", buttonText: "Mở bảng" } } });
 		const keys = server.sendMessage(bot, chat, "Chọn môi trường", 0, {
 			replyMarkup: { kind: { case: "keyboard", value: { rows: [{ buttons: [{ text: "staging" }] }], oneTime: true } } },
 		}).seq;
 		await settle(core);
 
 		const expected = [
-			{ seq: inline, buttons: [[{ text: "Lên production", url: null, callbackData: "Z28=" }]] },
+			{
+				seq: inline,
+				buttons: [[{ text: "Lên production", url: null, callbackData: "Z28=" }], [{ text: "Mở bảng", url: null, miniAppUrl: "https://app.example.invalid/p" }]],
+			},
+			{ seq: sent, fromId: self, action: { kind: "mini_app_data", buttonText: "Mở bảng" } },
 			{ seq: keys, buttons: [], keyboard: { kind: "keyboard", rows: [["staging"]], oneTime: true, placeholder: "", selective: false, hidden: false } },
 		];
 		expect((await core.history(chat)).messages.filter((m) => m.seq >= inline)).toMatchObject(expected);

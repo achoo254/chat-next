@@ -292,11 +292,12 @@ export function toForumTopic(topic: WireForumTopic): ForumTopic {
 	};
 }
 
-/** One inline button: URL and bot callback buttons; other kinds keep only their text. */
+/** One inline button: URL, bot callback and Mini App buttons; other kinds keep only their text. */
 function toButton(button: WireInlineButton): MessageButton {
 	const action = button.action;
 	if (action.case === "url") return { text: button.text, url: action.value };
 	if (action.case === "callbackData") return { text: button.text, url: null, callbackData: toBase64(action.value) };
+	if (action.case === "miniAppUrl" && action.value !== "") return { text: button.text, url: null, miniAppUrl: action.value };
 	return { text: button.text, url: null };
 }
 
@@ -466,6 +467,9 @@ function toAction(action: WireAction | undefined): MessageAction | null {
 			return { kind: "joined_by_invite" };
 		case "incomingHookStopped":
 			return { kind: "incoming_hook_stopped", hookName: kind.value.hookName, reason: HOOK_STOP_REASONS[kind.value.reason] ?? "unknown" };
+		case "miniAppData":
+			// The data itself is for the bot; the history only names the button.
+			return { kind: "mini_app_data", buttonText: kind.value.buttonText };
 		case undefined:
 			return { kind: "unsupported" };
 	}

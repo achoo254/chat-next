@@ -1,7 +1,8 @@
 // Developer Console (mockups/console.html), opened from Settings on the chat
-// session: the caller's bots, a new bot, and one bot's profile, token and
-// commands. A token is shown once, right after it is issued; issuing one,
-// deleting a bot or setting its webhook needs a recent sign-in, so the
+// session: the caller's bots, a new bot, and one bot's profile, token,
+// commands and Mini App (mini-app-settings.tsx). A token is shown once,
+// right after it is issued; issuing one, deleting a bot or setting its
+// webhook needs a recent sign-in, so the
 // console sends the browser to /auth/login?reauth=1 and, back on the same
 // page, asks once more (`?after=token`, `?after=delete` or `?after=webhook`
 // opens the confirmation; only its button acts, so a link carrying the
@@ -25,6 +26,7 @@ import { BOT_LIMITS, botErrorKind, EDITABLE_SCOPES, usernameProblem, validComman
 import { DeadLettersTab, StatsTab, UpdatesTab, when } from "./delivery.tsx";
 import { ConfirmDialog, ReauthDialog, reauthUrl, useConfirmShown, type After, type TabProps } from "./dialogs.tsx";
 import { BotPhotoField } from "./bot-photo.tsx";
+import { MiniAppTab } from "./mini-app-settings.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import type { BotsCopy } from "./copy-vi.ts";
 import "./console.css";
@@ -437,7 +439,7 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 	const shown = () => setTaken((current) => (current.after === null ? current : { ...current, after: null }));
 	const bot = state.status === "ready" ? (state.value.find((b) => b.id === botId) ?? null) : null;
 	const titleId = useDomId("bot");
-	const TABS: readonly ConsoleTab[] = ["profile", "token", "updates", "dead-letters", "stats", "commands"];
+	const TABS: readonly ConsoleTab[] = ["profile", "token", "updates", "dead-letters", "stats", "commands", "mini-app"];
 	return (
 		<section className="console" aria-labelledby={titleId}>
 			<ConsoleHead back={paths.console()} backLabel={t.console.backToList} parent={t.console.title} current={bot?.name ?? t.console.myBots} />
@@ -480,8 +482,10 @@ function BotPage({ botId, tab }: { botId: number; tab: ConsoleTab }) {
 							<DeadLettersTab bot={bot} />
 						) : tab === "stats" ? (
 							<StatsTab bot={bot} />
-						) : (
+						) : tab === "commands" ? (
 							<CommandsTab bot={bot} onSaved={put} />
+						) : (
+							<MiniAppTab bot={bot} onSaved={put} />
 						)}
 					</div>
 				</>

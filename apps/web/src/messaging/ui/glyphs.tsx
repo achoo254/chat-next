@@ -18,6 +18,15 @@ const PATHS = {
 		</>
 	),
 	crown: <path d="M12 6l4 6 5-4-2 10H5L3 8l5 4z" />,
+	/** A bot's Mini App (inline Mini App buttons). */
+	apps: (
+		<>
+			<rect x="4" y="4" width="6" height="6" rx="1" />
+			<rect x="14" y="4" width="6" height="6" rx="1" />
+			<rect x="4" y="14" width="6" height="6" rx="1" />
+			<path d="M14 17h6M17 14v6" />
+		</>
+	),
 	refresh: <path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4" />,
 	key: (
 		<>

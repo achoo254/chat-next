@@ -4,15 +4,19 @@ import type { StoredMessage } from "@app/core";
 import { Icon } from "../../components/icon.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";
+import { launchMiniApp } from "../bots/mini-app-launch.ts";
+import { useBotsCopy } from "../bots/use-bots-copy.ts";
+import { Glyph } from "./glyphs.tsx";
 import { isAllowedLink, laterLinkOpener, type RichContext } from "./rich-text.tsx";
 import { Cell, useCell, useUi } from "./ui-context.tsx";
 
-/** A button as shown: a bot callback or an allowed link. */
+/** A button as shown: a bot callback, a bot's Mini App or an allowed link. */
 type ShownButton =
 	| { readonly kind: "callback"; readonly text: string; readonly data: string; readonly key: string }
+	| { readonly kind: "app"; readonly text: string; readonly url: string; readonly key: string }
 	| { readonly kind: "url"; readonly text: string; readonly url: string; readonly key: string };
 
-/** Callback buttons waiting for the bot's answer ("chatId:seq:row:column"), across the screen. */
+/** Callback and Mini App buttons waiting for the server's answer ("chatId:seq:row:column"), across the screen. */
 const pressing = new Cell<ReadonlySet<string>>(new Set());
 
 function setPressing(key: string, on: boolean): void {
@@ -28,10 +32,12 @@ function setPressing(key: string, on: boolean): void {
  * before opening, like links in the text. A bot's callback button sends its
  * data to the bot (PressInlineButton) and shows the answer as a toast, or a
  * dialog when the bot asks for one; no answer in 10 seconds reads "Bot không
- * phản hồi".
+ * phản hồi". A Mini App button opens the bot's Mini App (OpenMiniApp, then
+ * the container).
  */
 export default function MessageButtons({ message, ctx }: { message: StoredMessage; ctx: RichContext }) {
 	const copy = useCopy();
+	const t = useBotsCopy();
 	const ui = useUi();
 	const { bots, toasts } = useServices();
 	const waiting = useCell(pressing);
@@ -40,6 +46,7 @@ export default function MessageButtons({ message, ctx }: { message: StoredMessag
 		.map((row, rowIndex) =>
 			row.flatMap((button, column): ShownButton[] => {
 				if (button.callbackData !== undefined) return [{ kind: "callback", text: button.text, data: button.callbackData, key: `${chatId}:${seq}:${rowIndex}:${column}` }];
+				if (button.miniAppUrl !== undefined) return [{ kind: "app", text: button.text, url: button.miniAppUrl, key: `${chatId}:${seq}:${rowIndex}:${column}` }];
 				if (button.url !== null && isAllowedLink(button.url)) return [{ kind: "url", text: button.text, url: button.url, key: `${rowIndex}:${column}` }];
 				return [];
 			}),
@@ -68,12 +75,32 @@ export default function MessageButtons({ message, ctx }: { message: StoredMessag
 			)
 			.finally(() => setPressing(key, false));
 	};
+	const openApp = (key: string, text: string, url: string) => {
+		if (pressing.get().has(key)) return;
+		setPressing(key, true);
+		// A message sent through a bot's inline mode carries that bot's buttons.
+		const botId = message.viaBotId !== 0 ? message.viaBotId : fromId;
+		launchMiniApp(bots, ui, { botId, chatId, seq, url, buttonText: text })
+			.catch(() => toasts.show(t.miniApp.openFailed))
+			.finally(() => setPressing(key, false));
+	};
 	return (
 		<div className="keyboard">
 			{rows.map((row, rowIndex) => (
 				<div className="kb-row" key={rowIndex}>
 					{row.map((button) =>
-						button.kind === "callback" ? (
+						button.kind === "app" ? (
+							<button
+								key={button.key}
+								type="button"
+								className="app-button"
+								aria-busy={waiting.has(button.key)}
+								onClick={() => openApp(button.key, button.text, button.url)}
+							>
+								<Glyph name="apps" small />
+								<span>{button.text}</span>
+							</button>
+						) : button.kind === "callback" ? (
 							<button
 								key={button.key}
 								type="button"

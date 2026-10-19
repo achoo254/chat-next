@@ -342,6 +342,9 @@ export class ChatFixture {
 			sendAsSelf: (chatId, text) => {
 				this.send(this.selfId, chatId, text);
 			},
+			sendMiniAppData: (chatId, data, buttonText) => {
+				this.send(this.selfId, chatId, "", { action: { kind: { case: "miniAppData", value: { data, buttonText } } } });
+			},
 		});
 	}
 

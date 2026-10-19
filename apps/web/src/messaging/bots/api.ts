@@ -48,6 +48,8 @@ export interface OwnBot {
 	readonly inlinePlaceholder: string;
 	/** file_id of the bot's photo; "" without one. */
 	readonly photoId: string;
+	/** The bot's main Mini App, an https URL on the owner's domain; "" for none. */
+	readonly miniAppUrl: string;
 }
 
 export type BotTierName = "new" | "default" | "verified" | "internal" | "restricted";
@@ -125,6 +127,8 @@ export interface BotChanges {
 	readonly inlinePlaceholder?: string;
 	/** A photo the owner uploaded becomes the bot's photo; "" removes it. */
 	readonly photoFileId?: string;
+	/** The main Mini App's https URL; "" removes the Mini App. */
+	readonly miniAppUrl?: string;
 }
 
 /** A bot's public profile and its command menu for one chat (GetBotInfo). */
@@ -143,6 +147,16 @@ export interface BotInfo {
 	readonly inlinePlaceholder: string;
 	/** file_id of the bot's photo; "" without one. */
 	readonly photoId: string;
+	/** The bot's main Mini App ("Mở app"); "" without one. */
+	readonly miniAppUrl: string;
+}
+
+/** What the Mini App container loads (OpenMiniApp). */
+export interface MiniAppLaunch {
+	/** The https URL to load; the container talks only to its origin. */
+	readonly url: string;
+	/** Signed init data (a query string) handed to the Mini App in the URL fragment. */
+	readonly initData: string;
 }
 
 export type InlineKind = "article" | "photo" | "video" | "document";
@@ -272,6 +286,16 @@ export interface Bots {
 	inlineQuery(botId: number, chatId: number, query: string): Promise<InlineAnswer>;
 	/** Posts the result as the caller's message via the bot. */
 	sendInlineResult(chatId: number, topicId: number, queryId: string, resultId: string, randomId: number): Promise<void>;
+	/**
+	 * The URL and init data of a Mini App: `url` "" opens the bot's main one
+	 * (`chatId` its private chat, or 0 from the profile, `seq` 0), else it is
+	 * the Mini App URL of an inline button of the message `chatId`/`seq`.
+	 */
+	openMiniApp(botId: number, chatId: number, seq: number, url: string): Promise<MiniAppLaunch>;
+	/** The user let the bot's Mini App message them (records consent like Bắt đầu). */
+	allowMiniAppWrite(botId: number): Promise<void>;
+	/** The Mini App's data (up to 4096 bytes) goes to the bot as the user's message; `buttonText` is the button that opened it. */
+	sendMiniAppData(botId: number, data: string, buttonText: string): Promise<void>;
 	/** Webhook, delivery state and 24-hour counters. */
 	delivery(botId: number): Promise<BotDelivery>;
 	/** BotError "invalid" with a webhookProblem() code when refused. */
@@ -328,6 +352,9 @@ const BOTS_METHODS = [
 	"press",
 	"inlineQuery",
 	"sendInlineResult",
+	"openMiniApp",
+	"allowMiniAppWrite",
+	"sendMiniAppData",
 	"delivery",
 	"setWebhook",
 	"deleteWebhook",

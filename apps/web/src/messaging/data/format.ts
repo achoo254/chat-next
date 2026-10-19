@@ -182,6 +182,8 @@ export function actionText(action: MessageAction, actor: string, nameOf: NameOf,
 			return t.joinedByInvite(actor);
 		case "incoming_hook_stopped":
 			return t.hookStopped(actor, action.hookName, action.reason, channel);
+		case "mini_app_data":
+			return t.miniAppData(action.buttonText);
 		case "unsupported":
 			return t.unsupported;
 	}

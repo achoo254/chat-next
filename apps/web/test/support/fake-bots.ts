@@ -6,7 +6,10 @@
 // private chat with "/start [param]". Callback presses answer what the test
 // queued. Update delivery: a webhook (https, no internal address, a secret
 // the first time and with every new URL), its status and counters as seeded,
-// and dead letters to retry or drop.
+// and dead letters to retry or drop. Mini Apps: the main URL set in the
+// Console (https on a domain, no credentials, no IP host), OpenMiniApp
+// answering fake signed init data, AllowMiniAppWrite and SendMiniAppData
+// posting the user's ActionMiniAppData message to the bot's private chat.
 // Never imported by production code.
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { BotAdminService, BotCommandScope, BotTier, type BotCommandSet } from "@app/proto-ts/bot_admin";
@@ -29,6 +32,8 @@ export interface BotHost {
 	wireChat(chatId: number): WireChat;
 	/** A text message from the signed-in user. */
 	sendAsSelf(chatId: number, text: string): void;
+	/** The signed-in user's Mini App data message (ActionMiniAppData). */
+	sendMiniAppData(chatId: number, data: string, buttonText: string): void;
 }
 
 interface FakeBot {
@@ -56,6 +61,8 @@ interface FakeBot {
 	maxConnections: number;
 	delivery: DeliverySeed;
 	deadLetters: DeadLetterSeed[];
+	/** The main Mini App; "" for none. */
+	miniAppUrl: string;
 }
 
 /** The delivery state GetBotDelivery reports. */
@@ -142,6 +149,14 @@ export class FakeBots {
 	readonly inlineAnswers = new Map<string, (FakeInlineResult & { botId: number })[]>();
 	/** InlineQuery requests: bot and query. */
 	readonly inlineQueries: { botId: number; query: string }[] = [];
+	/** OpenMiniApp requests, in order. */
+	readonly miniAppOpens: { botId: number; chatId: number; seq: number; url: string }[] = [];
+	/** OpenMiniApp fails with unavailable this many more times. */
+	failOpenMiniApp = 0;
+	/** AllowMiniAppWrite requests: the bot ids. */
+	readonly miniAppWrites: number[] = [];
+	/** SendMiniAppData requests, in order. */
+	readonly miniAppData: { botId: number; data: string; buttonText: string }[] = [];
 	private serial = 0;
 
 	constructor(private readonly host: BotHost) {}
@@ -174,6 +189,7 @@ export class FakeBots {
 			maxConnections: 40,
 			delivery: { ...NO_DELIVERY },
 			deadLetters: [],
+			miniAppUrl: "",
 			...extras,
 		});
 		return id;
@@ -211,6 +227,7 @@ export class FakeBots {
 			tokenIssuedAt: BigInt(bot.tokenIssuedAt),
 			lastUpdateAt: BigInt(bot.lastUpdateAt),
 			webhook: bot.webhookUrl !== "",
+			miniAppUrl: bot.miniAppUrl,
 		};
 	}
 
@@ -237,6 +254,21 @@ export class FakeBots {
 			throw new ConnectError("secret_required: a new secret is required when the url changes", Code.InvalidArgument);
 		}
 		if (maxConnections < 0 || maxConnections > 100) throw new ConnectError("max_connections_invalid: 1 to 100", Code.InvalidArgument);
+	}
+
+	/** The server's checks of a Mini App URL (UpdateBot); the fake treats *.example.test as the app's own domain. */
+	private checkMiniAppUrl(url: string): void {
+		if (url === "") return;
+		let parsed: URL;
+		try {
+			parsed = new URL(url);
+		} catch {
+			throw new ConnectError("mini_app_url_not_allowed: not a URL", Code.InvalidArgument);
+		}
+		if (parsed.protocol !== "https:" || parsed.username !== "" || parsed.password !== "" || parsed.hash !== "" || /^[\d.]+$/.test(parsed.hostname) || url.length > 512) {
+			throw new ConnectError("mini_app_url_not_allowed: https on a domain name, without credentials", Code.InvalidArgument);
+		}
+		if (parsed.hostname.endsWith(".example.test")) throw new ConnectError("mini_app_url_not_allowed: under the app's domain", Code.InvalidArgument);
 	}
 
 	private needRecentSignIn(): void {
@@ -292,6 +324,10 @@ export class FakeBots {
 				if (req.privacy !== undefined) bot.privacy = req.privacy;
 				if (req.commands !== undefined) bot.commands = req.commands.sets;
 				if (req.photoFileId !== undefined) this.host.setPhoto(bot.id, req.photoFileId);
+				if (req.miniAppUrl !== undefined) {
+					this.checkMiniAppUrl(req.miniAppUrl);
+					bot.miniAppUrl = req.miniAppUrl;
+				}
 				return { bot: this.wireBot(bot) };
 			},
 			resetBotToken: (req) => {
@@ -428,7 +464,38 @@ export class FakeBots {
 					lastUpdateAt: BigInt(bot.owned ? bot.lastUpdateAt : 0),
 					// Judged by the server's clock, as the real server does.
 					notRunning: bot.owned && Math.floor(Date.now() / 1000) - bot.lastUpdateAt > 120,
+					miniAppUrl: bot.miniAppUrl,
 				};
+			},
+			openMiniApp: (req) => {
+				const bot = this.bot(num(req.botId));
+				const open = { botId: bot.id, chatId: num(req.chatId), seq: num(req.seq), url: req.url };
+				this.miniAppOpens.push(open);
+				if (this.failOpenMiniApp > 0) {
+					this.failOpenMiniApp--;
+					throw new ConnectError("connection lost", Code.Unavailable);
+				}
+				const url = req.url === "" ? bot.miniAppUrl : req.url;
+				if (url === "") throw new ConnectError("the bot has no Mini App", Code.InvalidArgument);
+				const fields = new URLSearchParams({
+					user: JSON.stringify({ id: this.host.selfId, first_name: "Tôi" }),
+					chat_type: open.chatId === 0 ? "sender" : "private",
+					auth_date: String(this.now),
+					bot_id: String(bot.id),
+				});
+				fields.set("signature", "fake-signature");
+				return { url, initData: fields.toString() };
+			},
+			allowMiniAppWrite: (req) => {
+				const bot = this.bot(num(req.botId));
+				this.miniAppWrites.push(bot.id);
+				return {};
+			},
+			sendMiniAppData: (req) => {
+				const bot = this.bot(num(req.botId));
+				this.miniAppData.push({ botId: bot.id, data: req.data, buttonText: req.buttonText });
+				this.host.sendMiniAppData(this.host.privateChat(bot.id), req.data, req.buttonText);
+				return {};
 			},
 			startBot: (req) => {
 				const bot = this.bot(num(req.botId));

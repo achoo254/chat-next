@@ -59,6 +59,21 @@ export interface MenuTarget {
 	readonly picker?: boolean;
 }
 
+/** A Mini App the user opened (OpenMiniApp answered), shown in the container (bots/mini-app.tsx). */
+export interface MiniAppRequest {
+	/** New for each opening, so opening again starts the container afresh. */
+	readonly id: number;
+	readonly botId: number;
+	/** The chat and message whose button opened it; seq 0 for the bot's main Mini App. */
+	readonly chatId: number;
+	readonly seq: number;
+	/** Text of the button that opened it; "" for the main Mini App. */
+	readonly buttonText: string;
+	/** The https URL to load and the signed init data, from OpenMiniApp. */
+	readonly url: string;
+	readonly initData: string;
+}
+
 /** The chat list's row menu (mockups/chat.html#list-menu), opened at a point of the viewport. */
 export interface ListMenuTarget {
 	readonly chatId: number;
@@ -104,6 +119,7 @@ export interface Ui {
 	readonly dialog: Cell<DialogRequest | null>;
 	readonly menu: Cell<MenuTarget | null>;
 	readonly listMenu: Cell<ListMenuTarget | null>;
+	readonly miniApp: Cell<MiniAppRequest | null>;
 	readonly intents: ComposerIntents;
 	/** Focuses the search box of the chat list (⌘K, header search button). */
 	readonly focusSearch: () => void;

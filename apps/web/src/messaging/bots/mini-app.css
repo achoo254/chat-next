@@ -1,0 +1,37 @@
+/* Mini App container (mockups/bots.html#mini-app, #mini-app-permission): a
+   panel on the right, full screen when narrow, with the header, the main
+   button and the popups drawn by the app. Loaded with the container only.
+   Colours come only from tokens. */
+
+.mini-app {
+	position: fixed; top: 0; right: 0; bottom: 0; z-index: 25; width: min(400px, 100%);
+	display: flex; flex-direction: column; min-width: 0; min-height: 0;
+	background: var(--c-surface); border-left: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-lg);
+}
+.ma-head { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.ma-title { flex: 1; min-width: 0; }
+.ma-title strong { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-origin { display: flex; align-items: center; gap: var(--space-1); min-width: 0; font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }
+.ma-origin > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ma-origin .icon { flex: none; width: 12px; height: 12px; }
+.ma-strip { padding: var(--space-1) var(--space-3); font-size: 0.75rem; color: var(--c-text-muted); background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); overflow-wrap: anywhere; }
+.ma-frame { position: relative; flex: 1; min-height: 0; background: var(--c-bg); }
+.ma-frame iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--c-bg); }
+.ma-loading { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--space-4); font-size: 0.875rem; color: var(--c-text-muted); background: var(--c-bg); }
+.ma-main { padding: var(--space-3); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.ma-main .btn { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+
+/* Popups cover the header and the content, so the Mini App cannot draw over them. */
+.ma-popup-layer { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--space-4); background: var(--c-backdrop); overflow-y: auto; }
+.ma-popup-layer > .panel { width: min(360px, 100%); max-height: 100%; overflow: auto; border-radius: var(--radius-lg); background: var(--c-surface); box-shadow: var(--shadow-lg); }
+.ma-popup-layer .dlg-body { padding-top: var(--space-4); }
+.ma-popup-layer h2 { margin: var(--space-3) 0 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.ma-popup-layer p { margin: var(--space-2) 0 0; font-size: 0.875rem; color: var(--c-text-muted); }
+.ma-popup-layer .dlg-foot { padding-top: var(--space-2); }
+.ma-popup-layer .popup-from { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: 0.75rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+.ma-popup-layer .host { font-family: var(--font-mono); font-weight: 600; color: var(--c-text); overflow-wrap: anywhere; }
+.ma-popup-layer .url-line { display: block; margin-top: var(--space-2); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-text-muted); overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+	.mini-app { width: 100%; border-left: 0; box-shadow: none; }
+}

@@ -95,6 +95,7 @@ export function toOwnBot(bot: WireBot | undefined, method: string): OwnBot {
 		tier: TIERS[bot.tier] ?? "default",
 		inlinePlaceholder: bot.inlinePlaceholder,
 		photoId: user.photo?.fileId ?? "",
+		miniAppUrl: bot.miniAppUrl,
 	};
 }
 
@@ -172,6 +173,7 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 		notRunning: response.isOwner && response.notRunning,
 		inlinePlaceholder: user.botInlinePlaceholder,
 		photoId: user.photo?.fileId ?? "",
+		miniAppUrl: response.miniAppUrl,
 	};
 }
 
@@ -264,6 +266,7 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 					...(changes.commands === undefined ? {} : { commands: wireSets(changes.commands) }),
 					...(changes.inlinePlaceholder === undefined ? {} : { inlinePlaceholder: changes.inlinePlaceholder }),
 					...(changes.photoFileId === undefined ? {} : { photoFileId: changes.photoFileId }),
+					...(changes.miniAppUrl === undefined ? {} : { miniAppUrl: changes.miniAppUrl }),
 				});
 				return toOwnBot(response.bot, "UpdateBot");
 			}),
@@ -336,6 +339,20 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 				} finally {
 					clearTimeout(timer);
 				}
+			}),
+		openMiniApp: (botId, chatId, seq, url) =>
+			call(async () => {
+				const response = await bots.openMiniApp({ botId: BigInt(botId), chatId: BigInt(chatId), seq: BigInt(seq), url, startParam: "", themeParams: {} });
+				if (response.url === "") throw new BotError("other", "OpenMiniApp returned no url");
+				return { url: response.url, initData: response.initData };
+			}),
+		allowMiniAppWrite: (botId) =>
+			call(async () => {
+				await bots.allowMiniAppWrite({ botId: BigInt(botId) });
+			}),
+		sendMiniAppData: (botId, data, buttonText) =>
+			call(async () => {
+				await bots.sendMiniAppData({ botId: BigInt(botId), data, buttonText });
 			}),
 		delivery: (botId) => call(async () => toDelivery(await admin.getBotDelivery({ botId: BigInt(botId) }))),
 		setWebhook: (botId, changes) =>

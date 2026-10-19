@@ -15,7 +15,7 @@ export type ConsolePage =
 	| { readonly page: "new" }
 	| { readonly page: "bot"; readonly botId: number; readonly tab: ConsoleTab };
 
-export type ConsoleTab = "profile" | "token" | "updates" | "dead-letters" | "stats" | "commands";
+export type ConsoleTab = "profile" | "token" | "updates" | "dead-letters" | "stats" | "commands" | "mini-app";
 
 export type Route =
 	| { name: "home" }
@@ -76,7 +76,7 @@ const REPORT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const HOOK_ID = /^hk_[A-Za-z0-9]{1,32}$/;
 /** Bot usernames in deep links (any case; the server stores them lowercase). */
 const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
-const CONSOLE_TABS: readonly ConsoleTab[] = ["token", "updates", "dead-letters", "stats", "commands"];
+const CONSOLE_TABS: readonly ConsoleTab[] = ["token", "updates", "dead-letters", "stats", "commands", "mini-app"];
 
 function parseId(value: string | undefined): number | null {
 	if (value === undefined || !ID.test(value)) return null;
