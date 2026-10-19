@@ -79,19 +79,19 @@ Plan riêng ở repo đó: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integ
 | 1 | [Chốt contract và nền móng monorepo](./phase-01-contracts-foundation.md) | L | — | 1, 6, 7, 3, 5 | Done (Compose dev chưa chạy: máy không có Docker) |
 | 2 | [Backend core — tài khoản, chat, tin nhắn, sync](./phase-02-backend-core-sync.md) | XL | 1 | 1, 2, 4, 7, 5 | In progress (R1 lên prod; tenant thứ hai chạy bằng process riêng thay cho chọn tenant theo Host; còn test hot user/failover) |
 | 3 | [Realtime gateway và push](./phase-03-realtime-gateway-push.md) | L | 2 | 2, 4, 7, 5 | In progress (WS gateway R1; Web Push cho PWA lên prod 2026-10-16; push native ở R7) |
-| 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | In progress (R3 lên prod: lưu trên đĩa .65; còn tạm dừng upload, grouped_id khi chuyển tiếp, ffmpeg) |
+| 4 | [Media pipeline](./phase-04-media-pipeline.md) | L | 2, 6, 13 | 2, 4, 5, 7 | In progress (R3 lên prod: lưu trên đĩa .65; tạm dừng upload, giữ album khi chuyển tiếp, bỏ metadata MP4/WebM xong 2026-10-19; còn poster/waveform/thời lượng khi server không có ffmpeg) |
 | 5 | [Client core — sync engine và lưu trữ local](./phase-05-client-core-sync-engine.md) | L | 1, 2, 3 | 2, 4, 1, 5 | In progress (web xong; native ở R7/R8) |
-| 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI R1 lên prod; còn React Compiler, perf gate CI) |
+| 6 | [Web UI React 19 và ngân sách tốc độ](./phase-06-web-ui-speed-budget.md) | XL | 5 | 2, 3, 1 | In progress (UI lên prod; React Compiler bật, perf gate chạy trong CI; JS khởi động sát trần 150 KB, đang tách phần ít dùng) |
 | 7 | [Tìm kiếm lịch sử tin nhắn](./phase-07-message-history-search.md) | L | 2, 5 | 2, 3, 5, 7 | In progress (R4 lên prod: Postgres pg_trgm chuỗi con + tsvector; Meilisearch để giai đoạn scale) |
-| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | In progress (R5 lên prod: đủ method trừ inline mode và bulk; webhook, safehttp, dead-letter, test hợp đồng OpenAPI, bot trợ lý) |
+| 8 | [Bot API core (8a)](./phase-08-bot-platform.md) | XL | 2, 3, 4, 6 | 6, 2, 3, 5 | In progress (R5 lên prod: đủ method gồm inline mode, gửi hàng loạt, "đang gõ"; webhook, safehttp, dead-letter, test hợp đồng OpenAPI, bot trợ lý; còn bài thử bot echo 10 phút với người ngoài đội ở Phase 14) |
 | 15 | [SDK bot và Developer Console (8b)](./phase-15-bot-sdk-developer-console.md) | L | 8 | 6, 3 | In progress (Console lên prod; SDK TS/Python/Go + conformance và ảnh bot xong 2026-10-17; còn registry khi ra mắt) |
-| 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | In progress (web R6 xong code) |
-| 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 lên prod: incoming webhook; phần bot ở R5) |
+| 16 | [Mini App](./phase-16-mini-app.md) | L | 8, 15 (mobile/desktop: 10, 11) | 6, 5, 3 | In progress (web R6 lên prod 2026-10-19: Mini App ở chỗ cột thông tin, menu, thu nhỏ, ví dụ 3 SDK, trang mẫu GitHub Pages; mobile/desktop theo Phase 10, 11) |
+| 9 | [Thông báo qua Bot và incoming webhook](./phase-09-notification-webhook-pipeline.md) | L | 2, 3 (phần bot: 8) | 2, 6, 3, 7 | In progress (R2 incoming webhook và phần bot của R5 lên prod; push native theo Phase 10, 11) |
 | 10 | [Ứng dụng mobile bằng Capacitor](./phase-10-mobile-capacitor.md) | L | 3, 6 | 4, 2, 3 | Hoãn (user 2026-10-15: PWA + Web Push trước; Capacitor khi cần App Store/Play) |
 | 11 | [Ứng dụng desktop bằng Tauri v2](./phase-11-desktop-tauri.md) | L | 3, 6 | 4, 2, 3 | Hoãn (cùng quyết định với Phase 10) |
-| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1, xuất/xoá dữ liệu và chống lạm dụng đầy đủ lên prod 2026-10-16; còn redact log, xoay vòng khoá, STRIDE, đánh giá ND13) |
-| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65; tenant `inetdev` chạy process riêng từ 2026-10-16; CI GitHub Actions đang bị chặn vì thanh toán, deploy bằng root) |
-| 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | Pending |
+| 12 | [Quyền riêng tư, an toàn, chống lạm dụng](./phase-12-privacy-safety-anti-abuse.md) | L | 2, 3, 7, 8, 9 | 5, 3, 7 | In progress (R1, xuất/xoá dữ liệu, chống lạm dụng, lọc PII khỏi log, xoay vòng khoá, STRIDE lên prod 2026-10-16; còn đánh giá ND13, user bảo bỏ qua tới khi cần) |
+| 13 | [Hạ tầng self-host và observability](./phase-13-infra-observability.md) | L | 1, 2 (chạy song song) | 7, 2, 4, 5 | In progress (GĐ1 trên .65; tenant `inetdev` chạy process riêng từ 2026-10-16; repo public từ 2026-10-17: push main → CI → deploy tự động, deploy root chỉ khi đổi `infra/chat`; watchdog cảnh báo vận hành) |
+| 14 | [Load test và sẵn sàng phát hành](./phase-14-load-test-launch-readiness.md) | M | 2–13, 15, 16 | 2, 7, 1 | In progress (load test lượt 1 xong 2026-10-17, trần 1000 người online; test lớn hoãn tới khi có người dùng thật theo user) |
 
 Phase là luồng việc kỹ thuật; thứ tự làm và đưa lên prod theo mục "Lộ trình phát hành" dưới đây. Mỗi release lấy đúng phần cần của các phase liên quan. Phase 15 mang số 15 vì được tách ra sau; về logic nó là 8b.
 
