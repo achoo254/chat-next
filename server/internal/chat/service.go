@@ -23,6 +23,7 @@ import (
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
+	"app.local/server/internal/miniapp"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/search"
 	"connectrpc.com/connect"
@@ -125,6 +126,8 @@ type Service struct {
 	logger   *slog.Logger
 	// operators is Config.Operators as a set.
 	operators map[int64]bool
+	// miniAppURLs checks the Mini App URLs of bot buttons.
+	miniAppURLs *miniapp.URLs
 
 	mu       sync.RWMutex
 	sink     Sink
@@ -202,9 +205,13 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Pool == nil || d.IDs == nil || d.Previews == nil || d.Limiter == nil || d.Logger == nil {
 		return nil, errors.New("chat: missing dependency")
 	}
+	miniAppURLs, err := miniapp.NewURLs(cfg.PublicOrigin)
+	if err != nil {
+		return nil, err
+	}
 	s := &Service{
 		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, media: d.Media, limiter: d.Limiter, logger: d.Logger,
-		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{}, searcher: d.Searcher,
+		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{}, searcher: d.Searcher, miniAppURLs: miniAppURLs,
 	}
 	if s.searcher == nil {
 		s.searcher = search.NewPostgres(d.Pool)

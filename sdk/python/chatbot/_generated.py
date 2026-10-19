@@ -44,6 +44,7 @@ __all__ = [
     "MemberChanged",
     "Message",
     "MessageRef",
+    "MiniAppKey",
     "ReactRequest",
     "Reaction",
     "ReplyKeyboardMarkup",
@@ -60,13 +61,15 @@ __all__ = [
     "Update",
     "UpdateKind",
     "User",
+    "WebAppData",
+    "WebAppInfo",
     "WebhookAnswer",
     "WebhookAnswer1",
     "WebhookAnswer2",
     "WebhookInfo",
 ]
 
-API_VERSION = "1.1.0"
+API_VERSION = "1.3.0"
 """Version of the Bot API these types and methods follow."""
 
 
@@ -143,12 +146,34 @@ class Entity(TypedDict, total=False):
 
 
 class InlineButton(TypedDict, total=False):
-    """Exactly one of callback_data and url."""
+    """Exactly one of callback_data, url and web_app."""
     text: Required[str]
     callback_data: str
     """1 to 64 bytes, sent back in the callback update when pressed."""
     url: str
     """Opened by the client (http, https, mailto or the app scheme)."""
+    web_app: WebAppInfo
+    """Opens the bot's Mini App at this URL. Not allowed in inline query results."""
+
+
+class WebAppInfo(TypedDict, total=False):
+    url: Required[str]
+    """https URL on the bot developer's own domain: not under the app's or a tenant's domain,
+    no user name or password, no IP address host, no fragment.
+    """
+
+
+class WebAppData(TypedDict, total=False):
+    """Data the user's Mini App sent to the bot."""
+    data: Required[str]
+    """1 to 4096 bytes, as the Mini App sent it."""
+    button_text: Required[str]
+    """Text of the button that opened the Mini App; empty for the bot's main Mini App."""
+
+
+class MiniAppKey(TypedDict, total=False):
+    public_key: Required[str]
+    """Ed25519 public key (32 bytes), base64url without padding."""
 
 
 class KeyboardButton(TypedDict, total=False):
@@ -224,6 +249,7 @@ Message = TypedDict(
         "media": "Media",
         "action": "Action",
         "forward_from": "ForwardFrom",
+        "web_app_data": "WebAppData",
         "integration_label": "str",
         "random_id": "int",
         "grouped_id": "int",
@@ -270,9 +296,10 @@ class Update(TypedDict, total=False):
     promoted, demoted or restricted) and `reaction` (a person set, changed or removed a
     reaction on one of the bot's messages; opt-in: only when `allowed_updates` lists it).
     Version 1.2 adds `inline_query` (a user typed @username of a bot with inline mode on,
-    which the owner turns on in the Developer Console). When the bot leaves or is removed
-    from a chat, its pending updates of that chat are dropped, except the `member_changed`
-    telling it so. Later versions add kinds; ignore unknown ones.
+    which the owner turns on in the Developer Console). Version 1.3 adds `web_app_data` to
+    messages in the private chat (data sent by the bot's Mini App). When the bot leaves or
+    is removed from a chat, its pending updates of that chat are dropped, except the
+    `member_changed` telling it so. Later versions add kinds; ignore unknown ones.
     """
     update_id: Required[int]
     message: Message
@@ -658,6 +685,19 @@ class GeneratedMethods:
     def get_me(self) -> Me:
         """The bot's own profile."""
         return self._call("GET", "/me")  # type: ignore[no-any-return]
+
+    def get_mini_app_key(self) -> MiniAppKey:
+        """The public key of Mini App init data.
+
+        Mini Apps receive init data as a query string (`user`, `chat_type`, `chat_instance`,
+        `start_param` when set, `auth_date`, `bot_id`, `tenant_id`, `signature`). `signature` is
+        the base64url (no padding) Ed25519 signature of `"<bot_id>:WebAppData\\n"` followed by
+        every other field as `key=value` lines (decoded values) sorted by key and joined by
+        `\\n`. Check it with this key, check that `bot_id` is the bot's and that `auth_date` is
+        recent. The key is the same for every bot of the server and changes when the server's
+        keys are rotated: fetch it again when a signature does not verify.
+        """
+        return self._call("GET", "/miniAppKey")  # type: ignore[no-any-return]
 
     def send_message(
         self,

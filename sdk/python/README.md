@@ -1,6 +1,7 @@
 # chat-bot-sdk (Python)
 
-Python SDK of the chat platform's Bot API. Python 3.11 or newer, standard library only.
+Python SDK of the chat platform's Bot API. Python 3.11 or newer, standard library only (verifying Mini App
+init data needs the optional `cryptography` package, see below).
 Types and API methods are generated from [`spec/bot-api/openapi.yaml`](../../spec/bot-api/openapi.yaml)
 into `chatbot/_generated.py` (do not edit; regenerate with `cd server && go run ./cmd/sdkgen`).
 API guide: [`docs/bot-api/README.md`](../../docs/bot-api/README.md).
@@ -67,6 +68,14 @@ The app checks `X-Bot-Api-Secret-Token`, `X-Bot-Signature` and `X-Bot-Timestamp`
 `413` above 1 MiB, `200` without running the handler again for an `update_id` seen recently,
 `200` with the handler's `WebhookAnswer` as JSON, `204` when it returns `None`, and `500` when it
 raises (the server delivers again). Serve it behind HTTPS; the server only calls `https` URLs.
+
+## Mini Apps
+
+`verify_mini_app_init_data(init_data, bot_id, public_key, max_age=3600, now=None)` checks the Ed25519
+signature of a Mini App's init data (key from `client.get_mini_app_key()`), its `bot_id` and the age of
+`auth_date`, and returns the verified fields or `None`. Ed25519 is not in the standard library, so it needs
+`cryptography`: `pip install './sdk/python[miniapp]'`; without it the call raises `RuntimeError`. See the
+[Bot API guide](../../docs/bot-api/README.md#11-mini-app).
 
 ## Examples
 

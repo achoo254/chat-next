@@ -233,9 +233,51 @@ curl -s ... -d '{
 - Tối đa 50 kết quả. `article` gửi `text`; `photo`, `video`, `document` gửi file `file_id` của bot (file bot đã gửi hoặc thấy được) kèm `caption`. Mọi kết quả có thể kèm bàn phím inline chỉ gồm nút link (không có nút callback, vì tin là của người dùng, trong chat bot có thể không tham gia); `thumbnail_file_id` là ảnh nhỏ của bài viết.
 - `cache_time` (mặc định 300 giây, tối đa 3600): câu trả lời được dùng lại cho cùng từ khoá với mọi người, trừ khi `is_personal`. `gallery: true` hiện kết quả dạng lưới.
 
-## 11. SDK chính thức
+## 11. Mini App
 
-Ba SDK trong repo, chỉ dùng thư viện chuẩn, cùng hành vi (bộ conformance chạy cả ba với server thật):
+Mini App là trang web https do bạn tự chạy trên domain của mình, mở trong khung bên phải của app (màn hẹp thì toàn màn hình). Có hai cách mở:
+
+- **Mini App chính**: đặt URL ở Developer Console. Người dùng thấy nút "Mở app" trong chat với bot và trong hồ sơ bot.
+- **Nút inline** `web_app`, chỉ trên tin của bot (không dùng được trong kết quả inline):
+
+```sh
+curl -s ... -d '{"chat_id": 42, "text": "Mở cửa hàng",
+  "reply_markup": {"inline_keyboard": [[{"text": "Cửa hàng", "web_app": {"url": "https://shop.example.org/app"}}]]}}' $API/messages
+```
+
+URL phải là `https`, không chứa user:pass hay `#…`, host là tên miền công khai (không phải địa chỉ IP, `localhost` hay tên một nhãn), không nằm dưới domain của app (`hoandat.com`) hay domain của tenant nào, dài tối đa 512 byte. URL sai trả `400` với mô tả `mini_app_url_not_allowed: …`. App kiểm lại URL mỗi lần mở.
+
+**Dữ liệu khởi tạo.** App mở `URL#chatAppData=<init_data mã hoá URL>&chatAppTheme=<light|dark>`; script `https://chat.<domain>/miniapp/sdk.js` (đối tượng `ChatApp`) đọc sẵn và lo phần trao đổi với app qua `postMessage`. `init_data` là query string gồm `user` (JSON `{id, first_name, username}`), `chat_type` (`private`, `group`, `channel`, hoặc `sender` khi mở từ hồ sơ bot), `chat_instance` (chuỗi ổn định theo cặp chat và bot, không lộ id chat), `start_param` (chỉ có khi được truyền), `auth_date`, `bot_id`, `tenant_id` và `signature`.
+
+Đừng tin dữ liệu này ở trình duyệt: gửi nguyên chuỗi `init_data` về backend của bạn và xác thực ở đó. `signature` là chữ ký Ed25519 (base64url, không padding) trên chuỗi `"<bot_id>:WebAppData\n"` nối các trường còn lại dạng `key=value` (giá trị đã giải mã) theo thứ tự tên, cách nhau `\n`. Khoá công khai lấy bằng `GET /miniAppKey` (`{"public_key": "<32 byte base64url>"}`), giống nhau cho mọi bot của server và đổi khi server xoay khoá: chữ ký sai thì lấy khoá lại một lần. Kiểm thêm `bot_id` đúng bot của bạn và `auth_date` không quá 1 giờ. Ba SDK có sẵn hàm làm đủ các bước:
+
+```ts
+const { public_key } = await client.getMiniAppKey();
+const data = verifyMiniAppInitData(initData, botId, public_key); // null nếu sai hoặc quá hạn
+```
+
+Python: `verify_mini_app_init_data(init_data, bot_id, public_key)` (cần gói `cryptography`: `pip install './sdk/python[miniapp]'`). Go: `chatbot.VerifyMiniAppInitData(initData, botID, publicKey, 0, time.Now())`.
+
+Mẫu để thử bộ xác thực của bạn (SESSION_KEY gồm 32 byte `0x07`, tenant `primary`): khoá `3ktwc67vmU-jLgKZ13Lj1iN6KAk145mjNELp-vwXrcg`, `bot_id` `1234567`, `auth_date` `1760850000`, và
+
+```text
+auth_date=1760850000&bot_id=1234567&chat_instance=jkvivnNpwnmKUPzV&chat_type=private&signature=_Z0BDYBsfng_LKrIg5NS1OZZMzOmjLKQU9sXDmE4vYMWAzIZzX8_W_XApoETPJsVzHm-pwST8Goq1Z92Vnu0CQ&start_param=promo_1&tenant_id=primary&user=%7B%22id%22%3A7654321%2C%22first_name%22%3A%22Lan+Nguy%E1%BB%85n%22%2C%22username%22%3A%22lan%22%7D
+```
+
+**Gửi dữ liệu về bot.** Mini App mở từ chat riêng với bot hoặc từ hồ sơ bot có thể gửi `data_send {data}` qua bridge (tối đa 4096 byte); app đăng một tin của người dùng vào chat riêng với bot rồi đóng khung, người dùng thấy "Đã gửi dữ liệu từ <nút> tới bot". Bot nhận tin đó với `web_app_data` thay cho chữ:
+
+```json
+{"update_id": 12, "message": {"chat": {"id": 42, "type": "private", ...}, "seq": 7, "from": {...}, "date": 1760850000,
+  "web_app_data": {"data": "{\"order\": 42}", "button_text": "Cửa hàng"}}}
+```
+
+`button_text` rỗng khi mở Mini App chính. Người dùng gửi dữ liệu tức là đã nhắn cho bot, nên bot trả lời được ngay.
+
+**Xin quyền nhắn.** `request_write_access` qua bridge làm app hỏi người dùng; đồng ý thì bot được nhắn cho họ như khi họ bấm Bắt đầu (không có tin `/start`), và chat riêng với bot được mở để bot gửi vào.
+
+## 12. SDK chính thức
+
+Ba SDK trong repo, chỉ dùng thư viện chuẩn (riêng xác thực Mini App ở Python cần gói `cryptography`), cùng hành vi (bộ conformance chạy cả ba với server thật):
 
 | Ngôn ngữ | Thư mục | Cài |
 |---|---|---|
@@ -243,6 +285,6 @@ Ba SDK trong repo, chỉ dùng thư viện chuẩn, cùng hành vi (bộ conform
 | Python ≥ 3.11 | [`sdk/python`](../../sdk/python/README.md) | `pip install ./sdk/python`, import `chatbot` |
 | Go ≥ 1.24 | [`sdk/go`](../../sdk/go/README.md) | module `github.com/achoo254/chat-next/sdk/go` (repo riêng tư: đặt `GOPRIVATE`) |
 
-Mỗi SDK có client cho mọi method (sinh từ `spec/bot-api/openapi.yaml`), tự thử lại khi `429`/`503` theo `retry_after`, long poll, handler webhook đã kiểm HMAC và timestamp, router lệnh, nút và inline, cùng 5 bot mẫu (`echo`, `keyboard`, `files`, `commands`, `inline`) chạy được ở cả long poll lẫn webhook qua biến môi trường `BOT_TOKEN`, `BOT_API`, `BOT_MODE`.
+Mỗi SDK có client cho mọi method (sinh từ `spec/bot-api/openapi.yaml`), tự thử lại khi `429`/`503` theo `retry_after`, long poll, handler webhook đã kiểm HMAC và timestamp, hàm xác thực dữ liệu khởi tạo Mini App, router lệnh, nút và inline, cùng 5 bot mẫu (`echo`, `keyboard`, `files`, `commands`, `inline`) chạy được ở cả long poll lẫn webhook qua biến môi trường `BOT_TOKEN`, `BOT_API`, `BOT_MODE`.
 
 Người phát triển SDK: đổi OpenAPI thì chạy `pnpm sdk:gen` (`go test ./cmd/sdkgen` trong `server/` đỏ nếu quên); `pnpm conformance:sdk` chạy 3 SDK × 2 chế độ × 5 bot mẫu (cần `node`, `python3`, `go`). Hợp đồng chung: [`phase-15-sdk-contract.md`](../../plans/dattqh/261013-0448-chat-platform-v1/phase-15-sdk-contract.md).

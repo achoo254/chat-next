@@ -34,6 +34,7 @@ import (
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
+	"app.local/server/internal/miniapp"
 	"app.local/server/internal/privacy"
 	"app.local/server/internal/push"
 	"app.local/server/internal/ratelimit"
@@ -158,7 +159,15 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
-	botAdmin, err := botadmin.New(st.Pool(), cfg.TenantID, limiter, logger)
+	miniAppURLs, err := miniapp.NewURLs(publicOrigin)
+	if err != nil {
+		return nil, err
+	}
+	miniAppSigner, err := miniapp.NewSigner(cfg.SessionKey, cfg.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	botAdmin, err := botadmin.New(st.Pool(), cfg.TenantID, miniAppURLs, limiter, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +183,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		botUpdates.Kick()
 		pushSvc.Kick()
 	})
-	botAPI, err := botapi.New(botapi.Config{TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme},
+	botAPI, err := botapi.New(botapi.Config{TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme,
+		MiniAppKey: miniAppSigner.PublicKey()},
 		chatSvc, botAdmin, botUpdates, limiter, logger.With("component", "botapi"))
 	if err != nil {
 		return nil, err
@@ -211,7 +221,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
-		Bots: botAdmin, BotUpdates: botUpdates, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
+		Bots: botAdmin, BotUpdates: botUpdates, MiniApp: miniAppSigner, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
 		TenantName: cfg.TenantDomain, Logger: logger,
 	})
 	if err != nil {

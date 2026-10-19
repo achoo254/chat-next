@@ -38,7 +38,8 @@ func newHarness(t *testing.T) *harness {
 func newHarnessWith(t *testing.T, o bottest.Options) *harness {
 	t.Helper()
 	env := bottest.NewWith(t, o)
-	api, err := New(Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme},
+	api, err := New(Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme,
+		MiniAppKey: env.MiniApp.PublicKey()},
 		env.Chat, env.Admin, env.Updates, env.Limiter, bottest.Quiet)
 	if err != nil {
 		t.Fatal(err)

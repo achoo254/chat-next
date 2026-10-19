@@ -18,7 +18,8 @@ import (
 
 func newBotAPI(t *testing.T, env *bottest.Env, u *botupdates.Service) *botapi.Service {
 	t.Helper()
-	api, err := botapi.New(botapi.Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme},
+	api, err := botapi.New(botapi.Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme,
+		MiniAppKey: env.MiniApp.PublicKey()},
 		env.Chat, env.Admin, u, env.Limiter, bottest.Quiet)
 	if err != nil {
 		t.Fatal(err)

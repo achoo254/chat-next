@@ -20,6 +20,7 @@ import (
 	"app.local/server/internal/ids"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
+	"app.local/server/internal/miniapp"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
@@ -39,6 +40,20 @@ var Quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 // WebhookKey seals webhook secrets in tests.
 var WebhookKey = bytes.Repeat([]byte{9}, 32)
 
+// SessionKey stands for SESSION_KEY (the Mini App signing key is derived
+// from it).
+var SessionKey = bytes.Repeat([]byte{11}, 32)
+
+// MiniAppURLs returns the Mini App URL checker of the environment's origin.
+func MiniAppURLs(t testing.TB) *miniapp.URLs {
+	t.Helper()
+	urls, err := miniapp.NewURLs(PublicOrigin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return urls
+}
+
 // Env is a wired bot platform.
 type Env struct {
 	T       testing.TB
@@ -52,8 +67,10 @@ type Env struct {
 	Media *media.Service
 	// Operators are the accounts of Options.Operators, in that order.
 	Operators []int64
-	n         int
-	stop      func()
+	// MiniApp signs Mini App init data with the key of SessionKey.
+	MiniApp *miniapp.Signer
+	n       int
+	stop    func()
 }
 
 // Options adjust NewWith.
@@ -118,7 +135,11 @@ func NewWith(t testing.TB, o Options) *Env {
 		t.Fatal(err)
 	}
 	t.Cleanup(chatSvc.Stop)
-	admin, err := botadmin.New(st.Pool(), TenantID, limiter, Quiet)
+	admin, err := botadmin.New(st.Pool(), TenantID, MiniAppURLs(t), limiter, Quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := miniapp.NewSigner(SessionKey, TenantID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +149,7 @@ func NewWith(t testing.TB, o Options) *Env {
 	stop := RunUpdates(updates)
 	t.Cleanup(stop)
 	return &Env{T: t, Store: st, Chat: chatSvc, Admin: admin, Updates: updates, Limiter: limiter, Media: mediaSvc,
-		Operators: operators, stop: stop}
+		Operators: operators, MiniApp: signer, stop: stop}
 }
 
 // RunUpdates runs u in the background; the returned stop ends it and waits

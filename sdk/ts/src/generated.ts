@@ -3,7 +3,7 @@
 import type { InputFile } from "./input-file.ts";
 
 /** Version of the Bot API these types and methods follow. */
-export const API_VERSION = "1.1.0";
+export const API_VERSION = "1.3.0";
 
 export interface ErrorEnvelope {
 	ok: false;
@@ -76,13 +76,36 @@ export interface Entity {
 	language?: string;
 }
 
-/** Exactly one of callback_data and url. */
+/** Exactly one of callback_data, url and web_app. */
 export interface InlineButton {
 	text: string;
 	/** 1 to 64 bytes, sent back in the callback update when pressed. */
 	callback_data?: string;
 	/** Opened by the client (http, https, mailto or the app scheme). */
 	url?: string;
+	/** Opens the bot's Mini App at this URL. Not allowed in inline query results. */
+	web_app?: WebAppInfo;
+}
+
+export interface WebAppInfo {
+	/**
+	 * https URL on the bot developer's own domain: not under the app's or a tenant's domain, no user
+	 * name or password, no IP address host, no fragment.
+	 */
+	url: string;
+}
+
+/** Data the user's Mini App sent to the bot. */
+export interface WebAppData {
+	/** 1 to 4096 bytes, as the Mini App sent it. */
+	data: string;
+	/** Text of the button that opened the Mini App; empty for the bot's main Mini App. */
+	button_text: string;
+}
+
+export interface MiniAppKey {
+	/** Ed25519 public key (32 bytes), base64url without padding. */
+	public_key: string;
 }
 
 export interface KeyboardButton {
@@ -159,6 +182,8 @@ export interface Message {
 	media?: Media;
 	action?: Action;
 	forward_from?: ForwardFrom;
+	/** The user's Mini App sent data; such a message has no text and no action. */
+	web_app_data?: WebAppData;
 	/** Name of the incoming webhook that posted the message. */
 	integration_label?: string;
 	/** Echoed to the sender only. */
@@ -200,9 +225,10 @@ export interface InlineQuery {
  * removed, left, promoted, demoted or restricted) and `reaction` (a person set, changed or removed
  * a reaction on one of the bot's messages; opt-in: only when `allowed_updates` lists it). Version
  * 1.2 adds `inline_query` (a user typed @username of a bot with inline mode on, which the owner
- * turns on in the Developer Console). When the bot leaves or is removed from a chat, its pending
- * updates of that chat are dropped, except the `member_changed` telling it so. Later versions add
- * kinds; ignore unknown ones.
+ * turns on in the Developer Console). Version 1.3 adds `web_app_data` to messages in the private
+ * chat (data sent by the bot's Mini App). When the bot leaves or is removed from a chat, its
+ * pending updates of that chat are dropped, except the `member_changed` telling it so. Later
+ * versions add kinds; ignore unknown ones.
  */
 export interface Update {
 	update_id: number;
@@ -605,6 +631,21 @@ export abstract class GeneratedMethods {
 	/** The bot's own profile. */
 	getMe(): Promise<Me> {
 		return this.call<Me>("GET", "/me", {});
+	}
+
+	/**
+	 * The public key of Mini App init data.
+	 *
+	 * Mini Apps receive init data as a query string (`user`, `chat_type`, `chat_instance`,
+	 * `start_param` when set, `auth_date`, `bot_id`, `tenant_id`, `signature`). `signature` is the
+	 * base64url (no padding) Ed25519 signature of `"<bot_id>:WebAppData\n"` followed by every other
+	 * field as `key=value` lines (decoded values) sorted by key and joined by `\n`. Check it with this
+	 * key, check that `bot_id` is the bot's and that `auth_date` is recent. The key is the same for
+	 * every bot of the server and changes when the server's keys are rotated: fetch it again when a
+	 * signature does not verify.
+	 */
+	getMiniAppKey(): Promise<MiniAppKey> {
+		return this.call<MiniAppKey>("GET", "/miniAppKey", {});
 	}
 
 	/**

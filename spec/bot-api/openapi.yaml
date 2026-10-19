@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Chat Bot API
-  version: 1.1.0
-  summary: HTTP API for bots of the chat platform (release R5).
+  version: 1.3.0
+  summary: HTTP API for bots of the chat platform (release R6).
   description: |
     Bots talk to the chat server of their tenant over HTTPS with JSON.
     This API is our own and is not compatible with the Telegram Bot API.
@@ -53,6 +53,13 @@ info:
       or the author may do in the app, the bot may do through the API, and
       nothing more. The bot's tier replaces the per-person rate limits;
       posts, edits, forwards, copies, media and pins count as sends.
+    - Mini Apps: a bot's main Mini App (set in the Developer Console) and
+      inline buttons with `web_app: {url}` open an https page on the bot
+      developer's own domain (not under the app's or a tenant's domain, no
+      credentials, no IP address host, at most 512 bytes, no fragment). The
+      page gets signed init data; verify it with the key of
+      `GET /miniAppKey` (the SDKs have a helper). Data the Mini App sends
+      back arrives as `message.web_app_data`.
     - Updates arrive either by long poll (`GET /updates`) or at a webhook
       (`PUT /webhook`, see the `update` webhook below), never both: while a
       webhook is set, `GET /updates` answers `409 conflict`.
@@ -98,6 +105,35 @@ paths:
                 properties:
                   ok: {const: true}
                   result: {$ref: '#/components/schemas/Me'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /miniAppKey:
+    get:
+      tags: [bot]
+      operationId: getMiniAppKey
+      summary: The public key of Mini App init data.
+      description: |
+        Mini Apps receive init data as a query string (`user`, `chat_type`,
+        `chat_instance`, `start_param` when set, `auth_date`, `bot_id`,
+        `tenant_id`, `signature`). `signature` is the base64url (no padding)
+        Ed25519 signature of `"<bot_id>:WebAppData\n"` followed by every
+        other field as `key=value` lines (decoded values) sorted by key and
+        joined by `\n`. Check it with this key, check that `bot_id` is the
+        bot's and that `auth_date` is recent. The key is the same for every
+        bot of the server and changes when the server's keys are rotated:
+        fetch it again when a signature does not verify.
+      responses:
+        '200':
+          description: The key.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, result]
+                properties:
+                  ok: {const: true}
+                  result: {$ref: '#/components/schemas/MiniAppKey'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
@@ -1223,7 +1259,7 @@ components:
     InlineButton:
       type: object
       required: [text]
-      description: Exactly one of callback_data and url.
+      description: Exactly one of callback_data, url and web_app.
       properties:
         text: {type: string, minLength: 1, maxLength: 64}
         callback_data:
@@ -1233,6 +1269,38 @@ components:
           type: string
           maxLength: 2048
           description: Opened by the client (http, https, mailto or the app scheme).
+        web_app:
+          $ref: '#/components/schemas/WebAppInfo'
+          description: Opens the bot's Mini App at this URL. Not allowed in inline query results.
+    WebAppInfo:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 512
+          description: |
+            https URL on the bot developer's own domain: not under the app's
+            or a tenant's domain, no user name or password, no IP address
+            host, no fragment.
+    WebAppData:
+      type: object
+      required: [data, button_text]
+      description: Data the user's Mini App sent to the bot.
+      properties:
+        data:
+          type: string
+          description: 1 to 4096 bytes, as the Mini App sent it.
+        button_text:
+          type: string
+          description: Text of the button that opened the Mini App; empty for the bot's main Mini App.
+    MiniAppKey:
+      type: object
+      required: [public_key]
+      properties:
+        public_key:
+          type: string
+          description: Ed25519 public key (32 bytes), base64url without padding.
     KeyboardButton:
       type: object
       required: [text]
@@ -1352,6 +1420,9 @@ components:
         media: {$ref: '#/components/schemas/Media'}
         action: {$ref: '#/components/schemas/Action'}
         forward_from: {$ref: '#/components/schemas/ForwardFrom'}
+        web_app_data:
+          $ref: '#/components/schemas/WebAppData'
+          description: The user's Mini App sent data; such a message has no text and no action.
         integration_label:
           type: string
           description: Name of the incoming webhook that posted the message.
@@ -1411,7 +1482,8 @@ components:
         the bot's messages; opt-in: only when `allowed_updates` lists it).
         Version 1.2 adds `inline_query` (a user typed @username of a bot
         with inline mode on, which the owner turns on in the Developer
-        Console). When the bot leaves or is removed from a chat, its pending updates
+        Console). Version 1.3 adds `web_app_data` to messages in the private
+        chat (data sent by the bot's Mini App). When the bot leaves or is removed from a chat, its pending updates
         of that chat are dropped, except the `member_changed` telling it so.
         Later versions add kinds; ignore unknown ones.
       properties:

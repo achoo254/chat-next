@@ -326,7 +326,7 @@ func TestRecordUpdateFetchAndNotRunning(t *testing.T) {
 
 	// Another process (no memory of the write) still writes at most once per
 	// interval, through the database.
-	other, err := botadmin.New(env.Store.Pool(), bottest.TenantID, env.Limiter, bottest.Quiet)
+	other, err := botadmin.New(env.Store.Pool(), bottest.TenantID, bottest.MiniAppURLs(t), env.Limiter, bottest.Quiet)
 	if err != nil {
 		t.Fatal(err)
 	}

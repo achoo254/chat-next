@@ -9,7 +9,7 @@ import (
 )
 
 // APIVersion is the version of the Bot API these types and methods follow.
-const APIVersion = "1.1.0"
+const APIVersion = "1.3.0"
 
 type ErrorEnvelope struct {
 	Ok    bool               `json:"ok"`
@@ -95,13 +95,34 @@ type Entity struct {
 	Language string `json:"language,omitempty"`
 }
 
-// InlineButton: Exactly one of callback_data and url.
+// InlineButton: Exactly one of callback_data, url and web_app.
 type InlineButton struct {
 	Text string `json:"text"`
 	// 1 to 64 bytes, sent back in the callback update when pressed.
 	CallbackData string `json:"callback_data,omitempty"`
 	// Opened by the client (http, https, mailto or the app scheme).
 	URL string `json:"url,omitempty"`
+	// Opens the bot's Mini App at this URL. Not allowed in inline query results.
+	WebApp *WebAppInfo `json:"web_app,omitempty"`
+}
+
+type WebAppInfo struct {
+	// https URL on the bot developer's own domain: not under the app's or a tenant's domain, no user
+	// name or password, no IP address host, no fragment.
+	URL string `json:"url"`
+}
+
+// WebAppData: Data the user's Mini App sent to the bot.
+type WebAppData struct {
+	// 1 to 4096 bytes, as the Mini App sent it.
+	Data string `json:"data"`
+	// Text of the button that opened the Mini App; empty for the bot's main Mini App.
+	ButtonText string `json:"button_text"`
+}
+
+type MiniAppKey struct {
+	// Ed25519 public key (32 bytes), base64url without padding.
+	PublicKey string `json:"public_key"`
 }
 
 type KeyboardButton struct {
@@ -169,6 +190,8 @@ type Message struct {
 	Media       *Media       `json:"media,omitempty"`
 	Action      *Action      `json:"action,omitempty"`
 	ForwardFrom *ForwardFrom `json:"forward_from,omitempty"`
+	// The user's Mini App sent data; such a message has no text and no action.
+	WebAppData *WebAppData `json:"web_app_data,omitempty"`
 	// Name of the incoming webhook that posted the message.
 	IntegrationLabel string `json:"integration_label,omitempty"`
 	// Echoed to the sender only.
@@ -209,8 +232,9 @@ type InlineQuery struct {
 // is created with it, removed, left, promoted, demoted or restricted) and `reaction` (a person
 // set, changed or removed a reaction on one of the bot's messages; opt-in: only when
 // `allowed_updates` lists it). Version 1.2 adds `inline_query` (a user typed @username of a bot
-// with inline mode on, which the owner turns on in the Developer Console). When the bot leaves or
-// is removed from a chat, its pending updates of that chat are dropped, except the
+// with inline mode on, which the owner turns on in the Developer Console). Version 1.3 adds
+// `web_app_data` to messages in the private chat (data sent by the bot's Mini App). When the bot
+// leaves or is removed from a chat, its pending updates of that chat are dropped, except the
 // `member_changed` telling it so. Later versions add kinds; ignore unknown ones.
 type Update struct {
 	UpdateID      int64          `json:"update_id"`
@@ -624,6 +648,23 @@ func (p DeleteWebhookParams) values() url.Values {
 func (c *Client) GetMe(ctx context.Context) (*Me, error) {
 	var out Me
 	if err := c.call(ctx, "GET", "/me", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetMiniAppKey: The public key of Mini App init data.
+//
+// Mini Apps receive init data as a query string (`user`, `chat_type`, `chat_instance`,
+// `start_param` when set, `auth_date`, `bot_id`, `tenant_id`, `signature`). `signature` is the
+// base64url (no padding) Ed25519 signature of `"<bot_id>:WebAppData\n"` followed by every other
+// field as `key=value` lines (decoded values) sorted by key and joined by `\n`. Check it with this
+// key, check that `bot_id` is the bot's and that `auth_date` is recent. The key is the same for
+// every bot of the server and changes when the server's keys are rotated: fetch it again when a
+// signature does not verify.
+func (c *Client) GetMiniAppKey(ctx context.Context) (*MiniAppKey, error) {
+	var out MiniAppKey
+	if err := c.call(ctx, "GET", "/miniAppKey", nil, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

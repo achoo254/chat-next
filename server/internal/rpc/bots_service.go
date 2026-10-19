@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -12,18 +13,19 @@ import (
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/miniapp"
 	"app.local/server/internal/store"
 	"connectrpc.com/connect"
 )
 
 // botsService implements BotsService, the client side of bots: starting a
-// bot and its public profile, inline queries. Mini Apps come in a later
-// release.
+// bot and its public profile, inline queries and Mini Apps.
 type botsService struct {
 	appv1connect.UnimplementedBotsServiceHandler
 	chat    *chat.Service
 	bots    *botadmin.Service
 	updates *botupdates.Service
+	miniApp *miniapp.Signer
 	logger  *slog.Logger
 }
 
@@ -98,8 +100,81 @@ func (s *botsService) InlineQuery(ctx context.Context, req *connect.Request[appv
 	})
 }
 
-func (s *botsService) OpenMiniApp(context.Context, *connect.Request[appv1.OpenMiniAppRequest]) (*connect.Response[appv1.OpenMiniAppResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mini_apps_unavailable: Mini Apps come in a later release"))
+// startParamPattern is the start_param of a Mini App, as of a deep link.
+var startParamPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{0,64}$`)
+
+// OpenMiniApp returns the URL to load and the signed init data. The URL
+// (the bot's main one, or the button's) is checked again against the Mini
+// App rules: a tenant added since the bot set it may now refuse it.
+// theme_params only style the container's own chrome; they are not signed.
+func (s *botsService) OpenMiniApp(ctx context.Context, req *connect.Request[appv1.OpenMiniAppRequest]) (*connect.Response[appv1.OpenMiniAppResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.OpenMiniAppRequest) (*appv1.OpenMiniAppResponse, error) {
+		if !startParamPattern.MatchString(m.GetStartParam()) {
+			return nil, connect.NewError(connect.CodeInvalidArgument,
+				errors.New("start_param must have up to 64 characters of A-Z, a-z, 0-9, _ and -"))
+		}
+		bot, err := s.bots.Live(ctx, m.GetBotId())
+		if err != nil {
+			return nil, err
+		}
+		target := m.GetUrl()
+		if target == "" {
+			if bot.MiniAppURL == "" {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("no_mini_app: this bot has no Mini App"))
+			}
+			target = bot.MiniAppURL
+		}
+		chatType, err := s.chat.MiniAppChatType(ctx, me, bot.ID, m.GetChatId(), m.GetSeq(), m.GetUrl())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.chat.CheckMiniAppURL(ctx, target); err != nil {
+			return nil, err
+		}
+		users, err := s.chat.GetUsers(ctx, me, []int64{me})
+		if err != nil {
+			return nil, err
+		}
+		if len(users) != 1 {
+			return nil, fmt.Errorf("rpc: open mini app: caller %d not found", me)
+		}
+		initData, err := s.miniApp.Sign(miniapp.InitData{
+			BotID:        bot.ID,
+			User:         miniapp.User{ID: me, FirstName: users[0].GetName(), Username: users[0].GetUsername()},
+			ChatType:     chatType,
+			ChatInstance: s.miniApp.ChatInstance(m.GetChatId(), me, bot.ID),
+			StartParam:   m.GetStartParam(),
+			AuthDate:     time.Now(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.OpenMiniAppResponse{Url: target, InitData: initData}, nil
+	})
+}
+
+// AllowMiniAppWrite records the consent the Mini App asked for.
+func (s *botsService) AllowMiniAppWrite(ctx context.Context, req *connect.Request[appv1.AllowMiniAppWriteRequest]) (*connect.Response[appv1.AllowMiniAppWriteResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.AllowMiniAppWriteRequest) (*appv1.AllowMiniAppWriteResponse, error) {
+		if err := s.chat.AllowBotWrite(ctx, me, m.GetBotId()); err != nil {
+			return nil, err
+		}
+		return &appv1.AllowMiniAppWriteResponse{}, nil
+	})
+}
+
+// SendMiniAppData posts the Mini App's data to the bot as the caller. The
+// server keeps no state of opened Mini Apps, so it cannot tell where this
+// one was opened; the client calls it only for a Mini App opened from the
+// bot's private chat or profile. Either way the message only goes into the
+// caller's own chat with the bot, which the caller may write to anyway.
+func (s *botsService) SendMiniAppData(ctx context.Context, req *connect.Request[appv1.SendMiniAppDataRequest]) (*connect.Response[appv1.SendMiniAppDataResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SendMiniAppDataRequest) (*appv1.SendMiniAppDataResponse, error) {
+		if _, err := s.chat.SendMiniAppData(ctx, me, m.GetBotId(), m.GetData(), m.GetButtonText()); err != nil {
+			return nil, err
+		}
+		return &appv1.SendMiniAppDataResponse{}, nil
+	})
 }
 
 // botAdminService implements BotAdminService (Developer Console). Token

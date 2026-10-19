@@ -42,11 +42,25 @@ type Entity struct {
 	Language string `json:"language,omitempty"`
 }
 
-// InlineButton is a button of an inline keyboard: callback_data or url.
+// InlineButton is a button of an inline keyboard: callback_data, url or
+// web_app.
 type InlineButton struct {
-	Text         string  `json:"text"`
-	CallbackData *string `json:"callback_data,omitempty"`
-	URL          *string `json:"url,omitempty"`
+	Text         string      `json:"text"`
+	CallbackData *string     `json:"callback_data,omitempty"`
+	URL          *string     `json:"url,omitempty"`
+	WebApp       *WebAppInfo `json:"web_app,omitempty"`
+}
+
+// WebAppInfo is the Mini App a button opens: an https URL on the bot
+// developer's own domain.
+type WebAppInfo struct {
+	URL string `json:"url"`
+}
+
+// WebAppData is what a Mini App sent to its bot, posted by the user.
+type WebAppData struct {
+	Data       string `json:"data"`
+	ButtonText string `json:"button_text"`
 }
 
 // KeyboardButton is a button of a reply keyboard; pressing it sends its
@@ -114,6 +128,8 @@ type Message struct {
 	Media       *Media       `json:"media,omitempty"`
 	Action      *Action      `json:"action,omitempty"`
 	ForwardFrom *ForwardFrom `json:"forward_from,omitempty"`
+	// WebAppData: the user's Mini App sent data to the bot (no action then).
+	WebAppData *WebAppData `json:"web_app_data,omitempty"`
 	// Label of the incoming webhook that posted it (from is then absent).
 	IntegrationLabel string `json:"integration_label,omitempty"`
 	// Echoed to the sender only.
@@ -315,7 +331,9 @@ func FromMessage(m *appv1.Message, chat Chat, users Users) Message {
 			Width: md.GetWidth(), Height: md.GetHeight(), Duration: md.GetDuration(),
 		}
 	}
-	if a := m.GetAction(); a != nil {
+	if d := m.GetAction().GetMiniAppData(); d != nil {
+		out.WebAppData = &WebAppData{Data: d.GetData(), ButtonText: d.GetButtonText()}
+	} else if a := m.GetAction(); a != nil {
 		out.Action = fromAction(a)
 	}
 	if f := m.GetForwardFrom(); f != nil {
@@ -373,6 +391,8 @@ func fromMarkup(m *appv1.ReplyMarkup) *ReplyMarkup {
 				case *appv1.InlineButton_Url:
 					url := a.Url
 					btn.URL = &url
+				case *appv1.InlineButton_MiniAppUrl:
+					btn.WebApp = &WebAppInfo{URL: a.MiniAppUrl}
 				default:
 				}
 				r = append(r, btn)
@@ -435,13 +455,21 @@ func ToMarkup(m *ReplyMarkup) (*appv1.ReplyMarkup, error) {
 			r := &appv1.InlineKeyboardRow{}
 			for j, b := range row {
 				btn := &appv1.InlineButton{Text: b.Text}
-				switch {
-				case b.CallbackData != nil && b.URL == nil:
+				set := 0
+				if b.CallbackData != nil {
+					set++
 					btn.Action = &appv1.InlineButton_CallbackData{CallbackData: []byte(*b.CallbackData)}
-				case b.URL != nil && b.CallbackData == nil:
+				}
+				if b.URL != nil {
+					set++
 					btn.Action = &appv1.InlineButton_Url{Url: *b.URL}
-				default:
-					return nil, fmt.Errorf("inline_keyboard[%d][%d] needs exactly one of callback_data and url", i, j)
+				}
+				if b.WebApp != nil {
+					set++
+					btn.Action = &appv1.InlineButton_MiniAppUrl{MiniAppUrl: b.WebApp.URL}
+				}
+				if set != 1 {
+					return nil, fmt.Errorf("inline_keyboard[%d][%d] needs exactly one of callback_data, url and web_app", i, j)
 				}
 				r.Buttons = append(r.Buttons, btn)
 			}

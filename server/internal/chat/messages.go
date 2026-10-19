@@ -371,6 +371,8 @@ type textPost struct {
 	markup *appv1.ReplyMarkup
 	// viaBot: the bot whose inline result this is (Message.via_bot_id).
 	viaBot int64
+	// action: a service message posted by the sender (Mini App data).
+	action *appv1.MessageAction
 	// consent: see sendMessage.
 	consent string
 }
@@ -416,7 +418,7 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 		ev := t.event(kindMessageNew, chatID, me)
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
 			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
-			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup, ViaBotId: p.viaBot},
+			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup, ViaBotId: p.viaBot, Action: p.action},
 		})
 		if err != nil {
 			return err

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chat-bot-sdk"
 version = "0.1.0"
-description = "Python SDK of the chat platform's Bot API (stdlib only)"
+description = "Python SDK of the chat platform's Bot API (stdlib only; Mini App verification needs cryptography)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
@@ -14,6 +14,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Typing :: Typed",
 ]
+
+[project.optional-dependencies]
+# Ed25519 for verify_mini_app_init_data (not in the standard library).
+miniapp = ["cryptography>=42"]
 
 [tool.setuptools]
 packages = ["chatbot"]

@@ -33,7 +33,8 @@ type world struct {
 func newWorld(t *testing.T) *world {
 	t.Helper()
 	env := bottest.NewWith(t, bottest.Options{Operators: []string{"operator"}})
-	api, err := botapi.New(botapi.Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme},
+	api, err := botapi.New(botapi.Config{TenantID: bottest.TenantID, PublicOrigin: bottest.PublicOrigin, AppScheme: bottest.AppScheme,
+		MiniAppKey: env.MiniApp.PublicKey()},
 		env.Chat, env.Admin, env.Updates, env.Limiter, bottest.Quiet)
 	if err != nil {
 		t.Fatal(err)

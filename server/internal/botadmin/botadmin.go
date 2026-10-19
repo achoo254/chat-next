@@ -28,6 +28,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/media"
+	"app.local/server/internal/miniapp"
 	"app.local/server/internal/profile"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
@@ -116,7 +117,9 @@ type Bot struct {
 	// InlinePlaceholder is the composer hint of inline mode; "" is off.
 	InlinePlaceholder string
 	// PhotoID is the file_id of the bot's photo; "" without one.
-	PhotoID       string
+	PhotoID string
+	// MiniAppURL is the bot's main Mini App; "" for none.
+	MiniAppURL    string
 	Verified      bool
 	Internal      bool
 	Commands      []CommandSet
@@ -159,6 +162,8 @@ type Service struct {
 	limiter  ratelimit.Limiter
 	logger   *slog.Logger
 	now      func() time.Time
+	// miniAppURLs checks the URL of the bot's main Mini App.
+	miniAppURLs *miniapp.URLs
 
 	// fetchMu guards fetchWritten: when this process last wrote each bot's
 	// last_update_fetch_at, so most polls skip the database (one entry per
@@ -168,12 +173,12 @@ type Service struct {
 }
 
 // New returns the Service.
-func New(pool *pgxpool.Pool, tenantID string, limiter ratelimit.Limiter, logger *slog.Logger) (*Service, error) {
-	if pool == nil || tenantID == "" || limiter == nil || logger == nil {
+func New(pool *pgxpool.Pool, tenantID string, miniAppURLs *miniapp.URLs, limiter ratelimit.Limiter, logger *slog.Logger) (*Service, error) {
+	if pool == nil || tenantID == "" || miniAppURLs == nil || limiter == nil || logger == nil {
 		return nil, errors.New("botadmin: missing configuration or dependency")
 	}
 	return &Service{pool: pool, tenantID: tenantID, limiter: limiter, logger: logger, now: time.Now,
-		fetchWritten: map[int64]time.Time{}}, nil
+		miniAppURLs: miniAppURLs, fetchWritten: map[int64]time.Time{}}, nil
 }
 
 // ------------------------------------------------------------------ errors
@@ -239,7 +244,8 @@ func ParseToken(token string) (botID int64, secret string, ok bool) {
 
 const botColumns = `b.user_id, u.username, u.name, b.owner_id, b.description, b.about, b.privacy, b.verified, b.internal,
 	b.commands, b.created_at, b.token_issued_at, b.last_update_fetch_at, b.webhook_url IS NOT NULL, b.is_system, b.restricted_at,
-	b.token_hash, b.inline_placeholder, coalesce((SELECT f.public_id FROM files f WHERE f.id = u.photo_file_id), '')`
+	b.token_hash, b.inline_placeholder, coalesce((SELECT f.public_id FROM files f WHERE f.id = u.photo_file_id), ''),
+	b.mini_app_url`
 
 const botFrom = `bots b JOIN users u ON u.id = b.user_id`
 
@@ -248,7 +254,7 @@ func scanBot(row pgx.Row) (*Bot, error) {
 	var commands []byte
 	err := row.Scan(&b.ID, &b.Username, &b.Name, &b.OwnerID, &b.Description, &b.About, &b.Privacy, &b.Verified,
 		&b.Internal, &commands, &b.CreatedAt, &b.TokenIssuedAt, &b.LastUpdateAt, &b.Webhook, &b.System, &b.RestrictedAt, &b.tokenHash,
-		&b.InlinePlaceholder, &b.PhotoID)
+		&b.InlinePlaceholder, &b.PhotoID, &b.MiniAppURL)
 	if err != nil {
 		return nil, err
 	}
@@ -328,6 +334,7 @@ func (b *Bot) Render() *appv1.Bot {
 	out.LastUpdateAt = b.lastUpdateUnix()
 	out.Webhook = b.Webhook
 	out.InlinePlaceholder = b.InlinePlaceholder
+	out.MiniAppUrl = b.MiniAppURL
 	for _, set := range b.Commands {
 		out.Commands = append(out.Commands, renderSet(set))
 	}
@@ -439,7 +446,8 @@ func (s *Service) CreateBot(ctx context.Context, owner int64, username, name str
 	return bot.Render(), nil
 }
 
-// UpdateBot changes the fields set in req.
+// UpdateBot changes the fields set in req. A mini_app_url must pass
+// miniapp.URLs.Check; "" removes the Mini App.
 func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateBotRequest) (*appv1.Bot, error) {
 	var name, description, about *string
 	if req.Name != nil {
@@ -474,6 +482,11 @@ func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateB
 		}
 		inline = &v
 	}
+	if req.MiniAppUrl != nil && req.GetMiniAppUrl() != "" {
+		if err := s.miniAppURLs.Check(ctx, s.pool, req.GetMiniAppUrl()); err != nil {
+			return nil, err
+		}
+	}
 	var commands []byte
 	if req.GetCommands() != nil {
 		sets, err := commandSetsOf(req.GetCommands().GetSets())
@@ -502,8 +515,9 @@ func (s *Service) UpdateBot(ctx context.Context, owner int64, req *appv1.UpdateB
 		if _, err := tx.Exec(ctx, `
 			UPDATE bots SET description = coalesce($2, description), about = coalesce($3, about),
 				privacy = coalesce($4, privacy), commands = coalesce($5::jsonb, commands),
-				inline_placeholder = coalesce($6, inline_placeholder), updated_at = now()
-			WHERE user_id = $1`, req.GetBotId(), description, about, req.Privacy, commands, inline); err != nil {
+				inline_placeholder = coalesce($6, inline_placeholder), mini_app_url = coalesce($7, mini_app_url),
+				updated_at = now()
+			WHERE user_id = $1`, req.GetBotId(), description, about, req.Privacy, commands, inline, req.MiniAppUrl); err != nil {
 			return fmt.Errorf("botadmin: update bot: %w", err)
 		}
 		var err error
@@ -927,7 +941,7 @@ func (s *Service) Info(ctx context.Context, caller, botID int64, role ChatRole) 
 	}
 	resp := &appv1.GetBotInfoResponse{
 		User:        b.User(),
-		Description: b.Description, About: b.About,
+		Description: b.Description, About: b.About, MiniAppUrl: b.MiniAppURL,
 	}
 	if b.OwnerID == caller {
 		resp.IsOwner = true

@@ -51,6 +51,10 @@ await bot.client.setWebhook({ url: "https://bot.example.com/hook", secret: proce
 
 Handler kiểm `X-Bot-Api-Secret-Token` và chữ ký HMAC trước khi đọc JSON (sai → `401`), từ chối body > 1 MiB (`413`), bỏ trùng 1000 `update_id` gần nhất (`200`), trả `204`, hoặc `200` kèm JSON khi handler trả một `WebhookAnswer` (ví dụ `{ method: "sendMessage", chat_id, text }`); handler lỗi → `500` để server gửi lại. Không dùng router thì có `webhookHandler({ secret, onUpdate })` và hàm thuần `verifyWebhook(headers, rawBody, secret, now?)`.
 
+## Mini App
+
+`verifyMiniAppInitData(initData, botId, publicKey, maxAgeS?, now?)` kiểm chữ ký Ed25519 của dữ liệu khởi tạo Mini App (khoá từ `client.getMiniAppKey()`), `bot_id` và tuổi `auth_date` (mặc định tối đa 1 giờ); trả các trường đã kiểm, hoặc `null`. Xem [Bot API, mục Mini App](../../docs/bot-api/README.md#11-mini-app).
+
 ## Bot mẫu
 
 `examples/` có 5 bot (`echo`, `keyboard`, `files`, `commands`, `inline`) dùng cho conformance; chạy bằng Node ≥ 22.18:

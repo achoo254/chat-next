@@ -217,7 +217,7 @@ func (s *Service) CheckBotMessage(ctx context.Context, botID int64, m BotMessage
 	if m.RandomID < 0 {
 		return "", nil, errInvalid("random_id must not be negative")
 	}
-	if err := s.validateBotMarkup(m.Markup); err != nil {
+	if err := s.validateBotMarkup(ctx, m.Markup); err != nil {
 		return "", nil, err
 	}
 	return text, ents, nil
@@ -238,9 +238,10 @@ func (s *Service) BotPrivateChat(ctx context.Context, botID, user int64) (int64,
 	return chatID, nil
 }
 
-// validateBotMarkup checks a bot keyboard: inline keyboards of callback and
-// URL buttons (ADR 0004 schemes), reply keyboards, or a removal.
-func (s *Service) validateBotMarkup(m *appv1.ReplyMarkup) error {
+// validateBotMarkup checks a bot keyboard: inline keyboards of callback,
+// URL (ADR 0004 schemes) and Mini App buttons (miniapp.URLs), reply
+// keyboards, or a removal.
+func (s *Service) validateBotMarkup(ctx context.Context, m *appv1.ReplyMarkup) error {
 	if m == nil {
 		return nil
 	}
@@ -267,8 +268,12 @@ func (s *Service) validateBotMarkup(m *appv1.ReplyMarkup) error {
 					if len(a.Url) > inlineButtonURLBytes || !entities.IsAllowedURL(a.Url, s.cfg.AppScheme) {
 						return errInvalid("url_not_allowed: a button links to a URL that is not allowed")
 					}
+				case *appv1.InlineButton_MiniAppUrl:
+					if err := s.miniAppURLs.Check(ctx, s.pool, a.MiniAppUrl); err != nil {
+						return err
+					}
 				default:
-					return errInvalid("an inline button needs callback_data or url")
+					return errInvalid("an inline button needs callback_data, url or mini_app_url")
 				}
 			}
 		}

@@ -338,7 +338,7 @@ func (s *Service) checkInlineResult(ctx context.Context, t *txn, botID int64, r 
 				}
 			}
 		}
-		if err := s.validateBotMarkup(r.Markup); err != nil {
+		if err := s.validateBotMarkup(ctx, r.Markup); err != nil {
 			return out, nil, err
 		}
 	}

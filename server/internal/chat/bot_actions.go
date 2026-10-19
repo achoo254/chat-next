@@ -62,7 +62,7 @@ func (s *Service) EditBotMessage(ctx context.Context, botID int64, e BotEdit) (*
 		if e.Markup.GetInlineKeyboard() == nil {
 			return nil, errInvalid("only an inline keyboard can be set on a sent message")
 		}
-		if err := s.validateBotMarkup(e.Markup); err != nil {
+		if err := s.validateBotMarkup(ctx, e.Markup); err != nil {
 			return nil, err
 		}
 	}

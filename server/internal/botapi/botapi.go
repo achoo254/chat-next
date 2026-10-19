@@ -101,6 +101,9 @@ type Config struct {
 	PublicOrigin string
 	// AppScheme is the app's own URL scheme allowed in links (ADR 0004).
 	AppScheme string
+	// MiniAppKey is the Ed25519 public key of Mini App init data,
+	// base64url without padding (getMiniAppKey).
+	MiniAppKey string
 }
 
 // Typer relays a bot's chat action to the users viewing the chat (the
@@ -140,11 +143,15 @@ func New(cfg Config, chatSvc *chat.Service, admin *botadmin.Service, updates *bo
 	if err != nil || u.Host == "" {
 		return nil, errors.New("botapi: PublicOrigin must be an absolute URL")
 	}
+	if cfg.MiniAppKey == "" {
+		return nil, errors.New("botapi: MiniAppKey is required")
+	}
 	s := &Service{
 		cfg: cfg, host: strings.ToLower(u.Host), chat: chatSvc, admin: admin, updates: updates, limiter: limiter,
 		logger: logger, mux: http.NewServeMux(), blocked: map[string]time.Time{},
 	}
 	s.mux.Handle("/bot/v1/me", s.method(http.MethodGet, s.getMe))
+	s.mux.Handle("/bot/v1/miniAppKey", s.method(http.MethodGet, s.getMiniAppKey))
 	s.mux.Handle("/bot/v1/messages", s.method(http.MethodPost, s.sendMessage))
 	s.mux.Handle("/bot/v1/messages:edit", s.method(http.MethodPost, s.editMessage))
 	s.mux.Handle("/bot/v1/messages:editMarkup", s.method(http.MethodPost, s.editMarkup))
@@ -478,6 +485,16 @@ type meResult struct {
 func (s *Service) getMe(_ context.Context, _ *http.Request, bot *botadmin.Bot) (any, error) {
 	return meResult{User: wire.FromUser(botUser(bot)), Privacy: bot.Privacy, Tier: bot.Tier(),
 		Description: bot.Description, About: bot.About}, nil
+}
+
+type miniAppKeyResult struct {
+	PublicKey string `json:"public_key"`
+}
+
+// getMiniAppKey returns the key that verifies the signature of Mini App
+// init data; it changes when the server's session key is rotated.
+func (s *Service) getMiniAppKey(context.Context, *http.Request, *botadmin.Bot) (any, error) {
+	return miniAppKeyResult{PublicKey: s.cfg.MiniAppKey}, nil
 }
 
 type sendMessageRequest struct {

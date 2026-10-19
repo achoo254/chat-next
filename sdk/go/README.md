@@ -66,6 +66,10 @@ err := client.SetWebhook(ctx, chatbot.SetWebhookRequest{URL: "https://bot.exampl
 
 Handler kiểm chữ ký trước khi đọc JSON (`401` khi sai), từ chối body > 1 MiB (`413`), trả `200` không chạy lại với `update_id` đã xử lý gần đây (1000 id), `204` khi xong, `200` + JSON khi handler trả `*WebhookAnswer`, `500` khi handler lỗi (server giao lại). Tự kiểm request trong server riêng: `chatbot.VerifyWebhook(r.Header, body, secret, time.Now())`.
 
+## Mini App
+
+`chatbot.VerifyMiniAppInitData(initData, botID, publicKey, maxAge, time.Now())` kiểm chữ ký Ed25519 của dữ liệu khởi tạo Mini App (khoá từ `client.GetMiniAppKey`), `bot_id` và tuổi `auth_date` (`maxAge` 0 là 1 giờ); trả `*MiniAppInitData`, hoặc lỗi bọc `ErrMiniAppInitData`. Xem [Bot API, mục Mini App](../../docs/bot-api/README.md#11-mini-app).
+
 ## Bot mẫu
 
 `examples/echo`, `keyboard`, `files`, `commands`, `inline` (hành vi trong [hợp đồng SDK](../../plans/dattqh/261013-0448-chat-platform-v1/phase-15-sdk-contract.md)). Biến môi trường: `BOT_TOKEN`, `BOT_API`, `BOT_MODE` (`poll` mặc định, hoặc `webhook` với `WEBHOOK_PORT`, `WEBHOOK_SECRET`, `WEBHOOK_URL`). Bot in một dòng `ready` khi sẵn sàng.
