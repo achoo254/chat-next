@@ -7,7 +7,7 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { miniAppUrlProblem } from "../src/messaging/bots/mini-app-settings.tsx";
+import { appDomainOf, miniAppUrlProblem } from "../src/messaging/bots/mini-app-settings.tsx";
 import { BRIDGE_MAX_BYTES, miniAppFrameSrc, miniAppTarget, parseBridgeMessage } from "../src/messaging/bots/mini-app-bridge.ts";
 import { en } from "../src/messaging/copy/en.ts";
 import { vi as viCopy } from "../src/messaging/copy/vi.ts";
@@ -28,6 +28,9 @@ afterEach(() => {
 	delete document.documentElement.dataset.theme;
 	vi.restoreAllMocks();
 });
+
+/** The app's domain in these tests (chat.hoandat.com). */
+const APP = "hoandat.com";
 
 describe("Mini App helpers", () => {
 	it("take only well-formed bridge messages of known types, up to 4 KB", () => {
@@ -73,16 +76,24 @@ describe("Mini App helpers", () => {
 	});
 
 	it("check a Mini App URL before saving", () => {
-		expect(miniAppUrlProblem("")).toBeNull();
-		expect(miniAppUrlProblem("https://release.deploytools.vn/app")).toBeNull();
-		expect(miniAppUrlProblem("http://release.deploytools.vn/app")).toBe("invalid");
-		expect(miniAppUrlProblem("https://localhost/app")).toBe("invalid");
-		expect(miniAppUrlProblem("release.deploytools.vn")).toBe("invalid");
-		expect(miniAppUrlProblem("https://u:p@release.deploytools.vn/")).toBe("credentials");
-		expect(miniAppUrlProblem("https://10.0.0.7/app")).toBe("ip");
-		expect(miniAppUrlProblem("https://release.deploytools.vn/app#start")).toBe("fragment");
-		expect(miniAppUrlProblem("https://[::1]/app")).toBe("ip");
-		expect(miniAppUrlProblem(`https://a.example/${"x".repeat(520)}`)).toBe("long");
+		expect(miniAppUrlProblem("", APP)).toBeNull();
+		expect(miniAppUrlProblem("https://release.deploytools.vn/app", APP)).toBeNull();
+		expect(miniAppUrlProblem("http://release.deploytools.vn/app", APP)).toBe("invalid");
+		expect(miniAppUrlProblem("https://localhost/app", APP)).toBe("invalid");
+		expect(miniAppUrlProblem("release.deploytools.vn", APP)).toBe("invalid");
+		expect(miniAppUrlProblem("https://u:p@release.deploytools.vn/", APP)).toBe("credentials");
+		expect(miniAppUrlProblem("https://10.0.0.7/app", APP)).toBe("ip");
+		expect(miniAppUrlProblem("https://release.deploytools.vn/app#start", APP)).toBe("fragment");
+		expect(miniAppUrlProblem("https://[::1]/app", APP)).toBe("ip");
+		// The app's script pasted as the URL, and URLs on the app's own domain.
+		expect(miniAppUrlProblem("https://chat.hoandat.com/miniapp/sdk.js", APP)).toBe("script");
+		expect(miniAppUrlProblem("https://chat.hoandat.com/app", APP)).toBe("appDomain");
+		expect(miniAppUrlProblem("https://shop.hoandat.com/app", APP)).toBe("appDomain");
+		expect(miniAppUrlProblem("https://hoandat.com/app", APP)).toBe("appDomain");
+		expect(miniAppUrlProblem("https://nothoandat.com/app", APP)).toBeNull();
+		expect(appDomainOf("chat.hoandat.com")).toBe(APP);
+		expect(appDomainOf("localhost")).toBe("localhost");
+		expect(miniAppUrlProblem(`https://a.example/${"x".repeat(520)}`, APP)).toBe("long");
 	});
 });
 

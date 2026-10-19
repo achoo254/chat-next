@@ -1,0 +1,151 @@
+<!doctype html>
+<!--
+	Sample Mini App, published by .github/workflows/pages.yml at
+	https://achoo254.github.io/chat-next/miniapp-demo/ so a bot owner can try
+	Mini Apps without a site of their own: set it as the bot's Mini App URL in
+	the Developer Console, or as the url of a web_app button.
+	It loads the bridge script from the chat app that opened it (the
+	referrer's origin when it is a chat.<domain> site, else chat.hoandat.com)
+	and uses every call of ChatApp. It has no server, so it shows the init
+	data without verifying it: a real Mini App sends ChatApp.initData to its
+	own server and verifies it there with the SDK.
+-->
+<html lang="vi">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Mini App mẫu</title>
+	<style>
+		:root { color-scheme: light; --bg: #ffffff; --fg: #17212b; --muted: #5d6b79; --line: #dfe5ea; --accent: #2f6fdb; --card: #f4f7f9; }
+		:root[data-theme="dark"] { color-scheme: dark; --bg: #17212b; --fg: #e8edf1; --muted: #9aa8b5; --line: #2b3a48; --accent: #6ea2ff; --card: #1f2c38; }
+		* { box-sizing: border-box; }
+		body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+		h1 { font-size: 1.25rem; margin: 0 0 4px; }
+		p { margin: 0 0 12px; color: var(--muted); }
+		.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+		dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+		dt { color: var(--muted); }
+		dd { margin: 0; overflow-wrap: anywhere; }
+		.actions { display: grid; gap: 8px; }
+		button { font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; text-align: start; }
+		button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		label { display: block; margin-bottom: 4px; color: var(--muted); }
+		input { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+		#log { font-family: ui-monospace, Menlo, monospace; font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+		.warn { color: #c0392b; }
+	</style>
+</head>
+<body>
+	<h1>Mini App mẫu</h1>
+	<p>Trang thử các lệnh của Mini App. Không có server nên thông tin bên dưới <strong>chưa được xác thực</strong>; Mini App thật gửi initData về server của mình và kiểm bằng SDK.</p>
+
+	<section class="card" aria-labelledby="who">
+		<h2 id="who" style="font-size:1rem;margin:0 0 8px">Người mở</h2>
+		<dl id="info"><dt>Trạng thái</dt><dd>Đang nạp…</dd></dl>
+	</section>
+
+	<section class="card" aria-label="Thử lệnh">
+		<label for="data">Dữ liệu gửi cho bot (nút chính ở đáy khung)</label>
+		<input id="data" value="đơn-hàng-thử-1" maxlength="200">
+		<div class="actions" style="margin-top:12px">
+			<button type="button" id="write">Xin quyền nhắn tin cho tôi</button>
+			<button type="button" id="link">Mở link ngoài (tài liệu Bot API)</button>
+			<button type="button" id="close">Đóng Mini App</button>
+		</div>
+	</section>
+
+	<section class="card" aria-label="Nhật ký">
+		<pre id="log"></pre>
+	</section>
+
+	<script>
+		(function () {
+			"use strict";
+			var log = document.getElementById("log");
+			function note(text) {
+				log.textContent = new Date().toLocaleTimeString("vi-VN") + "  " + text + "\n" + log.textContent;
+			}
+
+			// The bridge script of the chat app that opened this page.
+			var chatOrigin = "https://chat.hoandat.com";
+			try {
+				var from = new URL(document.referrer);
+				if (from.protocol === "https:" && from.hostname.indexOf("chat.") === 0) chatOrigin = from.origin;
+			} catch (err) {
+				// No referrer: opened outside a chat app.
+			}
+			var script = document.createElement("script");
+			script.src = chatOrigin + "/miniapp/sdk.js";
+			script.onload = start;
+			script.onerror = function () {
+				note("Không nạp được " + script.src);
+			};
+			document.head.appendChild(script);
+
+			function row(list, name, value) {
+				var dt = document.createElement("dt");
+				dt.textContent = name;
+				var dd = document.createElement("dd");
+				dd.textContent = value;
+				list.append(dt, dd);
+			}
+
+			function start() {
+				var app = window.ChatApp;
+				document.documentElement.dataset.theme = app.theme;
+				app.onEvent("theme", function (event) {
+					document.documentElement.dataset.theme = event.scheme;
+					note("Đổi giao diện: " + event.scheme);
+				});
+
+				var info = document.getElementById("info");
+				info.textContent = "";
+				if (app.initData === "") {
+					row(info, "Trạng thái", "Không có initData: trang này cần được mở từ một bot trong app chat.");
+					info.lastChild.className = "warn";
+				} else {
+					var fields = new URLSearchParams(app.initData);
+					var user = {};
+					try {
+						user = JSON.parse(fields.get("user") || "{}");
+					} catch (err) {
+						note("Trường user không phải JSON");
+					}
+					row(info, "Tên", user.first_name || "");
+					row(info, "Username", user.username ? "@" + user.username : "(không có)");
+					row(info, "Id người dùng", String(user.id || ""));
+					row(info, "Mở từ", fields.get("chat_type") || "");
+					row(info, "Bot", fields.get("bot_id") || "");
+					row(info, "Tổ chức", fields.get("tenant_id") || "");
+					var at = Number(fields.get("auth_date"));
+					row(info, "Lúc mở", at ? new Date(at * 1000).toLocaleString("vi-VN") : "");
+					row(info, "Có chữ ký", fields.get("signature") ? "có (kiểm ở server của bạn)" : "không");
+				}
+
+				app.MainButton.setText("Gửi dữ liệu cho bot").show().onClick(function () {
+					var value = document.getElementById("data").value.trim();
+					if (value === "") {
+						note("Nhập dữ liệu trước khi gửi");
+						return;
+					}
+					note("Gửi dữ liệu: " + value);
+					app.sendData(value);
+				});
+				document.getElementById("write").addEventListener("click", function () {
+					app.requestWriteAccess(function (granted) {
+						note(granted ? "Đã được phép nhắn tin" : "Không được phép nhắn tin");
+					});
+				});
+				document.getElementById("link").addEventListener("click", function () {
+					app.openLink("https://github.com/achoo254/chat-next/blob/main/docs/bot-api/README.md");
+				});
+				document.getElementById("close").addEventListener("click", function () {
+					app.close();
+				});
+				app.ready();
+				note("Sẵn sàng (giao diện " + app.theme + ")");
+			}
+		})();
+	</script>
+</body>
+</html>

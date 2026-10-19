@@ -322,14 +322,16 @@ export const viBots = {
 	miniApp: {
 		title: "Mini App",
 		url: "URL Mini App",
-		urlHint: "Chỉ https, trên domain của bạn. Trang được nạp trong khung sandbox, không có cookie của app chat.",
+		urlHint: "Trang web của bạn, ví dụ https://shop.example.com/app. Chỉ https, ngoài domain của app chat; trang được nạp trong khung sandbox, không có cookie của app chat.",
 		urlProblem: {
 			invalid: "URL phải bắt đầu bằng https:// và có tên miền",
 			credentials: "URL không được chứa tên đăng nhập hay mật khẩu",
 			fragment: "Bỏ phần từ dấu # trở đi: Mini App nhận dữ liệu khởi tạo ở đó",
 			ip: "Dùng tên miền, không dùng địa chỉ IP",
 			long: "URL dài tối đa 512 ký tự",
+			script: "Đây là script để nạp trong trang Mini App, không phải URL Mini App. Nhập URL trang web của bạn có nạp script này.",
 		},
+		appDomain: (domain: string) => `URL thuộc domain của app chat (${domain}). Mini App phải nằm trên domain của bạn.`,
 		refused: "Server không nhận URL này: cần https, trên domain của bạn, không nằm dưới domain của app chat hay của tổ chức.",
 		preview: "Xem trước đầu khung",
 		previewBody: "Nội dung từ",
@@ -344,7 +346,7 @@ export const viBots = {
 			["Mini App nhận initData ký bằng Ed25519 với khoá công khai của nền tảng (lấy bằng method ", "getMiniAppKey", "), kèm id bot, ", "tenant_id", " và ", "auth_date", "."],
 			["Kiểm chữ ký bằng hàm xác thực của SDK trước khi tin id người dùng; từ chối initData của bot khác và ", "auth_date", " quá 1 giờ."],
 		],
-		script: (url: string) => ["Trong trang Mini App, nạp ", url, " để dùng đối tượng ", "ChatApp", "."],
+		script: (url: string) => ["Trong trang Mini App (trên domain của bạn), nạp ", url, " để dùng đối tượng ", "ChatApp", ". Link này là script, không phải URL Mini App."],
 		sdks: [
 			{ name: "TypeScript", note: "Xác thực initData trong Node" },
 			{ name: "Python", note: "Xác thực initData trong Python" },

@@ -666,7 +666,7 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 <section class="shot" id="mini-app-settings">
 	<div class="shot-head">
 		<h2>Mini App</h2><span class="phase">R6 · Phase 16</span>
-		<p>Đăng ký URL Mini App trên domain của chủ bot, như Telegram: chỉ https, không chứa thông tin đăng nhập, không trỏ vào IP nội bộ, không nằm dưới domain của app chat hay của tổ chức (thử gõ http:// để thấy lỗi). Đầu khung cho người dùng thấy domain thật của Mini App. Bot có một Mini App chính (nút "Mở app" ở chat với bot) và có thể mở URL khác trên cùng domain qua nút trên tin. Server của bot phải xác thực initData bằng SDK trước khi tin danh tính người dùng.</p>
+		<p>Đăng ký URL Mini App trên domain của chủ bot, như Telegram: chỉ https, không chứa thông tin đăng nhập, không trỏ vào IP nội bộ, không nằm dưới domain của app chat hay của tổ chức (thử gõ http://, hoặc dán nhầm https://chat.hoandat.com/miniapp/sdk.js, để thấy lỗi). Đầu khung cho người dùng thấy domain thật của Mini App. Bot có một Mini App chính (nút "Mở app" ở chat với bot) và có thể mở URL khác trên cùng domain qua nút trên tin. Server của bot phải xác thực initData bằng SDK trước khi tin danh tính người dùng.</p>
 	</div>
 	<div class="frame">
 		<div class="console">
@@ -678,8 +678,8 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 						<h4>Mini App</h4>
 						<div class="field">
 							<label for="ma-url">URL Mini App</label>
-							<input class="input mono" id="ma-url" value="https://release.deploytools.vn/app" spellcheck="false" aria-describedby="ma-url-msg">
-							<span class="hint" id="ma-url-msg">Chỉ https, trên domain của bạn. Trang được nạp trong khung sandbox, không có cookie của app chat.</span>
+							<input class="input mono" id="ma-url" value="https://release.deploytools.vn/app" placeholder="https://shop.example.com/app" spellcheck="false" aria-describedby="ma-url-msg">
+							<span class="hint" id="ma-url-msg">Trang web của bạn, ví dụ https://shop.example.com/app. Chỉ https, ngoài domain của app chat; trang được nạp trong khung sandbox, không có cookie của app chat.</span>
 						</div>
 						<div class="field">
 							<span class="label">Xem trước đầu khung</span>
@@ -695,6 +695,7 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 						<ul>
 							<li>Mini App nhận initData ký bằng Ed25519 với khoá công khai của nền tảng (lấy bằng method <code class="mono">getMiniAppKey</code>), kèm id bot, <code class="mono">tenant_id</code> và <code class="mono">auth_date</code>.</li>
 							<li>Kiểm chữ ký bằng hàm xác thực của SDK trước khi tin id người dùng; từ chối initData của bot khác và <code class="mono">auth_date</code> quá 1 giờ.</li>
+							<li>Trong trang Mini App (trên domain của bạn), nạp <code class="mono">https://chat.hoandat.com/miniapp/sdk.js</code> để dùng đối tượng <code class="mono">ChatApp</code>. Link này là script, không phải URL Mini App.</li>
 						</ul>
 						<div class="sdks" style="grid-template-columns: minmax(0, 1fr)">
 							<a class="sdk" href="#" data-toast="Mở hướng dẫn Mini App cho TypeScript"><b>TypeScript <svg class="icon"><use href="#i-external"/></svg></b><span>Xác thực initData trong Node</span></a>
@@ -835,14 +836,23 @@ POST https://chat.hoandat.com/bot/v1/…</pre>
 	});
 	renderPreview();
 
-	// Mini App URL: https only.
+	// Mini App URL: https, outside the app's domain (chat.hoandat.com → hoandat.com); the SDK script pasted by mistake gets its own message.
 	const maUrl = $("#ma-url");
+	const APP_DOMAIN = "hoandat.com";
+	const maProblem = (v) => {
+		if (!/^https:\/\/[^\s/]+\.[^\s/]+/.test(v)) return "URL phải bắt đầu bằng https:// và có tên miền";
+		const url = new URL(v);
+		if (url.pathname === "/miniapp/sdk.js") return "Đây là script để nạp trong trang Mini App, không phải URL Mini App. Nhập URL trang web của bạn có nạp script này.";
+		if (url.hostname === APP_DOMAIN || url.hostname.endsWith("." + APP_DOMAIN)) return `URL thuộc domain của app chat (${APP_DOMAIN}). Mini App phải nằm trên domain của bạn.`;
+		return "";
+	};
 	maUrl.addEventListener("input", () => {
 		const v = maUrl.value.trim();
-		const ok = /^https:\/\/[^\s/]+\.[^\s/]+/.test(v);
+		const problem = maProblem(v);
+		const ok = problem === "";
 		maUrl.setAttribute("aria-invalid", String(!ok));
 		$("#ma-url-msg").className = ok ? "hint" : "error-text";
-		$("#ma-url-msg").textContent = ok ? "Chỉ https, trên domain của bạn. Trang được nạp trong khung sandbox, không có cookie của app chat." : "URL phải bắt đầu bằng https:// và có tên miền";
+		$("#ma-url-msg").textContent = ok ? "Trang web của bạn, ví dụ https://shop.example.com/app. Chỉ https, ngoài domain của app chat; trang được nạp trong khung sandbox, không có cookie của app chat." : problem;
 		$("#ma-save").disabled = !ok;
 		if (ok) {
 			$("#ma-preview-url").textContent = v;

@@ -314,14 +314,16 @@ export const enBots: BotsCopy = {
 	miniApp: {
 		title: "Mini App",
 		url: "Mini App URL",
-		urlHint: "https only, on your own domain. The page loads in a sandboxed frame without the chat app's cookies.",
+		urlHint: "Your own web page, for example https://shop.example.com/app. https only, outside the chat app's domain; the page loads in a sandboxed frame without the chat app's cookies.",
 		urlProblem: {
 			invalid: "The URL must start with https:// and have a domain name",
 			credentials: "The URL must not contain a user name or password",
 			fragment: "Remove the part from # on: the Mini App gets its init data there",
 			ip: "Use a domain name, not an IP address",
 			long: "The URL can be at most 512 characters",
+			script: "This is the script to load in your Mini App's page, not a Mini App URL. Enter the URL of your page that loads it.",
 		},
+		appDomain: (domain) => `The URL is on the chat app's domain (${domain}). A Mini App must be on your own domain.`,
 		refused: "The server refused this URL: it must be https, on your own domain, not under the chat app's or the organization's domain.",
 		preview: "Header preview",
 		previewBody: "Content from",
@@ -335,7 +337,7 @@ export const enBots: BotsCopy = {
 			["The Mini App gets initData signed with Ed25519 by the platform's public key (get it with the ", "getMiniAppKey", " method), with the bot id, ", "tenant_id", " and ", "auth_date", "."],
 			["Check the signature with the SDK's verify function before trusting the user id; reject initData of another bot and an ", "auth_date", " older than 1 hour."],
 		],
-		script: (url: string) => ["In the Mini App's page, load ", url, " to use the ", "ChatApp", " object."],
+		script: (url: string) => ["In the Mini App's page (on your domain), load ", url, " to use the ", "ChatApp", " object. This link is the script, not a Mini App URL."],
 		sdks: [
 			{ name: "TypeScript", note: "Verify initData in Node" },
 			{ name: "Python", note: "Verify initData in Python" },

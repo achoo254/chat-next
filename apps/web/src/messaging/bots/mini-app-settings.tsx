@@ -15,10 +15,22 @@ import type { BotsCopy } from "./copy-vi.ts";
 /** Longest Mini App URL the server takes (bot_admin.proto). */
 const URL_MAX = 512;
 
-export type MiniAppUrlProblem = keyof BotsCopy["miniApp"]["urlProblem"];
+export type MiniAppUrlProblem = keyof BotsCopy["miniApp"]["urlProblem"] | "appDomain";
+
+/** Path of the Mini App script the app serves (public/miniapp/sdk.js), often pasted here by mistake. */
+const SDK_PATH = "/miniapp/sdk.js";
+
+/**
+ * The domain the app is served under: chat.<domain> → <domain>. Mini Apps
+ * there would be same-site with the app; the server refuses them (and the
+ * other tenants' domains, which only it knows).
+ */
+export function appDomainOf(appHost: string): string {
+	return appHost.replace(/^chat\./, "");
+}
 
 /** What is wrong with a Mini App URL before saving; null when it may go to the server ("" removes the Mini App). */
-export function miniAppUrlProblem(value: string): MiniAppUrlProblem | null {
+export function miniAppUrlProblem(value: string, appDomain: string): MiniAppUrlProblem | null {
 	if (value === "") return null;
 	if (value.length > URL_MAX) return "long";
 	let url: URL;
@@ -31,6 +43,8 @@ export function miniAppUrlProblem(value: string): MiniAppUrlProblem | null {
 	if (url.username !== "" || url.password !== "") return "credentials";
 	if (url.hash !== "" || value.includes("#")) return "fragment";
 	if (/^\d{1,3}(\.\d{1,3}){3}$/.test(url.hostname)) return "ip";
+	if (url.pathname === SDK_PATH) return "script";
+	if (url.hostname === appDomain || url.hostname.endsWith(`.${appDomain}`)) return "appDomain";
 	return null;
 }
 
@@ -67,8 +81,9 @@ export function MiniAppTab({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: OwnBo
 	const formId = useDomId("mini-app");
 	const urlId = useDomId("ma-url");
 	const value = url.trim();
-	const problem = miniAppUrlProblem(value);
-	const shown = problem === null ? serverError : t.urlProblem[problem];
+	const appDomain = appDomainOf(window.location.hostname);
+	const problem = miniAppUrlProblem(value, appDomain);
+	const shown = problem === null ? serverError : problem === "appDomain" ? t.appDomain(appDomain) : t.urlProblem[problem];
 	const dirty = value !== bot.miniAppUrl;
 	const host = problem === null ? hostOf(value) : "";
 
@@ -154,7 +169,7 @@ export function MiniAppTab({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: OwnBo
 						</li>
 					))}
 					<li>
-						<Coded parts={t.script(`${window.location.origin}/miniapp/sdk.js`)} />
+						<Coded parts={t.script(`${window.location.origin}${SDK_PATH}`)} />
 					</li>
 				</ul>
 				<div className="sdk-list">
