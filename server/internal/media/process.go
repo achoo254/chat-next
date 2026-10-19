@@ -70,6 +70,8 @@ func (s *Service) process(ctx context.Context, staging string, size int64, f *Fi
 		return false, s.processImage(ctx, staging, size, mime, f)
 	case isMP4Family(mime):
 		return s.processMP4(ctx, staging, size, f)
+	case mime == mimeWebM || mime == mimeMatroska:
+		return s.processWebM(ctx, staging, size, f)
 	}
 	if err := s.objects.Copy(ctx, staging, f.Key); err != nil {
 		return false, errUnavailable(err)
@@ -215,6 +217,36 @@ func (s *Service) processMP4(ctx context.Context, staging string, size int64, f 
 	}
 	if info.width > 0 && info.height > 0 && info.width <= dimensionMax && info.height <= dimensionMax {
 		f.Width, f.Height = int32(info.width), int32(info.height)
+	}
+	return s.wantsJob(f), nil
+}
+
+// processWebM removes the metadata of a WebM or Matroska file while
+// copying it to the file's key (webm.go).
+func (s *Service) processWebM(ctx context.Context, staging string, size int64, f *File) (bool, error) {
+	read := func(offset, n int64) ([]byte, error) {
+		n = min(n, size-offset)
+		if n <= 0 {
+			return nil, nil
+		}
+		return s.readAll(ctx, staging, offset, n)
+	}
+	patches, err := scanWebM(read, size)
+	if err != nil {
+		if f.Kind != appv1.MediaKind_MEDIA_KIND_DOCUMENT {
+			return false, refuse("the video or audio file is malformed")
+		}
+		if err := s.objects.Copy(ctx, staging, f.Key); err != nil {
+			return false, errUnavailable(err)
+		}
+		f.MIME = mimeBinary
+		return false, nil
+	}
+	if err := s.rewrite(ctx, staging, f.Key, size, patches); err != nil {
+		return false, err
+	}
+	if !inlineSafe(f.MIME) {
+		f.MIME = attachmentType(f.MIME)
 	}
 	return s.wantsJob(f), nil
 }
