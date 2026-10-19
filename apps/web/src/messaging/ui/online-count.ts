@@ -57,7 +57,9 @@ function onlineCountsOf(source: ChatSource): OnlineCounts {
 }
 
 /**
- * Members of a group online now (null while unknown; chatId 0 for none).
+ * Members of a group online now; null while unknown, for chatId 0 and when
+ * nobody is (the server does not count me), so the header shows the member
+ * count alone instead of "0 đang hoạt động".
  * Asked when the chat opens, again every minute while the page is visible,
  * and when the page becomes visible again.
  */
@@ -77,5 +79,8 @@ export function useOnlineCount(chatId: number): number | null {
 			document.removeEventListener("visibilitychange", refresh);
 		};
 	}, [source, onlineCounts, chatId]);
-	return useSyncExternalStore(onlineCounts.subscribe, () => (chatId === 0 ? null : onlineCounts.get(chatId)));
+	return useSyncExternalStore(onlineCounts.subscribe, () => {
+		const count = chatId === 0 ? null : onlineCounts.get(chatId);
+		return count === 0 ? null : count;
+	});
 }

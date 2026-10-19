@@ -430,7 +430,8 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 						<span className="grow">{copy.info.deleteGroup(channel)}</span>
 					</button>
 				)}
-				{backend.features.has("report") && (
+				{/* The owner does not report their own group or channel. */}
+				{backend.features.has("report") && !owner && (
 					<button
 						type="button"
 						className="row link-row"

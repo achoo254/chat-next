@@ -6,7 +6,7 @@
 import { NotificationSound } from "@app/proto-ts/chats";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { seedDemo, type Demo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 
@@ -270,5 +270,16 @@ describe("online count", () => {
 			return screen.findByRole("complementary", { name: "Thông tin nhóm" }, LONG);
 		})());
 		await waitFor(() => expect(within(info).getByText("5 thành viên · 3 đang hoạt động")).toBeTruthy(), LONG);
+	});
+
+	it("shows the member count alone when nobody else is online", async () => {
+		const demo = seedDemo();
+		demo.fixture.onlineCounts.set(demo.ids.ops, 0);
+		const asked = vi.spyOn(demo.fixture.onlineCounts, "get");
+		await openChat(demo, demo.ids.ops, "Dashboard ổn định.");
+		await waitFor(() => expect(asked).toHaveBeenCalledWith(demo.ids.ops), LONG);
+		const head = document.querySelector(".convo-head");
+		await waitFor(() => expect(head?.textContent).toMatch(/5 thành viên$/), LONG);
+		expect(head?.textContent).not.toMatch(/đang hoạt động/);
 	});
 });
