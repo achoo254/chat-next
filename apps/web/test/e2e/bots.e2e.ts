@@ -10,14 +10,17 @@
 // sees the reply, reads the delivery state in the Developer Console and
 // switches the bot back to long polling there. Last, the bot edits its
 // message and inline keyboard, uploads a photo, and An uses its command menu
-// in a group (screenshots of the menu when E2E_SHOTS_DIR is set).
+// in a group (screenshots of the menu when E2E_SHOTS_DIR is set), and opens
+// the bot's Mini App from an inline button.
 import assert from "node:assert/strict";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { after, before } from "node:test";
 import type { Browser } from "playwright";
+import { verifyMiniAppInitData } from "../../../../sdk/ts/src/mini-app.ts";
 import { composer, launch, message, scenario, send, signIn, WEB_ORIGIN, type Person } from "./people.ts";
 
 let browser: Browser;
@@ -35,7 +38,11 @@ after(async () => {
 
 interface Update {
 	readonly update_id: number;
-	readonly message?: { readonly chat: { readonly id: number }; readonly text?: string };
+	readonly message?: {
+		readonly chat: { readonly id: number };
+		readonly text?: string;
+		readonly web_app_data?: { readonly data: string; readonly button_text: string };
+	};
 	readonly callback?: { readonly id: string; readonly data: string };
 	readonly member_changed?: { readonly chat: { readonly id: number }; readonly member: { readonly status: string } };
 }
@@ -328,4 +335,66 @@ scenario("the bot edits its message, sends a photo, and offers its commands in a
 	await message(an, "/ping").waitFor();
 	const ping = await bot.next((update) => update.message?.text === "/ping");
 	assert.equal(ping.message?.chat.id, groupId);
+});
+
+/** The developer's Mini App: served by the browser context at an https origin of its own. */
+const SHOP = "https://shop.example.com";
+const SHOP_PAGE = `<!doctype html>
+<meta charset="utf-8">
+<title>Cửa hàng</title>
+<script src="${SHOP}/sdk.js"></script>
+<p id="init"></p>
+<script>
+	document.getElementById("init").textContent = ChatApp.initData;
+	ChatApp.MainButton.setText("Đặt hàng").show().onClick(() => ChatApp.sendData("order-42"));
+	ChatApp.ready();
+</script>`;
+
+scenario("open a Mini App from a button, check its init data, send data to the bot", () => [an], async () => {
+	assert.ok(echo !== null, "needs the bot of the first scenario");
+	const { bot, botId, chatId } = echo;
+	const { page } = an;
+	const sdk = readFileSync(new URL("../../public/miniapp/sdk.js", import.meta.url), "utf8");
+	await page.context().route(`${SHOP}/**`, (route) => {
+		const path = new URL(route.request().url()).pathname;
+		if (path === "/sdk.js") return route.fulfill({ contentType: "text/javascript", body: sdk });
+		if (path === "/app") return route.fulfill({ contentType: "text/html", body: SHOP_PAGE });
+		return route.fulfill({ status: 404 });
+	});
+
+	// A Mini App URL on the app's own host is refused.
+	await assert.rejects(
+		bot.call("POST", "/messages", {
+			chat_id: chatId,
+			text: "Không được",
+			reply_markup: { inline_keyboard: [[{ text: "Mở", web_app: { url: "https://localhost/app" } }]] },
+		}),
+	);
+	await bot.call("POST", "/messages", {
+		chat_id: chatId,
+		text: "Mời bạn xem cửa hàng.",
+		reply_markup: { inline_keyboard: [[{ text: "Mở cửa hàng", web_app: { url: `${SHOP}/app` } }]] },
+	});
+	await page.goto(`${WEB_ORIGIN}/c/${chatId}`);
+	await message(an, "Mời bạn xem cửa hàng.").getByRole("button", { name: "Mở cửa hàng" }).click();
+
+	const panel = page.getByRole("region", { name: "Mini App của Echo Bot" });
+	await panel.getByText("shop.example.com").waitFor();
+	const app = page.frameLocator('iframe[title="Mini App của Echo Bot"]');
+	const initData = (await app.locator("#init").textContent()) ?? "";
+	const { public_key: key } = await bot.call<{ public_key: string }>("GET", "/miniAppKey");
+	const verified = verifyMiniAppInitData(initData, botId, key);
+	assert.ok(verified !== null, "init data signed by the server");
+	assert.equal(verified.chat_type, "private");
+	assert.equal(verified.user.first_name, "An");
+	assert.equal(verifyMiniAppInitData(initData.replace("chat_type=private", "chat_type=group"), botId, key), null);
+
+	// The container draws the Mini App's main button; pressing it sends the data as An and closes the panel.
+	const sent = bot.next((update) => update.message?.web_app_data !== undefined);
+	await panel.getByRole("button", { name: "Đặt hàng" }).click();
+	const update = await sent;
+	assert.deepEqual(update.message?.web_app_data, { data: "order-42", button_text: "Mở cửa hàng" });
+	assert.equal(update.message?.chat.id, chatId);
+	await panel.waitFor({ state: "detached" });
+	await page.getByRole("log", { name: "Tin nhắn" }).getByText("Đã gửi dữ liệu từ “Mở cửa hàng” tới bot").waitFor();
 });
