@@ -599,6 +599,6 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 ### Việc tiếp theo
 1. **Media còn dở (Jev 0,44, đang làm):** giữ nhóm album khi chuyển tiếp, tạm dừng upload, bỏ metadata WebM/MKV, poster video và waveform khi server không có ffmpeg.
 2. Gọn ngân sách JS khởi động (Jev 0,37): tách phần ít dùng của `message-item.tsx` và bộ icon.
-3. Mini App web (R6) chờ user đăng ký domain riêng.
+3. Mini App web (R6): không còn chờ domain. Jev 0,95 (2026-10-19) chọn cách Telegram: Mini App chạy từ URL https của người viết bot, từ chối URL dưới domain app hay tenant (ADR 0010, Phase 16 đã sửa).
 4. Đánh giá Nghị định 13: user bảo bỏ qua; test tải lớn: bỏ qua tới khi có người dùng thật.
 

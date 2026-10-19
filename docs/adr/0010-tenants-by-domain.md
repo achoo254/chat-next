@@ -16,12 +16,12 @@ Hệ sinh thái hoandat có tenant theo domain (ADR 0006 của `hoandat-auth`): 
 | Host | Việc |
 |---|---|
 | `chat.<d>` | Web app, RPC, WebSocket, callback OIDC, back-channel logout, deep link `/b/<username>`, Bot API ở `/bot/v1/`, incoming webhook ở `/hook/` |
-| `b<bot_id>.{{miniapp_domain}}` | Origin riêng cho từng Mini App |
 | `{{media_domain}}` | Media |
 
 - Bot API và incoming webhook là đường dẫn trên `chat.<d>`, không có host riêng (quyết định 2026-10-15): Universal SSL miễn phí của Cloudflare chỉ phủ một cấp dưới `<d>`, nên host hai cấp như `bot.chat.<d>` được proxy sẽ lỗi TLS.
 - Host của tenant nằm trong `chat.<d>` và `*.chat.<d>` (một cấp), cùng quy ước với `localman.<d>` và `*.localman.<d>` của hệ sinh thái, nên dùng chung cơ chế cấp chứng chỉ theo tenant.
-- Mini App và media nằm trên domain đăng ký riêng, dùng chung cho mọi tenant, cố ý không nằm dưới `<d>`. `bot_id` duy nhất trên toàn hệ thống nên origin Mini App không trùng giữa các tenant.
+- Media nằm trên domain đăng ký riêng, dùng chung cho mọi tenant, cố ý không nằm dưới `<d>`.
+- Mini App chạy từ URL https của người viết bot, trên domain của họ, như Telegram (quyết định 2026-10-19, Jev 0,95; thay cho domain `b<bot_id>.{{miniapp_domain}}` do chat phục vụ). URL nằm dưới domain của app (`hoandat.com`) hay của bất kỳ tenant nào bị từ chối, nên code của bên thứ ba không bao giờ chạy cùng site với app.
 - `{{media_domain}}` không dùng cookie; token tải xuống mang `tenant_id` và chủ thể, và edge từ chối token của tenant bị đình chỉ.
 
 ### Dữ liệu
@@ -51,7 +51,7 @@ Một tenant chỉ được phục vụ khi chủ tenant bật chat ở `/admin`
 - Chọn tenant theo Host khớp với cách IdP và các app khác trong hệ sinh thái đã làm, nên người dùng của `<d>` thấy mọi app dưới cùng domain của họ.
 - `tenant_id` ngay từ đầu rẻ hơn rất nhiều so với migrate về sau, và cho phép mọi truy vấn kiểm quyền lọc tenant trong cùng câu SQL.
 - Domain của tenant do người khác giữ DNS; tin DNS công khai cho discovery và JWKS là để người giữ DNS giả IdP.
-- Cùng registrable domain với `chat.<d>` là same-site, nên request từ Mini App hay file media sẽ mang cookie `SameSite` của app. Domain đăng ký riêng cắt đường đó.
+- Cùng registrable domain với `chat.<d>` là same-site, nên request từ Mini App hay file media sẽ mang cookie `SameSite` của app. Media dùng domain đăng ký riêng; Mini App ở domain của người viết bot, vốn khác site với app.
 - Suy secret bằng HMAC cho phép tenant mới chạy mà không cần cấu hình tay ở cả hai phía.
 - `421` nói đúng nghĩa: request tới sai server cho Host đó, không phải lỗi xác thực.
 
@@ -66,7 +66,7 @@ Một tenant chỉ được phục vụ khi chủ tenant bật chat ở `/admin`
 ## Cách thay đổi
 
 - Thêm host mới cho tenant: giữ trong `*.chat.<d>` một cấp để dùng chứng chỉ sẵn có; cập nhật mẫu host trong `brand.config.json` ([ADR 0008](./0008-branding-and-naming.md)) và quy ước host phía IdP.
-- Không chuyển Mini App hay media vào dưới `<d>`; muốn đổi domain thì chọn một domain đăng ký riêng khác.
+- Không chuyển media vào dưới `<d>`; muốn đổi domain thì chọn một domain đăng ký riêng khác. Không nhận URL Mini App dưới `<d>` hay domain của app.
 - Khi backend rời server dùng chung với IdP, API nội bộ không còn trên loopback: cần kênh có xác thực (WireGuard hoặc mTLS) hoặc chuyển IdP cùng sang cụm, lên plan ở cả hai repo.
 - Đổi công thức suy secret cần đổi đồng thời ở IdP; xoay khoá gốc phía IdP xoay mọi secret suy ra cùng lúc.
 
