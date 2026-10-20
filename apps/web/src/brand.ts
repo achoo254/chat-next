@@ -1,5 +1,5 @@
-// Browser view of brand.config.json. packages/brand reads the file with
-// node:fs, so the web app imports the JSON through Vite instead.
+// Browser view of brand.config.json, imported through Vite (the build-time
+// loader in brand-files.ts reads it with node:fs and validates it).
 import brandConfig from "../../../brand.config.json";
 
 /** What comes before the domain in the web app's host: "chat." of chat.{domain}. */

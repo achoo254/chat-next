@@ -2,6 +2,7 @@
 
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-10-14
+- Cập nhật 20/10/2026: mã thương hiệu chuyển sang gói dùng chung `@shared-next/brand` (repo [`shared-next`](https://github.com/achoo254/shared-next), cài theo tag git). Schema `brand.config.schema.json` của repo này bị xóa; `brand.config.json` trỏ `$schema` về schema trong gói. `pnpm brand:gen` gọi API `./build` của gói (`apps/web/scripts/brand-gen.ts`, tùy chọn của chat ở `apps/web/brand-files.ts`), file sinh chuyển sang `brand/generated/` (cạnh logo); lint tên cứng là CLI `check-brand` của gói (`pnpm check:brand`). Gói `packages/brand` cũ đã gỡ.
 - Huỷ 20/10/2026: desktop = PWA. Toàn hệ sinh thái không có app desktop native (Tauri); trên máy tính dùng bản web cài dạng PWA, đăng nhập bằng `chat-web`. Client `chat-desktop` đã gỡ khỏi IdP. Phần nói về desktop/Tauri bên dưới chỉ còn là lịch sử.
 
 ## Bối cảnh
@@ -31,7 +32,7 @@ Tên sản phẩm chưa cố định và có thể đổi. Tên, màu, icon, bun
 
 ## Hệ quả
 
-- Mọi chỗ cần tên, màu hay domain phải đọc từ `packages/brand` hoặc file sinh ra, không tự khai hằng.
+- Mọi chỗ cần tên, màu hay domain phải đọc từ `brand.config.json` (qua `@shared-next/brand` hoặc `apps/web/src/brand.ts`) hoặc file sinh ra, không tự khai hằng.
 - CI có bước tìm tên sản phẩm cứng và chuỗi cấm trong `apps`, `packages`, `server`, `proto`.
 - Một bản app mobile và desktop phục vụ mọi tenant; tên và màu của app là của sản phẩm, chỉ tên tenant thay đổi theo tenant.
 

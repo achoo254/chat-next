@@ -8,7 +8,7 @@ export default tseslint.config(
 			"**/node_modules/**",
 			"**/dist/**",
 			"packages/proto-ts/src/gen/**",
-			"packages/brand/generated/**",
+			"brand/generated/**",
 			"plans/**",
 		],
 	},

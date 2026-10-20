@@ -10,5 +10,5 @@
     "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "test", "vite.config.ts", "vite-react.ts", "vite-brand.ts", "vite-service-worker.ts"]
+  "include": ["src", "test", "vite.config.ts", "vite-react.ts", "vite-brand.ts", "vite-service-worker.ts", "brand-files.ts", "scripts"]
 }

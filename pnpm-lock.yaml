@@ -17,6 +17,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.12.0)
+      '@shared-next/brand':
+        specifier: github:achoo254/shared-next#v0.2.0&path:/packages/brand
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
@@ -72,15 +75,15 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
-      '@app/brand':
-        specifier: workspace:*
-        version: link:../../packages/brand
       '@babel/core':
         specifier: 7.29.7
         version: 7.29.7
       '@rolldown/plugin-babel':
         specifier: 0.2.4
         version: 0.2.4(@babel/core@7.29.7)(@babel/runtime@7.29.10)(rolldown@1.2.13)(vite@8.3.4(@types/node@24.19.2))
+      '@shared-next/brand':
+        specifier: github:achoo254/shared-next#v0.2.0&path:/packages/brand
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand
       '@testing-library/dom':
         specifier: 10.4.2
         version: 10.4.2
@@ -114,16 +117,6 @@ importers:
       vitest:
         specifier: 5.0.4
         version: 5.0.4(@types/node@24.19.2)(jsdom@30.1.2)(vite@8.3.4(@types/node@24.19.2))
-
-  packages/brand:
-    dependencies:
-      ajv:
-        specifier: 8.20.0
-        version: 8.20.0
-    devDependencies:
-      playwright:
-        specifier: 1.64.0
-        version: 1.64.0
 
   packages/core:
     dependencies:
@@ -590,6 +583,12 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+
+  '@shared-next/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand':
+    resolution: {gitHosted: true, path: /packages/brand, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5}
+    version: 0.2.0
+    engines: {node: '>=22.12'}
+    hasBin: true
 
   '@sqlite.org/sqlite-wasm@3.53.4-build2':
     resolution: {integrity: sha512-kQVArGJA4z7s56Dm8t+eTBXad4LiohuVj9pfgDNOcxa+Ic5xMrWlLPTq6cT0hw5S4MIvtpsraW+B0wD+IPvC7A==}
@@ -1850,6 +1849,10 @@ snapshots:
       vite: 8.3.4(@types/node@24.19.2)
 
   '@rolldown/pluginutils@1.0.1': {}
+
+  '@shared-next/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand':
+    dependencies:
+      ajv: 8.20.0
 
   '@sqlite.org/sqlite-wasm@3.53.4-build2': {}
 

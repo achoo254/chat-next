@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { loadChatBrand } from "./brand-files.ts";
 import { brandAssets } from "./vite-brand.ts";
 import { reactPlugins } from "./vite-react.ts";
 import { serviceWorker } from "./vite-service-worker.ts";
@@ -9,7 +10,7 @@ const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
 const API_ORIGIN = "http://127.0.0.1:4600";
 
 export default defineConfig({
-	plugins: [...reactPlugins(), brandAssets(), serviceWorker()],
+	plugins: [...reactPlugins(), brandAssets(), serviceWorker(loadChatBrand().pushSenderName)],
 	server: {
 		// brand.config.json devOrigins lists this origin; never fall back to another port.
 		port: 5173,

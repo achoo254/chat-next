@@ -6,7 +6,6 @@
 // compiled into the worker, with the brand's push sender name, so every build ships a worker of its own and a new build installs
 // as an update. The dev server has no worker.
 import { createHash } from "node:crypto";
-import { loadBrandConfig } from "@app/brand";
 import { fileURLToPath } from "node:url";
 import { build, type Plugin } from "vite";
 import type { AppShellBuild } from "./src/sw/app-shell-worker.ts";
@@ -40,7 +39,8 @@ export function appShell(output: ReadonlyMap<string, string | Uint8Array>): AppS
 	return { version: hash.digest("hex").slice(0, 16), files, entry: entryScript(html) };
 }
 
-export function serviceWorker(): Plugin {
+/** `pushSenderName`: the brand's title of push notifications that hide the message. */
+export function serviceWorker(pushSenderName: string): Plugin {
 	return {
 		name: "app-service-worker",
 		apply: "build",
@@ -54,7 +54,7 @@ export function serviceWorker(): Plugin {
 				configFile: false,
 				logLevel: "warn",
 				publicDir: false,
-				define: { __APP_SHELL__: JSON.stringify(shell), __PUSH_APP_NAME__: JSON.stringify(loadBrandConfig().pushSenderName) },
+				define: { __APP_SHELL__: JSON.stringify(shell), __PUSH_APP_NAME__: JSON.stringify(pushSenderName) },
 				build: {
 					outDir,
 					emptyOutDir: false,

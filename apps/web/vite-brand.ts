@@ -3,13 +3,14 @@
 //
 // - index.html: %APP_NAME%, %APP_DESCRIPTION% and %APP_LOGO% (the splash logo,
 //   inline SVG), plus the favicon, Apple touch icon and manifest links;
-// - the icon files (packages/brand/generated/icons/, made by pnpm brand:gen) and
+// - the icon files (brand/generated/icons/, made by pnpm brand:gen) and
 //   manifest.webmanifest at the site root, served in dev and emitted in builds;
 // - virtual:brand-logo, the inline SVG the in-app logo and loaders render.
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { FAVICON_ICO, FAVICON_SVG, RASTER_ICONS, generateManifests, loadBrandConfig, webIconFiles } from "@app/brand";
+import { join } from "node:path";
+import { DEFAULT_FAVICON_SVG, FAVICON_ICO, RASTER_ICONS, generateManifests, webIconFiles } from "@shared-next/brand/build";
 import type { Plugin } from "vite";
+import { BRAND_ROOT, GENERATED_DIR, MANIFEST_OPTIONS, loadChatBrand } from "./brand-files.ts";
 import { inlineLogoSvg, scopeSvgIds } from "./src/brand-logo-svg.ts";
 
 const LOGO_MODULE = "virtual:brand-logo";
@@ -43,16 +44,16 @@ function contentType(path: string): string {
 const SPLASH_LOGO_SIZE = 88;
 
 export function brandAssets(): Plugin {
-	const brand = loadBrandConfig();
-	const logo = inlineLogoSvg(readFileSync(fileURLToPath(new URL(`../../${brand.icon}`, import.meta.url)), "utf8"));
+	const brand = loadChatBrand();
+	const logo = inlineLogoSvg(readFileSync(join(BRAND_ROOT, brand.icon), "utf8"));
 	const splashLogo = scopeSvgIds(logo, "splash").replace(
 		/^<svg\b/,
 		`<svg width="${SPLASH_LOGO_SIZE}" height="${SPLASH_LOGO_SIZE}"`,
 	);
-	const manifest = `${JSON.stringify(generateManifests(brand)["web.webmanifest.json"])}\n`;
+	const manifest = `${JSON.stringify(generateManifests(brand, MANIFEST_OPTIONS)["web.webmanifest.json"])}\n`;
 	/** URL path (no leading slash) to file contents, read on use so pnpm brand:gen shows up without a restart. */
 	const files = new Map<string, () => Buffer | string>([
-		...webIconFiles(brand).map((icon) => [icon.path, () => readFileSync(icon.file)] as const),
+		...webIconFiles(brand, { root: BRAND_ROOT, generatedDir: GENERATED_DIR }).map((icon) => [icon.path, () => readFileSync(icon.file)] as const),
 		[MANIFEST_PATH, () => manifest],
 	]);
 	const appleTouch = RASTER_ICONS.find((icon) => icon.file.startsWith("apple-touch-icon"));
@@ -60,7 +61,7 @@ export function brandAssets(): Plugin {
 	// Browsers with SVG favicons take the SVG; the others fall back to the ICO.
 	const links = [
 		`<link rel="icon" href="/${FAVICON_ICO}" sizes="16x16 32x32 48x48">`,
-		`<link rel="icon" href="/${FAVICON_SVG}" type="image/svg+xml">`,
+		`<link rel="icon" href="/${DEFAULT_FAVICON_SVG}" type="image/svg+xml">`,
 		`<link rel="apple-touch-icon" href="/${appleTouch.file}" sizes="${appleTouch.size}x${appleTouch.size}">`,
 		`<link rel="manifest" href="/${MANIFEST_PATH}">`,
 		// Browser chrome and the iOS home screen name follow the brand (installing: settings "Cài ứng dụng").
