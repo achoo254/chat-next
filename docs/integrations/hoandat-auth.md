@@ -1,6 +1,6 @@
-# Tích hợp với IdP `hoandat-auth`
+# Tích hợp với IdP `auth-next`
 
-App chat đăng nhập chỉ qua IdP của hệ sinh thái hoandat. Quyết định nằm ở [ADR 0006](../adr/0006-sign-in-and-chat-sessions.md) (đăng nhập và phiên) và [ADR 0010](../adr/0010-tenants-by-domain.md) (tenant). Hợp đồng chi tiết phía IdP là `hoandat-auth/docs/integration-guide.md`; trang này chỉ ghi phần riêng của app chat.
+App chat đăng nhập chỉ qua IdP của hệ sinh thái hoandat. Quyết định nằm ở [ADR 0006](../adr/0006-sign-in-and-chat-sessions.md) (đăng nhập và phiên) và [ADR 0010](../adr/0010-tenants-by-domain.md) (tenant). Hợp đồng chi tiết phía IdP là `auth-next/docs/integration-guide.md`; trang này chỉ ghi phần riêng của app chat.
 
 ## Client ở IdP
 
@@ -20,8 +20,8 @@ Cả ba xin scope `openid profile email`, không có audience API: app chat tự
 
 ## Trạng thái thay đổi phía IdP
 
-Plan: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integration/plan.md`.
+Plan: `auth-next/plans/dattqh/261014-1131-chat-app-integration/plan.md`.
 
-- Đã làm và đang chạy ở production (`main` của `hoandat-auth`, commit `0c0020d`, `4a9ca7d`; đo 15/10/2026): ba client chat, refresh native không trần, secret suy theo tenant, `CHAT_MOBILE_REDIRECT_URI`. `.env` của IdP có `CHAT_WEB_URL`, `CHAT_WEB_CLIENT_SECRET`; env và cách kiểm client nằm ở `hoandat-auth/docs/deployment-guide.md` mục "Client của app chat".
+- Đã làm và đang chạy ở production (`main` của `auth-next`, commit `0c0020d`, `4a9ca7d`; đo 15/10/2026): ba client chat, refresh native không trần, secret suy theo tenant, `CHAT_MOBILE_REDIRECT_URI`. `.env` của IdP có `CHAT_WEB_URL`, `CHAT_WEB_CLIENT_SECRET`; env và cách kiểm client nằm ở `auth-next/docs/deployment-guide.md` mục "Client của app chat".
 - App chat ở trang `/apps` của IdP: chỉ ở tenant chính (`auth.hoandat.com/apps`), vì tenant khác chưa có host `chat.<domain>`.
 - Chưa làm: host `chat.<domain>` theo tenant và bật chat ở `/admin` (khi có thì `/apps` của tenant đó mới hiện Chat), vai `chat` của API nội bộ, hạn mức `/token` cho request loopback, hiển thị máy chat ở `/account`, script tạo tenant thử cho dev.

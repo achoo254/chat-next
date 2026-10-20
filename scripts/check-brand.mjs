@@ -1,6 +1,7 @@
 /**
  * Fails when a product name is hard-coded outside the brand configuration:
- * - the folder name "chat-inet" anywhere in product code (any case);
+ * - "chat-inet", the repo name used before the *-next rename, anywhere in
+ *   product code (any case);
  * - the configured appName as a whole string literal in TS/JS/Go source.
  * Renaming the product must only need brand.config.json and a rebuild.
  */

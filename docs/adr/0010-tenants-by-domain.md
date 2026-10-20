@@ -5,7 +5,7 @@
 
 ## Bối cảnh
 
-Hệ sinh thái hoandat có tenant theo domain (ADR 0006 của `hoandat-auth`): người dùng của domain `<d>` đăng nhập ở `https://auth.<d>`, và dữ liệu của họ tách khỏi `hoandat.com`. Tenant chính là `hoandat.com`; tenant đầu tiên ngoài nó là `inetdev.io.vn`. App chat phải phục vụ các tenant này từ v1. Thêm `tenant_id` sau khi đã có dữ liệu thì phải migrate mọi bảng, nên đây là contract dữ liệu phải chốt từ đầu. Nội dung bên thứ ba (Mini App, file tải lên) không được chạy cùng site với app, nếu không request từ nội dung đó sẽ mang cookie của app.
+Hệ sinh thái hoandat có tenant theo domain (ADR 0006 của `auth-next`): người dùng của domain `<d>` đăng nhập ở `https://auth.<d>`, và dữ liệu của họ tách khỏi `hoandat.com`. Tenant chính là `hoandat.com`; tenant đầu tiên ngoài nó là `inetdev.io.vn`. App chat phải phục vụ các tenant này từ v1. Thêm `tenant_id` sau khi đã có dữ liệu thì phải migrate mọi bảng, nên đây là contract dữ liệu phải chốt từ đầu. Nội dung bên thứ ba (Mini App, file tải lên) không được chạy cùng site với app, nếu không request từ nội dung đó sẽ mang cookie của app.
 
 ## Quyết định
 
@@ -60,7 +60,7 @@ Một tenant chỉ được phục vụ khi chủ tenant bật chat ở `/admin`
 - Mọi bảng mới có danh tính hoặc chỉ mục unique theo người dùng phải có `tenant_id` ngay khi tạo.
 - Bộ test có ma trận tenant: không API nào (client, Bot API, webhook, tìm kiếm, presence) trả dữ liệu của tenant khác.
 - Kiểm duyệt tách theo tenant; chủ tenant (`ownerSubs` từ API nội bộ) kiểm duyệt được trong tenant của mình.
-- Phía IdP phải có: host `chat.<d>` và `*.chat.<d>` trong quy ước host của tenant, cờ bật chat theo tenant, chặn nhãn `chat` khi nhận domain, và credentials API nội bộ cho vai `chat`. Đây là thay đổi ở repo `hoandat-auth`.
+- Phía IdP phải có: host `chat.<d>` và `*.chat.<d>` trong quy ước host của tenant, cờ bật chat theo tenant, chặn nhãn `chat` khi nhận domain, và credentials API nội bộ cho vai `chat`. Đây là thay đổi ở repo `auth-next`.
 - Host của đăng nhập trong [ADR 0006](./0006-sign-in-and-chat-sessions.md) đều nằm dưới `chat.<d>`; allowlist `Origin` theo tenant suy từ bảng Host ở trên.
 
 ## Cách thay đổi

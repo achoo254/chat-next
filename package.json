@@ -1,5 +1,5 @@
 {
-  "name": "@app/root",
+  "name": "chat-next",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.9.0",

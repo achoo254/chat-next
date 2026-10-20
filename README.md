@@ -1,6 +1,6 @@
 # chat-next
 
-Ứng dụng chat của hệ sinh thái hoandat: web-first (React 19), đóng gói iOS/Android bằng Capacitor và desktop bằng Tauri v2, backend Go. Người dùng đăng nhập bằng tài khoản hoandat qua IdP [`hoandat-auth`](https://github.com/achoo254/hoandat-auth); mỗi domain (tenant) có `chat.<domain>` riêng. Tên sản phẩm cấu hình ở `brand.config.json`; "chat-next" chỉ là tên repo.
+Ứng dụng chat của hệ sinh thái hoandat: web-first (React 19), đóng gói iOS/Android bằng Capacitor và desktop bằng Tauri v2, backend Go. Người dùng đăng nhập bằng tài khoản hoandat qua IdP [`auth-next`](https://github.com/achoo254/hoandat-auth); mỗi domain (tenant) có `chat.<domain>` riêng. Tên sản phẩm cấu hình ở `brand.config.json`; "chat-next" chỉ là tên repo.
 
 Plan và quyết định: [`plans/dattqh/261013-0448-chat-platform-v1/plan.md`](plans/dattqh/261013-0448-chat-platform-v1/plan.md). Kiến trúc: [`docs/README.md`](docs/README.md) và các ADR trong `docs/adr/`.
 
@@ -47,7 +47,7 @@ cp deploy/dev/idp.env.example deploy/dev/idp.env  # secret của IdP local
 docker compose -f deploy/dev/docker-compose.yml --env-file deploy/dev/.env up
 ```
 
-IdP được build từ checkout `hoandat-auth` nằm cạnh repo này (`../hoandat-auth`); cần tạo khoá ký một lần ở đó bằng `pnpm generate-key`. Mọi cổng chỉ bind `127.0.0.1`. Không commit file `.env` hay `*.env`.
+IdP được build từ checkout `auth-next` nằm cạnh repo này (`../auth-next`, khai trong `deploy/dev/docker-compose.yml`); cần tạo khoá ký một lần ở đó bằng `pnpm generate-key`. Mọi cổng chỉ bind `127.0.0.1`. Không commit file `.env` hay `*.env`.
 
 ## Production
 

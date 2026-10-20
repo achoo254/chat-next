@@ -6,7 +6,7 @@ Dữ liệu cá nhân app chat giữ, ở đâu, giữ bao lâu và vì sao (Ngh
 
 | Bên | Giữ gì | Ai quản lý |
 |---|---|---|
-| IdP `hoandat-auth` | Danh tính Google/GitHub, email gốc, cách đăng nhập, grant của từng app | Người dùng ở `auth.<domain>/account`; xoá tài khoản hoandat.com ở đó |
+| IdP `auth-next` | Danh tính Google/GitHub, email gốc, cách đăng nhập, grant của từng app | Người dùng ở `auth.<domain>/account`; xoá tài khoản hoandat.com ở đó |
 | App chat | Mọi thứ trong bảng dưới, theo tenant (ADR 0010) | Người dùng trong app: Cài đặt > Tài khoản (xuất, tự xoá, xoá tài khoản chat) |
 
 Xoá tài khoản chat không xoá tài khoản hoandat.com; nó thu hồi grant của app chat ở IdP. Đăng nhập lại sau khi xoá tạo một tài khoản chat mới, trống.

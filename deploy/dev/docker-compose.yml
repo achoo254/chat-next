@@ -6,7 +6,7 @@
 # Postgres runs a primary plus one synchronous standby, so `server_epoch`
 # and failover behaviour can be tested locally (promote the standby with
 # `docker compose exec postgres-standby pg_ctl promote`).
-# The IdP is built from the sibling hoandat-auth checkout (../../../hoandat-auth).
+# The IdP is built from the sibling auth-next checkout (../../../auth-next).
 name: app-dev
 
 services:
@@ -103,7 +103,7 @@ services:
       start_period: 10s
 
   idp:
-    build: ../../../hoandat-auth
+    build: ../../../auth-next
     depends_on:
       idp-mongo:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
       SIGNING_KEYS_PATH: /run/secrets/idp/signing-keys.json
       CHAT_WEB_URL: http://localhost:5173
     volumes:
-      - ../../../hoandat-auth/secrets:/run/secrets/idp:ro
+      - ../../../auth-next/secrets:/run/secrets/idp:ro
     ports:
       - "127.0.0.1:4500:4500"
 

@@ -44,7 +44,7 @@ Phục hồi env file từ `<env>.rotate-bak-<thời gian>` của bước vừa 
 
 ## `OIDC_CLIENT_SECRET`
 
-Secret của `chat-web` do IdP sinh (`APP_CLIENT_SECRET_KEY` của `hoandat-auth`, dẫn xuất theo domain). Việc đổi làm ở phiên của repo `hoandat-auth` theo `hoandat-auth/docs/deployment-guide.md`; phía chat chỉ ghi giá trị mới vào `OIDC_CLIENT_SECRET` của env file tương ứng (backup trước) và reload process. Giữa lúc IdP đổi và lúc chat reload, đăng nhập và kiểm tra grant lỗi `invalid_client` (phiên vẫn còn, kiểm tra được thử lại sau), nên làm hai việc liền nhau.
+Secret của `chat-web` do IdP sinh (`APP_CLIENT_SECRET_KEY` của `auth-next`, dẫn xuất theo domain). Việc đổi làm ở phiên của repo `auth-next` theo `auth-next/docs/deployment-guide.md`; phía chat chỉ ghi giá trị mới vào `OIDC_CLIENT_SECRET` của env file tương ứng (backup trước) và reload process. Giữa lúc IdP đổi và lúc chat reload, đăng nhập và kiểm tra grant lỗi `invalid_client` (phiên vẫn còn, kiểm tra được thử lại sau), nên làm hai việc liền nhau.
 
 ## Mật khẩu database
 

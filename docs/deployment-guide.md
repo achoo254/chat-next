@@ -21,7 +21,7 @@ Giai đoạn 1 của hạ tầng: app chat chạy chung server `103.72.98.65` v�
 
 ## Lần đầu (đã làm ngày 2026-10-14)
 
-1. IdP: thêm `CHAT_WEB_URL` và `CHAT_WEB_CLIENT_SECRET` vào `/var/www/hoandat-auth/.env` (secret sinh trên server), deploy IdP theo `hoandat-auth/docs/deployment-guide.md`; cùng giá trị secret ghi vào `/opt/chat/.env` dưới tên `OIDC_CLIENT_SECRET`.
+1. IdP: thêm `CHAT_WEB_URL` và `CHAT_WEB_CLIENT_SECRET` vào `/var/www/hoandat-auth/.env` (secret sinh trên server), deploy IdP theo `auth-next/docs/deployment-guide.md`; cùng giá trị secret ghi vào `/opt/chat/.env` dưới tên `OIDC_CLIENT_SECRET`.
 2. DNS `chat.hoandat.com` proxied.
 3. Đồng bộ `infra/chat/` lên `/opt/chat/infra/`, chạy `bash /opt/chat/infra/issue-cert.sh` rồi `bash /opt/chat/infra/setup-server.sh` (user, thư mục, role/database Postgres, `pg_hba`, `SESSION_KEY`, `DATABASE_URL`, cron backup, conf nginx cấp http).
 4. Deploy lần đầu như mục dưới.
@@ -121,7 +121,7 @@ Luật bot chạy 10 phút một lần trong `chat-api`: bot có ít nhất 20 n
 
 Mỗi tenant khác tenant chính chạy một process `chat-api-<id>` riêng trên cùng database, ở `https://chat.<domain>`. Process nào chỉ đọc outbox và dữ liệu của tenant mình. Tenant `inetdev.io.vn` chỉ dùng để nghiệm thu mô hình tenant; các app khác không cần làm theo.
 
-1. Phía IdP (`hoandat-auth`): tenant đã có ở `auth.<domain>`. Chứng chỉ của tenant (`/etc/letsencrypt-tenants/live/<domain>/`) phải có `chat.<domain>`, và map `$tenant_cert` trong `00-tenants-http.conf` phải nhận nhãn `chat.`. Host `chat.<domain>` để DNS only hay Proxied qua Cloudflare đều được.
+1. Phía IdP (`auth-next`): tenant đã có ở `auth.<domain>`. Chứng chỉ của tenant (`/etc/letsencrypt-tenants/live/<domain>/`) phải có `chat.<domain>`, và map `$tenant_cert` trong `00-tenants-http.conf` phải nhận nhãn `chat.`. Host `chat.<domain>` để DNS only hay Proxied qua Cloudflare đều được.
 2. Trên server, với quyền root: `bash /opt/chat/infra/setup-tenant.sh <id> <domain> <cổng 4601–4699>`, ví dụ `setup-tenant.sh inetdev inetdev.io.vn 4601`. Script tạo `/opt/chat/tenants/<id>.env` một lần (`SESSION_KEY` mới; media và Web Push tắt).
 3. Ghi secret `chat-web` của tenant (suy ra ở IdP từ `APP_CLIENT_SECRET_KEY`) vào `OIDC_CLIENT_SECRET` của file đó, không in ra màn hình.
 4. Deploy release như thường lệ. `activate-release.sh` dựng `/etc/nginx/conf.d/chat.tenants.conf` bằng [`render-tenants-nginx.sh`](../infra/chat/render-tenants-nginx.sh) (block regex `chat.<tenant>` dựng từ conf chính), khởi động hoặc reload `chat-api-<id>`, rồi kiểm `/healthz` ở cổng của tenant. Tenant chưa có `OIDC_CLIENT_SECRET` thì chưa được khởi động; tenant lỗi chỉ in cảnh báo (`WARNING:` trong log deploy) và không rollback release của tenant chính. Thiếu `00-tenants-http.conf` thì tenant không được phục vụ và cũng chỉ có cảnh báo.

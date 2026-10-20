@@ -1,11 +1,11 @@
-# ADR 0006: Đăng nhập qua hoandat-auth và phiên chat
+# ADR 0006: Đăng nhập qua auth-next và phiên chat
 
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-10-14
 
 ## Bối cảnh
 
-App chat là một sản phẩm trong hệ sinh thái hoandat. Danh tính người dùng do IdP OpenID Connect `hoandat-auth` quản lý; IdP chỉ cho đăng nhập bằng Google hoặc GitHub, không có mật khẩu và không gửi email. Refresh token của IdP dùng một lần và xoay vòng: đưa lại token cũ làm IdP thu hồi cả grant. Gửi tin cần độ trễ vài chục mili-giây, nên không thể gọi IdP ở mỗi request, nhưng đăng xuất hay gỡ quyền ở trang `/account` của IdP vẫn phải cắt được phiên chat. Phiên web đặt sai chỗ (token trong JavaScript, cookie không khoá site) là đường cho XSS, CSRF và chiếm WebSocket chéo site.
+App chat là một sản phẩm trong hệ sinh thái hoandat. Danh tính người dùng do IdP OpenID Connect `auth-next` quản lý; IdP chỉ cho đăng nhập bằng Google hoặc GitHub, không có mật khẩu và không gửi email. Refresh token của IdP dùng một lần và xoay vòng: đưa lại token cũ làm IdP thu hồi cả grant. Gửi tin cần độ trễ vài chục mili-giây, nên không thể gọi IdP ở mỗi request, nhưng đăng xuất hay gỡ quyền ở trang `/account` của IdP vẫn phải cắt được phiên chat. Phiên web đặt sai chỗ (token trong JavaScript, cookie không khoá site) là đường cho XSS, CSRF và chiếm WebSocket chéo site.
 
 ## Quyết định
 
@@ -68,7 +68,7 @@ App chat là một sản phẩm trong hệ sinh thái hoandat. Danh tính ngư�
 
 - Web bị thu hồi gần như tức thì nhờ back-channel logout. Native chỉ biết khi kiểm grant: tối đa khoảng 1 giờ khi đang dùng, hoặc ở lần chạy kế tiếp của job 24 giờ.
 - Đăng xuất IdP trên trình duyệt không đăng xuất app native; người dùng thu hồi từng thiết bị ở `/account`.
-- Client của chat được khai ở repo `hoandat-auth` (`src/oidc/chat-clients.ts`); mọi thay đổi redirect, scope hay chính sách refresh phải làm ở đó trước.
+- Client của chat được khai ở repo `auth-next` (`src/oidc/chat-clients.ts`); mọi thay đổi redirect, scope hay chính sách refresh phải làm ở đó trước.
 - Khi IdP sập, người dùng mới và thiết bị mới không đăng nhập được, kèm thông báo rõ.
 
 ## Cách thay đổi

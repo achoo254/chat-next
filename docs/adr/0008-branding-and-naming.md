@@ -16,10 +16,10 @@ Tên sản phẩm chưa cố định và có thể đổi. Tên, màu, icon, bun
 - Tên hiển thị của tenant lấy từ IdP (`displayName` qua API nội bộ, xem [ADR 0010](./0010-tenants-by-domain.md)), không lấy từ `brand.config.json`. UI hiện tên tenant ở màn hình chào và cài đặt khi không phải tenant chính.
 - Bot token là chuỗi opaque có tiền tố theo brand.
 - Quy ước tên trong code:
-  - Package npm đặt tên `@app/<tên thư mục>`.
+  - Package npm đặt tên `@app/<tên thư mục>`; package gốc của workspace mang tên repo (`chat-next`).
   - Server là một Go module với một binary `server/cmd/server`, chạy theo role.
   - Protobuf nằm ở `proto/app/v1`, mỗi domain một file.
-- Không có tên sản phẩm viết cứng trong code; một lint rule chặn điều này. Chuỗi `chat-inet` không xuất hiện trong code sản phẩm, UI hay identifier.
+- Không có tên sản phẩm viết cứng trong code; một lint rule chặn điều này. Chuỗi `chat-inet` (tên repo cũ, trước khi hệ sinh thái đổi sang tên `*-next`) vẫn bị chặn: không xuất hiện trong code sản phẩm, UI hay identifier.
 
 ## Lý do
 

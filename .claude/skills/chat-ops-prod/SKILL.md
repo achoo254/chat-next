@@ -40,7 +40,7 @@ state gồm rủi ro và đường lùi) rồi trình user lựa chọn của Je
 | Dấu hiệu | Môi trường | Ai lo |
 |---|---|---|
 | `chat.hoandat.com`, `/opt/chat`, pm2 `chat-api`, db `chat` trên Postgres `127.0.0.1:5432` | **Chat prod** | skill này |
-| `auth.hoandat.com`, pm2 `hoandat-auth`, `/var/www/hoandat-auth` | IdP dùng chung — repo `~/inet-gitlab/hoandat-auth` | đọc ở đây; sửa/deploy theo `hoandat-auth/docs/deployment-guide.md` |
+| `auth.hoandat.com`, pm2 `hoandat-auth`, `/var/www/hoandat-auth` | IdP dùng chung — repo `auth-next` (`~/inet-gitlab/hoandat-app/auth-next`) | đọc ở đây; sửa/deploy theo `auth-next/docs/deployment-guide.md` |
 | `localman*`, `tunnel*`, Postgres db khác, Valkey `6379` của app khác, `vaultic`, `ai`, `tika`… | App khác trên cùng máy | không đụng |
 | `pnpm dev`, `deploy/dev/docker-compose.yml` | Dev local | README |
 
