@@ -86,6 +86,8 @@ button { cursor: pointer; }
 }
 .welcome-hint .icon { margin-top: 1px; }
 .welcome-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); font-size: 0.8125rem; color: var(--c-text-muted); }
+.welcome-legal { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-3); font-size: 0.8125rem; }
+.welcome-legal a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-text-muted); text-decoration: underline; text-underline-offset: 2px; }
 .lang { display: flex; gap: var(--space-2); }
 .lang button { border: 0; background: none; padding: var(--space-1) var(--space-2); color: var(--c-text-muted); min-height: 44px; white-space: nowrap; }
 .lang button[aria-pressed="true"] { color: var(--c-text); font-weight: 600; }
@@ -167,6 +169,7 @@ button { cursor: pointer; }
 .set-nav a[aria-current="page"] .icon { color: var(--c-primary); }
 .set-nav hr { width: 100%; border: 0; border-top: 1px solid var(--c-border-subtle); margin: var(--space-2) 0; }
 .set-nav form { margin: 0; }
+.set-legal .grow { flex: 1; min-width: 0; }
 /* Phones only (mockups/mobile.html#settings): the account card heads the category list, the back button the category. */
 .set .set-account, .set .set-back { display: none; }
 .set-main { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }

@@ -243,6 +243,7 @@ export default function MiniApp({ request, minimized }: { request: MiniAppReques
 	if (target === null) return null;
 	const covered = popup !== null;
 	return (
+		// eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Esc pressed on any control inside the panel bubbles here to close it or its popup
 		<section className="mini-app" aria-label={t.label(name)} hidden={minimized} onKeyDown={onKey}>
 			<header className="ma-head" inert={covered}>
 				<div className="ma-title">
@@ -323,6 +324,7 @@ export default function MiniApp({ request, minimized }: { request: MiniAppReques
 									<button type="button" className="btn" disabled={busy} onClick={() => answerWrite(false)}>
 										{t.deny}
 									</button>
+									{/* eslint-disable-next-line jsx-a11y/no-autofocus -- the alertdialog takes focus when it opens (WAI-ARIA dialog pattern) */}
 									<button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} autoFocus onClick={allowWrite}>
 										{t.allow}
 									</button>
@@ -345,6 +347,7 @@ export default function MiniApp({ request, minimized }: { request: MiniAppReques
 									<button type="button" className="btn" onClick={() => setPopup(null)}>
 										{t.cancel}
 									</button>
+									{/* eslint-disable-next-line jsx-a11y/no-autofocus -- the alertdialog takes focus when it opens (WAI-ARIA dialog pattern) */}
 									<button type="button" className="btn btn-primary" autoFocus onClick={() => openLink(popup.url)}>
 										{t.openLink}
 									</button>

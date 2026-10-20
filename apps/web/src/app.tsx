@@ -8,7 +8,7 @@ import { PageLoader } from "./components/brand-loader.tsx";
 import { Icon } from "./components/icon.tsx";
 import { UpdateBar } from "./components/update-bar.tsx";
 import { I18nProvider, useI18n } from "./i18n/i18n.tsx";
-import { matchRoute, navigate, paths, usePathname } from "./router.tsx";
+import { matchLegal, matchRoute, navigate, paths, usePathname } from "./router.tsx";
 import type { MessagingConnector } from "./messaging/data/connector.ts";
 
 // The signed-in app is its own chunk, so the welcome screen stays small.
@@ -17,6 +17,8 @@ const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
 const DeletionPending = lazy(() => import("./screens/deletion-pending.tsx"));
 // Only a signed-out start shows it, so a signed-in start does not load it.
 const Welcome = lazy(() => import("./screens/welcome.tsx").then((module) => ({ default: module.Welcome })));
+// Privacy policy, terms and account deletion: public, so they never wait for sign-in.
+const LegalScreen = lazy(() => import("./screens/legal/legal-screen.tsx"));
 
 export interface AppProps {
 	/** How RPCs reach the server; tests and the visual harness serve them in memory. */
@@ -33,12 +35,19 @@ type Boot =
 	| { status: "deletionPending"; self: SelfUser };
 
 export function App({ rpcFetch = sameOriginFetch, messagingConnector }: AppProps) {
+	const legal = matchLegal(usePathname());
 	return (
 		// The provider suspends only when the remembered language is English and
 		// its copy is still loading; the page's own splash stays up meanwhile.
 		<Suspense fallback={null}>
 			<I18nProvider>
-				<Root rpcFetch={rpcFetch} messagingConnector={messagingConnector} />
+				{legal === null ? (
+					<Root rpcFetch={rpcFetch} messagingConnector={messagingConnector} />
+				) : (
+					<Suspense fallback={<PageLoader />}>
+						<LegalScreen page={legal} />
+					</Suspense>
+				)}
 				<UpdateBar />
 			</I18nProvider>
 		</Suspense>

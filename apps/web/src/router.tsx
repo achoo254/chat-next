@@ -67,7 +67,26 @@ export const paths = {
 	announcements: () => "/moderation/announcements",
 	moderationLog: () => "/moderation/log",
 	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
+	privacy: "/privacy",
+	terms: "/terms",
+	/** How to delete the account; also the deletion URL given to app stores. */
+	deleteAccount: "/delete-account",
 } as const;
+
+/** Public pages: open without signing in, outside the signed-in routes. */
+export type LegalPage = "privacy" | "terms" | "delete-account";
+
+const LEGAL_PAGES: Readonly<Record<string, LegalPage>> = {
+	[paths.privacy]: "privacy",
+	[paths.terms]: "terms",
+	[paths.deleteAccount]: "delete-account",
+};
+
+/** The public page at `pathname` (a trailing slash allowed); null otherwise. */
+export function matchLegal(pathname: string): LegalPage | null {
+	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+	return Object.hasOwn(LEGAL_PAGES, path) ? (LEGAL_PAGES[path] ?? null) : null;
+}
 
 const ID = /^[1-9][0-9]{0,15}$/;
 const INVITE = /^\/(?:join\/|\+)([A-Za-z0-9_-]{4,128})$/;

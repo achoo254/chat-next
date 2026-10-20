@@ -165,11 +165,14 @@ export function CropDialog({
 		<Modal labelledBy={id} onClose={onClose}>
 			<DialogHead id={id} title={t.cropTitle} onClose={onClose} />
 			<div className="dlg-body">
+				{/* The stage is the picture being placed: drag it or use the arrow keys; the zoom slider below is a standard control. */}
+				{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- see above */}
 				<div
 					ref={stageRef}
 					className="crop-stage"
 					role="img"
 					aria-label={t.cropStage}
+					// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the arrow keys move the picture, so the stage is in the tab order
 					tabIndex={0}
 					onPointerDown={onPointerDown}
 					onPointerMove={onPointerMove}

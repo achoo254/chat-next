@@ -244,6 +244,7 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 	return (
 		<div
 			className={mine ? "ctx-layer mine" : "ctx-layer"}
+			role="presentation"
 			onClick={(event) => {
 				if (event.target === event.currentTarget) close();
 			}}
@@ -272,6 +273,7 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 			{more ? (
 				<EmojiPicker mode="reaction" onPick={react} onClose={close} />
 			) : (
+				// eslint-disable-next-line jsx-a11y/interactive-supports-focus -- focus sits on the menu items; the menu only receives their arrow keys
 				<div className="menu" role="menu" ref={menu} aria-label={mine ? copy.menu.labelMine : copy.menu.label} onKeyDown={onMenuKey}>
 					{entries.map((entry) => (
 						<MenuButton key={entry.label} entry={entry} onDone={close} />

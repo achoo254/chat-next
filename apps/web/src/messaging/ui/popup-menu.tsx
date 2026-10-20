@@ -43,6 +43,7 @@ export function PopupMenu({ label, className, style, boundary, onClose, children
 		items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
 	};
 	return (
+		// eslint-disable-next-line jsx-a11y/interactive-supports-focus -- focus sits on the menu items; the menu only receives their arrow keys and Esc
 		<div className={className === undefined ? "menu" : `menu ${className}`} role="menu" ref={ref} aria-label={label} style={style} onKeyDown={onKeyDown}>
 			{children}
 		</div>

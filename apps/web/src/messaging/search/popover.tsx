@@ -39,6 +39,7 @@ export function Popover({ id, label, className, onClose, children }: PopoverProp
 		closeRef.current();
 	};
 	return (
+		// eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Esc pressed on any control inside the popover bubbles here to close it
 		<div className={className === undefined ? "sx-pop" : `sx-pop ${className}`} id={id} role="dialog" aria-label={label} ref={ref} onKeyDown={onKeyDown}>
 			{children}
 		</div>

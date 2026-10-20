@@ -321,6 +321,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	};
 	return (
 		<div className="messages-wrap">
+			{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- arrow keys pressed on a focused message bubble here to move between messages */}
 			<div
 				className="messages"
 				ref={scroller}

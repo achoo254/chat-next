@@ -29,6 +29,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 ## Quyền riêng tư
 
 - [Danh mục dữ liệu cá nhân](./privacy/data-inventory.md): dữ liệu app chat giữ, nơi lưu, thời hạn, cơ sở pháp lý (Nghị định 13), xuất và xoá dữ liệu.
+- [Trang chính sách công khai](./privacy/legal-pages-draft.md) (`/privacy`, `/terms`, `/delete-account`): bản nháp chờ chủ sở hữu duyệt, từng khẳng định kèm file nguồn.
 
 ## Vận hành
 

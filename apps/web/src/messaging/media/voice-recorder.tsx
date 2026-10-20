@@ -166,6 +166,7 @@ export default function VoiceRecorder({ target, onClose }: { target: SendTarget;
 	};
 
 	return (
+		// eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Esc pressed on any recorder button bubbles here to cancel the recording
 		<div
 			className="recorder"
 			role="group"

@@ -166,6 +166,7 @@ export function EmojiPicker({ mode, onPick, onClose }: EmojiPickerProps) {
 	};
 
 	return (
+		// eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Esc pressed on the search field or an emoji bubbles here to close the picker
 		<div
 			ref={ref}
 			className="emoji-pop"
@@ -214,7 +215,7 @@ export function EmojiPicker({ mode, onPick, onClose }: EmojiPickerProps) {
 					))}
 				</div>
 			)}
-			<div className="emoji-scroll" onKeyDown={onGridKey}>
+			<div className="emoji-scroll" role="presentation" onKeyDown={onGridKey}>
 				{sections.map((section, sectionIndex) => {
 					const start = starts[sectionIndex] ?? 0;
 					return (

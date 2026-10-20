@@ -1,14 +1,10 @@
 import { signInUrl } from "@app/core";
 import { brand } from "../brand.ts";
 import { BrandLogo } from "../components/brand-loader.tsx";
+import { LanguageSwitch } from "../components/language-switch.tsx";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n, type Locale } from "../i18n/i18n.tsx";
-import { returnPathFor } from "../router.tsx";
-
-const LANGUAGES: { locale: Locale; label: string }[] = [
-	{ locale: "vi", label: "Tiếng Việt" },
-	{ locale: "en", label: "English" },
-];
+import { Link, paths, returnPathFor } from "../router.tsx";
 
 /**
  * Sign-in URL handled by the server; it redirects to the IdP with ui_locales
@@ -21,7 +17,7 @@ export function loginUrl(locale: Locale, create = false, pathname = window.locat
 
 /** Signed-out screen: sign in or create an account at the IdP. */
 export function Welcome() {
-	const { locale, t, setLocale } = useI18n();
+	const { locale, t } = useI18n();
 	return (
 		<main className="welcome">
 			<section className="welcome-card" aria-labelledby="welcome-title">
@@ -42,20 +38,13 @@ export function Welcome() {
 				</div>
 				<div className="welcome-foot">
 					<span>{brand.idpHost}</span>
-					<div className="lang" role="group" aria-label={t.welcome.language}>
-						{LANGUAGES.map((language) => (
-							<button
-								key={language.locale}
-								type="button"
-								lang={language.locale}
-								aria-pressed={language.locale === locale}
-								onClick={() => setLocale(language.locale)}
-							>
-								{language.label}
-							</button>
-						))}
-					</div>
+					<LanguageSwitch />
 				</div>
+				<nav className="welcome-legal" aria-label={t.legal.nav}>
+					<Link to={paths.privacy}>{t.legal.privacy}</Link>
+					<Link to={paths.terms}>{t.legal.terms}</Link>
+					<Link to={paths.deleteAccount}>{t.legal.deleteAccount}</Link>
+				</nav>
 			</section>
 		</main>
 	);

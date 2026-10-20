@@ -243,6 +243,7 @@ function VoicePlayer({ chatId, seq, media }: { chatId: number; seq: number; medi
 				</small>
 			</span>
 			{state.status === "ok" && (
+				// eslint-disable-next-line jsx-a11y/media-has-caption -- a recorded voice message has no transcript or caption file to attach
 				<audio
 					ref={audio}
 					src={state.url}

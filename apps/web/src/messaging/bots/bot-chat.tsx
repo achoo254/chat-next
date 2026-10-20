@@ -375,6 +375,7 @@ function CommandMenu({ chatId, menu, head, owners }: { chatId: number; menu: Com
 			</div>
 			<ul role="listbox" id={BOT_MENU_ID(chatId)} aria-label={t.menu.button}>
 				{menu.matches.map((entry, position) => (
+					// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the composer's textarea handles the arrow keys, Tab and Enter for this listbox (onKey)
 					<li
 						key={entry.key}
 						role="option"

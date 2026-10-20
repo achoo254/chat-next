@@ -1,6 +1,7 @@
 // Vietnamese copy of the screens that load on demand (dialogs, admin,
 // settings tabs, moderation). en-screens.ts must provide the same keys.
 import { brand } from "../../brand.ts";
+import { deletionTicks } from "../../i18n/account-deletion.ts";
 
 /** The chat kind in copy that names it: channels are never called groups. */
 const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");
@@ -1043,12 +1044,7 @@ export const viScreens = {
 		months: (n: number) => `${n} tháng`,
 		autoDeleteSaved: "Đã lưu cài đặt tự xoá",
 		deleteTitle: "Xoá tài khoản chat",
-		deleteTicks: (graceDays: number, idpHost: string): string[] => [
-			"Xoá hồ sơ, username, danh bạ, người đã chặn, Cloud của tôi, cài đặt và các phiên đăng nhập; bạn rời mọi nhóm và kênh.",
-			'Tin bạn đã gửi trong chat của người khác vẫn còn, người gửi hiện là "Tài khoản đã xoá".',
-			`Tài khoản bị khoá ngay và xoá hẳn sau ${graceDays} ngày. Đăng nhập lại trong ${graceDays} ngày để huỷ.`,
-			`Tài khoản ${brand.domain} vẫn còn và dùng bình thường ở các ứng dụng khác. Quản lý hoặc xoá nó ở ${idpHost}/account.`,
-		],
+		deleteTicks: deletionTicks.vi,
 		ownsChats: (n: number) => `Bạn đang là chủ sở hữu ${n} nhóm và kênh. Chuyển quyền sở hữu hoặc xoá chúng trước.`,
 		groupMembers: (n: number) => `Nhóm · ${n} thành viên`,
 		channelMembers: (n: number) => `Kênh · ${n} người theo dõi`,

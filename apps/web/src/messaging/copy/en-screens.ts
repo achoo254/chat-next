@@ -1,5 +1,6 @@
 // English copy of the screens that load on demand; keys mirror vi-screens.ts.
 import { brand } from "../../brand.ts";
+import { deletionTicks } from "../../i18n/account-deletion.ts";
 import { kind, plural } from "./en.ts";
 import type { ScreensCopy } from "./vi-screens.ts";
 
@@ -1039,12 +1040,7 @@ export const enScreens: ScreensCopy = {
 		months: (n: number) => `${n} months`,
 		autoDeleteSaved: "Auto-delete saved",
 		deleteTitle: "Delete chat account",
-		deleteTicks: (graceDays: number, idpHost: string): string[] => [
-			"Deletes your profile, username, contacts, blocked people, Cloud, settings and sessions; you leave every group and channel.",
-			'Messages you sent in other people\'s chats stay, from "Deleted account".',
-			`The account is locked at once and erased after ${graceDays} days. Sign in again within ${graceDays} days to cancel.`,
-			`Your ${brand.domain} account stays and keeps working in other apps. Manage or delete it at ${idpHost}/account.`,
-		],
+		deleteTicks: deletionTicks.en,
 		ownsChats: (n: number) => `You own ${n} groups and channels. Transfer their ownership or delete them first.`,
 		groupMembers: (n: number) => `Group · ${n} members`,
 		channelMembers: (n: number) => `Channel · ${n} subscribers`,

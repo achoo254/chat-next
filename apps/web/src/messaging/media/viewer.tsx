@@ -94,6 +94,7 @@ function Video({ message, media }: { message: StoredMessage; media: MediaRef }) 
 	if (failed) return <p className="v-gone">{copy.viewer.videoFailed}</p>;
 	if (url === null || url.seq !== message.seq) return <span className="spin" aria-hidden="true" />;
 	return (
+		// eslint-disable-next-line jsx-a11y/media-has-caption -- a video someone sent in a chat comes with no caption file; its caption text is the label
 		<video
 			key={url.value}
 			src={url.value ?? undefined}
@@ -218,7 +219,7 @@ export default function Viewer({ chatId, seq: startSeq, onClose }: ViewerProps) 
 	const when = current === null ? "" : copy.viewer.at(shortDate(current.date, locale), clock(current.date, locale));
 	return (
 		<Modal labelledBy={id} onClose={onClose} className="viewer">
-			<div className="v-top" onKeyDown={onKeyDown}>
+			<div className="v-top" role="presentation" onKeyDown={onKeyDown}>
 				<div className="who">
 					<strong id={id}>{current?.fromId === store.selfId ? (sender?.name ?? "") : (sender?.name ?? (media?.kind === "video" ? copy.viewer.videoLabel : copy.viewer.label))}</strong>
 					<span>{when}</span>
@@ -252,6 +253,7 @@ export default function Viewer({ chatId, seq: startSeq, onClose }: ViewerProps) 
 			</div>
 			<div
 				className={zoom > 1 ? "v-stage zoomed" : "v-stage"}
+				role="presentation"
 				tabIndex={-1}
 				onKeyDown={onKeyDown}
 				onTouchStart={onTouchStart}
@@ -282,7 +284,7 @@ export default function Viewer({ chatId, seq: startSeq, onClose }: ViewerProps) 
 					</button>
 				)}
 			</div>
-			<div className="v-bottom" onKeyDown={onKeyDown}>
+			<div className="v-bottom" role="presentation" onKeyDown={onKeyDown}>
 				{current !== null && current.text !== "" && !gone && <p>{current.text}</p>}
 				<span className="count">{gone ? copy.viewer.goneCount : index >= 0 ? copy.viewer.counter(index + 1, list.length) : ""}</span>
 				{album.length > 1 && (

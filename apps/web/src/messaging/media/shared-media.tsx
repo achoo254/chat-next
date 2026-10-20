@@ -299,6 +299,7 @@ export function SharedMediaView({ chatId, tab, onBack }: { chatId: number; tab: 
 				</p>
 			) : (
 				<>
+					{/* eslint-disable-next-line jsx-a11y/interactive-supports-focus -- roving tabindex: the selected tab holds focus, the tablist only receives its arrow keys */}
 					<div className="tabs" role="tablist" aria-label={copy.shared.tabs} onKeyDown={onTabKey}>
 						{tabs.map((entry) => (
 							<button

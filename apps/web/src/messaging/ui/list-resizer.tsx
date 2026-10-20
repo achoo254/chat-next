@@ -98,6 +98,8 @@ export function ListResizer({ app }: { app: RefObject<HTMLDivElement | null> }) 
 	};
 
 	return (
+		// A focusable separator with a value is a widget in ARIA 1.2 (window splitter); the plugin treats separator as structure only.
+		// eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- see above
 		<div
 			className="list-resize"
 			role="separator"
@@ -106,6 +108,7 @@ export function ListResizer({ app }: { app: RefObject<HTMLDivElement | null> }) 
 			aria-valuemin={LIST_MIN}
 			aria-valuemax={LIST_MAX}
 			aria-valuenow={shown}
+			// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the window splitter is operated with the keyboard, so it is in the tab order
 			tabIndex={0}
 			onKeyDown={onKeyDown}
 			onPointerDown={onPointerDown}

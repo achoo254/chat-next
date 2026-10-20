@@ -15,6 +15,12 @@ export const vi = {
 			`Bạn đăng nhập ở ${host} bằng Google hoặc GitHub. App không bao giờ thấy mật khẩu của bạn.`,
 		language: "Ngôn ngữ",
 	},
+	legal: {
+		nav: "Chính sách",
+		privacy: "Chính sách quyền riêng tư",
+		terms: "Điều khoản sử dụng",
+		deleteAccount: "Xoá tài khoản",
+	},
 	update: {
 		available: "Đã có bản mới",
 		reload: "Tải lại",

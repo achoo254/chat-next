@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
@@ -29,6 +30,19 @@ export default tseslint.config(
 		// code the compiler would skip fails lint instead of shipping unoptimized.
 		files: ["apps/web/**/*.{ts,tsx}"],
 		...reactHooks.configs.flat["recommended-latest"],
+	},
+	{
+		// Accessibility of the JSX: labels, roles, alt text, keyboard access.
+		// Its peer range stops at ESLint 9; it only reads the AST and the
+		// context methods ESLint 10 still has, and lint fails loudly if not.
+		files: ["apps/web/**/*.tsx"],
+		...jsxA11y.flatConfigs.recommended,
+		rules: {
+			...jsxA11y.flatConfigs.recommended.rules,
+			// Radio cards put their text two elements under the label
+			// (label > span > b); the default search depth of 2 misses it.
+			"jsx-a11y/label-has-associated-control": ["error", { depth: 3 }],
+		},
 	},
 	{
 		files: ["**/*.mjs", "scripts/**"],

@@ -105,6 +105,7 @@ export default function InChatSearch({ chatId, topicId, title, onClose }: InChat
 						autoComplete="off"
 						spellCheck={false}
 						// The bar opens on purpose (header button): typing starts at once.
+						// eslint-disable-next-line jsx-a11y/no-autofocus -- opened by the user's own click, so focus goes where they will type
 						autoFocus
 						placeholder={t.label(title)}
 						value={query}

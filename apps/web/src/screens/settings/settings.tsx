@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { Avatar } from "../../components/avatar.tsx";
 import { LoaderBoundary } from "../../components/delayed-loader.tsx";
+import { ExternalLink } from "../../components/external-link.tsx";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -125,6 +126,16 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 						<span>{t.settings.moderation}</span>
 					</Link>
 				)}
+				<hr />
+				{/* A new tab, so reading them leaves the app as it is. */}
+				<ExternalLink href={paths.privacy} className="set-legal">
+					<Icon name="shield" />
+					<span className="grow">{t.legal.privacy}</span>
+				</ExternalLink>
+				<ExternalLink href={paths.terms} className="set-legal">
+					<Icon name="file" />
+					<span className="grow">{t.legal.terms}</span>
+				</ExternalLink>
 				<hr />
 				{messaging === undefined ? (
 					<SignOutForm>
