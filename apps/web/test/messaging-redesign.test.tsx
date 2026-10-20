@@ -203,12 +203,13 @@ describe("composer", () => {
 
 	it("asks groups for @ mentions in the placeholder and counts who is online", async () => {
 		const demo = seedDemo();
+		demo.fixture.onlineCounts.set(demo.ids.ops, 3);
 		await openChat(`/c/${demo.ids.ops}`, "Dashboard ổn định.", demo);
 		expect((screen.getByRole("textbox", { name: "Tin nhắn tới Vận hành hệ thống" }) as HTMLTextAreaElement).placeholder).toBe(
 			"Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống",
 		);
 		const head = document.querySelector(".convo-head .title");
-		await waitFor(() => expect(head?.textContent).toMatch(/5 thành viên · \d+ đang hoạt động$/), LONG);
+		await waitFor(() => expect(head?.textContent).toMatch(/5 thành viên · 3 đang hoạt động$/), LONG);
 	});
 });
 

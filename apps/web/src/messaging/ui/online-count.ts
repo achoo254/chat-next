@@ -57,9 +57,9 @@ function onlineCountsOf(source: ChatSource): OnlineCounts {
 }
 
 /**
- * Members of a group online now; null while unknown, for chatId 0 and when
- * nobody is (the server does not count me), so the header shows the member
- * count alone instead of "0 đang hoạt động".
+ * Members of a group online now, me included (as the server counts); null
+ * while unknown, for chatId 0 and when nobody but me is, so the header shows
+ * the member count alone instead of "1 đang hoạt động", as Telegram does.
  * Asked when the chat opens, again every minute while the page is visible,
  * and when the page becomes visible again.
  */
@@ -81,6 +81,6 @@ export function useOnlineCount(chatId: number): number | null {
 	}, [source, onlineCounts, chatId]);
 	return useSyncExternalStore(onlineCounts.subscribe, () => {
 		const count = chatId === 0 ? null : onlineCounts.get(chatId);
-		return count === 0 ? null : count;
+		return count !== null && count <= 1 ? null : count;
 	});
 }

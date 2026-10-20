@@ -272,9 +272,9 @@ describe("online count", () => {
 		await waitFor(() => expect(within(info).getByText("5 thành viên · 3 đang hoạt động")).toBeTruthy(), LONG);
 	});
 
-	it("shows the member count alone when nobody else is online", async () => {
+	it.each([0, 1])("shows the member count alone when %i, at most me, is online", async (online) => {
 		const demo = seedDemo();
-		demo.fixture.onlineCounts.set(demo.ids.ops, 0);
+		demo.fixture.onlineCounts.set(demo.ids.ops, online);
 		const asked = vi.spyOn(demo.fixture.onlineCounts, "get");
 		await openChat(demo, demo.ids.ops, "Dashboard ổn định.");
 		await waitFor(() => expect(asked).toHaveBeenCalledWith(demo.ids.ops), LONG);
