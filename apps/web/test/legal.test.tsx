@@ -6,8 +6,11 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { deletionTicks, DELETION_GRACE_DAYS } from "../src/i18n/account-deletion.ts";
+import { pushServicesNote } from "../src/i18n/push-services.ts";
 import { matchLegal, matchRoute, returnPathFor } from "../src/router.tsx";
 import { renderApp, SELF } from "./render-app.tsx";
+import { ChatFixture } from "./support/fake-chat.ts";
+import { renderMessaging } from "./support/render-messaging.tsx";
 
 /** A server whose GetSelf answers signed out, counting the calls. */
 function signedOut(): { calls: () => number; routes: Parameters<typeof renderApp>[0] } {
@@ -82,6 +85,33 @@ describe("public pages", () => {
 		expect(idp.getAttribute("target")).toBe("_blank");
 	});
 
+	it("names the operator's contact, server location and what is still being written", async () => {
+		renderApp(signedOut().routes, "/privacy");
+		expect(await screen.findByRole("heading", { level: 1, name: "Chính sách quyền riêng tư" })).toBeTruthy();
+		const items = screen.getAllByRole("listitem").map((item) => item.textContent);
+		expect(items).toContain("Máy chủ đặt tại Việt Nam.");
+		expect(items).toContain("Kết nối tới chat.hoandat.com đi qua Cloudflare.");
+		expect(screen.getByText(pushServicesNote.vi)).toBeTruthy();
+		const email = screen.getByRole("link", { name: "quocdat254@gmail.com" });
+		expect(email.getAttribute("href")).toBe("mailto:quocdat254@gmail.com");
+		expect(screen.getByRole("heading", { level: 2, name: "Đang cập nhật" }).closest("section")?.className).toBe("legal-pending");
+	});
+
+	it("lists the undecided terms as being updated", async () => {
+		renderApp(signedOut().routes, "/terms");
+		const pending = await screen.findByRole("heading", { level: 2, name: "Đang cập nhật" });
+		expect(pending.closest("section")?.textContent).toContain("luật áp dụng");
+		expect(screen.getByRole("link", { name: "quocdat254@gmail.com" })).toBeTruthy();
+	});
+
+	it("gives a way to ask for deletion without signing in", async () => {
+		renderApp(signedOut().routes, "/delete-account");
+		const heading = await screen.findByRole("heading", { level: 2, name: "Không đăng nhập được?" });
+		const section = heading.closest("section");
+		expect(section?.textContent).toContain("quocdat254@gmail.com");
+		expect(section?.querySelector("a")?.getAttribute("href")).toBe("mailto:quocdat254@gmail.com");
+	});
+
 	it("opens for a signed-in user too, and the app link goes home", async () => {
 		renderApp((router) => {
 			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
@@ -112,5 +142,12 @@ describe("links to the public pages", () => {
 		expect(privacy.getAttribute("href")).toBe("/privacy");
 		expect(privacy.getAttribute("target")).toBe("_blank");
 		expect(within(nav).getByRole("link", { name: /Điều khoản sử dụng/ }).getAttribute("href")).toBe("/terms");
+	});
+});
+
+describe("push services", () => {
+	it("are named the same in Settings › Quyền riêng tư as on /privacy", async () => {
+		renderMessaging(new ChatFixture(), "/settings/privacy");
+		expect(await screen.findByText(pushServicesNote.vi, {}, { timeout: 8000 })).toBeTruthy();
 	});
 });

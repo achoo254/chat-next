@@ -34,6 +34,8 @@ export function brandFor(host: string) {
 		idpHost: issuer.host,
 		/** IdP account page: sign-in methods, app grants, devices. */
 		accountUrl: new URL("/account", issuer).toString(),
+		/** The primary tenant (brand.config.json), run by the product's own operator. */
+		primaryTenant: primary,
 		/** App URL scheme; links with it pass the allowlist (ADR 0004). */
 		urlScheme: brandConfig.urlScheme,
 	} as const;

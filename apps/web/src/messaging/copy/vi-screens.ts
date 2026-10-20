@@ -2,6 +2,7 @@
 // settings tabs, moderation). en-screens.ts must provide the same keys.
 import { brand } from "../../brand.ts";
 import { deletionTicks } from "../../i18n/account-deletion.ts";
+import { pushServicesNote } from "../../i18n/push-services.ts";
 
 /** The chat kind in copy that names it: channels are never called groups. */
 const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");
@@ -292,8 +293,7 @@ export const viScreens = {
 		preview: "Xem trước nội dung trong thông báo",
 		previewHint: "Bật, tắt riêng cho chat riêng, nhóm và kênh ở Thông báo",
 		photoHint: "Người không được thấy và người bạn đã chặn chỉ thấy chữ cái đầu.",
-		pushNote:
-			"Thông báo đẩy trên điện thoại đi qua máy chủ của Apple hoặc Google. Khi bật xem trước, nội dung được mã hoá riêng cho từng thiết bị trước khi gửi đi, nên Apple và Google không đọc được.",
+		pushNote: pushServicesNote.vi,
 		everyone: "Mọi người",
 		contacts: "Danh bạ",
 		nobody: "Không ai",

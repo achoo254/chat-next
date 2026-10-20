@@ -16,3 +16,4 @@
 .legal-main h2 { margin: 0 0 var(--space-2); font-size: 1.125rem; line-height: 1.35; font-weight: 600; }
 .legal-main p { margin: 0 0 var(--space-2); }
 .legal-main ul, .legal-main ol { margin: 0 0 var(--space-2); padding-left: var(--space-5); display: grid; gap: var(--space-1); }
+.legal-main .legal-pending { padding: var(--space-3) var(--space-4); border: 1px dashed var(--c-border-subtle); border-radius: var(--radius-sm); background: var(--c-surface-subtle); }

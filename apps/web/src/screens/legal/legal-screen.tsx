@@ -7,7 +7,7 @@ import { ExternalLink } from "../../components/external-link.tsx";
 import { LanguageSwitch } from "../../components/language-switch.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths, type LegalPage } from "../../router.tsx";
-import { legalCopy, type LegalSection } from "./legal-copy.ts";
+import { legalCopy, type LegalLink, type LegalSection } from "./legal-copy.ts";
 import "./legal.css";
 
 const PAGES: readonly { page: LegalPage; path: string }[] = [
@@ -62,7 +62,7 @@ export default function LegalScreen({ page }: { page: LegalPage }) {
 function Section({ section }: { section: LegalSection }) {
 	const { link } = section;
 	return (
-		<section>
+		<section className={section.pending === true ? "legal-pending" : undefined}>
 			<h2>{section.title}</h2>
 			{section.steps !== undefined && (
 				<ol>
@@ -81,20 +81,34 @@ function Section({ section }: { section: LegalSection }) {
 					))}
 				</ul>
 			)}
-			{link !== undefined &&
-				(link.external === true ? (
-					<p>
-						<ExternalLink href={link.href} className="link">
-							{link.label}
-						</ExternalLink>
-					</p>
-				) : (
-					<p>
-						<Link to={link.href} className="link">
-							{link.label}
-						</Link>
-					</p>
-				))}
+			{link !== undefined && (
+				<p>
+					<SectionLink link={link} />
+				</p>
+			)}
 		</section>
 	);
+}
+
+function SectionLink({ link }: { link: LegalLink }) {
+	switch (link.kind) {
+		case "site":
+			return (
+				<ExternalLink href={link.href} className="link">
+					{link.label}
+				</ExternalLink>
+			);
+		case "email":
+			return (
+				<a href={link.href} className="link">
+					{link.label}
+				</a>
+			);
+		default:
+			return (
+				<Link to={link.href} className="link">
+					{link.label}
+				</Link>
+			);
+	}
 }

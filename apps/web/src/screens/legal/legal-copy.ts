@@ -6,14 +6,15 @@
 import { brand } from "../../brand.ts";
 import { DELETION_GRACE_DAYS, deletionTicks } from "../../i18n/account-deletion.ts";
 import type { Locale } from "../../i18n/i18n.tsx";
+import { pushServicesNote } from "../../i18n/push-services.ts";
 import { paths, type LegalPage } from "../../router.tsx";
 
-/** A link at the end of a section: another public page or the IdP. */
+/** A link at the end of a section. */
 export interface LegalLink {
 	readonly href: string;
 	readonly label: string;
-	/** Another site (the IdP): opens in a new tab. */
-	readonly external?: boolean;
+	/** page (default): another public page; site: another site (the IdP), in a new tab; email: a mailto: link. */
+	readonly kind?: "page" | "site" | "email";
 }
 
 export interface LegalSection {
@@ -23,6 +24,8 @@ export interface LegalSection {
 	/** Numbered steps (an ordered list). */
 	readonly steps?: readonly string[];
 	readonly link?: LegalLink;
+	/** Not decided yet: shown marked as "Đang cập nhật". */
+	readonly pending?: boolean;
 }
 
 export interface LegalDocument {
@@ -39,7 +42,15 @@ export interface LegalCopy {
 /** When the text last changed (shown on every page). */
 export const LEGAL_UPDATED = { vi: "20/10/2026", en: "20 October 2026" } as const;
 
-const { appName, domain, webHost, idpHost, accountUrl } = brand;
+const { appName, domain, webHost, idpHost, accountUrl, primaryTenant } = brand;
+
+/**
+ * The operator's contact for privacy, terms and deletion requests, and where
+ * its servers are: facts of the primary tenant's service only. A tenant run
+ * by someone else shows its in-app channel and no location.
+ */
+const OPERATOR = primaryTenant ? { email: "quocdat254@gmail.com", inVietnam: true, cloudflare: true } : null;
+const mailto = (email: string): LegalLink => ({ href: `mailto:${email}`, label: email, kind: "email" });
 
 const vi: LegalCopy = {
 	updated: `Cập nhật ${LEGAL_UPDATED.vi}`,
@@ -81,7 +92,8 @@ const vi: LegalCopy = {
 					title: "Lưu ở đâu",
 					items: [
 						"Cơ sở dữ liệu, file và bản sao lưu nằm trên máy chủ của nhà vận hành; hiện chưa có bản lưu trữ hay sao lưu nào ở ngoài máy chủ đó.",
-						`Kết nối tới ${webHost} đi qua Cloudflare.`,
+						...(OPERATOR?.inVietnam === true ? ["Máy chủ đặt tại Việt Nam."] : []),
+						...(OPERATOR?.cloudflare === true ? [`Kết nối tới ${webHost} đi qua Cloudflare.`] : []),
 						"Log của app chỉ ghi mã định danh; không ghi nội dung tin, email hay token.",
 					],
 				},
@@ -103,7 +115,7 @@ const vi: LegalCopy = {
 				{
 					title: "Thông báo đẩy",
 					paragraphs: [
-						"Thông báo đẩy đi qua dịch vụ push của trình duyệt bạn dùng (Google, Mozilla, Microsoft hoặc Apple), là dịch vụ ở nước ngoài. Nội dung được mã hoá riêng cho trình duyệt của bạn; dịch vụ push chỉ thấy địa chỉ nhận, kích thước và thời điểm.",
+						pushServicesNote.vi,
 						"Bạn tắt xem trước nội dung trong thông báo ở Cài đặt › Thông báo.",
 					],
 				},
@@ -135,7 +147,16 @@ const vi: LegalCopy = {
 				},
 				{
 					title: "Liên hệ",
-					paragraphs: ["Gửi câu hỏi hoặc yêu cầu về dữ liệu cá nhân trong app ở Cài đặt › Góp ý; câu trả lời đến qua bot Trợ lý."],
+					paragraphs: [
+						...(OPERATOR === null ? [] : [`Gửi câu hỏi hoặc yêu cầu về dữ liệu cá nhân (xem, xuất, sửa, xoá) tới ${OPERATOR.email}.`]),
+						"Trong app, bạn cũng gửi được ở Cài đặt › Góp ý; câu trả lời đến qua bot Trợ lý.",
+					],
+					...(OPERATOR === null ? {} : { link: mailto(OPERATOR.email) }),
+				},
+				{
+					title: "Đang cập nhật",
+					pending: true,
+					paragraphs: ["Tên pháp nhân vận hành dịch vụ đang được cập nhật."],
 				},
 			],
 		},
@@ -192,6 +213,14 @@ const vi: LegalCopy = {
 					paragraphs: ["Dữ liệu app giữ và thời hạn lưu nằm ở Chính sách quyền riêng tư."],
 					link: { href: paths.privacy, label: "Chính sách quyền riêng tư" },
 				},
+				...(OPERATOR === null
+					? []
+					: [{ title: "Liên hệ", paragraphs: [`Câu hỏi về các điều khoản này: ${OPERATOR.email}.`], link: mailto(OPERATOR.email) }]),
+				{
+					title: "Đang cập nhật",
+					pending: true,
+					paragraphs: ["Các nội dung sau đang được cập nhật: tên pháp nhân vận hành dịch vụ, độ tuổi tối thiểu, giới hạn trách nhiệm, luật áp dụng và cách giải quyết tranh chấp."],
+				},
 			],
 		},
 		"delete-account": {
@@ -229,8 +258,19 @@ const vi: LegalCopy = {
 				{
 					title: `Tài khoản ${domain}`,
 					paragraphs: [`Xoá tài khoản chat không xoá tài khoản ${domain}. Muốn xoá tài khoản đó, vào trang tài khoản ở ${idpHost}.`],
-					link: { href: accountUrl, label: `Tài khoản ${domain}`, external: true },
+					link: { href: accountUrl, label: `Tài khoản ${domain}`, kind: "site" },
 				},
+				...(OPERATOR === null
+					? []
+					: [
+							{
+								title: "Không đăng nhập được?",
+								paragraphs: [
+									`Gửi yêu cầu xoá tài khoản chat tới ${OPERATOR.email}, ghi rõ username của bạn và email của tài khoản ${domain}.`,
+								],
+								link: mailto(OPERATOR.email),
+							},
+						]),
 			],
 		},
 	},
@@ -276,7 +316,8 @@ const en: LegalCopy = {
 					title: "Where it is stored",
 					items: [
 						"The database, files and backups are on the operator's server; no storage or backup outside that server yet.",
-						`Connections to ${webHost} go through Cloudflare.`,
+						...(OPERATOR?.inVietnam === true ? ["The servers are in Vietnam."] : []),
+						...(OPERATOR?.cloudflare === true ? [`Connections to ${webHost} go through Cloudflare.`] : []),
 						"The app's logs record ids only, never message text, emails or tokens.",
 					],
 				},
@@ -298,7 +339,7 @@ const en: LegalCopy = {
 				{
 					title: "Push notifications",
 					paragraphs: [
-						"Push notifications go through your browser's push service (Google, Mozilla, Microsoft or Apple), which is outside Vietnam. The content is encrypted for your browser; the push service sees only the address, size and time.",
+						pushServicesNote.en,
 						"Turn off message previews in notifications in Settings › Notifications.",
 					],
 				},
@@ -330,7 +371,16 @@ const en: LegalCopy = {
 				},
 				{
 					title: "Contact",
-					paragraphs: ["Send questions or requests about your personal data in the app at Settings › Feedback; replies come through the Assistant bot."],
+					paragraphs: [
+						...(OPERATOR === null ? [] : [`Send questions or requests about your personal data (access, export, correction, deletion) to ${OPERATOR.email}.`]),
+						"In the app you can also use Settings › Feedback; replies come through the Assistant bot.",
+					],
+					...(OPERATOR === null ? {} : { link: mailto(OPERATOR.email) }),
+				},
+				{
+					title: "Being updated",
+					pending: true,
+					paragraphs: ["The name of the legal entity operating the service is being added."],
 				},
 			],
 		},
@@ -385,6 +435,14 @@ const en: LegalCopy = {
 					paragraphs: ["The data the app keeps and for how long is in the privacy policy."],
 					link: { href: paths.privacy, label: "Privacy policy" },
 				},
+				...(OPERATOR === null
+					? []
+					: [{ title: "Contact", paragraphs: [`Questions about these terms: ${OPERATOR.email}.`], link: mailto(OPERATOR.email) }]),
+				{
+					title: "Being updated",
+					pending: true,
+					paragraphs: ["Still being added: the legal entity operating the service, the minimum age, limits of liability, the governing law and how disputes are resolved."],
+				},
 			],
 		},
 		"delete-account": {
@@ -422,8 +480,19 @@ const en: LegalCopy = {
 				{
 					title: `Your ${domain} account`,
 					paragraphs: [`Deleting your chat account does not delete your ${domain} account. To delete that, use its account page at ${idpHost}.`],
-					link: { href: accountUrl, label: `${domain} account`, external: true },
+					link: { href: accountUrl, label: `${domain} account`, kind: "site" },
 				},
+				...(OPERATOR === null
+					? []
+					: [
+							{
+								title: "Can't sign in?",
+								paragraphs: [
+									`Email your request to delete your chat account to ${OPERATOR.email}, with your username and your ${domain} account's email.`,
+								],
+								link: mailto(OPERATOR.email),
+							},
+						]),
 			],
 		},
 	},

@@ -1,6 +1,7 @@
 // English copy of the screens that load on demand; keys mirror vi-screens.ts.
 import { brand } from "../../brand.ts";
 import { deletionTicks } from "../../i18n/account-deletion.ts";
+import { pushServicesNote } from "../../i18n/push-services.ts";
 import { kind, plural } from "./en.ts";
 import type { ScreensCopy } from "./vi-screens.ts";
 
@@ -290,8 +291,7 @@ export const enScreens: ScreensCopy = {
 		preview: "Show message content in notifications",
 		previewHint: "Turned on or off for private chats, groups and channels in Notifications",
 		photoHint: "People not allowed, and people you blocked, see your initials.",
-		pushNote:
-			"Push notifications on phones go through Apple or Google. With previews on, the content is encrypted per device before it is sent, so Apple and Google cannot read it.",
+		pushNote: pushServicesNote.en,
 		everyone: "Everyone",
 		contacts: "Contacts",
 		nobody: "Nobody",
