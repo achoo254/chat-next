@@ -1,4 +1,5 @@
 // Vietnamese UI copy (default locale). en.ts must provide the same keys.
+import { brand } from "../brand.ts";
 export const vi = {
 	common: {
 		loading: "Đang tải…",
@@ -8,7 +9,7 @@ export const vi = {
 		newTab: "(mở tab mới)",
 	},
 	welcome: {
-		signIn: "Đăng nhập bằng tài khoản hoandat",
+		signIn: `Đăng nhập bằng tài khoản ${brand.domain}`,
 		createAccount: "Tạo tài khoản",
 		hint: (host: string) =>
 			`Bạn đăng nhập ở ${host} bằng Google hoặc GitHub. App không bao giờ thấy mật khẩu của bạn.`,
@@ -54,9 +55,9 @@ export const vi = {
 		usernameRejected: "Không dùng được username này",
 		bio: "Giới thiệu",
 		email: "Email",
-		emailSource: "từ tài khoản hoandat",
+		emailSource: `từ tài khoản ${brand.domain}`,
 		noEmail: "Chưa có email đã xác minh",
-		emailNote: "Email lấy từ tài khoản hoandat nên chỉ đọc ở đây. Muốn đổi email hoặc chuyển giữa Google và GitHub:",
+		emailNote: `Email lấy từ tài khoản ${brand.domain} nên chỉ đọc ở đây. Muốn đổi email hoặc chuyển giữa Google và GitHub:`,
 		changeSignIn: "Đổi cách đăng nhập",
 		unsaved: "Có thay đổi chưa lưu",
 		cancel: "Huỷ",
@@ -77,10 +78,10 @@ export const vi = {
 		revokeOthersButton: (count: number) => `Đăng xuất ${count} phiên`,
 		revokedOthers: (count: number) => `Đã đăng xuất ${count} phiên khác`,
 		needsRecentSignIn:
-			"Thao tác này cần một lần đăng nhập mới ở tài khoản hoandat. Đăng xuất, đăng nhập lại rồi thử trong vòng 10 phút.",
-		account: "Tài khoản hoandat",
+			`Thao tác này cần một lần đăng nhập mới ở tài khoản ${brand.domain}. Đăng xuất, đăng nhập lại rồi thử trong vòng 10 phút.`,
+		account: `Tài khoản ${brand.domain}`,
 		accountHint: "Đổi cách đăng nhập, gỡ quyền ứng dụng, thu hồi thiết bị",
-		manageAccount: "Quản lý tài khoản hoandat",
+		manageAccount: `Quản lý tài khoản ${brand.domain}`,
 		activeNow: "đang hoạt động",
 		today: "hôm nay",
 		yesterday: "hôm qua",

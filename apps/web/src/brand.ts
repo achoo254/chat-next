@@ -26,6 +26,8 @@ export function brandFor(host: string) {
 	return {
 		appName: brandConfig.appName,
 		description: brandConfig.description,
+		/** Tenant domain; names the sign-in account in copy, e.g. "tài khoản <domain>". */
+		domain,
 		/** Host of the web app, e.g. chat.<domain>. */
 		webHost: brandConfig.hostTemplates.web.replace("{domain}", domain),
 		/** Host of the IdP sign-in page, e.g. auth.<domain>. */

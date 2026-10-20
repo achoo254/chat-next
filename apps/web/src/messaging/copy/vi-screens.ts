@@ -1,5 +1,6 @@
 // Vietnamese copy of the screens that load on demand (dialogs, admin,
 // settings tabs, moderation). en-screens.ts must provide the same keys.
+import { brand } from "../../brand.ts";
 
 /** The chat kind in copy that names it: channels are never called groups. */
 const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");
@@ -408,7 +409,7 @@ export const viScreens = {
 		dark: "Tối",
 		system: "Theo hệ thống",
 		language: "Ngôn ngữ",
-		languageHint: "Trang đăng nhập hoandat cũng hiện bằng ngôn ngữ này",
+		languageHint: `Trang đăng nhập ${brand.domain} cũng hiện bằng ngôn ngữ này`,
 		fontSize: "Cỡ chữ tin nhắn",
 		px: (n: number) => `${n} px`,
 		previewName: "Quang Huy",
@@ -470,7 +471,7 @@ export const viScreens = {
 		lock: "Khoá tài khoản chat",
 		lockHint: "Đăng xuất mọi phiên chat; không gửi được tin, không vào được nhóm",
 		lockDuration: "Thời hạn khoá",
-		lockNote: "Chỉ khoá trong app chat của tổ chức này. Tài khoản hoandat do IdP quản lý.",
+		lockNote: `Chỉ khoá trong app chat của tổ chức này. Tài khoản ${brand.domain} do IdP quản lý.`,
 		durations: { day: "24 giờ", week: "7 ngày", month: "30 ngày", forever: "Tới khi gỡ khoá" } as Record<string, string>,
 		notForKind: "Không áp dụng cho loại đối tượng này",
 		skip: "Bỏ qua báo cáo",
@@ -1046,7 +1047,7 @@ export const viScreens = {
 			"Xoá hồ sơ, username, danh bạ, người đã chặn, Cloud của tôi, cài đặt và các phiên đăng nhập; bạn rời mọi nhóm và kênh.",
 			'Tin bạn đã gửi trong chat của người khác vẫn còn, người gửi hiện là "Tài khoản đã xoá".',
 			`Tài khoản bị khoá ngay và xoá hẳn sau ${graceDays} ngày. Đăng nhập lại trong ${graceDays} ngày để huỷ.`,
-			`Tài khoản hoandat vẫn còn và dùng bình thường ở các ứng dụng khác. Quản lý hoặc xoá nó ở ${idpHost}/account.`,
+			`Tài khoản ${brand.domain} vẫn còn và dùng bình thường ở các ứng dụng khác. Quản lý hoặc xoá nó ở ${idpHost}/account.`,
 		],
 		ownsChats: (n: number) => `Bạn đang là chủ sở hữu ${n} nhóm và kênh. Chuyển quyền sở hữu hoặc xoá chúng trước.`,
 		groupMembers: (n: number) => `Nhóm · ${n} thành viên`,
@@ -1055,14 +1056,14 @@ export const viScreens = {
 		openChannel: "Mở kênh",
 		botsStop: (n: number, names: string, graceDays: number) =>
 			`${n} bot của bạn (${names}) ngừng chạy ngay: token bị từ chối, webhook tạm dừng. Chúng bị xoá cùng tài khoản sau ${graceDays} ngày và chạy lại nếu bạn huỷ xoá.`,
-		needsSignIn: "Cần đăng nhập lại ở hoandat trong 10 phút gần nhất.",
+		needsSignIn: `Cần đăng nhập lại ở ${brand.domain} trong 10 phút gần nhất.`,
 		blockedByChats: "Chuyển quyền sở hữu hoặc xoá nhóm và kênh trước",
 		deleteButton: "Xoá tài khoản chat",
 		reauthBody: "Xoá tài khoản chat cần đăng nhập trong 10 phút gần đây.",
 		confirmTitle: "Xoá tài khoản chat?",
 		confirmedAt: (host: string, time: string) => `Đã xác nhận lại ở ${host} lúc ${time}`,
 		confirmBody: (date: string) =>
-			`Tài khoản bị khoá ngay, mọi thiết bị đăng xuất. Dữ liệu chat bị xoá hẳn vào ${date}; đăng nhập lại trước ngày đó để huỷ. Tài khoản hoandat của bạn không bị xoá.`,
+			`Tài khoản bị khoá ngay, mọi thiết bị đăng xuất. Dữ liệu chat bị xoá hẳn vào ${date}; đăng nhập lại trước ngày đó để huỷ. Tài khoản ${brand.domain} của bạn không bị xoá.`,
 		typeToConfirm: "Gõ username để xác nhận",
 		typeLabel: (username: string) => `Gõ ${username} để xác nhận`,
 		mismatch: "Username chưa khớp",

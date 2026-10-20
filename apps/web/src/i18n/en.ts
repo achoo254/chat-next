@@ -1,4 +1,5 @@
 // English UI copy; keys mirror vi.ts.
+import { brand } from "../brand.ts";
 import type { Messages } from "./vi.ts";
 
 export const en: Messages = {
@@ -10,7 +11,7 @@ export const en: Messages = {
 		newTab: "(opens in a new tab)",
 	},
 	welcome: {
-		signIn: "Sign in with your hoandat account",
+		signIn: `Sign in with your ${brand.domain} account`,
 		createAccount: "Create account",
 		hint: (host: string) =>
 			`You sign in at ${host} with Google or GitHub. The app never sees your password.`,
@@ -56,9 +57,9 @@ export const en: Messages = {
 		usernameRejected: "This username can't be used",
 		bio: "Bio",
 		email: "Email",
-		emailSource: "from your hoandat account",
+		emailSource: `from your ${brand.domain} account`,
 		noEmail: "No verified email",
-		emailNote: "Your email comes from your hoandat account and is read-only here. To change it or switch between Google and GitHub:",
+		emailNote: `Your email comes from your ${brand.domain} account and is read-only here. To change it or switch between Google and GitHub:`,
 		changeSignIn: "Change how you sign in",
 		unsaved: "Unsaved changes",
 		cancel: "Cancel",
@@ -79,10 +80,10 @@ export const en: Messages = {
 		revokeOthersButton: (count: number) => `Sign out ${count} ${count === 1 ? "session" : "sessions"}`,
 		revokedOthers: (count: number) => `Signed out ${count} other ${count === 1 ? "session" : "sessions"}`,
 		needsRecentSignIn:
-			"This needs a fresh sign-in to your hoandat account. Sign out, sign in again, then retry within 10 minutes.",
-		account: "hoandat account",
+			`This needs a fresh sign-in to your ${brand.domain} account. Sign out, sign in again, then retry within 10 minutes.`,
+		account: `${brand.domain} account`,
 		accountHint: "Change how you sign in, remove app access, revoke devices",
-		manageAccount: "Manage hoandat account",
+		manageAccount: `Manage ${brand.domain} account`,
 		activeNow: "active now",
 		today: "today",
 		yesterday: "yesterday",

@@ -1,4 +1,5 @@
 // English copy of the screens that load on demand; keys mirror vi-screens.ts.
+import { brand } from "../../brand.ts";
 import { kind, plural } from "./en.ts";
 import type { ScreensCopy } from "./vi-screens.ts";
 
@@ -406,7 +407,7 @@ export const enScreens: ScreensCopy = {
 		dark: "Dark",
 		system: "System",
 		language: "Language",
-		languageHint: "The hoandat sign-in page uses this language too",
+		languageHint: `The ${brand.domain} sign-in page uses this language too`,
 		fontSize: "Message text size",
 		px: (n: number) => `${n} px`,
 		previewName: "Quang Huy",
@@ -468,7 +469,7 @@ export const enScreens: ScreensCopy = {
 		lock: "Restrict chat account",
 		lockHint: "Signs out every chat session; no sending messages, no joining groups",
 		lockDuration: "Restriction length",
-		lockNote: "Only restricts this organisation's chat app. The hoandat account is managed by the IdP.",
+		lockNote: `Only restricts this organisation's chat app. The ${brand.domain} account is managed by the IdP.`,
 		durations: { day: "24 hours", week: "7 days", month: "30 days", forever: "Until lifted" } as Record<string, string>,
 		notForKind: "Does not apply to this kind of object",
 		skip: "Dismiss report",
@@ -1042,7 +1043,7 @@ export const enScreens: ScreensCopy = {
 			"Deletes your profile, username, contacts, blocked people, Cloud, settings and sessions; you leave every group and channel.",
 			'Messages you sent in other people\'s chats stay, from "Deleted account".',
 			`The account is locked at once and erased after ${graceDays} days. Sign in again within ${graceDays} days to cancel.`,
-			`Your hoandat account stays and keeps working in other apps. Manage or delete it at ${idpHost}/account.`,
+			`Your ${brand.domain} account stays and keeps working in other apps. Manage or delete it at ${idpHost}/account.`,
 		],
 		ownsChats: (n: number) => `You own ${n} groups and channels. Transfer their ownership or delete them first.`,
 		groupMembers: (n: number) => `Group · ${n} members`,
@@ -1051,14 +1052,14 @@ export const enScreens: ScreensCopy = {
 		openChannel: "Open channel",
 		botsStop: (n: number, names: string, graceDays: number) =>
 			`Your ${n} bots (${names}) stop at once: tokens are refused, webhooks paused. They are deleted with the account after ${graceDays} days and run again if you cancel.`,
-		needsSignIn: "Needs a hoandat sign-in within the last 10 minutes.",
+		needsSignIn: `Needs a ${brand.domain} sign-in within the last 10 minutes.`,
 		blockedByChats: "Transfer or delete your groups and channels first",
 		deleteButton: "Delete chat account",
 		reauthBody: "Deleting the chat account needs a sign-in within the last 10 minutes.",
 		confirmTitle: "Delete chat account?",
 		confirmedAt: (host: string, time: string) => `Confirmed again at ${host} at ${time}`,
 		confirmBody: (date: string) =>
-			`The account is locked at once and every device signs out. Chat data is erased on ${date}; sign in again before then to cancel. Your hoandat account is not deleted.`,
+			`The account is locked at once and every device signs out. Chat data is erased on ${date}; sign in again before then to cancel. Your ${brand.domain} account is not deleted.`,
 		typeToConfirm: "Type your username to confirm",
 		typeLabel: (username: string) => `Type ${username} to confirm`,
 		mismatch: "The username does not match",

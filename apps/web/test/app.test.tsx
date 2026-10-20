@@ -19,7 +19,7 @@ describe("boot", () => {
 
 		expect(await screen.findByRole("heading", { level: 1, name: brandConfig.appName })).toBeTruthy();
 		expect(screen.getByText(brandConfig.description)).toBeTruthy();
-		const signIn = screen.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" });
+		const signIn = screen.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" });
 		const create = screen.getByRole("link", { name: "Tạo tài khoản" });
 		expect(signIn.getAttribute("href")).toBe("/auth/login?locale=vi");
 		expect(create.getAttribute("href")).toBe("/auth/login?prompt=create&locale=vi");
@@ -28,7 +28,7 @@ describe("boot", () => {
 		await userEvent.click(screen.getByRole("button", { name: "English" }));
 
 		// English copy loads on first use, so the switch lands a moment later.
-		expect((await screen.findByRole("link", { name: "Sign in with your hoandat account" })).getAttribute("href")).toBe(
+		expect((await screen.findByRole("link", { name: "Sign in with your hoandat.com account" })).getAttribute("href")).toBe(
 			"/auth/login?locale=en",
 		);
 		expect(screen.getByRole("link", { name: "Create account" }).getAttribute("href")).toBe(
@@ -48,7 +48,7 @@ describe("boot", () => {
 			});
 		}, `/join/${token}`);
 		// The server keeps return_to across the IdP round trip, even when it ends in another tab.
-		const signIn = await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" });
+		const signIn = await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" });
 		expect(signIn.getAttribute("href")).toBe(`/auth/login?locale=vi&return_to=%2Fjoin%2F${token}`);
 		expect(screen.getByRole("link", { name: "Tạo tài khoản" }).getAttribute("href")).toBe(`/auth/login?prompt=create&locale=vi&return_to=%2Fjoin%2F${token}`);
 	});
@@ -113,7 +113,7 @@ describe("boot", () => {
 				},
 			});
 		});
-		expect(await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" })).toBeTruthy();
+		expect(await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" })).toBeTruthy();
 		expect(window.localStorage.getItem("app:last-self")).toBeNull();
 		window.localStorage.removeItem(CORE_LAST_USER_KEY);
 	});

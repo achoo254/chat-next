@@ -69,7 +69,7 @@ export async function signIn(browser: Browser, key: AccountKey): Promise<Person>
 	context.setDefaultTimeout(STEP_TIMEOUT_MS);
 	const page = await context.newPage();
 	await page.goto(WEB_ORIGIN + "/");
-	await page.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" }).click();
+	await page.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" }).click();
 	await page.getByRole("link", { name: `Đăng nhập là ${account.name} @${account.username}` }).click();
 	await page.getByRole("searchbox", { name: /Tìm/ }).first().waitFor();
 	return {

@@ -89,12 +89,12 @@ async function deleteAccount(person: Person): Promise<void> {
 	assert.equal(await submit.isDisabled(), true);
 	await confirm.getByRole("textbox", { name: `Gõ ${person.username} để xác nhận` }).fill(person.username);
 	await submit.click();
-	await page.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" }).waitFor();
+	await page.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" }).waitFor();
 }
 
 async function signInAgain(person: Person): Promise<void> {
 	const { page } = person;
-	await page.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat" }).click();
+	await page.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" }).click();
 	await page.getByRole("link", { name: `Đăng nhập là ${person.name} @${person.username}` }).click();
 }
 
