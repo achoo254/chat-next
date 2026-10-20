@@ -138,7 +138,7 @@ Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` tro
 |---|---|---|
 | `OutboxBacklog` | update chờ một consumer (realtime, push, bot) | quá 2 phút |
 | `ErrorsInLog` | bản ghi mức ERROR của process | từ 10 trong 5 phút |
-| `CertExpiring` | chứng chỉ TLS của host tenant | dưới 14 ngày (dưới 3 ngày: critical) |
+| `CertExpiring` | chứng chỉ TLS của host tenant do nginx trên máy (`127.0.0.1:443`) phục vụ, không phải chứng chỉ Cloudflare ở địa chỉ công khai | dưới 14 ngày (dưới 3 ngày: critical) |
 | `MemoryLow` | RAM khả dụng của máy (chỉ process tenant chính) | dưới 30% (dưới 15%: critical) |
 | `DiskLow` | ổ chứa `/` và `MEDIA_ROOT` (chỉ tenant chính) | dưới 15% trống (dưới 5%: critical) |
 | `BackupStale` | bản mới nhất trong `/opt/chat/backups` (chỉ tenant chính) | cũ hơn 26 giờ |

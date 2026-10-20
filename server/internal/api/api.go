@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -286,6 +287,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 const (
 	backupDir  = "/opt/chat/backups"
 	tenantsDir = "/opt/chat/tenants"
+	// nginx, which serves every tenant's certificate.
+	originTLS = "127.0.0.1:443"
 )
 
 // newWatcher sets up the watchdog: problems of this tenant (outbox, log
@@ -294,7 +297,7 @@ const (
 func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookSvc *hooks.Service, group *watch.Group, logger *slog.Logger) *watch.Watcher {
 	checks := []watch.Check{watch.Outbox(st.Pool(), cfg.TenantID, []string{chatSvc.CursorName("bots"), chatSvc.CursorName("push")}, time.Now), watch.Errors(watch.Process)}
 	if cfg.PublicURL != nil && cfg.PublicURL.Scheme == "https" {
-		checks = append(checks, watch.Cert(cfg.PublicURL.Hostname(), time.Now))
+		checks = append(checks, watch.Cert(cfg.PublicURL.Hostname(), originTLS, time.Now))
 	}
 	if cfg.TenantID == config.DefaultTenantID {
 		disks := []string{"/"}
@@ -401,7 +404,12 @@ func outboundDeny(cfg config.Config, logger *slog.Logger) []netip.Prefix {
 	if err != nil {
 		logger.Warn("listing this host's addresses failed; only OUTBOUND_DENY_CIDRS is refused", "err", err)
 	}
-	deny = append(deny, host...)
+	for _, p := range host {
+		// OUTBOUND_DENY_CIDRS often names this host already.
+		if !slices.Contains(deny, p) {
+			deny = append(deny, p)
+		}
+	}
 	ranges := make([]string, len(deny))
 	for i, p := range deny {
 		ranges[i] = p.String()

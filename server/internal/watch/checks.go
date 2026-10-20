@@ -147,14 +147,21 @@ func Backup(dir string, now func() time.Time) Check {
 	}
 }
 
-// Cert reports the TLS certificate of host expiring soon.
-func Cert(host string, now func() time.Time) Check {
+// Cert reports the TLS certificate of host expiring soon. It reads the
+// certificate the origin serves at origin (nginx on this machine): behind
+// Cloudflare the public address shows Cloudflare's own certificate, which
+// renews itself, and the origin's would expire unseen. Without a server at
+// origin it reads the one at host's public address.
+func Cert(host, origin string, now func() time.Time) Check {
 	return func(ctx context.Context) ([]Problem, error) {
 		if host == "" {
 			return nil, nil
 		}
 		dialer := &tls.Dialer{NetDialer: &net.Dialer{Timeout: certDialTimeout}, Config: &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}}
-		conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, "443"))
+		conn, err := dialer.DialContext(ctx, "tcp", origin)
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			conn, err = dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, "443"))
+		}
 		if err != nil {
 			return []Problem{{Key: "cert:" + host, Name: "CertUnreachable", Severity: severityWarning,
 				Summary: "Không kiểm được chứng chỉ TLS của " + host, Detail: err.Error()}}, nil
