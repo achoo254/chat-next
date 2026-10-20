@@ -70,6 +70,12 @@ func TestPublicRPCs(t *testing.T) {
 	if err != nil || web.Msg.GetClientId() != clientID {
 		t.Fatalf("web GetAuthConfig = %v, %v", web, err)
 	}
+	// No desktop client exists at the IdP (desktop is the web app as a PWA):
+	// the retired desktop value gets the web client, never "chat-desktop".
+	desktop, err := cl.auth.GetAuthConfig(ctx, connect.NewRequest(&appv1.GetAuthConfigRequest{Platform: appv1.ClientPlatform_CLIENT_PLATFORM_DESKTOP}))
+	if err != nil || desktop.Msg.GetClientId() != clientID {
+		t.Fatalf("desktop GetAuthConfig = %v, %v", desktop, err)
+	}
 
 	first, err := cl.config.GetAppConfig(ctx, connect.NewRequest(&appv1.GetAppConfigRequest{}))
 	if err != nil {

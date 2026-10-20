@@ -92,7 +92,6 @@ export const en: Messages = {
 			web: "Browser",
 			ios: "iPhone or iPad",
 			android: "Android",
-			desktop: "Desktop app",
 			unknown: "Other device",
 		},
 	},

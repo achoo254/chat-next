@@ -8,7 +8,7 @@ import { renderApp, SELF } from "./render-app.tsx";
 const SESSIONS = [
 	{ id: 1n, platform: ClientPlatform.WEB, deviceName: "Chrome trên macOS", location: "Hà Nội", current: true },
 	{ id: 2n, platform: ClientPlatform.IOS, deviceName: "iPhone 15", location: "TP. Hồ Chí Minh", lastActiveAt: 1_760_000_000n },
-	{ id: 3n, platform: ClientPlatform.DESKTOP, deviceName: "Windows 11", location: "Hà Nội", lastActiveAt: 1_759_000_000n },
+	{ id: 3n, platform: ClientPlatform.WEB, deviceName: "Windows 11", location: "Hà Nội", lastActiveAt: 1_759_000_000n },
 ];
 
 describe("sessions settings", () => {

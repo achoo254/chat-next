@@ -48,10 +48,8 @@ func (s *authService) GetAuthConfig(_ context.Context, req *connect.Request[appv
 	switch req.Msg.GetPlatform() {
 	case appv1.ClientPlatform_CLIENT_PLATFORM_IOS, appv1.ClientPlatform_CLIENT_PLATFORM_ANDROID:
 		clientID = auth.MobileClientID
-	case appv1.ClientPlatform_CLIENT_PLATFORM_DESKTOP:
-		clientID = auth.DesktopClientID
 	default:
-		// Web and unspecified use the web client.
+		// Web, unspecified and the retired desktop value use the web client.
 	}
 	return connect.NewResponse(&appv1.GetAuthConfigResponse{
 		Issuer:                s.idp.Issuer(),
@@ -108,8 +106,6 @@ func (s *authService) platformOf(clientID string) appv1.ClientPlatform {
 	switch clientID {
 	case s.idp.ClientID():
 		return appv1.ClientPlatform_CLIENT_PLATFORM_WEB
-	case auth.DesktopClientID:
-		return appv1.ClientPlatform_CLIENT_PLATFORM_DESKTOP
 	default:
 		// chat-mobile does not tell iOS from Android.
 		return appv1.ClientPlatform_CLIENT_PLATFORM_UNSPECIFIED

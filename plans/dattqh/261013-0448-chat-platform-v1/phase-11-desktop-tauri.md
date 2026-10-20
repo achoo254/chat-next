@@ -10,6 +10,8 @@ principles: [4, 2, 3]
 
 # Phase 11: Ứng dụng desktop bằng Tauri v2
 
+> **Huỷ 20/10/2026: desktop = PWA.** Không làm phase này: toàn hệ sinh thái không có app desktop native (`hoandat-app/docs/ecosystem-architecture.md` §3, §4). Máy tính dùng bản web cài dạng PWA; client `chat-desktop` đã gỡ khỏi IdP. Nội dung bên dưới giữ làm lịch sử.
+
 <!-- Updated: Red Team 2026-10-13 - spike WS bằng Rust làm dự phòng throttling, SQLCipher + keyring, cửa sổ Mini App không capability, opener allowlist scheme -->
 <!-- Updated: Validation Session 2 2026-10-14 - đăng nhập qua hoandat-auth bằng trình duyệt hệ thống + loopback, chọn tenant -->
 <!-- Updated: REA Telegram Desktop 2026-10-14 - data store riêng cho từng Mini App, thông báo có đánh dấu đã đọc/trả lời, xoá khi đọc nơi khác, id theo tenant, badge gộp -->

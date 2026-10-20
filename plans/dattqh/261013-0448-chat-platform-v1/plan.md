@@ -13,6 +13,8 @@ created: 2026-10-13
 
 # Nền tảng chat v1
 
+> **Huỷ 20/10/2026: desktop = PWA.** User quyết định toàn hệ sinh thái không có app desktop native (`hoandat-app/docs/ecosystem-architecture.md` §3, §4). Phase 11 (Tauri) và R8 bị huỷ; trên máy tính dùng bản web cài dạng PWA, đăng nhập bằng `chat-web`. Client `chat-desktop` đã gỡ khỏi IdP và khỏi server chat. Các chỗ nhắc Tauri/`chat-desktop` bên dưới giữ làm lịch sử.
+
 ## Overview
 
 Sản phẩm chat là **app tiếp theo trong hệ sinh thái hoandat**, cùng hàng với Localman và Tunelo, dùng chung IdP `hoandat-auth` (xem mục [Hệ sinh thái hoandat](#hệ-sinh-thái-hoandat)). Tên sản phẩm cấu hình được (`{{APP_NAME}}` trong `brand.config.json`; "chat-inet" chỉ là tên thư mục). Telegram chỉ là chuẩn tham chiếu về hiệu năng và kiến trúc; sản phẩm độc lập với Telegram, không tương thích và không liên quan Telegram về API, tên gọi hay thương hiệu.

@@ -2,6 +2,7 @@
 
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-10-14
+- Huỷ 20/10/2026: desktop = PWA. Toàn hệ sinh thái không có app desktop native (Tauri); trên máy tính dùng bản web cài dạng PWA, đăng nhập bằng `chat-web`. Client `chat-desktop` đã gỡ khỏi IdP. Native chỉ còn mobile (`chat-mobile`); giá trị `CLIENT_PLATFORM_DESKTOP` trong proto giữ số nhưng server coi như web. Phần nói về desktop/Tauri bên dưới chỉ còn là lịch sử.
 
 ## Bối cảnh
 

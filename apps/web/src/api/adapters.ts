@@ -29,7 +29,7 @@ export interface AccountDeletionInfo {
 	reason: "user" | "inactive";
 }
 
-export type SessionPlatform = "web" | "ios" | "android" | "desktop" | "unknown";
+export type SessionPlatform = "web" | "ios" | "android" | "unknown";
 
 export interface SessionView {
 	id: number;
@@ -63,7 +63,8 @@ const PLATFORMS: Record<ClientPlatform, SessionPlatform> = {
 	[ClientPlatform.WEB]: "web",
 	[ClientPlatform.IOS]: "ios",
 	[ClientPlatform.ANDROID]: "android",
-	[ClientPlatform.DESKTOP]: "desktop",
+	// Retired (desktop is the web app as a PWA); the server never returns it.
+	[ClientPlatform.DESKTOP]: "unknown",
 };
 
 export function toSessionView(session: Session): SessionView {

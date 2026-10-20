@@ -39,6 +39,9 @@ enum ClientPlatform {
   CLIENT_PLATFORM_WEB = 1;
   CLIENT_PLATFORM_IOS = 2;
   CLIENT_PLATFORM_ANDROID = 3;
+  // Retired 20/10/2026: there is no desktop app (desktop runs the web app
+  // as a PWA and signs in as WEB). Kept only so the number is never reused;
+  // the server treats it like WEB and never returns it.
   CLIENT_PLATFORM_DESKTOP = 4;
 }
 
@@ -66,7 +69,7 @@ enum SessionRevokeReason {
 }
 
 message GetAuthConfigRequest {
-  // Selects the IdP client: IOS/ANDROID use chat-mobile, DESKTOP chat-desktop.
+  // Selects the IdP client: IOS/ANDROID use chat-mobile, any other the web client.
   ClientPlatform platform = 1;
 }
 
@@ -87,7 +90,7 @@ message ExchangeNativeCodeRequest {
   string code = 1;
   string code_verifier = 2;
   string redirect_uri = 3;
-  // IOS/ANDROID or DESKTOP; selects the IdP client (see GetAuthConfig).
+  // IOS or ANDROID; selects the IdP client (see GetAuthConfig).
   ClientPlatform platform = 5;
   // Human-readable device label shown in ListSessions.
   string device_name = 6;

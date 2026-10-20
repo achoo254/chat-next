@@ -90,7 +90,6 @@ export const vi = {
 			web: "Trình duyệt",
 			ios: "iPhone hoặc iPad",
 			android: "Android",
-			desktop: "Ứng dụng máy tính",
 			unknown: "Thiết bị khác",
 		},
 	},

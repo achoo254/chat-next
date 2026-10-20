@@ -10,6 +10,8 @@ principles: [1, 2, 4, 7, 5]
 
 # Phase 2: Backend core — tài khoản, chat, tin nhắn, sync
 
+> **Huỷ 20/10/2026: desktop = PWA.** Phần desktop/Tauri và client `chat-desktop` trong phase này không còn hiệu lực (xem ghi chú ở `plan.md`); giữ làm lịch sử.
+
 <!-- Updated: Red Team 2026-10-13 - đăng ký chỉ email, OTP hardening, lock ordering, send_dedupe, outbox log + cursor + afterCommit, epoch, sync_mode, visible_from_seq, reactions/permissions, ratelimit chuyển về đây -->
 <!-- Updated: Validation Session 2 2026-10-14 - bỏ email OTP/2FA, đăng nhập qua hoandat-auth (OIDC), phiên chat gắn grant IdP + back-channel logout, tenant_id từ migration đầu -->
 <!-- Updated: REA Telegram Desktop 2026-10-14 - GetAppConfig, entity kèm update, read receipt chi tiết chỉ cho group nhỏ -->

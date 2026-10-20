@@ -25,11 +25,10 @@ import (
 // Scopes requested by every chat client; no API scope, no offline_access.
 var Scopes = []string{oidc.ScopeOpenID, "profile", "email"}
 
-// Native client ids registered at the IdP (hoandat-auth chat-clients.ts).
-const (
-	MobileClientID  = "chat-mobile"
-	DesktopClientID = "chat-desktop"
-)
+// MobileClientID is the native client registered at the IdP (auth-next
+// chat-clients.ts). There is no desktop client: desktop runs the web app as
+// a PWA and signs in with the web client.
+const MobileClientID = "chat-mobile"
 
 // Errors of IdP calls.
 var (

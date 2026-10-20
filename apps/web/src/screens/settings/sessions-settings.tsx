@@ -21,7 +21,6 @@ const PLATFORM_ICONS: Record<SessionView["platform"], IconName> = {
 	web: "globe",
 	ios: "mobile",
 	android: "mobile",
-	desktop: "laptop",
 	unknown: "laptop",
 };
 

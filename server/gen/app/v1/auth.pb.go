@@ -28,7 +28,10 @@ const (
 	ClientPlatform_CLIENT_PLATFORM_WEB         ClientPlatform = 1
 	ClientPlatform_CLIENT_PLATFORM_IOS         ClientPlatform = 2
 	ClientPlatform_CLIENT_PLATFORM_ANDROID     ClientPlatform = 3
-	ClientPlatform_CLIENT_PLATFORM_DESKTOP     ClientPlatform = 4
+	// Retired 20/10/2026: there is no desktop app (desktop runs the web app
+	// as a PWA and signs in as WEB). Kept only so the number is never reused;
+	// the server treats it like WEB and never returns it.
+	ClientPlatform_CLIENT_PLATFORM_DESKTOP ClientPlatform = 4
 )
 
 // Enum value maps for ClientPlatform.
@@ -154,7 +157,7 @@ func (SessionRevokeReason) EnumDescriptor() ([]byte, []int) {
 
 type GetAuthConfigRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Selects the IdP client: IOS/ANDROID use chat-mobile, DESKTOP chat-desktop.
+	// Selects the IdP client: IOS/ANDROID use chat-mobile, any other the web client.
 	Platform      ClientPlatform `protobuf:"varint,1,opt,name=platform,proto3,enum=app.v1.ClientPlatform" json:"platform,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -279,7 +282,7 @@ type ExchangeNativeCodeRequest struct {
 	Code         string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	CodeVerifier string                 `protobuf:"bytes,2,opt,name=code_verifier,json=codeVerifier,proto3" json:"code_verifier,omitempty"`
 	RedirectUri  string                 `protobuf:"bytes,3,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
-	// IOS/ANDROID or DESKTOP; selects the IdP client (see GetAuthConfig).
+	// IOS or ANDROID; selects the IdP client (see GetAuthConfig).
 	Platform ClientPlatform `protobuf:"varint,5,opt,name=platform,proto3,enum=app.v1.ClientPlatform" json:"platform,omitempty"`
 	// Human-readable device label shown in ListSessions.
 	DeviceName    string `protobuf:"bytes,6,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`

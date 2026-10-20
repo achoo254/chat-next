@@ -63,7 +63,7 @@ Cột "Kết quả" để người nghiệm thu ghi Đạt / Không đạt kèm 
 
 ## Giới hạn đã biết
 
-- Chưa có app iOS/Android và desktop riêng (R7/R8); trên điện thoại dùng bản web hoặc cài thành app từ trình duyệt.
+- Chưa có app iOS/Android (R7); trên điện thoại dùng bản web hoặc cài thành app từ trình duyệt. Không có app desktop riêng (huỷ R8 ngày 20/10/2026: desktop = PWA).
 - Server chưa có ffmpeg: video, audio do bot gửi chưa có ảnh xem trước, sóng âm và thời lượng.
 - Ở bề rộng 761–1100 px, cột thông tin và Mini App phủ lên phần phải khung chat thay vì xếp thành cột riêng.
 - Mỗi process phục vụ tối đa 1000 người online cùng lúc (giới hạn đã đo trên máy hiện tại); vượt thì người sau chờ "Đang kết nối…".

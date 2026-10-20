@@ -36,13 +36,13 @@ import { TypingTracker } from "./typing.ts";
 import { uploadPhotoNow } from "../media/direct-upload.ts";
 import { DirectActions, UnsupportedApiError, type PinnedMessagesRequest } from "./direct-actions.ts";
 
-export type ClientKind = "web" | "ios" | "android" | "desktop";
+/** Desktop has no app of its own: it runs the web app as a PWA ("web"). */
+export type ClientKind = "web" | "ios" | "android";
 
 const CLIENT_PLATFORMS: Record<ClientKind, ClientPlatform> = {
 	web: ClientPlatform.WEB,
 	ios: ClientPlatform.IOS,
 	android: ClientPlatform.ANDROID,
-	desktop: ClientPlatform.DESKTOP,
 };
 
 export interface StartOptions {

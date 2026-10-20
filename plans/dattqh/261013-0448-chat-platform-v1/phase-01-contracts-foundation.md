@@ -10,6 +10,8 @@ principles: [1, 6, 7, 3, 5]
 
 # Phase 1: Chốt contract và nền móng monorepo
 
+> **Huỷ 20/10/2026: desktop = PWA.** Phần desktop/Tauri và client `chat-desktop` trong phase này không còn hiệu lực (xem ghi chú ở `plan.md`); giữ làm lịch sử.
+
 <!-- Updated: Red Team 2026-10-13 - bổ sung ADR epoch/sync_mode/outbox/topology/auth web/link scheme, proto theo domain, đặc tả fold đúng -->
 <!-- Updated: Validation Session 2 2026-10-14 - app thuộc hệ sinh thái hoandat: ADR 0006 chuyển sang đăng nhập qua hoandat-auth, thêm ADR 0010 tenant theo domain, RPC auth mới, brand.config theo chat.<domain> -->
 <!-- Updated: REA Telegram Desktop 2026-10-14 - RPC config.GetAppConfig -->

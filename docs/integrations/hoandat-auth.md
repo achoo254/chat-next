@@ -8,9 +8,10 @@ App chat đăng nhập chỉ qua IdP của hệ sinh thái hoandat. Quyết đ�
 |---|---|---|
 | `chat-web` | confidential, Code + PKCE, refresh gắn phiên IdP | `https://chat.<domain>/auth/callback`; back-channel logout `https://chat.<domain>/auth/backchannel-logout` |
 | `chat-mobile` | public, native, Code + PKCE | `CHAT_MOBILE_REDIRECT_URI` của IdP, mặc định `com.hoandat.chat:/auth/callback`; phải trùng `urlScheme` trong `brand.config.json` |
-| `chat-desktop` | public, native, Code + PKCE | `http://127.0.0.1:<cổng bất kỳ>/auth/callback` |
 
-Cả ba xin scope `openid profile email`, không có audience API: app chat tự cấp phiên của mình và chỉ đọc ID token và userinfo. Refresh token của `chat-mobile` và `chat-desktop` không chết khi người dùng đăng xuất trong trình duyệt và không có trần 90 ngày; mỗi máy là một grant thu hồi được ở `/account` của IdP.
+Không có client desktop: trên máy tính, Chat chạy bản web cài dạng PWA và đăng nhập bằng `chat-web` (huỷ 20/10/2026: desktop = PWA; `chat-desktop` đã gỡ khỏi IdP).
+
+Cả hai xin scope `openid profile email`, không có audience API: app chat tự cấp phiên của mình và chỉ đọc ID token và userinfo. Refresh token của `chat-mobile` không chết khi người dùng đăng xuất trong trình duyệt và không có trần 90 ngày; mỗi máy là một grant thu hồi được ở `/account` của IdP.
 
 ## Cấu hình phía app chat
 
@@ -22,6 +23,6 @@ Cả ba xin scope `openid profile email`, không có audience API: app chat tự
 
 Plan: `auth-next/plans/dattqh/261014-1131-chat-app-integration/plan.md`.
 
-- Đã làm và đang chạy ở production (`main` của `auth-next`, commit `0c0020d`, `4a9ca7d`; đo 15/10/2026): ba client chat, refresh native không trần, secret suy theo tenant, `CHAT_MOBILE_REDIRECT_URI`. `.env` của IdP có `CHAT_WEB_URL`, `CHAT_WEB_CLIENT_SECRET`; env và cách kiểm client nằm ở `auth-next/docs/deployment-guide.md` mục "Client của app chat".
+- Đã làm và đang chạy ở production (`main` của `auth-next`, commit `0c0020d`, `4a9ca7d`; đo 15/10/2026): ba client chat (20/10/2026: gỡ `chat-desktop` trong code IdP, chờ deploy), refresh native không trần, secret suy theo tenant, `CHAT_MOBILE_REDIRECT_URI`. `.env` của IdP có `CHAT_WEB_URL`, `CHAT_WEB_CLIENT_SECRET`; env và cách kiểm client nằm ở `auth-next/docs/deployment-guide.md` mục "Client của app chat".
 - App chat ở trang `/apps` của IdP: chỉ ở tenant chính (`auth.hoandat.com/apps`), vì tenant khác chưa có host `chat.<domain>`.
 - Chưa làm: host `chat.<domain>` theo tenant và bật chat ở `/admin` (khi có thì `/apps` của tenant đó mới hiện Chat), vai `chat` của API nội bộ, hạn mức `/token` cho request loopback, hiển thị máy chat ở `/account`, script tạo tenant thử cho dev.

@@ -19,7 +19,7 @@ export const file_app_v1_auth: GenFile = /*@__PURE__*/
  */
 export type GetAuthConfigRequest = Message<"app.v1.GetAuthConfigRequest"> & {
   /**
-   * Selects the IdP client: IOS/ANDROID use chat-mobile, DESKTOP chat-desktop.
+   * Selects the IdP client: IOS/ANDROID use chat-mobile, any other the web client.
    *
    * @generated from field: app.v1.ClientPlatform platform = 1;
    */
@@ -92,7 +92,7 @@ export type ExchangeNativeCodeRequest = Message<"app.v1.ExchangeNativeCodeReques
   redirectUri: string;
 
   /**
-   * IOS/ANDROID or DESKTOP; selects the IdP client (see GetAuthConfig).
+   * IOS or ANDROID; selects the IdP client (see GetAuthConfig).
    *
    * @generated from field: app.v1.ClientPlatform platform = 5;
    */
@@ -351,6 +351,10 @@ export enum ClientPlatform {
   ANDROID = 3,
 
   /**
+   * Retired 20/10/2026: there is no desktop app (desktop runs the web app
+   * as a PWA and signs in as WEB). Kept only so the number is never reused;
+   * the server treats it like WEB and never returns it.
+   *
    * @generated from enum value: CLIENT_PLATFORM_DESKTOP = 4;
    */
   DESKTOP = 4,
