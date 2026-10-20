@@ -180,12 +180,13 @@ func (s *Store) TouchSession(ctx context.Context, id int64, minInterval time.Dur
 	return st, nil
 }
 
-// ListActiveSessions returns the usable sessions of a user, newest first.
+// ListActiveSessions returns the usable sessions of a user, the most
+// recently active first (as Telegram lists devices).
 func (s *Store) ListActiveSessions(ctx context.Context, tenantID string, userID int64) ([]Session, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+sessionColumns+` FROM user_sessions s
 		WHERE s.tenant_id = $1 AND s.user_id = $2 AND `+activeSession+`
-		ORDER BY s.created_at DESC, s.id DESC`,
+		ORDER BY s.last_seen_at DESC, s.id DESC`,
 		tenantID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list sessions: %w", err)

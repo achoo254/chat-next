@@ -74,7 +74,7 @@ export const vi = {
 		revoking: "Đang đăng xuất…",
 		revoked: (label: string) => `Đã đăng xuất ${label}`,
 		revokeOthers: "Đăng xuất mọi phiên khác",
-		revokeOthersHint: (host: string) => `Cần đã đăng nhập ở ${host} trong 10 phút gần nhất`,
+		revokeOthersHint: (host: string) => `Cần đăng nhập lại ở ${host} trong 10 phút gần nhất`,
 		revokeOthersButton: (count: number) => `Đăng xuất ${count} phiên`,
 		revokedOthers: (count: number) => `Đã đăng xuất ${count} phiên khác`,
 		needsRecentSignIn:
