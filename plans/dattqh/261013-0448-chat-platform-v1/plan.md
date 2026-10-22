@@ -605,3 +605,10 @@ Web Push đã kiểm trên thiết bị thật ngày 2026-10-16 10:14: Edge trê
 3. Mini App web (R6) đã lên prod 2026-10-19; còn chờ người dùng thử một Mini App thật. Mobile (R7) và desktop (R8) theo phase của chúng.
 4. Đánh giá Nghị định 13: user bảo bỏ qua; test tải lớn: bỏ qua tới khi có người dùng thật.
 
+
+## Cập nhật (2026-10-23)
+
+- Mục 1 và 2 của "Việc tiếp theo" ở bàn giao 19/10 đã xong ngay trong ngày 19/10: tạm dừng/tiếp tục upload (`2c4a775`), bỏ metadata WebM/Matroska (`09a37dd`), album chuyển tiếp vẫn là album (`9fa5a82`), JS khởi động 149,4 → 142,5 KB (`2088a77`).
+- 23/10: menu chuột phải "Chuyển tiếp" và "Lưu vào Cloud của tôi" chỉ gửi tin đầu của album; sửa để gửi cả album như nút chuyển tiếp nhanh (`60f735e`, test trong `apps/web/test/media.test.tsx`).
+- Poster video và waveform phía server: ffmpeg có sẵn trên `.65` nhưng Jev chọn giữ `MEDIA_FFMPEG_PATH` tắt (0,65; bật 0,30): client đã gửi thumb, waveform, thời lượng; không thêm bề mặt parser cho file người dùng trên máy dùng chung (`docs/infrastructure-inventory.md`).
+- Test hot user 2.000 tin/s và failover thật với standby (Phase 2) vẫn để Phase 14: là test tải, user đã hoãn tới khi có người dùng thật; máy dev không có Docker để dựng standby.

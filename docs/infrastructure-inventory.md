@@ -14,7 +14,7 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 | `postgresql-contrib` | 16.8 | **Chat cài ngày 2026-10-15** để có `pg_trgm` cho tìm kiếm chuỗi con; kéo theo `uuid` 1.6.2. Không khởi động lại Postgres |
 | `nginx` | 1.20.1 | Có sẵn, dùng chung; không hỗ trợ directive `http2` riêng |
 | `certbot`, `python3-certbot-dns-cloudflare` | 3.1.0 | Có sẵn, dùng chung |
-| `ffmpeg` | chưa cài | Tuỳ chọn cho poster video và sóng âm phía server (`MEDIA_FFMPEG_PATH`) |
+| `ffmpeg` | `/usr/bin/ffmpeg` 7.1.5 có trên máy (scribe dùng), chat **cố ý không bật** | Tuỳ chọn cho poster video và sóng âm phía server (`MEDIA_FFMPEG_PATH`). 23/10/2026 Jev chọn giữ tắt (0,65): client đã gửi thumb, waveform và thời lượng, không thêm bề mặt parser ffmpeg cho file người dùng trên máy dùng chung. Bật: thêm `MEDIA_FFMPEG_PATH=/usr/bin/ffmpeg` vào `/opt/chat/.env`, `pm2 restart chat-api` |
 
 ### User hệ thống
 
