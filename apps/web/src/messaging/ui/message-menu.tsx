@@ -13,6 +13,7 @@ import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { isSavedChat } from "../data/format.ts";
 import { pinnedLists } from "../data/pinned.ts";
+import type { WindowItem } from "../data/store.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
 import { EmojiPicker } from "./emoji-picker.tsx";
@@ -57,6 +58,16 @@ interface MenuLayerProps {
 	readOutboxMaxSeq: number;
 	/** Open on the emoji panel instead of the menu. */
 	picker: boolean;
+}
+
+/** Every message of the album `message` belongs to, in order; just its own seq outside an album. */
+function albumSeqs(items: readonly WindowItem[], message: StoredMessage): number[] {
+	if (message.groupedId === 0) return [message.seq];
+	return items.flatMap((item) =>
+		item.kind === "message" && !item.message.recalled && item.message.groupedId === message.groupedId && item.message.fromId === message.fromId
+			? [item.message.seq]
+			: [],
+	);
 }
 
 export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, picker }: MenuLayerProps) {
@@ -125,7 +136,9 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 		const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 		const canWrite = !channel || admin;
 		if (canWrite) entries.push({ label: copy.menu.reply, icon: "reply", run: () => ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq }) });
-		entries.push({ label: copy.menu.forward, icon: "forward", run: () => ui.dialog.set({ kind: "forward", chatId, seq: message.seq }) });
+		// An album goes on as a whole, as from its quick Forward button.
+		const seqs = albumSeqs(store.items(chatId), message);
+		entries.push({ label: copy.menu.forward, icon: "forward", run: () => ui.dialog.set({ kind: "forward", chatId, seq: message.seq, seqs }) });
 		if (!isSavedChat(chat, null)) {
 			entries.push({
 				label: copy.menu.saveToCloud,
@@ -134,7 +147,7 @@ export default function MenuLayer({ chatId, itemKey, chat, readOutboxMaxSeq, pic
 				run: () =>
 					remote
 						.createPrivate(store.selfId)
-						.then((saved) => remote.forward(chatId, [message.seq], saved))
+						.then((saved) => remote.forward(chatId, seqs, saved))
 						.then(() => toasts.show(copy.menu.savedToCloud), failure),
 			});
 		}
