@@ -16,6 +16,7 @@ import type { Remote } from "./remote.ts";
 import type { TopicPages } from "./topic-mapping.ts";
 import type { ChatSource } from "./source.ts";
 import { GENERAL_TOPIC } from "./general-topic.ts";
+import { serverOrigin } from "../../server-origin.ts";
 
 const RELOAD_DELAY_MS = 250;
 
@@ -34,7 +35,7 @@ export class ServerBackend implements PendingBackend {
 	constructor(
 		protected readonly remote: Remote,
 		source: ChatSource,
-		private readonly origin: string = window.location.origin,
+		private readonly origin: string = serverOrigin(),
 	) {
 		// New messages, reads and topic changes of a loaded forum refresh its topics.
 		this.unsubscribe = source.events.subscribeBatches((keys) => {

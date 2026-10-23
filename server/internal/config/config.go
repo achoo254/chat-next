@@ -55,6 +55,10 @@ type Config struct {
 	// AppURLScheme is the app's own scheme allowed in message links
 	// (ADR 0004).
 	AppURLScheme string
+	// NativeSignInOff (NATIVE_SIGN_IN=off) turns the iOS and Android apps'
+	// sign-in off: GetAuthConfig and ExchangeNativeCode refuse them. Existing
+	// app sessions keep working until they end.
+	NativeSignInOff bool
 	// DevOrigins is empty in production even when DEV_ORIGINS is set.
 	DevOrigins []string
 	// OperatorUserIDs may use the moderation queue (CHAT_OPERATOR_USER_IDS);
@@ -170,6 +174,17 @@ func (c Config) PublicOrigin() string {
 	return c.PublicURL.Scheme + "://" + c.PublicURL.Host
 }
 
+// MobileRedirectURL is the redirect URI of the native app's IdP client
+// (chat-mobile): the private-use scheme URI <APP_URL_SCHEME>:/auth/callback
+// (RFC 8252 §7.1), which the IdP registers as CHAT_MOBILE_REDIRECT_URI. ""
+// when native sign-in is off.
+func (c Config) MobileRedirectURL() string {
+	if c.NativeSignInOff {
+		return ""
+	}
+	return c.AppURLScheme + ":/auth/callback"
+}
+
 // Lookup reads one variable, like os.LookupEnv.
 type Lookup func(key string) (string, bool)
 
@@ -228,6 +243,13 @@ func Load(lookup Lookup) (Config, error) {
 		TenantID:         orDefault("TENANT_ID", DefaultTenantID),
 		TenantDomain:     strings.ToLower(orDefault("TENANT_DOMAIN", DefaultTenantDomain)),
 		AppURLScheme:     strings.ToLower(orDefault("APP_URL_SCHEME", DefaultAppURLScheme)),
+	}
+	switch get("NATIVE_SIGN_IN") {
+	case "", "on":
+	case "off":
+		c.NativeSignInOff = true
+	default:
+		errs = append(errs, invalid("NATIVE_SIGN_IN", "must be on or off"))
 	}
 	if c.Env != "" && c.Env != EnvProduction && c.Env != EnvDevelopment {
 		errs = append(errs, invalid("CHAT_ENV", "must be production or development"))

@@ -30,6 +30,7 @@ import { MiniAppTab } from "./mini-app-settings.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import type { BotsCopy } from "./copy-vi.ts";
 import "./console.css";
+import { serverHost, serverOrigin } from "../../server-origin.ts";
 
 /** An owner has at most this many bots (bot_admin.proto). */
 const BOTS_MAX = 20;
@@ -49,7 +50,7 @@ function useMyBots(page: number): [Load<OwnBot[]>, () => void, (bot: OwnBot) => 
 
 /** The Bot API base of this tenant. */
 function apiBase(): string {
-	return `${window.location.origin}/bot/v1`;
+	return `${serverOrigin()}/bot/v1`;
 }
 
 export default function DeveloperConsole({ view }: { view: ConsolePage }) {
@@ -78,7 +79,7 @@ function ConsoleHead({ back, backLabel, parent, current }: { back: string; backL
 			<span className="who-chip">
 				<ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} size="sm" />
 				<span>
-					{self.name} · {orgDomain(window.location.host)}
+					{self.name} · {orgDomain(serverHost())}
 				</span>
 			</span>
 		</header>
@@ -106,7 +107,7 @@ function BotList() {
 	const copy = useCopy();
 	const [state, reload] = useMyBots(0);
 	const loader = useLoader(state.status === "loading", copy.common.loading);
-	const org = orgDomain(window.location.host);
+	const org = orgDomain(serverHost());
 	const titleId = useDomId("bots");
 	const bots = state.status === "ready" ? state.value : [];
 	const full = bots.length >= BOTS_MAX;
@@ -229,7 +230,7 @@ function CreateBot() {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const [touched, setTouched] = useState(false);
-	const org = orgDomain(window.location.host);
+	const org = orgDomain(serverHost());
 	const nameId = useDomId("cb-name");
 	const userId = useDomId("cb-user");
 	const descId = useDomId("cb-desc");

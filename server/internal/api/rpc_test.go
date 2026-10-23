@@ -90,7 +90,8 @@ func TestPublicRPCs(t *testing.T) {
 		t.Fatalf("GetAppConfig(hash) = %v, %v", again, err)
 	}
 
-	if _, err := cl.auth.ExchangeNativeCode(ctx, connect.NewRequest(&appv1.ExchangeNativeCodeRequest{})); codeOf(err) != connect.CodeUnimplemented {
+	// Public, so an empty request reaches validation (native_test.go covers the flow).
+	if _, err := cl.auth.ExchangeNativeCode(ctx, connect.NewRequest(&appv1.ExchangeNativeCodeRequest{})); codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("ExchangeNativeCode: %v", err)
 	}
 }

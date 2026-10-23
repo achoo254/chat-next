@@ -30,6 +30,7 @@ import {
 } from "./api.ts";
 import { ConfirmDialog, ReauthDialog, reauthUrl, useConfirmShown, type TabProps } from "./dialogs.tsx";
 import { useBotsCopy } from "./use-bots-copy.ts";
+import { serverOrigin } from "../../server-origin.ts";
 
 /** Update kinds a bot can receive, in the Console's order. */
 export const UPDATE_KINDS: readonly UpdateKind[] = ["message", "message_edited", "channel_post", "callback", "member_changed", "reaction", "inline_query"];
@@ -549,7 +550,7 @@ function PollCommand() {
 	const t = useBotsCopy();
 	const copy = useCopy();
 	const { toasts } = useServices();
-	const command = pollCommand(window.location.origin);
+	const command = pollCommand(serverOrigin());
 	return (
 		<div className="command">
 			<pre className="snippet" aria-label={t.delivery.command}>

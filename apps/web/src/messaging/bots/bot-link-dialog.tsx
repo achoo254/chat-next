@@ -14,6 +14,7 @@ import { ChatAvatar, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 import { validStartParam, type BotInfo } from "./api.ts";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import "./bot-chat.css";
+import { serverHost } from "../../server-origin.ts";
 
 /** "/start" or "/start <param>": what the bot receives. */
 export function startCommand(startParam: string): string {
@@ -81,7 +82,7 @@ export default function BotLinkDialog({ username, startParam }: { username: stri
 					<ChatAvatar id={bot.id} name={bot.name} bot photoOf={bot.id} photoId={bot.photoId} />
 					<div>
 						<strong>{bot.name}</strong>
-						<small>{t.link.botLine(bot.username, orgDomain(window.location.host))}</small>
+						<small>{t.link.botLine(bot.username, orgDomain(serverHost()))}</small>
 					</div>
 				</div>
 				{bot.description !== "" && <p className="bot-desc">{bot.description}</p>}

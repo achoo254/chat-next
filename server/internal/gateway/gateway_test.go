@@ -97,6 +97,21 @@ func (tokenSessions) Authenticate(_ context.Context, token string) (store.Sessio
 	return store.Session{ID: id * 100, UserID: id, CreatedAt: time.Now()}, nil
 }
 
+// AuthenticateBearer maps a hello token "native-<id>" to a native session of
+// that user; any other token (a web session's included) is refused.
+func (tokenSessions) AuthenticateBearer(ctx context.Context, token string) (store.Session, error) {
+	rest, ok := strings.CutPrefix(token, "native-")
+	if !ok {
+		return store.Session{}, auth.ErrNoSession
+	}
+	s, err := tokenSessions{}.Authenticate(ctx, "user-"+rest)
+	if err != nil {
+		return store.Session{}, err
+	}
+	s.Platform = store.PlatformIOS
+	return s, nil
+}
+
 // fakeToucher reports sessions active unless revoked.
 type fakeToucher struct {
 	mu      sync.Mutex
@@ -460,5 +475,63 @@ func TestOnlineCapRefusesNewPeopleOnly(t *testing.T) {
 	tg.connect(t, 1)
 	if code := tg.dialHello(t, 2).closeStatus(t); code != websocket.StatusTryAgainLater {
 		t.Fatalf("over the cap: close %v, want try again later", code)
+	}
+}
+
+// dialNative opens a socket from the native app's iOS origin with cookie
+// (when not empty) and sends hello with token.
+func (tg *testGateway) dialNative(t *testing.T, token, cookie string) *client {
+	t.Helper()
+	h := http.Header{}
+	h.Set("Origin", auth.NativeOriginIOS)
+	if cookie != "" {
+		h.Set("Cookie", auth.SessionCookieName+"="+cookie)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ws, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(tg.srv.URL, "http")+"/ws", &websocket.DialOptions{HTTPHeader: h})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ws.CloseNow() })
+	c := &client{ws: ws}
+	c.send(t, &appv1.ClientFrame{Frame: &appv1.ClientFrame_Hello{Hello: &appv1.ClientHelloFrame{SessionToken: token}}})
+	return c
+}
+
+func TestNativeSocketAuthenticatesWithHelloToken(t *testing.T) {
+	tg := newTestGateway(t)
+	c := tg.dialNative(t, "native-4", "")
+	if f := c.read(t); f.GetHello().GetUserId() != 4 || f.GetHello().GetSessionId() != 400 {
+		t.Fatalf("hello = %v", f)
+	}
+	// A web session's cookie or token never opens a socket from a native
+	// origin: the client is told it is signed out and the socket closes.
+	for name, dial := range map[string]func() *client{
+		"cookie only":       func() *client { return tg.dialNative(t, "", "user-5") },
+		"web token":         func() *client { return tg.dialNative(t, "user-5", "") },
+		"web token, cookie": func() *client { return tg.dialNative(t, "user-5", "user-5") },
+	} {
+		c := dial()
+		if f := c.read(t); f.GetError().GetCode() != appv1.FrameErrorCode_FRAME_ERROR_CODE_UNAUTHENTICATED {
+			t.Errorf("%s: first frame %v", name, f)
+		}
+		if st := c.closeStatus(t); st != websocket.StatusPolicyViolation {
+			t.Errorf("%s: close status %v", name, st)
+		}
+	}
+}
+
+func TestNativeOriginsNeedNoAllowlistEntry(t *testing.T) {
+	tg := newTestGateway(t)
+	// The web handshake from a foreign origin is still refused before upgrade.
+	h := http.Header{}
+	h.Set("Origin", "capacitor://evil")
+	h.Set("Cookie", auth.SessionCookieName+"=user-1")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, resp, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(tg.srv.URL, "http")+"/ws", &websocket.DialOptions{HTTPHeader: h})
+	if err == nil || resp == nil || resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("foreign origin: resp %v err %v", resp, err)
 	}
 }

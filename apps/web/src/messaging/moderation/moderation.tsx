@@ -43,6 +43,7 @@ import { ChatAvatar, Choice, DialogHead, Modal, useDomId } from "../ui/parts.tsx
 import "./moderation.css";
 import { useLoad } from "./use-load.ts";
 import Announcements from "./announcements.tsx";
+import { serverHost } from "../../server-origin.ts";
 
 /** Which moderation screen is open. */
 export type ModerationView =
@@ -117,7 +118,7 @@ function actorName(operatorId: number, people: ReadonlyMap<number, Person>, self
 export default function Moderation({ view }: { view: ModerationView }) {
 	const copy = useScreensCopy();
 	const { self } = useServices();
-	const scope = orgDomain(window.location.host);
+	const scope = orgDomain(serverHost());
 	const t = copy.moderation;
 	const section = view.page === "feedback" || view.page === "announcements" || view.page === "log" ? view.page : "queue";
 	const nav = [

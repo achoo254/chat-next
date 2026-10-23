@@ -5,6 +5,7 @@
 // dialog later. Safari on iPhone and iPad has no such event: the user adds
 // the app to the home screen by hand, and only an app opened from there
 // gets Web Push.
+import { IS_NATIVE } from "./server-origin.ts";
 
 /** The Chromium event; not in the DOM typings. */
 interface BeforeInstallPromptEvent extends Event {
@@ -54,7 +55,8 @@ export function captureInstallPrompt(): void {
 }
 
 export function installState(): InstallState {
-	if (installedNow || isStandalone()) return "installed";
+	// The iOS and Android apps are installed by definition.
+	if (IS_NATIVE || installedNow || isStandalone()) return "installed";
 	if (deferred !== null) return "prompt";
 	return isAppleMobile() ? "ios" : "manual";
 }

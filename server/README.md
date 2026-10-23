@@ -34,6 +34,7 @@ Một binary `server`, chạy theo `-role`. Quyết định: [ADR 0006](../docs/
 | `WEB_PUSH_SUBJECT` | | `CHAT_PUBLIC_URL` | Liên hệ của người vận hành gửi trong token VAPID (`mailto:` hoặc `https:`); bắt buộc khi `CHAT_PUBLIC_URL` không phải https |
 | `WEB_PUSH_ALLOW_LOCAL` | | `false` | Chỉ khi `CHAT_ENV=development`: endpoint push trên loopback (`http`, mọi cổng), cho receiver của e2e (`server/cmd/e2e-stack` bật sẵn, kèm khoá VAPID sinh mỗi lần chạy) |
 | `APP_URL_SCHEME` | | `com.hoandat.chat` | Scheme riêng của app được phép trong link của tin (ADR 0004), khớp `urlScheme` của `brand.config.json`; không được là `http`/`https` |
+| `NATIVE_SIGN_IN` | | `on` | `off` tắt đăng nhập của app iOS/Android (`GetAuthConfig`/`ExchangeNativeCode` trả `failed_precondition`); phiên app đang có vẫn chạy tới khi kết thúc. Redirect của app là `<APP_URL_SCHEME>:/auth/callback` ([ADR 0011](../docs/adr/0011-native-sessions-bearer-cors.md)) |
 
 Media (tất cả tuỳ chọn; media bật khi có `MEDIA_PUBLIC_URL`, xem [Media](#media-package-internalmedia)):
 

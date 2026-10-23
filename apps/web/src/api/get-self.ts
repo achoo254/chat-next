@@ -6,9 +6,11 @@
 // (https://connectrpc.com/docs/protocol, unary requests).
 import { Code } from "@connectrpc/connect";
 import { assertSafeId } from "@app/core";
+import { NATIVE_API_ORIGIN } from "../server-origin.ts";
 import type { AccountDeletionInfo, SelfUser } from "./adapters.ts";
 
-export const RPC_BASE_URL = "/rpc";
+/** Same-origin /rpc on the web; the configured server's /rpc in the native app. */
+export const RPC_BASE_URL = `${NATIVE_API_ORIGIN}/rpc`;
 const GET_SELF_URL = `${RPC_BASE_URL}/app.v1.UsersService/GetSelf`;
 
 /** A failed JSON call, with the Connect code the server (or the HTTP status) gave. */
@@ -118,22 +120,32 @@ function parseDeletion(value: unknown): AccountDeletionInfo | null {
  * failed request in the browser console.
  */
 export async function fetchSelf(rpcFetch: typeof globalThis.fetch): Promise<SelfUser> {
-	const response = await rpcFetch(GET_SELF_URL, {
+	const body = await callJson(rpcFetch, GET_SELF_URL, '{"allowSignedOut":true}');
+	if (isRecord(body) && body.user === undefined) throw new RpcError(Code.Unauthenticated, "signed out");
+	return parseGetSelf(body);
+}
+
+/**
+ * One unary call in the Connect protocol's JSON encoding: POSTs `body` (a
+ * JSON request message) to `url` and returns the parsed answer, or throws
+ * RpcError with the server's code.
+ */
+export async function callJson(rpcFetch: typeof globalThis.fetch, url: string, body: string): Promise<unknown> {
+	const response = await rpcFetch(url, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1" },
-		body: '{"allowSignedOut":true}',
+		body,
 	});
-	let body: unknown = null;
+	let answer: unknown = null;
 	try {
-		body = await response.json();
+		answer = await response.json();
 	} catch {
 		// Not JSON (a proxy error page): the status decides below.
 	}
 	if (!response.ok) {
-		const code = isRecord(body) && typeof body.code === "string" ? CODES[body.code] : undefined;
-		const message = isRecord(body) && typeof body.message === "string" ? body.message : `HTTP ${response.status}`;
+		const code = isRecord(answer) && typeof answer.code === "string" ? CODES[answer.code] : undefined;
+		const message = isRecord(answer) && typeof answer.message === "string" ? answer.message : `HTTP ${response.status}`;
 		throw new RpcError(code ?? codeOfStatus(response.status), message);
 	}
-	if (isRecord(body) && body.user === undefined) throw new RpcError(Code.Unauthenticated, "signed out");
-	return parseGetSelf(body);
+	return answer;
 }

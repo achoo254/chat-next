@@ -127,7 +127,23 @@ type NewSessionData struct {
 	IP           string
 	// AuthTime is the ID token's auth_time; zero when unknown.
 	AuthTime time.Time
+	// Native is set for a session of the iOS or Android app: its IdP tokens
+	// belong to MobileClientID and it authenticates with the Authorization
+	// header. Nil for a web session.
+	Native *NativeDevice
 }
+
+// NativeDevice is what a native app says about itself at sign-in.
+type NativeDevice struct {
+	// Platform is store.PlatformIOS or store.PlatformAndroid.
+	Platform   int16
+	DeviceName string
+	AppVersion string
+}
+
+// maxDeviceTextBytes bounds the device name and app version of a native
+// session.
+const maxDeviceTextBytes = 128
 
 // Create issues a session and returns its opaque token (only its hash is
 // stored). The IdP tokens are sealed and bound to that hash.
@@ -138,7 +154,7 @@ func (m *Sessions) Create(ctx context.Context, d NewSessionData) (token string, 
 	if d.RefreshToken != "" {
 		refreshEnc = m.refresh.Seal([]byte(d.RefreshToken), hash)
 	}
-	id, err = m.store.CreateSession(ctx, store.NewSession{
+	n := store.NewSession{
 		TokenHash:       hash,
 		TenantID:        m.tenantID,
 		UserID:          d.UserID,
@@ -149,7 +165,18 @@ func (m *Sessions) Create(ctx context.Context, d NewSessionData) (token string, 
 		UserAgent:       truncate(d.UserAgent, maxStoredTextBytes),
 		IP:              d.IP,
 		AuthTime:        d.AuthTime,
-	})
+		Platform:        store.PlatformWeb,
+	}
+	if d.Native != nil {
+		if d.Native.Platform != store.PlatformIOS && d.Native.Platform != store.PlatformAndroid {
+			return "", 0, errors.New("auth: a native session needs the iOS or Android platform")
+		}
+		n.IdPClientID = MobileClientID
+		n.Platform = d.Native.Platform
+		n.DeviceName = truncate(d.Native.DeviceName, maxDeviceTextBytes)
+		n.AppVersion = truncate(d.Native.AppVersion, maxDeviceTextBytes)
+	}
+	id, err = m.store.CreateSession(ctx, n)
 	if err != nil {
 		return "", 0, err
 	}
@@ -167,6 +194,21 @@ func truncate(s string, n int) string {
 		n--
 	}
 	return s[:n]
+}
+
+// AuthenticateBearer resolves a session token sent in the Authorization
+// header (or the first WebSocket frame) like Authenticate, but accepts only
+// native app sessions: a web session's token lives in an HttpOnly cookie and
+// is never valid as a bearer token.
+func (m *Sessions) AuthenticateBearer(ctx context.Context, token string) (store.Session, error) {
+	s, err := m.Authenticate(ctx, token)
+	if err != nil {
+		return store.Session{}, err
+	}
+	if !s.Native() {
+		return store.Session{}, ErrNoSession
+	}
+	return s, nil
 }
 
 // Authenticate resolves a session token. It also records activity (at most
@@ -248,12 +290,13 @@ func (m *Sessions) CheckGrant(ctx context.Context, sessionID int64) (ran bool, e
 
 func (m *Sessions) runGrantCheck(ctx context.Context, sessionID int64) (ran bool, err error) {
 	var (
-		result store.GrantResult
-		held   string // refresh token in hand after the IdP answered
+		result   store.GrantResult
+		held     string // refresh token in hand after the IdP answered
+		clientID string // IdP client of held
 	)
 	ran, err = m.store.CheckGrant(ctx, sessionID, GrantCheckInterval, func(ctx context.Context, c store.GrantCandidate) store.GrantOutcome {
 		out, rt := m.refreshGrant(ctx, c)
-		result, held = out.Result, rt
+		result, held, clientID = out.Result, rt, c.IdPClientID
 		return out
 	})
 	notApplied := errors.Is(err, store.ErrGrantNotApplied)
@@ -266,7 +309,7 @@ func (m *Sessions) runGrantCheck(ctx context.Context, sessionID int64) (ran bool
 	if held != "" && (notApplied || result == store.GrantEnded) {
 		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orphanRevokeTimeout)
 		defer cancel()
-		if rerr := m.idp.Revoke(rctx, held); rerr != nil {
+		if rerr := m.idp.Revoke(rctx, clientID, held); rerr != nil {
 			m.logger.Warn("IdP revocation of an unstored refresh token failed", "session_id", sessionID, "err", rerr)
 		}
 	}
@@ -288,7 +331,7 @@ func (m *Sessions) refreshGrant(ctx context.Context, c store.GrantCandidate) (st
 		log.Warn("stored refresh token cannot be opened; revoking session")
 		return store.GrantOutcome{Result: store.GrantEnded}, ""
 	}
-	tokens, err := m.idp.Refresh(ctx, string(rt))
+	tokens, err := m.idp.Refresh(ctx, c.IdPClientID, string(rt))
 	retry := store.GrantOutcome{Result: store.GrantRetry, RetryAfter: grantRetryAfter}
 	switch {
 	case errors.Is(err, ErrGrantEnded):
@@ -331,10 +374,12 @@ func (m *Sessions) refreshGrant(ctx context.Context, c store.GrantCandidate) (st
 // Revoke revokes one session of the user and, in the background, its IdP
 // refresh token. store.ErrNotFound when the user has no such session. When
 // ctx is an RPC whose session cookie is the revoked session itself (SignOut)
-// its ID token is kept for /auth/logout; revoked from another session, the
-// ID token is erased too.
+// its ID token is kept for /auth/logout; revoked from another session, or a
+// native session signing out with its bearer token (it has no
+// /auth/logout), the ID token is erased too.
 func (m *Sessions) Revoke(ctx context.Context, userID, sessionID int64) error {
-	r, err := m.store.RevokeSession(ctx, m.tenantID, userID, sessionID, callerTokenHash(ctx))
+	hash, cookie := callerTokenHash(ctx)
+	r, err := m.store.RevokeSession(ctx, m.tenantID, userID, sessionID, hash, cookie)
 	if err != nil {
 		return err
 	}
@@ -422,24 +467,27 @@ func (m *Sessions) EndForLogout(ctx context.Context, token string) (idTokenHint 
 	return string(plain), nil
 }
 
-// callerTokenHash returns the token hash of the session cookie sent with the
-// RPC that ctx belongs to, or nil outside an RPC or without a valid cookie.
-func callerTokenHash(ctx context.Context) []byte {
+// callerTokenHash returns the token hash of the session the RPC that ctx
+// belongs to authenticated with (RequestToken), and whether it came from the
+// cookie; nil outside an RPC or without a well-formed token.
+func callerTokenHash(ctx context.Context) (hash []byte, cookie bool) {
 	info, ok := connect.CallInfoForHandlerContext(ctx)
 	if !ok {
-		return nil
+		return nil, false
 	}
-	hash, ok := hashToken(SessionToken(info.RequestHeader()))
+	token, bearer := RequestToken(info.RequestHeader(), false)
+	hash, ok = hashToken(token)
 	if !ok {
-		return nil
+		return nil, false
 	}
-	return hash
+	return hash, !bearer
 }
 
 // revokeAtIdP revokes the refresh tokens of just-revoked sessions at the IdP
 // in the background (best effort; failures are logged without the token).
 func (m *Sessions) revokeAtIdP(list []store.RevokedSession) {
-	var tokens []string
+	type grant struct{ clientID, token string }
+	var tokens []grant
 	for _, r := range list {
 		if r.RefreshTokenEnc == nil {
 			continue
@@ -449,14 +497,14 @@ func (m *Sessions) revokeAtIdP(list []store.RevokedSession) {
 			m.logger.Warn("stored refresh token cannot be opened; not revoked at IdP", "session_id", r.ID)
 			continue
 		}
-		tokens = append(tokens, string(rt))
+		tokens = append(tokens, grant{clientID: r.IdPClientID, token: string(rt)})
 	}
 	if len(tokens) == 0 {
 		return
 	}
 	m.background(func(ctx context.Context) {
-		for _, rt := range tokens {
-			if err := m.idp.Revoke(ctx, rt); err != nil {
+		for _, g := range tokens {
+			if err := m.idp.Revoke(ctx, g.clientID, g.token); err != nil {
 				m.logger.Warn("IdP token revocation failed", "err", err)
 			}
 		}

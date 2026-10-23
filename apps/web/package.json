@@ -13,15 +13,19 @@
     "brand:gen": "node scripts/brand-gen.ts"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
     "@app/core": "workspace:*",
     "@app/platform": "workspace:*",
     "@app/platform-web": "workspace:*",
     "@app/proto-ts": "workspace:*",
     "@bufbuild/protobuf": "2.16.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
     "@connectrpc/connect": "2.2.0",
     "@connectrpc/connect-web": "2.2.0",
     "@fontsource/inter": "5.3.0",
     "@fontsource/jetbrains-mono": "5.3.0",
+    "@shared-next/capacitor-system-auth": "github:achoo254/shared-next#v0.3.0&path:/packages/capacitor-system-auth",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

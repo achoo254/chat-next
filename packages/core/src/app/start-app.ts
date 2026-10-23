@@ -54,6 +54,11 @@ export interface StartOptions {
 	readonly realtimeUrl: string;
 	readonly appVersion: string;
 	readonly client: ClientKind;
+	/**
+	 * The native app's session token for the realtime hello (ADR 0006); the
+	 * web's socket rides on the HttpOnly cookie instead.
+	 */
+	readonly sessionToken?: string;
 	/** Tenant host or domain; part of the local database name. */
 	readonly tenant: string;
 	/** The user of the last session on this device; skips GetSelf on a warm start. */
@@ -443,6 +448,7 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 			timers: platform.timers,
 			platform: CLIENT_PLATFORMS[options.client],
 			appVersion: options.appVersion,
+			...(options.sessionToken === undefined ? {} : { sessionToken: options.sessionToken }),
 		},
 		{
 			onHello: (hello) => {

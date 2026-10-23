@@ -80,6 +80,10 @@ message GetAuthConfigResponse {
   repeated string scopes = 4;
   // Tenant display name from the IdP (not from brand config).
   string tenant_name = 5;
+  // redirect_uri the native client sends in the authorization request and
+  // again to ExchangeNativeCode (the chat-mobile private-use scheme URI);
+  // empty for the web client, whose redirect the server owns.
+  string redirect_uri = 6;
 }
 
 message ExchangeNativeCodeRequest {

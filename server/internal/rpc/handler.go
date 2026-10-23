@@ -36,8 +36,11 @@ type Deps struct {
 	IdP      *auth.IdP
 	Sessions *auth.Sessions
 	Origins  *auth.Origins
-	Chat     *chat.Service
-	Hooks    *hooks.Service
+	// SignIn runs native sign-in (ExchangeNativeCode) with the web
+	// callback's checks and sign-up limits.
+	SignIn *auth.Routes
+	Chat   *chat.Service
+	Hooks  *hooks.Service
 	// Bots manages bots (BotAdminService, GetBotInfo); BotUpdates carries
 	// button presses to bots and their answers back.
 	Bots       *botadmin.Service
@@ -70,8 +73,8 @@ const compressMinBytes = 1024
 // BotsService, BotAdminService, PushService, FeedbackService and PrivacyService. Every call passes the Origin check, the id-contract check
 // on request and response, and (except public procedures) the session check.
 func NewHandler(d Deps) (http.Handler, error) {
-	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.MiniApp == nil || d.Push == nil || d.Privacy == nil {
-		return nil, errors.New("rpc: chat, hooks, bot, Mini App, push and privacy services are required")
+	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.MiniApp == nil || d.Push == nil || d.Privacy == nil || d.SignIn == nil {
+		return nil, errors.New("rpc: chat, hooks, bot, Mini App, push, privacy and sign-in services are required")
 	}
 	var uploadMax int64
 	if d.Media != nil {
@@ -85,7 +88,7 @@ func NewHandler(d Deps) (http.Handler, error) {
 		connect.WithInterceptors(
 			originInterceptor(d.Origins),
 			idsInterceptor(d.Logger),
-			authInterceptor(d.Sessions, d.Logger),
+			authInterceptor(d.Sessions, d.Origins, d.Logger),
 		),
 		connect.WithReadMaxBytes(maxRequestBytes),
 		// Most answers are a few hundred bytes: gzip costs more CPU than it
@@ -94,7 +97,7 @@ func NewHandler(d Deps) (http.Handler, error) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle(appv1connect.NewAuthServiceHandler(&authService{
-		idp: d.IdP, sessions: d.Sessions, store: d.Store,
+		idp: d.IdP, sessions: d.Sessions, signIn: d.SignIn, store: d.Store,
 		tenantID: d.TenantID, tenantName: d.TenantName, logger: d.Logger,
 	}, opts...))
 	mux.Handle(appv1connect.NewUsersServiceHandler(&usersService{

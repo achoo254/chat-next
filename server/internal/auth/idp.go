@@ -43,6 +43,12 @@ var (
 	ErrRefreshRejected = errors.New("auth: IdP rejected the refresh request")
 	// ErrInvalidToken: an ID or logout token failed verification.
 	ErrInvalidToken = errors.New("auth: invalid token")
+	// ErrCodeRejected: the token endpoint refused an authorization code
+	// (invalid_grant: unknown, used or expired code, wrong PKCE verifier or
+	// redirect_uri). Signing in again helps; retrying the same code does not.
+	ErrCodeRejected = errors.New("auth: IdP rejected the authorization code")
+	// ErrNativeDisabled: no redirect URI is configured for the native client.
+	ErrNativeDisabled = errors.New("auth: native sign-in is not configured")
 )
 
 const (
@@ -56,12 +62,17 @@ const (
 // signingAlgs is the only accepted JWS algorithm for ID and logout tokens.
 var signingAlgs = []string{oidc.ES256}
 
-// IdPConfig configures the web client of one tenant.
+// IdPConfig configures the web client of one tenant, and the native client
+// (MobileClientID, public, PKCE only) when MobileRedirectURL is set.
 type IdPConfig struct {
 	Issuer       string
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
+	// MobileRedirectURL is the private-use scheme redirect of chat-mobile
+	// (e.g. com.hoandat.chat:/auth/callback, the IdP's
+	// CHAT_MOBILE_REDIRECT_URI); empty turns native sign-in off.
+	MobileRedirectURL string
 	// HTTPClient is used for discovery, JWKS and token calls; nil uses a
 	// client with a 15 s timeout.
 	HTTPClient *http.Client
@@ -81,6 +92,10 @@ type idpState struct {
 	oauth          oauth2.Config
 	idVerifier     *oidc.IDTokenVerifier
 	logoutVerifier *oidc.IDTokenVerifier
+	// mobile is the public native client: client_id in the request body, no
+	// secret, ID tokens with aud chat-mobile.
+	mobileOAuth    oauth2.Config
+	mobileVerifier *oidc.IDTokenVerifier
 	authURL        string
 	revocationURL  string
 	endSessionURL  string
@@ -99,6 +114,10 @@ func NewIdP(cfg IdPConfig) *IdP {
 
 // ClientID is the web client id.
 func (p *IdP) ClientID() string { return p.cfg.ClientID }
+
+// MobileRedirectURL is the redirect URI of the native client; "" when native
+// sign-in is off.
+func (p *IdP) MobileRedirectURL() string { return p.cfg.MobileRedirectURL }
 
 // Issuer is the configured issuer.
 func (p *IdP) Issuer() string { return p.cfg.Issuer }
@@ -123,8 +142,17 @@ func (p *IdP) Discover(ctx context.Context) error {
 	}
 	endpoint := provider.Endpoint()
 	endpoint.AuthStyle = oauth2.AuthStyleInHeader // client_secret_basic
+	publicEndpoint := provider.Endpoint()
+	publicEndpoint.AuthStyle = oauth2.AuthStyleInParams // token_endpoint_auth_method none
 	p.state.Store(&idpState{
-		provider: provider,
+		mobileOAuth: oauth2.Config{
+			ClientID:    MobileClientID,
+			Endpoint:    publicEndpoint,
+			RedirectURL: p.cfg.MobileRedirectURL,
+			Scopes:      Scopes,
+		},
+		mobileVerifier: provider.Verifier(&oidc.Config{ClientID: MobileClientID, SupportedSigningAlgs: signingAlgs}),
+		provider:       provider,
 		oauth: oauth2.Config{
 			ClientID:     p.cfg.ClientID,
 			ClientSecret: p.cfg.ClientSecret,
@@ -134,7 +162,9 @@ func (p *IdP) Discover(ctx context.Context) error {
 		},
 		idVerifier: provider.Verifier(&oidc.Config{ClientID: p.cfg.ClientID, SupportedSigningAlgs: signingAlgs}),
 		// Logout tokens need not carry exp; their age is checked from iat.
-		logoutVerifier: provider.Verifier(&oidc.Config{ClientID: p.cfg.ClientID, SupportedSigningAlgs: signingAlgs, SkipExpiryCheck: true}),
+		// Their aud may be the web or the native client: VerifyLogoutToken
+		// checks it against both.
+		logoutVerifier: provider.Verifier(&oidc.Config{SkipClientIDCheck: true, SupportedSigningAlgs: signingAlgs, SkipExpiryCheck: true}),
 		authURL:        endpoint.AuthURL,
 		revocationURL:  extra.RevocationEndpoint,
 		endSessionURL:  extra.EndSessionEndpoint,
@@ -319,15 +349,38 @@ func (p *IdP) Exchange(ctx context.Context, code, verifier string) (Tokens, erro
 	if err != nil {
 		return Tokens{}, err
 	}
-	tok, err := st.oauth.Exchange(p.clientContext(ctx), code, oauth2.VerifierOption(verifier))
+	return p.exchange(ctx, st, &st.oauth, st.idVerifier, code, verifier)
+}
+
+// ExchangeNative redeems a code of the native client (chat-mobile) with its
+// PKCE verifier, like Exchange: the ID token must have aud chat-mobile. The
+// redirect_uri sent is MobileRedirectURL. ErrNativeDisabled when that is
+// not configured; ErrCodeRejected when the IdP refuses the code.
+func (p *IdP) ExchangeNative(ctx context.Context, code, verifier string) (Tokens, error) {
+	if p.cfg.MobileRedirectURL == "" {
+		return Tokens{}, ErrNativeDisabled
+	}
+	st, err := p.ready()
 	if err != nil {
+		return Tokens{}, err
+	}
+	return p.exchange(ctx, st, &st.mobileOAuth, st.mobileVerifier, code, verifier)
+}
+
+func (p *IdP) exchange(ctx context.Context, st *idpState, client *oauth2.Config, verifier *oidc.IDTokenVerifier, code, codeVerifier string) (Tokens, error) {
+	tok, err := client.Exchange(p.clientContext(ctx), code, oauth2.VerifierOption(codeVerifier))
+	if err != nil {
+		var re *oauth2.RetrieveError
+		if errors.As(err, &re) && re.ErrorCode == "invalid_grant" {
+			return Tokens{}, fmt.Errorf("%w: %w", ErrCodeRejected, describeTokenError(err))
+		}
 		return Tokens{}, fmt.Errorf("auth: code exchange: %w", describeTokenError(err))
 	}
 	raw, _ := tok.Extra("id_token").(string)
 	if raw == "" {
 		return Tokens{}, fmt.Errorf("%w: token response has no id_token", ErrInvalidToken)
 	}
-	claims, err := p.verifyIDToken(ctx, st, raw)
+	claims, err := p.verifyIDToken(ctx, verifier, raw)
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -368,8 +421,8 @@ func (p *IdP) userInfo(ctx context.Context, st *idpState, tok *oauth2.Token) (ID
 	return c.profile(info.Subject), nil
 }
 
-func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDClaims, error) {
-	idt, err := st.idVerifier.Verify(p.clientContext(ctx), raw)
+func (p *IdP) verifyIDToken(ctx context.Context, verifier *oidc.IDTokenVerifier, raw string) (IDClaims, error) {
+	idt, err := verifier.Verify(p.clientContext(ctx), raw)
 	if err != nil {
 		return IDClaims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
@@ -396,14 +449,17 @@ func (p *IdP) verifyIDToken(ctx context.Context, st *idpState, raw string) (IDCl
 // stored even when Tokens.ClaimsErr reports that the claims could not be
 // verified. When the response carries an ID token it is verified and its
 // claims are completed from userinfo, which must answer for the same
-// subject; otherwise the claims are read from userinfo alone.
-func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) {
+// subject; otherwise the claims are read from userinfo alone. clientID is
+// the client the refresh token was issued to (the web client or
+// MobileClientID).
+func (p *IdP) Refresh(ctx context.Context, clientID, refreshToken string) (Tokens, error) {
 	st, err := p.ready()
 	if err != nil {
 		return Tokens{}, err
 	}
+	client, verifier := st.client(clientID)
 	cctx := p.clientContext(ctx)
-	tok, err := st.oauth.TokenSource(cctx, &oauth2.Token{RefreshToken: refreshToken}).Token()
+	tok, err := client.TokenSource(cctx, &oauth2.Token{RefreshToken: refreshToken}).Token()
 	if err != nil {
 		var re *oauth2.RetrieveError
 		if errors.As(err, &re) {
@@ -420,7 +476,7 @@ func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) 
 	raw, _ := tok.Extra("id_token").(string)
 	var idClaims IDClaims
 	if raw != "" {
-		if idClaims, err = p.verifyIDToken(ctx, st, raw); err != nil {
+		if idClaims, err = p.verifyIDToken(ctx, verifier, raw); err != nil {
 			out.ClaimsErr = err
 			return out, nil
 		}
@@ -442,6 +498,15 @@ func (p *IdP) Refresh(ctx context.Context, refreshToken string) (Tokens, error) 
 	}
 	out.IDToken, out.Claims = raw, mergeUserInfo(idClaims, info)
 	return out, nil
+}
+
+// client returns the OAuth configuration and ID token verifier of clientID:
+// the native client for MobileClientID, the web client for anything else.
+func (st *idpState) client(clientID string) (*oauth2.Config, *oidc.IDTokenVerifier) {
+	if clientID == MobileClientID {
+		return &st.mobileOAuth, st.mobileVerifier
+	}
+	return &st.oauth, st.idVerifier
 }
 
 // isPermanentClientError reports a 4xx status that retrying will not fix;
@@ -469,8 +534,10 @@ func describeTokenError(err error) error {
 }
 
 // Revoke revokes a refresh token (and with it the grant) at the revocation
-// endpoint. Callers treat it as best effort.
-func (p *IdP) Revoke(ctx context.Context, refreshToken string) error {
+// endpoint, authenticating as clientID, the client the token was issued to
+// (the public native client sends only its client_id). Callers treat it as
+// best effort.
+func (p *IdP) Revoke(ctx context.Context, clientID, refreshToken string) error {
 	st, err := p.ready()
 	if err != nil {
 		return err
@@ -479,12 +546,18 @@ func (p *IdP) Revoke(ctx context.Context, refreshToken string) error {
 		return errors.New("auth: IdP has no revocation_endpoint")
 	}
 	form := url.Values{"token": {refreshToken}, "token_type_hint": {"refresh_token"}}
+	native := clientID == MobileClientID
+	if native {
+		form.Set("client_id", MobileClientID)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, st.revocationURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return fmt.Errorf("auth: revoke: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(url.QueryEscape(p.cfg.ClientID), url.QueryEscape(p.cfg.ClientSecret))
+	if !native {
+		req.SetBasicAuth(url.QueryEscape(p.cfg.ClientID), url.QueryEscape(p.cfg.ClientSecret))
+	}
 	resp, err := p.cfg.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("auth: revoke: %w", err)
@@ -522,6 +595,9 @@ type LogoutClaims struct {
 	Subject   string
 	SessionID string
 	JTI       string
+	// ClientID is the chat client the token is for (its aud): the web client
+	// or MobileClientID.
+	ClientID string
 }
 
 type rawLogoutClaims struct {
@@ -554,6 +630,16 @@ func (p *IdP) VerifyLogoutToken(ctx context.Context, raw string, now time.Time) 
 	if err != nil {
 		return LogoutClaims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
+	clientID := ""
+	for _, aud := range idt.Audience {
+		if aud == p.cfg.ClientID || aud == MobileClientID {
+			clientID = aud
+			break
+		}
+	}
+	if clientID == "" {
+		return LogoutClaims{}, fmt.Errorf("%w: aud is not a chat client", ErrInvalidToken)
+	}
 	var c rawLogoutClaims
 	if err := idt.Claims(&c); err != nil {
 		return LogoutClaims{}, fmt.Errorf("%w: claims: %w", ErrInvalidToken, err)
@@ -578,7 +664,7 @@ func (p *IdP) VerifyLogoutToken(ctx context.Context, raw string, now time.Time) 
 	case idt.Subject == "" && c.SID == "":
 		return LogoutClaims{}, fmt.Errorf("%w: neither sub nor sid", ErrInvalidToken)
 	}
-	return LogoutClaims{Subject: idt.Subject, SessionID: c.SID, JTI: c.JTI}, nil
+	return LogoutClaims{Subject: idt.Subject, SessionID: c.SID, JTI: c.JTI, ClientID: clientID}, nil
 }
 
 // numericDate converts a JWT NumericDate (seconds, possibly fractional).

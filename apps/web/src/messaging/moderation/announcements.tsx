@@ -15,6 +15,7 @@ import { useServices } from "../data/services.tsx";
 import { DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 import { RichText, type RichContext } from "../ui/rich-text.tsx";
 import { useLoad } from "./use-load.ts";
+import { serverHost } from "../../server-origin.ts";
 
 /** Wait after typing before the server parses the text again. */
 const PREVIEW_DELAY_MS = 400;
@@ -47,7 +48,7 @@ export default function Announcements() {
 	const [stopping, setStopping] = useState<ReadonlySet<number>>(new Set());
 	const id = useDomId("announce");
 	const number = new Intl.NumberFormat(locale);
-	const scope = orgDomain(window.location.host);
+	const scope = orgDomain(serverHost());
 
 	// The server parses the text (markdown errors, the formatted preview).
 	const draft = text.trim();

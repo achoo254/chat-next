@@ -34,6 +34,8 @@ type GrantCandidate struct {
 	IdPSub          string
 	TokenHash       []byte
 	RefreshTokenEnc []byte // nil when the IdP issued no refresh token
+	// IdPClientID is the IdP client the refresh token was issued to.
+	IdPClientID string
 }
 
 // GrantResult is what a grant check concluded.
@@ -105,8 +107,8 @@ func (s *Store) claimGrantCheck(ctx context.Context, sessionID int64, interval t
 		WHERE s.id = $1 AND u.id = s.user_id AND `+activeSession+`
 			AND s.idp_checked_at <= now() - $2::interval
 			AND (s.grant_lease_until IS NULL OR s.grant_lease_until <= now())
-		RETURNING s.id, s.tenant_id, s.user_id, u.idp_sub, s.token_hash, s.refresh_token_enc, s.grant_lease_until`,
-		sessionID, interval, GrantLease).Scan(&c.SessionID, &c.TenantID, &c.UserID, &c.IdPSub, &c.TokenHash, &c.RefreshTokenEnc, &lease)
+		RETURNING s.id, s.tenant_id, s.user_id, u.idp_sub, s.token_hash, s.refresh_token_enc, s.idp_client_id, s.grant_lease_until`,
+		sessionID, interval, GrantLease).Scan(&c.SessionID, &c.TenantID, &c.UserID, &c.IdPSub, &c.TokenHash, &c.RefreshTokenEnc, &c.IdPClientID, &lease)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return GrantCandidate{}, time.Time{}, false, nil
 	}

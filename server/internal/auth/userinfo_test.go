@@ -139,7 +139,7 @@ func TestRefreshCompletesClaimsFromUserInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tokens, err := p.Refresh(context.Background(), signIn.RefreshToken)
+	tokens, err := p.Refresh(context.Background(), p.ClientID(), signIn.RefreshToken)
 	if err != nil || tokens.ClaimsErr != nil {
 		t.Fatalf("refresh: %v, claims %v", err, tokens.ClaimsErr)
 	}
@@ -151,7 +151,7 @@ func TestRefreshCompletesClaimsFromUserInfo(t *testing.T) {
 	// the rotated refresh token is still returned.
 	for _, mode := range []idptest.UserInfoMode{idptest.UserInfoServerError, idptest.UserInfoOtherSubject} {
 		fake.SetUserInfo(mode)
-		next, err := p.Refresh(context.Background(), tokens.RefreshToken)
+		next, err := p.Refresh(context.Background(), p.ClientID(), tokens.RefreshToken)
 		if err != nil || next.ClaimsErr == nil || next.RefreshToken == "" || next.Claims.Subject != "" || next.IDToken != "" {
 			t.Fatalf("mode %d: err %v, tokens %+v", mode, err, next)
 		}

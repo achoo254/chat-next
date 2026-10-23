@@ -245,11 +245,11 @@ func TestSessionsLifecycle(t *testing.T) {
 		t.Fatalf("TouchSession of an active session = %+v, %v", st, err)
 	}
 
-	r, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil)
+	r, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil, false)
 	if err != nil || r.ID != id2 || string(r.RefreshTokenEnc) != "rt-two" {
 		t.Fatalf("RevokeSession = %+v, %v", r, err)
 	}
-	if _, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.RevokeSession(ctx, tenant, u.ID, id2, nil, false); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("second revoke err = %v", err)
 	}
 	// The realtime gateway learns of the revocation from TouchSession.
@@ -269,7 +269,7 @@ func TestSessionsLifecycle(t *testing.T) {
 	}
 
 	// Logout hands the ID token out once, even after the session was revoked.
-	if _, err := s.RevokeSession(ctx, tenant, u.ID, id1, hashOf("one")); err != nil {
+	if _, err := s.RevokeSession(ctx, tenant, u.ID, id1, hashOf("one"), true); err != nil {
 		t.Fatal(err)
 	}
 	end, err := s.EndSessionForLogout(ctx, tenant, hashOf("one"))
@@ -300,7 +300,12 @@ func TestBackchannelLogout(t *testing.T) {
 	newSession(t, s, u.ID, "a", "sid-a")
 	newSession(t, s, u.ID, "b", "sid-b")
 	newSession(t, s, u.ID, "c", "sid-c")
+	// Native app sessions signed in from the same IdP browser sessions.
+	newNativeSession(t, s, u.ID, "na", "sid-a")
+	newNativeSession(t, s, u.ID, "nb", "sid-b")
 
+	// A web logout token for sid-a ends the web session only: the app's
+	// per-device grant outlives the browser's IdP session.
 	fresh, n, err := s.BackchannelLogout(ctx, tenant, "chat-web", "jti-1", 10*time.Minute, "sid-a", "acc_b")
 	if err != nil || !fresh || n != 1 {
 		t.Fatalf("by sid = %v, %d, %v", fresh, n, err)
@@ -309,10 +314,33 @@ func TestBackchannelLogout(t *testing.T) {
 	if err != nil || fresh || n != 0 {
 		t.Fatalf("replay = %v, %d, %v", fresh, n, err)
 	}
+	// A token for the native client ends that client's sessions of the sid.
+	fresh, n, err = s.BackchannelLogout(ctx, tenant, "chat-mobile", "jti-3", 10*time.Minute, "sid-a", "acc_b")
+	if err != nil || !fresh || n != 1 {
+		t.Fatalf("native by sid = %v, %d, %v", fresh, n, err)
+	}
+	// Without a sid every session of the subject ends, native ones included.
 	fresh, n, err = s.BackchannelLogout(ctx, tenant, "chat-web", "jti-2", 10*time.Minute, "", "acc_b")
-	if err != nil || !fresh || n != 2 {
+	if err != nil || !fresh || n != 3 {
 		t.Fatalf("by sub = %v, %d, %v", fresh, n, err)
 	}
+	list, err := s.ListActiveSessions(ctx, tenant, u.ID)
+	if err != nil || len(list) != 0 {
+		t.Fatalf("left after logout = %+v, %v", list, err)
+	}
+}
+
+func newNativeSession(t *testing.T, s *store.Store, userID int64, token, sid string) int64 {
+	t.Helper()
+	id, err := s.CreateSession(context.Background(), store.NewSession{
+		TokenHash: hashOf(token), TenantID: tenant, UserID: userID, IdPSID: sid,
+		IdPClientID: "chat-mobile", RefreshTokenEnc: []byte("rt-" + token), IDTokenEnc: []byte("idt-" + token),
+		UserAgent: "test", Platform: store.PlatformIOS, DeviceName: "iPhone", AppVersion: "1.0.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
 }
 
 // makeDue backdates the last grant check of a session by two hours.
@@ -425,7 +453,7 @@ func TestCheckGrantWritesAfterCallerDeadline(t *testing.T) {
 	if err != nil || !ran {
 		t.Fatalf("CheckGrant = %v, %v", ran, err)
 	}
-	r, err := s.RevokeSession(context.Background(), tenant, u.ID, id, nil)
+	r, err := s.RevokeSession(context.Background(), tenant, u.ID, id, nil, false)
 	if err != nil || string(r.RefreshTokenEnc) != "rt-rotated" {
 		t.Fatalf("stored refresh token = %q, %v", r.RefreshTokenEnc, err)
 	}
@@ -445,7 +473,7 @@ func TestCheckGrantHoldsNoLockAndKeepsRevocation(t *testing.T) {
 		if _, err := s.TouchSession(qctx, id, 0); err != nil {
 			t.Errorf("TouchSession during check: %v", err)
 		}
-		if _, err := s.RevokeSession(qctx, tenant, u.ID, id, nil); err != nil {
+		if _, err := s.RevokeSession(qctx, tenant, u.ID, id, nil, false); err != nil {
 			t.Errorf("RevokeSession during check: %v", err)
 		}
 		// A concurrent check finds the session leased.

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings=0 && pnpm check:brand",
-    "check:brand": "check-brand --config brand.config.json --dir apps --dir packages --dir server --dir proto --dir sdk --dir spec --dir deploy --skip-dir gen --banned chat-inet --test-file '/test/|_test\\.go$|\\.test\\.ts$' --hint 'read it from @shared-next/brand'",
+    "check:brand": "check-brand --config brand.config.json --dir apps --dir packages --dir server --dir proto --dir sdk --dir spec --dir deploy --skip-dir gen --ignore-path apps/mobile/www --ignore-path apps/mobile/ios/App/App/public --ignore-path apps/mobile/android/app/src/main/assets/public --banned chat-inet --test-file '/test/|_test\\.go$|\\.test\\.ts$' --hint 'read it from @shared-next/brand'",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "perf": "pnpm --filter @app/web perf",
@@ -17,6 +17,8 @@
     "proto:breaking": "buf breaking proto --against '.git#branch=main,subdir=proto'",
     "proto:gen": "buf generate proto --template proto/buf.gen.yaml",
     "brand:gen": "pnpm --filter @app/web brand:gen",
+    "mobile:build-web": "pnpm --filter @app/mobile build-web",
+    "mobile:sync": "pnpm --filter @app/mobile sync",
     "sdk:gen": "cd server && go run ./cmd/sdkgen",
     "conformance:sdk": "cd server && SDK_CONFORMANCE=1 go test -count=1 -run TestSDKConformance ./internal/api/"
   },

@@ -18,6 +18,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 | [0008 Branding và đặt tên](./adr/0008-branding-and-naming.md) | `brand.config.json` là nguồn duy nhất cho tên, màu, scheme, domain; tên tenant lấy từ IdP. |
 | [0009 Lưu trữ local](./adr/0009-local-storage.md) | SQLCipher trên native, cache không mã hoá trên web, dữ liệu local tách theo `(tenant, user)`. |
 | [0010 Tenant theo domain](./adr/0010-tenants-by-domain.md) | Host `chat.<d>` chọn tenant, `tenant_id` từ migration đầu, Mini App và media trên domain đăng ký riêng. |
+| [0011 Phiên native, bearer và CORS](./adr/0011-native-sessions-bearer-cors.md) | App iOS/Android đổi code qua `ExchangeNativeCode`, xác thực bằng bearer (hello ở `/ws`), CORS và origin WebView chỉ cho bearer, không bao giờ cho cookie. |
 
 Đổi một quyết định: viết ADR mới mang số kế tiếp, ghi ADR cũ là "Bị thay thế bởi ADR NNNN" trong dòng trạng thái, và làm theo mục "Cách thay đổi" của ADR cũ.
 
@@ -30,6 +31,10 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 
 - [Danh mục dữ liệu cá nhân](./privacy/data-inventory.md): dữ liệu app chat giữ, nơi lưu, thời hạn, cơ sở pháp lý (Nghị định 13), xuất và xoá dữ liệu.
 - [Trang chính sách công khai](./privacy/legal-pages-draft.md) (`/privacy`, `/terms`, `/delete-account`): Jev duyệt phát hành 20/10/2026, từng khẳng định kèm nguồn và các mục còn thiếu.
+
+## App mobile
+
+- [App iOS và Android](./mobile-app.md): build, chạy, luồng đăng nhập, khác web và phần chưa làm.
 
 ## Vận hành
 

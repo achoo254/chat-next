@@ -9,6 +9,15 @@ export interface LockManagerLike {
 	request(name: string, options: { mode: "exclusive" }, callback: () => Promise<void>): Promise<void>;
 }
 
+/**
+ * Grants every request at once: for a context without Web Locks (a WebView
+ * of the native app, where the page is the only one), where nobody else can
+ * want the database.
+ */
+export const soloLocks: LockManagerLike = {
+	request: (_name, _options, callback) => callback(),
+};
+
 export class LeaderLock {
 	private releaseHeld: (() => void) | null = null;
 	private released = false;

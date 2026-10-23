@@ -11,6 +11,7 @@ import { useDomId } from "../ui/parts.tsx";
 import { botErrorKind, type OwnBot } from "./api.ts";
 import { useBotsCopy } from "./use-bots-copy.ts";
 import type { BotsCopy } from "./copy-vi.ts";
+import { serverHostname, serverOrigin } from "../../server-origin.ts";
 
 /** Longest Mini App URL the server takes (bot_admin.proto). */
 const URL_MAX = 512;
@@ -81,7 +82,7 @@ export function MiniAppTab({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: OwnBo
 	const formId = useDomId("mini-app");
 	const urlId = useDomId("ma-url");
 	const value = url.trim();
-	const appDomain = appDomainOf(window.location.hostname);
+	const appDomain = appDomainOf(serverHostname());
 	const problem = miniAppUrlProblem(value, appDomain);
 	const shown = problem === null ? serverError : problem === "appDomain" ? t.appDomain(appDomain) : t.urlProblem[problem];
 	const dirty = value !== bot.miniAppUrl;
@@ -169,7 +170,7 @@ export function MiniAppTab({ bot, onSaved }: { bot: OwnBot; onSaved: (bot: OwnBo
 						</li>
 					))}
 					<li>
-						<Coded parts={t.script(`${window.location.origin}${SDK_PATH}`)} />
+						<Coded parts={t.script(`${serverOrigin()}${SDK_PATH}`)} />
 					</li>
 				</ul>
 				<div className="sdk-list">

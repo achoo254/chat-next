@@ -5,6 +5,7 @@
 // generated schemas and the subscription logic (web-push-client.ts) load on
 // the first call.
 import type { Transport } from "@connectrpc/connect";
+import { IS_NATIVE } from "../../server-origin.ts";
 
 export type PushLocale = "vi" | "en";
 
@@ -37,7 +38,16 @@ export interface WebPush {
 
 export const loadWebPushClient = () => import("./web-push-client.ts");
 
+/** The iOS and Android apps have no Web Push (native push is not built yet): the settings hide it. */
+const NO_PUSH: WebPush = {
+	status: async () => ({ kind: "off" }),
+	enable: async () => ({ kind: "off" }),
+	disable: async () => ({ kind: "off" }),
+	sync: async () => undefined,
+};
+
 export function createWebPush(transport: Transport, selfId: number, onUnauthenticated: () => void): WebPush {
+	if (IS_NATIVE) return NO_PUSH;
 	let client: Promise<WebPush> | null = null;
 	const load = (): Promise<WebPush> => {
 		client ??= loadWebPushClient()

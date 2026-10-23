@@ -13,4 +13,4 @@ export {
 	type WebChatOptions,
 	type WorkerLike,
 } from "./client.ts";
-export type { RemoteCore, WorkerConfig } from "./protocol.ts";
+export type { NativeConnection, RemoteCore, WorkerConfig } from "./protocol.ts";

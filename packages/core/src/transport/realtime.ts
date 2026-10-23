@@ -37,6 +37,8 @@ export interface RealtimeOptions {
 	readonly timers: Timers;
 	readonly platform: ClientPlatform;
 	readonly appVersion: string;
+	/** The native app's session token, sent in the hello (it has no cookie); unset on the web. */
+	readonly sessionToken?: string;
 	readonly random?: () => number;
 	readonly backoff?: BackoffPolicy;
 	/** Wait for HelloFrame before giving up on a fresh socket. */
@@ -149,7 +151,7 @@ export class RealtimeConnection {
 					if (!current()) return;
 					this.send({
 						case: "hello",
-						value: { sessionToken: "", platform: this.options.platform, appVersion: this.options.appVersion },
+						value: { sessionToken: this.options.sessionToken ?? "", platform: this.options.platform, appVersion: this.options.appVersion },
 					});
 				},
 				onMessage: (data) => {

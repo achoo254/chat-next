@@ -75,6 +75,19 @@ export interface WorkerConfig {
 	/** User of the previous session in this browser; skips GetSelf on warm start. */
 	readonly userIdHint?: number;
 	readonly foreground: boolean;
+	/** Set in the iOS and Android apps, which reach the server cross-origin with a bearer token. */
+	readonly native?: NativeConnection;
+}
+
+/**
+ * How the native app reaches the server (ADR 0006): the server's origin,
+ * the session token sent as "Authorization: Bearer" and in the realtime
+ * hello (never a cookie), and the platform it reports.
+ */
+export interface NativeConnection {
+	readonly apiOrigin: string;
+	readonly sessionToken: string;
+	readonly client: "ios" | "android";
 }
 
 /** Main thread -> its worker. */

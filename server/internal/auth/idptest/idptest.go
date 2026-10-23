@@ -3,7 +3,9 @@
 // authorize endpoint that immediately redirects back with a code, a token
 // endpoint (authorization_code with PKCE S256 and client_secret_basic, and
 // rotating single-use refresh tokens), revocation, end_session and userinfo.
-// It also signs back-channel logout tokens.
+// It also signs back-channel logout tokens. AllowPublicClient registers a
+// public native client (token_endpoint_auth_method none, client_id in the
+// request body), like hoandat-auth's chat-mobile.
 //
 // Like hoandat-auth, ID tokens carry preferred_username but not the name and
 // email claims, which only the userinfo endpoint returns.
@@ -79,6 +81,7 @@ type Authorize struct {
 }
 
 type codeGrant struct {
+	client    string
 	challenge string
 	nonce     string
 	redirect  string
@@ -107,6 +110,8 @@ type Provider struct {
 	refreshGate   chan struct{}   // non-nil: refresh grants wait for it to close
 	refreshArrive chan struct{}   // receives one value per gated refresh grant
 	refreshTokens map[string]bool // issued token -> still valid
+	tokenClient   map[string]string
+	publicClients map[string]bool
 	userInfoMode  UserInfoMode
 	// accounts is the picker's list (Serve only); nil means the provider
 	// always signs in account.
@@ -167,6 +172,8 @@ func newProvider(clientID, clientSecret string) (*Provider, error) {
 			Email: "tester@example.com", EmailVerified: true,
 		},
 		refreshTokens: map[string]bool{},
+		tokenClient:   map[string]string{},
+		publicClients: map[string]bool{},
 		tokenAccount:  map[string]Account{},
 		accessTokens:  map[string]Account{},
 		codes:         map[string]codeGrant{},
@@ -197,6 +204,28 @@ func (p *Provider) endSession(w http.ResponseWriter, r *http.Request) {
 
 // Issuer is the provider's issuer URL.
 func (p *Provider) Issuer() string { return p.Server.URL }
+
+// AllowPublicClient registers clientID as a public client: it authorizes
+// with PKCE and authenticates at the token and revocation endpoints with
+// its client_id alone; its ID tokens carry aud clientID.
+func (p *Provider) AllowPublicClient(clientID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.publicClients[clientID] = true
+}
+
+// clientOf authenticates the client of a token or revocation request: the
+// confidential client by client_secret_basic, a public client by the
+// client_id form field without credentials. ok is false otherwise.
+func (p *Provider) clientOf(r *http.Request) (string, bool) {
+	if id, secret, basic := r.BasicAuth(); basic {
+		return id, id == p.ClientID && secret == p.ClientSecret
+	}
+	id := r.PostForm.Get("client_id")
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return id, p.publicClients[id] && r.PostForm.Get("client_secret") == ""
+}
 
 // SetAccount changes the user signed in by the next authorization.
 func (p *Provider) SetAccount(a Account) {
@@ -308,7 +337,10 @@ func (p *Provider) authorize(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.authorizes = append(p.authorizes, Authorize{Query: q})
 	p.mu.Unlock()
-	if q.Get("client_id") != p.ClientID || q.Get("response_type") != "code" ||
+	p.mu.Lock()
+	knownClient := q.Get("client_id") == p.ClientID || p.publicClients[q.Get("client_id")]
+	p.mu.Unlock()
+	if !knownClient || q.Get("response_type") != "code" ||
 		q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" || q.Get("redirect_uri") == "" {
 		http.Error(w, "invalid authorization request", http.StatusBadRequest)
 		return
@@ -326,7 +358,7 @@ func (p *Provider) authorize(w http.ResponseWriter, r *http.Request) {
 	}
 	code := randomString()
 	p.mu.Lock()
-	g := codeGrant{challenge: q.Get("code_challenge"), nonce: q.Get("nonce"), redirect: q.Get("redirect_uri"), account: account}
+	g := codeGrant{client: q.Get("client_id"), challenge: q.Get("code_challenge"), nonce: q.Get("nonce"), redirect: q.Get("redirect_uri"), account: account}
 	if q.Get("max_age") != "" {
 		g.authTime = time.Now()
 	}
@@ -386,26 +418,26 @@ func tokenError(w http.ResponseWriter, status int, code string) {
 }
 
 func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
-	id, secret, ok := r.BasicAuth()
-	if !ok || id != p.ClientID || secret != p.ClientSecret {
-		tokenError(w, http.StatusUnauthorized, "invalid_client")
-		return
-	}
 	if err := r.ParseForm(); err != nil {
 		tokenError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
+	client, ok := p.clientOf(r)
+	if !ok {
+		tokenError(w, http.StatusUnauthorized, "invalid_client")
+		return
+	}
 	switch r.PostForm.Get("grant_type") {
 	case "authorization_code":
-		p.codeGrant(w, r)
+		p.codeGrant(w, r, client)
 	case "refresh_token":
-		p.refreshGrant(w, r)
+		p.refreshGrant(w, r, client)
 	default:
 		tokenError(w, http.StatusBadRequest, "unsupported_grant_type")
 	}
 }
 
-func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request) {
+func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request, client string) {
 	code := r.PostForm.Get("code")
 	p.mu.Lock()
 	g, ok := p.codes[code]
@@ -416,7 +448,7 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	p.mu.Unlock()
 	sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
-	if !ok || base64.RawURLEncoding.EncodeToString(sum[:]) != g.challenge || r.PostForm.Get("redirect_uri") != g.redirect {
+	if !ok || g.client != client || base64.RawURLEncoding.EncodeToString(sum[:]) != g.challenge || r.PostForm.Get("redirect_uri") != g.redirect {
 		tokenError(w, http.StatusBadRequest, "invalid_grant")
 		return
 	}
@@ -424,10 +456,10 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request) {
 	if override != nil {
 		nonce = *override
 	}
-	p.issueTokens(w, account, nonce, false, g.authTime)
+	p.issueTokens(w, client, account, nonce, false, g.authTime)
 }
 
-func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
+func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request, client string) {
 	p.mu.Lock()
 	p.refreshCalls++
 	mode, delay, account := p.refreshMode, p.refreshDelay, p.account
@@ -452,7 +484,7 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	rt := r.PostForm.Get("refresh_token")
 	p.mu.Lock()
-	valid := p.refreshTokens[rt]
+	valid := p.refreshTokens[rt] && p.tokenClient[rt] == client
 	// Single use: a replayed token fails (the real IdP also ends the grant).
 	p.refreshTokens[rt] = false
 	if bound, ok := p.tokenAccount[rt]; ok && p.accounts != nil {
@@ -463,22 +495,23 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request) {
 		tokenError(w, http.StatusBadRequest, "invalid_grant")
 		return
 	}
-	p.issueTokens(w, account, "", mode == RefreshBadIDToken, time.Time{})
+	p.issueTokens(w, client, account, "", mode == RefreshBadIDToken, time.Time{})
 }
 
 // issueTokens answers a successful grant with a new refresh token; with
 // foreignKey the ID token is signed by a key outside the JWKS. A non-zero
 // authTime becomes the auth_time claim.
-func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, foreignKey bool, authTime time.Time) {
+func (p *Provider) issueTokens(w http.ResponseWriter, client string, a Account, nonce string, foreignKey bool, authTime time.Time) {
 	rt, at := "rt-"+randomString(), "at-"+randomString()
 	p.mu.Lock()
 	p.refreshTokens[rt] = true
+	p.tokenClient[rt] = client
 	p.tokenAccount[rt] = a
 	p.accessTokens[at] = a
 	p.mu.Unlock()
 	now := time.Now()
 	claims := map[string]any{
-		"iss": p.Issuer(), "aud": p.ClientID, "sub": a.Sub, "sid": a.SID,
+		"iss": p.Issuer(), "aud": client, "sub": a.Sub, "sid": a.SID,
 		"iat": now.Unix(), "exp": now.Add(time.Hour).Unix(),
 		"preferred_username": a.PreferredUsername,
 	}
@@ -509,13 +542,12 @@ func (p *Provider) issueTokens(w http.ResponseWriter, a Account, nonce string, f
 }
 
 func (p *Provider) revoke(w http.ResponseWriter, r *http.Request) {
-	id, secret, ok := r.BasicAuth()
-	if !ok || id != p.ClientID || secret != p.ClientSecret {
-		tokenError(w, http.StatusUnauthorized, "invalid_client")
-		return
-	}
 	if err := r.ParseForm(); err != nil {
 		tokenError(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	if _, ok := p.clientOf(r); !ok {
+		tokenError(w, http.StatusUnauthorized, "invalid_client")
 		return
 	}
 	p.mu.Lock()

@@ -16,9 +16,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Sessions authenticates the session cookie of the handshake.
+// Sessions authenticates the session cookie of the handshake, or the
+// session token a native app sends in its ClientHelloFrame (native sessions
+// only).
 type Sessions interface {
 	Authenticate(ctx context.Context, token string) (store.Session, error)
+	AuthenticateBearer(ctx context.Context, token string) (store.Session, error)
 }
 
 // Toucher records activity of a long-lived session and reports whether it
@@ -80,8 +83,21 @@ func revokedFrame(st store.SessionStatus) ([]byte, error) {
 // cookie, ADR 0006) before upgrading, so a cross-site page can never open a
 // socket on the user's session. Failures answer 403 or 401 without an
 // upgrade; the client then asks an RPC which one it was.
+//
+// The native app's WebView cannot set headers on a WebSocket and holds no
+// cookie: from its origins the socket is upgraded first and authenticated
+// by the session token of the ClientHelloFrame (a native session only); the
+// cookie is never looked at. A cross-site page cannot know that token.
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !g.origins.Allowed(r.Header.Get("Origin")) {
+	origin := r.Header.Get("Origin")
+	if g.origins.Native(origin) {
+		ws, ok := g.accept(w, r)
+		if ok {
+			g.serve(ws, nil)
+		}
+		return
+	}
+	if !g.origins.Allowed(origin) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
@@ -105,28 +121,39 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "account pending deletion", http.StatusForbidden)
 		return
 	}
+	ws, ok := g.accept(w, r)
+	if !ok {
+		return
+	}
+	g.serve(ws, &sess)
+}
+
+// accept upgrades a request whose Origin was checked by the caller.
+func (g *Gateway) accept(w http.ResponseWriter, r *http.Request) (*websocket.Conn, bool) {
 	// The api server's read/write timeouts must not cut a long-lived socket.
 	rc := http.NewResponseController(w)
 	_ = rc.SetReadDeadline(time.Time{})
 	_ = rc.SetWriteDeadline(time.Time{})
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		// Origin was checked above against the exact allowlist.
+		// Origin was checked by the caller against the exact allowlist.
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		return
+		return nil, false
 	}
 	ws.SetReadLimit(readLimitBytes)
-	g.serve(ws, sess)
+	return ws, true
 }
 
-func (g *Gateway) serve(ws *websocket.Conn, sess store.Session) {
+// serve runs an upgraded socket. sess is the session the cookie of the
+// handshake authenticated, or nil for a native app's socket, which is
+// authenticated by the session token of its ClientHelloFrame.
+func (g *Gateway) serve(ws *websocket.Conn, cookieSession *store.Session) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c := &conn{
-		hub: g.hub, ws: ws, userID: sess.UserID, sessionID: sess.ID,
-		send: make(chan []byte, sendQueue), ctrl: make(chan []byte, 1),
-		ctx: ctx, cancel: cancel, visible: map[int64]bool{}, foreground: true,
+	var sessionID int64
+	if cookieSession != nil {
+		sessionID = cookieSession.ID
 	}
 	// The client speaks first: ClientHelloFrame.
 	hctx, hcancel := context.WithTimeout(ctx, helloTimeout)
@@ -134,16 +161,25 @@ func (g *Gateway) serve(ws *websocket.Conn, sess store.Session) {
 	hcancel()
 	if err != nil {
 		if !isNormalClose(err) {
-			g.logger.Warn("websocket closed before hello", "session_id", sess.ID, "err", err)
+			g.logger.Warn("websocket closed before hello", "session_id", sessionID, "err", err)
 		}
 		_ = ws.Close(websocket.StatusPolicyViolation, "hello expected")
 		return
 	}
 	f := &appv1.ClientFrame{}
 	if typ != websocket.MessageBinary || proto.Unmarshal(data, f) != nil || f.GetHello() == nil {
-		g.logger.Warn("websocket first frame is not a hello", "session_id", sess.ID, "binary", typ == websocket.MessageBinary, "bytes", len(data))
+		g.logger.Warn("websocket first frame is not a hello", "session_id", sessionID, "binary", typ == websocket.MessageBinary, "bytes", len(data))
 		_ = ws.Close(websocket.StatusPolicyViolation, "hello expected")
 		return
+	}
+	sess, ok := g.helloSession(ctx, ws, cookieSession, f.GetHello())
+	if !ok {
+		return
+	}
+	c := &conn{
+		hub: g.hub, ws: ws, userID: sess.UserID, sessionID: sess.ID,
+		send: make(chan []byte, sendQueue), ctrl: make(chan []byte, 1),
+		ctx: ctx, cancel: cancel, visible: map[int64]bool{}, foreground: true,
 	}
 	if !g.hub.track() {
 		_ = ws.Close(websocket.StatusTryAgainLater, "server restarting")
@@ -206,12 +242,51 @@ func (g *Gateway) serve(ws *websocket.Conn, sess store.Session) {
 	_ = ws.CloseNow()
 }
 
+// helloSession returns the socket's session: the cookie's, or for a native
+// socket the native session of the hello's token. A native socket without a
+// valid token gets an UNAUTHENTICATED error frame (the client then ends its
+// local session) and is closed; one of an account waiting for deletion is
+// closed like the web handshake refuses it.
+func (g *Gateway) helloSession(ctx context.Context, ws *websocket.Conn, cookieSession *store.Session, hello *appv1.ClientHelloFrame) (store.Session, bool) {
+	if cookieSession != nil {
+		return *cookieSession, true
+	}
+	actx, acancel := context.WithTimeout(ctx, 5*time.Second)
+	sess, err := g.sessions.AuthenticateBearer(actx, hello.GetSessionToken())
+	acancel()
+	switch {
+	case errors.Is(err, auth.ErrNoSession):
+		if b, merr := proto.Marshal(&appv1.ServerFrame{Frame: &appv1.ServerFrame_Error{Error: &appv1.ErrorFrame{
+			Code: appv1.FrameErrorCode_FRAME_ERROR_CODE_UNAUTHENTICATED, Message: "sign-in required",
+		}}}); merr == nil {
+			wctx, wcancel := context.WithTimeout(ctx, writeTimeout)
+			_ = ws.Write(wctx, websocket.MessageBinary, b)
+			wcancel()
+		}
+		_ = ws.Close(websocket.StatusPolicyViolation, "sign-in required")
+		return store.Session{}, false
+	case err != nil:
+		g.logger.Error("websocket authentication failed", "err", err)
+		_ = ws.Close(websocket.StatusTryAgainLater, "try again")
+		return store.Session{}, false
+	case sess.AccountLocked:
+		// Waiting for deletion: no realtime until the user cancels it.
+		_ = ws.Close(websocket.StatusPolicyViolation, "account pending deletion")
+		return store.Session{}, false
+	}
+	return sess, true
+}
+
 // keepSession marks the session active while the socket lives, re-checks
 // it every checkEvery (closing the socket once it is revoked or expired)
-// and closes the socket when the session reaches its maximum age.
+// and closes the socket when a web session reaches its maximum age (native
+// sessions have none).
 func (g *Gateway) keepSession(c *conn, sess store.Session) {
 	expiry := time.NewTimer(time.Until(sess.CreatedAt.Add(store.SessionMaxAge)))
 	defer expiry.Stop()
+	if sess.Native() {
+		expiry.Stop()
+	}
 	check := time.NewTicker(g.checkEvery)
 	defer check.Stop()
 	for {

@@ -275,7 +275,7 @@ func (h *Routes) handleBackchannelLogout(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid logout_token", http.StatusBadRequest)
 		return
 	}
-	fresh, revoked, err := h.cfg.Store.BackchannelLogout(r.Context(), h.cfg.TenantID, h.cfg.IdP.ClientID(),
+	fresh, revoked, err := h.cfg.Store.BackchannelLogout(r.Context(), h.cfg.TenantID, claims.ClientID,
 		claims.JTI, logoutJTITTL, claims.SessionID, claims.Subject)
 	if err != nil {
 		h.cfg.Logger.Error("back-channel logout", "err", err)

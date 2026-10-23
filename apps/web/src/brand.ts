@@ -1,6 +1,7 @@
 // Browser view of brand.config.json, imported through Vite (the build-time
 // loader in brand-files.ts reads it with node:fs and validates it).
 import brandConfig from "../../../brand.config.json";
+import { serverHost } from "./server-origin.ts";
 
 /** What comes before the domain in the web app's host: "chat." of chat.{domain}. */
 const WEB_HOST_PREFIX = brandConfig.hostTemplates.web.replace("{domain}", "");
@@ -41,4 +42,4 @@ export function brandFor(host: string) {
 	} as const;
 }
 
-export const brand = brandFor(typeof location === "undefined" ? "" : location.host);
+export const brand = brandFor(typeof location === "undefined" ? "" : serverHost());

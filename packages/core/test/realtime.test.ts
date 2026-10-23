@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { systemTimers } from "@app/platform";
+import { systemTimers, type SocketFactory } from "@app/platform";
 import { ClientPlatform } from "@app/proto-ts/auth";
 import { backoffDelay, DEFAULT_BACKOFF } from "../src/transport/backoff.ts";
 import { deadAfterMs, RealtimeConnection, type RealtimeHandlers } from "../src/transport/realtime.ts";
@@ -125,5 +125,40 @@ describe("realtime connection", () => {
 		await vi.advanceTimersByTimeAsync(10);
 		expect(handlers.ended).toEqual(["revoked_by_user"]);
 		connection.stop();
+	});
+});
+
+describe("hello", () => {
+	it("carries the native app's session token, and none on the web", async () => {
+		const { fromBinary } = await import("@bufbuild/protobuf");
+		const { ClientFrameSchema } = await import("@app/proto-ts/realtime");
+		const hello = async (sessionToken: string | undefined) => {
+			const sent: Uint8Array[] = [];
+			const socket: SocketFactory = (_url, handlers) => {
+				queueMicrotask(() => handlers.onOpen());
+				return { send: (data) => sent.push(data), close: () => undefined };
+			};
+			const connection = new RealtimeConnection(
+				{
+					url: "wss://chat.example.test/ws",
+					socket,
+					timers: systemTimers,
+					platform: sessionToken === undefined ? ClientPlatform.WEB : ClientPlatform.IOS,
+					appVersion: "1.0.0",
+					...(sessionToken === undefined ? {} : { sessionToken }),
+				},
+				recorder(),
+			);
+			connection.start();
+			await vi.advanceTimersByTimeAsync(0);
+			connection.stop();
+			const first = sent[0];
+			if (first === undefined) throw new Error("no hello sent");
+			const frame = fromBinary(ClientFrameSchema, first).frame;
+			if (frame.case !== "hello") throw new Error(`first frame is ${frame.case}`);
+			return frame.value;
+		};
+		expect(await hello("tok-1")).toMatchObject({ sessionToken: "tok-1", platform: ClientPlatform.IOS, appVersion: "1.0.0" });
+		expect((await hello(undefined)).sessionToken).toBe("");
 	});
 });

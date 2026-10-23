@@ -24,12 +24,14 @@ cd server && go vet ./... && go test -race ./...
 | `pnpm e2e [lọc]` | E2E nhiều người dùng trên máy dev (không cần Docker): `server/cmd/e2e-stack` dựng Postgres tạm, IdP giả cho chọn tài khoản An, Bình, Chi, Dũng và API thật; Vite ở 5173; Playwright mở mỗi người một trình duyệt và chạy `apps/web/test/e2e/*.e2e.ts`. DB mới mỗi lần chạy; bước lỗi lưu ảnh chụp mỗi người vào `$TMPDIR/chat-e2e-shots`. `POST http://127.0.0.1:4600/e2e/realtime?state=down` (hoặc `up`) cắt mọi WebSocket và từ chối kết nối mới (hoặc mở lại), để thử trạng thái mất kết nối |
 | `pnpm e2e --serve` | Chỉ dựng môi trường đó và giữ chạy, để tự chat với chính mình bằng nhiều profile trình duyệt (Ctrl+C để dừng) |
 | `pnpm brand:gen` | Kiểm `brand.config.json` theo schema của `@shared-next/brand`, sinh manifest web, Capacitor và icon PNG/ICO (favicon, Apple touch, manifest 192/512, maskable) từ `brand/icon.svg`, `brand/icon-maskable.svg` vào `brand/generated/` (dùng Chromium của Playwright), và bản sao tên cho server Go (`server/internal/brand/brand.json`). Script `apps/web/scripts/brand-gen.ts`; tùy chọn của chat ở `apps/web/brand-files.ts`. Chạy lại sau khi sửa brand hoặc logo |
+| `pnpm mobile:build-web` / `pnpm mobile:sync` | Build web app ở chế độ native (`VITE_NATIVE=true`) vào `apps/mobile/www`, rồi `cap sync` cho iOS và Android ([`docs/mobile-app.md`](docs/mobile-app.md)) |
 
 ## Cấu trúc
 
 | Đường dẫn | Nội dung |
 |---|---|
 | `apps/web` | Web app React 19 + Vite, gọi server qua Connect RPC (`/rpc`) |
+| `apps/mobile` | Vỏ Capacitor 8 cho iOS (SPM) và Android, bọc bản build native của `apps/web` ([`docs/mobile-app.md`](docs/mobile-app.md)) |
 | `proto/app/v1/` | Contract client ↔ server, mỗi domain một file |
 | `packages/core` | Fold tiếng Việt, ID, entities (dùng chung cho mọi client) |
 | `brand/generated` | File sinh từ brand (`pnpm brand:gen`), không sửa tay. Mã thương hiệu (schema, kiểm config, sinh manifest/icon, `check-brand`) nằm ở gói dùng chung [`@shared-next/brand`](https://github.com/achoo254/shared-next), cài từ tag git trong `package.json` |

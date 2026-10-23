@@ -207,7 +207,11 @@ type GetAuthConfigResponse struct {
 	AuthorizationEndpoint string                 `protobuf:"bytes,3,opt,name=authorization_endpoint,json=authorizationEndpoint,proto3" json:"authorization_endpoint,omitempty"`
 	Scopes                []string               `protobuf:"bytes,4,rep,name=scopes,proto3" json:"scopes,omitempty"`
 	// Tenant display name from the IdP (not from brand config).
-	TenantName    string `protobuf:"bytes,5,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
+	TenantName string `protobuf:"bytes,5,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
+	// redirect_uri the native client sends in the authorization request and
+	// again to ExchangeNativeCode (the chat-mobile private-use scheme URI);
+	// empty for the web client, whose redirect the server owns.
+	RedirectUri   string `protobuf:"bytes,6,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -273,6 +277,13 @@ func (x *GetAuthConfigResponse) GetScopes() []string {
 func (x *GetAuthConfigResponse) GetTenantName() string {
 	if x != nil {
 		return x.TenantName
+	}
+	return ""
+}
+
+func (x *GetAuthConfigResponse) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
 	}
 	return ""
 }
@@ -853,14 +864,15 @@ const file_app_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"\x11app/v1/auth.proto\x12\x06app.v1\x1a\x12app/v1/users.proto\"J\n" +
 	"\x14GetAuthConfigRequest\x122\n" +
-	"\bplatform\x18\x01 \x01(\x0e2\x16.app.v1.ClientPlatformR\bplatform\"\xbc\x01\n" +
+	"\bplatform\x18\x01 \x01(\x0e2\x16.app.v1.ClientPlatformR\bplatform\"\xdf\x01\n" +
 	"\x15GetAuthConfigResponse\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x1b\n" +
 	"\tclient_id\x18\x02 \x01(\tR\bclientId\x125\n" +
 	"\x16authorization_endpoint\x18\x03 \x01(\tR\x15authorizationEndpoint\x12\x16\n" +
 	"\x06scopes\x18\x04 \x03(\tR\x06scopes\x12\x1f\n" +
 	"\vtenant_name\x18\x05 \x01(\tR\n" +
-	"tenantName\"\xfe\x01\n" +
+	"tenantName\x12!\n" +
+	"\fredirect_uri\x18\x06 \x01(\tR\vredirectUri\"\xfe\x01\n" +
 	"\x19ExchangeNativeCodeRequest\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12#\n" +
 	"\rcode_verifier\x18\x02 \x01(\tR\fcodeVerifier\x12!\n" +

@@ -26,5 +26,9 @@ export type MessagingConnector = (options: MessagingConnectorOptions) => Messagi
 /** The production connector, loaded on first use. */
 export const webConnector: MessagingConnector = async (options) => {
 	const { connectWebChat } = await import("./web-client.ts");
+	if (import.meta.env.VITE_NATIVE === "true") {
+		const native = await import("../../native/native-app.ts");
+		return connectWebChat(options, native.nativeChatOptions());
+	}
 	return connectWebChat(options);
 };

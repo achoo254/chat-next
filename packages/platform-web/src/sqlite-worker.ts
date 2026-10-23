@@ -5,10 +5,18 @@
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { createRemoteApi, SessionEndedError, startApp, type ChatCore } from "@app/core";
 import { cryptoRandomId, systemTimers, type Platform } from "@app/platform";
-import { openSahpoolFactory } from "./driver.ts";
+import { openMemoryFactory, openSahpoolFactory } from "./driver.ts";
 import { LeaderLock } from "./leader.ts";
+import { nativeLocks, openLocalDatabase } from "./local-database.ts";
 import { cacheBlobStores, canvasImageProbe, fetchHttp } from "./media-platform.ts";
-import { serializeError, type CoreMethod, type FromWorker, type ToWorker, type WorkerConfig } from "./protocol.ts";
+import {
+	serializeError,
+	type CoreMethod,
+	type FromWorker,
+	type NativeConnection,
+	type ToWorker,
+	type WorkerConfig,
+} from "./protocol.ts";
 import { TabHub, type LeaderCore } from "./tab-hub.ts";
 import { RelayedLifecycle, webSocketFactory } from "./worker-platform.ts";
 
@@ -51,20 +59,44 @@ async function withRetries<T>(run: () => Promise<T>, attempts: number, delayMs: 
 	}
 }
 
+/** Whether this worker has what opfs-sahpool needs (OPFS with sync access handles). */
+function opfsAvailable(): boolean {
+	return typeof navigator.storage?.getDirectory === "function" && "FileSystemSyncAccessHandle" in globalThis;
+}
+
+/** fetch for /rpc: the session cookie on the web, the bearer token (and no cookie) in the native app. */
+function rpcFetch(native: NativeConnection | undefined): typeof fetch {
+	if (native === undefined) return (input, init) => fetch(input, { ...init, credentials: "same-origin" });
+	return (input, init) => {
+		const headers = new Headers(init?.headers);
+		if (native.sessionToken !== "") headers.set("Authorization", `Bearer ${native.sessionToken}`);
+		return fetch(input, { ...init, headers, credentials: "omit" });
+	};
+}
+
 function startHub(config: WorkerConfig): TabHub {
 	const host = location.host;
+	const native = config.native;
+	const origin = native?.apiOrigin ?? location.origin;
 	const lifecycle = new RelayedLifecycle(config.foreground);
+	const reportError = (context: string) => (err: unknown) => post({ type: "error", context, message: serializeError(err).message });
 	const hub: TabHub = new TabHub({
 		tabId: crypto.randomUUID(),
 		channel: new BroadcastChannel(`chat-core:${host}`),
-		lock: new LeaderLock(navigator.locks, `chat-core-leader:${host}`),
+		lock: new LeaderLock(native === undefined ? navigator.locks : nativeLocks(navigator.locks), `chat-core-leader:${host}`),
 		startLeader: async (): Promise<LeaderCore> => {
-			const sql = await withRetries(() => openSahpoolFactory(), 5, 300);
+			const sql = await openLocalDatabase({
+				native: native !== undefined,
+				opfsAvailable: opfsAvailable(),
+				openPool: () => withRetries(() => openSahpoolFactory(), 5, 300),
+				openMemory: openMemoryFactory,
+				report: reportError("local database"),
+			});
 			const api = createRemoteApi(
 				createConnectTransport({
-					baseUrl: `${location.origin}/rpc`,
+					baseUrl: `${origin}/rpc`,
 					useBinaryFormat: true,
-					fetch: (input, init) => fetch(input, { ...init, credentials: "same-origin" }),
+					fetch: rpcFetch(native),
 				}),
 			);
 			const blobs = cacheBlobStores();
@@ -90,8 +122,10 @@ function startHub(config: WorkerConfig): TabHub {
 				api,
 				realtimeUrl: config.realtimeUrl,
 				appVersion: config.appVersion,
-				client: "web",
-				tenant: host,
+				client: native?.client ?? "web",
+				// Part of the local database name: the server's host, so data of two tenants never mix.
+				tenant: new URL(origin).host,
+				...(native === undefined ? {} : { sessionToken: native.sessionToken }),
 				...(config.userIdHint === undefined ? {} : { userIdHint: config.userIdHint }),
 				onSessionEnded: (reason) => hub.broadcastEnded(reason),
 				onError: (err, context) => post({ type: "error", context, message: serializeError(err).message }),

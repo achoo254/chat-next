@@ -59,6 +59,8 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 	const [attempt, setAttempt] = useState(0);
 	const signedOut = useCallback(() => {
 		forgetSelf();
+		// The app's session token is gone with the session (revoked, expired, signed out elsewhere).
+		if (import.meta.env.VITE_NATIVE === "true") void import("./native/native-app.ts").then((native) => native.forgetSession());
 		setBoot({ status: "signedOut" });
 	}, []);
 	const transport = useMemo(() => createWebTransport(rpcFetch), [rpcFetch]);

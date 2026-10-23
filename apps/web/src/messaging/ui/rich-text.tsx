@@ -11,6 +11,7 @@ import { useCopy } from "../copy/use-copy.ts";
 import { hostOf, isTrustedHost } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
 import { copyText } from "./parts.tsx";
+import { serverHost, serverOrigin } from "../../server-origin.ts";
 
 const APP_SCHEME = brand.urlScheme;
 
@@ -266,12 +267,12 @@ export function inAppBotLink(url: string, origin: string): string | null {
 export function linkOpener(ask: (url: string, shown: string) => void): (url: string, shown?: string) => void {
 	return (url, shown = "") => {
 		if (!isAllowedUrl(url, APP_SCHEME)) return;
-		const botLink = inAppBotLink(url, window.location.origin);
+		const botLink = inAppBotLink(url, serverOrigin());
 		if (botLink !== null) {
 			navigate(botLink);
 			return;
 		}
-		if (url.startsWith("mailto:") || isTrustedHost(hostOf(url), window.location.host)) {
+		if (url.startsWith("mailto:") || isTrustedHost(hostOf(url), serverHost())) {
 			window.open(url, "_blank", "noopener,noreferrer");
 			return;
 		}
@@ -286,7 +287,7 @@ export function linkOpener(ask: (url: string, shown: string) => void): (url: str
  */
 export function laterLinkOpener(open: (url: string) => void): (url: string) => void {
 	return (url) => {
-		const local = isAllowedUrl(url, APP_SCHEME) ? inAppPath(url, window.location.origin) : null;
+		const local = isAllowedUrl(url, APP_SCHEME) ? inAppPath(url, serverOrigin()) : null;
 		if (local !== null) navigate(local);
 		else open(url);
 	};

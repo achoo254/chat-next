@@ -1,19 +1,25 @@
 // Production client: the core runs in this tab's worker (@app/platform-web)
-// and talks to the realtime gateway at same-origin /ws. Loaded lazily with
-// the messaging chunk, so the R0 shell never downloads the worker.
+// and talks to the realtime gateway at same-origin /ws (the native app: the
+// server's /ws, with its bearer token). Loaded lazily with the messaging
+// chunk, so the R0 shell never downloads the worker.
 import { realtimeUrlFor } from "@app/core";
-import { createWebChat } from "@app/platform-web";
+import { createWebChat, type WebChatOptions } from "@app/platform-web";
 import ChatWorker from "@app/platform-web/worker?worker";
 import type { MessagingClient, MessagingConnectorOptions } from "./connector.ts";
 import { ServerBackend } from "./server-backend.ts";
+import { serverOrigin } from "../../server-origin.ts";
 
 const APP_VERSION = "web-r1";
 
-export function connectWebChat(options: MessagingConnectorOptions): MessagingClient {
+/** What the native app adds: its server connection, sign-out ending and foreground source. */
+export type NativeChatOptions = Pick<WebChatOptions, "native" | "leave" | "onForegroundChange" | "appVersion">;
+
+export function connectWebChat(options: MessagingConnectorOptions, native?: NativeChatOptions): MessagingClient {
 	const chat = createWebChat({
 		createWorker: () => new ChatWorker(),
-		realtimeUrl: realtimeUrlFor(window.location.origin),
+		realtimeUrl: realtimeUrlFor(serverOrigin()),
 		appVersion: APP_VERSION,
+		...native,
 		onSessionEnded: options.onSessionEnded,
 		onNotificationClick: options.onNotificationClick,
 		filterNotification: options.filterNotification,

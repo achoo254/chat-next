@@ -1,0 +1,85 @@
+# Builds the Capacitor apps (apps/mobile, docs/mobile-app.md) whenever the
+# web app, the shared packages, the brand or the native projects change: a
+# debug APK (uploaded as an artifact to install by hand) and an unsigned iOS
+# Simulator build. Nothing here signs or publishes, and no secret is used.
+name: mobile
+
+on:
+  push:
+    branches: [main]
+    paths: &mobile-paths
+      - "apps/**"
+      - "packages/**"
+      - "brand/**"
+      - "brand.config.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/mobile.yml"
+  pull_request:
+    paths: *mobile-paths
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      # Capacitor 8 builds with JDK 21; the runner's Android SDK is used as is.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            apps/mobile/android/*.gradle*
+            apps/mobile/android/app/*.gradle*
+            apps/mobile/android/gradle/wrapper/gradle-wrapper.properties
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm mobile:build-web
+      - run: pnpm --filter @app/mobile exec cap sync android
+      - name: assemble debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm mobile:build-web
+      - run: pnpm --filter @app/mobile exec cap sync ios
+      # Unsigned Simulator build: proves the project, the Swift packages of
+      # the plugins and the bundle build together. Signing and TestFlight
+      # need the App Store Connect app record and keys (docs/mobile-app.md).
+      - name: build for the iOS Simulator
+        working-directory: apps/mobile/ios/App
+        run: >
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/DerivedData"
+          CODE_SIGNING_ALLOWED=NO build

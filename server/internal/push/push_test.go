@@ -279,7 +279,7 @@ func TestRegister(t *testing.T) {
 		t.Fatalf("another user's session: %v", err)
 	}
 	// Revoking the session deletes its subscription.
-	if _, err := e.Store.RevokeSession(ctx, bottest.TenantID, an, newer, nil); err != nil {
+	if _, err := e.Store.RevokeSession(ctx, bottest.TenantID, an, newer, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.Store.Pool().QueryRow(ctx, `SELECT count(*) FROM push_subscriptions WHERE user_id = $1`, an).Scan(&n); err != nil {

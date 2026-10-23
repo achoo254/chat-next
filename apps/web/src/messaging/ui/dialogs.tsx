@@ -21,6 +21,7 @@ import { ChatAvatar, copyText, CopyButton, DialogHead, Modal, useDomId } from ".
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
 import { usePrivateChatFailure } from "./private-chat-failure.ts";
+import { serverHost, serverHostname } from "../../server-origin.ts";
 
 interface CloseProps {
 	onClose: () => void;
@@ -145,7 +146,7 @@ export function LinkDialog({ url, text, fromId, onClose }: CloseProps & { url: s
 	const { store, toasts } = useServices();
 	const sender = useUser(fromId === store.selfId ? 0 : fromId);
 	const id = useDomId("link");
-	const domain = orgDomain(window.location.host);
+	const domain = orgDomain(serverHost());
 	const claimed = shownHost(text);
 	const mismatch = claimed !== "" && claimed.replace(/^www\./, "") !== hostOf(url).toLowerCase().replace(/^www\./, "");
 	const t = copy.link;
@@ -268,7 +269,7 @@ export function ReportDialog({ target, name, blockUserId, onClose }: ReportProps
 						<Icon name="check" />
 					</span>
 					<h2 id={id}>{copy.report.doneTitle}</h2>
-					<p className="muted">{copy.report.doneBody(window.location.hostname.replace(/^chat\./, ""))}</p>
+					<p className="muted">{copy.report.doneBody(serverHostname().replace(/^chat\./, ""))}</p>
 					{done.blocked && <p className="muted">{copy.report.doneBlocked(name)}</p>}
 					<button type="button" className="btn btn-primary" onClick={onClose}>
 						{copy.common.done}

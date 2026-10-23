@@ -71,11 +71,15 @@ func errUnauthenticated() error {
 // every call; a streaming service would need streaming interceptors too.
 
 // originInterceptor rejects every call whose Origin header is not in the
-// allowlist (CSRF defence together with the SameSite=Strict cookie).
+// allowlist (CSRF defence together with the SameSite=Strict cookie) or one
+// of the native app's origins. A call from a native origin never
+// authenticates with the cookie (auth.RequestToken), only with a bearer
+// token, which a cross-site page cannot attach.
 func originInterceptor(origins *auth.Origins) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			if !origins.Allowed(req.Header().Get("Origin")) {
+			origin := req.Header().Get("Origin")
+			if !origins.Allowed(origin) && !origins.Native(origin) {
 				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("origin not allowed"))
 			}
 			return next(ctx, req)
@@ -108,23 +112,28 @@ func idsInterceptor(logger *slog.Logger) connect.UnaryInterceptorFunc {
 	}
 }
 
-// authInterceptor resolves the session cookie into the caller's session.
-// Authenticate also schedules the hourly IdP grant check.
-func authInterceptor(sessions *auth.Sessions, logger *slog.Logger) connect.UnaryInterceptorFunc {
+// authInterceptor resolves the caller's session: a native app's bearer
+// token, otherwise the web session cookie (never the cookie for a call from
+// a native origin). Authenticate also schedules the hourly IdP grant check.
+func authInterceptor(sessions *auth.Sessions, origins *auth.Origins, logger *slog.Logger) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			procedure := req.Spec().Procedure
 			if publicProcedures[procedure] {
 				return next(ctx, req)
 			}
-			token := auth.SessionToken(req.Header())
+			token, bearer := auth.RequestToken(req.Header(), origins.Native(req.Header().Get("Origin")))
 			if token == "" {
 				if signedOutProcedures[procedure] {
 					return next(ctx, req)
 				}
 				return nil, errUnauthenticated()
 			}
-			s, err := sessions.Authenticate(ctx, token)
+			authenticate := sessions.Authenticate
+			if bearer {
+				authenticate = sessions.AuthenticateBearer
+			}
+			s, err := authenticate(ctx, token)
 			if errors.Is(err, auth.ErrNoSession) {
 				if signedOutProcedures[procedure] {
 					return next(ctx, req)

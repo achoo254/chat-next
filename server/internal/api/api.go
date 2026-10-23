@@ -101,8 +101,10 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		ClientID:     cfg.OIDCClientID,
 		ClientSecret: cfg.OIDCClientSecret,
 		RedirectURL:  publicOrigin + "/auth/callback",
-		HTTPClient:   httpClient,
-		Logger:       logger,
+		// One app for every tenant: its scheme is the brand's (ADR 0006).
+		MobileRedirectURL: cfg.MobileRedirectURL(),
+		HTTPClient:        httpClient,
+		Logger:            logger,
 	})
 	sessions, err := auth.NewSessions(st, idp, cfg.SessionKey, cfg.SessionKeyPrevious, cfg.TenantID, logger)
 	if err != nil {
@@ -221,7 +223,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		chatSvc.SetNotifier(assistantSvc)
 	}
 	rpcHandler, err := rpc.NewHandler(rpc.Deps{
-		Store: st, IdP: idp, Sessions: sessions, Origins: origins, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
+		Store: st, IdP: idp, Sessions: sessions, Origins: origins, SignIn: routes, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
 		Bots: botAdmin, BotUpdates: botUpdates, MiniApp: miniAppSigner, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
 		TenantName: cfg.TenantDomain, Logger: logger,
 	})
@@ -235,7 +237,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz(st))
 	routes.Register(mux)
-	mux.Handle("/rpc/", http.StripPrefix("/rpc", rpcHandler))
+	// The native app calls /rpc cross-origin from its WebView (ADR 0011).
+	mux.Handle("/rpc/", auth.NativeCORS(origins, http.StripPrefix("/rpc", rpcHandler)))
 	mux.Handle("GET /ws", ws)
 	for _, route := range hooks.Routes {
 		mux.Handle(route, hookSvc)

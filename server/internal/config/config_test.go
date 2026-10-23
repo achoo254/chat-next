@@ -372,3 +372,20 @@ func TestLoadMaxOnlineUsers(t *testing.T) {
 		t.Fatalf("negative: %v", err)
 	}
 }
+
+func TestLoadNativeSignIn(t *testing.T) {
+	env := validEnv()
+	c, err := Load(lookupFrom(env))
+	if err != nil || c.MobileRedirectURL() != DefaultAppURLScheme+":/auth/callback" {
+		t.Fatalf("default: %q, %v", c.MobileRedirectURL(), err)
+	}
+	env["NATIVE_SIGN_IN"] = "off"
+	c, err = Load(lookupFrom(env))
+	if err != nil || c.MobileRedirectURL() != "" {
+		t.Fatalf("off: %q, %v", c.MobileRedirectURL(), err)
+	}
+	env["NATIVE_SIGN_IN"] = "maybe"
+	if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "NATIVE_SIGN_IN") {
+		t.Fatalf("invalid value: %v", err)
+	}
+}

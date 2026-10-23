@@ -25,12 +25,12 @@ func isNewLogin(createdAt, now time.Time, current bool) bool {
 	return !current && now.Sub(createdAt) < newLoginWindow
 }
 
-// authService implements AuthService. ExchangeNativeCode stays
-// Unimplemented until native clients ship.
+// authService implements AuthService.
 type authService struct {
 	appv1connect.UnimplementedAuthServiceHandler
 	idp        *auth.IdP
 	sessions   *auth.Sessions
+	signIn     *auth.Routes
 	store      *store.Store
 	tenantID   string
 	tenantName string
@@ -44,19 +44,100 @@ func (s *authService) GetAuthConfig(_ context.Context, req *connect.Request[appv
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("sign-in is temporarily unavailable"))
 	}
-	clientID := s.idp.ClientID()
-	switch req.Msg.GetPlatform() {
-	case appv1.ClientPlatform_CLIENT_PLATFORM_IOS, appv1.ClientPlatform_CLIENT_PLATFORM_ANDROID:
-		clientID = auth.MobileClientID
-	default:
-		// Web, unspecified and the retired desktop value use the web client.
+	clientID, redirectURI := s.idp.ClientID(), ""
+	if nativePlatform(req.Msg.GetPlatform()) {
+		if s.idp.MobileRedirectURL() == "" {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("native_sign_in_disabled: this server has no native app sign-in"))
+		}
+		clientID, redirectURI = auth.MobileClientID, s.idp.MobileRedirectURL()
 	}
+	// Web, unspecified and the retired desktop value use the web client.
 	return connect.NewResponse(&appv1.GetAuthConfigResponse{
 		Issuer:                s.idp.Issuer(),
 		ClientId:              clientID,
 		AuthorizationEndpoint: endpoint,
 		Scopes:                auth.Scopes,
 		TenantName:            s.tenantName,
+		RedirectUri:           redirectURI,
+	}), nil
+}
+
+// nativePlatform reports the platforms of the native app (chat-mobile).
+func nativePlatform(p appv1.ClientPlatform) bool {
+	return p == appv1.ClientPlatform_CLIENT_PLATFORM_IOS || p == appv1.ClientPlatform_CLIENT_PLATFORM_ANDROID
+}
+
+// Bounds of ExchangeNativeCode fields.
+const (
+	maxCodeBytes = 2048
+	// RFC 7636 §4.1: 43 to 128 unreserved characters.
+	minVerifierLen = 43
+	maxVerifierLen = 128
+)
+
+// validVerifier reports a PKCE code_verifier of RFC 7636 §4.1 form.
+func validVerifier(v string) bool {
+	if len(v) < minVerifierLen || len(v) > maxVerifierLen {
+		return false
+	}
+	for _, c := range v {
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-', c == '.', c == '_', c == '~':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// ExchangeNativeCode redeems the authorization code the native app got
+// back from the system browser (Code + PKCE with chat-mobile) and issues a
+// native session: the app keeps the returned token in the platform secure
+// store and sends it as "Authorization: Bearer". A bearer token sent with
+// this call names the app's current session, which the new one replaces
+// (signing in again to confirm a sensitive action).
+func (s *authService) ExchangeNativeCode(ctx context.Context, req *connect.Request[appv1.ExchangeNativeCodeRequest]) (*connect.Response[appv1.ExchangeNativeCodeResponse], error) {
+	m := req.Msg
+	platform := int16(m.GetPlatform())
+	switch {
+	case !nativePlatform(m.GetPlatform()):
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("platform must be IOS or ANDROID"))
+	case m.GetCode() == "" || len(m.GetCode()) > maxCodeBytes:
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("code is required"))
+	case !validVerifier(m.GetCodeVerifier()):
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("code_verifier must be 43 to 128 unreserved characters (RFC 7636)"))
+	}
+	out, err := s.signIn.SignInNative(ctx, auth.NativeSignIn{
+		Code: m.GetCode(), Verifier: m.GetCodeVerifier(), RedirectURI: m.GetRedirectUri(),
+		Device:    auth.NativeDevice{Platform: platform, DeviceName: m.GetDeviceName(), AppVersion: m.GetAppVersion()},
+		UserAgent: req.Header().Get("User-Agent"), IP: auth.ClientIP(req.Peer().Addr, req.Header()),
+		ReplacesToken: auth.BearerToken(req.Header()),
+	})
+	switch {
+	case errors.Is(err, auth.ErrRedirectMismatch):
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("redirect_uri does not match the native client"))
+	case errors.Is(err, auth.ErrNativeDisabled):
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("native_sign_in_disabled: this server has no native app sign-in"))
+	case errors.Is(err, auth.ErrIdPUnavailable):
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("sign-in is temporarily unavailable"))
+	case errors.Is(err, auth.ErrCodeRejected), errors.Is(err, auth.ErrInvalidToken):
+		s.logger.Warn("native sign-in rejected", "err", err)
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("sign_in_failed: the sign-in did not complete; start it again"))
+	case errors.Is(err, store.ErrSignupLimited):
+		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("signup_limited: too many new accounts; try again later"))
+	case err != nil && ctx.Err() != nil:
+		// The app hung up: logged at Debug, answered Canceled.
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
+	case err != nil:
+		// The token endpoint could not be reached, or the database failed:
+		// the app may retry with a new sign-in.
+		s.logger.Error("native sign-in failed", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("sign-in is temporarily unavailable"))
+	}
+	return connect.NewResponse(&appv1.ExchangeNativeCodeResponse{
+		SessionToken: out.Token,
+		SessionId:    out.SessionID,
+		User:         selfUser(out.User),
 	}), nil
 }
 
@@ -89,10 +170,15 @@ func (s *authService) ListSessions(ctx context.Context, req *connect.Request[app
 	out := make([]*appv1.Session, 0, len(list))
 	for _, x := range list {
 		current := x.ID == sess.ID
+		device := DeviceName(x.UserAgent)
+		if x.Native() && x.DeviceName != "" {
+			device = x.DeviceName
+		}
 		out = append(out, &appv1.Session{
 			Id:           x.ID,
-			Platform:     s.platformOf(x.IdPClientID),
-			DeviceName:   DeviceName(x.UserAgent),
+			Platform:     platformOf(x),
+			DeviceName:   device,
+			AppVersion:   x.AppVersion,
 			CreatedAt:    x.CreatedAt.Unix(),
 			LastActiveAt: x.LastSeenAt.Unix(),
 			Current:      current,
@@ -102,13 +188,15 @@ func (s *authService) ListSessions(ctx context.Context, req *connect.Request[app
 	return connect.NewResponse(&appv1.ListSessionsResponse{Sessions: out}), nil
 }
 
-func (s *authService) platformOf(clientID string) appv1.ClientPlatform {
-	switch clientID {
-	case s.idp.ClientID():
-		return appv1.ClientPlatform_CLIENT_PLATFORM_WEB
+// platformOf is the platform a session signed in from.
+func platformOf(x store.Session) appv1.ClientPlatform {
+	switch x.Platform {
+	case store.PlatformIOS:
+		return appv1.ClientPlatform_CLIENT_PLATFORM_IOS
+	case store.PlatformAndroid:
+		return appv1.ClientPlatform_CLIENT_PLATFORM_ANDROID
 	default:
-		// chat-mobile does not tell iOS from Android.
-		return appv1.ClientPlatform_CLIENT_PLATFORM_UNSPECIFIED
+		return appv1.ClientPlatform_CLIENT_PLATFORM_WEB
 	}
 }
 

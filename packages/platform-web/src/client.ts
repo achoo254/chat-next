@@ -19,6 +19,7 @@ import {
 	deserializeError,
 	type CoreMethod,
 	type FromWorker,
+	type NativeConnection,
 	type RemoteCore,
 	type ToWorker,
 } from "./protocol.ts";
@@ -50,6 +51,15 @@ export interface WebChatOptions {
 	 */
 	readonly filterNotification?: (request: NotificationRequest) => ShownNotification | null;
 	readonly onError?: (context: string, message: string) => void;
+	/** The native app's server connection; unset on the web (same origin, HttpOnly cookie). */
+	readonly native?: NativeConnection;
+	/**
+	 * Where the browser goes once signOut ended the session; defaults to the
+	 * web's sign-out form POST (the server then redirects to the IdP).
+	 */
+	readonly leave?: () => void;
+	/** Extra foreground source (the native app's state, which the WebView's visibility does not follow on Android). */
+	readonly onForegroundChange?: (listener: (foreground: boolean) => void) => () => void;
 }
 
 /** A notification as shown; `silent` asks the system not to play a sound. */
@@ -205,6 +215,7 @@ export function createWebChat(options: WebChatOptions): WebChat {
 	document.addEventListener("visibilitychange", onVisibility);
 	window.addEventListener("online", onOnline);
 	window.addEventListener("pagehide", onPageHide);
+	const stopForeground = options.onForegroundChange?.((foreground) => worker.postMessage({ type: "foreground", foreground }));
 
 	worker.postMessage({
 		type: "init",
@@ -213,6 +224,7 @@ export function createWebChat(options: WebChatOptions): WebChat {
 			appVersion: options.appVersion,
 			foreground: !document.hidden,
 			...(userId === undefined ? {} : { userIdHint: userId }),
+			...(options.native === undefined ? {} : { native: options.native }),
 		},
 	});
 
@@ -258,13 +270,14 @@ export function createWebChat(options: WebChatOptions): WebChat {
 				await remote.signOut();
 			} finally {
 				clearLocal();
-				submitSignOut();
+				(options.leave ?? submitSignOut)();
 			}
 		},
 		dispose: () => {
 			document.removeEventListener("visibilitychange", onVisibility);
 			window.removeEventListener("online", onOnline);
 			window.removeEventListener("pagehide", onPageHide);
+			stopForeground?.();
 			worker.postMessage({ type: "close" });
 			worker.terminate();
 			for (const pending of calls.values()) pending.reject(new Error("web chat disposed"));

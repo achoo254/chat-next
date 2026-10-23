@@ -20,7 +20,8 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | `idp_sub` (`acc_…`), username, tên, giới thiệu | `users` | Tới khi xoá tài khoản; khi xoá: username đổi thành `deleted_<id>`, tên/giới thiệu xoá, `idp_sub` xoá | HĐ |
 | Email (bản sao từ IdP, chỉ khi đã xác minh) | `users.email` | Đọc lại mỗi lần đăng nhập/refresh; xoá khi IdP gỡ hoặc khi xoá tài khoản | HĐ; tìm theo email chỉ khi người dùng cho phép (ĐY) |
 | Ảnh đại diện | Chưa có (RPC trả `unimplemented`) | | |
-| Phiên chat: IP, user agent, thời điểm, `idp_sid` | `user_sessions` | Trượt 30 ngày, trần 90 ngày (web); xoá hẳn khi xoá tài khoản | HĐ, NV |
+| Phiên chat: IP, user agent, thời điểm, `idp_sid`; với app iOS/Android thêm nền tảng, tên thiết bị chung ("iPhone", "iPad", "Android") và phiên bản app | `user_sessions` | Trượt 30 ngày, trần 90 ngày (web; app không có trần); xoá hẳn khi xoá tài khoản | HĐ, NV |
+| Token phiên của app iOS/Android | Keychain (chỉ thiết bị này) hoặc Keystore của máy; server chỉ giữ hash | Xoá khi đăng xuất, phiên bị thu hồi hoặc hết hạn | HĐ |
 | Refresh token, ID token của IdP | `user_sessions` (mã hoá AES-GCM bằng `SESSION_KEY`) | Xoá khi phiên kết thúc; không bao giờ tới client | HĐ |
 | Đăng ký Web Push (endpoint, khoá trình duyệt, ngôn ngữ) | `push_subscriptions` | Sống theo phiên; xoá khi phiên kết thúc | ĐY |
 | Cài đặt quyền riêng tư, thông báo, tự xoá | `privacy_settings`, `notification_settings`, `users.auto_delete_months` | Tới khi xoá tài khoản | HĐ |

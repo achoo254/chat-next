@@ -1,0 +1,23 @@
+{
+  "name": "@app/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-web": "VITE_NATIVE=true VITE_APP_VERSION=$npm_package_version pnpm --filter @app/web exec vite build --outDir ../mobile/www --emptyOutDir",
+    "sync": "pnpm build-web && cap sync",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@shared-next/capacitor-system-auth": "github:achoo254/shared-next#v0.3.0&path:/packages/capacitor-system-auth"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "typescript": "6.0.3"
+  }
+}

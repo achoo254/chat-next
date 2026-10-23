@@ -10,6 +10,10 @@ export default tseslint.config(
 			"**/dist/**",
 			"packages/proto-ts/src/gen/**",
 			"brand/generated/**",
+			// Native projects and the bundle copied into them (npx cap add / sync).
+			"apps/mobile/ios/**",
+			"apps/mobile/android/**",
+			"apps/mobile/www/**",
 			"plans/**",
 		],
 	},
