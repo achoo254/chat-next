@@ -10,7 +10,26 @@ import {
 	webIconFiles,
 } from "@shared-next/brand/build";
 import { describe, expect, it } from "vitest";
-import { BRAND_ROOT, GENERATED_DIR, MANIFEST_OPTIONS, SERVER_BRAND_FILE, loadChatBrand, serverBrandNames } from "../brand-files.ts";
+import {
+	BRAND_ROOT,
+	GENERATED_DIR,
+	MANIFEST_OPTIONS,
+	MOBILE_DIR,
+	PLAY_FEATURE_GRAPHIC_FILE,
+	SERVER_BRAND_FILE,
+	loadChatBrand,
+	serverBrandNames,
+} from "../brand-files.ts";
+import {
+	FEATURE_GRAPHIC,
+	IOS_APP_ICON,
+	type NativeBrand,
+	nativePictures,
+	nativeTextFiles,
+	pngInfo,
+	replacedTemplateFiles,
+	styledIcon,
+} from "../scripts/brand-native.ts";
 
 const brand = loadChatBrand();
 const read = (file: string) => readFileSync(join(GENERATED_DIR, file), "utf8");
@@ -61,5 +80,44 @@ describe("generated brand files (run pnpm brand:gen after editing the brand)", (
 		const ico = readFileSync(join(GENERATED_DIR, ICONS_DIR, FAVICON_ICO));
 		expect(ico.readUInt16LE(2)).toBe(1);
 		expect(ico.readUInt16LE(4)).toBe(3);
+	});
+});
+
+describe("iOS and Android icons and launch screens (run pnpm brand:gen after editing the brand)", () => {
+	const native: NativeBrand = {
+		appName: brand.appName,
+		description: brand.description,
+		colors: brand.colors,
+		iconSvg: readFileSync(join(BRAND_ROOT, brand.icon), "utf8"),
+		maskableSvg: readFileSync(join(BRAND_ROOT, brand.iconMaskable), "utf8"),
+	};
+
+	it("hold the resources the current brand gives", () => {
+		for (const [file, content] of Object.entries(nativeTextFiles(native))) {
+			expect(readFileSync(join(MOBILE_DIR, file), "utf8"), file).toBe(content);
+		}
+	});
+
+	it("have every picture at its size, opaque where a store or launch screen needs it", () => {
+		for (const picture of nativePictures(native)) {
+			const info = pngInfo(readFileSync(join(MOBILE_DIR, picture.file)));
+			expect({ width: info.width, height: info.height }, picture.file).toEqual({ width: picture.width, height: picture.height });
+			if (picture.background !== null) expect(info.alpha, picture.file).toBe(false);
+		}
+		expect(pngInfo(readFileSync(join(MOBILE_DIR, IOS_APP_ICON)))).toEqual({ width: 1024, height: 1024, alpha: false });
+		expect(pngInfo(readFileSync(PLAY_FEATURE_GRAPHIC_FILE))).toEqual({ ...FEATURE_GRAPHIC, alpha: false });
+	});
+
+	it("left none of the Capacitor template pictures they replace", () => {
+		for (const file of replacedTemplateFiles()) expect(existsSync(join(MOBILE_DIR, file)), file).toBe(false);
+	});
+
+	it("refuse a logo without the classes that split it into layers", () => {
+		expect(() => styledIcon('<svg viewBox="0 0 1 1"><rect/></svg>', "")).toThrow(/logo-bg/);
+		expect(styledIcon(native.iconSvg, ".logo-bg{display:none}")).toContain("<style>.logo-bg{display:none}</style>");
+	});
+
+	it("read PNG headers and refuse other files", () => {
+		expect(() => pngInfo(new Uint8Array(40))).toThrow(/not a PNG/);
 	});
 });

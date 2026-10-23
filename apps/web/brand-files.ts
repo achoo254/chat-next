@@ -15,6 +15,12 @@ export const BRAND_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../.
 /** Where pnpm brand:gen writes the manifests (icons go to its icons/). */
 export const GENERATED_DIR = join(BRAND_ROOT, "brand/generated");
 
+/** The Capacitor app: pnpm brand:gen draws its icons and launch screens (scripts/brand-native.ts). */
+export const MOBILE_DIR = join(BRAND_ROOT, "apps/mobile");
+
+/** Google Play's feature graphic, drawn with the native icons; the rest of the store listing is next to it. */
+export const PLAY_FEATURE_GRAPHIC_FILE = join(BRAND_ROOT, "docs/store/play/feature-graphic.png");
+
 /** The names the Go server shows users, embedded from this copy (server/internal/brand). */
 export const SERVER_BRAND_FILE = join(BRAND_ROOT, "server/internal/brand/brand.json");
 

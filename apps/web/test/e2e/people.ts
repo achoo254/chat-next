@@ -5,7 +5,7 @@ import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { chromium, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type BrowserContextOptions, type Locator, type Page } from "playwright";
 
 export const WEB_ORIGIN = process.env.E2E_WEB_ORIGIN ?? "http://localhost:5173";
 
@@ -41,13 +41,16 @@ export async function launch(): Promise<Browser> {
 	return chromium.launch();
 }
 
+/** The screen a person's browser emulates; default a 1280 × 800 desktop window. */
+export type Screen = Pick<BrowserContextOptions, "viewport" | "deviceScaleFactor" | "isMobile" | "hasTouch">;
+
 /**
  * Opens a fresh browser context and signs in as the account. Notifications
  * are granted and recorded instead of shown, so a scenario can assert them.
  */
-export async function signIn(browser: Browser, key: AccountKey): Promise<Person> {
+export async function signIn(browser: Browser, key: AccountKey, screen: Screen = { viewport: { width: 1280, height: 800 } }): Promise<Person> {
 	const account = ACCOUNTS[key];
-	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 } });
+	const context = await browser.newContext({ locale: "vi-VN", ...screen });
 	await context.grantPermissions(["notifications"], { origin: WEB_ORIGIN });
 	await context.addInitScript(() => {
 		const shown: { title: string; body: string }[] = [];

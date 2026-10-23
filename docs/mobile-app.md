@@ -39,6 +39,17 @@ cd apps/mobile && pnpm exec cap open ios        # mở Xcode, chạy trên Simul
 
 - CI (`.github/workflows/mobile.yml`) chạy khi `apps/`, `packages/`, brand hoặc lockfile đổi: APK debug (artifact `android-debug-apk`, giữ 14 ngày, cài thử bằng `adb install`) và build iOS Simulator không ký.
 
+## Icon, màn khởi động và hồ sơ store
+
+`pnpm brand:gen` vẽ từ `brand/icon.svg`, `brand/icon-maskable.svg` và màu của `brand.config.json` (script `apps/web/scripts/brand-native.ts`, Chromium của Playwright), ghi thẳng vào hai project; sửa logo hay màu thì chạy lại và commit:
+
+- iOS: icon App Store 1024 px không alpha (`AppIcon.appiconset`), ảnh màn khởi động sáng/tối (`Splash.imageset`, logo giữa nền `colors.background`/`backgroundDark`).
+- Android: adaptive icon (nền, hình, monochrome cho icon theo theme Android 13+) và icon vuông, tròn cho Android 7.x ở mọi mật độ; màn khởi động Android 7–11 là `drawable/splash.xml` (màu `splash_background` của `values/`, `values-night/brand_colors.xml`, logo `splash_logo` ở giữa), Android 12+ hệ thống tự vẽ adaptive icon trên cùng màu.
+- Tách lớp dựa vào class `logo-bg`, `logo-bubble`, `logo-dot` của `brand/icon.svg`; logo vẽ lại phải giữ chúng. Test `apps/web/test/brand-files.test.ts` kiểm file sinh ra khớp brand, đúng kích thước, không alpha ở ảnh cần đục.
+- `cap sync` chỉ chép bundle web và danh sách plugin, không đụng các file này.
+
+Nội dung trang App Store và Google Play, câu trả lời quyền riêng tư, xếp hạng tuổi và ghi chú cho người duyệt: [docs/store/listing.md](./store/listing.md). Ảnh chụp màn hình store: `pnpm store:screenshots`.
+
 ## Đăng nhập
 
 1. App gọi `AuthService.GetAuthConfig` (platform IOS/ANDROID) và nhận `authorization_endpoint`, `client_id` `chat-mobile`, `redirect_uri` `com.hoandat.chat:/auth/callback`, scope.
@@ -60,6 +71,5 @@ Nút "Đăng nhập", "Tạo tài khoản" và các bước "đăng nhập lại
 - Thông báo đẩy APNs/FCM (cần key APNs và project Firebase), notification service extension.
 - Ký và phát hành: TestFlight cần app record `com.hoandat.chat` trên App Store Connect; AAB ký cần Play Console và keystore. Không có secret ký nào trong repo.
 - SQLCipher native cho DB local (ADR 0009), OTA, Mini App trong in-app browser.
-- Icon và splash từ brand cho iOS/Android (đang là icon mặc định của Capacitor).
 - Chọn tenant khác trong app: một bản build trỏ tới một server (`VITE_API_ORIGIN`).
 - Thông báo lỗi đăng nhập dùng hộp thoại hệ thống (`alert`), chưa theo giao diện app.

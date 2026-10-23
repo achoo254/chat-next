@@ -35,6 +35,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 ## App mobile
 
 - [App iOS và Android](./mobile-app.md): build, chạy, luồng đăng nhập, khác web và phần chưa làm.
+- [Hồ sơ store](./store/listing.md): nội dung App Store và Google Play, nhãn quyền riêng tư, Data safety, xếp hạng tuổi, ghi chú cho người duyệt, ảnh chụp màn hình và việc người sở hữu còn phải làm.
 
 ## Vận hành
 

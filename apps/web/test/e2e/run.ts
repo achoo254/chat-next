@@ -7,6 +7,9 @@
 //   pnpm e2e private-chat    run the files whose name contains the filter
 //   pnpm e2e --serve         start the stack and keep it running, to chat
 //                            with yourself in several browser profiles
+//   pnpm e2e --store-screenshots
+//                            seed made-up chats and photograph the app for the
+//                            App Store and Google Play (store-screenshots.ts)
 //
 // The ports are fixed (Vite 5173 proxies to the api on 4600), so a port in
 // use stops the run with its owner instead of starting a second stack.
@@ -79,6 +82,7 @@ async function stopAll(): Promise<void> {
 async function main(): Promise<number> {
 	const args = process.argv.slice(2);
 	const serve = args.includes("--serve");
+	const storeScreenshots = args.includes("--store-screenshots");
 	const filter = args.find((a) => !a.startsWith("--")) ?? "";
 
 	const busy = PORTS.map(portOwner).filter(Boolean);
@@ -123,6 +127,13 @@ async function main(): Promise<number> {
 			return 0;
 		}
 
+		const env = { ...process.env, E2E_WEB_ORIGIN: WEB_ORIGIN };
+		if (storeScreenshots) {
+			const shots = spawn(process.execPath, [join(E2E_DIR, "store-screenshots.ts")], { cwd: APP_DIR, stdio: "inherit", env });
+			children.push(shots);
+			return await new Promise<number>((resolve) => shots.once("exit", (code) => resolve(code ?? 1)));
+		}
+
 		const files = readdirSync(E2E_DIR)
 			.filter((f) => f.endsWith(".e2e.ts") && f.includes(filter))
 			.map((f) => join(E2E_DIR, f));
@@ -134,7 +145,7 @@ async function main(): Promise<number> {
 		const test = spawn(process.execPath, ["--test", "--test-concurrency=1", ...files], {
 			cwd: APP_DIR,
 			stdio: "inherit",
-			env: { ...process.env, E2E_WEB_ORIGIN: WEB_ORIGIN },
+			env,
 		});
 		children.push(test);
 		return await new Promise<number>((resolve) => test.once("exit", (code) => resolve(code ?? 1)));
