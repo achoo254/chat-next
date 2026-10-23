@@ -1,3 +1,4 @@
 - [IdP refresh rotation](idp-refresh-rotation-reuse-revokes-grant.md) — auth-next revokes grant on refresh-token reuse; pm2 root daemon writes /var/log/chat
 - [IdP same-site](idp-same-site-as-chat.md) — auth.hoandat.com is same-site with chat; Strict cookies reach callback and sibling-subdomain navs
 - [OPFS sahpool close](opfs-sahpool-close-keeps-handles.md) — db.close keeps OPFS handles; next leader needs pauseVfs or worker death
+- [IdP re-auth not forwarded](idp-reauth-not-forwarded-upstream.md) — auth-next prompt=login/max_age never reach Google (select_account); auth_time is weak proof
