@@ -69,8 +69,8 @@ export type CallResult =
 	| { readonly ok: false; readonly error: SerializedError };
 
 export interface WorkerConfig {
-	/** WebSocket endpoint of the realtime gateway. */
-	readonly realtimeUrl: string;
+	/** Origin of the chat server (checked by createWebChat): /rpc and /ws are reached there. */
+	readonly apiOrigin: string;
 	readonly appVersion: string;
 	/** User of the previous session in this browser; skips GetSelf on warm start. */
 	readonly userIdHint?: number;
@@ -80,12 +80,11 @@ export interface WorkerConfig {
 }
 
 /**
- * How the native app reaches the server (ADR 0006): the server's origin,
- * the session token sent as "Authorization: Bearer" and in the realtime
- * hello (never a cookie), and the platform it reports.
+ * How the native app authenticates (ADR 0006): the session token sent as
+ * "Authorization: Bearer" and in the realtime hello (never a cookie), and
+ * the platform it reports. The server's origin is WebChatOptions.apiOrigin.
  */
 export interface NativeConnection {
-	readonly apiOrigin: string;
 	readonly sessionToken: string;
 	readonly client: "ios" | "android";
 }

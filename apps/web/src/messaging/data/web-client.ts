@@ -2,7 +2,6 @@
 // and talks to the realtime gateway at same-origin /ws (the native app: the
 // server's /ws, with its bearer token). Loaded lazily with the messaging
 // chunk, so the R0 shell never downloads the worker.
-import { realtimeUrlFor } from "@app/core";
 import { createWebChat, type WebChatOptions } from "@app/platform-web";
 import ChatWorker from "@app/platform-web/worker?worker";
 import type { MessagingClient, MessagingConnectorOptions } from "./connector.ts";
@@ -17,7 +16,7 @@ export type NativeChatOptions = Pick<WebChatOptions, "native" | "leave" | "onFor
 export function connectWebChat(options: MessagingConnectorOptions, native?: NativeChatOptions): MessagingClient {
 	const chat = createWebChat({
 		createWorker: () => new ChatWorker(),
-		realtimeUrl: realtimeUrlFor(serverOrigin()),
+		apiOrigin: serverOrigin(),
 		appVersion: APP_VERSION,
 		...native,
 		onSessionEnded: options.onSessionEnded,

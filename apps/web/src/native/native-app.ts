@@ -10,7 +10,6 @@ import { SIGN_OUT_PATH } from "@app/core";
 import { SystemAuth } from "@shared-next/capacitor-system-auth";
 import type { RpcFetch } from "../api/client.ts";
 import type { NativeChatOptions } from "../messaging/data/web-client.ts";
-import { NATIVE_API_ORIGIN } from "../server-origin.ts";
 import { NativeSignInError, safeReturnTo, signInNative, signOutNative, type NativePlatform, type SignInFailure } from "./native-sign-in.ts";
 import { clearSessionToken, loadSessionToken, saveSessionToken, sessionToken } from "./session-token.ts";
 
@@ -37,7 +36,7 @@ export const nativeFetch: RpcFetch = (input, init) => {
 /** How the chat client reaches the server as this app (web-client.ts). */
 export function nativeChatOptions(): NativeChatOptions {
 	return {
-		native: { apiOrigin: NATIVE_API_ORIGIN, sessionToken: sessionToken(), client: nativePlatform() },
+		native: { sessionToken: sessionToken(), client: nativePlatform() },
 		appVersion: APP_VERSION,
 		// The core already ended the session (SignOut) and wiped this device's data.
 		leave: () => void restartSignedOut(),

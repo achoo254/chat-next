@@ -68,7 +68,7 @@ function start(options: Partial<WebChatOptions> = {}): FakeWorker {
 	const worker = new FakeWorker();
 	const chat = createWebChat({
 		createWorker: () => worker,
-		realtimeUrl: "wss://chat.example.test/ws",
+		apiOrigin: "https://chat.example.test",
 		appVersion: "test",
 		storage: new MemoryStorage(),
 		...options,
@@ -86,6 +86,7 @@ beforeEach(() => {
 	vi.stubGlobal("Notification", FakeNotification);
 	vi.stubGlobal("document", { ...listeners, hidden: false });
 	vi.stubGlobal("window", { ...listeners, focus: () => undefined });
+	vi.stubGlobal("location", { origin: "https://chat.example.test" });
 });
 
 afterEach(() => {

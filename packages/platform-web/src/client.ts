@@ -33,12 +33,19 @@ export interface WorkerLike {
 
 export interface WebChatOptions {
 	/**
-	 * Creates this tab's worker, e.g.
-	 * `() => new Worker(new URL("@app/platform-web/worker", import.meta.url), { type: "module" })`.
+	 * Creates this tab's worker, e.g. with Vite
+	 * `import ChatWorker from "@app/platform-web/worker?worker"` and
+	 * `() => new ChatWorker()`.
 	 */
 	readonly createWorker: () => WorkerLike;
-	/** WebSocket endpoint of the realtime gateway. */
-	readonly realtimeUrl: string;
+	/**
+	 * Origin of the chat server, e.g. `https://chat.example.com`: /rpc and the
+	 * realtime gateway (/ws) are reached there. On the web it must be the
+	 * page's own origin (the session is a SameSite=Strict HttpOnly cookie):
+	 * serve the app from the chat server, or proxy /rpc, /auth, /ws to it.
+	 * Only a `native` connection may name another origin.
+	 */
+	readonly apiOrigin: string;
 	readonly appVersion: string;
 	/** Defaults to window.localStorage. */
 	readonly storage?: Storage;
@@ -51,7 +58,7 @@ export interface WebChatOptions {
 	 */
 	readonly filterNotification?: (request: NotificationRequest) => ShownNotification | null;
 	readonly onError?: (context: string, message: string) => void;
-	/** The native app's server connection; unset on the web (same origin, HttpOnly cookie). */
+	/** The native app's session (bearer token); unset on the web (same origin, HttpOnly cookie). */
 	readonly native?: NativeConnection;
 	/**
 	 * Where the browser goes once signOut ended the session; defaults to the
@@ -114,7 +121,37 @@ function closeWorkerNotifications(tag: string): void {
 		.catch(() => undefined);
 }
 
+/**
+ * `apiOrigin` as an origin (a trailing slash is dropped). Throws when it is
+ * not a bare http(s) origin (the server's routes live at its root, so a
+ * path, query or credentials would be lost), or when a web client (no
+ * native connection) names another origin than the page's: its cookie
+ * session cannot reach it.
+ */
+export function checkApiOrigin(apiOrigin: string, pageOrigin: string, native: boolean): string {
+	let url: URL;
+	try {
+		url = new URL(apiOrigin);
+	} catch {
+		throw new TypeError(`apiOrigin must be the chat server's origin, e.g. https://chat.example.com, not "${apiOrigin}"`);
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:") {
+		throw new TypeError(`apiOrigin must be an http(s) origin, not "${apiOrigin}"`);
+	}
+	if (url.pathname !== "/" || url.search !== "" || url.hash !== "" || url.username !== "" || url.password !== "") {
+		throw new TypeError(`apiOrigin must be an origin only (scheme, host, port), e.g. https://chat.example.com, not "${apiOrigin}"`);
+	}
+	if (!native && url.origin !== pageOrigin) {
+		throw new Error(
+			`apiOrigin ${url.origin} is not this page's origin ${pageOrigin}: the web client signs in with a same-origin cookie, ` +
+				"so serve the app from the chat server or proxy /rpc, /auth and /ws to it",
+		);
+	}
+	return url.origin;
+}
+
 export function createWebChat(options: WebChatOptions): WebChat {
+	const apiOrigin = checkApiOrigin(options.apiOrigin, location.origin, options.native !== undefined);
 	const storage = options.storage ?? window.localStorage;
 	const worker = options.createWorker();
 	const events = new EventBus(frameScheduler, (err) =>
@@ -220,7 +257,7 @@ export function createWebChat(options: WebChatOptions): WebChat {
 	worker.postMessage({
 		type: "init",
 		config: {
-			realtimeUrl: options.realtimeUrl,
+			apiOrigin,
 			appVersion: options.appVersion,
 			foreground: !document.hidden,
 			...(userId === undefined ? {} : { userIdHint: userId }),

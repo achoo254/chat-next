@@ -3,7 +3,7 @@
 // worker whose tab holds the leader lock runs the core, the others proxy
 // their tab's calls to it (tab-hub.ts).
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { createRemoteApi, SessionEndedError, startApp, type ChatCore } from "@app/core";
+import { createRemoteApi, realtimeUrlFor, SessionEndedError, startApp, type ChatCore } from "@app/core";
 import { cryptoRandomId, systemTimers, type Platform } from "@app/platform";
 import { openMemoryFactory, openSahpoolFactory } from "./driver.ts";
 import { LeaderLock } from "./leader.ts";
@@ -77,7 +77,7 @@ function rpcFetch(native: NativeConnection | undefined): typeof fetch {
 function startHub(config: WorkerConfig): TabHub {
 	const host = location.host;
 	const native = config.native;
-	const origin = native?.apiOrigin ?? location.origin;
+	const origin = config.apiOrigin;
 	const lifecycle = new RelayedLifecycle(config.foreground);
 	const reportError = (context: string) => (err: unknown) => post({ type: "error", context, message: serializeError(err).message });
 	const hub: TabHub = new TabHub({
@@ -120,7 +120,7 @@ function startHub(config: WorkerConfig): TabHub {
 			};
 			const result = await startApp(platform, {
 				api,
-				realtimeUrl: config.realtimeUrl,
+				realtimeUrl: realtimeUrlFor(origin),
 				appVersion: config.appVersion,
 				client: native?.client ?? "web",
 				// Part of the local database name: the server's host, so data of two servers never mix.
