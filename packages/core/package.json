@@ -1,35 +1,12 @@
 {
   "name": "@achoo254/chat-core",
-  "version": "0.1.0",
+  "version": "0.0.0",
+  "private": true,
   "description": "Offline-first chat client core: sync engine, outbox, local SQLite store, realtime transport, media and local search; platform-agnostic",
-  "license": "MIT",
-  "author": "achoo254",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/achoo254/chat-next.git",
-    "directory": "packages/core"
-  },
-  "homepage": "https://github.com/achoo254/chat-next/tree/main/packages/core#readme",
-  "bugs": {
-    "url": "https://github.com/achoo254/chat-next/issues"
-  },
-  "keywords": [
-    "chat",
-    "client",
-    "offline-first",
-    "sync",
-    "sqlite",
-    "connectrpc"
-  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
   "sideEffects": false,
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
@@ -41,15 +18,5 @@
     "@achoo254/chat-proto": "workspace:*",
     "@bufbuild/protobuf": "2.16.0",
     "@connectrpc/connect": "2.2.0"
-  },
-  "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "./package.json": "./package.json"
-    }
   }
 }

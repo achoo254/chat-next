@@ -164,6 +164,25 @@ importers:
         specifier: 5.0.4
         version: 5.0.4(@types/node@24.19.2)(jsdom@30.1.2)(vite@8.3.4(@types/node@24.19.2))
 
+  packages/chat-client:
+    dependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.16.0
+        version: 2.16.0
+      '@connectrpc/connect':
+        specifier: 2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect-web':
+        specifier: 2.2.0
+        version: 2.2.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.16.0))
+      '@sqlite.org/sqlite-wasm':
+        specifier: 3.53.4-build2
+        version: 3.53.4-build2
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   packages/core:
     dependencies:
       '@achoo254/chat-platform':

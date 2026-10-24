@@ -1,4 +1,4 @@
-// Platform seam of the client (ADR 0007). @achoo254/chat-core never touches a platform
+// Platform seam of the client (ADR 0007). The client core never touches a platform
 // API directly: each platform package (web now; Capacitor and Tauri later)
 // implements these interfaces and hands them to startApp. Interfaces only the
 // native apps need (Push, Badge, Files, SecureStore, AuthBrowser) are added

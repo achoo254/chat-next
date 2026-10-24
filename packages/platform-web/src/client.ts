@@ -34,8 +34,8 @@ export interface WorkerLike {
 export interface WebChatOptions {
 	/**
 	 * Creates this tab's worker, e.g. with Vite
-	 * `import ChatWorker from "@achoo254/chat-platform-web/worker?worker"` and
-	 * `() => new ChatWorker()`.
+	 * `import ChatWorker from "@achoo254/chat-client/worker?worker"` and
+	 * `() => new ChatWorker()` (the package published from this one).
 	 */
 	readonly createWorker: () => WorkerLike;
 	/**

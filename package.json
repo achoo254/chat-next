@@ -10,7 +10,7 @@
     "lint": "eslint . --max-warnings=0 && pnpm check:brand",
     "check:brand": "check-brand --config brand.config.json --dir apps --dir packages --dir server --dir proto --dir sdk --dir spec --dir deploy --skip-dir gen --ignore-path apps/mobile/www --ignore-path apps/mobile/ios/App/App/public --ignore-path apps/mobile/android/app/src/main/assets/public --banned chat-inet --test-file '(^|\\x2f)test\\x2f|_test\\.go$|\\.test\\.ts$' --hint 'read it from @shared-next/brand'",
     "typecheck": "pnpm -r --if-present typecheck",
-    "build:packages": "pnpm --filter \"./packages/*\" --filter ./sdk/ts build",
+    "build:packages": "pnpm --filter @achoo254/chat-client --filter @achoo254/chat-bot-sdk build",
     "test": "pnpm -r --if-present test",
     "perf": "pnpm --filter @app/web perf",
     "e2e": "node apps/web/test/e2e/run.ts",

@@ -1,16 +1,12 @@
-# Publish one SDK package to npmjs when its release tag is pushed:
-#   chat-proto-vX.Y.Z         -> packages/proto-ts      (@achoo254/chat-proto)
-#   chat-platform-vX.Y.Z      -> packages/platform      (@achoo254/chat-platform)
-#   chat-core-vX.Y.Z          -> packages/core          (@achoo254/chat-core)
-#   chat-platform-web-vX.Y.Z  -> packages/platform-web  (@achoo254/chat-platform-web)
-#   chat-bot-sdk-vX.Y.Z       -> sdk/ts                 (@achoo254/chat-bot-sdk)
+# Publish one npm package to npmjs when its release tag is pushed:
+#   chat-client-vX.Y.Z   -> packages/chat-client  (@achoo254/chat-client)
+#   chat-bot-sdk-vX.Y.Z  -> sdk/ts                (@achoo254/chat-bot-sdk)
+# @achoo254/chat-client is the whole web client in one package: its build
+# bundles the private workspace packages core, platform, platform-web and
+# proto-ts into its own dist/, so it depends only on third-party packages.
 # The tag must match the package's version and point at a commit on main; a
 # version already on npmjs cannot be published again, so bump before
-# tagging. The client packages depend on each other at the exact version
-# (pnpm pack turns workspace:* into it): push the tags one at a time, in
-# the order above, each after the previous run finished, so every
-# dependency is on npmjs before its dependents. (GitHub starts no workflow
-# at all when more than three tags arrive in one push.)
+# tagging. The two packages are independent: push their tags in any order.
 #
 # Auth: npm trusted publishing (OIDC), no token anywhere. For each package,
 # npmjs.com > package > Settings > Trusted Publisher: GitHub Actions, user
@@ -22,10 +18,7 @@ name: sdk-publish
 on:
   push:
     tags:
-      - "chat-proto-v*"
-      - "chat-platform-v*"
-      - "chat-core-v*"
-      - "chat-platform-web-v*"
+      - "chat-client-v*"
       - "chat-bot-sdk-v*"
 
 permissions:
@@ -57,10 +50,7 @@ jobs:
         run: |
           name="${GITHUB_REF_NAME%-v*}"
           case "$name" in
-            chat-proto) dir=packages/proto-ts ;;
-            chat-platform) dir=packages/platform ;;
-            chat-core) dir=packages/core ;;
-            chat-platform-web) dir=packages/platform-web ;;
+            chat-client) dir=packages/chat-client ;;
             chat-bot-sdk) dir=sdk/ts ;;
             *) echo "unknown package in tag ${GITHUB_REF_NAME}"; exit 1 ;;
           esac
@@ -79,9 +69,8 @@ jobs:
       - run: pnpm test
       - run: pnpm build:packages
 
-      # pnpm pack replaces workspace:* ranges with real versions and applies
-      # publishConfig.exports (dist/); npm publishes the tarball. Trusted
-      # publishing needs npm 11.5.1 or later.
+      # pnpm pack applies publishConfig.exports (dist/) of the Bot SDK; npm
+      # publishes the tarball. Trusted publishing needs npm 11.5.1 or later.
       - run: npm install -g npm@11
       - name: Pack
         working-directory: ${{ steps.package.outputs.dir }}
@@ -95,5 +84,12 @@ jobs:
           # The packed manifest: real versions and exports into dist/ only.
           manifest="$(tar -xzOf "$RUNNER_TEMP"/pack/*.tgz package/package.json)"
           if echo "$manifest" | grep -Eq '"workspace:|"\./src/'; then echo "$manifest"; echo "packed package.json still has workspace: ranges or src/ exports"; exit 1; fi
+          # No dependency on a private workspace package (never on npmjs).
+          echo "$manifest" | node -e '
+            const m = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            const kinds = ["dependencies", "peerDependencies", "optionalDependencies"];
+            const internal = kinds.flatMap((k) => Object.keys(m[k] ?? {})).filter((d) => d.startsWith("@achoo254/chat-"));
+            if (internal.length > 0) { console.error("depends on workspace packages:", internal.join(", ")); process.exit(1); }
+          '
       - name: Publish to npmjs (trusted publishing, no token)
         run: npm publish "$RUNNER_TEMP"/pack/*.tgz --access public

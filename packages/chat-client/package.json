@@ -1,0 +1,77 @@
+{
+  "name": "@achoo254/chat-client",
+  "version": "0.1.0",
+  "description": "Browser client of the chat-next server: offline-first core (sync engine, outbox, SQLite WebAssembly on OPFS, realtime, local search) in a module worker, plus the Connect RPC contract",
+  "license": "MIT",
+  "author": "achoo254",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/achoo254/chat-next.git",
+    "directory": "packages/chat-client"
+  },
+  "homepage": "https://github.com/achoo254/chat-next/tree/main/packages/chat-client#readme",
+  "bugs": {
+    "url": "https://github.com/achoo254/chat-next/issues"
+  },
+  "keywords": [
+    "chat",
+    "client",
+    "offline-first",
+    "sync",
+    "sqlite-wasm",
+    "opfs",
+    "web-worker",
+    "connectrpc",
+    "protobuf"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/web/**",
+    "./dist/platform/**"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/web/index.d.ts",
+      "default": "./dist/web/index.js"
+    },
+    "./worker": {
+      "types": "./dist/web/sqlite-worker.d.ts",
+      "default": "./dist/web/sqlite-worker.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./platform": {
+      "types": "./dist/platform/index.d.ts",
+      "default": "./dist/platform/index.js"
+    },
+    "./proto/*": {
+      "types": "./dist/proto/*_pb.d.ts",
+      "default": "./dist/proto/*_pb.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "pnpm --filter @achoo254/chat-proto --filter @achoo254/chat-platform --filter @achoo254/chat-core --filter @achoo254/chat-platform-web build && node scripts/assemble-dist.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-web": "2.2.0",
+    "@sqlite.org/sqlite-wasm": "3.53.4-build2"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

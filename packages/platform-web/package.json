@@ -1,36 +1,13 @@
 {
   "name": "@achoo254/chat-platform-web",
-  "version": "0.1.0",
+  "version": "0.0.0",
+  "private": true,
   "description": "Browser platform of the chat client core: a module worker with SQLite WebAssembly on OPFS, one leader tab per browser, and the main-thread client",
-  "license": "MIT",
-  "author": "achoo254",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/achoo254/chat-next.git",
-    "directory": "packages/platform-web"
-  },
-  "homepage": "https://github.com/achoo254/chat-next/tree/main/packages/platform-web#readme",
-  "bugs": {
-    "url": "https://github.com/achoo254/chat-next/issues"
-  },
-  "keywords": [
-    "chat",
-    "client",
-    "browser",
-    "web-worker",
-    "sqlite-wasm",
-    "opfs"
-  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./worker": "./src/sqlite-worker.ts"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
   "scripts": {
     "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
@@ -45,19 +22,5 @@
   },
   "devDependencies": {
     "@achoo254/chat-proto": "workspace:*"
-  },
-  "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "./worker": {
-        "types": "./dist/sqlite-worker.d.ts",
-        "default": "./dist/sqlite-worker.js"
-      },
-      "./package.json": "./package.json"
-    }
   }
 }

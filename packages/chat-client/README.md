@@ -1,39 +1,46 @@
-# @achoo254/chat-platform-web
+# @achoo254/chat-client
 
-Browser client of the [chat-next](https://github.com/achoo254/chat-next) server. The client core
-([`@achoo254/chat-core`](https://www.npmjs.com/package/@achoo254/chat-core)) runs in a module worker per tab:
-Connect RPC, the realtime WebSocket, the sync engine and SQLite (WebAssembly, on OPFS) never touch the main
-thread. One tab per browser is the leader and holds the database; the other tabs forward their calls to it.
-The main thread gets an async `WebChat` with change events batched per animation frame.
+Browser client of the [chat-next](https://github.com/achoo254/chat-next) server, in one package. The client
+core runs in a module worker per tab: Connect RPC, the realtime WebSocket, the sync engine (gap recovery,
+per-chat difference), the outbox with idempotent resend, the media upload queue and cache, and SQLite
+(WebAssembly, on OPFS) with full-text search and Vietnamese folding never touch the main thread. One tab per
+browser is the leader and holds the database; the other tabs forward their calls to it. The main thread gets an
+async `WebChat` with change events batched per animation frame.
 
 There is no default server: you run your own chat backend and pass its origin as `apiOrigin`.
 
 The API is `0.x`: it may change in any minor release until 1.0. Pin the exact version.
 
+| Import | What |
+|---|---|
+| `@achoo254/chat-client` | `createWebChat`, `goToSignIn`, `submitSignOut`, `requestNotificationPermission`, `WebChat` and its options |
+| `@achoo254/chat-client/worker` | The worker entry (load it with your bundler's worker import, see [Vite](#vite)) |
+| `@achoo254/chat-client/core` | Types and helpers of the client core: `EventKeys`, `ChatCore`, `SessionEndReason`, `signInUrl`, `realtimeUrlFor`, model types, `startApp` for another platform |
+| `@achoo254/chat-client/platform` | The platform interfaces the core runs on (`Platform`, `SqlDriver`, `Socket`, `Timers`, `BlobStore`, ...) |
+| `@achoo254/chat-client/proto/<file>` | Protobuf-ES messages and Connect service descriptors of the chat API, one subpath per proto file |
+
 ## Install
 
 ```sh
-npm install @achoo254/chat-platform-web @achoo254/chat-core
+npm install @achoo254/chat-client
 ```
 
-`@achoo254/chat-core` is only needed when you import from it directly (types such as `SessionEndReason`,
-helpers such as `signInUrl`); `@achoo254/chat-platform-web` already depends on it.
+Runtime dependencies: `@connectrpc/connect`, `@connectrpc/connect-web`, `@bufbuild/protobuf` and
+`@sqlite.org/sqlite-wasm`. The package is ESM with an `exports` map only: TypeScript needs `moduleResolution`
+`bundler`, `node16` or `nodenext`.
 
 pnpm 11 refuses versions published less than 24 hours ago (`minimumReleaseAge`, 1440 minutes by default). To
-install a release on its first day, list those exact versions in `pnpm-workspace.yaml`:
+install a release on its first day, list that exact version in `pnpm-workspace.yaml`:
 
 ```yaml
 minimumReleaseAgeExclude:
-  - "@achoo254/chat-platform-web@0.1.0"
-  - "@achoo254/chat-core@0.1.0"
-  - "@achoo254/chat-platform@0.1.0"
-  - "@achoo254/chat-proto@0.1.0"
+  - "@achoo254/chat-client@0.1.0"
 ```
 
 ## Same origin: serve the app next to the chat server
 
 The web client signs in with the chat server's session cookie (`HttpOnly`, `Secure`, `SameSite=Strict`), so
-the page and the chat server must share one origin. `apiOrigin` must be the page's own origin
+the page and the chat server must share one origin. `apiOrigin` is required and must be the page's own origin
 (`location.origin`); `createWebChat` throws when it is not. A page on another origin cannot sign in: the
 server issues bearer tokens only to its iOS and Android apps.
 
@@ -117,9 +124,9 @@ needs a secure context (https, or `localhost` in development) and a browser with
 ## Usage
 
 ```ts
-import { EventKeys } from "@achoo254/chat-core";
-import { createWebChat, goToSignIn } from "@achoo254/chat-platform-web";
-import ChatWorker from "@achoo254/chat-platform-web/worker?worker";
+import { createWebChat, goToSignIn } from "@achoo254/chat-client";
+import { EventKeys } from "@achoo254/chat-client/core";
+import ChatWorker from "@achoo254/chat-client/worker?worker";
 
 const chat = createWebChat({
 	createWorker: () => new ChatWorker(),
@@ -137,9 +144,55 @@ await chat.sendText(chatId, "Hello");
 const page = await chat.history(chatId);
 ```
 
-Every `ChatCore` method of `@achoo254/chat-core` is available as an async call (`dialogs`, `history`,
-`sendText`, `sendMedia`, `markRead`, `search`, ...). `signOutAndLeave()` wipes this browser's data and posts the
-sign-out form; `dispose()` stops the client.
+Every `ChatCore` method except `close` is available as an async call (`dialogs`, `history`, `sendText`,
+`sendMedia`, `markRead`, `search`, ...). `signOutAndLeave()` wipes this browser's data and posts the sign-out
+form; `dispose()` stops the client.
+
+### Calling the API directly
+
+For an RPC the client does not wrap, use the generated service descriptors with Connect (same origin as the
+page: the server authenticates the web with its session cookie, and every RPC checks the `Origin` header
+against its `CHAT_PUBLIC_URL`):
+
+```ts
+import { createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { UsersService } from "@achoo254/chat-client/proto/users";
+
+const users = createClient(UsersService, createConnectTransport({ baseUrl: `${location.origin}/rpc` }));
+const self = await users.getSelf({});
+```
+
+The proto subpaths are `auth`, `bot_admin`, `bots`, `chats`, `config`, `feedback`, `integrations`, `media`,
+`messages`, `moderation`, `privacy`, `push`, `realtime`, `search`, `updates`, `users`, generated by
+[Protobuf-ES](https://github.com/bufbuild/protobuf-es) v2 from
+[`proto/app/v1`](https://github.com/achoo254/chat-next/tree/main/proto/app/v1). 64-bit ids are JavaScript
+numbers (`jstype = JS_NUMBER`, always below 2^53).
+
+### Another platform
+
+The core never calls a platform API itself: `startApp(platform, options)` of `@achoo254/chat-client/core`
+takes an implementation of `Platform` from `@achoo254/chat-client/platform` (SQL driver, lifecycle, sockets,
+timers, notifications, HTTP, blob storage, image probe). The browser implementation behind `createWebChat` is
+[`packages/platform-web`](https://github.com/achoo254/chat-next/tree/main/packages/platform-web/src) in the
+repository; read it for a complete example.
+
+```ts
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { createRemoteApi, realtimeUrlFor, startApp } from "@achoo254/chat-client/core";
+
+const apiOrigin = "https://chat.example.com"; // your chat server
+const result = await startApp(platform, {
+	api: createRemoteApi(createConnectTransport({ baseUrl: `${apiOrigin}/rpc`, useBinaryFormat: true })),
+	realtimeUrl: realtimeUrlFor(apiOrigin), // wss://chat.example.com/ws
+	appVersion: "my-app-1.0.0",
+	client: "web",
+	tenant: new URL(apiOrigin).host, // part of the local database name
+});
+if (result.status === "active") {
+	const dialogs = await result.core.dialogs(50);
+}
+```
 
 ## Server requirements
 
@@ -163,6 +216,11 @@ PostgreSQL, a fake IdP with test accounts and the real API (development only, ne
 ```sh
 cd server && go run ./cmd/e2e-stack -public http://localhost:5173
 ```
+
+## Bots
+
+Bots use the Bot API, not this package: see
+[`@achoo254/chat-bot-sdk`](https://www.npmjs.com/package/@achoo254/chat-bot-sdk) (Node).
 
 ## License
 

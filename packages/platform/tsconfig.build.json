@@ -1,5 +1,5 @@
 {
-  "$comment": "Emits the dist/ that npm consumers load (pnpm build); inside this repository the package resolves to src/.",
+  "$comment": "Emits the dist/ that packages/chat-client bundles into @achoo254/chat-client (its pnpm build runs this one); inside this repository the package resolves to src/.",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
