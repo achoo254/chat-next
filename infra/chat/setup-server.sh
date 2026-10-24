@@ -39,7 +39,6 @@ set_default CHAT_LISTEN_ADDR 127.0.0.1:4600
 set_default CHAT_PUBLIC_URL https://chat.hoandat.com
 set_default OIDC_ISSUER https://auth.hoandat.com
 set_default OIDC_CLIENT_ID chat-web
-set_default TENANT_ID primary
 set_default TENANT_DOMAIN hoandat.com
 grep -q '^OIDC_CLIENT_SECRET=' "$ENV_FILE" || die "OIDC_CLIENT_SECRET missing: copy CHAT_WEB_CLIENT_SECRET from the IdP .env (see docs/deployment-guide.md)"
 grep -q '^SESSION_KEY=' "$ENV_FILE" || printf 'SESSION_KEY=%s\n' "$(openssl rand -base64 48 | tr -d '\n')" >>"$ENV_FILE"

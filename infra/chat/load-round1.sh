@@ -4,7 +4,7 @@
 #   SSH_TARGET=root@103.72.98.65 SSH_OPTS="-i key -p 24700 -o IdentitiesOnly=yes" \
 #     bash infra/chat/load-round1.sh 250,500,1000 [profile]
 # It builds server/cmd/loadgen for linux, uploads it and runs, on the
-# server, a throwaway tenant as user nobody under /tmp/chat-load (its own
+# server, a throwaway chat instance as user nobody under /tmp/chat-load (its own
 # PostgreSQL on 127.0.0.1:4930, a fake IdP, the api on 127.0.0.1:4900; the
 # shared PostgreSQL and pm2 chat-api are not touched), then the scenario
 # step by step with a 30% free-memory guard. With "profile" it also takes a

@@ -1,7 +1,6 @@
 #!/bin/bash
 # Smoke test of production from outside (run after every deploy):
 #   bash infra/chat/smoke.sh [https://chat.hoandat.com]
-#   bash infra/chat/smoke.sh https://chat.inetdev.io.vn     another tenant
 # Checks the web app, the API health, that sign-in redirects to the IdP with
 # the chat-web client, and that the realtime route refuses a socket without a
 # session, and that the webhook route answers an unknown hook with
@@ -11,7 +10,7 @@
 set -euo pipefail
 BASE="${1:-https://chat.hoandat.com}"
 fail() { echo "smoke: FAIL $*" >&2; exit 1; }
-# The tenant's domain: its IdP is auth.<domain>, its media host media-chat.<domain>.
+# The domain: its IdP is auth.<domain>, its media host media-chat.<domain>.
 DOMAIN="${BASE#https://chat.}"
 
 code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"

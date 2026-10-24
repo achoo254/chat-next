@@ -1,11 +1,9 @@
 #!/bin/bash
-# Rotates SESSION_KEY of one tenant of the chat app without signing anyone
-# out (docs/operations/key-rotation.md).
-#   bash rotate-session-key.sh start  [tenant-id]          # new key, old one kept as previous
-#   bash rotate-session-key.sh finish [tenant-id] [--now]  # drop the previous key, 6 h after start
-#   bash rotate-session-key.sh reseal [tenant-id]          # reseal only (no key change)
-# Without a tenant id: the primary tenant (/opt/chat/.env, pm2 chat-api);
-# otherwise /opt/chat/tenants/<id>.env and pm2 chat-api-<id>.
+# Rotates SESSION_KEY of the chat app (/opt/chat/.env, pm2 chat-api) without
+# signing anyone out (docs/operations/key-rotation.md).
+#   bash rotate-session-key.sh start          # new key, old one kept as previous
+#   bash rotate-session-key.sh finish [--now] # drop the previous key, 6 h after start
+#   bash rotate-session-key.sh reseal         # reseal only (no key change)
 #
 # start: backs up the database and the env file (<env>.rotate-bak-<time>),
 # moves SESSION_KEY to SESSION_KEY_PREVIOUS, writes a new SESSION_KEY,
@@ -19,24 +17,19 @@
 # logs key ids only).
 set -euo pipefail
 
-USAGE="usage: rotate-session-key.sh start|finish|reseal [tenant-id] [--now]"
+USAGE="usage: rotate-session-key.sh start|finish|reseal [--now]"
 STEP="${1:?$USAGE}"
 shift
-ID="" NOW=""
+NOW=""
 for a in "$@"; do
 	case "$a" in
 	--now) NOW=1 ;;
-	-*) echo "$USAGE" >&2; exit 2 ;;
-	*) ID="$a" ;;
+	*) echo "$USAGE" >&2; exit 2 ;;
 	esac
 done
 WAIT_SECONDS=$((6 * 3600))
 ROOT=/opt/chat
-if [ -z "$ID" ]; then
-	FILE="$ROOT/.env" PROC=chat-api
-else
-	FILE="$ROOT/tenants/$ID.env" PROC="chat-api-$ID"
-fi
+FILE="$ROOT/.env" PROC=chat-api
 
 die() { echo "rotate-session-key: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "run as root"
@@ -84,7 +77,7 @@ start)
 		/^SESSION_KEY=/ { print "SESSION_KEY_PREVIOUS=" substr($0, 13); print "SESSION_KEY=" ENVIRON["NEW_KEY"]; next }
 		{ print }'
 	date +%s >"$MARK"
-	again="the new key is in place; fix the cause, then run: rotate-session-key.sh reseal $ID"
+	again="the new key is in place; fix the cause, then run: rotate-session-key.sh reseal"
 	reload || die "reloading $PROC failed: $again"
 	reseal || die "reseal failed: $again"
 	echo "rotate-session-key: started; run finish in 6 hours or later"
