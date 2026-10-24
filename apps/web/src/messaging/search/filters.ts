@@ -2,7 +2,7 @@
 // sender, one type (photos, files, links or voice) and a day range in the
 // device's time zone. The core takes them as SearchFilters, locally and on
 // the server alike.
-import type { SearchFilters } from "@app/core";
+import type { SearchFilters } from "@achoo254/chat-core";
 
 export type TypeFilter = "photo" | "document" | "link" | "voice";
 

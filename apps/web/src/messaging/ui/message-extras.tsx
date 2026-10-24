@@ -1,7 +1,7 @@
 // Lines few messages carry, loaded with the first message that shows one
 // (message-item.tsx): service messages ("… đã ghim một tin"), the "Chuyển
 // tiếp từ" header of a forwarded message and the "qua @bot" line.
-import type { StoredMessage } from "@app/core";
+import type { StoredMessage } from "@achoo254/chat-core";
 import { useCopy } from "../copy/use-copy.ts";
 import { actionText, messagePreview, namedUserIds } from "../data/format.ts";
 import { useChat, useMessage, useUser } from "../data/services.tsx";

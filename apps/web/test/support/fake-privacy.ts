@@ -3,7 +3,7 @@
 // server's rules on recent sign-in, owned chats and the typed username.
 // Never imported by production code.
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
-import { DataExportStatus, PrivacyService, type DataExport } from "@app/proto-ts/privacy";
+import { DataExportStatus, PrivacyService, type DataExport } from "@achoo254/chat-proto/privacy";
 
 export interface FakeOwnedChat {
 	readonly chatId: number;

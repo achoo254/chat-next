@@ -5,7 +5,7 @@
 // with a waveform, the upload state of your own sends (local preview,
 // progress, cancel, retry) and the photo of a link preview. A message that
 // is no longer available keeps its box and says so.
-import type { MediaRef, MediaRequest, MediaSizeType, PendingMedia, PendingMessage, StoredMessage } from "@app/core";
+import type { MediaRef, MediaRequest, MediaSizeType, PendingMedia, PendingMessage, StoredMessage } from "@achoo254/chat-core";
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

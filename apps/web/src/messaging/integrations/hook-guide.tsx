@@ -1,7 +1,7 @@
 // Connection guide for a webhook's format (mockups/integrations.html#setup-guides):
 // two to three steps in the usual tool and a configuration snippet to copy,
 // with {URL} standing for the URL saved when the webhook was created.
-import { fold } from "@app/core";
+import { fold } from "@achoo254/chat-core";
 import { CopyButton, useDomId } from "../ui/parts.tsx";
 import type { Hook } from "./api.ts";
 import { guideSnippet } from "./samples.ts";

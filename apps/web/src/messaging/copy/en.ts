@@ -1,5 +1,5 @@
 // English copy of the messaging UI; keys mirror vi.ts.
-import type { HookStopReason } from "@app/core";
+import type { HookStopReason } from "@achoo254/chat-core";
 import type { MessagingCopy } from "./vi.ts";
 
 export const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;

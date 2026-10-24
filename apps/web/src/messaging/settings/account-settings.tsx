@@ -4,7 +4,7 @@
 // IdP sign-in (ADR 0006): without one the tab sends the browser to the
 // reauth sign-in and, back here with ?after=delete, opens the confirmation
 // once; only its own button deletes.
-import { signInUrl } from "@app/core";
+import { signInUrl } from "@achoo254/chat-core";
 import { useEffect, useEffectEvent, useState } from "react";
 import { brand } from "../../brand.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";

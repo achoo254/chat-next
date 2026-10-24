@@ -2,7 +2,7 @@
 // them, the type label of a file card, which files go as photos, videos or
 // documents, how a selection splits into sends (albums of at most
 // albumSizeMax), and voice waveforms.
-import type { MediaInput, MediaKind, MediaLimits } from "@app/core";
+import type { MediaInput, MediaKind, MediaLimits } from "@achoo254/chat-core";
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 

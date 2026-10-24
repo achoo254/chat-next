@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { systemTimers, type NotificationRequest, type Platform } from "@app/platform";
+import { systemTimers, type NotificationRequest, type Platform } from "@achoo254/chat-platform";
 import { databaseName } from "../../src/auth/web.ts";
 import { startApp, type ChatCore, type StartOptions } from "../../src/app/start-app.ts";
 import type { FakeServer } from "./fake-server.ts";

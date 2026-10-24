@@ -2,7 +2,7 @@
 // photo the user just cropped. One CreateUpload, its parts PUT in order and
 // CompleteUpload; a failure throws (the user tries again), nothing resumes.
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { Http } from "@app/platform";
+import type { Http } from "@achoo254/chat-platform";
 import type { RemoteApi } from "../protocol/api.ts";
 import { toWireMediaKind } from "../protocol/map.ts";
 import { sha256Blob } from "./sha256.ts";

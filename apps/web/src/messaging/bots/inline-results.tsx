@@ -5,7 +5,7 @@
 // "via" the bot and clears the draft. Bots without inline mode, and
 // usernames of people, show nothing. Loaded with the first such draft.
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { cryptoRandomId } from "@app/platform";
+import { cryptoRandomId } from "@achoo254/chat-platform";
 import { Icon } from "../../components/screen-icons.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";

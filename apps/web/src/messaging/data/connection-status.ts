@@ -9,7 +9,7 @@
 //   nối…") while the core reconnects, then "waiting" ("Chờ mạng") once it
 //   has been down for OFFLINE_AFTER_MS. Without the grace period the header
 //   would flip between the two on every retry of the backoff.
-import type { ConnectionState } from "@app/core";
+import type { ConnectionState } from "@achoo254/chat-core";
 
 /** How long the socket may stay down, with the device online, before the screens treat it as no network. */
 export const OFFLINE_AFTER_MS = 10_000;

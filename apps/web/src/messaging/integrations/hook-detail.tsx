@@ -5,7 +5,7 @@
 // (rotate, revoke the old one now), counters and failed requests, a
 // connection guide for its format, its log, and deleting it.
 import { useState, type FormEvent } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
 import { Icon } from "../../components/screen-icons.tsx";

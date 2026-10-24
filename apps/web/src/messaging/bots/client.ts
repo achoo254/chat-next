@@ -1,6 +1,6 @@
 // Connect implementation of Bots (see api.ts), loaded on first use.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { assertSafeId, fromBase64, toMediaRef } from "@app/core";
+import { assertSafeId, fromBase64, toMediaRef } from "@achoo254/chat-core";
 import {
 	BotAdminService,
 	BotCommandScope as WireScope,
@@ -11,16 +11,16 @@ import {
 	type BotDeadLetter as WireDeadLetter,
 	type BotWebhook as WireWebhook,
 	type GetBotDeliveryResponse,
-} from "@app/proto-ts/bot_admin";
+} from "@achoo254/chat-proto/bot_admin";
 import {
 	BotsService,
 	InlineResultKind,
 	type GetBotInfoResponse,
 	type GetChatBotCommandsResponse,
 	type InlineResult as WireInlineResult,
-} from "@app/proto-ts/bots";
-import { MessagesService } from "@app/proto-ts/messages";
-import { UsersService } from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/bots";
+import { MessagesService } from "@achoo254/chat-proto/messages";
+import { UsersService } from "@achoo254/chat-proto/users";
 import {
 	BotError,
 	type InlineItem,

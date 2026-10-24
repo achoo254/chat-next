@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { systemTimers } from "@app/platform";
-import { ChatType } from "@app/proto-ts/chats";
-import { MessageSchema } from "@app/proto-ts/messages";
-import { UpdateSchema } from "@app/proto-ts/updates";
+import { systemTimers } from "@achoo254/chat-platform";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { MessageSchema } from "@achoo254/chat-proto/messages";
+import { UpdateSchema } from "@achoo254/chat-proto/updates";
 import { EventBus } from "../src/events/bus.ts";
 import { toUpdate } from "../src/protocol/map.ts";
 import { migrate } from "../src/repo/migrations.ts";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import type { Message } from "../src/model/types.ts";
 import type { StoredMessage } from "../src/repo/repository.ts";
 import { mergeSearchHits, sortNewestFirst } from "../src/search/merge.ts";

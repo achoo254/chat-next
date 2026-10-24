@@ -1,5 +1,5 @@
-import { ClientPlatform, AuthService, type RevokeSessionRequest } from "@app/proto-ts/auth";
-import { UsersService } from "@app/proto-ts/users";
+import { ClientPlatform, AuthService, type RevokeSessionRequest } from "@achoo254/chat-proto/auth";
+import { UsersService } from "@achoo254/chat-proto/users";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";

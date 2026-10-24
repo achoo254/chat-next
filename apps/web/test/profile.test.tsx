@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { UpdateProfileRequest } from "@app/proto-ts/users";
-import { UsersService } from "@app/proto-ts/users";
+import type { UpdateProfileRequest } from "@achoo254/chat-proto/users";
+import { UsersService } from "@achoo254/chat-proto/users";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";

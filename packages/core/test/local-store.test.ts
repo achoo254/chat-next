@@ -1,10 +1,10 @@
 // Mapping, migrations, events, search and snapshot of the local store.
 import { describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { MessageSchema } from "@app/proto-ts/messages";
-import { UserSchema } from "@app/proto-ts/users";
-import { UpdateFrameSchema } from "@app/proto-ts/realtime";
-import { UpdateSchema } from "@app/proto-ts/updates";
+import { MessageSchema } from "@achoo254/chat-proto/messages";
+import { UserSchema } from "@achoo254/chat-proto/users";
+import { UpdateFrameSchema } from "@achoo254/chat-proto/realtime";
+import { UpdateSchema } from "@achoo254/chat-proto/updates";
 import { EventBus, EventKeys } from "../src/events/bus.ts";
 import type { Message } from "../src/model/types.ts";
 import { toMessage, toUpdateBatch, toUser, toWireId } from "../src/protocol/map.ts";

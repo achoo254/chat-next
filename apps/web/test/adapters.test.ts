@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
-import { ClientPlatform, SessionSchema } from "@app/proto-ts/auth";
-import { UserSchema } from "@app/proto-ts/users";
+import { ClientPlatform, SessionSchema } from "@achoo254/chat-proto/auth";
+import { UserSchema } from "@achoo254/chat-proto/users";
 import { describe, expect, it } from "vitest";
 import { toSelfUser, toSessionView } from "../src/api/adapters.ts";
 

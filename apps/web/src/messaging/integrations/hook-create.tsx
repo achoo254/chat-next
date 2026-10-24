@@ -3,7 +3,7 @@
 // priority and silent sending, with a preview of how its messages look.
 // On success the URL shows once; closing it opens the webhook's page.
 import { useState, type FormEvent } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";

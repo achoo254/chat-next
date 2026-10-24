@@ -4,7 +4,7 @@
 // Push, a message arriving while no window of the app is visible is left to
 // the push (the server sends it exactly then), so it is not shown twice. Pure, so it is unit-tested
 // directly; the web client calls it on the main thread before showing one.
-import { isMuted, type DialogView, type NotificationSettings } from "@app/core";
+import { isMuted, type DialogView, type NotificationSettings } from "@achoo254/chat-core";
 
 export interface NotificationInput {
 	readonly title: string;

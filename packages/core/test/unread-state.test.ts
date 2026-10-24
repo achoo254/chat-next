@@ -1,9 +1,9 @@
 // Read position and unread counts across the reader's devices: what the
 // chat list badges, the folder counts and the unread divider read from.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
-import { EntityType } from "@app/proto-ts/messages";
-import { systemTimers } from "@app/platform";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { EntityType } from "@achoo254/chat-proto/messages";
+import { systemTimers } from "@achoo254/chat-platform";
 import { EventBus } from "../src/events/bus.ts";
 import { migrate } from "../src/repo/migrations.ts";
 import { Repository } from "../src/repo/repository.ts";

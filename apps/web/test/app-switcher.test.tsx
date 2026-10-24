@@ -6,7 +6,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { UsersService } from "@app/proto-ts/users";
+import { UsersService } from "@achoo254/chat-proto/users";
 import { renderApp, SELF } from "./render-app.tsx";
 
 const LONG = { timeout: 8000 };

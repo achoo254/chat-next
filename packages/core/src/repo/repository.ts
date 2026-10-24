@@ -1,5 +1,5 @@
 // Reads of the local database and the single commit path for writes.
-import type { SqlDriver, SqlRow } from "@app/platform";
+import type { SqlDriver, SqlRow } from "@achoo254/chat-platform";
 import type { EventBus } from "../events/bus.ts";
 import type { Chat, Dialog, Message, NotificationSettings, SearchFilters, SyncState, User } from "../model/types.ts";
 import type { TextMatch } from "../search/index.ts";

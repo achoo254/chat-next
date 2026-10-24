@@ -10,7 +10,7 @@
 // messages carry callback buttons too (mockups/bots.html#inline-keyboard):
 // the pressed one waits for the bot's answer while the others stay usable.
 import { Suspense, lazy, memo, type ReactNode } from "react";
-import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@app/core";
+import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";

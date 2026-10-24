@@ -1,11 +1,11 @@
 // Success criterion: with two tabs one writes the database and the other
 // works normally through it; closing the leader tab hands over to the other.
-// Runs the real core against the in-memory protocol server of @app/core's
+// Runs the real core against the in-memory protocol server of @achoo254/chat-core's
 // tests, with a database that survives the hand-over like an OPFS file.
 import { afterEach, describe, expect, it } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
-import { startApp, type ChatCore, type HistoryView } from "@app/core";
-import { systemTimers, type Platform } from "@app/platform";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { startApp, type ChatCore, type HistoryView } from "@achoo254/chat-core";
+import { systemTimers, type Platform } from "@achoo254/chat-platform";
 import { FakeServer } from "../../core/test/support/fake-server.ts";
 import { MemorySqlFactory } from "../../core/test/support/node-sql.ts";
 import { LeaderLock, type LockManagerLike } from "../src/leader.ts";

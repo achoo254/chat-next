@@ -1,9 +1,9 @@
 // The one place where protocol messages become client models (ADR 0001):
 // every int64 field arrives as a bigint and leaves as a number checked by
 // assertSafeId, so the rest of the app never sees a bigint.
-import { assertSafeId } from "@app/core";
-import { ClientPlatform, type Session } from "@app/proto-ts/auth";
-import type { User } from "@app/proto-ts/users";
+import { assertSafeId } from "@achoo254/chat-core";
+import { ClientPlatform, type Session } from "@achoo254/chat-proto/auth";
+import type { User } from "@achoo254/chat-proto/users";
 
 export interface SelfUser {
 	id: number;

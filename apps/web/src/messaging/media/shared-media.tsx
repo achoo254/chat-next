@@ -6,7 +6,7 @@
 // no server index of a chat's media yet, so they are collected from the
 // latest messages (SCAN_PAGES pages of history) and refreshed when the
 // chat's history changes.
-import { EventKeys, type MessageEntity, type StoredMessage } from "@app/core";
+import { EventKeys, type MessageEntity, type StoredMessage } from "@achoo254/chat-core";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

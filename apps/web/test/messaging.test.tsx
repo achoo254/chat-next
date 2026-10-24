@@ -2,7 +2,7 @@
 // in-memory protocol server: chat list filtering, message rendering states,
 // composer reply/edit, topics and the info panel.
 import { Code } from "@connectrpc/connect";
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
+import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";

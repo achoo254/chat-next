@@ -5,7 +5,7 @@
 // in a strip below. Videos stream from short-lived URLs with the browser's
 // controls (asking for a new URL once when one expired). A message deleted
 // for everyone while it is open says so instead of retrying.
-import type { MediaRef, StoredMessage } from "@app/core";
+import type { MediaRef, StoredMessage } from "@achoo254/chat-core";
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type TouchEvent } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

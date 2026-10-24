@@ -3,7 +3,7 @@
 // every link goes through the scheme allowlist, and links off the tenant's
 // own sites ask before opening.
 import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@app/core";
+import { isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@achoo254/chat-core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { matchRoute, navigate } from "../../router.tsx";

@@ -4,8 +4,8 @@
 // them. When the leader goes away, the next hub takes the lock, starts the
 // core on the same database and every follower re-sends its unanswered
 // calls (writes carry idempotency keys, see ChatCore.sendText).
-import type { SessionEndReason } from "@app/core";
-import type { Unsubscribe } from "@app/platform";
+import type { SessionEndReason } from "@achoo254/chat-core";
+import type { Unsubscribe } from "@achoo254/chat-platform";
 import type { LeaderLock } from "./leader.ts";
 import {
 	deserializeError,

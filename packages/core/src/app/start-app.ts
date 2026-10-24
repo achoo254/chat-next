@@ -1,8 +1,8 @@
 // startApp is the DI point of the client (ADR 0007): it takes the platform
 // implementations and returns the core the UI talks to. The same function
 // runs in the web worker and, later, on the native main thread.
-import type { BlobStore, Platform, SqlDriver } from "@app/platform";
-import { ClientPlatform } from "@app/proto-ts/auth";
+import type { BlobStore, Platform, SqlDriver } from "@achoo254/chat-platform";
+import { ClientPlatform } from "@achoo254/chat-proto/auth";
 import { databaseName, type SessionEndReason } from "../auth/web.ts";
 import { EventBus, EventKeys } from "../events/bus.ts";
 import { assertSafeId } from "../ids/index.ts";

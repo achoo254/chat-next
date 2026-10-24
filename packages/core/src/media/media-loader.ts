@@ -7,8 +7,8 @@
 // visible: its cached files are dropped.
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { Http } from "@app/platform";
-import type { GetFileUrlRequestSchema } from "@app/proto-ts/media";
+import type { Http } from "@achoo254/chat-platform";
+import type { GetFileUrlRequestSchema } from "@achoo254/chat-proto/media";
 import type { MediaKind, MediaSizeType } from "../model/types.ts";
 import type { RemoteApi } from "../protocol/api.ts";
 import { toSizeType, toWireId, toWireSizeType } from "../protocol/map.ts";

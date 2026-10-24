@@ -4,11 +4,11 @@
 // with or without notifying, who reacted, unsend and delete for me, one-screen
 // group creation, contacts A–Z, add-member reasons, the moderation queue,
 // grouped search, keyboard shortcuts, the list width handle and the composer.
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
-import { EntityType } from "@app/proto-ts/messages";
-import { BotTier } from "@app/proto-ts/bot_admin";
-import { FeedbackStatus, ModerationAction, ReportTargetKind } from "@app/proto-ts/moderation";
-import { ReportReason } from "@app/proto-ts/users";
+import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
+import { EntityType } from "@achoo254/chat-proto/messages";
+import { BotTier } from "@achoo254/chat-proto/bot_admin";
+import { FeedbackStatus, ModerationAction, ReportTargetKind } from "@achoo254/chat-proto/moderation";
+import { ReportReason } from "@achoo254/chat-proto/users";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";

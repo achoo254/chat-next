@@ -12,8 +12,8 @@ import {
 	signInUrl,
 	type ScreenSnapshot,
 	type SessionEndReason,
-} from "@app/core";
-import { cryptoRandomId, type FrameScheduler, type NotificationRequest } from "@app/platform";
+} from "@achoo254/chat-core";
+import { cryptoRandomId, type FrameScheduler, type NotificationRequest } from "@achoo254/chat-platform";
 import {
 	CORE_METHODS,
 	deserializeError,
@@ -34,7 +34,7 @@ export interface WorkerLike {
 export interface WebChatOptions {
 	/**
 	 * Creates this tab's worker, e.g. with Vite
-	 * `import ChatWorker from "@app/platform-web/worker?worker"` and
+	 * `import ChatWorker from "@achoo254/chat-platform-web/worker?worker"` and
 	 * `() => new ChatWorker()`.
 	 */
 	readonly createWorker: () => WorkerLike;

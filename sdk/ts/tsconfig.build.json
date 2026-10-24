@@ -1,0 +1,17 @@
+{
+  "$comment": "Emits the dist/ that npm consumers load (pnpm build); inside this repository the package resolves to src/.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": false,
+    "newLine": "lf"
+  },
+  "include": [
+    "src"
+  ]
+}

@@ -5,7 +5,7 @@
 // remembers the messages it was fetched for (media_cache_refs); triggers on
 // messages drop those when a message is purged or recalled, and a file left
 // without messages is evicted, so deleted or hidden media do not linger.
-import type { BlobStore } from "@app/platform";
+import type { BlobStore } from "@achoo254/chat-platform";
 import { num, str } from "../repo/rows.ts";
 import { placeholders } from "../repo/writes.ts";
 import type { MediaSizeType } from "../model/types.ts";

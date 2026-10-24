@@ -8,8 +8,8 @@
 // private chat. Loaded with the first bot chat or group opened, with its own
 // styles.
 import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react";
-import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@app/core";
-import { cryptoRandomId } from "@app/platform";
+import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@achoo254/chat-core";
+import { cryptoRandomId } from "@achoo254/chat-platform";
 import { Icon } from "../../components/icon.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";

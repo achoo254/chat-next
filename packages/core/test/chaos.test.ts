@@ -4,7 +4,7 @@
 // - a server_epoch change resyncs without losing a message.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@connectrpc/connect";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import type { ChatCore } from "../src/app/start-app.ts";
 import { FakeServer, seededRandom } from "./support/fake-server.ts";
 import { dbName, settle, startTestApp } from "./support/harness.ts";

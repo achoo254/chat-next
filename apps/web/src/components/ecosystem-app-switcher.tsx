@@ -1,6 +1,6 @@
 import "@shared-next/app-switcher/app-switcher.css";
 import { AppSwitcher, type AppSwitcherPlacement } from "@shared-next/app-switcher";
-import { openExternal } from "@app/platform-web";
+import { openExternal } from "@achoo254/chat-platform-web";
 import { brand } from "../brand.ts";
 import { useI18n } from "../i18n/i18n.tsx";
 import { IS_NATIVE } from "../server-origin.ts";

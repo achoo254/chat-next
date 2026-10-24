@@ -3,7 +3,7 @@
 // privacy, per-chat settings (mute, pinned chats, delete) and the moderation
 // queue. Their results reach the local database through the core's update
 // stream; these calls only return what the UI needs right away.
-import type { MessageEntity } from "@app/core";
+import type { MessageEntity } from "@achoo254/chat-core";
 import type { Transport } from "@connectrpc/connect";
 import type { ReportReason, ReportTarget } from "./pending-backend.ts";
 

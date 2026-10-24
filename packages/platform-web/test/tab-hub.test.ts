@@ -1,7 +1,7 @@
 // Two tabs in one process: Node's BroadcastChannel connects them like the
 // browser's, and an in-memory lock manager stands in for navigator.locks.
 import { afterEach, describe, expect, it } from "vitest";
-import type { SessionEndReason } from "@app/core";
+import type { SessionEndReason } from "@achoo254/chat-core";
 import { LeaderLock, type LockManagerLike } from "../src/leader.ts";
 import type { CoreMethod } from "../src/protocol.ts";
 import { TabHub, type LeaderCore } from "../src/tab-hub.ts";

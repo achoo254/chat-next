@@ -2,8 +2,8 @@
 // in-memory server: contacts, removing members with or without a ban, the
 // banned list, an owner leaving, capped counts, paged topics, sending without
 // a link preview, banned invitees, the emoji panel and the row menu.
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
-import { EntityType } from "@app/proto-ts/messages";
+import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
+import { EntityType } from "@achoo254/chat-proto/messages";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

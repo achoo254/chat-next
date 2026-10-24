@@ -2,7 +2,7 @@
 // list). Each typing lasts TYPING_SHOWN_MS unless it comes again; it ends
 // early when the server says so (cancel) or the person posts. Outgoing
 // typing is throttled: senders repeat it every TYPING_REPEAT_MS while busy.
-import type { Timers } from "@app/platform";
+import type { Timers } from "@achoo254/chat-platform";
 import type { ChatTyping, TypingAction } from "../model/types.ts";
 import type { TypingChange } from "../protocol/map.ts";
 

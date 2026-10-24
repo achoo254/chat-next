@@ -4,9 +4,9 @@
 // the viewer (keys, swipe, zoom, a message deleted while open), voice
 // messages, file cards, link preview photos, shared media in the info
 // column and forwarding without uploading again.
-import { ChatType } from "@app/proto-ts/chats";
-import { EntityType } from "@app/proto-ts/messages";
-import { MediaKind } from "@app/proto-ts/media";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { EntityType } from "@achoo254/chat-proto/messages";
+import { MediaKind } from "@achoo254/chat-proto/media";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

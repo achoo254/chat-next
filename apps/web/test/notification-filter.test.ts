@@ -1,6 +1,6 @@
 // The per-type notification rules on their own (data/notification-filter.ts).
 import { describe, expect, it } from "vitest";
-import { DEFAULT_NOTIFICATION_SETTINGS, MUTE_FOREVER, type Chat, type DialogView, type NotificationSettings } from "@app/core";
+import { DEFAULT_NOTIFICATION_SETTINGS, MUTE_FOREVER, type Chat, type DialogView, type NotificationSettings } from "@achoo254/chat-core";
 import { decideNotification } from "../src/messaging/data/notification-filter.ts";
 import { messagePreview } from "../src/messaging/data/format.ts";
 import { vi as copy } from "../src/messaging/copy/vi.ts";

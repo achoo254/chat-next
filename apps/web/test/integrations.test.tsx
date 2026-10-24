@@ -4,9 +4,9 @@
 // old secret, turn off and on, take over, delete, counters, dead letters,
 // log) and how their messages render in the chat (label, Firing/Resolved,
 // code blocks, URL buttons, alerts updated in place).
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
-import { IncomingHookAuditAction, IncomingHookDisabledReason, IncomingHookFormat, IncomingHookState } from "@app/proto-ts/integrations";
-import { EntityType } from "@app/proto-ts/messages";
+import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
+import { IncomingHookAuditAction, IncomingHookDisabledReason, IncomingHookFormat, IncomingHookState } from "@achoo254/chat-proto/integrations";
+import { EntityType } from "@achoo254/chat-proto/messages";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";

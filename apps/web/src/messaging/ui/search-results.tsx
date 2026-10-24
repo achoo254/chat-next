@@ -7,7 +7,7 @@
 // pause in typing without moving the rows already shown (#filters for the
 // sender, type and date filters, #empty-error for offline and failures).
 // ↑/↓ in the search box move between results, Enter opens one.
-import { fold, type SearchHit, type StoredMessage } from "@app/core";
+import { fold, type SearchHit, type StoredMessage } from "@achoo254/chat-core";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

@@ -245,7 +245,7 @@ describe("notifications tab: this device", () => {
 describe("background in-app notifications with push on this device", () => {
 	it("are left to the push", async () => {
 		const { decideNotification } = await import("../src/messaging/data/notification-filter.ts");
-		const { DEFAULT_NOTIFICATION_SETTINGS } = await import("@app/core");
+		const { DEFAULT_NOTIFICATION_SETTINGS } = await import("@achoo254/chat-core");
 		const request = { title: "Lan Anh", body: "Chào", tag: "chat:7", chatId: 7 };
 		const now = 1_760_500_000;
 		expect(decideNotification({ ...request, background: true }, undefined, DEFAULT_NOTIFICATION_SETTINGS, now, "x", true)).toBeNull();

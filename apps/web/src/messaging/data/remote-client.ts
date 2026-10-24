@@ -1,8 +1,8 @@
 // Connect implementation of Remote (see remote.ts), with the protocol
 // mapping (ADR 0001: every int64 arrives as a bigint and leaves as a number).
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { assertSafeId, fromWireEntity } from "@app/core";
-import { cryptoRandomId } from "@app/platform";
+import { assertSafeId, fromWireEntity } from "@achoo254/chat-core";
+import { cryptoRandomId } from "@achoo254/chat-platform";
 import {
 	AddMemberFailureReason,
 	ChatsService,
@@ -14,10 +14,10 @@ import {
 	type ChatMember,
 	type ForumTopic,
 	type InviteLink,
-} from "@app/proto-ts/chats";
-import { ConfigService } from "@app/proto-ts/config";
-import { FeedbackService } from "@app/proto-ts/feedback";
-import { MessagesService } from "@app/proto-ts/messages";
+} from "@achoo254/chat-proto/chats";
+import { ConfigService } from "@achoo254/chat-proto/config";
+import { FeedbackService } from "@achoo254/chat-proto/feedback";
+import { MessagesService } from "@achoo254/chat-proto/messages";
 import {
 	FeedbackKind as WireFeedbackKind,
 	FeedbackSource as WireFeedbackSource,
@@ -32,8 +32,8 @@ import {
 	type BotReview as WireBotReview,
 	type ModerationLogEntry,
 	type Report as WireReport,
-} from "@app/proto-ts/moderation";
-import { BotTier } from "@app/proto-ts/bot_admin";
+} from "@achoo254/chat-proto/moderation";
+import { BotTier } from "@achoo254/chat-proto/bot_admin";
 import {
 	PrivacyAudience,
 	ReportReason as WireReason,
@@ -41,7 +41,7 @@ import {
 	UserStatusKind,
 	type PrivacySettings,
 	type User as WireUser,
-} from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/users";
 import type { ReportReason } from "./pending-backend.ts";
 import type {
 	Announcement,

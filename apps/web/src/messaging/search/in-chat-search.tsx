@@ -5,7 +5,7 @@
 // current one stronger (CSS Custom Highlight API; browsers without it still
 // get the jump and the flash of the message). Esc or X closes the bar and
 // keeps the position.
-import { fold, hitKey } from "@app/core";
+import { fold, hitKey } from "@achoo254/chat-core";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

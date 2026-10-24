@@ -4,7 +4,7 @@
 // row menu and see hidden topics in their own section. The server pages the
 // topics: the next page loads when the end of the list scrolls into view.
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";

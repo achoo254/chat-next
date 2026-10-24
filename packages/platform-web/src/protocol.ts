@@ -1,8 +1,8 @@
 // Messages between the main thread, its worker and the other tabs' workers.
 // Everything crosses postMessage or BroadcastChannel by structured clone;
 // all parties are this app on the same origin.
-import type { ChatCore, SessionEndReason } from "@app/core";
-import type { NotificationRequest } from "@app/platform";
+import type { ChatCore, SessionEndReason } from "@achoo254/chat-core";
+import type { NotificationRequest } from "@achoo254/chat-platform";
 
 /** ChatCore methods callable from any tab. */
 export const CORE_METHODS = [

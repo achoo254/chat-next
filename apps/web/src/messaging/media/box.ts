@@ -3,7 +3,7 @@
 // before anything is downloaded and nothing moves when the image lands.
 // Part of the first chunk (the bubble reserves the box while the media
 // module loads), so it stays tiny.
-import type { MediaRef } from "@app/core";
+import type { MediaRef } from "@achoo254/chat-core";
 
 /** Widest photo or video in a bubble (mock .media-w). */
 export const MEDIA_MAX_W = 300;

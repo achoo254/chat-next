@@ -8,9 +8,9 @@
 // vite.config.ts), so render checks capture the finished state. Every page
 // then audits horizontal overflow (auditOverflow) and logs offenders as errors.
 import { Code } from "@connectrpc/connect";
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
-import { IncomingHookAuditAction, IncomingHookFormat } from "@app/proto-ts/integrations";
-import { EntityType, IncomingHookStopReason } from "@app/proto-ts/messages";
+import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
+import { IncomingHookAuditAction, IncomingHookFormat } from "@achoo254/chat-proto/integrations";
+import { EntityType, IncomingHookStopReason } from "@achoo254/chat-proto/messages";
 import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.ts";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -22,7 +22,7 @@ import "../../src/styles/app.css";
 import { entity, seedDemo } from "../support/demo-data.ts";
 import * as pictures from "../support/demo-images.ts";
 import type { FixtureFile } from "../support/fake-chat.ts";
-import { MediaKind } from "@app/proto-ts/media";
+import { MediaKind } from "@achoo254/chat-proto/media";
 import { addAttachments } from "../../src/messaging/media/media-state.ts";
 import { fixtureConnector } from "../support/fake-chat.ts";
 import { routerFetch } from "../support/router-fetch.ts";

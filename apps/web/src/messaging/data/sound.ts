@@ -1,7 +1,7 @@
 // The app's own notification tone (Web Audio, no sound file): played for
 // sound "Nhẹ" (quieter, the system notification is silent) and, when the
 // user turned it on, for messages arriving in the chat that is open.
-import type { NotificationSound } from "@app/core";
+import type { NotificationSound } from "@achoo254/chat-core";
 
 const GAIN: Record<NotificationSound, number> = { default: 0.18, soft: 0.06, off: 0 };
 const TONE_HZ = 880;

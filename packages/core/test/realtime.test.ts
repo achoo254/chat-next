@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { systemTimers, type SocketFactory } from "@app/platform";
-import { ClientPlatform } from "@app/proto-ts/auth";
+import { systemTimers, type SocketFactory } from "@achoo254/chat-platform";
+import { ClientPlatform } from "@achoo254/chat-proto/auth";
 import { backoffDelay, DEFAULT_BACKOFF } from "../src/transport/backoff.ts";
 import { deadAfterMs, RealtimeConnection, type RealtimeHandlers } from "../src/transport/realtime.ts";
 import { FakeServer } from "./support/fake-server.ts";
@@ -131,7 +131,7 @@ describe("realtime connection", () => {
 describe("hello", () => {
 	it("carries the native app's session token, and none on the web", async () => {
 		const { fromBinary } = await import("@bufbuild/protobuf");
-		const { ClientFrameSchema } = await import("@app/proto-ts/realtime");
+		const { ClientFrameSchema } = await import("@achoo254/chat-proto/realtime");
 		const hello = async (sessionToken: string | undefined) => {
 			const sent: Uint8Array[] = [];
 			const socket: SocketFactory = (_url, handlers) => {

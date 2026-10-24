@@ -2,7 +2,7 @@
 // bus delivers each dirty key once per frame, so a burst of updates in one
 // frame causes one re-render per subscribed component. Payloads are not
 // carried: subscribers re-read what they show.
-import type { FrameScheduler, Unsubscribe } from "@app/platform";
+import type { FrameScheduler, Unsubscribe } from "@achoo254/chat-platform";
 
 /** Event keys. Chat and message keys carry ids so the UI subscribes narrowly. */
 export const EventKeys = {

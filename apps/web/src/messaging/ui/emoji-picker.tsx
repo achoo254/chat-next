@@ -3,7 +3,7 @@
 // tabs and a grid. Arrow keys move between cells, Enter picks, Esc closes and
 // the caller returns focus to the button that opened it. A reaction closes
 // the panel; the composer keeps it open to pick more.
-import { fold } from "@app/core";
+import { fold } from "@achoo254/chat-core";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

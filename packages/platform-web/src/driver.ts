@@ -4,7 +4,7 @@
 // tab's worker opens it (see leader.ts). The same driver runs on an
 // in-memory database in Node for tests.
 import sqlite3InitModule, { type Database, type SqlValue as WasmValue } from "@sqlite.org/sqlite-wasm";
-import type { SqlDriver, SqlDriverFactory, SqlParams, SqlRow, SqlStatement, SqlValue } from "@app/platform";
+import type { SqlDriver, SqlDriverFactory, SqlParams, SqlRow, SqlStatement, SqlValue } from "@achoo254/chat-platform";
 
 function toSqlValue(value: WasmValue): SqlValue {
 	if (value === null || typeof value === "string" || typeof value === "number") return value;

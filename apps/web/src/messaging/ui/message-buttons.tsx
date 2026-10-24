@@ -1,6 +1,6 @@
 // Buttons under webhook and bot messages (split from message-item.tsx: most
 // messages have none).
-import type { StoredMessage } from "@app/core";
+import type { StoredMessage } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";

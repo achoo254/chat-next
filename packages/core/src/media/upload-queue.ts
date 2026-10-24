@@ -13,7 +13,7 @@
 // - network trouble backs off and resumes; a refused file fails for good
 //   until the user retries.
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { BlobStore, Http, SqlParams, SqlRow, Timers } from "@app/platform";
+import type { BlobStore, Http, SqlParams, SqlRow, Timers } from "@achoo254/chat-platform";
 import type { MediaKind, MediaRef } from "../model/types.ts";
 import { classifyFailure, type RemoteApi } from "../protocol/api.ts";
 import { toMediaRef, toWireMediaKind } from "../protocol/map.ts";

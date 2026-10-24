@@ -3,7 +3,7 @@
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
 import type { Transport } from "@connectrpc/connect";
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
-import type { Chat, ChatTyping, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@app/core";
+import type { Chat, ChatTyping, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@achoo254/chat-core";
 import type { SelfUser } from "../../api/adapters.ts";
 import { useCopy } from "../copy/use-copy.ts";
 import type { Bots } from "../bots/api.ts";

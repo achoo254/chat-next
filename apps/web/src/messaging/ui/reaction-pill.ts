@@ -6,7 +6,7 @@
 // của tôi" every reaction is your own, so only the emoji and count show. This is a
 // display rule of the client, separate from the server's limit on who-read
 // and who-reacted lists.
-import type { Chat, ReactionCount } from "@app/core";
+import type { Chat, ReactionCount } from "@achoo254/chat-core";
 
 /** Largest group whose pills show avatars. */
 export const AVATAR_CHAT_MAX = 10;

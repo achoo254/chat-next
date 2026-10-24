@@ -5,8 +5,8 @@
 // production code.
 import { create, fromBinary, toBinary, type MessageInitShape } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
-import { startApp, type ChatCore } from "@app/core";
-import { systemTimers, type NotificationRequest, type Platform, type SqlDriverFactory } from "@app/platform";
+import { startApp, type ChatCore } from "@achoo254/chat-core";
+import { systemTimers, type NotificationRequest, type Platform, type SqlDriverFactory } from "@achoo254/chat-platform";
 import {
 	AddMemberFailureReason,
 	ChatSchema,
@@ -17,13 +17,13 @@ import {
 	MemberRole,
 	type Chat as WireChat,
 	type Dialog as WireDialog,
-} from "@app/proto-ts/chats";
-import type { InviteLink } from "@app/proto-ts/chats";
-import { ConfigService } from "@app/proto-ts/config";
-import { FeedbackService } from "@app/proto-ts/feedback";
-import { EntityType, MessageSchema, MessagesService, type Message as WireMessage } from "@app/proto-ts/messages";
-import { ServerFrameSchema } from "@app/proto-ts/realtime";
-import type { Update as WireUpdate } from "@app/proto-ts/updates";
+} from "@achoo254/chat-proto/chats";
+import type { InviteLink } from "@achoo254/chat-proto/chats";
+import { ConfigService } from "@achoo254/chat-proto/config";
+import { FeedbackService } from "@achoo254/chat-proto/feedback";
+import { EntityType, MessageSchema, MessagesService, type Message as WireMessage } from "@achoo254/chat-proto/messages";
+import { ServerFrameSchema } from "@achoo254/chat-proto/realtime";
+import type { Update as WireUpdate } from "@achoo254/chat-proto/updates";
 import {
 	AnnouncementState,
 	FeedbackKind,
@@ -33,12 +33,12 @@ import {
 	ModerationService,
 	ReportStatus,
 	ReportTargetKind,
-} from "@app/proto-ts/moderation";
-import { BotTier } from "@app/proto-ts/bot_admin";
-import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/moderation";
+import { BotTier } from "@achoo254/chat-proto/bot_admin";
+import { PrivacyAudience, ReportReason, UsersService, UserSchema, UserStatusKind, type User as WireUser } from "@achoo254/chat-proto/users";
 import { FakeServer } from "../../../../packages/core/test/support/fake-server.ts";
 import { FakeMedia, MemoryBlobs } from "../../../../packages/core/test/support/fake-media.ts";
-import { MediaKind, MediaRefSchema, MediaSizeType, type MediaRef as WireMediaRef } from "@app/proto-ts/media";
+import { MediaKind, MediaRefSchema, MediaSizeType, type MediaRef as WireMediaRef } from "@achoo254/chat-proto/media";
 import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
 import { FakeBots } from "./fake-bots.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";

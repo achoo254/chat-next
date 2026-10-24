@@ -7,7 +7,7 @@
 //   the server never creates a duplicate;
 // - a refused operation stays in the outbox marked failed until the user
 //   retries or discards it; later operations of the chat continue.
-import type { Timers } from "@app/platform";
+import type { Timers } from "@achoo254/chat-platform";
 import { codePointLength, validateEntities } from "../entities/index.ts";
 import { EventKeys } from "../events/bus.ts";
 import type { MediaKind, MediaRef, Message, MessageEntity, SyncAck } from "../model/types.ts";

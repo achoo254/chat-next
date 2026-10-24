@@ -2,7 +2,7 @@
 // (the fake has a single session), and a key that turns Web Push off when
 // emptied. Never imported by production code.
 import type { ConnectRouter } from "@connectrpc/connect";
-import { PushService } from "@app/proto-ts/push";
+import { PushService } from "@achoo254/chat-proto/push";
 
 export interface FakeRegistration {
 	readonly endpoint: string;

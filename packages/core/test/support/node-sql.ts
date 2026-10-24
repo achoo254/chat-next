@@ -2,7 +2,7 @@
 // close() (like files on disk) until destroy(), so a test can "restart" the
 // app on the same data.
 import { DatabaseSync, type StatementSync } from "node:sqlite";
-import type { SqlDriver, SqlDriverFactory, SqlParams, SqlRow, SqlStatement } from "@app/platform";
+import type { SqlDriver, SqlDriverFactory, SqlParams, SqlRow, SqlStatement } from "@achoo254/chat-platform";
 
 class NodeSqlDriver implements SqlDriver {
 	private readonly statements = new Map<string, StatementSync>();

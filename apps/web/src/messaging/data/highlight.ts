@@ -2,9 +2,9 @@
 // "Tiếng Việt", and "uan" marks "uần" inside "tuần". Each code point is folded
 // on its own so positions map back to the original text (vifold's
 // whole-string fold collapses whitespace). Marks follow the search rule
-// (@app/core textMatch): every occurrence of a query token, or only those
+// (@achoo254/chat-core textMatch): every occurrence of a query token, or only those
 // that start a word when every token is shorter than SUBSTRING_MIN_CHARS.
-import { matchesSubstrings, searchText } from "@app/core";
+import { matchesSubstrings, searchText } from "@achoo254/chat-core";
 
 export interface Segment {
 	readonly text: string;

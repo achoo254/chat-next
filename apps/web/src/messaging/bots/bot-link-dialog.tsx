@@ -4,7 +4,7 @@
 // consent, opens the private chat and sends the command (StartBot); Huỷ sends
 // nothing.
 import { useEffect, useState } from "react";
-import { cryptoRandomId } from "@app/platform";
+import { cryptoRandomId } from "@achoo254/chat-platform";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";

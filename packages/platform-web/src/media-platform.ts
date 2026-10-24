@@ -8,7 +8,7 @@
 //   sign-out;
 // - ImageProbe: createImageBitmap + OffscreenCanvas, so photos are measured
 //   and thumbnailed off the main thread.
-import type { BlobStore, BlobStoreFactory, Http, ImageInfo, ImageProbe } from "@app/platform";
+import type { BlobStore, BlobStoreFactory, Http, ImageInfo, ImageProbe } from "@achoo254/chat-platform";
 
 export const fetchHttp: Http = {
 	async put(url, body, signal) {

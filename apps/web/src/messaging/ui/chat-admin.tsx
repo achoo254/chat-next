@@ -5,7 +5,7 @@
 // subscribers and skip the member permissions and history cards. "Tích hợp"
 // leads to the incoming webhooks (mockups/integrations.html#hooks-list).
 import { useEffect, useState } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";

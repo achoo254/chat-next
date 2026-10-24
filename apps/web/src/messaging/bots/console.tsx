@@ -11,7 +11,7 @@
 // dialogs.tsx.
 // Loaded on demand with its own styles.
 import { useEffect, useState, type FormEvent } from "react";
-import { fold } from "@app/core";
+import { fold } from "@achoo254/chat-core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad, type Load } from "../../components/preload.ts";
 import { Icon } from "../../components/screen-icons.tsx";

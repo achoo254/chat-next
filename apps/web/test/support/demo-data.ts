@@ -1,9 +1,9 @@
 // Chats and messages modelled on mockups/chat.html (#app, #rich-messages,
 // #topics), seeded into the core's in-memory server. Test and harness only.
-import { ChatType, HistoryVisibility, MemberRole } from "@app/proto-ts/chats";
-import { EntityType } from "@app/proto-ts/messages";
-import { FeedbackKind, FeedbackSource, FeedbackStatus, ModerationAction, ReportStatus, ReportTargetKind } from "@app/proto-ts/moderation";
-import { ReportReason } from "@app/proto-ts/users";
+import { ChatType, HistoryVisibility, MemberRole } from "@achoo254/chat-proto/chats";
+import { EntityType } from "@achoo254/chat-proto/messages";
+import { FeedbackKind, FeedbackSource, FeedbackStatus, ModerationAction, ReportStatus, ReportTargetKind } from "@achoo254/chat-proto/moderation";
+import { ReportReason } from "@achoo254/chat-proto/users";
 import { ChatFixture, type FixtureTopic } from "./fake-chat.ts";
 
 /** Entity for the first occurrence of `needle` in `text` (UTF-16 offsets). */

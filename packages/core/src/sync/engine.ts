@@ -11,8 +11,8 @@
 //   sees and mark the rest of the cache stale instead of deleting it;
 // - an update that references a user or chat the client does not have waits
 //   until that entity is fetched.
-import type { Timers } from "@app/platform";
-import { HistoryDirection } from "@app/proto-ts/messages";
+import type { Timers } from "@achoo254/chat-platform";
+import { HistoryDirection } from "@achoo254/chat-proto/messages";
 import type {
 	Chat,
 	ChatDifference,

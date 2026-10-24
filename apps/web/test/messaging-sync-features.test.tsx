@@ -3,7 +3,7 @@
 // messages (bar, list, unpin all, per topic), reaction chips with the latest
 // reactors, "marked as unread", notification settings with the badge and the
 // browser notifications they allow, and the online count of groups.
-import { NotificationSound } from "@app/proto-ts/chats";
+import { NotificationSound } from "@achoo254/chat-proto/chats";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";

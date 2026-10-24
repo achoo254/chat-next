@@ -7,7 +7,7 @@ import { Code } from "@connectrpc/connect";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { App } from "../src/app.tsx";
 import type { MessagingConnector } from "../src/messaging/data/connector.ts";

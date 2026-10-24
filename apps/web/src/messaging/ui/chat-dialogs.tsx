@@ -6,7 +6,7 @@
 // Groups say "Trưởng nhóm / Phó nhóm", channels "Chủ kênh / Admin".
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useState } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";

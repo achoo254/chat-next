@@ -34,6 +34,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # The npm packages (sdk-publish.yml) compile to dist/ on their own.
+      - run: pnpm build:packages
 
   # Budgets live in apps/web/test/perf/budgets.ts; `pnpm perf` runs the same locally.
   web-perf:

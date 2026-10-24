@@ -1,8 +1,8 @@
 // "đang gõ…" on the real client core and the core's in-memory protocol
 // server: the dialog list, the line under the newest message, and what the
 // composer tells the server.
-import { ChatType } from "@app/proto-ts/chats";
-import { TypingAction } from "@app/proto-ts/realtime";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { TypingAction } from "@achoo254/chat-proto/realtime";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";

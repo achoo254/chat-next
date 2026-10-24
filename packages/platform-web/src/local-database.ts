@@ -5,7 +5,7 @@
 // iOS 17, Web Locks outside a secure context), and there the app must still
 // open: an in-memory database for the run, and no election for its single
 // page.
-import type { SqlDriverFactory } from "@app/platform";
+import type { SqlDriverFactory } from "@achoo254/chat-platform";
 import { soloLocks, type LockManagerLike } from "./leader.ts";
 
 export interface LocalDatabaseOptions {

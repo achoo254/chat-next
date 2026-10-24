@@ -3,7 +3,7 @@
 // message with its X, or all of them with "Bỏ ghim tất cả" after a
 // confirmation. Loaded with the first use of the pinned bar's list button.
 import { useState } from "react";
-import type { Message } from "@app/core";
+import type { Message } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

@@ -2,7 +2,7 @@
 // approved mockups (mock.css: .avatar, .switch, .choice, dialog, .toast).
 // The small leaf components skip the compiler's memoization ("use no memo"):
 // they are cheap to render, and memoizing them only grows the startup bundle.
-import type { Chat, User } from "@app/core";
+import type { Chat, User } from "@achoo254/chat-core";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/icon.tsx";

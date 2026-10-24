@@ -4,8 +4,8 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { systemTimers, type BlobStore, type Http, type SqlDriver } from "@app/platform";
-import { MediaKind } from "@app/proto-ts/media";
+import { systemTimers, type BlobStore, type Http, type SqlDriver } from "@achoo254/chat-platform";
+import { MediaKind } from "@achoo254/chat-proto/media";
 import { Sha256, sha256Blob } from "../src/media/sha256.ts";
 import { AdaptiveConcurrency, UploadQueue, uploadBlobKey, type UploadDb, type UploadSpec } from "../src/media/upload-queue.ts";
 import { migrate } from "../src/repo/migrations.ts";

@@ -5,7 +5,7 @@
 // X cancels. A refused or missing microphone, or a browser without
 // MediaRecorder, says so and leaves the composer as it was.
 import { useEffect, useRef, useState } from "react";
-import { TYPING_REPEAT_MS } from "@app/core";
+import { TYPING_REPEAT_MS } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useServices } from "../data/services.tsx";
 import { formatDuration } from "./media-format.ts";

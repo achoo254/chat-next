@@ -5,8 +5,8 @@
 // poster only when it has ffmpeg), and each send goes to the outbox with a
 // random_id chosen here, so a topic view can show it while it uploads.
 // Photos are measured by the core (off the main thread).
-import type { MediaInput, MediaLimits } from "@app/core";
-import { cryptoRandomId } from "@app/platform";
+import type { MediaInput, MediaLimits } from "@achoo254/chat-core";
+import { cryptoRandomId } from "@achoo254/chat-platform";
 import type { ChatSource } from "../data/source.ts";
 import { encodeWaveform, mediaInput, planSends, type FileProblem, type PlannedItem } from "./media-format.ts";
 import { pendingTopics } from "./media-state.ts";

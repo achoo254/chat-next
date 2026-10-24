@@ -1,4 +1,4 @@
-import { signInUrl } from "@app/core";
+import { signInUrl } from "@achoo254/chat-core";
 import { brand } from "../brand.ts";
 import { BrandLogo } from "../components/brand-loader.tsx";
 import { LanguageSwitch } from "../components/language-switch.tsx";

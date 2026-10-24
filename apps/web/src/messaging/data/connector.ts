@@ -1,7 +1,7 @@
 // How the messaging UI gets its client. Production uses the worker-backed
 // web client (web-client.ts); tests and the visual harness pass their own
 // connector built on the core's in-memory test server.
-import type { SessionEndReason } from "@app/core";
+import type { SessionEndReason } from "@achoo254/chat-core";
 import type { NotificationDecision, NotificationInput } from "./notification-filter.ts";
 import type { PendingBackend } from "./pending-backend.ts";
 import type { Remote } from "./remote.ts";

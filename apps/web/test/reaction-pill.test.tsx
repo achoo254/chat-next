@@ -2,7 +2,7 @@
 // group floats over the bubble's bottom edge as its last child, faces in
 // private chats and groups of at most 10 members ("+N" past three), the
 // count elsewhere, your own reaction pressed, and the labels people hear.
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";

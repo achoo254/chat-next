@@ -1,8 +1,8 @@
 // Unread state on screen: the divider, marking read, the list and folder
 // badges, the tab title and the scroll button, on the real client core and
 // the core's in-memory protocol server.
-import { ChatType } from "@app/proto-ts/chats";
-import { EntityType } from "@app/proto-ts/messages";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { EntityType } from "@achoo254/chat-proto/messages";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";

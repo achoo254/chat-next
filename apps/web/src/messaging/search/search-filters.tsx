@@ -2,7 +2,7 @@
 // "Loại" and "Ngày" open a popover; a filter in use shows as a chip with a
 // remove button. The same sender picker serves the in-chat search, where it
 // lists the chat's members.
-import { fold } from "@app/core";
+import { fold } from "@achoo254/chat-core";
 import { useId, useMemo, useState } from "react";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

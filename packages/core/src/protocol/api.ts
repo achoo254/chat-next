@@ -1,14 +1,14 @@
 // RPC surface the core uses, typed by the generated Connect services so the
 // production client and the test fake implement the same contract.
 import { Code, ConnectError, createClient, type Client, type Transport } from "@connectrpc/connect";
-import { ChatsService } from "@app/proto-ts/chats";
-import { ConfigService } from "@app/proto-ts/config";
-import { MediaService } from "@app/proto-ts/media";
-import { MessagesService } from "@app/proto-ts/messages";
-import { ModerationService } from "@app/proto-ts/moderation";
-import { SearchService } from "@app/proto-ts/search";
-import { UpdatesService } from "@app/proto-ts/updates";
-import { UsersService } from "@app/proto-ts/users";
+import { ChatsService } from "@achoo254/chat-proto/chats";
+import { ConfigService } from "@achoo254/chat-proto/config";
+import { MediaService } from "@achoo254/chat-proto/media";
+import { MessagesService } from "@achoo254/chat-proto/messages";
+import { ModerationService } from "@achoo254/chat-proto/moderation";
+import { SearchService } from "@achoo254/chat-proto/search";
+import { UpdatesService } from "@achoo254/chat-proto/updates";
+import { UsersService } from "@achoo254/chat-proto/users";
 
 /**
  * The methods marked optional below are optional so test doubles written

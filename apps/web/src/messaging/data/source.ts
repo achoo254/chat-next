@@ -1,5 +1,5 @@
 // The part of the client core the messaging UI reads and writes. The web
-// build gets it from @app/platform-web (the core runs in a worker, every call
+// build gets it from @achoo254/chat-platform-web (the core runs in a worker, every call
 // is asynchronous); tests wrap an in-process ChatCore. Fast-changing data is
 // never passed through React context: components subscribe to ChatStore.
 import type {
@@ -32,7 +32,7 @@ import type {
 	TypingAction,
 	UploadProgress,
 	User,
-} from "@app/core";
+} from "@achoo254/chat-core";
 
 export interface ChatSource {
 	/** Change notifications, one batch per animation frame. */

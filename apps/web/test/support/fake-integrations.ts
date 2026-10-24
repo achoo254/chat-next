@@ -5,7 +5,7 @@
 // letters and the audit log. Never imported by production code.
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
-import { MemberRole } from "@app/proto-ts/chats";
+import { MemberRole } from "@achoo254/chat-proto/chats";
 import {
 	IncomingHookAuditAction,
 	IncomingHookDisabledReason,
@@ -17,9 +17,9 @@ import {
 	type IncomingHookAuditEntry,
 	type IncomingHookDeadLetter,
 	type IncomingHookFailure,
-} from "@app/proto-ts/integrations";
-import { IncomingHookStopReason } from "@app/proto-ts/messages";
-import type { User as WireUser } from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/integrations";
+import { IncomingHookStopReason } from "@achoo254/chat-proto/messages";
+import type { User as WireUser } from "@achoo254/chat-proto/users";
 
 const GRACE_SECONDS = 7 * 86_400;
 

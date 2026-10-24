@@ -1,7 +1,7 @@
 // Row decoding for the local database. JSON columns are written only by
 // this package, but they are still parsed defensively: a corrupt row becomes
 // an empty value instead of crashing the history view.
-import type { SqlRow, SqlValue } from "@app/platform";
+import type { SqlRow, SqlValue } from "@achoo254/chat-platform";
 import type {
 	Chat,
 	ChatType,

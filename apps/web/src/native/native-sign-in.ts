@@ -5,7 +5,7 @@
 // of the callback and hands the code and verifier to ExchangeNativeCode,
 // which answers with the chat session token. The IdP tokens stay on the
 // server.
-import { isReturnPath } from "@app/core";
+import { isReturnPath } from "@achoo254/chat-core";
 import { Code } from "@connectrpc/connect";
 import { callJson, RPC_BASE_URL, RpcError } from "../api/get-self.ts";
 import type { RpcFetch } from "../api/client.ts";

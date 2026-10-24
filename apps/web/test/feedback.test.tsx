@@ -1,7 +1,7 @@
 // Settings › Góp ý (mockups/settings.html#feedback): feedback for the team
 // in two clicks from anywhere, filed into the moderation queue; and the
 // error reporter that counts uncaught errors without personal data.
-import { FeedbackKind, FeedbackSource, FeedbackStatus } from "@app/proto-ts/moderation";
+import { FeedbackKind, FeedbackSource, FeedbackStatus } from "@achoo254/chat-proto/moderation";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -2,7 +2,7 @@
 // that starts with the word "Firing" or "Resolved" becomes a status chip and
 // the title; the other lines stay exactly as sent ("emoji label: value"
 // fields, code blocks). Entities are cut to each piece (UTF-16 offsets).
-import type { MessageEntity } from "@app/core";
+import type { MessageEntity } from "@achoo254/chat-core";
 
 export type AlertStatus = "firing" | "resolved";
 

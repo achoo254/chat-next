@@ -6,7 +6,7 @@
 // (main.tsx), so none of this reaches the web bundle.
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { SIGN_OUT_PATH } from "@app/core";
+import { SIGN_OUT_PATH } from "@achoo254/chat-core";
 import { SystemAuth } from "@shared-next/capacitor-system-auth";
 import type { RpcFetch } from "../api/client.ts";
 import type { NativeChatOptions } from "../messaging/data/web-client.ts";

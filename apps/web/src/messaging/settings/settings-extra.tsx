@@ -1,7 +1,7 @@
 // Settings tabs added with messaging (mockups/settings.html#privacy,
 // #blocked, #notifications, #appearance, #shortcuts).
-import type { NotificationSettings as CoreNotificationSettings, NotificationSound } from "@app/core";
-import { requestNotificationPermission } from "@app/platform-web";
+import type { NotificationSettings as CoreNotificationSettings, NotificationSound } from "@achoo254/chat-core";
+import { requestNotificationPermission } from "@achoo254/chat-platform-web";
 import { Fragment, useState } from "react";
 import { FONT_MAX, FONT_MIN, setFontSize, setTheme, storedFontSize, storedTheme, type Theme } from "../../appearance.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";

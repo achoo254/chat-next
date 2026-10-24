@@ -1,8 +1,25 @@
 {
-  "name": "@app/sdk",
+  "name": "@achoo254/chat-bot-sdk",
   "version": "0.1.0",
-  "private": true,
-  "description": "TypeScript (Node) SDK for the chat platform Bot API.",
+  "description": "TypeScript (Node) SDK of the chat platform Bot API: typed client with retries and uploads, long poll, webhook and Mini App verification, router",
+  "license": "MIT",
+  "author": "achoo254",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/achoo254/chat-next.git",
+    "directory": "sdk/ts"
+  },
+  "homepage": "https://github.com/achoo254/chat-next/tree/main/sdk/ts#readme",
+  "bugs": {
+    "url": "https://github.com/achoo254/chat-next/issues"
+  },
+  "keywords": [
+    "chat",
+    "bot",
+    "bot-api",
+    "sdk",
+    "webhook"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -11,10 +28,23 @@
     ".": "./src/index.ts"
   },
   "files": [
-    "src"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
+    "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --maxWorkers=1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }

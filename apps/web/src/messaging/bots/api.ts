@@ -5,7 +5,7 @@
 // bigint and leave as number). The Connect client and the generated schemas
 // load on the first call (client.ts), so the first screen does not carry them.
 // A token is only ever returned by resetToken, never kept here.
-import type { MediaRef } from "@app/core";
+import type { MediaRef } from "@achoo254/chat-core";
 import type { Transport } from "@connectrpc/connect";
 
 /** Where a command list applies (BotCommandScope); the Console edits private, group and group_admin. */

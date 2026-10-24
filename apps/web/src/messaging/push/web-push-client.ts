@@ -2,7 +2,7 @@
 // side, PushService on the other. webPushWith takes both as parameters so
 // the tests drive it with fakes; createWebPushClient wires the real ones.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { PushService } from "@app/proto-ts/push";
+import { PushService } from "@achoo254/chat-proto/push";
 import { isAppleMobile, isStandalone } from "../../install-prompt.ts";
 import { pushOnDevice, setPushOnDevice } from "./push-device.ts";
 import type { PushLocale, PushStatus, WebPush } from "./web-push.ts";

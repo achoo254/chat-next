@@ -9,17 +9,17 @@ import type {
 	GetDialogsResponse,
 	GetPeerDialogsResponse,
 	NotificationSettings as WireNotificationSettings,
-} from "@app/proto-ts/chats";
+} from "@achoo254/chat-proto/chats";
 import {
 	ChatType as WireChatType,
 	HistoryVisibility,
 	MemberRole as WireRole,
 	NotificationSound as WireSound,
 	SyncMode as WireSyncMode,
-} from "@app/proto-ts/chats";
-import { SessionRevokeReason as WireRevokeReason } from "@app/proto-ts/auth";
-import { MediaKind as WireMediaKind, MediaSizeType as WireSizeType } from "@app/proto-ts/media";
-import type { MediaRef as WireMediaRef, MediaSize as WireMediaSize } from "@app/proto-ts/media";
+} from "@achoo254/chat-proto/chats";
+import { SessionRevokeReason as WireRevokeReason } from "@achoo254/chat-proto/auth";
+import { MediaKind as WireMediaKind, MediaSizeType as WireSizeType } from "@achoo254/chat-proto/media";
+import type { MediaRef as WireMediaRef, MediaSize as WireMediaSize } from "@achoo254/chat-proto/media";
 import type {
 	GetHistoryResponse,
 	GetPinnedMessagesResponse,
@@ -32,9 +32,9 @@ import type {
 	ReactionCount as WireReaction,
 	ReplyMarkup as WireReplyMarkup,
 	SyncAck as WireSyncAck,
-} from "@app/proto-ts/messages";
-import { EntityType as WireEntityType, IncomingHookStopReason } from "@app/proto-ts/messages";
-import { TypingAction as WireTypingAction, type HelloFrame, type TypingFrame, type UpdateFrame } from "@app/proto-ts/realtime";
+} from "@achoo254/chat-proto/messages";
+import { EntityType as WireEntityType, IncomingHookStopReason } from "@achoo254/chat-proto/messages";
+import { TypingAction as WireTypingAction, type HelloFrame, type TypingFrame, type UpdateFrame } from "@achoo254/chat-proto/realtime";
 import type {
 	ChatState as WireChatState,
 	DifferenceUpdates,
@@ -43,8 +43,8 @@ import type {
 	LargeChatState as WireLargeChatState,
 	State as WireState,
 	Update as WireUpdate,
-} from "@app/proto-ts/updates";
-import type { User as WireUser } from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/updates";
+import type { User as WireUser } from "@achoo254/chat-proto/users";
 import { assertSafeId } from "../ids/index.ts";
 import { toBase64 } from "../media/codec.ts";
 import type {

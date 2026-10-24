@@ -3,7 +3,7 @@
 // only the newest pin and the count on the dialog. A list reloads when the
 // dialog's pin count or newest pin changes (a pin, an unpin, a recall), when
 // the core says the pins changed, or when a listed message is edited.
-import { EventKeys, type Message } from "@app/core";
+import { EventKeys, type Message } from "@achoo254/chat-core";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useServices } from "./services.tsx";
 import type { ChatSource } from "./source.ts";

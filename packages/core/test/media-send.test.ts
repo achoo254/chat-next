@@ -2,7 +2,7 @@
 // thumbnail, upload then SendMedia/SendAlbum in chat order, the sender's
 // file adopted by the media cache, purge on recall and wipe on sign-out.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { startApp, type ChatCore } from "../src/app/start-app.ts";
 import { FakeMedia, MemoryBlobs } from "./support/fake-media.ts";
 import { FakeServer } from "./support/fake-server.ts";

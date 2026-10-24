@@ -2,7 +2,7 @@
 // downloaded through short-lived URLs, which the core refreshes on its
 // own), the local file and progress of an upload, and whether a picture is
 // near the viewport (pictures load lazily).
-import { EventKeys, type MediaRequest, type MediaSizeType, type UploadProgress } from "@app/core";
+import { EventKeys, type MediaRequest, type MediaSizeType, type UploadProgress } from "@achoo254/chat-core";
 import { useCallback, useEffect, useState } from "react";
 import { useServices } from "../data/services.tsx";
 

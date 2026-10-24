@@ -3,7 +3,7 @@
 // button; files the server would refuse (over the upload limit, empty) are
 // named in an alert and left out of the send. The composer's text becomes
 // the caption; "Gửi dạng file" sends photos and videos uncompressed.
-import type { MediaLimits } from "@app/core";
+import type { MediaLimits } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCell } from "../ui/ui-context.tsx";

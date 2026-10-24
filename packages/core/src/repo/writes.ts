@@ -2,7 +2,7 @@
 // one WriteBatch and commits them as a single atomic SqlDriver batch, so the
 // database never holds half an update and listeners only hear about
 // committed changes.
-import type { SqlParams, SqlStatement } from "@app/platform";
+import type { SqlParams, SqlStatement } from "@achoo254/chat-platform";
 import { EventKeys } from "../events/bus.ts";
 import type {
 	Chat,

@@ -4,7 +4,7 @@
 // click, a long press, the menu key or the "…" button that shows on hover
 // opens the row menu (#list-menu).
 import { memo, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from "react";
-import type { DialogView, Message } from "@app/core";
+import type { DialogView, Message } from "@achoo254/chat-core";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";

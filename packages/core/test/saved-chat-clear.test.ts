@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { FakeServer } from "./support/fake-server.ts";
 import { settle, startTestApp } from "./support/harness.ts";
 import { MemorySqlFactory } from "./support/node-sql.ts";

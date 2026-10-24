@@ -20,7 +20,7 @@ import {
 	type ScreenSnapshot,
 	type StoredMessage,
 	type User,
-} from "@app/core";
+} from "@achoo254/chat-core";
 import { browserNetwork, ConnectionStatus, type NetworkStatus } from "./connection-status.ts";
 import { Permission } from "./remote.ts";
 import { chatKind, FOLDERS, inFolder, isSavedChat, type ChatKind, type Folder } from "./format.ts";

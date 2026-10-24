@@ -12,10 +12,10 @@
 // posting the user's ActionMiniAppData message to the bot's private chat.
 // Never imported by production code.
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
-import { BotAdminService, BotCommandScope, BotTier, type BotCommandSet } from "@app/proto-ts/bot_admin";
-import { BotsService, InlineResultKind } from "@app/proto-ts/bots";
-import type { Chat as WireChat } from "@app/proto-ts/chats";
-import type { User as WireUser } from "@app/proto-ts/users";
+import { BotAdminService, BotCommandScope, BotTier, type BotCommandSet } from "@achoo254/chat-proto/bot_admin";
+import { BotsService, InlineResultKind } from "@achoo254/chat-proto/bots";
+import type { Chat as WireChat } from "@achoo254/chat-proto/chats";
+import type { User as WireUser } from "@achoo254/chat-proto/users";
 
 /** What the fake needs from the chat fixture. */
 export interface BotHost {

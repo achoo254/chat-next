@@ -1,6 +1,6 @@
 // Platform pieces available inside the web worker. What only the main
 // thread can do (visibility, notifications) arrives or leaves as messages.
-import type { Lifecycle, SocketFactory, Unsubscribe } from "@app/platform";
+import type { Lifecycle, SocketFactory, Unsubscribe } from "@achoo254/chat-platform";
 
 /** Binary WebSocket for the realtime gateway; the HttpOnly session cookie rides along. */
 export const webSocketFactory: SocketFactory = (url, handlers) => {

@@ -9,7 +9,7 @@
 import type { SelfUser } from "./adapters.ts";
 
 const KEY = "app:last-self";
-/** The client core's key (LAST_USER_KEY of @app/platform-web), read here without loading that package at startup. */
+/** The client core's key (LAST_USER_KEY of @achoo254/chat-platform-web), read here without loading that package at startup. */
 export const CORE_LAST_USER_KEY = "chat:last-user";
 
 function storage(): Storage | null {

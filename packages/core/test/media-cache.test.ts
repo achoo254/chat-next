@@ -3,14 +3,14 @@
 // revocation on 404).
 import { describe, expect, it } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import type { SqlDriver } from "@app/platform";
-import { MediaKind, MediaRefSchema, MediaSizeType } from "@app/proto-ts/media";
-import { MessageSchema } from "@app/proto-ts/messages";
+import type { SqlDriver } from "@achoo254/chat-platform";
+import { MediaKind, MediaRefSchema, MediaSizeType } from "@achoo254/chat-proto/media";
+import { MessageSchema } from "@achoo254/chat-proto/messages";
 import { EventBus } from "../src/events/bus.ts";
 import { cacheKey, MediaCache, type CacheLimits } from "../src/media/media-cache.ts";
 import { MediaLoader, URLS_PER_CALL } from "../src/media/media-loader.ts";
 import { uploadPhotoNow } from "../src/media/direct-upload.ts";
-import { UserSchema } from "@app/proto-ts/users";
+import { UserSchema } from "@achoo254/chat-proto/users";
 import { toMessage, toUser } from "../src/protocol/map.ts";
 import { purgeMessages, recallMessages } from "../src/purge/index.ts";
 import { migrate } from "../src/repo/migrations.ts";

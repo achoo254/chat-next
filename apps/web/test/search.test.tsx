@@ -1,7 +1,7 @@
 // Message search (release R4, mockups/search.html): local hits at once, the
 // server's merged in after a pause, filters, failures and the in-chat bar.
 import { Code } from "@connectrpc/connect";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";

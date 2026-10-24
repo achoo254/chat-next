@@ -1,7 +1,7 @@
 // The sqlite-wasm driver runs the shared migrations, FTS5 with the vifold
 // tokenizer and atomic batches exactly like the native test driver.
 import { describe, expect, it } from "vitest";
-import { EventBus, migrate, Repository, searchLocal, searchText, SCHEMA_VERSION } from "@app/core";
+import { EventBus, migrate, Repository, searchLocal, searchText, SCHEMA_VERSION } from "@achoo254/chat-core";
 import { openMemoryFactory } from "../src/driver.ts";
 
 async function repository(): Promise<Repository> {

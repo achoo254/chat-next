@@ -5,7 +5,7 @@
 // The server's Connect handlers accept JSON as well as binary
 // (https://connectrpc.com/docs/protocol, unary requests).
 import { Code } from "@connectrpc/connect";
-import { assertSafeId } from "@app/core";
+import { assertSafeId } from "@achoo254/chat-core";
 import { NATIVE_API_ORIGIN } from "../server-origin.ts";
 import type { AccountDeletionInfo, SelfUser } from "./adapters.ts";
 

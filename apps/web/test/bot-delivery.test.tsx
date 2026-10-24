@@ -6,7 +6,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { BotTier } from "@app/proto-ts/bot_admin";
+import { BotTier } from "@achoo254/chat-proto/bot_admin";
 import { BotError } from "../src/messaging/bots/api.ts";
 import { breakAfterSlashes, newSecret, pollCommand, readDraft, validSecret, webhookProblem, webhookUrlProblem } from "../src/messaging/bots/delivery.tsx";
 import { matchRoute } from "../src/router.tsx";

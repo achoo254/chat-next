@@ -3,8 +3,8 @@
 // worker whose tab holds the leader lock runs the core, the others proxy
 // their tab's calls to it (tab-hub.ts).
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { createRemoteApi, realtimeUrlFor, SessionEndedError, startApp, type ChatCore } from "@app/core";
-import { cryptoRandomId, systemTimers, type Platform } from "@app/platform";
+import { createRemoteApi, realtimeUrlFor, SessionEndedError, startApp, type ChatCore } from "@achoo254/chat-core";
+import { cryptoRandomId, systemTimers, type Platform } from "@achoo254/chat-platform";
 import { openMemoryFactory, openSahpoolFactory } from "./driver.ts";
 import { LeaderLock } from "./leader.ts";
 import { nativeLocks, openLocalDatabase } from "./local-database.ts";

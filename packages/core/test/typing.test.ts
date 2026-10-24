@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
-import { TypingAction } from "@app/proto-ts/realtime";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { TypingAction } from "@achoo254/chat-proto/realtime";
 import { TYPING_REPEAT_MS, TYPING_SHOWN_MS } from "../src/app/typing.ts";
 import { FakeServer } from "./support/fake-server.ts";
 import { settle, startTestApp } from "./support/harness.ts";

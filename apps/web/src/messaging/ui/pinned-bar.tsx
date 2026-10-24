@@ -2,7 +2,7 @@
 // loaded with the first chat that has a pinned message, and the bars hidden
 // on this device (the info panel turns them back on).
 import { useState, useSyncExternalStore } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { messagePreview, namedUserIds } from "../data/format.ts";

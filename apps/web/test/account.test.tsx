@@ -5,9 +5,9 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
-import { PrivacyService } from "@app/proto-ts/privacy";
-import { AccountDeletionReason, UsersService } from "@app/proto-ts/users";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { PrivacyService } from "@achoo254/chat-proto/privacy";
+import { AccountDeletionReason, UsersService } from "@achoo254/chat-proto/users";
 import { parseGetSelf } from "../src/api/get-self.ts";
 import { matchRoute } from "../src/router.tsx";
 import { ChatFixture } from "./support/fake-chat.ts";

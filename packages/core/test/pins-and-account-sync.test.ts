@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { ChatType, DialogSchema, NotificationSettingsSchema, NotificationSound } from "@app/proto-ts/chats";
-import { UpdateSchema } from "@app/proto-ts/updates";
+import { ChatType, DialogSchema, NotificationSettingsSchema, NotificationSound } from "@achoo254/chat-proto/chats";
+import { UpdateSchema } from "@achoo254/chat-proto/updates";
 import { EventKeys } from "../src/events/bus.ts";
 import { DEFAULT_NOTIFICATION_SETTINGS, MUTE_FOREVER, unreadTotals } from "../src/model/types.ts";
 import { createRemoteApi } from "../src/protocol/api.ts";

@@ -1,7 +1,7 @@
 // The main-thread client shows the notifications its worker asks for, after
 // the app's filter: dropped, rewritten or silent, as the filter decides.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotificationRequest } from "@app/platform";
+import type { NotificationRequest } from "@achoo254/chat-platform";
 import { createWebChat, type ShownNotification, type WebChatOptions, type WorkerLike } from "../src/client.ts";
 import type { FromWorker } from "../src/protocol.ts";
 

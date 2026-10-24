@@ -6,8 +6,8 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { BotCommandScope } from "@app/proto-ts/bot_admin";
-import { ChatType } from "@app/proto-ts/chats";
+import { BotCommandScope } from "@achoo254/chat-proto/bot_admin";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { groupEntries, matchCommands } from "../src/messaging/bots/bot-chat.tsx";
 import { startCommand } from "../src/messaging/bots/bot-link-dialog.tsx";
 import { normalizeUsername, usernameFromName, usernameSuggestions } from "../src/messaging/bots/console.tsx";

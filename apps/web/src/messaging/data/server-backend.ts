@@ -1,7 +1,7 @@
 // PendingBackend on the R1 server: forum topics (GetForumTopics, paged, and
 // the topic RPCs), link previews (stored by the core on each message, and
 // GetLinkPreview while typing), reports and invite previews (CheckInvite).
-import type { Message } from "@app/core";
+import type { Message } from "@achoo254/chat-core";
 import type {
 	InvitePreview,
 	LinkPreview,

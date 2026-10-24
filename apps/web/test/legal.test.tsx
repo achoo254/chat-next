@@ -1,7 +1,7 @@
 // Public pages (/privacy, /terms, /delete-account): open without signing in,
 // linked from the welcome screen and Settings.
 import { Code, ConnectError } from "@connectrpc/connect";
-import { UsersService } from "@app/proto-ts/users";
+import { UsersService } from "@achoo254/chat-proto/users";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";

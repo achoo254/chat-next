@@ -1,0 +1,25 @@
+{
+  "$comment": "Emits the dist/ that npm consumers load (pnpm build). Inside this repository the packages resolve to src/; the paths below point the sibling packages at their own dist/ so only this package's src/ is compiled.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": false,
+    "newLine": "lf",
+    "paths": {
+      "@achoo254/chat-platform": [
+        "../platform/dist/index.d.ts"
+      ],
+      "@achoo254/chat-proto/*": [
+        "../proto-ts/dist/gen/app/v1/*_pb.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src"
+  ]
+}

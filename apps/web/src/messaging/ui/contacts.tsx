@@ -5,7 +5,7 @@
 // row opens the profile card on the right (full screen on narrow screens,
 // with a way back): message, new group with them, block, the date you added
 // them and the groups you share.
-import { fold } from "@app/core";
+import { fold } from "@achoo254/chat-core";
 import { useState, type ReactNode } from "react";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/screen-icons.tsx";

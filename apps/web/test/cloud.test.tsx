@@ -6,7 +6,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { pillContent } from "../src/messaging/ui/reaction-pill.ts";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";

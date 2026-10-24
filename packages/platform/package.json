@@ -1,12 +1,44 @@
 {
-  "name": "@app/platform",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@achoo254/chat-platform",
+  "version": "0.1.0",
+  "description": "Platform interfaces of the chat client core: SQL driver, lifecycle, sockets, timers, notifications, HTTP and blob storage",
+  "license": "MIT",
+  "author": "achoo254",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/achoo254/chat-next.git",
+    "directory": "packages/platform"
+  },
+  "homepage": "https://github.com/achoo254/chat-next/tree/main/packages/platform#readme",
+  "bugs": {
+    "url": "https://github.com/achoo254/chat-next/issues"
+  },
+  "keywords": [
+    "chat",
+    "client",
+    "platform"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }

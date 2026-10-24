@@ -1,8 +1,8 @@
 // Connect implementation of the account calls other than GetSelf (profile,
 // username, sessions), loaded with the first of them (see client.ts).
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { AuthService } from "@app/proto-ts/auth";
-import { UsersService, type User } from "@app/proto-ts/users";
+import { AuthService } from "@achoo254/chat-proto/auth";
+import { UsersService, type User } from "@achoo254/chat-proto/users";
 import { toSelfUser, toSessionView, type SelfUser } from "./adapters.ts";
 import type { AccountCalls } from "./client.ts";
 

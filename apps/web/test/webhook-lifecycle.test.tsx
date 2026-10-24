@@ -6,7 +6,7 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { IncomingHookDisabledReason, IncomingHookFormat } from "@app/proto-ts/integrations";
+import { IncomingHookDisabledReason, IncomingHookFormat } from "@achoo254/chat-proto/integrations";
 import { setSoundInChat } from "../src/messaging/data/device-settings.ts";
 import { navigate } from "../src/router.tsx";
 import { seedDemo } from "./support/demo-data.ts";

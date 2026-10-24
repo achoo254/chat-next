@@ -4,7 +4,7 @@
 // sends files with "Content-Disposition: attachment", so the browser
 // downloads them without holding the whole file in memory, and plays
 // video and audio in a tab.
-import type { MediaRef } from "@app/core";
+import type { MediaRef } from "@achoo254/chat-core";
 import type { ChatSource } from "../data/source.ts";
 
 /** How long a saved photo's object URL lives (the browser has started the download by then). */

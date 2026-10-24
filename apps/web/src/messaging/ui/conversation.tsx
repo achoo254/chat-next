@@ -1,7 +1,7 @@
 // The open chat or topic (mockups/chat.html#app, #channel, #topics,
 // #topic-states, #connection-states).
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";

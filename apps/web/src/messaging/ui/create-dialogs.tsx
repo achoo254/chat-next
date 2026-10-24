@@ -3,7 +3,7 @@
 // #forward).
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { fold, type DialogView } from "@app/core";
+import { fold, type DialogView } from "@achoo254/chat-core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/screen-icons.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";

@@ -1,4 +1,4 @@
-import { LAST_USER_KEY } from "@app/platform-web";
+import { LAST_USER_KEY } from "@achoo254/chat-platform-web";
 import { afterEach, describe, expect, it } from "vitest";
 import { CORE_LAST_USER_KEY, forgetSelf, lastSelf, rememberSelf } from "../src/api/offline-self.ts";
 

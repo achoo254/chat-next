@@ -72,21 +72,21 @@ importers:
 
   apps/web:
     dependencies:
+      '@achoo254/chat-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@achoo254/chat-platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@achoo254/chat-platform-web':
+        specifier: workspace:*
+        version: link:../../packages/platform-web
+      '@achoo254/chat-proto':
+        specifier: workspace:*
+        version: link:../../packages/proto-ts
       '@aparajita/capacitor-secure-storage':
         specifier: 8.0.1
         version: 8.0.1
-      '@app/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@app/platform':
-        specifier: workspace:*
-        version: link:../../packages/platform
-      '@app/platform-web':
-        specifier: workspace:*
-        version: link:../../packages/platform-web
-      '@app/proto-ts':
-        specifier: workspace:*
-        version: link:../../packages/proto-ts
       '@bufbuild/protobuf':
         specifier: 2.16.0
         version: 2.16.0
@@ -166,10 +166,10 @@ importers:
 
   packages/core:
     dependencies:
-      '@app/platform':
+      '@achoo254/chat-platform':
         specifier: workspace:*
         version: link:../platform
-      '@app/proto-ts':
+      '@achoo254/chat-proto':
         specifier: workspace:*
         version: link:../proto-ts
       '@bufbuild/protobuf':
@@ -183,10 +183,10 @@ importers:
 
   packages/platform-web:
     dependencies:
-      '@app/core':
+      '@achoo254/chat-core':
         specifier: workspace:*
         version: link:../core
-      '@app/platform':
+      '@achoo254/chat-platform':
         specifier: workspace:*
         version: link:../platform
       '@connectrpc/connect':
@@ -199,7 +199,7 @@ importers:
         specifier: 3.53.4-build2
         version: 3.53.4-build2
     devDependencies:
-      '@app/proto-ts':
+      '@achoo254/chat-proto':
         specifier: workspace:*
         version: link:../proto-ts
 

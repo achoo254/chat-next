@@ -5,7 +5,7 @@
 // visible message itself after a prepend. Floating buttons go to the newest
 // message and, while someone's mention of you is unread, to that message.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import type { Chat, DialogView } from "@app/core";
+import type { Chat, DialogView } from "@achoo254/chat-core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

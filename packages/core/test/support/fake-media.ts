@@ -5,7 +5,7 @@
 // messages (404), owner dedupe and refused content.
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { BlobStore, BlobStoreFactory, Http, HttpGetResult, HttpPutResult } from "@app/platform";
+import type { BlobStore, BlobStoreFactory, Http, HttpGetResult, HttpPutResult } from "@achoo254/chat-platform";
 import {
 	AbortUploadResponseSchema,
 	CompleteUploadResponseSchema,
@@ -15,8 +15,8 @@ import {
 	MediaRefSchema,
 	MediaSizeType,
 	type MediaRef as WireMediaRef,
-} from "@app/proto-ts/media";
-import { AppConfigSchema, GetAppConfigResponseSchema } from "@app/proto-ts/config";
+} from "@achoo254/chat-proto/media";
+import { AppConfigSchema, GetAppConfigResponseSchema } from "@achoo254/chat-proto/config";
 import type { RemoteApi } from "../../src/protocol/api.ts";
 
 interface UploadSessionRecord {

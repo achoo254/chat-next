@@ -1,6 +1,6 @@
 // Pure presentation helpers: chat kinds, names, avatar tones, times and
 // one-line previews. No React, so they are unit-tested directly.
-import { toBase64, type Chat, type DialogView, type Message, type MessageAction, type User } from "@app/core";
+import { toBase64, type Chat, type DialogView, type Message, type MessageAction, type User } from "@achoo254/chat-core";
 import type { MessagingCopy } from "../copy/vi.ts";
 import type { Tone } from "./pending-backend.ts";
 

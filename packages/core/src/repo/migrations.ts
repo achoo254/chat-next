@@ -3,7 +3,7 @@
 // Node test runner load them the same way. Versions only grow; a database
 // from a newer build is reset and synced again (the server is the source of
 // truth).
-import type { SqlDriver, SqlStatement } from "@app/platform";
+import type { SqlDriver, SqlStatement } from "@achoo254/chat-platform";
 import { FTS5_TOKENIZE } from "../vifold/index.ts";
 
 export interface Migration {

@@ -5,8 +5,8 @@
 // dedupe, and a realtime link that can drop and reorder frames.
 import { create, fromBinary, toBinary, type MessageInitShape } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { Socket, SocketFactory, SocketHandlers } from "@app/platform";
-import { SessionRevokeReason } from "@app/proto-ts/auth";
+import type { Socket, SocketFactory, SocketHandlers } from "@achoo254/chat-platform";
+import { SessionRevokeReason } from "@achoo254/chat-proto/auth";
 import {
 	ChatSchema,
 	ChatType,
@@ -24,7 +24,7 @@ import {
 	type Chat as WireChat,
 	type Dialog as WireDialog,
 	type NotificationSettings as WireNotificationSettings,
-} from "@app/proto-ts/chats";
+} from "@achoo254/chat-proto/chats";
 import {
 	DeleteMessagesResponseSchema,
 	EditMessageResponseSchema,
@@ -45,8 +45,8 @@ import {
 	UnpinAllMessagesResponseSchema,
 	type Message as WireMessage,
 	type SyncAck as WireSyncAck,
-} from "@app/proto-ts/messages";
-import { ClientFrameSchema, ResyncReason, ServerFrameSchema, TypingAction } from "@app/proto-ts/realtime";
+} from "@achoo254/chat-proto/messages";
+import { ClientFrameSchema, ResyncReason, ServerFrameSchema, TypingAction } from "@achoo254/chat-proto/realtime";
 import {
 	GetChatDifferenceResponseSchema,
 	GetDifferenceResponseSchema,
@@ -54,17 +54,17 @@ import {
 	LargeChatStateSchema,
 	UpdateSchema,
 	type Update as WireUpdate,
-} from "@app/proto-ts/updates";
-import { GetSelfResponseSchema, GetUsersResponseSchema, UserSchema, type User as WireUser } from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/updates";
+import { GetSelfResponseSchema, GetUsersResponseSchema, UserSchema, type User as WireUser } from "@achoo254/chat-proto/users";
 import {
 	SearchChatMessagesResponseSchema,
 	SearchMessagesResponseSchema,
 	SearchFilterSchema,
-} from "@app/proto-ts/search";
+} from "@achoo254/chat-proto/search";
 import { matchesSubstrings } from "../../src/search/index.ts";
 import { searchText } from "../../src/vifold/index.ts";
 import type { RemoteApi } from "../../src/protocol/api.ts";
-import type { MediaRef as WireMediaRef } from "@app/proto-ts/media";
+import type { MediaRef as WireMediaRef } from "@achoo254/chat-proto/media";
 import type { FakeMedia } from "./fake-media.ts";
 import { toMessage } from "../../src/protocol/map.ts";
 import type { Message } from "../../src/model/types.ts";

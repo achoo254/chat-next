@@ -2,7 +2,7 @@
 // the server's merged in after a pause in typing) bound to React state. The
 // session asks the server only while the device is online, and asks again
 // on its own once the connection comes back.
-import { IDLE_SEARCH, SearchSession, type SearchRequest, type SearchState } from "@app/core";
+import { IDLE_SEARCH, SearchSession, type SearchRequest, type SearchState } from "@achoo254/chat-core";
 import { useEffect, useState } from "react";
 import { useConnection, useServices } from "../data/services.tsx";
 

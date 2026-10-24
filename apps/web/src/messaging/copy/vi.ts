@@ -1,7 +1,7 @@
 // Vietnamese copy of the messaging UI (release R1), taken from the approved
 // mockups. Loaded with the messaging chunk so the R0 shell stays small;
 // en.ts must provide the same keys.
-import type { HookStopReason } from "@app/core";
+import type { HookStopReason } from "@achoo254/chat-core";
 
 /** The chat kind in copy that names it: channels are never called groups. */
 const kind = (channel: boolean): string => (channel ? "kênh" : "nhóm");

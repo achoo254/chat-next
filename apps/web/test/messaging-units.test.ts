@@ -5,7 +5,7 @@ import enScreensSource from "../src/messaging/copy/en-screens.ts?raw";
 import enSource from "../src/messaging/copy/en.ts?raw";
 import viScreensSource from "../src/messaging/copy/vi-screens.ts?raw";
 import viSource from "../src/messaging/copy/vi.ts?raw";
-import type { MessageEntity } from "@app/core";
+import type { MessageEntity } from "@achoo254/chat-core";
 import { vi as copy } from "../src/messaging/copy/vi.ts";
 import { en } from "../src/messaging/copy/en.ts";
 import { enScreens } from "../src/messaging/copy/en-screens.ts";

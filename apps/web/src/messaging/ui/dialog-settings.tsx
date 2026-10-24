@@ -4,7 +4,7 @@
 // lại) and pinned chats. Both are server state (SetDialogMute,
 // SetDialogPinned) that reaches every session through the dialog list.
 import { Code, ConnectError } from "@connectrpc/connect";
-import { MUTE_FOREVER } from "@app/core";
+import { MUTE_FOREVER } from "@achoo254/chat-core";
 import type { RefObject } from "react";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";

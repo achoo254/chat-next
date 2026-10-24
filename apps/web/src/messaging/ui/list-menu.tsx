@@ -4,7 +4,7 @@
 // yourself, a group or channel you own for everyone (#delete-chat). Opened by right click, a long press, the menu key or the row's
 // "…" button, never by opening the chat. Mute, pins and "marked as unread"
 // sync to the user's other sessions through the server.
-import { MUTE_FOREVER, PINNED_DIALOGS_MAX } from "@app/core";
+import { MUTE_FOREVER, PINNED_DIALOGS_MAX } from "@achoo254/chat-core";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";

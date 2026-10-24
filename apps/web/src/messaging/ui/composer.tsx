@@ -25,7 +25,7 @@ import {
 	type FormEvent,
 	type KeyboardEvent,
 } from "react";
-import { codePointLength } from "@app/core";
+import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";

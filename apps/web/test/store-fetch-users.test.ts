@@ -1,7 +1,7 @@
 // Users the source does not know are asked from the server by the store
 // itself, in requests the server accepts (at most 200 ids per GetUsers).
 import { afterEach, describe, expect, it } from "vitest";
-import type { User } from "@app/core";
+import type { User } from "@achoo254/chat-core";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { ChatStore } from "../src/messaging/data/store.ts";
 import { seedDemo } from "./support/demo-data.ts";

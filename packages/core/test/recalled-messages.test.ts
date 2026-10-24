@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { MessageSchema, ReactionCountSchema } from "@app/proto-ts/messages";
-import { UpdateSchema } from "@app/proto-ts/updates";
-import { ChatType } from "@app/proto-ts/chats";
+import { MessageSchema, ReactionCountSchema } from "@achoo254/chat-proto/messages";
+import { UpdateSchema } from "@achoo254/chat-proto/updates";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { toMessage, toUpdate } from "../src/protocol/map.ts";
 import { putMessage, WriteBatch } from "../src/repo/writes.ts";
 import { FakeServer } from "./support/fake-server.ts";

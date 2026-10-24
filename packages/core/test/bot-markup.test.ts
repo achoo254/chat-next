@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { ChatType } from "@app/proto-ts/chats";
-import { MessageSchema } from "@app/proto-ts/messages";
+import { ChatType } from "@achoo254/chat-proto/chats";
+import { MessageSchema } from "@achoo254/chat-proto/messages";
 import { fromBase64 } from "../src/media/codec.ts";
 import { toMessage } from "../src/protocol/map.ts";
 import { FakeServer } from "./support/fake-server.ts";

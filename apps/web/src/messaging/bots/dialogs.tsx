@@ -3,7 +3,7 @@
 // confirmation such an action opens on coming back (`?after=`), which acts
 // only from its own button.
 import { useEffect, useEffectEvent, type ReactNode } from "react";
-import { signInUrl } from "@app/core";
+import { signInUrl } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { paths, type ConsoleTab } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";

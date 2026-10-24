@@ -1,13 +1,13 @@
 // Connect implementation of AccountApi (see privacy-api.ts), loaded with the "Tài khoản" tab.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { assertSafeId } from "@app/core";
+import { assertSafeId } from "@achoo254/chat-core";
 import {
 	DataExportStatus,
 	PrivacyService,
 	type DataExport as WireExport,
 	type GetDataExportResponse,
 	type GetAccountDeletionResponse,
-} from "@app/proto-ts/privacy";
+} from "@achoo254/chat-proto/privacy";
 import type { AccountData, AutoDeleteMonths, DataExport, DeletionInfo, ExportState, ExportStatus, AccountApi, PrivacyErrorKind } from "./privacy-api.ts";
 
 const STATUSES: Partial<Record<DataExportStatus, ExportStatus>> = {

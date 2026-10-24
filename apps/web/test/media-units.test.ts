@@ -1,7 +1,7 @@
 // Pure helpers of the media screens: sizes and durations as people read
 // them, file type labels, how a selection splits into sends, waveforms,
 // fixed picture boxes, album rows of the message list and shared media.
-import type { StoredMessage } from "@app/core";
+import type { StoredMessage } from "@achoo254/chat-core";
 import { describe, expect, it } from "vitest";
 import { albumBox, mediaBox } from "../src/messaging/media/box.ts";
 import {

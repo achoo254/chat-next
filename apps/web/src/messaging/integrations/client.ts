@@ -1,6 +1,6 @@
 // Connect implementation of Integrations (see api.ts), loaded on first use.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { assertSafeId } from "@app/core";
+import { assertSafeId } from "@achoo254/chat-core";
 import {
 	IncomingHookAuditAction as WireAction,
 	IncomingHookDisabledReason as WireReason,
@@ -10,8 +10,8 @@ import {
 	type IncomingHook,
 	type IncomingHookAuditEntry,
 	type IncomingHookDeadLetter,
-} from "@app/proto-ts/integrations";
-import type { User as WireUser } from "@app/proto-ts/users";
+} from "@achoo254/chat-proto/integrations";
+import type { User as WireUser } from "@achoo254/chat-proto/users";
 import type { Hook, HookAuditAction, HookAuditEntry, HookDeadLetter, HookDisabledReason, HookFormat, HookNames, HookState, Integrations } from "./api.ts";
 
 const FORMATS: Partial<Record<WireFormat, HookFormat>> = {

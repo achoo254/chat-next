@@ -4,7 +4,7 @@
 // simply hidden. Everything else (contacts, bans, mute, pinned chats, the
 // blocked list, moderation) is a plain RPC on Remote, on every R1 server;
 // mute and pinned chats reach the dialog list through the client core.
-import type { Message } from "@app/core";
+import type { Message } from "@achoo254/chat-core";
 
 export type PendingFeature = "topics" | "linkPreview" | "report" | "invitePreview";
 

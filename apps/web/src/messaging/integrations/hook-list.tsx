@@ -1,7 +1,7 @@
 // The chat's webhooks (mockups/integrations.html#hooks-list): name, format,
 // creator, last request and status (running, rotating its secret, turned
 // off or turned off by the server), then the chat's webhook log.
-import type { Chat } from "@app/core";
+import type { Chat } from "@achoo254/chat-core";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
 import { Icon } from "../../components/icon.tsx";

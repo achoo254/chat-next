@@ -4,7 +4,7 @@
 // window.perfHarness (see test/perf/perf-api.ts). Test-only: never part of the
 // production build. The client core runs on this page's main thread (the
 // production app runs it in a worker), so the numbers are pessimistic.
-import { ChatType, MemberRole } from "@app/proto-ts/chats";
+import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
 import { openMemoryFactory } from "../../../../packages/platform-web/src/driver.ts";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

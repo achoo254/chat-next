@@ -1,4 +1,4 @@
-import type { SqlDriverFactory } from "@app/platform";
+import type { SqlDriverFactory } from "@achoo254/chat-platform";
 import { describe, expect, it } from "vitest";
 import { soloLocks, type LockManagerLike } from "../src/leader.ts";
 import { nativeLocks, openLocalDatabase } from "../src/local-database.ts";

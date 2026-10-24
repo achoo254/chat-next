@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@connectrpc/connect";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { parseOperation } from "../src/outbox/outbox.ts";
 import type { RemoteApi } from "../src/protocol/api.ts";
 import { FakeServer } from "./support/fake-server.ts";

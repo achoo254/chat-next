@@ -7,7 +7,7 @@
 // opens (#info-overlay), and below 760px it fills the screen with a back
 // arrow (#narrow). "Ảnh, file, link" lists the kinds of shared media the
 // chat has and opens them in the column, one tab per kind (R3).
-import { PINNED_DIALOGS_MAX, type Chat, type User } from "@app/core";
+import { PINNED_DIALOGS_MAX, type Chat, type User } from "@achoo254/chat-core";
 import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import type { SharedTab } from "../media/shared-media.tsx";
 import { Icon } from "../../components/screen-icons.tsx";

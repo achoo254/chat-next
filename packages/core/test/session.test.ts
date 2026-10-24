@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@connectrpc/connect";
-import { ChatType } from "@app/proto-ts/chats";
+import { ChatType } from "@achoo254/chat-proto/chats";
 import { databaseName, signInUrl } from "../src/auth/web.ts";
 import { startApp } from "../src/app/start-app.ts";
 import { SessionEndedError } from "../src/protocol/api.ts";

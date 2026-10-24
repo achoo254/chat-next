@@ -3,14 +3,14 @@
 // backoff. The sync engine owns what happens after a (re)connect: the
 // ADR 0002 order (subscribe, buffer, GetDifference, merge) starts on onHello.
 import { create, fromBinary, toBinary, type MessageInitShape } from "@bufbuild/protobuf";
-import type { Socket, SocketFactory, Timers } from "@app/platform";
-import { ClientPlatform } from "@app/proto-ts/auth";
+import type { Socket, SocketFactory, Timers } from "@achoo254/chat-platform";
+import { ClientPlatform } from "@achoo254/chat-proto/auth";
 import {
 	ClientFrameSchema,
 	FrameErrorCode,
 	ServerFrameSchema,
 	type ServerFrame,
-} from "@app/proto-ts/realtime";
+} from "@achoo254/chat-proto/realtime";
 import type { Hello, SessionRevokeReason, TypingAction, UpdateBatch } from "../model/types.ts";
 import { toHello, toRevokeReason, toTyping, toUpdateBatch, toWireId, toWireTypingAction, type TypingChange } from "../protocol/map.ts";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffPolicy } from "./backoff.ts";

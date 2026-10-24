@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
-import type { HookStopReason, MessageEntity } from "@app/core";
+import type { HookStopReason, MessageEntity } from "@achoo254/chat-core";
 import type { Hook } from "../src/messaging/integrations/api.ts";
 import { enHooks } from "../src/messaging/integrations/copy-en.ts";
 import { viHooks } from "../src/messaging/integrations/copy-vi.ts";

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
-import { systemTimers } from "@app/platform";
-import { ChatType, DialogSchema, GetDialogsResponseSchema } from "@app/proto-ts/chats";
-import { UpdateSchema } from "@app/proto-ts/updates";
+import { systemTimers } from "@achoo254/chat-platform";
+import { ChatType, DialogSchema, GetDialogsResponseSchema } from "@achoo254/chat-proto/chats";
+import { UpdateSchema } from "@achoo254/chat-proto/updates";
 import { isReturnPath, signInUrl } from "../src/auth/web.ts";
 import { EventBus } from "../src/events/bus.ts";
 import { isMuted, MUTE_FOREVER, unreadTotals } from "../src/model/types.ts";
