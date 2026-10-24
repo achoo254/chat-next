@@ -264,7 +264,8 @@ describe("composer", () => {
 		await userEvent.type(screen.getByRole("textbox", { name: /^Tin nhắn tới / }), text);
 		await userEvent.click(await screen.findByRole("button", { name: "Gửi không kèm xem trước" }, LONG));
 		await userEvent.keyboard("{Enter}");
-		expect(await within(log).findByText(/^Xem lại /, {}, LONG)).toBeTruthy();
+		// The address is a link of its own (detected while the message is pending too).
+		expect(await within(log).findByText("Xem lại", { selector: ".bubble p" }, LONG)).toBeTruthy();
 		await waitFor(() => expect(demo.fixture.sentWithoutPreview).toEqual([text]), LONG);
 	});
 
@@ -273,7 +274,7 @@ describe("composer", () => {
 		await userEvent.type(screen.getByRole("textbox", { name: /^Tin nhắn tới / }), "Đọc https://docs.example.com/postgres/upgrade");
 		await screen.findByRole("button", { name: "Gửi không kèm xem trước" }, LONG);
 		await userEvent.keyboard("{Enter}");
-		expect(await within(log).findByText(/^Đọc /, {}, LONG)).toBeTruthy();
+		expect(await within(log).findByText("Đọc", { selector: ".bubble p" }, LONG)).toBeTruthy();
 		await waitFor(() => expect(demo.fixture.sent.some((m) => m.text.startsWith("Đọc "))).toBe(true), LONG);
 		expect(demo.fixture.sentWithoutPreview).toEqual([]);
 	});

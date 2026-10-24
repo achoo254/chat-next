@@ -1,4 +1,5 @@
 export * from "./entities/index.ts";
+export { detectEntities, type DetectedEntity, type DetectedEntityType, type ExistingEntity } from "./entities/detect-entities.ts";
 export * from "./ids/index.ts";
 export * from "./vifold/index.ts";
 export * from "./model/types.ts";

@@ -237,6 +237,12 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .bubble p { margin: 0; white-space: pre-wrap; }
 .bubble code { font-family: var(--font-mono); font-size: 0.8125rem; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
 .bubble a { color: var(--c-primary); }
+/* Mentions, hashtags and e-mail addresses that act on a tap: buttons that read as text (rich-text.tsx). */
+.entity { display: inline; padding: 0; border: 0; background: none; font: inherit; color: var(--c-primary); text-align: inherit; cursor: pointer; }
+.entity:hover { text-decoration: underline; }
+/* The menu of an e-mail address (email-entity.tsx), at the address and kept inside the window. */
+.entity-menu { position: fixed; z-index: 20; max-width: calc(100vw - 2 * var(--space-2)); }
+.entity-menu .menu { min-width: 180px; }
 .mention { color: var(--c-primary); font-weight: 500; }
 .mention.me { padding: 0 2px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-primary-solid) 14%, transparent); }
 .msg.at-me .bubble { box-shadow: inset 3px 0 0 var(--c-primary-solid); }
@@ -426,8 +432,9 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .react-picker button:hover { background: var(--c-hover); }
 .react-picker .more-react { font-size: 1rem; }
 .menu { min-width: 220px; padding: var(--space-1); border-radius: var(--radius-sm); background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-md); }
-.menu button { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 40px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-xs); background: none; text-align: left; color: var(--c-text); font-size: 0.875rem; }
-.menu button:hover, .menu button:focus-visible { background: var(--c-hover); }
+.menu button, .menu a[role="menuitem"] { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 40px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-xs); background: none; text-align: left; color: var(--c-text); font-size: 0.875rem; }
+.menu button:hover, .menu button:focus-visible, .menu a[role="menuitem"]:hover, .menu a[role="menuitem"]:focus-visible { background: var(--c-hover); }
+.menu a[role="menuitem"] { text-decoration: none; }
 .menu .danger { color: var(--c-error); }
 .menu .count { margin-left: auto; font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 .menu .go { display: inline-flex; margin-left: auto; color: var(--c-icon-muted); }

@@ -147,6 +147,13 @@ export interface Ui {
 
 export const UiContext = createContext<Ui | null>(null);
 
+/**
+ * Opens the open conversation's in-chat search with a query (a tapped
+ * #hashtag). Provided by the conversation; null elsewhere (dialogs, other
+ * screens), where hashtags stay plain.
+ */
+export const ChatSearchContext = createContext<((query: string) => void) | null>(null);
+
 export function useUi(): Ui {
 	const ui = useContext(UiContext);
 	if (ui === null) throw new Error("useUi must be used inside <UiContext>");

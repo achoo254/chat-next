@@ -1,19 +1,31 @@
 // Message text rendered from entities (ADR 0004): offsets are UTF-16 units,
 // entities nest but never partially overlap. Nothing is inserted as HTML;
 // every link goes through the scheme allowlist, and links off the tenant's
-// own sites ask before opening.
+// own sites ask before opening. Links, e-mails, @mentions and #hashtags of
+// the plain text are detected here too, with the server's rules
+// (detectEntities), so messages stored before the server added them show
+// the same way.
 import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@achoo254/chat-core";
+import { detectEntities, isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@achoo254/chat-core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { matchRoute, navigate } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { hostOf, isTrustedHost } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
+import { EmailEntity } from "./email-entity.tsx";
 import { copyText } from "./parts.tsx";
 import { serverHost, serverOrigin } from "../../server-origin.ts";
 
 const APP_SCHEME = brand.urlScheme;
+/** Most entities a message holds (server/internal/chat entitiesMax), detected ones included. */
+const ENTITIES_MAX = 100;
+
+/** The message's entities plus the links, e-mails, mentions and hashtags its plain text holds. */
+function withDetectedEntities(text: string, entities: readonly MessageEntity[]): readonly MessageEntity[] {
+	const detected = detectEntities(text, entities, APP_SCHEME, ENTITIES_MAX - entities.length);
+	return detected.length === 0 ? entities : [...entities, ...detected];
+}
 
 interface Node {
 	readonly entity: MessageEntity | null;
@@ -54,6 +66,10 @@ export interface RichContext {
 	readonly selfUsername: string;
 	/** Opens a link, asking first when it leaves the tenant's sites; `shown` is the text the message shows for it. */
 	readonly openLink: (url: string, shown?: string) => void;
+	/** Opens the profile of the user or bot with this username (no "@"); without it a mention is not a control. */
+	readonly openMention?: (username: string) => void;
+	/** Searches the chat for a hashtag ("#tag"); without it a hashtag is not a control. */
+	readonly searchHashtag?: (tag: string) => void;
 }
 
 function Spoiler({ children }: { children: ReactNode }) {
@@ -69,7 +85,10 @@ function Spoiler({ children }: { children: ReactNode }) {
 	};
 	return (
 		<span className="spoiler" role="button" tabIndex={0} aria-label={copy.message.spoiler} onClick={() => setRevealed(true)} onKeyDown={reveal}>
-			<span aria-hidden="true">{children}</span>
+			{/* inert: links and buttons inside cannot be reached or pressed until it is revealed. */}
+			<span aria-hidden="true" inert>
+				{children}
+			</span>
 		</span>
 	);
 }
@@ -123,23 +142,30 @@ export function CodeBlock({ code, language }: { code: string; language: string }
 	);
 }
 
-function renderInline(text: string, node: Node, ctx: RichContext): ReactNode[] {
+/** Entities rendered as a link or a button; what they contain must not be another one. */
+const CONTROL_TYPES: ReadonlySet<string> = new Set(["text_link", "url", "email", "mention", "hashtag"]);
+
+/** `inControl`: inside a link or button, where nested entities show their text only (no nested controls). */
+function renderInline(text: string, node: Node, ctx: RichContext, inControl: boolean): ReactNode[] {
 	const out: ReactNode[] = [];
 	let cursor = node.start;
 	node.children.forEach((child, index) => {
 		if (child.start > cursor) out.push(text.slice(cursor, child.start));
-		out.push(<RichNode key={`${child.start}-${index}`} text={text} node={child} ctx={ctx} />);
+		out.push(<RichNode key={`${child.start}-${index}`} text={text} node={child} ctx={ctx} inControl={inControl} />);
 		cursor = child.end;
 	});
 	if (cursor < node.end) out.push(text.slice(cursor, node.end));
 	return out;
 }
 
-function RichNode({ text, node, ctx }: { text: string; node: Node; ctx: RichContext }) {
-	const inner = renderInline(text, node, ctx);
+function RichNode({ text, node, ctx, inControl }: { text: string; node: Node; ctx: RichContext; inControl: boolean }) {
 	const entity = node.entity;
+	const inner = renderInline(text, node, ctx, inControl || (entity !== null && CONTROL_TYPES.has(entity.type)));
 	const slice = text.slice(node.start, node.end);
 	if (entity === null) return <>{inner}</>;
+	if (inControl && CONTROL_TYPES.has(entity.type)) {
+		return entity.type === "mention" || entity.type === "hashtag" ? <span className={entity.type}>{inner}</span> : <>{inner}</>;
+	}
 	switch (entity.type) {
 		case "bold":
 			return <b>{inner}</b>;
@@ -168,24 +194,50 @@ function RichNode({ text, node, ctx }: { text: string; node: Node; ctx: RichCont
 		}
 		case "email":
 			return isAllowedUrl(`mailto:${slice}`, APP_SCHEME) ? (
-				<MessageLink url={`mailto:${slice}`} ctx={ctx}>
+				<EmailEntity email={slice}>
 					{inner}
-				</MessageLink>
+				</EmailEntity>
 			) : (
 				<>{inner}</>
 			);
 		case "mention": {
 			const me = ctx.selfUsername !== "" && slice.toLowerCase() === `@${ctx.selfUsername.toLowerCase()}`;
-			return <span className={me ? "mention me" : "mention"}>{inner}</span>;
+			const className = me ? "mention me" : "mention";
+			const open = ctx.openMention;
+			return open === undefined || !slice.startsWith("@") ? (
+				<span className={className}>{inner}</span>
+			) : (
+				<button type="button" className={`${className} entity`} onClick={() => open(slice.slice(1))}>
+					{inner}
+				</button>
+			);
 		}
 		case "mention_name":
 			return <span className={entity.userId === ctx.selfId ? "mention me" : "mention"}>{inner}</span>;
-		case "hashtag":
+		case "hashtag": {
+			const search = ctx.searchHashtag;
+			return search === undefined ? (
+				<span className="hashtag">{inner}</span>
+			) : (
+				<HashtagButton tag={slice} onSearch={search}>
+					{inner}
+				</HashtagButton>
+			);
+		}
 		case "bot_command":
 			return <span className="hashtag">{inner}</span>;
 		case "unknown":
 			return <>{inner}</>;
 	}
+}
+
+function HashtagButton({ tag, onSearch, children }: { tag: string; onSearch: (tag: string) => void; children: ReactNode }) {
+	const copy = useCopy();
+	return (
+		<button type="button" className="hashtag entity" title={copy.message.searchHashtag(tag)} onClick={() => onSearch(tag)}>
+			{children}
+		</button>
+	);
 }
 
 /** True when the text mentions the reader (@username or a name mention), as the server counts mentions. */
@@ -206,7 +258,7 @@ interface RichTextProps {
  * code blocks with a copy button; everything else stays inline.
  */
 export function RichText({ text, entities, ctx, tail }: RichTextProps) {
-	const root = entityTree(text, entities);
+	const root = entityTree(text, withDetectedEntities(text, entities));
 	const blocks: ReactNode[] = [];
 	let inline: ReactNode[] = [];
 	let cursor = 0;
@@ -235,7 +287,7 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 				/>,
 			);
 		} else {
-			inline.push(<RichNode key={`${child.start}-${index}`} text={text} node={child} ctx={ctx} />);
+			inline.push(<RichNode key={`${child.start}-${index}`} text={text} node={child} ctx={ctx} inControl={false} />);
 		}
 		cursor = child.end;
 	});

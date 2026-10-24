@@ -468,6 +468,8 @@ export interface Remote {
 	/** PermissionDenied when an admin removed and banned the caller. */
 	joinByInvite(link: string): Promise<number>;
 	searchPeople(query: string): Promise<Person[]>;
+	/** The id of the user or bot with this username ("@" optional); null when unknown or hidden by their privacy. */
+	userIdByUsername(username: string): Promise<number | null>;
 	people(ids: readonly number[]): Promise<Person[]>;
 	block(userId: number): Promise<void>;
 	unblock(userId: number): Promise<void>;
@@ -552,6 +554,7 @@ const METHODS = [
 	"exportInvite",
 	"joinByInvite",
 	"searchPeople",
+	"userIdByUsername",
 	"people",
 	"block",
 	"unblock",

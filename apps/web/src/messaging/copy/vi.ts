@@ -155,6 +155,15 @@ export const vi = {
 		spoiler: "Nội dung ẩn, bấm để hiện",
 		copyCode: "Sao chép đoạn code",
 		codeCopied: "Đã sao chép đoạn code",
+		/** The menu of an e-mail address in a message: copy it or write to it. */
+		emailMenu: (email: string) => `Email ${email}`,
+		copyEmail: "Sao chép",
+		emailCopied: "Đã sao chép email",
+		sendMail: "Gửi mail",
+		/** A tapped @username that the server does not know (or that hides from search). */
+		mentionNotFound: (username: string) => `Không tìm thấy @${username}`,
+		/** Tooltip of a #hashtag: tapping it searches the chat for it. */
+		searchHashtag: (tag: string) => `Tìm ${tag} trong chat`,
 		unsupportedTitle: "Tin này cần phiên bản mới hơn",
 		unsupportedBody: (name: string) => `${name} gửi một loại tin mà bản app này chưa hiển thị được.`,
 		reload: "Tải lại để cập nhật",

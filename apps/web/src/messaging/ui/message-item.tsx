@@ -9,7 +9,7 @@
 // starts with one, URL buttons, and "đã cập nhật" when edited in place. Bot
 // messages carry callback buttons too (mockups/bots.html#inline-keyboard):
 // the pressed one waits for the bot's answer while the others stay usable.
-import { Suspense, lazy, memo, type ReactNode } from "react";
+import { Suspense, lazy, memo, useContext, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
@@ -23,7 +23,7 @@ import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
-import { useIntent, useUi } from "./ui-context.tsx";
+import { ChatSearchContext, useIntent, useUi } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
 // Photos, files, voice and uploads render with the media chunk, loaded the
@@ -146,14 +146,31 @@ function useMenuTrigger(chatId: number, itemKey: string) {
 	return useContextTrigger(() => ui.menu.set({ chatId, key: itemKey }), true);
 }
 
-/** `fromId`: the sender, named in the external link confirmation. */
+/**
+ * `fromId`: the sender, named in the external link confirmation. A tapped
+ * @mention opens that user's or bot's profile; a #hashtag searches the
+ * conversation for it.
+ */
 function useRichContext(fromId: number): RichContext {
-	const { self } = useServices();
+	const copy = useCopy();
+	const { self, remote, toasts } = useServices();
 	const ui = useUi();
+	const searchChat = useContext(ChatSearchContext);
+	const openMention = (username: string) => {
+		remote.userIdByUsername(username).then(
+			(userId) => {
+				if (userId === null) toasts.show(copy.message.mentionNotFound(username));
+				else ui.dialog.set({ kind: "profile", userId });
+			},
+			() => toasts.show(copy.common.failed),
+		);
+	};
 	return {
 		selfId: self.id,
 		selfUsername: self.username,
 		openLink: linkOpener((url, text) => ui.dialog.set({ kind: "link", url, text, fromId })),
+		openMention,
+		...(searchChat === null ? {} : { searchHashtag: searchChat }),
 	};
 }
 

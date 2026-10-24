@@ -22,7 +22,7 @@ import { MiniAppChipSlot } from "./mini-app-slot.tsx";
 import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
-import { useCell, useUi } from "./ui-context.tsx";
+import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
 const MediaViewer = lazy(() => import("../media/viewer.tsx"));
@@ -231,9 +231,11 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const window_ = useWindow(chatId);
 	const [dragging, setDragging] = useState<number | null>(null);
 	const dragDepth = useRef(0);
-	// The search bar in place of the header, for the chat (and topic) it was opened in.
-	const [searchIn, setSearchIn] = useState<{ chatId: number; topicId: number } | null>(null);
+	// The search bar in place of the header, for the chat (and topic) it was opened in;
+	// `query` fills it (a tapped #hashtag), `opened` tells each opening apart.
+	const [searchIn, setSearchIn] = useState<{ chatId: number; topicId: number; query: string; opened: number } | null>(null);
 	const searching = searchIn !== null && searchIn.chatId === chatId && searchIn.topicId === effectiveTopic;
+	const openSearch = (query: string) => setSearchIn((open) => ({ chatId, topicId: effectiveTopic, query, opened: (open?.opened ?? 0) + 1 }));
 	useIncomingSound(chatId);
 	// Shares one loader timing with the message list (LoaderScope in chat-screen.tsx).
 	const loader = useLoader(chat === undefined);
@@ -322,7 +324,14 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 		<section className="convo" aria-label={topic?.title ?? title} {...dragHandlers}>
 			{searching ? (
 				<Suspense fallback={<header className="convo-head insearch" />}>
-					<InChatSearch chatId={chatId} topicId={effectiveTopic} title={topic?.title ?? title} onClose={() => setSearchIn(null)} />
+					<InChatSearch
+						key={searchIn?.opened ?? 0}
+						chatId={chatId}
+						topicId={effectiveTopic}
+						title={topic?.title ?? title}
+						initialQuery={searchIn?.query ?? ""}
+						onClose={() => setSearchIn(null)}
+					/>
 				</Suspense>
 			) : (
 				<header className="convo-head">
@@ -348,7 +357,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 						type="button"
 						className="icon-btn"
 						aria-label={topic !== null ? copy.topics.searchInTopic : copy.convo.searchInChat}
-						onClick={() => setSearchIn({ chatId, topicId: effectiveTopic })}
+						onClick={() => openSearch("")}
 					>
 						<Icon name="search" />
 					</button>
@@ -376,23 +385,25 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</Suspense>
 			)}
 			<MiniAppChipSlot place="top" />
-			<MessageList
-				// One list per chat and topic: its scroll position and what it
-				// marked read never carry over to the next chat.
-				key={`list:${chatId}:${effectiveTopic}`}
-				chatId={chatId}
-				topicId={effectiveTopic}
-				topic={topic}
-				chat={chat}
-				dialog={view}
-				empty={
-					botId === 0 ? undefined : (
-						<Suspense fallback={null}>
-							<BotProfileCard botId={botId} chatId={chatId} />
-						</Suspense>
-					)
-				}
-			/>
+			<ChatSearchContext value={openSearch}>
+				<MessageList
+					// One list per chat and topic: its scroll position and what it
+					// marked read never carry over to the next chat.
+					key={`list:${chatId}:${effectiveTopic}`}
+					chatId={chatId}
+					topicId={effectiveTopic}
+					topic={topic}
+					chat={chat}
+					dialog={view}
+					empty={
+						botId === 0 ? undefined : (
+							<Suspense fallback={null}>
+								<BotProfileCard botId={botId} chatId={chatId} />
+							</Suspense>
+						)
+					}
+				/>
+			</ChatSearchContext>
 			<MiniAppChipSlot place="bar" />
 			{chat.left ? (
 				<LeftBar chat={chat} />

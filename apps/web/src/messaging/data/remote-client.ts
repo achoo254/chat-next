@@ -565,6 +565,18 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => requireChatId((await chats.joinByInvite({ link })).chat, "JoinByInvite")),
 		searchPeople: (query) =>
 			call(async () => (await users.searchUsers({ query, limit: 20 })).users.map(toPerson)),
+		userIdByUsername: (username) =>
+			call(async () => {
+				try {
+					const user = (await users.resolveUsername({ username: username.replace(/^@/, "") })).user;
+					return user === undefined ? null : assertSafeId(user.id);
+				} catch (err) {
+					// InvalidArgument: not a username at all (a bot's own mention text).
+					const code = ConnectError.from(err).code;
+					if (code === Code.NotFound || code === Code.InvalidArgument) return null;
+					throw err;
+				}
+			}),
 		people: (ids) =>
 			call(async () =>
 				ids.length === 0 ? [] : (await users.getUsers({ userIds: ids.map(BigInt) })).users.map(toPerson),

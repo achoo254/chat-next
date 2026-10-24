@@ -21,14 +21,16 @@ interface InChatSearchProps {
 	/** Forum topic being viewed; 0 searches the whole chat. */
 	topicId: number;
 	title: string;
+	/** What the box holds when it opens (a tapped #hashtag); "" for an empty box. */
+	initialQuery?: string;
 	onClose: () => void;
 }
 
-export default function InChatSearch({ chatId, topicId, title, onClose }: InChatSearchProps) {
+export default function InChatSearch({ chatId, topicId, title, initialQuery = "", onClose }: InChatSearchProps) {
 	const copy = useScreensCopy();
 	const t = copy.search.inChat;
 	const { store } = useServices();
-	const [query, setQuery] = useState("");
+	const [query, setQuery] = useState(initialQuery);
 	const [fromId, setFromId] = useState(0);
 	const [picking, setPicking] = useState(false);
 	const pickerId = useId();
