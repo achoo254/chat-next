@@ -1,6 +1,6 @@
 # chat-next
 
-Ứng dụng chat của hệ sinh thái hoandat: web-first (React 19), đóng gói iOS/Android bằng Capacitor, desktop dùng bản web cài dạng PWA (không có app desktop native), backend Go. Người dùng đăng nhập bằng tài khoản hoandat qua IdP [`auth-next`](https://github.com/achoo254/auth-next); mỗi domain (tenant) có `chat.<domain>` riêng. Tên sản phẩm cấu hình ở `brand.config.json`; "chat-next" chỉ là tên repo.
+Ứng dụng chat của hệ sinh thái hoandat: web-first (React 19), đóng gói iOS/Android bằng Capacitor, desktop dùng bản web cài dạng PWA (không có app desktop native), backend Go. Người dùng đăng nhập bằng tài khoản hoandat qua IdP [`auth-next`](https://github.com/achoo254/auth-next); app chạy ở `chat.<domain>`, domain cấu hình bằng `TENANT_DOMAIN` (mặc định `hoandat.com`). Tên sản phẩm cấu hình ở `brand.config.json`; "chat-next" chỉ là tên repo.
 
 Plan và quyết định: [`plans/dattqh/261013-0448-chat-platform-v1/plan.md`](plans/dattqh/261013-0448-chat-platform-v1/plan.md). Kiến trúc: [`docs/README.md`](docs/README.md) và các ADR trong `docs/adr/`.
 

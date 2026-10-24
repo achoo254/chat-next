@@ -1,6 +1,6 @@
 # ADR 0010: Tenant theo domain
 
-- Trạng thái: Đã chấp nhận
+- Trạng thái: Bị thay thế (superseded) ngày 24/10/2026 bởi [ADR 0013 Đơn tenant của `auth-next`](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md). Hệ sinh thái chỉ phục vụ `hoandat.com`: không còn tenant khác, process `chat-api-<id>`, `setup-tenant.sh` hay `chat.tenants.conf`. Còn giữ: cột `tenant_id` (giá trị luôn `primary`, không migrate), lọc theo tenant trong mọi câu SQL, `tenant_id` trong initData của Mini App và token media, tên DB local, `tenant_name` của `GetAuthConfig` (bằng `TENANT_DOMAIN`). Server không còn đọc `TENANT_ID`; domain vẫn cấu hình bằng `TENANT_DOMAIN`. Phần dưới chỉ còn là lịch sử.
 - Ngày: 2026-10-14
 - Huỷ 20/10/2026: desktop = PWA. Toàn hệ sinh thái không có app desktop native (Tauri); trên máy tính dùng bản web cài dạng PWA, đăng nhập bằng `chat-web`. Client `chat-desktop` đã gỡ khỏi IdP. Phần nói về desktop/Tauri bên dưới chỉ còn là lịch sử.
 

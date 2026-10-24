@@ -26,7 +26,7 @@ pnpm mobile:sync               # build-web rồi `cap sync` (copy bundle, cập 
 cd apps/mobile && pnpm exec cap open ios        # mở Xcode, chạy trên Simulator hoặc máy thật
 ```
 
-- Server mặc định là host web của tenant chính trong `brand.config.json` (`https://chat.hoandat.com`). Trỏ sang server khác lúc build: `VITE_API_ORIGIN=https://chat.<domain> pnpm mobile:build-web`. Server đó phải có `APP_URL_SCHEME` khớp `urlScheme` của brand và IdP phải khai `chat-mobile` với cùng redirect.
+- Server mặc định là host web trong `brand.config.json` (`https://chat.hoandat.com`). Trỏ sang server khác lúc build: `VITE_API_ORIGIN=https://chat.<domain> pnpm mobile:build-web`. Server đó phải có `APP_URL_SCHEME` khớp `urlScheme` của brand và IdP phải khai `chat-mobile` với cùng redirect.
 - Tắt đăng nhập của app ở một server: `NATIVE_SIGN_IN=off` trong env của server ([`server/README.md`](../server/README.md)); phiên app đang có vẫn dùng được tới khi kết thúc.
 - `VITE_APP_VERSION` lấy `version` của `apps/mobile/package.json`; hiện trong danh sách phiên.
 - Build Simulator không ký, giống CI:
@@ -71,5 +71,4 @@ Nút "Đăng nhập", "Tạo tài khoản" và các bước "đăng nhập lại
 - Thông báo đẩy APNs/FCM (cần key APNs và project Firebase), notification service extension.
 - Ký và phát hành: TestFlight cần app record `com.hoandat.chat` trên App Store Connect; AAB ký cần Play Console và keystore. Không có secret ký nào trong repo.
 - SQLCipher native cho DB local (ADR 0009), OTA, Mini App trong in-app browser.
-- Chọn tenant khác trong app: một bản build trỏ tới một server (`VITE_API_ORIGIN`).
 - Thông báo lỗi đăng nhập dùng hộp thoại hệ thống (`alert`), chưa theo giao diện app.

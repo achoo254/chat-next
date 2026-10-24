@@ -245,7 +245,7 @@ curl -s ... -d '{"chat_id": 42, "text": "Mở cửa hàng",
   "reply_markup": {"inline_keyboard": [[{"text": "Cửa hàng", "web_app": {"url": "https://shop.example.org/app"}}]]}}' $API/messages
 ```
 
-URL phải là `https`, không chứa user:pass hay `#…`, host là tên miền công khai (không phải địa chỉ IP, `localhost` hay tên một nhãn), không nằm dưới domain của app (`hoandat.com`) hay domain của tenant nào, dài tối đa 512 byte. URL sai trả `400` với mô tả `mini_app_url_not_allowed: …`. App kiểm lại URL mỗi lần mở.
+URL phải là `https`, không chứa user:pass hay `#…`, host là tên miền công khai (không phải địa chỉ IP, `localhost` hay tên một nhãn), không nằm dưới domain của app (`hoandat.com`), dài tối đa 512 byte. URL sai trả `400` với mô tả `mini_app_url_not_allowed: …`. App kiểm lại URL mỗi lần mở.
 
 **Thử nhanh.** Trang Mini App mẫu [`sdk/miniapp-demo`](../../sdk/miniapp-demo/index.html) được phát hành ở `https://achoo254.github.io/chat-next/miniapp-demo/`: đặt URL đó cho bot ở Developer Console (tab Mini App) rồi bấm "Mở app" trong chat với bot. Trang hiện initData (chưa xác thực, vì không có server), đổi giao diện theo app, có nút chính gửi dữ liệu cho bot, xin quyền nhắn tin, mở link ngoài và ghi lại khi bị thu nhỏ hay mở lại. Lưu ý: `https://chat.<domain>/miniapp/sdk.js` là script để nạp trong trang, không phải URL Mini App.
 

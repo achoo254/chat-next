@@ -6,8 +6,7 @@ Tài liệu cho người nghiệm thu: mở đâu, thử gì, kết quả đúng
 
 | Thứ | Địa chỉ |
 |---|---|
-| App chat (tenant chính) | https://chat.hoandat.com |
-| Tenant nghiệm thu thứ hai | https://chat.inetdev.io.vn (dữ liệu tách riêng hoàn toàn với tenant chính) |
+| App chat | https://chat.hoandat.com |
 | Developer Console | Cài đặt › Developer Console (https://chat.hoandat.com/console) |
 | Tài liệu Bot API | [`docs/bot-api/README.md`](bot-api/README.md) |
 | Mini App mẫu | https://achoo254.github.io/chat-next/miniapp-demo/ |

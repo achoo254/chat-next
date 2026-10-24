@@ -4,11 +4,11 @@
 
 Ba trang mở được khi chưa đăng nhập (router `matchLegal` trong [`apps/web/src/router.tsx`](../../apps/web/src/router.tsx), hiển thị trước bước kiểm phiên ở [`apps/web/src/app.tsx`](../../apps/web/src/app.tsx)). nginx không cần sửa: `location /` của [`infra/chat/nginx/chat.hoandat.com.conf`](../../infra/chat/nginx/chat.hoandat.com.conf) đã `try_files $uri /index.html`, và service worker coi mọi lần mở trang cùng origin là trang của app ([`shell-routes.ts`](../../apps/web/src/sw/shell-routes.ts)). Có link ở màn hình đăng nhập và ở Cài đặt (mở tab mới). `/delete-account` dùng được làm URL xoá tài khoản khai cho kho ứng dụng.
 
-Văn bản: [`apps/web/src/screens/legal/legal-copy.ts`](../../apps/web/src/screens/legal/legal-copy.ts) (vi, en). Các dòng "Điều gì xảy ra" khi xoá tài khoản dùng chung với Cài đặt › Tài khoản: [`apps/web/src/i18n/account-deletion.ts`](../../apps/web/src/i18n/account-deletion.ts). Tên app, domain, host IdP lấy từ `brand.config.json` theo tenant. Câu về dịch vụ push dùng chung với tab Cài đặt › Quyền riêng tư: [`apps/web/src/i18n/push-services.ts`](../../apps/web/src/i18n/push-services.ts). Sửa một sự thật thì sửa cả bảng dưới, file nguồn và `legal-copy.ts`.
+Văn bản: [`apps/web/src/screens/legal/legal-copy.ts`](../../apps/web/src/screens/legal/legal-copy.ts) (vi, en). Các dòng "Điều gì xảy ra" khi xoá tài khoản dùng chung với Cài đặt › Tài khoản: [`apps/web/src/i18n/account-deletion.ts`](../../apps/web/src/i18n/account-deletion.ts). Tên app, domain, host IdP lấy từ `brand.config.json`. Câu về dịch vụ push dùng chung với tab Cài đặt › Quyền riêng tư: [`apps/web/src/i18n/push-services.ts`](../../apps/web/src/i18n/push-services.ts). Sửa một sự thật thì sửa cả bảng dưới, file nguồn và `legal-copy.ts`.
 
-## Thông tin vận hành (chỉ tenant chính `hoandat.com`)
+## Thông tin vận hành
 
-Email liên hệ, vị trí máy chủ và Cloudflare là sự thật của dịch vụ do nhà vận hành của tenant chính chạy. Trang chỉ hiện chúng khi host là tenant chính (`brand.primaryTenant` trong [`apps/web/src/brand.ts`](../../apps/web/src/brand.ts), so với `primaryTenant` của `brand.config.json`); tenant khác chỉ thấy kênh Góp ý trong app và không có dòng vị trí.
+Email liên hệ, vị trí máy chủ và Cloudflare là sự thật của dịch vụ `hoandat.com` do nhà vận hành chạy. Từ 24/10/2026 hệ sinh thái chỉ còn domain này (ADR 0013 Đơn tenant của `auth-next`), nên trang luôn hiện chúng (`OPERATOR_EMAIL` trong `legal-copy.ts`).
 
 | Khẳng định | Nguồn |
 |---|---|
@@ -91,4 +91,3 @@ Chưa đưa lên trang:
 
 - Nghị định 13/2023/NĐ-CP: repo chỉ nhắc trong tài liệu nội bộ (data-inventory.md, "chưa phải ý kiến pháp lý") và comment của `server/internal/privacy`, không có trong giao diện; trang công khai không trích. Đánh giá tác động chuyển dữ liệu ra nước ngoài (Điều 25) vẫn còn phải làm.
 - App mobile: ADR 0009 quyết định SQLCipher cho bản sao trên điện thoại; trang chỉ nói về trình duyệt, thêm khi app mobile phát hành.
-- Tenant ngoài tenant chính: chưa có email liên hệ hay vị trí máy chủ riêng; trang của họ chỉ có kênh Góp ý trong app.

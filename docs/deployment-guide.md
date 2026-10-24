@@ -40,6 +40,8 @@ Release R4 (tìm kiếm tin nhắn, migration `0011_message_search`) không đ�
 
 Release app iOS/Android (migration `0030_native_sessions`, ADR 0011) thêm location `= /rpc/app.v1.AuthService/ExchangeNativeCode` (zone `chat_auth`) vào `chat.hoandat.com.conf`, nên phải cập nhật bản nginx đã duyệt bằng root như các lần trên: đã làm 23/10/2026 07:53 (chép `infra/chat/nginx/` vào `/opt/chat/infra/nginx` và release hiện tại, render lại `chat.tenants.conf`, `nginx -t`, reload; bản cũ hậu tố `.bak-261023-075328`). Không cần biến môi trường mới (`NATIVE_SIGN_IN` mặc định `on`).
 
+Release bỏ đa tenant (24/10/2026, [ADR 0013 Đơn tenant](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md) của `auth-next`): server không đọc `TENANT_ID` nữa (tenant luôn `primary`, dữ liệu không đổi), `TENANT_DOMAIN` giữ nguyên. Đổi `activate-release.sh` (bỏ dựng `chat.tenants.conf`, khởi động và kiểm process `chat-api-<id>`), `ecosystem.config.cjs` (chỉ `chat-api`), `rotate-session-key.sh` (chỉ `/opt/chat/.env`), `setup-server.sh`; xoá `setup-tenant.sh`, `render-tenants-nginx.sh`. Bản deploy tự động của CI vẫn chạy được với script cũ trên server (không còn `/opt/chat/tenants` thì script cũ không dựng gì), nhưng phải deploy bằng root một lần để `/opt/chat/infra` nhận script mới (`rsync --delete` gỡ hai script đã xoá). Sau đó: backup rồi xoá dòng `TENANT_ID` khỏi `/opt/chat/.env`, `pm2 startOrReload /opt/chat/infra/ecosystem.config.cjs --only chat-api --update-env`, `pm2 save`, `smoke.sh`; `ls /etc/nginx/conf.d/*tenant*` không còn file của chat, `nginx -t` đạt.
+
 Bản tìm kiếm chuỗi con (migration `0012_message_search_substring`: từ khoá khớp cả giữa từ, "uần" ra "tuần") không đổi nginx, script hay biến môi trường, deploy như các lần sau, nhưng **cần `pg_trgm`**:
 
 - Điều kiện: gói `postgresql-contrib` đã cài trên server (người vận hành cài bản 16.8 ngày 2026-10-15; `SELECT name, default_version FROM pg_available_extensions WHERE name = 'pg_trgm'` trả `pg_trgm | 1.6`). Migration tự chạy `CREATE EXTENSION IF NOT EXISTS pg_trgm`. `pg_trgm` là extension trusted (Postgres ≥ 13), nên role `chat`, chủ database `chat`, tạo được mà không cần superuser; test `TestMigrateCreatesTrigramExtensionAsDatabaseOwner` chạy toàn bộ migration bằng một role chủ database không phải superuser.
@@ -114,23 +116,10 @@ Thu hồi: xoá id khỏi biến rồi reload. Mọi hành động kiểm duyệ
 
 - `ABUSE_STRANGER_CHATS_NEW` (20) và `ABUSE_STRANGER_CHATS` (50): số chat riêng mới với người chưa quen (chưa thêm mình vào danh bạ, không chung nhóm hay kênh) mỗi 24 giờ, cho tài khoản dưới `ABUSE_NEW_ACCOUNT_DAYS` (7) ngày tuổi và tài khoản lâu hơn.
 - `ABUSE_REPORTERS` (3): đủ số người có báo cáo đang mở trong 30 ngày thì tài khoản tạm không nhắn được người chưa quen, tới khi kiểm duyệt đóng báo cáo.
-- `ABUSE_SIGNUPS_PER_IP_HOUR` (30) và `ABUSE_SIGNUPS_PER_10MIN` (300): số tài khoản chat mới tạo ở lần đăng nhập đầu, theo IP mỗi giờ và theo tenant mỗi 10 phút; vượt thì trang đăng nhập báo thử lại sau. Bộ đếm nằm trong bộ nhớ process, restart thì đếm lại.
-- `CHAT_MAX_ONLINE_USERS` (1000, `0` là không giới hạn): số người khác nhau đang mở socket realtime trong một process (mỗi tenant một process). Người đã online mở thêm thiết bị vẫn được; người mới vượt trần bị gateway đóng socket với mã "try again later", app giữ trạng thái "Đang kết nối…" và tự thử lại, các RPC (gửi tin, lịch sử) vẫn chạy. Con số lấy từ load test lượt 1 trên `.65` ([báo cáo](../plans/dattqh/reports/load-test-261017-1102-round1.md)).
+- `ABUSE_SIGNUPS_PER_IP_HOUR` (30) và `ABUSE_SIGNUPS_PER_10MIN` (300): số tài khoản chat mới tạo ở lần đăng nhập đầu, theo IP mỗi giờ và toàn app mỗi 10 phút; vượt thì trang đăng nhập báo thử lại sau. Bộ đếm nằm trong bộ nhớ process, restart thì đếm lại.
+- `CHAT_MAX_ONLINE_USERS` (1000, `0` là không giới hạn): số người khác nhau đang mở socket realtime trong process `chat-api`. Người đã online mở thêm thiết bị vẫn được; người mới vượt trần bị gateway đóng socket với mã "try again later", app giữ trạng thái "Đang kết nối…" và tự thử lại, các RPC (gửi tin, lịch sử) vẫn chạy. Con số lấy từ load test lượt 1 trên `.65` ([báo cáo](../plans/dattqh/reports/load-test-261017-1102-round1.md)).
 
 Luật bot chạy 10 phút một lần trong `chat-api`: bot có ít nhất 20 người nhận trong 24 giờ mà từ 5% trong đó chặn bot, hoặc có từ 50 người dùng mới trong 24 giờ và gấp 10 lần trung bình tuần trước, bị hạ xuống tầng `restricted` và hiện ở đầu hàng đợi chờ xem xét. Ngưỡng này nằm trong code (`server/internal/chat/moderation_bots.go`).
-
-## Tenant khác (nghiệm thu `inetdev.io.vn`)
-
-Mỗi tenant khác tenant chính chạy một process `chat-api-<id>` riêng trên cùng database, ở `https://chat.<domain>`. Process nào chỉ đọc outbox và dữ liệu của tenant mình. Tenant `inetdev.io.vn` chỉ dùng để nghiệm thu mô hình tenant; các app khác không cần làm theo.
-
-1. Phía IdP (`auth-next`): tenant đã có ở `auth.<domain>`. Chứng chỉ của tenant (`/etc/letsencrypt-tenants/live/<domain>/`) phải có `chat.<domain>`, và map `$tenant_cert` trong `00-tenants-http.conf` phải nhận nhãn `chat.`. Host `chat.<domain>` để DNS only hay Proxied qua Cloudflare đều được.
-2. Trên server, với quyền root: `bash /opt/chat/infra/setup-tenant.sh <id> <domain> <cổng 4601–4699>`, ví dụ `setup-tenant.sh inetdev inetdev.io.vn 4601`. Script tạo `/opt/chat/tenants/<id>.env` một lần (`SESSION_KEY` mới; media và Web Push tắt).
-3. Ghi secret `chat-web` của tenant (suy ra ở IdP từ `APP_CLIENT_SECRET_KEY`) vào `OIDC_CLIENT_SECRET` của file đó, không in ra màn hình.
-4. Deploy release như thường lệ. `activate-release.sh` dựng `/etc/nginx/conf.d/chat.tenants.conf` bằng [`render-tenants-nginx.sh`](../infra/chat/render-tenants-nginx.sh) (block regex `chat.<tenant>` dựng từ conf chính), khởi động hoặc reload `chat-api-<id>`, rồi kiểm `/healthz` ở cổng của tenant. Tenant chưa có `OIDC_CLIENT_SECRET` thì chưa được khởi động; tenant lỗi chỉ in cảnh báo (`WARNING:` trong log deploy) và không rollback release của tenant chính. Thiếu `00-tenants-http.conf` thì tenant không được phục vụ và cũng chỉ có cảnh báo.
-
-Host `chat.<domain>` để Proxied qua Cloudflare thì phải dùng SSL Full hoặc Full (strict) cho host đó. Ở chế độ Flexible, Cloudflare cắt WebSocket ngay khi client gửi khung từ 8 byte trở lên (đo ngày 2026-10-16), nên app không đồng bộ được. Zone vẫn để Flexible được: chỉ cần một Configuration Rule của Cloudflare đặt Full (strict) riêng cho `chat.<domain>` (tenant `inetdev` đang dùng cách này).
-
-Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` trong file của tenant (user id của chính tenant đó). Log nằm ở `/var/log/chat/api-<id>.*.log`.
 
 ## Cảnh báo vận hành (watchdog)
 
@@ -140,17 +129,16 @@ Tài khoản vận hành của tenant đặt bằng `CHAT_OPERATOR_USER_IDS` tro
 |---|---|---|
 | `OutboxBacklog` | update chờ một consumer (realtime, push, bot) | quá 2 phút |
 | `ErrorsInLog` | bản ghi mức ERROR của process | từ 10 trong 5 phút |
-| `CertExpiring` | chứng chỉ TLS của host tenant do nginx trên máy (`127.0.0.1:443`) phục vụ, không phải chứng chỉ Cloudflare ở địa chỉ công khai | dưới 14 ngày (dưới 3 ngày: critical) |
-| `MemoryLow` | RAM khả dụng của máy (chỉ process tenant chính) | dưới 30% (dưới 15%: critical) |
-| `DiskLow` | ổ chứa `/` và `MEDIA_ROOT` (chỉ tenant chính) | dưới 15% trống (dưới 5%: critical) |
-| `BackupStale` | bản mới nhất trong `/opt/chat/backups` (chỉ tenant chính) | cũ hơn 26 giờ |
-| `TenantDown` | `/healthz` của từng tenant trong `/opt/chat/tenants` (chỉ tenant chính) | không trả lời 200 |
+| `CertExpiring` | chứng chỉ TLS của host chat do nginx trên máy (`127.0.0.1:443`) phục vụ, không phải chứng chỉ Cloudflare ở địa chỉ công khai | dưới 14 ngày (dưới 3 ngày: critical) |
+| `MemoryLow` | RAM khả dụng của máy | dưới 30% (dưới 15%: critical) |
+| `DiskLow` | ổ chứa `/` và `MEDIA_ROOT` | dưới 15% trống (dưới 5%: critical) |
+| `BackupStale` | bản mới nhất trong `/opt/chat/backups` | cũ hơn 26 giờ |
 
 Watchdog không báo được khi chính `chat-api` sập. Cảnh báo cấp máy và "chat không trả lời" từ bên ngoài đặt trong OneDash (máy đã có `onedash-agent`, `vmagent`). Trạng thái cảnh báo nằm ở bảng `ops_alerts`, nguồn cảnh báo ở `ops_alert_hooks`.
 
 ### Tín hiệu phản hồi trong nhóm "Vận hành chat"
 
-Cùng nhóm, cùng nguồn "Giám sát" (tin dạng native qua `hooks.PostNative`), mỗi tenant chỉ vào nhóm của tenant đó; không có operator thì bỏ qua, chỉ ghi log mức Info (`watch: no operators' group`). Không cần biến môi trường hay nginx mới.
+Cùng nhóm, cùng nguồn "Giám sát" (tin dạng native qua `hooks.PostNative`); không có operator thì bỏ qua, chỉ ghi log mức Info (`watch: no operators' group`). Không cần biến môi trường hay nginx mới.
 
 - **Góp ý mới** (Cài đặt › Góp ý qua `FeedbackService.SendFeedback`, hoặc gửi bot Trợ lý) và **báo cáo vi phạm mới** (`UsersService.Report`) báo ngay khi ghi xong: loại, tên và @username người gửi, nguồn, trích tối đa 140 ký tự của góp ý (che email, số điện thoại, token), nút mở Kiểm duyệt › Góp ý hoặc Kiểm duyệt. Báo cáo chỉ có lý do và loại đối tượng, không có nội dung tin bị báo cáo hay ghi chú của người báo cáo. Lỗi khi đăng tin chỉ ghi log Warn, góp ý và báo cáo vẫn được lưu.
 - **Bản tin hằng ngày** lúc **08:00 giờ Việt Nam** (Asia/Saigon) cho ngày hôm trước: người dùng mới, số người gửi tin, số tin (của người, có chữ hoặc file), góp ý mới và số đang mở, báo cáo mới, lỗi phía trình duyệt (tổng và 3 lỗi nhiều nhất). Bảng `ops_digests` giữ ngày đã đăng nên restart không đăng lại; process tắt qua 08:00 thì lúc chạy lại đăng đúng một bản, cho ngày gần nhất bị lỡ (không đăng bù từng ngày).
@@ -184,7 +172,7 @@ Cùng nhóm, cùng nguồn "Giám sát" (tin dạng native qua `hooks.PostNative
 
 ## Bot chính thức (Trợ lý)
 
-- Bot hệ thống của tenant chạy trong `chat-api` (không token, không có trong Developer Console của ai), giao thức ở [`server/README.md`](../server/README.md#bot-chính-thức-trợ-lý-package-internalassistant). Người vận hành đọc và trả lời góp ý ở Kiểm duyệt > Góp ý (cần `CHAT_OPERATOR_USER_IDS`).
+- Bot hệ thống chạy trong `chat-api` (không token, không có trong Developer Console của ai), giao thức ở [`server/README.md`](../server/README.md#bot-chính-thức-trợ-lý-package-internalassistant). Người vận hành đọc và trả lời góp ý ở Kiểm duyệt > Góp ý (cần `CHAT_OPERATOR_USER_IDS`).
 - Tra cứu (qua [`psql.sh`](../infra/chat/psql.sh)):
   - bot: `SELECT b.user_id, u.username, u.name, b.verified, b.internal FROM bots b JOIN users u ON u.id = b.user_id WHERE b.is_system;`
   - góp ý đang chờ: `SELECT id, user_id, kind, created_at, left(text, 80) FROM feedback WHERE status = 'open' ORDER BY id DESC LIMIT 20;`

@@ -4,12 +4,11 @@ info:
   version: 1.3.0
   summary: HTTP API for bots of the chat platform (release R6).
   description: |
-    Bots talk to the chat server of their tenant over HTTPS with JSON.
+    Bots talk to the chat server over HTTPS with JSON.
     This API is our own and is not compatible with the Telegram Bot API.
 
-    - Base URL: `https://chat.<domain>/bot/v1` (the tenant's chat host; any
-      other host answers 404). A bot belongs to one tenant and only sees
-      users and chats of that tenant.
+    - Base URL: `https://chat.<domain>/bot/v1` (the chat host; any other
+      host answers 404). A bot only sees users and chats of that server.
     - Authentication: `Authorization: Bearer <bot_id>:<secret>`. The token is
       shown once in the Developer Console (BotAdminService.ResetBotToken);
       the server keeps only a hash. A reset token stops working at once.
@@ -55,8 +54,8 @@ info:
       posts, edits, forwards, copies, media and pins count as sends.
     - Mini Apps: a bot's main Mini App (set in the Developer Console) and
       inline buttons with `web_app: {url}` open an https page on the bot
-      developer's own domain (not under the app's or a tenant's domain, no
-      credentials, no IP address host, at most 512 bytes, no fragment). The
+      developer's own domain (not under the app's domain, no credentials,
+      no IP address host, at most 512 bytes, no fragment). The
       page gets signed init data; verify it with the key of
       `GET /miniAppKey` (the SDKs have a helper). Data the Mini App sends
       back arrives as `message.web_app_data`.
@@ -74,7 +73,7 @@ servers:
     variables:
       domain:
         default: hoandat.com
-        description: Domain of the bot's tenant.
+        description: Domain the chat server runs under.
 security:
   - botToken: []
 tags:
