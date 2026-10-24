@@ -3,10 +3,10 @@
 // every link goes through the scheme allowlist, and links off the tenant's
 // own sites ask before opening. Links, e-mails, @mentions and #hashtags of
 // the plain text are detected here too, with the server's rules
-// (detectEntities), so messages stored before the server added them show
-// the same way.
-import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { detectEntities, isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@achoo254/chat-core";
+// (detectEntities, loaded lazily from entity-detection.ts), so messages
+// stored before the server added them show the same way.
+import { useEffect, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { isAllowedUrl, mentionsUser, normalizeLinkUrl, type MessageEntity } from "@achoo254/chat-core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/icon.tsx";
 import { matchRoute, navigate } from "../../router.tsx";
@@ -21,9 +21,43 @@ const APP_SCHEME = brand.urlScheme;
 /** Most entities a message holds (server/internal/chat entitiesMax), detected ones included. */
 const ENTITIES_MAX = 100;
 
+type Detect = (typeof import("./entity-detection.ts"))["detectEntities"];
+
+// The detector chunk, shared by every message: null until it has loaded.
+let detect: Detect | null = null;
+let loadingDetector: Promise<void> | null = null;
+const detectorListeners = new Set<() => void>();
+
+function loadDetector(): void {
+	loadingDetector ??= import("./entity-detection.ts").then(
+		(module) => {
+			detect = module.detectEntities;
+			for (const listener of [...detectorListeners]) listener();
+		},
+		() => {
+			// Offline or a stale deploy: messages keep their own entities; the next message tries again.
+			loadingDetector = null;
+		},
+	);
+}
+
+function subscribeDetector(listener: () => void): () => void {
+	detectorListeners.add(listener);
+	return () => detectorListeners.delete(listener);
+}
+
+/** The detector once loaded (loading starts with the first message shown), null before. */
+function useDetector(): Detect | null {
+	const current = useSyncExternalStore(subscribeDetector, () => detect);
+	useEffect(() => {
+		if (current === null) loadDetector();
+	}, [current]);
+	return current;
+}
+
 /** The message's entities plus the links, e-mails, mentions and hashtags its plain text holds. */
-function withDetectedEntities(text: string, entities: readonly MessageEntity[]): readonly MessageEntity[] {
-	const detected = detectEntities(text, entities, APP_SCHEME, ENTITIES_MAX - entities.length);
+function withDetectedEntities(text: string, entities: readonly MessageEntity[], find: Detect | null): readonly MessageEntity[] {
+	const detected = find === null ? [] : find(text, entities, APP_SCHEME, ENTITIES_MAX - entities.length);
 	return detected.length === 0 ? entities : [...entities, ...detected];
 }
 
@@ -258,7 +292,8 @@ interface RichTextProps {
  * code blocks with a copy button; everything else stays inline.
  */
 export function RichText({ text, entities, ctx, tail }: RichTextProps) {
-	const root = entityTree(text, withDetectedEntities(text, entities));
+	const find = useDetector();
+	const root = entityTree(text, withDetectedEntities(text, entities, find));
 	const blocks: ReactNode[] = [];
 	let inline: ReactNode[] = [];
 	let cursor = 0;
