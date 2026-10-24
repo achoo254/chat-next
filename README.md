@@ -25,6 +25,7 @@ cd server && go vet ./... && go test -race ./...
 | `pnpm e2e --serve` | Chỉ dựng môi trường đó và giữ chạy, để tự chat với chính mình bằng nhiều profile trình duyệt (Ctrl+C để dừng) |
 | `pnpm store:screenshots` | Ảnh App Store (6.9", 6.5") và Google Play của web app thật trên stack e2e (dữ liệu giả, tài khoản thử) vào `docs/store/screenshots/`; script `apps/web/test/e2e/store-screenshots.ts`, hồ sơ store ở `docs/store/listing.md` |
 | `pnpm brand:gen` | Kiểm `brand.config.json` theo schema của `@shared-next/brand`, sinh manifest web, Capacitor và icon PNG/ICO (favicon, Apple touch, manifest 192/512, maskable) từ `brand/icon.svg`, `brand/icon-maskable.svg` vào `brand/generated/` (dùng Chromium của Playwright), bản sao tên cho server Go (`server/internal/brand/brand.json`), icon và màn khởi động của app iOS/Android (`apps/mobile`) cùng feature graphic của Google Play (`docs/store/play/`). Script `apps/web/scripts/brand-gen.ts`; tùy chọn của chat ở `apps/web/brand-files.ts`. Chạy lại sau khi sửa brand hoặc logo |
+| `pnpm build:packages` | Build `dist/` (JS và `.d.ts`) của năm gói npm. Phát hành: đẩy tag `chat-proto-vX.Y.Z`, `chat-platform-v…`, `chat-core-v…`, `chat-platform-web-v…`, `chat-bot-sdk-v…` khớp version, trên commit của `main`, mỗi lần một tag theo thứ tự đó và chờ run trước xong (GitHub không chạy workflow nào khi một lần push có hơn ba tag); [`sdk-publish.yml`](.github/workflows/sdk-publish.yml) publish qua trusted publishing |
 | `pnpm mobile:build-web` / `pnpm mobile:sync` | Build web app ở chế độ native (`VITE_NATIVE=true`) vào `apps/mobile/www`, rồi `cap sync` cho iOS và Android ([`docs/mobile-app.md`](docs/mobile-app.md)) |
 
 ## Cấu trúc
@@ -34,9 +35,9 @@ cd server && go vet ./... && go test -race ./...
 | `apps/web` | Web app React 19 + Vite, gọi server qua Connect RPC (`/rpc`) |
 | `apps/mobile` | Vỏ Capacitor 8 cho iOS (SPM) và Android, bọc bản build native của `apps/web` ([`docs/mobile-app.md`](docs/mobile-app.md)) |
 | `proto/app/v1/` | Contract client ↔ server, mỗi domain một file |
-| `packages/core` | Fold tiếng Việt, ID, entities (dùng chung cho mọi client) |
+| `packages/core`, `packages/platform`, `packages/platform-web`, `packages/proto-ts` | Lõi client (đồng bộ, outbox, SQLite cục bộ, realtime), giao diện nền tảng, nền tảng trình duyệt (worker SQLite wasm trên OPFS) và mã TS sinh từ proto. Phát hành công khai lên npm là `@achoo254/chat-core`, `@achoo254/chat-platform`, `@achoo254/chat-platform-web`, `@achoo254/chat-proto` (không có backend mặc định: web phải cùng origin với server chat, xem README của `platform-web`) |
+| `sdk/ts` | Bot SDK cho Node, phát hành là `@achoo254/chat-bot-sdk` (`baseUrl` bắt buộc). `sdk/go`, `sdk/python` không phát hành |
 | `brand/generated` | File sinh từ brand (`pnpm brand:gen`), không sửa tay. Mã thương hiệu (schema, kiểm config, sinh manifest/icon, `check-brand`) nằm ở gói dùng chung [`@shared-next/brand`](https://github.com/achoo254/shared-next), cài từ tag git trong `package.json` |
-| `packages/proto-ts` | Code TS sinh từ proto |
 | `server/` | Go module: `cmd/server` (một binary chạy theo `-role`), `internal/` |
 | `spec/` | Đặc tả và test vector dùng chung TS/Go (`vi-fold`, `entities`) |
 | `deploy/dev/` | Docker Compose cho dev: Postgres primary + standby đồng bộ, Redis, Meilisearch, MinIO, IdP local |

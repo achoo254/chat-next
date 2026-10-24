@@ -1,31 +1,42 @@
-# @app/sdk — Bot API SDK cho TypeScript (Node)
+# @achoo254/chat-bot-sdk
 
-SDK chính thức của [Bot API](../../docs/bot-api/README.md) cho Node ≥ 22: client có kiểu (sinh từ [`spec/bot-api/openapi.yaml`](../../spec/bot-api/openapi.yaml)), tự thử lại `429`/`503`, tải file lên/xuống, long poll, kiểm chữ ký webhook và router. Chỉ dùng `fetch`, `node:http`, `node:crypto` có sẵn; không có dependency runtime.
+TypeScript (Node) SDK of the Bot API of the [chat-next](https://github.com/achoo254/chat-next) server, for Node
+≥ 22: a typed client (generated from
+[`spec/bot-api/openapi.yaml`](https://github.com/achoo254/chat-next/blob/main/spec/bot-api/openapi.yaml)) that
+retries `429`/`503`, file uploads and downloads, long poll, webhook signature checks, Mini App init data
+verification and a router. It uses only the built-in `fetch`, `node:http` and `node:crypto`; no runtime
+dependencies.
 
-`src/generated.ts` là mã sinh, không sửa tay. Sinh lại: `cd server && go run ./cmd/sdkgen`.
+There is no default server: `baseUrl` is required and is the Bot API URL of **your** chat server
+(`<CHAT_PUBLIC_URL>/bot/v1`). `new Client(token, {})` throws a `TypeError` that says so.
 
-## Cài
+The API is `0.x`: it may change in any minor release until 1.0. Pin the exact version.
 
-SDK chưa lên registry; cài từ repo:
+## Install
 
 ```sh
-# trong monorepo này (pnpm workspace)
-pnpm add @app/sdk --workspace
-# dự án khác: trỏ tới thư mục sdk/ts của bản checkout
-npm install /đường/dẫn/chat-next/sdk/ts
+npm install @achoo254/chat-bot-sdk
 ```
 
-Gói xuất thẳng mã nguồn TypeScript (`src/index.ts`): Node ≥ 22.18 chạy được không cần build (type stripping); dự án có bundler hoặc `tsc` thì dùng như mọi gói TS.
+pnpm 11 refuses versions published less than 24 hours ago (`minimumReleaseAge`, 1440 minutes by default). To
+install a release on its first day, list that exact version in `pnpm-workspace.yaml`:
 
-## Bắt đầu nhanh
+```yaml
+minimumReleaseAgeExclude:
+  - "@achoo254/chat-bot-sdk@0.1.0"
+```
+
+## Quick start
 
 ```ts
-import { Bot, Client } from "@app/sdk";
+import { Bot, Client } from "@achoo254/chat-bot-sdk";
 
-const bot = new Bot(new Client(process.env.BOT_TOKEN ?? "", { baseUrl: "https://chat.hoandat.com/bot/v1" }));
+const client = new Client(process.env.BOT_TOKEN ?? "", { baseUrl: "https://chat.example.com/bot/v1" });
+console.log(await client.getMe());
 
-bot.command("start", (ctx) => ctx.reply("Xin chào!"));
-bot.callback("pick:", (ctx) => ctx.answer(`Đã chọn ${ctx.callback?.data}`));
+const bot = new Bot(client);
+bot.command("start", (ctx) => ctx.reply("Hello!"));
+bot.callback("pick:", (ctx) => ctx.answer(`Picked ${ctx.callback?.data}`));
 bot.message((ctx) => ctx.reply(ctx.message?.text ?? ""));
 
 const stop = new AbortController();
@@ -34,10 +45,19 @@ await bot.client.deleteWebhook();
 await bot.poll({ signal: stop.signal });
 ```
 
-- `Client` có đủ method của API (`sendMessage`, `editMessage`, `getFile`, …), thêm `sendMediaUpload`, `sendAlbumUpload` (multipart, file là `new InputFile(tên, Blob | Uint8Array)`), `downloadFile(file)` và `request()` cho method mới hơn SDK.
-- Lỗi API là `ApiError` (`status`, `code`, `description`, `retryAfter`): rẽ nhánh theo `code`. Không có câu trả lời HTTP thì là `NetworkError`.
-- Thử lại tự động chỉ với `429 rate_limited` và `503 unavailable` (chờ `retry_after`, không có thì 1 s; mặc định 3 lần), và lỗi mạng của `GET`.
-- Router: `command(name)` khớp `/name` và `/name@username_của_bot`; `callback(prefix)` chọn prefix dài nhất; `inlineQuery`, `message` (tin không khớp lệnh nào), `on(kind)` cho `message_edited`, `channel_post`, `member_changed`, `reaction`. Kind lạ bị bỏ qua.
+A bot and its token come from the chat app's developer console (`BotAdminService`): create the bot, then
+issue its token (shown once; it needs a recent sign-in).
+
+- `Client` has every API method (`sendMessage`, `editMessage`, `getFile`, ...), plus `sendMediaUpload`,
+  `sendAlbumUpload` (multipart; a file is `new InputFile(name, Blob | Uint8Array)`), `downloadFile(file)` and
+  `request()` for methods newer than the SDK.
+- API errors are `ApiError` (`status`, `code`, `description`, `retryAfter`): branch on `code`. No HTTP answer
+  is a `NetworkError`.
+- Automatic retries only for `429 rate_limited` and `503 unavailable` (after `retry_after`, else 1 s; 3 times by
+  default), and for connection failures of a `GET`. The token is only ever sent in the `Authorization` header.
+- Router: `command(name)` matches `/name` and `/name@bot_username`; `callback(prefix)` picks the longest
+  prefix; `inlineQuery`, `message` (messages no command matched), `on(kind)` for `message_edited`,
+  `channel_post`, `member_changed`, `reaction`. Unknown kinds are ignored.
 
 ## Webhook
 
@@ -49,26 +69,40 @@ await bot.init();
 await bot.client.setWebhook({ url: "https://bot.example.com/hook", secret: process.env.WEBHOOK_SECRET ?? "" });
 ```
 
-Handler kiểm `X-Bot-Api-Secret-Token` và chữ ký HMAC trước khi đọc JSON (sai → `401`), từ chối body > 1 MiB (`413`), bỏ trùng 1000 `update_id` gần nhất (`200`), trả `204`, hoặc `200` kèm JSON khi handler trả một `WebhookAnswer` (ví dụ `{ method: "sendMessage", chat_id, text }`); handler lỗi → `500` để server gửi lại. Không dùng router thì có `webhookHandler({ secret, onUpdate })` và hàm thuần `verifyWebhook(headers, rawBody, secret, now?)`.
+The handler checks `X-Bot-Api-Secret-Token` and the HMAC signature before parsing JSON (`401` when wrong),
+refuses bodies over 1 MiB (`413`), drops the last 1000 duplicate `update_id`s (`200`), and answers `204`, or `200`
+with JSON when the handler returns a `WebhookAnswer` (e.g. `{ method: "sendMessage", chat_id, text }`); a
+handler that throws gets `500`, so the server retries. Without the router: `webhookHandler({ secret, onUpdate })`
+and the pure `verifyWebhook(headers, rawBody, secret, now?)`.
 
 ## Mini App
 
-`verifyMiniAppInitData(initData, botId, publicKey, maxAgeS?, now?)` kiểm chữ ký Ed25519 của dữ liệu khởi tạo Mini App (khoá từ `client.getMiniAppKey()`), `bot_id` và tuổi `auth_date` (mặc định tối đa 1 giờ); trả các trường đã kiểm, hoặc `null`. Xem [Bot API, mục Mini App](../../docs/bot-api/README.md#11-mini-app).
+`verifyMiniAppInitData(initData, botId, publicKey, maxAgeS?, now?)` checks the Ed25519 signature of a Mini App's
+init data (key from `client.getMiniAppKey()`), its `bot_id` and the age of `auth_date` (1 hour by default); it
+returns the checked fields, or `null`.
 
-## Bot mẫu
+## Server requirements
 
-`examples/` có 6 bot (`echo`, `keyboard`, `files`, `commands`, `inline`, `miniapp`) dùng cho conformance; chạy bằng Node ≥ 22.18. `miniapp` gửi nút mở Mini App (`MINI_APP_URL`, https trên domain của bạn) và chạy backend của Mini App ở `MINI_APP_PORT` (mặc định 8081): `POST /verify` nhận nguyên chuỗi init data, trả `{"user_id", "chat_type"}` hoặc `401`.
+A running [chat-next server](https://github.com/achoo254/chat-next/tree/main/server) (Go, PostgreSQL 16, an
+OpenID Connect provider); see [`server/README.md`](https://github.com/achoo254/chat-next/blob/main/server/README.md)
+for its environment and how to run it. The Bot API answers only on the host of the server's `CHAT_PUBLIC_URL`,
+so a reverse proxy in front of it must keep the `Host` header. Full API reference:
+[`docs/bot-api/README.md`](https://github.com/achoo254/chat-next/blob/main/docs/bot-api/README.md).
+
+## Example bots
+
+`examples/` in the repository holds 6 bots (`echo`, `keyboard`, `files`, `commands`, `inline`, `miniapp`) used for
+conformance, run with Node ≥ 22.18:
 
 ```sh
-BOT_TOKEN=... BOT_API=https://chat.hoandat.com/bot/v1 node examples/echo.ts
+BOT_TOKEN=... BOT_API=https://chat.example.com/bot/v1 node examples/echo.ts
 # webhook: BOT_MODE=webhook WEBHOOK_PORT=8443 WEBHOOK_SECRET=... WEBHOOK_URL=https://bot.example.com/hook
 ```
 
-Bot in đúng một dòng `ready` ra stdout khi sẵn sàng; log khác ra stderr.
+Each bot prints exactly one `ready` line to stdout once it receives updates; other logs go to stderr.
+`src/generated.ts` is generated (`cd server && go run ./cmd/sdkgen`); do not edit it by hand. Tests:
+`pnpm --filter @achoo254/chat-bot-sdk test`.
 
-## Test
+## License
 
-```sh
-pnpm --filter @app/sdk test     # vitest, server HTTP giả trong tiến trình
-npx tsc --noEmit -p sdk/ts      # từ gốc repo
-```
+MIT, see `LICENSE`.
