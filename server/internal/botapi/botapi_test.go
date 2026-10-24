@@ -152,8 +152,10 @@ type sentMessage struct {
 		IsBot bool  `json:"is_bot"`
 	} `json:"from"`
 	Entities []struct {
-		Type string `json:"type"`
-		URL  string `json:"url"`
+		Type   string `json:"type"`
+		Offset int    `json:"offset"`
+		Length int    `json:"length"`
+		URL    string `json:"url"`
 	} `json:"entities"`
 	ReplyMarkup json.RawMessage `json:"reply_markup"`
 }

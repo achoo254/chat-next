@@ -22,6 +22,15 @@ info:
       (4096 for a message). Links in entities and buttons allow only `http`,
       `https`, `mailto` and the app's own scheme. `parse_mode` (`markdown`,
       `html`) is described in `format.md` next to this file.
+    - The server adds `url`, `email`, `mention` and `hashtag` entities for
+      what the text holds outside any entity (or inside bold, italic,
+      underline, strike and spoiler only): `http(s)://` links and bare domains
+      with a known TLD (`hoandat.com/abc`), e-mail addresses, `@username` and
+      `#hashtag`. It does so with or without `parse_mode`; the entities the
+      bot sent are kept as given, and the message never exceeds 100 entities.
+      Answers and updates carry the added entities. The rules and test
+      vectors: `server/internal/entities/detect.go`,
+      `spec/entities/detect-vectors.json`.
     - Consent: a bot writes into a private chat only after the user started
       it, followed its deep link, pressed one of its buttons or wrote to it
       (`403 no_consent` otherwise). In groups it needs membership and the

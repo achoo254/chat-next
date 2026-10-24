@@ -16,6 +16,7 @@ Tin nhắn có định dạng (đậm, nghiêng, link, nhắc tên, code) đư�
 - Server kiểm allowlist scheme khi ghi tin từ mọi nguồn (client, Bot API, webhook). Client kiểm lại trước khi mở link ra ngoài, trên cả web, Capacitor và Tauri.
 - Giới hạn độ dài tin đếm theo code point. Giá trị giới hạn do server cấp qua `GetAppConfig`, client không hardcode.
 - Helper entities và kiểm scheme có ở cả TypeScript (`packages/core`) và Go (`server/internal/entities`), cùng chạy trên một bộ test có emoji nhiều code unit và các scheme `javascript:`, `file:`, `ms-msdt:`.
+- Bổ sung 25/10/2026: server tự thêm entity cho phần chữ thường khi ghi tin từ mọi nguồn (client, Bot API có hay không có `parse_mode`, webhook), như Telegram. `url` cho link `http(s)://` và tên miền trần có TLD trong danh sách (`hoandat.com`, `chat.hoandat.com/abc`; không phải `file.txt`, `v1.2`, `e.g`), `email` cho địa chỉ e-mail, `mention` cho `@username` (3 đến 32 ký tự `a-z`, `0-9`, `_`, không lấy phần sau `@` của e-mail), `hashtag` cho `#từ` (chữ cái, số, dấu và `_`, có ít nhất một chữ cái; gồm tiếng Việt). Không dò bên trong `code`, `pre`, link hay entity khác, trừ các kiểu chữ `bold`, `italic`, `underline`, `strike`, `spoiler`; entity người gửi đưa vào giữ nguyên, không bị đè hay chồng lấn; tổng số entity vẫn không quá giới hạn. Quy tắc nằm ở `Detect` (`server/internal/entities/detect.go`), bản TypeScript `detectEntities` (`packages/core/src/entities/detect-entities.ts`), cùng chạy bộ vector `spec/entities/detect-vectors.json` (kể cả danh sách TLD). Tin đã lưu không được migrate: client chạy cùng quy tắc khi hiển thị, nên tin cũ cũng hiện link, nhắc tên, hashtag và e-mail. Link preview chỉ lấy link có `http(s)://`, như ô soạn tin. Bảng Unicode của Go (15.0) có thể cũ hơn của trình duyệt; với ký tự mới hơn, client có thể thấy thêm hashtag mà server không lưu, chỉ khác ở hiển thị.
 
 ## Lý do
 
@@ -37,6 +38,7 @@ Tin nhắn có định dạng (đậm, nghiêng, link, nhắc tên, code) đư�
 
 - Thêm scheme vào allowlist: sửa cả server lẫn client trong cùng đợt. Client cũ vẫn từ chối mở scheme mới, đây là hướng hỏng an toàn.
 - Thêm loại entity: thêm giá trị enum trong protobuf; client cũ phải hiện đoạn đó như văn bản thường.
+- Đổi quy tắc tự dò entity (hoặc danh sách TLD): sửa cả Go lẫn TypeScript và bộ vector trong cùng đợt. Tin đã lưu giữ entity cũ; client hiển thị theo quy tắc mới cho phần chưa có entity.
 - Đổi đơn vị offset là thay đổi phá vỡ với mọi client và bot: cần trường mới song song và một phiên bản Bot API mới.
 - Đổi giới hạn độ dài chỉ cần đổi cấu hình trả qua `GetAppConfig`.
 

@@ -66,7 +66,6 @@ const (
 	code     = appv1.EntityType_ENTITY_TYPE_CODE
 	pre      = appv1.EntityType_ENTITY_TYPE_PRE
 	textLink = appv1.EntityType_ENTITY_TYPE_TEXT_LINK
-	urlType  = appv1.EntityType_ENTITY_TYPE_URL
 )
 
 func TestSlackMrkdwn(t *testing.T) {
@@ -89,8 +88,9 @@ func TestSlackMrkdwn(t *testing.T) {
 				{typ: bold, text: "ok"}, {typ: appv1.EntityType_ENTITY_TYPE_STRIKE, text: "gone"}}},
 		{"nested link in bold", "*see <https://a.example.invalid|this>*", "see this",
 			[]span{{typ: bold, text: "see this"}, {typ: textLink, text: "this", url: "https://a.example.invalid"}}},
-		{"bare url", "see https://example.invalid/x.", "see https://example.invalid/x.",
-			[]span{{typ: urlType, text: "https://example.invalid/x"}}},
+		// Bare links, mentions and hashtags are left to the chat service, which
+		// detects them for every source (entities.Detect).
+		{"bare url left to the chat service", "see https://example.invalid/x.", "see https://example.invalid/x.", nil},
 		{"utf-16 offsets after emoji", "😀 *a*", "😀 a", []span{{typ: bold, text: "a"}}},
 		{"unclosed markers stay", "*not closed and _also", "*not closed and _also", nil},
 	}

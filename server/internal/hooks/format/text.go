@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"html"
-	"regexp"
 	"slices"
 	"strings"
 	"unicode"
@@ -356,43 +355,6 @@ func (b *builder) slackToken(inner string) {
 
 // ------------------------------------------------------------ finishing
 
-var bareURL = regexp.MustCompile(`https?://[^\s<>"'` + "`" + `]+`)
-
-// linkable: entities a bare URL may sit inside.
-var linkable = map[appv1.EntityType]bool{
-	appv1.EntityType_ENTITY_TYPE_BOLD:      true,
-	appv1.EntityType_ENTITY_TYPE_ITALIC:    true,
-	appv1.EntityType_ENTITY_TYPE_UNDERLINE: true,
-	appv1.EntityType_ENTITY_TYPE_STRIKE:    true,
-	appv1.EntityType_ENTITY_TYPE_SPOILER:   true,
-}
-
-// autolink marks bare web URLs that no link or code entity covers.
-func autolink(text string, ents []*appv1.MessageEntity, appScheme string) []*appv1.MessageEntity {
-	for _, loc := range bareURL.FindAllStringIndex(text, 50) {
-		raw := strings.TrimRight(text[loc[0]:loc[1]], ".,;:!?)]}")
-		if _, ok := entities.NormalizeLinkURL(raw, appScheme); !ok {
-			continue
-		}
-		off := entities.UTF16Length(text[:loc[0]])
-		end := off + entities.UTF16Length(raw)
-		free := true
-		for _, e := range ents {
-			eo, ee := int(e.GetOffset()), int(e.GetOffset()+e.GetLength())
-			disjoint := end <= eo || off >= ee
-			inside := linkable[e.GetType()] && eo <= off && end <= ee
-			if !disjoint && !inside {
-				free = false
-				break
-			}
-		}
-		if free {
-			ents = append(ents, &appv1.MessageEntity{Type: appv1.EntityType_ENTITY_TYPE_URL, Offset: int32(off), Length: int32(end - off)})
-		}
-	}
-	return ents
-}
-
 // truncate cuts text to max code points (ending with "…") and clips the
 // entities to it; links cut in the middle are dropped.
 func truncate(text string, ents []*appv1.MessageEntity, max int) (string, []*appv1.MessageEntity) {
@@ -439,7 +401,6 @@ func (b *builder) finish(strict bool) (string, []*appv1.MessageEntity, error) {
 	if strings.TrimSpace(text) == "" {
 		return "", nil, errorf("text_empty", "the payload has no text to post")
 	}
-	ents = autolink(text, ents, b.opts.AppScheme)
 	slices.SortStableFunc(ents, func(x, y *appv1.MessageEntity) int { return int(x.GetOffset() - y.GetOffset()) })
 	if b.opts.MaxLength > 0 && entities.CodePointLength(text) > b.opts.MaxLength {
 		if strict {

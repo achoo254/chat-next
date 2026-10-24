@@ -35,6 +35,8 @@ curl -s -H "Authorization: Bearer $BOT_TOKEN" -H 'Content-Type: application/json
   -d '{"chat_id": 42, "text": "Xin chào *bạn*", "parse_mode": "markdown"}' $API/messages
 ```
 
+Không cần tự đánh dấu link, e-mail, `@username` hay `#hashtag` trong chữ thường: server tự thêm entity `url`, `email`, `mention`, `hashtag` cho chúng (link `http(s)://` và tên miền có TLD quen thuộc như `hoandat.com/abc`), có hay không có `parse_mode`, và không đụng vào phần nằm trong `code`, `pre`, link hay entity bot đã gửi. Quy tắc ở [`spec/bot-api/format.md`](../../spec/bot-api/format.md).
+
 ## 3. Nhận update qua webhook
 
 Đặt webhook bằng API (hoặc tab **Nhận update** trong Developer Console; ở Console, đặt hay đổi webhook cần đăng nhập lại nếu lần đăng nhập gần nhất đã quá 10 phút, và đổi URL thì phải kèm secret mới):

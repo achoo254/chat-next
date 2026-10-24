@@ -165,7 +165,9 @@ func utf16Slice(text string, offset, length int) string {
 	return string(utf16.Decode(units[offset : offset+length]))
 }
 
-// validateText checks a message text and its entities (ADR 0004).
+// validateText checks a message text and its entities (ADR 0004), then adds
+// the links, e-mails, mentions and hashtags of the plain text
+// (withDetectedEntities).
 func (s *Service) validateText(text string, ents []*appv1.MessageEntity, allowEmpty bool) (string, []*appv1.MessageEntity, error) {
 	if !utf8.ValidString(text) || strings.ContainsRune(text, 0) {
 		return "", nil, errInvalid("text is not valid UTF-8")
@@ -217,12 +219,18 @@ func (s *Service) validateText(text string, ents []*appv1.MessageEntity, allowEm
 			}
 		}
 	}
-	return text, out, nil
+	return text, s.withDetectedEntities(text, out), nil
 }
 
 var bareURL = regexp.MustCompile(`https?://[^\s<>"'` + "`" + `]+`)
 
-// previewURL returns the normalized first web link of a message, or "".
+// hasWebScheme reports text starting with "http://" or "https://" in any case.
+func hasWebScheme(text string) bool {
+	lower := strings.ToLower(text[:min(len(text), len("https://"))])
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
+
+// previewURL returns the normalized first http(s) link of a message, or "".
 func (s *Service) previewURL(text string, ents []*appv1.MessageEntity) string {
 	sorted := slices.Clone(ents)
 	slices.SortStableFunc(sorted, func(a, b *appv1.MessageEntity) int { return int(a.GetOffset() - b.GetOffset()) })
@@ -230,7 +238,13 @@ func (s *Service) previewURL(text string, ents []*appv1.MessageEntity) string {
 		var raw string
 		switch e.GetType() {
 		case appv1.EntityType_ENTITY_TYPE_URL:
-			raw, _ = entities.NormalizeLinkURL(utf16Slice(text, int(e.GetOffset()), int(e.GetLength())), s.cfg.AppScheme)
+			// Bare domains ("hoandat.com") are links but get no preview: the
+			// composer offers one, and a way to drop it, for http(s) links only.
+			shown := utf16Slice(text, int(e.GetOffset()), int(e.GetLength()))
+			if !hasWebScheme(shown) {
+				continue
+			}
+			raw, _ = entities.NormalizeLinkURL(shown, s.cfg.AppScheme)
 		case appv1.EntityType_ENTITY_TYPE_TEXT_LINK:
 			raw = e.GetUrl()
 		default:
