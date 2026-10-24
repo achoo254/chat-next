@@ -5,7 +5,7 @@
  */
 export * from "./generated.ts";
 export { InputFile } from "./input-file.ts";
-export { ApiError, Client, DEFAULT_BASE_URL, NetworkError } from "./client.ts";
+export { ApiError, Client, NetworkError } from "./client.ts";
 export type { ClientOptions, RequestOptions } from "./client.ts";
 export { POLL_TIMEOUT_S, poll } from "./polling.ts";
 export type { PollOptions } from "./polling.ts";

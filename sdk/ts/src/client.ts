@@ -3,17 +3,17 @@ import type { CallOptions, File, Message, SendAlbumUpload, SendMediaUpload } fro
 import type { InputFile } from "./input-file.ts";
 import { sleep } from "./sleep.ts";
 
-/** Base URL used when `ClientOptions.baseUrl` is not given. */
-export const DEFAULT_BASE_URL = "https://chat.hoandat.com/bot/v1";
-
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_S = 1;
 
 /** Options of a `Client`. */
 export interface ClientOptions {
-	/** Bot API base URL, for example `https://chat.example.com/bot/v1`. */
-	readonly baseUrl?: string;
+	/**
+	 * Bot API base URL of your chat server, for example
+	 * `https://chat.example.com/bot/v1`. Required: the SDK has no default server.
+	 */
+	readonly baseUrl: string;
 	/** Timeout of one request in milliseconds (default 60 000); a long poll adds its own `timeout`. */
 	readonly timeoutMs?: number;
 	/** How many times a `429 rate_limited` or `503 unavailable` answer is retried (default 3). */
@@ -75,11 +75,13 @@ export class Client extends GeneratedMethods {
 	readonly #timeoutMs: number;
 	readonly #retries: number;
 
-	constructor(token: string, options: ClientOptions = {}) {
+	constructor(token: string, options: ClientOptions) {
 		super();
 		if (token === "") {
 			throw new TypeError("Client needs a bot token");
 		}
+		// `?.`: a JavaScript caller may leave the options out altogether.
+		const baseUrl = checkBaseUrl(options?.baseUrl);
 		const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 		const retries = options.retries ?? DEFAULT_RETRIES;
 		if (!(timeoutMs > 0)) {
@@ -89,7 +91,7 @@ export class Client extends GeneratedMethods {
 			throw new RangeError("retries must be a non-negative integer");
 		}
 		this.#token = token;
-		this.#baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+		this.#baseUrl = baseUrl;
 		this.#timeoutMs = timeoutMs;
 		this.#retries = retries;
 	}
@@ -337,4 +339,29 @@ function describe(error: unknown): string {
 		return error.message + cause;
 	}
 	return String(error);
+}
+
+/**
+ * The Bot API base URL without trailing slashes. Throws when it is missing
+ * or not an http(s) URL: the SDK has no default server.
+ */
+function checkBaseUrl(baseUrl: string | undefined): string {
+	if (baseUrl === undefined || baseUrl === "") {
+		throw new TypeError("Client needs options.baseUrl, the Bot API URL of your chat server, e.g. https://chat.example.com/bot/v1");
+	}
+	let url: URL;
+	try {
+		url = new URL(baseUrl);
+	} catch {
+		throw new TypeError(`baseUrl must be an absolute http(s) URL, e.g. https://chat.example.com/bot/v1, not "${baseUrl}"`);
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:") {
+		throw new TypeError(`baseUrl must be an http(s) URL, not "${baseUrl}"`);
+	}
+	// Request paths are appended to it as text: a query, fragment, credentials
+	// or surrounding spaces (which URL parsing forgives) would corrupt them.
+	if (baseUrl !== baseUrl.trim() || url.search !== "" || url.hash !== "" || url.username !== "" || url.password !== "") {
+		throw new TypeError(`baseUrl must be a plain URL without query, fragment, credentials or spaces, not "${baseUrl}"`);
+	}
+	return baseUrl.replace(/\/+$/, "");
 }

@@ -27,6 +27,28 @@ function sequence(...routes: Route[]): Route {
 
 const message = { chat: { id: 7, type: "private" }, seq: 3, date: 1 };
 
+describe("Client options", () => {
+	it("needs the base URL of the user's chat server", () => {
+		expect(() => new Client(TOKEN, { baseUrl: "" })).toThrow(/needs options\.baseUrl/);
+		// A JavaScript caller can leave the options out entirely.
+		expect(() => new (Client as unknown as new (token: string) => Client)(TOKEN)).toThrow(/needs options\.baseUrl/);
+	});
+
+	it("refuses a base URL that is not an absolute http(s) URL", () => {
+		expect(() => new Client(TOKEN, { baseUrl: "chat.example.com/bot/v1" })).toThrow(/absolute http\(s\) URL/);
+		expect(() => new Client(TOKEN, { baseUrl: "ftp://chat.example.com/bot/v1" })).toThrow(/http\(s\) URL/);
+		for (const bad of [" https://chat.example.com/bot/v1", "https://chat.example.com/bot/v1?a=1", "https://chat.example.com/bot/v1#x", "https://u:p@chat.example.com/bot/v1"]) {
+			expect(() => new Client(TOKEN, { baseUrl: bad })).toThrow(/plain URL/);
+		}
+	});
+
+	it("drops trailing slashes of the base URL", async () => {
+		const { client, server } = await setup((_req, res) => ok(res, { id: 1 }));
+		await client.request("GET", "/me");
+		expect(server.requests[0]?.url.pathname).toBe("/bot/v1/me");
+	});
+});
+
 describe("Client envelope", () => {
 	it("returns the result and sends the token and JSON body", async () => {
 		const { client, server } = await setup((_req, res) => ok(res, message));

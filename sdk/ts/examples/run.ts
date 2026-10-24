@@ -1,6 +1,6 @@
 // Shared runner of the example bots. Environment:
 //   BOT_TOKEN       bot token (required; never printed)
-//   BOT_API         Bot API base URL (default: the SDK's DEFAULT_BASE_URL)
+//   BOT_API         Bot API base URL of the chat server (required), e.g. https://chat.example.com/bot/v1
 //   BOT_MODE        poll (default) or webhook
 //   WEBHOOK_PORT    port to listen on (webhook mode)
 //   WEBHOOK_SECRET  secret given to setWebhook and checked on every request
@@ -9,7 +9,7 @@
 // everything else goes to stderr.
 
 import { createServer } from "node:http";
-import { Bot, Client, DEFAULT_BASE_URL } from "../src/index.ts";
+import { Bot, Client } from "../src/index.ts";
 
 /** Builds the bot, lets `setup` add handlers (and startup calls), then serves it. */
 export async function run(setup: (bot: Bot) => void | Promise<void>): Promise<void> {
@@ -27,7 +27,7 @@ async function serve(setup: (bot: Bot) => void | Promise<void>): Promise<void> {
 	if (mode !== "poll" && mode !== "webhook") {
 		throw new Error(`BOT_MODE must be poll or webhook, not "${mode}"`);
 	}
-	const bot = new Bot(new Client(token, { baseUrl: process.env["BOT_API"] || DEFAULT_BASE_URL }));
+	const bot = new Bot(new Client(token, { baseUrl: required("BOT_API") }));
 	await setup(bot);
 	await bot.init();
 
