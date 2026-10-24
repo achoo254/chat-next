@@ -53,6 +53,22 @@ func TestLoadValid(t *testing.T) {
 	}
 }
 
+// The tenant id is a constant: signatures, media tokens and the clients'
+// local database names depend on it, so an environment variable must not
+// change it. The domain stays configurable.
+func TestLoadTenantIDIgnoresEnvironment(t *testing.T) {
+	env := validEnv()
+	env["TENANT_ID"] = "other"
+	env["TENANT_DOMAIN"] = "Example.COM"
+	c, err := Load(lookupFrom(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.TenantID != DefaultTenantID || c.TenantDomain != "example.com" {
+		t.Fatalf("tenant = %q, domain = %q", c.TenantID, c.TenantDomain)
+	}
+}
+
 func TestLoadDevelopment(t *testing.T) {
 	env := validEnv()
 	env["CHAT_ENV"] = "development"
@@ -80,7 +96,6 @@ func TestLoadErrorsNameVariablesWithoutValues(t *testing.T) {
 		"SESSION_KEY_PREVIOUS": func(e map[string]string) {
 			e["SESSION_KEY_PREVIOUS"] = base64.StdEncoding.EncodeToString([]byte(secret))
 		},
-		"TENANT_ID":        func(e map[string]string) { e["TENANT_ID"] = "Bad Tenant" },
 		"TENANT_DOMAIN":    func(e map[string]string) { e["TENANT_DOMAIN"] = "not a domain" },
 		"CHAT_LISTEN_ADDR": func(e map[string]string) { e["CHAT_LISTEN_ADDR"] = "4600" },
 		"APP_URL_SCHEME":   func(e map[string]string) { e["APP_URL_SCHEME"] = "https" },

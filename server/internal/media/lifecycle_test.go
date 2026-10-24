@@ -141,10 +141,11 @@ func TestDownloadTokenChecks(t *testing.T) {
 	if code := get(s.sign.download(expired)); code != http.StatusForbidden {
 		t.Fatalf("expired: %d", code)
 	}
+	// A token signed for another tenant_id never opens a file.
 	other := grant
-	other.tenant = "inetdev"
+	other.tenant = "other"
 	if code := get(s.sign.download(other)); code != http.StatusNotFound {
-		t.Fatalf("other tenant: %d", code)
+		t.Fatalf("other tenant id: %d", code)
 	}
 	if code := get("not-a-token"); code != http.StatusNotFound {
 		t.Fatalf("garbage: %d", code)

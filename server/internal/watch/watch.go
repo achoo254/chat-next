@@ -1,12 +1,10 @@
 // Package watch is the server's own watchdog: once a minute it checks what
-// would hurt users (another tenant's process down, the machine short of
-// memory or disk, a stale backup, a certificate about to expire, updates
+// would hurt users (the machine short of memory or disk, a stale backup, a certificate about to expire, updates
 // piling up in the outbox, errors in the log) and posts each problem into
 // the tenant's "Vận hành chat" group, which it creates for the operators
 // (CHAT_OPERATOR_USER_IDS), through an Alertmanager-format incoming hook:
 // the message turns from firing to resolved in place. A problem must show
 // in two checks in a row before it fires, so a deploy's restart does not.
-// Problems of the machine are checked by the main tenant's process only.
 // It cannot report the process it runs in being down (no extra channel
 // until real users; host alerts belong to OneDash).
 package watch
@@ -28,7 +26,7 @@ const Every = time.Minute
 
 // Problem is one thing wrong now.
 type Problem struct {
-	// Key names the problem stably (memory_low, tenant_down:inetdev).
+	// Key names the problem stably (memory_low, backup_stale).
 	Key string
 	// Name is the alert's name (MemoryLow).
 	Name string

@@ -283,13 +283,12 @@ func TestEndpointRejectsWrongHostsAndSecrets(t *testing.T) {
 	base := strings.TrimSuffix(hookURL, "/slack")
 	secret := base[strings.LastIndex(base, "/")+1:]
 	for name, c := range map[string]struct{ url, host string }{
-		"other tenant host": {hookURL, "chat.inetdev.io.vn"},
-		"bare domain":       {hookURL, "hoandat.com"},
-		"wrong secret":      {strings.Replace(hookURL, secret, strings.Repeat("A", len(secret)), 1), ""},
-		"unknown hook":      {strings.Replace(hookURL, hook.GetId(), "hk_AAAAAAAAAAAA", 1), ""},
-		"bad id":            {strings.Replace(hookURL, hook.GetId(), "hk_1", 1), ""},
-		"unknown format":    {base + "/discord", ""},
-		"native suffix":     {base + "/native", ""},
+		"bare domain":    {hookURL, "hoandat.com"},
+		"wrong secret":   {strings.Replace(hookURL, secret, strings.Repeat("A", len(secret)), 1), ""},
+		"unknown hook":   {strings.Replace(hookURL, hook.GetId(), "hk_AAAAAAAAAAAA", 1), ""},
+		"bad id":         {strings.Replace(hookURL, hook.GetId(), "hk_1", 1), ""},
+		"unknown format": {base + "/discord", ""},
+		"native suffix":  {base + "/native", ""},
 	} {
 		if r := h.postHost(c.url, c.host, "", body); r.status != http.StatusNotFound {
 			t.Errorf("%s: status %d %q", name, r.status, r.body)

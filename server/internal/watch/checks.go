@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,22 +20,20 @@ import (
 
 // Thresholds. Memory follows the rule of the shared server: keep 30% free.
 const (
-	memoryWarnPct     = 30
-	memoryCritPct     = 15
-	diskWarnPct       = 15
-	diskCritPct       = 5
-	backupMaxAge      = 26 * time.Hour
-	certWarn          = 14 * 24 * time.Hour
-	certCrit          = 3 * 24 * time.Hour
-	outboxMaxWait     = 2 * time.Minute
-	errorsWindow      = 5 * time.Minute
-	errorsThreshold   = 10
-	healthTimeout     = 5 * time.Second
-	certDialTimeout   = 10 * time.Second
-	severityWarning   = "warning"
-	severityCritical  = "critical"
-	meminfoPath       = "/proc/meminfo"
-	tenantsHealthPath = "/healthz"
+	memoryWarnPct    = 30
+	memoryCritPct    = 15
+	diskWarnPct      = 15
+	diskCritPct      = 5
+	backupMaxAge     = 26 * time.Hour
+	certWarn         = 14 * 24 * time.Hour
+	certCrit         = 3 * 24 * time.Hour
+	outboxMaxWait    = 2 * time.Minute
+	errorsWindow     = 5 * time.Minute
+	errorsThreshold  = 10
+	certDialTimeout  = 10 * time.Second
+	severityWarning  = "warning"
+	severityCritical = "critical"
+	meminfoPath      = "/proc/meminfo"
 )
 
 func severity(critical bool) string {
@@ -181,68 +178,10 @@ func Cert(host, origin string, now func() time.Time) Check {
 	}
 }
 
-// Tenants reports the other tenants' processes (one /opt/chat/tenants/<id>.env
-// each, with CHAT_LISTEN_ADDR) not answering /healthz.
-func Tenants(dir string, client *http.Client) Check {
-	return func(ctx context.Context) ([]Problem, error) {
-		files, err := filepath.Glob(filepath.Join(dir, "*.env"))
-		if err != nil {
-			return nil, err
-		}
-		var out []Problem
-		for _, f := range files {
-			id := strings.TrimSuffix(filepath.Base(f), ".env")
-			addr := envValue(f, "CHAT_LISTEN_ADDR")
-			// A tenant without its IdP client is not started (activate-release.sh).
-			if addr == "" || envValue(f, "OIDC_CLIENT_SECRET") == "" {
-				continue
-			}
-			if err := healthy(ctx, client, "http://"+addr+tenantsHealthPath); err != nil {
-				out = append(out, Problem{Key: "tenant_down:" + id, Name: "TenantDown", Severity: severityCritical,
-					Summary: "Tenant " + id + " không trả lời /healthz", Detail: err.Error()})
-			}
-		}
-		return out, nil
-	}
-}
-
-func healthy(ctx context.Context, client *http.Client, url string) error {
-	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	return nil
-}
-
-// envValue is the last KEY=value of a dotenv file ("" when absent).
-func envValue(path, key string) string {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	var v string
-	for _, line := range strings.Split(string(b), "\n") {
-		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), key+"="); ok {
-			v = strings.Trim(rest, `"'`)
-		}
-	}
-	return v
-}
-
 // Outbox reports updates of tenant waiting longer than two minutes for one
-// of its consumers (the outbox_cursors rows named in consumers). Tenants
-// share the outbox and each consumer reads its own tenant's rows only, so
-// another tenant's rows past a cursor wait for nobody.
+// of its consumers (the outbox_cursors rows named in consumers). Each
+// consumer reads its own tenant's rows only, so rows of any other
+// tenant_id past a cursor wait for nobody.
 func Outbox(pool *pgxpool.Pool, tenant string, consumers []string, now func() time.Time) Check {
 	return func(ctx context.Context) ([]Problem, error) {
 		rows, err := pool.Query(ctx, `

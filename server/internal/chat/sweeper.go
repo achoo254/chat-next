@@ -189,8 +189,7 @@ func (s *Service) sweep(ctx context.Context, st *sweepState) error {
 }
 
 func (s *Service) readOutbox(ctx context.Context, where string, arg any) ([]OutboxRow, error) {
-	// Several tenants can share the database, one process each: a process
-	// consumes the rows of its own tenant only.
+	// The process consumes the rows of its own tenant only.
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, created_at, kind, chat_id, actor_id, session_id, reason, user_ids, pts, chat_pts
 		FROM outbox WHERE tenant_id = $2 AND `+where, arg, s.cfg.TenantID)

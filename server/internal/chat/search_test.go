@@ -169,17 +169,8 @@ func TestSearchVisibility(t *testing.T) {
 		t.Fatalf("former member found %q", got)
 	}
 
-	// Another tenant's chat, or a secret chat, is never searched.
-	if err := h.st.EnsureTenant(ctx, "other", "other.test", "other.test"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.st.Pool().Exec(ctx, `UPDATE chats SET tenant_id = 'other' WHERE id = $1`, chatID); err != nil {
-		t.Fatal(err)
-	}
-	if got := h.found(alice, "ke hoach"); len(got) != 0 {
-		t.Fatalf("other tenant's chat searched: %q", got)
-	}
-	if _, err := h.st.Pool().Exec(ctx, `UPDATE chats SET tenant_id = $2, type = 'secret' WHERE id = $1`, chatID, testTenant); err != nil {
+	// A secret chat is never searched.
+	if _, err := h.st.Pool().Exec(ctx, `UPDATE chats SET type = 'secret' WHERE id = $1`, chatID); err != nil {
 		t.Fatal(err)
 	}
 	if got := h.found(alice, "ke hoach"); len(got) != 0 {

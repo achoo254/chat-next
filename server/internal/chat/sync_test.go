@@ -268,41 +268,6 @@ func TestTooLongAndEpoch(t *testing.T) {
 	}
 }
 
-func TestTenantsAreIsolated(t *testing.T) {
-	h := newHarness(t, nil)
-	ctx := context.Background()
-	if err := h.st.EnsureTenant(ctx, "other", "inetdev.io.vn", "inetdev.io.vn"); err != nil {
-		t.Fatal(err)
-	}
-	other := newHarnessOn(t, h.st, "other", nil)
-	a, b := h.user("a"), h.user("b")
-	stranger := other.user("stranger")
-	chatID := h.group(a, b)
-	if _, _, err := other.svc.GetChat(ctx, stranger, chatID); codeOf(err) != connect.CodeNotFound {
-		t.Fatalf("other tenant reads the chat: %v", err)
-	}
-	if _, err := other.svc.SendMessage(ctx, stranger, &appv1.SendMessageRequest{ChatId: chatID, Text: "hi"}); codeOf(err) != connect.CodeNotFound {
-		t.Fatalf("other tenant posts: %v", err)
-	}
-	resp, err := h.svc.AddMembers(ctx, a, chatID, []int64{stranger})
-	failed := resp.GetFailedUserIds()
-	if err != nil || !slices.Equal(failed, []int64{stranger}) || resp.GetFailures()[0].GetReason() != appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_NOT_FOUND {
-		t.Fatalf("adding a user of another tenant: %v %v", failed, err)
-	}
-	if _, _, err := h.svc.CreatePrivate(ctx, a, stranger); codeOf(err) != connect.CodeNotFound {
-		t.Fatalf("private chat across tenants: %v", err)
-	}
-	if users, err := h.svc.GetUsers(ctx, a, []int64{stranger, b}); err != nil || len(users) != 1 || users[0].GetId() != b {
-		t.Fatalf("GetUsers across tenants = %v, %v", users, err)
-	}
-	if found, err := h.svc.SearchUsers(ctx, a, "stranger", 10); err != nil || len(found) != 0 {
-		t.Fatalf("search across tenants = %v, %v", found, err)
-	}
-	if _, err := other.svc.JoinByInvite(ctx, stranger, inviteOf(t, h, a, chatID)); codeOf(err) != connect.CodeNotFound {
-		t.Fatalf("invite used from another tenant: %v", err)
-	}
-}
-
 func inviteOf(t *testing.T, h *harness, admin, chatID int64) string {
 	t.Helper()
 	inv, err := h.svc.ExportInviteLink(context.Background(), admin, chatID, 0, 0)

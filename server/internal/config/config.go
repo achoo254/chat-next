@@ -27,7 +27,10 @@ const (
 
 // Defaults of optional variables.
 const (
-	DefaultListenAddr   = "127.0.0.1:4600"
+	DefaultListenAddr = "127.0.0.1:4600"
+	// DefaultTenantID is the tenant_id of every row, kept as a constant:
+	// Mini App initData signatures, media tokens and the clients' local
+	// database names are derived from it, so it must never change.
 	DefaultTenantID     = "primary"
 	DefaultTenantDomain = "hoandat.com"
 	// DefaultAppURLScheme matches urlScheme in brand.config.json.
@@ -50,8 +53,11 @@ type Config struct {
 	// SessionKeyPrevious (SESSION_KEY_PREVIOUS, optional) still opens values
 	// sealed and tokens signed before a key rotation; nothing new uses it.
 	SessionKeyPrevious []byte
-	TenantID           string
-	TenantDomain       string
+	// TenantID is always DefaultTenantID (one tenant per database).
+	TenantID string
+	// TenantDomain (TENANT_DOMAIN) is the domain the service runs under,
+	// returned to clients as tenant_name.
+	TenantDomain string
 	// AppURLScheme is the app's own scheme allowed in message links
 	// (ADR 0004).
 	AppURLScheme string
@@ -207,9 +213,8 @@ func invalid(name, reason string) error {
 }
 
 var (
-	tenantIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
-	schemePattern   = regexp.MustCompile(`^[a-z][a-z0-9+.-]{0,62}$`)
-	domainPattern   = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
+	schemePattern = regexp.MustCompile(`^[a-z][a-z0-9+.-]{0,62}$`)
+	domainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 )
 
 // Load reads and validates the api configuration. Every problem is reported
@@ -240,7 +245,7 @@ func Load(lookup Lookup) (Config, error) {
 		DatabaseURL:      required("DATABASE_URL"),
 		OIDCClientID:     required("OIDC_CLIENT_ID"),
 		OIDCClientSecret: required("OIDC_CLIENT_SECRET"),
-		TenantID:         orDefault("TENANT_ID", DefaultTenantID),
+		TenantID:         DefaultTenantID,
 		TenantDomain:     strings.ToLower(orDefault("TENANT_DOMAIN", DefaultTenantDomain)),
 		AppURLScheme:     strings.ToLower(orDefault("APP_URL_SCHEME", DefaultAppURLScheme)),
 	}
@@ -309,9 +314,6 @@ func Load(lookup Lookup) (Config, error) {
 		}
 	}
 
-	if !tenantIDPattern.MatchString(c.TenantID) {
-		errs = append(errs, invalid("TENANT_ID", "must match "+tenantIDPattern.String()))
-	}
 	if !schemePattern.MatchString(c.AppURLScheme) || c.AppURLScheme == "http" || c.AppURLScheme == "https" {
 		errs = append(errs, invalid("APP_URL_SCHEME", "must be a URL scheme like com.example.chat"))
 	}

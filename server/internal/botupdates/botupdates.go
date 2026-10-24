@@ -52,7 +52,8 @@ import (
 
 // Timings and limits.
 const (
-	cursorName = "bots"
+	// CursorName is the consumer's outbox_cursors row.
+	CursorName = "bots"
 	passBatch  = 500
 	tickEvery  = time.Second
 	// gapTTL: an outbox id skipped by the cursor that has not appeared by
@@ -216,7 +217,7 @@ func (s *Service) pass(ctx context.Context) (int, error) {
 	var read int
 	var stored []int64
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		persisted, err := lockCursor(ctx, tx, s.chat.CursorName(cursorName))
+		persisted, err := lockCursor(ctx, tx, CursorName)
 		if err != nil {
 			return err
 		}
@@ -272,7 +273,7 @@ func (s *Service) pass(ctx context.Context) (int, error) {
 		}
 		if low != persisted {
 			if _, err := tx.Exec(ctx, `UPDATE outbox_cursors SET last_id = $2, updated_at = now() WHERE consumer = $1`,
-				s.chat.CursorName(cursorName), low); err != nil {
+				CursorName, low); err != nil {
 				return fmt.Errorf("botupdates: save cursor: %w", err)
 			}
 		}

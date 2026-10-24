@@ -288,28 +288,23 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 // Production layout of the shared server (infra/chat): the watchdog checks
 // these when they exist.
 const (
-	backupDir  = "/opt/chat/backups"
-	tenantsDir = "/opt/chat/tenants"
-	// nginx, which serves every tenant's certificate.
+	backupDir = "/opt/chat/backups"
+	// nginx, which serves the certificate.
 	originTLS = "127.0.0.1:443"
 )
 
-// newWatcher sets up the watchdog: problems of this tenant (outbox, log
-// errors, certificate), and in the main tenant's process those of the
-// machine (memory, disk, backups, the other tenants' processes).
+// newWatcher sets up the watchdog: problems of the service (outbox, log
+// errors, certificate) and of the machine (memory, disk, backups).
 func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookSvc *hooks.Service, group *watch.Group, logger *slog.Logger) *watch.Watcher {
-	checks := []watch.Check{watch.Outbox(st.Pool(), cfg.TenantID, []string{chatSvc.CursorName("bots"), chatSvc.CursorName("push")}, time.Now), watch.Errors(watch.Process)}
+	checks := []watch.Check{watch.Outbox(st.Pool(), cfg.TenantID, []string{botupdates.CursorName, push.CursorName}, time.Now), watch.Errors(watch.Process)}
 	if cfg.PublicURL != nil && cfg.PublicURL.Scheme == "https" {
 		checks = append(checks, watch.Cert(cfg.PublicURL.Hostname(), originTLS, time.Now))
 	}
-	if cfg.TenantID == config.DefaultTenantID {
-		disks := []string{"/"}
-		if cfg.Media != nil && cfg.Media.Root != "" {
-			disks = append(disks, cfg.Media.Root)
-		}
-		checks = append(checks, watch.Memory(), watch.Disk(disks...), watch.Backup(backupDir, time.Now),
-			watch.Tenants(tenantsDir, &http.Client{Timeout: 10 * time.Second}))
+	disks := []string{"/"}
+	if cfg.Media != nil && cfg.Media.Root != "" {
+		disks = append(disks, cfg.Media.Root)
 	}
+	checks = append(checks, watch.Memory(), watch.Disk(disks...), watch.Backup(backupDir, time.Now))
 	return watch.New(watch.Config{
 		TenantID: cfg.TenantID, Operators: cfg.OperatorUserIDs, Pool: st.Pool(),
 		Chats: chatSvc, Hooks: hookSvc, Checks: checks, Logger: logger.With("component", "watch"), Group: group,

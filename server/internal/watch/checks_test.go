@@ -2,8 +2,6 @@ package watch
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,24 +32,6 @@ func TestBackupStale(t *testing.T) {
 	}
 	if p, _ := Backup(filepath.Join(dir, "none"), time.Now)(context.Background()); len(p) != 0 {
 		t.Fatalf("another machine: %v", p)
-	}
-}
-
-func TestTenantsDown(t *testing.T) {
-	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
-	defer up.Close()
-	dir := t.TempDir()
-	write := func(name, body string) {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("ok.env", "CHAT_LISTEN_ADDR="+strings.TrimPrefix(up.URL, "http://")+"\nOIDC_CLIENT_SECRET=s\n")
-	write("down.env", "CHAT_LISTEN_ADDR=127.0.0.1:1\nOIDC_CLIENT_SECRET=s\n")
-	write("unset.env", "CHAT_LISTEN_ADDR=127.0.0.1:1\n")
-	p, err := Tenants(dir, up.Client())(context.Background())
-	if err != nil || len(p) != 1 || p[0].Key != "tenant_down:down" {
-		t.Fatalf("tenants: %v, %v", p, err)
 	}
 }
 

@@ -90,37 +90,45 @@ func TestWatchdogAlertsOperators(t *testing.T) {
 	t.Logf("resolved text: %q", alerts[0].GetText())
 }
 
-// Tenants share the outbox: rows of another tenant past a consumer's
-// cursor wait for nobody, and only the consumers named are checked.
+// Updates past a named consumer's cursor for over two minutes alert; a
+// row of another tenant_id (raw SQL only) waits for nobody and never
+// alerts, and consumers not named are not checked.
 func TestWatchdogOutboxCountsOwnTenant(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	pool := e.store.Pool()
-	const other = "watch-other"
+	op := e.member(t, "watchop")
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO outbox_cursors (consumer, last_id) SELECT c, coalesce((SELECT max(id) FROM outbox), 0)
-		FROM unnest(ARRAY['watch-own', 'watch-own:'||$1]) AS c`, other); err != nil {
+		FROM unnest(ARRAY['watch-own', 'watch-unnamed']) AS c`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO outbox (kind, tenant_id, created_at) VALUES ('read', $1, now() - interval '10 minutes')`, other); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO outbox (kind, tenant_id, created_at) VALUES ('read', 'watch-other', now() - interval '10 minutes')`); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM outbox WHERE tenant_id = $1`, other)
-		_, _ = pool.Exec(context.Background(), `DELETE FROM outbox_cursors WHERE consumer LIKE 'watch-own%'`)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM outbox WHERE tenant_id = 'watch-other'`)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM outbox_cursors WHERE consumer LIKE 'watch-%'`)
 	})
-	found, err := watch.Outbox(pool, tenantID, []string{"watch-own"}, time.Now)(ctx)
-	if err != nil {
-		t.Fatal(err)
+	check := func(now func() time.Time) []watch.Problem {
+		t.Helper()
+		found, err := watch.Outbox(pool, tenantID, []string{"watch-own"}, now)(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return found
 	}
-	if len(found) != 0 {
+	later := func() time.Time { return time.Now().Add(10 * time.Minute) }
+	if found := check(later); len(found) != 0 {
 		t.Fatalf("another tenant's row alerted: %+v", found)
 	}
-	found, err = watch.Outbox(pool, other, []string{"watch-own:" + other}, time.Now)(ctx)
-	if err != nil {
+	if _, err := op.chats.CreateGroup(ctx, connect.NewRequest(&appv1.CreateGroupRequest{Title: "Chờ"})); err != nil {
 		t.Fatal(err)
 	}
-	if len(found) != 1 || found[0].Key != "outbox_backlog:watch-own:"+other {
-		t.Fatalf("own tenant's waiting row: %+v", found)
+	if found := check(time.Now); len(found) != 0 {
+		t.Fatalf("a fresh row alerted: %+v", found)
+	}
+	if found := check(later); len(found) != 1 || found[0].Key != "outbox_backlog:watch-own" {
+		t.Fatalf("own waiting row: %+v", found)
 	}
 }

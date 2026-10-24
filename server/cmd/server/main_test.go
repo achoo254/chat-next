@@ -12,7 +12,7 @@ import (
 func clearConfigEnv(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{"CHAT_ENV", "CHAT_LISTEN_ADDR", "CHAT_PUBLIC_URL", "DATABASE_URL", "OIDC_ISSUER",
-		"OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "SESSION_KEY", "TENANT_ID", "TENANT_DOMAIN", "DEV_ORIGINS"} {
+		"OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "SESSION_KEY", "TENANT_DOMAIN", "DEV_ORIGINS"} {
 		t.Setenv(k, "")
 		if err := os.Unsetenv(k); err != nil {
 			t.Fatal(err)
