@@ -42,14 +42,13 @@ export interface LegalCopy {
 /** When the text last changed (shown on every page). */
 export const LEGAL_UPDATED = { vi: "20/10/2026", en: "20 October 2026" } as const;
 
-const { appName, domain, webHost, idpHost, accountUrl, primaryTenant } = brand;
+const { appName, domain, webHost, idpHost, accountUrl } = brand;
 
 /**
- * The operator's contact for privacy, terms and deletion requests, and where
- * its servers are: facts of the primary tenant's service only. A tenant run
- * by someone else shows its in-app channel and no location.
+ * The operator's contact for privacy, terms and deletion requests. Its
+ * servers are in Vietnam and the web host goes through Cloudflare.
  */
-const OPERATOR = primaryTenant ? { email: "quocdat254@gmail.com", inVietnam: true, cloudflare: true } : null;
+const OPERATOR_EMAIL = "quocdat254@gmail.com";
 const mailto = (email: string): LegalLink => ({ href: `mailto:${email}`, label: email, kind: "email" });
 
 const vi: LegalCopy = {
@@ -92,8 +91,8 @@ const vi: LegalCopy = {
 					title: "Lưu ở đâu",
 					items: [
 						"Cơ sở dữ liệu, file và bản sao lưu nằm trên máy chủ của nhà vận hành; hiện chưa có bản lưu trữ hay sao lưu nào ở ngoài máy chủ đó.",
-						...(OPERATOR?.inVietnam === true ? ["Máy chủ đặt tại Việt Nam."] : []),
-						...(OPERATOR?.cloudflare === true ? [`Kết nối tới ${webHost} đi qua Cloudflare.`] : []),
+						"Máy chủ đặt tại Việt Nam.",
+						`Kết nối tới ${webHost} đi qua Cloudflare.`,
 						"Log của app chỉ ghi mã định danh; không ghi nội dung tin, email hay token.",
 					],
 				},
@@ -148,10 +147,10 @@ const vi: LegalCopy = {
 				{
 					title: "Liên hệ",
 					paragraphs: [
-						...(OPERATOR === null ? [] : [`Gửi câu hỏi hoặc yêu cầu về dữ liệu cá nhân (xem, xuất, sửa, xoá) tới ${OPERATOR.email}.`]),
+						`Gửi câu hỏi hoặc yêu cầu về dữ liệu cá nhân (xem, xuất, sửa, xoá) tới ${OPERATOR_EMAIL}.`,
 						"Trong app, bạn cũng gửi được ở Cài đặt › Góp ý; câu trả lời đến qua bot Trợ lý.",
 					],
-					...(OPERATOR === null ? {} : { link: mailto(OPERATOR.email) }),
+					link: mailto(OPERATOR_EMAIL),
 				},
 				{
 					title: "Đang cập nhật",
@@ -213,9 +212,7 @@ const vi: LegalCopy = {
 					paragraphs: ["Dữ liệu app giữ và thời hạn lưu nằm ở Chính sách quyền riêng tư."],
 					link: { href: paths.privacy, label: "Chính sách quyền riêng tư" },
 				},
-				...(OPERATOR === null
-					? []
-					: [{ title: "Liên hệ", paragraphs: [`Câu hỏi về các điều khoản này: ${OPERATOR.email}.`], link: mailto(OPERATOR.email) }]),
+				{ title: "Liên hệ", paragraphs: [`Câu hỏi về các điều khoản này: ${OPERATOR_EMAIL}.`], link: mailto(OPERATOR_EMAIL) },
 				{
 					title: "Đang cập nhật",
 					pending: true,
@@ -260,17 +257,11 @@ const vi: LegalCopy = {
 					paragraphs: [`Xoá tài khoản chat không xoá tài khoản ${domain}. Muốn xoá tài khoản đó, vào trang tài khoản ở ${idpHost}.`],
 					link: { href: accountUrl, label: `Tài khoản ${domain}`, kind: "site" },
 				},
-				...(OPERATOR === null
-					? []
-					: [
-							{
-								title: "Không đăng nhập được?",
-								paragraphs: [
-									`Gửi yêu cầu xoá tài khoản chat tới ${OPERATOR.email}, ghi rõ username của bạn và email của tài khoản ${domain}.`,
-								],
-								link: mailto(OPERATOR.email),
-							},
-						]),
+				{
+					title: "Không đăng nhập được?",
+					paragraphs: [`Gửi yêu cầu xoá tài khoản chat tới ${OPERATOR_EMAIL}, ghi rõ username của bạn và email của tài khoản ${domain}.`],
+					link: mailto(OPERATOR_EMAIL),
+				},
 			],
 		},
 	},
@@ -316,8 +307,8 @@ const en: LegalCopy = {
 					title: "Where it is stored",
 					items: [
 						"The database, files and backups are on the operator's server; no storage or backup outside that server yet.",
-						...(OPERATOR?.inVietnam === true ? ["The servers are in Vietnam."] : []),
-						...(OPERATOR?.cloudflare === true ? [`Connections to ${webHost} go through Cloudflare.`] : []),
+						"The servers are in Vietnam.",
+						`Connections to ${webHost} go through Cloudflare.`,
 						"The app's logs record ids only, never message text, emails or tokens.",
 					],
 				},
@@ -372,10 +363,10 @@ const en: LegalCopy = {
 				{
 					title: "Contact",
 					paragraphs: [
-						...(OPERATOR === null ? [] : [`Send questions or requests about your personal data (access, export, correction, deletion) to ${OPERATOR.email}.`]),
+						`Send questions or requests about your personal data (access, export, correction, deletion) to ${OPERATOR_EMAIL}.`,
 						"In the app you can also use Settings › Feedback; replies come through the Assistant bot.",
 					],
-					...(OPERATOR === null ? {} : { link: mailto(OPERATOR.email) }),
+					link: mailto(OPERATOR_EMAIL),
 				},
 				{
 					title: "Being updated",
@@ -435,9 +426,7 @@ const en: LegalCopy = {
 					paragraphs: ["The data the app keeps and for how long is in the privacy policy."],
 					link: { href: paths.privacy, label: "Privacy policy" },
 				},
-				...(OPERATOR === null
-					? []
-					: [{ title: "Contact", paragraphs: [`Questions about these terms: ${OPERATOR.email}.`], link: mailto(OPERATOR.email) }]),
+				{ title: "Contact", paragraphs: [`Questions about these terms: ${OPERATOR_EMAIL}.`], link: mailto(OPERATOR_EMAIL) },
 				{
 					title: "Being updated",
 					pending: true,
@@ -482,17 +471,11 @@ const en: LegalCopy = {
 					paragraphs: [`Deleting your chat account does not delete your ${domain} account. To delete that, use its account page at ${idpHost}.`],
 					link: { href: accountUrl, label: `${domain} account`, kind: "site" },
 				},
-				...(OPERATOR === null
-					? []
-					: [
-							{
-								title: "Can't sign in?",
-								paragraphs: [
-									`Email your request to delete your chat account to ${OPERATOR.email}, with your username and your ${domain} account's email.`,
-								],
-								link: mailto(OPERATOR.email),
-							},
-						]),
+				{
+					title: "Can't sign in?",
+					paragraphs: [`Email your request to delete your chat account to ${OPERATOR_EMAIL}, with your username and your ${domain} account's email.`],
+					link: mailto(OPERATOR_EMAIL),
+				},
 			],
 		},
 	},

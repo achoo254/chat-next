@@ -2,7 +2,7 @@
 // (iOS, this device only) or the Keystore (Android) through
 // @aparajita/capacitor-secure-storage, never in the WebView's storage, and
 // held in memory for the requests of this run. One entry per server, so a
-// build pointed at another tenant never reads this one's token.
+// build pointed at another server never reads this one's token.
 import { KeychainAccess, SecureStorage } from "@aparajita/capacitor-secure-storage";
 import { NATIVE_API_ORIGIN } from "../server-origin.ts";
 

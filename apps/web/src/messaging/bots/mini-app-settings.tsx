@@ -1,7 +1,7 @@
 // Developer Console, Mini App tab (mockups/console.html#mini-app-settings):
 // the bot's main Mini App URL with a preview of the header users see, and
 // how the bot's server verifies initData. The server decides what it takes
-// (https, not under the app's or a tenant's domain, no credentials, no IP
+// (https, not under the app's domain, no credentials, no IP
 // host, 512 characters); the field checks what it can before saving.
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "../../components/icon.tsx";
@@ -23,8 +23,7 @@ const SDK_PATH = "/miniapp/sdk.js";
 
 /**
  * The domain the app is served under: chat.<domain> → <domain>. Mini Apps
- * there would be same-site with the app; the server refuses them (and the
- * other tenants' domains, which only it knows).
+ * there would be same-site with the app; the server refuses them.
  */
 export function appDomainOf(appHost: string): string {
 	return appHost.replace(/^chat\./, "");

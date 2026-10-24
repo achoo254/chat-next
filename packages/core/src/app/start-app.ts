@@ -59,7 +59,7 @@ export interface StartOptions {
 	 * web's socket rides on the HttpOnly cookie instead.
 	 */
 	readonly sessionToken?: string;
-	/** Tenant host or domain; part of the local database name. */
+	/** Server host, e.g. chat.hoandat.com; part of the local database name, so it never changes for a server. */
 	readonly tenant: string;
 	/** The user of the last session on this device; skips GetSelf on a warm start. */
 	readonly userIdHint?: number;

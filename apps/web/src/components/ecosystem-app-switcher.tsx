@@ -28,9 +28,8 @@ export function EcosystemAppSwitcher({ placement, className }: EcosystemAppSwitc
 		<AppSwitcher
 			current="chat"
 			tenantDomain={brand.domain}
-			// Scribe runs on the primary tenant (hoandat.com) only: chat.<domain> of
-			// another tenant or a self-hosted install lists the other apps without it.
-			isPrimaryTenant={brand.primaryTenant}
+			// The only domain served is the primary one, where every app runs.
+			isPrimaryTenant
 			locale={locale}
 			placement={placement}
 			onOpen={IS_NATIVE ? openInSystemBrowser : undefined}

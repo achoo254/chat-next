@@ -123,7 +123,7 @@ function startHub(config: WorkerConfig): TabHub {
 				realtimeUrl: config.realtimeUrl,
 				appVersion: config.appVersion,
 				client: native?.client ?? "web",
-				// Part of the local database name: the server's host, so data of two tenants never mix.
+				// Part of the local database name: the server's host, so data of two servers never mix.
 				tenant: new URL(origin).host,
 				...(native === undefined ? {} : { sessionToken: native.sessionToken }),
 				...(config.userIdHint === undefined ? {} : { userIdHint: config.userIdHint }),

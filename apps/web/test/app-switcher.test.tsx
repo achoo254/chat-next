@@ -1,5 +1,5 @@
 // The app switcher (@shared-next/app-switcher) of the signed-in screens: the
-// other apps of the tenant, Chat itself left out, every link tagged as coming
+// other apps of the domain, Chat itself left out, every link tagged as coming
 // from Chat. In the folder rail of the chat screens and the rail of the
 // other screens, before Cài đặt.
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -27,7 +27,7 @@ function expectBeforeSettings(rail: HTMLElement): HTMLElement {
 }
 
 describe("app switcher", () => {
-	it("lists the other apps of the primary tenant from the folder rail; Esc closes it", async () => {
+	it("lists the other apps of the domain from the folder rail; Esc closes it", async () => {
 		renderSignedIn("/");
 		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
 		const button = expectBeforeSettings(rail);

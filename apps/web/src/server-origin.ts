@@ -2,7 +2,7 @@
 // it is the page's own origin. The iOS and Android apps (Capacitor, built
 // with VITE_NATIVE=true) load the same bundle from capacitor://localhost or
 // https://localhost and call the server cross-origin: VITE_API_ORIGIN, or
-// the primary tenant's web host from brand.config.json.
+// the web host of brand.config.json.
 //
 // IS_NATIVE is a build-time constant. A dynamic import of a native module
 // must test `import.meta.env.VITE_NATIVE === "true"` in place rather than
@@ -12,7 +12,7 @@ import brandConfig from "../../../brand.config.json";
 
 export const IS_NATIVE = import.meta.env.VITE_NATIVE === "true";
 
-/** The primary tenant's web origin, e.g. https://chat.<domain>. */
+/** The web origin of brand.config.json, e.g. https://chat.<domain>. */
 function primaryWebOrigin(): string {
 	return `https://${brandConfig.hostTemplates.web.replace("{domain}", brandConfig.primaryTenant.domain)}`;
 }
@@ -32,7 +32,7 @@ export function serverHostname(): string {
 	return IS_NATIVE ? new URL(NATIVE_API_ORIGIN).hostname : window.location.hostname;
 }
 
-/** Host of the chat server (the tenant's web host), e.g. chat.hoandat.com. */
+/** Host of the chat server (its web host), e.g. chat.hoandat.com. */
 export function serverHost(): string {
 	return IS_NATIVE ? new URL(NATIVE_API_ORIGIN).host : window.location.host;
 }

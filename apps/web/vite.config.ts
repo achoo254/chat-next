@@ -23,7 +23,7 @@ export default defineConfig({
 			// answers only on the app's own host, so the Host header stays as sent.
 			"/bot/": { target: API_ORIGIN, changeOrigin: false },
 			// Incoming webhooks: the URL shown in the group panel uses this origin, and
-			// the server resolves the tenant from the Host header, as for /bot/.
+			// the server checks the Host header, as for /bot/.
 			"/hook/": { target: API_ORIGIN, changeOrigin: false },
 			// Realtime gateway (same origin as in production).
 			"/ws": { target: API_ORIGIN, ws: true },
