@@ -118,6 +118,12 @@
 .folder[aria-current="true"], .folder[aria-current="page"] { background: var(--c-selected); color: var(--c-primary); }
 .folder .badge { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
 .folder.me { min-height: 48px; place-items: center; }
+/* The app switcher (components/ecosystem-app-switcher.tsx) in the folder rail.
+   The rail scrolls (overflow-y), which would clip a panel positioned against
+   the switcher; static, its panel is placed against .app (relative) instead,
+   outside the rail's clip: beside the rail, along the bottom of the screen. */
+.folder-rail .sn-app-switcher.folder-switcher { position: static; align-self: center; }
+.sn-app-switcher.folder-switcher[data-placement] .sn-app-switcher__panel { left: calc(var(--rail-w) + var(--space-1)); bottom: var(--space-2); }
 
 .app .list { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--c-border-subtle); }
 .search-field:focus-within { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
@@ -937,6 +943,12 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 @media (max-width: 760px) {
 	.narrow-only { display: inline-grid; }
 	.n-head.narrow-only { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2); min-height: var(--topbar-h); border-bottom: 1px solid var(--c-border-subtle); }
+	/* The app switcher's panel opens under this bar at its right edge: aligned
+	   to the button, with Danh bạ and the new-chat button after it, it would
+	   run off the left of a phone screen. */
+	.n-head.narrow-only { position: relative; }
+	.n-head .sn-app-switcher.n-head-switcher { position: static; }
+	.sn-app-switcher.n-head-switcher[data-placement] .sn-app-switcher__panel { right: var(--space-2); }
 	.n-head h2 { flex: 1; margin: 0 0 0 var(--space-1); font-size: 1.125rem; font-weight: 600; }
 	.app .list .list-head { max-height: 80px; overflow: hidden; padding: var(--space-3) var(--space-3) var(--space-2); transition: max-height var(--dur-base) var(--ease-standard), padding var(--dur-base) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard); }
 	/* Scrolled down (chat-list.tsx collapseHead): the search box folds away and the header slims to one small title row. */

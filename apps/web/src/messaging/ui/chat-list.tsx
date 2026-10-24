@@ -6,6 +6,7 @@
 // the list does not jump (#list-states). Alt+↑/↓ opens the chat above/below.
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import { brand } from "../../brand.ts";
+import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -57,6 +58,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 					<Icon name="settings" />
 				</Link>
 				<h2>{brand.appName}</h2>
+				<EcosystemAppSwitcher placement="bottom-end" className="n-head-switcher" />
 				<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
 					<ContactsGlyph />
 				</Link>

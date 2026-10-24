@@ -101,6 +101,25 @@ button { cursor: pointer; }
 	padding: var(--space-3) 0; background: var(--c-surface-subtle); border-right: 1px solid var(--c-border-subtle);
 }
 .rail .spacer { flex: 1; }
+/* App switcher of the *-next apps (@shared-next/app-switcher): its variables
+   mapped to the tokens, the button sized like the rail's .icon-btn. */
+.sn-app-switcher {
+	--app-switcher-button-size: 44px;
+	--app-switcher-button-radius: var(--radius-sm);
+	--app-switcher-button-text: var(--c-icon-muted);
+	--app-switcher-hover: var(--c-hover);
+	--app-switcher-focus-ring: var(--c-primary);
+	--app-switcher-surface: var(--c-surface);
+	--app-switcher-text: var(--c-text);
+	--app-switcher-muted: var(--c-text-muted);
+	--app-switcher-border: var(--c-border-subtle);
+	--app-switcher-shadow: var(--shadow-md);
+	--app-switcher-radius: var(--radius-md);
+	--app-switcher-item-radius: var(--radius-sm);
+	--app-switcher-font: var(--font-sans);
+	--app-switcher-icon: var(--c-primary);
+	--app-switcher-icon-stroke: var(--icon-stroke);
+}
 .avatar {
 	display: grid; place-items: center; width: var(--avatar); height: var(--avatar); border-radius: var(--radius-full);
 	font-weight: 600; font-size: 0.875rem; flex: none;
@@ -225,6 +244,13 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 @media (max-width: 760px) {
 	.shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 	.rail { flex-direction: row; padding: var(--space-1) var(--space-3); border-right: 0; border-bottom: 1px solid var(--c-border-subtle); }
+	/* The rail is a top bar here: the app switcher's panel opens under it, at
+	   its right edge, instead of beside the button (above the screen's top). */
+	.rail { position: relative; }
+	.sn-app-switcher.rail-switcher { position: static; }
+	.sn-app-switcher.rail-switcher[data-placement] .sn-app-switcher__panel {
+		top: calc(100% + var(--space-1)); bottom: auto; left: auto; right: var(--space-2);
+	}
 	.home { grid-template-columns: minmax(0, 1fr); }
 	.home .convo { display: none; }
 	.list { border-right: 0; }

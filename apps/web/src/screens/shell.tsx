@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { Avatar } from "../components/avatar.tsx";
+import { EcosystemAppSwitcher } from "../components/ecosystem-app-switcher.tsx";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, paths, type Route } from "../router.tsx";
@@ -15,7 +16,7 @@ interface ShellProps {
 	children: ReactNode;
 }
 
-/** Signed-in frame: navigation rail plus the active screen. */
+/** Signed-in frame: navigation rail (with the switcher to the other apps) plus the active screen. */
 export function Shell({ self, route, nav, avatar, children }: ShellProps) {
 	const { t } = useI18n();
 	return (
@@ -30,6 +31,7 @@ export function Shell({ self, route, nav, avatar, children }: ShellProps) {
 				</Link>
 				{nav}
 				<span className="spacer" />
+				<EcosystemAppSwitcher placement="right-end" className="rail-switcher" />
 				<Link
 					to={paths.settingsList}
 					className="icon-btn"

@@ -1,9 +1,10 @@
 // Built-in folders (R1): Tất cả, Cá nhân, Nhóm, Bot filtered on the client by
-// chat kind, and Chưa đọc by read state; then Danh bạ and Cài đặt. Wide
-// screens show the labelled rail; narrow screens the tab row inside the list
-// (mockups/chat.html#app, #contacts, #narrow). Badges count chats with
-// unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
+// chat kind, and Chưa đọc by read state; then Danh bạ, the app switcher and
+// Cài đặt. Wide screens show the labelled rail; narrow screens the tab row
+// inside the list (mockups/chat.html#app, #contacts, #narrow). Badges count
+// chats with unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
 import type { SelfUser } from "../../api/adapters.ts";
+import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -52,6 +53,7 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 				<ContactsGlyph />
 				{copy.folders.contacts}
 			</Link>
+			<EcosystemAppSwitcher placement="right-end" className="folder-switcher" />
 			<Link to={paths.settingsList} className="folder">
 				<Icon name="settings" />
 				{copy.folders.settings}
