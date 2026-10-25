@@ -36,5 +36,9 @@ $SSH "$SSH_TARGET" "install -d -m 755 $ROOT/releases $ROOT/infra"
 rsync -rltz -e "$SSH" "$rel/" "$SSH_TARGET:$ROOT/releases/$id/"
 rsync -rltz --delete -e "$SSH" infra/chat/ "$SSH_TARGET:$ROOT/infra/"
 
+# A binary built on Windows carries no executable bit, and rsync without -p
+# keeps that; the release is only activated when the server binary runs.
+$SSH "$SSH_TARGET" "chmod 755 $ROOT/releases/$id/server"
+
 echo "== activate"
 $SSH "$SSH_TARGET" "bash $ROOT/infra/activate-release.sh '$id'"
