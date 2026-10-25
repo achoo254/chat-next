@@ -1,6 +1,6 @@
 ---
 name: chat-ops-prod
-description: Tra cứu và vận hành app chat trên PRODUCTION (chat.hoandat.com, server dùng chung 103.72.98.65 cổng SSH 24700, pm2 chat-api, Postgres dùng chung db `chat`, release /opt/chat/current). Chỉ đường đọc docs/deployment-guide.md — credential SSH ở $ALL_IN_ONE_STAGING_DEV entry SSH_SERVER_STAGING, token ở $ACCESS_TOKENS_JSON; SSH/psql qua scripts/ của skill, deploy/rollback bằng infra/chat/. Kích hoạt khi user nhắc "prod", "production", "chat.hoandat.com", "server .65", "SSH prod", "psql prod", "log prod", "deploy", "rollback", "release", "pm2 chat-api", "backup chat". KHÔNG dùng cho dev local (pnpm dev, deploy/dev/docker-compose.yml).
+description: Tra cứu và vận hành app chat trên PRODUCTION (chat.hoandat.com, server dùng chung <SERVER_65_IP> cổng SSH 24700, pm2 chat-api, Postgres dùng chung db `chat`, release /opt/chat/current). Chỉ đường đọc docs/deployment-guide.md — credential SSH ở $ALL_IN_ONE_STAGING_DEV entry SSH_SERVER_STAGING, token ở $ACCESS_TOKENS_JSON; SSH/psql qua scripts/ của skill, deploy/rollback bằng infra/chat/. Kích hoạt khi user nhắc "prod", "production", "chat.hoandat.com", "server .65", "SSH prod", "psql prod", "log prod", "deploy", "rollback", "release", "pm2 chat-api", "backup chat". KHÔNG dùng cho dev local (pnpm dev, deploy/dev/docker-compose.yml).
 ---
 
 # Chat Ops — Production
@@ -87,5 +87,5 @@ subshell ghi key (để file build không thành 600):
 ```bash
 K="$(mktemp -d)"; trap 'rm -rf "$K"' EXIT
 (umask 077; jq -r '.servers[]|select(.name=="SSH_SERVER_STAGING")|.private_key' "$ALL_IN_ONE_STAGING_DEV" > "$K/key")
-SSH_TARGET=root@103.72.98.65 SSH_OPTS="-i $K/key -p 24700 -o IdentitiesOnly=yes" bash infra/chat/deploy.sh
+SSH_TARGET=root@<SERVER_65_IP> SSH_OPTS="-i $K/key -p 24700 -o IdentitiesOnly=yes" bash infra/chat/deploy.sh
 ```

@@ -20,7 +20,7 @@ principles: [7, 2, 4, 5]
 
 Dựng hạ tầng tại Việt Nam theo hai giai đoạn, có sao lưu và đo đạc đủ để chứng minh các ngân sách latency. Phase này chạy song song với các phase tính năng.
 
-- **Giai đoạn 1 — server dùng chung `103.72.98.65`:** staging và bản ra mắt đầu chạy chung máy với IdP `hoandat-auth`, Localman, Tunelo, theo quy ước của máy đó (pm2, nginx một file mỗi hostname, không Docker Compose). API nội bộ của IdP gọi qua loopback.
+- **Giai đoạn 1 — server dùng chung `<SERVER_65_IP>`:** staging và bản ra mắt đầu chạy chung máy với IdP `hoandat-auth`, Localman, Tunelo, theo quy ước của máy đó (pm2, nginx một file mỗi hostname, không Docker Compose). API nội bộ của IdP gọi qua loopback.
 - **Giai đoạn 2 — cụm riêng:** khi tải đạt ngưỡng chuyển (mục "Ngưỡng chuyển" dưới), chuyển các role và dữ liệu sang cụm riêng ở datacenter Việt Nam. RPO = 0 và quy mô 100k kết nối chỉ được cam kết ở giai đoạn này.
 
 ## Context Links

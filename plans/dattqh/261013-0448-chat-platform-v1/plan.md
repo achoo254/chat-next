@@ -213,7 +213,7 @@ Secret chat E2E (đã chừa chỗ trong data model), cuộc gọi thoại/video
 
 ### Session 3 — 2026-10-14
 - Cho phép thay đổi ở repo `hoandat-auth`; plan phía IdP: `hoandat-auth/plans/dattqh/261014-1131-chat-app-integration/`. Quyết định chi tiết từ plan đó áp ngược vào đây: refresh token native theo chính sách client (không `offline_access`), gọi `/token` qua loopback, chat bật theo từng tenant.
-- Backend chat chạy chung server `103.72.98.65` với IdP: API nội bộ của IdP gọi qua loopback, bỏ yêu cầu kênh WireGuard/mTLS ở giai đoạn đầu.
+- Backend chat chạy chung server `<SERVER_65_IP>` với IdP: API nội bộ của IdP gọi qua loopback, bỏ yêu cầu kênh WireGuard/mTLS ở giai đoạn đầu.
 - Hạ tầng hai giai đoạn (user chọn hướng A): `.65` cho staging và bản ra mắt đầu; chuyển lên cụm riêng khi chạm ngưỡng RAM/kết nối/latency. RPO = 0 và quy mô 100k chỉ cam kết ở cụm riêng; khi chuyển, API nội bộ IdP cần kênh từ xa. Đã sửa Phase 13, 14 và Success Criteria.
 
 ### Session 4 — 2026-10-14
@@ -510,7 +510,7 @@ Từ 16:43, user giao: AI tự review từng màn hình và tính năng trên Ch
 - Logo, favicon, màn chờ có hiệu ứng; một loader trễ 320 ms cho mỗi màn, tải trước màn phụ khi rảnh.
 - Sửa sau review trình duyệt và QA nhiều người dùng: bài đăng kênh, phiên đăng nhập lại thay phiên cũ, ngày tương đối, hộp Chat mới mở ngay, username ngắn đệm số, trạng thái mất mạng, service worker (mở offline, tiếp quản ngay, thanh "Đã có bản mới · Tải lại"), nhóm có chủ đề, câu trung tính khi không nhắn được.
 - R5: webhook ra ngoài (safehttp, HMAC, dead-letter, cần đăng nhập lại khi đổi webhook, chặn IP của chính server), đủ method Bot API trừ inline và bulk, menu lệnh trong nhóm, test hợp đồng OpenAPI, bot trợ lý `tro_ly_bot` chào người dùng mới và nhận góp ý vào Kiểm duyệt > Góp ý.
-- Vận hành: `OUTBOUND_DENY_CIDRS=103.72.98.65`, `CHAT_OPERATOR_USER_IDS=1` (@achoo254, user cho phép).
+- Vận hành: `OUTBOUND_DENY_CIDRS=<SERVER_65_IP>`, `CHAT_OPERATOR_USER_IDS=1` (@achoo254, user cho phép).
 
 Đã thử và gỡ: nhường quyền tab chính cho bản mới (khoá OPFS không nhả khi đóng DB; review dựng lại trên Chromium).
 

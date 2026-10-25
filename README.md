@@ -56,4 +56,4 @@ IdP được build từ checkout `auth-next` nằm cạnh repo này (`../auth-ne
 
 ## Production
 
-`https://chat.hoandat.com` trên server dùng chung `103.72.98.65`. Deploy và vận hành theo [`docs/deployment-guide.md`](docs/deployment-guide.md); danh mục hạ tầng đã triển khai ở [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md) và skill `chat-ops-prod` (`.claude/skills/chat-ops-prod/`).
+`https://chat.hoandat.com` trên server dùng chung `<SERVER_65_IP>`. Deploy và vận hành theo [`docs/deployment-guide.md`](docs/deployment-guide.md); danh mục hạ tầng đã triển khai ở [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md) và skill `chat-ops-prod` (`.claude/skills/chat-ops-prod/`).

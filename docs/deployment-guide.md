@@ -1,12 +1,12 @@
 # Deploy chat (chat.hoandat.com)
 
-Giai đoạn 1 của hạ tầng: app chat chạy chung server `103.72.98.65` với IdP, Localman và các app khác, theo quy ước của server đó (pm2, nginx một file mỗi host, không Docker Compose). Vận hành hằng ngày qua skill [`chat-ops-prod`](../.claude/skills/chat-ops-prod/SKILL.md). Khi tải chạm ngưỡng thì chuyển lên cụm riêng (plan, Phase 13 giai đoạn 2).
+Giai đoạn 1 của hạ tầng: app chat chạy chung server `<SERVER_65_IP>` với IdP, Localman và các app khác, theo quy ước của server đó (pm2, nginx một file mỗi host, không Docker Compose). Vận hành hằng ngày qua skill [`chat-ops-prod`](../.claude/skills/chat-ops-prod/SKILL.md). Khi tải chạm ngưỡng thì chuyển lên cụm riêng (plan, Phase 13 giai đoạn 2).
 
 ## Thành phần
 
 | Thành phần | Vị trí |
 |---|---|
-| DNS (Cloudflare, zone `hoandat.com`) | `chat` → `103.72.98.65`, proxied. Webhook không cần bản ghi riêng: nằm ở `https://chat.hoandat.com/hook/…`, vì Universal SSL miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, không phủ host cấp hai như `hook.chat.hoandat.com` (quyết định 2026-10-15). `*.chat` (bot) thêm khi có release cần. `media-chat` → `103.72.98.65`, proxied: host media tạm thời (R3), host cấp một nên Universal SSL phủ được; trước R9 chuyển sang domain đăng ký riêng (ADR 0010) |
+| DNS (Cloudflare, zone `hoandat.com`) | `chat` → `<SERVER_65_IP>`, proxied. Webhook không cần bản ghi riêng: nằm ở `https://chat.hoandat.com/hook/…`, vì Universal SSL miễn phí của Cloudflare chỉ phủ `*.hoandat.com`, không phủ host cấp hai như `hook.chat.hoandat.com` (quyết định 2026-10-15). `*.chat` (bot) thêm khi có release cần. `media-chat` → `<SERVER_65_IP>`, proxied: host media tạm thời (R3), host cấp một nên Universal SSL phủ được; trước R9 chuyển sang domain đăng ký riêng (ADR 0010) |
 | TLS | Let's Encrypt `chat.hoandat.com` + `*.chat.hoandat.com`, DNS-01 Cloudflare với token Zone:DNS:Edit đã có trên server (`/etc/letsencrypt/cloudflare-localman.ini`), gia hạn bằng timer certbot kèm `systemctl reload nginx` ([`issue-cert.sh`](../infra/chat/issue-cert.sh)). Chứng chỉ trên không phủ `media-chat.hoandat.com`: host này có chứng chỉ Let's Encrypt riêng ở `/etc/letsencrypt/live/media-chat.hoandat.com/` (đã cấp 2026-10-15) |
 | Release | `/opt/chat/releases/<id>/{server,web,nginx}`, id = giờ UTC + commit 12 ký tự (+`-dirty`), symlink `/opt/chat/current`; giữ 5 bản |
 | Process | pm2 `chat-api` ([`ecosystem.config.cjs`](../infra/chat/ecosystem.config.cjs)), một instance, user hệ thống `chat`, binary Go tĩnh `server -role api -env-file /opt/chat/.env`, nghe `127.0.0.1:4600`, restart khi vượt 700 MB (`GOMEMLIMIT=450MiB`; ảnh được giải mã trong process với ngân sách 256 MiB, xem [Media](#media-r3)). Gateway realtime (WebSocket `/ws`) chạy trong chính process này, không có process hay cổng riêng |
@@ -69,7 +69,7 @@ Bản mở app khi offline (service worker `/sw.js` chỉ cache app shell: `inde
 
 Bản hardening webhook và service worker (sau review 2026-10-15) **phải deploy bằng root một lần** vì đổi conf nginx (`location = /sw.js`, xem trên) và thêm file `infra/chat/sw-kill-switch.js`; deploy tự động chỉ dùng conf trong `/opt/chat/infra/nginx`. Không có migration, không cần DNS hay chứng chỉ mới.
 
-- Biến môi trường mới `OUTBOUND_DENY_CIDRS` (tuỳ chọn, nhưng production phải đặt): IP hoặc dải CIDR mà webhook của bot và xem trước link không bao giờ gọi tới. Thêm vào `/opt/chat/.env` trước khi deploy: `OUTBOUND_DENY_CIDRS=103.72.98.65` (`activate-release.sh` reload pm2 với `--update-env`, nên process mới đọc ngay). Thiếu biến thì server vẫn chạy và vẫn chặn địa chỉ công khai trên network interface của máy; log khởi động `outbound requests refuse these ranges` liệt kê dải đang chặn, nên kiểm sau deploy rằng có `103.72.98.65/32`. Lý do: không có biến này, URL webhook trỏ thẳng vào `.65` (bản ghi DNS không proxy của app khác cùng máy) đi ra từ chính `.65`, qua được luật "chỉ IP Cloudflare" và các `allow <IP server>` của vhost khác.
+- Biến môi trường mới `OUTBOUND_DENY_CIDRS` (tuỳ chọn, nhưng production phải đặt): IP hoặc dải CIDR mà webhook của bot và xem trước link không bao giờ gọi tới. Thêm vào `/opt/chat/.env` trước khi deploy: `OUTBOUND_DENY_CIDRS=<SERVER_65_IP>` (`activate-release.sh` reload pm2 với `--update-env`, nên process mới đọc ngay). Thiếu biến thì server vẫn chạy và vẫn chặn địa chỉ công khai trên network interface của máy; log khởi động `outbound requests refuse these ranges` liệt kê dải đang chặn, nên kiểm sau deploy rằng có `<SERVER_65_IP>/32`. Lý do: không có biến này, URL webhook trỏ thẳng vào `.65` (bản ghi DNS không proxy của app khác cùng máy) đi ra từ chính `.65`, qua được luật "chỉ IP Cloudflare" và các `allow <IP server>` của vhost khác.
 - Developer Console: đặt hay đổi webhook (`SetBotWebhook`) cần đăng nhập IdP trong 10 phút như cấp lại token; quay về từ trang đăng nhập, Console mở hộp xác nhận với những gì đã nhập (giữ trong `sessionStorage` của tab, dùng một lần) và chỉ lưu khi bấm nút. `PUT /bot/v1/webhook` của Bot API không đổi (đã cần token). Đổi URL webhook ở Console cần secret mới.
 - Webhook: câu trả lời 2xx chỉ đọc tối đa 64 KiB cho hành động; cả process tối đa 256 request đang chạy, chia đều giữa các bot; `Retry-After: 0` vẫn chờ 1 giây; bot rảnh không đọc DB theo đồng hồ. Số liệu 24 giờ của Console tính cả từ update còn lưu, nên có số từ trước khi bộ đếm ra đời.
 
@@ -94,7 +94,7 @@ Mặc định deploy tự động: mỗi lần `ci` xanh trên `main`, workflow 
 Deploy bằng root từ gốc repo, key SSH qua thư mục tạm (cách nạp key ở skill `chat-ops-prod`):
 
 ```bash
-SSH_TARGET=root@103.72.98.65 SSH_OPTS="-i <key> -p 24700 -o IdentitiesOnly=yes" bash infra/chat/deploy.sh
+SSH_TARGET=root@<SERVER_65_IP> SSH_OPTS="-i <key> -p 24700 -o IdentitiesOnly=yes" bash infra/chat/deploy.sh
 bash infra/chat/smoke.sh
 ```
 
@@ -209,7 +209,7 @@ Vận hành:
 
 ## Bảo mật mạng
 
-- Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `103.72.98.65` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này. Cả hai không gọi được chính `.65` (`OUTBOUND_DENY_CIDRS`, xem trên), nên luật này không bị vượt bằng một URL trỏ về chính server.
+- Xem trước link do server tải trang người dùng dán, nên site đích thấy IP gốc `<SERVER_65_IP>` (và biết server đứng sau Cloudflare). Việc vận hành cần làm: chặn cổng 443/80 của server với mọi nguồn trừ dải IP của Cloudflare (`https://www.cloudflare.com/ips/`), để biết IP gốc cũng không vượt được Cloudflare. Chưa làm trong repo này vì firewall của server dùng chung với các app khác. Webhook tới bot cũng đi ra từ IP này. Cả hai không gọi được chính `.65` (`OUTBOUND_DENY_CIDRS`, xem trên), nên luật này không bị vượt bằng một URL trỏ về chính server.
 
 ## Web Push và cài ứng dụng (PWA)
 

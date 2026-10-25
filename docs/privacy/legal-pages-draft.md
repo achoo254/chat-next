@@ -14,7 +14,7 @@ Email liên hệ, vị trí máy chủ và Cloudflare là sự thật của dị
 |---|---|
 | Liên hệ về quyền riêng tư, điều khoản và yêu cầu xoá: `quocdat254@gmail.com` | Quyết định của Jev, 20/10/2026; cùng địa chỉ đã công bố làm liên hệ trên trang quyền riêng tư công khai của Miu (`content/legal/privacy-vi.json` trong repo `miu-world-next`) |
 | Không đăng nhập được thì gửi yêu cầu xoá tới email đó, kèm username và email tài khoản `<domain>` (đường không cần đăng nhập, dùng cho URL xoá của kho ứng dụng) | Quyết định của Jev, 20/10/2026; người vận hành xử lý tay |
-| Máy chủ đặt tại Việt Nam | whois IP `103.72.98.65` (máy chủ trong [infrastructure-inventory.md](../infrastructure-inventory.md)): country VN, mạng của iNET; đo ngày 20/10/2026 |
+| Máy chủ đặt tại Việt Nam | whois IP `<SERVER_65_IP>` (máy chủ trong [infrastructure-inventory.md](../infrastructure-inventory.md)): country VN, mạng của iNET; đo ngày 20/10/2026 |
 | Kết nối tới `chat.hoandat.com` đi qua Cloudflare | infrastructure-inventory.md "Ngoài server": bản ghi A proxied của zone `hoandat.com` |
 
 ## Chính sách quyền riêng tư (`/privacy`)

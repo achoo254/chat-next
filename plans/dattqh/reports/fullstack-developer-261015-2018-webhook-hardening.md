@@ -5,9 +5,9 @@ Date: 2026-10-15. Source: `code-reviewer-261015-1909-webhook-sw.md` and the cont
 ## Deploy facts for the controller
 
 - **Root deploy needed: YES.** `infra/chat/nginx/chat.hoandat.com.conf` gains `location = /sw.js`, and `infra/chat/sw-kill-switch.js` is new. Automatic deploys only use the conf in `/opt/chat/infra/nginx`.
-- **Env var to set on prod: YES.** Add `OUTBOUND_DENY_CIDRS=103.72.98.65` to `/opt/chat/.env` before the deploy. `activate-release.sh` reloads pm2 with `--update-env`.
+- **Env var to set on prod: YES.** Add `OUTBOUND_DENY_CIDRS=<SERVER_65_IP>` to `/opt/chat/.env` before the deploy. `activate-release.sh` reloads pm2 with `--update-env`.
   - If it is missing, the server still starts. It still refuses the public addresses on the host's network interfaces.
-  - After the deploy, check that the startup log line `outbound requests refuse these ranges` lists `103.72.98.65/32`.
+  - After the deploy, check that the startup log line `outbound requests refuse these ranges` lists `<SERVER_65_IP>/32`.
   - When the variable is set, update `docs/infrastructure-inventory.md`: move `OUTBOUND_DENY_CIDRS` from "Chưa đặt" into the list of variables that are set.
 - No migration, DNS or certificate change.
 
@@ -94,4 +94,4 @@ The mock was updated before the code: `mockups/console.html` sections #token, #w
 
 Status: DONE
 Summary: H1, M1–M4, L1/L3/L4/L6, the Console copy, the Stats backfill, the token side card and the curl command are implemented with tests, docs, spec and mock. All gates pass: Go race full, golangci-lint 0, lint, typecheck, vitest, perf 146.3 KB, e2e 20/20, redocly, gitleaks on the diff.
-Concerns: Needs a root deploy (nginx) and `OUTBOUND_DENY_CIDRS=103.72.98.65` in `/opt/chat/.env`. `nginx -t` was not run locally. The Stats query scales with the bot's daily volume.
+Concerns: Needs a root deploy (nginx) and `OUTBOUND_DENY_CIDRS=<SERVER_65_IP>` in `/opt/chat/.env`. `nginx -t` was not run locally. The Stats query scales with the bot's daily volume.

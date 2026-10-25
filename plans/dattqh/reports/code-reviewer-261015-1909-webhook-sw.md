@@ -37,8 +37,8 @@ None found.
 - Fix: lower `replyMax` to 64 KiB. Add a process-wide semaphore on in-flight webhook requests (for example 512), so one tenant's bots cannot use all memory or sockets.
 
 ### M2. Webhooks can reach the server's own public IP and same-host vhosts
-- `safehttp.PublicIP` allows 103.72.98.65, the origin of every app on .65.
-- Scenario: a bot sets its webhook to an `https://<name>` whose DNS points straight at .65 (a grey-cloud record of another app on the shared server). The request comes from 103.72.98.65 itself, so it gets past:
+- `safehttp.PublicIP` allows <SERVER_65_IP>, the origin of every app on .65.
+- Scenario: a bot sets its webhook to an `https://<name>` whose DNS points straight at .65 (a grey-cloud record of another app on the shared server). The request comes from <SERVER_65_IP> itself, so it gets past:
   - the planned "only Cloudflare IPs on 443/80" firewall (`docs/deployment-guide.md`, Bảo mật mạng);
   - any nginx `allow <server IP>` rule on other vhosts.
 - TLS verification and the port list (443/80/8443) limit the damage, but the server can still be used to call itself.

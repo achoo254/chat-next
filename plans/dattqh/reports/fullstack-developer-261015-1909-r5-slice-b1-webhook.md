@@ -99,7 +99,7 @@ Test vector: `my_secret` / `1760500000` / `{"update_id":1}` cho ra `v1=12ce7a96�
 ## Deploy
 
 - Không đổi nginx (`/bot/` đã có), không có script mới, không DNS hay chứng chỉ mới, không biến môi trường production mới, không process pm2 mới. Deploy tự động bình thường, không cần root. Migration 0015 tự chạy.
-- Server gọi ra internet từ IP gốc `103.72.98.65` (như link preview). Firewall cần cho phép outbound 80/443/8443.
+- Server gọi ra internet từ IP gốc `<SERVER_65_IP>` (như link preview). Firewall cần cho phép outbound 80/443/8443.
 - Đổi `SESSION_KEY` thì secret webhook không đọc được nữa (lỗi `secret_unreadable`) tới khi chủ bot lưu lại webhook.
 - Giả định một process `chat-api`: hai instance sẽ cùng giao một update và phá thứ tự trong chat. Đã ghi trong README.
 
