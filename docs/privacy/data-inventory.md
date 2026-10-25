@@ -49,3 +49,5 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 ## Chuyển dữ liệu ra nước ngoài
 
 Web Push đi qua dịch vụ push của trình duyệt (Google FCM, Mozilla, Microsoft, Apple; danh sách host trong [infrastructure-inventory.md](../infrastructure-inventory.md#ngoài-server)). Nội dung mã hoá theo từng trình duyệt (RFC 8291), dịch vụ push chỉ thấy endpoint, kích thước và thời điểm. Xem trước trong thông báo tắt được trong Cài đặt > Quyền riêng tư. Đánh giá tác động theo Điều 25 NĐ 13 (hồ sơ chuyển dữ liệu ra nước ngoài) còn phải làm trước khi mở công khai.
+
+Công cụ AI người dùng tự kết nối qua MCP ([ADR 0012](../adr/0012-mcp-endpoint.md)) đọc được tin nhắn, hồ sơ người dùng và bot trong các cuộc trò chuyện của chính người dùng đó trong phạm vi quyền đã duyệt ở IdP, rồi gửi chúng tới nhà cung cấp AI người dùng chọn (có thể ở nước ngoài). Đây là chuyển dữ liệu do chính người dùng khởi tạo và duyệt trên trang cấp quyền; app chat không chọn nhà cung cấp và không lưu gì thêm. Người dùng thu hồi ở `auth.<domain>/account` (token đang có còn hiệu lực tối đa 15 phút).

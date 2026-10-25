@@ -30,6 +30,7 @@ import (
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/brand"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/chatmcp"
 	"app.local/server/internal/config"
 	"app.local/server/internal/gateway"
 	"app.local/server/internal/hooks"
@@ -222,11 +223,16 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		feedback, announcer = assistantSvc, assistantSvc
 		chatSvc.SetNotifier(assistantSvc)
 	}
-	rpcHandler, err := rpc.NewHandler(rpc.Deps{
+	rpcDeps := rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, SignIn: routes, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
 		Bots: botAdmin, BotUpdates: botUpdates, MiniApp: miniAppSigner, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
 		TenantName: cfg.TenantDomain, Logger: logger,
-	})
+	}
+	rpcHandler, err := rpc.NewHandler(rpcDeps)
+	if err != nil {
+		return nil, err
+	}
+	mcpHandler, err := newMCP(cfg, st, idp, origins, limiter, rpc.NewInProcess(rpcDeps), logger)
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +250,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		mux.Handle(route, hookSvc)
 	}
 	mux.Handle(botapi.Prefix, botAPI)
+	mcpHandler.Register(mux)
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
@@ -308,6 +315,22 @@ func newWatcher(cfg config.Config, st *store.Store, chatSvc *chat.Service, hookS
 	return watch.New(watch.Config{
 		TenantID: cfg.TenantID, Operators: cfg.OperatorUserIDs, Pool: st.Pool(),
 		Chats: chatSvc, Hooks: hookSvc, Checks: checks, Logger: logger.With("component", "watch"), Group: group,
+	})
+}
+
+// newMCP sets up the MCP endpoint (/mcp, ADR 0012): its resource is
+// CHAT_PUBLIC_URL + /mcp, the audience of the IdP access tokens it takes.
+func newMCP(cfg config.Config, st *store.Store, idp *auth.IdP, origins *auth.Origins, limiter ratelimit.Limiter,
+	services *rpc.InProcess, logger *slog.Logger,
+) (*chatmcp.Handler, error) {
+	names, err := brand.Load()
+	if err != nil {
+		return nil, err
+	}
+	return chatmcp.New(chatmcp.Config{
+		Resource: cfg.PublicOrigin() + "/mcp", Issuer: cfg.OIDCIssuer, ResourceName: names.AppName + " MCP",
+		TenantID: cfg.TenantID, IdP: idp, Store: st, Services: services, Limiter: limiter,
+		AllowOrigin: origins.Allowed, SessionKey: cfg.SessionKey, Logger: logger.With("component", "mcp"),
 	})
 }
 

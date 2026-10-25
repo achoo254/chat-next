@@ -11,7 +11,7 @@ App chat đăng nhập chỉ qua IdP của hệ sinh thái hoandat. Quyết đ�
 
 Không có client desktop: trên máy tính, Chat chạy bản web cài dạng PWA và đăng nhập bằng `chat-web` (huỷ 20/10/2026: desktop = PWA; `chat-desktop` đã gỡ khỏi IdP).
 
-Cả hai xin scope `openid profile email`, không có audience API: app chat tự cấp phiên của mình và chỉ đọc ID token và userinfo. Refresh token của `chat-mobile` không chết khi người dùng đăng xuất trong trình duyệt và không có trần 90 ngày; mỗi máy là một grant thu hồi được ở `/account` của IdP.
+Cả hai xin scope `openid profile email`, không có audience API: app chat tự cấp phiên của mình và chỉ đọc ID token và userinfo. Ngoại lệ duy nhất là endpoint MCP ([ADR 0012](../adr/0012-mcp-endpoint.md)): resource `https://chat.<domain>/mcp` với scope `chat:read`, `chat:write`, `bots:read`, `bots:write`, `bots:admin`, do client MCP tự đăng ký (DCR) ở IdP xin; chat chỉ xác minh access token đó offline bằng JWKS. Refresh token của `chat-mobile` không chết khi người dùng đăng xuất trong trình duyệt và không có trần 90 ngày; mỗi máy là một grant thu hồi được ở `/account` của IdP.
 
 ## Cấu hình phía app chat
 

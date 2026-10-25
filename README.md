@@ -54,6 +54,10 @@ docker compose -f deploy/dev/docker-compose.yml --env-file deploy/dev/.env up
 
 IdP được build từ checkout `auth-next` nằm cạnh repo này (`../auth-next`, khai trong `deploy/dev/docker-compose.yml`); cần tạo khoá ký một lần ở đó bằng `pnpm generate-key`. Mọi cổng chỉ bind `127.0.0.1`. Không commit file `.env` hay `*.env`.
 
+## MCP cho công cụ AI
+
+Thêm `https://chat.hoandat.com/mcp` vào công cụ AI (Claude Code, …) làm MCP server, rồi duyệt quyền ở trang cấp quyền của IdP. Tool đọc và gửi tin nhắn, quản lý bot và webhook với đúng quyền của tài khoản trong app; nhóm `bots:admin` (webhook, token, xoá bot) cần quyền riêng và xác nhận hai bước. Quyết định và danh sách tool: [ADR 0012](docs/adr/0012-mcp-endpoint.md); mã ở `server/internal/chatmcp/`.
+
 ## Production
 
 `https://chat.hoandat.com` trên server dùng chung `<SERVER_65_IP>`. Deploy và vận hành theo [`docs/deployment-guide.md`](docs/deployment-guide.md); danh mục hạ tầng đã triển khai ở [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md) và skill `chat-ops-prod` (`.claude/skills/chat-ops-prod/`).

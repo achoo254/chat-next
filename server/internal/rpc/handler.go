@@ -95,24 +95,23 @@ func NewHandler(d Deps) (http.Handler, error) {
 		// saves there (about 7% of the api's CPU under load).
 		connect.WithCompressMinBytes(compressMinBytes),
 	}
+	shared := NewInProcess(d)
 	mux := http.NewServeMux()
 	mux.Handle(appv1connect.NewAuthServiceHandler(&authService{
 		idp: d.IdP, sessions: d.Sessions, signIn: d.SignIn, store: d.Store,
 		tenantID: d.TenantID, tenantName: d.TenantName, logger: d.Logger,
 	}, opts...))
-	mux.Handle(appv1connect.NewUsersServiceHandler(&usersService{
-		store: d.Store, chat: d.Chat, tenantID: d.TenantID, logger: d.Logger,
-	}, opts...))
+	mux.Handle(appv1connect.NewUsersServiceHandler(shared.Users, opts...))
 	mux.Handle(appv1connect.NewConfigServiceHandler(&configService{config: appConfig}, opts...))
-	mux.Handle(appv1connect.NewChatsServiceHandler(&chatsService{chat: d.Chat, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewMessagesServiceHandler(&messagesService{chat: d.Chat, bots: d.BotUpdates, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewChatsServiceHandler(shared.Chats, opts...))
+	mux.Handle(appv1connect.NewMessagesServiceHandler(shared.Messages, opts...))
 	mux.Handle(appv1connect.NewUpdatesServiceHandler(&updatesService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewModerationServiceHandler(&moderationService{chat: d.Chat, feedback: d.Feedback, announcer: d.Announcer, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewIntegrationsServiceHandler(&integrationsService{hooks: d.Hooks, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewMediaServiceHandler(&mediaService{media: d.Media, chat: d.Chat, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewSearchServiceHandler(&searchService{chat: d.Chat, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewSearchServiceHandler(shared.Search, opts...))
 	mux.Handle(appv1connect.NewBotsServiceHandler(&botsService{chat: d.Chat, bots: d.Bots, updates: d.BotUpdates, miniApp: d.MiniApp, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewBotAdminServiceHandler(&botAdminService{bots: d.Bots, updates: d.BotUpdates, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewBotAdminServiceHandler(shared.BotAdmin, opts...))
 	mux.Handle(appv1connect.NewPushServiceHandler(&pushService{push: d.Push, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewFeedbackServiceHandler(&feedbackService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{

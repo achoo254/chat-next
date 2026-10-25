@@ -232,6 +232,18 @@ func (s *Store) UserByID(ctx context.Context, tenantID string, id int64) (User, 
 	return u, err
 }
 
+// UserByIdPSub returns the live (not erased) person of the tenant with this
+// IdP subject; ErrNotFound when the account never signed in to the chat or
+// was erased. Bots never match.
+func (s *Store) UserByIdPSub(ctx context.Context, tenantID, sub string) (User, error) {
+	u, err := scanUser(s.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users
+		WHERE tenant_id = $1 AND idp_sub = $2 AND NOT is_bot AND deleted_at IS NULL`, tenantID, sub))
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return User{}, fmt.Errorf("store: user by IdP subject: %w", err)
+	}
+	return u, err
+}
+
 // UpdateProfile sets the fields that are non-nil and returns the user.
 func (s *Store) UpdateProfile(ctx context.Context, tenantID string, id int64, name, bio *string) (User, error) {
 	u, err := scanUser(s.pool.QueryRow(ctx, `
