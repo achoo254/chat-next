@@ -1,17 +1,18 @@
 // Brand assets of the web app, all derived from brand.config.json and the
 // brand SVGs, so a rebrand is "edit the brand files, pnpm brand:gen, rebuild":
 //
-// - index.html: %APP_NAME%, %APP_DESCRIPTION% and %APP_LOGO% (the splash logo,
-//   inline SVG), plus the favicon, Apple touch icon and manifest links;
+// - index.html: %APP_NAME%, %APP_DESCRIPTION% and %APP_LOGO% (the splash logo:
+//   inline SVG for a vector icon, an <img> of /icon.svg for a raster one), plus the favicon, Apple touch icon and manifest links;
 // - the icon files (brand/generated/icons/, made by pnpm brand:gen) and
 //   manifest.webmanifest at the site root, served in dev and emitted in builds;
-// - virtual:brand-logo, the inline SVG the in-app logo and loaders render.
+// - virtual:brand-logo, what the in-app logo and loaders render (the same
+//   choice: inline SVG markup or the icon file's URL, brand-logo-svg.ts).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_FAVICON_SVG, FAVICON_ICO, RASTER_ICONS, generateManifests, webIconFiles } from "@shared-next/brand/build";
 import type { Plugin } from "vite";
 import { BRAND_ROOT, GENERATED_DIR, MANIFEST_OPTIONS, loadChatBrand } from "./brand-files.ts";
-import { inlineLogoSvg, scopeSvgIds } from "./src/brand-logo-svg.ts";
+import { brandLogoSource, inlineLogoSvg, splashLogoHtml } from "./src/brand-logo-svg.ts";
 
 const LOGO_MODULE = "virtual:brand-logo";
 const RESOLVED_LOGO_MODULE = `\0${LOGO_MODULE}`;
@@ -45,11 +46,9 @@ const SPLASH_LOGO_SIZE = 88;
 
 export function brandAssets(): Plugin {
 	const brand = loadChatBrand();
-	const logo = inlineLogoSvg(readFileSync(join(BRAND_ROOT, brand.icon), "utf8"));
-	const splashLogo = scopeSvgIds(logo, "splash").replace(
-		/^<svg\b/,
-		`<svg width="${SPLASH_LOGO_SIZE}" height="${SPLASH_LOGO_SIZE}"`,
-	);
+	// webIconFiles serves the brand icon itself at /icon.svg.
+	const logo = brandLogoSource(inlineLogoSvg(readFileSync(join(BRAND_ROOT, brand.icon), "utf8")), `/${DEFAULT_FAVICON_SVG}`);
+	const splashLogo = splashLogoHtml(logo, SPLASH_LOGO_SIZE);
 	const manifest = `${JSON.stringify(generateManifests(brand, MANIFEST_OPTIONS)["web.webmanifest.json"])}\n`;
 	/** URL path (no leading slash) to file contents, read on use so pnpm brand:gen shows up without a restart. */
 	const files = new Map<string, () => Buffer | string>([

@@ -1,21 +1,31 @@
 import { act, render, screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import logoSvg from "virtual:brand-logo";
+import logo from "virtual:brand-logo";
 import brandConfig from "../../../brand.config.json";
 import indexHtml from "../index.html?raw";
-import { inlineLogoSvg, scopeSvgIds } from "../src/brand-logo-svg.ts";
+import { brandLogoSource, inlineLogoSvg, scopeSvgIds, splashLogoHtml } from "../src/brand-logo-svg.ts";
 import { BrandLoader, BrandLogo, PageLoader } from "../src/components/brand-loader.tsx";
 import { I18nProvider } from "../src/i18n/i18n.tsx";
 
 describe("brand logo markup", () => {
-	it("inlines the brand icon as decorative SVG", () => {
-		// virtual:brand-logo is inlineLogoSvg of brand.config.json's icon (vite-brand.ts).
-		const svg = logoSvg;
-		expect(svg.startsWith('<svg aria-hidden="true" focusable="false"')).toBe(true);
-		expect(svg).not.toContain("<!--");
+	it("prepares the brand icon as decorative SVG", () => {
 		expect(() => inlineLogoSvg("<p>not an svg</p>")).toThrow(/single <svg>/);
 		expect(inlineLogoSvg('<?xml version="1.0"?><!-- c --><svg></svg>')).toBe('<svg aria-hidden="true" focusable="false"></svg>');
+	});
+
+	it("inlines a vector icon and points at the icon file for a raster one", () => {
+		const vector = '<svg aria-hidden="true"><path d="M0 0h1"/></svg>';
+		const raster = '<svg aria-hidden="true"><image href="data:image/webp;base64,AAAA"/></svg>';
+		expect(brandLogoSource(vector, "/icon.svg")).toEqual({ svg: vector });
+		expect(brandLogoSource(raster, "/icon.svg")).toEqual({ src: "/icon.svg" });
+		expect(splashLogoHtml({ src: "/icon.svg" }, 88)).toBe('<img src="/icon.svg" alt="" width="88" height="88" decoding="async">');
+		expect(splashLogoHtml({ svg: '<svg><g id="a"/></svg>' }, 88)).toBe('<svg width="88" height="88"><g id="splash-a"/></svg>');
+	});
+
+	it("keeps the AI-drawn (raster) brand icon out of the bundle: the logo is the served /icon.svg", () => {
+		// virtual:brand-logo comes from brand.config.json's icon (vite-brand.ts).
+		expect(logo).toEqual({ src: "/icon.svg" });
 	});
 
 	it("scopes ids and their references so inlined copies stay independent", () => {
@@ -39,9 +49,10 @@ describe("loaders", () => {
 		expect(screen.getByRole("img", { name: brandConfig.appName })).toBeTruthy();
 		const logos = container.querySelectorAll(".brand-logo");
 		expect(logos[1]?.getAttribute("aria-hidden")).toBe("true");
-		// Each copy has its own gradient id.
-		const ids = [...container.querySelectorAll("linearGradient")].map((node) => node.id);
-		expect(new Set(ids).size).toBe(ids.length);
+		for (const image of container.querySelectorAll(".brand-logo img")) {
+			expect(image.getAttribute("src")).toBe("/icon.svg");
+			expect(image.getAttribute("alt")).toBe("");
+		}
 	});
 
 	it("announces the loading state politely", () => {
@@ -54,7 +65,7 @@ describe("loaders", () => {
 		expect(status.getAttribute("aria-live")).toBe("polite");
 		expect(status.getAttribute("aria-busy")).toBe("true");
 		expect(status.textContent).toContain("Đang tải hồ sơ…");
-		expect(status.querySelectorAll(".brand-logo svg")).toHaveLength(1);
+		expect(status.querySelectorAll(".brand-logo img")).toHaveLength(1);
 	});
 
 	it("draws the full-window loader itself when the page has no splash", () => {

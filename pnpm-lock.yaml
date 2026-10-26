@@ -73,11 +73,11 @@ importers:
   apps/web:
     dependencies:
       '@achoo254/app-switcher':
-        specifier: github:achoo254/shared-next#v0.5.0&path:/packages/app-switcher
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/brand)(react@19.3.0)
+        specifier: github:achoo254/shared-next#v0.5.1&path:/packages/app-switcher
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand)(react@19.3.0)
       '@achoo254/brand':
-        specifier: github:achoo254/shared-next#v0.5.0&path:/packages/brand
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/brand
+        specifier: github:achoo254/shared-next#v0.5.1&path:/packages/brand
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand
       '@achoo254/chat-core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -235,16 +235,16 @@ importers:
 
 packages:
 
-  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/app-switcher':
-    resolution: {gitHosted: true, integrity: sha512-/4Jx2CBWVZFdAw382vbLFfXCAoyN/fgPeRuej4uVisdEzxax/AhcGFuCpD06cc/YnswKLD9xaBK5F7H+VXXuMA==, path: /packages/app-switcher, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db}
-    version: 0.3.0
+  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/app-switcher':
+    resolution: {gitHosted: true, integrity: sha512-oYMs3/FUqN5t/abPGgQ3u7i8BkfCXgjyNIHw/GBG3KxqpiTDJF82vL0diRlPU0if4qoOylLtkiBen7D3LwJGNA==, path: /packages/app-switcher, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1}
+    version: 0.3.1
     engines: {node: '>=22.12'}
     peerDependencies:
       '@achoo254/brand': '>=0.3.0 <1'
       react: ^19.0.0
 
-  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/brand':
-    resolution: {gitHosted: true, integrity: sha512-/4Jx2CBWVZFdAw382vbLFfXCAoyN/fgPeRuej4uVisdEzxax/AhcGFuCpD06cc/YnswKLD9xaBK5F7H+VXXuMA==, path: /packages/brand, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db}
+  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand':
+    resolution: {gitHosted: true, integrity: sha512-oYMs3/FUqN5t/abPGgQ3u7i8BkfCXgjyNIHw/GBG3KxqpiTDJF82vL0diRlPU0if4qoOylLtkiBen7D3LwJGNA==, path: /packages/brand, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1}
     version: 0.3.0
     engines: {node: '>=22.12'}
     hasBin: true
@@ -2353,12 +2353,12 @@ packages:
 
 snapshots:
 
-  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/brand)(react@19.3.0)':
+  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand)(react@19.3.0)':
     dependencies:
-      '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/brand
+      '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand
       react: 19.3.0
 
-  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/6847f8ad38dbdee13dc6e7652bc873685280a9db#path:/packages/brand':
+  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand':
     dependencies:
       ajv: 8.20.0
 

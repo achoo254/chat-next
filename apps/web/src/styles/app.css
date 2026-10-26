@@ -304,7 +304,7 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
    that take over from one another share --loader-phase (the animation clock)
    and --loader-age (time already on screen), so the hand-over does not show. */
 .brand-logo { position: relative; isolation: isolate; display: inline-block; flex: none; width: 48px; height: 48px; line-height: 0; }
-.brand-logo svg { display: block; width: 100%; height: 100%; }
+.brand-logo svg, .brand-logo img { display: block; width: 100%; height: 100%; }
 .brand-loader {
 	flex: 1 1 auto; align-self: stretch; display: grid; place-content: center; justify-items: center; gap: var(--space-4);
 	min-height: 240px; padding: var(--space-6) var(--space-4); text-align: center; color: var(--c-text-muted);

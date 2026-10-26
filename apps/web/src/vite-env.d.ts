@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-/** The brand icon as inline SVG markup (vite-brand.ts). */
+/** The brand icon: inline SVG markup, or the URL of the icon file (vite-brand.ts). */
 declare module "virtual:brand-logo" {
-	const svg: string;
-	export default svg;
+	const source: import("./brand-logo-svg.ts").BrandLogoSource;
+	export default source;
 }
 
 interface ImportMetaEnv {

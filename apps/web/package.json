@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.1",
-    "@achoo254/app-switcher": "github:achoo254/shared-next#v0.5.0&path:/packages/app-switcher",
-    "@achoo254/brand": "github:achoo254/shared-next#v0.5.0&path:/packages/brand",
+    "@achoo254/app-switcher": "github:achoo254/shared-next#v0.5.1&path:/packages/app-switcher",
+    "@achoo254/brand": "github:achoo254/shared-next#v0.5.1&path:/packages/brand",
     "@achoo254/chat-core": "workspace:*",
     "@achoo254/chat-platform": "workspace:*",
     "@achoo254/chat-platform-web": "workspace:*",

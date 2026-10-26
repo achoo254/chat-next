@@ -1,8 +1,9 @@
 // The app logo and the loaders built on it (mockups/auth.html#loading). The
-// logo is the brand icon inlined (virtual:brand-logo, from brand.config.json),
-// so its typing dots can move; styles are .brand-logo / .brand-loader in app.css.
+// logo is the brand icon (virtual:brand-logo, from brand.config.json): inline
+// SVG when it is vector, an <img> of the served icon file when it embeds a
+// raster picture; styles are .brand-logo / .brand-loader in app.css.
 import { useId, useLayoutEffect, useRef } from "react";
-import logoSvg from "virtual:brand-logo";
+import logo from "virtual:brand-logo";
 import { brand } from "../brand.ts";
 import { scopeSvgIds } from "../brand-logo-svg.ts";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -14,15 +15,17 @@ import { pageSplash } from "./loader-gate.ts";
  */
 export function BrandLogo({ decorative = false }: { decorative?: boolean }) {
 	const id = useId();
+	const label = decorative ? { "aria-hidden": true } : { role: "img", "aria-label": brand.appName };
+	if (logo.src !== undefined) {
+		return (
+			<span className="brand-logo" {...label}>
+				<img src={logo.src} alt="" decoding="async" />
+			</span>
+		);
+	}
 	// Trusted build-time markup (the brand icon), with ids unique per copy.
-	const html = scopeSvgIds(logoSvg, `logo${id}`);
-	return (
-		<span
-			className="brand-logo"
-			{...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": brand.appName })}
-			dangerouslySetInnerHTML={{ __html: html }}
-		/>
-	);
+	const html = scopeSvgIds(logo.svg, `logo${id}`);
+	return <span className="brand-logo" {...label} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 interface BrandLoaderProps {
