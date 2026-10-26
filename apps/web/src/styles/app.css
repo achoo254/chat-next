@@ -71,26 +71,34 @@ button { cursor: pointer; }
 	background-image: linear-gradient(var(--c-grid) 1px, transparent 1px), linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
 	background-size: var(--grid-size) var(--grid-size);
 }
+.welcome-stack { display: grid; gap: var(--space-5); width: min(100%, 440px); }
 .welcome-card {
-	width: min(100%, 440px); padding: var(--space-6); border-radius: var(--radius-lg);
+	padding: var(--space-6); border-radius: var(--radius-lg);
 	background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-md);
 }
 .welcome h1 { margin: var(--space-3) 0 var(--space-2); font-size: 1.5rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; }
 .welcome p { margin: 0; color: var(--c-text-muted); }
 .welcome-actions { display: grid; gap: var(--space-3); margin-top: var(--space-6); }
-.welcome-actions .btn { width: 100%; }
+.welcome-actions .btn { width: 100%; padding-block: var(--space-2); text-align: center; }
 .welcome-hint {
 	display: flex; gap: var(--space-2); margin-top: var(--space-5); padding: var(--space-3);
 	border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle);
 	font-size: 0.8125rem; color: var(--c-text-muted);
 }
 .welcome-hint .icon { margin-top: 1px; }
-.welcome-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); font-size: 0.8125rem; color: var(--c-text-muted); }
-.welcome-legal { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-3); font-size: 0.8125rem; }
-.welcome-legal a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-text-muted); text-decoration: underline; text-underline-offset: 2px; }
-.lang { display: flex; gap: var(--space-2); }
-.lang button { border: 0; background: none; padding: var(--space-1) var(--space-2); color: var(--c-text-muted); min-height: 44px; white-space: nowrap; }
-.lang button[aria-pressed="true"] { color: var(--c-text); font-weight: 600; }
+/* Below the card: the language switch, then one quiet row of legal links. */
+.welcome-foot { display: grid; justify-items: center; gap: var(--space-3); font-size: 0.8125rem; color: var(--c-text-muted); }
+.welcome-legal { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: var(--space-5); }
+.welcome-legal a { display: inline-flex; align-items: center; min-height: 32px; color: var(--c-text-muted); text-decoration: none; }
+.welcome-legal a:hover { color: var(--c-text); text-decoration: underline; text-underline-offset: 2px; }
+/* Tiếng Việt / English as one segmented pill. */
+.lang { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--c-border-subtle); border-radius: 999px; background: var(--c-surface); }
+.lang button { border: 0; border-radius: 999px; background: none; padding: 0 var(--space-3); min-height: 30px; color: var(--c-text-muted); font-size: 0.8125rem; white-space: nowrap; }
+.lang button:hover { color: var(--c-text); }
+.lang button[aria-pressed="true"] { background: var(--c-selected); color: var(--c-primary); font-weight: 600; }
+@media (pointer: coarse) {
+	.welcome-legal a, .lang button { min-height: 44px; }
+}
 .boot-error { width: min(100%, 440px); display: grid; gap: var(--space-3); }
 
 /* ---------- App shell: rail + content ---------- */
