@@ -80,6 +80,9 @@ export function brandAssets(): Plugin {
 		`<link rel="icon" href="/${DEFAULT_FAVICON_SVG}" type="image/svg+xml">`,
 		`<link rel="apple-touch-icon" href="/${appleTouch.file}" sizes="${appleTouch.size}x${appleTouch.size}">`,
 		`<link rel="manifest" href="/${MANIFEST_PATH}">`,
+		// One shell serves every route, so search engines index the home page only and
+		// fold the campaign links (?utm_…) into it instead of listing them as duplicates.
+		`<link rel="canonical" href="${webOrigin}/">`,
 		// Browser chrome and the iOS home screen name follow the brand (installing: settings "Cài ứng dụng").
 		`<meta name="theme-color" content="${escapeHtml(brand.colors.primary)}">`,
 		`<meta name="apple-mobile-web-app-title" content="${escapeHtml(brand.shortName)}">`,

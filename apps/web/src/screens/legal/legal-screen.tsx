@@ -28,6 +28,19 @@ export default function LegalScreen({ page }: { page: LegalPage }) {
 		};
 	}, [doc.title]);
 
+	// The shell's canonical names the home page; each public page is its own
+	// document for search engines, so point it here while this page is open.
+	useEffect(() => {
+		const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+		const path = PAGES.find((entry) => entry.page === page)?.path;
+		if (canonical === null || path === undefined) return;
+		const previous = canonical.href;
+		canonical.href = new URL(path, previous).href;
+		return () => {
+			canonical.href = previous;
+		};
+	}, [page]);
+
 	return (
 		<PublicPage className="legal">
 			<nav className="legal-nav" aria-label={t.legal.nav}>
