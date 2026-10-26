@@ -71,7 +71,6 @@ button { cursor: pointer; }
 	background-image: linear-gradient(var(--c-grid) 1px, transparent 1px), linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
 	background-size: var(--grid-size) var(--grid-size);
 }
-.welcome-stack { display: grid; gap: var(--space-5); width: min(100%, 440px); }
 .welcome-card {
 	padding: var(--space-6); border-radius: var(--radius-lg);
 	background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-md);
@@ -86,19 +85,6 @@ button { cursor: pointer; }
 	font-size: 0.8125rem; color: var(--c-text-muted);
 }
 .welcome-hint .icon { margin-top: 1px; }
-/* Below the card: the language switch, then one quiet row of legal links. */
-.welcome-foot { display: grid; justify-items: center; gap: var(--space-3); font-size: 0.8125rem; color: var(--c-text-muted); }
-.welcome-legal { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: var(--space-5); }
-.welcome-legal a { display: inline-flex; align-items: center; min-height: 32px; color: var(--c-text-muted); text-decoration: none; }
-.welcome-legal a:hover { color: var(--c-text); text-decoration: underline; text-underline-offset: 2px; }
-/* Tiếng Việt / English as one segmented pill. */
-.lang { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--c-border-subtle); border-radius: 999px; background: var(--c-surface); }
-.lang button { border: 0; border-radius: 999px; background: none; padding: 0 var(--space-3); min-height: 30px; color: var(--c-text-muted); font-size: 0.8125rem; white-space: nowrap; }
-.lang button:hover { color: var(--c-text); }
-.lang button[aria-pressed="true"] { background: var(--c-selected); color: var(--c-primary); font-weight: 600; }
-@media (pointer: coarse) {
-	.welcome-legal a, .lang button { min-height: 44px; }
-}
 .boot-error { width: min(100%, 440px); display: grid; gap: var(--space-3); }
 
 /* ---------- App shell: rail + content ---------- */

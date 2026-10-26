@@ -2,7 +2,8 @@
 // brand SVGs, so a rebrand is "edit the brand files, pnpm brand:gen, rebuild":
 //
 // - index.html: %APP_NAME%, %APP_DESCRIPTION% and %APP_LOGO% (the splash logo:
-//   inline SVG for a vector icon, an <img> of /icon.svg for a raster one), plus the favicon, Apple touch icon and manifest links;
+//   inline SVG for a vector icon, an <img> of /icon.svg for a raster one), plus the favicon, Apple touch icon and manifest links
+//   and the link preview tags (Open Graph and X, with public/og-image.jpg);
 // - the icon files (brand/generated/icons/, made by pnpm brand:gen) and
 //   manifest.webmanifest at the site root, served in dev and emitted in builds;
 // - virtual:brand-logo, what the in-app logo and loaders render (the same
@@ -13,6 +14,7 @@ import { DEFAULT_FAVICON_SVG, FAVICON_ICO, RASTER_ICONS, generateManifests, webI
 import type { Plugin } from "vite";
 import { BRAND_ROOT, GENERATED_DIR, MANIFEST_OPTIONS, loadChatBrand } from "./brand-files.ts";
 import { brandLogoSource, inlineLogoSvg, splashLogoHtml } from "./src/brand-logo-svg.ts";
+import { OG_IMAGE_FILE } from "./vite-service-worker.ts";
 
 const LOGO_MODULE = "virtual:brand-logo";
 const RESOLVED_LOGO_MODULE = `\0${LOGO_MODULE}`;
@@ -55,6 +57,21 @@ export function brandAssets(): Plugin {
 		...webIconFiles(brand, { root: BRAND_ROOT, generatedDir: GENERATED_DIR }).map((icon) => [icon.path, () => readFileSync(icon.file)] as const),
 		[MANIFEST_PATH, () => manifest],
 	]);
+	// Link previews (Open Graph, X): absolute URLs on the web host, the AI-drawn 1200 × 630 picture of public/.
+	const webOrigin = `https://${brand.hostTemplates.web.replace("{domain}", brand.primaryTenant.domain)}`;
+	const shareImage = `${webOrigin}/${OG_IMAGE_FILE}`;
+	const shareTags = [
+		`<meta property="og:type" content="website">`,
+		`<meta property="og:site_name" content="${escapeHtml(brand.appName)}">`,
+		`<meta property="og:title" content="${escapeHtml(brand.appName)}">`,
+		`<meta property="og:description" content="${escapeHtml(brand.description)}">`,
+		`<meta property="og:url" content="${webOrigin}/">`,
+		`<meta property="og:image" content="${shareImage}">`,
+		`<meta property="og:image:width" content="1200">`,
+		`<meta property="og:image:height" content="630">`,
+		`<meta name="twitter:card" content="summary_large_image">`,
+		`<meta name="twitter:image" content="${shareImage}">`,
+	];
 	const appleTouch = RASTER_ICONS.find((icon) => icon.file.startsWith("apple-touch-icon"));
 	if (appleTouch === undefined) throw new Error("brand: no Apple touch icon in RASTER_ICONS");
 	// Browsers with SVG favicons take the SVG; the others fall back to the ICO.
@@ -66,6 +83,7 @@ export function brandAssets(): Plugin {
 		// Browser chrome and the iOS home screen name follow the brand (installing: settings "Cài ứng dụng").
 		`<meta name="theme-color" content="${escapeHtml(brand.colors.primary)}">`,
 		`<meta name="apple-mobile-web-app-title" content="${escapeHtml(brand.shortName)}">`,
+		...shareTags,
 	].join("\n");
 
 	return {

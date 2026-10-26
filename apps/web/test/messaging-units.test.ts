@@ -17,7 +17,7 @@ import { loadNextTopicPage, loadTopicPages, toneForColor, topicIcon } from "../s
 import { isOwnAccount } from "../src/messaging/ui/people-search.ts";
 import { entityTree } from "../src/messaging/ui/rich-text.tsx";
 import { matchRoute, paths, returnPathFor } from "../src/router.tsx";
-import { loginUrl } from "../src/screens/welcome.tsx";
+import { loginUrl } from "../src/screens/welcome-url.ts";
 import { presenceText } from "../src/messaging/ui/presence.tsx";
 import { autoGroupName } from "../src/messaging/ui/create-dialogs.tsx";
 import { initialLetter } from "../src/messaging/ui/contacts.tsx";

@@ -5,15 +5,16 @@ const LANGUAGES: { locale: Locale; label: string }[] = [
 	{ locale: "en", label: "English" },
 ];
 
-/** Tiếng Việt / English, for screens shown before sign-in (welcome, public pages). */
+/** Tiếng Việt / English, for screens shown before sign-in (welcome, public pages); the account app's pill (public.css). */
 export function LanguageSwitch() {
 	const { locale, t, setLocale } = useI18n();
 	return (
-		<div className="lang" role="group" aria-label={t.welcome.language}>
+		<div className="lang-switch" role="group" data-id="lang-switch" aria-label={t.welcome.language}>
 			{LANGUAGES.map((language) => (
 				<button
 					key={language.locale}
 					type="button"
+					className="lang-option"
 					lang={language.locale}
 					aria-pressed={language.locale === locale}
 					onClick={() => setLocale(language.locale)}

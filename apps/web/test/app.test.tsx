@@ -17,8 +17,12 @@ describe("boot", () => {
 			});
 		});
 
-		expect(await screen.findByRole("heading", { level: 1, name: brandConfig.appName })).toBeTruthy();
+		expect(await screen.findByRole("heading", { level: 1, name: "Nhắn tin nhanh trên mọi thiết bị" })).toBeTruthy();
+		expect(screen.getByRole("heading", { level: 2, name: brandConfig.appName })).toBeTruthy();
 		expect(screen.getByText(brandConfig.description)).toBeTruthy();
+		// The account app's top bar: the app name goes home, "Đăng nhập" signs in.
+		expect(screen.getByRole("link", { name: brandConfig.appName }).getAttribute("href")).toBe("/");
+		expect(screen.getByRole("link", { name: "Đăng nhập" }).getAttribute("href")).toBe("/auth/login?locale=vi");
 		const signIn = screen.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" });
 		const create = screen.getByRole("link", { name: "Tạo tài khoản" });
 		expect(signIn.getAttribute("href")).toBe("/auth/login?locale=vi");

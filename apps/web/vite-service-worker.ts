@@ -12,9 +12,12 @@ import type { AppShellBuild } from "./src/sw/app-shell-worker.ts";
 
 export const SERVICE_WORKER_FILE = "sw.js";
 
-/** Build output the worker does not cache: itself, source maps and Vite's manifest. */
+/** The link preview image (public/), fetched by link unfurlers, never by the app. */
+export const OG_IMAGE_FILE = "og-image.jpg";
+
+/** Build output the worker does not cache: itself, the link preview image, source maps and Vite's manifest. */
 function cached(fileName: string): boolean {
-	return fileName !== SERVICE_WORKER_FILE && !fileName.endsWith(".map") && !fileName.startsWith(".vite/");
+	return fileName !== SERVICE_WORKER_FILE && fileName !== OG_IMAGE_FILE && !fileName.endsWith(".map") && !fileName.startsWith(".vite/");
 }
 
 /** The entry script index.html loads, the same one the page finds (register-service-worker.ts). */
