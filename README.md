@@ -1,12 +1,20 @@
 # chat-next
 
-Ứng dụng chat của hệ sinh thái hoandat: web-first (React 19), đóng gói iOS/Android bằng Capacitor, desktop dùng bản web cài dạng PWA (không có app desktop native), backend Go. Người dùng đăng nhập bằng tài khoản hoandat qua IdP [`auth-next`](https://github.com/achoo254/auth-next); app chạy ở `chat.<domain>`, domain cấu hình bằng `TENANT_DOMAIN` (mặc định `hoandat.com`). Tên sản phẩm cấu hình ở `brand.config.json`; "chat-next" chỉ là tên repo.
+Ứng dụng chat của hệ sinh thái hoandat, chạy ở `https://chat.hoandat.com`. Người dùng đăng nhập bằng tài khoản hoandat qua IdP [`auth-next`](https://github.com/achoo254/auth-next); app không có tài khoản hay mật khẩu riêng. "chat-next" chỉ là tên repo: tên sản phẩm, màu, scheme và domain lấy từ [`brand.config.json`](brand.config.json) (ADR 0008).
 
-Plan và quyết định: [`plans/dattqh/261013-0448-chat-platform-v1/plan.md`](plans/dattqh/261013-0448-chat-platform-v1/plan.md). Kiến trúc: [`docs/README.md`](docs/README.md) và các ADR trong `docs/adr/`.
+Mọi quyết định kiến trúc, đặc tả, quyền riêng tư và vận hành được chỉ đường ở [`docs/README.md`](docs/README.md). README này chỉ giữ phần định hướng.
+
+## Định hướng sản phẩm
+
+- **Web-first.** Web app React là bản chính; iOS/Android là vỏ Capacitor bọc bản build native của web ([`docs/mobile-app.md`](docs/mobile-app.md)); desktop dùng bản web cài dạng PWA, không có app desktop native. Một codebase client, không duy trì ba app.
+- **Đăng nhập chỉ qua `auth-next`.** Chat tự cấp phiên của mình nhưng phiên chết theo grant ở IdP (ADR 0006); app native xác thực bằng bearer (ADR 0011).
+- **Đơn tenant.** Chỉ phục vụ `hoandat.com`; cột `tenant_id` vẫn giữ, luôn `primary`. ADR tenant theo domain của repo (0010) đã bị thay bằng [ADR 0013 của `auth-next`](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md).
+- **Contract client ↔ server viết bằng proto** ([`proto/`](proto/)), sinh mã cho cả Go và TS; thay đổi phá vỡ contract bị chặn bằng `pnpm proto:breaking`.
+- **Không gửi email.** Hệ sinh thái không có kênh mail; thông báo đi qua push và trong app.
 
 ## Bắt đầu
 
-Yêu cầu: Node ≥ 22.18 (chạy thẳng file `.ts`), pnpm 11 (qua corepack), Go 1.26.
+Yêu cầu: Node và pnpm theo `engines`/`packageManager` trong [`package.json`](package.json), Go theo [`server/go.mod`](server/go.mod).
 
 ```bash
 pnpm install
@@ -14,50 +22,36 @@ pnpm lint && pnpm typecheck && pnpm test
 cd server && go vet ./... && go test -race ./...
 ```
 
-| Lệnh | Việc |
+Danh sách lệnh ở `scripts` của [`package.json`](package.json); mỗi lệnh trỏ tới script có chú thích ở đầu file. Hai lệnh hay dùng khi phát triển:
+
+- `pnpm e2e` chạy E2E nhiều người dùng trên máy dev, không cần Docker; `pnpm e2e --serve` chỉ dựng môi trường đó và giữ chạy để tự chat bằng nhiều profile trình duyệt. Cách dùng ở đầu [`apps/web/test/e2e/run.ts`](apps/web/test/e2e/run.ts).
+- `pnpm brand:gen` sinh manifest, icon và tài nguyên app native từ brand; chạy lại sau khi sửa brand hoặc logo. File trong `brand/generated/` không sửa tay.
+
+Môi trường dev đầy đủ (Postgres, Redis, Meilisearch, MinIO và IdP local) ở [`deploy/dev/docker-compose.yml`](deploy/dev/docker-compose.yml), env mẫu ở [`deploy/dev/.env.example`](deploy/dev/.env.example) và [`deploy/dev/idp.env.example`](deploy/dev/idp.env.example). IdP được build từ checkout `auth-next` nằm cạnh repo này; tạo khoá ký một lần ở đó bằng `pnpm generate-key`. Không commit file `.env` hay `*.env`.
+
+Cấu hình server Go (biến môi trường, role của binary): [`server/README.md`](server/README.md).
+
+## Đi đâu trong code
+
+| Chỗ | Vai trò |
 |---|---|
-| `pnpm lint` | ESLint (`--max-warnings=0`) và `pnpm check:brand` (CLI `check-brand` của `@shared-next/brand`: không có tên sản phẩm viết cứng, không có chuỗi `chat-inet`) |
-| `pnpm typecheck` / `pnpm test` | TypeScript và Vitest cho mọi package |
-| `pnpm proto:lint` / `pnpm proto:gen` | `buf lint` / sinh code Go (`server/gen`) và TS (`packages/proto-ts/src/gen`) từ `proto/` |
-| `pnpm proto:breaking` | So contract với nhánh `main` |
-| `pnpm --filter @app/web dev` | Web app ở `http://localhost:5173`, proxy `/rpc` và `/auth` tới server `127.0.0.1:4600` |
-| `pnpm e2e [lọc]` | E2E nhiều người dùng trên máy dev (không cần Docker): `server/cmd/e2e-stack` dựng Postgres tạm, IdP giả cho chọn tài khoản An, Bình, Chi, Dũng và API thật; Vite ở 5173; Playwright mở mỗi người một trình duyệt và chạy `apps/web/test/e2e/*.e2e.ts`. DB mới mỗi lần chạy; bước lỗi lưu ảnh chụp mỗi người vào `$TMPDIR/chat-e2e-shots`. `POST http://127.0.0.1:4600/e2e/realtime?state=down` (hoặc `up`) cắt mọi WebSocket và từ chối kết nối mới (hoặc mở lại), để thử trạng thái mất kết nối |
-| `pnpm e2e --serve` | Chỉ dựng môi trường đó và giữ chạy, để tự chat với chính mình bằng nhiều profile trình duyệt (Ctrl+C để dừng) |
-| `pnpm store:screenshots` | Ảnh App Store (6.9", 6.5") và Google Play của web app thật trên stack e2e (dữ liệu giả, tài khoản thử) vào `docs/store/screenshots/`; script `apps/web/test/e2e/store-screenshots.ts`, hồ sơ store ở `docs/store/listing.md` |
-| `pnpm brand:gen` | Kiểm `brand.config.json` theo schema của `@shared-next/brand`, sinh manifest web, Capacitor và icon PNG/ICO (favicon, Apple touch, manifest 192/512, maskable) từ `brand/icon.svg`, `brand/icon-maskable.svg` vào `brand/generated/` (dùng Chromium của Playwright), bản sao tên cho server Go (`server/internal/brand/brand.json`), icon và màn khởi động của app iOS/Android (`apps/mobile`) cùng feature graphic của Google Play (`docs/store/play/`). Script `apps/web/scripts/brand-gen.ts`; tùy chọn của chat ở `apps/web/brand-files.ts`. Chạy lại sau khi sửa brand hoặc logo |
-| `pnpm build:packages` | Build `dist/` (JS và `.d.ts`) của hai gói npm: `@achoo254/chat-client` (build trước `dist/` của bốn gói nội bộ `proto-ts`, `platform`, `core`, `platform-web`, rồi `packages/chat-client/scripts/assemble-dist.ts` gộp vào một `dist/` và đổi import giữa chúng thành đường dẫn tương đối) và `@achoo254/chat-bot-sdk`. Phát hành: đẩy tag `chat-client-vX.Y.Z` hoặc `chat-bot-sdk-vX.Y.Z` khớp version, trên commit của `main`; [`sdk-publish.yml`](.github/workflows/sdk-publish.yml) publish qua trusted publishing |
-| `pnpm mobile:build-web` / `pnpm mobile:sync` | Build web app ở chế độ native (`VITE_NATIVE=true`) vào `apps/mobile/www`, rồi `cap sync` cho iOS và Android ([`docs/mobile-app.md`](docs/mobile-app.md)) |
+| [`apps/web/`](apps/web/) | Web app, gọi server qua Connect RPC |
+| [`apps/mobile/`](apps/mobile/) | Vỏ Capacitor cho iOS và Android |
+| [`proto/`](proto/) | Contract client ↔ server |
+| [`packages/`](packages/) | Lõi client (đồng bộ, outbox, SQLite cục bộ, realtime) và lớp nền tảng; gói nội bộ, riêng `chat-client` phát hành npm |
+| [`sdk/`](sdk/) | Bot SDK; bắt đầu viết bot ở [`docs/bot-api/README.md`](docs/bot-api/README.md) |
+| [`server/`](server/) | Go module: một binary chạy theo role |
+| [`spec/`](spec/) | Đặc tả và test vector dùng chung TS/Go |
+| [`infra/chat/`](infra/chat/) | Script production: deploy, release, nginx, pm2, backup |
 
-## Cấu trúc
+## Gói npm
 
-| Đường dẫn | Nội dung |
-|---|---|
-| `apps/web` | Web app React 19 + Vite, gọi server qua Connect RPC (`/rpc`) |
-| `apps/mobile` | Vỏ Capacitor 8 cho iOS (SPM) và Android, bọc bản build native của `apps/web` ([`docs/mobile-app.md`](docs/mobile-app.md)) |
-| `proto/app/v1/` | Contract client ↔ server, mỗi domain một file |
-| `packages/core`, `packages/platform`, `packages/platform-web`, `packages/proto-ts` | Lõi client (đồng bộ, outbox, SQLite cục bộ, realtime), giao diện nền tảng, nền tảng trình duyệt (worker SQLite wasm trên OPFS) và mã TS sinh từ proto. Gói workspace nội bộ (`private`), `apps/web` và `apps/mobile` import thẳng `src/` |
-| `packages/chat-client` | Gói npm công khai `@achoo254/chat-client`: gộp bốn gói trên vào một `dist/` (subpath `.` cho `createWebChat`, `./worker`, `./core`, `./platform`, `./proto/*`), chỉ phụ thuộc thư viện bên thứ ba. Không có backend mặc định: web phải cùng origin với server chat, xem [README](packages/chat-client/README.md) |
-| `sdk/ts` | Bot SDK cho Node, phát hành là `@achoo254/chat-bot-sdk` (`baseUrl` bắt buộc). `sdk/go`, `sdk/python` không phát hành |
-| `brand/generated` | File sinh từ brand (`pnpm brand:gen`), không sửa tay. Mã thương hiệu (schema, kiểm config, sinh manifest/icon, `check-brand`) nằm ở gói dùng chung [`@shared-next/brand`](https://github.com/achoo254/shared-next), cài từ tag git trong `package.json` |
-| `server/` | Go module: `cmd/server` (một binary chạy theo `-role`), `internal/` |
-| `spec/` | Đặc tả và test vector dùng chung TS/Go (`vi-fold`, `entities`) |
-| `deploy/dev/` | Docker Compose cho dev: Postgres primary + standby đồng bộ, Redis, Meilisearch, MinIO, IdP local |
-| `infra/chat/` | Script production: deploy, kích hoạt/rollback release, setup server, chứng chỉ, nginx, pm2, backup ([`docs/deployment-guide.md`](docs/deployment-guide.md)) |
-
-## Môi trường dev
-
-```bash
-cp deploy/dev/.env.example deploy/dev/.env        # điền secret ngẫu nhiên
-cp deploy/dev/idp.env.example deploy/dev/idp.env  # secret của IdP local
-docker compose -f deploy/dev/docker-compose.yml --env-file deploy/dev/.env up
-```
-
-IdP được build từ checkout `auth-next` nằm cạnh repo này (`../auth-next`, khai trong `deploy/dev/docker-compose.yml`); cần tạo khoá ký một lần ở đó bằng `pnpm generate-key`. Mọi cổng chỉ bind `127.0.0.1`. Không commit file `.env` hay `*.env`.
+Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`](packages/chat-client/README.md); không có backend mặc định, web phải cùng origin với server chat) và `@achoo254/chat-bot-sdk` ([`sdk/ts/README.md`](sdk/ts/README.md)). Phát hành bằng cách đẩy tag `chat-client-vX.Y.Z` hoặc `chat-bot-sdk-vX.Y.Z` khớp version, trên commit của `main`; [`sdk-publish.yml`](.github/workflows/sdk-publish.yml) publish qua trusted publishing.
 
 ## MCP cho công cụ AI
 
-Thêm `https://chat.hoandat.com/mcp` vào công cụ AI (Claude Code, …) làm MCP server, rồi duyệt quyền ở trang cấp quyền của IdP. Tool đọc và gửi tin nhắn, quản lý bot và webhook với đúng quyền của tài khoản trong app; nhóm `bots:admin` (webhook, token, xoá bot) cần quyền riêng và xác nhận hai bước. Quyết định và danh sách tool: [ADR 0012](docs/adr/0012-mcp-endpoint.md); mã ở `server/internal/chatmcp/`.
+Thêm `https://chat.hoandat.com/mcp` vào công cụ AI (Claude Code, …) làm MCP server rồi duyệt quyền ở trang consent của IdP. Tool làm việc với đúng quyền của tài khoản trong app; quản trị bot (`bots:admin`) cần scope riêng và xác nhận hai bước. Quyết định: [ADR 0012](docs/adr/0012-mcp-endpoint.md); mã ở [`server/internal/chatmcp/`](server/internal/chatmcp/).
 
 ## Production
 
-`https://chat.hoandat.com` trên server dùng chung `<SERVER_65_IP>`. Deploy và vận hành theo [`docs/deployment-guide.md`](docs/deployment-guide.md); danh mục hạ tầng đã triển khai ở [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md) và skill `chat-ops-prod` (`.claude/skills/chat-ops-prod/`).
+Deploy và vận hành: [`docs/deployment-guide.md`](docs/deployment-guide.md); hạ tầng đã triển khai: [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md); skill vận hành cho agent: [`.claude/skills/chat-ops-prod/`](.claude/skills/chat-ops-prod/).
