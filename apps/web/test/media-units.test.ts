@@ -16,7 +16,7 @@ import {
 	waveformBars,
 } from "../src/messaging/media/media-format.ts";
 import { collectShared } from "../src/messaging/media/shared-media.tsx";
-import { groupRows } from "../src/messaging/ui/message-list.tsx";
+import { groupRows, joinsRun, RUN_GAP_S } from "../src/messaging/ui/message-list.tsx";
 import type { WindowItem } from "../src/messaging/data/store.ts";
 
 function file(name: string, size: number, type: string): File {
@@ -116,6 +116,23 @@ describe("album rows", () => {
 		]);
 		const rows = groupRows([...items.keys()], (key) => items.get(key));
 		expect(rows.map((row) => row.keys)).toEqual([["s1"], ["s2", "s3"], ["s4"], ["s5"]]);
+	});
+});
+
+describe("bubble runs", () => {
+	const item = (seq: number, patch: Partial<StoredMessage> = {}): WindowItem => ({ kind: "message", message: message(seq, patch) });
+	it("joins messages of one sender close in time on the same day", () => {
+		expect(joinsRun(item(1), item(2), 7)).toBe(true);
+		expect(joinsRun(item(1), item(2, { date: 1_760_000_001 + RUN_GAP_S }), 7)).toBe(true);
+		expect(joinsRun(item(1), item(2, { date: 1_760_000_002 + RUN_GAP_S }), 7)).toBe(false);
+	});
+	it("breaks on another sender, another webhook, a service line or a new day", () => {
+		expect(joinsRun(item(1), item(2, { fromId: 3 }), 7)).toBe(false);
+		expect(joinsRun(item(1, { fromId: 0, integrationLabel: "Grafana" }), item(2, { fromId: 0, integrationLabel: "Jenkins" }), 7)).toBe(false);
+		expect(joinsRun(item(1), item(2, { action: { kind: "chat_created", title: "x" } }), 7)).toBe(false);
+		const late = Math.floor(new Date(2026, 9, 14, 23, 59).getTime() / 1000);
+		expect(joinsRun(item(1, { date: late }), item(2, { date: late + 120 }), 7)).toBe(false);
+		expect(joinsRun(undefined, item(2), 7)).toBe(false);
 	});
 });
 

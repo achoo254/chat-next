@@ -103,9 +103,13 @@ interface MessageItemProps {
 	readOutboxMaxSeq: number;
 	/** Keyboard roving focus: only one message is in the tab order. */
 	tabbable: boolean;
+	/** Continues the previous message's run of bubbles (same sender, close in time). */
+	runPrev?: boolean;
+	/** The next message continues this one's run. */
+	runNext?: boolean;
 }
 
-export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKeys = "", chat, readOutboxMaxSeq, tabbable }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKeys = "", chat, readOutboxMaxSeq, tabbable, runPrev = false, runNext = false }: MessageItemProps) {
 	const { store } = useServices();
 	const keys = splitKeys(albumKeys);
 	// An album's caption, reactions and menu belong to the message carrying the text (else the first).
@@ -117,7 +121,19 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKey
 	const item = useItem(chatId, captionKey);
 	if (item === undefined) return null;
 	if (item.kind === "pending") {
-		return <PendingBubble chatId={chatId} itemKey={captionKey} rowKey={itemKey} albumKeys={keys} pending={item.pending} chat={chat} tabbable={tabbable} />;
+		return (
+			<PendingBubble
+				chatId={chatId}
+				itemKey={captionKey}
+				rowKey={itemKey}
+				albumKeys={keys}
+				pending={item.pending}
+				chat={chat}
+				tabbable={tabbable}
+				runPrev={runPrev}
+				runNext={runNext}
+			/>
+		);
 	}
 	if (item.message.action !== null) {
 		return (
@@ -136,9 +152,31 @@ export const MessageItem = memo(function MessageItem({ chatId, itemKey, albumKey
 			chat={chat}
 			readOutboxMaxSeq={readOutboxMaxSeq}
 			tabbable={tabbable}
+			runPrev={runPrev}
+			runNext={runNext}
 		/>
 	);
 });
+
+/** Classes of a message in a run of bubbles: tighter spacing, inner corners and the tail (styles: .run-prev, .run-next). */
+function runClasses(runPrev: boolean, runNext: boolean): string {
+	return [runPrev ? "run-prev" : "", runNext ? "run-next" : ""].filter(Boolean).join(" ");
+}
+
+/**
+ * The sender's name over the first bubble of a run; later bubbles keep it
+ * for screen readers only, so each message still says who wrote it.
+ */
+function SenderName({ name, tone, hidden, children }: { name: string; tone: string; hidden: boolean; children?: ReactNode }) {
+	"use no memo";
+	if (hidden) return <span className="sr-only">{name}</span>;
+	return (
+		<span className={`who s-${tone}`}>
+			{name}
+			{children}
+		</span>
+	);
+}
 
 /** Context menu on right click, long press or the keyboard (Enter, Shift+F10, Menu key). */
 function useMenuTrigger(chatId: number, itemKey: string) {
@@ -388,6 +426,8 @@ interface BubbleProps {
 	tabbable: boolean;
 	/** Rendered again inside the message menu: no handlers, no focus. */
 	inert?: boolean;
+	runPrev?: boolean;
+	runNext?: boolean;
 }
 
 /** The media of a message or album, in its reserved box until the media chunk is there. */
@@ -415,7 +455,19 @@ function MediaSlot({ chatId, message, albumKeys }: { chatId: number; message: St
 	);
 }
 
-export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [], message, chat, readOutboxMaxSeq, tabbable, inert = false }: BubbleProps) {
+export function MessageBubble({
+	chatId,
+	itemKey,
+	rowKey = itemKey,
+	albumKeys = [],
+	message,
+	chat,
+	readOutboxMaxSeq,
+	tabbable,
+	inert = false,
+	runPrev = false,
+	runNext = false,
+}: BubbleProps) {
 	const copy = useCopy();
 	const { store, self, backend } = useServices();
 	const ui = useUi();
@@ -453,7 +505,9 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	const canReply = (!channel || admin) && !message.recalled;
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
-	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : ""].filter(Boolean).join(" ");
+	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : "", runClasses(runPrev, runNext)]
+		.filter(Boolean)
+		.join(" ");
 	const edited = message.editDate !== 0 && !recalled;
 	// Alerts edited in place by their webhook read "đã cập nhật", not "đã sửa".
 	const stamp = (
@@ -489,12 +543,14 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 						}
 			}
 		>
-			{group && integration && (
+			{/* The avatar stands by the last bubble of a run; the others keep its room. */}
+			{group && !mine && runNext && <span className="avatar-gap" aria-hidden="true" />}
+			{group && integration && !runNext && (
 				<span className={`avatar sm av-${integrationTone(message.integrationLabel)}`} aria-hidden="true">
 					<Icon name="webhook" small />
 				</span>
 			)}
-			{group && !mine && !integration && (
+			{group && !mine && !integration && !runNext && (
 				<button
 					type="button"
 					className="avatar-btn"
@@ -514,7 +570,7 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 			)}
 			{recalled ? (
 				<div className="bubble recalled">
-					{showSender && <span className={`who s-${tone}`}>{senderName}</span>}
+					{showSender && <SenderName name={senderName} tone={tone} hidden={runPrev} />}
 					<p>
 						{copy.message.recalled}
 						{stamp}
@@ -540,10 +596,9 @@ export function MessageBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 						</span>
 					)}
 					{showSender && !integration && (
-						<span className={`who s-${tone}`}>
-							{senderName}
+						<SenderName name={senderName} tone={tone} hidden={runPrev}>
 							{sender?.isBot === true && <span className="tag">{copy.bot.tag}</span>}
-						</span>
+						</SenderName>
 					)}
 					{message.forward !== null && (
 						<Suspense fallback={<LineReserve className="fwd" />}>
@@ -611,6 +666,8 @@ interface PendingProps {
 	chat: Chat | null;
 	tabbable: boolean;
 	inert?: boolean;
+	runPrev?: boolean;
+	runNext?: boolean;
 }
 
 function PendingMediaSlot({ chatId, pending, albumKeys }: { chatId: number; pending: PendingMessage; albumKeys: readonly string[] }) {
@@ -637,7 +694,18 @@ function PendingMediaSlot({ chatId, pending, albumKeys }: { chatId: number; pend
 	);
 }
 
-export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [], pending, chat, tabbable, inert = false }: PendingProps) {
+export function PendingBubble({
+	chatId,
+	itemKey,
+	rowKey = itemKey,
+	albumKeys = [],
+	pending,
+	chat,
+	tabbable,
+	inert = false,
+	runPrev = false,
+	runNext = false,
+}: PendingProps) {
 	const copy = useCopy();
 	const { source, toasts, self } = useServices();
 	// Media sends show their upload state (progress, cancel, retry) on the file itself.
@@ -658,7 +726,7 @@ export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	);
 	const bubble = (
 		<div className={hasMedia ? "bubble media" : "bubble"}>
-			{channel && <span className="who">{chat.title}</span>}
+			{channel && (runPrev ? <span className="sr-only">{chat.title}</span> : <span className="who">{chat.title}</span>)}
 			{pending.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={pending.replyToSeq} />}
 			{hasMedia && <PendingMediaSlot chatId={chatId} pending={pending} albumKeys={albumKeys} />}
 			<RichText text={pending.text} entities={pending.entities} ctx={ctx} tail={stamp} />
@@ -666,7 +734,7 @@ export function PendingBubble({ chatId, itemKey, rowKey = itemKey, albumKeys = [
 	);
 	return (
 		<div
-			className={channel ? "msg post" : "msg mine"}
+			className={[channel ? "msg post" : "msg mine", runClasses(runPrev, runNext)].filter(Boolean).join(" ")}
 			data-key={rowKey}
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
 			{...(inert ? {} : trigger)}

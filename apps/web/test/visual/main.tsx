@@ -54,6 +54,32 @@ const cSeq = f.send(f.selfId, owned, "c");
 for (const user of [demo.ids.users.minh, demo.ids.users.ha]) f.react(user, owned, cSeq, "👍");
 f.react(demo.ids.users.ha, owned, okSeq, "❤️");
 f.react(f.selfId, owned, okSeq, "😂");
+// Bubble grouping (Telegram style): runs of own and others' messages across a day break,
+// a reply, a link, a code span, mentions and reactions on both sides.
+const cafe = f.createChat(ChatType.GROUP, "Góc cà phê", [f.selfId, demo.ids.users.lan, demo.ids.users.minh], { myRole: MemberRole.MEMBER });
+const yesterday = BigInt(Math.floor(Date.now() / 1000) - 86_400);
+f.send(demo.ids.users.lan, cafe, "Chào cả nhà", { date: yesterday });
+f.send(demo.ids.users.lan, cafe, "Mai họp lúc mấy giờ nhỉ?", { date: yesterday });
+f.send(f.selfId, cafe, "9 giờ nhé, phòng họp tầng 3", { date: yesterday });
+const docsText = "Tài liệu thiết kế ở https://docs.example.com/thiet-ke nhé";
+const docsLink = f.send(demo.ids.users.minh, cafe, docsText, { entities: [entity(EntityType.URL, docsText, "https://docs.example.com/thiet-ke")] });
+const perfText = "Nhớ chạy pnpm perf trước khi đẩy code";
+f.send(demo.ids.users.minh, cafe, perfText, { entities: [entity(EntityType.CODE, perfText, "pnpm perf")] });
+f.send(f.selfId, cafe, "Ok, để mình xem", { replyToSeq: BigInt(docsLink) });
+const doneText = "Đã chạy xong, ngân sách vẫn ổn. Link kết quả: https://ci.example.com/run/42 và lệnh pnpm perf ra 142 KB, @lananh xem giúp";
+const done = f.send(f.selfId, cafe, doneText, {
+	entities: [
+		entity(EntityType.URL, doneText, "https://ci.example.com/run/42"),
+		entity(EntityType.CODE, doneText, "pnpm perf"),
+		entity(EntityType.MENTION, doneText, "@lananh"),
+	],
+});
+for (const user of [demo.ids.users.lan, demo.ids.users.minh]) f.react(user, cafe, done, "👍");
+f.send(f.selfId, cafe, "Một tin dài hơn để xem thời gian nằm gọn ở góc dưới bên phải của bong bóng khi chữ xuống dòng nhiều lần.");
+const thanksText = "@ductrung tuyệt, cảm ơn nhé";
+const thanks = f.send(demo.ids.users.lan, cafe, thanksText, { entities: [entity(EntityType.MENTION, thanksText, "@ductrung")], replyToSeq: BigInt(done) });
+f.react(f.selfId, cafe, thanks, "❤️");
+f.send(demo.ids.users.lan, cafe, "Chiều mình gửi bản màu mới");
 // A link whose text names another domain (#external-link, right frame).
 const lure = "Khuyến mãi ở hoandat.com/khuyen-mai nhé";
 f.send(demo.ids.users.minh, demo.ids.ops, lure, {
@@ -230,6 +256,7 @@ const pollingBot = f.bots.seed("Báo cáo doanh thu hằng ngày", "report_daily
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
 	owned: `/c/${owned}`,
+	cafe: `/c/${cafe}`,
 	forum: `/c/${demo.ids.forum}`,
 	lan: `/c/${demo.ids.lanAnh}`,
 	admin: `/c/${demo.ids.ops}/admin`,

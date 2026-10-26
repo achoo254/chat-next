@@ -29,6 +29,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// Reaction pills on short own and others' messages in a small group (faces), info open and closed.
 	"reactions-hover": "?at=owned&open=hover-all",
 	"reactions-bare": "?at=owned&open=hover-bare",
+	// Bubble grouping, in-bubble time, own bubbles on the solid fill: runs, a reply, a link, code, a day break.
+	bubbles: "?at=cafe",
 	lan: "?at=lan",
 	media: "?at=media",
 	"media-info": "?at=media&open=info",

@@ -121,6 +121,30 @@ function itemDate(item: WindowItem | undefined): number {
 	return item.kind === "message" ? item.message.date : item.pending.date;
 }
 
+/** Messages of one sender this close together (seconds) read as one run of bubbles. */
+export const RUN_GAP_S = 5 * 60;
+
+/** Who a bubble speaks as, for runs: "" for service lines, which never join a run. */
+function runSender(item: WindowItem | undefined, selfId: number): string {
+	if (item === undefined) return "";
+	if (item.kind === "pending") return `u${selfId}`;
+	if (item.message.action !== null) return "";
+	return `u${item.message.fromId}:${item.message.integrationLabel}`;
+}
+
+/**
+ * Whether `next` continues the run of `previous` (Telegram grouping): the
+ * same sender, the same day and at most RUN_GAP_S apart. Runs draw tightly,
+ * with the name on the first bubble and the avatar by the last.
+ */
+export function joinsRun(previous: WindowItem | undefined, next: WindowItem | undefined, selfId: number): boolean {
+	const sender = runSender(previous, selfId);
+	if (sender === "" || sender !== runSender(next, selfId)) return false;
+	const a = itemDate(previous);
+	const b = itemDate(next);
+	return a !== 0 && b !== 0 && sameDay(a, b) && Math.abs(b - a) <= RUN_GAP_S;
+}
+
 /**
  * The first unread message in the window that mentions you or replies to
  * you; 0 when it is outside the window (the caller loads around the first
@@ -279,8 +303,13 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const rows: ReactNode[] = [];
 	let previousDate = 0;
 	const divider = dividerRow(groups, (key) => store.item(chatId, key), unreadFrom, store.selfId);
-	for (const { key, keys: members } of groups) {
-		const item = store.item(chatId, key);
+	const items = groups.map(({ key }) => store.item(chatId, key));
+	groups.forEach(({ key, keys: members }, index) => {
+		const item = items[index];
+		const next = groups[index + 1];
+		// The unread divider breaks a run like a day does.
+		const runPrev = key !== divider && joinsRun(items[index - 1], item, store.selfId);
+		const runNext = next !== undefined && next.key !== divider && joinsRun(item, items[index + 1], store.selfId);
 		const date = itemDate(item);
 		if (date !== 0 && (previousDate === 0 || !sameDay(previousDate, date))) {
 			rows.push(
@@ -306,9 +335,11 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 				chat={chat}
 				readOutboxMaxSeq={readOutbox}
 				tabbable={key === tabKey}
+				runPrev={runPrev}
+				runNext={runNext}
 			/>,
 		);
-	}
+	});
 
 	const unread = topic !== null ? topic.unreadCount : (dialog?.dialog.unreadCount ?? 0);
 	const mentions = topicId === 0 ? (dialog?.dialog.unreadMentionsCount ?? 0) : 0;

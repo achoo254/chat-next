@@ -10,10 +10,26 @@
 	--avatar-xs: 24px;
 	--avatar-lg: 72px;
 	--chat-row-h: 64px;
-	--c-mine: color-mix(in srgb, var(--c-primary-solid) 14%, var(--c-surface));
-	--c-mine-border: color-mix(in srgb, var(--c-primary-solid) 28%, var(--c-surface));
 	--c-mark: color-mix(in srgb, var(--c-warning) 26%, transparent);
+	/* Bubbles have no outline (Telegram, Zalo): others' sit one step off the conversation
+	   background (greyer in light, lighter in dark); yours are the brand violet darkened
+	   towards the theme's ink, with light text. Contrast (WCAG AA) of every pairing is in
+	   the comment of each rule below; measured values: light / dark. */
+	--c-ink: var(--c-text);
+	--c-theirs: color-mix(in srgb, var(--c-text) 7%, var(--c-bg));
+	--c-mine: color-mix(in srgb, var(--c-primary-solid) 80%, var(--c-ink));
+	/* Time, ticks and secondary text in your bubble: 5.9 / 6.2:1 on --c-mine, 4.6 / 4.9:1 on
+	   the 10% light fills inside it (link preview, code block). */
+	--c-mine-muted: color-mix(in srgb, var(--c-on-primary) 90%, var(--c-mine));
+	/* Bubble tail: a curved wedge at the bottom corner of a run's last bubble. */
+	--tail-w: 8px;
+	--tail-h: 14px;
 }
+/* Dark themes darken your bubble towards the background (the ink of a dark theme). */
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) { --c-ink: var(--c-bg); }
+}
+:root[data-theme="dark"] { --c-ink: var(--c-bg); }
 
 /* ---------- Shared controls ---------- */
 .narrow-only { display: none; }
@@ -219,27 +235,77 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .messages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
 /* Newest message sits at the bottom, as in any chat. */
 .messages > :first-child { margin-top: auto; }
-.day { align-self: center; margin: var(--space-3) 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: var(--c-surface); border: 1px solid var(--c-border-subtle); font-size: 0.75rem; color: var(--c-text-muted); }
+/* Muted text on --c-theirs: 4.9 / 7.8:1. */
+.day { align-self: center; margin: var(--space-3) 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: var(--c-theirs); font-size: 0.75rem; font-weight: 500; color: var(--c-text-muted); }
 .system { align-self: center; text-align: center; font-size: 0.8125rem; color: var(--c-text-muted); padding: var(--space-1) var(--space-3); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
 .messages > .typing { align-self: flex-start; font-size: 0.8125rem; color: var(--c-text-muted); padding: var(--space-1) var(--space-2); }
 .msg { display: flex; gap: var(--space-2); align-items: flex-end; max-width: var(--bubble-max); border-radius: var(--radius-md); }
 .msg.mine { align-self: flex-end; flex-direction: row-reverse; }
+/* Runs (message-list.tsx joinsRun): bubbles of one sender sit close together, the avatar by the last. */
+.msg.run-prev { margin-top: calc(2px - var(--space-2)); }
+.avatar-gap { width: var(--avatar-sm); flex: none; }
 .msg:focus-visible { outline-offset: 4px; }
 .msg.post { max-width: min(var(--bubble-max), 100%); }
 .msg.post .bubble { width: 100%; }
 .msg.post .who { color: var(--c-primary); }
 .avatar-btn { display: grid; flex: none; padding: 0; border: 0; border-radius: var(--radius-full); background: none; }
+/* Others' bubble: text 13.6 / 13.5:1, muted 4.9 / 7.8:1, links 5.1 / 7.5:1 on --c-theirs. */
 .bubble {
+	--bubble: var(--c-theirs);
 	position: relative; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
-	background: var(--c-surface); border: 1px solid var(--c-border-subtle); min-width: 0; overflow-wrap: anywhere;
+	background: var(--bubble); min-width: 0; overflow-wrap: anywhere;
 	transition: box-shadow var(--dur-base) var(--ease-standard);
 }
-.msg.mine .bubble { background: var(--c-mine); border-color: var(--c-mine-border); }
+/* Your bubble: --c-on-primary text 6.8 / 7.1:1 on --c-mine. Inside it the theme's text, link
+   and line colours turn light for every part but the reactions and quick actions (they keep
+   the page's colours), so links, mentions, code, replies, previews and files stay readable. */
+.msg.mine .bubble { --bubble: var(--c-mine); color: var(--c-on-primary); }
+.msg.mine .bubble:not(.recalled, .unsupported) > :not(.reactions, .msg-actions) {
+	--c-text: var(--c-on-primary);
+	--c-text-muted: var(--c-mine-muted);
+	--c-icon-muted: var(--c-mine-muted);
+	--c-primary: var(--c-on-primary);
+	--c-primary-solid: var(--c-on-primary);
+	--c-surface-subtle: color-mix(in srgb, var(--c-on-primary) 10%, transparent);
+	--c-border-subtle: color-mix(in srgb, var(--c-on-primary) 24%, transparent);
+	--c-border-strong: color-mix(in srgb, var(--c-on-primary) 45%, transparent);
+	--c-bar-track: color-mix(in srgb, var(--c-on-primary) 24%, transparent);
+	--c-selected: color-mix(in srgb, var(--c-on-primary) 18%, transparent);
+	--c-hover: color-mix(in srgb, var(--c-on-primary) 10%, transparent);
+	--who: var(--c-on-primary);
+	--who-text: var(--c-on-primary);
+}
+/* Mentions and hashtags are buttons that read as text: underlined where the colour cannot set them apart. */
+.msg.mine .bubble :is(.entity, .mention, .hashtag) { text-decoration: underline; text-underline-offset: 2px; }
+.msg.mine .bubble a.lp:hover { background: color-mix(in srgb, var(--c-on-primary) 10%, transparent); }
+/* A voice message's play button: the bubble's colour on a light disc. */
+.msg.mine .bubble .voice .play { color: var(--c-mine); }
+/* Run shape: inner corners of joined bubbles are tighter; the last bubble of a run has a tail. */
+.msg.run-prev .bubble { border-top-left-radius: var(--radius-xs); }
+.msg.run-next .bubble { border-bottom-left-radius: var(--radius-xs); }
+.msg.mine.run-prev .bubble { border-top-left-radius: var(--radius-md); border-top-right-radius: var(--radius-xs); }
+.msg.mine.run-next .bubble { border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-xs); }
+.msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration) { border-bottom-left-radius: 0; }
+.msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported) { border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: 0; }
+.msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration)::before {
+	content: ""; position: absolute; bottom: 0; left: calc(-1 * var(--tail-w)); width: var(--tail-w); height: var(--tail-h);
+	background: var(--bubble); pointer-events: none;
+	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 0 0, transparent 96%, currentColor 100%);
+	mask: radial-gradient(var(--tail-w) var(--tail-h) at 0 0, transparent 96%, currentColor 100%);
+}
+.msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported)::before {
+	left: auto; right: calc(-1 * var(--tail-w));
+	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
+	mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
+}
 .msg.flash .bubble { box-shadow: 0 0 0 2px var(--c-primary); }
-.bubble .who { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--c-viz-blue); margin-bottom: 2px; }
-.bubble .who[class*="s-"] { color: var(--who); }
+/* Sender names: the tone darkened towards the text colour (light: 5.0–6.4:1 on --c-theirs; dark: 8.7:1 and up). */
+.bubble .who { display: block; font-size: 0.8125rem; font-weight: 600; color: color-mix(in srgb, var(--c-viz-blue) 80%, var(--c-text)); margin-bottom: 2px; }
+.bubble .who[class*="s-"] { color: color-mix(in srgb, var(--who) 80%, var(--c-text)); }
 .bubble p { margin: 0; white-space: pre-wrap; }
-.bubble code { font-family: var(--font-mono); font-size: 0.8125rem; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+/* The paragraph holds the floating time (.stamp), so the bubble grows a line when the last one is full. */
+.bubble p:has(> .stamp) { display: flow-root; }
+.bubble code { font-family: var(--font-mono); font-size: 0.8125rem; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-text) 9%, transparent); }
 .bubble a { color: var(--c-primary); }
 /* Mentions, hashtags and e-mail addresses that act on a tap: buttons that read as text (rich-text.tsx). */
 .entity { display: inline; padding: 0; border: 0; background: none; font: inherit; color: var(--c-primary); text-align: inherit; cursor: pointer; }
@@ -253,13 +319,15 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .hashtag { color: var(--c-primary); }
 .spoiler { padding: 0 2px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-text) 14%, transparent); filter: blur(4px); cursor: pointer; transition: filter var(--dur-base) var(--ease-standard); }
 .spoiler.revealed { filter: none; background: none; cursor: auto; }
-.stamp { display: inline-flex; align-items: center; gap: 2px; float: right; margin: 6px 0 0 var(--space-3); font-size: 0.6875rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Time and ticks (Telegram): floated to the end of the last line, never over the text. */
+.stamp { display: inline-flex; align-items: center; gap: 2px; float: right; margin: 6px 0 -2px var(--space-3); font-size: 0.6875rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .stamp [role="img"] { display: inline-flex; }
 /* Silent message (no notification): bell-off before the time, mock #alert-grouping. */
 .stamp .silent-mark { margin-right: 2px; }
 .stamp .icon-sm { width: 14px; height: 14px; }
 .stamp .read { color: var(--c-primary); }
 .stamp .fail { color: var(--c-error); }
+.msg.mine .stamp .fail { color: var(--c-on-primary); }
 .fwd { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-primary); }
 .via-bot { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-text-muted); }
 .via-bot b { color: var(--c-primary); font-weight: 600; }
@@ -287,8 +355,9 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 	min-width: 44px; min-height: 32px; padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted);
 	font-size: 0.75rem; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.reaction::before { content: ""; position: absolute; inset: calc(50% - 12px) 0; z-index: -1; background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-left-width: 0; transition: background var(--dur-fast) var(--ease-standard); }
-.reaction:first-child::before { border-left-width: 1px; border-radius: var(--radius-full) 0 0 var(--radius-full); }
+/* A filled pill, no outline: the shadow lifts it off the bubble and the page. */
+.reaction::before { content: ""; position: absolute; inset: calc(50% - 12px) 0; z-index: -1; background: var(--c-surface); box-shadow: var(--shadow-sm); transition: background var(--dur-fast) var(--ease-standard); }
+.reaction:first-child::before { border-radius: var(--radius-full) 0 0 var(--radius-full); }
 .reaction:last-child::before { border-radius: 0 var(--radius-full) var(--radius-full) 0; }
 .reaction:only-child::before { border-radius: var(--radius-full); }
 .reaction::after { content: ""; position: absolute; inset: calc(-1 * (var(--space-1) + 2px)) 0; }
@@ -328,7 +397,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .who .tag { margin-left: var(--space-1); vertical-align: 1px; }
 .int-label { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); margin-bottom: var(--space-1); }
 .int-label .icon { width: 14px; height: 14px; }
-.bubble.unsupported { display: flex; gap: var(--space-2); align-items: flex-start; border-style: dashed; }
+.bubble.unsupported { display: flex; gap: var(--space-2); align-items: flex-start; border: 1px dashed var(--c-border-strong); }
 .bubble.unsupported .icon { color: var(--c-icon-muted); margin-top: 2px; }
 .bubble.unsupported small { display: block; color: var(--c-text-muted); font-size: 0.8125rem; }
 .bubble.unsupported .btn { margin-top: var(--space-2); }
@@ -371,15 +440,17 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .compose-extras { display: grid; gap: var(--space-2); padding: var(--space-2) var(--space-4) 0; }
 .composer-error { padding: var(--space-2) var(--space-4) 0; font-size: 0.8125rem; color: var(--c-error); }
 .composer { display: flex; align-items: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+/* A filled field, no outline (placeholder 5.4 / 7.0:1 on the fill); focus draws the ring. */
 .composer textarea {
 	flex: 1; min-height: 44px; max-height: 160px; resize: none; padding: var(--space-2) var(--space-3);
-	border-radius: var(--radius-md); border: 1px solid var(--c-border); background: var(--c-surface); line-height: 1.45;
+	border-radius: var(--radius-lg); border: 0; background: color-mix(in srgb, var(--c-text) 6%, var(--c-surface)); line-height: 1.45;
 }
 /* The placeholder never wraps: one line, cut with "…" (mockups/bots.html#reply-keyboard). */
 .composer textarea:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.composer textarea:focus { outline: none; border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
-.composer textarea[aria-invalid="true"] { border-color: var(--c-error); }
+.composer textarea:focus { outline: none; }
+.composer textarea:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 0; border-radius: var(--radius-lg); }
+.composer textarea[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--c-error); }
 .send { width: 44px; height: 44px; flex: none; border-radius: var(--radius-full); border: 0; display: grid; place-items: center; background: var(--c-primary-solid); color: var(--c-on-primary); }
 .send:hover { background: var(--c-primary-solid-hover); }
 .send:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -1023,7 +1094,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 }
 
 /* Recalled message (#message-kinds): keeps its place in the stream, nothing left to act on. */
-.bubble.recalled, .msg.mine .bubble.recalled { background: var(--c-surface); border: 1px dashed var(--c-border-strong); color: var(--c-text-muted); }
+.bubble.recalled, .msg.mine .bubble.recalled { background: transparent; border: 1px dashed var(--c-border-strong); color: var(--c-text-muted); }
 .bubble.recalled p { font-style: italic; }
 
 
