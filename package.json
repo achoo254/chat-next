@@ -21,6 +21,7 @@
     "brand:gen": "pnpm --filter @app/web brand:gen",
     "mobile:build-web": "pnpm --filter @app/mobile build-web",
     "mobile:sync": "pnpm --filter @app/mobile sync",
+    "mobile:ios-release": "pnpm --filter @app/mobile ios-release",
     "sdk:gen": "cd server && go run ./cmd/sdkgen",
     "conformance:sdk": "cd server && SDK_CONFORMANCE=1 go test -count=1 -run TestSDKConformance ./internal/api/"
   },

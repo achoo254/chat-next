@@ -39,6 +39,22 @@ cd apps/mobile && pnpm exec cap open ios        # mở Xcode, chạy trên Simul
 
 - CI (`.github/workflows/mobile.yml`) chạy khi `apps/`, `packages/`, brand hoặc lockfile đổi: APK debug (artifact `android-debug-apk`, giữ 14 ngày, cài thử bằng `adb install`) và build iOS Simulator không ký.
 
+## Phát hành TestFlight
+
+`pnpm mobile:ios-release` ([`apps/mobile/scripts/ios-release.sh`](../apps/mobile/scripts/ios-release.sh), cùng cách với Scribe) chạy tay trên Mac build, không chạy trên CI: build web native (luôn gọi server prod là host web của `brand.config.json`; bỏ qua `VITE_API_ORIGIN` và dừng nếu một tệp `apps/web/.env*` đặt biến này) → `cap sync ios` → `xcodebuild archive` (Release, ký tự động bằng key API, `-allowProvisioningUpdates`) → `xcodebuild -exportArchive` với `method: app-store-connect`, `destination: upload` (ký phân phối và tải thẳng lên App Store Connect).
+
+```bash
+ASC_KEY_ID=<Key ID> ASC_ISSUER_ID=<Issuer ID> \
+ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8 pnpm mobile:ios-release
+```
+
+- Key API (vai trò Admin, cần cho ký phân phối bằng key): tệp `.p8` ngoài repo, quyền 600; Key ID và Issuer ID nằm trong tệp access-tokens trên iCloud, service `appstoreconnect.apple.com`.
+- Phiên bản: `MARKETING_VERSION` (`1.0`) trong `project.pbxproj`; số build do script đặt = giờ UTC `YYYYMMDD.HHMM` (luôn tăng), hoặc `IOS_BUILD_NUMBER`. `IOS_RELEASE_DIR` giữ lại archive.
+- `Info.plist` khai `ITSAppUsesNonExemptEncryption = false` (chỉ HTTPS chuẩn) nên TestFlight không hỏi về mã hoá; `UIRequiredDeviceCapabilities` = `arm64`.
+- App record "Chat - trò chuyện" (`com.hoandat.chat`) có nhóm TestFlight nội bộ "Nội bộ" nhận mọi build (`hasAccessToAllBuilds`); build hiện ở đó sau khi Apple xử lý xong (trạng thái `VALID`).
+- Server không cần Team ID: callback đăng nhập là scheme riêng `com.hoandat.chat:/auth/callback`, không phải Universal Link, nên không có `apple-app-site-association`. Đăng nhập app bật mặc định (`NATIVE_SIGN_IN` không đặt trong `/opt/chat/.env`, kiểm 26/10/2026).
+- App khai cả iPhone và iPad (`TARGETED_DEVICE_FAMILY = 1,2`): nộp App Store sẽ cần thêm ảnh iPad, hoặc chuyển về chỉ iPhone trước khi nộp.
+
 ## Icon, màn khởi động và hồ sơ store
 
 `pnpm brand:gen` vẽ từ `brand/icon.svg`, `brand/icon-maskable.svg` và màu của `brand.config.json` (script `apps/web/scripts/brand-native.ts`, Chromium của Playwright), ghi thẳng vào hai project; sửa logo hay màu thì chạy lại và commit:
@@ -69,6 +85,6 @@ Nút "Đăng nhập", "Tạo tài khoản" và các bước "đăng nhập lại
 ## Chưa làm
 
 - Thông báo đẩy APNs/FCM (cần key APNs và project Firebase), notification service extension.
-- Ký và phát hành: TestFlight cần app record `com.hoandat.chat` trên App Store Connect; AAB ký cần Play Console và keystore. Không có secret ký nào trong repo.
+- Phát hành: mới có TestFlight nội bộ, chưa nộp duyệt App Store; AAB ký cần Play Console và keystore. Không có secret ký nào trong repo.
 - SQLCipher native cho DB local (ADR 0009), OTA, Mini App trong in-app browser.
 - Thông báo lỗi đăng nhập dùng hộp thoại hệ thống (`alert`), chưa theo giao diện app.
