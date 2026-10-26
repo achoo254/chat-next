@@ -91,6 +91,7 @@ describe("public pages", () => {
 		const items = screen.getAllByRole("listitem").map((item) => item.textContent);
 		expect(items).toContain("Máy chủ đặt tại Việt Nam.");
 		expect(items).toContain("Kết nối tới chat.hoandat.com đi qua Cloudflare.");
+		expect(items).toContain("Trang web chat.hoandat.com dùng Cloudflare Web Analytics để đếm lượt xem trang; công cụ này không đặt cookie và không lưu gì trên thiết bị của bạn.");
 		expect(screen.getByText(pushServicesNote.vi)).toBeTruthy();
 		const email = screen.getByRole("link", { name: "quocdat254@gmail.com" });
 		expect(email.getAttribute("href")).toBe("mailto:quocdat254@gmail.com");
@@ -122,9 +123,10 @@ describe("public pages", () => {
 });
 
 describe("links to the public pages", () => {
-	it("are on the welcome screen and open in place", async () => {
+	it("are in the footer of the welcome screen and open in place", async () => {
 		renderApp(signedOut().routes);
-		const nav = await screen.findByRole("navigation", { name: "Chính sách" });
+		const nav = await screen.findByRole("navigation", { name: "Liên kết cuối trang" });
+		expect(within(nav).getByRole("link", { name: "Một app của hoandat.com" }).getAttribute("href")).toBe("https://hoandat.com");
 		expect(within(nav).getByRole("link", { name: "Điều khoản sử dụng" }).getAttribute("href")).toBe("/terms");
 		expect(within(nav).getByRole("link", { name: "Xoá tài khoản" }).getAttribute("href")).toBe("/delete-account");
 

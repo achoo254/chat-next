@@ -40,7 +40,7 @@ export interface LegalCopy {
 }
 
 /** When the text last changed (shown on every page). */
-export const LEGAL_UPDATED = { vi: "20/10/2026", en: "20 October 2026" } as const;
+export const LEGAL_UPDATED = { vi: "26/10/2026", en: "26 October 2026" } as const;
 
 const { appName, domain, webHost, idpHost, accountUrl } = brand;
 
@@ -93,6 +93,7 @@ const vi: LegalCopy = {
 						"Cơ sở dữ liệu, file và bản sao lưu nằm trên máy chủ của nhà vận hành; hiện chưa có bản lưu trữ hay sao lưu nào ở ngoài máy chủ đó.",
 						"Máy chủ đặt tại Việt Nam.",
 						`Kết nối tới ${webHost} đi qua Cloudflare.`,
+						`Trang web ${webHost} dùng Cloudflare Web Analytics để đếm lượt xem trang; công cụ này không đặt cookie và không lưu gì trên thiết bị của bạn.`,
 						"Log của app chỉ ghi mã định danh; không ghi nội dung tin, email hay token.",
 					],
 				},
@@ -309,6 +310,7 @@ const en: LegalCopy = {
 						"The database, files and backups are on the operator's server; no storage or backup outside that server yet.",
 						"The servers are in Vietnam.",
 						`Connections to ${webHost} go through Cloudflare.`,
+						`The ${webHost} website counts page views with Cloudflare Web Analytics, which sets no cookies and stores nothing on your device.`,
 						"The app's logs record ids only, never message text, emails or tokens.",
 					],
 				},

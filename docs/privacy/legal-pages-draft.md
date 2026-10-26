@@ -16,6 +16,7 @@ Email liên hệ, vị trí máy chủ và Cloudflare là sự thật của dị
 | Không đăng nhập được thì gửi yêu cầu xoá tới email đó, kèm username và email tài khoản `<domain>` (đường không cần đăng nhập, dùng cho URL xoá của kho ứng dụng) | Quyết định của Jev, 20/10/2026; người vận hành xử lý tay |
 | Máy chủ đặt tại Việt Nam | whois IP `<SERVER_65_IP>` (máy chủ trong [infrastructure-inventory.md](../infrastructure-inventory.md)): country VN, mạng của iNET; đo ngày 20/10/2026 |
 | Kết nối tới `chat.hoandat.com` đi qua Cloudflare | infrastructure-inventory.md "Ngoài server": bản ghi A proxied của zone `hoandat.com` |
+| Trang web dùng Cloudflare Web Analytics để đếm lượt xem trang, không đặt cookie | Cloudflare tự chèn beacon `static.cloudflareinsights.com` vào trang; từ 26/10/2026 CSP trong `infra/chat/nginx/chat.hoandat.com.conf` cho nó chạy (`script-src`) và gửi số liệu về `https://cloudflareinsights.com` (`connect-src`); quyết định đồng bộ UX hệ sinh thái 26/10/2026 |
 
 ## Chính sách quyền riêng tư (`/privacy`)
 
