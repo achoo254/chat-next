@@ -11,12 +11,16 @@ import (
 	"unicode/utf8"
 )
 
-// The pages carry no script and no external resource. The interstitial
+// The pages carry no script; their only resources are the web app's
+// favicon files on this same host (img-src 'self'). The interstitial
 // exists because the session cookie is SameSite=Strict: it is set on the
 // response to the IdP's redirect, which is cross-site when the IdP is on
 // another site, and only a navigation started from this same-site page is
 // sure to send it on the first app request.
 var pages = template.Must(template.New("pages").Parse(`
+{{define "icons"}}<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">{{end}}
 {{define "interstitial"}}<!doctype html>
 <html lang="vi">
 <head>
@@ -24,6 +28,7 @@ var pages = template.Must(template.New("pages").Parse(`
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="0;url={{.}}">
 <title>Đang đăng nhập…</title>
+{{template "icons"}}
 </head>
 <body>
 <p>Đang đăng nhập… <a href="{{.}}">Tiếp tục</a></p>
@@ -36,6 +41,7 @@ var pages = template.Must(template.New("pages").Parse(`
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Đăng nhập không thành công</title>
+{{template "icons"}}
 </head>
 <body>
 <h1>Đăng nhập không thành công</h1>
@@ -52,7 +58,7 @@ func writePageHeaders(w http.ResponseWriter) {
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-store")
-	h.Set("Content-Security-Policy", "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("X-Content-Type-Options", "nosniff")
 }

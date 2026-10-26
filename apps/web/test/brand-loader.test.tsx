@@ -9,11 +9,11 @@ import { BrandLoader, BrandLogo, PageLoader } from "../src/components/brand-load
 import { I18nProvider } from "../src/i18n/i18n.tsx";
 
 describe("brand logo markup", () => {
-	it("inlines the brand icon as decorative SVG with the dots the loader animates", () => {
+	it("inlines the brand icon as decorative SVG", () => {
 		// virtual:brand-logo is inlineLogoSvg of brand.config.json's icon (vite-brand.ts).
 		const svg = logoSvg;
 		expect(svg.startsWith('<svg aria-hidden="true" focusable="false"')).toBe(true);
-		expect(svg.match(/class="logo-dot"/g)).toHaveLength(3);
+		expect(svg).not.toContain("<!--");
 		expect(() => inlineLogoSvg("<p>not an svg</p>")).toThrow(/single <svg>/);
 		expect(inlineLogoSvg('<?xml version="1.0"?><!-- c --><svg></svg>')).toBe('<svg aria-hidden="true" focusable="false"></svg>');
 	});
@@ -54,7 +54,7 @@ describe("loaders", () => {
 		expect(status.getAttribute("aria-live")).toBe("polite");
 		expect(status.getAttribute("aria-busy")).toBe("true");
 		expect(status.textContent).toContain("Đang tải hồ sơ…");
-		expect(status.querySelectorAll(".logo-dot")).toHaveLength(3);
+		expect(status.querySelectorAll(".brand-logo svg")).toHaveLength(1);
 	});
 
 	it("draws the full-window loader itself when the page has no splash", () => {

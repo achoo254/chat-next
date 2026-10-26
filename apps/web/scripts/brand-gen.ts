@@ -20,7 +20,7 @@ import {
 	loadChatBrand,
 	serverBrandNames,
 } from "../brand-files.ts";
-import { writeNativeBrandFiles } from "./brand-native.ts";
+import { readMonochromeIcon, writeNativeBrandFiles } from "./brand-native.ts";
 
 const brand = loadChatBrand();
 const written = await writeBrandFiles({
@@ -44,6 +44,7 @@ const native = await writeNativeBrandFiles({
 		colors: brand.colors,
 		iconSvg: readFileSync(join(BRAND_ROOT, brand.icon), "utf8"),
 		maskableSvg: readFileSync(join(BRAND_ROOT, brand.iconMaskable), "utf8"),
+		monochromeSvg: readMonochromeIcon(BRAND_ROOT),
 	},
 	mobileDir: MOBILE_DIR,
 	featureGraphicFile: PLAY_FEATURE_GRAPHIC_FILE,

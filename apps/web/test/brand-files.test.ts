@@ -24,9 +24,11 @@ import {
 	FEATURE_GRAPHIC,
 	IOS_APP_ICON,
 	type NativeBrand,
+	isLayeredIcon,
 	nativePictures,
 	nativeTextFiles,
 	pngInfo,
+	readMonochromeIcon,
 	replacedTemplateFiles,
 	styledIcon,
 } from "../scripts/brand-native.ts";
@@ -76,6 +78,14 @@ describe("generated brand files (run pnpm brand:gen after editing the brand)", (
 		expect(listed.some((icon) => icon.purpose === "maskable")).toBe(true);
 	});
 
+	it("are copied as is into the sample Mini App (sdk/miniapp-demo)", () => {
+		const demo = join(BRAND_ROOT, "sdk/miniapp-demo");
+		const same = (copy: string, source: string) => expect(readFileSync(join(demo, copy)).equals(readFileSync(source)), copy).toBe(true);
+		same("favicon.ico", join(GENERATED_DIR, ICONS_DIR, FAVICON_ICO));
+		same("apple-touch-icon.png", join(GENERATED_DIR, ICONS_DIR, "apple-touch-icon.png"));
+		same("icon.svg", join(BRAND_ROOT, brand.icon));
+	});
+
 	it("keep favicon.ico readable as an icon file with three sizes", () => {
 		const ico = readFileSync(join(GENERATED_DIR, ICONS_DIR, FAVICON_ICO));
 		expect(ico.readUInt16LE(2)).toBe(1);
@@ -90,6 +100,7 @@ describe("iOS and Android icons and launch screens (run pnpm brand:gen after edi
 		colors: brand.colors,
 		iconSvg: readFileSync(join(BRAND_ROOT, brand.icon), "utf8"),
 		maskableSvg: readFileSync(join(BRAND_ROOT, brand.iconMaskable), "utf8"),
+		monochromeSvg: readMonochromeIcon(BRAND_ROOT),
 	};
 
 	it("hold the resources the current brand gives", () => {
@@ -109,12 +120,26 @@ describe("iOS and Android icons and launch screens (run pnpm brand:gen after edi
 	});
 
 	it("left none of the Capacitor template pictures they replace", () => {
-		for (const file of replacedTemplateFiles()) expect(existsSync(join(MOBILE_DIR, file)), file).toBe(false);
+		for (const file of replacedTemplateFiles(native)) expect(existsSync(join(MOBILE_DIR, file)), file).toBe(false);
 	});
 
-	it("refuse a logo without the classes that split it into layers", () => {
+	it("split only a logo with the layer classes", () => {
+		const layered = '<svg viewBox="0 0 1 1"><rect class="logo-bg"/><path class="logo-bubble"/><circle class="logo-dot"/></svg>';
 		expect(() => styledIcon('<svg viewBox="0 0 1 1"><rect/></svg>', "")).toThrow(/logo-bg/);
-		expect(styledIcon(native.iconSvg, ".logo-bg{display:none}")).toContain("<style>.logo-bg{display:none}</style>");
+		expect(styledIcon(layered, ".logo-bg{display:none}")).toContain("<style>.logo-bg{display:none}</style>");
+		expect(isLayeredIcon(layered)).toBe(true);
+	});
+
+	it("give Android 13+ a themed layer: the picture logo's silhouette, none without one", () => {
+		const themed = (brand: NativeBrand) => nativePictures(brand).filter((picture) => picture.file.endsWith("ic_launcher_monochrome.png"));
+		expect(native.monochromeSvg).not.toBeNull();
+		expect(themed(native)).toHaveLength(5);
+		expect(nativeTextFiles(native)["android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"]).toContain("<monochrome ");
+		const bare: NativeBrand = { ...native, monochromeSvg: null };
+		if (!isLayeredIcon(bare.iconSvg)) {
+			expect(themed(bare)).toHaveLength(0);
+			expect(replacedTemplateFiles(bare).filter((file) => file.endsWith("ic_launcher_monochrome.png"))).toHaveLength(5);
+		}
 	});
 
 	it("read PNG headers and refuse other files", () => {

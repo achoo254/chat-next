@@ -297,8 +297,8 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 }
 
 /* ---------- Brand logo and loader (mockups/auth.html#loading) ----------
-   The logo is the brand icon inlined as SVG. The loader animates its three
-   typing dots in a wave under a breathing halo; the status text fades in
+   The logo is the brand icon inlined as SVG. The loader shows it under a
+   breathing halo; the status text fades in
    after 600 ms so fast loads show the logo only. Reduced motion: static logo;
    the duration tokens collapse, so the text appears after 600 ms.
    In the app a loader appears only after 320 ms of waiting (an empty frame
@@ -321,21 +321,14 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 	background: radial-gradient(closest-side, color-mix(in srgb, var(--c-primary-solid) 55%, transparent), transparent);
 	animation: loader-halo 2.4s ease-in-out var(--loader-phase, 0s) infinite;
 }
-.brand-loader .logo-dot { transform-box: fill-box; transform-origin: center; animation: loader-dot 1.2s ease-in-out var(--loader-phase, 0s) infinite; }
-.brand-loader .logo-dot:nth-of-type(2) { animation-delay: calc(var(--loader-phase, 0s) + 0.15s); }
-.brand-loader .logo-dot:nth-of-type(3) { animation-delay: calc(var(--loader-phase, 0s) + 0.3s); }
 .brand-loader-text { margin: 0; font-size: 0.875rem; animation: loader-reveal var(--dur-slow) var(--ease-decelerate) 600ms both; }
 /* In-app loaders appear after 320 ms already: the text follows ~600 ms after the wait began. */
 .brand-loader.delayed .brand-loader-text { animation-delay: calc(280ms + var(--loader-age, 0s)); }
-@keyframes loader-dot {
-	0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
-	30% { transform: translateY(-38%); opacity: 1; }
-}
 @keyframes loader-halo {
 	0%, 100% { transform: scale(0.9); opacity: 0.45; }
 	50% { transform: scale(1.06); opacity: 1; }
 }
 @keyframes loader-reveal { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) {
-	.brand-loader .logo-dot, .brand-loader .brand-logo::before { animation: none; }
+	.brand-loader .brand-logo::before { animation: none; }
 }

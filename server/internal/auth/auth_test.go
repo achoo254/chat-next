@@ -162,3 +162,21 @@ func TestInterstitialAndRetryCarryReturnTo(t *testing.T) {
 		t.Fatalf("error page = %s", w.Body.String())
 	}
 }
+
+func TestPagesLinkTheAppFavicon(t *testing.T) {
+	interstitial := httptest.NewRecorder()
+	writeInterstitial(interstitial, "/")
+	failure := httptest.NewRecorder()
+	writeErrorPage(failure, http.StatusBadRequest, msgSignInFailed, "vi", "/")
+	for name, w := range map[string]*httptest.ResponseRecorder{"interstitial": interstitial, "error": failure} {
+		body := w.Body.String()
+		for _, link := range []string{`<link rel="icon" href="/favicon.ico"`, `<link rel="icon" href="/icon.svg" type="image/svg+xml">`, `<link rel="apple-touch-icon" href="/apple-touch-icon.png">`} {
+			if !strings.Contains(body, link) {
+				t.Errorf("%s page lacks %s", name, link)
+			}
+		}
+		if csp := w.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "img-src 'self'") || !strings.Contains(csp, "default-src 'none'") {
+			t.Errorf("%s page CSP = %q", name, csp)
+		}
+	}
+}
