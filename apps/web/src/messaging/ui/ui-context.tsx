@@ -80,6 +80,8 @@ export interface MiniAppRequest {
 export interface OpenMiniApp {
 	readonly request: MiniAppRequest;
 	readonly minimized: boolean;
+	/** Minimized because the user went to another chat, not by hand: going back to its chat restores it. */
+	readonly away?: boolean;
 }
 
 /** Closes the Mini App `id`; one opened since (another, or the same reloaded) stays. */
@@ -91,6 +93,20 @@ export function closeMiniApp(cell: Cell<OpenMiniApp | null>, id: number): void {
 export function minimizeMiniApp(cell: Cell<OpenMiniApp | null>, id: number, minimized: boolean): void {
 	const open = cell.get();
 	if (open !== null && open.request.id === id && open.minimized !== minimized) cell.set({ request: open.request, minimized });
+}
+
+/**
+ * Keeps the Mini App with the chat it was opened from: going to another chat
+ * minimizes it to its chip (its main button would otherwise sit beside a chat
+ * its data does not go to), and going back to its chat restores it, unless
+ * the user minimized it by hand. No chat on the screen (0) changes nothing.
+ */
+export function followChatOnScreen(cell: Cell<OpenMiniApp | null>, chatId: number): void {
+	const open = cell.get();
+	if (open === null || chatId === 0) return;
+	const own = open.request.chatId === chatId;
+	if (!own && !open.minimized) cell.set({ request: open.request, minimized: true, away: true });
+	else if (own && open.minimized && open.away === true) cell.set({ request: open.request, minimized: false });
 }
 
 /** The chat list's row menu (mockups/chat.html#list-menu), opened at a point of the viewport. */

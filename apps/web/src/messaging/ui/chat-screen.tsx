@@ -26,6 +26,7 @@ import {
 	Cell,
 	ComposerIntents,
 	UiContext,
+	followChatOnScreen,
 	minimizeMiniApp,
 	useCell,
 	type DialogRequest,
@@ -157,6 +158,7 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 	const startParam = new URLSearchParams(useSearch()).get("start") ?? "";
 	// A Mini App shown takes the info column's place; minimized or closed, the column is back as it was.
 	const miniApp = useCell(ui.miniApp);
+	useEffect(() => followChatOnScreen(ui.miniApp, chatId), [ui, chatId]);
 	const miniAppDocked = miniApp !== null && !miniApp.minimized;
 	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts && !miniAppDocked;
 

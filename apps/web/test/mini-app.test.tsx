@@ -428,6 +428,39 @@ describe("Mini App menu, minimize and place", () => {
 		expect(panel.isConnected).toBe(false);
 	});
 
+	it("minimizes when the user goes to another chat and comes back with its chat", async () => {
+		const demo = seedDemo();
+		const { panel, frame, posted } = await openFromButton(demo);
+		await fromApp(frame, { type: "ready" });
+
+		// Another chat: the Mini App and its main button leave the column, still running behind the chip.
+		act(() => navigate(paths.chat(demo.ids.ops)));
+		await waitFor(() => expect(panel.hidden).toBe(true));
+		expect(frame.isConnected).toBe(true);
+		expect(posted).toHaveBeenCalledWith({ type: "deactivated" }, ORIGIN);
+		await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG);
+
+		// Back to the chat it was opened from: it shows again, same frame.
+		act(() => navigate(paths.chat(demo.ids.bot)));
+		await waitFor(() => expect(panel.hidden).toBe(false));
+		expect(within(panel).getByTitle("Mini App của Deploy Bot")).toBe(frame);
+		expect(posted).toHaveBeenCalledWith({ type: "activated" }, ORIGIN);
+		expect(screen.queryByRole("button", { name: "Mở lại Deploy Bot · Mini App" })).toBeNull();
+	});
+
+	it("stays minimized back in its chat when the user minimized it by hand", async () => {
+		const demo = seedDemo();
+		const { panel } = await openFromButton(demo);
+		await userEvent.click(within(await openMenu(panel)).getByRole("menuitem", { name: "Thu nhỏ" }));
+		await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG);
+
+		act(() => navigate(paths.chat(demo.ids.ops)));
+		await waitFor(() => expect(document.querySelector(".convo")?.getAttribute("aria-label")).not.toBe("Deploy Bot"));
+		act(() => navigate(paths.chat(demo.ids.bot)));
+		await screen.findByRole("button", { name: "Mở lại Deploy Bot · Mini App" }, LONG);
+		expect(panel.hidden).toBe(true);
+	});
+
 	it("docks in the info column's place and gives it back as it was", async () => {
 		const demo = seedDemo();
 		const { panel } = await openFromButton(demo);
