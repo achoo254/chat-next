@@ -63,10 +63,17 @@ function initialInfoOpen(): boolean {
 
 type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" } | { name: "contacts" } | { name: "bot" }>;
 
-export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }) {
+interface ChatScreenProps {
+	self: SelfUser;
+	route: ChatRoute;
+	/** Held by the parent so the folder stays picked across Settings and back. */
+	folder: Folder;
+	onFolder: (folder: Folder) => void;
+}
+
+export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScreenProps) {
 	const copy = useCopy();
 	const { source, store, remote, integrations } = useServices();
-	const [folder, setFolder] = useState<Folder>("all");
 	const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
 	const [visible, setVisible] = useState<readonly number[]>([]);
 	const searchRef = useRef<HTMLInputElement>(null);
@@ -124,7 +131,7 @@ export function ChatScreen({ self, route }: { self: SelfUser; route: ChatRoute }
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [route]);
+	}, [route, setFolder]);
 
 	const chatId = route.name === "chat" ? route.chatId : 0;
 	const panel = route.name === "chat" ? route.panel : "chat";

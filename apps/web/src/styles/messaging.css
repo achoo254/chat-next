@@ -106,7 +106,11 @@
 	position: relative; display: grid; grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr) var(--info-w);
 	height: 100vh; height: 100dvh; background: var(--c-surface);
 }
-.app.folders { --rail-w: 76px; }
+.app.folders, .shell.folders { --rail-w: 76px; }
+/* Settings and admin pages keep the chat screen's folder rail (screens/shell.tsx);
+   the icon rail is only their top bar on narrow screens, where the folder rail hides. */
+.shell.folders { position: relative; }
+.shell.folders > .rail { display: none; }
 .app.no-info { grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr); }
 .app > * { min-height: 0; }
 .app .list, .app .convo { overflow: hidden; }
@@ -965,6 +969,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.list.scrolled .n-head h2 { font-size: 1rem; }
 	.app, .app.no-info { grid-template-columns: minmax(0, 1fr); }
 	.folder-rail { display: none; }
+	.shell.folders > .rail { display: flex; }
 	.app .list .folder-tabs { display: flex; overflow-x: auto; }
 	.app .list { border-right: 0; }
 	.app.has-chat > .list { display: none; }

@@ -1,7 +1,9 @@
 // Built-in folders (R1): Tất cả, Cá nhân, Nhóm, Bot filtered on the client by
 // chat kind, and Chưa đọc by read state; then Danh bạ, the app switcher and
-// Cài đặt. Wide screens show the labelled rail; narrow screens the tab row
-// inside the list (mockups/chat.html#app, #contacts, #narrow). Badges count
+// Cài đặt. Wide screens show the labelled rail, the same one on Settings and
+// the admin pages so the frame does not change under the user; narrow screens
+// the tab row inside the list (mockups/chat.html#app, #contacts, #narrow) and
+// the compact top bar elsewhere (screens/shell.tsx). Badges count
 // chats with unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
 import type { SelfUser } from "../../api/adapters.ts";
 import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
@@ -20,8 +22,16 @@ interface FolderProps {
 	onFolder: (folder: Folder) => void;
 }
 
-/** `folder` null: the contacts list is open instead of a folder. */
-export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder: Folder | null; onFolder: (folder: Folder) => void }) {
+interface FolderRailProps {
+	self: SelfUser;
+	/** null: no folder is shown (the contacts list, Settings or an admin page is open). */
+	folder: Folder | null;
+	/** Settings is open: its link shows as current. */
+	settings?: boolean;
+	onFolder: (folder: Folder) => void;
+}
+
+export function FolderRail({ self, folder, settings = false, onFolder }: FolderRailProps) {
 	"use no memo";
 	const copy = useCopy();
 	const counts = useFolderCounts();
@@ -49,12 +59,12 @@ export function FolderRail({ self, folder, onFolder }: { self: SelfUser; folder:
 				</button>
 			))}
 			<span className="spacer" />
-			<Link to={paths.contacts()} className="folder" current={folder === null}>
+			<Link to={paths.contacts()} className="folder" current={folder === null && !settings}>
 				<ContactsGlyph />
 				{copy.folders.contacts}
 			</Link>
 			<EcosystemAppSwitcher placement="right-end" className="folder-switcher" />
-			<Link to={paths.settingsList} className="folder">
+			<Link to={paths.settingsList} className="folder" current={settings}>
 				<Icon name="settings" />
 				{copy.folders.settings}
 			</Link>

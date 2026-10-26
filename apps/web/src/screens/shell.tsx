@@ -13,14 +13,17 @@ interface ShellProps {
 	nav?: ReactNode;
 	/** The user's avatar with their photo (the messaging UI), in place of the initials. */
 	avatar?: ReactNode;
+	/** The labelled folder rail (the messaging UI): shown on wide screens in place of the icon rail, which stays as the narrow top bar. */
+	rail?: ReactNode;
 	children: ReactNode;
 }
 
 /** Signed-in frame: navigation rail (with the switcher to the other apps) plus the active screen. */
-export function Shell({ self, route, nav, avatar, children }: ShellProps) {
+export function Shell({ self, route, nav, avatar, rail, children }: ShellProps) {
 	const { t } = useI18n();
 	return (
-		<div className="shell">
+		<div className={rail === undefined ? "shell" : "shell folders"}>
+			{rail}
 			<nav className="rail" aria-label={t.shell.nav}>
 				<span title={t.shell.account(self.name)}>
 					{avatar ?? <Avatar name={self.name} size="sm" />}

@@ -17,7 +17,7 @@ import { sessionsData } from "../screens/settings/sessions-data.ts";
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
 import { useCopy } from "./copy/use-copy.ts";
-import { countLabel } from "./data/format.ts";
+import { countLabel, type Folder } from "./data/format.ts";
 import { webConnector, type MessagingClient, type MessagingConnector } from "./data/connector.ts";
 import { Drafts } from "./data/drafts.ts";
 import type { PendingBackend } from "./data/pending-backend.ts";
@@ -32,6 +32,7 @@ import { accountData, blockedData, myBotsData, notificationSettingsData, privacy
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
+import { FolderRail } from "./ui/folder-rail.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { messageExtrasPreloads } from "./ui/message-item.tsx";
 import { ChatAvatar, Toast } from "./ui/parts.tsx";
@@ -306,9 +307,14 @@ interface ScreenProps {
 function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
 	const services = useServices();
 	const api = useApi();
+	const [folder, setFolder] = useState<Folder>("all");
 	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot") {
-		return <ChatScreen self={self} route={route} />;
+		return <ChatScreen self={self} route={route} folder={folder} onFolder={setFolder} />;
 	}
+	const openFolder = (next: Folder) => {
+		setFolder(next);
+		navigate(paths.home);
+	};
 	// Started on every render: the requests are shared, so this only starts what a new route needs.
 	const parts = screenParts(route, services, api);
 	let screen: ReactNode;
@@ -360,6 +366,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 			route={route}
 			nav={<ContactsLink />}
 			avatar={<ChatAvatar id={self.id} name={self.name} size="sm" photoOf={self.id} photoId={self.photoId} />}
+			rail={<FolderRail self={self} folder={null} settings={route.name === "settings"} onFolder={openFolder} />}
 		>
 			<LoaderBoundary key={route.name}>
 				<Ready parts={parts}>{screen}</Ready>
@@ -393,7 +400,7 @@ function AppBadge() {
 	return null;
 }
 
-/** The rail link to the contacts list (mockups/settings.html rail). */
+/** The contacts link of the compact top bar on narrow screens. */
 function ContactsLink() {
 	"use no memo";
 	const copy = useCopy();
