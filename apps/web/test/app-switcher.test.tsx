@@ -1,4 +1,4 @@
-// The app switcher (@shared-next/app-switcher) of the signed-in screens: the
+// The app switcher (@achoo254/app-switcher) of the signed-in screens: the
 // other apps of the domain, Chat itself left out, every link tagged as coming
 // from Chat. In the folder rail of the chat screens and the rail of the
 // other screens, before Cài đặt.

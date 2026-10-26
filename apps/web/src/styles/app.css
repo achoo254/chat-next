@@ -109,7 +109,7 @@ button { cursor: pointer; }
 	padding: var(--space-3) 0; background: var(--c-surface-subtle); border-right: 1px solid var(--c-border-subtle);
 }
 .rail .spacer { flex: 1; }
-/* App switcher of the *-next apps (@shared-next/app-switcher): its variables
+/* App switcher of the *-next apps (@achoo254/app-switcher): its variables
    mapped to the tokens, the button sized like the rail's .icon-btn. */
 .sn-app-switcher {
 	--app-switcher-button-size: 44px;
@@ -125,8 +125,6 @@ button { cursor: pointer; }
 	--app-switcher-radius: var(--radius-md);
 	--app-switcher-item-radius: var(--radius-sm);
 	--app-switcher-font: var(--font-sans);
-	--app-switcher-icon: var(--c-primary);
-	--app-switcher-icon-stroke: var(--icon-stroke);
 }
 .avatar {
 	display: grid; place-items: center; width: var(--avatar); height: var(--avatar); border-radius: var(--radius-full);

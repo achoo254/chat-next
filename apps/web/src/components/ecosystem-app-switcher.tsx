@@ -1,5 +1,5 @@
-import "@shared-next/app-switcher/app-switcher.css";
-import { AppSwitcher, type AppSwitcherPlacement } from "@shared-next/app-switcher";
+import "@achoo254/app-switcher/app-switcher.css";
+import { AppSwitcher, type AppSwitcherPlacement } from "@achoo254/app-switcher";
 import { openExternal } from "@achoo254/chat-platform-web";
 import { brand } from "../brand.ts";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -19,7 +19,7 @@ interface EcosystemAppSwitcherProps {
 
 /**
  * The 9-dot button listing the other apps the same account signs in to
- * (`@shared-next/app-switcher`). Signed-in screens only: the settings rail
+ * (`@achoo254/app-switcher`). Signed-in screens only: the settings rail
  * (Shell), the folder rail and the narrow chat list's top bar.
  */
 export function EcosystemAppSwitcher({ placement, className }: EcosystemAppSwitcherProps) {
@@ -27,9 +27,7 @@ export function EcosystemAppSwitcher({ placement, className }: EcosystemAppSwitc
 	return (
 		<AppSwitcher
 			current="chat"
-			tenantDomain={brand.domain}
-			// The only domain served is the primary one, where every app runs.
-			isPrimaryTenant
+			domain={brand.domain}
 			locale={locale}
 			placement={placement}
 			onOpen={IS_NATIVE ? openInSystemBrowser : undefined}
