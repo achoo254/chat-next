@@ -59,7 +59,7 @@ App iOS và Android là chính web app (`apps/web`) đóng trong Capacitor (`app
 ## Hệ quả
 
 - Đăng xuất IdP trên trình duyệt không đăng xuất app; thu hồi ở `/account` có hiệu lực ở lần kiểm grant kế tiếp (bảng trên), không tức thì.
-- Một bản app phục vụ một server (`VITE_API_ORIGIN` lúc build). Chọn tenant khác trong app ("Đăng nhập bằng domain khác") chưa làm.
+- Một bản app phục vụ một server (`VITE_API_ORIGIN` lúc build). Không có chọn tenant khác trong app: hệ sinh thái chỉ còn một tenant ([ADR 0013 của `auth-next`](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md)).
 - Socket native chưa xác thực tồn tại tối đa `helloTimeout`; nginx giới hạn tốc độ handshake ở `/ws`.
 - iOS 15–16 không có OPFS sync access handle trong WebView: DB local chạy trong bộ nhớ cho lần chạy đó và đồng bộ lại khi mở app. SQLCipher native (ADR 0009) chưa làm.
 

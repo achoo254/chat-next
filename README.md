@@ -46,7 +46,7 @@ Cấu hình server Go (biến môi trường, role của binary): [`server/READM
 
 ## Gói npm
 
-Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`](packages/chat-client/README.md); không có backend mặc định, web phải cùng origin với server chat) và `@achoo254/chat-bot-sdk` ([`sdk/ts/README.md`](sdk/ts/README.md)). Phát hành bằng cách đẩy tag `chat-client-vX.Y.Z` hoặc `chat-bot-sdk-vX.Y.Z` khớp version, trên commit của `main`; [`sdk-publish.yml`](.github/workflows/sdk-publish.yml) publish qua trusted publishing.
+Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`](packages/chat-client/README.md); không có backend mặc định, web phải cùng origin với server chat) và `@achoo254/chat-bot-sdk` ([`sdk/ts/README.md`](sdk/ts/README.md)). Phát hành bằng cách đẩy tag `chat-client-vX.Y.Z` hoặc `chat-bot-sdk-vX.Y.Z` khớp version, trên commit của `main`; [`sdk-publish.yml`](.github/workflows/sdk-publish.yml) publish qua trusted publishing. Chưa gói nào lên npm vì tài khoản npm đang bị tạm khoá; lần publish đầu của mỗi gói do chủ tài khoản tự làm trên máy mình.
 
 ## MCP cho công cụ AI
 

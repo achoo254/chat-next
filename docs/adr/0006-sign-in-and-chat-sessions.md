@@ -3,6 +3,7 @@
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-10-14
 - Huỷ 20/10/2026: desktop = PWA. Toàn hệ sinh thái không có app desktop native (Tauri); trên máy tính dùng bản web cài dạng PWA, đăng nhập bằng `chat-web`. Client `chat-desktop` đã gỡ khỏi IdP. Native chỉ còn mobile (`chat-mobile`); giá trị `CLIENT_PLATFORM_DESKTOP` trong proto giữ số nhưng server coi như web. Phần nói về desktop/Tauri bên dưới chỉ còn là lịch sử.
+- Đơn tenant 24/10/2026 ([ADR 0013 của `auth-next`](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md), thay [ADR 0010](./0010-tenants-by-domain.md)): chỉ còn issuer `OIDC_ISSUER` (`https://auth.hoandat.com`) của tenant `primary`. Chỗ bên dưới nói về nhiều tenant (`auth.<d>`, JWKS hay allowlist theo tenant, API nội bộ của ADR 0010) chỉ còn là lịch sử; danh tính vẫn là cặp `(tenant_id, idp_sub)`.
 
 ## Bối cảnh
 

@@ -15,7 +15,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 | [0005 Fold tiếng Việt](./adr/0005-vietnamese-fold.md) | Một hàm bỏ dấu có đặc tả và test vector dùng chung cho TypeScript và Go. |
 | [0006 Đăng nhập và phiên chat](./adr/0006-sign-in-and-chat-sessions.md) | Đăng nhập chỉ qua `auth-next`; phiên chat riêng của app nhưng chết theo grant của IdP. |
 | [0007 Topology client](./adr/0007-client-topology.md) | Web chạy sync và SQLite trong worker; native chạy sync trên main thread và đẩy việc nặng xuống native theo lô. |
-| [0008 Branding và đặt tên](./adr/0008-branding-and-naming.md) | `brand.config.json` là nguồn duy nhất cho tên, màu, scheme, domain; tên tenant lấy từ IdP. |
+| [0008 Branding và đặt tên](./adr/0008-branding-and-naming.md) | `brand.config.json` là nguồn duy nhất cho tên, màu, scheme, domain. |
 | [0009 Lưu trữ local](./adr/0009-local-storage.md) | SQLCipher trên native, cache không mã hoá trên web, dữ liệu local tách theo `(tenant, user)`. |
 | [0010 Tenant theo domain](./adr/0010-tenants-by-domain.md) | Bị thay thế 24/10/2026 bởi [ADR 0013 Đơn tenant](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md) của `auth-next`: chỉ còn `hoandat.com`; giữ cột `tenant_id` = `primary`, Mini App và media trên domain đăng ký riêng. |
 | [0011 Phiên native, bearer và CORS](./adr/0011-native-sessions-bearer-cors.md) | App iOS/Android đổi code qua `ExchangeNativeCode`, xác thực bằng bearer (hello ở `/ws`), CORS và origin WebView chỉ cho bearer, không bao giờ cho cookie. |

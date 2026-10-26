@@ -4,6 +4,7 @@
 - Ngày: 2026-10-14
 - Cập nhật 20/10/2026: mã thương hiệu chuyển sang gói dùng chung `@shared-next/brand` (repo [`shared-next`](https://github.com/achoo254/shared-next), cài theo tag git). Schema `brand.config.schema.json` của repo này bị xóa; `brand.config.json` trỏ `$schema` về schema trong gói. `pnpm brand:gen` gọi API `./build` của gói (`apps/web/scripts/brand-gen.ts`, tùy chọn của chat ở `apps/web/brand-files.ts`), file sinh chuyển sang `brand/generated/` (cạnh logo); lint tên cứng là CLI `check-brand` của gói (`pnpm check:brand`). Gói `packages/brand` cũ đã gỡ.
 - Huỷ 20/10/2026: desktop = PWA. Toàn hệ sinh thái không có app desktop native (Tauri); trên máy tính dùng bản web cài dạng PWA, đăng nhập bằng `chat-web`. Client `chat-desktop` đã gỡ khỏi IdP. Phần nói về desktop/Tauri bên dưới chỉ còn là lịch sử.
+- Đơn tenant 24/10/2026 ([ADR 0013 của `auth-next`](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md), thay [ADR 0010](./0010-tenants-by-domain.md)): chỉ còn tenant `hoandat.com`; tên tenant là `TENANT_DOMAIN` của server (`tenant_name` của `GetAuthConfig`), không lấy `displayName` từ IdP. Phần nói về nhiều tenant bên dưới chỉ còn là lịch sử.
 
 ## Bối cảnh
 
@@ -18,7 +19,7 @@ Tên sản phẩm chưa cố định và có thể đổi. Tên, màu, icon, bun
 - Tên hiển thị của tenant lấy từ IdP (`displayName` qua API nội bộ, xem [ADR 0010](./0010-tenants-by-domain.md)), không lấy từ `brand.config.json`. UI hiện tên tenant ở màn hình chào và cài đặt khi không phải tenant chính.
 - Bot token là chuỗi opaque có tiền tố theo brand.
 - Quy ước tên trong code:
-  - Package npm đặt tên `@app/<tên thư mục>`; package gốc của workspace mang tên repo (`chat-next`).
+  - App trong `apps/` đặt tên `@app/<tên thư mục>`; gói trong `packages/` và `sdk/ts` mang scope `@achoo254/chat-*` (chỉ `@achoo254/chat-client` và `@achoo254/chat-bot-sdk` phát hành npm, xem `package.json` của từng gói); package gốc của workspace mang tên repo (`chat-next`).
   - Server là một Go module với một binary `server/cmd/server`, chạy theo role.
   - Protobuf nằm ở `proto/app/v1`, mỗi domain một file.
 - Không có tên sản phẩm viết cứng trong code; một lint rule chặn điều này. Chuỗi `chat-inet` (tên repo cũ, trước khi hệ sinh thái đổi sang tên `*-next`) vẫn bị chặn: không xuất hiện trong code sản phẩm, UI hay identifier.
@@ -28,7 +29,7 @@ Tên sản phẩm chưa cố định và có thể đổi. Tên, màu, icon, bun
 - Một nguồn cấu hình cộng generator là cách duy nhất bảo đảm đổi tên không sót chỗ nào, và kiểm được bằng CI.
 - Tên người gửi email bị bỏ vì đăng nhập và mọi email thuộc IdP; app chat không có SMTP.
 - Tenant do chủ domain quản lý ở IdP; lấy `displayName` từ IdP tránh hai nguồn sự thật cho tên tenant.
-- `@app/*` và `proto/app/v1` là tên trung tính, không đổi khi tên sản phẩm đổi.
+- `@app/*`, `@achoo254/chat-*` và `proto/app/v1` là tên trung tính, không đổi khi tên sản phẩm đổi.
 
 ## Hệ quả
 
