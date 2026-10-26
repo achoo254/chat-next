@@ -68,8 +68,9 @@ jobs:
     environment: production
     env:
       RELEASE_ID: ${{ needs.build.outputs.release_id }}
-      # The server address is a secret so the public repository does not show it.
+      # The server address and SSH port are secrets so the public repository does not show them.
       DEPLOY_HOST: ${{ secrets.CHAT_DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.CHAT_DEPLOY_PORT }}
       TARGET: chat-deploy@${{ secrets.CHAT_DEPLOY_HOST }}
     steps:
       # Only the smoke script is needed from the repository.
@@ -91,7 +92,7 @@ jobs:
           printf '%s\n' "$SSH_KEY" >~/.ssh/chat_deploy
           chmod 600 ~/.ssh/chat_deploy
           printf '%s\n' "$KNOWN_HOSTS" >~/.ssh/known_hosts
-          printf 'Host %s\n  Port 24700\n  IdentityFile ~/.ssh/chat_deploy\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$DEPLOY_HOST" >~/.ssh/config
+          printf 'Host %s\n  Port %s\n  IdentityFile ~/.ssh/chat_deploy\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$DEPLOY_HOST" "$DEPLOY_PORT" >~/.ssh/config
       - name: upload and activate
         run: |
           rsync -rltz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r release/ "$TARGET:/opt/chat/incoming/$RELEASE_ID/"

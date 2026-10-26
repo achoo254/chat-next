@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Load test round 1 on the shared production server, run from the dev
 # machine (needs Go):
-#   SSH_TARGET=root@<SERVER_65_IP> SSH_OPTS="-i key -p 24700 -o IdentitiesOnly=yes" \
+#   SSH_TARGET=<user>@<SERVER_65_IP> SSH_OPTS="-i key -p <SSH_PORT> -o IdentitiesOnly=yes" \
 #     bash infra/chat/load-round1.sh 250,500,1000 [profile]
 # It builds server/cmd/loadgen for linux, uploads it and runs, on the
 # server, a throwaway chat instance as user nobody under /tmp/chat-load (its own
