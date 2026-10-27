@@ -88,7 +88,11 @@ button { cursor: pointer; }
 .boot-error { width: min(100%, 440px); display: grid; gap: var(--space-3); }
 
 /* ---------- App shell: rail + content ---------- */
-.shell { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); height: 100vh; height: 100dvh; background: var(--c-surface); }
+.shell {
+	display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); height: 100vh; height: 100dvh; background: var(--c-surface);
+	/* Clear of the status bar and home indicator in the iOS app (viewport-fit=cover). */
+	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
 .shell > * { min-height: 0; }
 .rail {
 	display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
@@ -155,7 +159,7 @@ button { cursor: pointer; }
 /* A newer build is on the server (mockups/chat.html#connection-states): one floating line,
    above the composer when a chat is open. Reloading is the user's call. */
 .update-bar {
-	position: fixed; left: 50%; bottom: var(--space-5); transform: translateX(-50%); z-index: 30;
+	position: fixed; left: 50%; bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
 	display: flex; align-items: center; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-4));
 	padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4); border-radius: var(--radius-sm);
 	background: var(--c-text); color: var(--c-surface); box-shadow: var(--shadow-md); font-size: 0.875rem; white-space: nowrap;

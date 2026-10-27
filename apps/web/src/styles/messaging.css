@@ -86,7 +86,7 @@
 .mid-trunc.value { font-size: 0.875rem; }
 .status.pad { padding: var(--space-4); }
 .toast {
-	position: fixed; left: 50%; bottom: var(--space-5); transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+	position: fixed; left: 50%; bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
 	max-width: calc(100vw - 2 * var(--space-4)); padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm);
 	background: var(--c-text); color: var(--c-surface); box-shadow: var(--shadow-md);
 	transition: opacity var(--dur-base) var(--ease-decelerate), transform var(--dur-base) var(--ease-decelerate); z-index: 30; font-size: 0.875rem;
@@ -121,6 +121,8 @@
 .app {
 	position: relative; display: grid; grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr) var(--info-w);
 	height: 100vh; height: 100dvh; background: var(--c-surface);
+	/* The iOS app draws under the status bar and home indicator (viewport-fit=cover): keep the chat clear of them. */
+	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .app.folders, .shell.folders { --rail-w: 76px; }
 /* Settings and admin pages keep the chat screen's folder rail (screens/shell.tsx);

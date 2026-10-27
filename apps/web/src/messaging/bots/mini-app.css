@@ -61,7 +61,10 @@
 }
 /* Narrow: full screen, like Zalo; minimized, the floating pill. */
 @media (max-width: 760px) {
-	.mini-app { position: fixed; z-index: 25; width: 100%; border-left: 0; box-shadow: none; }
+	.mini-app {
+		position: fixed; z-index: 25; width: 100%; border-left: 0; box-shadow: none;
+		padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+	}
 }
 /* Touch: the chip's controls reach 44px. */
 @media (max-width: 760px), (pointer: coarse) {
