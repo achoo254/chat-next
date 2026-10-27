@@ -7,7 +7,7 @@
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { SIGN_OUT_PATH } from "@achoo254/chat-core";
-import { SystemAuth } from "@shared-next/capacitor-system-auth";
+import { SystemAuth } from "@achoo254/capacitor-system-auth";
 import type { RpcFetch } from "../api/client.ts";
 import type { NativeChatOptions } from "../messaging/data/web-client.ts";
 import { NativeSignInError, safeReturnTo, signInNative, signOutNative, type NativePlatform, type SignInFailure } from "./native-sign-in.ts";

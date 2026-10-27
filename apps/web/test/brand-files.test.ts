@@ -8,7 +8,7 @@ import {
 	generateManifests,
 	iconSourceHashes,
 	webIconFiles,
-} from "@shared-next/brand/build";
+} from "@achoo254/brand/build";
 import { describe, expect, it } from "vitest";
 import {
 	BRAND_ROOT,

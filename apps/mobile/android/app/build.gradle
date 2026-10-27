@@ -11,7 +11,7 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Redirect scheme of the IdP's chat-mobile client (brand urlScheme),
-        // caught by @shared-next/capacitor-system-auth's RedirectActivity.
+        // caught by @achoo254/capacitor-system-auth's RedirectActivity.
         manifestPlaceholders += [systemAuthRedirectScheme: "com.hoandat.chat"]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -10,7 +10,7 @@
 //   choice: inline SVG markup or the icon file's URL, brand-logo-svg.ts).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_FAVICON_SVG, FAVICON_ICO, RASTER_ICONS, generateManifests, webIconFiles } from "@shared-next/brand/build";
+import { DEFAULT_FAVICON_SVG, FAVICON_ICO, RASTER_ICONS, generateManifests, webIconFiles } from "@achoo254/brand/build";
 import type { Plugin } from "vite";
 import { BRAND_ROOT, GENERATED_DIR, MANIFEST_OPTIONS, loadChatBrand } from "./brand-files.ts";
 import { brandLogoSource, inlineLogoSvg, splashLogoHtml } from "./src/brand-logo-svg.ts";

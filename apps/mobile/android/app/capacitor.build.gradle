@@ -11,7 +11,7 @@ apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':aparajita-capacitor-secure-storage')
     implementation project(':capacitor-app')
-    implementation project(':shared-next-capacitor-system-auth')
+    implementation project(':achoo254-capacitor-system-auth')
 
 }
 

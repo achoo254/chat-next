@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@achoo254/brand':
+        specifier: github:achoo254/shared-next#v0.5.1&path:/packages/brand
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand
       '@bufbuild/buf':
         specifier: 1.73.0
         version: 1.73.0
@@ -17,9 +20,6 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.12.0)
-      '@shared-next/brand':
-        specifier: github:achoo254/shared-next#v0.2.0&path:/packages/brand
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
@@ -44,6 +44,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@achoo254/capacitor-system-auth':
+        specifier: github:achoo254/shared-next#v0.5.1&path:/packages/capacitor-system-auth
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
       '@aparajita/capacitor-secure-storage':
         specifier: 8.0.1
         version: 8.0.1
@@ -59,9 +62,6 @@ importers:
       '@capacitor/ios':
         specifier: 8.5.3
         version: 8.5.3(@capacitor/core@8.5.3)
-      '@shared-next/capacitor-system-auth':
-        specifier: github:achoo254/shared-next#v0.3.0&path:/packages/capacitor-system-auth
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/199c230e4679f53f95a230122c7289acd016ce9d#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
     devDependencies:
       '@capacitor/cli':
         specifier: 8.5.3
@@ -78,6 +78,9 @@ importers:
       '@achoo254/brand':
         specifier: github:achoo254/shared-next#v0.5.1&path:/packages/brand
         version: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/brand
+      '@achoo254/capacitor-system-auth':
+        specifier: github:achoo254/shared-next#v0.5.1&path:/packages/capacitor-system-auth
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
       '@achoo254/chat-core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -114,9 +117,6 @@ importers:
       '@fontsource/jetbrains-mono':
         specifier: 5.3.0
         version: 5.3.0
-      '@shared-next/capacitor-system-auth':
-        specifier: github:achoo254/shared-next#v0.3.0&path:/packages/capacitor-system-auth
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/199c230e4679f53f95a230122c7289acd016ce9d#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -130,9 +130,6 @@ importers:
       '@rolldown/plugin-babel':
         specifier: 0.2.4
         version: 0.2.4(@babel/core@7.29.7)(@babel/runtime@7.29.10)(rolldown@1.2.13)(vite@8.3.4(@types/node@24.19.2))
-      '@shared-next/brand':
-        specifier: github:achoo254/shared-next#v0.2.0&path:/packages/brand
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand
       '@testing-library/dom':
         specifier: 10.4.2
         version: 10.4.2
@@ -248,6 +245,12 @@ packages:
     version: 0.3.0
     engines: {node: '>=22.12'}
     hasBin: true
+
+  '@achoo254/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/capacitor-system-auth':
+    resolution: {gitHosted: true, integrity: sha512-oYMs3/FUqN5t/abPGgQ3u7i8BkfCXgjyNIHw/GBG3KxqpiTDJF82vL0diRlPU0if4qoOylLtkiBen7D3LwJGNA==, path: /packages/capacitor-system-auth, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1}
+    version: 0.2.0
+    peerDependencies:
+      '@capacitor/core': ^8.0.0
 
   '@aparajita/capacitor-secure-storage@8.0.1':
     resolution: {integrity: sha512-NSYIQtH6TyBgL3myumQGcCE3iecq2PtGNFlGxl1fJKEU37Dv5DudzDlwg42cgbVxCm1ay72g4X7rTSAvKULsVg==}
@@ -733,18 +736,6 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
-
-  '@shared-next/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand':
-    resolution: {gitHosted: true, path: /packages/brand, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5}
-    version: 0.2.0
-    engines: {node: '>=22.12'}
-    hasBin: true
-
-  '@shared-next/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/199c230e4679f53f95a230122c7289acd016ce9d#path:/packages/capacitor-system-auth':
-    resolution: {gitHosted: true, path: /packages/capacitor-system-auth, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/199c230e4679f53f95a230122c7289acd016ce9d}
-    version: 0.1.0
-    peerDependencies:
-      '@capacitor/core': ^8.0.0
 
   '@sqlite.org/sqlite-wasm@3.53.4-build2':
     resolution: {integrity: sha512-kQVArGJA4z7s56Dm8t+eTBXad4LiohuVj9pfgDNOcxa+Ic5xMrWlLPTq6cT0hw5S4MIvtpsraW+B0wD+IPvC7A==}
@@ -2362,6 +2353,10 @@ snapshots:
     dependencies:
       ajv: 8.20.0
 
+  '@achoo254/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/e33adf9fb8fb81c16186d8fcdda4c2e5f763dbd1#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)':
+    dependencies:
+      '@capacitor/core': 8.5.3
+
   '@aparajita/capacitor-secure-storage@8.0.1':
     dependencies:
       '@capacitor/android': 8.5.3(@capacitor/core@8.5.3)
@@ -2848,14 +2843,6 @@ snapshots:
       vite: 8.3.4(@types/node@24.19.2)
 
   '@rolldown/pluginutils@1.0.1': {}
-
-  '@shared-next/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/2dfb78942308f36f459ef861fbb57489402c3eb5#path:/packages/brand':
-    dependencies:
-      ajv: 8.20.0
-
-  '@shared-next/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/199c230e4679f53f95a230122c7289acd016ce9d#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)':
-    dependencies:
-      '@capacitor/core': 8.5.3
 
   '@sqlite.org/sqlite-wasm@3.53.4-build2': {}
 

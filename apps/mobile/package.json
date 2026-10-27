@@ -15,7 +15,7 @@
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
     "@capacitor/ios": "8.5.3",
-    "@shared-next/capacitor-system-auth": "github:achoo254/shared-next#v0.3.0&path:/packages/capacitor-system-auth"
+    "@achoo254/capacitor-system-auth": "github:achoo254/shared-next#v0.5.1&path:/packages/capacitor-system-auth"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",

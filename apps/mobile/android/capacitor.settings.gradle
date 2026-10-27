@@ -8,5 +8,5 @@ project(':aparajita-capacitor-secure-storage').projectDir = new File('../../../n
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../../../node_modules/.pnpm/@capacitor+app@8.1.2_@capacitor+core@8.5.3/node_modules/@capacitor/app/android')
 
-include ':shared-next-capacitor-system-auth'
-project(':shared-next-capacitor-system-auth').projectDir = new File('../../../node_modules/.pnpm/@shared-next+capacitor-system-auth@https+++codeload.github.com+achoo254+shared-next+tar_27aa528850f1ccf8bb48d6d33223ceb0/node_modules/@shared-next/capacitor-system-auth/android')
+include ':achoo254-capacitor-system-auth'
+project(':achoo254-capacitor-system-auth').projectDir = new File('../../../node_modules/.pnpm/@achoo254+capacitor-system-auth@https+++codeload.github.com+achoo254+shared-next+tar.gz_98babdb2982b0cba0b0badce9c2203c6/node_modules/@achoo254/capacitor-system-auth/android')

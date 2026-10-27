@@ -16,6 +16,7 @@
     "@aparajita/capacitor-secure-storage": "8.0.1",
     "@achoo254/app-switcher": "github:achoo254/shared-next#v0.5.1&path:/packages/app-switcher",
     "@achoo254/brand": "github:achoo254/shared-next#v0.5.1&path:/packages/brand",
+    "@achoo254/capacitor-system-auth": "github:achoo254/shared-next#v0.5.1&path:/packages/capacitor-system-auth",
     "@achoo254/chat-core": "workspace:*",
     "@achoo254/chat-platform": "workspace:*",
     "@achoo254/chat-platform-web": "workspace:*",
@@ -27,14 +28,12 @@
     "@connectrpc/connect-web": "2.2.0",
     "@fontsource/inter": "5.3.0",
     "@fontsource/jetbrains-mono": "5.3.0",
-    "@shared-next/capacitor-system-auth": "github:achoo254/shared-next#v0.3.0&path:/packages/capacitor-system-auth",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
     "@rolldown/plugin-babel": "0.2.4",
-    "@shared-next/brand": "github:achoo254/shared-next#v0.2.0&path:/packages/brand",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",

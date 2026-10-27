@@ -29,12 +29,16 @@ Runtime dependencies: `@connectrpc/connect`, `@connectrpc/connect-web`, `@bufbui
 `@sqlite.org/sqlite-wasm`. The package is ESM with an `exports` map only: TypeScript needs `moduleResolution`
 `bundler`, `node16` or `nodenext`.
 
-pnpm 11 refuses versions published less than 24 hours ago (`minimumReleaseAge`, 1440 minutes by default). To
-install a release on its first day, list that exact version in `pnpm-workspace.yaml`:
+The package is not on npm yet: the publishing account is suspended. Until it is published, build the
+tarball from a checkout of this repository and install that file:
 
-```yaml
-minimumReleaseAgeExclude:
-  - "@achoo254/chat-client@0.1.0"
+```sh
+git clone https://github.com/achoo254/chat-next.git && cd chat-next
+pnpm install
+pnpm --filter @achoo254/chat-client build
+pnpm --filter @achoo254/chat-client pack --pack-destination /tmp
+# then, in your project:
+npm install /tmp/achoo254-chat-client-<version>.tgz
 ```
 
 ## Same origin: serve the app next to the chat server

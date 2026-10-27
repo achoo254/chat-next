@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/@shared-next/brand/brand.config.schema.json",
+  "$schema": "./node_modules/@achoo254/brand/brand.config.schema.json",
   "appName": "Chat",
   "shortName": "Chat",
   "description": "Nhắn tin nhanh trên web, điện thoại và máy tính.",

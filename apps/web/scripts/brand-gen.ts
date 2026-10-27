@@ -8,7 +8,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { chromiumRenderer, formatGenerated, writeBrandFiles } from "@shared-next/brand/build";
+import { chromiumRenderer, formatGenerated, writeBrandFiles } from "@achoo254/brand/build";
 import { chromium } from "playwright";
 import {
 	BRAND_ROOT,

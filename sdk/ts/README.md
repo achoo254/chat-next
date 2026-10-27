@@ -18,12 +18,16 @@ The API is `0.x`: it may change in any minor release until 1.0. Pin the exact ve
 npm install @achoo254/chat-bot-sdk
 ```
 
-pnpm 11 refuses versions published less than 24 hours ago (`minimumReleaseAge`, 1440 minutes by default). To
-install a release on its first day, list that exact version in `pnpm-workspace.yaml`:
+The package is not on npm yet: the publishing account is suspended. Until it is published, build the
+tarball from a checkout of this repository and install that file:
 
-```yaml
-minimumReleaseAgeExclude:
-  - "@achoo254/chat-bot-sdk@0.1.0"
+```sh
+git clone https://github.com/achoo254/chat-next.git && cd chat-next
+pnpm install
+pnpm --filter @achoo254/chat-bot-sdk build
+pnpm --filter @achoo254/chat-bot-sdk pack --pack-destination /tmp
+# then, in your project:
+npm install /tmp/achoo254-chat-bot-sdk-<version>.tgz
 ```
 
 ## Quick start

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings=0 && pnpm check:brand",
-    "check:brand": "check-brand --config brand.config.json --dir apps --dir packages --dir server --dir proto --dir sdk --dir spec --dir deploy --skip-dir gen --ignore-path apps/mobile/www --ignore-path apps/mobile/ios/App/App/public --ignore-path apps/mobile/android/app/src/main/assets/public --banned chat-inet --test-file '(^|\\x2f)test\\x2f|_test\\.go$|\\.test\\.ts$' --hint 'read it from @shared-next/brand'",
+    "check:brand": "check-brand --config brand.config.json --dir apps --dir packages --dir server --dir proto --dir sdk --dir spec --dir deploy --skip-dir gen --ignore-path apps/mobile/www --ignore-path apps/mobile/ios/App/App/public --ignore-path apps/mobile/android/app/src/main/assets/public --banned chat-inet --test-file '(^|\\x2f)test\\x2f|_test\\.go$|\\.test\\.ts$' --hint 'read it from @achoo254/brand'",
     "typecheck": "pnpm -r --if-present typecheck",
     "build:packages": "pnpm --filter @achoo254/chat-client --filter @achoo254/chat-bot-sdk build",
     "test": "pnpm -r --if-present test",
@@ -29,7 +29,7 @@
     "@bufbuild/buf": "1.73.0",
     "@bufbuild/protoc-gen-es": "2.16.0",
     "@eslint/js": "10.0.1",
-    "@shared-next/brand": "github:achoo254/shared-next#v0.2.0&path:/packages/brand",
+    "@achoo254/brand": "github:achoo254/shared-next#v0.5.1&path:/packages/brand",
     "@types/node": "24.19.2",
     "eslint": "10.12.0",
     "eslint-plugin-jsx-a11y": "6.10.2",

@@ -13,7 +13,7 @@ App mobile là chính web app (`apps/web`) đóng trong Capacitor 8 (`apps/mobil
 | `apps/web/src/native/` | Mã chỉ có trong bản native: đăng nhập PKCE, token trong secure storage, `fetch` gắn bearer |
 | `apps/web/src/server-origin.ts` | `IS_NATIVE` và gốc server; web là origin của trang, native là `VITE_API_ORIGIN` |
 
-Plugin: `@capacitor/app` (trạng thái foreground), `@aparajita/capacitor-secure-storage` (token), `@shared-next/capacitor-system-auth` (trình duyệt hệ thống, cài từ tag git của `shared-next`).
+Plugin: `@capacitor/app` (trạng thái foreground), `@aparajita/capacitor-secure-storage` (token), `@achoo254/capacitor-system-auth` (trình duyệt hệ thống, cài từ tag git của `shared-next`).
 
 ## Build và chạy
 

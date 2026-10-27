@@ -1,4 +1,4 @@
-// Chat's use of @shared-next/brand at build time: where brand.config.json and
+// Chat's use of @achoo254/brand at build time: where brand.config.json and
 // the generated files live, the fields chat needs, and the options of the
 // generated manifests. pnpm brand:gen (scripts/brand-gen.ts) writes the files
 // with these options and the Vite plugins serve them, so both always agree.
@@ -7,7 +7,7 @@
 // rewrites that pattern into a dev-server URL when Vitest loads this module.
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type GenerateManifestsOptions, loadBrandConfig, svgManifestIcons } from "@shared-next/brand/build";
+import { type GenerateManifestsOptions, loadBrandConfig, svgManifestIcons } from "@achoo254/brand/build";
 
 /** Directory of brand.config.json (the repository root); the brand's icon paths are relative to it. */
 export const BRAND_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
