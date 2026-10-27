@@ -14,12 +14,8 @@ The API is `0.x`: it may change in any minor release until 1.0. Pin the exact ve
 
 ## Install
 
-```sh
-npm install @achoo254/chat-bot-sdk
-```
-
-The package is not on npm yet: the publishing account is suspended. Until it is published, build the
-tarball from a checkout of this repository and install that file:
+The package is not published to npm. Build the tarball from a checkout of this repository and install that
+file:
 
 ```sh
 git clone https://github.com/achoo254/chat-next.git && cd chat-next

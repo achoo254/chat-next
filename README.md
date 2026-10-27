@@ -38,15 +38,15 @@ Cấu hình server Go (biến môi trường, role của binary): [`server/READM
 | [`apps/web/`](apps/web/) | Web app, gọi server qua Connect RPC |
 | [`apps/mobile/`](apps/mobile/) | Vỏ Capacitor cho iOS và Android |
 | [`proto/`](proto/) | Contract client ↔ server |
-| [`packages/`](packages/) | Lõi client (đồng bộ, outbox, SQLite cục bộ, realtime) và lớp nền tảng; gói nội bộ, riêng `chat-client` phát hành npm |
+| [`packages/`](packages/) | Lõi client (đồng bộ, outbox, SQLite cục bộ, realtime) và lớp nền tảng; gói nội bộ, riêng `chat-client` đóng gói thành SDK |
 | [`sdk/`](sdk/) | Bot SDK; bắt đầu viết bot ở [`docs/bot-api/README.md`](docs/bot-api/README.md) |
 | [`server/`](server/) | Go module: một binary chạy theo role |
 | [`spec/`](spec/) | Đặc tả và test vector dùng chung TS/Go |
 | [`infra/chat/`](infra/chat/) | Script production: deploy, release, nginx, pm2, backup |
 
-## Gói npm
+## Gói SDK
 
-Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`](packages/chat-client/README.md); không có backend mặc định, web phải cùng origin với server chat) và `@achoo254/chat-bot-sdk` ([`sdk/ts/README.md`](sdk/ts/README.md)). Phát hành bằng cách đẩy tag `chat-client-vX.Y.Z` hoặc `chat-bot-sdk-vX.Y.Z` khớp version, trên commit của `main`; [`sdk-publish.yml`](.github/workflows/sdk-publish.yml) publish qua trusted publishing. Chưa gói nào lên npm vì tài khoản npm đang bị tạm khoá; lần publish đầu của mỗi gói do chủ tài khoản tự làm trên máy mình.
+Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`](packages/chat-client/README.md); không có backend mặc định, web phải cùng origin với server chat) và `@achoo254/chat-bot-sdk` ([`sdk/ts/README.md`](sdk/ts/README.md)). Hai gói không phát hành lên npm (chốt 27/10/2026): ai cần thì build từ repo này và cài file `.tgz` do `pnpm pack` tạo, cách làm ở README của từng gói.
 
 ## MCP cho công cụ AI
 

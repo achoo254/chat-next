@@ -38,7 +38,6 @@
     "test": "vitest run --maxWorkers=1"
   },
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",

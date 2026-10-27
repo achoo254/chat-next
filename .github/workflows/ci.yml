@@ -34,7 +34,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-      # The npm packages (sdk-publish.yml): @achoo254/chat-client assembles
+      # The SDK packages: @achoo254/chat-client assembles
       # its dist/ from the workspace packages, the Bot SDK compiles its own.
       - run: pnpm build:packages
 

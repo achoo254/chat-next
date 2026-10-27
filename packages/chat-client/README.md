@@ -21,16 +21,12 @@ The API is `0.x`: it may change in any minor release until 1.0. Pin the exact ve
 
 ## Install
 
-```sh
-npm install @achoo254/chat-client
-```
-
 Runtime dependencies: `@connectrpc/connect`, `@connectrpc/connect-web`, `@bufbuild/protobuf` and
 `@sqlite.org/sqlite-wasm`. The package is ESM with an `exports` map only: TypeScript needs `moduleResolution`
 `bundler`, `node16` or `nodenext`.
 
-The package is not on npm yet: the publishing account is suspended. Until it is published, build the
-tarball from a checkout of this repository and install that file:
+The package is not published to npm. Build the tarball from a checkout of this repository and install that
+file:
 
 ```sh
 git clone https://github.com/achoo254/chat-next.git && cd chat-next
@@ -224,7 +220,7 @@ cd server && go run ./cmd/e2e-stack -public http://localhost:5173
 ## Bots
 
 Bots use the Bot API, not this package: see
-[`@achoo254/chat-bot-sdk`](https://www.npmjs.com/package/@achoo254/chat-bot-sdk) (Node).
+[`@achoo254/chat-bot-sdk`](../../sdk/ts/README.md) (Node).
 
 ## License
 

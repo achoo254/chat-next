@@ -287,7 +287,7 @@ Ba SDK trong repo, chỉ dùng thư viện chuẩn (riêng xác thực Mini App 
 
 | Ngôn ngữ | Thư mục | Cài |
 |---|---|---|
-| TypeScript (Node ≥ 22) | [`sdk/ts`](../../sdk/ts/README.md) | `npm install @achoo254/chat-bot-sdk` (npm công khai, phát hành bằng `.github/workflows/sdk-publish.yml`); `baseUrl` bắt buộc, SDK không có server mặc định |
+| TypeScript (Node ≥ 22) | [`sdk/ts`](../../sdk/ts/README.md) | Không lên npm: build và `pnpm pack` từ repo, cài file `.tgz` (cách làm ở README của gói); `baseUrl` bắt buộc, SDK không có server mặc định |
 | Python ≥ 3.11 | [`sdk/python`](../../sdk/python/README.md) | `pip install ./sdk/python`, import `chatbot` |
 | Go ≥ 1.24 | [`sdk/go`](../../sdk/go/README.md) | module `github.com/achoo254/chat-next/sdk/go` (repo riêng tư: đặt `GOPRIVATE`) |
 
