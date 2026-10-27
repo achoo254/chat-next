@@ -38,7 +38,7 @@ describe("app switcher", () => {
 			`https://scribe.hoandat.com/?${UTM}`,
 			`https://localman.hoandat.com/?${UTM}`,
 			`https://tunnel.hoandat.com/?${UTM}`,
-			`https://auth.hoandat.com/account?${UTM}`,
+			`https://tieude.hoandat.com/?${UTM}`,			`https://auth.hoandat.com/account?${UTM}`,
 		]);
 
 		await userEvent.keyboard("{Escape}");

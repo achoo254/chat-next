@@ -9,4 +9,4 @@ include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../../../node_modules/.pnpm/@capacitor+app@8.1.2_@capacitor+core@8.5.3/node_modules/@capacitor/app/android')
 
 include ':achoo254-capacitor-system-auth'
-project(':achoo254-capacitor-system-auth').projectDir = new File('../../../node_modules/.pnpm/@achoo254+capacitor-system-auth@https+++codeload.github.com+achoo254+shared-next+tar.gz_98babdb2982b0cba0b0badce9c2203c6/node_modules/@achoo254/capacitor-system-auth/android')
+project(':achoo254-capacitor-system-auth').projectDir = new File('../../../node_modules/.pnpm/@achoo254+capacitor-system-auth@https+++codeload.github.com+achoo254+shared-next+tar.gz_7b5a2f1fdb0d4651fd2b305870fc3c6c/node_modules/@achoo254/capacitor-system-auth/android')
