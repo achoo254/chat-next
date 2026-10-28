@@ -10,7 +10,8 @@ import type { ReactNode } from "react";
 import { LEGACY_THEME_KEY } from "../appearance.ts";
 import { brand } from "../brand.ts";
 import { LOCALES, useI18n } from "../i18n/i18n.tsx";
-import { followInApp, paths, usePathname } from "../router.tsx";
+import { followInApp, paths, returnPathFor, usePathname, useSearch } from "../router.tsx";
+import { loginUrl } from "../screens/welcome-url.ts";
 
 /** What the shared shell shows of Chat: name, root domain, AI mark (the brand icon the build serves). */
 export const SHELL_BRAND: ShellBrand = {
@@ -20,9 +21,9 @@ export const SHELL_BRAND: ShellBrand = {
 };
 
 /**
- * Chat's own pages open in place, without a reload. The shell hands it only
- * paths the router renders: the sign-in card's call to action, a server
- * route (/auth/login), never gets it.
+ * Chat's own pages open in place, without a reload. A server route such as
+ * /auth/login (the header's sign-in on a page sign-in returns to) is left to
+ * the browser.
  */
 const RouterLink: ShellLinkComponent = ({ href, onClick, children, ...rest }) => (
 	<a
@@ -30,23 +31,35 @@ const RouterLink: ShellLinkComponent = ({ href, onClick, children, ...rest }) =>
 		href={href}
 		onClick={(event) => {
 			onClick?.(event);
-			followInApp(event, href);
+			if (!href.startsWith("/auth/")) followInApp(event, href);
 		}}
 	>
 		{children}
 	</a>
 );
 
+/**
+ * The header's "Đăng nhập": /login, except on the web on a page sign-in
+ * should come back to (an invite, a chat, a bot link), where it signs in
+ * straight away like the card does, so the visitor lands back on that page.
+ * The iPhone and Android apps sign in through the card's system browser.
+ */
+function headerSignInHref(locale: Parameters<typeof loginUrl>[0], pathname: string, search: string): string {
+	if (import.meta.env.VITE_NATIVE === "true") return paths.login;
+	return returnPathFor(pathname, search) === undefined ? paths.login : loginUrl(locale, pathname, search);
+}
+
 export function ChatPublicPage({ children, layout = "flow" }: { children: ReactNode; layout?: "flow" | "center" }) {
 	const { locale, t, followStoredLocale } = useI18n();
 	const pathname = usePathname();
+	const search = useSearch();
 	return (
 		<PublicPage
 			brand={SHELL_BRAND}
 			locale={locale}
 			locales={LOCALES}
 			onLocaleChange={followStoredLocale}
-			signInHref={paths.login}
+			signInHref={headerSignInHref(locale, pathname, search)}
 			signInCurrent={pathname === paths.login}
 			privacyHref={paths.privacy}
 			termsHref={paths.terms}

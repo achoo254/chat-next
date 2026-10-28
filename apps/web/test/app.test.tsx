@@ -1,6 +1,6 @@
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { UsersService } from "@achoo254/chat-proto/users";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import brandConfig from "../../../brand.config.json";
@@ -90,6 +90,20 @@ describe("boot", () => {
 		// The server keeps return_to across the IdP round trip, even when it ends in another tab.
 		const signIn = await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" });
 		expect(signIn.getAttribute("href")).toBe(`/auth/login?locale=vi&return_to=%2Fjoin%2F${token}`);
+	});
+
+	it("keeps the invite link when the header's sign-in is used on it", async () => {
+		const token = "V-puXq3hT9mZ2cLk8RbkVUp";
+		renderApp(signedOutRoutes, `/join/${token}`);
+		const header = await screen.findByRole("banner");
+		const signIn = within(header).getByRole("link", { name: "Đăng nhập" });
+		expect(signIn.getAttribute("href")).toBe(`/auth/login?locale=vi&return_to=%2Fjoin%2F${token}`);
+	});
+
+	it("leads the header's sign-in to /login on the welcome page", async () => {
+		renderApp(signedOutRoutes, "/");
+		const header = await screen.findByRole("banner");
+		expect(within(header).getByRole("link", { name: "Đăng nhập" }).getAttribute("href")).toBe("/login");
 	});
 
 	it("opens the chat list when signed in", async () => {
