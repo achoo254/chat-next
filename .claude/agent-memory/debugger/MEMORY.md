@@ -1,2 +1,0 @@
-- [gh keychain lock](gh-keychain-lock.md) — push/gh hang or "could not read Username": locked login keychain, ask user to unlock
-- [Stale leader tab](stale-leader-tab.md) — prod client fix "not working": an old-bundle tab may own the DB lock; check navigator.locks first

@@ -24,3 +24,6 @@ secrets/
 
 # Native web bundle (pnpm mobile:build-web)
 apps/mobile/www/
+
+# Agent config (rules, skills, agent memory) stays on the machines and in the private workspace repo, not in this public repo.
+/.claude/
