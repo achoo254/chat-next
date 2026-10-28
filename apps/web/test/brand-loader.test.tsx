@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { Suspense } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import logo from "virtual:brand-logo";
@@ -85,7 +85,8 @@ describe("loaders", () => {
 		document.body.append(splash);
 		window.localStorage.setItem("locale", "en");
 		// English copy loads on first use; the splash keeps its text until then.
-		// An awaited act lets React retry the provider once the copy is in.
+		// act does not wait for that import (its time varies by machine), so
+		// wait for React to retry the provider once the copy is in.
 		let container = document.body;
 		await act(async () => {
 			container = render(
@@ -96,7 +97,7 @@ describe("loaders", () => {
 				</Suspense>,
 			).container;
 		});
-		expect(splash.textContent).toBe("Loading…");
+		await waitFor(() => expect(splash.textContent).toBe("Loading…"));
 		expect(container.childElementCount).toBe(0);
 	});
 });
