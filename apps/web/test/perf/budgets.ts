@@ -21,7 +21,10 @@ export const BUNDLE_BUDGET = {
 	 * 149.7 KB with the anti-abuse copy once the signed-out welcome screen
 	 * loaded only when shown. 142.5 KB once icons only lazy screens draw, the
 	 * dialog switch and service, forward and via-bot lines loaded on demand,
-	 * and more leaf components skipped the compiler's memoization.
+	 * and more leaf components skipped the compiler's memoization. 149.3 KB
+	 * with the language and theme choice shared by the hoandat.com apps
+	 * (@achoo254/app-shell preferences, about 1.1 KB), the welcome page's copy
+	 * having left the startup catalog for its own chunk.
 	 */
 	startupJsGzip: 150 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */

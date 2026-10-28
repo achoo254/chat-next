@@ -59,7 +59,7 @@ describe("app switcher", () => {
 				},
 			});
 		});
-		expect(await screen.findByRole("link", { name: "Tạo tài khoản" }, LONG)).toBeTruthy();
+		expect(await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" }, LONG)).toBeTruthy();
 		expect(screen.queryByRole("button", SWITCH)).toBeNull();
 	});
 });

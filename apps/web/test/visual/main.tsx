@@ -17,7 +17,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "../../src/app.tsx";
 import { captureInstallPrompt } from "../../src/install-prompt.ts";
 import "../../src/styles/fonts.css";
-import "../../src/styles/tokens.css";
+import "@achoo254/app-shell/tokens.css";
 import "../../src/styles/app.css";
 import { entity, seedDemo } from "../support/demo-data.ts";
 import * as pictures from "../support/demo-images.ts";
@@ -282,6 +282,8 @@ const SCREENS: Record<string, string> = {
 	// Settings › Thông báo with the device's Web Push card; Settings › Cài ứng dụng with the browser's offer.
 	"settings-notifications": "/settings/notifications",
 	"settings-app": "/settings/app",
+	// The shared language and theme switches (@achoo254/app-shell) in Settings › Giao diện.
+	"settings-appearance": "/settings/appearance",
 };
 const at = params.get("at");
 if (at === "settings-app") {
@@ -680,7 +682,7 @@ const scenario = params.get("open");
 const run = scenario === null ? undefined : SCENARIOS[scenario];
 if (scenario !== null && run === undefined) console.warn(`harness: unknown scenario ${scenario}`);
 // Wait for the first screen, then click through; on failure the screenshot shows where it stopped.
-void find(() => document.querySelector(".app, .shell, .welcome"))
+void find(() => document.querySelector(".app, .app-frame, .shell, .welcome"))
 	.then(run ?? (() => Promise.resolve()))
 	.catch((err: unknown) => console.warn(String(err)))
 	// Let late content (messages, member lists) render before the audit and the capture.

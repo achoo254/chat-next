@@ -630,18 +630,32 @@ describe("nothing without server support", () => {
 });
 
 describe("appearance and shortcuts", () => {
-	it("keeps the theme and message size on this device", async () => {
+	it("has the shared language and theme switches, and keeps the message size on this device", async () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture, "/settings/appearance");
 		expect(await screen.findByRole("heading", { level: 1, name: "Giao diện" }, LONG)).toBeTruthy();
-		await userEvent.click(within(await screen.findByRole("group", { name: "Chủ đề" }, LONG)).getByRole("button", { name: "Tối" }));
+		const switches = await screen.findByRole("heading", { level: 2, name: "Ngôn ngữ và giao diện" }, LONG);
+		const card = switches.closest("[data-id='appearance-switches']") as HTMLElement;
+		await userEvent.click(within(within(card).getByRole("group", { name: "Giao diện" })).getByRole("button", { name: "Tối" }));
 		expect(document.documentElement.dataset.theme).toBe("dark");
-		expect(window.localStorage.getItem("app:theme")).toBe("dark");
+		expect(document.cookie).toContain("hd_theme=dark");
 		fireEvent.change(screen.getByRole("slider", { name: "Cỡ chữ tin nhắn" }), { target: { value: "18" } });
 		expect(screen.getByText("18 px")).toBeTruthy();
 		expect(document.documentElement.style.getPropertyValue("--msg-font")).toBe("1.125rem");
-		await userEvent.click(within(screen.getByRole("group", { name: "Chủ đề" })).getByRole("button", { name: "Theo hệ thống" }));
+		await userEvent.click(within(within(card).getByRole("group", { name: "Giao diện" })).getByRole("button", { name: "Theo máy" }));
 		expect(document.documentElement.dataset.theme).toBeUndefined();
+
+		await userEvent.click(within(within(card).getByRole("group", { name: "Ngôn ngữ" })).getByRole("button", { name: "English" }));
+		expect(await screen.findByRole("heading", { level: 2, name: "Language and theme" }, LONG)).toBeTruthy();
+		expect(document.cookie).toContain("hd_lang=en");
+	});
+
+	it("shows the theme picked in Chat before the shared choice", async () => {
+		window.localStorage.setItem("app:theme", "dark");
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, "/settings/appearance");
+		const theme = await screen.findByRole("group", { name: "Giao diện" }, LONG);
+		expect(within(theme).getByRole("button", { name: "Tối" }).getAttribute("aria-pressed")).toBe("true");
 	});
 
 	it("lists the shortcuts and opens the list with Ctrl+/", async () => {

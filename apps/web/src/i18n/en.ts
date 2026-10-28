@@ -10,23 +10,6 @@ export const en: Messages = {
 		genericError: "Something went wrong. Try again in a few minutes.",
 		newTab: "(opens in a new tab)",
 	},
-	welcome: {
-		signIn: `Sign in with your ${brand.domain} account`,
-		createAccount: "Create account",
-		hint: (host: string) =>
-			`You sign in at ${host} with Google or GitHub. The app never sees your password.`,
-		language: "Language",
-		eyebrow: `${brand.appName} · ${brand.domain}`,
-		title: "Fast messaging on every device",
-		lede: "One-to-one and group chats with photos, files and voice messages, synced across web, phone and computer.",
-		points: ["Messages sync at once on every device", "Find old messages with a few words", "Bots and Mini Apps right in the chat"],
-	},
-	publicChrome: {
-		nav: "Navigation",
-		signIn: "Sign in",
-		ecosystem: `An app from ${brand.domain}`,
-		footLinks: "Footer links",
-	},
 	legal: {
 		nav: "Policies",
 		privacy: "Privacy policy",

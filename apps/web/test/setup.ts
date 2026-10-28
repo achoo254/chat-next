@@ -1,3 +1,4 @@
+import { PREFERENCE_KEYS } from "@achoo254/app-shell/preferences";
 import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { resetMediaState } from "../src/messaging/media/media-state.ts";
@@ -21,6 +22,9 @@ window.cancelIdleCallback = () => undefined;
 configure({ asyncUtilTimeout: 5000 });
 
 beforeEach(() => {
+	// The shared language and theme of every hoandat.com app (@achoo254/app-shell).
+	for (const key of Object.values(PREFERENCE_KEYS)) document.cookie = `${key}=; Path=/; Max-Age=0`;
+	document.documentElement.removeAttribute("data-theme");
 	window.localStorage.clear();
 	window.sessionStorage.clear();
 	window.history.replaceState(null, "", "/");

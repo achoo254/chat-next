@@ -1,46 +1,52 @@
-import { brand } from "../brand.ts";
-import { BrandLogo } from "../components/brand-loader.tsx";
-import { PublicPage } from "../components/public-chrome.tsx";
-import { Icon } from "../components/screen-icons.tsx";
+import { FeatureList, Hero } from "@achoo254/app-shell";
+import { ChatPublicPage } from "../components/chat-public-page.tsx";
+import { Icon, type IconName } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { loginUrl } from "./welcome-url.ts";
+import { matchSignIn, usePathname } from "../router.tsx";
+import { ChatSignInCard } from "./chat-sign-in-card.tsx";
+import { WELCOME_COPY, type WelcomeCopy } from "./welcome-copy.ts";
+
+/** Feature cards, in order, with their icons. */
+const FEATURES: readonly { id: keyof WelcomeCopy["features"]; icon: IconName }[] = [
+	{ id: "sync", icon: "message" },
+	{ id: "search", icon: "search" },
+	{ id: "bots", icon: "robot" },
+];
 
 /**
- * Signed-out screen, in the account app's layout: a short intro (what the
- * app does, three points) next to the card that signs in or creates an
- * account at the IdP.
+ * Signed-out start, on the web and in the iPhone and Android apps: what the
+ * app does beside the shared sign-in card (the page's one call to action),
+ * then its features, in the shared frame of every hoandat.com app.
  */
-export function Welcome() {
-	const { locale, t } = useI18n();
+function Welcome() {
+	const t = WELCOME_COPY[useI18n().locale];
+	const { features } = t;
 	return (
-		<PublicPage className="welcome-hero">
-			<section className="welcome-intro" aria-labelledby="welcome-title" data-id="welcome-intro">
-				<p className="pub-eyebrow">{t.welcome.eyebrow}</p>
-				<h1 id="welcome-title">{t.welcome.title}</h1>
-				<p className="welcome-lede">{t.welcome.lede}</p>
-				<ul className="pub-checks">
-					{t.welcome.points.map((point) => (
-						<li key={point}>{point}</li>
-					))}
-				</ul>
-			</section>
-			<section className="welcome-card" aria-labelledby="welcome-card-title" data-id="welcome-card">
-				<BrandLogo decorative />
-				<h2 id="welcome-card-title">{brand.appName}</h2>
-				<p>{brand.description}</p>
-				<div className="welcome-actions">
-					<a className="btn btn-primary" href={loginUrl(locale)}>
-						{t.welcome.signIn}
-					</a>
-					<a className="btn" href={loginUrl(locale, true)}>
-						{t.welcome.createAccount}
-					</a>
-				</div>
-				<div className="welcome-hint">
-					<Icon name="shield" small />
-					<span>{t.welcome.hint(brand.idpHost)}</span>
-				</div>
-			</section>
-		</PublicPage>
+		<ChatPublicPage>
+			<Hero eyebrow={t.eyebrow} title={t.title} lede={t.lede} aside={<ChatSignInCard headingLevel={2} />} />
+			<FeatureList
+				title={t.featuresTitle}
+				items={FEATURES.map(({ id, icon }) => ({
+					id,
+					title: features[id].title,
+					description: features[id].body,
+					icon: <Icon name={icon} small />,
+				}))}
+			/>
+		</ChatPublicPage>
 	);
+}
+
+/** /login for visitors: the sign-in card alone, where the header's "Đăng nhập" leads. */
+function SignIn() {
+	return (
+		<ChatPublicPage layout="center">
+			<ChatSignInCard />
+		</ChatPublicPage>
+	);
+}
+
+/** Signed out: the sign-in card alone on /login, the welcome page on any other path (which sign-in returns to). */
+export default function SignedOutPage() {
+	return matchSignIn(usePathname()) ? <SignIn /> : <Welcome />;
 }

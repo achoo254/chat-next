@@ -10,7 +10,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "../../src/app.tsx";
 import "../../src/styles/fonts.css";
-import "../../src/styles/tokens.css";
+import "@achoo254/app-shell/tokens.css";
 import "../../src/styles/app.css";
 import type { MessagingConnector } from "../../src/messaging/data/connector.ts";
 import type { ChatSource } from "../../src/messaging/data/source.ts";

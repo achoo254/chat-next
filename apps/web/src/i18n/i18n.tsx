@@ -1,9 +1,21 @@
+import { DEFAULT_SHELL_LOCALES, type DefaultShellLocale } from "@achoo254/app-shell";
+import { readPreferences, subscribePreferences } from "@achoo254/app-shell/preferences";
 import { createContext, use, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { brand } from "../brand.ts";
 import { vi, type Messages } from "./vi.ts";
 
-export type Locale = "vi" | "en";
+/**
+ * Languages of the whole app, signed in or not: Vietnamese and English, the
+ * shared shell's default pair (@achoo254/app-shell). A `zh-CN` choice
+ * another hoandat.com app stored counts as no choice here.
+ */
+export type Locale = DefaultShellLocale;
 
-const STORAGE_KEY = "locale";
+/** Every language of the UI, in the order the language switches list them. */
+export const LOCALES: readonly Locale[] = DEFAULT_SHELL_LOCALES;
+
+/** Chat's localStorage key of the language before the shared `hd_lang` cookie. */
+const LEGACY_LANG_KEY = "locale";
 
 // Vietnamese is the default and ships with the first screen; English is
 // fetched the first time it is needed. Once in, it is read synchronously, so
@@ -25,33 +37,23 @@ function useMessages(locale: Locale): Messages {
 	return english ?? use(loadEnglish());
 }
 
-function isLocale(value: unknown): value is Locale {
-	return value === "vi" || value === "en";
-}
-
-/** The remembered locale; Vietnamese unless the user picked English. */
+/**
+ * The remembered language: the shared choice of every hoandat.com app
+ * (`hd_lang`, this WebView's storage in the native app), else the one picked
+ * in Chat before that choice existed, else Vietnamese.
+ */
 export function readStoredLocale(): Locale {
-	try {
-		const stored = window.localStorage.getItem(STORAGE_KEY);
-		return isLocale(stored) ? stored : "vi";
-	} catch {
-		// Storage can be blocked (privacy settings); fall back to the default.
-		return "vi";
-	}
-}
-
-function storeLocale(locale: Locale): void {
-	try {
-		window.localStorage.setItem(STORAGE_KEY, locale);
-	} catch {
-		// Not remembering the choice is acceptable when storage is blocked.
-	}
+	return readPreferences({ domain: brand.domain, legacyLangKey: LEGACY_LANG_KEY }).lang ?? "vi";
 }
 
 interface I18n {
 	locale: Locale;
 	t: Messages;
-	setLocale: (locale: Locale) => void;
+	/**
+	 * Shows the app in the stored language: `onLocaleChange` of the shared
+	 * language switches, which have already stored the choice.
+	 */
+	followStoredLocale: () => void;
 }
 
 const I18nContext = createContext<I18n | null>(null);
@@ -64,28 +66,30 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 		document.documentElement.lang = locale;
 	}, [locale]);
 
-	const value = useMemo<I18n>(
-		() => ({
-			locale,
-			t,
-			setLocale: (next) => {
-				const apply = () => {
-					storeLocale(next);
-					setLocaleState(next);
-				};
-				if (next === "vi" || english !== null) {
-					apply();
-					return;
-				}
-				// Switch once the copy is in, so the screen never blanks while it
-				// loads; when it cannot load (offline), the language stays as it was.
-				loadEnglish().then(apply, () => {
+	const value = useMemo<I18n>(() => {
+		const followStoredLocale = () => {
+			const next = readStoredLocale();
+			if (next === "vi" || english !== null) {
+				setLocaleState(next);
+				return;
+			}
+			// Switch once the copy is in, so the screen never blanks while it
+			// loads; when it cannot load (offline), the language stays as it was.
+			loadEnglish().then(
+				() => setLocaleState(next),
+				() => {
 					englishLoad = null;
-				});
-			},
-		}),
-		[locale, t],
-	);
+				},
+			);
+		};
+		return { locale, t, followStoredLocale };
+	}, [locale, t]);
+
+	// A choice made here or in another app (noticed when the page comes back
+	// into view) re-renders the app in place, without a reload.
+	const { followStoredLocale } = value;
+	useEffect(() => subscribePreferences(followStoredLocale), [followStoredLocale]);
+
 	return <I18nContext value={value}>{children}</I18nContext>;
 }
 

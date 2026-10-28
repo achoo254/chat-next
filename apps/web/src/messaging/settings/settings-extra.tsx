@@ -2,12 +2,15 @@
 // #blocked, #notifications, #appearance, #shortcuts).
 import type { NotificationSettings as CoreNotificationSettings, NotificationSound } from "@achoo254/chat-core";
 import { requestNotificationPermission } from "@achoo254/chat-platform-web";
+import { LanguageSwitch, ThemeSwitch } from "@achoo254/app-shell";
+import "@achoo254/app-shell/app-shell.css";
 import { Fragment, useState } from "react";
-import { FONT_MAX, FONT_MIN, setFontSize, setTheme, storedFontSize, storedTheme, type Theme } from "../../appearance.ts";
+import { brand } from "../../brand.ts";
+import { FONT_MAX, FONT_MIN, LEGACY_THEME_KEY, setFontSize, storedFontSize } from "../../appearance.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
-import { useI18n, type Locale } from "../../i18n/i18n.tsx";
+import { LOCALES, useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths, type SettingsTab } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useContacts } from "../data/contacts.ts";
@@ -414,57 +417,26 @@ function NotificationOptions({ onPermission }: { onPermission: (permission: Noti
 	);
 }
 
-const THEMES: readonly Theme[] = ["light", "dark", "system"];
-const LANGUAGES: readonly { locale: Locale; label: string }[] = [
-	{ locale: "vi", label: "Tiếng Việt" },
-	{ locale: "en", label: "English" },
-];
-
-/** Theme, language and message text size, kept on this device (#appearance). */
+/**
+ * Language and theme (the shared switches of every hoandat.com app, as in
+ * the footer of the public pages), and message text size kept on this
+ * device (#appearance).
+ */
 function AppearanceSettings() {
 	const copy = useScreensCopy();
-	const { locale, setLocale } = useI18n();
-	const [theme, pickTheme] = useState<Theme>(storedTheme);
+	const { locale, followStoredLocale } = useI18n();
 	const [size, pickSize] = useState(storedFontSize);
 	const id = useDomId("font");
 	const t = copy.appearance;
-	const names: Record<Theme, string> = { light: t.light, dark: t.dark, system: t.system };
 	return (
 		<div className="set-body">
-			<div className="card pad">
-				<h2 className="card-title flush">{t.theme}</h2>
-				<div className="theme-pick" role="group" aria-label={t.theme}>
-					{THEMES.map((value) => (
-						<button
-							key={value}
-							type="button"
-							aria-pressed={theme === value}
-							onClick={() => {
-								setTheme(value);
-								pickTheme(value);
-							}}
-						>
-							<span className={`swatch sw-${value}`} aria-hidden="true">
-								<i />
-								<i />
-							</span>
-							{names[value]}
-						</button>
-					))}
-				</div>
-			</div>
-			<div className="card">
-				<div className="row opt-row">
-					<span className="grow">
-						{t.language}
-						<small>{t.languageHint}</small>
-					</span>
-					<Choice<Locale>
-						label={t.language}
-						value={locale}
-						options={LANGUAGES.map((language) => ({ value: language.locale, label: language.label }))}
-						onChange={setLocale}
-					/>
+			<div className="card pad" data-id="appearance-switches">
+				<h2 className="card-title flush">{t.languageAndTheme}</h2>
+				{/* The native app keeps its choice in its own WebView: no other app follows it there. */}
+				{import.meta.env.VITE_NATIVE !== "true" && <p className="note">{t.sharedHint}</p>}
+				<div className="shared-switches">
+					<LanguageSwitch locale={locale} locales={LOCALES} domain={brand.domain} onLocaleChange={followStoredLocale} />
+					<ThemeSwitch locale={locale} domain={brand.domain} legacyThemeKey={LEGACY_THEME_KEY} />
 				</div>
 			</div>
 			<div className="card pad">

@@ -8,24 +8,6 @@ export const vi = {
 		genericError: "Có lỗi xảy ra, thử lại sau ít phút.",
 		newTab: "(mở tab mới)",
 	},
-	welcome: {
-		signIn: `Đăng nhập bằng tài khoản ${brand.domain}`,
-		createAccount: "Tạo tài khoản",
-		hint: (host: string) =>
-			`Bạn đăng nhập ở ${host} bằng Google hoặc GitHub. App không bao giờ thấy mật khẩu của bạn.`,
-		language: "Ngôn ngữ",
-		/** Signed-out landing: one heading, one value line, three points. */
-		eyebrow: `${brand.appName} · ${brand.domain}`,
-		title: "Nhắn tin nhanh trên mọi thiết bị",
-		lede: "Chat riêng và nhóm, gửi ảnh, file và tin thoại, đồng bộ giữa web, điện thoại và máy tính.",
-		points: ["Tin nhắn đồng bộ ngay trên mọi thiết bị", "Tìm lại tin cũ chỉ với vài chữ", "Bot và Mini App ngay trong cuộc trò chuyện"],
-	},
-	publicChrome: {
-		nav: "Điều hướng",
-		signIn: "Đăng nhập",
-		ecosystem: `Một app của ${brand.domain}`,
-		footLinks: "Liên kết cuối trang",
-	},
 	legal: {
 		nav: "Chính sách",
 		privacy: "Chính sách quyền riêng tư",

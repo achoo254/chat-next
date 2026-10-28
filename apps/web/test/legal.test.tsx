@@ -123,14 +123,14 @@ describe("public pages", () => {
 });
 
 describe("links to the public pages", () => {
-	it("are in the footer of the welcome screen and open in place", async () => {
+	it("are in the shared footer of the welcome screen and open in place", async () => {
 		renderApp(signedOut().routes);
 		const nav = await screen.findByRole("navigation", { name: "Liên kết cuối trang" });
 		expect(within(nav).getByRole("link", { name: "Một app của hoandat.com" }).getAttribute("href")).toBe("https://hoandat.com");
-		expect(within(nav).getByRole("link", { name: "Điều khoản sử dụng" }).getAttribute("href")).toBe("/terms");
+		expect(within(nav).getByRole("link", { name: "Điều khoản" }).getAttribute("href")).toBe("/terms");
 		expect(within(nav).getByRole("link", { name: "Xoá tài khoản" }).getAttribute("href")).toBe("/delete-account");
 
-		await userEvent.click(within(nav).getByRole("link", { name: "Chính sách quyền riêng tư" }));
+		await userEvent.click(within(nav).getByRole("link", { name: "Quyền riêng tư" }));
 		expect(await screen.findByRole("heading", { level: 1, name: "Chính sách quyền riêng tư" })).toBeTruthy();
 		expect(window.location.pathname).toBe("/privacy");
 	});

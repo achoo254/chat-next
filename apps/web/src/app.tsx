@@ -15,8 +15,8 @@ import type { MessagingConnector } from "./messaging/data/connector.ts";
 const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
 // Shown instead of the app while the account waits for deletion.
 const DeletionPending = lazy(() => import("./screens/deletion-pending.tsx"));
-// Only a signed-out start shows it, so a signed-in start does not load it.
-const Welcome = lazy(() => import("./screens/welcome.tsx").then((module) => ({ default: module.Welcome })));
+// Only a signed-out start shows it (welcome, or /login), so a signed-in start does not load it.
+const SignedOut = lazy(() => import("./screens/welcome.tsx"));
 // Privacy policy, terms and account deletion: public, so they never wait for sign-in.
 const LegalScreen = lazy(() => import("./screens/legal/legal-screen.tsx"));
 
@@ -114,7 +114,7 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 		case "signedOut":
 			return (
 				<Suspense fallback={<PageLoader />}>
-					<Welcome />
+					<SignedOut />
 				</Suspense>
 			);
 		case "error":

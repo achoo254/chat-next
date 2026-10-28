@@ -1,60 +1,95 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { UsersService } from "@achoo254/chat-proto/users";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import brandConfig from "../../../brand.config.json";
 import { CORE_LAST_USER_KEY } from "../src/api/offline-self.ts";
 import { renderApp, SELF } from "./render-app.tsx";
 
+/** A server whose GetSelf answers signed out. */
+function signedOutRoutes(router: ConnectRouter): void {
+	router.service(UsersService, {
+		getSelf: () => {
+			throw new ConnectError("no session", Code.Unauthenticated);
+		},
+	});
+}
+
 describe("boot", () => {
-	it("shows the welcome screen with IdP links when signed out", async () => {
-		renderApp((router) => {
-			router.service(UsersService, {
-				getSelf: () => {
-					throw new ConnectError("no session", Code.Unauthenticated);
-				},
-			});
-		});
+	it("shows the welcome page of the shared shell with one call to sign in", async () => {
+		renderApp(signedOutRoutes);
 
 		expect(await screen.findByRole("heading", { level: 1, name: "Nhắn tin nhanh trên mọi thiết bị" })).toBeTruthy();
-		expect(screen.getByRole("heading", { level: 2, name: brandConfig.appName })).toBeTruthy();
-		expect(screen.getByText(brandConfig.description)).toBeTruthy();
-		// The account app's top bar: the app name goes home, "Đăng nhập" signs in.
+		expect(screen.getByRole("heading", { level: 2, name: `Đăng nhập vào ${brandConfig.appName}` })).toBeTruthy();
+		expect(screen.getByRole("heading", { level: 3, name: "Tìm lại tin cũ" })).toBeTruthy();
+		// The shared top bar: the app name goes home, "Đăng nhập" opens /login.
 		expect(screen.getByRole("link", { name: brandConfig.appName }).getAttribute("href")).toBe("/");
-		expect(screen.getByRole("link", { name: "Đăng nhập" }).getAttribute("href")).toBe("/auth/login?locale=vi");
-		const signIn = screen.getByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" });
-		const create = screen.getByRole("link", { name: "Tạo tài khoản" });
+		expect(screen.getByRole("link", { name: "Đăng nhập" }).getAttribute("href")).toBe("/login");
+		// One call to action; the account page creates accounts.
+		const signIn = screen.getByRole("link", { name: "Đăng nhập bằng hoandat.com" });
 		expect(signIn.getAttribute("href")).toBe("/auth/login?locale=vi");
-		expect(create.getAttribute("href")).toBe("/auth/login?prompt=create&locale=vi");
-		expect(screen.getAllByText(/auth\.hoandat\.com/).length).toBeGreaterThan(0);
+		expect(document.querySelectorAll('a[href^="/auth/login"]')).toHaveLength(1);
+		expect(screen.queryByRole("link", { name: /Tạo tài khoản/ })).toBeNull();
 
 		await userEvent.click(screen.getByRole("button", { name: "English" }));
 
 		// English copy loads on first use, so the switch lands a moment later.
-		expect((await screen.findByRole("link", { name: "Sign in with your hoandat.com account" })).getAttribute("href")).toBe(
-			"/auth/login?locale=en",
-		);
-		expect(screen.getByRole("link", { name: "Create account" }).getAttribute("href")).toBe(
-			"/auth/login?prompt=create&locale=en",
-		);
+		expect((await screen.findByRole("link", { name: "Sign in with hoandat.com" })).getAttribute("href")).toBe("/auth/login?locale=en");
+		expect(screen.getByRole("heading", { level: 1, name: "Fast messaging on every device" })).toBeTruthy();
 		await waitFor(() => expect(document.documentElement.lang).toBe("en"));
-		expect(window.localStorage.getItem("locale")).toBe("en");
+		// The shared choice of every hoandat.com app.
+		expect(document.cookie).toContain("hd_lang=en");
+	});
+
+	it("opens the sign-in card alone on /login, in place from the top bar", async () => {
+		renderApp(signedOutRoutes);
+		await userEvent.click(await screen.findByRole("link", { name: "Đăng nhập" }));
+
+		expect(await screen.findByRole("heading", { level: 1, name: `Đăng nhập vào ${brandConfig.appName}` })).toBeTruthy();
+		expect(window.location.pathname).toBe("/login");
+		expect(screen.getByRole("link", { name: "Đăng nhập" }).getAttribute("aria-current")).toBe("page");
+		expect(screen.getByRole("link", { name: "Đăng nhập bằng hoandat.com" }).getAttribute("href")).toBe("/auth/login?locale=vi");
+		expect(screen.queryByRole("heading", { level: 1, name: "Nhắn tin nhanh trên mọi thiết bị" })).toBeNull();
+	});
+
+	it("opens the chats on /login when already signed in", async () => {
+		renderApp((router) => {
+			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
+		}, "/login");
+		expect(await screen.findByText("Chưa có chat nào ở đây", {}, { timeout: 5000 })).toBeTruthy();
+		expect(window.location.pathname).toBe("/");
+	});
+
+	it("keeps the language picked in Chat before the shared choice, and ignores one Chat does not have", async () => {
+		window.localStorage.setItem("locale", "en");
+		renderApp(signedOutRoutes);
+		expect(await screen.findByRole("link", { name: "Sign in with hoandat.com" })).toBeTruthy();
+		cleanup();
+
+		// Chinese, picked in an app that has it: Chat falls back to its own choice.
+		document.cookie = "hd_lang=zh-CN; Path=/";
+		window.localStorage.removeItem("locale");
+		renderApp(signedOutRoutes);
+		expect(await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" })).toBeTruthy();
+	});
+
+	it("follows a language picked in another app when the page comes back into view", async () => {
+		renderApp(signedOutRoutes);
+		expect(await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" })).toBeTruthy();
+
+		document.cookie = "hd_lang=en; Path=/";
+		window.dispatchEvent(new Event("focus"));
+
+		expect(await screen.findByRole("link", { name: "Sign in with hoandat.com" })).toBeTruthy();
 	});
 
 	it("asks sign-in to come back to an invite link opened while signed out", async () => {
 		const token = "V-puXq3hT9mZ2cLk8RbkVUp";
-		renderApp((router) => {
-			router.service(UsersService, {
-				getSelf: () => {
-					throw new ConnectError("no session", Code.Unauthenticated);
-				},
-			});
-		}, `/join/${token}`);
+		renderApp(signedOutRoutes, `/join/${token}`);
 		// The server keeps return_to across the IdP round trip, even when it ends in another tab.
-		const signIn = await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" });
+		const signIn = await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" });
 		expect(signIn.getAttribute("href")).toBe(`/auth/login?locale=vi&return_to=%2Fjoin%2F${token}`);
-		expect(screen.getByRole("link", { name: "Tạo tài khoản" }).getAttribute("href")).toBe(`/auth/login?prompt=create&locale=vi&return_to=%2Fjoin%2F${token}`);
 	});
 
 	it("opens the chat list when signed in", async () => {
@@ -117,7 +152,7 @@ describe("boot", () => {
 				},
 			});
 		});
-		expect(await screen.findByRole("link", { name: "Đăng nhập bằng tài khoản hoandat.com" })).toBeTruthy();
+		expect(await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" })).toBeTruthy();
 		expect(window.localStorage.getItem("app:last-self")).toBeNull();
 		window.localStorage.removeItem(CORE_LAST_USER_KEY);
 	});

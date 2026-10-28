@@ -87,12 +87,22 @@ function failureMessage(kind: SignInFailure): string {
 	return FAILURE_COPY[lang][kind];
 }
 
-let signingIn = false;
+let signingIn: Promise<void> | null = null;
 
-/** Runs the native sign-in for a web /auth/login link and opens return_to once signed in. */
-async function signInFromLink(href: string): Promise<void> {
-	if (signingIn) return;
-	signingIn = true;
+/**
+ * Runs the native sign-in for a web /auth/login link and opens return_to once
+ * signed in. One at a time: while the system browser is open, every call
+ * (the link interception below, a screen's onSignIn) gets the sign-in in
+ * progress, which settles when the user closed the browser or it failed.
+ */
+export function signInFromLink(href: string): Promise<void> {
+	signingIn ??= runSignIn(href).finally(() => {
+		signingIn = null;
+	});
+	return signingIn;
+}
+
+async function runSignIn(href: string): Promise<void> {
 	const query = new URL(href, window.location.origin).searchParams;
 	const platform = nativePlatform();
 	try {
@@ -114,8 +124,6 @@ async function signInFromLink(href: string): Promise<void> {
 		const kind = err instanceof NativeSignInError ? err.kind : "unavailable";
 		console.warn("native sign-in:", err instanceof Error ? err.message : String(err));
 		window.alert(failureMessage(kind));
-	} finally {
-		signingIn = false;
 	}
 }
 

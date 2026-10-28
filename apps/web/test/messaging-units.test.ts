@@ -176,8 +176,8 @@ describe("routes", () => {
 		expect(returnPathFor("/join/V-puXq3hT9mZ2cLk8RbkVUp")).toBe("/join/V-puXq3hT9mZ2cLk8RbkVUp");
 		expect(returnPathFor("/")).toBeUndefined();
 		expect(returnPathFor("/no/such/page")).toBeUndefined();
-		expect(loginUrl("vi", false, "/c/5001")).toBe("/auth/login?locale=vi&return_to=%2Fc%2F5001");
-		expect(loginUrl("en", true, "/")).toBe("/auth/login?prompt=create&locale=en");
+		expect(loginUrl("vi", "/c/5001")).toBe("/auth/login?locale=vi&return_to=%2Fc%2F5001");
+		expect(loginUrl("en", "/")).toBe("/auth/login?locale=en");
 	});
 
 	it("maps a topic's icon colour to the nearest avatar tone", () => {

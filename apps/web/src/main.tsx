@@ -2,16 +2,18 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
 import { applyStoredAppearance } from "./appearance.ts";
+import { followSharedTheme } from "./shared-theme.ts";
 import { installErrorReporter, reportClientError } from "./error-reporter.ts";
 import { captureInstallPrompt } from "./install-prompt.ts";
 import { registerServiceWorker } from "./register-service-worker.ts";
 import type { RpcFetch } from "./api/client.ts";
 import "./styles/fonts.css";
-import "./styles/tokens.css";
+import "@achoo254/app-shell/tokens.css";
 import "./styles/app.css";
 
 installErrorReporter();
 applyStoredAppearance();
+followSharedTheme();
 // The browser announces installability once, early; Settings › Cài ứng dụng uses it later.
 captureInstallPrompt();
 

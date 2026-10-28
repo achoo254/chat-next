@@ -53,6 +53,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"console-stats": "?at=console-stats",
 	"settings-notifications": "?at=settings-notifications",
 	"settings-app": "?at=settings-app",
+	"settings-appearance": "?at=settings-appearance",
 };
 
 export const VIEWPORTS = [

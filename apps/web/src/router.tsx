@@ -67,6 +67,8 @@ export const paths = {
 	announcements: () => "/moderation/announcements",
 	moderationLog: () => "/moderation/log",
 	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
+	/** The sign-in card alone, for visitors (the header's "Đăng nhập"); signed in, it opens the chats. */
+	login: "/login",
 	privacy: "/privacy",
 	terms: "/terms",
 	/** How to delete the account; also the deletion URL given to app stores. */
@@ -86,6 +88,11 @@ const LEGAL_PAGES: Readonly<Record<string, LegalPage>> = {
 export function matchLegal(pathname: string): LegalPage | null {
 	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 	return Object.hasOwn(LEGAL_PAGES, path) ? (LEGAL_PAGES[path] ?? null) : null;
+}
+
+/** Whether `pathname` is /login (a trailing slash allowed). */
+export function matchSignIn(pathname: string): boolean {
+	return pathname.replace(/\/+$/, "") === paths.login;
 }
 
 const ID = /^[1-9][0-9]{0,15}$/;
@@ -234,14 +241,17 @@ interface LinkProps {
 	children: ReactNode;
 }
 
+/** Opens `to` in place on a plain click; modified clicks keep browser behaviour. */
+export function followInApp(event: MouseEvent<HTMLAnchorElement>, to: string): void {
+	if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+	event.preventDefault();
+	navigate(to);
+}
+
 /** In-app link: plain clicks navigate without a reload, modified clicks keep browser behaviour. */
 export function Link({ to, className, current, title, children, ...rest }: LinkProps) {
 	"use no memo";
-	const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
-		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-		event.preventDefault();
-		navigate(to);
-	};
+	const onClick = (event: MouseEvent<HTMLAnchorElement>) => followInApp(event, to);
 	return (
 		<a
 			href={to}

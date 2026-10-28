@@ -1,6 +1,6 @@
 /* ---------- Public pages: privacy, terms, account deletion ----------
-   Inside the public chrome (styles/public.css): the policy tabs, then the
-   text in the account app's wide card (720px). */
+   Inside the shared public page (@achoo254/app-shell): the policy tabs, then
+   the text in the account app's wide card (720px). */
 .legal { display: grid; justify-items: center; align-content: start; gap: var(--space-4); padding-block: var(--space-6) 0; }
 .legal-nav, .legal-main { width: 100%; max-width: 720px; }
 .legal-nav { display: flex; flex-wrap: wrap; gap: var(--space-1); }

@@ -22,7 +22,7 @@ interface ShellProps {
 export function Shell({ self, route, nav, avatar, rail, children }: ShellProps) {
 	const { t } = useI18n();
 	return (
-		<div className={rail === undefined ? "shell" : "shell folders"}>
+		<div className={rail === undefined ? "app-frame" : "app-frame folders"}>
 			{rail}
 			<nav className="rail" aria-label={t.shell.nav}>
 				<span title={t.shell.account(self.name)}>

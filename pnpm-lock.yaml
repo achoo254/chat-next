@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@achoo254/brand':
-        specifier: github:achoo254/shared-next#v0.6.0&path:/packages/brand
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand
+        specifier: github:achoo254/shared-next#v0.8.0&path:/packages/brand
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand
       '@bufbuild/buf':
         specifier: 1.73.0
         version: 1.73.0
@@ -45,8 +45,8 @@ importers:
   apps/mobile:
     dependencies:
       '@achoo254/capacitor-system-auth':
-        specifier: github:achoo254/shared-next#v0.6.0&path:/packages/capacitor-system-auth
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
+        specifier: github:achoo254/shared-next#v0.8.0&path:/packages/capacitor-system-auth
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
       '@aparajita/capacitor-secure-storage':
         specifier: 8.0.1
         version: 8.0.1
@@ -72,15 +72,18 @@ importers:
 
   apps/web:
     dependencies:
+      '@achoo254/app-shell':
+        specifier: github:achoo254/shared-next#v0.8.0&path:/packages/app-shell
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)
       '@achoo254/app-switcher':
-        specifier: github:achoo254/shared-next#v0.6.0&path:/packages/app-switcher
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand)(react@19.3.0)
+        specifier: github:achoo254/shared-next#v0.8.0&path:/packages/app-switcher
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)
       '@achoo254/brand':
-        specifier: github:achoo254/shared-next#v0.6.0&path:/packages/brand
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand
+        specifier: github:achoo254/shared-next#v0.8.0&path:/packages/brand
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand
       '@achoo254/capacitor-system-auth':
-        specifier: github:achoo254/shared-next#v0.6.0&path:/packages/capacitor-system-auth
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
+        specifier: github:achoo254/shared-next#v0.8.0&path:/packages/capacitor-system-auth
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)
       '@achoo254/chat-core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -232,22 +235,30 @@ importers:
 
 packages:
 
-  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/app-switcher':
-    resolution: {gitHosted: true, integrity: sha512-/3W90Vh63fovsd+8GEfoMEV7f5BA+V1DsUPZXsFhH2vbjlpbecQLoP9xHHavyb/Pil3BbHKCtMaX0jtTIJpwNQ==, path: /packages/app-switcher, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c}
+  '@achoo254/app-shell@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/app-shell':
+    resolution: {gitHosted: true, path: /packages/app-shell, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e}
+    version: 0.2.0
+    engines: {node: '>=22.12'}
+    peerDependencies:
+      '@achoo254/brand': '>=0.3.0 <1'
+      react: ^19.0.0
+
+  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/app-switcher':
+    resolution: {gitHosted: true, path: /packages/app-switcher, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e}
     version: 0.4.0
     engines: {node: '>=22.12'}
     peerDependencies:
       '@achoo254/brand': '>=0.3.0 <1'
       react: ^19.0.0
 
-  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand':
-    resolution: {gitHosted: true, integrity: sha512-/3W90Vh63fovsd+8GEfoMEV7f5BA+V1DsUPZXsFhH2vbjlpbecQLoP9xHHavyb/Pil3BbHKCtMaX0jtTIJpwNQ==, path: /packages/brand, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c}
+  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand':
+    resolution: {gitHosted: true, path: /packages/brand, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e}
     version: 0.3.0
     engines: {node: '>=22.12'}
     hasBin: true
 
-  '@achoo254/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/capacitor-system-auth':
-    resolution: {gitHosted: true, integrity: sha512-/3W90Vh63fovsd+8GEfoMEV7f5BA+V1DsUPZXsFhH2vbjlpbecQLoP9xHHavyb/Pil3BbHKCtMaX0jtTIJpwNQ==, path: /packages/capacitor-system-auth, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c}
+  '@achoo254/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/capacitor-system-auth':
+    resolution: {gitHosted: true, integrity: sha512-NmYoQ+x9JH8OBstzR+TNUsoFJ+TgbQ6p55DIm/sYmCYdjIje55L/kWr4hok3gU9W9T35PkWDHY8d3PxixkPBLw==, path: /packages/capacitor-system-auth, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e}
     version: 0.2.0
     peerDependencies:
       '@capacitor/core': ^8.0.0
@@ -2344,16 +2355,21 @@ packages:
 
 snapshots:
 
-  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand)(react@19.3.0)':
+  '@achoo254/app-shell@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)':
     dependencies:
-      '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand
+      '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand
       react: 19.3.0
 
-  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/brand':
+  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)':
+    dependencies:
+      '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand
+      react: 19.3.0
+
+  '@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand':
     dependencies:
       ajv: 8.20.0
 
-  '@achoo254/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/1ae97bdb887ffb7c336f7d99fa6ab04ac687f81c#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)':
+  '@achoo254/capacitor-system-auth@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/capacitor-system-auth(@capacitor/core@8.5.3)':
     dependencies:
       '@capacitor/core': 8.5.3
 

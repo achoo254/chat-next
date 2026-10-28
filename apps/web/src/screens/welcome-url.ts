@@ -6,7 +6,7 @@ import { returnPathFor } from "../router.tsx";
  * Sign-in URL handled by the server; it redirects to the IdP with ui_locales
  * and, after sign-in, back to the page this visitor opened (return_to).
  */
-export function loginUrl(locale: Locale, create = false, pathname = window.location.pathname, search = window.location.search): string {
+export function loginUrl(locale: Locale, pathname = window.location.pathname, search = window.location.search): string {
 	const returnTo = returnPathFor(pathname, search);
-	return signInUrl(locale, { create, ...(returnTo === undefined ? {} : { returnTo }) });
+	return signInUrl(locale, returnTo === undefined ? {} : { returnTo });
 }
