@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 	"unicode"
@@ -42,6 +43,9 @@ type User struct {
 	DeletionReason      string
 	// PhotoID is the file_id of the profile photo ("" without one).
 	PhotoID string
+	// IdPPicture is the https URL of the IdP's profile picture ("" without
+	// one); only ever shown to the user themself.
+	IdPPicture string
 }
 
 // IdPEmail is the email state the IdP reports; only a verified address is
@@ -69,6 +73,27 @@ type IdPProfile struct {
 	// claims (an ID token without them while userinfo was unavailable): the
 	// stored email is then kept instead of being cleared.
 	EmailUnknown bool
+	// Picture is the IdP's picture claim; PictureUnknown, like EmailUnknown,
+	// keeps the stored picture when the answer said nothing about it.
+	Picture        string
+	PictureUnknown bool
+}
+
+// maxPictureLen bounds a stored picture URL (the column's CHECK).
+const maxPictureLen = 2048
+
+// idpPicture is the picture URL to store: an absolute https URL with a
+// host, or nil (none, or one the app will not load).
+func (p IdPProfile) idpPicture() *string {
+	raw := strings.TrimSpace(p.Picture)
+	if raw == "" || len(raw) > maxPictureLen {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return nil
+	}
+	return &raw
 }
 
 // idpName is the IdP display name cleaned like the name of a new account,
@@ -87,17 +112,19 @@ func (p IdPProfile) fallbackName() string {
 }
 
 const userColumns = `id, tenant_id, coalesce(idp_sub, ''), username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at,
-	deletion_requested_at, coalesce(deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = photo_file_id), '')`
+	deletion_requested_at, coalesce(deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = photo_file_id), ''),
+	coalesce(idp_picture, '')`
 
 // qualifiedUserColumns is userColumns for statements that join users (as u)
 // with another relation.
 const qualifiedUserColumns = `u.id, u.tenant_id, coalesce(u.idp_sub, ''), u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at,
-	u.deletion_requested_at, coalesce(u.deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = u.photo_file_id), '')`
+	u.deletion_requested_at, coalesce(u.deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = u.photo_file_id), ''),
+	coalesce(u.idp_picture, '')`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.TenantID, &u.IdPSub, &u.Username, &u.Name, &u.Bio, &u.Email, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt,
-		&u.DeletionRequestedAt, &u.DeletionReason, &u.PhotoID)
+		&u.DeletionRequestedAt, &u.DeletionReason, &u.PhotoID, &u.IdPPicture)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -138,11 +165,11 @@ func (s *Store) UpsertIdPUserAdmitting(ctx context.Context, tenantID string, p I
 		}
 		// No conflict target: a clash on either unique key returns no row.
 		u, err := scanUser(s.pool.QueryRow(ctx, `
-			INSERT INTO users (id, tenant_id, idp_sub, username, name, email, email_verified)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO users (id, tenant_id, idp_sub, username, name, email, email_verified, idp_picture)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT DO NOTHING
 			RETURNING `+userColumns,
-			id, tenantID, p.Sub, profile.UsernameCandidate(base, attempt), name, email, verified))
+			id, tenantID, p.Sub, profile.UsernameCandidate(base, attempt), name, email, verified, p.idpPicture()))
 		if err == nil {
 			return u, nil
 		}
@@ -176,10 +203,10 @@ func NextUserID(ctx context.Context, db queryRower) (int64, error) {
 }
 
 // refreshIdPUser applies what the IdP reports to the existing user of
-// (tenantID, p.Sub): the email state (unless p.EmailUnknown) and the display
-// name while the stored name is still the username fallback (equal to the
-// username, or to the name derived from preferred_username). ErrNotFound
-// when there is no such user.
+// (tenantID, p.Sub): the email state (unless p.EmailUnknown), the picture
+// (unless p.PictureUnknown) and the display name while the stored name is
+// still the username fallback (equal to the username, or to the name
+// derived from preferred_username). ErrNotFound when there is no such user.
 func refreshIdPUser(ctx context.Context, db queryRower, tenantID string, p IdPProfile) (User, error) {
 	email, verified := p.Email.stored()
 	u, err := scanUser(db.QueryRow(ctx, `
@@ -187,15 +214,17 @@ func refreshIdPUser(ctx context.Context, db queryRower, tenantID string, p IdPPr
 			SELECT id,
 				CASE WHEN $5 THEN email ELSE $3 END AS email,
 				CASE WHEN $5 THEN email_verified ELSE $4 END AS email_verified,
-				CASE WHEN $6 <> '' AND (name = username OR name = $7) THEN $6 ELSE name END AS name
+				CASE WHEN $6 <> '' AND (name = username OR name = $7) THEN $6 ELSE name END AS name,
+				CASE WHEN $9 THEN idp_picture ELSE $8::text END AS idp_picture
 			FROM users WHERE tenant_id = $1 AND idp_sub = $2
 		)
 		UPDATE users u SET email = next.email, email_verified = next.email_verified, name = next.name,
+			idp_picture = next.idp_picture,
 			updated_at = CASE WHEN u.email IS DISTINCT FROM next.email OR u.email_verified <> next.email_verified
-				OR u.name <> next.name THEN now() ELSE u.updated_at END
+				OR u.name <> next.name OR u.idp_picture IS DISTINCT FROM next.idp_picture THEN now() ELSE u.updated_at END
 		FROM next WHERE u.id = next.id
 		RETURNING `+qualifiedUserColumns,
-		tenantID, p.Sub, email, verified, p.EmailUnknown, p.idpName(), p.fallbackName()))
+		tenantID, p.Sub, email, verified, p.EmailUnknown, p.idpName(), p.fallbackName(), p.idpPicture(), p.PictureUnknown))
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return User{}, fmt.Errorf("store: refresh user from IdP: %w", err)
 	}

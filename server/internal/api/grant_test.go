@@ -117,6 +117,25 @@ func TestGrantCheckRefreshesEmail(t *testing.T) {
 	}
 }
 
+func TestGrantCheckRefreshesIdPPicture(t *testing.T) {
+	e := newEnv(t)
+	cl, _ := e.signedIn(t)
+	if u, err := getSelf(t, cl); err != nil || u.GetIdpPicture() != "" {
+		t.Fatalf("picture before the IdP has one: %v, %v", u, err)
+	}
+	const picture = "https://avatars.githubusercontent.com/u/1"
+	id := currentSessionID(t, cl)
+	e.makeGrantDue(t, id)
+	e.idp.SetAccount(idptest.Account{Sub: "acc_test", SID: "sid-1", PreferredUsername: "tester",
+		Email: "tester@example.com", EmailVerified: true, Picture: picture})
+	if _, err := e.app.Sessions.CheckGrant(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	if u, err := getSelf(t, cl); err != nil || u.GetIdpPicture() != picture {
+		t.Fatalf("GetSelf after the grant check: %v, %v", u, err)
+	}
+}
+
 func TestGrantCheckStoresRotatedTokenWhenClaimsFail(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)

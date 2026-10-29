@@ -78,7 +78,7 @@ func exchange(t *testing.T, p *IdP, fake *idptest.Provider) (Tokens, error) {
 
 var testAccount = idptest.Account{
 	Sub: "acc_ui", SID: "sid-ui", PreferredUsername: "annguyen", Name: "Nguyễn Văn An",
-	Email: "an@example.com", EmailVerified: true,
+	Email: "an@example.com", EmailVerified: true, Picture: "https://lh3.googleusercontent.com/a/an",
 }
 
 func TestExchangeCompletesClaimsFromUserInfo(t *testing.T) {
@@ -93,7 +93,11 @@ func TestExchangeCompletesClaimsFromUserInfo(t *testing.T) {
 		c.Name != "Nguyễn Văn An" || c.Email != "an@example.com" || !c.EmailVerified || !c.EmailKnown {
 		t.Fatalf("claims = %+v", c)
 	}
-	if prof := c.idpProfile(); prof.EmailUnknown || prof.Email.Email != "an@example.com" || !prof.Email.Verified {
+	if c.Picture != "https://lh3.googleusercontent.com/a/an" || !c.PictureKnown {
+		t.Fatalf("picture claims = %+v", c)
+	}
+	if prof := c.idpProfile(); prof.EmailUnknown || prof.Email.Email != "an@example.com" || !prof.Email.Verified ||
+		prof.Picture != c.Picture || prof.PictureUnknown {
 		t.Fatalf("profile = %+v", prof)
 	}
 }
@@ -113,6 +117,9 @@ func TestExchangeUserInfoOutageFallsBackToIDToken(t *testing.T) {
 	}
 	if !c.idpProfile().EmailUnknown {
 		t.Fatal("an unknown email state would clear the stored email")
+	}
+	if c.PictureKnown || !c.idpProfile().PictureUnknown {
+		t.Fatal("an unknown picture would clear the stored picture")
 	}
 	out := logs.String()
 	if !strings.Contains(out, "IdP userinfo unavailable at sign-in") {
@@ -163,12 +170,17 @@ func TestMergeUserInfo(t *testing.T) {
 	id := IDClaims{Subject: "s", SessionID: "sid", Nonce: "n", PreferredUsername: "id-user", Name: "ID Name"}
 	got := mergeUserInfo(id, IDClaims{Subject: "s", Email: "e@example.com", EmailVerified: true})
 	want := IDClaims{Subject: "s", SessionID: "sid", Nonce: "n", PreferredUsername: "id-user", Name: "ID Name",
-		Email: "e@example.com", EmailVerified: true, EmailKnown: true}
+		Email: "e@example.com", EmailVerified: true, EmailKnown: true, PictureKnown: true}
 	if got != want {
 		t.Fatalf("empty userinfo values replaced ID token values: %+v", got)
 	}
 	got = mergeUserInfo(id, IDClaims{Subject: "s", PreferredUsername: "ui-user", Name: "UI Name"})
 	if got.PreferredUsername != "ui-user" || got.Name != "UI Name" || got.Email != "" || !got.EmailKnown {
 		t.Fatalf("userinfo values not applied: %+v", got)
+	}
+	// userinfo states the picture: its absence there clears the ID token's.
+	got = mergeUserInfo(IDClaims{Subject: "s", Picture: "https://a.example/p", PictureKnown: true}, IDClaims{Subject: "s"})
+	if got.Picture != "" || !got.PictureKnown {
+		t.Fatalf("picture absent from userinfo kept: %+v", got)
 	}
 }

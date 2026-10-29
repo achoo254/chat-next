@@ -28,12 +28,13 @@ type usersService struct {
 // selfUser renders the caller's own user.
 func selfUser(u store.User) *appv1.User {
 	out := &appv1.User{
-		Id:       u.ID,
-		Username: u.Username,
-		Name:     u.Name,
-		Bio:      u.Bio,
-		IsSelf:   true,
-		Email:    u.Email,
+		Id:         u.ID,
+		Username:   u.Username,
+		Name:       u.Name,
+		Bio:        u.Bio,
+		IsSelf:     true,
+		Email:      u.Email,
+		IdpPicture: u.IdPPicture,
 	}
 	if u.PhotoID != "" {
 		out.Photo = media.PhotoRef(u.PhotoID)

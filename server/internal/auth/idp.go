@@ -266,6 +266,11 @@ type IDClaims struct {
 	// carried the email claim, or userinfo answered. When false, Email and
 	// EmailVerified say nothing and the stored email must be kept.
 	EmailKnown bool
+	// Picture is the profile picture URL; PictureKnown, like EmailKnown,
+	// reports that the IdP stated it (the claim was present, or userinfo
+	// answered).
+	Picture      string
+	PictureKnown bool
 	// AuthTime is the ID token's auth_time (when the user last entered
 	// credentials at the IdP); zero when the token has none.
 	AuthTime time.Time
@@ -278,6 +283,7 @@ type rawIDClaims struct {
 	Name              string          `json:"name"`
 	Email             *string         `json:"email"`
 	EmailVerified     json.RawMessage `json:"email_verified"`
+	Picture           *string         `json:"picture"`
 	AuthTime          *float64        `json:"auth_time"`
 }
 
@@ -288,17 +294,21 @@ func (c rawIDClaims) profile(subject string) IDClaims {
 		Subject: subject, SessionID: c.SID,
 		PreferredUsername: c.PreferredUsername, Name: c.Name,
 		EmailVerified: parseBool(c.EmailVerified), EmailKnown: c.Email != nil,
+		PictureKnown: c.Picture != nil,
 	}
 	if c.Email != nil {
 		out.Email = *c.Email
+	}
+	if c.Picture != nil {
+		out.Picture = *c.Picture
 	}
 	return out
 }
 
 // mergeUserInfo completes ID token claims with userinfo claims of the same
 // subject: a userinfo value replaces the ID token's when it is not empty,
-// and the userinfo answer always states the email (an absent email claim
-// there means the account has none to share).
+// and the userinfo answer always states the email and the picture (an
+// absent claim there means the account has none to share).
 func mergeUserInfo(id, info IDClaims) IDClaims {
 	if info.PreferredUsername != "" {
 		id.PreferredUsername = info.PreferredUsername
@@ -307,6 +317,7 @@ func mergeUserInfo(id, info IDClaims) IDClaims {
 		id.Name = info.Name
 	}
 	id.Email, id.EmailVerified, id.EmailKnown = info.Email, info.EmailVerified, true
+	id.Picture, id.PictureKnown = info.Picture, true
 	return id
 }
 

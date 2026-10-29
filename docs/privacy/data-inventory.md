@@ -19,7 +19,8 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 |---|---|---|---|
 | `idp_sub` (`acc_…`), username, tên, giới thiệu | `users` | Tới khi xoá tài khoản; khi xoá: username đổi thành `deleted_<id>`, tên/giới thiệu xoá, `idp_sub` xoá | HĐ |
 | Email (bản sao từ IdP, chỉ khi đã xác minh) | `users.email` | Đọc lại mỗi lần đăng nhập/refresh; xoá khi IdP gỡ hoặc khi xoá tài khoản | HĐ; tìm theo email chỉ khi người dùng cho phép (ĐY) |
-| Ảnh đại diện | Chưa có (RPC trả `unimplemented`) | | |
+| Ảnh đại diện người dùng tự tải lên | `users.photo_file_id` (file ở kho media) | Tới khi người dùng gỡ ảnh hoặc xoá tài khoản; ai thấy theo Cài đặt › Quyền riêng tư | ĐY |
+| Đường dẫn ảnh tài khoản IdP (claim `picture` của scope `profile`: ảnh Google/GitHub, chỉ URL `https`) | `users.idp_picture` | Đọc lại mỗi lần đăng nhập/refresh; xoá khi IdP gỡ hoặc khi xoá tài khoản; chỉ trả cho chính người dùng (`User.idp_picture` ở `GetSelf`), có trong `profile.json` của bản xuất | HĐ |
 | Phiên chat: IP, user agent, thời điểm, `idp_sid`; với app iOS/Android thêm nền tảng, tên thiết bị chung ("iPhone", "iPad", "Android") và phiên bản app | `user_sessions` | Trượt 30 ngày, trần 90 ngày (web; app không có trần); xoá hẳn khi xoá tài khoản | HĐ, NV |
 | Token phiên của app iOS/Android | Keychain (chỉ thiết bị này) hoặc Keystore của máy; server chỉ giữ hash | Xoá khi đăng xuất, phiên bị thu hồi hoặc hết hạn | HĐ |
 | Refresh token, ID token của IdP | `user_sessions` (mã hoá AES-GCM bằng `SESSION_KEY`) | Xoá khi phiên kết thúc; không bao giờ tới client | HĐ |

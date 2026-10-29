@@ -80,6 +80,11 @@ message User {
   // show it as a deleted account. username, name, bio and email are then
   // empty and nobody can write to it. Never set for the caller's own user.
   bool deleted = 12;
+  // The profile picture of the caller's IdP account (an https URL of a
+  // Google or GitHub avatar), set only in UsersService answers about the
+  // caller (GetSelf, UpdateProfile, SetUsername); empty when the IdP has
+  // none. Clients show it where the user has no chat photo.
+  string idp_picture = 13;
 }
 
 message GetSelfRequest {

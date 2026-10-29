@@ -339,7 +339,12 @@ type User struct {
 	// The account was deleted or waits for deletion (PrivacyService): clients
 	// show it as a deleted account. username, name, bio and email are then
 	// empty and nobody can write to it. Never set for the caller's own user.
-	Deleted       bool `protobuf:"varint,12,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	Deleted bool `protobuf:"varint,12,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	// The profile picture of the caller's IdP account (an https URL of a
+	// Google or GitHub avatar), set only in UsersService answers about the
+	// caller (GetSelf, UpdateProfile, SetUsername); empty when the IdP has
+	// none. Clients show it where the user has no chat photo.
+	IdpPicture    string `protobuf:"bytes,13,opt,name=idp_picture,json=idpPicture,proto3" json:"idp_picture,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -456,6 +461,13 @@ func (x *User) GetDeleted() bool {
 		return x.Deleted
 	}
 	return false
+}
+
+func (x *User) GetIdpPicture() string {
+	if x != nil {
+		return x.IdpPicture
+	}
+	return ""
 }
 
 type GetSelfRequest struct {
@@ -2350,7 +2362,7 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"UserStatus\x12*\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x16.app.v1.UserStatusKindR\x04kind\x12\x1f\n" +
 	"\tlast_seen\x18\x02 \x01(\x03B\x020\x02R\blastSeen\x12\x1c\n" +
-	"\aexpires\x18\x03 \x01(\x03B\x020\x02R\aexpires\"\xe5\x02\n" +
+	"\aexpires\x18\x03 \x01(\x03B\x020\x02R\aexpires\"\x86\x03\n" +
 	"\x04User\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x12\n" +
@@ -2365,7 +2377,9 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x05email\x18\n" +
 	" \x01(\tR\x05email\x124\n" +
 	"\x16bot_inline_placeholder\x18\v \x01(\tR\x14botInlinePlaceholder\x12\x18\n" +
-	"\adeleted\x18\f \x01(\bR\adeleted\":\n" +
+	"\adeleted\x18\f \x01(\bR\adeleted\x12\x1f\n" +
+	"\vidp_picture\x18\r \x01(\tR\n" +
+	"idpPicture\":\n" +
 	"\x0eGetSelfRequest\x12(\n" +
 	"\x10allow_signed_out\x18\x01 \x01(\bR\x0eallowSignedOut\"\x89\x01\n" +
 	"\x0fGetSelfResponse\x12 \n" +

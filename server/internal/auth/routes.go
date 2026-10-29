@@ -219,8 +219,10 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 func (c IDClaims) idpProfile() store.IdPProfile {
 	return store.IdPProfile{
 		Sub: c.Subject, PreferredUsername: c.PreferredUsername, Name: c.Name,
-		Email:        store.IdPEmail{Email: c.Email, Verified: c.EmailVerified},
-		EmailUnknown: !c.EmailKnown,
+		Email:          store.IdPEmail{Email: c.Email, Verified: c.EmailVerified},
+		EmailUnknown:   !c.EmailKnown,
+		Picture:        c.Picture,
+		PictureUnknown: !c.PictureKnown,
 	}
 }
 

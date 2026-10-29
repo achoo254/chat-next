@@ -73,6 +73,8 @@ type Account struct {
 	Name              string
 	Email             string
 	EmailVerified     bool
+	// Picture is left out of userinfo when empty, as the IdP does.
+	Picture string
 }
 
 // Authorize records one authorization request.
@@ -576,10 +578,14 @@ func (p *Provider) userinfo(w http.ResponseWriter, r *http.Request) {
 		sub = "other-" + a.Sub
 	case UserInfoOK:
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	info := map[string]any{
 		"sub": sub, "preferred_username": a.PreferredUsername, "name": a.Name,
 		"email": a.Email, "email_verified": a.EmailVerified,
-	})
+	}
+	if a.Picture != "" {
+		info["picture"] = a.Picture
+	}
+	writeJSON(w, http.StatusOK, info)
 }
 
 // Sign returns a compact ES256 JWS of claims with the given typ header

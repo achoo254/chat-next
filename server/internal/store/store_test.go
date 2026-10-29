@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -72,6 +73,48 @@ func TestUpsertIdPUser(t *testing.T) {
 	}
 	if other.Username != "dat2" || other.Name != "dat" {
 		t.Fatalf("conflicting user = %+v", other)
+	}
+}
+
+func TestUpsertIdPUserPicture(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	const picture = "https://lh3.googleusercontent.com/a/dat"
+	upsert := func(p store.IdPProfile) store.User {
+		t.Helper()
+		p.Sub, p.PreferredUsername = "acc_pic", "dat"
+		u, err := s.UpsertIdPUser(ctx, tenant, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+
+	if u := upsert(store.IdPProfile{Picture: " " + picture + " "}); u.IdPPicture != picture {
+		t.Fatalf("new user picture = %q", u.IdPPicture)
+	}
+	// An answer that said nothing about the picture keeps it.
+	if u := upsert(store.IdPProfile{PictureUnknown: true}); u.IdPPicture != picture {
+		t.Fatalf("unknown picture state cleared it: %q", u.IdPPicture)
+	}
+	read, err := s.UserByIdPSub(ctx, tenant, "acc_pic")
+	if err != nil || read.IdPPicture != picture {
+		t.Fatalf("read back = %q, %v", read.IdPPicture, err)
+	}
+	// Only absolute https URLs are stored; anything else counts as none.
+	for _, bad := range []string{"http://example.com/p.png", "javascript:alert(1)", "https:///p.png",
+		"https://user:pass@example.com/p.png", "https://example.com/" + strings.Repeat("a", 2048)} {
+		if u := upsert(store.IdPProfile{Picture: picture}); u.IdPPicture != picture {
+			t.Fatalf("picture not restored: %q", u.IdPPicture)
+		}
+		if u := upsert(store.IdPProfile{Picture: bad}); u.IdPPicture != "" {
+			t.Fatalf("picture %q stored as %q", bad, u.IdPPicture)
+		}
+	}
+	// The IdP reports none: cleared.
+	upsert(store.IdPProfile{Picture: picture})
+	if u := upsert(store.IdPProfile{}); u.IdPPicture != "" {
+		t.Fatalf("picture the IdP dropped kept: %q", u.IdPPicture)
 	}
 }
 

@@ -334,6 +334,7 @@ func (w *exportWriter) write() error {
 		Name         string          `json:"name"`
 		Bio          string          `json:"bio"`
 		Email        string          `json:"email,omitempty"`
+		IdPPicture   string          `json:"idp_picture,omitempty"`
 		CreatedAt    string          `json:"created_at"`
 		AutoDelete   int16           `json:"auto_delete_months"`
 		Privacy      json.RawMessage `json:"privacy_settings"`
@@ -343,11 +344,11 @@ func (w *exportWriter) write() error {
 	var created time.Time
 	var privacy, notification []byte
 	if err := q.QueryRow(ctx, `
-		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.created_at, u.auto_delete_months,
+		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), coalesce(u.idp_picture, ''), u.created_at, u.auto_delete_months,
 			coalesce((SELECT to_jsonb(p) - 'user_id' FROM privacy_settings p WHERE p.user_id = u.id), 'null'),
 			coalesce((SELECT to_jsonb(n) - 'user_id' FROM notification_settings n WHERE n.user_id = u.id), 'null')
 		FROM users u WHERE u.id = $1 AND u.tenant_id = $2`, me, w.s.cfg.TenantID).Scan(
-		&profile.ID, &profile.Username, &profile.Name, &profile.Bio, &profile.Email, &created, &profile.AutoDelete,
+		&profile.ID, &profile.Username, &profile.Name, &profile.Bio, &profile.Email, &profile.IdPPicture, &created, &profile.AutoDelete,
 		&privacy, &notification); err != nil {
 		return fmt.Errorf("privacy: export profile: %w", err)
 	}
