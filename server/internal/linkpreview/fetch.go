@@ -32,8 +32,10 @@ import (
 
 // Limits of one fetch and of the stored fields.
 const (
-	DefaultTimeout      = 5 * time.Second
-	DefaultMaxBytes     = 512 << 10
+	DefaultTimeout = 5 * time.Second
+	// DefaultMaxBytes is read up to the end of <head>: some sign-in pages
+	// (Google's) carry about 750 KB of inline style and script before <title>.
+	DefaultMaxBytes     = 2 << 20
 	DefaultMaxRedirects = 3
 	MaxURLLength        = 2048
 

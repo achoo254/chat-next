@@ -146,6 +146,23 @@ func TestFetchRejectsNonHTMLAndBoundsSize(t *testing.T) {
 	}
 }
 
+func TestFetchReadsTitleAfterLargeHead(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Sign-in pages such as Google's put about 750 KB of inline style and
+		// script before their title.
+		_, _ = fmt.Fprint(w, "<html><head><style>"+strings.Repeat("a{color:red}", 800<<10/12)+"</style><title>Đăng nhập - Tài khoản Google</title></head></html>")
+	}))
+	defer srv.Close()
+	p, err := NewFetcher(Options{Allow: localOnly(t, srv)}).Fetch(context.Background(), srv.URL+"/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Title != "Đăng nhập - Tài khoản Google" {
+		t.Fatalf("preview = %+v", p)
+	}
+}
+
 func TestNormalizeURL(t *testing.T) {
 	for in, want := range map[string]string{
 		"HTTPS://Example.COM":          "https://example.com/",
