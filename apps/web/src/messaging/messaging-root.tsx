@@ -98,6 +98,7 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 				case "appearance":
 				case "shortcuts":
 				case "app":
+				case "mcp":
 					return [settingsCode.preload(), settingsExtraCode.preload()];
 				case "account":
 					warm(loadConnectWeb, loadPrivacyClient);

@@ -70,8 +70,9 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 	const { t } = useI18n();
 	const groups = tabGroups(messaging);
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
-	// "Tài khoản" (export and deletion) follows the Developer Console link (mockups/settings.html#export-delete).
-	const available = groups.some((group) => group.some((item) => item.tab === tab)) || (messaging !== undefined && tab === "account");
+	// "Kết nối AI" and "Tài khoản" (export and deletion) follow the Developer Console link (mockups/settings.html#export-delete).
+	const available =
+		groups.some((group) => group.some((item) => item.tab === tab)) || (messaging !== undefined && (tab === "mcp" || tab === "account"));
 	useEffect(() => {
 		if (!available) navigate(paths.settings("profile"), { replace: true });
 	}, [available]);
@@ -107,6 +108,10 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 						<Link to={paths.console()}>
 							<Icon name="robot" />
 							<span>{t.settings.console}</span>
+						</Link>
+						<Link to={paths.settings("mcp")} current={tab === "mcp"}>
+							<Icon name="plug" />
+							<span>{t.settings.mcp}</span>
 						</Link>
 						<Link to={paths.settings("account")} current={tab === "account"}>
 							<Icon name="key" />

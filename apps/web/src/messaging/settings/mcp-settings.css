@@ -1,0 +1,9 @@
+/* "Kết nối AI (MCP)" settings tab. */
+.mcp .card.pad { display: grid; gap: var(--space-3); }
+.mcp .card.pad > .card-title.flush { padding-bottom: 0; }
+.mcp .choice { justify-self: start; }
+.mcp-address { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
+.mcp-address code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mcp-snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mcp-snippet-actions { display: flex; justify-content: flex-end; }
+.tag.warn { background: color-mix(in srgb, var(--c-warning) 16%, transparent); color: var(--c-warning-text); }

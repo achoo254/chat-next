@@ -39,6 +39,7 @@ export const en: Messages = {
 		app: "Install the app",
 		moderation: "Moderation",
 		console: "Developer Console",
+		mcp: "AI tools (MCP)",
 		account: "Account",
 		feedback: "Feedback",
 		signOut: "Sign out",

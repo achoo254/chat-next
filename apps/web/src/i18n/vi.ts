@@ -37,6 +37,7 @@ export const vi = {
 		app: "Cài ứng dụng",
 		moderation: "Kiểm duyệt",
 		console: "Developer Console",
+		mcp: "Kết nối AI (MCP)",
 		account: "Tài khoản",
 		feedback: "Góp ý",
 		signOut: "Đăng xuất",

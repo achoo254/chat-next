@@ -284,6 +284,7 @@ const SCREENS: Record<string, string> = {
 	"settings-app": "/settings/app",
 	// The shared language and theme switches (@achoo254/app-shell) in Settings › Giao diện.
 	"settings-appearance": "/settings/appearance",
+	"settings-mcp": "/settings/mcp",
 };
 const at = params.get("at");
 if (at === "settings-app") {

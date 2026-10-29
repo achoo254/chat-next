@@ -1,5 +1,6 @@
 // Settings tabs added with messaging (mockups/settings.html#privacy,
-// #blocked, #notifications, #appearance, #shortcuts).
+// #blocked, #notifications, #appearance, #shortcuts), and the MCP endpoint
+// for AI tools (ADR 0012).
 import type { NotificationSettings as CoreNotificationSettings, NotificationSound } from "@achoo254/chat-core";
 import { requestNotificationPermission } from "@achoo254/chat-platform-web";
 import { LanguageSwitch, ThemeSwitch } from "@achoo254/app-shell";
@@ -23,6 +24,7 @@ import { ContactsGlyph } from "../ui/contacts-glyph.tsx";
 import { DevicePush, usePushOnDevice } from "./device-push.tsx";
 import { InstallSettings } from "./install-app.tsx";
 import { AccountSettings } from "./account-settings.tsx";
+import { McpSettings } from "./mcp-settings.tsx";
 import ProfilePhotoField from "./profile-photo.tsx";
 import type { SelfUser } from "../../api/adapters.ts";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
@@ -46,6 +48,8 @@ export default function SettingsExtra({ tab, self, onSelfChange }: { tab: Settin
 			return <InstallSettings />;
 		case "account":
 			return <AccountSettings />;
+		case "mcp":
+			return <McpSettings />;
 		default:
 			return null;
 	}

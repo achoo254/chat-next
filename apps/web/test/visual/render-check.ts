@@ -54,6 +54,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"settings-notifications": "?at=settings-notifications",
 	"settings-app": "?at=settings-app",
 	"settings-appearance": "?at=settings-appearance",
+	"settings-mcp": "?at=settings-mcp",
 };
 
 export const VIEWPORTS = [
