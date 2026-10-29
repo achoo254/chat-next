@@ -49,7 +49,7 @@ ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8 pnpm mobile:ios
 ```
 
 - Key API (vai trò Admin, cần cho ký phân phối bằng key): tệp `.p8` ngoài repo, quyền 600; Key ID và Issuer ID nằm trong tệp access-tokens trên iCloud, service `appstoreconnect.apple.com`.
-- Phiên bản: `MARKETING_VERSION` (`1.0`) trong `project.pbxproj`; số build do script đặt = giờ UTC `YYYYMMDD.HHMM` (luôn tăng), hoặc `IOS_BUILD_NUMBER`. `IOS_RELEASE_DIR` giữ lại archive.
+- Phiên bản: `MARKETING_VERSION` (`1.0.1`; bản 1.0 nộp duyệt App Store ngày 27/10/2026) trong `project.pbxproj`, tăng mỗi lần nộp bản mới; số build do script đặt = giờ UTC `YYYYMMDD.HHMM` (luôn tăng), hoặc `IOS_BUILD_NUMBER`. `IOS_RELEASE_DIR` giữ lại archive.
 - `Info.plist` khai `ITSAppUsesNonExemptEncryption = false` (chỉ HTTPS chuẩn) nên TestFlight không hỏi về mã hoá; `UIRequiredDeviceCapabilities` = `arm64`.
 - App record "Chat - trò chuyện" (`com.hoandat.chat`) có nhóm TestFlight nội bộ "Nội bộ" nhận mọi build (`hasAccessToAllBuilds`); build hiện ở đó sau khi Apple xử lý xong (trạng thái `VALID`).
 - Server không cần Team ID: callback đăng nhập là scheme riêng `com.hoandat.chat:/auth/callback`, không phải Universal Link, nên không có `apple-app-site-association`. Đăng nhập app bật mặc định (`NATIVE_SIGN_IN` không đặt trong `/opt/chat/.env`, kiểm 26/10/2026).
