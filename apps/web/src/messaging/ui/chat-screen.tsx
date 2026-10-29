@@ -205,7 +205,7 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 								<TopicListColumn chat={chat} title={title} topics={topics} currentTopicId={topic?.id ?? 0} />
 							</Suspense>
 						) : (
-							<ChatListColumn folder={folder} onFolder={setFolder} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
+							<ChatListColumn self={self} folder={folder} onFolder={setFolder} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
 						)}
 						{chatId === 0 ? (
 							<EmptyConversation />

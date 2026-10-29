@@ -139,7 +139,16 @@
 .folder:hover { background: var(--c-hover); color: var(--c-text); }
 .folder[aria-current="true"], .folder[aria-current="page"] { background: var(--c-selected); color: var(--c-primary); }
 .folder .badge { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
-.folder.me { min-height: 48px; place-items: center; }
+/* The account menu (messaging/ui/account-menu.tsx) heads the rail. The rail
+   scrolls (overflow-y) and would clip a panel placed against the button, so
+   like the switcher below its panel is placed against .app (relative):
+   beside the rail, at the top of the screen. */
+.folder-rail .chat-account { align-self: center; margin-bottom: var(--space-1); }
+.folder-rail .chat-account .shell-account { position: static; }
+.folder-rail .shell-account-panel {
+	top: calc(env(safe-area-inset-top) + var(--space-2)); right: auto;
+	left: calc(env(safe-area-inset-left) + var(--rail-w) + var(--space-1));
+}
 /* The app switcher (components/ecosystem-app-switcher.tsx) in the folder rail.
    The rail scrolls (overflow-y), which would clip a panel positioned against
    the switcher; static, its panel is placed against .app (relative) instead,
@@ -1018,6 +1027,9 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.n-head.narrow-only { position: relative; }
 	.n-head .sn-app-switcher.n-head-switcher { position: static; }
 	.sn-app-switcher.n-head-switcher[data-placement] .sn-app-switcher__panel { right: var(--space-2); }
+	/* The account menu at the bar's left edge opens under it, from the left. */
+	.n-head .chat-account .shell-account { position: static; }
+	.n-head .shell-account-panel { top: calc(100% + var(--space-1)); left: var(--space-2); right: auto; }
 	.n-head h2 { flex: 1; margin: 0 0 0 var(--space-1); font-size: 1.125rem; font-weight: 600; }
 	.app .list .list-head { max-height: 80px; overflow: hidden; padding: var(--space-3) var(--space-3) var(--space-2); transition: max-height var(--dur-base) var(--ease-standard), padding var(--dur-base) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard); }
 	/* Scrolled down (chat-list.tsx collapseHead): the search box folds away and the header slims to one small title row. */

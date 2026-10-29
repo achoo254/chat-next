@@ -26,6 +26,7 @@ Email liên hệ, vị trí máy chủ và Cloudflare là sự thật của dị
 | Danh tính Google/GitHub, email gốc, cách đăng nhập do IdP giữ; quản lý/xoá ở `auth.<domain>/account` | [data-inventory.md](data-inventory.md) mục "IdP và app chat" |
 | Hồ sơ: username, tên, giới thiệu, mã tài khoản IdP | data-inventory.md, dòng `users` |
 | Email: bản sao đã xác minh, đọc lại mỗi lần đăng nhập; tìm theo email mặc định Không ai | data-inventory.md, dòng `users.email`; `privacy.findByEmailHint` trong [`vi-screens.ts`](../../apps/web/src/messaging/copy/vi-screens.ts) |
+| Ảnh tài khoản: đường dẫn ảnh Google/GitHub, đọc lại mỗi lần đăng nhập, chỉ chính người dùng thấy khi chưa tải ảnh lên | data-inventory.md, dòng `users.idp_picture`; `selfUser` trong [`users_service.go`](../../server/internal/rpc/users_service.go), `drawsChatAvatar` trong [`account-menu.tsx`](../../apps/web/src/messaging/ui/account-menu.tsx) |
 | Phiên: IP, user agent, thời điểm; trượt 30 ngày, trần 90 ngày (web) | data-inventory.md, dòng `user_sessions` |
 | Tin, cảm xúc, ghim, trạng thái đọc, file media | data-inventory.md |
 | Danh bạ, chặn, cài đặt quyền riêng tư/thông báo/tự xoá | data-inventory.md |

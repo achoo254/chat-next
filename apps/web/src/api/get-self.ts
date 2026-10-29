@@ -102,6 +102,8 @@ export function parseGetSelf(body: unknown): SelfUser {
 	};
 	const photoId = isRecord(user.photo) ? text(user.photo, "fileId") : "";
 	if (photoId !== "") self.photoId = photoId;
+	const idpPicture = text(user, "idpPicture");
+	if (idpPicture !== "") self.idpPicture = idpPicture;
 	const deletion = parseDeletion(body.deletion);
 	return deletion === null ? self : { ...self, deletion };
 }

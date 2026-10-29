@@ -2,16 +2,16 @@
 // /delete-account): the shared header, footer and page of every hoandat.com
 // app (@achoo254/app-shell), so Chat's chrome cannot drift from the others.
 // Chat gives its name, mark, links and language; the body is its own.
-// app-shell.css loads with these lazy screens (and the Appearance settings),
-// not at a signed-in start.
-import { PublicPage, type ShellBrand, type ShellLinkComponent } from "@achoo254/app-shell";
+// app-shell.css also styles the signed-in screens' account menu.
+import { PublicPage, type ShellBrand } from "@achoo254/app-shell";
 import "@achoo254/app-shell/app-shell.css";
 import type { ReactNode } from "react";
 import { LEGACY_THEME_KEY } from "../appearance.ts";
 import { brand } from "../brand.ts";
 import { LOCALES, useI18n } from "../i18n/i18n.tsx";
-import { followInApp, paths, returnPathFor, usePathname, useSearch } from "../router.tsx";
+import { paths, returnPathFor, usePathname, useSearch } from "../router.tsx";
 import { loginUrl } from "../screens/welcome-url.ts";
+import { ShellRouterLink } from "./shell-router-link.tsx";
 
 /** What the shared shell shows of Chat: name, root domain, AI mark (the brand icon the build serves). */
 export const SHELL_BRAND: ShellBrand = {
@@ -19,24 +19,6 @@ export const SHELL_BRAND: ShellBrand = {
 	domain: brand.domain,
 	markSrc: "/icon.svg",
 };
-
-/**
- * Chat's own pages open in place, without a reload. A server route such as
- * /auth/login (the header's sign-in on a page sign-in returns to) is left to
- * the browser.
- */
-const RouterLink: ShellLinkComponent = ({ href, onClick, children, ...rest }) => (
-	<a
-		{...rest}
-		href={href}
-		onClick={(event) => {
-			onClick?.(event);
-			if (!href.startsWith("/auth/")) followInApp(event, href);
-		}}
-	>
-		{children}
-	</a>
-);
 
 /**
  * The header's "Đăng nhập": /login, except on the web on a page sign-in
@@ -72,7 +54,7 @@ export function ChatPublicPage({ children, layout = "flow" }: { children: ReactN
 				},
 			]}
 			legacyThemeKey={LEGACY_THEME_KEY}
-			linkComponent={RouterLink}
+			linkComponent={ShellRouterLink}
 			layout={layout}
 		>
 			{children}

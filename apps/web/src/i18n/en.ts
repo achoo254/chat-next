@@ -24,7 +24,6 @@ export const en: Messages = {
 		nav: "Navigation",
 		chats: "Chats",
 		settings: "Settings",
-		account: (name: string) => `Your account: ${name}`,
 	},
 	settings: {
 		title: "Settings",

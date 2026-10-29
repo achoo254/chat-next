@@ -1,14 +1,8 @@
 import "@achoo254/app-switcher/app-switcher.css";
 import { AppSwitcher, type AppSwitcherPlacement } from "@achoo254/app-switcher";
-import { openExternal } from "@achoo254/chat-platform-web";
 import { brand } from "../brand.ts";
 import { useI18n } from "../i18n/i18n.tsx";
-import { IS_NATIVE } from "../server-origin.ts";
-
-/** The native app hands the other apps to the system browser, never its WebView. */
-function openInSystemBrowser(url: string): void {
-	openExternal(url, brand.urlScheme);
-}
+import { OPEN_EXTERNAL } from "./open-in-system-browser.ts";
 
 interface EcosystemAppSwitcherProps {
 	/** "right-end" beside a side rail, "bottom-end" under a top bar. */
@@ -30,7 +24,7 @@ export function EcosystemAppSwitcher({ placement, className }: EcosystemAppSwitc
 			domain={brand.domain}
 			locale={locale}
 			placement={placement}
-			onOpen={IS_NATIVE ? openInSystemBrowser : undefined}
+			onOpen={OPEN_EXTERNAL}
 			className={className}
 		/>
 	);

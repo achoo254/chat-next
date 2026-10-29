@@ -32,6 +32,7 @@ import { accountData, blockedData, myBotsData, notificationSettingsData, privacy
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
+import { AccountMenuSlot } from "./ui/account-menu-slot.tsx";
 import { FolderRail } from "./ui/folder-rail.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { messageExtrasPreloads } from "./ui/message-item.tsx";
@@ -362,10 +363,9 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 	}
 	return (
 		<Shell
-			self={self}
 			route={route}
 			nav={<ContactsLink />}
-			avatar={<ChatAvatar id={self.id} name={self.name} size="sm" photoOf={self.id} photoId={self.photoId} />}
+			account={<AccountMenuSlot self={self} />}
 			rail={<FolderRail self={self} folder={null} settings={route.name === "settings"} onFolder={openFolder} />}
 		>
 			<LoaderBoundary key={route.name}>

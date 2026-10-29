@@ -70,6 +70,7 @@ const vi: LegalCopy = {
 					items: [
 						"Hồ sơ: username, tên hiển thị, giới thiệu và mã tài khoản ở nơi đăng nhập.",
 						`Email: bản sao email đã xác minh của tài khoản ${domain}, đọc lại mỗi lần đăng nhập. Người khác chỉ tìm được bạn bằng email khi bạn cho phép (mặc định: Không ai).`,
+						`Ảnh tài khoản: đường dẫn ảnh Google hoặc GitHub của tài khoản ${domain}, đọc lại mỗi lần đăng nhập. Chỉ bạn thấy, trên nút tài khoản, khi bạn chưa tải ảnh đại diện lên app chat.`,
 						"Phiên đăng nhập: địa chỉ IP, trình duyệt hoặc thiết bị và thời điểm dùng.",
 						"Tin nhắn, cảm xúc, tin ghim, trạng thái đã đọc và file bạn gửi (ảnh, video, file, tin thoại).",
 						"Danh bạ, người bạn đã chặn, và cài đặt quyền riêng tư, thông báo, tự xoá.",
@@ -287,6 +288,7 @@ const en: LegalCopy = {
 					items: [
 						"Profile: username, display name, bio and the id of your sign-in account.",
 						`Email: a copy of your ${domain} account's verified email, read again at every sign-in. Others find you by email only if you allow it (default: Nobody).`,
+						`Account picture: the link to the Google or GitHub picture of your ${domain} account, read again at every sign-in. Only you see it, on the account button, while you have not uploaded a profile photo to the chat app.`,
 						"Sessions: IP address, browser or device, and when they were used.",
 						"Messages, reactions, pins, read state and the files you send (photos, videos, files, voice messages).",
 						"Contacts, people you blocked, and your privacy, notification and auto-delete settings.",

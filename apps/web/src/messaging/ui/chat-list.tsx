@@ -1,10 +1,11 @@
-// The chat list column: search box, filter tabs and the header with
-// Settings, Contacts and New chat (narrow screens, mockups/chat.html#narrow)
+// The chat list column: search box, filter tabs and the header with the
+// account menu, Settings, Contacts and New chat (narrow screens, mockups/chat.html#narrow)
 // and the dialog list. Rows have a fixed height per kind and are absolutely
 // positioned, and only the rows in view (plus a margin) are mounted. The
 // "Chưa đọc" filter keeps a chat you just read until you change filters, so
 // the list does not jump (#list-states). Alt+↑/↓ opens the chat above/below.
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
+import type { SelfUser } from "../../api/adapters.ts";
 import { brand } from "../../brand.ts";
 import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon } from "../../components/icon.tsx";
@@ -12,6 +13,7 @@ import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { inFolder, type Folder } from "../data/format.ts";
 import { useBackendValue, useListEntries, useListStatus } from "../data/services.tsx";
+import { AccountMenuSlot } from "./account-menu-slot.tsx";
 import { ChatRow, ROW_HEIGHT, TWO_LINE_ROW_HEIGHT } from "./chat-row.tsx";
 import { FolderTabs } from "./folder-rail.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
@@ -28,6 +30,7 @@ interface Kept {
 }
 
 interface ChatListProps {
+	self: SelfUser;
 	folder: Folder;
 	onFolder: (folder: Folder) => void;
 	currentChatId: number;
@@ -38,7 +41,7 @@ interface ChatListProps {
 /** The search shortcut as this platform writes it (⌘K on Apple, Ctrl K elsewhere). */
 const SEARCH_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘K" : "Ctrl K";
 
-export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onVisibleChats }: ChatListProps) {
+export function ChatListColumn({ self, folder, onFolder, currentChatId, searchRef, onVisibleChats }: ChatListProps) {
 	const copy = useCopy();
 	const ui = useUi();
 	const [query, setQuery] = useState("");
@@ -54,6 +57,7 @@ export function ChatListColumn({ folder, onFolder, currentChatId, searchRef, onV
 	return (
 		<section className="list" aria-label={copy.list.label}>
 			<header className="n-head narrow-only">
+				<AccountMenuSlot self={self} />
 				<Link to={paths.settingsList} className="icon-btn" aria-label={copy.folders.settings}>
 					<Icon name="settings" />
 				</Link>

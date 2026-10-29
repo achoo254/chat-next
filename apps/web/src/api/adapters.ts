@@ -17,6 +17,8 @@ export interface SelfUser {
 	isOperator: boolean;
 	/** file_id of the profile photo; absent without one. */
 	photoId?: string;
+	/** https URL of the IdP account's picture (User.idp_picture), shown where there is no chat photo; absent without one. */
+	idpPicture?: string;
 	/** Set while the account waits for deletion (GetSelfResponse.deletion): the app then only offers to cancel it. */
 	deletion?: AccountDeletionInfo;
 }
@@ -55,6 +57,7 @@ export function toSelfUser(user: User, isOperator = false): SelfUser {
 		email: user.email,
 		isOperator,
 		...(user.photo !== undefined && user.photo.fileId !== "" ? { photoId: user.photo.fileId } : {}),
+		...(user.idpPicture !== "" ? { idpPicture: user.idpPicture } : {}),
 	};
 }
 

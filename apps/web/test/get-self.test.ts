@@ -16,6 +16,10 @@ describe("GetSelf over JSON", () => {
 			email: "t@example.com",
 			isOperator: true,
 		});
+		expect(parseGetSelf({ user: { id: "42", photo: { fileId: "f1" }, idpPicture: "https://avatars.githubusercontent.com/u/1" } })).toMatchObject({
+			photoId: "f1",
+			idpPicture: "https://avatars.githubusercontent.com/u/1",
+		});
 		// Default values are omitted on the wire.
 		expect(parseGetSelf({ user: { id: "7" } })).toEqual({ id: 7, name: "", username: "", bio: "", email: "", isOperator: false });
 	});

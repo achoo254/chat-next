@@ -22,7 +22,6 @@ export const vi = {
 		nav: "Điều hướng",
 		chats: "Trò chuyện",
 		settings: "Cài đặt",
-		account: (name: string) => `Tài khoản của bạn: ${name}`,
 	},
 	settings: {
 		title: "Cài đặt",

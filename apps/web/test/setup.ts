@@ -17,6 +17,13 @@ if (typeof URL.createObjectURL !== "function") {
 window.requestIdleCallback = () => 0;
 window.cancelIdleCallback = () => undefined;
 
+// A browser's own stylesheet hides what a closed <details> holds besides its
+// <summary> (the account menu's items), which takes it out of the
+// accessibility tree; jsdom has no such rule, so role queries would find it.
+const userAgentRules = document.createElement("style");
+userAgentRules.textContent = "details:not([open]) > :not(summary) { display: none; }";
+document.head.append(userAgentRules);
+
 // Screens and menus load lazily; shared CI runners are about twice as slow
 // as a laptop, so async queries wait up to 5 s before failing.
 configure({ asyncUtilTimeout: 5000 });

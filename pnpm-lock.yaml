@@ -73,8 +73,8 @@ importers:
   apps/web:
     dependencies:
       '@achoo254/app-shell':
-        specifier: github:achoo254/shared-next#v0.9.1&path:/packages/app-shell
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/6fecc5f65b044438a2fde6ebd68b450e2956bb47#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)
+        specifier: github:achoo254/shared-next#v0.11.0&path:/packages/app-shell
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/b343ab95bdb90817277a8cfa8ed47556ff59427d#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)
       '@achoo254/app-switcher':
         specifier: github:achoo254/shared-next#v0.10.0&path:/packages/app-switcher
         version: https://codeload.github.com/achoo254/shared-next/tar.gz/435bed1875041317dd434d5eded7253b5c2bbe98#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)
@@ -235,9 +235,9 @@ importers:
 
 packages:
 
-  '@achoo254/app-shell@https://codeload.github.com/achoo254/shared-next/tar.gz/6fecc5f65b044438a2fde6ebd68b450e2956bb47#path:/packages/app-shell':
-    resolution: {gitHosted: true, path: /packages/app-shell, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/6fecc5f65b044438a2fde6ebd68b450e2956bb47}
-    version: 0.3.1
+  '@achoo254/app-shell@https://codeload.github.com/achoo254/shared-next/tar.gz/b343ab95bdb90817277a8cfa8ed47556ff59427d#path:/packages/app-shell':
+    resolution: {gitHosted: true, path: /packages/app-shell, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/b343ab95bdb90817277a8cfa8ed47556ff59427d}
+    version: 0.4.0
     engines: {node: '>=22.12'}
     peerDependencies:
       '@achoo254/brand': '>=0.3.0 <1'
@@ -2355,7 +2355,7 @@ packages:
 
 snapshots:
 
-  '@achoo254/app-shell@https://codeload.github.com/achoo254/shared-next/tar.gz/6fecc5f65b044438a2fde6ebd68b450e2956bb47#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)':
+  '@achoo254/app-shell@https://codeload.github.com/achoo254/shared-next/tar.gz/b343ab95bdb90817277a8cfa8ed47556ff59427d#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand)(react@19.3.0)':
     dependencies:
       '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/74b8c792754fbb1f4d4f4e26fbdf3958c8bb7f8e#path:/packages/brand
       react: 19.3.0

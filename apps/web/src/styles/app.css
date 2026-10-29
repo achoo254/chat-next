@@ -116,6 +116,23 @@ button { cursor: pointer; }
 	--app-switcher-item-radius: var(--radius-sm);
 	--app-switcher-font: var(--font-sans);
 }
+/* Account menu (messaging/ui/account-menu.tsx): the shared avatar button of
+   @achoo254/app-shell, avatar only and round like Chat's avatars, with Chat's
+   own avatar stacked over it in the same grid cell (no positioned box, so the
+   panel is still placed against the frame where a rail needs it). The rails
+   have no room for the name: it is in the button's label and the menu. */
+.chat-account { display: grid; flex: none; }
+.chat-account > * { grid-area: 1 / 1; }
+.chat-account-photo { z-index: 1; display: grid; place-self: center; pointer-events: none; }
+/* While the menu loads (account-menu-slot.tsx): the avatar in the button's box. */
+.chat-account-stand-in { display: grid; place-items: center; min-width: 44px; min-height: 44px; }
+.chat-account .shell-account-trigger { justify-content: center; min-width: 44px; min-height: 44px; padding: var(--space-1); }
+.chat-account .shell-avatar { width: var(--avatar-sm); height: var(--avatar-sm); border-radius: var(--radius-full); }
+.chat-account .shell-account-name, .chat-account .shell-account-trigger > .shell-icon { display: none; }
+.shell-account-item > .icon { color: var(--c-icon-muted); }
+/* The settings screens' rail: beside the button, not under it (its default
+   right-aligned drop would run off the left of the screen). */
+.rail .shell-account-panel { top: 0; left: calc(100% + var(--space-2)); right: auto; }
 .avatar {
 	display: grid; place-items: center; width: var(--avatar); height: var(--avatar); border-radius: var(--radius-full);
 	font-weight: 600; font-size: 0.875rem; flex: none;
@@ -244,6 +261,9 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 	   its right edge, instead of beside the button (above the screen's top). */
 	.rail { position: relative; }
 	.sn-app-switcher.rail-switcher { position: static; }
+	/* The account menu at its left edge opens under the bar, from the left. */
+	.rail .chat-account .shell-account { position: static; }
+	.rail .shell-account-panel { top: calc(100% + var(--space-1)); left: var(--space-2); }
 	.sn-app-switcher.rail-switcher[data-placement] .sn-app-switcher__panel {
 		top: calc(100% + var(--space-1)); bottom: auto; left: auto; right: var(--space-2);
 	}
