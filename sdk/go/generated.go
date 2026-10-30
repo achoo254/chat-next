@@ -31,6 +31,10 @@ type User struct {
 	Name  string `json:"name"`
 	// Unique in the tenant; absent when the user has none.
 	Username string `json:"username,omitempty"`
+	// The language the person's app shows, so the bot can answer in it. Set on the users of updates
+	// (the sender, the presser of a button, the private chat's user, ...) when known; never on bots
+	// nor in method answers. Users whose app has not reported a language yet count as `vi`.
+	LanguageCode string `json:"language_code,omitempty"`
 }
 
 type Me struct {
@@ -39,6 +43,10 @@ type Me struct {
 	Name  string `json:"name"`
 	// Unique in the tenant; absent when the user has none.
 	Username string `json:"username,omitempty"`
+	// The language the person's app shows, so the bot can answer in it. Set on the users of updates
+	// (the sender, the presser of a button, the private chat's user, ...) when known; never on bots
+	// nor in method answers. Users whose app has not reported a language yet count as `vi`.
+	LanguageCode string `json:"language_code,omitempty"`
 	// Privacy mode in groups (default on): the bot receives only the messages listed under
 	// Update.message, and forwards or copies from a group only those and its own messages (others
 	// answer 404 not_found).

@@ -39,3 +39,43 @@ func (s *Service) UserLocale(ctx context.Context, userID int64) (string, error) 
 	}
 	return lang, nil
 }
+
+// attachLocales sets the Locales of updates with one query for the people
+// among their users, so a bot can answer in the sender's language.
+func (s *Service) attachLocales(ctx context.Context, updates []BotUpdate) error {
+	var ids []int64
+	for _, u := range updates {
+		for _, user := range u.Users {
+			if !user.GetIsBot() && !user.GetDeleted() {
+				ids = append(ids, user.GetId())
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.pool.Query(ctx, `SELECT id, locale FROM users WHERE tenant_id = $1 AND id = ANY($2)`,
+		s.cfg.TenantID, uniqueSorted(ids))
+	if err != nil {
+		return fmt.Errorf("chat: user locales: %w", err)
+	}
+	defer rows.Close()
+	locales := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var lang string
+		if err := rows.Scan(&id, &lang); err != nil {
+			return fmt.Errorf("chat: user locales: %w", err)
+		}
+		if locale.Valid(lang) {
+			locales[id] = lang
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("chat: user locales: %w", err)
+	}
+	for i := range updates {
+		updates[i].Locales = locales
+	}
+	return nil
+}

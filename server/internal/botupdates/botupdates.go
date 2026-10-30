@@ -468,7 +468,7 @@ func (s *Service) updatesOf(ctx context.Context, rows []chat.OutboxRow) ([]chat.
 
 // payloadOf serializes the update body (without update_id) for the bot.
 func payloadOf(u chat.BotUpdate) ([]byte, error) {
-	users := wire.IndexUsers(u.Users)
+	users := wire.IndexUsers(u.Users).WithLocales(u.Locales)
 	c := wire.FromChat(u.Chat, users)
 	var v any
 	switch {

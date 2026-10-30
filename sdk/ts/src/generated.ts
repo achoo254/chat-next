@@ -27,6 +27,12 @@ export interface User {
 	name: string;
 	/** Unique in the tenant; absent when the user has none. */
 	username?: string;
+	/**
+	 * The language the person's app shows, so the bot can answer in it. Set on the users of updates
+	 * (the sender, the presser of a button, the private chat's user, ...) when known; never on bots
+	 * nor in method answers. Users whose app has not reported a language yet count as `vi`.
+	 */
+	language_code?: "vi" | "en" | "zh-CN";
 }
 
 export interface Me {
@@ -35,6 +41,12 @@ export interface Me {
 	name: string;
 	/** Unique in the tenant; absent when the user has none. */
 	username?: string;
+	/**
+	 * The language the person's app shows, so the bot can answer in it. Set on the users of updates
+	 * (the sender, the presser of a button, the private chat's user, ...) when known; never on bots
+	 * nor in method answers. Users whose app has not reported a language yet count as `vi`.
+	 */
+	language_code?: "vi" | "en" | "zh-CN";
 	/**
 	 * Privacy mode in groups (default on): the bot receives only the messages listed under
 	 * Update.message, and forwards or copies from a group only those and its own messages (others

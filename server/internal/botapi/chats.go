@@ -65,7 +65,7 @@ func (s *Service) editChat(ctx context.Context, r *http.Request, bot *botadmin.B
 	if err != nil {
 		return nil, err
 	}
-	return wire.FromChat(resp.GetChat(), nil), nil
+	return wire.FromChat(resp.GetChat(), wire.Users{}), nil
 }
 
 // leaveChat is POST /chats/{chat_id}:leave: the bot leaves a group or

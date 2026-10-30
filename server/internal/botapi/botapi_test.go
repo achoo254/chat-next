@@ -753,3 +753,96 @@ func TestGetUpdatesRecordsTheFetchForTheOwner(t *testing.T) {
 		t.Fatalf("ListMyBots = %v, %v", bots, err)
 	}
 }
+
+// TestUpdatesCarryTheSendersLanguage: the people of an update carry the
+// language their app shows, bots and method answers never do.
+func TestUpdatesCarryTheSendersLanguage(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	owner := h.User("owner")
+	botID, token := h.Bot(owner, "langbot")
+	user := h.User("user")
+	if err := h.Chat.SetUserLocale(ctx, user, "zh-CN"); err != nil {
+		t.Fatal(err)
+	}
+	start, err := h.Chat.StartBot(ctx, user, &appv1.StartBotRequest{BotId: botID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	private := start.GetChat().GetId()
+	h.CatchUp()
+
+	type person struct {
+		ID           int64   `json:"id"`
+		LanguageCode *string `json:"language_code"`
+	}
+	type langUpdate struct {
+		UpdateID int64 `json:"update_id"`
+		Message  *struct {
+			From person `json:"from"`
+			Chat struct {
+				User person `json:"user"`
+			} `json:"chat"`
+		} `json:"message"`
+		Callback *struct {
+			From    person `json:"from"`
+			Message struct {
+				From person `json:"from"`
+			} `json:"message"`
+		} `json:"callback"`
+	}
+	poll := func(query string) []langUpdate {
+		t.Helper()
+		var list []langUpdate
+		h.call(http.MethodGet, "/bot/v1/updates?"+query, token, "").into(t, &list)
+		return list
+	}
+	lang := func(p person) string {
+		if p.LanguageCode == nil {
+			return "<absent>"
+		}
+		return *p.LanguageCode
+	}
+
+	list := poll("timeout=0")
+	if len(list) != 1 || list[0].Message == nil {
+		t.Fatalf("updates = %+v", list)
+	}
+	m := list[0].Message
+	if m.From.ID != user || lang(m.From) != "zh-CN" || lang(m.Chat.User) != "zh-CN" {
+		t.Fatalf("from %d %s, chat.user %s; want %d zh-CN", m.From.ID, lang(m.From), lang(m.Chat.User), user)
+	}
+
+	// The bot's own message, as a method answer and inside a callback.
+	var raw json.RawMessage
+	h.send(token, private, `"text": "Choose", "reply_markup": {"inline_keyboard": [[{"text": "Yes", "callback_data": "yes"}]]}`).into(t, &raw)
+	if strings.Contains(string(raw), "language_code") {
+		t.Fatalf("method answer has language_code: %s", raw)
+	}
+	var menu sentMessage
+	if err := json.Unmarshal(raw, &menu); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Chat.PressInlineButton(ctx, user, &appv1.PressInlineButtonRequest{ChatId: private, Seq: menu.Seq, CallbackData: []byte("yes")}); err != nil {
+		t.Fatal(err)
+	}
+	list = poll(fmt.Sprintf("offset=%d&timeout=5", list[0].UpdateID+1))
+	if len(list) != 1 || list[0].Callback == nil {
+		t.Fatalf("updates = %+v", list)
+	}
+	cb := list[0].Callback
+	if lang(cb.From) != "zh-CN" || lang(cb.Message.From) != "<absent>" {
+		t.Fatalf("callback from %s, message from (the bot) %s", lang(cb.From), lang(cb.Message.From))
+	}
+
+	// A user whose app never reported a language counts as vi.
+	other := h.User("other")
+	if _, err := h.Chat.StartBot(ctx, other, &appv1.StartBotRequest{BotId: botID}); err != nil {
+		t.Fatal(err)
+	}
+	h.CatchUp()
+	list = poll(fmt.Sprintf("offset=%d&timeout=0", list[0].UpdateID+1))
+	if len(list) != 1 || list[0].Message == nil || list[0].Message.From.ID != other || lang(list[0].Message.From) != "vi" {
+		t.Fatalf("updates = %+v", list)
+	}
+}

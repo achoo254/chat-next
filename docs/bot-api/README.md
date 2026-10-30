@@ -28,6 +28,8 @@ while true; do
 done
 ```
 
+Người dùng trong update (`from` của tin, người bấm nút, `chat.user` của chat riêng…) có `language_code`: ngôn ngữ app của họ (`vi`, `en` hoặc `zh-CN`; app chưa báo thì là `vi`), để bot trả lời đúng tiếng. Bot và kết quả của các method không có trường này.
+
 Bot chỉ nhắn được người đã bấm **Bắt đầu** với bot (hoặc nhóm có bot là thành viên):
 
 ```sh

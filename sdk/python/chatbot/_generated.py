@@ -96,6 +96,12 @@ class User(TypedDict, total=False):
     name: Required[str]
     username: str
     """Unique in the tenant; absent when the user has none."""
+    language_code: Literal["vi", "en", "zh-CN"]
+    """The language the person's app shows, so the bot can answer in it. Set on the users of
+    updates (the sender, the presser of a button, the private chat's user, ...) when known;
+    never on bots nor in method answers. Users whose app has not reported a language yet
+    count as `vi`.
+    """
 
 
 class Me(TypedDict, total=False):
@@ -104,6 +110,12 @@ class Me(TypedDict, total=False):
     name: Required[str]
     username: str
     """Unique in the tenant; absent when the user has none."""
+    language_code: Literal["vi", "en", "zh-CN"]
+    """The language the person's app shows, so the bot can answer in it. Set on the users of
+    updates (the sender, the presser of a button, the private chat's user, ...) when known;
+    never on bots nor in method answers. Users whose app has not reported a language yet
+    count as `vi`.
+    """
     privacy: Required[bool]
     """Privacy mode in groups (default on): the bot receives only the messages listed under
     Update.message, and forwards or copies from a group only those and its own messages

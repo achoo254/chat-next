@@ -1199,6 +1199,15 @@ components:
         username:
           type: string
           description: Unique in the tenant; absent when the user has none.
+        language_code:
+          type: string
+          enum: [vi, en, zh-CN]
+          description: >-
+            The language the person's app shows, so the bot can answer in it.
+            Set on the users of updates (the sender, the presser of a button,
+            the private chat's user, ...) when known; never on bots nor in
+            method answers. Users whose app has not reported a language yet
+            count as `vi`.
     Me:
       allOf:
         - $ref: '#/components/schemas/User'

@@ -17,6 +17,9 @@ type User struct {
 	IsBot    bool   `json:"is_bot"`
 	Name     string `json:"name"`
 	Username string `json:"username,omitempty"`
+	// LanguageCode is the language the person's app shows ("vi", "en",
+	// "zh-CN"); only in updates, never for bots.
+	LanguageCode string `json:"language_code,omitempty"`
 }
 
 // Chat is a chat the bot is in.
@@ -238,16 +241,27 @@ var mediaKindNames = map[appv1.MediaKind]string{
 	appv1.MediaKind_MEDIA_KIND_DOCUMENT: "document",
 }
 
-// Users indexes rendered users by id.
-type Users map[int64]*appv1.User
+// Users indexes rendered users by id, with the language of the people
+// when the caller knows it (updates).
+type Users struct {
+	byID    map[int64]*appv1.User
+	locales map[int64]string
+}
 
 // IndexUsers builds the index.
 func IndexUsers(list []*appv1.User) Users {
-	out := make(Users, len(list))
+	byID := make(map[int64]*appv1.User, len(list))
 	for _, u := range list {
-		out[u.GetId()] = u
+		byID[u.GetId()] = u
 	}
-	return out
+	return Users{byID: byID}
+}
+
+// WithLocales returns the index that renders language_code from locales
+// (user id to locale) for users that are not bots.
+func (us Users) WithLocales(locales map[int64]string) Users {
+	us.locales = locales
+	return us
 }
 
 // MediaKindName is the wire name of a media kind ("" when unknown).
@@ -280,8 +294,11 @@ func (us Users) user(id int64) *User {
 	if id == 0 {
 		return nil
 	}
-	if u, ok := us[id]; ok {
+	if u, ok := us.byID[id]; ok {
 		w := FromUser(u)
+		if !w.IsBot {
+			w.LanguageCode = us.locales[id]
+		}
 		return &w
 	}
 	return &User{ID: id}

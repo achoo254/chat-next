@@ -471,7 +471,10 @@ type BotUpdate struct {
 	// Users index the users the update refers to (the message's author and
 	// referenced users, the presser of a callback, the peer of a private
 	// chat); it may hold more users, shared by the updates of one batch.
-	Users    []*appv1.User
+	Users []*appv1.User
+	// Locales maps the people (not bots, not deleted accounts) of Users to
+	// the language their app shows (locale.Valid), shared like Users.
+	Locales  map[int64]string
 	Callback *BotCallback
 	// Member: member_changed only (Message is nil).
 	Member *BotMemberChange
@@ -602,6 +605,9 @@ func (s *Service) BotUpdates(ctx context.Context, rows []OutboxRow) ([]BotUpdate
 	slices.SortStableFunc(out, func(a, b BotUpdate) int {
 		return cmp.Or(cmp.Compare(a.OutboxID, b.OutboxID), cmp.Compare(a.Seq(), b.Seq()))
 	})
+	if err := s.attachLocales(ctx, out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
