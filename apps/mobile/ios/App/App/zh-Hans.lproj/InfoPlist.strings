@@ -1,0 +1,4 @@
+/* Simplified Chinese permission prompts; Info.plist holds the Vietnamese / English originals. Terms follow apps/web/src/messaging/copy/zh-CN.ts. */
+"NSCameraUsageDescription" = "拍摄照片和视频并在聊天中发送时，需要使用相机。";
+"NSMicrophoneUsageDescription" = "录制语音消息和视频的声音时，需要使用麦克风。";
+"NSPhotoLibraryUsageDescription" = "从照片图库选择照片和视频并在聊天中发送时，需要访问照片图库。";

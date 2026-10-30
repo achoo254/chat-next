@@ -80,7 +80,7 @@ Nút "Đăng nhập", "Tạo tài khoản" và các bước "đăng nhập lại
 
 - Không có service worker và Web Push; mục "Thông báo khi đã đóng app" bị ẩn, mục "Cài ứng dụng" báo đã cài.
 - DB local vẫn là SQLite WebAssembly của web. Khi WebView không có OPFS (iOS 15–16, WebView cũ) hoặc OPFS từ chối, DB chạy trong bộ nhớ: dùng được khi có mạng, mở app lần sau đồng bộ lại.
-- Quyền máy: camera (chụp ảnh, quay video từ ô chọn file), micro (tin nhắn thoại), thư viện ảnh (iOS). Android tắt `allowBackup` để cache chat không đi theo bản sao lưu.
+- Quyền máy: camera (chụp ảnh, quay video từ ô chọn file), micro (tin nhắn thoại), thư viện ảnh (iOS). Câu xin quyền iOS trong `Info.plist` viết song ngữ Việt / Anh; máy đặt tiếng Trung giản thể đọc bản trong `App/zh-Hans.lproj/InfoPlist.strings`. Android không có chuỗi riêng của app cần dịch (hộp xin quyền do hệ thống viết theo ngôn ngữ máy). Android tắt `allowBackup` để cache chat không đi theo bản sao lưu.
 
 ## Chưa làm
 
