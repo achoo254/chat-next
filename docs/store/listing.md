@@ -97,6 +97,45 @@ BOTS AND INTEGRATIONS
 Sign in with your hoandat.com account (Google, GitHub or Apple). No ads, and your data is never sold.
 ```
 
+### 简体中文 (zh-Hans trên App Store, zh-CN trên Play)
+
+Giao diện app có tiếng Trung giản thể từ 30/10/2026; từ ngữ theo `apps/web/src/messaging/copy/zh-CN*.ts`. Từ khoá đã giữ ≤ 100 byte UTF-8 vì chữ Hán 3 byte một chữ.
+
+- **Tên (App Store, Play)**: `Chat hoandat: 群组聊天` (18)
+- **Phụ đề (App Store)**: `群组、频道和机器人，所有设备同步` (16)
+- **Mô tả ngắn (Play)**: `私聊、群组、频道和机器人；越南语不输入声调也能搜索，所有设备同步。` (33)
+- **Văn bản quảng bá (App Store)**: `私聊、群组和频道，一个应用全搞定。发送照片、视频和语音消息，轻松找回任何消息；由你决定谁可以看到你、给你发消息或把你加入群组。` (63)
+- **Từ khoá (App Store)**: `即时通讯,群聊,频道,消息,机器人,聊天应用,语音消息,照片,团队聊天,置顶` (38; 96 byte UTF-8)
+- **Mô tả**:
+
+```text
+Chat 是一款为朋友、家人和团队打造的即时通讯应用，一个账号即可在手机、电脑和浏览器上使用。
+
+按你的方式聊天
+• 私聊、群组，以及向众多关注者发布消息的频道。
+• 发送照片、视频、文件和语音消息；回复、编辑、表情回应、置顶和撤回消息。
+• 群组可按话题分开讨论；通过邀请链接邀请他人加入。
+• “我的云端”保存只给自己看的笔记、链接和文件。
+
+找回一切
+• 搜索聊天和消息，越南语不输入声调也能找到：输入“da lat”即可找到“Đà Lạt”。
+• 可按发送者、类型和日期筛选；搜索结果也包括尚未同步到本机的旧消息。
+
+所有设备同步
+• 消息在手机、电脑和网页上即时同步。
+• 查看已登录你账号的设备，并可远程退出登录。
+
+隐私由你决定
+• 选择谁可以看到你的在线状态和头像、谁可以找到你、给你发消息以及把你加入群组。
+• 屏蔽和举报消息、用户或聊天。
+• 在应用内直接导出你的数据或删除账号。
+
+机器人和集成
+• 使用社区创建的机器人，或在 Developer Console 中创建你自己的机器人。
+
+界面支持简体中文、越南语和英语。使用 hoandat.com 账号登录（Google、GitHub 或 Apple）。应用没有广告，也绝不出售你的数据。
+```
+
 ## Ảnh và đồ hoạ
 
 | Ô | File | Kích thước | Sinh bằng |

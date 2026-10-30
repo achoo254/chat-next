@@ -1,6 +1,6 @@
 # Chat — hồ sơ App Store (bản nháp)
 
-Bản nháp để dán vào App Store Connect cho app iOS "Chat - trò chuyện" (`apps/mobile`, [mobile-app.md](../mobile-app.md)). Bản đầy đủ cho cả Google Play, căn cứ từng câu trả lời quyền riêng tư và các mục chặn phát hành: [listing.md](./listing.md). File này chỉ gom phần App Store theo cùng khuôn với Scribe. Ngôn ngữ chính của trang App Store: **Tiếng Việt**; thêm bản **English (U.S.)** bằng các dòng tiếng Anh dưới đây. Kiểm với code và trang thật ngày 27/10/2026.
+Bản nháp để dán vào App Store Connect cho app iOS "Chat - trò chuyện" (`apps/mobile`, [mobile-app.md](../mobile-app.md)). Bản đầy đủ cho cả Google Play, căn cứ từng câu trả lời quyền riêng tư và các mục chặn phát hành: [listing.md](./listing.md). File này chỉ gom phần App Store theo cùng khuôn với Scribe. Ngôn ngữ chính của trang App Store: **Tiếng Việt**; thêm bản **English (U.S.)** bằng các dòng tiếng Anh dưới đây và bản **Chinese (Simplified)** (`zh-Hans`) bằng mục [简体中文](#bản-简体中文-zh-hans). Kiểm với code và trang thật ngày 27/10/2026.
 
 Ký tự đếm bằng số ký tự Unicode (NFC, App Store Connect đếm như vậy); số trong ngoặc là độ dài thật. Riêng từ khoá ghi thêm số byte UTF-8 vì có bản App Store Connect đếm byte.
 
@@ -111,6 +111,55 @@ Căn cứ mục "Trên iPhone": đăng nhập qua `SystemAuth.authenticate` (ASW
 VI (81 ký tự; 97 byte): `nhắn tin,nhóm,kênh,tin nhắn,bot,gửi ảnh,tin thoại,danh bạ,messenger,ghim,link mời`
 
 EN (94): `messenger,group chat,channels,messaging,bots,voice message,photos,team,contacts,pin,vietnamese`
+
+## Bản 简体中文 (zh-Hans)
+
+Thêm ngôn ngữ **Chinese (Simplified)** trên trang phiên bản ở App Store Connect rồi dán các trường dưới đây (30/10/2026: web và server đã có giao diện zh-CN, app hiện đúng bản web đó). Từ ngữ theo giao diện zh-CN của app (`apps/web/src/messaging/copy/zh-CN*.ts`). URL, danh mục, ảnh chụp màn hình dùng chung với bản tiếng Việt; App Review Notes giữ tiếng Anh.
+
+| Trường | Giá trị |
+|---|---|
+| Tên (≤ 30) | `Chat - 聊天` (9). Nếu App Store Connect báo tên đã có người dùng, dùng `Chat hoandat - 聊天` (16) |
+| Phụ đề (≤ 30) | `私聊、群组、频道和机器人` (12) |
+
+Văn bản quảng bá (≤ 170; 62): `私聊、群组和频道，一个应用全搞定。发送照片、视频和语音消息，轻松找回任何消息；由你决定谁可以给你发消息、谁可以把你加入群组。`
+
+Từ khoá (≤ 100; 40 ký tự, 100 byte UTF-8, không lặp chữ "聊天" của tên): `群聊,频道,即时通讯,消息,机器人,语音消息,发照片,团队,联系人,置顶,越南语`
+
+Mô tả (641):
+
+```
+Chat 是一款为朋友、家人和团队打造的即时通讯应用，一个账号即可在 iPhone、电脑和浏览器上使用。
+
+按你的方式聊天
+• 私聊、群组，以及向众多关注者发布消息的频道。
+• 发送照片、视频、文件和语音消息；回复、编辑、表情回应、置顶和撤回消息。
+• 群组可按话题分开讨论；通过邀请链接邀请他人加入。
+• “我的云端”保存只给自己看的笔记、链接和文件。
+
+找回一切
+• 搜索聊天和消息，越南语不输入声调也能找到：输入“da lat”即可找到“Đà Lạt”。
+• 搜索结果也包括尚未同步到本机的旧消息。
+
+在 IPHONE 上
+• 在 iOS 的安全登录页面中登录，无需在应用内输入密码。
+• 登录会话保存在钥匙串中，仅限本机。
+• 在聊天中直接拍照、录制视频和语音消息。
+• 通过 iPhone 共享菜单发送群组邀请链接。
+
+所有设备同步
+• 消息在手机、电脑和网页上即时同步。
+• 查看已登录你账号的设备，并可远程退出登录。
+
+隐私由你决定
+• 选择谁可以看到你的在线状态、谁可以找到你、给你发消息以及把你加入群组。
+• 屏蔽和举报消息、用户或聊天；审核团队会处理每一条举报。
+• 在应用内直接导出你的数据或删除账号。
+
+机器人
+• 与“助手”机器人聊天，或在 Developer Console 中创建你自己的机器人。
+
+界面支持简体中文、越南语和英语。使用 hoandat.com 账号登录（Google、GitHub 或 Apple）。应用没有广告，也绝不出售你的数据。
+```
 
 ## Phân loại độ tuổi (Age Rating)
 
