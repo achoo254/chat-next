@@ -43,7 +43,7 @@ message RegisterWebPushRequest {
   bytes p256dh = 2;
   // PushSubscription.getKey("auth"): 16 bytes.
   bytes auth = 3;
-  // Language of the notification text: "vi" or "en". Empty keeps the
+  // Language of the notification text: "vi", "en" or "zh-CN". Empty keeps the
   // registration's current language ("vi" for a new one).
   string locale = 4;
 }

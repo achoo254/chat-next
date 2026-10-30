@@ -79,7 +79,7 @@ export type RegisterWebPushRequest = Message<"app.v1.RegisterWebPushRequest"> & 
   auth: Uint8Array;
 
   /**
-   * Language of the notification text: "vi" or "en". Empty keeps the
+   * Language of the notification text: "vi", "en" or "zh-CN". Empty keeps the
    * registration's current language ("vi" for a new one).
    *
    * @generated from field: string locale = 4;

@@ -9,7 +9,7 @@ import { Link, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { pushOnDevice, subscribePushOnDevice } from "../push/push-device.ts";
-import { pushLocaleOf, type PushStatus } from "../push/web-push.ts";
+import type { PushStatus } from "../push/web-push.ts";
 import { Switch } from "../ui/parts.tsx";
 
 /** Whether this device gets Web Push (the notifications tab's closing note follows it). */
@@ -50,7 +50,7 @@ export function DevicePush({ onPermission }: DevicePushProps) {
 
 	const toggle = (on: boolean) => {
 		setBusy(true);
-		(on ? webPush.enable(pushLocaleOf(locale)) : webPush.disable())
+		(on ? webPush.enable(locale) : webPush.disable())
 			.then(
 				(next) => {
 					setStatus(next);

@@ -105,6 +105,9 @@ describe("web push on this device", () => {
 		await push.enable("en");
 		expect(pm.made).toBe(1);
 		expect(server.registered?.locale).toBe("en");
+		// Simplified Chinese goes to the server as is.
+		await push.enable("zh-CN");
+		expect(server.registered?.locale).toBe("zh-CN");
 	});
 
 	it("stays off when the permission is refused, and reports the other states", async () => {

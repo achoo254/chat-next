@@ -26,8 +26,9 @@ type copyText struct {
 }
 
 var copies = map[string]copyText{
-	LocaleVI: {hidden: "Bạn có tin nhắn mới", photo: "Ảnh", video: "Video", audio: "Âm thanh", voice: "Tin nhắn thoại", file: "Tệp"},
-	LocaleEN: {hidden: "You have a new message", photo: "Photo", video: "Video", audio: "Audio", voice: "Voice message", file: "File"},
+	LocaleVI:   {hidden: "Bạn có tin nhắn mới", photo: "Ảnh", video: "Video", audio: "Âm thanh", voice: "Tin nhắn thoại", file: "Tệp"},
+	LocaleEN:   {hidden: "You have a new message", photo: "Photo", video: "Video", audio: "Audio", voice: "Voice message", file: "File"},
+	LocaleZhCN: {hidden: "你有一条新消息", photo: "照片", video: "视频", audio: "音频", voice: "语音消息", file: "文件"},
 }
 
 // Payload is the JSON the service worker receives (apps/web/src/sw).

@@ -19,7 +19,6 @@ import { viMedia } from "../src/messaging/media/copy-vi.ts";
 import { zhCNMedia } from "../src/messaging/media/copy-zh-CN.ts";
 import { vi as shellVi } from "../src/i18n/vi.ts";
 import { zhCN as shellZhCN } from "../src/i18n/zh-CN.ts";
-import { pushLocaleOf } from "../src/messaging/push/web-push.ts";
 import { viScreens } from "../src/messaging/copy/vi-screens.ts";
 import { actionText, chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain, recentTime } from "../src/messaging/data/format.ts";
 import { highlight } from "../src/messaging/data/highlight.ts";
@@ -235,11 +234,6 @@ describe("copy", () => {
 		expect(keys(zhCNMedia).sort()).toEqual(keys(viMedia).sort());
 	});
 
-	it("asks the server for English notification text in Chinese, the server writing only vi and en", () => {
-		expect(pushLocaleOf("vi")).toBe("vi");
-		expect(pushLocaleOf("en")).toBe("en");
-		expect(pushLocaleOf("zh-CN")).toBe("en");
-	});
 });
 
 describe("channel wording", () => {

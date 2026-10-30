@@ -121,7 +121,7 @@ type RegisterWebPushRequest struct {
 	P256Dh []byte `protobuf:"bytes,2,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
 	// PushSubscription.getKey("auth"): 16 bytes.
 	Auth []byte `protobuf:"bytes,3,opt,name=auth,proto3" json:"auth,omitempty"`
-	// Language of the notification text: "vi" or "en". Empty keeps the
+	// Language of the notification text: "vi", "en" or "zh-CN". Empty keeps the
 	// registration's current language ("vi" for a new one).
 	Locale        string `protobuf:"bytes,4,opt,name=locale,proto3" json:"locale,omitempty"`
 	unknownFields protoimpl.UnknownFields

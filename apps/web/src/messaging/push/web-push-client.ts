@@ -5,7 +5,8 @@ import { Code, ConnectError, createClient, type Transport } from "@connectrpc/co
 import { PushService } from "@achoo254/chat-proto/push";
 import { isAppleMobile, isStandalone } from "../../install-prompt.ts";
 import { pushOnDevice, setPushOnDevice } from "./push-device.ts";
-import type { PushLocale, PushStatus, WebPush } from "./web-push.ts";
+import type { Locale } from "../../i18n/i18n.tsx";
+import type { PushStatus, WebPush } from "./web-push.ts";
 
 /** How long to wait for the service worker before giving up (it registers after the first load). */
 const WORKER_WAIT_MS = 10_000;
@@ -38,7 +39,7 @@ export interface BrowserPush {
 export interface PushServer {
 	/** key is empty when the server has Web Push off. */
 	config(): Promise<{ key: Uint8Array<ArrayBuffer>; endpoint: string }>;
-	register(subscription: { endpoint: string; p256dh: Uint8Array; auth: Uint8Array }, locale: PushLocale): Promise<void>;
+	register(subscription: { endpoint: string; p256dh: Uint8Array; auth: Uint8Array }, locale: Locale): Promise<void>;
 	unregister(): Promise<void>;
 }
 
@@ -70,7 +71,7 @@ export function webPushWith(server: PushServer, browser: BrowserPush, selfId: nu
 		return pm.subscribe({ userVisibleOnly: true, applicationServerKey: key });
 	};
 
-	const register = async (subscription: PushSubscriptionLike, locale: PushLocale): Promise<void> => {
+	const register = async (subscription: PushSubscriptionLike, locale: Locale): Promise<void> => {
 		await server.register({ endpoint: subscription.endpoint, p256dh: keyOf(subscription, "p256dh"), auth: keyOf(subscription, "auth") }, locale);
 	};
 

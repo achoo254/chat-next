@@ -265,6 +265,16 @@ func TestRegister(t *testing.T) {
 	if n != 1 || locale != LocaleEN {
 		t.Fatalf("%d subscriptions, locale %q", n, locale)
 	}
+	// Simplified Chinese is stored as sent.
+	if err := e.svc.Register(ctx, an, sess, Subscription{Endpoint: e.server.URL + "/b", Keys: keys, Locale: LocaleZhCN}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Store.Pool().QueryRow(ctx, `SELECT locale FROM push_subscriptions WHERE user_id = $1`, an).Scan(&locale); err != nil {
+		t.Fatal(err)
+	}
+	if locale != LocaleZhCN {
+		t.Fatalf("locale %q", locale)
+	}
 	// The browser signed in again: the endpoint moves to the new session.
 	newer := e.session(an)
 	if err := e.svc.Register(ctx, an, newer, Subscription{Endpoint: e.server.URL + "/b", Keys: keys}); err != nil {
@@ -486,6 +496,27 @@ func TestGroupAndChannel(t *testing.T) {
 	}
 }
 
+func TestChineseNotification(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	an, dung := e.User("an_user"), e.User("dung_user")
+	chatID := e.private(an, dung)
+	phone := e.device(dung, LocaleZhCN)
+	off := false
+	if _, err := e.Chat.SetNotificationSettings(ctx, dung, &appv1.SetNotificationSettingsRequest{PrivatePreview: &off}); err != nil {
+		t.Fatal(err)
+	}
+	e.send(an, chatID, "bí mật")
+	e.catchUp()
+	got := jobsFor(e.planned(), phone)
+	if len(got) != 1 {
+		t.Fatalf("%d pushes", len(got))
+	}
+	if p := payloadOf(t, got[0], phone); p.Title != appName || p.Body != "你有一条新消息" {
+		t.Fatalf("hidden payload in Chinese %+v", p)
+	}
+}
+
 // deliver runs the workers until the test ends.
 func (e *env) deliver() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -609,7 +640,7 @@ func TestRunKickedByCommits(t *testing.T) {
 }
 
 func TestShownText(t *testing.T) {
-	vi, en := copies[LocaleVI], copies[LocaleEN]
+	vi, en, zh := copies[LocaleVI], copies[LocaleEN], copies[LocaleZhCN]
 	for _, c := range []struct {
 		m           chat.PushMessage
 		text        copyText
@@ -621,6 +652,8 @@ func TestShownText(t *testing.T) {
 		{chat.PushMessage{ChatType: "private", SenderName: "Lan", MediaKind: appv1.MediaKind_MEDIA_KIND_VOICE}, en, "Lan", "Voice message"},
 		{chat.PushMessage{ChatType: "channel", ChatTitle: "Tin", SenderName: "GitLab", Text: "Pipeline failed"}, vi, "Tin", "GitLab: Pipeline failed"},
 		{chat.PushMessage{ChatType: "group", ChatTitle: "Nhóm"}, vi, "Nhóm", "Bạn có tin nhắn mới"},
+		{chat.PushMessage{ChatType: "group", ChatTitle: "Nhóm", SenderName: "Lan", MediaKind: appv1.MediaKind_MEDIA_KIND_PHOTO}, zh, "Nhóm", "Lan: 照片"},
+		{chat.PushMessage{ChatType: "private", SenderName: "Lan", MediaKind: appv1.MediaKind_MEDIA_KIND_VOICE}, zh, "Lan", "语音消息"},
 	} {
 		title, body := shownText(c.m, c.text)
 		if title != c.title || body != c.body {

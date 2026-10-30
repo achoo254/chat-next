@@ -8,16 +8,6 @@ import type { Transport } from "@connectrpc/connect";
 import type { Locale } from "../../i18n/i18n.tsx";
 import { IS_NATIVE } from "../../server-origin.ts";
 
-export type PushLocale = "vi" | "en";
-
-/**
- * The language of this device's notification text: the server writes it in
- * Vietnamese and English only, so any other UI language gets English.
- */
-export function pushLocaleOf(locale: Locale): PushLocale {
-	return locale === "vi" ? "vi" : "en";
-}
-
 /**
  * What the device can do:
  * - off: the server has Web Push off (no key);
@@ -33,8 +23,11 @@ export type PushStatus =
 
 export interface WebPush {
 	status(): Promise<PushStatus>;
-	/** Asks for the notification permission when needed, subscribes and registers. */
-	enable(locale: PushLocale): Promise<PushStatus>;
+	/**
+	 * Asks for the notification permission when needed, subscribes and
+	 * registers. The server writes notification text in every UI language.
+	 */
+	enable(locale: Locale): Promise<PushStatus>;
 	disable(): Promise<PushStatus>;
 	/**
 	 * At start: registers the subscription again (a new session after
@@ -42,7 +35,7 @@ export interface WebPush {
 	 * device should not get pushes (turned off, permission withdrawn, another
 	 * account's subscription).
 	 */
-	sync(locale: PushLocale): Promise<void>;
+	sync(locale: Locale): Promise<void>;
 }
 
 export const loadWebPushClient = () => import("./web-push-client.ts");

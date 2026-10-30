@@ -40,8 +40,9 @@ import (
 
 // Locales of the notification text.
 const (
-	LocaleVI = "vi"
-	LocaleEN = "en"
+	LocaleVI   = "vi"
+	LocaleEN   = "en"
+	LocaleZhCN = "zh-CN"
 )
 
 // ErrDisabled is returned by Register when the server has no VAPID key.
@@ -143,7 +144,8 @@ func (s *Service) WebPushConfig(ctx context.Context, sessionID int64) ([]byte, s
 type Subscription struct {
 	Endpoint string
 	Keys     webpush.Keys
-	// Locale is LocaleVI, LocaleEN, or "" to keep the current one.
+	// Locale is LocaleVI, LocaleEN, LocaleZhCN, or "" to keep the current
+	// one.
 	Locale string
 }
 
@@ -161,9 +163,9 @@ func (s *Service) Register(ctx context.Context, userID, sessionID int64, sub Sub
 		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	switch sub.Locale {
-	case "", LocaleVI, LocaleEN:
+	case "", LocaleVI, LocaleEN, LocaleZhCN:
 	default:
-		return fmt.Errorf("%w: locale must be vi or en", ErrInvalid)
+		return fmt.Errorf("%w: locale must be vi, en or zh-CN", ErrInvalid)
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
