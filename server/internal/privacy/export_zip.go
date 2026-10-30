@@ -31,7 +31,7 @@ import (
 //
 //	README.txt              what the files are
 //	index.html              offline overview: profile, settings, chats
-//	profile.json            the account, its settings and auto-delete
+//	profile.json            the account, its settings, app language and auto-delete
 //	contacts.json           the user's contact list
 //	blocked.json            the users they blocked
 //	sessions.json           devices signed in (user agent, IP, dates)
@@ -335,6 +335,7 @@ func (w *exportWriter) write() error {
 		Bio          string          `json:"bio"`
 		Email        string          `json:"email,omitempty"`
 		IdPPicture   string          `json:"idp_picture,omitempty"`
+		Locale       string          `json:"locale"`
 		CreatedAt    string          `json:"created_at"`
 		AutoDelete   int16           `json:"auto_delete_months"`
 		Privacy      json.RawMessage `json:"privacy_settings"`
@@ -344,11 +345,11 @@ func (w *exportWriter) write() error {
 	var created time.Time
 	var privacy, notification []byte
 	if err := q.QueryRow(ctx, `
-		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), coalesce(u.idp_picture, ''), u.created_at, u.auto_delete_months,
+		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), coalesce(u.idp_picture, ''), u.locale, u.created_at, u.auto_delete_months,
 			coalesce((SELECT to_jsonb(p) - 'user_id' FROM privacy_settings p WHERE p.user_id = u.id), 'null'),
 			coalesce((SELECT to_jsonb(n) - 'user_id' FROM notification_settings n WHERE n.user_id = u.id), 'null')
 		FROM users u WHERE u.id = $1 AND u.tenant_id = $2`, me, w.s.cfg.TenantID).Scan(
-		&profile.ID, &profile.Username, &profile.Name, &profile.Bio, &profile.Email, &profile.IdPPicture, &created, &profile.AutoDelete,
+		&profile.ID, &profile.Username, &profile.Name, &profile.Bio, &profile.Email, &profile.IdPPicture, &profile.Locale, &created, &profile.AutoDelete,
 		&privacy, &notification); err != nil {
 		return fmt.Errorf("privacy: export profile: %w", err)
 	}
@@ -435,7 +436,7 @@ func (w *exportWriter) writeReadme() error {
 		"Dữ liệu cá nhân của bạn trong ứng dụng chat",
 		"",
 		"Mở index.html để xem offline. Các file .json đọc được bằng máy:",
-		"profile.json: tài khoản, cài đặt quyền riêng tư và thông báo, tự xoá.",
+		"profile.json: tài khoản, cài đặt quyền riêng tư và thông báo, ngôn ngữ app, tự xoá.",
 		"contacts.json, blocked.json: danh bạ và người bạn đã chặn.",
 		"sessions.json: các thiết bị đã đăng nhập.",
 		"bots.json: bot của bạn (không có token).",

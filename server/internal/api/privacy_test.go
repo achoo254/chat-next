@@ -107,6 +107,11 @@ func TestDataExport(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The app language the user picked is their data too.
+	if _, err := an.users.SetLocale(ctx, connect.NewRequest(&appv1.SetLocaleRequest{Locale: "zh-CN"})); err != nil {
+		t.Fatal(err)
+	}
+
 	p := an.privacy(e.env)
 	state, err := p.GetDataExport(ctx, connect.NewRequest(&appv1.GetDataExportRequest{}))
 	if err != nil || !state.Msg.GetAvailable() || state.Msg.GetExport() != nil || state.Msg.GetNextRequestAt() != 0 {
@@ -154,8 +159,9 @@ func TestDataExport(t *testing.T) {
 	}
 	var profile struct {
 		Username string `json:"username"`
+		Locale   string `json:"locale"`
 	}
-	if err := json.Unmarshal(files["profile.json"], &profile); err != nil || profile.Username != "annguyen" {
+	if err := json.Unmarshal(files["profile.json"], &profile); err != nil || profile.Username != "annguyen" || profile.Locale != "zh-CN" {
 		t.Fatalf("profile.json: %s %v", files["profile.json"], err)
 	}
 	messages := string(files["messages/"+strconv.FormatInt(chatID, 10)+".json"])

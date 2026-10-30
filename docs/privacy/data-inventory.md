@@ -25,7 +25,7 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | Token phiên của app iOS/Android | Keychain (chỉ thiết bị này) hoặc Keystore của máy; server chỉ giữ hash | Xoá khi đăng xuất, phiên bị thu hồi hoặc hết hạn | HĐ |
 | Refresh token, ID token của IdP | `user_sessions` (mã hoá AES-GCM bằng `SESSION_KEY`) | Xoá khi phiên kết thúc; không bao giờ tới client | HĐ |
 | Đăng ký Web Push (endpoint, khoá trình duyệt, ngôn ngữ) | `push_subscriptions` | Sống theo phiên; xoá khi phiên kết thúc | ĐY |
-| Ngôn ngữ app đang hiện (`vi`, `en`, `zh-CN`), để bot Trợ lý nhắn đúng ngôn ngữ | `users.locale` | App gửi lại mỗi lần mở và khi đổi ngôn ngữ (`UsersService.SetLocale`); tới khi xoá tài khoản (dòng của tài khoản đã xoá còn giữ giá trị này, không định danh được ai); không có trong bản xuất | HĐ |
+| Ngôn ngữ app đang hiện (`vi`, `en`, `zh-CN`), để bot Trợ lý nhắn đúng ngôn ngữ | `users.locale` | App gửi lại mỗi lần mở và khi đổi ngôn ngữ (`UsersService.SetLocale`); tới khi xoá tài khoản (dòng của tài khoản đã xoá còn giữ giá trị này, không định danh được ai); có trong `profile.json` của bản xuất (`locale`) | HĐ |
 | Cài đặt quyền riêng tư, thông báo, tự xoá | `privacy_settings`, `notification_settings`, `users.auto_delete_months` | Tới khi xoá tài khoản | HĐ |
 | Danh bạ, người đã chặn | `contacts`, `blocks` | Tới khi người dùng gỡ hoặc xoá tài khoản (cả hai chiều) | HĐ |
 | Tin nhắn, cảm xúc, ghim, trạng thái đọc | `messages`, `message_reactions`, `chat_read_states`, `read_receipts` (7 ngày) | Tới khi thu hồi/xoá chat. Khi xoá tài khoản: tin gửi trong chat **của người khác** còn lại, người gửi hiện "Tài khoản đã xoá"; Cloud của tôi và chat riêng không còn ai giữ (bên kia là bot hoặc đã xoá) bị xoá | HĐ |
