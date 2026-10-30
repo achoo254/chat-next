@@ -65,7 +65,7 @@ BẠN QUYẾT ĐỊNH QUYỀN RIÊNG TƯ
 BOT
 • Trò chuyện với bot Trợ lý, hoặc tự tạo bot của bạn trong Developer Console.
 
-Đăng nhập bằng tài khoản hoandat.com (Google hoặc GitHub). App không có quảng cáo và không bán dữ liệu của bạn.
+Đăng nhập bằng tài khoản hoandat.com (Google, GitHub hoặc Apple). App không có quảng cáo và không bán dữ liệu của bạn.
 ```
 
 EN (1425):
@@ -101,7 +101,7 @@ YOUR PRIVACY, YOUR CHOICE
 BOTS
 • Chat with the Assistant bot, or build your own bots in the Developer Console.
 
-Sign in with your hoandat.com account (Google or GitHub). No ads, and your data is never sold.
+Sign in with your hoandat.com account (Google, GitHub or Apple). No ads, and your data is never sold.
 ```
 
 Căn cứ mục "Trên iPhone": đăng nhập qua `SystemAuth.authenticate` (ASWebAuthenticationSession, `apps/web/src/native/native-sign-in.ts`); token phiên lưu bằng `@aparajita/capacitor-secure-storage` với `KeychainAccess.whenUnlockedThisDeviceOnly` (`apps/web/src/native/session-token.ts`); quyền camera, micro, thư viện ảnh khai trong `Info.plist`; nút chia sẻ link mời dùng `navigator.share` và chỉ hiện khi WebView hỗ trợ (`apps/web/src/messaging/ui/create-dialogs.tsx`). Không viết: thông báo đẩy (chưa có trên app), gọi thoại/video, mã hoá đầu cuối, ảnh đại diện người dùng (chưa có), Mini App trong app.

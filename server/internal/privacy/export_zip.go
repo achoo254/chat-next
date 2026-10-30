@@ -443,7 +443,7 @@ func (w *exportWriter) writeReadme() error {
 		"messages/<chat>.json và chats/<chat>.html: tin bạn đã gửi trong từng chat.",
 		"media/: file đính kèm tin bạn gửi (file vượt giới hạn dung lượng có included=false).",
 		"",
-		"Tin nhắn của người khác không có trong bản xuất. Tài khoản hoandat (đăng nhập Google, GitHub)",
+		"Tin nhắn của người khác không có trong bản xuất. Tài khoản hoandat (đăng nhập Google, GitHub hoặc Apple)",
 		"được quản lý ở trang tài khoản hoandat, không thuộc bản xuất này.",
 		"",
 	}, "\n"))

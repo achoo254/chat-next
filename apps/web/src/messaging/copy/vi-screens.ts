@@ -108,7 +108,7 @@ export const viScreens = {
 	},
 	inviteTeam: {
 		title: (group: string) => `Mời đồng đội vào ${group}`,
-		note: "Dán link vào email, nhóm làm việc hay tin nhắn bạn vẫn dùng. Người chưa có tài khoản đăng nhập bằng Google hoặc GitHub, sau đó thấy xem trước nhóm và bấm Tham gia.",
+		note: "Dán link vào email, nhóm làm việc hay tin nhắn bạn vẫn dùng. Người chưa có tài khoản đăng nhập bằng Google, GitHub hoặc Apple, sau đó thấy xem trước nhóm và bấm Tham gia.",
 		manage: "Thu hồi hoặc tạo link mới trong Quản lý nhóm",
 		share: "Chia sẻ",
 		copy: "Sao chép link",

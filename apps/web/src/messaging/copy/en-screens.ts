@@ -107,7 +107,7 @@ export const enScreens: ScreensCopy = {
 	},
 	inviteTeam: {
 		title: (group: string) => `Invite your team to ${group}`,
-		note: "Paste the link into an email, a work chat or any message. People without an account sign in with Google or GitHub, then see a preview of the group and press Join.",
+		note: "Paste the link into an email, a work chat or any message. People without an account sign in with Google, GitHub or Apple, then see a preview of the group and press Join.",
 		manage: "Revoke it or make a new link in Manage group",
 		share: "Share",
 		copy: "Copy link",

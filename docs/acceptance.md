@@ -11,7 +11,7 @@ Tài liệu cho người nghiệm thu: mở đâu, thử gì, kết quả đúng
 | Tài liệu Bot API | [`docs/bot-api/README.md`](bot-api/README.md) |
 | Mini App mẫu | https://achoo254.github.io/chat-next/miniapp-demo/ |
 
-Đăng nhập bằng tài khoản hoandat.com (Google hoặc GitHub qua trang đăng nhập hoandat.com). Trình duyệt: Chrome, Edge, Safari, Firefox bản mới; điện thoại dùng trình duyệt hoặc cài thành app (Cài đặt › Cài ứng dụng). Nên thử ít nhất hai tài khoản để nhắn qua lại.
+Đăng nhập bằng tài khoản hoandat.com (Google, GitHub hoặc Apple qua trang đăng nhập hoandat.com). Trình duyệt: Chrome, Edge, Safari, Firefox bản mới; điện thoại dùng trình duyệt hoặc cài thành app (Cài đặt › Cài ứng dụng). Nên thử ít nhất hai tài khoản để nhắn qua lại.
 
 ## Kịch bản kiểm
 

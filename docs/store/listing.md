@@ -57,7 +57,7 @@ BẠN QUYẾT ĐỊNH QUYỀN RIÊNG TƯ
 BOT VÀ TÍCH HỢP
 • Dùng bot do cộng đồng tạo, hoặc tự tạo bot của bạn trong Developer Console.
 
-Đăng nhập bằng tài khoản hoandat.com (Google hoặc GitHub). App không có quảng cáo và không bán dữ liệu của bạn.
+Đăng nhập bằng tài khoản hoandat.com (Google, GitHub hoặc Apple). App không có quảng cáo và không bán dữ liệu của bạn.
 ```
 
 ### English (en)
@@ -94,7 +94,7 @@ YOUR PRIVACY, YOUR CHOICE
 BOTS AND INTEGRATIONS
 • Use bots made by the community, or build your own in the Developer Console.
 
-Sign in with your hoandat.com account (Google or GitHub). No ads, and your data is never sold.
+Sign in with your hoandat.com account (Google, GitHub or Apple). No ads, and your data is never sold.
 ```
 
 ## Ảnh và đồ hoạ
@@ -170,7 +170,7 @@ Không thu: vị trí, danh bạ của máy (danh bạ của app là người d�
 ## Google Play Data safety
 
 - Thu thập: **Có**. Chia sẻ với bên thứ ba: **Không** (Cloudflare là nhà cung cấp xử lý thay nhà vận hành; tin gửi bot là người dùng chủ động gửi tới bot họ chọn, theo định nghĩa của Play không tính là chia sẻ). Mã hoá khi truyền: **Có** (HTTPS, WSS). Người dùng yêu cầu xoá được: **Có** (trong app: Cài đặt › Tài khoản › Xoá tài khoản chat; trên web: `https://chat.hoandat.com/delete-account`).
-- Cách tạo tài khoản: đăng nhập OAuth/OpenID Connect qua auth.hoandat.com (Google, GitHub).
+- Cách tạo tài khoản: đăng nhập OAuth/OpenID Connect qua auth.hoandat.com (Google, GitHub, Apple).
 
 | Nhóm Play | Loại | Bắt buộc/tuỳ chọn | Mục đích |
 | --- | --- | --- | --- |

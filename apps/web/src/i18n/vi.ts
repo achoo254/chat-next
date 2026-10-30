@@ -56,7 +56,7 @@ export const vi = {
 		email: "Email",
 		emailSource: `từ tài khoản ${brand.domain}`,
 		noEmail: "Chưa có email đã xác minh",
-		emailNote: `Email lấy từ tài khoản ${brand.domain} nên chỉ đọc ở đây. Muốn đổi email hoặc chuyển giữa Google và GitHub:`,
+		emailNote: `Email lấy từ tài khoản ${brand.domain} nên chỉ đọc ở đây. Muốn đổi email hoặc đổi giữa Google, GitHub và Apple:`,
 		changeSignIn: "Đổi cách đăng nhập",
 		unsaved: "Có thay đổi chưa lưu",
 		cancel: "Huỷ",

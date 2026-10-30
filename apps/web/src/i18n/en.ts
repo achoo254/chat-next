@@ -58,7 +58,7 @@ export const en: Messages = {
 		email: "Email",
 		emailSource: `from your ${brand.domain} account`,
 		noEmail: "No verified email",
-		emailNote: `Your email comes from your ${brand.domain} account and is read-only here. To change it or switch between Google and GitHub:`,
+		emailNote: `Your email comes from your ${brand.domain} account and is read-only here. To change it or switch between Google, GitHub and Apple:`,
 		changeSignIn: "Change how you sign in",
 		unsaved: "Unsaved changes",
 		cancel: "Cancel",
