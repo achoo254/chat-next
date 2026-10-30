@@ -1,19 +1,12 @@
-import { use } from "react";
-import { useI18n } from "../../i18n/i18n.tsx";
-import { vi, type MessagingCopy } from "./vi.ts";
+import { lazyCopy } from "../../i18n/i18n.tsx";
+import { vi } from "./vi.ts";
 
-// Vietnamese is the default and ships with the messaging chunk; English is
-// fetched the first time it is needed (the screen suspends meanwhile).
-let english: Promise<MessagingCopy> | null = null;
-
-function loadEnglish(): Promise<MessagingCopy> {
-	english ??= import("./en.ts").then((module) => module.en);
-	return english;
-}
-
-/** Messaging copy in the current UI language. */
-export function useCopy(): MessagingCopy {
-	const { locale } = useI18n();
-	const pending = locale === "en" ? loadEnglish() : null;
-	return pending === null ? vi : use(pending);
-}
+/**
+ * Messaging copy in the current UI language. Vietnamese is the default and
+ * ships with the messaging chunk; other languages are fetched the first time
+ * they are needed (the screen suspends meanwhile).
+ */
+export const useCopy = lazyCopy(vi, {
+	en: () => import("./en.ts").then((module) => module.en),
+	"zh-CN": () => import("./zh-CN.ts").then((module) => module.zhCN),
+});

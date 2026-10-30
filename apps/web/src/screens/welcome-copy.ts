@@ -59,4 +59,26 @@ export const WELCOME_COPY: Readonly<Record<Locale, WelcomeCopy>> = {
 			},
 		},
 	},
+	"zh-CN": {
+		eyebrow: `${brand.appName} · ${brand.domain}`,
+		title: "在所有设备上快速聊天",
+		lede: "私聊和群聊，发送照片、文件和语音消息，在网页、手机和电脑之间同步。",
+		signInTitle: `登录 ${brand.appName}`,
+		signInBody: `一个账号即可使用 ${brand.appName} 和 ${brand.domain} 的所有应用。`,
+		featuresTitle: "功能",
+		features: {
+			sync: {
+				title: "所有设备同步",
+				body: "消息即时显示在网页、手机和电脑上。离线时发送的消息会在恢复联网后自动发出。",
+			},
+			search: {
+				title: "找回旧消息",
+				body: "输入几个字（越南语带不带声调都可以），即可在所有聊天中找到旧消息。",
+			},
+			bots: {
+				title: "机器人和 Mini App",
+				body: "直接在聊天中使用机器人和 Mini App，或用 Bot API 编写自己的机器人。",
+			},
+		},
+	},
 };

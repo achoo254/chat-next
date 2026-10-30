@@ -40,7 +40,7 @@ export interface LegalCopy {
 }
 
 /** When the text last changed (shown on every page). */
-export const LEGAL_UPDATED = { vi: "26/10/2026", en: "26 October 2026" } as const;
+export const LEGAL_UPDATED = { vi: "26/10/2026", en: "26 October 2026", "zh-CN": "2026年10月26日" } as const;
 
 const { appName, domain, webHost, idpHost, accountUrl } = brand;
 
@@ -485,4 +485,220 @@ const en: LegalCopy = {
 	},
 };
 
-export const legalCopy: Readonly<Record<Locale, LegalCopy>> = { vi, en };
+const zhCN: LegalCopy = {
+	updated: `更新于 ${LEGAL_UPDATED["zh-CN"]}`,
+	documents: {
+		privacy: {
+			title: "隐私政策",
+			lede: `你使用 ${appName}（${webHost}）时它保存哪些数据、保存在哪里、保存多久，以及你如何导出或删除这些数据。`,
+			sections: [
+				{
+					title: "登录",
+					paragraphs: [
+						`你在 ${idpHost} 使用 ${domain} 账号登录，可通过 Google、GitHub 或 Apple 登录。聊天应用永远不会看到你的密码。`,
+						`你的 Google、GitHub 或 Apple 身份、原始电子邮箱和登录方式由 ${idpHost} 保存，而不是聊天应用。你可以在 ${idpHost}/account 管理或删除你的 ${domain} 账号。`,
+					],
+				},
+				{
+					title: "聊天应用保存的数据",
+					items: [
+						"个人资料：用户名、显示名称、简介，以及你登录账号的 ID。",
+						`电子邮箱：你的 ${domain} 账号已验证电子邮箱的副本，每次登录时重新读取。只有在你允许时，他人才能通过电子邮箱找到你（默认：任何人都不能）。`,
+						`账号头像：指向你的 ${domain} 账号在 Google 或 GitHub 上头像的链接，每次登录时重新读取（通过 Apple 登录则没有头像，因为 Apple 不提供）。在你尚未向聊天应用上传头像时，只有你能在账号按钮上看到它。`,
+						"会话：IP 地址、浏览器或设备，以及使用时间。",
+						"消息、表情回应、置顶、已读状态，以及你发送的文件（照片、视频、文件、语音消息）。",
+						"联系人、你屏蔽的人，以及你的隐私、通知和自动删除设置。",
+						"开启通知时，你浏览器的推送订阅。",
+						"你发送的反馈，其中的电子邮箱和电话号码会被遮盖。",
+						"你针对某条消息、某个人或某个聊天提交的举报。",
+						"浏览器中的技术错误（电子邮箱已遮盖），用于修复问题；不与你的账号关联。",
+					],
+				},
+				{
+					title: "数据的用途",
+					paragraphs: [
+						"提供你注册的服务：在各设备间投递和同步消息、搜索、通知。",
+						"部分用途仅在你开启后才使用：推送通知、允许他人通过电子邮箱找到你。",
+						"安全和防止滥用：会话、举报、审核日志、备份和日志。",
+					],
+				},
+				{
+					title: "存储位置",
+					items: [
+						"数据库、文件和备份存放在运营者的服务器上；目前没有在该服务器之外存储或备份。",
+						"服务器位于越南。",
+						`与 ${webHost} 的连接经由 Cloudflare。`,
+						`${webHost} 网站使用 Cloudflare Web Analytics 统计页面浏览量，它不设置 Cookie，也不在你的设备上存储任何内容。`,
+						"应用日志只记录 ID，从不记录消息内容、电子邮箱或令牌。",
+					],
+				},
+				{
+					title: "保存期限",
+					items: [
+						"个人资料、联系人、设置和反馈：直到你删除聊天账号。",
+						"消息：直到被撤回或聊天被删除。",
+						"文件：直到不再有消息使用它们，再加 1 天。",
+						"网页会话：30 天未使用即结束，最长 90 天。",
+						"每条消息的已读人员：7 天。设备间同步日志：30 天。",
+						"浏览器错误：90 天。",
+						"调用机器人（@bot）时输入的内容：1 天。机器人的群发消息：完成后 30 天。",
+						"数据导出：30 天。",
+						"备份：每天一份，保留 14 份，因此已删除的数据最多会在备份中保留 14 天。",
+						"举报和审核日志：账号删除后仍会保留，用于处理申诉。",
+					],
+				},
+				{
+					title: "推送通知",
+					paragraphs: [
+						pushServicesNote["zh-CN"],
+						"可在 设置 › 通知 中关闭通知里的消息预览。",
+					],
+				},
+				{
+					title: "机器人和 Mini App",
+					items: [
+						"机器人由用户创建，运行在其创建者的服务器上。你发给机器人的内容（消息、命令、按钮点击、在 @bot 后输入的内容）会发送到该服务器。",
+						"隐私设置同样适用于机器人：机器人看不到你已隐藏的内容。",
+						"机器人只会向启动过它的人群发消息。",
+						"Mini App 是机器人创建者的网站，在应用内打开并显示其域名。该网站能看到你在其中的操作。",
+					],
+				},
+				{
+					title: "在你的设备上",
+					paragraphs: [
+						"你的浏览器会保存一份聊天副本，以便快速打开并离线使用。该副本未加密，按账号分开保存，并在你退出登录时删除。",
+					],
+				},
+				{
+					title: "你的权利",
+					items: [
+						"选择谁能看到你的最后在线时间和头像，谁能找到你、把你加入群组和给你发消息：设置 › 隐私。",
+						"查看你的设备并让其退出登录：设置 › 会话。",
+						"导出你的数据：设置 › 账号。导出在后台进行，在应用内下载，每 7 天一次，保留 30 天。其中包含你的个人资料、联系人、屏蔽的人、会话、机器人（不含令牌）、聊天列表，以及你发送的消息和文件；不含他人的消息。",
+						"在 6、12 或 24 个月未使用后自动删除你的聊天账号（默认关闭）：设置 › 账号。",
+						"随时删除你的聊天账号。",
+					],
+					link: { href: paths.deleteAccount, label: "如何删除账号" },
+				},
+				{
+					title: "联系方式",
+					paragraphs: [
+						`关于你个人数据的问题或请求（访问、导出、更正、删除），请发送至 ${OPERATOR_EMAIL}。`,
+						"你也可以在应用内使用 设置 › 反馈；回复将通过助手机器人送达。",
+					],
+					link: mailto(OPERATOR_EMAIL),
+				},
+				{
+					title: "正在更新",
+					pending: true,
+					paragraphs: ["运营本服务的法律实体名称正在补充中。"],
+				},
+			],
+		},
+		terms: {
+			title: "使用条款",
+			lede: `你使用 ${appName}（${webHost}）服务时适用的规则。`,
+			sections: [
+				{
+					title: "你的账号",
+					paragraphs: [`你使用 ${domain} 账号使用本应用。聊天账号仅属于本应用：删除它不会删除你的 ${domain} 账号。`],
+				},
+				{
+					title: "举报内容",
+					paragraphs: [
+						`你可以因垃圾信息、诈骗、暴力、色情内容或其他原因举报某条消息、某个人或某个聊天。${domain} 的审核人员会审查每一条举报。`,
+					],
+				},
+				{
+					title: "审核措施",
+					paragraphs: ["处理举报时，审核人员可以："],
+					items: [
+						"移除内容。",
+						"将某人移出群组或频道并封禁。",
+						"警告，或锁定聊天账号。",
+						"限制其向陌生人发起聊天。",
+						"对于机器人：将其移至受限级别，或关闭其 Webhook。",
+					],
+				},
+				{
+					title: "垃圾信息",
+					paragraphs: [
+						"新账号只能向陌生人发送有限数量的消息。违反防滥用规则的机器人会被自动移至受限级别。",
+					],
+				},
+				{
+					title: "群组和频道",
+					paragraphs: ["如果你拥有群组或频道，删除聊天账号前请先转让其所有权或将其删除。"],
+				},
+				{
+					title: "机器人",
+					paragraphs: [
+						"你可以在 设置 › 开发者控制台 中创建机器人。机器人令牌只显示一次；服务器只保存其哈希值。你一开始删除账号，你的机器人就会停止运行，并随账号一起删除。",
+					],
+				},
+				{
+					title: "离开",
+					paragraphs: ["你可以随时在应用内删除你的聊天账号。"],
+					link: { href: paths.deleteAccount, label: "如何删除账号" },
+				},
+				{
+					title: "隐私",
+					paragraphs: ["应用保存哪些数据以及保存多久，请参阅隐私政策。"],
+					link: { href: paths.privacy, label: "隐私政策" },
+				},
+				{ title: "联系方式", paragraphs: [`关于本条款的问题：${OPERATOR_EMAIL}。`], link: mailto(OPERATOR_EMAIL) },
+				{
+					title: "正在更新",
+					pending: true,
+					paragraphs: ["以下内容仍在补充中：运营本服务的法律实体、最低年龄、责任限制、适用法律以及争议解决方式。"],
+				},
+			],
+		},
+		"delete-account": {
+			title: "删除账号",
+			lede: `如何删除你的 ${appName} 聊天账号及其相关数据。`,
+			sections: [
+				{
+					title: "如何删除",
+					steps: [
+						`在 ${webHost} 登录。`,
+						"打开 设置 › 账号，进入“删除聊天账号”。",
+						`如有提示，请在 ${idpHost} 重新登录（删除需要最近 10 分钟内登录过）。`,
+						"输入你的用户名进行确认，然后点击“删除账号”。",
+					],
+					paragraphs: ["如果你拥有群组或频道，请先转让其所有权或将其删除。"],
+				},
+				{
+					title: "删除后会发生什么",
+					items: [
+						...deletionTicks["zh-CN"](DELETION_GRACE_DAYS, idpHost),
+						"所有设备都会退出登录。你的机器人会立即停止运行，并随账号一起删除。",
+					],
+				},
+				{
+					title: "取消删除",
+					paragraphs: [`在 ${DELETION_GRACE_DAYS} 天内重新登录，应用会提供一个选项：取消删除。`],
+				},
+				{
+					title: "删除后仍保留的内容",
+					items: [
+						"已删除的数据最多会在备份中保留 14 天。",
+						"你提交的举报和审核日志会保留，用于处理申诉，举报人显示为已删除的账号。",
+					],
+				},
+				{
+					title: `你的 ${domain} 账号`,
+					paragraphs: [`删除聊天账号不会删除你的 ${domain} 账号。如需删除该账号，请前往 ${idpHost} 的账号页面。`],
+					link: { href: accountUrl, label: `${domain} 账号`, kind: "site" },
+				},
+				{
+					title: "无法登录？",
+					paragraphs: [`请将删除聊天账号的请求发送至 ${OPERATOR_EMAIL}，并附上你的用户名和你 ${domain} 账号的电子邮箱。`],
+					link: mailto(OPERATOR_EMAIL),
+				},
+			],
+		},
+	},
+};
+
+export const legalCopy: Readonly<Record<Locale, LegalCopy>> = { vi, en, "zh-CN": zhCN };

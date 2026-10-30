@@ -42,6 +42,20 @@ describe("boot", () => {
 		expect(document.cookie).toContain("hd_lang=en");
 	});
 
+	it("offers Vietnamese, English and Chinese, and shows the whole welcome page in Chinese", async () => {
+		renderApp(signedOutRoutes);
+		const group = await screen.findByRole("group", { name: "Ngôn ngữ" });
+		expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["Tiếng Việt", "English", "中文"]);
+
+		await userEvent.click(within(group).getByRole("button", { name: "中文" }));
+
+		expect((await screen.findByRole("link", { name: "使用 hoandat.com 登录" })).getAttribute("href")).toBe("/auth/login?locale=zh-cn");
+		expect(screen.getByRole("heading", { level: 1, name: "在所有设备上快速聊天" })).toBeTruthy();
+		expect(screen.getByRole("heading", { level: 3, name: "找回旧消息" })).toBeTruthy();
+		await waitFor(() => expect(document.documentElement.lang).toBe("zh-CN"));
+		expect(document.cookie).toContain("hd_lang=zh-CN");
+	});
+
 	it("opens the sign-in card alone on /login, in place from the top bar", async () => {
 		renderApp(signedOutRoutes);
 		await userEvent.click(await screen.findByRole("link", { name: "Đăng nhập" }));
@@ -61,15 +75,22 @@ describe("boot", () => {
 		expect(window.location.pathname).toBe("/");
 	});
 
-	it("keeps the language picked in Chat before the shared choice, and ignores one Chat does not have", async () => {
+	it("keeps the language picked in Chat before the shared choice, follows a stored Chinese choice, and ignores one Chat does not have", async () => {
 		window.localStorage.setItem("locale", "en");
 		renderApp(signedOutRoutes);
 		expect(await screen.findByRole("link", { name: "Sign in with hoandat.com" })).toBeTruthy();
 		cleanup();
 
-		// Chinese, picked in an app that has it: Chat falls back to its own choice.
+		// Chinese, picked in any hoandat.com app: Chat has it too.
 		document.cookie = "hd_lang=zh-CN; Path=/";
 		window.localStorage.removeItem("locale");
+		renderApp(signedOutRoutes);
+		expect(await screen.findByRole("link", { name: "使用 hoandat.com 登录" })).toBeTruthy();
+		await waitFor(() => expect(document.documentElement.lang).toBe("zh-CN"));
+		cleanup();
+
+		// A language no Chat build has counts as no choice: Vietnamese.
+		document.cookie = "hd_lang=fr; Path=/";
 		renderApp(signedOutRoutes);
 		expect(await screen.findByRole("link", { name: "Đăng nhập bằng hoandat.com" })).toBeTruthy();
 	});

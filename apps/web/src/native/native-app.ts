@@ -6,6 +6,7 @@
 // (main.tsx), so none of this reaches the web bundle.
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { SHELL_LOCALES, matchShellLocale, type ShellLocale } from "@achoo254/app-shell";
 import { SIGN_OUT_PATH } from "@achoo254/chat-core";
 import { SystemAuth } from "@achoo254/capacitor-system-auth";
 import type { RpcFetch } from "../api/client.ts";
@@ -69,7 +70,7 @@ async function signOutAndRestart(): Promise<void> {
 	await restartSignedOut();
 }
 
-const FAILURE_COPY: Record<"vi" | "en", Record<SignInFailure, string>> = {
+const FAILURE_COPY: Record<ShellLocale, Record<SignInFailure, string>> = {
 	vi: {
 		failed: "Đăng nhập chưa xong. Hãy thử lại.",
 		unavailable: "Chưa kết nối được tới máy chủ đăng nhập. Hãy thử lại sau.",
@@ -80,10 +81,16 @@ const FAILURE_COPY: Record<"vi" | "en", Record<SignInFailure, string>> = {
 		unavailable: "Could not reach the sign-in server. Please try again later.",
 		limited: "Too many new accounts right now. Please try again in a few minutes.",
 	},
+	"zh-CN": {
+		failed: "登录未完成，请重试。",
+		unavailable: "无法连接到登录服务器，请稍后再试。",
+		limited: "目前新账号过多，请过几分钟再试。",
+	},
 };
 
 function failureMessage(kind: SignInFailure): string {
-	const lang = document.documentElement.lang.toLowerCase().startsWith("en") ? "en" : "vi";
+	// The page language the I18nProvider set; Vietnamese before it ran.
+	const lang = matchShellLocale(document.documentElement.lang, SHELL_LOCALES) ?? "vi";
 	return FAILURE_COPY[lang][kind];
 }
 

@@ -1,40 +1,58 @@
-import { DEFAULT_SHELL_LOCALES, type DefaultShellLocale } from "@achoo254/app-shell";
+import { SHELL_LOCALES, type ShellLocale } from "@achoo254/app-shell";
 import { readPreferences, subscribePreferences } from "@achoo254/app-shell/preferences";
 import { createContext, use, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { brand } from "../brand.ts";
 import { vi, type Messages } from "./vi.ts";
 
 /**
- * Languages of the whole app, signed in or not: Vietnamese and English, the
- * shared shell's default pair (@achoo254/app-shell). A `zh-CN` choice
- * another hoandat.com app stored counts as no choice here.
+ * Languages of the whole app, signed in or not: Vietnamese, English and
+ * Simplified Chinese, the shared shell's full set (@achoo254/app-shell).
  */
-export type Locale = DefaultShellLocale;
+export type Locale = ShellLocale;
 
 /** Every language of the UI, in the order the language switches list them. */
-export const LOCALES: readonly Locale[] = DEFAULT_SHELL_LOCALES;
+export const LOCALES: readonly Locale[] = SHELL_LOCALES;
+
+/** Languages fetched on demand: every one but the default Vietnamese. */
+export type LazyLocale = Exclude<Locale, "vi">;
 
 /** Chat's localStorage key of the language before the shared `hd_lang` cookie. */
 const LEGACY_LANG_KEY = "locale";
 
-// Vietnamese is the default and ships with the first screen; English is
-// fetched the first time it is needed. Once in, it is read synchronously, so
-// later renders never suspend.
-let english: Messages | null = null;
-let englishLoad: Promise<Messages> | null = null;
+const LOADERS: Readonly<Record<LazyLocale, () => Promise<Messages>>> = {
+	en: () => import("./en.ts").then((module) => module.en),
+	"zh-CN": () => import("./zh-CN.ts").then((module) => module.zhCN),
+};
 
-function loadEnglish(): Promise<Messages> {
-	englishLoad ??= import("./en.ts").then((module) => {
-		english = module.en;
-		return module.en;
-	});
-	return englishLoad;
+// Vietnamese is the default and ships with the first screen; other languages
+// are fetched the first time they are needed. Once in, they are read
+// synchronously, so later renders never suspend.
+const loaded = new Map<LazyLocale, Messages>();
+const loading = new Map<LazyLocale, Promise<Messages>>();
+
+function loadMessages(locale: LazyLocale): Promise<Messages> {
+	let pending = loading.get(locale);
+	if (pending === undefined) {
+		pending = LOADERS[locale]().then(
+			(messages) => {
+				loaded.set(locale, messages);
+				return messages;
+			},
+			(err: unknown) => {
+				// Offline: the next attempt fetches again.
+				loading.delete(locale);
+				throw err;
+			},
+		);
+		loading.set(locale, pending);
+	}
+	return pending;
 }
 
-/** Messages for `locale`; suspends only while English is first fetched. */
+/** Messages for `locale`; suspends only while a language is first fetched. */
 function useMessages(locale: Locale): Messages {
 	if (locale === "vi") return vi;
-	return english ?? use(loadEnglish());
+	return loaded.get(locale) ?? use(loadMessages(locale));
 }
 
 /**
@@ -43,7 +61,7 @@ function useMessages(locale: Locale): Messages {
  * in Chat before that choice existed, else Vietnamese.
  */
 export function readStoredLocale(): Locale {
-	return readPreferences({ domain: brand.domain, legacyLangKey: LEGACY_LANG_KEY }).lang ?? "vi";
+	return readPreferences({ domain: brand.domain, legacyLangKey: LEGACY_LANG_KEY, locales: LOCALES }).lang ?? "vi";
 }
 
 interface I18n {
@@ -69,17 +87,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 	const value = useMemo<I18n>(() => {
 		const followStoredLocale = () => {
 			const next = readStoredLocale();
-			if (next === "vi" || english !== null) {
+			if (next === "vi" || loaded.has(next)) {
 				setLocaleState(next);
 				return;
 			}
 			// Switch once the copy is in, so the screen never blanks while it
 			// loads; when it cannot load (offline), the language stays as it was.
-			loadEnglish().then(
+			loadMessages(next).then(
 				() => setLocaleState(next),
-				() => {
-					englishLoad = null;
-				},
+				() => undefined,
 			);
 		};
 		return { locale, t, followStoredLocale };
@@ -97,4 +113,25 @@ export function useI18n(): I18n {
 	const i18n = useContext(I18nContext);
 	if (!i18n) throw new Error("useI18n must be used inside <I18nProvider>");
 	return i18n;
+}
+
+/**
+ * A hook giving `vietnamese` copy, or the copy of the current language,
+ * fetched the first time it is needed (the screen suspends meanwhile). For
+ * copy that ships with a screen's own chunk rather than with the app.
+ */
+export function lazyCopy<T>(vietnamese: T, loaders: Readonly<Record<LazyLocale, () => Promise<T>>>): () => T {
+	const pending = new Map<LazyLocale, Promise<T>>();
+	const load = (locale: LazyLocale): Promise<T> => {
+		let copy = pending.get(locale);
+		if (copy === undefined) {
+			copy = loaders[locale]();
+			pending.set(locale, copy);
+		}
+		return copy;
+	};
+	return function useLocaleCopy(): T {
+		const { locale } = useI18n();
+		return locale === "vi" ? vietnamese : use(load(locale));
+	};
 }

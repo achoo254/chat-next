@@ -5,9 +5,18 @@
 // generated schemas and the subscription logic (web-push-client.ts) load on
 // the first call.
 import type { Transport } from "@connectrpc/connect";
+import type { Locale } from "../../i18n/i18n.tsx";
 import { IS_NATIVE } from "../../server-origin.ts";
 
 export type PushLocale = "vi" | "en";
+
+/**
+ * The language of this device's notification text: the server writes it in
+ * Vietnamese and English only, so any other UI language gets English.
+ */
+export function pushLocaleOf(locale: Locale): PushLocale {
+	return locale === "vi" ? "vi" : "en";
+}
 
 /**
  * What the device can do:

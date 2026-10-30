@@ -71,6 +71,13 @@ describe("public pages", () => {
 		await userEvent.click(screen.getByRole("button", { name: "English" }));
 		expect(await screen.findByRole("heading", { level: 1, name: "Delete your account" })).toBeTruthy();
 		await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+
+		await userEvent.click(screen.getByRole("button", { name: "中文" }));
+		expect(await screen.findByRole("heading", { level: 1, name: "删除账号" })).toBeTruthy();
+		await waitFor(() => expect(document.documentElement.lang).toBe("zh-CN"));
+		const items = screen.getAllByRole("listitem").map((item) => item.textContent);
+		for (const line of deletionTicks["zh-CN"](DELETION_GRACE_DAYS, "auth.hoandat.com")) expect(items).toContain(line);
+		expect(within(screen.getByRole("navigation", { name: "政策" })).getByRole("link", { name: "隐私政策" })).toBeTruthy();
 	});
 
 	it("explains account deletion with the same lines as Settings › Tài khoản", async () => {

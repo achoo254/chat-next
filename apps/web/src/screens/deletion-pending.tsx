@@ -36,6 +36,17 @@ const COPY = {
 		failed: "Could not cancel; try again in a few minutes.",
 		signOut: "Sign out",
 	},
+	"zh-CN": {
+		title: "你的聊天账号正在等待删除",
+		requested: (username: string, date: string) => `你已申请删除聊天账号 @${username}。其聊天数据将于 ${date} 彻底删除。`,
+		inactive: (username: string, date: string) =>
+			`聊天账号 @${username} 长期未使用，已根据你的“自动删除”设置安排删除。其聊天数据将于 ${date} 彻底删除。`,
+		keep: "取消删除即可照常使用：你的消息、群组、联系人和机器人都还在。",
+		cancel: "取消删除账号",
+		cancelling: "正在取消…",
+		failed: "暂时无法取消，请过几分钟再试。",
+		signOut: "退出登录",
+	},
 } as const satisfies Record<Locale, unknown>;
 
 function dateOf(unixSeconds: number, locale: Locale): string {

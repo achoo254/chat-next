@@ -26,7 +26,7 @@ import { createRemote, loadRemoteClient } from "./data/remote.ts";
 import { createIntegrations, loadIntegrationsClient } from "./integrations/api.ts";
 import { createBots, loadBotsClient } from "./bots/api.ts";
 import { pushOnDevice } from "./push/push-device.ts";
-import { createWebPush, loadWebPushClient } from "./push/web-push.ts";
+import { createWebPush, loadWebPushClient, pushLocaleOf } from "./push/web-push.ts";
 import { loadPrivacyClient } from "./settings/privacy-api.ts";
 import { accountData, blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
@@ -261,7 +261,7 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 	// Keep this device's Web Push registration in step with the session (a
 	// browser that never allowed notifications has nothing to sync).
 	const { locale } = useI18n();
-	const pushLocale = useEffectEvent(() => locale);
+	const pushLocale = useEffectEvent(() => pushLocaleOf(locale));
 	useEffect(() => {
 		if (start.status !== "ready") return;
 		const granted = typeof Notification !== "undefined" && Notification.permission === "granted";

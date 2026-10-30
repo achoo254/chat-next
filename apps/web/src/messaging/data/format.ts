@@ -136,7 +136,10 @@ export function dayLabel(unixSeconds: number, now: Date, locale: string, copy: M
 	if (days <= 0) return copy.list.today;
 	if (days === 1) return copy.list.yesterday;
 	const weekday = new Intl.DateTimeFormat(locale, { weekday: "long" }).format(then);
-	const year = then.getFullYear() === now.getFullYear() ? "" : `/${then.getFullYear()}`;
+	const sameYear = then.getFullYear() === now.getFullYear();
+	// Chinese reads the date before the weekday: 10月12日 星期一, 2025年10月12日 星期日.
+	if (locale === "zh-CN") return `${sameYear ? "" : `${then.getFullYear()}年`}${then.getMonth() + 1}月${then.getDate()}日 ${weekday}`;
+	const year = sameYear ? "" : `/${then.getFullYear()}`;
 	const label = `${weekday}, ${shortDate(unixSeconds, locale)}${year}`;
 	return label.charAt(0).toLocaleUpperCase(locale) + label.slice(1);
 }

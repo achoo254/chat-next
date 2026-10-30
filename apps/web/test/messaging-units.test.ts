@@ -9,6 +9,17 @@ import type { MessageEntity } from "@achoo254/chat-core";
 import { vi as copy } from "../src/messaging/copy/vi.ts";
 import { en } from "../src/messaging/copy/en.ts";
 import { enScreens } from "../src/messaging/copy/en-screens.ts";
+import { zhCN } from "../src/messaging/copy/zh-CN.ts";
+import { zhCNScreens } from "../src/messaging/copy/zh-CN-screens.ts";
+import { viBots } from "../src/messaging/bots/copy-vi.ts";
+import { zhCNBots } from "../src/messaging/bots/copy-zh-CN.ts";
+import { viHooks } from "../src/messaging/integrations/copy-vi.ts";
+import { zhCNHooks } from "../src/messaging/integrations/copy-zh-CN.ts";
+import { viMedia } from "../src/messaging/media/copy-vi.ts";
+import { zhCNMedia } from "../src/messaging/media/copy-zh-CN.ts";
+import { vi as shellVi } from "../src/i18n/vi.ts";
+import { zhCN as shellZhCN } from "../src/i18n/zh-CN.ts";
+import { pushLocaleOf } from "../src/messaging/push/web-push.ts";
 import { viScreens } from "../src/messaging/copy/vi-screens.ts";
 import { actionText, chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain, recentTime } from "../src/messaging/data/format.ts";
 import { highlight } from "../src/messaging/data/highlight.ts";
@@ -34,6 +45,15 @@ describe("format", () => {
 		expect(listTime(at(2026, 9, 3), NOW, "vi", copy)).toBe("03/10");
 		expect(dayLabel(at(2026, 9, 14), NOW, "vi", copy)).toBe("Hôm nay");
 		expect(dayLabel(at(2026, 9, 12), NOW, "vi", copy)).toBe("Thứ Hai, 12/10");
+	});
+
+	it("writes Chinese dates the Chinese way: the date, then the weekday", () => {
+		expect(listTime(at(2026, 9, 13), NOW, "zh-CN", zhCN)).toBe("昨天");
+		expect(listTime(at(2026, 9, 12), NOW, "zh-CN", zhCN)).toBe("周一");
+		expect(dayLabel(at(2026, 9, 14), NOW, "zh-CN", zhCN)).toBe("今天");
+		expect(dayLabel(at(2026, 9, 12), NOW, "zh-CN", zhCN)).toBe("10月12日 星期一");
+		expect(dayLabel(at(2025, 11, 31), NOW, "zh-CN", zhCN)).toBe("2025年12月31日 星期三");
+		expect(recentTime(at(2026, 9, 13, 21, 52), NOW, "zh-CN", { today: "今天", yesterday: "昨天" })).toBe("昨天 21:52");
 	});
 
 	it("formats recent times for session rows: today and yesterday with the clock, else the full date", () => {
@@ -178,6 +198,7 @@ describe("routes", () => {
 		expect(returnPathFor("/no/such/page")).toBeUndefined();
 		expect(loginUrl("vi", "/c/5001")).toBe("/auth/login?locale=vi&return_to=%2Fc%2F5001");
 		expect(loginUrl("en", "/")).toBe("/auth/login?locale=en");
+		expect(loginUrl("zh-CN", "/")).toBe("/auth/login?locale=zh-cn");
 	});
 
 	it("maps a topic's icon colour to the nearest avatar tone", () => {
@@ -200,6 +221,25 @@ describe("copy", () => {
 		expect(keys(en).sort()).toEqual(keys(copy).sort());
 		expect(keys(enScreens).sort()).toEqual(keys(viScreens).sort());
 	});
+
+	it("has the same keys in Vietnamese and Chinese", () => {
+		const keys = (value: object, prefix = ""): string[] =>
+			Object.entries(value).flatMap(([key, child]) =>
+				child !== null && typeof child === "object" && !Array.isArray(child) ? keys(child as object, `${prefix}${key}.`) : [`${prefix}${key}`],
+			);
+		expect(keys(shellZhCN).sort()).toEqual(keys(shellVi).sort());
+		expect(keys(zhCN).sort()).toEqual(keys(copy).sort());
+		expect(keys(zhCNScreens).sort()).toEqual(keys(viScreens).sort());
+		expect(keys(zhCNBots).sort()).toEqual(keys(viBots).sort());
+		expect(keys(zhCNHooks).sort()).toEqual(keys(viHooks).sort());
+		expect(keys(zhCNMedia).sort()).toEqual(keys(viMedia).sort());
+	});
+
+	it("asks the server for English notification text in Chinese, the server writing only vi and en", () => {
+		expect(pushLocaleOf("vi")).toBe("vi");
+		expect(pushLocaleOf("en")).toBe("en");
+		expect(pushLocaleOf("zh-CN")).toBe("en");
+	});
 });
 
 describe("channel wording", () => {
@@ -215,6 +255,8 @@ describe("channel wording", () => {
 		expect(actionText({ kind: "photo_changed" }, "Bạn", nameOf, copy, true)).toBe("Bạn đã đổi ảnh kênh");
 		expect(actionText(created, "You", nameOf, en, true)).toBe("You created the channel “Thông báo”");
 		expect(actionText(created, "You", nameOf, en, false)).toBe("You created the group “Thông báo”");
+		expect(actionText(created, "你", nameOf, zhCN, true)).toContain("创建了频道“Thông báo”");
+		expect(actionText(created, "你", nameOf, zhCN, false)).toContain("创建了群组“Thông báo”");
 	});
 
 	it("counts subscribers, not members, in a channel; groups have a leader and deputies", () => {

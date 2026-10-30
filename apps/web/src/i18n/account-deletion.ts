@@ -19,4 +19,10 @@ export const deletionTicks = {
 		`The account is locked at once and erased after ${graceDays} days. Sign in again within ${graceDays} days to cancel.`,
 		`Your ${brand.domain} account stays and keeps working in other apps. Manage or delete it at ${idpHost}/account.`,
 	],
+	"zh-CN": (graceDays: number, idpHost: string): string[] => [
+		"删除你的个人资料、用户名、联系人、已屏蔽的用户、我的云端、设置和所有会话；你将退出所有群组和频道。",
+		"你在他人聊天中发送的消息会保留，发送者显示为“已删除的账号”。",
+		`账号会立即被锁定，并在 ${graceDays} 天后彻底删除。在 ${graceDays} 天内重新登录即可取消删除。`,
+		`你的 ${brand.domain} 账号仍会保留，并可在其他应用中照常使用。如需管理或删除，请前往 ${idpHost}/account。`,
+	],
 } as const;
