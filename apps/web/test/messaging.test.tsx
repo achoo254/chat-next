@@ -645,9 +645,14 @@ describe("appearance and shortcuts", () => {
 		await userEvent.click(within(within(card).getByRole("group", { name: "Giao diện" })).getByRole("button", { name: "Theo máy" }));
 		expect(document.documentElement.dataset.theme).toBeUndefined();
 
+		// The server learns the language at start and on every change (the assistant bot's messages).
+		await waitFor(() => expect(demo.fixture.locales).toEqual(["vi"]), LONG);
 		await userEvent.click(within(within(card).getByRole("group", { name: "Ngôn ngữ" })).getByRole("button", { name: "English" }));
 		expect(await screen.findByRole("heading", { level: 2, name: "Language and theme" }, LONG)).toBeTruthy();
 		expect(document.cookie).toContain("hd_lang=en");
+		await waitFor(() => expect(demo.fixture.locales).toEqual(["vi", "en"]), LONG);
+		await userEvent.click(within(within(card).getByRole("group", { name: "Language" })).getByRole("button", { name: "中文" }));
+		await waitFor(() => expect(demo.fixture.locales).toEqual(["vi", "en", "zh-CN"]), LONG);
 	});
 
 	it("shows the theme picked in Chat before the shared choice", async () => {

@@ -172,6 +172,14 @@ func (s *usersService) Block(ctx context.Context, req *connect.Request[appv1.Blo
 	})
 }
 
+// SetLocale records the language the caller's app shows, for the
+// assistant bot's messages.
+func (s *usersService) SetLocale(ctx context.Context, req *connect.Request[appv1.SetLocaleRequest]) (*connect.Response[appv1.SetLocaleResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetLocaleRequest) (*appv1.SetLocaleResponse, error) {
+		return &appv1.SetLocaleResponse{}, s.chat.SetUserLocale(ctx, me, m.GetLocale())
+	})
+}
+
 // Unblock removes a block.
 func (s *usersService) Unblock(ctx context.Context, req *connect.Request[appv1.UnblockRequest]) (*connect.Response[appv1.UnblockResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.UnblockRequest) (*appv1.UnblockResponse, error) {

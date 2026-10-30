@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"app.local/server/internal/locale"
 )
 
 // The pages carry no script; their only resources are the web app's
@@ -22,34 +24,87 @@ var pages = template.Must(template.New("pages").Parse(`
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">{{end}}
 {{define "interstitial"}}<!doctype html>
-<html lang="vi">
+<html lang="{{.Text.Lang}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0;url={{.}}">
-<title>Đang đăng nhập…</title>
+<meta http-equiv="refresh" content="0;url={{.URL}}">
+<title>{{.Text.SigningIn}}</title>
 {{template "icons"}}
 </head>
 <body>
-<p>Đang đăng nhập… <a href="{{.}}">Tiếp tục</a></p>
+<p>{{.Text.SigningIn}} <a href="{{.URL}}">{{.Text.Continue}}</a></p>
 </body>
 </html>
 {{end}}
 {{define "error"}}<!doctype html>
-<html lang="vi">
+<html lang="{{.Text.Lang}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Đăng nhập không thành công</title>
+<title>{{.Text.Failed}}</title>
 {{template "icons"}}
 </head>
 <body>
-<h1>Đăng nhập không thành công</h1>
+<h1>{{.Text.Failed}}</h1>
 <p>{{.Message}}</p>
-<p><a href="{{.RetryURL}}">Thử lại</a></p>
+<p><a href="{{.RetryURL}}">{{.Text.Retry}}</a></p>
 </body>
 </html>
 {{end}}`))
+
+// pageMessage is the reason an error page gives.
+type pageMessage int
+
+// Messages of the sign-in error page.
+const (
+	msgSignInFailed pageMessage = iota
+	msgIdPUnavailable
+	msgSignupLimited
+)
+
+// pageText is the text of the pages in one language.
+type pageText struct {
+	Lang, SigningIn, Continue, Failed, Retry string
+	messages                                 [3]string // by pageMessage
+}
+
+// pageTexts holds the pages' text by locale (the ?locale= the sign-in
+// started with); any other value gets Vietnamese.
+var pageTexts = map[string]pageText{
+	locale.VI: {
+		Lang: locale.VI, SigningIn: "Đang đăng nhập…", Continue: "Tiếp tục", Failed: "Đăng nhập không thành công", Retry: "Thử lại",
+		messages: [3]string{
+			msgSignInFailed:   "Không hoàn tất được đăng nhập. Vui lòng thử lại.",
+			msgIdPUnavailable: "Máy chủ đăng nhập đang tạm thời không phản hồi. Vui lòng thử lại sau ít phút.",
+			msgSignupLimited:  "Vừa có quá nhiều tài khoản mới được tạo từ mạng của bạn. Vui lòng thử lại sau ít phút.",
+		},
+	},
+	locale.EN: {
+		Lang: locale.EN, SigningIn: "Signing in…", Continue: "Continue", Failed: "Sign-in failed", Retry: "Try again",
+		messages: [3]string{
+			msgSignInFailed:   "Sign-in could not be completed. Please try again.",
+			msgIdPUnavailable: "The sign-in server is not responding right now. Please try again in a few minutes.",
+			msgSignupLimited:  "Too many new accounts were just created from your network. Please try again in a few minutes.",
+		},
+	},
+	locale.ZhCN: {
+		Lang: locale.ZhCN, SigningIn: "正在登录…", Continue: "继续", Failed: "登录失败", Retry: "重试",
+		messages: [3]string{
+			msgSignInFailed:   "未能完成登录，请重试。",
+			msgIdPUnavailable: "登录服务器暂时没有响应，请过几分钟再试。",
+			msgSignupLimited:  "你所在的网络刚刚创建了过多新账号，请过几分钟再试。",
+		},
+	},
+}
+
+// textOf is the pages' text in lang, Vietnamese when lang is not one of them.
+func textOf(lang string) pageText {
+	if t, ok := pageTexts[lang]; ok {
+		return t
+	}
+	return pageTexts[locale.Default]
+}
 
 // writePageHeaders sets the headers of every HTML page of the auth routes.
 // no-referrer keeps the callback URL (code, state) out of the Referer of the
@@ -64,8 +119,8 @@ func writePageHeaders(w http.ResponseWriter) {
 }
 
 // writeInterstitial sends the browser to returnTo, a path CleanReturnTo
-// accepted ("" means "/").
-func writeInterstitial(w http.ResponseWriter, returnTo string) {
+// accepted ("" means "/"), with its text in lang.
+func writeInterstitial(w http.ResponseWriter, lang, returnTo string) {
 	if returnTo == "" {
 		returnTo = "/"
 	}
@@ -73,7 +128,10 @@ func writeInterstitial(w http.ResponseWriter, returnTo string) {
 	// has the whole page even while the callback still revokes the session
 	// it replaces.
 	var page bytes.Buffer
-	if err := pages.ExecuteTemplate(&page, "interstitial", returnTo); err != nil {
+	if err := pages.ExecuteTemplate(&page, "interstitial", struct {
+		Text pageText
+		URL  string
+	}{textOf(lang), returnTo}); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -112,18 +170,13 @@ func CleanReturnTo(raw string) string {
 	return raw
 }
 
-// Messages of the sign-in error page.
-const (
-	msgSignInFailed   = "Không hoàn tất được đăng nhập. Vui lòng thử lại."
-	msgIdPUnavailable = "Máy chủ đăng nhập đang tạm thời không phản hồi. Vui lòng thử lại sau ít phút."
-	msgSignupLimited  = "Vừa có quá nhiều tài khoản mới được tạo từ mạng của bạn. Vui lòng thử lại sau ít phút."
-)
-
-func writeErrorPage(w http.ResponseWriter, status int, message, locale, returnTo string) {
+// writeErrorPage tells why sign-in failed, in lang, with a link that starts
+// it again in the same language and toward the same returnTo.
+func writeErrorPage(w http.ResponseWriter, status int, message pageMessage, lang, returnTo string) {
 	retry := "/auth/login"
 	q := url.Values{}
-	if locale != "" {
-		q.Set("locale", locale)
+	if lang != "" {
+		q.Set("locale", lang)
 	}
 	if returnTo != "" {
 		q.Set("return_to", returnTo)
@@ -133,5 +186,9 @@ func writeErrorPage(w http.ResponseWriter, status int, message, locale, returnTo
 	}
 	writePageHeaders(w)
 	w.WriteHeader(status)
-	_ = pages.ExecuteTemplate(w, "error", struct{ Message, RetryURL string }{message, retry})
+	text := textOf(lang)
+	_ = pages.ExecuteTemplate(w, "error", struct {
+		Text              pageText
+		Message, RetryURL string
+	}{text, text.messages[message], retry})
 }

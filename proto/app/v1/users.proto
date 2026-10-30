@@ -35,6 +35,9 @@ service UsersService {
   rpc GetContacts(GetContactsRequest) returns (GetContactsResponse);
   // Users the caller blocked, most recently blocked first.
   rpc GetBlockedUsers(GetBlockedUsersRequest) returns (GetBlockedUsersResponse);
+  // The language the caller's app shows; the assistant bot writes to the
+  // caller in it. Apps send it at every start and when the user changes it.
+  rpc SetLocale(SetLocaleRequest) returns (SetLocaleResponse);
 }
 
 // Presence as visible to the caller after privacy rules are applied.
@@ -318,3 +321,10 @@ message GetBlockedUsersResponse {
   // Empty when there are no more blocked users.
   string next_cursor = 3;
 }
+
+message SetLocaleRequest {
+  // "vi", "en" or "zh-CN"; anything else is InvalidArgument.
+  string locale = 1;
+}
+
+message SetLocaleResponse {}

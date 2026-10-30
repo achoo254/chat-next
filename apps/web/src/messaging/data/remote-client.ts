@@ -589,6 +589,10 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				await users.unblock({ userId: BigInt(userId) });
 			}),
+		setLocale: (locale) =>
+			call(async () => {
+				await users.setLocale({ locale });
+			}),
 		privacy: () => call(async () => toPrivacy((await users.getPrivacy({})).settings)),
 		contacts: (cursor = "") =>
 			call(async () => {

@@ -131,7 +131,7 @@ func (h *Routes) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	st, err := readLoginCookie(r, h.login, h.now())
-	fail := func(status int, msg, reason string, err error) {
+	fail := func(status int, msg pageMessage, reason string, err error) {
 		h.cfg.Logger.Warn("sign-in callback rejected", "reason", reason, "err", err)
 		writeErrorPage(w, status, msg, st.Locale, st.ReturnTo)
 	}
@@ -194,7 +194,7 @@ func (h *Routes) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	h.cfg.Logger.Info("signed in", "user_id", user.ID, "session_id", sessionID)
 	setSessionCookie(w, token)
-	writeInterstitial(w, st.ReturnTo)
+	writeInterstitial(w, st.Locale, st.ReturnTo)
 	replaced, err := base64.RawURLEncoding.DecodeString(st.Replaces)
 	if err != nil || len(replaced) == 0 {
 		return

@@ -236,6 +236,8 @@ export class ChatFixture {
 	readonly inviteLinks = new Map<number, InviteLink[]>();
 	readonly readers = new Map<string, number[]>();
 	readonly reports: { target: string; reason: number; comment: string }[] = [];
+	/** Every SetLocale the app sent, in order. */
+	readonly locales: string[] = [];
 	/** Users whose privacy refuses being added to groups by this user. */
 	readonly refusesGroups = new Set<number>();
 	/** Users whose privacy refuses a new private chat with this user ("message me": contacts). */
@@ -860,6 +862,10 @@ export class ChatFixture {
 			report: (req) => {
 				const target = req.target.case === "messages" ? `messages:${num(req.target.value.chatId)}:${req.target.value.seqs.map(num).join(",")}` : `${req.target.case ?? ""}:${String(req.target.value ?? "")}`;
 				this.reports.push({ target, reason: req.reason, comment: req.comment });
+				return {};
+			},
+			setLocale: (req) => {
+				this.locales.push(req.locale);
 				return {};
 			},
 			getPrivacy: () => ({

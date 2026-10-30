@@ -161,6 +161,18 @@ func TestProfileRPCs(t *testing.T) {
 	if err != nil || len(got.Msg.GetUsers()) != 1 || got.Msg.GetUsers()[0].GetName() != "Alice" || !got.Msg.GetUsers()[0].GetIsSelf() {
 		t.Fatalf("GetUsers = %v, %v", got, err)
 	}
+
+	// The app's language, for the assistant's messages.
+	if _, err := alice.users.SetLocale(ctx, connect.NewRequest(&appv1.SetLocaleRequest{Locale: "fr"})); codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("SetLocale(fr): %v", err)
+	}
+	if _, err := alice.users.SetLocale(ctx, connect.NewRequest(&appv1.SetLocaleRequest{Locale: "zh-CN"})); err != nil {
+		t.Fatalf("SetLocale(zh-CN): %v", err)
+	}
+	var lang string
+	if err := e.store.Pool().QueryRow(ctx, `SELECT locale FROM users WHERE id = $1`, u.GetId()).Scan(&lang); err != nil || lang != "zh-CN" {
+		t.Fatalf("stored locale = %q, %v", lang, err)
+	}
 }
 
 func TestSessionRPCs(t *testing.T) {

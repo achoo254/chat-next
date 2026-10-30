@@ -146,13 +146,13 @@ func TestCleanReturnTo(t *testing.T) {
 
 func TestInterstitialAndRetryCarryReturnTo(t *testing.T) {
 	w := httptest.NewRecorder()
-	writeInterstitial(w, "/chat/7?topic=2&x=1")
+	writeInterstitial(w, "vi", "/chat/7?topic=2&x=1")
 	body := w.Body.String()
 	if !strings.Contains(body, `content="0;url=/chat/7?topic=2&amp;x=1"`) || !strings.Contains(body, `href="/chat/7?topic=2&amp;x=1"`) {
 		t.Fatalf("interstitial = %s", body)
 	}
 	w = httptest.NewRecorder()
-	writeInterstitial(w, "")
+	writeInterstitial(w, "", "")
 	if !strings.Contains(w.Body.String(), `content="0;url=/"`) {
 		t.Fatalf("interstitial without return_to = %s", w.Body.String())
 	}
@@ -163,9 +163,35 @@ func TestInterstitialAndRetryCarryReturnTo(t *testing.T) {
 	}
 }
 
+// The pages speak the language the sign-in started with, Vietnamese when
+// it named none.
+func TestPagesSpeakTheSignInLanguage(t *testing.T) {
+	for _, c := range []struct {
+		lang, html, title, message, retry string
+	}{
+		{"zh-CN", `<html lang="zh-CN">`, "登录失败", "登录服务器暂时没有响应", "重试"},
+		{"en", `<html lang="en">`, "Sign-in failed", "The sign-in server is not responding", "Try again"},
+		{"", `<html lang="vi">`, "Đăng nhập không thành công", "Máy chủ đăng nhập đang tạm thời không phản hồi", "Thử lại"},
+	} {
+		w := httptest.NewRecorder()
+		writeErrorPage(w, http.StatusServiceUnavailable, msgIdPUnavailable, c.lang, "/")
+		body := w.Body.String()
+		for _, want := range []string{c.html, "<title>" + c.title + "</title>", c.message, ">" + c.retry + "</a>"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%q error page lacks %q: %s", c.lang, want, body)
+			}
+		}
+	}
+	w := httptest.NewRecorder()
+	writeInterstitial(w, "zh-CN", "/")
+	if body := w.Body.String(); !strings.Contains(body, `<html lang="zh-CN">`) || !strings.Contains(body, "正在登录…") || !strings.Contains(body, ">继续</a>") {
+		t.Fatalf("interstitial in Chinese = %s", body)
+	}
+}
+
 func TestPagesLinkTheAppFavicon(t *testing.T) {
 	interstitial := httptest.NewRecorder()
-	writeInterstitial(interstitial, "/")
+	writeInterstitial(interstitial, "vi", "/")
 	failure := httptest.NewRecorder()
 	writeErrorPage(failure, http.StatusBadRequest, msgSignInFailed, "vi", "/")
 	for name, w := range map[string]*httptest.ResponseRecorder{"interstitial": interstitial, "error": failure} {

@@ -34,15 +34,16 @@ import (
 	"time"
 
 	"app.local/server/internal/chat"
+	"app.local/server/internal/locale"
 	"app.local/server/internal/webpush"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Locales of the notification text.
+// Locales of the notification text: every UI language.
 const (
-	LocaleVI   = "vi"
-	LocaleEN   = "en"
-	LocaleZhCN = "zh-CN"
+	LocaleVI   = locale.VI
+	LocaleEN   = locale.EN
+	LocaleZhCN = locale.ZhCN
 )
 
 // ErrDisabled is returned by Register when the server has no VAPID key.
@@ -162,9 +163,7 @@ func (s *Service) Register(ctx context.Context, userID, sessionID int64, sub Sub
 	if err := sub.Keys.Validate(); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
-	switch sub.Locale {
-	case "", LocaleVI, LocaleEN, LocaleZhCN:
-	default:
+	if sub.Locale != "" && !locale.Valid(sub.Locale) {
 		return fmt.Errorf("%w: locale must be vi, en or zh-CN", ErrInvalid)
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -172,11 +171,11 @@ func (s *Service) Register(ctx context.Context, userID, sessionID int64, sub Sub
 		return fmt.Errorf("push: register: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	locale := sub.Locale
-	if locale == "" {
+	lang := sub.Locale
+	if lang == "" {
 		if err := tx.QueryRow(ctx, `
 			SELECT coalesce((SELECT locale FROM push_subscriptions WHERE session_id = $1 OR endpoint = $2
-				ORDER BY session_id = $1 DESC LIMIT 1), $3)`, sessionID, sub.Endpoint, LocaleVI).Scan(&locale); err != nil {
+				ORDER BY session_id = $1 DESC LIMIT 1), $3)`, sessionID, sub.Endpoint, LocaleVI).Scan(&lang); err != nil {
 			return fmt.Errorf("push: register: %w", err)
 		}
 	}
@@ -190,7 +189,7 @@ func (s *Service) Register(ctx context.Context, userID, sessionID int64, sub Sub
 		SELECT $1, $2, $3, $4, $5, $6, $7 FROM user_sessions
 		WHERE id = $3 AND user_id = $2 AND tenant_id = $1 AND revoked_at IS NULL
 		FOR SHARE`,
-		s.cfg.TenantID, userID, sessionID, sub.Endpoint, sub.Keys.P256DH, sub.Keys.Auth, locale)
+		s.cfg.TenantID, userID, sessionID, sub.Endpoint, sub.Keys.P256DH, sub.Keys.Auth, lang)
 	if err != nil {
 		return fmt.Errorf("push: register: %w", err)
 	}

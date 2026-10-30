@@ -5,6 +5,7 @@
 // stream; these calls only return what the UI needs right away.
 import type { MessageEntity } from "@achoo254/chat-core";
 import type { Transport } from "@connectrpc/connect";
+import type { Locale } from "../../i18n/i18n.tsx";
 import type { ReportReason, ReportTarget } from "./pending-backend.ts";
 
 export type Presence =
@@ -475,6 +476,8 @@ export interface Remote {
 	unblock(userId: number): Promise<void>;
 	privacy(): Promise<Privacy>;
 	setPrivacy(change: Partial<Privacy>): Promise<Privacy>;
+	/** Tells the server the language the app shows: the assistant bot writes to the user in it. */
+	setLocale(locale: Locale): Promise<void>;
 	/** The caller's own contact list, a page at a time (ordered by user id). */
 	contacts(cursor?: string): Promise<Page<Contact>>;
 	/** NotFound when the user is unknown or their privacy hides them from this kind of search. */
@@ -560,6 +563,7 @@ const METHODS = [
 	"unblock",
 	"privacy",
 	"setPrivacy",
+	"setLocale",
 	"contacts",
 	"addContact",
 	"deleteContact",

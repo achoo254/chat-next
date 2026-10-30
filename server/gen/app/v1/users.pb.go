@@ -2353,6 +2353,87 @@ func (x *GetBlockedUsersResponse) GetNextCursor() string {
 	return ""
 }
 
+type SetLocaleRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "vi", "en" or "zh-CN"; anything else is InvalidArgument.
+	Locale        string `protobuf:"bytes,1,opt,name=locale,proto3" json:"locale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetLocaleRequest) Reset() {
+	*x = SetLocaleRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetLocaleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetLocaleRequest) ProtoMessage() {}
+
+func (x *SetLocaleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetLocaleRequest.ProtoReflect.Descriptor instead.
+func (*SetLocaleRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *SetLocaleRequest) GetLocale() string {
+	if x != nil {
+		return x.Locale
+	}
+	return ""
+}
+
+type SetLocaleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetLocaleResponse) Reset() {
+	*x = SetLocaleResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetLocaleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetLocaleResponse) ProtoMessage() {}
+
+func (x *SetLocaleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetLocaleResponse.ProtoReflect.Descriptor instead.
+func (*SetLocaleResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{38}
+}
+
 var File_app_v1_users_proto protoreflect.FileDescriptor
 
 const file_app_v1_users_proto_rawDesc = "" +
@@ -2495,7 +2576,10 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\ablocked\x18\x01 \x03(\v2\x13.app.v1.BlockedUserR\ablocked\x12\"\n" +
 	"\x05users\x18\x02 \x03(\v2\f.app.v1.UserR\x05users\x12\x1f\n" +
 	"\vnext_cursor\x18\x03 \x01(\tR\n" +
-	"nextCursor*\xcd\x01\n" +
+	"nextCursor\"*\n" +
+	"\x10SetLocaleRequest\x12\x16\n" +
+	"\x06locale\x18\x01 \x01(\tR\x06locale\"\x13\n" +
+	"\x11SetLocaleResponse*\xcd\x01\n" +
 	"\x0eUserStatusKind\x12 \n" +
 	"\x1cUSER_STATUS_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17USER_STATUS_KIND_ONLINE\x10\x01\x12\x1c\n" +
@@ -2521,7 +2605,7 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x1bREPORT_REASON_PERSONAL_DATA\x10\x05\x12\x17\n" +
 	"\x13REPORT_REASON_OTHER\x10\x06\x12\x16\n" +
 	"\x12REPORT_REASON_SCAM\x10\a\x12\x18\n" +
-	"\x14REPORT_REASON_SEXUAL\x10\b2\x9f\b\n" +
+	"\x14REPORT_REASON_SEXUAL\x10\b2\xe1\b\n" +
 	"\fUsersService\x12:\n" +
 	"\aGetSelf\x12\x16.app.v1.GetSelfRequest\x1a\x17.app.v1.GetSelfResponse\x12=\n" +
 	"\bGetUsers\x12\x17.app.v1.GetUsersRequest\x1a\x18.app.v1.GetUsersResponse\x12L\n" +
@@ -2540,7 +2624,8 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"AddContact\x12\x19.app.v1.AddContactRequest\x1a\x1a.app.v1.AddContactResponse\x12L\n" +
 	"\rDeleteContact\x12\x1c.app.v1.DeleteContactRequest\x1a\x1d.app.v1.DeleteContactResponse\x12F\n" +
 	"\vGetContacts\x12\x1a.app.v1.GetContactsRequest\x1a\x1b.app.v1.GetContactsResponse\x12R\n" +
-	"\x0fGetBlockedUsers\x12\x1e.app.v1.GetBlockedUsersRequest\x1a\x1f.app.v1.GetBlockedUsersResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\x0fGetBlockedUsers\x12\x1e.app.v1.GetBlockedUsersRequest\x1a\x1f.app.v1.GetBlockedUsersResponse\x12@\n" +
+	"\tSetLocale\x12\x18.app.v1.SetLocaleRequest\x1a\x19.app.v1.SetLocaleResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_users_proto_rawDescOnce sync.Once
@@ -2555,7 +2640,7 @@ func file_app_v1_users_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_app_v1_users_proto_goTypes = []any{
 	(UserStatusKind)(0),             // 0: app.v1.UserStatusKind
 	(AccountDeletionReason)(0),      // 1: app.v1.AccountDeletionReason
@@ -2598,11 +2683,13 @@ var file_app_v1_users_proto_goTypes = []any{
 	(*GetBlockedUsersRequest)(nil),  // 38: app.v1.GetBlockedUsersRequest
 	(*BlockedUser)(nil),             // 39: app.v1.BlockedUser
 	(*GetBlockedUsersResponse)(nil), // 40: app.v1.GetBlockedUsersResponse
-	(*MediaRef)(nil),                // 41: app.v1.MediaRef
+	(*SetLocaleRequest)(nil),        // 41: app.v1.SetLocaleRequest
+	(*SetLocaleResponse)(nil),       // 42: app.v1.SetLocaleResponse
+	(*MediaRef)(nil),                // 43: app.v1.MediaRef
 }
 var file_app_v1_users_proto_depIdxs = []int32{
 	0,  // 0: app.v1.UserStatus.kind:type_name -> app.v1.UserStatusKind
-	41, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
+	43, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
 	4,  // 2: app.v1.User.status:type_name -> app.v1.UserStatus
 	5,  // 3: app.v1.GetSelfResponse.user:type_name -> app.v1.User
 	8,  // 4: app.v1.GetSelfResponse.deletion:type_name -> app.v1.AccountDeletion
@@ -2648,23 +2735,25 @@ var file_app_v1_users_proto_depIdxs = []int32{
 	33, // 44: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
 	35, // 45: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
 	38, // 46: app.v1.UsersService.GetBlockedUsers:input_type -> app.v1.GetBlockedUsersRequest
-	7,  // 47: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
-	10, // 48: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
-	12, // 49: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
-	14, // 50: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
-	16, // 51: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
-	18, // 52: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
-	20, // 53: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
-	22, // 54: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
-	25, // 55: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
-	27, // 56: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
-	30, // 57: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
-	32, // 58: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
-	34, // 59: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
-	36, // 60: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
-	40, // 61: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
-	47, // [47:62] is the sub-list for method output_type
-	32, // [32:47] is the sub-list for method input_type
+	41, // 47: app.v1.UsersService.SetLocale:input_type -> app.v1.SetLocaleRequest
+	7,  // 48: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
+	10, // 49: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
+	12, // 50: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
+	14, // 51: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
+	16, // 52: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
+	18, // 53: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
+	20, // 54: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
+	22, // 55: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
+	25, // 56: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
+	27, // 57: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
+	30, // 58: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
+	32, // 59: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
+	34, // 60: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
+	36, // 61: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
+	40, // 62: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
+	42, // 63: app.v1.UsersService.SetLocale:output_type -> app.v1.SetLocaleResponse
+	48, // [48:64] is the sub-list for method output_type
+	32, // [32:48] is the sub-list for method input_type
 	32, // [32:32] is the sub-list for extension type_name
 	32, // [32:32] is the sub-list for extension extendee
 	0,  // [0:32] is the sub-list for field type_name
@@ -2694,7 +2783,7 @@ func file_app_v1_users_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_users_proto_rawDesc), len(file_app_v1_users_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   37,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

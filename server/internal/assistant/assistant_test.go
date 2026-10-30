@@ -355,3 +355,71 @@ func TestReplyToFeedbackFromSettings(t *testing.T) {
 		t.Fatal("assistant feedback source")
 	}
 }
+
+// The assistant writes to each user in the language their app reported
+// (UsersService.SetLocale), Vietnamese until one did.
+func TestAssistantSpeaksTheUsersLanguage(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	env := w.env
+	botID := w.assistant.BotID()
+	user := env.User("wei")
+	if err := env.Chat.SetUserLocale(ctx, user, "fr"); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("unknown locale: %v", err)
+	}
+	if err := env.Chat.SetUserLocale(ctx, user, "zh-CN"); err != nil {
+		t.Fatal(err)
+	}
+	if err := env.Chat.SetUserLocale(ctx, user, "zh-CN"); err != nil {
+		t.Fatalf("the same locale again: %v", err)
+	}
+	if _, err := env.Chat.StartBot(ctx, user, &appv1.StartBotRequest{BotId: botID, RandomId: 9}); err != nil {
+		t.Fatal(err)
+	}
+	chatID, err := env.Chat.SystemBotNoticeChat(ctx, user)
+	if err != nil || chatID == 0 {
+		t.Fatalf("assistant chat = %d, %v", chatID, err)
+	}
+	welcome := w.waitBotMessage(t, user, chatID, 1)
+	if !strings.HasPrefix(welcome.GetText(), "欢迎使用 Demo App！") || !strings.Contains(welcome.GetText(), "我的云端") {
+		t.Fatalf("welcome = %q", welcome.GetText())
+	}
+	if got := strings.Join(buttons(welcome), "|"); got != "快速指南|发送建议|报告问题" {
+		t.Fatalf("welcome buttons = %s", got)
+	}
+	w.press(t, user, welcome, "guide")
+	if guide := w.waitBotMessage(t, user, chatID, 2); !strings.HasPrefix(guide.GetText(), "快速指南") {
+		t.Fatalf("guide = %q", guide.GetText())
+	}
+	idea := w.say(t, user, chatID, "希望支持深色模式")
+	if thanks := w.waitBotMessage(t, user, chatID, 3); thanks.GetText() != "谢谢！团队已收到你的反馈。" || thanks.GetReplyToSeq() != idea {
+		t.Fatalf("thanks = %q", thanks.GetText())
+	}
+	open, err := env.Chat.GetFeedback(ctx, w.operator, &appv1.GetFeedbackRequest{})
+	if err != nil || len(open.GetFeedback()) != 1 {
+		t.Fatalf("queue = %v, %v", open, err)
+	}
+	if _, err := w.assistant.Reply(ctx, w.operator, open.GetFeedback()[0].GetId(), "已在计划中。"); err != nil {
+		t.Fatal(err)
+	}
+	if reply := w.waitBotMessage(t, user, chatID, 4); reply.GetText() != "Demo App 团队的回复：\n\n已在计划中。" {
+		t.Fatalf("reply = %q", reply.GetText())
+	}
+
+	// Switching the app to English switches the assistant, notices included.
+	if err := env.Chat.SetUserLocale(ctx, user, "en"); err != nil {
+		t.Fatal(err)
+	}
+	until := time.Date(2026, 10, 23, 7, 30, 0, 0, time.UTC)
+	if err := w.assistant.NotifyModeration(ctx, user, chat.ModerationNotice{
+		Actions: []appv1.ModerationAction{appv1.ModerationAction_MODERATION_ACTION_RESTRICT_ACCOUNT}, Note: "spam", Until: until,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	notice := w.waitBotMessage(t, user, chatID, 5)
+	for _, want := range []string{"Notice from the Demo App moderation team.", "locked until 14:30, 23 Oct 2026", "Reason: spam"} {
+		if !strings.Contains(notice.GetText(), want) {
+			t.Fatalf("notice %q lacks %q", notice.GetText(), want)
+		}
+	}
+}

@@ -269,6 +269,14 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 		start.services.webPush.sync(pushLocale()).catch((err: unknown) => reportError("web push", err instanceof Error ? err.message : String(err)));
 	}, [start, self.id]);
 
+	// Tell the server the app's language at every start and on every
+	// change, so the assistant bot writes in it (older accounts get theirs
+	// on their next start).
+	useEffect(() => {
+		if (start.status !== "ready") return;
+		start.services.remote.setLocale(locale).catch((err: unknown) => reportError("set locale", err instanceof Error ? err.message : String(err)));
+	}, [start, locale]);
+
 	// One services object per client and profile, so context readers re-render rarely.
 	const services = useMemo(() => (start.status === "ready" ? { ...start.services, self } : null), [start, self]);
 

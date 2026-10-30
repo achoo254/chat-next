@@ -31,6 +31,7 @@ import (
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/brand"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/locale"
 	"connectrpc.com/connect"
 )
 
@@ -58,7 +59,8 @@ type Service struct {
 	api     *botapi.Service
 	bulk    *botbulk.Service // announcements; nil turns them off (UseBulk)
 	logger  *slog.Logger
-	copy    copyText
+	names   brand.Names
+	copies  map[string]copyText // by locale
 	botID   int64
 
 	mu sync.Mutex
@@ -79,16 +81,14 @@ func New(chatSvc *chat.Service, admin *botadmin.Service, updates *botupdates.Ser
 	if chatSvc == nil || admin == nil || updates == nil || api == nil || logger == nil {
 		return nil, errors.New("assistant: missing dependency")
 	}
-	return &Service{chat: chatSvc, admin: admin, updates: updates, api: api, logger: logger, copy: newCopy(names),
+	return &Service{chat: chatSvc, admin: admin, updates: updates, api: api, logger: logger, names: names, copies: newCopies(names),
 		pending: map[int64]pendingKind{}}, nil
 }
 
 // Ensure creates or updates the assistant's account and turns on the
 // assistant chat of every user.
 func (s *Service) Ensure(ctx context.Context) error {
-	bot, err := s.admin.EnsureSystemBot(ctx, botadmin.SystemBot{
-		Username: Username, Name: s.copy.name, Description: s.copy.description, About: s.copy.about, Commands: commands(),
-	})
+	bot, err := s.admin.EnsureSystemBot(ctx, systemBot(s.names))
 	if err != nil {
 		return err
 	}
@@ -176,56 +176,77 @@ func (s *Service) handle(ctx context.Context, u botupdates.Update) error {
 
 func (s *Service) onMessage(ctx context.Context, updateID int64, m *wire.Message) error {
 	user := m.From.ID
+	c, err := s.copyFor(ctx, user)
+	if err != nil {
+		return err
+	}
 	text := strings.TrimSpace(m.Text)
 	if name, _, ok := chat.CommandOf(text); ok {
 		args := strings.TrimSpace(strings.TrimPrefix(text, strings.Fields(text)[0]))
 		switch strings.ToLower(name) {
 		case cmdStart:
 			s.setPending(user, "")
-			return s.send(ctx, updateID, m.Chat.ID, s.copy.welcome, 0, welcomeKeyboard())
+			return s.send(ctx, updateID, m.Chat.ID, c.welcome, 0, welcomeKeyboard(c))
 		case cmdGuide:
-			return s.send(ctx, updateID, m.Chat.ID, s.copy.guide, 0, nil)
+			return s.send(ctx, updateID, m.Chat.ID, c.guide, 0, nil)
 		case cmdFeedback:
 			if args == "" {
 				s.setPending(user, chat.FeedbackIdea)
-				return s.send(ctx, updateID, m.Chat.ID, s.copy.askIdea, 0, nil)
+				return s.send(ctx, updateID, m.Chat.ID, c.askIdea, 0, nil)
 			}
-			return s.record(ctx, updateID, m, chat.FeedbackIdea, args)
+			return s.record(ctx, updateID, m, c, chat.FeedbackIdea, args)
 		default:
-			return s.send(ctx, updateID, m.Chat.ID, s.copy.unknownCommand, 0, nil)
+			return s.send(ctx, updateID, m.Chat.ID, c.unknownCommand, 0, nil)
 		}
 	}
 	if text == "" {
-		return s.send(ctx, updateID, m.Chat.ID, s.copy.textOnly, 0, nil)
+		return s.send(ctx, updateID, m.Chat.ID, c.textOnly, 0, nil)
 	}
-	return s.record(ctx, updateID, m, s.takePending(user), text)
+	return s.record(ctx, updateID, m, c, s.takePending(user), text)
 }
 
 // record files the message as feedback and thanks the user.
-func (s *Service) record(ctx context.Context, updateID int64, m *wire.Message, kind, text string) error {
+func (s *Service) record(ctx context.Context, updateID int64, m *wire.Message, c copyText, kind, text string) error {
 	if _, err := s.chat.RecordFeedback(ctx, m.From.ID, m.Chat.ID, m.Seq, kind, text); err != nil {
 		return err
 	}
-	return s.send(ctx, updateID, m.Chat.ID, s.copy.thanks, m.Seq, nil)
+	return s.send(ctx, updateID, m.Chat.ID, c.thanks, m.Seq, nil)
 }
 
 func (s *Service) onButton(ctx context.Context, updateID int64, cb *wire.Callback) error {
 	if err := s.api.AnswerAsSystemBot(ctx, s.botID, cb.ID, ""); err != nil && !errors.Is(err, botupdates.ErrCallbackNotFound) {
 		return err
 	}
+	c, err := s.copyFor(ctx, cb.From.ID)
+	if err != nil {
+		return err
+	}
 	chatID := cb.Message.Chat.ID
 	switch cb.Data {
 	case dataGuide:
-		return s.send(ctx, updateID, chatID, s.copy.guide, 0, nil)
+		return s.send(ctx, updateID, chatID, c.guide, 0, nil)
 	case dataIdea:
 		s.setPending(cb.From.ID, chat.FeedbackIdea)
-		return s.send(ctx, updateID, chatID, s.copy.askIdea, 0, nil)
+		return s.send(ctx, updateID, chatID, c.askIdea, 0, nil)
 	case dataBug:
 		s.setPending(cb.From.ID, chat.FeedbackBug)
-		return s.send(ctx, updateID, chatID, s.copy.askBug, 0, nil)
+		return s.send(ctx, updateID, chatID, c.askBug, 0, nil)
 	default:
 		return nil
 	}
+}
+
+// copyFor is the assistant's text in the language userID's app shows.
+func (s *Service) copyFor(ctx context.Context, userID int64) (copyText, error) {
+	lang, err := s.chat.UserLocale(ctx, userID)
+	if err != nil {
+		return copyText{}, err
+	}
+	c, ok := s.copies[lang]
+	if !ok {
+		c = s.copies[locale.Default]
+	}
+	return c, nil
 }
 
 // send posts text in chatID, once per update (randomID from the update).
@@ -292,8 +313,12 @@ func (s *Service) Reply(ctx context.Context, operator, feedbackID int64, text st
 	if err != nil {
 		return nil, err
 	}
+	c, err := s.copyFor(ctx, item.UserID)
+	if err != nil {
+		return nil, err
+	}
 	out := botapi.OutgoingMessage{
-		ChatID: item.ChatID, Text: s.copy.replyPrefix + text, ReplyToSeq: item.Seq, RandomID: randomID("feedback", item.ID),
+		ChatID: item.ChatID, Text: c.replyPrefix + text, ReplyToSeq: item.Seq, RandomID: randomID("feedback", item.ID),
 	}
 	if item.FromSettings() {
 		// No message of the user's to reply to: a new one quoting it.
@@ -305,7 +330,7 @@ func (s *Service) Reply(ctx context.Context, operator, feedbackID int64, text st
 			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("user_unreachable: the user has no chat with the assistant"))
 		}
 		out.ChatID, out.ReplyToSeq = chatID, 0
-		out.Text = fmt.Sprintf(s.copy.replySettingsPrefix, chat.Excerpt(item.Text, quoteMax)) + text
+		out.Text = fmt.Sprintf(c.replySettingsPrefix, chat.Excerpt(item.Text, quoteMax)) + text
 	}
 	if _, err := s.api.SendAsSystemBot(ctx, s.botID, out); err != nil {
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -324,7 +349,11 @@ var vietnam = time.FixedZone("ICT", 7*60*60)
 // assistant's chat (chat.Notifier). The chat is opened for them when they
 // never pressed Start.
 func (s *Service) NotifyModeration(ctx context.Context, userID int64, n chat.ModerationNotice) error {
-	text := s.copy.noticeText(n)
+	c, err := s.copyFor(ctx, userID)
+	if err != nil {
+		return err
+	}
+	text := c.noticeText(n)
 	if text == "" {
 		return nil
 	}
@@ -352,7 +381,7 @@ func (c copyText) noticeText(n chat.ModerationNotice) string {
 			if n.Until.IsZero() {
 				lines = append(lines, c.modLocked)
 			} else {
-				lines = append(lines, fmt.Sprintf(c.modLockedUntil, n.Until.In(vietnam).Format("15:04 02/01/2006")))
+				lines = append(lines, fmt.Sprintf(c.modLockedUntil, n.Until.In(vietnam).Format(c.dateLayout)))
 			}
 		}
 	}
