@@ -62,7 +62,7 @@ type confirmBotInput struct {
 }
 
 // adminNote marks the tools that need bots:admin and a confirm token.
-const adminNote = " Needs bots:admin and two calls: the first returns a preview and a confirm_token, the second (same arguments plus confirm_token, after the user agreed) does it."
+const adminNote = " Needs bots:admin." + confirmNote
 
 // ownedBot finds bot_id among the caller's bots (NotFound otherwise).
 func ownedBot(ctx context.Context, t *toolset, botID int64) (*appv1.Bot, error) {

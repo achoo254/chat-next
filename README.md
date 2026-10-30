@@ -50,7 +50,7 @@ Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`]
 
 ## MCP cho công cụ AI
 
-Thêm `https://chat.hoandat.com/mcp` vào công cụ AI (Claude Code, …) làm MCP server rồi duyệt quyền ở trang consent của IdP; cấu hình mẫu cho từng công cụ có ở Cài đặt › Kết nối AI (MCP) trong app. Tool làm việc với đúng quyền của tài khoản trong app; quản trị bot (`bots:admin`) cần scope riêng và xác nhận hai bước. Quyết định: [ADR 0012](docs/adr/0012-mcp-endpoint.md); mã ở [`server/internal/chatmcp/`](server/internal/chatmcp/).
+Thêm `https://chat.hoandat.com/mcp` vào công cụ AI (Claude Code, …) làm MCP server rồi duyệt quyền ở trang consent của IdP; cấu hình mẫu cho từng công cụ có ở Cài đặt › Kết nối AI (MCP) trong app. Tool làm việc với đúng quyền của tài khoản trong app; quản trị bot (`bots:admin`) cần scope riêng và xác nhận hai bước; tạo, xoay vòng URL hay xoá webhook đến cũng xác nhận hai bước. Quyết định: [ADR 0012](docs/adr/0012-mcp-endpoint.md); mã ở [`server/internal/chatmcp/`](server/internal/chatmcp/).
 
 ## Production
 

@@ -22,13 +22,15 @@ Người dùng muốn cho công cụ AI (Claude Code và các client MCP khác) 
 
 | Scope | Tool |
 |---|---|
-| `chat:read` | `get_me`, `list_chats`, `get_chat`, `get_chat_members`, `get_messages`, `search_messages`, `search_users`, `resolve_username`, `get_users` |
-| `chat:write` | `send_message`, `start_private_chat`, `edit_message`, `delete_messages`, `mark_read`, `set_reaction` |
+| `chat:read` | `get_me`, `list_chats`, `get_chat`, `get_chat_members`, `get_messages`, `search_messages`, `search_users`, `resolve_username`, `get_users`; tin nhắn: `get_pinned_messages`, `get_message_reactions`, `get_message_readers`; nhóm: `get_invite_links`, `get_forum_topics`; danh bạ: `get_contacts`, `get_blocked_users`, `get_common_chats`; webhook đến: `list_incoming_hooks`, `get_incoming_hook`, `get_incoming_hook_stats`, `list_incoming_hook_dead_letters`, `get_incoming_hook_audit` |
+| `chat:write` | `send_message`, `start_private_chat`, `edit_message`, `delete_messages`, `mark_read`, `set_reaction`; tin nhắn: `forward_messages`, `copy_message`, `pin_message`, `unpin_message`, `unpin_all_messages`; nhóm và kênh: `create_group`, `create_channel`, `add_members`, `remove_member`, `update_chat_info`, `leave_chat`, `export_invite_link`, `revoke_invite_link`, `create_forum_topic`, `edit_forum_topic`, `set_admin`, `set_member_permissions`; danh sách chat của chính người dùng: `set_dialog_mute`, `set_dialog_pinned`, `set_dialog_unread_mark`; danh bạ: `add_contact`, `delete_contact`, `block_user`, `unblock_user`; webhook đến: `update_incoming_hook`, `set_incoming_hook_enabled`, và hai bước: `create_incoming_hook`, `rotate_incoming_hook_secret`, `revoke_previous_hook_secret`, `take_over_incoming_hook`, `delete_incoming_hook` |
 | `bots:read` | `list_bots`, `get_bot_delivery`, `list_bot_dead_letters` |
 | `bots:write` | `create_bot`, `update_bot`, `retry_bot_dead_letters`, `discard_bot_dead_letters` |
 | `bots:admin` | `set_bot_webhook`, `delete_bot_webhook`, `reset_bot_token`, `delete_bot` |
 
 - Tool gọi chính các handler của `/rpc` trong cùng tiến trình (`rpc.InProcess`, `rpc.Invoke`), với phiên dựng từ người dùng của token. Kiểm thành viên, quyền sở hữu bot, hạn mức, validate và hợp đồng id (ADR 0001) vì thế giống hệt app; MCP không đọc hay sửa được gì mà người dùng không làm được trong app.
+- Webhook đến (`IntegrationsService`) dùng `chat:read`/`chat:write` chứ không có scope riêng: handler chỉ cho admin của nhóm hay kênh, như trong app. Tool trả URL bí mật (tạo, xoay vòng, tiếp quản), làm URL ngừng chạy (thu hồi URL cũ, xoá) đi hai bước với `confirm_token` như `bots:admin` (mục dưới); bản xem trước không bao giờ chứa URL. Các tool này không cần đăng nhập IdP gần đây vì `/rpc` cũng không đòi.
+- Không có tool `DeleteChat`: xoá nhóm hay kênh cho mọi thành viên không hoàn tác được, mà `chat:write` không có cảnh báo riêng lúc cấp quyền; người dùng xoá trong app. Ngoài phạm vi MCP: đăng nhập, push, realtime, cấu hình, góp ý, quyền riêng tư và xoá tài khoản, Mini App và inline, kiểm duyệt, tải media.
 - Kết quả là JSON của message protobuf (tên trường theo proto, id 64-bit xuất thành số). Lỗi là kết quả tool `{"error":{"code","message"}}` với mã Connect như `/rpc`.
 
 ### Ngoại lệ cho `bots:admin`
@@ -55,7 +57,7 @@ Lần gọi đã xác nhận chạy handler `/rpc` với `AuthTime` là lúc xá
 
 ## Cách thay đổi
 
-- Thêm tool: thêm vào `server/internal/chatmcp/tools_*.go` với scope phù hợp, gọi qua `rpc.InProcess`; tool ghi mới thuộc scope sẵn có không cần đổi IdP.
+- Thêm tool: thêm vào `server/internal/chatmcp/tools_*.go` với scope phù hợp, gọi qua `rpc.InProcess` (service chưa có trong đó thì thêm vào `rpc.NewInProcess`); tool ghi mới thuộc scope sẵn có không cần đổi scope ở IdP, nhưng câu mô tả scope trên trang consent (`auth-next/src/i18n/messages/*/consent.ts`) nên theo kịp.
 - Thêm scope: khai ở IdP trước (`auth-next/src/oidc/resources.ts`, `CHAT_MCP_SCOPES`, câu trên consent), deploy IdP, rồi mới dùng ở chat.
 - Đổi đường dẫn `/mcp` hay domain: đổi resource ở IdP (`tenant-resources.ts`) cùng lúc; client MCP đã kết nối phải kết nối lại.
 

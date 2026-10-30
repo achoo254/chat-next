@@ -107,7 +107,7 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewMessagesServiceHandler(shared.Messages, opts...))
 	mux.Handle(appv1connect.NewUpdatesServiceHandler(&updatesService{chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewModerationServiceHandler(&moderationService{chat: d.Chat, feedback: d.Feedback, announcer: d.Announcer, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewIntegrationsServiceHandler(&integrationsService{hooks: d.Hooks, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewIntegrationsServiceHandler(shared.Integrations, opts...))
 	mux.Handle(appv1connect.NewMediaServiceHandler(&mediaService{media: d.Media, chat: d.Chat, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewSearchServiceHandler(shared.Search, opts...))
 	mux.Handle(appv1connect.NewBotsServiceHandler(&botsService{chat: d.Chat, bots: d.Bots, updates: d.BotUpdates, miniApp: d.MiniApp, logger: d.Logger}, opts...))

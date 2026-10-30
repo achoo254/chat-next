@@ -30,7 +30,7 @@ var (
 )
 
 // confirmTokens issues and checks the tokens that turn a preview of a
-// bots:admin tool into the real call. A token is bound to the user, the
+// two-call tool into the real call. A token is bound to the user, the
 // tool and the exact arguments, lives 5 minutes and works once. The used
 // nonces are kept in memory: the api runs as one process (as the rate
 // limiter assumes), and a restart only makes pending previews fail.

@@ -21,7 +21,11 @@ import (
 const instructions = `Tools act as the signed-in user of this chat, with exactly the rights the user has in the app.
 Chats are identified by chat_id and messages by (chat_id, seq); users and bots by their user id.
 Start with list_chats or search_messages, read with get_messages, find people with search_users or resolve_username, then send_message (start_private_chat opens a one-to-one chat).
-Bots: list_bots, get_bot_delivery (webhook and delivery state), list_bot_dead_letters. Tools marked "needs bots:admin" (webhook, token, deletion) run in two calls:
+Messages: forward_messages, copy_message, pin_message, get_pinned_messages, get_message_reactions, get_message_readers.
+Groups and channels: create_group, create_channel, add_members, update_chat_info, export_invite_link, get_forum_topics, create_forum_topic, set_admin; set_dialog_mute, set_dialog_pinned and set_dialog_unread_mark change only the user's own chat list.
+Contacts: get_contacts, add_contact, block_user, get_common_chats. Incoming webhooks of chats the user administers: list_incoming_hooks, get_incoming_hook_stats, list_incoming_hook_dead_letters, get_incoming_hook_audit.
+Bots: list_bots, get_bot_delivery (webhook and delivery state), list_bot_dead_letters.
+Tools that say "two calls" (bot webhook, token and deletion, which also need bots:admin; incoming webhook creation, secret rotation, take-over and deletion) work like this:
 the first returns a preview and a confirm_token; show the preview to the user, and only after the user agrees call the tool again with the same arguments plus confirm_token.`
 
 // toolDef is one tool: its name, the scope it needs and how it is added
@@ -33,8 +37,15 @@ type toolDef struct {
 }
 
 func allTools() []toolDef {
-	return append(chatTools(), botTools()...)
+	var all []toolDef
+	for _, group := range [][]toolDef{chatTools(), messageTools(), groupTools(), contactTools(), hookTools(), botTools()} {
+		all = append(all, group...)
+	}
+	return all
 }
+
+// confirmNote marks the tools that run in two calls (see confirmed).
+const confirmNote = " Runs in two calls: the first returns a preview and a confirm_token, the second (same arguments plus confirm_token, after the user agreed) does it."
 
 // toolset is what the tools of one request share.
 type toolset struct {
@@ -68,7 +79,8 @@ func call[Req, Resp any](ctx context.Context, t *toolset,
 	return callAs(ctx, t, false, method, msg)
 }
 
-// callAs is call; approved marks a confirmed bots:admin call.
+// callAs is call; approved marks a confirmed bots:admin call (it stands in
+// for the recent IdP sign-in those changes need in the app).
 func callAs[Req, Resp any](ctx context.Context, t *toolset, approved bool,
 	method func(context.Context, *connect.Request[Req]) (*connect.Response[Resp], error), msg *Req,
 ) (*Resp, error) {
@@ -198,7 +210,7 @@ func (t *toolset) errorResult(ctx context.Context, tool string, err error) *mcp.
 	return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: string(text)}}}
 }
 
-// preview is the first answer of a bots:admin tool.
+// preview is the first answer of a two-call tool.
 type preview struct {
 	Preview               any    `json:"preview"`
 	ConfirmToken          string `json:"confirm_token"`
@@ -206,10 +218,13 @@ type preview struct {
 	Next                  string `json:"next"`
 }
 
-// confirmed runs the two-call flow of a bots:admin tool. Without a token
-// it answers describe()'s preview and a token bound to (user, tool, args);
-// with one it spends the token and runs do as an approved call. args must
-// be the input without its confirm_token.
+// confirmed runs the two-call flow of a tool that hands out a secret,
+// redirects updates or destroys something (the bots:admin tools, and the
+// incoming webhook tools that return a secret URL, take a hook over or
+// stop a URL). Without a token it answers describe()'s preview and a token
+// bound to (user, tool, args); with one it spends the token and runs do
+// (the bots:admin tools run it as an approved call). args must be the
+// input without its confirm_token.
 func confirmed(t *toolset, tool string, args any, token string,
 	describe func() (any, error), do func() (any, error),
 ) (any, error) {

@@ -48,7 +48,7 @@ type Config struct {
 	// AllowOrigin accepts a browser Origin; a request without one (every
 	// non-browser MCP client) is always accepted.
 	AllowOrigin func(origin string) bool
-	// SessionKey keys the confirm tokens of bots:admin tools.
+	// SessionKey keys the confirm tokens of the two-call tools.
 	SessionKey []byte
 	Logger     *slog.Logger
 }
