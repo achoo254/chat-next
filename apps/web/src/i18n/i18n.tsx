@@ -24,18 +24,25 @@ const LOADERS: Readonly<Record<LazyLocale, () => Promise<Messages>>> = {
 	"zh-CN": () => import("./zh-CN.ts").then((module) => module.zhCN),
 };
 
+/**
+ * A fetch of a language's copy. Once in, it carries the copy the way React
+ * reads a settled promise (`status`, `value`), so `use` returns it at once.
+ */
+type MessagesFetch = Promise<Messages> & ({ status?: undefined } | { status: "fulfilled"; value: Messages });
+
 // Vietnamese is the default and ships with the first screen; other languages
 // are fetched the first time they are needed. Once in, they are read
 // synchronously, so later renders never suspend.
 const loaded = new Map<LazyLocale, Messages>();
-const loading = new Map<LazyLocale, Promise<Messages>>();
+const loading = new Map<LazyLocale, MessagesFetch>();
 
-function loadMessages(locale: LazyLocale): Promise<Messages> {
+function loadMessages(locale: LazyLocale): MessagesFetch {
 	let pending = loading.get(locale);
 	if (pending === undefined) {
-		pending = LOADERS[locale]().then(
+		const fetching: MessagesFetch = LOADERS[locale]().then(
 			(messages) => {
 				loaded.set(locale, messages);
+				Object.assign(fetching, { status: "fulfilled", value: messages });
 				return messages;
 			},
 			(err: unknown) => {
@@ -44,15 +51,21 @@ function loadMessages(locale: LazyLocale): Promise<Messages> {
 				throw err;
 			},
 		);
+		pending = fetching;
 		loading.set(locale, pending);
 	}
 	return pending;
 }
 
-/** Messages for `locale`; suspends only while a language is first fetched. */
+/**
+ * Messages for `locale`; suspends only while a language is first fetched.
+ * `use` runs on every render of a fetched language, loaded or not: React
+ * replays a suspended first render once the fetch is in, and that replay
+ * must call the same hooks.
+ */
 function useMessages(locale: Locale): Messages {
 	if (locale === "vi") return vi;
-	return loaded.get(locale) ?? use(loadMessages(locale));
+	return use(loadMessages(locale));
 }
 
 /**
