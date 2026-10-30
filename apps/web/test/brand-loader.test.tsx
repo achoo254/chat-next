@@ -109,7 +109,8 @@ describe("index.html splash", () => {
 		expect(splash).toBeGreaterThan(html.indexOf('<div id="root"></div>'));
 		expect(html.indexOf('<script type="module"')).toBeGreaterThan(splash);
 		expect(html).toContain('<span class="brand-logo" role="img" aria-label="%APP_NAME%">%APP_LOGO%</span>');
-		expect(html).toContain('<p class="brand-loader-text">Đang tải…</p>');
+		// The text in every language (vite-lang-bootstrap.ts, test/lang-bootstrap.test.ts).
+		expect(html).toContain('<p class="brand-loader-text"><!--splash-text--></p>');
 		// The CSP (style-src 'self') refuses inline styles and scripts.
 		expect(html).not.toMatch(/<style|style="|<script>/);
 	});

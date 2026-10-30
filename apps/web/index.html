@@ -6,6 +6,8 @@
 <meta name="color-scheme" content="light dark">
 <!-- The shared theme script (vite-theme-bootstrap.ts): data-theme before the first paint. -->
 <!--theme-bootstrap-->
+<!-- The language script (vite-lang-bootstrap.ts): lang of the visitor's choice, so the splash speaks it. -->
+<!--lang-bootstrap-->
 <meta name="description" content="%APP_DESCRIPTION%">
 <title>%APP_NAME%</title>
 </head>
@@ -17,7 +19,7 @@
      stylesheet (.brand-loader in app.css): the CSP allows no inline style. -->
 <div id="splash" class="brand-loader page" role="status" aria-live="polite" aria-busy="true">
 <span class="brand-logo" role="img" aria-label="%APP_NAME%">%APP_LOGO%</span>
-<p class="brand-loader-text">Đang tải…</p>
+<p class="brand-loader-text"><!--splash-text--></p>
 </div>
 <script type="module" src="/src/main.tsx"></script>
 </body>

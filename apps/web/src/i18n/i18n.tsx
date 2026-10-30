@@ -1,23 +1,13 @@
-import { SHELL_LOCALES, type ShellLocale } from "@achoo254/app-shell";
 import { readPreferences, subscribePreferences } from "@achoo254/app-shell/preferences";
 import { createContext, use, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { brand } from "../brand.ts";
+import { LEGACY_LANG_KEY, LOCALES, type Locale } from "./locales.ts";
 import { vi, type Messages } from "./vi.ts";
 
-/**
- * Languages of the whole app, signed in or not: Vietnamese, English and
- * Simplified Chinese, the shared shell's full set (@achoo254/app-shell).
- */
-export type Locale = ShellLocale;
-
-/** Every language of the UI, in the order the language switches list them. */
-export const LOCALES: readonly Locale[] = SHELL_LOCALES;
+export { LOCALES, type Locale };
 
 /** Languages fetched on demand: every one but the default Vietnamese. */
 export type LazyLocale = Exclude<Locale, "vi">;
-
-/** Chat's localStorage key of the language before the shared `hd_lang` cookie. */
-const LEGACY_LANG_KEY = "locale";
 
 const LOADERS: Readonly<Record<LazyLocale, () => Promise<Messages>>> = {
 	en: () => import("./en.ts").then((module) => module.en),

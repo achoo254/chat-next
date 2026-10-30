@@ -332,6 +332,11 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 .brand-loader-text { margin: 0; font-size: 0.875rem; animation: loader-reveal var(--dur-slow) var(--ease-decelerate) 600ms both; }
 /* In-app loaders appear after 320 ms already: the text follows ~600 ms after the wait began. */
 .brand-loader.delayed .brand-loader-text { animation-delay: calc(280ms + var(--loader-age, 0s)); }
+/* The index.html splash carries its text in every language; the one of <html lang> shows (vite-lang-bootstrap.ts). */
+.brand-loader-text > [lang] { display: none; }
+html[lang="vi"] .brand-loader-text > [lang="vi"],
+html[lang="en"] .brand-loader-text > [lang="en"],
+html[lang="zh-CN"] .brand-loader-text > [lang="zh-CN"] { display: inline; }
 @keyframes loader-halo {
 	0%, 100% { transform: scale(0.9); opacity: 0.45; }
 	50% { transform: scale(1.06); opacity: 1; }
