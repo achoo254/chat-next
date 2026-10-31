@@ -19,8 +19,9 @@ function renderSignedIn(path: string): void {
 	}, path);
 }
 
-function expectBeforeSettings(rail: HTMLElement): HTMLElement {
-	const button = within(rail).getByRole("button", SWITCH);
+// The switcher loads in its own chunk, so its button arrives after the rail.
+async function expectBeforeSettings(rail: HTMLElement): Promise<HTMLElement> {
+	const button = await within(rail).findByRole("button", SWITCH, LONG);
 	const settings = within(rail).getByRole("link", { name: "Cài đặt" });
 	expect(button.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	return button;
@@ -30,7 +31,7 @@ describe("app switcher", () => {
 	it("lists the other apps of the domain from the folder rail; Esc closes it", async () => {
 		renderSignedIn("/");
 		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
-		const button = expectBeforeSettings(rail);
+		const button = await expectBeforeSettings(rail);
 
 		await userEvent.click(button);
 		const panel = within(rail).getByRole("dialog", { name: "Ứng dụng" });
@@ -53,7 +54,7 @@ describe("app switcher", () => {
 
 	it("sits in the rail of the settings screens", async () => {
 		renderSignedIn("/settings");
-		expectBeforeSettings(await screen.findByRole("navigation", { name: "Điều hướng" }, LONG));
+		await expectBeforeSettings(await screen.findByRole("navigation", { name: "Điều hướng" }, LONG));
 	});
 
 	it("is not shown signed out", async () => {

@@ -24,7 +24,9 @@ export const BUNDLE_BUDGET = {
 	 * and more leaf components skipped the compiler's memoization. 149.3 KB
 	 * with the language and theme choice shared by the hoandat.com apps
 	 * (@achoo254/app-shell preferences, about 1.1 KB), the welcome page's copy
-	 * having left the startup catalog for its own chunk.
+	 * having left the startup catalog for its own chunk. 150.4 KB with
+	 * @achoo254/app-switcher 0.6.0 (developer tools heading); 147.7 KB once the
+	 * switcher loaded in its own chunk behind a placeholder of its size.
 	 */
 	startupJsGzip: 150 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
