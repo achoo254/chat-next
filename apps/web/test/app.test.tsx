@@ -7,6 +7,9 @@ import brandConfig from "../../../brand.config.json";
 import { CORE_LAST_USER_KEY } from "../src/api/offline-self.ts";
 import { renderApp, SELF } from "./render-app.tsx";
 
+// The shared header's guest button: "Đăng ký miễn phí", with the short "Đăng ký" for phones beside it (CSS picks one).
+const SIGN_UP = /^Đăng ký miễn phí/;
+
 /** A server whose GetSelf answers signed out. */
 function signedOutRoutes(router: ConnectRouter): void {
 	router.service(UsersService, {
@@ -23,9 +26,9 @@ describe("boot", () => {
 		expect(await screen.findByRole("heading", { level: 1, name: "Nhắn tin nhanh trên mọi thiết bị" })).toBeTruthy();
 		expect(screen.getByRole("heading", { level: 2, name: `Đăng nhập vào ${brandConfig.appName}` })).toBeTruthy();
 		expect(screen.getByRole("heading", { level: 3, name: "Tìm lại tin cũ" })).toBeTruthy();
-		// The shared top bar: the app name goes home, "Đăng nhập" opens /login.
+		// The shared top bar: the app name goes home, "Đăng ký miễn phí" opens /login.
 		expect(screen.getByRole("link", { name: brandConfig.appName }).getAttribute("href")).toBe("/");
-		expect(screen.getByRole("link", { name: "Đăng nhập" }).getAttribute("href")).toBe("/login");
+		expect(screen.getByRole("link", { name: SIGN_UP }).getAttribute("href")).toBe("/login");
 		// One call to action; the account page creates accounts.
 		const signIn = screen.getByRole("link", { name: "Đăng nhập bằng hoandat.com" });
 		expect(signIn.getAttribute("href")).toBe("/auth/login?locale=vi");
@@ -58,11 +61,11 @@ describe("boot", () => {
 
 	it("opens the sign-in card alone on /login, in place from the top bar", async () => {
 		renderApp(signedOutRoutes);
-		await userEvent.click(await screen.findByRole("link", { name: "Đăng nhập" }));
+		await userEvent.click(await screen.findByRole("link", { name: SIGN_UP }));
 
 		expect(await screen.findByRole("heading", { level: 1, name: `Đăng nhập vào ${brandConfig.appName}` })).toBeTruthy();
 		expect(window.location.pathname).toBe("/login");
-		expect(screen.getByRole("link", { name: "Đăng nhập" }).getAttribute("aria-current")).toBe("page");
+		expect(screen.getByRole("link", { name: SIGN_UP }).getAttribute("aria-current")).toBe("page");
 		expect(screen.getByRole("link", { name: "Đăng nhập bằng hoandat.com" }).getAttribute("href")).toBe("/auth/login?locale=vi");
 		expect(screen.queryByRole("heading", { level: 1, name: "Nhắn tin nhanh trên mọi thiết bị" })).toBeNull();
 	});
@@ -117,14 +120,14 @@ describe("boot", () => {
 		const token = "V-puXq3hT9mZ2cLk8RbkVUp";
 		renderApp(signedOutRoutes, `/join/${token}`);
 		const header = await screen.findByRole("banner");
-		const signIn = within(header).getByRole("link", { name: "Đăng nhập" });
+		const signIn = within(header).getByRole("link", { name: SIGN_UP });
 		expect(signIn.getAttribute("href")).toBe(`/auth/login?locale=vi&return_to=%2Fjoin%2F${token}`);
 	});
 
 	it("leads the header's sign-in to /login on the welcome page", async () => {
 		renderApp(signedOutRoutes, "/");
 		const header = await screen.findByRole("banner");
-		expect(within(header).getByRole("link", { name: "Đăng nhập" }).getAttribute("href")).toBe("/login");
+		expect(within(header).getByRole("link", { name: SIGN_UP }).getAttribute("href")).toBe("/login");
 	});
 
 	it("opens the chat list when signed in", async () => {
