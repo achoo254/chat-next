@@ -29,7 +29,7 @@
     "@bufbuild/buf": "1.73.0",
     "@bufbuild/protoc-gen-es": "2.16.0",
     "@eslint/js": "10.0.1",
-    "@achoo254/brand": "github:achoo254/shared-next#v0.12.0&path:/packages/brand",
+    "@achoo254/brand": "github:achoo254/shared-next#v0.13.0&path:/packages/brand",
     "@types/node": "24.19.2",
     "eslint": "10.12.0",
     "eslint-plugin-jsx-a11y": "6.10.2",

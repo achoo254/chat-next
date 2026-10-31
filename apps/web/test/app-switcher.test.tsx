@@ -35,13 +35,16 @@ describe("app switcher", () => {
 		await userEvent.click(button);
 		const panel = within(rail).getByRole("dialog", { name: "Ứng dụng" });
 		expect(within(panel).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+			`https://tuvi.hoandat.com/?${UTM}`,
+			`https://miu.hoandat.com/?${UTM}`,
+			`https://webnhanh.hoandat.com/?${UTM}`,
+			`https://tieude.hoandat.com/?${UTM}`,
 			`https://scribe.hoandat.com/?${UTM}`,
 			`https://localman.hoandat.com/?${UTM}`,
 			`https://tunnel.hoandat.com/?${UTM}`,
-			`https://webnhanh.hoandat.com/?${UTM}`,
-			`https://tieude.hoandat.com/?${UTM}`,
 			`https://auth.hoandat.com/account?${UTM}`,
 		]);
+		expect(within(panel).getByText("Công cụ cho lập trình viên")).toBeTruthy();
 
 		await userEvent.keyboard("{Escape}");
 		expect(within(rail).queryByRole("dialog")).toBeNull();
