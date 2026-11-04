@@ -39,6 +39,7 @@ describe("app switcher", () => {
 			`https://tuvi.hoandat.com/?${UTM}`,
 			`https://miu.hoandat.com/?${UTM}`,
 			`https://webnhanh.hoandat.com/?${UTM}`,
+			`https://kb.hoandat.com/?${UTM}`,
 			`https://tieude.hoandat.com/?${UTM}`,
 			`https://scribe.hoandat.com/?${UTM}`,
 			`https://localman.hoandat.com/?${UTM}`,
