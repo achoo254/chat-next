@@ -1,7 +1,7 @@
 ---
 title: "Nền tảng chat v1 — hiệu năng và kiến trúc học từ Telegram"
 description: "Sản phẩm app tiếp theo trong hệ sinh thái hoandat (đăng nhập qua IdP hoandat-auth). Ứng dụng chat tên cấu hình được, web-first, đóng gói Capacitor/Tauri, nhanh ngang Telegram, có nền tảng Bot riêng, tìm kiếm lịch sử và thông báo qua Bot/webhook cực nhanh."
-status: in-progress
+status: paused
 priority: P1
 effort: "XL"
 branch: main
@@ -10,6 +10,8 @@ blockedBy: []
 blocks: []
 created: 2026-10-13
 ---
+
+> Tạm dừng 07/11/2026: công cụ cho lập trình viên đã ra khỏi nhóm app chủ lực từ 01/11; ưu tiên mục tiêu 1.000 / 500 / 100 tới 31/12. Không huỷ.
 
 # Nền tảng chat v1
 
