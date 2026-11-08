@@ -1,4 +1,5 @@
 // A machine's page: its sessions, its Claude accounts (claude-profiles.tsx),
+// whether Localman may send requests to localhost on it (local-forward-setting.tsx),
 // the consent log kept on the machine (opening
 // sensitive folders, loading project settings, approving sensitive tools,
 // pairing and revoking devices), what it runs, the devices paired with it
@@ -16,6 +17,7 @@ import { Link, navigate, paths } from "../router.tsx";
 import { ClaudeProfiles } from "./claude-profiles.tsx";
 import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
 import { LinkBanner } from "./link-banner.tsx";
+import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { PageHead } from "./page-head.tsx";
 import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
@@ -155,6 +157,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 					))}
 				</section>
 				{online && hasClaude && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, "claude")} />}
+				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>
 					<p className="note">{t.detail.auditNote(name)}</p>
@@ -174,7 +177,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 												<span className="mono">{e.path}</span>
 											</>
 										)}
-										{(e.action === "approve_sensitive" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
+										{(e.action === "approve_sensitive" || e.action === "local_forward" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
 									</span>
 								</li>
 							))}

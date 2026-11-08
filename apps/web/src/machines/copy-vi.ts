@@ -239,7 +239,7 @@ export const viMachines = {
 		noSessions: "Chưa có phiên nào.",
 		audit: "Nhật ký đồng ý",
 		auditNote: (machine: string) =>
-			`Lưu trên ${machine}. Ghi khi mở phiên ở thư mục nhạy cảm, nạp cấu hình dự án, duyệt việc chạm thư mục nhạy cảm, ghép hay thu hồi thiết bị, thêm, chọn hay xoá tài khoản Claude.`,
+			`Lưu trên ${machine}. Ghi khi mở phiên ở thư mục nhạy cảm, nạp cấu hình dự án, duyệt việc chạm thư mục nhạy cảm, ghép hay thu hồi thiết bị, thêm, chọn hay xoá tài khoản Claude, bật hay tắt chuyển tiếp localhost.`,
 		auditEmpty: "Chưa có mục nào.",
 		auditAll: "Xem tất cả",
 		auditActions: {
@@ -252,6 +252,7 @@ export const viMachines = {
 			profile_add: "thêm tài khoản Claude",
 			profile_select: "chọn tài khoản Claude",
 			profile_remove: "xoá tài khoản Claude",
+			local_forward: "đổi chuyển tiếp localhost",
 		} as Readonly<Record<string, string>>,
 		needsLink: "Kết nối tới máy để xem phiên và nhật ký.",
 		about: "Máy này",
@@ -283,6 +284,15 @@ export const viMachines = {
 		revokeOtherBody: (machine: string) => `${machine} sẽ cắt thiết bị đó ở lần báo kế tiếp (tối đa khoảng 1 phút). Muốn dùng lại, thiết bị đó phải ghép lại.`,
 		pairedAt: (date: string) => `ghép ngày ${date}`,
 		unnamedDevice: "Thiết bị không tên",
+	},
+	localForward: {
+		title: "Gửi tới localhost",
+		label: "Cho Localman gửi request tới localhost trên máy này",
+		onNote:
+			"Localman, đăng nhập bằng chính tài khoản của bạn, gửi được request tới localhost:<cổng> trên máy này. Cổng nguy hiểm (Docker, debug, cơ sở dữ liệu, cổng của tunelo và IDE) luôn bị chặn. Mỗi request được ghi vào nhật ký của tunelo trên máy (tunelo logs).",
+		offNote: "Đã tắt: Localman báo máy này đã tắt chuyển tiếp. Bật lại ở đây hoặc chạy tunelo config local-forward on trên máy.",
+		unavailable: "Máy chủ tunnel chưa chuyển các request này (hoặc máy chưa kết nối tunnel), nên hiện chưa có gì được chuyển.",
+		failed: "Không đổi được cài đặt. Thử lại.",
 	},
 	profiles: {
 		title: "Tài khoản Claude",

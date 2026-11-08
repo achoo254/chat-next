@@ -236,7 +236,7 @@ export const enMachines: MachinesCopy = {
 		noSessions: "No sessions yet.",
 		audit: "Consent log",
 		auditNote: (machine) =>
-			`Kept on ${machine}. Written when a session opens in a sensitive folder, project settings load, a tool touching a sensitive folder is approved, a device is paired or revoked, or a Claude account is added, picked or removed.`,
+			`Kept on ${machine}. Written when a session opens in a sensitive folder, project settings load, a tool touching a sensitive folder is approved, a device is paired or revoked, a Claude account is added, picked or removed, or forwarding to localhost is turned on or off.`,
 		auditEmpty: "Nothing yet.",
 		auditAll: "Show all",
 		auditActions: {
@@ -249,6 +249,7 @@ export const enMachines: MachinesCopy = {
 			profile_add: "added a Claude account",
 			profile_select: "picked a Claude account",
 			profile_remove: "removed a Claude account",
+			local_forward: "changed forwarding to localhost",
 		},
 		needsLink: "Connect to the machine to see its sessions and log.",
 		about: "This machine",
@@ -280,6 +281,15 @@ export const enMachines: MachinesCopy = {
 		revokeOtherBody: (machine) => `${machine} drops that device at its next check-in (within about a minute). To use it again, it must pair again.`,
 		pairedAt: (date) => `paired ${date}`,
 		unnamedDevice: "Unnamed device",
+	},
+	localForward: {
+		title: "Requests to localhost",
+		label: "Let Localman send requests to localhost on this machine",
+		onNote:
+			"Localman, signed in with your own account, can send requests to localhost:<port> on this machine. Risky ports (Docker, debuggers, databases, tunelo's and IDE ports) are always refused. Each request is written to tunelo's log on the machine (tunelo logs).",
+		offNote: "Off: Localman reports forwarding as turned off for this machine. Turn it on here, or run tunelo config local-forward on on the machine.",
+		unavailable: "The tunnel server does not carry these requests yet (or the machine tunnel is not connected), so nothing is forwarded for now.",
+		failed: "Could not change the setting. Try again.",
 	},
 	profiles: {
 		title: "Claude accounts",

@@ -234,7 +234,7 @@ export const zhCNMachines: MachinesCopy = {
 		sessions: "会话",
 		noSessions: "还没有会话。",
 		audit: "同意记录",
-		auditNote: (machine) => `保存在 ${machine} 上。在敏感文件夹中打开会话、加载项目配置、批准涉及敏感文件夹的操作、配对或撤销设备、添加、选择或移除 Claude 账号时记录。`,
+		auditNote: (machine) => `保存在 ${machine} 上。在敏感文件夹中打开会话、加载项目配置、批准涉及敏感文件夹的操作、配对或撤销设备、添加、选择或移除 Claude 账号、开启或关闭 localhost 转发时记录。`,
 		auditEmpty: "暂无记录。",
 		auditAll: "查看全部",
 		auditActions: {
@@ -247,6 +247,7 @@ export const zhCNMachines: MachinesCopy = {
 			profile_add: "添加了 Claude 账号",
 			profile_select: "选择了 Claude 账号",
 			profile_remove: "移除了 Claude 账号",
+			local_forward: "更改了 localhost 转发",
 		},
 		needsLink: "连接到电脑以查看会话和记录。",
 		about: "这台电脑",
@@ -278,6 +279,15 @@ export const zhCNMachines: MachinesCopy = {
 		revokeOtherBody: (machine) => `${machine} 将在下次报到时（约 1 分钟内）断开该设备。若要再次使用，该设备需要重新配对。`,
 		pairedAt: (date) => `${date} 配对`,
 		unnamedDevice: "未命名设备",
+	},
+	localForward: {
+		title: "发送到 localhost",
+		label: "允许 Localman 向这台机器的 localhost 发送请求",
+		onNote:
+			"用你自己的账号登录的 Localman 可以向这台机器的 localhost:<端口> 发送请求。危险端口（Docker、调试器、数据库、tunelo 和 IDE 的端口）始终被拒绝。每个请求都记录在机器上的 tunelo 日志中（tunelo logs）。",
+		offNote: "已关闭：Localman 会提示这台机器已关闭转发。可在此开启，或在机器上运行 tunelo config local-forward on。",
+		unavailable: "隧道服务器尚未转发这些请求（或机器尚未连接隧道），因此目前不会转发任何内容。",
+		failed: "无法更改设置。请重试。",
 	},
 	profiles: {
 		title: "Claude 账号",
