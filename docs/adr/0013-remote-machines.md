@@ -11,7 +11,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 
 ### Kiến trúc
 
-- Máy B chạy `hda` ("hoandat agent", `apps/agent`; tên cũ `chat-agent`, đổi ngày 08/11/2026 cho ngắn và gõ được khi bật Unikey): một file chạy duy nhất, giữ các phiên AI qua adapter. Adapter đầu tiên chạy `claude` CLI người dùng đã cài, qua Claude Agent SDK.
+- Máy B chạy `tunelo` (`apps/agent`; tên cũ `chat-agent`, rồi `hda` ngày 08/11/2026, rồi `tunelo` 2.0.0 cùng ngày, xem "Đổi tên thành tunelo"): một file chạy duy nhất, giữ các phiên AI qua adapter. Adapter đầu tiên chạy `claude` CLI người dùng đã cài, qua Claude Agent SDK.
 - Máy A nối tới máy B qua relay Tunelo (`wss://<subdomain>.tunnel.hoandat.com`). Tiến trình nền mở WebSocket server trên `127.0.0.1` và cho tunnel chuyển tới đó.
 - Server Chat chỉ là danh bạ máy (tên, OS, khoá công khai, địa chỉ tunnel, lần thấy cuối), cấp mã cài và bắn Web Push không chứa nội dung. Server không phải gốc tin cậy cho khoá máy B và không thấy nội dung.
 - Không dùng Bot API của Chat: bot đi qua server và lưu tin nhắn, trái với yêu cầu nội dung chỉ nằm ở hai đầu.
@@ -23,8 +23,8 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 - Khung: `secretbox` (tweetnacl), nonce = mã phiên ‖ chiều ‖ bộ đếm 64-bit. Bộ đếm phải tăng đúng 1: khung phát lại, mất hay đảo thứ tự làm hỏng phiên, máy A nối lại theo con trỏ journal.
 - `Hello`/`Ready`/`HandshakeError` mang `protocolVersion` và `minProtocolVersion`; lệch thì báo bên nào cần cập nhật.
 - Ghép thiết bị, không có bí mật nào đi qua server:
-  - Lệnh cài một dòng: trình duyệt sinh bí mật 32 byte, đưa cho `chat-agent install` qua stdin (không nằm trong argv). Ở lần bắt tay đầu, B gửi HMAC(bí mật, "install" ‖ khoá A ‖ khoá B); A kiểm rồi mới ghim khoá B. A không bao giờ lấy khoá B từ server.
-  - `chat-agent pair` mở cửa sổ ghép 10 phút, in QR (khoá B + bí mật 32 byte) và mã 6 số. QR: A chứng minh bí mật trong `Hello`. Mã 6 số: CPace trên ristretto255 (`@noble/curves`) trước bắt tay, kèm thẻ xác nhận gắn cả hai khoá tĩnh; relay nhìn thấy trao đổi cũng không dò mã offline được. Tối đa 5 lần thử mỗi cửa sổ, ghép xong thì đóng cửa sổ.
+  - Lệnh cài một dòng: trình duyệt sinh bí mật 32 byte, đưa cho `tunelo install` qua stdin (không nằm trong argv). Ở lần bắt tay đầu, B gửi HMAC(bí mật, "install" ‖ khoá A ‖ khoá B); A kiểm rồi mới ghim khoá B. A không bao giờ lấy khoá B từ server.
+  - `tunelo pair` mở cửa sổ ghép 10 phút, in QR (khoá B + bí mật 32 byte) và mã 6 số. QR: A chứng minh bí mật trong `Hello`. Mã 6 số: CPace trên ristretto255 (`@noble/curves`) trước bắt tay, kèm thẻ xác nhận gắn cả hai khoá tĩnh; relay nhìn thấy trao đổi cũng không dò mã offline được. Tối đa 5 lần thử mỗi cửa sổ, ghép xong thì đóng cửa sổ.
 - Journal theo luồng chat: mỗi mục có `seq` tăng dần và `revision`; thiết bị nhận tiếp từ con trỏ `{epoch, seq}`. `epoch` tăng mỗi lần tiến trình nền khởi động lại; con trỏ khác epoch, vượt quá, hay rơi vào phần đã nén thì nhận `ThreadReset` và tải lại (`journal-rules.ts`).
 - Không gắn với một AI: khung tin dùng loại tool chuẩn (`read, edit, shell, search, web, mcp, subagent, todo, other`) và cờ khả năng của adapter; web không đọc tên tool riêng.
 
@@ -41,6 +41,16 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 - `strictMcpConfig` + chỉ MCP người dùng bật tại máy B. Chế độ quyền theo đúng cấu hình Claude của máy B (`permissions.defaultMode` và luật allow/deny trong settings của người dùng; settings dự án chỉ nạp khi người dùng tick), kể cả `bypassPermissions` nếu chủ máy đã đặt vậy. Máy A thấy chế độ hiện tại và đổi được trong khung chat (`ThreadSetPermissionMode`, đại ca chốt 08/11/2026 chiều, thay "chỉ hiển thị"): chỉ trong các chế độ máy B liệt kê ở `ThreadInfo.permission_modes` (default, acceptEdits, plan, auto); `bypassPermissions` chỉ có trong danh sách khi chính cấu hình máy B khởi động phiên ở chế độ đó, nên máy A không bao giờ tự bật được. Mỗi lần đổi ghi vào nhật ký đồng ý trên máy B (`permission_mode`). Effort đổi bằng `ThreadSetEffort`; lựa chọn của thiết bị lưu theo phiên, mở lại phiên vẫn giữ. Thanh trạng thái hiện tài khoản Claude đang đăng nhập (email, tổ chức, gói) lấy từ `accountInfo()` của CLI, không có token.
 - Thư mục nhạy cảm (`~`, `/`, `~/.ssh`, `~/.aws`, thư mục cấu hình của tiến trình nền…) không bị chặn mà phải xác nhận; đồng ý được ghi vào nhật ký trên máy B.
 - Rủi ro còn lại: XSS trên `chat.hoandat.com` dùng được khoá thiết bị (non-extractable) trong lúc trang mở, dù không lấy được khoá ra. Giảm bằng CSP chặt và xoá khoá khi đăng xuất.
+
+## Đổi tên thành tunelo (08/11/2026)
+
+- Lệnh, file chạy, dịch vụ nền, thư mục cấu hình đổi sang `tunelo` 2.0.0: `%APPDATA%\tunelo`, `~/.config/tunelo` (biến `TUNELO_HOME`, vẫn đọc `CHAT_AGENT_HOME` khi biến mới trống); LaunchAgent `com.hoandat.tunelo`, giá trị Run `tunelo`; Keychain `com.hoandat.tunelo`, đọc `com.hoandat.chat-agent` khi mục mới chưa có. Danh tính máy không đổi: `deviceId = chat-agent.<machineId>` (nên subdomain giữ nguyên), `machineId`, `machineSecret`, khoá X25519.
+- Phát hành: tag `tunelo-v<semver>`, file `tunelo-*`, chú thích ký `tunelo <version> <file>`. Bản cầu nối duy nhất `agent-v0.3.0` chứa `tunelo` 2.0.0 dưới tên `hda-*`, ký `hda 0.3.0 <file>`, vì `hda` 0.2.x chỉ cập nhật từ đó; CI cho phép riêng tag này build từ `AGENT_VERSION` 2.0.0. Không bao giờ xoá release đó.
+- Chuyển cài đặt (`apps/agent/src/migrate-from-hda.ts`), chạy lại được sau mọi lần dừng giữa chừng, thứ tự giữ đúng một vòng nền: (1) chép thư mục cũ (trừ file của tiến trình đang chạy) và khoá Keychain, đọc lại được mới đi tiếp; (2) chép file chạy sang `%LOCALAPPDATA%\tunelo\tunelo.exe` / `~/.local/bin/tunelo`, thêm PATH, cài và chờ dịch vụ mới trả lời; (3) ghi `stop` và `migrated-to-tunelo` vào thư mục cũ; (4) xoá mục khởi động cũ; (5) cuối cùng `launchctl bootout` nhãn cũ. Thư mục và khoá cũ giữ lại để quay về.
+- Chạy bằng tên `hda`: `hda run` (do dịch vụ cũ gọi) chuyển cài đặt; đã có marker thì không bao giờ mở agent, chỉ bảo đảm `tunelo` đang chạy rồi thoát; chuyển lỗi trước bước 3 thì agent chạy tiếp từ thư mục cũ như `hda`. Lệnh khác chuyển sang `tunelo`. `tunelo run` từ chối khi có agent trả lời ở thư mục cũ hoặc mới. `tunelo start` trên Windows xoá `hda.exe` khi không còn ai giữ.
+- Lối thoát: `hda` 0.2.x chỉ đọc 20 release mới nhất. Khi `agent-v0.3.0` trôi khỏi đó, người dùng chạy lại `install.sh`/`install.ps1` (không cần mã cài, trang thêm máy có lệnh); script thấy `hda` thì chạy `tunelo migrate-from-hda`, thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
+- Từ CLI Tunelo 1.x (`~/.tunelo/config.json`) chỉ nhập địa chỉ tunnel server; không đọc khoá, phiên, không sửa `~/.tunelo`.
+- Rủi ro macOS: LaunchAgent (cũ lẫn mới) và Keychain cần phiên đăng nhập GUI (`gui/<uid>`). Mac headless tắt tự đăng nhập không chạy được tiến trình nền nào; chạy chuyển đổi qua SSH thì `launchctl bootstrap` hỏng ở bước 2 và cài đặt cũ không bị đổi. Nghiệm thu chuyển đổi trên Mac làm khi có phiên GUI.
 
 ## Thử khả thi (08/11/2026)
 
