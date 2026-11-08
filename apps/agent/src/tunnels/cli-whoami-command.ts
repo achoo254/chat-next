@@ -29,10 +29,11 @@ export function registerWhoamiCommand(program: Command): void {
 			try {
 				console.log(`  ${describeWhoAmI(await whoAmI(serverUrl))}`);
 			} catch (err) {
+				// Still show where each app stands: that is what helps now.
 				console.error(
 					`  Could not reach the server: ${(err as Error).message}`,
 				);
-				process.exit(1);
+				process.exitCode = 1;
 			}
 			const info = identitySession(dir).info();
 			if (!info) return;

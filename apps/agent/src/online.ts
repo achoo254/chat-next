@@ -83,6 +83,7 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
       }
       if (r.claimed) registration.claimConfirmed();
       else registration.claimNeeded();
+      registration.tunnelListed(r.tunnelRefused !== true);
       for (const std of r.revokedDeviceKeys ?? []) {
         const key = toUrl64(std);
         if (m.config.deviceStatus(Uint8Array.from(atob(std), (ch) => ch.charCodeAt(0))) === "paired") {
@@ -95,9 +96,6 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
     } catch (err) {
       if (err instanceof MachineApiError && err.reason === "agent_update_required") {
         return stop("this tunelo is too old for the server: run `tunelo update`");
-      }
-      if (err instanceof MachineApiError && err.reason === "tunnel_not_owned") {
-        registration.chatRefused("Chat refused the tunnel: it was opened with another account; run `tunelo login` with the machine's account");
       }
       log(`heartbeat failed: ${(err as Error).message}`);
     }

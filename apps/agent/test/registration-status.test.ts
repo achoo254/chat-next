@@ -179,6 +179,36 @@ describe("registration status", () => {
     expect(s.timers).toHaveLength(1);
   });
 
+  test("a machine removed on the web while unclaimed stops trying", async () => {
+    const s = setup(AGENT, {
+      claim: async () => {
+        throw new MachineApiError("permission_denied", "machine_revoked: the machine was removed from the account");
+      },
+    });
+    s.config.update((c) => {
+      c.machineId = "3";
+      c.machineSecret = "o".repeat(43);
+    });
+    s.registration.start();
+    await settle();
+    expect(s.registration.report().chat.status).toBe("off");
+    expect(s.timers).toHaveLength(0);
+    expect(s.config.get().machineId).toBeUndefined();
+  });
+
+  test("a tunnel Chat does not list shows as a Chat error until it is listed again", async () => {
+    const s = setup(AGENT);
+    s.config.update((c) => {
+      c.machineId = "3";
+      c.machineSecret = "o".repeat(43);
+      c.claimed = true;
+    });
+    s.registration.tunnelListed(false);
+    expect(s.registration.report().chat).toMatchObject({ status: "error", detail: expect.stringContaining("another account") });
+    s.registration.tunnelListed(true);
+    expect(s.registration.report().chat.status).toBe("ok");
+  });
+
   test("a tunnel-only sign-in asks for tunelo login and calls nothing", async () => {
     const s = setup(CLI);
     s.registration.start();

@@ -5,11 +5,16 @@
 // background service at login. The service then adds the machine to the
 // account's "My machines" by itself; no install code is involved. The
 // pairing stays end to end: the secret never leaves this machine.
+//
+// Nothing changes until the sign-in succeeded: an abandoned or refused
+// sign-in leaves the machine, its config and its running service as they
+// were. Should installing the service fail after that, the previous config
+// comes back and the service is started again.
 import type { Command } from "commander";
-import { ConfigStore, configDir } from "../config.ts";
+import { type AgentConfig, ConfigStore, configDir } from "../config.ts";
 import { callControl } from "../control-socket.ts";
 import { machineKey } from "../keystore.ts";
-import { installService, stopService } from "../service.ts";
+import { installService, startService, stopService } from "../service.ts";
 import { TUNNEL_SERVER } from "../tunnel.ts";
 import { signInForServer } from "../tunnels/cli-login-command.js";
 
@@ -26,43 +31,76 @@ async function readLine(): Promise<string> {
   return (data.split(/\r?\n/)[0] ?? "").replace(/^\uFEFF/, "");
 }
 
-async function isRunning(dir: string): Promise<boolean> {
-  return callControl(dir, "GET", "/status").then(
-    () => true,
-    () => false,
-  );
+/** What installing touches outside the config; tests replace it. */
+export interface InstallDeps {
+  readSecret: () => Promise<string>;
+  signIn: () => Promise<unknown>;
+  isRunning: (dir: string) => Promise<boolean>;
+  stopService: (dir: string) => Promise<void>;
+  startService: (dir: string) => Promise<void>;
+  installService: (dir: string) => Promise<string>;
+  ensureMachineKey: (dir: string) => Promise<unknown>;
+  log: (line: string) => void;
 }
 
-async function install(options: { trust?: string }): Promise<number> {
-  const dir = configDir();
+const defaultDeps: InstallDeps = {
+  readSecret: readLine,
+  signIn: () => signInForServer(TUNNEL_SERVER),
+  isRunning: (dir) =>
+    callControl(dir, "GET", "/status").then(
+      () => true,
+      () => false,
+    ),
+  stopService,
+  startService,
+  installService,
+  ensureMachineKey: machineKey,
+  log: (line) => console.log(line),
+};
+
+export async function install(dir: string, options: { trust?: string }, deps: InstallDeps = defaultDeps): Promise<void> {
   const trust = options.trust ?? "";
   if (!KEY_RE.test(trust)) throw new Error("usage: tunelo install --trust <device key> (pairing secret on stdin)");
-  const secret = (await readLine()).trim();
+  const secret = (await deps.readSecret()).trim();
   if (!KEY_RE.test(secret)) throw new Error("the pairing secret must come on stdin");
 
+  // First the sign-in, while everything else stays as it is.
+  await deps.signIn();
+  deps.log("Signed in.");
+
   // The running service owns the config: stop it before changing it.
-  if (await isRunning(dir)) {
-    await stopService(dir);
-    for (const end = Date.now() + 15_000; Date.now() < end && (await isRunning(dir)); ) {
+  const wasRunning = await deps.isRunning(dir);
+  if (wasRunning) {
+    await deps.stopService(dir);
+    for (const end = Date.now() + 15_000; Date.now() < end && (await deps.isRunning(dir)); ) {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
-  await machineKey(dir);
-  // "Add this machine" adds a new machine, as each install always did: the
-  // service registers it again, and the browser that showed the command
-  // pairs through the secret.
-  new ConfigStore(dir).update((c) => {
-    c.install = { deviceKey: trust, secret };
-    delete c.machineId;
-    delete c.machineSecret;
-    delete c.claimed;
-    delete c.machineRemoved;
-  });
-  await signInForServer(TUNNEL_SERVER);
-  console.log("Signed in.");
-  const where = await installService(dir);
-  console.log(`tunelo will start at login (${where}); this machine appears in My machines in a moment. You can close this window.`);
-  return 0;
+  const config = new ConfigStore(dir);
+  const previous: AgentConfig = structuredClone(config.get());
+  try {
+    await deps.ensureMachineKey(dir);
+    // "Add this machine" adds a new machine, as each install always did: the
+    // service registers it again, and the browser that showed the command
+    // pairs through the secret.
+    config.update((c) => {
+      c.install = { deviceKey: trust, secret };
+      delete c.machineId;
+      delete c.machineSecret;
+      delete c.claimed;
+      delete c.machineRemoved;
+    });
+    const where = await deps.installService(dir);
+    deps.log(`tunelo will start at login (${where}); this machine appears in My machines in a moment. You can close this window.`);
+  } catch (err) {
+    // Only the install and the machine's place changed: put them back.
+    config.update((c) => {
+      Object.assign(c, previous);
+      if (previous.install === undefined) delete c.install;
+    });
+    if (wasRunning) await deps.startService(dir).catch(() => undefined);
+    throw err;
+  }
 }
 
 export function registerInstallCommand(program: Command): void {
@@ -70,5 +108,8 @@ export function registerInstallCommand(program: Command): void {
     .command("install")
     .description("add this machine to My machines: sign in, pair the browser that showed the command (secret on stdin), start at login")
     .requiredOption("--trust <device key>", "the device that pairs first")
-    .action(async (options: { trust?: string }) => process.exit(await install(options)));
+    .action(async (options: { trust?: string }) => {
+      await install(configDir(), options);
+      process.exit(0);
+    });
 }

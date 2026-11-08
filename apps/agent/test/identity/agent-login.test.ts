@@ -42,6 +42,15 @@ describe("tunelo-agent device sign-in", () => {
     }
   });
 
+  test("polls every 5 s when the IdP names no interval", async () => {
+    idp.tokenReplies.push({ status: 200, body: { access_token: fakeJwt("acc_1"), refresh_token: "rt", expires_in: 900 } });
+    const endpoints = await discover(idp.issuer);
+    const authorization = { ...(await startAgentAuthorization(endpoints, idp.issuer, "Mac mini")), interval: 0 };
+    const waits: number[] = [];
+    await pollAgentTokens(endpoints, idp.issuer, authorization, "tunnel", { sleep: async (ms) => void waits.push(ms) });
+    expect(waits).toEqual([5000]);
+  });
+
   test("a denied sign-in ends with the IdP's reason", async () => {
     idp.tokenReplies.push({ status: 400, body: { error: "access_denied" } });
     const endpoints = await discover(idp.issuer);

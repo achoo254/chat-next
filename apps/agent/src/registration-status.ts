@@ -100,6 +100,7 @@ export class Registration {
   private running: Promise<void> | undefined;
   private again = false;
   private stopped = false;
+  private refusedTunnel = false;
   private readonly now: () => number;
   private readonly schedule: (fn: () => void, ms: number) => () => void;
 
@@ -154,9 +155,21 @@ export class Registration {
     if (!this.deps.config.get().claimed) this.deps.config.update((c) => (c.claimed = true));
   }
 
-  /** Chat refused a heartbeat; the tunnel keeps running. */
-  chatRefused(detail: string): void {
-    this.chat = { status: "error", detail };
+  /**
+   * Whether Chat listed the machine tunnel at the last heartbeat: it lists
+   * only the tunnel of the machine's own account (the tunnel keeps running).
+   */
+  tunnelListed(listed: boolean): void {
+    if (!listed) {
+      this.refusedTunnel = true;
+      this.chat = {
+        status: "error",
+        detail: "Chat does not list the tunnel: it was opened with another account; run `tunelo login --force` with the machine's account",
+      };
+    } else if (this.refusedTunnel) {
+      this.refusedTunnel = false;
+      this.chat = storedChatState(this.deps.config, this.deps.session) ?? this.chat;
+    }
   }
 
   /** The owner removed the machine on the web: never added again until `tunelo install`. */
@@ -239,9 +252,14 @@ export class Registration {
       return;
     }
     const reason = err instanceof MachineApiError ? err.reason : "";
+    if (reason === "machine_revoked") {
+      // Removed on the web while unclaimed: nothing left to claim.
+      this.removed();
+      return;
+    }
     const detail =
       reason === "chat_account_missing"
-        ? "waiting: open Chat once with this account; the machine then appears in My machines"
+        ? "waiting: Chat cannot add this account yet (open Chat once, or wait); the machine then appears in My machines"
         : reason === "agent_update_required"
           ? "this tunelo is too old for Chat: run `tunelo update`"
           : reason === "claim_wrong_account"

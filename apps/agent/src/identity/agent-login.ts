@@ -99,7 +99,8 @@ export async function pollAgentTokens(
 	const now = options.now ?? Date.now;
 	const resource = appResources(issuer)[app];
 	const deadline = now() + authorization.expiresIn * 1000;
-	let interval = authorization.interval;
+	// RFC 8628: 5 s when the IdP names no interval.
+	let interval = authorization.interval > 0 ? authorization.interval : 5;
 	let networkFailures = 0;
 	while (now() < deadline) {
 		await sleep(interval * 1000);

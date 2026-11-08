@@ -67,16 +67,17 @@ function issuerFor(serverUrl: string): string {
  * Localman at once. The current session (an older `tunelo-cli` one
  * included) stays in use until the new one is saved, and its grant is
  * revoked only then: a failed or abandoned sign-in leaves it working.
+ * Rejects with the reason; the caller decides how to end.
  */
 async function deviceLogin(issuer: string): Promise<string> {
-	const endpoints = await discover(issuer).catch((err: Error) =>
-		fail(`Could not reach ${issuer}: ${err.message}`),
-	);
+	const endpoints = await discover(issuer).catch((err: Error) => {
+		throw new Error(`Could not reach ${issuer}: ${err.message}`);
+	});
 	const authorization = await startAgentAuthorization(
 		endpoints,
 		issuer,
 		deviceNameForIdp(hostname()),
-	).catch((err: Error) => fail(err.message));
+	);
 
 	// The IdP gives this client no link with the code filled in: the person
 	// types the code shown here, on a page they opened themselves.
@@ -88,9 +89,7 @@ async function deviceLogin(issuer: string): Promise<string> {
 	console.log("  Waiting for approval...");
 	await openBrowser(authorization.verificationUri);
 
-	const tokens = await pollAgentTokens(endpoints, issuer, authorization, "tunnel").catch(
-		(err: Error) => fail(err.message),
-	);
+	const tokens = await pollAgentTokens(endpoints, issuer, authorization, "tunnel");
 	const resources = appResources(issuer);
 	const { info, revokeError } = await identitySession(configDir()).replace(
 		issuer,
@@ -109,7 +108,8 @@ async function deviceLogin(issuer: string): Promise<string> {
 
 /**
  * Signs this machine in for `serverUrl` unless it already is (or `force`).
- * Resolves with the account id, and whether a sign-in happened now.
+ * Resolves with the account id, and whether a sign-in happened now; rejects
+ * when the sign-in fails (the stored session is then unchanged).
  */
 export async function signInForServer(
 	serverUrl: string,
@@ -172,7 +172,7 @@ export function registerLoginCommands(program: Command): void {
 				const { sub, signedInNow } = await signInForServer(
 					serverUrl,
 					options.force === true,
-				);
+				).catch((err: Error) => fail(err.message));
 				if (options.server) {
 					updateSettings((settings) => ({ ...settings, server: serverUrl }));
 				}

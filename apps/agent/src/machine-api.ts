@@ -57,7 +57,7 @@ export function claimMachine(accessToken: string, machineSecret: string) {
   return call<{ machineId?: string }>("ClaimMachine", { machineSecret }, accessToken);
 }
 
-export type HeartbeatReply = { revoked?: boolean; revokedDeviceKeys?: string[]; minAgentVersion?: string; claimed?: boolean };
+export type HeartbeatReply = { revoked?: boolean; revokedDeviceKeys?: string[]; minAgentVersion?: string; claimed?: boolean; tunnelRefused?: boolean };
 
 export function heartbeat(secret: string, body: { tunnelUrl: string; agentVersion: string; claudeVersion: string }) {
   return call<HeartbeatReply>("Heartbeat", body, secret);
