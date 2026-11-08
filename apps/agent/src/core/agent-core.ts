@@ -62,8 +62,13 @@ type ThreadMeta = {
   createdAt: number;
   updatedAt: number;
   segments: Segment[];
+  /** Picked on a device; unset follows the machine's own AI settings. */
+  effort?: string;
+  permissionMode?: string;
+  /** The mode the machine's own settings started the last session in. */
+  machineMode?: string;
   /** Last statusline data, kept so a parked or restarted thread still shows it. */
-  info?: Omit<ProviderInfo, "rateLimits">;
+  info?: Omit<ProviderInfo, "rateLimits" | "account">;
 };
 
 type Pending = {
@@ -89,8 +94,10 @@ type Thread = {
   dirtyText: Set<string>;
   flushTimer?: ReturnType<typeof setTimeout>;
   usage?: { tokens: number; window: number };
-  info: Omit<ProviderInfo, "rateLimits">;
+  info: Omit<ProviderInfo, "rateLimits" | "account">;
   clientMsgIds: Set<string>;
+  /** The open session has not reported its permission mode yet. */
+  modeUnseen: boolean;
 };
 
 export type CoreOptions = {
@@ -130,6 +137,8 @@ export class AgentCore {
   private infoListeners = new Set<(threadId: string) => void>();
   /** Plan usage of the AI account; the same for every thread. */
   private rateLimits: ProviderInfo["rateLimits"];
+  /** The AI account signed in on this machine; the same for every thread. */
+  private account: ProviderInfo["account"];
   /** The latest command list any session reported, for threads that have none yet. */
   private lastCommands: NonNullable<ProviderInfo["commands"]> = [];
   private idleTimer: ReturnType<typeof setInterval> | undefined;
@@ -154,7 +163,7 @@ export class AgentCore {
 
   /** Bumps the epoch and restores machine-wide statusline data. */
   private bumpEpoch(): bigint {
-    let state: { epoch?: number; rateLimits?: ProviderInfo["rateLimits"]; commands?: ProviderInfo["commands"] } = {};
+    let state: { epoch?: number; rateLimits?: ProviderInfo["rateLimits"]; account?: ProviderInfo["account"]; commands?: ProviderInfo["commands"] } = {};
     try {
       state = JSON.parse(readFileSync(this.stateFile, "utf8")) as typeof state;
     } catch {
@@ -162,13 +171,14 @@ export class AgentCore {
     }
     const epoch = (state.epoch ?? 0) + 1;
     this.rateLimits = state.rateLimits;
+    this.account = state.account;
     this.lastCommands = state.commands ?? [];
     writeFileSync(this.stateFile, JSON.stringify({ ...state, epoch }), { mode: 0o600 });
     return BigInt(epoch);
   }
 
   private saveState(): void {
-    const state = { epoch: Number(this.epoch), rateLimits: this.rateLimits, commands: this.lastCommands };
+    const state = { epoch: Number(this.epoch), rateLimits: this.rateLimits, account: this.account, commands: this.lastCommands };
     writeFileSync(this.stateFile, JSON.stringify(state), { mode: 0o600 });
   }
 
@@ -240,6 +250,9 @@ export class AgentCore {
       linesAdded: t.info.linesAdded ?? 0,
       linesRemoved: t.info.linesRemoved ?? 0,
       commands: t.info.commands?.length ? t.info.commands : this.lastCommands,
+      effort: t.info.effort ?? "",
+      permissionModes: this.permissionModes(t),
+      ...(this.account ? { account: this.account } : {}),
       ...(r ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
     });
   }
@@ -416,6 +429,38 @@ export class AgentCore {
     this.touch(t);
   }
 
+  /** Effort for the rest of the session; "" goes back to the AI's default. */
+  async setEffort(threadId: string, effort: string): Promise<void> {
+    const t = this.thread(threadId);
+    if (effort !== "" && !this.provider(t.meta.provider).capabilities.effortLevels.includes(effort)) {
+      throw new AgentError(ErrorCode.INVALID, `unknown effort "${effort}"`);
+    }
+    if (t.session?.setEffort) await t.session.setEffort(effort);
+    if (effort === "") delete t.meta.effort;
+    else t.meta.effort = effort;
+    t.info.effort = effort;
+    this.saveMeta(t);
+    for (const fn of this.infoListeners) fn(t.meta.id);
+  }
+
+  /** Modes a device may pick: the AI's safe ones, plus bypass only when the machine itself starts there. */
+  private permissionModes(t: Thread): string[] {
+    const modes = [...this.provider(t.meta.provider).capabilities.permissionModes];
+    if (t.meta.machineMode === "bypassPermissions") modes.push("bypassPermissions");
+    return modes;
+  }
+
+  async setPermissionMode(threadId: string, mode: string, device: string): Promise<void> {
+    const t = this.thread(threadId);
+    if (!this.permissionModes(t).includes(mode)) throw new AgentError(ErrorCode.INVALID, `permission mode "${mode}" is not allowed from a device`);
+    if (t.session?.setPermissionMode) await t.session.setPermissionMode(mode);
+    t.meta.permissionMode = mode;
+    t.info.permissionMode = mode;
+    this.saveMeta(t);
+    this.opts.audit.write({ device, action: "permission_mode", path: t.meta.dir, detail: mode });
+    for (const fn of this.infoListeners) fn(t.meta.id);
+  }
+
   /** Hands the thread to another AI: summary + changed files as its first message. */
   async switchProvider(threadId: string, providerId: string, model: string): Promise<void> {
     const t = this.thread(threadId);
@@ -473,7 +518,11 @@ export class AgentCore {
       projectSettings: t.meta.projectSettings,
       isSensitive: this.opts.isSensitive,
       ...(t.meta.model ? { model: t.meta.model } : {}),
+      ...(t.meta.effort ? { effort: t.meta.effort } : {}),
+      ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
+      ...(t.meta.machineMode === "bypassPermissions" ? { allowBypass: true } : {}),
     };
+    t.modeUnseen = true;
     t.starting = provider.start({ policy, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {
       t.session = await t.starting;
@@ -610,13 +659,19 @@ export class AgentCore {
         this.put(t, `status:${randomUUID()}`, { case: "status", value: { text: e.text } });
         return;
       case "info": {
-        const { type: _type, rateLimits, ...rest } = e;
+        const { type: _type, rateLimits, account, ...rest } = e;
+        // The first mode a session reports, with no device pick, is the machine's own.
+        if (rest.permissionMode && t.modeUnseen) {
+          t.modeUnseen = false;
+          if (!t.meta.permissionMode) t.meta.machineMode = rest.permissionMode;
+        }
         Object.assign(t.info, rest);
+        if (account) this.account = account;
         this.saveMeta(t);
         if (rest.commands?.length) this.lastCommands = rest.commands;
         if (rateLimits || rest.commands?.length) this.saveState();
-        if (rateLimits) {
-          this.rateLimits = rateLimits;
+        if (rateLimits || account) {
+          if (rateLimits) this.rateLimits = rateLimits;
           this.saveState();
           for (const id of this.threads.keys()) for (const fn of this.infoListeners) fn(id);
         } else {
@@ -752,6 +807,7 @@ export class AgentCore {
       textItems: new Map(),
       dirtyText: new Set(),
       clientMsgIds: new Set(),
+      modeUnseen: false,
       info: (meta.info ??= {}),
     };
   }

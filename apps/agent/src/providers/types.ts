@@ -19,6 +19,10 @@ export type ProviderCapabilities = {
   diff: boolean;
   images: boolean;
   models: { id: string; name: string }[];
+  /** Reasoning effort levels, lowest first; empty when the AI has none. */
+  effortLevels: string[];
+  /** Permission modes a device may pick; never one that skips every prompt. */
+  permissionModes: string[];
 };
 
 export type LoginState = "ok" | "needs-login" | "unknown";
@@ -31,13 +35,20 @@ export type SlashCommand = { name: string; description: string; argumentHint: st
 
 export type RateWindow = { utilization: number; resetsAt: number };
 
+/** Who the AI is signed in as, from the CLI itself; never a credential. */
+export type AccountInfo = { email: string; organization: string; plan: string };
+
 /** Statusline data; each field present only when it changed or is known. */
 export type ProviderInfo = {
   permissionMode?: string;
+  /** The session's reasoning effort; "" for the AI's default. */
+  effort?: string;
   commands?: SlashCommand[];
   linesAdded?: number;
   linesRemoved?: number;
   rateLimits?: { fiveHour?: RateWindow; sevenDay?: RateWindow };
+  /** Machine-wide, like rateLimits. */
+  account?: AccountInfo;
 };
 
 export type ProviderEvent =
@@ -97,6 +108,11 @@ export type SessionPolicy = {
   /** Tells whether a path is sensitive (for the approval card label). */
   isSensitive: (path: string) => boolean;
   model?: string;
+  /** Picked from a device; unset keeps the machine's own settings. */
+  effort?: string;
+  permissionMode?: string;
+  /** The machine's own settings start sessions in bypassPermissions, so a device may return to it. */
+  allowBypass?: boolean;
 };
 
 export interface ProviderSession {
@@ -105,6 +121,8 @@ export interface ProviderSession {
   interrupt(): Promise<void>;
   close(): Promise<void>;
   setModel?(model: string): Promise<void>;
+  setEffort?(effort: string): Promise<void>;
+  setPermissionMode?(mode: string): Promise<void>;
 }
 
 export interface AgentProvider {

@@ -123,6 +123,8 @@ message Frame {
     DirList dir_list = 21;
     AuditList audit_list = 22;
     ThreadClose thread_close = 23;
+    ThreadSetPermissionMode thread_set_permission_mode = 24;
+    ThreadSetEffort thread_set_effort = 25;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -221,6 +223,21 @@ message ThreadSetModel {
   string model = 2;
 }
 
+// Changes the session's permission mode. B accepts only the modes listed in
+// ThreadInfo.permission_modes: a device can never turn on bypassPermissions
+// unless the machine's own AI settings already start sessions in it.
+message ThreadSetPermissionMode {
+  string thread_id = 1;
+  string mode = 2;
+}
+
+// Changes the session's reasoning effort (one of the AI's effort_levels);
+// empty goes back to the AI's own default.
+message ThreadSetEffort {
+  string thread_id = 1;
+  string effort = 2;
+}
+
 message ThreadSwitch {
   string thread_id = 1;
   string provider = 2;
@@ -256,9 +273,9 @@ message Ack {}
 // device subscribes and whenever it changes.
 message ThreadInfo {
   string thread_id = 1;
-  // The session's permission mode as the machine's own AI settings set it
-  // (Claude: default, acceptEdits, plan, bypassPermissions, auto). Read-only
-  // on devices.
+  // The session's permission mode (Claude: default, acceptEdits, plan,
+  // bypassPermissions, auto). Starts from the machine's own AI settings;
+  // devices change it with ThreadSetPermissionMode.
   string permission_mode = 2;
   string git_branch = 3;
   uint32 lines_added = 4;
@@ -267,6 +284,21 @@ message ThreadInfo {
   repeated SlashCommand commands = 6;
   // Plan usage of the AI account on this machine; unset when unknown.
   RateLimits rate_limits = 7;
+  // The session's reasoning effort; empty when the AI's default applies.
+  string effort = 8;
+  // The AI account signed in on this machine; unset when unknown.
+  AccountInfo account = 9;
+  // Permission modes a device may pick for this session.
+  repeated string permission_modes = 10;
+}
+
+// Who the AI on the machine is signed in as, as the AI's CLI reports it.
+// Never a credential.
+message AccountInfo {
+  string email = 1;
+  string organization = 2;
+  // The plan, e.g. "max" or "pro"; empty for API-key or cloud-provider logins.
+  string plan = 3;
 }
 
 message SlashCommand {
@@ -586,6 +618,8 @@ message ProviderCapabilities {
   bool diff = 8;
   bool images = 9;
   repeated ModelOption models = 10;
+  // Reasoning effort levels the AI accepts, lowest first; empty when it has none.
+  repeated string effort_levels = 11;
 }
 
 message ModelOption {

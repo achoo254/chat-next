@@ -7,8 +7,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import {
+  type AccountInfo as SdkAccountInfo,
   type CanUseTool,
+  type EffortLevel,
   type Options,
+  type PermissionMode,
   type PermissionResult,
   type PermissionUpdate,
   type Query,
@@ -19,6 +22,7 @@ import {
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import { Channel } from "../../util/channel.ts";
 import type {
+  AccountInfo,
   AgentProvider,
   AskUser,
   Detected,
@@ -51,7 +55,17 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
     { id: "sonnet", name: "Sonnet" },
     { id: "haiku", name: "Haiku" },
   ],
+  effortLevels: ["low", "medium", "high", "xhigh", "max"],
+  // bypassPermissions and dontAsk are left out: a device may only return to
+  // bypass when the machine's own settings start sessions in it.
+  permissionModes: ["default", "acceptEdits", "plan", "auto"],
 };
+
+/** The CLI's account report, without any token source. */
+export function toAccount(a: SdkAccountInfo): AccountInfo | undefined {
+  if (!a.email && !a.organization && !a.subscriptionType) return undefined;
+  return { email: a.email ?? "", organization: a.organization ?? "", plan: a.subscriptionType ?? "" };
+}
 
 /** The user's own `claude`: PATH first, then the native installer's location. */
 export async function findClaude(): Promise<string | null> {
@@ -167,12 +181,15 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
     strictMcpConfig: true,
     mcpServers: policy.mcpServers as NonNullable<Options["mcpServers"]>,
-    // No permissionMode: the session uses the machine's own Claude settings
-    // (permissions.defaultMode and allow/deny rules); devices only see it.
+    // Without a mode picked on a device, the session follows the machine's own
+    // Claude settings (permissions.defaultMode and allow/deny rules).
     includePartialMessages: true,
     canUseTool,
   };
   if (policy.model) options.model = policy.model;
+  if (policy.effort) options.effort = policy.effort as EffortLevel;
+  if (policy.permissionMode) options.permissionMode = policy.permissionMode as PermissionMode;
+  if (policy.allowBypass) options.allowDangerouslySkipPermissions = true;
   if (resumeId) options.resume = resumeId;
 
   const q = queryFn({ prompt: inbox, options });
@@ -193,7 +210,14 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         }
         if (msg.type === "system" && msg.subtype === "init") {
           hidden = msg.terminal_slash_commands ?? [];
-          events.push({ type: "info", permissionMode: msg.permissionMode });
+          events.push({ type: "info", permissionMode: msg.permissionMode, effort: msg.effort ?? "" });
+          void q.accountInfo().then(
+            (a) => {
+              const account = toAccount(a);
+              if (account) events.push({ type: "info", account });
+            },
+            () => undefined,
+          );
           void q.supportedCommands().then(
             (list) => events.push({ type: "info", commands: toCommands(list, hidden) }),
             () => undefined,
@@ -236,6 +260,17 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     async setModel(model) {
       if (closed) return;
       await q.setModel(model);
+    },
+    async setEffort(effort) {
+      if (closed) return;
+      // null drops the session override, back to the user's own settings.
+      await q.applyFlagSettings({ effortLevel: effort === "" ? null : (effort as EffortLevel) });
+      events.push({ type: "info", effort });
+    },
+    async setPermissionMode(mode) {
+      if (closed) return;
+      await q.setPermissionMode(mode as PermissionMode);
+      events.push({ type: "info", permissionMode: mode });
     },
     async close() {
       if (closed) return;

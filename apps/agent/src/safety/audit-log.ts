@@ -3,7 +3,7 @@
 // approving a tool that touches a sensitive path, pairing, revoking).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
-export type AuditAction = "open_sensitive" | "project_settings" | "approve_sensitive" | "pair" | "revoke";
+export type AuditAction = "open_sensitive" | "project_settings" | "approve_sensitive" | "pair" | "revoke" | "permission_mode";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

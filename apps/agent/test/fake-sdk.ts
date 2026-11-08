@@ -4,7 +4,7 @@
 import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { Channel } from "../src/util/channel.ts";
 
-export type SdkLog = { options: Options[]; interrupts: number; models: string[] };
+export type SdkLog = { options: Options[]; interrupts: number; models: string[]; modes?: string[]; flags?: unknown[] };
 
 export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: [] }) {
   const fn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }): Query => {
@@ -26,7 +26,7 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
     const result = (ok: boolean) => m({ type: "result", subtype: ok ? "success" : "error_during_execution", is_error: !ok, duration_ms: 1 });
 
     void (async () => {
-      m({ type: "system", subtype: "init", session_id: sessionId, mcp_servers: [], model: "claude-test", permissionMode: "default", terminal_slash_commands: ["exit"] });
+      m({ type: "system", subtype: "init", session_id: sessionId, mcp_servers: [], model: "claude-test", permissionMode: params.options.permissionMode ?? "default", effort: params.options.effort ?? null, terminal_slash_commands: ["exit"] });
       const canUseTool = params.options.canUseTool;
       if (!canUseTool) throw new Error("adapter must pass canUseTool");
       for await (const msg of params.prompt) {
@@ -78,6 +78,15 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
       },
       async setModel(model?: string) {
         log.models.push(model ?? "");
+      },
+      async setPermissionMode(mode: string) {
+        (log.modes ??= []).push(mode);
+      },
+      async applyFlagSettings(settings: unknown) {
+        (log.flags ??= []).push(settings);
+      },
+      async accountInfo() {
+        return { email: "me@example.com", subscriptionType: "max", tokenSource: "never-forwarded" };
       },
       async supportedCommands() {
         return [

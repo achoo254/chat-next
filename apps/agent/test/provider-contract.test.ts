@@ -50,6 +50,69 @@ describe("claude adapter usage", () => {
     expect(sdk.log.options[0]?.permissionMode).toBeUndefined();
     await core.stop();
   });
+
+  it("reports the signed-in account without any token source, and sets effort and mode live", async () => {
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const { core, work } = makeCore([provider]);
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(core.info(t.id).account).toMatchObject({ email: "me@example.com", organization: "", plan: "max" });
+    expect(JSON.stringify(core.info(t.id).account)).not.toContain("never-forwarded");
+    await core.setEffort(t.id, "high");
+    await core.setEffort(t.id, "");
+    await core.setPermissionMode(t.id, "acceptEdits", "test");
+    expect(sdk.log.flags).toEqual([{ effortLevel: "high" }, { effortLevel: null }]);
+    expect(sdk.log.modes).toEqual(["acceptEdits"]);
+    await core.stop();
+  });
+});
+
+describe("effort and permission mode from a device", () => {
+  it("keeps the picks across a parked session and logs a mode change", async () => {
+    const p = fakeProvider();
+    const { core, work, audit } = makeCore([p]);
+    const t = await core.create({ provider: p.id, model: "", dir: work, text: "one", consent, device: "phone" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    await core.setEffort(t.id, "high");
+    await core.setPermissionMode(t.id, "plan", "phone");
+    expect(core.info(t.id)).toMatchObject({ effort: "high", permissionMode: "plan" });
+    await expect(core.setEffort(t.id, "turbo")).rejects.toMatchObject({ code: ErrorCode.INVALID });
+    await core.close(t.id);
+    await core.send(t.id, "two", "");
+    await until(core, t.id, (i) => turnDone(2)(byCase(i, "turn")));
+    expect(p.log.starts[1]).toMatchObject({ effort: "high", permissionMode: "plan" });
+    expect(audit.list(10).map((e) => [e.device, e.action, e.detail])).toContainEqual(["phone", "permission_mode", "plan"]);
+    await core.stop();
+  });
+
+  it("never turns bypass on from a device unless the machine itself starts there", async () => {
+    const p = fakeProvider();
+    const { core, work } = makeCore([p]);
+    const t = await core.create({ provider: p.id, model: "", dir: work, text: "one", consent, device: "phone" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    expect(core.info(t.id).permissionModes).toEqual(["default", "plan"]);
+    await expect(core.setPermissionMode(t.id, "bypassPermissions", "phone")).rejects.toMatchObject({ code: ErrorCode.INVALID });
+    await core.stop();
+
+    const q = fakeProvider();
+    q.log.machineMode = "bypassPermissions";
+    const m = makeCore([q]);
+    const u = await m.core.create({ provider: q.id, model: "", dir: m.work, text: "one", consent, device: "phone" });
+    await until(m.core, u.id, (i) => turnDone(1)(byCase(i, "turn")));
+    expect(m.core.info(u.id).permissionModes).toContain("bypassPermissions");
+    await m.core.setPermissionMode(u.id, "default", "phone");
+    await m.core.close(u.id);
+    await m.core.send(u.id, "two", "");
+    await until(m.core, u.id, (i) => turnDone(2)(byCase(i, "turn")));
+    // Still the machine's choice after the device's pick restarted the session.
+    expect(q.log.starts[1]).toMatchObject({ permissionMode: "default", allowBypass: true });
+    await m.core.setPermissionMode(u.id, "bypassPermissions", "phone");
+    expect(m.core.info(u.id).permissionMode).toBe("bypassPermissions");
+    await m.core.stop();
+  });
 });
 
 describe.each(adapters)("provider contract: %s", (_name, make) => {

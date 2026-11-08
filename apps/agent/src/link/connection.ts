@@ -236,6 +236,12 @@ export class Connection {
         case "threadSetModel":
           await core.setModel(b.value.threadId, b.value.model);
           return ack();
+        case "threadSetEffort":
+          await core.setEffort(b.value.threadId, b.value.effort);
+          return ack();
+        case "threadSetPermissionMode":
+          await core.setPermissionMode(b.value.threadId, b.value.mode, this.device);
+          return ack();
         case "threadSwitch":
           await core.switchProvider(b.value.threadId, b.value.provider, b.value.model);
           return ack();

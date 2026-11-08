@@ -6,7 +6,15 @@
 import { Channel } from "../src/util/channel.ts";
 import type { AgentProvider, AskUser, ProviderEvent, ProviderSession, SessionPolicy } from "../src/providers/types.ts";
 
-export type FakeLog = { starts: { resumeId?: string; model?: string }[]; sent: string[]; closed: number };
+export type FakeLog = {
+  starts: { resumeId?: string; model?: string; effort?: string; permissionMode?: string; allowBypass?: boolean }[];
+  sent: string[];
+  closed: number;
+  /** The mode the machine's own settings start a session in. */
+  machineMode?: string;
+  modes?: string[];
+  efforts?: string[];
+};
 
 export function fakeProvider(id = "fake", log: FakeLog = { starts: [], sent: [], closed: 0 }): AgentProvider & { log: FakeLog } {
   return {
@@ -24,12 +32,20 @@ export function fakeProvider(id = "fake", log: FakeLog = { starts: [], sent: [],
       diff: false,
       images: false,
       models: [{ id: "small", name: "Small" }],
+      effortLevels: ["low", "high"],
+      permissionModes: ["default", "plan"],
     },
     async detect() {
       return { installed: true, version: "1.0.0", loginState: "ok" };
     },
     async start({ policy, resumeId, askUser }) {
-      log.starts.push({ ...(resumeId ? { resumeId } : {}), ...(policy.model ? { model: policy.model } : {}) });
+      log.starts.push({
+        ...(resumeId ? { resumeId } : {}),
+        ...(policy.model ? { model: policy.model } : {}),
+        ...(policy.effort ? { effort: policy.effort } : {}),
+        ...(policy.permissionMode ? { permissionMode: policy.permissionMode } : {}),
+        ...(policy.allowBypass ? { allowBypass: true } : {}),
+      });
       return fakeSession(id, policy, askUser, log, resumeId);
     },
   };
@@ -41,7 +57,7 @@ function fakeSession(id: string, policy: SessionPolicy, askUser: AskUser, log: F
   let abort: AbortController | undefined;
   let closed = false;
   events.push({ type: "session", sessionId: resumeId ?? `${id}-session-1` });
-  events.push({ type: "info", permissionMode: "default", commands: [{ name: "review", description: "Review the diff", argumentHint: "", builtin: false }] });
+  events.push({ type: "info", permissionMode: policy.permissionMode ?? log.machineMode ?? "default", commands: [{ name: "review", description: "Review the diff", argumentHint: "", builtin: false }] });
 
   async function runTurn(text: string) {
     turn += 1;
@@ -94,6 +110,14 @@ function fakeSession(id: string, policy: SessionPolicy, askUser: AskUser, log: F
     },
     async setModel() {
       // nothing to do
+    },
+    async setEffort(effort) {
+      (log.efforts ??= []).push(effort);
+      events.push({ type: "info", effort });
+    },
+    async setPermissionMode(mode) {
+      (log.modes ??= []).push(mode);
+      events.push({ type: "info", permissionMode: mode });
     },
     async close() {
       if (closed) return;
