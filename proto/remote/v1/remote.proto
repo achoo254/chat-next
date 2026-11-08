@@ -384,11 +384,14 @@ message RateWindow {
 message ClaudeProfile {
   // Empty: the default profile (the machine's own Claude folder).
   string id = 1;
-  // As `claude auth status` reports it; empty when not signed in.
+  // As `claude auth status` reports it; for an added profile, the account it
+  // was added with even when it needs to sign in again.
   string email = 2;
   string organization = 3;
   // The plan, e.g. "max" or "pro".
   string plan = 4;
+  // Last `claude auth status` of the profile: signed in and not past
+  // login_expires_at. False means it needs to sign in again.
   bool signed_in = 5;
   // Last known plan usage; unset when unknown.
   RateLimits last_usage = 6;
@@ -396,6 +399,8 @@ message ClaudeProfile {
   int64 usage_updated_at = 7;
   // Unix milliseconds; 0 for the default profile.
   int64 created_at = 8;
+  // Unix milliseconds when the sign-in ends, as claude reports it; 0 when unknown.
+  int64 login_expires_at = 9;
 }
 
 message ProfileListResult {

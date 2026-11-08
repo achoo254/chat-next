@@ -90,9 +90,12 @@ export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
 				<ul className="mx-device-list">
 					{list.profiles.map((profile) => {
 						const selected = profile.id === list.selectedId;
-						const name = profile.signedIn && profile.email !== "" ? profile.email : p.notSignedIn;
+						// An added profile keeps its e-mail when it needs to sign in again; the default one shows what claude says now.
+						const name = profile.email !== "" && (profile.signedIn || profile.id !== "") ? profile.email : p.notSignedIn;
+						const needsSignIn = profile.id !== "" && !profile.signedIn;
 						const usage = profile.lastUsage;
 						const updated = Number(profile.usageUpdatedAt);
+						const expires = Number(profile.loginExpiresAt);
 						return (
 							<li key={profile.id || "default"} className="mx-device" data-id={`claude-profiles-item-${profile.id || "default"}`}>
 								<span className="tx">
@@ -106,13 +109,19 @@ export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
 										{usage === undefined ? p.usageUnknown : p.usage(pct(usage.fiveHour), pct(usage.sevenDay))}
 										{updated > 0 && ` · ${p.updatedAt(at(updated))}`}
 									</small>
+									{expires > 0 && <small>{expires > now ? p.loginEnds(at(expires)) : p.loginEnded(at(expires))}</small>}
+									{needsSignIn && (
+										<small role="note">
+											<span className="chip mx-chip warn">{p.needsSignIn}</span> {p.needsSignInHint}
+										</small>
+									)}
 								</span>
 								<span className="acts">
 									{!selected && (
 										<button
 											type="button"
 											className="btn btn-sm"
-											disabled={!online || busy !== ""}
+											disabled={!online || busy !== "" || needsSignIn}
 											onClick={() => void run(`select:${profile.id}`, { case: "profileSelect", value: { id: profile.id } })}
 										>
 											{p.select}
@@ -121,7 +130,7 @@ export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
 									<button
 										type="button"
 										className="btn btn-sm"
-										disabled={!online || busy !== "" || !profile.signedIn}
+										disabled={!online || busy !== "" || (profile.id === "" && !profile.signedIn)}
 										onClick={() => void run(`usage:${profile.id}`, { case: "usageRefresh", value: { id: profile.id } })}
 									>
 										{p.refresh}

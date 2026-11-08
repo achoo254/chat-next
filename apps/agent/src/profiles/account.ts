@@ -41,9 +41,25 @@ const statusSchema = z.object({
   orgId: z.string().optional(),
   orgName: z.string().optional(),
   subscriptionType: z.string().nullable().optional(),
+  loginExpiresAt: z.union([z.string(), z.number()]).nullable().optional(),
 });
 
-export type ClaudeAccount = { loggedIn: boolean; email: string; orgId: string; orgName: string; plan: string };
+export type ClaudeAccount = {
+  loggedIn: boolean;
+  email: string;
+  orgId: string;
+  orgName: string;
+  plan: string;
+  /** Unix milliseconds when the sign-in ends; 0 when claude does not say. */
+  loginExpiresAt: number;
+};
+
+/** claude's loginExpiresAt (ISO text, or seconds or milliseconds) as Unix milliseconds; 0 when unknown. */
+export function expiryMs(value: string | number | null | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? (value < 1e12 ? value * 1000 : value) : 0;
+  if (typeof value === "string" && value !== "") return Date.parse(value) || 0;
+  return 0;
+}
 
 /** The account of a profile; null when claude gave no readable report. */
 export async function readAccount(bin: string, configDir: string | undefined): Promise<ClaudeAccount | null> {
@@ -58,7 +74,14 @@ export async function readAccount(bin: string, configDir: string | undefined): P
   const r = statusSchema.safeParse(parsed);
   if (!r.success) return null;
   const s = r.data;
-  return { loggedIn: s.loggedIn, email: s.email ?? "", orgId: s.orgId ?? "", orgName: s.orgName ?? "", plan: s.subscriptionType ?? "" };
+  return {
+    loggedIn: s.loggedIn,
+    email: s.email ?? "",
+    orgId: s.orgId ?? "",
+    orgName: s.orgName ?? "",
+    plan: s.subscriptionType ?? "",
+    loginExpiresAt: expiryMs(s.loginExpiresAt),
+  };
 }
 
 /** Same person in the same organization: e-mail without case, organization id as is. */

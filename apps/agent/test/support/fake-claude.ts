@@ -15,6 +15,8 @@ import { join } from "node:path";
 export const GOOD_CODE = "GOODCODE-7f3a9c1e5b2d#state-81d2";
 export const FAKE_TOKEN = "sk-ant-oat01-FAKE-SECRET-TOKEN-5e1b7a";
 export const FAKE_URL_STATE = "state-9c2f6e04aa";
+/** When the fake sign-in ends, as `auth status` reports it. */
+export const LOGIN_EXPIRES = "2099-01-01T00:00:00.000Z";
 
 const SCRIPT = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -61,7 +63,7 @@ if (a === "auth" && b === "login") {
       process.stderr.write("Login failed: That code wasn't accepted.\\n");
       process.exit(1);
     }
-    fs.writeFileSync(acct, JSON.stringify({ email: process.env.FAKE_CLAUDE_EMAIL || "second@example.com", orgId: process.env.FAKE_CLAUDE_ORG || "org-1", orgName: "Org One", subscriptionType: "max" }));
+    fs.writeFileSync(acct, JSON.stringify({ email: process.env.FAKE_CLAUDE_EMAIL || "second@example.com", orgId: process.env.FAKE_CLAUDE_ORG || "org-1", orgName: "Org One", subscriptionType: "max", loginExpiresAt: "${LOGIN_EXPIRES}" }));
     fs.writeFileSync(cred, JSON.stringify({ claudeAiOauth: { accessToken: "${FAKE_TOKEN}" } }));
     console.log("Login successful.");
     process.exit(0);

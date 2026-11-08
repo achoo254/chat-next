@@ -5,14 +5,14 @@
 // shows no link, the terminal way, picking, usage limits, settings that
 // follow the machine, removal (refused when the sign-out fails), a damaged
 // profiles.json, and that no claude process outlives its attempt.
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { claudeEnv } from "../src/profiles/account.ts";
+import { claudeEnv, expiryMs } from "../src/profiles/account.ts";
 import { profileDir, profileHome } from "../src/profiles/paths.ts";
 import { ClaudeProfiles } from "../src/profiles/service.ts";
 import { extractSignInUrl, validCode } from "../src/profiles/sign-in.ts";
-import { GOOD_CODE, livePids, signInDefault } from "./support/fake-claude.ts";
+import { GOOD_CODE, LOGIN_EXPIRES, livePids, signInDefault } from "./support/fake-claude.ts";
 import { profilesFixture } from "./support/profiles-fixture.ts";
 
 const posix = process.platform !== "win32";
@@ -337,6 +337,35 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     expect((await f.profiles.list()).selectedId).toBe("");
     await expect(f.profiles.remove("", "x")).rejects.toThrow(/default/);
     expect(f.audit.list()[0]).toMatchObject({ action: "profile_remove", detail: "second@example.com" });
+  });
+
+  it("tells from claude whether an added profile is still signed in, checked again once the last check is old", async () => {
+    const f = profilesFixture();
+    const added = await addProfile(f.profiles);
+    if (!added.ok) throw new Error(added.error);
+    const view = async () => (await f.profiles.list()).profiles.find((p) => p.id === added.id);
+    expect(await view()).toMatchObject({ signedIn: true, loginExpiresAt: Date.parse(LOGIN_EXPIRES) });
+    // Signed out behind tunelo's back: the recent check still stands…
+    const auth = join(profileHome(f.configDir, added.id), "fake-auth.json");
+    const kept = readFileSync(auth, "utf8");
+    rmSync(auth);
+    expect((await view())?.signedIn).toBe(true);
+    // …until a refresh asks claude again.
+    await f.profiles.refreshUsage(added.id);
+    expect(await view()).toMatchObject({ signedIn: false, email: "second@example.com" });
+    // Signed in again but past its expiry: it needs to sign in again too.
+    writeFileSync(auth, kept.replace(LOGIN_EXPIRES, "2020-01-01T00:00:00.000Z"));
+    const fresh = new ClaudeProfiles({ configDir: f.configDir, audit: f.audit, claudeHome: f.claudeHome, findBinary: async () => f.bin, probeUsage: async () => null, signInCheckMs: 0 });
+    expect((await fresh.list()).profiles.find((p) => p.id === added.id)).toMatchObject({ signedIn: false, loginExpiresAt: Date.parse("2020-01-01T00:00:00.000Z") });
+    writeFileSync(auth, kept);
+    expect((await fresh.list()).profiles.find((p) => p.id === added.id)?.signedIn).toBe(true);
+  });
+
+  it("reads claude's sign-in expiry as text, seconds or milliseconds", () => {
+    expect(expiryMs("2026-11-09T00:00:00Z")).toBe(Date.UTC(2026, 10, 9));
+    expect(expiryMs(1_800_000_000)).toBe(1_800_000_000_000);
+    expect(expiryMs(1_800_000_000_000)).toBe(1_800_000_000_000);
+    expect([expiryMs(null), expiryMs(undefined), expiryMs(""), expiryMs("soon")]).toEqual([0, 0, 0, 0]);
   });
 
   it("refuses to remove a profile claude cannot sign out, unless forced on the machine", async () => {

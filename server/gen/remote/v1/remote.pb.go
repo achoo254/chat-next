@@ -3674,20 +3674,25 @@ type ClaudeProfile struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Empty: the default profile (the machine's own Claude folder).
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// As `claude auth status` reports it; empty when not signed in.
+	// As `claude auth status` reports it; for an added profile, the account it
+	// was added with even when it needs to sign in again.
 	Email        string `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	Organization string `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
 	// The plan, e.g. "max" or "pro".
-	Plan     string `protobuf:"bytes,4,opt,name=plan,proto3" json:"plan,omitempty"`
-	SignedIn bool   `protobuf:"varint,5,opt,name=signed_in,json=signedIn,proto3" json:"signed_in,omitempty"`
+	Plan string `protobuf:"bytes,4,opt,name=plan,proto3" json:"plan,omitempty"`
+	// Last `claude auth status` of the profile: signed in and not past
+	// login_expires_at. False means it needs to sign in again.
+	SignedIn bool `protobuf:"varint,5,opt,name=signed_in,json=signedIn,proto3" json:"signed_in,omitempty"`
 	// Last known plan usage; unset when unknown.
 	LastUsage *RateLimits `protobuf:"bytes,6,opt,name=last_usage,json=lastUsage,proto3" json:"last_usage,omitempty"`
 	// Unix milliseconds of last_usage; 0 when unknown.
 	UsageUpdatedAt int64 `protobuf:"varint,7,opt,name=usage_updated_at,json=usageUpdatedAt,proto3" json:"usage_updated_at,omitempty"`
 	// Unix milliseconds; 0 for the default profile.
-	CreatedAt     int64 `protobuf:"varint,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CreatedAt int64 `protobuf:"varint,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Unix milliseconds when the sign-in ends, as claude reports it; 0 when unknown.
+	LoginExpiresAt int64 `protobuf:"varint,9,opt,name=login_expires_at,json=loginExpiresAt,proto3" json:"login_expires_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ClaudeProfile) Reset() {
@@ -3772,6 +3777,13 @@ func (x *ClaudeProfile) GetUsageUpdatedAt() int64 {
 func (x *ClaudeProfile) GetCreatedAt() int64 {
 	if x != nil {
 		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *ClaudeProfile) GetLoginExpiresAt() int64 {
+	if x != nil {
+		return x.LoginExpiresAt
 	}
 	return 0
 }
@@ -6877,7 +6889,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\n" +
 	"RateWindow\x12 \n" +
 	"\vutilization\x18\x01 \x01(\rR\vutilization\x12\x1b\n" +
-	"\tresets_at\x18\x02 \x01(\x03R\bresetsAt\"\x89\x02\n" +
+	"\tresets_at\x18\x02 \x01(\x03R\bresetsAt\"\xb3\x02\n" +
 	"\rClaudeProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\"\n" +
@@ -6888,7 +6900,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"last_usage\x18\x06 \x01(\v2\x15.remote.v1.RateLimitsR\tlastUsage\x12(\n" +
 	"\x10usage_updated_at\x18\a \x01(\x03R\x0eusageUpdatedAt\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\b \x01(\x03R\tcreatedAt\"j\n" +
+	"created_at\x18\b \x01(\x03R\tcreatedAt\x12(\n" +
+	"\x10login_expires_at\x18\t \x01(\x03R\x0eloginExpiresAt\"j\n" +
 	"\x11ProfileListResult\x124\n" +
 	"\bprofiles\x18\x01 \x03(\v2\x18.remote.v1.ClaudeProfileR\bprofiles\x12\x1f\n" +
 	"\vselected_id\x18\x02 \x01(\tR\n" +

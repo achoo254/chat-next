@@ -64,6 +64,7 @@ function profileListBody(list: ProfileList) {
         organization: p.organization,
         plan: p.plan,
         signedIn: p.signedIn,
+        loginExpiresAt: BigInt(p.loginExpiresAt),
         createdAt: BigInt(p.createdAt),
         usageUpdatedAt: BigInt(u?.updatedAt ?? 0),
         ...(u ? { lastUsage: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),

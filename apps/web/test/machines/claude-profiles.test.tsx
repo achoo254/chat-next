@@ -58,6 +58,31 @@ describe("Claude accounts of a machine", () => {
 		await waitFor(() => expect(sent.at(-1)?.case).toBe("usageRefresh"));
 	});
 
+	it("marks an added account that needs to sign in again, with when its sign-in ended", async () => {
+		const ended = Date.UTC(2026, 10, 1, 7, 0);
+		const { link } = fakeLink(() => ({
+			case: "profileListResult",
+			value: {
+				selectedId: "",
+				profiles: [
+					{ id: "", email: "", signedIn: false },
+					{ id: "p2", email: "second@example.com", signedIn: false, loginExpiresAt: BigInt(ended) },
+					{ id: "p3", email: "third@example.com", signedIn: true, loginExpiresAt: BigInt(Date.now() + 86_400_000) },
+				],
+			},
+		}));
+		wrap(<ClaudeProfiles link={link} online ai="Claude Code" />);
+		const second = (await screen.findByText("second@example.com")).closest("li") as HTMLElement;
+		expect(within(second).getByText("Cần đăng nhập lại")).toBeTruthy();
+		expect(within(second).getByText(/đăng nhập đã hết hạn lúc/)).toBeTruthy();
+		expect((within(second).getByRole("button", { name: "Dùng cho phiên mới" }) as HTMLButtonElement).disabled).toBe(true);
+		expect((within(second).getByRole("button", { name: "Làm mới hạn mức" }) as HTMLButtonElement).disabled).toBe(false);
+		const third = screen.getByText("third@example.com").closest("li") as HTMLElement;
+		expect(within(third).queryByText("Cần đăng nhập lại")).toBeNull();
+		expect(within(third).getByText(/đăng nhập tới/)).toBeTruthy();
+		expect(screen.getByText("Chưa đăng nhập")).toBeTruthy();
+	});
+
 	it("removes an added account after confirming, never the default one", async () => {
 		const { link, sent } = fakeLink(() => LIST);
 		wrap(<ClaudeProfiles link={link} online ai="Claude Code" />);

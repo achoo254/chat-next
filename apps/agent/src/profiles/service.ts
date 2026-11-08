@@ -33,7 +33,10 @@ export type ProfileView = {
   email: string;
   organization: string;
   plan: string;
+  /** Signed in by claude's last report and not past loginExpiresAt; false: needs to sign in again. */
   signedIn: boolean;
+  /** Unix milliseconds; 0 when unknown. */
+  loginExpiresAt: number;
   lastUsage?: ProfileUsage;
   createdAt: number;
 };
@@ -61,6 +64,8 @@ export type ClaudeProfilesOptions = {
   urlTimeoutMs?: number;
   /** A profile's usage is read at most this often; meanwhile the last value answers. */
   usageMinIntervalMs?: number;
+  /** How long a profile's sign-in check stands before the list checks again. */
+  signInCheckMs?: number;
 };
 
 type Attempt = {
@@ -73,6 +78,8 @@ type Attempt = {
 
 const TTL_MS = 10 * 60_000;
 const USAGE_MIN_INTERVAL_MS = 30_000;
+/** How long a profile's `claude auth status` answer stands before the list asks again. */
+const SIGN_IN_CHECK_MS = 5 * 60_000;
 /** In a profile folder (beside home) while its sign-in has not finished. */
 const ATTEMPT_MARKER = "attempt";
 
@@ -84,6 +91,7 @@ export class ClaudeProfiles {
   private attempt: Attempt | undefined;
   private queue: Promise<unknown> = Promise.resolve();
   private usageInFlight = new Map<string, Promise<void>>();
+  private signInCheck: Promise<void> | undefined;
   private readonly now: () => number;
   private readonly log: (line: string) => void;
 
@@ -174,10 +182,41 @@ export class ClaudeProfiles {
     return { id: p.id, accountDir: home };
   }
 
+  /** Asks claude whether a profile is still signed in, and keeps the answer. No answer keeps the last one. */
+  private async checkSignIn(bin: string, id: string): Promise<void> {
+    const account = await readAccount(bin, this.home(id));
+    if (!account || this.store.damaged || !this.store.find(id)) return;
+    const signIn = { loggedIn: account.loggedIn, loginExpiresAt: account.loginExpiresAt, checkedAt: this.now() };
+    this.store.update((d) => {
+      const p = d.profiles.find((x) => x.id === id);
+      if (p) p.signIn = signIn;
+    });
+  }
+
+  /** Checks every added profile whose last check is older than the interval; one round at a time. */
+  private checkStaleSignIns(bin: string): Promise<void> {
+    this.signInCheck ??= (async () => {
+      const every = this.opts.signInCheckMs ?? SIGN_IN_CHECK_MS;
+      for (const p of this.store.get().profiles) {
+        if (p.signIn && this.now() - p.signIn.checkedAt < every) continue;
+        await this.checkSignIn(bin, p.id).catch(() => undefined);
+      }
+    })().finally(() => (this.signInCheck = undefined));
+    return this.signInCheck;
+  }
+
+  /** Signed in by the last check and not expired; a profile never checked counts as signed in (it was when added). */
+  private signedIn(signIn: { loggedIn: boolean; loginExpiresAt: number } | undefined): boolean {
+    if (!signIn) return true;
+    return signIn.loggedIn && !(signIn.loginExpiresAt > 0 && signIn.loginExpiresAt <= this.now());
+  }
+
+  /** The profiles as devices see them; added profiles' sign-ins are checked with claude when their last check is old. */
   async list(): Promise<ProfileList> {
     this.readable();
     const bin = await this.opts.findBinary();
     const account = bin ? await readAccount(bin, undefined) : null;
+    if (bin) await this.checkStaleSignIns(bin);
     const d = this.store.get();
     const known = d.defaultProfile;
     if (account && (known.email !== account.email || known.orgId !== account.orgId || known.orgName !== account.orgName || known.plan !== account.plan)) {
@@ -190,7 +229,8 @@ export class ClaudeProfiles {
       email: account?.loggedIn ? account.email : "",
       organization: account?.loggedIn ? account.orgName : "",
       plan: account?.loggedIn ? account.plan : "",
-      signedIn: account?.loggedIn ?? false,
+      signedIn: account ? this.signedIn(account) : false,
+      loginExpiresAt: account?.loggedIn ? account.loginExpiresAt : 0,
       createdAt: 0,
       ...(known.lastUsage ? { lastUsage: known.lastUsage } : {}),
     };
@@ -200,7 +240,8 @@ export class ClaudeProfiles {
         email: p.email,
         organization: p.orgName,
         plan: p.plan,
-        signedIn: true,
+        signedIn: this.signedIn(p.signIn),
+        loginExpiresAt: p.signIn?.loginExpiresAt ?? 0,
         createdAt: p.createdAt,
         ...(p.lastUsage ? { lastUsage: p.lastUsage } : {}),
       }),
@@ -255,7 +296,10 @@ export class ClaudeProfiles {
     const running = this.usageInFlight.get(id);
     if (running) return running;
     const run = (async () => {
-      const usage = await this.opts.probeUsage(await this.bin(), id === "" ? undefined : this.home(id));
+      const bin = await this.bin();
+      // A refresh also tells whether the profile is still signed in.
+      if (id !== "") await this.checkSignIn(bin, id);
+      const usage = await this.opts.probeUsage(bin, id === "" ? undefined : this.home(id));
       if (!usage) return;
       this.recordUsage(id, usage);
       this.opts.onUsage?.(id, usage);
@@ -397,7 +441,15 @@ export class ClaudeProfiles {
     // Marker first: a crash between the two leaves a folder nothing cleans by itself, never a kept profile deleted.
     rmSync(join(profileDir(this.opts.configDir, id), ATTEMPT_MARKER), { force: true });
     this.store.update((d) => {
-      d.profiles.push({ id, email: account.email, orgId: account.orgId, orgName: account.orgName, plan: account.plan, createdAt: this.now() });
+      d.profiles.push({
+        id,
+        email: account.email,
+        orgId: account.orgId,
+        orgName: account.orgName,
+        plan: account.plan,
+        createdAt: this.now(),
+        signIn: { loggedIn: true, loginExpiresAt: account.loginExpiresAt, checkedAt: this.now() },
+      });
     });
     this.opts.audit.write({ device, action: "profile_add", path: "", detail: account.email });
     this.log(`claude profiles: added a profile (${id.slice(0, 8)})`);

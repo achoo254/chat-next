@@ -22,7 +22,13 @@ const MESSAGES: Record<string, string> = {
 const percent = (w?: { utilization: number }) => (w ? `${w.utilization}%` : "?");
 
 function line(p: ProfileView, selected: boolean): string {
-  const who = p.signedIn ? `${p.email}${p.organization ? ` · ${p.organization}` : ""}${p.plan ? ` · ${p.plan}` : ""}` : "(not signed in)";
+  const account = `${p.email}${p.organization ? ` · ${p.organization}` : ""}${p.plan ? ` · ${p.plan}` : ""}`;
+  const expiry = p.loginExpiresAt > 0 ? ` (sign-in ${p.signedIn ? "ends" : "ended"} ${new Date(p.loginExpiresAt).toLocaleString()})` : "";
+  const who = p.signedIn
+    ? `${account}${expiry}`
+    : p.id === ""
+      ? "(not signed in)"
+      : `${account}  NEEDS TO SIGN IN AGAIN${expiry}: remove it and add it again`;
   const usage = p.lastUsage
     ? `  5h ${percent(p.lastUsage.fiveHour)}, week ${percent(p.lastUsage.sevenDay)} (at ${new Date(p.lastUsage.updatedAt).toLocaleString()})`
     : "";
@@ -32,7 +38,7 @@ function line(p: ProfileView, selected: boolean): string {
 async function list(): Promise<number> {
   const l = (await callControl(configDir(), "GET", "/claude/profiles")) as ProfileList;
   for (const p of l.profiles) console.log(line(p, p.id === l.selectedId));
-  console.log("* new sessions use this one; open sessions keep theirs until they open again.");
+  console.log("* new sessions use this one. A session that is open keeps its account; one that was closed or parked uses this one when it opens again.");
   return 0;
 }
 
@@ -69,7 +75,9 @@ async function add(): Promise<number> {
 async function select(name: string): Promise<number> {
   const id = await resolveProfile(name);
   await callControl(configDir(), "POST", "/claude/profiles/select", { id });
-  console.log(`New sessions now use ${id === "" ? "the default profile" : name}; open sessions keep theirs until they open again.`);
+  console.log(
+    `New sessions now use ${id === "" ? "the default profile" : name}. Open sessions keep their account; closed or parked ones use this one when they open again.`,
+  );
   return 0;
 }
 

@@ -16,6 +16,9 @@ const usageSchema = z.object({
   updatedAt: z.number(),
 });
 
+/** The last `claude auth status` of a profile. */
+const signInSchema = z.object({ loggedIn: z.boolean(), loginExpiresAt: z.number(), checkedAt: z.number() });
+
 const profileSchema = z.object({
   id: z.string().regex(PROFILE_ID_RE),
   email: z.string(),
@@ -24,6 +27,7 @@ const profileSchema = z.object({
   plan: z.string().default(""),
   createdAt: z.number(),
   lastUsage: usageSchema.optional(),
+  signIn: signInSchema.optional(),
 });
 
 const fileSchema = z.object({
@@ -37,6 +41,7 @@ const fileSchema = z.object({
 });
 
 export type ProfileUsage = z.infer<typeof usageSchema>;
+export type ProfileSignIn = z.infer<typeof signInSchema>;
 export type StoredProfile = z.infer<typeof profileSchema>;
 export type ProfilesFile = z.infer<typeof fileSchema>;
 
