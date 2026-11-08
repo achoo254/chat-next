@@ -206,6 +206,7 @@ export class Machine {
       openSessions: this.core.openSessions(),
       maxSessions: this.core.limit,
       memoryMb: Math.round(process.memoryUsage().rss / 1e6),
+      devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
     });
   }
 

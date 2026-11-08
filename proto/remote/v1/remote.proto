@@ -624,6 +624,16 @@ message MachineInfo {
   uint32 max_sessions = 11;
   // Resident memory of the agent and its sessions, in megabytes.
   uint32 memory_mb = 12;
+  // Devices paired with this machine, for revoking one from another device.
+  repeated PairedDevice devices = 13;
+}
+
+message PairedDevice {
+  // X25519 public key, 32 bytes (RevokeDevice takes it as is).
+  bytes public_key = 1;
+  string name = 2;
+  // Unix milliseconds.
+  int64 added_at = 3;
 }
 
 message DirListResult {

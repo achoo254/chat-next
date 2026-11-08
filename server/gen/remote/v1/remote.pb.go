@@ -5193,7 +5193,9 @@ type MachineInfo struct {
 	OpenSessions    uint32                 `protobuf:"varint,10,opt,name=open_sessions,json=openSessions,proto3" json:"open_sessions,omitempty"`
 	MaxSessions     uint32                 `protobuf:"varint,11,opt,name=max_sessions,json=maxSessions,proto3" json:"max_sessions,omitempty"`
 	// Resident memory of the agent and its sessions, in megabytes.
-	MemoryMb      uint32 `protobuf:"varint,12,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
+	MemoryMb uint32 `protobuf:"varint,12,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
+	// Devices paired with this machine, for revoking one from another device.
+	Devices       []*PairedDevice `protobuf:"bytes,13,rep,name=devices,proto3" json:"devices,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5312,6 +5314,75 @@ func (x *MachineInfo) GetMemoryMb() uint32 {
 	return 0
 }
 
+func (x *MachineInfo) GetDevices() []*PairedDevice {
+	if x != nil {
+		return x.Devices
+	}
+	return nil
+}
+
+type PairedDevice struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// X25519 public key, 32 bytes (RevokeDevice takes it as is).
+	PublicKey []byte `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	Name      string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Unix milliseconds.
+	AddedAt       int64 `protobuf:"varint,3,opt,name=added_at,json=addedAt,proto3" json:"added_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PairedDevice) Reset() {
+	*x = PairedDevice{}
+	mi := &file_remote_v1_remote_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PairedDevice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PairedDevice) ProtoMessage() {}
+
+func (x *PairedDevice) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PairedDevice.ProtoReflect.Descriptor instead.
+func (*PairedDevice) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *PairedDevice) GetPublicKey() []byte {
+	if x != nil {
+		return x.PublicKey
+	}
+	return nil
+}
+
+func (x *PairedDevice) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PairedDevice) GetAddedAt() int64 {
+	if x != nil {
+		return x.AddedAt
+	}
+	return 0
+}
+
 type DirListResult struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Path    string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -5325,7 +5396,7 @@ type DirListResult struct {
 
 func (x *DirListResult) Reset() {
 	*x = DirListResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[62]
+	mi := &file_remote_v1_remote_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5337,7 +5408,7 @@ func (x *DirListResult) String() string {
 func (*DirListResult) ProtoMessage() {}
 
 func (x *DirListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[62]
+	mi := &file_remote_v1_remote_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5350,7 +5421,7 @@ func (x *DirListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirListResult.ProtoReflect.Descriptor instead.
 func (*DirListResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{62}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *DirListResult) GetPath() string {
@@ -5393,7 +5464,7 @@ type DirEntry struct {
 
 func (x *DirEntry) Reset() {
 	*x = DirEntry{}
-	mi := &file_remote_v1_remote_proto_msgTypes[63]
+	mi := &file_remote_v1_remote_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5405,7 +5476,7 @@ func (x *DirEntry) String() string {
 func (*DirEntry) ProtoMessage() {}
 
 func (x *DirEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[63]
+	mi := &file_remote_v1_remote_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5418,7 +5489,7 @@ func (x *DirEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirEntry.ProtoReflect.Descriptor instead.
 func (*DirEntry) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{63}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *DirEntry) GetName() string {
@@ -5458,7 +5529,7 @@ type AuditListResult struct {
 
 func (x *AuditListResult) Reset() {
 	*x = AuditListResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[64]
+	mi := &file_remote_v1_remote_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5470,7 +5541,7 @@ func (x *AuditListResult) String() string {
 func (*AuditListResult) ProtoMessage() {}
 
 func (x *AuditListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[64]
+	mi := &file_remote_v1_remote_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5483,7 +5554,7 @@ func (x *AuditListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuditListResult.ProtoReflect.Descriptor instead.
 func (*AuditListResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{64}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *AuditListResult) GetEntries() []*AuditEntry {
@@ -5508,7 +5579,7 @@ type AuditEntry struct {
 
 func (x *AuditEntry) Reset() {
 	*x = AuditEntry{}
-	mi := &file_remote_v1_remote_proto_msgTypes[65]
+	mi := &file_remote_v1_remote_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5520,7 +5591,7 @@ func (x *AuditEntry) String() string {
 func (*AuditEntry) ProtoMessage() {}
 
 func (x *AuditEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[65]
+	mi := &file_remote_v1_remote_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5533,7 +5604,7 @@ func (x *AuditEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuditEntry.ProtoReflect.Descriptor instead.
 func (*AuditEntry) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{65}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *AuditEntry) GetAt() int64 {
@@ -5901,7 +5972,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vlogin_state\x18\x04 \x01(\x0e2\x15.remote.v1.LoginStateR\n" +
 	"loginState\x12C\n" +
 	"\fcapabilities\x18\x05 \x01(\v2\x1f.remote.v1.ProviderCapabilitiesR\fcapabilities\x12)\n" +
-	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\x87\x03\n" +
+	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\xba\x03\n" +
 	"\vMachineInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x12\n" +
@@ -5917,7 +5988,13 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\ropen_sessions\x18\n" +
 	" \x01(\rR\fopenSessions\x12!\n" +
 	"\fmax_sessions\x18\v \x01(\rR\vmaxSessions\x12\x1b\n" +
-	"\tmemory_mb\x18\f \x01(\rR\bmemoryMb\"\x88\x01\n" +
+	"\tmemory_mb\x18\f \x01(\rR\bmemoryMb\x121\n" +
+	"\adevices\x18\r \x03(\v2\x17.remote.v1.PairedDeviceR\adevices\"\\\n" +
+	"\fPairedDevice\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x01 \x01(\fR\tpublicKey\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
+	"\badded_at\x18\x03 \x01(\x03R\aaddedAt\"\x88\x01\n" +
 	"\rDirListResult\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12-\n" +
 	"\aentries\x18\x02 \x03(\v2\x13.remote.v1.DirEntryR\aentries\x12\x16\n" +
@@ -6029,7 +6106,7 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 }
 
 var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),      // 0: remote.v1.HandshakeErrorCode
 	(Decision)(0),                // 1: remote.v1.Decision
@@ -6104,10 +6181,11 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(*ModelOption)(nil),          // 70: remote.v1.ModelOption
 	(*ProviderInfo)(nil),         // 71: remote.v1.ProviderInfo
 	(*MachineInfo)(nil),          // 72: remote.v1.MachineInfo
-	(*DirListResult)(nil),        // 73: remote.v1.DirListResult
-	(*DirEntry)(nil),             // 74: remote.v1.DirEntry
-	(*AuditListResult)(nil),      // 75: remote.v1.AuditListResult
-	(*AuditEntry)(nil),           // 76: remote.v1.AuditEntry
+	(*PairedDevice)(nil),         // 73: remote.v1.PairedDevice
+	(*DirListResult)(nil),        // 74: remote.v1.DirListResult
+	(*DirEntry)(nil),             // 75: remote.v1.DirEntry
+	(*AuditListResult)(nil),      // 76: remote.v1.AuditListResult
+	(*AuditEntry)(nil),           // 77: remote.v1.AuditEntry
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
 	12, // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
@@ -6139,8 +6217,8 @@ var file_remote_v1_remote_proto_depIdxs = []int32{
 	50, // 26: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
 	72, // 27: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
 	41, // 28: remote.v1.Frame.pong:type_name -> remote.v1.Pong
-	73, // 29: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
-	75, // 30: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
+	74, // 29: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
+	76, // 30: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
 	36, // 31: remote.v1.Frame.ack:type_name -> remote.v1.Ack
 	42, // 32: remote.v1.Frame.error:type_name -> remote.v1.Error
 	37, // 33: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
@@ -6192,13 +6270,14 @@ var file_remote_v1_remote_proto_depIdxs = []int32{
 	10, // 79: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
 	69, // 80: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
 	71, // 81: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
-	74, // 82: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
-	76, // 83: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
-	84, // [84:84] is the sub-list for method output_type
-	84, // [84:84] is the sub-list for method input_type
-	84, // [84:84] is the sub-list for extension type_name
-	84, // [84:84] is the sub-list for extension extendee
-	0,  // [0:84] is the sub-list for field type_name
+	73, // 82: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
+	75, // 83: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
+	77, // 84: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
+	85, // [85:85] is the sub-list for method output_type
+	85, // [85:85] is the sub-list for method input_type
+	85, // [85:85] is the sub-list for extension type_name
+	85, // [85:85] is the sub-list for extension extendee
+	0,  // [0:85] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -6269,7 +6348,7 @@ func file_remote_v1_remote_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
 			NumEnums:      11,
-			NumMessages:   66,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
