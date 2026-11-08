@@ -1,5 +1,6 @@
 // The background service with only its tunnel and MCP side (no chat machine),
 // for tests that drive it from other real processes (node or bun).
+import { writeFileSync } from "node:fs";
 import { configDir } from "../../src/config.ts";
 import { serveControl } from "../../src/control-socket.ts";
 import { McpHost } from "../../src/mcp/mcp-host.ts";
@@ -12,6 +13,8 @@ const tunnels = new TunnelService(dir);
 const remoteApps = process.env.TUNELO_TEST_REMOTE_APPS;
 const remote = remoteApps ? fakeRemote(JSON.parse(remoteApps) as Record<string, { url: string; token: string }>) : undefined;
 const mcp = new McpHost(dir, remote ? { remote } : {});
+// Tests that act as a claude session of tunelo read its ticket here.
+if (process.env.TUNELO_TEST_TICKET_FILE) writeFileSync(process.env.TUNELO_TEST_TICKET_FILE, mcp.tickets.issue("test-session"), { mode: 0o600 });
 
 function fakeRemote(apps: Record<string, { url: string; token: string }>): RemoteProxy {
 	const app = (name: string) => {
@@ -23,6 +26,7 @@ function fakeRemote(apps: Record<string, { url: string; token: string }>): Remot
 		endpoint: (name) => app(name).url,
 		token: async (name) => app(name).token,
 		forget: async () => undefined,
+		account: () => "test",
 	});
 }
 const timeout = Number(process.env.TUNELO_TEST_STREAM_TIMEOUT_MS);

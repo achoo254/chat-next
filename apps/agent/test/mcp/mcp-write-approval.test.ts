@@ -6,7 +6,7 @@
 import { Decision, PromptState, TurnState } from "@achoo254/chat-proto/remote/remote";
 import type { HookCallbackMatcher, Options, PermissionUpdate, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it } from "vitest";
-import type { AgentCore } from "../../src/core/agent-core.ts";
+import type { AgentCore, CoreOptions } from "../../src/core/agent-core.ts";
 import { createClaudeProvider, writeApprovalHook } from "../../src/providers/claude/index.ts";
 import { Channel } from "../../src/util/channel.ts";
 import { byCase, makeCore, until } from "../harness.ts";
@@ -107,11 +107,11 @@ function fakeClaude(mode: string, allowRules: string[]) {
 }
 
 /** Runs `calls` in one thread, answering every card with `answer`; returns how many cards came. */
-async function run(mode: string, allowRules: string[], calls: [string, Record<string, unknown>][], answer = Decision.ALLOW) {
+async function run(mode: string, allowRules: string[], calls: [string, Record<string, unknown>][], answer = Decision.ALLOW, sessionMcp?: CoreOptions["sessionMcp"]) {
   const claude = fakeClaude(mode, allowRules);
   const provider = createClaudeProvider({ query: claude.fn, findBinary: async () => "claude" });
   provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
-  const { core, work } = makeCore([provider]);
+  const { core, work } = makeCore([provider], sessionMcp ? { sessionMcp } : {});
   const answered = new Set<string>();
   const answerCards = (c: AgentCore, threadId: string) => {
     for (const card of byCase(c.snapshot(threadId), "approval")) {
@@ -136,9 +136,9 @@ async function run(mode: string, allowRules: string[], calls: [string, Record<st
     await until(core, t.id, turns(++done));
   }
   off();
-  const cards = byCase(core.snapshot(t.id), "approval").length;
+  const approvals = byCase(core.snapshot(t.id), "approval");
   await core.stop();
-  return { cards, ran: claude.ran, options: claude.options };
+  return { cards: approvals.length, summaries: approvals.map((a) => a.body.value.summary), reasons: approvals.map((a) => a.body.value.reason), ran: claude.ran, options: claude.options };
 }
 
 const SEND: [string, Record<string, unknown>] = ["mcp__tunelo__chat_send_message", { chat_id: 7, text: "test" }];
@@ -180,5 +180,44 @@ describe("write tools in a session", () => {
     const r = await run("auto", ["mcp__tunelo__*"], [SEND], Decision.DENY);
     expect(r.cards).toBe(1);
     expect(r.ran).toEqual([]);
+  });
+
+  describe("with tunelo's MCP in the session", () => {
+    function lease() {
+      const approved: [string, Record<string, unknown>][] = [];
+      const sessionMcp: CoreOptions["sessionMcp"] = () => ({
+        ticket: "ticket-1",
+        configDir: "/tmp/tunelo",
+        approveWrite: (name, input) => approved.push([name, input]),
+        describeWrite: async (name) => (name.endsWith("chat_send_message") ? "Send to «Team» (12 members): test" : undefined),
+        release: () => undefined,
+      });
+      return { approved, sessionMcp };
+    }
+
+    it("an approved card lets the service run that exact call; the card names the chat", async () => {
+      const { approved, sessionMcp } = lease();
+      const r = await run("auto", ["mcp__tunelo__*"], [SEND], Decision.ALLOW, sessionMcp);
+      expect(r.summaries).toEqual(["Send to «Team» (12 members): test"]);
+      expect(approved).toEqual([SEND]);
+    });
+
+    it("a refused card approves nothing", async () => {
+      const { approved, sessionMcp } = lease();
+      await run("default", [], [SEND], Decision.DENY, sessionMcp);
+      expect(approved).toEqual([]);
+    });
+
+    it("reads and other tools approve nothing in the service", async () => {
+      const { approved, sessionMcp } = lease();
+      await run("default", [], [["mcp__tunelo__chat_get_messages", { chat_id: 7 }], ["Bash", { command: "ls" }]], Decision.ALLOW, sessionMcp);
+      expect(approved).toEqual([]);
+    });
+
+    it("says when the input on the card is cut", async () => {
+      const { sessionMcp } = lease();
+      const r = await run("default", [], [["mcp__tunelo__chat_send_message", { chat_id: 7, text: "x".repeat(5000) }]], Decision.ALLOW, sessionMcp);
+      expect(r.reasons[0]).toMatch(/cut: \d+ characters in all/);
+    });
   });
 });

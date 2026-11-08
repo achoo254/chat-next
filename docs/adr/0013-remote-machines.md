@@ -54,11 +54,42 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 
 ## MCP của tunelo trong phiên claude (09/11/2026)
 
-- Phiên claude do tunelo mở có MCP `tunelo` (stdio, chính file chạy `tunelo mcp`, biến `TUNELO_MCP_TICKET` là vé 256 bit của phiên, hết khi phiên đóng). Ba nhóm tool, danh sách tĩnh ở `apps/agent/src/mcp/groups.ts`: `tunnel` (11 tool của CLI Tunelo 1.x, chạy trong dịch vụ), `chat` (`chat_list_chats`, `chat_get_messages`, `chat_search_messages`, …, ghi: `chat_send_message`), `localman` (`localman_list_collections`, `localman_list_history`, `localman_list_machines`, …, ghi: `localman_send_request`). Localman không có tool chạy cả collection; chạy từng request bằng `localman_send_request`.
-- `tunelo mcp` và claude không cầm token. Mọi lời gọi qua kênh điều khiển (`POST /mcp/call`); dịch vụ kiểm vé, kiểm tool nằm trong danh sách của nhóm, gắn Bearer của đúng app (`https://chat.<miền>/mcp`, `https://localman.<miền>/mcp`, cũng là `aud` của token), gọi MCP của app (`mcp/remote-proxy.ts`, danh sách tool lưu 10 phút; 401 làm mới token một lần; thiếu scope thì báo chạy lại `tunelo login`) và chỉ trả nội dung tool, có cắt mọi token đã gửi nếu server lỡ trả lại. Không có vé (`claude mcp add tunelo -- tunelo mcp` ở phiên ngoài tunelo): dùng quyền người dùng cục bộ, cùng danh sách tool; vé đã hết bị từ chối. Mỗi lời gọi ghi một dòng vào `agent.log` (phiên, nhóm, tool, kết quả; không ghi tham số).
-- Tool ghi (`chat_send_message`, `localman_send_request`, mở/đóng tunnel, dừng tiến trình tunnel, thu hồi liên kết) theo chế độ quyền của phiên (quyết định A): hook `PreToolUse` trả `ask` ở default, acceptEdits, plan, auto, kể cả khi có luật allow `mcp__tunelo__*`, nên thiết bị luôn thấy đúng một thẻ cho mỗi lần gửi. Tool hai bước (`revoke_linked_machine`) chỉ hỏi ở lượt mang `confirm_token`, lượt xem trước không hỏi. "Cho phép cả phiên" không thêm luật cho tool ghi. Ở `bypassPermissions` (chỉ có khi cấu hình claude của chính máy khởi động phiên ở đó) tool ghi chạy không thẻ.
-- Rủi ro prompt injection: nội dung claude đọc từ Chat (tin của người khác), Localman (response của request) hay file dự án có thể dụ claude gửi tin thay người dùng hoặc gửi request tới `localhost` của máy. Ở default/acceptEdits/auto thẻ duyệt chặn được, người dùng phải đọc thẻ (nội dung, `chat_id`, URL). Ở `bypassPermissions` không có gì chặn: người dùng chọn chấp nhận rủi ro này khi tự đặt máy ở chế độ đó. Còn lại để tra soát: nhật ký trong `agent.log` và lịch sử của chính Chat/Localman.
-- Tắt: `sessionMcp: false` trong `config.json` của tunelo (phiên mới không có MCP `tunelo`), `mcpGroups` giới hạn nhóm phục vụ trên máy.
+- Phiên claude do tunelo mở có MCP `tunelo` (stdio, chính file chạy `tunelo mcp`). Có ba nhóm tool, khai báo trong danh sách tĩnh `apps/agent/src/mcp/groups.ts`:
+  - `tunnel`: 11 tool của CLI Tunelo 1.x, chạy trong dịch vụ.
+  - `chat`: `chat_list_chats`, `chat_get_messages`, `chat_search_messages`, …; tool ghi `chat_send_message`.
+  - `localman`: `localman_list_collections`, `localman_list_history`, `localman_list_machines`, …; tool ghi `localman_send_request`.
+  - Localman không có tool chạy cả collection.
+- `tunelo mcp` và claude không cầm token:
+  - Mọi lời gọi đi qua kênh điều khiển (`POST /mcp/call`). Dịch vụ kiểm tool có trong danh sách của nhóm, gắn Bearer của đúng app (`https://chat.<miền>/mcp`, `https://localman.<miền>/mcp`; đây cũng là `aud` của token), rồi gọi MCP của app (`mcp/remote-proxy.ts`).
+  - Danh sách tool được nhớ 10 phút theo tài khoản; lỗi liệt kê được nhớ 30 giây. Gặp 401 thì làm mới đúng token bị từ chối, một lần. Thiếu scope thì báo chạy lại `tunelo login`.
+  - Mọi chuỗi rời phía MCP đều qua một hàm che (`mcp/redact.ts`): kết quả, lỗi, danh sách tool, stderr của `tunelo mcp`, lỗi của kênh điều khiển, log. Hàm này bỏ token đã gửi, mọi chuỗi dạng JWT và `Bearer …`, kể cả khi server hay proxy đứng trước nó chép lại header.
+  - Mỗi lời gọi ghi một dòng vào `agent.log`: phiên, nhóm, tool, kết quả. Không ghi tham số.
+- Vé `TUNELO_MCP_TICKET` (256 bit, mỗi phiên một vé, hết khi phiên đóng) **chỉ là định danh phiên, không phải bí mật**:
+  - claude nhận vé qua argv (`--mcp-config`), nên mọi tiến trình cùng user đọc được vé, kể cả Bash trong chính phiên.
+  - Vé đã hết bị từ chối.
+- **Quyền ghi nằm ở lần cấp duyệt, giữ trong dịch vụ** (`mcp/write-approvals.ts`):
+  - Tool ghi gồm `chat_send_message`, `localman_send_request`, mở/đóng tunnel, dừng tiến trình tunnel, và lượt có `confirm_token` của `revoke_linked_machine`.
+  - Khi người dùng duyệt thẻ của tool ghi trên thiết bị, `canUseTool` (chạy trong dịch vụ) cấp một lần cho phép gắn với vé, tool và hash tham số. Lần cấp dùng được một lần, sống 60 giây.
+  - Dịch vụ chỉ chạy tool ghi của một phiên có vé khi tiêu được đúng lần cấp đó. Ngoại lệ duy nhất là phiên đang ở `bypassPermissions`, chế độ chỉ có khi cấu hình claude của chính máy khởi động ở đó.
+  - Vì vậy Bash trong phiên lấy được vé (qua `ps`, hoặc đọc `control.json` rồi gọi socket) vẫn không gửi được tin hay request.
+- Hook `PreToolUse` trả `ask` cho tool ghi ở default, acceptEdits, plan, auto, kể cả khi có luật allow `mcp__tunelo__*`; ở `bypassPermissions` thì không can thiệp:
+  - Đã thử với claude 2.1.319: hook `allow` trong settings không thắng `ask` của tunelo, `canUseTool` vẫn được gọi. Lỡ có cách gộp khác, tool ghi vẫn không chạy khi chưa có lần cấp.
+  - Thẻ duyệt hiện người nhận theo tên cuộc trò chuyện (lấy bằng `get_chat`, lỗi thì hiện `chat <id>`) kèm 300 ký tự đầu của tin; với request thì hiện `METHOD URL`. Input dài hơn 4000 ký tự thì thẻ ghi rõ đã bị cắt.
+  - "Cho phép cả phiên" không thêm luật cho tool ghi.
+  - Server MCP nào trong cấu hình máy chạy `tunelo mcp` dưới tên khác đều bị bỏ khỏi phiên có MCP `tunelo`.
+- Lời gọi không vé (`claude mcp add tunelo -- tunelo mcp` ở phiên ngoài tunelo, hay bất kỳ tiến trình cùng user nào đọc `control.json`) hiện dùng quyền người dùng cục bộ, cùng danh sách tool. Việc có cho lời gọi không vé dùng tool ghi hay không đang chờ người dùng chốt; code có sẵn chỗ cho một cờ (`McpHost` option `localWrites`).
+- Rủi ro prompt injection:
+  - Nội dung claude đọc từ Chat (tin của người khác), Localman (response) hay file dự án có thể dụ claude gửi tin thay người dùng hoặc gửi request tới `localhost` của máy.
+  - Ở default/acceptEdits/auto, lần cấp duyệt chặn được cả lời gọi tool lẫn đường qua Bash có vé. Người dùng vẫn phải đọc thẻ: người nhận, nội dung, URL.
+  - Còn hở:
+    - Lời gọi không vé, như trên.
+    - Bash tự gửi request mạng bằng thông tin đăng nhập riêng của nó (ngoài tunelo).
+    - `bypassPermissions`: không có gì chặn. Người dùng chấp nhận rủi ro này khi tự đặt máy ở chế độ đó.
+- Dữ liệu nhạy cảm đi vào context:
+  - `localman_list_history`, `localman_get_history_entry`, `localman_send_request` có thể trả header của những request người dùng từng gửi.
+  - Dịch vụ che giá trị của các header nhạy cảm trước khi trả về: `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, …
+  - Thân request/response và header tên lạ vẫn có thể chứa khoá API, và sẽ vào context claude (rồi lên Anthropic). Localman MCP nên tự che ở phía server.
+- Tắt: trong `config.json` của tunelo, `sessionMcp: false` thì phiên mới không có MCP `tunelo`; `mcpGroups` giới hạn các nhóm được phục vụ trên máy.
 
 ## Thử khả thi (08/11/2026)
 

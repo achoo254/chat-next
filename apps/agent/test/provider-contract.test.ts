@@ -283,7 +283,7 @@ describe("tunelo's MCP in a claude session", () => {
     const { core, work } = makeCore([provider], {
       sessionMcp: (threadId) => {
         ticket = tickets.issue(threadId);
-        return { ticket, configDir: "/tmp/tunelo-config", release: () => tickets.revoke(ticket) };
+        return { ticket, configDir: "/tmp/tunelo-config", approveWrite: () => undefined, describeWrite: async () => undefined, release: () => tickets.revoke(ticket) };
       },
     });
     const t = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" });

@@ -25,6 +25,8 @@ export type ProviderCapabilities = {
   effortLevels: string[];
   /** Permission modes a device may pick; never one that skips every prompt. */
   permissionModes: string[];
+  /** Sessions take tunelo's own MCP (and its ticket). */
+  sessionMcp?: boolean;
 };
 
 export type LoginState = "ok" | "needs-login" | "unknown";

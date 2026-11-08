@@ -486,6 +486,11 @@ export class AgentCore {
   }
 
   /** Modes a device may pick: the AI's safe ones, plus bypass only when the machine itself starts there. */
+  /** The permission mode the thread's session reported last; undefined for an unknown thread. */
+  permissionMode(threadId: string): string | undefined {
+    return this.threads.get(threadId)?.info.permissionMode;
+  }
+
   private permissionModes(t: Thread): string[] {
     const modes = [...this.provider(t.meta.provider).capabilities.permissionModes];
     if (t.meta.machineMode === "bypassPermissions") modes.push("bypassPermissions");
@@ -590,8 +595,8 @@ export class AgentCore {
       ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
     };
     // Its ticket lives as long as this session.
-    const lease = this.opts.sessionMcp?.(t.meta.id);
-    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir } } : policy;
+    const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
+    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite } } : policy;
     t.modeUnseen = true;
     t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {

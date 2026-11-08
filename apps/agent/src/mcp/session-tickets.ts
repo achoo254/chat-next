@@ -6,11 +6,15 @@
  */
 import { randomBytes } from "node:crypto";
 
-/** What a session needs to start tunelo's MCP. */
+/** What a session needs to start tunelo's MCP, and to have its writes approved. */
 export interface SessionMcp {
 	ticket: string;
 	/** tunelo's config folder, for the `tunelo mcp` the session starts. */
 	configDir: string;
+	/** The user approved this call of a write tool on the device: the service lets it run once. */
+	approveWrite(claudeName: string, input: Record<string, unknown>): void;
+	/** One line for a write's approval card (recipient, URL); undefined to keep the default. */
+	describeWrite(claudeName: string, input: Record<string, unknown>): Promise<string | undefined>;
 }
 
 /** A session's MCP, with the end of its ticket (when the session ends). */

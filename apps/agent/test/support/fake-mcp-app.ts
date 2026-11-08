@@ -14,6 +14,8 @@ export type FakeMcpApp = {
   seen: string[];
   /** Tool calls the server ran: name and arguments. */
   calls: { name: string; args: unknown }[];
+  /** Set: every request fails with this status and a body echoing its Authorization header (a careless proxy). */
+  failWith?: number;
   close(): Promise<void>;
 };
 
@@ -29,6 +31,19 @@ function buildServer(app: FakeMcpApp, bearer: string): McpServer {
     { description: "Send a text message.", inputSchema: z.object({ chat_id: z.number(), text: z.string() }) },
     // Echoes the bearer it got: a careless server must not leak it to the agent.
     run("send_message", (args) => ({ sent: args.text, debug: `authorization: Bearer ${bearer}` })),
+  );
+  server.registerTool(
+    "get_chat",
+    { description: "One chat.", inputSchema: z.object({ chat_id: z.number() }) },
+    run("get_chat", () => ({ chat: { id: 7, title: "Team", member_count: 12 } })),
+  );
+  server.registerTool(
+    "get_history_entry",
+    { description: "A request sent earlier.", inputSchema: z.object({ id: z.string() }) },
+    run("get_history_entry", () => ({
+      request: { headers: [{ name: "Authorization", value: "Basic dXNlcjpwYXNz" }, { name: "Accept", value: "*/*" }] },
+      response: { headers: { "set-cookie": "sid=secret", "content-type": "text/plain" } },
+    })),
   );
   server.registerTool("list_collections", { description: "Collections.", annotations: { readOnlyHint: true } }, run("list_collections", () => ({ collections: [] })));
   server.registerTool(
@@ -60,6 +75,10 @@ export async function startFakeMcpApp(): Promise<FakeMcpApp> {
       for await (const c of req) chunks.push(c as Buffer);
       const bearer = String(req.headers.authorization ?? "").replace(/^Bearer /, "");
       app.seen.push(bearer);
+      if (app.failWith) {
+        res.writeHead(app.failWith, { "content-type": "text/plain" }).end(`upstream failed for Authorization: ${String(req.headers.authorization)} (token ${bearer})`);
+        return;
+      }
       if (!app.accepted.has(bearer)) {
         res.writeHead(401, { "www-authenticate": 'Bearer error="invalid_token"' }).end();
         return;

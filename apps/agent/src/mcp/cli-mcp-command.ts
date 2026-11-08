@@ -18,6 +18,7 @@ import { LocalTunnels } from "./local-tunnels.js";
 import { type McpContext, createMcpContext } from "./mcp-context.js";
 import type { OfferedTool } from "./mcp-host.ts";
 import { failure } from "./mcp-result.js";
+import { redactMessage } from "./redact.js";
 import { TICKET_ENV } from "./session-tickets.js";
 
 const NOT_RUNNING =
@@ -116,10 +117,10 @@ async function offeredTools(dir: string, context: McpContext): Promise<OfferedTo
 			context.log("Chat and Localman tools left out: tunelo did not list them in time");
 			return [];
 		}
-		for (const gap of answer.unavailable ?? []) context.log(`${gap.group} tools left out: ${gap.reason}`);
+		for (const gap of answer.unavailable ?? []) context.log(redactMessage(`${gap.group} tools left out: ${gap.reason}`));
 		return answer.tools ?? [];
 	} catch (err) {
-		context.log(`Chat and Localman tools left out: ${err instanceof Error ? err.message : String(err)}`);
+		context.log(redactMessage(`Chat and Localman tools left out: ${err instanceof Error ? err.message : String(err)}`));
 		return [];
 	} finally {
 		clearTimeout(timer);
@@ -167,7 +168,7 @@ export function registerMcpCommand(program: Command): void {
 				} catch (err) {
 					const message = err instanceof Error ? err.message : String(err);
 					return failure(
-						new Error(message.startsWith("tunelo is not running") ? NOT_RUNNING : message),
+						new Error(message.startsWith("tunelo is not running") ? NOT_RUNNING : redactMessage(message)),
 					);
 				}
 			};

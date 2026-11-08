@@ -77,8 +77,11 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   }
   await importLegacySignIns(dir);
   const config = new ConfigStore(dir);
-  const mcp = new McpHost(dir, { log, enabledGroups: () => config.get().mcpGroups });
+  // A session's writes need the device's approval, except in bypassPermissions (set on the machine only).
+  let sessionMode: (threadId: string) => string | undefined = () => undefined;
+  const mcp = new McpHost(dir, { log, enabledGroups: () => config.get().mcpGroups, sessionMode: (threadId) => sessionMode(threadId) });
   const machine = new Machine({ config, mcp });
+  sessionMode = (threadId) => machine.core.permissionMode(threadId);
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;
   const port = await machine.start(portArg ? Number(portArg) : undefined);

@@ -120,6 +120,23 @@ describe("identity session", () => {
 		expect(statSync(join(dir, SESSION_FILE)).mode & 0o777).toBe(0o600);
 	});
 
+	test("forgetting a refused access token refreshes it, but never drops a newer one", async () => {
+		const fake = rotatingRefresh();
+		const session = new IdentitySession(dir, deps(fake.refresh));
+		await signedIn(session, NOW + 10 * 60_000);
+		await session.forgetAccessToken(TUNNEL, "at-other");
+		expect(await session.getAccessToken(TUNNEL)).toBe("at-old");
+		expect(fake.used).toEqual([]);
+		await session.forgetAccessToken(TUNNEL, "at-old");
+		const fresh = await session.getAccessToken(TUNNEL);
+		expect(fresh).not.toBe("at-old");
+		expect(fake.used).toHaveLength(1);
+		// A second caller still holding the refused token forgets nothing more.
+		await session.forgetAccessToken(TUNNEL, "at-old");
+		expect(await session.getAccessToken(TUNNEL)).toBe(fresh);
+		expect(fake.used).toHaveLength(1);
+	});
+
 	test("a token that is still valid is used as is", async () => {
 		const fake = rotatingRefresh();
 		const session = new IdentitySession(dir, deps(fake.refresh));

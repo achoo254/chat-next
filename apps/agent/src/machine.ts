@@ -325,6 +325,12 @@ export function sessionMcpFor(mcp: McpHost, config: ConfigStore): (threadId: str
     const ticket = mcp.tickets.issue(threadId);
     // The Chat and Localman tool lists, ready by the time claude asks for them.
     mcp.warm();
-    return { ticket, configDir: config.dir, release: () => mcp.tickets.revoke(ticket) };
+    return {
+      ticket,
+      configDir: config.dir,
+      approveWrite: (claudeName, input) => mcp.approve(ticket, claudeName, input),
+      describeWrite: (claudeName, input) => mcp.describeWrite(claudeName, input),
+      release: () => mcp.release(ticket),
+    };
   };
 }

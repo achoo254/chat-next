@@ -100,6 +100,8 @@ export interface ToolGroup {
 	allowedTools: readonly string[];
 	writeTools: readonly string[];
 	twoStepTools: readonly string[];
+	/** Tools whose results may carry the headers of the user's own requests: their secret values are hidden. */
+	maskHeaderTools?: readonly string[];
 	/** Tools run in the service itself; absent for a group served by its app's MCP server. */
 	register?: (tools: ToolRegistrar, session: McpSession) => void;
 }
@@ -167,6 +169,7 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
 		],
 		writeTools: ["send_request"],
 		twoStepTools: [],
+		maskHeaderTools: ["list_history", "get_history_entry", "send_request"],
 	},
 ];
 
@@ -206,17 +209,22 @@ export function isWriteTool(claudeName: string): boolean {
 }
 
 /**
- * Whether this call of a claude tool acts for the user and so needs the
- * user's approval: a write tool, and for a two-step tool only the call that
- * carries the `confirm_token` (the dry run before it changes nothing, so
- * the user is asked once).
+ * Whether this call acts for the user (and so needs the user's approval):
+ * a write tool, and for a two-step tool only the call that carries the
+ * `confirm_token` (the dry run before it changes nothing, so the user is
+ * asked once).
  */
-export function needsApproval(claudeName: string, input: unknown): boolean {
-	const found = sessionTool(claudeName);
-	if (!found || !found.group.writeTools.includes(found.tool)) return false;
-	if (!found.group.twoStepTools.includes(found.tool)) return true;
+export function actsForUser(group: ToolGroup, tool: string, input: unknown): boolean {
+	if (!group.writeTools.includes(tool)) return false;
+	if (!group.twoStepTools.includes(tool)) return true;
 	const token = (input as { confirm_token?: unknown } | null)?.confirm_token;
 	return typeof token === "string" && token !== "";
+}
+
+/** actsForUser, for a claude tool name. */
+export function needsApproval(claudeName: string, input: unknown): boolean {
+	const found = sessionTool(claudeName);
+	return found !== undefined && actsForUser(found.group, found.tool, input);
 }
 
 /** The tools of every group served in the service, for one session. */

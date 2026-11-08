@@ -67,6 +67,7 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   // bypassPermissions and dontAsk are left out: a device may only return to
   // bypass when the machine's own settings start sessions in it.
   permissionModes: ["default", "acceptEdits", "plan", "auto"],
+  sessionMcp: true,
 };
 
 /** The CLI's account report, without any token source. */
@@ -134,6 +135,24 @@ export function sessionMcpServer(mcp: SessionMcp): McpServerConfig {
   return { type: "stdio", command, args, env: { [TICKET_ENV]: mcp.ticket, TUNELO_HOME: mcp.configDir } };
 }
 
+/** How much of a tool's input an approval card shows. */
+const CARD_INPUT_CHARS = 4000;
+
+/**
+ * The machine's MCP servers without any that runs `tunelo mcp` under
+ * another name: the session has tunelo's own, whose writes are guarded.
+ */
+export function withoutTuneloMcp(servers: Record<string, unknown>): NonNullable<Options["mcpServers"]> {
+  const runsTunelo = (config: unknown): boolean => {
+    const { command, args } = (config ?? {}) as { command?: unknown; args?: unknown };
+    if (typeof command !== "string" || !Array.isArray(args) || !args.includes("mcp")) return false;
+    // Either separator: a config may name a Windows path.
+    const name = (command.split(/[\\/]/).pop() ?? "").toLowerCase().replace(/\.exe$/, "");
+    return name === "tunelo" || command === process.execPath;
+  };
+  return Object.fromEntries(Object.entries(servers).filter(([, config]) => !runsTunelo(config))) as NonNullable<Options["mcpServers"]>;
+}
+
 const WRITE_APPROVAL_REASON = "It acts as you in Chat, Localman or on the internet: tunelo asks you every time.";
 
 /**
@@ -181,18 +200,25 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     const paths = [...toolPaths(input), ...(opts.blockedPath ? [opts.blockedPath] : [])];
     const command = typeof input.command === "string" ? input.command : "";
     const sensitive = paths.some(policy.isSensitive) || (command !== "" && mentionsSensitive(command, policy.isSensitive, { cwd: policy.dir }));
+    // A write of tunelo's MCP: the card names what it does, and the service runs it only once approved here.
+    const write = policy.sessionMcp && needsApproval(toolName, input) ? policy.sessionMcp : undefined;
+    const summary = (write && (await write.describeWrite(toolName, input).catch(() => undefined))) || toolSummary(toolName, input, policy.dir);
+    const full = JSON.stringify(input);
+    const cut = full.length > CARD_INPUT_CHARS ? `The input shown is cut: ${full.length} characters in all.` : "";
+    const reason = [opts.decisionReason ?? "", cut].filter(Boolean).join(" ");
     const req = {
       kind: "approval" as const,
       toolId: opts.toolUseID ?? "",
       toolKind: toolKind(toolName),
       name: toolName,
-      summary: toolSummary(toolName, input, policy.dir),
-      input: JSON.stringify(input).slice(0, 4000),
+      summary,
+      input: full.slice(0, CARD_INPUT_CHARS),
       sensitive,
-      ...(opts.decisionReason ? { reason: opts.decisionReason } : {}),
+      ...(reason ? { reason } : {}),
     };
     const { decision } = await askUser(req, opts.signal);
     if (decision === "deny") return { behavior: "deny", message: "The user denied this from their device." };
+    write?.approveWrite(toolName, input);
     // A write tool of tunelo's MCP is asked about every time: no rule for the session.
     if (decision === "allow-session" && !sensitive && !isWriteTool(toolName)) {
       // Only allow rules for this session: a remote "allow for the session"
@@ -211,10 +237,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     cwd: policy.dir,
     settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
     strictMcpConfig: true,
-    mcpServers: {
-      ...(policy.mcpServers as NonNullable<Options["mcpServers"]>),
-      ...(policy.sessionMcp ? { [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) } : {}),
-    },
+    mcpServers: policy.sessionMcp
+      ? { ...withoutTuneloMcp(policy.mcpServers), [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) }
+      : (policy.mcpServers as NonNullable<Options["mcpServers"]>),
     // Also guards a `tunelo` MCP the machine's own config adds.
     hooks: { PreToolUse: [{ matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook] }] },
     // Without a mode picked on a device, the session follows the machine's own

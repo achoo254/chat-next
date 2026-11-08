@@ -24,6 +24,7 @@ import {
 import { AGENT_VERSION } from "../version.ts";
 import type { ToolAnnotations, ToolGroup } from "./groups.js";
 import { failure } from "./mcp-result.js";
+import { redact, redactMessage } from "./redact.js";
 
 /** How the service reaches an app's MCP server as the signed-in account. */
 export interface RemoteAccess {
@@ -32,6 +33,8 @@ export interface RemoteAccess {
 	token(app: AppName): Promise<string>;
 	/** The server refused `token` before it expired: the next token() refreshes. */
 	forget(app: AppName, token: string): Promise<void>;
+	/** Who is signed in ("" for nobody): tool lists are kept per account. */
+	account(): string;
 }
 
 const NOT_SIGNED_IN = "This machine is not signed in: run `tunelo login` on it.";
@@ -48,6 +51,10 @@ export function identityAccess(dir: string): RemoteAccess {
 		endpoint: resource,
 		token: (app) => session.getAppToken(app),
 		forget: (app, token) => session.forgetAccessToken(resource(app), token),
+		account: () => {
+			const info = session.info();
+			return info ? `${info.issuer} ${info.sub}` : "";
+		},
 	};
 }
 
@@ -71,7 +78,10 @@ export interface RemoteProxyOptions {
 
 const LIST_TTL_MS = 10 * 60_000;
 const MAX_LIST_PAGES = 5;
-const MAX_SENT_TOKENS = 8;
+/** A server that could not list its tools is not asked again for this long. */
+const LIST_FAILURE_TTL_MS = 30_000;
+/** Tokens sent are remembered this long, to cut them out of anything a server echoes. */
+const SENT_TOKEN_TTL_MS = 24 * 60 * 60_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -95,16 +105,17 @@ function explain(app: AppName, err: unknown): string {
 	return `${server} could not be reached: ${message}`;
 }
 
-/** One connected client per app, with the tokens it sent (to cut from results). */
+/** One connected client per app. */
 interface Connection {
 	client: Client;
-	sent: Set<string>;
 }
 
 export class RemoteProxy {
-	private readonly lists = new Map<string, { at: number; tools: RemoteTool[] }>();
+	private readonly lists = new Map<string, { at: number; tools: RemoteTool[] } | { at: number; failure: Error }>();
 	private readonly loading = new Map<string, Promise<RemoteTool[]>>();
 	private readonly connections = new Map<AppName, Promise<Connection>>();
+	/** Every token sent, until when it is still cut out of answers. */
+	private readonly sent = new Map<string, number>();
 	private readonly now: () => number;
 	private readonly listTimeoutMs: number;
 	private readonly callTimeoutMs: number;
@@ -118,33 +129,57 @@ export class RemoteProxy {
 		this.callTimeoutMs = options.callTimeoutMs ?? 150_000;
 	}
 
+	/** Any text bound for an agent: without the tokens sent, JWTs or Bearer values. */
+	redact(text: string): string {
+		const at = this.now();
+		for (const [token, until] of this.sent) if (until <= at) this.sent.delete(token);
+		return redact(text, this.sent.keys());
+	}
+
+	private failed(app: AppName, err: unknown): Error {
+		return new Error(redactMessage(explain(app, err), this.sent.keys()));
+	}
+
 	/** The group's tools the server offers this account, among those the group allows. */
 	tools(group: ToolGroup): Promise<RemoteTool[]> {
-		const cached = this.lists.get(group.name);
-		if (cached && this.now() - cached.at < LIST_TTL_MS) return Promise.resolve(cached.tools);
-		const pending = this.loading.get(group.name);
+		const key = `${group.name}\n${this.access.account()}`;
+		const cached = this.lists.get(key);
+		if (cached && "failure" in cached && this.now() - cached.at < LIST_FAILURE_TTL_MS) return Promise.reject(cached.failure);
+		if (cached && "tools" in cached && this.now() - cached.at < LIST_TTL_MS) return Promise.resolve(cached.tools);
+		const pending = this.loading.get(key);
 		if (pending) return pending;
-		const load = this.fetchTools(group).finally(() => this.loading.delete(group.name));
-		this.loading.set(group.name, load);
-		return load;
+		const load = this.fetchTools(group).then(
+			(tools) => {
+				this.lists.set(key, { at: this.now(), tools });
+				return tools;
+			},
+			(err: unknown) => {
+				const failure = err instanceof Error ? err : new Error(String(err));
+				this.lists.set(key, { at: this.now(), failure });
+				throw failure;
+			},
+		);
+		const tracked = load.finally(() => this.loading.delete(key));
+		this.loading.set(key, tracked);
+		return tracked;
 	}
 
 	/** Runs `tool` of `group` on its server; a failure comes back as a tool error. */
 	async call(group: ToolGroup, tool: string, args: Record<string, unknown>): Promise<CallToolResult> {
 		if (!group.allowedTools.includes(tool)) return failure(new Error(`${tool} is not a tool tunelo offers`));
 		try {
-			const { connection, result } = await this.withClient(group.app, this.callTimeoutMs, (client) =>
+			const result = await this.withClient(group.app, this.callTimeoutMs, (client) =>
 				client.callTool({ name: tool, arguments: args }, { timeout: this.callTimeoutMs }),
 			);
 			const content = Array.isArray(result.content) ? result.content : [];
 			const texts = content.flatMap((item) =>
 				isRecord(item) && item.type === "text" && typeof item.text === "string"
-					? [{ type: "text" as const, text: scrub(item.text, connection.sent) }]
+					? [{ type: "text" as const, text: this.redact(item.text) }]
 					: [],
 			);
 			return { content: texts, ...(result.isError === true ? { isError: true } : {}) };
 		} catch (err) {
-			return failure(new Error(explain(group.app, err)));
+			return failure(this.failed(group.app, err));
 		}
 	}
 
@@ -157,7 +192,7 @@ export class RemoteProxy {
 
 	private async fetchTools(group: ToolGroup): Promise<RemoteTool[]> {
 		try {
-			const { result } = await this.withClient(group.app, this.listTimeoutMs, async (client) => {
+			return await this.withClient(group.app, this.listTimeoutMs, async (client) => {
 				const listed: RemoteTool[] = [];
 				let cursor: string | undefined;
 				for (let page = 0; page < MAX_LIST_PAGES; page++) {
@@ -166,8 +201,8 @@ export class RemoteProxy {
 						if (!group.allowedTools.includes(tool.name)) continue;
 						listed.push({
 							name: tool.name,
-							...(tool.title ? { title: tool.title } : {}),
-							description: tool.description ?? "",
+							...(tool.title ? { title: this.redact(tool.title) } : {}),
+							description: this.redact(tool.description ?? ""),
 							inputSchema: isRecord(tool.inputSchema) ? tool.inputSchema : { type: "object" },
 							...(tool.annotations ? { annotations: pickAnnotations(tool.annotations) } : {}),
 						});
@@ -177,19 +212,13 @@ export class RemoteProxy {
 				}
 				return listed;
 			});
-			this.lists.set(group.name, { at: this.now(), tools: result });
-			return result;
 		} catch (err) {
-			throw new Error(explain(group.app, err), { cause: err });
+			throw this.failed(group.app, err);
 		}
 	}
 
 	/** Runs `use` on the app's client, connecting first; a failed client is dropped. */
-	private async withClient<T>(
-		app: AppName,
-		connectTimeoutMs: number,
-		use: (client: Client) => Promise<T>,
-	): Promise<{ connection: Connection; result: T }> {
+	private async withClient<T>(app: AppName, connectTimeoutMs: number, use: (client: Client) => Promise<T>): Promise<T> {
 		let pending = this.connections.get(app);
 		if (!pending) {
 			pending = this.connect(app, connectTimeoutMs);
@@ -198,7 +227,7 @@ export class RemoteProxy {
 		let connection: Connection | undefined;
 		try {
 			connection = await pending;
-			return { connection, result: await use(connection.client) };
+			return await use(connection.client);
 		} catch (err) {
 			// A refused or broken connection: the next call starts a new one.
 			if (this.connections.get(app) === pending) this.connections.delete(app);
@@ -208,27 +237,33 @@ export class RemoteProxy {
 	}
 
 	private async connect(app: AppName, timeoutMs: number): Promise<Connection> {
-		const sent = new Set<string>();
-		let last: string | undefined;
+		// The token each answer was asked with: a 401 forgets exactly that one,
+		// never the fresh token another call already got.
+		const askedWith = new WeakMap<Response, string>();
 		const transport = new StreamableHTTPClientTransport(new URL(this.access.endpoint(app)), {
 			authProvider: {
 				token: async () => {
-					last = await this.access.token(app);
-					sent.add(last);
-					// The few latest are enough: an older one can no longer be echoed back.
-					for (const old of sent) if (sent.size > MAX_SENT_TOKENS) sent.delete(old);
-					return last;
+					const token = await this.access.token(app);
+					this.sent.set(token, this.now() + SENT_TOKEN_TTL_MS);
+					return token;
 				},
 				// Refreshed once; a second 401 fails the request.
-				onUnauthorized: async () => {
-					if (last) await this.access.forget(app, last);
+				onUnauthorized: async ({ response }) => {
+					const token = askedWith.get(response);
+					if (token) await this.access.forget(app, token);
 				},
+			},
+			fetch: async (url, init) => {
+				const response = await fetch(url, init);
+				const bearer = new Headers(init?.headers).get("authorization")?.replace(/^Bearer\s+/i, "");
+				if (bearer) askedWith.set(response, bearer);
+				return response;
 			},
 			onInsufficientScope: "throw",
 		});
 		const client = new Client({ name: "tunelo", version: AGENT_VERSION });
 		await client.connect(transport, { timeout: timeoutMs });
-		return { client, sent };
+		return { client };
 	}
 }
 
@@ -237,12 +272,5 @@ function pickAnnotations(a: Record<string, unknown>): ToolAnnotations {
 	for (const key of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] as const) {
 		if (typeof a[key] === "boolean") out[key] = a[key];
 	}
-	return out;
-}
-
-/** A result never carries a token this service sent, whatever the server echoes. */
-function scrub(text: string, tokens: ReadonlySet<string>): string {
-	let out = text;
-	for (const token of tokens) if (token) out = out.split(token).join("[token]");
 	return out;
 }

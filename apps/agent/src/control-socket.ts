@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Machine } from "./machine.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
+import { redactMessage } from "./mcp/redact.ts";
 import type { AppsReport, Registration } from "./registration-status.ts";
 import { type TunnelEvent, tunnelSpecSchema } from "./tunnels/tunnel-host.ts";
 import { isAlive } from "./tunnels/run-registry.js";
@@ -252,9 +253,10 @@ function readBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+/** An error as the caller reads it: never a token, whatever it echoes (mcp/redact.ts). */
 function errorMessage(err: unknown): string {
-  if (err instanceof z.ZodError) return err.issues.map((i) => i.message).join("; ");
-  return err instanceof Error ? err.message : String(err);
+  if (err instanceof z.ZodError) return redactMessage(err.issues.map((i) => i.message).join("; "));
+  return redactMessage(err instanceof Error ? err.message : String(err));
 }
 
 /** True when the pid surely names no process any more. A pid of another user (EPERM) counts as alive; confirmations decide then. */
