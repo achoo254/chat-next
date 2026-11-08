@@ -1,4 +1,4 @@
-# Installs chat-agent, the background process of "My machines" (ADR 0013),
+# Installs hda, the background process of "My machines" (ADR 0013),
 # on Windows (Windows PowerShell 5.1 or PowerShell 7). The web app shows the
 # command:
 #
@@ -10,7 +10,7 @@
 # and the device's public key are not secret.
 #
 # The release is pinned: version and SHA-256 are written into this script
-# when the web app is built for a chat-agent release, and the minisign
+# when the web app is built for a hda release, and the minisign
 # signature is checked with the embedded public key when minisign is
 # installed. A script whose pins were not filled in refuses to run.
 param(
@@ -22,11 +22,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$AgentVersion = '0.1.2'
-$Sha256WindowsX64 = '4fac923ee0848957d164ac3bbd98ec792852c57ed6c0623e0487a3fe44677e4a'
+$AgentVersion = '0.2.0'
+$Sha256WindowsX64 = '5350b0fb898a8dd3f7d010831485188548d7602c76d2aaf029e01fa179d0381f'
 $MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
-$Asset = 'chat-agent-windows-x64.exe'
+$Asset = 'hda-windows-x64.exe'
 
 if (-not $Locale) { $Locale = (Get-Culture).Name }
 $Lang = 'en'
@@ -51,21 +51,21 @@ function Install-ChatAgent {
 			'安装码或设备密钥缺失或格式不正确；请从 Chat 页面重新复制命令。'
 	}
 	if ($AgentVersion.StartsWith('__')) {
-		Stop-Install 'chưa có bản phát hành chat-agent.' 'no chat-agent release is available yet.' 'chat-agent 尚未发布。'
+		Stop-Install 'chưa có bản phát hành hda.' 'no hda release is available yet.' 'hda 尚未发布。'
 	}
 	# x64 also runs on Windows on Arm through emulation.
 	if ($env:PROCESSOR_ARCHITECTURE -notin @('AMD64', 'ARM64') -and $env:PROCESSOR_ARCHITEW6432 -notin @('AMD64', 'ARM64')) {
-		Stop-Install 'chat-agent cần Windows 64-bit.' 'chat-agent needs 64-bit Windows.' 'chat-agent 需要 64 位 Windows。'
+		Stop-Install 'hda cần Windows 64-bit.' 'hda needs 64-bit Windows.' 'hda 需要 64 位 Windows。'
 	}
 	# Windows PowerShell 5.1 may still default to older TLS versions.
 	[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-	$tmp = Join-Path ([IO.Path]::GetTempPath()) ('chat-agent-' + [Guid]::NewGuid().ToString('N'))
+	$tmp = Join-Path ([IO.Path]::GetTempPath()) ('hda-' + [Guid]::NewGuid().ToString('N'))
 	New-Item -ItemType Directory -Path $tmp | Out-Null
 	try {
 		$url = "$Releases/agent-v$AgentVersion/$Asset"
 		$file = Join-Path $tmp $Asset
-		Write-Host (Get-Text "Đang tải chat-agent $AgentVersion…" "Downloading chat-agent $AgentVersion…" "正在下载 chat-agent $AgentVersion…")
+		Write-Host (Get-Text "Đang tải hda $AgentVersion…" "Downloading hda $AgentVersion…" "正在下载 hda $AgentVersion…")
 		try {
 			Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
 		} catch {
@@ -90,11 +90,11 @@ function Install-ChatAgent {
 			}
 		}
 
-		$dir = Join-Path $env:LOCALAPPDATA 'chat-agent'
-		$exe = Join-Path $dir 'chat-agent.exe'
+		$dir = Join-Path $env:LOCALAPPDATA 'hda'
+		$exe = Join-Path $dir 'hda.exe'
 		New-Item -ItemType Directory -Force -Path $dir | Out-Null
 		Move-Item -Force -Path $file -Destination $exe
-		# Put chat-agent on the user's PATH (no admin); new terminals see it.
+		# Put hda on the user's PATH (no admin); new terminals see it.
 		$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 		if (-not (($userPath -split ';') -contains $dir)) {
 			$newPath = if ($userPath) { "$userPath;$dir" } else { $dir }
@@ -120,12 +120,12 @@ function Install-ChatAgent {
 			'the pairing secret is malformed; run the command again and paste it.' `
 			'配对密钥格式不正确；请重新运行命令并粘贴。'
 	}
-	# The secret reaches chat-agent on stdin only.
+	# The secret reaches hda on stdin only.
 	# Windows PowerShell may prefix piped text with a UTF-8 BOM; send plain UTF-8.
 	$OutputEncoding = New-Object System.Text.UTF8Encoding $false
 	$secret | & $exe install $Code --trust $DeviceKey
 	if ($LASTEXITCODE -ne 0) {
-		Stop-Install 'chat-agent install không thành công.' 'chat-agent install failed.' 'chat-agent install 失败。'
+		Stop-Install 'hda install không thành công.' 'hda install failed.' 'hda install 失败。'
 	}
 }
 

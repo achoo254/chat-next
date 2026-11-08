@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs chat-agent, the background process of "My machines" (ADR 0013),
+# Installs hda, the background process of "My machines" (ADR 0013),
 # on macOS. The web app shows the command:
 #
 #   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <install code> <device key> [vi|en|zh-CN]
@@ -10,14 +10,14 @@
 # and the device's public key are not secret.
 #
 # The release is pinned: version and SHA-256 of every file are written into
-# this script when the web app is built for a chat-agent release, and the
+# this script when the web app is built for a hda release, and the
 # minisign signature is checked with the embedded public key when minisign
 # is installed. A script whose pins were not filled in refuses to run.
 set -eu
 
-AGENT_VERSION="0.1.2"
-SHA256_DARWIN_ARM64="aeb2faf91d8dd39679e7b6136dd5e2c95c440c6b964b7ec42f3c30807d0f3e3d"
-SHA256_DARWIN_X64="a79c7505019ac86633c83c19fc9da911d73e22a97c0f35065c94b6673bbdbfc9"
+AGENT_VERSION="0.2.0"
+SHA256_DARWIN_ARM64="2504b00a8d7ef7d4030a770bb2e01a8bbca638f1e77b8243ad98027f9a49751c"
+SHA256_DARWIN_X64="2935f8a8fba61269b9dcdf077562b2abbb800e1647a31e8c93b4b21789b848e8"
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
@@ -60,21 +60,21 @@ main() {
 	printf '%s' "$device_key" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "khoá thiết bị không hợp lệ." "the device key is malformed." "设备密钥格式不正确。"
 
 	case "$AGENT_VERSION" in
-	__*) die "chưa có bản phát hành chat-agent." "no chat-agent release is available yet." "chat-agent 尚未发布。" ;;
+	__*) die "chưa có bản phát hành hda." "no hda release is available yet." "hda 尚未发布。" ;;
 	esac
 
-	[ "$(uname -s)" = "Darwin" ] || die "chat-agent hiện chỉ có cho macOS và Windows." \
-		"chat-agent is only available for macOS and Windows." "chat-agent 目前仅支持 macOS 和 Windows。"
+	[ "$(uname -s)" = "Darwin" ] || die "hda hiện chỉ có cho macOS và Windows." \
+		"hda is only available for macOS and Windows." "hda 目前仅支持 macOS 和 Windows。"
 	case "$(uname -m)" in
-	arm64) asset="chat-agent-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
-	x86_64) asset="chat-agent-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
+	arm64) asset="hda-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
+	x86_64) asset="hda-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
 	*) die "kiến trúc máy không được hỗ trợ." "this processor is not supported." "不支持此处理器。" ;;
 	esac
 
 	tmp="$(mktemp -d)"
 	trap 'rm -rf "$tmp"' EXIT INT TERM
 	url="$RELEASES/agent-v$AGENT_VERSION/$asset"
-	say "Đang tải chat-agent $AGENT_VERSION…" "Downloading chat-agent $AGENT_VERSION…" "正在下载 chat-agent $AGENT_VERSION…"
+	say "Đang tải hda $AGENT_VERSION…" "Downloading hda $AGENT_VERSION…" "正在下载 hda $AGENT_VERSION…"
 	curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$asset" "$url" || die "không tải được $url" "could not download $url" "无法下载 $url"
 	[ "$(sha256_of "$tmp/$asset")" = "$sha" ] || die "file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt." \
 		"the download does not match the pinned SHA-256; nothing was installed." "下载的文件与固定的 SHA-256 不符；未安装任何内容。"
@@ -86,7 +86,7 @@ main() {
 	fi
 
 	bin_dir="$HOME/.local/bin"
-	bin="$bin_dir/chat-agent"
+	bin="$bin_dir/hda"
 	mkdir -p "$bin_dir"
 	chmod 0755 "$tmp/$asset"
 	mv -f "$tmp/$asset" "$bin.new"
@@ -105,10 +105,10 @@ main() {
 	printf '%s' "$secret" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "mã ghép không hợp lệ; chạy lại lệnh và dán đúng mã." \
 		"the pairing secret is malformed; run the command again and paste it." "配对密钥格式不正确；请重新运行命令并粘贴。"
 
-	# printf is a shell builtin: the secret reaches chat-agent on stdin only.
+	# printf is a shell builtin: the secret reaches hda on stdin only.
 	printf '%s\n' "$secret" | "$bin" install "$code" --trust "$device_key"
 
-	# Put chat-agent on PATH for new terminals (zsh is the macOS default shell).
+	# Put hda on PATH for new terminals (zsh is the macOS default shell).
 	case ":$PATH:" in
 	*":$bin_dir:"*) ;;
 	*)
@@ -117,7 +117,7 @@ main() {
 			case "$rc" in *bash_profile) [ -f "$rc" ] || continue ;; esac
 			grep -Fqs "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
 		done
-		say "Đã thêm $bin_dir vào PATH; mở terminal mới để gõ chat-agent." "Added $bin_dir to your PATH; open a new terminal to use chat-agent." "已将 $bin_dir 加入 PATH；打开新终端即可使用 chat-agent。"
+		say "Đã thêm $bin_dir vào PATH; mở terminal mới để gõ hda." "Added $bin_dir to your PATH; open a new terminal to use hda." "已将 $bin_dir 加入 PATH；打开新终端即可使用 hda。"
 		;;
 	esac
 }
