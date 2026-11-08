@@ -35,6 +35,8 @@ import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
 import { AccountMenuSlot } from "./ui/account-menu-slot.tsx";
 import { FolderRail } from "./ui/folder-rail.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
+import { MachineLinksProvider } from "../machines/link/connection-provider.tsx";
+import { MachineIcon } from "../machines/machine-icons.tsx";
 import { messageExtrasPreloads } from "./ui/message-item.tsx";
 import { ChatAvatar, Toast } from "./ui/parts.tsx";
 import { forgetSelf } from "../api/offline-self.ts";
@@ -45,11 +47,13 @@ const settingsCode = preloadable(async () => ({ default: (await import("../scree
 const settingsExtraCode = preloadable(() => import("./settings/settings-extra.tsx"));
 const moderationCode = preloadable(() => import("./moderation/moderation.tsx"));
 const consoleCode = preloadable(() => import("./bots/console.tsx"));
+const machinesCode = preloadable(() => import("../machines/machines-screen.tsx"));
 const feedbackDialogCode = preloadable(() => import("./settings/feedback-dialog.tsx"));
 const Settings = settingsCode.Component;
 const SettingsExtra = settingsExtraCode.Component;
 const Moderation = moderationCode.Component;
 const DeveloperConsole = consoleCode.Component;
+const MachinesScreen = machinesCode.Component;
 const FeedbackDialog = feedbackDialogCode.Component;
 
 /**
@@ -110,6 +114,8 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 			warm(loadConnectWeb, loadBotsClient);
 			if (route.view.page === "new") return [consoleCode.preload()];
 			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
+		case "machines":
+			return [machinesCode.preload()];
 		case "moderation":
 		case "feedback":
 		case "announcements":
@@ -293,13 +299,15 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 	if (services === null) return <PageLoader />;
 	return (
 		<ServicesContext value={services}>
-			<Screen
-				self={self}
-				route={route}
-				onSelfChange={onSelfChange}
-				onSignOut={services.signOut}
-				moderator={self.isOperator}
-			/>
+			<MachineLinksProvider>
+				<Screen
+					self={self}
+					route={route}
+					onSelfChange={onSelfChange}
+					onSignOut={services.signOut}
+					moderator={self.isOperator}
+				/>
+			</MachineLinksProvider>
 			<Toast />
 			<AppBadge />
 		</ServicesContext>
@@ -369,13 +377,21 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		case "moderationBot":
 			screen = <Moderation view={{ page: "bot", botId: route.botId }} />;
 			break;
+		case "machines":
+			screen = <MachinesScreen view={route.view} />;
+			break;
 	}
 	return (
 		<Shell
 			route={route}
-			nav={<ContactsLink />}
+			nav={
+				<>
+					<ContactsLink />
+					<MachinesLink current={route.name === "machines"} />
+				</>
+			}
 			account={<AccountMenuSlot self={self} />}
-			rail={<FolderRail self={self} folder={null} settings={route.name === "settings"} onFolder={openFolder} />}
+			rail={<FolderRail self={self} folder={null} settings={route.name === "settings"} machines={route.name === "machines"} onFolder={openFolder} />}
 		>
 			<LoaderBoundary key={route.name}>
 				<Ready parts={parts}>{screen}</Ready>
@@ -416,6 +432,17 @@ function ContactsLink() {
 	return (
 		<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
 			<ContactsGlyph />
+		</Link>
+	);
+}
+
+/** "Máy của tôi" in the compact top bar on narrow screens. */
+function MachinesLink({ current }: { current: boolean }) {
+	"use no memo";
+	const copy = useCopy();
+	return (
+		<Link to={paths.machines()} className="icon-btn" current={current} aria-label={copy.folders.machines}>
+			<MachineIcon name="cpu" />
 		</Link>
 	);
 }

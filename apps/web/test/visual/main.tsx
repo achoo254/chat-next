@@ -26,6 +26,7 @@ import { MediaKind } from "@achoo254/chat-proto/media";
 import { addAttachments } from "../../src/messaging/media/media-state.ts";
 import { fixtureConnector } from "../support/fake-chat.ts";
 import { routerFetch } from "../support/router-fetch.ts";
+import { FakeMachines } from "../support/fake-machines.ts";
 
 const params = new URLSearchParams(window.location.search);
 // Every page holds its load event until the scenario (if any) and the overflow audit ran.
@@ -305,7 +306,10 @@ if (container === null) throw new Error("harness is missing #root");
 createRoot(container).render(
 	<StrictMode>
 		<App
-			rpcFetch={routerFetch((router) => f.routes(router))}
+			rpcFetch={routerFetch((router) => {
+				f.routes(router);
+				new FakeMachines().routes(router);
+			})}
 			messagingConnector={fixtureConnector(f, openMemoryFactory)}
 		/>
 	</StrictMode>,

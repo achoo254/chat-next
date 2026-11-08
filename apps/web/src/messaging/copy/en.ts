@@ -34,6 +34,7 @@ export const en: MessagingCopy = {
 		unread: "Unread",
 		settings: "Settings",
 		contacts: "Contacts",
+		machines: "Machines",
 		unreadChats: (n: number) => `${plural(n, "unread chat", "unread chats")}`,
 		emptyTitle: "No chats here yet",
 		emptyTitleUnread: "You are all caught up",

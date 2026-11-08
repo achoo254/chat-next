@@ -9,7 +9,7 @@
 // reloads on its own: a draft or an open dialog would be lost.
 import { navigate, paths } from "./router.tsx";
 import { answerBuild, askBuild, isBuildQuery, type MessageTarget } from "./sw/build-messages.ts";
-import { openChatId } from "./sw/push-messages.ts";
+import { openChatId, openPath } from "./sw/push-messages.ts";
 
 /** Browsers check /sw.js on each page load; an open tab also checks this often… */
 const UPDATE_CHECK_MS = 60 * 60_000;
@@ -62,6 +62,9 @@ export function watchAppUpdates(container: WorkerContainerLike, entry: string, r
 		// A click on a push notification focused this tab: open the chat.
 		const chatId = openChatId(event.data);
 		if (chatId !== null) navigate(paths.chat(chatId));
+		// …or the machine (or its waiting session) that needs the user.
+		const path = openPath(event.data);
+		if (path !== null) navigate(path);
 	});
 	container.startMessages();
 	let controlled = container.controller !== null;

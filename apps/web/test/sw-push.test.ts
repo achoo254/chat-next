@@ -2,10 +2,11 @@
 // worker scope: showing a push, opening its chat on click, and registering
 // a renewed subscription.
 import { describe, expect, it, vi } from "vitest";
-import { OPEN_CHAT, openChatId } from "../src/sw/push-messages.ts";
+import { OPEN_CHAT, OPEN_PATH, openChatId, openPath } from "../src/sw/push-messages.ts";
 import {
 	NOTIFICATION_ICON,
 	REGISTER_PATH,
+	parseMachinePayload,
 	parsePayload,
 	startPushHandlers,
 	type NotificationEventLike,
@@ -160,6 +161,58 @@ describe("notificationclick", () => {
 		const bad = scope();
 		await bad.fire("notificationclick", click("javascript:alert(1)"));
 		expect(bad.opened).toEqual(["/"]);
+	});
+});
+
+describe("machine pushes", () => {
+	// server/internal/push Payload of kind "machine": no content, the machine's name and what it waits for.
+	const machine = { kind: "machine", machine_id: 42, session_id: "t_1", title: "Chat", body: "Claude trên Mac mini cần bạn duyệt", tag: "machine:42", url: "/machines/42?session=t_1", silent: false, ts: 1_760_000_000_000 };
+	const clickOf = (data: unknown): Omit<NotificationEventLike, "waitUntil"> => ({ notification: { data, close: () => undefined } });
+
+	it("shows one notification per machine that opens its waiting session", async () => {
+		const sw = scope();
+		await sw.fire("push", pushOf(machine));
+		expect(sw.shown).toEqual([
+			{
+				title: "Chat",
+				options: {
+					body: machine.body,
+					tag: "machine:42",
+					icon: NOTIFICATION_ICON,
+					silent: false,
+					renotify: true,
+					timestamp: machine.ts,
+					data: { chatId: 0, path: "/machines/42/s/t_1" },
+				},
+			},
+		]);
+	});
+
+	it("reads only well-formed machine payloads", () => {
+		expect(parseMachinePayload(machine)?.path).toBe("/machines/42/s/t_1");
+		expect(parseMachinePayload({ ...machine, session_id: "" })?.path).toBe("/machines/42");
+		expect(parseMachinePayload({ ...machine, session_id: "../../x" })?.path).toBe("/machines/42");
+		expect(parseMachinePayload({ ...machine, tag: "machine:43" })).toBeNull();
+		expect(parseMachinePayload({ ...machine, machine_id: 0 })).toBeNull();
+		expect(parseMachinePayload(payload)).toBeNull();
+		// A machine payload is not a message: the chat parser leaves it alone.
+		expect(parsePayload(machine)).toBeNull();
+	});
+
+	it("asks an open window to open the session, or opens one on it", async () => {
+		const open = new FakeWindow(`${ORIGIN}/c/1`, false, "visible");
+		const sw = scope([open]);
+		await sw.fire("notificationclick", clickOf({ chatId: 0, path: "/machines/42/s/t_1" }));
+		expect(open.messages).toEqual([{ type: OPEN_PATH, path: "/machines/42/s/t_1" }]);
+		expect(openPath(open.messages[0])).toBe("/machines/42/s/t_1");
+		const none = scope();
+		await none.fire("notificationclick", clickOf({ chatId: 0, path: "/machines/42" }));
+		expect(none.opened).toEqual(["/machines/42"]);
+		// Only machine paths: anything else opens the app's home.
+		const bad = scope();
+		await bad.fire("notificationclick", clickOf({ chatId: 0, path: "https://evil.test/" }));
+		expect(bad.opened).toEqual(["/"]);
+		expect(openPath({ type: OPEN_PATH, path: "/settings" })).toBeNull();
 	});
 });
 

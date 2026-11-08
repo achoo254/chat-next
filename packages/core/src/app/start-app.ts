@@ -34,6 +34,7 @@ import { SyncEngine, type HistoryDirectionName } from "../sync/engine.ts";
 import { RealtimeConnection, type ConnectionState } from "../transport/realtime.ts";
 import { TypingTracker } from "./typing.ts";
 import { uploadPhotoNow } from "../media/direct-upload.ts";
+import { wipeDeviceKeys } from "./device-keys-wipe.ts";
 import { DirectActions, UnsupportedApiError, type PinnedMessagesRequest } from "./direct-actions.ts";
 
 /** Desktop has no app of its own: it runs the web app as a PWA ("web"). */
@@ -277,6 +278,8 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 				report(err, "wipe media storage");
 			}
 		}
+		// The keys of "My machines" belong to the session as well (ADR 0013).
+		if (wipe) await wipeDeviceKeys();
 		bus.emit(EventKeys.session);
 		bus.flush();
 		if (wipe) options.onSessionEnded?.(reason);

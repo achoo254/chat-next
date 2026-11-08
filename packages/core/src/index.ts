@@ -83,3 +83,4 @@ export {
 	type StartOptions,
 	type StartResult,
 } from "./app/start-app.ts";
+export { DEVICE_KEYS_DATABASE, wipeDeviceKeys } from "./app/device-keys-wipe.ts";

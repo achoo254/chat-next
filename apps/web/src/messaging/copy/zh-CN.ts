@@ -32,6 +32,7 @@ export const zhCN: MessagingCopy = {
 		unread: "未读",
 		settings: "设置",
 		contacts: "联系人",
+		machines: "电脑",
 		unreadChats: (n: number) => `${n} 个未读聊天`,
 		emptyTitle: "这里还没有聊天",
 		emptyTitleUnread: "所有消息都已读完",

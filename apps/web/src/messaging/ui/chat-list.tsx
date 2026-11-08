@@ -16,6 +16,7 @@ import { useBackendValue, useListEntries, useListStatus } from "../data/services
 import { AccountMenuSlot } from "./account-menu-slot.tsx";
 import { ChatRow, ROW_HEIGHT, TWO_LINE_ROW_HEIGHT } from "./chat-row.tsx";
 import { FolderTabs } from "./folder-rail.tsx";
+import { MachineIcon } from "../../machines/machine-icons.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { useUi } from "./ui-context.tsx";
 
@@ -65,6 +66,9 @@ export function ChatListColumn({ self, folder, onFolder, currentChatId, searchRe
 				<EcosystemAppSwitcher placement="bottom-end" className="n-head-switcher" />
 				<Link to={paths.contacts()} className="icon-btn" aria-label={copy.folders.contacts}>
 					<ContactsGlyph />
+				</Link>
+				<Link to={paths.machines()} className="icon-btn" aria-label={copy.folders.machines}>
+					<MachineIcon name="cpu" />
 				</Link>
 				<button type="button" className="icon-btn" aria-label={copy.list.newChat} onClick={() => ui.dialog.set({ kind: "newChat" })}>
 					<Icon name="plus" />

@@ -17,6 +17,21 @@ export type ConsolePage =
 
 export type ConsoleTab = "profile" | "token" | "updates" | "dead-letters" | "stats" | "commands" | "mini-app";
 
+/**
+ * "My machines" pages (ADR 0013). `machine` is the machine id as text, or
+ * "local" for the agent on this computer in development builds.
+ */
+export type MachinesView =
+	| { readonly page: "list" }
+	| { readonly page: "add" }
+	/** Development only: pair with `chat-agent run` on this computer. */
+	| { readonly page: "local" }
+	/** The machine's sessions and their board. */
+	| { readonly page: "machine"; readonly machine: string }
+	| { readonly page: "info"; readonly machine: string }
+	| { readonly page: "pair"; readonly machine: string }
+	| { readonly page: "session"; readonly machine: string; readonly threadId: string };
+
 export type Route =
 	| { name: "home" }
 	/** list: "/settings" itself, which phones show as the category list (desktop shows the tab). */
@@ -36,6 +51,7 @@ export type Route =
 	| { name: "moderationLog" }
 	| { name: "moderationBot"; botId: number }
 	| { name: "console"; view: ConsolePage }
+	| { name: "machines"; view: MachinesView }
 	/** A bot deep link (/b/<username>?start=<param>); the start parameter is read from the query. */
 	| { name: "bot"; username: string };
 
@@ -67,6 +83,13 @@ export const paths = {
 	announcements: () => "/moderation/announcements",
 	moderationLog: () => "/moderation/log",
 	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
+	machines: () => "/machines",
+	machinesAdd: () => "/machines/add",
+	machinesLocal: () => "/machines/local/pair",
+	machine: (machine: string) => `/machines/${machine}`,
+	machineInfo: (machine: string) => `/machines/${machine}/info`,
+	machinePair: (machine: string) => `/machines/${machine}/pair`,
+	machineSession: (machine: string, threadId: string) => `/machines/${machine}/s/${encodeURIComponent(threadId)}`,
 	/** The sign-in card alone, for visitors (the header's "Đăng nhập"); signed in, it opens the chats. */
 	login: "/login",
 	privacy: "/privacy",
@@ -103,6 +126,8 @@ const HOOK_ID = /^hk_[A-Za-z0-9]{1,32}$/;
 /** Bot usernames in deep links (any case; the server stores them lowercase). */
 const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
 const CONSOLE_TABS: readonly ConsoleTab[] = ["token", "updates", "dead-letters", "stats", "commands", "mini-app"];
+/** Thread ids of a machine's agent (UUIDs today; any opaque id of this shape). */
+const THREAD_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 function parseId(value: string | undefined): number | null {
 	if (value === undefined || !ID.test(value)) return null;
@@ -153,6 +178,7 @@ function matchMessaging(path: string): Route | null {
 		if (parts.length === 3 && tab !== undefined) return { name: "console", view: { page: "bot", botId, tab } };
 		return null;
 	}
+	if (parts[0] === "machines") return matchMachines(parts.slice(1));
 	if (parts[0] === "moderation") {
 		if (parts.length === 1) return { name: "moderation", reportId: null, actions: false };
 		if (parts.length === 2 && parts[1] === "feedback") return { name: "feedback" };
@@ -167,6 +193,24 @@ function matchMessaging(path: string): Route | null {
 		if (parts.length === 2) return { name: "moderation", reportId, actions: false };
 		if (parts.length === 3 && parts[2] === "actions") return { name: "moderation", reportId, actions: true };
 	}
+	return null;
+}
+
+function matchMachines(parts: readonly string[]): Route | null {
+	const route = (view: MachinesView): Route => ({ name: "machines", view });
+	if (parts.length === 0) return route({ page: "list" });
+	if (parts.length === 1 && parts[0] === "add") return route({ page: "add" });
+	const head = parts[0] ?? "";
+	// The development machine exists only in development builds.
+	const local = head === "local" && import.meta.env.DEV;
+	if (local && parts.length === 2 && parts[1] === "pair") return route({ page: "local" });
+	const machine = local ? "local" : parseId(head) === null ? null : head;
+	if (machine === null) return null;
+	if (parts.length === 1) return route({ page: "machine", machine });
+	if (parts.length === 2 && parts[1] === "info") return route({ page: "info", machine });
+	if (parts.length === 2 && parts[1] === "pair" && !local) return route({ page: "pair", machine });
+	const threadId = parts[2] === undefined ? "" : decodeURIComponent(parts[2]);
+	if (parts.length === 3 && parts[1] === "s" && THREAD_ID.test(threadId)) return route({ page: "session", machine, threadId });
 	return null;
 }
 
@@ -200,8 +244,8 @@ export function matchRoute(pathname: string): Route | null {
 export function returnPathFor(pathname: string, search = ""): string | undefined {
 	const route = matchRoute(pathname);
 	if (route === null || route.name === "home") return undefined;
-	// A bot link carries its start parameter in the query.
-	return route.name === "bot" && search !== "" ? pathname + search : pathname;
+	// A bot link carries its start parameter in the query, a machine's push the session to open.
+	return (route.name === "bot" || route.name === "machines") && search !== "" ? pathname + search : pathname;
 }
 
 const listeners = new Set<() => void>();

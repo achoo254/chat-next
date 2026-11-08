@@ -35,6 +35,7 @@ export const vi = {
 		unread: "Chưa đọc",
 		settings: "Cài đặt",
 		contacts: "Danh bạ",
+		machines: "Máy",
 		unreadChats: (n: number) => `${n} chat chưa đọc`,
 		emptyTitle: "Chưa có chat nào ở đây",
 		emptyTitleUnread: "Bạn đã đọc hết",

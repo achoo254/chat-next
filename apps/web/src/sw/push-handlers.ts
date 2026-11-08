@@ -8,12 +8,15 @@
 //   a window of the app is focused right now: that window shows the message.
 // - notificationclick: focuses a window of the app and asks it to open the
 //   chat (push-messages.ts), or opens a new window on /c/<id>.
+// - machine pushes (ADR 0013, payload kind "machine"): one per machine (tag
+//   "machine:<id>"), no content, only the machine's name and what it waits
+//   for; a click opens the machine's waiting session (/machines/<id>/s/<thread>).
 // - pushsubscriptionchange: the browser renewed the subscription; register
 //   the new one for the session (the cookie rides along) over Connect JSON.
 //
 // The scope and fetch are passed in, so the tests run the handlers on fakes.
 import type { ExtendableEventLike } from "./app-shell-worker.ts";
-import { OPEN_CHAT, type OpenChatMessage } from "./push-messages.ts";
+import { OPEN_CHAT, OPEN_PATH, isMachinePath, type OpenChatMessage, type OpenPathMessage } from "./push-messages.ts";
 
 /** The payload of server/internal/push (Payload). */
 export interface PushPayload {
@@ -66,7 +69,8 @@ export interface ShownOptions {
 	readonly silent: boolean;
 	readonly renotify: boolean;
 	readonly timestamp: number;
-	readonly data: { readonly chatId: number };
+	/** path: set for a machine push, the page its click opens. */
+	readonly data: { readonly chatId: number; readonly path?: string };
 }
 
 export interface PushScopeLike {
@@ -119,6 +123,41 @@ export function parsePayload(raw: unknown): PushPayload | null {
 	};
 }
 
+/** A machine's "needs you" push (server/internal/push Payload with kind "machine"). */
+export interface MachinePushPayload {
+	readonly machineId: number;
+	/** The waiting thread; "" when the agent did not say. */
+	readonly sessionId: string;
+	readonly title: string;
+	readonly body: string;
+	readonly tag: string;
+	readonly timestamp: number;
+	/** The page a click opens. */
+	readonly path: string;
+}
+
+const SESSION_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Reads a machine payload; null when it is not one. */
+export function parseMachinePayload(raw: unknown): MachinePushPayload | null {
+	if (typeof raw !== "object" || raw === null) return null;
+	const { kind, machine_id: machineId, session_id: sessionId, title, body, tag, ts } = raw as Record<string, unknown>;
+	if (kind !== "machine") return null;
+	if (typeof machineId !== "number" || !Number.isSafeInteger(machineId) || machineId <= 0) return null;
+	if (typeof title !== "string" || typeof body !== "string" || tag !== `machine:${machineId}`) return null;
+	const session = typeof sessionId === "string" && SESSION_ID.test(sessionId) ? sessionId : "";
+	const path = session === "" ? `/machines/${machineId}` : `/machines/${machineId}/s/${session}`;
+	return {
+		machineId,
+		sessionId: session,
+		title,
+		body,
+		tag,
+		timestamp: typeof ts === "number" && Number.isFinite(ts) ? ts : Date.now(),
+		path,
+	};
+}
+
 function base64(bytes: ArrayBuffer | null): string {
 	if (bytes === null) throw new Error("push subscription without keys");
 	let binary = "";
@@ -148,8 +187,21 @@ export function startPushHandlers(scope: PushScopeLike, deps: PushDeps): void {
 					// Not JSON: shown as a plain "new message" below.
 				}
 				const payload = parsePayload(raw);
+				const machine = parseMachinePayload(raw);
 				// A focused window of the app shows the message itself.
 				if ((await windows()).some((client) => client.focused && client.visibilityState === "visible")) return;
+				if (machine !== null) {
+					await scope.registration.showNotification(machine.title, {
+						body: machine.body,
+						tag: machine.tag,
+						icon: NOTIFICATION_ICON,
+						silent: false,
+						renotify: true,
+						timestamp: machine.timestamp,
+						data: { chatId: 0, path: machine.path },
+					});
+					return;
+				}
 				if (payload === null) {
 					await scope.registration.showNotification(deps.appName, {
 						body: deps.fallbackBody,
@@ -178,18 +230,22 @@ export function startPushHandlers(scope: PushScopeLike, deps: PushDeps): void {
 
 	scope.addEventListener("notificationclick", (event) => {
 		event.notification.close();
-		const data = event.notification.data as { chatId?: unknown } | null;
+		const data = event.notification.data as { chatId?: unknown; path?: unknown } | null;
 		const chatId = typeof data?.chatId === "number" && Number.isSafeInteger(data.chatId) && data.chatId > 0 ? data.chatId : 0;
+		const path = typeof data?.path === "string" && isMachinePath(data.path) ? data.path : "";
 		event.waitUntil(
 			(async () => {
 				const open = await windows();
 				const target = open.find((client) => client.focused) ?? open.find((client) => client.visibilityState === "visible") ?? open[0];
 				if (target === undefined) {
-					await scope.clients.openWindow(chatId === 0 ? "/" : chatPath(chatId));
+					await scope.clients.openWindow(path !== "" ? path : chatId === 0 ? "/" : chatPath(chatId));
 					return;
 				}
 				await target.focus();
-				if (chatId !== 0) {
+				if (path !== "") {
+					const message: OpenPathMessage = { type: OPEN_PATH, path };
+					target.postMessage(message);
+				} else if (chatId !== 0) {
 					const message: OpenChatMessage = { type: OPEN_CHAT, chatId };
 					target.postMessage(message);
 				}

@@ -1,6 +1,6 @@
 // The account menu, then the built-in folders (R1): Tất cả, Cá nhân, Nhóm,
 // Bot filtered on the client by chat kind, and Chưa đọc by read state; then
-// Danh bạ, the app switcher and Cài đặt. Wide screens show the labelled rail, the same one on Settings and
+// Danh bạ, Máy (My machines), the app switcher and Cài đặt. Wide screens show the labelled rail, the same one on Settings and
 // the admin pages so the frame does not change under the user; narrow screens
 // the tab row inside the list (mockups/chat.html#app, #contacts, #narrow) and
 // the compact top bar elsewhere (screens/shell.tsx). Badges count
@@ -14,6 +14,7 @@ import { countLabel, FOLDERS, type Folder } from "../data/format.ts";
 import { useFolderCounts } from "../data/services.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { AccountMenuSlot } from "./account-menu-slot.tsx";
+import { MachineIcon } from "../../machines/machine-icons.tsx";
 
 const FOLDER_ICONS: Record<Folder, IconName> = { all: "message", private: "user", group: "users", bot: "robot", unread: "message-dot" };
 
@@ -28,10 +29,12 @@ interface FolderRailProps {
 	folder: Folder | null;
 	/** Settings is open: its link shows as current. */
 	settings?: boolean;
+	/** "My machines" is open: its link shows as current. */
+	machines?: boolean;
 	onFolder: (folder: Folder) => void;
 }
 
-export function FolderRail({ self, folder, settings = false, onFolder }: FolderRailProps) {
+export function FolderRail({ self, folder, settings = false, machines = false, onFolder }: FolderRailProps) {
 	"use no memo";
 	const copy = useCopy();
 	const counts = useFolderCounts();
@@ -56,9 +59,13 @@ export function FolderRail({ self, folder, settings = false, onFolder }: FolderR
 				</button>
 			))}
 			<span className="spacer" />
-			<Link to={paths.contacts()} className="folder" current={folder === null && !settings}>
+			<Link to={paths.contacts()} className="folder" current={folder === null && !settings && !machines}>
 				<ContactsGlyph />
 				{copy.folders.contacts}
+			</Link>
+			<Link to={paths.machines()} className="folder" current={machines}>
+				<MachineIcon name="cpu" />
+				{copy.folders.machines}
 			</Link>
 			<EcosystemAppSwitcher placement="right-end" className="folder-switcher" />
 			<Link to={paths.settingsList} className="folder" current={settings}>

@@ -16,3 +16,25 @@ export function openChatId(data: unknown): number | null {
 	const { type, chatId } = data as { type?: unknown; chatId?: unknown };
 	return type === OPEN_CHAT && typeof chatId === "number" && Number.isSafeInteger(chatId) && chatId > 0 ? chatId : null;
 }
+
+/** A click on a machine's push ("needs you", ADR 0013): open that machine or its waiting thread. */
+export const OPEN_PATH = "app-push:open-path";
+
+export interface OpenPathMessage {
+	readonly type: typeof OPEN_PATH;
+	readonly path: string;
+}
+
+/** The only paths a push may open: a machine, or one of its threads. */
+const MACHINE_PATH = /^\/machines\/[1-9][0-9]{0,15}(?:\/s\/[A-Za-z0-9_-]{1,64})?$/;
+
+export function isMachinePath(path: string): boolean {
+	return MACHINE_PATH.test(path);
+}
+
+/** The path of an open-path message, or null for anything else. */
+export function openPath(data: unknown): string | null {
+	if (typeof data !== "object" || data === null) return null;
+	const { type, path } = data as { type?: unknown; path?: unknown };
+	return type === OPEN_PATH && typeof path === "string" && isMachinePath(path) ? path : null;
+}
