@@ -96,6 +96,11 @@ export class Machine {
     await this.core.stop();
   }
 
+  /** Wired once the machine is registered with the chat server. */
+  setNotify(fn: (thread: ThreadSummary, pending: number) => void): void {
+    this.opts.notify = fn;
+  }
+
   get publicKey(): Uint8Array {
     return this.key.publicKey;
   }
