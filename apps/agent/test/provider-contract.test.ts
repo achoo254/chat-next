@@ -4,6 +4,7 @@
 import { Decision, ErrorCode, PromptState, Role, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { join } from "node:path";
+import { SessionTickets } from "../src/mcp/session-tickets.ts";
 import { createClaudeProvider } from "../src/providers/claude/index.ts";
 import type { AgentProvider } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
@@ -268,6 +269,48 @@ describe.each(adapters)("provider contract: %s", (_name, make) => {
     const { core, work, audit } = makeCore([provider], { trusted: (d) => d.endsWith("work") });
     await core.create({ provider: provider.id, model: "", dir: work, text: "hi", consent: { sensitive: false, projectSettings: true }, device: "phone" });
     expect(audit.list().map((e) => e.action)).toEqual(["project_settings"]);
+    await core.stop();
+  });
+});
+
+describe("tunelo's MCP in a claude session", () => {
+  it("starts `tunelo mcp` with the session's ticket and no token, guards its write tools, ends the ticket with the session", async () => {
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const tickets = new SessionTickets();
+    let ticket = "";
+    const { core, work } = makeCore([provider], {
+      sessionMcp: (threadId) => {
+        ticket = tickets.issue(threadId);
+        return { ticket, configDir: "/tmp/tunelo-config", release: () => tickets.revoke(ticket) };
+      },
+    });
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    const options = sdk.log.options[0];
+    const server = options?.mcpServers?.tunelo as { type: string; command: string; args: string[]; env: Record<string, string> };
+    expect(server.type).toBe("stdio");
+    expect(server.command).toBe(process.execPath);
+    expect(server.args.at(-1)).toBe("mcp");
+    expect(server.env).toEqual({ TUNELO_MCP_TICKET: ticket, TUNELO_HOME: "/tmp/tunelo-config" });
+    expect(ticket).toMatch(/^[\w-]{43}$/);
+    expect(JSON.stringify(server)).not.toMatch(/eyJ/);
+    expect(options?.hooks?.PreToolUse?.[0]?.matcher).toBe("^mcp__tunelo__");
+    expect(tickets.owner(ticket)).toBe(t.id);
+    await core.stop();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(tickets.owner(ticket)).toBeUndefined();
+  });
+
+  it("is absent when the machine turned it off", async () => {
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const { core, work } = makeCore([provider], { sessionMcp: () => undefined });
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    expect(sdk.log.options[0]?.mcpServers).toEqual({});
     await core.stop();
   });
 });

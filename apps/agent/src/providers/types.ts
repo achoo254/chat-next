@@ -6,6 +6,8 @@
 // user's own login or key, never read or forward credentials, and route
 // every permission through `askUser`.
 
+import type { SessionMcp } from "../mcp/session-tickets.ts";
+
 export type ToolKind = "read" | "edit" | "shell" | "search" | "web" | "mcp" | "subagent" | "todo" | "other";
 
 export type ProviderCapabilities = {
@@ -115,6 +117,8 @@ export type SessionPolicy = {
   allowBypass?: boolean;
   /** The AI's config folder of the account picked on the machine (Claude: CLAUDE_CONFIG_DIR); unset for its default. */
   accountDir?: string;
+  /** tunelo's own MCP for this session (its ticket ends with the session). */
+  sessionMcp?: SessionMcp;
 };
 
 export type DetectOptions = {

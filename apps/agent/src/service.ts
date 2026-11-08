@@ -26,11 +26,16 @@ export function isCompiled(): boolean {
   return !script || /^\/\$bunfs\/|[\\/]~BUN[\\/]/.test(script);
 }
 
-/** The binary to run: the compiled file itself, or bun + script in development. */
-function command(): string[] {
+/** tunelo itself with `args`: the compiled file, or bun + script in development. */
+export function selfCommand(...args: string[]): string[] {
   const exe = process.execPath;
   const script = process.argv[1];
-  return isCompiled() || !script ? [exe, "run"] : [exe, script, "run"];
+  return isCompiled() || !script ? [exe, ...args] : [exe, script, ...args];
+}
+
+/** The binary to run as the service. */
+function command(): string[] {
+  return selfCommand("run");
 }
 
 /** A config folder other than the default has to reach the agent the supervisor starts. */

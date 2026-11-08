@@ -83,7 +83,7 @@ type Stream = (target: ControlTarget, input: unknown, send: (message: unknown) =
 const deviceRevoke = z.object({ key: z.string().min(6, "give at least 6 characters of the device key").max(128) });
 const trustInput = z.object({ dir: z.string().min(1).max(4096), trusted: z.enum(["true", "false"]).optional() });
 const closeInput = z.object({ id: z.string().min(1).max(64) });
-const mcpSession = z.object({ server: z.string().min(1).max(512) });
+const mcpSession = z.object({ server: z.string().min(1).max(512), ticket: z.string().min(1).max(64).optional() });
 const profileInput = z.object({ id: z.string().max(64) });
 const profileRemove = z.object({ id: z.string().max(64), force: z.boolean().optional() });
 const forwardToggle = z.object({ enabled: z.boolean() });
@@ -192,6 +192,8 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     const { id } = closeInput.parse(input);
     return { closed: t.tunnels.close(id) || t.mcp.closeTunnel(id) };
   },
+  /** Tools of the Chat and Localman servers for `tunelo mcp` to list: names and schemas, no token. */
+  "POST /mcp/tools": (t) => t.mcp.remoteTools(),
   "POST /mcp/call": (t, input) => {
     const call = mcpCall.parse(input);
     return t.mcp.call(call.session, call.group, call.tool, call.args ?? {});
@@ -216,10 +218,10 @@ export const CONTROL_STREAMS: Readonly<Record<string, Stream>> = {
     send({ type: "opened", id });
     return () => t.tunnels.close(id, "the terminal left");
   },
-  /** `tunelo mcp`: a session whose tunnels close when the caller leaves. */
+  /** `tunelo mcp`: a session whose tunnels close when the caller leaves; with the ticket of the claude session that started it. */
   "POST /mcp/session": (t, input, send) => {
-    const { server } = mcpSession.parse(input);
-    const session = t.mcp.open(server);
+    const { server, ticket } = mcpSession.parse(input);
+    const session = t.mcp.open(server, ticket);
     send({ session });
     return () => t.mcp.end(session);
   },

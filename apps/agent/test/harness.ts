@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Item, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
-import { AgentCore } from "../src/core/agent-core.ts";
+import { AgentCore, type CoreOptions } from "../src/core/agent-core.ts";
 import type { AgentProvider } from "../src/providers/types.ts";
 import { AuditLog } from "../src/safety/audit-log.ts";
 import { createSensitiveCheck } from "../src/safety/sensitive-paths.ts";
@@ -11,7 +11,10 @@ export function tempDir(prefix = "agent-test-"): string {
   return mkdtempSync(join(tmpdir(), prefix));
 }
 
-export function makeCore(providers: AgentProvider[], opts: { dataDir?: string; home?: string; maxSessions?: number; trusted?: (dir: string) => boolean } = {}) {
+export function makeCore(
+  providers: AgentProvider[],
+  opts: { dataDir?: string; home?: string; maxSessions?: number; trusted?: (dir: string) => boolean; sessionMcp?: CoreOptions["sessionMcp"] } = {},
+) {
   const root = tempDir();
   const home = opts.home ?? join(root, "home");
   const work = join(home, "work");
@@ -26,6 +29,7 @@ export function makeCore(providers: AgentProvider[], opts: { dataDir?: string; h
     isSensitive: createSensitiveCheck({ home }),
     maxSessions: opts.maxSessions ?? 3,
     ...(opts.trusted ? { isTrusted: opts.trusted } : {}),
+    ...(opts.sessionMcp ? { sessionMcp: opts.sessionMcp } : {}),
   });
   return { core, audit, home, work, dataDir };
 }

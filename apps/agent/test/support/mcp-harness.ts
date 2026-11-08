@@ -42,10 +42,10 @@ export async function waitFor(check: () => boolean | Promise<boolean>, ms = 5000
  * Starts the service of this test machine (anonymous `TEST_KEY`, as a
  * machine without an account) and waits until its control socket is up.
  */
-export async function startService(bundle: string, home: string): Promise<{ child: ChildProcess; stop: () => Promise<void> }> {
+export async function startService(bundle: string, home: string, extraEnv: Record<string, string> = {}): Promise<{ child: ChildProcess; stop: () => Promise<void> }> {
 	const dir = join(home, "tunelo");
 	mkdirSync(dir, { recursive: true, mode: 0o700 });
-	const child = spawn(process.execPath, [bundle], { env: machineEnv(home, { TUNELO_KEY: TEST_KEY }), stdio: "ignore" });
+	const child = spawn(process.execPath, [bundle], { env: machineEnv(home, { TUNELO_KEY: TEST_KEY, ...extraEnv }), stdio: "ignore" });
 	await waitFor(() => existsSync(join(dir, "control.json")));
 	return {
 		child,
@@ -59,11 +59,11 @@ export async function startService(bundle: string, home: string): Promise<{ chil
 }
 
 /** `tunelo mcp` over stdio, not yet connected. */
-export function mcpClient(bundle: string, wsUrl: string, home: string): { client: Client; transport: StdioClientTransport } {
+export function mcpClient(bundle: string, wsUrl: string, home: string, extraEnv: Record<string, string> = {}): { client: Client; transport: StdioClientTransport } {
 	const transport = new StdioClientTransport({
 		command: process.execPath,
 		args: [bundle, "mcp", "--server", wsUrl],
-		env: machineEnv(home),
+		env: machineEnv(home, extraEnv),
 		stderr: "ignore",
 	});
 	return { client: new Client({ name: "test", version: "0.0.0" }), transport };

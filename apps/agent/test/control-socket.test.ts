@@ -143,6 +143,7 @@ describe("control socket", () => {
         "POST /local-forward",
         "POST /local-forward/blocked",
         "POST /mcp/call",
+        "POST /mcp/tools",
         "POST /pair",
         "POST /registration/retry",
         "POST /restart",

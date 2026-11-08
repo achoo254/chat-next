@@ -10,6 +10,8 @@ import {
   type AccountInfo as SdkAccountInfo,
   type CanUseTool,
   type EffortLevel,
+  type HookCallback,
+  type McpServerConfig,
   type Options,
   type PermissionMode,
   type PermissionResult,
@@ -19,8 +21,11 @@ import {
   type SDKUserMessage,
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
+import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
+import { type SessionMcp, TICKET_ENV } from "../../mcp/session-tickets.ts";
 import { claudeEnv, readAccount } from "../../profiles/account.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
+import { selfCommand } from "../../service.ts";
 import { Channel } from "../../util/channel.ts";
 import type {
   AccountInfo,
@@ -120,6 +125,33 @@ export function createClaudeProvider(deps: { query?: QueryFn; findBinary?: () =>
   };
 }
 
+/**
+ * tunelo's own MCP in a session: `tunelo mcp` over stdio, with the
+ * session's ticket. It holds no token; the service adds them.
+ */
+export function sessionMcpServer(mcp: SessionMcp): McpServerConfig {
+  const [command = process.execPath, ...args] = selfCommand("mcp");
+  return { type: "stdio", command, args, env: { [TICKET_ENV]: mcp.ticket, TUNELO_HOME: mcp.configDir } };
+}
+
+const WRITE_APPROVAL_REASON = "It acts as you in Chat, Localman or on the internet: tunelo asks you every time.";
+
+/**
+ * PreToolUse: a write tool of tunelo's MCP always goes to the device for
+ * approval, even under an allow rule or in auto mode, unless the session
+ * runs in bypassPermissions (which only the machine's own settings start).
+ * A two-step tool is asked about on the call that acts (with its
+ * confirm_token), not on the dry run before it.
+ */
+export const writeApprovalHook: HookCallback = async (input) => {
+  if (input.hook_event_name !== "PreToolUse") return {};
+  if (input.permission_mode === "bypassPermissions") return {};
+  if (!needsApproval(input.tool_name, input.tool_input)) return {};
+  return {
+    hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: WRITE_APPROVAL_REASON },
+  };
+};
+
 function userMessage(text: string): SDKUserMessage {
   return { type: "user", message: { role: "user", content: text }, parent_tool_use_id: null } as SDKUserMessage;
 }
@@ -161,7 +193,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     };
     const { decision } = await askUser(req, opts.signal);
     if (decision === "deny") return { behavior: "deny", message: "The user denied this from their device." };
-    if (decision === "allow-session" && !sensitive) {
+    // A write tool of tunelo's MCP is asked about every time: no rule for the session.
+    if (decision === "allow-session" && !sensitive && !isWriteTool(toolName)) {
       // Only allow rules for this session: a remote "allow for the session"
       // must never switch the permission mode or add directories.
       const suggested = (opts.suggestions ?? []).filter((s) => s.type === "addRules" && s.behavior === "allow");
@@ -178,7 +211,12 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     cwd: policy.dir,
     settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
     strictMcpConfig: true,
-    mcpServers: policy.mcpServers as NonNullable<Options["mcpServers"]>,
+    mcpServers: {
+      ...(policy.mcpServers as NonNullable<Options["mcpServers"]>),
+      ...(policy.sessionMcp ? { [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) } : {}),
+    },
+    // Also guards a `tunelo` MCP the machine's own config adds.
+    hooks: { PreToolUse: [{ matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook] }] },
     // Without a mode picked on a device, the session follows the machine's own
     // Claude settings (permissions.defaultMode and allow/deny rules).
     includePartialMessages: true,

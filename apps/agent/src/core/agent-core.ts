@@ -40,6 +40,7 @@ import type {
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
 import { gitBranch } from "../safety/dirs.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
+import type { SessionMcpLease } from "../mcp/session-tickets.ts";
 
 export class AgentError extends Error {
   constructor(
@@ -121,6 +122,8 @@ export type CoreOptions = {
   profile?: () => { id: string; accountDir?: string };
   /** The account folder of the selected profile, only looked up (for checking its sign-in). */
   selectedAccountDir?: () => string | undefined;
+  /** tunelo's own MCP for a new session of the thread `threadId`; none when it is off. */
+  sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
   /** A session reported plan usage for its profile ("" for the default one). */
   onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
   now?: () => number;
@@ -586,18 +589,22 @@ export class AgentCore {
       ...(t.meta.machineMode === "bypassPermissions" ? { allowBypass: true } : {}),
       ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
     };
+    // Its ticket lives as long as this session.
+    const lease = this.opts.sessionMcp?.(t.meta.id);
+    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir } } : policy;
     t.modeUnseen = true;
-    t.starting = provider.start({ policy, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
+    t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {
       t.session = await t.starting;
     } catch (err) {
+      lease?.release();
       this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: (err as Error).message.slice(0, 500) } });
       this.endTurn(t, TurnState.FAILED, 0);
       throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, (err as Error).message);
     } finally {
       delete t.starting;
     }
-    void this.consume(t, t.session);
+    void this.consume(t, t.session).finally(() => lease?.release());
     await this.flushOutbox(t);
   }
 

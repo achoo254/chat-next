@@ -289,6 +289,26 @@ export class IdentitySession {
 		}
 	}
 
+	/**
+	 * Forgets `token` as the access token of `resource` (its server refused
+	 * it before it expired), so the next getAccessToken refreshes. A token
+	 * another process already replaced stays.
+	 */
+	async forgetAccessToken(resource: string, token: string): Promise<void> {
+		for (const [key, cached] of this.cache) {
+			if (key.endsWith(` ${resource}`) && cached.token === token) this.cache.delete(key);
+		}
+		await withFileLock(this.lockPath, async () => {
+			const session = readSession(this.dir);
+			const stored = session?.access[resource];
+			if (!session || !stored) return;
+			const current = await unseal(this.dir, stored.token).catch(() => null);
+			if (current !== token) return;
+			const { [resource]: _dropped, ...access } = session.access;
+			writeSession(this.dir, { ...session, access });
+		});
+	}
+
 	/** A cached or stored access token that is still good, if any. */
 	private async validToken(
 		session: SessionFile,
