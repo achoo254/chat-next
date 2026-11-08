@@ -1,7 +1,7 @@
 // The machines screens' shared state: the directory (ListMachines) and one
 // MachineLink per machine, kept in the HubSlot above the screens
 // (connection-provider.tsx). In development a machine on this computer
-// ("local", `chat-agent run --port N`) can stand in for the directory.
+// ("local", `hda run --port N`) can stand in for the directory.
 import type { MachineEntry, MachinesDirectory } from "../machines-client.ts";
 import type { DeviceKeyStore } from "./device-keys.ts";
 import { MachineLink } from "./machine-link.ts";

@@ -1,10 +1,12 @@
 // A machine's page: its sessions, the consent log kept on the machine (opening
 // sensitive folders, loading project settings, approving sensitive tools,
-// pairing and revoking devices), what it runs, this device's pairing, and
-// renaming or removing the machine. Removing it or revoking this device
-// takes effect at the machine's next heartbeat (about a minute).
+// pairing and revoking devices), what it runs, the devices paired with it
+// (any of them can be revoked from here), and renaming or removing the
+// machine. Removing it or revoking a device takes effect at the machine's
+// next heartbeat (about a minute); revoking this device also forgets the
+// machine's key here and opens the pairing page.
 import { useEffect, useState, type FormEvent } from "react";
-import type { AuditEntry } from "@achoo254/chat-proto/remote/remote";
+import type { AuditEntry, PairedDevice } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
@@ -13,6 +15,7 @@ import { Link, navigate, paths } from "../router.tsx";
 import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
 import { LinkBanner } from "./link-banner.tsx";
 import { PageHead } from "./page-head.tsx";
+import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
 import { aiName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -29,11 +32,29 @@ export function MachineDetail({ machine }: { machine: string }) {
 	const [audit, setAudit] = useState<readonly AuditEntry[] | null>(null);
 	const [auditLimit, setAuditLimit] = useState(AUDIT_FIRST);
 	const [dialog, setDialog] = useState<"rename" | "remove" | "revoke" | null>(null);
+	/** The device the revoke dialog is about; null for this device when the machine's list is not known. */
+	const [target, setTarget] = useState<PairedDevice | null>(null);
+	const [myKey, setMyKey] = useState<Uint8Array | null>(null);
+	/** Devices revoked from this page, by key (the machine drops them at its next heartbeat). */
+	const [revoked, setRevoked] = useState<ReadonlySet<string>>(() => new Set());
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const online = state.status.kind === "open";
 	const name = entry?.name ?? "";
 	const local = machine === LOCAL_REF;
+
+	useEffect(() => {
+		let active = true;
+		hub.deps.keys.device().then(
+			(device) => {
+				if (active) setMyKey(device.publicKey);
+			},
+			() => undefined,
+		);
+		return () => {
+			active = false;
+		};
+	}, [hub]);
 
 	useEffect(() => {
 		if (!online) return;
@@ -74,16 +95,26 @@ export function MachineDetail({ machine }: { machine: string }) {
 			},
 			() => navigate(paths.machines()),
 		);
-	const revokeThis = () =>
+	const revoke = (device: PairedDevice | null) => {
+		let whose: "self" | "other" = "other";
 		act(
 			async () => {
 				if (entry === null) return;
-				const device = await hub.deps.keys.device();
-				await hub.deps.directory.revokeDevice(entry.id, device.publicKey);
-				await hub.forget(machine);
+				whose = await revokePairedDevice(hub, machine, entry.id, device);
+				if (whose === "other" && device !== null) setRevoked((current) => new Set(current).add(keyText(device.publicKey)));
 			},
-			() => navigate(paths.machines()),
+			() => {
+				if (whose === "self") navigate(paths.machinePair(machine));
+			},
 		);
+	};
+	const askRevoke = (device: PairedDevice | null) => {
+		setError("");
+		setTarget(device);
+		setDialog("revoke");
+	};
+	const devices = state.info?.devices ?? [];
+	const targetIsSelf = target === null || (myKey !== null && sameKey(target.publicKey, myKey));
 
 	if (entry === null) {
 		return (
@@ -174,17 +205,10 @@ export function MachineDetail({ machine }: { machine: string }) {
 							</>
 						)}
 						<dt>{t.detail.agent}</dt>
-						<dd className="mono">chat-agent {state.info?.agentVersion || entry.agentVersion || "—"}</dd>
+						<dd className="mono">hda {state.info?.agentVersion || entry.agentVersion || "—"}</dd>
 						<dt>{t.detail.devices}</dt>
 						<dd className="mx-devices">
-							<span>
-								{hub.deps.deviceName} ({t.detail.thisDevice}){" "}
-								{!local && (
-									<button type="button" className="btn btn-sm btn-danger" onClick={() => setDialog("revoke")}>
-										{t.detail.revokeThis}
-									</button>
-								)}
-							</span>
+							<PairedDevices devices={devices} myKey={myKey} revoked={revoked} canRevoke={!local} deviceName={hub.deps.deviceName} onRevoke={askRevoke} />
 							<span className="note">{t.detail.pairNewHint}</span>
 						</dd>
 					</dl>
@@ -221,13 +245,22 @@ export function MachineDetail({ machine }: { machine: string }) {
 			)}
 			{dialog === "revoke" && (
 				<ConfirmDialog
-					title={t.detail.revokeTitle}
-					body={<p>{t.detail.revokeBody(name)}</p>}
+					title={targetIsSelf ? t.detail.revokeTitle : t.detail.revokeOtherTitle(target?.name || t.detail.unnamedDevice)}
+					body={
+						<>
+							<p>{targetIsSelf ? t.detail.revokeBody(name) : t.detail.revokeOtherBody(name)}</p>
+							{error !== "" && (
+								<p className="mx-error" role="alert">
+									{error}
+								</p>
+							)}
+						</>
+					}
 					action={t.detail.revokeThis}
 					busyLabel={t.detail.revoking}
 					busy={busy}
 					danger
-					onConfirm={revokeThis}
+					onConfirm={() => revoke(target)}
 					onClose={() => setDialog(null)}
 				/>
 			)}

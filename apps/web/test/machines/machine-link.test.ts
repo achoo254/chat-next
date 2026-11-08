@@ -2,12 +2,12 @@
 // id, pings while active, reconnecting with the thread cursor, ThreadReset,
 // a broken frame, refused devices, and asking the directory for a new tunnel.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ItemSchema, Role, type Item } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ItemSchema, Role, ThreadInfoSchema, type Item } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MachineLink, RemoteError, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
+import { MachineLink, mergeThreadInfo, RemoteError, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
 import { orderedItems } from "../../src/machines/transcript/reducer.ts";
-import { FakeMachine, until } from "./fake-machine.ts";
+import { defaultAnswer as defaultAnswerOf, FakeMachine, until } from "./fake-machine.ts";
 
 const URL_A = "wss://abc.tunnel.hoandat.com";
 const URL_B = "wss://def.tunnel.hoandat.com";
@@ -119,6 +119,68 @@ describe("MachineLink", () => {
 		expect(orderedItems(l.journal("t1")).map((i) => i.id)).toEqual(["c"]);
 		unwatch();
 		l.stop();
+	});
+
+	it("asks the directory at once when the first attempt has no address yet", async () => {
+		let refreshed = 0;
+		const l = link({
+			tunnelUrl: () => "",
+			refreshTunnel: () => {
+				refreshed++;
+				return Promise.resolve(URL_A);
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+		expect(refreshed).toBe(1);
+		expect(machine.sockets).toHaveLength(1);
+		l.stop();
+	});
+
+	it("keeps each thread's ThreadInfo apart from its journal, merged on update and kept over a reset", async () => {
+		machine.handler = (frame, socket) => {
+			if (frame.body.case !== "threadSubscribe") return defaultAnswerOf(frame);
+			const threadId = frame.body.value.threadId;
+			setTimeout(() => {
+				machine.send(socket, {
+					case: "threadInfo",
+					value: {
+						threadId,
+						permissionMode: "default",
+						gitBranch: "main",
+						commands: [{ name: "review", builtin: true }],
+						rateLimits: { fiveHour: { utilization: 4, resetsAt: 9n } },
+					},
+				});
+				// A later one without rate limits or commands keeps the known ones.
+				machine.send(socket, { case: "threadInfo", value: { threadId, permissionMode: "plan", gitBranch: "dev", linesAdded: 3 } });
+				machine.send(socket, { case: "threadReset", value: { threadId, reason: 1 } });
+			}, 0);
+			return [{ case: "threadItems", value: { threadId, items: [], cursor: frame.body.value.cursor } }];
+		};
+		const l = link();
+		const unwatch = l.watch("t1");
+		l.start();
+		await until(() => l.snapshot().threadInfo.get("t1")?.permissionMode === "plan", "second info");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const info = l.snapshot().threadInfo.get("t1");
+		expect(info).toMatchObject({ gitBranch: "dev", linesAdded: 3, rateLimits: { fiveHour: { utilization: 4 } } });
+		expect(info?.commands.map((c) => c.name)).toEqual(["review"]);
+		expect(l.snapshot().threadInfo.has("t2")).toBe(false);
+		unwatch();
+		l.stop();
+	});
+
+	it("lets a newer ThreadInfo replace the older one where it knows better", () => {
+		const first = create(ThreadInfoSchema, { threadId: "t", permissionMode: "default", commands: [{ name: "a" }], rateLimits: { sevenDay: { utilization: 50 } } });
+		const second = create(ThreadInfoSchema, { threadId: "t", permissionMode: "acceptEdits", commands: [{ name: "b" }], rateLimits: { sevenDay: { utilization: 60 } } });
+		expect(mergeThreadInfo(undefined, first)).toBe(first);
+		expect(mergeThreadInfo(first, second)).toBe(second);
+		const bare = create(ThreadInfoSchema, { threadId: "t", permissionMode: "auto" });
+		const merged = mergeThreadInfo(second, bare);
+		expect(merged.permissionMode).toBe("auto");
+		expect(merged.commands.map((c) => c.name)).toEqual(["b"]);
+		expect(merged.rateLimits?.sevenDay?.utilization).toBe(60);
 	});
 
 	it("matches answers to requests and rejects machine errors", async () => {

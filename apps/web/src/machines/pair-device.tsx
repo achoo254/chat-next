@@ -1,6 +1,6 @@
 // "Ghép thiết bị này": pairing this device with a machine it has never
 // talked to (being signed in to the same account is not enough). Scan the QR
-// that `chat-agent pair` shows (where the browser can read QR codes), or type
+// that `hda pair` shows (where the browser can read QR codes), or type
 // its 6 digits. On success the machine key is pinned and the link opens.
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { HandshakeErrorCode } from "@achoo254/chat-proto/remote/remote";

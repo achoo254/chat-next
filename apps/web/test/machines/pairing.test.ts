@@ -21,7 +21,7 @@ import { matchRoute, paths, returnPathFor } from "../../src/router.tsx";
 
 const URL = "wss://abc.tunnel.hoandat.com";
 
-/** A machine with `chat-agent pair` open, answering one connection the way the agent does. */
+/** A machine with `hda pair` open, answering one connection the way the agent does. */
 function pairingMachine(machine: KeyPair, window: PairingWindow, install?: { deviceKey: Uint8Array; secret: Uint8Array<ArrayBuffer> }) {
 	const paired: Uint8Array[] = [];
 	const factory = (): SocketLike => {

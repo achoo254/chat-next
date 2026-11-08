@@ -1,10 +1,13 @@
 // Turns a thread's items (in display order) into what the chat draws:
-// consecutive tool calls fold into one "ran N tools" row with their results
-// attached, a turn's outcome shows where the turn ends (before the next
+// consecutive tool calls fold into one run of rows with their results
+// attached (the card groups them under "ran N tools" from two calls on), an
+// answered permission prompt folds into its tool's row (a pending one stays
+// a card with buttons), a turn's outcome shows where the turn ends (before the next
 // message of the user), and a label names the AI/model when the answering
 // one changed. Only the generic item shapes are read, never a tool's own
 // name, so every AI adapter renders the same way.
 import {
+	PromptState,
 	Role,
 	ToolKind,
 	TurnState,
@@ -27,6 +30,8 @@ export interface ToolRun {
 	readonly subagent: SubagentItem | null;
 	/** Item id of the result, for fetching the full output. */
 	readonly resultId: string | null;
+	/** The answered permission prompt of this call, shown as a short status in its row. */
+	readonly approval: ApprovalItem | null;
 }
 
 export type Block =
@@ -55,13 +60,20 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	const results = new Map<string, Item>();
 	const subagents = new Map<string, SubagentItem>();
 	const calls = new Set<string>();
+	/** Calls drawn as a row (the todo tool is not). */
+	const rows = new Set<string>();
 	const echoed = new Set<string>();
+	/** Answered prompts by tool id (the latest wins); folded into the call's row. */
+	const answered = new Map<string, ApprovalItem>();
 	for (const item of items) {
 		const b = item.body;
 		if (b.case === "toolResult") results.set(b.value.toolId, item);
 		else if (b.case === "subagent") subagents.set(b.value.toolId, b.value);
-		else if (b.case === "toolCall") calls.add(b.value.toolId);
-		else if (b.case === "text" && b.value.clientMsgId !== "") echoed.add(b.value.clientMsgId);
+		else if (b.case === "toolCall") {
+			calls.add(b.value.toolId);
+			if (b.value.kind !== ToolKind.TODO) rows.add(b.value.toolId);
+		} else if (b.case === "text" && b.value.clientMsgId !== "") echoed.add(b.value.clientMsgId);
+		else if (b.case === "approval" && b.value.state !== PromptState.PENDING && b.value.toolId !== "") answered.set(b.value.toolId, b.value);
 	}
 
 	const blocks: Block[] = [];
@@ -96,6 +108,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 					result: result?.body.case === "toolResult" ? result.body.value : null,
 					subagent: subagents.get(b.value.toolId) ?? null,
 					resultId: result?.id ?? null,
+					approval: answered.get(b.value.toolId) ?? null,
 				});
 				break;
 			}
@@ -103,7 +116,13 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				// Shown with its call; a result without one is dropped.
 				break;
 			case "subagent":
-				if (!calls.has(b.value.toolId)) runs.push({ id: item.id, call: null, result: null, subagent: b.value, resultId: null });
+				if (!calls.has(b.value.toolId)) runs.push({ id: item.id, call: null, result: null, subagent: b.value, resultId: null, approval: null });
+				break;
+			case "approval":
+				// Answered and its call is shown: the call's row carries the outcome.
+				if (b.value.state !== PromptState.PENDING && rows.has(b.value.toolId)) break;
+				flushRuns();
+				blocks.push({ kind: "approval", id: item.id, revision: item.revision, approval: b.value });
 				break;
 			case "text": {
 				if (b.value.role === Role.THINKING) break;
@@ -149,8 +168,6 @@ function single(item: Item): Block | null {
 			return { kind: "diff", id: item.id, diff: b.value };
 		case "todo":
 			return b.value.entries.length === 0 ? null : { kind: "todo", id: item.id, todo: b.value };
-		case "approval":
-			return { kind: "approval", id: item.id, revision: item.revision, approval: b.value };
 		case "question":
 			return { kind: "question", id: item.id, revision: item.revision, question: b.value };
 		case "modelChange":
@@ -177,6 +194,16 @@ export function contextShare(items: readonly Item[]): number | null {
 		}
 	}
 	return null;
+}
+
+/** The model answering now: the thread's own, else the latest model change; "" for the AI's default. */
+export function currentModel(items: readonly Item[], threadModel: string): string {
+	if (threadModel !== "") return threadModel;
+	for (let i = items.length - 1; i >= 0; i--) {
+		const b = items[i]?.body;
+		if (b?.case === "modelChange") return b.value.to;
+	}
+	return "";
 }
 
 /** The newest turn is still running (the Stop button shows). */

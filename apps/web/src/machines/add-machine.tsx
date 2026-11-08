@@ -1,5 +1,5 @@
 // "Thêm máy này", done in the browser of the machine to add: (1) the AI CLI is
-// installed and signed in, (2) one command installs chat-agent with a
+// installed and signed in, (2) one command installs hda with a
 // one-time install code and this browser's device key, then asks for the
 // pairing secret, which this page made and shows (it never goes to the
 // server), (3) the page waits for the machine in the directory and checks in

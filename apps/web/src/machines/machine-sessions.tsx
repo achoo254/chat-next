@@ -23,6 +23,7 @@ export function SessionList({ machine, current }: { machine: string; current: st
 	const [creating, setCreating] = useState(false);
 	const name = entry?.name ?? "";
 	const online = state.status.kind === "open";
+	const linkKey = online ? "on" : state.status.kind === "connecting" || state.status.kind === "idle" ? "wait" : "off";
 	const need = state.threads.filter((x) => x.state === ThreadState.WAITING).length;
 	const shown = sortForList(state.threads).filter((x) =>
 		filter === "need" ? x.state === ThreadState.WAITING : filter === "running" ? x.state === ThreadState.RUNNING || x.state === ThreadState.QUEUED : true,
@@ -31,22 +32,24 @@ export function SessionList({ machine, current }: { machine: string; current: st
 	return (
 		<section className="mx-list" aria-label={t.sessions.label(name)}>
 			<header className="mx-list-head">
-				<Link to={paths.machines()} className="mx-switch" aria-label={`${t.sessions.switchMachine}: ${name}`}>
+				<Link to={paths.machines()} className="mx-switch" aria-label={`${t.sessions.switchMachine}: ${name}`} {...(name.length > 24 ? { title: name } : {})}>
 					<span className="mx-ico sm">
 						<MachineIcon name="monitor" small />
-						<span className={online ? "dot on" : "dot off"} />
 					</span>
 					<span className="tx">
 						<b>{name}</b>
-						<small>{online ? `${t.status.online} · ${t.sessionsCount(state.threads.length)}` : t.link.connecting}</small>
+						<small>
+							<span className={`dot ${linkKey}`} aria-hidden="true" />
+							{t.sessions.link[linkKey]}
+						</small>
 					</span>
 				</Link>
 				<Link to={paths.machineInfo(machine)} className="icon-btn" aria-label={t.sessions.info}>
 					<Icon name="info" />
 				</Link>
-				<button type="button" className="btn btn-primary btn-sm" disabled={!online} onClick={() => setCreating(true)}>
+				<button type="button" className="btn btn-primary btn-sm mx-new-btn" aria-label={t.sessions.new} title={t.sessions.new} disabled={!online} onClick={() => setCreating(true)}>
 					<Icon name="plus" small />
-					<span>{t.sessions.new}</span>
+					<span className="label">{t.sessions.new}</span>
 				</button>
 			</header>
 			<div className="tabs mx-filters" role="tablist" aria-label={t.sessions.filters}>

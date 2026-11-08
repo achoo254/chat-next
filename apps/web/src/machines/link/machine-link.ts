@@ -6,7 +6,8 @@
 // few failures it asks the directory again for the tunnel address (it changes
 // when the agent reconnects). After reconnecting it resubscribes each watched
 // thread from its cursor; a ThreadReset drops the thread's items and the
-// snapshot that follows fills them again.
+// snapshot that follows fills them again. A thread's ThreadInfo (what the
+// user's terminal statusline shows) is kept apart from its journal.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { backoffDelay } from "@achoo254/chat-core";
 import {
@@ -17,6 +18,7 @@ import {
 	type Frame,
 	type Item,
 	type MachineInfo,
+	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
 import { HandshakeFailure, startHandshake, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
@@ -62,6 +64,8 @@ export interface LinkState {
 	/** Items fetched in full (long diffs and outputs), by item id. */
 	readonly full: ReadonlyMap<string, Item>;
 	readonly pending: ReadonlyMap<string, readonly PendingSend[]>;
+	/** Each watched thread's statusline data (ThreadInfo), by thread id. */
+	readonly threadInfo: ReadonlyMap<string, ThreadInfo>;
 }
 
 export class RemoteError extends Error {
@@ -128,6 +132,7 @@ const INITIAL: LinkState = {
 	journals: new Map(),
 	full: new Map(),
 	pending: new Map(),
+	threadInfo: new Map(),
 };
 
 export class MachineLink {
@@ -289,7 +294,9 @@ export class MachineLink {
 		if (this.stopped) return;
 		if (pinned === null) return this.fail("unpaired");
 		let url = this.deps.tunnelUrl();
-		if (this.attempt > 1 && (this.attempt - 1) % REFRESH_AFTER === 0) {
+		// The first attempt without an address (a page opened straight from a
+		// link, before the directory loaded) asks the directory at once.
+		if ((this.attempt === 1 && url === "") || (this.attempt > 1 && (this.attempt - 1) % REFRESH_AFTER === 0)) {
 			url = await this.deps.refreshTunnel().catch(() => url);
 			if (this.stopped) return;
 		}
@@ -461,6 +468,7 @@ export class MachineLink {
 				break;
 			}
 			case "threadReset": {
+				// ThreadInfo is not journal data: it stays until the next one replaces it.
 				const journals = new Map(this.current.journals);
 				journals.set(b.value.threadId, resetJournal());
 				this.set({ journals });
@@ -477,6 +485,12 @@ export class MachineLink {
 			case "machineInfo":
 				this.set({ info: b.value, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
 				break;
+			case "threadInfo": {
+				const threadInfo = new Map(this.current.threadInfo);
+				threadInfo.set(b.value.threadId, mergeThreadInfo(this.current.threadInfo.get(b.value.threadId), b.value));
+				this.set({ threadInfo });
+				break;
+			}
 			case "fullItem":
 				if (b.value.item !== undefined) {
 					const full = new Map(this.current.full);
@@ -502,6 +516,19 @@ export class MachineLink {
 		const open = threads.filter((t) => t.open).length;
 		this.set({ threads, openSessions: Math.max(open, 0) });
 	}
+}
+
+/**
+ * A newer ThreadInfo replaces the older one, except for what it does not
+ * know: unset rate limits (the AI reports them only now and then) and an
+ * empty command list (not listed yet) keep the previous values.
+ */
+export function mergeThreadInfo(previous: ThreadInfo | undefined, next: ThreadInfo): ThreadInfo {
+	if (previous === undefined) return next;
+	const rateLimits = next.rateLimits ?? previous.rateLimits;
+	const commands = next.commands.length > 0 ? next.commands : previous.commands;
+	if (rateLimits === next.rateLimits && commands === next.commands) return next;
+	return { ...next, rateLimits, commands };
 }
 
 /** Threads that need the user first, then running ones, then the rest by last change. */

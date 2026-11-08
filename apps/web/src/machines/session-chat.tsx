@@ -1,5 +1,6 @@
 // One session (thread) of a machine: the transcript with tool rows, diffs,
-// todos, approval and question cards, the model/AI menu, and the composer.
+// todos, approval and question cards, the model/AI menu, the status bar
+// (ThreadInfo) and the composer.
 // The thread is watched on the machine's shared link while this shows, so a
 // reconnect resubscribes from the cursor and a reset reloads the snapshot.
 import { useEffect, useRef, useState } from "react";
@@ -20,8 +21,9 @@ import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { PageHead } from "./page-head.tsx";
+import { StatusBar } from "./status-bar.tsx";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
-import { contextShare, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
+import { contextShare, currentModel, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
 import { aiName, errorText, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -39,7 +41,8 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const caps = providerOf(state.info, provider)?.capabilities;
 	const online = state.status.kind === "open";
 	const running = turnRunning(items) || thread?.state === ThreadState.RUNNING || thread?.state === ThreadState.WAITING || thread?.state === ThreadState.QUEUED;
-	const share = contextShare(items);
+	const threadInfo = state.threadInfo.get(threadId);
+	const model = currentModel(items, thread?.model ?? "");
 	const machineName = entry?.name ?? "";
 	const missing = online && state.listed && thread === null && items.length === 0;
 
@@ -83,14 +86,6 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 				<span className="mx-e2ee" title={t.link.e2ee} role="img" aria-label={t.link.e2ee}>
 					<Icon name="lock" small />
 				</span>
-				{share !== null && (
-					<span className="mx-ctx" title={t.chat.context(Math.round(share * 100))}>
-						<span className="bar">
-							<i style={{ width: `${Math.round(share * 100)}%` }} />
-						</span>
-						<span className="hide-narrow">{Math.round(share * 100)}%</span>
-					</span>
-				)}
 				{thread !== null && <ModelMenu link={link} info={state.info} threadId={threadId} provider={thread.provider} model={thread.model} disabled={!online} />}
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
@@ -110,11 +105,21 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 					fetchFull={fetchFull}
 				/>
 			)}
+			{!missing && (
+				<StatusBar
+					ai={ai}
+					dir={thread?.dir ?? ""}
+					model={model === "" ? "" : modelName(state.info, provider, model)}
+					context={contextShare(items)}
+					info={threadInfo}
+				/>
+			)}
 			<Composer
 				ai={ai}
 				machine={machineName}
 				online={online && !missing}
 				running={running}
+				commands={threadInfo?.commands ?? []}
 				onSend={(text) => link.send(threadId, text)}
 				onStop={() => request({ case: "threadInterrupt", value: { threadId } })}
 			/>

@@ -4,7 +4,7 @@
 // clone), so the key material never exists as bytes the page could read or
 // send anywhere. Ending the session deletes the database
 // (@achoo254/chat-core wipeDeviceKeys); clearing site data does too, after
-// which the device pairs again with `chat-agent pair`.
+// which the device pairs again with `hda pair`.
 import { DEVICE_KEYS_DATABASE } from "@achoo254/chat-core";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 

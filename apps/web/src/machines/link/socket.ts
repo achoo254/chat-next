@@ -24,7 +24,7 @@ function escapeRegExp(text: string): string {
 
 /** A machine's tunnel: wss://<subdomain>.tunnel.<domain>, nothing else. */
 const TUNNEL = new RegExp(`^wss://[a-z0-9-]+\\.tunnel\\.${escapeRegExp(brand.domain)}/?$`);
-/** The agent on this computer, for development only (`chat-agent run --port N`). */
+/** The agent on this computer, for development only (`hda run --port N`). */
 const LOCAL = /^ws:\/\/127\.0\.0\.1:([0-9]{1,5})\/?$/;
 
 /** Whether the app may open `url` as a machine's tunnel. */

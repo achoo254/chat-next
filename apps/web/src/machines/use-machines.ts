@@ -67,8 +67,10 @@ export function useDirectory(hub: LinkHub): DirectoryState {
 
 /** The machine `ref` as the directory lists it (or the development machine). */
 export function useEntry(hub: LinkHub, ref: string): MachineEntry | null {
-	useDirectory(hub);
-	return hub.entry(ref);
+	// Read from the snapshot itself, so the result follows the directory (a
+	// bare hub.entry(ref) would be memoized on hub and ref alone).
+	const directory = useDirectory(hub);
+	return directory.machines.find((m) => m.ref === ref) ?? hub.entry(ref);
 }
 
 /** The started link to `ref` and its state. */

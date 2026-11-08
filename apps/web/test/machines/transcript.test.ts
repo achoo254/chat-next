@@ -2,10 +2,10 @@
 // draws: merge by id keeping the highest revision, display order by creation,
 // reset, tool grouping with results, turn outcomes, AI/model dividers.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { ItemSchema, PromptState, Role, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { Decision, ItemSchema, PromptState, Role, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { applyItems, EMPTY_JOURNAL, orderedItems, resetJournal } from "../../src/machines/transcript/reducer.ts";
-import { contextShare, foldTranscript, turnRunning } from "../../src/machines/transcript/tool-fold.ts";
+import { contextShare, currentModel, foldTranscript, turnRunning } from "../../src/machines/transcript/tool-fold.ts";
 
 type Body = NonNullable<MessageInitShape<typeof ItemSchema>["body"]>;
 
@@ -165,5 +165,37 @@ describe("folding the transcript", () => {
 		];
 		expect(contextShare(items)).toBe(0.25);
 		expect(contextShare([])).toBeNull();
+	});
+
+	it("folds an answered prompt into its tool's row and keeps one tool a run of its own", () => {
+		const ask = (toolId: string, state: PromptState, decision = Decision.UNSPECIFIED): Body => ({
+			case: "approval",
+			value: { toolId, kind: ToolKind.SHELL, name: "Bash", summary: "rm -rf dist", state, decision },
+		});
+		const items = [
+			item("tool:1", 1, call("1", ToolKind.SHELL, "Bash")),
+			item("ask:1", 2, ask("1", PromptState.ANSWERED, Decision.ALLOW_SESSION), 2),
+			item("result:1", 3, result("1")),
+			item("tool:2", 4, call("2", ToolKind.SHELL, "Bash")),
+			item("ask:2", 5, ask("2", PromptState.PENDING)),
+			item("ask:9", 6, ask("9", PromptState.ANSWERED, Decision.DENY), 2),
+		];
+		const blocks = foldTranscript(items);
+		// The answered prompt does not split the run; the pending one stays a card; one without a shown call stays a line.
+		expect(blocks.map((b) => b.kind)).toEqual(["tools", "approval", "approval"]);
+		const tools = blocks[0];
+		if (tools?.kind !== "tools") throw new Error("expected tools");
+		expect(tools.runs.map((r) => [r.call?.toolId, r.approval?.decision ?? null])).toEqual([
+			["1", Decision.ALLOW_SESSION],
+			["2", null],
+		]);
+		expect(blocks.slice(1).map((b) => (b.kind === "approval" ? b.approval.toolId : ""))).toEqual(["2", "9"]);
+	});
+
+	it("names the current model: the thread's own, else the latest change, else the default", () => {
+		const items = [item("model:1", 1, { case: "modelChange", value: { from: "opus", to: "sonnet" } }), item("model:2", 2, { case: "modelChange", value: { from: "sonnet", to: "haiku" } })];
+		expect(currentModel(items, "opus")).toBe("opus");
+		expect(currentModel(items, "")).toBe("haiku");
+		expect(currentModel([], "")).toBe("");
 	});
 });

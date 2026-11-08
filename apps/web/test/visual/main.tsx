@@ -27,6 +27,8 @@ import { addAttachments } from "../../src/messaging/media/media-state.ts";
 import { fixtureConnector } from "../support/fake-chat.ts";
 import { routerFetch } from "../support/router-fetch.ts";
 import { FakeMachines } from "../support/fake-machines.ts";
+import { DEMO_THREAD, installRemoteMachineDemo } from "../support/remote-machine-demo.ts";
+import { paths } from "../../src/router.tsx";
 
 const params = new URLSearchParams(window.location.search);
 // Every page holds its load event until the scenario (if any) and the overflow audit ran.
@@ -286,6 +288,9 @@ const SCREENS: Record<string, string> = {
 	// The shared language and theme switches (@achoo254/app-shell) in Settings › Giao diện.
 	"settings-appearance": "/settings/appearance",
 	"settings-mcp": "/settings/mcp",
+	// "Máy của tôi" with a paired demo machine (test/support/remote-machine-demo.ts): a session, the machine's page.
+	"machine-chat": paths.machineSession("1", DEMO_THREAD),
+	"machine-info": paths.machineInfo("1"),
 };
 const at = params.get("at");
 if (at === "settings-app") {
@@ -303,16 +308,21 @@ if (screenPath !== undefined) window.history.replaceState(null, "", `${screenPat
 
 const container = document.getElementById("root");
 if (container === null) throw new Error("harness is missing #root");
-createRoot(container).render(
-	<StrictMode>
-		<App
-			rpcFetch={routerFetch((router) => {
-				f.routes(router);
-				new FakeMachines().routes(router);
-			})}
-			messagingConnector={fixtureConnector(f, openMemoryFactory)}
-		/>
-	</StrictMode>,
+const machines = new FakeMachines();
+// The demo machine's key is pinned (IndexedDB) before the screens look for it.
+const machinesReady = at?.startsWith("machine-") === true ? installRemoteMachineDemo(machines) : Promise.resolve("");
+void machinesReady.then(() =>
+	createRoot(container).render(
+		<StrictMode>
+			<App
+				rpcFetch={routerFetch((router) => {
+					f.routes(router);
+					machines.routes(router);
+				})}
+				messagingConnector={fixtureConnector(f, openMemoryFactory)}
+			/>
+		</StrictMode>,
+	),
 );
 
 // ------------------------------------------------------------- scenarios
@@ -372,6 +382,15 @@ async function openInfo(): Promise<void> {
 }
 
 const SCENARIOS: Record<string, () => Promise<void>> = {
+	// The composer's "/" picker of the demo session's commands and skills.
+	slash: async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		const field = await find(() => document.querySelector<HTMLTextAreaElement>(".mx-field"));
+		Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, "/");
+		field.dispatchEvent(new Event("input", { bubbles: true }));
+		field.focus();
+		await find(() => document.querySelector(".mx-slash"));
+	},
 	// The one-time URL after creating a webhook (#hook-created).
 	"hook-created": async () => {
 		await type("#root form input.input", "Uptime Kuma");

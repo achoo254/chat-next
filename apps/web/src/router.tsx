@@ -24,7 +24,7 @@ export type ConsoleTab = "profile" | "token" | "updates" | "dead-letters" | "sta
 export type MachinesView =
 	| { readonly page: "list" }
 	| { readonly page: "add" }
-	/** Development only: pair with `chat-agent run` on this computer. */
+	/** Development only: pair with `hda run` on this computer. */
 	| { readonly page: "local" }
 	/** The machine's sessions and their board. */
 	| { readonly page: "machine"; readonly machine: string }

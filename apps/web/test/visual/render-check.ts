@@ -55,6 +55,10 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"settings-app": "?at=settings-app",
 	"settings-appearance": "?at=settings-appearance",
 	"settings-mcp": "?at=settings-mcp",
+	// "Máy của tôi": a session with long commands, a folded answered prompt, the status bar; the "/" picker; paired devices.
+	"machine-chat": "?at=machine-chat",
+	"machine-slash": "?at=machine-chat&open=slash",
+	"machine-info": "?at=machine-info",
 };
 
 export const VIEWPORTS = [

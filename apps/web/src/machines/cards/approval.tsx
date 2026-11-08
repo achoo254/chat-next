@@ -1,7 +1,8 @@
 // A tool waiting for the user's permission: Allow, Allow for the session (not
 // for a sensitive path, nor when the AI cannot remember it), Deny. The answer
 // names the revision the user saw, so a prompt that changed meanwhile is
-// refused instead of answered blindly. Answered prompts stay as a short line.
+// refused instead of answered blindly. An answered prompt shows in its tool's
+// row (tool-run.tsx); one without a shown tool stays as a short line.
 import { useState } from "react";
 import { Decision, PromptState, ToolKind, type ApprovalItem } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "../copy-vi.ts";
@@ -44,7 +45,8 @@ function askTitle(t: MachinesCopy, approval: ApprovalItem): string {
 	}
 }
 
-function outcome(t: MachinesCopy, approval: ApprovalItem): string {
+/** What became of an answered (or expired, cancelled) prompt. */
+export function approvalOutcome(t: MachinesCopy, approval: ApprovalItem): string {
 	switch (approval.state) {
 		case PromptState.ANSWERED:
 			return approval.decision === Decision.DENY ? t.approval.denied : approval.decision === Decision.ALLOW_SESSION ? t.approval.allowedSession : t.approval.allowed;
@@ -75,7 +77,7 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 			<div className="mx-done-line">
 				<MachineIcon name={toolIcon(approval.kind)} small />
 				<span className="mono">{approval.summary || approval.name}</span>
-				<span className="muted">· {outcome(t, approval)}</span>
+				<span className="muted">· {approvalOutcome(t, approval)}</span>
 			</div>
 		);
 	}

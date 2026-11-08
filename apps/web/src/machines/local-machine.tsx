@@ -1,6 +1,6 @@
-// Development only: pair with `chat-agent run --port N` on this computer
+// Development only: pair with `hda run --port N` on this computer
 // (ws://127.0.0.1:N, no server and no tunnel) using the 6-digit code from
-// `chat-agent pair`, so every screen can be tried end to end locally. The
+// `hda pair`, so every screen can be tried end to end locally. The
 // route and this page do not exist in production builds (router.tsx).
 import { useState } from "react";
 import { navigate, paths } from "../router.tsx";

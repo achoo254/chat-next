@@ -1,0 +1,146 @@
+// A paired machine for the visual harness: the real handshake and sealed
+// frames (FakeMachine) behind the browser's WebSocket for one tunnel
+// address, its key pinned in this browser, and a session with long shell
+// commands, an answered and a pending permission prompt, a grouped run, a
+// wide diff, and the statusline data (ThreadInfo) with commands and skills.
+// Test-only: never part of the production build.
+import { create, type MessageInitShape } from "@bufbuild/protobuf";
+import { Decision, ItemSchema, PromptState, Role, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { brand } from "../../src/brand.ts";
+import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
+import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
+import type { FakeMachines } from "./fake-machines.ts";
+
+export const DEMO_THREAD = "demo-thread";
+const TUNNEL = `wss://demo.tunnel.${brand.domain}`;
+
+type Body = NonNullable<MessageInitShape<typeof ItemSchema>["body"]>;
+
+function transcript(now: number): Item[] {
+	let seq = 0n;
+	const item = (id: string, body: Body, revision = 1): Item => {
+		seq += 1n;
+		return create(ItemSchema, { id, seq, revision, at: BigInt(now - 600_000) + seq * 1000n, provider: "claude", model: "opus", body });
+	};
+	const bash = (toolId: string, summary: string): Body => ({ case: "toolCall", value: { toolId, kind: ToolKind.SHELL, name: "Bash", summary, input: "{}" } });
+	const done = (toolId: string, output: string): Body => ({ case: "toolResult", value: { toolId, ok: true, output } });
+	const longCommand =
+		'cd "D:\\CONG VIEC\\hoandat-app\\chat-next" && pnpm --filter @app/web exec vitest run test/machines/chat-ui.test.tsx test/machines/transcript.test.ts --reporter=verbose --coverage.enabled=true --coverage.include=src/machines/**/*.tsx 2>&1 | tail -n 40';
+	return [
+		item("u1", { case: "text", value: { role: Role.USER, text: "Chạy test của màn Máy của tôi rồi sửa chỗ lỗi giúp mình" } }),
+		item("turn1", { case: "turn", value: { state: TurnState.COMPLETED, durationMs: 42_300n, contextTokens: 68_000n, contextWindow: 200_000n } }),
+		item("a1", { case: "text", value: { role: Role.ASSISTANT, text: "Mình chạy bộ test trước để xem trạng thái hiện tại." } }),
+		item("t1", bash("1", longCommand)),
+		item("p1", { case: "approval", value: { toolId: "1", kind: ToolKind.SHELL, name: "Bash", summary: longCommand, state: PromptState.ANSWERED, decision: Decision.ALLOW_SESSION } }, 2),
+		item("r1", done("1", " Test Files  5 passed (5)\n      Tests  52 passed (52)")),
+		item("a1b", { case: "text", value: { role: Role.ASSISTANT, text: "Test đều qua. Mình xem chỗ cột tool bị tràn ngang." } }),
+		item("t2", { case: "toolCall", value: { toolId: "2", kind: ToolKind.READ, name: "Read", summary: "apps/web/src/machines/cards/tool-run.tsx", input: "{}" } }),
+		item("r2", done("2", "…")),
+		item("t3", { case: "toolCall", value: { toolId: "3", kind: ToolKind.SEARCH, name: "Grep", summary: "overflow-wrap:anywhere apps/web/src/machines/machines.css", input: "{}" } }),
+		item("r3", done("3", "machines.css:55")),
+		item("d1", {
+			case: "diff",
+			value: {
+				toolId: "4",
+				path: "apps/web/src/machines/machines.css",
+				unified: "@@ -146,3 +146,4 @@\n-.mx-tools li .mono { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }\n+.mx-run-cmd { min-width: 0; overflow-wrap: anywhere; word-break: break-word; line-height: 1.45; }\n+.mx-run-cmd.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }",
+				added: 2,
+				removed: 1,
+			},
+		}),
+		item("u2", { case: "text", value: { role: Role.USER, text: "Ok, build lại luôn nhé" } }),
+		item("turn2", { case: "turn", value: { state: TurnState.RUNNING } }),
+		item("a2", { case: "text", value: { role: Role.ASSISTANT, text: "Mình xoá thư mục build cũ rồi chạy lại." } }),
+		item("t5", bash("5", "rm -rf apps/web/dist apps/web/test/visual/dist && pnpm --filter @app/web build")),
+		item("p5", { case: "approval", value: { toolId: "5", kind: ToolKind.SHELL, name: "Bash", summary: "rm -rf apps/web/dist apps/web/test/visual/dist && pnpm --filter @app/web build", reason: "Xoá thư mục build", state: PromptState.PENDING } }),
+	];
+}
+
+/** Adds the machine to `machines`, pins its key here and answers its link; resolves with its ref. */
+export async function installRemoteMachineDemo(machines: FakeMachines): Promise<string> {
+	const now = Date.now();
+	const machine = await FakeMachine.create();
+	const keys = deviceKeyStore();
+	const device = await keys.device();
+	machine.paired = [device.publicKey];
+	const entry = machines.add({ name: "DIEUVY-LAPTOP", os: "win32", arch: "x64", tunnelUrl: TUNNEL, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "0.2.0" });
+	const ref = String(entry.id);
+	await keys.pin(ref, machine.keys.publicKey);
+	const thread = {
+		id: DEMO_THREAD,
+		title: "Sửa giao diện Máy của tôi",
+		dir: "D:\\CONG VIEC\\hoandat-app\\chat-next",
+		provider: "claude",
+		model: "opus",
+		state: ThreadState.WAITING,
+		pending: 1,
+		updatedAt: BigInt(now),
+		open: true,
+	};
+	machine.handler = (frame, socket) => {
+		switch (frame.body.case) {
+			case "machineInfoRequest":
+				return [
+					{
+						case: "machineInfo",
+						value: {
+							name: "DIEUVY-LAPTOP",
+							os: "win32",
+							agentVersion: "0.2.0",
+							maxSessions: 3,
+							openSessions: 1,
+							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
+							devices: [
+								{ publicKey: device.publicKey, name: "Chrome · Windows", addedAt: BigInt(now - 3 * 86_400_000) },
+								{ publicKey: new Uint8Array(32).fill(7), name: "Safari · iPhone của Đạt", addedAt: BigInt(now - 20 * 86_400_000) },
+							],
+						},
+					},
+				];
+			case "threadList":
+				return [{ case: "threadListResult", value: { threads: [thread], openSessions: 1, maxSessions: 3 } }];
+			case "threadSubscribe": {
+				const threadId = frame.body.value.threadId;
+				setTimeout(
+					() =>
+						machine.send(socket, {
+							case: "threadInfo",
+							value: {
+								threadId,
+								permissionMode: "acceptEdits",
+								gitBranch: "main",
+								linesAdded: 22,
+								linesRemoved: 27,
+								rateLimits: {
+									fiveHour: { utilization: 4, resetsAt: BigInt(now + (4 * 60 + 31) * 60_000) },
+									sevenDay: { utilization: 80, resetsAt: BigInt(now + 2 * 86_400_000 + 3_600_000) },
+								},
+								commands: [
+									{ name: "review", description: "Review the current changes", builtin: true },
+									{ name: "compact", description: "Clear history but keep a summary in context", argumentHint: "[instructions]", builtin: true },
+									{ name: "ak-cook", description: "Implement a feature end to end with tests and review", argumentHint: "[task]" },
+									{ name: "ak-debug", description: "Find the root cause of a bug before fixing it" },
+								],
+							},
+						}),
+					0,
+				);
+				return threadId === DEMO_THREAD
+					? [{ case: "threadItems", value: { threadId, items: transcript(now), cursor: { epoch: 1n, seq: 100n } } }]
+					: defaultAnswer(frame);
+			}
+			case "auditList":
+				return [{ case: "auditListResult", value: { entries: [] } }];
+			default:
+				return defaultAnswer(frame);
+		}
+	};
+	// The link opens `new WebSocket(TUNNEL)`: that one address goes to the fake machine.
+	const Native = window.WebSocket;
+	const Patched = function (this: unknown, url: string | URL, protocols?: string | string[]) {
+		return String(url) === TUNNEL ? machine.factory(String(url)) : new Native(url, protocols);
+	} as unknown as typeof WebSocket;
+	Object.assign(Patched, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
+	window.WebSocket = Patched;
+	return ref;
+}
