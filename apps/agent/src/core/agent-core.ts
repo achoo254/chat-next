@@ -62,6 +62,8 @@ type ThreadMeta = {
   createdAt: number;
   updatedAt: number;
   segments: Segment[];
+  /** Last statusline data, kept so a parked or restarted thread still shows it. */
+  info?: Omit<ProviderInfo, "rateLimits">;
 };
 
 type Pending = {
@@ -128,6 +130,8 @@ export class AgentCore {
   private infoListeners = new Set<(threadId: string) => void>();
   /** Plan usage of the AI account; the same for every thread. */
   private rateLimits: ProviderInfo["rateLimits"];
+  /** The latest command list any session reported, for threads that have none yet. */
+  private lastCommands: NonNullable<ProviderInfo["commands"]> = [];
   private idleTimer: ReturnType<typeof setInterval> | undefined;
   private readonly maxSessions: number;
   private readonly idleMs: number;
@@ -144,16 +148,28 @@ export class AgentCore {
 
   // --- lifecycle -----------------------------------------------------------
 
+  private get stateFile(): string {
+    return join(this.opts.dataDir, "state.json");
+  }
+
+  /** Bumps the epoch and restores machine-wide statusline data. */
   private bumpEpoch(): bigint {
-    const file = join(this.opts.dataDir, "state.json");
-    let epoch = 0;
+    let state: { epoch?: number; rateLimits?: ProviderInfo["rateLimits"]; commands?: ProviderInfo["commands"] } = {};
     try {
-      epoch = (JSON.parse(readFileSync(file, "utf8")) as { epoch?: number }).epoch ?? 0;
+      state = JSON.parse(readFileSync(this.stateFile, "utf8")) as typeof state;
     } catch {
       // first start
     }
-    writeFileSync(file, JSON.stringify({ epoch: epoch + 1 }), { mode: 0o600 });
-    return BigInt(epoch + 1);
+    const epoch = (state.epoch ?? 0) + 1;
+    this.rateLimits = state.rateLimits;
+    this.lastCommands = state.commands ?? [];
+    writeFileSync(this.stateFile, JSON.stringify({ ...state, epoch }), { mode: 0o600 });
+    return BigInt(epoch);
+  }
+
+  private saveState(): void {
+    const state = { epoch: Number(this.epoch), rateLimits: this.rateLimits, commands: this.lastCommands };
+    writeFileSync(this.stateFile, JSON.stringify(state), { mode: 0o600 });
   }
 
   /** Loads threads and repairs what a crash left: open prompts expire, open turns end. */
@@ -223,7 +239,7 @@ export class AgentCore {
       gitBranch: gitBranch(t.meta.dir).branch,
       linesAdded: t.info.linesAdded ?? 0,
       linesRemoved: t.info.linesRemoved ?? 0,
-      commands: t.info.commands ?? [],
+      commands: t.info.commands?.length ? t.info.commands : this.lastCommands,
       ...(r ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
     });
   }
@@ -596,8 +612,12 @@ export class AgentCore {
       case "info": {
         const { type: _type, rateLimits, ...rest } = e;
         Object.assign(t.info, rest);
+        this.saveMeta(t);
+        if (rest.commands?.length) this.lastCommands = rest.commands;
+        if (rateLimits || rest.commands?.length) this.saveState();
         if (rateLimits) {
           this.rateLimits = rateLimits;
+          this.saveState();
           for (const id of this.threads.keys()) for (const fn of this.infoListeners) fn(id);
         } else {
           for (const fn of this.infoListeners) fn(t.meta.id);
@@ -732,7 +752,7 @@ export class AgentCore {
       textItems: new Map(),
       dirtyText: new Set(),
       clientMsgIds: new Set(),
-      info: {},
+      info: (meta.info ??= {}),
     };
   }
 

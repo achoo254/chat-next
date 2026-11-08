@@ -63,6 +63,19 @@ describe("restart", () => {
   });
 });
 
+describe("statusline after restart", () => {
+  it("keeps the thread's mode and commands, and offers the last commands to new threads", async () => {
+    const first = makeCore([fakeProvider()]);
+    const t = await first.core.create({ provider: "fake", model: "", dir: first.work, text: "hi", consent: { sensitive: false, projectSettings: false }, device: "d" });
+    await until(first.core, t.id, (i) => byCase(i, "turn").some((x) => x.body.value.state === TurnState.COMPLETED));
+    await first.core.stop();
+    const second = makeCore([fakeProvider()], { dataDir: first.dataDir, home: first.home });
+    const info = second.core.info(t.id);
+    expect(info.permissionMode).toBe("default");
+    expect(info.commands.map((c) => c.name)).toEqual(["review"]);
+  });
+});
+
 describe("wire", () => {
   it("shortens big outputs and diffs, keeping the stored item whole", () => {
     const j = new Journal(join(tempDir(), "j.jsonl"));
