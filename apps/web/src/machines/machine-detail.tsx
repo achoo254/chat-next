@@ -205,7 +205,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 							</>
 						)}
 						<dt>{t.detail.agent}</dt>
-						<dd className="mono">hda {state.info?.agentVersion || entry.agentVersion || "—"}</dd>
+						<dd className="mono">tunelo {state.info?.agentVersion || entry.agentVersion || "—"}</dd>
 						<dt>{t.detail.devices}</dt>
 						<dd className="mx-devices">
 							<PairedDevices devices={devices} myKey={myKey} revoked={revoked} canRevoke={!local} deviceName={hub.deps.deviceName} onRevoke={askRevoke} />

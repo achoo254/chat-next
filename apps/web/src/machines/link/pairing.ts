@@ -34,7 +34,7 @@ export async function confirmTrust(target: PairTarget, trust: DeviceTrust): Prom
 	}
 }
 
-/** Pairs with the 6-digit code `hda pair` shows; returns the machine key to pin. */
+/** Pairs with the 6-digit code `tunelo pair` shows; returns the machine key to pin. */
 export async function pairWithCode(target: PairTarget, code: string): Promise<Uint8Array> {
 	if (!/^[0-9]{6}$/.test(code)) throw new HandshakeFailure(HandshakeErrorCode.MALFORMED);
 	const exchange = await openExchange(target.socket, target.url);

@@ -14,14 +14,14 @@ import {
 	type KeyPair,
 } from "@achoo254/chat-remote-protocol";
 import { describe, expect, it } from "vitest";
-import { installCommand } from "../../src/machines/add-machine.tsx";
+import { installCommand, migrateCommand } from "../../src/machines/add-machine.tsx";
 import { confirmTrust, pairWithCode } from "../../src/machines/link/pairing.ts";
 import { allowedTunnel, type SocketLike } from "../../src/machines/link/socket.ts";
 import { matchRoute, paths, returnPathFor } from "../../src/router.tsx";
 
 const URL = "wss://abc.tunnel.hoandat.com";
 
-/** A machine with `hda pair` open, answering one connection the way the agent does. */
+/** A machine with `tunelo pair` open, answering one connection the way the agent does. */
 function pairingMachine(machine: KeyPair, window: PairingWindow, install?: { deviceKey: Uint8Array; secret: Uint8Array<ArrayBuffer> }) {
 	const paired: Uint8Array[] = [];
 	const factory = (): SocketLike => {
@@ -137,6 +137,11 @@ describe("install command", () => {
 		expect(installCommand("windows", "https://chat.example.test", "c".repeat(22), key, "en")).toBe(
 			`& ([scriptblock]::Create((irm https://chat.example.test/agent/install.ps1))) ${"c".repeat(22)} ${key} en`,
 		);
+	});
+
+	it("moves a computer still on hda with the same scripts and no install code", () => {
+		expect(migrateCommand("mac", "https://chat.example.test", "zh-CN")).toBe("curl -fsSL https://chat.example.test/agent/install.sh | sh -s -- zh-CN");
+		expect(migrateCommand("windows", "https://chat.example.test", "vi")).toBe("& ([scriptblock]::Create((irm https://chat.example.test/agent/install.ps1))) vi");
 	});
 });
 

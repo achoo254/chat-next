@@ -1,5 +1,5 @@
 // "Thêm máy này", done in the browser of the machine to add: (1) the AI CLI is
-// installed and signed in, (2) one command installs hda with a
+// installed and signed in, (2) one command installs tunelo with a
 // one-time install code and this browser's device key, then asks for the
 // pairing secret, which this page made and shows (it never goes to the
 // server), (3) the page waits for the machine in the directory and checks in
@@ -28,6 +28,11 @@ type Os = "mac" | "windows";
 function detectOs(userAgent: string): Os | "phone" {
 	if (/iPhone|iPad|Android/.test(userAgent)) return "phone";
 	return /Windows/.test(userAgent) ? "windows" : "mac";
+}
+
+/** Moves a computer still running hda (the earlier name) to tunelo: the install script without an install code. */
+export function migrateCommand(os: Os, origin: string, locale: string): string {
+	return os === "windows" ? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${locale}` : `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${locale}`;
 }
 
 /** The command the page shows; the pairing secret is pasted when the script asks, never part of it. */
@@ -148,6 +153,7 @@ export function AddMachine() {
 	const secret = waiting === null ? "" : toBase64Url(waiting.secret);
 	const expires = waiting === null ? "" : new Date(waiting.expiresAt * 1000).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 	const done = step.kind === "connected";
+	const fromHda = migrateCommand(os, serverOrigin(), locale);
 	return (
 		<div className="mx-scroll">
 			<PageHead back={paths.machines()} backLabel={t.backToMachines} title={t.add} subtitle={t.addMachine.subtitle} />
@@ -247,6 +253,11 @@ export function AddMachine() {
 					<div className="mx-hint">
 						<MachineIcon name="shield" small />
 						<span>{t.addMachine.e2ee(brand.appName)}</span>
+					</div>
+					<p className="muted">{t.addMachine.fromHda}</p>
+					<div className="mx-cmd">
+						<code aria-label={t.addMachine.command}>{fromHda}</code>
+						<CopyButton text={fromHda} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
 					</div>
 				</div>
 			</div>
