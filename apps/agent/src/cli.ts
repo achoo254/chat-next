@@ -2,7 +2,6 @@
 // chat-agent: lets the user's own devices drive the AI coding CLI installed
 // on this machine, end-to-end encrypted.
 import { execFile } from "node:child_process";
-import { createInterface } from "node:readline";
 import { ConfigStore, configDir } from "./config.ts";
 import { callControl, serveControl } from "./control-socket.ts";
 import { machineKey } from "./keystore.ts";
@@ -122,15 +121,15 @@ async function main(argv: string[]): Promise<number> {
   }
 }
 
-function readLine(): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin });
-    rl.once("line", (l) => {
-      rl.close();
-      resolve(l);
-    });
-    rl.once("close", () => resolve(""));
-  });
+/** First line of stdin. The installer pipes exactly one line and closes it. */
+async function readLine(): Promise<string> {
+  let data = "";
+  for await (const chunk of process.stdin) {
+    data += Buffer.from(chunk as Uint8Array).toString("utf8");
+    if (data.includes("\n")) break;
+  }
+  // PowerShell may prefix piped text with a byte order mark.
+  return (data.split(/\r?\n/)[0] ?? "").replace(/^\uFEFF/, "");
 }
 
 function openBrowser(url: string): void {

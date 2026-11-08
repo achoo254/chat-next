@@ -114,6 +114,8 @@ function Install-ChatAgent {
 			'配对密钥格式不正确；请重新运行命令并粘贴。'
 	}
 	# The secret reaches chat-agent on stdin only.
+	# Windows PowerShell may prefix piped text with a UTF-8 BOM; send plain UTF-8.
+	$OutputEncoding = New-Object System.Text.UTF8Encoding $false
 	$secret | & $exe install $Code --trust $DeviceKey
 	if ($LASTEXITCODE -ne 0) {
 		Stop-Install 'chat-agent install không thành công.' 'chat-agent install failed.' 'chat-agent install 失败。'
