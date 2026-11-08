@@ -22,6 +22,8 @@ import { useHub } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const POLL_MS = 3_000;
+/** A forgotten tab stops asking after this long; "Check again" resumes. */
+const WAIT_MS = 15 * 60_000;
 /** Official install guide of the AI CLI the first adapter drives. */
 const CLI_GUIDE = "https://code.claude.com/docs/en/setup";
 
@@ -47,7 +49,8 @@ export function installCommand(os: Os, origin: string, deviceKey: string, locale
 type Step =
 	| { readonly kind: "start" }
 	| { readonly kind: "making" }
-	| { readonly kind: "waiting"; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number> }
+	| { readonly kind: "waiting"; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number>; readonly until: number }
+	| { readonly kind: "stale"; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number> }
 	| { readonly kind: "confirming"; readonly machine: MachineEntry; readonly secret: Uint8Array<ArrayBuffer> }
 	| { readonly kind: "connected"; readonly machine: MachineEntry };
 
@@ -73,6 +76,10 @@ export function AddMachine() {
 		if (step.kind !== "waiting") return;
 		let stopped = false;
 		const timer = window.setInterval(() => {
+			if (Date.now() > step.until) {
+				setStep({ kind: "stale", secret: step.secret, known: step.known });
+				return;
+			}
 			if (busy.current) return;
 			busy.current = true;
 			hub
@@ -123,7 +130,7 @@ export function AddMachine() {
 		setError("");
 		setStep({ kind: "making" });
 		hub.refresh().then(
-			(machines) => setStep({ kind: "waiting", secret: random(32), known: new Set(machines.map((m) => m.id)) }),
+			(machines) => setStep({ kind: "waiting", secret: random(32), known: new Set(machines.map((m) => m.id)), until: Date.now() + WAIT_MS }),
 			() => {
 				setStep({ kind: "start" });
 				setError(t.errors.generic);
@@ -145,7 +152,10 @@ export function AddMachine() {
 		);
 	}
 
-	const waiting = step.kind === "waiting" ? step : null;
+	const waiting = step.kind === "waiting" || step.kind === "stale" ? step : null;
+	const checkAgain = () => {
+		if (step.kind === "stale") setStep({ kind: "waiting", secret: step.secret, known: step.known, until: Date.now() + WAIT_MS });
+	};
 	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), deviceKey, locale);
 	const secret = waiting === null ? "" : toBase64Url(waiting.secret);
 	const done = step.kind === "connected";
@@ -209,11 +219,19 @@ export function AddMachine() {
 						<li className={done ? "done" : undefined}>
 							<div>
 								<h4>{t.addMachine.step3}</h4>
-								{waiting !== null && (
+								{step.kind === "waiting" && (
 									<div className="mx-wait">
 										<span className="spin" aria-hidden="true" />
 										{t.addMachine.waiting}
 									</div>
+								)}
+								{step.kind === "stale" && (
+									<p className="mx-wait">
+										{t.addMachine.stale}{" "}
+										<button type="button" className="btn btn-sm" onClick={checkAgain}>
+											{t.addMachine.checkAgain}
+										</button>
+									</p>
 								)}
 								{step.kind === "confirming" && (
 									<div className="mx-wait">

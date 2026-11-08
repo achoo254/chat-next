@@ -101,7 +101,9 @@ main() {
 		from_hda="yes"
 	fi
 	tmp="$(mktemp -d)"
-	trap 'rm -rf "$tmp"' EXIT INT TERM
+	# Ctrl-C while the pairing secret is typed must not leave the terminal without echo.
+	trap 'rm -rf "$tmp"; stty echo </dev/tty 2>/dev/null || true' EXIT
+	trap 'exit 130' INT TERM
 	url="$RELEASES/tunelo-v$TUNELO_VERSION/$asset"
 	say "Đang tải tunelo $TUNELO_VERSION…" "Downloading tunelo $TUNELO_VERSION…" "正在下载 tunelo $TUNELO_VERSION…"
 	curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$asset" "$url" || die "không tải được $url" "could not download $url" "无法下载 $url"
@@ -150,6 +152,13 @@ main() {
 	fi
 
 	if [ -z "$device_key" ]; then
+		# A running background service still runs the previous file: restart it
+		# on the new one (moving from hda already started tunelo).
+		if [ -z "$from_hda" ] && "$bin" status --json >/dev/null 2>&1; then
+			say "Đang khởi động lại tunelo chạy nền với bản mới…" "Restarting the background tunelo on the new version…" "正在用新版本重启后台 tunelo…"
+			"$bin" stop >/dev/null 2>&1 || true
+			"$bin" start || say "Chưa khởi động lại được; chạy tunelo start." "Could not restart it; run tunelo start." "无法重启；请运行 tunelo start。"
+		fi
 		# Binary only: one sign-in for the tunnel, Chat and Localman. A failed or
 		# skipped sign-in leaves tunelo installed.
 		say "Đăng nhập tài khoản cho tunelo (tunnel, Chat, Localman)…" \

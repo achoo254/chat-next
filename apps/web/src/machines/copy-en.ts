@@ -300,6 +300,8 @@ export const enMachines: MachinesCopy = {
 		note: "The command opens the browser for you to sign in to your account (type the code it prints), then the machine shows up here by itself. The pairing secret stays in this browser and is never sent to the server.",
 		step3: "Wait for the machine",
 		waiting: "Waiting for this computer to connect…",
+		stale: "No sign of this computer after 15 minutes. Once the command has finished on it, check again.",
+		checkAgain: "Check again",
 		confirming: "Checking the machine's key…",
 		connected: (machine) => `Connected ${machine}`,
 		open: "Open machine",

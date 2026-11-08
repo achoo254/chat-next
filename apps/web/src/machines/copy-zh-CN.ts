@@ -298,6 +298,8 @@ export const zhCNMachines: MachinesCopy = {
 		note: "命令会打开浏览器让你登录账号（输入命令显示的代码），之后电脑会自动出现在这里。配对密钥只保存在此浏览器中，不会发送到服务器。",
 		step3: "等待电脑连接",
 		waiting: "正在等待这台电脑连接…",
+		stale: "15 分钟后仍未看到这台电脑。命令在电脑上运行完成后，请重新检查。",
+		checkAgain: "重新检查",
 		confirming: "正在核对电脑的密钥…",
 		connected: (machine) => `已连接 ${machine}`,
 		open: "打开电脑",

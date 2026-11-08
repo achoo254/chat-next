@@ -304,6 +304,8 @@ export const viMachines = {
 		note: "Lệnh mở trình duyệt để bạn đăng nhập tài khoản (gõ mã lệnh in ra), rồi máy tự hiện ở đây. Mã ghép chỉ nằm trong trình duyệt này, không gửi lên máy chủ.",
 		step3: "Chờ máy kết nối",
 		waiting: "Đang chờ máy này kết nối…",
+		stale: "Chưa thấy máy này sau 15 phút. Chạy xong lệnh trên máy thì bấm kiểm lại.",
+		checkAgain: "Kiểm lại",
 		confirming: "Đang xác nhận khoá của máy…",
 		connected: (machine: string) => `Đã kết nối ${machine}`,
 		open: "Mở máy",

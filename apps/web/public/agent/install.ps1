@@ -69,6 +69,23 @@ function Get-Text([string]$Vi, [string]$En, [string]$Zh) {
 	}
 }
 
+# Runs a native command with its output discarded and returns its exit code.
+# Windows PowerShell 5.1 turns redirected stderr of a native command (npm
+# warn …, "tunelo is not running") into errors that 'Stop' would end the
+# script with, so this one call runs with 'Continue'.
+function Invoke-Quiet([string]$Exe, [string[]]$Arguments) {
+	$saved = $ErrorActionPreference
+	try {
+		$ErrorActionPreference = 'Continue'
+		& $Exe @Arguments *> $null
+		return $LASTEXITCODE
+	} catch {
+		return 1
+	} finally {
+		$ErrorActionPreference = $saved
+	}
+}
+
 function Stop-Install([string]$Vi, [string]$En, [string]$Zh) {
 	throw (Get-Text "Lỗi: $Vi" "Error: $En" "错误：$Zh")
 }
@@ -144,8 +161,7 @@ function Install-Tunelo {
 
 	# The old Tunelo CLI from npm (1.x) is also called tunelo and may come first on PATH.
 	if (Get-Command npm -ErrorAction SilentlyContinue) {
-		& npm ls -g tunelo --depth=0 *> $null
-		if ($LASTEXITCODE -eq 0) {
+		if ((Invoke-Quiet 'npm' @('ls', '-g', 'tunelo', '--depth=0')) -eq 0) {
 			Write-Warning (Get-Text 'Gói npm tunelo 1.x cũ vẫn đang cài và có thể che lệnh tunelo mới. Gỡ nó bằng: npm uninstall -g tunelo' `
 				'The old tunelo 1.x npm package is still installed and may hide the new tunelo command. Remove it with: npm uninstall -g tunelo' `
 				'旧的 tunelo 1.x npm 包仍已安装，可能遮住新的 tunelo 命令。请运行 npm uninstall -g tunelo 卸载。')
@@ -164,6 +180,19 @@ function Install-Tunelo {
 	}
 
 	if (-not $DeviceKey) {
+		# A running background service still runs the previous file: restart it
+		# on the new one (moving from hda already started tunelo).
+		if (-not $fromHda) {
+			if ((Invoke-Quiet $exe @('status', '--json')) -eq 0) {
+				Write-Host (Get-Text 'Đang khởi động lại tunelo chạy nền với bản mới…' `
+					'Restarting the background tunelo on the new version…' '正在用新版本重启后台 tunelo…')
+				Invoke-Quiet $exe @('stop') | Out-Null
+				& $exe start
+				if ($LASTEXITCODE -ne 0) {
+					Write-Host (Get-Text 'Chưa khởi động lại được; chạy tunelo start.' 'Could not restart it; run tunelo start.' '无法重启；请运行 tunelo start。')
+				}
+			}
+		}
 		# Binary only: one sign-in for the tunnel, Chat and Localman. A failed or
 		# skipped sign-in leaves tunelo installed.
 		Write-Host (Get-Text 'Đăng nhập tài khoản cho tunelo (tunnel, Chat, Localman)…' `
