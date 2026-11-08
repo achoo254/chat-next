@@ -7,6 +7,7 @@ import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { machineKey } from "./keystore.ts";
 import { registerMachine } from "./machine-api.ts";
 import { Machine } from "./machine.ts";
+import { logFile, tailLog } from "./log-tail.ts";
 import { goOnline } from "./online.ts";
 import { installService, startService, stopService, uninstallService } from "./service.ts";
 import { signIn } from "./tunnel.ts";
@@ -27,6 +28,7 @@ Usage:
   hda run [--port N]        run in this terminal only (closing it stops hda)
   hda pair                  show a QR payload and 6-digit code to pair a device
   hda status                show machine, AI and session status
+  hda logs [-n N] [-f]      show the last N lines of the log (50); -f keeps following it
   hda devices               list paired devices
   hda devices revoke <key>  revoke a paired device (first characters of its key)
   hda audit                 show the consent log
@@ -129,6 +131,14 @@ async function main(argv: string[]): Promise<number> {
       await stopService(dir);
       console.log("hda stopped. `hda start` starts it again; it also starts at the next login.");
       return 0;
+    case "logs": {
+      const n = Number(flag(args, "-n") ?? 50);
+      const follow = args.includes("-f") || args.includes("--follow");
+      const stop = new AbortController();
+      process.on("SIGINT", () => stop.abort());
+      await tailLog(logFile(dir), { lines: Number.isFinite(n) ? n : 50, follow, write: (s) => process.stdout.write(s), signal: stop.signal });
+      return 0;
+    }
     case "uninstall":
       await uninstallService(dir);
       console.log("hda no longer starts at login. Remove the machine on the web to forget it there.");
