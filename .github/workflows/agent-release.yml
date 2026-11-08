@@ -36,6 +36,8 @@ jobs:
   build:
     needs: test
     strategy:
+      # One flaky download must not cancel the other platforms' builds.
+      fail-fast: false
       matrix:
         include:
           - { target: bun-darwin-arm64, asset: hda-darwin-arm64 }
@@ -53,7 +55,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Bun
         run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4"
+          # GitHub release downloads sometimes answer 504; try a few times.
+          for i in 1 2 3 4 5; do
+            curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4" && break
+            echo "Bun download failed (try $i), retrying"; sleep $((i * 20))
+          done
+          test -x "$HOME/.bun/bin/bun"
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
       - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile dist/${{ matrix.asset }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
