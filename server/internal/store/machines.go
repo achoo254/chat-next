@@ -17,11 +17,8 @@ import (
 
 // Limits of the machine directory (ADR 0013).
 const (
-	// InstallCodeTTL is how long an install code can be redeemed.
-	InstallCodeTTL = 10 * time.Minute
-	// MaxLiveInstallCodes bounds a user's unused, unexpired install codes.
-	MaxLiveInstallCodes = 5
-	// MaxMachines bounds a user's machines that are not revoked.
+	// MaxMachines bounds a user's machines that are not revoked; the same
+	// as the linked machines of a Localman account.
 	MaxMachines = 20
 	// MaxMachineNameLen is the longest machine name, in characters.
 	MaxMachineNameLen = 64
@@ -31,12 +28,7 @@ const (
 
 // Machine directory errors.
 var (
-	// ErrTooManyInstallCodes: the user holds MaxLiveInstallCodes codes.
-	ErrTooManyInstallCodes = errors.New("store: too many live install codes")
-	// ErrInstallCodeInvalid: the code is unknown, expired or used, or its
-	// owner's account was erased.
-	ErrInstallCodeInvalid = errors.New("store: install code invalid")
-	// ErrTooManyMachines: the code's owner has MaxMachines machines.
+	// ErrTooManyMachines: the owner has MaxMachines machines.
 	ErrTooManyMachines = errors.New("store: too many machines")
 )
 
@@ -57,9 +49,19 @@ type Machine struct {
 	// Revoked: the user removed the machine; only its heartbeat still
 	// authenticates, to be told so.
 	Revoked bool
+	// Claimed: tied to the owner's IdP account (registered with an access
+	// token, or claimed later); machines of install codes start unclaimed.
+	Claimed bool
 }
 
-// NewMachine is what chat-agent reports when it registers.
+// AuthenticatedMachine is the machine of a secret with its owner's IdP
+// subject (users.idp_sub), which its claim and tunnel checks compare with.
+type AuthenticatedMachine struct {
+	Machine
+	OwnerSub string
+}
+
+// NewMachine is what tunelo reports when it registers.
 type NewMachine struct {
 	Name         string
 	OS           string
@@ -69,12 +71,12 @@ type NewMachine struct {
 }
 
 const machineColumns = `m.id, m.tenant_id, m.user_id, m.name, m.os, m.arch, m.agent_version, m.claude_version,
-	m.public_key, m.tunnel_url, m.created_at, m.last_seen_at, m.revoked_at IS NOT NULL`
+	m.public_key, m.tunnel_url, m.created_at, m.last_seen_at, m.revoked_at IS NOT NULL, m.claimed_at IS NOT NULL`
 
 func scanMachine(row pgx.Row) (Machine, error) {
 	var m Machine
 	err := row.Scan(&m.ID, &m.TenantID, &m.UserID, &m.Name, &m.OS, &m.Arch, &m.AgentVersion, &m.ClaudeVersion,
-		&m.PublicKey, &m.TunnelURL, &m.CreatedAt, &m.LastSeenAt, &m.Revoked)
+		&m.PublicKey, &m.TunnelURL, &m.CreatedAt, &m.LastSeenAt, &m.Revoked, &m.Claimed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Machine{}, ErrNotFound
 	}
@@ -113,75 +115,26 @@ func machineTokenHash(token string) []byte {
 	return h[:]
 }
 
-// CreateInstallCode stores a new install code of the user (128 random bits,
-// valid for InstallCodeTTL) and returns it with its expiry. The user's used
-// and expired codes are deleted on the way.
-func (s *Store) CreateInstallCode(ctx context.Context, tenantID string, userID int64) (string, time.Time, error) {
-	code, hash, err := newMachineToken(16)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-	var expires time.Time
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		// Serializes the user's code creations, so the limit holds.
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM users WHERE id = $1 AND tenant_id = $2 FOR UPDATE`, userID, tenantID); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `
-			DELETE FROM machine_install_codes WHERE tenant_id = $1 AND user_id = $2 AND (used_at IS NOT NULL OR expires_at <= now())`,
-			tenantID, userID); err != nil {
-			return err
-		}
-		var live int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM machine_install_codes WHERE tenant_id = $1 AND user_id = $2`,
-			tenantID, userID).Scan(&live); err != nil {
-			return err
-		}
-		if live >= MaxLiveInstallCodes {
-			return ErrTooManyInstallCodes
-		}
-		return tx.QueryRow(ctx, `
-			INSERT INTO machine_install_codes (code_hash, tenant_id, user_id, expires_at)
-			VALUES ($1, $2, $3, now() + $4::interval) RETURNING expires_at`,
-			hash, tenantID, userID, InstallCodeTTL).Scan(&expires)
-	})
-	if errors.Is(err, ErrTooManyInstallCodes) {
-		return "", time.Time{}, err
-	}
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("store: create install code: %w", err)
-	}
-	return code, expires, nil
-}
-
-// RegisterMachine redeems an install code for a new machine of the code's
-// owner and returns the machine and its secret (256 random bits; only its
-// hash is stored). The fields must be validated by the caller. It fails
-// with ErrInstallCodeInvalid or ErrTooManyMachines; on ErrTooManyMachines
-// the code stays usable.
-func (s *Store) RegisterMachine(ctx context.Context, tenantID, code string, n NewMachine) (Machine, string, error) {
+// RegisterMachine adds a claimed machine of the user (a live person; the
+// caller resolved it from the access token) and returns it with its secret
+// (256 random bits; only its hash is stored). The fields must be validated
+// by the caller. ErrNotFound when the user is gone, ErrTooManyMachines at
+// the limit.
+func (s *Store) RegisterMachine(ctx context.Context, tenantID string, userID int64, n NewMachine) (Machine, string, error) {
 	secret, secretHash, err := newMachineToken(32)
 	if err != nil {
 		return Machine{}, "", err
 	}
 	var m Machine
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var userID int64
-		err := tx.QueryRow(ctx, `
-			UPDATE machine_install_codes c SET used_at = now()
-			FROM users u
-			WHERE c.code_hash = $1 AND c.tenant_id = $2 AND c.used_at IS NULL AND c.expires_at > now()
-				AND u.id = c.user_id AND u.deleted_at IS NULL
-			RETURNING c.user_id`, machineTokenHash(code), tenantID).Scan(&userID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrInstallCodeInvalid
+		// The user row serializes the user's registrations, so the limit holds.
+		var live bool
+		err := tx.QueryRow(ctx, `SELECT deleted_at IS NULL FROM users WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+			userID, tenantID).Scan(&live)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !live) {
+			return ErrNotFound
 		}
 		if err != nil {
-			return err
-		}
-		// The code row is locked by the update; the user row serializes the
-		// user's registrations, so the limit holds.
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID); err != nil {
 			return err
 		}
 		var count int
@@ -193,13 +146,13 @@ func (s *Store) RegisterMachine(ctx context.Context, tenantID, code string, n Ne
 			return ErrTooManyMachines
 		}
 		m, err = scanMachine(tx.QueryRow(ctx, `
-			INSERT INTO machines AS m (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			INSERT INTO machines AS m (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash, claimed_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
 			RETURNING `+machineColumns,
 			tenantID, userID, n.Name, n.OS, n.Arch, n.AgentVersion, n.PublicKey, secretHash))
 		return err
 	})
-	if errors.Is(err, ErrInstallCodeInvalid) || errors.Is(err, ErrTooManyMachines) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrTooManyMachines) {
 		return Machine{}, "", err
 	}
 	if err != nil {
@@ -209,14 +162,40 @@ func (s *Store) RegisterMachine(ctx context.Context, tenantID, code string, n Ne
 }
 
 // AuthenticateMachine returns the machine whose secret is secret, revoked or
-// not; ErrNotFound when there is none or its owner's account was erased.
-func (s *Store) AuthenticateMachine(ctx context.Context, tenantID, secret string) (Machine, error) {
-	m, err := scanMachine(s.pool.QueryRow(ctx, `
-		SELECT `+machineColumns+` FROM machines m JOIN users u ON u.id = m.user_id
+// not, with its owner's IdP subject; ErrNotFound when there is none or its
+// owner's account was erased.
+func (s *Store) AuthenticateMachine(ctx context.Context, tenantID, secret string) (AuthenticatedMachine, error) {
+	var a AuthenticatedMachine
+	var sub *string
+	err := s.pool.QueryRow(ctx, `
+		SELECT `+machineColumns+`, u.idp_sub FROM machines m JOIN users u ON u.id = m.user_id
 		WHERE m.tenant_id = $1 AND m.secret_hash = $2 AND u.deleted_at IS NULL`,
-		tenantID, machineTokenHash(secret)))
+		tenantID, machineTokenHash(secret)).Scan(&a.ID, &a.TenantID, &a.UserID, &a.Name, &a.OS, &a.Arch, &a.AgentVersion,
+		&a.ClaudeVersion, &a.PublicKey, &a.TunnelURL, &a.CreatedAt, &a.LastSeenAt, &a.Revoked, &a.Claimed, &sub)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AuthenticatedMachine{}, ErrNotFound
+	}
+	if err != nil {
+		return AuthenticatedMachine{}, fmt.Errorf("store: authenticate machine: %w", err)
+	}
+	if sub != nil {
+		a.OwnerSub = *sub
+	}
+	return a, nil
+}
+
+// ClaimMachine ties a machine that is not revoked to its owner's IdP
+// account: it sets claimed_at (kept when already set) only while the
+// owner's idp_sub is ownerSub. ErrNotFound otherwise.
+func (s *Store) ClaimMachine(ctx context.Context, tenantID string, machineID int64, ownerSub string) (Machine, error) {
+	m, err := scanMachine(s.pool.QueryRow(ctx, `
+		UPDATE machines m SET claimed_at = coalesce(m.claimed_at, now())
+		FROM users u
+		WHERE m.id = $1 AND m.tenant_id = $2 AND m.revoked_at IS NULL
+			AND u.id = m.user_id AND u.deleted_at IS NULL AND u.idp_sub = $3
+		RETURNING `+machineColumns, machineID, tenantID, ownerSub))
 	if err != nil && !errors.Is(err, ErrNotFound) {
-		return Machine{}, fmt.Errorf("store: authenticate machine: %w", err)
+		return Machine{}, fmt.Errorf("store: claim machine: %w", err)
 	}
 	return m, err
 }

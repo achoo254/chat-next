@@ -93,8 +93,12 @@ type Machine struct {
 	// wss://<subdomain>.tunnel.<domain>, empty while the tunnel is down.
 	TunnelUrl string `protobuf:"bytes,8,opt,name=tunnel_url,json=tunnelUrl,proto3" json:"tunnel_url,omitempty"`
 	// Unix seconds.
-	CreatedAt     int64 `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	LastSeenAt    int64 `protobuf:"varint,10,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	CreatedAt  int64 `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastSeenAt int64 `protobuf:"varint,10,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	// The machine is tied to the account by tunelo login (registered that
+	// way, or claimed later). False for a machine registered with an install
+	// code whose tunelo has not signed in with the account yet.
+	Claimed       bool `protobuf:"varint,11,opt,name=claimed,proto3" json:"claimed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -199,6 +203,13 @@ func (x *Machine) GetLastSeenAt() int64 {
 	return 0
 }
 
+func (x *Machine) GetClaimed() bool {
+	if x != nil {
+		return x.Claimed
+	}
+	return false
+}
+
 type CreateInstallCodeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -235,6 +246,7 @@ func (*CreateInstallCodeRequest) Descriptor() ([]byte, []int) {
 	return file_app_v1_machines_proto_rawDescGZIP(), []int{1}
 }
 
+// Never answered (CreateInstallCode is retired); kept for older clients.
 type CreateInstallCodeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 128 random bits, base64url without padding (22 characters).
@@ -637,7 +649,9 @@ func (*RevokeDeviceResponse) Descriptor() ([]byte, []int) {
 
 type RegisterMachineRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// CreateInstallCodeResponse.code.
+	// Ignored: the owner comes from the access token.
+	//
+	// Deprecated: Marked as deprecated in app/v1/machines.proto.
 	InstallCode string `protobuf:"bytes,1,opt,name=install_code,json=installCode,proto3" json:"install_code,omitempty"`
 	// Shown in the directory; the host name is a good default. Trimmed; 1 to
 	// 64 characters, no control characters.
@@ -646,7 +660,7 @@ type RegisterMachineRequest struct {
 	// process.arch).
 	Os   string `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
 	Arch string `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
-	// Semantic version of chat-agent, such as "0.1.0".
+	// Semantic version of tunelo, such as "2.1.0".
 	AgentVersion string `protobuf:"bytes,5,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
 	// The machine's X25519 static public key, 32 bytes.
 	PublicKey     []byte `protobuf:"bytes,6,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
@@ -684,6 +698,7 @@ func (*RegisterMachineRequest) Descriptor() ([]byte, []int) {
 	return file_app_v1_machines_proto_rawDescGZIP(), []int{11}
 }
 
+// Deprecated: Marked as deprecated in app/v1/machines.proto.
 func (x *RegisterMachineRequest) GetInstallCode() string {
 	if x != nil {
 		return x.InstallCode
@@ -781,6 +796,95 @@ func (x *RegisterMachineResponse) GetMachineSecret() string {
 	return ""
 }
 
+type ClaimMachineRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// RegisterMachineResponse.machine_secret of the machine to claim.
+	MachineSecret string `protobuf:"bytes,1,opt,name=machine_secret,json=machineSecret,proto3" json:"machine_secret,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimMachineRequest) Reset() {
+	*x = ClaimMachineRequest{}
+	mi := &file_app_v1_machines_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimMachineRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimMachineRequest) ProtoMessage() {}
+
+func (x *ClaimMachineRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_machines_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimMachineRequest.ProtoReflect.Descriptor instead.
+func (*ClaimMachineRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_machines_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ClaimMachineRequest) GetMachineSecret() string {
+	if x != nil {
+		return x.MachineSecret
+	}
+	return ""
+}
+
+type ClaimMachineResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MachineId     int64                  `protobuf:"varint,1,opt,name=machine_id,json=machineId,proto3" json:"machine_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimMachineResponse) Reset() {
+	*x = ClaimMachineResponse{}
+	mi := &file_app_v1_machines_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimMachineResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimMachineResponse) ProtoMessage() {}
+
+func (x *ClaimMachineResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_machines_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimMachineResponse.ProtoReflect.Descriptor instead.
+func (*ClaimMachineResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_machines_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ClaimMachineResponse) GetMachineId() int64 {
+	if x != nil {
+		return x.MachineId
+	}
+	return 0
+}
+
 type HeartbeatRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// wss://<subdomain>.tunnel.<domain> (optionally with a trailing slash), or
@@ -796,7 +900,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_app_v1_machines_proto_msgTypes[13]
+	mi := &file_app_v1_machines_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -808,7 +912,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_machines_proto_msgTypes[13]
+	mi := &file_app_v1_machines_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -821,7 +925,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_machines_proto_rawDescGZIP(), []int{13}
+	return file_app_v1_machines_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *HeartbeatRequest) GetTunnelUrl() string {
@@ -852,16 +956,19 @@ type HeartbeatResponse struct {
 	// Public keys (32 bytes each) of the devices the user revoked for this
 	// machine: drop their connections and forget them.
 	RevokedDeviceKeys [][]byte `protobuf:"bytes,2,rep,name=revoked_device_keys,json=revokedDeviceKeys,proto3" json:"revoked_device_keys,omitempty"`
-	// The oldest chat-agent version the server accepts; update before falling
+	// The oldest tunelo version the server accepts; update before falling
 	// below it.
 	MinAgentVersion string `protobuf:"bytes,3,opt,name=min_agent_version,json=minAgentVersion,proto3" json:"min_agent_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Machine.claimed: false asks tunelo to call ClaimMachine once it is
+	// signed in with the account.
+	Claimed       bool `protobuf:"varint,4,opt,name=claimed,proto3" json:"claimed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_app_v1_machines_proto_msgTypes[14]
+	mi := &file_app_v1_machines_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +980,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_machines_proto_msgTypes[14]
+	mi := &file_app_v1_machines_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +993,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_machines_proto_rawDescGZIP(), []int{14}
+	return file_app_v1_machines_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *HeartbeatResponse) GetRevoked() bool {
@@ -910,6 +1017,13 @@ func (x *HeartbeatResponse) GetMinAgentVersion() string {
 	return ""
 }
 
+func (x *HeartbeatResponse) GetClaimed() bool {
+	if x != nil {
+		return x.Claimed
+	}
+	return false
+}
+
 type NotifyNeedsInputRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  NeedsInputKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=app.v1.NeedsInputKind" json:"kind,omitempty"`
@@ -925,7 +1039,7 @@ type NotifyNeedsInputRequest struct {
 
 func (x *NotifyNeedsInputRequest) Reset() {
 	*x = NotifyNeedsInputRequest{}
-	mi := &file_app_v1_machines_proto_msgTypes[15]
+	mi := &file_app_v1_machines_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -937,7 +1051,7 @@ func (x *NotifyNeedsInputRequest) String() string {
 func (*NotifyNeedsInputRequest) ProtoMessage() {}
 
 func (x *NotifyNeedsInputRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_machines_proto_msgTypes[15]
+	mi := &file_app_v1_machines_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -950,7 +1064,7 @@ func (x *NotifyNeedsInputRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotifyNeedsInputRequest.ProtoReflect.Descriptor instead.
 func (*NotifyNeedsInputRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_machines_proto_rawDescGZIP(), []int{15}
+	return file_app_v1_machines_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *NotifyNeedsInputRequest) GetKind() NeedsInputKind {
@@ -982,7 +1096,7 @@ type NotifyNeedsInputResponse struct {
 
 func (x *NotifyNeedsInputResponse) Reset() {
 	*x = NotifyNeedsInputResponse{}
-	mi := &file_app_v1_machines_proto_msgTypes[16]
+	mi := &file_app_v1_machines_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +1108,7 @@ func (x *NotifyNeedsInputResponse) String() string {
 func (*NotifyNeedsInputResponse) ProtoMessage() {}
 
 func (x *NotifyNeedsInputResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_machines_proto_msgTypes[16]
+	mi := &file_app_v1_machines_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,14 +1121,14 @@ func (x *NotifyNeedsInputResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotifyNeedsInputResponse.ProtoReflect.Descriptor instead.
 func (*NotifyNeedsInputResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_machines_proto_rawDescGZIP(), []int{16}
+	return file_app_v1_machines_proto_rawDescGZIP(), []int{18}
 }
 
 var File_app_v1_machines_proto protoreflect.FileDescriptor
 
 const file_app_v1_machines_proto_rawDesc = "" +
 	"\n" +
-	"\x15app/v1/machines.proto\x12\x06app.v1\"\xa8\x02\n" +
+	"\x15app/v1/machines.proto\x12\x06app.v1\"\xc2\x02\n" +
 	"\aMachine\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
@@ -1030,7 +1144,8 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\x03B\x020\x02R\tcreatedAt\x12$\n" +
 	"\flast_seen_at\x18\n" +
 	" \x01(\x03B\x020\x02R\n" +
-	"lastSeenAt\"\x1a\n" +
+	"lastSeenAt\x12\x18\n" +
+	"\aclaimed\x18\v \x01(\bR\aclaimed\"\x1a\n" +
 	"\x18CreateInstallCodeRequest\"R\n" +
 	"\x19CreateInstallCodeResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12!\n" +
@@ -1053,9 +1168,9 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\n" +
 	"machine_id\x18\x01 \x01(\x03B\x020\x02R\tmachineId\x12*\n" +
 	"\x11device_public_key\x18\x02 \x01(\fR\x0fdevicePublicKey\"\x16\n" +
-	"\x14RevokeDeviceResponse\"\xb7\x01\n" +
-	"\x16RegisterMachineRequest\x12!\n" +
-	"\finstall_code\x18\x01 \x01(\tR\vinstallCode\x12\x12\n" +
+	"\x14RevokeDeviceResponse\"\xbb\x01\n" +
+	"\x16RegisterMachineRequest\x12%\n" +
+	"\finstall_code\x18\x01 \x01(\tB\x02\x18\x01R\vinstallCode\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
 	"\x04arch\x18\x04 \x01(\tR\x04arch\x12#\n" +
@@ -1065,16 +1180,22 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\x17RegisterMachineResponse\x12!\n" +
 	"\n" +
 	"machine_id\x18\x01 \x01(\x03B\x020\x02R\tmachineId\x12%\n" +
-	"\x0emachine_secret\x18\x02 \x01(\tR\rmachineSecret\"}\n" +
+	"\x0emachine_secret\x18\x02 \x01(\tR\rmachineSecret\"<\n" +
+	"\x13ClaimMachineRequest\x12%\n" +
+	"\x0emachine_secret\x18\x01 \x01(\tR\rmachineSecret\"9\n" +
+	"\x14ClaimMachineResponse\x12!\n" +
+	"\n" +
+	"machine_id\x18\x01 \x01(\x03B\x020\x02R\tmachineId\"}\n" +
 	"\x10HeartbeatRequest\x12\x1d\n" +
 	"\n" +
 	"tunnel_url\x18\x01 \x01(\tR\ttunnelUrl\x12#\n" +
 	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12%\n" +
-	"\x0eclaude_version\x18\x03 \x01(\tR\rclaudeVersion\"\x89\x01\n" +
+	"\x0eclaude_version\x18\x03 \x01(\tR\rclaudeVersion\"\xa3\x01\n" +
 	"\x11HeartbeatResponse\x12\x18\n" +
 	"\arevoked\x18\x01 \x01(\bR\arevoked\x12.\n" +
 	"\x13revoked_device_keys\x18\x02 \x03(\fR\x11revokedDeviceKeys\x12*\n" +
-	"\x11min_agent_version\x18\x03 \x01(\tR\x0fminAgentVersion\"\x89\x01\n" +
+	"\x11min_agent_version\x18\x03 \x01(\tR\x0fminAgentVersion\x12\x18\n" +
+	"\aclaimed\x18\x04 \x01(\bR\aclaimed\"\x89\x01\n" +
 	"\x17NotifyNeedsInputRequest\x12*\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x16.app.v1.NeedsInputKindR\x04kind\x12#\n" +
 	"\rpending_count\x18\x02 \x01(\x05R\fpendingCount\x12\x1d\n" +
@@ -1090,9 +1211,10 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\fListMachines\x12\x1b.app.v1.ListMachinesRequest\x1a\x1c.app.v1.ListMachinesResponse\x12L\n" +
 	"\rRenameMachine\x12\x1c.app.v1.RenameMachineRequest\x1a\x1d.app.v1.RenameMachineResponse\x12L\n" +
 	"\rRevokeMachine\x12\x1c.app.v1.RevokeMachineRequest\x1a\x1d.app.v1.RevokeMachineResponse\x12I\n" +
-	"\fRevokeDevice\x12\x1b.app.v1.RevokeDeviceRequest\x1a\x1c.app.v1.RevokeDeviceResponse2\x82\x02\n" +
+	"\fRevokeDevice\x12\x1b.app.v1.RevokeDeviceRequest\x1a\x1c.app.v1.RevokeDeviceResponse2\xcd\x02\n" +
 	"\x13MachineAgentService\x12R\n" +
-	"\x0fRegisterMachine\x12\x1e.app.v1.RegisterMachineRequest\x1a\x1f.app.v1.RegisterMachineResponse\x12@\n" +
+	"\x0fRegisterMachine\x12\x1e.app.v1.RegisterMachineRequest\x1a\x1f.app.v1.RegisterMachineResponse\x12I\n" +
+	"\fClaimMachine\x12\x1b.app.v1.ClaimMachineRequest\x1a\x1c.app.v1.ClaimMachineResponse\x12@\n" +
 	"\tHeartbeat\x12\x18.app.v1.HeartbeatRequest\x1a\x19.app.v1.HeartbeatResponse\x12U\n" +
 	"\x10NotifyNeedsInput\x12\x1f.app.v1.NotifyNeedsInputRequest\x1a .app.v1.NotifyNeedsInputResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
@@ -1109,7 +1231,7 @@ func file_app_v1_machines_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_machines_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_app_v1_machines_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_app_v1_machines_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_app_v1_machines_proto_goTypes = []any{
 	(NeedsInputKind)(0),               // 0: app.v1.NeedsInputKind
 	(*Machine)(nil),                   // 1: app.v1.Machine
@@ -1125,10 +1247,12 @@ var file_app_v1_machines_proto_goTypes = []any{
 	(*RevokeDeviceResponse)(nil),      // 11: app.v1.RevokeDeviceResponse
 	(*RegisterMachineRequest)(nil),    // 12: app.v1.RegisterMachineRequest
 	(*RegisterMachineResponse)(nil),   // 13: app.v1.RegisterMachineResponse
-	(*HeartbeatRequest)(nil),          // 14: app.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),         // 15: app.v1.HeartbeatResponse
-	(*NotifyNeedsInputRequest)(nil),   // 16: app.v1.NotifyNeedsInputRequest
-	(*NotifyNeedsInputResponse)(nil),  // 17: app.v1.NotifyNeedsInputResponse
+	(*ClaimMachineRequest)(nil),       // 14: app.v1.ClaimMachineRequest
+	(*ClaimMachineResponse)(nil),      // 15: app.v1.ClaimMachineResponse
+	(*HeartbeatRequest)(nil),          // 16: app.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),         // 17: app.v1.HeartbeatResponse
+	(*NotifyNeedsInputRequest)(nil),   // 18: app.v1.NotifyNeedsInputRequest
+	(*NotifyNeedsInputResponse)(nil),  // 19: app.v1.NotifyNeedsInputResponse
 }
 var file_app_v1_machines_proto_depIdxs = []int32{
 	1,  // 0: app.v1.ListMachinesResponse.machines:type_name -> app.v1.Machine
@@ -1140,18 +1264,20 @@ var file_app_v1_machines_proto_depIdxs = []int32{
 	8,  // 6: app.v1.MachinesService.RevokeMachine:input_type -> app.v1.RevokeMachineRequest
 	10, // 7: app.v1.MachinesService.RevokeDevice:input_type -> app.v1.RevokeDeviceRequest
 	12, // 8: app.v1.MachineAgentService.RegisterMachine:input_type -> app.v1.RegisterMachineRequest
-	14, // 9: app.v1.MachineAgentService.Heartbeat:input_type -> app.v1.HeartbeatRequest
-	16, // 10: app.v1.MachineAgentService.NotifyNeedsInput:input_type -> app.v1.NotifyNeedsInputRequest
-	3,  // 11: app.v1.MachinesService.CreateInstallCode:output_type -> app.v1.CreateInstallCodeResponse
-	5,  // 12: app.v1.MachinesService.ListMachines:output_type -> app.v1.ListMachinesResponse
-	7,  // 13: app.v1.MachinesService.RenameMachine:output_type -> app.v1.RenameMachineResponse
-	9,  // 14: app.v1.MachinesService.RevokeMachine:output_type -> app.v1.RevokeMachineResponse
-	11, // 15: app.v1.MachinesService.RevokeDevice:output_type -> app.v1.RevokeDeviceResponse
-	13, // 16: app.v1.MachineAgentService.RegisterMachine:output_type -> app.v1.RegisterMachineResponse
-	15, // 17: app.v1.MachineAgentService.Heartbeat:output_type -> app.v1.HeartbeatResponse
-	17, // 18: app.v1.MachineAgentService.NotifyNeedsInput:output_type -> app.v1.NotifyNeedsInputResponse
-	11, // [11:19] is the sub-list for method output_type
-	3,  // [3:11] is the sub-list for method input_type
+	14, // 9: app.v1.MachineAgentService.ClaimMachine:input_type -> app.v1.ClaimMachineRequest
+	16, // 10: app.v1.MachineAgentService.Heartbeat:input_type -> app.v1.HeartbeatRequest
+	18, // 11: app.v1.MachineAgentService.NotifyNeedsInput:input_type -> app.v1.NotifyNeedsInputRequest
+	3,  // 12: app.v1.MachinesService.CreateInstallCode:output_type -> app.v1.CreateInstallCodeResponse
+	5,  // 13: app.v1.MachinesService.ListMachines:output_type -> app.v1.ListMachinesResponse
+	7,  // 14: app.v1.MachinesService.RenameMachine:output_type -> app.v1.RenameMachineResponse
+	9,  // 15: app.v1.MachinesService.RevokeMachine:output_type -> app.v1.RevokeMachineResponse
+	11, // 16: app.v1.MachinesService.RevokeDevice:output_type -> app.v1.RevokeDeviceResponse
+	13, // 17: app.v1.MachineAgentService.RegisterMachine:output_type -> app.v1.RegisterMachineResponse
+	15, // 18: app.v1.MachineAgentService.ClaimMachine:output_type -> app.v1.ClaimMachineResponse
+	17, // 19: app.v1.MachineAgentService.Heartbeat:output_type -> app.v1.HeartbeatResponse
+	19, // 20: app.v1.MachineAgentService.NotifyNeedsInput:output_type -> app.v1.NotifyNeedsInputResponse
+	12, // [12:21] is the sub-list for method output_type
+	3,  // [3:12] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name
@@ -1168,7 +1294,7 @@ func file_app_v1_machines_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_machines_proto_rawDesc), len(file_app_v1_machines_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

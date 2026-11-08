@@ -8,15 +8,16 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // always holds a value < 2^53; the server asserts the bound when serializing.
 
 // My machines (ADR 0013): the directory of the computers where the user runs
-// chat-agent. The server only lists them (name, OS, public key, tunnel
-// address, last seen), hands out install codes and sends content-free Web
-// Pushes for them; it is never a root of trust for a machine's key and never
+// tunelo (formerly chat-agent). The server only lists them (name, OS, public
+// key, tunnel address, last seen) and sends content-free Web Pushes for
+// them; it is never a root of trust for a machine's key and never
 // sees what goes through the tunnel. Served under /rpc with the user's
 // session like every user service.
 service MachinesService {
-  // A one-time install code for `chat-agent install`, valid for 10 minutes.
-  // Fails with resource_exhausted "too_many_install_codes" while the user
-  // holds 5 unused, unexpired codes.
+  // Retired: machines now join with the owner's account (tunelo login), so
+  // there are no install codes any more. Always fails with
+  // failed_precondition "install_codes_retired" (update tunelo, then add the
+  // machine again).
   rpc CreateInstallCode(CreateInstallCodeRequest) returns (CreateInstallCodeResponse);
   // The caller's machines that are not revoked, oldest first.
   rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse);
@@ -34,23 +35,40 @@ service MachinesService {
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
 }
 
-// The calls of chat-agent itself. Served under /machine-api (not /rpc): the
-// agent sends no Origin and has no user session. RegisterMachine is
-// authenticated by its install code; the other calls by the machine secret in
+// The calls of tunelo itself. Served under /machine-api (not /rpc): the agent
+// sends no Origin and has no user session. RegisterMachine and ClaimMachine
+// are authenticated by an access token of the owner's IdP account in
+// "Authorization: Bearer <token>": an ES256 JWT whose aud is the chat's MCP
+// resource (<chat origin>/mcp) and whose scope holds machines:write (only the
+// tunelo-agent client gets it). The other calls by the machine secret in
 // "Authorization: Bearer <machine_secret>". Every call fails with
-// unauthenticated for a wrong code or secret (and resource_exhausted after too
-// many failures from one address).
+// unauthenticated for a wrong token or secret (and resource_exhausted after
+// too many failures from one address); RegisterMachine and ClaimMachine fail
+// with permission_denied "insufficient_scope" for a token without
+// machines:write and unavailable while the server cannot check tokens yet.
 service MachineAgentService {
-  // Turns an install code into a machine of the code's owner. Fails with
-  // unauthenticated "install_code_invalid" for a wrong, expired or used code,
-  // invalid_argument for malformed fields, failed_precondition
-  // "agent_update_required" when agent_version is below the minimum, and
-  // resource_exhausted "too_many_machines" when the owner has 20 machines.
+  // Adds a machine to the directory of the token's account, claimed from the
+  // start. Fails with failed_precondition "chat_account_missing" when that
+  // account never opened the chat (tunelo waits and retries: the machine
+  // appears after the first visit), invalid_argument for malformed fields,
+  // failed_precondition "agent_update_required" when agent_version is below
+  // the minimum, and resource_exhausted "too_many_machines" when the owner
+  // has 20 machines.
   rpc RegisterMachine(RegisterMachineRequest) returns (RegisterMachineResponse);
+  // Ties a machine registered with an install code (before accounts) to the
+  // token's account, so the tunnel check of Heartbeat applies to it. The
+  // machine is named by its secret in the request. Succeeds again for a
+  // machine already claimed by the same account. Fails with unauthenticated
+  // for a wrong secret, permission_denied "claim_wrong_account" when the
+  // machine belongs to another account and permission_denied
+  // "machine_revoked" for a removed machine.
+  rpc ClaimMachine(ClaimMachineRequest) returns (ClaimMachineResponse);
   // Reports the machine alive (every 60 s and whenever the tunnel changes)
   // and returns what was revoked. A revoked machine gets revoked = true (and
   // nothing is recorded); otherwise an agent_version below the minimum fails
-  // with failed_precondition "agent_update_required".
+  // with failed_precondition "agent_update_required". For a claimed machine
+  // a tunnel_url other than the machine tunnel Tunelo holds for its owner
+  // fails with permission_denied "tunnel_not_owned" (nothing is recorded).
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   // Asks the server to tell the owner's devices, by Web Push, that a session
   // waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -81,10 +99,15 @@ message Machine {
   // Unix seconds.
   int64 created_at = 9 [jstype = JS_NUMBER];
   int64 last_seen_at = 10 [jstype = JS_NUMBER];
+  // The machine is tied to the account by tunelo login (registered that
+  // way, or claimed later). False for a machine registered with an install
+  // code whose tunelo has not signed in with the account yet.
+  bool claimed = 11;
 }
 
 message CreateInstallCodeRequest {}
 
+// Never answered (CreateInstallCode is retired); kept for older clients.
 message CreateInstallCodeResponse {
   // 128 random bits, base64url without padding (22 characters).
   string code = 1;
@@ -123,8 +146,8 @@ message RevokeDeviceRequest {
 message RevokeDeviceResponse {}
 
 message RegisterMachineRequest {
-  // CreateInstallCodeResponse.code.
-  string install_code = 1;
+  // Ignored: the owner comes from the access token.
+  string install_code = 1 [deprecated = true];
   // Shown in the directory; the host name is a good default. Trimmed; 1 to
   // 64 characters, no control characters.
   string name = 2;
@@ -132,7 +155,7 @@ message RegisterMachineRequest {
   // process.arch).
   string os = 3;
   string arch = 4;
-  // Semantic version of chat-agent, such as "0.1.0".
+  // Semantic version of tunelo, such as "2.1.0".
   string agent_version = 5;
   // The machine's X25519 static public key, 32 bytes.
   bytes public_key = 6;
@@ -144,6 +167,15 @@ message RegisterMachineResponse {
   // token of Heartbeat and NotifyNeedsInput. Shown once; the server keeps
   // only its hash.
   string machine_secret = 2;
+}
+
+message ClaimMachineRequest {
+  // RegisterMachineResponse.machine_secret of the machine to claim.
+  string machine_secret = 1;
+}
+
+message ClaimMachineResponse {
+  int64 machine_id = 1 [jstype = JS_NUMBER];
 }
 
 message HeartbeatRequest {
@@ -162,9 +194,12 @@ message HeartbeatResponse {
   // Public keys (32 bytes each) of the devices the user revoked for this
   // machine: drop their connections and forget them.
   repeated bytes revoked_device_keys = 2;
-  // The oldest chat-agent version the server accepts; update before falling
+  // The oldest tunelo version the server accepts; update before falling
   // below it.
   string min_agent_version = 3;
+  // Machine.claimed: false asks tunelo to call ClaimMachine once it is
+  // signed in with the account.
+  bool claimed = 4;
 }
 
 // What a waiting session needs from the user.

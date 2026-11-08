@@ -1,15 +1,22 @@
-// Package machineapi serves the calls of chat-agent, the background process
-// of "My machines" (ADR 0013), under /machine-api/ as the Connect service
-// app.v1.MachineAgentService: RegisterMachine (authenticated by an install
-// code), Heartbeat and NotifyNeedsInput (by the machine secret in
-// "Authorization: Bearer <secret>").
+// Package machineapi serves the calls of tunelo (formerly chat-agent), the
+// background process of "My machines" (ADR 0013), under /machine-api/ as the
+// Connect service app.v1.MachineAgentService: RegisterMachine and
+// ClaimMachine (authenticated by an IdP access token of the owner, aud the
+// chat's MCP resource, scope machines:write), Heartbeat and NotifyNeedsInput
+// (by the machine secret in "Authorization: Bearer <secret>").
 //
 // It is mounted beside /rpc, not inside it: the agent sends no Origin and
 // has no user session, so the Origin and session checks of /rpc do not
 // apply. The machine secret only reports the machine alive and asks for
-// content-free pushes; it reads no chat data.
+// content-free pushes; it reads no chat data. Pairing a device stays
+// end-to-end between the device and the machine: no call here takes a
+// device key or pairing secret.
 //
-// Secrets and install codes never reach a log. Failed authentications are
+// A claimed machine (tied to its owner's IdP account) may report only the
+// machine tunnel Tunelo holds for that account (MachineSubdomain), so the
+// directory never points devices at a tunnel another account opened.
+//
+// Secrets and tokens never reach a log. Failed authentications are
 // limited per client address (a valid secret is never refused by that
 // limit); nginx also limits the paths, RegisterMachine per address and
 // overall. A machine's "needs you" pushes go out at most once per
@@ -49,6 +56,10 @@ const Prefix = "/machine-api/"
 // MinAgentVersion is the oldest machine agent (tunelo, formerly hda and chat-agent) the server accepts.
 const MinAgentVersion = "0.1.0"
 
+// MachinesScope is the scope an access token needs to register or claim a
+// machine; the IdP grants it to the tunelo-agent client only.
+const MachinesScope = "machines:write"
+
 // Limits and timings.
 const (
 	maxRequestBytes = 16 << 10
@@ -69,20 +80,27 @@ var (
 	// limitMachineCalls bounds the authenticated calls of one machine
 	// (heartbeats every 60 s, notices when a session waits).
 	limitMachineCalls = ratelimit.Rule{Rate: 1, Burst: 30}
+	// limitAccountCalls bounds RegisterMachine and ClaimMachine of one IdP
+	// account (tunelo retries them at most once a minute per machine).
+	limitAccountCalls = ratelimit.Rule{Rate: 0.2, Burst: 20}
 
 	osNames   = map[string]bool{"darwin": true, "win32": true, "linux": true}
 	archNames = map[string]bool{"arm64": true, "x64": true}
 
-	// Base64url without padding of 16 and 32 bytes.
-	installCodeRE = regexp.MustCompile(`^[A-Za-z0-9_-]{22}$`)
-	secretRE      = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
-	sessionIDRE   = regexp.MustCompile(`^[A-Za-z0-9_-]{0,64}$`)
-	versionRE     = regexp.MustCompile(`^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})(-[0-9A-Za-z.-]{1,16})?$`)
+	// Base64url without padding of 32 bytes.
+	secretRE    = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	sessionIDRE = regexp.MustCompile(`^[A-Za-z0-9_-]{0,64}$`)
+	versionRE   = regexp.MustCompile(`^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})(-[0-9A-Za-z.-]{1,16})?$`)
 )
 
 // Notifier sends a machine's notice to its owner's devices (push.Service).
 type Notifier interface {
 	NotifyUser(ctx context.Context, userID int64, n push.MachineNotice) (int, error)
+}
+
+// TokenVerifier checks IdP access tokens offline (auth.IdP).
+type TokenVerifier interface {
+	VerifyAccessToken(ctx context.Context, raw, audience string) (auth.AccessToken, error)
 }
 
 // Config holds the tenant settings.
@@ -91,6 +109,10 @@ type Config struct {
 	// TenantDomain is the tenant's domain: tunnel addresses must be
 	// wss://<subdomain>.tunnel.<TenantDomain>.
 	TenantDomain string
+	// Resource is the audience the owner's access tokens must carry: the
+	// chat's MCP resource, CHAT_PUBLIC_URL + "/mcp" (tunelo's one sign-in
+	// asks the IdP for it).
+	Resource string
 }
 
 // Service is the handler of MachineAgentService.
@@ -98,6 +120,7 @@ type Service struct {
 	appv1connect.UnimplementedMachineAgentServiceHandler
 	cfg      Config
 	store    *store.Store
+	tokens   TokenVerifier
 	notifier Notifier
 	limiter  ratelimit.Limiter
 	logger   *slog.Logger
@@ -125,11 +148,11 @@ type noticeState struct {
 type stopper interface{ Stop() bool }
 
 // New returns the service; serve Handler at Prefix and Close it at shutdown.
-func New(cfg Config, st *store.Store, notifier Notifier, limiter ratelimit.Limiter, logger *slog.Logger) (*Service, error) {
-	if st == nil || notifier == nil || limiter == nil || logger == nil {
+func New(cfg Config, st *store.Store, tokens TokenVerifier, notifier Notifier, limiter ratelimit.Limiter, logger *slog.Logger) (*Service, error) {
+	if st == nil || tokens == nil || notifier == nil || limiter == nil || logger == nil {
 		return nil, errors.New("machineapi: missing dependency")
 	}
-	if cfg.TenantID == "" || cfg.TenantDomain == "" {
+	if cfg.TenantID == "" || cfg.TenantDomain == "" || cfg.Resource == "" {
 		return nil, errors.New("machineapi: incomplete configuration")
 	}
 	tunnelRE, err := regexp.Compile(`^wss://[a-z0-9-]+\.tunnel\.` + regexp.QuoteMeta(strings.ToLower(cfg.TenantDomain)) + `/?$`)
@@ -137,7 +160,7 @@ func New(cfg Config, st *store.Store, notifier Notifier, limiter ratelimit.Limit
 		return nil, fmt.Errorf("machineapi: tunnel pattern: %w", err)
 	}
 	return &Service{
-		cfg: cfg, store: st, notifier: notifier, limiter: limiter, logger: logger, tunnelRE: tunnelRE, now: time.Now,
+		cfg: cfg, store: st, tokens: tokens, notifier: notifier, limiter: limiter, logger: logger, tunnelRE: tunnelRE, now: time.Now,
 		after:   func(d time.Duration, f func()) stopper { return time.AfterFunc(d, f) },
 		notices: map[int64]*noticeState{},
 	}, nil
@@ -169,10 +192,11 @@ func (s *Service) Close() {
 // ----------------------------------------------------------------- calls
 
 func (s *Service) RegisterMachine(ctx context.Context, req *connect.Request[appv1.RegisterMachineRequest]) (*connect.Response[appv1.RegisterMachineResponse], error) {
-	m := req.Msg
-	if !installCodeRE.MatchString(m.GetInstallCode()) {
-		return nil, s.authFailed(req, "install_code_invalid: the install code is wrong, expired or used")
+	tok, err := s.owner(ctx, req)
+	if err != nil {
+		return nil, err
 	}
+	m := req.Msg
 	name, ok := store.CleanMachineName(m.GetName())
 	if !ok {
 		return nil, invalid("name must be 1 to 64 characters without control characters")
@@ -186,12 +210,20 @@ func (s *Service) RegisterMachine(ctx context.Context, req *connect.Request[appv
 	if len(m.GetPublicKey()) != store.MachineKeyLen {
 		return nil, invalid("public_key must be 32 bytes")
 	}
-	machine, secret, err := s.store.RegisterMachine(ctx, s.cfg.TenantID, m.GetInstallCode(), store.NewMachine{
+	user, err := s.store.UserByIdPSub(ctx, s.cfg.TenantID, tok.Subject)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, errNoChatAccount()
+	}
+	if err != nil {
+		return nil, s.internal(ctx, req.Spec().Procedure, err)
+	}
+	machine, secret, err := s.store.RegisterMachine(ctx, s.cfg.TenantID, user.ID, store.NewMachine{
 		Name: name, OS: m.GetOs(), Arch: m.GetArch(), AgentVersion: m.GetAgentVersion(), PublicKey: m.GetPublicKey(),
 	})
 	switch {
-	case errors.Is(err, store.ErrInstallCodeInvalid):
-		return nil, s.authFailed(req, "install_code_invalid: the install code is wrong, expired or used")
+	case errors.Is(err, store.ErrNotFound):
+		// Erased between the lookup and the registration.
+		return nil, errNoChatAccount()
 	case errors.Is(err, store.ErrTooManyMachines):
 		return nil, connect.NewError(connect.CodeResourceExhausted,
 			fmt.Errorf("too_many_machines: an account has at most %d machines; remove one first", store.MaxMachines))
@@ -199,8 +231,43 @@ func (s *Service) RegisterMachine(ctx context.Context, req *connect.Request[appv
 		return nil, s.internal(ctx, req.Spec().Procedure, err)
 	}
 	s.logger.Info("machine registered", "machine_id", machine.ID, "user_id", machine.UserID, "os", machine.OS,
-		"arch", machine.Arch, "agent_version", machine.AgentVersion)
+		"arch", machine.Arch, "agent_version", machine.AgentVersion, "client_id", tok.ClientID)
 	return connect.NewResponse(&appv1.RegisterMachineResponse{MachineId: machine.ID, MachineSecret: secret}), nil
+}
+
+func (s *Service) ClaimMachine(ctx context.Context, req *connect.Request[appv1.ClaimMachineRequest]) (*connect.Response[appv1.ClaimMachineResponse], error) {
+	tok, err := s.owner(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	secret := req.Msg.GetMachineSecret()
+	if !secretRE.MatchString(secret) {
+		return nil, s.authFailed(req, "invalid machine secret")
+	}
+	machine, err := s.store.AuthenticateMachine(ctx, s.cfg.TenantID, secret)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, s.authFailed(req, "invalid machine secret")
+	case err != nil:
+		return nil, s.internal(ctx, req.Spec().Procedure, err)
+	case machine.Revoked:
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("machine_revoked: the machine was removed from the account"))
+	case machine.OwnerSub != tok.Subject:
+		return nil, connect.NewError(connect.CodePermissionDenied,
+			errors.New("claim_wrong_account: the machine belongs to another account; sign in to tunelo with the account that added it"))
+	}
+	claimed, err := s.store.ClaimMachine(ctx, s.cfg.TenantID, machine.ID, tok.Subject)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		// Revoked or the owner erased in between.
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("machine_revoked: the machine was removed from the account"))
+	case err != nil:
+		return nil, s.internal(ctx, req.Spec().Procedure, err)
+	}
+	if !machine.Claimed {
+		s.logger.Info("machine claimed", "machine_id", claimed.ID, "user_id", claimed.UserID, "client_id", tok.ClientID)
+	}
+	return connect.NewResponse(&appv1.ClaimMachineResponse{MachineId: claimed.ID}), nil
 }
 
 func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.HeartbeatRequest]) (*connect.Response[appv1.HeartbeatResponse], error) {
@@ -220,6 +287,11 @@ func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.Hear
 		return nil, invalid("tunnel_url must be wss://<subdomain>.tunnel." + strings.ToLower(s.cfg.TenantDomain))
 	}
 	tunnel = strings.TrimSuffix(tunnel, "/")
+	if tunnel != "" && machine.Claimed && tunnel != s.machineTunnel(machine) {
+		s.logger.Warn("heartbeat with a tunnel of another account", "machine_id", machine.ID)
+		return nil, connect.NewError(connect.CodePermissionDenied,
+			errors.New("tunnel_not_owned: the tunnel is not the machine tunnel of the machine's account; sign in to tunelo with that account"))
+	}
 	claude := m.GetClaudeVersion()
 	if !cleanLabel(claude, maxClaudeLen) {
 		return nil, invalid("claude_version must be at most 64 characters without control characters")
@@ -232,7 +304,7 @@ func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.Hear
 	if err != nil {
 		return nil, s.internal(ctx, req.Spec().Procedure, err)
 	}
-	return connect.NewResponse(&appv1.HeartbeatResponse{RevokedDeviceKeys: keys, MinAgentVersion: MinAgentVersion}), nil
+	return connect.NewResponse(&appv1.HeartbeatResponse{RevokedDeviceKeys: keys, MinAgentVersion: MinAgentVersion, Claimed: machine.Claimed}), nil
 }
 
 func (s *Service) NotifyNeedsInput(ctx context.Context, req *connect.Request[appv1.NotifyNeedsInputRequest]) (*connect.Response[appv1.NotifyNeedsInputResponse], error) {
@@ -334,22 +406,58 @@ func (s *Service) send(ctx context.Context, userID int64, n push.MachineNotice) 
 
 // authenticate resolves the machine of the bearer secret, revoked or not,
 // and applies its call budget.
-func (s *Service) authenticate(ctx context.Context, req connect.AnyRequest) (store.Machine, error) {
+func (s *Service) authenticate(ctx context.Context, req connect.AnyRequest) (store.AuthenticatedMachine, error) {
 	secret, ok := bearer(req.Header().Get("Authorization"))
 	if !ok || !secretRE.MatchString(secret) {
-		return store.Machine{}, s.authFailed(req, "missing or invalid machine secret (Authorization: Bearer <machine_secret>)")
+		return store.AuthenticatedMachine{}, s.authFailed(req, "missing or invalid machine secret (Authorization: Bearer <machine_secret>)")
 	}
 	machine, err := s.store.AuthenticateMachine(ctx, s.cfg.TenantID, secret)
 	if errors.Is(err, store.ErrNotFound) {
-		return store.Machine{}, s.authFailed(req, "missing or invalid machine secret (Authorization: Bearer <machine_secret>)")
+		return store.AuthenticatedMachine{}, s.authFailed(req, "missing or invalid machine secret (Authorization: Bearer <machine_secret>)")
 	}
 	if err != nil {
-		return store.Machine{}, s.internal(ctx, req.Spec().Procedure, err)
+		return store.AuthenticatedMachine{}, s.internal(ctx, req.Spec().Procedure, err)
 	}
 	if !s.limiter.Allow(limitMachineCalls, "machinecall:"+strconv.FormatInt(machine.ID, 10)) {
-		return store.Machine{}, connect.NewError(connect.CodeResourceExhausted, errors.New("rate_limited: too many calls; retry later"))
+		return store.AuthenticatedMachine{}, connect.NewError(connect.CodeResourceExhausted, errors.New("rate_limited: too many calls; retry later"))
 	}
 	return machine, nil
+}
+
+// owner verifies the access token of the machine's owner (the bearer of
+// RegisterMachine and ClaimMachine): an IdP access token of the chat's
+// resource carrying MachinesScope. It applies the account's call budget.
+func (s *Service) owner(ctx context.Context, req connect.AnyRequest) (auth.AccessToken, error) {
+	raw, ok := bearer(req.Header().Get("Authorization"))
+	if !ok {
+		return auth.AccessToken{}, s.authFailed(req, "invalid_token: send the account's access token (Authorization: Bearer <token>); run tunelo login")
+	}
+	tok, err := s.tokens.VerifyAccessToken(ctx, raw, s.cfg.Resource)
+	if errors.Is(err, auth.ErrIdPUnavailable) {
+		return auth.AccessToken{}, connect.NewError(connect.CodeUnavailable, errors.New("auth_unavailable: sign-in is not available yet; retry shortly"))
+	}
+	if err != nil {
+		s.logger.Debug("machine owner token rejected", "err", err)
+		return auth.AccessToken{}, s.authFailed(req, "invalid_token: the access token is invalid or expired; run tunelo login")
+	}
+	if !tok.HasScope(MachinesScope) {
+		return auth.AccessToken{}, connect.NewError(connect.CodePermissionDenied,
+			fmt.Errorf("insufficient_scope: the token lacks %s; update tunelo and run tunelo login", MachinesScope))
+	}
+	if !s.limiter.Allow(limitAccountCalls, "machineowner:"+tok.Subject) {
+		return auth.AccessToken{}, connect.NewError(connect.CodeResourceExhausted, errors.New("rate_limited: too many calls; retry later"))
+	}
+	return tok, nil
+}
+
+// machineTunnel is the only tunnel address a claimed machine may report.
+func (s *Service) machineTunnel(m store.AuthenticatedMachine) string {
+	return "wss://" + MachineSubdomain(m.OwnerSub, machineDeviceID(m.ID)) + ".tunnel." + strings.ToLower(s.cfg.TenantDomain)
+}
+
+func errNoChatAccount() error {
+	return connect.NewError(connect.CodeFailedPrecondition,
+		errors.New("chat_account_missing: this account has not opened the chat yet; open it once and the machine is added by itself"))
 }
 
 // authFailed counts a failed authentication of the caller's address: within
@@ -396,7 +504,7 @@ func checkVersion(v string) error {
 		if got[i] != minimum[i] {
 			if got[i] < minimum[i] {
 				return connect.NewError(connect.CodeFailedPrecondition,
-					fmt.Errorf("agent_update_required: chat-agent %s or newer is required; run chat-agent update", MinAgentVersion))
+					fmt.Errorf("agent_update_required: tunelo %s or newer is required; run tunelo update", MinAgentVersion))
 			}
 			return nil
 		}

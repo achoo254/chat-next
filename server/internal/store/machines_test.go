@@ -3,7 +3,9 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,56 +16,18 @@ func newMachineInput(name string) store.NewMachine {
 	return store.NewMachine{Name: name, OS: "darwin", Arch: "arm64", AgentVersion: "0.1.0", PublicKey: bytes.Repeat([]byte{7}, 32)}
 }
 
-func TestInstallCodes(t *testing.T) {
-	ctx := context.Background()
-	s := newStore(t)
-	u, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_1", PreferredUsername: "dat"})
-	if err != nil {
+// legacyMachine inserts a machine as an install code made it: unclaimed.
+func legacyMachine(t *testing.T, s *store.Store, userID int64, secret string) int64 {
+	t.Helper()
+	hash := sha256.Sum256([]byte(secret))
+	var id int64
+	if err := s.Pool().QueryRow(context.Background(), `
+		INSERT INTO machines (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
+		VALUES ($1, $2, 'old', 'win32', 'x64', '0.2.4', $3, $4) RETURNING id`,
+		tenant, userID, bytes.Repeat([]byte{2}, 32), hash[:]).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
-	before := time.Now()
-	code, expires, err := s.CreateInstallCode(ctx, tenant, u.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(code) != 22 || expires.Before(before.Add(store.InstallCodeTTL-time.Minute)) || expires.After(before.Add(store.InstallCodeTTL+time.Minute)) {
-		t.Fatalf("code %q expires %v", code, expires)
-	}
-	var stored []byte
-	if err := s.Pool().QueryRow(ctx, `SELECT code_hash FROM machine_install_codes`).Scan(&stored); err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Contains(stored, []byte(code)) || len(stored) != 32 {
-		t.Fatal("the code is stored in clear")
-	}
-	for range store.MaxLiveInstallCodes - 1 {
-		if _, _, err := s.CreateInstallCode(ctx, tenant, u.ID); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, _, err := s.CreateInstallCode(ctx, tenant, u.ID); !errors.Is(err, store.ErrTooManyInstallCodes) {
-		t.Fatalf("code over the limit: %v", err)
-	}
-	// Used and expired codes free their place.
-	if _, _, err := s.RegisterMachine(ctx, tenant, code, newMachineInput("Mac mini")); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := s.CreateInstallCode(ctx, tenant, u.ID); err != nil {
-		t.Fatalf("after one code was used: %v", err)
-	}
-	if _, err := s.Pool().Exec(ctx, `UPDATE machine_install_codes SET expires_at = now() - interval '1 second'`); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := s.CreateInstallCode(ctx, tenant, u.ID); err != nil {
-		t.Fatalf("after the codes expired: %v", err)
-	}
-	var n int
-	if err := s.Pool().QueryRow(ctx, `SELECT count(*) FROM machine_install_codes`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Fatalf("%d codes kept", n)
-	}
+	return id
 }
 
 func TestRegisterMachine(t *testing.T) {
@@ -73,39 +37,26 @@ func TestRegisterMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, _, err := s.CreateInstallCode(ctx, tenant, u.ID)
+	if _, _, err := s.RegisterMachine(ctx, "other", u.ID, newMachineInput("x")); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("user of another tenant: %v", err)
+	}
+	m, secret, err := s.RegisterMachine(ctx, tenant, u.ID, newMachineInput("Mac mini"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.RegisterMachine(ctx, tenant, "AAAAAAAAAAAAAAAAAAAAAA", newMachineInput("x")); !errors.Is(err, store.ErrInstallCodeInvalid) {
-		t.Fatalf("unknown code: %v", err)
-	}
-	if _, _, err := s.RegisterMachine(ctx, "other", code, newMachineInput("x")); !errors.Is(err, store.ErrInstallCodeInvalid) {
-		t.Fatalf("code of another tenant: %v", err)
-	}
-	m, secret, err := s.RegisterMachine(ctx, tenant, code, newMachineInput("Mac mini"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if m.UserID != u.ID || m.Name != "Mac mini" || m.OS != "darwin" || m.Arch != "arm64" || m.Revoked || len(secret) != 43 {
+	if m.UserID != u.ID || m.Name != "Mac mini" || m.OS != "darwin" || m.Arch != "arm64" || m.Revoked || !m.Claimed || len(secret) != 43 {
 		t.Fatalf("machine %+v secret %q", m, secret)
 	}
-	if _, _, err := s.RegisterMachine(ctx, tenant, code, newMachineInput("again")); !errors.Is(err, store.ErrInstallCodeInvalid) {
-		t.Fatalf("code used twice: %v", err)
-	}
-	expired, _, err := s.CreateInstallCode(ctx, tenant, u.ID)
-	if err != nil {
+	var stored []byte
+	if err := s.Pool().QueryRow(ctx, `SELECT secret_hash FROM machines WHERE id = $1`, m.ID).Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Pool().Exec(ctx, `UPDATE machine_install_codes SET expires_at = now() WHERE used_at IS NULL`); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := s.RegisterMachine(ctx, tenant, expired, newMachineInput("late")); !errors.Is(err, store.ErrInstallCodeInvalid) {
-		t.Fatalf("expired code: %v", err)
+	if bytes.Contains(stored, []byte(secret)) || len(stored) != 32 {
+		t.Fatal("the secret is stored in clear")
 	}
 
 	got, err := s.AuthenticateMachine(ctx, tenant, secret)
-	if err != nil || got.ID != m.ID {
+	if err != nil || got.ID != m.ID || got.OwnerSub != "acc_1" || !got.Claimed {
 		t.Fatalf("authenticate: %+v %v", got, err)
 	}
 	if _, err := s.AuthenticateMachine(ctx, tenant, secret+"x"); !errors.Is(err, store.ErrNotFound) {
@@ -115,7 +66,7 @@ func TestRegisterMachine(t *testing.T) {
 		t.Fatalf("secret on another tenant: %v", err)
 	}
 
-	// The machine limit leaves the code usable.
+	// The machine limit counts the machines that are not revoked.
 	for i := range store.MaxMachines - 1 {
 		if _, err := s.Pool().Exec(ctx, `
 			INSERT INTO machines (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
@@ -124,18 +75,63 @@ func TestRegisterMachine(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	full, _, err := s.CreateInstallCode(ctx, tenant, u.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := s.RegisterMachine(ctx, tenant, full, newMachineInput("one too many")); !errors.Is(err, store.ErrTooManyMachines) {
+	if _, _, err := s.RegisterMachine(ctx, tenant, u.ID, newMachineInput("one too many")); !errors.Is(err, store.ErrTooManyMachines) {
 		t.Fatalf("over the machine limit: %v", err)
 	}
 	if err := s.RevokeMachine(ctx, tenant, u.ID, m.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.RegisterMachine(ctx, tenant, full, newMachineInput("replacement")); err != nil {
+	if _, _, err := s.RegisterMachine(ctx, tenant, u.ID, newMachineInput("replacement")); err != nil {
 		t.Fatalf("after revoking one: %v", err)
+	}
+
+	if _, err := s.Pool().Exec(ctx, `UPDATE users SET deleted_at = now() WHERE id = $1`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.RegisterMachine(ctx, tenant, u.ID, newMachineInput("x")); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("erased user: %v", err)
+	}
+}
+
+func TestClaimMachine(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	u, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_1", PreferredUsername: "dat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := strings.Repeat("s", 43)
+	id := legacyMachine(t, s, u.ID, secret)
+	got, err := s.AuthenticateMachine(ctx, tenant, secret)
+	if err != nil || got.Claimed || got.OwnerSub != "acc_1" {
+		t.Fatalf("machine of an install code: %+v %v", got, err)
+	}
+	if _, err := s.ClaimMachine(ctx, tenant, id, "acc_2"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("claim by another account: %v", err)
+	}
+	m, err := s.ClaimMachine(ctx, tenant, id, "acc_1")
+	if err != nil || !m.Claimed || m.ID != id {
+		t.Fatalf("claim: %+v %v", m, err)
+	}
+	var first time.Time
+	if err := s.Pool().QueryRow(ctx, `SELECT claimed_at FROM machines WHERE id = $1`, id).Scan(&first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimMachine(ctx, tenant, id, "acc_1"); err != nil {
+		t.Fatalf("claim again: %v", err)
+	}
+	var again time.Time
+	if err := s.Pool().QueryRow(ctx, `SELECT claimed_at FROM machines WHERE id = $1`, id).Scan(&again); err != nil || !again.Equal(first) {
+		t.Fatalf("claimed_at moved: %v -> %v (%v)", first, again, err)
+	}
+	if list, _ := s.ListMachines(ctx, tenant, u.ID); len(list) != 1 || !list[0].Claimed {
+		t.Fatalf("list %+v", list)
+	}
+	if err := s.RevokeMachine(ctx, tenant, u.ID, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimMachine(ctx, tenant, id, "acc_1"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("claim a revoked machine: %v", err)
 	}
 }
 
@@ -152,11 +148,7 @@ func TestMachineDirectory(t *testing.T) {
 	}
 	register := func(name string) (store.Machine, string) {
 		t.Helper()
-		code, _, err := s.CreateInstallCode(ctx, tenant, u.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		m, secret, err := s.RegisterMachine(ctx, tenant, code, newMachineInput(name))
+		m, secret, err := s.RegisterMachine(ctx, tenant, u.ID, newMachineInput(name))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,7 +223,9 @@ func TestMachineDirectory(t *testing.T) {
 	}
 
 	// Erasing the account deletes its machines and codes.
-	if _, _, err := s.CreateInstallCode(ctx, tenant, u.ID); err != nil {
+	if _, err := s.Pool().Exec(ctx, `
+		INSERT INTO machine_install_codes (code_hash, tenant_id, user_id, expires_at)
+		VALUES ($1, $2, $3, now() + interval '10 minutes')`, bytes.Repeat([]byte{8}, 32), tenant, u.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Pool().Exec(ctx, `UPDATE users SET deleted_at = now() WHERE id = $1`, u.ID); err != nil {

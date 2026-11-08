@@ -3,16 +3,20 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/auth/idptest"
+	"app.local/server/internal/machineapi"
 	"connectrpc.com/connect"
 )
 
 // The machine directory end to end: the user's calls under /rpc with the
-// session, chat-agent's under /machine-api with no Origin and no cookie.
+// session, tunelo's under /machine-api with no Origin and no cookie: it
+// registers with an access token of the account (aud the chat's /mcp,
+// scope machines:write), then uses the machine secret.
 func TestMachineDirectory(t *testing.T) {
 	e := newEnv(t, withWebPush(t))
 	ctx := context.Background()
@@ -22,7 +26,7 @@ func TestMachineDirectory(t *testing.T) {
 
 	// The user's calls need the session and the Origin of /rpc.
 	anonymous := appv1connect.NewMachinesServiceClient(e.browser(t), e.srv.URL+"/rpc", withOrigin(e.srv.URL))
-	if _, err := anonymous.CreateInstallCode(ctx, connect.NewRequest(&appv1.CreateInstallCodeRequest{})); codeOf(err) != connect.CodeUnauthenticated {
+	if _, err := anonymous.ListMachines(ctx, connect.NewRequest(&appv1.ListMachinesRequest{})); codeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("without a session: %v", err)
 	}
 	noOrigin := appv1connect.NewMachinesServiceClient(c, e.srv.URL+"/rpc")
@@ -30,21 +34,23 @@ func TestMachineDirectory(t *testing.T) {
 		t.Fatalf("without Origin: %v", err)
 	}
 
-	code, err := machines.CreateInstallCode(ctx, connect.NewRequest(&appv1.CreateInstallCodeRequest{}))
-	if err != nil {
-		t.Fatal(err)
+	// Install codes are retired; an older page gets the reason.
+	if _, err := machines.CreateInstallCode(ctx, connect.NewRequest(&appv1.CreateInstallCodeRequest{})); codeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("install code: %v", err)
 	}
-	reg, err := agent.RegisterMachine(ctx, connect.NewRequest(&appv1.RegisterMachineRequest{
-		InstallCode: code.Msg.GetCode(), Name: "Mac mini", Os: "darwin", Arch: "arm64", AgentVersion: "0.1.0",
-		PublicKey: bytes.Repeat([]byte{4}, 32),
-	}))
+	register := connect.NewRequest(&appv1.RegisterMachineRequest{
+		Name: "Mac mini", Os: "darwin", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: bytes.Repeat([]byte{4}, 32),
+	})
+	register.Header().Set("Authorization", "Bearer "+e.mcpToken(t, "chat:read machines:write"))
+	reg, err := agent.RegisterMachine(ctx, register)
 	if err != nil {
 		t.Fatal(err)
 	}
 	id, secret := reg.Msg.GetMachineId(), reg.Msg.GetMachineSecret()
+	tunnel := "wss://" + machineapi.MachineSubdomain("acc_test", fmt.Sprintf("chat-agent.%d", id)) + ".tunnel.hoandat.com"
 	heartbeat := func() *appv1.HeartbeatResponse {
 		t.Helper()
-		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: "wss://dat.tunnel.hoandat.com", AgentVersion: "0.1.0", ClaudeVersion: "2.1.319"})
+		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0", ClaudeVersion: "2.1.319"})
 		req.Header().Set("Authorization", "Bearer "+secret)
 		resp, err := agent.Heartbeat(ctx, req)
 		if err != nil {
@@ -67,7 +73,7 @@ func TestMachineDirectory(t *testing.T) {
 		t.Fatalf("machines %+v", list.Msg)
 	}
 	m := list.Msg.GetMachines()[0]
-	if m.GetId() != id || m.GetName() != "Mac mini" || m.GetTunnelUrl() != "wss://dat.tunnel.hoandat.com" ||
+	if m.GetId() != id || m.GetName() != "Mac mini" || m.GetTunnelUrl() != tunnel || !m.GetClaimed() ||
 		m.GetClaudeVersion() != "2.1.319" || len(m.GetPublicKey()) != 32 || m.GetLastSeenAt() == 0 {
 		t.Fatalf("machine %+v", m)
 	}

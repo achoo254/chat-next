@@ -77,7 +77,7 @@ type App struct {
 	Push *push.Service
 	// Privacy builds data exports and deletes accounts.
 	Privacy *privacy.Service
-	// Machines serves chat-agent's calls (ADR 0013).
+	// Machines serves tunelo's calls (ADR 0013).
 	Machines *machineapi.Service
 
 	logger   *slog.Logger
@@ -236,8 +236,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
-	machines, err := machineapi.New(machineapi.Config{TenantID: cfg.TenantID, TenantDomain: cfg.TenantDomain},
-		st, pushSvc, limiter, logger.With("component", "machineapi"))
+	machines, err := machineapi.New(machineapi.Config{TenantID: cfg.TenantID, TenantDomain: cfg.TenantDomain, Resource: publicOrigin + "/mcp"},
+		st, idp, pushSvc, limiter, logger.With("component", "machineapi"))
 	if err != nil {
 		return nil, err
 	}

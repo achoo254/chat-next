@@ -53,6 +53,9 @@ const (
 	// MachineAgentServiceRegisterMachineProcedure is the fully-qualified name of the
 	// MachineAgentService's RegisterMachine RPC.
 	MachineAgentServiceRegisterMachineProcedure = "/app.v1.MachineAgentService/RegisterMachine"
+	// MachineAgentServiceClaimMachineProcedure is the fully-qualified name of the MachineAgentService's
+	// ClaimMachine RPC.
+	MachineAgentServiceClaimMachineProcedure = "/app.v1.MachineAgentService/ClaimMachine"
 	// MachineAgentServiceHeartbeatProcedure is the fully-qualified name of the MachineAgentService's
 	// Heartbeat RPC.
 	MachineAgentServiceHeartbeatProcedure = "/app.v1.MachineAgentService/Heartbeat"
@@ -63,9 +66,10 @@ const (
 
 // MachinesServiceClient is a client for the app.v1.MachinesService service.
 type MachinesServiceClient interface {
-	// A one-time install code for `chat-agent install`, valid for 10 minutes.
-	// Fails with resource_exhausted "too_many_install_codes" while the user
-	// holds 5 unused, unexpired codes.
+	// Retired: machines now join with the owner's account (tunelo login), so
+	// there are no install codes any more. Always fails with
+	// failed_precondition "install_codes_retired" (update tunelo, then add the
+	// machine again).
 	CreateInstallCode(context.Context, *connect.Request[v1.CreateInstallCodeRequest]) (*connect.Response[v1.CreateInstallCodeResponse], error)
 	// The caller's machines that are not revoked, oldest first.
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
@@ -163,9 +167,10 @@ func (c *machinesServiceClient) RevokeDevice(ctx context.Context, req *connect.R
 
 // MachinesServiceHandler is an implementation of the app.v1.MachinesService service.
 type MachinesServiceHandler interface {
-	// A one-time install code for `chat-agent install`, valid for 10 minutes.
-	// Fails with resource_exhausted "too_many_install_codes" while the user
-	// holds 5 unused, unexpired codes.
+	// Retired: machines now join with the owner's account (tunelo login), so
+	// there are no install codes any more. Always fails with
+	// failed_precondition "install_codes_retired" (update tunelo, then add the
+	// machine again).
 	CreateInstallCode(context.Context, *connect.Request[v1.CreateInstallCodeRequest]) (*connect.Response[v1.CreateInstallCodeResponse], error)
 	// The caller's machines that are not revoked, oldest first.
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
@@ -263,16 +268,28 @@ func (UnimplementedMachinesServiceHandler) RevokeDevice(context.Context, *connec
 
 // MachineAgentServiceClient is a client for the app.v1.MachineAgentService service.
 type MachineAgentServiceClient interface {
-	// Turns an install code into a machine of the code's owner. Fails with
-	// unauthenticated "install_code_invalid" for a wrong, expired or used code,
-	// invalid_argument for malformed fields, failed_precondition
-	// "agent_update_required" when agent_version is below the minimum, and
-	// resource_exhausted "too_many_machines" when the owner has 20 machines.
+	// Adds a machine to the directory of the token's account, claimed from the
+	// start. Fails with failed_precondition "chat_account_missing" when that
+	// account never opened the chat (tunelo waits and retries: the machine
+	// appears after the first visit), invalid_argument for malformed fields,
+	// failed_precondition "agent_update_required" when agent_version is below
+	// the minimum, and resource_exhausted "too_many_machines" when the owner
+	// has 20 machines.
 	RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error)
+	// Ties a machine registered with an install code (before accounts) to the
+	// token's account, so the tunnel check of Heartbeat applies to it. The
+	// machine is named by its secret in the request. Succeeds again for a
+	// machine already claimed by the same account. Fails with unauthenticated
+	// for a wrong secret, permission_denied "claim_wrong_account" when the
+	// machine belongs to another account and permission_denied
+	// "machine_revoked" for a removed machine.
+	ClaimMachine(context.Context, *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error)
 	// Reports the machine alive (every 60 s and whenever the tunnel changes)
 	// and returns what was revoked. A revoked machine gets revoked = true (and
 	// nothing is recorded); otherwise an agent_version below the minimum fails
-	// with failed_precondition "agent_update_required".
+	// with failed_precondition "agent_update_required". For a claimed machine
+	// a tunnel_url other than the machine tunnel Tunelo holds for its owner
+	// fails with permission_denied "tunnel_not_owned" (nothing is recorded).
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
 	// Asks the server to tell the owner's devices, by Web Push, that a session
 	// waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -299,6 +316,12 @@ func NewMachineAgentServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(machineAgentServiceMethods.ByName("RegisterMachine")),
 			connect.WithClientOptions(opts...),
 		),
+		claimMachine: connect.NewClient[v1.ClaimMachineRequest, v1.ClaimMachineResponse](
+			httpClient,
+			baseURL+MachineAgentServiceClaimMachineProcedure,
+			connect.WithSchema(machineAgentServiceMethods.ByName("ClaimMachine")),
+			connect.WithClientOptions(opts...),
+		),
 		heartbeat: connect.NewClient[v1.HeartbeatRequest, v1.HeartbeatResponse](
 			httpClient,
 			baseURL+MachineAgentServiceHeartbeatProcedure,
@@ -317,6 +340,7 @@ func NewMachineAgentServiceClient(httpClient connect.HTTPClient, baseURL string,
 // machineAgentServiceClient implements MachineAgentServiceClient.
 type machineAgentServiceClient struct {
 	registerMachine  *connect.Client[v1.RegisterMachineRequest, v1.RegisterMachineResponse]
+	claimMachine     *connect.Client[v1.ClaimMachineRequest, v1.ClaimMachineResponse]
 	heartbeat        *connect.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
 	notifyNeedsInput *connect.Client[v1.NotifyNeedsInputRequest, v1.NotifyNeedsInputResponse]
 }
@@ -324,6 +348,11 @@ type machineAgentServiceClient struct {
 // RegisterMachine calls app.v1.MachineAgentService.RegisterMachine.
 func (c *machineAgentServiceClient) RegisterMachine(ctx context.Context, req *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error) {
 	return c.registerMachine.CallUnary(ctx, req)
+}
+
+// ClaimMachine calls app.v1.MachineAgentService.ClaimMachine.
+func (c *machineAgentServiceClient) ClaimMachine(ctx context.Context, req *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error) {
+	return c.claimMachine.CallUnary(ctx, req)
 }
 
 // Heartbeat calls app.v1.MachineAgentService.Heartbeat.
@@ -338,16 +367,28 @@ func (c *machineAgentServiceClient) NotifyNeedsInput(ctx context.Context, req *c
 
 // MachineAgentServiceHandler is an implementation of the app.v1.MachineAgentService service.
 type MachineAgentServiceHandler interface {
-	// Turns an install code into a machine of the code's owner. Fails with
-	// unauthenticated "install_code_invalid" for a wrong, expired or used code,
-	// invalid_argument for malformed fields, failed_precondition
-	// "agent_update_required" when agent_version is below the minimum, and
-	// resource_exhausted "too_many_machines" when the owner has 20 machines.
+	// Adds a machine to the directory of the token's account, claimed from the
+	// start. Fails with failed_precondition "chat_account_missing" when that
+	// account never opened the chat (tunelo waits and retries: the machine
+	// appears after the first visit), invalid_argument for malformed fields,
+	// failed_precondition "agent_update_required" when agent_version is below
+	// the minimum, and resource_exhausted "too_many_machines" when the owner
+	// has 20 machines.
 	RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error)
+	// Ties a machine registered with an install code (before accounts) to the
+	// token's account, so the tunnel check of Heartbeat applies to it. The
+	// machine is named by its secret in the request. Succeeds again for a
+	// machine already claimed by the same account. Fails with unauthenticated
+	// for a wrong secret, permission_denied "claim_wrong_account" when the
+	// machine belongs to another account and permission_denied
+	// "machine_revoked" for a removed machine.
+	ClaimMachine(context.Context, *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error)
 	// Reports the machine alive (every 60 s and whenever the tunnel changes)
 	// and returns what was revoked. A revoked machine gets revoked = true (and
 	// nothing is recorded); otherwise an agent_version below the minimum fails
-	// with failed_precondition "agent_update_required".
+	// with failed_precondition "agent_update_required". For a claimed machine
+	// a tunnel_url other than the machine tunnel Tunelo holds for its owner
+	// fails with permission_denied "tunnel_not_owned" (nothing is recorded).
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
 	// Asks the server to tell the owner's devices, by Web Push, that a session
 	// waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -370,6 +411,12 @@ func NewMachineAgentServiceHandler(svc MachineAgentServiceHandler, opts ...conne
 		connect.WithSchema(machineAgentServiceMethods.ByName("RegisterMachine")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineAgentServiceClaimMachineHandler := connect.NewUnaryHandler(
+		MachineAgentServiceClaimMachineProcedure,
+		svc.ClaimMachine,
+		connect.WithSchema(machineAgentServiceMethods.ByName("ClaimMachine")),
+		connect.WithHandlerOptions(opts...),
+	)
 	machineAgentServiceHeartbeatHandler := connect.NewUnaryHandler(
 		MachineAgentServiceHeartbeatProcedure,
 		svc.Heartbeat,
@@ -386,6 +433,8 @@ func NewMachineAgentServiceHandler(svc MachineAgentServiceHandler, opts ...conne
 		switch r.URL.Path {
 		case MachineAgentServiceRegisterMachineProcedure:
 			machineAgentServiceRegisterMachineHandler.ServeHTTP(w, r)
+		case MachineAgentServiceClaimMachineProcedure:
+			machineAgentServiceClaimMachineHandler.ServeHTTP(w, r)
 		case MachineAgentServiceHeartbeatProcedure:
 			machineAgentServiceHeartbeatHandler.ServeHTTP(w, r)
 		case MachineAgentServiceNotifyNeedsInputProcedure:
@@ -401,6 +450,10 @@ type UnimplementedMachineAgentServiceHandler struct{}
 
 func (UnimplementedMachineAgentServiceHandler) RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.RegisterMachine is not implemented"))
+}
+
+func (UnimplementedMachineAgentServiceHandler) ClaimMachine(context.Context, *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.ClaimMachine is not implemented"))
 }
 
 func (UnimplementedMachineAgentServiceHandler) Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error) {

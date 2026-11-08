@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/machines.proto.
  */
 export const file_app_v1_machines: GenFile = /*@__PURE__*/
-  fileDesc("ChVhcHAvdjEvbWFjaGluZXMucHJvdG8SBmFwcC52MSLKAQoHTWFjaGluZRIOCgJpZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCRIKCgJvcxgDIAEoCRIMCgRhcmNoGAQgASgJEhUKDWFnZW50X3ZlcnNpb24YBSABKAkSFgoOY2xhdWRlX3ZlcnNpb24YBiABKAkSEgoKcHVibGljX2tleRgHIAEoDBISCgp0dW5uZWxfdXJsGAggASgJEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACEhgKDGxhc3Rfc2Vlbl9hdBgKIAEoA0ICMAIiGgoYQ3JlYXRlSW5zdGFsbENvZGVSZXF1ZXN0IkEKGUNyZWF0ZUluc3RhbGxDb2RlUmVzcG9uc2USDAoEY29kZRgBIAEoCRIWCgpleHBpcmVzX2F0GAIgASgDQgIwAiIVChNMaXN0TWFjaGluZXNSZXF1ZXN0IjkKFExpc3RNYWNoaW5lc1Jlc3BvbnNlEiEKCG1hY2hpbmVzGAEgAygLMg8uYXBwLnYxLk1hY2hpbmUiPAoUUmVuYW1lTWFjaGluZVJlcXVlc3QSFgoKbWFjaGluZV9pZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCSI5ChVSZW5hbWVNYWNoaW5lUmVzcG9uc2USIAoHbWFjaGluZRgBIAEoCzIPLmFwcC52MS5NYWNoaW5lIi4KFFJldm9rZU1hY2hpbmVSZXF1ZXN0EhYKCm1hY2hpbmVfaWQYASABKANCAjACIhcKFVJldm9rZU1hY2hpbmVSZXNwb25zZSJIChNSZXZva2VEZXZpY2VSZXF1ZXN0EhYKCm1hY2hpbmVfaWQYASABKANCAjACEhkKEWRldmljZV9wdWJsaWNfa2V5GAIgASgMIhYKFFJldm9rZURldmljZVJlc3BvbnNlIoEBChZSZWdpc3Rlck1hY2hpbmVSZXF1ZXN0EhQKDGluc3RhbGxfY29kZRgBIAEoCRIMCgRuYW1lGAIgASgJEgoKAm9zGAMgASgJEgwKBGFyY2gYBCABKAkSFQoNYWdlbnRfdmVyc2lvbhgFIAEoCRISCgpwdWJsaWNfa2V5GAYgASgMIkkKF1JlZ2lzdGVyTWFjaGluZVJlc3BvbnNlEhYKCm1hY2hpbmVfaWQYASABKANCAjACEhYKDm1hY2hpbmVfc2VjcmV0GAIgASgJIlUKEEhlYXJ0YmVhdFJlcXVlc3QSEgoKdHVubmVsX3VybBgBIAEoCRIVCg1hZ2VudF92ZXJzaW9uGAIgASgJEhYKDmNsYXVkZV92ZXJzaW9uGAMgASgJIlwKEUhlYXJ0YmVhdFJlc3BvbnNlEg8KB3Jldm9rZWQYASABKAgSGwoTcmV2b2tlZF9kZXZpY2Vfa2V5cxgCIAMoDBIZChFtaW5fYWdlbnRfdmVyc2lvbhgDIAEoCSJqChdOb3RpZnlOZWVkc0lucHV0UmVxdWVzdBIkCgRraW5kGAEgASgOMhYuYXBwLnYxLk5lZWRzSW5wdXRLaW5kEhUKDXBlbmRpbmdfY291bnQYAiABKAUSEgoKc2Vzc2lvbl9pZBgDIAEoCSIaChhOb3RpZnlOZWVkc0lucHV0UmVzcG9uc2UqcAoOTmVlZHNJbnB1dEtpbmQSIAocTkVFRFNfSU5QVVRfS0lORF9VTlNQRUNJRklFRBAAEh0KGU5FRURTX0lOUFVUX0tJTkRfQVBQUk9WQUwQARIdChlORUVEU19JTlBVVF9LSU5EX1FVRVNUSU9OEAIynQMKD01hY2hpbmVzU2VydmljZRJYChFDcmVhdGVJbnN0YWxsQ29kZRIgLmFwcC52MS5DcmVhdGVJbnN0YWxsQ29kZVJlcXVlc3QaIS5hcHAudjEuQ3JlYXRlSW5zdGFsbENvZGVSZXNwb25zZRJJCgxMaXN0TWFjaGluZXMSGy5hcHAudjEuTGlzdE1hY2hpbmVzUmVxdWVzdBocLmFwcC52MS5MaXN0TWFjaGluZXNSZXNwb25zZRJMCg1SZW5hbWVNYWNoaW5lEhwuYXBwLnYxLlJlbmFtZU1hY2hpbmVSZXF1ZXN0Gh0uYXBwLnYxLlJlbmFtZU1hY2hpbmVSZXNwb25zZRJMCg1SZXZva2VNYWNoaW5lEhwuYXBwLnYxLlJldm9rZU1hY2hpbmVSZXF1ZXN0Gh0uYXBwLnYxLlJldm9rZU1hY2hpbmVSZXNwb25zZRJJCgxSZXZva2VEZXZpY2USGy5hcHAudjEuUmV2b2tlRGV2aWNlUmVxdWVzdBocLmFwcC52MS5SZXZva2VEZXZpY2VSZXNwb25zZTKCAgoTTWFjaGluZUFnZW50U2VydmljZRJSCg9SZWdpc3Rlck1hY2hpbmUSHi5hcHAudjEuUmVnaXN0ZXJNYWNoaW5lUmVxdWVzdBofLmFwcC52MS5SZWdpc3Rlck1hY2hpbmVSZXNwb25zZRJACglIZWFydGJlYXQSGC5hcHAudjEuSGVhcnRiZWF0UmVxdWVzdBoZLmFwcC52MS5IZWFydGJlYXRSZXNwb25zZRJVChBOb3RpZnlOZWVkc0lucHV0Eh8uYXBwLnYxLk5vdGlmeU5lZWRzSW5wdXRSZXF1ZXN0GiAuYXBwLnYxLk5vdGlmeU5lZWRzSW5wdXRSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
+  fileDesc("ChVhcHAvdjEvbWFjaGluZXMucHJvdG8SBmFwcC52MSLbAQoHTWFjaGluZRIOCgJpZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCRIKCgJvcxgDIAEoCRIMCgRhcmNoGAQgASgJEhUKDWFnZW50X3ZlcnNpb24YBSABKAkSFgoOY2xhdWRlX3ZlcnNpb24YBiABKAkSEgoKcHVibGljX2tleRgHIAEoDBISCgp0dW5uZWxfdXJsGAggASgJEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACEhgKDGxhc3Rfc2Vlbl9hdBgKIAEoA0ICMAISDwoHY2xhaW1lZBgLIAEoCCIaChhDcmVhdGVJbnN0YWxsQ29kZVJlcXVlc3QiQQoZQ3JlYXRlSW5zdGFsbENvZGVSZXNwb25zZRIMCgRjb2RlGAEgASgJEhYKCmV4cGlyZXNfYXQYAiABKANCAjACIhUKE0xpc3RNYWNoaW5lc1JlcXVlc3QiOQoUTGlzdE1hY2hpbmVzUmVzcG9uc2USIQoIbWFjaGluZXMYASADKAsyDy5hcHAudjEuTWFjaGluZSI8ChRSZW5hbWVNYWNoaW5lUmVxdWVzdBIWCgptYWNoaW5lX2lkGAEgASgDQgIwAhIMCgRuYW1lGAIgASgJIjkKFVJlbmFtZU1hY2hpbmVSZXNwb25zZRIgCgdtYWNoaW5lGAEgASgLMg8uYXBwLnYxLk1hY2hpbmUiLgoUUmV2b2tlTWFjaGluZVJlcXVlc3QSFgoKbWFjaGluZV9pZBgBIAEoA0ICMAIiFwoVUmV2b2tlTWFjaGluZVJlc3BvbnNlIkgKE1Jldm9rZURldmljZVJlcXVlc3QSFgoKbWFjaGluZV9pZBgBIAEoA0ICMAISGQoRZGV2aWNlX3B1YmxpY19rZXkYAiABKAwiFgoUUmV2b2tlRGV2aWNlUmVzcG9uc2UihQEKFlJlZ2lzdGVyTWFjaGluZVJlcXVlc3QSGAoMaW5zdGFsbF9jb2RlGAEgASgJQgIYARIMCgRuYW1lGAIgASgJEgoKAm9zGAMgASgJEgwKBGFyY2gYBCABKAkSFQoNYWdlbnRfdmVyc2lvbhgFIAEoCRISCgpwdWJsaWNfa2V5GAYgASgMIkkKF1JlZ2lzdGVyTWFjaGluZVJlc3BvbnNlEhYKCm1hY2hpbmVfaWQYASABKANCAjACEhYKDm1hY2hpbmVfc2VjcmV0GAIgASgJIi0KE0NsYWltTWFjaGluZVJlcXVlc3QSFgoObWFjaGluZV9zZWNyZXQYASABKAkiLgoUQ2xhaW1NYWNoaW5lUmVzcG9uc2USFgoKbWFjaGluZV9pZBgBIAEoA0ICMAIiVQoQSGVhcnRiZWF0UmVxdWVzdBISCgp0dW5uZWxfdXJsGAEgASgJEhUKDWFnZW50X3ZlcnNpb24YAiABKAkSFgoOY2xhdWRlX3ZlcnNpb24YAyABKAkibQoRSGVhcnRiZWF0UmVzcG9uc2USDwoHcmV2b2tlZBgBIAEoCBIbChNyZXZva2VkX2RldmljZV9rZXlzGAIgAygMEhkKEW1pbl9hZ2VudF92ZXJzaW9uGAMgASgJEg8KB2NsYWltZWQYBCABKAgiagoXTm90aWZ5TmVlZHNJbnB1dFJlcXVlc3QSJAoEa2luZBgBIAEoDjIWLmFwcC52MS5OZWVkc0lucHV0S2luZBIVCg1wZW5kaW5nX2NvdW50GAIgASgFEhIKCnNlc3Npb25faWQYAyABKAkiGgoYTm90aWZ5TmVlZHNJbnB1dFJlc3BvbnNlKnAKDk5lZWRzSW5wdXRLaW5kEiAKHE5FRURTX0lOUFVUX0tJTkRfVU5TUEVDSUZJRUQQABIdChlORUVEU19JTlBVVF9LSU5EX0FQUFJPVkFMEAESHQoZTkVFRFNfSU5QVVRfS0lORF9RVUVTVElPThACMp0DCg9NYWNoaW5lc1NlcnZpY2USWAoRQ3JlYXRlSW5zdGFsbENvZGUSIC5hcHAudjEuQ3JlYXRlSW5zdGFsbENvZGVSZXF1ZXN0GiEuYXBwLnYxLkNyZWF0ZUluc3RhbGxDb2RlUmVzcG9uc2USSQoMTGlzdE1hY2hpbmVzEhsuYXBwLnYxLkxpc3RNYWNoaW5lc1JlcXVlc3QaHC5hcHAudjEuTGlzdE1hY2hpbmVzUmVzcG9uc2USTAoNUmVuYW1lTWFjaGluZRIcLmFwcC52MS5SZW5hbWVNYWNoaW5lUmVxdWVzdBodLmFwcC52MS5SZW5hbWVNYWNoaW5lUmVzcG9uc2USTAoNUmV2b2tlTWFjaGluZRIcLmFwcC52MS5SZXZva2VNYWNoaW5lUmVxdWVzdBodLmFwcC52MS5SZXZva2VNYWNoaW5lUmVzcG9uc2USSQoMUmV2b2tlRGV2aWNlEhsuYXBwLnYxLlJldm9rZURldmljZVJlcXVlc3QaHC5hcHAudjEuUmV2b2tlRGV2aWNlUmVzcG9uc2UyzQIKE01hY2hpbmVBZ2VudFNlcnZpY2USUgoPUmVnaXN0ZXJNYWNoaW5lEh4uYXBwLnYxLlJlZ2lzdGVyTWFjaGluZVJlcXVlc3QaHy5hcHAudjEuUmVnaXN0ZXJNYWNoaW5lUmVzcG9uc2USSQoMQ2xhaW1NYWNoaW5lEhsuYXBwLnYxLkNsYWltTWFjaGluZVJlcXVlc3QaHC5hcHAudjEuQ2xhaW1NYWNoaW5lUmVzcG9uc2USQAoJSGVhcnRiZWF0EhguYXBwLnYxLkhlYXJ0YmVhdFJlcXVlc3QaGS5hcHAudjEuSGVhcnRiZWF0UmVzcG9uc2USVQoQTm90aWZ5TmVlZHNJbnB1dBIfLmFwcC52MS5Ob3RpZnlOZWVkc0lucHV0UmVxdWVzdBogLmFwcC52MS5Ob3RpZnlOZWVkc0lucHV0UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM");
 
 /**
  * A machine of the directory.
@@ -82,6 +82,15 @@ export type Machine = Message<"app.v1.Machine"> & {
    * @generated from field: int64 last_seen_at = 10 [jstype = JS_NUMBER];
    */
   lastSeenAt: bigint;
+
+  /**
+   * The machine is tied to the account by tunelo login (registered that
+   * way, or claimed later). False for a machine registered with an install
+   * code whose tunelo has not signed in with the account yet.
+   *
+   * @generated from field: bool claimed = 11;
+   */
+  claimed: boolean;
 };
 
 /**
@@ -105,6 +114,8 @@ export const CreateInstallCodeRequestSchema: GenMessage<CreateInstallCodeRequest
   messageDesc(file_app_v1_machines, 1);
 
 /**
+ * Never answered (CreateInstallCode is retired); kept for older clients.
+ *
  * @generated from message app.v1.CreateInstallCodeResponse
  */
 export type CreateInstallCodeResponse = Message<"app.v1.CreateInstallCodeResponse"> & {
@@ -273,9 +284,10 @@ export const RevokeDeviceResponseSchema: GenMessage<RevokeDeviceResponse> = /*@_
  */
 export type RegisterMachineRequest = Message<"app.v1.RegisterMachineRequest"> & {
   /**
-   * CreateInstallCodeResponse.code.
+   * Ignored: the owner comes from the access token.
    *
-   * @generated from field: string install_code = 1;
+   * @generated from field: string install_code = 1 [deprecated = true];
+   * @deprecated
    */
   installCode: string;
 
@@ -301,7 +313,7 @@ export type RegisterMachineRequest = Message<"app.v1.RegisterMachineRequest"> & 
   arch: string;
 
   /**
-   * Semantic version of chat-agent, such as "0.1.0".
+   * Semantic version of tunelo, such as "2.1.0".
    *
    * @generated from field: string agent_version = 5;
    */
@@ -349,6 +361,42 @@ export const RegisterMachineResponseSchema: GenMessage<RegisterMachineResponse> 
   messageDesc(file_app_v1_machines, 12);
 
 /**
+ * @generated from message app.v1.ClaimMachineRequest
+ */
+export type ClaimMachineRequest = Message<"app.v1.ClaimMachineRequest"> & {
+  /**
+   * RegisterMachineResponse.machine_secret of the machine to claim.
+   *
+   * @generated from field: string machine_secret = 1;
+   */
+  machineSecret: string;
+};
+
+/**
+ * Describes the message app.v1.ClaimMachineRequest.
+ * Use `create(ClaimMachineRequestSchema)` to create a new message.
+ */
+export const ClaimMachineRequestSchema: GenMessage<ClaimMachineRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 13);
+
+/**
+ * @generated from message app.v1.ClaimMachineResponse
+ */
+export type ClaimMachineResponse = Message<"app.v1.ClaimMachineResponse"> & {
+  /**
+   * @generated from field: int64 machine_id = 1 [jstype = JS_NUMBER];
+   */
+  machineId: bigint;
+};
+
+/**
+ * Describes the message app.v1.ClaimMachineResponse.
+ * Use `create(ClaimMachineResponseSchema)` to create a new message.
+ */
+export const ClaimMachineResponseSchema: GenMessage<ClaimMachineResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 14);
+
+/**
  * @generated from message app.v1.HeartbeatRequest
  */
 export type HeartbeatRequest = Message<"app.v1.HeartbeatRequest"> & {
@@ -379,7 +427,7 @@ export type HeartbeatRequest = Message<"app.v1.HeartbeatRequest"> & {
  * Use `create(HeartbeatRequestSchema)` to create a new message.
  */
 export const HeartbeatRequestSchema: GenMessage<HeartbeatRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 13);
+  messageDesc(file_app_v1_machines, 15);
 
 /**
  * @generated from message app.v1.HeartbeatResponse
@@ -401,12 +449,20 @@ export type HeartbeatResponse = Message<"app.v1.HeartbeatResponse"> & {
   revokedDeviceKeys: Uint8Array[];
 
   /**
-   * The oldest chat-agent version the server accepts; update before falling
+   * The oldest tunelo version the server accepts; update before falling
    * below it.
    *
    * @generated from field: string min_agent_version = 3;
    */
   minAgentVersion: string;
+
+  /**
+   * Machine.claimed: false asks tunelo to call ClaimMachine once it is
+   * signed in with the account.
+   *
+   * @generated from field: bool claimed = 4;
+   */
+  claimed: boolean;
 };
 
 /**
@@ -414,7 +470,7 @@ export type HeartbeatResponse = Message<"app.v1.HeartbeatResponse"> & {
  * Use `create(HeartbeatResponseSchema)` to create a new message.
  */
 export const HeartbeatResponseSchema: GenMessage<HeartbeatResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 14);
+  messageDesc(file_app_v1_machines, 16);
 
 /**
  * @generated from message app.v1.NotifyNeedsInputRequest
@@ -447,7 +503,7 @@ export type NotifyNeedsInputRequest = Message<"app.v1.NotifyNeedsInputRequest"> 
  * Use `create(NotifyNeedsInputRequestSchema)` to create a new message.
  */
 export const NotifyNeedsInputRequestSchema: GenMessage<NotifyNeedsInputRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 15);
+  messageDesc(file_app_v1_machines, 17);
 
 /**
  * @generated from message app.v1.NotifyNeedsInputResponse
@@ -460,7 +516,7 @@ export type NotifyNeedsInputResponse = Message<"app.v1.NotifyNeedsInputResponse"
  * Use `create(NotifyNeedsInputResponseSchema)` to create a new message.
  */
 export const NotifyNeedsInputResponseSchema: GenMessage<NotifyNeedsInputResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 16);
+  messageDesc(file_app_v1_machines, 18);
 
 /**
  * What a waiting session needs from the user.
@@ -496,9 +552,9 @@ export const NeedsInputKindSchema: GenEnum<NeedsInputKind> = /*@__PURE__*/
 
 /**
  * My machines (ADR 0013): the directory of the computers where the user runs
- * chat-agent. The server only lists them (name, OS, public key, tunnel
- * address, last seen), hands out install codes and sends content-free Web
- * Pushes for them; it is never a root of trust for a machine's key and never
+ * tunelo (formerly chat-agent). The server only lists them (name, OS, public
+ * key, tunnel address, last seen) and sends content-free Web Pushes for
+ * them; it is never a root of trust for a machine's key and never
  * sees what goes through the tunnel. Served under /rpc with the user's
  * session like every user service.
  *
@@ -506,9 +562,10 @@ export const NeedsInputKindSchema: GenEnum<NeedsInputKind> = /*@__PURE__*/
  */
 export const MachinesService: GenService<{
   /**
-   * A one-time install code for `chat-agent install`, valid for 10 minutes.
-   * Fails with resource_exhausted "too_many_install_codes" while the user
-   * holds 5 unused, unexpired codes.
+   * Retired: machines now join with the owner's account (tunelo login), so
+   * there are no install codes any more. Always fails with
+   * failed_precondition "install_codes_retired" (update tunelo, then add the
+   * machine again).
    *
    * @generated from rpc app.v1.MachinesService.CreateInstallCode
    */
@@ -567,22 +624,29 @@ export const MachinesService: GenService<{
   serviceDesc(file_app_v1_machines, 0);
 
 /**
- * The calls of chat-agent itself. Served under /machine-api (not /rpc): the
- * agent sends no Origin and has no user session. RegisterMachine is
- * authenticated by its install code; the other calls by the machine secret in
+ * The calls of tunelo itself. Served under /machine-api (not /rpc): the agent
+ * sends no Origin and has no user session. RegisterMachine and ClaimMachine
+ * are authenticated by an access token of the owner's IdP account in
+ * "Authorization: Bearer <token>": an ES256 JWT whose aud is the chat's MCP
+ * resource (<chat origin>/mcp) and whose scope holds machines:write (only the
+ * tunelo-agent client gets it). The other calls by the machine secret in
  * "Authorization: Bearer <machine_secret>". Every call fails with
- * unauthenticated for a wrong code or secret (and resource_exhausted after too
- * many failures from one address).
+ * unauthenticated for a wrong token or secret (and resource_exhausted after
+ * too many failures from one address); RegisterMachine and ClaimMachine fail
+ * with permission_denied "insufficient_scope" for a token without
+ * machines:write and unavailable while the server cannot check tokens yet.
  *
  * @generated from service app.v1.MachineAgentService
  */
 export const MachineAgentService: GenService<{
   /**
-   * Turns an install code into a machine of the code's owner. Fails with
-   * unauthenticated "install_code_invalid" for a wrong, expired or used code,
-   * invalid_argument for malformed fields, failed_precondition
-   * "agent_update_required" when agent_version is below the minimum, and
-   * resource_exhausted "too_many_machines" when the owner has 20 machines.
+   * Adds a machine to the directory of the token's account, claimed from the
+   * start. Fails with failed_precondition "chat_account_missing" when that
+   * account never opened the chat (tunelo waits and retries: the machine
+   * appears after the first visit), invalid_argument for malformed fields,
+   * failed_precondition "agent_update_required" when agent_version is below
+   * the minimum, and resource_exhausted "too_many_machines" when the owner
+   * has 20 machines.
    *
    * @generated from rpc app.v1.MachineAgentService.RegisterMachine
    */
@@ -592,10 +656,28 @@ export const MachineAgentService: GenService<{
     output: typeof RegisterMachineResponseSchema;
   },
   /**
+   * Ties a machine registered with an install code (before accounts) to the
+   * token's account, so the tunnel check of Heartbeat applies to it. The
+   * machine is named by its secret in the request. Succeeds again for a
+   * machine already claimed by the same account. Fails with unauthenticated
+   * for a wrong secret, permission_denied "claim_wrong_account" when the
+   * machine belongs to another account and permission_denied
+   * "machine_revoked" for a removed machine.
+   *
+   * @generated from rpc app.v1.MachineAgentService.ClaimMachine
+   */
+  claimMachine: {
+    methodKind: "unary";
+    input: typeof ClaimMachineRequestSchema;
+    output: typeof ClaimMachineResponseSchema;
+  },
+  /**
    * Reports the machine alive (every 60 s and whenever the tunnel changes)
    * and returns what was revoked. A revoked machine gets revoked = true (and
    * nothing is recorded); otherwise an agent_version below the minimum fails
-   * with failed_precondition "agent_update_required".
+   * with failed_precondition "agent_update_required". For a claimed machine
+   * a tunnel_url other than the machine tunnel Tunelo holds for its owner
+   * fails with permission_denied "tunnel_not_owned" (nothing is recorded).
    *
    * @generated from rpc app.v1.MachineAgentService.Heartbeat
    */

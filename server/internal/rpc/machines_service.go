@@ -12,7 +12,7 @@ import (
 )
 
 // machinesService implements MachinesService: the caller's directory of
-// machines running chat-agent (ADR 0013). The agent's own calls are served
+// machines running tunelo (ADR 0013). The agent's own calls are served
 // by package machineapi.
 type machinesService struct {
 	appv1connect.UnimplementedMachinesServiceHandler
@@ -29,20 +29,15 @@ func errBadMachineName() error {
 	return connect.NewError(connect.CodeInvalidArgument, errors.New("name must be 1 to 64 characters without control characters"))
 }
 
-func (s *machinesService) CreateInstallCode(ctx context.Context, req *connect.Request[appv1.CreateInstallCodeRequest]) (*connect.Response[appv1.CreateInstallCodeResponse], error) {
-	sess, err := mustSession(ctx)
-	if err != nil {
+// CreateInstallCode is retired: tunelo adds a machine with the owner's
+// account (tunelo login). An older web page that still asks gets a reason
+// it can show; the session is checked first, as for every call.
+func (s *machinesService) CreateInstallCode(ctx context.Context, _ *connect.Request[appv1.CreateInstallCodeRequest]) (*connect.Response[appv1.CreateInstallCodeResponse], error) {
+	if _, err := mustSession(ctx); err != nil {
 		return nil, err
 	}
-	code, expires, err := s.store.CreateInstallCode(ctx, s.tenantID, sess.UserID)
-	switch {
-	case errors.Is(err, store.ErrTooManyInstallCodes):
-		return nil, connect.NewError(connect.CodeResourceExhausted,
-			errors.New("too_many_install_codes: use or let expire an earlier install code first"))
-	case err != nil:
-		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
-	}
-	return connect.NewResponse(&appv1.CreateInstallCodeResponse{Code: code, ExpiresAt: expires.Unix()}), nil
+	return nil, connect.NewError(connect.CodeFailedPrecondition,
+		errors.New("install_codes_retired: update tunelo; a machine now joins with tunelo login, without an install code"))
 }
 
 func (s *machinesService) ListMachines(ctx context.Context, req *connect.Request[appv1.ListMachinesRequest]) (*connect.Response[appv1.ListMachinesResponse], error) {
@@ -118,5 +113,6 @@ func machineProto(m store.Machine) *appv1.Machine {
 	return &appv1.Machine{
 		Id: m.ID, Name: m.Name, Os: m.OS, Arch: m.Arch, AgentVersion: m.AgentVersion, ClaudeVersion: m.ClaudeVersion,
 		PublicKey: m.PublicKey, TunnelUrl: m.TunnelURL, CreatedAt: m.CreatedAt.Unix(), LastSeenAt: m.LastSeenAt.Unix(),
+		Claimed: m.Claimed,
 	}
 }
