@@ -23,6 +23,9 @@
 // service reports gone (404, 410) is deleted; one rejected maxFailures
 // times in a row too. Revoking a session deletes its subscription (a
 // trigger on user_sessions).
+//
+// NotifyUser also sends a machine's "needs you" notice (ADR 0013): the
+// machine's name and the kind of request only, never content.
 package push
 
 import (
@@ -36,6 +39,7 @@ import (
 	"app.local/server/internal/chat"
 	"app.local/server/internal/locale"
 	"app.local/server/internal/webpush"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -213,4 +217,43 @@ func (s *Service) Unregister(ctx context.Context, sessionID int64) error {
 
 func (s *Service) allowLocal() bool {
 	return s.cfg.Sender != nil && s.cfg.Sender.AllowLocal()
+}
+
+// NotifyUser queues the push of a machine's notice to every device of the
+// user whose session is still usable (the conditions of chat.PushTargets:
+// not revoked, idle less than SessionIdleTimeout, younger than
+// SessionMaxAge), whether or not the user has the app open: chat-agent asks
+// only when no device answered. Delivery, retries and dropping gone
+// subscriptions are the consumer's (deliver.go). It returns how many pushes
+// were queued; none when Web Push is off.
+func (s *Service) NotifyUser(ctx context.Context, userID int64, n MachineNotice) (int, error) {
+	if s.queue == nil {
+		return 0, nil
+	}
+	now := s.now()
+	rows, err := s.pool.Query(ctx, `
+		SELECT ps.id, ps.user_id, ps.endpoint, ps.p256dh, ps.auth, ps.locale
+		FROM push_subscriptions ps JOIN user_sessions s ON s.id = ps.session_id
+		WHERE ps.tenant_id = $1 AND ps.user_id = $2
+			AND s.revoked_at IS NULL AND s.last_seen_at > $3 AND s.created_at > $4
+		ORDER BY ps.id`,
+		s.cfg.TenantID, userID, now.Add(-s.cfg.SessionIdleTimeout), now.Add(-s.cfg.SessionMaxAge))
+	if err != nil {
+		return 0, fmt.Errorf("push: notify user: %w", err)
+	}
+	targets, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (chat.PushTarget, error) {
+		var t chat.PushTarget
+		err := row.Scan(&t.SubscriptionID, &t.UserID, &t.Endpoint, &t.P256DH, &t.Auth, &t.Locale)
+		return t, err
+	})
+	if err != nil {
+		return 0, fmt.Errorf("push: notify user: %w", err)
+	}
+	if n.At.IsZero() {
+		n.At = now
+	}
+	for _, t := range targets {
+		s.queue.add(job{target: t, notification: s.machineNotification(n, t.Locale)})
+	}
+	return len(targets), nil
 }

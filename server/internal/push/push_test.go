@@ -661,3 +661,74 @@ func TestShownText(t *testing.T) {
 		}
 	}
 }
+
+func TestNotifyUserMachine(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	an, binh := e.User("an_user"), e.User("binh_user")
+	phone := e.device(an, LocaleVI)
+	laptop := e.device(an, LocaleEN)
+	gone := e.device(an, LocaleZhCN)
+	other := e.device(binh, LocaleVI)
+	if _, err := e.Store.RevokeSession(ctx, bottest.TenantID, an, gone.session, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	// Using the app in the foreground does not stop a machine's push: the
+	// agent asks only when no device answered.
+	e.presence.set(an, true)
+	n, err := e.svc.NotifyUser(ctx, an, MachineNotice{MachineID: 42, MachineName: "Mac mini", Kind: MachineApproval, Pending: 1, SessionID: "t_1"})
+	if err != nil || n != 2 {
+		t.Fatalf("queued %d: %v", n, err)
+	}
+	jobs := e.planned()
+	if len(jobsFor(jobs, gone)) != 0 || len(jobsFor(jobs, other)) != 0 {
+		t.Fatal("pushed to a revoked session or another user")
+	}
+	got := jobsFor(jobs, phone)
+	if len(got) != 1 {
+		t.Fatalf("%d pushes to the phone", len(got))
+	}
+	p := payloadOf(t, got[0], phone)
+	want := Payload{Kind: KindMachine, MachineID: 42, SessionID: "t_1", Title: appName, Body: "Claude trên Mac mini cần bạn duyệt",
+		Tag: "machine:42", URL: "/machines/42?session=t_1", Timestamp: p.Timestamp}
+	if p != want || p.Timestamp == 0 || strings.Contains(string(got[0].notification.Payload), "chat_id") {
+		t.Fatalf("payload %+v", p)
+	}
+	if msg := got[0].notification; msg.Urgency != webpush.UrgencyHigh || msg.Topic != "machine42" || msg.TTL != machineTTL {
+		t.Fatalf("message options %+v", msg)
+	}
+	if p := payloadOf(t, jobsFor(jobs, laptop)[0], laptop); p.Body != "Claude on Mac mini needs your approval" {
+		t.Fatalf("English body %q", p.Body)
+	}
+
+	for _, c := range []struct {
+		notice MachineNotice
+		locale string
+		body   string
+	}{
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleVI, "Claude trên PC cần bạn trả lời"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleEN, "Claude on PC needs your answer"},
+		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 3}, LocaleVI, "Claude trên PC có 3 việc cần bạn"},
+		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 3}, LocaleEN, "Claude on PC has 3 requests waiting for you"},
+		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你批准"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你回答"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 2}, LocaleZhCN, "PC 上的 Claude 有 2 个请求等你处理"},
+	} {
+		var p Payload
+		if err := json.Unmarshal(e.svc.machineNotification(c.notice, c.locale).Payload, &p); err != nil {
+			t.Fatal(err)
+		}
+		if p.Body != c.body || p.URL != "/machines/0" {
+			t.Errorf("%s %+v: %+v", c.locale, c.notice, p)
+		}
+	}
+
+	off, err := New(e.Store.Pool(), e.Chat, e.presence, Config{TenantID: bottest.TenantID, AppName: appName,
+		SessionIdleTimeout: time.Hour, SessionMaxAge: time.Hour}, bottest.Quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := off.NotifyUser(ctx, an, MachineNotice{MachineID: 1, MachineName: "x", Kind: MachineApproval, Pending: 1}); n != 0 || err != nil {
+		t.Fatalf("disabled service: %d %v", n, err)
+	}
+}

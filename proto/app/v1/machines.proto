@@ -1,0 +1,189 @@
+syntax = "proto3";
+
+package app.v1;
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+
+// My machines (ADR 0013): the directory of the computers where the user runs
+// chat-agent. The server only lists them (name, OS, public key, tunnel
+// address, last seen), hands out install codes and sends content-free Web
+// Pushes for them; it is never a root of trust for a machine's key and never
+// sees what goes through the tunnel. Served under /rpc with the user's
+// session like every user service.
+service MachinesService {
+  // A one-time install code for `chat-agent install`, valid for 10 minutes.
+  // Fails with resource_exhausted "too_many_install_codes" while the user
+  // holds 5 unused, unexpired codes.
+  rpc CreateInstallCode(CreateInstallCodeRequest) returns (CreateInstallCodeResponse);
+  // The caller's machines that are not revoked, oldest first.
+  rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse);
+  // Renames one of the caller's machines. Fails with invalid_argument for an
+  // empty or too long name and not_found for a machine that is not the
+  // caller's (or is revoked).
+  rpc RenameMachine(RenameMachineRequest) returns (RenameMachineResponse);
+  // Removes the machine from the directory: its secret stops working for
+  // NotifyNeedsInput, and its next Heartbeat answers revoked, so chat-agent
+  // closes its tunnel. not_found as RenameMachine.
+  rpc RevokeMachine(RevokeMachineRequest) returns (RevokeMachineResponse);
+  // Puts a paired device's public key on the machine's revoked list: the
+  // machine drops that device at its next Heartbeat. Succeeds when the key is
+  // already revoked; not_found as RenameMachine.
+  rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+}
+
+// The calls of chat-agent itself. Served under /machine-api (not /rpc): the
+// agent sends no Origin and has no user session. RegisterMachine is
+// authenticated by its install code; the other calls by the machine secret in
+// "Authorization: Bearer <machine_secret>". Every call fails with
+// unauthenticated for a wrong code or secret (and resource_exhausted after too
+// many failures from one address).
+service MachineAgentService {
+  // Turns an install code into a machine of the code's owner. Fails with
+  // unauthenticated "install_code_invalid" for a wrong, expired or used code,
+  // invalid_argument for malformed fields, failed_precondition
+  // "agent_update_required" when agent_version is below the minimum, and
+  // resource_exhausted "too_many_machines" when the owner has 20 machines.
+  rpc RegisterMachine(RegisterMachineRequest) returns (RegisterMachineResponse);
+  // Reports the machine alive (every 60 s and whenever the tunnel changes)
+  // and returns what was revoked. A revoked machine gets revoked = true (and
+  // nothing is recorded); otherwise an agent_version below the minimum fails
+  // with failed_precondition "agent_update_required".
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  // Asks the server to tell the owner's devices, by Web Push, that a session
+  // waits for them. Pushes of one machine are at most one per 30 s: calls in
+  // between are merged into the next push, which carries the newest pending
+  // count. The push holds the machine's name and the kind of request only.
+  // Fails with permission_denied "machine_revoked" for a revoked machine.
+  rpc NotifyNeedsInput(NotifyNeedsInputRequest) returns (NotifyNeedsInputResponse);
+}
+
+// A machine of the directory.
+message Machine {
+  int64 id = 1 [jstype = JS_NUMBER];
+  // Up to 64 characters, chosen at install and changed with RenameMachine.
+  string name = 2;
+  // As Node's process.platform and process.arch: "darwin", "win32" or
+  // "linux"; "arm64" or "x64".
+  string os = 3;
+  string arch = 4;
+  // As last reported by the agent; claude_version is empty when unknown.
+  string agent_version = 5;
+  string claude_version = 6;
+  // The machine's X25519 static public key (32 bytes), as the agent reported
+  // it. Informational only: a device trusts a machine key solely through the
+  // pairing proof (ADR 0013), never because the server lists it.
+  bytes public_key = 7;
+  // wss://<subdomain>.tunnel.<domain>, empty while the tunnel is down.
+  string tunnel_url = 8;
+  // Unix seconds.
+  int64 created_at = 9 [jstype = JS_NUMBER];
+  int64 last_seen_at = 10 [jstype = JS_NUMBER];
+}
+
+message CreateInstallCodeRequest {}
+
+message CreateInstallCodeResponse {
+  // 128 random bits, base64url without padding (22 characters).
+  string code = 1;
+  // Unix seconds.
+  int64 expires_at = 2 [jstype = JS_NUMBER];
+}
+
+message ListMachinesRequest {}
+
+message ListMachinesResponse {
+  repeated Machine machines = 1;
+}
+
+message RenameMachineRequest {
+  int64 machine_id = 1 [jstype = JS_NUMBER];
+  // Trimmed; 1 to 64 characters, no control characters.
+  string name = 2;
+}
+
+message RenameMachineResponse {
+  Machine machine = 1;
+}
+
+message RevokeMachineRequest {
+  int64 machine_id = 1 [jstype = JS_NUMBER];
+}
+
+message RevokeMachineResponse {}
+
+message RevokeDeviceRequest {
+  int64 machine_id = 1 [jstype = JS_NUMBER];
+  // The device's X25519 static public key, 32 bytes.
+  bytes device_public_key = 2;
+}
+
+message RevokeDeviceResponse {}
+
+message RegisterMachineRequest {
+  // CreateInstallCodeResponse.code.
+  string install_code = 1;
+  // Shown in the directory; the host name is a good default. Trimmed; 1 to
+  // 64 characters, no control characters.
+  string name = 2;
+  // "darwin", "win32" or "linux"; "arm64" or "x64" (process.platform and
+  // process.arch).
+  string os = 3;
+  string arch = 4;
+  // Semantic version of chat-agent, such as "0.1.0".
+  string agent_version = 5;
+  // The machine's X25519 static public key, 32 bytes.
+  bytes public_key = 6;
+}
+
+message RegisterMachineResponse {
+  int64 machine_id = 1 [jstype = JS_NUMBER];
+  // 256 random bits, base64url without padding (43 characters): the bearer
+  // token of Heartbeat and NotifyNeedsInput. Shown once; the server keeps
+  // only its hash.
+  string machine_secret = 2;
+}
+
+message HeartbeatRequest {
+  // wss://<subdomain>.tunnel.<domain> (optionally with a trailing slash), or
+  // empty while the tunnel is down.
+  string tunnel_url = 1;
+  string agent_version = 2;
+  // `claude --version` of the machine, up to 64 characters; empty when
+  // unknown.
+  string claude_version = 3;
+}
+
+message HeartbeatResponse {
+  // The user revoked the machine: close the tunnel and stop.
+  bool revoked = 1;
+  // Public keys (32 bytes each) of the devices the user revoked for this
+  // machine: drop their connections and forget them.
+  repeated bytes revoked_device_keys = 2;
+  // The oldest chat-agent version the server accepts; update before falling
+  // below it.
+  string min_agent_version = 3;
+}
+
+// What a waiting session needs from the user.
+enum NeedsInputKind {
+  NEEDS_INPUT_KIND_UNSPECIFIED = 0;
+  // A tool waits for allow or deny.
+  NEEDS_INPUT_KIND_APPROVAL = 1;
+  // The AI asked the user a question.
+  NEEDS_INPUT_KIND_QUESTION = 2;
+}
+
+message NotifyNeedsInputRequest {
+  NeedsInputKind kind = 1;
+  // How many approvals and questions wait on the machine in total (at least
+  // 1, at most 1000).
+  int32 pending_count = 2;
+  // The waiting thread, so the notification opens it: up to 64 characters of
+  // [A-Za-z0-9_-]; empty when unknown. An opaque id, never content.
+  string session_id = 3;
+}
+
+message NotifyNeedsInputResponse {}

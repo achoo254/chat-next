@@ -70,7 +70,7 @@ const compressMinBytes = 1024
 // NewHandler returns the Connect handler for AuthService, UsersService,
 // ConfigService, ChatsService, MessagesService, UpdatesService,
 // ModerationService, IntegrationsService, MediaService, SearchService,
-// BotsService, BotAdminService, PushService, FeedbackService and PrivacyService. Every call passes the Origin check, the id-contract check
+// BotsService, BotAdminService, PushService, FeedbackService, PrivacyService and MachinesService. Every call passes the Origin check, the id-contract check
 // on request and response, and (except public procedures) the session check.
 func NewHandler(d Deps) (http.Handler, error) {
 	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.MiniApp == nil || d.Push == nil || d.Privacy == nil || d.SignIn == nil {
@@ -117,5 +117,6 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{
 		privacy: d.Privacy, store: d.Store, tenantID: d.TenantID, logger: d.Logger,
 	}, opts...))
+	mux.Handle(appv1connect.NewMachinesServiceHandler(&machinesService{store: d.Store, tenantID: d.TenantID, logger: d.Logger}, opts...))
 	return mux, nil
 }

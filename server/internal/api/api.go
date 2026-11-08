@@ -3,8 +3,9 @@
 // realtime WebSocket at /ws (the gateway runs inside the api process in
 // stage 1), the incoming webhook endpoint POST /hook/... (in the same
 // process, so a hook message reaches the in-memory gateway right after
-// commit), the Bot API under /bot/v1/ and, on the media host only, media downloads and proxied upload
-// parts.
+// commit), the Bot API under /bot/v1/, the calls of chat-agent under
+// /machine-api/ and, on the media host only, media downloads and proxied
+// upload parts.
 package api
 
 import (
@@ -35,6 +36,7 @@ import (
 	"app.local/server/internal/gateway"
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/machineapi"
 	"app.local/server/internal/media"
 	"app.local/server/internal/miniapp"
 	"app.local/server/internal/privacy"
@@ -75,6 +77,8 @@ type App struct {
 	Push *push.Service
 	// Privacy builds data exports and deletes accounts.
 	Privacy *privacy.Service
+	// Machines serves chat-agent's calls (ADR 0013).
+	Machines *machineapi.Service
 
 	logger   *slog.Logger
 	cancel   context.CancelFunc
@@ -232,6 +236,11 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	machines, err := machineapi.New(machineapi.Config{TenantID: cfg.TenantID, TenantDomain: cfg.TenantDomain},
+		st, pushSvc, limiter, logger.With("component", "machineapi"))
+	if err != nil {
+		return nil, err
+	}
 	mcpHandler, err := newMCP(cfg, st, idp, origins, limiter, rpc.NewInProcess(rpcDeps), logger)
 	if err != nil {
 		return nil, err
@@ -250,11 +259,14 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		mux.Handle(route, hookSvc)
 	}
 	mux.Handle(botapi.Prefix, botAPI)
+	// chat-agent sends no Origin and has no user session: its calls are
+	// not under /rpc (ADR 0013).
+	mux.Handle(machineapi.Prefix, machines.Handler())
 	mcpHandler.Register(mux)
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	app := &App{Handler: mux, IdP: idp, Sessions: sessions, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc, Hub: hub,
-		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, Push: pushSvc, Privacy: privacySvc, logger: logger,
+		BotAdmin: botAdmin, BotUpdates: botUpdates, Assistant: assistantSvc, Push: pushSvc, Privacy: privacySvc, Machines: machines, logger: logger,
 		cancel: cancel}
 	loops := []func(context.Context){
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
@@ -507,6 +519,7 @@ func (a *App) Shutdown() {
 		a.Hub.Shutdown(ctx)
 		cancel()
 		a.cancel()
+		a.Machines.Close()
 		a.loops.Wait()
 		a.Chat.Stop()
 		// After the dispatcher drained: its realtime counts are in memory.
