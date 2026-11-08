@@ -142,8 +142,36 @@ async function chat(url: string, dir: string, text: string, yes: boolean, model:
   send(session, { id: "c", body: { case: "threadCreate", value: { provider: "claude", model, dir, text, consent: { sensitive: false, projectSettings: false } } } });
 }
 
+/** Round trips of sealed ping frames, to measure latency through the relay. */
+async function ping(url: string, count: number) {
+  const { saved, pair: key } = await device();
+  if (!saved.machineKey) throw new Error("pair first");
+  const t0 = performance.now();
+  const ws = await open(url);
+  const hs = await startHandshake({ device: key, deviceName: "terminal", trust: { kind: "pinned", machineKey: fromBase64Url(saved.machineKey) } });
+  ws.send(hs.hello);
+  const { session } = await hs.finish(await next(ws));
+  console.log(`connect + handshake: ${Math.round(performance.now() - t0)} ms`);
+  const times: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const start = performance.now();
+    ws.send(session.seal(create(FrameSchema, { id: String(i), body: { case: "ping", value: {} } })));
+    for (;;) {
+      const f = session.open(await next(ws));
+      if (f.id === String(i)) break;
+    }
+    times.push(performance.now() - start);
+  }
+  times.sort((x, y) => x - y);
+  const q = (p: number) => Math.round(times[Math.min(times.length - 1, Math.floor(p * times.length))] ?? 0);
+  console.log(`ping x${count}: p50 ${q(0.5)} ms, p95 ${q(0.95)} ms, max ${q(1)} ms`);
+  ws.close();
+  process.exit(0);
+}
+
 const [cmd, url, a, b, ...rest] = process.argv.slice(2);
 const model = rest.includes("--model") ? (rest[rest.indexOf("--model") + 1] ?? "") : "";
-if (cmd === "pair" && url && a) await pair(url, a);
+if (cmd === "ping" && url) await ping(url, Number(a ?? 50));
+else if (cmd === "pair" && url && a) await pair(url, a);
 else if (cmd === "chat" && url && a && b) await chat(url, a, b, rest.includes("--yes"), model);
-else console.log("usage: device.ts pair <ws-url> <code> | chat <ws-url> <folder> <text> [--yes] [--model m]");
+else console.log("usage: device.ts pair <ws-url> <code> | ping <ws-url> [count] | chat <ws-url> <folder> <text> [--yes] [--model m]");
