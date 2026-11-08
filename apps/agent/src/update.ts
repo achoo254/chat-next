@@ -38,6 +38,12 @@ export function verifyMinisign(file: Uint8Array, sigText: string, pubkey = MINIS
   return ed25519.verify(globalSig, signed, key);
 }
 
+/** The trusted comment of a minisign signature (checked by verifyMinisign). */
+export function trustedComment(sigText: string): string {
+  const line = sigText.split(/\r?\n/)[2] ?? "";
+  return line.startsWith("trusted comment: ") ? line.slice("trusted comment: ".length) : "";
+}
+
 export function assetName(os = platform(), cpu = arch()): string {
   if (os === "darwin") return `hda-darwin-${cpu === "arm64" ? "arm64" : "x64"}`;
   if (os === "win32") return "hda-windows-x64.exe";
@@ -71,21 +77,27 @@ export async function update(log: (l: string) => void): Promise<string | null> {
   const base = `https://github.com/${REPO}/releases/download/agent-v${latest}/${asset}`;
   log(`downloading hda ${latest}…`);
   const [bin, sig] = await Promise.all([fetchBytes(base), fetchBytes(`${base}.minisig`)]);
-  if (!verifyMinisign(bin, new TextDecoder().decode(sig))) throw new Error("signature check failed; the download was not installed");
+  const sigText = new TextDecoder().decode(sig);
+  if (!verifyMinisign(bin, sigText)) throw new Error("signature check failed; the download was not installed");
+  // The signed comment names the file and version, so an older signed build
+  // cannot be served in place of this one.
+  if (trustedComment(sigText) !== `hda ${latest} ${asset}`) throw new Error("the signature is for another file or version; not installed");
   const exe = process.execPath;
+  const next = `${exe}.new`;
   const old = `${exe}.old`;
+  writeFileSync(next, bin, { mode: 0o755 });
+  if (!same(new Uint8Array(readFileSync(next)), bin)) {
+    rmSync(next, { force: true });
+    throw new Error("the new file did not write correctly; kept the old one");
+  }
   rmSync(old, { force: true });
   // A running executable cannot be overwritten on Windows, but it can be renamed.
   renameSync(exe, old);
   try {
-    writeFileSync(exe, bin, { mode: 0o755 });
+    renameSync(next, exe);
   } catch (err) {
     renameSync(old, exe);
     throw err;
-  }
-  if (!same(new Uint8Array(readFileSync(exe)), bin)) {
-    renameSync(old, exe);
-    throw new Error("the new file did not write correctly; kept the old one");
   }
   return latest;
 }

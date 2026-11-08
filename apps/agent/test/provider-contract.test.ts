@@ -192,8 +192,19 @@ describe.each(adapters)("provider contract: %s", (_name, make) => {
     await expect(core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent, device: "phone" })).rejects.toMatchObject({
       code: ErrorCode.NEEDS_CONSENT,
     });
-    await core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: true }, device: "phone" });
-    expect(audit.list().map((e) => e.action).sort()).toEqual(["open_sensitive", "project_settings"]);
+    await expect(
+      core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: true }, device: "phone" }),
+    ).rejects.toThrow(/hda trust/);
+    await core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: false }, device: "phone" });
+    expect(audit.list().map((e) => e.action)).toEqual(["open_sensitive"]);
+    await core.stop();
+  });
+
+  it("loads project settings only in folders trusted on the machine", async () => {
+    const { provider } = make();
+    const { core, work, audit } = makeCore([provider], { trusted: (d) => d.endsWith("work") });
+    await core.create({ provider: provider.id, model: "", dir: work, text: "hi", consent: { sensitive: false, projectSettings: true }, device: "phone" });
+    expect(audit.list().map((e) => e.action)).toEqual(["project_settings"]);
     await core.stop();
   });
 });

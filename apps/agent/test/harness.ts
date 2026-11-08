@@ -11,7 +11,7 @@ export function tempDir(prefix = "agent-test-"): string {
   return mkdtempSync(join(tmpdir(), prefix));
 }
 
-export function makeCore(providers: AgentProvider[], opts: { dataDir?: string; home?: string; maxSessions?: number } = {}) {
+export function makeCore(providers: AgentProvider[], opts: { dataDir?: string; home?: string; maxSessions?: number; trusted?: (dir: string) => boolean } = {}) {
   const root = tempDir();
   const home = opts.home ?? join(root, "home");
   const work = join(home, "work");
@@ -25,6 +25,7 @@ export function makeCore(providers: AgentProvider[], opts: { dataDir?: string; h
     audit,
     isSensitive: createSensitiveCheck({ home }),
     maxSessions: opts.maxSessions ?? 3,
+    ...(opts.trusted ? { isTrusted: opts.trusted } : {}),
   });
   return { core, audit, home, work, dataDir };
 }

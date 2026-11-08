@@ -48,7 +48,13 @@ export type LinkContext = {
 type Pake = Extract<Awaited<ReturnType<typeof pakeReply>>, { ok: true }>;
 
 export class Connection {
-  private state: "new" | "pake" | "open" | "closed" = "new";
+  // "confirming": the handshake answered, but the device has not yet proven
+  // its key with a first valid frame; it holds no session until then.
+  private state: "new" | "pake" | "confirming" | "open" | "closed" = "new";
+  private pairedBy: "install" | "qr" | undefined;
+  private deviceName = "";
+  /** Last time any message arrived, for the idle timeout. */
+  lastSeen = Date.now();
   private session: Session | undefined;
   private pake: Pake | undefined;
   private device = "";
@@ -72,6 +78,7 @@ export class Connection {
 
   /** Messages are handled one at a time, in order. */
   receive(data: Uint8Array): void {
+    this.lastSeen = Date.now();
     this.queue = this.queue.then(() => this.handle(data)).catch(() => this.close(1008, "protocol error"));
   }
 
@@ -85,6 +92,11 @@ export class Connection {
   private async handle(data: Uint8Array): Promise<void> {
     if (this.state === "closed") return;
     if (this.state === "open") return this.frame(this.session?.open(data));
+    if (this.state === "confirming") {
+      const first = this.session?.open(data); // throws on a forged frame
+      this.confirmed();
+      return this.frame(first);
+    }
     const plain = decodePlain(data);
     const body = plain.body;
     if (this.state === "pake") {
@@ -121,10 +133,19 @@ export class Connection {
     if (!result.ok) return this.close(1000, "handshake refused");
     this.session = result.session;
     this.device = deviceLabel(result.deviceKey, result.deviceName);
-    if (result.pairedBy) {
-      this.ctx.config.addDevice(result.deviceKey, result.deviceName);
-      this.ctx.audit.write({ device: this.device, action: "pair", path: "", detail: result.pairedBy });
-      this.ctx.onPaired(result.pairedBy);
+    this.deviceName = result.deviceName;
+    this.pairedBy = result.pairedBy;
+    this.state = "confirming";
+  }
+
+  /** The device proved its key: pair it if this was a pairing, then serve it. */
+  private confirmed(): void {
+    const key = this.session?.peerStatic;
+    if (!key) throw new Error("no session");
+    if (this.pairedBy) {
+      this.ctx.config.addDevice(key, this.deviceName);
+      this.ctx.audit.write({ device: this.device, action: "pair", path: "", detail: this.pairedBy });
+      this.ctx.onPaired(this.pairedBy);
     }
     this.state = "open";
     this.unsubscribe.push(

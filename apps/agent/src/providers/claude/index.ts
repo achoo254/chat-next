@@ -136,7 +136,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     }
     const paths = [...toolPaths(input), ...(opts.blockedPath ? [opts.blockedPath] : [])];
     const command = typeof input.command === "string" ? input.command : "";
-    const sensitive = paths.some(policy.isSensitive) || (command !== "" && mentionsSensitive(command, policy.isSensitive));
+    const sensitive = paths.some(policy.isSensitive) || (command !== "" && mentionsSensitive(command, policy.isSensitive, { cwd: policy.dir }));
     const req = {
       kind: "approval" as const,
       toolId: opts.toolUseID ?? "",
@@ -150,8 +150,11 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     const { decision } = await askUser(req, opts.signal);
     if (decision === "deny") return { behavior: "deny", message: "The user denied this from their device." };
     if (decision === "allow-session" && !sensitive) {
-      const rules: PermissionUpdate[] = opts.suggestions?.length
-        ? opts.suggestions.map((s) => ({ ...s, destination: "session" }) as PermissionUpdate)
+      // Only allow rules for this session: a remote "allow for the session"
+      // must never switch the permission mode or add directories.
+      const suggested = (opts.suggestions ?? []).filter((s) => s.type === "addRules" && s.behavior === "allow");
+      const rules: PermissionUpdate[] = suggested.length
+        ? suggested.map((s) => ({ ...s, destination: "session" }) as PermissionUpdate)
         : [{ type: "addRules", rules: [{ toolName }], behavior: "allow", destination: "session" }];
       return { behavior: "allow", updatedInput: input, updatedPermissions: rules };
     }

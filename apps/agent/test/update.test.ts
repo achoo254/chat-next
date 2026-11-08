@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { assetName, verifyMinisign } from "../src/update.ts";
+import { assetName, trustedComment, verifyMinisign } from "../src/update.ts";
 
 const dir = join(import.meta.dirname, "fixtures");
 const file = new Uint8Array(readFileSync(join(dir, "payload.bin")));
@@ -20,6 +20,10 @@ describe("minisign", () => {
     expect(verifyMinisign(changed, sig, pub)).toBe(false);
     expect(verifyMinisign(file, sig.replace(/^trusted comment: /m, "trusted comment: x"), pub)).toBe(false);
     expect(verifyMinisign(file, sig)).toBe(false);
+  });
+
+  it("reads the signed comment", () => {
+    expect(trustedComment(readFileSync(join(dir, "payload.bin.minisig"), "utf8"))).toBe("chat-agent test");
   });
 
   it("names the right asset per platform", () => {

@@ -67,8 +67,23 @@ export function createSensitiveCheck(opts: SensitiveOptions = {}) {
 }
 
 /** True when a command line or tool input mentions a sensitive path. */
-export function mentionsSensitive(text: string, isSensitive: (p: string) => boolean, home = homedir()): boolean {
+export function mentionsSensitive(
+  text: string,
+  isSensitive: (p: string) => boolean,
+  opts: { home?: string; cwd?: string } = {},
+): boolean {
+  const home = opts.home ?? homedir();
+  // The agent's own commands hand out pairing secrets or change trust.
+  if (/\bhda(\.exe)?\s+(pair|devices|trust|untrust|install|login)\b/i.test(text)) return true;
   // JSON inputs escape Windows backslashes; undo that before splitting.
-  const words = text.replaceAll("\\\\", "\\").split(/[\s"'=,;()[\]{}]+/);
-  return words.some((w) => (w.startsWith("~") ? isSensitive(join(home, w.slice(1))) : /[\\/]/.test(w) && isSensitive(w)));
+  const unescaped = text
+    .replaceAll("\\\\", "\\")
+    .replace(/\$\{?HOME\}?|%USERPROFILE%|\$env:USERPROFILE/gi, home);
+  const words = unescaped.split(/[\s"'=,;()[\]{}]+/);
+  return words.some((w) => {
+    if (w.startsWith("~")) return isSensitive(join(home, w.slice(1)));
+    if (!/[\\/]/.test(w)) return false;
+    // Relative paths count from the session folder, not the agent's.
+    return isSensitive(opts.cwd ? resolve(opts.cwd, w) : w);
+  });
 }

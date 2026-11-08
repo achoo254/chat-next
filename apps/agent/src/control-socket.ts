@@ -72,6 +72,13 @@ async function handle(m: Machine, route: string, input: Record<string, string>):
       // The supervisor starts the agent again (launchd KeepAlive, task loop).
       setTimeout(() => process.exit(0), 200);
       return { restarting: true };
+    case "GET /trust":
+      return m.config.get().trustedDirs;
+    case "POST /trust": {
+      const dir = m.config.setTrusted(input.dir ?? "", input.trusted !== "false");
+      m.audit.write({ device: "local", action: "project_settings", path: dir, detail: input.trusted === "false" ? "untrust" : "trust" });
+      return { dir, trusted: input.trusted !== "false" };
+    }
     case "GET /audit":
       return m.audit.list(50);
     default:

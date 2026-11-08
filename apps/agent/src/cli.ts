@@ -28,6 +28,9 @@ Usage:
   hda devices               list paired devices
   hda devices revoke <key>  revoke a paired device (first characters of its key)
   hda audit                 show the consent log
+  hda trust [dir]           let a folder's own .claude settings load (default: current folder)
+  hda untrust [dir]         stop loading that folder's .claude settings
+  hda trusted               list trusted folders
 `;
 
 function flag(args: string[], name: string): string | undefined {
@@ -103,6 +106,13 @@ async function main(argv: string[]): Promise<number> {
     case "status":
     case "audit":
       console.log(JSON.stringify(await callControl(dir, "GET", `/${cmd}`), null, 2));
+      return 0;
+    case "trust":
+    case "untrust":
+      console.log(JSON.stringify(await callControl(dir, "POST", "/trust", { dir: args[0] ?? process.cwd(), trusted: cmd === "trust" ? "true" : "false" })));
+      return 0;
+    case "trusted":
+      console.log(JSON.stringify(await callControl(dir, "GET", "/trust"), null, 2));
       return 0;
     case "devices":
       if (args[0] === "revoke") {

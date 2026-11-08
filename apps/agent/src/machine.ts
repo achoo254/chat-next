@@ -27,6 +27,8 @@ import { AGENT_VERSION } from "./version.ts";
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
+/** Devices ping every 10 s; a silent connection is dropped. */
+const IDLE_TIMEOUT_MS = 45_000;
 /** Push only when nobody looked at the machine for this long… */
 const PING_FRESH_MS = 15_000;
 /** …and the prompt is still waiting after this long. */
@@ -67,6 +69,7 @@ export class Machine {
       providers: this.providers,
       audit: this.audit,
       isSensitive: this.isSensitive,
+      isTrusted: (dir) => this.config.isTrusted(dir),
       mcpServers: c.mcpServers,
       maxSessions: c.maxSessions,
       idleMs: c.idleMinutes * 60_000,
@@ -157,6 +160,9 @@ export class Machine {
     const timer = setTimeout(() => {
       if (!conn.isOpen) conn.close(1008, "handshake timeout");
     }, HANDSHAKE_TIMEOUT_MS);
+    const idle = setInterval(() => {
+      if (Date.now() - conn.lastSeen > IDLE_TIMEOUT_MS) conn.close(1001, "idle");
+    }, 15_000);
     ws.on("message", (data, isBinary) => {
       if (!isBinary) return conn.close(1003, "binary only");
       const buf = Array.isArray(data) ? Buffer.concat(data) : Buffer.from(data as ArrayBuffer);
@@ -164,6 +170,7 @@ export class Machine {
     });
     ws.on("close", () => {
       clearTimeout(timer);
+      clearInterval(idle);
       conn.close();
       this.connections.delete(conn);
     });

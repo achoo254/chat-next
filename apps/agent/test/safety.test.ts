@@ -29,11 +29,14 @@ describe("sensitive paths", () => {
   });
 
   it("finds sensitive paths inside a command or JSON input", () => {
-    expect(mentionsSensitive(`cat ${join(home, ".ssh", "id")}`, check, home)).toBe(true);
-    expect(mentionsSensitive(JSON.stringify({ file_path: join(home, ".ssh", "config") }), check, home)).toBe(true);
-    expect(mentionsSensitive("cat ~/.ssh/config", check, home)).toBe(true);
-    expect(mentionsSensitive(`ls ${join(home, "code")}`, check, home)).toBe(false);
-    expect(mentionsSensitive("npm test", check, home)).toBe(false);
+    expect(mentionsSensitive(`cat ${join(home, ".ssh", "id")}`, check, { home })).toBe(true);
+    expect(mentionsSensitive(JSON.stringify({ file_path: join(home, ".ssh", "config") }), check, { home })).toBe(true);
+    expect(mentionsSensitive("cat ~/.ssh/config", check, { home })).toBe(true);
+    expect(mentionsSensitive(`ls ${join(home, "code")}`, check, { home })).toBe(false);
+    expect(mentionsSensitive("npm test", check, { home })).toBe(false);
+    expect(mentionsSensitive("cat ../../.ssh/id_rsa", check, { home, cwd: join(home, "code", "app") })).toBe(true);
+    expect(mentionsSensitive("cat $HOME/.ssh/id_rsa", check, { home })).toBe(true);
+    expect(mentionsSensitive("hda pair", check, { home })).toBe(true);
   });
 });
 

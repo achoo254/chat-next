@@ -4,7 +4,7 @@
 // the service writes it.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { toBase64Url } from "@achoo254/chat-remote-protocol";
 
 export type PairedDevice = { key: string; name: string; addedAt: number };
@@ -17,6 +17,8 @@ export type AgentConfig = {
   idleMinutes: number;
   mcpServers: Record<string, unknown>;
   pinnedDirs: string[];
+  /** Folders whose own .claude settings may load (set on the machine: hda trust). */
+  trustedDirs: string[];
   /** Set by `hda install`; cleared once that browser has connected. */
   install?: { deviceKey: string; secret: string };
   machineId?: string;
@@ -40,6 +42,7 @@ const DEFAULTS: AgentConfig = {
   idleMinutes: 5,
   mcpServers: {},
   pinnedDirs: [],
+  trustedDirs: [],
 };
 
 export class ConfigStore {
@@ -77,8 +80,29 @@ export class ConfigStore {
     const k = toBase64Url(key);
     this.update((c) => {
       c.revoked = c.revoked.filter((r) => r !== k);
-      if (!c.devices.some((d) => d.key === k)) c.devices.push({ key: k, name: name || "device", addedAt: Date.now() });
+      // Names come from the device: no control characters, at most 64.
+      const clean = [...name].filter((ch) => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) !== 127).join("").trim().slice(0, 64) || "device";
+      if (!c.devices.some((d) => d.key === k)) c.devices.push({ key: k, name: clean, addedAt: Date.now() });
     });
+  }
+
+  /** True when dir is a trusted folder or inside one. */
+  isTrusted(dir: string): boolean {
+    const norm = (p: string) => {
+      const r = resolve(p);
+      return process.platform === "win32" || process.platform === "darwin" ? r.toLowerCase() : r;
+    };
+    const d = norm(dir);
+    return this.data.trustedDirs.some((t) => d === norm(t) || d.startsWith(norm(t) + sep));
+  }
+
+  setTrusted(dir: string, trusted: boolean): string {
+    const full = resolve(dir);
+    this.update((c) => {
+      c.trustedDirs = c.trustedDirs.filter((t) => resolve(t) !== full);
+      if (trusted) c.trustedDirs.push(full);
+    });
+    return full;
   }
 
   revokeDevice(key: string): boolean {

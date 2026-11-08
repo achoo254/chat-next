@@ -96,6 +96,8 @@ export type CoreOptions = {
   providers: AgentProvider[];
   audit: AuditLog;
   isSensitive: (path: string) => boolean;
+  /** Project settings load only in folders the owner trusted on the machine. */
+  isTrusted?: (dir: string) => boolean;
   mcpServers?: Record<string, unknown>;
   maxSessions?: number;
   idleMs?: number;
@@ -293,6 +295,9 @@ export class AgentCore {
     if (!detected.installed) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`);
     if (detected.loginState === "needs-login") throw new AgentError(ErrorCode.NEEDS_LOGIN, `${provider.name} needs sign-in`);
 
+    if (req.consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false)) {
+      throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: hda trust "${dir}"`);
+    }
     if (sensitive) this.opts.audit.write({ device: req.device, action: "open_sensitive", path: dir, detail: "" });
     if (req.consent.projectSettings) {
       this.opts.audit.write({ device: req.device, action: "project_settings", path: dir, detail: provider.id });
@@ -555,7 +560,7 @@ export class AgentCore {
       case "tool-start":
         this.put(t, `tool:${e.toolId}`, {
           case: "toolCall",
-          value: { toolId: e.toolId, kind: KIND[e.kind], name: e.name, summary: e.summary, input: e.input, sensitive: mentionsSensitive(`${e.summary} ${e.input}`, this.opts.isSensitive) },
+          value: { toolId: e.toolId, kind: KIND[e.kind], name: e.name, summary: e.summary, input: e.input, sensitive: mentionsSensitive(`${e.summary} ${e.input}`, this.opts.isSensitive, { cwd: t.meta.dir }) },
         });
         return;
       case "tool-end":
@@ -662,7 +667,7 @@ export class AgentCore {
     const itemId = `ask:${req.toolId || randomUUID()}`;
     if (req.kind === "approval") {
       // The core checks too, so an adapter that misses a path cannot unlock "allow for the session".
-      req = { ...req, sensitive: req.sensitive || mentionsSensitive(`${req.summary} ${req.input}`, this.opts.isSensitive) };
+      req = { ...req, sensitive: req.sensitive || mentionsSensitive(`${req.summary} ${req.input}`, this.opts.isSensitive, { cwd: t.meta.dir }) };
       this.put(t, itemId, {
         case: "approval",
         value: {
