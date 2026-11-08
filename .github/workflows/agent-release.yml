@@ -1,5 +1,6 @@
 # Releases chat-agent (apps/agent) on a tag agent-v<semver>: tests, single-file
-# builds for macOS (arm64, x64, ad-hoc signed) and Windows x64, SHA256SUMS,
+# builds for macOS (arm64, x64) and Windows x64, cross-compiled by Bun on Linux
+# (Bun ad-hoc signs the macOS files itself), SHA256SUMS,
 # minisign signatures, then a GitHub Release. Afterwards pin the install
 # scripts locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS,
 # commit and push (the web deploy serves them).
@@ -37,10 +38,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: macos-14, target: bun-darwin-arm64, asset: chat-agent-darwin-arm64 }
-          - { os: macos-14, target: bun-darwin-x64, asset: chat-agent-darwin-x64 }
-          - { os: ubuntu-latest, target: bun-windows-x64, asset: chat-agent-windows-x64.exe }
-    runs-on: ${{ matrix.os }}
+          - { target: bun-darwin-arm64, asset: chat-agent-darwin-arm64 }
+          - { target: bun-darwin-x64, asset: chat-agent-darwin-x64 }
+          - { target: bun-windows-x64, asset: chat-agent-windows-x64.exe }
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -55,9 +56,6 @@ jobs:
           curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4"
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
       - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile dist/${{ matrix.asset }}
-      - name: Ad-hoc sign (macOS refuses unsigned arm64 binaries)
-        if: runner.os == 'macOS'
-        run: codesign --force -s - dist/${{ matrix.asset }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.asset }}
