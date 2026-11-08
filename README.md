@@ -52,6 +52,10 @@ Hai gói công khai: `@achoo254/chat-client` ([`packages/chat-client/README.md`]
 
 Thêm `https://chat.hoandat.com/mcp` vào công cụ AI (Claude Code, …) làm MCP server rồi duyệt quyền ở trang consent của IdP; cấu hình mẫu cho từng công cụ có ở Cài đặt › Kết nối AI (MCP) trong app. Tool làm việc với đúng quyền của tài khoản trong app; quản trị bot (`bots:admin`) cần scope riêng và xác nhận hai bước; tạo, xoay vòng URL hay xoá webhook đến cũng xác nhận hai bước. Quyết định: [ADR 0012](docs/adr/0012-mcp-endpoint.md); mã ở [`server/internal/chatmcp/`](server/internal/chatmcp/).
 
+## Máy của tôi (điều khiển AI lập trình trên máy riêng)
+
+Từ web/PWA, người dùng chat với Claude Code đang chạy trên máy của chính họ: thẻ tool, diff, duyệt quyền, câu hỏi, dừng, lệnh `/` và skill của máy, thanh trạng thái (thư mục, nhánh, model, ngữ cảnh, hạn mức 5 giờ / tuần, chế độ quyền). Máy chạy tiến trình nền `hda` (`apps/agent`), cài bằng một lệnh lấy ở trang Máy của tôi; `hda pair` ghép thêm thiết bị bằng mã 6 số, `hda status`, `hda update`. Nội dung mã hoá đầu cuối giữa thiết bị và máy qua relay Tunelo; server chỉ giữ danh bạ máy và gửi push không chứa nội dung. Chế độ quyền theo cấu hình Claude trên máy. Thiết kế: [ADR 0013](docs/adr/0013-remote-machines.md); giao thức `proto/remote/v1`, mã hoá `packages/remote-protocol`, phát hành bằng tag `agent-v*` ([`agent-release.yml`](.github/workflows/agent-release.yml)) rồi `node apps/agent/scripts/pin-release.ts <version> SHA256SUMS` để script cài trỏ bản mới.
+
 ## Production
 
 Deploy và vận hành: [`docs/deployment-guide.md`](docs/deployment-guide.md); hạ tầng đã triển khai: [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md); skill vận hành cho agent: [`.claude/skills/chat-ops-prod/`](.claude/skills/chat-ops-prod/).
