@@ -53,13 +53,17 @@ function writeWindowsLoop(configDir: string): string {
   mkdirSync(configDir, { recursive: true });
   const loop = join(configDir, "run-agent.cmd");
   const stop = join(configDir, "stop");
-  const quoted = command().map((a) => `"${a}"`).join(" ");
+  const cmd = command();
+  const quoted = cmd.map((a) => `"${a}"`).join(" ");
+  const status = [...cmd.slice(0, -1), "status"].map((a) => `"${a}"`).join(" ");
   const lines = [
     "@echo off",
     // A custom config folder (tests, a second agent) must reach the agent too.
     ...(process.env.CHAT_AGENT_HOME ? [`set "CHAT_AGENT_HOME=${configDir}"`] : []),
     ":loop",
     `if exist "${stop}" exit /b`,
+    // An agent already answers: another loop keeps it (a quick stop then start), so this one ends.
+    `${status} >nul 2>&1 && exit /b`,
     `${quoted} >> "${join(configDir, "agent.log")}" 2>&1`,
     "timeout /t 10 /nobreak >nul",
     "goto loop",
