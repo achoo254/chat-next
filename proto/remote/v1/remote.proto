@@ -1,0 +1,617 @@
+syntax = "proto3";
+
+package remote.v1;
+
+option go_package = "app.local/server/gen/remote/v1;remotev1";
+
+// Wire contract between a user's device (A: web, PWA, phone) and the
+// background agent on their own machine (B), carried over a Tunelo
+// WebSocket relay. The relay and the chat server never see plaintext:
+// `Plain` messages only carry public keys and proofs, everything after the
+// handshake is a `Frame` sealed with the session keys (ADR 0013).
+//
+// Nothing here is specific to one AI: B runs adapters (Claude Code first)
+// that map their own events and tool names onto the generic shapes below.
+
+// ---------------------------------------------------------------------------
+// Before the handshake: sent in clear, one WebSocket binary message each.
+
+message Plain {
+  oneof body {
+    Hello hello = 1;
+    Ready ready = 2;
+    PakeStart pake_start = 3;
+    PakeReply pake_reply = 4;
+    PakeFinish pake_finish = 5;
+    HandshakeError error = 6;
+  }
+}
+
+// A → B: opens a session.
+message Hello {
+  uint32 protocol_version = 1;
+  uint32 min_protocol_version = 2;
+  // X25519 public keys, 32 bytes each.
+  bytes ephemeral_key = 3;
+  bytes static_key = 4;
+  // 32 random bytes.
+  bytes nonce = 5;
+  // QR pairing only: HMAC-SHA256(pairing secret, "qr" ‖ A static ‖ B static).
+  // B adds A to its paired devices when the proof checks out.
+  bytes pair_proof = 6;
+  // Shown on B's device list; at most 64 characters.
+  string device_name = 7;
+}
+
+// B → A: answers a Hello.
+message Ready {
+  uint32 protocol_version = 1;
+  uint32 min_protocol_version = 2;
+  bytes ephemeral_key = 3;
+  bytes static_key = 4;
+  bytes nonce = 5;
+  // First connection after the one-command install only:
+  // HMAC-SHA256(install secret, "install" ‖ A static ‖ B static). A pins B's
+  // static key only after checking it; it never takes B's key from the server.
+  bytes install_proof = 6;
+  // Key confirmation: the transcript hash sealed as B → A frame 0.
+  bytes confirm = 7;
+}
+
+// Pairing with the 6-digit code shown by `chat-agent pair` (CPace on
+// ristretto255): a wrong guess costs one online attempt and reveals nothing
+// that allows an offline search.
+message PakeStart {
+  bytes share = 1;
+  bytes static_key = 2;
+  string device_name = 3;
+  // 16 random bytes chosen by A: the CPace session id.
+  bytes sid = 4;
+}
+
+message PakeReply {
+  bytes share = 1;
+  bytes static_key = 2;
+  // HMAC-SHA256(ISK, "B" ‖ transcript).
+  bytes tag = 3;
+}
+
+message PakeFinish {
+  // HMAC-SHA256(ISK, "A" ‖ transcript).
+  bytes tag = 1;
+}
+
+message HandshakeError {
+  HandshakeErrorCode code = 1;
+  // The sender's supported range, so the peer can say which side must update.
+  uint32 protocol_version = 2;
+  uint32 min_protocol_version = 3;
+}
+
+enum HandshakeErrorCode {
+  HANDSHAKE_ERROR_CODE_UNSPECIFIED = 0;
+  // A's static key is not paired with this machine.
+  HANDSHAKE_ERROR_CODE_UNKNOWN_DEVICE = 1;
+  HANDSHAKE_ERROR_CODE_VERSION_UNSUPPORTED = 2;
+  HANDSHAKE_ERROR_CODE_BAD_PROOF = 3;
+  HANDSHAKE_ERROR_CODE_PAIRING_EXPIRED = 4;
+  HANDSHAKE_ERROR_CODE_TOO_MANY_ATTEMPTS = 5;
+  HANDSHAKE_ERROR_CODE_REVOKED = 6;
+  HANDSHAKE_ERROR_CODE_BUSY = 7;
+  HANDSHAKE_ERROR_CODE_MALFORMED = 8;
+}
+
+// ---------------------------------------------------------------------------
+// After the handshake: every WebSocket message is one sealed Frame.
+
+message Frame {
+  // Set by A on requests; B echoes it on the direct answer or error.
+  string id = 1;
+  oneof body {
+    // A → B
+    ThreadList thread_list = 10;
+    ThreadCreate thread_create = 11;
+    ThreadSend thread_send = 12;
+    ThreadSubscribe thread_subscribe = 13;
+    ThreadRespond thread_respond = 14;
+    ThreadInterrupt thread_interrupt = 15;
+    ThreadSetModel thread_set_model = 16;
+    ThreadSwitch thread_switch = 17;
+    ThreadFetchFull thread_fetch_full = 18;
+    MachineInfoRequest machine_info_request = 19;
+    Ping ping = 20;
+    DirList dir_list = 21;
+    AuditList audit_list = 22;
+    ThreadClose thread_close = 23;
+
+    // B → A
+    ThreadListResult thread_list_result = 40;
+    ThreadCreated thread_created = 41;
+    ThreadItems thread_items = 42;
+    ThreadStatus thread_status = 43;
+    ThreadReset thread_reset = 44;
+    FullItem full_item = 45;
+    MachineInfo machine_info = 46;
+    Pong pong = 47;
+    DirListResult dir_list_result = 48;
+    AuditListResult audit_list_result = 49;
+    Ack ack = 50;
+    Error error = 51;
+  }
+}
+
+// --- requests (A → B) ------------------------------------------------------
+
+message ThreadList {}
+
+message ThreadCreate {
+  // Adapter id from MachineInfo.providers, e.g. "claude".
+  string provider = 1;
+  // Empty: the adapter's default model.
+  string model = 2;
+  // Absolute working directory on B.
+  string dir = 3;
+  // First user message.
+  string text = 4;
+  Consent consent = 5;
+}
+
+// What the user confirmed on A before opening the session.
+message Consent {
+  // The directory is sensitive (home, root, ~/.ssh, …) and the user agreed.
+  bool sensitive = 1;
+  // Load the project's own agent settings (for Claude: .claude/settings.json
+  // and hooks). Off by default; B logs it when on.
+  bool project_settings = 2;
+}
+
+message ThreadSend {
+  string thread_id = 1;
+  string text = 2;
+  // Client-generated; B drops a repeat of an id it already accepted.
+  string client_msg_id = 3;
+}
+
+message ThreadSubscribe {
+  string thread_id = 1;
+  // Zero cursor: from the start.
+  Cursor cursor = 2;
+}
+
+message ThreadRespond {
+  string thread_id = 1;
+  string item_id = 2;
+  // The approval/question revision the user saw; a stale answer is refused.
+  uint32 expected_revision = 3;
+  oneof answer {
+    Decision decision = 4;
+    Answers answers = 5;
+  }
+}
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  DECISION_ALLOW = 1;
+  // Allow this tool for the rest of the session (never written to settings).
+  DECISION_ALLOW_SESSION = 2;
+  DECISION_DENY = 3;
+}
+
+message Answers {
+  // One entry per question, in order; each holds the chosen option labels or
+  // free text.
+  repeated Answer answers = 1;
+}
+
+message Answer {
+  repeated string values = 1;
+}
+
+message ThreadInterrupt {
+  string thread_id = 1;
+}
+
+message ThreadClose {
+  string thread_id = 1;
+}
+
+message ThreadSetModel {
+  string thread_id = 1;
+  string model = 2;
+}
+
+message ThreadSwitch {
+  string thread_id = 1;
+  string provider = 2;
+  string model = 3;
+}
+
+message ThreadFetchFull {
+  string thread_id = 1;
+  string item_id = 2;
+}
+
+message MachineInfoRequest {}
+
+// Every 10 s while A shows the machine: B pushes a notification only when no
+// device pinged recently.
+message Ping {}
+
+message DirList {
+  // Absolute path; empty for the home directory.
+  string path = 1;
+  bool show_hidden = 2;
+}
+
+message AuditList {
+  uint32 limit = 1;
+}
+
+// --- answers and events (B → A) --------------------------------------------
+
+message Ack {}
+
+message Pong {}
+
+message Error {
+  ErrorCode code = 1;
+  string message = 2;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID = 1;
+  ERROR_CODE_NOT_FOUND = 2;
+  // ThreadCreate on a sensitive directory without Consent.sensitive.
+  ERROR_CODE_NEEDS_CONSENT = 3;
+  // ThreadRespond with a revision that is no longer current.
+  ERROR_CODE_STALE = 4;
+  // All session slots are busy; the thread is queued.
+  ERROR_CODE_QUEUED = 5;
+  ERROR_CODE_PROVIDER_UNAVAILABLE = 6;
+  ERROR_CODE_NEEDS_LOGIN = 7;
+  ERROR_CODE_INTERNAL = 8;
+}
+
+message Cursor {
+  // Bumped each time the agent restarts; a cursor from another epoch resets.
+  uint64 epoch = 1;
+  // Last item seq the device has applied.
+  uint64 seq = 2;
+}
+
+message ThreadSummary {
+  string id = 1;
+  string title = 2;
+  string dir = 3;
+  string provider = 4;
+  string model = 5;
+  ThreadState state = 6;
+  // Approvals and questions waiting for the user.
+  uint32 pending = 7;
+  // Unix milliseconds.
+  int64 updated_at = 8;
+  // The session is open (counts against the limit) or parked.
+  bool open = 9;
+}
+
+enum ThreadState {
+  THREAD_STATE_UNSPECIFIED = 0;
+  THREAD_STATE_IDLE = 1;
+  THREAD_STATE_RUNNING = 2;
+  THREAD_STATE_WAITING = 3;
+  THREAD_STATE_QUEUED = 4;
+  THREAD_STATE_ERROR = 5;
+}
+
+message ThreadListResult {
+  repeated ThreadSummary threads = 1;
+  uint32 open_sessions = 2;
+  uint32 max_sessions = 3;
+}
+
+message ThreadCreated {
+  ThreadSummary thread = 1;
+}
+
+message ThreadStatus {
+  ThreadSummary thread = 1;
+}
+
+message ThreadItems {
+  string thread_id = 1;
+  repeated Item items = 2;
+  // Where the device is after applying these items.
+  Cursor cursor = 3;
+}
+
+message ThreadReset {
+  string thread_id = 1;
+  ResetReason reason = 2;
+}
+
+enum ResetReason {
+  RESET_REASON_UNSPECIFIED = 0;
+  RESET_REASON_EPOCH_CHANGED = 1;
+  RESET_REASON_CURSOR_AHEAD = 2;
+  RESET_REASON_CURSOR_COMPACTED = 3;
+  RESET_REASON_JOURNAL_GAP = 4;
+  RESET_REASON_SCHEMA_UNREADABLE = 5;
+}
+
+message FullItem {
+  string thread_id = 1;
+  Item item = 2;
+}
+
+// One journal entry. Devices merge by id and keep the highest revision.
+message Item {
+  string id = 1;
+  uint64 seq = 2;
+  uint32 revision = 3;
+  // Unix milliseconds.
+  int64 at = 4;
+  // Which adapter/model produced it.
+  string provider = 5;
+  string model = 6;
+  oneof body {
+    TextItem text = 10;
+    ToolCallItem tool_call = 11;
+    ToolResultItem tool_result = 12;
+    DiffItem diff = 13;
+    TodoItem todo = 14;
+    QuestionItem question = 15;
+    ApprovalItem approval = 16;
+    StatusItem status = 17;
+    TurnItem turn = 18;
+    SubagentItem subagent = 19;
+    CompactionItem compaction = 20;
+    ErrorItem error = 21;
+    ModelChangeItem model_change = 22;
+    AgentHandoffItem agent_handoff = 23;
+  }
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_USER = 1;
+  ROLE_ASSISTANT = 2;
+  ROLE_THINKING = 3;
+}
+
+message TextItem {
+  Role role = 1;
+  string text = 2;
+  // Still streaming: later revisions replace the text.
+  bool partial = 3;
+  // Echo of ThreadSend.client_msg_id for user messages.
+  string client_msg_id = 4;
+}
+
+enum ToolKind {
+  TOOL_KIND_UNSPECIFIED = 0;
+  TOOL_KIND_READ = 1;
+  TOOL_KIND_EDIT = 2;
+  TOOL_KIND_SHELL = 3;
+  TOOL_KIND_SEARCH = 4;
+  TOOL_KIND_WEB = 5;
+  TOOL_KIND_MCP = 6;
+  TOOL_KIND_SUBAGENT = 7;
+  TOOL_KIND_TODO = 8;
+  TOOL_KIND_OTHER = 9;
+}
+
+message ToolCallItem {
+  string tool_id = 1;
+  ToolKind kind = 2;
+  // The adapter's own tool name, for display only.
+  string name = 3;
+  // One line: command, path or query.
+  string summary = 4;
+  // JSON input, shortened when large.
+  string input = 5;
+  bool sensitive = 6;
+}
+
+message ToolResultItem {
+  string tool_id = 1;
+  bool ok = 2;
+  string output = 3;
+  // Output was shortened; ThreadFetchFull returns the whole item.
+  bool truncated = 4;
+}
+
+message DiffItem {
+  string tool_id = 1;
+  string path = 2;
+  // Unified diff, at most 120 lines unless fetched in full.
+  string unified = 3;
+  uint32 added = 4;
+  uint32 removed = 5;
+  bool truncated = 6;
+}
+
+message TodoItem {
+  repeated TodoEntry entries = 1;
+}
+
+message TodoEntry {
+  string text = 1;
+  TodoState state = 2;
+}
+
+enum TodoState {
+  TODO_STATE_UNSPECIFIED = 0;
+  TODO_STATE_PENDING = 1;
+  TODO_STATE_IN_PROGRESS = 2;
+  TODO_STATE_DONE = 3;
+}
+
+enum PromptState {
+  PROMPT_STATE_UNSPECIFIED = 0;
+  PROMPT_STATE_PENDING = 1;
+  PROMPT_STATE_ANSWERED = 2;
+  // The agent restarted while it was pending.
+  PROMPT_STATE_EXPIRED = 3;
+  // The turn was interrupted or the thread switched AI.
+  PROMPT_STATE_CANCELLED = 4;
+}
+
+message ApprovalItem {
+  string tool_id = 1;
+  ToolKind kind = 2;
+  string name = 3;
+  string summary = 4;
+  string input = 5;
+  // Touches a sensitive path: shown in red, no "allow for the session".
+  bool sensitive = 6;
+  // Why the adapter asked, when it says.
+  string reason = 7;
+  PromptState state = 8;
+  Decision decision = 9;
+}
+
+message QuestionItem {
+  repeated Question questions = 1;
+  PromptState state = 2;
+  Answers answers = 3;
+}
+
+message Question {
+  string question = 1;
+  string header = 2;
+  repeated QuestionOption options = 3;
+  bool multi_select = 4;
+}
+
+message QuestionOption {
+  string label = 1;
+  string description = 2;
+}
+
+message StatusItem {
+  string text = 1;
+}
+
+enum TurnState {
+  TURN_STATE_UNSPECIFIED = 0;
+  TURN_STATE_RUNNING = 1;
+  TURN_STATE_COMPLETED = 2;
+  TURN_STATE_INTERRUPTED = 3;
+  TURN_STATE_FAILED = 4;
+}
+
+message TurnItem {
+  TurnState state = 1;
+  uint64 duration_ms = 2;
+  // Context window use after the turn, when the adapter reports it.
+  uint64 context_tokens = 3;
+  uint64 context_window = 4;
+}
+
+message SubagentItem {
+  string tool_id = 1;
+  string description = 2;
+  bool done = 3;
+}
+
+message CompactionItem {
+  uint64 tokens_before = 1;
+}
+
+message ErrorItem {
+  string message = 1;
+}
+
+message ModelChangeItem {
+  string from = 1;
+  string to = 2;
+}
+
+message AgentHandoffItem {
+  string from = 1;
+  string to = 2;
+  // The handoff text the new AI received as its first message.
+  string summary = 3;
+  repeated string files_changed = 4;
+}
+
+message ProviderCapabilities {
+  bool interrupt = 1;
+  bool resume = 2;
+  bool session_allow = 3;
+  bool questions = 4;
+  bool todo = 5;
+  bool context_usage = 6;
+  bool compaction = 7;
+  bool diff = 8;
+  bool images = 9;
+  repeated ModelOption models = 10;
+}
+
+message ModelOption {
+  string id = 1;
+  string name = 2;
+}
+
+enum LoginState {
+  LOGIN_STATE_UNSPECIFIED = 0;
+  LOGIN_STATE_OK = 1;
+  LOGIN_STATE_NEEDS_LOGIN = 2;
+  LOGIN_STATE_UNKNOWN = 3;
+}
+
+message ProviderInfo {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  LoginState login_state = 4;
+  ProviderCapabilities capabilities = 5;
+  // The installed CLI is outside the range this agent was tested with.
+  bool untested_version = 6;
+}
+
+message MachineInfo {
+  string name = 1;
+  string os = 2;
+  string arch = 3;
+  string agent_version = 4;
+  uint32 protocol_version = 5;
+  repeated ProviderInfo providers = 6;
+  string home = 7;
+  repeated string recent_dirs = 8;
+  repeated string pinned_dirs = 9;
+  uint32 open_sessions = 10;
+  uint32 max_sessions = 11;
+  // Resident memory of the agent and its sessions, in megabytes.
+  uint32 memory_mb = 12;
+}
+
+message DirListResult {
+  string path = 1;
+  repeated DirEntry entries = 2;
+  // Parent path; empty at the filesystem root.
+  string parent = 3;
+  bool sensitive = 4;
+}
+
+message DirEntry {
+  string name = 1;
+  bool git = 2;
+  string branch = 3;
+  bool sensitive = 4;
+}
+
+message AuditListResult {
+  repeated AuditEntry entries = 1;
+}
+
+message AuditEntry {
+  // Unix milliseconds.
+  int64 at = 1;
+  string device = 2;
+  // open_sensitive, project_settings, approve_sensitive, pair, revoke
+  string action = 3;
+  string path = 4;
+  string detail = 5;
+}
