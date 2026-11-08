@@ -1,0 +1,32 @@
+// Consent log on the machine: append-only JSONL of what a device agreed to
+// (opening a session in a sensitive folder, loading project settings,
+// approving a tool that touches a sensitive path, pairing, revoking).
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+
+export type AuditAction = "open_sensitive" | "project_settings" | "approve_sensitive" | "pair" | "revoke";
+
+export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
+
+export class AuditLog {
+  constructor(private readonly file: string) {}
+
+  write(entry: Omit<AuditEntry, "at"> & { at?: number }): void {
+    const line: AuditEntry = { at: entry.at ?? Date.now(), device: entry.device, action: entry.action, path: entry.path, detail: entry.detail.slice(0, 2000) };
+    appendFileSync(this.file, `${JSON.stringify(line)}\n`, { mode: 0o600 });
+  }
+
+  /** Newest first. */
+  list(limit = 100): AuditEntry[] {
+    if (!existsSync(this.file)) return [];
+    const out: AuditEntry[] = [];
+    for (const line of readFileSync(this.file, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        out.push(JSON.parse(line) as AuditEntry);
+      } catch {
+        // torn line
+      }
+    }
+    return out.reverse().slice(0, Math.max(1, Math.min(limit, 1000)));
+  }
+}

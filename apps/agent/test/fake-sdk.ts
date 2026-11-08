@@ -1,0 +1,92 @@
+// A stand-in for the Agent SDK `query()`: plays the same scripts as
+// fake-provider.ts, but as raw SDK messages and canUseTool calls, so the
+// Claude adapter's mapping is tested without a real `claude`.
+import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import { Channel } from "../src/util/channel.ts";
+
+export type SdkLog = { options: Options[]; interrupts: number; models: string[] };
+
+export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: [] }) {
+  const fn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }): Query => {
+    log.options.push(params.options);
+    const out = new Channel<SDKMessage>();
+    const sessionId = params.options.resume ?? "claude-session-1";
+    let interrupted = false;
+    let n = 0;
+    const m = (x: unknown) => out.push(x as SDKMessage);
+
+    const say = (text: string) => {
+      const id = `msg${++n}`;
+      m({ type: "stream_event", parent_tool_use_id: null, event: { type: "message_start", message: { id } } });
+      m({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } } });
+      m({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } } });
+      m({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_stop", index: 0 } });
+      m({ type: "assistant", parent_tool_use_id: null, uuid: `u${n}`, message: { id, content: [{ type: "text", text }] } });
+    };
+    const result = (ok: boolean) => m({ type: "result", subtype: ok ? "success" : "error_during_execution", is_error: !ok, duration_ms: 1 });
+
+    void (async () => {
+      m({ type: "system", subtype: "init", session_id: sessionId, mcp_servers: [], model: "claude-test" });
+      const canUseTool = params.options.canUseTool;
+      if (!canUseTool) throw new Error("adapter must pass canUseTool");
+      for await (const msg of params.prompt) {
+        const text = typeof msg.message.content === "string" ? msg.message.content : "";
+        const signal = new AbortController().signal;
+        if (text.startsWith("ask ")) {
+          const command = text.slice(4);
+          const toolUseID = `tu${++n}`;
+          m({ type: "assistant", parent_tool_use_id: null, uuid: `u${n}`, message: { id: `msg${n}`, content: [{ type: "tool_use", id: toolUseID, name: "Bash", input: { command } }] } });
+          const r = await canUseTool("Bash", { command }, { signal, toolUseID } as Parameters<typeof canUseTool>[2]);
+          if (interrupted) {
+            interrupted = false;
+            result(false);
+            continue;
+          }
+          m({ type: "user", parent_tool_use_id: null, message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolUseID, is_error: r?.behavior === "deny", content: r?.behavior === "deny" ? "denied" : `ran ${command}` }] } });
+          say(r?.behavior === "deny" ? "denied" : `ran ${command}`);
+          result(true);
+        } else if (text === "question") {
+          const input = { questions: [{ question: "Pick one?", header: "Pick", options: [{ label: "A", description: "" }, { label: "B", description: "" }], multiSelect: false }] };
+          const r = await canUseTool("AskUserQuestion", input, { signal, toolUseID: `tu${++n}` } as Parameters<typeof canUseTool>[2]);
+          const picked = r?.behavior === "allow" ? (r.updatedInput as { answers?: Record<string, string> } | undefined)?.answers?.["Pick one?"] : undefined;
+          say(picked ? `you picked ${picked}` : "no answer");
+          result(true);
+        } else if (text === "slow") {
+          const id = `msg${++n}`;
+          m({ type: "stream_event", parent_tool_use_id: null, event: { type: "message_start", message: { id } } });
+          m({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } } });
+          while (!interrupted) {
+            m({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "." } } });
+            await new Promise((r) => setTimeout(r, 5));
+          }
+          interrupted = false;
+          result(false);
+        } else {
+          say(`echo: ${text.split("\n")[0]}`);
+          result(true);
+        }
+      }
+      out.close();
+    })();
+
+    const q = {
+      [Symbol.asyncIterator]: () => out[Symbol.asyncIterator](),
+      async interrupt() {
+        log.interrupts += 1;
+        interrupted = true;
+        return undefined;
+      },
+      async setModel(model?: string) {
+        log.models.push(model ?? "");
+      },
+      async getContextUsage() {
+        return { totalTokens: 1000, maxTokens: 200000 };
+      },
+      close() {
+        out.close();
+      },
+    };
+    return q as unknown as Query;
+  };
+  return { fn, log };
+}

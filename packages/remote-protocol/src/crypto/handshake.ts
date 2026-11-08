@@ -46,7 +46,8 @@ export function decodePlain(bytes: Uint8Array): Plain {
   }
 }
 
-function errorPlain(code: HandshakeErrorCode): Uint8Array {
+/** A HandshakeError carrying this side's supported versions. */
+export function encodeHandshakeError(code: HandshakeErrorCode): Uint8Array {
   return encodePlain({
     case: "error",
     value: { $typeName: "remote.v1.HandshakeError", code, protocolVersion: PROTOCOL_VERSION, minProtocolVersion: MIN_PROTOCOL_VERSION },
@@ -188,7 +189,7 @@ export type Accepted = {
 export type Rejected = { ok: false; reply: Uint8Array; code: HandshakeErrorCode };
 
 export async function acceptHello(bytes: Uint8Array, auth: MachineAuth): Promise<Accepted | Rejected> {
-  const reject = (code: HandshakeErrorCode): Rejected => ({ ok: false, reply: errorPlain(code), code });
+  const reject = (code: HandshakeErrorCode): Rejected => ({ ok: false, reply: encodeHandshakeError(code), code });
   let plain: Plain;
   try {
     plain = decodePlain(bytes);
