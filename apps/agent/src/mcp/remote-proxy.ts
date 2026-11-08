@@ -72,7 +72,6 @@ export interface RemoteProxyOptions {
 const LIST_TTL_MS = 10 * 60_000;
 const MAX_LIST_PAGES = 5;
 const MAX_SENT_TOKENS = 8;
-const APP_TITLE: Record<AppName, string> = { tunnel: "Tunelo", chat: "Chat", localman: "Localman" };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -80,19 +79,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** What an agent should read when a call fails before the tool ran. */
 function explain(app: AppName, err: unknown): string {
-	const name = APP_TITLE[app];
+	// The app's id, not its product name (that one belongs to the brand package).
+	const server = `the ${app} MCP server`;
 	if (err instanceof InsufficientScopeError) {
-		return `This machine's sign-in does not allow this ${name} tool: run \`tunelo login\` on it again.`;
+		return `This machine's sign-in does not allow this ${app} tool: run \`tunelo login\` on it again.`;
 	}
 	if (err instanceof SdkError && err.code === SdkErrorCode.ClientHttpForbidden) {
-		return `${name} refused this tool for this machine's sign-in: run \`tunelo login\` on it again.`;
+		return `${server} refused this tool for this machine's sign-in: run \`tunelo login\` on it again.`;
 	}
 	if (err instanceof UnauthorizedError || (err instanceof SdkError && err.code === SdkErrorCode.ClientHttpAuthentication)) {
-		return `${name} did not accept this machine's sign-in: run \`tunelo login\` on it again.`;
+		return `${server} did not accept this machine's sign-in: run \`tunelo login\` on it again.`;
 	}
 	if (err instanceof SessionExpiredError || err instanceof ResourceNotGrantedError) return err.message;
 	const message = err instanceof Error ? err.message : String(err);
-	return `${name} could not be reached: ${message}`;
+	return `${server} could not be reached: ${message}`;
 }
 
 /** One connected client per app, with the tokens it sent (to cut from results). */

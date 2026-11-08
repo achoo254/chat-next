@@ -28,6 +28,8 @@ import { builtinProviders } from "./providers/registry.ts";
 import type { AgentProvider, Detected } from "./providers/types.ts";
 import { logFile } from "./log-tail.ts";
 import { startLogRotation } from "./log-rotate.ts";
+import type { McpHost } from "./mcp/mcp-host.ts";
+import type { SessionMcpLease } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
@@ -53,6 +55,8 @@ export type MachineOptions = {
   /** Sends a content-free "needs you" push through the chat server. */
   notify?: (thread: ThreadSummary, pending: number) => void;
   log?: (line: string) => void;
+  /** tunelo's MCP for the sessions this machine opens (its tickets); absent in tests. */
+  mcp?: McpHost;
 };
 
 export class Machine {
@@ -119,6 +123,7 @@ export class Machine {
       profile: () => this.profiles.sessionProfile(),
       selectedAccountDir: () => this.profiles.selectedAccountDir(),
       onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
+      ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config) } : {}),
     });
   }
 
@@ -308,4 +313,18 @@ export class Machine {
       else this.log(`needs you: "${now.title}" (${pending} waiting)`);
     }, PUSH_DELAY_MS).unref?.();
   }
+}
+
+/**
+ * A new session's MCP: a ticket of `mcp` for the thread, ended with the
+ * session; none when the machine turned tunelo's MCP off (`sessionMcp: false`).
+ */
+export function sessionMcpFor(mcp: McpHost, config: ConfigStore): (threadId: string) => SessionMcpLease | undefined {
+  return (threadId) => {
+    if (config.get().sessionMcp === false) return undefined;
+    const ticket = mcp.tickets.issue(threadId);
+    // The Chat and Localman tool lists, ready by the time claude asks for them.
+    mcp.warm();
+    return { ticket, configDir: config.dir, release: () => mcp.tickets.revoke(ticket) };
+  };
 }

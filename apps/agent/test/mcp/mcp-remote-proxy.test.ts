@@ -111,7 +111,7 @@ describe("remote MCP proxy", () => {
     const p = proxy();
     const result = await p.call(chat, "send_message", { chat_id: 7, text: "hi" });
     expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/Chat did not accept this machine's sign-in: run `tunelo login`/);
+    expect(text(result)).toMatch(/the chat MCP server did not accept this machine's sign-in: run `tunelo login`/);
     expect(forgotten).toHaveLength(1);
     expect(apps.chat.calls).toEqual([]);
     await p.close();
@@ -122,7 +122,7 @@ describe("remote MCP proxy", () => {
     const p = proxy();
     const result = await p.call(chat, "send_message", { chat_id: 7, text: "hi" });
     expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/does not allow this Chat tool: run `tunelo login`/);
+    expect(text(result)).toMatch(/does not allow this chat tool: run `tunelo login`/);
     await p.close();
   });
 

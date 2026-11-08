@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { ConfigStore } from "../../src/config.ts";
 import { callControl } from "../../src/control-socket.ts";
+import { sessionMcpFor } from "../../src/machine.ts";
 import {
 	TOOL_GROUPS,
 	ToolTable,
@@ -121,6 +123,25 @@ describe("the service's MCP host", () => {
 		]);
 		h.endAll();
 		all.endAll();
+	});
+});
+
+describe("sessions of the machine", () => {
+	test("get a ticket of the service's MCP, ended with them; none with sessionMcp off", () => {
+		const dir = mkdtempSync(join(tmpdir(), "tunelo-session-mcp-"));
+		const config = new ConfigStore(dir);
+		const mcp = new McpHost(dir, { remote: new RemoteProxy({ endpoint: () => "http://127.0.0.1:9/mcp", token: async () => "t", forget: async () => undefined }) });
+		const lease = sessionMcpFor(mcp, config)("thread-9");
+		expect(lease?.configDir).toBe(dir);
+		expect(mcp.tickets.owner(lease?.ticket ?? "")).toBe("thread-9");
+		lease?.release();
+		expect(mcp.tickets.owner(lease?.ticket ?? "")).toBeUndefined();
+		config.update((c) => {
+			c.sessionMcp = false;
+		});
+		expect(sessionMcpFor(mcp, config)("thread-10")).toBeUndefined();
+		mcp.endAll();
+		rmSync(dir, { recursive: true, force: true });
 	});
 });
 

@@ -76,12 +76,13 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     if (running !== null) throw new Error(`tunelo is already running (pid ${running}, ${d}); \`tunelo stop\` stops it`);
   }
   await importLegacySignIns(dir);
-  const machine = new Machine({ config: new ConfigStore(dir) });
+  const config = new ConfigStore(dir);
+  const mcp = new McpHost(dir, { log, enabledGroups: () => config.get().mcpGroups });
+  const machine = new Machine({ config, mcp });
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;
   const port = await machine.start(portArg ? Number(portArg) : undefined);
   const tunnels = new TunnelService(dir);
-  const mcp = new McpHost(dir);
   const online = goOnline(machine, port, log);
   const stopControl = serveControl({ dir, machine, registration: online.registration, tunnels, mcp });
   const shutdown = async () => {
