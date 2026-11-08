@@ -22,9 +22,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$AgentVersion = '__AGENT_VERSION__'
-$Sha256WindowsX64 = '__SHA256_WINDOWS_X64__'
-$MinisignPubKey = '__MINISIGN_PUBKEY__'
+$AgentVersion = '0.1.0'
+$Sha256WindowsX64 = '0112eb9a36261ac480402029eeba8ab88606b4943939eef8738815e24f5cb00c'
+$MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
 $Asset = 'chat-agent-windows-x64.exe'
 
