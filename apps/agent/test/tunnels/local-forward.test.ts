@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ConfigStore } from "../../src/config.ts";
+import { ForwardSettings } from "../../src/tunnels/forward-settings.ts";
 import { AuditLog } from "../../src/safety/audit-log.ts";
 import { ForwardDenyList } from "../../src/tunnels/forward-deny-ports.ts";
 import { LocalForward, appPath, headersForApp, loggedPath, rewriteLocation } from "../../src/tunnels/forward.ts";
@@ -28,10 +28,11 @@ let frontPort = 0;
 let seen: Seen[] = [];
 let logs: string[] = [];
 let forward: LocalForward;
-let config: ConfigStore;
+let settings: ForwardSettings;
 let listening: ListeningPort[] = [];
 let processes: ProcessLine[] = [];
 let claudeHome = "";
+let appClosed: string[] = [];
 
 function listen(server: Server): Promise<number> {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve((server.address() as AddressInfo).port)));
@@ -68,15 +69,15 @@ function send(path: string, headers: Record<string, string>, opts: { method?: st
   });
 }
 
-function makeForward(extra: { maxRequestBytes?: number; timeoutMs?: number } = {}): LocalForward {
+function makeForward(extra: { maxRequestBytes?: number; maxResponseBytes?: number; timeoutMs?: number } = {}): LocalForward {
   return new LocalForward({
-    config,
+    settings,
     audit: new AuditLog(join(dir, "audit.jsonl")),
     log: (line) => logs.push(line),
     deny: new ForwardDenyList({
       configDir: dir,
       ownPorts: () => [frontPort],
-      extraPorts: () => config.get().localForwardBlockedPorts ?? [],
+      extraPorts: () => settings.read().blockedPorts,
       listening: async () => listening,
       processes: async () => processes,
       runs: () => [],
@@ -89,11 +90,12 @@ function makeForward(extra: { maxRequestBytes?: number; timeoutMs?: number } = {
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "tunelo-forward-"));
   claudeHome = join(dir, "claude-home");
-  config = new ConfigStore(dir);
+  settings = new ForwardSettings(dir);
   seen = [];
   logs = [];
   listening = [];
   processes = [];
+  appClosed = [];
   app = createServer((req, res) => {
     let body = "";
     req.on("data", (c: Buffer) => (body += c.toString("utf8")));
@@ -106,6 +108,17 @@ beforeEach(async () => {
         return;
       }
       if (url.startsWith("/hang")) return; // never answers
+      if (url.startsWith("/big")) {
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end("x".repeat(5000));
+        return;
+      }
+      if (url.startsWith("/stream")) {
+        res.writeHead(200, { "content-type": "text/event-stream" });
+        res.write("data: first\n\n");
+        req.socket.once("close", () => appClosed.push(url));
+        return; // keeps streaming until the other side leaves
+      }
       res.writeHead(200, {
         "content-type": "text/plain",
         "tunelo-forward-error": "TUNELO_FORWARD_001",
@@ -173,13 +186,13 @@ describe("who gets served", () => {
   });
 
   test("turned off: 403 TUNELO_FORWARD_003, written to the consent log; on again serves", async () => {
-    forward.setEnabled(false, "phone (abc)");
+    await forward.setEnabled(false, "phone (abc)");
     const r = await send("/.tunelo/forward/", { ...GRANTED, "tunelo-local-port": port() });
     expect(r.status).toBe(403);
     expect(r.headers["tunelo-forward-error"]).toBe("TUNELO_FORWARD_003");
     expect((await send("/.tunelo/forward/ports", GRANTED)).status).toBe(403);
-    expect(new ConfigStore(dir).get().localForward).toBe(false);
-    forward.setEnabled(true, "local");
+    expect(new ForwardSettings(dir).read().enabled).toBe(false);
+    await forward.setEnabled(true, "local");
     expect((await send("/.tunelo/forward/", { ...GRANTED, "tunelo-local-port": port() })).status).toBe(200);
     const audit = new AuditLog(join(dir, "audit.jsonl")).list(10);
     expect(audit.map((e) => [e.device, e.action, e.detail])).toEqual([
@@ -237,9 +250,9 @@ describe("refused ports: 403 TUNELO_FORWARD_002", () => {
 
     fresh();
     listening = [];
-    forward.setBlocked([appPort], true, "local");
+    await forward.setBlocked([appPort], true, "local");
     expect(await blocked(appPort)).toEqual([403, "TUNELO_FORWARD_002"]);
-    forward.setBlocked([appPort], false, "local");
+    await forward.setBlocked([appPort], false, "local");
     fresh();
     expect(await blocked(appPort)).toEqual([200, undefined]);
     expect(seen).toHaveLength(1);
@@ -316,7 +329,80 @@ describe("what the app and the caller see", () => {
   });
 });
 
+describe("loopback addresses", () => {
+  for (const host of ["::1", "localhost"]) {
+    test(`an app listening on ${host} is reached (127.0.0.1 refused, then ::1)`, async () => {
+      const v6 = createServer((req, res) => res.end(`v6 ${req.headers.host} ${req.url}`));
+      await new Promise<void>((r) => v6.listen(0, host, () => r()));
+      const p = (v6.address() as AddressInfo).port;
+      try {
+        const r = await send("/.tunelo/forward/x", { ...GRANTED, "tunelo-local-port": String(p) });
+        expect([r.status, r.body]).toEqual([200, `v6 localhost:${p} /x`]);
+      } finally {
+        await close(v6);
+      }
+    });
+  }
+
+  test("the forward path matches in any case, as the tunnel server's does", async () => {
+    const r = await send("/.TUNELO/Forward/up?a=1", { ...GRANTED, "tunelo-local-port": port() });
+    expect([r.status, seen.at(-1)?.url]).toEqual([200, "/up?a=1"]);
+  });
+});
+
 describe("limits", () => {
+  test("a body declared over the limit is refused before the app is reached", async () => {
+    forward = makeForward({ maxRequestBytes: 10 });
+    forward.tunnelConnected(`wss://${TUNNEL_HOST}/`, ["local-forward"]);
+    const r = await send("/.tunelo/forward/", { ...GRANTED, "tunelo-local-port": port(), "content-length": "1000" }, { method: "POST", body: "y".repeat(1000) });
+    expect(r.status).toBe(413);
+    expect(seen).toEqual([]);
+  });
+
+  test("a chunked body over the limit is refused before the app is reached", async () => {
+    forward = makeForward({ maxRequestBytes: 10 });
+    forward.tunnelConnected(`wss://${TUNNEL_HOST}/`, ["local-forward"]);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request({ host: "127.0.0.1", port: frontPort, method: "POST", path: "/.tunelo/forward/", headers: { ...GRANTED, "tunelo-local-port": port() } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on("error", reject);
+      req.write("a".repeat(8));
+      req.write("b".repeat(8));
+      req.end();
+    });
+    expect(status).toBe(413);
+    expect(seen).toEqual([]);
+  });
+
+  test("a response over the limit is cut off, with that reason in the log", async () => {
+    forward = makeForward({ maxResponseBytes: 100 });
+    forward.tunnelConnected(`wss://${TUNNEL_HOST}/`, ["local-forward"]);
+    await send("/.tunelo/forward/big", { ...GRANTED, "tunelo-local-port": port() }).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(logs.join("\n")).toContain("→ cut off: response too large");
+    expect(logs.join("\n")).not.toContain("caller left");
+  });
+
+  test("a caller that leaves ends the request to the app at once", async () => {
+    await new Promise<void>((resolve, reject) => {
+      const req = request({ host: "127.0.0.1", port: frontPort, path: "/.tunelo/forward/stream", headers: { ...GRANTED, "tunelo-local-port": port() } }, (res) => {
+        res.once("data", () => {
+          req.destroy();
+          resolve();
+        });
+      });
+      req.on("error", () => undefined);
+      req.end();
+      setTimeout(() => reject(new Error("no first chunk")), 2000);
+    });
+    const until = Date.now() + 2000;
+    while (appClosed.length === 0 && Date.now() < until) await new Promise((r) => setTimeout(r, 20));
+    expect(appClosed).toEqual(["/stream"]);
+    expect(logs.join("\n")).toContain("/stream → caller left");
+  });
+
   test("a body over the limit is refused with 413", async () => {
     forward = makeForward({ maxRequestBytes: 10 });
     forward.tunnelConnected(`wss://${TUNNEL_HOST}/`, ["local-forward"]);

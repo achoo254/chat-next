@@ -89,7 +89,7 @@ describe("the machine's local server", () => {
     const off = await device.request("1", { case: "machineSettingsSet", value: { localForward: false } });
     expect(off.body.case).toBe("machineInfo");
     if (off.body.case === "machineInfo") expect(off.body.value.settings).toEqual(expect.objectContaining({ localForward: false, localForwardAvailable: true }));
-    expect(machine.config.get().localForward).toBe(false);
+    expect(machine.localForward.state().enabled).toBe(false);
     const headers = { host: HOST, "tunelo-forward-granted": "1", "tunelo-local-port": String(appPort) };
     expect(await get("/.tunelo/forward/", headers)).toEqual(expect.objectContaining({ status: 403, code: "TUNELO_FORWARD_003" }));
     const on = await device.request("2", { case: "machineSettingsSet", value: { localForward: true } });

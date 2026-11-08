@@ -26,10 +26,13 @@ import { ClaudeProfiles } from "./profiles/service.ts";
 import { findClaude, probeUsage } from "./providers/claude/index.ts";
 import { builtinProviders } from "./providers/registry.ts";
 import type { AgentProvider, Detected } from "./providers/types.ts";
+import { logFile } from "./log-tail.ts";
+import { startLogRotation } from "./log-rotate.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
+import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
 
 const MAX_CONNECTIONS = 16;
@@ -65,6 +68,7 @@ export class Machine {
   private server: Server | undefined;
   private wss: WebSocketServer | undefined;
   private port = 0;
+  private stopRotation: (() => void) | undefined;
   private connections = new Set<Connection>();
   private lastPing = 0;
   private providers: AgentProvider[];
@@ -90,14 +94,16 @@ export class Machine {
         onUsage: (id, usage) => this.core.setProfileUsage(id, usage),
         log: this.log,
       });
+    const forwardSettings = new ForwardSettings(dir);
     this.localForward = new LocalForward({
-      config: this.config,
+      settings: forwardSettings,
       audit: this.audit,
       log: this.log,
       deny: new ForwardDenyList({
         configDir: dir,
         ownPorts: () => (this.port ? [this.port] : []),
-        extraPorts: () => this.config.get().localForwardBlockedPorts ?? [],
+        extraPorts: () => forwardSettings.read().blockedPorts,
+        log: this.log,
       }),
     });
     this.core = new AgentCore({
@@ -147,11 +153,13 @@ export class Machine {
     const addr = server.address();
     const actual = typeof addr === "object" && addr ? addr.port : port;
     this.port = actual;
+    this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     return actual;
   }
 
   async stop(): Promise<void> {
+    this.stopRotation?.();
     for (const c of this.connections) c.close(1001, "shutting down");
     await new Promise<void>((r) => (this.wss ? this.wss.close(() => r()) : r()));
     this.server?.closeAllConnections?.();

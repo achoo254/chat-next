@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ForwardDenyList, debugPortsOf, idePorts } from "../../src/tunnels/forward-deny-ports.ts";
+import { FALLBACK_DEBUG_PORTS, ForwardDenyList, debugPortsOf, idePorts, randomDebugPort } from "../../src/tunnels/forward-deny-ports.ts";
 import { parseLsof, parseNetstat, parseProcessLines, parseTasklist } from "../../src/tunnels/listening-ports.ts";
 
 const LSOF = [
@@ -33,6 +33,10 @@ const LSOF = [
   "n127.0.0.1:3000->127.0.0.1:50000",
   "f8",
   "n0.0.0.0:3001",
+  "p900",
+  "cvite",
+  "f9",
+  "n[::1]:5174",
   "",
 ].join("\n");
 
@@ -45,6 +49,8 @@ Active Connections
   TCP    127.0.0.1:5173         127.0.0.1:61000        ESTABLISHED     4567
   TCP    192.168.1.5:139        0.0.0.0:0              LISTENING       4
   TCP    [::]:445               [::]:0                 LISTENING       4
+  TCP    [::1]:5174             [::]:0                 LISTENING       4567
+  TCP    [fe80::1%5]:7000       [::]:0                 LISTENING       4
 `;
 
 const TASKLIST = `"System Idle Process","0","Services","0","8 K"
@@ -57,6 +63,7 @@ describe("parsers", () => {
     expect(parseLsof(LSOF)).toEqual([
       { port: 3001, pid: 800, name: "weirdname" },
       { port: 5173, pid: 501, name: "node" },
+      { port: 5174, pid: 900, name: "vite" },
       { port: 5433, pid: 700, name: "postgres" },
       { port: 9222, pid: 600, name: "Google Chrome Helper" },
       { port: 9229, pid: 501, name: "node" },
@@ -68,6 +75,7 @@ describe("parsers", () => {
       { port: 135, pid: 1012, name: "svchost.exe" },
       { port: 445, pid: 4, name: "" },
       { port: 5173, pid: 4567, name: "node.exe" },
+      { port: 5174, pid: 4567, name: "node.exe" },
     ]);
   });
 
@@ -90,6 +98,11 @@ describe("debug ports on command lines", () => {
     ["java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006 -jar a.jar", [5006]],
     ["node --inspection-report app.js", []],
     ["node app.js --port 3000", []],
+    ["node server.js HOME=/Users/a NODE_OPTIONS=--inspect", [9229]],
+    ["kubectl proxy", [8001]],
+    ["kubectl proxy --port=8011", [8011]],
+    ["/usr/local/bin/kubectl --context dev proxy -p 8012", [8012]],
+    ["kubectl get pods", []],
   ])("%s", (command, ports) => {
     expect(debugPortsOf(command)).toEqual(ports);
   });
@@ -144,6 +157,57 @@ describe("ports the machine refuses", () => {
     now += 5_000;
     await deny.denies(5173);
     expect(reads).toBe(2);
+  });
+
+  test("a debug port picked at random refuses every port of that process", async () => {
+    expect(randomDebugPort("node --inspect=0 app.js")).toBe(true);
+    expect(randomDebugPort("node --inspect=127.0.0.1:0 app.js")).toBe(true);
+    expect(randomDebugPort("chrome --remote-debugging-port=0")).toBe(true);
+    expect(randomDebugPort("node --inspect=9229 app.js")).toBe(false);
+    const deny = new ForwardDenyList({
+      configDir: dir,
+      ownPorts: () => [],
+      extraPorts: () => [],
+      listening: async () => [
+        { port: 41000, pid: 10, name: "node" },
+        { port: 41001, pid: 10, name: "node" },
+        { port: 41002, pid: 11, name: "node" },
+      ],
+      processes: async () => [{ pid: 10, command: "node --inspect=0 app.js" }],
+      runs: () => [],
+      claudeHomes: () => [],
+    });
+    expect([await deny.denies(41000), await deny.denies(41001), await deny.denies(41002)]).toEqual([true, true, false]);
+  });
+
+  test("a failed reading keeps the last good one; before any, common debug ports are refused", async () => {
+    let fail = true;
+    let now = 0;
+    const logs: string[] = [];
+    const deny = new ForwardDenyList({
+      configDir: dir,
+      ownPorts: () => [],
+      extraPorts: () => [],
+      listening: async () => [],
+      processes: async () => {
+        if (fail) throw new Error("ps timed out");
+        return [{ pid: 5, command: "node --inspect=42000 x.js" }];
+      },
+      runs: () => [],
+      claudeHomes: () => [],
+      log: (l) => logs.push(l),
+      now: () => now,
+    });
+    for (const p of FALLBACK_DEBUG_PORTS) expect(await deny.denies(p)).toBe(true);
+    expect(logs.join("\n")).toContain("could not read running processes");
+    fail = false;
+    now += 10_000;
+    expect(await deny.denies(42000)).toBe(true);
+    expect(await deny.denies(8001)).toBe(false);
+    fail = true;
+    now += 10_000;
+    expect(await deny.denies(42000)).toBe(true);
+    expect(await deny.denies(8001)).toBe(false);
   });
 
   test("an OS listing that fails leaves the known ports refused", async () => {

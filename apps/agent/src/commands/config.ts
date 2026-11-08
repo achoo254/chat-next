@@ -1,16 +1,18 @@
 // `tunelo config local-forward [on|off|block|unblock] [ports…]`: whether
 // Localman may send requests to localhost on this machine
 // (tunnels/forward.ts), and ports it never reaches here. The running service
-// makes the change (it owns the config); when it is not running, the change
-// is written directly and holds from its next start. Every change goes to
-// the consent log.
+// makes the change when its control channel answers; otherwise the command
+// writes local-forward.json itself, under the same lock the service uses,
+// and a service that is starting reads it again (forward-settings.ts).
+// Every change goes to the consent log.
 import { join } from "node:path";
 import type { Command } from "commander";
-import { ConfigStore, configDir } from "../config.ts";
+import { configDir } from "../config.ts";
 import { callControl, controlAnswers } from "../control-socket.ts";
 import { AuditLog } from "../safety/audit-log.ts";
 import { ForwardDenyList } from "../tunnels/forward-deny-ports.ts";
 import { LocalForward, type LocalForwardState } from "../tunnels/forward.ts";
+import { ForwardSettings } from "../tunnels/forward-settings.ts";
 
 type Exits = <A extends unknown[]>(run: (...args: A) => Promise<number>) => (...args: A) => Promise<void>;
 
@@ -27,14 +29,14 @@ export function parsePorts(values: readonly string[]): number[] {
   });
 }
 
-/** The forwarding of the config folder `dir`, for changes while the service is not running. */
+/** The forwarding of the config folder `dir`, for changes while the service does not answer. */
 function offline(dir: string): LocalForward {
-  const config = new ConfigStore(dir);
+  const settings = new ForwardSettings(dir);
   return new LocalForward({
-    config,
+    settings,
     audit: new AuditLog(join(dir, "audit.jsonl")),
     log: () => undefined,
-    deny: new ForwardDenyList({ configDir: dir, ownPorts: () => [], extraPorts: () => config.get().localForwardBlockedPorts ?? [] }),
+    deny: new ForwardDenyList({ configDir: dir, ownPorts: () => [], extraPorts: () => settings.read().blockedPorts }),
   });
 }
 
@@ -64,11 +66,11 @@ async function localForward(action: string | undefined, ports: string[]): Promis
     state = running ? ((await callControl(dir, "GET", "/local-forward")) as LocalForwardState) : offline(dir).state();
   } else if (act === "on" || act === "off") {
     const enabled = act === "on";
-    state = running ? ((await callControl(dir, "POST", "/local-forward", { enabled })) as LocalForwardState) : offline(dir).setEnabled(enabled, "local");
+    state = running ? ((await callControl(dir, "POST", "/local-forward", { enabled })) as LocalForwardState) : await offline(dir).setEnabled(enabled, "local");
   } else {
     const list = parsePorts(ports);
     const blocked = act === "block";
-    state = running ? ((await callControl(dir, "POST", "/local-forward/blocked", { ports: list, blocked })) as LocalForwardState) : offline(dir).setBlocked(list, blocked, "local");
+    state = running ? ((await callControl(dir, "POST", "/local-forward/blocked", { ports: list, blocked })) as LocalForwardState) : await offline(dir).setBlocked(list, blocked, "local");
   }
   for (const line of describeLocalForward(state, running)) console.log(line);
   return 0;

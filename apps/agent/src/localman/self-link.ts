@@ -7,7 +7,11 @@
 //
 // Localman failing never touches the tunnel or Chat: it only sets
 // Localman's state and tries again later (1 minute, doubling up to 1 hour),
-// and at once after each `tunelo login`. A machine linked for this account
+// and at once after each `tunelo login`. The tunnel server revokes the
+// machine's earlier link when it mints a new one, so once a new token was
+// minted but Localman did not take it, Localman holds a dead token: that
+// case tries again sooner (15 seconds, doubling up to 5 minutes). The link
+// counts as done only when Localman confirmed it. A machine linked for this account
 // and device is not linked again on restart; `tunelo login` links it anew.
 import { hostname } from "node:os";
 import { SelfLinkError, linkMachineToApp } from "@tunelo/client";
@@ -20,6 +24,9 @@ import type { LocalForwardState } from "../tunnels/forward.ts";
 /** Name of the app in the machine's list of links on the tunnel server. */
 export const LOCALMAN_CLIENT_NAME = "Localman";
 const HTTP_TIMEOUT_MS = 15_000;
+/** Retries while Localman holds a revoked token: 15 s, doubling up to 5 minutes. */
+export const HANDOVER_RETRY_FIRST_MS = 15_000;
+export const HANDOVER_RETRY_MAX_MS = 5 * 60_000;
 const LOGIN_HINT = "run `tunelo login`";
 
 export type LocalmanLinkDeps = {
@@ -176,6 +183,7 @@ export class LocalmanLink {
     if (!info || !machineId) return;
     this.force = false;
     const deviceId = deviceIdOf(machineId);
+    let minted = false;
     try {
       const tunnelToken = await session.getAppToken("tunnel");
       const link = await (this.deps.link ?? linkMachineToApp)({
@@ -185,13 +193,14 @@ export class LocalmanLink {
         clientName: LOCALMAN_CLIENT_NAME,
         ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}),
       });
+      minted = true;
       await this.handOver(info.issuer, link.token, machineId);
       config.update((c) => (c.localman = { sub: info.sub, deviceId, linkedAt: this.now() }));
       this.failures = 0;
       this.current = { status: "ok", detail: "linked" };
       this.deps.log(`localman: linked this machine (link ${link.linkId})`);
     } catch (err) {
-      this.failed(err);
+      this.failed(err, minted);
     }
   }
 
@@ -221,7 +230,7 @@ export class LocalmanLink {
     throw new LocalmanLinkError(res.status, errorCode(body) ?? (challenge.includes("insufficient_scope") ? "insufficient_scope" : null));
   }
 
-  private failed(err: unknown): void {
+  private failed(err: unknown, minted = false): void {
     if (err instanceof SessionExpiredError || err instanceof ResourceNotGrantedError) {
       // Nothing to retry until `tunelo login`, which retries at once.
       this.current = { status: "sign-in", detail: LOGIN_HINT };
@@ -229,9 +238,12 @@ export class LocalmanLink {
     }
     const state = describe(err);
     this.failures++;
-    const delay = retryDelay(this.failures);
+    const delay = minted
+      ? Math.min(HANDOVER_RETRY_MAX_MS, HANDOVER_RETRY_FIRST_MS * 2 ** (this.failures - 1))
+      : retryDelay(this.failures);
+    if (minted) state.detail = `${state.detail}; Localman's earlier link was replaced, so its requests fail until this succeeds`;
     this.current = { ...state, retryAt: this.now() + delay };
-    this.deps.log(`localman: ${state.detail}; trying again in ${Math.round(delay / 60_000)} min`);
+    this.deps.log(`localman: ${state.detail}; trying again in ${Math.max(1, Math.round(delay / 1000))} s`);
     this.cancelRetry?.();
     this.cancelRetry = this.schedule(() => {
       this.cancelRetry = undefined;

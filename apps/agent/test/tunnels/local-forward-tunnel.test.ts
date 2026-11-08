@@ -27,6 +27,7 @@ async function standIn(features: string[] | undefined) {
   let connected: () => void = () => undefined;
   const ready = new Promise<void>((r) => (connected = r));
   const answers = new Map<string, { status: number; headers: Record<string, string | string[]>; chunks: Buffer[]; done: (a: Answer) => void }>();
+  const auths: Record<string, unknown>[] = [];
   const server = http.createServer((_req, res) => res.writeHead(404).end());
   const wss = new WebSocketServer({ server, path: "/tunnel" });
   wss.on("connection", (ws) => {
@@ -34,6 +35,7 @@ async function standIn(features: string[] | undefined) {
     ws.on("message", (raw) => {
       const msg = JSON.parse(raw.toString()) as ClientToServerMessage;
       if (msg.type === "auth") {
+        auths.push(msg as unknown as Record<string, unknown>);
         ws.send(JSON.stringify({ type: "auth-result", success: true, subdomain: SUBDOMAIN, url: `https://${SUBDOMAIN}.tunnel.example.com`, ...(features ? { features } : {}) }));
         connected();
       } else if (msg.type === "stream-start") {
@@ -57,6 +59,7 @@ async function standIn(features: string[] | undefined) {
   return {
     url: `http://127.0.0.1:${port}`,
     ready,
+    auths,
     send(path: string, headers: Record<string, string>): Promise<Answer> {
       const id = `r${++seq}`;
       return new Promise((done) => {
@@ -149,6 +152,16 @@ describe("Localman's requests through the machine tunnel", () => {
     expect(logs.join("\n")).not.toContain("cookie-secret");
   });
 
+  test("the machine tunnel signs in as a machine without naming a local port", async () => {
+    const s = await online(["local-forward"]);
+    expect(s.auths).toHaveLength(1);
+    expect(s.auths[0]).toEqual(expect.objectContaining({ kind: "machine", deviceId: "chat-agent.1" }));
+    expect(s.auths[0]).not.toHaveProperty("localPort");
+    // Requests still reach the device link's server.
+    const r = await s.send("/.tunelo/forward/", { "tunelo-forward-granted": "1", "tunelo-local-port": String(appPort) });
+    expect(r.status).toBe(200);
+  });
+
   test("the request with no grant, and every request when the server did not name the feature, is refused", async () => {
     const s = await online(["local-forward"]);
     const r = await s.send("/.tunelo/forward/", { "tunelo-local-port": String(appPort) });
@@ -163,7 +176,7 @@ describe("Localman's requests through the machine tunnel", () => {
 
   test("turned off, Localman gets 403 TUNELO_FORWARD_003 through the tunnel", async () => {
     const s = await online(["local-forward"]);
-    machine.localForward.setEnabled(false, "local");
+    await machine.localForward.setEnabled(false, "local");
     const r = await s.send("/.tunelo/forward/", { "tunelo-forward-granted": "1", "tunelo-local-port": String(appPort) });
     expect([r.status, r.headers["tunelo-forward-error"]]).toEqual([403, "TUNELO_FORWARD_003"]);
   });

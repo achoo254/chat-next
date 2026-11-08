@@ -9,12 +9,14 @@ import { execFile } from "node:child_process";
 export type ListeningPort = { port: number; pid: number; name: string };
 export type ProcessLine = { pid: number; command: string };
 
-const COMMAND_TIMEOUT_MS = 5_000;
-const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+/** PowerShell alone can take seconds to start on a busy Windows machine. */
+const COMMAND_TIMEOUT_MS = process.platform === "win32" ? 15_000 : 5_000;
+/** Process listings carry the environment on macOS and Linux. */
+const MAX_OUTPUT_BYTES = 32 * 1024 * 1024;
 const MAX_NAME = 100;
 
 /** Runs a command; its stdout, or a rejection. */
-function run(file: string, args: string[]): Promise<string> {
+function run(file: string, args: readonly string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(file, args, { timeout: COMMAND_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true }, (err, stdout) => {
       if (err) reject(err);
@@ -41,9 +43,9 @@ function splitAddress(address: string): { host: string; port: number } | null {
   return { host: address.slice(0, at).replace(/^\[|\]$/g, ""), port };
 }
 
-/** Whether a socket bound to `host` accepts connections to 127.0.0.1. */
+/** Whether a socket bound to `host` is reached by a forward (127.0.0.1, then ::1). */
 function reachableOnLoopback(host: string): boolean {
-  return host === "*" || host === "0.0.0.0" || host === "::" || host.startsWith("127.") || host === "::ffff:127.0.0.1";
+  return host === "*" || host === "0.0.0.0" || host === "::" || host === "::1" || host.startsWith("127.") || host.startsWith("::ffff:127.");
 }
 
 function addPort(out: Map<number, ListeningPort>, port: number, pid: number, name: string): void {
@@ -77,8 +79,9 @@ export function parseLsof(output: string): ListeningPort[] {
 }
 
 /**
- * `netstat -ano -p TCP`: listening sockets are the rows whose foreign address
- * is `0.0.0.0:0` (the state column is translated on some Windows languages).
+ * `netstat -ano -p TCP` and `-p TCPv6`: listening sockets are the rows whose
+ * foreign address is `0.0.0.0:0` or `[::]:0` (the state column is
+ * translated on some Windows languages).
  */
 export function parseNetstat(output: string, names: ReadonlyMap<number, string> = new Map()): ListeningPort[] {
   const out = new Map<number, ListeningPort>();
@@ -118,8 +121,12 @@ export function parseProcessLines(output: string): ProcessLine[] {
 /** Ports listening on this machine that 127.0.0.1 reaches, by port. */
 export async function listeningPorts(platform: NodeJS.Platform = process.platform): Promise<ListeningPort[]> {
   if (platform === "win32") {
-    const [netstat, tasks] = await Promise.all([run("netstat", ["-ano", "-p", "TCP"]), run("tasklist", ["/FO", "CSV", "/NH"]).catch(() => "")]);
-    return parseNetstat(netstat, parseTasklist(tasks));
+    const [v4, v6, tasks] = await Promise.all([
+      run("netstat", ["-ano", "-p", "TCP"]),
+      run("netstat", ["-ano", "-p", "TCPv6"]).catch(() => ""),
+      run("tasklist", ["/FO", "CSV", "/NH"]).catch(() => ""),
+    ]);
+    return parseNetstat(`${v4}\n${v6}`, parseTasklist(tasks));
   }
   // lsof exits 1 when nothing matches: no listening port.
   const output = await run("lsof", ["+c", "0", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpcn"]).catch((err: { code?: unknown; stdout?: unknown }) => {
@@ -132,11 +139,17 @@ export async function listeningPorts(platform: NodeJS.Platform = process.platfor
 const WINDOWS_PROCESSES =
   "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }";
 
-/** The command line of every running process this user can see. */
+/** ps arguments: command line, followed by the environment (NODE_OPTIONS) where ps shows it. */
+const PS_ARGS: Partial<Record<NodeJS.Platform, readonly string[]>> = {
+  darwin: ["-axwwE", "-o", "pid=,command="],
+  linux: ["axwwe", "-o", "pid=,command="],
+};
+
+/** The command line (and, on macOS and Linux, the environment) of every running process this user can see; read only in memory, never logged. */
 export async function processLines(platform: NodeJS.Platform = process.platform): Promise<ProcessLine[]> {
   const output =
     platform === "win32"
       ? await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_PROCESSES])
-      : await run("ps", ["-axww", "-o", "pid=,command="]);
+      : await run("ps", PS_ARGS[platform] ?? ["-axww", "-o", "pid=,command="]);
   return parseProcessLines(output);
 }

@@ -10,7 +10,7 @@ import { SelfLinkError, type SelfLinkOptions } from "@tunelo/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { type AppName, ResourceNotGrantedError, type SessionInfo } from "../src/identity/session.ts";
-import { LocalmanLink, machineNameFor } from "../src/localman/self-link.ts";
+import { HANDOVER_RETRY_FIRST_MS, LocalmanLink, machineNameFor } from "../src/localman/self-link.ts";
 import { type AppSession, RETRY_FIRST_MS, Registration } from "../src/registration-status.ts";
 
 const LINK_TOKEN = "tunelo_link_secret_0123456789";
@@ -130,27 +130,28 @@ describe("linking the machine to Localman", () => {
     expect(s.config.get().localman?.sub).toBe("acc_1");
   });
 
-  test("Localman full: an error with the reason, retried with backoff, never touching the token", async () => {
+  test("Localman full after the new token was minted: an error with the reason, retried soon, never touching the token", async () => {
     const s = setup({ localman: (n) => (n === 1 ? Response.json({ error: { code: "TUNNEL_LINK_LIMIT_REACHED", message: "x" } }, { status: 409 }) : Response.json({}, { status: 200 })) });
     s.link.start();
     await s.settle();
     const failed = s.link.state();
     expect(failed.status).toBe("error");
     expect(failed.detail).toMatch(/20 machines/);
-    expect(failed.retryAt).toBe(1_000_000 + RETRY_FIRST_MS);
+    expect(failed.retryAt).toBe(1_000_000 + HANDOVER_RETRY_FIRST_MS);
+    expect(failed.detail).toMatch(/earlier link was replaced/);
     expect(s.config.get().localman).toBeUndefined();
     await s.fire();
     expect(s.link.state().status).toBe("ok");
     expect(s.logs.join("\n")).not.toContain(LINK_TOKEN);
   });
 
-  test("Localman down or unreachable: waiting, the backoff doubles", async () => {
+  test("Localman down or unreachable after the token was minted: waiting, the short backoff doubles", async () => {
     const s = setup({ localman: () => new Response("", { status: 503 }) });
     s.link.start();
     await s.settle();
     expect(s.link.state().status).toBe("waiting");
     await s.fire();
-    expect(s.timers.at(-1)?.ms).toBe(2 * RETRY_FIRST_MS);
+    expect(s.timers.at(-1)?.ms).toBe(2 * HANDOVER_RETRY_FIRST_MS);
   });
 
   test("a sign-in Localman refuses asks for tunelo login; a tunnel server without self links waits", async () => {
@@ -166,6 +167,8 @@ describe("linking the machine to Localman", () => {
     t.link.start();
     await t.settle();
     expect(t.link.state()).toEqual(expect.objectContaining({ status: "waiting", detail: "the tunnel server does not link machines to apps yet" }));
+    // Nothing was minted: Localman's link still works, the usual backoff applies.
+    expect(t.link.state().retryAt).toBe(1_000_000 + RETRY_FIRST_MS);
     expect(t.posted).toEqual([]);
   });
 

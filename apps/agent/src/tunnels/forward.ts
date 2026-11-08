@@ -12,20 +12,23 @@
 // - `tunelo-forward-granted` is exactly "1";
 // - forwarding is on (`tunelo config local-forward on|off`, or the machine's
 //   page in Chat); it is on unless turned off.
-// Then it goes to 127.0.0.1:<port> (never a name lookup) with Host
-// `localhost:<port>`, unless the port is refused (forward-deny-ports.ts).
+// Then it goes to 127.0.0.1:<port>, or [::1]:<port> when nothing answers
+// there (an app on `localhost` often listens on ::1 only), never through a
+// name lookup, with Host `localhost:<port>`, unless the port is refused
+// (forward-deny-ports.ts). A caller that leaves ends the request to the app
+// at once.
 // `GET /.tunelo/forward/ports` lists what listens on loopback.
 //
 // Each request is logged (time, port, method, path without the query,
 // status), never a header or a body. The app's response loses every
 // `tunelo-*` header, so it cannot fake a refusal, and a redirect to its own
 // address is turned into a path under the forward path.
-import { type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse, request } from "node:http";
+import { type ClientRequest, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse, request } from "node:http";
 import { LOCAL_FORWARD, LOCAL_FORWARD_ERRORS, LOCAL_FORWARD_HEADERS, SERVER_FEATURES, isLocalForwardPath, isTuneloHeader, parseLocalPort } from "@tunelo/client";
-import type { ConfigStore } from "../config.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { cleanName } from "./listening-ports.ts";
 import type { ForwardDenyList } from "./forward-deny-ports.ts";
+import type { ForwardSettings } from "./forward-settings.ts";
 
 /** A request body larger than this is refused (the tunnel server's own limit). */
 export const MAX_REQUEST_BYTES = 50 * 1024 * 1024;
@@ -39,9 +42,31 @@ export const MAX_LISTED_PORTS = 200;
 const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "proxy-connection", "te", "trailer", "trailers", "transfer-encoding", "upgrade"]);
 const LOOPBACK_NAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const MAX_LOGGED_PATH = 200;
+/** Loopback addresses tried in turn, never a name lookup. */
+type LoopbackHost = "127.0.0.1" | "::1";
+/** Connection errors meaning nothing listens there (or that address family is off). */
+const UNREACHABLE = new Set(["ECONNREFUSED", "EADDRNOTAVAIL", "ENETUNREACH", "EAFNOSUPPORT", "EHOSTUNREACH"]);
+
+/** The whole request body; null when it passes `max` (the rest is drained). Rejects when the caller leaves. */
+function readBody(req: IncomingMessage, max: number): Promise<Buffer | null> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let over = false;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > max) over = true;
+      if (!over) chunks.push(chunk);
+    });
+    req.once("end", () => resolve(over ? null : Buffer.concat(chunks)));
+    req.once("aborted", () => reject(new Error("the caller left")));
+    req.once("error", reject);
+  });
+}
 
 export type LocalForwardDeps = {
-  config: ConfigStore;
+  /** On or off, and the user's refused ports (local-forward.json). */
+  settings: ForwardSettings;
   deny: ForwardDenyList;
   audit?: AuditLog;
   log: (line: string) => void;
@@ -181,17 +206,22 @@ export class LocalForward {
   }
 
   enabled(): boolean {
-    return this.deps.config.get().localForward !== false;
+    return this.deps.settings.read().enabled;
   }
 
   state(): LocalForwardState {
-    return { enabled: this.enabled(), available: this.tunnel?.gated === true, blockedPorts: [...(this.deps.config.get().localForwardBlockedPorts ?? [])] };
+    const s = this.deps.settings.read();
+    return { enabled: s.enabled, available: this.tunnel?.gated === true, blockedPorts: s.blockedPorts };
   }
 
   /** Turns forwarding on or off; `device` is who asked (written to the consent log). */
-  setEnabled(on: boolean, device: string): LocalForwardState {
-    if (this.enabled() !== on) {
-      this.deps.config.update((c) => (c.localForward = on));
+  async setEnabled(on: boolean, device: string): Promise<LocalForwardState> {
+    let changed = false;
+    await this.deps.settings.update((s) => {
+      changed = s.enabled !== on;
+      s.enabled = on;
+    });
+    if (changed) {
       this.deps.audit?.write({ device, action: "local_forward", path: "", detail: on ? "on" : "off" });
       this.deps.log(`local forward turned ${on ? "on" : "off"} by ${device}`);
     }
@@ -199,15 +229,15 @@ export class LocalForward {
   }
 
   /** Adds or removes ports the user refuses on this machine. */
-  setBlocked(ports: readonly number[], blocked: boolean, device: string): LocalForwardState {
+  async setBlocked(ports: readonly number[], blocked: boolean, device: string): Promise<LocalForwardState> {
     const valid = ports.filter((p) => Number.isInteger(p) && p >= 1 && p <= 65_535);
-    this.deps.config.update((c) => {
-      const current = new Set(c.localForwardBlockedPorts ?? []);
+    await this.deps.settings.update((s) => {
+      const current = new Set(s.blockedPorts);
       for (const p of valid) {
         if (blocked) current.add(p);
         else current.delete(p);
       }
-      c.localForwardBlockedPorts = [...current].sort((a, b) => a - b);
+      s.blockedPorts = [...current];
     });
     this.deps.audit?.write({ device, action: "local_forward", path: "", detail: `${blocked ? "block" : "unblock"} ${valid.join(",")}` });
     return this.state();
@@ -252,7 +282,7 @@ export class LocalForward {
     const port = parseLocalPort(rawPort);
     if (port === null) return this.refuse(req, res, REFUSE.badPort, null, path);
     if (await this.deps.deny.denies(port)) return this.refuse(req, res, REFUSE.blocked, port, path);
-    this.forward(req, res, port, path);
+    return this.forward(req, res, port, path);
   }
 
   private async listPorts(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -268,86 +298,106 @@ export class LocalForward {
     writeJson(res, 200, { ports });
   }
 
-  private forward(req: IncomingMessage, res: ServerResponse, port: number, path: string): void {
+  private async forward(req: IncomingMessage, res: ServerResponse, port: number, path: string): Promise<void> {
     const started = this.now();
     const method = req.method ?? "GET";
     const maxRequest = this.deps.maxRequestBytes ?? MAX_REQUEST_BYTES;
     const maxResponse = this.deps.maxResponseBytes ?? MAX_RESPONSE_BYTES;
+    const log = (status: number | string) => this.deps.log(`local forward ${method} :${port} ${loggedPath(path)} → ${status} (${this.now() - started} ms)`);
+
+    // The whole body first: the tunnel client already holds it whole, an
+    // oversized one never reaches the app, and a refused 127.0.0.1 can be
+    // tried again on ::1 with the same body.
+    const declared = Number(req.headers["content-length"]);
+    if (Number.isFinite(declared) && declared > maxRequest) {
+      req.resume();
+      writeJson(res, 413, { error: { code: "TOO_LARGE", message: "The request body is too large" } });
+      return log(413);
+    }
+    let body: Buffer | null;
+    try {
+      body = await readBody(req, maxRequest);
+    } catch {
+      if (!res.headersSent) writeJson(res, 400, { error: { code: "BAD_REQUEST", message: "The request broke" } });
+      return log("caller left");
+    }
+    if (body === null) {
+      writeJson(res, 413, { error: { code: "TOO_LARGE", message: "The request body is too large" } });
+      return log(413);
+    }
+
     let done = false;
+    let upstream: ClientRequest | undefined;
+    let answer: IncomingMessage | undefined;
+    // Bun reports a caller that left on the request and its socket, not on the response.
+    const gone = () => {
+      if (!done && !res.writableFinished) stop("caller left");
+    };
+    const resGone = () => gone();
+    const stop = (status: number | string) => {
+      finish(status);
+      upstream?.destroy();
+      answer?.destroy();
+      if (!res.writableFinished) res.destroy();
+    };
     const finish = (status: number | string) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
-      this.deps.log(`local forward ${method} :${port} ${loggedPath(path)} → ${status} (${this.now() - started} ms)`);
+      req.socket?.off("close", gone);
+      req.off("aborted", gone);
+      res.off("close", resGone);
+      log(status);
     };
-    const fail = (status: number, body: unknown, extra: OutgoingHttpHeaders = {}) => {
-      upstream.destroy();
-      if (!res.headersSent) writeJson(res, status, body, extra);
-      else res.destroy();
+    const fail = (status: number, payload: unknown, extra: OutgoingHttpHeaders = {}) => {
+      if (res.headersSent) return stop(status);
       finish(status);
+      upstream?.destroy();
+      writeJson(res, status, payload, extra);
     };
-
-    const upstream = request({ host: "127.0.0.1", port, method, path, headers: headersForApp(req.headers, port) }, (answer) => {
-      if (done) return answer.destroy();
-      res.writeHead(answer.statusCode ?? 502, headersForCaller(answer.headers, port));
-      let size = 0;
-      answer.on("data", (chunk: Buffer) => {
-        size += chunk.length;
-        if (size > maxResponse) {
-          answer.destroy();
-          res.destroy();
-          finish("cut off: response too large");
-          return;
-        }
-        if (!res.write(chunk)) {
-          answer.pause();
-          res.once("drain", () => answer.resume());
-        }
-      });
-      answer.on("end", () => {
-        res.end();
-        finish(answer.statusCode ?? 502);
-      });
-      answer.on("error", () => {
-        res.destroy();
-        finish("cut off: the app's response broke");
-      });
-    });
     const timer = setTimeout(() => fail(504, { error: { code: "TIMEOUT", message: "The app did not answer in time" } }), this.deps.timeoutMs ?? FORWARD_TIMEOUT_MS);
     timer.unref?.();
-    upstream.on("error", (err: NodeJS.ErrnoException) => {
-      if (done) return;
-      if (err.code === "ECONNREFUSED") {
-        this.deps.log(`local forward refused ${REFUSE.closed.code}: ${method} :${port} ${loggedPath(path)}`);
-        fail(REFUSE.closed.status, { error: { code: REFUSE.closed.code, message: MESSAGES[REFUSE.closed.code] } }, { [LOCAL_FORWARD_HEADERS.ERROR]: REFUSE.closed.code });
-      } else {
-        fail(502, { error: { code: "UPSTREAM", message: "The app closed the connection" } });
-      }
-    });
-    res.on("close", () => {
-      if (!res.writableFinished) {
-        upstream.destroy();
-        finish("caller left");
-      }
-    });
+    req.socket?.once("close", gone);
+    req.once("aborted", gone);
+    res.once("close", resGone);
+    if (req.socket?.destroyed) return gone();
 
-    let sent = 0;
-    req.on("data", (chunk: Buffer) => {
-      if (done) return;
-      sent += chunk.length;
-      if (sent > maxRequest) {
-        req.resume();
-        fail(413, { error: { code: "TOO_LARGE", message: "The request body is too large" } });
-        return;
-      }
-      if (!upstream.write(chunk)) {
-        req.pause();
-        upstream.once("drain", () => req.resume());
-      }
-    });
-    req.on("end", () => {
-      if (!done) upstream.end();
-    });
-    req.on("error", () => fail(400, { error: { code: "BAD_REQUEST", message: "The request broke" } }));
+    const attempt = (host: LoopbackHost) => {
+      const sent = request({ host, port, method, path, headers: headersForApp(req.headers, port) }, (got) => {
+        answer = got;
+        if (done) return got.destroy();
+        res.writeHead(got.statusCode ?? 502, headersForCaller(got.headers, port));
+        let size = 0;
+        got.on("data", (chunk: Buffer) => {
+          if (done) return;
+          size += chunk.length;
+          if (size > maxResponse) return stop("cut off: response too large");
+          if (!res.write(chunk)) {
+            got.pause();
+            res.once("drain", () => got.resume());
+          }
+        });
+        got.on("end", () => {
+          if (done) return;
+          res.end();
+          finish(got.statusCode ?? 502);
+        });
+        got.on("error", () => stop("cut off: the app's response broke"));
+      });
+      upstream = sent;
+      sent.on("error", (err: NodeJS.ErrnoException) => {
+        if (done) return;
+        const refused = err.code !== undefined && UNREACHABLE.has(err.code);
+        // An app on `localhost` often listens on ::1 only (macOS, recent Node): the same port there, no name lookup.
+        if (refused && host === "127.0.0.1") return attempt("::1");
+        if (refused) {
+          this.deps.log(`local forward refused ${REFUSE.closed.code}: ${method} :${port} ${loggedPath(path)}`);
+          return fail(REFUSE.closed.status, { error: { code: REFUSE.closed.code, message: MESSAGES[REFUSE.closed.code] } }, { [LOCAL_FORWARD_HEADERS.ERROR]: REFUSE.closed.code });
+        }
+        fail(502, { error: { code: "UPSTREAM", message: "The app closed the connection" } });
+      });
+      sent.end(body);
+    };
+    attempt("127.0.0.1");
   }
 }

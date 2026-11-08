@@ -254,7 +254,7 @@ export class Connection {
           const forward = this.ctx.localForward;
           if (b.value.localForward !== undefined) {
             if (!forward) return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "this machine does not forward to localhost" } });
-            forward.setEnabled(b.value.localForward, this.device);
+            await forward.setEnabled(b.value.localForward, this.device);
           }
           return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
         }
