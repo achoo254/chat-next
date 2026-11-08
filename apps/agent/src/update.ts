@@ -57,26 +57,43 @@ function newer(a: string, b: string): boolean {
   return false;
 }
 
-async function fetchBytes(url: string): Promise<Uint8Array> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(300_000) });
-  if (!res.ok) throw new Error(`download failed (${res.status}): ${url}`);
-  return new Uint8Array(await res.arrayBuffer());
+type Asset = { name: string; url: string; browser_download_url: string };
+
+/**
+ * Downloads a release file. GitHub's public download link sometimes answers
+ * 5xx for a while; those are retried, then the same file is fetched through
+ * the API. Either way the signature check decides what gets installed.
+ */
+async function fetchBytes(asset: Asset, tries = 3): Promise<Uint8Array> {
+  let status = 0;
+  for (let i = 1; i <= tries; i++) {
+    const res = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(300_000) });
+    if (res.ok) return new Uint8Array(await res.arrayBuffer());
+    status = res.status;
+    if (status < 500) break;
+    if (i < tries) await new Promise((r) => setTimeout(r, i * 2000));
+  }
+  const api = await fetch(asset.url, { headers: { accept: "application/octet-stream" }, signal: AbortSignal.timeout(300_000) });
+  if (api.ok) return new Uint8Array(await api.arrayBuffer());
+  throw new Error(`download failed (${status}, then ${api.status}): ${asset.browser_download_url}`);
 }
 
 /** Returns the installed version, or null when already up to date. */
 export async function update(log: (l: string) => void): Promise<string | null> {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { headers: { accept: "application/vnd.github+json" } });
   if (!res.ok) throw new Error(`cannot list releases (${res.status})`);
-  const releases = (await res.json()) as { tag_name: string; draft: boolean; prerelease: boolean }[];
-  const latest = releases
+  const releases = (await res.json()) as { tag_name: string; draft: boolean; prerelease: boolean; assets: Asset[] }[];
+  const release = releases
     .filter((r) => !r.draft && !r.prerelease && /^agent-v\d+\.\d+\.\d+$/.test(r.tag_name))
-    .map((r) => r.tag_name.slice("agent-v".length))
-    .sort((a, b) => (newer(a, b) ? -1 : 1))[0];
-  if (!latest || !newer(latest, AGENT_VERSION)) return null;
+    .sort((a, b) => (newer(a.tag_name.slice("agent-v".length), b.tag_name.slice("agent-v".length)) ? -1 : 1))[0];
+  const latest = release?.tag_name.slice("agent-v".length);
+  if (!release || !latest || !newer(latest, AGENT_VERSION)) return null;
   const asset = assetName();
-  const base = `https://github.com/${REPO}/releases/download/agent-v${latest}/${asset}`;
+  const file = release.assets.find((a) => a.name === asset);
+  const sigFile = release.assets.find((a) => a.name === `${asset}.minisig`);
+  if (!file || !sigFile) throw new Error(`hda ${latest} has no ${asset} for this computer`);
   log(`downloading hda ${latest}…`);
-  const [bin, sig] = await Promise.all([fetchBytes(base), fetchBytes(`${base}.minisig`)]);
+  const [bin, sig] = await Promise.all([fetchBytes(file), fetchBytes(sigFile)]);
   const sigText = new TextDecoder().decode(sig);
   if (!verifyMinisign(bin, sigText)) throw new Error("signature check failed; the download was not installed");
   // The signed comment names the file and version, so an older signed build
