@@ -15,9 +15,9 @@
 # is installed. A script whose pins were not filled in refuses to run.
 set -eu
 
-AGENT_VERSION="0.2.2"
-SHA256_DARWIN_ARM64="672ecca8f41ad5b79e66c6a2b8ac282c20a6d0bcb2f86f11fd99c3c72717ec75"
-SHA256_DARWIN_X64="4e47be8d504b73361fdd894a19c0dbf04a3bc239b04d8167a0c1d8f408110a1b"
+AGENT_VERSION="0.2.3"
+SHA256_DARWIN_ARM64="e4d5eee8ab2be63411b8e46d67776b5e93dee53a75281f23a45a353361575335"
+SHA256_DARWIN_X64="8139ca56ae3a2f7827b08b31c3515bb5cf25d09c387bb995771032ee6bc30e2e"
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
