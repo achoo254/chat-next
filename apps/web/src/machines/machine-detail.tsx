@@ -1,4 +1,5 @@
-// A machine's page: its sessions, the consent log kept on the machine (opening
+// A machine's page: its sessions, its Claude accounts (claude-profiles.tsx),
+// the consent log kept on the machine (opening
 // sensitive folders, loading project settings, approving sensitive tools,
 // pairing and revoking devices), what it runs, the devices paired with it
 // (any of them can be revoked from here), and renaming or removing the
@@ -12,6 +13,7 @@ import { useI18n } from "../i18n/i18n.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { Link, navigate, paths } from "../router.tsx";
+import { ClaudeProfiles } from "./claude-profiles.tsx";
 import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
 import { LinkBanner } from "./link-banner.tsx";
 import { PageHead } from "./page-head.tsx";
@@ -127,6 +129,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 		);
 	}
 	const claude = providerVersion(state);
+	const hasClaude = state.info?.providers.some((p) => p.id === "claude") ?? false;
 	return (
 		<div className="mx-scroll">
 			<PageHead
@@ -151,6 +154,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</Link>
 					))}
 				</section>
+				{online && hasClaude && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, "claude")} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>
 					<p className="note">{t.detail.auditNote(name)}</p>
@@ -170,7 +174,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 												<span className="mono">{e.path}</span>
 											</>
 										)}
-										{e.action === "approve_sensitive" && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
+										{(e.action === "approve_sensitive" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
 									</span>
 								</li>
 							))}
