@@ -1,7 +1,8 @@
 // Consent log on the machine: append-only JSONL of what a device agreed to
 // (opening a session in a sensitive folder, loading project settings,
 // approving a tool that touches a sensitive path, pairing, revoking,
-// switching the permission mode, adding, picking or removing a Claude profile).
+// switching the permission mode, adding, picking or removing a Claude profile,
+// turning forwarding to localhost on or off, blocking ports for it).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -13,7 +14,8 @@ export type AuditAction =
   | "permission_mode"
   | "profile_add"
   | "profile_select"
-  | "profile_remove";
+  | "profile_remove"
+  | "local_forward";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

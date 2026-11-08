@@ -24,6 +24,7 @@ import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import { type ClaudeProfiles, type ProfileList, ProfileError } from "../profiles/service.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
+import type { LocalForward } from "../tunnels/forward.ts";
 import { listDir } from "../safety/dirs.ts";
 import { wireItem } from "./wire.ts";
 
@@ -46,6 +47,8 @@ export type LinkContext = {
   onPaired: (via: "install" | "qr" | "code") => void;
   /** The Claude profiles of the machine; absent where the machine has none (tests). */
   profiles?: ClaudeProfiles;
+  /** Localman's requests for localhost; absent where the machine has none (tests). */
+  localForward?: LocalForward;
 };
 
 const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
@@ -247,6 +250,14 @@ export class Connection {
           return this.send(id, { case: "pong", value: {} });
         case "machineInfoRequest":
           return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
+        case "machineSettingsSet": {
+          const forward = this.ctx.localForward;
+          if (b.value.localForward !== undefined) {
+            if (!forward) return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "this machine does not forward to localhost" } });
+            forward.setEnabled(b.value.localForward, this.device);
+          }
+          return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
+        }
         case "threadList":
           return this.send(id, {
             case: "threadListResult",

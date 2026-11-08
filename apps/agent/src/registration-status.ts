@@ -1,5 +1,6 @@
 // Where this machine stands with each app of the one sign-in (tunnel, Chat,
-// Localman), and the machine's place in Chat: after `tunelo login` the
+// Localman; the Localman link itself is localman/self-link.ts), and the
+// machine's place in Chat: after `tunelo login` the
 // service adds the machine to the account's "My machines" by itself
 // (RegisterMachine), or ties a machine added with an install code before
 // accounts to that account (ClaimMachine).
@@ -43,6 +44,8 @@ export interface RegistrationDeps {
   agentVersion: string;
   /** The machine just got its id and secret: open its tunnel. */
   onRegistered: () => void;
+  /** The machine's link to Localman: its state, and linking again after `tunelo login`. */
+  localman?: { state(): AppState; retryNow(): void };
   log: (line: string) => void;
   now?: () => number;
   /** Runs `fn` after `ms`; returns a cancel. */
@@ -75,10 +78,12 @@ function localmanState(session: AppSession): AppState {
 /** The report when the background service is not running: what the files say. */
 export function storedReport(config: ConfigStore, session: AppSession): AppsReport {
   const stopped = "the background service is not running (tunelo start)";
+  const info = session.info();
+  const linked = info !== undefined && session.covers("localman") && config.get().localman?.sub === info.sub;
   return {
-    tunnel: session.info() ? { status: "off", detail: stopped } : { status: "sign-in", detail: LOGIN_HINT },
+    tunnel: info ? { status: "off", detail: stopped } : { status: "sign-in", detail: LOGIN_HINT },
     chat: storedChatState(config, session) ?? { status: "off", detail: `not in My machines yet; ${stopped}` },
-    localman: localmanState(session),
+    localman: linked ? { status: "off", detail: `linked; ${stopped}` } : localmanState(session),
   };
 }
 
@@ -120,7 +125,7 @@ export class Registration {
   }
 
   report(): AppsReport {
-    return { tunnel: { ...this.tunnel }, chat: { ...this.chat }, localman: localmanState(this.deps.session) };
+    return { tunnel: { ...this.tunnel }, chat: { ...this.chat }, localman: this.deps.localman?.state() ?? localmanState(this.deps.session) };
   }
 
   /** The machine tunnel's state, from its events. */
@@ -128,8 +133,9 @@ export class Registration {
     this.tunnel = state;
   }
 
-  /** Starts (or restarts) the registration now, forgetting the backoff: after `tunelo login`. */
+  /** Starts (or restarts) the registration and the Localman link now, forgetting the backoff: after `tunelo login`. */
   retryNow(): void {
+    this.deps.localman?.retryNow();
     this.failures = 0;
     this.cancelRetry?.();
     this.cancelRetry = undefined;

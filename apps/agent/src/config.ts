@@ -32,6 +32,19 @@ export type AgentConfig = {
   port?: number;
   /** Tunnel server chosen in the old Tunelo CLI (`~/.tunelo/config.json`), copied when moving from hda. */
   tunnelServer?: string;
+  /**
+   * Localman may send requests to localhost on this machine (tunnels/forward.ts).
+   * Unset is on: it serves once the tunnel server gates it. Turned off with
+   * `tunelo config local-forward off` or on the machine's page in Chat.
+   */
+  localForward?: boolean;
+  /** Ports never forwarded on this machine, beyond the built-in ones. */
+  localForwardBlockedPorts?: number[];
+  /**
+   * The machine is linked to Localman for this account and tunnel device
+   * (localman/self-link.ts). No token: Localman keeps it.
+   */
+  localman?: { sub: string; deviceId: string; linkedAt: number };
 };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */

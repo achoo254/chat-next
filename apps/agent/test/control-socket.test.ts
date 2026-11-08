@@ -32,6 +32,9 @@ let local: http.Server;
 let localPort = 0;
 const answers: string[] = [];
 
+let forwardOn = true;
+let forwardBlocked: number[] = [];
+
 /** A machine with just what the commands touch. */
 function fakeMachine(): Machine {
   const fake = {
@@ -54,6 +57,17 @@ function fakeMachine(): Machine {
       cancel: async () => undefined,
       remove: async () => undefined,
       refreshUsage: async () => undefined,
+    },
+    localForward: {
+      state: () => ({ enabled: forwardOn, available: false, blockedPorts: forwardBlocked }),
+      setEnabled: (on: boolean) => {
+        forwardOn = on;
+        return { enabled: on, available: false, blockedPorts: forwardBlocked };
+      },
+      setBlocked: (ports: number[], blocked: boolean) => {
+        forwardBlocked = blocked ? ports : [];
+        return { enabled: forwardOn, available: false, blockedPorts: forwardBlocked };
+      },
     },
   };
   // Only the members above are reached by the control routes.
@@ -115,6 +129,7 @@ describe("control socket", () => {
         "GET /audit",
         "GET /claude/profiles",
         "GET /devices",
+        "GET /local-forward",
         "GET /status",
         "GET /trust",
         "GET /tunnels",
@@ -125,6 +140,8 @@ describe("control socket", () => {
         "POST /claude/profiles/select",
         "POST /claude/profiles/usage",
         "POST /devices/revoke",
+        "POST /local-forward",
+        "POST /local-forward/blocked",
         "POST /mcp/call",
         "POST /pair",
         "POST /registration/retry",
@@ -253,6 +270,11 @@ describe("control socket", () => {
       expect(await call("POST", "/claude/profiles/usage", { id: "" })).toMatchObject({ selectedId: "" });
       expect(await call("POST", "/claude/profiles/remove", { id: "p1" })).toMatchObject({ selectedId: "" });
       expect(await call("POST", "/claude/profiles/remove", {})).toMatchObject({ error: expect.any(String) });
+      expect(await call("GET", "/local-forward")).toEqual({ enabled: true, available: false, blockedPorts: [] });
+      expect(await call("POST", "/local-forward", { enabled: false })).toMatchObject({ enabled: false });
+      expect(await call("POST", "/local-forward", { enabled: "no" })).toMatchObject({ error: expect.any(String) });
+      expect(await call("POST", "/local-forward/blocked", { ports: [8080], blocked: true })).toMatchObject({ blockedPorts: [8080] });
+      expect(await call("POST", "/local-forward/blocked", { ports: [70000], blocked: true })).toMatchObject({ error: expect.any(String) });
       await call("POST", "/restart");
       expect(await call("POST", "/streams/alive", { id: "nope" })).toMatchObject({ error: "no such stream" });
       expect(await call("POST", "/devices/revoke", { key: "x" })).toMatchObject({ error: expect.stringContaining("6 characters") });

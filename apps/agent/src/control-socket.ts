@@ -86,6 +86,8 @@ const closeInput = z.object({ id: z.string().min(1).max(64) });
 const mcpSession = z.object({ server: z.string().min(1).max(512) });
 const profileInput = z.object({ id: z.string().max(64) });
 const profileRemove = z.object({ id: z.string().max(64), force: z.boolean().optional() });
+const forwardToggle = z.object({ enabled: z.boolean() });
+const forwardBlocked = z.object({ ports: z.array(z.number().int().min(1).max(65_535)).min(1).max(100), blocked: z.boolean() });
 const mcpCall = z.object({
   session: z.string().min(1).max(64),
   group: z.string().min(1).max(64),
@@ -177,6 +179,13 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     const { profiles } = machineOf(t);
     await profiles.refreshUsage(profileInput.parse(input).id);
     return profiles.list();
+  },
+  /** Localman's requests for localhost: on or off, and ports refused on this machine. */
+  "GET /local-forward": (t) => machineOf(t).localForward.state(),
+  "POST /local-forward": (t, input) => machineOf(t).localForward.setEnabled(forwardToggle.parse(input).enabled, "local"),
+  "POST /local-forward/blocked": (t, input) => {
+    const { ports, blocked } = forwardBlocked.parse(input);
+    return machineOf(t).localForward.setBlocked(ports, blocked, "local");
   },
   "GET /tunnels": (t) => ({ tunnels: t.tunnels.list(), mcp: t.mcp.tunnels() }),
   "POST /tunnels/close": (t, input) => {

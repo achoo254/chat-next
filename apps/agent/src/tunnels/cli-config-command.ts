@@ -7,8 +7,9 @@ import {
 } from "../identity/cli-settings.ts";
 import { identitySession } from "../identity/session.ts";
 
-export function registerConfigCommand(program: Command): void {
-	program
+/** `tunelo config`; its subcommands (commands/config.ts) are added on the command returned. */
+export function registerConfigCommand(program: Command): Command {
+	return program
 		.command("config")
 		.description("Set default configuration")
 		.option("-k, --key <apikey>", "Set default anonymous access token")

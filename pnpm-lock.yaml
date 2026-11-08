@@ -66,11 +66,11 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
       '@tunelo/client':
-        specifier: github:achoo254/localman-next#tunelo-client-v0.2.0&path:/packages/tunelo-client
-        version: https://codeload.github.com/achoo254/localman-next/tar.gz/337af7df8512270c545b863154fbd83825acd1d1#path:/packages/tunelo-client
+        specifier: github:achoo254/localman-next#tunelo-client-v0.3.1&path:/packages/tunelo-client
+        version: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-client
       '@tunelo/shared':
-        specifier: github:achoo254/localman-next#tunelo-shared-v0.1.0&path:/packages/tunelo-shared
-        version: https://codeload.github.com/achoo254/localman-next/tar.gz/3fbfa2a1245283444fcc4cd515ba67d25decd063#path:/packages/tunelo-shared
+        specifier: github:achoo254/localman-next#tunelo-shared-v0.2.1&path:/packages/tunelo-shared
+        version: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared
       chalk:
         specifier: 5.6.2
         version: 5.6.2
@@ -1107,14 +1107,14 @@ packages:
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
 
-  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/337af7df8512270c545b863154fbd83825acd1d1#path:/packages/tunelo-client':
-    resolution: {gitHosted: true, integrity: sha512-+Nd8g9C/E/ctSnko83qwHjMzx5dshHVMjqYt9cr10vl//HBaCvn59EcW0Q4Vq/hFB2Oo+tR1AEpkrFkvTbQlqA==, path: /packages/tunelo-client, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/337af7df8512270c545b863154fbd83825acd1d1}
-    version: 0.2.0
+  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-client':
+    resolution: {gitHosted: true, integrity: sha512-BntBbW3GDx6jGqTHnwfbMu15WlpVQr6KwQ7e7R7VepuucCQHbiyNpEOhRQqRKFg3yLBEDUdj1gTMp4frH8wlPQ==, path: /packages/tunelo-client, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77}
+    version: 0.3.1
     engines: {node: '>=20'}
 
-  '@tunelo/shared@https://codeload.github.com/achoo254/localman-next/tar.gz/3fbfa2a1245283444fcc4cd515ba67d25decd063#path:/packages/tunelo-shared':
-    resolution: {gitHosted: true, integrity: sha512-rjfUeG4f31p8n2kzncqQb1ZAmwEhxQt3k2a04zAH/ir8hoUy7miqjE+8gVYuhXmhuFhhTp3J86ManA9s+7t13w==, path: /packages/tunelo-shared, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/3fbfa2a1245283444fcc4cd515ba67d25decd063}
-    version: 0.1.0
+  '@tunelo/shared@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared':
+    resolution: {gitHosted: true, integrity: sha512-BntBbW3GDx6jGqTHnwfbMu15WlpVQr6KwQ7e7R7VepuucCQHbiyNpEOhRQqRKFg3yLBEDUdj1gTMp4frH8wlPQ==, path: /packages/tunelo-shared, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77}
+    version: 0.2.1
 
   '@types/aria-query@5.0.4':
     resolution: {integrity: sha512-rfT93uj5s0PRL7EzccGMs3brplhcrghnDoV26NqKhCAS1hVo+WdNsPvE/yb6ilfr5hi2MEk6d5EWJTKdxg8jVw==}
@@ -3680,7 +3680,7 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.2
 
-  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/337af7df8512270c545b863154fbd83825acd1d1#path:/packages/tunelo-client':
+  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-client':
     dependencies:
       '@types/ws': 8.18.1
       ws: 8.18.3
@@ -3688,7 +3688,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@tunelo/shared@https://codeload.github.com/achoo254/localman-next/tar.gz/3fbfa2a1245283444fcc4cd515ba67d25decd063#path:/packages/tunelo-shared': {}
+  '@tunelo/shared@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared': {}
 
   '@types/aria-query@5.0.4': {}
 

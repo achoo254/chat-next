@@ -1,5 +1,9 @@
-// The running service: config, machine key, core, local WebSocket server,
-// pairing window and the "needs you" push decision.
+// The running service: config, machine key, core, local server (the
+// devices' WebSocket, and Localman's requests for localhost under
+// `/.tunelo/forward`, tunnels/forward.ts), pairing window and the "needs you"
+// push decision.
+import { type IncomingMessage, type Server, createServer } from "node:http";
+import type { Duplex } from "node:stream";
 import { arch, homedir, hostname, platform } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
@@ -24,6 +28,8 @@ import { builtinProviders } from "./providers/registry.ts";
 import type { AgentProvider, Detected } from "./providers/types.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
+import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
+import { LocalForward } from "./tunnels/forward.ts";
 import { AGENT_VERSION } from "./version.ts";
 
 const MAX_CONNECTIONS = 16;
@@ -52,9 +58,13 @@ export class Machine {
   readonly audit: AuditLog;
   readonly isSensitive: (p: string) => boolean;
   readonly profiles: ClaudeProfiles;
+  /** Localman's requests for localhost on this machine. */
+  readonly localForward: LocalForward;
   private key!: KeyPair;
   private pairing: PairingWindow | undefined;
-  private server: WebSocketServer | undefined;
+  private server: Server | undefined;
+  private wss: WebSocketServer | undefined;
+  private port = 0;
   private connections = new Set<Connection>();
   private lastPing = 0;
   private providers: AgentProvider[];
@@ -80,6 +90,16 @@ export class Machine {
         onUsage: (id, usage) => this.core.setProfileUsage(id, usage),
         log: this.log,
       });
+    this.localForward = new LocalForward({
+      config: this.config,
+      audit: this.audit,
+      log: this.log,
+      deny: new ForwardDenyList({
+        configDir: dir,
+        ownPorts: () => (this.port ? [this.port] : []),
+        extraPorts: () => this.config.get().localForwardBlockedPorts ?? [],
+      }),
+    });
     this.core = new AgentCore({
       dataDir: join(dir, "data"),
       providers: this.providers,
@@ -100,21 +120,41 @@ export class Machine {
     this.key = await machineKey(this.config.dir);
     this.core.start();
     void this.profiles.cleanLeftovers();
-    const wss = new WebSocketServer({ host: "127.0.0.1", port, maxPayload: 8 * 1024 * 1024 });
-    this.server = wss;
+    const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
+    this.wss = wss;
     wss.on("connection", (ws) => this.accept(ws));
-    await new Promise<void>((resolve, reject) => {
-      wss.once("listening", resolve);
-      wss.once("error", reject);
+    const server = createServer((req, res) => {
+      if (this.localForward.handle(req, res)) return;
+      // Anything else here is the devices' WebSocket.
+      res.writeHead(426, { "content-type": "text/plain", upgrade: "websocket" }).end("Upgrade Required");
     });
-    const addr = wss.address();
+    server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+      // Localman's requests are plain HTTP: a WebSocket on that path is not forwarded.
+      if (LocalForward.isForwardUpgrade(req)) {
+        socket.end("HTTP/1.1 404 Not Found\r\nconnection: close\r\ncontent-length: 0\r\n\r\n");
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+    });
+    this.server = server;
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", () => {
+        server.off("error", reject);
+        resolve();
+      });
+    });
+    const addr = server.address();
     const actual = typeof addr === "object" && addr ? addr.port : port;
+    this.port = actual;
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     return actual;
   }
 
   async stop(): Promise<void> {
     for (const c of this.connections) c.close(1001, "shutting down");
+    await new Promise<void>((r) => (this.wss ? this.wss.close(() => r()) : r()));
+    this.server?.closeAllConnections?.();
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
     await this.profiles.stop();
     await this.core.stop();
@@ -170,6 +210,7 @@ export class Machine {
         machineInfo: () => this.machineInfo(),
         isSensitive: this.isSensitive,
         profiles: this.profiles,
+        localForward: this.localForward,
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
           if (via === "install") this.config.update((c) => delete c.install);
@@ -217,6 +258,7 @@ export class Machine {
 
   async machineInfo(): Promise<MachineInfo> {
     const c = this.config.get();
+    const forward = this.localForward.state();
     const providers = [];
     for (const p of this.providers) {
       const d = await this.detect(p);
@@ -244,6 +286,7 @@ export class Machine {
       maxSessions: this.core.limit,
       memoryMb: Math.round(process.memoryUsage().rss / 1e6),
       devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
+      settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
     });
   }
 

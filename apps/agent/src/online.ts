@@ -3,13 +3,16 @@
 // tunnel, a heartbeat every minute (and whenever the tunnel address
 // changes), revocations from the web and "needs you" pushes.
 //
-// Chat and the tunnel fail apart: a heartbeat or registration that fails only
-// changes Chat's state, and the tunnel keeps running.
+// Chat, Localman and the tunnel fail apart: a heartbeat, registration or
+// Localman link that fails only changes that app's state, and the tunnel
+// keeps running. The tunnel tells the machine whether its server gates
+// Localman's requests for localhost (tunnels/forward.ts).
 import { identitySession } from "./identity/session.ts";
+import { LocalmanLink, deviceIdOf } from "./localman/self-link.ts";
 import { MachineApiError, claimMachine, heartbeat, notifyNeedsInput, registerMachine, toUrl64 } from "./machine-api.ts";
 import type { Machine } from "./machine.ts";
 import { Registration } from "./registration-status.ts";
-import { isSignedIn, openTunnel } from "./tunnel.ts";
+import { TUNNEL_SERVER, isSignedIn, openTunnel } from "./tunnel.ts";
 import { AGENT_VERSION } from "./version.ts";
 
 const HEARTBEAT_MS = 60_000;
@@ -21,25 +24,37 @@ export type Online = {
 
 export function goOnline(m: Machine, localPort: number, log: (l: string) => void): Online {
   let stopMachine: (() => void) | undefined;
+  const session = identitySession(m.config.dir);
+  const localman = new LocalmanLink({
+    config: m.config,
+    session,
+    tunnelServer: TUNNEL_SERVER,
+    forward: () => m.localForward.state(),
+    log,
+  });
   const registration = new Registration({
     config: m.config,
-    session: identitySession(m.config.dir),
+    session,
     api: { register: registerMachine, claim: claimMachine },
     publicKey: () => m.publicKey,
     agentVersion: AGENT_VERSION,
     onRegistered: () => {
       stopMachine ??= machineOnline(m, localPort, registration, log);
+      localman.start();
     },
+    localman,
     log,
   });
   const c = m.config.get();
   // A machine with a place in Chat opens its tunnel at once, claimed or not.
   if (c.machineId && c.machineSecret) stopMachine = machineOnline(m, localPort, registration, log);
   registration.start();
+  localman.start();
   return {
     registration,
     stop: () => {
       registration.stop();
+      localman.stop();
       stopMachine?.();
     },
   };
@@ -67,6 +82,7 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
     if (stopped) return;
     stopped = true;
     closeTunnel();
+    m.localForward.tunnelDisconnected();
     clearInterval(timer);
     log(why);
   };
@@ -102,15 +118,17 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
   };
 
   closeTunnel = openTunnel(
-    { dir: m.config.dir, localPort, deviceId: `chat-agent.${machineId}`, ...(c.subdomain ? { subdomain: c.subdomain } : {}) },
+    { dir: m.config.dir, localPort, deviceId: deviceIdOf(machineId), ...(c.subdomain ? { subdomain: c.subdomain } : {}) },
     {
-      onUrl: (url, subdomain) => {
+      onUrl: (url, subdomain, features) => {
         tunnelUrl = url;
+        m.localForward.tunnelConnected(url, features);
         if (subdomain && subdomain !== m.config.get().subdomain) m.config.update((x) => (x.subdomain = subdomain));
         registration.setTunnel({ status: "ok", detail: `online at ${url}` });
         log(`online at ${url}`);
         void beat();
       },
+      onDown: () => m.localForward.tunnelDisconnected(),
       onFatal: (code, message) => {
         tunnelUrl = "";
         registration.setTunnel({ status: "error", detail: `refused (${code}): ${message}` });

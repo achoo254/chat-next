@@ -1,6 +1,7 @@
-// Chat failing never holds back the machine tunnel: a machine that already
-// has its place in Chat opens its tunnel at once, whatever Chat answers; a new
-// one opens it as soon as Chat adds it.
+// Chat or Localman failing never holds back the machine tunnel: a machine that
+// already has its place in Chat opens its tunnel at once, whatever Chat or
+// Localman answer; a new one opens it as soon as Chat adds it, and links
+// itself to Localman then.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,9 +13,22 @@ const state = vi.hoisted(() => ({
   opened: [] as string[],
   registerFails: true,
   claims: 0,
+  links: [] as string[],
 }));
 
+vi.mock("@tunelo/client", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@tunelo/client")>();
+  return {
+    ...real,
+    linkMachineToApp: async (o: { deviceId: string }) => {
+      state.links.push(o.deviceId);
+      throw new real.SelfLinkError(503, null);
+    },
+  };
+});
+
 vi.mock("../src/tunnel.ts", () => ({
+  TUNNEL_SERVER: "https://tunnel.example",
   isSignedIn: () => true,
   openTunnel: (opts: { deviceId: string }) => {
     state.opened.push(opts.deviceId);
@@ -58,6 +72,7 @@ beforeEach(() => {
   state.opened = [];
   state.registerFails = true;
   state.claims = 0;
+  state.links = [];
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -69,6 +84,11 @@ function fakeMachine(config: ConfigStore): Machine {
     machineInfo: async () => ({ providers: [] }),
     dropDevice: () => undefined,
     audit: { write: () => undefined },
+    localForward: {
+      state: () => ({ enabled: true, available: false, blockedPorts: [] }),
+      tunnelConnected: () => undefined,
+      tunnelDisconnected: () => undefined,
+    },
   };
   // Only these members are reached while going online.
   return fake as unknown as Machine;
@@ -88,6 +108,8 @@ describe("going online", () => {
     expect(state.opened).toEqual(["chat-agent.5"]);
     expect(state.claims).toBe(1);
     expect(online.registration.report().chat.status).toBe("error");
+    expect(state.links).toEqual(["chat-agent.5"]);
+    expect(online.registration.report().localman.status).toBe("waiting");
     online.stop();
   });
 
@@ -101,6 +123,7 @@ describe("going online", () => {
     online.registration.retryNow();
     await settle();
     expect(state.opened).toEqual(["chat-agent.12"]);
+    expect(state.links).toEqual(["chat-agent.12"]);
     online.stop();
   });
 });

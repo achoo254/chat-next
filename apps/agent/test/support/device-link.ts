@@ -2,13 +2,14 @@
 // for tests that go through the end-to-end link: it sends sealed frames and
 // waits for the answer with a given id.
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
-import { type Frame, FrameSchema } from "@achoo254/chat-proto/remote/remote";
+import { type Frame, FrameSchema, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { type Session, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
 import type { ConfigStore } from "../../src/config.ts";
 import type { AgentCore } from "../../src/core/agent-core.ts";
 import { Connection } from "../../src/link/connection.ts";
 import type { ClaudeProfiles } from "../../src/profiles/service.ts";
 import type { AuditLog } from "../../src/safety/audit-log.ts";
+import type { LocalForward } from "../../src/tunnels/forward.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -19,7 +20,14 @@ export type DeviceLink = {
   received: Frame[];
 };
 
-export async function pairedDevice(ctx: { core: AgentCore; config: ConfigStore; audit: AuditLog; profiles: ClaudeProfiles }): Promise<DeviceLink> {
+export async function pairedDevice(ctx: {
+  core: AgentCore;
+  config: ConfigStore;
+  audit: AuditLog;
+  profiles?: ClaudeProfiles;
+  localForward?: LocalForward;
+  machineInfo?: () => Promise<MachineInfo>;
+}): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
   const device = await generateKeyPair();
   ctx.config.addDevice(device.publicKey, "phone");
@@ -37,12 +45,15 @@ export async function pairedDevice(ctx: { core: AgentCore; config: ConfigStore; 
       core: ctx.core,
       config: ctx.config,
       audit: ctx.audit,
-      profiles: ctx.profiles,
+      ...(ctx.profiles ? { profiles: ctx.profiles } : {}),
+      ...(ctx.localForward ? { localForward: ctx.localForward } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
       pairing: () => undefined,
-      machineInfo: async () => {
-        throw new Error("unused");
-      },
+      machineInfo:
+        ctx.machineInfo ??
+        (async () => {
+          throw new Error("unused");
+        }),
       isSensitive: () => false,
       onPing: () => undefined,
       onPaired: () => undefined,

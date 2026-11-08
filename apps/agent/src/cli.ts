@@ -11,6 +11,7 @@ import { basename, resolve } from "node:path";
 import { Command } from "commander";
 import { ConfigStore, configDir, legacyConfigDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
+import { registerLocalForwardCommand } from "./commands/config.ts";
 import { registerInstallCommand } from "./commands/install.ts";
 import { registerProfilesCommand } from "./commands/profiles.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
@@ -322,7 +323,7 @@ function buildProgram(): Command {
   registerMcpCommand(program);
   registerKillCommand(program);
   registerWatchCommand(program);
-  registerConfigCommand(program);
+  registerLocalForwardCommand(registerConfigCommand(program), exits);
   return program;
 }
 
