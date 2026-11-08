@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { acceptsAccountToken } from "@tunelo/client";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { loadSettings, saveSettings, settingsPath } from "../../src/identity/cli-settings.ts";
-import { resolveCredential } from "../../src/identity/credentials.ts";
+import { DEV_CUSTOM_SERVER_ENV, accountServes, resolveCredential } from "../../src/identity/credentials.ts";
 import { identitySession } from "../../src/identity/session.ts";
 import { legacyReminder } from "../../src/tunnels/display.js";
 import { DEFAULT_SERVER_URL, resolveServerUrl } from "../../src/tunnels/server-url.js";
@@ -88,6 +88,28 @@ describe("server and credentials", () => {
 		expect(acceptsAccountToken("ws://127.0.0.1:3001", "https://idp")).toBe(true);
 		saveSettings({}, dir);
 		expect(resolveCredential(undefined, "https://evil.example", dir)).toBeNull();
+	});
+
+	test("the account token goes only to the IdP's own Tunelo server, unless a developer allows another", async () => {
+		await signIn("https://auth.hoandat.com", "acc_a");
+		const saved = process.env[DEV_CUSTOM_SERVER_ENV];
+		try {
+			Reflect.deleteProperty(process.env, DEV_CUSTOM_SERVER_ENV);
+			expect(accountServes("https://tunnel.hoandat.com", "https://auth.hoandat.com")).toBe(true);
+			expect(accountServes("wss://tunnel.hoandat.com/", "https://auth.hoandat.com")).toBe(true);
+			expect(accountServes("https://tunnel.hoandat.com:8443", "https://auth.hoandat.com")).toBe(false);
+			expect(accountServes("http://127.0.0.1:9999", "https://auth.hoandat.com")).toBe(false);
+			expect(accountServes("ws://localhost:3001", "https://auth.hoandat.com")).toBe(false);
+			expect(resolveCredential(undefined, "ws://127.0.0.1:9999", dir)).toBeNull();
+			process.env[DEV_CUSTOM_SERVER_ENV] = "1";
+			expect(accountServes("ws://127.0.0.1:9999", "https://auth.hoandat.com")).toBe(true);
+			expect(resolveCredential(undefined, "ws://127.0.0.1:9999", dir)).toMatchObject({ kind: "account" });
+			// Still never another public domain.
+			expect(accountServes("https://tunnel.evil.example", "https://auth.hoandat.com")).toBe(false);
+		} finally {
+			if (saved === undefined) Reflect.deleteProperty(process.env, DEV_CUSTOM_SERVER_ENV);
+			else process.env[DEV_CUSTOM_SERVER_ENV] = saved;
+		}
 	});
 
 	test("the account token only goes to the Tunelo of its own domain", () => {

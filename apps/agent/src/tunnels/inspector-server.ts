@@ -3,6 +3,7 @@
 import http from "node:http";
 import { getInspectorHtml } from "./inspector-ui.js";
 import { listenWithPortFallback } from "./listen-with-port-fallback.js";
+import { isLocalRequest } from "./local-origin.ts";
 import type { InspectorEntry, RequestStore } from "./request-store.js";
 
 interface InspectorServerOptions {
@@ -69,14 +70,11 @@ export async function startInspectorServer(
 		const url = new URL(req.url ?? "/", "http://localhost");
 		const pathname = url.pathname;
 
-		// CORS for local dev
-		res.setHeader("Access-Control-Allow-Origin", "*");
-		res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-		res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-		if (req.method === "OPTIONS") {
-			res.writeHead(204);
-			res.end();
+		// Only this machine's own inspector page and local clients (no CORS):
+		// requests carry the headers and bodies of the tunnel's visitors.
+		if (!isLocalRequest(req)) {
+			res.writeHead(403, { "content-type": "text/plain" });
+			res.end("Forbidden");
 			return;
 		}
 

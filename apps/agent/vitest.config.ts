@@ -1,12 +1,14 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { defineConfig } from "vitest/config";
 
 // macOS puts temp folders under /var/folders, and /var is a sensitive path
 // of the agent (safety/sensitive-paths.ts), so a test home made there reads
-// as sensitive. Tests take their temp folders from /private/tmp instead; the
-// rule itself stays as it is. Linux (CI) already uses /tmp.
-const tempRoot = process.platform === "darwin" && tmpdir().startsWith("/var/") ? mkdtempSync("/private/tmp/tunelo-agent-test-") : undefined;
+// as sensitive. Tests take their temp folders from one folder under
+// /private/tmp instead (reused, so runs leave no new folders); the rule
+// itself stays as it is. Linux (CI) already uses /tmp.
+const tempRoot = process.platform === "darwin" && tmpdir().startsWith("/var/") ? "/private/tmp/tunelo-agent-test" : undefined;
+if (tempRoot) mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
 
 export default defineConfig({
   test: {

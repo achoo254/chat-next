@@ -3,13 +3,14 @@
 // once, and replaying a used one revokes the whole grant (the machine is
 // signed out). The session lock must make every refresh use the newest one.
 import { execFile } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { IdentitySession } from "../src/identity/session.ts";
+import { seal } from "../src/keystore.ts";
 import { bundleForNode } from "./support/bundle.ts";
 import { fakeJwt } from "./support/fake-idp.ts";
 
@@ -25,8 +26,14 @@ interface RotatingIdp {
 	close(): Promise<void>;
 }
 
-async function startRotatingIdp(): Promise<RotatingIdp> {
+/**
+ * `rewriteFirst`: on the first refresh, another writer (one that skipped the
+ * lock) replaces the session; the IdP then holds the token it saved and
+ * refuses the one presented with invalid_grant.
+ */
+async function startRotatingIdp(rewriteFirst?: () => Promise<string>): Promise<RotatingIdp> {
 	let current = "rt-1";
+	let first = true;
 	let n = 1;
 	const used = new Set<string>();
 	const state = { presented: [] as string[], revoked: false };
@@ -42,10 +49,16 @@ async function startRotatingIdp(): Promise<RotatingIdp> {
 		}
 		const chunks: Buffer[] = [];
 		req.on("data", (c: Buffer) => chunks.push(c));
-		req.on("end", () => {
+		req.on("end", async () => {
 			const form = new URLSearchParams(Buffer.concat(chunks).toString());
 			const rt = form.get("refresh_token") ?? "";
 			state.presented.push(rt);
+			if (first && rewriteFirst) {
+				first = false;
+				current = await rewriteFirst();
+				send(400, { error: "invalid_grant" });
+				return;
+			}
 			if (state.revoked || used.has(rt) || rt !== current) {
 				// Replay of a rotated token: the grant is gone for everyone.
 				if (used.has(rt)) state.revoked = true;
@@ -105,6 +118,22 @@ describe("two processes, one session", () => {
 		expect(b.error).toBeUndefined();
 		expect(a.token).toBe(b.token);
 		expect(idp.presented).toEqual(["rt-1"]);
+		expect(idp.revoked).toBe(false);
+	});
+
+	test("invalid_grant after another writer rotated the token: the process reads the file again and succeeds", async () => {
+		await idp.close();
+		idp = await startRotatingIdp(async () => {
+			const file = join(dir, "session.json");
+			const stored = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+			writeFileSync(file, JSON.stringify({ ...stored, refreshToken: await seal(dir, "rt-other") }));
+			return "rt-other";
+		});
+		rmSync(join(dir, "session.json"));
+		await new IdentitySession(dir).adopt({ issuer: idp.issuer, sub: "acc_alice", refreshToken: "rt-1", accessToken: "old", accessTokenExpiresAt: 1 }, TUNNEL);
+		const result = await tokenIn(TUNNEL);
+		expect(result.error).toBeUndefined();
+		expect(idp.presented).toEqual(["rt-1", "rt-other"]);
 		expect(idp.revoked).toBe(false);
 	});
 

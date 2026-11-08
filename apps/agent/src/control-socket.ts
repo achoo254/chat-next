@@ -5,10 +5,13 @@
 //
 // No route hands out a token of the account: tunnels and MCP tools run in
 // the service, which adds the Bearer itself. `tunelo http|tcp` and
-// `tunelo mcp` hold a streaming request open and send their pid; what they
-// opened closes when the stream closes or that process is gone (Bun's
-// node:http server does not report a client that left a stream).
-import { randomBytes, timingSafeEqual } from "node:crypto";
+// `tunelo mcp` hold a streaming request open, give their pid and confirm
+// every few seconds that they are still there; what they opened closes when
+// the stream closes, the pid is gone, or the confirmations stop. Bun's
+// node:http server does not report a client that left a stream, a pid can
+// be reused, and on Windows the pid is not checked at all: the
+// confirmations are what holds for sure.
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer, request } from "node:http";
 import { join } from "node:path";
@@ -27,7 +30,41 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const STREAM_PING_MS = 5_000;
 /** How often the service checks that the process holding a stream still runs. */
 const HOLDER_CHECK_MS = 1_000;
-const streamHolder = z.object({ pid: z.number().int().positive().optional() });
+/** How often a holder confirms it is alive, and how long the service waits for that before closing. */
+export const STREAM_ALIVE_EVERY_MS = 5_000;
+const STREAM_ALIVE_TIMEOUT_MS = 20_000;
+const streamHolder = z.object({ pid: z.number().int().positive() }, { error: "a stream needs the pid of the process that holds it" });
+const streamAlive = z.object({ id: z.string().min(1).max(64) });
+
+/** The streams open on one control server, each confirmed alive by its holder. */
+class StreamLiveness {
+  private readonly lastSeen = new Map<string, number>();
+
+  open(): string {
+    const id = randomUUID();
+    this.lastSeen.set(id, Date.now());
+    return id;
+  }
+
+  touch(id: string): boolean {
+    if (!this.lastSeen.has(id)) return false;
+    this.lastSeen.set(id, Date.now());
+    return true;
+  }
+
+  silentFor(id: string): number {
+    return Date.now() - (this.lastSeen.get(id) ?? 0);
+  }
+
+  close(id: string): void {
+    this.lastSeen.delete(id);
+  }
+}
+
+export type ControlOptions = {
+  /** Tests shorten it; the default suits the holders' confirmations. */
+  streamTimeoutMs?: number;
+};
 
 /** What the control channel drives. The machine is absent in a tunnel-only service (tests). */
 export type ControlTarget = {
@@ -37,7 +74,7 @@ export type ControlTarget = {
   mcp: McpHost;
 };
 
-type Route = (target: ControlTarget, input: unknown) => unknown;
+type Route = (target: ControlTarget & { streams: StreamLiveness }, input: unknown) => unknown;
 type Stream = (target: ControlTarget, input: unknown, send: (message: unknown) => void, end: () => void) => () => void;
 
 const deviceRevoke = z.object({ key: z.string().min(6, "give at least 6 characters of the device key").max(128) });
@@ -109,6 +146,12 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     const call = mcpCall.parse(input);
     return t.mcp.call(call.session, call.group, call.tool, call.args ?? {});
   },
+  /** A stream's holder is still there (see streamControl). */
+  "POST /streams/alive": (t, input) => {
+    const { id } = streamAlive.parse(input);
+    if (!t.streams.touch(id)) throw new Error("no such stream");
+    return { alive: true };
+  },
 };
 
 /** Commands that answer with a stream of JSON lines while the caller stays connected. */
@@ -162,35 +205,46 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function openStream(target: ControlTarget, stream: Stream, input: unknown, res: ServerResponse): void {
+/** True when the pid surely names no process any more. A pid of another user (EPERM) counts as alive; confirmations decide then. */
+function holderGone(pid: number): boolean {
+  if (process.platform === "win32") return false;
+  return !isAlive(pid);
+}
+
+function openStream(
+  target: ControlTarget,
+  stream: Stream,
+  input: unknown,
+  res: ServerResponse,
+  holder: { pid: number; streams: StreamLiveness; timeoutMs: number },
+): void {
   res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-store" });
   const live = () => !res.writableEnded && !res.destroyed;
   const send = (message: unknown) => {
     if (live()) res.write(`${JSON.stringify(message)}\n`);
   };
+  const streamId = holder.streams.open();
+  send({ type: "stream", id: streamId, aliveEveryMs: STREAM_ALIVE_EVERY_MS });
   const ping = setInterval(() => send({ type: "ping" }), STREAM_PING_MS);
   let cleanup: (() => void) | undefined;
   let closed = false;
-  const holder = streamHolder.safeParse(input);
-  const pid = holder.success ? holder.data.pid : undefined;
-  const watch = pid
-    ? setInterval(() => {
-        if (!isAlive(pid)) {
-          finish();
-          end();
-        }
-      }, HOLDER_CHECK_MS)
-    : undefined;
+  const end = () => {
+    if (live()) res.end();
+  };
   const finish = () => {
     if (closed) return;
     closed = true;
     clearInterval(ping);
     clearInterval(watch);
+    holder.streams.close(streamId);
     cleanup?.();
   };
-  const end = () => {
-    if (live()) res.end();
-  };
+  const watch = setInterval(() => {
+    if (holderGone(holder.pid) || holder.streams.silentFor(streamId) > holder.timeoutMs) {
+      finish();
+      end();
+    }
+  }, HOLDER_CHECK_MS);
   res.on("close", finish);
   try {
     cleanup = stream(target, input, send, end);
@@ -202,8 +256,10 @@ function openStream(target: ControlTarget, stream: Stream, input: unknown, res: 
   }
 }
 
-export function serveControl(target: ControlTarget): () => void {
+export function serveControl(target: ControlTarget, options: ControlOptions = {}): () => void {
   const token = randomBytes(32).toString("hex");
+  const streams = new StreamLiveness();
+  const timeoutMs = options.streamTimeoutMs ?? STREAM_ALIVE_TIMEOUT_MS;
   const server = createServer((req, res) => {
     const given = Buffer.from(String(req.headers[TOKEN_HEADER] ?? ""));
     if (given.length !== token.length || !timingSafeEqual(given, Buffer.from(token))) {
@@ -216,12 +272,13 @@ export function serveControl(target: ControlTarget): () => void {
         const input = await readBody(req);
         const stream = CONTROL_STREAMS[name];
         if (stream) {
-          openStream(target, stream, input, res);
+          const { pid } = streamHolder.parse(input);
+          openStream(target, stream, input, res, { pid, streams, timeoutMs });
           return;
         }
         const route = CONTROL_ROUTES[name];
         if (!route) throw new Error(`unknown command ${name}`);
-        const out = await route(target, input);
+        const out = await route({ ...target, streams }, input);
         res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out));
       } catch (err) {
         if (res.headersSent) return;
@@ -253,7 +310,9 @@ export function controlPid(configDir: string): number | undefined {
 
 function controlTarget(configDir: string): { port: number; token: string } | null {
   try {
-    const parsed = JSON.parse(readFileSync(controlFile(configDir), "utf8")) as { port?: unknown; token?: unknown };
+    const parsed = JSON.parse(readFileSync(controlFile(configDir), "utf8")) as { port?: unknown; token?: unknown; pid?: unknown };
+    // A control.json left by a service that crashed: its port may be anyone's now.
+    if (typeof parsed.pid === "number" && !isAlive(parsed.pid)) return null;
     return typeof parsed.port === "number" && typeof parsed.token === "string" ? { port: parsed.port, token: parsed.token } : null;
   } catch {
     return null;
@@ -326,7 +385,16 @@ export function streamControl(configDir: string, path: string, input: unknown, o
         });
         return;
       }
-      resolve({ close: () => req.destroy(), done });
+      let alive: ReturnType<typeof setInterval> | undefined;
+      const stopAlive = () => clearInterval(alive);
+      void done.then(stopAlive);
+      resolve({
+        close: () => {
+          stopAlive();
+          req.destroy();
+        },
+        done,
+      });
       let buffer = "";
       res.on("data", (c: Buffer) => {
         buffer += c.toString("utf8");
@@ -340,7 +408,15 @@ export function streamControl(configDir: string, path: string, input: unknown, o
           } catch {
             continue;
           }
-          if ((message as { type?: unknown }).type !== "ping") onMessage(message);
+          const kind = (message as { type?: unknown }).type;
+          if (kind === "stream") {
+            // Confirm to the service, every few seconds, that this process still holds the stream.
+            const id = (message as { id?: unknown }).id;
+            if (typeof id === "string" && !alive) {
+              alive = setInterval(() => void callControl(configDir, "POST", "/streams/alive", { id }).catch(() => undefined), STREAM_ALIVE_EVERY_MS);
+              alive.unref();
+            }
+          } else if (kind !== "ping") onMessage(message);
         }
       });
       // Not the request's "close": Bun emits it once the response starts.

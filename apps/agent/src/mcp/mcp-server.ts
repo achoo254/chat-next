@@ -151,7 +151,7 @@ export function registerTunnelTools(
 			description: "The account (or anonymous token) this machine tunnels as.",
 			annotations: { readOnlyHint: true, openWorldHint: false },
 		},
-		() => attempt(() => whoAmI(context.serverUrl)),
+		() => attempt(() => whoAmI(context.serverUrl, context.dir)),
 	);
 
 	registerRequestTools(server, tunnels);

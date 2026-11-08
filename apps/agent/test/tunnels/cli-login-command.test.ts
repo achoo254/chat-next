@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
@@ -91,6 +91,15 @@ describe("tunelo login --server", () => {
 		expect(state.resources).toEqual([]);
 		expect(state.revoked).toEqual([]);
 		expect(loadSettings(dir).server).toBe("https://tunnel.hoandat.com");
+	});
+
+	test("a stored session that no longer opens is signed in again without --force", async () => {
+		const file = join(dir, "session.json");
+		const stored = JSON.parse(readFileSync(file, "utf8")) as { refreshToken: string };
+		writeFileSync(file, JSON.stringify({ ...stored, refreshToken: "v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAA" }));
+		await login();
+		expect(identitySession(dir).info()?.sub).toBe("new-account");
+		expect(await identitySession(dir).isUsable()).toBe(true);
 	});
 
 	test("--force signs in again even for the same server", async () => {

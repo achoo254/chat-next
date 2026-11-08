@@ -27,7 +27,7 @@ import {
 	withFileLock,
 	writePrivateFile,
 } from "@tunelo/client";
-import { seal, unseal } from "../keystore.ts";
+import { KeyStoreUnavailableError, seal, unseal } from "../keystore.ts";
 
 export { SessionExpiredError } from "@tunelo/client";
 
@@ -37,8 +37,11 @@ const LOCK_FILE = "session.lock";
 const EXPIRY_MARGIN_MS = 60_000;
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 const EXPIRED_MESSAGE = "Your sign-in has expired. Run `tunelo login` again.";
+/** `tunelo login` signs in again by itself when the stored session does not open. */
 const UNREADABLE_MESSAGE =
-	"The sign-in on this machine cannot be opened with this user's key store. Run `tunelo login` again.";
+	"The sign-in on this machine cannot be opened with this user's key store. Run `tunelo login` to sign in again.";
+/** The grant died after another process saved a session: that one may look fine, so ask for a fresh one. */
+const REPLACED_MESSAGE = "Your sign-in has expired. Run `tunelo login --force`.";
 
 /** What callers may know about the session: never a token. */
 export interface SessionInfo {
@@ -232,11 +235,33 @@ export class IdentitySession {
 		}
 	}
 
+	/**
+	 * The refresh token in clear. A key store that cannot be read right now
+	 * (Keychain locked) is a passing error, kept as is; a token that does not
+	 * open with this user's key means signing in again.
+	 */
 	private async openRefreshToken(session: SessionFile): Promise<string> {
 		try {
 			return await unseal(this.dir, session.refreshToken);
-		} catch {
+		} catch (err) {
+			if (err instanceof KeyStoreUnavailableError) throw err;
 			throw new SessionExpiredError(UNREADABLE_MESSAGE);
+		}
+	}
+
+	/**
+	 * True when a session is stored and its refresh token opens. Rejects
+	 * when the key store cannot be read now, which says nothing either way.
+	 */
+	async isUsable(): Promise<boolean> {
+		const session = readSession(this.dir);
+		if (!session) return false;
+		try {
+			await this.openRefreshToken(session);
+			return true;
+		} catch (err) {
+			if (err instanceof SessionExpiredError) return false;
+			throw err;
 		}
 	}
 
@@ -253,10 +278,12 @@ export class IdentitySession {
 		if (ready) return { token: ready };
 		for (let retried = false; ; retried = true) {
 			try {
+				// Open the token first: no network call for a session that cannot be used.
+				const refreshToken = await this.openRefreshToken(session);
 				const endpoints = await this.deps.discover(session.issuer);
 				const tokens = await this.deps.refresh(
 					endpoints,
-					await this.openRefreshToken(session),
+					refreshToken,
 					resource,
 					session.clientId,
 				);
@@ -274,7 +301,7 @@ export class IdentitySession {
 					continue;
 				}
 				if (!changed) rmSync(join(this.dir, SESSION_FILE), { force: true });
-				throw new SessionExpiredError(EXPIRED_MESSAGE);
+				throw new SessionExpiredError(changed ? REPLACED_MESSAGE : EXPIRED_MESSAGE);
 			}
 		}
 	}

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { listenWithPortFallback } from "./listen-with-port-fallback.js";
+import { isLocalRequest } from "./local-origin.ts";
 import { portalAssets } from "./portal-assets.ts";
 
 const MIME_TYPES: Record<string, string> = {
@@ -45,6 +46,11 @@ export async function startPortalServer(port: number): Promise<number> {
 	const index = assets["/index.html"];
 
 	const server = http.createServer((req, res) => {
+		if (!isLocalRequest(req)) {
+			res.writeHead(403, { "content-type": "text/plain" });
+			res.end("Forbidden");
+			return;
+		}
 		const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
 		const file = assets[pathname] ?? index;
 		if (!file) {

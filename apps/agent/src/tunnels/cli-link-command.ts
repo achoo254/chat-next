@@ -1,4 +1,3 @@
-import { acceptsAccountToken } from "@tunelo/client";
 import type { Command } from "commander";
 import {
 	approveLink,
@@ -8,6 +7,7 @@ import {
 } from "./api-client.js";
 import { configDir } from "../config.ts";
 import { loadSettings } from "../identity/cli-settings.ts";
+import { accountServes } from "../identity/credentials.ts";
 import { identitySession } from "../identity/session.ts";
 import { printServerMigration, resolveServerUrl } from "./server-url.js";
 
@@ -65,7 +65,7 @@ export function linkContextOf(
 	envKey: string | undefined,
 ): LinkContext {
 	const issuer = state.issuer;
-	if (issuer && acceptsAccountToken(serverUrl, issuer)) {
+	if (issuer && accountServes(serverUrl, issuer)) {
 		return { kind: "not-needed" };
 	}
 	const key = envKey ?? state.key;

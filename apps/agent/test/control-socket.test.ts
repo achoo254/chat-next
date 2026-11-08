@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { CONTROL_ROUTES, CONTROL_STREAMS, callControl, serveControl, streamControl } from "../src/control-socket.ts";
 import { saveSettings } from "../src/identity/cli-settings.ts";
+import { DEV_CUSTOM_SERVER_ENV } from "../src/identity/credentials.ts";
 import { identitySession } from "../src/identity/session.ts";
 import type { Machine } from "../src/machine.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
@@ -53,6 +54,8 @@ async function call(method: string, path: string, input?: unknown): Promise<unkn
 }
 
 beforeAll(async () => {
+  // The fake Tunelo server is on loopback: a development server.
+  process.env[DEV_CUSTOM_SERVER_ENV] = "1";
   dir = mkdtempSync(join(tmpdir(), "tunelo-control-"));
   server = await startFakeTunnelServer();
   local = http.createServer((_req, res) => res.end("hello"));
@@ -70,6 +73,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  Reflect.deleteProperty(process.env, DEV_CUSTOM_SERVER_ENV);
   stop();
   await server.close();
   await new Promise<void>((r) => local.close(() => r()));
@@ -89,6 +93,7 @@ describe("control socket", () => {
         "POST /mcp/call",
         "POST /pair",
         "POST /restart",
+        "POST /streams/alive",
         "POST /trust",
         "POST /tunnels/close",
       ].sort(),
@@ -143,15 +148,48 @@ describe("control socket", () => {
       answers.push(JSON.stringify(m));
     });
     await waitFor(() => session !== "");
-    const tool = (name: string, args: Record<string, unknown> = {}) => call("POST", "/mcp/call", { session, group: "tunnel", tool: name, args });
-    await tool("whoami");
+    type Result = { content: { text: string }[]; isError?: boolean };
+    const called = new Set<string>();
+    const tool = async (name: string, args: Record<string, unknown> = {}) => {
+      called.add(name);
+      return (await call("POST", "/mcp/call", { session, group: "tunnel", tool: name, args })) as Result;
+    };
+    const json = (r: Result) => JSON.parse(r.content[0]?.text ?? "null") as Record<string, unknown>;
+    expect(json(await tool("whoami"))).toEqual({ kind: "account", account: "acc_control" });
     await tool("tunnel_status");
-    const opened = (await tool("open_http_tunnel", { port: localPort, ttl: 60 })) as { content: { text: string }[] };
-    expect(opened.content[0]?.text).toContain("url");
+    const opened = await tool("open_http_tunnel", { port: localPort, ttl: 60 });
+    const tunnelId = String(json(opened).id);
+    const url = String(json(opened).url);
     expect(((await call("GET", "/tunnels")) as { mcp: unknown[] }).mcp).toHaveLength(1);
-    await tool("list_local_tunnels");
-    await tool("list_linked_machines");
-    expect(((await tool("open_http_tunnel", { port: 0 })) as { isError?: boolean }).isError).toBe(true);
+    await (await fetch(`${url}/through-mcp`)).text();
+    expect(json(await tool("list_local_tunnels")).tunnels).toHaveLength(1);
+    await waitFor(async () => Number(json(await tool("list_tunnel_requests", { tunnel: tunnelId })).total) === 1);
+    const [first] = json(await tool("list_tunnel_requests", { tunnel: tunnelId })).requests as { id: string }[];
+    expect(json(await tool("get_tunnel_request", { tunnel: tunnelId, id: first?.id })).path).toBe("/through-mcp");
+    // Signed in: the machine needs no links; revoking says so.
+    expect(json(await tool("list_linked_machines")).links).toEqual([]);
+    expect((await tool("revoke_linked_machine", { id: "l1", dry_run: true })).isError).toBe(true);
+    expect((await tool("close_local_tunnel_process", { target: "no-such-tunnel" })).isError).toBe(true);
+    // Without a ttl a TCP tunnel is refused before anything opens.
+    expect((await tool("open_tcp_tunnel", { port: localPort })).isError).toBe(true);
+    expect(json(await tool("close_tunnel", { id: tunnelId }))).toEqual({ closed: tunnelId });
+    expect((await tool("open_http_tunnel", { port: 0 })).isError).toBe(true);
+    expect([...called].sort()).toEqual(
+      [
+        "close_local_tunnel_process",
+        "close_tunnel",
+        "get_tunnel_request",
+        "list_linked_machines",
+        "list_local_tunnels",
+        "list_tunnel_requests",
+        "open_http_tunnel",
+        "open_tcp_tunnel",
+        "revoke_linked_machine",
+        "tunnel_status",
+        "whoami",
+      ].sort(),
+    );
+    await tool("open_http_tunnel", { port: localPort, ttl: 60 });
     stream.close();
     await stream.done;
     // The session ended with its client: its tunnel closed.
@@ -169,6 +207,7 @@ describe("control socket", () => {
       await call("POST", "/trust", { dir: "/tmp/x", trusted: "true" });
       await call("GET", "/audit");
       await call("POST", "/restart");
+      expect(await call("POST", "/streams/alive", { id: "nope" })).toMatchObject({ error: "no such stream" });
       expect(await call("POST", "/devices/revoke", { key: "x" })).toMatchObject({ error: expect.stringContaining("6 characters") });
       expect(await call("POST", "/nope")).toMatchObject({ error: "unknown command POST /nope" });
       await new Promise((r) => setTimeout(r, 300));

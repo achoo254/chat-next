@@ -20,14 +20,28 @@ const LEGACY_SERVICE = "com.hoandat.chat-agent";
 /** Entries of the store: the machine's X25519 key, and the key that seals secrets on disk. */
 type Entry = "machine-key" | "session-key";
 
+/** `read` resolves null only when the entry does not exist; a store it cannot read rejects. */
 type Backend = { read(): Promise<string | null>; write(value: string): Promise<void> };
+
+/** The key store is there but cannot be read now (Keychain locked, no GUI session, DPAPI failing). */
+export class KeyStoreUnavailableError extends Error {
+  constructor(detail: string) {
+    super(`cannot read this user's key store (${detail}); unlock the Keychain (log in on the Mac) or try again`);
+    this.name = "KeyStoreUnavailableError";
+  }
+}
+
+/** Exit code of `security find-generic-password` when the item does not exist. */
+const ITEM_NOT_FOUND = 44;
 
 async function readKeychain(service: string, account: Entry = "machine-key"): Promise<string | null> {
   try {
     const { stdout } = await run("security", ["find-generic-password", "-s", service, "-a", account, "-w"]);
     return stdout.trim() || null;
-  } catch {
-    return null;
+  } catch (err) {
+    const code = (err as { code?: unknown }).code;
+    if (code === ITEM_NOT_FOUND) return null;
+    throw new KeyStoreUnavailableError(`security exited ${String(code)}`);
   }
 }
 
@@ -69,7 +83,9 @@ function dpapi(dir: string, entry: Entry): Backend {
       return ps(
         `${load} $b = [Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String($in), $null, 'CurrentUser'); [Text.Encoding]::UTF8.GetString($b)`,
         readFileSync(file, "utf8"),
-      );
+      ).catch((err: unknown) => {
+        throw new KeyStoreUnavailableError(`DPAPI: ${err instanceof Error ? err.message : String(err)}`);
+      });
     },
     async write(value) {
       const sealed = await ps(
@@ -96,8 +112,17 @@ function plainFile(dir: string, entry: Entry): Backend {
 const fileKeystore = () => (process.env.TUNELO_KEYSTORE || process.env.CHAT_AGENT_KEYSTORE) === "file";
 const usesKeychain = () => process.platform === "darwin" && !fileKeystore();
 
+let warnedPlainFile = false;
+
 function backend(dir: string, entry: Entry): Backend {
-  if (fileKeystore()) return plainFile(dir, entry);
+  if (fileKeystore()) {
+    // Meant for tests: the keys then sit beside what they protect.
+    if (!warnedPlainFile && !process.env.VITEST) {
+      warnedPlainFile = true;
+      console.error("tunelo: TUNELO_KEYSTORE=file keeps the machine and sealing keys in plain files next to the sign-in");
+    }
+    return plainFile(dir, entry);
+  }
   if (usesKeychain()) return keychain(entry);
   if (process.platform === "win32") return dpapi(dir, entry);
   return plainFile(dir, entry);
@@ -142,28 +167,38 @@ const TAG_BYTES = 16;
 const AAD = Buffer.from("tunelo sealed secret v1");
 const sealingKeys = new Map<string, Promise<Buffer | null>>();
 
+/** The stored key, null when there is none; a damaged one is an error, never replaced. */
 function decodeKey(text: string | null): Buffer | null {
   if (!text) return null;
   const key = Buffer.from(text, "base64url");
-  return key.length === KEY_BYTES ? key : null;
+  if (key.length !== KEY_BYTES) throw new Error("the sealing key in the key store is damaged");
+  return key;
 }
 
-/** The sealing key of this config folder, read once per process. */
+/** The sealing key of this config folder. Only a key found is kept for the process. */
 function loadSealingKey(dir: string): Promise<Buffer | null> {
   const cached = sealingKeys.get(dir);
   if (cached) return cached;
   const pending = backend(dir, "session-key").read().then(decodeKey);
-  // A failed read (Keychain locked) must not stick: the next call retries.
-  pending.catch(() => sealingKeys.delete(dir));
   sealingKeys.set(dir, pending);
+  // Neither "none yet" nor a failed read (Keychain locked) may stick: the next call asks again.
+  pending.then(
+    (key) => {
+      if (!key) sealingKeys.delete(dir);
+    },
+    () => sealingKeys.delete(dir),
+  );
   return pending;
 }
 
-/** Creates the sealing key on first use and reads it back from the store. */
+/**
+ * Creates the sealing key on first use and reads it back from the store.
+ * Only when the store says there is none: a store that cannot be read
+ * fails here, so a key in it is never written over.
+ */
 async function sealingKey(dir: string): Promise<Buffer> {
   const existing = await loadSealingKey(dir);
   if (existing) return existing;
-  sealingKeys.delete(dir);
   await backend(dir, "session-key").write(randomBytes(KEY_BYTES).toString("base64url"));
   const saved = await loadSealingKey(dir);
   if (!saved) throw new Error("could not store the sealing key in the key store");

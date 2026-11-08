@@ -30,6 +30,7 @@ import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
 import { goOnline } from "./online.ts";
 import { installService, isCompiled, startService, stopService, uninstallService } from "./service.ts";
+import { dropInheritedMarkers } from "./startup-env.ts";
 import { TUNNEL_SERVER } from "./tunnel.ts";
 import { registerConfigCommand } from "./tunnels/cli-config-command.ts";
 import { registerHttpCommand } from "./tunnels/cli-http-command.js";
@@ -150,16 +151,26 @@ async function printJson(path: string): Promise<number> {
   return 0;
 }
 
-/** `tunelo status`: the tunnels of this machine, then the background service (exit 1 when it is not running). */
-async function status(): Promise<number> {
+/**
+ * `tunelo status`: exit 1 when the background service is not running (the
+ * Windows restart loop relies on it). For a person at a terminal, the
+ * tunnels of this machine come first; with `--json` or when the output goes
+ * to a program, only the service's JSON, as before.
+ */
+async function status(options: { json?: boolean }): Promise<number> {
   const dir = configDir();
-  for (const line of tunnelRunLines()) console.log(line);
+  const forPeople = !options.json && process.stdout.isTTY === true;
+  if (forPeople) for (const line of tunnelRunLines()) console.log(line);
   let service: unknown;
   try {
     service = await callControl(dir, "GET", "/status");
   } catch (err) {
     console.error((err as Error).message);
     return 1;
+  }
+  if (!forPeople) {
+    console.log(JSON.stringify(service, null, 2));
+    return 0;
   }
   const held = (await callControl(dir, "GET", "/tunnels").catch(() => ({ mcp: [] }))) as { mcp?: { id: string; protocol: string; url: string; localPort: number }[] };
   for (const t of held.mcp ?? []) console.log(`MCP ${t.id}  [${t.protocol}]  ${t.url} → :${t.localPort}`);
@@ -290,7 +301,11 @@ function buildProgram(): Command {
       await runAgent(configDir(), options.port ? ["--port", options.port] : []);
     });
   program.command("pair").description("show a QR payload and 6-digit code to pair a device").action(exits(pair));
-  program.command("status").description("show the tunnels of this machine, and machine, AI and session status").action(exits(status));
+  program
+    .command("status")
+    .description("show the tunnels of this machine, and machine, AI and session status")
+    .option("--json", "only the status of the background service, as JSON (also when the output is not a terminal)")
+    .action(exits(status));
   program
     .command("logs")
     .description("show the last lines of the log")
@@ -348,6 +363,8 @@ async function readLine(): Promise<string> {
   return (data.split(/\r?\n/)[0] ?? "").replace(/^\uFEFF/, "");
 }
 
+dropInheritedMarkers();
+
 const asHda = basename(process.execPath).replace(/\.exe$/i, "").toLowerCase() === "hda";
 
 if (asHda) {
@@ -359,6 +376,11 @@ if (asHda) {
     },
   );
 } else {
+  // No command: the help, exit 0 (as before commander).
+  if (process.argv.length <= 2) {
+    buildProgram().outputHelp();
+    process.exit(0);
+  }
   buildProgram()
     .parseAsync(process.argv)
     .catch((err: Error) => {

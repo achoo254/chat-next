@@ -114,9 +114,11 @@ export async function signInForServer(
 	force = false,
 ): Promise<{ sub: string; signedInNow: boolean }> {
 	const issuer = issuerFor(serverUrl);
-	const existing = identitySession(configDir()).info();
-	// Another IdP: its session replaces this one (one session).
-	if (existing?.issuer === issuer && !force) {
+	const session = identitySession(configDir());
+	const existing = session.info();
+	// Another IdP: its session replaces this one (one session). A stored
+	// session that no longer opens is signed in again without --force.
+	if (existing?.issuer === issuer && !force && (await session.isUsable())) {
 		console.log(
 			`  Already signed in (account ${existing.sub}). Use --force to sign in again.`,
 		);
