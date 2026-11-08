@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { IdentitySession } from "../src/identity/session.ts";
+import { AGENT_CLIENT_ID, IdentitySession, SESSION_FILE } from "../src/identity/session.ts";
 import { seal } from "../src/keystore.ts";
 import { bundleForNode } from "./support/bundle.ts";
 import { fakeJwt } from "./support/fake-idp.ts";
@@ -138,6 +138,9 @@ describe("two processes, one session", () => {
 	});
 
 	test("tokens for two resources at once: each refresh uses the newest refresh token", async () => {
+		// A sign-in of tunelo-agent: its grant holds both resources.
+		const file = join(dir, SESSION_FILE);
+		writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), clientId: AGENT_CLIENT_ID, resources: [TUNNEL, CHAT] }));
 		const [tunnel, chat] = await Promise.all([tokenIn(TUNNEL), tokenIn(CHAT)]);
 		expect(tunnel.error).toBeUndefined();
 		expect(chat.error).toBeUndefined();

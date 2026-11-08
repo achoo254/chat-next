@@ -8,10 +8,13 @@ import {
 } from "@tunelo/client";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
+	AGENT_CLIENT_ID,
 	IdentitySession,
+	ResourceNotGrantedError,
 	SESSION_FILE,
 	type SessionDeps,
 	SessionExpiredError,
+	appResources,
 } from "../../src/identity/session.ts";
 import { seal } from "../../src/keystore.ts";
 import { fakeJwt } from "../support/fake-idp.ts";
@@ -78,6 +81,17 @@ async function signedIn(session: IdentitySession, expiresAt: number): Promise<vo
 	);
 }
 
+/** Signs in as tunelo-agent for the tunnel and Chat, with an access token of the tunnel expiring at `expiresAt`. */
+async function signedInAgent(session: IdentitySession, expiresAt: number): Promise<void> {
+	await session.replace(
+		"https://idp",
+		{ accessToken: "at-old", refreshToken: "rt-1", idToken: fakeJwt("acc_alice"), expiresIn: (expiresAt - NOW) / 1000 },
+		TUNNEL,
+		AGENT_CLIENT_ID,
+		[TUNNEL, CHAT],
+	);
+}
+
 function sessionText(): string {
 	return readFileSync(join(dir, SESSION_FILE), "utf8");
 }
@@ -117,10 +131,10 @@ describe("identity session", () => {
 	test("an expiring token is refreshed for its resource and the rotated refresh token saved", async () => {
 		const fake = rotatingRefresh();
 		const session = new IdentitySession(dir, deps(fake.refresh));
-		await signedIn(session, NOW + 30_000);
+		await signedInAgent(session, NOW + 30_000);
 		const token = await session.getAccessToken(TUNNEL);
 		expect(token).not.toBe("at-old");
-		expect(fake.used).toEqual([{ refreshToken: "rt-1", resource: TUNNEL, clientId: "tunelo-cli" }]);
+		expect(fake.used).toEqual([{ refreshToken: "rt-1", resource: TUNNEL, clientId: AGENT_CLIENT_ID }]);
 		// A second process reads the rotated token from disk and needs no refresh.
 		const other = new IdentitySession(dir, deps(fake.refresh));
 		expect(await other.getAccessToken(TUNNEL)).toBe(token);
@@ -257,5 +271,55 @@ describe("identity session", () => {
 		expect(out?.revokeError?.message).toBe("offline");
 		expect(session.info()).toBeUndefined();
 		expect(await session.signOut()).toBeNull();
+	});
+
+	test("a resource outside the grant is refused before any request, so the refresh token is not burnt", async () => {
+		const fake = rotatingRefresh();
+		const session = new IdentitySession(dir, deps(fake.refresh));
+		await signedIn(session, NOW - 1);
+		await expect(session.getAccessToken(CHAT)).rejects.toBeInstanceOf(ResourceNotGrantedError);
+		await expect(session.getAppToken("chat")).rejects.toBeInstanceOf(ResourceNotGrantedError);
+		expect(fake.used).toEqual([]);
+		expect(session.covers("chat")).toBe(false);
+		expect(session.covers("localman")).toBe(false);
+	});
+
+	test("every refresh of a tunelo-agent session names its resource", async () => {
+		const fake = rotatingRefresh();
+		const session = new IdentitySession(dir, deps(fake.refresh));
+		const issuer = "https://auth.example";
+		const resources = appResources(issuer);
+		expect(resources).toEqual({
+			tunnel: "https://tunnel.example",
+			chat: "https://chat.example/mcp",
+			localman: "https://localman.example/mcp",
+		});
+		await session.replace(
+			issuer,
+			{ accessToken: "at-old", refreshToken: "rt-1", idToken: fakeJwt("acc_alice"), expiresIn: 0 },
+			resources.tunnel,
+			AGENT_CLIENT_ID,
+			Object.values(resources),
+		);
+		for (const app of ["chat", "localman", "tunnel"] as const) {
+			expect(session.covers(app)).toBe(true);
+			await session.getAppToken(app);
+		}
+		expect(fake.used.map((u) => u.resource)).toEqual([resources.chat, resources.localman, resources.tunnel]);
+		expect(fake.used.every((u) => u.clientId === AGENT_CLIENT_ID)).toBe(true);
+		expect(JSON.parse(sessionText()).resources).toEqual([resources.tunnel, resources.chat, resources.localman]);
+	});
+
+	test("a session file written before resources were recorded keeps what its client always held", async () => {
+		const session = new IdentitySession(dir, deps(rotatingRefresh().refresh));
+		await session.adopt({ issuer: "https://auth.example", sub: "acc_alice", refreshToken: "rt-1" }, "https://tunnel.example");
+		const stored = JSON.parse(sessionText()) as Record<string, unknown>;
+		delete stored.resources;
+		writeFileSync(join(dir, SESSION_FILE), JSON.stringify(stored));
+		expect(session.covers("tunnel")).toBe(true);
+		expect(session.covers("chat")).toBe(false);
+		writeFileSync(join(dir, SESSION_FILE), JSON.stringify({ ...stored, clientId: AGENT_CLIENT_ID }));
+		expect(session.covers("chat")).toBe(true);
+		expect(session.covers("localman")).toBe(true);
 	});
 });

@@ -12,7 +12,9 @@ import { saveSettings } from "../src/identity/cli-settings.ts";
 import { DEV_CUSTOM_SERVER_ENV } from "../src/identity/credentials.ts";
 import { identitySession } from "../src/identity/session.ts";
 import type { Machine } from "../src/machine.ts";
+import { ConfigStore } from "../src/config.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
+import { Registration } from "../src/registration-status.ts";
 import { TunnelService } from "../src/tunnels/tunnel-service.ts";
 import { type FakeTunnelServer, startFakeTunnelServer } from "./support/fake-tunnel-server.ts";
 import { fakeJwt } from "./support/fake-idp.ts";
@@ -68,7 +70,21 @@ beforeAll(async () => {
     "https://tunnel.example",
   );
   saveSettings({ key: KEY, deviceId: "dev-control" }, dir);
-  stop = serveControl({ dir, machine: fakeMachine(), tunnels: new TunnelService(dir), mcp: new McpHost(dir) });
+  const registration = new Registration({
+    config: new ConfigStore(dir),
+    session: identitySession(dir),
+    api: {
+      register: async () => {
+        throw new Error("not reached: the session does not cover Chat");
+      },
+      claim: async () => undefined,
+    },
+    publicKey: () => new Uint8Array(32),
+    agentVersion: "2.0.0",
+    onRegistered: () => undefined,
+    log: () => undefined,
+  });
+  stop = serveControl({ dir, machine: fakeMachine(), registration, tunnels: new TunnelService(dir), mcp: new McpHost(dir) });
   await waitFor(() => existsSync(join(dir, "control.json")));
 });
 
@@ -84,6 +100,7 @@ describe("control socket", () => {
   test("has exactly the commands this test covers", () => {
     expect(Object.keys(CONTROL_ROUTES).sort()).toEqual(
       [
+        "GET /apps",
         "GET /audit",
         "GET /devices",
         "GET /status",
@@ -92,6 +109,7 @@ describe("control socket", () => {
         "POST /devices/revoke",
         "POST /mcp/call",
         "POST /pair",
+        "POST /registration/retry",
         "POST /restart",
         "POST /streams/alive",
         "POST /trust",
@@ -206,6 +224,8 @@ describe("control socket", () => {
       await call("GET", "/trust");
       await call("POST", "/trust", { dir: "/tmp/x", trusted: "true" });
       await call("GET", "/audit");
+      expect(await call("GET", "/apps")).toMatchObject({ chat: { status: "sign-in" }, localman: { status: "sign-in" } });
+      expect(await call("POST", "/registration/retry")).toEqual({ retrying: true });
       await call("POST", "/restart");
       expect(await call("POST", "/streams/alive", { id: "nope" })).toMatchObject({ error: "no such stream" });
       expect(await call("POST", "/devices/revoke", { key: "x" })).toMatchObject({ error: expect.stringContaining("6 characters") });

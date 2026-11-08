@@ -11,9 +11,8 @@ import { basename, resolve } from "node:path";
 import { Command } from "commander";
 import { ConfigStore, configDir, legacyConfigDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
+import { registerInstallCommand } from "./commands/install.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
-import { machineKey } from "./keystore.ts";
-import { registerMachine } from "./machine-api.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
 import {
@@ -29,13 +28,12 @@ import {
 import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
 import { goOnline } from "./online.ts";
-import { installService, isCompiled, startService, stopService, uninstallService } from "./service.ts";
+import { isCompiled, startService, stopService, uninstallService } from "./service.ts";
 import { dropInheritedMarkers } from "./startup-env.ts";
-import { TUNNEL_SERVER } from "./tunnel.ts";
 import { registerConfigCommand } from "./tunnels/cli-config-command.ts";
 import { registerHttpCommand } from "./tunnels/cli-http-command.js";
 import { registerLinkCommands } from "./tunnels/cli-link-command.js";
-import { registerLoginCommands, signInForServer } from "./tunnels/cli-login-command.js";
+import { registerLoginCommands } from "./tunnels/cli-login-command.js";
 import { registerKillCommand, tunnelRunLines } from "./tunnels/cli-status-commands.js";
 import { registerTcpCommand } from "./tunnels/cli-tcp-command.js";
 import { registerWatchCommand } from "./tunnels/cli-watch-command.js";
@@ -82,10 +80,10 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   const port = await machine.start(portArg ? Number(portArg) : undefined);
   const tunnels = new TunnelService(dir);
   const mcp = new McpHost(dir);
-  const stopControl = serveControl({ dir, machine, tunnels, mcp });
-  const offline = goOnline(machine, port, log);
+  const online = goOnline(machine, port, log);
+  const stopControl = serveControl({ dir, machine, registration: online.registration, tunnels, mcp });
   const shutdown = async () => {
-    offline();
+    online.stop();
     tunnels.closeAll("closed because tunelo stopped");
     mcp.endAll();
     stopControl();
@@ -179,28 +177,6 @@ async function status(options: { json?: boolean }): Promise<number> {
   return 0;
 }
 
-async function install(code: string, options: { trust?: string }): Promise<number> {
-  const dir = configDir();
-  const trust = options.trust ?? "";
-  if (!/^[A-Za-z0-9_-]{22}$/.test(code) || !/^[A-Za-z0-9_-]{43}$/.test(trust)) throw new Error("usage: tunelo install <code> --trust <device key>");
-  const secret = (await readLine()).trim();
-  if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) throw new Error("the pairing secret must come on stdin");
-  const config = new ConfigStore(dir);
-  const key = await machineKey(dir);
-  const reg = await registerMachine(code, key.publicKey, AGENT_VERSION);
-  config.update((c) => {
-    c.machineId = reg.machineId;
-    c.machineSecret = reg.machineSecret;
-    c.install = { deviceKey: trust, secret };
-  });
-  console.log("Registered. Now allow the tunnel sign-in in your browser.");
-  await signInForServer(TUNNEL_SERVER);
-  console.log("Signed in.");
-  const where = await installService(dir);
-  console.log(`tunelo will start at login (${where}). You can close this window.`);
-  return 0;
-}
-
 async function updateCommand(options: { check?: boolean }): Promise<number> {
   if (options.check) {
     const latest = await checkForUpdate();
@@ -266,11 +242,7 @@ function buildProgram(): Command {
     });
 
   // The background service and this machine in My machines.
-  program
-    .command("install <code>")
-    .description("register this machine (pairing secret on stdin), sign in and start at login")
-    .requiredOption("--trust <device key>", "the device that pairs first")
-    .action(exits(install));
+  registerInstallCommand(program);
   program.command("start").description("run in the background (keeps running after the terminal closes)").action(exits(start));
   program
     .command("stop")
@@ -350,17 +322,6 @@ function buildProgram(): Command {
   registerWatchCommand(program);
   registerConfigCommand(program);
   return program;
-}
-
-/** First line of stdin. The installer pipes exactly one line and closes it. */
-async function readLine(): Promise<string> {
-  let data = "";
-  for await (const chunk of process.stdin) {
-    data += Buffer.from(chunk as Uint8Array).toString("utf8");
-    if (data.includes("\n")) break;
-  }
-  // PowerShell may prefix piped text with a byte order mark.
-  return (data.split(/\r?\n/)[0] ?? "").replace(/^\uFEFF/, "");
 }
 
 dropInheritedMarkers();

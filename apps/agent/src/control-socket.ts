@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Machine } from "./machine.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
+import type { AppsReport, Registration } from "./registration-status.ts";
 import { type TunnelEvent, tunnelSpecSchema } from "./tunnels/tunnel-host.ts";
 import { isAlive } from "./tunnels/run-registry.js";
 import type { TunnelService } from "./tunnels/tunnel-service.ts";
@@ -70,6 +71,8 @@ export type ControlOptions = {
 export type ControlTarget = {
   dir: string;
   machine?: Machine;
+  /** The machine's place in Chat and the state of each app; absent with the machine. */
+  registration?: Registration;
   tunnels: TunnelService;
   mcp: McpHost;
 };
@@ -110,6 +113,16 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
       memoryMb: info.memoryMb,
       tunnels,
     };
+  },
+  /** Where the machine stands with each app; states and reasons, never a token. */
+  "GET /apps": (t): AppsReport => {
+    if (!t.registration) throw new Error("this tunelo runs tunnels only");
+    return t.registration.report();
+  },
+  /** `tunelo login` just signed in: add or claim the machine in Chat now. */
+  "POST /registration/retry": (t) => {
+    t.registration?.retryNow();
+    return { retrying: t.registration !== undefined };
   },
   "GET /devices": (t) =>
     machineOf(t)

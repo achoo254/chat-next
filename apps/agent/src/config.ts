@@ -23,6 +23,10 @@ export type AgentConfig = {
   install?: { deviceKey: string; secret: string };
   machineId?: string;
   machineSecret?: string;
+  /** The machine is tied to the signed-in account in Chat (registered with it, or claimed). */
+  claimed?: boolean;
+  /** The owner removed the machine on the web: it is not added again until `tunelo install`. */
+  machineRemoved?: boolean;
   subdomain?: string;
   serverUrl?: string;
   port?: number;

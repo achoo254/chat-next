@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { loadSettings } from "../../src/identity/cli-settings.ts";
-import { identitySession } from "../../src/identity/session.ts";
+import { AGENT_CLIENT_ID, appResources, identitySession } from "../../src/identity/session.ts";
 import { fakeJwt } from "../support/fake-idp.ts";
 
 const state = vi.hoisted(() => ({
 	pollFails: false,
 	revoked: [] as string[],
 	resources: [] as unknown[],
+	polledFor: [] as string[],
 }));
 
 vi.mock("@tunelo/client", async (importOriginal) => ({
@@ -23,15 +24,21 @@ vi.mock("@tunelo/client", async (importOriginal) => ({
 	revokeToken: async (_endpoints: unknown, refreshToken: string) => {
 		state.revoked.push(refreshToken);
 	},
-	startDeviceAuthorization: async (_e: unknown, _name: string, resource: unknown) => {
-		state.resources.push(resource);
-		return { verificationUri: "https://idp.test/device", userCode: "ABCD" };
-	},
-	pollForTokens: async () => {
-		if (state.pollFails) throw new Error("access_denied");
-		return { accessToken: fakeJwt("new-account"), refreshToken: "new-refresh", idToken: fakeJwt("new-account"), expiresIn: 300 };
-	},
 }));
+vi.mock("../../src/identity/agent-login.ts", async () => {
+	const { appResources: resourcesOf } = await import("../../src/identity/session.ts");
+	return {
+		startAgentAuthorization: async (_e: unknown, issuer: string) => {
+			state.resources.push(...Object.values(resourcesOf(issuer)));
+			return { deviceCode: "dc", verificationUri: "https://idp.test/device", verificationUriComplete: null, userCode: "ABCD", expiresIn: 600, interval: 5 };
+		},
+		pollAgentTokens: async (_e: unknown, _issuer: string, _a: unknown, app: string) => {
+			state.polledFor.push(app);
+			if (state.pollFails) throw new Error("access_denied");
+			return { accessToken: fakeJwt("new-account"), refreshToken: "new-refresh", idToken: fakeJwt("new-account"), expiresIn: 300 };
+		},
+	};
+});
 vi.mock("../../src/tunnels/open-browser.js", () => ({ openBrowser: async () => undefined }));
 
 const { registerLoginCommands } = await import("../../src/tunnels/cli-login-command.js");
@@ -51,6 +58,7 @@ beforeEach(async () => {
 	state.pollFails = false;
 	state.revoked = [];
 	state.resources = [];
+	state.polledFor = [];
 	await identitySession(dir).adopt({ issuer: "https://auth.hoandat.com", sub: "old-account", refreshToken: "old-refresh" }, "https://tunnel.hoandat.com");
 	vi.spyOn(console, "log").mockImplementation(() => undefined);
 	vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -77,8 +85,11 @@ describe("tunelo login --server", () => {
 
 	test("a new server's session replaces the old one once signed in, sealed", async () => {
 		await login("--server", "tunnel.acme.test");
-		expect(identitySession(dir).info()).toMatchObject({ issuer: "https://auth.acme.test", sub: "new-account" });
-		expect(state.resources).toEqual(["https://tunnel.acme.test"]);
+		expect(identitySession(dir).info()).toEqual({ issuer: "https://auth.acme.test", sub: "new-account", clientId: AGENT_CLIENT_ID });
+		// One approval for the three apps; the device code is redeemed for the tunnel's resource.
+		expect(state.resources).toEqual(["https://tunnel.acme.test", "https://chat.acme.test/mcp", "https://localman.acme.test/mcp"]);
+		expect(state.polledFor).toEqual(["tunnel"]);
+		expect(identitySession(dir).covers("chat")).toBe(true);
 		expect(state.revoked).toEqual(["old-refresh"]);
 		expect(loadSettings(dir).server).toBe("https://tunnel.acme.test");
 		for (const name of readdirSync(dir)) {
@@ -86,7 +97,23 @@ describe("tunelo login --server", () => {
 		}
 	});
 
+	test("a tunnel-only session of an older install is replaced by the one sign-in without --force", async () => {
+		expect(identitySession(dir).info()?.clientId).toBe("tunelo-cli");
+		await login();
+		expect(identitySession(dir).info()).toMatchObject({ sub: "new-account", clientId: AGENT_CLIENT_ID });
+		expect(state.revoked).toEqual(["old-refresh"]);
+	});
+
 	test("already signed in for the server: it still becomes the default", async () => {
+		const resources = appResources("https://auth.hoandat.com");
+		await identitySession(dir).replace(
+			"https://auth.hoandat.com",
+			{ accessToken: fakeJwt("old-account"), refreshToken: "agent-refresh", idToken: fakeJwt("old-account"), expiresIn: 300 },
+			resources.tunnel,
+			AGENT_CLIENT_ID,
+			Object.values(resources),
+		);
+		state.revoked = [];
 		await login("--server", "https://tunnel.hoandat.com");
 		expect(state.resources).toEqual([]);
 		expect(state.revoked).toEqual([]);

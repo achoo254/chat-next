@@ -3,15 +3,14 @@ import {
 	IDP_DEFAULTS,
 	deviceNameForIdp,
 	discover,
-	pollForTokens,
-	resourceOfIssuer,
 	serverIdentity,
-	startDeviceAuthorization,
 } from "@tunelo/client";
 import type { Command } from "commander";
 import { configDir } from "../config.ts";
+import { callControl } from "../control-socket.ts";
+import { pollAgentTokens, startAgentAuthorization } from "../identity/agent-login.ts";
 import { updateSettings } from "../identity/cli-settings.ts";
-import { identitySession } from "../identity/session.ts";
+import { AGENT_CLIENT_ID, appResources, identitySession } from "../identity/session.ts";
 import { getApiBaseUrl, verifyKey } from "./api-client.js";
 import { openBrowser } from "./open-browser.js";
 import { printServerMigration, resolveServerUrl } from "./server-url.js";
@@ -64,38 +63,41 @@ function issuerFor(serverUrl: string): string {
 }
 
 /**
- * Device sign-in at `issuer`. The current session stays in use until the
- * new one is saved, and its grant is revoked only then: a failed or
- * abandoned sign-in leaves it working.
+ * Device sign-in at `issuer` as `tunelo-agent`, for the tunnel, Chat and
+ * Localman at once. The current session (an older `tunelo-cli` one
+ * included) stays in use until the new one is saved, and its grant is
+ * revoked only then: a failed or abandoned sign-in leaves it working.
  */
 async function deviceLogin(issuer: string): Promise<string> {
 	const endpoints = await discover(issuer).catch((err: Error) =>
 		fail(`Could not reach ${issuer}: ${err.message}`),
 	);
-	const resource = resourceOfIssuer(issuer);
-	const authorization = await startDeviceAuthorization(
+	const authorization = await startAgentAuthorization(
 		endpoints,
-		deviceNameForIdp(`tunelo on ${hostname()}`),
-		resource,
+		issuer,
+		deviceNameForIdp(hostname()),
 	).catch((err: Error) => fail(err.message));
 
-	const url =
-		authorization.verificationUriComplete ?? authorization.verificationUri;
+	// The IdP gives this client no link with the code filled in: the person
+	// types the code shown here, on a page they opened themselves.
 	console.log();
-	console.log("  Sign in to Tunelo in your browser:");
-	console.log(`  ${url}`);
-	console.log(`  Confirm the code: ${authorization.userCode}`);
+	console.log("  Sign in with your account in the browser (Tunelo, Chat and Localman):");
+	console.log(`  ${authorization.verificationUri}`);
+	console.log(`  and type the code: ${authorization.userCode}`);
 	console.log();
 	console.log("  Waiting for approval...");
-	await openBrowser(url);
+	await openBrowser(authorization.verificationUri);
 
-	const tokens = await pollForTokens(endpoints, authorization).catch(
+	const tokens = await pollAgentTokens(endpoints, issuer, authorization, "tunnel").catch(
 		(err: Error) => fail(err.message),
 	);
+	const resources = appResources(issuer);
 	const { info, revokeError } = await identitySession(configDir()).replace(
 		issuer,
 		tokens,
-		resource,
+		resources.tunnel,
+		AGENT_CLIENT_ID,
+		Object.values(resources),
 	);
 	if (revokeError) {
 		console.error(
@@ -117,20 +119,29 @@ export async function signInForServer(
 	const session = identitySession(configDir());
 	const existing = session.info();
 	// Another IdP: its session replaces this one (one session). A stored
-	// session that no longer opens is signed in again without --force.
-	if (existing?.issuer === issuer && !force && (await session.isUsable())) {
+	// session that no longer opens, or one of the tunnel-only client of
+	// older installs, is signed in again without --force.
+	if (
+		existing?.issuer === issuer &&
+		existing.clientId === AGENT_CLIENT_ID &&
+		!force &&
+		(await session.isUsable())
+	) {
 		console.log(
 			`  Already signed in (account ${existing.sub}). Use --force to sign in again.`,
 		);
 		return { sub: existing.sub, signedInNow: false };
 	}
-	return { sub: await deviceLogin(issuer), signedInNow: true };
+	const sub = await deviceLogin(issuer);
+	// A running service adds or claims the machine in Chat now instead of at its next try.
+	await callControl(configDir(), "POST", "/registration/retry").catch(() => undefined);
+	return { sub, signedInNow: true };
 }
 
 export function registerLoginCommands(program: Command): void {
 	program
 		.command("login")
-		.description("Sign in with your account (opens the browser)")
+		.description("Sign in with your account for the tunnel, Chat and Localman (opens the browser)")
 		.option(
 			"--legacy-key [token]",
 			"Save an anonymous access token instead (CI, no browser); without a value it is read from TUNELO_KEY, keeping it out of shell history",

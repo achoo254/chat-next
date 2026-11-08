@@ -1,6 +1,9 @@
-// The three calls the agent makes to the chat server (Connect, JSON):
-// register with a one-time install code, heartbeat with the tunnel address,
-// and ask for a content-free "needs you" push.
+// The calls the agent makes to the chat server (Connect, JSON): register or
+// claim the machine with an access token of the owner's account (Chat's
+// resource, machines:write), heartbeat with the tunnel address, and ask for
+// a content-free "needs you" push (both with the machine secret). No call
+// carries a paired device's key or a pairing secret: pairing stays end to
+// end between the device and this machine.
 import { arch, hostname, platform } from "node:os";
 import { toBase64Url } from "@achoo254/chat-remote-protocol";
 
@@ -13,33 +16,48 @@ export class MachineApiError extends Error {
     message: string,
   ) {
     super(message);
+    this.name = "MachineApiError";
+  }
+
+  /** The server's reason, the word before ":" of its message (`chat_account_missing`…). */
+  get reason(): string {
+    return /^([a-z_]+):/.exec(this.message)?.[1] ?? "";
   }
 }
 
-async function call<T>(method: string, body: unknown, secret?: string): Promise<T> {
+async function call<T>(method: string, body: unknown, bearer?: string): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json", "connect-protocol-version": "1" };
-  if (secret) headers.authorization = `Bearer ${secret}`;
+  if (bearer) headers.authorization = `Bearer ${bearer}`;
   const res = await fetch(new URL(BASE + method, CHAT_SERVER), { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(20_000) });
   const text = await res.text();
-  const json = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  let json: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = text ? JSON.parse(text) : {};
+    if (typeof parsed === "object" && parsed !== null) json = parsed as Record<string, unknown>;
+  } catch {
+    // A proxy's HTML error page: keep the HTTP status.
+  }
   if (!res.ok) throw new MachineApiError(String(json.code ?? res.status), String(json.message ?? res.statusText));
   return json as T;
 }
 
 const std64 = (b: Uint8Array) => toBase64Url(b).replaceAll("-", "+").replaceAll("_", "/") + "=".repeat((4 - (toBase64Url(b).length % 4)) % 4);
 
-export function registerMachine(installCode: string, publicKey: Uint8Array, agentVersion: string, name = hostname()) {
-  return call<{ machineId: string; machineSecret: string }>("RegisterMachine", {
-    installCode,
-    name: name.slice(0, 64),
-    os: platform(),
-    arch: arch(),
-    agentVersion,
-    publicKey: std64(publicKey),
-  });
+/** Adds this machine to the account of `accessToken` (Chat's resource, machines:write). */
+export function registerMachine(accessToken: string, publicKey: Uint8Array, agentVersion: string, name = hostname()) {
+  return call<{ machineId: string; machineSecret: string }>(
+    "RegisterMachine",
+    { name: name.slice(0, 64) || "tunelo", os: platform(), arch: arch(), agentVersion, publicKey: std64(publicKey) },
+    accessToken,
+  );
 }
 
-export type HeartbeatReply = { revoked?: boolean; revokedDeviceKeys?: string[]; minAgentVersion?: string };
+/** Ties a machine added with an install code (before accounts) to the account of `accessToken`. */
+export function claimMachine(accessToken: string, machineSecret: string) {
+  return call<{ machineId?: string }>("ClaimMachine", { machineSecret }, accessToken);
+}
+
+export type HeartbeatReply = { revoked?: boolean; revokedDeviceKeys?: string[]; minAgentVersion?: string; claimed?: boolean };
 
 export function heartbeat(secret: string, body: { tunnelUrl: string; agentVersion: string; claudeVersion: string }) {
   return call<HeartbeatReply>("Heartbeat", body, secret);

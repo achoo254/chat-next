@@ -1,8 +1,15 @@
 /**
  * The machine's one account session at the shared IdP: one rotating refresh
- * token for every resource (tunnel now; Chat and Localman later), kept in
+ * token for every resource (tunnel, Chat, Localman), kept in
  * `<config dir>/session.json` sealed with the OS key store (keystore.ts), and
  * short-lived access tokens per resource, sealed beside it.
+ *
+ * `tunelo login` signs in as the client `tunelo-agent` for the three
+ * resources at once. A session of the client `tunelo-cli` (taken over from an
+ * older install) holds the tunnel only and stays in use until such a sign-in
+ * replaces it. The session records the resources its grant holds, and a
+ * token is never asked for another one: the IdP answers that with
+ * `invalid_target` and burns the refresh token.
  *
  * Every refresh runs under one lock file (`session.lock`) and re-reads the
  * file inside it: replaying a rotated refresh token revokes the whole grant,
@@ -22,6 +29,7 @@ import {
 	type TokenSet,
 	discover,
 	refreshTokens,
+	resourceOfIssuer,
 	revokeToken,
 	subjectOf,
 	withFileLock,
@@ -32,6 +40,39 @@ import { KeyStoreUnavailableError, seal, unseal } from "../keystore.ts";
 export { SessionExpiredError } from "@tunelo/client";
 
 export const SESSION_FILE = "session.json";
+
+/** The OAuth client of `tunelo login`: one grant for the tunnel, Chat and Localman. */
+export const AGENT_CLIENT_ID = "tunelo-agent";
+/** Everything `tunelo-agent` asks for (the IdP grants this client no more). */
+export const AGENT_SCOPE =
+	"openid offline_access tunnels:open tunnels:read chat:read chat:write machines:write mock:read mock:write client:read client:write client:send";
+
+/** The apps of the one sign-in. */
+export const APPS = ["tunnel", "chat", "localman"] as const;
+export type AppName = (typeof APPS)[number];
+
+/**
+ * The resource (token `aud`) of each app for the IdP `issuer`:
+ * `https://auth.<d>` signs in for `https://tunnel.<d>`, `https://chat.<d>/mcp`
+ * and `https://localman.<d>/mcp`. Another issuer (a local or staging IdP)
+ * keeps the domain of the default tunnel resource, as resourceOfIssuer does.
+ */
+export function appResources(issuer: string): Record<AppName, string> {
+	const domain = new URL(resourceOfIssuer(issuer)).hostname.replace(/^tunnel\./, "");
+	return {
+		tunnel: `https://tunnel.${domain}`,
+		chat: `https://chat.${domain}/mcp`,
+		localman: `https://localman.${domain}/mcp`,
+	};
+}
+
+/** The grant of this session does not hold the resource: `tunelo login` signs in for it. */
+export class ResourceNotGrantedError extends Error {
+	constructor(readonly resource: string) {
+		super(`This machine's sign-in does not cover ${resource}. Run \`tunelo login\`.`);
+		this.name = "ResourceNotGrantedError";
+	}
+}
 const LOCK_FILE = "session.lock";
 /** Refresh this long before `exp` so a token never expires mid-handshake. */
 const EXPIRY_MARGIN_MS = 60_000;
@@ -63,6 +104,8 @@ interface SessionFile extends SessionInfo {
 	/** New on every sign-in; tells processes their cached tokens are stale. */
 	generation: string;
 	refreshToken: string;
+	/** The resources the grant holds; a refresh asks for one of them only. */
+	resources: string[];
 	access: Record<string, SealedToken>;
 }
 
@@ -137,8 +180,20 @@ function readSession(dir: string): SessionFile | undefined {
 		clientId,
 		generation,
 		refreshToken,
+		resources: parseResources(raw.resources, issuer, clientId),
 		access: parseAccess(raw.access),
 	};
+}
+
+/** The stored resources; a file written before they were recorded holds what its client always gets. */
+function parseResources(value: unknown, issuer: string, clientId: string): string[] {
+	if (Array.isArray(value)) {
+		const list = value.filter((r): r is string => typeof r === "string" && r.length > 0);
+		if (list.length > 0) return list;
+	}
+	return clientId === AGENT_CLIENT_ID
+		? Object.values(appResources(issuer))
+		: [resourceOfIssuer(issuer)];
 }
 
 function writeSession(dir: string, session: SessionFile): void {
@@ -192,14 +247,34 @@ export class IdentitySession {
 		return { issuer, sub, clientId };
 	}
 
+	/** Whether the stored session's grant holds `app` (no network, no secret). */
+	covers(app: AppName): boolean {
+		const session = readSession(this.dir);
+		return session !== undefined && session.resources.includes(appResources(session.issuer)[app]);
+	}
+
+	/**
+	 * An access token of `app` (tunnel, Chat or Localman). Throws
+	 * `SessionExpiredError` without a session and `ResourceNotGrantedError`
+	 * when the sign-in does not cover the app (a session of the old
+	 * `tunelo-cli` client holds the tunnel only).
+	 */
+	async getAppToken(app: AppName): Promise<string> {
+		const info = this.info();
+		if (!info) throw new SessionExpiredError(EXPIRED_MESSAGE);
+		return this.getAccessToken(appResources(info.issuer)[app]);
+	}
+
 	/**
 	 * An access token for `resource` (its `aud`), refreshed when about to
 	 * expire. Throws `SessionExpiredError` when there is no session or the
-	 * grant is gone.
+	 * grant is gone, and `ResourceNotGrantedError`, before any request, for a
+	 * resource the grant does not hold.
 	 */
 	async getAccessToken(resource: string): Promise<string> {
 		const session = readSession(this.dir);
 		if (!session) throw new SessionExpiredError(EXPIRED_MESSAGE);
+		if (!session.resources.includes(resource)) throw new ResourceNotGrantedError(resource);
 		const ready = await this.validToken(session, resource);
 		if (ready) return ready;
 		// Back off outside the lock, so other processes are not kept waiting.
@@ -274,6 +349,8 @@ export class IdentitySession {
 	private async refreshLocked(resource: string): Promise<Attempt> {
 		let session = readSession(this.dir);
 		if (!session) throw new SessionExpiredError(EXPIRED_MESSAGE);
+		// Another process may have replaced the session meanwhile.
+		if (!session.resources.includes(resource)) throw new ResourceNotGrantedError(resource);
 		const ready = await this.validToken(session, resource);
 		if (ready) return { token: ready };
 		for (let retried = false; ; retried = true) {
@@ -296,7 +373,7 @@ export class IdentitySession {
 				const again = readSession(this.dir);
 				const changed =
 					again !== undefined && again.refreshToken !== session.refreshToken;
-				if (changed && !retried) {
+				if (changed && !retried && again.resources.includes(resource)) {
 					session = again;
 					continue;
 				}
@@ -338,14 +415,16 @@ export class IdentitySession {
 
 	/**
 	 * Saves the tokens of a new device sign-in in place of the current
-	 * session, then revokes the grant that session held. Resolves with the
-	 * new session, and the revocation error if that failed.
+	 * session, then revokes the grant that session held. `tokens` are those
+	 * of `resource`; `resources` lists every resource the sign-in asked for.
+	 * Resolves with the new session, and the revocation error if that failed.
 	 */
 	async replace(
 		issuer: string,
 		tokens: TokenSet,
 		resource: string,
 		clientId: string = IDP_DEFAULTS.clientId,
+		resources: readonly string[] = [resource],
 	): Promise<{ info: SessionInfo; revokeError?: Error }> {
 		const sub = subjectOf(tokens.idToken) ?? subjectOf(tokens.accessToken);
 		if (!tokens.refreshToken || !sub) {
@@ -361,6 +440,7 @@ export class IdentitySession {
 				clientId,
 				generation: randomUUID(),
 				refreshToken: await seal(this.dir, refreshToken),
+				resources: [...new Set([resource, ...resources])],
 				access: {
 					[resource]: {
 						token: await seal(this.dir, tokens.accessToken),
@@ -398,6 +478,7 @@ export class IdentitySession {
 				clientId: IDP_DEFAULTS.clientId,
 				generation: randomUUID(),
 				refreshToken: await seal(this.dir, plain.refreshToken),
+				resources: [resource],
 				access,
 			});
 			return true;
