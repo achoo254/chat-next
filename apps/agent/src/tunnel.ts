@@ -41,7 +41,10 @@ export function openTunnel(opts: { dir: string; localPort: number; deviceId: str
     deviceId: opts.deviceId,
     deviceName: hostname(),
     subdomain: opts.subdomain,
+    // Requests go to the device link's local server; the relay is not told
+    // that port: the machine tunnel serves no port of the user's own.
     localPort: opts.localPort,
+    reportLocalPort: false,
     localHost: "127.0.0.1",
   });
   client.on("connected", (r: AuthResult) => {

@@ -66,8 +66,8 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
       '@tunelo/client':
-        specifier: github:achoo254/localman-next#tunelo-client-v0.3.1&path:/packages/tunelo-client
-        version: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-client
+        specifier: github:achoo254/localman-next#tunelo-client-v0.3.2&path:/packages/tunelo-client
+        version: https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03#path:/packages/tunelo-client
       '@tunelo/shared':
         specifier: github:achoo254/localman-next#tunelo-shared-v0.2.1&path:/packages/tunelo-shared
         version: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared
@@ -1107,9 +1107,9 @@ packages:
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
 
-  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-client':
-    resolution: {gitHosted: true, integrity: sha512-BntBbW3GDx6jGqTHnwfbMu15WlpVQr6KwQ7e7R7VepuucCQHbiyNpEOhRQqRKFg3yLBEDUdj1gTMp4frH8wlPQ==, path: /packages/tunelo-client, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77}
-    version: 0.3.1
+  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03#path:/packages/tunelo-client':
+    resolution: {gitHosted: true, integrity: sha512-d+8fhh/eY72/synM9MqBRx9nrDrDlW8LO9kxXU0apZusvmlTY20BmVantYemg4xFoha5WZZ4ODNMbWa7j1Dkew==, path: /packages/tunelo-client, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03}
+    version: 0.3.2
     engines: {node: '>=20'}
 
   '@tunelo/shared@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared':
@@ -3680,7 +3680,7 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.2
 
-  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-client':
+  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03#path:/packages/tunelo-client':
     dependencies:
       '@types/ws': 8.18.1
       ws: 8.18.3
