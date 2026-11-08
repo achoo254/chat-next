@@ -4,7 +4,7 @@
 // usage a session reports belong to its profile only.
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { TurnState } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { AgentCore } from "../src/core/agent-core.ts";
 import { createClaudeProvider } from "../src/providers/claude/index.ts";
@@ -37,6 +37,7 @@ describe("sessions and Claude profiles", () => {
       audit: new AuditLog(join(root, "audit.jsonl")),
       isSensitive: createSensitiveCheck({ home }),
       profile: () => selected,
+      selectedAccountDir: () => selected.accountDir,
       onProfileUsage: (id) => usage.push(id),
     });
 
@@ -74,6 +75,34 @@ describe("sessions and Claude profiles", () => {
     await until(core, second.id, turns(2));
     expect(sdk.log.options[2]?.env).toBeUndefined();
     expect(core.info(second.id).profileId).toBe("");
+    await core.stop();
+  });
+
+  it("fails the turn rather than run on another account when the selected profile cannot be read", async () => {
+    const root = tempDir();
+    const work = join(root, "home", "work");
+    mkdirSync(work, { recursive: true });
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const core = new AgentCore({
+      dataDir: join(root, "data"),
+      providers: [provider],
+      audit: new AuditLog(join(root, "audit.jsonl")),
+      isSensitive: createSensitiveCheck({ home: join(root, "home") }),
+      profile: () => {
+        throw new Error("profiles.json is damaged");
+      },
+    });
+    await expect(core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" })).rejects.toMatchObject({
+      code: ErrorCode.PROVIDER_UNAVAILABLE,
+    });
+    expect(sdk.log.options).toHaveLength(0);
+    const [thread] = core.list();
+    if (!thread) throw new Error("no thread");
+    const items = core.snapshot(thread.id);
+    expect(items.some((i) => i.body.case === "error" && i.body.value.message.includes("damaged"))).toBe(true);
+    expect(byCase(items, "turn").at(-1)?.body.value.state).toBe(TurnState.FAILED);
     await core.stop();
   });
 });

@@ -16,12 +16,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { sameVolume } from "./volume.ts";
 
 export const HISTORY = "history.jsonl";
-/** Beside the profile's home: what the link pointed at when it was made. */
-const MARKER = "history-link.json";
 
 export type HistoryLinkState = "linked" | "repaired" | "separate";
 
@@ -78,7 +76,5 @@ export function ensureHistoryLink(home: string, claudeHome: string, warn: (messa
   }
   if (useHardLink()) linkSync(target, link);
   else symlinkSync(target, link, "file");
-  const t = statSync(target);
-  writeFileSync(join(dirname(home), MARKER), JSON.stringify({ dev: t.dev, ino: t.ino }), { mode: 0o600 });
   return repaired ? "repaired" : "linked";
 }

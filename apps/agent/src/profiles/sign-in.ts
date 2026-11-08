@@ -12,6 +12,8 @@ const URL_TIMEOUT_MS = 20_000;
 /** How long claude has to check the code and exit. */
 const CODE_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT = 64 * 1024;
+/** How long claude has to leave after SIGTERM before it gets SIGKILL. */
+const KILL_GRACE_MS = 5_000;
 
 /**
  * Keeps claude from opening a browser on the machine itself (nobody is
@@ -57,7 +59,8 @@ export type LoginProcess = {
   url: string;
   /** Writes the code to claude and waits for it to finish: its exit code (-1 when it had to be stopped). */
   submit(code: string): Promise<number>;
-  kill(): void;
+  /** Stops claude (SIGKILL when SIGTERM is not enough) and resolves once it is gone. */
+  kill(): Promise<void>;
 };
 
 /**
@@ -84,20 +87,27 @@ export function startLogin(bin: string, configDir: string, urlTimeoutMs = URL_TI
   };
   child.stdout.on("data", onData);
   child.stderr.on("data", onData);
+  // claude may close stdin or exit while the code is written: that must not crash the service.
+  child.stdin.on("error", () => undefined);
   child.on("exit", (code, signal) => {
     exited = code ?? (signal ? -1 : 1);
     for (const w of exitWaiters.splice(0)) w(exited);
   });
   const waitExit = (): Promise<number> => (exited !== null ? Promise.resolve(exited) : new Promise((r) => exitWaiters.push(r)));
-  const kill = () => {
-    if (exited === null) child.kill();
+  const kill = async (): Promise<void> => {
+    if (exited !== null) return;
+    child.kill("SIGTERM");
+    const hard = setTimeout(() => {
+      if (exited === null) child.kill("SIGKILL");
+    }, KILL_GRACE_MS);
+    await waitExit();
+    clearTimeout(hard);
   };
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       done();
-      kill();
-      reject(new Error("claude printed no sign-in link"));
+      void kill().then(() => reject(new Error("claude printed no sign-in link")));
     }, urlTimeoutMs);
     const check = () => {
       const url = extractSignInUrl(output);
@@ -109,7 +119,7 @@ export function startLogin(bin: string, configDir: string, urlTimeoutMs = URL_TI
         async submit(code) {
           if (exited !== null) return exited;
           child.stdin.write(`${code}\n`);
-          const stop = setTimeout(kill, CODE_TIMEOUT_MS);
+          const stop = setTimeout(() => void kill(), CODE_TIMEOUT_MS);
           const result = await waitExit();
           clearTimeout(stop);
           return result;

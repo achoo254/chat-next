@@ -1,7 +1,10 @@
 // profiles.json: the Claude profiles of this machine (who each is signed in
 // as, last plan usage) and which one new sessions use. Only the service
 // writes it, through a temp file and a rename. No credential is ever in it.
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+// A file that cannot be read is never taken for "no profiles": a copy is
+// kept, the file stays as it is, and the store refuses every change until
+// someone repairs it, so nothing gets signed out or deleted on its account.
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { PROFILE_ID_RE, profilesRoot } from "./paths.ts";
@@ -40,22 +43,38 @@ export type ProfilesFile = z.infer<typeof fileSchema>;
 export class ProfileStore {
   readonly file: string;
   private data: ProfilesFile;
+  /** Why profiles.json could not be read; null when it is fine (or not there yet). */
+  readonly damaged: string | null = null;
 
-  constructor(configDir: string) {
+  constructor(configDir: string, now: () => number = Date.now) {
     const root = profilesRoot(configDir);
     mkdirSync(root, { recursive: true, mode: 0o700 });
     this.file = join(root, "profiles.json");
-    this.data = ProfileStore.load(this.file);
-  }
-
-  private static load(file: string): ProfilesFile {
+    this.data = fileSchema.parse({});
+    let raw: string;
     try {
-      const parsed = fileSchema.safeParse(JSON.parse(readFileSync(file, "utf8")));
-      if (parsed.success) return parsed.data;
-    } catch {
-      // first start, or unreadable: start empty rather than fail the service
+      raw = readFileSync(this.file, "utf8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") this.damaged = `${this.file} could not be read (${(err as Error).message})`;
+      return;
     }
-    return fileSchema.parse({});
+    let parsed: ReturnType<typeof fileSchema.safeParse> | undefined;
+    try {
+      parsed = fileSchema.safeParse(JSON.parse(raw));
+    } catch {
+      parsed = undefined;
+    }
+    if (parsed?.success) {
+      this.data = parsed.data;
+      return;
+    }
+    const copy = `${this.file}.corrupt-${now()}`;
+    try {
+      copyFileSync(this.file, copy);
+    } catch {
+      // the original stays in place either way
+    }
+    this.damaged = `${this.file} is damaged (a copy is in ${copy}); repair or remove it, then restart tunelo`;
   }
 
   get(): Readonly<ProfilesFile> {
@@ -73,6 +92,7 @@ export class ProfileStore {
   }
 
   update(change: (d: ProfilesFile) => void): void {
+    if (this.damaged) throw new Error(this.damaged);
     const next = structuredClone(this.data);
     change(next);
     const tmp = `${this.file}.${process.pid}.tmp`;

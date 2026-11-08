@@ -91,6 +91,7 @@ export class Machine {
       idleMs: c.idleMinutes * 60_000,
       onNeedsInput: (t) => this.maybePush(t),
       profile: () => this.profiles.sessionProfile(),
+      selectedAccountDir: () => this.profiles.selectedAccountDir(),
       onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
     });
   }
@@ -202,9 +203,9 @@ export class Machine {
   private async detect(p: AgentProvider): Promise<Detected> {
     let accountDir: string | undefined;
     try {
-      accountDir = this.profiles.sessionProfile().accountDir;
+      accountDir = this.profiles.selectedAccountDir();
     } catch {
-      accountDir = undefined;
+      accountDir = undefined; // the profiles cannot be read: sessions say so when they open
     }
     const key = `${p.id}\n${accountDir ?? ""}`;
     const hit = this.detected.get(key);

@@ -1,17 +1,23 @@
 // The Claude profiles of this machine, as the service runs them: listing,
 // picking the one new sessions use, signing a new account in (from a device
 // with a pasted code, or in the terminal on the machine), refusing an account
-// that is already there, plan usage, and removal. One sign-in at a time; a
-// new one cancels the one before; one left alone ends after 10 minutes.
+// that is already there, plan usage, and removal.
+//
+// Every change runs one at a time (a promise chain), so one sign-in is open
+// at a time, a cancel or the 10-minute expiry never lands in the middle of
+// keeping a profile, and removal checks, unselects and deletes in one go.
+// A folder of an unfinished sign-in carries an "attempt" marker; only such
+// folders are ever cleaned up on their own.
 import { randomUUID } from "node:crypto";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { RateWindow } from "../providers/types.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { type ClaudeAccount, readAccount, sameAccount, signOut } from "./account.ts";
 import { ensureHistoryLink } from "./history-link.ts";
 import { PROFILE_ID_RE, assertSafeHome, defaultClaudeHome, makeProfileHome, profileDir, profileHome, profilesRoot } from "./paths.ts";
 import { removeTreeSafely } from "./remove.ts";
-import { setupProfileHome } from "./setup.ts";
+import { setupProfileHome, syncMachineSettings } from "./setup.ts";
 import { type LoginProcess, startLogin, validCode } from "./sign-in.ts";
 import { ProfileStore, type ProfileUsage } from "./store.ts";
 
@@ -53,6 +59,8 @@ export type ClaudeProfilesOptions = {
   now?: () => number;
   ttlMs?: number;
   urlTimeoutMs?: number;
+  /** A profile's usage is read at most this often; meanwhile the last value answers. */
+  usageMinIntervalMs?: number;
 };
 
 type Attempt = {
@@ -61,10 +69,12 @@ type Attempt = {
   login?: LoginProcess;
   expiresAt: number;
   timer: ReturnType<typeof setTimeout>;
-  busy: boolean;
 };
 
 const TTL_MS = 10 * 60_000;
+const USAGE_MIN_INTERVAL_MS = 30_000;
+/** In a profile folder (beside home) while its sign-in has not finished. */
+const ATTEMPT_MARKER = "attempt";
 
 export class ProfileError extends Error {}
 
@@ -72,14 +82,28 @@ export class ClaudeProfiles {
   readonly store: ProfileStore;
   readonly claudeHome: string;
   private attempt: Attempt | undefined;
+  private queue: Promise<unknown> = Promise.resolve();
+  private usageInFlight = new Map<string, Promise<void>>();
   private readonly now: () => number;
   private readonly log: (line: string) => void;
 
   constructor(private readonly opts: ClaudeProfilesOptions) {
-    this.store = new ProfileStore(opts.configDir);
-    this.claudeHome = opts.claudeHome ?? defaultClaudeHome();
     this.now = opts.now ?? Date.now;
+    this.store = new ProfileStore(opts.configDir, this.now);
+    this.claudeHome = opts.claudeHome ?? defaultClaudeHome();
     this.log = opts.log ?? (() => undefined);
+    if (this.store.damaged) this.log(`claude profiles: ${this.store.damaged}`);
+  }
+
+  /** Runs `fn` after every change queued before it. */
+  private serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private readable(): void {
+    if (this.store.damaged) throw new ProfileError(this.store.damaged);
   }
 
   private home(id: string): string {
@@ -94,30 +118,53 @@ export class ClaudeProfiles {
     return bin;
   }
 
-  /** Folders a crash left behind (a sign-in that never finished): signed out and deleted. */
-  async cleanLeftovers(): Promise<void> {
-    let names: string[];
-    try {
-      names = readdirSync(profilesRoot(this.opts.configDir));
-    } catch {
-      return;
-    }
-    const bin = await this.opts.findBinary();
-    for (const name of names) {
-      if (!PROFILE_ID_RE.test(name) || this.store.find(name) || this.attempt?.id === name) continue;
+  /** Folders of sign-ins a crash left unfinished (marked as such): signed out and deleted. Nothing else. */
+  cleanLeftovers(): Promise<void> {
+    return this.serial(async () => {
+      if (this.store.damaged) return;
+      let names: string[];
       try {
-        await this.discard(name, bin);
-      } catch (err) {
-        this.log(`claude profiles: could not remove an unfinished profile folder (${(err as Error).message})`);
+        names = readdirSync(profilesRoot(this.opts.configDir));
+      } catch {
+        return;
       }
-    }
+      const leftovers = names.filter(
+        (name) =>
+          PROFILE_ID_RE.test(name) &&
+          !this.store.find(name) &&
+          this.attempt?.id !== name &&
+          existsSync(join(profileDir(this.opts.configDir, name), ATTEMPT_MARKER)),
+      );
+      if (leftovers.length === 0) return;
+      const bin = await this.opts.findBinary();
+      for (const name of leftovers) {
+        try {
+          await this.discard(name, bin);
+        } catch (err) {
+          this.log(`claude profiles: could not remove an unfinished profile folder (${(err as Error).message})`);
+        }
+      }
+    });
   }
 
-  /** What a new session uses: the selected profile, its history link checked. */
+  /** The account folder new sessions would use; only looks it up. */
+  selectedAccountDir(): string | undefined {
+    this.readable();
+    const p = this.store.selected();
+    return p ? this.home(p.id) : undefined;
+  }
+
+  /**
+   * What a session opening now uses: the selected profile, with the
+   * machine's settings copied in and its history link checked. Throws when
+   * the profiles cannot be read, rather than run on another account.
+   */
   sessionProfile(): SessionProfile {
+    this.readable();
     const p = this.store.selected();
     if (!p) return { id: "" };
     const home = this.home(p.id);
+    syncMachineSettings(home, this.claudeHome);
     try {
       const state = ensureHistoryLink(home, this.claudeHome, (w) => this.log(`claude profiles: ${w}`));
       if (state === "repaired") this.log("claude profiles: the shared prompt history link was made again");
@@ -128,14 +175,16 @@ export class ClaudeProfiles {
   }
 
   async list(): Promise<ProfileList> {
+    this.readable();
     const bin = await this.opts.findBinary();
     const account = bin ? await readAccount(bin, undefined) : null;
-    if (account) {
-      this.store.update((d) => {
-        d.defaultProfile = { ...d.defaultProfile, email: account.email, orgId: account.orgId, orgName: account.orgName, plan: account.plan };
+    const d = this.store.get();
+    const known = d.defaultProfile;
+    if (account && (known.email !== account.email || known.orgId !== account.orgId || known.orgName !== account.orgName || known.plan !== account.plan)) {
+      this.store.update((x) => {
+        x.defaultProfile = { ...x.defaultProfile, email: account.email, orgId: account.orgId, orgName: account.orgName, plan: account.plan };
       });
     }
-    const d = this.store.get();
     const def: ProfileView = {
       id: "",
       email: account?.loggedIn ? account.email : "",
@@ -143,9 +192,9 @@ export class ClaudeProfiles {
       plan: account?.loggedIn ? account.plan : "",
       signedIn: account?.loggedIn ?? false,
       createdAt: 0,
-      ...(d.defaultProfile.lastUsage ? { lastUsage: d.defaultProfile.lastUsage } : {}),
+      ...(known.lastUsage ? { lastUsage: known.lastUsage } : {}),
     };
-    const rest = d.profiles.map(
+    const rest = this.store.get().profiles.map(
       (p): ProfileView => ({
         id: p.id,
         email: p.email,
@@ -160,17 +209,21 @@ export class ClaudeProfiles {
   }
 
   /** Picks the profile of new sessions; "" for the default one. Open sessions keep theirs. */
-  select(id: string, device: string): void {
-    const p = id === "" ? null : this.store.find(id);
-    if (id !== "" && !p) throw new ProfileError("no such profile");
-    this.store.update((d) => {
-      d.selectedProfileId = id === "" ? null : id;
+  select(id: string, device: string): Promise<void> {
+    return this.serial(async () => {
+      this.readable();
+      const p = id === "" ? null : this.store.find(id);
+      if (id !== "" && !p) throw new ProfileError("no such profile");
+      this.store.update((d) => {
+        d.selectedProfileId = id === "" ? null : id;
+      });
+      this.opts.audit.write({ device, action: "profile_select", path: "", detail: p ? p.email : "default" });
     });
-    this.opts.audit.write({ device, action: "profile_select", path: "", detail: p ? p.email : "default" });
   }
 
   /** Records usage a session or a refresh reported for a profile. */
   recordUsage(id: string, usage: RateLimits): void {
+    if (this.store.damaged) return;
     const lastUsage: ProfileUsage = { ...usage, updatedAt: this.now() };
     if (id === "") {
       this.store.update((d) => {
@@ -185,38 +238,56 @@ export class ClaudeProfiles {
     });
   }
 
-  /** Reads a profile's plan usage now (a short session with no message). */
-  async refreshUsage(id: string): Promise<void> {
-    if (id !== "" && !this.store.find(id)) throw new ProfileError("no such profile");
-    const usage = await this.opts.probeUsage(await this.bin(), id === "" ? undefined : this.home(id));
-    if (!usage) return;
-    this.recordUsage(id, usage);
-    this.opts.onUsage?.(id, usage);
+  private lastUsage(id: string): ProfileUsage | undefined {
+    return id === "" ? this.store.get().defaultProfile.lastUsage : this.store.find(id)?.lastUsage;
+  }
+
+  /**
+   * Reads a profile's plan usage now (a short session with no message). One
+   * read per profile at a time; within the minimum interval the last value
+   * stands and no session opens.
+   */
+  refreshUsage(id: string): Promise<void> {
+    this.readable();
+    if (id !== "" && !this.store.find(id)) return Promise.reject(new ProfileError("no such profile"));
+    const last = this.lastUsage(id);
+    if (last && this.now() - last.updatedAt < (this.opts.usageMinIntervalMs ?? USAGE_MIN_INTERVAL_MS)) return Promise.resolve();
+    const running = this.usageInFlight.get(id);
+    if (running) return running;
+    const run = (async () => {
+      const usage = await this.opts.probeUsage(await this.bin(), id === "" ? undefined : this.home(id));
+      if (!usage) return;
+      this.recordUsage(id, usage);
+      this.opts.onUsage?.(id, usage);
+    })().finally(() => this.usageInFlight.delete(id));
+    this.usageInFlight.set(id, run);
+    return run;
   }
 
   // --- signing in ------------------------------------------------------------
 
+  /** Opens a new attempt (ending the one before). Runs inside serial(). */
   private async newAttempt(kind: Attempt["kind"]): Promise<{ id: string; home: string }> {
-    await this.cancel(this.attempt?.id ?? "");
+    this.readable();
+    await this.endAttempt(this.attempt?.id ?? "");
     const id = randomUUID();
-    const home = makeProfileHome(this.opts.configDir, id, this.claudeHome);
     const ttl = this.opts.ttlMs ?? TTL_MS;
-    const attempt: Attempt = {
-      id,
-      kind,
-      expiresAt: this.now() + ttl,
-      busy: false,
-      timer: setTimeout(() => void this.cancel(id), ttl),
-    };
+    const attempt: Attempt = { id, kind, expiresAt: this.now() + ttl, timer: setTimeout(() => void this.cancel(id), ttl) };
     attempt.timer.unref?.();
     this.attempt = attempt;
     try {
+      const home = makeProfileHome(this.opts.configDir, id, this.claudeHome);
+      writeFileSync(join(profileDir(this.opts.configDir, id), ATTEMPT_MARKER), "", { mode: 0o600 });
       for (const w of setupProfileHome(home, this.claudeHome).warnings) this.log(`claude profiles: ${w}`);
+      return { id, home };
     } catch (err) {
-      await this.cancel(id);
+      await this.endAttempt(id);
       throw err;
     }
-    return { id, home };
+  }
+
+  private current(id: string): Attempt | undefined {
+    return this.attempt?.id === id ? this.attempt : undefined;
   }
 
   /**
@@ -224,64 +295,71 @@ export class ClaudeProfiles {
    * claude cannot sign in without a terminal, the answer says to do it on the
    * machine (`tunelo claude profiles add`).
    */
-  async beginRemote(): Promise<{ ok: true; attemptId: string; url: string; expiresAt: number } | { ok: false; error: SignInError }> {
-    const bin = await this.bin();
-    const { id, home } = await this.newAttempt("remote");
-    try {
-      const login = await startLogin(bin, home, this.opts.urlTimeoutMs);
-      const attempt = this.attempt;
-      if (attempt?.id !== id) {
-        login.kill();
-        return { ok: false, error: "cancelled" };
+  beginRemote(): Promise<{ ok: true; attemptId: string; url: string; expiresAt: number } | { ok: false; error: SignInError }> {
+    return this.serial(async () => {
+      const bin = await this.bin();
+      const { id, home } = await this.newAttempt("remote");
+      let login: LoginProcess;
+      try {
+        login = await startLogin(bin, home, this.opts.urlTimeoutMs);
+      } catch {
+        await this.endAttempt(id);
+        this.log("claude profiles: claude showed no sign-in link; sign in on the machine instead");
+        return { ok: false as const, error: "sign-in-on-machine" as const };
+      }
+      const attempt = this.current(id);
+      if (!attempt) {
+        await login.kill();
+        return { ok: false as const, error: "cancelled" as const };
       }
       attempt.login = login;
-      return { ok: true, attemptId: id, url: login.url, expiresAt: attempt.expiresAt };
-    } catch {
-      await this.cancel(id);
-      this.log("claude profiles: claude showed no sign-in link; sign in on the machine instead");
-      return { ok: false, error: "sign-in-on-machine" };
-    }
+      return { ok: true as const, attemptId: id, url: login.url, expiresAt: attempt.expiresAt };
+    });
   }
 
   /** From a device: the code of the sign-in page, straight to claude and then forgotten. */
-  async submitCode(attemptId: string, code: string): Promise<SignInOutcome> {
-    const attempt = this.attempt;
-    if (!attempt || attempt.id !== attemptId || attempt.kind !== "remote" || !attempt.login) return { ok: false, error: "expired" };
-    if (attempt.busy) return { ok: false, error: "busy" };
-    const trimmed = code.trim();
-    if (!validCode(trimmed)) return { ok: false, error: "code-rejected" };
-    attempt.busy = true;
-    const exit = await attempt.login.submit(trimmed);
-    if (this.attempt?.id !== attemptId) return { ok: false, error: "cancelled" };
-    if (exit !== 0) {
-      // claude ends the attempt on a wrong code: a new one is needed.
-      await this.cancel(attemptId);
-      return { ok: false, error: "code-rejected" };
-    }
-    return this.register(attemptId, "remote device");
+  submitCode(attemptId: string, code: string): Promise<SignInOutcome> {
+    return this.serial(async () => {
+      const attempt = this.current(attemptId);
+      if (!attempt || attempt.kind !== "remote" || !attempt.login) return { ok: false, error: "expired" };
+      const trimmed = code.trim();
+      if (!validCode(trimmed)) return { ok: false, error: "code-rejected" };
+      const exit = await attempt.login.submit(trimmed);
+      if (!this.current(attemptId)) return { ok: false, error: "cancelled" };
+      if (exit !== 0) {
+        // claude ends the attempt on a wrong code: a new one is needed.
+        await this.endAttempt(attemptId);
+        return { ok: false, error: "code-rejected" };
+      }
+      return this.register(attemptId, "remote device");
+    });
   }
 
   /** On the machine: a prepared profile folder for `claude auth login` in the terminal. */
-  async prepareTerminal(): Promise<{ id: string; home: string }> {
-    return this.newAttempt("terminal");
+  prepareTerminal(): Promise<{ id: string; home: string }> {
+    return this.serial(() => this.newAttempt("terminal"));
   }
 
   /** On the machine: claude's terminal sign-in finished; keep the profile if it is a new account. */
-  async finishTerminal(id: string): Promise<SignInOutcome> {
-    const attempt = this.attempt;
-    if (!attempt || attempt.id !== id || attempt.kind !== "terminal") return { ok: false, error: "expired" };
-    if (attempt.busy) return { ok: false, error: "busy" };
-    attempt.busy = true;
-    return this.register(id, "local");
+  finishTerminal(id: string): Promise<SignInOutcome> {
+    return this.serial(async () => {
+      const attempt = this.current(id);
+      if (!attempt || attempt.kind !== "terminal") return { ok: false, error: "expired" };
+      return this.register(id, "local");
+    });
   }
 
   /** Ends an attempt: claude stops and the unfinished folder goes. */
-  async cancel(attemptId: string): Promise<void> {
-    const attempt = this.attempt;
-    if (!attempt || attempt.id !== attemptId) return;
+  cancel(attemptId: string): Promise<void> {
+    return this.serial(() => this.endAttempt(attemptId));
+  }
+
+  private async endAttempt(attemptId: string): Promise<void> {
+    const attempt = this.current(attemptId);
+    if (!attempt) return;
     this.attempt = undefined;
     clearTimeout(attempt.timer);
-    attempt.login?.kill();
+    await attempt.login?.kill();
     try {
       await this.discard(attempt.id, await this.opts.findBinary());
     } catch (err) {
@@ -296,24 +374,28 @@ export class ClaudeProfiles {
     removeTreeSafely(profileDir(this.opts.configDir, id));
   }
 
+  /** Keeps a signed-in attempt as a profile. Runs inside serial(); the attempt is checked after every wait. */
   private async register(id: string, device: string): Promise<SignInOutcome> {
     const bin = await this.opts.findBinary();
     const account: ClaudeAccount | null = bin ? await readAccount(bin, this.home(id)) : null;
+    if (!this.current(id)) return { ok: false, error: "cancelled" };
     if (!account?.loggedIn || account.email === "") {
-      await this.cancel(id);
+      await this.endAttempt(id);
       return { ok: false, error: "failed" };
     }
     const def = bin ? await readAccount(bin, undefined) : null;
+    if (!this.current(id)) return { ok: false, error: "cancelled" };
     const taken = this.store.get().profiles.some((p) => sameAccount(p, account)) || Boolean(def?.loggedIn && sameAccount(def, account));
     if (taken) {
-      await this.cancel(id);
+      await this.endAttempt(id);
       return { ok: false, error: "duplicate" };
     }
-    const attempt = this.attempt;
-    if (attempt?.id === id) {
-      clearTimeout(attempt.timer);
-      this.attempt = undefined;
-    }
+    const attempt = this.current(id);
+    if (!attempt) return { ok: false, error: "cancelled" };
+    clearTimeout(attempt.timer);
+    this.attempt = undefined;
+    // Marker first: a crash between the two leaves a folder nothing cleans by itself, never a kept profile deleted.
+    rmSync(join(profileDir(this.opts.configDir, id), ATTEMPT_MARKER), { force: true });
     this.store.update((d) => {
       d.profiles.push({ id, email: account.email, orgId: account.orgId, orgName: account.orgName, plan: account.plan, createdAt: this.now() });
     });
@@ -324,21 +406,46 @@ export class ClaudeProfiles {
 
   // --- removing ----------------------------------------------------------------
 
-  /** Signs the profile out and deletes its folder; the shared Claude folder is never touched. */
-  async remove(id: string, device: string): Promise<void> {
-    if (id === "") throw new ProfileError("the default profile cannot be removed");
-    const p = this.store.find(id);
-    if (!p) throw new ProfileError("no such profile");
-    if (this.opts.inUse?.(id)) throw new ProfileError("a session is open with this profile; close it first");
-    const bin = await this.opts.findBinary();
-    const home = this.home(id);
-    if (bin && !(await signOut(bin, home).catch(() => false))) this.log("claude profiles: claude did not confirm the sign-out; deleting the folder anyway");
-    this.store.update((d) => {
-      d.profiles = d.profiles.filter((x) => x.id !== id);
-      if (d.selectedProfileId === id) d.selectedProfileId = null;
+  /**
+   * Signs the profile out and deletes its folder; the shared Claude folder is
+   * never touched. Refused while a session runs with it, and when claude
+   * cannot sign it out (its stored sign-in would stay behind); `force`
+   * (only from the machine's own terminal) deletes anyway.
+   */
+  remove(id: string, device: string, options: { force?: boolean } = {}): Promise<void> {
+    return this.serial(async () => {
+      this.readable();
+      if (id === "") throw new ProfileError("the default profile cannot be removed");
+      const p = this.store.find(id);
+      if (!p) throw new ProfileError("no such profile");
+      if (this.opts.inUse?.(id)) throw new ProfileError("a session is open with this profile; close it first");
+      // Unselected at once: no new session can open with it while it is signed out.
+      const wasSelected = this.store.get().selectedProfileId === id;
+      if (wasSelected) {
+        this.store.update((d) => {
+          d.selectedProfileId = null;
+        });
+      }
+      const bin = await this.opts.findBinary();
+      const home = this.home(id);
+      const signedOut = bin ? await signOut(bin, home).catch(() => false) : false;
+      if (!signedOut && !options.force) {
+        if (wasSelected) {
+          this.store.update((d) => {
+            d.selectedProfileId = id;
+          });
+        }
+        throw new ProfileError(
+          `claude could not sign this account out, so nothing was deleted. On the machine, \`tunelo claude profiles remove ${id} --force\` deletes it anyway`,
+        );
+      }
+      if (!signedOut) this.log("claude profiles: removed a profile claude could not sign out (forced)");
+      this.store.update((d) => {
+        d.profiles = d.profiles.filter((x) => x.id !== id);
+      });
+      removeTreeSafely(profileDir(this.opts.configDir, id));
+      this.opts.audit.write({ device, action: "profile_remove", path: "", detail: options.force && !signedOut ? `${p.email} (forced)` : p.email });
     });
-    removeTreeSafely(profileDir(this.opts.configDir, id));
-    this.opts.audit.write({ device, action: "profile_remove", path: "", detail: p.email });
   }
 
   /** Stops a sign-in in progress (the service is stopping). */

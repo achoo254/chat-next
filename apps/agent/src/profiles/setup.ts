@@ -1,7 +1,8 @@
 // Fills a new profile's home so that only the sign-in is its own: the
 // folders of projects, plans, skills, hooks… link back to the machine's
 // Claude folder (junctions on Windows, symlinks elsewhere), the prompt
-// history is shared (history-link.ts), settings and key bindings are copied,
+// history is shared (history-link.ts), settings and key bindings are copied
+// (again at every session start: syncMachineSettings),
 // CLAUDE.md imports the shared one, and the profile's .claude.json gets the
 // projects and MCP servers of the machine's own. The machine's .claude.json
 // is only read, and only those two keys: never its account or user id.
@@ -14,6 +15,7 @@ import {
   readdirSync,
   realpathSync,
   renameSync,
+  rmSync,
   rmdirSync,
   symlinkSync,
   unlinkSync,
@@ -45,7 +47,13 @@ export const SHARED_DIRS = [
   "scripts",
 ] as const;
 
-/** Copied once; claude rewrites them in place, which would cut a link. */
+/**
+ * The machine's settings (permission rules, hooks, default mode) and key
+ * bindings, copied over the profile's at every session start so a change
+ * on the machine reaches every profile. Not linked: claude saves them by
+ * writing a new file and renaming it, which cuts a link, and a file link on
+ * Windows needs administrator rights; a copy behaves the same everywhere.
+ */
 const COPIED_FILES = ["settings.json", "keybindings.json"] as const;
 
 /** Keys of the machine's .claude.json a profile takes over. */
@@ -135,6 +143,25 @@ function sharedMemoryRef(claudeHome: string): string {
   return samePath(claudeHome, join(homedir(), ".claude")) ? "~/.claude/CLAUDE.md" : join(claudeHome, "CLAUDE.md");
 }
 
+/**
+ * Makes the profile's settings those of the machine: copied (temp file and
+ * rename), or removed when the machine has none, so a profile never keeps
+ * rules or a mode the machine dropped.
+ */
+export function syncMachineSettings(home: string, claudeHome: string): void {
+  for (const name of COPIED_FILES) {
+    const from = join(claudeHome, name);
+    const to = join(home, name);
+    if (!existsSync(from)) {
+      rmSync(to, { force: true });
+      continue;
+    }
+    const tmp = `${to}.${process.pid}.tmp`;
+    copyFileSync(from, tmp);
+    renameSync(tmp, to);
+  }
+}
+
 /** Prepares `home` (already created, 0700) as a profile of `claudeHome`. */
 export function setupProfileHome(home: string, claudeHome: string): SetupResult {
   const warnings: string[] = [];
@@ -142,11 +169,7 @@ export function setupProfileHome(home: string, claudeHome: string): SetupResult 
   for (const name of SHARED_DIRS) shareDir(home, claudeHome, name, warnings);
   mkdirSync(join(home, "sessions"), { recursive: true, mode: 0o700 });
   ensureHistoryLink(home, claudeHome, (w) => warnings.push(w));
-  for (const name of COPIED_FILES) {
-    const from = join(claudeHome, name);
-    const to = join(home, name);
-    if (existsSync(from) && !existsSync(to)) copyFileSync(from, to);
-  }
+  syncMachineSettings(home, claudeHome);
   const memory = join(home, "CLAUDE.md");
   if (existsSync(join(claudeHome, "CLAUDE.md")) && !existsSync(memory)) {
     writeFileSync(memory, `@${sharedMemoryRef(claudeHome)}\n`, { mode: 0o600 });

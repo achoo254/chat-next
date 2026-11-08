@@ -6,10 +6,20 @@
 import { execFile } from "node:child_process";
 import { z } from "zod";
 
+/**
+ * Variables that sign claude in by themselves, ahead of its config folder: a
+ * profile must run with its own sign-in only, or `auth status` and its
+ * sessions would show (and use) another account.
+ */
+const ACCOUNT_VARS = /^(ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|CLAUDE_CODE_OAUTH_[A-Z_]*|CLAUDE_CODE_API_KEY[A-Z_]*)$/;
+
 /** The env of a claude process for a profile; the default profile keeps the service's own. */
 export function claudeEnv(configDir: string | undefined, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, ...extra };
-  if (configDir) env.CLAUDE_CONFIG_DIR = configDir;
+  if (configDir) {
+    for (const key of Object.keys(env)) if (ACCOUNT_VARS.test(key)) Reflect.deleteProperty(env, key);
+    env.CLAUDE_CONFIG_DIR = configDir;
+  }
   return env;
 }
 

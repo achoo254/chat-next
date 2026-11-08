@@ -117,8 +117,10 @@ export type CoreOptions = {
   idleMs?: number;
   /** Called when a thread starts waiting for the user. */
   onNeedsInput?: (thread: ThreadSummary) => void;
-  /** The AI account profile a new session opens with; the default one when unset. */
+  /** The AI account profile a new session opens with; the default one when unset. Throws when it cannot tell. */
   profile?: () => { id: string; accountDir?: string };
+  /** The account folder of the selected profile, only looked up (for checking its sign-in). */
+  selectedAccountDir?: () => string | undefined;
   /** A session reported plan usage for its profile ("" for the default one). */
   onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
   now?: () => number;
@@ -533,7 +535,12 @@ export class AgentCore {
 
   /** The sign-in to check before a new session: that of the selected profile. */
   private detectOptions(): { accountDir?: string } {
-    const dir = this.opts.profile?.().accountDir;
+    let dir: string | undefined;
+    try {
+      dir = this.opts.selectedAccountDir?.();
+    } catch (err) {
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, (err as Error).message);
+    }
     return dir ? { accountDir: dir } : {};
   }
 
@@ -556,11 +563,15 @@ export class AgentCore {
     const seg = t.meta.segments.at(-1);
     const askUser = ((req: ApprovalRequest | QuestionRequest, signal: AbortSignal) => this.ask(t, req, signal)) as AskUser;
     // A new session takes the profile selected now; an open one keeps its own.
+    // When the selection cannot be read, the turn fails: never another account quietly.
     let profile: { id: string; accountDir?: string };
     try {
       profile = this.opts.profile?.() ?? { id: "" };
-    } catch {
-      profile = { id: "" };
+    } catch (err) {
+      const message = `the Claude account picked on this machine cannot be used: ${(err as Error).message}`.slice(0, 500);
+      this.put(t, `error:${randomUUID()}`, { case: "error", value: { message } });
+      this.endTurn(t, TurnState.FAILED, 0);
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, message);
     }
     if (profile.id) t.meta.profileId = profile.id;
     else delete t.meta.profileId;

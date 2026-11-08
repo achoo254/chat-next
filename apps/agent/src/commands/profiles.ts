@@ -73,11 +73,17 @@ async function select(name: string): Promise<number> {
   return 0;
 }
 
-async function remove(name: string): Promise<number> {
+async function remove(name: string, options: { force?: boolean }): Promise<number> {
   const id = await resolveProfile(name);
   if (id === "") throw new Error("the default profile cannot be removed");
-  await callControl(configDir(), "POST", "/claude/profiles/remove", { id });
-  console.log("Signed out and removed. The shared Claude folder (projects, history, settings) is untouched.");
+  const force = options.force === true;
+  if (force) {
+    console.warn(
+      "Forcing: if claude cannot sign this account out, its stored sign-in may stay on this machine (on macOS a Keychain item named “Claude Code-credentials-…”); remove it there, or sign out at claude.ai.",
+    );
+  }
+  await callControl(configDir(), "POST", "/claude/profiles/remove", { id, force });
+  console.log("Removed. The shared Claude folder (projects, history, settings) is untouched.");
   return 0;
 }
 
@@ -96,5 +102,6 @@ export function registerProfilesCommand(program: Command, exits: <A extends unkn
   profiles
     .command("remove <profile>")
     .description("sign a profile out and delete its folder (an id or an e-mail)")
+    .option("--force", "delete it even when claude cannot sign it out")
     .action(exits(remove));
 }

@@ -209,7 +209,7 @@ export class Connection {
       case "profileList":
         return sendList();
       case "profileSelect":
-        profiles.select(b.value.id, this.device);
+        await profiles.select(b.value.id, this.device);
         return sendList();
       case "profileSignInBegin": {
         const r = await profiles.beginRemote();
@@ -322,14 +322,21 @@ export class Connection {
         case "profileSignInCancel":
         case "profileRemove":
         case "usageRefresh":
-          return await this.profileFrame(id, b);
+          // These may wait on claude for seconds: they answer later, by id, and the
+          // frames after them (pings, threads) go on meanwhile.
+          void this.profileFrame(id, b).catch((err: unknown) => this.sendError(id, err));
+          return;
         default:
           return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "unsupported request" } });
       }
     } catch (err) {
-      const code = err instanceof AgentError ? err.code : isFsError(err) || err instanceof ProfileError ? ErrorCode.INVALID : ErrorCode.INTERNAL;
-      this.send(id, { case: "error", value: { code, message: (err as Error).message.slice(0, 300) } });
+      this.sendError(id, err);
     }
+  }
+
+  private sendError(id: string, err: unknown): void {
+    const code = err instanceof AgentError ? err.code : isFsError(err) || err instanceof ProfileError ? ErrorCode.INVALID : ErrorCode.INTERNAL;
+    this.send(id, { case: "error", value: { code, message: (err as Error).message.slice(0, 300) } });
   }
 }
 

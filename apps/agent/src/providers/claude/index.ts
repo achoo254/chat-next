@@ -319,22 +319,40 @@ async function pushInfo(q: Query, events: Channel<ProviderEvent>) {
 /**
  * Plan usage of an account without sending a message: a session with no
  * prompt starts, reports usage and closes. null when unknown (signed out,
- * or the experimental API is missing on this claude).
+ * the experimental API missing on this claude, or no answer within
+ * `timeoutMs`); the claude it started is stopped in every case.
  */
-export async function probeUsage(bin: string, accountDir: string | undefined, queryFn: QueryFn = (p) => sdkQuery(p)): Promise<NonNullable<RateLimits> | null> {
+export async function probeUsage(
+  bin: string,
+  accountDir: string | undefined,
+  queryFn: QueryFn = (p) => sdkQuery(p),
+  timeoutMs = 15_000,
+): Promise<NonNullable<RateLimits> | null> {
   const inbox = new Channel<SDKUserMessage>();
-  const options: Options = { pathToClaudeCodeExecutable: bin, cwd: homedir(), settingSources: [], strictMcpConfig: true, mcpServers: {} };
+  const abort = new AbortController();
+  const options: Options = { pathToClaudeCodeExecutable: bin, cwd: homedir(), settingSources: [], strictMcpConfig: true, mcpServers: {}, abortController: abort };
   if (accountDir) options.env = claudeEnv(accountDir);
-  const q = queryFn({ prompt: inbox, options });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  let q: Query | undefined;
   try {
-    await q.initializationResult();
-    return rateLimitsOf(await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })) ?? null;
+    q = queryFn({ prompt: inbox, options });
+    const started = q;
+    const read = (async () => {
+      await started.initializationResult();
+      return rateLimitsOf(await started.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })) ?? null;
+    })().catch(() => null);
+    return await Promise.race([read, timeout]);
   } catch {
     return null;
   } finally {
+    clearTimeout(timer);
     inbox.close();
+    abort.abort();
     try {
-      q.close();
+      q?.close();
     } catch {
       // already gone
     }

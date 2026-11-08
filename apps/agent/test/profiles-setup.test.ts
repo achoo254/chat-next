@@ -3,7 +3,7 @@
 // projects and MCP servers, earlier data is kept aside, unsafe paths are
 // refused, deleting a profile never reaches through a link, and a cut
 // prompt-history link is noticed and made again without losing a line.
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ensureHistoryLink, historyLinked } from "../src/profiles/history-link.ts";
@@ -135,6 +135,6 @@ describe("shared prompt history", () => {
     expect(historyLinked(home, claudeHome)).toBe(true);
     expect(readFileSync(join(claudeHome, "history.jsonl"), "utf8")).toBe('{"display":"first"}\n{"display":"from the profile"}\n');
     expect(ensureHistoryLink(home, claudeHome)).toBe("linked");
-    rmSync(join(home, "..", "history-link.json"));
+    expect(existsSync(join(home, "..", "history-link.json"))).toBe(false);
   });
 });

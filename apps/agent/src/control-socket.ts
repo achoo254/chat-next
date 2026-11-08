@@ -85,6 +85,7 @@ const trustInput = z.object({ dir: z.string().min(1).max(4096), trusted: z.enum(
 const closeInput = z.object({ id: z.string().min(1).max(64) });
 const mcpSession = z.object({ server: z.string().min(1).max(512) });
 const profileInput = z.object({ id: z.string().max(64) });
+const profileRemove = z.object({ id: z.string().max(64), force: z.boolean().optional() });
 const mcpCall = z.object({
   session: z.string().min(1).max(64),
   group: z.string().min(1).max(64),
@@ -153,9 +154,9 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
   "GET /audit": (t) => machineOf(t).audit.list(50),
   /** Claude profiles: accounts and usage, never a credential. */
   "GET /claude/profiles": (t) => machineOf(t).profiles.list(),
-  "POST /claude/profiles/select": (t, input) => {
+  "POST /claude/profiles/select": async (t, input) => {
     const { profiles } = machineOf(t);
-    profiles.select(profileInput.parse(input).id, "local");
+    await profiles.select(profileInput.parse(input).id, "local");
     return profiles.list();
   },
   /** `tunelo claude profiles add`: a folder for claude's own sign-in in that terminal. */
@@ -165,9 +166,11 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     await machineOf(t).profiles.cancel(profileInput.parse(input).id);
     return { cancelled: true };
   },
+  /** Only here (this OS user, on the machine) may a removal be forced past a failed sign-out. */
   "POST /claude/profiles/remove": async (t, input) => {
     const { profiles } = machineOf(t);
-    await profiles.remove(profileInput.parse(input).id, "local");
+    const { id, force } = profileRemove.parse(input);
+    await profiles.remove(id, "local", { force: force === true });
     return profiles.list();
   },
   "POST /claude/profiles/usage": async (t, input) => {

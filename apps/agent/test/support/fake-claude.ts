@@ -5,8 +5,10 @@
 // claude keeps its own sign-in); `auth status` reports that account as JSON
 // (exit 1 when signed out); `auth logout` removes both files.
 // FAKE_CLAUDE_EMAIL / FAKE_CLAUDE_ORG pick the account a sign-in gets;
-// FAKE_CLAUDE_SILENT=1 makes login print no link.
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+// FAKE_CLAUDE_SILENT=1 makes login print no link; FAKE_CLAUDE_STATUS_DELAY_MS
+// slows `auth status`; FAKE_CLAUDE_LOGOUT_FAIL=1 makes logout fail;
+// FAKE_CLAUDE_PID_DIR gets one file per login process, named by its pid.
+import { chmodSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -21,11 +23,21 @@ const dir = process.env.CLAUDE_CONFIG_DIR;
 const acct = path.join(dir, "fake-auth.json");
 const cred = path.join(dir, ".credentials.json");
 const [a, b] = process.argv.slice(2);
+if (process.env.FAKE_CLAUDE_PID_DIR && b === "login") fs.writeFileSync(path.join(process.env.FAKE_CLAUDE_PID_DIR, String(process.pid)), "");
+const delay = Number(process.env.FAKE_CLAUDE_STATUS_DELAY_MS || 0);
+if (a === "auth" && b === "status" && delay > 0) {
+  const until = Date.now() + delay;
+  while (Date.now() < until) {}
+}
 if (a === "auth" && b === "status") {
   let s = { loggedIn: false };
   try { s = { loggedIn: true, authMethod: "claude.ai", ...JSON.parse(fs.readFileSync(acct, "utf8")) }; } catch {}
   process.stdout.write(JSON.stringify(s));
   process.exit(s.loggedIn ? 0 : 1);
+}
+if (a === "auth" && b === "logout" && process.env.FAKE_CLAUDE_LOGOUT_FAIL === "1") {
+  process.stderr.write("could not reach the Keychain\\n");
+  process.exit(1);
 }
 if (a === "auth" && b === "logout") {
   fs.rmSync(acct, { force: true });
@@ -66,6 +78,20 @@ export function fakeClaude(): string {
   writeFileSync(bin, SCRIPT);
   chmodSync(bin, 0o755);
   return bin;
+}
+
+/** Pids of the fake login processes still running, from FAKE_CLAUDE_PID_DIR. */
+export function livePids(pidDir: string): number[] {
+  return readdirSync(pidDir)
+    .map(Number)
+    .filter((pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    });
 }
 
 /** Signs the machine's own Claude folder in as `email` (the default profile). */
