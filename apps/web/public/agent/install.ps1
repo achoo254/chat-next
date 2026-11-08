@@ -22,8 +22,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$AgentVersion = '0.2.3'
-$Sha256WindowsX64 = 'd9d5ae39c87e97daea029f52e9906c02bfcba4ec92bfffada2f02e518ff0dd7b'
+$AgentVersion = '0.2.4'
+$Sha256WindowsX64 = '8c8f05a1af992771d1c3948f3d61405a5188c4c3adc27118b6d80a0ee3ab1db7'
 $MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
 $Asset = 'hda-windows-x64.exe'
