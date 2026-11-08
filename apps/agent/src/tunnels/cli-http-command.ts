@@ -1,10 +1,9 @@
 import { type TunnelMapping, parseTunnelArgs } from "@tunelo/client";
-import type { Command } from "commander";
+import { type Command, Option } from "commander";
 import { AGENT_VERSION } from "../version.ts";
 import { credentialNotices, setupTunnel } from "./cli-tunnel-setup.js";
 import type { Display } from "./display.js";
 import { createInspectorIntegration } from "./inspector-integration.js";
-import { startPortalServer, stopPortalServer } from "./portal-server.js";
 import { type RunTunnel, startRunRecord } from "./run-registry.js";
 import type { TunnelEvent } from "./tunnel-host.ts";
 import { openTerminalTunnel } from "./tunnel-route.ts";
@@ -16,8 +15,6 @@ interface HttpOptions {
 	server?: string;
 	inspectPort?: string;
 	inspect?: boolean;
-	portalPort?: string;
-	portal?: boolean;
 	quiet?: boolean;
 	verbose?: boolean;
 }
@@ -39,12 +36,9 @@ export function registerHttpCommand(program: Command, display: Display): void {
 			"4040",
 		)
 		.option("--no-inspect", "Disable request inspector")
-		.option(
-			"--portal-port <port>",
-			"Portal server port; next free port is used if taken (default: 4041)",
-			"4041",
-		)
-		.option("--no-portal", "Disable the portal server")
+		// The local portal is gone; its flags stay accepted so scripts of 1.x keep working.
+		.addOption(new Option("--portal-port <port>").hideHelp())
+		.addOption(new Option("--no-portal").hideHelp())
 		.option("-q, --quiet", "Suppress request logging")
 		.option("-v, --verbose", "Show extra details (body size)")
 		.action((portArgs: string[], options: HttpOptions) =>
@@ -96,8 +90,6 @@ async function runHttp(
 	const run = startRunRecord("http", serverUrl);
 	const runTunnels: RunTunnel[] = [];
 
-	const portalPort = Number(options.portalPort) || 4041;
-	const portalEnabled = options.portal !== false;
 	let started = false;
 
 	const onConnected = (url: string, subdomain: string): void => {
@@ -123,15 +115,6 @@ async function runHttp(
 				})
 				.catch((err: Error) => {
 					display.showError(`Inspector failed to start: ${err.message}`);
-				});
-		}
-		if (portalEnabled) {
-			startPortalServer(portalPort)
-				.then((boundPort) => {
-					display.showPortal(boundPort, portalPort);
-				})
-				.catch((err: Error) => {
-					display.showError(`Portal server failed to start: ${err.message}`);
 				});
 		}
 	};
@@ -213,7 +196,6 @@ async function runHttp(
 
 	process.on("SIGINT", () => {
 		tunnel.close();
-		if (portalEnabled) void stopPortalServer();
 		display.showStats();
 		process.exit(0);
 	});

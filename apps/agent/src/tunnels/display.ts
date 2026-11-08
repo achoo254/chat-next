@@ -76,14 +76,6 @@ export class Display {
 		);
 	}
 
-	showPortal(port: number, requestedPort?: number): void {
-		console.log(
-			chalk.green("  Portal:    ") +
-				chalk.cyan(`http://localhost:${port}`) +
-				portFallbackNote(port, requestedPort),
-		);
-	}
-
 	showTunnelRegistered(
 		subdomain: string,
 		url: string,

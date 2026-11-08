@@ -1,16 +1,14 @@
 // The inspector holds the headers and bodies of everyone who called the
-// tunnel and can replay requests into the local app; the portal is local
-// too. Other web pages (CORS, DNS rebinding) must not reach either.
+// tunnel and can replay requests into the local app. Other web pages
+// (CORS, DNS rebinding) must not reach it.
 import http from "node:http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { fetchInspectorRequests } from "../../src/tunnels/inspector-client.js";
 import { startInspectorServer } from "../../src/tunnels/inspector-server.js";
-import { startPortalServer, stopPortalServer } from "../../src/tunnels/portal-server.js";
 import { RequestStore } from "../../src/tunnels/request-store.js";
 
 let inspector: http.Server;
 let port = 0;
-let portalPort = 0;
 const replayed: string[] = [];
 
 beforeAll(async () => {
@@ -38,12 +36,10 @@ beforeAll(async () => {
 	});
 	inspector = handle.server;
 	port = handle.port;
-	portalPort = await startPortalServer(47390);
 });
 
 afterAll(async () => {
 	await new Promise<void>((r) => inspector.close(() => r()));
-	await stopPortalServer();
 });
 
 function send(
@@ -112,13 +108,5 @@ describe("request inspector", () => {
 	test("`tunelo watch` and the MCP tools still read it", async () => {
 		const summaries = await fetchInspectorRequests(port);
 		expect(summaries.map((s) => s.id)).toEqual(["r1"]);
-	});
-});
-
-describe("local portal", () => {
-	test("refuses other sites and rebinding hosts, serves its own origin", async () => {
-		expect((await send(portalPort, "/", { host: `evil.example:${portalPort}` })).status).toBe(403);
-		expect((await send(portalPort, "/", { host: `localhost:${portalPort}`, origin: "https://evil.example" })).status).toBe(403);
-		expect((await send(portalPort, "/", { host: `localhost:${portalPort}` })).status).not.toBe(403);
 	});
 });

@@ -1,5 +1,5 @@
 /**
- * The local servers of `tunelo http` (inspector, portal) answer only this
+ * The local server of `tunelo http` (the request inspector) answers only this
  * machine's own pages. A request must name a loopback host (so a DNS
  * rebinding page, whose Host is its own name, is refused), and a browser
  * request must come from that same origin (so another site cannot read the
