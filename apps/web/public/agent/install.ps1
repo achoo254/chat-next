@@ -22,8 +22,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$AgentVersion = '0.1.1'
-$Sha256WindowsX64 = '2f1f3dc501e0002c100a9c51656a83acd72e013500e1bbb24a78cf0efe589b33'
+$AgentVersion = '0.1.2'
+$Sha256WindowsX64 = '4fac923ee0848957d164ac3bbd98ec792852c57ed6c0623e0487a3fe44677e4a'
 $MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
 $Asset = 'chat-agent-windows-x64.exe'
@@ -94,6 +94,13 @@ function Install-ChatAgent {
 		$exe = Join-Path $dir 'chat-agent.exe'
 		New-Item -ItemType Directory -Force -Path $dir | Out-Null
 		Move-Item -Force -Path $file -Destination $exe
+		# Put chat-agent on the user's PATH (no admin); new terminals see it.
+		$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+		if (-not (($userPath -split ';') -contains $dir)) {
+			$newPath = if ($userPath) { "$userPath;$dir" } else { $dir }
+			[Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+		}
+		if (-not (($env:Path -split ';') -contains $dir)) { $env:Path = "$env:Path;$dir" }
 	} finally {
 		Remove-Item -Recurse -Force -Path $tmp -ErrorAction SilentlyContinue
 	}

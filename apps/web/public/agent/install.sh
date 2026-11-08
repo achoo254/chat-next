@@ -15,9 +15,9 @@
 # is installed. A script whose pins were not filled in refuses to run.
 set -eu
 
-AGENT_VERSION="0.1.1"
-SHA256_DARWIN_ARM64="5e1a539ba2ce2b2a24d7e09aebd94632fe30004c081c5d93f7eb0488f208a2bf"
-SHA256_DARWIN_X64="d9763c419a5340def9c79a00e9a14a09a4aee9bea9c805273f6e3c2d439a65f4"
+AGENT_VERSION="0.1.2"
+SHA256_DARWIN_ARM64="aeb2faf91d8dd39679e7b6136dd5e2c95c440c6b964b7ec42f3c30807d0f3e3d"
+SHA256_DARWIN_X64="a79c7505019ac86633c83c19fc9da911d73e22a97c0f35065c94b6673bbdbfc9"
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
@@ -108,9 +108,17 @@ main() {
 	# printf is a shell builtin: the secret reaches chat-agent on stdin only.
 	printf '%s\n' "$secret" | "$bin" install "$code" --trust "$device_key"
 
+	# Put chat-agent on PATH for new terminals (zsh is the macOS default shell).
 	case ":$PATH:" in
 	*":$bin_dir:"*) ;;
-	*) say "Đã cài vào $bin (thư mục này chưa có trong PATH)." "Installed to $bin (that folder is not on your PATH)." "已安装到 $bin（该目录不在 PATH 中）。" ;;
+	*)
+		line='export PATH="$HOME/.local/bin:$PATH"'
+		for rc in "$HOME/.zprofile" "$HOME/.bash_profile"; do
+			case "$rc" in *bash_profile) [ -f "$rc" ] || continue ;; esac
+			grep -Fqs "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
+		done
+		say "Đã thêm $bin_dir vào PATH; mở terminal mới để gõ chat-agent." "Added $bin_dir to your PATH; open a new terminal to use chat-agent." "已将 $bin_dir 加入 PATH；打开新终端即可使用 chat-agent。"
+		;;
 	esac
 }
 
