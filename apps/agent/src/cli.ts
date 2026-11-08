@@ -11,6 +11,7 @@ import { Machine } from "./machine.ts";
 import { goOnline } from "./online.ts";
 import { installService, uninstallService } from "./service.ts";
 import { signIn } from "./tunnel.ts";
+import { update } from "./update.ts";
 import { AGENT_VERSION } from "./version.ts";
 
 const HELP = `chat-agent ${AGENT_VERSION}
@@ -21,6 +22,7 @@ Usage:
                                    sign in to the tunnel and start at login
   chat-agent login                 sign in to the tunnel again
   chat-agent uninstall             stop starting at login
+  chat-agent update                install the newest signed release and restart
   chat-agent run [--port N]        start the agent in the foreground
   chat-agent pair                  show a QR payload and 6-digit code to pair a device
   chat-agent status                show machine, AI and session status
@@ -77,6 +79,17 @@ async function main(argv: string[]): Promise<number> {
     case "login":
       await login(dir);
       return 0;
+    case "update": {
+      const v = await update((l) => console.log(l));
+      if (!v) {
+        console.log(`chat-agent ${AGENT_VERSION} is the newest.`);
+        return 0;
+      }
+      // The service supervisor (launchd / logon task loop) starts the new file.
+      await callControl(dir, "POST", "/restart").catch(() => undefined);
+      console.log(`Updated to ${v}.`);
+      return 0;
+    }
     case "uninstall":
       await uninstallService(dir);
       console.log("chat-agent no longer starts at login. Remove the machine on the web to forget it there.");

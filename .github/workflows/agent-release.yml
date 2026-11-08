@@ -1,0 +1,92 @@
+# Releases chat-agent (apps/agent) on a tag agent-v<semver>: tests, single-file
+# builds for macOS (arm64, x64, ad-hoc signed) and Windows x64, SHA256SUMS,
+# minisign signatures, then a GitHub Release. Afterwards pin the install
+# scripts locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS,
+# commit and push (the web deploy serves them).
+name: agent-release
+
+on:
+  push:
+    tags: ["agent-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Tag matches the agent version
+        run: |
+          want="${GITHUB_REF_NAME#agent-v}"
+          have=$(sed -n 's/^export const AGENT_VERSION = "\(.*\)";$/\1/p' apps/agent/src/version.ts)
+          test "$want" = "$have" || { echo "tag $want != AGENT_VERSION $have"; exit 1; }
+      - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/chat-agent test
+      - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/chat-agent typecheck
+
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - { os: macos-14, target: bun-darwin-arm64, asset: chat-agent-darwin-arm64 }
+          - { os: macos-14, target: bun-darwin-x64, asset: chat-agent-darwin-x64 }
+          - { os: ubuntu-latest, target: bun-windows-x64, asset: chat-agent-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4"
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile dist/${{ matrix.asset }}
+      - name: Ad-hoc sign (macOS refuses unsigned arm64 binaries)
+        if: runner.os == 'macOS'
+        run: codesign --force -s - dist/${{ matrix.asset }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and signatures
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          sudo apt-get install -y minisign >/dev/null
+          cd dist
+          umask 077
+          printf '%s\n' "$MINISIGN_SECRET_KEY" > ../minisign.key
+          for f in chat-agent-*; do minisign -S -s ../minisign.key -m "$f" -t "chat-agent ${GITHUB_REF_NAME#agent-v} $f" < /dev/null; done
+          rm -f ../minisign.key
+          sha256sum chat-agent-darwin-arm64 chat-agent-darwin-x64 chat-agent-windows-x64.exe > SHA256SUMS
+          cat SHA256SUMS
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "chat-agent ${GITHUB_REF_NAME#agent-v}" --notes "Background agent of My machines. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false

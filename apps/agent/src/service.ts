@@ -14,7 +14,8 @@ const TASK = "chat-agent";
 function command(): string[] {
   const exe = process.execPath;
   const script = process.argv[1];
-  const compiled = !script || script.startsWith("/$bunfs") || script.startsWith("B:\\~BUN");
+  // Inside a `bun build --compile` file the script lives in Bun's virtual FS.
+  const compiled = !script || /^\/\$bunfs\/|[\\/]~BUN[\\/]/.test(script);
   return compiled ? [exe, "run"] : [exe, script, "run"];
 }
 

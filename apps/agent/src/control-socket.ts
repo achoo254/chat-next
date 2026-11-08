@@ -68,6 +68,10 @@ async function handle(m: Machine, route: string, input: Record<string, string>):
       m.audit.write({ device: "local", action: "revoke", path: "", detail: key });
       return { revoked: found };
     }
+    case "POST /restart":
+      // The supervisor starts the agent again (launchd KeepAlive, task loop).
+      setTimeout(() => process.exit(0), 200);
+      return { restarting: true };
     case "GET /audit":
       return m.audit.list(50);
     default:
