@@ -22,6 +22,7 @@ import {
 } from "@achoo254/chat-remote-protocol";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
+import { type ClaudeProfiles, type ProfileList, ProfileError } from "../profiles/service.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { listDir } from "../safety/dirs.ts";
 import { wireItem } from "./wire.ts";
@@ -43,7 +44,33 @@ export type LinkContext = {
   onPing: () => void;
   /** A device was paired (refresh caches, close the install window). */
   onPaired: (via: "install" | "qr" | "code") => void;
+  /** The Claude profiles of the machine; absent where the machine has none (tests). */
+  profiles?: ClaudeProfiles;
 };
+
+const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
+
+/** The profile list as devices get it: accounts and usage, never a credential. */
+function profileListBody(list: ProfileList) {
+  return {
+    selectedId: list.selectedId,
+    profiles: list.profiles.map((p) => {
+      const u = p.lastUsage;
+      const fiveHour = window(u?.fiveHour);
+      const sevenDay = window(u?.sevenDay);
+      return {
+        id: p.id,
+        email: p.email,
+        organization: p.organization,
+        plan: p.plan,
+        signedIn: p.signedIn,
+        createdAt: BigInt(p.createdAt),
+        usageUpdatedAt: BigInt(u?.updatedAt ?? 0),
+        ...(u ? { lastUsage: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
+      };
+    }),
+  };
+}
 
 type Pake = Extract<Awaited<ReturnType<typeof pakeReply>>, { ok: true }>;
 
@@ -173,6 +200,39 @@ export class Connection {
     this.send(id, { case: "threadItems", value: { threadId, items: items.map(wireItem), cursor } });
   }
 
+  /** Claude profiles: the sign-in code is handed on and dropped, never kept or logged. */
+  private async profileFrame(id: string, b: ProfileFrame): Promise<void> {
+    const profiles = this.ctx.profiles;
+    if (!profiles) return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "this machine has no Claude profiles" } });
+    const sendList = async () => this.send(id, { case: "profileListResult", value: profileListBody(await profiles.list()) });
+    switch (b.case) {
+      case "profileList":
+        return sendList();
+      case "profileSelect":
+        profiles.select(b.value.id, this.device);
+        return sendList();
+      case "profileSignInBegin": {
+        const r = await profiles.beginRemote();
+        if (!r.ok) return this.send(id, { case: "profileSignInResult", value: { ok: false, error: r.error } });
+        return this.send(id, { case: "profileSignInPrompt", value: { attemptId: r.attemptId, url: r.url, expiresAt: BigInt(r.expiresAt) } });
+      }
+      case "profileSignInCode": {
+        const r = await profiles.submitCode(b.value.attemptId, b.value.code);
+        const value = r.ok ? { ok: true, id: r.id, email: r.email, organization: r.organization } : { ok: false, error: r.error };
+        return this.send(id, { case: "profileSignInResult", value });
+      }
+      case "profileSignInCancel":
+        await profiles.cancel(b.value.attemptId);
+        return this.send(id, { case: "ack", value: {} });
+      case "profileRemove":
+        await profiles.remove(b.value.id, this.device);
+        return sendList();
+      case "usageRefresh":
+        await profiles.refreshUsage(b.value.id);
+        return sendList();
+    }
+  }
+
   private async frame(f: Frame | undefined): Promise<void> {
     if (!f) return;
     const { core } = this.ctx;
@@ -255,15 +315,28 @@ export class Connection {
           const entries = this.ctx.audit.list(b.value.limit || 100).map((e) => ({ ...e, at: BigInt(e.at) }));
           return this.send(id, { case: "auditListResult", value: { entries } });
         }
+        case "profileList":
+        case "profileSelect":
+        case "profileSignInBegin":
+        case "profileSignInCode":
+        case "profileSignInCancel":
+        case "profileRemove":
+        case "usageRefresh":
+          return await this.profileFrame(id, b);
         default:
           return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "unsupported request" } });
       }
     } catch (err) {
-      const code = err instanceof AgentError ? err.code : isFsError(err) ? ErrorCode.INVALID : ErrorCode.INTERNAL;
+      const code = err instanceof AgentError ? err.code : isFsError(err) || err instanceof ProfileError ? ErrorCode.INVALID : ErrorCode.INTERNAL;
       this.send(id, { case: "error", value: { code, message: (err as Error).message.slice(0, 300) } });
     }
   }
 }
+
+type ProfileFrame = Extract<
+  Frame["body"],
+  { case: "profileList" | "profileSelect" | "profileSignInBegin" | "profileSignInCode" | "profileSignInCancel" | "profileRemove" | "usageRefresh" }
+>;
 
 function isFsError(err: unknown): boolean {
   return typeof (err as { code?: unknown })?.code === "string";

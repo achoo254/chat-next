@@ -67,9 +67,14 @@ type ThreadMeta = {
   permissionMode?: string;
   /** The mode the machine's own settings started the last session in. */
   machineMode?: string;
+  /** The AI account profile the last session opened with; unset for the default one. */
+  profileId?: string;
   /** Last statusline data, kept so a parked or restarted thread still shows it. */
   info?: Omit<ProviderInfo, "rateLimits" | "account">;
 };
+
+/** Last statusline data of one AI account profile. */
+type AccountState = { rateLimits?: ProviderInfo["rateLimits"]; account?: ProviderInfo["account"] };
 
 type Pending = {
   itemId: string;
@@ -112,6 +117,10 @@ export type CoreOptions = {
   idleMs?: number;
   /** Called when a thread starts waiting for the user. */
   onNeedsInput?: (thread: ThreadSummary) => void;
+  /** The AI account profile a new session opens with; the default one when unset. */
+  profile?: () => { id: string; accountDir?: string };
+  /** A session reported plan usage for its profile ("" for the default one). */
+  onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
   now?: () => number;
 };
 
@@ -135,10 +144,8 @@ export class AgentCore {
   private listeners = new Set<(threadId: string, items: Item[]) => void>();
   private statusListeners = new Set<(summary: ThreadSummary) => void>();
   private infoListeners = new Set<(threadId: string) => void>();
-  /** Plan usage of the AI account; the same for every thread. */
-  private rateLimits: ProviderInfo["rateLimits"];
-  /** The AI account signed in on this machine; the same for every thread. */
-  private account: ProviderInfo["account"];
+  /** Plan usage and account of each AI account profile ("" for the default one), shared by its threads. */
+  private accounts = new Map<string, AccountState>();
   /** The latest command list any session reported, for threads that have none yet. */
   private lastCommands: NonNullable<ProviderInfo["commands"]> = [];
   private idleTimer: ReturnType<typeof setInterval> | undefined;
@@ -163,22 +170,31 @@ export class AgentCore {
 
   /** Bumps the epoch and restores machine-wide statusline data. */
   private bumpEpoch(): bigint {
-    let state: { epoch?: number; rateLimits?: ProviderInfo["rateLimits"]; account?: ProviderInfo["account"]; commands?: ProviderInfo["commands"] } = {};
+    let state: {
+      epoch?: number;
+      /** Before profiles: the one account of the machine. */
+      rateLimits?: ProviderInfo["rateLimits"];
+      account?: ProviderInfo["account"];
+      accounts?: Record<string, AccountState>;
+      commands?: ProviderInfo["commands"];
+    } = {};
     try {
       state = JSON.parse(readFileSync(this.stateFile, "utf8")) as typeof state;
     } catch {
       // first start
     }
     const epoch = (state.epoch ?? 0) + 1;
-    this.rateLimits = state.rateLimits;
-    this.account = state.account;
+    this.accounts = new Map(Object.entries(state.accounts ?? {}));
+    if (!state.accounts && (state.rateLimits || state.account)) {
+      this.accounts.set("", { ...(state.rateLimits ? { rateLimits: state.rateLimits } : {}), ...(state.account ? { account: state.account } : {}) });
+    }
     this.lastCommands = state.commands ?? [];
-    writeFileSync(this.stateFile, JSON.stringify({ ...state, epoch }), { mode: 0o600 });
+    writeFileSync(this.stateFile, JSON.stringify({ epoch, accounts: Object.fromEntries(this.accounts), commands: this.lastCommands }), { mode: 0o600 });
     return BigInt(epoch);
   }
 
   private saveState(): void {
-    const state = { epoch: Number(this.epoch), rateLimits: this.rateLimits, account: this.account, commands: this.lastCommands };
+    const state = { epoch: Number(this.epoch), accounts: Object.fromEntries(this.accounts), commands: this.lastCommands };
     writeFileSync(this.stateFile, JSON.stringify(state), { mode: 0o600 });
   }
 
@@ -239,7 +255,8 @@ export class AgentCore {
   /** The statusline data of a thread, for devices. */
   info(threadId: string): ThreadInfo {
     const t = this.thread(threadId);
-    const r = this.rateLimits;
+    const profileId = t.meta.profileId ?? "";
+    const { rateLimits: r, account } = this.accounts.get(profileId) ?? {};
     const win = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
     const fiveHour = win(r?.fiveHour);
     const sevenDay = win(r?.sevenDay);
@@ -252,7 +269,8 @@ export class AgentCore {
       commands: t.info.commands?.length ? t.info.commands : this.lastCommands,
       effort: t.info.effort ?? "",
       permissionModes: this.permissionModes(t),
-      ...(this.account ? { account: this.account } : {}),
+      profileId,
+      ...(account ? { account } : {}),
       ...(r ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
     });
   }
@@ -266,6 +284,25 @@ export class AgentCore {
 
   list(): ThreadSummary[] {
     return [...this.threads.values()].map((t) => this.summary(t)).sort((a, b) => Number(b.updatedAt - a.updatedAt));
+  }
+
+  /** True when an open session runs with this AI account profile. */
+  profileInUse(profileId: string): boolean {
+    return [...this.threads.values()].some((t) => (t.session || t.starting) && (t.meta.profileId ?? "") === profileId);
+  }
+
+  /** Usage read outside a session (a refresh): shown on the profile's threads. */
+  setProfileUsage(profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>): void {
+    this.accounts.set(profileId, { ...this.accounts.get(profileId), rateLimits });
+    this.saveState();
+    this.notifyProfile(profileId);
+  }
+
+  private notifyProfile(profileId: string): void {
+    for (const t of this.threads.values()) {
+      if ((t.meta.profileId ?? "") !== profileId) continue;
+      for (const fn of this.infoListeners) fn(t.meta.id);
+    }
   }
 
   openSessions(): number {
@@ -320,7 +357,7 @@ export class AgentCore {
     if (!req.text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message");
     const sensitive = this.opts.isSensitive(dir);
     if (sensitive && !req.consent.sensitive) throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder");
-    const detected = await provider.detect();
+    const detected = await provider.detect(this.detectOptions());
     if (!detected.installed) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`);
     if (detected.loginState === "needs-login") throw new AgentError(ErrorCode.NEEDS_LOGIN, `${provider.name} needs sign-in`);
 
@@ -466,7 +503,7 @@ export class AgentCore {
     const t = this.thread(threadId);
     const target = this.provider(providerId);
     if (target.id === t.meta.provider) throw new AgentError(ErrorCode.INVALID, "already on this AI");
-    const detected = await target.detect();
+    const detected = await target.detect(this.detectOptions());
     if (!detected.installed) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${target.name} is not installed`);
     if (detected.loginState === "needs-login") throw new AgentError(ErrorCode.NEEDS_LOGIN, `${target.name} needs sign-in`);
     if (t.running) await this.interrupt(threadId);
@@ -494,6 +531,12 @@ export class AgentCore {
 
   // --- sessions ------------------------------------------------------------
 
+  /** The sign-in to check before a new session: that of the selected profile. */
+  private detectOptions(): { accountDir?: string } {
+    const dir = this.opts.profile?.().accountDir;
+    return dir ? { accountDir: dir } : {};
+  }
+
   private async ensureSession(t: Thread): Promise<void> {
     if (t.session) return this.flushOutbox(t);
     if (t.starting) return;
@@ -512,6 +555,15 @@ export class AgentCore {
     const provider = this.provider(t.meta.provider);
     const seg = t.meta.segments.at(-1);
     const askUser = ((req: ApprovalRequest | QuestionRequest, signal: AbortSignal) => this.ask(t, req, signal)) as AskUser;
+    // A new session takes the profile selected now; an open one keeps its own.
+    let profile: { id: string; accountDir?: string };
+    try {
+      profile = this.opts.profile?.() ?? { id: "" };
+    } catch {
+      profile = { id: "" };
+    }
+    if (profile.id) t.meta.profileId = profile.id;
+    else delete t.meta.profileId;
     const policy = {
       dir: t.meta.dir,
       mcpServers: this.opts.mcpServers ?? {},
@@ -521,6 +573,7 @@ export class AgentCore {
       ...(t.meta.effort ? { effort: t.meta.effort } : {}),
       ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
       ...(t.meta.machineMode === "bypassPermissions" ? { allowBypass: true } : {}),
+      ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
     };
     t.modeUnseen = true;
     t.starting = provider.start({ policy, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
@@ -666,14 +719,16 @@ export class AgentCore {
           if (!t.meta.permissionMode) t.meta.machineMode = rest.permissionMode;
         }
         Object.assign(t.info, rest);
-        if (account) this.account = account;
         this.saveMeta(t);
         if (rest.commands?.length) this.lastCommands = rest.commands;
         if (rateLimits || rest.commands?.length) this.saveState();
         if (rateLimits || account) {
-          if (rateLimits) this.rateLimits = rateLimits;
+          const profileId = t.meta.profileId ?? "";
+          const prev = this.accounts.get(profileId);
+          this.accounts.set(profileId, { ...prev, ...(rateLimits ? { rateLimits } : {}), ...(account ? { account } : {}) });
           this.saveState();
-          for (const id of this.threads.keys()) for (const fn of this.infoListeners) fn(id);
+          if (rateLimits) this.opts.onProfileUsage?.(profileId, rateLimits);
+          this.notifyProfile(profileId);
         } else {
           for (const fn of this.infoListeners) fn(t.meta.id);
         }

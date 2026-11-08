@@ -19,6 +19,7 @@ import {
   type SDKUserMessage,
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
+import { claudeEnv, readAccount } from "../../profiles/account.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import { Channel } from "../../util/channel.ts";
 import type {
@@ -26,8 +27,10 @@ import type {
   AgentProvider,
   AskUser,
   Detected,
+  DetectOptions,
   ProviderCapabilities,
   ProviderEvent,
+  ProviderInfo,
   ProviderSession,
   Question,
   SessionPolicy,
@@ -80,7 +83,7 @@ export async function findClaude(): Promise<string | null> {
   return existsSync(local) ? local : null;
 }
 
-type QueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => Query;
+export type QueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => Query;
 
 export function createClaudeProvider(deps: { query?: QueryFn; findBinary?: () => Promise<string | null> } = {}): AgentProvider {
   const queryFn: QueryFn = deps.query ?? ((p) => sdkQuery(p));
@@ -91,7 +94,7 @@ export function createClaudeProvider(deps: { query?: QueryFn; findBinary?: () =>
     name: "Claude Code",
     capabilities: CLAUDE_CAPABILITIES,
 
-    async detect(): Promise<Detected> {
+    async detect(opts: DetectOptions = {}): Promise<Detected> {
       const bin = await findBinary();
       if (!bin) return { installed: false, loginState: "unknown" };
       let version: string | undefined;
@@ -100,14 +103,9 @@ export function createClaudeProvider(deps: { query?: QueryFn; findBinary?: () =>
       } catch {
         return { installed: false, loginState: "unknown" };
       }
-      let loginState: Detected["loginState"] = "unknown";
-      try {
-        // The CLI's own status report; the agent never opens credential files.
-        const { stdout } = await run(bin, ["auth", "status"], { timeout: 15_000 });
-        loginState = (JSON.parse(stdout) as { loggedIn?: boolean }).loggedIn ? "ok" : "needs-login";
-      } catch {
-        // older CLI without `auth status`, or not logged in (non-zero exit)
-      }
+      // The CLI's own status report (exit 1 when signed out); the agent never opens credential files.
+      const account = await readAccount(bin, opts.accountDir);
+      const loginState: Detected["loginState"] = account === null ? "unknown" : account.loggedIn ? "ok" : "needs-login";
       const minor = version?.split(".").slice(0, 2).join(".");
       const out: Detected = { installed: true, loginState, untestedVersion: !minor || !TESTED.includes(minor) };
       if (version) out.version = version;
@@ -186,6 +184,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     includePartialMessages: true,
     canUseTool,
   };
+  // A profile picked on the machine: its own sign-in, the shared projects.
+  if (policy.accountDir) options.env = claudeEnv(policy.accountDir);
   if (policy.model) options.model = policy.model;
   if (policy.effort) options.effort = policy.effort as EffortLevel;
   if (policy.permissionMode) options.permissionMode = policy.permissionMode as PermissionMode;
@@ -287,23 +287,57 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
 
 const ts = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
 
+type Usage = Awaited<ReturnType<Query["usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET"]>>;
+type RateLimits = ProviderInfo["rateLimits"];
+
+/** The 5-hour and weekly windows of a usage report; undefined when it has neither. */
+function rateLimitsOf(u: Usage): RateLimits {
+  const r = u.rate_limits;
+  const win = (w: { utilization: number | null; resets_at: string | null } | null | undefined) =>
+    w && w.utilization !== null ? { utilization: Math.round(w.utilization), resetsAt: ts(w.resets_at) } : undefined;
+  const fiveHour = win(r?.five_hour);
+  const sevenDay = win(r?.seven_day);
+  return fiveHour || sevenDay ? { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } : undefined;
+}
+
 /** Plan usage, lines changed and the command list, after each turn. */
 async function pushInfo(q: Query, events: Channel<ProviderEvent>) {
   try {
     const u = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true });
-    const r = u.rate_limits;
-    const win = (w: { utilization: number | null; resets_at: string | null } | null | undefined) =>
-      w && w.utilization !== null ? { utilization: Math.round(w.utilization), resetsAt: ts(w.resets_at) } : undefined;
-    const fiveHour = win(r?.five_hour);
-    const sevenDay = win(r?.seven_day);
+    const rateLimits = rateLimitsOf(u);
     events.push({
       type: "info",
       linesAdded: u.session.total_lines_added,
       linesRemoved: u.session.total_lines_removed,
-      ...(fiveHour || sevenDay ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
+      ...(rateLimits ? { rateLimits } : {}),
     });
   } catch {
     // experimental API missing or changed on this CLI version
+  }
+}
+
+/**
+ * Plan usage of an account without sending a message: a session with no
+ * prompt starts, reports usage and closes. null when unknown (signed out,
+ * or the experimental API is missing on this claude).
+ */
+export async function probeUsage(bin: string, accountDir: string | undefined, queryFn: QueryFn = (p) => sdkQuery(p)): Promise<NonNullable<RateLimits> | null> {
+  const inbox = new Channel<SDKUserMessage>();
+  const options: Options = { pathToClaudeCodeExecutable: bin, cwd: homedir(), settingSources: [], strictMcpConfig: true, mcpServers: {} };
+  if (accountDir) options.env = claudeEnv(accountDir);
+  const q = queryFn({ prompt: inbox, options });
+  try {
+    await q.initializationResult();
+    return rateLimitsOf(await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })) ?? null;
+  } catch {
+    return null;
+  } finally {
+    inbox.close();
+    try {
+      q.close();
+    } catch {
+      // already gone
+    }
   }
 }
 

@@ -12,6 +12,7 @@ import { Command } from "commander";
 import { ConfigStore, configDir, legacyConfigDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { registerInstallCommand } from "./commands/install.ts";
+import { registerProfilesCommand } from "./commands/profiles.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
@@ -305,6 +306,7 @@ function buildProgram(): Command {
     .description("stop loading that folder's .claude settings")
     .action(exits((dir: string | undefined) => setTrust(dir, false)));
   program.command("trusted").description("list trusted folders").action(exits(() => printJson("/trust")));
+  registerProfilesCommand(program, exits);
   program.command("migrate-from-hda", { hidden: true }).description("move an install of hda (the earlier name) to tunelo").action(exits(migrateCommand));
   program
     .command("version")

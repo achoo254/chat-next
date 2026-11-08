@@ -18,6 +18,8 @@ import { ConfigStore } from "./config.ts";
 import { AgentCore } from "./core/agent-core.ts";
 import { machineKey } from "./keystore.ts";
 import { Connection } from "./link/connection.ts";
+import { ClaudeProfiles } from "./profiles/service.ts";
+import { findClaude, probeUsage } from "./providers/claude/index.ts";
 import { builtinProviders } from "./providers/registry.ts";
 import type { AgentProvider, Detected } from "./providers/types.ts";
 import { AuditLog } from "./safety/audit-log.ts";
@@ -37,6 +39,8 @@ const PUSH_DELAY_MS = 20_000;
 export type MachineOptions = {
   config?: ConfigStore;
   providers?: AgentProvider[];
+  /** The Claude profiles; built from the config folder when not given. */
+  profiles?: ClaudeProfiles;
   /** Sends a content-free "needs you" push through the chat server. */
   notify?: (thread: ThreadSummary, pending: number) => void;
   log?: (line: string) => void;
@@ -47,6 +51,7 @@ export class Machine {
   readonly core: AgentCore;
   readonly audit: AuditLog;
   readonly isSensitive: (p: string) => boolean;
+  readonly profiles: ClaudeProfiles;
   private key!: KeyPair;
   private pairing: PairingWindow | undefined;
   private server: WebSocketServer | undefined;
@@ -64,6 +69,17 @@ export class Machine {
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
     this.providers = opts.providers ?? builtinProviders();
     const c = this.config.get();
+    this.profiles =
+      opts.profiles ??
+      new ClaudeProfiles({
+        configDir: dir,
+        audit: this.audit,
+        findBinary: findClaude,
+        probeUsage: (bin, accountDir) => probeUsage(bin, accountDir),
+        inUse: (id) => this.core.profileInUse(id),
+        onUsage: (id, usage) => this.core.setProfileUsage(id, usage),
+        log: this.log,
+      });
     this.core = new AgentCore({
       dataDir: join(dir, "data"),
       providers: this.providers,
@@ -74,12 +90,15 @@ export class Machine {
       maxSessions: c.maxSessions,
       idleMs: c.idleMinutes * 60_000,
       onNeedsInput: (t) => this.maybePush(t),
+      profile: () => this.profiles.sessionProfile(),
+      onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
     });
   }
 
   async start(port = this.config.get().port ?? 0): Promise<number> {
     this.key = await machineKey(this.config.dir);
     this.core.start();
+    void this.profiles.cleanLeftovers();
     const wss = new WebSocketServer({ host: "127.0.0.1", port, maxPayload: 8 * 1024 * 1024 });
     this.server = wss;
     wss.on("connection", (ws) => this.accept(ws));
@@ -96,6 +115,7 @@ export class Machine {
   async stop(): Promise<void> {
     for (const c of this.connections) c.close(1001, "shutting down");
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
+    await this.profiles.stop();
     await this.core.stop();
   }
 
@@ -148,6 +168,7 @@ export class Machine {
         pairing: () => this.pairing,
         machineInfo: () => this.machineInfo(),
         isSensitive: this.isSensitive,
+        profiles: this.profiles,
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
           if (via === "install") this.config.update((c) => delete c.install);
@@ -177,11 +198,19 @@ export class Machine {
     ws.on("error", () => conn.close());
   }
 
+  /** What a provider reports, for the selected Claude profile; cached a minute. */
   private async detect(p: AgentProvider): Promise<Detected> {
-    const hit = this.detected.get(p.id);
+    let accountDir: string | undefined;
+    try {
+      accountDir = this.profiles.sessionProfile().accountDir;
+    } catch {
+      accountDir = undefined;
+    }
+    const key = `${p.id}\n${accountDir ?? ""}`;
+    const hit = this.detected.get(key);
     if (hit && Date.now() - hit.at < 60_000) return hit.value;
-    const value = await p.detect();
-    this.detected.set(p.id, { at: Date.now(), value });
+    const value = await p.detect(accountDir ? { accountDir } : {});
+    this.detected.set(key, { at: Date.now(), value });
     return value;
   }
 

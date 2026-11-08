@@ -84,6 +84,7 @@ const deviceRevoke = z.object({ key: z.string().min(6, "give at least 6 characte
 const trustInput = z.object({ dir: z.string().min(1).max(4096), trusted: z.enum(["true", "false"]).optional() });
 const closeInput = z.object({ id: z.string().min(1).max(64) });
 const mcpSession = z.object({ server: z.string().min(1).max(512) });
+const profileInput = z.object({ id: z.string().max(64) });
 const mcpCall = z.object({
   session: z.string().min(1).max(64),
   group: z.string().min(1).max(64),
@@ -150,6 +151,30 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     return { dir, trusted: trusted !== "false" };
   },
   "GET /audit": (t) => machineOf(t).audit.list(50),
+  /** Claude profiles: accounts and usage, never a credential. */
+  "GET /claude/profiles": (t) => machineOf(t).profiles.list(),
+  "POST /claude/profiles/select": (t, input) => {
+    const { profiles } = machineOf(t);
+    profiles.select(profileInput.parse(input).id, "local");
+    return profiles.list();
+  },
+  /** `tunelo claude profiles add`: a folder for claude's own sign-in in that terminal. */
+  "POST /claude/profiles/prepare": (t) => machineOf(t).profiles.prepareTerminal(),
+  "POST /claude/profiles/finish": (t, input) => machineOf(t).profiles.finishTerminal(profileInput.parse(input).id),
+  "POST /claude/profiles/cancel": async (t, input) => {
+    await machineOf(t).profiles.cancel(profileInput.parse(input).id);
+    return { cancelled: true };
+  },
+  "POST /claude/profiles/remove": async (t, input) => {
+    const { profiles } = machineOf(t);
+    await profiles.remove(profileInput.parse(input).id, "local");
+    return profiles.list();
+  },
+  "POST /claude/profiles/usage": async (t, input) => {
+    const { profiles } = machineOf(t);
+    await profiles.refreshUsage(profileInput.parse(input).id);
+    return profiles.list();
+  },
   "GET /tunnels": (t) => ({ tunnels: t.tunnels.list(), mcp: t.mcp.tunnels() }),
   "POST /tunnels/close": (t, input) => {
     const { id } = closeInput.parse(input);

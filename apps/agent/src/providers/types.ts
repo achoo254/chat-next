@@ -113,6 +113,13 @@ export type SessionPolicy = {
   permissionMode?: string;
   /** The machine's own settings start sessions in bypassPermissions, so a device may return to it. */
   allowBypass?: boolean;
+  /** The AI's config folder of the account picked on the machine (Claude: CLAUDE_CONFIG_DIR); unset for its default. */
+  accountDir?: string;
+};
+
+export type DetectOptions = {
+  /** Check the sign-in of this account folder instead of the AI's default one. */
+  accountDir?: string;
 };
 
 export interface ProviderSession {
@@ -129,6 +136,6 @@ export interface AgentProvider {
   readonly id: string;
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
-  detect(): Promise<Detected>;
+  detect(opts?: DetectOptions): Promise<Detected>;
   start(opts: { policy: SessionPolicy; resumeId?: string; askUser: AskUser }): Promise<ProviderSession>;
 }
