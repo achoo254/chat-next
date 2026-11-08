@@ -132,6 +132,7 @@ message Frame {
     ProfileSignInCancel profile_sign_in_cancel = 30;
     ProfileRemove profile_remove = 31;
     UsageRefresh usage_refresh = 32;
+    MachineSettingsSet machine_settings_set = 33;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -320,6 +321,16 @@ message ProfileRemove {
 message UsageRefresh {
   // Empty: the default profile.
   string id = 1;
+}
+
+// --- machine settings -------------------------------------------------------
+
+// Changes a setting of the machine; fields left unset stay as they are.
+// Answered with MachineInfo. B writes each change to the consent log.
+message MachineSettingsSet {
+  // Lets Localman send requests to localhost on the machine (see
+  // MachineSettings.local_forward).
+  optional bool local_forward = 1;
 }
 
 // --- answers and events (B → A) --------------------------------------------
@@ -767,6 +778,17 @@ message MachineInfo {
   uint32 memory_mb = 12;
   // Devices paired with this machine, for revoking one from another device.
   repeated PairedDevice devices = 13;
+  // Unset on machines that have no settings to change from a device.
+  MachineSettings settings = 14;
+}
+
+message MachineSettings {
+  // Localman (the owner's own account only) may send requests to
+  // localhost:<port> on the machine through its tunnel. On by default.
+  bool local_forward = 1;
+  // The machine's tunnel server carries those requests now; when false,
+  // nothing is forwarded whatever local_forward says.
+  bool local_forward_available = 2;
 }
 
 message PairedDevice {
