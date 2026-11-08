@@ -125,6 +125,13 @@ message Frame {
     ThreadClose thread_close = 23;
     ThreadSetPermissionMode thread_set_permission_mode = 24;
     ThreadSetEffort thread_set_effort = 25;
+    ProfileList profile_list = 26;
+    ProfileSelect profile_select = 27;
+    ProfileSignInBegin profile_sign_in_begin = 28;
+    ProfileSignInCode profile_sign_in_code = 29;
+    ProfileSignInCancel profile_sign_in_cancel = 30;
+    ProfileRemove profile_remove = 31;
+    UsageRefresh usage_refresh = 32;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -140,6 +147,9 @@ message Frame {
     Ack ack = 50;
     Error error = 51;
     ThreadInfo thread_info = 52;
+    ProfileListResult profile_list_result = 53;
+    ProfileSignInPrompt profile_sign_in_prompt = 54;
+    ProfileSignInResult profile_sign_in_result = 55;
   }
 }
 
@@ -265,6 +275,53 @@ message AuditList {
   uint32 limit = 1;
 }
 
+// --- AI accounts (Claude profiles) ------------------------------------------
+//
+// A machine may hold several Claude accounts. Each one is a profile: a folder
+// of its own that the machine's `claude` signs in to. The default profile is
+// the machine's own Claude folder. New sessions use the selected profile; open
+// sessions keep theirs until they open again. B never reads, keeps or sends a
+// Claude credential: the account shown is what `claude auth status` reports.
+
+// Answered with ProfileListResult.
+message ProfileList {}
+
+// Answered with ProfileListResult. B writes it to the consent log.
+message ProfileSelect {
+  // Empty: the default profile.
+  string id = 1;
+}
+
+// Starts signing in a new account. B answers with ProfileSignInPrompt, or
+// with ProfileSignInResult carrying an error. A new attempt cancels the one
+// before it; an attempt left alone ends after 10 minutes.
+message ProfileSignInBegin {}
+
+// The code the sign-in page showed. B hands it to `claude` and forgets it; it
+// is never stored or logged. Answered with ProfileSignInResult.
+message ProfileSignInCode {
+  string attempt_id = 1;
+  string code = 2;
+}
+
+// Answered with Ack.
+message ProfileSignInCancel {
+  string attempt_id = 1;
+}
+
+// Signs the profile out and deletes its folder. Answered with
+// ProfileListResult. The default profile cannot be removed.
+message ProfileRemove {
+  string id = 1;
+}
+
+// Reads the plan usage of a profile without sending a message. Answered with
+// ProfileListResult.
+message UsageRefresh {
+  // Empty: the default profile.
+  string id = 1;
+}
+
 // --- answers and events (B → A) --------------------------------------------
 
 message Ack {}
@@ -290,6 +347,8 @@ message ThreadInfo {
   AccountInfo account = 9;
   // Permission modes a device may pick for this session.
   repeated string permission_modes = 10;
+  // The Claude profile the session runs with; empty for the default one.
+  string profile_id = 11;
 }
 
 // Who the AI on the machine is signed in as, as the AI's CLI reports it.
@@ -320,6 +379,49 @@ message RateWindow {
   uint32 utilization = 1;
   // Unix milliseconds when the window resets; 0 when unknown.
   int64 resets_at = 2;
+}
+
+message ClaudeProfile {
+  // Empty: the default profile (the machine's own Claude folder).
+  string id = 1;
+  // As `claude auth status` reports it; empty when not signed in.
+  string email = 2;
+  string organization = 3;
+  // The plan, e.g. "max" or "pro".
+  string plan = 4;
+  bool signed_in = 5;
+  // Last known plan usage; unset when unknown.
+  RateLimits last_usage = 6;
+  // Unix milliseconds of last_usage; 0 when unknown.
+  int64 usage_updated_at = 7;
+  // Unix milliseconds; 0 for the default profile.
+  int64 created_at = 8;
+}
+
+message ProfileListResult {
+  repeated ClaudeProfile profiles = 1;
+  // Empty: the default profile.
+  string selected_id = 2;
+}
+
+message ProfileSignInPrompt {
+  string attempt_id = 1;
+  // The Claude sign-in page; it shows a code to paste back.
+  string url = 2;
+  // Unix milliseconds.
+  int64 expires_at = 3;
+}
+
+message ProfileSignInResult {
+  bool ok = 1;
+  string email = 2;
+  string organization = 3;
+  // The new profile on success.
+  string id = 4;
+  // On failure: code-rejected, duplicate, expired, cancelled, busy,
+  // sign-in-on-machine (this machine's claude cannot sign in from a device;
+  // run `tunelo claude profiles add` on the machine), or failed.
+  string error = 5;
 }
 
 message Pong {}
@@ -693,7 +795,8 @@ message AuditEntry {
   // Unix milliseconds.
   int64 at = 1;
   string device = 2;
-  // open_sensitive, project_settings, approve_sensitive, pair, revoke
+  // open_sensitive, project_settings, approve_sensitive, pair, revoke,
+  // permission_mode, profile_add, profile_select, profile_remove
   string action = 3;
   string path = 4;
   string detail = 5;
