@@ -65,6 +65,13 @@ const PATHS = {
 		</>
 	),
 	list: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
+	user: (
+		<>
+			<circle cx="12" cy="8" r="4" />
+			<path d="M4 20a8 8 0 0 1 16 0" />
+		</>
+	),
+	gauge: <path d="M4 18a8 8 0 1 1 16 0M12 18l4-6" />,
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
 } satisfies Record<string, ReactElement>;
 

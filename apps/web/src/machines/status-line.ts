@@ -35,3 +35,8 @@ const MODES: readonly PermissionMode[] = ["default", "acceptEdits", "plan", "byp
 export function permissionMode(value: string): PermissionMode | null {
 	return (MODES as readonly string[]).includes(value) ? (value as PermissionMode) : null;
 }
+
+/** "max" becomes "Max": the plan as the AI's CLI names it, capitalised; "" stays "". */
+export function planName(plan: string): string {
+	return plan === "" ? "" : plan.charAt(0).toUpperCase() + plan.slice(1);
+}

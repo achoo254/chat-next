@@ -24,11 +24,20 @@ import { ToolRunCard } from "../../src/machines/cards/tool-run.tsx";
 import { Composer } from "../../src/machines/composer.tsx";
 import { PairedDevices, revokePairedDevice } from "../../src/machines/paired-devices.tsx";
 import { filterCommands, flatCommands, slashQuery } from "../../src/machines/slash-commands.ts";
+import type { MachineLink } from "../../src/machines/link/machine-link.ts";
 import { StatusBar } from "../../src/machines/status-bar.tsx";
 import { permissionMode, resetIn, usageOf } from "../../src/machines/status-line.ts";
 import type { ToolRun } from "../../src/machines/transcript/tool-fold.ts";
 
 const wrap = (node: ReactNode) => render(<I18nProvider>{node}</I18nProvider>);
+
+/** A link that records requests and answers each one at once. */
+const fakeLink = () => {
+	const sent: unknown[] = [];
+	const link = { request: (body: unknown) => (sent.push(body), Promise.resolve({})) } as unknown as MachineLink;
+	return { link, sent };
+};
+const live = { link: fakeLink().link, threadId: "t", online: true };
 
 const call = (toolId: string, summary: string): ToolCallItem =>
 	({ toolId, kind: ToolKind.SHELL, name: "Bash", summary, input: "", sensitive: false }) as unknown as ToolCallItem;
@@ -97,7 +106,7 @@ describe("status bar", () => {
 					sevenDay: { utilization: 80, resetsAt: BigInt(NOW + 2 * 86_400_000 + 60_000) },
 				},
 			});
-			wrap(<StatusBar ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} model="" context={0.34} info={info} />);
+			wrap(<StatusBar ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} model="" context={0.34} info={info} {...live} />);
 			const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 			expect(within(bar).getByText("chat-next").closest("[title]")?.getAttribute("title")).toBe("Thư mục: D:\\CONG VIEC\\chat-next");
 			expect(within(bar).getByText("main")).toBeTruthy();
@@ -107,23 +116,47 @@ describe("status bar", () => {
 			expect(bar.textContent).toContain("tuần 80% · 2d");
 			expect(within(bar).getByText("+22")).toBeTruthy();
 			expect(within(bar).getByText("−27")).toBeTruthy();
-			const mode = within(bar).getByText("Bỏ qua quyền");
-			expect(mode.classList.contains("warn")).toBe(true);
-			expect(mode.getAttribute("title")).toContain("Claude Code");
+			expect(within(bar).getByText("Bỏ qua quyền").classList.contains("warn")).toBe(true);
 		} finally {
 			vi.useRealTimers();
 		}
 	});
 
 	it("leaves out what is not known yet", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" model="Opus" context={null} info={undefined} />);
+		wrap(<StatusBar ai="Claude Code" dir="" model="Opus" context={null} info={undefined} {...live} />);
 		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 		expect(bar.textContent).toBe("Opus");
 	});
 
 	it("shows an unknown permission mode as is, without the warning", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "dontAsk" })} />);
+		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "dontAsk" })} {...live} />);
 		expect(screen.getByText("dontAsk").classList.contains("warn")).toBe(false);
+	});
+
+	it("shows the signed-in account and the effort", () => {
+		const info = create(ThreadInfoSchema, { effort: "xhigh", account: { email: "me@example.com", organization: "Acme", plan: "max" } });
+		wrap(<StatusBar ai="Claude Code" dir="" model="Opus" context={null} info={info} {...live} />);
+		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
+		expect(within(bar).getByText("me@example.com · Max").closest("[title]")?.getAttribute("title")).toContain("Acme");
+		expect(within(bar).getByText("Rất cao")).toBeTruthy();
+	});
+
+	it("switches the permission mode among the modes the machine allows", async () => {
+		const user = userEvent.setup();
+		const { link, sent } = fakeLink();
+		const info = create(ThreadInfoSchema, { permissionMode: "default", permissionModes: ["default", "acceptEdits", "plan"] });
+		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={info} link={link} threadId="t1" online />);
+		await user.click(screen.getByRole("button", { name: /Hỏi quyền/ }));
+		const menu = screen.getByRole("menu", { name: "Chế độ quyền của phiên" });
+		expect(within(menu).queryByText("Bỏ qua quyền")).toBeNull();
+		await user.click(within(menu).getByRole("menuitemradio", { name: /Tự sửa file/ }));
+		expect(sent).toEqual([{ case: "threadSetPermissionMode", value: { threadId: "t1", mode: "acceptEdits" } }]);
+	});
+
+	it("keeps the mode read-only on a machine that offers no modes", () => {
+		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "plan" })} {...live} />);
+		expect(screen.queryByRole("button", { name: /Lập kế hoạch/ })).toBeNull();
+		expect(screen.getByText("Lập kế hoạch")).toBeTruthy();
 	});
 });
 

@@ -77,7 +77,9 @@
 .mx-ok { color: var(--c-success); font-weight: 500; }
 .mx-tag { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; border-radius: var(--radius-full); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-size: 0.6875rem; font-weight: 500; color: var(--c-text-muted); white-space: nowrap; }
 .mx-tag.danger { color: var(--c-error); border-color: color-mix(in srgb, var(--c-error) 40%, var(--c-border)); background: color-mix(in srgb, var(--c-error) 8%, var(--c-surface)); }
-.mx-chip { white-space: nowrap; }
+/* A quiet status label: a coloured dot and the word, not a filled button. */
+.chip.mx-chip { min-height: 24px; gap: 6px; padding: 0 10px; border: 1px solid var(--c-border-subtle); background: transparent; color: var(--c-text-muted); font-size: 0.75rem; white-space: nowrap; }
+.chip.mx-chip::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: var(--radius-full); background: currentColor; opacity: 0.8; }
 .mx-chip.waiting, .mx-chip.warn { color: var(--c-warning); border-color: color-mix(in srgb, var(--c-warning) 40%, var(--c-border)); }
 .mx-chip.running, .mx-chip.queued { color: var(--c-primary); }
 .mx-chip.offline, .mx-chip.error { color: var(--c-error); }
@@ -147,6 +149,8 @@
 .mx-menu button span { display: grid; }
 .mx-menu small { color: var(--c-text-muted); font-size: 0.75rem; }
 .mx-menu-gap { display: block; width: 18px; }
+/* A menu opened from the status bar, above the composer. */
+.mx-menu.up { top: auto; bottom: calc(100% + var(--space-1)); right: auto; left: 0; }
 .mx-messages { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
 .mx-messages > * { flex: none; max-width: 860px; width: 100%; min-width: 0; margin-inline: auto; }
 .mx-msg.mine { display: flex; justify-content: flex-end; }
@@ -238,6 +242,9 @@
 .mx-stop { color: var(--c-error); }
 .mx-compose-hint { max-width: 860px; margin: var(--space-1) auto 0; font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-mode { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); color: var(--c-text-muted); white-space: nowrap; }
+button.mx-mode { font: inherit; cursor: pointer; }
+button.mx-mode:hover:not(:disabled) { background: var(--c-hover); }
+button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-mode.warn { color: var(--c-warning); border-color: color-mix(in srgb, var(--c-warning) 45%, var(--c-border)); background: color-mix(in srgb, var(--c-warning) 10%, var(--c-surface)); }
 .mx-status { padding: var(--space-2) var(--space-5) 0; background: var(--c-surface); border-top: 1px solid var(--c-border-subtle); }
 .mx-status + .mx-composer { border-top: 0; padding-top: var(--space-1); }
@@ -303,7 +310,7 @@
 }
 /* Touch: the small text controls of tool rows still get a full-size target. */
 @media (pointer: coarse) {
-	.mx-link, .mx-run-out summary { min-height: 44px; }
+	.mx-link, .mx-run-out summary, button.mx-mode { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.mx-agent.streaming::after, .mx-typing i { animation: none; }

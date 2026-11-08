@@ -26,6 +26,7 @@ import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
 import { aiName, errorText, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
+import { usePopover } from "./use-popover.ts";
 
 export function SessionChat({ machine, threadId }: { machine: string; threadId: string }) {
 	const t = useMachinesCopy();
@@ -86,7 +87,9 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 				<span className="mx-e2ee" title={t.link.e2ee} role="img" aria-label={t.link.e2ee}>
 					<Icon name="lock" small />
 				</span>
-				{thread !== null && <ModelMenu link={link} info={state.info} threadId={threadId} provider={thread.provider} model={thread.model} disabled={!online} />}
+				{thread !== null && (
+					<ModelMenu link={link} info={state.info} threadId={threadId} provider={thread.provider} model={thread.model} effort={threadInfo?.effort ?? ""} disabled={!online} />
+				)}
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			{missing ? (
@@ -112,6 +115,9 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 					model={model === "" ? "" : modelName(state.info, provider, model)}
 					context={contextShare(items)}
 					info={threadInfo}
+					link={link}
+					threadId={threadId}
+					online={online}
 				/>
 			)}
 			<Composer
@@ -263,35 +269,23 @@ interface ModelMenuProps {
 	threadId: string;
 	provider: string;
 	model: string;
+	/** The session's effort; "" for the machine's default. */
+	effort: string;
 	disabled: boolean;
 }
 
-/** "Claude Code · Opus ▾": the AI's models, and switching to another AI when the machine has two or more. */
-function ModelMenu({ link, info, threadId, provider, model, disabled }: ModelMenuProps) {
+/** "Claude Code · Opus ▾": the AI's models and effort levels, and switching to another AI when the machine has two or more. */
+function ModelMenu({ link, info, threadId, provider, model, effort, disabled }: ModelMenuProps) {
 	const t = useMachinesCopy();
-	const [open, setOpen] = useState(false);
+	const { open, setOpen, ref: menu } = usePopover();
 	const [switchTo, setSwitchTo] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
-	const menu = useRef<HTMLDivElement>(null);
 	const ai = aiName(info, provider);
-	const models = providerOf(info, provider)?.capabilities?.models ?? [];
+	const caps = providerOf(info, provider)?.capabilities;
+	const models = caps?.models ?? [];
+	const efforts = caps?.effortLevels ?? [];
 	const others = (info?.providers ?? []).filter((p) => p.id !== provider);
-	useEffect(() => {
-		if (!open) return;
-		const onDown = (event: PointerEvent) => {
-			if (menu.current !== null && !menu.current.contains(event.target as Node)) setOpen(false);
-		};
-		const onKey = (event: globalThis.KeyboardEvent) => {
-			if (event.key === "Escape") setOpen(false);
-		};
-		document.addEventListener("pointerdown", onDown);
-		document.addEventListener("keydown", onKey);
-		return () => {
-			document.removeEventListener("pointerdown", onDown);
-			document.removeEventListener("keydown", onKey);
-		};
-	}, [open]);
 	const run = (body: Parameters<MachineLink["request"]>[0], done: () => void) => {
 		setBusy(true);
 		setError("");
@@ -330,6 +324,25 @@ function ModelMenu({ link, info, threadId, provider, model, disabled }: ModelMen
 							<span>{m.name || m.id}</span>
 						</button>
 					))}
+					{efforts.length > 0 && (
+						<>
+							<hr />
+							<h5>{t.chat.effort}</h5>
+							{["", ...efforts].map((level) => (
+								<button
+									key={level || "default"}
+									type="button"
+									role="menuitemradio"
+									aria-checked={level === effort}
+									disabled={busy}
+									onClick={() => run({ case: "threadSetEffort", value: { threadId, effort: level } }, () => setOpen(false))}
+								>
+									{level === effort ? <Icon name="check" small /> : <span className="mx-menu-gap" />}
+									<span>{level === "" ? t.chat.effortDefault : (t.chat.efforts[level] ?? level)}</span>
+								</button>
+							))}
+						</>
+					)}
 					{others.length > 0 && (
 						<>
 							<hr />
