@@ -87,12 +87,21 @@ async function handle(m: Machine, route: string, input: Record<string, string>):
 }
 
 /** Client side, used by the CLI. */
+/** The pid the running agent wrote next to its control port. */
+export function controlPid(configDir: string): number | undefined {
+  try {
+    return (JSON.parse(readFileSync(controlFile(configDir), "utf8")) as { pid?: number }).pid;
+  } catch {
+    return undefined;
+  }
+}
+
 export function callControl(configDir: string, method: string, path: string, input?: unknown): Promise<unknown> {
   let target: { port: number; token: string };
   try {
     target = JSON.parse(readFileSync(controlFile(configDir), "utf8")) as { port: number; token: string };
   } catch {
-    return Promise.reject(new Error("hda is not running (start it with `hda run`)"));
+    return Promise.reject(new Error("hda is not running (start it with `hda start`)"));
   }
   return new Promise((resolve, reject) => {
     const headers = { "content-type": "application/json", "x-chat-agent-token": target.token };
@@ -109,7 +118,7 @@ export function callControl(configDir: string, method: string, path: string, inp
         }
       });
     });
-    req.on("error", () => reject(new Error("hda is not running (start it with `hda run`)")));
+    req.on("error", () => reject(new Error("hda is not running (start it with `hda start`)")));
     req.end(input === undefined ? undefined : JSON.stringify(input));
   });
 }

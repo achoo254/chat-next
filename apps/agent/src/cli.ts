@@ -3,12 +3,12 @@
 // on this machine, end-to-end encrypted.
 import { execFile } from "node:child_process";
 import { ConfigStore, configDir } from "./config.ts";
-import { callControl, serveControl } from "./control-socket.ts";
+import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { machineKey } from "./keystore.ts";
 import { registerMachine } from "./machine-api.ts";
 import { Machine } from "./machine.ts";
 import { goOnline } from "./online.ts";
-import { installService, uninstallService } from "./service.ts";
+import { installService, startService, stopService, uninstallService } from "./service.ts";
 import { signIn } from "./tunnel.ts";
 import { update } from "./update.ts";
 import { AGENT_VERSION } from "./version.ts";
@@ -20,9 +20,11 @@ Usage:
                                    register this machine (pairing secret on stdin),
                                    sign in to the tunnel and start at login
   hda login                 sign in to the tunnel again
+  hda start                 run in the background (keeps running after the terminal closes)
+  hda stop                  stop the background agent until hda start or the next login
   hda uninstall             stop starting at login
   hda update                install the newest signed release and restart
-  hda run [--port N]        start the agent in the foreground
+  hda run [--port N]        run in this terminal only (closing it stops hda)
   hda pair                  show a QR payload and 6-digit code to pair a device
   hda status                show machine, AI and session status
   hda devices               list paired devices
@@ -32,6 +34,24 @@ Usage:
   hda untrust [dir]         stop loading that folder's .claude settings
   hda trusted               list trusted folders
 `;
+
+/** The pid of the agent answering on the control channel, or null when none does. */
+async function runningPid(dir: string): Promise<number | null> {
+  try {
+    await callControl(dir, "GET", "/status");
+  } catch {
+    return null;
+  }
+  return controlPid(dir) ?? 0;
+}
+
+async function waitRunning(dir: string, ms: number): Promise<number | null> {
+  for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 500))) {
+    const pid = await runningPid(dir);
+    if (pid !== null) return pid;
+  }
+  return null;
+}
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -43,6 +63,8 @@ async function main(argv: string[]): Promise<number> {
   const dir = configDir();
   switch (cmd) {
     case "run": {
+      const running = await runningPid(dir);
+      if (running !== null) throw new Error(`hda is already running (pid ${running}); \`hda stop\` stops it`);
       const machine = new Machine({ config: new ConfigStore(dir) });
       const portArg = flag(args, "--port");
       const port = await machine.start(portArg ? Number(portArg) : undefined);
@@ -92,6 +114,21 @@ async function main(argv: string[]): Promise<number> {
       console.log(`Updated to ${v}.`);
       return 0;
     }
+    case "start": {
+      const running = await runningPid(dir);
+      if (running !== null) {
+        console.log(`hda is already running in the background (pid ${running}).`);
+        return 0;
+      }
+      await startService(dir);
+      const pid = await waitRunning(dir, 30_000);
+      console.log(pid === null ? "hda is starting; check `hda status` in a moment." : `hda is running in the background (pid ${pid}). You can close this terminal.`);
+      return 0;
+    }
+    case "stop":
+      await stopService(dir);
+      console.log("hda stopped. `hda start` starts it again; it also starts at the next login.");
+      return 0;
     case "uninstall":
       await uninstallService(dir);
       console.log("hda no longer starts at login. Remove the machine on the web to forget it there.");

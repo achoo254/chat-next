@@ -42,7 +42,7 @@ export const zhCNMachines: MachinesCopy = {
 	link: {
 		e2ee: "端到端加密",
 		connecting: "正在连接电脑…",
-		offline: (machine, attempt) => `与 ${machine} 的连接已断开。正在重新连接（第 ${attempt} 次）… 电脑可能处于睡眠状态。`,
+		offline: (machine, attempt) => `与 ${machine} 的连接已断开。正在重新连接（第 ${attempt} 次）… 电脑可能处于睡眠状态，或 hda 已停止：请在电脑上运行 hda start。`,
 		unpaired: "此设备尚未与这台电脑配对。",
 		refused: "这台电脑不接受此设备。请重新配对。",
 		revoked: "此设备已在这台电脑上被撤销。",
@@ -218,7 +218,7 @@ export const zhCNMachines: MachinesCopy = {
 		answered: "已回答",
 	},
 	errors: {
-		offline: "电脑未连接。请在电脑在线时重试。",
+		offline: "电脑未连接。请在那台电脑上运行 hda start 后重试。",
 		stale: "此请求已更改，或已在其他设备上回答。",
 		needsLogin: (ai) => `电脑上的 ${ai} 尚未登录。请在那台电脑上打开终端登录一次。`,
 		unavailable: (ai) => `这台电脑上没有安装 ${ai}。`,
@@ -320,7 +320,7 @@ export const zhCNMachines: MachinesCopy = {
 		wrong: "码不正确。请检查 6 位数字。",
 		expired: "码已过期或已使用。请重新运行 hda pair。",
 		tooMany: "错误次数过多。请重新运行 hda pair。",
-		unreachable: "无法连接到电脑。电脑上是否正在运行 hda？",
+		unreachable: "无法连接到电脑。请在电脑上运行 hda start 后重试。",
 		cameraFailed: "无法打开摄像头。",
 		badQr: "这不是 hda 的配对码。",
 	},

@@ -44,7 +44,7 @@ export const viMachines = {
 	link: {
 		e2ee: "Mã hoá đầu cuối",
 		connecting: "Đang kết nối tới máy…",
-		offline: (machine: string, attempt: number) => `Mất kết nối tới ${machine}. Đang nối lại (lần ${attempt})… Máy có thể đang ngủ.`,
+		offline: (machine: string, attempt: number) => `Mất kết nối tới ${machine}. Đang nối lại (lần ${attempt})… Máy có thể đang ngủ, hoặc hda đã tắt: chạy hda start trên máy.`,
 		unpaired: "Thiết bị này chưa ghép với máy này.",
 		refused: "Máy không nhận thiết bị này. Hãy ghép lại.",
 		revoked: "Thiết bị này đã bị thu hồi trên máy này.",
@@ -222,7 +222,7 @@ export const viMachines = {
 		answered: "Đã trả lời",
 	},
 	errors: {
-		offline: "Máy chưa kết nối. Thử lại khi máy trực tuyến.",
+		offline: "Máy chưa kết nối. Trên máy đó chạy hda start rồi thử lại.",
 		stale: "Yêu cầu này đã đổi hoặc đã được trả lời trên thiết bị khác.",
 		needsLogin: (ai: string) => `${ai} trên máy chưa đăng nhập. Trên máy đó, mở Terminal và đăng nhập một lần.`,
 		unavailable: (ai: string) => `${ai} chưa có trên máy này.`,
@@ -326,7 +326,7 @@ export const viMachines = {
 		wrong: "Mã không đúng. Kiểm tra lại 6 số.",
 		expired: "Mã đã hết hạn hoặc đã dùng. Chạy lại hda pair.",
 		tooMany: "Sai quá 5 lần. Chạy lại hda pair.",
-		unreachable: "Không kết nối được tới máy. Máy có đang chạy hda không?",
+		unreachable: "Không kết nối được tới máy. Trên máy chạy hda start rồi thử lại.",
 		cameraFailed: "Không mở được camera.",
 		badQr: "Đây không phải mã ghép của hda.",
 	},

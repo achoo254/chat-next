@@ -42,7 +42,7 @@ export const enMachines: MachinesCopy = {
 	link: {
 		e2ee: "End-to-end encrypted",
 		connecting: "Connecting to the machine…",
-		offline: (machine, attempt) => `Lost the connection to ${machine}. Reconnecting (attempt ${attempt})… The machine may be asleep.`,
+		offline: (machine, attempt) => `Lost the connection to ${machine}. Reconnecting (attempt ${attempt})… The machine may be asleep, or hda is stopped: run hda start on it.`,
 		unpaired: "This device is not paired with this machine.",
 		refused: "The machine does not accept this device. Pair it again.",
 		revoked: "This device was revoked on this machine.",
@@ -219,7 +219,7 @@ export const enMachines: MachinesCopy = {
 		answered: "Answered",
 	},
 	errors: {
-		offline: "The machine is not connected. Try again when it is online.",
+		offline: "The machine is not connected. Run hda start on it, then try again.",
 		stale: "This request changed or was answered on another device.",
 		needsLogin: (ai) => `${ai} is not signed in on the machine. On that machine, open a terminal and sign in once.`,
 		unavailable: (ai) => `${ai} is not installed on this machine.`,
@@ -322,7 +322,7 @@ export const enMachines: MachinesCopy = {
 		wrong: "Wrong code. Check the 6 digits.",
 		expired: "The code expired or was used. Run hda pair again.",
 		tooMany: "Too many wrong tries. Run hda pair again.",
-		unreachable: "Could not reach the machine. Is hda running on it?",
+		unreachable: "Could not reach the machine. Run hda start on it, then try again.",
 		cameraFailed: "Could not open the camera.",
 		badQr: "This is not an hda pairing code.",
 	},
