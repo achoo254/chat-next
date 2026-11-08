@@ -58,8 +58,12 @@ export function SignInCodeDialog({ link, ai, onAdded, onClose }: SignInCodeDialo
 		let active = true;
 		link.request({ case: "profileSignInBegin", value: {} }).then(
 			(frame) => {
-				if (!active) return;
 				const b = frame.body;
+				if (!active) {
+					// Closed before the link came: end that sign-in on the machine too.
+					if (b.case === "profileSignInPrompt") link.request({ case: "profileSignInCancel", value: { attemptId: b.value.attemptId } }).catch(() => undefined);
+					return;
+				}
 				if (b.case === "profileSignInPrompt") {
 					const url = safeSignInUrl(b.value.url);
 					open.current = b.value.attemptId;

@@ -114,6 +114,24 @@ describe("adding a Claude account", () => {
 		expect(sent.at(-1)).toEqual(expect.objectContaining({ case: "profileSignInCancel", value: expect.objectContaining({ attemptId: "a1" }) }));
 	});
 
+	it("cancels the attempt when closed before the machine sent the link", async () => {
+		let answer: (body: Body) => void = () => undefined;
+		const sent: Sent[] = [];
+		const link = {
+			request: (body: Body) => {
+				const frame = create(FrameSchema, { body });
+				sent.push(frame.body);
+				if (frame.body.case !== "profileSignInBegin") return Promise.resolve(create(FrameSchema, { body: { case: "ack", value: {} } }));
+				return new Promise((resolve) => (answer = (b) => resolve(create(FrameSchema, { body: b }))));
+			},
+		} as unknown as MachineLink;
+		const view = wrap(<SignInCodeDialog link={link} ai="Claude Code" onAdded={() => undefined} onClose={() => undefined} />);
+		await screen.findByText("Máy đang mở trang đăng nhập…");
+		view.unmount();
+		answer(prompt);
+		await waitFor(() => expect(sent.at(-1)).toEqual(expect.objectContaining({ case: "profileSignInCancel", value: expect.objectContaining({ attemptId: "a1" }) })));
+	});
+
 	it("opens only Claude's own pages", () => {
 		expect(safeSignInUrl("https://claude.ai/oauth/authorize?code=true")).toBe("https://claude.ai/oauth/authorize?code=true");
 		expect(safeSignInUrl("https://claude.ai.evil.example/x")).toBeNull();
