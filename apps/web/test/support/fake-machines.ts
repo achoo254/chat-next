@@ -7,10 +7,9 @@ import { MachineSchema, MachinesService, type Machine } from "@achoo254/chat-pro
 
 export class FakeMachines {
 	machines: Machine[] = [];
-	private nextCode = 0;
 
 	add(fields: Partial<Omit<Machine, "$typeName">>): Machine {
-		const machine = create(MachineSchema, { id: BigInt(this.machines.length + 1), name: "Mac mini", os: "darwin", arch: "arm64", ...fields });
+		const machine = create(MachineSchema, { id: BigInt(this.machines.length + 1), name: "Mac mini", os: "darwin", arch: "arm64", claimed: true, ...fields });
 		this.machines.push(machine);
 		return machine;
 	}
@@ -22,7 +21,9 @@ export class FakeMachines {
 			return machine;
 		};
 		router.service(MachinesService, {
-			createInstallCode: () => ({ code: `code${String(++this.nextCode).padStart(18, "0")}`, expiresAt: BigInt(Math.floor(Date.now() / 1000) + 600) }),
+			createInstallCode: () => {
+				throw new ConnectError("install_codes_retired: update tunelo", Code.FailedPrecondition);
+			},
 			listMachines: () => ({ machines: this.machines }),
 			renameMachine: (req) => {
 				const machine = find(req.machineId);

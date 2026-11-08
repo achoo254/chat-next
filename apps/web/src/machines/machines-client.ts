@@ -1,6 +1,7 @@
 // The machine directory on the chat server (MachinesService, ADR 0013): the
-// user's machines with their tunnel address and last heartbeat, install
-// codes, renaming, removing a machine and revoking a paired device. Mapped
+// user's machines with their tunnel address and last heartbeat, renaming,
+// removing a machine and revoking a paired device. tunelo adds a machine by
+// itself with the account it signed in with; there are no install codes. Mapped
 // from the wire (ADR 0001: int64 arrive as bigint below 2^53, leave as number). The
 // server never vouches for a machine key: pairing does.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
@@ -24,11 +25,12 @@ export interface MachineEntry {
 	/** Unix seconds. */
 	readonly createdAt: number;
 	readonly lastSeenAt: number;
+	/** Tied to the account by tunelo login; false for a machine of an old install code until then. */
+	readonly claimed: boolean;
 }
 
 export interface MachinesDirectory {
 	list(): Promise<MachineEntry[]>;
-	createInstallCode(): Promise<{ readonly code: string; readonly expiresAt: number }>;
 	rename(id: number, name: string): Promise<MachineEntry>;
 	remove(id: number): Promise<void>;
 	revokeDevice(id: number, deviceKey: Uint8Array): Promise<void>;
@@ -46,6 +48,7 @@ export function toEntry(m: Machine): MachineEntry {
 		tunnelUrl: m.tunnelUrl,
 		createdAt: Number(m.createdAt),
 		lastSeenAt: Number(m.lastSeenAt),
+		claimed: m.claimed,
 	};
 }
 
@@ -65,11 +68,6 @@ export function createMachinesDirectory(transport: Transport, onUnauthenticated:
 	};
 	return {
 		list: () => call(async () => (await client.listMachines({})).machines.map(toEntry)),
-		createInstallCode: () =>
-			call(async () => {
-				const response = await client.createInstallCode({});
-				return { code: response.code, expiresAt: Number(response.expiresAt) };
-			}),
 		rename: (id, name) =>
 			call(async () => {
 				const response = await client.renameMachine({ machineId: BigInt(id), name });
@@ -87,7 +85,7 @@ export function createMachinesDirectory(transport: Transport, onUnauthenticated:
 	};
 }
 
-/** "too_many_install_codes" and other server reasons, from a Connect error. */
+/** Server reasons (rate limits, a machine that is gone), from a Connect error. */
 export function directoryErrorReason(err: unknown): string {
 	const e = ConnectError.from(err);
 	return e.code === Code.ResourceExhausted ? "rate" : e.code === Code.NotFound ? "not-found" : "other";

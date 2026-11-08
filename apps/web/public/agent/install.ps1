@@ -1,28 +1,35 @@
-# Installs tunelo, the background process of "My machines" (ADR 0013),
-# on Windows (Windows PowerShell 5.1 or PowerShell 7). The web app shows the
-# command:
+# Installs tunelo, the background process of "My machines" (ADR 0013) and
+# the Tunelo CLI, on Windows (Windows PowerShell 5.1 or PowerShell 7).
+# "Add this machine" in Chat shows:
 #
-#   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) <install code> <device key> [vi|en|zh-CN]
+#   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) <device key> [vi|en|zh-CN]
 #
-# A computer that still runs hda (the earlier name of tunelo) is moved to
-# tunelo first, keeping the machine, its paired devices and sessions. Without
-# an install code the script only does that move:
+# which installs tunelo, asks you to paste the pairing secret the page
+# shows, and runs `tunelo install`: you sign in with your account in the
+# browser and the machine joins My machines by itself (no install code).
+# The secret is read with Read-Host -AsSecureString: it is never in a command
+# line (argv, PSReadLine history). The device's public key is not secret. A
+# command of an older page, with an install code before the device key,
+# still works: the code is ignored.
+#
+# With only a language (or nothing), the script installs or updates the
+# binary and runs `tunelo login`; this is what `tunelo update` of the Tunelo
+# CLI 1.x runs:
 #
 #   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) [vi|en|zh-CN]
 #
-# then asks you to paste the pairing secret it shows, which this script
-# reads with Read-Host -AsSecureString: the secret is never in a command
-# line (argv, PSReadLine history). The install code (one-time, 10 minutes)
-# and the device's public key are not secret.
+# A computer that still runs hda (the earlier name of tunelo) is moved to
+# tunelo first either way, keeping the machine, its paired devices and
+# sessions.
 #
 # The release is pinned: version and SHA-256 are written into this script
 # when the web app is built for a tunelo release, and the minisign
 # signature is checked with the embedded public key when minisign is
 # installed. A script whose pins were not filled in refuses to run.
 param(
-	[string]$Code = '',
-	[string]$DeviceKey = '',
-	[string]$Locale = ''
+	[string]$First = '',
+	[string]$Second = '',
+	[string]$Third = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,10 +41,21 @@ $MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
 $Asset = 'tunelo-windows-x64.exe'
 
-# Only a language given (the command that moves hda): it arrives as the first argument.
-if (-not $DeviceKey -and $Code -match '^(vi|en|zh)') {
-	$Locale = $Code
-	$Code = ''
+# <device key> [language], an older page's <install code> <device key>
+# [language] (the code is ignored), or only [language].
+$KeyPattern = '^[A-Za-z0-9_-]{43}$'
+$DeviceKey = ''
+$Locale = ''
+$BadKey = $false
+if ($First -match $KeyPattern) {
+	$DeviceKey = $First
+	$Locale = $Second
+} elseif ($First -match '^[A-Za-z0-9_-]{22}$' -and $Second) {
+	$DeviceKey = $Second
+	$Locale = $Third
+	$BadKey = $DeviceKey -notmatch $KeyPattern
+} else {
+	$Locale = $First
 }
 if (-not $Locale) { $Locale = (Get-Culture).Name }
 $Lang = 'en'
@@ -59,12 +77,10 @@ function Install-Tunelo {
 	# hda keeps its config here; the marker means it has already moved to tunelo.
 	$hdaDir = if ($env:CHAT_AGENT_HOME) { $env:CHAT_AGENT_HOME } else { Join-Path $env:APPDATA 'chat-agent' }
 	$fromHda = (Test-Path (Join-Path $hdaDir 'config.json')) -and -not (Test-Path (Join-Path $hdaDir 'migrated-to-tunelo'))
-	if ($Code -or -not $fromHda) {
-		if ($Code -notmatch '^[A-Za-z0-9_-]{22}$' -or $DeviceKey -notmatch '^[A-Za-z0-9_-]{43}$') {
-			Stop-Install 'thiếu hoặc sai mã cài/khoá thiết bị; hãy chép lại lệnh từ trang Chat.' `
-				'missing or malformed install code or device key; copy the command from the Chat page again.' `
-				'安装码或设备密钥缺失或格式不正确；请从 Chat 页面重新复制命令。'
-		}
+	if ($BadKey) {
+		Stop-Install 'khoá thiết bị không hợp lệ; hãy chép lại lệnh từ trang Chat.' `
+			'the device key is malformed; copy the command from the Chat page again.' `
+			'设备密钥格式不正确；请从 Chat 页面重新复制命令。'
 	}
 	if ($TuneloVersion.StartsWith('__')) {
 		Stop-Install 'chưa có bản phát hành tunelo.' 'no tunelo release is available yet.' 'tunelo 尚未发布。'
@@ -145,7 +161,19 @@ function Install-Tunelo {
 			Stop-Install 'chuyển hda sang tunelo không thành công; hda vẫn chạy như cũ.' `
 				'moving hda to tunelo failed; hda keeps running as before.' 'hda 迁移到 tunelo 失败；hda 仍照常运行。'
 		}
-		if (-not $Code) { return }
+	}
+
+	if (-not $DeviceKey) {
+		# Binary only: one sign-in for the tunnel, Chat and Localman. A failed or
+		# skipped sign-in leaves tunelo installed.
+		Write-Host (Get-Text 'Đăng nhập tài khoản cho tunelo (tunnel, Chat, Localman)…' `
+			'Signing tunelo in with your account (tunnel, Chat, Localman)…' '正在用你的账号登录 tunelo（隧道、Chat、Localman）…')
+		& $exe login
+		if ($LASTEXITCODE -ne 0) {
+			Write-Host (Get-Text 'Chưa đăng nhập được; chạy lại tunelo login khi sẵn sàng.' `
+				'Not signed in yet; run tunelo login when you are ready.' '尚未登录；准备好后请运行 tunelo login。')
+		}
+		return
 	}
 
 	$prompt = Get-Text 'Dán mã ghép đang hiện trên trang Chat rồi bấm Enter (chữ sẽ không hiện khi dán)' `
@@ -166,7 +194,7 @@ function Install-Tunelo {
 	# The secret reaches tunelo on stdin only.
 	# Windows PowerShell may prefix piped text with a UTF-8 BOM; send plain UTF-8.
 	$OutputEncoding = New-Object System.Text.UTF8Encoding $false
-	$secret | & $exe install $Code --trust $DeviceKey
+	$secret | & $exe install --trust $DeviceKey
 	if ($LASTEXITCODE -ne 0) {
 		Stop-Install 'tunelo install không thành công.' 'tunelo install failed.' 'tunelo install 失败。'
 	}

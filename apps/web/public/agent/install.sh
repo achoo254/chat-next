@@ -1,19 +1,25 @@
 #!/bin/sh
-# Installs tunelo, the background process of "My machines" (ADR 0013),
-# on macOS. The web app shows the command:
+# Installs tunelo, the background process of "My machines" (ADR 0013) and
+# the Tunelo CLI, on macOS. "Add this machine" in Chat shows:
 #
-#   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <install code> <device key> [vi|en|zh-CN]
+#   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <device key> [vi|en|zh-CN]
 #
-# A Mac that still runs hda (the earlier name of tunelo) is moved to tunelo
-# first, keeping the machine, its paired devices and sessions. Without an
-# install code the script only does that move:
+# which installs tunelo, asks you to paste the pairing secret the page
+# shows, and runs `tunelo install`: you sign in with your account in the
+# browser and the machine joins My machines by itself (no install code).
+# The pairing secret is read from the terminal with echo off: it is never in
+# a command line (argv, shell history, ps). The device's public key is not
+# secret. A command of an older page, with an install code before the
+# device key, still works: the code is ignored.
+#
+# With only a language (or nothing), the script installs or updates the
+# binary and runs `tunelo login`; this is what `tunelo update` of the Tunelo
+# CLI 1.x runs:
 #
 #   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- [vi|en|zh-CN]
 #
-# then asks you to paste the pairing secret it shows, which this script
-# reads from the terminal with echo off: the secret is never in a command
-# line (argv, shell history, ps). The install code (one-time, 10 minutes)
-# and the device's public key are not secret.
+# A Mac that still runs hda (the earlier name of tunelo) is moved to tunelo
+# first either way, keeping the machine, its paired devices and sessions.
 #
 # The release is pinned: version and SHA-256 of every file are written into
 # this script when the web app is built for a tunelo release, and the
@@ -51,25 +57,30 @@ sha256_of() {
 	fi
 }
 
+is_key() {
+	printf '%s' "$1" | grep -Eq '^[A-Za-z0-9_-]{43}$'
+}
+
 main() {
-	if [ $# -ge 2 ]; then
-		code="$1"
+	device_key=""
+	locale=""
+	if [ $# -ge 1 ] && is_key "$1"; then
+		device_key="$1"
+		locale="${2:-}"
+	elif [ $# -ge 2 ] && printf '%s' "$1" | grep -Eq '^[A-Za-z0-9_-]{22}$'; then
+		# An older page: <install code> <device key> [language]; install codes are retired.
 		device_key="$2"
-		locale="${3:-${LANG:-en}}"
+		locale="${3:-}"
+		is_key "$device_key" || die "khoá thiết bị không hợp lệ." "the device key is malformed." "设备密钥格式不正确。"
 	else
-		code=""
-		device_key=""
-		locale="${1:-${LANG:-en}}"
+		locale="${1:-}"
 	fi
+	locale="${locale:-${LANG:-en}}"
 	case "$locale" in
 	vi*) lang="vi" ;;
 	zh*) lang="zh-CN" ;;
 	*) lang="en" ;;
 	esac
-	if [ -n "$code" ]; then
-		printf '%s' "$code" | grep -Eq '^[A-Za-z0-9_-]{22}$' || die "mã cài không hợp lệ." "the install code is malformed." "安装码格式不正确。"
-		printf '%s' "$device_key" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "khoá thiết bị không hợp lệ." "the device key is malformed." "设备密钥格式不正确。"
-	fi
 
 	case "$TUNELO_VERSION" in
 	__*) die "chưa có bản phát hành tunelo." "no tunelo release is available yet." "tunelo 尚未发布。" ;;
@@ -89,10 +100,6 @@ main() {
 	if [ -f "$hda_dir/config.json" ] && [ ! -f "$hda_dir/migrated-to-tunelo" ]; then
 		from_hda="yes"
 	fi
-	[ -n "$code" ] || [ -n "$from_hda" ] || die "thiếu mã cài hoặc khoá thiết bị; hãy chép lại lệnh từ trang Chat." \
-		"missing the install code or the device key; copy the command from the Chat page again." \
-		"缺少安装码或设备密钥；请从 Chat 页面重新复制命令。"
-
 	tmp="$(mktemp -d)"
 	trap 'rm -rf "$tmp"' EXIT INT TERM
 	url="$RELEASES/tunelo-v$TUNELO_VERSION/$asset"
@@ -140,7 +147,16 @@ main() {
 			"在这台 Mac 上找到 hda；正在迁移到 tunelo（保留电脑、已配对设备和会话）…"
 		"$bin" migrate-from-hda || die "chuyển hda sang tunelo không thành công; hda vẫn chạy như cũ." \
 			"moving hda to tunelo failed; hda keeps running as before." "hda 迁移到 tunelo 失败；hda 仍照常运行。"
-		[ -n "$code" ] || return 0
+	fi
+
+	if [ -z "$device_key" ]; then
+		# Binary only: one sign-in for the tunnel, Chat and Localman. A failed or
+		# skipped sign-in leaves tunelo installed.
+		say "Đăng nhập tài khoản cho tunelo (tunnel, Chat, Localman)…" \
+			"Signing tunelo in with your account (tunnel, Chat, Localman)…" "正在用你的账号登录 tunelo（隧道、Chat、Localman）…"
+		"$bin" login || say "Chưa đăng nhập được; chạy lại tunelo login khi sẵn sàng." \
+			"Not signed in yet; run tunelo login when you are ready." "尚未登录；准备好后请运行 tunelo login。"
+		return 0
 	fi
 
 	[ -r /dev/tty ] || die "cần chạy lệnh trong cửa sổ Terminal để dán mã ghép." \
@@ -157,7 +173,7 @@ main() {
 		"the pairing secret is malformed; run the command again and paste it." "配对密钥格式不正确；请重新运行命令并粘贴。"
 
 	# printf is a shell builtin: the secret reaches tunelo on stdin only.
-	printf '%s\n' "$secret" | "$bin" install "$code" --trust "$device_key"
+	printf '%s\n' "$secret" | "$bin" install --trust "$device_key"
 }
 
 main "$@"

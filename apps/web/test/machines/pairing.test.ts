@@ -129,13 +129,12 @@ describe("tunnel addresses", () => {
 });
 
 describe("install command", () => {
-	it("passes the code, device key and language, never the pairing secret", () => {
+	it("passes the device key and language, never the pairing secret or an install code", () => {
 		const key = "A".repeat(43);
-		expect(installCommand("mac", "https://chat.example.test", "c".repeat(22), key, "vi")).toBe(
-			`curl -fsSL https://chat.example.test/agent/install.sh | sh -s -- ${"c".repeat(22)} ${key} vi`,
-		);
-		expect(installCommand("windows", "https://chat.example.test", "c".repeat(22), key, "en")).toBe(
-			`& ([scriptblock]::Create((irm https://chat.example.test/agent/install.ps1))) ${"c".repeat(22)} ${key} en`,
+		// No install code: tunelo joins My machines with the account it signs in with.
+		expect(installCommand("mac", "https://chat.example.test", key, "vi")).toBe(`curl -fsSL https://chat.example.test/agent/install.sh | sh -s -- ${key} vi`);
+		expect(installCommand("windows", "https://chat.example.test", key, "en")).toBe(
+			`& ([scriptblock]::Create((irm https://chat.example.test/agent/install.ps1))) ${key} en`,
 		);
 	});
 

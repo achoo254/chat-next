@@ -1,9 +1,11 @@
 // "Thêm máy này", done in the browser of the machine to add: (1) the AI CLI is
-// installed and signed in, (2) one command installs tunelo with a
-// one-time install code and this browser's device key, then asks for the
-// pairing secret, which this page made and shows (it never goes to the
-// server), (3) the page waits for the machine in the directory and checks in
-// the first handshake that it knows the secret before pinning its key.
+// installed and signed in, (2) one command installs tunelo with this
+// browser's device key, then asks for the pairing secret, which this page
+// made and shows (it never goes to the server), and signs tunelo in with the
+// account (tunelo login): tunelo then adds the machine to My machines by
+// itself, without an install code, (3) the page waits for the new machine in
+// the directory and checks in the first handshake that it knows the secret
+// before pinning its key.
 import { useEffect, useRef, useState } from "react";
 import { random, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { brand } from "../brand.ts";
@@ -14,7 +16,7 @@ import { Link, paths } from "../router.tsx";
 import { serverOrigin } from "../server-origin.ts";
 import { confirmTrust } from "./link/pairing.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { directoryErrorReason, type MachineEntry } from "./machines-client.ts";
+import type { MachineEntry } from "./machines-client.ts";
 import { PageHead } from "./page-head.tsx";
 import { useHub } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -30,25 +32,24 @@ function detectOs(userAgent: string): Os | "phone" {
 	return /Windows/.test(userAgent) ? "windows" : "mac";
 }
 
-/** Moves a computer still running hda (the earlier name) to tunelo: the install script without an install code. */
+/** Installs tunelo and signs it in, without pairing: also moves a computer still running hda (the earlier name). */
 export function migrateCommand(os: Os, origin: string, locale: string): string {
 	return os === "windows" ? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${locale}` : `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${locale}`;
 }
 
 /** The command the page shows; the pairing secret is pasted when the script asks, never part of it. */
-export function installCommand(os: Os, origin: string, code: string, deviceKey: string, locale: string): string {
+export function installCommand(os: Os, origin: string, deviceKey: string, locale: string): string {
 	return os === "windows"
-		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${code} ${deviceKey} ${locale}`
-		: `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${code} ${deviceKey} ${locale}`;
+		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${deviceKey} ${locale}`
+		: `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${deviceKey} ${locale}`;
 }
 
 type Step =
 	| { readonly kind: "start" }
 	| { readonly kind: "making" }
-	| { readonly kind: "waiting"; readonly code: string; readonly expiresAt: number; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number> }
+	| { readonly kind: "waiting"; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number> }
 	| { readonly kind: "confirming"; readonly machine: MachineEntry; readonly secret: Uint8Array<ArrayBuffer> }
-	| { readonly kind: "connected"; readonly machine: MachineEntry }
-	| { readonly kind: "expired" };
+	| { readonly kind: "connected"; readonly machine: MachineEntry };
 
 export function AddMachine() {
 	const t = useMachinesCopy();
@@ -67,15 +68,11 @@ export function AddMachine() {
 		);
 	}, [hub, t]);
 
-	// Wait for the new machine in the directory (it registers, then opens its tunnel).
+	// Wait for the new machine in the directory (tunelo adds it once signed in, then opens its tunnel).
 	useEffect(() => {
 		if (step.kind !== "waiting") return;
 		let stopped = false;
 		const timer = window.setInterval(() => {
-			if (Date.now() > step.expiresAt * 1000) {
-				setStep({ kind: "expired" });
-				return;
-			}
 			if (busy.current) return;
 			busy.current = true;
 			hub
@@ -121,15 +118,15 @@ export function AddMachine() {
 		};
 	}, [step, hub, t]);
 
+	// The machines already listed are not the new one: read the directory first.
 	const make = () => {
 		setError("");
 		setStep({ kind: "making" });
-		const known = new Set(hub.directory().machines.map((m) => m.id));
-		hub.deps.directory.createInstallCode().then(
-			({ code, expiresAt }) => setStep({ kind: "waiting", code, expiresAt, secret: random(32), known }),
-			(err: unknown) => {
+		hub.refresh().then(
+			(machines) => setStep({ kind: "waiting", secret: random(32), known: new Set(machines.map((m) => m.id)) }),
+			() => {
 				setStep({ kind: "start" });
-				setError(directoryErrorReason(err) === "rate" ? t.addMachine.rate : t.errors.generic);
+				setError(t.errors.generic);
 			},
 		);
 	};
@@ -149,9 +146,8 @@ export function AddMachine() {
 	}
 
 	const waiting = step.kind === "waiting" ? step : null;
-	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), waiting.code, deviceKey, locale);
+	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), deviceKey, locale);
 	const secret = waiting === null ? "" : toBase64Url(waiting.secret);
-	const expires = waiting === null ? "" : new Date(waiting.expiresAt * 1000).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 	const done = step.kind === "connected";
 	const fromHda = migrateCommand(os, serverOrigin(), locale);
 	return (
@@ -205,16 +201,8 @@ export function AddMachine() {
 											<code aria-label={t.addMachine.secretLabel}>{secret}</code>
 											<CopyButton text={secret} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
 										</div>
-										<p className="note">{t.addMachine.expires(expires)}</p>
+										<p className="note">{t.addMachine.note}</p>
 									</>
-								)}
-								{step.kind === "expired" && (
-									<p className="mx-error">
-										{t.addMachine.expired}{" "}
-										<button type="button" className="btn btn-sm" onClick={make}>
-											{t.addMachine.make}
-										</button>
-									</p>
 								)}
 							</div>
 						</li>

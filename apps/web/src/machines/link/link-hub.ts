@@ -40,6 +40,7 @@ function localEntry(port: number, name: string): MachineEntry {
 		tunnelUrl: `ws://127.0.0.1:${port}`,
 		createdAt: 0,
 		lastSeenAt: 0,
+		claimed: true,
 	};
 }
 

@@ -141,6 +141,7 @@ function MachineRow({ machine, current, now }: { machine: MachineEntry; current:
 			<span className="tx">
 				<span className="name">{machine.name}</span>
 				<span className="sub">{sub}</span>
+				{!machine.claimed && <span className="chip mx-chip warn">{t.status.needsLogin}</span>}
 			</span>
 			{machine.os !== "" && <span className="meta">{t.os(machine.os, machine.arch)}</span>}
 		</Link>
