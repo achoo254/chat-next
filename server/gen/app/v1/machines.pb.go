@@ -961,7 +961,10 @@ type HeartbeatResponse struct {
 	MinAgentVersion string `protobuf:"bytes,3,opt,name=min_agent_version,json=minAgentVersion,proto3" json:"min_agent_version,omitempty"`
 	// Machine.claimed: false asks tunelo to call ClaimMachine once it is
 	// signed in with the account.
-	Claimed       bool `protobuf:"varint,4,opt,name=claimed,proto3" json:"claimed,omitempty"`
+	Claimed bool `protobuf:"varint,4,opt,name=claimed,proto3" json:"claimed,omitempty"`
+	// The reported tunnel was opened by another account than the machine's
+	// owner, so the directory shows the machine without a tunnel.
+	TunnelRefused bool `protobuf:"varint,5,opt,name=tunnel_refused,json=tunnelRefused,proto3" json:"tunnel_refused,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1020,6 +1023,13 @@ func (x *HeartbeatResponse) GetMinAgentVersion() string {
 func (x *HeartbeatResponse) GetClaimed() bool {
 	if x != nil {
 		return x.Claimed
+	}
+	return false
+}
+
+func (x *HeartbeatResponse) GetTunnelRefused() bool {
+	if x != nil {
+		return x.TunnelRefused
 	}
 	return false
 }
@@ -1190,12 +1200,13 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\n" +
 	"tunnel_url\x18\x01 \x01(\tR\ttunnelUrl\x12#\n" +
 	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12%\n" +
-	"\x0eclaude_version\x18\x03 \x01(\tR\rclaudeVersion\"\xa3\x01\n" +
+	"\x0eclaude_version\x18\x03 \x01(\tR\rclaudeVersion\"\xca\x01\n" +
 	"\x11HeartbeatResponse\x12\x18\n" +
 	"\arevoked\x18\x01 \x01(\bR\arevoked\x12.\n" +
 	"\x13revoked_device_keys\x18\x02 \x03(\fR\x11revokedDeviceKeys\x12*\n" +
 	"\x11min_agent_version\x18\x03 \x01(\tR\x0fminAgentVersion\x12\x18\n" +
-	"\aclaimed\x18\x04 \x01(\bR\aclaimed\"\x89\x01\n" +
+	"\aclaimed\x18\x04 \x01(\bR\aclaimed\x12%\n" +
+	"\x0etunnel_refused\x18\x05 \x01(\bR\rtunnelRefused\"\x89\x01\n" +
 	"\x17NotifyNeedsInputRequest\x12*\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x16.app.v1.NeedsInputKindR\x04kind\x12#\n" +
 	"\rpending_count\x18\x02 \x01(\x05R\fpendingCount\x12\x1d\n" +

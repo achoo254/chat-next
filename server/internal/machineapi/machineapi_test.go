@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -252,10 +253,17 @@ func TestRegisterMachine(t *testing.T) {
 		!strings.Contains(err.Error(), "insufficient_scope") {
 		t.Fatalf("without machines:write: %v", err)
 	}
-	// An account that never opened the chat: a reason of its own, so tunelo waits.
-	_, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token("acc_new")))
-	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "chat_account_missing") {
-		t.Fatalf("no chat account: %v", err)
+	// Signed with a key outside the IdP's JWKS, with the IdP's issuer.
+	stranger := idptest.New(t, "chat-web", "secret")
+	forged, err := stranger.Sign(map[string]any{
+		"iss": e.idp.Issuer(), "aud": resource, "sub": ownerSub, "client_id": "tunelo-agent", "scope": "machines:write",
+		"iat": time.Now().Unix(), "exp": time.Now().Add(10 * time.Minute).Unix(),
+	}, "at+jwt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), forged)); connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("token of a foreign key: %v", err)
 	}
 
 	tok := e.token(ownerSub)
@@ -285,6 +293,81 @@ func TestRegisterMachine(t *testing.T) {
 	list, err := e.store.ListMachines(ctx, tenant, e.userID)
 	if err != nil || len(list) != 1 || list[0].Name != "Mac mini" || !list[0].Claimed {
 		t.Fatalf("directory %+v %v", list, err)
+	}
+}
+
+func TestRegisterMachineCreatesTheChatUser(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	// New accounts refused (sign-up caps): a reason of its own, so tunelo waits.
+	var asked []string
+	e.svc.cfg.AdmitNewUser = func(ip string) bool { asked = append(asked, ip); return false }
+	_, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token("acc_new")))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "chat_account_missing") {
+		t.Fatalf("new account refused: %v", err)
+	}
+	if len(asked) != 1 || asked[0] == "" {
+		t.Fatalf("admission asked %v", asked)
+	}
+	if _, err := e.store.UserByIdPSub(ctx, tenant, "acc_new"); err != nil && !errors.Is(err, store.ErrNotFound) {
+		t.Fatal(err)
+	} else if err == nil {
+		t.Fatal("a refused account got a user")
+	}
+	// Admitted: the user is created, pending its profile, and owns the machine.
+	e.svc.cfg.AdmitNewUser = func(string) bool { return true }
+	resp, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token("acc_new")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := e.store.UserByIdPSub(ctx, tenant, "acc_new")
+	if err != nil || !u.ProfilePending || u.Username != "acc_new" {
+		t.Fatalf("created user %+v %v", u, err)
+	}
+	list, err := e.store.ListMachines(ctx, tenant, u.ID)
+	if err != nil || len(list) != 1 || list[0].ID != resp.Msg.GetMachineId() || !list[0].Claimed {
+		t.Fatalf("machines of the new user %+v %v", list, err)
+	}
+	// An existing user is never admitted again.
+	e.svc.cfg.AdmitNewUser = func(string) bool { t.Error("admission asked for an existing user"); return false }
+	if _, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token(ownerSub))); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRegisterMachineLimitHoldsUnderConcurrency(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	for i := range 19 {
+		if _, err := e.store.Pool().Exec(ctx, `
+			INSERT INTO machines (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
+			VALUES ($1, $2, 'm', 'linux', 'x64', '0.1.0', $3, $4)`,
+			tenant, e.userID, bytes.Repeat([]byte{1}, 32), bytes.Repeat([]byte{byte(i + 1)}, 32)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tok := e.token(ownerSub)
+	errs := make([]error, 2)
+	var wg sync.WaitGroup
+	for i := range errs {
+		wg.Go(func() {
+			_, errs[i] = e.client.RegisterMachine(ctx, withSecret(registerRequest(), tok))
+		})
+	}
+	wg.Wait()
+	ok, full := 0, 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			ok++
+		case connect.CodeOf(err) == connect.CodeResourceExhausted:
+			full++
+		default:
+			t.Fatalf("parallel register: %v", err)
+		}
+	}
+	if ok != 1 || full != 1 {
+		t.Fatalf("the 20th machine: %d registered, %d refused", ok, full)
 	}
 }
 
@@ -355,17 +438,27 @@ func TestClaimMachine(t *testing.T) {
 		t.Fatalf("claim again: %v", err)
 	}
 
-	// Claimed: only the machine tunnel of the owner's account.
+	// Claimed: only the machine tunnel of the owner's account is listed. Another
+	// one is refused without failing the heartbeat: the machine stays alive
+	// without a tunnel and still learns which devices were revoked.
+	phone := bytes.Repeat([]byte{9}, 32)
+	if err := e.store.RevokeMachineDevice(ctx, tenant, e.userID, id, phone); err != nil {
+		t.Fatal(err)
+	}
 	for _, tunnel := range []string{"wss://old-name.tunnel.hoandat.com", machineTunnel("acc_2", id), machineTunnel(ownerSub, id+1)} {
-		if _, err := beat(tunnel); connect.CodeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "tunnel_not_owned") {
-			t.Errorf("tunnel %s: %v", tunnel, err)
+		r, err := beat(tunnel)
+		if err != nil || !r.GetTunnelRefused() || len(r.GetRevokedDeviceKeys()) != 1 || !bytes.Equal(r.GetRevokedDeviceKeys()[0], phone) {
+			t.Errorf("tunnel %s: %+v %v", tunnel, r, err)
+		}
+		if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != "" {
+			t.Fatalf("a refused tunnel was listed: %q", list[0].TunnelURL)
 		}
 	}
-	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != "wss://old-name.tunnel.hoandat.com" {
-		t.Fatalf("a refused heartbeat recorded %q", list[0].TunnelURL)
-	}
-	if r, err := beat(machineTunnel(ownerSub, id) + "/"); err != nil || !r.GetClaimed() {
+	if r, err := beat(machineTunnel(ownerSub, id) + "/"); err != nil || !r.GetClaimed() || r.GetTunnelRefused() {
 		t.Fatalf("own tunnel: %+v %v", r, err)
+	}
+	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != machineTunnel(ownerSub, id) {
+		t.Fatalf("own tunnel recorded %q", list[0].TunnelURL)
 	}
 	if r, err := beat(""); err != nil || !r.GetClaimed() {
 		t.Fatalf("tunnel down: %+v %v", r, err)
@@ -383,15 +476,18 @@ func TestRegisteredMachineTunnelIsChecked(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id, secret := e.register()
-	beat := func(tunnel string) error {
-		_, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0"}, secret))
-		return err
+	beat := func(tunnel string) (bool, error) {
+		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0"}, secret))
+		if err != nil {
+			return false, err
+		}
+		return r.Msg.GetTunnelRefused(), nil
 	}
-	if err := beat("wss://dat-mac.tunnel.hoandat.com"); connect.CodeOf(err) != connect.CodePermissionDenied {
-		t.Fatalf("another tunnel: %v", err)
+	if refused, err := beat("wss://dat-mac.tunnel.hoandat.com"); err != nil || !refused {
+		t.Fatalf("another tunnel: %v %v", refused, err)
 	}
-	if err := beat(machineTunnel(ownerSub, id)); err != nil {
-		t.Fatal(err)
+	if refused, err := beat(machineTunnel(ownerSub, id)); err != nil || refused {
+		t.Fatalf("own tunnel: %v %v", refused, err)
 	}
 }
 

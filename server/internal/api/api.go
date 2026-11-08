@@ -236,7 +236,9 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
-	machines, err := machineapi.New(machineapi.Config{TenantID: cfg.TenantID, TenantDomain: cfg.TenantDomain, Resource: publicOrigin + "/mcp"},
+	machines, err := machineapi.New(machineapi.Config{
+		TenantID: cfg.TenantID, TenantDomain: cfg.TenantDomain, Resource: publicOrigin + "/mcp", AdmitNewUser: routes.AdmitSignup,
+	},
 		st, idp, pushSvc, limiter, logger.With("component", "machineapi"))
 	if err != nil {
 		return nil, err

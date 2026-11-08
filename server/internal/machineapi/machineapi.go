@@ -12,9 +12,9 @@
 // end-to-end between the device and the machine: no call here takes a
 // device key or pairing secret.
 //
-// A claimed machine (tied to its owner's IdP account) may report only the
-// machine tunnel Tunelo holds for that account (MachineSubdomain), so the
-// directory never points devices at a tunnel another account opened.
+// A claimed machine (tied to its owner's IdP account) gets listed only with
+// the machine tunnel Tunelo holds for that account (MachineSubdomain), so
+// the directory never points devices at a tunnel another account opened.
 //
 // Secrets and tokens never reach a log. Failed authentications are
 // limited per client address (a valid secret is never refused by that
@@ -113,6 +113,9 @@ type Config struct {
 	// chat's MCP resource, CHAT_PUBLIC_URL + "/mcp" (tunelo's one sign-in
 	// asks the IdP for it).
 	Resource string
+	// AdmitNewUser takes a new-account token for the caller's address, as
+	// a web sign-in does (auth.Routes.AdmitSignup); nil admits everyone.
+	AdmitNewUser func(ip string) bool
 }
 
 // Service is the handler of MachineAgentService.
@@ -210,8 +213,13 @@ func (s *Service) RegisterMachine(ctx context.Context, req *connect.Request[appv
 	if len(m.GetPublicKey()) != store.MachineKeyLen {
 		return nil, invalid("public_key must be 32 bytes")
 	}
-	user, err := s.store.UserByIdPSub(ctx, s.cfg.TenantID, tok.Subject)
-	if errors.Is(err, store.ErrNotFound) {
+	// An account that never opened the chat gets its user now (not
+	// findable until its first web sign-in), admitted as a web sign-up is.
+	ip := auth.ClientIP(req.Peer().Addr, req.Header())
+	user, err := s.store.UpsertPendingIdPUser(ctx, s.cfg.TenantID, tok.Subject, func() bool {
+		return s.cfg.AdmitNewUser == nil || s.cfg.AdmitNewUser(ip)
+	})
+	if errors.Is(err, store.ErrSignupLimited) {
 		return nil, errNoChatAccount()
 	}
 	if err != nil {
@@ -222,7 +230,7 @@ func (s *Service) RegisterMachine(ctx context.Context, req *connect.Request[appv
 	})
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		// Erased between the lookup and the registration.
+		// An erased account, or erased in between.
 		return nil, errNoChatAccount()
 	case errors.Is(err, store.ErrTooManyMachines):
 		return nil, connect.NewError(connect.CodeResourceExhausted,
@@ -287,10 +295,12 @@ func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.Hear
 		return nil, invalid("tunnel_url must be wss://<subdomain>.tunnel." + strings.ToLower(s.cfg.TenantDomain))
 	}
 	tunnel = strings.TrimSuffix(tunnel, "/")
-	if tunnel != "" && machine.Claimed && tunnel != s.machineTunnel(machine) {
+	// A tunnel of another account is never listed, but the machine stays
+	// alive and still learns which devices were revoked.
+	refused := tunnel != "" && machine.Claimed && tunnel != s.machineTunnel(machine)
+	if refused {
 		s.logger.Warn("heartbeat with a tunnel of another account", "machine_id", machine.ID)
-		return nil, connect.NewError(connect.CodePermissionDenied,
-			errors.New("tunnel_not_owned: the tunnel is not the machine tunnel of the machine's account; sign in to tunelo with that account"))
+		tunnel = ""
 	}
 	claude := m.GetClaudeVersion()
 	if !cleanLabel(claude, maxClaudeLen) {
@@ -304,7 +314,9 @@ func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.Hear
 	if err != nil {
 		return nil, s.internal(ctx, req.Spec().Procedure, err)
 	}
-	return connect.NewResponse(&appv1.HeartbeatResponse{RevokedDeviceKeys: keys, MinAgentVersion: MinAgentVersion, Claimed: machine.Claimed}), nil
+	return connect.NewResponse(&appv1.HeartbeatResponse{
+		RevokedDeviceKeys: keys, MinAgentVersion: MinAgentVersion, Claimed: machine.Claimed, TunnelRefused: refused,
+	}), nil
 }
 
 func (s *Service) NotifyNeedsInput(ctx context.Context, req *connect.Request[appv1.NotifyNeedsInputRequest]) (*connect.Response[appv1.NotifyNeedsInputResponse], error) {
@@ -457,7 +469,7 @@ func (s *Service) machineTunnel(m store.AuthenticatedMachine) string {
 
 func errNoChatAccount() error {
 	return connect.NewError(connect.CodeFailedPrecondition,
-		errors.New("chat_account_missing: this account has not opened the chat yet; open it once and the machine is added by itself"))
+		errors.New("chat_account_missing: the chat cannot add this account yet; open the chat once, or wait, and the machine is added by itself"))
 }
 
 // authFailed counts a failed authentication of the caller's address: within

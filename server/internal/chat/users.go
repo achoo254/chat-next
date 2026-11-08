@@ -38,6 +38,11 @@ const (
 // waiting for deletion nor erased: only those can be found.
 const liveUser = `u.deletion_requested_at IS NULL AND u.deleted_at IS NULL`
 
+// findableUser (alias u) is a live user others may find by username, email
+// or search: not one tunelo created before the person opened the chat
+// (profile_pending, placeholder username and name).
+const findableUser = liveUser + ` AND NOT u.profile_pending`
+
 type privacyRow struct {
 	LastSeen, ProfilePhoto, FindByEmail, FindByUsername, AddToGroups, SendMessages int16
 	NotificationPreview                                                            bool
@@ -341,11 +346,11 @@ func (s *Service) findable(ctx context.Context, me int64, username, email string
 	if email != "" {
 		err = s.pool.QueryRow(ctx, `
 			SELECT u.id, coalesce(p.find_by_email, $3) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND `+liveUser, s.cfg.TenantID, email, audNobody).Scan(&id, &audience)
+			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND `+findableUser, s.cfg.TenantID, email, audNobody).Scan(&id, &audience)
 	} else {
 		err = s.pool.QueryRow(ctx, `
 			SELECT u.id, coalesce(p.find_by_username, $3) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND u.username = $2 AND `+liveUser, s.cfg.TenantID, username, audEveryone).Scan(&id, &audience)
+			WHERE u.tenant_id = $1 AND u.username = $2 AND `+findableUser, s.cfg.TenantID, username, audEveryone).Scan(&id, &audience)
 	}
 	if isNoRows(err) {
 		return 0, errNotFound("user")
@@ -410,12 +415,12 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	if email {
 		rows, err = s.pool.Query(ctx, `
 			SELECT u.id, coalesce(p.find_by_email, $4) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND u.id <> $3 AND `+liveUser, s.cfg.TenantID, query, me, audNobody)
+			WHERE u.tenant_id = $1 AND lower(u.email) = lower($2) AND u.id <> $3 AND `+findableUser, s.cfg.TenantID, query, me, audNobody)
 	} else {
 		q := strings.ToLower(strings.TrimPrefix(query, "@"))
 		rows, err = s.pool.Query(ctx, `
 			SELECT u.id, coalesce(p.find_by_username, $5) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
-			WHERE u.tenant_id = $1 AND u.id <> $4 AND `+liveUser+`
+			WHERE u.tenant_id = $1 AND u.id <> $4 AND `+findableUser+`
 				AND (u.username LIKE $2 || '%' OR chat_fold_name(u.name) LIKE '%' || $3 || '%')
 			ORDER BY (u.username = $2) DESC, u.username LIMIT $6`,
 			s.cfg.TenantID, escapeLike(q), escapeLike(vifold.Fold(query)), me, audEveryone, limit*2)

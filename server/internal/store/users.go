@@ -46,6 +46,10 @@ type User struct {
 	// IdPPicture is the https URL of the IdP's profile picture ("" without
 	// one); only ever shown to the user themself.
 	IdPPicture string
+	// ProfilePending: created by tunelo's machine registration with a
+	// placeholder username and name, before the person opened the chat; not
+	// findable until the first web sign-in fills in the profile.
+	ProfilePending bool
 }
 
 // IdPEmail is the email state the IdP reports; only a verified address is
@@ -113,18 +117,18 @@ func (p IdPProfile) fallbackName() string {
 
 const userColumns = `id, tenant_id, coalesce(idp_sub, ''), username, name, bio, coalesce(email, ''), email_verified, created_at, updated_at,
 	deletion_requested_at, coalesce(deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = photo_file_id), ''),
-	coalesce(idp_picture, '')`
+	coalesce(idp_picture, ''), profile_pending`
 
 // qualifiedUserColumns is userColumns for statements that join users (as u)
 // with another relation.
 const qualifiedUserColumns = `u.id, u.tenant_id, coalesce(u.idp_sub, ''), u.username, u.name, u.bio, coalesce(u.email, ''), u.email_verified, u.created_at, u.updated_at,
 	u.deletion_requested_at, coalesce(u.deletion_reason, ''), coalesce((SELECT pf.public_id FROM files pf WHERE pf.id = u.photo_file_id), ''),
-	coalesce(u.idp_picture, '')`
+	coalesce(u.idp_picture, ''), u.profile_pending`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.TenantID, &u.IdPSub, &u.Username, &u.Name, &u.Bio, &u.Email, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt,
-		&u.DeletionRequestedAt, &u.DeletionReason, &u.PhotoID, &u.IdPPicture)
+		&u.DeletionRequestedAt, &u.DeletionReason, &u.PhotoID, &u.IdPPicture, &u.ProfilePending)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -149,7 +153,11 @@ var ErrSignupLimited = errors.New("store: too many new users")
 // nil) before creating a user; a refusal returns ErrSignupLimited and
 // existing users are unaffected.
 func (s *Store) UpsertIdPUserAdmitting(ctx context.Context, tenantID string, p IdPProfile, admitNew func() bool) (User, error) {
-	if u, err := refreshIdPUser(ctx, s.pool, tenantID, p); !errors.Is(err, ErrNotFound) {
+	u, err := refreshIdPUser(ctx, s.pool, tenantID, p)
+	if err == nil && u.ProfilePending {
+		return s.completeProfile(ctx, u, p)
+	}
+	if !errors.Is(err, ErrNotFound) {
 		return u, err
 	}
 	if admitNew != nil && !admitNew() {
@@ -158,6 +166,23 @@ func (s *Store) UpsertIdPUserAdmitting(ctx context.Context, tenantID string, p I
 	email, verified := p.Email.stored()
 	base := profile.UsernameBase(p.PreferredUsername)
 	name := profile.InitialName(p.Name, p.PreferredUsername, base)
+	return s.insertIdPUser(ctx, tenantID, p.Sub, base, newUserFields{name: name, email: email, verified: verified, picture: p.idpPicture()},
+		func() (User, error) { return refreshIdPUser(ctx, s.pool, tenantID, p) })
+}
+
+// newUserFields are the profile columns of a new IdP user.
+type newUserFields struct {
+	name     string
+	email    *string
+	verified bool
+	picture  *string
+	pending  bool
+}
+
+// insertIdPUser creates the user of sub with the first free username
+// derived from base. On a clash, existing reports the user a concurrent
+// sign-in created (ErrNotFound when the clash was the username).
+func (s *Store) insertIdPUser(ctx context.Context, tenantID, sub, base string, f newUserFields, existing func() (User, error)) (User, error) {
 	for attempt := range maxUsernameAttempts {
 		id, err := NextUserID(ctx, s.pool)
 		if err != nil {
@@ -165,11 +190,11 @@ func (s *Store) UpsertIdPUserAdmitting(ctx context.Context, tenantID string, p I
 		}
 		// No conflict target: a clash on either unique key returns no row.
 		u, err := scanUser(s.pool.QueryRow(ctx, `
-			INSERT INTO users (id, tenant_id, idp_sub, username, name, email, email_verified, idp_picture)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			INSERT INTO users (id, tenant_id, idp_sub, username, name, email, email_verified, idp_picture, profile_pending)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			ON CONFLICT DO NOTHING
 			RETURNING `+userColumns,
-			id, tenantID, p.Sub, profile.UsernameCandidate(base, attempt), name, email, verified, p.idpPicture()))
+			id, tenantID, sub, profile.UsernameCandidate(base, attempt), f.name, f.email, f.verified, f.picture, f.pending))
 		if err == nil {
 			return u, nil
 		}
@@ -178,8 +203,63 @@ func (s *Store) UpsertIdPUserAdmitting(ctx context.Context, tenantID string, p I
 		}
 		// Either a concurrent sign-in created this account, or the username
 		// is taken; the first case wins.
-		if u, err := refreshIdPUser(ctx, s.pool, tenantID, p); !errors.Is(err, ErrNotFound) {
+		if u, err := existing(); !errors.Is(err, ErrNotFound) {
 			return u, err
+		}
+	}
+	return User{}, fmt.Errorf("store: no free username for base %q after %d attempts", base, maxUsernameAttempts)
+}
+
+// UpsertPendingIdPUser returns the user of the IdP subject sub, creating
+// it when the account never signed in to the chat: tunelo registers the
+// person's machine with an access token that carries no name or email, so
+// the user gets a placeholder username and name derived from sub and
+// profile_pending, which keeps it out of username lookups and search until
+// the first web sign-in fills in the profile (UpsertIdPUser). admitNew is
+// asked before creating, as for a web sign-in (ErrSignupLimited when it
+// refuses). An existing user is returned as is, erased or not.
+func (s *Store) UpsertPendingIdPUser(ctx context.Context, tenantID, sub string, admitNew func() bool) (User, error) {
+	byExactSub := func() (User, error) {
+		u, err := scanUser(s.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE tenant_id = $1 AND idp_sub = $2`, tenantID, sub))
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return User{}, fmt.Errorf("store: user by IdP subject: %w", err)
+		}
+		return u, err
+	}
+	if u, err := byExactSub(); !errors.Is(err, ErrNotFound) {
+		return u, err
+	}
+	if admitNew != nil && !admitNew() {
+		return User{}, ErrSignupLimited
+	}
+	base := profile.UsernameBase(sub)
+	return s.insertIdPUser(ctx, tenantID, sub, base, newUserFields{name: profile.InitialName("", "", base), pending: true}, byExactSub)
+}
+
+// completeProfile gives a pending user (UpsertPendingIdPUser) the username
+// and name of the IdP profile at its first web sign-in, as a new user would
+// get them, and clears profile_pending. A name the person already set is
+// kept.
+func (s *Store) completeProfile(ctx context.Context, u User, p IdPProfile) (User, error) {
+	base := profile.UsernameBase(p.PreferredUsername)
+	name := profile.InitialName(p.Name, p.PreferredUsername, base)
+	for attempt := range maxUsernameAttempts {
+		done, err := scanUser(s.pool.QueryRow(ctx, `
+			UPDATE users SET username = $3, name = CASE WHEN name = username THEN $4 ELSE name END,
+				profile_pending = false, updated_at = now()
+			WHERE id = $1 AND tenant_id = $2 AND profile_pending
+			RETURNING `+userColumns, u.ID, u.TenantID, profile.UsernameCandidate(base, attempt), name))
+		var pgErr *pgconn.PgError
+		switch {
+		case err == nil:
+			return done, nil
+		case errors.Is(err, ErrNotFound):
+			// A concurrent sign-in completed it.
+			return s.UserByID(ctx, u.TenantID, u.ID)
+		case errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_tenant_username_key":
+			continue
+		default:
+			return User{}, fmt.Errorf("store: complete profile: %w", err)
 		}
 	}
 	return User{}, fmt.Errorf("store: no free username for base %q after %d attempts", base, maxUsernameAttempts)

@@ -257,3 +257,49 @@ func TestCleanMachineName(t *testing.T) {
 		}
 	}
 }
+
+// A person whose tunelo registers a machine before they opened the chat gets
+// a user with a placeholder profile; the first web sign-in fills it in as a
+// new user's would be.
+func TestPendingUserGetsItsProfileAtFirstSignIn(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	if _, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_other", PreferredUsername: "dat"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpsertPendingIdPUser(ctx, tenant, "acc_9", func() bool { return false }); !errors.Is(err, store.ErrSignupLimited) {
+		t.Fatalf("refused admission: %v", err)
+	}
+	pending, err := s.UpsertPendingIdPUser(ctx, tenant, "acc_9", func() bool { return true })
+	if err != nil || !pending.ProfilePending || pending.Username != "acc_9" || pending.Name != "acc_9" || pending.Email != "" {
+		t.Fatalf("pending user %+v %v", pending, err)
+	}
+	again, err := s.UpsertPendingIdPUser(ctx, tenant, "acc_9", func() bool { t.Error("asked again"); return false })
+	if err != nil || again.ID != pending.ID {
+		t.Fatalf("second registration %+v %v", again, err)
+	}
+
+	done, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{
+		Sub: "acc_9", PreferredUsername: "dat", Name: "Đạt Trịnh", Email: store.IdPEmail{Email: "dat@example.com", Verified: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.ID != pending.ID || done.ProfilePending || done.Username != "dat2" || done.Name != "Đạt Trịnh" || done.Email != "dat@example.com" {
+		t.Fatalf("after the first sign-in %+v", done)
+	}
+	// Later sign-ins keep the username, as for any user.
+	later, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_9", PreferredUsername: "other_name", Name: "Đạt Trịnh"})
+	if err != nil || later.Username != "dat2" {
+		t.Fatalf("later sign-in %+v %v", later, err)
+	}
+
+	// Without a name at the IdP, the name comes from preferred_username.
+	if _, err := s.UpsertPendingIdPUser(ctx, tenant, "acc_10", nil); err != nil {
+		t.Fatal(err)
+	}
+	named, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_10", PreferredUsername: "binh"})
+	if err != nil || named.Username != "binh" || named.Name != "binh" || named.ProfilePending {
+		t.Fatalf("no IdP name %+v %v", named, err)
+	}
+}

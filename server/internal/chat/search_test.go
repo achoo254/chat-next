@@ -437,6 +437,30 @@ func TestSearchBackfillIndexesOldRows(t *testing.T) {
 	}
 }
 
+// A user tunelo created before the person opened the chat has a placeholder
+// profile: nobody finds it by username or search until the first sign-in.
+func TestPendingUsersAreNotFindable(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	me := h.user("me")
+	pending := h.user("pending_one")
+	if _, err := h.st.Pool().Exec(ctx, `UPDATE users SET profile_pending = true WHERE id = $1`, pending); err != nil {
+		t.Fatal(err)
+	}
+	if users, err := h.svc.SearchUsers(ctx, me, "pending", 10); err != nil || len(users) != 0 {
+		t.Fatalf("search found %v, %v", users, err)
+	}
+	if _, err := h.svc.ResolveUsername(ctx, me, "pending_one"); err == nil {
+		t.Fatal("username lookup found a pending user")
+	}
+	if _, err := h.st.Pool().Exec(ctx, `UPDATE users SET profile_pending = false WHERE id = $1`, pending); err != nil {
+		t.Fatal(err)
+	}
+	if users, err := h.svc.SearchUsers(ctx, me, "pending", 10); err != nil || len(users) != 1 {
+		t.Fatalf("search after the profile %v, %v", users, err)
+	}
+}
+
 func TestSearchUsersIgnoresAccents(t *testing.T) {
 	h := newHarness(t, nil)
 	ctx := context.Background()

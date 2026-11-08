@@ -313,6 +313,12 @@ func ClientIP(remoteAddr string, h http.Header) string {
 	return peer.Unmap().String()
 }
 
+// AdmitSignup is admitSignup for other ways a chat account is created
+// (tunelo's machine registration): the same per-address and tenant caps.
+func (h *Routes) AdmitSignup(ip string) bool {
+	return h.admitSignup(ip)
+}
+
 // admitSignup takes one new-account token of ip and of the tenant.
 func (h *Routes) admitSignup(ip string) bool {
 	if h.cfg.Limiter == nil {

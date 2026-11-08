@@ -269,9 +269,11 @@ func (UnimplementedMachinesServiceHandler) RevokeDevice(context.Context, *connec
 // MachineAgentServiceClient is a client for the app.v1.MachineAgentService service.
 type MachineAgentServiceClient interface {
 	// Adds a machine to the directory of the token's account, claimed from the
-	// start. Fails with failed_precondition "chat_account_missing" when that
-	// account never opened the chat (tunelo waits and retries: the machine
-	// appears after the first visit), invalid_argument for malformed fields,
+	// start. An account that never opened the chat gets its chat user now,
+	// with a placeholder profile that is not findable until its first web
+	// sign-in; new users are admitted as at a web sign-in, and a refusal
+	// fails with failed_precondition "chat_account_missing" (tunelo waits and
+	// retries). Fails with invalid_argument for malformed fields,
 	// failed_precondition "agent_update_required" when agent_version is below
 	// the minimum, and resource_exhausted "too_many_machines" when the owner
 	// has 20 machines.
@@ -288,8 +290,9 @@ type MachineAgentServiceClient interface {
 	// and returns what was revoked. A revoked machine gets revoked = true (and
 	// nothing is recorded); otherwise an agent_version below the minimum fails
 	// with failed_precondition "agent_update_required". For a claimed machine
-	// a tunnel_url other than the machine tunnel Tunelo holds for its owner
-	// fails with permission_denied "tunnel_not_owned" (nothing is recorded).
+	// a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+	// not recorded: the machine is recorded alive without a tunnel and the
+	// answer says tunnel_refused (revoked devices still come back).
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
 	// Asks the server to tell the owner's devices, by Web Push, that a session
 	// waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -368,9 +371,11 @@ func (c *machineAgentServiceClient) NotifyNeedsInput(ctx context.Context, req *c
 // MachineAgentServiceHandler is an implementation of the app.v1.MachineAgentService service.
 type MachineAgentServiceHandler interface {
 	// Adds a machine to the directory of the token's account, claimed from the
-	// start. Fails with failed_precondition "chat_account_missing" when that
-	// account never opened the chat (tunelo waits and retries: the machine
-	// appears after the first visit), invalid_argument for malformed fields,
+	// start. An account that never opened the chat gets its chat user now,
+	// with a placeholder profile that is not findable until its first web
+	// sign-in; new users are admitted as at a web sign-in, and a refusal
+	// fails with failed_precondition "chat_account_missing" (tunelo waits and
+	// retries). Fails with invalid_argument for malformed fields,
 	// failed_precondition "agent_update_required" when agent_version is below
 	// the minimum, and resource_exhausted "too_many_machines" when the owner
 	// has 20 machines.
@@ -387,8 +392,9 @@ type MachineAgentServiceHandler interface {
 	// and returns what was revoked. A revoked machine gets revoked = true (and
 	// nothing is recorded); otherwise an agent_version below the minimum fails
 	// with failed_precondition "agent_update_required". For a claimed machine
-	// a tunnel_url other than the machine tunnel Tunelo holds for its owner
-	// fails with permission_denied "tunnel_not_owned" (nothing is recorded).
+	// a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+	// not recorded: the machine is recorded alive without a tunnel and the
+	// answer says tunnel_refused (revoked devices still come back).
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
 	// Asks the server to tell the owner's devices, by Web Push, that a session
 	// waits for them. Pushes of one machine are at most one per 30 s: calls in

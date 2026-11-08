@@ -48,9 +48,11 @@ service MachinesService {
 // machines:write and unavailable while the server cannot check tokens yet.
 service MachineAgentService {
   // Adds a machine to the directory of the token's account, claimed from the
-  // start. Fails with failed_precondition "chat_account_missing" when that
-  // account never opened the chat (tunelo waits and retries: the machine
-  // appears after the first visit), invalid_argument for malformed fields,
+  // start. An account that never opened the chat gets its chat user now,
+  // with a placeholder profile that is not findable until its first web
+  // sign-in; new users are admitted as at a web sign-in, and a refusal
+  // fails with failed_precondition "chat_account_missing" (tunelo waits and
+  // retries). Fails with invalid_argument for malformed fields,
   // failed_precondition "agent_update_required" when agent_version is below
   // the minimum, and resource_exhausted "too_many_machines" when the owner
   // has 20 machines.
@@ -67,8 +69,9 @@ service MachineAgentService {
   // and returns what was revoked. A revoked machine gets revoked = true (and
   // nothing is recorded); otherwise an agent_version below the minimum fails
   // with failed_precondition "agent_update_required". For a claimed machine
-  // a tunnel_url other than the machine tunnel Tunelo holds for its owner
-  // fails with permission_denied "tunnel_not_owned" (nothing is recorded).
+  // a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+  // not recorded: the machine is recorded alive without a tunnel and the
+  // answer says tunnel_refused (revoked devices still come back).
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   // Asks the server to tell the owner's devices, by Web Push, that a session
   // waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -200,6 +203,9 @@ message HeartbeatResponse {
   // Machine.claimed: false asks tunelo to call ClaimMachine once it is
   // signed in with the account.
   bool claimed = 4;
+  // The reported tunnel was opened by another account than the machine's
+  // owner, so the directory shows the machine without a tunnel.
+  bool tunnel_refused = 5;
 }
 
 // What a waiting session needs from the user.
