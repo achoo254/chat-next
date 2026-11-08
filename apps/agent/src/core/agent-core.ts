@@ -16,6 +16,8 @@ import {
   ThreadState,
   type ThreadSummary,
   ThreadSummarySchema,
+  type ThreadInfo,
+  ThreadInfoSchema,
   TodoState,
   ToolKind,
   TurnState,
@@ -29,12 +31,14 @@ import type {
   ApprovalRequest,
   AskUser,
   ProviderEvent,
+  ProviderInfo,
   ProviderSession,
   QuestionAnswer,
   QuestionRequest,
   ToolKind as Kind,
 } from "../providers/types.ts";
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
+import { gitBranch } from "../safety/dirs.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 
 export class AgentError extends Error {
@@ -83,6 +87,7 @@ type Thread = {
   dirtyText: Set<string>;
   flushTimer?: ReturnType<typeof setTimeout>;
   usage?: { tokens: number; window: number };
+  info: Omit<ProviderInfo, "rateLimits">;
   clientMsgIds: Set<string>;
 };
 
@@ -118,6 +123,9 @@ export class AgentCore {
   private threads = new Map<string, Thread>();
   private listeners = new Set<(threadId: string, items: Item[]) => void>();
   private statusListeners = new Set<(summary: ThreadSummary) => void>();
+  private infoListeners = new Set<(threadId: string) => void>();
+  /** Plan usage of the AI account; the same for every thread. */
+  private rateLimits: ProviderInfo["rateLimits"];
   private idleTimer: ReturnType<typeof setInterval> | undefined;
   private readonly maxSessions: number;
   private readonly idleMs: number;
@@ -192,6 +200,30 @@ export class AgentCore {
   onItems(fn: (threadId: string, items: Item[]) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /** Called with a thread id whenever its ThreadInfo may have changed. */
+  onInfo(fn: (threadId: string) => void): () => void {
+    this.infoListeners.add(fn);
+    return () => this.infoListeners.delete(fn);
+  }
+
+  /** The statusline data of a thread, for devices. */
+  info(threadId: string): ThreadInfo {
+    const t = this.thread(threadId);
+    const r = this.rateLimits;
+    const win = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
+    const fiveHour = win(r?.fiveHour);
+    const sevenDay = win(r?.sevenDay);
+    return create(ThreadInfoSchema, {
+      threadId,
+      permissionMode: t.info.permissionMode ?? "",
+      gitBranch: gitBranch(t.meta.dir).branch,
+      linesAdded: t.info.linesAdded ?? 0,
+      linesRemoved: t.info.linesRemoved ?? 0,
+      commands: t.info.commands ?? [],
+      ...(r ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
+    });
   }
 
   onStatus(fn: (summary: ThreadSummary) => void): () => void {
@@ -556,6 +588,17 @@ export class AgentCore {
       case "status":
         this.put(t, `status:${randomUUID()}`, { case: "status", value: { text: e.text } });
         return;
+      case "info": {
+        const { type: _type, rateLimits, ...rest } = e;
+        Object.assign(t.info, rest);
+        if (rateLimits) {
+          this.rateLimits = rateLimits;
+          for (const id of this.threads.keys()) for (const fn of this.infoListeners) fn(id);
+        } else {
+          for (const fn of this.infoListeners) fn(t.meta.id);
+        }
+        return;
+      }
       case "usage":
         t.usage = { tokens: e.contextTokens, window: e.contextWindow };
         return;
@@ -684,6 +727,7 @@ export class AgentCore {
       textItems: new Map(),
       dirtyText: new Set(),
       clientMsgIds: new Set(),
+      info: {},
     };
   }
 

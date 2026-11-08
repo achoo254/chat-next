@@ -1,4 +1,4 @@
-# Releases chat-agent (apps/agent) on a tag agent-v<semver>: tests, single-file
+# Releases hda, the background agent (apps/agent), on a tag agent-v<semver>: tests, single-file
 # builds for macOS (arm64, x64) and Windows x64, cross-compiled by Bun on Linux
 # (Bun ad-hoc signs the macOS files itself), SHA256SUMS,
 # minisign signatures, then a GitHub Release. Afterwards pin the install
@@ -38,9 +38,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - { target: bun-darwin-arm64, asset: chat-agent-darwin-arm64 }
-          - { target: bun-darwin-x64, asset: chat-agent-darwin-x64 }
-          - { target: bun-windows-x64, asset: chat-agent-windows-x64.exe }
+          - { target: bun-darwin-arm64, asset: hda-darwin-arm64 }
+          - { target: bun-darwin-x64, asset: hda-darwin-x64 }
+          - { target: bun-windows-x64, asset: hda-windows-x64.exe }
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -80,11 +80,11 @@ jobs:
           cd dist
           umask 077
           printf '%s\n' "$MINISIGN_SECRET_KEY" > ../minisign.key
-          for f in chat-agent-*; do minisign -S -s ../minisign.key -m "$f" -t "chat-agent ${GITHUB_REF_NAME#agent-v} $f" < /dev/null; done
+          for f in hda-*; do minisign -S -s ../minisign.key -m "$f" -t "hda ${GITHUB_REF_NAME#agent-v} $f" < /dev/null; done
           rm -f ../minisign.key
-          sha256sum chat-agent-darwin-arm64 chat-agent-darwin-x64 chat-agent-windows-x64.exe > SHA256SUMS
+          sha256sum hda-darwin-arm64 hda-darwin-x64 hda-windows-x64.exe > SHA256SUMS
           cat SHA256SUMS
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "chat-agent ${GITHUB_REF_NAME#agent-v}" --notes "Background agent of My machines. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "hda ${GITHUB_REF_NAME#agent-v}" --notes "Background agent of My machines. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false

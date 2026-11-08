@@ -26,7 +26,7 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
     const result = (ok: boolean) => m({ type: "result", subtype: ok ? "success" : "error_during_execution", is_error: !ok, duration_ms: 1 });
 
     void (async () => {
-      m({ type: "system", subtype: "init", session_id: sessionId, mcp_servers: [], model: "claude-test" });
+      m({ type: "system", subtype: "init", session_id: sessionId, mcp_servers: [], model: "claude-test", permissionMode: "default", terminal_slash_commands: ["exit"] });
       const canUseTool = params.options.canUseTool;
       if (!canUseTool) throw new Error("adapter must pass canUseTool");
       for await (const msg of params.prompt) {
@@ -78,6 +78,18 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
       },
       async setModel(model?: string) {
         log.models.push(model ?? "");
+      },
+      async supportedCommands() {
+        return [
+          { name: "review", description: "Review the diff", argumentHint: "", builtin: false },
+          { name: "exit", description: "Quit", argumentHint: "", builtin: true },
+        ];
+      },
+      async usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET() {
+        return {
+          session: { total_lines_added: 3, total_lines_removed: 1 },
+          rate_limits: { five_hour: { utilization: 4.4, resets_at: "2026-11-08T12:00:00Z" }, seven_day: { utilization: 80, resets_at: null } },
+        };
       },
       async getContextUsage() {
         return { totalTokens: 1000, maxTokens: 200000 };

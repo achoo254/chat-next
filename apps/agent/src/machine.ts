@@ -86,7 +86,7 @@ export class Machine {
     });
     const addr = wss.address();
     const actual = typeof addr === "object" && addr ? addr.port : port;
-    this.log(`chat-agent ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
+    this.log(`hda ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     return actual;
   }
 
@@ -105,7 +105,7 @@ export class Machine {
     return this.key.publicKey;
   }
 
-  /** `chat-agent pair`: a 10-minute window with a QR payload and a 6-digit code. */
+  /** `hda pair`: a 10-minute window with a QR payload and a 6-digit code. */
   openPairing(): { code: string; qr: string; expiresAt: number } {
     this.pairing = PairingWindow.open();
     return { code: this.pairing.code, qr: encodeQr(this.key.publicKey, this.pairing.secret), expiresAt: this.pairing.expiresAt };

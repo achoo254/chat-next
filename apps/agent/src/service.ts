@@ -1,4 +1,4 @@
-// Runs `chat-agent run` at login and keeps it alive: a LaunchAgent on macOS,
+// Runs `hda run` at login and keeps it alive: a LaunchAgent on macOS,
 // on Windows a value under HKCU\...\Run (no admin needed) that starts a
 // hidden loop script restarting the agent if it exits.
 import { execFile, spawn } from "node:child_process";
@@ -74,7 +74,7 @@ export async function installService(configDir: string): Promise<string> {
     spawn("wscript.exe", [vbs], { detached: true, stdio: "ignore", windowsHide: true }).unref();
     return RUN_KEY;
   }
-  throw new Error("only macOS and Windows are supported; run `chat-agent run` yourself");
+  throw new Error("only macOS and Windows are supported; run `hda run` yourself");
 }
 
 export async function uninstallService(configDir: string): Promise<void> {
@@ -85,7 +85,7 @@ export async function uninstallService(configDir: string): Promise<void> {
   } else if (process.platform === "win32") {
     await run("reg", ["delete", RUN_KEY, "/v", RUN_VALUE, "/f"]).catch(() => undefined);
     writeFileSync(join(configDir, "stop"), "");
-    await run("taskkill", ["/F", "/IM", "chat-agent.exe"]).catch(() => undefined);
+    await run("taskkill", ["/F", "/IM", "hda.exe"]).catch(() => undefined);
     rmSync(join(configDir, "run-agent.cmd"), { force: true });
     rmSync(join(configDir, "run-agent.vbs"), { force: true });
   }

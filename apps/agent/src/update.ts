@@ -1,4 +1,4 @@
-// `chat-agent update`: fetch the newest agent-v* release, check its minisign
+// `hda update`: fetch the newest agent-v* release, check its minisign
 // signature against the key built into this binary, replace the file and
 // let the service restart itself.
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -39,9 +39,9 @@ export function verifyMinisign(file: Uint8Array, sigText: string, pubkey = MINIS
 }
 
 export function assetName(os = platform(), cpu = arch()): string {
-  if (os === "darwin") return `chat-agent-darwin-${cpu === "arm64" ? "arm64" : "x64"}`;
-  if (os === "win32") return "chat-agent-windows-x64.exe";
-  throw new Error("no chat-agent build for this OS");
+  if (os === "darwin") return `hda-darwin-${cpu === "arm64" ? "arm64" : "x64"}`;
+  if (os === "win32") return "hda-windows-x64.exe";
+  throw new Error("no hda build for this OS");
 }
 
 function newer(a: string, b: string): boolean {
@@ -69,7 +69,7 @@ export async function update(log: (l: string) => void): Promise<string | null> {
   if (!latest || !newer(latest, AGENT_VERSION)) return null;
   const asset = assetName();
   const base = `https://github.com/${REPO}/releases/download/agent-v${latest}/${asset}`;
-  log(`downloading chat-agent ${latest}…`);
+  log(`downloading hda ${latest}…`);
   const [bin, sig] = await Promise.all([fetchBytes(base), fetchBytes(`${base}.minisig`)]);
   if (!verifyMinisign(bin, new TextDecoder().decode(sig))) throw new Error("signature check failed; the download was not installed");
   const exe = process.execPath;

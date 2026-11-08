@@ -17,7 +17,7 @@ export type AgentConfig = {
   idleMinutes: number;
   mcpServers: Record<string, unknown>;
   pinnedDirs: string[];
-  /** Set by `chat-agent install`; cleared once that browser has connected. */
+  /** Set by `hda install`; cleared once that browser has connected. */
   install?: { deviceKey: string; secret: string };
   machineId?: string;
   machineSecret?: string;

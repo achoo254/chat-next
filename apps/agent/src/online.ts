@@ -12,11 +12,11 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
   const c = m.config.get();
   const secret = c.machineSecret;
   if (!secret || !c.machineId) {
-    log("not registered with a chat account yet: run the command from the web page (chat-agent install)");
+    log("not registered with a chat account yet: run the command from the web page (hda install)");
     return () => undefined;
   }
   if (!isSignedIn(m.config.dir)) {
-    log("tunnel sign-in missing: run `chat-agent login`");
+    log("tunnel sign-in missing: run `hda login`");
     return () => undefined;
   }
 
@@ -59,7 +59,7 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
       }
     } catch (err) {
       if (err instanceof MachineApiError && /agent_update_required/.test(err.message)) {
-        return stop("this chat-agent is too old for the server: run `chat-agent update`");
+        return stop("this hda is too old for the server: run `hda update`");
       }
       log(`heartbeat failed: ${(err as Error).message}`);
     }

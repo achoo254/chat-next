@@ -41,6 +41,7 @@ function fakeSession(id: string, policy: SessionPolicy, askUser: AskUser, log: F
   let abort: AbortController | undefined;
   let closed = false;
   events.push({ type: "session", sessionId: resumeId ?? `${id}-session-1` });
+  events.push({ type: "info", permissionMode: "default", commands: [{ name: "review", description: "Review the diff", argumentHint: "", builtin: false }] });
 
   async function runTurn(text: string) {
     turn += 1;

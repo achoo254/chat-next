@@ -23,8 +23,8 @@ describe("minisign", () => {
   });
 
   it("names the right asset per platform", () => {
-    expect(assetName("darwin", "arm64")).toBe("chat-agent-darwin-arm64");
-    expect(assetName("darwin", "x64")).toBe("chat-agent-darwin-x64");
-    expect(assetName("win32", "x64")).toBe("chat-agent-windows-x64.exe");
+    expect(assetName("darwin", "arm64")).toBe("hda-darwin-arm64");
+    expect(assetName("darwin", "x64")).toBe("hda-darwin-x64");
+    expect(assetName("win32", "x64")).toBe("hda-windows-x64.exe");
   });
 });

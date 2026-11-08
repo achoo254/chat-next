@@ -137,6 +137,7 @@ message Frame {
     AuditListResult audit_list_result = 49;
     Ack ack = 50;
     Error error = 51;
+    ThreadInfo thread_info = 52;
   }
 }
 
@@ -250,6 +251,44 @@ message AuditList {
 // --- answers and events (B → A) --------------------------------------------
 
 message Ack {}
+
+// What the user's own terminal statusline shows, for one thread: sent when a
+// device subscribes and whenever it changes.
+message ThreadInfo {
+  string thread_id = 1;
+  // The session's permission mode as the machine's own AI settings set it
+  // (Claude: default, acceptEdits, plan, bypassPermissions, auto). Read-only
+  // on devices.
+  string permission_mode = 2;
+  string git_branch = 3;
+  uint32 lines_added = 4;
+  uint32 lines_removed = 5;
+  // Slash commands and skills the AI offers in this folder.
+  repeated SlashCommand commands = 6;
+  // Plan usage of the AI account on this machine; unset when unknown.
+  RateLimits rate_limits = 7;
+}
+
+message SlashCommand {
+  // Without the leading slash.
+  string name = 1;
+  string description = 2;
+  string argument_hint = 3;
+  // The AI's own command, as opposed to a user, project or plugin skill.
+  bool builtin = 4;
+}
+
+message RateLimits {
+  RateWindow five_hour = 1;
+  RateWindow seven_day = 2;
+}
+
+message RateWindow {
+  // Percent of the window used, 0-100.
+  uint32 utilization = 1;
+  // Unix milliseconds when the window resets; 0 when unknown.
+  int64 resets_at = 2;
+}
 
 message Pong {}
 

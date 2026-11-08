@@ -1,4 +1,4 @@
-// Pins the install scripts to a published chat-agent release: version,
+// Pins the install scripts to a published hda release: version,
 // SHA-256 of each file (from the release's SHA256SUMS) and the minisign key.
 //   node apps/agent/scripts/pin-release.ts <version> <SHA256SUMS file>
 // Commit and push the result; the web deploy then serves the new scripts.
@@ -36,13 +36,13 @@ const set = (file: string, pairs: [RegExp, string][]) => {
 };
 set("install.sh", [
   [/^AGENT_VERSION=".*"$/m, `AGENT_VERSION="${version}"`],
-  [/^SHA256_DARWIN_ARM64=".*"$/m, `SHA256_DARWIN_ARM64="${need("chat-agent-darwin-arm64")}"`],
-  [/^SHA256_DARWIN_X64=".*"$/m, `SHA256_DARWIN_X64="${need("chat-agent-darwin-x64")}"`],
+  [/^SHA256_DARWIN_ARM64=".*"$/m, `SHA256_DARWIN_ARM64="${need("hda-darwin-arm64")}"`],
+  [/^SHA256_DARWIN_X64=".*"$/m, `SHA256_DARWIN_X64="${need("hda-darwin-x64")}"`],
   [/^MINISIGN_PUBKEY=".*"$/m, `MINISIGN_PUBKEY="${MINISIGN_PUBKEY}"`],
 ]);
 set("install.ps1", [
   [/^\$AgentVersion = '.*'$/m, `$AgentVersion = '${version}'`],
-  [/^\$Sha256WindowsX64 = '.*'$/m, `$Sha256WindowsX64 = '${need("chat-agent-windows-x64.exe")}'`],
+  [/^\$Sha256WindowsX64 = '.*'$/m, `$Sha256WindowsX64 = '${need("hda-windows-x64.exe")}'`],
   [/^\$MinisignPubKey = '.*'$/m, `$MinisignPubKey = '${MINISIGN_PUBKEY}'`],
 ]);
-console.log(`install scripts pinned to chat-agent ${version}`);
+console.log(`install scripts pinned to hda ${version}`);

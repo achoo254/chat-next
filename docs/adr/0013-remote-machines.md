@@ -11,7 +11,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 
 ### Kiến trúc
 
-- Máy B chạy `chat-agent` (`apps/agent`): một file chạy duy nhất, giữ các phiên AI qua adapter. Adapter đầu tiên chạy `claude` CLI người dùng đã cài, qua Claude Agent SDK.
+- Máy B chạy `hda` ("hoandat agent", `apps/agent`; tên cũ `chat-agent`, đổi ngày 08/11/2026 cho ngắn và gõ được khi bật Unikey): một file chạy duy nhất, giữ các phiên AI qua adapter. Adapter đầu tiên chạy `claude` CLI người dùng đã cài, qua Claude Agent SDK.
 - Máy A nối tới máy B qua relay Tunelo (`wss://<subdomain>.tunnel.hoandat.com`). Tiến trình nền mở WebSocket server trên `127.0.0.1` và cho tunnel chuyển tới đó.
 - Server Chat chỉ là danh bạ máy (tên, OS, khoá công khai, địa chỉ tunnel, lần thấy cuối), cấp mã cài và bắn Web Push không chứa nội dung. Server không phải gốc tin cậy cho khoá máy B và không thấy nội dung.
 - Không dùng Bot API của Chat: bot đi qua server và lưu tin nhắn, trái với yêu cầu nội dung chỉ nằm ở hai đầu.
@@ -38,7 +38,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 ### An toàn phiên
 
 - `settingSources: ['user']` mặc định: `.claude/settings.json` và hook của dự án không có hiệu lực, trừ khi người dùng tick "Nạp cấu hình .claude của dự án" (ghi nhật ký).
-- `strictMcpConfig` + chỉ MCP người dùng bật tại máy B. `permissionMode: 'default'` cố định; máy A không đổi được chế độ quyền, `bypassPermissions` chỉ bật bằng lệnh tại máy B.
+- `strictMcpConfig` + chỉ MCP người dùng bật tại máy B. Chế độ quyền theo đúng cấu hình Claude của máy B (`permissions.defaultMode` và luật allow/deny trong settings của người dùng; settings dự án chỉ nạp khi người dùng tick), kể cả `bypassPermissions` nếu chủ máy đã đặt vậy. Máy A chỉ thấy chế độ hiện tại, không đổi được (Jev 08/11/2026, phương án A 0,54; thay quyết định cũ "luôn hỏi quyền").
 - Thư mục nhạy cảm (`~`, `/`, `~/.ssh`, `~/.aws`, thư mục cấu hình của tiến trình nền…) không bị chặn mà phải xác nhận; đồng ý được ghi vào nhật ký trên máy B.
 - Rủi ro còn lại: XSS trên `chat.hoandat.com` dùng được khoá thiết bị (non-extractable) trong lúc trang mở, dù không lấy được khoá ra. Giảm bằng CSP chặt và xoá khoá khi đăng xuất.
 

@@ -164,7 +164,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
     strictMcpConfig: true,
     mcpServers: policy.mcpServers as NonNullable<Options["mcpServers"]>,
-    permissionMode: "default",
+    // No permissionMode: the session uses the machine's own Claude settings
+    // (permissions.defaultMode and allow/deny rules); devices only see it.
     includePartialMessages: true,
     canUseTool,
   };
@@ -173,6 +174,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
 
   const q = queryFn({ prompt: inbox, options });
   const mapper = new MessageMapper(policy.dir, (e) => events.push(e));
+  let hidden: string[] = [];
 
   void (async () => {
     try {
@@ -182,8 +184,21 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
           const state = interrupted ? "interrupted" : msg.subtype === "success" && !msg.is_error ? "completed" : "failed";
           interrupted = false;
           await pushUsage(q, events);
+          await pushInfo(q, events);
           events.push({ type: "turn-end", state, durationMs: Math.round(performance.now() - turnStart) });
           continue;
+        }
+        if (msg.type === "system" && msg.subtype === "init") {
+          hidden = msg.terminal_slash_commands ?? [];
+          events.push({ type: "info", permissionMode: msg.permissionMode });
+          void q.supportedCommands().then(
+            (list) => events.push({ type: "info", commands: toCommands(list, hidden) }),
+            () => undefined,
+          );
+        } else if (msg.type === "system" && msg.subtype === "status" && msg.permissionMode) {
+          events.push({ type: "info", permissionMode: msg.permissionMode });
+        } else if (msg.type === "system" && msg.subtype === "commands_changed") {
+          events.push({ type: "info", commands: toCommands(msg.commands, hidden) });
         }
         mapper.map(msg);
       }
@@ -230,6 +245,34 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       }
     },
   };
+}
+
+const ts = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
+
+/** Plan usage, lines changed and the command list, after each turn. */
+async function pushInfo(q: Query, events: Channel<ProviderEvent>) {
+  try {
+    const u = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true });
+    const r = u.rate_limits;
+    const win = (w: { utilization: number | null; resets_at: string | null } | null | undefined) =>
+      w && w.utilization !== null ? { utilization: Math.round(w.utilization), resetsAt: ts(w.resets_at) } : undefined;
+    const fiveHour = win(r?.five_hour);
+    const sevenDay = win(r?.seven_day);
+    events.push({
+      type: "info",
+      linesAdded: u.session.total_lines_added,
+      linesRemoved: u.session.total_lines_removed,
+      ...(fiveHour || sevenDay ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
+    });
+  } catch {
+    // experimental API missing or changed on this CLI version
+  }
+}
+
+export function toCommands(list: { name: string; description: string; argumentHint: string; builtin?: boolean }[], hide: string[] = []) {
+  return list
+    .filter((c) => !hide.includes(c.name))
+    .map((c) => ({ name: c.name, description: c.description, argumentHint: c.argumentHint, builtin: Boolean(c.builtin) }));
 }
 
 async function pushUsage(q: Query, events: Channel<ProviderEvent>) {

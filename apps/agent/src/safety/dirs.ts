@@ -6,7 +6,7 @@ import { join, parse, resolve } from "node:path";
 export type DirEntry = { name: string; git: boolean; branch: string; sensitive: boolean };
 export type DirListing = { path: string; parent: string; entries: DirEntry[]; sensitive: boolean };
 
-function gitBranch(dir: string): { git: boolean; branch: string } {
+export function gitBranch(dir: string): { git: boolean; branch: string } {
   const dotgit = join(dir, ".git");
   if (!existsSync(dotgit)) return { git: false, branch: "" };
   try {

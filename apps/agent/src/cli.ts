@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// chat-agent: lets the user's own devices drive the AI coding CLI installed
+// hda: lets the user's own devices drive the AI coding CLI installed
 // on this machine, end-to-end encrypted.
 import { execFile } from "node:child_process";
 import { ConfigStore, configDir } from "./config.ts";
@@ -13,21 +13,21 @@ import { signIn } from "./tunnel.ts";
 import { update } from "./update.ts";
 import { AGENT_VERSION } from "./version.ts";
 
-const HELP = `chat-agent ${AGENT_VERSION}
+const HELP = `hda ${AGENT_VERSION}
 
 Usage:
-  chat-agent install <code> --trust <device key>
+  hda install <code> --trust <device key>
                                    register this machine (pairing secret on stdin),
                                    sign in to the tunnel and start at login
-  chat-agent login                 sign in to the tunnel again
-  chat-agent uninstall             stop starting at login
-  chat-agent update                install the newest signed release and restart
-  chat-agent run [--port N]        start the agent in the foreground
-  chat-agent pair                  show a QR payload and 6-digit code to pair a device
-  chat-agent status                show machine, AI and session status
-  chat-agent devices               list paired devices
-  chat-agent devices revoke <key>  revoke a paired device (first characters of its key)
-  chat-agent audit                 show the consent log
+  hda login                 sign in to the tunnel again
+  hda uninstall             stop starting at login
+  hda update                install the newest signed release and restart
+  hda run [--port N]        start the agent in the foreground
+  hda pair                  show a QR payload and 6-digit code to pair a device
+  hda status                show machine, AI and session status
+  hda devices               list paired devices
+  hda devices revoke <key>  revoke a paired device (first characters of its key)
+  hda audit                 show the consent log
 `;
 
 function flag(args: string[], name: string): string | undefined {
@@ -58,7 +58,7 @@ async function main(argv: string[]): Promise<number> {
     case "install": {
       const code = args[0] ?? "";
       const trust = flag(args, "--trust") ?? "";
-      if (!/^[A-Za-z0-9_-]{22}$/.test(code) || !/^[A-Za-z0-9_-]{43}$/.test(trust)) throw new Error("usage: chat-agent install <code> --trust <device key>");
+      if (!/^[A-Za-z0-9_-]{22}$/.test(code) || !/^[A-Za-z0-9_-]{43}$/.test(trust)) throw new Error("usage: hda install <code> --trust <device key>");
       const secret = (await readLine()).trim();
       if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) throw new Error("the pairing secret must come on stdin");
       const config = new ConfigStore(dir);
@@ -72,7 +72,7 @@ async function main(argv: string[]): Promise<number> {
       console.log("Registered. Now allow the tunnel sign-in in your browser.");
       await login(dir);
       const where = await installService(dir);
-      console.log(`chat-agent will start at login (${where}). You can close this window.`);
+      console.log(`hda will start at login (${where}). You can close this window.`);
       return 0;
     }
     case "login":
@@ -81,7 +81,7 @@ async function main(argv: string[]): Promise<number> {
     case "update": {
       const v = await update((l) => console.log(l));
       if (!v) {
-        console.log(`chat-agent ${AGENT_VERSION} is the newest.`);
+        console.log(`hda ${AGENT_VERSION} is the newest.`);
         return 0;
       }
       // The service supervisor (launchd / logon task loop) starts the new file.
@@ -91,7 +91,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case "uninstall":
       await uninstallService(dir);
-      console.log("chat-agent no longer starts at login. Remove the machine on the web to forget it there.");
+      console.log("hda no longer starts at login. Remove the machine on the web to forget it there.");
       return 0;
     case "pair": {
       const p = (await callControl(dir, "POST", "/pair")) as { code: string; qr: string; expiresAt: number };
@@ -149,7 +149,7 @@ async function login(dir: string): Promise<void> {
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (err: Error) => {
-    console.error(`chat-agent: ${err.message}`);
+    console.error(`hda: ${err.message}`);
     process.exit(1);
   },
 );

@@ -33,6 +33,25 @@ const adapters: [string, () => { provider: AgentProvider; resumeIds: () => (stri
 
 const turnDone = (n: number) => (items: ReturnType<typeof byCase<"turn">>) => items.filter((t) => t.body.value.state !== TurnState.RUNNING).length >= n;
 
+describe("claude adapter usage", () => {
+  it("passes plan usage and lines changed", async () => {
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const { core, work } = makeCore([provider]);
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    await new Promise((r) => setTimeout(r, 20));
+    const info = core.info(t.id);
+    expect([info.linesAdded, info.linesRemoved]).toEqual([3, 1]);
+    expect(info.rateLimits?.fiveHour?.utilization).toBe(4);
+    expect(info.rateLimits?.fiveHour?.resetsAt).toBe(BigInt(Date.parse("2026-11-08T12:00:00Z")));
+    expect(info.rateLimits?.sevenDay?.utilization).toBe(80);
+    expect(sdk.log.options[0]?.permissionMode).toBeUndefined();
+    await core.stop();
+  });
+});
+
 describe.each(adapters)("provider contract: %s", (_name, make) => {
   it("streams an answer and ends the turn", async () => {
     const { provider } = make();
@@ -48,6 +67,18 @@ describe.each(adapters)("provider contract: %s", (_name, make) => {
     expect(byCase(items, "turn")[0]?.body.value.state).toBe(TurnState.COMPLETED);
     const seqs = items.map((i) => i.seq);
     expect([...seqs].sort((a, b) => (a < b ? -1 : 1))).toEqual(seqs);
+    await core.stop();
+  });
+
+  it("reports the statusline info of the thread", async () => {
+    const { provider } = make();
+    const { core, work } = makeCore([provider]);
+    const t = await core.create({ provider: provider.id, model: "", dir: work, text: "hello", consent, device: "test" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    await new Promise((r) => setTimeout(r, 20));
+    const info = core.info(t.id);
+    expect(info.permissionMode).toBe("default");
+    expect(info.commands.map((c) => c.name)).toEqual(["review"]);
     await core.stop();
   });
 

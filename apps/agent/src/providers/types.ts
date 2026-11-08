@@ -27,7 +27,21 @@ export type Detected = { installed: boolean; version?: string; loginState: Login
 
 export type TodoEntry = { text: string; state: "pending" | "in-progress" | "done" };
 
+export type SlashCommand = { name: string; description: string; argumentHint: string; builtin: boolean };
+
+export type RateWindow = { utilization: number; resetsAt: number };
+
+/** Statusline data; each field present only when it changed or is known. */
+export type ProviderInfo = {
+  permissionMode?: string;
+  commands?: SlashCommand[];
+  linesAdded?: number;
+  linesRemoved?: number;
+  rateLimits?: { fiveHour?: RateWindow; sevenDay?: RateWindow };
+};
+
 export type ProviderEvent =
+  | ({ type: "info" } & ProviderInfo)
   /** The adapter's own session id, kept for resume. */
   | { type: "session"; sessionId: string }
   | { type: "text-delta"; blockId: string; role: "assistant" | "thinking"; text: string }

@@ -132,12 +132,19 @@ export class Connection {
         if (this.subscribed.has(threadId)) this.sendItems(threadId, items);
       }),
       this.ctx.core.onStatus((thread) => this.send("", { case: "threadStatus", value: { thread } })),
+      this.ctx.core.onInfo((threadId) => {
+        if (this.subscribed.has(threadId)) this.sendInfo(threadId);
+      }),
     );
   }
 
   private send(id: string, body: NonNullable<MessageInitShape<typeof FrameSchema>["body"]>): void {
     if (this.state !== "open" || !this.session) return;
     this.socket.send(this.session.seal(create(FrameSchema, { id, body })));
+  }
+
+  private sendInfo(threadId: string): void {
+    this.send("", { case: "threadInfo", value: this.ctx.core.info(threadId) });
   }
 
   private sendItems(threadId: string, items: Item[], id = ""): void {
@@ -175,12 +182,14 @@ export class Connection {
           });
           this.subscribed.add(thread.id);
           this.send(id, { case: "threadCreated", value: { thread } });
+          this.sendInfo(thread.id);
           return this.sendItems(thread.id, core.snapshot(thread.id));
         }
         case "threadSubscribe": {
           const { threadId, cursor } = b.value;
           const r = core.subscribe(threadId, cursor);
           this.subscribed.add(threadId);
+          this.sendInfo(threadId);
           if (r.resume.kind === "reset") {
             this.send(id, { case: "threadReset", value: { threadId, reason: r.resume.reason } });
             return this.sendItems(threadId, core.snapshot(threadId), id);
