@@ -1,8 +1,14 @@
-# Installs hda, the background process of "My machines" (ADR 0013),
+# Installs tunelo, the background process of "My machines" (ADR 0013),
 # on Windows (Windows PowerShell 5.1 or PowerShell 7). The web app shows the
 # command:
 #
 #   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) <install code> <device key> [vi|en|zh-CN]
+#
+# A computer that still runs hda (the earlier name of tunelo) is moved to
+# tunelo first, keeping the machine, its paired devices and sessions. Without
+# an install code the script only does that move:
+#
+#   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) [vi|en|zh-CN]
 #
 # then asks you to paste the pairing secret it shows, which this script
 # reads with Read-Host -AsSecureString: the secret is never in a command
@@ -10,7 +16,7 @@
 # and the device's public key are not secret.
 #
 # The release is pinned: version and SHA-256 are written into this script
-# when the web app is built for a hda release, and the minisign
+# when the web app is built for a tunelo release, and the minisign
 # signature is checked with the embedded public key when minisign is
 # installed. A script whose pins were not filled in refuses to run.
 param(
@@ -22,12 +28,17 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$AgentVersion = '0.2.4'
-$Sha256WindowsX64 = '8c8f05a1af992771d1c3948f3d61405a5188c4c3adc27118b6d80a0ee3ab1db7'
+$TuneloVersion = '__TUNELO_VERSION__'
+$Sha256WindowsX64 = '__SHA256_WINDOWS_X64__'
 $MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
-$Asset = 'hda-windows-x64.exe'
+$Asset = 'tunelo-windows-x64.exe'
 
+# Only a language given (the command that moves hda): it arrives as the first argument.
+if (-not $DeviceKey -and $Code -match '^(vi|en|zh)') {
+	$Locale = $Code
+	$Code = ''
+}
 if (-not $Locale) { $Locale = (Get-Culture).Name }
 $Lang = 'en'
 if ($Locale -like 'vi*') { $Lang = 'vi' } elseif ($Locale -like 'zh*') { $Lang = 'zh-CN' }
@@ -44,28 +55,33 @@ function Stop-Install([string]$Vi, [string]$En, [string]$Zh) {
 	throw (Get-Text "Lỗi: $Vi" "Error: $En" "错误：$Zh")
 }
 
-function Install-ChatAgent {
-	if ($Code -notmatch '^[A-Za-z0-9_-]{22}$' -or $DeviceKey -notmatch '^[A-Za-z0-9_-]{43}$') {
-		Stop-Install 'thiếu hoặc sai mã cài/khoá thiết bị; hãy chép lại lệnh từ trang Chat.' `
-			'missing or malformed install code or device key; copy the command from the Chat page again.' `
-			'安装码或设备密钥缺失或格式不正确；请从 Chat 页面重新复制命令。'
+function Install-Tunelo {
+	# hda keeps its config here; the marker means it has already moved to tunelo.
+	$hdaDir = if ($env:CHAT_AGENT_HOME) { $env:CHAT_AGENT_HOME } else { Join-Path $env:APPDATA 'chat-agent' }
+	$fromHda = (Test-Path (Join-Path $hdaDir 'config.json')) -and -not (Test-Path (Join-Path $hdaDir 'migrated-to-tunelo'))
+	if ($Code -or -not $fromHda) {
+		if ($Code -notmatch '^[A-Za-z0-9_-]{22}$' -or $DeviceKey -notmatch '^[A-Za-z0-9_-]{43}$') {
+			Stop-Install 'thiếu hoặc sai mã cài/khoá thiết bị; hãy chép lại lệnh từ trang Chat.' `
+				'missing or malformed install code or device key; copy the command from the Chat page again.' `
+				'安装码或设备密钥缺失或格式不正确；请从 Chat 页面重新复制命令。'
+		}
 	}
-	if ($AgentVersion.StartsWith('__')) {
-		Stop-Install 'chưa có bản phát hành hda.' 'no hda release is available yet.' 'hda 尚未发布。'
+	if ($TuneloVersion.StartsWith('__')) {
+		Stop-Install 'chưa có bản phát hành tunelo.' 'no tunelo release is available yet.' 'tunelo 尚未发布。'
 	}
 	# x64 also runs on Windows on Arm through emulation.
 	if ($env:PROCESSOR_ARCHITECTURE -notin @('AMD64', 'ARM64') -and $env:PROCESSOR_ARCHITEW6432 -notin @('AMD64', 'ARM64')) {
-		Stop-Install 'hda cần Windows 64-bit.' 'hda needs 64-bit Windows.' 'hda 需要 64 位 Windows。'
+		Stop-Install 'tunelo cần Windows 64-bit.' 'tunelo needs 64-bit Windows.' 'tunelo 需要 64 位 Windows。'
 	}
 	# Windows PowerShell 5.1 may still default to older TLS versions.
 	[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-	$tmp = Join-Path ([IO.Path]::GetTempPath()) ('hda-' + [Guid]::NewGuid().ToString('N'))
+	$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tunelo-' + [Guid]::NewGuid().ToString('N'))
 	New-Item -ItemType Directory -Path $tmp | Out-Null
 	try {
-		$url = "$Releases/agent-v$AgentVersion/$Asset"
+		$url = "$Releases/tunelo-v$TuneloVersion/$Asset"
 		$file = Join-Path $tmp $Asset
-		Write-Host (Get-Text "Đang tải hda $AgentVersion…" "Downloading hda $AgentVersion…" "正在下载 hda $AgentVersion…")
+		Write-Host (Get-Text "Đang tải tunelo $TuneloVersion…" "Downloading tunelo $TuneloVersion…" "正在下载 tunelo $TuneloVersion…")
 		try {
 			Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
 		} catch {
@@ -90,11 +106,16 @@ function Install-ChatAgent {
 			}
 		}
 
-		$dir = Join-Path $env:LOCALAPPDATA 'hda'
-		$exe = Join-Path $dir 'hda.exe'
+		$dir = Join-Path $env:LOCALAPPDATA 'tunelo'
+		$exe = Join-Path $dir 'tunelo.exe'
 		New-Item -ItemType Directory -Force -Path $dir | Out-Null
+		# A running tunelo.exe cannot be overwritten, but it can be renamed.
+		if (Test-Path $exe) {
+			Remove-Item -Force -Path "$exe.old" -ErrorAction SilentlyContinue
+			Move-Item -Force -Path $exe -Destination "$exe.old"
+		}
 		Move-Item -Force -Path $file -Destination $exe
-		# Put hda on the user's PATH (no admin); new terminals see it.
+		# Put tunelo on the user's PATH (no admin); new terminals see it.
 		$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 		if (-not (($userPath -split ';') -contains $dir)) {
 			$newPath = if ($userPath) { "$userPath;$dir" } else { $dir }
@@ -103,6 +124,28 @@ function Install-ChatAgent {
 		if (-not (($env:Path -split ';') -contains $dir)) { $env:Path = "$env:Path;$dir" }
 	} finally {
 		Remove-Item -Recurse -Force -Path $tmp -ErrorAction SilentlyContinue
+	}
+
+	# The old Tunelo CLI from npm (1.x) is also called tunelo and may come first on PATH.
+	if (Get-Command npm -ErrorAction SilentlyContinue) {
+		& npm ls -g tunelo --depth=0 *> $null
+		if ($LASTEXITCODE -eq 0) {
+			Write-Warning (Get-Text 'Gói npm tunelo 1.x cũ vẫn đang cài và có thể che lệnh tunelo mới. Gỡ nó bằng: npm uninstall -g tunelo' `
+				'The old tunelo 1.x npm package is still installed and may hide the new tunelo command. Remove it with: npm uninstall -g tunelo' `
+				'旧的 tunelo 1.x npm 包仍已安装，可能遮住新的 tunelo 命令。请运行 npm uninstall -g tunelo 卸载。')
+		}
+	}
+
+	if ($fromHda) {
+		Write-Host (Get-Text 'Tìm thấy hda trên máy; đang chuyển sang tunelo (giữ máy, thiết bị đã ghép và các phiên)…' `
+			'Found hda on this computer; moving it to tunelo (the machine, paired devices and sessions stay)…' `
+			'在这台电脑上找到 hda；正在迁移到 tunelo（保留电脑、已配对设备和会话）…')
+		& $exe migrate-from-hda
+		if ($LASTEXITCODE -ne 0) {
+			Stop-Install 'chuyển hda sang tunelo không thành công; hda vẫn chạy như cũ.' `
+				'moving hda to tunelo failed; hda keeps running as before.' 'hda 迁移到 tunelo 失败；hda 仍照常运行。'
+		}
+		if (-not $Code) { return }
 	}
 
 	$prompt = Get-Text 'Dán mã ghép đang hiện trên trang Chat rồi bấm Enter (chữ sẽ không hiện khi dán)' `
@@ -120,13 +163,13 @@ function Install-ChatAgent {
 			'the pairing secret is malformed; run the command again and paste it.' `
 			'配对密钥格式不正确；请重新运行命令并粘贴。'
 	}
-	# The secret reaches hda on stdin only.
+	# The secret reaches tunelo on stdin only.
 	# Windows PowerShell may prefix piped text with a UTF-8 BOM; send plain UTF-8.
 	$OutputEncoding = New-Object System.Text.UTF8Encoding $false
 	$secret | & $exe install $Code --trust $DeviceKey
 	if ($LASTEXITCODE -ne 0) {
-		Stop-Install 'hda install không thành công.' 'hda install failed.' 'hda install 失败。'
+		Stop-Install 'tunelo install không thành công.' 'tunelo install failed.' 'tunelo install 失败。'
 	}
 }
 
-Install-ChatAgent
+Install-Tunelo

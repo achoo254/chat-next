@@ -51,9 +51,11 @@ export function createSensitiveCheck(opts: SensitiveOptions = {}) {
   if (process.platform === "win32") {
     const win = process.env.SystemRoot ?? "C:\\Windows";
     inside.push(win, process.env.ProgramFiles ?? "C:\\Program Files", process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)");
-    if (process.env.APPDATA) inside.push(join(process.env.APPDATA, "chat-agent"));
+    // The agent's config under its current and earlier name (machine key, tunnel sign-in).
+    if (process.env.APPDATA) inside.push(join(process.env.APPDATA, "tunelo"), join(process.env.APPDATA, "chat-agent"));
   } else {
     inside.push("/etc", "/System", "/usr", "/bin", "/sbin", "/var", "/private/etc", "/Library");
+    inside.push(join(home, ".config", "tunelo"), join(home, ".config", "chat-agent"));
   }
   inside.push(...(opts.extra ?? []));
   const dirs = inside.map(norm);
@@ -73,8 +75,9 @@ export function mentionsSensitive(
   opts: { home?: string; cwd?: string } = {},
 ): boolean {
   const home = opts.home ?? homedir();
-  // The agent's own commands hand out pairing secrets or change trust.
-  if (/\bhda(\.exe)?\s+(pair|devices|trust|untrust|install|login)\b/i.test(text)) return true;
+  // The agent's own commands (current and earlier name) hand out pairing
+  // secrets, sign in, or change trust, Claude profiles and local forwarding.
+  if (/\b(tunelo|hda)(\.exe)?\s+(pair|devices|trust|untrust|install|login|claude\s+profiles|config\s+local-forward)\b/i.test(text)) return true;
   // JSON inputs escape Windows backslashes; undo that before splitting.
   const unescaped = text
     .replaceAll("\\\\", "\\")

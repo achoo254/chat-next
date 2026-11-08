@@ -325,7 +325,7 @@ export class AgentCore {
     if (detected.loginState === "needs-login") throw new AgentError(ErrorCode.NEEDS_LOGIN, `${provider.name} needs sign-in`);
 
     if (req.consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false)) {
-      throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: hda trust "${dir}"`);
+      throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: tunelo trust "${dir}"`);
     }
     if (sensitive) this.opts.audit.write({ device: req.device, action: "open_sensitive", path: dir, detail: "" });
     if (req.consent.projectSettings) {

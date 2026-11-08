@@ -1,5 +1,5 @@
 {
-  "name": "@achoo254/chat-agent",
+  "name": "@achoo254/tunelo-agent",
   "version": "0.0.0",
   "private": true,
   "description": "Background agent on a user's own machine: runs their installed AI coding CLI and relays it, end-to-end encrypted, to their paired devices",

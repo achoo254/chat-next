@@ -1,4 +1,4 @@
-// Local control channel between `hda <command>` and the running
+// Local control channel between `tunelo <command>` and the running
 // service: HTTP on 127.0.0.1 with a random token written to control.json in
 // the 0700 config folder, so only this OS user can call it. Only the service
 // writes the config; commands ask it to.
@@ -101,7 +101,7 @@ export function callControl(configDir: string, method: string, path: string, inp
   try {
     target = JSON.parse(readFileSync(controlFile(configDir), "utf8")) as { port: number; token: string };
   } catch {
-    return Promise.reject(new Error("hda is not running (start it with `hda start`)"));
+    return Promise.reject(new Error("tunelo is not running (start it with `tunelo start`)"));
   }
   return new Promise((resolve, reject) => {
     const headers = { "content-type": "application/json", "x-chat-agent-token": target.token };
@@ -118,7 +118,7 @@ export function callControl(configDir: string, method: string, path: string, inp
         }
       });
     });
-    req.on("error", () => reject(new Error("hda is not running (start it with `hda start`)")));
+    req.on("error", () => reject(new Error("tunelo is not running (start it with `tunelo start`)")));
     req.end(input === undefined ? undefined : JSON.stringify(input));
   });
 }

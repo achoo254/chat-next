@@ -12,11 +12,11 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
   const c = m.config.get();
   const secret = c.machineSecret;
   if (!secret || !c.machineId) {
-    log("not registered with a chat account yet: run the command from the web page (hda install)");
+    log("not registered with a chat account yet: run the command from the web page (tunelo install)");
     return () => undefined;
   }
   if (!isSignedIn(m.config.dir)) {
-    log("tunnel sign-in missing: run `hda login`");
+    log("tunnel sign-in missing: run `tunelo login`");
     return () => undefined;
   }
 
@@ -59,7 +59,7 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
       }
     } catch (err) {
       if (err instanceof MachineApiError && /agent_update_required/.test(err.message)) {
-        return stop("this hda is too old for the server: run `hda update`");
+        return stop("this tunelo is too old for the server: run `tunelo update`");
       }
       log(`heartbeat failed: ${(err as Error).message}`);
     }

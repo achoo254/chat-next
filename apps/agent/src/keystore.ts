@@ -1,6 +1,8 @@
 // The machine's private X25519 key lives in the OS key store: the macOS
 // login Keychain, DPAPI (current user) on Windows. Elsewhere, and in tests,
-// a 0600 file in the config folder.
+// a 0600 file in the config folder. The Keychain entry was named after
+// chat-agent before tunelo; that entry is still read while the new one is
+// missing, so a machine never gets a second key.
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,28 +10,35 @@ import { promisify } from "node:util";
 import { type KeyPair, exportPrivateKey, fromBase64Url, generateKeyPair, importKeyPair, toBase64Url } from "@achoo254/chat-remote-protocol";
 
 const run = promisify(execFile);
-const SERVICE = "com.hoandat.chat-agent";
+const SERVICE = "com.hoandat.tunelo";
+const LEGACY_SERVICE = "com.hoandat.chat-agent";
 const ACCOUNT = "machine-key";
 
 type Backend = { read(): Promise<string | null>; write(value: string): Promise<void> };
 
+async function readKeychain(service: string): Promise<string | null> {
+  try {
+    const { stdout } = await run("security", ["find-generic-password", "-s", service, "-a", ACCOUNT, "-w"]);
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeKeychain(service: string, value: string): Promise<void> {
+  // Through `security -i` on stdin so the key never shows up in argv.
+  return new Promise<void>((resolve, reject) => {
+    const child = execFile("security", ["-i"], (err) => (err ? reject(err) : resolve()));
+    child.stdin?.end(`add-generic-password -U -s ${service} -a ${ACCOUNT} -w ${value}\n`);
+  });
+}
+
 function keychain(): Backend {
   return {
     async read() {
-      try {
-        const { stdout } = await run("security", ["find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"]);
-        return stdout.trim() || null;
-      } catch {
-        return null;
-      }
+      return (await readKeychain(SERVICE)) ?? (await readKeychain(LEGACY_SERVICE));
     },
-    async write(value) {
-      // Through `security -i` on stdin so the key never shows up in argv.
-      await new Promise<void>((resolve, reject) => {
-        const child = execFile("security", ["-i"], (err) => (err ? reject(err) : resolve()));
-        child.stdin?.end(`add-generic-password -U -s ${SERVICE} -a ${ACCOUNT} -w ${value}\n`);
-      });
-    },
+    write: (value) => writeKeychain(SERVICE, value),
   };
 }
 
@@ -76,9 +85,12 @@ function plainFile(dir: string): Backend {
   };
 }
 
+const fileKeystore = () => (process.env.TUNELO_KEYSTORE || process.env.CHAT_AGENT_KEYSTORE) === "file";
+const usesKeychain = () => process.platform === "darwin" && !fileKeystore();
+
 function backend(dir: string): Backend {
-  if (process.env.CHAT_AGENT_KEYSTORE === "file") return plainFile(dir);
-  if (process.platform === "darwin") return keychain();
+  if (fileKeystore()) return plainFile(dir);
+  if (usesKeychain()) return keychain();
   if (process.platform === "win32") return dpapi(dir);
   return plainFile(dir);
 }
@@ -93,4 +105,23 @@ export async function machineKey(dir: string): Promise<KeyPair> {
   const saved = await store.read();
   if (!saved) throw new Error("could not store the machine key");
   return importKeyPair(fromBase64Url(saved));
+}
+
+/**
+ * Copies the machine key from the Keychain entry of the old name to the new
+ * one and reads it back. The old entry stays, so going back to hda still has
+ * the key. The DPAPI and file stores live in the config folder and move with
+ * it. Throws rather than letting the machine end up with two keys.
+ */
+export async function copyLegacyMachineKey(): Promise<void> {
+  if (!usesKeychain()) return;
+  const legacy = await readKeychain(LEGACY_SERVICE);
+  if (!legacy) return;
+  const current = await readKeychain(SERVICE);
+  if (current) {
+    if (current !== legacy) throw new Error(`the Keychain holds two different machine keys (${SERVICE}, ${LEGACY_SERVICE}); nothing was changed`);
+    return;
+  }
+  await writeKeychain(SERVICE, legacy);
+  if ((await readKeychain(SERVICE)) !== legacy) throw new Error("the machine key did not copy to its new Keychain entry; nothing else was changed");
 }

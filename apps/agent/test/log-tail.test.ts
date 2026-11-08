@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { lastLines, tailLog } from "../src/log-tail.ts";
 import { tempDir } from "./harness.ts";
 
-describe("hda logs", () => {
+describe("tunelo logs", () => {
   it("keeps the last lines, Windows line ends included", () => {
     expect(lastLines("a\r\nb\r\nc\r\n", 2)).toEqual(["b", "c"]);
     expect(lastLines("a\nb", 5)).toEqual(["a", "b"]);

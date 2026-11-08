@@ -1,8 +1,14 @@
 #!/bin/sh
-# Installs hda, the background process of "My machines" (ADR 0013),
+# Installs tunelo, the background process of "My machines" (ADR 0013),
 # on macOS. The web app shows the command:
 #
 #   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <install code> <device key> [vi|en|zh-CN]
+#
+# A Mac that still runs hda (the earlier name of tunelo) is moved to tunelo
+# first, keeping the machine, its paired devices and sessions. Without an
+# install code the script only does that move:
+#
+#   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- [vi|en|zh-CN]
 #
 # then asks you to paste the pairing secret it shows, which this script
 # reads from the terminal with echo off: the secret is never in a command
@@ -10,14 +16,14 @@
 # and the device's public key are not secret.
 #
 # The release is pinned: version and SHA-256 of every file are written into
-# this script when the web app is built for a hda release, and the
+# this script when the web app is built for a tunelo release, and the
 # minisign signature is checked with the embedded public key when minisign
 # is installed. A script whose pins were not filled in refuses to run.
 set -eu
 
-AGENT_VERSION="0.2.4"
-SHA256_DARWIN_ARM64="f9049a4322640826959ee1c28e2798efceb9cfd6f4addf1b3b03951ca2e9e545"
-SHA256_DARWIN_X64="8cbc55d75720115810f953627c21ed4c373b70afa8a789e08d3f2d31caa30af3"
+TUNELO_VERSION="__TUNELO_VERSION__"
+SHA256_DARWIN_ARM64="__SHA256_DARWIN_ARM64__"
+SHA256_DARWIN_X64="__SHA256_DARWIN_X64__"
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
@@ -46,35 +52,51 @@ sha256_of() {
 }
 
 main() {
-	case "${3:-${LANG:-en}}" in
+	if [ $# -ge 2 ]; then
+		code="$1"
+		device_key="$2"
+		locale="${3:-${LANG:-en}}"
+	else
+		code=""
+		device_key=""
+		locale="${1:-${LANG:-en}}"
+	fi
+	case "$locale" in
 	vi*) lang="vi" ;;
 	zh*) lang="zh-CN" ;;
 	*) lang="en" ;;
 	esac
-	[ $# -ge 2 ] || die "thiếu mã cài hoặc khoá thiết bị; hãy chép lại lệnh từ trang Chat." \
-		"missing the install code or the device key; copy the command from the Chat page again." \
-		"缺少安装码或设备密钥；请从 Chat 页面重新复制命令。"
-	code="$1"
-	device_key="$2"
-	printf '%s' "$code" | grep -Eq '^[A-Za-z0-9_-]{22}$' || die "mã cài không hợp lệ." "the install code is malformed." "安装码格式不正确。"
-	printf '%s' "$device_key" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "khoá thiết bị không hợp lệ." "the device key is malformed." "设备密钥格式不正确。"
+	if [ -n "$code" ]; then
+		printf '%s' "$code" | grep -Eq '^[A-Za-z0-9_-]{22}$' || die "mã cài không hợp lệ." "the install code is malformed." "安装码格式不正确。"
+		printf '%s' "$device_key" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "khoá thiết bị không hợp lệ." "the device key is malformed." "设备密钥格式不正确。"
+	fi
 
-	case "$AGENT_VERSION" in
-	__*) die "chưa có bản phát hành hda." "no hda release is available yet." "hda 尚未发布。" ;;
+	case "$TUNELO_VERSION" in
+	__*) die "chưa có bản phát hành tunelo." "no tunelo release is available yet." "tunelo 尚未发布。" ;;
 	esac
 
-	[ "$(uname -s)" = "Darwin" ] || die "hda hiện chỉ có cho macOS và Windows." \
-		"hda is only available for macOS and Windows." "hda 目前仅支持 macOS 和 Windows。"
+	[ "$(uname -s)" = "Darwin" ] || die "tunelo hiện chỉ có cho macOS và Windows." \
+		"tunelo is only available for macOS and Windows." "tunelo 目前仅支持 macOS 和 Windows。"
 	case "$(uname -m)" in
-	arm64) asset="hda-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
-	x86_64) asset="hda-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
+	arm64) asset="tunelo-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
+	x86_64) asset="tunelo-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
 	*) die "kiến trúc máy không được hỗ trợ." "this processor is not supported." "不支持此处理器。" ;;
 	esac
 
+	# hda keeps its config here; the marker means it has already moved to tunelo.
+	hda_dir="${CHAT_AGENT_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/chat-agent}"
+	from_hda=""
+	if [ -f "$hda_dir/config.json" ] && [ ! -f "$hda_dir/migrated-to-tunelo" ]; then
+		from_hda="yes"
+	fi
+	[ -n "$code" ] || [ -n "$from_hda" ] || die "thiếu mã cài hoặc khoá thiết bị; hãy chép lại lệnh từ trang Chat." \
+		"missing the install code or the device key; copy the command from the Chat page again." \
+		"缺少安装码或设备密钥；请从 Chat 页面重新复制命令。"
+
 	tmp="$(mktemp -d)"
 	trap 'rm -rf "$tmp"' EXIT INT TERM
-	url="$RELEASES/agent-v$AGENT_VERSION/$asset"
-	say "Đang tải hda $AGENT_VERSION…" "Downloading hda $AGENT_VERSION…" "正在下载 hda $AGENT_VERSION…"
+	url="$RELEASES/tunelo-v$TUNELO_VERSION/$asset"
+	say "Đang tải tunelo $TUNELO_VERSION…" "Downloading tunelo $TUNELO_VERSION…" "正在下载 tunelo $TUNELO_VERSION…"
 	curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$asset" "$url" || die "không tải được $url" "could not download $url" "无法下载 $url"
 	[ "$(sha256_of "$tmp/$asset")" = "$sha" ] || die "file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt." \
 		"the download does not match the pinned SHA-256; nothing was installed." "下载的文件与固定的 SHA-256 不符；未安装任何内容。"
@@ -86,11 +108,40 @@ main() {
 	fi
 
 	bin_dir="$HOME/.local/bin"
-	bin="$bin_dir/hda"
+	bin="$bin_dir/tunelo"
 	mkdir -p "$bin_dir"
 	chmod 0755 "$tmp/$asset"
 	mv -f "$tmp/$asset" "$bin.new"
 	mv -f "$bin.new" "$bin"
+
+	# Put tunelo on PATH for new terminals (zsh is the macOS default shell).
+	case ":$PATH:" in
+	*":$bin_dir:"*) ;;
+	*)
+		line='export PATH="$HOME/.local/bin:$PATH"'
+		for rc in "$HOME/.zprofile" "$HOME/.bash_profile"; do
+			case "$rc" in *bash_profile) [ -f "$rc" ] || continue ;; esac
+			grep -Fqs "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
+		done
+		say "Đã thêm $bin_dir vào PATH; mở terminal mới để gõ tunelo." "Added $bin_dir to your PATH; open a new terminal to use tunelo." "已将 $bin_dir 加入 PATH；打开新终端即可使用 tunelo。"
+		;;
+	esac
+
+	# The old Tunelo CLI from npm (1.x) is also called tunelo and may come first on PATH.
+	if command -v npm >/dev/null 2>&1 && npm ls -g tunelo --depth=0 >/dev/null 2>&1; then
+		say "Lưu ý: gói npm tunelo 1.x cũ vẫn đang cài và có thể che lệnh tunelo mới. Gỡ nó bằng: npm uninstall -g tunelo" \
+			"Note: the old tunelo 1.x npm package is still installed and may hide the new tunelo command. Remove it with: npm uninstall -g tunelo" \
+			"注意：旧的 tunelo 1.x npm 包仍已安装，可能遮住新的 tunelo 命令。请运行 npm uninstall -g tunelo 卸载。"
+	fi
+
+	if [ -n "$from_hda" ]; then
+		say "Tìm thấy hda trên máy; đang chuyển sang tunelo (giữ máy, thiết bị đã ghép và các phiên)…" \
+			"Found hda on this Mac; moving it to tunelo (the machine, paired devices and sessions stay)…" \
+			"在这台 Mac 上找到 hda；正在迁移到 tunelo（保留电脑、已配对设备和会话）…"
+		"$bin" migrate-from-hda || die "chuyển hda sang tunelo không thành công; hda vẫn chạy như cũ." \
+			"moving hda to tunelo failed; hda keeps running as before." "hda 迁移到 tunelo 失败；hda 仍照常运行。"
+		[ -n "$code" ] || return 0
+	fi
 
 	[ -r /dev/tty ] || die "cần chạy lệnh trong cửa sổ Terminal để dán mã ghép." \
 		"run the command in a Terminal window to paste the pairing secret." "请在终端窗口中运行该命令以粘贴配对密钥。"
@@ -105,21 +156,8 @@ main() {
 	printf '%s' "$secret" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "mã ghép không hợp lệ; chạy lại lệnh và dán đúng mã." \
 		"the pairing secret is malformed; run the command again and paste it." "配对密钥格式不正确；请重新运行命令并粘贴。"
 
-	# printf is a shell builtin: the secret reaches hda on stdin only.
+	# printf is a shell builtin: the secret reaches tunelo on stdin only.
 	printf '%s\n' "$secret" | "$bin" install "$code" --trust "$device_key"
-
-	# Put hda on PATH for new terminals (zsh is the macOS default shell).
-	case ":$PATH:" in
-	*":$bin_dir:"*) ;;
-	*)
-		line='export PATH="$HOME/.local/bin:$PATH"'
-		for rc in "$HOME/.zprofile" "$HOME/.bash_profile"; do
-			case "$rc" in *bash_profile) [ -f "$rc" ] || continue ;; esac
-			grep -Fqs "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
-		done
-		say "Đã thêm $bin_dir vào PATH; mở terminal mới để gõ hda." "Added $bin_dir to your PATH; open a new terminal to use hda." "已将 $bin_dir 加入 PATH；打开新终端即可使用 hda。"
-		;;
-	esac
 }
 
 main "$@"

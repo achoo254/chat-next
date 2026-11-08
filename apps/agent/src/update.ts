@@ -1,6 +1,11 @@
-// `hda update`: fetch the newest agent-v* release, check its minisign
+// `tunelo update`: fetch the newest tunelo-v* release, check its minisign
 // signature against the key built into this binary, replace the file and
 // let the service restart itself.
+//
+// The same repo also holds the agent-v* releases of hda, the earlier name.
+// hda 0.2.x only looks there (assets hda-*, comment "hda <version> <asset>"),
+// so its last release, agent-v0.3.0, carries the tunelo 2.0.0 binary under
+// those names; that binary moves the install to tunelo (migrate-from-hda.ts).
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -44,10 +49,20 @@ export function trustedComment(sigText: string): string {
   return line.startsWith("trusted comment: ") ? line.slice("trusted comment: ".length) : "";
 }
 
-export function assetName(os = platform(), cpu = arch()): string {
-  if (os === "darwin") return `hda-darwin-${cpu === "arm64" ? "arm64" : "x64"}`;
-  if (os === "win32") return "hda-windows-x64.exe";
-  throw new Error("no hda build for this OS");
+/** A line of releases: its file names and its tags (`<tagPrefix><semver>`). */
+export type ReleaseLine = { readonly name: "tunelo" | "hda"; readonly tagPrefix: string };
+export const TUNELO_RELEASES: ReleaseLine = { name: "tunelo", tagPrefix: "tunelo-v" };
+export const HDA_RELEASES: ReleaseLine = { name: "hda", tagPrefix: "agent-v" };
+
+export function assetName(os = platform(), cpu = arch(), line = TUNELO_RELEASES): string {
+  if (os === "darwin") return `${line.name}-darwin-${cpu === "arm64" ? "arm64" : "x64"}`;
+  if (os === "win32") return `${line.name}-windows-x64.exe`;
+  throw new Error(`no ${line.name} build for this OS`);
+}
+
+/** The trusted comment a release signs into each file's signature. */
+export function signedComment(line: ReleaseLine, version: string, asset: string): string {
+  return `${line.name} ${version} ${asset}`;
 }
 
 function newer(a: string, b: string): boolean {
@@ -58,6 +73,18 @@ function newer(a: string, b: string): boolean {
 }
 
 type Asset = { name: string; url: string; browser_download_url: string };
+type Release = { tag_name: string; draft: boolean; prerelease: boolean; assets: Asset[] };
+
+/** The newest published release of a line, with its version. */
+export function newestRelease<R extends Omit<Release, "assets">>(releases: readonly R[], line: ReleaseLine): { release: R; version: string } | null {
+  const tag = new RegExp(`^${line.tagPrefix}(\\d+\\.\\d+\\.\\d+)$`);
+  let best: { release: R; version: string } | null = null;
+  for (const r of releases) {
+    const version = r.draft || r.prerelease ? undefined : tag.exec(r.tag_name)?.[1];
+    if (version && (!best || newer(version, best.version))) best = { release: r, version };
+  }
+  return best;
+}
 
 /**
  * Downloads a release file. GitHub's public download link sometimes answers
@@ -80,25 +107,24 @@ async function fetchBytes(asset: Asset, tries = 3): Promise<Uint8Array> {
 
 /** Returns the installed version, or null when already up to date. */
 export async function update(log: (l: string) => void): Promise<string | null> {
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { headers: { accept: "application/vnd.github+json" } });
+  const line = TUNELO_RELEASES;
+  // Other lines share the repo; a full page keeps the newest tunelo-v* in view.
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { accept: "application/vnd.github+json" } });
   if (!res.ok) throw new Error(`cannot list releases (${res.status})`);
-  const releases = (await res.json()) as { tag_name: string; draft: boolean; prerelease: boolean; assets: Asset[] }[];
-  const release = releases
-    .filter((r) => !r.draft && !r.prerelease && /^agent-v\d+\.\d+\.\d+$/.test(r.tag_name))
-    .sort((a, b) => (newer(a.tag_name.slice("agent-v".length), b.tag_name.slice("agent-v".length)) ? -1 : 1))[0];
-  const latest = release?.tag_name.slice("agent-v".length);
-  if (!release || !latest || !newer(latest, AGENT_VERSION)) return null;
-  const asset = assetName();
+  const found = newestRelease((await res.json()) as Release[], line);
+  if (!found || !newer(found.version, AGENT_VERSION)) return null;
+  const { release, version: latest } = found;
+  const asset = assetName(platform(), arch(), line);
   const file = release.assets.find((a) => a.name === asset);
   const sigFile = release.assets.find((a) => a.name === `${asset}.minisig`);
-  if (!file || !sigFile) throw new Error(`hda ${latest} has no ${asset} for this computer`);
-  log(`downloading hda ${latest}…`);
+  if (!file || !sigFile) throw new Error(`${line.name} ${latest} has no ${asset} for this computer`);
+  log(`downloading ${line.name} ${latest}…`);
   const [bin, sig] = await Promise.all([fetchBytes(file), fetchBytes(sigFile)]);
   const sigText = new TextDecoder().decode(sig);
   if (!verifyMinisign(bin, sigText)) throw new Error("signature check failed; the download was not installed");
   // The signed comment names the file and version, so an older signed build
   // cannot be served in place of this one.
-  if (trustedComment(sigText) !== `hda ${latest} ${asset}`) throw new Error("the signature is for another file or version; not installed");
+  if (trustedComment(sigText) !== signedComment(line, latest, asset)) throw new Error("the signature is for another file or version; not installed");
   const exe = process.execPath;
   const next = `${exe}.new`;
   const old = `${exe}.old`;

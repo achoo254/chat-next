@@ -257,7 +257,7 @@ describe.each(adapters)("provider contract: %s", (_name, make) => {
     });
     await expect(
       core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: true }, device: "phone" }),
-    ).rejects.toThrow(/hda trust/);
+    ).rejects.toThrow(/tunelo trust/);
     await core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: false }, device: "phone" });
     expect(audit.list().map((e) => e.action)).toEqual(["open_sensitive"]);
     await core.stop();

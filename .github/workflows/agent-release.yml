@@ -1,14 +1,19 @@
-# Releases hda, the background agent (apps/agent), on a tag agent-v<semver>: tests, single-file
+# Releases tunelo, the background agent (apps/agent), on a tag tunelo-v<semver>: tests, single-file
 # builds for macOS (arm64, x64) and Windows x64, cross-compiled by Bun on Linux
 # (Bun ad-hoc signs the macOS files itself), SHA256SUMS,
 # minisign signatures, then a GitHub Release. Afterwards pin the install
 # scripts locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS,
 # commit and push (the web deploy serves them).
+#
+# One exception: agent-v0.3.0, the bridge for machines still on hda (the
+# earlier name). hda 0.2.x updates only from agent-v* tags, files hda-* and
+# signatures commented "hda <version> <file>", so that tag builds the tunelo
+# 2.0.0 sources under those names. Never delete that release.
 name: agent-release
 
 on:
   push:
-    tags: ["agent-v*"]
+    tags: ["tunelo-v*", "agent-v0.3.0"]
 
 permissions:
   contents: read
@@ -17,6 +22,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      prefix: ${{ steps.line.outputs.prefix }}
+      version: ${{ steps.line.outputs.version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -26,12 +34,25 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Tag matches the agent version
+        id: line
         run: |
-          want="${GITHUB_REF_NAME#agent-v}"
           have=$(sed -n 's/^export const AGENT_VERSION = "\(.*\)";$/\1/p' apps/agent/src/version.ts)
-          test "$want" = "$have" || { echo "tag $want != AGENT_VERSION $have"; exit 1; }
-      - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/chat-agent test
-      - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/chat-agent typecheck
+          case "$GITHUB_REF_NAME" in
+          tunelo-v*)
+            prefix=tunelo version="${GITHUB_REF_NAME#tunelo-v}"
+            test "$version" = "$have" || { echo "tag $version != AGENT_VERSION $have"; exit 1; }
+            ;;
+          agent-v0.3.0)
+            # The bridge carries tunelo 2.0.0 under the old names.
+            prefix=hda version=0.3.0
+            test "$have" = "2.0.0" || { echo "the bridge agent-v0.3.0 must build AGENT_VERSION 2.0.0, not $have"; exit 1; }
+            ;;
+          *) echo "not a release tag: $GITHUB_REF_NAME"; exit 1 ;;
+          esac
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/tunelo-agent test
+      - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/tunelo-agent typecheck
 
   build:
     needs: test
@@ -40,10 +61,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: bun-darwin-arm64, asset: hda-darwin-arm64 }
-          - { target: bun-darwin-x64, asset: hda-darwin-x64 }
-          - { target: bun-windows-x64, asset: hda-windows-x64.exe }
+          - { target: bun-darwin-arm64, suffix: darwin-arm64 }
+          - { target: bun-darwin-x64, suffix: darwin-x64 }
+          - { target: bun-windows-x64, suffix: windows-x64.exe }
     runs-on: ubuntu-latest
+    env:
+      ASSET: ${{ needs.test.outputs.prefix }}-${{ matrix.suffix }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -71,14 +94,14 @@ jobs:
           fi
           "$HOME/.bun/bin/bun" --version
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
-      - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile dist/${{ matrix.asset }}
+      - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile "dist/$ASSET"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}
+          name: ${{ env.ASSET }}
+          path: dist/${{ env.ASSET }}
 
   release:
-    needs: build
+    needs: [test, build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -91,16 +114,21 @@ jobs:
       - name: Checksums and signatures
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          PREFIX: ${{ needs.test.outputs.prefix }}
+          VERSION: ${{ needs.test.outputs.version }}
         run: |
           sudo apt-get install -y minisign >/dev/null
           cd dist
           umask 077
           printf '%s\n' "$MINISIGN_SECRET_KEY" > ../minisign.key
-          for f in hda-*; do minisign -S -s ../minisign.key -m "$f" -t "hda ${GITHUB_REF_NAME#agent-v} $f" < /dev/null; done
+          # The signed comment names the program, version and file (update.ts checks it).
+          for f in "$PREFIX"-*; do minisign -S -s ../minisign.key -m "$f" -t "$PREFIX $VERSION $f" < /dev/null; done
           rm -f ../minisign.key
-          sha256sum hda-darwin-arm64 hda-darwin-x64 hda-windows-x64.exe > SHA256SUMS
+          sha256sum "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" > SHA256SUMS
           cat SHA256SUMS
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "hda ${GITHUB_REF_NAME#agent-v}" --notes "Background agent of My machines. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false
+          PREFIX: ${{ needs.test.outputs.prefix }}
+          VERSION: ${{ needs.test.outputs.version }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" --notes "Background agent of My machines. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false

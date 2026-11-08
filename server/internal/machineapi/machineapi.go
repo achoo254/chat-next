@@ -46,7 +46,7 @@ import (
 // /machine-api/app.v1.MachineAgentService/<Method>.
 const Prefix = "/machine-api/"
 
-// MinAgentVersion is the oldest chat-agent the server accepts.
+// MinAgentVersion is the oldest machine agent (tunelo, formerly hda and chat-agent) the server accepts.
 const MinAgentVersion = "0.1.0"
 
 // Limits and timings.

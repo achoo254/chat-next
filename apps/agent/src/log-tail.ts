@@ -1,4 +1,4 @@
-// `hda logs`: the end of agent.log, and with --follow every line written
+// `tunelo logs`: the end of agent.log, and with --follow every line written
 // after it, until Ctrl+C. Works the same on Windows and macOS (no `tail`).
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";

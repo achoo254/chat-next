@@ -17,21 +17,43 @@ export type AgentConfig = {
   idleMinutes: number;
   mcpServers: Record<string, unknown>;
   pinnedDirs: string[];
-  /** Folders whose own .claude settings may load (set on the machine: hda trust). */
+  /** Folders whose own .claude settings may load (set on the machine: tunelo trust). */
   trustedDirs: string[];
-  /** Set by `hda install`; cleared once that browser has connected. */
+  /** Set by `tunelo install`; cleared once that browser has connected. */
   install?: { deviceKey: string; secret: string };
   machineId?: string;
   machineSecret?: string;
   subdomain?: string;
   serverUrl?: string;
   port?: number;
+  /** Tunnel server chosen in the old Tunelo CLI (`~/.tunelo/config.json`), copied when moving from hda. */
+  tunnelServer?: string;
 };
 
+/** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */
+function platformDir(name: string): string {
+  if (process.platform === "win32") return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), name);
+  return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), name);
+}
+
+/** The default config folder of tunelo, when no variable points elsewhere. */
+export function defaultConfigDir(): string {
+  return platformDir("tunelo");
+}
+
+/** Where tunelo keeps its config: TUNELO_HOME, else the variable of the old name (CHAT_AGENT_HOME), else the default. */
 export function configDir(): string {
-  if (process.env.CHAT_AGENT_HOME) return process.env.CHAT_AGENT_HOME;
-  if (process.platform === "win32") return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "chat-agent");
-  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "chat-agent");
+  return process.env.TUNELO_HOME || process.env.CHAT_AGENT_HOME || defaultConfigDir();
+}
+
+/** The folder tunelo moves an hda install into: like configDir, without the old variable. */
+export function tuneloConfigDir(): string {
+  return process.env.TUNELO_HOME || defaultConfigDir();
+}
+
+/** The config folder of hda, the earlier name of tunelo (chat-agent before that). */
+export function legacyConfigDir(): string {
+  return process.env.CHAT_AGENT_HOME || platformDir("chat-agent");
 }
 
 const DEFAULTS: AgentConfig = {

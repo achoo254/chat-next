@@ -26,7 +26,7 @@ export function isSignedIn(dir: string): boolean {
 export async function signIn(dir: string, onCode: (a: DeviceAuthorization) => void): Promise<void> {
   const id = serverIdentity(TUNNEL_SERVER);
   if (!id) throw new Error(`not a Tunelo server: ${TUNNEL_SERVER}`);
-  await deviceSignIn({ issuer: id.issuer, store: fileSessionStore(sessionFile(dir)), deviceName: `hda on ${hostname()}`, onCode });
+  await deviceSignIn({ issuer: id.issuer, store: fileSessionStore(sessionFile(dir)), deviceName: `tunelo on ${hostname()}`, onCode });
 }
 
 /** wss:// address devices connect to, from the tunnel's public https:// URL. */
