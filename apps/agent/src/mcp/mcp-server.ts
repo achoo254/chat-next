@@ -1,10 +1,9 @@
-import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { getApiBaseUrl, listAccountTunnels } from "../api-client.js";
-import { VERSION } from "../version.js";
-import { whoAmI } from "../whoami.js";
+import { getApiBaseUrl, listAccountTunnels } from "../tunnels/api-client.js";
+import { whoAmI } from "../tunnels/whoami.js";
+import type { ToolRegistrar } from "./groups.js";
 import { registerLinkTools } from "./link-tools.js";
-import { LocalTunnels } from "./local-tunnels.js";
+import type { LocalTunnels } from "./local-tunnels.js";
 import type { McpContext } from "./mcp-context.js";
 import { attempt } from "./mcp-result.js";
 import { listTunnelProcesses, registerProcessTools } from "./process-tools.js";
@@ -15,17 +14,16 @@ const MAX_HTTP_TTL_S = 24 * 60 * 60;
 const MAX_TCP_TTL_S = 8 * 60 * 60;
 
 /**
- * `tunelo mcp`: lets an agent open, list and close tunnels on this machine
- * with the CLI's own sign-in, read the requests through them, stop other
- * local tunnel processes and manage the machine's links. Tunnels it opens
- * belong to this process.
+ * The `tunnel` group of `tunelo mcp`: lets an agent open, list and close
+ * tunnels on this machine with tunelo's own sign-in, read the requests
+ * through them, stop local `tunelo http|tcp` processes and manage the
+ * machine's links. Tunnels it opens belong to the MCP session.
  */
-export function createTuneloMcpServer(context: McpContext): {
-	server: McpServer;
-	tunnels: LocalTunnels;
-} {
-	const tunnels = new LocalTunnels(context);
-	const server = new McpServer({ name: "tunelo", version: VERSION });
+export function registerTunnelTools(
+	server: ToolRegistrar,
+	context: McpContext,
+	tunnels: LocalTunnels,
+): void {
 
 	server.registerTool(
 		"open_http_tunnel",
@@ -159,6 +157,4 @@ export function createTuneloMcpServer(context: McpContext): {
 	registerRequestTools(server, tunnels);
 	registerProcessTools(server);
 	registerLinkTools(server, context);
-
-	return { server, tunnels };
 }

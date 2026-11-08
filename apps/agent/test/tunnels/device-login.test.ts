@@ -10,7 +10,7 @@ import {
 	type FakeIdp,
 	fakeJwt,
 	startFakeIdp,
-} from "./test-support/fake-idp.js";
+} from "../support/fake-idp.ts";
 
 let idp: FakeIdp;
 beforeEach(async () => {

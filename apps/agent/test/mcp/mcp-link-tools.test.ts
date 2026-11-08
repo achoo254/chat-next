@@ -6,22 +6,27 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
 	type FakeTunnelServer,
 	startFakeTunnelServer,
-} from "../test-support/fake-tunnel-server.js";
+} from "../support/fake-tunnel-server.ts";
 import {
 	buildCliBundle,
+	buildServiceBundle,
 	jsonOf,
 	mcpClient,
-} from "../test-support/mcp-harness.js";
+	startService,
+} from "../support/mcp-harness.ts";
 
 let tunnelServer: FakeTunnelServer;
 let home: string;
 let client: Client;
+let service: Awaited<ReturnType<typeof startService>>;
 
 beforeAll(async () => {
 	const bundle = await buildCliBundle("tunelo-mcp-link-test");
+	const serviceBundle = await buildServiceBundle("tunelo-mcp-link-test");
 	tunnelServer = await startFakeTunnelServer();
-	// TUNELO_KEY is an anonymous token: the machine has links.
+	// The service tunnels with TUNELO_KEY, an anonymous token: the machine has links.
 	home = mkdtempSync(join(tmpdir(), "tunelo-mcp-link-"));
+	service = await startService(serviceBundle, home);
 	const connection = mcpClient(bundle, tunnelServer.wsUrl, home);
 	client = connection.client;
 	await client.connect(connection.transport);
@@ -29,6 +34,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await client.close();
+	await service.stop();
 	await tunnelServer.close();
 	rmSync(home, { recursive: true, force: true });
 });

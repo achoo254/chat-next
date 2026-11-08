@@ -43,6 +43,8 @@ export function createSensitiveCheck(opts: SensitiveOptions = {}) {
     ".claude",
     ".codex",
     ".config/gh",
+    // The Tunelo CLI 1.x kept its config and account session here.
+    ".tunelo",
     "Library/Keychains",
     "Library/Mobile Documents/com~apple~CloudDocs/ENV production",
     "iCloudDrive/ENV production",
@@ -76,8 +78,8 @@ export function mentionsSensitive(
 ): boolean {
   const home = opts.home ?? homedir();
   // The agent's own commands (current and earlier name) hand out pairing
-  // secrets, sign in, or change trust, Claude profiles and local forwarding.
-  if (/\b(tunelo|hda)(\.exe)?\s+(pair|devices|trust|untrust|install|login|claude\s+profiles|config\s+local-forward)\b/i.test(text)) return true;
+  // secrets, sign in or out, or change trust, Claude profiles and local forwarding.
+  if (/\b(tunelo|hda)(\.exe)?\s+(pair|devices|trust|untrust|install|login|logout|claude\s+profiles|config\s+local-forward)\b/i.test(text)) return true;
   // JSON inputs escape Windows backslashes; undo that before splitting.
   const unescaped = text
     .replaceAll("\\\\", "\\")

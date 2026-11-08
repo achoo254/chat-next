@@ -1,11 +1,12 @@
 /** CLI handler for `tunelo tcp <port>` command */
 
-import { type TcpRegisterResult, TunnelClient } from "@tunelo/client";
 import type { Command } from "commander";
-import { setupTunnel, showCredentialNotices } from "./cli-tunnel-setup.js";
+import { AGENT_VERSION } from "../version.ts";
+import { credentialNotices, setupTunnel } from "./cli-tunnel-setup.js";
 import type { Display } from "./display.js";
-import { TcpProxy } from "./tcp-proxy.js";
-import { VERSION } from "./version.js";
+import { startRunRecord } from "./run-registry.js";
+import type { TunnelEvent } from "./tunnel-host.ts";
+import { openTerminalTunnel } from "./tunnel-route.ts";
 
 export function registerTcpCommand(program: Command, display: Display): void {
 	program
@@ -20,57 +21,80 @@ export function registerTcpCommand(program: Command, display: Display): void {
 				options: { key?: string; server?: string; remotePort?: string },
 			) => {
 				const port = Number(portStr);
-				if (Number.isNaN(port) || port < 1 || port > 65535) {
+				if (!Number.isInteger(port) || port < 1 || port > 65535) {
 					display.showError("Invalid port number");
+					process.exit(1);
+				}
+				const remotePort = options.remotePort
+					? Number(options.remotePort)
+					: undefined;
+				if (
+					remotePort !== undefined &&
+					(!Number.isInteger(remotePort) || remotePort < 1 || remotePort > 65535)
+				) {
+					display.showError("Invalid remote port number");
 					process.exit(1);
 				}
 
 				const setup = setupTunnel(options, display);
 
-				display.showBanner(VERSION);
+				display.showBanner(AGENT_VERSION);
 				display.showConnecting(setup.serverUrl);
 
-				const client = new TunnelClient({
-					...setup.clientOptions,
-					localPort: port,
-					tcpOnly: true,
-				});
-				showCredentialNotices(client, setup.credential, display);
+				const notices = credentialNotices(setup.credential, display);
+				const run = startRunRecord("tcp", setup.serverUrl);
 
-				client.on("connected", () => {
-					const remotePort = options.remotePort
-						? Number(options.remotePort)
-						: undefined;
-					client.registerTcp(port, remotePort);
-				});
+				const onEvent = (event: TunnelEvent): void => {
+					notices(event);
+					switch (event.type) {
+						case "tcp-registered":
+							run.update([{ url: event.url, localPort: port }]);
+							display.showTcpTunnel(event.url, port);
+							return;
+						case "tcp-register-error":
+							display.showError(`TCP tunnel failed: ${event.error}`);
+							return;
+						case "disconnected":
+							display.showDisconnected();
+							return;
+						case "reconnecting":
+							display.showReconnecting(event.attempt, event.delay);
+							return;
+						case "error":
+							display.showError(event.message);
+							return;
+						case "failed":
+							display.showError(event.message);
+							process.exit(1);
+							return;
+						case "closed":
+							display.showError(`The tunnel was ${event.reason}.`);
+							process.exit(0);
+							return;
+						default:
+							return;
+					}
+				};
 
-				client.on("tcp-registered", (result: TcpRegisterResult) => {
-					display.showTcpTunnel(result.url, port);
-					new TcpProxy(client, port);
-				});
-
-				client.on("tcp-register-error", (result: TcpRegisterResult) => {
-					display.showError(`TCP tunnel failed: ${result.error}`);
-				});
-
-				client.on("disconnected", () => display.showDisconnected());
-				client.on(
-					"reconnecting",
-					(info: { attempt: number; delay: number }) => {
-						display.showReconnecting(info.attempt, info.delay);
-					},
-				);
-				client.on("error", (err: Error) => display.showError(err.message));
-
+				let tunnel: Awaited<ReturnType<typeof openTerminalTunnel>>;
 				try {
-					await client.connect();
+					tunnel = await openTerminalTunnel(
+						{
+							kind: "tcp",
+							server: setup.serverUrl,
+							port,
+							...(remotePort !== undefined ? { remotePort } : {}),
+						},
+						setup.credential,
+						onEvent,
+					);
 				} catch (err) {
 					display.showError((err as Error).message);
 					process.exit(1);
 				}
 
 				process.on("SIGINT", () => {
-					client.disconnect();
+					tunnel.close();
 					display.showStats();
 					process.exit(0);
 				});

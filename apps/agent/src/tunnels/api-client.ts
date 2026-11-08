@@ -39,7 +39,9 @@ async function request<T>(
 	const res = await fetch(`${baseUrl}/api${path}`, {
 		method: options.method ?? "GET",
 		headers,
-		body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+		...(options.body !== undefined
+			? { body: JSON.stringify(options.body) }
+			: {}),
 		signal: AbortSignal.timeout(15_000),
 	});
 

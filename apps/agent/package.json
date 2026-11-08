@@ -2,11 +2,12 @@
   "name": "@achoo254/tunelo-agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Background agent on a user's own machine: runs their installed AI coding CLI and relays it, end-to-end encrypted, to their paired devices",
+  "description": "Background process on a user's own machine: tunnels to localhost (the Tunelo CLI), and their installed AI coding CLI relayed end-to-end encrypted to their paired devices",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.portal.json",
     "test": "vitest run",
+    "build:portal": "node scripts/build-portal.ts",
     "start": "bun src/cli.ts run",
     "spike": "bun src/spike.ts"
   },
@@ -15,12 +16,29 @@
     "@achoo254/chat-remote-protocol": "workspace:*",
     "@anthropic-ai/claude-agent-sdk": "0.3.319",
     "@bufbuild/protobuf": "2.16.0",
-    "ws": "8.18.3",
-    "@tunelo/client": "github:achoo254/localman-next#tunelo-client-v0.1.0&path:/packages/tunelo-client",
+    "@modelcontextprotocol/server": "2.3.1",
     "@noble/curves": "2.4.0",
-    "@noble/hashes": "2.4.0"
+    "@noble/hashes": "2.4.0",
+    "@tunelo/client": "github:achoo254/localman-next#tunelo-client-v0.2.0&path:/packages/tunelo-client",
+    "@tunelo/shared": "github:achoo254/localman-next#tunelo-shared-v0.1.0&path:/packages/tunelo-shared",
+    "chalk": "5.6.2",
+    "commander": "12.1.0",
+    "ws": "8.18.3",
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/ws": "8.18.1"
+    "@modelcontextprotocol/client": "2.3.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@types/ws": "8.18.1",
+    "@vitejs/plugin-react": "4.7.0",
+    "esbuild": "0.27.7",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.30.6",
+    "recharts": "2.15.4",
+    "tailwindcss": "4.3.3",
+    "vite": "6.4.4"
   }
 }

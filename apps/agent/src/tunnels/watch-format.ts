@@ -4,11 +4,11 @@ import type { InspectorEntry, InspectorEntrySummary } from "./request-store.js";
 /** What `tunelo watch` shows of a tunnel's traffic. */
 export interface WatchFilter {
 	/** One subdomain of a process carrying several. */
-	subdomain?: string;
+	subdomain?: string | undefined;
 	/** `2xx`, `4xx`, `5xx` or a code such as `404`. */
-	status?: string;
+	status?: string | undefined;
 	/** Text the path must contain (case-insensitive). */
-	path?: string;
+	path?: string | undefined;
 }
 
 const STATUS_FILTER = /^[1-5](xx|\dx|\d\d)$/i;

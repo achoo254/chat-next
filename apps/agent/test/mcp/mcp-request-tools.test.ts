@@ -5,24 +5,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Client } from "@modelcontextprotocol/client";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { MCP_BODY_LIMIT } from "../../src/mcp/request-tools.js";
 import type {
 	InspectorEntry,
 	InspectorEntrySummary,
-} from "../request-store.js";
-import type { RunRecord } from "../run-registry.js";
+} from "../../src/tunnels/request-store.js";
+import type { RunRecord } from "../../src/tunnels/run-registry.js";
 import {
 	type FakeTunnelServer,
 	startFakeTunnelServer,
-} from "../test-support/fake-tunnel-server.js";
+} from "../support/fake-tunnel-server.ts";
 import {
+	TEST_KEY,
 	buildCliBundle,
-	cliEnv,
+	buildServiceBundle,
 	jsonOf,
+	machineEnv,
 	mcpClient,
+	startService,
 	textOf,
 	waitFor,
-} from "../test-support/mcp-harness.js";
-import { MCP_BODY_LIMIT } from "./request-tools.js";
+} from "../support/mcp-harness.ts";
 
 const BIG_BODY = "x".repeat(MCP_BODY_LIMIT + 100);
 
@@ -32,9 +35,11 @@ let app: http.Server;
 let appPort: number;
 let home: string;
 let client: Client;
+let service: Awaited<ReturnType<typeof startService>>;
 
 beforeAll(async () => {
 	bundle = await buildCliBundle("tunelo-mcp-tools-test");
+	const serviceBundle = await buildServiceBundle("tunelo-mcp-tools-test");
 	tunnelServer = await startFakeTunnelServer();
 	app = http.createServer((req, res) => {
 		if (req.url === "/big") res.end(BIG_BODY);
@@ -45,6 +50,7 @@ beforeAll(async () => {
 	const address = app.address();
 	appPort = typeof address === "object" && address ? address.port : 0;
 	home = mkdtempSync(join(tmpdir(), "tunelo-mcp-tools-"));
+	service = await startService(serviceBundle, home);
 	const connection = mcpClient(bundle, tunnelServer.wsUrl, home);
 	client = connection.client;
 	await client.connect(connection.transport);
@@ -52,6 +58,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await client.close();
+	await service.stop();
 	await tunnelServer.close();
 	await new Promise<void>((r) => app.close(() => r()));
 	rmSync(home, { recursive: true, force: true });
@@ -153,10 +160,10 @@ describe("tunelo mcp: requests and tunnel processes", () => {
 				"--inspect-port",
 				"47140",
 			]),
-			{ env: cliEnv(home), stdio: "ignore" },
+			{ env: machineEnv(home, { TUNELO_KEY: TEST_KEY }), stdio: "ignore" },
 		);
 		const exited = new Promise((r) => child.once("exit", r));
-		const recordFile = join(home, ".tunelo/running", `${child.pid}.json`);
+		const recordFile = join(home, "tunelo", "running", `${child.pid}.json`);
 		const record = (): RunRecord | null =>
 			existsSync(recordFile)
 				? (JSON.parse(readFileSync(recordFile, "utf-8")) as RunRecord)

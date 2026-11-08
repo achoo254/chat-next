@@ -6,16 +6,34 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
 	type FakeTunnelServer,
 	startFakeTunnelServer,
-} from "../test-support/fake-tunnel-server.js";
+} from "../support/fake-tunnel-server.ts";
 import {
 	TEST_KEY,
 	buildCliBundle,
+	buildServiceBundle,
 	mcpClient,
+	startService,
 	textOf,
 	waitFor,
-} from "../test-support/mcp-harness.js";
+} from "../support/mcp-harness.ts";
+
+const TOOLS = [
+	"close_local_tunnel_process",
+	"close_tunnel",
+	"get_tunnel_request",
+	"list_linked_machines",
+	"list_local_tunnels",
+	"list_tunnel_requests",
+	"open_http_tunnel",
+	"open_tcp_tunnel",
+	"revoke_linked_machine",
+	"tunnel_status",
+	"whoami",
+];
 
 let bundle: string;
+let serviceBundle: string;
+let service: Awaited<ReturnType<typeof startService>>;
 let tunnelServer: FakeTunnelServer;
 let app: http.Server;
 let appPort: number;
@@ -23,15 +41,18 @@ let home: string;
 
 beforeAll(async () => {
 	bundle = await buildCliBundle("tunelo-mcp-test");
+	serviceBundle = await buildServiceBundle("tunelo-mcp-test");
 	tunnelServer = await startFakeTunnelServer();
 	app = http.createServer((_req, res) => res.end("hello from the local app"));
 	await new Promise<void>((r) => app.listen(0, "127.0.0.1", r));
 	const address = app.address();
 	appPort = typeof address === "object" && address ? address.port : 0;
 	home = mkdtempSync(join(tmpdir(), "tunelo-mcp-"));
+	service = await startService(serviceBundle, home);
 });
 
 afterAll(async () => {
+	await service.stop();
 	await tunnelServer.close();
 	await new Promise<void>((r) => app.close(() => r()));
 	rmSync(home, { recursive: true, force: true });
@@ -46,19 +67,7 @@ describe("tunelo mcp over stdio", () => {
 		const { client, transport } = connectClient();
 		await client.connect(transport);
 		const tools = await client.listTools();
-		expect(tools.tools.map((t) => t.name).sort()).toEqual([
-			"close_local_tunnel_process",
-			"close_tunnel",
-			"get_tunnel_request",
-			"list_linked_machines",
-			"list_local_tunnels",
-			"list_tunnel_requests",
-			"open_http_tunnel",
-			"open_tcp_tunnel",
-			"revoke_linked_machine",
-			"tunnel_status",
-			"whoami",
-		]);
+		expect(tools.tools.map((t) => t.name).sort()).toEqual(TOOLS);
 		expect(
 			tools.tools.find((t) => t.name === "close_tunnel")?.annotations,
 		).toMatchObject({
@@ -102,6 +111,22 @@ describe("tunelo mcp over stdio", () => {
 		await waitFor(() => tunnelServer.openSockets() === 2);
 		await client.close();
 		await waitFor(() => tunnelServer.openSockets() === 0);
+	});
+
+	test("without the background service it still answers, and a call says to start it", async () => {
+		const empty = mkdtempSync(join(tmpdir(), "tunelo-mcp-none-"));
+		try {
+			const { client, transport } = mcpClient(bundle, tunnelServer.wsUrl, empty);
+			await client.connect(transport);
+			const tools = await client.listTools();
+			expect(tools.tools.map((t) => t.name).sort()).toEqual(TOOLS);
+			const result = await client.callTool({ name: "whoami", arguments: {} });
+			expect(result.isError).toBe(true);
+			expect(textOf(result)).toContain("tunelo start");
+			await client.close();
+		} finally {
+			rmSync(empty, { recursive: true, force: true });
+		}
 	});
 
 	test("refuses a TCP tunnel without a ttl", async () => {

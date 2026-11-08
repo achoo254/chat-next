@@ -1,17 +1,17 @@
 /**
  * Tunnels other `tunelo http`/`tcp` processes run on this machine, as
- * `tunelo status` and `tunelo kill` see them (the run records in this
- * user's ~/.tunelo).
+ * `tunelo status` and `tunelo kill` see them (the run records in tunelo's
+ * config folder).
  */
-import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import {
 	type RunRecord,
 	type RunTunnel,
 	listRecords,
 	removeRecord,
-} from "../run-registry.js";
-import { matchRuns } from "../run-target.js";
+} from "../tunnels/run-registry.js";
+import { matchRuns } from "../tunnels/run-target.js";
+import type { ToolRegistrar } from "./groups.js";
 import { attempt } from "./mcp-result.js";
 
 export interface LocalTunnelProcess {
@@ -40,14 +40,16 @@ function stop(record: RunRecord): { stopped: number; wasRunning: boolean } {
 		return { stopped: record.pid, wasRunning: true };
 	} catch (err) {
 		if ((err as NodeJS.ErrnoException).code === "EPERM") {
-			throw new Error(`PID ${record.pid} belongs to another user.`);
+			throw new Error(`PID ${record.pid} belongs to another user.`, {
+				cause: err,
+			});
 		}
 		removeRecord(record.pid);
 		return { stopped: record.pid, wasRunning: false };
 	}
 }
 
-export function registerProcessTools(server: McpServer): void {
+export function registerProcessTools(server: ToolRegistrar): void {
 	server.registerTool(
 		"close_local_tunnel_process",
 		{

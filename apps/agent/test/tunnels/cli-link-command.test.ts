@@ -1,17 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { linkContextOf } from "./cli-link-command.js";
-import type { StoredSession } from "./config.js";
+import { linkContextOf } from "../../src/tunnels/cli-link-command.js";
 
 const SERVER = "wss://tunnel.hoandat.com";
-
-function sessionOf(issuer: string): StoredSession {
-	return { issuer, sub: "acc_test", refreshToken: "refresh-test" };
-}
 
 describe("linkContextOf", () => {
 	it("needs no link when the sign-in is for this server", () => {
 		const config = {
-			session: sessionOf("https://auth.hoandat.com"),
+			issuer: "https://auth.hoandat.com",
 			key: "tunelo_anon",
 		};
 		expect(linkContextOf(config, SERVER, undefined)).toEqual({
@@ -23,7 +18,7 @@ describe("linkContextOf", () => {
 		// A session from before the domain move: `tunelo http` uses the
 		// anonymous token, so Localman can only see the tunnels through a link.
 		const config = {
-			session: sessionOf("https://auth.inetdev.io.vn"),
+			issuer: "https://auth.inetdev.io.vn",
 			key: "tunelo_anon",
 		};
 		expect(linkContextOf(config, SERVER, undefined)).toEqual({
@@ -44,7 +39,7 @@ describe("linkContextOf", () => {
 	});
 
 	it("reports a machine with neither a usable sign-in nor a token", () => {
-		const config = { session: sessionOf("https://auth.inetdev.io.vn") };
+		const config = { issuer: "https://auth.inetdev.io.vn" };
 		expect(linkContextOf(config, SERVER, undefined)).toEqual({
 			kind: "no-key",
 		});

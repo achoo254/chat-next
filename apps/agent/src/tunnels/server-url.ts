@@ -1,5 +1,7 @@
 import { serverIdentity } from "@tunelo/client";
-import { loadConfig, updateConfig } from "./config.js";
+import { configDir } from "../config.ts";
+import { loadSettings, updateSettings } from "../identity/cli-settings.ts";
+import { identitySession } from "../identity/session.ts";
 import { DEFAULT_SERVER_URL } from "./default-server.js";
 
 export { DEFAULT_SERVER_URL } from "./default-server.js";
@@ -24,15 +26,20 @@ function isRetired(url: string): boolean {
 export function resolveServerUrl(
 	flag?: string,
 	onMigrated?: (from: string, to: string) => void,
+	dir: string = configDir(),
 ): string {
 	if (flag) return flag;
 	if (process.env.TUNELO_SERVER) return process.env.TUNELO_SERVER;
-	const { server: saved, session } = loadConfig();
+	const saved = loadSettings(dir).server;
 	if (!saved) return DEFAULT_SERVER_URL;
+	const issuer = identitySession(dir).info()?.issuer;
 	const ownSignIn =
-		session !== undefined && serverIdentity(saved)?.issuer === session.issuer;
+		issuer !== undefined && serverIdentity(saved)?.issuer === issuer;
 	if (isRetired(saved) && !ownSignIn) {
-		updateConfig((config) => ({ ...config, server: DEFAULT_SERVER_URL }));
+		updateSettings(
+			(settings) => ({ ...settings, server: DEFAULT_SERVER_URL }),
+			dir,
+		);
 		onMigrated?.(saved, DEFAULT_SERVER_URL);
 		return DEFAULT_SERVER_URL;
 	}

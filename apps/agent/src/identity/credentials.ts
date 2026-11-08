@@ -1,8 +1,12 @@
-import { randomUUID } from "node:crypto";
-import { hostname } from "node:os";
-import { acceptsAccountToken } from "@tunelo/client";
-import { loadConfig, updateConfig } from "./config.js";
-import { getAccessToken } from "./idp-session.js";
+import {
+	SessionExpiredError,
+	UntrustedServerError,
+	acceptsAccountToken,
+	resourceOfIssuer,
+} from "@tunelo/client";
+import { configDir } from "../config.ts";
+import { loadSettings } from "./cli-settings.ts";
+import { identitySession } from "./session.ts";
 
 /**
  * What `tunelo http|tcp|mcp` authenticates with, in order: `--key`,
@@ -16,9 +20,30 @@ export type Credential =
 export const UNTRUSTED_SERVER_MESSAGE =
 	"Your sign-in is for another Tunelo server; run `tunelo login --server <url>` for this one, or use --key.";
 
+/**
+ * The account token for a Tunelo server, checked again on every connect:
+ * never handed to a server of another domain than the session's issuer,
+ * which could replay it against the real one.
+ */
+export function accountKeyFor(
+	serverUrl: string,
+	dir: string = configDir(),
+): () => Promise<string> {
+	return async () => {
+		const session = identitySession(dir);
+		const info = session.info();
+		if (!info) throw new SessionExpiredError();
+		if (!acceptsAccountToken(serverUrl, info.issuer)) {
+			throw new UntrustedServerError(serverUrl);
+		}
+		return session.getAccessToken(resourceOfIssuer(info.issuer));
+	};
+}
+
 export function resolveCredential(
 	flagKey: string | undefined,
 	serverUrl: string,
+	dir: string = configDir(),
 ): Credential | null {
 	const explicit = flagKey ?? process.env.TUNELO_KEY;
 	if (explicit) {
@@ -28,31 +53,17 @@ export function resolveCredential(
 			getKey: async () => explicit,
 		};
 	}
-	const config = loadConfig();
-	if (config.session && acceptsAccountToken(serverUrl, config.session.issuer)) {
+	const info = identitySession(dir).info();
+	if (info && acceptsAccountToken(serverUrl, info.issuer)) {
 		return {
 			kind: "account",
-			sub: config.session.sub,
-			getKey: () => getAccessToken(),
+			sub: info.sub,
+			getKey: accountKeyFor(serverUrl, dir),
 		};
 	}
-	const saved = config.key;
+	const saved = loadSettings(dir).key;
 	if (saved) return { kind: "key", anonymous: true, getKey: async () => saved };
 	return null;
-}
-
-/** Stable per-machine id; created once and persisted in the config. */
-export function getDeviceId(): string {
-	const existing = loadConfig().deviceId;
-	if (existing) return existing;
-	const deviceId = randomUUID();
-	updateConfig((config) => ({ ...config, deviceId }));
-	return deviceId;
-}
-
-/** Machine details sent with `auth` so the account can tell machines apart. */
-export function deviceInfo(): { deviceId: string; deviceName: string } {
-	return { deviceId: getDeviceId(), deviceName: hostname().slice(0, 80) };
 }
 
 export const NO_CREDENTIAL_MESSAGE =

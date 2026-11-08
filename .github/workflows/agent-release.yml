@@ -94,7 +94,10 @@ jobs:
           fi
           "$HOME/.bun/bin/bun" --version
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
-      - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile "dist/$ASSET"
+      # The local portal of `tunelo http` goes into the binary: build it, then
+      # compile the entry that embeds its files (apps/agent/scripts/build-portal.ts).
+      - run: pnpm --filter @achoo254/tunelo-agent build:portal
+      - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/dist/release-entry.ts --outfile "dist/$ASSET"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ env.ASSET }}

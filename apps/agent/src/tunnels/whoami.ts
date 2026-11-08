@@ -1,15 +1,19 @@
 import { getApiBaseUrl, verifyKey } from "./api-client.js";
-import { resolveCredential } from "./credentials.js";
+import { configDir } from "../config.ts";
+import { resolveCredential } from "../identity/credentials.ts";
 import { legacyReminder } from "./display.js";
 
 export type WhoAmI =
 	| { kind: "account"; account: string }
-	| { kind: "anonymous"; valid: boolean; legacyTokenCutoff?: string }
+	| { kind: "anonymous"; valid: boolean; legacyTokenCutoff?: string | undefined }
 	| { kind: "none" };
 
 /** Who this machine tunnels as. Anonymous tokens are checked with the server. */
-export async function whoAmI(serverUrl: string): Promise<WhoAmI> {
-	const credential = resolveCredential(undefined, serverUrl);
+export async function whoAmI(
+	serverUrl: string,
+	dir: string = configDir(),
+): Promise<WhoAmI> {
+	const credential = resolveCredential(undefined, serverUrl, dir);
 	if (!credential) return { kind: "none" };
 	if (credential.kind === "account") {
 		return { kind: "account", account: credential.sub };

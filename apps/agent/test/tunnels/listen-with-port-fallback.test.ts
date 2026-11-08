@@ -1,6 +1,6 @@
 import http from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { listenWithPortFallback } from "./listen-with-port-fallback.js";
+import { listenWithPortFallback } from "../../src/tunnels/listen-with-port-fallback.js";
 
 const openServers: http.Server[] = [];
 
@@ -53,8 +53,8 @@ async function reserveAdjacentPorts(): Promise<number> {
 describe("listenWithPortFallback", () => {
 	it("binds the preferred port when it is free", async () => {
 		const free = await reserveEphemeralPort();
-		const holder = openServers[openServers.length - 1];
-		await new Promise<void>((resolve) => holder.close(() => resolve()));
+		const holder = openServers.at(-1);
+		await new Promise<void>((resolve) => (holder ? holder.close(() => resolve()) : resolve()));
 
 		const result = await listenWithPortFallback(newServer(), free);
 
@@ -87,8 +87,8 @@ describe("listenWithPortFallback", () => {
 
 	it("keeps two concurrent inspectors on distinct ports", async () => {
 		const base = await reserveEphemeralPort();
-		const holder = openServers[openServers.length - 1];
-		await new Promise<void>((resolve) => holder.close(() => resolve()));
+		const holder = openServers.at(-1);
+		await new Promise<void>((resolve) => (holder ? holder.close(() => resolve()) : resolve()));
 
 		const first = await listenWithPortFallback(newServer(), base);
 		const second = await listenWithPortFallback(newServer(), base);

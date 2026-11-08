@@ -12,5 +12,8 @@
     "src",
     "test",
     "scripts"
+  ],
+  "exclude": [
+    "src/tunnels/portal"
   ]
 }

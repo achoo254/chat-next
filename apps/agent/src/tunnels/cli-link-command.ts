@@ -6,7 +6,9 @@ import {
 	listLinks,
 	revokeLink,
 } from "./api-client.js";
-import { type TuneloConfig, loadConfig } from "./config.js";
+import { configDir } from "../config.ts";
+import { loadSettings } from "../identity/cli-settings.ts";
+import { identitySession } from "../identity/session.ts";
 import { printServerMigration, resolveServerUrl } from "./server-url.js";
 
 export const LINKS_NOT_NEEDED_MESSAGE =
@@ -16,8 +18,12 @@ export const OTHER_SERVER_SESSION_MESSAGE =
 
 /** Names come from the server; never let them drive the terminal. */
 function printable(text: string): string {
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
-	return text.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
+	return [...text]
+		.filter((ch) => {
+			const code = ch.codePointAt(0) ?? 0;
+			return code >= 0x20 && (code < 0x7f || code > 0x9f);
+		})
+		.join("");
 }
 
 function fail(message: string): never {
@@ -27,6 +33,20 @@ function fail(message: string): never {
 
 export const NO_ANONYMOUS_TOKEN_MESSAGE =
 	"No anonymous token on this machine. Run `tunelo login`.";
+
+/** What decides whether this machine needs links: its sign-in and anonymous token. */
+export interface LinkState {
+	/** Issuer of the account session, if signed in. */
+	issuer?: string | undefined;
+	key?: string | undefined;
+}
+
+export function linkStateOf(dir: string = configDir()): LinkState {
+	return {
+		issuer: identitySession(dir).info()?.issuer,
+		key: loadSettings(dir).key,
+	};
+}
 
 export type LinkContext =
 	| { kind: "not-needed" }
@@ -40,17 +60,17 @@ export type LinkContext =
  * the machine still needs a link.
  */
 export function linkContextOf(
-	config: Pick<TuneloConfig, "session" | "key">,
+	state: LinkState,
 	serverUrl: string,
 	envKey: string | undefined,
 ): LinkContext {
-	const session = config.session;
-	if (session && acceptsAccountToken(serverUrl, session.issuer)) {
+	const issuer = state.issuer;
+	if (issuer && acceptsAccountToken(serverUrl, issuer)) {
 		return { kind: "not-needed" };
 	}
-	const key = envKey ?? config.key;
+	const key = envKey ?? state.key;
 	if (!key) return { kind: "no-key" };
-	return { kind: "anonymous", key, otherServerSession: Boolean(session) };
+	return { kind: "anonymous", key, otherServerSession: Boolean(issuer) };
 }
 
 /**
@@ -60,7 +80,7 @@ export function linkContextOf(
 function anonymousContext(): { baseUrl: string; key: string } {
 	const serverUrl = resolveServerUrl(undefined, printServerMigration);
 	const context = linkContextOf(
-		loadConfig(),
+		linkStateOf(),
 		serverUrl,
 		process.env.TUNELO_KEY,
 	);

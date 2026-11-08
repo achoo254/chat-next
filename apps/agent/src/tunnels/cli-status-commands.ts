@@ -10,27 +10,24 @@ function formatUptime(ms: number): string {
 	return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-export function registerStatusCommands(program: Command): void {
-	program
-		.command("status")
-		.description("List tunnels running on this machine")
-		.action(() => {
-			const records = listRecords();
-			if (records.length === 0) {
-				console.log("No tunnels running.");
-				return;
-			}
-			const now = Date.now();
-			for (const r of records) {
-				const tunnels = r.tunnels.length
-					? r.tunnels.map((t) => `${t.url} → :${t.localPort}`).join(", ")
-					: "(connecting…)";
-				console.log(
-					`PID ${r.pid}  [${r.kind}]  up ${formatUptime(now - r.startedAt)}  ${tunnels}`,
-				);
-			}
-		});
+/**
+ * The `tunelo http|tcp` processes of this machine, one line each, as
+ * `tunelo status` printed them in the Tunelo CLI 1.x.
+ */
+export function tunnelRunLines(): string[] {
+	const records = listRecords();
+	if (records.length === 0) return ["No tunnels running."];
+	const now = Date.now();
+	return records.map((r) => {
+		const tunnels = r.tunnels.length
+			? r.tunnels.map((t) => `${t.url} → :${t.localPort}`).join(", ")
+			: "(connecting…)";
+		return `PID ${r.pid}  [${r.kind}]  up ${formatUptime(now - r.startedAt)}  ${tunnels}`;
+	});
+}
 
+/** `tunelo kill`; `tunelo status` lives with the service commands. */
+export function registerKillCommand(program: Command): void {
 	program
 		.command("kill <target>")
 		.description("Stop a running tunnel by PID, subdomain/URL, or 'all'")

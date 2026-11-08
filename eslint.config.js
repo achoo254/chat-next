@@ -49,6 +49,16 @@ export default tseslint.config(
 		},
 	},
 	{
+		// The local portal of tunelo (apps/agent), kept as it came from the
+		// Tunelo CLI: the classic rules of hooks, not the compiler ones.
+		files: ["apps/agent/src/tunnels/portal/**/*.{ts,tsx}"],
+		plugins: { "react-hooks": reactHooks },
+		rules: {
+			"react-hooks/rules-of-hooks": "error",
+			"react-hooks/exhaustive-deps": "error",
+		},
+	},
+	{
 		files: ["**/*.mjs", "scripts/**"],
 		languageOptions: {
 			globals: { process: "readonly", console: "readonly", URL: "readonly" },

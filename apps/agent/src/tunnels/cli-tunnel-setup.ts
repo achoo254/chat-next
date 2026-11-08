@@ -1,25 +1,19 @@
-import type { TunnelClient, TunnelClientOptions } from "@tunelo/client";
-import { loadConfig } from "./config.js";
+import { configDir } from "../config.ts";
 import {
 	type Credential,
 	NO_CREDENTIAL_MESSAGE,
 	UNTRUSTED_SERVER_MESSAGE,
-	deviceInfo,
 	resolveCredential,
-} from "./credentials.js";
+} from "../identity/credentials.ts";
+import { identitySession } from "../identity/session.ts";
 import type { Display } from "./display.js";
 import { printServerMigration, resolveServerUrl } from "./server-url.js";
 
 export interface TunnelSetup {
 	serverUrl: string;
 	credential: Credential;
-	/** Connection options shared by `tunelo http` and `tunelo tcp`. */
-	clientOptions: Pick<
-		TunnelClientOptions,
-		"serverUrl" | "getApiKey" | "deviceId" | "deviceName"
-	>;
 	/** Shown masked in the banner; only for fixed tokens. */
-	displayKey?: string;
+	displayKey?: string | undefined;
 }
 
 /** Server and credential for a tunnel command; exits when not signed in. */
@@ -30,7 +24,7 @@ export function setupTunnel(
 	const serverUrl = resolveServerUrl(options.server, printServerMigration);
 	const credential = resolveCredential(options.key, serverUrl);
 	if (!credential) {
-		const signedIn = loadConfig().session !== undefined;
+		const signedIn = identitySession(configDir()).info() !== undefined;
 		display.showError(
 			signedIn ? UNTRUSTED_SERVER_MESSAGE : NO_CREDENTIAL_MESSAGE,
 		);
@@ -39,11 +33,6 @@ export function setupTunnel(
 	return {
 		serverUrl,
 		credential,
-		clientOptions: {
-			serverUrl,
-			getApiKey: credential.getKey,
-			...deviceInfo(),
-		},
 		displayKey:
 			credential.kind === "key"
 				? (options.key ?? process.env.TUNELO_KEY)
@@ -51,18 +40,21 @@ export function setupTunnel(
 	};
 }
 
-/** Account line, or the anonymous-token reminder (with the server's cutoff). */
-export function showCredentialNotices(
-	client: TunnelClient,
+/**
+ * Account line, or the anonymous-token reminder (with the server's cutoff),
+ * once the first connection is up. Feed it every tunnel event.
+ */
+export function credentialNotices(
 	credential: Credential,
 	display: Display,
-): void {
+): (event: { type: string; date?: string }) => void {
 	let cutoff: string | undefined;
-	client.on("legacy-token", (date: string) => {
-		cutoff = date;
-	});
-	client.once("connected", () => {
+	let shown = false;
+	return (event) => {
+		if (event.type === "legacy-token") cutoff = event.date;
+		if (event.type !== "connected" || shown) return;
+		shown = true;
 		if (credential.kind === "account") display.showAccount(credential.sub);
 		else if (credential.anonymous) display.showLegacyReminder(cutoff);
-	});
+	};
 }

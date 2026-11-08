@@ -3,22 +3,22 @@
  * linked to this machine's anonymous token. Revoking cannot be undone (a
  * person has to link again), so it takes a dry run and a confirm token.
  */
-import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import {
 	type LinkInfo,
 	getApiBaseUrl,
 	listLinks,
 	revokeLink,
-} from "../api-client.js";
+} from "../tunnels/api-client.js";
 import {
 	LINKS_NOT_NEEDED_MESSAGE,
 	NO_ANONYMOUS_TOKEN_MESSAGE,
 	OTHER_SERVER_SESSION_MESSAGE,
 	linkContextOf,
-} from "../cli-link-command.js";
-import { loadConfig } from "../config.js";
+	linkStateOf,
+} from "../tunnels/cli-link-command.js";
 import { ConfirmTokens } from "./confirm-tokens.js";
+import type { ToolRegistrar } from "./groups.js";
 import type { McpContext } from "./mcp-context.js";
 import { attempt } from "./mcp-result.js";
 
@@ -29,7 +29,7 @@ type LinkAccess =
 /** Same rule as `tunelo links`: only a machine on an anonymous token has links. */
 function linkAccess(context: McpContext): LinkAccess {
 	const link = linkContextOf(
-		loadConfig(),
+		linkStateOf(context.dir),
 		context.serverUrl,
 		process.env.TUNELO_KEY,
 	);
@@ -54,7 +54,7 @@ async function findLink(
 }
 
 export function registerLinkTools(
-	server: McpServer,
+	server: ToolRegistrar,
 	context: McpContext,
 ): void {
 	const confirmTokens = new ConfirmTokens();

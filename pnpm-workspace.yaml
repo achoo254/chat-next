@@ -3,7 +3,9 @@ packages:
   - packages/*
   - sdk/ts
 
-# buf's postinstall only links the platform binary early; the bin shim finds
-# the optional platform package without it, so no install script runs.
+# buf's and esbuild's postinstalls only link or check the platform binary
+# early; both find their optional platform package without it, so no
+# install script runs.
 allowBuilds:
   "@bufbuild/buf": false
+  esbuild: false

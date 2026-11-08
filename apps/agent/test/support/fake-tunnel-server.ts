@@ -1,7 +1,7 @@
 import http from "node:http";
 import type { ClientToServerMessage, TunnelRequest } from "@tunelo/shared";
 import { type WebSocket, WebSocketServer } from "ws";
-import type { LinkInfo } from "../api-client.js";
+import type { LinkInfo } from "../../src/tunnels/api-client.js";
 
 export interface FakeTunnelServer {
 	/** ws:// URL for `--server`. */
@@ -52,7 +52,7 @@ export async function startFakeTunnelServer(): Promise<FakeTunnelServer> {
 			path: match[2] ?? "/",
 			headers: {},
 			body: null,
-			subdomain: match[1],
+			...(match[1] ? { subdomain: match[1] } : {}),
 		};
 		ws.send(JSON.stringify(request));
 	});

@@ -6,8 +6,8 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { configDir } from "../config.ts";
 
 export interface RunTunnel {
 	url: string;
@@ -26,7 +26,7 @@ export interface RunRecord {
 }
 
 function getRunDir(): string {
-	return join(homedir(), ".tunelo", "running");
+	return join(configDir(), "running");
 }
 
 function recordPath(pid: number): string {
@@ -46,8 +46,10 @@ export function isAlive(pid: number): boolean {
 
 function saveRecord(record: RunRecord): void {
 	const dir = getRunDir();
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-	writeFileSync(recordPath(record.pid), JSON.stringify(record));
+	if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+	writeFileSync(recordPath(record.pid), JSON.stringify(record), {
+		mode: 0o600,
+	});
 }
 
 export function removeRecord(pid: number): void {

@@ -1,6 +1,6 @@
 /**
- * Tunnels opened by `tunelo mcp`. They live in this process only: closing
- * one, its TTL running out, or the process exiting closes the connection.
+ * Tunnels opened by one `tunelo mcp` client, held by the service: closing
+ * one, its TTL running out, or the client disconnecting closes it.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -8,8 +8,8 @@ import {
 	TunnelClient,
 	type TunnelClientOptions,
 } from "@tunelo/client";
-import { type InspectorEntry, RequestStore } from "../request-store.js";
-import { TcpProxy } from "../tcp-proxy.js";
+import { type InspectorEntry, RequestStore } from "../tunnels/request-store.js";
+import { TcpProxy } from "../tunnels/tcp-proxy.js";
 import type { McpContext } from "./mcp-context.js";
 
 const TCP_REGISTER_TIMEOUT_MS = 15_000;
@@ -69,9 +69,9 @@ export class LocalTunnels {
 
 	async openHttp(options: {
 		port: number;
-		subdomain?: string;
-		auth?: string;
-		ttlSeconds?: number;
+		subdomain?: string | undefined;
+		auth?: string | undefined;
+		ttlSeconds?: number | undefined;
 	}): Promise<LocalTunnel> {
 		const client = this.newClient({
 			localPort: options.port,

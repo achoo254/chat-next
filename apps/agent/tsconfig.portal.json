@@ -5,10 +5,10 @@
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
 		"jsx": "react-jsx",
-		"outDir": "portal-dist-types",
-		"rootDir": "src/portal",
 		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"types": ["vite/client"],
 		"lib": ["ES2020", "DOM", "DOM.Iterable"]
 	},
-	"include": ["src/portal"]
+	"include": ["src/tunnels/portal", "src/tunnels/default-server.ts"]
 }

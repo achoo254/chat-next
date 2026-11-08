@@ -3,7 +3,12 @@
 // a 0600 file in the config folder. The Keychain entry was named after
 // chat-agent before tunelo; that entry is still read while the new one is
 // missing, so a machine never gets a second key.
+//
+// The same store holds a sealing key: seal/unseal encrypt any secret kept on
+// disk (the account's refresh token) with AES-256-GCM under it, so the file
+// alone is useless without this user's Keychain or DPAPI.
 import { execFile } from "node:child_process";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -12,38 +17,41 @@ import { type KeyPair, exportPrivateKey, fromBase64Url, generateKeyPair, importK
 const run = promisify(execFile);
 const SERVICE = "com.hoandat.tunelo";
 const LEGACY_SERVICE = "com.hoandat.chat-agent";
-const ACCOUNT = "machine-key";
+/** Entries of the store: the machine's X25519 key, and the key that seals secrets on disk. */
+type Entry = "machine-key" | "session-key";
 
 type Backend = { read(): Promise<string | null>; write(value: string): Promise<void> };
 
-async function readKeychain(service: string): Promise<string | null> {
+async function readKeychain(service: string, account: Entry = "machine-key"): Promise<string | null> {
   try {
-    const { stdout } = await run("security", ["find-generic-password", "-s", service, "-a", ACCOUNT, "-w"]);
+    const { stdout } = await run("security", ["find-generic-password", "-s", service, "-a", account, "-w"]);
     return stdout.trim() || null;
   } catch {
     return null;
   }
 }
 
-function writeKeychain(service: string, value: string): Promise<void> {
+function writeKeychain(service: string, value: string, account: Entry = "machine-key"): Promise<void> {
   // Through `security -i` on stdin so the key never shows up in argv.
   return new Promise<void>((resolve, reject) => {
     const child = execFile("security", ["-i"], (err) => (err ? reject(err) : resolve()));
-    child.stdin?.end(`add-generic-password -U -s ${service} -a ${ACCOUNT} -w ${value}\n`);
+    child.stdin?.end(`add-generic-password -U -s ${service} -a ${account} -w ${value}\n`);
   });
 }
 
-function keychain(): Backend {
+function keychain(entry: Entry): Backend {
   return {
     async read() {
-      return (await readKeychain(SERVICE)) ?? (await readKeychain(LEGACY_SERVICE));
+      const current = await readKeychain(SERVICE, entry);
+      // Only the machine key existed under the old name.
+      return current ?? (entry === "machine-key" ? await readKeychain(LEGACY_SERVICE) : null);
     },
-    write: (value) => writeKeychain(SERVICE, value),
+    write: (value) => writeKeychain(SERVICE, value, entry),
   };
 }
 
-function dpapi(dir: string): Backend {
-  const file = join(dir, "machine-key.dpapi");
+function dpapi(dir: string, entry: Entry): Backend {
+  const file = join(dir, `${entry}.dpapi`);
   const ps = (script: string, input: string) =>
     new Promise<string>((resolve, reject) => {
       const child = execFile(
@@ -73,8 +81,8 @@ function dpapi(dir: string): Backend {
   };
 }
 
-function plainFile(dir: string): Backend {
-  const file = join(dir, "machine-key");
+function plainFile(dir: string, entry: Entry): Backend {
+  const file = join(dir, entry);
   return {
     async read() {
       return existsSync(file) ? readFileSync(file, "utf8").trim() : null;
@@ -88,16 +96,16 @@ function plainFile(dir: string): Backend {
 const fileKeystore = () => (process.env.TUNELO_KEYSTORE || process.env.CHAT_AGENT_KEYSTORE) === "file";
 const usesKeychain = () => process.platform === "darwin" && !fileKeystore();
 
-function backend(dir: string): Backend {
-  if (fileKeystore()) return plainFile(dir);
-  if (usesKeychain()) return keychain();
-  if (process.platform === "win32") return dpapi(dir);
-  return plainFile(dir);
+function backend(dir: string, entry: Entry): Backend {
+  if (fileKeystore()) return plainFile(dir, entry);
+  if (usesKeychain()) return keychain(entry);
+  if (process.platform === "win32") return dpapi(dir, entry);
+  return plainFile(dir, entry);
 }
 
 /** Loads the machine key, creating it on first run. */
 export async function machineKey(dir: string): Promise<KeyPair> {
-  const store = backend(dir);
+  const store = backend(dir, "machine-key");
   const existing = await store.read();
   if (existing) return importKeyPair(fromBase64Url(existing));
   const fresh = await generateKeyPair(true);
@@ -124,4 +132,69 @@ export async function copyLegacyMachineKey(): Promise<void> {
   }
   await writeKeychain(SERVICE, legacy);
   if ((await readKeychain(SERVICE)) !== legacy) throw new Error("the machine key did not copy to its new Keychain entry; nothing else was changed");
+}
+
+const SEALED_PREFIX = "v1";
+const KEY_BYTES = 32;
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
+/** Bound into every sealed value, so a ciphertext of another use does not open here. */
+const AAD = Buffer.from("tunelo sealed secret v1");
+const sealingKeys = new Map<string, Promise<Buffer | null>>();
+
+function decodeKey(text: string | null): Buffer | null {
+  if (!text) return null;
+  const key = Buffer.from(text, "base64url");
+  return key.length === KEY_BYTES ? key : null;
+}
+
+/** The sealing key of this config folder, read once per process. */
+function loadSealingKey(dir: string): Promise<Buffer | null> {
+  const cached = sealingKeys.get(dir);
+  if (cached) return cached;
+  const pending = backend(dir, "session-key").read().then(decodeKey);
+  // A failed read (Keychain locked) must not stick: the next call retries.
+  pending.catch(() => sealingKeys.delete(dir));
+  sealingKeys.set(dir, pending);
+  return pending;
+}
+
+/** Creates the sealing key on first use and reads it back from the store. */
+async function sealingKey(dir: string): Promise<Buffer> {
+  const existing = await loadSealingKey(dir);
+  if (existing) return existing;
+  sealingKeys.delete(dir);
+  await backend(dir, "session-key").write(randomBytes(KEY_BYTES).toString("base64url"));
+  const saved = await loadSealingKey(dir);
+  if (!saved) throw new Error("could not store the sealing key in the key store");
+  return saved;
+}
+
+/**
+ * Encrypts a secret for storage on disk with this user's sealing key
+ * (created on first use). Callers that may run at the same time for the
+ * first time must hold one lock (the session lock does).
+ */
+export async function seal(dir: string, plaintext: string): Promise<string> {
+  const key = await sealingKey(dir);
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  cipher.setAAD(AAD);
+  const data = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final(), cipher.getAuthTag()]);
+  return `${SEALED_PREFIX}.${iv.toString("base64url")}.${data.toString("base64url")}`;
+}
+
+/** Decrypts a value of seal(); throws when the key is gone or the value was changed. */
+export async function unseal(dir: string, sealed: string): Promise<string> {
+  const [version, ivText, dataText] = sealed.split(".");
+  if (version !== SEALED_PREFIX || !ivText || !dataText) throw new Error("not a sealed value");
+  const key = await loadSealingKey(dir);
+  if (!key) throw new Error("the sealing key is missing from the key store");
+  const iv = Buffer.from(ivText, "base64url");
+  const data = Buffer.from(dataText, "base64url");
+  if (iv.length !== IV_BYTES || data.length < TAG_BYTES) throw new Error("not a sealed value");
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAAD(AAD);
+  decipher.setAuthTag(data.subarray(data.length - TAG_BYTES));
+  return Buffer.concat([decipher.update(data.subarray(0, data.length - TAG_BYTES)), decipher.final()]).toString("utf8");
 }

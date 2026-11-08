@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { CONFIRM_TOKEN_TTL_MS, ConfirmTokens } from "./confirm-tokens.js";
+import { CONFIRM_TOKEN_TTL_MS, ConfirmTokens } from "../../src/mcp/confirm-tokens.js";
 
 describe("ConfirmTokens", () => {
 	test("a token works once, for its own action", () => {

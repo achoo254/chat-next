@@ -1,6 +1,7 @@
 // `tunelo update`: fetch the newest tunelo-v* release, check its minisign
 // signature against the key built into this binary, replace the file and
-// let the service restart itself.
+// let the service restart itself. (The Tunelo CLI 1.x updated through npm;
+// tunelo has one way: this signed binary.)
 //
 // The same repo also holds the agent-v* releases of hda, the earlier name.
 // hda 0.2.x only looks there (assets hda-*, comment "hda <version> <asset>"),
@@ -105,14 +106,25 @@ async function fetchBytes(asset: Asset, tries = 3): Promise<Uint8Array> {
   throw new Error(`download failed (${status}, then ${api.status}): ${asset.browser_download_url}`);
 }
 
-/** Returns the installed version, or null when already up to date. */
-export async function update(log: (l: string) => void): Promise<string | null> {
-  const line = TUNELO_RELEASES;
+/** The newest tunelo release when it is newer than this binary. */
+async function findUpdate(): Promise<{ release: Release; version: string } | null> {
   // Other lines share the repo; a full page keeps the newest tunelo-v* in view.
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { accept: "application/vnd.github+json" } });
   if (!res.ok) throw new Error(`cannot list releases (${res.status})`);
-  const found = newestRelease((await res.json()) as Release[], line);
-  if (!found || !newer(found.version, AGENT_VERSION)) return null;
+  const found = newestRelease((await res.json()) as Release[], TUNELO_RELEASES);
+  return found && newer(found.version, AGENT_VERSION) ? found : null;
+}
+
+/** `tunelo update --check`: the newer version, or null when up to date. */
+export async function checkForUpdate(): Promise<string | null> {
+  return (await findUpdate())?.version ?? null;
+}
+
+/** Returns the installed version, or null when already up to date. */
+export async function update(log: (l: string) => void): Promise<string | null> {
+  const line = TUNELO_RELEASES;
+  const found = await findUpdate();
+  if (!found) return null;
   const { release, version: latest } = found;
   const asset = assetName(platform(), arch(), line);
   const file = release.assets.find((a) => a.name === asset);

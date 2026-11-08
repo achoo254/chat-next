@@ -41,7 +41,16 @@ describe("sensitive paths", () => {
     expect(mentionsSensitive("tunelo.exe login", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo claude profiles add work", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo config local-forward off", check, { home })).toBe(true);
+    expect(mentionsSensitive("tunelo logout", check, { home })).toBe(true);
+    expect(mentionsSensitive("cat ~/.tunelo/config.json", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo status", check, { home })).toBe(false);
+  });
+
+  it("flags the sign-in of the Tunelo CLI 1.x and tunelo's sealed session", () => {
+    expect(check(join(home, ".tunelo"))).toBe(true);
+    expect(check(join(home, ".tunelo", "config.json"))).toBe(true);
+    expect(check(join(home, "cfg", "session.json"))).toBe(true);
+    expect(check(join(home, "cfg", "session-key"))).toBe(true);
   });
 
   it("flags the agent's config folder under its current and earlier name", () => {
@@ -57,6 +66,7 @@ describe("sensitive paths", () => {
       for (const d of dirs) {
         expect(plain(d)).toBe(true);
         expect(plain(join(d, "tunelo-session.json"))).toBe(true);
+        expect(plain(join(d, "session.json"))).toBe(true);
       }
       expect(plain(join(home, ".config", "other-app"))).toBe(false);
     } finally {

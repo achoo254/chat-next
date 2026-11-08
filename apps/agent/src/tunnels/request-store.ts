@@ -3,7 +3,7 @@
 export interface InspectorEntry {
 	id: string;
 	timestamp: number;
-	subdomain?: string;
+	subdomain?: string | undefined;
 	method: string;
 	path: string;
 	requestHeaders: Record<string, string | string[]>;
@@ -15,7 +15,7 @@ export interface InspectorEntry {
 	/** "normal" for tunnel traffic, "replay" for replayed requests */
 	entryType: "normal" | "replay";
 	/** Original entry ID if this is a replay */
-	originalId?: string;
+	originalId?: string | undefined;
 }
 
 /** Lightweight entry without bodies — for list API */
@@ -64,9 +64,9 @@ export class RequestStore {
 	}
 
 	list(filter?: {
-		subdomain?: string;
-		status?: string;
-		q?: string;
+		subdomain?: string | undefined;
+		status?: string | undefined;
+		q?: string | undefined;
 	}): InspectorEntrySummary[] {
 		let result = this.entries;
 
@@ -90,10 +90,10 @@ export class RequestStore {
 		return result
 			.map(
 				({
-					requestBody,
-					responseBody,
-					requestHeaders,
-					responseHeaders,
+					requestBody: _requestBody,
+					responseBody: _responseBody,
+					requestHeaders: _requestHeaders,
+					responseHeaders: _responseHeaders,
 					...summary
 				}) => summary,
 			)

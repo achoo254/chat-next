@@ -1,17 +1,18 @@
+import { hostname } from "node:os";
 import {
 	IDP_DEFAULTS,
 	deviceNameForIdp,
 	discover,
 	pollForTokens,
 	resourceOfIssuer,
-	revokeToken,
 	serverIdentity,
 	startDeviceAuthorization,
 } from "@tunelo/client";
 import type { Command } from "commander";
+import { configDir } from "../config.ts";
+import { updateSettings } from "../identity/cli-settings.ts";
+import { identitySession } from "../identity/session.ts";
 import { getApiBaseUrl, verifyKey } from "./api-client.js";
-import { type StoredSession, loadConfig, updateConfig } from "./config.js";
-import { clearSession, saveSession, sessionFromTokens } from "./idp-session.js";
 import { openBrowser } from "./open-browser.js";
 import { printServerMigration, resolveServerUrl } from "./server-url.js";
 
@@ -45,13 +46,13 @@ async function saveLegacyKey(key: string): Promise<void> {
 	if (!result.valid || result.kind !== "legacy") {
 		fail("That token is not a valid anonymous access token.");
 	}
-	updateConfig((config) => ({ ...config, key }));
+	updateSettings((settings) => ({ ...settings, key }));
 	console.log("  ✓ Token verified & saved. Run: tunelo http <port>");
 }
 
 /**
  * The IdP that signs in for `serverUrl`, from its host (`tunnel.<d>` →
- * `https://auth.<d>`); `TUNELO_AUTH_ISSUER` points the CLI at a staging or
+ * `https://auth.<d>`); `TUNELO_AUTH_ISSUER` points tunelo at a staging or
  * local IdP instead.
  */
 function issuerFor(serverUrl: string): string {
@@ -63,17 +64,19 @@ function issuerFor(serverUrl: string): string {
 }
 
 /**
- * Signs in at `issuer` without touching the stored session: a failed or
- * abandoned sign-in leaves the current one working.
+ * Device sign-in at `issuer`. The current session stays in use until the
+ * new one is saved, and its grant is revoked only then: a failed or
+ * abandoned sign-in leaves it working.
  */
-async function deviceLogin(issuer: string): Promise<StoredSession> {
+async function deviceLogin(issuer: string): Promise<string> {
 	const endpoints = await discover(issuer).catch((err: Error) =>
 		fail(`Could not reach ${issuer}: ${err.message}`),
 	);
+	const resource = resourceOfIssuer(issuer);
 	const authorization = await startDeviceAuthorization(
 		endpoints,
-		deviceNameForIdp(),
-		resourceOfIssuer(issuer),
+		deviceNameForIdp(`tunelo on ${hostname()}`),
+		resource,
 	).catch((err: Error) => fail(err.message));
 
 	const url =
@@ -89,19 +92,37 @@ async function deviceLogin(issuer: string): Promise<StoredSession> {
 	const tokens = await pollForTokens(endpoints, authorization).catch(
 		(err: Error) => fail(err.message),
 	);
-	return sessionFromTokens(issuer, tokens, undefined, Date.now());
-}
-
-/** Revokes the grant at the IdP; on failure says where to do it by hand. */
-async function revokeSession(session: StoredSession): Promise<void> {
-	const { issuer, refreshToken } = session;
-	try {
-		await revokeToken(await discover(issuer), refreshToken);
-	} catch (err) {
+	const { info, revokeError } = await identitySession(configDir()).replace(
+		issuer,
+		tokens,
+		resource,
+	);
+	if (revokeError) {
 		console.error(
-			`  Could not revoke at ${issuer} (${(err as Error).message}); revoke this machine at ${issuer}/account.`,
+			`  Could not revoke the previous sign-in at ${issuer} (${revokeError.message}); revoke it at ${issuer}/account.`,
 		);
 	}
+	return info.sub;
+}
+
+/**
+ * Signs this machine in for `serverUrl` unless it already is (or `force`).
+ * Resolves with the account id, and whether a sign-in happened now.
+ */
+export async function signInForServer(
+	serverUrl: string,
+	force = false,
+): Promise<{ sub: string; signedInNow: boolean }> {
+	const issuer = issuerFor(serverUrl);
+	const existing = identitySession(configDir()).info();
+	// Another IdP: its session replaces this one (one session).
+	if (existing?.issuer === issuer && !force) {
+		console.log(
+			`  Already signed in (account ${existing.sub}). Use --force to sign in again.`,
+		);
+		return { sub: existing.sub, signedInNow: false };
+	}
+	return { sub: await deviceLogin(issuer), signedInNow: true };
 }
 
 export function registerLoginCommands(program: Command): void {
@@ -135,28 +156,18 @@ export function registerLoginCommands(program: Command): void {
 				const serverUrl = options.server
 					? normalizeServer(options.server)
 					: resolveServerUrl(undefined, printServerMigration);
-				const issuer = issuerFor(serverUrl);
-				const existing = loadConfig().session;
-				const makeDefault = (): void => {
-					if (!options.server) return;
-					updateConfig((config) => ({ ...config, server: serverUrl }));
-				};
-				// Another IdP: its session replaces this one (one session).
-				if (existing?.issuer === issuer && !options.force) {
-					makeDefault();
-					console.log(
-						`  Already signed in (account ${existing.sub}). Use --force to sign in again.`,
-					);
-					return;
-				}
-				const session = await deviceLogin(issuer);
-				// The new grant replaces this machine's old one: end it.
-				if (existing) await revokeSession(existing);
-				saveSession(session);
-				makeDefault();
-				console.log(
-					`  ✓ Signed in (account ${session.sub}). Run: tunelo http <port>`,
+				const { sub, signedInNow } = await signInForServer(
+					serverUrl,
+					options.force === true,
 				);
+				if (options.server) {
+					updateSettings((settings) => ({ ...settings, server: serverUrl }));
+				}
+				if (signedInNow) {
+					console.log(
+						`  ✓ Signed in (account ${sub}). Run: tunelo http <port>`,
+					);
+				}
 			},
 		);
 
@@ -164,17 +175,23 @@ export function registerLoginCommands(program: Command): void {
 		.command("logout")
 		.description("Sign out: revoke this machine's sign-in and forget tokens")
 		.action(async () => {
-			const config = loadConfig();
-			if (!config.session && !config.key) {
+			const dir = configDir();
+			const result = await identitySession(dir).signOut();
+			let hadKey = false;
+			updateSettings((settings) => {
+				hadKey = settings.key !== undefined;
+				// Keep deviceId so a later sign-in stays idempotent for this machine.
+				return { ...settings, key: undefined };
+			});
+			if (!result && !hadKey) {
 				console.log("  Not signed in.");
 				return;
 			}
-			if (config.session) {
-				await revokeSession(config.session);
-				clearSession();
+			if (result?.revokeError) {
+				console.error(
+					`  Could not revoke at ${result.issuer} (${result.revokeError.message}); revoke this machine at ${result.issuer}/account.`,
+				);
 			}
-			// Keep deviceId so a later sign-in stays idempotent for this machine.
-			updateConfig((current) => ({ ...current, key: undefined }));
 			console.log("  Signed out. Tokens removed from this machine.");
 		});
 }

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { InspectorEntry } from "./request-store.js";
-import type { RunRecord } from "./run-registry.js";
-import { matchRuns, targetSubdomain } from "./run-target.js";
+import type { InspectorEntry } from "../../src/tunnels/request-store.js";
+import type { RunRecord } from "../../src/tunnels/run-registry.js";
+import { matchRuns, targetSubdomain } from "../../src/tunnels/run-target.js";
 import {
 	formatDetails,
 	formatLine,
 	isStatusFilter,
 	matchesFilter,
-} from "./watch-format.js";
+} from "../../src/tunnels/watch-format.js";
 
 const entry: InspectorEntry = {
 	id: "r1",

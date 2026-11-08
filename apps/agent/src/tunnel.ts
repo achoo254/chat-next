@@ -1,32 +1,16 @@
 // The way in from the user's other devices: a Tunelo "machine" tunnel to the
-// local WebSocket server, signed in with the user's own account (device flow
-// of the shared IdP). The relay only sees sealed frames.
+// local WebSocket server, signed in with the user's own account (the one
+// session of identity/session.ts, from `tunelo login`). The relay only sees
+// sealed frames.
 import { hostname } from "node:os";
-import { join } from "node:path";
-import { existsSync } from "node:fs";
-import {
-  type DeviceAuthorization,
-  TunnelAuthError,
-  TunnelClient,
-  accountTokenFor,
-  deviceSignIn,
-  fileSessionStore,
-  serverIdentity,
-} from "@tunelo/client";
+import { TunnelAuthError, TunnelClient } from "@tunelo/client";
+import { accountKeyFor } from "./identity/credentials.ts";
+import { identitySession } from "./identity/session.ts";
 
 export const TUNNEL_SERVER = process.env.CHAT_AGENT_TUNNEL_SERVER ?? "https://tunnel.hoandat.com";
 
-const sessionFile = (dir: string) => join(dir, "tunelo-session.json");
-
 export function isSignedIn(dir: string): boolean {
-  return existsSync(sessionFile(dir));
-}
-
-/** Device-flow sign-in; `onCode` shows the link and code to the user. */
-export async function signIn(dir: string, onCode: (a: DeviceAuthorization) => void): Promise<void> {
-  const id = serverIdentity(TUNNEL_SERVER);
-  if (!id) throw new Error(`not a Tunelo server: ${TUNNEL_SERVER}`);
-  await deviceSignIn({ issuer: id.issuer, store: fileSessionStore(sessionFile(dir)), deviceName: `tunelo on ${hostname()}`, onCode });
+  return identitySession(dir).info() !== undefined;
 }
 
 /** wss:// address devices connect to, from the tunnel's public https:// URL. */
@@ -47,7 +31,7 @@ export type TunnelEvents = {
 export function openTunnel(opts: { dir: string; localPort: number; deviceId: string; subdomain?: string }, ev: TunnelEvents): () => void {
   const client = new TunnelClient({
     serverUrl: TUNNEL_SERVER,
-    getApiKey: accountTokenFor(fileSessionStore(sessionFile(opts.dir)), TUNNEL_SERVER),
+    getApiKey: accountKeyFor(TUNNEL_SERVER, opts.dir),
     kind: "machine",
     deviceId: opts.deviceId,
     deviceName: hostname(),

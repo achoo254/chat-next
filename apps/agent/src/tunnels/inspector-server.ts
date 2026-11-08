@@ -128,7 +128,7 @@ export async function startInspectorServer(
 		// Request detail
 		const detailMatch = pathname.match(/^\/api\/requests\/([^/]+)$/);
 		if (detailMatch && req.method === "GET") {
-			const entry = store.get(detailMatch[1]);
+			const entry = store.get(detailMatch[1] ?? "");
 			if (!entry) {
 				sendJson(res, 404, { error: "Not found" });
 				return;
@@ -150,7 +150,7 @@ export async function startInspectorServer(
 				sendJson(res, 501, { error: "Replay not available" });
 				return;
 			}
-			onReplay(replayMatch[1])
+			onReplay(replayMatch[1] ?? "")
 				.then((entry) => {
 					if (!entry) {
 						sendJson(res, 404, { error: "Original request not found" });
@@ -241,10 +241,10 @@ function collectBody(
 
 function toSummary(entry: InspectorEntry): Record<string, unknown> {
 	const {
-		requestBody,
-		responseBody,
-		requestHeaders,
-		responseHeaders,
+		requestBody: _requestBody,
+		responseBody: _responseBody,
+		requestHeaders: _requestHeaders,
+		responseHeaders: _responseHeaders,
 		...summary
 	} = entry;
 	return summary;
