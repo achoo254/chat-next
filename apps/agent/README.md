@@ -5,7 +5,8 @@ thiết bị khác, mã hoá đầu-cuối), Localman gọi `localhost` của m�
 [ADR 0013](../../docs/adr/0013-remote-machines.md), [ADR 0014](../../docs/adr/0014-tunelo-machine-agent.md).
 
 Chạy trên macOS (arm64, x64) và Windows x64. Một file chạy do Bun build, ký minisign, phát hành ở GitHub Releases của repo này
-(tag `tunelo-v<version>`). Không có gói npm.
+(tag `tunelo-v<version>`). Không có gói npm. Từ 2.0.3, bản macOS còn được ký Developer ID (team `AM5C55N339`, identifier
+`com.hoandat.tunelo`, hardened runtime) và notarize trong `agent-release.yml`.
 
 ## Cài
 
@@ -67,6 +68,18 @@ script cài ở trên. Script thấy `hda` thì chạy `tunelo migrate-from-hda`
 Bản chạy nền là LaunchAgent `com.hoandat.tunelo` trong phiên GUI của người dùng, và khoá máy nằm trong login Keychain. Mac không ai
 đăng nhập (headless, tắt tự đăng nhập) không chạy được tiến trình nền, và qua SSH thì Keychain bị khoá. Bật tự đăng nhập, hoặc đăng
 nhập GUI một lần sau mỗi lần khởi động máy.
+
+## macOS: quyền Truy cập toàn bộ ổ đĩa (Full Disk Access)
+
+Phiên làm trong Desktop, Documents, Downloads hoặc iCloud Drive cần tunelo có Full Disk Access; thiếu thì macOS chặn, hoặc hỏi bằng
+hộp thoại trên máy mà không ai bấm nên phiên treo. Chỉ chủ máy cấp được: kéo `~/.local/bin/tunelo` vào danh sách ở Cài đặt hệ thống
+› Quyền riêng tư & Bảo mật › Truy cập toàn bộ ổ đĩa, rồi bật công tắc.
+
+- Script cài và `tunelo install` mở sẵn trang đó và một cửa sổ Finder chọn sẵn tunelo. `tunelo status` in các bước khi còn thiếu.
+- Dịch vụ dò quyền mà không gây hộp thoại, báo cho thiết bị (`MachineInfo.needs_full_disk_access`; web hiện banner có nút mở lại
+  trang cài đặt trên máy). Khi còn thiếu, nó kiểm lại vài giây một lần và báo ngay khi được cấp, không cần khởi động lại.
+- Nhờ chữ ký Developer ID, quyền đã cấp giữ qua các lần `tunelo update`. Bản 2.0.2 trở về trước ký ad-hoc nên phải cấp lại một lần
+  sau khi lên 2.0.3.
 
 ## Gỡ
 
