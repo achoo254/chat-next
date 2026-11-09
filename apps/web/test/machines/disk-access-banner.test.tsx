@@ -1,5 +1,6 @@
 // The banner of a Mac whose tunelo lacks Full Disk Access: shown only when the
-// machine says so, with the steps, and "Check again" asks the machine anew.
+// machine says so, with the steps and a drawing, opens the settings on the
+// machine again, and says so once it is granted.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { FrameSchema, MachineInfoSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -41,7 +42,7 @@ describe("Full Disk Access banner", () => {
 		expect(container.textContent).toBe("");
 	});
 
-	it("shows the steps and asks the machine again", async () => {
+	it("shows the two steps with a drawing, and opens the settings on the machine again", async () => {
 		const { link, sent } = fakeLink();
 		render(
 			<I18nProvider>
@@ -49,26 +50,42 @@ describe("Full Disk Access banner", () => {
 			</I18nProvider>,
 		);
 		expect(screen.getByRole("alert").textContent).toContain(viMachines.diskAccess.title);
-		expect(screen.getAllByRole("listitem")).toHaveLength(3);
-		await userEvent.click(screen.getByRole("button", { name: viMachines.diskAccess.recheck }));
-		await waitFor(() => expect(sent).toEqual([expect.objectContaining({ case: "machineInfoRequest" })]));
+		expect(screen.getAllByRole("listitem")).toHaveLength(2);
+		expect(screen.getByRole("img", { name: viMachines.diskAccess.figure })).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: viMachines.diskAccess.reopen }));
+		await waitFor(() => expect(sent).toEqual([expect.objectContaining({ case: "openDiskAccessSettings" })]));
+		expect(await screen.findByText(viMachines.diskAccess.reopened)).toBeTruthy();
 	});
 
-	it("cannot ask again while the machine is offline", () => {
+	it("says it is granted once the machine reports it", () => {
+		const { link } = fakeLink();
+		const { rerender } = render(
+			<I18nProvider>
+				<DiskAccessBanner link={link} info={create(MachineInfoSchema, { needsFullDiskAccess: true })} online />
+			</I18nProvider>,
+		);
+		rerender(
+			<I18nProvider>
+				<DiskAccessBanner link={link} info={create(MachineInfoSchema, { needsFullDiskAccess: false })} online />
+			</I18nProvider>,
+		);
+		expect(screen.getByRole("status").textContent).toBe(viMachines.diskAccess.granted);
+	});
+
+	it("cannot open the settings while the machine is offline", () => {
 		const { link } = fakeLink();
 		render(
 			<I18nProvider>
 				<DiskAccessBanner link={link} info={create(MachineInfoSchema, { needsFullDiskAccess: true })} online={false} />
 			</I18nProvider>,
 		);
-		expect((screen.getByRole("button", { name: viMachines.diskAccess.recheck }) as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByRole("button", { name: viMachines.diskAccess.reopen }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	it("has the same steps in every language", () => {
 		for (const copy of [viMachines, enMachines, zhCNMachines]) {
-			expect(copy.diskAccess.steps).toHaveLength(3);
-			expect(copy.diskAccess.steps.join(" ")).toContain("~/.local/bin/tunelo");
-			expect(copy.diskAccess.steps.join(" ")).toContain("tunelo start");
+			expect(copy.diskAccess.steps).toHaveLength(2);
+			expect(copy.diskAccess.steps.join(" ")).toContain("tunelo");
 		}
 	});
 });

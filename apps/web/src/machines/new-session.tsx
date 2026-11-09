@@ -16,7 +16,7 @@ import { navigate, paths } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { PROMPT_HINTS, folderName, hintPrompt, recentFolders, type PromptHint } from "./new-session-hints.ts";
+import { PROMPT_HINTS, folderName, hintPrompt, inDiskAccessFolder, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
 import { aiName, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -29,6 +29,13 @@ interface NewSessionProps {
 	onClose: () => void;
 }
 
+/** Folders that start with what was typed: the suggestions, then the folders shown; at most six. */
+function folderMatches(typed: string, suggestions: readonly string[], listing: DirListResult | null): string[] {
+	const lower = typed.toLowerCase();
+	const shown = listing === null ? [] : listing.entries.map((entry) => joinPath(listing.path, entry.name));
+	return [...new Set([...suggestions, ...shown])].filter((dir) => dir.toLowerCase().startsWith(lower) && dir !== typed).slice(0, 6);
+}
+
 function joinPath(dir: string, child: string): string {
 	const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
 	return dir.endsWith(sep) ? `${dir}${child}` : `${dir}${sep}${child}`;
@@ -37,13 +44,18 @@ function joinPath(dir: string, child: string): string {
 export function NewSession({ machine, name, link, state, onClose }: NewSessionProps) {
 	const t = useMachinesCopy();
 	const titleId = useDomId("new-session");
-	const listId = useDomId("dirs");
+	const suggestId = useDomId("dir-suggestions");
 	const providers = state.info?.providers ?? [];
 	const [provider, setProvider] = useState(() => providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? providers[0]?.id ?? "claude");
 	const [model, setModel] = useState("");
 	const [path, setPath] = useState("");
 	const [listing, setListing] = useState<DirListResult | null>(null);
-	const [listFailed, setListFailed] = useState(false);
+	// Why the folder typed or picked could not be listed; empty when it could.
+	const [listError, setListError] = useState("");
+	// The folder being listed now, for the "Go to" button.
+	const [going, setGoing] = useState("");
+	// The field is being typed in: show matching folders under it.
+	const [typing, setTyping] = useState(false);
 	const [projectSettings, setProjectSettings] = useState(false);
 	// The first message: a suggestion (it follows the folder) until the user types.
 	const [hint, setHint] = useState<PromptHint | null>("summary");
@@ -57,16 +69,22 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	const models = providerOf(state.info, provider)?.capabilities?.models ?? [];
 
 	const browse = (dir: string) => {
-		setListFailed(false);
+		setTyping(false);
+		setListError("");
+		setGoing(dir);
 		link.request({ case: "dirList", value: { path: dir, showHidden: false } }).then(
 			(frame) => {
+				setGoing("");
 				if (frame.body.case !== "dirListResult") return;
 				setListing(frame.body.value);
 				setPath(frame.body.value.path);
 				setAskConsent(false);
 				setAskTrust("");
 			},
-			() => setListFailed(true),
+			(err: unknown) => {
+				setGoing("");
+				setListError(machineErrorText(t, err, ai));
+			},
 		);
 	};
 	const recent = recentFolders(state.threads, state.info?.recentDirs);
@@ -88,14 +106,19 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 			});
 		open(startDir)
 			.catch(() => (startDir === "" ? Promise.reject(new Error("no home")) : open("")))
-			.catch(() => setListFailed(true));
-	}, [link, ready, startDir]);
+			.catch(() => setListError(t.newSession.listFailed));
+	}, [link, ready, startDir, t]);
 
 	const sensitive = listing !== null && listing.path === path && listing.sensitive;
-	const noProject = sensitive || isHome(path, state.info?.home ?? "");
-	const loadProject = projectSettings && !noProject;
+	// "Go to" only does something for a folder other than the one shown.
+	const typed = path.trim();
+	const canGo = typed !== "" && typed !== listing?.path;
 	const pinned = state.info?.pinnedDirs ?? [];
 	const suggestions = [...new Set([...recent, ...pinned])];
+	const matches = typing && typed !== "" ? folderMatches(typed, suggestions, listing) : [];
+	const diskAccessHint = state.info?.needsFullDiskAccess === true && inDiskAccessFolder(typed, state.info.home);
+	const noProject = sensitive || isHome(path, state.info?.home ?? "");
+	const loadProject = projectSettings && !noProject;
 	const message = hint !== null ? hintPrompt(t.newSession, hint, path) : text;
 	const full = state.maxSessions > 0 && state.openSessions >= state.maxSessions;
 	const victim = full
@@ -195,46 +218,88 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 							className="input"
 							aria-label={t.newSession.folder}
 							placeholder={t.newSession.folderPlaceholder}
-							list={listId}
 							value={path}
+							aria-controls={matches.length > 0 ? suggestId : undefined}
+							onBlur={() => setTyping(false)}
 							spellCheck={false}
 							autoComplete="off"
 							onChange={(event) => {
 								setPath(event.target.value);
+								setTyping(true);
 								setAskConsent(false);
 								setAskTrust("");
 							}}
 							onKeyDown={(event) => {
+								if (event.key === "Escape" && matches.length > 0) {
+									event.preventDefault();
+									event.stopPropagation();
+									setTyping(false);
+								}
 								if (event.key === "Enter") {
 									event.preventDefault();
-									browse(path.trim());
+									if (canGo) browse(typed);
 								}
 							}}
 						/>
-						<button type="button" className="btn btn-sm" onClick={() => browse(path.trim())}>
-							{t.newSession.go}
-						</button>
-						<datalist id={listId}>
-							{suggestions.map((dir) => (
-								<option key={dir} value={dir} />
-							))}
-							{listing?.entries.map((entry) => (
-								<option key={`e:${entry.name}`} value={joinPath(listing.path, entry.name)} />
-							))}
-						</datalist>
-					</div>
-					{listing !== null && (
-						<div className="mx-crumbs">
-							{listing.parent !== "" && (
-								<button type="button" className="icon-btn" aria-label={t.newSession.up} onClick={() => browse(listing.parent)}>
-									<MachineIcon name="arrow-up" small />
+						{going !== "" ? (
+							<span className="mx-wait" role="status">
+								<span className="spin" aria-hidden="true" />
+								{t.newSession.going}
+							</span>
+						) : (
+							canGo && (
+								<button type="button" className="btn btn-sm" onClick={() => browse(typed)}>
+									{t.newSession.go}
 								</button>
-							)}
-							<b className="mono">{listing.path}</b>
-							{listing.sensitive && <small className="mx-tag danger">{t.newSession.sensitive}</small>}
-						</div>
+							)
+						)}
+					</div>
+					{matches.length > 0 && (
+						<ul className="mx-suggest" id={suggestId} aria-label={t.newSession.suggestions}>
+							{matches.map((dir) => (
+								<li key={dir}>
+									{/* Keeps the field focused so the click lands. */}
+									<button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => browse(dir)}>
+										<MachineIcon name="folder" small />
+										<span className="mono">{dir}</span>
+									</button>
+								</li>
+							))}
+						</ul>
 					)}
-					{listFailed && <p className="mx-error">{t.newSession.listFailed}</p>}
+					{listing !== null && (
+						<nav className="mx-crumbs" aria-label={t.newSession.crumbs}>
+							<ol>
+								{pathCrumbs(listing.path, state.info?.home ?? "").map((crumb, i, all) => (
+									<li key={crumb.path}>
+										{i === all.length - 1 ? (
+											<b aria-current="location">{crumb.name}</b>
+										) : (
+											<button type="button" title={crumb.path} onClick={() => browse(crumb.path)}>
+												{crumb.name}
+											</button>
+										)}
+									</li>
+								))}
+								{listing.path === "/" && (
+									<li>
+										<b aria-current="location">/</b>
+									</li>
+								)}
+							</ol>
+							{listing.sensitive && <small className="mx-tag danger">{t.newSession.sensitive}</small>}
+						</nav>
+					)}
+					{listError !== "" && (
+						<p className="mx-error" role="alert">
+							{listError}
+						</p>
+					)}
+					{diskAccessHint && (
+						<p className="mx-warn" role="note" data-id="new-session-disk-access">
+							{t.diskAccess.sessionHint}
+						</p>
+					)}
 					{listing !== null && (
 						<ul className="mx-dirs">
 							{listing.entries.length === 0 && <li className="muted">{t.newSession.noSubfolders}</li>}

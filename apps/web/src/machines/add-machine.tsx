@@ -20,6 +20,7 @@ import { MachineIcon } from "./machine-icons.tsx";
 import type { MachineEntry } from "./machines-client.ts";
 import { PageHead } from "./page-head.tsx";
 import { useHub } from "./use-machines.ts";
+import { DiskAccessGuide } from "./disk-access-guide.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const POLL_MS = 3_000;
@@ -238,6 +239,13 @@ export function AddMachine() {
 								</div>
 							)}
 						</li>
+						{os === "mac" && (
+							<li className={state(false, done)} data-id="add-machine-disk-access">
+								<h4>{t.diskAccess.addStep}</h4>
+								<p className="muted">{t.diskAccess.addBody}</p>
+								<DiskAccessGuide />
+							</li>
+						)}
 					</ol>
 					{error !== "" && (
 						<p className="mx-error" role="alert">

@@ -172,14 +172,14 @@ export function DialogHead({ id, title, onClose, onBack, backLabel, step }: Dial
 	return (
 		<div className="dlg-head">
 			{onBack !== undefined && (
-				<button type="button" className="icon-btn" aria-label={backLabel ?? copy.common.back} onClick={onBack}>
+				<button type="button" className="icon-btn" aria-label={backLabel ?? copy.common.back} title={backLabel ?? copy.common.back} onClick={onBack}>
 					<Icon name="back" />
 				</button>
 			)}
 			<h2 id={id}>{title}</h2>
 			{step !== undefined && <span className="step">{step}</span>}
 			{onClose !== undefined && (
-				<button type="button" className="icon-btn" aria-label={copy.common.close} onClick={onClose}>
+				<button type="button" className="icon-btn" aria-label={copy.common.close} title={copy.common.close} onClick={onClose}>
 					<Icon name="x" />
 				</button>
 			)}
