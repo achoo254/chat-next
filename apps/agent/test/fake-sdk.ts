@@ -6,13 +6,27 @@ import { Channel } from "../src/util/channel.ts";
 
 export type SdkLog = { options: Options[]; interrupts: number; models: string[]; modes?: string[]; flags?: unknown[]; denials?: string[] };
 
+/** Whether allow rules cover a call: `Tool`, `Tool(exact)` or `Tool(prefix:*)`, as claude reads them. */
+function allowedBy(rules: string[] | undefined, tool: string, content: string): boolean {
+  return (rules ?? []).some((rule) => {
+    if (rule === tool) return true;
+    const m = /^([^(]+)\((.*)\)$/.exec(rule);
+    if (!m || m[1] !== tool) return false;
+    const body = m[2] ?? "";
+    return body.endsWith(":*") ? content.startsWith(body.slice(0, -2)) : body === content;
+  });
+}
+
+let idBase = 0;
+
 export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: [] }) {
   const fn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }): Query => {
     log.options.push(params.options);
     const out = new Channel<SDKMessage>();
     const sessionId = params.options.resume ?? "claude-session-1";
     let interrupted = false;
-    let n = 0;
+    // Ids go on across sessions, as claude's own are unique (a resumed session never reuses one).
+    let n = (idBase += 1000);
     const m = (x: unknown) => out.push(x as SDKMessage);
 
     const say = (text: string) => {
@@ -36,7 +50,10 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
           const command = text.slice(4);
           const toolUseID = `tu${++n}`;
           m({ type: "assistant", parent_tool_use_id: null, uuid: `u${n}`, message: { id: `msg${n}`, content: [{ type: "tool_use", id: toolUseID, name: "Bash", input: { command } }] } });
-          const r = await canUseTool("Bash", { command }, { signal, toolUseID } as Parameters<typeof canUseTool>[2]);
+          // As claude: a tool its allow rules (allowedTools) cover runs without asking.
+          const r = allowedBy(params.options.allowedTools, "Bash", command)
+            ? ({ behavior: "allow", updatedInput: { command } } as const)
+            : await canUseTool("Bash", { command }, { signal, toolUseID } as Parameters<typeof canUseTool>[2]);
           if (r?.behavior === "deny") (log.denials ??= []).push(r.message);
           if (interrupted) {
             interrupted = false;
@@ -51,6 +68,15 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
           const r = await canUseTool("AskUserQuestion", input, { signal, toolUseID: `tu${++n}` } as Parameters<typeof canUseTool>[2]);
           const picked = r?.behavior === "allow" ? (r.updatedInput as { answers?: Record<string, string> } | undefined)?.answers?.["Pick one?"] : undefined;
           say(picked ? `you picked ${picked}` : "no answer");
+          result(true);
+        } else if (text.startsWith("mcpwrite ")) {
+          // A write tool of tunelo's MCP (its PreToolUse hook always asks).
+          const toolName = "mcp__tunelo__chat_send_message";
+          const input = { chat_id: "c1", text: text.slice(9) };
+          const r = allowedBy(params.options.allowedTools, toolName, "")
+            ? ({ behavior: "allow", updatedInput: input } as const)
+            : await canUseTool(toolName, input, { signal, toolUseID: `tu${++n}` } as Parameters<typeof canUseTool>[2]);
+          say(r?.behavior === "deny" ? "not sent" : "sent");
           result(true);
         } else if (text === "limit") {
           // The account's plan usage ran out: claude says so and the turn fails.

@@ -52,7 +52,11 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
   tài khoản cũ, nên đổi từng phiên là thừa (cách của Orca).
   - Phiên đã tạm tắt: lần mở sau dùng profile mới.
   - Phiên đang mở và rảnh: đóng tiến trình claude rồi mở lại ngay bằng resume cùng session id dưới profile mới. Model, effort, chế độ
-    quyền, thư mục giữ nguyên; MCP của tunelo nhận vé mới. Quyền "cho phép cả phiên" đã cấp trong tiến trình cũ không còn.
+    quyền, thư mục giữ nguyên; MCP của tunelo nhận vé mới.
+  - Quyền "cho phép cả phiên" do tunelo nhớ theo phiên (luật allow, cú pháp của claude, trong `meta.json` của thread), không phụ
+    thuộc tiến trình claude. Mỗi lần phiên mở lại (đổi profile, tự tạm tắt, khởi động lại dịch vụ) tunelo trao lại qua
+    `allowedTools`. Chỉ luật allow, không bao giờ đổi chế độ quyền hay thêm thư mục. Không bao giờ nhớ tool ghi của MCP tunelo
+    hay luật cho cả server MCP tunelo, và thao tác nhạy cảm không được "cả phiên" từ đầu. Chuyển sang AI khác thì xoá.
   - Phiên đang chạy giữa lượt (kể cả đang chờ duyệt quyền): không bị ngắt, chuyển khi lượt kết thúc. `ThreadInfo` báo
     `profile_switch_pending` kèm tài khoản sẽ chuyển sang.
   - Resume chạy được dưới profile khác vì `projects/` (nơi claude lưu hội thoại) là thư mục dùng chung.

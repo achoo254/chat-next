@@ -12,7 +12,7 @@ import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it } from "vitest";
 import { AgentCore, type ProfileSuggestion } from "../src/core/agent-core.ts";
 import type { SessionMcpLease } from "../src/mcp/session-tickets.ts";
-import { createClaudeProvider } from "../src/providers/claude/index.ts";
+import { createClaudeProvider, replayableRule, ruleString } from "../src/providers/claude/index.ts";
 import { AuditLog } from "../src/safety/audit-log.ts";
 import { createSensitiveCheck } from "../src/safety/sensitive-paths.ts";
 import { fakeQuery } from "./fake-sdk.ts";
@@ -25,8 +25,8 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const configDirOf = (o: Options | undefined) => o?.env?.CLAUDE_CONFIG_DIR;
 
 /** A core on the fake SDK whose machine profile the test picks ("" or "p2"). */
-function machineCore(opts: { suggest?: (id: string) => Promise<ProfileSuggestion | undefined> } = {}) {
-  const root = tempDir();
+function machineCore(opts: { suggest?: (id: string) => Promise<ProfileSuggestion | undefined>; root?: string } = {}) {
+  const root = opts.root ?? tempDir();
   const home = join(root, "home");
   const work = join(home, "work");
   mkdirSync(work, { recursive: true });
@@ -67,7 +67,7 @@ function machineCore(opts: { suggest?: (id: string) => Promise<ProfileSuggestion
     const server = sdk.log.options[i]?.mcpServers?.tunelo as { env?: Record<string, string> } | undefined;
     return server?.env?.TUNELO_MCP_TICKET;
   };
-  return { core, sdk, work, p2, select, moved, tickets, ticketOf };
+  return { core, sdk, work, p2, root, select, moved, tickets, ticketOf };
 }
 
 describe("sessions and Claude profiles", () => {
@@ -154,6 +154,64 @@ describe("sessions and Claude profiles", () => {
     expect(configDirOf(sdk.log.options[2])).toBeUndefined();
     expect(core.info(t.id).profileId).toBe("");
     await core.stop();
+  });
+
+  it("keeps \"allow for the session\" across a profile switch and a restart; tunelo's MCP writes still ask", async () => {
+    const { core, sdk, work, root, select } = machineCore();
+    const approvals = (id: string) => byCase(core.snapshot(id), "approval");
+    const answer = async (id: string, n: number, decision: Decision) => {
+      const items = await until(core, id, (xs) => byCase(xs, "approval").length === n);
+      const a = byCase(items, "approval")[n - 1];
+      if (!a) throw new Error("no approval");
+      core.respond(id, a.id, a.revision, { decision }, "test");
+    };
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "ask ls", consent, device: "test" });
+    await answer(t.id, 1, Decision.ALLOW_SESSION);
+    await until(core, t.id, turns(1));
+
+    select("p2");
+    await settle();
+    expect(sdk.log.options).toHaveLength(2);
+    expect(sdk.log.options[1]?.allowedTools).toEqual(["Bash"]);
+    // Same kind of tool in the resumed session: no new approval.
+    await core.send(t.id, "ask pwd", "");
+    await until(core, t.id, turns(2));
+    expect(approvals(t.id)).toHaveLength(1);
+    expect(byCase(core.snapshot(t.id), "text").some((i) => i.body.value.text === "ran pwd")).toBe(true);
+
+    // A write of tunelo's MCP: asked, and "for the session" keeps nothing.
+    await core.send(t.id, "mcpwrite hi", "");
+    await answer(t.id, 2, Decision.ALLOW_SESSION);
+    await until(core, t.id, turns(3));
+    select("");
+    await settle();
+    expect(sdk.log.options.at(-1)?.allowedTools).toEqual(["Bash"]);
+    await core.send(t.id, "mcpwrite again", "");
+    await answer(t.id, 3, Decision.ALLOW);
+    await until(core, t.id, turns(4));
+    await core.stop();
+
+    // The service restarts: the thread still carries the rule.
+    const again = machineCore({ root });
+    await again.core.send(t.id, "ask whoami", "");
+    await until(again.core, t.id, turns(5));
+    expect(again.sdk.log.options[0]?.allowedTools).toEqual(["Bash"]);
+    expect(again.sdk.log.options[0]?.resume).toBe("claude-session-1");
+    expect(byCase(again.core.snapshot(t.id), "approval")).toHaveLength(3);
+    await again.core.stop();
+  });
+
+  it("writes and filters session rules as claude reads them", () => {
+    expect(ruleString({ toolName: "Bash", ruleContent: "npm test:*" })).toBe("Bash(npm test:*)");
+    expect(ruleString({ toolName: "Bash", ruleContent: "echo (x)" })).toBe("Bash(echo \\(x\\))");
+    expect(ruleString({ toolName: "Read" })).toBe("Read");
+    expect(replayableRule("Bash(npm test:*)")).toBe(true);
+    expect(replayableRule("mcp__tunelo__chat_list_chats")).toBe(true);
+    expect(replayableRule("mcp__tunelo__chat_send_message")).toBe(false);
+    expect(replayableRule("mcp__tunelo__localman_send_request")).toBe(false);
+    expect(replayableRule("mcp__tunelo")).toBe(false);
+    expect(replayableRule("mcp__tunelo__*")).toBe(false);
+    expect(replayableRule("")).toBe(false);
   });
 
   it("keeps usage with the profile that reported it", async () => {

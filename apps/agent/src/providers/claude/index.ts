@@ -171,6 +171,25 @@ export const writeApprovalHook: HookCallback = async (input) => {
   };
 };
 
+/** A permission rule as Claude writes it: `Tool` or `Tool(content)`, parentheses in the content escaped. */
+export function ruleString(rule: { toolName: string; ruleContent?: string }): string {
+  if (!rule.ruleContent) return rule.toolName;
+  return `${rule.toolName}(${rule.ruleContent.replace(/\\/g, "\\\\").replace(/[()]/g, (c) => `\\${c}`)})`;
+}
+
+/**
+ * A session allow rule tunelo may hand back to claude: never one for tunelo's
+ * own MCP as a whole or for its write tools (those are asked about every
+ * time), never a wildcard tool name.
+ */
+export function replayableRule(rule: string): boolean {
+  const tool = rule.split("(")[0] ?? "";
+  if (tool === "" || tool.includes("*")) return false;
+  const ownServer = `mcp__${SESSION_MCP_SERVER}`;
+  if (tool === ownServer || tool === `${ownServer}__`) return false;
+  return !isWriteTool(tool);
+}
+
 /** What Claude reads as the tool's answer: like the terminal's "No, and tell Claude what to do differently". */
 export function denialText(message: string | undefined): string {
   const said = message?.trim();
@@ -235,6 +254,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       const rules: PermissionUpdate[] = suggested.length
         ? suggested.map((s) => ({ ...s, destination: "session" }) as PermissionUpdate)
         : [{ type: "addRules", rules: [{ toolName }], behavior: "allow", destination: "session" }];
+      // Kept by tunelo with the thread: a session opened again gets them back (allowedTools).
+      const kept = rules.flatMap((u) => (u.type === "addRules" ? u.rules.map(ruleString) : [])).filter(replayableRule);
+      if (kept.length) events.push({ type: "session-rules", rules: kept });
       return { behavior: "allow", updatedInput: input, updatedPermissions: rules };
     }
     return { behavior: "allow", updatedInput: input };
@@ -262,6 +284,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   if (policy.permissionMode) options.permissionMode = policy.permissionMode as PermissionMode;
   if (policy.allowBypass) options.allowDangerouslySkipPermissions = true;
   if (resumeId) options.resume = resumeId;
+  // "Allow for the session" given before this process: the same allow rules, from tunelo's own record.
+  const sessionRules = (policy.sessionRules ?? []).filter(replayableRule);
+  if (sessionRules.length) options.allowedTools = sessionRules;
 
   const q = queryFn({ prompt: inbox, options });
   const mapper = new MessageMapper(policy.dir, (e) => events.push(e));

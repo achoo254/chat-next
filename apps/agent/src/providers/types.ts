@@ -71,6 +71,12 @@ export type ProviderEvent =
   | { type: "compaction"; tokensBefore: number }
   | { type: "turn-end"; state: "completed" | "interrupted" | "failed"; durationMs: number }
   | { type: "error"; message: string; needsLogin?: boolean }
+  /**
+   * The user allowed a tool for the whole session: the allow rules it added,
+   * in the AI's own rule syntax (Claude: "Bash(npm test:*)"). The core keeps
+   * them with the thread and hands them back whenever the session opens again.
+   */
+  | { type: "session-rules"; rules: string[] }
   /** The account's plan usage ran out (rejected for its rate limit); resetsAt in Unix milliseconds, 0 when unknown. */
   | { type: "limit-reached"; resetsAt: number };
 
@@ -124,6 +130,12 @@ export type SessionPolicy = {
   accountDir?: string;
   /** tunelo's own MCP for this session (its ticket ends with the session). */
   sessionMcp?: SessionMcp;
+  /**
+   * Allow rules the user gave "for the session" before (session-rules
+   * events), so a session opened again (another profile, after parking, after
+   * a restart) does not ask again. Allow rules only: never a mode or a folder.
+   */
+  sessionRules?: string[];
 };
 
 export type DetectOptions = {

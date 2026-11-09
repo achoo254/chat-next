@@ -83,7 +83,17 @@ type ThreadMeta = {
   profileId?: string;
   /** Last statusline data, kept so a parked or restarted thread still shows it. */
   info?: Omit<ProviderInfo, "rateLimits" | "account">;
+  /**
+   * Allow rules the user gave "for the session" on this thread (the AI's own
+   * rule syntax), handed back whenever its session opens again: after a
+   * profile switch, parking or a restart of the service. Cleared when the
+   * thread moves to another AI.
+   */
+  sessionRules?: string[];
 };
+
+/** At most this many session allow rules per thread; the oldest go first. */
+const SESSION_RULES_MAX = 200;
 
 /** Last statusline data of one AI account profile. */
 type AccountState = { rateLimits?: ProviderInfo["rateLimits"]; account?: ProviderInfo["account"] };
@@ -702,6 +712,8 @@ export class AgentCore {
     const summary = buildHandoff({ from, to: target.name, dir: t.meta.dir, items: t.journal.all(), gitStat: git.stat });
     t.meta.provider = target.id;
     t.meta.model = model;
+    // Another AI: rules in the old one's syntax mean nothing there.
+    delete t.meta.sessionRules;
     t.meta.segments.push({ provider: target.id, model, startedSeq: String(this.lastSeq(threadId) + 1n) });
     this.saveMeta(t);
     this.put(t, `handoff:${randomUUID()}`, {
@@ -790,6 +802,7 @@ export class AgentCore {
       ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
       ...(t.meta.machineMode === "bypassPermissions" ? { allowBypass: true } : {}),
       ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
+      ...(t.meta.sessionRules?.length ? { sessionRules: [...t.meta.sessionRules] } : {}),
     };
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
@@ -972,6 +985,13 @@ export class AgentCore {
       case "error":
         this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: e.message } });
         return;
+      case "session-rules": {
+        const rules = [...(t.meta.sessionRules ?? [])];
+        for (const rule of e.rules) if (!rules.includes(rule)) rules.push(rule);
+        t.meta.sessionRules = rules.slice(-SESSION_RULES_MAX);
+        this.saveMeta(t);
+        return;
+      }
       case "limit-reached":
         if (t.limitSeen) return;
         t.limitSeen = true;
