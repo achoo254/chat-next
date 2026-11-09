@@ -39,6 +39,8 @@ import type { GitChangesResult, GitFileChange } from "../threads/git-changes.ts"
 import { InputError } from "../remote-browser/browser-input.ts";
 import { BrowserNotRunning, BrowserToolError, BrowserUnavailable, type RemoteBrowser, TakeoverGone } from "../remote-browser/remote-browser.ts";
 import { type BrowserFrame, BrowserLink } from "./browser-link.ts";
+import { ScreenShareBusy, ScreenShareGone, type ScreenShare, ScreenSharingOff } from "../screen-share/screen-share.ts";
+import { ScreenShareLink } from "./screen-share-link.ts";
 import { wireItem } from "./wire.ts";
 
 export type Socket = {
@@ -70,6 +72,8 @@ export type LinkContext = {
   secrets?: SecretService;
   /** The tunelo browser the user may take over; absent where the machine has none (tests). */
   browser?: RemoteBrowser;
+  /** The machine's own Screen Sharing (macOS); absent where the machine has none (tests). */
+  screenShare?: ScreenShare;
   /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
   openDiskAccessSettings?: () => boolean;
 };
@@ -96,6 +100,9 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   if (err instanceof TakeoverGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.TAKEOVER_GONE, subject: "" };
   if (err instanceof BrowserNotRunning) return { code: ErrorCode.INVALID, message, reason: ErrorReason.BROWSER_NOT_RUNNING, subject: "" };
   if (err instanceof BrowserUnavailable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.BROWSER_UNAVAILABLE, subject: "" };
+  if (err instanceof ScreenSharingOff) return { code: ErrorCode.INVALID, message, reason: ErrorReason.SCREEN_SHARING_OFF, subject: "" };
+  if (err instanceof ScreenShareBusy) return { code: ErrorCode.INVALID, message, reason: ErrorReason.SCREEN_SHARE_BUSY, subject: "" };
+  if (err instanceof ScreenShareGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SCREEN_SHARE_GONE, subject: "" };
   if (err instanceof InputError || err instanceof BrowserToolError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
   if (isFsError(err)) {
     const fsCode = (err as { code: string }).code;
@@ -198,6 +205,7 @@ export class Connection {
   private unsubscribe: (() => void)[] = [];
   private queue: Promise<void> = Promise.resolve();
   private browserLink: BrowserLink | undefined;
+  private screenShareLink: ScreenShareLink | undefined;
   readonly opened = Date.now();
 
   constructor(
@@ -224,6 +232,7 @@ export class Connection {
     this.state = "closed";
     for (const u of this.unsubscribe) u();
     this.browserLink?.close();
+    this.screenShareLink?.close();
     this.socket.close(code, reason);
   }
 
@@ -316,8 +325,18 @@ export class Connection {
         (id, err) => this.sendError(id, err),
         () => this.socket.buffered?.() ?? 0,
         () => this.device,
+        () => this.ctx.machineInfo(),
       );
       this.unsubscribe.push(this.browserLink.subscribe());
+    }
+    if (this.ctx.screenShare?.supported) {
+      this.screenShareLink = new ScreenShareLink(
+        this.ctx.screenShare,
+        (id, body) => this.send(id, body),
+        (id, err) => this.sendError(id, err),
+        () => this.socket.buffered?.() ?? 0,
+        () => this.device,
+      );
     }
   }
 
@@ -652,7 +671,14 @@ export class Connection {
         case "browserView":
         case "browserInput":
         case "browserTakeoverEnd":
+        case "browserClear":
           return this.browserFrame(id, b);
+        case "screenShareStatusRequest":
+        case "screenShareOpen":
+        case "screenShareData":
+        case "screenShareClose":
+          if (!this.screenShareLink) return this.send(id, { case: "error", value: refusal("this machine has no Screen Sharing", ErrorReason.UNSUPPORTED_REQUEST) });
+          return this.screenShareLink.handle(id, b);
         case "projectList":
         case "projectAdd":
         case "projectCreate":

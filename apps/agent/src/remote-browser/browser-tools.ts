@@ -48,13 +48,17 @@ export function registerBrowserTools(server: ToolRegistrar, bound?: { browser: R
 			inputSchema: z.object({
 				reason: z.string().min(1).max(300).describe("One sentence the user reads: what to do on the page"),
 				url: url.optional().describe("An http or https page to open first; the current tab otherwise"),
+				os_dialog: z
+					.boolean()
+					.optional()
+					.describe("true when a dialog of the operating system (a passkey sheet, a Keychain prompt) waits on the machine's screen, outside the page: the user is offered the machine's whole screen"),
 			}),
 			annotations: { openWorldHint: true },
 		},
 		(args) =>
 			attempt(async () => {
 				const { browser, session } = service();
-				return browser.requestTakeover(session, { reason: args.reason, ...(args.url ? { url: args.url } : {}) });
+				return browser.requestTakeover(session, { reason: args.reason, ...(args.url ? { url: args.url } : {}), ...(args.os_dialog ? { osDialog: true } : {}) });
 			}),
 	);
 

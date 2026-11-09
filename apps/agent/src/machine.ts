@@ -43,6 +43,7 @@ import { Projects } from "./projects/projects.ts";
 import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
 import { SecretService } from "./sign-in-secrets/secret-service.ts";
 import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
+import { ScreenShare } from "./screen-share/screen-share.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -70,6 +71,8 @@ export type MachineOptions = {
   secrets?: SecretService;
   /** The tunelo browser; built from the config folder when not given. */
   browser?: RemoteBrowser;
+  /** The machine's own Screen Sharing (macOS); built when not given. */
+  screenShare?: ScreenShare;
 };
 
 export class Machine {
@@ -81,6 +84,7 @@ export class Machine {
   readonly projects: Projects;
   readonly secrets: SecretService;
   readonly browser: RemoteBrowser;
+  readonly screenShare: ScreenShare;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
@@ -105,6 +109,7 @@ export class Machine {
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
     this.secrets = opts.secrets ?? new SecretService({ configDir: dir, audit: this.audit });
     this.browser = opts.browser ?? new RemoteBrowser({ configDir: dir, audit: this.audit, log: this.log });
+    this.screenShare = opts.screenShare ?? new ScreenShare({ audit: this.audit, log: this.log });
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
     this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
     const c = this.config.get();
@@ -250,6 +255,7 @@ export class Machine {
   async stop(): Promise<void> {
     this.secrets.close();
     await this.browser.close();
+    this.screenShare.stop();
     this.diskWatch.stop();
     this.stopRotation?.();
     clearTimeout(this.announcing);
@@ -317,6 +323,7 @@ export class Machine {
         localForward: this.localForward,
         secrets: this.secrets,
         browser: this.browser,
+        screenShare: this.screenShare,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
@@ -398,7 +405,8 @@ export class Machine {
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
       secrets: true,
       gitChanges: true,
-      browser: { available: this.browser.available(), running: this.browser.running() },
+      browser: { available: this.browser.available(), running: this.browser.running(), clearable: true },
+      screenShare: this.screenShare.supported,
     });
   }
 

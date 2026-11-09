@@ -4,12 +4,12 @@
 // here end-to-end encrypted and are never logged. Input of one device is
 // applied strictly in order, apart from its other requests.
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { BrowserMouseType, type BrowserInput, type Frame, type FrameSchema } from "@achoo254/chat-proto/remote/remote";
+import { BrowserMouseType, type BrowserInput, type Frame, type FrameSchema, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { InputError, type InputAction, type MouseKind } from "../remote-browser/browser-input.ts";
 import type { BrowserEvent, BrowserViewer, RemoteBrowser, TakeoverInfo } from "../remote-browser/remote-browser.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
-export type BrowserFrame = Extract<Frame["body"], { case: "browserControl" | "browserView" | "browserInput" | "browserTakeoverEnd" }>;
+export type BrowserFrame = Extract<Frame["body"], { case: "browserControl" | "browserView" | "browserInput" | "browserTakeoverEnd" | "browserClear" }>;
 
 /** More than this unsent on the device's socket: pictures are skipped until it drains. */
 const BUSY_BYTES = 512 * 1024;
@@ -41,7 +41,7 @@ export function inputAction(v: BrowserInput): InputAction {
 }
 
 export function takeoverBody(t: TakeoverInfo) {
-	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: BigInt(t.expiresAt) };
+	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: BigInt(t.expiresAt), osDialog: t.osDialog };
 }
 
 export class BrowserLink {
@@ -54,6 +54,7 @@ export class BrowserLink {
 		private readonly fail: (id: string, err: unknown) => void,
 		buffered: () => number,
 		private readonly device: () => string,
+		private readonly machineInfo: () => Promise<MachineInfo>,
 	) {
 		this.viewer = {
 			frame: (f) => this.send("", { case: "browserFrame", value: f }),
@@ -109,6 +110,15 @@ export class BrowserLink {
 					.then(ack, (err: unknown) => this.fail(id, err));
 				return;
 			}
+			case "browserClear":
+				void this.browser
+					.clear(this.device())
+					.then(() => this.machineInfo())
+					.then(
+						(value) => this.send(id, { case: "machineInfo", value }),
+						(err: unknown) => this.fail(id, err),
+					);
+				return;
 			case "browserTakeoverEnd":
 				try {
 					this.browser.end(b.value.takeoverId, this.device());

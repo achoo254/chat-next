@@ -26,7 +26,7 @@ import { randomBytes } from "node:crypto";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { originOf } from "../sign-in-secrets/secret-names.ts";
 import { type InputAction, inputCommands } from "./browser-input.ts";
-import { type BrowserEndpoint, BrowserUnavailable, findBrowser, launchBrowser, profileDir, runningBrowser } from "./browser-profile.ts";
+import { type BrowserEndpoint, BrowserUnavailable, clearProfile, findBrowser, launchBrowser, profileDir, runningBrowser } from "./browser-profile.ts";
 import { CdpConnection, type CdpEvent } from "./cdp-connection.ts";
 import { NoticeQueues, PASSKEY_BINDING, PASSKEY_SCRIPT, type PasskeyNoticeInfo, PasskeyThrottle, passkeyNoticeText } from "./passkey-watch.ts";
 
@@ -72,6 +72,8 @@ export interface TakeoverInfo {
 	reason: string;
 	url: string;
 	expiresAt: number;
+	/** Claude says a dialog of the operating system waits on the machine's screen. */
+	osDialog: boolean;
 }
 
 export interface TabInfo {
@@ -122,6 +124,8 @@ export interface BrowserLauncher {
 	available(): boolean;
 	running(): Promise<BrowserEndpoint | undefined>;
 	launch(): Promise<BrowserEndpoint>;
+	/** Deletes the profile (the browser is closed first). */
+	clear(): Promise<void>;
 }
 
 export function profileLauncher(configDir: string): BrowserLauncher {
@@ -133,6 +137,9 @@ export function profileLauncher(configDir: string): BrowserLauncher {
 			const exe = findBrowser();
 			if (!exe) throw new BrowserUnavailable("no Chrome, Chromium, Edge or Brave is installed on this machine (or set TUNELO_BROWSER to one)");
 			return launchBrowser(dir, exe);
+		},
+		clear: async () => {
+			await clearProfile(dir);
 		},
 	};
 }
@@ -463,7 +470,7 @@ export class RemoteBrowser {
 	}
 
 	/** request_takeover: resolves when the user gives the tab back; rejects when it ends otherwise. */
-	async requestTakeover(session: BrowserSession, input: { reason: string; url?: string }): Promise<TakeoverResult> {
+	async requestTakeover(session: BrowserSession, input: { reason: string; url?: string; osDialog?: boolean }): Promise<TakeoverResult> {
 		if ([...this.takeovers.values()].some((t) => t.key === session.key)) {
 			throw new BrowserToolError("this session already waits for the user on the browser");
 		}
@@ -473,7 +480,7 @@ export class RemoteBrowser {
 		this.used(session);
 		const page = target ? await this.show(ctl, target) : await this.currentPage(ctl);
 		return new Promise<TakeoverResult>((resolve, reject) => {
-			this.openTakeover({ threadId: session.threadId, key: session.key, reason, url: page.url, targetId: page.targetId, resolve, reject });
+			this.openTakeover({ threadId: session.threadId, key: session.key, reason, url: page.url, targetId: page.targetId, osDialog: input.osDialog === true, resolve, reject });
 		});
 	}
 
@@ -625,7 +632,7 @@ export class RemoteBrowser {
 			return infoOf(mine);
 		}
 		const page = await this.currentPage(ctl);
-		return infoOf(this.openTakeover({ threadId: "", key: "", reason: "", url: page.url, targetId: page.targetId }));
+		return infoOf(this.openTakeover({ threadId: "", key: "", reason: "", url: page.url, targetId: page.targetId, osDialog: false }));
 	}
 
 	/** A device gives a takeover back (to Claude) or closes its own. */
@@ -765,6 +772,24 @@ export class RemoteBrowser {
 		if (this.lastUser?.key === key) this.lastUser = undefined;
 	}
 
+	/**
+	 * A device (or `tunelo browser clear`) deletes the profile: every takeover
+	 * ends, the browser closes, every sign-in in it is gone. Logged.
+	 */
+	async clear(device: string): Promise<void> {
+		for (const t of [...this.takeovers.values()]) this.finish(t, new BrowserToolError("the tunelo browser's profile was deleted"));
+		const ctl = this.ctl;
+		if (ctl) {
+			await ctl.conn.send("Browser.close").catch(() => undefined);
+			ctl.conn.close();
+		}
+		this.credentials.clear();
+		this.virtualOn = false;
+		await this.launcher.clear();
+		this.opts.audit.write({ device, action: "browser_clear", path: "", detail: "" });
+		this.log("browser: profile deleted");
+	}
+
 	/** tunelo stops: every takeover ends and the browser closes (its sign-ins stay in the profile). */
 	async close(): Promise<void> {
 		for (const t of [...this.takeovers.values()]) this.finish(t, new BrowserToolError("tunelo stopped"));
@@ -777,5 +802,5 @@ export class RemoteBrowser {
 }
 
 function infoOf(t: Takeover): TakeoverInfo {
-	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: t.expiresAt };
+	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: t.expiresAt, osDialog: t.osDialog };
 }

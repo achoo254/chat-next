@@ -24,7 +24,8 @@ export type AuditAction =
   | "secret_use"
   | "secret_remove"
   | "browser_control"
-  | "browser_clear";
+  | "browser_clear"
+  | "screen_share";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

@@ -12,6 +12,7 @@ import type { AuditLog } from "../../src/safety/audit-log.ts";
 import type { LocalForward } from "../../src/tunnels/forward.ts";
 import type { SecretService } from "../../src/sign-in-secrets/secret-service.ts";
 import type { RemoteBrowser } from "../../src/remote-browser/remote-browser.ts";
+import type { ScreenShare } from "../../src/screen-share/screen-share.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -32,6 +33,7 @@ export async function pairedDevice(ctx: {
   localForward?: LocalForward;
   secrets?: SecretService;
   browser?: RemoteBrowser;
+  screenShare?: ScreenShare;
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -55,6 +57,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.localForward ? { localForward: ctx.localForward } : {}),
       ...(ctx.secrets ? { secrets: ctx.secrets } : {}),
       ...(ctx.browser ? { browser: ctx.browser } : {}),
+      ...(ctx.screenShare ? { screenShare: ctx.screenShare } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
       pairing: () => undefined,
       machineInfo:

@@ -26,6 +26,7 @@ export class FakeChrome {
 	readonly tabs = new Map<string, Tab>();
 	passwordFocused = false;
 	launched = 0;
+	cleared = 0;
 	private server!: Server;
 	private wss!: WebSocketServer;
 	private socket: WebSocket | undefined;
@@ -55,6 +56,9 @@ export class FakeChrome {
 			this.launched += 1;
 			this.running = true;
 			return this.endpoint();
+		},
+		clear: async () => {
+			this.cleared += 1;
 		},
 	};
 
