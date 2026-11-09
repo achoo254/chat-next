@@ -14,6 +14,7 @@ import type { Command } from "commander";
 import { type AgentConfig, ConfigStore, configDir } from "../config.ts";
 import { callControl } from "../control-socket.ts";
 import { machineKey } from "../keystore.ts";
+import { type DiskAccess, diskAccessSteps, openDiskAccessSettings } from "../safety/disk-access.ts";
 import { installService, startService, stopService } from "../service.ts";
 import { TUNNEL_SERVER } from "../tunnel.ts";
 import { signInForServer } from "../tunnels/cli-login-command.js";
@@ -40,7 +41,23 @@ export interface InstallDeps {
   startService: (dir: string) => Promise<void>;
   installService: (dir: string) => Promise<string>;
   ensureMachineKey: (dir: string) => Promise<unknown>;
+  /** What macOS lets the started service open; "not-applicable" off macOS or when it does not answer. */
+  serviceDiskAccess: (dir: string) => Promise<DiskAccess>;
+  openDiskAccessSettings: () => void;
   log: (line: string) => void;
+}
+
+/** Asks the service just started, for up to 15 s, whether it has Full Disk Access. */
+async function askServiceDiskAccess(dir: string): Promise<DiskAccess> {
+  if (process.platform !== "darwin") return "not-applicable";
+  for (const end = Date.now() + 15_000; Date.now() < end; ) {
+    const status = (await callControl(dir, "GET", "/status").catch(() => undefined)) as { fullDiskAccess?: unknown } | undefined;
+    const access = status?.fullDiskAccess;
+    if (access === "granted" || access === "needed" || access === "not-applicable") return access;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  // An older service, or one still starting: show the steps anyway.
+  return "needed";
 }
 
 const defaultDeps: InstallDeps = {
@@ -55,6 +72,8 @@ const defaultDeps: InstallDeps = {
   startService,
   installService,
   ensureMachineKey: machineKey,
+  serviceDiskAccess: askServiceDiskAccess,
+  openDiskAccessSettings,
   log: (line) => console.log(line),
 };
 
@@ -100,6 +119,12 @@ export async function install(dir: string, options: { trust?: string }, deps: In
     });
     if (wasRunning) await deps.startService(dir).catch(() => undefined);
     throw err;
+  }
+  // The machine is installed; Full Disk Access is the owner's to grant, so a
+  // missing one only shows the way to it.
+  if ((await deps.serviceDiskAccess(dir)) === "needed") {
+    for (const line of diskAccessSteps(process.execPath)) deps.log(line);
+    deps.openDiskAccessSettings();
   }
 }
 

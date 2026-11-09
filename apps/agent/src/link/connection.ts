@@ -27,6 +27,7 @@ import { type ClaudeProfiles, type ProfileErrorKind, type ProfileList, ProfileEr
 import type { AuditLog } from "../safety/audit-log.ts";
 import type { LocalForward } from "../tunnels/forward.ts";
 import { listDir } from "../safety/dirs.ts";
+import { isDiskAccessDenial } from "../safety/disk-access.ts";
 import { OutsideFolderError, listSessionFiles } from "../safety/session-files.ts";
 import { wireItem } from "./wire.ts";
 
@@ -73,9 +74,11 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
     const reason =
       fsCode === "ENOENT" || fsCode === "ENOTDIR"
         ? ErrorReason.FOLDER_NOT_FOUND
-        : fsCode === "EACCES" || fsCode === "EPERM"
-          ? ErrorReason.ACCESS_DENIED
-          : ErrorReason.UNSPECIFIED;
+        : isDiskAccessDenial(err)
+          ? ErrorReason.FULL_DISK_ACCESS_NEEDED
+          : fsCode === "EACCES" || fsCode === "EPERM"
+            ? ErrorReason.ACCESS_DENIED
+            : ErrorReason.UNSPECIFIED;
     return { code: ErrorCode.INVALID, message, reason, subject: "" };
   }
   return { code: ErrorCode.INTERNAL, message, reason: ErrorReason.UNSPECIFIED, subject: "" };

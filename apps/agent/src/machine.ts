@@ -31,6 +31,7 @@ import { startLogRotation } from "./log-rotate.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
 import type { SessionMcpLease } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
+import { diskAccess, diskAccessSteps } from "./safety/disk-access.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
@@ -172,6 +173,7 @@ export class Machine {
     this.port = actual;
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
+    if (diskAccess() === "needed") for (const line of diskAccessSteps(process.execPath)) this.log(line);
     return actual;
   }
 
@@ -313,6 +315,7 @@ export class Machine {
       memoryMb: Math.round(process.memoryUsage().rss / 1e6),
       devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
+      needsFullDiskAccess: diskAccess() === "needed",
     });
   }
 

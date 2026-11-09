@@ -38,7 +38,7 @@ function line(p: ProfileView, selected: boolean): string {
 async function list(): Promise<number> {
   const l = (await callControl(configDir(), "GET", "/claude/profiles")) as ProfileList;
   for (const p of l.profiles) console.log(line(p, p.id === l.selectedId));
-  console.log("* new sessions use this one. A session that is open keeps its account; one that was closed or parked uses this one when it opens again.");
+  console.log("* the machine uses this one: every session moves to it (idle ones at once, busy ones when their turn ends, parked ones when they open again).");
   return 0;
 }
 

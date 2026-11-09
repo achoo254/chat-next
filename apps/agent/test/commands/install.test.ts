@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { type InstallDeps, install } from "../../src/commands/install.ts";
 import { ConfigStore } from "../../src/config.ts";
+import type { DiskAccess } from "../../src/safety/disk-access.ts";
 
 const KEY = "K".repeat(43);
 const SECRET = "S".repeat(43);
@@ -35,6 +36,8 @@ function deps(over: Partial<InstallDeps> = {}) {
     }),
     installService: vi.fn(async () => "launchd"),
     ensureMachineKey: vi.fn(async () => undefined),
+    serviceDiskAccess: vi.fn(async (): Promise<DiskAccess> => "granted"),
+    openDiskAccessSettings: vi.fn(),
     log: vi.fn(),
     ...over,
   };
@@ -74,6 +77,21 @@ describe("tunelo install", () => {
     expect(c.install).toEqual({ deviceKey: KEY, secret: SECRET });
     expect(c.machineId).toBeUndefined();
     expect(c.claimed).toBeUndefined();
+  });
+
+  test("a service without Full Disk Access: the steps are shown and the setting opens", async () => {
+    const d = deps({ serviceDiskAccess: vi.fn(async (): Promise<DiskAccess> => "needed") });
+    await install(dir, { trust: KEY }, d);
+    expect(d.openDiskAccessSettings).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(d.log).mock.calls.flat().join("\n")).toMatch(/Full Disk Access/);
+  });
+
+  test("a service with Full Disk Access, or off macOS: nothing opens", async () => {
+    for (const access of ["granted", "not-applicable"] as const) {
+      const d = deps({ serviceDiskAccess: vi.fn(async (): Promise<DiskAccess> => access) });
+      await install(dir, { trust: KEY }, d);
+      expect(d.openDiskAccessSettings).not.toHaveBeenCalled();
+    }
   });
 
   test("refuses a malformed key or secret before signing in", async () => {

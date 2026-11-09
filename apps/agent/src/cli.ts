@@ -32,6 +32,7 @@ import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
 import { goOnline } from "./online.ts";
 import { isCompiled, startService, stopService, uninstallService } from "./service.ts";
+import { diskAccessSteps } from "./safety/disk-access.ts";
 import { dropInheritedMarkers } from "./startup-env.ts";
 import { registerConfigCommand } from "./tunnels/cli-config-command.ts";
 import { registerHttpCommand } from "./tunnels/cli-http-command.js";
@@ -181,6 +182,10 @@ async function status(options: { json?: boolean }): Promise<number> {
   for (const t of held.mcp ?? []) console.log(`MCP ${t.id}  [${t.protocol}]  ${t.url} → :${t.localPort}`);
   console.log("Background service:");
   console.log(JSON.stringify(service, null, 2));
+  if ((service as { fullDiskAccess?: unknown }).fullDiskAccess === "needed") {
+    console.log("");
+    for (const line of diskAccessSteps(process.execPath)) console.log(line);
+  }
   return 0;
 }
 

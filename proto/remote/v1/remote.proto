@@ -582,6 +582,9 @@ enum ErrorReason {
   ERROR_REASON_ACCESS_DENIED = 27;
   // FileList.prefix leaves the session's working directory.
   ERROR_REASON_PATH_OUTSIDE_FOLDER = 28;
+  // macOS refused the path because tunelo has no Full Disk Access; the
+  // owner grants it on the machine (see MachineInfo.needs_full_disk_access).
+  ERROR_REASON_FULL_DISK_ACCESS_NEEDED = 29;
 }
 
 enum ErrorCode {
@@ -927,6 +930,11 @@ message MachineInfo {
   repeated PairedDevice devices = 13;
   // Unset on machines that have no settings to change from a device.
   MachineSettings settings = 14;
+  // macOS only: tunelo lacks Full Disk Access, so its sessions cannot read
+  // Desktop, Documents, Downloads, iCloud Drive and other protected folders,
+  // and macOS may stop them on a prompt nobody at the machine answers. The
+  // owner grants it in System Settings on the machine, then restarts tunelo.
+  bool needs_full_disk_access = 15;
 }
 
 message MachineSettings {

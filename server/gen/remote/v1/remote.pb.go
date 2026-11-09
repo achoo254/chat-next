@@ -196,6 +196,9 @@ const (
 	ErrorReason_ERROR_REASON_ACCESS_DENIED ErrorReason = 27
 	// FileList.prefix leaves the session's working directory.
 	ErrorReason_ERROR_REASON_PATH_OUTSIDE_FOLDER ErrorReason = 28
+	// macOS refused the path because tunelo has no Full Disk Access; the
+	// owner grants it on the machine (see MachineInfo.needs_full_disk_access).
+	ErrorReason_ERROR_REASON_FULL_DISK_ACCESS_NEEDED ErrorReason = 29
 )
 
 // Enum value maps for ErrorReason.
@@ -230,6 +233,7 @@ var (
 		26: "ERROR_REASON_UNSUPPORTED_REQUEST",
 		27: "ERROR_REASON_ACCESS_DENIED",
 		28: "ERROR_REASON_PATH_OUTSIDE_FOLDER",
+		29: "ERROR_REASON_FULL_DISK_ACCESS_NEEDED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                 0,
@@ -261,6 +265,7 @@ var (
 		"ERROR_REASON_UNSUPPORTED_REQUEST":         26,
 		"ERROR_REASON_ACCESS_DENIED":               27,
 		"ERROR_REASON_PATH_OUTSIDE_FOLDER":         28,
+		"ERROR_REASON_FULL_DISK_ACCESS_NEEDED":     29,
 	}
 )
 
@@ -6867,9 +6872,14 @@ type MachineInfo struct {
 	// Devices paired with this machine, for revoking one from another device.
 	Devices []*PairedDevice `protobuf:"bytes,13,rep,name=devices,proto3" json:"devices,omitempty"`
 	// Unset on machines that have no settings to change from a device.
-	Settings      *MachineSettings `protobuf:"bytes,14,opt,name=settings,proto3" json:"settings,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Settings *MachineSettings `protobuf:"bytes,14,opt,name=settings,proto3" json:"settings,omitempty"`
+	// macOS only: tunelo lacks Full Disk Access, so its sessions cannot read
+	// Desktop, Documents, Downloads, iCloud Drive and other protected folders,
+	// and macOS may stop them on a prompt nobody at the machine answers. The
+	// owner grants it in System Settings on the machine, then restarts tunelo.
+	NeedsFullDiskAccess bool `protobuf:"varint,15,opt,name=needs_full_disk_access,json=needsFullDiskAccess,proto3" json:"needs_full_disk_access,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *MachineInfo) Reset() {
@@ -6998,6 +7008,13 @@ func (x *MachineInfo) GetSettings() *MachineSettings {
 		return x.Settings
 	}
 	return nil
+}
+
+func (x *MachineInfo) GetNeedsFullDiskAccess() bool {
+	if x != nil {
+		return x.NeedsFullDiskAccess
+	}
+	return false
 }
 
 type MachineSettings struct {
@@ -7933,7 +7950,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vlogin_state\x18\x04 \x01(\x0e2\x15.remote.v1.LoginStateR\n" +
 	"loginState\x12C\n" +
 	"\fcapabilities\x18\x05 \x01(\v2\x1f.remote.v1.ProviderCapabilitiesR\fcapabilities\x12)\n" +
-	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\xf2\x03\n" +
+	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\xa7\x04\n" +
 	"\vMachineInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x12\n" +
@@ -7951,7 +7968,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\fmax_sessions\x18\v \x01(\rR\vmaxSessions\x12\x1b\n" +
 	"\tmemory_mb\x18\f \x01(\rR\bmemoryMb\x121\n" +
 	"\adevices\x18\r \x03(\v2\x17.remote.v1.PairedDeviceR\adevices\x126\n" +
-	"\bsettings\x18\x0e \x01(\v2\x1a.remote.v1.MachineSettingsR\bsettings\"n\n" +
+	"\bsettings\x18\x0e \x01(\v2\x1a.remote.v1.MachineSettingsR\bsettings\x123\n" +
+	"\x16needs_full_disk_access\x18\x0f \x01(\bR\x13needsFullDiskAccess\"n\n" +
 	"\x0fMachineSettings\x12#\n" +
 	"\rlocal_forward\x18\x01 \x01(\bR\flocalForward\x126\n" +
 	"\x17local_forward_available\x18\x02 \x01(\bR\x15localForwardAvailable\"\\\n" +
@@ -8000,7 +8018,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x1a\n" +
 	"\x16DECISION_ALLOW_SESSION\x10\x02\x12\x11\n" +
-	"\rDECISION_DENY\x10\x03*\x86\b\n" +
+	"\rDECISION_DENY\x10\x03*\xb0\b\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -8031,7 +8049,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x1dERROR_REASON_NO_LOCAL_FORWARD\x10\x19\x12$\n" +
 	" ERROR_REASON_UNSUPPORTED_REQUEST\x10\x1a\x12\x1e\n" +
 	"\x1aERROR_REASON_ACCESS_DENIED\x10\x1b\x12$\n" +
-	" ERROR_REASON_PATH_OUTSIDE_FOLDER\x10\x1c*\xfe\x01\n" +
+	" ERROR_REASON_PATH_OUTSIDE_FOLDER\x10\x1c\x12(\n" +
+	"$ERROR_REASON_FULL_DISK_ACCESS_NEEDED\x10\x1d*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +

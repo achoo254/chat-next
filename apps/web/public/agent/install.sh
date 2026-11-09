@@ -169,6 +169,7 @@ main() {
 			"Signing tunelo in with your account (tunnel, Chat, Localman)…" "正在用你的账号登录 tunelo（隧道、Chat、Localman）…"
 		"$bin" login || say "Chưa đăng nhập được; chạy lại tunelo login khi sẵn sàng." \
 			"Not signed in yet; run tunelo login when you are ready." "尚未登录；准备好后请运行 tunelo login。"
+		disk_access_hint
 		return 0
 	fi
 
@@ -186,6 +187,25 @@ main() {
 
 	# printf is a shell builtin: the secret reaches tunelo on stdin only.
 	printf '%s\n' "$secret" | "$bin" install --trust "$device_key"
+}
+
+# The background service lacks Full Disk Access: its sessions cannot open
+# Desktop, Documents, Downloads or iCloud Drive, and may hang on a macOS prompt
+# nobody answers. Only the owner can grant it, so open the setting and say how.
+# (`tunelo install` does the same for the command with a device key.)
+disk_access_hint() {
+	"$bin" status --json 2>/dev/null | grep -q '"fullDiskAccess": "needed"' || return 0
+	say "tunelo cần quyền Truy cập toàn bộ ổ đĩa để mở Desktop, Documents, Downloads, iCloud Drive mà không bị macOS hỏi chặn:" \
+		"tunelo needs Full Disk Access to open Desktop, Documents, Downloads and iCloud Drive without macOS stopping it with a prompt:" \
+		"tunelo 需要“完全磁盘访问权限”，才能打开桌面、文稿、下载和 iCloud 云盘而不被 macOS 弹窗拦住："
+	say "  1. Cài đặt hệ thống > Quyền riêng tư & Bảo mật > Truy cập toàn bộ ổ đĩa (đang mở sẵn)." \
+		"  1. System Settings > Privacy & Security > Full Disk Access (opening it now)." \
+		"  1. 系统设置 > 隐私与安全性 > 完全磁盘访问权限（正在为你打开）。"
+	say "  2. Bấm +, nhấn Cmd+Shift+G, nhập ${bin}, bấm Mở, rồi bật tunelo." \
+		"  2. Click +, press Cmd+Shift+G, enter ${bin}, click Open and turn tunelo on." \
+		"  2. 点按 +，按 Cmd+Shift+G，输入 ${bin}，点按“打开”，然后打开 tunelo。"
+	say "  3. Chạy: tunelo stop && tunelo start" "  3. Run: tunelo stop && tunelo start" "  3. 运行：tunelo stop && tunelo start"
+	open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles" >/dev/null 2>&1 || true
 }
 
 main "$@"
