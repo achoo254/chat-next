@@ -68,6 +68,8 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.accessDenied;
 		case ErrorReason.PATH_OUTSIDE_FOLDER:
 			return r.pathOutsideFolder;
+		case ErrorReason.FULL_DISK_ACCESS_NEEDED:
+			return r.fullDiskAccessNeeded;
 		default:
 			return undefined;
 	}

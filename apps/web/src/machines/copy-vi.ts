@@ -54,6 +54,16 @@ export const viMachines = {
 		pair: "Ghép thiết bị này",
 		retry: "Thử lại",
 	},
+	diskAccess: {
+		title: "Máy cần cấp Full Disk Access cho tunelo",
+		body: "Thiếu quyền này, phiên không mở được Desktop, Documents, Downloads, iCloud Drive và có thể treo vì macOS hỏi trên máy mà không ai bấm. Làm trên máy:",
+		steps: [
+			"Mở Cài đặt hệ thống > Quyền riêng tư & Bảo mật > Truy cập toàn bộ ổ đĩa.",
+			"Bấm +, nhấn Cmd+Shift+G, nhập ~/.local/bin/tunelo, bấm Mở rồi bật tunelo.",
+			"Chạy tunelo stop rồi tunelo start.",
+		],
+		recheck: "Kiểm tra lại",
+	},
 	sessions: {
 		label: (machine: string) => `Phiên trên ${machine}`,
 		filters: "Lọc phiên",
@@ -258,6 +268,7 @@ export const viMachines = {
 			unsupportedRequest: "Máy chưa hỗ trợ việc này. Cập nhật trên máy: tunelo update.",
 			accessDenied: "Máy không cho truy cập đường dẫn này.",
 			pathOutsideFolder: "Đường dẫn nằm ngoài thư mục của phiên.",
+			fullDiskAccessNeeded: "macOS chặn đường dẫn này vì tunelo chưa có quyền Full Disk Access trên máy.",
 		},
 	},
 	detail: {

@@ -117,6 +117,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-strip { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); font-size: 0.8125rem; background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
 .mx-strip .grow { flex: 1; }
 .mx-strip.warn { background: color-mix(in srgb, var(--c-warning) 12%, var(--c-surface)); color: var(--c-warning); }
+.mx-disk-access { align-items: flex-start; }
+.mx-disk-access p { margin: var(--space-1) 0 0; }
+.mx-disk-access ol { margin: var(--space-1) 0 0; padding-left: var(--space-4); }
 .mx-strip.error { background: color-mix(in srgb, var(--c-error) 10%, var(--c-surface)); color: var(--c-error); }
 
 /* Add machine, pair */

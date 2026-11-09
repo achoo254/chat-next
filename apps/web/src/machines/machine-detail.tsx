@@ -16,6 +16,7 @@ import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { Link, navigate, paths } from "../router.tsx";
 import { ClaudeProfiles } from "./claude-profiles.tsx";
 import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
+import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { PageHead } from "./page-head.tsx";
@@ -141,6 +142,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 				subtitle={entry.os === "" ? entry.tunnelUrl : t.os(entry.os, entry.arch)}
 			/>
 			<LinkBanner machine={machine} name={name} status={state.status} />
+			<DiskAccessBanner link={link} info={state.info} online={online} />
 			<div className="mx-body">
 				<section className="card pad mx-card">
 					<h3>{t.detail.sessions}</h3>

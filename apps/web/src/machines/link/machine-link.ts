@@ -525,7 +525,13 @@ export class MachineLink {
 		if (waiter === undefined) return;
 		this.waiters.delete(frame.id);
 		this.timers.clearTimeout(waiter.timer);
-		if (b.case === "error") waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject));
+		if (b.case === "error") {
+			// The machine just found out it lacks Full Disk Access: its info says so now.
+			if (b.value.reason === ErrorReason.FULL_DISK_ACCESS_NEEDED && this.current.info?.needsFullDiskAccess !== true) {
+				this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
+			}
+			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject));
+		}
 		else waiter.resolve(frame);
 	}
 

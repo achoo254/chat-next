@@ -52,6 +52,16 @@ export const zhCNMachines: MachinesCopy = {
 		pair: "配对此设备",
 		retry: "重试",
 	},
+	diskAccess: {
+		title: "这台电脑需要为 tunelo 开启“完全磁盘访问权限”",
+		body: "没有该权限，会话无法打开桌面、文稿、下载和 iCloud 云盘，还可能因 macOS 在电脑上弹窗而无人点按导致卡住。请在电脑上：",
+		steps: [
+			"打开 系统设置 > 隐私与安全性 > 完全磁盘访问权限。",
+			"点按 +，按 Cmd+Shift+G，输入 ~/.local/bin/tunelo，点按“打开”，然后打开 tunelo。",
+			"运行 tunelo stop，再运行 tunelo start。",
+		],
+		recheck: "重新检查",
+	},
 	sessions: {
 		label: (machine) => `${machine} 上的会话`,
 		filters: "筛选会话",
@@ -252,6 +262,7 @@ export const zhCNMachines: MachinesCopy = {
 			unsupportedRequest: "电脑暂不支持此操作。请在电脑上更新：tunelo update。",
 			accessDenied: "电脑不允许访问此路径。",
 			pathOutsideFolder: "路径在会话文件夹之外。",
+			fullDiskAccessNeeded: "macOS 阻止了此路径，因为 tunelo 在电脑上没有“完全磁盘访问权限”。",
 		},
 	},
 	detail: {

@@ -52,6 +52,16 @@ export const enMachines: MachinesCopy = {
 		pair: "Pair this device",
 		retry: "Retry",
 	},
+	diskAccess: {
+		title: "The machine needs to give tunelo Full Disk Access",
+		body: "Without it, sessions cannot open Desktop, Documents, Downloads or iCloud Drive, and may hang on a macOS prompt nobody at the machine answers. On the machine:",
+		steps: [
+			"Open System Settings > Privacy & Security > Full Disk Access.",
+			"Click +, press Cmd+Shift+G, enter ~/.local/bin/tunelo, click Open and turn tunelo on.",
+			"Run tunelo stop, then tunelo start.",
+		],
+		recheck: "Check again",
+	},
 	sessions: {
 		label: (machine) => `Sessions on ${machine}`,
 		filters: "Filter sessions",
@@ -255,6 +265,7 @@ export const enMachines: MachinesCopy = {
 			unsupportedRequest: "The machine cannot do this yet. Update it on the machine: tunelo update.",
 			accessDenied: "The machine does not allow access to this path.",
 			pathOutsideFolder: "The path is outside the session's folder.",
+			fullDiskAccessNeeded: "macOS blocked this path because tunelo has no Full Disk Access on the machine.",
 		},
 	},
 	detail: {

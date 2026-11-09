@@ -21,6 +21,7 @@ import { ChangesPanel } from "./changes-panel.tsx";
 import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import type { LinkState } from "./link/machine-link.ts";
+import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
@@ -159,6 +160,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 				<HeadMenu machine={machine} machineName={machineName} dir={dir} />
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
+			<DiskAccessBanner link={link} info={state.info} online={online} />
 			<div className="mx-chat-body">
 				<div className="mx-chat-main">
 					{missing ? (

@@ -13,6 +13,7 @@ import { ApprovalCard } from "./cards/approval.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
 import { LOCAL_REF } from "./link/link-hub.ts";
+import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { needsPairing } from "./machine-status.ts";
@@ -134,6 +135,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 				)}
 			</PageHead>
 			{!needsPairing(conn) && <LinkBanner machine={machine} name={entry.name} status={state.status} />}
+			<DiskAccessBanner link={link} info={state.info} online={state.status.kind === "open"} />
 			<div className="mx-body">
 				{needsPairing(conn) && (
 					<div className="empty">
