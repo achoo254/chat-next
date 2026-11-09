@@ -577,6 +577,7 @@ export const viMachines = {
 			queued: "Chờ chỗ trống",
 			error: "Lượt cuối bị lỗi",
 			parked: "Đã tạm tắt",
+			empty: "Chưa có tin nhắn",
 		},
 		home: {
 			title: "Cần bạn",

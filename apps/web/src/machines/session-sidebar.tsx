@@ -312,6 +312,7 @@ function connTextShort(t: MachinesCopy, conn: Conn): string {
 /**
  * A session row's second line: what waits for the user first, then the tool
  * running now, the last message (tunelo 2.0.2+), else the state or model.
+ * A session opened with no message (it has no name yet) says so.
  */
 export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInfo | null): string {
 	const key = stateKey(thread);
@@ -319,6 +320,7 @@ export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInf
 	if (thread.previewTool !== "") return t.agent.sub.tool(thread.previewTool);
 	if (thread.preview !== "") return thread.preview;
 	if (key === "running" || key === "queued" || key === "error") return t.agent.sub[key];
+	if (thread.title === "") return t.agent.sub.empty;
 	if (!thread.open) return t.agent.sub.parked;
 	const model = thread.model === "" ? aiName(info, thread.provider) : modelName(info, thread.provider, thread.model);
 	return (info?.providers.length ?? 0) > 1 ? `${aiName(info, thread.provider)} · ${model}` : model;

@@ -567,6 +567,7 @@ export const zhCNMachines: MachinesCopy = {
 			queued: "等待空位",
 			error: "上一轮出错",
 			parked: "已暂停",
+			empty: "暂无消息",
 		},
 		home: {
 			title: "需要你",

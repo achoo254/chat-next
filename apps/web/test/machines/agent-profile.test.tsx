@@ -142,6 +142,7 @@ describe("session column preview", () => {
 		expect(rowLine(t, row({ preview: "Đã sửa xong 3 file" }), null)).toBe("Đã sửa xong 3 file");
 		expect(rowLine(t, row({ state: ThreadState.RUNNING }), null)).toBe("Đang làm…");
 		expect(rowLine(t, row({ open: false }), null)).toBe("Đã tạm tắt");
+		expect(rowLine(t, row({ title: "", open: false }), null)).toBe("Chưa có tin nhắn");
 		expect(rowLine(enMachines, row({ state: ThreadState.RUNNING, previewTool: "Bash" }), null)).toBe("Running: Bash");
 	});
 });

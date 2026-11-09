@@ -573,6 +573,7 @@ export const enMachines: MachinesCopy = {
 			queued: "Waiting for a free slot",
 			error: "The last turn failed",
 			parked: "Paused",
+			empty: "No messages yet",
 		},
 		home: {
 			title: "Needs you",
