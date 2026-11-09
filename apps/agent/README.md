@@ -48,6 +48,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo config mcp-local-writes [on\|off]` | Cho client MCP ngoài phiên của tunelo dùng tool ghi (mặc định tắt) |
 | `tunelo mcp` | Server MCP (stdio): tool tunnel, Chat, Localman |
 | `tunelo trust [thư mục]` / `untrust` / `trusted` | Thư mục được nạp cấu hình `.claude` của dự án; thiết bị đã ghép cũng tin được từ web (có ghi nhật ký), trừ thư mục nhạy cảm |
+| `tunelo secrets list` / `remove <id>` | Bí mật đăng nhập đã lưu cho Claude (trang, tên, lần dùng cuối; không bao giờ in giá trị) |
 | `tunelo audit` | Nhật ký đồng ý |
 | `tunelo run` | Chạy trong terminal để gỡ lỗi; từ chối khi đã có bản chạy nền |
 
@@ -88,6 +89,32 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
 Đọc ít: danh sách chỉ đọc đầu file (thư mục, câu hỏi đầu) và cuối file (tiêu đề), giữ theo kích thước và giờ sửa; số tin
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
 đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
+
+## Đăng nhập khi điều khiển từ xa: bí mật (2.0.8)
+
+Trong phiên tunelo mở, Claude xin mật khẩu/token bằng tool MCP `request_secret(name, purpose, origin)`. Claude chỉ nhận **tham
+chiếu** (`secret://…`), không bao giờ nhận giá trị.
+
+- Máy đã lưu bí mật cho đúng (origin, name): trả tham chiếu ngay. Chưa có: mọi thiết bị đang kết nối hiện thẻ "Claude cần thông tin
+  đăng nhập" phía trên ô nhập, **ngoài transcript** (không vào lịch sử phiên, không vào journal), phiên hiện "Cần bạn" và có thể
+  đẩy thông báo. Người dùng nhập ở một thiết bị; giá trị đi một khung E2E tới máy, trình duyệt xoá khỏi ô nhập ngay khi gửi. Chờ tối
+  đa 5 phút; từ chối/hết hạn/phiên dừng thì Claude nhận lỗi nói rõ.
+- "Lưu cho lần sau" (mặc định bật): niêm phong bằng khoá trong Keychain/DPAPI, cùng origin và tên (chuyển sang trang khác thì không
+  mở được), ghi vào `secrets.json` (0600) trong thư mục cấu hình. Bỏ chọn: chỉ giữ trong bộ nhớ cho phiên đó.
+- `fill_secret(ref, selector?, cdp_url?)`: tunelo điền vào ô của một trang **cùng origin** trong trình duyệt Claude điều khiển, qua
+  Chrome DevTools Protocol (trình duyệt mở bằng `--remote-debugging-port`; tunelo tự tìm cổng từ tiến trình đang chạy và
+  `DevToolsActivePort`, hoặc nhận `cdp_url` loopback). Trang tự kiểm lại origin của nó trong cùng đoạn script điền, nên trang vừa
+  chuyển đi nơi khác không bị điền. Trình duyệt chạy qua pipe (mặc định của Playwright) thì không gắn được: lỗi nói rõ để Claude
+  dùng cách env.
+- Lệnh Bash: Claude viết `$TUNELO_SECRET_<NAME>`. Lệnh dùng bí mật luôn hiện thẻ duyệt (trừ `bypassPermissions`); duyệt xong tunelo
+  ghi giá trị vào một file 0600 mà loader `CLAUDE_ENV_FILE` của phiên nạp trước lệnh, rồi làm rỗng file khi lệnh xong/lỗi. Giá trị
+  không có trong nội dung lệnh, argv hay transcript.
+- Che: hook PostToolUse thay output mọi tool trước khi Claude đọc (giá trị, base64, base64url, URL-encode, JSON-escape thành
+  `[hidden]`; giá trị dưới 3 ký tự không che), sự kiện gửi web/journal, kết quả tool MCP, log đều qua cùng bộ che.
+- Trang cài đặt máy có "Bí mật đã lưu" (trang, tên, lần dùng cuối, nút xoá); `tunelo secrets list|remove`. Nhật ký đồng ý ghi
+  `secret_add` / `secret_use` (fill hoặc env) / `secret_remove`, không bao giờ ghi giá trị. Máy cũ hơn 2.0.8: web ẩn cả hai.
+- Giới hạn: bảo vệ khỏi lộ tình cờ và khỏi lưu vào lịch sử, không chống được một phiên cố ý xấu (Claude điều khiển trình duyệt
+  có thể đọc lại ô đã điền, lệnh được duyệt có thể gửi biến đi nơi khác). Vì vậy lệnh dùng bí mật luôn hỏi.
 
 ## Dự án (2.0.7)
 
