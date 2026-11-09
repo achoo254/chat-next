@@ -78,6 +78,10 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// Archive and delete: the session's menu and the delete confirmation.
 	"machine-thread-menu": "?at=machine-chat&open=thread-menu",
 	"machine-thread-delete": "?at=machine-chat&open=thread-delete",
+	// Projects: the column by project (git branch, changes, "+"), "Khác", suggestions; "Thêm dự án" and a clone.
+	"machine-projects": "?at=machine-home",
+	"machine-add-project": "?at=machine-chat&open=add-project",
+	"machine-add-project-clone": "?at=machine-chat&open=add-project-clone",
 	"machine-new-session": "?at=machine-sessions&open=new-session",
 	"machine-new-session-existing": "?at=machine-sessions&open=new-session-existing",
 	"machine-info": "?at=machine-info",

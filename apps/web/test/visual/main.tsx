@@ -449,6 +449,22 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		chat.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: data }));
 		await find(() => document.querySelector(".mx-drop"));
 	},
+	// "Thêm dự án": a folder on the machine.
+	"add-project": async () => {
+		await click(".mx-add-project-btn", /Thêm dự án/);
+		await find(() => document.querySelector(".modal .mx-add-project .mx-dirs button"));
+	},
+	// "Thêm dự án", Clone từ git: a clone receiving its objects.
+	"add-project-clone": async () => {
+		await click(".mx-add-project-btn", /Thêm dự án/);
+		await click(".modal .mx-new-tabs button", "Clone từ git");
+		const url = await find(() => document.querySelector<HTMLInputElement>(".modal input.mono"));
+		Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(url, "https://github.com/achoo254/kb-next.git");
+		url.dispatchEvent(new Event("input", { bubbles: true }));
+		await find(() => document.querySelector(".modal .mx-add-project .mx-dirs button"));
+		await click(".modal .dlg-foot button.btn-primary:not(:disabled)", "Clone");
+		await find(() => document.querySelector(".modal .mx-clone"));
+	},
 	// The session's menu with Lưu trữ and Xoá phiên.
 	"thread-menu": async () => {
 		await click(".mx-head button.icon-btn", "Tuỳ chọn phiên");

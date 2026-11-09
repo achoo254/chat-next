@@ -13,7 +13,7 @@
 // a session the machine already keeps (from a terminal, an IDE, Claude
 // Desktop); it loads only when picked.
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
-import { ErrorCode, LoginState, ThreadState, type DirListResult } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, LoginState, ThreadState, type DirListResult, type Project } from "@achoo254/chat-proto/remote/remote";
 import { navigate, paths } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
@@ -31,6 +31,8 @@ interface NewSessionProps {
 	link: MachineLink;
 	state: LinkState;
 	onClose: () => void;
+	/** Start in this project, with its defaults (tunelo 2.0.7+). */
+	project?: Project | undefined;
 }
 
 /** Folders that start with what was typed: the suggestions, then the folders shown; at most six. */
@@ -45,7 +47,7 @@ function joinPath(dir: string, child: string): string {
 	return dir.endsWith(sep) ? `${dir}${child}` : `${dir}${sep}${child}`;
 }
 
-export function NewSession({ machine, name, link, state, onClose }: NewSessionProps) {
+export function NewSession({ machine, name, link, state, onClose, project }: NewSessionProps) {
 	const t = useMachinesCopy();
 	const titleId = useDomId("new-session");
 	const tabsId = useDomId("new-session-tab");
@@ -53,7 +55,11 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	const suggestId = useDomId("dir-suggestions");
 	const providers = state.info?.providers ?? [];
 	const [provider, setProvider] = useState(() => providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? providers[0]?.id ?? "claude");
-	const [model, setModel] = useState("");
+	const [model, setModel] = useState(project?.defaults?.model ?? "");
+	// The project picked (its defaults apply); "" for none.
+	const [projectId, setProjectId] = useState(project?.id ?? "");
+	const [mode, setMode] = useState(project?.defaults?.permissionMode ?? "");
+	const projects = state.projects?.projects.filter((p) => !p.missing) ?? [];
 	const [path, setPath] = useState("");
 	const [listing, setListing] = useState<DirListResult | null>(null);
 	// Why the folder typed or picked could not be listed; empty when it could.
@@ -62,7 +68,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	const [going, setGoing] = useState("");
 	// The field is being typed in: show matching folders under it.
 	const [typing, setTyping] = useState(false);
-	const [projectSettings, setProjectSettings] = useState(false);
+	const [projectSettings, setProjectSettings] = useState(project?.defaults?.projectSettings ?? false);
 	// The first message: a suggestion (it follows the folder) until the user types.
 	const [hint, setHint] = useState<PromptHint | null>("summary");
 	const [text, setText] = useState("");
@@ -98,7 +104,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	// or when that folder cannot be opened any more). Waits for the session list
 	// unless a folder is already known.
 	const started = useRef(false);
-	const startDir = recent[0] ?? "";
+	const startDir = project?.dir ?? recent[0] ?? "";
 	const ready = state.listed || startDir !== "";
 	useEffect(() => {
 		if (!ready || started.current) return;
@@ -148,7 +154,14 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 		link
 			.request({
 				case: "threadCreate",
-				value: { provider, model, dir, text: first, consent: { sensitive: consent, projectSettings: loadProject, trustProject: loadProject && trust } },
+				value: {
+					provider,
+					model,
+					dir,
+					text: first,
+					consent: { sensitive: consent, projectSettings: loadProject, trustProject: loadProject && trust },
+					permissionMode: projectId === "" ? "" : mode,
+				},
 			})
 			.then(
 				(frame) => {
@@ -229,6 +242,31 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 								);
 							})}
 						</fieldset>
+					)}
+					{projects.length > 0 && (
+						<label className="mx-field-row">
+							<span>{t.agent.projects.pick}</span>
+							<select
+								className="input"
+								value={projectId}
+								onChange={(event) => {
+									const picked = projects.find((p) => p.id === event.target.value);
+									setProjectId(picked?.id ?? "");
+									setMode(picked?.defaults?.permissionMode ?? "");
+									if (picked === undefined) return;
+									setModel(picked.defaults?.model ?? "");
+									setProjectSettings(picked.defaults?.projectSettings ?? false);
+									browse(picked.dir);
+								}}
+							>
+								<option value="">{t.agent.projects.pickNone}</option>
+								{projects.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.name}
+									</option>
+								))}
+							</select>
+						</label>
 					)}
 					{suggestions.length > 0 && (
 						<div className="mx-quick">

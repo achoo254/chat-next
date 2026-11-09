@@ -6,7 +6,7 @@
 // offers the fix (pair) in place. Archived sessions show only under their own
 // filter; a row's menu (hover, or a long press on a phone) archives or
 // deletes it on machines that can (tunelo 2.0.6+).
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { countLabel } from "../messaging/data/format.ts";
@@ -22,6 +22,8 @@ import { aiName, folderName, modelName, stateKey, timeAgo, useHub, useMachineVie
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
+import { AddProject, ProjectSection, ProjectSuggestions } from "./project-section.tsx";
+import { byProject, projectsSupported } from "./projects-view.ts";
 
 export type Filter = "all" | "need" | "running" | "archived";
 
@@ -163,7 +165,16 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 	const [creating, setCreating] = useState(false);
 	const ref = entry.ref;
 	const shown = state.threads.filter((x) => matches(filter, x));
-	const folders = byFolder(shown);
+	// tunelo 2.0.7+: sessions by project, the rest under "Khác".
+	const withProjects = projectsSupported(state.info?.agentVersion);
+	const online = conn.kind === "on";
+	useEffect(() => {
+		if (withProjects && online && state.projects === null) link.request({ case: "projectList", value: {} }).catch(() => undefined);
+	}, [withProjects, online, state.projects, link]);
+	const projectList = withProjects ? (state.projects?.projects ?? []) : [];
+	const grouped = byProject(shown, projectList);
+	const folders = byFolder(withProjects ? grouped.other : shown);
+	const order = projectList.map((x) => x.id);
 	const pairPath = ref === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(ref);
 	const loading = conn.kind === "on" ? !state.listed : conn.kind === "connecting" || conn.kind === "checking";
 	// The machine's Claude account, as it announces it (tunelo 2.0.2+): it changes for every session at once.
@@ -198,6 +209,22 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 					<li />
 				</ul>
 			)}
+			{grouped.groups
+				.filter((g) => filter === "all" || g.threads.length > 0)
+				.map((g) => (
+					<ProjectSection key={g.project.id} machine={ref} machineName={entry.name} link={link} state={state} project={g.project} order={order} online={online}>
+						{g.threads.length > 0 && (
+							<ul className="mx-rows">
+								{g.threads.map((thread) => (
+									<li key={thread.id}>
+										<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
+									</li>
+								))}
+							</ul>
+						)}
+					</ProjectSection>
+				))}
+			{withProjects && projectList.length > 0 && folders.length > 0 && <p className="mx-other-head">{t.agent.projects.other}</p>}
 			{folders.map((folder) => (
 				<div key={folder.dir} className="mx-folder">
 					<p className="mx-folder-name" title={folder.dir}>
@@ -213,7 +240,15 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 					</ul>
 				</div>
 			))}
-			{conn.kind === "on" && state.listed && shown.length === 0 && (
+			{withProjects && online && filter === "all" && state.projects !== null && (
+				<>
+					<ProjectSuggestions machine={ref} link={link} suggestions={state.projects.suggestions} />
+					<div className="mx-group-note">
+						<AddProject link={link} state={state} />
+					</div>
+				</>
+			)}
+			{conn.kind === "on" && state.listed && shown.length === 0 && projectList.length === 0 && (
 				<p className="mx-group-note muted">{state.threads.length === 0 ? t.agent.noSessions : filter === "archived" ? t.agent.thread.noArchived : t.agent.emptyFilter}</p>
 			)}
 			{creating && <NewSession machine={ref} name={entry.name} link={link} state={state} onClose={() => setCreating(false)} />}

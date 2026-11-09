@@ -14,3 +14,6 @@ export function versionAtLeast(version: string, min: readonly number[]): boolean
 
 /** The first tunelo that deletes and archives sessions (ThreadDelete, ThreadSetArchived). */
 export const AGENT_THREAD_ACTIONS = [2, 0, 6] as const;
+
+/** The first tunelo that keeps projects (ProjectList and friends). */
+export const AGENT_PROJECTS = [2, 0, 7] as const;

@@ -53,6 +53,28 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-group .mx-rows { flex: none; overflow: visible; padding: 2px 0; }
 .mx-srow { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-2); align-items: center; min-height: 56px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); color: inherit; text-decoration: none; }
 .mx-srow:hover { background: var(--c-hover); }
+/* Projects: a head row (name, git, +, menu) over its sessions; "Khác" for the rest. */
+.mx-project { margin-top: var(--space-1); }
+.mx-project-head { position: relative; display: flex; align-items: center; gap: 2px; padding: 0 var(--space-1) 0 var(--space-2); }
+.mx-project-name { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: var(--space-2); flex: 1; min-width: 0; padding: var(--space-1) 0; }
+.mx-project-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
+.mx-project-name small { grid-column: 2; display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
+.mx-project-name > .icon { color: var(--c-icon-muted); }
+.mx-project[data-missing] .mx-project-name small { color: var(--c-error-text); }
+.mx-project-head > .mx-menu { top: 100%; }
+.mx-project .mx-rows { padding-left: var(--space-3); }
+.mx-other-head { margin: var(--space-2) 0 0; padding: 0 var(--space-3); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.mx-group > * { min-width: 0; }
+.mx-suggest-projects { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border: 1px dashed var(--c-border); border-radius: var(--radius-md); }
+.mx-suggest-projects .head { display: flex; align-items: center; justify-content: space-between; }
+.mx-suggest-projects p { margin: 0 0 var(--space-1); font-size: 0.8125rem; }
+.mx-suggest-projects ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.mx-suggest-projects li { display: flex; align-items: center; gap: var(--space-2); }
+.mx-suggest-projects li > span { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
+.mx-suggest-projects li small { color: var(--c-text-muted); font-size: 0.75rem; }
+.mx-add-project .mx-dirs { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); }
+.mx-clone { display: grid; gap: var(--space-1); position: relative; padding-bottom: var(--space-1); font-size: 0.8125rem; }
+.mx-clone .mx-tray-bar { position: static; display: block; }
 /* A row's menu: shown on hover or focus (always on touch screens), over the row's right edge. */
 .mx-srow-wrap { position: relative; }
 .mx-srow-menu { position: absolute; top: 50%; right: var(--space-1); transform: translateY(-50%); opacity: 0; background: var(--c-surface); }

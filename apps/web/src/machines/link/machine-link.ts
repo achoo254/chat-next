@@ -20,6 +20,8 @@ import {
 	type Item,
 	type MachineInfo,
 	type MachineProfile,
+	type ProjectCloneProgress,
+	type ProjectListResult,
 	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
@@ -74,6 +76,10 @@ export interface LinkState {
 	 * until it does (tunelo before 2.0.2 never does).
 	 */
 	readonly machineProfile: MachineProfile | null;
+	/** The machine's projects as it last sent them (tunelo 2.0.7+); null until it does. */
+	readonly projects: ProjectListResult | null;
+	/** Clones this device started, by clone id, as their progress last said. */
+	readonly clones: ReadonlyMap<string, ProjectCloneProgress>;
 }
 
 /**
@@ -149,6 +155,8 @@ const INITIAL: LinkState = {
 	pending: new Map(),
 	threadInfo: new Map(),
 	machineProfile: null,
+	projects: null,
+	clones: new Map(),
 };
 
 export class MachineLink {
@@ -513,6 +521,15 @@ export class MachineLink {
 			case "machineProfile":
 				this.set({ machineProfile: b.value });
 				break;
+			case "projectListResult":
+				this.set({ projects: b.value });
+				break;
+			case "projectCloneProgress": {
+				const clones = new Map(this.current.clones);
+				clones.set(b.value.cloneId, b.value);
+				this.set({ clones });
+				break;
+			}
 			case "threadDeleted":
 				this.dropThread(b.value.threadId);
 				break;

@@ -84,6 +84,18 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.threadRunning;
 		case ErrorReason.TRASH_UNAVAILABLE:
 			return r.trashUnavailable(s);
+		case ErrorReason.PROJECT_NOT_FOUND:
+			return r.projectNotFound;
+		case ErrorReason.PROJECT_EXISTS:
+			return r.projectExists(s);
+		case ErrorReason.CLONE_URL_INVALID:
+			return r.cloneUrlInvalid;
+		case ErrorReason.CLONE_FAILED:
+			return r.cloneFailed(s);
+		case ErrorReason.GIT_NOT_INSTALLED:
+			return r.gitNotInstalled;
+		case ErrorReason.NAME_INVALID:
+			return r.nameInvalid;
 		default:
 			return undefined;
 	}

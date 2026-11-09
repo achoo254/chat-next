@@ -209,7 +209,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						value: {
 							name: "DIEUVY-LAPTOP",
 							os: "win32",
-							agentVersion: "2.0.6",
+							agentVersion: "2.0.7",
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -303,6 +303,31 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 				const stop = stalled.get(v.uploadId);
 				return stop !== undefined && Number(v.offset) + v.data.length > stop ? [] : [{ case: "ack", value: {} }];
 			}
+			case "projectList":
+				return [
+					{
+						case: "projectListResult",
+						value: {
+							projects: [
+								{ id: "pr1", name: "chat-next", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", pinned: true, git: { git: true, branch: "main", changed: 4, ahead: 2, upstream: true } },
+								{ id: "pr2", name: "localman-next", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", git: { git: true, branch: "feat/forward", changed: 0, behind: 1, upstream: true } },
+								{ id: "pr3", name: "auth-next", dir: "D:\\CONG VIEC\\hoandat-app\\auth-next", git: { git: true, branch: "main" } },
+							],
+							suggestions: [{ dir: "D:\\CONG VIEC\\hoandat-app\\kb-next", sessions: 6 }],
+						},
+					},
+				];
+			case "projectClone":
+				// The clone runs: about a third of its objects arrived.
+				setTimeout(
+					() =>
+						machine.send(socket, {
+							case: "projectCloneProgress",
+							value: { cloneId: frame.body.case === "projectClone" ? frame.body.value.cloneId : "", phase: "Receiving objects", percent: 37 },
+						}),
+					0,
+				);
+				return [{ case: "ack", value: {} }];
 			case "threadSetArchived":
 				return [{ case: "ack", value: {} }];
 			case "attachmentCancel":
