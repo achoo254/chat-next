@@ -153,6 +153,39 @@ describe("the composer's files", () => {
 		expect(await screen.findByText("data.csv")).toBeTruthy();
 	});
 
+	it("on a phone, pastes a copied image from the attach menu, and says when none was copied", async () => {
+		vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(pointer: coarse)" }));
+		const image = { types: ["text/html", "image/png"], getType: () => Promise.resolve(new Blob([new Uint8Array(3)], { type: "image/png" })) };
+		const read = vi.fn().mockResolvedValueOnce([image]).mockResolvedValueOnce([{ types: ["text/plain"], getType: vi.fn() }]);
+		Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read } });
+		try {
+			const { link } = fakeLink();
+			wrap(<Session link={link} limits={LIMITS} onSend={() => Promise.resolve()} />);
+			const menu = screen.getByRole("button", { name: "Đính kèm ảnh hoặc tệp" });
+			await userEvent.click(menu);
+			await userEvent.click(screen.getByRole("menuitem", { name: "Dán ảnh đã sao chép" }));
+			expect(await screen.findByText("image.png")).toBeTruthy();
+			await userEvent.click(menu);
+			await userEvent.click(screen.getByRole("menuitem", { name: "Dán ảnh đã sao chép" }));
+			expect(await screen.findByText(viMachines.agent.attach.pasteEmpty)).toBeTruthy();
+		} finally {
+			vi.unstubAllGlobals();
+			Reflect.deleteProperty(navigator, "clipboard");
+		}
+	});
+
+	it("offers no paste item where the pointer is a mouse", async () => {
+		Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read: vi.fn() } });
+		try {
+			const { link } = fakeLink();
+			wrap(<Session link={link} limits={LIMITS} onSend={() => Promise.resolve()} />);
+			await userEvent.click(screen.getByRole("button", { name: "Đính kèm ảnh hoặc tệp" }));
+			expect(screen.queryByRole("menuitem", { name: "Dán ảnh đã sao chép" })).toBeNull();
+		} finally {
+			Reflect.deleteProperty(navigator, "clipboard");
+		}
+	});
+
 	it("removes a file and drops its upload on the machine", async () => {
 		const { link, sent } = fakeLink();
 		wrap(<Session link={link} limits={LIMITS} onSend={() => Promise.resolve()} />);

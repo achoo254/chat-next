@@ -19,6 +19,27 @@ function coarsePointer(): boolean {
 	return typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
 }
 
+/**
+ * The browser reads copied images on request. A phone needs this: Safari on
+ * iPhone offers "Paste" in a text field only for copied text, so a copied
+ * image never reaches the composer's paste handler.
+ */
+function canReadClipboard(): boolean {
+	return typeof navigator.clipboard?.read === "function";
+}
+
+/** The images among the clipboard's items, as files. */
+export async function clipboardImages(items: readonly ClipboardItem[]): Promise<File[]> {
+	const images: File[] = [];
+	for (const item of items) {
+		const type = item.types.find((x) => x.startsWith("image/"));
+		if (type === undefined) continue;
+		const blob = await item.getType(type);
+		images.push(new File([blob], `image.${type.slice("image/".length)}`, { type }));
+	}
+	return images;
+}
+
 /** Files dragged in from the system (not text or a link). */
 export function dragHasFiles(types: readonly string[]): boolean {
 	return types.includes("Files");
@@ -71,6 +92,22 @@ export function AttachButton({ attach, disabled }: { attach: Attachments; disabl
 		setOpen(false);
 		input?.click();
 	};
+	const paste = () => {
+		setOpen(false);
+		// Called straight from the tap: Safari only reads the clipboard inside a user gesture.
+		navigator.clipboard
+			.read()
+			.then(clipboardImages)
+			.then(
+				(images) => {
+					if (images.length > 0) attach.add(images);
+					else attach.say(t.agent.attach.pasteEmpty);
+				},
+				() => {
+					attach.say(t.agent.attach.pasteDenied);
+				},
+			);
+	};
 	const onPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const picked = [...(event.target.files ?? [])];
 		// The same file may be picked again later.
@@ -93,6 +130,12 @@ export function AttachButton({ attach, disabled }: { attach: Attachments; disabl
 			</button>
 			{open && (
 				<div className="mx-menu up mx-attach-menu" role="menu" aria-label={t.agent.attach.button}>
+					{coarsePointer() && canReadClipboard() && (
+						<button type="button" role="menuitem" onClick={paste}>
+							<Icon name="copy" small />
+							<span>{t.agent.attach.paste}</span>
+						</button>
+					)}
 					<button type="button" role="menuitem" onClick={() => pick(photos.current)}>
 						<Icon name="photo" small />
 						<span>{t.agent.attach.photos}</span>

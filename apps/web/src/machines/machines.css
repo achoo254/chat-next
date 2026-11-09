@@ -368,6 +368,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-compose-row { position: relative; display: flex; align-items: flex-end; gap: var(--space-2); max-width: var(--mx-col); margin-inline: auto; }
 .mx-field { flex: 1; min-height: 44px; max-height: 200px; padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-surface); color: var(--c-text); font: inherit; resize: none; field-sizing: content; }
 .mx-field:focus { outline: none; border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
+/* The placeholder never wraps: one line, cut with "…", as in the chat composer. */
+.mx-field:placeholder-shown, .mx-field::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-send { color: var(--c-primary); }
 .mx-send.stop { color: var(--c-error); }
 /* Attachments: the button left of the field, the tray above it, the drop zone over the session. */
@@ -544,6 +546,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 @media (max-width: 760px) {
 	.mx { grid-template-columns: minmax(0, 1fr); }
 	.mx[data-pane="list"] > .mx-main, .mx[data-pane="main"] > .mx-list { display: none; }
+	/* An open session has its own bar with a back button: the app's top bar steps aside, as in an open chat. */
+	.app-frame:has(.mx-chat) > .rail { display: none; }
 	.mx-list { border-right: 0; }
 	.mx-back { display: inline-grid; }
 	.mx-head { padding: var(--space-2) var(--space-2); }

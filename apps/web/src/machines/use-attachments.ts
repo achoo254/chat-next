@@ -41,6 +41,8 @@ export interface Attachments {
 	remove(id: string): void;
 	retry(id: string): void;
 	dismiss(): void;
+	/** Shows a notice of the caller's own (a paste that found no image). */
+	say(notice: string): void;
 	/** The uploaded files, out of the tray, for a message about to go. */
 	take(): ShownAttachment[];
 	/** The message went: the thread keeps their previews. */
@@ -245,6 +247,7 @@ export function useAttachments(link: UploadLink, threadId: string, limits: Limit
 			remove,
 			retry,
 			dismiss: () => setNotice(""),
+			say: setNotice,
 			take,
 			sent,
 			putBack,
