@@ -184,6 +184,11 @@ message Frame {
     SecretRemove secret_remove = 84;
     ThreadGitChanges thread_git_changes = 85;
     GitFileDiff git_file_diff = 86;
+    // The tunelo browser (tunelo 2.0.12+); see "the tunelo browser" below.
+    BrowserControl browser_control = 87;
+    BrowserView browser_view = 88;
+    BrowserInput browser_input = 89;
+    BrowserTakeoverEnd browser_takeover_end = 90;
 
     // B → A, continued
     SecretPrompt secret_prompt = 63;
@@ -193,6 +198,11 @@ message Frame {
     // thread whenever one of its turns ends.
     GitChanges git_changes = 66;
     GitFileDiffResult git_file_diff_result = 67;
+    BrowserTakeover browser_takeover = 68;
+    BrowserTakeoverEnded browser_takeover_ended = 69;
+    BrowserFrame browser_frame = 91;
+    BrowserState browser_state = 92;
+    PasskeyNotice passkey_notice = 93;
   }
 }
 
@@ -1013,6 +1023,13 @@ enum ErrorReason {
   ERROR_REASON_SECRET_INVALID = 44;
   // SecretRemove: the machine keeps no such secret (any more).
   ERROR_REASON_SECRET_NOT_FOUND = 45;
+  // No Chrome, Chromium or Edge was found on the machine for the tunelo browser.
+  ERROR_REASON_BROWSER_UNAVAILABLE = 46;
+  // BrowserView, BrowserInput or BrowserTakeoverEnd names a takeover that is
+  // no longer open (given back, expired, or its session ended).
+  ERROR_REASON_TAKEOVER_GONE = 47;
+  // BrowserControl while the tunelo browser is not running.
+  ERROR_REASON_BROWSER_NOT_RUNNING = 48;
 }
 
 enum ErrorCode {
@@ -1414,6 +1431,16 @@ message MachineInfo {
   // The machine answers ThreadGitChanges and GitFileDiff; false before
   // tunelo 2.0.11.
   bool git_changes = 18;
+  // The tunelo browser; unset before tunelo 2.0.12.
+  RemoteBrowserInfo browser = 19;
+}
+
+message RemoteBrowserInfo {
+  // A Chrome, Chromium or Edge was found for it.
+  bool available = 1;
+  // Its profile runs now: a device may open it (BrowserControl). B sends
+  // MachineInfo unasked to every connected device when this changes.
+  bool running = 2;
 }
 
 message MachineSettings {
@@ -1477,7 +1504,10 @@ message AuditEntry {
   // project_add (a sensitive folder added as a project),
   // secret_add (path: the site; detail: the name, "saved" or "once"),
   // secret_use (path: the site; detail: the name and "fill" or "env"),
-  // secret_remove (path: the site; detail: the name)
+  // secret_remove (path: the site; detail: the name),
+  // browser_control (a device gave the tunelo browser back or closed it;
+  // path: the site it showed; detail: "claude" or "user"),
+  // browser_clear (the tunelo browser's profile was deleted; device "local")
   string action = 3;
   string path = 4;
   string detail = 5;
@@ -1596,4 +1626,149 @@ message GitFileChange {
 message GitFileDiffResult {
   string thread_id = 1;
   GitFileChange file = 2;
+}
+
+// --- the tunelo browser --------------------------------------------------------
+//
+// tunelo keeps one Chrome (or Chromium, Edge) profile of its own for Claude,
+// apart from the user's browsers, so sign-ins stay between sessions. Claude
+// opens it with the open_browser tool and drives it over the Chrome DevTools
+// Protocol (Playwright's connectOverCDP). When a page needs a person (a
+// sign-in, a captcha, a passkey), Claude calls request_takeover and waits:
+// every device gets a BrowserTakeover; the user views the tab live and
+// clicks, types and scrolls on it from the device, then gives it back
+// (BrowserTakeoverEnd) and Claude gets the page's address and title. A user
+// may also open the running browser from the machine's page
+// (BrowserControl). Frames and input travel only over this end-to-end
+// encrypted link; B keeps none of them, logs no key or text, and puts none in
+// a journal. A takeover nobody uses for 10 minutes ends by itself.
+
+// A → B: the user opens the running browser from the machine's page.
+// Answered with BrowserTakeover (thread_id empty), or ERROR_REASON_BROWSER_NOT_RUNNING.
+message BrowserControl {}
+
+// A → B: show a takeover's tab on this device (on), or stop (off). B sends
+// BrowserState, then BrowserFrame whenever the tab's picture changes, and
+// only while at least one device views it. Answered with Ack.
+message BrowserView {
+  string takeover_id = 1;
+  // The tab to show; empty: the one shown last (or the one Claude used).
+  string target_id = 2;
+  bool on = 3;
+  // The largest picture this device wants, in pixels; 0: B's default. B caps
+  // both at 1600.
+  uint32 max_width = 4;
+  uint32 max_height = 5;
+}
+
+// A → B: one action of the user on the tab shown. Only while the takeover is
+// open; answered with Ack. B never logs it.
+message BrowserInput {
+  string takeover_id = 1;
+  string target_id = 2;
+  oneof action {
+    BrowserMouse mouse = 3;
+    BrowserKey key = 4;
+    // Typed text (a phone's keyboard, a paste), at most 1000 characters.
+    string text = 5;
+  }
+}
+
+enum BrowserMouseType {
+  BROWSER_MOUSE_TYPE_UNSPECIFIED = 0;
+  BROWSER_MOUSE_TYPE_MOVE = 1;
+  BROWSER_MOUSE_TYPE_DOWN = 2;
+  BROWSER_MOUSE_TYPE_UP = 3;
+  BROWSER_MOUSE_TYPE_WHEEL = 4;
+}
+
+message BrowserMouse {
+  BrowserMouseType type = 1;
+  // In CSS pixels of the page (BrowserFrame.page_width, page_height).
+  double x = 2;
+  double y = 3;
+  // 0 left, 1 middle, 2 right.
+  uint32 button = 4;
+  uint32 click_count = 5;
+  // WHEEL: CSS pixels to scroll.
+  double delta_x = 6;
+  double delta_y = 7;
+  // Alt 1, Control 2, Meta 4, Shift 8.
+  uint32 modifiers = 8;
+}
+
+// A key pressed and released: `key` as KeyboardEvent.key ("Enter", "a"),
+// `code` as KeyboardEvent.code, `text` what it types (empty for Enter,
+// arrows, shortcuts).
+message BrowserKey {
+  string key = 1;
+  string code = 2;
+  string text = 3;
+  uint32 modifiers = 4;
+}
+
+// A → B: give the tab back to Claude (a takeover Claude asked for) or close
+// the user's own. Answered with Ack.
+message BrowserTakeoverEnd {
+  string takeover_id = 1;
+}
+
+// B → A, unasked: a takeover is open. Sent to every device, again to a device
+// that connects while it is open, and again when its expiry moves.
+message BrowserTakeover {
+  string takeover_id = 1;
+  // The session whose Claude waits; empty when a device opened it.
+  string thread_id = 2;
+  // Why Claude needs the user, in Claude's words (at most 300 characters).
+  string reason = 3;
+  // The page it was opened on.
+  string url = 4;
+  // Unix milliseconds: it ends by itself then unless the user acts.
+  int64 expires_at = 5;
+}
+
+// B → A, unasked: a takeover ended; every device closes its view and card.
+message BrowserTakeoverEnded {
+  string takeover_id = 1;
+}
+
+// B → A, unasked, to a device viewing: the tab's picture.
+message BrowserFrame {
+  string takeover_id = 1;
+  string target_id = 2;
+  // JPEG.
+  bytes jpeg = 3;
+  // The page's viewport in CSS pixels, which the picture shows whole.
+  double page_width = 4;
+  double page_height = 5;
+}
+
+// B → A, unasked, to a device viewing: the tabs and the one shown, when they change.
+message BrowserState {
+  string takeover_id = 1;
+  repeated BrowserTab tabs = 2;
+  string target_id = 3;
+  // The field the user types into is a password field: A should not let its
+  // keyboard learn or suggest what is typed.
+  bool password_focused = 4;
+}
+
+message BrowserTab {
+  string target_id = 1;
+  string url = 2;
+  string title = 3;
+}
+
+// B → A, unasked: a page of the tunelo browser asked for a passkey
+// (navigator.credentials) while no virtual authenticator was on. The OS
+// passkey dialog needs someone at the machine; Claude is told too.
+message PasskeyNotice {
+  // The page's site.
+  string origin = 1;
+  // A new passkey (create) rather than a sign-in (get).
+  bool create = 2;
+  // The session that drove the browser last; empty when none.
+  string thread_id = 3;
+  // Unix milliseconds.
+  int64 at = 4;
 }
