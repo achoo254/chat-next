@@ -63,6 +63,29 @@ Lối thoát: `hda` 0.2.x chỉ đọc 20 release mới nhất. Khi `agent-v0.3.
 script cài ở trên. Script thấy `hda` thì chạy `tunelo migrate-from-hda`, thấy gói npm `tunelo` 1.x thì nhắc
 `npm uninstall -g tunelo` (không tự gỡ).
 
+## Phiên Claude Code hai chiều giữa Chat và máy
+
+Phiên AI Agent là phiên Claude Code bình thường của máy, không phải bản sao:
+
+- **Mở trong Chat, làm tiếp trên máy.** tunelo chạy `claude` của máy qua Agent SDK, ở đúng thư mục đã chọn và với thư mục
+  Claude của máy (profile mặc định không đổi `CLAUDE_CONFIG_DIR`; profile khác dùng chung `projects/` qua link). Bản ghi nằm ở
+  `~/.claude/projects/<thư mục mã hoá>/<session id>.jsonl` (`entrypoint: sdk-ts`), nên trên máy chỉ cần `cd` vào thư mục đó và
+  chạy `claude --resume` (hoặc `claude --resume <session id>`).
+- **Mở trên máy, làm tiếp trong Chat.** Hộp thoại Phiên mới › tab "Phiên có sẵn trên máy" liệt kê các phiên trong
+  `projects/` của thư mục Claude của máy và của mọi profile (Terminal, IDE như Orca, Claude Desktop, Chat), nhóm theo thư mục,
+  có tìm kiếm và phân trang. Mở một phiên: lịch sử (tin người dùng, trả lời, tool, diff) hiện ngay; tin nhắn đầu tiên resume
+  đúng session id trong thư mục của nó. Thư mục nhạy cảm và cấu hình `.claude` của dự án hỏi đồng ý như phiên mới.
+- **Lượt gõ trên máy sau đó** (`claude --resume` trong Terminal) hiện trong Chat khi mở lại phiên hoặc gửi tin tiếp; phiên đang
+  mở trong tunelo được mở lại để Claude đọc cả phần đó.
+- **Mở hai nơi cùng lúc:** phiên "có vẻ đang mở ở nơi khác" khi bản ghi vừa đổi trong 60 giây, hoặc một `claude` đang chạy ghi
+  nó trong `sessions/<pid>.json` của thư mục Claude mà tunelo biết. Web hỏi lại trước khi mở. Giới hạn: `claude` chạy với một
+  `CLAUDE_CONFIG_DIR` tunelo không biết (profile riêng của IDE) chỉ được nhận ra theo 60 giây; lượt gõ trên máy trong lúc Chat
+  đang chạy một lượt của cùng phiên không được đọc vào.
+
+Đọc ít: danh sách chỉ đọc đầu file (thư mục, câu hỏi đầu) và cuối file (tiêu đề), giữ theo kích thước và giờ sửa; số tin
+đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
+đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
+
 ## macOS cần phiên đăng nhập GUI
 
 Bản chạy nền là LaunchAgent `com.hoandat.tunelo` trong phiên GUI của người dùng, và khoá máy nằm trong login Keychain. Mac không ai
@@ -75,7 +98,8 @@ Phiên làm trong Desktop, Documents, Downloads hoặc iCloud Drive cần tunelo
 hộp thoại trên máy mà không ai bấm nên phiên treo. Chỉ chủ máy cấp được: kéo `~/.local/bin/tunelo` vào danh sách ở Cài đặt hệ thống
 › Quyền riêng tư & Bảo mật › Truy cập toàn bộ ổ đĩa, rồi bật công tắc.
 
-- Script cài và `tunelo install` mở sẵn trang đó và một cửa sổ Finder chọn sẵn tunelo. `tunelo status` in các bước khi còn thiếu.
+- Script cài và `tunelo install` mở sẵn trang đó và một cửa sổ Finder chọn sẵn tunelo. `tunelo status` và log của dịch vụ in các
+  bước khi còn thiếu (không mở gì, nên cũng không nói là đã mở).
 - Dịch vụ dò quyền mà không gây hộp thoại, báo cho thiết bị (`MachineInfo.needs_full_disk_access`; web hiện banner có nút mở lại
   trang cài đặt trên máy). Khi còn thiếu, nó kiểm lại vài giây một lần và báo ngay khi được cấp, không cần khởi động lại.
 - Nhờ chữ ký Developer ID, quyền đã cấp giữ qua các lần `tunelo update`. Bản 2.0.2 trở về trước ký ad-hoc nên phải cấp lại một lần
