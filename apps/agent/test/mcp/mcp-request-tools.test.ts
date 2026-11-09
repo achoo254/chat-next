@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Client } from "@modelcontextprotocol/client";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { LocalWritesSetting } from "../../src/mcp/local-writes.ts";
 import { MCP_BODY_LIMIT } from "../../src/mcp/request-tools.js";
 import type {
 	InspectorEntry,
@@ -50,6 +51,9 @@ beforeAll(async () => {
 	const address = app.address();
 	appPort = typeof address === "object" && address ? address.port : 0;
 	home = mkdtempSync(join(tmpdir(), "tunelo-mcp-tools-"));
+	// A client without a session ticket, as `claude mcp add tunelo -- tunelo mcp`:
+	// these tests run write tools, so the owner turned writes on for such clients.
+	await new LocalWritesSetting(join(home, "tunelo")).set(true);
 	service = await startService(serviceBundle, home);
 	const connection = mcpClient(bundle, tunnelServer.wsUrl, home);
 	client = connection.client;

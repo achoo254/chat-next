@@ -177,7 +177,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 												<span className="mono">{e.path}</span>
 											</>
 										)}
-										{(e.action === "approve_sensitive" || e.action === "local_forward" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
+										{(e.action === "approve_sensitive" || e.action === "local_forward" || e.action === "mcp_local_writes" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
 									</span>
 								</li>
 							))}

@@ -109,7 +109,7 @@ beforeAll(async () => {
     onRegistered: () => undefined,
     log: () => undefined,
   });
-  stop = serveControl({ dir, machine: fakeMachine(), registration, tunnels: new TunnelService(dir), mcp: new McpHost(dir) });
+  stop = serveControl({ dir, machine: fakeMachine(), registration, tunnels: new TunnelService(dir), mcp: new McpHost(dir, { localWrites: () => true }) });
   await waitFor(() => existsSync(join(dir, "control.json")));
 });
 

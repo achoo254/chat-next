@@ -18,6 +18,7 @@ import { LocalTunnels } from "./local-tunnels.js";
 import { type McpContext, createMcpContext } from "./mcp-context.js";
 import type { OfferedTool } from "./mcp-host.ts";
 import { failure } from "./mcp-result.js";
+import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { redactMessage } from "./redact.js";
 import { TICKET_ENV } from "./session-tickets.js";
 
@@ -102,26 +103,32 @@ function advertisedSchema(schema: Record<string, unknown>): StandardSchemaWithJS
 	};
 }
 
-/** The Chat and Localman tools the service offers now; none without it (the call then says why). */
-async function offeredTools(dir: string, context: McpContext): Promise<OfferedTool[]> {
+/**
+ * The Chat and Localman tools the service offers this client now, and
+ * whether it may write. Without the service: no remote tools, and writes as
+ * the machine's setting says (a call then says to start the service).
+ */
+async function offeredTools(dir: string, context: McpContext, ticket: string | undefined): Promise<{ tools: OfferedTool[]; writes: boolean }> {
+	const offline = { tools: [], writes: ticket !== undefined || new LocalWritesSetting(dir).enabled() };
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const timeout = new Promise<null>((resolve) => {
 		timer = setTimeout(() => resolve(null), REMOTE_LIST_WAIT_MS);
 	});
 	try {
-		const answer = (await Promise.race([callControl(dir, "POST", "/mcp/tools", {}), timeout])) as {
+		const answer = (await Promise.race([callControl(dir, "POST", "/mcp/tools", ticket ? { ticket } : {}), timeout])) as {
 			tools?: OfferedTool[];
 			unavailable?: { group: string; reason: string }[];
+			writes?: boolean;
 		} | null;
 		if (!answer) {
 			context.log("Chat and Localman tools left out: tunelo did not list them in time");
-			return [];
+			return offline;
 		}
 		for (const gap of answer.unavailable ?? []) context.log(redactMessage(`${gap.group} tools left out: ${gap.reason}`));
-		return answer.tools ?? [];
+		return { tools: answer.tools ?? [], writes: answer.writes === true };
 	} catch (err) {
 		context.log(redactMessage(`Chat and Localman tools left out: ${err instanceof Error ? err.message : String(err)}`));
-		return [];
+		return offline;
 	} finally {
 		clearTimeout(timer);
 	}
@@ -173,12 +180,17 @@ export function registerMcpCommand(program: Command): void {
 				}
 			};
 
+			// A client that may not write does not see write tools (the service refuses them anyway).
+			const offered = await offeredTools(dir, context, ticket);
+			if (!offered.writes) context.log(LOCAL_WRITES_OFF);
+
 			// The tunnel tools come from the same table the service runs.
 			for (const group of TOOL_GROUPS) {
 				if (!group.register) continue;
 				const table = new ToolTable();
 				group.register(table, { context, tunnels: new LocalTunnels(context) });
 				for (const [name, config] of table.entries()) {
+					if (!offered.writes && group.writeTools.includes(name)) continue;
 					const { title, description, annotations, inputSchema } = config;
 					if (inputSchema) {
 						server.registerTool(
@@ -196,7 +208,7 @@ export function registerMcpCommand(program: Command): void {
 				}
 			}
 
-			for (const tool of await offeredTools(dir, context)) {
+			for (const tool of offered.tools) {
 				server.registerTool(
 					tool.exposed,
 					{

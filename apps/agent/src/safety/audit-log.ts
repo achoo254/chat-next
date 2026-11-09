@@ -15,7 +15,8 @@ export type AuditAction =
   | "profile_add"
   | "profile_select"
   | "profile_remove"
-  | "local_forward";
+  | "local_forward"
+  | "mcp_local_writes";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

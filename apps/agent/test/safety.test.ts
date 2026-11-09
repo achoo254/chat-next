@@ -41,6 +41,7 @@ describe("sensitive paths", () => {
     expect(mentionsSensitive("tunelo.exe login", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo claude profiles add work", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo config local-forward off", check, { home })).toBe(true);
+    expect(mentionsSensitive("tunelo config mcp-local-writes on", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo logout", check, { home })).toBe(true);
     expect(mentionsSensitive("cat ~/.tunelo/config.json", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo status", check, { home })).toBe(false);

@@ -89,6 +89,7 @@ const profileInput = z.object({ id: z.string().max(64) });
 const profileRemove = z.object({ id: z.string().max(64), force: z.boolean().optional() });
 const forwardToggle = z.object({ enabled: z.boolean() });
 const forwardBlocked = z.object({ ports: z.array(z.number().int().min(1).max(65_535)).min(1).max(100), blocked: z.boolean() });
+const mcpTools = z.object({ ticket: z.string().min(1).max(64).optional() });
 const mcpCall = z.object({
   session: z.string().min(1).max(64),
   group: z.string().min(1).max(64),
@@ -193,8 +194,8 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     const { id } = closeInput.parse(input);
     return { closed: t.tunnels.close(id) || t.mcp.closeTunnel(id) };
   },
-  /** Tools of the Chat and Localman servers for `tunelo mcp` to list: names and schemas, no token. */
-  "POST /mcp/tools": (t) => t.mcp.remoteTools(),
+  /** Tools of the Chat and Localman servers for `tunelo mcp` to list (names and schemas, no token), and whether its caller may write. */
+  "POST /mcp/tools": (t, input) => t.mcp.remoteTools(mcpTools.parse(input).ticket),
   "POST /mcp/call": (t, input) => {
     const call = mcpCall.parse(input);
     return t.mcp.call(call.session, call.group, call.tool, call.args ?? {});

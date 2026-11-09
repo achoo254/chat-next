@@ -3,6 +3,7 @@ import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { LocalWritesSetting } from "../../src/mcp/local-writes.ts";
 import {
 	type FakeTunnelServer,
 	startFakeTunnelServer,
@@ -31,6 +32,9 @@ const TOOLS = [
 	"whoami",
 ];
 
+/** The tunnel tools a client that may not write sees. */
+const READ_TOOLS = ["get_tunnel_request", "list_linked_machines", "list_local_tunnels", "list_tunnel_requests", "tunnel_status", "whoami"];
+
 let bundle: string;
 let serviceBundle: string;
 let service: Awaited<ReturnType<typeof startService>>;
@@ -48,6 +52,9 @@ beforeAll(async () => {
 	const address = app.address();
 	appPort = typeof address === "object" && address ? address.port : 0;
 	home = mkdtempSync(join(tmpdir(), "tunelo-mcp-"));
+	// A client without a session ticket, as `claude mcp add tunelo -- tunelo mcp`:
+	// these tests open tunnels, so the owner turned writes on for such clients.
+	await new LocalWritesSetting(join(home, "tunelo")).set(true);
 	service = await startService(serviceBundle, home);
 });
 
@@ -113,13 +120,13 @@ describe("tunelo mcp over stdio", () => {
 		await waitFor(() => tunnelServer.openSockets() === 0);
 	});
 
-	test("without the background service it still answers, and a call says to start it", async () => {
+	test("without the background service it still answers (read tools only: writes are off there), and a call says to start it", async () => {
 		const empty = mkdtempSync(join(tmpdir(), "tunelo-mcp-none-"));
 		try {
 			const { client, transport } = mcpClient(bundle, tunnelServer.wsUrl, empty);
 			await client.connect(transport);
 			const tools = await client.listTools();
-			expect(tools.tools.map((t) => t.name).sort()).toEqual(TOOLS);
+			expect(tools.tools.map((t) => t.name).sort()).toEqual(READ_TOOLS);
 			const result = await client.callTool({ name: "whoami", arguments: {} });
 			expect(result.isError).toBe(true);
 			expect(textOf(result)).toContain("tunelo start");

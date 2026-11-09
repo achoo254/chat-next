@@ -12,6 +12,7 @@ import { Command } from "commander";
 import { ConfigStore, configDir, legacyConfigDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { registerLocalForwardCommand } from "./commands/config.ts";
+import { registerMcpLocalWritesCommand } from "./commands/mcp-local-writes.ts";
 import { registerInstallCommand } from "./commands/install.ts";
 import { registerProfilesCommand } from "./commands/profiles.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
@@ -327,7 +328,9 @@ function buildProgram(): Command {
   registerMcpCommand(program);
   registerKillCommand(program);
   registerWatchCommand(program);
-  registerLocalForwardCommand(registerConfigCommand(program), exits);
+  const configCommand = registerConfigCommand(program);
+  registerLocalForwardCommand(configCommand, exits);
+  registerMcpLocalWritesCommand(configCommand, exits);
   return program;
 }
 

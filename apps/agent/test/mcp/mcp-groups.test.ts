@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -15,12 +16,13 @@ import {
 } from "../../src/mcp/groups.ts";
 import { LocalTunnels } from "../../src/mcp/local-tunnels.ts";
 import { createMcpContext } from "../../src/mcp/mcp-context.ts";
+import { LOCAL_WRITES_FILE, LocalWritesSetting } from "../../src/mcp/local-writes.ts";
 import { McpHost, type McpHostOptions } from "../../src/mcp/mcp-host.ts";
 import { WriteApprovals } from "../../src/mcp/write-approvals.ts";
 import { RemoteProxy } from "../../src/mcp/remote-proxy.ts";
 import { type FakeMcpApp, startFakeMcpApp } from "../support/fake-mcp-app.ts";
 import { startFakeTunnelServer, type FakeTunnelServer } from "../support/fake-tunnel-server.ts";
-import { buildCliBundle, buildServiceBundle, mcpClient, startService, textOf } from "../support/mcp-harness.ts";
+import { buildCliBundle, buildServiceBundle, machineEnv, mcpClient, startService, textOf } from "../support/mcp-harness.ts";
 
 const JWT = /eyJ[\w-]+\.[\w-]+\.[\w-]*/;
 const CHAT_TOKEN = "eyJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJjaGF0In0.c2lnY2hhdA";
@@ -140,12 +142,45 @@ describe("the service's MCP host", () => {
 		h.endAll();
 	});
 
-	test("without a ticket, writes follow the machine's setting", async () => {
-		const { h } = host(undefined, { localWrites: () => false });
+	test("without a ticket, writes are off by default: refused and not listed; reads still run", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "tunelo-local-writes-"));
+		const remote = new RemoteProxy({ endpoint: () => chat.url, token: async () => CHAT_TOKEN, forget: async () => undefined, account: () => "a" });
+		const h = new McpHost(dir, { remote, enabledGroups: () => ["tunnel", "chat"] });
 		const id = h.open("wss://tunnel.example");
-		expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/may only read/);
+		const before = chat.calls.length;
+		const refused = await h.call(id, "chat", "send_message", SEND);
+		expect(refused.isError).toBe(true);
+		expect(textOf(refused)).toMatch(/tunelo config mcp-local-writes on/);
+		expect(textOf(await h.call(id, "tunnel", "open_http_tunnel", { port: 3000 }))).toMatch(/mcp-local-writes/);
+		expect(chat.calls.length).toBe(before);
 		expect((await h.call(id, "chat", "list_chats", {})).isError).toBeUndefined();
+		expect((await h.remoteTools()).tools.map((t) => t.exposed)).not.toContain("chat_send_message");
+		expect((await h.remoteTools()).writes).toBe(false);
+
+		// Turned on: the same client writes, and sees the write tools.
+		await new LocalWritesSetting(dir).set(true);
+		expect((await h.call(id, "chat", "send_message", SEND)).isError).toBeUndefined();
+		expect((await h.remoteTools()).tools.map((t) => t.exposed)).toContain("chat_send_message");
+
+		// Off again; a session's ticket is not affected either way (its writes need the device's approval).
+		await new LocalWritesSetting(dir).set(false);
+		const ticket = h.tickets.issue("thread-1");
+		const session = h.open("wss://tunnel.example", ticket);
+		expect((await h.remoteTools(ticket)).tools.map((t) => t.exposed)).toContain("chat_send_message");
+		expect(textOf(await h.call(session, "chat", "send_message", SEND))).toMatch(/not approved on the device/);
+		h.approve(ticket, "mcp__tunelo__chat_send_message", SEND);
+		expect((await h.call(session, "chat", "send_message", SEND)).isError).toBeUndefined();
+		await new LocalWritesSetting(dir).set(true);
+		expect(textOf(await h.call(session, "chat", "send_message", SEND))).toMatch(/not approved on the device/);
 		h.endAll();
+		rmSync(dir, { recursive: true, force: true });
+	});
+
+	test("an unreadable setting counts as off", () => {
+		const dir = mkdtempSync(join(tmpdir(), "tunelo-local-writes-"));
+		writeFileSync(join(dir, LOCAL_WRITES_FILE), "{ not json");
+		expect(new LocalWritesSetting(dir).enabled()).toBe(false);
+		rmSync(dir, { recursive: true, force: true });
 	});
 
 	test("headers of the user's own requests come back hidden", async () => {
@@ -191,8 +226,8 @@ describe("the service's MCP host", () => {
 		h.endAll();
 	});
 
-	test("without a ticket it acts as the local user, with the same tools", async () => {
-		const { h, lines } = host();
+	test("without a ticket and with local writes on, it acts as the local user, with the same tools", async () => {
+		const { h, lines } = host(undefined, { localWrites: () => true });
 		const id = h.open("wss://tunnel.example");
 		expect((await h.call(id, "chat", "send_message", { chat_id: 7, text: "x" })).isError).toBeUndefined();
 		expect(lines).toEqual(["mcp local: chat send_message ok"]);
@@ -204,7 +239,7 @@ describe("the service's MCP host", () => {
 		const id = h.open("wss://tunnel.example");
 		const before = chat.calls.length;
 		expect(textOf(await h.call(id, "chat", "list_chats", {}))).toMatch(/off on this machine/);
-		const { h: all } = host();
+		const { h: all } = host(undefined, { localWrites: () => true });
 		const id2 = all.open("wss://tunnel.example");
 		expect(textOf(await all.call(id2, "chat", "delete_messages", { chat_id: 7 }))).toMatch(/not a tool tunelo offers/);
 		expect(textOf(await all.call(id2, "tunnel", "kill_everything", {}))).toMatch(/not a tool tunelo offers/);
@@ -275,27 +310,51 @@ describe("tunelo mcp with the service", () => {
 		rmSync(home, { recursive: true, force: true });
 	});
 
-	test("lists the tools of all three groups and runs them with no token reaching the client", async () => {
+	test("without a ticket and with local writes off (the default), lists and runs only read tools", async () => {
 		const { client, transport } = mcpClient(bundle, tunnelServer.wsUrl, home);
 		await client.connect(transport);
 		const names = (await client.listTools()).tools.map((t) => t.name);
-		expect(names).toEqual(expect.arrayContaining(["open_http_tunnel", "whoami", "chat_list_chats", "chat_send_message", "localman_list_collections", "localman_send_request"]));
-		expect(names).not.toContain("chat_delete_messages");
-		expect(names).not.toContain("localman_list_chats");
-
-		const sent = await client.callTool({ name: "chat_send_message", arguments: { chat_id: 7, text: "test" } });
-		expect(textOf(sent)).toContain('"sent":"test"');
-		const request = await client.callTool({ name: "localman_send_request", arguments: { method: "GET", url: "http://localhost:5173" } });
-		expect(textOf(request)).toContain("localhost:5173");
-		for (const result of [sent, request]) expect(JSON.stringify(result)).not.toMatch(JWT);
-		// The list route answers names and schemas only.
-		const listed = await callControl(join(home, "tunelo"), "POST", "/mcp/tools", {});
-		expect(JSON.stringify(listed)).toContain("chat_send_message");
-		expect(JSON.stringify(listed)).not.toMatch(JWT);
-		// Each app saw only its own token.
-		expect(new Set(chat.seen)).toEqual(new Set([CHAT_TOKEN]));
-		expect(new Set(localman.seen)).toEqual(new Set([LOCALMAN_TOKEN]));
+		expect(names).toEqual(expect.arrayContaining(["whoami", "list_local_tunnels", "chat_list_chats", "localman_list_collections"]));
+		for (const write of ["open_http_tunnel", "close_tunnel", "revoke_linked_machine", "chat_send_message", "localman_send_request"]) {
+			expect(names).not.toContain(write);
+		}
+		const before = chat.calls.length;
+		// Not listed, so the client cannot even call it.
+		await expect(client.callTool({ name: "chat_send_message", arguments: { chat_id: 7, text: "x" } })).rejects.toThrow(/not found/);
+		expect(chat.calls.length).toBe(before);
 		await client.close();
+	});
+
+	test("`tunelo config mcp-local-writes on` lets a client without a ticket list and run every tool, no token reaching it", async () => {
+		const env = machineEnv(home);
+		const on = spawnSync(process.execPath, [bundle, "config", "mcp-local-writes", "on"], { env, encoding: "utf8" });
+		expect(on.status).toBe(0);
+		expect(on.stdout).toMatch(/: on\./);
+		try {
+			const { client, transport } = mcpClient(bundle, tunnelServer.wsUrl, home);
+			await client.connect(transport);
+			const names = (await client.listTools()).tools.map((t) => t.name);
+			expect(names).toEqual(expect.arrayContaining(["open_http_tunnel", "whoami", "chat_list_chats", "chat_send_message", "localman_list_collections", "localman_send_request"]));
+			expect(names).not.toContain("chat_delete_messages");
+			expect(names).not.toContain("localman_list_chats");
+
+			const sent = await client.callTool({ name: "chat_send_message", arguments: { chat_id: 7, text: "test" } });
+			expect(textOf(sent)).toContain('"sent":"test"');
+			const request = await client.callTool({ name: "localman_send_request", arguments: { method: "GET", url: "http://localhost:5173" } });
+			expect(textOf(request)).toContain("localhost:5173");
+			for (const result of [sent, request]) expect(JSON.stringify(result)).not.toMatch(JWT);
+			// Each app saw only its own token.
+			expect(new Set(chat.seen)).toEqual(new Set([CHAT_TOKEN]));
+			expect(new Set(localman.seen)).toEqual(new Set([LOCALMAN_TOKEN]));
+			// The list route answers names and schemas only.
+			const listed = await callControl(join(home, "tunelo"), "POST", "/mcp/tools", {});
+			expect(JSON.stringify(listed)).toContain("chat_send_message");
+			expect(JSON.stringify(listed)).not.toMatch(JWT);
+			await client.close();
+		} finally {
+			const off = spawnSync(process.execPath, [bundle, "config", "mcp-local-writes", "off"], { env, encoding: "utf8" });
+			expect(off.stdout).toMatch(/: off/);
+		}
 	});
 
 	test("with a session's ticket (as Bash in that session could read it), a write without the device's approval is refused", async () => {

@@ -77,12 +77,19 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
   - Thẻ duyệt hiện người nhận theo tên cuộc trò chuyện (lấy bằng `get_chat`, lỗi thì hiện `chat <id>`) kèm 300 ký tự đầu của tin; với request thì hiện `METHOD URL`. Input dài hơn 4000 ký tự thì thẻ ghi rõ đã bị cắt.
   - "Cho phép cả phiên" không thêm luật cho tool ghi.
   - Server MCP nào trong cấu hình máy chạy `tunelo mcp` dưới tên khác đều bị bỏ khỏi phiên có MCP `tunelo`.
-- Lời gọi không vé (`claude mcp add tunelo -- tunelo mcp` ở phiên ngoài tunelo, hay bất kỳ tiến trình cùng user nào đọc `control.json`) hiện dùng quyền người dùng cục bộ, cùng danh sách tool. Việc có cho lời gọi không vé dùng tool ghi hay không đang chờ người dùng chốt; code có sẵn chỗ cho một cờ (`McpHost` option `localWrites`).
+- **Lời gọi không vé chỉ được đọc** (người dùng chốt 09/11/2026). Lời gọi không vé là `claude mcp add tunelo -- tunelo mcp` ở phiên ngoài tunelo, hay bất kỳ tiến trình cùng user nào đọc `control.json`.
+  - Mọi tool ghi (gửi tin, gửi request, mở/đóng tunnel, dừng tiến trình tunnel, thu hồi liên kết) đều bị từ chối, kèm hướng dẫn cách bật.
+  - `tools/list` của client đó không có tool ghi.
+  - Chủ máy bật bằng `tunelo config mcp-local-writes on|off`, mặc định off:
+    - Cờ lưu ở file `mcp-local-writes.json`. Ghi dưới khoá file, ghi nguyên tử, dịch vụ đang chạy đọc lại khi file đổi. File hỏng thì coi là tắt.
+    - Mỗi lần đổi được ghi vào nhật ký đồng ý (`mcp_local_writes`).
+    - Khi bật, lời gọi không vé dùng đủ tool, và chỉ còn việc duyệt của chính client đó chặn tool ghi.
+  - Lời gọi có vé không phụ thuộc cờ này: vẫn cần lần cấp duyệt.
 - Rủi ro prompt injection:
   - Nội dung claude đọc từ Chat (tin của người khác), Localman (response) hay file dự án có thể dụ claude gửi tin thay người dùng hoặc gửi request tới `localhost` của máy.
-  - Ở default/acceptEdits/auto, lần cấp duyệt chặn được cả lời gọi tool lẫn đường qua Bash có vé. Người dùng vẫn phải đọc thẻ: người nhận, nội dung, URL.
+  - Ở default/acceptEdits/auto, lần cấp duyệt chặn lời gọi tool. Bash trong phiên hay tiến trình lạ cũng không ghi được qua tunelo: có vé thì vẫn thiếu lần cấp, không vé thì chỉ được đọc. Người dùng vẫn phải đọc thẻ: người nhận, nội dung, URL.
   - Còn hở:
-    - Lời gọi không vé, như trên.
+    - Chủ máy tự bật `mcp-local-writes`: khi đó mọi tiến trình cùng user ghi được qua socket. Lệnh `tunelo config mcp-local-writes` (cũng như thư mục cấu hình tunelo) được tính là nhạy cảm: thẻ của nó có nhãn cảnh báo và không bao giờ được "cho phép cả phiên". Tuy vậy, ở `auto`, hoặc khi máy có luật allow cho Bash, claude có thể tự chạy lệnh này mà không qua thẻ, giống mọi lệnh Bash.
     - Bash tự gửi request mạng bằng thông tin đăng nhập riêng của nó (ngoài tunelo).
     - `bypassPermissions`: không có gì chặn. Người dùng chấp nhận rủi ro này khi tự đặt máy ở chế độ đó.
 - Dữ liệu nhạy cảm đi vào context:

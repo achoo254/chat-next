@@ -10,7 +10,8 @@
  * user gave on the device for that exact call (write-approvals.ts), or
  * when the session runs in bypassPermissions. A client started elsewhere
  * (`claude mcp add tunelo -- tunelo mcp`) has no ticket and acts as this OS
- * user (`localWrites` decides whether it may write). A ticket that is no
+ * user and only reads, unless the owner turned writes on for such clients
+ * (`tunelo config mcp-local-writes on`, local-writes.ts). A ticket that is no
  * longer live is refused. Every call is logged on the machine (group, tool,
  * outcome; never its arguments). Nothing leaves without redact().
  */
@@ -31,6 +32,7 @@ import {
 } from "./groups.js";
 import { type LocalTunnel, LocalTunnels } from "./local-tunnels.js";
 import { createMcpContext } from "./mcp-context.js";
+import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { failure } from "./mcp-result.js";
 import { RemoteProxy, type RemoteTool, identityAccess } from "./remote-proxy.js";
 import { hideSensitiveHeaders, redact, redactMessage } from "./redact.js";
@@ -50,8 +52,6 @@ const TICKET_ENDED =
 	"This claude session's access to tunelo ended; start a new session.";
 const NOT_APPROVED =
 	"This was not approved on the device: tunelo runs it only after the user approves this exact call.";
-const NO_LOCAL_WRITES =
-	"Writes need a claude session tunelo opened (with its approval card); this client may only read.";
 /** How long a card waits for the name of the chat a message goes to. */
 const DESCRIBE_WAIT_MS = 3_000;
 const PREVIEW_CHARS = 300;
@@ -64,7 +64,7 @@ export interface McpHostOptions {
 	enabledGroups?: () => readonly GroupName[] | undefined;
 	/** The permission mode a session (by the label of its ticket) runs in now. */
 	sessionMode?: (owner: string) => string | undefined;
-	/** Whether a client without a ticket may run write tools; yes when unset. */
+	/** Whether a client without a ticket may run write tools; mcp-local-writes.json when unset. */
 	localWrites?: () => boolean;
 	log?: (line: string) => void;
 }
@@ -81,6 +81,7 @@ export class McpHost {
 	readonly tickets: SessionTickets;
 	readonly approvals: WriteApprovals;
 	private readonly remote: RemoteProxy;
+	private readonly localWrites: () => boolean;
 	private readonly log: (line: string) => void;
 
 	constructor(
@@ -91,6 +92,16 @@ export class McpHost {
 		this.approvals = options.approvals ?? new WriteApprovals();
 		this.remote = options.remote ?? new RemoteProxy(identityAccess(dir));
 		this.log = options.log ?? (() => undefined);
+		if (options.localWrites) this.localWrites = options.localWrites;
+		else {
+			const setting = new LocalWritesSetting(dir);
+			this.localWrites = () => setting.enabled();
+		}
+	}
+
+	/** Whether a client presenting `ticket` (or none) may run write tools at all. */
+	maySeeWrites(ticket?: string): boolean {
+		return (ticket !== undefined && this.tickets.owner(ticket) !== undefined) || this.localWrites();
 	}
 
 	private enabled(group: GroupName): boolean {
@@ -142,7 +153,7 @@ export class McpHost {
 	/** Why a write may not run now; undefined when it may (or is no write). */
 	private writeRefusal(ticket: string | undefined, who: string, group: ToolGroup, tool: string, args: Record<string, unknown>): string | undefined {
 		if (!actsForUser(group, tool, args)) return undefined;
-		if (!ticket) return (this.options.localWrites?.() ?? true) ? undefined : NO_LOCAL_WRITES;
+		if (!ticket) return this.localWrites() ? undefined : LOCAL_WRITES_OFF;
 		if (this.options.sessionMode?.(who) === "bypassPermissions") return undefined;
 		return this.approvals.consume(ticket, group.name, tool, args) ? undefined : NOT_APPROVED;
 	}
@@ -223,7 +234,8 @@ export class McpHost {
 	 * The tools of the app servers' groups that are on, for `tunelo mcp` to
 	 * list; a group whose server cannot be reached now is left out, with why.
 	 */
-	async remoteTools(): Promise<{ tools: OfferedTool[]; unavailable: { group: GroupName; reason: string }[] }> {
+	async remoteTools(ticket?: string): Promise<{ tools: OfferedTool[]; unavailable: { group: GroupName; reason: string }[]; writes: boolean }> {
+		const writes = this.maySeeWrites(ticket);
 		const groups = TOOL_GROUPS.filter((g) => !g.register && this.enabled(g.name));
 		const settled = await Promise.allSettled(groups.map((g) => this.remote.tools(g)));
 		const tools: OfferedTool[] = [];
@@ -233,6 +245,7 @@ export class McpHost {
 			if (!group) return;
 			if (outcome.status === "fulfilled") {
 				for (const tool of outcome.value) {
+					if (!writes && group.writeTools.includes(tool.name)) continue;
 					tools.push({ ...tool, group: group.name, exposed: exposedToolName(group.name, tool.name) });
 				}
 			} else {
@@ -240,7 +253,7 @@ export class McpHost {
 				unavailable.push({ group: group.name, reason: redactMessage(reason) });
 			}
 		});
-		return { tools, unavailable };
+		return { tools, unavailable, writes };
 	}
 
 	/** Lists the app servers' tools ahead of a session that will ask for them. */

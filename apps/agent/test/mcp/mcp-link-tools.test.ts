@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Client } from "@modelcontextprotocol/client";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { LocalWritesSetting } from "../../src/mcp/local-writes.ts";
 import {
 	type FakeTunnelServer,
 	startFakeTunnelServer,
@@ -26,6 +27,9 @@ beforeAll(async () => {
 	tunnelServer = await startFakeTunnelServer();
 	// The service tunnels with TUNELO_KEY, an anonymous token: the machine has links.
 	home = mkdtempSync(join(tmpdir(), "tunelo-mcp-link-"));
+	// A client without a session ticket, as `claude mcp add tunelo -- tunelo mcp`:
+	// these tests run write tools, so the owner turned writes on for such clients.
+	await new LocalWritesSetting(join(home, "tunelo")).set(true);
 	service = await startService(serviceBundle, home);
 	const connection = mcpClient(bundle, tunnelServer.wsUrl, home);
 	client = connection.client;
