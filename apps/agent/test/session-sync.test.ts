@@ -242,3 +242,38 @@ describe("turns typed on the machine later", () => {
     expect(texts(items, Role.ASSISTANT)).toEqual(["echo: hello"]);
   });
 });
+
+describe("the session's name", () => {
+  test("a session opened without a message waits, runs nothing, and takes its name from the first message", async () => {
+    const { core, sdk, work } = setup(randomUUID());
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "", consent: none, device: "phone" });
+    expect(thread.title).toBe("");
+    expect(sdk.log.options).toHaveLength(0);
+    await core.send(thread.id, "Sửa lỗi đăng nhập\nchi tiết ở dưới", "");
+    await until(core, thread.id, turnsDone(1));
+    expect(core.list().find((s) => s.id === thread.id)?.title).toBe("Sửa lỗi đăng nhập");
+  });
+
+  test("follows the name Claude gives the session, and one the user gives it in a terminal, and tells devices", async () => {
+    const id = randomUUID();
+    const { core, claudeHome, work } = setup(id);
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent: none, device: "phone" });
+    await until(core, thread.id, turnsDone(1));
+    const seen: string[] = [];
+    core.onStatus((s) => seen.push(s.title));
+
+    const t = new Transcript(id, work, "sdk-ts").opening();
+    t.user("hello");
+    t.assistant([{ type: "text", text: "echo: hello" }]);
+    t.aiTitle("Chào hỏi");
+    t.write(claudeHome);
+    core.subscribe(thread.id, undefined);
+    expect(core.list().find((s) => s.id === thread.id)?.title).toBe("Chào hỏi");
+    expect(seen).toContain("Chào hỏi");
+
+    t.customTitle("Phiên của tôi");
+    t.write(claudeHome);
+    core.subscribe(thread.id, undefined);
+    expect(core.list().find((s) => s.id === thread.id)?.title).toBe("Phiên của tôi");
+  });
+});

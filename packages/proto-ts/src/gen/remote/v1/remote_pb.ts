@@ -790,7 +790,9 @@ export type ThreadCreate = Message<"remote.v1.ThreadCreate"> & {
   dir: string;
 
   /**
-   * First user message.
+   * First user message. Empty opens the session with none: it waits, parked,
+   * for the first message typed in it, which also names it (tunelo 2.0.9+;
+   * earlier machines refuse it as an empty message).
    *
    * @generated from field: string text = 4;
    */

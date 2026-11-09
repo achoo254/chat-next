@@ -201,7 +201,9 @@ message ThreadCreate {
   string model = 2;
   // Absolute working directory on B.
   string dir = 3;
-  // First user message.
+  // First user message. Empty opens the session with none: it waits, parked,
+  // for the first message typed in it, which also names it (tunelo 2.0.9+;
+  // earlier machines refuse it as an empty message).
   string text = 4;
   Consent consent = 5;
   // One of the AI's permission_modes to start in (a project's default);

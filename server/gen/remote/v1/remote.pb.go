@@ -2714,7 +2714,9 @@ type ThreadCreate struct {
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
 	// Absolute working directory on B.
 	Dir string `protobuf:"bytes,3,opt,name=dir,proto3" json:"dir,omitempty"`
-	// First user message.
+	// First user message. Empty opens the session with none: it waits, parked,
+	// for the first message typed in it, which also names it (tunelo 2.0.9+;
+	// earlier machines refuse it as an empty message).
 	Text    string   `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
 	Consent *Consent `protobuf:"bytes,5,opt,name=consent,proto3" json:"consent,omitempty"`
 	// One of the AI's permission_modes to start in (a project's default);

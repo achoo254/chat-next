@@ -39,6 +39,7 @@ import type {
   ProviderSession,
   QuestionAnswer,
   QuestionRequest,
+  SessionHistory,
   SessionPage,
   SessionQuery,
   ToolKind as Kind,
@@ -582,14 +583,13 @@ export class AgentCore {
     const provider = this.provider(req.provider || "claude");
     const dir = resolve(req.dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
-    if (!req.text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
     const mode = req.permissionMode ?? "";
     if (mode !== "" && !provider.capabilities.permissionModes.includes(mode)) {
       throw new AgentError(ErrorCode.INVALID, "permission mode not allowed", { reason: ErrorReason.PERMISSION_MODE_NOT_ALLOWED, subject: mode });
     }
     await this.admit(provider, dir, req.consent, req.device);
     const t = this.addThread({
-      title: req.text.trim().split("\n")[0]?.slice(0, 80) ?? "",
+      title: firstLine(req.text),
       dir,
       provider: provider.id,
       model: req.model,
@@ -599,7 +599,8 @@ export class AgentCore {
       t.meta.permissionMode = mode;
       this.saveMeta(t);
     }
-    await this.send(t.meta.id, req.text, "");
+    // No first message: the session waits, parked, for the one typed in it.
+    if (req.text.trim()) await this.send(t.meta.id, req.text, "");
     return this.summary(t);
   }
 
@@ -736,6 +737,11 @@ export class AgentCore {
     const seg = t.meta.segments.at(-1);
     const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
     if (!history || !seg?.sessionId) return 0;
+    if (this.renameFromHistory(t, history, seg.sessionId)) {
+      this.saveMeta(t);
+      const summary = this.summary(t);
+      for (const fn of this.statusListeners) fn(summary);
+    }
     const mark = t.meta.history?.sessionId === seg.sessionId ? t.meta.history.end : undefined;
     let end: number | undefined;
     try {
@@ -765,6 +771,23 @@ export class AgentCore {
     } catch {
       // unreadable now: the next look reads from the last mark
     }
+    this.renameFromHistory(t, history, seg.sessionId);
+  }
+
+  /**
+   * Takes the session's name from the AI's transcript: the one it gave the
+   * session, or one the user gave it (Claude: /rename). True when it changed.
+   */
+  private renameFromHistory(t: Thread, history: SessionHistory, sessionId: string): boolean {
+    let title: string | undefined;
+    try {
+      title = history.find(sessionId)?.title.slice(0, 80);
+    } catch {
+      return false;
+    }
+    if (!title || title === t.meta.title) return false;
+    t.meta.title = title;
+    return true;
   }
 
   private importHistory(t: Thread, entries: HistoryEntry[], skipEqualTexts: boolean): number {
@@ -861,6 +884,8 @@ export class AgentCore {
     }
     if (clientMsgId) t.clientMsgIds.add(clientMsgId);
     t.limitSeen = false;
+    // A session opened without a message is named by its first one.
+    if (!t.meta.title) t.meta.title = firstLine(text);
     // Turns typed elsewhere since come first; an open session opens again so the AI reads them.
     if (!t.running && this.syncHistory(t) > 0 && t.session) await this.park(t);
     const attachments = (prepared?.attachments ?? []).map((a) => ({ ...a, size: BigInt(a.size) }));
@@ -1611,6 +1636,11 @@ export class AgentCore {
       archived: Boolean(t.meta.archived),
     });
   }
+}
+
+/** A session's name from a message: its first line, at most 80 characters. */
+function firstLine(text: string): string {
+  return text.trim().split("\n")[0]?.slice(0, 80) ?? "";
 }
 
 /** The preview line of a user or AI text item; undefined for anything else (thinking, empty text). */
