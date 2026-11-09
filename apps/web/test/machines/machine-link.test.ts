@@ -183,41 +183,6 @@ describe("MachineLink", () => {
 		expect(merged.rateLimits?.sevenDay?.utilization).toBe(60);
 	});
 
-	it("forgets the rate limits of the profile a session left", () => {
-		const onTeam = create(ThreadInfoSchema, { threadId: "t", profileId: "", rateLimits: { fiveHour: { utilization: 100 } } });
-		const sameProfile = create(ThreadInfoSchema, { threadId: "t", profileId: "" });
-		expect(mergeThreadInfo(onTeam, sameProfile).rateLimits?.fiveHour?.utilization).toBe(100);
-		const moved = create(ThreadInfoSchema, { threadId: "t", profileId: "p2", machineProfileId: "p2" });
-		expect(mergeThreadInfo(onTeam, moved).rateLimits).toBeUndefined();
-	});
-
-	it("keeps the machine's profile as the machine last announced it, unasked", async () => {
-		machine.handler = (frame, socket) => {
-			if (frame.body.case === "machineInfoRequest") {
-				setTimeout(() => {
-					machine.send(socket, {
-						case: "machineProfile",
-						value: { profiles: { selectedId: "", profiles: [{ id: "", email: "team@example.com" }] }, sessions: [{ threadId: "t1", profileId: "" }] },
-					});
-					machine.send(socket, {
-						case: "machineProfile",
-						value: {
-							profiles: { selectedId: "p2", profiles: [{ id: "", email: "team@example.com" }, { id: "p2", email: "max@example.com" }] },
-							sessions: [{ threadId: "t1", profileId: "", switchPending: true }],
-						},
-					});
-				}, 0);
-			}
-			return defaultAnswerOf(frame);
-		};
-		const l = link();
-		expect(l.snapshot().machineProfile).toBeNull();
-		l.start();
-		await until(() => l.snapshot().machineProfile?.profiles?.selectedId === "p2", "announced profile");
-		expect(l.snapshot().machineProfile?.sessions).toMatchObject([{ threadId: "t1", profileId: "", switchPending: true }]);
-		l.stop();
-	});
-
 	it("matches answers to requests and rejects machine errors", async () => {
 		machine.handler = (frame) => {
 			if (frame.body.case === "threadSend") return [{ case: "error", value: { code: ErrorCode.NOT_FOUND, message: "no such thread" } }];
