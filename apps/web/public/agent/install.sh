@@ -105,7 +105,7 @@ main() {
 	trap 'rm -rf "$tmp"; stty echo </dev/tty 2>/dev/null || true' EXIT
 	trap 'exit 130' INT TERM
 	url="$RELEASES/tunelo-v$TUNELO_VERSION/$asset"
-	say "Đang tải tunelo $TUNELO_VERSION…" "Downloading tunelo $TUNELO_VERSION…" "正在下载 tunelo $TUNELO_VERSION…"
+	say "Đang tải tunelo ${TUNELO_VERSION}…" "Downloading tunelo ${TUNELO_VERSION}…" "正在下载 tunelo ${TUNELO_VERSION}…"
 	curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$asset" "$url" || die "không tải được $url" "could not download $url" "无法下载 $url"
 	[ "$(sha256_of "$tmp/$asset")" = "$sha" ] || die "file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt." \
 		"the download does not match the pinned SHA-256; nothing was installed." "下载的文件与固定的 SHA-256 不符；未安装任何内容。"
