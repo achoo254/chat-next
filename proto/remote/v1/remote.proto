@@ -182,11 +182,17 @@ message Frame {
     SecretDecline secret_decline = 82;
     SecretList secret_list = 83;
     SecretRemove secret_remove = 84;
+    ThreadGitChanges thread_git_changes = 85;
+    GitFileDiff git_file_diff = 86;
 
     // B → A, continued
     SecretPrompt secret_prompt = 63;
     SecretPromptEnded secret_prompt_ended = 64;
     SecretListResult secret_list_result = 65;
+    // Answers ThreadGitChanges, and is sent unasked to devices following the
+    // thread whenever one of its turns ends.
+    GitChanges git_changes = 66;
+    GitFileDiffResult git_file_diff_result = 67;
   }
 }
 
@@ -344,6 +350,18 @@ message ThreadSwitch {
 message ThreadFetchFull {
   string thread_id = 1;
   string item_id = 2;
+}
+
+// What is not committed in the thread's folder, as git sees it (GitChanges).
+message ThreadGitChanges {
+  string thread_id = 1;
+}
+
+// One file of the thread's GitChanges with its whole diff (GitFileDiffResult).
+// Only a path GitChanges lists now is answered.
+message GitFileDiff {
+  string thread_id = 1;
+  string path = 2;
 }
 
 message MachineInfoRequest {}
@@ -1188,6 +1206,9 @@ message DiffItem {
   uint32 added = 4;
   uint32 removed = 5;
   bool truncated = 6;
+  // An edit made inside a subagent: the subagent's tool id (SubagentItem).
+  // Devices show it with the subagent, not as a card of its own.
+  string parent_tool_id = 7;
 }
 
 message TodoItem {
@@ -1230,6 +1251,16 @@ message ApprovalItem {
   Decision decision = 9;
   // What the user told the AI when denying (ThreadRespond.deny_message).
   string deny_message = 10;
+  // The sign-in secrets a command reads ($TUNELO_SECRET_<NAME>), each with
+  // the site it belongs to; empty before tunelo 2.0.11, where devices take
+  // the names from the input.
+  repeated ApprovalSecret secrets = 11;
+}
+
+message ApprovalSecret {
+  string name = 1;
+  // https://host[:port]; "" when the session holds no secret of that name.
+  string origin = 2;
 }
 
 message QuestionItem {
@@ -1268,6 +1299,22 @@ message TurnItem {
   // Context window use after the turn, when the adapter reports it.
   uint64 context_tokens = 3;
   uint64 context_window = 4;
+  // What the adapter reports about the finished turn; each one 0 or empty
+  // when it does not (other AIs, tunelo before 2.0.11, a failed start).
+  // The model that answered.
+  string model = 5;
+  // Tokens of the turn's own conversation (not of its subagents).
+  uint64 input_tokens = 6;
+  uint64 output_tokens = 7;
+  uint64 cache_read_tokens = 8;
+  uint64 cache_write_tokens = 9;
+  // Time spent waiting on the AI's API during the turn.
+  uint64 duration_api_ms = 10;
+  // Model round trips of the turn.
+  uint32 num_turns = 11;
+  // What the turn would cost at the AI's API prices, subagents included, in
+  // US dollars. Only an estimate: a subscription plan is not charged by it.
+  double cost_usd_estimate = 12;
 }
 
 message SubagentItem {
@@ -1364,6 +1411,9 @@ message MachineInfo {
   // The machine asks devices for sign-in secrets (SecretPrompt) and keeps
   // saved ones (SecretList); false before tunelo 2.0.8.
   bool secrets = 17;
+  // The machine answers ThreadGitChanges and GitFileDiff; false before
+  // tunelo 2.0.11.
+  bool git_changes = 18;
 }
 
 message MachineSettings {
@@ -1501,4 +1551,49 @@ message SavedSecret {
   int64 created_at = 4;
   // Unix milliseconds; 0 when never used since it was saved.
   int64 last_used_at = 5;
+}
+
+// --- uncommitted changes of a thread's folder --------------------------------
+
+// What git reports as not committed in the thread's folder (and below it):
+// changed, staged, deleted and untracked files, with a short diff of each.
+message GitChanges {
+  string thread_id = 1;
+  // The folder is in a git work tree; false: nothing else is set.
+  bool git = 2;
+  // Paths relative to the thread's folder, at most 200.
+  repeated GitFileChange files = 3;
+  // More files changed than listed.
+  bool truncated = 4;
+  // git did not answer in time or failed: the list may be incomplete.
+  bool partial = 5;
+}
+
+enum GitFileState {
+  GIT_FILE_STATE_UNSPECIFIED = 0;
+  GIT_FILE_STATE_MODIFIED = 1;
+  GIT_FILE_STATE_ADDED = 2;
+  GIT_FILE_STATE_DELETED = 3;
+  GIT_FILE_STATE_UNTRACKED = 4;
+  GIT_FILE_STATE_TYPE_CHANGED = 5;
+  GIT_FILE_STATE_CONFLICTED = 6;
+}
+
+message GitFileChange {
+  string path = 1;
+  GitFileState state = 2;
+  uint32 added = 3;
+  uint32 removed = 4;
+  // Unified diff against the last commit, at most 120 lines unless fetched
+  // with GitFileDiff; empty for a binary or sensitive file.
+  string unified = 5;
+  bool truncated = 6;
+  bool binary = 7;
+  // A sensitive path: listed without its content.
+  bool sensitive = 8;
+}
+
+message GitFileDiffResult {
+  string thread_id = 1;
+  GitFileChange file = 2;
 }
