@@ -5,6 +5,7 @@
  * and never turns into a token. It ends with the session.
  */
 import { randomBytes } from "node:crypto";
+import type { SessionSecretHooks } from "../sign-in-secrets/secret-env.ts";
 
 /** What a session needs to start tunelo's MCP, and to have its writes approved. */
 export interface SessionMcp {
@@ -15,6 +16,8 @@ export interface SessionMcp {
 	approveWrite(claudeName: string, input: Record<string, unknown>): void;
 	/** One line for a write's approval card (recipient, URL); undefined to keep the default. */
 	describeWrite(claudeName: string, input: Record<string, unknown>): Promise<string | undefined>;
+	/** The session's sign-in secrets in its commands; absent when the machine keeps none. */
+	secrets?: SessionSecretHooks;
 }
 
 /** A session's MCP, with the end of its ticket (when the session ends). */

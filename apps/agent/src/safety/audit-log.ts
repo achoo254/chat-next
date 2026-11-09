@@ -2,7 +2,8 @@
 // (opening a session in a sensitive folder, loading project settings,
 // approving a tool that touches a sensitive path, pairing, revoking,
 // switching the permission mode, adding, picking or removing a Claude profile,
-// turning forwarding to localhost on or off, blocking ports for it).
+// turning forwarding to localhost on or off, blocking ports for it, giving,
+// using or removing a sign-in secret: never its value).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -18,7 +19,10 @@ export type AuditAction =
   | "profile_select"
   | "profile_remove"
   | "local_forward"
-  | "mcp_local_writes";
+  | "mcp_local_writes"
+  | "secret_add"
+  | "secret_use"
+  | "secret_remove";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

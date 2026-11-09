@@ -40,6 +40,8 @@ import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
 import { attachmentLimitsBody } from "./attachments/uploads.ts";
 import { Projects } from "./projects/projects.ts";
+import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
+import { SecretService } from "./sign-in-secrets/secret-service.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -63,6 +65,8 @@ export type MachineOptions = {
   log?: (line: string) => void;
   /** tunelo's MCP for the sessions this machine opens (its tickets); absent in tests. */
   mcp?: McpHost;
+  /** Sign-in secrets; built from the config folder when not given. */
+  secrets?: SecretService;
 };
 
 export class Machine {
@@ -72,6 +76,7 @@ export class Machine {
   readonly isSensitive: (p: string) => boolean;
   readonly profiles: ClaudeProfiles;
   readonly projects: Projects;
+  readonly secrets: SecretService;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
@@ -94,6 +99,7 @@ export class Machine {
     const dir = this.config.dir;
     this.isSensitive = createSensitiveCheck({ configDir: dir });
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
+    this.secrets = opts.secrets ?? new SecretService({ configDir: dir, audit: this.audit });
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
     this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
     const c = this.config.get();
@@ -141,7 +147,7 @@ export class Machine {
       suggestProfile: (id) => this.profiles.suggestion(id),
       onSessionProfile: () => this.announceProfiles(),
       onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
-      ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config) } : {}),
+      ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets) } : {}),
     });
     this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
     this.projects = new Projects({
@@ -159,6 +165,11 @@ export class Machine {
       },
     });
     this.projects.onChange(() => this.announceProjects());
+    // A session waiting for a secret shows as waiting for the user, like a prompt in its transcript.
+    this.secrets.onEvent((event) => {
+      const threadId = event.type === "prompt" ? event.prompt.threadId : event.threadId;
+      this.core.setOutsidePrompts(threadId, this.secrets.openPrompts().filter((p) => p.threadId === threadId).length);
+    });
     // A turn that ends may have changed files: the project's git status is read again.
     this.core.onStatus((s) => {
       if (s.state === ThreadState.IDLE && this.projects.invalidate(s.dir)) this.announceProjects();
@@ -184,6 +195,8 @@ export class Machine {
   async start(port = this.config.get().port ?? 0): Promise<number> {
     this.key = await machineKey(this.config.dir);
     this.core.start();
+    // Saved values are hidden from every output from the start, not only once used.
+    void this.secrets.store.loadForRedaction().catch((err: unknown) => this.log(`secrets: ${(err as Error).message}`));
     void this.profiles.cleanLeftovers();
     const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
     this.wss = wss;
@@ -219,6 +232,7 @@ export class Machine {
   }
 
   async stop(): Promise<void> {
+    this.secrets.close();
     this.diskWatch.stop();
     this.stopRotation?.();
     clearTimeout(this.announcing);
@@ -284,6 +298,7 @@ export class Machine {
         profiles: this.profiles,
         projects: this.projects,
         localForward: this.localForward,
+        secrets: this.secrets,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
@@ -363,6 +378,7 @@ export class Machine {
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
       needsFullDiskAccess: diskAccess() === "needed",
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
+      secrets: true,
     });
   }
 
@@ -442,19 +458,30 @@ export class Machine {
 /**
  * A new session's MCP: a ticket of `mcp` for the thread, ended with the
  * session; none when the machine turned tunelo's MCP off (`sessionMcp: false`).
+ * With `secrets`, the session's commands can read the secrets it was given.
  */
-export function sessionMcpFor(mcp: McpHost, config: ConfigStore): (threadId: string) => SessionMcpLease | undefined {
+export function sessionMcpFor(mcp: McpHost, config: ConfigStore, secrets?: SecretService): (threadId: string) => SessionMcpLease | undefined {
   return (threadId) => {
     if (config.get().sessionMcp === false) return undefined;
     const ticket = mcp.tickets.issue(threadId);
     // The Chat and Localman tool lists, ready by the time claude asks for them.
     mcp.warm();
+    let env: SessionSecretEnv | undefined;
+    try {
+      env = secrets ? new SessionSecretEnv(secrets, { key: ticket, threadId }, join(config.dir, "data")) : undefined;
+    } catch {
+      // The data folder cannot be written: the session runs without secrets in its commands.
+    }
     return {
       ticket,
       configDir: config.dir,
       approveWrite: (claudeName, input) => mcp.approve(ticket, claudeName, input),
       describeWrite: (claudeName, input) => mcp.describeWrite(claudeName, input),
-      release: () => mcp.release(ticket),
+      ...(env ? { secrets: env } : {}),
+      release: () => {
+        env?.dispose();
+        mcp.release(ticket);
+      },
     };
   };
 }

@@ -10,6 +10,7 @@ import { Connection } from "../../src/link/connection.ts";
 import type { ClaudeProfiles } from "../../src/profiles/service.ts";
 import type { AuditLog } from "../../src/safety/audit-log.ts";
 import type { LocalForward } from "../../src/tunnels/forward.ts";
+import type { SecretService } from "../../src/sign-in-secrets/secret-service.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -26,6 +27,7 @@ export async function pairedDevice(ctx: {
   audit: AuditLog;
   profiles?: ClaudeProfiles;
   localForward?: LocalForward;
+  secrets?: SecretService;
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -47,6 +49,7 @@ export async function pairedDevice(ctx: {
       audit: ctx.audit,
       ...(ctx.profiles ? { profiles: ctx.profiles } : {}),
       ...(ctx.localForward ? { localForward: ctx.localForward } : {}),
+      ...(ctx.secrets ? { secrets: ctx.secrets } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
       pairing: () => undefined,
       machineInfo:

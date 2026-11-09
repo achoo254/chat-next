@@ -14,6 +14,9 @@
  * (`tunelo config mcp-local-writes on`, local-writes.ts). A ticket that is no
  * longer live is refused. Every call is logged on the machine (group, tool,
  * outcome; never its arguments). Nothing leaves without redact().
+ *
+ * A session with a ticket also has the sign-in secret tools (request_secret,
+ * fill_secret; sign-in-secrets/secret-tools.ts), bound to that ticket and its thread.
  */
 import { randomUUID } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/server";
@@ -23,7 +26,7 @@ import {
 	type McpSession,
 	TOOL_GROUPS,
 	type ToolGroup,
-	type ToolTable,
+	ToolTable,
 	actsForUser,
 	exposedToolName,
 	sessionTool,
@@ -38,12 +41,16 @@ import { RemoteProxy, type RemoteTool, identityAccess } from "./remote-proxy.js"
 import { hideSensitiveHeaders, redact, redactMessage } from "./redact.js";
 import { SessionTickets } from "./session-tickets.js";
 import { WriteApprovals } from "./write-approvals.js";
+import { SECRETS_GROUP, SECRET_TOOLS, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
+import type { SecretService } from "../sign-in-secrets/secret-service.ts";
 
 interface Entry {
 	session: McpSession;
 	tables: Map<GroupName, ToolTable>;
 	/** The ticket the client presented, if any. */
 	ticket?: string;
+	/** request_secret and fill_secret, for a session with a ticket. */
+	secrets?: ToolTable;
 }
 
 const NO_SESSION =
@@ -66,6 +73,8 @@ export interface McpHostOptions {
 	sessionMode?: (owner: string) => string | undefined;
 	/** Whether a client without a ticket may run write tools; mcp-local-writes.json when unset. */
 	localWrites?: () => boolean;
+	/** The machine's sign-in secrets; without them a session has no secret tools. */
+	secrets?: () => SecretService | undefined;
 	log?: (line: string) => void;
 }
 
@@ -118,8 +127,17 @@ export class McpHost {
 		const id = randomUUID();
 		const context = createMcpContext(serverUrl, this.dir);
 		const session: McpSession = { context, tunnels: new LocalTunnels(context) };
-		this.sessions.set(id, { session, tables: toolTables(session), ...(ticket ? { ticket } : {}) });
+		this.sessions.set(id, { session, tables: toolTables(session), ...(ticket ? { ticket, ...this.secretTools(ticket) } : {}) });
 		return id;
+	}
+
+	private secretTools(ticket: string): { secrets?: ToolTable } {
+		const service = this.options.secrets?.();
+		const threadId = this.tickets.owner(ticket);
+		if (!service || !threadId) return {};
+		const table = new ToolTable();
+		registerSecretTools(table, { service, session: { key: ticket, threadId } });
+		return { secrets: table };
 	}
 
 	async call(
@@ -132,6 +150,7 @@ export class McpHost {
 		if (!entry) return failure(new Error(NO_SESSION));
 		const who = entry.ticket ? this.tickets.owner(entry.ticket) : "local";
 		if (!who) return failure(new Error(TICKET_ENDED));
+		if (groupName === SECRETS_GROUP) return this.callSecrets(entry, who, tool, args);
 		const group = toolGroup(groupName);
 		if (!group || !this.enabled(group.name)) {
 			return failure(new Error(`The ${groupName} tools are off on this machine`));
@@ -148,6 +167,15 @@ export class McpHost {
 		const result = table ? await table.call(tool, args) : await this.remote.call(group, tool, args);
 		this.log(redactMessage(`mcp ${who}: ${group.name} ${tool} ${result.isError ? "failed" : "ok"}`));
 		return this.clean(group, tool, result);
+	}
+
+	/** A sign-in secret tool: only for a session tunelo opened; its result never holds a value (redact). */
+	private async callSecrets(entry: Entry, who: string, tool: string, args: Record<string, unknown>): Promise<CallToolResult> {
+		if (!(SECRET_TOOLS as readonly string[]).includes(tool)) return failure(new Error(`${tool} is not a tool tunelo offers`));
+		if (!entry.secrets) return failure(new Error("Sign-in secrets are only offered in a session tunelo opened."));
+		const result = await entry.secrets.call(tool, args);
+		this.log(redactMessage(`mcp ${who}: ${SECRETS_GROUP} ${tool} ${result.isError ? "failed" : "ok"}`));
+		return { ...result, content: result.content.map((item) => (item.type === "text" ? { ...item, text: redact(item.text) } : item)) };
 	}
 
 	/** Why a write may not run now; undefined when it may (or is no write). */
@@ -179,6 +207,7 @@ export class McpHost {
 	release(ticket: string): void {
 		this.tickets.revoke(ticket);
 		this.approvals.forget(ticket);
+		this.options.secrets?.()?.endSession(ticket);
 	}
 
 	/**

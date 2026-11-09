@@ -21,6 +21,7 @@ import { failure } from "./mcp-result.js";
 import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { redactMessage } from "./redact.js";
 import { TICKET_ENV } from "./session-tickets.js";
+import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 
 const NOT_RUNNING =
 	"tunelo is not running in the background: run `tunelo start`, then call the tool again.";
@@ -205,6 +206,21 @@ export function registerMcpCommand(program: Command): void {
 							() => forward(group.name, name, {}),
 						);
 					}
+				}
+			}
+
+			// Sign-in secrets: only a session tunelo opened has a device to ask.
+			if (ticket) {
+				const table = new ToolTable();
+				registerSecretTools(table);
+				for (const [name, config] of table.entries()) {
+					const { title, description, annotations, inputSchema } = config;
+					if (!inputSchema) continue;
+					server.registerTool(
+						name,
+						{ title, description, inputSchema, ...(annotations ? { annotations } : {}) },
+						(args: ToolArgs) => forward(SECRETS_GROUP, name, args),
+					);
 				}
 			}
 

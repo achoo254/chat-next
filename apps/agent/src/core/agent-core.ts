@@ -146,6 +146,8 @@ type Thread = {
   turnCount: number;
   lastActive: number;
   pending: Map<string, Pending>;
+  /** Prompts outside the transcript the thread waits on (sign-in secrets). */
+  outsidePrompts?: number;
   textItems: Map<string, string>;
   dirtyText: Set<string>;
   flushTimer?: ReturnType<typeof setTimeout>;
@@ -447,6 +449,19 @@ export class AgentCore {
    * same conversation), busy ones when their turn ends, parked ones open with
    * it. Devices hear about every thread.
    */
+  /**
+   * How many prompts outside the transcript (sign-in secrets) a thread waits
+   * on: it shows as waiting while there are any, and a new one may push.
+   */
+  setOutsidePrompts(threadId: string, count: number): void {
+    const t = this.threads.get(threadId);
+    if (!t) return;
+    const before = t.outsidePrompts ?? 0;
+    t.outsidePrompts = count;
+    if (count > before) this.opts.onNeedsInput?.(this.touch(t));
+    else if (count !== before) this.announce(t);
+  }
+
   followMachineProfile(): void {
     const machineProfileId = this.machineProfile();
     for (const t of this.threads.values()) {
@@ -1189,7 +1204,7 @@ export class AgentCore {
     };
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
-    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite } } : policy;
+    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, ...(lease.secrets ? { secrets: lease.secrets } : {}) } } : policy;
     t.modeUnseen = true;
     t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {
@@ -1576,7 +1591,7 @@ export class AgentCore {
   private summary(t: Thread): ThreadSummary {
     const state = t.queued
       ? ThreadState.QUEUED
-      : t.pending.size
+      : t.pending.size || t.outsidePrompts
         ? ThreadState.WAITING
         : t.running
           ? ThreadState.RUNNING
@@ -1588,7 +1603,7 @@ export class AgentCore {
       provider: t.meta.provider,
       model: t.meta.model,
       state,
-      pending: t.pending.size,
+      pending: t.pending.size + (t.outsidePrompts ?? 0),
       updatedAt: BigInt(t.meta.updatedAt),
       open: this.isOpen(t),
       preview: t.preview,

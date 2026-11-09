@@ -22,6 +22,9 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
 import { type SessionMcp, TICKET_ENV } from "../../mcp/session-tickets.ts";
+import { redactDeep } from "../../mcp/redact.ts";
+import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
+import { envName } from "../../sign-in-secrets/secret-names.ts";
 import { claudeEnv, readAccount } from "../../profiles/account.ts";
 import { defaultClaudeHome } from "../../profiles/paths.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
@@ -184,6 +187,60 @@ export const writeApprovalHook: HookCallback = async (input) => {
   };
 };
 
+/** request_secret asks the user on the device itself: no approval card before it. */
+export const secretRequestHook: HookCallback = async (input) => {
+  if (input.hook_event_name !== "PreToolUse" || input.tool_name !== `mcp__${SESSION_MCP_SERVER}__request_secret`) return {};
+  return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+};
+
+const SECRET_COMMAND_REASON = "It reads a sign-in secret ($TUNELO_SECRET_…): tunelo asks you every time a command uses one.";
+
+const commandOf = (input: unknown): string => {
+  const command = (input as { command?: unknown } | null)?.command;
+  return typeof command === "string" ? command : "";
+};
+
+/**
+ * PreToolUse of Bash: a command that names `$TUNELO_SECRET_<NAME>` goes to
+ * the device for approval (unless the session runs in bypassPermissions,
+ * where it gets its secrets at once); names the session was not given are
+ * pointed out to Claude.
+ */
+export function secretCommandHook(secrets: SessionSecretHooks): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse" || input.tool_name !== "Bash") return {};
+    const command = commandOf(input.tool_input);
+    const { given, missing } = secrets.namesIn(command);
+    if (given.length === 0 && missing.length === 0) return {};
+    const note = missing.length
+      ? { additionalContext: `${missing.map(envName).join(", ")} ${missing.length > 1 ? "are" : "is"} not set: get the secret with request_secret first.` }
+      : {};
+    if (given.length > 0 && input.permission_mode !== "bypassPermissions") {
+      return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: SECRET_COMMAND_REASON, ...note } };
+    }
+    if (given.length > 0) await secrets.beforeCommand(input.tool_use_id, command);
+    return missing.length ? { hookSpecificOutput: { hookEventName: "PreToolUse", ...note } } : {};
+  };
+}
+
+/**
+ * After every tool: a command's secrets leave its environment file, and no
+ * secret value reaches Claude (or its transcript) in a tool's output.
+ */
+export function secretOutputHook(secrets: SessionSecretHooks | undefined): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name === "PostToolUseFailure") {
+      secrets?.afterCommand(input.tool_use_id);
+      return {};
+    }
+    if (input.hook_event_name !== "PostToolUse") return {};
+    secrets?.afterCommand(input.tool_use_id);
+    const output = redactDeep(input.tool_response);
+    if (output === input.tool_response) return {};
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: output } };
+  };
+}
+
 /** A permission rule as Claude writes it: `Tool` or `Tool(content)`, parentheses in the content escaped. */
 export function ruleString(rule: { toolName: string; ruleContent?: string }): string {
   if (!rule.ruleContent) return rule.toolName;
@@ -226,6 +283,9 @@ export function userMessage(text: string, images: readonly ImageInput[] = []): S
 function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askUser: AskUser, resumeId?: string): ProviderSession {
   const inbox = new Channel<SDKUserMessage>();
   const events = new Channel<ProviderEvent>();
+  // No sign-in secret value goes to the devices or the journal.
+  const emit = (e: ProviderEvent) => events.push(redactDeep(e));
+  const secrets = policy.sessionMcp?.secrets;
   let interrupted = false;
   let turnStart = 0;
   let turnOpen = false;
@@ -268,6 +328,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     if (answer.decision === "deny") return { behavior: "deny", message: denialText(answer.message) };
     const { decision } = answer;
     write?.approveWrite(toolName, input);
+    // Approved: the secrets the command names go where its shell loads them, until it ends.
+    if (secrets && toolName === "Bash" && opts.toolUseID) await secrets.beforeCommand(opts.toolUseID, command);
     // A write tool of tunelo's MCP is asked about every time: no rule for the session.
     if (decision === "allow-session" && !sensitive && !isWriteTool(toolName)) {
       // Only allow rules for this session: a remote "allow for the session"
@@ -278,7 +340,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         : [{ type: "addRules", rules: [{ toolName }], behavior: "allow", destination: "session" }];
       // Kept by tunelo with the thread: a session opened again gets them back (allowedTools).
       const kept = rules.flatMap((u) => (u.type === "addRules" ? u.rules.map(ruleString) : [])).filter(replayableRule);
-      if (kept.length) events.push({ type: "session-rules", rules: kept });
+      if (kept.length) emit({ type: "session-rules", rules: kept });
       return { behavior: "allow", updatedInput: input, updatedPermissions: rules };
     }
     return { behavior: "allow", updatedInput: input };
@@ -293,7 +355,14 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       ? { ...withoutTuneloMcp(policy.mcpServers), [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) }
       : (policy.mcpServers as NonNullable<Options["mcpServers"]>),
     // Also guards a `tunelo` MCP the machine's own config adds.
-    hooks: { PreToolUse: [{ matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook] }] },
+    hooks: {
+      PreToolUse: [
+        { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook] },
+        ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
+      ],
+      PostToolUse: [{ hooks: [secretOutputHook(secrets)] }],
+      PostToolUseFailure: [{ hooks: [secretOutputHook(secrets)] }],
+    },
     // Without a mode picked on a device, the session follows the machine's own
     // Claude settings (permissions.defaultMode and allow/deny rules).
     includePartialMessages: true,
@@ -301,6 +370,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   };
   // A profile picked on the machine: its own sign-in, the shared projects.
   if (policy.accountDir) options.env = claudeEnv(policy.accountDir);
+  // Claude Code runs this before every Bash command: the secrets a running command may read (secret-env.ts).
+  if (secrets) options.env = { ...(options.env ?? claudeEnv(undefined)), CLAUDE_ENV_FILE: secrets.loader };
   if (policy.model) options.model = policy.model;
   if (policy.effort) options.effort = policy.effort as EffortLevel;
   if (policy.permissionMode) options.permissionMode = policy.permissionMode as PermissionMode;
@@ -311,7 +382,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   if (sessionRules.length) options.allowedTools = sessionRules;
 
   const q = queryFn({ prompt: inbox, options });
-  const mapper = new MessageMapper(policy.dir, (e) => events.push(e));
+  const mapper = new MessageMapper(policy.dir, emit);
   let hidden: string[] = [];
 
   void (async () => {
@@ -323,36 +394,36 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
           interrupted = false;
           await pushUsage(q, events);
           await pushInfo(q, events);
-          events.push({ type: "turn-end", state, durationMs: Math.round(performance.now() - turnStart) });
+          emit({ type: "turn-end", state, durationMs: Math.round(performance.now() - turnStart) });
           continue;
         }
         if (msg.type === "system" && msg.subtype === "init") {
           hidden = msg.terminal_slash_commands ?? [];
-          events.push({ type: "info", permissionMode: msg.permissionMode, effort: msg.effort ?? "" });
+          emit({ type: "info", permissionMode: msg.permissionMode, effort: msg.effort ?? "" });
           void q.accountInfo().then(
             (a) => {
               const account = toAccount(a);
-              if (account) events.push({ type: "info", account });
+              if (account) emit({ type: "info", account });
             },
             () => undefined,
           );
           void q.supportedCommands().then(
-            (list) => events.push({ type: "info", commands: toCommands(list, hidden) }),
+            (list) => emit({ type: "info", commands: toCommands(list, hidden) }),
             () => undefined,
           );
         } else if (msg.type === "system" && msg.subtype === "status" && msg.permissionMode) {
-          events.push({ type: "info", permissionMode: msg.permissionMode });
+          emit({ type: "info", permissionMode: msg.permissionMode });
         } else if (msg.type === "system" && msg.subtype === "commands_changed") {
-          events.push({ type: "info", commands: toCommands(msg.commands, hidden) });
+          emit({ type: "info", commands: toCommands(msg.commands, hidden) });
         }
         mapper.map(msg);
       }
     } catch (err) {
       // After an interrupted turn the SDK ends the stream by throwing.
-      if (!interrupted && !closed) events.push({ type: "error", message: (err as Error).message.slice(0, 500) });
+      if (!interrupted && !closed) emit({ type: "error", message: (err as Error).message.slice(0, 500) });
     } finally {
       if (turnOpen) {
-        events.push({ type: "turn-end", state: interrupted || closed ? "interrupted" : "failed", durationMs: 0 });
+        emit({ type: "turn-end", state: interrupted || closed ? "interrupted" : "failed", durationMs: 0 });
       }
       events.close();
     }
@@ -383,12 +454,12 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       if (closed) return;
       // null drops the session override, back to the user's own settings.
       await q.applyFlagSettings({ effortLevel: effort === "" ? null : (effort as EffortLevel) });
-      events.push({ type: "info", effort });
+      emit({ type: "info", effort });
     },
     async setPermissionMode(mode) {
       if (closed) return;
       await q.setPermissionMode(mode as PermissionMode);
-      events.push({ type: "info", permissionMode: mode });
+      emit({ type: "info", permissionMode: mode });
     },
     async close() {
       if (closed) return;

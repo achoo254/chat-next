@@ -31,6 +31,9 @@ import { listDir } from "../safety/dirs.ts";
 import { isDiskAccessDenial } from "../safety/disk-access.ts";
 import { OutsideFolderError, listSessionFiles } from "../safety/session-files.ts";
 import type { ProjectList, Projects } from "../projects/projects.ts";
+import { SecretInputError } from "../sign-in-secrets/secret-names.ts";
+import type { SavedSecretInfo } from "../sign-in-secrets/secret-store.ts";
+import { type SecretEvent, SecretNotFound, SecretPromptGone, type SecretService } from "../sign-in-secrets/secret-service.ts";
 import { wireItem } from "./wire.ts";
 
 export type Socket = {
@@ -56,6 +59,8 @@ export type LinkContext = {
   projects?: Projects;
   /** Localman's requests for localhost; absent where the machine has none (tests). */
   localForward?: LocalForward;
+  /** Sign-in secrets Claude asks the user for; absent where the machine has none (tests). */
+  secrets?: SecretService;
   /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
   openDiskAccessSettings?: () => boolean;
 };
@@ -76,6 +81,9 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   if (err instanceof ProfileError) return { code: ErrorCode.INVALID, message, reason: PROFILE_REASONS[err.kind], subject: err.subject };
   if (err instanceof AttachmentError) return { code: ErrorCode.INVALID, message, reason: err.reason, subject: err.subject };
   if (err instanceof OutsideFolderError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.PATH_OUTSIDE_FOLDER, subject: "" };
+  if (err instanceof SecretPromptGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SECRET_PROMPT_GONE, subject: "" };
+  if (err instanceof SecretNotFound) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SECRET_NOT_FOUND, subject: "" };
+  if (err instanceof SecretInputError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.SECRET_INVALID, subject: "" };
   if (isFsError(err)) {
     const fsCode = (err as { code: string }).code;
     const reason =
@@ -115,6 +123,13 @@ export function profileListBody(list: ProfileList) {
         ...(u ? { lastUsage: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
       };
     }),
+  };
+}
+
+/** The saved secrets as devices get them: never a value. */
+export function secretListBody(list: readonly SavedSecretInfo[]) {
+  return {
+    secrets: list.map((s) => ({ id: s.id, name: s.name, origin: s.origin, createdAt: BigInt(s.createdAt), lastUsedAt: BigInt(s.lastUsedAt) })),
   };
 }
 
@@ -251,6 +266,39 @@ export class Connection {
         this.send("", { case: "threadDeleted", value: { threadId, trashed } });
       }),
     );
+    const secrets = this.ctx.secrets;
+    if (secrets) {
+      this.unsubscribe.push(secrets.onEvent((event) => this.secretEvent(event)));
+      for (const prompt of secrets.openPrompts()) this.secretEvent({ type: "prompt", prompt });
+    }
+  }
+
+  /** A prompt for a secret opened or closed: every device hears it, outside any thread's journal. */
+  private secretEvent(event: SecretEvent): void {
+    if (event.type === "ended") return this.send("", { case: "secretPromptEnded", value: { requestId: event.requestId } });
+    const p = event.prompt;
+    this.send("", {
+      case: "secretPrompt",
+      value: { requestId: p.requestId, threadId: p.threadId, name: p.name, purpose: p.purpose, origin: p.origin, expiresAt: BigInt(p.expiresAt) },
+    });
+  }
+
+  /** Secrets: the value arrives only here, sealed end to end, and goes straight to the store; it is never logged or echoed. */
+  private async secretFrame(id: string, b: SecretFrame): Promise<void> {
+    const secrets = this.ctx.secrets;
+    if (!secrets) return this.send(id, { case: "error", value: refusal("this machine keeps no secrets", ErrorReason.UNSUPPORTED_REQUEST) });
+    switch (b.case) {
+      case "secretProvide":
+        await secrets.provide(b.value.requestId, b.value.value, b.value.remember, this.device);
+        return this.send(id, { case: "ack", value: {} });
+      case "secretDecline":
+        secrets.decline(b.value.requestId);
+        return this.send(id, { case: "ack", value: {} });
+      case "secretList":
+        return this.send(id, { case: "secretListResult", value: secretListBody(secrets.list()) });
+      case "secretRemove":
+        return this.send(id, { case: "secretListResult", value: secretListBody(secrets.remove(b.value.id, this.device)) });
+    }
   }
 
   /** An event every device gets unasked (the machine's profile and where each session stands). */
@@ -530,6 +578,13 @@ export class Connection {
           // frames after them (pings, threads) go on meanwhile.
           void this.profileFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
+        case "secretProvide":
+        case "secretDecline":
+        case "secretList":
+        case "secretRemove":
+          // Sealing waits on the key store: answered later, by id.
+          void this.secretFrame(id, b).catch((err: unknown) => this.sendError(id, err));
+          return;
         case "projectList":
         case "projectAdd":
         case "projectCreate":
@@ -565,6 +620,8 @@ type ProjectFrame = Extract<
   Frame["body"],
   { case: "projectList" | "projectAdd" | "projectCreate" | "projectClone" | "projectCloneCancel" | "projectUpdate" | "projectReorder" | "projectRemove" }
 >;
+
+type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecline" | "secretList" | "secretRemove" }>;
 
 type ProfileFrame = Extract<
   Frame["body"],
