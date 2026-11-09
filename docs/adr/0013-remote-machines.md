@@ -2,6 +2,7 @@
 
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-11-08
+- Bổ sung bởi [ADR 0014](./0014-tunelo-machine-agent.md): Tunelo là tiến trình máy duy nhất, máy đăng ký theo tài khoản (không còn mã cài), profile Claude, Localman gọi `localhost` của máy.
 
 ## Bối cảnh
 
@@ -13,7 +14,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 
 - Máy B chạy `tunelo` (`apps/agent`; tên cũ `chat-agent`, rồi `hda` ngày 08/11/2026, rồi `tunelo` 2.0.0 cùng ngày, xem "Đổi tên thành tunelo"): một file chạy duy nhất, giữ các phiên AI qua adapter. Adapter đầu tiên chạy `claude` CLI người dùng đã cài, qua Claude Agent SDK.
 - Máy A nối tới máy B qua relay Tunelo (`wss://<subdomain>.tunnel.hoandat.com`). Tiến trình nền mở WebSocket server trên `127.0.0.1` và cho tunnel chuyển tới đó.
-- Server Chat chỉ là danh bạ máy (tên, OS, khoá công khai, địa chỉ tunnel, lần thấy cuối), cấp mã cài và bắn Web Push không chứa nội dung. Server không phải gốc tin cậy cho khoá máy B và không thấy nội dung.
+- Server Chat chỉ là danh bạ máy (tên, OS, khoá công khai, địa chỉ tunnel, lần thấy cuối) và bắn Web Push không chứa nội dung. Máy đăng ký theo tài khoản của chủ (ADR 0014); mã cài trước đây chỉ còn cho máy cũ tới bước dọn. Server không phải gốc tin cậy cho khoá máy B và không thấy nội dung.
 - Không dùng Bot API của Chat: bot đi qua server và lưu tin nhắn, trái với yêu cầu nội dung chỉ nằm ở hai đầu.
 
 ### Giao thức và mã hoá (`proto/remote/v1/remote.proto`, `packages/remote-protocol`)
@@ -23,7 +24,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 - Khung: `secretbox` (tweetnacl), nonce = mã phiên ‖ chiều ‖ bộ đếm 64-bit. Bộ đếm phải tăng đúng 1: khung phát lại, mất hay đảo thứ tự làm hỏng phiên, máy A nối lại theo con trỏ journal.
 - `Hello`/`Ready`/`HandshakeError` mang `protocolVersion` và `minProtocolVersion`; lệch thì báo bên nào cần cập nhật.
 - Ghép thiết bị, không có bí mật nào đi qua server:
-  - Lệnh cài một dòng: trình duyệt sinh bí mật 32 byte, đưa cho `tunelo install` qua stdin (không nằm trong argv). Ở lần bắt tay đầu, B gửi HMAC(bí mật, "install" ‖ khoá A ‖ khoá B); A kiểm rồi mới ghim khoá B. A không bao giờ lấy khoá B từ server.
+  - Lệnh cài một dòng: trình duyệt sinh bí mật 32 byte, người dùng dán vào script cài, script đưa cho `tunelo install` qua stdin (không nằm trong argv). Ở lần bắt tay đầu, B gửi HMAC(bí mật, "install" ‖ khoá A ‖ khoá B); A kiểm rồi mới ghim khoá B. A không bao giờ lấy khoá B từ server.
   - `tunelo pair` mở cửa sổ ghép 10 phút, in QR (khoá B + bí mật 32 byte) và mã 6 số. QR: A chứng minh bí mật trong `Hello`. Mã 6 số: CPace trên ristretto255 (`@noble/curves`) trước bắt tay, kèm thẻ xác nhận gắn cả hai khoá tĩnh; relay nhìn thấy trao đổi cũng không dò mã offline được. Tối đa 5 lần thử mỗi cửa sổ, ghép xong thì đóng cửa sổ.
 - Journal theo luồng chat: mỗi mục có `seq` tăng dần và `revision`; thiết bị nhận tiếp từ con trỏ `{epoch, seq}`. `epoch` tăng mỗi lần tiến trình nền khởi động lại; con trỏ khác epoch, vượt quá, hay rơi vào phần đã nén thì nhận `ThreadReset` và tải lại (`journal-rules.ts`).
 - Không gắn với một AI: khung tin dùng loại tool chuẩn (`read, edit, shell, search, web, mcp, subagent, todo, other`) và cờ khả năng của adapter; web không đọc tên tool riêng.
@@ -80,7 +81,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 - **Lời gọi không vé chỉ được đọc** (người dùng chốt 09/11/2026). Lời gọi không vé là `claude mcp add tunelo -- tunelo mcp` ở phiên ngoài tunelo, hay bất kỳ tiến trình cùng user nào đọc `control.json`.
   - Mọi tool ghi (gửi tin, gửi request, mở/đóng tunnel, dừng tiến trình tunnel, thu hồi liên kết) đều bị từ chối, kèm hướng dẫn cách bật.
   - `tools/list` của client đó không có tool ghi.
-  - Chủ máy bật bằng `tunelo config mcp-local-writes on|off`, mặc định off:
+  - Chủ máy bật bằng `tunelo config mcp-local-writes on|off` (bật chỉ trong terminal, có hỏi xác nhận), mặc định off:
     - Cờ lưu ở file `mcp-local-writes.json`. Ghi dưới khoá file, ghi nguyên tử, dịch vụ đang chạy đọc lại khi file đổi. File hỏng thì coi là tắt.
     - Mỗi lần đổi được ghi vào nhật ký đồng ý (`mcp_local_writes`).
     - Khi bật, lời gọi không vé dùng đủ tool, và chỉ còn việc duyệt của chính client đó chặn tool ghi.
@@ -89,7 +90,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
   - Nội dung claude đọc từ Chat (tin của người khác), Localman (response) hay file dự án có thể dụ claude gửi tin thay người dùng hoặc gửi request tới `localhost` của máy.
   - Ở default/acceptEdits/auto, lần cấp duyệt chặn lời gọi tool. Bash trong phiên hay tiến trình lạ cũng không ghi được qua tunelo: có vé thì vẫn thiếu lần cấp, không vé thì chỉ được đọc. Người dùng vẫn phải đọc thẻ: người nhận, nội dung, URL.
   - Còn hở:
-    - Chủ máy tự bật `mcp-local-writes`: khi đó mọi tiến trình cùng user ghi được qua socket. Lệnh `tunelo config mcp-local-writes` (cũng như thư mục cấu hình tunelo) được tính là nhạy cảm: thẻ của nó có nhãn cảnh báo và không bao giờ được "cho phép cả phiên". Tuy vậy, ở `auto`, hoặc khi máy có luật allow cho Bash, claude có thể tự chạy lệnh này mà không qua thẻ, giống mọi lệnh Bash.
+    - Chủ máy tự bật `mcp-local-writes`: khi đó mọi tiến trình cùng user ghi được qua socket. `tunelo config mcp-local-writes on` chỉ chạy khi stdin và stdout là terminal và người dùng gõ `yes`; Bash của claude hay script không có terminal nên bị từ chối (`off` luôn chạy được). Lệnh này (cũng như thư mục cấu hình tunelo) còn được tính là nhạy cảm: thẻ của nó có nhãn cảnh báo và không bao giờ được "cho phép cả phiên". Đây là bước chặn model tự bật, không phải tường chắn: mã cùng user vẫn tự ghi được file cờ hoặc giả terminal (`script`).
     - Bash tự gửi request mạng bằng thông tin đăng nhập riêng của nó (ngoài tunelo).
     - `bypassPermissions`: không có gì chặn. Người dùng chấp nhận rủi ro này khi tự đặt máy ở chế độ đó.
 - Dữ liệu nhạy cảm đi vào context:
