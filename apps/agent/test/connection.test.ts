@@ -175,6 +175,17 @@ describe("connection", () => {
     expect(noImage?.case === "error" && noImage.value.reason).toBe(ErrorReason.ATTACHMENT_NOT_FOUND);
     seal("11", { body: { case: "attachmentCancel", value: { uploadId: "never-sent-1" } } });
     expect((await frames(session, link.next, (f) => f.id === "11")).at(-1)?.body.case).toBe("ack");
+
+    // Archive, then delete: every device hears the thread is gone.
+    seal("12", { body: { case: "threadSetArchived", value: { threadId: id, archived: true } } });
+    const archived = await frames(session, link.next, (f) => f.id === "12");
+    expect(archived.some((f) => f.body.case === "threadStatus" && f.body.value.thread?.archived === true)).toBe(true);
+    seal("13", { body: { case: "threadDelete", value: { threadId: id } } });
+    const deleted = await frames(session, link.next, (f) => f.id === "13");
+    expect(deleted.filter((f) => f.body.case === "threadDeleted").map((f) => f.id)).toEqual(["", "13"]);
+    seal("14", { body: { case: "threadDelete", value: { threadId: id } } });
+    const gone = (await frames(session, link.next, (f) => f.id === "14")).at(-1)?.body;
+    expect(gone?.case === "error" && gone.value.reason).toBe(ErrorReason.THREAD_NOT_FOUND);
   });
 
   it("lists the machine's Claude sessions and opens one as a thread with its history", async () => {

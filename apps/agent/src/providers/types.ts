@@ -211,6 +211,12 @@ export interface SessionHistory {
    * no transcript.
    */
   read(sessionId: string, from: number | "recent"): HistoryRead | undefined;
+  /**
+   * The AI's own files of the session, to move to the trash when its thread
+   * is deleted: only files of that session, inside the AI's own folders;
+   * empty when there are none.
+   */
+  sessionFiles?(sessionId: string): string[];
 }
 
 export interface AgentProvider {

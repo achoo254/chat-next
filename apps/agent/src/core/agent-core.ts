@@ -2,8 +2,8 @@
 // permission prompts, the session limit and idle parking. Knows nothing about
 // the network or which AI runs; adapters plug in through AgentProvider.
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import {
   type Answers,
@@ -51,6 +51,8 @@ import type { SessionMcpLease } from "../mcp/session-tickets.ts";
 import { AttachmentError, type AttachmentLimits, type UploadPiece, Uploads } from "../attachments/uploads.ts";
 import { keptImage, prepareAttachments, textForAi } from "../attachments/message-attachments.ts";
 import { imageType } from "../attachments/image-type.ts";
+import { ATTACHMENTS_FOLDER } from "../attachments/project-files.ts";
+import { type Trash, systemTrash } from "../safety/trash.ts";
 
 /** A refusal devices can say in the user's language: `reason` (+ `subject`) is stable, `message` is English. */
 export class AgentError extends Error {
@@ -105,6 +107,8 @@ type ThreadMeta = {
    * an IDE) and is read in before the thread goes on.
    */
   history?: { sessionId: string; end: number };
+  /** Hidden from the list on every device (ThreadSetArchived). */
+  archived?: boolean;
 };
 
 /** A session kept on the machine, as devices see it (LocalSession in the protocol). */
@@ -160,6 +164,8 @@ type Thread = {
   preview: string;
   /** The tool call running now, for "Running: <tool>". */
   runningTool?: { toolId: string; name: string };
+  /** Deleted (ThreadDelete): its folder is gone and nothing writes to it again. */
+  deleted?: boolean;
 };
 
 /** Another AI account profile with usage left (see ThreadInfo.profile_suggestion). */
@@ -204,6 +210,8 @@ export type CoreOptions = {
   onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
   /** Smaller limits for files sent with a message (tests); ATTACHMENT_LIMITS otherwise. */
   attachmentLimits?: Partial<AttachmentLimits>;
+  /** Moves files to the operating system's trash (tests record instead). */
+  trash?: Trash;
   now?: () => number;
 };
 
@@ -226,6 +234,7 @@ export class AgentCore {
   private threads = new Map<string, Thread>();
   private listeners = new Set<(threadId: string, items: Item[]) => void>();
   private statusListeners = new Set<(summary: ThreadSummary) => void>();
+  private deletedListeners = new Set<(threadId: string, trashed: number) => void>();
   private infoListeners = new Set<(threadId: string) => void>();
   /** Plan usage and account of each AI account profile ("" for the default one), shared by its threads. */
   private accounts = new Map<string, AccountState>();
@@ -333,6 +342,12 @@ export class AgentCore {
   onItems(fn: (threadId: string, items: Item[]) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /** Called once a thread is deleted (ThreadDelete), with how many files went to the trash. */
+  onDeleted(fn: (threadId: string, trashed: number) => void): () => void {
+    this.deletedListeners.add(fn);
+    return () => this.deletedListeners.delete(fn);
   }
 
   /** Called with a thread id whenever its ThreadInfo may have changed. */
@@ -900,6 +915,102 @@ export class AgentCore {
     this.touch(t);
   }
 
+  /** Hides a thread from the list on every device, or shows it again; nothing on disk changes. */
+  setArchived(threadId: string, archived: boolean): void {
+    const t = this.thread(threadId);
+    if (Boolean(t.meta.archived) === archived) return;
+    if (archived) t.meta.archived = true;
+    else delete t.meta.archived;
+    this.saveMeta(t);
+    this.announce(t);
+  }
+
+  /**
+   * Deletes a thread: stops its session, moves the AI's transcripts of its
+   * sessions and the files sent with its messages to the trash (never
+   * anything else, never for good), drops its journal and tells every
+   * device. Returns how many files went to the trash.
+   */
+  async deleteThread(req: { threadId: string; stopRunning: boolean; openAnyway: boolean; device: string }): Promise<number> {
+    const t = this.thread(req.threadId);
+    if ((t.running || t.pending.size > 0 || t.starting || t.switching) && !req.stopRunning) {
+      throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+    }
+    const sessions = this.threadSessions(t);
+    if (!req.openAnyway) {
+      for (const { history, sessionId } of sessions) {
+        await history.prime?.();
+        const found = history.find(sessionId);
+        // A change after this thread's own last one came from elsewhere.
+        if (found?.busy && !this.isOpen(t) && found.updatedAt > t.meta.updatedAt + 5_000) {
+          throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: found.dir });
+        }
+      }
+    }
+    t.outbox = [];
+    t.queued = false;
+    if (t.session) {
+      if (t.running) await t.session.interrupt();
+      await this.park(t);
+    }
+    const files = [...new Set([...sessions.flatMap(({ history, sessionId }) => history.sessionFiles?.(sessionId) ?? []), ...this.sentFiles(t)])];
+    try {
+      await (this.opts.trash ?? systemTrash())(files);
+    } catch (err) {
+      const why = (err as Error).message.slice(0, 300);
+      throw new AgentError(ErrorCode.INTERNAL, `the trash did not take the files: ${why}`, { reason: ErrorReason.TRASH_UNAVAILABLE, subject: why });
+    }
+    t.deleted = true;
+    clearTimeout(t.flushTimer);
+    this.cancelPending(t);
+    this.threads.delete(t.meta.id);
+    rmSync(join(this.opts.dataDir, "threads", t.meta.id), { recursive: true, force: true });
+    this.opts.audit.write({ device: req.device, action: "delete_session", path: t.meta.dir, detail: sessions.map((x) => x.sessionId).join(" ") });
+    for (const fn of this.deletedListeners) fn(t.meta.id, files.length);
+    void this.dequeue();
+    return files.length;
+  }
+
+  /** Every AI session the thread ran, with the record its AI keeps of it. */
+  private threadSessions(t: Thread): { history: NonNullable<AgentProvider["history"]>; sessionId: string }[] {
+    const out: { history: NonNullable<AgentProvider["history"]>; sessionId: string }[] = [];
+    for (const seg of t.meta.segments) {
+      const history = this.opts.providers.find((p) => p.id === seg.provider)?.history;
+      if (history && seg.sessionId && !out.some((x) => x.sessionId === seg.sessionId)) out.push({ history, sessionId: seg.sessionId });
+    }
+    return out;
+  }
+
+  /**
+   * Files the thread's messages saved in its folder: each one that is still a
+   * plain file inside <folder>/.tunelo-attachments (no link, nothing
+   * sensitive), and nothing else.
+   */
+  private sentFiles(t: Thread): string[] {
+    let inside: string;
+    try {
+      inside = join(realpathSync.native(t.meta.dir), ATTACHMENTS_FOLDER) + sep;
+    } catch {
+      return [];
+    }
+    const out: string[] = [];
+    for (const item of t.journal.all()) {
+      if (item.body.case !== "text") continue;
+      for (const a of item.body.value.attachments) {
+        if (a.image || a.path === "") continue;
+        const full = resolve(t.meta.dir, a.path);
+        try {
+          if (!lstatSync(full).isFile()) continue;
+          const real = realpathSync.native(full);
+          if (real.startsWith(inside) && !this.opts.isSensitive(real)) out.push(real);
+        } catch {
+          // gone already
+        }
+      }
+    }
+    return out;
+  }
+
   async setModel(threadId: string, model: string): Promise<void> {
     const t = this.thread(threadId);
     const from = t.meta.model;
@@ -1128,7 +1239,12 @@ export class AgentCore {
 
   /** Events of one session; usage and account it reports belong to the profile it opened with. */
   private async consume(t: Thread, session: ProviderSession, profileId: string): Promise<void> {
-    for await (const e of session.events) this.handle(t, e, profileId);
+    for await (const e of session.events) {
+      // A deleted thread hears nothing more from the session it had.
+      if (t.deleted) return;
+      this.handle(t, e, profileId);
+    }
+    if (t.deleted) return;
     if (t.session === session) {
       delete t.session;
       if (t.running) this.endTurn(t, TurnState.FAILED, 0);
@@ -1430,6 +1546,7 @@ export class AgentCore {
   }
 
   private saveMeta(t: Thread): void {
+    if (t.deleted) return;
     writeFileSync(join(this.opts.dataDir, "threads", t.meta.id, "meta.json"), JSON.stringify(t.meta), { mode: 0o600 });
   }
 
@@ -1461,6 +1578,7 @@ export class AgentCore {
       open: this.isOpen(t),
       preview: t.preview,
       previewTool: t.running ? (t.runningTool?.name ?? "") : "",
+      archived: Boolean(t.meta.archived),
     });
   }
 }

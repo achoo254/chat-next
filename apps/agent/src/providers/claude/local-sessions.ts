@@ -12,8 +12,8 @@
 // folder and that session changed since it started (running-claude.ts; this
 // one also sees a claude with a Claude folder tunelo does not know, as an
 // IDE may start). Only the folder and start time of the process are read.
-import { type Dirent, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { type Dirent, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type { HistoryEntry, HistoryRead, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
 import { ClaudeProcesses, heldSessions } from "./running-claude.ts";
 import { TranscriptReader, oneLine, parseRecord, promptText, scanLines, withFile } from "./transcript.ts";
@@ -192,6 +192,30 @@ export class LocalSessions implements SessionHistory {
       entries = first < 0 ? [] : entries.slice(first);
     }
     return { entries, end };
+  }
+
+  /**
+   * The transcript <id>.jsonl and the <id>/ folder beside it (subagents,
+   * tool results), as found under a Claude folder's projects/; never a link.
+   */
+  sessionFiles(sessionId: string): string[] {
+    const k = this.locate(sessionId);
+    if (!k) return [];
+    const out: string[] = [];
+    const plain = (p: string, dir: boolean) => {
+      try {
+        const st = lstatSync(p);
+        return !st.isSymbolicLink() && (dir ? st.isDirectory() : st.isFile());
+      } catch {
+        return false;
+      }
+    };
+    const name = basename(k.file);
+    if (name.toLowerCase() !== `${k.sessionId}.jsonl` || !plain(k.file, false)) return [];
+    out.push(k.file);
+    const beside = join(dirname(k.file), name.slice(0, -".jsonl".length));
+    if (plain(beside, true)) out.push(beside);
+    return out;
   }
 
   // --- files -----------------------------------------------------------------

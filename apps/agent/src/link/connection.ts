@@ -226,6 +226,10 @@ export class Connection {
       this.ctx.core.onInfo((threadId) => {
         if (this.subscribed.has(threadId)) this.sendInfo(threadId);
       }),
+      this.ctx.core.onDeleted((threadId, trashed) => {
+        this.subscribed.delete(threadId);
+        this.send("", { case: "threadDeleted", value: { threadId, trashed } });
+      }),
     );
   }
 
@@ -413,6 +417,14 @@ export class Connection {
         case "threadClose":
           await core.close(b.value.threadId);
           this.subscribed.delete(b.value.threadId);
+          return ack();
+        case "threadDelete": {
+          const v = b.value;
+          const trashed = await core.deleteThread({ threadId: v.threadId, stopRunning: v.stopRunning, openAnyway: v.openAnyway, device: this.device });
+          return this.send(id, { case: "threadDeleted", value: { threadId: v.threadId, trashed } });
+        }
+        case "threadSetArchived":
+          core.setArchived(b.value.threadId, b.value.archived);
           return ack();
         case "threadSetModel":
           await core.setModel(b.value.threadId, b.value.model);

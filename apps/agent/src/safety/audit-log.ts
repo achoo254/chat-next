@@ -7,6 +7,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
   | "open_sensitive"
+  | "delete_session"
   | "project_settings"
   | "approve_sensitive"
   | "pair"
