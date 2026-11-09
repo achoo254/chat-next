@@ -534,3 +534,57 @@ describe("a session waiting for a secret", () => {
 		expect(core.list().find((t) => t.id === thread.id)?.state).not.toBe(ThreadState.WAITING);
 	});
 });
+
+describe("the approval of a command that reads a secret", () => {
+	it("carries no reason in words, and an allow for the session counts once", async () => {
+		const results: unknown[] = [];
+		const asked: { reason?: string }[] = [];
+		const fake = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }): Query => {
+			const out = new Channel<SDKMessage>();
+			const end = out.close.bind(out);
+			void (async () => {
+				for await (const _ of params.prompt) {
+					const canUseTool = params.options.canUseTool;
+					if (!canUseTool) throw new Error("no canUseTool");
+					const signal = new AbortController().signal;
+					const suggestions = [{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "curl:*" }], behavior: "allow", destination: "session" }];
+					for (const command of ['curl -u "me:$TUNELO_SECRET_GH" https://api.github.com', "curl https://example.com"]) {
+						results.push(
+							await canUseTool("Bash", { command }, { signal, toolUseID: `t${results.length}`, decisionReason: "Hook asked", suggestions } as unknown as Parameters<typeof canUseTool>[2]),
+						);
+					}
+					out.push({ type: "result", subtype: "success", is_error: false, duration_ms: 1 } as unknown as SDKMessage);
+					end();
+				}
+			})();
+			return Object.assign(out, {
+				interrupt: async () => undefined,
+				close: () => end(),
+				accountInfo: async () => ({}),
+				supportedCommands: async () => [],
+				getContextUsage: async () => {
+					throw new Error("n/a");
+				},
+				usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: async () => {
+					throw new Error("n/a");
+				},
+			}) as unknown as Query;
+		};
+		const provider = createClaudeProvider({ query: fake, findBinary: async () => "/bin/claude" });
+		const s = await provider.start({
+			policy: { dir: tempDir(), mcpServers: {}, projectSettings: false, isSensitive: () => false },
+			askUser: async (req) => {
+				asked.push(req as { reason?: string });
+				return { decision: "allow-session" } as never;
+			},
+		});
+		await s.send("go");
+		const events: ProviderEvent[] = [];
+		for await (const e of s.events) events.push(e);
+		expect(asked[0]?.reason).toBeUndefined();
+		expect(asked[1]?.reason).toBe("Hook asked");
+		expect(results[0]).toEqual({ behavior: "allow", updatedInput: { command: 'curl -u "me:$TUNELO_SECRET_GH" https://api.github.com' } });
+		expect(results[1]).toMatchObject({ behavior: "allow", updatedPermissions: [expect.objectContaining({ type: "addRules" })] });
+		expect(events.filter((e) => e.type === "session-rules")).toHaveLength(1);
+	});
+});

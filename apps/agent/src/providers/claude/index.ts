@@ -24,7 +24,7 @@ import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups
 import { type SessionMcp, TICKET_ENV } from "../../mcp/session-tickets.ts";
 import { redactDeep } from "../../mcp/redact.ts";
 import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
-import { envName } from "../../sign-in-secrets/secret-names.ts";
+import { envName, envNamesIn } from "../../sign-in-secrets/secret-names.ts";
 import { claudeEnv, readAccount } from "../../profiles/account.ts";
 import { defaultClaudeHome } from "../../profiles/paths.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
@@ -193,8 +193,6 @@ export const secretRequestHook: HookCallback = async (input) => {
   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
 };
 
-const SECRET_COMMAND_REASON = "It reads a sign-in secret ($TUNELO_SECRET_…): tunelo asks you every time a command uses one.";
-
 const commandOf = (input: unknown): string => {
   const command = (input as { command?: unknown } | null)?.command;
   return typeof command === "string" ? command : "";
@@ -216,7 +214,8 @@ export function secretCommandHook(secrets: SessionSecretHooks): HookCallback {
       ? { additionalContext: `${missing.map(envName).join(", ")} ${missing.length > 1 ? "are" : "is"} not set: get the secret with request_secret first.` }
       : {};
     if (given.length > 0 && input.permission_mode !== "bypassPermissions") {
-      return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: SECRET_COMMAND_REASON, ...note } };
+      // No reason in words: the device says it in the user's language, from the command itself.
+      return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", ...note } };
     }
     if (given.length > 0) await secrets.beforeCommand(input.tool_use_id, command);
     return missing.length ? { hookSpecificOutput: { hookEventName: "PreToolUse", ...note } } : {};
@@ -313,7 +312,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     const summary = (write && (await write.describeWrite(toolName, input).catch(() => undefined))) || toolSummary(toolName, input, policy.dir);
     const full = JSON.stringify(input);
     const cut = full.length > CARD_INPUT_CHARS ? `The input shown is cut: ${full.length} characters in all.` : "";
-    const reason = [opts.decisionReason ?? "", cut].filter(Boolean).join(" ");
+    // A command reading a sign-in secret: the device words why it asks (from $TUNELO_SECRET_* in the input).
+    const usesSecret = toolName === "Bash" && envNamesIn(command).length > 0;
+    const reason = [usesSecret ? "" : (opts.decisionReason ?? ""), cut].filter(Boolean).join(" ");
     const req = {
       kind: "approval" as const,
       toolId: opts.toolUseID ?? "",
@@ -331,7 +332,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     // Approved: the secrets the command names go where its shell loads them, until it ends.
     if (secrets && toolName === "Bash" && opts.toolUseID) await secrets.beforeCommand(opts.toolUseID, command);
     // A write tool of tunelo's MCP is asked about every time: no rule for the session.
-    if (decision === "allow-session" && !sensitive && !isWriteTool(toolName)) {
+    // A command reading a sign-in secret is asked about every time: an older device's "allow for the session" counts once.
+    if (decision === "allow-session" && !sensitive && !isWriteTool(toolName) && !usesSecret) {
       // Only allow rules for this session: a remote "allow for the session"
       // must never switch the permission mode or add directories.
       const suggested = (opts.suggestions ?? []).filter((s) => s.type === "addRules" && s.behavior === "allow");
