@@ -49,6 +49,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo mcp` | Server MCP (stdio): tool tunnel, Chat, Localman |
 | `tunelo trust [thư mục]` / `untrust` / `trusted` | Thư mục được nạp cấu hình `.claude` của dự án; thiết bị đã ghép cũng tin được từ web (có ghi nhật ký), trừ thư mục nhạy cảm |
 | `tunelo secrets list` / `remove <id>` | Bí mật đăng nhập đã lưu cho Claude (trang, tên, lần dùng cuối; không bao giờ in giá trị) |
+| `tunelo browser status` / `close` / `clear` | Trình duyệt riêng của tunelo cho Claude: trình duyệt nào, hồ sơ ở đâu, có đang chạy; đóng (giữ đăng nhập); `clear` xoá hồ sơ (đăng xuất mọi trang, ghi nhật ký) |
 | `tunelo audit` | Nhật ký đồng ý |
 | `tunelo run` | Chạy trong terminal để gỡ lỗi; từ chối khi đã có bản chạy nền |
 
@@ -117,6 +118,35 @@ chiếu** (`secret://…`), không bao giờ nhận giá trị.
   `secret_add` / `secret_use` (fill hoặc env) / `secret_remove`, không bao giờ ghi giá trị. Máy cũ hơn 2.0.8: web ẩn cả hai.
 - Giới hạn: bảo vệ khỏi lộ tình cờ và khỏi lưu vào lịch sử, không chống được một phiên cố ý xấu (Claude điều khiển trình duyệt
   có thể đọc lại ô đã điền, lệnh được duyệt có thể gửi biến đi nơi khác). Vì vậy lệnh dùng bí mật luôn hỏi.
+
+## Trình duyệt của máy: điều khiển từ xa và passkey (2.0.12)
+
+Phiên tunelo mở có thêm 3 tool MCP. Không tool nào trả hình của trang hay thứ người dùng gõ.
+
+- `open_browser(url?)`: mở (hoặc dùng lại) **hồ sơ Chrome riêng của tunelo** (`browser-profile/` trong thư mục cấu hình, 0700), tách
+  khỏi hồ sơ Chrome của người dùng; đăng nhập (cookie) trong đó được giữ giữa các phiên. Chrome mở với cổng debug ngẫu nhiên trên
+  127.0.0.1 (`--remote-debugging-port=0`), trả `{ cdp_url, ws_endpoint, tab, tabs, headless }` để Claude dùng Playwright
+  `chromium.connectOverCDP(cdp_url)` (dùng `browser.contexts()[0]`), và `fill_secret` tự tìm ra nó. Tìm Chrome, Chromium, Edge, Brave
+  (hoặc `TUNELO_BROWSER`). Không có màn hình (không ai đăng nhập desktop) thì chạy headless. macOS: hồ sơ dùng keychain giả
+  (`--use-mock-keychain`) để Chrome không bao giờ hỏi Keychain trên máy không người; cookie vì vậy chỉ được bảo vệ bằng quyền thư mục.
+  Cửa sổ bị che hay ẩn vẫn vẽ và nhận thao tác (`--disable-backgrounding-occluded-windows`…). tunelo dừng thì Chrome đóng theo.
+- `request_takeover(reason, url?)`: Claude dừng; mọi thiết bị hiện thẻ "Cần bạn thao tác trên trình duyệt của máy" (ngoài transcript,
+  phiên hiện "Cần bạn"). "Mở trình duyệt" hiện tab trực tiếp: máy chỉ bật screencast (`Page.startScreencast`, JPEG chất lượng 60,
+  tối đa 1600 px, tối đa 10 hình/giây, bỏ hình khi kết nối của thiết bị đang nghẽn) **khi có thiết bị đang xem** và trang web đang
+  hiện; người dùng click, kéo, cuộn, gõ (`Input.dispatchMouseEvent` / `dispatchKeyEvent` / `insertText`), đổi tab, thanh địa chỉ chỉ
+  đọc. Điện thoại: toàn màn hình, chạm = click, một ngón = cuộn trang, hai ngón = phóng to hình, nút "Bàn phím". Ô đang gõ là ô mật
+  khẩu thì web báo và ô nhập của điện thoại thành ô mật khẩu (bàn phím không học). "Trả lại cho Claude" kết thúc: Claude nhận URL,
+  tiêu đề, số tab (và `passkey_requests` nếu có), không có hình. Thao tác chỉ được nhận khi takeover đang mở; không ai thao tác 10
+  phút thì tự kết thúc và Claude nhận lỗi. Hình và thao tác chỉ đi qua kênh E2E, không lưu, không ghi log, không vào journal.
+  Nhật ký đồng ý ghi `browser_control` (thiết bị, site) khi trả lại.
+- Trang máy có "Trình duyệt của máy" và nút "Xem trình duyệt của máy" khi hồ sơ đang chạy (takeover của chính người dùng).
+- `virtual_authenticator(enable)`: passkey ảo (CDP WebAuthn, CTAP2, có xác minh người dùng) cho mọi tab kể cả tab mở sau, dùng cho
+  test E2E app của người dùng; passkey tạo ra chỉ ở trong bộ nhớ, mọi tab dùng chung, mất khi tắt hoặc đóng trình duyệt.
+- Phát hiện passkey thật: mỗi trang được tiêm script bọc `navigator.credentials.create/get` (bỏ qua passkey autofill
+  `mediation: "conditional"`). Trang đòi passkey khi không bật passkey ảo: web hiện "Trang cần passkey" (mở điều khiển từ xa, chọn
+  cách khác, hoặc chờ ở máy), và Claude nhận thông báo kèm kết quả tool kế tiếp (hook PostToolUse). Hộp thoại passkey của hệ điều
+  hành vẫn cần người ở máy.
+- `tunelo browser clear` xoá hồ sơ (đăng xuất mọi trang); Claude chạy lệnh `tunelo browser …` luôn bị hỏi như lệnh nhạy cảm.
 
 ## Dự án (2.0.7)
 
