@@ -80,6 +80,10 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.tooManyAttachments;
 		case ErrorReason.ATTACHMENT_NOT_FOUND:
 			return r.attachmentNotFound;
+		case ErrorReason.THREAD_RUNNING:
+			return r.threadRunning;
+		case ErrorReason.TRASH_UNAVAILABLE:
+			return r.trashUnavailable(s);
 		default:
 			return undefined;
 	}

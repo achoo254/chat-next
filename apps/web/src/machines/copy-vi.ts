@@ -308,6 +308,8 @@ export const viMachines = {
 				name === "" ? "Các tệp của tin này cộng lại quá lớn để gửi một lần." : `Tệp “${name}” quá lớn để gửi tới máy.`,
 			tooManyAttachments: "Quá nhiều tệp: bớt tệp trong tin này, hoặc gửi các tệp đang chờ trước.",
 			attachmentNotFound: "Máy không còn giữ tệp đính kèm này. Đính kèm lại rồi gửi.",
+			threadRunning: "Phiên đang chạy một lượt. Dừng lượt đó trước.",
+			trashUnavailable: (why: string) => `Máy không chuyển được tệp vào Thùng rác nên chưa xoá gì${why === "" ? "." : `: ${why}`}`,
 		},
 	},
 	detail: {
@@ -558,6 +560,22 @@ export const viMachines = {
 		composer: {
 			queue: "Gửi vào hàng chờ",
 			hint: "Enter gửi · Shift+Enter xuống dòng · Esc dừng",
+		},
+		thread: {
+			archive: "Lưu trữ",
+			unarchive: "Bỏ lưu trữ",
+			delete: "Xoá phiên",
+			deleting: "Đang xoá…",
+			deleteTitle: "Xoá phiên này?",
+			deleteBody: (title: string, machine: string) =>
+				`“${title}” biến mất khỏi mọi thiết bị. Bản ghi của Claude và các tệp đã gửi trong phiên được chuyển vào Thùng rác trên ${machine}, khôi phục được từ Thùng rác.`,
+			deleteRunning: (ai: string) => `${ai} đang chạy một lượt trong phiên này. Dừng lượt đó rồi xoá?`,
+			stopAndDelete: "Dừng và xoá",
+			deleteElsewhere: "Phiên này có vẻ đang mở ở nơi khác trên máy (Terminal, IDE). Xoá vẫn chuyển bản ghi vào Thùng rác; nơi đang mở có thể ghi tiếp vào bản mới.",
+			deleteAnyway: "Vẫn xoá",
+			rowMenu: (title: string) => `Tuỳ chọn cho ${title}`,
+			archived: "Đã lưu trữ",
+			noArchived: "Chưa có phiên nào được lưu trữ.",
 		},
 		attach: {
 			button: "Đính kèm ảnh hoặc tệp",

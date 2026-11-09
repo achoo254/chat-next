@@ -513,6 +513,9 @@ export class MachineLink {
 			case "machineProfile":
 				this.set({ machineProfile: b.value });
 				break;
+			case "threadDeleted":
+				this.dropThread(b.value.threadId);
+				break;
 			case "fullItem":
 				if (b.value.item !== undefined) {
 					const full = new Map(this.current.full);
@@ -536,6 +539,23 @@ export class MachineLink {
 			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject));
 		}
 		else waiter.resolve(frame);
+	}
+
+	/** A thread deleted on the machine leaves every list and cache here. */
+	private dropThread(threadId: string): void {
+		const without = <V>(map: ReadonlyMap<string, V>) => {
+			const next = new Map(map);
+			next.delete(threadId);
+			return next;
+		};
+		const threads = this.current.threads.filter((t) => t.id !== threadId);
+		this.set({
+			threads,
+			openSessions: threads.filter((t) => t.open).length,
+			journals: without(this.current.journals),
+			pending: without(this.current.pending),
+			threadInfo: without(this.current.threadInfo),
+		});
 	}
 
 	private putThread(thread: ThreadSummary): void {

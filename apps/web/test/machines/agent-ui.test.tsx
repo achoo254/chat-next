@@ -69,11 +69,16 @@ describe("sessions column", () => {
 		]);
 	});
 
-	it("filters on what needs the user and what runs", () => {
-		expect(matches("need", { state: ThreadState.WAITING })).toBe(true);
-		expect(matches("need", { state: ThreadState.RUNNING })).toBe(false);
-		expect(matches("running", { state: ThreadState.QUEUED })).toBe(true);
-		expect(matches("all", { state: ThreadState.IDLE })).toBe(true);
+	it("filters on what needs the user and what runs, and keeps archived sessions under their own filter", () => {
+		const live = { archived: false };
+		expect(matches("need", { ...live, state: ThreadState.WAITING })).toBe(true);
+		expect(matches("need", { ...live, state: ThreadState.RUNNING })).toBe(false);
+		expect(matches("running", { ...live, state: ThreadState.QUEUED })).toBe(true);
+		expect(matches("all", { ...live, state: ThreadState.IDLE })).toBe(true);
+		expect(matches("all", { archived: true, state: ThreadState.IDLE })).toBe(false);
+		expect(matches("archived", { archived: true, state: ThreadState.IDLE })).toBe(true);
+		expect(matches("archived", { ...live, state: ThreadState.IDLE })).toBe(false);
+		expect(matches("need", { archived: true, state: ThreadState.WAITING })).toBe(true);
 	});
 });
 

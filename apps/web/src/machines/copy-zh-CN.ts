@@ -300,6 +300,8 @@ export const zhCNMachines: MachinesCopy = {
 			attachmentTooLarge: (name: string) => (name === "" ? "这条消息的文件合计太大，无法一次发送。" : `“${name}”太大，无法发送到电脑。`),
 			tooManyAttachments: "文件太多：减少这条消息的文件，或先发送正在等待的文件。",
 			attachmentNotFound: "电脑上已没有这个附件。请重新添加后发送。",
+			threadRunning: "会话正在运行一轮。请先停止。",
+			trashUnavailable: (why: string) => `电脑无法把文件移到废纸篓，因此没有删除任何内容${why === "" ? "。" : `：${why}`}`,
 		},
 	},
 	detail: {
@@ -548,6 +550,22 @@ export const zhCNMachines: MachinesCopy = {
 		composer: {
 			queue: "加入队列",
 			hint: "Enter 发送 · Shift+Enter 换行 · Esc 停止",
+		},
+		thread: {
+			archive: "归档",
+			unarchive: "取消归档",
+			delete: "删除会话",
+			deleting: "正在删除…",
+			deleteTitle: "删除此会话？",
+			deleteBody: (title: string, machine: string) =>
+				`“${title}”将从所有设备上消失。Claude 的会话记录和会话中发送的文件会移到 ${machine} 的废纸篓，可从废纸篓恢复。`,
+			deleteRunning: (ai: string) => `${ai} 正在此会话中运行一轮。停止后删除？`,
+			stopAndDelete: "停止并删除",
+			deleteElsewhere: "此会话似乎正在电脑上的其他地方打开（终端、IDE）。删除仍会把记录移到废纸篓；打开它的地方可能会写入新的记录。",
+			deleteAnyway: "仍然删除",
+			rowMenu: (title: string) => `${title} 的选项`,
+			archived: "已归档",
+			noArchived: "没有已归档的会话。",
 		},
 		attach: {
 			button: "添加图片或文件",

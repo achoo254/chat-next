@@ -3,12 +3,14 @@
 // machine as a group header (status in words, a menu with a new session,
 // its board, its details, pairing) over its sessions grouped by folder, laid
 // out like the chat list. A machine this device cannot use yet says why and
-// offers the fix (pair) in place.
-import { useState } from "react";
+// offers the fix (pair) in place. Archived sessions show only under their own
+// filter; a row's menu (hover, or a long press on a phone) archives or
+// deletes it on machines that can (tunelo 2.0.6+).
+import { useState, type MouseEvent } from "react";
 import { ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { countLabel } from "../messaging/data/format.ts";
-import { Link, paths, type MachinesView } from "../router.tsx";
+import { Link, navigate, paths, type MachinesView } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { sortForList } from "./link/machine-link.ts";
@@ -19,25 +21,27 @@ import { NewSession } from "./new-session.tsx";
 import { aiName, folderName, modelName, stateKey, timeAgo, useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
+import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 
-export type Filter = "all" | "need" | "running";
+export type Filter = "all" | "need" | "running" | "archived";
 
 const FILTER_KEY = "ai:filter";
 
 function savedFilter(): Filter {
 	try {
 		const value = window.sessionStorage.getItem(FILTER_KEY);
-		return value === "need" || value === "running" ? value : "all";
+		return value === "need" || value === "running" || value === "archived" ? value : "all";
 	} catch {
 		return "all";
 	}
 }
 
-/** The session matches the filter. */
-export function matches(filter: Filter, thread: Pick<ThreadSummary, "state">): boolean {
+/** The session matches the filter: "all" leaves archived ones out, "archived" shows only them; what needs the user or runs shows either way. */
+export function matches(filter: Filter, thread: Pick<ThreadSummary, "state" | "archived">): boolean {
 	if (filter === "need") return thread.state === ThreadState.WAITING;
 	if (filter === "running") return thread.state === ThreadState.RUNNING || thread.state === ThreadState.QUEUED;
-	return true;
+	if (filter === "archived") return thread.archived;
+	return !thread.archived;
 }
 
 /** Sessions by folder, folders in the order of their first (most urgent, newest) session. */
@@ -93,6 +97,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 			// Private mode: the filter still applies on this page.
 		}
 	};
+	const archived = machines.some((m) => m.state.threads.some((x) => x.archived));
 	const need = machines.reduce((n, m) => n + m.state.threads.filter((x) => x.state === ThreadState.WAITING).length, 0);
 	const directory = hub.directory();
 	const currentThread = view.page === "session" ? view.threadId : null;
@@ -113,11 +118,13 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 					{need > 0 && <span className="badge">{countLabel(need)}</span>}
 				</Link>
 				<div className="tabs mx-filters" role="tablist" aria-label={t.sessions.filters}>
-					{(["all", "need", "running"] as const).map((f) => (
-						<button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}>
-							{f === "all" ? t.sessions.all : f === "need" ? t.sessions.need(need) : t.sessions.running}
-						</button>
-					))}
+					{(["all", "need", "running", "archived"] as const)
+						.filter((f) => f !== "archived" || archived || filter === "archived")
+						.map((f) => (
+							<button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}>
+								{f === "all" ? t.sessions.all : f === "need" ? t.sessions.need(need) : f === "running" ? t.sessions.running : t.agent.thread.archived}
+							</button>
+						))}
 				</div>
 			</div>
 			<div className="mx-groups" aria-busy={directory.status === "loading"}>
@@ -207,7 +214,7 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 				</div>
 			))}
 			{conn.kind === "on" && state.listed && shown.length === 0 && (
-				<p className="mx-group-note muted">{state.threads.length === 0 ? t.agent.noSessions : t.agent.emptyFilter}</p>
+				<p className="mx-group-note muted">{state.threads.length === 0 ? t.agent.noSessions : filter === "archived" ? t.agent.thread.noArchived : t.agent.emptyFilter}</p>
 			)}
 			{creating && <NewSession machine={ref} name={entry.name} link={link} state={state} onClose={() => setCreating(false)} />}
 		</section>
@@ -286,8 +293,24 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 	const t = useMachinesCopy();
 	const key = stateKey(thread);
 	const sub = rowLine(t, thread, machine.state.info);
-	return (
-		<Link to={paths.machineSession(machine.entry.ref, thread.id)} className={`mx-srow ${key}`} current={current}>
+	const manage = threadActionsSupported(machine.state.info) && machine.state.status.kind === "open";
+	const { open, setOpen, ref } = usePopover();
+	const [deleting, setDeleting] = useState(false);
+	const row = (
+		<Link
+			to={paths.machineSession(machine.entry.ref, thread.id)}
+			className={`mx-srow ${key}`}
+			current={current}
+			// A long press on a phone (or a right click) opens the row's menu.
+			{...(manage
+				? {
+						onContextMenu: (event: MouseEvent) => {
+							event.preventDefault();
+							setOpen(true);
+						},
+					}
+				: {})}
+		>
 			<span className={`mx-st ${key}`} aria-hidden="true">
 				{key === "running" ? <span className="spin" /> : <MachineIcon name={key === "waiting" ? "help" : "terminal"} small />}
 			</span>
@@ -306,5 +329,31 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 				</span>
 			</span>
 		</Link>
+	);
+	if (!manage) return row;
+	return (
+		<div className="mx-srow-wrap" ref={ref} data-open={open ? "" : undefined}>
+			{row}
+			<button type="button" className="icon-btn mx-srow-menu" aria-label={t.agent.thread.rowMenu(thread.title)} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+				<Icon name="dots" small />
+			</button>
+			{open && (
+				<div className="mx-menu" role="menu" aria-label={t.agent.thread.rowMenu(thread.title)}>
+					<ThreadMenuItems link={machine.link} thread={thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
+				</div>
+			)}
+			{deleting && (
+				<DeleteThreadDialog
+					link={machine.link}
+					thread={thread}
+					machine={machine.entry.name}
+					ai={aiName(machine.state.info, thread.provider)}
+					onClose={() => setDeleting(false)}
+					onDeleted={() => {
+						if (current) navigate(paths.machines());
+					}}
+				/>
+			)}
+		</div>
 	);
 }

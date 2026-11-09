@@ -8,10 +8,10 @@
 // Files dragged anywhere over the session go to the composer when dropped.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, Decision, PromptState, ThreadState, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, PromptState, ThreadState, TurnState, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { Link, paths } from "../router.tsx";
+import { Link, navigate, paths } from "../router.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
 import { QuestionCard } from "./cards/question.tsx";
@@ -23,7 +23,8 @@ import { DropZone, MessageAttachments, useFileDrop } from "./attachment-tray.tsx
 import { ChangesPanel } from "./changes-panel.tsx";
 import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
-import type { LinkState } from "./link/machine-link.ts";
+import type { LinkState, MachineLink } from "./link/machine-link.ts";
+import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -38,21 +39,12 @@ import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntr
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
+import { versionAtLeast } from "./agent-version.ts";
+
+export { versionAtLeast };
 
 /** The first tunelo that takes a message with a denial and lists a session's files. */
 const AGENT_2_0_1 = [2, 0, 1] as const;
-
-/** `version` ("2.0.1", "v2.1.0-beta") is at least `min`; false when unreadable. */
-export function versionAtLeast(version: string, min: readonly number[]): boolean {
-	const parts = /^v?(\d+)\.(\d+)\.(\d+)/.exec(version.trim());
-	if (parts === null) return false;
-	for (let i = 0; i < min.length; i++) {
-		const have = Number(parts[i + 1]);
-		const want = min[i] ?? 0;
-		if (have !== want) return have > want;
-	}
-	return true;
-}
 
 type Pending = Extract<Block, { kind: "approval" | "question" }>;
 
@@ -168,7 +160,12 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						{changes.length > 0 && <span className="count">{changes.length}</span>}
 					</button>
 				)}
-				<HeadMenu machine={machine} machineName={machineName} dir={dir} />
+				<HeadMenu
+					machine={machine}
+					machineName={machineName}
+					dir={dir}
+					{...(thread !== null && online && threadActionsSupported(state.info) ? { manage: { link, thread, ai } } : {})}
+				/>
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			<DiskAccessBanner link={link} info={state.info} online={online} />
@@ -277,10 +274,21 @@ export function LimitBar({ from, to, left, onSwitch, ai }: { from: string; to: s
 	);
 }
 
-/** "⋯" of the session header: the machine, the folder, the encryption. */
-function HeadMenu({ machine, machineName, dir }: { machine: string; machineName: string; dir: string }) {
+/** "⋯" of the session header: archive and delete (tunelo 2.0.6+), the machine, the folder, the encryption. */
+function HeadMenu({
+	machine,
+	machineName,
+	dir,
+	manage,
+}: {
+	machine: string;
+	machineName: string;
+	dir: string;
+	manage?: { link: MachineLink; thread: ThreadSummary; ai: string };
+}) {
 	const t = useMachinesCopy();
 	const { open, setOpen, ref } = usePopover();
+	const [deleting, setDeleting] = useState(false);
 	return (
 		<div className="mx-model" ref={ref}>
 			<button type="button" className="icon-btn" aria-label={t.agent.header.menu} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
@@ -288,6 +296,12 @@ function HeadMenu({ machine, machineName, dir }: { machine: string; machineName:
 			</button>
 			{open && (
 				<div className="mx-menu" role="menu" aria-label={t.agent.header.menu}>
+					{manage !== undefined && (
+						<>
+							<ThreadMenuItems link={manage.link} thread={manage.thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
+							<hr />
+						</>
+					)}
 					<Link to={paths.machineInfo(machine)} className="mx-menu-link">
 						<MachineIcon name="monitor" small />
 						<span>{t.agent.header.machine(machineName)}</span>
@@ -303,6 +317,16 @@ function HeadMenu({ machine, machineName, dir }: { machine: string; machineName:
 						<span>{t.agent.header.e2ee}</span>
 					</p>
 				</div>
+			)}
+			{deleting && manage !== undefined && (
+				<DeleteThreadDialog
+					link={manage.link}
+					thread={manage.thread}
+					machine={machineName}
+					ai={manage.ai}
+					onClose={() => setDeleting(false)}
+					onDeleted={() => navigate(paths.machines())}
+				/>
 			)}
 		</div>
 	);

@@ -77,6 +77,21 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
+	it("drops a thread the machine deleted from every list here", async () => {
+		machine.handler = (frame) =>
+			frame.body.case === "threadList"
+				? [{ case: "threadListResult", value: { threads: [{ id: "t1", title: "a", open: true }, { id: "t2", title: "b" }], openSessions: 1, maxSessions: 3 } }]
+				: defaultAnswerOf(frame);
+		const l = link();
+		l.start();
+		await until(() => l.snapshot().threads.length === 2, "two threads");
+		machine.send(machine.socket, { case: "threadDeleted", value: { threadId: "t1", trashed: 2 } });
+		await until(() => l.snapshot().threads.length === 1, "one left");
+		expect(l.snapshot().threads.map((t) => t.id)).toEqual(["t2"]);
+		expect(l.snapshot().openSessions).toBe(0);
+		l.stop();
+	});
+
 	it("pings only while the user looks at the machine", async () => {
 		const l = link();
 		l.start();

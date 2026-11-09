@@ -305,6 +305,8 @@ export const enMachines: MachinesCopy = {
 				name === "" ? "The files of this message are too large together to send at once." : `“${name}” is too large to send to the machine.`,
 			tooManyAttachments: "Too many files: send fewer with this message, or send the ones waiting first.",
 			attachmentNotFound: "The machine no longer holds this attachment. Attach it again and send.",
+			threadRunning: "The session is running a turn. Stop it first.",
+			trashUnavailable: (why: string) => `The machine could not move the files to the Trash, so nothing was deleted${why === "" ? "." : `: ${why}`}`,
 		},
 	},
 	detail: {
@@ -554,6 +556,22 @@ export const enMachines: MachinesCopy = {
 		composer: {
 			queue: "Add to queue",
 			hint: "Enter to send · Shift+Enter for a new line · Esc to stop",
+		},
+		thread: {
+			archive: "Archive",
+			unarchive: "Unarchive",
+			delete: "Delete session",
+			deleting: "Deleting…",
+			deleteTitle: "Delete this session?",
+			deleteBody: (title: string, machine: string) =>
+				`“${title}” goes away on every device. Claude's record of it and the files sent in it move to the Trash on ${machine}, where you can restore them.`,
+			deleteRunning: (ai: string) => `${ai} is running a turn in this session. Stop it and delete?`,
+			stopAndDelete: "Stop and delete",
+			deleteElsewhere: "This session seems open elsewhere on the machine (a terminal, an IDE). Deleting still moves its record to the Trash; where it is open may write a new one.",
+			deleteAnyway: "Delete anyway",
+			rowMenu: (title: string) => `Options for ${title}`,
+			archived: "Archived",
+			noArchived: "No archived sessions.",
 		},
 		attach: {
 			button: "Attach images or files",

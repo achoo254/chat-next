@@ -449,6 +449,17 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		chat.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: data }));
 		await find(() => document.querySelector(".mx-drop"));
 	},
+	// The session's menu with Lưu trữ and Xoá phiên.
+	"thread-menu": async () => {
+		await click(".mx-head button.icon-btn", "Tuỳ chọn phiên");
+		await find(() => document.querySelector(".mx-head .mx-menu button.danger"));
+	},
+	// The delete confirmation: where the files go.
+	"thread-delete": async () => {
+		await click(".mx-head button.icon-btn", "Tuỳ chọn phiên");
+		await click(".mx-head .mx-menu button", "Xoá phiên");
+		await find(() => document.querySelector(".modal .btn-danger"));
+	},
 	// A sent message with an image (fetched back from the machine) and a file saved in the session's folder.
 	"attach-history": async () => {
 		const image = await find(() => document.querySelector(".mx-sent-img img"));

@@ -209,7 +209,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						value: {
 							name: "DIEUVY-LAPTOP",
 							os: "win32",
-							agentVersion: "2.0.1",
+							agentVersion: "2.0.6",
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -303,6 +303,8 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 				const stop = stalled.get(v.uploadId);
 				return stop !== undefined && Number(v.offset) + v.data.length > stop ? [] : [{ case: "ack", value: {} }];
 			}
+			case "threadSetArchived":
+				return [{ case: "ack", value: {} }];
 			case "attachmentCancel":
 				return [{ case: "ack", value: {} }];
 			case "attachmentFetch":
