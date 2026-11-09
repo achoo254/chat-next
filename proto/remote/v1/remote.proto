@@ -135,6 +135,8 @@ message Frame {
     MachineSettingsSet machine_settings_set = 33;
     FileList file_list = 34;
     OpenDiskAccessSettings open_disk_access_settings = 35;
+    SessionList session_list = 36;
+    SessionOpen session_open = 37;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -155,6 +157,7 @@ message Frame {
     ProfileSignInResult profile_sign_in_result = 55;
     FileListResult file_list_result = 56;
     MachineProfile machine_profile = 57;
+    SessionListResult session_list_result = 58;
   }
 }
 
@@ -302,6 +305,83 @@ message FileList {
   string prefix = 2;
   // At most this many entries; 0 means 50, B caps it at 200.
   uint32 limit = 3;
+}
+
+// --- sessions kept on the machine -------------------------------------------
+//
+// The AI's own transcripts on B, whatever started them: a terminal, an IDE,
+// Claude Desktop or tunelo itself (Claude Code keeps every session under
+// ~/.claude/projects). They only ever go to paired devices, end-to-end
+// encrypted, like the rest of a thread.
+
+// Answered with SessionListResult, newest first.
+message SessionList {
+  // Adapter id; empty: "claude".
+  string provider = 1;
+  // Only sessions started in this folder or below it; empty: every folder.
+  string dir = 2;
+  // Words (case-insensitive) that must all appear in the title, the first
+  // message or the folder; empty: every session.
+  string query = 3;
+  uint32 offset = 4;
+  // 0 means 30; B caps it at 100.
+  uint32 limit = 5;
+}
+
+message LocalSession {
+  // The AI's own session id (resumed as is).
+  string session_id = 1;
+  // The working directory the session started in, as its transcript records it.
+  string dir = 2;
+  // The session's title as the AI named it, else its first user message: one
+  // line, at most 120 characters.
+  string title = 3;
+  // Unix milliseconds: the last change of its transcript.
+  int64 updated_at = 4;
+  // User messages and AI replies; 0 when not counted (B counts only as much
+  // as it can read quickly, the rest on a later page or request).
+  uint32 messages = 5;
+  // What started it, as the transcript says (Claude: "cli" for a terminal or
+  // an IDE running claude, "sdk-ts" for an app on the Agent SDK such as
+  // tunelo, "claude-desktop", …); empty when unknown.
+  string entrypoint = 6;
+  // The thread that holds this session already; empty when none does.
+  string thread_id = 7;
+  // The session seems open elsewhere on the machine: its transcript changed
+  // in the last minute, or a running claude says it holds it.
+  bool busy_elsewhere = 8;
+  // The folder is sensitive: opening it needs Consent.sensitive.
+  bool sensitive = 9;
+}
+
+message SessionDir {
+  string dir = 1;
+  uint32 sessions = 2;
+}
+
+message SessionListResult {
+  repeated LocalSession sessions = 1;
+  // Sessions that match dir and query in all.
+  uint32 total = 2;
+  // Folders of the sessions that match query (whatever dir says), most
+  // sessions first; at most 50.
+  repeated SessionDir dirs = 3;
+}
+
+// Opens a session from SessionList as a thread: B reads its transcript into
+// the thread (shown at once) and resumes the same session in its folder with
+// the next message. Consent works as for ThreadCreate. Answered like
+// ThreadCreate (ThreadCreated, then ThreadInfo and ThreadItems); a session a
+// thread holds already answers with that thread. A session that seems open
+// elsewhere is refused with ERROR_REASON_SESSION_OPEN_ELSEWHERE unless
+// open_anyway is set.
+message SessionOpen {
+  // Adapter id; empty: "claude".
+  string provider = 1;
+  string session_id = 2;
+  Consent consent = 3;
+  // The user was told the session may be open elsewhere and goes on.
+  bool open_anyway = 4;
 }
 
 // --- AI accounts (Claude profiles) ------------------------------------------
@@ -591,6 +671,11 @@ enum ErrorReason {
   // macOS refused the path because tunelo has no Full Disk Access; the
   // owner grants it on the machine (see MachineInfo.needs_full_disk_access).
   ERROR_REASON_FULL_DISK_ACCESS_NEEDED = 29;
+  // SessionOpen: the machine keeps no such session (any more).
+  ERROR_REASON_SESSION_NOT_FOUND = 30;
+  // SessionOpen: the session seems open elsewhere on the machine (see
+  // LocalSession.busy_elsewhere); ask the user, then send open_anyway.
+  ERROR_REASON_SESSION_OPEN_ELSEWHERE = 31;
 }
 
 enum ErrorCode {
