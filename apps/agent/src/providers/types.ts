@@ -19,6 +19,7 @@ export type ProviderCapabilities = {
   contextUsage: boolean;
   compaction: boolean;
   diff: boolean;
+  /** Takes images with a message (ProviderSession.send). */
   images: boolean;
   models: { id: string; name: string }[];
   /** Reasoning effort levels, lowest first; empty when the AI has none. */
@@ -143,9 +144,13 @@ export type DetectOptions = {
   accountDir?: string;
 };
 
+/** An image going with a message, to an AI whose capabilities say `images`. */
+export type ImageInput = { mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp"; data: Uint8Array };
+
 export interface ProviderSession {
   readonly events: AsyncIterable<ProviderEvent>;
-  send(text: string): Promise<void>;
+  /** `text` may be empty when images go. */
+  send(text: string, images?: readonly ImageInput[]): Promise<void>;
   interrupt(): Promise<void>;
   close(): Promise<void>;
   setModel?(model: string): Promise<void>;
@@ -194,6 +199,8 @@ export type HistoryRead = { entries: HistoryEntry[]; end: number };
 
 /** The AI's own record of its sessions on this machine (Claude: ~/.claude/projects). */
 export interface SessionHistory {
+  /** Brings what tells busy sessions apart up to date before list() or find(); quick, never fails. */
+  prime?(): Promise<void>;
   list(q: SessionQuery): SessionPage;
   find(sessionId: string): LocalSession | undefined;
   /** Where the transcript ends now; undefined when there is none. */

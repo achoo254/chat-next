@@ -32,6 +32,7 @@ import type {
   ApprovalRequest,
   AskUser,
   HistoryEntry,
+  ImageInput,
   LocalSession,
   ProviderEvent,
   ProviderInfo,
@@ -47,6 +48,9 @@ import { gitBranch } from "../safety/dirs.ts";
 import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 import type { SessionMcpLease } from "../mcp/session-tickets.ts";
+import { AttachmentError, type AttachmentLimits, type UploadPiece, Uploads } from "../attachments/uploads.ts";
+import { keptImage, prepareAttachments, textForAi } from "../attachments/message-attachments.ts";
+import { imageType } from "../attachments/image-type.ts";
 
 /** A refusal devices can say in the user's language: `reason` (+ `subject`) is stable, `message` is English. */
 export class AgentError extends Error {
@@ -131,7 +135,8 @@ type Thread = {
   session?: ProviderSession;
   starting?: Promise<ProviderSession>;
   queued: boolean;
-  outbox: string[];
+  /** Messages for the AI not handed to its session yet. */
+  outbox: { text: string; images?: ImageInput[] }[];
   running: boolean;
   turnItem?: string;
   turnCount: number;
@@ -197,6 +202,8 @@ export type CoreOptions = {
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
   /** A session reported plan usage for its profile ("" for the default one). */
   onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
+  /** Smaller limits for files sent with a message (tests); ATTACHMENT_LIMITS otherwise. */
+  attachmentLimits?: Partial<AttachmentLimits>;
   now?: () => number;
 };
 
@@ -228,12 +235,15 @@ export class AgentCore {
   private readonly maxSessions: number;
   private readonly idleMs: number;
   private readonly now: () => number;
+  /** Files devices sent for messages not sent yet. */
+  private readonly uploads: Uploads;
 
   constructor(private readonly opts: CoreOptions) {
     this.maxSessions = opts.maxSessions ?? 3;
     this.idleMs = opts.idleMs ?? 5 * 60_000;
     this.now = opts.now ?? Date.now;
     mkdirSync(join(opts.dataDir, "threads"), { recursive: true, mode: 0o700 });
+    this.uploads = new Uploads(join(opts.dataDir, "uploads"), { now: this.now, ...(opts.attachmentLimits ? { limits: opts.attachmentLimits } : {}) });
     this.epoch = this.bumpEpoch();
     this.loadThreads();
   }
@@ -610,9 +620,10 @@ export class AgentCore {
   // --- sessions kept on the machine ------------------------------------------
 
   /** The AI's sessions on the machine, with the thread that holds each one. */
-  localSessions(req: { provider: string } & SessionQuery): Omit<SessionPage, "sessions"> & { sessions: LocalSessionView[] } {
+  async localSessions(req: { provider: string } & SessionQuery): Promise<Omit<SessionPage, "sessions"> & { sessions: LocalSessionView[] }> {
     const history = this.provider(req.provider || "claude").history;
     if (!history) return { sessions: [], total: 0, dirs: [] };
+    await history.prime?.();
     const page = history.list({ dir: req.dir, query: req.query, offset: req.offset, limit: req.limit });
     return { ...page, sessions: page.sessions.map((s) => this.localView(s)) };
   }
@@ -645,6 +656,7 @@ export class AgentCore {
    */
   async openLocal(req: { provider: string; sessionId: string; consent: ConsentGiven; openAnyway: boolean; device: string }): Promise<ThreadSummary> {
     const provider = this.provider(req.provider || "claude");
+    await provider.history?.prime?.();
     const found = provider.history?.find(req.sessionId);
     if (!provider.history || !found) {
       throw new AgentError(ErrorCode.NOT_FOUND, "no such session on this machine", { reason: ErrorReason.SESSION_NOT_FOUND, subject: req.sessionId });
@@ -749,23 +761,77 @@ export class AgentCore {
     return items.length;
   }
 
-  async send(threadId: string, text: string, clientMsgId: string): Promise<void> {
-    const t = this.thread(threadId);
-    if (!text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
-    if (clientMsgId) {
-      if (t.clientMsgIds.has(clientMsgId)) return;
-      t.clientMsgIds.add(clientMsgId);
+  // --- attachments -----------------------------------------------------------
+
+  /** What the machine takes with a message (MachineInfo.attachments). */
+  get attachmentLimits(): AttachmentLimits {
+    return this.uploads.limits;
+  }
+
+  /** One piece of a file for a message of `piece.threadId` (checked on the first piece). */
+  upload(piece: UploadPiece): void {
+    if (piece.offset === 0) this.thread(piece.threadId);
+    this.uploads.put(piece);
+  }
+
+  cancelUpload(uploadId: string): void {
+    this.uploads.cancel(uploadId);
+  }
+
+  /** An image a message of the thread carried, as kept with the thread. */
+  attachmentImage(threadId: string, attachmentId: string): { mimeType: string; data: Uint8Array } {
+    const sent = this.thread(threadId)
+      .journal.all()
+      .some((i) => i.body.case === "text" && i.body.value.attachments.some((a) => a.id === attachmentId && a.image));
+    let data: Buffer | undefined;
+    try {
+      data = sent ? readFileSync(keptImage(this.imagesDir(threadId), attachmentId)) : undefined;
+    } catch {
+      data = undefined;
     }
+    const type = data && imageType(data.subarray(0, 16));
+    if (!data || !type) throw new AttachmentError("no such image in this thread", ErrorReason.ATTACHMENT_NOT_FOUND);
+    return { mimeType: type, data: new Uint8Array(data) };
+  }
+
+  private imagesDir(threadId: string): string {
+    return join(this.opts.dataDir, "threads", threadId, "attachments");
+  }
+
+  async send(threadId: string, text: string, clientMsgId: string, attachmentIds: readonly string[] = []): Promise<void> {
+    const t = this.thread(threadId);
+    if (!text.trim() && attachmentIds.length === 0) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
+    if (clientMsgId && t.clientMsgIds.has(clientMsgId)) return;
+    // Placed before anything else changes: a refused file refuses the whole message.
+    const taken = this.uploads.take(threadId, attachmentIds);
+    let prepared: ReturnType<typeof prepareAttachments> | undefined;
+    try {
+      prepared = taken.length
+        ? prepareAttachments(taken, {
+            cwd: t.meta.dir,
+            keepDir: this.imagesDir(threadId),
+            images: this.provider(t.meta.provider).capabilities.images,
+            imageMaxBytes: this.uploads.limits.imageMaxBytes,
+            isSensitive: this.opts.isSensitive,
+            now: new Date(this.now()),
+          })
+        : undefined;
+    } finally {
+      for (const u of taken) this.uploads.discard(u);
+    }
+    if (clientMsgId) t.clientMsgIds.add(clientMsgId);
     t.limitSeen = false;
     // Turns typed elsewhere since come first; an open session opens again so the AI reads them.
     if (!t.running && this.syncHistory(t) > 0 && t.session) await this.park(t);
-    this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId } });
+    const attachments = (prepared?.attachments ?? []).map((a) => ({ ...a, size: BigInt(a.size) }));
+    this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId, attachments } });
     t.turnCount += 1;
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
     this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING } });
     t.running = true;
     t.lastActive = this.now();
-    t.outbox.push(text);
+    const images = prepared?.images ?? [];
+    t.outbox.push({ text: textForAi(text, prepared?.files ?? []), ...(images.length ? { images } : {}) });
     this.touch(t);
     await this.ensureSession(t);
   }
@@ -915,7 +981,7 @@ export class AgentCore {
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
     this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING } });
     t.running = true;
-    t.outbox.push(summary);
+    t.outbox.push({ text: summary });
     this.touch(t);
     await this.ensureSession(t);
   }
@@ -1019,8 +1085,8 @@ export class AgentCore {
     const s = t.session;
     if (!s) return;
     while (t.outbox.length) {
-      const text = t.outbox.shift();
-      if (text !== undefined) await s.send(text);
+      const next = t.outbox.shift();
+      if (next !== undefined) await s.send(next.text, next.images);
     }
   }
 
@@ -1403,7 +1469,8 @@ export class AgentCore {
 function previewOf(item: Item): string | undefined {
   const b = item.body;
   if (b.case !== "text" || (b.value.role !== Role.USER && b.value.role !== Role.ASSISTANT)) return undefined;
-  const line = previewLine(b.value.text);
+  // A message of files only: their names.
+  const line = previewLine(b.value.text) || previewLine(b.value.attachments.map((a) => a.name).join(", "));
   return line === "" ? undefined : line;
 }
 

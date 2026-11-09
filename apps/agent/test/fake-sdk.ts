@@ -4,7 +4,16 @@
 import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { Channel } from "../src/util/channel.ts";
 
-export type SdkLog = { options: Options[]; interrupts: number; models: string[]; modes?: string[]; flags?: unknown[]; denials?: string[] };
+export type SdkLog = {
+  options: Options[];
+  interrupts: number;
+  models: string[];
+  modes?: string[];
+  flags?: unknown[];
+  denials?: string[];
+  /** Every user message's content as the adapter sent it. */
+  prompts?: SDKUserMessage["message"]["content"][];
+};
 
 /** Whether allow rules cover a call: `Tool`, `Tool(exact)` or `Tool(prefix:*)`, as claude reads them. */
 function allowedBy(rules: string[] | undefined, tool: string, content: string): boolean {
@@ -45,7 +54,12 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
       const canUseTool = params.options.canUseTool;
       if (!canUseTool) throw new Error("adapter must pass canUseTool");
       for await (const msg of params.prompt) {
-        const text = typeof msg.message.content === "string" ? msg.message.content : "";
+        (log.prompts ??= []).push(msg.message.content);
+        const content = msg.message.content;
+        const text =
+          typeof content === "string"
+            ? content
+            : content.flatMap((b) => (typeof b === "object" && b.type === "text" ? [b.text] : [])).join("\n");
         const signal = new AbortController().signal;
         if (text.startsWith("ask ")) {
           const command = text.slice(4);

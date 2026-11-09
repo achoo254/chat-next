@@ -33,6 +33,7 @@ import type {
   AskUser,
   Detected,
   DetectOptions,
+  ImageInput,
   ProviderCapabilities,
   ProviderEvent,
   ProviderInfo,
@@ -60,7 +61,7 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   contextUsage: true,
   compaction: true,
   diff: true,
-  images: false,
+  images: true,
   models: [
     { id: "opus", name: "Opus" },
     { id: "sonnet", name: "Sonnet" },
@@ -209,8 +210,17 @@ export function denialText(message: string | undefined): string {
   return `The user denied this from their device and said:\n${said}`;
 }
 
-function userMessage(text: string): SDKUserMessage {
-  return { type: "user", message: { role: "user", content: text }, parent_tool_use_id: null } as SDKUserMessage;
+/** A user turn: the images first (as Claude reads them best), then the text. */
+export function userMessage(text: string, images: readonly ImageInput[] = []): SDKUserMessage {
+  if (images.length === 0) return { type: "user", message: { role: "user", content: text }, parent_tool_use_id: null } as SDKUserMessage;
+  const content = [
+    ...images.map((img) => ({
+      type: "image" as const,
+      source: { type: "base64" as const, media_type: img.mediaType, data: Buffer.from(img.data).toString("base64") },
+    })),
+    ...(text.trim() === "" ? [] : [{ type: "text" as const, text }]),
+  ];
+  return { type: "user", message: { role: "user", content }, parent_tool_use_id: null } as SDKUserMessage;
 }
 
 function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askUser: AskUser, resumeId?: string): ProviderSession {
@@ -350,11 +360,11 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
 
   return {
     events,
-    async send(text) {
+    async send(text, images) {
       if (closed) throw new Error("session closed");
       turnStart = performance.now();
       turnOpen = true;
-      inbox.push(userMessage(text));
+      inbox.push(userMessage(text, images));
     },
     async interrupt() {
       if (closed || !turnOpen) return;

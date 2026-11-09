@@ -22,6 +22,7 @@ import {
   pakeReply,
 } from "@achoo254/chat-remote-protocol";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
+import { AttachmentError } from "../attachments/uploads.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import { type ClaudeProfiles, type ProfileErrorKind, type ProfileList, ProfileError } from "../profiles/service.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
@@ -70,6 +71,7 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
   if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject };
   if (err instanceof ProfileError) return { code: ErrorCode.INVALID, message, reason: PROFILE_REASONS[err.kind], subject: err.subject };
+  if (err instanceof AttachmentError) return { code: ErrorCode.INVALID, message, reason: err.reason, subject: err.subject };
   if (err instanceof OutsideFolderError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.PATH_OUTSIDE_FOLDER, subject: "" };
   if (isFsError(err)) {
     const fsCode = (err as { code: string }).code;
@@ -330,7 +332,7 @@ export class Connection {
         }
         case "sessionList": {
           const v = b.value;
-          const page = core.localSessions({ provider: v.provider, dir: v.dir, query: v.query, offset: v.offset, limit: v.limit });
+          const page = await core.localSessions({ provider: v.provider, dir: v.dir, query: v.query, offset: v.offset, limit: v.limit });
           const sessions = page.sessions.map((x) => ({
             sessionId: x.sessionId,
             dir: x.dir,
@@ -371,8 +373,29 @@ export class Connection {
           return this.sendItems(threadId, r.items, id);
         }
         case "threadSend":
-          await core.send(b.value.threadId, b.value.text, b.value.clientMsgId);
+          await core.send(b.value.threadId, b.value.text, b.value.clientMsgId, b.value.attachmentIds);
           return ack();
+        case "attachmentUpload": {
+          const v = b.value;
+          core.upload({
+            uploadId: v.uploadId,
+            threadId: v.threadId,
+            name: v.name,
+            mimeType: v.mimeType,
+            size: Number(v.size),
+            offset: Number(v.offset),
+            data: v.data,
+          });
+          return ack();
+        }
+        case "attachmentCancel":
+          core.cancelUpload(b.value.uploadId);
+          return ack();
+        case "attachmentFetch": {
+          const { threadId, attachmentId } = b.value;
+          const image = core.attachmentImage(threadId, attachmentId);
+          return this.send(id, { case: "attachmentData", value: { threadId, attachmentId, mimeType: image.mimeType, data: image.data } });
+        }
         case "threadRespond": {
           const v = b.value;
           const answer =

@@ -38,6 +38,7 @@ import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
 import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
+import { attachmentLimitsBody } from "./attachments/uploads.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -320,6 +321,7 @@ export class Machine {
       devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
       needsFullDiskAccess: diskAccess() === "needed",
+      attachments: attachmentLimitsBody(this.core.attachmentLimits),
     });
   }
 

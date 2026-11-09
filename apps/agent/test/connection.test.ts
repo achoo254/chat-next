@@ -153,6 +153,28 @@ describe("connection", () => {
     );
     const stale = (await frames(session, link.next, (f) => f.id === "5")).at(-1)?.body;
     expect(stale?.case === "error" && stale.value.reason).toBe(ErrorReason.PROMPT_STALE);
+
+    // A file in two pieces, then a message naming it: saved in the folder, kept on the message.
+    const seal = (fid: string, body: Parameters<typeof create<typeof FrameSchema>>[1]) => link.conn.receive(session.seal(create(FrameSchema, { id: fid, ...body })));
+    const bytes = new TextEncoder().encode("hello file");
+    seal("6", { body: { case: "attachmentUpload", value: { uploadId: "upload-1234", threadId: id, name: "../notes.txt", size: BigInt(bytes.length), offset: 0n, data: bytes.slice(0, 6) } } });
+    seal("7", { body: { case: "attachmentUpload", value: { uploadId: "upload-1234", offset: 6n, data: bytes.slice(6) } } });
+    const acks = await frames(session, link.next, (f) => f.id === "7");
+    expect(acks.filter((f) => f.id === "6" || f.id === "7").map((f) => f.body.case)).toEqual(["ack", "ack"]);
+    seal("8", { body: { case: "threadSend", value: { threadId: id, text: "read it", clientMsgId: "c8", attachmentIds: ["upload-1234"] } } });
+    const echoed = await frames(session, link.next, (f) => f.body.case === "threadItems" && f.body.value.items.some((i) => i.body.case === "text" && i.body.value.clientMsgId === "c8"));
+    const user = echoed.flatMap((f) => (f.body.case === "threadItems" ? f.body.value.items : [])).find((i) => i.body.case === "text" && i.body.value.clientMsgId === "c8");
+    const sentFile = user?.body.case === "text" ? user.body.value.attachments[0] : undefined;
+    expect(sentFile && [sentFile.name, sentFile.image, sentFile.path.endsWith("/notes.txt")]).toEqual(["../notes.txt", false, true]);
+    // A piece at the wrong place, and an image that is not one, are refused with their reasons.
+    seal("9", { body: { case: "attachmentUpload", value: { uploadId: "upload-5678", offset: 4n, data: bytes } } });
+    const gap = (await frames(session, link.next, (f) => f.id === "9")).at(-1)?.body;
+    expect(gap?.case === "error" && gap.value.reason).toBe(ErrorReason.ATTACHMENT_NOT_FOUND);
+    seal("10", { body: { case: "attachmentFetch", value: { threadId: id, attachmentId: "upload-1234" } } });
+    const noImage = (await frames(session, link.next, (f) => f.id === "10")).at(-1)?.body;
+    expect(noImage?.case === "error" && noImage.value.reason).toBe(ErrorReason.ATTACHMENT_NOT_FOUND);
+    seal("11", { body: { case: "attachmentCancel", value: { uploadId: "never-sent-1" } } });
+    expect((await frames(session, link.next, (f) => f.id === "11")).at(-1)?.body.case).toBe("ack");
   });
 
   it("lists the machine's Claude sessions and opens one as a thread with its history", async () => {
