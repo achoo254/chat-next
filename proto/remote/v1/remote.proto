@@ -189,6 +189,14 @@ message Frame {
     BrowserView browser_view = 88;
     BrowserInput browser_input = 89;
     BrowserTakeoverEnd browser_takeover_end = 90;
+    // The machine's own screen (tunelo 2.0.13+); see "the machine's screen" below.
+    ScreenShareStatusRequest screen_share_status_request = 94;
+    ScreenShareOpen screen_share_open = 95;
+    // Both ways: A → B answered with Ack; B → A unasked.
+    ScreenShareData screen_share_data = 96;
+    ScreenShareClose screen_share_close = 97;
+    // Deletes the tunelo browser's profile (as `tunelo browser clear`). Answered with MachineInfo.
+    BrowserClear browser_clear = 98;
 
     // B → A, continued
     SecretPrompt secret_prompt = 63;
@@ -203,6 +211,9 @@ message Frame {
     BrowserFrame browser_frame = 91;
     BrowserState browser_state = 92;
     PasskeyNotice passkey_notice = 93;
+    ScreenShareStatus screen_share_status = 99;
+    ScreenShareOpened screen_share_opened = 100;
+    ScreenShareClosed screen_share_closed = 101;
   }
 }
 
@@ -1030,6 +1041,13 @@ enum ErrorReason {
   ERROR_REASON_TAKEOVER_GONE = 47;
   // BrowserControl while the tunelo browser is not running.
   ERROR_REASON_BROWSER_NOT_RUNNING = 48;
+  // ScreenShareOpen while nothing answers on the machine's Screen Sharing port
+  // (the owner turns Screen Sharing on in System Settings on the machine).
+  ERROR_REASON_SCREEN_SHARING_OFF = 49;
+  // ScreenShareOpen while another session is open.
+  ERROR_REASON_SCREEN_SHARE_BUSY = 50;
+  // ScreenShareData or ScreenShareClose names a session that is no longer open.
+  ERROR_REASON_SCREEN_SHARE_GONE = 51;
 }
 
 enum ErrorCode {
@@ -1433,6 +1451,10 @@ message MachineInfo {
   bool git_changes = 18;
   // The tunelo browser; unset before tunelo 2.0.12.
   RemoteBrowserInfo browser = 19;
+  // The machine can bridge its own Screen Sharing (macOS) to a device
+  // (ScreenShareStatusRequest, ScreenShareOpen); false before tunelo 2.0.13
+  // and on other systems.
+  bool screen_share = 20;
 }
 
 message RemoteBrowserInfo {
@@ -1441,6 +1463,8 @@ message RemoteBrowserInfo {
   // Its profile runs now: a device may open it (BrowserControl). B sends
   // MachineInfo unasked to every connected device when this changes.
   bool running = 2;
+  // A device may delete its profile (BrowserClear); false before tunelo 2.0.13.
+  bool clearable = 3;
 }
 
 message MachineSettings {
@@ -1507,7 +1531,8 @@ message AuditEntry {
   // secret_remove (path: the site; detail: the name),
   // browser_control (a device gave the tunelo browser back or closed it;
   // path: the site it showed; detail: "claude" or "user"),
-  // browser_clear (the tunelo browser's profile was deleted; device "local")
+  // browser_clear (the tunelo browser's profile was deleted),
+  // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed)
   string action = 3;
   string path = 4;
   string detail = 5;
@@ -1725,6 +1750,10 @@ message BrowserTakeover {
   string url = 4;
   // Unix milliseconds: it ends by itself then unless the user acts.
   int64 expires_at = 5;
+  // Claude says a dialog of the operating system (a passkey sheet, a
+  // Keychain prompt) waits on the machine's screen: the machine's whole
+  // screen (ScreenShareOpen) is what the user needs. tunelo 2.0.13+.
+  bool os_dialog = 6;
 }
 
 // B → A, unasked: a takeover ended; every device closes its view and card.
@@ -1772,3 +1801,74 @@ message PasskeyNotice {
   // Unix milliseconds.
   int64 at = 4;
 }
+
+// --- the machine's screen -------------------------------------------------------
+//
+// A dialog of the operating system (a passkey sheet, a Keychain prompt) is no
+// browser page. On macOS the owner may turn on the system's own Screen
+// Sharing; tunelo never turns it on or changes any setting. When a device asks
+// (ScreenShareOpen, only on the user's tap), tunelo opens one TCP stream to
+// 127.0.0.1:5900 and relays its bytes over this end-to-end encrypted link:
+// the VNC client on the device speaks to the system's service directly, so
+// the Mac account's password (Apple's VNC authentication) is never read,
+// kept or logged by tunelo. One session at a time; it ends after 10 minutes
+// without anything from the device, when either side closes, or when the
+// device's link closes.
+
+// A → B: is Screen Sharing on, and is it reachable from the network?
+// Answered with ScreenShareStatus.
+message ScreenShareStatusRequest {}
+
+message ScreenShareStatus {
+  // macOS: the system has Screen Sharing.
+  bool supported = 1;
+  // A VNC service answers on 127.0.0.1:5900.
+  bool enabled = 2;
+  // It also listens beyond loopback and the firewall does not block all
+  // incoming connections: anyone on the network can reach its sign-in.
+  bool exposed = 3;
+  // The macOS firewall is on.
+  bool firewall_on = 4;
+}
+
+// A → B: open the session. Answered with ScreenShareOpened, or
+// ERROR_REASON_SCREEN_SHARING_OFF / ERROR_REASON_SCREEN_SHARE_BUSY.
+message ScreenShareOpen {}
+
+message ScreenShareOpened {
+  string stream_id = 1;
+  // It closes after this long without anything from the device.
+  uint32 idle_ms = 2;
+}
+
+// Bytes of the VNC stream, in order; at most 256 KiB each.
+message ScreenShareData {
+  string stream_id = 1;
+  bytes data = 2;
+}
+
+// A → B: the device closes the session. Answered with Ack.
+message ScreenShareClose {
+  string stream_id = 1;
+}
+
+enum ScreenShareEnd {
+  SCREEN_SHARE_END_UNSPECIFIED = 0;
+  // The device closed it.
+  SCREEN_SHARE_END_CLOSED = 1;
+  // Nothing came from the device for too long.
+  SCREEN_SHARE_END_IDLE = 2;
+  // The system's service closed the stream (or could not be reached).
+  SCREEN_SHARE_END_SERVICE = 3;
+  // tunelo stopped.
+  SCREEN_SHARE_END_STOPPED = 4;
+}
+
+// B → A, unasked, to the device that opened it: the session is over.
+message ScreenShareClosed {
+  string stream_id = 1;
+  ScreenShareEnd reason = 2;
+}
+
+// A → B: delete the tunelo browser's profile. Answered with MachineInfo.
+message BrowserClear {}
