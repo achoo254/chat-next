@@ -4,7 +4,7 @@
 import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { Channel } from "../src/util/channel.ts";
 
-export type SdkLog = { options: Options[]; interrupts: number; models: string[]; modes?: string[]; flags?: unknown[] };
+export type SdkLog = { options: Options[]; interrupts: number; models: string[]; modes?: string[]; flags?: unknown[]; denials?: string[] };
 
 export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: [] }) {
   const fn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }): Query => {
@@ -37,6 +37,7 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
           const toolUseID = `tu${++n}`;
           m({ type: "assistant", parent_tool_use_id: null, uuid: `u${n}`, message: { id: `msg${n}`, content: [{ type: "tool_use", id: toolUseID, name: "Bash", input: { command } }] } });
           const r = await canUseTool("Bash", { command }, { signal, toolUseID } as Parameters<typeof canUseTool>[2]);
+          if (r?.behavior === "deny") (log.denials ??= []).push(r.message);
           if (interrupted) {
             interrupted = false;
             result(false);

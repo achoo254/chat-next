@@ -1,11 +1,11 @@
 // Every adapter must pass this contract, driven through the agent core the
 // way a device drives it. Runs for the Claude adapter (fake SDK) and for the
 // scripted fake adapter.
-import { Decision, ErrorCode, PromptState, Role, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { Decision, ErrorCode, ErrorReason, PromptState, Role, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import { SessionTickets } from "../src/mcp/session-tickets.ts";
-import { createClaudeProvider } from "../src/providers/claude/index.ts";
+import { createClaudeProvider, denialText } from "../src/providers/claude/index.ts";
 import type { AgentProvider } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { fakeQuery } from "./fake-sdk.ts";
@@ -33,6 +33,61 @@ const adapters: [string, () => { provider: AgentProvider; resumeIds: () => (stri
 ];
 
 const turnDone = (n: number) => (items: ReturnType<typeof byCase<"turn">>) => items.filter((t) => t.body.value.state !== TurnState.RUNNING).length >= n;
+
+describe("deny and tell Claude", () => {
+  const claude = () => {
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    return { sdk, provider };
+  };
+
+  it("hands the user's words to Claude as the tool's answer, in the same turn, and keeps them on the card", async () => {
+    const { sdk, provider } = claude();
+    const { core, work } = makeCore([provider]);
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "ask rm -rf build", consent, device: "test" });
+    const pending = await until(core, t.id, (i) => byCase(i, "approval").some((a) => a.body.value.state === PromptState.PENDING));
+    const card = byCase(pending, "approval")[0];
+    if (!card) throw new Error("no approval");
+    core.respond(t.id, card.id, card.revision, { decision: Decision.DENY, denyMessage: "  delete only build/tmp  " }, "phone");
+    const items = await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    expect(sdk.log.denials).toEqual([denialText("delete only build/tmp")]);
+    expect(sdk.log.denials?.[0]).toContain("delete only build/tmp");
+    expect(byCase(items, "approval")[0]?.body.value.denyMessage).toBe("delete only build/tmp");
+    expect(byCase(items, "turn")).toHaveLength(1);
+    await core.stop();
+  });
+
+  it("keeps the plain refusal without words", async () => {
+    expect(denialText(undefined)).toBe("The user denied this from their device.");
+    expect(denialText("   ")).toBe("The user denied this from their device.");
+  });
+
+  it("refuses words with an allow, on a question, or past the limit, and leaves the prompt open", async () => {
+    const { provider } = claude();
+    const { core, work } = makeCore([provider]);
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "ask ls", consent, device: "test" });
+    const pending = await until(core, t.id, (i) => byCase(i, "approval").some((a) => a.body.value.state === PromptState.PENDING));
+    const card = byCase(pending, "approval")[0];
+    if (!card) throw new Error("no approval");
+    const invalid = { code: ErrorCode.INVALID, reason: ErrorReason.DENY_MESSAGE_INVALID };
+    expect(() => core.respond(t.id, card.id, card.revision, { decision: Decision.ALLOW, denyMessage: "x" }, "test")).toThrow(
+      expect.objectContaining(invalid),
+    );
+    expect(() => core.respond(t.id, card.id, card.revision, { decision: Decision.DENY, denyMessage: "x".repeat(4001) }, "test")).toThrow(
+      expect.objectContaining(invalid),
+    );
+    core.respond(t.id, card.id, card.revision, { decision: Decision.ALLOW }, "test");
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+
+    const q = await core.create({ provider: "claude", model: "", dir: work, text: "question", consent, device: "test" });
+    const asked = await until(core, q.id, (i) => byCase(i, "question").length > 0);
+    const question = byCase(asked, "question")[0];
+    if (!question) throw new Error("no question");
+    expect(() => core.respond(q.id, question.id, question.revision, { denyMessage: "no" }, "test")).toThrow(expect.objectContaining(invalid));
+    await core.stop();
+  });
+});
 
 describe("claude adapter usage", () => {
   it("passes plan usage and lines changed", async () => {
@@ -259,8 +314,43 @@ describe.each(adapters)("provider contract: %s", (_name, make) => {
     await expect(
       core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: true }, device: "phone" }),
     ).rejects.toThrow(/tunelo trust/);
+    // A sensitive folder is never trusted from a device, consent or not.
+    await expect(
+      core.create({
+        provider: provider.id,
+        model: "",
+        dir: home,
+        text: "hi",
+        consent: { sensitive: true, projectSettings: true, trustProject: true },
+        device: "phone",
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.INVALID, reason: ErrorReason.TRUST_ON_MACHINE, subject: home });
     await core.create({ provider: provider.id, model: "", dir: home, text: "hi", consent: { sensitive: true, projectSettings: false }, device: "phone" });
     expect(audit.list().map((e) => e.action)).toEqual(["open_sensitive"]);
+    await core.stop();
+  });
+
+  it("trusts a folder from a device only with consent, and logs who did it", async () => {
+    const { provider } = make();
+    const trusted = new Set<string>();
+    const trustedBy: string[] = [];
+    const { core, work, audit } = makeCore([provider], {
+      trusted: (d) => trusted.has(d),
+      trust: (dir, device) => {
+        trusted.add(dir);
+        trustedBy.push(device);
+      },
+    });
+    const ask = (trustProject: boolean) =>
+      core.create({ provider: provider.id, model: "", dir: work, text: "hi", consent: { sensitive: false, projectSettings: true, trustProject }, device: "phone" });
+    await expect(ask(false)).rejects.toMatchObject({ code: ErrorCode.INVALID, reason: ErrorReason.PROJECT_SETTINGS_UNTRUSTED, subject: work });
+    expect(trusted.size).toBe(0);
+    await ask(true);
+    expect(trusted.has(work)).toBe(true);
+    expect(trustedBy).toEqual(["phone"]);
+    expect(audit.list().map((e) => [e.action, e.device])).toEqual([["project_settings", "phone"]]);
+    // Trusted now: no consent needed the next time.
+    await ask(false);
     await core.stop();
   });
 

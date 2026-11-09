@@ -171,6 +171,13 @@ export const writeApprovalHook: HookCallback = async (input) => {
   };
 };
 
+/** What Claude reads as the tool's answer: like the terminal's "No, and tell Claude what to do differently". */
+export function denialText(message: string | undefined): string {
+  const said = message?.trim();
+  if (!said) return "The user denied this from their device.";
+  return `The user denied this from their device and said:\n${said}`;
+}
+
 function userMessage(text: string): SDKUserMessage {
   return { type: "user", message: { role: "user", content: text }, parent_tool_use_id: null } as SDKUserMessage;
 }
@@ -216,8 +223,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       sensitive,
       ...(reason ? { reason } : {}),
     };
-    const { decision } = await askUser(req, opts.signal);
-    if (decision === "deny") return { behavior: "deny", message: "The user denied this from their device." };
+    const answer = await askUser(req, opts.signal);
+    if (answer.decision === "deny") return { behavior: "deny", message: denialText(answer.message) };
+    const { decision } = answer;
     write?.approveWrite(toolName, input);
     // A write tool of tunelo's MCP is asked about every time: no rule for the session.
     if (decision === "allow-session" && !sensitive && !isWriteTool(toolName)) {

@@ -1,8 +1,9 @@
 // A device talking to the machine over in-memory sockets: code pairing,
 // handshake, a thread, an unknown device, a revoked device.
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { type Frame, FrameSchema, HandshakeErrorCode, ThreadState } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, type Frame, FrameSchema, HandshakeErrorCode, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import {
   HandshakeFailure,
   PairingWindow,
@@ -117,7 +118,32 @@ describe("connection", () => {
 
     link.conn.receive(session.seal(create(FrameSchema, { id: "2", body: { case: "dirList", value: { path: "/definitely/not/here" } } })));
     const err = await frames(session, link.next, (f) => f.id === "2");
-    expect(err.at(-1)?.body.case).toBe("error");
+    const notFound = err.at(-1)?.body;
+    expect(notFound?.case).toBe("error");
+    if (notFound?.case === "error") expect(notFound.value.reason).toBe(ErrorReason.FOLDER_NOT_FOUND);
+
+    // @-mentions: files of the thread's own folder; a path out of it is refused with its reason.
+    const threadId = got.find((f) => f.body.case === "threadCreated")?.body.value;
+    const id = threadId && "thread" in threadId ? (threadId.thread?.id ?? "") : "";
+    writeFileSync(join(m.work, "notes.md"), "x");
+    link.conn.receive(session.seal(create(FrameSchema, { id: "3", body: { case: "fileList", value: { threadId: id, prefix: "no" } } })));
+    const listed = (await frames(session, link.next, (f) => f.id === "3")).at(-1)?.body;
+    expect(listed?.case === "fileListResult" && listed.value.entries.map((e) => e.path)).toEqual(["notes.md"]);
+    link.conn.receive(session.seal(create(FrameSchema, { id: "4", body: { case: "fileList", value: { threadId: id, prefix: "../" } } })));
+    const outside = (await frames(session, link.next, (f) => f.id === "4")).at(-1)?.body;
+    expect(outside?.case === "error" && [outside.value.code, outside.value.reason]).toEqual([ErrorCode.INVALID, ErrorReason.PATH_OUTSIDE_FOLDER]);
+
+    // A denial with words reaches the core and lands on the card.
+    link.conn.receive(
+      session.seal(
+        create(FrameSchema, {
+          id: "5",
+          body: { case: "threadRespond", value: { threadId: id, itemId: "nope", expectedRevision: 1, answer: { case: "decision", value: 3 }, denyMessage: "no" } },
+        }),
+      ),
+    );
+    const stale = (await frames(session, link.next, (f) => f.id === "5")).at(-1)?.body;
+    expect(stale?.case === "error" && stale.value.reason).toBe(ErrorReason.PROMPT_STALE);
   });
 
   it("refuses an unpaired device and a revoked one", async () => {

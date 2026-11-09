@@ -83,7 +83,19 @@ const SIGN_IN_CHECK_MS = 5 * 60_000;
 /** In a profile folder (beside home) while its sign-in has not finished. */
 const ATTEMPT_MARKER = "attempt";
 
-export class ProfileError extends Error {}
+/** Why a profile request was refused; devices word it in the user's language. */
+export type ProfileErrorKind = "damaged" | "not-found" | "default-permanent" | "in-use" | "sign-out-failed" | "cli-missing";
+
+export class ProfileError extends Error {
+  constructor(
+    message: string,
+    readonly kind: ProfileErrorKind,
+    /** The variable part the kind names (a profile id), when it has one. */
+    readonly subject = "",
+  ) {
+    super(message);
+  }
+}
 
 export class ClaudeProfiles {
   readonly store: ProfileStore;
@@ -111,7 +123,7 @@ export class ClaudeProfiles {
   }
 
   private readable(): void {
-    if (this.store.damaged) throw new ProfileError(this.store.damaged);
+    if (this.store.damaged) throw new ProfileError(this.store.damaged, "damaged");
   }
 
   private home(id: string): string {
@@ -122,7 +134,7 @@ export class ClaudeProfiles {
 
   private async bin(): Promise<string> {
     const bin = await this.opts.findBinary();
-    if (!bin) throw new ProfileError("claude is not installed on this machine");
+    if (!bin) throw new ProfileError("claude is not installed on this machine", "cli-missing");
     return bin;
   }
 
@@ -254,7 +266,7 @@ export class ClaudeProfiles {
     return this.serial(async () => {
       this.readable();
       const p = id === "" ? null : this.store.find(id);
-      if (id !== "" && !p) throw new ProfileError("no such profile");
+      if (id !== "" && !p) throw new ProfileError("no such profile", "not-found");
       this.store.update((d) => {
         d.selectedProfileId = id === "" ? null : id;
       });
@@ -290,7 +302,7 @@ export class ClaudeProfiles {
    */
   refreshUsage(id: string): Promise<void> {
     this.readable();
-    if (id !== "" && !this.store.find(id)) return Promise.reject(new ProfileError("no such profile"));
+    if (id !== "" && !this.store.find(id)) return Promise.reject(new ProfileError("no such profile", "not-found"));
     const last = this.lastUsage(id);
     if (last && this.now() - last.updatedAt < (this.opts.usageMinIntervalMs ?? USAGE_MIN_INTERVAL_MS)) return Promise.resolve();
     const running = this.usageInFlight.get(id);
@@ -467,10 +479,10 @@ export class ClaudeProfiles {
   remove(id: string, device: string, options: { force?: boolean } = {}): Promise<void> {
     return this.serial(async () => {
       this.readable();
-      if (id === "") throw new ProfileError("the default profile cannot be removed");
+      if (id === "") throw new ProfileError("the default profile cannot be removed", "default-permanent");
       const p = this.store.find(id);
-      if (!p) throw new ProfileError("no such profile");
-      if (this.opts.inUse?.(id)) throw new ProfileError("a session is open with this profile; close it first");
+      if (!p) throw new ProfileError("no such profile", "not-found");
+      if (this.opts.inUse?.(id)) throw new ProfileError("a session is open with this profile; close it first", "in-use");
       // Unselected at once: no new session can open with it while it is signed out.
       const wasSelected = this.store.get().selectedProfileId === id;
       if (wasSelected) {
@@ -489,6 +501,8 @@ export class ClaudeProfiles {
         }
         throw new ProfileError(
           `claude could not sign this account out, so nothing was deleted. On the machine, \`tunelo claude profiles remove ${id} --force\` deletes it anyway`,
+          "sign-out-failed",
+          id,
         );
       }
       if (!signedOut) this.log("claude profiles: removed a profile claude could not sign out (forced)");

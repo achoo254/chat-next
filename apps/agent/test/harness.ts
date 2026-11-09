@@ -13,7 +13,7 @@ export function tempDir(prefix = "agent-test-"): string {
 
 export function makeCore(
   providers: AgentProvider[],
-  opts: { dataDir?: string; home?: string; maxSessions?: number; trusted?: (dir: string) => boolean; sessionMcp?: CoreOptions["sessionMcp"] } = {},
+  opts: { dataDir?: string; home?: string; maxSessions?: number; trusted?: (dir: string) => boolean; trust?: CoreOptions["trust"]; sessionMcp?: CoreOptions["sessionMcp"] } = {},
 ) {
   const root = tempDir();
   const home = opts.home ?? join(root, "home");
@@ -29,6 +29,7 @@ export function makeCore(
     isSensitive: createSensitiveCheck({ home }),
     maxSessions: opts.maxSessions ?? 3,
     ...(opts.trusted ? { isTrusted: opts.trusted } : {}),
+    ...(opts.trust ? { trust: opts.trust } : {}),
     ...(opts.sessionMcp ? { sessionMcp: opts.sessionMcp } : {}),
   });
   return { core, audit, home, work, dataDir };

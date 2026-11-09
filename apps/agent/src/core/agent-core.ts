@@ -10,6 +10,7 @@ import {
   type Cursor,
   Decision,
   ErrorCode,
+  ErrorReason,
   type Item,
   PromptState,
   Role,
@@ -42,14 +43,24 @@ import { gitBranch } from "../safety/dirs.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 import type { SessionMcpLease } from "../mcp/session-tickets.ts";
 
+/** A refusal devices can say in the user's language: `reason` (+ `subject`) is stable, `message` is English. */
 export class AgentError extends Error {
+  readonly reason: ErrorReason;
+  readonly subject: string;
+
   constructor(
     readonly code: ErrorCode,
     message: string,
+    detail: { reason?: ErrorReason; subject?: string } = {},
   ) {
     super(message);
+    this.reason = detail.reason ?? ErrorReason.UNSPECIFIED;
+    this.subject = detail.subject ?? "";
   }
 }
+
+/** Longest ThreadRespond.deny_message accepted. */
+export const DENY_MESSAGE_MAX = 4000;
 
 type Segment = { provider: string; model: string; sessionId?: string; startedSeq: string };
 
@@ -111,8 +122,10 @@ export type CoreOptions = {
   providers: AgentProvider[];
   audit: AuditLog;
   isSensitive: (path: string) => boolean;
-  /** Project settings load only in folders the owner trusted on the machine. */
+  /** Project settings load only in folders the owner trusted (on the machine, or from a device with consent). */
   isTrusted?: (dir: string) => boolean;
+  /** Trusts a folder for a device that asked with consent; writes the consent log. */
+  trust?: (dir: string, device: string) => void;
   mcpServers?: Record<string, unknown>;
   maxSessions?: number;
   idleMs?: number;
@@ -334,9 +347,14 @@ export class AgentCore {
     return this.thread(threadId).journal.bounds(this.epoch).lastSeq;
   }
 
+  /** The thread's working directory. */
+  threadDir(threadId: string): string {
+    return this.thread(threadId).meta.dir;
+  }
+
   fullItem(threadId: string, itemId: string): Item {
     const item = this.thread(threadId).journal.get(itemId);
-    if (!item) throw new AgentError(ErrorCode.NOT_FOUND, "no such item");
+    if (!item) throw new AgentError(ErrorCode.NOT_FOUND, "no such item", { reason: ErrorReason.ITEM_NOT_FOUND });
     return item;
   }
 
@@ -353,21 +371,34 @@ export class AgentCore {
     model: string;
     dir: string;
     text: string;
-    consent: { sensitive: boolean; projectSettings: boolean };
+    consent: { sensitive: boolean; projectSettings: boolean; trustProject?: boolean };
     device: string;
   }): Promise<ThreadSummary> {
     const provider = this.provider(req.provider || "claude");
     const dir = resolve(req.dir);
-    if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found");
-    if (!req.text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message");
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
+    if (!req.text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
     const sensitive = this.opts.isSensitive(dir);
-    if (sensitive && !req.consent.sensitive) throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder");
+    if (sensitive && !req.consent.sensitive) throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder", { reason: ErrorReason.SENSITIVE_FOLDER, subject: dir });
     const detected = await provider.detect(this.detectOptions());
-    if (!detected.installed) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`);
-    if (detected.loginState === "needs-login") throw new AgentError(ErrorCode.NEEDS_LOGIN, `${provider.name} needs sign-in`);
+    this.assertReady(provider, detected);
 
-    if (req.consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false)) {
-      throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: tunelo trust "${dir}"`);
+    const trustNow = req.consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false);
+    if (trustNow) {
+      // Trusting a sensitive folder (home, a disk root) from a device would trust everything under it.
+      if (sensitive || !this.opts.trust) {
+        throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are trusted on the machine only; run there: tunelo trust "${dir}"`, {
+          reason: ErrorReason.TRUST_ON_MACHINE,
+          subject: dir,
+        });
+      }
+      if (!req.consent.trustProject) {
+        throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: tunelo trust "${dir}"`, {
+          reason: ErrorReason.PROJECT_SETTINGS_UNTRUSTED,
+          subject: dir,
+        });
+      }
+      this.opts.trust(dir, req.device);
     }
     if (sensitive) this.opts.audit.write({ device: req.device, action: "open_sensitive", path: dir, detail: "" });
     if (req.consent.projectSettings) {
@@ -396,7 +427,7 @@ export class AgentCore {
 
   async send(threadId: string, text: string, clientMsgId: string): Promise<void> {
     const t = this.thread(threadId);
-    if (!text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message");
+    if (!text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
     if (clientMsgId) {
       if (t.clientMsgIds.has(clientMsgId)) return;
       t.clientMsgIds.add(clientMsgId);
@@ -412,11 +443,26 @@ export class AgentCore {
     await this.ensureSession(t);
   }
 
-  respond(threadId: string, itemId: string, expectedRevision: number, answer: { decision?: Decision; answers?: Answers }, device: string): void {
+  respond(
+    threadId: string,
+    itemId: string,
+    expectedRevision: number,
+    answer: { decision?: Decision; answers?: Answers; denyMessage?: string },
+    device: string,
+  ): void {
     const t = this.thread(threadId);
     const p = t.pending.get(itemId);
     const item = t.journal.get(itemId);
-    if (!p || !item || item.revision !== expectedRevision) throw new AgentError(ErrorCode.STALE, "this prompt changed or was answered");
+    if (!p || !item || item.revision !== expectedRevision) {
+      throw new AgentError(ErrorCode.STALE, "this prompt changed or was answered", { reason: ErrorReason.PROMPT_STALE });
+    }
+    const denyMessage = (answer.denyMessage ?? "").trim();
+    if (denyMessage && (p.kind !== "approval" || (answer.decision ?? Decision.DENY) !== Decision.DENY)) {
+      throw new AgentError(ErrorCode.INVALID, "a message goes with a denial only", { reason: ErrorReason.DENY_MESSAGE_INVALID });
+    }
+    if (denyMessage.length > DENY_MESSAGE_MAX) {
+      throw new AgentError(ErrorCode.INVALID, `the message is longer than ${DENY_MESSAGE_MAX} characters`, { reason: ErrorReason.DENY_MESSAGE_INVALID });
+    }
     t.pending.delete(itemId);
     if (p.kind === "approval") {
       let decision = answer.decision ?? Decision.DENY;
@@ -425,12 +471,15 @@ export class AgentCore {
         if (b.case === "approval") {
           b.value.state = PromptState.ANSWERED;
           b.value.decision = decision;
+          if (denyMessage) b.value.denyMessage = denyMessage;
         }
       });
       if (p.sensitive && decision !== Decision.DENY && item.body.case === "approval") {
         this.opts.audit.write({ device, action: "approve_sensitive", path: t.meta.dir, detail: `${item.body.value.name} ${item.body.value.summary}` });
       }
-      p.resolve({ decision: decision === Decision.ALLOW ? "allow" : decision === Decision.ALLOW_SESSION ? "allow-session" : "deny" });
+      if (decision === Decision.ALLOW) p.resolve({ decision: "allow" });
+      else if (decision === Decision.ALLOW_SESSION) p.resolve({ decision: "allow-session" });
+      else p.resolve(denyMessage ? { decision: "deny", message: denyMessage } : { decision: "deny" });
     } else {
       const values = (answer.answers?.answers ?? []).map((a) => a.values);
       this.update(t, itemId, (b) => {
@@ -475,7 +524,7 @@ export class AgentCore {
   async setEffort(threadId: string, effort: string): Promise<void> {
     const t = this.thread(threadId);
     if (effort !== "" && !this.provider(t.meta.provider).capabilities.effortLevels.includes(effort)) {
-      throw new AgentError(ErrorCode.INVALID, `unknown effort "${effort}"`);
+      throw new AgentError(ErrorCode.INVALID, `unknown effort "${effort}"`, { reason: ErrorReason.UNKNOWN_EFFORT, subject: effort });
     }
     if (t.session?.setEffort) await t.session.setEffort(effort);
     if (effort === "") delete t.meta.effort;
@@ -499,7 +548,12 @@ export class AgentCore {
 
   async setPermissionMode(threadId: string, mode: string, device: string): Promise<void> {
     const t = this.thread(threadId);
-    if (!this.permissionModes(t).includes(mode)) throw new AgentError(ErrorCode.INVALID, `permission mode "${mode}" is not allowed from a device`);
+    if (!this.permissionModes(t).includes(mode)) {
+      throw new AgentError(ErrorCode.INVALID, `permission mode "${mode}" is not allowed from a device`, {
+        reason: ErrorReason.PERMISSION_MODE_NOT_ALLOWED,
+        subject: mode,
+      });
+    }
     if (t.session?.setPermissionMode) await t.session.setPermissionMode(mode);
     t.meta.permissionMode = mode;
     t.info.permissionMode = mode;
@@ -512,10 +566,8 @@ export class AgentCore {
   async switchProvider(threadId: string, providerId: string, model: string): Promise<void> {
     const t = this.thread(threadId);
     const target = this.provider(providerId);
-    if (target.id === t.meta.provider) throw new AgentError(ErrorCode.INVALID, "already on this AI");
-    const detected = await target.detect(this.detectOptions());
-    if (!detected.installed) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${target.name} is not installed`);
-    if (detected.loginState === "needs-login") throw new AgentError(ErrorCode.NEEDS_LOGIN, `${target.name} needs sign-in`);
+    if (target.id === t.meta.provider) throw new AgentError(ErrorCode.INVALID, "already on this AI", { reason: ErrorReason.SAME_AI });
+    this.assertReady(target, await target.detect(this.detectOptions()));
     if (t.running) await this.interrupt(threadId);
     this.cancelPending(t);
     await this.park(t);
@@ -541,13 +593,24 @@ export class AgentCore {
 
   // --- sessions ------------------------------------------------------------
 
+  /** The AI is installed and signed in, or the refusal says which is missing. */
+  private assertReady(provider: AgentProvider, detected: { installed: boolean; loginState: string }): void {
+    if (!detected.installed) {
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
+    }
+    if (detected.loginState === "needs-login") {
+      throw new AgentError(ErrorCode.NEEDS_LOGIN, `${provider.name} needs sign-in`, { reason: ErrorReason.AI_NEEDS_LOGIN, subject: provider.name });
+    }
+  }
+
   /** The sign-in to check before a new session: that of the selected profile. */
   private detectOptions(): { accountDir?: string } {
     let dir: string | undefined;
     try {
       dir = this.opts.selectedAccountDir?.();
     } catch (err) {
-      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, (err as Error).message);
+      const why = (err as Error).message;
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });
     }
     return dir ? { accountDir: dir } : {};
   }
@@ -576,10 +639,11 @@ export class AgentCore {
     try {
       profile = this.opts.profile?.() ?? { id: "" };
     } catch (err) {
-      const message = `the Claude account picked on this machine cannot be used: ${(err as Error).message}`.slice(0, 500);
+      const why = (err as Error).message;
+      const message = `the Claude account picked on this machine cannot be used: ${why}`.slice(0, 500);
       this.put(t, `error:${randomUUID()}`, { case: "error", value: { message } });
       this.endTurn(t, TurnState.FAILED, 0);
-      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, message);
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, message, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });
     }
     if (profile.id) t.meta.profileId = profile.id;
     else delete t.meta.profileId;
@@ -603,9 +667,10 @@ export class AgentCore {
       t.session = await t.starting;
     } catch (err) {
       lease?.release();
-      this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: (err as Error).message.slice(0, 500) } });
+      const why = (err as Error).message;
+      this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: why.slice(0, 500) } });
       this.endTurn(t, TurnState.FAILED, 0);
-      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, (err as Error).message);
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.AI_START_FAILED, subject: why.slice(0, 300) });
     } finally {
       delete t.starting;
     }
@@ -892,13 +957,13 @@ export class AgentCore {
 
   private thread(id: string): Thread {
     const t = this.threads.get(id);
-    if (!t) throw new AgentError(ErrorCode.NOT_FOUND, "no such thread");
+    if (!t) throw new AgentError(ErrorCode.NOT_FOUND, "no such thread", { reason: ErrorReason.THREAD_NOT_FOUND });
     return t;
   }
 
   private provider(id: string): AgentProvider {
     const p = this.opts.providers.find((x) => x.id === id);
-    if (!p) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `unknown AI "${id}"`);
+    if (!p) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `unknown AI "${id}"`, { reason: ErrorReason.UNKNOWN_AI, subject: id });
     return p;
   }
 

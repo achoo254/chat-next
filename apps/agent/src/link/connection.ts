@@ -3,6 +3,7 @@
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import {
   ErrorCode,
+  ErrorReason,
   type Frame,
   FrameSchema,
   HandshakeErrorCode,
@@ -22,10 +23,11 @@ import {
 } from "@achoo254/chat-remote-protocol";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
-import { type ClaudeProfiles, type ProfileList, ProfileError } from "../profiles/service.ts";
+import { type ClaudeProfiles, type ProfileErrorKind, type ProfileList, ProfileError } from "../profiles/service.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import type { LocalForward } from "../tunnels/forward.ts";
 import { listDir } from "../safety/dirs.ts";
+import { OutsideFolderError, listSessionFiles } from "../safety/session-files.ts";
 import { wireItem } from "./wire.ts";
 
 export type Socket = {
@@ -50,6 +52,36 @@ export type LinkContext = {
   /** Localman's requests for localhost; absent where the machine has none (tests). */
   localForward?: LocalForward;
 };
+
+const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
+  damaged: ErrorReason.PROFILES_DAMAGED,
+  "not-found": ErrorReason.PROFILE_NOT_FOUND,
+  "default-permanent": ErrorReason.DEFAULT_PROFILE_PERMANENT,
+  "in-use": ErrorReason.PROFILE_IN_USE,
+  "sign-out-failed": ErrorReason.PROFILE_SIGN_OUT_FAILED,
+  "cli-missing": ErrorReason.AI_CLI_MISSING,
+};
+
+/** What a device gets for a failed request: a class, a stable reason to word it, and English for the rest. */
+export function errorBody(err: unknown): { code: ErrorCode; message: string; reason: ErrorReason; subject: string } {
+  const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
+  if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject };
+  if (err instanceof ProfileError) return { code: ErrorCode.INVALID, message, reason: PROFILE_REASONS[err.kind], subject: err.subject };
+  if (err instanceof OutsideFolderError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.PATH_OUTSIDE_FOLDER, subject: "" };
+  if (isFsError(err)) {
+    const fsCode = (err as { code: string }).code;
+    const reason =
+      fsCode === "ENOENT" || fsCode === "ENOTDIR"
+        ? ErrorReason.FOLDER_NOT_FOUND
+        : fsCode === "EACCES" || fsCode === "EPERM"
+          ? ErrorReason.ACCESS_DENIED
+          : ErrorReason.UNSPECIFIED;
+    return { code: ErrorCode.INVALID, message, reason, subject: "" };
+  }
+  return { code: ErrorCode.INTERNAL, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
+}
+
+const refusal = (message: string, reason: ErrorReason) => ({ code: ErrorCode.INVALID, message, reason, subject: "" });
 
 const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
 
@@ -207,7 +239,7 @@ export class Connection {
   /** Claude profiles: the sign-in code is handed on and dropped, never kept or logged. */
   private async profileFrame(id: string, b: ProfileFrame): Promise<void> {
     const profiles = this.ctx.profiles;
-    if (!profiles) return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "this machine has no Claude profiles" } });
+    if (!profiles) return this.send(id, { case: "error", value: refusal("this machine has no Claude profiles", ErrorReason.NO_PROFILES) });
     const sendList = async () => this.send(id, { case: "profileListResult", value: profileListBody(await profiles.list()) });
     switch (b.case) {
       case "profileList":
@@ -253,7 +285,9 @@ export class Connection {
         case "machineSettingsSet": {
           const forward = this.ctx.localForward;
           if (b.value.localForward !== undefined) {
-            if (!forward) return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "this machine does not forward to localhost" } });
+            if (!forward) {
+              return this.send(id, { case: "error", value: refusal("this machine does not forward to localhost", ErrorReason.NO_LOCAL_FORWARD) });
+            }
             await forward.setEnabled(b.value.localForward, this.device);
           }
           return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
@@ -270,7 +304,11 @@ export class Connection {
             model: v.model,
             dir: v.dir,
             text: v.text,
-            consent: { sensitive: Boolean(v.consent?.sensitive), projectSettings: Boolean(v.consent?.projectSettings) },
+            consent: {
+              sensitive: Boolean(v.consent?.sensitive),
+              projectSettings: Boolean(v.consent?.projectSettings),
+              trustProject: Boolean(v.consent?.trustProject),
+            },
             device: this.device,
           });
           this.subscribed.add(thread.id);
@@ -294,7 +332,12 @@ export class Connection {
           return ack();
         case "threadRespond": {
           const v = b.value;
-          const answer = v.answer.case === "decision" ? { decision: v.answer.value } : v.answer.case === "answers" ? { answers: v.answer.value } : {};
+          const answer =
+            v.answer.case === "decision"
+              ? { decision: v.answer.value, denyMessage: v.denyMessage }
+              : v.answer.case === "answers"
+                ? { answers: v.answer.value, denyMessage: v.denyMessage }
+                : { denyMessage: v.denyMessage };
           core.respond(v.threadId, v.itemId, v.expectedRevision, answer, this.device);
           return ack();
         }
@@ -323,6 +366,11 @@ export class Connection {
           const l = listDir(b.value.path, { showHidden: b.value.showHidden, isSensitive: this.ctx.isSensitive });
           return this.send(id, { case: "dirListResult", value: l });
         }
+        case "fileList": {
+          const { threadId, prefix, limit } = b.value;
+          const listing = listSessionFiles(core.threadDir(threadId), prefix, { limit, isSensitive: this.ctx.isSensitive });
+          return this.send(id, { case: "fileListResult", value: { threadId, ...listing } });
+        }
         case "auditList": {
           const entries = this.ctx.audit.list(b.value.limit || 100).map((e) => ({ ...e, at: BigInt(e.at) }));
           return this.send(id, { case: "auditListResult", value: { entries } });
@@ -339,7 +387,7 @@ export class Connection {
           void this.profileFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
         default:
-          return this.send(id, { case: "error", value: { code: ErrorCode.INVALID, message: "unsupported request" } });
+          return this.send(id, { case: "error", value: refusal("unsupported request", ErrorReason.UNSUPPORTED_REQUEST) });
       }
     } catch (err) {
       this.sendError(id, err);
@@ -347,8 +395,7 @@ export class Connection {
   }
 
   private sendError(id: string, err: unknown): void {
-    const code = err instanceof AgentError ? err.code : isFsError(err) || err instanceof ProfileError ? ErrorCode.INVALID : ErrorCode.INTERNAL;
-    this.send(id, { case: "error", value: { code, message: (err as Error).message.slice(0, 300) } });
+    this.send(id, { case: "error", value: errorBody(err) });
   }
 }
 

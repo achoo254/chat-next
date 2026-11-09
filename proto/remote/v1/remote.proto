@@ -133,6 +133,7 @@ message Frame {
     ProfileRemove profile_remove = 31;
     UsageRefresh usage_refresh = 32;
     MachineSettingsSet machine_settings_set = 33;
+    FileList file_list = 34;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -151,6 +152,7 @@ message Frame {
     ProfileListResult profile_list_result = 53;
     ProfileSignInPrompt profile_sign_in_prompt = 54;
     ProfileSignInResult profile_sign_in_result = 55;
+    FileListResult file_list_result = 56;
   }
 }
 
@@ -177,6 +179,12 @@ message Consent {
   // Load the project's own agent settings (for Claude: .claude/settings.json
   // and hooks). Off by default; B logs it when on.
   bool project_settings = 2;
+  // With project_settings: the user agreed to trust this directory's project
+  // settings on B from now on (as `tunelo trust` on the machine does). B logs
+  // it. B refuses it for a sensitive directory: that is trusted on the
+  // machine itself. Without it, an untrusted directory is refused with
+  // ERROR_REASON_PROJECT_SETTINGS_UNTRUSTED.
+  bool trust_project = 3;
 }
 
 message ThreadSend {
@@ -201,6 +209,10 @@ message ThreadRespond {
     Decision decision = 4;
     Answers answers = 5;
   }
+  // With DECISION_DENY only: what the user tells the AI instead, at most
+  // 4000 characters. The AI reads it as the tool's answer in the same turn
+  // and goes on. Empty: a plain refusal. B refuses it with any other answer.
+  string deny_message = 6;
 }
 
 enum Decision {
@@ -274,6 +286,20 @@ message DirList {
 
 message AuditList {
   uint32 limit = 1;
+}
+
+// Files and folders inside a session's working directory, for @-mentions.
+// Answered with FileListResult. B never lists outside that directory, never
+// follows a symbolic link to a folder, and skips .git, node_modules and
+// sensitive paths.
+message FileList {
+  string thread_id = 1;
+  // A path relative to the working directory, "/"-separated; entries whose
+  // relative path starts with it match, and so do those whose name starts
+  // with it when it has no "/". Case-insensitive. Empty: everything.
+  string prefix = 2;
+  // At most this many entries; 0 means 50, B caps it at 200.
+  uint32 limit = 3;
 }
 
 // --- AI accounts (Claude profiles) ------------------------------------------
@@ -444,7 +470,68 @@ message Pong {}
 
 message Error {
   ErrorCode code = 1;
+  // In English, for logs and for devices that do not know the reason.
   string message = 2;
+  // What went wrong, for devices to say in the user's language. Unspecified
+  // (older machines) or unknown to the device: show message instead.
+  ErrorReason reason = 3;
+  // The one variable part the reason names, when it has one: a folder, an
+  // AI's name, a mode, an effort level, a profile id, or the AI's own error.
+  string subject = 4;
+}
+
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+  // The working directory does not exist or is not a folder.
+  ERROR_REASON_FOLDER_NOT_FOUND = 1;
+  ERROR_REASON_EMPTY_MESSAGE = 2;
+  // Consent.sensitive is missing for a sensitive folder.
+  ERROR_REASON_SENSITIVE_FOLDER = 3;
+  // Project settings asked for in a folder not trusted on B (subject: the
+  // folder). Asking again with Consent.trust_project trusts it.
+  ERROR_REASON_PROJECT_SETTINGS_UNTRUSTED = 4;
+  // The folder can be trusted on the machine only: it is sensitive, or B
+  // cannot trust from a device (subject: the folder).
+  ERROR_REASON_TRUST_ON_MACHINE = 5;
+  // Subject: the AI's name.
+  ERROR_REASON_AI_NOT_INSTALLED = 6;
+  // Subject: the AI's name.
+  ERROR_REASON_AI_NEEDS_LOGIN = 7;
+  // Subject: the AI id.
+  ERROR_REASON_UNKNOWN_AI = 8;
+  ERROR_REASON_SAME_AI = 9;
+  // The AI could not start (subject: its own error, in English).
+  ERROR_REASON_AI_START_FAILED = 10;
+  // The Claude account picked on B cannot be used (subject: why, in English).
+  ERROR_REASON_PROFILE_UNUSABLE = 11;
+  ERROR_REASON_THREAD_NOT_FOUND = 12;
+  ERROR_REASON_ITEM_NOT_FOUND = 13;
+  // The approval or question changed or was answered elsewhere.
+  ERROR_REASON_PROMPT_STALE = 14;
+  // ThreadRespond.deny_message with an answer other than deny, or too long.
+  ERROR_REASON_DENY_MESSAGE_INVALID = 15;
+  // Subject: the effort level.
+  ERROR_REASON_UNKNOWN_EFFORT = 16;
+  // Subject: the mode.
+  ERROR_REASON_PERMISSION_MODE_NOT_ALLOWED = 17;
+  ERROR_REASON_NO_PROFILES = 18;
+  ERROR_REASON_PROFILE_NOT_FOUND = 19;
+  ERROR_REASON_DEFAULT_PROFILE_PERMANENT = 20;
+  ERROR_REASON_PROFILE_IN_USE = 21;
+  // claude could not sign the account out, so nothing was deleted (subject:
+  // the profile id, for `tunelo claude profiles remove <id> --force`).
+  ERROR_REASON_PROFILE_SIGN_OUT_FAILED = 22;
+  // B's list of Claude profiles cannot be read; repair it on the machine.
+  ERROR_REASON_PROFILES_DAMAGED = 23;
+  ERROR_REASON_AI_CLI_MISSING = 24;
+  // B does not forward to localhost.
+  ERROR_REASON_NO_LOCAL_FORWARD = 25;
+  // B does not know this request (an older version).
+  ERROR_REASON_UNSUPPORTED_REQUEST = 26;
+  // The operating system refused access to the path.
+  ERROR_REASON_ACCESS_DENIED = 27;
+  // FileList.prefix leaves the session's working directory.
+  ERROR_REASON_PATH_OUTSIDE_FOLDER = 28;
 }
 
 enum ErrorCode {
@@ -658,6 +745,8 @@ message ApprovalItem {
   string reason = 7;
   PromptState state = 8;
   Decision decision = 9;
+  // What the user told the AI when denying (ThreadRespond.deny_message).
+  string deny_message = 10;
 }
 
 message QuestionItem {
@@ -814,6 +903,20 @@ message DirEntry {
   bool sensitive = 4;
 }
 
+message FileListResult {
+  string thread_id = 1;
+  // Sorted: shallower paths first, then by name.
+  repeated FileEntry entries = 2;
+  // More entries matched than were returned, or B stopped looking.
+  bool truncated = 3;
+}
+
+message FileEntry {
+  // Relative to the session's working directory, "/"-separated.
+  string path = 1;
+  bool dir = 2;
+}
+
 message AuditListResult {
   repeated AuditEntry entries = 1;
 }
@@ -822,7 +925,8 @@ message AuditEntry {
   // Unix milliseconds.
   int64 at = 1;
   string device = 2;
-  // open_sensitive, project_settings, approve_sensitive, pair, revoke,
+  // open_sensitive, project_settings (detail "trust" when a device trusted
+  // the folder), approve_sensitive, pair, revoke,
   // permission_mode, profile_add, profile_select, profile_remove
   string action = 3;
   string path = 4;

@@ -27,7 +27,7 @@ export function gitBranch(dir: string): { git: boolean; branch: string } {
 export function listDir(path: string, opts: { showHidden: boolean; isSensitive: (p: string) => boolean }): DirListing {
   const dir = resolve(path || homedir());
   const st = statSync(dir);
-  if (!st.isDirectory()) throw new Error("not a directory");
+  if (!st.isDirectory()) throw Object.assign(new Error("not a directory"), { code: "ENOTDIR" });
   const entries: DirEntry[] = [];
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (!opts.showHidden && e.name.startsWith(".")) continue;

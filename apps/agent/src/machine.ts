@@ -116,6 +116,10 @@ export class Machine {
       audit: this.audit,
       isSensitive: this.isSensitive,
       isTrusted: (dir) => this.config.isTrusted(dir),
+      trust: (dir, device) => {
+        const full = this.config.setTrusted(dir, true);
+        this.audit.write({ device, action: "project_settings", path: full, detail: "trust" });
+      },
       mcpServers: c.mcpServers,
       maxSessions: c.maxSessions,
       idleMs: c.idleMinutes * 60_000,

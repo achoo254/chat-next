@@ -93,7 +93,8 @@ export type Question = {
 
 export type QuestionRequest = { kind: "question"; toolId: string; questions: Question[] };
 
-export type ApprovalAnswer = { decision: "allow" | "allow-session" | "deny" };
+/** A denial may carry what the user tells the AI instead; it reads it as the tool's answer. */
+export type ApprovalAnswer = { decision: "allow" | "allow-session" } | { decision: "deny"; message?: string };
 /** One entry per question: chosen labels or free text. */
 export type QuestionAnswer = { answers: string[][] } | { cancelled: true };
 
