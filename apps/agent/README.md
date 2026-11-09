@@ -72,19 +72,36 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
   `~/.claude/projects/<thư mục mã hoá>/<session id>.jsonl` (`entrypoint: sdk-ts`), nên trên máy chỉ cần `cd` vào thư mục đó và
   chạy `claude --resume` (hoặc `claude --resume <session id>`).
 - **Mở trên máy, làm tiếp trong Chat.** Hộp thoại Phiên mới › tab "Phiên có sẵn trên máy" liệt kê các phiên trong
-  `projects/` của thư mục Claude của máy và của mọi profile (Terminal, IDE như Orca, Claude Desktop, Chat), nhóm theo thư mục,
+  `projects/` của thư mục Claude của máy và của mọi profile (Terminal, IDE, Claude Desktop, Chat), nhóm theo thư mục,
   có tìm kiếm và phân trang. Mở một phiên: lịch sử (tin người dùng, trả lời, tool, diff) hiện ngay; tin nhắn đầu tiên resume
   đúng session id trong thư mục của nó. Thư mục nhạy cảm và cấu hình `.claude` của dự án hỏi đồng ý như phiên mới.
 - **Lượt gõ trên máy sau đó** (`claude --resume` trong Terminal) hiện trong Chat khi mở lại phiên hoặc gửi tin tiếp; phiên đang
   mở trong tunelo được mở lại để Claude đọc cả phần đó.
-- **Mở hai nơi cùng lúc:** phiên "có vẻ đang mở ở nơi khác" khi bản ghi vừa đổi trong 60 giây, hoặc một `claude` đang chạy ghi
-  nó trong `sessions/<pid>.json` của thư mục Claude mà tunelo biết. Web hỏi lại trước khi mở. Giới hạn: `claude` chạy với một
-  `CLAUDE_CONFIG_DIR` tunelo không biết (profile riêng của IDE) chỉ được nhận ra theo 60 giây; lượt gõ trên máy trong lúc Chat
-  đang chạy một lượt của cùng phiên không được đọc vào.
+- **Mở hai nơi cùng lúc:** phiên "có vẻ đang mở ở nơi khác" khi bản ghi vừa đổi trong 60 giây, khi một `claude` đang chạy ghi
+  nó trong `sessions/<pid>.json` của thư mục Claude mà tunelo biết, hoặc khi một tiến trình `claude` đang chạy (bất kể ai mở,
+  kể cả với `CLAUDE_CONFIG_DIR` riêng) làm việc trong thư mục của phiên và phiên đổi sau lúc tiến trình bắt đầu (phiên mới
+  nhất, mỗi tiến trình một phiên; `--resume <id>` trên dòng lệnh thì đúng phiên đó). macOS/Linux đọc bằng `ps` và `lsof`
+  (thư mục làm việc, giờ bắt đầu), giữ 5 giây; Windows chỉ dùng hai cách đầu. tunelo không đọc thư mục cấu hình của ứng dụng
+  nào khác. Web hỏi lại trước khi mở. Giới hạn: lượt gõ trên máy trong lúc Chat đang chạy một lượt của cùng phiên không được
+  đọc vào.
 
 Đọc ít: danh sách chỉ đọc đầu file (thư mục, câu hỏi đầu) và cuối file (tiêu đề), giữ theo kích thước và giờ sửa; số tin
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
 đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
+
+## Ảnh và tệp đính kèm (2.0.5)
+
+Ô nhập của phiên nhận tệp bằng nút đính kèm (điện thoại có thêm chụp ảnh), dán, hoặc kéo thả vào bất kỳ đâu trong phiên. Tệp đi
+từng khúc 512 KB qua kênh mã hoá đầu cuối, không qua server Chat, ngay khi được thêm; có tiến trình, huỷ, thử lại.
+
+- **Ảnh** PNG, JPEG, GIF, WebP (nhận theo byte của tệp) tới 3,75 MB đi thẳng cho Claude dạng ảnh. Ảnh lớn hơn, cạnh trên
+  8000 px hay định dạng khác (HEIC…) được trình duyệt thu nhỏ trước. tunelo giữ ảnh cùng phiên trong thư mục dữ liệu của nó để
+  thiết bị xem lại trong lịch sử (tải lại qua kênh mã hoá khi xem).
+- **Tệp khác** lưu trong thư mục của phiên ở `.tunelo-attachments/<yyyy-mm-dd>/<tên>`; tin nhắn gửi Claude kèm đường dẫn tương
+  đối. Tên tệp chỉ giữ phần cuối, bỏ ký tự hệ điều hành cấm, trùng thì thêm `(2)`. Thư mục đính kèm là link ra ngoài, hay đích
+  nhạy cảm, đều bị từ chối. Trong repo git, `.tunelo-attachments/` được thêm vào `.git/info/exclude` (không sửa `.gitignore`).
+- Giới hạn: 25 MB mỗi tệp, 10 tệp và 50 MB mỗi tin; tệp tải lên mà không gửi bị xoá sau một giờ. Máy cũ hơn 2.0.5 không nhận tệp:
+  web ẩn nút đính kèm, dán hay kéo thả thì nhắc `tunelo update`.
 
 ## macOS cần phiên đăng nhập GUI
 
