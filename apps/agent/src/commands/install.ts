@@ -3,7 +3,7 @@
 // for the first handshake of that browser, signs in with the account
 // (`tunelo login`: tunnel, Chat and Localman at once) and starts the
 // background service at login. The service then adds the machine to the
-// account's "My machines" by itself; no install code is involved. The
+// account's "AI Agent" by itself; no install code is involved. The
 // pairing stays end to end: the secret never leaves this machine.
 //
 // Nothing changes until the sign-in succeeded: an abandoned or refused
@@ -91,7 +91,7 @@ export async function install(dir: string, options: { trust?: string }, deps: In
       delete c.machineRemoved;
     });
     const where = await deps.installService(dir);
-    deps.log(`tunelo will start at login (${where}); this machine appears in My machines in a moment. You can close this window.`);
+    deps.log(`tunelo will start at login (${where}); this machine appears in AI Agent in a moment. You can close this window.`);
   } catch (err) {
     // Only the install and the machine's place changed: put them back.
     config.update((c) => {
@@ -106,7 +106,7 @@ export async function install(dir: string, options: { trust?: string }, deps: In
 export function registerInstallCommand(program: Command): void {
   program
     .command("install")
-    .description("add this machine to My machines: sign in, pair the browser that showed the command (secret on stdin), start at login")
+    .description("add this machine to AI Agent: sign in, pair the browser that showed the command (secret on stdin), start at login")
     .requiredOption("--trust <device key>", "the device that pairs first")
     .action(async (options: { trust?: string }) => {
       await install(configDir(), options);

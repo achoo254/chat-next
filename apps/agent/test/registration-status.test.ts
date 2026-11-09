@@ -99,7 +99,7 @@ describe("registration status", () => {
     expect(s.session.asked).toEqual(["chat"]);
     expect(s.config.get()).toMatchObject({ machineId: "7", machineSecret: "s".repeat(43), claimed: true });
     expect(s.registered).toHaveBeenCalledTimes(1);
-    expect(s.registration.report().chat).toEqual({ status: "ok", detail: "in My machines (machine 7)" });
+    expect(s.registration.report().chat).toEqual({ status: "ok", detail: "in AI Agent (machine 7)" });
     expect(s.registration.report().localman.status).toBe("ok");
   });
 

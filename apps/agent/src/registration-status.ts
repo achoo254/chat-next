@@ -1,7 +1,7 @@
 // Where this machine stands with each app of the one sign-in (tunnel, Chat,
 // Localman; the Localman link itself is localman/self-link.ts), and the
 // machine's place in Chat: after `tunelo login` the
-// service adds the machine to the account's "My machines" by itself
+// service adds the machine to the account's "AI Agent" by itself
 // (RegisterMachine), or ties a machine added with an install code before
 // accounts to that account (ClaimMachine).
 //
@@ -59,13 +59,13 @@ function storedChatState(config: ConfigStore, session: AppSession): AppState | u
   const c = config.get();
   if (c.machineRemoved) return { status: "off", detail: "removed on the web; add it again from the Chat page (Add this machine)" };
   const registered = Boolean(c.machineId && c.machineSecret);
-  if (registered && c.claimed) return { status: "ok", detail: `in My machines (machine ${c.machineId ?? ""})` };
+  if (registered && c.claimed) return { status: "ok", detail: `in AI Agent (machine ${c.machineId ?? ""})` };
   if (!session.covers("chat")) {
     return {
       status: "sign-in",
       detail: registered
-        ? `in My machines; ${LOGIN_HINT} once to tie it to your account`
-        : `${LOGIN_HINT} to add this machine to My machines`,
+        ? `in AI Agent; ${LOGIN_HINT} once to tie it to your account`
+        : `${LOGIN_HINT} to add this machine to AI Agent`,
     };
   }
   return undefined;
@@ -82,7 +82,7 @@ export function storedReport(config: ConfigStore, session: AppSession): AppsRepo
   const linked = info !== undefined && session.covers("localman") && config.get().localman?.sub === info.sub;
   return {
     tunnel: info ? { status: "off", detail: stopped } : { status: "sign-in", detail: LOGIN_HINT },
-    chat: storedChatState(config, session) ?? { status: "off", detail: `not in My machines yet; ${stopped}` },
+    chat: storedChatState(config, session) ?? { status: "off", detail: `not in AI Agent yet; ${stopped}` },
     localman: linked ? { status: "off", detail: `linked; ${stopped}` } : localmanState(session),
   };
 }
@@ -120,7 +120,7 @@ export class Registration {
       });
     this.chat = storedChatState(deps.config, deps.session) ?? this.chat;
     this.tunnel = deps.session.info()
-      ? { status: "waiting", detail: "opens once the machine is in My machines" }
+      ? { status: "waiting", detail: "opens once the machine is in AI Agent" }
       : { status: "sign-in", detail: LOGIN_HINT };
   }
 
@@ -229,7 +229,7 @@ export class Registration {
         await api.claim(token, c.machineSecret);
         config.update((x) => (x.claimed = true));
         this.deps.log(`machine ${c.machineId} is now tied to account ${session.info()?.sub ?? ""} in Chat`);
-        this.settled({ status: "ok", detail: `in My machines (machine ${c.machineId})` });
+        this.settled({ status: "ok", detail: `in AI Agent (machine ${c.machineId})` });
         return;
       }
       const reg = await api.register(token, this.deps.publicKey(), this.deps.agentVersion);
@@ -238,8 +238,8 @@ export class Registration {
         x.machineSecret = reg.machineSecret;
         x.claimed = true;
       });
-      this.deps.log(`added to My machines in Chat (machine ${reg.machineId})`);
-      this.settled({ status: "ok", detail: `in My machines (machine ${reg.machineId})` });
+      this.deps.log(`added to AI Agent in Chat (machine ${reg.machineId})`);
+      this.settled({ status: "ok", detail: `in AI Agent (machine ${reg.machineId})` });
       this.deps.onRegistered();
     } catch (err) {
       this.failed(err);
@@ -265,7 +265,7 @@ export class Registration {
     }
     const detail =
       reason === "chat_account_missing"
-        ? "waiting: Chat cannot add this account yet (open Chat once, or wait); the machine then appears in My machines"
+        ? "waiting: Chat cannot add this account yet (open Chat once, or wait); the machine then appears in AI Agent"
         : reason === "agent_update_required"
           ? "this tunelo is too old for Chat: run `tunelo update`"
           : reason === "claim_wrong_account"

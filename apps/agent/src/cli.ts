@@ -142,7 +142,7 @@ async function hdaMain(argv: string[]): Promise<number> {
     return forward(paths.newExe, argv);
   }
   throw new Error(
-    "hda is being renamed to tunelo. The move finishes when the background process starts again; or run the install command from the Chat page (My machines) again.",
+    "hda is being renamed to tunelo. The move finishes when the background process starts again; or run the install command from the Chat page (AI Agent) again.",
   );
 }
 
@@ -248,7 +248,7 @@ function buildProgram(): Command {
       await importLegacySignIns(configDir()).catch((err: Error) => console.error(`tunelo: could not move the earlier sign-in yet (${err.message})`));
     });
 
-  // The background service and this machine in My machines.
+  // The background service and this machine in AI Agent.
   registerInstallCommand(program);
   program.command("start").description("run in the background (keeps running after the terminal closes)").action(exits(start));
   program

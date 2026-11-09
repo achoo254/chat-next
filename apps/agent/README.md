@@ -1,6 +1,6 @@
 # tunelo
 
-Tiến trình máy của hệ sinh thái hoandat: tunnel tới `localhost` (CLI Tunelo), Máy của tôi trong Chat (chat với claude trên máy từ
+Tiến trình máy của hệ sinh thái hoandat: tunnel tới `localhost` (CLI Tunelo), AI Agent trong Chat (chat với claude trên máy từ
 thiết bị khác, mã hoá đầu-cuối), Localman gọi `localhost` của máy, MCP `tunelo` cho claude. Thiết kế:
 [ADR 0013](../../docs/adr/0013-remote-machines.md), [ADR 0014](../../docs/adr/0014-tunelo-machine-agent.md).
 
@@ -9,7 +9,7 @@ Chạy trên macOS (arm64, x64) và Windows x64. Một file chạy do Bun build,
 
 ## Cài
 
-Trang Máy của tôi › Thêm máy trong Chat hiện lệnh một dòng kèm khoá của thiết bị. Lệnh đó cài `tunelo`, hỏi mã ghép (dán vào, chữ
+AI Agent › Máy › Thêm máy trong Chat hiện lệnh một dòng kèm khoá của thiết bị. Lệnh đó cài `tunelo`, hỏi mã ghép (dán vào, chữ
 không hiện), rồi chạy `tunelo install`: đăng nhập trên trình duyệt, máy tự vào danh sách, không cần mã cài.
 
 Chỉ cài file chạy và đăng nhập (cũng là cách cập nhật khi `tunelo update` không dùng được):
@@ -70,7 +70,7 @@ nhập GUI một lần sau mỗi lần khởi động máy.
 
 ## Gỡ
 
-1. Xoá máy trên trang Máy của tôi trong Chat (thu hồi máy và thiết bị đã ghép).
+1. Xoá máy ở AI Agent › Máy trong Chat (thu hồi máy và thiết bị đã ghép).
 2. `tunelo logout`: thu hồi đăng nhập của máy trên IdP.
 3. `tunelo uninstall`: dừng dịch vụ và bỏ khởi động lúc đăng nhập.
 4. Xoá file chạy (`~/.local/bin/tunelo` hoặc `%LOCALAPPDATA%\tunelo`) và thư mục cấu hình (`~/.config/tunelo` hoặc

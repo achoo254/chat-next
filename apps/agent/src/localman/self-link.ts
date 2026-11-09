@@ -148,7 +148,7 @@ export class LocalmanLink {
     const info = session.info();
     if (!info || !session.covers("localman") || !session.covers("tunnel")) return { status: "sign-in", detail: LOGIN_HINT };
     const c = config.get();
-    if (!c.machineId) return { status: "waiting", detail: "links once the machine is in My machines" };
+    if (!c.machineId) return { status: "waiting", detail: "links once the machine is in AI Agent" };
     if (!this.force && c.localman?.sub === info.sub && c.localman.deviceId === deviceIdOf(c.machineId)) return { status: "ok", detail: "linked" };
     return undefined;
   }
