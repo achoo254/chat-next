@@ -178,6 +178,15 @@ message Frame {
     ProjectUpdate project_update = 78;
     ProjectReorder project_reorder = 79;
     ProjectRemove project_remove = 80;
+    SecretProvide secret_provide = 81;
+    SecretDecline secret_decline = 82;
+    SecretList secret_list = 83;
+    SecretRemove secret_remove = 84;
+
+    // B → A, continued
+    SecretPrompt secret_prompt = 63;
+    SecretPromptEnded secret_prompt_ended = 64;
+    SecretListResult secret_list_result = 65;
   }
 }
 
@@ -977,6 +986,13 @@ enum ErrorReason {
   ERROR_REASON_GIT_NOT_INSTALLED = 41;
   // A project name or folder name that cannot be used.
   ERROR_REASON_NAME_INVALID = 42;
+  // SecretProvide or SecretDecline names a prompt that is no longer open
+  // (answered on another device, expired, or its session ended).
+  ERROR_REASON_SECRET_PROMPT_GONE = 43;
+  // SecretProvide: an empty value, one too long, or one with control characters.
+  ERROR_REASON_SECRET_INVALID = 44;
+  // SecretRemove: the machine keeps no such secret (any more).
+  ERROR_REASON_SECRET_NOT_FOUND = 45;
 }
 
 enum ErrorCode {
@@ -1343,6 +1359,9 @@ message MachineInfo {
   bool needs_full_disk_access = 15;
   // The machine takes files with a message; unset before tunelo 2.0.5.
   AttachmentLimits attachments = 16;
+  // The machine asks devices for sign-in secrets (SecretPrompt) and keeps
+  // saved ones (SecretList); false before tunelo 2.0.8.
+  bool secrets = 17;
 }
 
 message MachineSettings {
@@ -1403,8 +1422,81 @@ message AuditEntry {
   // the folder), approve_sensitive, pair, revoke,
   // permission_mode, profile_add, profile_select, profile_remove,
   // delete_session (path: the folder; detail: the session ids),
-  // project_add (a sensitive folder added as a project)
+  // project_add (a sensitive folder added as a project),
+  // secret_add (path: the site; detail: the name, "saved" or "once"),
+  // secret_use (path: the site; detail: the name and "fill" or "env"),
+  // secret_remove (path: the site; detail: the name)
   string action = 3;
   string path = 4;
   string detail = 5;
+}
+
+// --- sign-in secrets ----------------------------------------------------------
+//
+// Claude asks for a password or a token with the request_secret tool of
+// tunelo's MCP. When B keeps none for that site and name, every connected
+// device gets a SecretPrompt; the user types the value on one of them and it
+// reaches B end-to-end encrypted, never through the server. B seals a saved
+// value with the OS key store (Keychain, DPAPI) or keeps a one-time value in
+// memory for the session. Claude only ever gets a reference: tunelo fills the
+// value into a page of that site or into the environment of a command, and
+// hides it from every tool result, log and transcript. No frame from B ever
+// carries a value. Prompts are no thread items: they never enter a journal.
+
+// A → B: the value for an open prompt. Answered with Ack.
+message SecretProvide {
+  string request_id = 1;
+  // At most 4096 characters, no control characters.
+  string value = 2;
+  // Keep it sealed on the machine for later sessions; false: this session only.
+  bool remember = 3;
+}
+
+// A → B: the user will not give it. Answered with Ack.
+message SecretDecline {
+  string request_id = 1;
+}
+
+// A → B: the saved secrets, without their values. Answered with SecretListResult.
+message SecretList {}
+
+// A → B: forget a saved secret. Answered with SecretListResult.
+message SecretRemove {
+  string id = 1;
+}
+
+// B → A, unasked: Claude waits for a secret. Sent to every connected device,
+// and again to a device that connects while it is open.
+message SecretPrompt {
+  string request_id = 1;
+  string thread_id = 2;
+  // What Claude calls it, e.g. "GITHUB_PASSWORD" (letters, digits, "_").
+  string name = 3;
+  // Why Claude needs it, in Claude's words (at most 300 characters).
+  string purpose = 4;
+  // The site it is for: scheme and host (and port), e.g. "https://github.com".
+  string origin = 5;
+  // Unix milliseconds: B stops waiting then.
+  int64 expires_at = 6;
+}
+
+// B → A, unasked: a prompt is closed (answered, declined, expired or its
+// session ended); every device drops its card.
+message SecretPromptEnded {
+  string request_id = 1;
+}
+
+message SecretListResult {
+  // By site, then name.
+  repeated SavedSecret secrets = 1;
+}
+
+message SavedSecret {
+  string id = 1;
+  string name = 2;
+  string origin = 3;
+  // Unix milliseconds.
+  int64 created_at = 4;
+  // Unix milliseconds; 0 when never used since it was saved.
+  int64 last_used_at = 5;
 }
