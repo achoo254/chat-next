@@ -7,7 +7,7 @@
 // The probe reads the user's own TCC folder, which only a process with Full
 // Disk Access may list. Unlike Desktop or Downloads, macOS never asks about
 // it: it refuses outright, so probing shows no dialog.
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -58,21 +58,112 @@ export function isDiskAccessDenial(err: unknown, probe: DiskAccessProbe = defaul
 /** The steps for the machine's owner, in English for the terminal and the log. */
 export function diskAccessSteps(binary: string): string[] {
   return [
-    "tunelo needs Full Disk Access on this Mac, or its sessions cannot open Desktop, Documents,",
-    "Downloads or iCloud Drive and may hang on a macOS prompt nobody answers. To grant it:",
-    "  1. Open System Settings > Privacy & Security > Full Disk Access.",
-    `  2. Click +, press Cmd+Shift+G, enter ${binary} and click Open; turn tunelo on.`,
-    "  3. Run `tunelo stop` and then `tunelo start`.",
+    "tunelo needs Full Disk Access on this Mac to work in Desktop, Documents, Downloads or iCloud Drive",
+    "(and not hang on a macOS prompt nobody answers). System Settings and a Finder window showing tunelo are open:",
+    "  1. Drag tunelo from the Finder window into the Full Disk Access list.",
+    "  2. Turn on the switch next to tunelo. tunelo notices by itself; nothing to restart.",
+    `If they did not open: System Settings > Privacy & Security > Full Disk Access, click + and pick ${binary}.`,
   ];
 }
 
-/** Opens Full Disk Access in System Settings; never throws (the steps say where it is anyway). */
-export function openDiskAccessSettings(): void {
+function openDetached(args: string[]): void {
   try {
-    const child = spawn("open", [FULL_DISK_ACCESS_SETTINGS], { stdio: "ignore", detached: true });
+    const child = spawn("open", args, { stdio: "ignore", detached: true });
     child.on("error", () => undefined);
     child.unref();
   } catch {
     // The printed steps still say where the setting is.
   }
+}
+
+/**
+ * Opens Full Disk Access in System Settings and a Finder window with the
+ * binary selected, ready to drag into the list. Never throws: the steps say
+ * where both are anyway.
+ */
+export function openDiskAccessSettings(binary: string): void {
+  openDetached([FULL_DISK_ACCESS_SETTINGS]);
+  openDetached(["-R", binary]);
+}
+
+/** What the watch looks at and does; Machine wires the real ones, tests fakes. */
+export interface DiskAccessWatchOptions {
+  /** This process's own access (the probe in this process). */
+  check: () => DiskAccess;
+  /**
+   * A new process's access. macOS may give a grant only to processes started
+   * after it; when a new one has it and this one still does not, this one has
+   * to restart.
+   */
+  checkFresh: () => Promise<DiskAccess>;
+  /** This process can use the access now. */
+  onGranted: () => void;
+  /** Only a restarted process would have it. */
+  onGrantedAfterRestart: () => void;
+  intervalMs?: number;
+  /** Every how many checks a new process checks too. */
+  freshEvery?: number;
+}
+
+/**
+ * While tunelo lacks Full Disk Access, checks every few seconds whether the
+ * owner granted it, so devices learn at once and nobody has to restart
+ * anything. Stops once it is granted.
+ */
+export class DiskAccessWatch {
+  private timer: ReturnType<typeof setInterval> | undefined;
+  private ticks = 0;
+  private freshRunning = false;
+
+  constructor(private readonly opts: DiskAccessWatchOptions) {}
+
+  /** Starts watching when the access is missing; true when it does. */
+  start(): boolean {
+    if (this.timer || this.opts.check() !== "needed") return false;
+    this.ticks = 0;
+    this.timer = setInterval(() => void this.tick(), this.opts.intervalMs ?? 3_000);
+    this.timer.unref?.();
+    return true;
+  }
+
+  stop(): void {
+    clearInterval(this.timer);
+    this.timer = undefined;
+  }
+
+  get watching(): boolean {
+    return this.timer !== undefined;
+  }
+
+  private async tick(): Promise<void> {
+    this.ticks += 1;
+    if (this.opts.check() === "granted") {
+      this.stop();
+      this.opts.onGranted();
+      return;
+    }
+    if (this.freshRunning || this.ticks % (this.opts.freshEvery ?? 5) !== 0) return;
+    this.freshRunning = true;
+    try {
+      const fresh = await this.opts.checkFresh().catch((): DiskAccess => "not-applicable");
+      if (fresh === "granted" && this.timer) {
+        this.stop();
+        this.opts.onGrantedAfterRestart();
+      }
+    } finally {
+      this.freshRunning = false;
+    }
+  }
+}
+
+/** Runs `command` (tunelo's own `disk-access`) in a new process and reads its answer. */
+export function freshDiskAccess(command: string[]): Promise<DiskAccess> {
+  const [exe, ...args] = command;
+  if (!exe) return Promise.resolve("not-applicable");
+  return new Promise((resolve) => {
+    execFile(exe, args, { timeout: 10_000 }, (err, stdout) => {
+      const answer = String(stdout).trim();
+      resolve(!err && (answer === "granted" || answer === "needed") ? answer : "not-applicable");
+    });
+  });
 }

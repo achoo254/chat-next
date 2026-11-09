@@ -43,7 +43,7 @@ export interface InstallDeps {
   ensureMachineKey: (dir: string) => Promise<unknown>;
   /** What macOS lets the started service open; "not-applicable" off macOS or when it does not answer. */
   serviceDiskAccess: (dir: string) => Promise<DiskAccess>;
-  openDiskAccessSettings: () => void;
+  openDiskAccessSettings: (binary: string) => void;
   log: (line: string) => void;
 }
 
@@ -122,9 +122,11 @@ export async function install(dir: string, options: { trust?: string }, deps: In
   }
   // The machine is installed; Full Disk Access is the owner's to grant, so a
   // missing one only shows the way to it.
+  // install.sh shows this step itself, in the page's language.
+  if (process.env.TUNELO_DISK_ACCESS_HINT === "script") return;
   if ((await deps.serviceDiskAccess(dir)) === "needed") {
     for (const line of diskAccessSteps(process.execPath)) deps.log(line);
-    deps.openDiskAccessSettings();
+    deps.openDiskAccessSettings(process.execPath);
   }
 }
 

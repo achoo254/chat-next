@@ -52,6 +52,8 @@ export type LinkContext = {
   profiles?: ClaudeProfiles;
   /** Localman's requests for localhost; absent where the machine has none (tests). */
   localForward?: LocalForward;
+  /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
+  openDiskAccessSettings?: () => boolean;
 };
 
 const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
@@ -290,6 +292,11 @@ export class Connection {
           return this.send(id, { case: "pong", value: {} });
         case "machineInfoRequest":
           return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
+        case "openDiskAccessSettings":
+          if (!this.ctx.openDiskAccessSettings?.()) {
+            return this.send(id, { case: "error", value: refusal("only a Mac has Full Disk Access", ErrorReason.UNSUPPORTED_REQUEST) });
+          }
+          return ack();
         case "machineSettingsSet": {
           const forward = this.ctx.localForward;
           if (b.value.localForward !== undefined) {

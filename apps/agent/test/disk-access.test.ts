@@ -1,9 +1,9 @@
 // Full Disk Access on macOS: what the probe concludes, and which file errors
 // are macOS refusing for the lack of it.
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { ErrorReason } from "@achoo254/chat-proto/remote/remote";
 import { errorBody } from "../src/link/connection.ts";
-import { type DiskAccessProbe, diskAccess, diskAccessSteps, isDiskAccessDenial } from "../src/safety/disk-access.ts";
+import { type DiskAccess, type DiskAccessProbe, DiskAccessWatch, diskAccess, diskAccessSteps, isDiskAccessDenial } from "../src/safety/disk-access.ts";
 
 const fsError = (code: string) => Object.assign(new Error(`${code}: operation failed`), { code });
 const refusing = (code: string): DiskAccessProbe => ({
@@ -41,11 +41,12 @@ describe("isDiskAccessDenial", () => {
   });
 });
 
-test("the steps name the binary to add and how to restart", () => {
+test("the steps say to drag tunelo in, switch it on, and name the binary", () => {
   const text = diskAccessSteps("/Users/me/.local/bin/tunelo").join("\n");
   expect(text).toContain("/Users/me/.local/bin/tunelo");
   expect(text).toContain("Full Disk Access");
-  expect(text).toContain("tunelo stop");
+  expect(text).toMatch(/Drag tunelo/);
+  expect(text).toMatch(/nothing to restart/);
 });
 
 test("a file error a device gets stays a known reason on this system", () => {
@@ -53,4 +54,64 @@ test("a file error a device gets stays a known reason on this system", () => {
   expect(errorBody(fsError("EACCES")).reason).toBe(ErrorReason.ACCESS_DENIED);
   const expected = isDiskAccessDenial(fsError("EPERM")) ? ErrorReason.FULL_DISK_ACCESS_NEEDED : ErrorReason.ACCESS_DENIED;
   expect(errorBody(fsError("EPERM")).reason).toBe(expected);
+});
+
+describe("DiskAccessWatch", () => {
+  afterEach(() => vi.useRealTimers());
+
+  function watch(states: DiskAccess[], fresh: DiskAccess = "needed") {
+    let i = 0;
+    const calls = { granted: 0, restart: 0, fresh: 0 };
+    const w = new DiskAccessWatch({
+      check: () => states[Math.min(i++, states.length - 1)] ?? "needed",
+      checkFresh: async () => {
+        calls.fresh += 1;
+        return fresh;
+      },
+      onGranted: () => (calls.granted += 1),
+      onGrantedAfterRestart: () => (calls.restart += 1),
+      intervalMs: 1_000,
+      freshEvery: 3,
+    });
+    return { w, calls };
+  }
+
+  test("does not watch when the access is there or does not apply", () => {
+    expect(watch(["granted"]).w.start()).toBe(false);
+    expect(watch(["not-applicable"]).w.start()).toBe(false);
+  });
+
+  test("tells once, and stops, as soon as this process has it", async () => {
+    vi.useFakeTimers();
+    const { w, calls } = watch(["needed", "needed", "granted"]);
+    expect(w.start()).toBe(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls.granted).toBe(1);
+    expect(calls.restart).toBe(0);
+    expect(w.watching).toBe(false);
+  });
+
+  test("a new process that has it while this one does not: restart", async () => {
+    vi.useFakeTimers();
+    const { w, calls } = watch(["needed"], "granted");
+    w.start();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(calls.fresh).toBe(0);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(calls.fresh).toBe(1);
+    expect(calls.restart).toBe(1);
+    expect(calls.granted).toBe(0);
+    expect(w.watching).toBe(false);
+  });
+
+  test("keeps watching while nobody granted it", async () => {
+    vi.useFakeTimers();
+    const { w, calls } = watch(["needed"]);
+    w.start();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(calls.fresh).toBe(3);
+    expect(calls.granted + calls.restart).toBe(0);
+    expect(w.watching).toBe(true);
+    w.stop();
+  });
 });

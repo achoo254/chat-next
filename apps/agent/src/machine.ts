@@ -31,7 +31,8 @@ import { startLogRotation } from "./log-rotate.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
 import type { SessionMcpLease } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
-import { diskAccess, diskAccessSteps } from "./safety/disk-access.ts";
+import { DiskAccessWatch, diskAccess, diskAccessSteps, freshDiskAccess, openDiskAccessSettings } from "./safety/disk-access.ts";
+import { isCompiled, selfCommand, underLaunchAgent } from "./service.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
@@ -173,11 +174,12 @@ export class Machine {
     this.port = actual;
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
-    if (diskAccess() === "needed") for (const line of diskAccessSteps(process.execPath)) this.log(line);
+    if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath)) this.log(line);
     return actual;
   }
 
   async stop(): Promise<void> {
+    this.diskWatch.stop();
     this.stopRotation?.();
     clearTimeout(this.announcing);
     for (const c of this.connections) c.close(1001, "shutting down");
@@ -239,6 +241,7 @@ export class Machine {
         isSensitive: this.isSensitive,
         profiles: this.profiles,
         localForward: this.localForward,
+        openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
           if (via === "install") this.config.update((c) => delete c.install);
@@ -324,6 +327,45 @@ export class Machine {
    * and usage, and where each session stands. Changes that come together go
    * out as one.
    */
+  /** Watches for the owner granting Full Disk Access while it is missing. */
+  private readonly diskWatch = new DiskAccessWatch({
+    check: () => diskAccess(),
+    // Only the installed binary can ask a new copy of itself (not tests, not `bun src/cli.ts`).
+    checkFresh: () => (isCompiled() ? freshDiskAccess(selfCommand("disk-access")) : Promise.resolve("not-applicable")),
+    onGranted: () => {
+      this.log("Full Disk Access granted");
+      void this.announceInfo();
+    },
+    onGrantedAfterRestart: () => {
+      if (!underLaunchAgent()) {
+        this.log("Full Disk Access granted; restart tunelo to use it");
+        return;
+      }
+      // launchd starts the agent again (KeepAlive); devices reconnect and see it.
+      this.log("Full Disk Access granted; restarting to use it");
+      process.kill(process.pid, "SIGTERM");
+    },
+  });
+
+  /** macOS: opens Full Disk Access and the binary in Finder on the machine's screen; false elsewhere. */
+  openDiskAccessSettings(): boolean {
+    if (process.platform !== "darwin") return false;
+    openDiskAccessSettings(process.execPath);
+    // Asked from a device, maybe after the access was taken away again.
+    this.diskWatch.start();
+    return true;
+  }
+
+  /** Sends the machine's info to every connected device, unasked. */
+  private async announceInfo(): Promise<void> {
+    try {
+      const value = await this.machineInfo();
+      for (const c of this.connections) if (c.isOpen) c.announce({ case: "machineInfo", value });
+    } catch (err) {
+      this.log(`machine info: not announced (${(err as Error).message})`);
+    }
+  }
+
   private announceProfiles(): void {
     if (this.announcing) return;
     this.announcing = setTimeout(() => {

@@ -186,26 +186,36 @@ main() {
 		"the pairing secret is malformed; run the command again and paste it." "配对密钥格式不正确；请重新运行命令并粘贴。"
 
 	# printf is a shell builtin: the secret reaches tunelo on stdin only.
-	printf '%s\n' "$secret" | "$bin" install --trust "$device_key"
+	# The script shows the Full Disk Access step itself, in the page's language.
+	printf '%s\n' "$secret" | TUNELO_DISK_ACCESS_HINT=script "$bin" install --trust "$device_key"
+	disk_access_hint
 }
 
-# The background service lacks Full Disk Access: its sessions cannot open
+# The background service lacks Full Disk Access: its sessions cannot work in
 # Desktop, Documents, Downloads or iCloud Drive, and may hang on a macOS prompt
-# nobody answers. Only the owner can grant it, so open the setting and say how.
-# (`tunelo install` does the same for the command with a device key.)
+# nobody answers. Only the owner can grant it: open the setting and a Finder
+# window with tunelo selected, and say what to do; tunelo notices by itself.
+# `tunelo install` leaves it to this script (TUNELO_DISK_ACCESS_HINT=script).
 disk_access_hint() {
-	"$bin" status --json 2>/dev/null | grep -q '"fullDiskAccess": "needed"' || return 0
-	say "tunelo cần quyền Truy cập toàn bộ ổ đĩa để mở Desktop, Documents, Downloads, iCloud Drive mà không bị macOS hỏi chặn:" \
-		"tunelo needs Full Disk Access to open Desktop, Documents, Downloads and iCloud Drive without macOS stopping it with a prompt:" \
-		"tunelo 需要“完全磁盘访问权限”，才能打开桌面、文稿、下载和 iCloud 云盘而不被 macOS 弹窗拦住："
-	say "  1. Cài đặt hệ thống > Quyền riêng tư & Bảo mật > Truy cập toàn bộ ổ đĩa (đang mở sẵn)." \
-		"  1. System Settings > Privacy & Security > Full Disk Access (opening it now)." \
-		"  1. 系统设置 > 隐私与安全性 > 完全磁盘访问权限（正在为你打开）。"
-	say "  2. Bấm +, nhấn Cmd+Shift+G, nhập ${bin}, bấm Mở, rồi bật tunelo." \
-		"  2. Click +, press Cmd+Shift+G, enter ${bin}, click Open and turn tunelo on." \
-		"  2. 点按 +，按 Cmd+Shift+G，输入 ${bin}，点按“打开”，然后打开 tunelo。"
-	say "  3. Chạy: tunelo stop && tunelo start" "  3. Run: tunelo stop && tunelo start" "  3. 运行：tunelo stop && tunelo start"
+	# The service may still be starting: give it a few seconds to answer.
+	tries=0
+	until status="$("$bin" status --json 2>/dev/null)"; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 15 ] || return 0
+		sleep 1
+	done
+	printf '%s' "$status" | grep -q '"fullDiskAccess": "needed"' || return 0
 	open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles" >/dev/null 2>&1 || true
+	open -R "$bin" >/dev/null 2>&1 || true
+	say "Việc cuối: cho tunelo quyền Truy cập toàn bộ ổ đĩa (cần khi làm trong Desktop, Documents, Downloads, iCloud Drive)." \
+		"Last step: give tunelo Full Disk Access (needed to work in Desktop, Documents, Downloads, iCloud Drive)." \
+		"最后一步：给 tunelo“完全磁盘访问权限”（在桌面、文稿、下载、iCloud 云盘中工作时需要）。"
+	say "  1. Kéo tunelo từ cửa sổ Finder vừa mở thả vào danh sách trong Cài đặt hệ thống." \
+		"  1. Drag tunelo from the Finder window that just opened into the list in System Settings." \
+		"  1. 将刚打开的访达窗口中的 tunelo 拖到系统设置的列表里。"
+	say "  2. Bật công tắc cạnh tunelo. tunelo tự nhận ra, không cần khởi động lại." \
+		"  2. Turn on the switch next to tunelo. tunelo notices by itself; nothing to restart." \
+		"  2. 打开 tunelo 旁边的开关。tunelo 会自动发现，无需重启。"
 }
 
 main "$@"

@@ -133,6 +133,11 @@ describe("connection", () => {
     const outside = (await frames(session, link.next, (f) => f.id === "4")).at(-1)?.body;
     expect(outside?.case === "error" && [outside.value.code, outside.value.reason]).toEqual([ErrorCode.INVALID, ErrorReason.PATH_OUTSIDE_FOLDER]);
 
+    // A machine without Full Disk Access to open (not a Mac) says it does not know the request.
+    link.conn.receive(session.seal(create(FrameSchema, { id: "4b", body: { case: "openDiskAccessSettings", value: {} } })));
+    const settings = (await frames(session, link.next, (f) => f.id === "4b")).at(-1)?.body;
+    expect(settings?.case === "error" && settings.value.reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
+
     // A denial with words reaches the core and lands on the card.
     link.conn.receive(
       session.seal(

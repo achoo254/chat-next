@@ -27,6 +27,11 @@ export function isCompiled(): boolean {
 }
 
 /** tunelo itself with `args`: the compiled file, or bun + script in development. */
+/** True in the agent launchd started from tunelo's own LaunchAgent (it starts it again when it exits). */
+export function underLaunchAgent(): boolean {
+  return process.platform === "darwin" && process.env.XPC_SERVICE_NAME === LABEL;
+}
+
 export function selfCommand(...args: string[]): string[] {
   const exe = process.execPath;
   const script = process.argv[1];

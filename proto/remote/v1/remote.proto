@@ -134,6 +134,7 @@ message Frame {
     UsageRefresh usage_refresh = 32;
     MachineSettingsSet machine_settings_set = 33;
     FileList file_list = 34;
+    OpenDiskAccessSettings open_disk_access_settings = 35;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -363,6 +364,11 @@ message MachineSettingsSet {
   // MachineSettings.local_forward).
   optional bool local_forward = 1;
 }
+
+// macOS only: B opens System Settings at Full Disk Access and a Finder window
+// with its own binary selected, on the machine's screen, for the owner sitting
+// there. Answered with Ack; UNSUPPORTED_REQUEST elsewhere.
+message OpenDiskAccessSettings {}
 
 // --- answers and events (B → A) --------------------------------------------
 
@@ -933,7 +939,9 @@ message MachineInfo {
   // macOS only: tunelo lacks Full Disk Access, so its sessions cannot read
   // Desktop, Documents, Downloads, iCloud Drive and other protected folders,
   // and macOS may stop them on a prompt nobody at the machine answers. The
-  // owner grants it in System Settings on the machine, then restarts tunelo.
+  // owner grants it in System Settings on the machine. B checks every few
+  // seconds while it is missing and sends MachineInfo unasked to every
+  // connected device once it is granted.
   bool needs_full_disk_access = 15;
 }
 
