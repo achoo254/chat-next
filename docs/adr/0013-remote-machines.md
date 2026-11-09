@@ -39,6 +39,9 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 ### An toàn phiên
 
 - `settingSources: ['user']` mặc định: `.claude/settings.json` và hook của dự án không có hiệu lực, trừ khi người dùng tick "Nạp cấu hình .claude của dự án" (ghi nhật ký).
+  Máy chỉ nạp cấu hình đó ở thư mục đã tin (`tunelo trust` trên máy). Từ `tunelo` 2.0.1, thiết bị đã ghép tin được thư mục ngay
+  trên web bằng nút "Tin thư mục này và mở phiên" (`Consent.trust_project`); máy ghi nhật ký đồng ý (thiết bị, thời điểm, thư mục,
+  `project_settings`/`trust`). Thư mục nhạy cảm (home, gốc ổ đĩa…) chỉ tin được trên máy, vì tin nó là tin mọi thư mục con.
 - `strictMcpConfig` + chỉ MCP người dùng bật tại máy B. Chế độ quyền theo đúng cấu hình Claude của máy B (`permissions.defaultMode` và luật allow/deny trong settings của người dùng; settings dự án chỉ nạp khi người dùng tick), kể cả `bypassPermissions` nếu chủ máy đã đặt vậy. Máy A thấy chế độ hiện tại và đổi được trong khung chat (`ThreadSetPermissionMode`, đại ca chốt 08/11/2026 chiều, thay "chỉ hiển thị"): chỉ trong các chế độ máy B liệt kê ở `ThreadInfo.permission_modes` (default, acceptEdits, plan, auto); `bypassPermissions` chỉ có trong danh sách khi chính cấu hình máy B khởi động phiên ở chế độ đó, nên máy A không bao giờ tự bật được. Mỗi lần đổi ghi vào nhật ký đồng ý trên máy B (`permission_mode`). Effort đổi bằng `ThreadSetEffort`; lựa chọn của thiết bị lưu theo phiên, mở lại phiên vẫn giữ. Thanh trạng thái hiện tài khoản Claude đang đăng nhập (email, tổ chức, gói) lấy từ `accountInfo()` của CLI, không có token.
 - Thư mục nhạy cảm (`~`, `/`, `~/.ssh`, `~/.aws`, thư mục cấu hình của tiến trình nền…) không bị chặn mà phải xác nhận; đồng ý được ghi vào nhật ký trên máy B.
 - Rủi ro còn lại: XSS trên `chat.hoandat.com` dùng được khoá thiết bị (non-extractable) trong lúc trang mở, dù không lấy được khoá ra. Giảm bằng CSP chặt và xoá khoá khi đăng xuất.

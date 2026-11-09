@@ -46,6 +46,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo config local-forward [on\|off\|block\|unblock] [cổng…]` | Cho Localman gửi request tới `localhost` của máy (mặc định bật) |
 | `tunelo config mcp-local-writes [on\|off]` | Cho client MCP ngoài phiên của tunelo dùng tool ghi (mặc định tắt) |
 | `tunelo mcp` | Server MCP (stdio): tool tunnel, Chat, Localman |
+| `tunelo trust [thư mục]` / `untrust` / `trusted` | Thư mục được nạp cấu hình `.claude` của dự án; thiết bị đã ghép cũng tin được từ web (có ghi nhật ký), trừ thư mục nhạy cảm |
 | `tunelo audit` | Nhật ký đồng ý |
 | `tunelo run` | Chạy trong terminal để gỡ lỗi; từ chối khi đã có bản chạy nền |
 
