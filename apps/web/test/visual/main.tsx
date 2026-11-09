@@ -288,9 +288,10 @@ const SCREENS: Record<string, string> = {
 	// The shared language and theme switches (@achoo254/app-shell) in Settings › Giao diện.
 	"settings-appearance": "/settings/appearance",
 	"settings-mcp": "/settings/mcp",
-	// "Máy của tôi" with a paired demo machine (test/support/remote-machine-demo.ts): a session, the machine's page.
+	// "Máy của tôi" with a paired demo machine (test/support/remote-machine-demo.ts): a session, the machine's page, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
 	"machine-info": paths.machineInfo("1"),
+	"machine-add": paths.machinesAdd(),
 };
 const at = params.get("at");
 if (at === "settings-app") {

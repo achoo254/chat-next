@@ -14,7 +14,7 @@ import {
 	type KeyPair,
 } from "@achoo254/chat-remote-protocol";
 import { describe, expect, it } from "vitest";
-import { installCommand, migrateCommand } from "../../src/machines/add-machine.tsx";
+import { installCommand } from "../../src/machines/add-machine.tsx";
 import { confirmTrust, pairWithCode } from "../../src/machines/link/pairing.ts";
 import { allowedTunnel, type SocketLike } from "../../src/machines/link/socket.ts";
 import { matchRoute, paths, returnPathFor } from "../../src/router.tsx";
@@ -139,11 +139,6 @@ describe("install command", () => {
 		expect(installCommand("windows", "https://chat.example.test", key, secret, "en")).toBe(
 			`& ([scriptblock]::Create((irm https://chat.example.test/agent/install.ps1))) ${key} ${secret} en`,
 		);
-	});
-
-	it("moves a computer still on hda with the same scripts and no install code", () => {
-		expect(migrateCommand("mac", "https://chat.example.test", "zh-CN")).toBe("curl -fsSL https://chat.example.test/agent/install.sh | sh -s -- zh-CN");
-		expect(migrateCommand("windows", "https://chat.example.test", "vi")).toBe("& ([scriptblock]::Create((irm https://chat.example.test/agent/install.ps1))) vi");
 	});
 });
 

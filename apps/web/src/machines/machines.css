@@ -91,13 +91,17 @@
 .mx-strip.error { background: color-mix(in srgb, var(--c-error) 10%, var(--c-surface)); color: var(--c-error); }
 
 /* Add machine, pair */
-.mx-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); counter-reset: step; }
-.mx-steps > li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: var(--space-3); counter-increment: step; }
-.mx-steps > li::before { content: counter(step); display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--c-surface-subtle); border: 1px solid var(--c-border); font-size: 0.8125rem; font-weight: 600; }
-.mx-steps > li.done::before { content: "✓"; background: var(--c-success); border-color: var(--c-success); color: var(--c-on-primary); }
-.mx-steps h4 { margin: 4px 0 var(--space-1); font-size: 0.9375rem; font-weight: 600; }
-.mx-steps > li > div { display: grid; gap: var(--space-2); justify-items: start; min-width: 0; }
-.mx-os { margin: var(--space-1) 0; }
+/* A vertical stepper: every step has the same numbered marker, tinted while it is the current one and ticked once done. */
+.mx-steps { --mx-step: 28px; list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); counter-reset: step; }
+.mx-steps > li { position: relative; display: grid; gap: var(--space-2); justify-items: start; min-width: 0; padding-left: calc(var(--mx-step) + var(--space-3)); counter-increment: step; }
+.mx-steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: var(--mx-step); height: var(--mx-step); box-sizing: border-box; border-radius: var(--radius-full); background: var(--c-surface-subtle); border: 1px solid var(--c-border); color: var(--c-text-muted); font-size: 0.8125rem; font-weight: 600; }
+.mx-steps > li:not(:last-child)::after { content: ""; position: absolute; left: calc(var(--mx-step) / 2); top: calc(var(--mx-step) + var(--space-1)); bottom: calc(-1 * var(--space-5) + var(--space-1)); border-left: 1px solid var(--c-border-subtle); }
+.mx-steps > li.is-current::before { border-color: var(--c-primary); color: var(--c-primary); background: color-mix(in srgb, var(--c-primary) 10%, var(--c-surface)); }
+.mx-steps > li.is-done::before { content: "✓"; border-color: transparent; color: var(--c-success-text); background: color-mix(in srgb, var(--c-success) 14%, var(--c-surface)); }
+.mx-steps h4 { display: flex; align-items: center; min-height: var(--mx-step); margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.mx-steps > li > p { font-size: 0.875rem; }
+.mx-step-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.mx-ext { display: inline-flex; align-items: center; gap: var(--space-1); }
 .mx-cmd { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
 .mx-cmd code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.8125rem; overflow-wrap: anywhere; user-select: all; }
 .mx-otp { display: flex; gap: var(--space-2); }

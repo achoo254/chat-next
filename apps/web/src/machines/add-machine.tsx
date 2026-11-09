@@ -34,11 +34,6 @@ function detectOs(userAgent: string): Os | "phone" {
 	return /Windows/.test(userAgent) ? "windows" : "mac";
 }
 
-/** Installs tunelo and signs it in, without pairing: also moves a computer still running hda (the earlier name). */
-export function migrateCommand(os: Os, origin: string, locale: string): string {
-	return os === "windows" ? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${locale}` : `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${locale}`;
-}
-
 /** The one command the page shows; the one-time pairing secret rides in it, so nothing is pasted later. */
 export function installCommand(os: Os, origin: string, deviceKey: string, secret: string, locale: string): string {
 	return os === "windows"
@@ -158,33 +153,29 @@ export function AddMachine() {
 	};
 	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), deviceKey, toBase64Url(waiting.secret), locale);
 	const done = step.kind === "connected";
-	const fromHda = migrateCommand(os, serverOrigin(), locale);
+	const state = (isDone: boolean, isCurrent: boolean): string | undefined => (isDone ? "is-done" : isCurrent ? "is-current" : undefined);
 	return (
 		<div className="mx-scroll">
 			<PageHead back={paths.machines()} backLabel={t.backToMachines} title={t.add} subtitle={t.addMachine.subtitle} />
 			<div className="mx-body">
-				<div className="card pad mx-card">
-					<h3>
-						<Icon name="plus" />
-						{t.addMachine.heading}
-					</h3>
+				<section className="card pad mx-card" data-id="add-machine">
+					<h3>{t.addMachine.heading}</h3>
 					<p className="muted">{t.addMachine.intro}</p>
 					<ol className="mx-steps">
-						<li className="done">
-							<div>
-								<h4>{t.addMachine.step1}</h4>
-								<p className="muted">
-									{t.addMachine.step1Body}{" "}
-									<a className="link" href={CLI_GUIDE} target="_blank" rel="noreferrer noopener">
-										{t.addMachine.guide}
-									</a>
-								</p>
-							</div>
+						<li data-id="add-machine-cli">
+							<h4>{t.addMachine.step1}</h4>
+							<p className="muted">
+								{t.addMachine.step1Body}{" "}
+								<a className="link mx-ext" href={CLI_GUIDE} target="_blank" rel="noreferrer noopener" data-id="add-machine-cli-guide">
+									{t.addMachine.guide}
+									<Icon name="external" small />
+								</a>
+							</p>
 						</li>
-						<li className={step.kind === "confirming" || done ? "done" : undefined}>
-							<div>
-								<h4>{os === "windows" ? t.addMachine.step2Win : t.addMachine.step2Mac}</h4>
-								<div className="choice mx-os" role="group" aria-label={t.addMachine.osTabs}>
+						<li className={state(step.kind === "confirming" || done, step.kind === "start" || step.kind === "making")} data-id="add-machine-command">
+							<h4>{os === "windows" ? t.addMachine.step2Win : t.addMachine.step2Mac}</h4>
+							<div className="mx-step-row">
+								<div className="choice" role="group" aria-label={t.addMachine.osTabs}>
 									<button type="button" aria-pressed={os === "mac"} onClick={() => setOs("mac")}>
 										{t.addMachine.macos}
 									</button>
@@ -192,57 +183,59 @@ export function AddMachine() {
 										{t.addMachine.windows}
 									</button>
 								</div>
-								{waiting === null ? (
-									step.kind !== "confirming" &&
-									!done && (
-										<button type="button" className="btn btn-primary btn-sm" disabled={step.kind === "making" || deviceKey === ""} onClick={make}>
-											{step.kind === "making" ? t.addMachine.making : t.addMachine.make}
-										</button>
-									)
-								) : (
-									<>
-										<div className="mx-cmd">
-											<code aria-label={t.addMachine.command}>{command}</code>
-											<CopyButton text={command} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
-										</div>
-										<p className="note">{t.addMachine.note}</p>
-									</>
+								{waiting === null && step.kind !== "confirming" && !done && (
+									<button
+										type="button"
+										className="btn btn-primary btn-sm"
+										disabled={step.kind === "making" || deviceKey === ""}
+										onClick={make}
+										data-id="add-machine-make"
+									>
+										{step.kind === "making" ? t.addMachine.making : t.addMachine.make}
+									</button>
 								)}
 							</div>
+							{waiting !== null && (
+								<>
+									<div className="mx-cmd">
+										<code aria-label={t.addMachine.command}>{command}</code>
+										<CopyButton text={command} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
+									</div>
+									<p className="note">{t.addMachine.note}</p>
+								</>
+							)}
 						</li>
-						<li className={done ? "done" : undefined}>
-							<div>
-								<h4>{t.addMachine.step3}</h4>
-								{step.kind === "waiting" && (
-									<div className="mx-wait">
-										<span className="spin" aria-hidden="true" />
-										{t.addMachine.waiting}
-									</div>
-								)}
-								{step.kind === "stale" && (
-									<p className="mx-wait">
-										{t.addMachine.stale}{" "}
-										<button type="button" className="btn btn-sm" onClick={checkAgain}>
-											{t.addMachine.checkAgain}
-										</button>
-									</p>
-								)}
-								{step.kind === "confirming" && (
-									<div className="mx-wait">
-										<span className="spin" aria-hidden="true" />
-										{t.addMachine.confirming}
-									</div>
-								)}
-								{done && (
-									<div className="mx-ok" role="status">
-										<Icon name="check" small />
-										{t.addMachine.connected(step.machine.name)}
-										<Link to={paths.machine(step.machine.ref)} className="btn btn-primary btn-sm">
-											{t.addMachine.open}
-										</Link>
-									</div>
-								)}
-							</div>
+						<li className={state(done, waiting !== null || step.kind === "confirming")} data-id="add-machine-wait">
+							<h4>{t.addMachine.step3}</h4>
+							{step.kind === "waiting" && (
+								<div className="mx-wait" role="status">
+									<span className="spin" aria-hidden="true" />
+									{t.addMachine.waiting}
+								</div>
+							)}
+							{step.kind === "stale" && (
+								<div className="mx-wait">
+									<span className="muted">{t.addMachine.stale}</span>
+									<button type="button" className="btn btn-sm" onClick={checkAgain}>
+										{t.addMachine.checkAgain}
+									</button>
+								</div>
+							)}
+							{step.kind === "confirming" && (
+								<div className="mx-wait" role="status">
+									<span className="spin" aria-hidden="true" />
+									{t.addMachine.confirming}
+								</div>
+							)}
+							{done && (
+								<div className="mx-ok" role="status">
+									<Icon name="check" small />
+									{t.addMachine.connected(step.machine.name)}
+									<Link to={paths.machine(step.machine.ref)} className="btn btn-primary btn-sm">
+										{t.addMachine.open}
+									</Link>
+								</div>
+							)}
 						</li>
 					</ol>
 					{error !== "" && (
@@ -254,12 +247,7 @@ export function AddMachine() {
 						<MachineIcon name="shield" small />
 						<span>{t.addMachine.e2ee(brand.appName)}</span>
 					</div>
-					<p className="muted">{t.addMachine.fromHda}</p>
-					<div className="mx-cmd">
-						<code aria-label={t.addMachine.command}>{fromHda}</code>
-						<CopyButton text={fromHda} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
-					</div>
-				</div>
+				</section>
 			</div>
 		</div>
 	);
