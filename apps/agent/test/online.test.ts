@@ -11,6 +11,7 @@ import type { Machine } from "../src/machine.ts";
 
 const state = vi.hoisted(() => ({
   opened: [] as string[],
+  openedWith: [] as Record<string, unknown>[],
   registerFails: true,
   claims: 0,
   links: [] as string[],
@@ -32,6 +33,7 @@ vi.mock("../src/tunnel.ts", () => ({
   isSignedIn: () => true,
   openTunnel: (opts: { deviceId: string }) => {
     state.opened.push(opts.deviceId);
+    state.openedWith.push({ ...opts });
     return () => undefined;
   },
 }));
@@ -70,6 +72,7 @@ let dir = "";
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "tunelo-online-"));
   state.opened = [];
+  state.openedWith = [];
   state.registerFails = true;
   state.claims = 0;
   state.links = [];
@@ -124,6 +127,24 @@ describe("going online", () => {
     await settle();
     expect(state.opened).toEqual(["chat-agent.12"]);
     expect(state.links).toEqual(["chat-agent.12"]);
+    online.stop();
+  });
+
+  test("a machine added again opens the tunnel of its new id, never the name its old id held", async () => {
+    // Removed on the web as machine 1, added again by `tunelo install` as
+    // machine 3: the config still holds the subdomain machine 1's tunnel got.
+    // The relay derives the name from the account and the device id and
+    // refuses any other, which held the machine offline for good.
+    const config = new ConfigStore(dir);
+    config.update((c) => {
+      c.machineId = "3";
+      c.machineSecret = "o".repeat(43);
+      c.subdomain = "m-708503bbc4a9c5958a61b600e9274c";
+    });
+    const online = goOnline(fakeMachine(config), 1234, () => undefined);
+    await settle();
+    expect(state.opened).toEqual(["chat-agent.3"]);
+    expect(state.openedWith[0]).not.toHaveProperty("subdomain");
     online.stop();
   });
 });

@@ -28,6 +28,11 @@ export type AgentConfig = {
   claimed?: boolean;
   /** The owner removed the machine on the web: it is not added again until `tunelo install`. */
   machineRemoved?: boolean;
+  /**
+   * The machine tunnel's subdomain, kept by tunelo before 2.0.14. No longer
+   * read or written: the relay derives the name from the account and the
+   * machine id (online.ts).
+   */
   subdomain?: string;
   serverUrl?: string;
   port?: number;

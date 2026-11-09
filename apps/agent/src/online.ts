@@ -118,12 +118,11 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
   };
 
   closeTunnel = openTunnel(
-    { dir: m.config.dir, localPort, deviceId: deviceIdOf(machineId), ...(c.subdomain ? { subdomain: c.subdomain } : {}) },
+    { dir: m.config.dir, localPort, deviceId: deviceIdOf(machineId) },
     {
-      onUrl: (url, subdomain, features) => {
+      onUrl: (url, features) => {
         tunnelUrl = url;
         m.localForward.tunnelConnected(url, features);
-        if (subdomain && subdomain !== m.config.get().subdomain) m.config.update((x) => (x.subdomain = subdomain));
         registration.setTunnel({ status: "ok", detail: `online at ${url}` });
         log(`online at ${url}`);
         void beat();

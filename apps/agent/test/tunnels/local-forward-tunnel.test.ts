@@ -126,7 +126,7 @@ async function online(features: string[] | undefined) {
   closeTunnel = openTunnel(
     { dir, localPort: port, deviceId: "chat-agent.1" },
     {
-      onUrl: (url, _subdomain, f) => {
+      onUrl: (url, f) => {
         machine.localForward.tunnelConnected(url, f);
         up();
       },
@@ -155,7 +155,8 @@ describe("Localman's requests through the machine tunnel", () => {
   test("the machine tunnel signs in as a machine without naming a local port", async () => {
     const s = await online(["local-forward"]);
     expect(s.auths).toHaveLength(1);
-    expect(s.auths[0]).toEqual(expect.objectContaining({ kind: "machine", deviceId: "chat-agent.1" }));
+    // It asks for no name: the relay derives it from the account and the device id.
+    expect(s.auths[0]).toEqual(expect.objectContaining({ kind: "machine", deviceId: "chat-agent.1", subdomain: "" }));
     expect(s.auths[0]).not.toHaveProperty("localPort");
     // Requests still reach the device link's server.
     const r = await s.send("/.tunelo/forward/", { "tunelo-forward-granted": "1", "tunelo-local-port": String(appPort) });

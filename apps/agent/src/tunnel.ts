@@ -25,7 +25,7 @@ export function toWebSocketUrl(publicUrl: string): string {
 
 export type TunnelEvents = {
   /** Connected (again): the devices' address, and the features the server named for this connection. */
-  onUrl: (wssUrl: string, subdomain: string, features: readonly string[]) => void;
+  onUrl: (wssUrl: string, features: readonly string[]) => void;
   /** The connection dropped (it reconnects) or was refused. */
   onDown?: () => void;
   /** The relay refused for good (sign-in expired, quota, held name). */
@@ -33,14 +33,19 @@ export type TunnelEvents = {
   log: (line: string) => void;
 };
 
-export function openTunnel(opts: { dir: string; localPort: number; deviceId: string; subdomain?: string }, ev: TunnelEvents): () => void {
+/**
+ * Opens the machine tunnel of `deviceId`. It never asks for a subdomain: the
+ * relay derives it from the signed-in account and `deviceId`, and refuses for
+ * good any other name asked for (one kept from before the machine was added
+ * again would hold the new machine offline).
+ */
+export function openTunnel(opts: { dir: string; localPort: number; deviceId: string }, ev: TunnelEvents): () => void {
   const client = new TunnelClient({
     serverUrl: TUNNEL_SERVER,
     getApiKey: accountKeyFor(TUNNEL_SERVER, opts.dir),
     kind: "machine",
     deviceId: opts.deviceId,
     deviceName: hostname(),
-    subdomain: opts.subdomain,
     // Requests go to the device link's local server; the relay is not told
     // that port: the machine tunnel serves no port of the user's own.
     localPort: opts.localPort,
@@ -48,7 +53,7 @@ export function openTunnel(opts: { dir: string; localPort: number; deviceId: str
     localHost: "127.0.0.1",
   });
   client.on("connected", (r: AuthResult) => {
-    if (r.url) ev.onUrl(toWebSocketUrl(r.url), r.subdomain ?? "", r.features ?? []);
+    if (r.url) ev.onUrl(toWebSocketUrl(r.url), r.features ?? []);
   });
   client.on("disconnected", () => {
     ev.onDown?.();
