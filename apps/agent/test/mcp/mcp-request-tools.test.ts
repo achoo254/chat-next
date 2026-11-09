@@ -168,10 +168,15 @@ describe("tunelo mcp: requests and tunnel processes", () => {
 		);
 		const exited = new Promise((r) => child.once("exit", r));
 		const recordFile = join(home, "tunelo", "running", `${child.pid}.json`);
-		const record = (): RunRecord | null =>
-			existsSync(recordFile)
-				? (JSON.parse(readFileSync(recordFile, "utf-8")) as RunRecord)
-				: null;
+		// The child may be writing it right now: a half-written record is not there yet.
+		const record = (): RunRecord | null => {
+			if (!existsSync(recordFile)) return null;
+			try {
+				return JSON.parse(readFileSync(recordFile, "utf-8")) as RunRecord;
+			} catch {
+				return null;
+			}
+		};
 		try {
 			await waitFor(() => Boolean(record()?.inspectorPort), 15_000);
 			const { processes } = jsonOf<{ processes: { pid: number }[] }>(
