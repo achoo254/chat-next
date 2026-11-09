@@ -26,9 +26,9 @@
 # is installed. A script whose pins were not filled in refuses to run.
 set -eu
 
-TUNELO_VERSION="2.0.6"
-SHA256_DARWIN_ARM64="750f0f4f0a4fd26c385bf19dac877ceffcb6f8c9413575375c364bea51d735ae"
-SHA256_DARWIN_X64="619dc1c022284db7125857f4cc65ffd23d5434db8f267f3a260b1bae3d054a8f"
+TUNELO_VERSION="2.0.7"
+SHA256_DARWIN_ARM64="155b9b3e2b2c2c14e2c032e6b5893e0d05be322e27b47f7bb0f47efb4b991f32"
+SHA256_DARWIN_X64="aff1214698b6eb6c7646344f212a8a781ae8fa25c9bb074251d6100aa931dc04"
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
