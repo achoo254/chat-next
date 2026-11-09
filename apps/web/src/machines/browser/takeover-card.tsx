@@ -11,7 +11,7 @@ import { Icon } from "../../components/screen-icons.tsx";
 import { useDomId } from "../../messaging/ui/parts.tsx";
 import { Origin } from "../cards/secret-request.tsx";
 import type { MachineLink } from "../link/machine-link.ts";
-import { MachineIcon } from "../machine-icons.tsx";
+import { BrowserIcon } from "./browser-icons.tsx";
 import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 
@@ -56,7 +56,7 @@ export function TakeoverCard({ takeover, ai, onOpen, onGiveBack }: TakeoverCardP
 			<p className="note">{b.waits(ai)}</p>
 			<div className="acts">
 				<button type="button" className="btn btn-primary btn-sm" onClick={onOpen} data-id="takeover-card-open">
-					<MachineIcon name="pointer" small />
+					<BrowserIcon name="pointer" small />
 					{b.open}
 				</button>
 				<button

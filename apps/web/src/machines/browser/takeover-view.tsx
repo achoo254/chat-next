@@ -15,7 +15,7 @@ import { BrowserMouseType, type BrowserInputSchema, type BrowserTab, type Browse
 import { Icon } from "../../components/screen-icons.tsx";
 import { useDomId } from "../../messaging/ui/parts.tsx";
 import type { MachineLink } from "../link/machine-link.ts";
-import { MachineIcon } from "../machine-icons.tsx";
+import { BrowserIcon } from "./browser-icons.tsx";
 import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { keyPress, modifiersOf, NO_ZOOM, pagePoint, pageScale, phoneKey, pinch, TAP_MS, TAP_SLOP, wheelPixels, type KeyPress, type PageSize, type Point, type Zoom } from "./input-map.ts";
@@ -333,7 +333,7 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 					{online ? (rtt === null ? b.liveNoMs : b.live(rtt)) : b.connecting}
 				</span>
 				<button type="button" className="icon-btn" aria-label={b.minimize} title={b.minimize} onClick={onMinimize} data-id="browser-view-minimize">
-					<MachineIcon name="x" />
+					<BrowserIcon name="x" />
 				</button>
 			</header>
 			<div className="mx-browser-bar">
@@ -407,12 +407,12 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 			<footer className="mx-browser-foot">
 				<div className="mx-browser-tools">
 					<button type="button" className="btn btn-sm" onClick={() => typing.current?.focus()} data-id="browser-view-keyboard">
-						<MachineIcon name="keyboard" small />
+						<BrowserIcon name="keyboard" small />
 						{b.keyboard}
 					</button>
 					{zoom.scale > 1 && (
 						<button type="button" className="btn btn-sm" onClick={() => setZoom(NO_ZOOM)}>
-							<MachineIcon name="zoom-out" small />
+							<BrowserIcon name="zoom-out" small />
 							{b.resetZoom}
 						</button>
 					)}
