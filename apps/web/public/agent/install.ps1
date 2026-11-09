@@ -2,15 +2,14 @@
 # the Tunelo CLI, on Windows (Windows PowerShell 5.1 or PowerShell 7).
 # "Add this machine" in Chat shows:
 #
-#   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) <device key> [vi|en|zh-CN]
+#   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) <device key> <pairing secret> [vi|en|zh-CN]
 #
-# which installs tunelo, asks you to paste the pairing secret the page
-# shows, and runs `tunelo install`: you sign in with your account in the
-# browser and the machine joins My machines by itself (no install code).
-# The secret is read with Read-Host -AsSecureString: it is never in a command
-# line (argv, PSReadLine history). The device's public key is not secret. A
-# command of an older page, with an install code before the device key,
-# still works: the code is ignored.
+# which installs tunelo and runs `tunelo install`: you sign in with your
+# account in the browser and the machine joins My machines by itself (no
+# install code). The pairing secret is one-time and short-lived, so it rides
+# in the one command the page shows. A command without it (an older page)
+# asks for it. A command of an older page, with an install code before the
+# device key, still works: the code is ignored.
 #
 # With only a language (or nothing), the script installs or updates the
 # binary and runs `tunelo login`; this is what `tunelo update` of the Tunelo
@@ -47,9 +46,15 @@ $KeyPattern = '^[A-Za-z0-9_-]{43}$'
 $DeviceKey = ''
 $Locale = ''
 $BadKey = $false
+$Secret = ''
 if ($First -match $KeyPattern) {
 	$DeviceKey = $First
-	$Locale = $Second
+	if ($Second -match $KeyPattern) {
+		$Secret = $Second
+		$Locale = $Third
+	} else {
+		$Locale = $Second
+	}
 } elseif ($First -match '^[A-Za-z0-9_-]{22}$' -and $Second) {
 	$DeviceKey = $Second
 	$Locale = $Third
@@ -205,15 +210,12 @@ function Install-Tunelo {
 		return
 	}
 
-	$prompt = Get-Text 'Dán mã ghép đang hiện trên trang Chat rồi bấm Enter (chữ sẽ không hiện khi dán)' `
-		'Paste the pairing secret shown on the Chat page and press Enter (it stays hidden)' `
-		'粘贴 Chat 页面上显示的配对密钥并按回车（输入内容不会显示）'
-	$secure = Read-Host -AsSecureString -Prompt $prompt
-	$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-	try {
-		$secret = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-	} finally {
-		[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+	$secret = $Secret
+	if (-not $secret) {
+		$prompt = Get-Text 'Dán mã ghép đang hiện trên trang Chat rồi bấm Enter' `
+			'Paste the pairing secret shown on the Chat page and press Enter' `
+			'粘贴 Chat 页面上显示的配对密钥并按回车'
+		$secret = (Read-Host -Prompt $prompt).Trim()
 	}
 	if ($secret -notmatch '^[A-Za-z0-9_-]{43}$') {
 		Stop-Install 'mã ghép không hợp lệ; chạy lại lệnh và dán đúng mã.' `

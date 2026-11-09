@@ -352,8 +352,6 @@ export const zhCNMachines: MachinesCopy = {
 		make: "生成安装命令",
 		making: "正在生成…",
 		command: "安装命令",
-		secret: "当命令要求输入配对密钥时，粘贴以下内容（粘贴时不会显示）：",
-		secretLabel: "配对密钥",
 		copy: "复制",
 		copied: "已复制",
 		note: "命令会打开浏览器让你登录账号（输入命令显示的代码），之后电脑会自动出现在这里。配对密钥只保存在此浏览器中，不会发送到服务器。",

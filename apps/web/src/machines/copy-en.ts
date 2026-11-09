@@ -354,8 +354,6 @@ export const enMachines: MachinesCopy = {
 		make: "Create the install command",
 		making: "Creating…",
 		command: "Install command",
-		secret: "When the command asks for the pairing secret, paste this (it stays hidden while pasting):",
-		secretLabel: "Pairing secret",
 		copy: "Copy",
 		copied: "Copied",
 		note: "The command opens the browser for you to sign in to your account (type the code it prints), then the machine shows up here by itself. The pairing secret stays in this browser and is never sent to the server.",

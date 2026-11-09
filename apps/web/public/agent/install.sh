@@ -2,15 +2,14 @@
 # Installs tunelo, the background process of "My machines" (ADR 0013) and
 # the Tunelo CLI, on macOS. "Add this machine" in Chat shows:
 #
-#   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <device key> [vi|en|zh-CN]
+#   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <device key> <pairing secret> [vi|en|zh-CN]
 #
-# which installs tunelo, asks you to paste the pairing secret the page
-# shows, and runs `tunelo install`: you sign in with your account in the
-# browser and the machine joins My machines by itself (no install code).
-# The pairing secret is read from the terminal with echo off: it is never in
-# a command line (argv, shell history, ps). The device's public key is not
-# secret. A command of an older page, with an install code before the
-# device key, still works: the code is ignored.
+# which installs tunelo and runs `tunelo install`: you sign in with your
+# account in the browser and the machine joins My machines by itself (no
+# install code). The pairing secret is one-time and short-lived, so it rides
+# in the one command the page shows. A command without it (an older page)
+# asks for it in the terminal. A command of an older page, with an install
+# code before the device key, still works: the code is ignored.
 #
 # With only a language (or nothing), the script installs or updates the
 # binary and runs `tunelo login`; this is what `tunelo update` of the Tunelo
@@ -63,10 +62,16 @@ is_key() {
 
 main() {
 	device_key=""
+	secret=""
 	locale=""
 	if [ $# -ge 1 ] && is_key "$1"; then
 		device_key="$1"
-		locale="${2:-}"
+		if [ $# -ge 2 ] && is_key "$2"; then
+			secret="$2"
+			locale="${3:-}"
+		else
+			locale="${2:-}"
+		fi
 	elif [ $# -ge 2 ] && printf '%s' "$1" | grep -Eq '^[A-Za-z0-9_-]{22}$'; then
 		# An older page: <install code> <device key> [language]; install codes are retired.
 		device_key="$2"
@@ -101,8 +106,7 @@ main() {
 		from_hda="yes"
 	fi
 	tmp="$(mktemp -d)"
-	# Ctrl-C while the pairing secret is typed must not leave the terminal without echo.
-	trap 'rm -rf "$tmp"; stty echo </dev/tty 2>/dev/null || true' EXIT
+	trap 'rm -rf "$tmp"' EXIT
 	trap 'exit 130' INT TERM
 	url="$RELEASES/tunelo-v$TUNELO_VERSION/$asset"
 	say "Đang tải tunelo ${TUNELO_VERSION}…" "Downloading tunelo ${TUNELO_VERSION}…" "正在下载 tunelo ${TUNELO_VERSION}…"
@@ -168,16 +172,15 @@ main() {
 		return 0
 	fi
 
-	[ -r /dev/tty ] || die "cần chạy lệnh trong cửa sổ Terminal để dán mã ghép." \
-		"run the command in a Terminal window to paste the pairing secret." "请在终端窗口中运行该命令以粘贴配对密钥。"
-	say "Dán mã ghép đang hiện trên trang Chat rồi bấm Enter (chữ sẽ không hiện khi dán):" \
-		"Paste the pairing secret shown on the Chat page and press Enter (it stays hidden):" \
-		"粘贴 Chat 页面上显示的配对密钥并按回车（输入内容不会显示）："
-	stty -echo </dev/tty 2>/dev/null || true
-	secret=""
-	IFS= read -r secret </dev/tty || true
-	stty echo </dev/tty 2>/dev/null || true
-	printf '\n'
+	if [ -z "$secret" ]; then
+		[ -r /dev/tty ] || die "cần chạy lệnh trong cửa sổ Terminal để dán mã ghép." \
+			"run the command in a Terminal window to paste the pairing secret." "请在终端窗口中运行该命令以粘贴配对密钥。"
+		say "Dán mã ghép đang hiện trên trang Chat rồi bấm Enter:" \
+			"Paste the pairing secret shown on the Chat page and press Enter:" \
+			"粘贴 Chat 页面上显示的配对密钥并按回车："
+		IFS= read -r secret </dev/tty || true
+		secret="$(printf '%s' "$secret" | tr -d '[:space:]')"
+	fi
 	printf '%s' "$secret" | grep -Eq '^[A-Za-z0-9_-]{43}$' || die "mã ghép không hợp lệ; chạy lại lệnh và dán đúng mã." \
 		"the pairing secret is malformed; run the command again and paste it." "配对密钥格式不正确；请重新运行命令并粘贴。"
 

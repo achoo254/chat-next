@@ -39,11 +39,11 @@ export function migrateCommand(os: Os, origin: string, locale: string): string {
 	return os === "windows" ? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${locale}` : `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${locale}`;
 }
 
-/** The command the page shows; the pairing secret is pasted when the script asks, never part of it. */
-export function installCommand(os: Os, origin: string, deviceKey: string, locale: string): string {
+/** The one command the page shows; the one-time pairing secret rides in it, so nothing is pasted later. */
+export function installCommand(os: Os, origin: string, deviceKey: string, secret: string, locale: string): string {
 	return os === "windows"
-		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${deviceKey} ${locale}`
-		: `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${deviceKey} ${locale}`;
+		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${deviceKey} ${secret} ${locale}`
+		: `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${deviceKey} ${secret} ${locale}`;
 }
 
 type Step =
@@ -156,8 +156,7 @@ export function AddMachine() {
 	const checkAgain = () => {
 		if (step.kind === "stale") setStep({ kind: "waiting", secret: step.secret, known: step.known, until: Date.now() + WAIT_MS });
 	};
-	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), deviceKey, locale);
-	const secret = waiting === null ? "" : toBase64Url(waiting.secret);
+	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), deviceKey, toBase64Url(waiting.secret), locale);
 	const done = step.kind === "connected";
 	const fromHda = migrateCommand(os, serverOrigin(), locale);
 	return (
@@ -205,11 +204,6 @@ export function AddMachine() {
 										<div className="mx-cmd">
 											<code aria-label={t.addMachine.command}>{command}</code>
 											<CopyButton text={command} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
-										</div>
-										<p className="muted">{t.addMachine.secret}</p>
-										<div className="mx-cmd">
-											<code aria-label={t.addMachine.secretLabel}>{secret}</code>
-											<CopyButton text={secret} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
 										</div>
 										<p className="note">{t.addMachine.note}</p>
 									</>

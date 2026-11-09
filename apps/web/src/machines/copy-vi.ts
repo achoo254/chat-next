@@ -358,8 +358,6 @@ export const viMachines = {
 		make: "Tạo lệnh cài",
 		making: "Đang tạo…",
 		command: "Lệnh cài",
-		secret: "Khi lệnh hỏi mã ghép, dán mã này (chữ sẽ không hiện khi dán):",
-		secretLabel: "Mã ghép",
 		copy: "Sao chép",
 		copied: "Đã chép",
 		note: "Lệnh mở trình duyệt để bạn đăng nhập tài khoản (gõ mã lệnh in ra), rồi máy tự hiện ở đây. Mã ghép chỉ nằm trong trình duyệt này, không gửi lên máy chủ.",
