@@ -125,7 +125,8 @@ describe("the machine's profile on every device", () => {
         ),
       );
     }
-    expect(phone.frames.some((x) => x.id === "pick" && x.body.case === "profileListResult")).toBe(true);
+    // The answer to the pick may come after the announcements: wait for it.
+    await waitFor(() => phone.frames.some((x) => x.id === "pick" && x.body.case === "profileListResult"));
     expect(laptop.frames.some((x) => x.id === "pick")).toBe(false);
     const last = announced(laptop).at(-1);
     expect(last?.profiles?.profiles.map((p) => p.email)).toEqual(["team@example.com", "max@example.com"]);
