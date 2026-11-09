@@ -89,6 +89,24 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
 đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
 
+## Dự án (2.0.7)
+
+Cột AI Agent nhóm phiên theo máy → dự án → phiên; phiên ngoài mọi dự án nằm ở "Khác". Danh sách dự án lưu trên máy trong
+`config.json` của tunelo (ghi nguyên tử): id, tên, thư mục, ghim, thứ tự, cài đặt mặc định cho phiên mới (model, chế độ quyền,
+nạp `.claude` của dự án). Mọi thay đổi gửi ngay tới mọi thiết bị đang kết nối.
+
+- **Thêm**: chọn thư mục có sẵn (thư mục nhạy cảm phải đồng ý, ghi nhật ký `project_add`); **clone** từ git (chỉ `https://` hoặc
+  ssh, không kèm mật khẩu/token; có tiến trình và huỷ, huỷ hay lỗi thì xoá đúng thư mục clone vừa tạo); **tạo mới** một thư mục
+  (+ `git init`). Clone và tạo mới không bao giờ ghi vào thư mục đã tồn tại hay thư mục nhạy cảm; tên thư mục chỉ là một phần
+  đường dẫn.
+- Mọi lệnh git của tunelo tắt chương trình do repo tự đặt (`core.fsmonitor`, hooks qua `core.hooksPath`), clone không dùng
+  template hook và chỉ cho giao thức https/ssh, không hỏi mật khẩu (`GIT_TERMINAL_PROMPT=0`, ssh `BatchMode`).
+- Trạng thái git mỗi dự án (nhánh, số file đổi, ahead/behind) đọc bằng `git status --porcelain=v2`, giữ 1 phút và đọc lại khi một
+  phiên trong dự án xong lượt. Dự án mất thư mục hiện "Thư mục không còn trên máy".
+- Nút **+** của dự án mở phiên ngay với cài đặt mặc định và câu đầu gợi ý; menu dự án: phiên mới (tuỳ chỉnh), đổi tên, ghim,
+  chuyển lên/xuống, cài đặt, **gỡ** (chỉ bỏ khỏi danh sách, thư mục giữ nguyên). Gợi ý "Thêm làm dự án?" lấy từ thư mục đã có
+  phiên (của tunelo và `~/.claude/projects`). Máy cũ hơn 2.0.7: web giữ cột như cũ.
+
 ## Lưu trữ và xoá phiên (2.0.6)
 
 Menu ⋮ của phiên (và của dòng phiên ở cột trái: rê chuột, nhấn giữ trên điện thoại) có "Lưu trữ" và "Xoá phiên".
