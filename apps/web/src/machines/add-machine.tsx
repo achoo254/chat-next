@@ -13,6 +13,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { CopyButton } from "../messaging/ui/parts.tsx";
 import { Link, paths } from "../router.tsx";
+import { aiPaths } from "./ai-paths.ts";
 import { serverOrigin } from "../server-origin.ts";
 import { confirmTrust } from "./link/pairing.ts";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -136,7 +137,7 @@ export function AddMachine() {
 	if (os === "phone") {
 		return (
 			<div className="mx-scroll">
-				<PageHead back={paths.machines()} backLabel={t.backToMachines} title={t.add} />
+				<PageHead back={aiPaths.manage} backLabel={t.agent.machinesTitle} title={t.add} />
 				<div className="mx-body">
 					<div className="mx-hint">
 						<MachineIcon name="monitor" small />
@@ -156,7 +157,7 @@ export function AddMachine() {
 	const state = (isDone: boolean, isCurrent: boolean): string | undefined => (isDone ? "is-done" : isCurrent ? "is-current" : undefined);
 	return (
 		<div className="mx-scroll">
-			<PageHead back={paths.machines()} backLabel={t.backToMachines} title={t.add} subtitle={t.addMachine.subtitle} />
+			<PageHead back={aiPaths.manage} backLabel={t.agent.machinesTitle} title={t.add} subtitle={t.addMachine.subtitle} />
 			<div className="mx-body">
 				<section className="card pad mx-card" data-id="add-machine">
 					<h3>{t.addMachine.heading}</h3>

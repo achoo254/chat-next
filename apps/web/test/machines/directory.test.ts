@@ -14,9 +14,9 @@ describe("machine directory", () => {
 		expect(toEntry(create(MachineSchema, { id: 4n, name: "Mac", claimed: true })).claimed).toBe(true);
 	});
 
-	it("says what to do in every language", () => {
+	it("says what to do in every language: a short chip, the command in its hint", () => {
 		for (const copy of [viMachines, enMachines, zhCNMachines]) {
-			expect(copy.status.needsLogin).toContain("tunelo");
+			expect(copy.status.needsLogin.length).toBeLessThanOrEqual(16);
 			expect(copy.status.needsLoginHint).toContain("tunelo login");
 			expect(copy.addMachine.note.length).toBeGreaterThan(20);
 		}

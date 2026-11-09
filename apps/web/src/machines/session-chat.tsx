@@ -1,32 +1,57 @@
-// One session (thread) of a machine: the transcript with tool rows, diffs,
-// todos, approval and question cards, the model/AI menu, the status bar
-// (ThreadInfo) and the composer.
+// One AI session (thread) of a machine: a short header (title, folder,
+// state, "Thay đổi", a menu with the machine and the encryption), the
+// transcript (markdown answers, tool rows, diffs, todos, results of answered
+// prompts), the prompts waiting for the user docked above the composer, the
+// status bar and the composer. "Thay đổi" opens the files the AI changed.
 // The thread is watched on the machine's shared link while this shows, so a
 // reconnect resubscribes from the cursor and a reset reloads the snapshot.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, LoginState, ThreadState, TurnState, type Decision, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, PromptState, ThreadState, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
-import { paths } from "../router.tsx";
+import { Link, paths } from "../router.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import { TodoCard } from "./cards/todo.tsx";
 import { ToolRunCard } from "./cards/tool-run.tsx";
-import { Composer } from "./composer.tsx";
+import { ChangesPanel } from "./changes-panel.tsx";
+import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
-import type { LinkState, MachineLink } from "./link/machine-link.ts";
+import type { LinkState } from "./link/machine-link.ts";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { PageHead } from "./page-head.tsx";
+import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
+import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
-import { aiName, errorText, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { aiName, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
+
+/** The first tunelo that takes a message with a denial and lists a session's files. */
+const AGENT_2_0_1 = [2, 0, 1] as const;
+
+/** `version` ("2.0.1", "v2.1.0-beta") is at least `min`; false when unreadable. */
+export function versionAtLeast(version: string, min: readonly number[]): boolean {
+	const parts = /^v?(\d+)\.(\d+)\.(\d+)/.exec(version.trim());
+	if (parts === null) return false;
+	for (let i = 0; i < min.length; i++) {
+		const have = Number(parts[i + 1]);
+		const want = min[i] ?? 0;
+		if (have !== want) return have > want;
+	}
+	return true;
+}
+
+type Pending = Extract<Block, { kind: "approval" | "question" }>;
+
+function isPending(block: Block): block is Pending {
+	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
+}
 
 export function SessionChat({ machine, threadId }: { machine: string; threadId: string }) {
 	const t = useMachinesCopy();
@@ -34,9 +59,13 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const entry = useEntry(hub, machine);
 	const [link, state] = useLink(hub, machine);
 	useWatch(link, threadId);
+	const [changesOpen, setChangesOpen] = useState(false);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
-	const blocks = foldTranscript(items, state.pending.get(threadId) ?? []);
+	const all = foldTranscript(items, state.pending.get(threadId) ?? []);
+	const blocks = all.filter((b) => !isPending(b));
+	const prompts = all.filter(isPending);
+	const changes = sessionChanges(items);
 	const provider = thread?.provider ?? items.at(-1)?.provider ?? "";
 	const ai = aiName(state.info, provider);
 	const caps = providerOf(state.info, provider)?.capabilities;
@@ -46,108 +75,204 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const model = currentModel(items, thread?.model ?? "");
 	const machineName = entry?.name ?? "";
 	const missing = online && state.listed && thread === null && items.length === 0;
+	const modern = versionAtLeast(state.info?.agentVersion ?? "", AGENT_2_0_1);
 
-	const request = async (body: Parameters<MachineLink["request"]>[0]): Promise<void> => {
-		try {
-			await link.request(body);
-		} catch (err) {
-			throw new Error(errorText(t, err, ai), { cause: err });
-		}
+	const fetchFull = async (itemId: string): Promise<void> => {
+		await link.request({ case: "threadFetchFull", value: { threadId, itemId } });
 	};
-	const decide = (itemId: string, revision: number) => (decision: Decision) =>
-		request({ case: "threadRespond", value: { threadId, itemId, expectedRevision: revision, answer: { case: "decision", value: decision } } });
-	const answer = (itemId: string, revision: number) => (answers: string[][]) =>
-		request({
+	const decide = (itemId: string, revision: number) => async (decision: Decision, message?: string) => {
+		const note = decision === Decision.DENY ? (message ?? "") : "";
+		await link.request({
+			case: "threadRespond",
+			value: { threadId, itemId, expectedRevision: revision, answer: { case: "decision", value: decision }, denyMessage: modern ? note : "" },
+		});
+		// tunelo 2.0.0 drops the message of a denial: it goes as the next message instead.
+		if (!modern && note !== "") await link.send(threadId, note);
+	};
+	const answer = (itemId: string, revision: number) => async (answers: string[][]) => {
+		await link.request({
 			case: "threadRespond",
 			value: { threadId, itemId, expectedRevision: revision, answer: { case: "answers", value: create(AnswersSchema, { answers: answers.map((values) => ({ values })) }) } },
 		});
-	const fetchFull = (itemId: string) => request({ case: "threadFetchFull", value: { threadId, itemId } });
+	};
+	const listFiles = useCallback<ListFiles>(
+		async (prefix) => {
+			try {
+				const frame = await link.request({ case: "fileList", value: { threadId, prefix, limit: 50 } });
+				if (frame.body.case !== "fileListResult") return null;
+				const listing: FileListing = { entries: frame.body.value.entries.map((e) => ({ path: e.path, dir: e.dir })), truncated: frame.body.value.truncated };
+				return listing;
+			} catch {
+				// tunelo 2.0.0 does not know the request; offline or a bad prefix: no suggestions.
+				return null;
+			}
+		},
+		[link, threadId],
+	);
+	const closeChanges = useCallback(() => setChangesOpen(false), []);
 
 	const chip = !online ? "offline" : thread === null ? null : stateKey(thread);
+	const dir = thread?.dir ?? "";
 	return (
-		<div className="mx-chat">
+		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined}>
 			<PageHead
-				back={paths.machine(machine)}
-				backLabel={t.sessions.label(machineName)}
+				back={paths.machines()}
+				backLabel={t.backToMachines}
 				title={thread?.title ?? ""}
 				subtitle={
 					<>
-						<MachineIcon name="monitor" small />
-						{machineName}
-						{thread !== null && (
-							<>
-								{" · "}
-								<span className="mono">{thread.dir}</span>
-							</>
-						)}
+						<span className="mono" title={dir}>
+							{folderName(dir)}
+						</span>
+						<span className="hide-narrow">· {machineName}</span>
 					</>
 				}
 			>
-				{chip !== null && <span className={`chip mx-chip ${chip}`}>{t.chat.chip[chip]}</span>}
-				<span className="mx-e2ee" title={t.link.e2ee} role="img" aria-label={t.link.e2ee}>
-					<Icon name="lock" small />
-				</span>
-				{thread !== null && (
-					<ModelMenu link={link} info={state.info} threadId={threadId} provider={thread.provider} model={thread.model} effort={threadInfo?.effort ?? ""} disabled={!online} />
+				{chip !== null && (
+					<span className={`chip mx-chip ${chip}`} role="status" aria-label={t.chat.chip[chip]} title={t.chat.chip[chip]}>
+						<span className="hide-narrow" aria-hidden="true">
+							{t.chat.chip[chip]}
+						</span>
+					</span>
 				)}
+				{thread !== null && (
+					<button
+						type="button"
+						className="btn btn-sm mx-changes-btn"
+						aria-label={changes.length > 0 ? `${t.agent.header.changes} (${changes.length})` : t.agent.header.changes}
+						aria-expanded={changesOpen}
+						onClick={() => setChangesOpen((v) => !v)}
+					>
+						<MachineIcon name="pencil" small />
+						<span className="hide-narrow">{t.agent.header.changes}</span>
+						{changes.length > 0 && <span className="count">{changes.length}</span>}
+					</button>
+				)}
+				<HeadMenu machine={machine} machineName={machineName} dir={dir} />
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
-			{missing ? (
-				<div className="empty">
-					<p>{t.chat.notFound}</p>
+			<div className="mx-chat-body">
+				<div className="mx-chat-main">
+					{missing ? (
+						<div className="empty">
+							<p>{t.chat.notFound}</p>
+						</div>
+					) : (
+						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0} fetchFull={fetchFull} />
+					)}
+					{prompts.length > 0 && (
+						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
+					)}
+					{!missing && (
+						<StatusBar
+							ai={ai}
+							dir={dir}
+							machine={state.info}
+							provider={provider}
+							model={model}
+							context={contextShare(items)}
+							info={threadInfo}
+							link={link}
+							threadId={threadId}
+							online={online}
+						/>
+					)}
+					<Composer
+						ai={ai}
+						machine={machineName}
+						online={online && !missing}
+						running={running}
+						prompting={prompts.length > 0}
+						commands={threadInfo?.commands ?? []}
+						listFiles={modern ? listFiles : undefined}
+						onSend={(text) => link.send(threadId, text)}
+						onStop={async () => {
+							await link.request({ case: "threadInterrupt", value: { threadId } });
+						}}
+					/>
 				</div>
-			) : (
-				<Transcript
-					blocks={blocks}
-					state={state}
-					ai={ai}
-					sessionAllow={caps?.sessionAllow ?? false}
-					running={running}
-					decide={decide}
-					answer={answer}
-					fetchFull={fetchFull}
-				/>
-			)}
-			{!missing && (
-				<StatusBar
-					ai={ai}
-					dir={thread?.dir ?? ""}
-					model={model === "" ? "" : modelName(state.info, provider, model)}
-					context={contextShare(items)}
-					info={threadInfo}
-					link={link}
-					threadId={threadId}
-					online={online}
-				/>
-			)}
-			<Composer
-				ai={ai}
-				machine={machineName}
-				online={online && !missing}
-				running={running}
-				commands={threadInfo?.commands ?? []}
-				onSend={(text) => link.send(threadId, text)}
-				onStop={() => request({ case: "threadInterrupt", value: { threadId } })}
-			/>
+				{changesOpen && <ChangesPanel changes={changes} full={state.full} onFetchFull={fetchFull} onClose={closeChanges} />}
+			</div>
 		</div>
+	);
+}
+
+/** "⋯" of the session header: the machine, the folder, the encryption. */
+function HeadMenu({ machine, machineName, dir }: { machine: string; machineName: string; dir: string }) {
+	const t = useMachinesCopy();
+	const { open, setOpen, ref } = usePopover();
+	return (
+		<div className="mx-model" ref={ref}>
+			<button type="button" className="icon-btn" aria-label={t.agent.header.menu} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+				<Icon name="dots" />
+			</button>
+			{open && (
+				<div className="mx-menu" role="menu" aria-label={t.agent.header.menu}>
+					<Link to={paths.machineInfo(machine)} className="mx-menu-link">
+						<MachineIcon name="monitor" small />
+						<span>{t.agent.header.machine(machineName)}</span>
+					</Link>
+					{dir !== "" && (
+						<p className="mx-menu-note">
+							<MachineIcon name="folder" small />
+							<span className="mono">{dir}</span>
+						</p>
+					)}
+					<p className="mx-menu-note ok">
+						<Icon name="lock" small />
+						<span>{t.agent.header.e2ee}</span>
+					</p>
+				</div>
+			)}
+		</div>
+	);
+}
+
+interface DockProps {
+	prompts: readonly Pending[];
+	ai: string;
+	sessionAllow: boolean;
+	decide: (itemId: string, revision: number) => (decision: Decision, message?: string) => Promise<void>;
+	answer: (itemId: string, revision: number) => (answers: string[][]) => Promise<void>;
+}
+
+/** The oldest prompt waiting for the user, above the composer; the count of those after it. */
+function Dock({ prompts, ai, sessionAllow, decide, answer }: DockProps) {
+	const t = useMachinesCopy();
+	const first = prompts[0];
+	if (first === undefined) return null;
+	return (
+		<section className="mx-dock" aria-label={t.agent.dock.label}>
+			<div className="mx-dock-inner">
+				{first.kind === "approval" ? (
+					<ApprovalCard key={first.id} hotkeys approval={first.approval} ai={ai} sessionAllow={sessionAllow} onDecide={decide(first.id, first.revision)} />
+				) : (
+					<QuestionCard key={first.id} question={first.question} ai={ai} onAnswer={answer(first.id, first.revision)} />
+				)}
+				{prompts.length > 1 && <p className="note">{t.agent.dock.more(prompts.length - 1)}</p>}
+			</div>
+		</section>
 	);
 }
 
 interface TranscriptProps {
 	blocks: readonly Block[];
 	state: LinkState;
-	ai: string;
-	sessionAllow: boolean;
 	running: boolean;
-	decide: (itemId: string, revision: number) => (decision: Decision) => Promise<void>;
-	answer: (itemId: string, revision: number) => (answers: string[][]) => Promise<void>;
+	/** A prompt waits in the dock. */
+	waiting: boolean;
 	fetchFull: (itemId: string) => Promise<void>;
 }
 
-function Transcript({ blocks, state, ai, sessionAllow, running, decide, answer, fetchFull }: TranscriptProps) {
+/** Within this distance of the bottom, the transcript follows new content. */
+const STICK_PX = 80;
+
+function Transcript({ blocks, state, running, waiting, fetchFull }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
+	/** Blocks there were when the user scrolled up; null while following. */
+	const [seenAt, setSeenAt] = useState<number | null>(null);
 	const last = blocks.at(-1);
 	const tail = last === undefined ? "" : `${blocks.length}:${last.kind === "text" ? last.text.length : last.id}`;
 	// New content scrolls into view unless the user scrolled up to read.
@@ -155,32 +280,71 @@ function Transcript({ blocks, state, ai, sessionAllow, running, decide, answer, 
 		const el = scroller.current;
 		if (el !== null && stick.current) el.scrollTop = el.scrollHeight;
 	}, [tail]);
-	const typing = running && !(last?.kind === "text" && last.partial);
+	// A width change (the changes panel, a rotated phone) keeps a following transcript at the bottom.
+	const lastTop = useRef(0);
+	useEffect(() => {
+		const el = scroller.current;
+		if (el === null || typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver(() => {
+			if (stick.current) el.scrollTop = el.scrollHeight;
+		});
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, []);
+	const typing = running && !waiting && !(last?.kind === "text" && last.partial);
+	const newer = seenAt === null ? 0 : Math.max(0, blocks.length - seenAt);
+	const toBottom = () => {
+		const el = scroller.current;
+		if (el === null) return;
+		stick.current = true;
+		setSeenAt(null);
+		el.scrollTo?.({ top: el.scrollHeight, behavior: "smooth" });
+		if (el.scrollTo === undefined) el.scrollTop = el.scrollHeight;
+	};
 	return (
-		<div
-			ref={scroller}
-			className="mx-messages"
-			onScroll={(event) => {
-				const el = event.currentTarget;
-				stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-			}}
-		>
-			{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
-			{blocks.map((block) => (
-				<BlockView key={block.id} block={block} state={state} ai={ai} sessionAllow={sessionAllow} running={running} decide={decide} answer={answer} fetchFull={fetchFull} t={t} />
-			))}
-			{typing && (
-				<div className="mx-typing" role="status" aria-label={t.chat.typing(ai)}>
-					<i />
-					<i />
-					<i />
-				</div>
+		<div className="mx-messages-wrap">
+			<div
+				ref={scroller}
+				className="mx-messages"
+				onScroll={(event) => {
+					const el = event.currentTarget;
+					const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
+					const up = el.scrollTop < lastTop.current;
+					lastTop.current = el.scrollTop;
+					if (atBottom) {
+						stick.current = true;
+						setSeenAt(null);
+					} else if (up) {
+						// Only the user scrolling up stops the following; content growing does not.
+						stick.current = false;
+						setSeenAt((seen) => seen ?? blocks.length);
+					}
+				}}
+			>
+				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
+				{blocks.map((block) => (
+					<BlockView key={block.id} block={block} state={state} running={running} fetchFull={fetchFull} t={t} />
+				))}
+				{typing && (
+					<div className="mx-typing" role="status" aria-label={t.chat.typing(aiName(state.info, ""))}>
+						<i />
+						<i />
+						<i />
+					</div>
+				)}
+			</div>
+			{seenAt !== null && (
+				<button type="button" className="mx-jump" onClick={toBottom}>
+					<Icon name="arrow-down" small />
+					{t.agent.jump.newer}
+					{newer > 0 && <span className="count">{newer}</span>}
+				</button>
 			)}
 		</div>
 	);
 }
 
-function BlockView({ block, state, ai, sessionAllow, running, decide, answer, fetchFull, t }: Omit<TranscriptProps, "blocks"> & { block: Block; t: MachinesCopy }) {
+function BlockView({ block, state, running, fetchFull, t }: { block: Block; state: LinkState; running: boolean; fetchFull: (itemId: string) => Promise<void>; t: MachinesCopy }) {
 	const { locale } = useI18n();
 	switch (block.kind) {
 		case "user":
@@ -193,7 +357,7 @@ function BlockView({ block, state, ai, sessionAllow, running, decide, answer, fe
 				</div>
 			);
 		case "text":
-			return <div className={block.partial ? "mx-agent streaming" : "mx-agent"}>{block.text}</div>;
+			return <AgentText text={block.text} streaming={block.partial} />;
 		case "who":
 			return (
 				<div className="mx-who">
@@ -212,9 +376,10 @@ function BlockView({ block, state, ai, sessionAllow, running, decide, answer, fe
 		case "todo":
 			return <TodoCard todo={block.todo} />;
 		case "approval":
-			return <ApprovalCard approval={block.approval} ai={ai} sessionAllow={sessionAllow} onDecide={decide(block.id, block.revision)} />;
+			// Answered (pending ones wait in the dock): the outcome line.
+			return <ApprovalCard approval={block.approval} ai="" sessionAllow={false} onDecide={() => Promise.resolve()} />;
 		case "question":
-			return <QuestionCard question={block.question} ai={ai} onAnswer={answer(block.id, block.revision)} />;
+			return <QuestionCard question={block.question} ai="" onAnswer={() => Promise.resolve()} />;
 		case "turn": {
 			const turn = block.turn;
 			const text =
@@ -261,143 +426,4 @@ function BlockView({ block, state, ai, sessionAllow, running, decide, answer, fe
 				</div>
 			);
 	}
-}
-
-interface ModelMenuProps {
-	link: MachineLink;
-	info: MachineInfo | null;
-	threadId: string;
-	provider: string;
-	model: string;
-	/** The session's effort; "" for the machine's default. */
-	effort: string;
-	disabled: boolean;
-}
-
-/** "Claude Code · Opus ▾": the AI's models and effort levels, and switching to another AI when the machine has two or more. */
-function ModelMenu({ link, info, threadId, provider, model, effort, disabled }: ModelMenuProps) {
-	const t = useMachinesCopy();
-	const { open, setOpen, ref: menu } = usePopover();
-	const [switchTo, setSwitchTo] = useState<string | null>(null);
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState("");
-	const ai = aiName(info, provider);
-	const caps = providerOf(info, provider)?.capabilities;
-	const models = caps?.models ?? [];
-	const efforts = caps?.effortLevels ?? [];
-	const others = (info?.providers ?? []).filter((p) => p.id !== provider);
-	const run = (body: Parameters<MachineLink["request"]>[0], done: () => void) => {
-		setBusy(true);
-		setError("");
-		link.request(body).then(
-			() => {
-				setBusy(false);
-				done();
-			},
-			(err: unknown) => {
-				setBusy(false);
-				setError(errorText(t, err, ai));
-			},
-		);
-	};
-	const label = model === "" ? ai : `${ai} · ${modelName(info, provider, model)}`;
-	return (
-		<div className="mx-model" ref={menu}>
-			<button type="button" className="mx-model-btn" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>
-				<span className="hide-narrow">{label}</span>
-				<span className="narrow-only">{model === "" ? ai : modelName(info, provider, model)}</span>
-				<MachineIcon name="chevron-down" small />
-			</button>
-			{open && (
-				<div className="mx-menu" role="menu" aria-label={t.chat.modelMenu}>
-					<h5>{t.chat.modelsOf(ai)}</h5>
-					{models.map((m) => (
-						<button
-							key={m.id}
-							type="button"
-							role="menuitemradio"
-							aria-checked={m.id === model}
-							disabled={busy}
-							onClick={() => run({ case: "threadSetModel", value: { threadId, model: m.id } }, () => setOpen(false))}
-						>
-							{m.id === model ? <Icon name="check" small /> : <span className="mx-menu-gap" />}
-							<span>{m.name || m.id}</span>
-						</button>
-					))}
-					{efforts.length > 0 && (
-						<>
-							<hr />
-							<h5>{t.chat.effort}</h5>
-							{["", ...efforts].map((level) => (
-								<button
-									key={level || "default"}
-									type="button"
-									role="menuitemradio"
-									aria-checked={level === effort}
-									disabled={busy}
-									onClick={() => run({ case: "threadSetEffort", value: { threadId, effort: level } }, () => setOpen(false))}
-								>
-									{level === effort ? <Icon name="check" small /> : <span className="mx-menu-gap" />}
-									<span>{level === "" ? t.chat.effortDefault : (t.chat.efforts[level] ?? level)}</span>
-								</button>
-							))}
-						</>
-					)}
-					{others.length > 0 && (
-						<>
-							<hr />
-							<h5>{t.chat.switchAi}</h5>
-							{others.map((p) => {
-								const usable = p.loginState !== LoginState.NEEDS_LOGIN;
-								return (
-									<button
-										key={p.id}
-										type="button"
-										role="menuitem"
-										disabled={busy || !usable}
-										onClick={() => {
-											setOpen(false);
-											setSwitchTo(p.id);
-										}}
-									>
-										<MachineIcon name="chevron-right" small />
-										<span>
-											{p.name || p.id}
-											<small>{usable ? t.chat.switchHint : t.newSession.needsLogin}</small>
-										</span>
-									</button>
-								);
-							})}
-						</>
-					)}
-					{error !== "" && (
-						<p className="mx-error" role="alert">
-							{error}
-						</p>
-					)}
-				</div>
-			)}
-			{switchTo !== null && (
-				<ConfirmDialog
-					title={t.chat.switchTitle(aiName(info, switchTo))}
-					body={
-						<>
-							<p>{t.chat.switchBody(aiName(info, switchTo))}</p>
-							{error !== "" && (
-								<p className="mx-error" role="alert">
-									{error}
-								</p>
-							)}
-						</>
-					}
-					action={t.chat.switchAction}
-					busyLabel={t.chat.switching}
-					busy={busy}
-					danger={false}
-					onConfirm={() => run({ case: "threadSwitch", value: { threadId, provider: switchTo, model: "" } }, () => setSwitchTo(null))}
-					onClose={() => setSwitchTo(null)}
-				/>
-			)}
-		</div>
-	);
 }

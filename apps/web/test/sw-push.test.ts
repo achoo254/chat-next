@@ -182,16 +182,16 @@ describe("machine pushes", () => {
 					silent: false,
 					renotify: true,
 					timestamp: machine.ts,
-					data: { chatId: 0, path: "/machines/42/s/t_1" },
+					data: { chatId: 0, path: "/ai/42/s/t_1" },
 				},
 			},
 		]);
 	});
 
 	it("reads only well-formed machine payloads", () => {
-		expect(parseMachinePayload(machine)?.path).toBe("/machines/42/s/t_1");
-		expect(parseMachinePayload({ ...machine, session_id: "" })?.path).toBe("/machines/42");
-		expect(parseMachinePayload({ ...machine, session_id: "../../x" })?.path).toBe("/machines/42");
+		expect(parseMachinePayload(machine)?.path).toBe("/ai/42/s/t_1");
+		expect(parseMachinePayload({ ...machine, session_id: "" })?.path).toBe("/ai/42");
+		expect(parseMachinePayload({ ...machine, session_id: "../../x" })?.path).toBe("/ai/42");
 		expect(parseMachinePayload({ ...machine, tag: "machine:43" })).toBeNull();
 		expect(parseMachinePayload({ ...machine, machine_id: 0 })).toBeNull();
 		expect(parseMachinePayload(payload)).toBeNull();
@@ -202,12 +202,12 @@ describe("machine pushes", () => {
 	it("asks an open window to open the session, or opens one on it", async () => {
 		const open = new FakeWindow(`${ORIGIN}/c/1`, false, "visible");
 		const sw = scope([open]);
-		await sw.fire("notificationclick", clickOf({ chatId: 0, path: "/machines/42/s/t_1" }));
-		expect(open.messages).toEqual([{ type: OPEN_PATH, path: "/machines/42/s/t_1" }]);
-		expect(openPath(open.messages[0])).toBe("/machines/42/s/t_1");
+		await sw.fire("notificationclick", clickOf({ chatId: 0, path: "/ai/42/s/t_1" }));
+		expect(open.messages).toEqual([{ type: OPEN_PATH, path: "/ai/42/s/t_1" }]);
+		expect(openPath(open.messages[0])).toBe("/ai/42/s/t_1");
 		const none = scope();
-		await none.fire("notificationclick", clickOf({ chatId: 0, path: "/machines/42" }));
-		expect(none.opened).toEqual(["/machines/42"]);
+		await none.fire("notificationclick", clickOf({ chatId: 0, path: "/ai/42" }));
+		expect(none.opened).toEqual(["/ai/42"]);
 		// Only machine paths: anything else opens the app's home.
 		const bad = scope();
 		await bad.fire("notificationclick", clickOf({ chatId: 0, path: "https://evil.test/" }));

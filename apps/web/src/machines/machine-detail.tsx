@@ -223,7 +223,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 						)}
 						<dt>{t.detail.devices}</dt>
 						<dd className="mx-devices">
-							<PairedDevices devices={devices} myKey={myKey} revoked={revoked} canRevoke={!local} deviceName={hub.deps.deviceName} onRevoke={askRevoke} />
+							<PairedDevices devices={devices} myKey={myKey} revoked={revoked} canRevoke={!local} onRevoke={askRevoke} />
 							<span className="note">{t.detail.pairNewHint}</span>
 						</dd>
 					</dl>

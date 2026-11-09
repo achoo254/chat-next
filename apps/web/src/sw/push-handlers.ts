@@ -10,7 +10,7 @@
 //   chat (push-messages.ts), or opens a new window on /c/<id>.
 // - machine pushes (ADR 0013, payload kind "machine"): one per machine (tag
 //   "machine:<id>"), no content, only the machine's name and what it waits
-//   for; a click opens the machine's waiting session (/machines/<id>/s/<thread>).
+//   for; a click opens the machine's waiting session (/ai/<id>/s/<thread>).
 // - pushsubscriptionchange: the browser renewed the subscription; register
 //   the new one for the session (the cookie rides along) over Connect JSON.
 //
@@ -146,7 +146,7 @@ export function parseMachinePayload(raw: unknown): MachinePushPayload | null {
 	if (typeof machineId !== "number" || !Number.isSafeInteger(machineId) || machineId <= 0) return null;
 	if (typeof title !== "string" || typeof body !== "string" || tag !== `machine:${machineId}`) return null;
 	const session = typeof sessionId === "string" && SESSION_ID.test(sessionId) ? sessionId : "";
-	const path = session === "" ? `/machines/${machineId}` : `/machines/${machineId}/s/${session}`;
+	const path = session === "" ? `/ai/${machineId}` : `/ai/${machineId}/s/${session}`;
 	return {
 		machineId,
 		sessionId: session,

@@ -18,11 +18,17 @@ export type ConsolePage =
 export type ConsoleTab = "profile" | "token" | "updates" | "dead-letters" | "stats" | "commands" | "mini-app";
 
 /**
- * "My machines" pages (ADR 0013). `machine` is the machine id as text, or
- * "local" for the agent on this computer in development builds.
+ * "AI Agent" pages (ADR 0013): the AI sessions of every machine, at /ai
+ * (/machines/* of before redirects there). `machine` is the machine id as
+ * text, or "local" for the agent on this computer in development builds.
  */
 export type MachinesView =
+	/** The sessions column; wide screens show the "Cần bạn" board beside it. */
 	| { readonly page: "list" }
+	/** The "Cần bạn" board of every machine (what phones open from the list). */
+	| { readonly page: "need" }
+	/** Managing the machines: the list, adding, pairing, details. */
+	| { readonly page: "machines" }
 	| { readonly page: "add" }
 	/** Development only: pair with `tunelo run` on this computer. */
 	| { readonly page: "local" }
@@ -83,13 +89,13 @@ export const paths = {
 	announcements: () => "/moderation/announcements",
 	moderationLog: () => "/moderation/log",
 	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
-	machines: () => "/machines",
-	machinesAdd: () => "/machines/add",
-	machinesLocal: () => "/machines/local/pair",
-	machine: (machine: string) => `/machines/${machine}`,
-	machineInfo: (machine: string) => `/machines/${machine}/info`,
-	machinePair: (machine: string) => `/machines/${machine}/pair`,
-	machineSession: (machine: string, threadId: string) => `/machines/${machine}/s/${encodeURIComponent(threadId)}`,
+	machines: () => "/ai",
+	machinesAdd: () => "/ai/add",
+	machinesLocal: () => "/ai/local/pair",
+	machine: (machine: string) => `/ai/${machine}`,
+	machineInfo: (machine: string) => `/ai/${machine}/info`,
+	machinePair: (machine: string) => `/ai/${machine}/pair`,
+	machineSession: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}`,
 	/** The sign-in card alone, for visitors (the header's "Đăng nhập"); signed in, it opens the chats. */
 	login: "/login",
 	privacy: "/privacy",
@@ -178,7 +184,8 @@ function matchMessaging(path: string): Route | null {
 		if (parts.length === 3 && tab !== undefined) return { name: "console", view: { page: "bot", botId, tab } };
 		return null;
 	}
-	if (parts[0] === "machines") return matchMachines(parts.slice(1));
+	// AI Agent lives at /ai; /machines is where it was, still opened (and redirected by the screen).
+	if (parts[0] === "ai" || parts[0] === "machines") return matchMachines(parts.slice(1));
 	if (parts[0] === "moderation") {
 		if (parts.length === 1) return { name: "moderation", reportId: null, actions: false };
 		if (parts.length === 2 && parts[1] === "feedback") return { name: "feedback" };
@@ -200,6 +207,8 @@ function matchMachines(parts: readonly string[]): Route | null {
 	const route = (view: MachinesView): Route => ({ name: "machines", view });
 	if (parts.length === 0) return route({ page: "list" });
 	if (parts.length === 1 && parts[0] === "add") return route({ page: "add" });
+	if (parts.length === 1 && parts[0] === "need") return route({ page: "need" });
+	if (parts.length === 1 && parts[0] === "machines") return route({ page: "machines" });
 	const head = parts[0] ?? "";
 	// The development machine exists only in development builds.
 	const local = head === "local" && import.meta.env.DEV;

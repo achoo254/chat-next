@@ -92,60 +92,64 @@ describe("status bar", () => {
 		expect(permissionMode("dontAsk")).toBeNull();
 	});
 
-	it("shows what is known, like the terminal statusline", () => {
+	it("keeps model, mode and 5-hour usage in the line, the rest labelled in Chi tiết", async () => {
 		vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
 		try {
+			const user = userEvent.setup();
 			const info = create(ThreadInfoSchema, {
 				threadId: "t",
 				permissionMode: "bypassPermissions",
 				gitBranch: "main",
 				linesAdded: 22,
 				linesRemoved: 27,
+				effort: "xhigh",
+				account: { email: "me@example.com", organization: "Acme", plan: "max" },
 				rateLimits: {
 					fiveHour: { utilization: 4, resetsAt: BigInt(NOW + (4 * 60 + 31) * 60_000) },
 					sevenDay: { utilization: 80, resetsAt: BigInt(NOW + 2 * 86_400_000 + 60_000) },
 				},
 			});
-			wrap(<StatusBar ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} model="" context={0.34} info={info} {...live} />);
+			wrap(<StatusBar ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} machine={null} provider="claude" model="" context={0.34} info={info} {...live} />);
 			const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
-			expect(within(bar).getByText("chat-next").closest("[title]")?.getAttribute("title")).toBe("Thư mục: D:\\CONG VIEC\\chat-next");
-			expect(within(bar).getByText("main")).toBeTruthy();
 			expect(within(bar).getByText("mặc định")).toBeTruthy();
-			expect(within(bar).getByText("34%")).toBeTruthy();
-			expect(bar.textContent).toContain("5h 4% · 4h31m");
-			expect(bar.textContent).toContain("tuần 80% · 2d");
-			expect(within(bar).getByText("+22")).toBeTruthy();
-			expect(within(bar).getByText("−27")).toBeTruthy();
-			expect(within(bar).getByText("Bỏ qua quyền").classList.contains("warn")).toBe(true);
+			expect(within(bar).getByText("Bỏ qua quyền").closest(".mx-mode")?.classList.contains("warn")).toBe(true);
+			// 5 hours always; the week only once it nears its limit (80%), as a warning.
+			expect(within(bar).getByText("5 giờ")).toBeTruthy();
+			expect(within(bar).getByText("7 ngày").closest(".mx-usage")?.classList.contains("warn")).toBe(true);
+			expect(within(bar).queryByText("main")).toBeNull();
+			await user.click(within(bar).getByRole("button", { name: "Chi tiết" }));
+			const details = screen.getByRole("dialog", { name: "Chi tiết phiên" });
+			expect(within(details).getByText("D:\\CONG VIEC\\chat-next")).toBeTruthy();
+			expect(within(details).getByText("main")).toBeTruthy();
+			expect(within(details).getByText("Rất cao")).toBeTruthy();
+			expect(within(details).getByText("đã dùng 34%")).toBeTruthy();
+			expect(within(details).getByText("me@example.com · Max")).toBeTruthy();
+			expect(within(details).getByText("4% · đặt lại sau 4h31m")).toBeTruthy();
+			expect(within(details).getByText("80% · đặt lại sau 2d")).toBeTruthy();
+			expect(within(details).getByText("+22")).toBeTruthy();
 		} finally {
 			vi.useRealTimers();
 		}
 	});
 
 	it("leaves out what is not known yet", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" model="Opus" context={null} info={undefined} {...live} />);
+		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="Opus" context={null} info={undefined} {...live} />);
 		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
-		expect(bar.textContent).toBe("Opus");
+		expect(bar.querySelector(".mx-usage")).toBeNull();
+		expect(bar.querySelector(".mx-mode")).toBeNull();
+		expect(within(bar).getByText("Opus")).toBeTruthy();
 	});
 
 	it("shows an unknown permission mode as is, without the warning", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "dontAsk" })} {...live} />);
-		expect(screen.getByText("dontAsk").classList.contains("warn")).toBe(false);
-	});
-
-	it("shows the signed-in account and the effort", () => {
-		const info = create(ThreadInfoSchema, { effort: "xhigh", account: { email: "me@example.com", organization: "Acme", plan: "max" } });
-		wrap(<StatusBar ai="Claude Code" dir="" model="Opus" context={null} info={info} {...live} />);
-		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
-		expect(within(bar).getByText("me@example.com · Max").closest("[title]")?.getAttribute("title")).toContain("Acme");
-		expect(within(bar).getByText("Rất cao")).toBeTruthy();
+		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "dontAsk" })} {...live} />);
+		expect(screen.getByText("dontAsk").closest(".mx-mode")?.classList.contains("warn")).toBe(false);
 	});
 
 	it("switches the permission mode among the modes the machine allows", async () => {
 		const user = userEvent.setup();
 		const { link, sent } = fakeLink();
 		const info = create(ThreadInfoSchema, { permissionMode: "default", permissionModes: ["default", "acceptEdits", "plan"] });
-		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={info} link={link} threadId="t1" online />);
+		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={info} link={link} threadId="t1" online />);
 		await user.click(screen.getByRole("button", { name: /Hỏi quyền/ }));
 		const menu = screen.getByRole("menu", { name: "Chế độ quyền của phiên" });
 		expect(within(menu).queryByText("Bỏ qua quyền")).toBeNull();
@@ -154,7 +158,7 @@ describe("status bar", () => {
 	});
 
 	it("keeps the mode read-only on a machine that offers no modes", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "plan" })} {...live} />);
+		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "plan" })} {...live} />);
 		expect(screen.queryByRole("button", { name: /Lập kế hoạch/ })).toBeNull();
 		expect(screen.getByText("Lập kế hoạch")).toBeTruthy();
 	});
@@ -185,7 +189,7 @@ describe("slash commands", () => {
 
 	const composer = (list = commands) => {
 		const onSend = vi.fn(() => Promise.resolve());
-		wrap(<Composer ai="Claude Code" machine="Mac" online running={false} commands={list} onSend={onSend} onStop={() => Promise.resolve()} />);
+		wrap(<Composer ai="Claude Code" machine="Mac" online running={false} prompting={false} commands={list} onSend={onSend} onStop={() => Promise.resolve()} />);
 		return { onSend, field: screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement };
 	};
 
@@ -247,7 +251,7 @@ describe("paired devices", () => {
 	it("lists the machine's devices, marks this one and revokes any", async () => {
 		const user = userEvent.setup();
 		const onRevoke = vi.fn();
-		wrap(<PairedDevices devices={devices} myKey={key(2)} revoked={new Set()} canRevoke deviceName="Chrome" onRevoke={onRevoke} />);
+		wrap(<PairedDevices devices={devices} myKey={key(2)} revoked={new Set()} canRevoke onRevoke={onRevoke} />);
 		const rows = screen.getAllByRole("listitem");
 		expect(rows[0]?.textContent).toContain("ghép ngày 01/11/2026");
 		expect(within(rows[0] as HTMLElement).queryByText("Thiết bị này")).toBeNull();
@@ -256,14 +260,15 @@ describe("paired devices", () => {
 		expect(onRevoke).toHaveBeenCalledWith(devices[0]);
 	});
 
-	it("shows a revoked device as revoked, and only this device before the machine's list arrives", () => {
+	it("shows a revoked device as revoked, and no device (nor a revoke) before the machine's list arrives", () => {
 		const { unmount } = wrap(
-			<PairedDevices devices={devices} myKey={null} revoked={new Set(["01".repeat(32)])} canRevoke deviceName="Chrome" onRevoke={() => undefined} />,
+			<PairedDevices devices={devices} myKey={null} revoked={new Set(["01".repeat(32)])} canRevoke onRevoke={() => undefined} />,
 		);
 		expect(within(screen.getAllByRole("listitem")[0] as HTMLElement).getByText("Đã thu hồi")).toBeTruthy();
 		unmount();
-		wrap(<PairedDevices devices={[]} myKey={null} revoked={new Set()} canRevoke={false} deviceName="Chrome" onRevoke={() => undefined} />);
-		expect(screen.getByText("Chrome")).toBeTruthy();
+		wrap(<PairedDevices devices={[]} myKey={null} revoked={new Set()} canRevoke onRevoke={() => undefined} />);
+		expect(screen.getByText("Danh sách thiết bị hiện khi đã kết nối tới máy.")).toBeTruthy();
+		expect(screen.queryByText("Thiết bị này")).toBeNull();
 		expect(screen.queryByRole("button")).toBeNull();
 	});
 

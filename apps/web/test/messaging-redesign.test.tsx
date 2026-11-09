@@ -50,7 +50,9 @@ describe("chat list", () => {
 		renderMessaging(demo.fixture);
 		await screen.findByRole("list", { name: "Danh sách chat" }, LONG);
 		const tabs = screen.getByRole("tablist", { name: "Lọc chat" });
-		expect(within(tabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Tất cả", "Cá nhân", "Nhóm", "Bot", "Chưa đọc"]);
+		// The folders, then AI Agent, which opens its own screen.
+		expect(within(tabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Tất cả", "Cá nhân", "Nhóm", "Bot", "Chưa đọc", "AI Agent"]);
+		expect(within(tabs).getByRole("tab", { name: "AI Agent" }).getAttribute("href")).toBe("/ai");
 		fireEvent.keyDown(document, { key: "5", ctrlKey: true });
 		await waitFor(() => expect(within(tabs).getByRole("tab", { name: "Chưa đọc" }).getAttribute("aria-selected")).toBe("true"));
 		fireEvent.keyDown(document, { key: "4", metaKey: true });

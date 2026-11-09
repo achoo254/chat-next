@@ -1,24 +1,34 @@
-// The slim line above the composer, like the user's terminal statusline:
-// folder, git branch, model and effort, context used, the signed-in account,
-// its 5-hour and weekly usage with the time until they reset, lines changed,
-// and the session's permission mode, which a device can change from here.
-// Whatever is not known yet is left out.
+// The slim line above the composer: the model (a menu of models and
+// effort), the session's permission mode (a menu of the modes the machine
+// allows) and the account's 5-hour usage as a bar, the weekly one too once
+// it nears its limit. Everything else the user's terminal statusline shows
+// (folder, branch, effort, context used, account, both usage windows with
+// their reset, lines changed) sits in "Chi tiết", labelled. One line on
+// phones. Whatever is not known yet is left out.
 import { useState } from "react";
-import type { ThreadInfo } from "@achoo254/chat-proto/remote/remote";
+import type { MachineInfo, ThreadInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
+import type { MachinesCopy } from "./copy-vi.ts";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { permissionMode, planName, usageOf } from "./status-line.ts";
-import { errorText, folderName, useNow } from "./use-machines.ts";
+import { ModelMenu } from "./model-menu.tsx";
+import { permissionMode, planName, usageOf, type Countdown } from "./status-line.ts";
+import { errorText, modelName, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
+
+/** At this share of a usage window the bar warns. */
+export const USAGE_WARN = 80;
 
 interface StatusBarProps {
 	ai: string;
 	/** The session's folder on the machine; "" when unknown. */
 	dir: string;
-	/** The model's display name; "" for the AI's default. */
+	/** What the machine reports about itself (models, providers). */
+	machine: MachineInfo | null;
+	provider: string;
+	/** The model id answering now; "" for the AI's default. */
 	model: string;
 	/** Share of the context window used (0-1); null when unknown. */
 	context: number | null;
@@ -28,78 +38,144 @@ interface StatusBarProps {
 	online: boolean;
 }
 
-export function StatusBar({ ai, dir, model, context, info, link, threadId, online }: StatusBarProps) {
+function countdown(t: MachinesCopy, left: Countdown | null): string {
+	return left === null ? "" : t.statusBar.resetIn(left.days, left.hours, left.minutes);
+}
+
+function Bar({ pct }: { pct: number }) {
+	return (
+		<span className="mx-bar" aria-hidden="true">
+			<i style={{ width: `${pct}%` }} />
+		</span>
+	);
+}
+
+export function StatusBar({ ai, dir, machine, provider, model, context, info, link, threadId, online }: StatusBarProps) {
 	const t = useMachinesCopy();
-	const { locale } = useI18n();
 	const now = useNow(30_000);
 	const five = usageOf(info?.rateLimits?.fiveHour, now);
 	const week = usageOf(info?.rateLimits?.sevenDay, now);
-	const at = (ms: number, withDay: boolean) =>
-		ms > 0 ? new Date(ms).toLocaleString(locale, withDay ? { weekday: "short", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit" }) : "";
-	const pct = context === null ? null : Math.round(context * 100);
 	const mode = info === undefined || info.permissionMode === "" ? null : info.permissionMode;
-	const effort = info === undefined || info.effort === "" ? "" : (t.chat.efforts[info.effort] ?? info.effort);
-	const account = info?.account;
 	return (
 		<div className="mx-status" role="group" aria-label={t.statusBar.label}>
 			<div className="mx-status-row">
-				{dir !== "" && (
-					<span className="mx-st-item" title={t.statusBar.folder(dir)}>
-						<MachineIcon name="folder" small />
-						<span className="mono">{folderName(dir)}</span>
-					</span>
-				)}
-				{info !== undefined && info.gitBranch !== "" && (
-					<span className="mx-st-item" title={t.statusBar.branch(info.gitBranch)}>
-						<MachineIcon name="branch" small />
-						<span className="mono">{info.gitBranch}</span>
-					</span>
-				)}
-				<span className="mx-st-item" title={t.statusBar.model(model || t.statusBar.defaultModel)}>
-					<MachineIcon name="cpu" small />
-					<span>{model || t.statusBar.defaultModel}</span>
-				</span>
-				{effort !== "" && (
-					<span className="mx-st-item" title={t.statusBar.effort(effort)}>
-						<MachineIcon name="gauge" small />
-						<span>{effort}</span>
-					</span>
-				)}
-				{pct !== null && (
-					<span className="mx-st-item mx-ctx" title={t.statusBar.context(pct)}>
-						<span className="bar" aria-hidden="true">
-							<i style={{ width: `${pct}%` }} />
-						</span>
-						<span>{pct}%</span>
-						<span className="sr-only">{t.statusBar.context(pct)}</span>
-					</span>
-				)}
-				{account !== undefined && account.email !== "" && (
-					<span className="mx-st-item" title={t.statusBar.accountHint(ai, account.organization)}>
-						<MachineIcon name="user" small />
-						<span>{t.statusBar.account(account.email, planName(account.plan))}</span>
-					</span>
-				)}
-				{five !== null && (
-					<span className="mx-st-item" title={t.statusBar.fiveHourHint(five.pct, at(five.resetsAt, false))}>
-						{t.statusBar.fiveHour(five.pct)}
-						{five.left !== null && ` · ${t.statusBar.resetIn(five.left.days, five.left.hours, five.left.minutes)}`}
-					</span>
-				)}
-				{week !== null && (
-					<span className="mx-st-item" title={t.statusBar.weekHint(week.pct, at(week.resetsAt, true))}>
-						{t.statusBar.week(week.pct)}
-						{week.left !== null && ` · ${t.statusBar.resetIn(week.left.days, week.left.hours, week.left.minutes)}`}
-					</span>
-				)}
-				{info !== undefined && (info.linesAdded > 0 || info.linesRemoved > 0) && (
-					<span className="mx-st-item mx-st-lines" title={t.statusBar.lines(info.linesAdded, info.linesRemoved)}>
-						<span className="add">+{info.linesAdded}</span>
-						<span className="del">−{info.linesRemoved}</span>
-					</span>
-				)}
+				<ModelMenu link={link} info={machine} threadId={threadId} provider={provider} model={model} effort={info?.effort ?? ""} disabled={!online} />
 				{mode !== null && <ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} link={link} threadId={threadId} disabled={!online} />}
+				{five !== null && (
+					<span
+						className={five.pct >= USAGE_WARN ? "mx-st-item mx-usage warn" : "mx-st-item mx-usage"}
+						title={t.agent.status.usageValue(five.pct, countdown(t, five.left))}
+					>
+						<span className="lbl">{t.agent.status.fiveHour}</span>
+						<Bar pct={five.pct} />
+						<span>{five.pct}%</span>
+						<span className="sr-only">{`${t.agent.status.usage} ${t.agent.status.fiveHour}: ${t.agent.status.usageValue(five.pct, countdown(t, five.left))}`}</span>
+					</span>
+				)}
+				{week !== null && week.pct >= USAGE_WARN && (
+					<span className="mx-st-item mx-usage warn" title={t.agent.status.usageValue(week.pct, countdown(t, week.left))}>
+						<span className="lbl">{t.agent.status.week}</span>
+						<Bar pct={week.pct} />
+						<span>{week.pct}%</span>
+						<span className="sr-only">{`${t.agent.status.usage} ${t.agent.status.week}: ${t.agent.status.usageValue(week.pct, countdown(t, week.left))}`}</span>
+					</span>
+				)}
+				<Details ai={ai} dir={dir} machine={machine} provider={provider} model={model} context={context} info={info} now={now} />
 			</div>
+		</div>
+	);
+}
+
+interface DetailsProps {
+	ai: string;
+	dir: string;
+	machine: MachineInfo | null;
+	provider: string;
+	model: string;
+	context: number | null;
+	info: ThreadInfo | undefined;
+	now: number;
+}
+
+/** "Chi tiết": every statusline value with its name. */
+function Details({ ai, dir, machine, provider, model, context, info, now }: DetailsProps) {
+	const t = useMachinesCopy();
+	const { locale } = useI18n();
+	const { open, setOpen, ref } = usePopover();
+	const five = usageOf(info?.rateLimits?.fiveHour, now);
+	const week = usageOf(info?.rateLimits?.sevenDay, now);
+	const pct = context === null ? null : Math.round(context * 100);
+	const effort = info === undefined || info.effort === "" ? "" : (t.chat.efforts[info.effort] ?? info.effort);
+	const account = info?.account;
+	const at = (ms: number, withDay: boolean) =>
+		ms > 0 ? new Date(ms).toLocaleString(locale, withDay ? { weekday: "short", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit" }) : "";
+	const usage = (label: string, u: NonNullable<typeof five>, withDay: boolean) => (
+		<>
+			<dt>{label}</dt>
+			<dd className="mx-dd-usage" title={at(u.resetsAt, withDay)}>
+				<Bar pct={u.pct} />
+				<span>{t.agent.status.usageValue(u.pct, countdown(t, u.left))}</span>
+			</dd>
+		</>
+	);
+	return (
+		<div className="mx-model mx-details" ref={ref}>
+			<button type="button" className="mx-st-btn" aria-label={t.agent.status.details} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+				<Icon name="info" small />
+				<span className="hide-narrow">{t.agent.status.details}</span>
+			</button>
+			{open && (
+				<div className="mx-menu up mx-pop" role="dialog" aria-label={t.agent.status.detailsTitle}>
+					<h5>{t.agent.status.detailsTitle}</h5>
+					<dl className="mx-kv">
+						{dir !== "" && (
+							<>
+								<dt>{t.agent.status.folder}</dt>
+								<dd className="mono">{dir}</dd>
+							</>
+						)}
+						{info !== undefined && info.gitBranch !== "" && (
+							<>
+								<dt>{t.agent.status.branch}</dt>
+								<dd className="mono">{info.gitBranch}</dd>
+							</>
+						)}
+						<dt>{t.agent.status.model}</dt>
+						<dd>{model === "" ? t.statusBar.defaultModel : `${ai} · ${modelName(machine, provider, model)}`}</dd>
+						{effort !== "" && (
+							<>
+								<dt>{t.agent.status.effort}</dt>
+								<dd>{effort}</dd>
+							</>
+						)}
+						{pct !== null && (
+							<>
+								<dt>{t.agent.status.context}</dt>
+								<dd className="mx-dd-usage">
+									<Bar pct={pct} />
+									<span>{t.agent.status.contextValue(pct)}</span>
+								</dd>
+							</>
+						)}
+						{account !== undefined && account.email !== "" && (
+							<>
+								<dt>{t.agent.status.account}</dt>
+								<dd title={t.statusBar.accountHint(ai, account.organization)}>{t.statusBar.account(account.email, planName(account.plan))}</dd>
+							</>
+						)}
+						{five !== null && usage(`${t.agent.status.usage} ${t.agent.status.fiveHour}`, five, false)}
+						{week !== null && usage(`${t.agent.status.usage} ${t.agent.status.week}`, week, true)}
+						{info !== undefined && (info.linesAdded > 0 || info.linesRemoved > 0) && (
+							<>
+								<dt>{t.agent.status.lines}</dt>
+								<dd className="mx-st-lines">
+									<span className="add">+{info.linesAdded}</span> <span className="del">−{info.linesRemoved}</span>
+								</dd>
+							</>
+						)}
+					</dl>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -127,9 +203,9 @@ function ModeMenu({ ai, mode, modes, link, threadId, disabled }: ModeMenuProps) 
 	const className = permissionMode(mode) === "bypassPermissions" ? "mx-mode warn" : "mx-mode";
 	if (modes.length === 0) {
 		return (
-			<span className={className}>
+			<span className={className} title={t.agent.status.mode}>
 				<MachineIcon name="shield" small />
-				{label(mode)}
+				<span>{label(mode)}</span>
 			</span>
 		);
 	}
@@ -152,7 +228,7 @@ function ModeMenu({ ai, mode, modes, link, threadId, disabled }: ModeMenuProps) 
 		<div className="mx-model" ref={ref}>
 			<button type="button" className={className} title={t.statusBar.modeHint(ai)} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>
 				<MachineIcon name="shield" small />
-				{label(mode)}
+				<span>{label(mode)}</span>
 				<MachineIcon name="chevron-down" small />
 			</button>
 			{open && (

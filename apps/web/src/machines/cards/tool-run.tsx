@@ -38,13 +38,14 @@ export function ToolRunCard({ runs, full, onFetchFull, live }: ToolRunCardProps)
 			</div>
 		);
 	}
-	const icons = runs.slice(0, 4).map((r) => (r.call === null ? "cpu" : toolIcon(r.call.kind)));
+	// One icon per kind of tool: "☰ ☰" for two reads read as a glitch.
+	const icons = [...new Set(runs.map((r) => (r.call === null ? "cpu" : toolIcon(r.call.kind))))].slice(0, 4);
 	return (
 		<details className="mx-tools">
 			<summary>
 				<span className="icons">
-					{icons.map((icon, i) => (
-						<MachineIcon key={i} name={icon} small />
+					{icons.map((icon) => (
+						<MachineIcon key={icon} name={icon} small />
 					))}
 				</span>
 				<span>{running?.call ? t.transcript.runningTool(running.call.name) : t.transcript.ranTools(runs.length)}</span>

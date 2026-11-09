@@ -1,16 +1,18 @@
 // Hooks and helpers shared by the "My machines" screens: the link hub from
 // the slot above the screens, the directory, one machine's link, and the
 // wording of remote errors.
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
 import { ThreadState, type MachineInfo, type ProviderInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { useServices } from "../messaging/data/services.tsx";
+import { setAgentNeeds } from "./agent-needs.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { useHubSlot } from "./link/connection-provider.tsx";
 import { deviceKeyStore } from "./link/device-keys.ts";
-import { deviceName, LinkHub, type DirectoryState } from "./link/link-hub.ts";
+import { deviceName, LinkHub, LOCAL_REF, localPort, type DirectoryState } from "./link/link-hub.ts";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { machineErrorText } from "./machine-errors.ts";
 import { browserSocket } from "./link/socket.ts";
+import { connOf, shouldConnect, type Conn } from "./machine-status.ts";
 import { createMachinesDirectory, type MachineEntry } from "./machines-client.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -21,17 +23,49 @@ export function useHub(): LinkHub {
 	const slot = useHubSlot();
 	const { transport } = useServices();
 	const t = useMachinesCopy();
-	return slot.get(
-		() =>
-			new LinkHub({
-				// A 401 also reaches the client core, which ends the session; nothing to add here.
-				directory: createMachinesDirectory(transport, () => undefined),
-				keys: deviceKeyStore(),
-				deviceName: deviceName(navigator.userAgent),
-				socket: browserSocket,
-				localName: t.local.name,
-			}),
-	);
+	return slot.get(() => {
+		const hub = new LinkHub({
+			// A 401 also reaches the client core, which ends the session; nothing to add here.
+			directory: createMachinesDirectory(transport, () => undefined),
+			keys: deviceKeyStore(),
+			deviceName: deviceName(navigator.userAgent),
+			socket: browserSocket,
+			localName: t.local.name,
+		});
+		countNeeds(hub);
+		return hub;
+	});
+}
+
+/** Waiting sessions of every machine the hub has a link to, for the navigation badge. */
+export function needsOf(hub: LinkHub): number {
+	const refs = hub.directory().machines.map((m) => m.ref);
+	if (localPort() !== null) refs.push(LOCAL_REF);
+	let count = 0;
+	for (const ref of refs) {
+		for (const thread of hub.link(ref).snapshot().threads) if (thread.state === ThreadState.WAITING) count += 1;
+	}
+	return count;
+}
+
+/**
+ * Keeps the navigation badge (agent-needs.ts) up to date for as long as the
+ * hub lives, including while the user is in a chat: it follows the
+ * directory and every machine's link.
+ */
+function countNeeds(hub: LinkHub): void {
+	const watched = new Set<string>();
+	const update = () => setAgentNeeds(needsOf(hub));
+	const follow = () => {
+		for (const machine of hub.directory().machines) {
+			if (watched.has(machine.ref)) continue;
+			watched.add(machine.ref);
+			hub.link(machine.ref).subscribe(update);
+		}
+		update();
+	};
+	hub.subscribe(follow);
+	follow();
 }
 
 /**
@@ -80,6 +114,71 @@ export function useLink(hub: LinkHub, ref: string): [MachineLink, LinkState] {
 	useEffect(() => link.start(), [link]);
 	const state = useSyncExternalStore(link.subscribe, link.snapshot);
 	return [link, state];
+}
+
+/** One machine as the session column and the boards show it. */
+export interface MachineView {
+	readonly entry: MachineEntry;
+	readonly link: MachineLink;
+	readonly state: LinkState;
+	readonly conn: Conn;
+}
+
+/**
+ * Every machine of the directory (and the development machine) with its
+ * link. A link opens only to a paired machine the directory sees online
+ * (shouldConnect), so unpaired or sleeping machines hold no socket; open
+ * links ping only while a machines screen is visible (useHubPresence).
+ */
+export function useMachineViews(hub: LinkHub, now: number): MachineView[] {
+	const directory = useDirectory(hub);
+	const local = localPort() !== null ? hub.entry(LOCAL_REF) : null;
+	const entries = local === null ? directory.machines : [...directory.machines, local];
+	const refs = entries.map((e) => e.ref).join(",");
+	const links = entries.map((e) => hub.link(e.ref));
+	const [, rerender] = useReducer((n: number) => n + 1, 0);
+	useEffect(() => {
+		const offs = refs === "" ? [] : refs.split(",").map((ref) => hub.link(ref).subscribe(rerender));
+		return () => {
+			for (const off of offs) off();
+		};
+	}, [hub, refs]);
+	const states = links.map((link) => link.snapshot());
+	const pinned = usePinned(hub, refs, states.map((s) => s.status.kind).join(","));
+	useEffect(() => {
+		for (const entry of entries) {
+			if (shouldConnect(entry, pinned.get(entry.ref) ?? null, now)) hub.link(entry.ref).start();
+		}
+	});
+	return entries.map((entry, i) => {
+		const link = links[i] ?? hub.link(entry.ref);
+		const state = states[i] ?? link.snapshot();
+		return { entry, link, state, conn: connOf(entry, pinned.get(entry.ref) ?? null, state, now) };
+	});
+}
+
+/**
+ * Whether this device holds each machine's key, read again whenever a
+ * link's status changes (pairing restarts the link).
+ */
+function usePinned(hub: LinkHub, refs: string, statuses: string): ReadonlyMap<string, boolean> {
+	const [pinned, setPinned] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+	useEffect(() => {
+		let live = true;
+		const list = refs === "" ? [] : refs.split(",");
+		Promise.all(list.map(async (ref) => [ref, (await hub.deps.keys.pinned(ref)) !== null] as const)).then(
+			(pairs) => {
+				if (!live) return;
+				setPinned((current) => (pairs.every(([ref, has]) => current.get(ref) === has) && current.size === pairs.length ? current : new Map(pairs)));
+			},
+			// Unreadable key store: the links report "unpaired" themselves once started.
+			() => undefined,
+		);
+		return () => {
+			live = false;
+		};
+	}, [hub, refs, statuses]);
+	return pinned;
 }
 
 /** Watches a thread while the component shows it. */

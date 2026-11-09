@@ -43,29 +43,15 @@ interface PairedDevicesProps {
 	revoked: ReadonlySet<string>;
 	/** Revoking goes through the directory: not for the development machine. */
 	canRevoke: boolean;
-	/** This device's name, shown alone while the machine's list is not known. */
-	deviceName: string;
-	onRevoke: (device: PairedDevice | null) => void;
+	onRevoke: (device: PairedDevice) => void;
 }
 
-export function PairedDevices({ devices, myKey, revoked, canRevoke, deviceName, onRevoke }: PairedDevicesProps) {
+export function PairedDevices({ devices, myKey, revoked, canRevoke, onRevoke }: PairedDevicesProps) {
 	const t = useMachinesCopy();
 	const { locale } = useI18n();
-	if (devices.length === 0) {
-		return (
-			<span className="mx-device">
-				<span className="tx">
-					<b>{deviceName}</b>
-					<small>{t.detail.thisDevice}</small>
-				</span>
-				{canRevoke && (
-					<button type="button" className="btn btn-sm btn-danger" onClick={() => onRevoke(null)}>
-						{t.detail.revokeThis}
-					</button>
-				)}
-			</span>
-		);
-	}
+	// The machine lists its devices once connected; until then say so, and
+	// never show this device as paired (nor a revoke for it) on a guess.
+	if (devices.length === 0) return <span className="note">{t.agent.devicesLater}</span>;
 	return (
 		<ul className="mx-device-list">
 			{devices.map((device) => {
@@ -86,7 +72,7 @@ export function PairedDevices({ devices, myKey, revoked, canRevoke, deviceName, 
 							<span className="muted">{t.detail.revoked}</span>
 						) : (
 							canRevoke && (
-								<button type="button" className="btn btn-sm btn-danger" aria-label={`${t.detail.revokeThis}: ${name}`} onClick={() => onRevoke(device)}>
+								<button type="button" className="btn btn-sm danger-outline" aria-label={`${t.detail.revokeThis}: ${name}`} onClick={() => onRevoke(device)}>
 									{t.detail.revokeThis}
 								</button>
 							)

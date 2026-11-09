@@ -2,7 +2,10 @@
 // frames (FakeMachine) behind the browser's WebSocket for one tunnel
 // address, its key pinned in this browser, and a session with long shell
 // commands, an answered and a pending permission prompt, a grouped run, a
-// wide diff, and the statusline data (ThreadInfo) with commands and skills.
+// markdown answer (list, tasks, table, a code block wider than a phone),
+// diffs of two files, and the statusline data (ThreadInfo) with commands and
+// skills; a running and a parked session in two folders; and beside it a
+// machine this browser has not paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { Decision, ItemSchema, PromptState, Role, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
@@ -33,7 +36,32 @@ function transcript(now: number): Item[] {
 		item("t1", bash("1", longCommand)),
 		item("p1", { case: "approval", value: { toolId: "1", kind: ToolKind.SHELL, name: "Bash", summary: longCommand, state: PromptState.ANSWERED, decision: Decision.ALLOW_SESSION } }, 2),
 		item("r1", done("1", " Test Files  5 passed (5)\n      Tests  52 passed (52)")),
-		item("a1b", { case: "text", value: { role: Role.ASSISTANT, text: "Test đều qua. Mình xem chỗ cột tool bị tràn ngang." } }),
+		item("a1b", {
+			case: "text",
+			value: {
+				role: Role.ASSISTANT,
+				text: [
+					"Test đều qua (**52/52**). Chỗ cột tool bị tràn ngang do `white-space: nowrap` trên lệnh dài:",
+					"",
+					"1. Lệnh xuống dòng và gói trong 3 dòng, có **Xem thêm**.",
+					"2. Kết quả nằm sau nút `Kết quả`.",
+					"- [x] Sửa CSS",
+					"- [ ] Chụp lại ảnh 375 px",
+					"",
+					"| Khổ | Trước | Sau |",
+					"|---|---:|---:|",
+					"| 375 px | tràn 212 px | 0 |",
+					"| 1440 px | 0 | 0 |",
+					"",
+					"```css",
+					"/* lệnh dài xuống dòng, tối đa 3 dòng */",
+					".mx-run-cmd.clamp { display: -webkit-box; -webkit-line-clamp: 3; overflow: hidden; } .mx-run-cmd { overflow-wrap: anywhere; }",
+					"```",
+					"",
+					"Xem thêm ở [tài liệu CSS](https://developer.mozilla.org/docs/Web/CSS/overflow-wrap).",
+				].join("\n"),
+			},
+		}),
 		item("t2", { case: "toolCall", value: { toolId: "2", kind: ToolKind.READ, name: "Read", summary: "apps/web/src/machines/cards/tool-run.tsx", input: "{}" } }),
 		item("r2", done("2", "…")),
 		item("t3", { case: "toolCall", value: { toolId: "3", kind: ToolKind.SEARCH, name: "Grep", summary: "overflow-wrap:anywhere apps/web/src/machines/machines.css", input: "{}" } }),
@@ -45,6 +73,26 @@ function transcript(now: number): Item[] {
 				path: "apps/web/src/machines/machines.css",
 				unified: "@@ -146,3 +146,4 @@\n-.mx-tools li .mono { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }\n+.mx-run-cmd { min-width: 0; overflow-wrap: anywhere; word-break: break-word; line-height: 1.45; }\n+.mx-run-cmd.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }",
 				added: 2,
+				removed: 1,
+			},
+		}),
+		item("d2", {
+			case: "diff",
+			value: {
+				toolId: "6",
+				path: "apps/web/src/machines/cards/tool-run.tsx",
+				unified: "@@ -40,4 +40,5 @@\n \tconst rows = runs.map((run) => (\n-\t\t<RunRow key={run.id} run={run} />\n+\t\t// One row per call; the answered prompt folds in.\n+\t\t<RunRow key={run.id} run={run} running={run === running} />\n \t));",
+				added: 2,
+				removed: 1,
+			},
+		}),
+		item("d3", {
+			case: "diff",
+			value: {
+				toolId: "7",
+				path: "apps/web/src/machines/machines.css",
+				unified: "@@ -210,2 +210,2 @@\n-.mx-diff pre span { white-space: pre-wrap; }\n+.mx-diff-body td { white-space: pre; }",
+				added: 1,
 				removed: 1,
 			},
 		}),
@@ -63,7 +111,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	const keys = deviceKeyStore();
 	const device = await keys.device();
 	machine.paired = [device.publicKey];
-	const entry = machines.add({ name: "DIEUVY-LAPTOP", os: "win32", arch: "x64", tunnelUrl: TUNNEL, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "0.2.0" });
+	const entry = machines.add({ name: "DIEUVY-LAPTOP", os: "win32", arch: "x64", tunnelUrl: TUNNEL, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
 	const ref = String(entry.id);
 	await keys.pin(ref, machine.keys.publicKey);
 	const thread = {
@@ -77,6 +125,13 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		updatedAt: BigInt(now),
 		open: true,
 	};
+	const others = [
+		{ id: "demo-running", title: "Viết test cho bảng Cần bạn", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "sonnet", state: ThreadState.RUNNING, pending: 0, updatedAt: BigInt(now - 60_000), open: true },
+		{ id: "demo-idle", title: "Rà soát quyền MCP của tunelo", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 3 * 3_600_000), open: false },
+	];
+	// A machine this browser has not paired with, and one that went offline.
+	machines.add({ name: "Mac mini", os: "darwin", arch: "arm64", tunnelUrl: `wss://other.tunnel.${brand.domain}`, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
+	machines.add({ name: "Máy nhà", os: "linux", arch: "x64", tunnelUrl: "", lastSeenAt: BigInt(Math.floor(now / 1000) - 2 * 3600), agentVersion: "2.0.1" });
 	machine.handler = (frame, socket) => {
 		switch (frame.body.case) {
 			case "machineInfoRequest":
@@ -86,7 +141,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						value: {
 							name: "DIEUVY-LAPTOP",
 							os: "win32",
-							agentVersion: "0.2.0",
+							agentVersion: "2.0.1",
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -98,7 +153,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 					},
 				];
 			case "threadList":
-				return [{ case: "threadListResult", value: { threads: [thread], openSessions: 1, maxSessions: 3 } }];
+				return [{ case: "threadListResult", value: { threads: [thread, ...others], openSessions: 2, maxSessions: 3 } }];
 			case "threadSubscribe": {
 				const threadId = frame.body.value.threadId;
 				setTimeout(
@@ -140,6 +195,12 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 					{ name: "server", git: true, branch: "main", sensitive: false },
 				];
 				return [{ case: "dirListResult", value: { path, parent, entries, sensitive: path === home } }];
+			}
+			case "fileList": {
+				const prefix = frame.body.value.prefix.toLowerCase();
+				const all = ["apps/", "apps/web/src/machines/composer.tsx", "apps/web/src/machines/machines.css", "apps/web/src/machines/session-chat.tsx", "docs/adr/0013-remote-machines.md"];
+				const entries = all.filter((p) => p.toLowerCase().includes(prefix)).map((path) => ({ path, dir: path.endsWith("/") }));
+				return [{ case: "fileListResult", value: { threadId: frame.body.value.threadId, entries, truncated: false } }];
 			}
 			case "auditList":
 				return [{ case: "auditListResult", value: { entries: [] } }];

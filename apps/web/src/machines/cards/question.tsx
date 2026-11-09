@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PromptState, type QuestionItem } from "@achoo254/chat-proto/remote/remote";
 import { useDomId } from "../../messaging/ui/parts.tsx";
 import { MachineIcon } from "../machine-icons.tsx";
+import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 
 const OTHER = "\u0000other";
@@ -51,7 +52,7 @@ export function QuestionCard({ question, ai, onAnswer, compact = false }: Questi
 			() => setBusy(false),
 			(err: unknown) => {
 				setBusy(false);
-				setError(err instanceof Error ? err.message : String(err));
+				setError(errorText(t, err, ai));
 			},
 		);
 	};

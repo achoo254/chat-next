@@ -55,11 +55,22 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"settings-app": "?at=settings-app",
 	"settings-appearance": "?at=settings-appearance",
 	"settings-mcp": "?at=settings-mcp",
-	// "Máy của tôi": a session with long commands, a folded answered prompt, the status bar; the "/" picker; paired devices; "Thêm máy này".
+	// AI Agent: the sessions of every machine, the "Cần bạn" board, an unpaired machine, the machines page;
+	// a session with markdown, the docked prompt, the status bar's details, the changes panel and "@" files.
 	"machine-chat": "?at=machine-chat",
+	"machine-home": "?at=machine-home",
+	"machine-need": "?at=machine-need",
+	"machine-unpaired": "?at=machine-unpaired",
+	"machine-list": "?at=machine-list",
+	"machine-markdown": "?at=machine-chat&open=markdown",
+	"machine-details": "?at=machine-chat&open=status-details",
+	"machine-changes": "?at=machine-chat&open=changes",
+	"machine-changes-file": "?at=machine-chat&open=changes-file",
+	"machine-mention": "?at=machine-chat&open=mention",
 	"machine-slash": "?at=machine-chat&open=slash",
 	"machine-new-session": "?at=machine-sessions&open=new-session",
 	"machine-info": "?at=machine-info",
+	"machine-pair": "?at=machine-pair",
 	"machine-add": "?at=machine-add",
 };
 

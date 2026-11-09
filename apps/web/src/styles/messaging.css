@@ -895,6 +895,9 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 /* Five built-in filters fit one row of a 280px list: compact, never broken inside a label. */
 .list .tabs { flex-wrap: wrap; gap: 0; justify-content: space-between; padding-left: var(--space-3); padding-right: var(--space-3); }
 .list .tabs button { min-width: 44px; white-space: nowrap; padding-left: var(--space-1); padding-right: var(--space-1); font-size: 0.875rem; }
+/* AI Agent sits in the folder row but opens its own screen. */
+.folder-tabs .folder-tab-link { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 44px; padding: var(--space-2) var(--space-1); border-bottom: 2px solid transparent; color: var(--c-text-muted); font-size: 0.875rem; font-weight: 500; white-space: nowrap; text-decoration: none; }
+.folder-tabs .folder-tab-link .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
 
 /* Message text follows the chosen size (Cài đặt › Giao diện). */
 .messages .bubble, .size-preview .bubble { font-size: var(--msg-font, 0.9375rem); }

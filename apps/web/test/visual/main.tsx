@@ -29,6 +29,7 @@ import { routerFetch } from "../support/router-fetch.ts";
 import { FakeMachines } from "../support/fake-machines.ts";
 import { DEMO_THREAD, installRemoteMachineDemo } from "../support/remote-machine-demo.ts";
 import { paths } from "../../src/router.tsx";
+import { aiPaths } from "../../src/machines/ai-paths.ts";
 
 const params = new URLSearchParams(window.location.search);
 // Every page holds its load event until the scenario (if any) and the overflow audit ran.
@@ -288,10 +289,16 @@ const SCREENS: Record<string, string> = {
 	// The shared language and theme switches (@achoo254/app-shell) in Settings › Giao diện.
 	"settings-appearance": "/settings/appearance",
 	"settings-mcp": "/settings/mcp",
-	// "Máy của tôi" with a paired demo machine (test/support/remote-machine-demo.ts): a session, the machine's page, "Thêm máy này".
+	// AI Agent with a paired demo machine, an unpaired and an offline one (test/support/remote-machine-demo.ts):
+	// a session, the "Cần bạn" home, an unpaired machine's board, the machines page, a machine's board, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
+	"machine-home": paths.machines(),
+	"machine-need": aiPaths.need,
+	"machine-unpaired": paths.machine("2"),
+	"machine-list": aiPaths.manage,
 	"machine-sessions": paths.machine("1"),
 	"machine-info": paths.machineInfo("1"),
+	"machine-pair": paths.machinePair("2"),
 	"machine-add": paths.machinesAdd(),
 };
 const at = params.get("at");
@@ -395,8 +402,41 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	// "Phiên mới" on the demo machine's page (?at=machine-sessions): opened in the session's folder, with the first message suggested.
 	"new-session": async () => {
-		await click(".mx-new-btn:not(:disabled)", /Phiên mới/);
+		await click(".mx-head button.btn-primary:not(:disabled)", /Phiên mới/);
 		await find(() => document.querySelector(".mx-new .mx-crumbs"));
+	},
+	// The markdown answer (list, tasks, table, code block) scrolled into view.
+	markdown: async () => {
+		const table = await find(() => document.querySelector(".mx-agent.md .md-table"));
+		table.scrollIntoView({ block: "center" });
+	},
+	// The session's "Chi tiết" popover of the status bar.
+	"status-details": async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		await click(".mx-details button", /Chi tiết/);
+		await find(() => document.querySelector(".mx-pop"));
+	},
+	// The files Claude changed in the session, then one file's diffs.
+	changes: async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		await click(".mx-changes-btn", /Thay đổi/);
+		await find(() => document.querySelector(".mx-file"));
+	},
+	"changes-file": async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		await click(".mx-changes-btn", /Thay đổi/);
+		await click(".mx-file", /tool-run/);
+		await find(() => document.querySelector(".mx-changes .mx-diff"));
+	},
+	// "@" in the composer: the session folder's files.
+	mention: async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		const field = await find(() => document.querySelector<HTMLTextAreaElement>(".mx-field[data-composer]"));
+		Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, "xem @machines");
+		field.setSelectionRange(13, 13);
+		field.dispatchEvent(new Event("input", { bubbles: true }));
+		field.focus();
+		await find(() => document.querySelector(".mx-slash .file"));
 	},
 	// The one-time URL after creating a webhook (#hook-created).
 	"hook-created": async () => {
@@ -703,6 +743,8 @@ function auditOverflow(): void {
 		return overflowX === "auto" || overflowX === "scroll";
 	});
 	for (const element of containers) {
+		// Code blocks, tables and diffs scroll sideways on purpose (data-scroll-x).
+		if (element.hasAttribute("data-scroll-x")) continue;
 		if (element.scrollWidth > element.clientWidth + 1) {
 			console.error(`harness: horizontal overflow in ${describe(element)}: ${element.scrollWidth}px content in ${element.clientWidth}px`);
 		}

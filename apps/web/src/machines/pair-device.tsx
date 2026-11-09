@@ -6,6 +6,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { HandshakeErrorCode } from "@achoo254/chat-proto/remote/remote";
 import { HandshakeFailure, PakeFailure, decodeQr } from "@achoo254/chat-remote-protocol";
 import { Icon } from "../components/screen-icons.tsx";
+import { CopyButton } from "../messaging/ui/parts.tsx";
 import { navigate, paths } from "../router.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { confirmTrust, pairWithCode } from "./link/pairing.ts";
@@ -81,20 +82,28 @@ export function PairDevice({ machine }: { machine: string }) {
 						<MachineIcon name="qr" />
 						{t.pair.heading(name)}
 					</h3>
-					<p className="muted">{t.pair.intro(name)}</p>
-					{canScan &&
-						(scanning ? (
-							<QrScanner onText={onQr} onFail={() => setError(t.pair.cameraFailed)} onStop={() => setScanning(false)} />
-						) : (
-							<div>
-								<button type="button" className="btn" disabled={busy || url === ""} onClick={() => setScanning(true)}>
-									<MachineIcon name="qr" small />
-									{t.pair.scan}
-								</button>
+					<ol className="mx-steps">
+						<li>
+							<p>{t.agent.pairing.step1(name)}</p>
+							<div className="mx-cmd">
+								<code>tunelo pair</code>
+								<CopyButton text="tunelo pair" label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
 							</div>
-						))}
-					<p className="note">{t.pair.orCode}</p>
-					<CodeInput disabled={busy || url === ""} onCode={(code) => finish(() => pairByCode(hub, machine, url, code))} />
+						</li>
+						<li>
+							<p>{t.agent.pairing.step2}</p>
+							{canScan &&
+								(scanning ? (
+									<QrScanner onText={onQr} onFail={() => setError(t.pair.cameraFailed)} onStop={() => setScanning(false)} />
+								) : (
+									<button type="button" className="btn" disabled={busy || url === ""} onClick={() => setScanning(true)}>
+										<MachineIcon name="qr" small />
+										{t.pair.scan}
+									</button>
+								))}
+							<CodeInput disabled={busy || url === ""} onCode={(code) => finish(() => pairByCode(hub, machine, url, code))} />
+						</li>
+					</ol>
 					{busy && (
 						<div className="mx-wait">
 							<span className="spin" aria-hidden="true" />
@@ -106,6 +115,7 @@ export function PairDevice({ machine }: { machine: string }) {
 							{error}
 						</p>
 					)}
+					<p className="note">{t.agent.pairing.sameMachine(name)}</p>
 					<div className="mx-hint">
 						<Icon name="lock" small />
 						<span>{t.pair.note}</span>

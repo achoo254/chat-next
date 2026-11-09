@@ -1,8 +1,10 @@
 // The remote chat's composer: a message goes out at once (shown until the
-// machine echoes it; while a turn runs the machine queues it), Stop
-// interrupts the turn. Typing "/" first opens a picker of the AI's commands
-// and skills in this folder (ThreadInfo); the pick goes in as "/name " and
-// the message is sent as plain text, which the AI runs as the command.
+// machine echoes it; while a turn runs the machine queues it). One button
+// sends, or stops the turn while it runs and the field is empty; Esc stops
+// it too (unless a prompt above waits for an answer: Esc answers that).
+// Typing "/" first opens a picker of the AI's commands and skills in this
+// folder (ThreadInfo); typing "@" opens the files of the session's folder
+// (FileList, tunelo 2.0.1+), and the pick goes in as "@path ".
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -10,46 +12,125 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { filterCommands, flatCommands, slashQuery } from "./slash-commands.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
+/** Files of the session's folder matching a prefix; null when the machine cannot list them. */
+export interface FileListing {
+	readonly entries: readonly { readonly path: string; readonly dir: boolean }[];
+	readonly truncated: boolean;
+}
+
+export type ListFiles = (prefix: string) => Promise<FileListing | null>;
+
 interface ComposerProps {
 	ai: string;
 	machine: string;
 	/** The link is open. */
 	online: boolean;
 	running: boolean;
+	/** An approval or question waits above the composer (Esc answers it, not Stop). */
+	prompting: boolean;
 	/** The AI's slash commands and skills; empty while unknown. */
 	commands: readonly SlashCommand[];
+	/** Lists the session folder's files for "@"; absent when the machine cannot. */
+	listFiles?: ListFiles | undefined;
 	onSend: (text: string) => Promise<void>;
 	onStop: () => Promise<void>;
 }
 
-export function Composer({ ai, machine, online, running, commands, onSend, onStop }: ComposerProps) {
+const MENTION_DELAY_MS = 150;
+
+/** The "@…" being typed right before the caret: its start and what follows the "@"; null when none. */
+export function mentionAt(text: string, caret: number): { start: number; query: string } | null {
+	const before = text.slice(0, caret);
+	const match = /(?:^|\s)@([^\s@]*)$/.exec(before);
+	if (match === null) return null;
+	const query = match[1] ?? "";
+	return { start: caret - query.length - 1, query };
+}
+
+type Option = { kind: "command"; command: SlashCommand } | { kind: "file"; path: string; dir: boolean };
+
+/** The files found for one "@" query. */
+interface Found {
+	readonly query: string;
+	readonly listing: FileListing;
+}
+
+export function Composer({ ai, machine, online, running, prompting, commands, listFiles, onSend, onStop }: ComposerProps) {
 	const t = useMachinesCopy();
 	const [text, setText] = useState("");
+	const [caret, setCaret] = useState(0);
 	const [error, setError] = useState("");
 	const [stopping, setStopping] = useState(false);
 	const [active, setActive] = useState(0);
 	/** The text the picker was closed at (Esc); it opens again once the text changes. */
 	const [closedAt, setClosedAt] = useState<string | null>(null);
+	const [found, setFound] = useState<Found | null>(null);
 	const field = useRef<HTMLTextAreaElement>(null);
 	const listId = useId();
-	const query = slashQuery(text);
+	const at = listFiles === undefined || closedAt === text ? null : mentionAt(text, caret);
+	const query = at === null ? slashQuery(text) : null;
 	const groups = query === null || closedAt === text ? null : filterCommands(commands, query);
-	const options = groups === null ? [] : flatCommands(groups);
-	const open = options.length > 0;
-	const index = Math.min(active, options.length - 1);
+	const files = at !== null && found !== null && found.query === at.query ? found.listing : null;
+	const searching = at !== null && files === null;
+	const options: Option[] =
+		at !== null
+			? (files?.entries ?? []).map((e) => ({ kind: "file", path: e.path, dir: e.dir }))
+			: groups === null
+				? []
+				: flatCommands(groups).map((command) => ({ kind: "command", command }));
+	const open = options.length > 0 || at !== null;
+	const index = Math.min(active, Math.max(0, options.length - 1));
 	const optionId = (i: number) => `${listId}-${i}`;
+	const stopMode = running && text.trim() === "";
 
 	useEffect(() => {
 		if (open) document.getElementById(`${listId}-${index}`)?.scrollIntoView?.({ block: "nearest" });
 	}, [open, index, listId]);
 
-	const edit = (value: string) => {
+	// "@…": ask the machine for matching files, a moment after the typing stops.
+	const mentionQuery = at?.query ?? null;
+	useEffect(() => {
+		if (mentionQuery === null || listFiles === undefined) return;
+		let live = true;
+		const none: FileListing = { entries: [], truncated: false };
+		const timer = window.setTimeout(() => {
+			listFiles(mentionQuery).then(
+				(listing) => {
+					if (live) setFound({ query: mentionQuery, listing: listing ?? none });
+				},
+				() => {
+					if (live) setFound({ query: mentionQuery, listing: none });
+				},
+			);
+		}, MENTION_DELAY_MS);
+		return () => {
+			live = false;
+			window.clearTimeout(timer);
+		};
+	}, [mentionQuery, listFiles]);
+
+	const edit = (value: string, nextCaret = value.length) => {
 		setText(value);
+		setCaret(nextCaret);
 		setActive(0);
 	};
-	const pick = (command: SlashCommand) => {
-		edit(`/${command.name} `);
-		field.current?.focus();
+	const place = (pos: number) =>
+		queueMicrotask(() => {
+			field.current?.focus();
+			field.current?.setSelectionRange(pos, pos);
+		});
+	const pick = (option: Option) => {
+		if (option.kind === "command") {
+			edit(`/${option.command.name} `);
+			place(option.command.name.length + 2);
+			return;
+		}
+		if (at === null) return;
+		const inserted = option.dir ? `@${option.path}` : `@${option.path} `;
+		const next = text.slice(0, at.start) + inserted + text.slice(caret);
+		const pos = at.start + inserted.length;
+		edit(next, pos);
+		place(pos);
 	};
 	const send = () => {
 		const message = text.trim();
@@ -63,19 +144,26 @@ export function Composer({ ai, machine, online, running, commands, onSend, onSto
 		});
 		field.current?.focus();
 	};
+	const stop = () => {
+		if (stopping) return;
+		setStopping(true);
+		onStop()
+			.catch(() => setError(t.errors.offline))
+			.finally(() => setStopping(false));
+	};
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (event.nativeEvent.isComposing) return;
 		if (open) {
 			const picked = options[index];
-			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			if ((event.key === "ArrowDown" || event.key === "ArrowUp") && options.length > 0) {
 				event.preventDefault();
 				const step = event.key === "ArrowDown" ? 1 : -1;
 				setActive((index + step + options.length) % options.length);
 				return;
 			}
-			if ((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && !event.shiftKey)) {
+			if (((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && !event.shiftKey)) && picked !== undefined) {
 				event.preventDefault();
-				if (picked !== undefined) pick(picked);
+				pick(picked);
 				return;
 			}
 			if (event.key === "Escape") {
@@ -85,13 +173,43 @@ export function Composer({ ai, machine, online, running, commands, onSend, onSto
 				return;
 			}
 		}
+		if (event.key === "Escape" && running && !prompting && online) {
+			event.preventDefault();
+			stop();
+			return;
+		}
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
 			send();
 		}
 	};
 
-	/** One group of options; `offset` is the index of its first option in keyboard order. */
+	const commandOption = (option: Option, i: number) => {
+		if (option.kind !== "command") return null;
+		const command = option.command;
+		return (
+			// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the textarea handles the arrow keys, Tab, Enter and Esc for this listbox
+			<li
+				key={command.name}
+				id={optionId(i)}
+				role="option"
+				aria-selected={i === index}
+				className={i === index ? "active" : undefined}
+				// Keep the focus (and the phone keyboard) in the field.
+				onPointerDown={(event) => event.preventDefault()}
+				onPointerMove={() => i !== index && setActive(i)}
+				onClick={() => pick(option)}
+			>
+				<span className="cmd">
+					<b>/{command.name}</b>
+					{command.argumentHint !== "" && <span className="arg">{command.argumentHint}</span>}
+				</span>
+				{command.description !== "" && <small>{command.description}</small>}
+			</li>
+		);
+	};
+
+	/** One group of commands; `offset` is the index of its first option in keyboard order. */
 	const group = (label: string, list: readonly SlashCommand[], key: string, offset: number) =>
 		list.length === 0 ? null : (
 			<li role="presentation" key={key}>
@@ -99,29 +217,7 @@ export function Composer({ ai, machine, online, running, commands, onSend, onSto
 					{label}
 				</div>
 				<ul role="group" aria-labelledby={`${listId}-${key}`}>
-					{list.map((command, n) => {
-						const i = offset + n;
-						return (
-							// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the textarea handles the arrow keys, Tab, Enter and Esc for this listbox
-							<li
-								key={command.name}
-								id={optionId(i)}
-								role="option"
-								aria-selected={i === index}
-								className={i === index ? "active" : undefined}
-								// Keep the focus (and the phone keyboard) in the field.
-								onPointerDown={(event) => event.preventDefault()}
-								onPointerMove={() => i !== index && setActive(i)}
-								onClick={() => pick(command)}
-							>
-								<span className="cmd">
-									<b>/{command.name}</b>
-									{command.argumentHint !== "" && <span className="arg">{command.argumentHint}</span>}
-								</span>
-								{command.description !== "" && <small>{command.description}</small>}
-							</li>
-						);
-					})}
+					{list.map((command, n) => commandOption({ kind: "command", command }, offset + n))}
 				</ul>
 			</li>
 		);
@@ -134,47 +230,80 @@ export function Composer({ ai, machine, online, running, commands, onSend, onSto
 				</p>
 			)}
 			<div className="mx-compose-row">
-				{open && groups !== null && (
+				{open && at === null && groups !== null && (
 					<ul className="mx-slash" id={listId} role="listbox" aria-label={t.slash.label}>
 						{group(t.slash.builtin(ai), groups.builtin, "builtin", 0)}
 						{group(t.slash.skills, groups.skills, "skills", groups.builtin.length)}
+					</ul>
+				)}
+				{open && at !== null && (
+					<ul className="mx-slash" id={listId} role="listbox" aria-label={t.agent.mention.label} aria-busy={searching}>
+						{options.length === 0 && (
+							<li role="presentation" className="mx-slash-head">
+								{searching ? t.agent.mention.loading : t.agent.mention.none}
+							</li>
+						)}
+						{options.map((option, i) =>
+							option.kind === "file" ? (
+								// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the textarea handles the keys for this listbox
+								<li
+									key={option.path}
+									id={optionId(i)}
+									role="option"
+									aria-selected={i === index}
+									className={i === index ? "active file" : "file"}
+									onPointerDown={(event) => event.preventDefault()}
+									onPointerMove={() => i !== index && setActive(i)}
+									onClick={() => pick(option)}
+								>
+									<span className="cmd">
+										<MachineIcon name={option.dir ? "folder" : "list"} small />
+										<b>{option.path}</b>
+									</span>
+								</li>
+							) : null,
+						)}
+						{files?.truncated === true && (
+							<li role="presentation" className="mx-slash-head">
+								{t.agent.mention.more}
+							</li>
+						)}
 					</ul>
 				)}
 				<textarea
 					ref={field}
 					rows={1}
 					className="mx-field"
+					data-composer=""
 					aria-label={t.chat.message}
 					aria-autocomplete="list"
 					aria-controls={open ? listId : undefined}
-					aria-activedescendant={open ? optionId(index) : undefined}
+					aria-activedescendant={open && options.length > 0 ? optionId(index) : undefined}
 					placeholder={t.chat.placeholder(ai, machine)}
 					value={text}
 					disabled={!online}
-					onChange={(event) => edit(event.target.value)}
+					onChange={(event) => edit(event.target.value, event.target.selectionStart)}
+					onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
 					onKeyDown={onKeyDown}
 				/>
-				{running && (
-					<button
-						type="button"
-						className="icon-btn mx-stop"
-						aria-label={t.chat.stop}
-						disabled={!online || stopping}
-						onClick={() => {
-							setStopping(true);
-							onStop()
-								.catch(() => setError(t.errors.offline))
-								.finally(() => setStopping(false));
-						}}
-					>
+				{stopMode ? (
+					<button type="button" className="icon-btn mx-send stop" aria-label={t.chat.stop} title={t.chat.stop} disabled={!online || stopping} onClick={stop}>
 						<MachineIcon name="stop" />
 					</button>
+				) : (
+					<button
+						type="button"
+						className="icon-btn mx-send"
+						aria-label={running ? t.agent.composer.queue : t.chat.send}
+						title={running ? t.agent.composer.queue : t.chat.send}
+						disabled={!online || text.trim() === ""}
+						onClick={send}
+					>
+						<Icon name="send" />
+					</button>
 				)}
-				<button type="button" className="icon-btn mx-send" aria-label={t.chat.send} disabled={!online || text.trim() === ""} onClick={send}>
-					<Icon name="send" />
-				</button>
 			</div>
-			<p className="mx-compose-hint">{t.chat.keys}</p>
+			<p className="mx-compose-hint">{t.agent.composer.hint}</p>
 		</div>
 	);
 }

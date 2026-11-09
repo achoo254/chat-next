@@ -1,12 +1,15 @@
 // A tool waiting for the user's permission: Allow, Allow for the session (not
-// for a sensitive path, nor when the AI cannot remember it), Deny. The answer
-// names the revision the user saw, so a prompt that changed meanwhile is
-// refused instead of answered blindly. An answered prompt shows in its tool's
-// row (tool-run.tsx); one without a shown tool stays as a short line.
-import { useState } from "react";
+// for a sensitive path, nor when the AI cannot remember it), Deny and tell
+// the AI what to do instead, Deny. In a session the card sits above the
+// composer and answers keys 1, 2, 3 and Esc. The answer names the revision
+// the user saw, so a prompt that changed meanwhile is refused instead of
+// answered blindly. An answered prompt shows in its tool's row
+// (tool-run.tsx); one without a shown tool stays as a short line.
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Decision, PromptState, ToolKind, type ApprovalItem } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon, type MachineIconName } from "../machine-icons.tsx";
+import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 
 export function toolIcon(kind: ToolKind): MachineIconName {
@@ -49,7 +52,8 @@ function askTitle(t: MachinesCopy, approval: ApprovalItem): string {
 export function approvalOutcome(t: MachinesCopy, approval: ApprovalItem): string {
 	switch (approval.state) {
 		case PromptState.ANSWERED:
-			return approval.decision === Decision.DENY ? t.approval.denied : approval.decision === Decision.ALLOW_SESSION ? t.approval.allowedSession : t.approval.allowed;
+			if (approval.decision === Decision.DENY) return approval.denyMessage === "" ? t.approval.denied : `${t.approval.denied}: “${approval.denyMessage}”`;
+			return approval.decision === Decision.ALLOW_SESSION ? t.approval.allowedSession : t.approval.allowed;
 		case PromptState.EXPIRED:
 			return t.approval.expired;
 		default:
@@ -57,21 +61,78 @@ export function approvalOutcome(t: MachinesCopy, approval: ApprovalItem): string
 	}
 }
 
+/** At most this long, as the machine accepts it. */
+export const DENY_MESSAGE_MAX = 4000;
+
 interface ApprovalCardProps {
 	approval: ApprovalItem;
 	ai: string;
 	/** The AI can remember "allow for the session" (capabilities.session_allow). */
 	sessionAllow: boolean;
-	onDecide: (decision: Decision) => Promise<void>;
-	/** Shorter form for the session board's tiles. */
+	/** `message`: with a denial, what the AI should do instead. */
+	onDecide: (decision: Decision, message?: string) => Promise<void>;
+	/** Shorter form for the board's tiles: Allow and Deny only. */
 	compact?: boolean;
+	/** Answer keys 1, 2, 3 and Esc (the card above a session's composer). */
+	hotkeys?: boolean;
 }
 
-export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = false }: ApprovalCardProps) {
+/** A key press belongs to the page, not to text being typed (an empty composer counts as not typing). */
+export function freeForHotkey(event: KeyboardEvent): boolean {
+	if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return false;
+	if (document.querySelector("dialog[open]") !== null) return false;
+	const target = event.target;
+	if (!(target instanceof HTMLElement)) return true;
+	if (target instanceof HTMLTextAreaElement && target.dataset.composer !== undefined) return target.value === "";
+	return !(target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement);
+}
+
+export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = false, hotkeys = false }: ApprovalCardProps) {
 	const t = useMachinesCopy();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	const [telling, setTelling] = useState(false);
+	const [message, setMessage] = useState("");
+	const field = useRef<HTMLTextAreaElement>(null);
 	const pending = approval.state === PromptState.PENDING;
+	const canSession = !approval.sensitive && sessionAllow && !compact;
+	const decide = (decision: Decision, note?: string) => {
+		if (busy) return;
+		setBusy(true);
+		setError("");
+		onDecide(decision, note).then(
+			() => setBusy(false),
+			(err: unknown) => {
+				setBusy(false);
+				setError(errorText(t, err, ai));
+			},
+		);
+	};
+	const tell = () => {
+		setTelling(true);
+		queueMicrotask(() => field.current?.focus());
+	};
+	const sendTell = () => {
+		const note = message.trim();
+		if (note === "") return;
+		decide(Decision.DENY, note.slice(0, DENY_MESSAGE_MAX));
+	};
+	const onKey = useEffectEvent((event: KeyboardEvent) => {
+		if (!pending || busy || telling || !freeForHotkey(event)) return;
+		const key = event.key;
+		if (key === "1") decide(Decision.ALLOW);
+		else if (key === "2" && canSession) decide(Decision.ALLOW_SESSION);
+		else if (key === "3") tell();
+		else if (key === "Escape") decide(Decision.DENY);
+		else return;
+		event.preventDefault();
+	});
+	useEffect(() => {
+		if (!hotkeys) return;
+		const listener = (event: KeyboardEvent) => onKey(event);
+		document.addEventListener("keydown", listener);
+		return () => document.removeEventListener("keydown", listener);
+	}, [hotkeys]);
 	if (!pending) {
 		return (
 			<div className="mx-done-line">
@@ -81,17 +142,12 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 			</div>
 		);
 	}
-	const decide = (decision: Decision) => {
-		setBusy(true);
-		setError("");
-		onDecide(decision).then(
-			() => setBusy(false),
-			(err: unknown) => {
-				setBusy(false);
-				setError(err instanceof Error ? err.message : String(err));
-			},
-		);
-	};
+	const key = (k: string) =>
+		hotkeys ? (
+			<kbd className="mx-kbd" aria-hidden="true">
+				{k}
+			</kbd>
+		) : null;
 	return (
 		<div className={approval.sensitive ? "mx-action sensitive" : "mx-action"} role="group" aria-label={t.approval.label(ai)}>
 			<h4>
@@ -101,19 +157,66 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 			</h4>
 			{approval.summary !== "" && <pre className="mx-pre">{approval.summary}</pre>}
 			{!compact && approval.reason !== "" && <p className="muted mx-reason">{approval.reason}</p>}
-			<div className="acts">
-				<button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => decide(Decision.ALLOW)}>
-					{t.approval.allow}
-				</button>
-				{!approval.sensitive && sessionAllow && !compact && (
-					<button type="button" className="btn btn-sm" disabled={busy} onClick={() => decide(Decision.ALLOW_SESSION)}>
-						{t.approval.allowSession}
+			{telling ? (
+				<div className="mx-tell">
+					<label className="sr-only" htmlFor={`tell-${approval.toolId}`}>
+						{t.agent.dock.tellLabel}
+					</label>
+					<textarea
+						id={`tell-${approval.toolId}`}
+						ref={field}
+						rows={2}
+						className="mx-field"
+						maxLength={DENY_MESSAGE_MAX}
+						placeholder={t.agent.dock.tellPlaceholder}
+						value={message}
+						disabled={busy}
+						onChange={(event) => setMessage(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.nativeEvent.isComposing) return;
+							if (event.key === "Escape") {
+								event.preventDefault();
+								event.stopPropagation();
+								setTelling(false);
+							} else if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								sendTell();
+							}
+						}}
+					/>
+					<div className="acts">
+						<button type="button" className="btn btn-primary btn-sm" disabled={busy || message.trim() === ""} onClick={sendTell}>
+							{t.agent.dock.tellSend}
+						</button>
+						<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setTelling(false)}>
+							{t.agent.dock.cancel}
+						</button>
+					</div>
+				</div>
+			) : (
+				<div className="acts">
+					<button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => decide(Decision.ALLOW)}>
+						{key("1")}
+						{t.approval.allow}
 					</button>
-				)}
-				<button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(Decision.DENY)}>
-					{t.approval.deny}
-				</button>
-			</div>
+					{canSession && (
+						<button type="button" className="btn btn-sm" disabled={busy} onClick={() => decide(Decision.ALLOW_SESSION)}>
+							{key("2")}
+							{t.approval.allowSession}
+						</button>
+					)}
+					{!compact && (
+						<button type="button" className="btn btn-sm" disabled={busy} onClick={tell}>
+							{key("3")}
+							{t.agent.dock.denyTell}
+						</button>
+					)}
+					<button type="button" className="btn btn-sm danger-outline" disabled={busy} onClick={() => decide(Decision.DENY)}>
+						{key("Esc")}
+						{t.approval.deny}
+					</button>
+				</div>
+			)}
 			{error !== "" && (
 				<p className="mx-error" role="alert">
 					{error}
