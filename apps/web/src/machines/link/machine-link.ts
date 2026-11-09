@@ -17,6 +17,7 @@ import {
 	HandshakeErrorCode,
 	ThreadState,
 	type Frame,
+	type GitChanges,
 	type Item,
 	type MachineInfo,
 	type MachineProfile,
@@ -86,6 +87,11 @@ export interface LinkState {
 	 * no thread items: never in a journal, and dropped when answered anywhere.
 	 */
 	readonly secretPrompts: ReadonlyMap<string, SecretPrompt>;
+	/**
+	 * What is not committed in each watched thread's folder, as the machine
+	 * last sent it (tunelo 2.0.11+: asked, and unasked after each turn).
+	 */
+	readonly gitChanges: ReadonlyMap<string, GitChanges>;
 }
 
 /**
@@ -164,6 +170,7 @@ const INITIAL: LinkState = {
 	projects: null,
 	clones: new Map(),
 	secretPrompts: new Map(),
+	gitChanges: new Map(),
 };
 
 export class MachineLink {
@@ -550,6 +557,12 @@ export class MachineLink {
 			case "secretPromptEnded":
 				this.dropSecretPrompt(b.value.requestId);
 				break;
+			case "gitChanges": {
+				const gitChanges = new Map(this.current.gitChanges);
+				gitChanges.set(b.value.threadId, b.value);
+				this.set({ gitChanges });
+				break;
+			}
 			case "fullItem":
 				if (b.value.item !== undefined) {
 					const full = new Map(this.current.full);
@@ -597,6 +610,7 @@ export class MachineLink {
 			journals: without(this.current.journals),
 			pending: without(this.current.pending),
 			threadInfo: without(this.current.threadInfo),
+			gitChanges: without(this.current.gitChanges),
 		});
 	}
 

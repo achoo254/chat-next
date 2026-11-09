@@ -29,7 +29,9 @@ export function QuestionCard({ question, ai, onAnswer, compact = false }: Questi
 			<div className="mx-done-line">
 				<MachineIcon name="help" small />
 				<span>{question.questions[0]?.question ?? ""}</span>
-				<span className="muted">· {question.state === PromptState.ANSWERED ? (given === "" ? t.question.answered : given) : t.approval.cancelled}</span>
+				<span className="muted">
+					· {question.state === PromptState.ANSWERED ? (given === "" ? t.question.answered : given) : question.state === PromptState.EXPIRED ? t.approval.expired : t.approval.cancelled}
+				</span>
 			</div>
 		);
 	}

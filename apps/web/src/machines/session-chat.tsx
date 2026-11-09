@@ -2,13 +2,14 @@
 // state, "Thay đổi", a menu with the machine and the encryption), the
 // transcript (markdown answers, tool rows, diffs, todos, results of answered
 // prompts), the prompts waiting for the user docked above the composer, the
-// status bar and the composer. "Thay đổi" opens the files the AI changed.
+// status bar and the composer. "Thay đổi" opens what changed in the folder
+// (git, tunelo 2.0.11+) and the files the AI edited.
 // The thread is watched on the machine's shared link while this shows, so a
 // reconnect resubscribes from the cursor and a reset reloads the snapshot.
 // Files dragged anywhere over the session go to the composer when dropped.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, Decision, PromptState, ThreadState, TurnState, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../router.tsx";
@@ -18,13 +19,14 @@ import { QuestionCard } from "./cards/question.tsx";
 import { SecretCard } from "./cards/secret-request.tsx";
 import { TodoCard } from "./cards/todo.tsx";
 import { ToolRunCard } from "./cards/tool-run.tsx";
+import { TurnLine } from "./cards/turn-line.tsx";
 import { AccountMenu, profileName } from "./account-menu.tsx";
 import { limitsOf, type UploadLink } from "./attachments.ts";
 import { DropZone, MessageAttachments, useFileDrop } from "./attachment-tray.tsx";
-import { ChangesPanel } from "./changes-panel.tsx";
+import { ChangesPanel, changesCount } from "./changes-panel.tsx";
 import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
-import type { LinkState, MachineLink } from "./link/machine-link.ts";
+import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
@@ -67,6 +69,9 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const prompts = all.filter(isPending);
 	const secretPrompts = [...state.secretPrompts.values()].filter((p) => p.threadId === threadId);
 	const changes = sessionChanges(items);
+	const gitSupported = state.info?.gitChanges === true;
+	const git = state.gitChanges.get(threadId) ?? null;
+	const changeCount = changesCount(changes, gitSupported ? git : null);
 	const provider = thread?.provider ?? items.at(-1)?.provider ?? "";
 	const ai = aiName(state.info, provider);
 	const caps = providerOf(state.info, provider)?.capabilities;
@@ -123,6 +128,22 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 		[link, threadId],
 	);
 	const closeChanges = useCallback(() => setChangesOpen(false), []);
+	// The folder's git changes: once the session shows (for the count), again whenever the panel opens.
+	const hasThread = thread !== null;
+	useEffect(() => {
+		if (!online || !gitSupported || !hasThread) return;
+		link.request({ case: "threadGitChanges", value: { threadId } }).catch(() => undefined);
+	}, [link, threadId, online, gitSupported, hasThread, changesOpen]);
+	const gitFileDiff = async (path: string): Promise<GitFileChange | null> => {
+		try {
+			const frame = await link.request({ case: "gitFileDiff", value: { threadId, path } });
+			return frame.body.case === "gitFileDiffResult" ? (frame.body.value.file ?? null) : null;
+		} catch (err) {
+			// The file has no uncommitted change any more.
+			if (err instanceof RemoteError && err.code === ErrorCode.NOT_FOUND) return null;
+			throw err;
+		}
+	};
 
 	const chip = !online ? "offline" : thread === null ? null : stateKey(thread);
 	const dir = thread?.dir ?? "";
@@ -153,13 +174,13 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 					<button
 						type="button"
 						className="btn btn-sm mx-changes-btn"
-						aria-label={changes.length > 0 ? `${t.agent.header.changes} (${changes.length})` : t.agent.header.changes}
+						aria-label={changeCount > 0 ? `${t.agent.header.changes} (${changeCount})` : t.agent.header.changes}
 						aria-expanded={changesOpen}
 						onClick={() => setChangesOpen((v) => !v)}
 					>
 						<MachineIcon name="pencil" small />
 						<span className="hide-narrow">{t.agent.header.changes}</span>
-						{changes.length > 0 && <span className="count">{changes.length}</span>}
+						{changeCount > 0 && <span className="count">{changeCount}</span>}
 					</button>
 				)}
 				<HeadMenu
@@ -234,7 +255,18 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						}}
 					/>
 				</div>
-				{changesOpen && <ChangesPanel changes={changes} full={state.full} onFetchFull={fetchFull} onClose={closeChanges} />}
+				{changesOpen && (
+					<ChangesPanel
+						ai={ai}
+						changes={changes}
+						gitSupported={gitSupported}
+						git={git}
+						full={state.full}
+						onFetchFull={fetchFull}
+						onGitFileDiff={gitFileDiff}
+						onClose={closeChanges}
+					/>
+				)}
 			</div>
 		</div>
 	);
@@ -531,16 +563,8 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId }: Bloc
 			return <ApprovalCard approval={block.approval} ai="" sessionAllow={false} onDecide={() => Promise.resolve()} />;
 		case "question":
 			return <QuestionCard question={block.question} ai="" onAnswer={() => Promise.resolve()} />;
-		case "turn": {
-			const turn = block.turn;
-			const text =
-				turn.state === TurnState.COMPLETED
-					? t.transcript.turnDone(`${(Number(turn.durationMs) / 1000).toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`)
-					: turn.state === TurnState.INTERRUPTED
-						? t.transcript.turnInterrupted
-						: t.transcript.turnFailed;
-			return <div className={turn.state === TurnState.FAILED ? "mx-line error" : "mx-line"}>{text}</div>;
-		}
+		case "turn":
+			return <TurnLine turn={block.turn} tools={block.tools} files={block.files} t={t} locale={locale} />;
 		case "model":
 			return <div className="mx-divider">{t.transcript.model(block.from, block.to)}</div>;
 		case "handoff":

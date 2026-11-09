@@ -635,3 +635,28 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-tag.warn { color: var(--c-warning-text); border-color: color-mix(in srgb, var(--c-warning) 45%, var(--c-border)); background: color-mix(in srgb, var(--c-warning) 10%, var(--c-surface)); }
 .mx-local-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .mx-local-count { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
+
+/* The line where a turn ended, opening to its numbers. */
+.mx-turn { display: grid; justify-items: center; gap: var(--space-2); }
+.mx-turn > summary { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 32px; padding: 0 var(--space-2); border-radius: var(--radius-full); list-style: none; cursor: pointer; }
+.mx-turn > summary::-webkit-details-marker { display: none; }
+.mx-turn > summary:hover { background: var(--c-hover); color: var(--c-text); }
+.mx-turn > summary:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.mx-turn > summary svg { transition: transform 0.15s ease; }
+.mx-turn[open] > summary svg { transform: rotate(90deg); }
+.mx-turn dl { display: grid; gap: var(--space-1); width: min(100%, 420px); margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); font-size: 0.75rem; }
+.mx-turn dl > div { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: var(--space-2); }
+.mx-turn dt { color: var(--c-text-muted); }
+.mx-turn dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.mx-turn dd small { display: block; color: var(--c-text-muted); }
+
+/* "Thay đổi": the git part and the AI's part. */
+.mx-changes-sec { display: grid; gap: var(--space-2); }
+.mx-changes-sec h3 { margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c-text-muted); }
+.mx-file .nums .mx-tag { justify-self: end; }
+
+/* The sites of the sign-in secrets a command reads. */
+.mx-secret-sites { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.mx-secret-sites li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
+.mx-secret-sites strong { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.mx-secret-sites code { font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }

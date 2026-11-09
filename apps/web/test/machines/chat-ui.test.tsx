@@ -50,6 +50,7 @@ const run = (id: string, summary: string, extra: Partial<ToolRun> = {}): ToolRun
 	subagent: null,
 	resultId: `result:${id}`,
 	approval: null,
+	subagentFiles: [],
 	...extra,
 });
 

@@ -32,6 +32,8 @@ export interface ToolRun {
 	readonly resultId: string | null;
 	/** The answered permission prompt of this call, shown as a short status in its row. */
 	readonly approval: ApprovalItem | null;
+	/** Files a subagent edited (its diffs), each path once. */
+	readonly subagentFiles: readonly string[];
 }
 
 export type Block =
@@ -43,7 +45,8 @@ export type Block =
 	| { readonly kind: "todo"; readonly id: string; readonly todo: TodoItem }
 	| { readonly kind: "approval"; readonly id: string; readonly revision: number; readonly approval: ApprovalItem }
 	| { readonly kind: "question"; readonly id: string; readonly revision: number; readonly question: QuestionItem }
-	| { readonly kind: "turn"; readonly id: string; readonly turn: TurnItem }
+	/** `tools` and `files`: tool calls and files edited in the turn, counted from its items. */
+	| { readonly kind: "turn"; readonly id: string; readonly turn: TurnItem; readonly tools: number; readonly files: number }
 	| { readonly kind: "model"; readonly id: string; readonly from: string; readonly to: string }
 	| { readonly kind: "handoff"; readonly id: string; readonly handoff: AgentHandoffItem }
 	| { readonly kind: "compaction"; readonly id: string }
@@ -79,9 +82,15 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	const echoed = new Set<string>();
 	/** Answered prompts by tool id (the latest wins); folded into the call's row. */
 	const answered = new Map<string, ApprovalItem>();
+	/** Paths each subagent edited, by its tool id. */
+	const subagentFiles = new Map<string, Set<string>>();
 	for (const item of items) {
 		const b = item.body;
-		if (b.case === "toolResult") results.set(b.value.toolId, item);
+		if (b.case === "diff" && b.value.parentToolId !== "") {
+			const set = subagentFiles.get(b.value.parentToolId) ?? new Set<string>();
+			set.add(b.value.path);
+			subagentFiles.set(b.value.parentToolId, set);
+		} else if (b.case === "toolResult") results.set(b.value.toolId, item);
 		else if (b.case === "subagent") subagents.set(b.value.toolId, b.value);
 		else if (b.case === "toolCall") {
 			calls.add(b.value.toolId);
@@ -94,6 +103,10 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	let runs: ToolRun[] = [];
 	let heldTurn: Item | null = null;
 	let lastWho: string | null = null;
+	/** Tool calls and edited files since the user's last message. */
+	let turnTools = 0;
+	let turnFiles = new Set<string>();
+	const filesOf = (toolId: string): string[] => [...(subagentFiles.get(toolId) ?? [])];
 
 	const flushRuns = () => {
 		if (runs.length === 0) return;
@@ -105,7 +118,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 		const turn = heldTurn;
 		heldTurn = null;
 		if (turn.body.case === "turn" && turn.body.value.state !== TurnState.RUNNING && turn.body.value.state !== TurnState.UNSPECIFIED) {
-			blocks.push({ kind: "turn", id: turn.id, turn: turn.body.value });
+			blocks.push({ kind: "turn", id: turn.id, turn: turn.body.value, tools: turnTools, files: turnFiles.size });
 		}
 	};
 
@@ -115,6 +128,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 			case "toolCall": {
 				// The todo card shows the list; its tool call adds nothing.
 				if (b.value.kind === ToolKind.TODO) break;
+				turnTools += 1;
 				const result = results.get(b.value.toolId);
 				runs.push({
 					id: item.id,
@@ -123,6 +137,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 					subagent: subagents.get(b.value.toolId) ?? null,
 					resultId: result?.id ?? null,
 					approval: answered.get(b.value.toolId) ?? null,
+					subagentFiles: filesOf(b.value.toolId),
 				});
 				break;
 			}
@@ -130,7 +145,16 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				// Shown with its call; a result without one is dropped.
 				break;
 			case "subagent":
-				if (!calls.has(b.value.toolId)) runs.push({ id: item.id, call: null, result: null, subagent: b.value, resultId: null, approval: null });
+				if (!calls.has(b.value.toolId)) {
+					runs.push({ id: item.id, call: null, result: null, subagent: b.value, resultId: null, approval: null, subagentFiles: filesOf(b.value.toolId) });
+				}
+				break;
+			case "diff":
+				turnFiles.add(b.value.path);
+				// A subagent's edit shows with the subagent (and in "Thay đổi"), not as a card of its own.
+				if (b.value.parentToolId !== "") break;
+				flushRuns();
+				blocks.push({ kind: "diff", id: item.id, diff: b.value });
 				break;
 			case "approval":
 				// Answered and its call is shown: the call's row carries the outcome.
@@ -143,6 +167,8 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				flushRuns();
 				if (b.value.role === Role.USER) {
 					flushTurn();
+					turnTools = 0;
+					turnFiles = new Set<string>();
 					const attachments = b.value.attachments.map((a) => ({ id: a.id, name: a.name, size: Number(a.size), image: a.image, path: a.path, preview: "" }));
 					blocks.push({ kind: "user", id: item.id, text: b.value.text, pending: false, attachments });
 					break;
@@ -181,8 +207,6 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 function single(item: Item): Block | null {
 	const b = item.body;
 	switch (b.case) {
-		case "diff":
-			return { kind: "diff", id: item.id, diff: b.value };
 		case "todo":
 			return b.value.entries.length === 0 ? null : { kind: "todo", id: item.id, todo: b.value };
 		case "question":

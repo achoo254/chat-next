@@ -70,6 +70,10 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-details": "?at=machine-chat&open=status-details",
 	"machine-changes": "?at=machine-chat&open=changes",
 	"machine-changes-file": "?at=machine-chat&open=changes-file",
+	// The folder's uncommitted changes (git), one file of them fetched whole; a turn's numbers; a command reading secrets.
+	"machine-changes-git-file": "?at=machine-chat&open=changes-git-file",
+	"machine-turn-details": "?at=machine-chat&open=turn-details",
+	"machine-secret-command": "?at=machine-chat&open=secret-command",
 	"machine-mention": "?at=machine-chat&open=mention",
 	"machine-slash": "?at=machine-chat&open=slash",
 	// Attachments: the drop zone while files are dragged, the tray with an image and a document, an upload in progress.

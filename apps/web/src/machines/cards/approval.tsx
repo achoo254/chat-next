@@ -6,7 +6,7 @@
 // answered blindly. An answered prompt shows in its tool's row
 // (tool-run.tsx); one without a shown tool stays as a short line.
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { Decision, PromptState, ToolKind, type ApprovalItem } from "@achoo254/chat-proto/remote/remote";
+import { Decision, PromptState, ToolKind, type ApprovalItem, type ApprovalSecret } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon, type MachineIconName } from "../machine-icons.tsx";
 import { errorText } from "../use-machines.ts";
@@ -76,6 +76,23 @@ export function secretsInCommand(approval: Pick<ApprovalItem, "kind" | "input">)
 	return [...new Set([...input.matchAll(SECRET_REFERENCE)].map((m) => m[1] ?? "").filter(Boolean))];
 }
 
+/**
+ * The site of a secret as the card shows it: the host for https (the part a
+ * user checks), the whole origin otherwise (http on loopback).
+ */
+export function siteLabel(origin: string): string {
+	return origin.startsWith("https://") ? origin.slice("https://".length) : origin;
+}
+
+/**
+ * The secrets a command reads with their sites, from the machine (tunelo
+ * 2.0.11+); older machines send none and the card names them from the input.
+ * Items built by hand (tests, older journals) may lack the list.
+ */
+export function secretSites(approval: Pick<ApprovalItem, "secrets">): readonly ApprovalSecret[] {
+	return Array.isArray(approval.secrets) ? approval.secrets : [];
+}
+
 /** At most this long, as the machine accepts it. */
 export const DENY_MESSAGE_MAX = 4000;
 
@@ -110,7 +127,8 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 	const [message, setMessage] = useState("");
 	const field = useRef<HTMLTextAreaElement>(null);
 	const pending = approval.state === PromptState.PENDING;
-	const secrets = secretsInCommand(approval);
+	const sites = secretSites(approval);
+	const secrets = sites.length > 0 ? sites.map((s) => s.name) : secretsInCommand(approval);
 	const canSession = !approval.sensitive && sessionAllow && !compact && secrets.length === 0;
 	const decide = (decision: Decision, note?: string) => {
 		if (busy) return;
@@ -172,6 +190,16 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 				{approval.sensitive && <span className="mx-tag danger">{t.approval.sensitive}</span>}
 			</h4>
 			{approval.summary !== "" && <pre className="mx-pre">{approval.summary}</pre>}
+			{sites.length > 0 && (
+				<ul className="mx-secret-sites" aria-label={t.approval.secretSites}>
+					{sites.map((s) => (
+						<li key={s.name}>
+							{s.origin === "" ? <span className="muted">{t.approval.secretNoSite}</span> : <strong title={s.origin}>{siteLabel(s.origin)}</strong>}
+							<code>{s.name}</code>
+						</li>
+					))}
+				</ul>
+			)}
 			{secrets.length > 0 ? (
 				// Worded here: tunelo 2.0.8 sent its own English reason for these, which is left out.
 				<p className="muted mx-reason">{t.approval.secretCommand(secrets.join(", "))}</p>

@@ -115,6 +115,19 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
+	it("keeps each thread's git changes as the machine last sent them, and drops them with the thread", async () => {
+		const l = link();
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+		machine.send(machine.socket, { case: "gitChanges", value: { threadId: "t1", git: true, files: [{ path: "a.txt", added: 1 }] } });
+		await until(() => l.snapshot().gitChanges.has("t1"), "git changes");
+		expect(l.snapshot().gitChanges.get("t1")?.files.map((f) => f.path)).toEqual(["a.txt"]);
+		expect(l.journal("t1").items.size).toBe(0);
+		machine.send(machine.socket, { case: "threadDeleted", value: { threadId: "t1", trashed: 0 } });
+		await until(() => !l.snapshot().gitChanges.has("t1"), "dropped");
+		l.stop();
+	});
+
 	it("pings only while the user looks at the machine", async () => {
 		const l = link();
 		l.start();

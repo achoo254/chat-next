@@ -3,7 +3,10 @@
 // address, its key pinned in this browser, and a session with long shell
 // commands, an answered and a pending permission prompt, a grouped run, a
 // markdown answer (list, tasks, table, a code block wider than a phone),
-// diffs of two files, and the statusline data (ThreadInfo) with commands and
+// diffs of two files (one more edited by a subagent), the turn's numbers
+// (tunelo 2.0.11), the folder's uncommitted changes as git sees them, a
+// command reading a sign-in secret (?open=secret-command), and the
+// statusline data (ThreadInfo) with commands and
 // skills; the machine's Claude profiles announced unasked, the session
 // switching account after its turn, a running session out of usage with a
 // suggestion; previews; a running and a parked session in two folders; a
@@ -13,7 +16,7 @@
 // paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { Decision, ItemSchema, PromptState, Role, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { Decision, GitFileState, ItemSchema, PromptState, Role, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../../src/brand.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
@@ -66,7 +69,23 @@ function transcript(now: number): Item[] {
 				],
 			},
 		}),
-		item("turn1", { case: "turn", value: { state: TurnState.COMPLETED, durationMs: 42_300n, contextTokens: 68_000n, contextWindow: 200_000n } }),
+		item("turn1", {
+			case: "turn",
+			value: {
+				state: TurnState.COMPLETED,
+				durationMs: 77_400n,
+				contextTokens: 68_000n,
+				contextWindow: 200_000n,
+				model: "claude-opus-4-7",
+				inputTokens: 1_240n,
+				outputTokens: 6_830n,
+				cacheReadTokens: 412_000n,
+				cacheWriteTokens: 18_400n,
+				durationApiMs: 58_200n,
+				numTurns: 14,
+				costUsdEstimate: 1.2734,
+			},
+		}),
 		item("a1", { case: "text", value: { role: Role.ASSISTANT, text: "Mình chạy bộ test trước để xem trạng thái hiện tại." } }),
 		item("t1", bash("1", longCommand)),
 		item("p1", { case: "approval", value: { toolId: "1", kind: ToolKind.SHELL, name: "Bash", summary: longCommand, state: PromptState.ANSWERED, decision: Decision.ALLOW_SESSION } }, 2),
@@ -131,11 +150,65 @@ function transcript(now: number): Item[] {
 				removed: 1,
 			},
 		}),
+		item("t8", { case: "toolCall", value: { toolId: "8", kind: ToolKind.SUBAGENT, name: "Task", summary: "Rà lại CSS của thẻ tool ở khổ 375", input: "{}" } }),
+		item("s8", { case: "subagent", value: { toolId: "8", description: "Rà lại CSS của thẻ tool ở khổ 375", done: true } }),
+		item("r8", done("8", "Đã sửa 1 file.")),
+		item("d8", {
+			case: "diff",
+			value: {
+				toolId: "9",
+				parentToolId: "8",
+				path: "apps/web/src/machines/cards/tool-run.css",
+				unified: "@@\n-.mx-run { gap: 4px; }\n+.mx-run { gap: var(--space-1); }",
+				added: 1,
+				removed: 1,
+			},
+		}),
 		item("u2", { case: "text", value: { role: Role.USER, text: "Ok, build lại luôn nhé" } }),
 		item("turn2", { case: "turn", value: { state: TurnState.RUNNING } }),
 		item("a2", { case: "text", value: { role: Role.ASSISTANT, text: "Mình xoá thư mục build cũ rồi chạy lại." } }),
 		item("t5", bash("5", "rm -rf apps/web/dist apps/web/test/visual/dist && pnpm --filter @app/web build")),
-		item("p5", { case: "approval", value: { toolId: "5", kind: ToolKind.SHELL, name: "Bash", summary: "rm -rf apps/web/dist apps/web/test/visual/dist && pnpm --filter @app/web build", reason: "Xoá thư mục build", state: PromptState.PENDING } }),
+		new URLSearchParams(window.location.search).get("open") === "secret-command"
+			? item("p5", {
+					case: "approval",
+					value: {
+						toolId: "5",
+						kind: ToolKind.SHELL,
+						name: "Bash",
+						summary: SECRET_COMMAND,
+						input: JSON.stringify({ command: SECRET_COMMAND }),
+						state: PromptState.PENDING,
+						secrets: [
+							{ name: "GITHUB_TOKEN", origin: "https://api.github.com" },
+							{ name: "STAGING_ADMIN", origin: "" },
+						],
+					},
+				})
+			: item("p5", { case: "approval", value: { toolId: "5", kind: ToolKind.SHELL, name: "Bash", summary: "rm -rf apps/web/dist apps/web/test/visual/dist && pnpm --filter @app/web build", reason: "Xoá thư mục build", state: PromptState.PENDING } }),
+	];
+}
+
+const SECRET_COMMAND = 'curl -sf -H "Authorization: Bearer $TUNELO_SECRET_GITHUB_TOKEN" https://api.github.com/user && echo ${TUNELO_SECRET_STAGING_ADMIN:+set}';
+
+/** The demo session's folder as git sees it: an edit by a shell command, a new file, a deleted one, a sensitive one. */
+function gitFiles() {
+	const file = (path: string, state: GitFileState, added: number, removed: number, unified: string, extra: { truncated?: boolean; sensitive?: boolean; binary?: boolean } = {}) => ({
+		path,
+		state,
+		added,
+		removed,
+		unified,
+		truncated: extra.truncated ?? false,
+		sensitive: extra.sensitive ?? false,
+		binary: extra.binary ?? false,
+	});
+	return [
+		file("apps/web/src/machines/machines.css", GitFileState.MODIFIED, 3, 2, "--- a/apps/web/src/machines/machines.css\n+++ b/apps/web/src/machines/machines.css\n@@ -146,3 +146,4 @@\n-.mx-tools li .mono { white-space: nowrap; }\n+.mx-run-cmd { overflow-wrap: anywhere; }\n+.mx-run-cmd.clamp { -webkit-line-clamp: 3; }\n@@ -210,2 +210,2 @@\n-.mx-diff pre span { white-space: pre-wrap; }\n+.mx-diff-body td { white-space: pre; }"),
+		file("apps/web/package.json", GitFileState.MODIFIED, 1, 1, "--- a/apps/web/package.json\n+++ b/apps/web/package.json\n@@ -12,1 +12,1 @@\n-    \"vite\": \"8.3.3\",\n+    \"vite\": \"8.3.4\","),
+		file("apps/web/test/visual/shots/man-may-375.png", GitFileState.UNTRACKED, 0, 0, "", { binary: true }),
+		file("docs/notes/build-log.md", GitFileState.UNTRACKED, 4, 0, "--- /dev/null\n+++ b/docs/notes/build-log.md\n@@ -0,0 +1,4 @@\n+# Build\n+\n+pnpm --filter @app/web build\n+OK, 0 cảnh báo", { truncated: true }),
+		file("apps/web/src/legacy-styles.css", GitFileState.DELETED, 0, 38, "--- a/apps/web/src/legacy-styles.css\n+++ /dev/null\n@@ -1,38 +0,0 @@\n-.legacy { display: none; }"),
+		file(".env.local", GitFileState.MODIFIED, 0, 0, "", { sensitive: true }),
 	];
 }
 
@@ -227,8 +300,9 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						value: {
 							name: "DIEUVY-LAPTOP",
 							os: "win32",
-							agentVersion: "2.0.8",
+							agentVersion: "2.0.11",
 							secrets: true,
+							gitChanges: true,
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -316,6 +390,15 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			}
 			case "auditList":
 				return [{ case: "auditListResult", value: { entries: [] } }];
+			case "threadGitChanges":
+				return [{ case: "gitChanges", value: { threadId: frame.body.value.threadId, git: true, files: gitFiles() } }];
+			case "gitFileDiff": {
+				const { threadId, path } = frame.body.value;
+				const file = gitFiles().find((f) => f.path === path);
+				if (file === undefined) return defaultAnswer(frame);
+				const whole = file.truncated ? { ...file, truncated: false, unified: `${file.unified}\n+\n+Đã chụp lại ảnh 375 và 1440.` } : file;
+				return [{ case: "gitFileDiffResult", value: { threadId, file: whole } }];
+			}
 			case "secretList":
 				return [
 					{

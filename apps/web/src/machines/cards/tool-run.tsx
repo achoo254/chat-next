@@ -2,7 +2,8 @@
 // fold under "Đã chạy 3 tool" (or "Đang chạy Bash" while one runs), opened
 // to see each call. A row shows the call's command wrapped and clamped to
 // three lines ("Xem thêm" shows the rest), the answered permission prompt
-// as a short status under it, and its output behind "Kết quả".
+// as a short status under it, the files a subagent edited, and its output
+// behind "Kết quả".
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Item } from "@achoo254/chat-proto/remote/remote";
 import { MachineIcon } from "../machine-icons.tsx";
@@ -86,6 +87,7 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 	}, [summary, expanded]);
 	const output = result !== null && (result.output !== "" || result.truncated) ? result : null;
 	const showToggle = clamped || expanded;
+	const edited = run.subagentFiles.length;
 	return (
 		<li className="mx-run">
 			<MachineIcon name={run.call === null ? "cpu" : toolIcon(run.call.kind)} small />
@@ -94,7 +96,7 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 					<b className="name">{name}</b>
 					{summary !== "" && <span className="mono"> {summary}</span>}
 				</span>
-				{(showToggle || run.approval !== null || run.call?.sensitive === true || output !== null) && (
+				{(showToggle || run.approval !== null || run.call?.sensitive === true || output !== null || edited > 0) && (
 					<div className="mx-run-sub">
 						{showToggle && (
 							<button type="button" className="mx-link" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
@@ -102,6 +104,12 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 							</button>
 						)}
 						{run.approval !== null && <span className="mx-run-approval">{approvalOutcome(t, run.approval)}</span>}
+						{edited > 0 && (
+							<span className="mx-run-approval" title={run.subagentFiles.join("\n")}>
+								<MachineIcon name="pencil" small />
+								{t.transcript.subagentFiles(edited)}
+							</span>
+						)}
 						{run.call?.sensitive === true && <span className="mx-tag danger">{t.approval.sensitive}</span>}
 						{output !== null && (
 							<details className="mx-run-out">

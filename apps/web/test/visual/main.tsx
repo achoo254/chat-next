@@ -535,6 +535,25 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click(".mx-file", /tool-run/);
 		await find(() => document.querySelector(".mx-changes .mx-diff"));
 	},
+	// One file of the folder's git changes, fetched whole with "Xem đủ".
+	"changes-git-file": async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		await click(".mx-changes-btn", /Thay đổi/);
+		await click(".mx-file", /build-log/);
+		await click(".mx-changes .mx-diff button", /Xem đủ/);
+		await find(() => [...document.querySelectorAll(".mx-changes .mx-diff")].find((el) => el.textContent?.includes("1440")) ?? null);
+	},
+	// The end of a turn opened to its numbers.
+	"turn-details": async () => {
+		const summary = await find(() => document.querySelector<HTMLElement>(".mx-turn > summary"));
+		summary.click();
+		await find(() => document.querySelector(".mx-turn[open] dl"));
+		summary.scrollIntoView({ block: "start" });
+	},
+	// The pending approval of a command reading sign-in secrets: their sites stand out.
+	"secret-command": async () => {
+		await find(() => document.querySelector(".mx-dock .mx-secret-sites"));
+	},
 	// "@" in the composer: the session folder's files.
 	mention: async () => {
 		await find(() => document.querySelector(".mx-status .mx-mode"));
