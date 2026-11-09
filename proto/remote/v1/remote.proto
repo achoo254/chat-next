@@ -137,6 +137,8 @@ message Frame {
     OpenDiskAccessSettings open_disk_access_settings = 35;
     SessionList session_list = 36;
     SessionOpen session_open = 37;
+    AttachmentUpload attachment_upload = 38;
+    AttachmentCancel attachment_cancel = 39;
 
     // B → A
     ThreadListResult thread_list_result = 40;
@@ -158,6 +160,10 @@ message Frame {
     FileListResult file_list_result = 56;
     MachineProfile machine_profile = 57;
     SessionListResult session_list_result = 58;
+    AttachmentData attachment_data = 59;
+
+    // A → B, continued
+    AttachmentFetch attachment_fetch = 70;
   }
 }
 
@@ -194,9 +200,15 @@ message Consent {
 
 message ThreadSend {
   string thread_id = 1;
+  // May be empty when attachment_ids is not.
   string text = 2;
   // Client-generated; B drops a repeat of an id it already accepted.
   string client_msg_id = 3;
+  // Uploads (AttachmentUpload) for this thread that arrived whole and go with
+  // this message, in order; each is used once. An unknown, unfinished or
+  // spent id refuses the message with ERROR_REASON_ATTACHMENT_NOT_FOUND.
+  // Machines before tunelo 2.0.5 ignore the field: send none to them.
+  repeated string attachment_ids = 4;
 }
 
 message ThreadSubscribe {
@@ -382,6 +394,87 @@ message SessionOpen {
   Consent consent = 3;
   // The user was told the session may be open elsewhere and goes on.
   bool open_anyway = 4;
+}
+
+// --- attachments ------------------------------------------------------------
+//
+// Files a device sends with a message, end-to-end encrypted like the rest:
+// the relay and the chat server never see them. A file goes up in pieces
+// (AttachmentUpload) before the message that names it (ThreadSend.
+// attachment_ids). B keeps an unsent upload for an hour at most. With the
+// message, B hands an image (PNG, JPEG, GIF or WebP, told by its bytes, at
+// most AttachmentLimits.image_max_bytes) to an AI whose capabilities say
+// `images` as an image; it saves any other file in the session's folder,
+// under .tunelo-attachments/<yyyy-mm-dd>/ (kept out of git through
+// .git/info/exclude, never .gitignore), and tells the AI its path. A
+// sensitive target is refused with ERROR_REASON_SENSITIVE_FOLDER.
+
+// One piece of a file, in order: the first at offset 0 names the file, each
+// one after it starts where the one before ended. Answered with Ack. Pieces
+// may be sent without waiting for the Ack of the one before (B handles them
+// in order); after an Error, the upload is gone: start it again or drop it.
+message AttachmentUpload {
+  // Chosen by A: 8-64 characters, letters, digits, "-" and "_".
+  string upload_id = 1;
+  // First piece only: the thread the file goes with.
+  string thread_id = 2;
+  // First piece only: the file's name on the device (B keeps its last path
+  // part, made safe for any file system).
+  string name = 3;
+  // First piece only: the type the device reports; B goes by the bytes.
+  string mime_type = 4;
+  // First piece only: the whole size in bytes, at most
+  // AttachmentLimits.file_max_bytes.
+  uint64 size = 5;
+  uint64 offset = 6;
+  // At most AttachmentLimits.piece_max_bytes; may be empty only for an empty file.
+  bytes data = 7;
+}
+
+// Drops an upload (whole or not) that is not sent yet. Answered with Ack,
+// also for an id B does not know.
+message AttachmentCancel {
+  string upload_id = 1;
+}
+
+// An image a message of the thread carried (Attachment.image), for showing
+// it again. Answered with AttachmentData.
+message AttachmentFetch {
+  string thread_id = 1;
+  string attachment_id = 2;
+}
+
+message AttachmentData {
+  string thread_id = 1;
+  string attachment_id = 2;
+  string mime_type = 3;
+  bytes data = 4;
+}
+
+// A file that went with a user message (TextItem.attachments).
+message Attachment {
+  // The upload id; AttachmentFetch takes it for an image.
+  string id = 1;
+  string name = 2;
+  string mime_type = 3;
+  uint64 size = 4;
+  // The AI got it as an image; B keeps it with the thread.
+  bool image = 5;
+  // Saved in the session's folder: its path relative to that folder,
+  // "/"-separated; empty for an image.
+  string path = 6;
+}
+
+// What a machine takes (MachineInfo.attachments); unset before tunelo 2.0.5,
+// which takes no attachments.
+message AttachmentLimits {
+  uint64 file_max_bytes = 1;
+  // All files of one message together.
+  uint64 message_max_bytes = 2;
+  uint32 message_max_files = 3;
+  // An image larger than this goes as a file; a device shrinks it first.
+  uint64 image_max_bytes = 4;
+  uint32 piece_max_bytes = 5;
 }
 
 // --- AI accounts (Claude profiles) ------------------------------------------
@@ -676,6 +769,16 @@ enum ErrorReason {
   // SessionOpen: the session seems open elsewhere on the machine (see
   // LocalSession.busy_elsewhere); ask the user, then send open_anyway.
   ERROR_REASON_SESSION_OPEN_ELSEWHERE = 31;
+  // A file is larger than AttachmentLimits.file_max_bytes, or the files of a
+  // message than message_max_bytes (subject: the file's name, when one).
+  ERROR_REASON_ATTACHMENT_TOO_LARGE = 32;
+  // More files with a message than AttachmentLimits.message_max_files, or too
+  // many uploads waiting on the machine.
+  ERROR_REASON_TOO_MANY_ATTACHMENTS = 33;
+  // ThreadSend names an upload B does not hold whole (unknown, unfinished,
+  // expired or sent already), AttachmentUpload continues one B does not
+  // know or at the wrong offset, or AttachmentFetch names nothing kept.
+  ERROR_REASON_ATTACHMENT_NOT_FOUND = 34;
 }
 
 enum ErrorCode {
@@ -814,6 +917,8 @@ message TextItem {
   bool partial = 3;
   // Echo of ThreadSend.client_msg_id for user messages.
   string client_msg_id = 4;
+  // User messages: the files that went with it, in order.
+  repeated Attachment attachments = 5;
 }
 
 enum ToolKind {
@@ -1028,6 +1133,8 @@ message MachineInfo {
   // seconds while it is missing and sends MachineInfo unasked to every
   // connected device once it is granted.
   bool needs_full_disk_access = 15;
+  // The machine takes files with a message; unset before tunelo 2.0.5.
+  AttachmentLimits attachments = 16;
 }
 
 message MachineSettings {
