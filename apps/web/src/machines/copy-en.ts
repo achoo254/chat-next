@@ -251,6 +251,7 @@ export const enMachines: MachinesCopy = {
 		denied: "Denied",
 		expired: "Expired: the machine restarted",
 		cancelled: "Cancelled",
+		secretCommand: (names: string) => `This command uses the sign-in secret ${names}. tunelo asks you every time a command uses a secret, never for the whole session.`,
 	},
 	question: {
 		label: (ai) => `${ai} asks`,

@@ -248,6 +248,7 @@ export const zhCNMachines: MachinesCopy = {
 		denied: "已拒绝",
 		expired: "已过期：电脑已重启",
 		cancelled: "已取消",
+		secretCommand: (names: string) => `此命令使用登录密钥 ${names}。每次有命令使用密钥时 tunelo 都会询问你，不会对整个会话放行。`,
 	},
 	question: {
 		label: (ai) => `${ai} 提问`,

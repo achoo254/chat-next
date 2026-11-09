@@ -254,6 +254,7 @@ export const viMachines = {
 		denied: "Đã từ chối",
 		expired: "Hết hạn: máy đã khởi động lại",
 		cancelled: "Đã huỷ",
+		secretCommand: (names: string) => `Lệnh này dùng bí mật đăng nhập ${names}. tunelo hỏi bạn mỗi lần một lệnh dùng bí mật, không cho phép cả phiên.`,
 	},
 	question: {
 		label: (ai: string) => `${ai} hỏi`,

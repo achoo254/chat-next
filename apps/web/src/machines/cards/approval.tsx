@@ -61,6 +61,21 @@ export function approvalOutcome(t: MachinesCopy, approval: ApprovalItem): string
 	}
 }
 
+/** `$TUNELO_SECRET_X` / `${TUNELO_SECRET_X}` in a command: tunelo hands it a sign-in secret. */
+const SECRET_REFERENCE = /\$\{?TUNELO_SECRET_([A-Z][A-Z0-9_]{0,47})\b/g;
+
+/**
+ * The sign-in secrets a shell command reads, from its input as the card
+ * shows it. The machine asks about such a command every time and never
+ * allows it for the session.
+ */
+export function secretsInCommand(approval: Pick<ApprovalItem, "kind" | "input">): string[] {
+	if (approval.kind !== ToolKind.SHELL) return [];
+	// Items built by hand (tests, older journals) may lack the input.
+	const input: string = typeof approval.input === "string" ? approval.input : "";
+	return [...new Set([...input.matchAll(SECRET_REFERENCE)].map((m) => m[1] ?? "").filter(Boolean))];
+}
+
 /** At most this long, as the machine accepts it. */
 export const DENY_MESSAGE_MAX = 4000;
 
@@ -95,7 +110,8 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 	const [message, setMessage] = useState("");
 	const field = useRef<HTMLTextAreaElement>(null);
 	const pending = approval.state === PromptState.PENDING;
-	const canSession = !approval.sensitive && sessionAllow && !compact;
+	const secrets = secretsInCommand(approval);
+	const canSession = !approval.sensitive && sessionAllow && !compact && secrets.length === 0;
 	const decide = (decision: Decision, note?: string) => {
 		if (busy) return;
 		setBusy(true);
@@ -156,7 +172,12 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 				{approval.sensitive && <span className="mx-tag danger">{t.approval.sensitive}</span>}
 			</h4>
 			{approval.summary !== "" && <pre className="mx-pre">{approval.summary}</pre>}
-			{!compact && approval.reason !== "" && <p className="muted mx-reason">{approval.reason}</p>}
+			{secrets.length > 0 ? (
+				// Worded here: tunelo 2.0.8 sent its own English reason for these, which is left out.
+				<p className="muted mx-reason">{t.approval.secretCommand(secrets.join(", "))}</p>
+			) : (
+				!compact && approval.reason !== "" && <p className="muted mx-reason">{approval.reason}</p>
+			)}
 			{telling ? (
 				<div className="mx-tell">
 					<label className="sr-only" htmlFor={`tell-${approval.toolId}`}>

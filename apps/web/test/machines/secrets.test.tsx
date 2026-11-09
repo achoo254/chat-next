@@ -4,11 +4,12 @@
 // declining says so. The machine's page lists what it keeps, never a value,
 // and removes one. Machines without the feature show neither.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { FrameSchema, SecretPromptSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
+import { ApprovalItemSchema, Decision, FrameSchema, PromptState, SecretPromptSchema, ToolKind, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
+import { ApprovalCard, secretsInCommand } from "../../src/machines/cards/approval.tsx";
 import { SecretCard, originParts } from "../../src/machines/cards/secret-request.tsx";
 import { SavedSecrets } from "../../src/machines/saved-secrets.tsx";
 
@@ -134,5 +135,41 @@ describe("saved secrets on a machine's page", () => {
 			</I18nProvider>,
 		);
 		expect(await screen.findByText("Chưa lưu bí mật nào trên máy này.")).toBeTruthy();
+	});
+});
+
+describe("the approval card of a command that uses a secret", () => {
+	const command = (text: string, reason = "") =>
+		create(ApprovalItemSchema, { toolId: "t", kind: ToolKind.SHELL, name: "Bash", summary: text, input: JSON.stringify({ command: text }), state: PromptState.PENDING, reason });
+
+	it("says so in the user's language, never in the machine's English, and offers no allow for the session", async () => {
+		const english = "It reads a sign-in secret ($TUNELO_SECRET_…): tunelo asks you every time a command uses one.";
+		const decided: Decision[] = [];
+		render(
+			<I18nProvider>
+				<ApprovalCard hotkeys approval={command('curl -u "me:$TUNELO_SECRET_GH_PASSWORD" https://api.github.com', english)} ai="Claude" sessionAllow onDecide={async (d) => void decided.push(d)} />
+			</I18nProvider>,
+		);
+		expect(screen.getByText(/Lệnh này dùng bí mật đăng nhập GH_PASSWORD/)).toBeTruthy();
+		expect(screen.queryByText(english)).toBeNull();
+		expect(screen.queryByRole("button", { name: /Cho phép cả phiên/ })).toBeNull();
+		await userEvent.keyboard("2");
+		expect(decided).toEqual([]);
+		await userEvent.click(screen.getByRole("button", { name: /^1?Cho phép$/ }));
+		await waitFor(() => expect(decided).toEqual([Decision.ALLOW]));
+	});
+
+	it("keeps allow for the session for other commands", () => {
+		render(
+			<I18nProvider>
+				<ApprovalCard approval={command("npm test")} ai="Claude" sessionAllow onDecide={async () => undefined} />
+			</I18nProvider>,
+		);
+		expect(screen.getByRole("button", { name: /Cho phép cả phiên/ })).toBeTruthy();
+	});
+
+	it("finds each secret a shell command names, once", () => {
+		expect(secretsInCommand(command("echo $TUNELO_SECRET_A ${TUNELO_SECRET_B} $TUNELO_SECRET_A $HOME"))).toEqual(["A", "B"]);
+		expect(secretsInCommand({ ...command("echo $TUNELO_SECRET_A"), kind: ToolKind.EDIT })).toEqual([]);
 	});
 });
