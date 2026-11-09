@@ -162,8 +162,12 @@ message Frame {
     SessionListResult session_list_result = 58;
     AttachmentData attachment_data = 59;
 
+    ThreadDeleted thread_deleted = 60;
+
     // A → B, continued
     AttachmentFetch attachment_fetch = 70;
+    ThreadDelete thread_delete = 71;
+    ThreadSetArchived thread_set_archived = 72;
   }
 }
 
@@ -256,6 +260,34 @@ message ThreadInterrupt {
 
 message ThreadClose {
   string thread_id = 1;
+}
+
+// Deletes a thread for good: B stops its AI session, moves the AI's own
+// transcript of each of its sessions (Claude: projects/<folder>/<id>.jsonl
+// and the <id>/ folder beside it) and the files sent with its messages
+// (.tunelo-attachments/… in its folder, only those) to the operating
+// system's trash, where the user can restore them, then drops the thread's
+// journal and tells every device with ThreadDeleted. Nothing outside those
+// files is touched; B writes it to the consent log. Answered with
+// ThreadDeleted. A thread in the middle of a turn (or waiting for the user)
+// is refused with ERROR_REASON_THREAD_RUNNING unless stop_running is set; a
+// session that seems open elsewhere with ERROR_REASON_SESSION_OPEN_ELSEWHERE
+// unless open_anyway is set. Machines before tunelo 2.0.6 answer
+// UNSUPPORTED_REQUEST.
+message ThreadDelete {
+  string thread_id = 1;
+  // The user agreed to stop the running turn first.
+  bool stop_running = 2;
+  // The user was told the session may be open elsewhere and goes on.
+  bool open_anyway = 3;
+}
+
+// Hides a thread from the list on every device (ThreadSummary.archived) or
+// shows it again; nothing on disk changes and the session opens as before.
+// Answered with Ack. Machines before tunelo 2.0.6 answer UNSUPPORTED_REQUEST.
+message ThreadSetArchived {
+  string thread_id = 1;
+  bool archived = 2;
 }
 
 message ThreadSetModel {
@@ -779,6 +811,12 @@ enum ErrorReason {
   // expired or sent already), AttachmentUpload continues one B does not
   // know or at the wrong offset, or AttachmentFetch names nothing kept.
   ERROR_REASON_ATTACHMENT_NOT_FOUND = 34;
+  // ThreadDelete: the thread runs a turn or waits for the user; ask, then
+  // send stop_running.
+  ERROR_REASON_THREAD_RUNNING = 35;
+  // ThreadDelete: the operating system's trash cannot take the files, so
+  // nothing was deleted (subject: why, in English).
+  ERROR_REASON_TRASH_UNAVAILABLE = 36;
 }
 
 enum ErrorCode {
@@ -824,6 +862,8 @@ message ThreadSummary {
   // The tool running right now (its name, e.g. "Bash"); a device shows
   // "Running: <tool>" instead of preview. Empty when none runs.
   string preview_tool = 11;
+  // Hidden from the list (ThreadSetArchived); unset before tunelo 2.0.6.
+  bool archived = 12;
 }
 
 enum ThreadState {
@@ -843,6 +883,14 @@ message ThreadListResult {
 
 message ThreadCreated {
   ThreadSummary thread = 1;
+}
+
+// A thread was deleted (ThreadDelete): the answer to the request, and sent
+// unasked to every connected device.
+message ThreadDeleted {
+  string thread_id = 1;
+  // How many files went to the trash on the machine.
+  uint32 trashed = 2;
 }
 
 message ThreadStatus {
@@ -1193,7 +1241,8 @@ message AuditEntry {
   string device = 2;
   // open_sensitive, project_settings (detail "trust" when a device trusted
   // the folder), approve_sensitive, pair, revoke,
-  // permission_mode, profile_add, profile_select, profile_remove
+  // permission_mode, profile_add, profile_select, profile_remove,
+  // delete_session (path: the folder; detail: the session ids)
   string action = 3;
   string path = 4;
   string detail = 5;
