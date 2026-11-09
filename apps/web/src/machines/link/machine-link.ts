@@ -19,6 +19,7 @@ import {
 	type Frame,
 	type Item,
 	type MachineInfo,
+	type MachineProfile,
 	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
@@ -67,6 +68,12 @@ export interface LinkState {
 	readonly pending: ReadonlyMap<string, readonly PendingSend[]>;
 	/** Each watched thread's statusline data (ThreadInfo), by thread id. */
 	readonly threadInfo: ReadonlyMap<string, ThreadInfo>;
+	/**
+	 * The machine's Claude profile, its profiles and the profile each session
+	 * runs with, as the machine last announced them (whole, unasked); null
+	 * until it does (tunelo before 2.0.2 never does).
+	 */
+	readonly machineProfile: MachineProfile | null;
 }
 
 /**
@@ -141,6 +148,7 @@ const INITIAL: LinkState = {
 	full: new Map(),
 	pending: new Map(),
 	threadInfo: new Map(),
+	machineProfile: null,
 };
 
 export class MachineLink {
@@ -499,6 +507,9 @@ export class MachineLink {
 				this.set({ threadInfo });
 				break;
 			}
+			case "machineProfile":
+				this.set({ machineProfile: b.value });
+				break;
 			case "fullItem":
 				if (b.value.item !== undefined) {
 					const full = new Map(this.current.full);
@@ -528,12 +539,13 @@ export class MachineLink {
 
 /**
  * A newer ThreadInfo replaces the older one, except for what it does not
- * know: unset rate limits (the AI reports them only now and then) and an
- * empty command list (not listed yet) keep the previous values.
+ * know: unset rate limits (the AI reports them only now and then) keep the
+ * previous ones while the session stays on the same Claude profile, and an
+ * empty command list (not listed yet) keeps the previous one.
  */
 export function mergeThreadInfo(previous: ThreadInfo | undefined, next: ThreadInfo): ThreadInfo {
 	if (previous === undefined) return next;
-	const rateLimits = next.rateLimits ?? previous.rateLimits;
+	const rateLimits = next.rateLimits ?? (previous.profileId === next.profileId ? previous.rateLimits : undefined);
 	const commands = next.commands.length > 0 ? next.commands : previous.commands;
 	if (rateLimits === next.rateLimits && commands === next.commands) return next;
 	return { ...next, rateLimits, commands };
