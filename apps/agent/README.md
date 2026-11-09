@@ -49,7 +49,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo mcp` | Server MCP (stdio): tool tunnel, Chat, Localman |
 | `tunelo trust [thư mục]` / `untrust` / `trusted` | Thư mục được nạp cấu hình `.claude` của dự án; thiết bị đã ghép cũng tin được từ web (có ghi nhật ký), trừ thư mục nhạy cảm |
 | `tunelo secrets list` / `remove <id>` | Bí mật đăng nhập đã lưu cho Claude (trang, tên, lần dùng cuối; không bao giờ in giá trị) |
-| `tunelo browser status` / `close` / `clear` | Trình duyệt riêng của tunelo cho Claude: trình duyệt nào, hồ sơ ở đâu, có đang chạy; đóng (giữ đăng nhập); `clear` xoá hồ sơ (đăng xuất mọi trang, ghi nhật ký) |
+| `tunelo browser status` / `close` / `clear` (cũng xoá được từ trang máy trên web) | Trình duyệt riêng của tunelo cho Claude: trình duyệt nào, hồ sơ ở đâu, có đang chạy; đóng (giữ đăng nhập); `clear` xoá hồ sơ (đăng xuất mọi trang, ghi nhật ký) |
 | `tunelo audit` | Nhật ký đồng ý |
 | `tunelo run` | Chạy trong terminal để gỡ lỗi; từ chối khi đã có bản chạy nền |
 
@@ -147,6 +147,26 @@ Phiên tunelo mở có thêm 3 tool MCP. Không tool nào trả hình của tran
   cách khác, hoặc chờ ở máy), và Claude nhận thông báo kèm kết quả tool kế tiếp (hook PostToolUse). Hộp thoại passkey của hệ điều
   hành vẫn cần người ở máy.
 - `tunelo browser clear` xoá hồ sơ (đăng xuất mọi trang); Claude chạy lệnh `tunelo browser …` luôn bị hỏi như lệnh nhạy cảm.
+
+## Màn hình của máy qua Chia sẻ màn hình của macOS (2.0.13)
+
+Cho các hộp thoại của hệ điều hành mà trình duyệt không thấy (sheet passkey, hộp mật khẩu Keychain).
+
+- tunelo **không bao giờ** bật hay đổi cài đặt hệ thống. Thiết bị hỏi trạng thái (`ScreenShareStatusRequest`): có dịch vụ VNC trả lời
+  trên `127.0.0.1:5900` không (đọc lời chào `RFB `), có nghe ngoài loopback không (`netstat -an -p tcp`), tường lửa có bật và chặn
+  mọi kết nối đến không (`socketfilterfw --getglobalstate`, `--getblockall`). Chưa bật: web hướng dẫn 2 bước (Cài đặt hệ thống →
+  Cài đặt chung → Chia sẻ → Chia sẻ màn hình; chỉ cho tài khoản của mình). Mở ra mạng: web cảnh báo, không tự sửa.
+- Chỉ khi người dùng bấm "Điều khiển toàn màn hình", tunelo mở **một** luồng TCP tới `127.0.0.1:5900` và chuyển byte hai chiều qua
+  kênh E2E sẵn có (`ScreenShareData`, tối đa 256 KiB mỗi khung, tạm dừng đọc khi kết nối thiết bị nghẽn). Một phiên một lúc; hết
+  khi thiết bị đóng, 10 phút không có gì từ thiết bị (web cũng tự đóng sau 10 phút không thao tác), dịch vụ đóng, link thiết bị
+  đóng, hoặc tunelo dừng. Nhật ký đồng ý ghi `screen_share`; log chỉ có "opened by …"/"closed (…)", không nội dung.
+- Xác thực VNC của Apple (ARD, kiểu 30) diễn ra giữa noVNC trên thiết bị và dịch vụ của Apple: tên và mật khẩu Mac chỉ đi qua tunelo
+  dưới dạng byte mã hoá, tunelo không đọc, không lưu, không log.
+- Web dùng noVNC 1.7.0 (MPL-2.0, mã nguồn <https://github.com/novnc/noVNC>), nạp lười; một file được vá, xem
+  [`patches/README.md`](../../patches/README.md).
+- Trang máy có nút "Xoá hồ sơ trình duyệt" (cùng việc với `tunelo browser clear`, có xác nhận, ghi `browser_clear`).
+- `request_takeover(…, os_dialog: true)`: Claude báo hộp thoại hệ điều hành đang chờ; thẻ trên web đưa "Điều khiển toàn màn hình"
+  lên đầu.
 
 ## Dự án (2.0.7)
 
