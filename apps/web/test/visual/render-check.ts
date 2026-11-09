@@ -71,6 +71,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-mention": "?at=machine-chat&open=mention",
 	"machine-slash": "?at=machine-chat&open=slash",
 	"machine-new-session": "?at=machine-sessions&open=new-session",
+	"machine-new-session-existing": "?at=machine-sessions&open=new-session-existing",
 	"machine-info": "?at=machine-info",
 	"machine-pair": "?at=machine-pair",
 	"machine-add": "?at=machine-add",

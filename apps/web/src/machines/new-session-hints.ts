@@ -60,3 +60,12 @@ export function pathCrumbs(path: string, home: string): Crumb[] {
 	const homeAt = home === "" ? -1 : crumbs.findIndex((c) => same(clean(c.path), clean(home)));
 	return homeAt > 0 ? crumbs.slice(homeAt) : crumbs;
 }
+
+/** `path` is the machine's home folder (trailing separators and, on Windows, letter case aside). */
+export function isHome(path: string, home: string): boolean {
+	if (home === "" || path.trim() === "") return false;
+	const clean = (p: string) => p.trim().replace(/[\\/]+$/, "");
+	const a = clean(path);
+	const b = clean(home);
+	return a === b || (/^[A-Za-z]:/.test(b) && a.toLowerCase() === b.toLowerCase()) || a === "~";
+}

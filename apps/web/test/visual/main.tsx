@@ -406,6 +406,12 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click(".mx-head button.btn-primary:not(:disabled)", /Phiên mới/);
 		await find(() => document.querySelector(".mx-new .mx-crumbs"));
 	},
+	// Its "Phiên có sẵn trên máy" tab: the machine's Claude Code sessions by folder, one that may be open elsewhere.
+	"new-session-existing": async () => {
+		await click(".mx-head button.btn-primary:not(:disabled)", /Phiên mới/);
+		await click(".mx-new-tabs button", /Phiên có sẵn/);
+		await find(() => document.querySelector(".mx-local-row"));
+	},
 	// The markdown answer (list, tasks, table, code block) scrolled into view.
 	markdown: async () => {
 		const table = await find(() => document.querySelector(".mx-agent.md .md-table"));

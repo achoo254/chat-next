@@ -241,6 +241,23 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 				const entries = all.filter((p) => p.toLowerCase().includes(prefix)).map((path) => ({ path, dir: path.endsWith("/") }));
 				return [{ case: "fileListResult", value: { threadId: frame.body.value.threadId, entries, truncated: false } }];
 			}
+			case "sessionList": {
+				// Claude Code sessions kept on the machine: from a terminal, an IDE, Claude Desktop, and one Chat holds.
+				const root = "D:\\CONG VIEC\\hoandat-app";
+				const all = [
+					{ sessionId: "5b1c0d2e-1111-4a6b-9c1d-000000000001", dir: `${root}\\chat-next`, title: "Thêm tab phiên có sẵn vào hộp thoại Phiên mới", updatedAt: BigInt(now - 40_000), messages: 46, entrypoint: "cli", threadId: "", busyElsewhere: true, sensitive: false },
+					{ sessionId: "5b1c0d2e-1111-4a6b-9c1d-000000000002", dir: `${root}\\chat-next`, title: "Sửa giao diện Máy của tôi", updatedAt: BigInt(now - 25 * 60_000), messages: 18, entrypoint: "sdk-ts", threadId: DEMO_THREAD, busyElsewhere: false, sensitive: false },
+					{ sessionId: "5b1c0d2e-1111-4a6b-9c1d-000000000003", dir: `${root}\\chat-next`, title: "Rà soát log deploy tối qua", updatedAt: BigInt(now - 5 * 3_600_000), messages: 9, entrypoint: "claude-desktop", threadId: "", busyElsewhere: false, sensitive: false },
+					{ sessionId: "5b1c0d2e-1111-4a6b-9c1d-000000000004", dir: `${root}\\localman-next`, title: "Viết lại trình xem request của Localman cho màn hình hẹp", updatedAt: BigInt(now - 2 * 86_400_000), messages: 124, entrypoint: "cli", threadId: "", busyElsewhere: false, sensitive: false },
+					{ sessionId: "5b1c0d2e-1111-4a6b-9c1d-000000000005", dir: "C:\\Users\\dieuvy", title: "Dọn file tải về", updatedAt: BigInt(now - 6 * 86_400_000), messages: 4, entrypoint: "cli", threadId: "", busyElsewhere: false, sensitive: true },
+				];
+				const { query, dir } = frame.body.value;
+				const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+				const matching = all.filter((x) => words.every((w) => `${x.title} ${x.dir}`.toLowerCase().includes(w)));
+				const dirs = [...new Set(matching.map((x) => x.dir))].map((d) => ({ dir: d, sessions: matching.filter((x) => x.dir === d).length }));
+				const sessions = dir === "" ? matching : matching.filter((x) => x.dir === dir || x.dir.startsWith(`${dir}\\`));
+				return [{ case: "sessionListResult", value: { sessions, total: sessions.length, dirs } }];
+			}
 			case "auditList":
 				return [{ case: "auditListResult", value: { entries: [] } }];
 			default:

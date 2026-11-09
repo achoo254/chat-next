@@ -70,6 +70,10 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.pathOutsideFolder;
 		case ErrorReason.FULL_DISK_ACCESS_NEEDED:
 			return r.fullDiskAccessNeeded;
+		case ErrorReason.SESSION_NOT_FOUND:
+			return r.sessionNotFound;
+		case ErrorReason.SESSION_OPEN_ELSEWHERE:
+			return r.sessionOpenElsewhere;
 		default:
 			return undefined;
 	}
@@ -102,4 +106,9 @@ export function machineErrorText(t: MachinesCopy, err: unknown, ai: string): str
 /** The machine refused to load project settings it does not trust yet; trusting from this device may fix it. */
 export function needsProjectTrust(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.PROJECT_SETTINGS_UNTRUSTED;
+}
+
+/** The machine thinks the session is open elsewhere on it; asking the user first, then opening anyway, is fine. */
+export function openElsewhere(err: unknown): boolean {
+	return err instanceof RemoteError && err.reason === ErrorReason.SESSION_OPEN_ELSEWHERE;
 }
