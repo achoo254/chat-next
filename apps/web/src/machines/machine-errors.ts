@@ -102,6 +102,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.secretInvalid;
 		case ErrorReason.SECRET_NOT_FOUND:
 			return r.secretNotFound;
+		case ErrorReason.BROWSER_UNAVAILABLE:
+			return r.browserUnavailable;
+		case ErrorReason.TAKEOVER_GONE:
+			return r.takeoverGone;
+		case ErrorReason.BROWSER_NOT_RUNNING:
+			return r.browserNotRunning;
 		default:
 			return undefined;
 	}

@@ -8,6 +8,9 @@
 // thread from its cursor; a ThreadReset drops the thread's items and the
 // snapshot that follows fills them again. A thread's ThreadInfo (what the
 // user's terminal statusline shows) is kept apart from its journal.
+// Pictures and tab lists of the machine's browser (BrowserFrame,
+// BrowserState) go to their own listeners, never into the state: they come
+// many times a second and only the open browser view wants them.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { backoffDelay } from "@achoo254/chat-core";
 import {
@@ -16,11 +19,15 @@ import {
 	FrameSchema,
 	HandshakeErrorCode,
 	ThreadState,
+	type BrowserFrame,
+	type BrowserState,
+	type BrowserTakeover,
 	type Frame,
 	type GitChanges,
 	type Item,
 	type MachineInfo,
 	type MachineProfile,
+	type PasskeyNotice,
 	type ProjectCloneProgress,
 	type ProjectListResult,
 	type SecretPrompt,
@@ -92,7 +99,20 @@ export interface LinkState {
 	 * last sent it (tunelo 2.0.11+: asked, and unasked after each turn).
 	 */
 	readonly gitChanges: ReadonlyMap<string, GitChanges>;
+	/**
+	 * Takeovers of the machine's browser open now (tunelo 2.0.12+), by id: the
+	 * AI waits for the user on a page, or a device opened the browser itself.
+	 */
+	readonly takeovers: ReadonlyMap<string, BrowserTakeover>;
+	/** Pages of the machine's browser that asked for a passkey nobody at the machine can give, newest last. */
+	readonly passkeyNotices: readonly PasskeyNotice[];
 }
+
+/** What the open browser view gets: a picture of the tab, or the tabs and the one shown. */
+export type BrowserMessage = { readonly kind: "frame"; readonly frame: BrowserFrame } | { readonly kind: "state"; readonly state: BrowserState };
+
+/** Passkey notices kept for showing. */
+const MAX_PASSKEY_NOTICES = 5;
 
 /**
  * The machine refused a request. `message` is the machine's English; `reason`
@@ -171,11 +191,14 @@ const INITIAL: LinkState = {
 	clones: new Map(),
 	secretPrompts: new Map(),
 	gitChanges: new Map(),
+	takeovers: new Map(),
+	passkeyNotices: [],
 };
 
 export class MachineLink {
 	private current: LinkState = INITIAL;
 	private readonly listeners = new Set<() => void>();
+	private readonly browserListeners = new Set<(message: BrowserMessage) => void>();
 	private readonly timers: Timers;
 	private readonly random: () => number;
 	private readonly newId: () => string;
@@ -207,6 +230,12 @@ export class MachineLink {
 	};
 
 	readonly snapshot = (): LinkState => this.current;
+
+	/** The browser's pictures and tab lists, for the open browser view; returns the unsubscribe. */
+	onBrowser(listener: (message: BrowserMessage) => void): () => void {
+		this.browserListeners.add(listener);
+		return () => this.browserListeners.delete(listener);
+	}
 
 	private set(change: Partial<LinkState>): void {
 		this.current = { ...this.current, ...change };
@@ -394,8 +423,8 @@ export class MachineLink {
 
 	private opened(): void {
 		this.attempt = 0;
-		// The machine sends every prompt still open again on this connection.
-		this.set({ status: { kind: "open" }, secretPrompts: new Map() });
+		// The machine sends every prompt and takeover still open again on this connection.
+		this.set({ status: { kind: "open" }, secretPrompts: new Map(), takeovers: new Map() });
 		this.timers.clearInterval(this.pingTimer);
 		this.pingTimer = this.timers.setInterval(() => this.tick(), PING_MS);
 		this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
@@ -557,6 +586,24 @@ export class MachineLink {
 			case "secretPromptEnded":
 				this.dropSecretPrompt(b.value.requestId);
 				break;
+			case "browserTakeover": {
+				const takeovers = new Map(this.current.takeovers);
+				takeovers.set(b.value.takeoverId, b.value);
+				this.set({ takeovers });
+				break;
+			}
+			case "browserTakeoverEnded":
+				this.dropTakeover(b.value.takeoverId);
+				break;
+			case "browserFrame":
+				for (const listener of this.browserListeners) listener({ kind: "frame", frame: b.value });
+				return;
+			case "browserState":
+				for (const listener of this.browserListeners) listener({ kind: "state", state: b.value });
+				return;
+			case "passkeyNotice":
+				this.set({ passkeyNotices: [...this.current.passkeyNotices, b.value].slice(-MAX_PASSKEY_NOTICES) });
+				break;
 			case "gitChanges": {
 				const gitChanges = new Map(this.current.gitChanges);
 				gitChanges.set(b.value.threadId, b.value);
@@ -594,6 +641,19 @@ export class MachineLink {
 		const secretPrompts = new Map(this.current.secretPrompts);
 		secretPrompts.delete(requestId);
 		this.set({ secretPrompts });
+	}
+
+	/** A takeover this device gave back, or the machine ended. */
+	dropTakeover(takeoverId: string): void {
+		if (!this.current.takeovers.has(takeoverId)) return;
+		const takeovers = new Map(this.current.takeovers);
+		takeovers.delete(takeoverId);
+		this.set({ takeovers });
+	}
+
+	/** The user read a passkey notice. */
+	dismissPasskey(notice: PasskeyNotice): void {
+		this.set({ passkeyNotices: this.current.passkeyNotices.filter((n) => n !== notice) });
 	}
 
 	/** A thread deleted on the machine leaves every list and cache here. */

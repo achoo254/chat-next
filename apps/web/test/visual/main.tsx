@@ -295,6 +295,9 @@ const SCREENS: Record<string, string> = {
 	"machine-limit": paths.machineSession("1", "demo-running"),
 	// Claude asks for a sign-in secret: the card above the composer, outside the transcript.
 	"machine-secret": paths.machineSession("1", "demo-idle"),
+	// Claude waits for the user on the machine's browser; a page asked for a passkey.
+	"machine-takeover": paths.machineSession("1", "demo-idle"),
+	"machine-passkey": paths.machineSession("1", "demo-idle"),
 	"machine-home": paths.machines(),
 	"machine-need": aiPaths.need,
 	"machine-unpaired": paths.machine("2"),
@@ -471,6 +474,26 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	// Claude waits for a sign-in secret: the card is in place above the composer.
 	"secret-card": async () => {
 		await find(() => document.querySelector(".mx-secret input[type=password]"));
+	},
+	// The machine's browser waits for the user: the card above the composer.
+	"takeover-card": async () => {
+		await find(() => document.querySelector("[data-id=takeover-card]"));
+	},
+	// The live view of the machine's browser, opened from the card (a password field focused).
+	"takeover-view": async () => {
+		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=takeover-card-open]"));
+		open.click();
+		await find(() => document.querySelector(".mx-browser-surface img"));
+		await find(() => document.querySelector(".mx-browser-password"));
+	},
+	"passkey-card": async () => {
+		await find(() => document.querySelector("[data-id=passkey-card]"));
+	},
+	// "Xem trình duyệt của máy" on the machine's page, opened.
+	"machine-browser-view": async () => {
+		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-browser-open]:not(:disabled)"));
+		open.click();
+		await find(() => document.querySelector(".mx-browser-surface img"));
 	},
 	// "Bí mật đã lưu" on the machine's page, scrolled into view.
 	"saved-secrets": async () => {

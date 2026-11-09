@@ -43,6 +43,50 @@ async function demoImage(): Promise<Uint8Array> {
 	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
 	return blob === null ? new Uint8Array() : new Uint8Array(await blob.arrayBuffer());
 }
+
+/** What the machine's browser shows in the demo: a sign-in page, as a JPEG like the screencast's. */
+async function demoBrowserPicture(): Promise<Uint8Array> {
+	const canvas = document.createElement("canvas");
+	canvas.width = 1200;
+	canvas.height = 800;
+	const c = canvas.getContext("2d");
+	if (c === null) return new Uint8Array();
+	c.fillStyle = "#f6f8fa";
+	c.fillRect(0, 0, 1200, 800);
+	c.fillStyle = "#24292f";
+	c.fillRect(0, 0, 1200, 64);
+	c.fillStyle = "#ffffff";
+	c.font = "600 22px sans-serif";
+	c.fillText("accounts.example.com", 32, 40);
+	c.fillStyle = "#ffffff";
+	c.fillRect(400, 150, 400, 470);
+	c.strokeStyle = "#d0d7de";
+	c.strokeRect(400, 150, 400, 470);
+	c.fillStyle = "#24292f";
+	c.font = "600 30px sans-serif";
+	c.fillText("Đăng nhập", 430, 215);
+	c.font = "18px sans-serif";
+	c.fillText("Email", 430, 270);
+	c.fillText("Mật khẩu", 430, 375);
+	c.strokeRect(430, 285, 340, 48);
+	c.strokeStyle = "#0969da";
+	c.lineWidth = 3;
+	c.strokeRect(430, 390, 340, 48);
+	c.fillStyle = "#57606a";
+	c.fillText("dieuvy@example.com", 445, 316);
+	c.fillText("••••••••", 445, 421);
+	c.fillStyle = "#1f883d";
+	c.fillRect(430, 470, 340, 52);
+	c.fillStyle = "#ffffff";
+	c.font = "600 20px sans-serif";
+	c.fillText("Tiếp tục", 556, 503);
+	c.fillStyle = "#0969da";
+	c.font = "17px sans-serif";
+	c.fillText("Đăng nhập bằng passkey", 500, 575);
+	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.6));
+	return blob === null ? new Uint8Array() : new Uint8Array(await blob.arrayBuffer());
+}
+
 const TUNNEL = `wss://demo.tunnel.${brand.domain}`;
 
 type Body = NonNullable<MessageInitShape<typeof ItemSchema>["body"]>;
@@ -223,6 +267,19 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	const ref = String(entry.id);
 	await keys.pin(ref, machine.keys.publicKey);
 	const image = await demoImage();
+	const browserPicture = await demoBrowserPicture();
+	const at = new URLSearchParams(window.location.search).get("at");
+	const browserTabs = [
+		{ targetId: "T1", url: "https://accounts.example.com/login?next=%2Fsettings%2Fsecurity", title: "Đăng nhập · Example" },
+		{ targetId: "T2", url: "http://localhost:5173/settings", title: "Cài đặt · ứng dụng của bạn" },
+	];
+	const takeover = {
+		takeoverId: "demo-takeover",
+		threadId: "demo-idle",
+		reason: "Đăng nhập tài khoản Example giúp mình (trang đòi mã 2 bước), rồi bấm Trả lại để mình chạy tiếp test e2e.",
+		url: browserTabs[0]?.url ?? "",
+		expiresAt: BigInt(now + 10 * 60_000),
+	};
 	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
 	const stalled = new Map<string, number>();
 	const thread = {
@@ -278,6 +335,14 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						0,
 					);
 				}
+				// Claude waits for the user on the machine's browser (?at=machine-takeover), or a page asked for a passkey (?at=machine-passkey).
+				if (at === "machine-takeover") setTimeout(() => machine.send(socket, { case: "browserTakeover", value: takeover }), 0);
+				if (at === "machine-passkey") {
+					setTimeout(
+						() => machine.send(socket, { case: "passkeyNotice", value: { origin: "https://accounts.example.com", create: false, threadId: "demo-idle", at: BigInt(now) } }),
+						0,
+					);
+				}
 				// The machine announces its profiles unasked (id "") to every device.
 				setTimeout(
 					() =>
@@ -303,6 +368,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							agentVersion: "2.0.11",
 							secrets: true,
 							gitChanges: true,
+							browser: { available: true, running: true },
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -399,6 +465,23 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 				const whole = file.truncated ? { ...file, truncated: false, unified: `${file.unified}\n+\n+Đã chụp lại ảnh 375 và 1440.` } : file;
 				return [{ case: "gitFileDiffResult", value: { threadId, file: whole } }];
 			}
+			case "browserControl":
+				return [{ case: "browserTakeover", value: { ...takeover, takeoverId: "demo-control", threadId: "", reason: "" } }];
+			case "browserView": {
+				const v = frame.body.value;
+				if (!v.on) return [{ case: "ack", value: {} }];
+				const shown = v.targetId === "" ? "T1" : v.targetId;
+				setTimeout(() => {
+					machine.send(socket, { case: "browserState", value: { takeoverId: v.takeoverId, tabs: browserTabs, targetId: shown, passwordFocused: shown === "T1" } });
+					machine.send(socket, { case: "browserFrame", value: { takeoverId: v.takeoverId, targetId: shown, jpeg: browserPicture, pageWidth: 1200, pageHeight: 800 } });
+				}, 0);
+				return [{ case: "ack", value: {} }];
+			}
+			case "browserInput":
+				return [{ case: "ack", value: {} }];
+			case "browserTakeoverEnd":
+				setTimeout(() => machine.send(socket, { case: "browserTakeoverEnded", value: { takeoverId: frame.body.case === "browserTakeoverEnd" ? frame.body.value.takeoverId : "" } }), 0);
+				return [{ case: "ack", value: {} }];
 			case "secretList":
 				return [
 					{

@@ -67,6 +67,12 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-limit": "?at=machine-limit",
 	"machine-secret": "?at=machine-secret&open=secret-card",
 	"machine-info-secrets": "?at=machine-info&open=saved-secrets",
+	// The machine's browser: Claude's takeover card, the live view (desktop: over the session; phone: full screen),
+	// a page asking for a passkey, and the view opened from the machine's page.
+	"machine-takeover": "?at=machine-takeover&open=takeover-card",
+	"machine-takeover-view": "?at=machine-takeover&open=takeover-view",
+	"machine-passkey": "?at=machine-passkey&open=passkey-card",
+	"machine-info-browser": "?at=machine-info&open=machine-browser-view",
 	"machine-details": "?at=machine-chat&open=status-details",
 	"machine-changes": "?at=machine-chat&open=changes",
 	"machine-changes-file": "?at=machine-chat&open=changes-file",

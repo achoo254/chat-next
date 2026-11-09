@@ -73,6 +73,15 @@ const PATHS = {
 	),
 	gauge: <path d="M4 18a8 8 0 1 1 16 0M12 18l4-6" />,
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
+	keyboard: (
+		<>
+			<rect x="3" y="6" width="18" height="12" rx="2" />
+			<path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
+		</>
+	),
+	"zoom-out": <path d="M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM7 10h6M21 21l-6-6" />,
+	x: <path d="M6 6l12 12M18 6L6 18" />,
+	pointer: <path d="M7 3l12 7-5 1.5L11 17z" />,
 } satisfies Record<string, ReactElement>;
 
 export type MachineIconName = keyof typeof PATHS;

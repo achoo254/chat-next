@@ -417,6 +417,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-slash .file .cmd { align-items: center; }
 .mx-slash .file b { font-weight: 500; }
 .mx-dock { padding: var(--space-2) var(--space-5) 0; background: var(--c-bg); }
+.mx-takeover > p { margin: 0; }
+.mx-takeover-site { font-size: 0.8125rem; }
+.mx-browser-card .acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .mx-dock-inner { display: grid; gap: var(--space-1); max-width: var(--mx-col); margin-inline: auto; }
 .mx-dock .mx-action { box-shadow: var(--shadow-sm); }
 .mx-dock .note { margin: 0; text-align: right; }

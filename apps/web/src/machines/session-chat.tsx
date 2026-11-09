@@ -43,6 +43,7 @@ import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { versionAtLeast } from "./agent-version.ts";
+import { BrowserDock, BrowserViewHost } from "./browser/takeover-card.tsx";
 
 export { versionAtLeast };
 
@@ -68,6 +69,12 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const blocks = all.filter((b) => !isPending(b));
 	const prompts = all.filter(isPending);
 	const secretPrompts = [...state.secretPrompts.values()].filter((p) => p.threadId === threadId);
+	const takeovers = [...state.takeovers.values()].filter((x) => x.threadId === threadId);
+	const passkeys = state.passkeyNotices.filter((n) => n.threadId === threadId);
+	/** The takeover whose live view shows over the session. */
+	const [viewing, setViewing] = useState<string | null>(null);
+	const viewed = viewing === null ? undefined : state.takeovers.get(viewing);
+	const outside = secretPrompts.length + takeovers.length;
 	const changes = sessionChanges(items);
 	const gitSupported = state.info?.gitChanges === true;
 	const git = state.gitChanges.get(threadId) ?? null;
@@ -199,7 +206,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
-						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0 || secretPrompts.length > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
+						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0 || outside > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
 					)}
 					{suggestion !== undefined && (
 						<LimitBar
@@ -211,6 +218,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						/>
 					)}
 					{secretPrompts.length > 0 && <SecretDock prompts={secretPrompts} ai={ai} link={link} />}
+					{(takeovers.length > 0 || passkeys.length > 0) && <BrowserDock link={link} takeovers={takeovers} notices={passkeys} ai={ai} onView={setViewing} />}
 					{prompts.length > 0 && (
 						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
 					)}
@@ -245,7 +253,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						machine={machineName}
 						online={online && !missing}
 						running={running}
-						prompting={prompts.length > 0 || secretPrompts.length > 0}
+						prompting={prompts.length > 0 || outside > 0}
 						commands={threadInfo?.commands ?? []}
 						listFiles={modern ? listFiles : undefined}
 						attach={attach}
@@ -255,6 +263,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						}}
 					/>
 				</div>
+				{viewed !== undefined && <BrowserViewHost link={link} takeover={viewed} ai={ai} online={online} inSession onMinimize={() => setViewing(null)} />}
 				{changesOpen && (
 					<ChangesPanel
 						ai={ai}

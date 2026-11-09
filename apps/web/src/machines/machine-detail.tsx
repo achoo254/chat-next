@@ -20,6 +20,7 @@ import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
+import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { PageHead } from "./page-head.tsx";
 import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
@@ -162,6 +163,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 				{online && hasClaude && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, "claude")} announced={state.machineProfile} />}
 				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
 				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={aiName(state.info, "claude")} />}
+				{state.info?.browser?.available === true && <MachineBrowser link={link} state={state} ai={aiName(state.info, "claude")} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>
 					<p className="note">{t.detail.auditNote(name)}</p>
@@ -181,7 +183,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 												<span className="mono">{e.path}</span>
 											</>
 										)}
-										{(e.action === "approve_sensitive" || e.action === "local_forward" || e.action === "mcp_local_writes" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
+										{(e.action === "approve_sensitive" || e.action === "browser_control" || e.action === "local_forward" || e.action === "mcp_local_writes" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
 									</span>
 								</li>
 							))}
