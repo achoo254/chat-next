@@ -13,7 +13,7 @@ import { withFileLock, writePrivateFile } from "@tunelo/client";
 export const LOCAL_WRITES_FILE = "mcp-local-writes.json";
 
 export const LOCAL_WRITES_OFF =
-	"Write tools are off for MCP clients outside the claude sessions tunelo opens (they only read). The owner of this machine can turn them on with `tunelo config mcp-local-writes on`; the AI client then approves every write itself.";
+	"Write tools are off for MCP clients outside the claude sessions tunelo opens (they only read). The owner of this machine can turn them on by running `tunelo config mcp-local-writes on` in a terminal; the AI client then approves every write itself.";
 
 export class LocalWritesSetting {
 	readonly file: string;

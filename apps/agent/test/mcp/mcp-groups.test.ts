@@ -325,11 +325,18 @@ describe("tunelo mcp with the service", () => {
 		await client.close();
 	});
 
-	test("`tunelo config mcp-local-writes on` lets a client without a ticket list and run every tool, no token reaching it", async () => {
+	test("`tunelo config mcp-local-writes on` without a terminal (an AI client's shell, a script) is refused and changes nothing", () => {
 		const env = machineEnv(home);
-		const on = spawnSync(process.execPath, [bundle, "config", "mcp-local-writes", "on"], { env, encoding: "utf8" });
-		expect(on.status).toBe(0);
-		expect(on.stdout).toMatch(/: on\./);
+		const on = spawnSync(process.execPath, [bundle, "config", "mcp-local-writes", "on"], { env, encoding: "utf8", input: "yes\n" });
+		expect(on.status).toBe(1);
+		expect(on.stderr).toMatch(/needs a person at a terminal/);
+		expect(new LocalWritesSetting(join(home, "tunelo")).enabled()).toBe(false);
+	});
+
+	test("once the owner turns writes on in a terminal, a client without a ticket lists and runs every tool, no token reaching it", async () => {
+		const env = machineEnv(home);
+		// What `tunelo config mcp-local-writes on` writes after the owner typed yes.
+		await new LocalWritesSetting(join(home, "tunelo")).set(true);
 		try {
 			const { client, transport } = mcpClient(bundle, tunnelServer.wsUrl, home);
 			await client.connect(transport);
