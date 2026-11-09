@@ -293,6 +293,8 @@ const SCREENS: Record<string, string> = {
 	// a session, the "Cần bạn" home, an unpaired machine's board, the machines page, a machine's board, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
 	"machine-limit": paths.machineSession("1", "demo-running"),
+	// Claude asks for a sign-in secret: the card above the composer, outside the transcript.
+	"machine-secret": paths.machineSession("1", "demo-idle"),
 	"machine-home": paths.machines(),
 	"machine-need": aiPaths.need,
 	"machine-unpaired": paths.machine("2"),
@@ -466,6 +468,15 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await find(() => document.querySelector(".modal .mx-clone"));
 	},
 	// The session's menu with Lưu trữ and Xoá phiên.
+	// Claude waits for a sign-in secret: the card is in place above the composer.
+	"secret-card": async () => {
+		await find(() => document.querySelector(".mx-secret input[type=password]"));
+	},
+	// "Bí mật đã lưu" on the machine's page, scrolled into view.
+	"saved-secrets": async () => {
+		const list = await find(() => document.querySelector(".mx-secrets-list"));
+		list.closest(".mx-card")?.scrollIntoView({ block: "center" });
+	},
 	"thread-menu": async () => {
 		await click(".mx-head button.icon-btn", "Tuỳ chọn phiên");
 		await find(() => document.querySelector(".mx-head .mx-menu button.danger"));

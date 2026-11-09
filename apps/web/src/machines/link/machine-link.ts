@@ -22,6 +22,7 @@ import {
 	type MachineProfile,
 	type ProjectCloneProgress,
 	type ProjectListResult,
+	type SecretPrompt,
 	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
@@ -80,6 +81,11 @@ export interface LinkState {
 	readonly projects: ProjectListResult | null;
 	/** Clones this device started, by clone id, as their progress last said. */
 	readonly clones: ReadonlyMap<string, ProjectCloneProgress>;
+	/**
+	 * Sign-in secrets the AI waits for (tunelo 2.0.8+), by request id. They are
+	 * no thread items: never in a journal, and dropped when answered anywhere.
+	 */
+	readonly secretPrompts: ReadonlyMap<string, SecretPrompt>;
 }
 
 /**
@@ -157,6 +163,7 @@ const INITIAL: LinkState = {
 	machineProfile: null,
 	projects: null,
 	clones: new Map(),
+	secretPrompts: new Map(),
 };
 
 export class MachineLink {
@@ -380,7 +387,8 @@ export class MachineLink {
 
 	private opened(): void {
 		this.attempt = 0;
-		this.set({ status: { kind: "open" } });
+		// The machine sends every prompt still open again on this connection.
+		this.set({ status: { kind: "open" }, secretPrompts: new Map() });
 		this.timers.clearInterval(this.pingTimer);
 		this.pingTimer = this.timers.setInterval(() => this.tick(), PING_MS);
 		this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
@@ -533,6 +541,15 @@ export class MachineLink {
 			case "threadDeleted":
 				this.dropThread(b.value.threadId);
 				break;
+			case "secretPrompt": {
+				const secretPrompts = new Map(this.current.secretPrompts);
+				secretPrompts.set(b.value.requestId, b.value);
+				this.set({ secretPrompts });
+				break;
+			}
+			case "secretPromptEnded":
+				this.dropSecretPrompt(b.value.requestId);
+				break;
 			case "fullItem":
 				if (b.value.item !== undefined) {
 					const full = new Map(this.current.full);
@@ -556,6 +573,14 @@ export class MachineLink {
 			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject));
 		}
 		else waiter.resolve(frame);
+	}
+
+	/** A prompt this device answered or the machine closed. */
+	dropSecretPrompt(requestId: string): void {
+		if (!this.current.secretPrompts.has(requestId)) return;
+		const secretPrompts = new Map(this.current.secretPrompts);
+		secretPrompts.delete(requestId);
+		this.set({ secretPrompts });
 	}
 
 	/** A thread deleted on the machine leaves every list and cache here. */

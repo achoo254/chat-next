@@ -96,6 +96,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.gitNotInstalled;
 		case ErrorReason.NAME_INVALID:
 			return r.nameInvalid;
+		case ErrorReason.SECRET_PROMPT_GONE:
+			return r.secretPromptGone;
+		case ErrorReason.SECRET_INVALID:
+			return r.secretInvalid;
+		case ErrorReason.SECRET_NOT_FOUND:
+			return r.secretNotFound;
 		default:
 			return undefined;
 	}

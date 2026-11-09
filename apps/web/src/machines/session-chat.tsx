@@ -8,13 +8,14 @@
 // Files dragged anywhere over the session go to the composer when dropped.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, Decision, PromptState, ThreadState, TurnState, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, PromptState, ThreadState, TurnState, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../router.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
 import { QuestionCard } from "./cards/question.tsx";
+import { SecretCard } from "./cards/secret-request.tsx";
 import { TodoCard } from "./cards/todo.tsx";
 import { ToolRunCard } from "./cards/tool-run.tsx";
 import { AccountMenu, profileName } from "./account-menu.tsx";
@@ -64,6 +65,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const all = foldTranscript(items, state.pending.get(threadId) ?? []);
 	const blocks = all.filter((b) => !isPending(b));
 	const prompts = all.filter(isPending);
+	const secretPrompts = [...state.secretPrompts.values()].filter((p) => p.threadId === threadId);
 	const changes = sessionChanges(items);
 	const provider = thread?.provider ?? items.at(-1)?.provider ?? "";
 	const ai = aiName(state.info, provider);
@@ -176,7 +178,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
-						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
+						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0 || secretPrompts.length > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
 					)}
 					{suggestion !== undefined && (
 						<LimitBar
@@ -187,6 +189,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							ai={ai}
 						/>
 					)}
+					{secretPrompts.length > 0 && <SecretDock prompts={secretPrompts} ai={ai} link={link} />}
 					{prompts.length > 0 && (
 						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
 					)}
@@ -221,7 +224,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						machine={machineName}
 						online={online && !missing}
 						running={running}
-						prompting={prompts.length > 0}
+						prompting={prompts.length > 0 || secretPrompts.length > 0}
 						commands={threadInfo?.commands ?? []}
 						listFiles={modern ? listFiles : undefined}
 						attach={attach}
@@ -338,6 +341,37 @@ interface DockProps {
 	sessionAllow: boolean;
 	decide: (itemId: string, revision: number) => (decision: Decision, message?: string) => Promise<void>;
 	answer: (itemId: string, revision: number) => (answers: string[][]) => Promise<void>;
+}
+
+/**
+ * The AI waits for a sign-in secret: the oldest request, above the composer,
+ * outside the transcript. The value goes to the machine in one frame.
+ */
+function SecretDock({ prompts, ai, link }: { prompts: readonly SecretPrompt[]; ai: string; link: MachineLink }) {
+	const t = useMachinesCopy();
+	const first = prompts[0];
+	if (first === undefined) return null;
+	const requestId = first.requestId;
+	return (
+		<section className="mx-dock" aria-label={t.secrets.title(ai)}>
+			<div className="mx-dock-inner">
+				<SecretCard
+					key={requestId}
+					prompt={first}
+					ai={ai}
+					onProvide={async (value, remember) => {
+						await link.request({ case: "secretProvide", value: { requestId, value, remember } });
+						link.dropSecretPrompt(requestId);
+					}}
+					onDecline={async () => {
+						await link.request({ case: "secretDecline", value: { requestId } });
+						link.dropSecretPrompt(requestId);
+					}}
+				/>
+				{prompts.length > 1 && <p className="note">{t.secrets.more(prompts.length - 1)}</p>}
+			</div>
+		</section>
+	);
 }
 
 /** The oldest prompt waiting for the user, above the composer; the count of those after it. */

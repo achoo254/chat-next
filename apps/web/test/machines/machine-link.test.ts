@@ -92,6 +92,29 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
+	it("keeps the machine's secret prompts apart from every journal, and drops them when closed", async () => {
+		const l = link();
+		const unwatch = l.watch("t1");
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+		const prompt = { requestId: "r1", threadId: "t1", name: "GH_PASSWORD", purpose: "sign in", origin: "https://github.com", expiresAt: 5n };
+		machine.send(machine.socket, { case: "secretPrompt", value: prompt });
+		await until(() => l.snapshot().secretPrompts.size === 1, "prompt");
+		expect(l.snapshot().secretPrompts.get("r1")).toMatchObject({ name: "GH_PASSWORD", origin: "https://github.com" });
+		expect(l.journal("t1").items.size).toBe(0);
+		machine.send(machine.socket, { case: "secretPromptEnded", value: { requestId: "r1" } });
+		await until(() => l.snapshot().secretPrompts.size === 0, "ended");
+
+		// After a reconnect the machine sends what is still open again; nothing stale stays.
+		machine.send(machine.socket, { case: "secretPrompt", value: { ...prompt, requestId: "r2" } });
+		await until(() => l.snapshot().secretPrompts.size === 1, "second prompt");
+		machine.socket.drop();
+		await until(() => l.snapshot().status.kind === "open" && machine.sockets.length === 2, "reconnected");
+		await until(() => l.snapshot().secretPrompts.size === 0, "cleared on reconnect");
+		unwatch();
+		l.stop();
+	});
+
 	it("pings only while the user looks at the machine", async () => {
 		const l = link();
 		l.start();

@@ -412,6 +412,19 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-dock .mx-action { box-shadow: var(--shadow-sm); }
 .mx-dock .note { margin: 0; text-align: right; }
 .mx-dock .mx-pre { max-height: 120px; }
+.mx-dock .mx-secret .note, .mx-secret .note { margin: 0; text-align: left; }
+.mx-secret-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: 0; font-size: 0.875rem; }
+.mx-secret-facts dt { color: var(--c-text-muted); }
+.mx-secret-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.mx-origin strong { font-weight: 700; color: var(--c-text); }
+.mx-secret-field { display: flex; align-items: center; gap: var(--space-1); }
+.mx-secret-field .input { flex: 1; min-width: 0; }
+.mx-secret-expires { margin-left: auto; align-self: center; font-size: 0.75rem; }
+.mx-secrets-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.mx-secrets-list li { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) 0; border-top: 1px solid var(--c-border-subtle); }
+.mx-secrets-list li:first-child { border-top: 0; }
+.mx-secrets-list .mx-secret-what { display: grid; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mx-secrets-list small { color: var(--c-text-muted); font-size: 0.75rem; }
 .mx-kbd { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 4px; margin-right: var(--space-1); border-radius: var(--radius-xs); border: 1px solid currentColor; font-family: var(--font-mono); font-size: 0.6875rem; opacity: 0.7; }
 .mx-tell { display: grid; gap: var(--space-2); }
 .mx-tell .mx-field { min-height: 64px; }
@@ -540,6 +553,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-usage .mx-bar, .mx-st-btn > span + .icon, .mx-mode > span + .icon { display: none; }
 	.mx-status-row .mx-mode .icon:first-child { display: none; }
 	.mx-dock .acts { display: grid; grid-template-columns: 1fr 1fr; }
+	.mx-dock .mx-secret-expires { grid-column: 1 / -1; margin-left: 0; }
 	.mx-status-row { gap: var(--space-1); }
 }
 /* Phones: one column at a time. */

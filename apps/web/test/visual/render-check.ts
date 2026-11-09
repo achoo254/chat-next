@@ -65,6 +65,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-markdown": "?at=machine-chat&open=markdown",
 	"machine-account": "?at=machine-chat&open=account-menu",
 	"machine-limit": "?at=machine-limit",
+	"machine-secret": "?at=machine-secret&open=secret-card",
+	"machine-info-secrets": "?at=machine-info&open=saved-secrets",
 	"machine-details": "?at=machine-chat&open=status-details",
 	"machine-changes": "?at=machine-chat&open=changes",
 	"machine-changes-file": "?at=machine-chat&open=changes-file",

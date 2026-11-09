@@ -187,6 +187,24 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			case "profileSelect":
 				return [{ case: "profileListResult", value: profiles }];
 			case "machineInfoRequest":
+				// Claude waits for a sign-in secret in the idle demo session (?at=machine-secret).
+				if (new URLSearchParams(window.location.search).get("at") === "machine-secret") {
+					setTimeout(
+						() =>
+							machine.send(socket, {
+								case: "secretPrompt",
+								value: {
+									requestId: "demo-secret",
+									threadId: "demo-idle",
+									name: "GITHUB_PASSWORD",
+									purpose: "Đăng nhập GitHub trong trình duyệt để chạy test e2e của trang cài đặt.",
+									origin: "https://github.com",
+									expiresAt: BigInt(now + 5 * 60_000),
+								},
+							}),
+						0,
+					);
+				}
 				// The machine announces its profiles unasked (id "") to every device.
 				setTimeout(
 					() =>
@@ -209,7 +227,8 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						value: {
 							name: "DIEUVY-LAPTOP",
 							os: "win32",
-							agentVersion: "2.0.7",
+							agentVersion: "2.0.8",
+							secrets: true,
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -297,6 +316,19 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			}
 			case "auditList":
 				return [{ case: "auditListResult", value: { entries: [] } }];
+			case "secretList":
+				return [
+					{
+						case: "secretListResult",
+						value: {
+							secrets: [
+								{ id: "s1", name: "API_TOKEN", origin: "https://api.staging.hoandat.io.vn", createdAt: BigInt(now - 86_400_000), lastUsedAt: 0n },
+								{ id: "s2", name: "GITHUB_PASSWORD", origin: "https://github.com", createdAt: BigInt(now - 3 * 86_400_000), lastUsedAt: BigInt(now - 12 * 60_000) },
+								{ id: "s3", name: "LOCALMAN_ADMIN", origin: "http://localhost:5173", createdAt: BigInt(now - 7 * 86_400_000), lastUsedAt: BigInt(now - 2 * 86_400_000) },
+							],
+						},
+					},
+				];
 			case "attachmentUpload": {
 				const v = frame.body.value;
 				if (v.offset === 0n && v.name.startsWith("stall-")) stalled.set(v.uploadId, Math.floor(Number(v.size) * 0.4));
