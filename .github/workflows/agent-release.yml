@@ -92,7 +92,8 @@ jobs:
   sign-macos:
     needs: [test, build]
     runs-on: macos-15
-    timeout-minutes: 45
+    # Apple usually notarizes in minutes, but may hold a submission much longer.
+    timeout-minutes: 150
     env:
       PREFIX: ${{ needs.test.outputs.prefix }}
     steps:
@@ -144,7 +145,7 @@ jobs:
           printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode > "$key"
           ditto -c -k dist "$RUNNER_TEMP/notarize.zip"
           xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$key" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" \
-            --wait --timeout 40m --output-format json > "$RUNNER_TEMP/notary.json"
+            --wait --timeout 140m --output-format json > "$RUNNER_TEMP/notary.json"
           id="$(plutil -extract id raw "$RUNNER_TEMP/notary.json")"
           status="$(plutil -extract status raw "$RUNNER_TEMP/notary.json")"
           echo "notarization $id: $status"
