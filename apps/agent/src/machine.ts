@@ -379,6 +379,7 @@ export class Machine {
       needsFullDiskAccess: diskAccess() === "needed",
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
       secrets: true,
+      gitChanges: true,
     });
   }
 

@@ -332,6 +332,15 @@ describe("secrets in commands", () => {
 		expect(readdirSync(join(dir, "data", "secret-env"))).toEqual([]);
 	});
 
+	it("names the site of each secret a command reads, and none for a secret the session was not given", async () => {
+		const { env } = await givenEnv();
+		expect(env.sitesIn('curl -H "x: $TUNELO_SECRET_API_TOKEN" ${TUNELO_SECRET_OTHER} $TUNELO_SECRET_API_TOKEN')).toEqual([
+			{ name: "API_TOKEN", origin: "https://api.example" },
+			{ name: "OTHER", origin: "" },
+		]);
+		env.dispose();
+	});
+
 	it("in bypassPermissions puts the secrets in at once; names not given are pointed out", async () => {
 		const { env, values } = await givenEnv();
 		const hook = secretCommandHook(env);
@@ -583,6 +592,9 @@ describe("the approval of a command that reads a secret", () => {
 		for await (const e of s.events) events.push(e);
 		expect(asked[0]?.reason).toBeUndefined();
 		expect(asked[1]?.reason).toBe("Hook asked");
+		// Without secrets in the session the names still go, with no site.
+		expect((asked[0] as { secrets?: unknown }).secrets).toEqual([{ name: "GH", origin: "" }]);
+		expect((asked[1] as { secrets?: unknown }).secrets).toBeUndefined();
 		expect(results[0]).toEqual({ behavior: "allow", updatedInput: { command: 'curl -u "me:$TUNELO_SECRET_GH" https://api.github.com' } });
 		expect(results[1]).toMatchObject({ behavior: "allow", updatedPermissions: [expect.objectContaining({ type: "addRules" })] });
 		expect(events.filter((e) => e.type === "session-rules")).toHaveLength(1);

@@ -15,6 +15,8 @@ export class MessageMapper {
   private blocks = new Map<number, { id: string; role: "assistant" | "thinking"; text: string }>();
   private subagents = new Set<string>();
   private hidden = new Set<string>();
+  /** The model of the conversation's latest reply ("" before one). */
+  model = "";
 
   constructor(
     private readonly dir: string,
@@ -22,7 +24,11 @@ export class MessageMapper {
   ) {}
 
   map(msg: SDKMessage): void {
-    if ("parent_tool_use_id" in msg && msg.parent_tool_use_id) return; // inside a subagent
+    if ("parent_tool_use_id" in msg && msg.parent_tool_use_id) {
+      // Inside a subagent: only its file edits show (with the subagent), no tool cards.
+      if (msg.type === "assistant") this.subagentEdits(msg.parent_tool_use_id, msg.message.content);
+      return;
+    }
     switch (msg.type) {
       case "system":
         if (msg.subtype === "init") this.emit({ type: "session", sessionId: msg.session_id });
@@ -77,6 +83,7 @@ export class MessageMapper {
       this.emit({ type: "error", message: "Claude needs to sign in again on this machine.", needsLogin: true });
     }
     if (msg.error === "rate_limit") this.emit({ type: "limit-reached", resetsAt: 0 });
+    if (typeof msg.message.model === "string" && msg.message.model !== "" && msg.message.model !== "<synthetic>") this.model = msg.message.model;
     const streamed = this.streamed.has(msg.message.id);
     msg.message.content.forEach((block, i) => {
       if (block.type === "text" && !streamed) {
@@ -119,6 +126,16 @@ export class MessageMapper {
     });
     const diff = toolDiff(name, input, this.dir);
     if (diff) this.emit({ type: "diff", toolId: id, ...diff });
+  }
+
+  /** A subagent's file edits, as diffs that belong to it. */
+  private subagentEdits(parentToolId: string, content: unknown) {
+    if (!Array.isArray(content)) return;
+    for (const b of content as { type?: string; id?: string; name?: string; input?: unknown }[]) {
+      if (b.type !== "tool_use" || !b.id || !b.name || toolKind(b.name) !== "edit") continue;
+      const diff = toolDiff(b.name, (b.input ?? {}) as Record<string, unknown>, this.dir);
+      if (diff) this.emit({ type: "diff", toolId: b.id, ...diff, parentToolId });
+    }
   }
 
   /** Tool results in a user message's content (also from a transcript read back). */

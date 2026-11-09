@@ -32,6 +32,8 @@ export interface SessionSecretHooks {
 	readonly loader: string;
 	/** The secret names a command reads that this session was given, and those it was not. */
 	namesIn(command: string): { given: string[]; missing: string[] };
+	/** Every secret name a command reads, with the site of the one this session holds ("" when it holds none). */
+	sitesIn(command: string): { name: string; origin: string }[];
 	/** The command may run now: its secrets are put where its shell loads them. */
 	beforeCommand(toolUseId: string, command: string): Promise<void>;
 	/** The command ended, failed or was denied: its secrets leave the file. */
@@ -71,6 +73,10 @@ export class SessionSecretEnv implements SessionSecretHooks {
 			given: names.filter((n) => this.service.hasName(this.session.key, n)),
 			missing: names.filter((n) => !this.service.hasName(this.session.key, n)),
 		};
+	}
+
+	sitesIn(command: string): { name: string; origin: string }[] {
+		return envNamesIn(command).map((name) => ({ name, origin: this.service.originOf(this.session.key, name) ?? "" }));
 	}
 
 	async beforeCommand(toolUseId: string, command: string): Promise<void> {

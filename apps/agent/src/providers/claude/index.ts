@@ -17,6 +17,7 @@ import {
   type PermissionResult,
   type PermissionUpdate,
   type Query,
+  type SDKMessage,
   type SDKUserMessage,
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
@@ -43,6 +44,7 @@ import type {
   ProviderSession,
   Question,
   SessionPolicy,
+  TurnStats,
 } from "../types.ts";
 import { LocalSessions } from "./local-sessions.ts";
 import { MessageMapper } from "./message-mapper.ts";
@@ -324,6 +326,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       input: full.slice(0, CARD_INPUT_CHARS),
       sensitive,
       ...(reason ? { reason } : {}),
+      // Named with their sites, so the card shows where each one belongs.
+      ...(usesSecret ? { secrets: secrets ? secrets.sitesIn(command) : envNamesIn(command).map((name) => ({ name, origin: "" })) } : {}),
     };
     const answer = await askUser(req, opts.signal);
     if (answer.decision === "deny") return { behavior: "deny", message: denialText(answer.message) };
@@ -396,7 +400,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
           interrupted = false;
           await pushUsage(q, events);
           await pushInfo(q, events);
-          emit({ type: "turn-end", state, durationMs: Math.round(performance.now() - turnStart) });
+          emit({ type: "turn-end", state, durationMs: Math.round(performance.now() - turnStart), stats: turnStats(msg, mapper.model) });
           continue;
         }
         if (msg.type === "system" && msg.subtype === "init") {
@@ -473,6 +477,29 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         // already gone
       }
     },
+  };
+}
+
+type ResultMessage = Extract<SDKMessage, { type: "result" }>;
+
+const count = (n: unknown): number => (typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0);
+
+/**
+ * The turn's numbers from its result: tokens and round trips of this turn
+ * (its own conversation), API time and cost as the session's running totals
+ * (in streaming input they add up over the session).
+ */
+export function turnStats(msg: ResultMessage, model: string): TurnStats {
+  const u = msg.usage;
+  return {
+    model,
+    inputTokens: count(u?.input_tokens),
+    outputTokens: count(u?.output_tokens),
+    cacheReadTokens: count(u?.cache_read_input_tokens),
+    cacheWriteTokens: count(u?.cache_creation_input_tokens),
+    numTurns: count(msg.num_turns),
+    apiMsTotal: count(msg.duration_api_ms),
+    costUsdTotal: count(msg.total_cost_usd),
   };
 }
 

@@ -237,6 +237,11 @@ export class SecretService {
 		return [...(this.grants.get(key)?.values() ?? [])].some((h) => h.name === name);
 	}
 
+	/** The site of the secret of this name a session was given (the latest one, as envFor uses); undefined without one. */
+	originOf(key: string, name: string): string | undefined {
+		return [...(this.grants.get(key)?.values() ?? [])].filter((h) => h.name === name).at(-1)?.origin;
+	}
+
 	list(): SavedSecretInfo[] {
 		return this.store.list();
 	}

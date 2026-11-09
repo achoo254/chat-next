@@ -6,6 +6,7 @@ import {
   ErrorReason,
   type Frame,
   FrameSchema,
+  GitFileState,
   HandshakeErrorCode,
   type Item,
   type MachineInfo,
@@ -34,6 +35,7 @@ import type { ProjectList, Projects } from "../projects/projects.ts";
 import { SecretInputError } from "../sign-in-secrets/secret-names.ts";
 import type { SavedSecretInfo } from "../sign-in-secrets/secret-store.ts";
 import { type SecretEvent, SecretNotFound, SecretPromptGone, type SecretService } from "../sign-in-secrets/secret-service.ts";
+import type { GitChangesResult, GitFileChange } from "../threads/git-changes.ts";
 import { wireItem } from "./wire.ts";
 
 export type Socket = {
@@ -124,6 +126,24 @@ export function profileListBody(list: ProfileList) {
       };
     }),
   };
+}
+
+const GIT_STATE: Record<GitFileChange["state"], GitFileState> = {
+  modified: GitFileState.MODIFIED,
+  added: GitFileState.ADDED,
+  deleted: GitFileState.DELETED,
+  untracked: GitFileState.UNTRACKED,
+  typeChanged: GitFileState.TYPE_CHANGED,
+  conflicted: GitFileState.CONFLICTED,
+};
+
+function gitFileBody(f: GitFileChange) {
+  return { path: f.path, state: GIT_STATE[f.state], added: f.added, removed: f.removed, unified: f.unified, truncated: f.truncated, binary: f.binary, sensitive: f.sensitive };
+}
+
+/** A thread's uncommitted changes as devices get them (only over the sealed link). */
+export function gitChangesBody(threadId: string, r: GitChangesResult) {
+  return { threadId, git: r.git, files: r.files.map(gitFileBody), truncated: r.truncated, partial: r.partial };
 }
 
 /** The saved secrets as devices get them: never a value. */
@@ -265,11 +285,24 @@ export class Connection {
         this.subscribed.delete(threadId);
         this.send("", { case: "threadDeleted", value: { threadId, trashed } });
       }),
+      // A turn may have changed files: devices following the thread get its git changes unasked.
+      this.ctx.core.onTurnEnd((threadId) => {
+        if (this.subscribed.has(threadId)) void this.pushGitChanges(threadId);
+      }),
     );
     const secrets = this.ctx.secrets;
     if (secrets) {
       this.unsubscribe.push(secrets.onEvent((event) => this.secretEvent(event)));
       for (const prompt of secrets.openPrompts()) this.secretEvent({ type: "prompt", prompt });
+    }
+  }
+
+  private async pushGitChanges(threadId: string): Promise<void> {
+    try {
+      const r = await this.ctx.core.gitChanges(threadId);
+      if (this.subscribed.has(threadId)) this.send("", { case: "gitChanges", value: gitChangesBody(threadId, r) });
+    } catch {
+      // the thread went away meanwhile
     }
   }
 
@@ -554,6 +587,12 @@ export class Connection {
           return ack();
         case "threadFetchFull":
           return this.send(id, { case: "fullItem", value: { threadId: b.value.threadId, item: core.fullItem(b.value.threadId, b.value.itemId) } });
+        case "threadGitChanges":
+          return this.send(id, { case: "gitChanges", value: gitChangesBody(b.value.threadId, await core.gitChanges(b.value.threadId)) });
+        case "gitFileDiff": {
+          const file = await core.gitFileDiff(b.value.threadId, b.value.path);
+          return this.send(id, { case: "gitFileDiffResult", value: { threadId: b.value.threadId, file: gitFileBody(file) } });
+        }
         case "dirList": {
           const l = listDir(b.value.path, { showHidden: b.value.showHidden, isSensitive: this.ctx.isSensitive });
           return this.send(id, { case: "dirListResult", value: l });

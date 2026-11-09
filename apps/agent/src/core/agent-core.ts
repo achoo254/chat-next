@@ -37,14 +37,17 @@ import type {
   ProviderEvent,
   ProviderInfo,
   ProviderSession,
+  Question,
   QuestionAnswer,
   QuestionRequest,
   SessionHistory,
   SessionPage,
   SessionQuery,
   ToolKind as Kind,
+  TurnStats,
 } from "../providers/types.ts";
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
+import { type GitChangesResult, type GitFileChange, readGitChanges, readGitFileDiff } from "../threads/git-changes.ts";
 import { gitBranch } from "../safety/dirs.ts";
 import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
@@ -110,6 +113,16 @@ type ThreadMeta = {
   history?: { sessionId: string; end: number };
   /** Hidden from the list on every device (ThreadSetArchived). */
   archived?: boolean;
+  /**
+   * The running totals the AI last reported for the session `sessionId`
+   * (API time, cost at API prices): a turn's share is what they grew by.
+   */
+  turnTotals?: { sessionId: string; apiMs: number; costUsd: number };
+  /**
+   * Questions the service stopped while they waited for the user (an
+   * update, a restart): asked again as new cards when it starts.
+   */
+  reask?: string[];
 };
 
 /** A session kept on the machine, as devices see it (LocalSession in the protocol). */
@@ -169,7 +182,15 @@ type Thread = {
   runningTool?: { toolId: string; name: string };
   /** Deleted (ThreadDelete): its folder is gone and nothing writes to it again. */
   deleted?: boolean;
+  /**
+   * Questions asked again after a restart, by item id: their answer goes to
+   * the AI as a message, since the call that asked them is gone.
+   */
+  reasks: Map<string, Question[]>;
 };
+
+/** How long a thread's git changes are reused before git runs again. */
+const GIT_CHANGES_TTL_MS = 2_000;
 
 /** Another AI account profile with usage left (see ThreadInfo.profile_suggestion). */
 export type ProfileSuggestion = { id: string; email: string; remaining: number };
@@ -239,6 +260,9 @@ export class AgentCore {
   private statusListeners = new Set<(summary: ThreadSummary) => void>();
   private deletedListeners = new Set<(threadId: string, trashed: number) => void>();
   private infoListeners = new Set<(threadId: string) => void>();
+  private turnEndListeners = new Set<(threadId: string) => void>();
+  /** The latest git changes of each thread's folder (or the read under way), reused for GIT_CHANGES_TTL_MS. */
+  private gitReads = new Map<string, { at: number; read: Promise<GitChangesResult> }>();
   /** Plan usage and account of each AI account profile ("" for the default one), shared by its threads. */
   private accounts = new Map<string, AccountState>();
   /** The latest command list any session reported, for threads that have none yet. */
@@ -306,8 +330,13 @@ export class AgentCore {
         const journal = new Journal(join(dir, "journal.jsonl"));
         journal.load();
         const t = this.newThread(meta, journal);
+        const reask = new Set(meta.reask ?? []);
+        const again: Question[][] = [];
         for (const item of journal.all()) {
           const b = item.body;
+          if (b.case === "question" && (b.value.state === PromptState.PENDING || (b.value.state === PromptState.EXPIRED && reask.has(item.id)))) {
+            again.push(b.value.questions.map((q) => ({ question: q.question, header: q.header, options: q.options.map((o) => ({ label: o.label, description: o.description })), multiSelect: q.multiSelect })));
+          }
           if ((b.case === "approval" || b.case === "question") && b.value.state === PromptState.PENDING) {
             journal.update(item.id, (body) => {
               if (body.case === "approval" || body.case === "question") body.value.state = PromptState.EXPIRED;
@@ -324,6 +353,11 @@ export class AgentCore {
         }
         t.preview = lastPreview(journal.all());
         this.threads.set(id, t);
+        for (const questions of again) this.reaskQuestion(t, questions);
+        if (meta.reask) {
+          delete meta.reask;
+          this.saveMeta(t);
+        }
       } catch {
         // unreadable thread folder: skip it rather than fail the agent
       }
@@ -337,6 +371,8 @@ export class AgentCore {
 
   async stop(): Promise<void> {
     if (this.idleTimer) clearInterval(this.idleTimer);
+    // Prompts waiting for the user expire with the service; its next start asks the questions again.
+    for (const t of this.threads.values()) this.expirePending(t);
     // A session moving to another profile opens first, then closes with the rest.
     await Promise.all([...this.threads.values()].map((t) => t.switching));
     await Promise.all([...this.threads.values()].map((t) => this.park(t)));
@@ -357,6 +393,33 @@ export class AgentCore {
   onInfo(fn: (threadId: string) => void): () => void {
     this.infoListeners.add(fn);
     return () => this.infoListeners.delete(fn);
+  }
+
+  /** Called with a thread id whenever one of its turns ended (its folder may have changed). */
+  onTurnEnd(fn: (threadId: string) => void): () => void {
+    this.turnEndListeners.add(fn);
+    return () => this.turnEndListeners.delete(fn);
+  }
+
+  /**
+   * What is not committed in the thread's folder, as git sees it. Devices
+   * asking at about the same time share one read.
+   */
+  gitChanges(threadId: string): Promise<GitChangesResult> {
+    const t = this.thread(threadId);
+    const cached = this.gitReads.get(threadId);
+    if (cached && this.now() - cached.at < GIT_CHANGES_TTL_MS) return cached.read;
+    const read = readGitChanges(t.meta.dir, this.opts.isSensitive);
+    this.gitReads.set(threadId, { at: this.now(), read });
+    return read;
+  }
+
+  /** One file of the thread's git changes with its whole diff; NOT_FOUND unless git lists it now. */
+  async gitFileDiff(threadId: string, path: string): Promise<GitFileChange> {
+    const t = this.thread(threadId);
+    const file = path === "" ? undefined : await readGitFileDiff(t.meta.dir, path, this.opts.isSensitive);
+    if (!file) throw new AgentError(ErrorCode.NOT_FOUND, "this file has no uncommitted change", { reason: ErrorReason.UNSPECIFIED, subject: path.slice(0, 300) });
+    return file;
   }
 
   /** The statusline data of a thread, for devices. */
@@ -890,13 +953,18 @@ export class AgentCore {
     if (!t.running && this.syncHistory(t) > 0 && t.session) await this.park(t);
     const attachments = (prepared?.attachments ?? []).map((a) => ({ ...a, size: BigInt(a.size) }));
     this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId, attachments } });
+    const images = prepared?.images ?? [];
+    await this.startTurn(t, { text: textForAi(text, prepared?.files ?? []), ...(images.length ? { images } : {}) });
+  }
+
+  /** A turn starts with this message for the AI. */
+  private async startTurn(t: Thread, message: { text: string; images?: ImageInput[] }): Promise<void> {
     t.turnCount += 1;
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
     this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING } });
     t.running = true;
     t.lastActive = this.now();
-    const images = prepared?.images ?? [];
-    t.outbox.push({ text: textForAi(text, prepared?.files ?? []), ...(images.length ? { images } : {}) });
+    t.outbox.push(message);
     this.touch(t);
     await this.ensureSession(t);
   }
@@ -909,6 +977,8 @@ export class AgentCore {
     device: string,
   ): void {
     const t = this.thread(threadId);
+    const asked = t.reasks.get(itemId);
+    if (asked) return this.answerReask(t, itemId, asked, expectedRevision, answer.answers);
     const p = t.pending.get(itemId);
     const item = t.journal.get(itemId);
     if (!p || !item || item.revision !== expectedRevision) {
@@ -954,6 +1024,7 @@ export class AgentCore {
   async interrupt(threadId: string): Promise<void> {
     const t = this.thread(threadId);
     this.cancelPending(t);
+    this.cancelReasks(t);
     t.outbox = [];
     if (t.session) await t.session.interrupt();
     else if (t.running) this.endTurn(t, TurnState.INTERRUPTED, 0);
@@ -1390,6 +1461,7 @@ export class AgentCore {
           t,
           e.state === "completed" ? TurnState.COMPLETED : e.state === "interrupted" ? TurnState.INTERRUPTED : TurnState.FAILED,
           e.durationMs,
+          e.stats,
         );
         return;
       case "error":
@@ -1441,9 +1513,10 @@ export class AgentCore {
     t.dirtyText.clear();
   }
 
-  private endTurn(t: Thread, state: TurnState, durationMs: number): void {
+  private endTurn(t: Thread, state: TurnState, durationMs: number, stats?: TurnStats): void {
     if (t.turnItem) {
       const usage = t.usage;
+      const share = stats ? this.turnShare(t, stats) : undefined;
       this.update(t, t.turnItem, (b) => {
         if (b.case === "turn") {
           b.value.state = state;
@@ -1451,6 +1524,16 @@ export class AgentCore {
           if (usage) {
             b.value.contextTokens = BigInt(usage.tokens);
             b.value.contextWindow = BigInt(usage.window);
+          }
+          if (stats && share) {
+            b.value.model = stats.model;
+            b.value.inputTokens = BigInt(Math.round(stats.inputTokens));
+            b.value.outputTokens = BigInt(Math.round(stats.outputTokens));
+            b.value.cacheReadTokens = BigInt(Math.round(stats.cacheReadTokens));
+            b.value.cacheWriteTokens = BigInt(Math.round(stats.cacheWriteTokens));
+            b.value.numTurns = Math.round(stats.numTurns);
+            b.value.durationApiMs = BigInt(Math.round(share.apiMs));
+            b.value.costUsdEstimate = share.costUsd;
           }
         }
       });
@@ -1465,9 +1548,26 @@ export class AgentCore {
       for (const fn of this.infoListeners) fn(t.meta.id);
     }
     this.touch(t);
+    this.gitReads.delete(t.meta.id);
+    for (const fn of this.turnEndListeners) fn(t.meta.id);
     void this.dequeue();
     // The machine switched profile during the turn: move now.
     void this.follow(t);
+  }
+
+  /**
+   * The turn's API time and cost from the session's running totals: what
+   * they grew by since the last turn of the same session. Totals that went
+   * down started over (a new process that did not carry them): all of them
+   * belong to this turn.
+   */
+  private turnShare(t: Thread, stats: TurnStats): { apiMs: number; costUsd: number } {
+    const sessionId = t.meta.segments.at(-1)?.sessionId ?? "";
+    const prev = sessionId !== "" && t.meta.turnTotals?.sessionId === sessionId ? t.meta.turnTotals : undefined;
+    const grew = (total: number, before: number | undefined) => (before !== undefined && total >= before ? total - before : total);
+    const share = { apiMs: grew(stats.apiMsTotal, prev?.apiMs), costUsd: grew(stats.costUsdTotal, prev?.costUsd) };
+    if (sessionId !== "") t.meta.turnTotals = { sessionId, apiMs: stats.apiMsTotal, costUsd: stats.costUsdTotal };
+    return share;
   }
 
   // --- prompts -------------------------------------------------------------
@@ -1488,6 +1588,7 @@ export class AgentCore {
           sensitive: req.sensitive,
           reason: req.reason ?? "",
           state: PromptState.PENDING,
+          secrets: req.secrets ?? [],
         },
       });
     } else {
@@ -1526,6 +1627,72 @@ export class AgentCore {
     t.pending.clear();
   }
 
+  /**
+   * The service stops: prompts waiting for the user expire (not cancelled:
+   * nobody declined them), and questions are kept to be asked again.
+   */
+  private expirePending(t: Thread): void {
+    const again = [...t.reasks.keys()];
+    for (const p of t.pending.values()) {
+      if (p.kind === "question") again.push(p.itemId);
+      p.resolve(p.kind === "approval" ? { decision: "deny" } : { cancelled: true });
+    }
+    for (const id of [...t.pending.keys(), ...t.reasks.keys()]) {
+      this.update(t, id, (b) => {
+        if (b.case === "approval" || b.case === "question") b.value.state = PromptState.EXPIRED;
+      });
+    }
+    t.pending.clear();
+    t.reasks.clear();
+    if (again.length === 0 || t.deleted) return;
+    t.meta.reask = again;
+    this.saveMeta(t);
+  }
+
+  /** A question the AI asked before the service restarted, as a new card the user can answer. */
+  private reaskQuestion(t: Thread, questions: Question[]): void {
+    if (questions.length === 0) return;
+    const itemId = `ask:again:${randomUUID()}`;
+    t.reasks.set(itemId, questions);
+    this.put(t, itemId, { case: "question", value: { questions, state: PromptState.PENDING } });
+  }
+
+  /** The answer to a question asked again: the AI gets it as a message, in a turn of its own. */
+  private answerReask(t: Thread, itemId: string, questions: Question[], expectedRevision: number, answers: Answers | undefined): void {
+    const item = t.journal.get(itemId);
+    if (!item || item.revision !== expectedRevision) {
+      throw new AgentError(ErrorCode.STALE, "this prompt changed or was answered", { reason: ErrorReason.PROMPT_STALE });
+    }
+    t.reasks.delete(itemId);
+    this.update(t, itemId, (b) => {
+      if (b.case === "question") {
+        b.value.state = PromptState.ANSWERED;
+        if (answers) b.value.answers = answers;
+      }
+    });
+    const values = (answers?.answers ?? []).map((a) => a.values);
+    const lines = questions.map((q, i) => `- ${q.question}: ${(values[i] ?? []).join(", ") || "(no answer)"}`);
+    const text = [
+      "The machine running this session restarted while your question waited for the user, so your call to ask it was cancelled. The user answered it afterwards:",
+      ...lines,
+      "Go on from there.",
+    ].join("\n");
+    this.touch(t);
+    void this.startTurn(t, { text }).catch(() => undefined);
+  }
+
+  /** The user stopped the thread: questions asked again are dropped too. */
+  private cancelReasks(t: Thread): void {
+    for (const id of t.reasks.keys()) {
+      this.update(t, id, (b) => {
+        if (b.case === "question") b.value.state = PromptState.CANCELLED;
+      });
+    }
+    if (t.reasks.size === 0) return;
+    t.reasks.clear();
+    this.touch(t);
+  }
+
   // --- helpers -------------------------------------------------------------
 
   private newThread(meta: ThreadMeta, journal: Journal): Thread {
@@ -1545,6 +1712,7 @@ export class AgentCore {
       limitSeen: false,
       preview: "",
       info: (meta.info ??= {}),
+      reasks: new Map(),
     };
   }
 
@@ -1616,7 +1784,7 @@ export class AgentCore {
   private summary(t: Thread): ThreadSummary {
     const state = t.queued
       ? ThreadState.QUEUED
-      : t.pending.size || t.outsidePrompts
+      : t.pending.size || t.reasks.size || t.outsidePrompts
         ? ThreadState.WAITING
         : t.running
           ? ThreadState.RUNNING
@@ -1628,7 +1796,7 @@ export class AgentCore {
       provider: t.meta.provider,
       model: t.meta.model,
       state,
-      pending: t.pending.size + (t.outsidePrompts ?? 0),
+      pending: t.pending.size + t.reasks.size + (t.outsidePrompts ?? 0),
       updatedAt: BigInt(t.meta.updatedAt),
       open: this.isOpen(t),
       preview: t.preview,
@@ -1687,7 +1855,10 @@ function historyItem(e: HistoryEntry | Extract<ProviderEvent, { type: "tool-star
       return { id: `result:${e.toolId}`, body: { case: "toolResult", value: { toolId: e.toolId, ok: e.ok, output } } };
     }
     case "diff":
-      return { id: `diff:${e.toolId}`, body: { case: "diff", value: { toolId: e.toolId, path: e.path, unified: e.unified, added: e.added, removed: e.removed } } };
+      return {
+        id: `diff:${e.toolId}`,
+        body: { case: "diff", value: { toolId: e.toolId, path: e.path, unified: e.unified, added: e.added, removed: e.removed, parentToolId: e.parentToolId ?? "" } },
+      };
     case "todo":
       return {
         id: "todo",

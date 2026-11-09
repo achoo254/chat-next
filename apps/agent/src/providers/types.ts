@@ -56,6 +56,23 @@ export type ProviderInfo = {
   account?: AccountInfo;
 };
 
+/**
+ * What an AI reports about a finished turn. Tokens and round trips are the
+ * turn's own; `apiMsTotal` and `costUsdTotal` are the session's running
+ * totals so far (the core takes the turn's share), cost at API prices and
+ * only an estimate.
+ */
+export type TurnStats = {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  numTurns: number;
+  apiMsTotal: number;
+  costUsdTotal: number;
+};
+
 export type ProviderEvent =
   | ({ type: "info" } & ProviderInfo)
   /** The adapter's own session id, kept for resume. */
@@ -64,13 +81,14 @@ export type ProviderEvent =
   | { type: "text"; blockId: string; role: "assistant" | "thinking"; text: string }
   | { type: "tool-start"; toolId: string; kind: ToolKind; name: string; summary: string; input: string }
   | { type: "tool-end"; toolId: string; ok: boolean; output: string }
-  | { type: "diff"; toolId: string; path: string; unified: string; added: number; removed: number }
+  /** `parentToolId`: an edit made inside that subagent. */
+  | { type: "diff"; toolId: string; path: string; unified: string; added: number; removed: number; parentToolId?: string }
   | { type: "todo"; entries: TodoEntry[] }
   | { type: "subagent"; toolId: string; description: string; done: boolean }
   | { type: "status"; text: string }
   | { type: "usage"; contextTokens: number; contextWindow: number }
   | { type: "compaction"; tokensBefore: number }
-  | { type: "turn-end"; state: "completed" | "interrupted" | "failed"; durationMs: number }
+  | { type: "turn-end"; state: "completed" | "interrupted" | "failed"; durationMs: number; stats?: TurnStats }
   | { type: "error"; message: string; needsLogin?: boolean }
   /**
    * The user allowed a tool for the whole session: the allow rules it added,
@@ -91,6 +109,8 @@ export type ApprovalRequest = {
   /** Touches a sensitive path; never offered "allow for the session". */
   sensitive: boolean;
   reason?: string;
+  /** Sign-in secrets the command reads, with the site each belongs to ("" when the session holds none of that name). */
+  secrets?: { name: string; origin: string }[];
 };
 
 export type Question = {
