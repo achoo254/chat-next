@@ -19,11 +19,12 @@ function allowedBy(rules: string[] | undefined, tool: string, content: string): 
 
 let idBase = 0;
 
-export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: [] }) {
+/** `sessionId`: the id a new session gets (claude's own are UUIDs). */
+export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: [] }, opts: { sessionId?: string } = {}) {
   const fn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }): Query => {
     log.options.push(params.options);
     const out = new Channel<SDKMessage>();
-    const sessionId = params.options.resume ?? "claude-session-1";
+    const sessionId = params.options.resume ?? opts.sessionId ?? "claude-session-1";
     let interrupted = false;
     // Ids go on across sessions, as claude's own are unique (a resumed session never reuses one).
     let n = (idBase += 1000);

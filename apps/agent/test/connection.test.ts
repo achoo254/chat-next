@@ -1,6 +1,7 @@
 // A device talking to the machine over in-memory sockets: code pairing,
 // handshake, a thread, an unknown device, a revoked device.
-import { writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, type Frame, FrameSchema, HandshakeErrorCode, ThreadState } from "@achoo254/chat-proto/remote/remote";
@@ -18,13 +19,16 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { Connection } from "../src/link/connection.ts";
+import { LocalSessions } from "../src/providers/claude/local-sessions.ts";
+import type { AgentProvider } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
+import { Transcript } from "./support/claude-transcript.ts";
 import { makeCore, tempDir } from "./harness.ts";
 
 process.env.CHAT_AGENT_KEYSTORE = "file";
 
-async function machine() {
-  const { core, audit, work, home } = makeCore([fakeProvider()]);
+async function machine(providers: AgentProvider[] = [fakeProvider()]) {
+  const { core, audit, work, home } = makeCore(providers);
   const config = new ConfigStore(join(tempDir(), "cfg"));
   const key = await generateKeyPair(true);
   let window: PairingWindow | undefined;
@@ -149,6 +153,43 @@ describe("connection", () => {
     );
     const stale = (await frames(session, link.next, (f) => f.id === "5")).at(-1)?.body;
     expect(stale?.case === "error" && stale.value.reason).toBe(ErrorReason.PROMPT_STALE);
+  });
+
+  it("lists the machine's Claude sessions and opens one as a thread with its history", async () => {
+    const claudeHome = tempDir("claude-home-");
+    const m = await machine([{ ...fakeProvider("claude"), history: new LocalSessions({ homes: () => [claudeHome] }) }]);
+    cores.push(m.core);
+    const t = new Transcript(randomUUID(), m.work, "cli").opening();
+    t.user("Viết README");
+    t.assistant([{ type: "text", text: "Xong README." }]);
+    const file = t.write(claudeHome);
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    utimesSync(file, hourAgo, hourAgo);
+
+    const device = await generateKeyPair();
+    m.config.addDevice(device.publicKey, "phone");
+    const link = m.connect();
+    const hs = await startHandshake({ device, deviceName: "phone", trust: { kind: "pinned", machineKey: m.key.publicKey } });
+    link.conn.receive(hs.hello);
+    const { session } = await hs.finish((await link.next()) ?? new Uint8Array());
+
+    link.conn.receive(session.seal(create(FrameSchema, { id: "1", body: { case: "sessionList", value: { query: "readme" } } })));
+    const listed = (await frames(session, link.next, (f) => f.id === "1")).at(-1)?.body;
+    if (listed?.case !== "sessionListResult") throw new Error(`expected a list, got ${listed?.case}`);
+    expect(listed.value.total).toBe(1);
+    expect(listed.value.sessions[0]).toMatchObject({ sessionId: t.sessionId, dir: m.work, title: "Viết README", messages: 2, entrypoint: "cli", threadId: "", busyElsewhere: false });
+    expect(listed.value.dirs).toEqual([expect.objectContaining({ dir: m.work, sessions: 1 })]);
+
+    link.conn.receive(session.seal(create(FrameSchema, { id: "2", body: { case: "sessionOpen", value: { sessionId: t.sessionId } } })));
+    const got = await frames(session, link.next, (f) => f.body.case === "threadItems");
+    const created = got.find((f) => f.id === "2")?.body;
+    expect(created?.case === "threadCreated" && created.value.thread?.title).toBe("Viết README");
+    const items = got.flatMap((f) => (f.body.case === "threadItems" ? f.body.value.items : []));
+    expect(items.flatMap((i) => (i.body.case === "text" ? [i.body.value.text] : []))).toEqual(["Viết README", "Xong README."]);
+
+    link.conn.receive(session.seal(create(FrameSchema, { id: "3", body: { case: "sessionOpen", value: { sessionId: randomUUID() } } })));
+    const missing = (await frames(session, link.next, (f) => f.id === "3")).at(-1)?.body;
+    expect(missing?.case === "error" && [missing.value.code, missing.value.reason]).toEqual([ErrorCode.NOT_FOUND, ErrorReason.SESSION_NOT_FOUND]);
   });
 
   it("refuses an unpaired device and a revoked one", async () => {

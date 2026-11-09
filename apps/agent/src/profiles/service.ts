@@ -199,6 +199,23 @@ export class ClaudeProfiles {
     return { email: p.email, organization: p.orgName ?? "", plan: p.plan ?? "" };
   }
 
+  /**
+   * Every Claude folder of the machine: its own, then each profile's that is
+   * safe to read (for the sessions kept there). Only looked up.
+   */
+  claudeHomes(): string[] {
+    const homes = [this.claudeHome];
+    if (this.store.damaged) return homes;
+    for (const p of this.store.get().profiles) {
+      try {
+        homes.push(this.home(p.id));
+      } catch {
+        // an unsafe or odd profile folder is left out
+      }
+    }
+    return homes;
+  }
+
   /** The account folder new sessions would use; only looks it up. */
   selectedAccountDir(): string | undefined {
     this.readable();

@@ -3,6 +3,7 @@
 import { createClaudeProvider } from "./claude/index.ts";
 import type { AgentProvider } from "./types.ts";
 
-export function builtinProviders(): AgentProvider[] {
-  return [createClaudeProvider()];
+/** `claudeHomes`: the machine's Claude folders whose sessions are listed (its own when unset). */
+export function builtinProviders(claudeHomes?: () => string[]): AgentProvider[] {
+  return [createClaudeProvider(claudeHomes ? { homes: claudeHomes } : {})];
 }

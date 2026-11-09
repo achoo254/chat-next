@@ -153,10 +153,65 @@ export interface ProviderSession {
   setPermissionMode?(mode: string): Promise<void>;
 }
 
+/** A session the AI keeps on this machine, whatever started it (a terminal, an IDE, an app, tunelo). */
+export type LocalSession = {
+  sessionId: string;
+  /** The working directory the session started in, as its transcript records it. */
+  dir: string;
+  title: string;
+  /** Unix milliseconds of the transcript's last change. */
+  updatedAt: number;
+  /** User messages and AI replies; 0 when not counted. */
+  messages: number;
+  /** What started it, as the transcript says; "" when unknown. */
+  entrypoint: string;
+  /** Changed in the last minute, or a running process of the AI says it holds it. */
+  busy: boolean;
+};
+
+export type SessionQuery = {
+  /** Only sessions started in this folder or below it; "" for all. */
+  dir: string;
+  /** Words that must all appear in the title, the first message or the folder. */
+  query: string;
+  offset: number;
+  limit: number;
+};
+
+export type SessionPage = { sessions: LocalSession[]; total: number; dirs: { dir: string; sessions: number }[] };
+
+/**
+ * One past entry of a session as the AI's own transcript keeps it. Ids are
+ * stable: the same entry read twice (or seen live) has the same id.
+ */
+export type HistoryEntry = { at: number } & (
+  | { type: "user"; id: string; text: string }
+  | Extract<ProviderEvent, { type: "text" | "tool-start" | "tool-end" | "diff" | "todo" | "subagent" | "compaction" }>
+);
+
+/** Where a session's transcript ends now; read() continues from such a position. */
+export type HistoryRead = { entries: HistoryEntry[]; end: number };
+
+/** The AI's own record of its sessions on this machine (Claude: ~/.claude/projects). */
+export interface SessionHistory {
+  list(q: SessionQuery): SessionPage;
+  find(sessionId: string): LocalSession | undefined;
+  /** Where the transcript ends now; undefined when there is none. */
+  end(sessionId: string): number | undefined;
+  /**
+   * Entries from position `from` to the end. "recent" reads the newest part
+   * only (a long session is cut at a user message). Undefined when there is
+   * no transcript.
+   */
+  read(sessionId: string, from: number | "recent"): HistoryRead | undefined;
+}
+
 export interface AgentProvider {
   readonly id: string;
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
   detect(opts?: DetectOptions): Promise<Detected>;
   start(opts: { policy: SessionPolicy; resumeId?: string; askUser: AskUser }): Promise<ProviderSession>;
+  /** Sessions the AI keeps on the machine; absent when it keeps none tunelo can read. */
+  readonly history?: SessionHistory;
 }

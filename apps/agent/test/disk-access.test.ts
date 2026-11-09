@@ -42,11 +42,21 @@ describe("isDiskAccessDenial", () => {
 });
 
 test("the steps say to drag tunelo in, switch it on, and name the binary", () => {
-  const text = diskAccessSteps("/Users/me/.local/bin/tunelo").join("\n");
-  expect(text).toContain("/Users/me/.local/bin/tunelo");
-  expect(text).toContain("Full Disk Access");
-  expect(text).toMatch(/Drag tunelo/);
-  expect(text).toMatch(/nothing to restart/);
+  for (const opened of [true, false]) {
+    const text = diskAccessSteps("/Users/me/.local/bin/tunelo", opened).join("\n");
+    expect(text).toContain("/Users/me/.local/bin/tunelo");
+    expect(text).toContain("Full Disk Access");
+    expect(text).toMatch(/drag/i);
+    expect(text).toMatch(/nothing to restart/);
+  }
+});
+
+test("only steps shown right after opening them say System Settings and Finder are open", () => {
+  expect(diskAccessSteps("/b/tunelo", true).join("\n")).toMatch(/Finder window showing tunelo are open/);
+  // The service starting by itself (log) and `tunelo status` open nothing.
+  const quiet = diskAccessSteps("/b/tunelo", false).join("\n");
+  expect(quiet).not.toMatch(/are open/);
+  expect(quiet).toMatch(/Open System Settings > Privacy & Security > Full Disk Access/);
 });
 
 test("a file error a device gets stays a known reason on this system", () => {

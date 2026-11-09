@@ -55,14 +55,29 @@ export function isDiskAccessDenial(err: unknown, probe: DiskAccessProbe = defaul
   return probe.platform === "darwin" && errnoCode(err) === "EPERM" && diskAccess(probe) === "needed";
 }
 
-/** The steps for the machine's owner, in English for the terminal and the log. */
-export function diskAccessSteps(binary: string): string[] {
+/**
+ * The steps for the machine's owner, in English for the terminal and the log.
+ * `opened`: System Settings and Finder were just opened for them; only then
+ * do the steps say so (a service starting by itself opens nothing).
+ */
+export function diskAccessSteps(binary: string, opened: boolean): string[] {
+  const why = "tunelo needs Full Disk Access on this Mac to work in Desktop, Documents, Downloads or iCloud Drive";
+  if (opened) {
+    return [
+      why,
+      "(and not hang on a macOS prompt nobody answers). System Settings and a Finder window showing tunelo are open:",
+      "  1. Drag tunelo from the Finder window into the Full Disk Access list.",
+      "  2. Turn on the switch next to tunelo. tunelo notices by itself; nothing to restart.",
+      `If they did not open: System Settings > Privacy & Security > Full Disk Access, click + and pick ${binary}.`,
+    ];
+  }
   return [
-    "tunelo needs Full Disk Access on this Mac to work in Desktop, Documents, Downloads or iCloud Drive",
-    "(and not hang on a macOS prompt nobody answers). System Settings and a Finder window showing tunelo are open:",
-    "  1. Drag tunelo from the Finder window into the Full Disk Access list.",
-    "  2. Turn on the switch next to tunelo. tunelo notices by itself; nothing to restart.",
-    `If they did not open: System Settings > Privacy & Security > Full Disk Access, click + and pick ${binary}.`,
+    why,
+    "(and not hang on a macOS prompt nobody answers). On the Mac:",
+    "  1. Open System Settings > Privacy & Security > Full Disk Access.",
+    `  2. Click + and pick ${binary} (or drag it into the list).`,
+    "  3. Turn on the switch next to tunelo. tunelo notices by itself; nothing to restart.",
+    "A paired device can also open that setting on this Mac from Chat.",
   ];
 }
 

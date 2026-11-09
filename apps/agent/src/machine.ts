@@ -90,7 +90,8 @@ export class Machine {
     const dir = this.config.dir;
     this.isSensitive = createSensitiveCheck({ configDir: dir });
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
-    this.providers = opts.providers ?? builtinProviders();
+    // Sessions kept on the machine are read from its own Claude folder and every profile's.
+    this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
     const c = this.config.get();
     this.profiles =
       opts.profiles ??
@@ -174,7 +175,7 @@ export class Machine {
     this.port = actual;
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
-    if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath)) this.log(line);
+    if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath, false)) this.log(line);
     return actual;
   }
 

@@ -125,8 +125,8 @@ export async function install(dir: string, options: { trust?: string }, deps: In
   // install.sh shows this step itself, in the page's language.
   if (process.env.TUNELO_DISK_ACCESS_HINT === "script") return;
   if ((await deps.serviceDiskAccess(dir)) === "needed") {
-    for (const line of diskAccessSteps(process.execPath)) deps.log(line);
     deps.openDiskAccessSettings(process.execPath);
+    for (const line of diskAccessSteps(process.execPath, true)) deps.log(line);
   }
 }
 

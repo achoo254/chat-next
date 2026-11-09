@@ -184,7 +184,7 @@ async function status(options: { json?: boolean }): Promise<number> {
   console.log(JSON.stringify(service, null, 2));
   if ((service as { fullDiskAccess?: unknown }).fullDiskAccess === "needed") {
     console.log("");
-    for (const line of diskAccessSteps(process.execPath)) console.log(line);
+    for (const line of diskAccessSteps(process.execPath, false)) console.log(line);
   }
   return 0;
 }

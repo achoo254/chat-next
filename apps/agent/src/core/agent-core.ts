@@ -31,11 +31,15 @@ import type {
   ApprovalAnswer,
   ApprovalRequest,
   AskUser,
+  HistoryEntry,
+  LocalSession,
   ProviderEvent,
   ProviderInfo,
   ProviderSession,
   QuestionAnswer,
   QuestionRequest,
+  SessionPage,
+  SessionQuery,
   ToolKind as Kind,
 } from "../providers/types.ts";
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
@@ -91,7 +95,22 @@ type ThreadMeta = {
    * thread moves to another AI.
    */
   sessionRules?: string[];
+  /**
+   * How far the AI's own transcript of the session (`sessionId`) is in the
+   * journal: what was appended after `end` came from elsewhere (a terminal,
+   * an IDE) and is read in before the thread goes on.
+   */
+  history?: { sessionId: string; end: number };
 };
+
+/** A session kept on the machine, as devices see it (LocalSession in the protocol). */
+export type LocalSessionView = LocalSession & { threadId: string; busyElsewhere: boolean; sensitive: boolean };
+
+/** What the user agreed to on the device before a session opens (Consent in the protocol). */
+export type ConsentGiven = { sensitive: boolean; projectSettings: boolean; trustProject?: boolean };
+
+/** Longest tool output kept from a transcript read back (live output is kept whole). */
+const HISTORY_OUTPUT_MAX = 64 * 1024;
 
 /** At most this many session allow rules per thread; the oldest go first. */
 const SESSION_RULES_MAX = 200;
@@ -474,6 +493,9 @@ export class AgentCore {
 
   subscribe(threadId: string, cursor: Cursor | undefined): { resume: Resume; items: Item[] } {
     const t = this.thread(threadId);
+    // Turns added elsewhere (a terminal, an IDE) show with the rest; an open
+    // session opens again so the AI reads them too.
+    if (this.syncHistory(t) > 0 && t.session) void this.park(t).then(() => this.touch(t));
     const resume = resumeFrom(t.journal.bounds(this.epoch), cursor ? { epoch: cursor.epoch, seq: cursor.seq } : undefined);
     if (resume.kind === "reset") return { resume, items: [] };
     return { resume, items: t.journal.since(resume.fromSeq - 1n) };
@@ -512,19 +534,38 @@ export class AgentCore {
     model: string;
     dir: string;
     text: string;
-    consent: { sensitive: boolean; projectSettings: boolean; trustProject?: boolean };
+    consent: ConsentGiven;
     device: string;
   }): Promise<ThreadSummary> {
     const provider = this.provider(req.provider || "claude");
     const dir = resolve(req.dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
     if (!req.text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
+    await this.admit(provider, dir, req.consent, req.device);
+    const t = this.addThread({
+      title: req.text.trim().split("\n")[0]?.slice(0, 80) ?? "",
+      dir,
+      provider: provider.id,
+      model: req.model,
+      projectSettings: req.consent.projectSettings,
+    });
+    await this.send(t.meta.id, req.text, "");
+    return this.summary(t);
+  }
+
+  /**
+   * The checks every session opening in `dir` goes through, in this order:
+   * the sensitive folder's consent, the AI installed and signed in, then the
+   * project settings' trust (trusted now when the device asked to). Logs
+   * what was agreed to.
+   */
+  private async admit(provider: AgentProvider, dir: string, consent: ConsentGiven, device: string): Promise<void> {
     const sensitive = this.opts.isSensitive(dir);
-    if (sensitive && !req.consent.sensitive) throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder", { reason: ErrorReason.SENSITIVE_FOLDER, subject: dir });
+    if (sensitive && !consent.sensitive) throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder", { reason: ErrorReason.SENSITIVE_FOLDER, subject: dir });
     const detected = await provider.detect(this.detectOptions());
     this.assertReady(provider, detected);
 
-    const trustNow = req.consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false);
+    const trustNow = consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false);
     if (trustNow) {
       // Trusting a sensitive folder (home, a disk root) from a device would trust everything under it.
       if (sensitive || !this.opts.trust) {
@@ -533,37 +574,179 @@ export class AgentCore {
           subject: dir,
         });
       }
-      if (!req.consent.trustProject) {
+      if (!consent.trustProject) {
         throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: tunelo trust "${dir}"`, {
           reason: ErrorReason.PROJECT_SETTINGS_UNTRUSTED,
           subject: dir,
         });
       }
-      this.opts.trust(dir, req.device);
+      this.opts.trust(dir, device);
     }
-    if (sensitive) this.opts.audit.write({ device: req.device, action: "open_sensitive", path: dir, detail: "" });
-    if (req.consent.projectSettings) {
-      this.opts.audit.write({ device: req.device, action: "project_settings", path: dir, detail: provider.id });
+    if (sensitive) this.opts.audit.write({ device, action: "open_sensitive", path: dir, detail: "" });
+    if (consent.projectSettings) {
+      this.opts.audit.write({ device, action: "project_settings", path: dir, detail: provider.id });
     }
+  }
+
+  /** A new, parked thread with an empty journal. */
+  private addThread(init: Pick<ThreadMeta, "title" | "dir" | "provider" | "model" | "projectSettings"> & { sessionId?: string }): Thread {
     const id = randomUUID();
     const folder = join(this.opts.dataDir, "threads", id);
     mkdirSync(folder, { recursive: true, mode: 0o700 });
+    const { sessionId, ...rest } = init;
     const meta: ThreadMeta = {
       id,
-      title: req.text.trim().split("\n")[0]?.slice(0, 80) ?? "",
-      dir,
-      provider: provider.id,
-      model: req.model,
-      projectSettings: req.consent.projectSettings,
+      ...rest,
       createdAt: this.now(),
       updatedAt: this.now(),
-      segments: [{ provider: provider.id, model: req.model, startedSeq: "1" }],
+      segments: [{ provider: init.provider, model: init.model, ...(sessionId ? { sessionId } : {}), startedSeq: "1" }],
     };
     const t = this.newThread(meta, new Journal(join(folder, "journal.jsonl")));
     this.threads.set(id, t);
     this.saveMeta(t);
-    await this.send(id, req.text, "");
-    return this.summary(t);
+    return t;
+  }
+
+  // --- sessions kept on the machine ------------------------------------------
+
+  /** The AI's sessions on the machine, with the thread that holds each one. */
+  localSessions(req: { provider: string } & SessionQuery): Omit<SessionPage, "sessions"> & { sessions: LocalSessionView[] } {
+    const history = this.provider(req.provider || "claude").history;
+    if (!history) return { sessions: [], total: 0, dirs: [] };
+    const page = history.list({ dir: req.dir, query: req.query, offset: req.offset, limit: req.limit });
+    return { ...page, sessions: page.sessions.map((s) => this.localView(s)) };
+  }
+
+  private localView(s: LocalSession): LocalSessionView {
+    const holder = this.holder(s.sessionId);
+    return {
+      ...s,
+      threadId: holder?.meta.id ?? "",
+      // Open in a session of this machine's own: that is here, not elsewhere.
+      busyElsewhere: s.busy && !(holder && this.isOpen(holder)),
+      sensitive: this.opts.isSensitive(s.dir),
+    };
+  }
+
+  /** The thread whose AI session this is, if any. */
+  private holder(sessionId: string): Thread | undefined {
+    const id = sessionId.toLowerCase();
+    for (const t of this.threads.values()) {
+      if (t.meta.segments.some((seg) => seg.sessionId?.toLowerCase() === id)) return t;
+    }
+    return undefined;
+  }
+
+  /**
+   * A session kept on the machine as a thread: its transcript (the newest
+   * part of a long one) goes into the journal, and the next message resumes
+   * the same session in its folder. A session a thread holds already gives
+   * that thread, brought up to date.
+   */
+  async openLocal(req: { provider: string; sessionId: string; consent: ConsentGiven; openAnyway: boolean; device: string }): Promise<ThreadSummary> {
+    const provider = this.provider(req.provider || "claude");
+    const found = provider.history?.find(req.sessionId);
+    if (!provider.history || !found) {
+      throw new AgentError(ErrorCode.NOT_FOUND, "no such session on this machine", { reason: ErrorReason.SESSION_NOT_FOUND, subject: req.sessionId });
+    }
+    const view = this.localView(found);
+    if (view.busyElsewhere && !req.openAnyway) {
+      throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: found.dir });
+    }
+    const held = this.holder(found.sessionId);
+    if (held) {
+      this.syncHistory(held);
+      return this.summary(held);
+    }
+    const dir = resolve(found.dir);
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
+    await this.admit(provider, dir, req.consent, req.device);
+    const t = this.addThread({
+      title: found.title.slice(0, 80),
+      dir,
+      provider: provider.id,
+      model: "",
+      projectSettings: req.consent.projectSettings,
+      sessionId: found.sessionId,
+    });
+    this.syncHistory(t);
+    return this.touch(t);
+  }
+
+  /**
+   * Reads into the journal what the AI's transcript of the thread's session
+   * got since the journal last caught up: turns typed in a terminal or an
+   * IDE on the session. Never during a turn of this machine's own. Returns
+   * how many items came in.
+   */
+  private syncHistory(t: Thread): number {
+    if (t.running || t.starting || t.switching) return 0;
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (!history || !seg?.sessionId) return 0;
+    const mark = t.meta.history?.sessionId === seg.sessionId ? t.meta.history.end : undefined;
+    let end: number | undefined;
+    try {
+      end = history.end(seg.sessionId);
+    } catch {
+      return 0;
+    }
+    if (end === undefined || (mark !== undefined && end === mark)) return 0;
+    // Cut short (rewritten): nothing to add, start from its new end.
+    const read = mark !== undefined && end < mark ? { entries: [], end } : history.read(seg.sessionId, mark ?? "recent");
+    if (!read) return 0;
+    // Without a mark (a thread from before marks) the journal may hold what the transcript has: skip equal texts.
+    const added = this.importHistory(t, read.entries, mark === undefined);
+    t.meta.history = { sessionId: seg.sessionId, end: read.end };
+    this.saveMeta(t);
+    return added;
+  }
+
+  /** The transcript holds everything the thread did so far: later appends come from elsewhere. */
+  private markHistory(t: Thread): void {
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (!history || !seg?.sessionId) return;
+    try {
+      const end = history.end(seg.sessionId);
+      if (end !== undefined) t.meta.history = { sessionId: seg.sessionId, end };
+    } catch {
+      // unreadable now: the next look reads from the last mark
+    }
+  }
+
+  private importHistory(t: Thread, entries: HistoryEntry[], skipEqualTexts: boolean): number {
+    const texts = new Map<string, number>();
+    if (skipEqualTexts) {
+      for (const item of t.journal.all()) {
+        if (item.body.case === "text") {
+          const key = `${item.body.value.role}:${item.body.value.text}`;
+          texts.set(key, (texts.get(key) ?? 0) + 1);
+        }
+      }
+    }
+    const items: Item[] = [];
+    for (const e of entries) {
+      const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
+      const prev = t.journal.get(entry.id);
+      // The same item seen live or read before; a subagent may have finished, a todo list changed since.
+      if (prev && !(e.type === "todo" || (e.type === "subagent" && e.done && prev.body.case === "subagent" && !prev.body.value.done))) continue;
+      if (e.type === "subagent" && prev?.body.case === "subagent") entry.body = { case: "subagent", value: { ...prev.body.value, done: true } };
+      if (entry.body.case === "text") {
+        const key = `${entry.body.value.role ?? Role.UNSPECIFIED}:${entry.body.value.text ?? ""}`;
+        const n = texts.get(key) ?? 0;
+        if (n > 0) {
+          texts.set(key, n - 1);
+          continue;
+        }
+      }
+      items.push(t.journal.put(entry.id, entry.body, { provider: t.meta.provider, model: t.meta.model, now: e.at || this.now() }));
+    }
+    if (items.length === 0) return 0;
+    for (const fn of this.listeners) fn(t.meta.id, items);
+    t.preview = lastPreview(t.journal.all());
+    this.touch(t);
+    return items.length;
   }
 
   async send(threadId: string, text: string, clientMsgId: string): Promise<void> {
@@ -574,6 +757,8 @@ export class AgentCore {
       t.clientMsgIds.add(clientMsgId);
     }
     t.limitSeen = false;
+    // Turns typed elsewhere since come first; an open session opens again so the AI reads them.
+    if (!t.running && this.syncHistory(t) > 0 && t.session) await this.park(t);
     this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId } });
     t.turnCount += 1;
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
@@ -917,31 +1102,13 @@ export class AgentCore {
         return;
       }
       case "tool-start":
-        this.put(t, `tool:${e.toolId}`, {
-          case: "toolCall",
-          value: { toolId: e.toolId, kind: KIND[e.kind], name: e.name, summary: e.summary, input: e.input, sensitive: mentionsSensitive(`${e.summary} ${e.input}`, this.opts.isSensitive, { cwd: t.meta.dir }) },
-        });
-        return;
       case "tool-end":
-        this.put(t, `result:${e.toolId}`, { case: "toolResult", value: { toolId: e.toolId, ok: e.ok, output: e.output } });
-        return;
       case "diff":
-        this.put(t, `diff:${e.toolId}`, {
-          case: "diff",
-          value: { toolId: e.toolId, path: e.path, unified: e.unified, added: e.added, removed: e.removed },
-        });
+      case "todo": {
+        const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
+        this.put(t, entry.id, entry.body);
         return;
-      case "todo":
-        this.put(t, "todo", {
-          case: "todo",
-          value: {
-            entries: e.entries.map((x) => ({
-              text: x.text,
-              state: x.state === "done" ? TodoState.DONE : x.state === "in-progress" ? TodoState.IN_PROGRESS : TodoState.PENDING,
-            })),
-          },
-        });
-        return;
+      }
       case "subagent": {
         const id = `sub:${e.toolId}`;
         const prev = t.journal.get(id);
@@ -1054,6 +1221,7 @@ export class AgentCore {
     t.running = false;
     delete t.turnItem;
     delete t.runningTool;
+    this.markHistory(t);
     // A turn that went through: the profile has room again.
     if (state === TurnState.COMPLETED && t.suggestion && !t.limitSeen) {
       delete t.suggestion;
@@ -1247,4 +1415,50 @@ function lastPreview(items: Item[]): string {
     if (line !== undefined) return line;
   }
   return "";
+}
+
+/**
+ * The journal item of a tool call, result, diff or todo list, live or read
+ * back from a transcript, and of what only transcripts give (user messages,
+ * whole texts, finished subagents, compactions). Ids match between the two.
+ */
+function historyItem(e: HistoryEntry | Extract<ProviderEvent, { type: "tool-start" | "tool-end" | "diff" | "todo" }>, dir: string, isSensitive: (p: string) => boolean): { id: string; body: ItemBody } {
+  switch (e.type) {
+    case "user":
+      return { id: e.id, body: { case: "text", value: { role: Role.USER, text: e.text } } };
+    case "text":
+      return { id: `text:${e.blockId}`, body: { case: "text", value: { role: e.role === "assistant" ? Role.ASSISTANT : Role.THINKING, text: e.text } } };
+    case "tool-start":
+      return {
+        id: `tool:${e.toolId}`,
+        body: {
+          case: "toolCall",
+          value: { toolId: e.toolId, kind: KIND[e.kind], name: e.name, summary: e.summary, input: e.input, sensitive: mentionsSensitive(`${e.summary} ${e.input}`, isSensitive, { cwd: dir }) },
+        },
+      };
+    case "tool-end": {
+      // A transcript read back keeps a bounded copy; a live result is kept whole.
+      const output = "at" in e && e.output.length > HISTORY_OUTPUT_MAX ? e.output.slice(0, HISTORY_OUTPUT_MAX) : e.output;
+      return { id: `result:${e.toolId}`, body: { case: "toolResult", value: { toolId: e.toolId, ok: e.ok, output } } };
+    }
+    case "diff":
+      return { id: `diff:${e.toolId}`, body: { case: "diff", value: { toolId: e.toolId, path: e.path, unified: e.unified, added: e.added, removed: e.removed } } };
+    case "todo":
+      return {
+        id: "todo",
+        body: {
+          case: "todo",
+          value: {
+            entries: e.entries.map((x) => ({
+              text: x.text,
+              state: x.state === "done" ? TodoState.DONE : x.state === "in-progress" ? TodoState.IN_PROGRESS : TodoState.PENDING,
+            })),
+          },
+        },
+      };
+    case "subagent":
+      return { id: `sub:${e.toolId}`, body: { case: "subagent", value: { toolId: e.toolId, description: e.description, done: e.done } } };
+    case "compaction":
+      return { id: `compact:at:${e.at}`, body: { case: "compaction", value: { tokensBefore: BigInt(e.tokensBefore) } } };
+  }
 }

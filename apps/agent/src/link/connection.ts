@@ -326,10 +326,38 @@ export class Connection {
             },
             device: this.device,
           });
-          this.subscribed.add(thread.id);
-          this.send(id, { case: "threadCreated", value: { thread } });
-          this.sendInfo(thread.id);
-          return this.sendItems(thread.id, core.snapshot(thread.id));
+          return this.openedThread(id, thread);
+        }
+        case "sessionList": {
+          const v = b.value;
+          const page = core.localSessions({ provider: v.provider, dir: v.dir, query: v.query, offset: v.offset, limit: v.limit });
+          const sessions = page.sessions.map((x) => ({
+            sessionId: x.sessionId,
+            dir: x.dir,
+            title: x.title,
+            updatedAt: BigInt(x.updatedAt),
+            messages: x.messages,
+            entrypoint: x.entrypoint,
+            threadId: x.threadId,
+            busyElsewhere: x.busyElsewhere,
+            sensitive: x.sensitive,
+          }));
+          return this.send(id, { case: "sessionListResult", value: { sessions, total: page.total, dirs: page.dirs } });
+        }
+        case "sessionOpen": {
+          const v = b.value;
+          const thread = await core.openLocal({
+            provider: v.provider,
+            sessionId: v.sessionId,
+            consent: {
+              sensitive: Boolean(v.consent?.sensitive),
+              projectSettings: Boolean(v.consent?.projectSettings),
+              trustProject: Boolean(v.consent?.trustProject),
+            },
+            openAnyway: v.openAnyway,
+            device: this.device,
+          });
+          return this.openedThread(id, thread);
         }
         case "threadSubscribe": {
           const { threadId, cursor } = b.value;
@@ -407,6 +435,14 @@ export class Connection {
     } catch (err) {
       this.sendError(id, err);
     }
+  }
+
+  /** A thread opened for this device: it is followed from now on and gets its statusline and every item. */
+  private openedThread(id: string, thread: ThreadSummary): void {
+    this.subscribed.add(thread.id);
+    this.send(id, { case: "threadCreated", value: { thread } });
+    this.sendInfo(thread.id);
+    this.sendItems(thread.id, this.ctx.core.snapshot(thread.id));
   }
 
   private sendError(id: string, err: unknown): void {
