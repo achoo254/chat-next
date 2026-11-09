@@ -1,6 +1,6 @@
 // A machine's projects in the AI Agent column (tunelo 2.0.7+): each project
-// with its git branch and changed files, "+" that opens a session there at
-// once with the project's defaults (and the usual first message), a menu (a
+// with its git branch and changed files, "+" that opens an empty session there
+// at once with the project's defaults (no first message), a menu (a
 // custom new session, rename, pin, move, settings, remove), its sessions
 // below; then "Khác" for sessions in no project, and "Thêm làm dự án?" for
 // folders that have sessions but no project. The dialogs load when opened.
@@ -10,7 +10,6 @@ import { Icon } from "../components/screen-icons.tsx";
 import { navigate, paths } from "../router.tsx";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { hintPrompt } from "./new-session-hints.ts";
 import { NewSession } from "./new-session.tsx";
 import { gitLine } from "./projects-view.ts";
 import { aiName, folderName } from "./use-machines.ts";
@@ -54,7 +53,11 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 		ids[at] = other;
 		link.request({ case: "projectReorder", value: { ids } }).catch(() => undefined);
 	};
-	/** "+": a session right away with the project's defaults; anything to ask first goes through the dialog. */
+	/**
+	 * "+": an empty session right away with the project's defaults, waiting for
+	 * what the user types; anything to ask first goes through the dialog (as
+	 * does a machine before tunelo 2.0.9, which refuses a session with no message).
+	 */
 	const quickStart = () => {
 		if (project.sensitive) return setDialog("custom");
 		setStarting(true);
@@ -66,7 +69,7 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 					provider: "claude",
 					model: d?.model ?? "",
 					dir: project.dir,
-					text: hintPrompt(t.newSession, "summary", project.dir),
+					text: "",
 					consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false },
 					permissionMode: d?.permissionMode ?? "",
 				},

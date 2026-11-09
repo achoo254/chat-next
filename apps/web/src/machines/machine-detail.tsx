@@ -152,7 +152,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 					{sortForList(state.threads).map((thread) => (
 						<Link key={thread.id} to={paths.machineSession(machine, thread.id)} className="mx-session-row">
 							<span>
-								<b>{thread.title}</b>
+								<b>{thread.title || t.agent.newSession}</b>
 								<span className="mono muted">{thread.dir}</span>
 							</span>
 							<span className={`chip mx-chip ${stateKey(thread)}`}>{t.sessions.state[stateKey(thread)]}</span>

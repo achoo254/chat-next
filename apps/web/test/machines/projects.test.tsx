@@ -70,7 +70,7 @@ describe("clone URLs on the device", () => {
 });
 
 describe("a project row", () => {
-	it("starts a session at once with the project's defaults", async () => {
+	it("starts an empty session at once with the project's defaults, with no first message", async () => {
 		const { link, sent } = fakeLink();
 		const p = project({ defaults: { model: "sonnet", permissionMode: "plan", projectSettings: true } });
 		wrap(
@@ -87,7 +87,7 @@ describe("a project row", () => {
 			expect(req.value.model).toBe("sonnet");
 			expect(req.value.permissionMode).toBe("plan");
 			expect(req.value.consent?.projectSettings).toBe(true);
-			expect(req.value.text).not.toBe("");
+			expect(req.value.text).toBe("");
 		}
 	});
 

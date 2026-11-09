@@ -351,7 +351,7 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 			</span>
 			<span className="tx">
 				<span className="line">
-					<span className="name">{thread.title}</span>
+					<span className="name">{thread.title || t.agent.newSession}</span>
 					<time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
 				</span>
 				<span className="line">

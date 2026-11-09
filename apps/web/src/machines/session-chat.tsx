@@ -132,7 +132,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 			<PageHead
 				back={paths.machines()}
 				backLabel={t.backToMachines}
-				title={thread?.title ?? ""}
+				title={thread ? thread.title || t.agent.newSession : ""}
 				subtitle={
 					<>
 						<span className="mono" title={dir}>

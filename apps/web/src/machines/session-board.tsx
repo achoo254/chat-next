@@ -187,12 +187,13 @@ function Tiles({ need, running, showMachine }: { need: readonly Placed[]; runnin
 }
 
 function TileHead({ machine, thread, showMachine, waiting }: { machine: MachineView; thread: ThreadSummary; showMachine: boolean; waiting: boolean }) {
+	const t = useMachinesCopy();
 	return (
 		<>
 			<h4>
 				{waiting ? <MachineIcon name="help" small /> : <span className="spin" aria-hidden="true" />}
 				<Link to={paths.machineSession(machine.entry.ref, thread.id)} className="mx-tile-title">
-					{thread.title}
+					{thread.title || t.agent.newSession}
 				</Link>
 				{thread.pending > 0 && <span className="badge">{thread.pending}</span>}
 			</h4>
@@ -297,7 +298,7 @@ function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachi
 						<Link to={paths.machineSession(machine.entry.ref, thread.id)} className="mx-recent-row">
 							<MachineIcon name="terminal" small />
 							<span className="tx">
-								<b>{thread.title}</b>
+								<b>{thread.title || t.agent.newSession}</b>
 								<small>
 									{showMachine && `${machine.entry.name} · `}
 									{folderName(thread.dir)} · {timeAgo(t, Number(thread.updatedAt), now)}
