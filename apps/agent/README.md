@@ -85,6 +85,8 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
   (thư mục làm việc, giờ bắt đầu), giữ 5 giây; Windows chỉ dùng hai cách đầu. tunelo không đọc thư mục cấu hình của ứng dụng
   nào khác. Web hỏi lại trước khi mở. Giới hạn: lượt gõ trên máy trong lúc Chat đang chạy một lượt của cùng phiên không được
   đọc vào.
+- **Tên phiên** (2.0.9): theo tên Claude đặt cho phiên, hoặc tên người dùng đặt bằng `/rename` trên máy; cập nhật sau mỗi lượt và
+  khi mở lại phiên. Nút + của dự án mở phiên trống (chưa gửi gì); tin nhắn đầu tiên chạy Claude và làm tên tạm.
 
 Đọc ít: danh sách chỉ đọc đầu file (thư mục, câu hỏi đầu) và cuối file (tiêu đề), giữ theo kích thước và giờ sửa; số tin
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
