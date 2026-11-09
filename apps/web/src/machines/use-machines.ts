@@ -2,13 +2,14 @@
 // the slot above the screens, the directory, one machine's link, and the
 // wording of remote errors.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ErrorCode, ThreadState, type MachineInfo, type ProviderInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ThreadState, type MachineInfo, type ProviderInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { useServices } from "../messaging/data/services.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { useHubSlot } from "./link/connection-provider.tsx";
 import { deviceKeyStore } from "./link/device-keys.ts";
 import { deviceName, LinkHub, type DirectoryState } from "./link/link-hub.ts";
-import { OfflineError, RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
+import type { LinkState, MachineLink } from "./link/machine-link.ts";
+import { machineErrorText } from "./machine-errors.ts";
 import { browserSocket } from "./link/socket.ts";
 import { createMachinesDirectory, type MachineEntry } from "./machines-client.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -121,28 +122,9 @@ export function modelName(info: MachineInfo | null, provider: string, model: str
 	return found?.name || model;
 }
 
-/** What to tell the user about a failed request. */
+/** What to tell the user about a failed request, in the account's language (see machine-errors.ts). */
 export function errorText(t: MachinesCopy, err: unknown, ai: string): string {
-	if (err instanceof OfflineError) return t.errors.offline;
-	if (err instanceof RemoteError) {
-		switch (err.code) {
-			case ErrorCode.STALE:
-				return t.errors.stale;
-			case ErrorCode.NEEDS_LOGIN:
-				return t.errors.needsLogin(ai);
-			case ErrorCode.PROVIDER_UNAVAILABLE:
-				return t.errors.unavailable(ai);
-			case ErrorCode.QUEUED:
-				return t.errors.queued;
-			case ErrorCode.NOT_FOUND:
-				return t.errors.notFound;
-			case ErrorCode.INVALID:
-				return t.errors.invalid(err.message);
-			default:
-				return t.errors.generic;
-		}
-	}
-	return t.errors.generic;
+	return machineErrorText(t, err, ai);
 }
 
 export type StateKey = "waiting" | "running" | "queued" | "idle" | "error";

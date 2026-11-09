@@ -1,12 +1,13 @@
 // "Phiên mới" starts without typing: it opens in the newest session's folder,
 // fills in a first message that follows the folder, offers one-tap ideas, and
-// sends the default suggestion when the message is emptied.
+// sends the default suggestion when the message is emptied. Project settings
+// in a folder the machine does not trust yet ask to trust it right there.
 import { create } from "@bufbuild/protobuf";
-import { ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
-import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
+import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
 import { NewSession } from "../../src/machines/new-session.tsx";
 import { folderName, recentFolders } from "../../src/machines/new-session-hints.ts";
 
@@ -16,11 +17,11 @@ const thread = (id: string, dir: string, updatedAt: number): ThreadSummary =>
 
 interface Request {
 	case: string;
-	value: { path?: string; text?: string; dir?: string };
+	value: { path?: string; text?: string; dir?: string; consent?: { projectSettings?: boolean; trustProject?: boolean } };
 }
 
-/** A machine that lists any folder under HOME (not `missing`) and creates threads. */
-const fakeLink = (missing = "") => {
+/** A machine that lists any folder under HOME (not `missing`) and creates threads; `untrusted` needs trust for project settings. */
+const fakeLink = (missing = "", untrusted = "") => {
 	const sent: Request[] = [];
 	const link = {
 		request: (body: Request) => {
@@ -30,7 +31,13 @@ const fakeLink = (missing = "") => {
 				if (path === missing) return Promise.reject(new Error("gone"));
 				return Promise.resolve({ body: { case: "dirListResult", value: { path, parent: "/Users", entries: [], sensitive: path === HOME } } });
 			}
-			if (body.case === "threadCreate") return Promise.resolve({ body: { case: "threadCreated", value: { thread: { id: "new" } } } });
+			if (body.case === "threadCreate") {
+				const { dir, consent } = body.value;
+				if (dir === untrusted && consent?.projectSettings && !consent.trustProject) {
+					return Promise.reject(new RemoteError(ErrorCode.INVALID, "not trusted", ErrorReason.PROJECT_SETTINGS_UNTRUSTED, dir));
+				}
+				return Promise.resolve({ body: { case: "threadCreated", value: { thread: { id: "new" } } } });
+			}
 			return Promise.resolve({ body: { case: "ack", value: {} } });
 		},
 	} as unknown as MachineLink;
@@ -118,6 +125,33 @@ describe("new session", () => {
 		const gone = fakeLink("/w/deleted");
 		open(gone.link, stateWith([thread("b", "/w/deleted", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe(HOME));
+	});
+
+	it("asks to trust the folder's project settings, then opens with that consent", async () => {
+		const { link, sent } = fakeLink("", "/w/chat-next");
+		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
+		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+		fireEvent.click(screen.getByLabelText(/Nạp cấu hình .claude/));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await screen.findByText("Máy chưa tin cấu hình .claude của /w/chat-next");
+		expect(screen.queryByText(/not trusted/)).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Tin thư mục này và mở phiên" }));
+		await waitFor(() => expect(sent.filter((r) => r.case === "threadCreate")).toHaveLength(2));
+		expect(sent.filter((r) => r.case === "threadCreate").map((r) => r.value.consent?.trustProject)).toEqual([false, true]);
+	});
+
+	it("opens without project settings when the user would rather not trust the folder", async () => {
+		const { link, sent } = fakeLink("", "/w/chat-next");
+		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
+		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+		const setting = screen.getByLabelText(/Nạp cấu hình .claude/) as HTMLInputElement;
+		fireEvent.click(setting);
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		fireEvent.click(await screen.findByRole("button", { name: "Không nạp cấu hình dự án" }));
+		expect(setting.checked).toBe(false);
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(sent.filter((r) => r.case === "threadCreate")).toHaveLength(2));
+		expect(sent.filter((r) => r.case === "threadCreate").at(-1)?.value.consent).toEqual({ sensitive: false, projectSettings: false, trustProject: false });
 	});
 
 	it("waits for the session list before choosing a folder", async () => {

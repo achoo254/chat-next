@@ -12,6 +12,7 @@ import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { backoffDelay } from "@achoo254/chat-core";
 import {
 	ErrorCode,
+	ErrorReason,
 	FrameSchema,
 	HandshakeErrorCode,
 	ThreadState,
@@ -68,10 +69,17 @@ export interface LinkState {
 	readonly threadInfo: ReadonlyMap<string, ThreadInfo>;
 }
 
+/**
+ * The machine refused a request. `message` is the machine's English; `reason`
+ * and `subject` say what went wrong for wording it in the user's language
+ * (UNSPECIFIED from machines older than tunelo 2.0.1).
+ */
 export class RemoteError extends Error {
 	constructor(
 		readonly code: ErrorCode,
 		message: string,
+		readonly reason: ErrorReason = ErrorReason.UNSPECIFIED,
+		readonly subject = "",
 	) {
 		super(message);
 	}
@@ -506,7 +514,7 @@ export class MachineLink {
 		if (waiter === undefined) return;
 		this.waiters.delete(frame.id);
 		this.timers.clearTimeout(waiter.timer);
-		if (b.case === "error") waiter.reject(new RemoteError(b.value.code, b.value.message));
+		if (b.case === "error") waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject));
 		else waiter.resolve(frame);
 	}
 

@@ -5,7 +5,9 @@
 // default), and the first message, filled in with a suggestion that follows
 // the folder until the user edits it or picks another one. A sensitive
 // folder needs an explicit "I agree", which the machine logs; it is never
-// blocked. Warns which idle session will be parked when the machine is full.
+// blocked. Project settings in a folder the machine does not trust yet ask
+// for "Trust this folder" right here (the machine logs that too). Warns which
+// idle session will be parked when the machine is full.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ErrorCode, LoginState, ThreadState, type DirListResult } from "@achoo254/chat-proto/remote/remote";
 import { navigate, paths } from "../router.tsx";
@@ -13,7 +15,8 @@ import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { PROMPT_HINTS, folderName, hintPrompt, recentFolders, type PromptHint } from "./new-session-hints.ts";
-import { aiName, errorText, providerOf } from "./use-machines.ts";
+import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
+import { aiName, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 interface NewSessionProps {
@@ -44,6 +47,8 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	const [hint, setHint] = useState<PromptHint | null>("summary");
 	const [text, setText] = useState("");
 	const [askConsent, setAskConsent] = useState(false);
+	// The folder whose .claude settings the machine refused to load untrusted.
+	const [askTrust, setAskTrust] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const ai = aiName(state.info, provider);
@@ -57,6 +62,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 				setListing(frame.body.value);
 				setPath(frame.body.value.path);
 				setAskConsent(false);
+				setAskTrust("");
 			},
 			() => setListFailed(true),
 		);
@@ -94,7 +100,8 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 				.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0))[0]
 		: undefined;
 
-	const start = (consent: boolean) => {
+	// `consent`: the user agreed to the sensitive folder; `trust`: to trusting its project settings.
+	const start = (consent: boolean, trust = false) => {
 		if (path.trim() === "") return setError(t.newSession.needFolder);
 		// An emptied message falls back to the default suggestion.
 		const first = message.trim() === "" ? hintPrompt(t.newSession, "summary", path) : message.trim();
@@ -104,10 +111,11 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 		}
 		setBusy(true);
 		setError("");
+		const dir = path.trim();
 		link
 			.request({
 				case: "threadCreate",
-				value: { provider, model, dir: path.trim(), text: first, consent: { sensitive: consent, projectSettings } },
+				value: { provider, model, dir, text: first, consent: { sensitive: consent, projectSettings, trustProject: projectSettings && trust } },
 			})
 			.then(
 				(frame) => {
@@ -120,7 +128,9 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 				(err: unknown) => {
 					setBusy(false);
 					if (err instanceof RemoteError && err.code === ErrorCode.NEEDS_CONSENT) setAskConsent(true);
-					else setError(errorText(t, err, ai));
+					// The machine answers the trust question before it opens a session, so the agreement above still holds.
+					else if (needsProjectTrust(err) && !trust) setAskTrust(dir);
+					else setError(machineErrorText(t, err, ai));
 				},
 			);
 	};
@@ -188,6 +198,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 							onChange={(event) => {
 								setPath(event.target.value);
 								setAskConsent(false);
+								setAskTrust("");
 							}}
 							onKeyDown={(event) => {
 								if (event.key === "Enter") {
@@ -251,6 +262,27 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 							</button>
 							<button type="button" className="btn btn-sm" onClick={() => setAskConsent(false)}>
 								{t.newSession.other}
+							</button>
+						</div>
+					</div>
+				)}
+				{askTrust !== "" && askTrust === path.trim() && projectSettings && (
+					<div className="mx-warn" role="alert">
+						<b>{t.newSession.trustTitle(askTrust)}</b>
+						<span>{t.newSession.trustBody(ai, name)}</span>
+						<div className="acts">
+							<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => start(askConsent || sensitive, true)}>
+								{t.newSession.trust}
+							</button>
+							<button
+								type="button"
+								className="btn btn-sm"
+								onClick={() => {
+									setProjectSettings(false);
+									setAskTrust("");
+								}}
+							>
+								{t.newSession.skipProjectSettings}
 							</button>
 						</div>
 					</div>
