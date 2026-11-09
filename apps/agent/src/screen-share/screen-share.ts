@@ -116,7 +116,7 @@ export function vncAnswers(host: string, port: number, timeoutMs = PROBE_TIMEOUT
 			resolve(yes);
 		};
 		socket.setTimeout(timeoutMs, () => finish(false));
-		socket.once("error", () => finish(false));
+		socket.on("error", () => finish(false));
 		socket.once("data", (d: Buffer) => finish(d.subarray(0, 4).toString("latin1") === "RFB "));
 		socket.once("close", () => finish(false));
 	});

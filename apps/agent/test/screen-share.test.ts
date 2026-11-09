@@ -31,6 +31,8 @@ class FakeVnc {
 			s.write("RFB 003.889\n");
 			s.on("data", (d) => this.received.push(d));
 			s.on("close", () => (this.closed += 1));
+			// The bridge (or a probe) may reset the connection: Linux reports it as an error.
+			s.on("error", () => undefined);
 		});
 		await new Promise<void>((r) => this.server.listen(0, "127.0.0.1", () => r()));
 		this.port = (this.server.address() as { port: number }).port;
