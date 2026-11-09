@@ -163,11 +163,21 @@ message Frame {
     AttachmentData attachment_data = 59;
 
     ThreadDeleted thread_deleted = 60;
+    ProjectListResult project_list_result = 61;
+    ProjectCloneProgress project_clone_progress = 62;
 
     // A → B, continued
     AttachmentFetch attachment_fetch = 70;
     ThreadDelete thread_delete = 71;
     ThreadSetArchived thread_set_archived = 72;
+    ProjectList project_list = 73;
+    ProjectAdd project_add = 74;
+    ProjectCreate project_create = 75;
+    ProjectClone project_clone = 76;
+    ProjectCloneCancel project_clone_cancel = 77;
+    ProjectUpdate project_update = 78;
+    ProjectReorder project_reorder = 79;
+    ProjectRemove project_remove = 80;
   }
 }
 
@@ -185,6 +195,10 @@ message ThreadCreate {
   // First user message.
   string text = 4;
   Consent consent = 5;
+  // One of the AI's permission_modes to start in (a project's default);
+  // empty follows the machine's own AI settings. Machines before tunelo 2.0.7
+  // ignore it.
+  string permission_mode = 6;
 }
 
 // What the user confirmed on A before opening the session.
@@ -509,6 +523,141 @@ message AttachmentLimits {
   uint32 piece_max_bytes = 5;
 }
 
+// --- projects ---------------------------------------------------------------
+//
+// Folders the user keeps as projects on a machine (tunelo 2.0.7+), stored in
+// the machine's tunelo config: a name, the folder, pinned or not, an order,
+// and what a new session there starts with. Removing one only drops it from
+// the list; its folder stays. Every change is sent unasked to every connected
+// device as ProjectListResult (frame id empty). Machines before tunelo 2.0.7
+// answer UNSUPPORTED_REQUEST.
+
+// Answered with ProjectListResult.
+message ProjectList {}
+
+// Adds an existing folder. A sensitive folder needs Consent.sensitive (B logs
+// it); a folder that is a project already is refused with
+// ERROR_REASON_PROJECT_EXISTS. Answered with ProjectListResult.
+message ProjectAdd {
+  // Absolute.
+  string dir = 1;
+  // Empty: the folder's name.
+  string name = 2;
+  Consent consent = 3;
+}
+
+// Makes a new folder `name` in `parent` (refused when it exists or is
+// sensitive), runs `git init` in it when asked, and adds it. Answered with
+// ProjectListResult.
+message ProjectCreate {
+  string parent = 1;
+  // A folder name: one path part, made safe by B.
+  string name = 2;
+  bool git_init = 3;
+}
+
+// Clones a repository into `parent`/`name` (refused when it exists or is
+// sensitive) and adds it. Only https:// and ssh (ssh://, user@host:path)
+// URLs, without a password in them; no hooks run beyond git's own defaults.
+// Answered with Ack at once; ProjectCloneProgress follows, unasked, to the
+// device that asked, until it says done.
+message ProjectClone {
+  string url = 1;
+  string parent = 2;
+  // Empty: the repository's name.
+  string name = 3;
+  // Chosen by A (8-64 letters, digits, "-", "_"); names the clone in its
+  // progress and in ProjectCloneCancel.
+  string clone_id = 4;
+}
+
+// Stops a clone and removes what it wrote. Answered with Ack.
+message ProjectCloneCancel {
+  string clone_id = 1;
+}
+
+message ProjectCloneProgress {
+  string clone_id = 1;
+  // git's phase in English ("Receiving objects", …); empty before the first.
+  string phase = 2;
+  // 0-100 of the phase.
+  uint32 percent = 3;
+  bool done = 4;
+  // When done: the new project, or empty when it failed or was cancelled.
+  string project_id = 5;
+  // When it failed: why (UNSPECIFIED when cancelled or done well) and git's
+  // own last line, in English.
+  ErrorReason reason = 6;
+  string message = 7;
+}
+
+// Changes what is set; the rest stays. Answered with ProjectListResult.
+message ProjectUpdate {
+  string id = 1;
+  optional string name = 2;
+  optional bool pinned = 3;
+  ProjectDefaults defaults = 4;
+}
+
+// The projects in this order (every id once). Answered with ProjectListResult.
+message ProjectReorder {
+  repeated string ids = 1;
+}
+
+// Drops a project from the list; its folder is not touched. Answered with
+// ProjectListResult.
+message ProjectRemove {
+  string id = 1;
+}
+
+// What a new session of a project starts with.
+message ProjectDefaults {
+  // Empty: the AI's default.
+  string model = 1;
+  // One of the AI's permission_modes; empty: the machine's own settings.
+  string permission_mode = 2;
+  // Load the project's own .claude settings (still asked to trust once).
+  bool project_settings = 3;
+}
+
+message GitStatus {
+  // The folder is in a git work tree.
+  bool git = 1;
+  string branch = 2;
+  // Files changed, staged or not, and untracked ones.
+  uint32 changed = 3;
+  // Commits ahead of and behind the upstream; both 0 without one.
+  uint32 ahead = 4;
+  uint32 behind = 5;
+  bool upstream = 6;
+}
+
+message Project {
+  string id = 1;
+  string name = 2;
+  string dir = 3;
+  bool pinned = 4;
+  ProjectDefaults defaults = 5;
+  // Unset when not read yet (or not readable quickly).
+  GitStatus git = 6;
+  // The folder is not there any more.
+  bool missing = 7;
+  bool sensitive = 8;
+}
+
+// A folder that has sessions but is no project yet.
+message ProjectSuggestion {
+  string dir = 1;
+  uint32 sessions = 2;
+}
+
+message ProjectListResult {
+  // Pinned first, then in the user's order.
+  repeated Project projects = 1;
+  // At most 8, most sessions first.
+  repeated ProjectSuggestion suggestions = 2;
+}
+
 // --- AI accounts (Claude profiles) ------------------------------------------
 //
 // A machine may hold several Claude accounts. Each one is a profile: a folder
@@ -817,6 +966,17 @@ enum ErrorReason {
   // ThreadDelete: the operating system's trash cannot take the files, so
   // nothing was deleted (subject: why, in English).
   ERROR_REASON_TRASH_UNAVAILABLE = 36;
+  ERROR_REASON_PROJECT_NOT_FOUND = 37;
+  // The folder is a project already, or the folder to create or clone into
+  // exists (subject: the folder).
+  ERROR_REASON_PROJECT_EXISTS = 38;
+  // Not an https or ssh URL, or one with a password in it.
+  ERROR_REASON_CLONE_URL_INVALID = 39;
+  // git could not clone (subject: its last line, in English).
+  ERROR_REASON_CLONE_FAILED = 40;
+  ERROR_REASON_GIT_NOT_INSTALLED = 41;
+  // A project name or folder name that cannot be used.
+  ERROR_REASON_NAME_INVALID = 42;
 }
 
 enum ErrorCode {
@@ -1242,7 +1402,8 @@ message AuditEntry {
   // open_sensitive, project_settings (detail "trust" when a device trusted
   // the folder), approve_sensitive, pair, revoke,
   // permission_mode, profile_add, profile_select, profile_remove,
-  // delete_session (path: the folder; detail: the session ids)
+  // delete_session (path: the folder; detail: the session ids),
+  // project_add (a sensitive folder added as a project)
   string action = 3;
   string path = 4;
   string detail = 5;
