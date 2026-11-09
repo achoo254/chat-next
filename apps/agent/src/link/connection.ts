@@ -30,6 +30,7 @@ import type { LocalForward } from "../tunnels/forward.ts";
 import { listDir } from "../safety/dirs.ts";
 import { isDiskAccessDenial } from "../safety/disk-access.ts";
 import { OutsideFolderError, listSessionFiles } from "../safety/session-files.ts";
+import type { ProjectList, Projects } from "../projects/projects.ts";
 import { wireItem } from "./wire.ts";
 
 export type Socket = {
@@ -51,6 +52,8 @@ export type LinkContext = {
   onPaired: (via: "install" | "qr" | "code") => void;
   /** The Claude profiles of the machine; absent where the machine has none (tests). */
   profiles?: ClaudeProfiles;
+  /** The machine's projects; absent where the machine has none (tests). */
+  projects?: Projects;
   /** Localman's requests for localhost; absent where the machine has none (tests). */
   localForward?: LocalForward;
   /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
@@ -112,6 +115,23 @@ export function profileListBody(list: ProfileList) {
         ...(u ? { lastUsage: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
       };
     }),
+  };
+}
+
+/** The projects as devices get them. */
+export function projectListBody(list: ProjectList) {
+  return {
+    projects: list.projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      dir: p.dir,
+      pinned: p.pinned,
+      defaults: p.defaults,
+      missing: p.missing,
+      sensitive: p.sensitive,
+      ...(p.git ? { git: p.git } : {}),
+    })),
+    suggestions: list.suggestions,
   };
 }
 
@@ -285,6 +305,51 @@ export class Connection {
     }
   }
 
+  /** Projects: git may take a moment (status, init, a clone's start), so they answer later, by id. */
+  private async projectFrame(id: string, b: ProjectFrame): Promise<void> {
+    const projects = this.ctx.projects;
+    if (!projects) return this.send(id, { case: "error", value: refusal("this machine keeps no projects", ErrorReason.UNSUPPORTED_REQUEST) });
+    const sendList = async () => this.send(id, { case: "projectListResult", value: projectListBody(await projects.list()) });
+    switch (b.case) {
+      case "projectList":
+        return sendList();
+      case "projectAdd":
+        projects.add({ dir: b.value.dir, name: b.value.name, sensitive: Boolean(b.value.consent?.sensitive), device: this.device });
+        return sendList();
+      case "projectCreate":
+        await projects.create({ parent: b.value.parent, name: b.value.name, gitInit: b.value.gitInit });
+        return sendList();
+      case "projectClone":
+        projects.clone({ url: b.value.url, parent: b.value.parent, name: b.value.name, cloneId: b.value.cloneId }, (p) =>
+          this.send("", { case: "projectCloneProgress", value: p }),
+        );
+        return this.send(id, { case: "ack", value: {} });
+      case "projectCloneCancel":
+        projects.cancelClone(b.value.cloneId);
+        return this.send(id, { case: "ack", value: {} });
+      case "projectUpdate": {
+        const v = b.value;
+        const d = v.defaults;
+        projects.update(
+          {
+            id: v.id,
+            ...(v.name !== undefined ? { name: v.name } : {}),
+            ...(v.pinned !== undefined ? { pinned: v.pinned } : {}),
+            ...(d ? { defaults: { model: d.model, permissionMode: d.permissionMode, projectSettings: d.projectSettings } } : {}),
+          },
+          this.ctx.core.aiPermissionModes("claude"),
+        );
+        return sendList();
+      }
+      case "projectReorder":
+        projects.reorder(b.value.ids);
+        return sendList();
+      case "projectRemove":
+        projects.remove(b.value.id);
+        return sendList();
+    }
+  }
+
   private async frame(f: Frame | undefined): Promise<void> {
     if (!f) return;
     const { core } = this.ctx;
@@ -325,6 +390,7 @@ export class Connection {
             model: v.model,
             dir: v.dir,
             text: v.text,
+            permissionMode: v.permissionMode,
             consent: {
               sensitive: Boolean(v.consent?.sensitive),
               projectSettings: Boolean(v.consent?.projectSettings),
@@ -464,6 +530,16 @@ export class Connection {
           // frames after them (pings, threads) go on meanwhile.
           void this.profileFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
+        case "projectList":
+        case "projectAdd":
+        case "projectCreate":
+        case "projectClone":
+        case "projectCloneCancel":
+        case "projectUpdate":
+        case "projectReorder":
+        case "projectRemove":
+          void this.projectFrame(id, b).catch((err: unknown) => this.sendError(id, err));
+          return;
         default:
           return this.send(id, { case: "error", value: refusal("unsupported request", ErrorReason.UNSUPPORTED_REQUEST) });
       }
@@ -484,6 +560,11 @@ export class Connection {
     this.send(id, { case: "error", value: errorBody(err) });
   }
 }
+
+type ProjectFrame = Extract<
+  Frame["body"],
+  { case: "projectList" | "projectAdd" | "projectCreate" | "projectClone" | "projectCloneCancel" | "projectUpdate" | "projectReorder" | "projectRemove" }
+>;
 
 type ProfileFrame = Extract<
   Frame["body"],

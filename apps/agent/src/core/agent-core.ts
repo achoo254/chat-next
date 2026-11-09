@@ -561,11 +561,17 @@ export class AgentCore {
     text: string;
     consent: ConsentGiven;
     device: string;
+    /** One of the AI's permission modes to start in; "" or unset follows the machine. */
+    permissionMode?: string;
   }): Promise<ThreadSummary> {
     const provider = this.provider(req.provider || "claude");
     const dir = resolve(req.dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
     if (!req.text.trim()) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
+    const mode = req.permissionMode ?? "";
+    if (mode !== "" && !provider.capabilities.permissionModes.includes(mode)) {
+      throw new AgentError(ErrorCode.INVALID, "permission mode not allowed", { reason: ErrorReason.PERMISSION_MODE_NOT_ALLOWED, subject: mode });
+    }
     await this.admit(provider, dir, req.consent, req.device);
     const t = this.addThread({
       title: req.text.trim().split("\n")[0]?.slice(0, 80) ?? "",
@@ -574,6 +580,10 @@ export class AgentCore {
       model: req.model,
       projectSettings: req.consent.projectSettings,
     });
+    if (mode !== "") {
+      t.meta.permissionMode = mode;
+      this.saveMeta(t);
+    }
     await this.send(t.meta.id, req.text, "");
     return this.summary(t);
   }
@@ -913,6 +923,11 @@ export class AgentCore {
     const t = this.thread(threadId);
     await this.park(t);
     this.touch(t);
+  }
+
+  /** Permission modes a device may pick for sessions of this AI. */
+  aiPermissionModes(provider: string): string[] {
+    return [...(this.opts.providers.find((p) => p.id === provider)?.capabilities.permissionModes ?? [])];
   }
 
   /** Hides a thread from the list on every device, or shows it again; nothing on disk changes. */

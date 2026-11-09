@@ -21,7 +21,7 @@ import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore } from "./config.ts";
 import { AgentCore } from "./core/agent-core.ts";
 import { machineKey } from "./keystore.ts";
-import { Connection, profileListBody } from "./link/connection.ts";
+import { Connection, profileListBody, projectListBody } from "./link/connection.ts";
 import { ClaudeProfiles, type ProfileList } from "./profiles/service.ts";
 import { findClaude, probeUsage } from "./providers/claude/index.ts";
 import { builtinProviders } from "./providers/registry.ts";
@@ -39,6 +39,7 @@ import { LocalForward } from "./tunnels/forward.ts";
 import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
 import { attachmentLimitsBody } from "./attachments/uploads.ts";
+import { Projects } from "./projects/projects.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -70,6 +71,8 @@ export class Machine {
   readonly audit: AuditLog;
   readonly isSensitive: (p: string) => boolean;
   readonly profiles: ClaudeProfiles;
+  readonly projects: Projects;
+  private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
   private key!: KeyPair;
@@ -141,6 +144,41 @@ export class Machine {
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config) } : {}),
     });
     this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
+    this.projects = new Projects({
+      config: this.config,
+      audit: this.audit,
+      isSensitive: this.isSensitive,
+      home: homedir(),
+      sessionDirs: async () => {
+        const count = new Map<string, number>();
+        for (const t of this.core.list()) count.set(t.dir, (count.get(t.dir) ?? 0) + 1);
+        for (const d of (await this.core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 1 })).dirs) {
+          count.set(d.dir, Math.max(count.get(d.dir) ?? 0, d.sessions));
+        }
+        return [...count].map(([dir, sessions]) => ({ dir, sessions }));
+      },
+    });
+    this.projects.onChange(() => this.announceProjects());
+    // A turn that ends may have changed files: the project's git status is read again.
+    this.core.onStatus((s) => {
+      if (s.state === ThreadState.IDLE && this.projects.invalidate(s.dir)) this.announceProjects();
+    });
+  }
+
+  /** Every connected device gets the projects again; changes that come together go out as one. */
+  private announceProjects(): void {
+    if (this.announcingProjects) return;
+    this.announcingProjects = setTimeout(() => {
+      this.announcingProjects = undefined;
+      void this.projects.list().then(
+        (list) => {
+          const value = projectListBody(list);
+          for (const c of this.connections) if (c.isOpen) c.announce({ case: "projectListResult", value });
+        },
+        (err: unknown) => this.log(`projects: not announced (${(err as Error).message})`),
+      );
+    }, 1_000);
+    this.announcingProjects.unref?.();
   }
 
   async start(port = this.config.get().port ?? 0): Promise<number> {
@@ -189,6 +227,8 @@ export class Machine {
     this.server?.closeAllConnections?.();
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
     await this.profiles.stop();
+    clearTimeout(this.announcingProjects);
+    this.projects.stop();
     await this.core.stop();
   }
 
@@ -242,6 +282,7 @@ export class Machine {
         machineInfo: () => this.machineInfo(),
         isSensitive: this.isSensitive,
         profiles: this.profiles,
+        projects: this.projects,
         localForward: this.localForward,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),

@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { toBase64Url } from "@achoo254/chat-remote-protocol";
+import type { ProjectRecord } from "./projects/projects.ts";
 
 export type PairedDevice = { key: string; name: string; addedAt: number };
 
@@ -44,6 +45,8 @@ export type AgentConfig = {
   sessionMcp?: boolean;
   /** The MCP tool groups served on this machine (mcp/groups.ts); unset is all of them. */
   mcpGroups?: ("tunnel" | "chat" | "localman")[];
+  /** The user's projects on this machine (projects/projects.ts), in their order. */
+  projects?: ProjectRecord[];
 };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */
