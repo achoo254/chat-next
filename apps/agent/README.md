@@ -61,6 +61,10 @@ bị từ chối. `off` luôn chạy được.
 `tunelo update` đọc các release `tunelo-v*` của repo. Máy còn `hda` 0.2.x (tên cũ) chạy `hda update`: bản cầu nối `agent-v0.3.0`
 chứa `tunelo` 2.0.0, và dịch vụ cũ tự chuyển sang `tunelo` khi khởi động lại (giữ máy, thiết bị đã ghép, subdomain, phiên).
 
+Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thêm máy") mà Chat thấy không có tunnel, ô mã ghép bị khoá: `tunelo` 2.0.13
+trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
+nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
+
 Lối thoát: `hda` 0.2.x chỉ đọc 20 release mới nhất. Khi `agent-v0.3.0` trôi khỏi đó, `hda update` báo không có bản mới. Chạy lại
 script cài ở trên. Script thấy `hda` thì chạy `tunelo migrate-from-hda`, thấy gói npm `tunelo` 1.x thì nhắc
 `npm uninstall -g tunelo` (không tự gỡ).
