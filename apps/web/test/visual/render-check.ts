@@ -70,6 +70,11 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-changes-file": "?at=machine-chat&open=changes-file",
 	"machine-mention": "?at=machine-chat&open=mention",
 	"machine-slash": "?at=machine-chat&open=slash",
+	// Attachments: the drop zone while files are dragged, the tray with an image and a document, an upload in progress.
+	"machine-attach-drop": "?at=machine-chat&open=attach-drop",
+	"machine-attach-tray": "?at=machine-chat&open=attach-tray",
+	"machine-attach-progress": "?at=machine-chat&open=attach-progress",
+	"machine-attach-history": "?at=machine-chat&open=attach-history",
 	"machine-new-session": "?at=machine-sessions&open=new-session",
 	"machine-new-session-existing": "?at=machine-sessions&open=new-session-existing",
 	"machine-info": "?at=machine-info",

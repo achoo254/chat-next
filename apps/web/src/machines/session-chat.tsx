@@ -5,6 +5,7 @@
 // status bar and the composer. "Thay đổi" opens the files the AI changed.
 // The thread is watched on the machine's shared link while this shows, so a
 // reconnect resubscribes from the cursor and a reset reloads the snapshot.
+// Files dragged anywhere over the session go to the composer when dropped.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, PromptState, ThreadState, TurnState } from "@achoo254/chat-proto/remote/remote";
@@ -17,6 +18,8 @@ import { QuestionCard } from "./cards/question.tsx";
 import { TodoCard } from "./cards/todo.tsx";
 import { ToolRunCard } from "./cards/tool-run.tsx";
 import { AccountMenu, profileName } from "./account-menu.tsx";
+import { limitsOf, type UploadLink } from "./attachments.ts";
+import { DropZone, MessageAttachments, useFileDrop } from "./attachment-tray.tsx";
 import { ChangesPanel } from "./changes-panel.tsx";
 import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
@@ -32,6 +35,7 @@ import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
 import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -85,6 +89,12 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const nextProfile = profileById(profiles.list, profiles.list?.selectedId ?? "");
 	const switchingTo = !pending ? "" : threadInfo?.nextAccount?.email || nextProfile?.email || t.agent.account.defaultName;
 	const suggestion = pending ? undefined : threadInfo?.profileSuggestion;
+	const limits = limitsOf(state.info?.attachments);
+	const attach = useAttachments(link, threadId, limits, caps?.images ?? false, ai);
+	const drop = useFileDrop(online && !missing, (files) => {
+		attach.add(files);
+		document.querySelector<HTMLTextAreaElement>(".mx-chat [data-composer]")?.focus();
+	});
 
 	const fetchFull = async (itemId: string): Promise<void> => {
 		await link.request({ case: "threadFetchFull", value: { threadId, itemId } });
@@ -123,7 +133,8 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const chip = !online ? "offline" : thread === null ? null : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	return (
-		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined}>
+		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
+			{drop.dragging && <DropZone ai={ai} maxBytes={limits?.fileMaxBytes ?? 0} supported={limits !== null} />}
 			<PageHead
 				back={paths.machines()}
 				backLabel={t.backToMachines}
@@ -168,7 +179,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
-						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0} fetchFull={fetchFull} />
+						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
 					)}
 					{suggestion !== undefined && (
 						<LimitBar
@@ -216,7 +227,8 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						prompting={prompts.length > 0}
 						commands={threadInfo?.commands ?? []}
 						listFiles={modern ? listFiles : undefined}
-						onSend={(text) => link.send(threadId, text)}
+						attach={attach}
+						onSend={(text, files) => link.send(threadId, text, files)}
 						onStop={async () => {
 							await link.request({ case: "threadInterrupt", value: { threadId } });
 						}}
@@ -330,12 +342,14 @@ interface TranscriptProps {
 	/** A prompt waits in the dock. */
 	waiting: boolean;
 	fetchFull: (itemId: string) => Promise<void>;
+	link: UploadLink;
+	threadId: string;
 }
 
 /** Within this distance of the bottom, the transcript follows new content. */
 const STICK_PX = 80;
 
-function Transcript({ blocks, state, running, waiting, fetchFull }: TranscriptProps) {
+function Transcript({ blocks, state, running, waiting, fetchFull, link, threadId }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -391,7 +405,7 @@ function Transcript({ blocks, state, running, waiting, fetchFull }: TranscriptPr
 			>
 				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
 				{blocks.map((block) => (
-					<BlockView key={block.id} block={block} state={state} running={running} fetchFull={fetchFull} t={t} />
+					<BlockView key={block.id} block={block} state={state} running={running} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
 				))}
 				{typing && (
 					<div className="mx-typing" role="status" aria-label={t.chat.typing(aiName(state.info, ""))}>
@@ -412,13 +426,24 @@ function Transcript({ blocks, state, running, waiting, fetchFull }: TranscriptPr
 	);
 }
 
-function BlockView({ block, state, running, fetchFull, t }: { block: Block; state: LinkState; running: boolean; fetchFull: (itemId: string) => Promise<void>; t: MachinesCopy }) {
+interface BlockViewProps {
+	block: Block;
+	state: LinkState;
+	running: boolean;
+	fetchFull: (itemId: string) => Promise<void>;
+	t: MachinesCopy;
+	link: UploadLink;
+	threadId: string;
+}
+
+function BlockView({ block, state, running, fetchFull, t, link, threadId }: BlockViewProps) {
 	const { locale } = useI18n();
 	switch (block.kind) {
 		case "user":
 			return (
 				<div className="mx-msg mine">
 					<div className="bubble" aria-busy={block.pending}>
+						{block.attachments.length > 0 && <MessageAttachments link={link} threadId={threadId} files={block.attachments} />}
 						{block.text}
 						{block.pending && <span className="sr-only">{t.chat.sending}</span>}
 					</div>

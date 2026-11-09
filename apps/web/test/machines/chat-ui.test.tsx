@@ -212,7 +212,7 @@ describe("slash commands", () => {
 		expect(screen.queryByRole("listbox")).toBeNull();
 		expect(onSend).not.toHaveBeenCalled();
 		await user.type(field, "src{Enter}");
-		expect(onSend).toHaveBeenCalledWith("/ak-review src");
+		expect(onSend).toHaveBeenCalledWith("/ak-review src", []);
 	});
 
 	it("inserts with Tab or a click, and closes on Esc until the text changes", async () => {
@@ -237,7 +237,7 @@ describe("slash commands", () => {
 		const { onSend, field } = composer([]);
 		await user.type(field, "/help{Enter}");
 		expect(screen.queryByRole("listbox")).toBeNull();
-		expect(onSend).toHaveBeenCalledWith("/help");
+		expect(onSend).toHaveBeenCalledWith("/help", []);
 	});
 });
 

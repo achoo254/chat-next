@@ -5,10 +5,16 @@
 // Typing "/" first opens a picker of the AI's commands and skills in this
 // folder (ThreadInfo); typing "@" opens the files of the session's folder
 // (FileList, tunelo 2.0.1+), and the pick goes in as "@path ".
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+// Files (tunelo 2.0.5+) come by the attach button, by pasting or by dropping
+// them on the session; they upload at once and go with the next message,
+// which may then have no text.
+import { useEffect, useId, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
+import { AttachButton, AttachTray } from "./attachment-tray.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import type { ShownAttachment } from "./transcript/tool-fold.ts";
+import type { Attachments } from "./use-attachments.ts";
 import { filterCommands, flatCommands, slashQuery } from "./slash-commands.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -32,7 +38,9 @@ interface ComposerProps {
 	commands: readonly SlashCommand[];
 	/** Lists the session folder's files for "@"; absent when the machine cannot. */
 	listFiles?: ListFiles | undefined;
-	onSend: (text: string) => Promise<void>;
+	/** Files waiting for the next message; absent where the session takes none. */
+	attach?: Attachments | undefined;
+	onSend: (text: string, files: readonly ShownAttachment[]) => Promise<void>;
 	onStop: () => Promise<void>;
 }
 
@@ -55,7 +63,7 @@ interface Found {
 	readonly listing: FileListing;
 }
 
-export function Composer({ ai, machine, online, running, prompting, commands, listFiles, onSend, onStop }: ComposerProps) {
+export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, onSend, onStop }: ComposerProps) {
 	const t = useMachinesCopy();
 	const [text, setText] = useState("");
 	const [caret, setCaret] = useState(0);
@@ -81,7 +89,10 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	const open = options.length > 0 || at !== null;
 	const index = Math.min(active, Math.max(0, options.length - 1));
 	const optionId = (i: number) => `${listId}-${i}`;
-	const stopMode = running && text.trim() === "";
+	const filesReady = attach !== undefined && attach.items.length > 0 && !attach.busy && !attach.failed;
+	const filesWaiting = attach !== undefined && (attach.busy || attach.failed);
+	const stopMode = running && text.trim() === "" && (attach?.items.length ?? 0) === 0;
+	const canSend = online && !filesWaiting && (text.trim() !== "" || filesReady);
 
 	useEffect(() => {
 		if (open) document.getElementById(`${listId}-${index}`)?.scrollIntoView?.({ block: "nearest" });
@@ -134,15 +145,27 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	};
 	const send = () => {
 		const message = text.trim();
-		if (message === "" || !online) return;
+		if (!canSend) return;
+		const files = attach?.take() ?? [];
 		edit("");
 		setError("");
-		onSend(message).catch(() => {
-			// Put the text back so nothing typed is lost.
-			setText((current) => (current === "" ? message : current));
-			setError(t.chat.sendFailed);
-		});
+		onSend(message, files).then(
+			() => attach?.sent(files),
+			() => {
+				// Put the text and the files back so nothing is lost.
+				setText((current) => (current === "" ? message : current));
+				attach?.putBack(files);
+				setError(t.chat.sendFailed);
+			},
+		);
 		field.current?.focus();
+	};
+	const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+		const pasted = [...event.clipboardData.files];
+		// Copied text that also carries a file (a cell, a rich document): the text goes in as usual.
+		if (pasted.length === 0 || event.clipboardData.getData("text/plain") !== "" || attach === undefined) return;
+		event.preventDefault();
+		attach.add(pasted);
 	};
 	const stop = () => {
 		if (stopping) return;
@@ -229,7 +252,9 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					{error}
 				</p>
 			)}
+			{attach !== undefined && <AttachTray attach={attach} />}
 			<div className="mx-compose-row">
+				{attach?.supported === true && <AttachButton attach={attach} disabled={!online} />}
 				{open && at === null && groups !== null && (
 					<ul className="mx-slash" id={listId} role="listbox" aria-label={t.slash.label}>
 						{group(t.slash.builtin(ai), groups.builtin, "builtin", 0)}
@@ -285,6 +310,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					onChange={(event) => edit(event.target.value, event.target.selectionStart)}
 					onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
 					onKeyDown={onKeyDown}
+					onPaste={onPaste}
 				/>
 				{stopMode ? (
 					<button type="button" className="icon-btn mx-send stop" aria-label={t.chat.stop} title={t.chat.stop} disabled={!online || stopping} onClick={stop}>
@@ -295,8 +321,8 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 						type="button"
 						className="icon-btn mx-send"
 						aria-label={running ? t.agent.composer.queue : t.chat.send}
-						title={running ? t.agent.composer.queue : t.chat.send}
-						disabled={!online || text.trim() === ""}
+						title={filesWaiting ? t.agent.attach.waitUpload : running ? t.agent.composer.queue : t.chat.send}
+						disabled={!canSend}
 						onClick={send}
 					>
 						<Icon name="send" />

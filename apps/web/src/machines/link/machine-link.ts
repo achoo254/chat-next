@@ -25,7 +25,7 @@ import {
 } from "@achoo254/chat-proto/remote/remote";
 import { HandshakeFailure, startHandshake, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
 import { applyItems, EMPTY_JOURNAL, resetJournal, type Journal } from "../transcript/reducer.ts";
-import type { PendingSend } from "../transcript/tool-fold.ts";
+import type { PendingSend, ShownAttachment } from "../transcript/tool-fold.ts";
 import { allowedTunnel, frameBytes, type SocketFactory, type SocketLike } from "./socket.ts";
 
 export const PING_MS = 10_000;
@@ -270,13 +270,16 @@ export class MachineLink {
 		});
 	}
 
-	/** Sends a message; it shows at once and stays until the machine echoes it. */
-	async send(threadId: string, text: string): Promise<void> {
+	/**
+	 * Sends a message, with files uploaded for it before (their upload ids);
+	 * it shows at once and stays until the machine echoes it.
+	 */
+	async send(threadId: string, text: string, attachments: readonly ShownAttachment[] = []): Promise<void> {
 		const clientMsgId = this.newId();
 		const list = this.current.pending.get(threadId) ?? [];
-		this.setPending(threadId, [...list, { clientMsgId, text }]);
+		this.setPending(threadId, [...list, { clientMsgId, text, ...(attachments.length > 0 ? { attachments } : {}) }]);
 		try {
-			await this.request({ case: "threadSend", value: { threadId, text, clientMsgId } });
+			await this.request({ case: "threadSend", value: { threadId, text, clientMsgId, attachmentIds: attachments.map((a) => a.id) } });
 		} catch (err) {
 			this.setPending(
 				threadId,

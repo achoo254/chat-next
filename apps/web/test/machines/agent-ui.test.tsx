@@ -231,7 +231,7 @@ describe("prompt card above the composer", () => {
 
 describe("composer", () => {
 	const setup = (props: { running?: boolean; prompting?: boolean; listFiles?: ListFiles } = {}) => {
-		const onSend = vi.fn((_text: string) => Promise.resolve());
+		const onSend = vi.fn((_text: string, _files: readonly unknown[]) => Promise.resolve());
 		const onStop = vi.fn(() => Promise.resolve());
 		wrap(
 			<Composer
@@ -258,7 +258,7 @@ describe("composer", () => {
 		await user.type(field, "rồi chạy test");
 		expect(screen.queryByRole("button", { name: "Dừng" })).toBeNull();
 		await user.click(screen.getByRole("button", { name: "Gửi vào hàng chờ" }));
-		expect(onSend).toHaveBeenCalledWith("rồi chạy test");
+		expect(onSend).toHaveBeenCalledWith("rồi chạy test", []);
 	});
 
 	it("stops with Esc, unless a prompt waits for an answer", async () => {

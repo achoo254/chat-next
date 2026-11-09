@@ -6,8 +6,11 @@
 // diffs of two files, and the statusline data (ThreadInfo) with commands and
 // skills; the machine's Claude profiles announced unasked, the session
 // switching account after its turn, a running session out of usage with a
-// suggestion; previews; a running and a parked session in two folders; and beside it a
-// machine this browser has not paired with and one that is offline.
+// suggestion; previews; a running and a parked session in two folders; a
+// message with an image and a file (the image fetched back over the link),
+// uploads acknowledged piece by piece (a file named "stall-…" stops at about
+// 40 %, to show the progress); and beside it a machine this browser has not
+// paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { Decision, ItemSchema, PromptState, Role, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
@@ -17,6 +20,26 @@ import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
 import type { FakeMachines } from "./fake-machines.ts";
 
 export const DEMO_THREAD = "demo-thread";
+const DEMO_IMAGE = "demo-image-1";
+
+/** A small screenshot-like PNG for the demo message's image. */
+async function demoImage(): Promise<Uint8Array> {
+	const canvas = document.createElement("canvas");
+	canvas.width = 240;
+	canvas.height = 160;
+	const c = canvas.getContext("2d");
+	if (c === null) return new Uint8Array();
+	c.fillStyle = "#f4f6fa";
+	c.fillRect(0, 0, 240, 160);
+	c.fillStyle = "#2f6bff";
+	c.fillRect(0, 0, 240, 24);
+	c.fillStyle = "#d8dee9";
+	for (let y = 40; y < 150; y += 22) c.fillRect(16, y, 140 + ((y * 7) % 60), 10);
+	c.fillStyle = "#ff6b6b";
+	c.fillRect(196, 40, 60, 40);
+	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+	return blob === null ? new Uint8Array() : new Uint8Array(await blob.arrayBuffer());
+}
 const TUNNEL = `wss://demo.tunnel.${brand.domain}`;
 
 type Body = NonNullable<MessageInitShape<typeof ItemSchema>["body"]>;
@@ -32,7 +55,17 @@ function transcript(now: number): Item[] {
 	const longCommand =
 		'cd "D:\\CONG VIEC\\hoandat-app\\chat-next" && pnpm --filter @app/web exec vitest run test/machines/chat-ui.test.tsx test/machines/transcript.test.ts --reporter=verbose --coverage.enabled=true --coverage.include=src/machines/**/*.tsx 2>&1 | tail -n 40';
 	return [
-		item("u1", { case: "text", value: { role: Role.USER, text: "Chạy test của màn Máy của tôi rồi sửa chỗ lỗi giúp mình" } }),
+		item("u1", {
+			case: "text",
+			value: {
+				role: Role.USER,
+				text: "Chạy test của màn Máy của tôi rồi sửa chỗ lỗi giúp mình",
+				attachments: [
+					{ id: DEMO_IMAGE, name: "man-may-375.png", mimeType: "image/png", size: 48_213n, image: true },
+					{ id: "demo-file-1", name: "loi-tran-ngang.log", mimeType: "text/plain", size: 3_412n, path: ".tunelo-attachments/2026-11-09/loi-tran-ngang.log" },
+				],
+			},
+		}),
 		item("turn1", { case: "turn", value: { state: TurnState.COMPLETED, durationMs: 42_300n, contextTokens: 68_000n, contextWindow: 200_000n } }),
 		item("a1", { case: "text", value: { role: Role.ASSISTANT, text: "Mình chạy bộ test trước để xem trạng thái hiện tại." } }),
 		item("t1", bash("1", longCommand)),
@@ -116,6 +149,9 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	const entry = machines.add({ name: "DIEUVY-LAPTOP", os: "win32", arch: "x64", tunnelUrl: TUNNEL, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
 	const ref = String(entry.id);
 	await keys.pin(ref, machine.keys.publicKey);
+	const image = await demoImage();
+	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
+	const stalled = new Map<string, number>();
 	const thread = {
 		id: DEMO_THREAD,
 		title: "Sửa giao diện Máy của tôi",
@@ -176,7 +212,8 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							agentVersion: "2.0.1",
 							maxSessions: 3,
 							openSessions: 1,
-							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
+							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
+							attachments: { fileMaxBytes: 25n * 1024n * 1024n, messageMaxBytes: 50n * 1024n * 1024n, messageMaxFiles: 10, imageMaxBytes: 3_932_160n, pieceMaxBytes: 64 * 1024 },
 							devices: [
 								{ publicKey: device.publicKey, name: "Chrome · Windows", addedAt: BigInt(now - 3 * 86_400_000) },
 								{ publicKey: new Uint8Array(32).fill(7), name: "Safari · iPhone của Đạt", addedAt: BigInt(now - 20 * 86_400_000) },
@@ -260,6 +297,16 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			}
 			case "auditList":
 				return [{ case: "auditListResult", value: { entries: [] } }];
+			case "attachmentUpload": {
+				const v = frame.body.value;
+				if (v.offset === 0n && v.name.startsWith("stall-")) stalled.set(v.uploadId, Math.floor(Number(v.size) * 0.4));
+				const stop = stalled.get(v.uploadId);
+				return stop !== undefined && Number(v.offset) + v.data.length > stop ? [] : [{ case: "ack", value: {} }];
+			}
+			case "attachmentCancel":
+				return [{ case: "ack", value: {} }];
+			case "attachmentFetch":
+				return [{ case: "attachmentData", value: { threadId: frame.body.value.threadId, attachmentId: frame.body.value.attachmentId, mimeType: "image/png", data: image } }];
 			default:
 				return defaultAnswer(frame);
 		}

@@ -74,6 +74,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.sessionNotFound;
 		case ErrorReason.SESSION_OPEN_ELSEWHERE:
 			return r.sessionOpenElsewhere;
+		case ErrorReason.ATTACHMENT_TOO_LARGE:
+			return r.attachmentTooLarge(s);
+		case ErrorReason.TOO_MANY_ATTACHMENTS:
+			return r.tooManyAttachments;
+		case ErrorReason.ATTACHMENT_NOT_FOUND:
+			return r.attachmentNotFound;
 		default:
 			return undefined;
 	}

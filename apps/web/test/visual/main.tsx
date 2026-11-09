@@ -391,6 +391,34 @@ async function openInfo(): Promise<void> {
 	await find(() => document.querySelector("aside.info .info-head"));
 }
 
+/** A small PNG made here, as a pasted screenshot would be. */
+async function pngFile(name: string): Promise<File> {
+	const canvas = document.createElement("canvas");
+	canvas.width = 320;
+	canvas.height = 200;
+	const c = canvas.getContext("2d");
+	if (c !== null) {
+		c.fillStyle = "#e9eefc";
+		c.fillRect(0, 0, 320, 200);
+		c.fillStyle = "#2f6bff";
+		c.fillRect(24, 24, 120, 80);
+		c.fillStyle = "#ffb020";
+		c.fillRect(170, 60, 120, 110);
+	}
+	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+	return new File([blob ?? new Blob()], name, { type: "image/png" });
+}
+
+/** Drops files on the session, as the user dragging them from the system would. */
+async function dropFiles(files: File[]): Promise<void> {
+	const chat = await find(() => document.querySelector<HTMLElement>(".mx-chat"));
+	await find(() => document.querySelector(".mx-attach-btn"));
+	const data = new DataTransfer();
+	for (const file of files) data.items.add(file);
+	chat.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: data }));
+	chat.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
 	// The composer's "/" picker of the demo session's commands and skills.
 	slash: async () => {
@@ -411,6 +439,33 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click(".mx-head button.btn-primary:not(:disabled)", /Phiên mới/);
 		await click(".mx-new-tabs button", /Phiên có sẵn/);
 		await find(() => document.querySelector(".mx-local-row"));
+	},
+	// Files dragged over the session: the drop zone over all of it.
+	"attach-drop": async () => {
+		const chat = await find(() => document.querySelector<HTMLElement>(".mx-chat"));
+		await find(() => document.querySelector(".mx-attach-btn"));
+		const data = new DataTransfer();
+		data.items.add(new File(["x"], "anh.png", { type: "image/png" }));
+		chat.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: data }));
+		await find(() => document.querySelector(".mx-drop"));
+	},
+	// A sent message with an image (fetched back from the machine) and a file saved in the session's folder.
+	"attach-history": async () => {
+		const image = await find(() => document.querySelector(".mx-sent-img img"));
+		image.closest(".mx-msg")?.scrollIntoView({ block: "center" });
+	},
+	// Two files dropped: an image (thumbnail) and a document, both uploaded; the composer ready to send.
+	"attach-tray": async () => {
+		await dropFiles([await pngFile("ban-thiet-ke.png"), new File([new Uint8Array(180_000)], "bao-cao-quy-3.pdf", { type: "application/pdf" })]);
+		await find(() => (document.querySelectorAll(".mx-tray-item.ready").length === 2 ? document.querySelector(".mx-tray") : null));
+	},
+	// A large file uploading (the machine stops answering at about 40 %), next to an uploaded image.
+	"attach-progress": async () => {
+		await dropFiles([await pngFile("ban-thiet-ke.png"), new File([new Uint8Array(2_000_000)], "stall-du-lieu-mau.zip", { type: "application/zip" })]);
+		await find(() => {
+			const bar = document.querySelector(".mx-tray-bar");
+			return bar !== null && Number(bar.getAttribute("aria-valuenow")) >= 30 ? bar : null;
+		});
 	},
 	// The markdown answer (list, tasks, table, code block) scrolled into view.
 	markdown: async () => {

@@ -35,7 +35,7 @@ export interface ToolRun {
 }
 
 export type Block =
-	| { readonly kind: "user"; readonly id: string; readonly text: string; readonly pending: boolean }
+	| { readonly kind: "user"; readonly id: string; readonly text: string; readonly pending: boolean; readonly attachments: readonly ShownAttachment[] }
 	| { readonly kind: "text"; readonly id: string; readonly text: string; readonly partial: boolean }
 	| { readonly kind: "who"; readonly id: string; readonly provider: string; readonly model: string }
 	| { readonly kind: "tools"; readonly id: string; readonly runs: readonly ToolRun[] }
@@ -51,9 +51,23 @@ export type Block =
 	| { readonly kind: "error"; readonly id: string; readonly message: string };
 
 /** A message the user sent that the machine has not echoed yet. */
+/** A file that went with a user message, as the thread shows it. */
+export interface ShownAttachment {
+	readonly id: string;
+	readonly name: string;
+	readonly size: number;
+	/** The AI got it as an image: shown as one (a preview here, else fetched from the machine). */
+	readonly image: boolean;
+	/** Where the machine saved a file in the session's folder; "" for an image or while sending. */
+	readonly path: string;
+	/** A local preview of an image being sent; "" otherwise. */
+	readonly preview: string;
+}
+
 export interface PendingSend {
 	readonly clientMsgId: string;
 	readonly text: string;
+	readonly attachments?: readonly ShownAttachment[];
 }
 
 export function foldTranscript(items: readonly Item[], pending: readonly PendingSend[] = []): Block[] {
@@ -129,7 +143,8 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				flushRuns();
 				if (b.value.role === Role.USER) {
 					flushTurn();
-					blocks.push({ kind: "user", id: item.id, text: b.value.text, pending: false });
+					const attachments = b.value.attachments.map((a) => ({ id: a.id, name: a.name, size: Number(a.size), image: a.image, path: a.path, preview: "" }));
+					blocks.push({ kind: "user", id: item.id, text: b.value.text, pending: false, attachments });
 					break;
 				}
 				if (b.value.text === "" && !b.value.partial) break;
@@ -156,7 +171,9 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	flushRuns();
 	flushTurn();
 	for (const send of pending) {
-		if (!echoed.has(send.clientMsgId)) blocks.push({ kind: "user", id: `pending:${send.clientMsgId}`, text: send.text, pending: true });
+		if (!echoed.has(send.clientMsgId)) {
+			blocks.push({ kind: "user", id: `pending:${send.clientMsgId}`, text: send.text, pending: true, attachments: send.attachments ?? [] });
+		}
 	}
 	return blocks;
 }
