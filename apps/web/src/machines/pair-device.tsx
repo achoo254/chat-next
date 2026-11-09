@@ -13,7 +13,8 @@ import { confirmTrust, pairWithCode } from "./link/pairing.ts";
 import type { LinkHub } from "./link/link-hub.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { PageHead } from "./page-head.tsx";
-import { useEntry, useHub } from "./use-machines.ts";
+import { useEntry, useHub, useNow } from "./use-machines.ts";
+import { reachable } from "./machine-status.ts";
 import { useI18n } from "../i18n/i18n.tsx";
 import { serverOrigin } from "../server-origin.ts";
 import { type Os, quickInstallCommand } from "./add-machine.tsx";
@@ -46,7 +47,20 @@ export function PairDevice({ machine }: { machine: string }) {
 	const [error, setError] = useState("");
 	const [scanning, setScanning] = useState(false);
 	const name = entry?.name ?? "";
-	const url = entry?.tunnelUrl ?? "";
+	const now = useNow();
+	// The code goes to the machine through its tunnel: only while the directory sees it online.
+	const online = entry !== null && reachable(entry, now);
+	const url = online ? (entry?.tunnelUrl ?? "") : "";
+	const os = osOf(entry?.os ?? "");
+
+	// Offline: ask the directory every few seconds, so the code boxes open as soon as the machine is up.
+	useEffect(() => {
+		if (online) return;
+		const ask = () => void hub.refresh().catch(() => undefined);
+		ask();
+		const timer = window.setInterval(ask, OFFLINE_POLL_MS);
+		return () => window.clearInterval(timer);
+	}, [hub, online]);
 
 	const finish = (run: () => Promise<void>) => {
 		setBusy(true);
@@ -85,9 +99,12 @@ export function PairDevice({ machine }: { machine: string }) {
 						<MachineIcon name="qr" />
 						{t.pair.heading(name)}
 					</h3>
+					{entry !== null && !online ? (
+						<NotConnected name={name} machineOs={entry.os} />
+					) : (
 					<ol className="mx-steps">
 						<li>
-							<p>{t.agent.pairing.step1(name)}</p>
+							<p>{os === "windows" ? t.agent.pairing.step1Windows(name) : os === "mac" ? t.agent.pairing.step1Mac(name) : t.agent.pairing.step1(name)}</p>
 							<div className="mx-cmd">
 								<code>tunelo pair</code>
 								<CopyButton text="tunelo pair" label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
@@ -108,6 +125,7 @@ export function PairDevice({ machine }: { machine: string }) {
 							<CodeInput disabled={busy || url === ""} onCode={(code) => finish(() => pairByCode(hub, machine, url, code))} />
 						</li>
 					</ol>
+					)}
 					{busy && (
 						<div className="mx-wait">
 							<span className="spin" aria-hidden="true" />
@@ -119,13 +137,50 @@ export function PairDevice({ machine }: { machine: string }) {
 							{error}
 						</p>
 					)}
-					<p className="note">{t.agent.pairing.sameMachine(name)}</p>
+					{online && (
+						<p className="note">{os === "windows" ? t.agent.pairing.sameMachineWindows(name) : t.agent.pairing.sameMachine(name)}</p>
+					)}
 					<div className="mx-hint">
 						<Icon name="lock" small />
 						<span>{t.pair.note}</span>
 					</div>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+export const OFFLINE_POLL_MS = 5_000;
+
+/**
+ * The machine is not reachable now (switched off or asleep, tunelo not
+ * running, or an old version without the tunnel): what to do on it. The page
+ * opens the code boxes by itself once it is up.
+ */
+function NotConnected({ name, machineOs }: { name: string; machineOs: string }) {
+	const t = useMachinesCopy();
+	const p = t.agent.pairing;
+	const os = osOf(machineOs);
+	return (
+		<div className="mx-pair-offline" role="status" data-id="pair-offline">
+			<h4>{p.offlineTitle(name)}</h4>
+			<p>{p.offlineWhy}</p>
+			<ol className="mx-steps">
+				<li>
+					<QuickInstall machineOs={machineOs} />
+				</li>
+				<li>
+					<p>{os === "windows" ? p.startWindows : p.startMac}</p>
+					<div className="mx-cmd">
+						<code>tunelo start</code>
+						<CopyButton text="tunelo start" label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
+					</div>
+				</li>
+			</ol>
+			<p className="mx-wait">
+				<span className="spin" aria-hidden="true" />
+				{p.offlineWaiting}
+			</p>
 		</div>
 	);
 }

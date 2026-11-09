@@ -65,14 +65,19 @@ export function connText(t: MachinesCopy, conn: Conn, now: number): string {
 			return conn.lastSeenMs === 0 ? t.agent.conn.never : t.agent.conn.offline(timeAgo(t, conn.lastSeenMs, now));
 		case "retrying":
 			return t.agent.conn.retrying(conn.attempt);
+		case "unpaired":
+			return conn.online ? t.agent.conn.unpaired : t.agent.conn.unpairedOffline;
 		default:
 			return t.agent.conn[conn.kind];
 	}
 }
 
-/** The dot beside a machine: on, waiting, off or a problem to fix. */
-export function connDot(conn: Conn): "on" | "wait" | "off" | "warn" {
+/** The dot beside a machine: on, waiting, off, ready to pair, or a problem to fix. */
+export function connDot(conn: Conn): "on" | "wait" | "off" | "pair" | "warn" {
 	switch (conn.kind) {
+		case "unpaired":
+			// Online and only waiting for this device to pair, or not reachable at all.
+			return conn.online ? "pair" : "off";
 		case "on":
 			return "on";
 		case "connecting":

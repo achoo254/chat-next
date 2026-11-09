@@ -8,7 +8,8 @@ import { isOnline, type MachineEntry } from "./machines-client.ts";
 
 export type Conn =
 	| { readonly kind: "checking" }
-	| { readonly kind: "unpaired" }
+	/** Not paired with this device; `online`: the machine itself is reachable now. */
+	| { readonly kind: "unpaired"; readonly online: boolean }
 	| { readonly kind: "repair" }
 	| { readonly kind: "update" }
 	| { readonly kind: "offline"; readonly lastSeenMs: number }
@@ -40,14 +41,14 @@ export function connOf(entry: Pick<MachineEntry, "ref" | "lastSeenAt" | "tunnelU
 	if (status.kind === "failed") {
 		switch (status.reason) {
 			case "unpaired":
-				return { kind: "unpaired" };
+				return { kind: "unpaired", online: true };
 			case "version":
 				return { kind: "update" };
 			default:
 				return { kind: "repair" };
 		}
 	}
-	if (pinned === false) return { kind: "unpaired" };
+	if (pinned === false) return { kind: "unpaired", online: reachable(entry, nowMs) };
 	if (!reachable(entry, nowMs)) return { kind: "offline", lastSeenMs: entry.lastSeenAt * 1000 };
 	if (pinned === null) return { kind: "checking" };
 	if ((status.kind === "connecting" || status.kind === "offline") && status.attempt > 1) return { kind: "retrying", attempt: status.attempt };

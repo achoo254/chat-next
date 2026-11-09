@@ -104,6 +104,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-new-session-existing": "?at=machine-sessions&open=new-session-existing",
 	"machine-info": "?at=machine-info",
 	"machine-pair": "?at=machine-pair",
+	"machine-pair-offline": "?at=machine-pair-offline",
 	"machine-add": "?at=machine-add",
 };
 

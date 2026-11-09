@@ -25,6 +25,7 @@
 .mx .dot.off { background: var(--c-border-strong); }
 .mx .dot.wait { background: var(--c-warning); }
 .mx .dot.warn { background: var(--c-error); }
+.mx .dot.pair { background: var(--c-primary); }
 
 /* The AI Agent column: the "Cần bạn" entry and the filters, then a group per machine. */
 .mx-nav-top { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-2) 0; border-bottom: 1px solid var(--c-border-subtle); }
@@ -669,3 +670,6 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-first-phone { font-weight: 600; }
 .mx-quick-install { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
 .mx-quick-install .note { margin: 0; }
+.mx-pair-offline { display: grid; gap: var(--space-2); }
+.mx-pair-offline h4 { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.mx-pair-offline > p { margin: 0; }

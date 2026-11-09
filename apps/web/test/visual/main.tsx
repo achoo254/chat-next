@@ -310,6 +310,8 @@ const SCREENS: Record<string, string> = {
 	"machine-sessions": paths.machine("1"),
 	"machine-info": paths.machineInfo("1"),
 	"machine-pair": paths.machinePair("2"),
+	// Pairing with the offline machine: why it is not connected and what to run on it.
+	"machine-pair-offline": paths.machinePair("3"),
 	"machine-add": paths.machinesAdd(),
 };
 const at = params.get("at");

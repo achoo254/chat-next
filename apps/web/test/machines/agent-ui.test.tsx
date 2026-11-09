@@ -38,7 +38,7 @@ const idle = { status: { kind: "idle" } } as const;
 
 describe("machine state", () => {
 	it("names why a machine cannot be used, before and after its link ran", () => {
-		expect(connOf(online, false, idle, NOW)).toEqual({ kind: "unpaired" });
+		expect(connOf(online, false, idle, NOW)).toEqual({ kind: "unpaired", online: true });
 		expect(connOf(online, null, idle, NOW)).toEqual({ kind: "checking" });
 		expect(connOf(online, true, idle, NOW)).toEqual({ kind: "connecting" });
 		expect(connOf(online, true, { status: { kind: "offline", attempt: 3 } }, NOW)).toEqual({ kind: "retrying", attempt: 3 });
