@@ -254,6 +254,13 @@ describe("composer", () => {
 		return { onSend, onStop, field: screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement };
 	};
 
+	it("shows no key hints under the field; the send button's tooltip names the keys", async () => {
+		const { field } = setup();
+		await userEvent.type(field, "x");
+		expect(screen.queryByText(/Enter gửi · Shift\+Enter/)).toBeNull();
+		expect(screen.getByRole("button", { name: "Gửi" }).getAttribute("title")).toBe("Gửi · Enter gửi · Shift+Enter xuống dòng · Esc dừng");
+	});
+
 	it("has one button: Stop while a turn runs and nothing is typed, queueing once there is text", async () => {
 		const user = userEvent.setup();
 		const { onSend, onStop, field } = setup({ running: true });

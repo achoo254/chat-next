@@ -549,7 +549,8 @@ export const zhCNMachines: MachinesCopy = {
 		jump: { newer: "新内容", needYou: "需要你批准" },
 		composer: {
 			queue: "加入队列",
-			hint: "Enter 发送 · Shift+Enter 换行 · Esc 停止",
+			/** The keys, as the send button\'s tooltip. */
+			keys: "Enter 发送 · Shift+Enter 换行 · Esc 停止",
 		},
 		thread: {
 			archive: "归档",

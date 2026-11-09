@@ -225,7 +225,8 @@ export const en: MessagingCopy = {
 		placeholder: (name: string) => `Message ${name}`,
 		placeholderSaved: "Write a note to My Cloud",
 		placeholderGroup: (name: string) => `Type @ to mention, message ${name}`,
-		hint: "Enter to send · Shift+Enter for a new line",
+		/** The keys, as the send button\'s tooltip. */
+		keys: "Enter to send · Shift+Enter for a new line",
 		placeholderOffline: "Messages send when you are back online",
 		channelLabel: "Post",
 		channelPlaceholder: "Post to the channel",

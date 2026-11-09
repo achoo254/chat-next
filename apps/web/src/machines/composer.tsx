@@ -321,7 +321,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 						type="button"
 						className="icon-btn mx-send"
 						aria-label={running ? t.agent.composer.queue : t.chat.send}
-						title={filesWaiting ? t.agent.attach.waitUpload : running ? t.agent.composer.queue : t.chat.send}
+						title={filesWaiting ? t.agent.attach.waitUpload : `${running ? t.agent.composer.queue : t.chat.send} · ${t.agent.composer.keys}`}
 						disabled={!canSend}
 						onClick={send}
 					>
@@ -329,7 +329,6 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					</button>
 				)}
 			</div>
-			<p className="mx-compose-hint">{t.agent.composer.hint}</p>
 		</div>
 	);
 }

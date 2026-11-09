@@ -348,10 +348,6 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-field:focus { outline: none; border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
 .mx-send { color: var(--c-primary); }
 .mx-send.stop { color: var(--c-error); }
-/* The keys hint shows only while typing with a keyboard. */
-.mx-compose-hint { max-width: var(--mx-col); min-height: 1.5em; margin: var(--space-1) auto 0; font-size: 0.75rem; line-height: 1.5; color: var(--c-text-muted); visibility: hidden; }
-.mx-composer:focus-within .mx-compose-hint { visibility: visible; }
-@media (pointer: coarse) { .mx-compose-hint { display: none; } }
 /* Attachments: the button left of the field, the tray above it, the drop zone over the session. */
 .mx-attach { position: relative; display: flex; }
 .mx-attach-btn { color: var(--c-icon-muted); }

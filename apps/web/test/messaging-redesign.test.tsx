@@ -185,16 +185,17 @@ describe("messages", () => {
 });
 
 describe("composer", () => {
-	it("says where the message goes, hints the keys until the first send and edits the last message with ↑", async () => {
+	it("says where the message goes, names the keys only in the send button's tooltip and edits the last message with ↑", async () => {
 		const demo = seedDemo();
 		const { log } = await openChat(`/c/${demo.ids.lanAnh}`, "Mình gửi file thiết kế rồi nhé", demo);
 		const box = screen.getByRole("textbox", { name: "Tin nhắn tới Lan Anh" }) as HTMLTextAreaElement;
 		expect(box.placeholder).toBe("Nhập tin nhắn tới Lan Anh");
-		expect(screen.getByText("Enter gửi · Shift+Enter xuống dòng")).toBeTruthy();
-		await userEvent.type(box, "Mình nhận rồi{Enter}");
+		// No line of key hints under the field: the keys are the send button's tooltip.
+		expect(screen.queryByText("Enter gửi · Shift+Enter xuống dòng")).toBeNull();
+		await userEvent.type(box, "Mình");
+		expect(screen.getByRole("button", { name: "Gửi" }).getAttribute("title")).toBe("Enter gửi · Shift+Enter xuống dòng");
+		await userEvent.type(box, " nhận rồi{Enter}");
 		expect(await within(log).findByText("Mình nhận rồi", {}, LONG)).toBeTruthy();
-		await waitFor(() => expect(screen.queryByText("Enter gửi · Shift+Enter xuống dòng")).toBeNull());
-		expect(window.localStorage.getItem("chat:composer-hint-done")).toBe("1");
 
 		await waitFor(() => expect(messageOf(log, "Mình nhận rồi").dataset.seq).toBeTruthy(), LONG);
 		box.focus();

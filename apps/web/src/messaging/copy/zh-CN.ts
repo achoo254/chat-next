@@ -222,7 +222,8 @@ export const zhCN: MessagingCopy = {
 		placeholder: (name: string) => `给 ${name} 发消息`,
 		placeholderSaved: "在我的云端写笔记",
 		placeholderGroup: (name: string) => `输入 @ 提及成员，给 ${name} 发消息`,
-		hint: "Enter 发送 · Shift+Enter 换行",
+		/** The keys, as the send button\'s tooltip. */
+		keys: "Enter 发送 · Shift+Enter 换行",
 		placeholderOffline: "消息将在恢复联网后发送",
 		channelLabel: "发布",
 		channelPlaceholder: "发布到频道",

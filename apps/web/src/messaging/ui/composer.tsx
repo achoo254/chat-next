@@ -2,7 +2,7 @@
 // Enter sends, Shift+Enter breaks the line, Esc cancels reply or edit, ↑ in
 // an empty composer edits your last message (mockups/chat.html#composer-states,
 // settings.html#shortcuts). The placeholder says where the message goes; the
-// key hint under it shows until the first message sent on this device.
+// send button's tooltip names the keys.
 // Sending is optimistic: the core shows the message at once with a clock.
 // Dropping the link preview sends the message with no_link_preview, so the
 // server attaches none. The paper clip (shown when the server takes media)
@@ -81,24 +81,6 @@ export function sizeLimitLabel(bytes: number, locale: string): string {
 const MAX_HEIGHT_PX = 160;
 const PREVIEW_DELAY_MS = 400;
 const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
-const HINT_KEY = "chat:composer-hint-done";
-
-function hintDone(): boolean {
-	try {
-		return window.localStorage.getItem(HINT_KEY) === "1";
-	} catch {
-		return false;
-	}
-}
-
-function markHintDone(): void {
-	try {
-		window.localStorage.setItem(HINT_KEY, "1");
-	} catch {
-		// Storage off: the hint shows again next time.
-	}
-}
-
 interface ComposerProps {
 	chatId: number;
 	topicId: number;
@@ -130,7 +112,6 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	// Media is off on the server (upload_size_max 0) or the chat does not allow it: no clip, no mic.
 	const mediaOn = media && limits !== null && limits.uploadSizeMax > 0 && !disabled;
 	const { source, remote, backend, drafts, store, toasts } = useServices();
-	const [hint, setHint] = useState(() => !hintDone());
 	const ui = useUi();
 	const connection = useConnection();
 	const intent = useIntent(chatId);
@@ -273,10 +254,6 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 			cancelIntent();
 			setPreview(null);
 			setDismissed("");
-			if (hint) {
-				markHintDone();
-				setHint(false);
-			}
 		} catch {
 			if (!editing) {
 				setText(value);
@@ -546,6 +523,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						type="submit"
 						className="send"
 						aria-label={editing ? copy.composer.save : channel ? copy.composer.post : copy.composer.send}
+						title={copy.composer.keys}
 						disabled={empty || disabled}
 					>
 						<Icon name={editing ? "check" : "send"} />
@@ -585,7 +563,6 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					/>
 				</Suspense>
 			)}
-			{hint && !editing && !disabled && <p className="composer-hint">{copy.composer.hint}</p>}
 		</div>
 	);
 }

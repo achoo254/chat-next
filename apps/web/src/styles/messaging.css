@@ -928,8 +928,6 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .to-mention:hover { color: var(--c-primary); }
 
 /* Composer: one-line key hint under it until the first message sent on this device. */
-.composer-hint { margin: 0; padding: 0 var(--space-4) var(--space-2); background: var(--c-surface); font-size: 0.75rem; color: var(--c-text-muted); }
-.composer + .composer-hint { margin-top: calc(-1 * var(--space-2)); }
 
 /* Info panel, Zalo order: three equal quick actions whose labels may wrap. */
 .info-hero p { margin: 0; font-size: 0.875rem; color: var(--c-text-muted); overflow-wrap: anywhere; }

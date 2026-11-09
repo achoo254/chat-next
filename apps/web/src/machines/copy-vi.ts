@@ -559,7 +559,8 @@ export const viMachines = {
 		jump: { newer: "Mới", needYou: "Cần bạn duyệt" },
 		composer: {
 			queue: "Gửi vào hàng chờ",
-			hint: "Enter gửi · Shift+Enter xuống dòng · Esc dừng",
+			/** The keys, as the send button\'s tooltip. */
+			keys: "Enter gửi · Shift+Enter xuống dòng · Esc dừng",
 		},
 		thread: {
 			archive: "Lưu trữ",

@@ -240,7 +240,8 @@ export const vi = {
 		/** "Cloud của tôi" (mockups/chat.html#first-run). */
 		placeholderSaved: "Ghi chú vào Cloud của tôi",
 		placeholderGroup: (name: string) => `Nhập @ để nhắc tên, tin nhắn tới ${name}`,
-		hint: "Enter gửi · Shift+Enter xuống dòng",
+		/** The keys, as the send button\'s tooltip. */
+		keys: "Enter gửi · Shift+Enter xuống dòng",
 		placeholderOffline: "Tin sẽ gửi khi có mạng",
 		channelLabel: "Bài đăng",
 		channelPlaceholder: "Đăng bài lên kênh",

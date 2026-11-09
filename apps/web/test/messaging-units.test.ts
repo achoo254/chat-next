@@ -294,7 +294,7 @@ describe("channel wording", () => {
 		expect(viScreens.contacts.add).toBe("Thêm vào danh bạ");
 		expect(copy.composer.placeholder("Lan Anh")).toBe("Nhập tin nhắn tới Lan Anh");
 		expect(copy.composer.placeholderGroup("Vận hành hệ thống")).toBe("Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống");
-		expect(copy.composer.hint).toBe("Enter gửi · Shift+Enter xuống dòng");
+		expect(copy.composer.keys).toBe("Enter gửi · Shift+Enter xuống dòng");
 		expect(copy.convo.membersOnline(12, 3)).toBe("12 thành viên · 3 đang hoạt động");
 		expect(viScreens.addFailed.reasonTooMany(false)).toBe("Nhóm đã đủ số thành viên tối đa");
 	});
