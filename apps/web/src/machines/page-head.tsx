@@ -1,4 +1,4 @@
-// The header of a "My machines" page: a back link (phones, or where a page
+// The header of an AI Agent page: a back link (phones, or where a page
 // has a parent), the title and a subtitle, then the page's own actions.
 import type { ReactNode } from "react";
 import { Icon } from "../components/screen-icons.tsx";

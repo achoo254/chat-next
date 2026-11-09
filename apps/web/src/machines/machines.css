@@ -5,6 +5,9 @@
 .mx-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--c-surface); border-right: 1px solid var(--c-border-subtle); container-type: inline-size; }
 .mx-list-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
 .mx-list-head h2 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
+/* "Quản lý máy" shortens before the heading does; its title shows it whole. */
+.mx-list-head .mx-manage { min-width: 0; flex-shrink: 1; }
+.mx-manage span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx-banner { margin: var(--space-2) var(--space-3) 0; }
 .mx-rows { list-style: none; margin: 0; padding: var(--space-2); overflow-y: auto; flex: 1; min-height: 0; }
 .mx-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); min-height: 64px; border-radius: var(--radius-sm); color: inherit; text-decoration: none; }

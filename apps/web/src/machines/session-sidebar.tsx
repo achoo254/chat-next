@@ -101,9 +101,9 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
 				<h2>{t.agent.title}</h2>
-				<Link to={aiPaths.manage} className="btn btn-sm" current={view.page === "machines" || view.page === "add"}>
+				<Link to={aiPaths.manage} className="btn btn-sm mx-manage" title={t.agent.machines} current={view.page === "machines" || view.page === "add"}>
 					<MachineIcon name="monitor" small />
-					{t.agent.machines}
+					<span>{t.agent.machines}</span>
 				</Link>
 			</header>
 			<div className="mx-nav-top">

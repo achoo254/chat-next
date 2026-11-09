@@ -1,4 +1,4 @@
-// Icons only "My machines" draws (paths from the mock), kept out of the
+// Icons only AI Agent draws (paths from the mock), kept out of the
 // shared sets. The folder rail imports MachineIcon "cpu" too: one small path.
 import type { ReactElement } from "react";
 import { iconSvg } from "../components/icon.tsx";

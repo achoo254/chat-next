@@ -116,7 +116,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 	const pairPath = machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine);
 	const max = state.maxSessions;
 	return (
-		<div className="mx-scroll">
+		<div className="mx-scroll" role="region" aria-label={t.agent.machineBoardOf(entry.name)}>
 			<PageHead back={paths.machines()} backLabel={t.backToMachines} title={entry.name} subtitle={connText(t, conn, now)}>
 				<Link to={paths.machineInfo(machine)} className="icon-btn" aria-label={t.agent.info}>
 					<Icon name="info" />

@@ -1,4 +1,4 @@
-// English copy of "My machines"; keys mirror copy-vi.ts.
+// English copy of the AI Agent screens; keys mirror copy-vi.ts.
 import type { MachinesCopy } from "./copy-vi.ts";
 
 export const enMachines: MachinesCopy = {
@@ -66,7 +66,7 @@ export const enMachines: MachinesCopy = {
 		granted: "Full Disk Access granted ✓",
 		addStep: "On the Mac: give tunelo Full Disk Access",
 		addBody: "The install command opened System Settings and Finder. Only needed if you work in Desktop, Documents, Downloads or iCloud Drive; it can wait.",
-		sessionHint: "The machine has no Full Disk Access yet: macOS may block a session in this folder. Pick another folder, or grant it first (see the machine's page).",
+		sessionHint: "The machine has no Full Disk Access yet: macOS may block a session in this folder. Pick another folder, or grant it first (see Machine settings).",
 	},
 	sessions: {
 		label: (machine) => `Sessions on ${machine}`,
@@ -477,7 +477,7 @@ export const enMachines: MachinesCopy = {
 			unknown: "Usage unknown",
 			updatedAt: (at) => `updated ${at}`,
 			add: "Add a Claude account",
-			manage: "Manage on the machine's page",
+			manage: "Manage in Machine settings",
 			pending: (email) => `Switches to ${email} after this turn`,
 		},
 		limit: {
@@ -493,13 +493,15 @@ export const enMachines: MachinesCopy = {
 		title: "AI Agent",
 		sessionsLabel: "AI sessions on every machine",
 		inbox: "Needs you",
-		machines: "Machines",
-		machinesTitle: "Machines",
+		machines: "Manage machines",
+		machinesTitle: "Manage machines",
 		machinesIntro: "Computers running tunelo and Claude Code. Sessions of every machine show in the AI Agent column.",
 		machineMenu: (machine) => `Options for ${machine}`,
-		machineBoard: "Machine's session board",
+		machineBoard: "Sessions on this machine",
+		machineBoardOf: (machine: string) => `Sessions on ${machine}`,
 		newSession: "New session",
-		info: "Machine details",
+		info: "Machine settings",
+		infoOf: (machine: string) => `Machine settings of ${machine}`,
 		pair: "Pair this device",
 		conn: {
 			checking: "Checking…",

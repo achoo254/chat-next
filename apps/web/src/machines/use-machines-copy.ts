@@ -2,7 +2,7 @@ import { lazyCopy } from "../i18n/i18n.tsx";
 import { viMachines } from "./copy-vi.ts";
 
 /**
- * Copy of the "My machines" screens in the current UI language. Vietnamese
+ * Copy of the AI Agent screens in the current UI language. Vietnamese
  * ships with the screens; other languages load the first time they are
  * needed (the screen suspends meanwhile).
  */

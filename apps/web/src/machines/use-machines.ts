@@ -1,4 +1,4 @@
-// Hooks and helpers shared by the "My machines" screens: the link hub from
+// Hooks and helpers shared by the AI Agent screens: the link hub from
 // the slot above the screens, the directory, one machine's link, and the
 // wording of remote errors.
 import { useEffect, useReducer, useState, useSyncExternalStore } from "react";

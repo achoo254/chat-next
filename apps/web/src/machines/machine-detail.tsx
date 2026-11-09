@@ -134,12 +134,12 @@ export function MachineDetail({ machine }: { machine: string }) {
 	const claude = providerVersion(state);
 	const hasClaude = state.info?.providers.some((p) => p.id === "claude") ?? false;
 	return (
-		<div className="mx-scroll">
+		<div className="mx-scroll" role="region" aria-label={t.agent.infoOf(name)}>
 			<PageHead
 				back={paths.machine(machine)}
 				backLabel={t.sessions.label(name)}
-				title={name}
-				subtitle={entry.os === "" ? entry.tunnelUrl : t.os(entry.os, entry.arch)}
+				title={t.agent.info}
+				subtitle={`${name} · ${entry.os === "" ? entry.tunnelUrl : t.os(entry.os, entry.arch)}`}
 			/>
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<DiskAccessBanner link={link} info={state.info} online={online} />

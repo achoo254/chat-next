@@ -2,7 +2,7 @@
 // installed and signed in, (2) one command installs tunelo with this
 // browser's device key, then asks for the pairing secret, which this page
 // made and shows (it never goes to the server), and signs tunelo in with the
-// account (tunelo login): tunelo then adds the machine to My machines by
+// account (tunelo login): tunelo then adds the machine to AI Agent by
 // itself, without an install code, (3) the page waits for the new machine in
 // the directory and checks in the first handshake that it knows the secret
 // before pinning its key.
