@@ -8,9 +8,10 @@
 // thread from its cursor; a ThreadReset drops the thread's items and the
 // snapshot that follows fills them again. A thread's ThreadInfo (what the
 // user's terminal statusline shows) is kept apart from its journal.
-// Pictures and tab lists of the machine's browser (BrowserFrame,
-// BrowserState) go to their own listeners, never into the state: they come
-// many times a second and only the open browser view wants them.
+// Frames the machine sends unasked that the state does not keep (pictures
+// and tab lists of the machine's browser, the bytes of its screen sharing)
+// go to their own listeners, never into the state: they come many times a
+// second and only an open view wants them.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { backoffDelay } from "@achoo254/chat-core";
 import {
@@ -19,8 +20,6 @@ import {
 	FrameSchema,
 	HandshakeErrorCode,
 	ThreadState,
-	type BrowserFrame,
-	type BrowserState,
 	type BrowserTakeover,
 	type Frame,
 	type GitChanges,
@@ -107,9 +106,6 @@ export interface LinkState {
 	/** Pages of the machine's browser that asked for a passkey nobody at the machine can give, newest last. */
 	readonly passkeyNotices: readonly PasskeyNotice[];
 }
-
-/** What the open browser view gets: a picture of the tab, or the tabs and the one shown. */
-export type BrowserMessage = { readonly kind: "frame"; readonly frame: BrowserFrame } | { readonly kind: "state"; readonly state: BrowserState };
 
 /** Passkey notices kept for showing. */
 const MAX_PASSKEY_NOTICES = 5;
@@ -198,7 +194,7 @@ const INITIAL: LinkState = {
 export class MachineLink {
 	private current: LinkState = INITIAL;
 	private readonly listeners = new Set<() => void>();
-	private readonly browserListeners = new Set<(message: BrowserMessage) => void>();
+	private readonly listenersOfViews = new Set<(body: Frame["body"]) => void>();
 	private readonly timers: Timers;
 	private readonly random: () => number;
 	private readonly newId: () => string;
@@ -231,10 +227,10 @@ export class MachineLink {
 
 	readonly snapshot = (): LinkState => this.current;
 
-	/** The browser's pictures and tab lists, for the open browser view; returns the unsubscribe. */
-	onBrowser(listener: (message: BrowserMessage) => void): () => void {
-		this.browserListeners.add(listener);
-		return () => this.browserListeners.delete(listener);
+	/** Every frame the state does not keep (browser pictures, screen sharing bytes), for an open view; returns the unsubscribe. */
+	onFrame(listener: (body: Frame["body"]) => void): () => void {
+		this.listenersOfViews.add(listener);
+		return () => this.listenersOfViews.delete(listener);
 	}
 
 	private set(change: Partial<LinkState>): void {
@@ -595,12 +591,6 @@ export class MachineLink {
 			case "browserTakeoverEnded":
 				this.dropTakeover(b.value.takeoverId);
 				break;
-			case "browserFrame":
-				for (const listener of this.browserListeners) listener({ kind: "frame", frame: b.value });
-				return;
-			case "browserState":
-				for (const listener of this.browserListeners) listener({ kind: "state", state: b.value });
-				return;
 			case "passkeyNotice":
 				this.set({ passkeyNotices: [...this.current.passkeyNotices, b.value].slice(-MAX_PASSKEY_NOTICES) });
 				break;
@@ -618,7 +608,7 @@ export class MachineLink {
 				}
 				break;
 			default:
-				break;
+				for (const listener of this.listenersOfViews) listener(b);
 		}
 		if (frame.id === "") return;
 		const waiter = this.waiters.get(frame.id);

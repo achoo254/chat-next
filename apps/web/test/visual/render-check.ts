@@ -73,6 +73,12 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-takeover-view": "?at=machine-takeover&open=takeover-view",
 	"machine-passkey": "?at=machine-passkey&open=passkey-card",
 	"machine-info-browser": "?at=machine-info&open=machine-browser-view",
+	// Claude says a dialog of the operating system waits; the machine's whole screen (off, sign-in, live); deleting the browser's profile.
+	"machine-os-dialog": "?at=machine-os-dialog&open=os-dialog-card",
+	"machine-screen-off": "?at=machine-screen-off&open=screen-off",
+	"machine-screen-signin": "?at=machine-screen-signin&open=screen-signin",
+	"machine-screen-live": "?at=machine-screen-live&open=screen-live",
+	"machine-info-browser-clear": "?at=machine-info&open=browser-clear",
 	"machine-details": "?at=machine-chat&open=status-details",
 	"machine-changes": "?at=machine-chat&open=changes",
 	"machine-changes-file": "?at=machine-chat&open=changes-file",

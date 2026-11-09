@@ -1,0 +1,18 @@
+diff --git a/core/util/browser.js b/core/util/browser.js
+index 63596d211bc3f2ac0c1853d58488dcbb18bd8949..9720f510bd53a6d63babbc84a80fcefbe3d3ec53 100644
+--- a/core/util/browser.js
++++ b/core/util/browser.js
+@@ -149,7 +149,12 @@ async function _checkWebCodecsH264DecodeSupport() {
+ 
+     return true;
+ }
+-supportsWebCodecsH264Decode = await _checkWebCodecsH264DecodeSupport();
++// Patched for chat-next: no top-level await (it changes how the app's bundler
++// splits every chunk). The check finishes in the background; until then
++// H.264 is not offered, which only matters to servers that send it.
++_checkWebCodecsH264DecodeSupport().then((supported) => {
++    supportsWebCodecsH264Decode = supported;
++}, () => {});
+ 
+ /*
+  * The functions for detection of platforms and browsers below are exported

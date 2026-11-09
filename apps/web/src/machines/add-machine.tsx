@@ -27,11 +27,11 @@ const POLL_MS = 3_000;
 /** A forgotten tab stops asking after this long; "Check again" resumes. */
 const WAIT_MS = 15 * 60_000;
 /** Official install guide of the AI CLI the first adapter drives. */
-const CLI_GUIDE = "https://code.claude.com/docs/en/setup";
+export const CLI_GUIDE = "https://code.claude.com/docs/en/setup";
 
-type Os = "mac" | "windows";
+export type Os = "mac" | "windows";
 
-function detectOs(userAgent: string): Os | "phone" {
+export function detectOs(userAgent: string): Os | "phone" {
 	if (/iPhone|iPad|Android/.test(userAgent)) return "phone";
 	return /Windows/.test(userAgent) ? "windows" : "mac";
 }
@@ -41,6 +41,11 @@ export function installCommand(os: Os, origin: string, deviceKey: string, secret
 	return os === "windows"
 		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${deviceKey} ${secret} ${locale}`
 		: `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${deviceKey} ${secret} ${locale}`;
+}
+
+/** Installs (or updates) tunelo alone, for a machine that is listed already but lacks it. */
+export function quickInstallCommand(os: Os, origin: string, locale: string): string {
+	return os === "windows" ? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${locale}` : `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${locale}`;
 }
 
 type Step =

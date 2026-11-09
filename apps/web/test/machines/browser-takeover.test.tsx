@@ -72,7 +72,10 @@ describe("the link", () => {
 		const l = await openLink();
 		const before = l.snapshot();
 		const got: string[] = [];
-		const stop = l.onBrowser((m) => got.push(m.kind));
+		const stop = l.onFrame((b) => {
+			if (b.case === "browserFrame") got.push("frame");
+			if (b.case === "browserState") got.push("state");
+		});
 		machine.send(machine.socket, { case: "browserFrame", value: { takeoverId: "k1", targetId: "T1", jpeg: new Uint8Array([1, 2, 3]), pageWidth: 800, pageHeight: 600 } });
 		machine.send(machine.socket, { case: "browserState", value: { takeoverId: "k1", tabs: [], targetId: "T1", passwordFocused: false } });
 		await until(() => got.length === 2, "browser messages");

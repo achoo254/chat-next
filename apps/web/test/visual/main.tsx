@@ -298,6 +298,11 @@ const SCREENS: Record<string, string> = {
 	// Claude waits for the user on the machine's browser; a page asked for a passkey.
 	"machine-takeover": paths.machineSession("1", "demo-idle"),
 	"machine-passkey": paths.machineSession("1", "demo-idle"),
+	// Claude says a dialog of the operating system waits; the machine's Screen Sharing: off, open to the network (Apple's sign-in), on.
+	"machine-os-dialog": paths.machineSession("1", "demo-idle"),
+	"machine-screen-off": paths.machineInfo("1"),
+	"machine-screen-signin": paths.machineInfo("1"),
+	"machine-screen-live": paths.machineInfo("1"),
 	"machine-home": paths.machines(),
 	"machine-need": aiPaths.need,
 	"machine-unpaired": paths.machine("2"),
@@ -488,6 +493,33 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	"passkey-card": async () => {
 		await find(() => document.querySelector("[data-id=passkey-card]"));
+	},
+	// The machine's whole screen from the machine's page: the two steps to turn Screen Sharing on, the sign-in, the screen.
+	"screen-off": async () => {
+		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-screen-open]:not(:disabled)"));
+		open.click();
+		await find(() => document.querySelector("[data-id=screen-view-off]"));
+	},
+	"screen-signin": async () => {
+		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-screen-open]:not(:disabled)"));
+		open.click();
+		const connect = await find(() => document.querySelector<HTMLButtonElement>("[data-id=screen-view-connect]"));
+		connect.click();
+		await find(() => document.querySelector("[data-id=screen-view-password]"));
+	},
+	"screen-live": async () => {
+		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-screen-open]:not(:disabled)"));
+		open.click();
+		await find(() => document.querySelector(".mx-screen-surface[data-live] canvas"));
+	},
+	"os-dialog-card": async () => {
+		await find(() => document.querySelector("[data-id=takeover-card-screen]"));
+	},
+	"browser-clear": async () => {
+		const clear = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-browser-clear]:not(:disabled)"));
+		clear.closest(".mx-card")?.scrollIntoView({ block: "center" });
+		clear.click();
+		await find(() => document.querySelector(".modal .btn-danger"));
 	},
 	// "Xem trình duyệt của máy" on the machine's page, opened.
 	"machine-browser-view": async () => {

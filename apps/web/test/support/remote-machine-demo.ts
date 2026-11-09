@@ -20,6 +20,7 @@ import { Decision, GitFileState, ItemSchema, PromptState, Role, ThreadState, Too
 import { brand } from "../../src/brand.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
+import { FakeRfb } from "./fake-rfb.ts";
 import type { FakeMachines } from "./fake-machines.ts";
 
 export const DEMO_THREAD = "demo-thread";
@@ -85,6 +86,53 @@ async function demoBrowserPicture(): Promise<Uint8Array> {
 	c.fillText("Đăng nhập bằng passkey", 500, 575);
 	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.6));
 	return blob === null ? new Uint8Array() : new Uint8Array(await blob.arrayBuffer());
+}
+
+/** The machine's screen in the demo: a desktop with a passkey sheet waiting, as RGBA. */
+function demoScreen(): { width: number; height: number; rgba: Uint8ClampedArray } {
+	const width = 1280;
+	const height = 800;
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const c = canvas.getContext("2d");
+	if (c === null) return { width, height, rgba: new Uint8ClampedArray(width * height * 4) };
+	const sky = c.createLinearGradient(0, 0, width, height);
+	sky.addColorStop(0, "#3a5f9e");
+	sky.addColorStop(1, "#8a6fb3");
+	c.fillStyle = sky;
+	c.fillRect(0, 0, width, height);
+	c.fillStyle = "rgba(255,255,255,0.85)";
+	c.fillRect(0, 0, width, 26);
+	c.fillStyle = "#1d1d1f";
+	c.font = "600 14px sans-serif";
+	c.fillText("Google Chrome   Tệp   Sửa   Xem", 40, 18);
+	c.fillStyle = "#f5f5f7";
+	c.fillRect(120, 70, 1040, 640);
+	c.fillStyle = "#e3e3e8";
+	c.fillRect(120, 70, 1040, 40);
+	c.fillStyle = "rgba(0,0,0,0.35)";
+	c.fillRect(120, 110, 1040, 600);
+	c.fillStyle = "#ffffff";
+	c.fillRect(440, 230, 400, 320);
+	c.fillStyle = "#1d1d1f";
+	c.font = "600 20px sans-serif";
+	c.fillText("Đăng nhập bằng passkey", 520, 290);
+	c.font = "15px sans-serif";
+	c.fillText("accounts.example.com muốn xác minh danh tính.", 470, 330);
+	c.fillText("Nhập mật khẩu của máy để cho phép.", 500, 355);
+	c.strokeStyle = "#0a84ff";
+	c.lineWidth = 3;
+	c.strokeRect(480, 385, 320, 40);
+	c.fillStyle = "#e5e5ea";
+	c.fillRect(480, 470, 150, 40);
+	c.fillStyle = "#0a84ff";
+	c.fillRect(650, 470, 150, 40);
+	c.fillStyle = "#1d1d1f";
+	c.fillText("Huỷ", 540, 496);
+	c.fillStyle = "#ffffff";
+	c.fillText("Tiếp tục", 695, 496);
+	return { width, height, rgba: c.getImageData(0, 0, width, height).data };
 }
 
 const TUNNEL = `wss://demo.tunnel.${brand.domain}`;
@@ -273,7 +321,10 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		{ targetId: "T1", url: "https://accounts.example.com/login?next=%2Fsettings%2Fsecurity", title: "Đăng nhập · Example" },
 		{ targetId: "T2", url: "http://localhost:5173/settings", title: "Cài đặt · ứng dụng của bạn" },
 	];
+	/** The machine's Screen Sharing in the demo (?at=machine-screen-…): off, open to the network with Apple's sign-in, or on. */
+	let rfb: FakeRfb | null = null;
 	const takeover = {
+		osDialog: at === "machine-os-dialog",
 		takeoverId: "demo-takeover",
 		threadId: "demo-idle",
 		reason: "Đăng nhập tài khoản Example giúp mình (trang đòi mã 2 bước), rồi bấm Trả lại để mình chạy tiếp test e2e.",
@@ -336,7 +387,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 					);
 				}
 				// Claude waits for the user on the machine's browser (?at=machine-takeover), or a page asked for a passkey (?at=machine-passkey).
-				if (at === "machine-takeover") setTimeout(() => machine.send(socket, { case: "browserTakeover", value: takeover }), 0);
+				if (at === "machine-takeover" || at === "machine-os-dialog") setTimeout(() => machine.send(socket, { case: "browserTakeover", value: takeover }), 0);
 				if (at === "machine-passkey") {
 					setTimeout(
 						() => machine.send(socket, { case: "passkeyNotice", value: { origin: "https://accounts.example.com", create: false, threadId: "demo-idle", at: BigInt(now) } }),
@@ -368,7 +419,8 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							agentVersion: "2.0.11",
 							secrets: true,
 							gitChanges: true,
-							browser: { available: true, running: true },
+							browser: { available: true, running: true, clearable: true },
+							screenShare: true,
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -465,6 +517,23 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 				const whole = file.truncated ? { ...file, truncated: false, unified: `${file.unified}\n+\n+Đã chụp lại ảnh 375 và 1440.` } : file;
 				return [{ case: "gitFileDiffResult", value: { threadId, file: whole } }];
 			}
+			case "screenShareStatusRequest":
+				return [{ case: "screenShareStatus", value: { supported: true, enabled: at !== "machine-screen-off", exposed: at === "machine-screen-signin", firewallOn: false } }];
+			case "screenShareOpen": {
+				const streamId = "demo-screen";
+				rfb = new FakeRfb(at === "machine-screen-signin" ? 30 : 1, demoScreen(), (data) => machine.send(socket, { case: "screenShareData", value: { streamId, data: data.slice() } }));
+				const started = rfb;
+				setTimeout(() => started.start(), 0);
+				return [{ case: "screenShareOpened", value: { streamId, idleMs: 600_000 } }];
+			}
+			case "screenShareData":
+				rfb?.receive(frame.body.value.data);
+				return [{ case: "ack", value: {} }];
+			case "screenShareClose":
+				rfb = null;
+				return [{ case: "ack", value: {} }];
+			case "browserClear":
+				return [{ case: "ack", value: {} }];
 			case "browserControl":
 				return [{ case: "browserTakeover", value: { ...takeover, takeoverId: "demo-control", threadId: "", reason: "" } }];
 			case "browserView": {

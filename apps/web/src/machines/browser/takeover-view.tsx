@@ -70,15 +70,16 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 	// Pictures and tabs: straight from the link, never through its state.
 	useEffect(() => {
 		let last = "";
-		const stop = link.onBrowser((message) => {
-			if (message.kind === "state") {
-				if (message.state.takeoverId !== takeoverId) return;
-				setTabs(message.state.tabs);
-				setShown(message.state.targetId);
-				setPassword(message.state.passwordFocused);
+		const stop = link.onFrame((body) => {
+			if (body.case === "browserState") {
+				if (body.value.takeoverId !== takeoverId) return;
+				setTabs(body.value.tabs);
+				setShown(body.value.targetId);
+				setPassword(body.value.passwordFocused);
 				return;
 			}
-			const f = message.frame;
+			if (body.case !== "browserFrame") return;
+			const f = body.value;
 			if (f.takeoverId !== takeoverId) return;
 			const src = URL.createObjectURL(new Blob([new Uint8Array(f.jpeg)], { type: "image/jpeg" }));
 			setPicture({ src, page: { width: f.pageWidth, height: f.pageHeight } });

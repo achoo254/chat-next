@@ -1,0 +1,29 @@
+/* The machine's whole screen (screen-view.tsx); loaded with the view only.
+   Inside a session on a wide screen it covers the session's body; elsewhere
+   and on a phone it covers the whole screen. */
+.mx-screen { position: fixed; inset: var(--space-4); z-index: 41; display: flex; flex-direction: column; border-radius: var(--radius-lg); border: 1px solid var(--c-border); background: var(--c-surface); box-shadow: var(--shadow-lg); overflow: hidden; }
+.mx-screen.in-session { position: absolute; inset: 0; border-radius: 0; border: 0; box-shadow: none; z-index: 27; }
+.mx-screen-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.mx-screen-head h3 { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.9375rem; }
+.mx-screen-warn { flex: none; margin: var(--space-2) var(--space-3) 0; }
+.mx-screen-warn p { margin: var(--space-1) 0 0; }
+.mx-screen-surface { position: relative; display: grid; flex: 1; min-height: 0; overflow: hidden; background: var(--c-surface-subtle); }
+.mx-screen-surface[data-live] { background: #000; touch-action: none; }
+.mx-screen-surface > div:not(.mx-screen-panel) { width: 100%; height: 100%; }
+/* Over noVNC's own area (which keeps its full size for when the screen arrives). */
+.mx-screen-panel { position: absolute; inset: 0; z-index: 1; display: grid; align-content: center; justify-items: center; overflow-y: auto; padding: var(--space-4); background: var(--c-surface-subtle); }
+.mx-screen-panel > * { width: min(440px, 100%); }
+.mx-screen-panel { gap: var(--space-3); }
+.mx-screen-off h4 { margin: 0 0 var(--space-2); }
+.mx-screen-off ol { margin: 0 0 var(--space-2); padding-left: var(--space-5); display: grid; gap: var(--space-1); }
+.mx-screen-signin { display: grid; gap: var(--space-2); }
+.mx-screen-signin .field { display: grid; gap: var(--space-1); font-size: 0.875rem; }
+.mx-screen-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.mx-screen-foot .note { flex: 1; min-width: 200px; margin: 0; }
+.mx-screen .mx-browser-typing { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
+
+@media (max-width: 760px) {
+	.mx-screen, .mx-screen.in-session { position: fixed; inset: 0; z-index: 41; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+	.mx-screen-foot .note { flex-basis: 100%; font-size: 0.75rem; }
+}
+.mx-screen-warn { grid-template-columns: auto minmax(0, 1fr); align-items: start; }

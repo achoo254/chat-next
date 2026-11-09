@@ -13,6 +13,7 @@ import { canonicalAiPath } from "./ai-paths.ts";
 import { LocalMachine } from "./local-machine.tsx";
 import { MachineDetail } from "./machine-detail.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { FirstMachine } from "./first-machine.tsx";
 import { PageHead } from "./page-head.tsx";
 import { PairDevice } from "./pair-device.tsx";
 import { HomeBoard, MachineBoard } from "./session-board.tsx";
@@ -98,13 +99,7 @@ function MachinesPage() {
 				</div>
 			)}
 			<div className="mx-body">
-				{directory.status === "ready" && machines.length === 0 && (
-					<div className="empty">
-						<MachineIcon name="monitor" />
-						<h2>{t.emptyTitle}</h2>
-						<p>{t.emptyBody}</p>
-					</div>
-				)}
+				{directory.status === "ready" && machines.length === 0 && <FirstMachine />}
 				<ul className="mx-machines">
 					{machines.map(({ entry, conn }) => (
 						<li key={entry.ref}>

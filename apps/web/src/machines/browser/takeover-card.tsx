@@ -16,6 +16,7 @@ import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 
 const TakeoverView = lazy(() => import("./takeover-view.tsx"));
+const ScreenView = lazy(() => import("../screen/screen-view.tsx"));
 
 /** The site of a page address, or the address itself when it has none. */
 export function siteOf(url: string): string {
@@ -32,9 +33,11 @@ interface TakeoverCardProps {
 	ai: string;
 	onOpen: () => void;
 	onGiveBack: () => Promise<void>;
+	/** The machine's whole screen (machines with Screen Sharing); absent elsewhere. */
+	onScreen?: (() => void) | undefined;
 }
 
-export function TakeoverCard({ takeover, ai, onOpen, onGiveBack }: TakeoverCardProps) {
+export function TakeoverCard({ takeover, ai, onOpen, onGiveBack, onScreen }: TakeoverCardProps) {
 	const t = useMachinesCopy();
 	const b = t.browser;
 	const id = useDomId("takeover");
@@ -55,10 +58,20 @@ export function TakeoverCard({ takeover, ai, onOpen, onGiveBack }: TakeoverCardP
 			)}
 			<p className="note">{b.waits(ai)}</p>
 			<div className="acts">
-				<button type="button" className="btn btn-primary btn-sm" onClick={onOpen} data-id="takeover-card-open">
+				{onScreen !== undefined && takeover.osDialog && (
+					<button type="button" className="btn btn-primary btn-sm" onClick={onScreen} data-id="takeover-card-screen">
+						{b.screen}
+					</button>
+				)}
+				<button type="button" className={`btn ${takeover.osDialog && onScreen !== undefined ? "" : "btn-primary "}btn-sm`} onClick={onOpen} data-id="takeover-card-open">
 					<BrowserIcon name="pointer" small />
 					{b.open}
 				</button>
+				{onScreen !== undefined && !takeover.osDialog && (
+					<button type="button" className="btn btn-sm" onClick={onScreen} data-id="takeover-card-screen">
+						{b.screen}
+					</button>
+				)}
 				<button
 					type="button"
 					className="btn btn-sm"
@@ -89,7 +102,19 @@ export function TakeoverCard({ takeover, ai, onOpen, onGiveBack }: TakeoverCardP
 	);
 }
 
-export function PasskeyCard({ notice, ai, onOpen, onDismiss }: { notice: PasskeyNotice; ai: string; onOpen: () => void; onDismiss: () => void }) {
+export function PasskeyCard({
+	notice,
+	ai,
+	onOpen,
+	onDismiss,
+	onScreen,
+}: {
+	notice: PasskeyNotice;
+	ai: string;
+	onOpen: () => void;
+	onDismiss: () => void;
+	onScreen?: (() => void) | undefined;
+}) {
 	const t = useMachinesCopy();
 	const b = t.browser;
 	const id = useDomId("passkey");
@@ -104,6 +129,11 @@ export function PasskeyCard({ notice, ai, onOpen, onDismiss }: { notice: Passkey
 				<button type="button" className="btn btn-primary btn-sm" onClick={onOpen} data-id="passkey-card-open">
 					{b.passkeyOpen}
 				</button>
+				{onScreen !== undefined && (
+					<button type="button" className="btn btn-sm" onClick={onScreen} data-id="passkey-card-screen">
+						{b.screen}
+					</button>
+				)}
 				<button type="button" className="btn btn-sm" onClick={onDismiss} data-id="passkey-card-dismiss">
 					{b.dismiss}
 				</button>
@@ -131,6 +161,15 @@ export function BrowserViewHost(props: BrowserViewHostProps) {
 	);
 }
 
+/** The machine's whole screen (Screen Sharing), loaded on first use. */
+export function ScreenViewHost(props: { link: MachineLink; ai: string; online: boolean; inSession: boolean; onClose: () => void }) {
+	return (
+		<Suspense fallback={<div className={`mx-browser${props.inSession ? " in-session" : ""}`} aria-busy="true" />}>
+			<ScreenView {...props} />
+		</Suspense>
+	);
+}
+
 /**
  * Asks the machine to open its running browser for this device; resolves
  * with the takeover (the machine also announces it to every device).
@@ -147,10 +186,12 @@ interface BrowserDockProps {
 	ai: string;
 	/** Opens the live view of a takeover. */
 	onView: (takeoverId: string) => void;
+	/** Opens the machine's whole screen; absent where the machine has no Screen Sharing. */
+	onScreen?: (() => void) | undefined;
 }
 
 /** Above the composer: the takeover the AI waits on, and pages that asked for a passkey. */
-export function BrowserDock({ link, takeovers, notices, ai, onView }: BrowserDockProps) {
+export function BrowserDock({ link, takeovers, notices, ai, onView, onScreen }: BrowserDockProps) {
 	const t = useMachinesCopy();
 	const [error, setError] = useState("");
 	const first = takeovers[0];
@@ -174,13 +215,14 @@ export function BrowserDock({ link, takeovers, notices, ai, onView }: BrowserDoc
 						takeover={first}
 						ai={ai}
 						onOpen={() => onView(first.takeoverId)}
+						onScreen={onScreen}
 						onGiveBack={async () => {
 							await link.request({ case: "browserTakeoverEnd", value: { takeoverId: first.takeoverId } });
 							link.dropTakeover(first.takeoverId);
 						}}
 					/>
 				)}
-				{notice !== undefined && <PasskeyCard notice={notice} ai={ai} onOpen={takeOver} onDismiss={() => link.dismissPasskey(notice)} />}
+				{notice !== undefined && <PasskeyCard notice={notice} ai={ai} onOpen={takeOver} onDismiss={() => link.dismissPasskey(notice)} onScreen={onScreen} />}
 				{error !== "" && (
 					<p className="mx-error" role="alert">
 						{error}

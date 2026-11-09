@@ -14,6 +14,9 @@ import type { LinkHub } from "./link/link-hub.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { PageHead } from "./page-head.tsx";
 import { useEntry, useHub } from "./use-machines.ts";
+import { useI18n } from "../i18n/i18n.tsx";
+import { serverOrigin } from "../server-origin.ts";
+import { type Os, quickInstallCommand } from "./add-machine.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 /** The error to show for a failed pairing. */
@@ -89,6 +92,7 @@ export function PairDevice({ machine }: { machine: string }) {
 								<code>tunelo pair</code>
 								<CopyButton text="tunelo pair" label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
 							</div>
+							<QuickInstall machineOs={entry?.os ?? ""} />
 						</li>
 						<li>
 							<p>{t.agent.pairing.step2}</p>
@@ -122,6 +126,43 @@ export function PairDevice({ machine }: { machine: string }) {
 					</div>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+/** The machine's system as the directory knows it: "darwin", "win32", or unknown. */
+function osOf(machineOs: string): Os | null {
+	return machineOs === "win32" ? "windows" : machineOs === "darwin" ? "mac" : null;
+}
+
+/** "Máy chưa có tunelo?": the one command that installs it, for the machine's system (chosen here when unknown). */
+export function QuickInstall({ machineOs }: { machineOs: string }) {
+	const t = useMachinesCopy();
+	const q = t.agent.pairing;
+	const { locale } = useI18n();
+	const known = osOf(machineOs);
+	const [picked, setPicked] = useState<Os>("mac");
+	const os = known ?? picked;
+	const command = quickInstallCommand(os, serverOrigin(), locale);
+	return (
+		<div className="mx-quick-install" data-id="pair-quick-install">
+			<p className="note">
+				<strong>{q.noTunelo}</strong> {os === "windows" ? q.installWindows : q.installMac}
+			</p>
+			{known === null && (
+				<div className="mx-new-tabs" role="group" aria-label={q.systemLabel}>
+					{(["mac", "windows"] as const).map((o) => (
+						<button key={o} type="button" className={`btn btn-sm${o === os ? " btn-primary" : ""}`} aria-pressed={o === os} onClick={() => setPicked(o)}>
+							{o === "mac" ? "macOS" : "Windows"}
+						</button>
+					))}
+				</div>
+			)}
+			<div className="mx-cmd">
+				<code>{command}</code>
+				<CopyButton text={command} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
+			</div>
+			<p className="note">{os === "windows" ? q.notFoundWindows : q.notFoundMac}</p>
 		</div>
 	);
 }

@@ -16,6 +16,7 @@ import { LOCAL_REF } from "./link/link-hub.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
 import { PageHead } from "./page-head.tsx";
@@ -61,17 +62,7 @@ export function HomeBoard({ back }: { back: boolean }) {
 		<div className="mx-scroll">
 			<PageHead {...(back ? { back: paths.machines() } : {})} backLabel={t.backToMachines} title={t.agent.home.title} subtitle={t.agent.home.summary(need.length, running.length)} />
 			<div className="mx-body">
-				{ready && machines.length === 0 && (
-					<div className="empty">
-						<MachineIcon name="cpu" />
-						<h2>{t.agent.noMachinesTitle}</h2>
-						<p>{t.agent.noMachinesBody}</p>
-						<Link to={paths.machinesAdd()} className="btn btn-primary">
-							<Icon name="plus" />
-							{t.add}
-						</Link>
-					</div>
-				)}
+				{ready && machines.length === 0 && <FirstMachine />}
 				{machines.length > 0 && need.length === 0 && (
 					<div className="mx-calm">
 						<Icon name="check" />

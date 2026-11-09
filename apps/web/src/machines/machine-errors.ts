@@ -108,6 +108,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.takeoverGone;
 		case ErrorReason.BROWSER_NOT_RUNNING:
 			return r.browserNotRunning;
+		case ErrorReason.SCREEN_SHARING_OFF:
+			return r.screenSharingOff;
+		case ErrorReason.SCREEN_SHARE_BUSY:
+			return r.screenShareBusy;
+		case ErrorReason.SCREEN_SHARE_GONE:
+			return r.screenShareGone;
 		default:
 			return undefined;
 	}

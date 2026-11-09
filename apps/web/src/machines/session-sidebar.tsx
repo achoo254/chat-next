@@ -16,6 +16,7 @@ import type { MachinesCopy } from "./copy-vi.ts";
 import { sortForList } from "./link/machine-link.ts";
 import { LOCAL_REF } from "./link/link-hub.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing, type Conn } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
 import { aiName, folderName, modelName, stateKey, timeAgo, useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
@@ -133,17 +134,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				{machines.map((m) => (
 					<MachineGroup key={m.entry.ref} machine={m} filter={filter} now={now} currentThread={m.entry.ref === currentMachine ? currentThread : null} current={m.entry.ref === currentMachine && currentThread === null} />
 				))}
-				{directory.status === "ready" && machines.length === 0 && (
-					<div className="empty">
-						<MachineIcon name="monitor" />
-						<h2>{t.agent.noMachinesTitle}</h2>
-						<p>{t.agent.noMachinesBody}</p>
-						<Link to={paths.machinesAdd()} className="btn btn-primary">
-							<Icon name="plus" />
-							{t.add}
-						</Link>
-					</div>
-				)}
+				{directory.status === "ready" && machines.length === 0 && <FirstMachine compact />}
 			</div>
 		</section>
 	);

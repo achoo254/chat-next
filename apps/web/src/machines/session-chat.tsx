@@ -43,7 +43,7 @@ import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { versionAtLeast } from "./agent-version.ts";
-import { BrowserDock, BrowserViewHost } from "./browser/takeover-card.tsx";
+import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
 
 export { versionAtLeast };
 
@@ -74,6 +74,9 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	/** The takeover whose live view shows over the session. */
 	const [viewing, setViewing] = useState<string | null>(null);
 	const viewed = viewing === null ? undefined : state.takeovers.get(viewing);
+	/** The machine's whole screen shows over the session. */
+	const [screenOpen, setScreenOpen] = useState(false);
+	const openScreen = state.info?.screenShare === true ? () => setScreenOpen(true) : undefined;
 	const outside = secretPrompts.length + takeovers.length;
 	const changes = sessionChanges(items);
 	const gitSupported = state.info?.gitChanges === true;
@@ -218,7 +221,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						/>
 					)}
 					{secretPrompts.length > 0 && <SecretDock prompts={secretPrompts} ai={ai} link={link} />}
-					{(takeovers.length > 0 || passkeys.length > 0) && <BrowserDock link={link} takeovers={takeovers} notices={passkeys} ai={ai} onView={setViewing} />}
+					{(takeovers.length > 0 || passkeys.length > 0) && <BrowserDock link={link} takeovers={takeovers} notices={passkeys} ai={ai} onView={setViewing} onScreen={openScreen} />}
 					{prompts.length > 0 && (
 						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
 					)}
@@ -263,6 +266,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						}}
 					/>
 				</div>
+				{screenOpen && <ScreenViewHost link={link} ai={ai} online={online} inSession onClose={() => setScreenOpen(false)} />}
 				{viewed !== undefined && <BrowserViewHost link={link} takeover={viewed} ai={ai} online={online} inSession onMinimize={() => setViewing(null)} />}
 				{changesOpen && (
 					<ChangesPanel
