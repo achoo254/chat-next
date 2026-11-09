@@ -58,6 +58,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// "Máy của tôi": a session with long commands, a folded answered prompt, the status bar; the "/" picker; paired devices; "Thêm máy này".
 	"machine-chat": "?at=machine-chat",
 	"machine-slash": "?at=machine-chat&open=slash",
+	"machine-new-session": "?at=machine-sessions&open=new-session",
 	"machine-info": "?at=machine-info",
 	"machine-add": "?at=machine-add",
 };

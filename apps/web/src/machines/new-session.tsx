@@ -1,15 +1,18 @@
 // "Phiên mới" (a dialog on desktop, a bottom sheet on phones): the AI when the
 // machine has more than one, any folder (typed with suggestions, recent and
-// pinned ones, or browsed with git and "sensitive" labels), the project's
-// own .claude settings (off by default), and the first message. A sensitive
+// pinned ones, or browsed with git and "sensitive" labels; it opens in the
+// folder of the newest session), the project's own .claude settings (off by
+// default), and the first message, filled in with a suggestion that follows
+// the folder until the user edits it or picks another one. A sensitive
 // folder needs an explicit "I agree", which the machine logs; it is never
 // blocked. Warns which idle session will be parked when the machine is full.
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ErrorCode, LoginState, ThreadState, type DirListResult } from "@achoo254/chat-proto/remote/remote";
 import { navigate, paths } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { PROMPT_HINTS, folderName, hintPrompt, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { aiName, errorText, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -37,6 +40,8 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	const [listing, setListing] = useState<DirListResult | null>(null);
 	const [listFailed, setListFailed] = useState(false);
 	const [projectSettings, setProjectSettings] = useState(false);
+	// The first message: a suggestion (it follows the folder) until the user types.
+	const [hint, setHint] = useState<PromptHint | null>("summary");
 	const [text, setText] = useState("");
 	const [askConsent, setAskConsent] = useState(false);
 	const [busy, setBusy] = useState(false);
@@ -56,21 +61,32 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 			() => setListFailed(true),
 		);
 	};
-	// Start in the home folder.
+	const recent = recentFolders(state.threads, state.info?.recentDirs);
+	// Start in the newest session's folder (the home folder when there is none,
+	// or when that folder cannot be opened any more). Waits for the session list
+	// unless a folder is already known.
+	const started = useRef(false);
+	const startDir = recent[0] ?? "";
+	const ready = state.listed || startDir !== "";
 	useEffect(() => {
-		link.request({ case: "dirList", value: { path: "", showHidden: false } }).then(
-			(frame) => {
-				if (frame.body.case === "dirListResult") {
-					setListing(frame.body.value);
-					setPath(frame.body.value.path);
-				}
-			},
-			() => setListFailed(true),
-		);
-	}, [link]);
+		if (!ready || started.current) return;
+		started.current = true;
+		const open = (dir: string): Promise<void> =>
+			link.request({ case: "dirList", value: { path: dir, showHidden: false } }).then((frame) => {
+				if (frame.body.case !== "dirListResult") return;
+				const result = frame.body.value;
+				setListing(result);
+				setPath((typed) => (typed === "" ? result.path : typed));
+			});
+		open(startDir)
+			.catch(() => (startDir === "" ? Promise.reject(new Error("no home")) : open("")))
+			.catch(() => setListFailed(true));
+	}, [link, ready, startDir]);
 
 	const sensitive = listing !== null && listing.path === path && listing.sensitive;
-	const suggestions = [...new Set([...(state.info?.recentDirs ?? []), ...(state.info?.pinnedDirs ?? [])])];
+	const pinned = state.info?.pinnedDirs ?? [];
+	const suggestions = [...new Set([...recent, ...pinned])];
+	const message = hint !== null ? hintPrompt(t.newSession, hint, path) : text;
 	const full = state.maxSessions > 0 && state.openSessions >= state.maxSessions;
 	const victim = full
 		? state.threads
@@ -80,7 +96,8 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 
 	const start = (consent: boolean) => {
 		if (path.trim() === "") return setError(t.newSession.needFolder);
-		if (text.trim() === "") return setError(t.newSession.needText);
+		// An emptied message falls back to the default suggestion.
+		const first = message.trim() === "" ? hintPrompt(t.newSession, "summary", path) : message.trim();
 		if ((sensitive || askConsent) && !consent) {
 			setAskConsent(true);
 			return;
@@ -90,7 +107,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 		link
 			.request({
 				case: "threadCreate",
-				value: { provider, model, dir: path.trim(), text: text.trim(), consent: { sensitive: consent, projectSettings } },
+				value: { provider, model, dir: path.trim(), text: first, consent: { sensitive: consent, projectSettings } },
 			})
 			.then(
 				(frame) => {
@@ -142,17 +159,17 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 				)}
 				{suggestions.length > 0 && (
 					<div className="mx-quick">
-						{(state.info?.recentDirs.length ?? 0) > 0 && <em>{t.newSession.recent}</em>}
-						{state.info?.recentDirs.map((dir) => (
-							<button key={`r:${dir}`} type="button" className="chip" onClick={() => browse(dir)} title={dir}>
-								{dir.split(/[\\/]/).filter(Boolean).at(-1) ?? dir}
+						{recent.length > 0 && <em>{t.newSession.recent}</em>}
+						{recent.map((dir) => (
+							<button key={`r:${dir}`} type="button" className="chip" aria-pressed={dir === path} onClick={() => browse(dir)} title={dir}>
+								{folderName(dir)}
 							</button>
 						))}
-						{(state.info?.pinnedDirs.length ?? 0) > 0 && <em>{t.newSession.pinned}</em>}
-						{state.info?.pinnedDirs.map((dir) => (
-							<button key={`p:${dir}`} type="button" className="chip" onClick={() => browse(dir)} title={dir}>
+						{pinned.length > 0 && <em>{t.newSession.pinned}</em>}
+						{pinned.map((dir) => (
+							<button key={`p:${dir}`} type="button" className="chip" aria-pressed={dir === path} onClick={() => browse(dir)} title={dir}>
 								<MachineIcon name="star" small />
-								{dir.split(/[\\/]/).filter(Boolean).at(-1) ?? dir}
+								{folderName(dir)}
 							</button>
 						))}
 					</div>
@@ -255,12 +272,23 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 					<input type="checkbox" checked={projectSettings} onChange={(event) => setProjectSettings(event.target.checked)} />
 					<span>{t.newSession.projectSettings}</span>
 				</label>
+				<div className="mx-quick" role="group" aria-label={t.newSession.hints}>
+					<em>{t.newSession.hints}</em>
+					{PROMPT_HINTS.map((id) => (
+						<button key={id} type="button" className="chip" aria-pressed={hint === id} onClick={() => setHint(id)}>
+							{t.newSession.hint[id]}
+						</button>
+					))}
+				</div>
 				<textarea
 					className="input"
 					aria-label={t.newSession.first}
 					placeholder={t.newSession.firstPlaceholder(ai)}
-					value={text}
-					onChange={(event) => setText(event.target.value)}
+					value={message}
+					onChange={(event) => {
+						setHint(null);
+						setText(event.target.value);
+					}}
 				/>
 				{full && <p className="note mx-hint">{victim !== undefined ? t.newSession.park(victim.title) : t.newSession.queue}</p>}
 				{error !== "" && (

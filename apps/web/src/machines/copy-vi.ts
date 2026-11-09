@@ -113,7 +113,20 @@ export const viMachines = {
 		start: "Bắt đầu",
 		starting: "Đang mở…",
 		needFolder: "Chọn hoặc gõ một thư mục",
-		needText: "Nhập câu đầu tiên",
+		hints: "Gợi ý",
+		hint: {
+			summary: "Tóm tắt dự án",
+			commit: "Xem thay đổi, đề xuất commit",
+			test: "Chạy test và sửa lỗi",
+			resume: "Tiếp tục việc dở",
+		},
+		prompt: {
+			summary: (folder: string) =>
+				`Xem qua dự án ${folder === "" ? "trong thư mục này" : folder} và tóm tắt trạng thái hiện tại, việc nên làm tiếp.`,
+			commit: "Xem các thay đổi git chưa commit, tóm tắt chúng và đề xuất cách chia commit kèm commit message. Chưa commit.",
+			test: "Chạy bộ test của dự án, tìm nguyên nhân các test lỗi rồi sửa cho tới khi xanh.",
+			resume: "Xem git log, thay đổi chưa commit và ghi chú hoặc plan gần đây để biết việc đang dở, rồi làm tiếp.",
+		},
 	},
 	chat: {
 		placeholder: (ai: string, machine: string) => `Nhắn cho ${ai} trên ${machine}…`,

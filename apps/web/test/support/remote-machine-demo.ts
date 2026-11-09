@@ -129,6 +129,18 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 					? [{ case: "threadItems", value: { threadId, items: transcript(now), cursor: { epoch: 1n, seq: 100n } } }]
 					: defaultAnswer(frame);
 			}
+			case "dirList": {
+				// A Windows home with the demo session's project folder beneath it.
+				const home = "C:\\Users\\dieuvy";
+				const path = frame.body.value.path === "" ? home : frame.body.value.path;
+				const parent = path.includes("\\") ? path.slice(0, path.lastIndexOf("\\")) : "";
+				const entries = [
+					{ name: "apps", git: false, branch: "", sensitive: false },
+					{ name: "docs", git: false, branch: "", sensitive: false },
+					{ name: "server", git: true, branch: "main", sensitive: false },
+				];
+				return [{ case: "dirListResult", value: { path, parent, entries, sensitive: path === home } }];
+			}
 			case "auditList":
 				return [{ case: "auditListResult", value: { entries: [] } }];
 			default:

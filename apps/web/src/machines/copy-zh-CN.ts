@@ -110,7 +110,19 @@ export const zhCNMachines: MachinesCopy = {
 		start: "开始",
 		starting: "正在打开…",
 		needFolder: "请选择或输入文件夹",
-		needText: "请输入第一条消息",
+		hints: "建议",
+		hint: {
+			summary: "概括项目",
+			commit: "查看改动并建议提交",
+			test: "运行测试并修复",
+			resume: "继续未完成的工作",
+		},
+		prompt: {
+			summary: (folder) => `浏览${folder === "" ? "此文件夹中的项目" : `项目 ${folder}`}，概括当前状态和接下来该做的事。`,
+			commit: "查看未提交的 git 改动，概括内容，并建议如何拆分提交及提交信息。先不要提交。",
+			test: "运行项目的测试，找出失败测试的原因并修复，直到全部通过。",
+			resume: "查看 git log、未提交的改动以及最近的笔记或计划，找出未完成的工作，然后继续。",
+		},
 	},
 	chat: {
 		placeholder: (ai, machine) => `给 ${machine} 上的 ${ai} 发消息…`,

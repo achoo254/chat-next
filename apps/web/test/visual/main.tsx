@@ -290,6 +290,7 @@ const SCREENS: Record<string, string> = {
 	"settings-mcp": "/settings/mcp",
 	// "Máy của tôi" with a paired demo machine (test/support/remote-machine-demo.ts): a session, the machine's page, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
+	"machine-sessions": paths.machine("1"),
 	"machine-info": paths.machineInfo("1"),
 	"machine-add": paths.machinesAdd(),
 };
@@ -391,6 +392,11 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		field.dispatchEvent(new Event("input", { bubbles: true }));
 		field.focus();
 		await find(() => document.querySelector(".mx-slash"));
+	},
+	// "Phiên mới" on the demo machine's page (?at=machine-sessions): opened in the session's folder, with the first message suggested.
+	"new-session": async () => {
+		await click(".mx-new-btn:not(:disabled)", /Phiên mới/);
+		await find(() => document.querySelector(".mx-new .mx-crumbs"));
 	},
 	// The one-time URL after creating a webhook (#hook-created).
 	"hook-created": async () => {

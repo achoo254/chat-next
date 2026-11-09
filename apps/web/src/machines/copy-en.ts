@@ -111,7 +111,20 @@ export const enMachines: MachinesCopy = {
 		start: "Start",
 		starting: "Opening…",
 		needFolder: "Choose or type a folder",
-		needText: "Type the first message",
+		hints: "Ideas",
+		hint: {
+			summary: "Summarize the project",
+			commit: "Review changes, suggest commits",
+			test: "Run tests and fix",
+			resume: "Pick up where it left off",
+		},
+		prompt: {
+			summary: (folder) =>
+				`Look through ${folder === "" ? "the project in this folder" : `the ${folder} project`} and summarize where it stands and what to do next.`,
+			commit: "Look at the uncommitted git changes, summarize them, and suggest how to split them into commits with messages. Do not commit yet.",
+			test: "Run the project's tests, find why the failing ones fail, and fix them until they pass.",
+			resume: "Check the git log, the uncommitted changes, and recent notes or plans to find the unfinished work, then carry on.",
+		},
 	},
 	chat: {
 		placeholder: (ai, machine) => `Message ${ai} on ${machine}…`,

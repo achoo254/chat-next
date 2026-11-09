@@ -281,6 +281,9 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-ai-pick small { color: var(--c-text-muted); font-size: 0.75rem; }
 .mx-quick { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: 0.8125rem; }
 .mx-quick em { font-style: normal; color: var(--c-text-muted); margin-right: var(--space-1); }
+.mx-quick .chip { padding: 0 var(--space-3); border: 1px solid var(--c-border); background: var(--c-surface); color: var(--c-text); }
+.mx-quick .chip:hover { border-color: var(--c-border-strong); background: var(--c-surface-subtle); }
+.mx-quick .chip[aria-pressed="true"] { border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-border)); background: var(--c-selected); color: var(--c-primary); }
 .mx-dirbox { display: grid; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
 .mx-dir-input { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
 .mx-dir-input .input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.8125rem; }
@@ -311,6 +314,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-board { grid-template-columns: minmax(0, 1fr); }
 	.mx-menu { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: auto; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
 	.modal.mx-sheet { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 92dvh; padding-bottom: env(safe-area-inset-bottom); }
+	/* The dialog body pads by --space-4 on phones, so the foot bleeds by the same. */
+	.mx-new-foot { margin-inline: calc(-1 * var(--space-4)); }
 	.mx-audit li { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 /* Touch: the small text controls of tool rows still get a full-size target. */
