@@ -358,6 +358,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
 
 const ts = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
 
+/** A reset time claude gives in Unix seconds (or milliseconds) as milliseconds; 0 when absent. */
+const epochMs = (t: number | undefined) => (t && t > 0 ? (t < 1e12 ? t * 1000 : t) : 0);
+
 type Usage = Awaited<ReturnType<Query["usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET"]>>;
 type RateLimits = ProviderInfo["rateLimits"];
 
@@ -475,6 +478,11 @@ export class MessageMapper {
       case "user":
         this.toolResults(msg.message.content);
         return;
+      case "rate_limit_event": {
+        const info = msg.rate_limit_info;
+        if (info.status === "rejected") this.emit({ type: "limit-reached", resetsAt: epochMs(info.resetsAt) });
+        return;
+      }
       default:
         return;
     }
@@ -509,6 +517,7 @@ export class MessageMapper {
     if (msg.error === "authentication_failed" || msg.error === "oauth_org_not_allowed") {
       this.emit({ type: "error", message: "Claude needs to sign in again on this machine.", needsLogin: true });
     }
+    if (msg.error === "rate_limit") this.emit({ type: "limit-reached", resetsAt: 0 });
     const streamed = this.streamed.has(msg.message.id);
     msg.message.content.forEach((block, i) => {
       if (block.type === "text" && !streamed) {

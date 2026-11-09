@@ -1,5 +1,5 @@
 // The Claude profiles of this machine, as the service runs them: listing,
-// picking the one new sessions use, signing a new account in (from a device
+// picking the machine's profile (every session moves to it), signing a new account in (from a device
 // with a pasted code, or in the terminal on the machine), refusing an account
 // that is already there, plan usage, and removal.
 //
@@ -43,8 +43,18 @@ export type ProfileView = {
 
 export type ProfileList = { profiles: ProfileView[]; selectedId: string };
 
+/** Another profile with usage left, offered when a session's profile ran out. */
+export type ProfileSuggestion = { id: string; email: string; remaining: number };
+
 /** The account folder of a session: none for the default profile. */
 export type SessionProfile = { id: string; accountDir?: string };
+
+export type ProfileListener = {
+  /** The machine's profile changed (picked, or unselected by a removal): sessions move to it. */
+  onSelect?: (id: string) => void;
+  /** What devices see of the profiles changed (picked, added, removed, usage read). */
+  onChange?: () => void;
+};
 
 export type ClaudeProfilesOptions = {
   configDir: string;
@@ -104,8 +114,11 @@ export class ClaudeProfiles {
   private queue: Promise<unknown> = Promise.resolve();
   private usageInFlight = new Map<string, Promise<void>>();
   private signInCheck: Promise<void> | undefined;
+  /** The default profile's sign-in as list() last saw it; unknown until then. */
+  private defaultSignIn: { signedIn: boolean; loginExpiresAt: number } | undefined;
   private readonly now: () => number;
   private readonly log: (line: string) => void;
+  private listener: ProfileListener = {};
 
   constructor(private readonly opts: ClaudeProfilesOptions) {
     this.now = opts.now ?? Date.now;
@@ -113,6 +126,11 @@ export class ClaudeProfiles {
     this.claudeHome = opts.claudeHome ?? defaultClaudeHome();
     this.log = opts.log ?? (() => undefined);
     if (this.store.damaged) this.log(`claude profiles: ${this.store.damaged}`);
+  }
+
+  /** Who hears about changes (the machine: its sessions and devices); one listener, the last set. */
+  listen(listener: ProfileListener): void {
+    this.listener = listener;
   }
 
   /** Runs `fn` after every change queued before it. */
@@ -165,6 +183,20 @@ export class ClaudeProfiles {
         }
       }
     });
+  }
+
+  /** The machine's profile ("" for the default one); undefined when profiles.json cannot be read. */
+  selectedId(): string | undefined {
+    if (this.store.damaged) return undefined;
+    return this.store.selected()?.id ?? "";
+  }
+
+  /** Who a profile is signed in as, from the last report kept; undefined when unknown. */
+  account(id: string): { email: string; organization: string; plan: string } | undefined {
+    if (this.store.damaged) return undefined;
+    const p = id === "" ? this.store.get().defaultProfile : this.store.find(id);
+    if (!p?.email) return undefined;
+    return { email: p.email, organization: p.orgName ?? "", plan: p.plan ?? "" };
   }
 
   /** The account folder new sessions would use; only looks it up. */
@@ -229,20 +261,34 @@ export class ClaudeProfiles {
     const bin = await this.opts.findBinary();
     const account = bin ? await readAccount(bin, undefined) : null;
     if (bin) await this.checkStaleSignIns(bin);
-    const d = this.store.get();
-    const known = d.defaultProfile;
+    const known = this.store.get().defaultProfile;
     if (account && (known.email !== account.email || known.orgId !== account.orgId || known.orgName !== account.orgName || known.plan !== account.plan)) {
       this.store.update((x) => {
         x.defaultProfile = { ...x.defaultProfile, email: account.email, orgId: account.orgId, orgName: account.orgName, plan: account.plan };
       });
     }
+    this.defaultSignIn = account
+      ? { signedIn: this.signedIn(account), loginExpiresAt: account.loggedIn ? account.loginExpiresAt : 0 }
+      : { signedIn: false, loginExpiresAt: 0 };
+    return this.view();
+  }
+
+  /**
+   * The profiles from what is kept, without asking claude: for announcing a
+   * change to every device. The default profile's sign-in is as list() last
+   * saw it (before that: signed in when an account is known).
+   */
+  view(): ProfileList {
+    this.readable();
+    const known = this.store.get().defaultProfile;
+    const signIn = this.defaultSignIn ?? { signedIn: Boolean(known.email), loginExpiresAt: 0 };
     const def: ProfileView = {
       id: "",
-      email: account?.loggedIn ? account.email : "",
-      organization: account?.loggedIn ? account.orgName : "",
-      plan: account?.loggedIn ? account.plan : "",
-      signedIn: account ? this.signedIn(account) : false,
-      loginExpiresAt: account?.loggedIn ? account.loginExpiresAt : 0,
+      email: signIn.signedIn ? (known.email ?? "") : "",
+      organization: signIn.signedIn ? (known.orgName ?? "") : "",
+      plan: signIn.signedIn ? (known.plan ?? "") : "",
+      signedIn: signIn.signedIn,
+      loginExpiresAt: signIn.loginExpiresAt,
       createdAt: 0,
       ...(known.lastUsage ? { lastUsage: known.lastUsage } : {}),
     };
@@ -261,16 +307,25 @@ export class ClaudeProfiles {
     return { profiles: [def, ...rest], selectedId: this.store.selected()?.id ?? "" };
   }
 
-  /** Picks the profile of new sessions; "" for the default one. Open sessions keep theirs. */
+  /**
+   * Picks the machine's profile; "" for the default one. Every session moves
+   * to it (the core restarts idle ones and moves busy ones after their turn),
+   * and its usage is read again (within the minimum interval, the last value
+   * stands).
+   */
   select(id: string, device: string): Promise<void> {
     return this.serial(async () => {
       this.readable();
       const p = id === "" ? null : this.store.find(id);
       if (id !== "" && !p) throw new ProfileError("no such profile", "not-found");
+      const changed = (this.store.get().selectedProfileId ?? "") !== id;
       this.store.update((d) => {
         d.selectedProfileId = id === "" ? null : id;
       });
       this.opts.audit.write({ device, action: "profile_select", path: "", detail: p ? p.email : "default" });
+      if (changed) this.listener.onSelect?.(id);
+      this.listener.onChange?.();
+      void this.refreshUsage(id).catch((err: unknown) => this.log(`claude profiles: usage not read after a switch (${(err as Error).message})`));
     });
   }
 
@@ -289,6 +344,24 @@ export class ClaudeProfiles {
       const p = d.profiles.find((x) => x.id === id);
       if (p) p.lastUsage = lastUsage;
     });
+  }
+
+  /**
+   * For a session whose profile `exhaustedId` ran out of usage: the signed-in
+   * profile with the most usage left (each read again first, within the
+   * minimum interval), or undefined when none has room or its usage is unknown.
+   */
+  async suggestion(exhaustedId: string): Promise<ProfileSuggestion | undefined> {
+    if (this.store.damaged) return undefined;
+    const others = this.view().profiles.filter((p) => p.id !== exhaustedId && p.signedIn && p.email !== "");
+    await Promise.allSettled(others.map((p) => this.refreshUsage(p.id)));
+    let best: ProfileSuggestion | undefined;
+    for (const p of this.view().profiles) {
+      if (p.id === exhaustedId || !p.signedIn || p.email === "" || !p.lastUsage) continue;
+      const remaining = usageLeft(p.lastUsage, this.now());
+      if (remaining > 0 && (!best || remaining > best.remaining)) best = { id: p.id, email: p.email, remaining };
+    }
+    return best;
   }
 
   private lastUsage(id: string): ProfileUsage | undefined {
@@ -315,6 +388,7 @@ export class ClaudeProfiles {
       if (!usage) return;
       this.recordUsage(id, usage);
       this.opts.onUsage?.(id, usage);
+      this.listener.onChange?.();
     })().finally(() => this.usageInFlight.delete(id));
     this.usageInFlight.set(id, run);
     return run;
@@ -464,6 +538,7 @@ export class ClaudeProfiles {
       });
     });
     this.opts.audit.write({ device, action: "profile_add", path: "", detail: account.email });
+    this.listener.onChange?.();
     this.log(`claude profiles: added a profile (${id.slice(0, 8)})`);
     return { ok: true, id, email: account.email, organization: account.orgName };
   }
@@ -511,6 +586,8 @@ export class ClaudeProfiles {
       });
       removeTreeSafely(profileDir(this.opts.configDir, id));
       this.opts.audit.write({ device, action: "profile_remove", path: "", detail: options.force && !signedOut ? `${p.email} (forced)` : p.email });
+      if (wasSelected) this.listener.onSelect?.("");
+      this.listener.onChange?.();
     });
   }
 
@@ -518,4 +595,10 @@ export class ClaudeProfiles {
   async stop(): Promise<void> {
     await this.cancel(this.attempt?.id ?? "");
   }
+}
+
+/** Percent of usage left by the tighter window; a window past its reset counts as unused. */
+export function usageLeft(usage: { fiveHour?: RateWindow | undefined; sevenDay?: RateWindow | undefined }, now: number): number {
+  const used = (w?: RateWindow) => (w && !(w.resetsAt > 0 && w.resetsAt <= now) ? w.utilization : 0);
+  return Math.max(0, Math.min(100, 100 - Math.max(used(usage.fiveHour), used(usage.sevenDay))));
 }

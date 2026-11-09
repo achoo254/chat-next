@@ -115,7 +115,19 @@ type Thread = {
   clientMsgIds: Set<string>;
   /** The open session has not reported its permission mode yet. */
   modeUnseen: boolean;
+  /** The idle session is closing to open again on the machine's profile. */
+  switching?: Promise<void>;
+  /** This turn already reported running out of usage. */
+  limitSeen: boolean;
+  /** Another profile with room, offered after this session's profile ran out. */
+  suggestion?: ProfileSuggestion;
 };
+
+/** Another AI account profile with usage left (see ThreadInfo.profile_suggestion). */
+export type ProfileSuggestion = { id: string; email: string; remaining: number };
+
+/** Where one thread stands against the machine's profile (see MachineProfile.sessions). */
+export type SessionProfileState = { threadId: string; profileId: string; switchPending: boolean };
 
 export type CoreOptions = {
   dataDir: string;
@@ -135,6 +147,18 @@ export type CoreOptions = {
   profile?: () => { id: string; accountDir?: string };
   /** The account folder of the selected profile, only looked up (for checking its sign-in). */
   selectedAccountDir?: () => string | undefined;
+  /**
+   * The machine's profile ("" for the default one), only looked up; undefined
+   * when it cannot be told. Every session follows it: unset, sessions keep
+   * the profile they opened with.
+   */
+  selectedProfileId?: () => string | undefined;
+  /** Who a profile is signed in as, from what the machine keeps. */
+  profileAccount?: (profileId: string) => ProviderInfo["account"] | undefined;
+  /** Another profile with room, for a session whose profile ran out of usage. */
+  suggestProfile?: (exhaustedId: string) => Promise<ProfileSuggestion | undefined>;
+  /** A session finished moving to the machine's profile. */
+  onSessionProfile?: (threadId: string) => void;
   /** tunelo's own MCP for a new session of the thread `threadId`; none when it is off. */
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
   /** A session reported plan usage for its profile ("" for the default one). */
@@ -256,6 +280,8 @@ export class AgentCore {
 
   async stop(): Promise<void> {
     if (this.idleTimer) clearInterval(this.idleTimer);
+    // A session moving to another profile opens first, then closes with the rest.
+    await Promise.all([...this.threads.values()].map((t) => t.switching));
     await Promise.all([...this.threads.values()].map((t) => this.park(t)));
   }
 
@@ -273,7 +299,10 @@ export class AgentCore {
   /** The statusline data of a thread, for devices. */
   info(threadId: string): ThreadInfo {
     const t = this.thread(threadId);
-    const profileId = t.meta.profileId ?? "";
+    const machineProfileId = this.machineProfile();
+    const profileId = this.profileOf(t, machineProfileId);
+    const switchPending = this.switchPending(t, machineProfileId);
+    const nextAccount = switchPending && machineProfileId !== undefined ? this.accountOf(machineProfileId) : undefined;
     const { rateLimits: r, account } = this.accounts.get(profileId) ?? {};
     const win = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
     const fiveHour = win(r?.fiveHour);
@@ -288,6 +317,10 @@ export class AgentCore {
       effort: t.info.effort ?? "",
       permissionModes: this.permissionModes(t),
       profileId,
+      machineProfileId: machineProfileId ?? "",
+      profileSwitchPending: switchPending,
+      ...(nextAccount ? { nextAccount } : {}),
+      ...(t.suggestion ? { profileSuggestion: { profileId: t.suggestion.id, email: t.suggestion.email, remaining: t.suggestion.remaining } } : {}),
       ...(account ? { account } : {}),
       ...(r ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
     });
@@ -306,7 +339,98 @@ export class AgentCore {
 
   /** True when an open session runs with this AI account profile. */
   profileInUse(profileId: string): boolean {
-    return [...this.threads.values()].some((t) => (t.session || t.starting) && (t.meta.profileId ?? "") === profileId);
+    return [...this.threads.values()].some((t) => (t.session || t.starting || t.switching) && (t.meta.profileId ?? "") === profileId);
+  }
+
+  // --- the machine's profile -----------------------------------------------
+
+  /** The machine's profile; undefined when unknown (or sessions do not follow one). */
+  private machineProfile(): string | undefined {
+    try {
+      return this.opts.selectedProfileId?.();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private isOpen(t: Thread): boolean {
+    return Boolean(t.session || t.starting || t.switching);
+  }
+
+  /** The profile a thread runs with; a parked one opens with the machine's next. */
+  private profileOf(t: Thread, machineProfileId = this.machineProfile()): string {
+    if (!this.isOpen(t) && machineProfileId !== undefined) return machineProfileId;
+    return t.meta.profileId ?? "";
+  }
+
+  /** An open session on another profile than the machine's: it moves when it can. */
+  private switchPending(t: Thread, machineProfileId = this.machineProfile()): boolean {
+    return machineProfileId !== undefined && this.isOpen(t) && (t.meta.profileId ?? "") !== machineProfileId;
+  }
+
+  private accountOf(profileId: string): ProviderInfo["account"] | undefined {
+    return this.accounts.get(profileId)?.account ?? this.opts.profileAccount?.(profileId);
+  }
+
+  /** Every thread and the profile it runs with, for devices. */
+  profileStates(): SessionProfileState[] {
+    const machineProfileId = this.machineProfile();
+    return [...this.threads.values()].map((t) => ({
+      threadId: t.meta.id,
+      profileId: this.profileOf(t, machineProfileId),
+      switchPending: this.switchPending(t, machineProfileId),
+    }));
+  }
+
+  /**
+   * The machine's profile changed: idle sessions restart on it now (resumed,
+   * same conversation), busy ones when their turn ends, parked ones open with
+   * it. Devices hear about every thread.
+   */
+  followMachineProfile(): void {
+    const machineProfileId = this.machineProfile();
+    for (const t of this.threads.values()) {
+      if (t.suggestion && t.suggestion.id === machineProfileId) delete t.suggestion;
+      void this.follow(t);
+      for (const fn of this.infoListeners) fn(t.meta.id);
+    }
+  }
+
+  /**
+   * Moves an open, idle session to the machine's profile: closes it and opens
+   * it again resumed (same session id, model, effort, permission mode, folder;
+   * a new MCP ticket). Without room or a session id to resume it stays
+   * parked and opens on the machine's profile next time. Never touches a
+   * session in the middle of a turn or waiting for an answer.
+   */
+  private async follow(t: Thread): Promise<void> {
+    const target = this.machineProfile();
+    const s = t.session;
+    if (target === undefined || !s || t.switching || t.starting || t.running || t.pending.size > 0) return;
+    if ((t.meta.profileId ?? "") === target) return;
+    t.switching = (async () => {
+      delete t.session;
+      await s.close();
+      const seg = t.meta.segments.at(-1);
+      if (!seg?.sessionId || this.openSessions() >= this.maxSessions) return;
+      try {
+        await this.openSession(t);
+      } catch {
+        // the thread shows the error; it opens again with the next message
+      }
+    })();
+    try {
+      await t.switching;
+    } finally {
+      delete t.switching;
+    }
+    delete t.suggestion;
+    this.touch(t);
+    for (const fn of this.infoListeners) fn(t.meta.id);
+    this.opts.onSessionProfile?.(t.meta.id);
+    if (!t.session) void this.dequeue();
+    // The machine may have switched again meanwhile.
+    void this.follow(t);
   }
 
   /** Usage read outside a session (a refresh): shown on the profile's threads. */
@@ -317,8 +441,9 @@ export class AgentCore {
   }
 
   private notifyProfile(profileId: string): void {
+    const machineProfileId = this.machineProfile();
     for (const t of this.threads.values()) {
-      if ((t.meta.profileId ?? "") !== profileId) continue;
+      if (this.profileOf(t, machineProfileId) !== profileId) continue;
       for (const fn of this.infoListeners) fn(t.meta.id);
     }
   }
@@ -432,6 +557,7 @@ export class AgentCore {
       if (t.clientMsgIds.has(clientMsgId)) return;
       t.clientMsgIds.add(clientMsgId);
     }
+    t.limitSeen = false;
     this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId } });
     t.turnCount += 1;
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
@@ -616,6 +742,8 @@ export class AgentCore {
   }
 
   private async ensureSession(t: Thread): Promise<void> {
+    // Moving to the machine's profile: the message goes to the session it opens.
+    if (t.switching) await t.switching;
     if (t.session) return this.flushOutbox(t);
     if (t.starting) return;
     if (this.openSessions() >= this.maxSessions) {
@@ -630,10 +758,15 @@ export class AgentCore {
       this.touch(victim);
     }
     t.queued = false;
+    await this.openSession(t);
+  }
+
+  /** Opens the thread's session (resumed when it had one) on the machine's profile and sends what waits. */
+  private async openSession(t: Thread): Promise<void> {
     const provider = this.provider(t.meta.provider);
     const seg = t.meta.segments.at(-1);
     const askUser = ((req: ApprovalRequest | QuestionRequest, signal: AbortSignal) => this.ask(t, req, signal)) as AskUser;
-    // A new session takes the profile selected now; an open one keeps its own.
+    // A session opens on the machine's profile now; an open one moves to it when idle.
     // When the selection cannot be read, the turn fails: never another account quietly.
     let profile: { id: string; accountDir?: string };
     try {
@@ -674,7 +807,7 @@ export class AgentCore {
     } finally {
       delete t.starting;
     }
-    void this.consume(t, t.session).finally(() => lease?.release());
+    void this.consume(t, t.session, profile.id).finally(() => lease?.release());
     await this.flushOutbox(t);
   }
 
@@ -723,8 +856,9 @@ export class AgentCore {
     }
   }
 
-  private async consume(t: Thread, session: ProviderSession): Promise<void> {
-    for await (const e of session.events) this.handle(t, e);
+  /** Events of one session; usage and account it reports belong to the profile it opened with. */
+  private async consume(t: Thread, session: ProviderSession, profileId: string): Promise<void> {
+    for await (const e of session.events) this.handle(t, e, profileId);
     if (t.session === session) {
       delete t.session;
       if (t.running) this.endTurn(t, TurnState.FAILED, 0);
@@ -733,7 +867,7 @@ export class AgentCore {
     }
   }
 
-  private handle(t: Thread, e: ProviderEvent): void {
+  private handle(t: Thread, e: ProviderEvent, profileId: string): void {
     t.lastActive = this.now();
     switch (e.type) {
       case "session": {
@@ -811,7 +945,6 @@ export class AgentCore {
         if (rest.commands?.length) this.lastCommands = rest.commands;
         if (rateLimits || rest.commands?.length) this.saveState();
         if (rateLimits || account) {
-          const profileId = t.meta.profileId ?? "";
           const prev = this.accounts.get(profileId);
           this.accounts.set(profileId, { ...prev, ...(rateLimits ? { rateLimits } : {}), ...(account ? { account } : {}) });
           this.saveState();
@@ -839,7 +972,26 @@ export class AgentCore {
       case "error":
         this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: e.message } });
         return;
+      case "limit-reached":
+        if (t.limitSeen) return;
+        t.limitSeen = true;
+        void this.suggest(t, profileId);
+        return;
     }
+  }
+
+  /** The session's profile ran out: offer another one with room (a hint for devices, never a switch). */
+  private async suggest(t: Thread, profileId: string): Promise<void> {
+    let suggestion: ProfileSuggestion | undefined;
+    try {
+      suggestion = await this.opts.suggestProfile?.(profileId);
+    } catch {
+      return;
+    }
+    // Already moved on (or the machine moved there): nothing to offer.
+    if (!suggestion || this.profileOf(t) !== profileId || this.machineProfile() === suggestion.id) return;
+    t.suggestion = suggestion;
+    for (const fn of this.infoListeners) fn(t.meta.id);
   }
 
   private textItem(t: Thread, blockId: string, role: "assistant" | "thinking"): string {
@@ -875,8 +1027,15 @@ export class AgentCore {
     }
     t.running = false;
     delete t.turnItem;
+    // A turn that went through: the profile has room again.
+    if (state === TurnState.COMPLETED && t.suggestion && !t.limitSeen) {
+      delete t.suggestion;
+      for (const fn of this.infoListeners) fn(t.meta.id);
+    }
     this.touch(t);
     void this.dequeue();
+    // The machine switched profile during the turn: move now.
+    void this.follow(t);
   }
 
   // --- prompts -------------------------------------------------------------
@@ -951,6 +1110,7 @@ export class AgentCore {
       dirtyText: new Set(),
       clientMsgIds: new Set(),
       modeUnseen: false,
+      limitSeen: false,
       info: (meta.info ??= {}),
     };
   }
@@ -1007,7 +1167,7 @@ export class AgentCore {
       state,
       pending: t.pending.size,
       updatedAt: BigInt(t.meta.updatedAt),
-      open: Boolean(t.session || t.starting),
+      open: this.isOpen(t),
     });
   }
 }

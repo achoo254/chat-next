@@ -21,8 +21,8 @@ import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore } from "./config.ts";
 import { AgentCore } from "./core/agent-core.ts";
 import { machineKey } from "./keystore.ts";
-import { Connection } from "./link/connection.ts";
-import { ClaudeProfiles } from "./profiles/service.ts";
+import { Connection, profileListBody } from "./link/connection.ts";
+import { ClaudeProfiles, type ProfileList } from "./profiles/service.ts";
 import { findClaude, probeUsage } from "./providers/claude/index.ts";
 import { builtinProviders } from "./providers/registry.ts";
 import type { AgentProvider, Detected } from "./providers/types.ts";
@@ -46,6 +46,8 @@ const IDLE_TIMEOUT_MS = 45_000;
 const PING_FRESH_MS = 15_000;
 /** …and the prompt is still waiting after this long. */
 const PUSH_DELAY_MS = 20_000;
+/** Profile changes this close together reach devices as one MachineProfile. */
+const ANNOUNCE_DELAY_MS = 50;
 
 export type MachineOptions = {
   config?: ConfigStore;
@@ -78,6 +80,7 @@ export class Machine {
   private providers: AgentProvider[];
   private detected = new Map<string, { at: number; value: Detected }>();
   private log: (line: string) => void;
+  private announcing: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly opts: MachineOptions = {}) {
     this.config = opts.config ?? new ConfigStore();
@@ -126,9 +129,14 @@ export class Machine {
       onNeedsInput: (t) => this.maybePush(t),
       profile: () => this.profiles.sessionProfile(),
       selectedAccountDir: () => this.profiles.selectedAccountDir(),
+      selectedProfileId: () => this.profiles.selectedId(),
+      profileAccount: (id) => this.profiles.account(id),
+      suggestProfile: (id) => this.profiles.suggestion(id),
+      onSessionProfile: () => this.announceProfiles(),
       onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config) } : {}),
     });
+    this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
   }
 
   async start(port = this.config.get().port ?? 0): Promise<number> {
@@ -169,6 +177,7 @@ export class Machine {
 
   async stop(): Promise<void> {
     this.stopRotation?.();
+    clearTimeout(this.announcing);
     for (const c of this.connections) c.close(1001, "shutting down");
     await new Promise<void>((r) => (this.wss ? this.wss.close(() => r()) : r()));
     this.server?.closeAllConnections?.();
@@ -305,6 +314,28 @@ export class Machine {
       devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
     });
+  }
+
+  /**
+   * Tells every connected device the machine's profile, the profiles' accounts
+   * and usage, and where each session stands. Changes that come together go
+   * out as one.
+   */
+  private announceProfiles(): void {
+    if (this.announcing) return;
+    this.announcing = setTimeout(() => {
+      this.announcing = undefined;
+      let profiles: ProfileList;
+      try {
+        profiles = this.profiles.view();
+      } catch (err) {
+        this.log(`claude profiles: not announced (${(err as Error).message})`);
+        return;
+      }
+      const value = { profiles: profileListBody(profiles), sessions: this.core.profileStates() };
+      for (const c of this.connections) if (c.isOpen) c.announce({ case: "machineProfile", value });
+    }, ANNOUNCE_DELAY_MS);
+    this.announcing.unref?.();
   }
 
   private maybePush(thread: ThreadSummary): void {

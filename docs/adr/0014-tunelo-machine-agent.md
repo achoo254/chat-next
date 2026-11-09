@@ -47,7 +47,20 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 ### Profile Claude
 
 - Mỗi profile là một thư mục `claude-profiles/<id>/home` trong thư mục cấu hình, truyền cho claude bằng `CLAUDE_CONFIG_DIR`. Mặc
-  định là `~/.claude` của máy. Máy chọn một profile cho phiên mới. Phiên đang mở giữ tài khoản của nó.
+  định là `~/.claude` của máy.
+- Profile được chọn là profile của cả máy: mọi phiên chuyển theo. Lý do: người dùng đổi profile vì hết hạn mức hoặc muốn để dành
+  tài khoản cũ, nên đổi từng phiên là thừa (cách của Orca).
+  - Phiên đã tạm tắt: lần mở sau dùng profile mới.
+  - Phiên đang mở và rảnh: đóng tiến trình claude rồi mở lại ngay bằng resume cùng session id dưới profile mới. Model, effort, chế độ
+    quyền, thư mục giữ nguyên; MCP của tunelo nhận vé mới. Quyền "cho phép cả phiên" đã cấp trong tiến trình cũ không còn.
+  - Phiên đang chạy giữa lượt (kể cả đang chờ duyệt quyền): không bị ngắt, chuyển khi lượt kết thúc. `ThreadInfo` báo
+    `profile_switch_pending` kèm tài khoản sẽ chuyển sang.
+  - Resume chạy được dưới profile khác vì `projects/` (nơi claude lưu hội thoại) là thư mục dùng chung.
+- Mỗi lần đổi profile máy, mỗi phiên chuyển xong, mỗi lần đọc lại hạn mức, máy gửi `MachineProfile` (danh sách profile, profile
+  máy, profile từng phiên) tới mọi thiết bị đang kết nối, không cần thiết bị hỏi. Đổi từ thiết bị nào hay từ
+  `tunelo claude profiles select` trên máy đều như nhau. Hạn mức profile mới được đọc lại ngay (tối đa 1 lần/30 giây mỗi profile).
+- Phiên hết hạn mức (claude báo `rate_limit`) mà máy có profile khác đã đăng nhập và còn hạn mức: `ThreadInfo.profile_suggestion`
+  gợi ý profile còn nhiều nhất (phần trăm còn lại theo cửa sổ chặt hơn). Chỉ là gợi ý; máy không tự đổi.
 - Profile dùng chung dữ liệu với `~/.claude` (`projects`, `todos`, `plans`, … liên kết bằng symlink hoặc junction). Chỉ đăng nhập
   là riêng. `settings.json` và `keybindings.json` được chép lại mỗi lần mở phiên, vì claude ghi file bằng cách đổi tên nên link bị cắt.
 - Tài khoản lấy từ `claude auth status --json`. tunelo không đọc token Claude. Trùng email + tổ chức với profile có sẵn thì bị từ chối.

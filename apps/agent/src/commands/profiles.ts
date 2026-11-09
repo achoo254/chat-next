@@ -76,7 +76,7 @@ async function select(name: string): Promise<number> {
   const id = await resolveProfile(name);
   await callControl(configDir(), "POST", "/claude/profiles/select", { id });
   console.log(
-    `New sessions now use ${id === "" ? "the default profile" : name}. Open sessions keep their account; closed or parked ones use this one when they open again.`,
+    `The machine now uses ${id === "" ? "the default profile" : name}. Idle sessions restart on it right away (same conversation), busy ones move when their turn ends, parked ones open with it.`,
   );
   return 0;
 }
@@ -101,11 +101,11 @@ export function registerProfilesCommand(program: Command, exits: <A extends unkn
     .description("the Claude accounts of this machine")
     .command("profiles")
     .description("list, add, pick or remove Claude accounts (profiles)");
-  profiles.command("list", { isDefault: true }).description("list the profiles and which one new sessions use").action(exits(list));
+  profiles.command("list", { isDefault: true }).description("list the profiles and which one the machine uses").action(exits(list));
   profiles.command("add").description("sign in another Claude account, in this terminal").action(exits(add));
   profiles
     .command("select <profile>")
-    .description('pick the profile of new sessions: "default", an id or an e-mail')
+    .description('pick the profile of the whole machine (every session moves to it): "default", an id or an e-mail')
     .action(exits(select));
   profiles
     .command("remove <profile>")

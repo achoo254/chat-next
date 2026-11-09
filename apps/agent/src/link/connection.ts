@@ -86,7 +86,7 @@ const refusal = (message: string, reason: ErrorReason) => ({ code: ErrorCode.INV
 const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
 
 /** The profile list as devices get it: accounts and usage, never a credential. */
-function profileListBody(list: ProfileList) {
+export function profileListBody(list: ProfileList) {
   return {
     selectedId: list.selectedId,
     profiles: list.profiles.map((p) => {
@@ -220,6 +220,11 @@ export class Connection {
         if (this.subscribed.has(threadId)) this.sendInfo(threadId);
       }),
     );
+  }
+
+  /** An event every device gets unasked (the machine's profile and where each session stands). */
+  announce(body: NonNullable<MessageInitShape<typeof FrameSchema>["body"]>): void {
+    this.send("", body);
   }
 
   private send(id: string, body: NonNullable<MessageInitShape<typeof FrameSchema>["body"]>): void {

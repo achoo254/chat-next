@@ -52,6 +52,11 @@ export function fakeQuery(log: SdkLog = { options: [], interrupts: 0, models: []
           const picked = r?.behavior === "allow" ? (r.updatedInput as { answers?: Record<string, string> } | undefined)?.answers?.["Pick one?"] : undefined;
           say(picked ? `you picked ${picked}` : "no answer");
           result(true);
+        } else if (text === "limit") {
+          // The account's plan usage ran out: claude says so and the turn fails.
+          m({ type: "rate_limit_event", rate_limit_info: { status: "rejected", rateLimitType: "five_hour", resetsAt: 1_900_000_000 }, uuid: `u${++n}`, session_id: sessionId });
+          m({ type: "assistant", parent_tool_use_id: null, error: "rate_limit", uuid: `u${++n}`, message: { id: `msg${n}`, content: [{ type: "text", text: "Claude usage limit reached" }] } });
+          result(false);
         } else if (text === "slow") {
           const id = `msg${++n}`;
           m({ type: "stream_event", parent_tool_use_id: null, event: { type: "message_start", message: { id } } });

@@ -39,7 +39,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo update` (`--check`) | Cài bản ký mới nhất rồi khởi động lại |
 | `tunelo pair` | Ghép thêm thiết bị bằng QR hoặc mã 6 số |
 | `tunelo devices list` / `revoke <khoá>` | Thiết bị đã ghép |
-| `tunelo claude profiles list` / `add` / `select <profile>` / `remove <profile>` | Các tài khoản Claude của máy; `add` đăng nhập ngay trong terminal |
+| `tunelo claude profiles list` / `add` / `select <profile>` / `remove <profile>` | Các tài khoản Claude của máy; `add` đăng nhập ngay trong terminal; `select` đổi profile cho cả máy: phiên rảnh mở lại ngay dưới profile mới (cùng hội thoại), phiên đang chạy đổi sau lượt hiện tại |
 | `tunelo http <cổng>` / `tcp <cổng>` | Mở tunnel; inspector request ở `127.0.0.1:4040`, `tunelo watch` xem request |
 | `tunelo kill <pid\|subdomain\|all>` | Đóng tunnel |
 | `tunelo link <mã>` / `links list` / `links revoke <id>` | Liên kết máy với Localman |

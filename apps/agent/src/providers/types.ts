@@ -70,7 +70,9 @@ export type ProviderEvent =
   | { type: "usage"; contextTokens: number; contextWindow: number }
   | { type: "compaction"; tokensBefore: number }
   | { type: "turn-end"; state: "completed" | "interrupted" | "failed"; durationMs: number }
-  | { type: "error"; message: string; needsLogin?: boolean };
+  | { type: "error"; message: string; needsLogin?: boolean }
+  /** The account's plan usage ran out (rejected for its rate limit); resetsAt in Unix milliseconds, 0 when unknown. */
+  | { type: "limit-reached"; resetsAt: number };
 
 export type ApprovalRequest = {
   kind: "approval";
