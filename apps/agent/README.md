@@ -89,6 +89,18 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
 đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
 
+## Lưu trữ và xoá phiên (2.0.6)
+
+Menu ⋮ của phiên (và của dòng phiên ở cột trái: rê chuột, nhấn giữ trên điện thoại) có "Lưu trữ" và "Xoá phiên".
+
+- **Lưu trữ** chỉ ẩn phiên khỏi danh sách trên mọi thiết bị (bộ lọc "Đã lưu trữ" để mở lại hay bỏ lưu trữ); không đụng file nào.
+- **Xoá phiên** dừng tiến trình `claude` của phiên, chuyển vào **Thùng rác của hệ điều hành** (không xoá vĩnh viễn): bản ghi
+  `<thư mục Claude>/projects/<thư mục>/<session id>.jsonl` và thư mục `<session id>/` bên cạnh của mọi phiên AI thread đó đã chạy,
+  cùng đúng các tệp mà tin nhắn của thread đã lưu trong `.tunelo-attachments/` (tệp thường, không link, không nhạy cảm). Sau đó
+  xoá journal của tunelo, ghi nhật ký đồng ý (`delete_session`) và báo mọi thiết bị. macOS dùng `trashItemAtURL` (như Finder),
+  Windows dùng Recycle Bin, Linux `gio trash`; Thùng rác từ chối thì không xoá gì. Phiên đang chạy một lượt: web hỏi "Dừng và
+  xoá". Phiên có vẻ đang mở ở nơi khác (đổi sau lần cuối tunelo ghi): web cảnh báo trước khi xoá. Máy cũ hơn 2.0.6: web ẩn mục.
+
 ## Ảnh và tệp đính kèm (2.0.5)
 
 Ô nhập của phiên nhận tệp bằng nút đính kèm (điện thoại có thêm chụp ảnh), dán, hoặc kéo thả vào bất kỳ đâu trong phiên. Tệp đi
