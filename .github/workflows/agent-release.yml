@@ -1,7 +1,9 @@
 # Releases tunelo, the background agent (apps/agent), on a tag tunelo-v<semver>: tests, single-file
-# builds for macOS (arm64, x64) and Windows x64, cross-compiled by Bun on Linux
-# (Bun ad-hoc signs the macOS files itself), SHA256SUMS,
-# minisign signatures, then a GitHub Release. Afterwards pin the install
+# builds for macOS (arm64, x64) and Windows x64, cross-compiled by Bun on Linux,
+# the macOS files signed with the Developer ID (hardened runtime, identifier
+# com.hoandat.tunelo) and notarized on a macOS runner, so macOS keeps the
+# Full Disk Access granted to tunelo across updates; then SHA256SUMS and
+# minisign signatures of the signed files, then a GitHub Release. Afterwards pin the install
 # scripts locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS,
 # commit and push (the web deploy serves them).
 #
@@ -85,8 +87,91 @@ jobs:
           name: ${{ env.ASSET }}
           path: dist/${{ env.ASSET }}
 
-  release:
+  # A stable signature: macOS ties Full Disk Access to the team and identifier
+  # instead of to each build's hash. Signed before the checksums and minisign.
+  sign-macos:
     needs: [test, build]
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      PREFIX: ${{ needs.test.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: apps/agent/macos
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ${{ needs.test.outputs.prefix }}-darwin-*
+          path: dist
+          merge-multiple: true
+      - name: Sign with the Developer ID
+        env:
+          P12_BASE64: ${{ secrets.MACOS_SIGN_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          kc="$RUNNER_TEMP/sign.keychain-db"
+          kc_password="$(openssl rand -hex 24)"
+          security create-keychain -p "$kc_password" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kc_password" "$kc"
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/sign.p12"
+          security import "$RUNNER_TEMP/sign.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
+          rm -f "$RUNNER_TEMP/sign.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_password" "$kc" >/dev/null
+          # codesign looks the identity up in the search list; the runner's login keychain stays on it.
+          security list-keychains -d user -s "$kc" login.keychain-db
+          for f in dist/"$PREFIX"-darwin-*; do
+            chmod +x "$f"
+            codesign --force --options runtime --timestamp --identifier com.hoandat.tunelo \
+              --entitlements apps/agent/macos/entitlements.plist --keychain "$kc" --sign "$IDENTITY" "$f"
+            codesign --verify --strict --verbose=2 "$f"
+            codesign -dv "$f" 2>&1 | grep -E '^(Identifier|TeamIdentifier|Authority)=|flags='
+          done
+          # Runs under the hardened runtime (Bun's JIT needs the entitlements).
+          "dist/$PREFIX-darwin-arm64" --version
+      - name: Notarize
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode > "$key"
+          ditto -c -k dist "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$key" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" \
+            --wait --timeout 40m --output-format json > "$RUNNER_TEMP/notary.json"
+          id="$(plutil -extract id raw "$RUNNER_TEMP/notary.json")"
+          status="$(plutil -extract status raw "$RUNNER_TEMP/notary.json")"
+          echo "notarization $id: $status"
+          if [ "$status" != "Accepted" ]; then
+            xcrun notarytool log "$id" --key "$key" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" || true
+            exit 1
+          fi
+          # A bare executable cannot be stapled: Gatekeeper finds the ticket online.
+          for f in dist/"$PREFIX"-darwin-*; do spctl -a -vv -t install "$f"; done
+      - name: Remove the signing keychain and key
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/sign.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/sign.p12 "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP/notarize.zip"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.test.outputs.prefix }}-darwin-arm64
+          path: dist/${{ needs.test.outputs.prefix }}-darwin-arm64
+          overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.test.outputs.prefix }}-darwin-x64
+          path: dist/${{ needs.test.outputs.prefix }}-darwin-x64
+          overwrite: true
+
+  release:
+    needs: [test, build, sign-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
