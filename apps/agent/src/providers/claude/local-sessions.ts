@@ -7,12 +7,15 @@
 // and then only for what was appended since.
 //
 // "Busy elsewhere" is a cheap guess: the transcript changed in the last
-// minute, or a running claude registered the session in <claude folder>/
-// sessions/<pid>.json. A claude started with another CLAUDE_CONFIG_DIR that
-// tunelo does not know (an IDE's own profile) only shows by the first.
+// minute, a running claude registered the session in <claude folder>/
+// sessions/<pid>.json, or a running claude process works in the session's
+// folder and that session changed since it started (running-claude.ts; this
+// one also sees a claude with a Claude folder tunelo does not know, as an
+// IDE may start). Only the folder and start time of the process are read.
 import { type Dirent, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { HistoryEntry, HistoryRead, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
+import { ClaudeProcesses, heldSessions } from "./running-claude.ts";
 import { TranscriptReader, oneLine, parseRecord, promptText, scanLines, withFile } from "./transcript.ts";
 
 const SESSION_FILE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
@@ -45,6 +48,8 @@ export type LocalSessionsOptions = {
   now?: () => number;
   /** Whether a process runs; tests replace it. */
   alive?: (pid: number) => boolean;
+  /** The running Claude processes; tests replace it. */
+  processes?: ClaudeProcesses;
 };
 
 function processAlive(pid: number): boolean {
@@ -68,23 +73,55 @@ function within(dir: string, parent: string): boolean {
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
+/** A folder by its real path when it still exists (a transcript may name it through a link). */
+function realDir(dir: string): string {
+  try {
+    return realpathSync.native(dir);
+  } catch {
+    return dir;
+  }
+}
+
+/** Compares folders, also by their real paths (each looked up once per comparer). */
+function dirComparer(): (a: string, b: string) => boolean {
+  const real = new Map<string, string>();
+  const strip = (p: string) => fold(p).replace(/[\\/]+$/, "");
+  const key = (p: string) => {
+    let k = real.get(p);
+    if (k === undefined) {
+      k = strip(realDir(p));
+      real.set(p, k);
+    }
+    return k;
+  };
+  return (a, b) => strip(a) === strip(b) || key(a) === key(b);
+}
+
 export class LocalSessions implements SessionHistory {
   private known = new Map<string, Known>();
   private readonly now: () => number;
   private readonly alive: (pid: number) => boolean;
+  private readonly processes: ClaudeProcesses;
 
   constructor(private readonly opts: LocalSessionsOptions) {
     this.now = opts.now ?? Date.now;
     this.alive = opts.alive ?? processAlive;
+    this.processes = opts.processes ?? new ClaudeProcesses();
+  }
+
+  /** Reads the running Claude processes again when the last read is old; cheap, and never fails. */
+  prime(): Promise<void> {
+    return this.processes.refresh();
   }
 
   list(q: SessionQuery): SessionPage {
-    const busy = this.running();
     const words = q.query.toLowerCase().split(/\s+/).filter(Boolean);
     const matching: { k: Known; head: Head; title: string }[] = [];
+    const all: Known[] = [];
     for (const k of this.scan()) {
       const head = this.head(k);
       if (!head?.dir) continue;
+      all.push(k);
       const title = this.title(k, head);
       if (!title) continue;
       if (words.length) {
@@ -93,6 +130,7 @@ export class LocalSessions implements SessionHistory {
       }
       matching.push({ k, head, title });
     }
+    const busy = this.running(all);
     const perDir = new Map<string, number>();
     for (const m of matching) perDir.set(m.head.dir, (perDir.get(m.head.dir) ?? 0) + 1);
     const dirs = [...perDir.entries()]
@@ -114,7 +152,7 @@ export class LocalSessions implements SessionHistory {
     const k = this.locate(sessionId);
     const head = k && this.head(k);
     if (!k || !head?.dir) return undefined;
-    return this.view(k, head, this.title(k, head) || "", this.running());
+    return this.view(k, head, this.title(k, head) || "", this.running([...this.known.values()]));
   }
 
   end(sessionId: string): number | undefined {
@@ -301,9 +339,15 @@ export class LocalSessions implements SessionHistory {
     return todo;
   }
 
-  /** Session ids a running claude holds, from each Claude folder's register of running sessions. */
-  private running(): Set<string> {
-    const ids = new Set<string>();
+  /**
+   * Session ids a running claude holds: from each Claude folder's register of
+   * running sessions, and from the running processes' folders (`known`: the
+   * sessions to tell apart, with where they began).
+   */
+  private running(known: readonly Known[]): Set<string> {
+    const sessions = known.flatMap((k) => (k.head?.dir ? [{ sessionId: k.sessionId, dir: k.head.dir, mtimeMs: k.mtimeMs }] : []));
+    const procs = this.processes.current;
+    const ids = procs.length ? heldSessions(procs, sessions, dirComparer()) : new Set<string>();
     const seen = new Set<string>();
     for (const home of this.opts.homes()) {
       const dir = join(home, "sessions");

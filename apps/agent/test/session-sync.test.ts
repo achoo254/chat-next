@@ -79,7 +79,7 @@ describe("a session Chat opened is a Claude Code session of the machine", () => 
     t.assistant([{ type: "text", text: "echo: hello" }]);
     t.write(claudeHome);
 
-    const listed = core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 }).sessions;
+    const listed = (await core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 })).sessions;
     expect(listed).toHaveLength(1);
     // Written just now, but by this machine's own open session: not "elsewhere".
     expect(listed[0]).toMatchObject({ sessionId: id, dir: work, entrypoint: "sdk-ts", threadId: thread.id, busyElsewhere: false, title: "hello" });
@@ -118,14 +118,14 @@ describe("opening a session from the machine", () => {
     const again = await core.openLocal({ provider: "claude", sessionId: t.sessionId, consent: none, openAnyway: false, device: "phone" });
     expect(again.id).toBe(thread.id);
     expect(core.list()).toHaveLength(1);
-    const listed = core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 }).sessions;
+    const listed = (await core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 })).sessions;
     expect(listed[0]?.threadId).toBe(thread.id);
   });
 
   test("a session that seems open elsewhere is refused until the user goes on anyway", async () => {
     const { core, claudeHome, work } = setup();
     const t = terminalSession(work, claudeHome, 5_000);
-    expect(core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 }).sessions[0]?.busyElsewhere).toBe(true);
+    expect((await core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 })).sessions[0]?.busyElsewhere).toBe(true);
     const err = await core.openLocal({ provider: "claude", sessionId: t.sessionId, consent: none, openAnyway: false, device: "phone" }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AgentError);
     expect((err as AgentError).reason).toBe(ErrorReason.SESSION_OPEN_ELSEWHERE);
