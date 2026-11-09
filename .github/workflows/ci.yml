@@ -1,5 +1,6 @@
 # Quality gates for every push to main and every pull request: TS lint,
-# typecheck and tests; the web perf gate (startup bundle size and UI timings
+# typecheck and tests (the agent's also under the release's Bun, and its
+# Windows-only parts on Windows); the web perf gate (startup bundle size and UI timings
 # in Chromium, see apps/web/test/perf); Go format, vet, race tests and
 # golangci-lint; protobuf lint, breaking-change check and up-to-date
 # generated code.
@@ -31,12 +32,31 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The agent's tests that need the release's runtime (Bun) run, not skip.
+      - uses: ./.github/actions/setup-bun
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       # The SDK packages: @achoo254/chat-client assembles
       # its dist/ from the workspace packages, the Bot SDK compiles its own.
       - run: pnpm build:packages
+
+  # What only Windows shows of the background agent: DPAPI, junctions,
+  # netstat/tasklist/PowerShell listings (apps/agent/test/os-integration.test.ts).
+  # The rest of the agent's suite is POSIX-minded and runs on Linux above.
+  agent-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      # The agent with its workspace packages, and the root for vitest.
+      - run: pnpm install --frozen-lockfile --filter "@achoo254/tunelo-agent..." --filter .
+      - run: pnpm --filter @achoo254/tunelo-agent exec vitest run test/os-integration.test.ts
 
   # Budgets live in apps/web/test/perf/budgets.ts; `pnpm perf` runs the same locally.
   web-perf:

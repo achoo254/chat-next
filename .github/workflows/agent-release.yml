@@ -51,6 +51,8 @@ jobs:
           esac
           echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      # The tests that need the release's runtime run under the same Bun.
+      - uses: ./.github/actions/setup-bun
       - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/tunelo-agent test
       - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/tunelo-agent typecheck
 
@@ -76,24 +78,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install Bun
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # GitHub's public release link sometimes answers 504 for a long time
-          # while the API serves the same file: try the link, then the API.
-          for i in 1 2; do
-            curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4" && break
-            echo "Bun download failed (try $i)"; sleep 15
-          done
-          if [ ! -x "$HOME/.bun/bin/bun" ]; then
-            gh release download bun-v1.4.4 -R oven-sh/bun -p bun-linux-x64.zip -D "$RUNNER_TEMP/bun"
-            unzip -q "$RUNNER_TEMP/bun/bun-linux-x64.zip" -d "$RUNNER_TEMP/bun"
-            mkdir -p "$HOME/.bun/bin"
-            mv "$RUNNER_TEMP/bun/bun-linux-x64/bun" "$HOME/.bun/bin/bun"
-          fi
-          "$HOME/.bun/bin/bun" --version
-          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/setup-bun
       - run: bun build --compile --minify --target=${{ matrix.target }} apps/agent/src/cli.ts --outfile "dist/$ASSET"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

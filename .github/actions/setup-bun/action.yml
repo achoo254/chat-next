@@ -1,0 +1,28 @@
+# The one Bun of the repository: the release builds tunelo with it, and CI
+# runs the agent's tests that need the release's runtime under it. Change the
+# version here only (test/tunnels/forward-under-bun.test.ts names it too).
+name: setup-bun
+description: Install the pinned Bun on a Linux runner and put it on PATH
+runs:
+  using: composite
+  steps:
+    - name: Install Bun
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        BUN_VERSION: "1.4.4"
+      run: |
+        # GitHub's public release link sometimes answers 504 for a long time
+        # while the API serves the same file: try the link, then the API.
+        for i in 1 2; do
+          curl -fsSL https://bun.sh/install | bash -s "bun-v$BUN_VERSION" && break
+          echo "Bun download failed (try $i)"; sleep 15
+        done
+        if [ ! -x "$HOME/.bun/bin/bun" ]; then
+          gh release download "bun-v$BUN_VERSION" -R oven-sh/bun -p bun-linux-x64.zip -D "$RUNNER_TEMP/bun"
+          unzip -q "$RUNNER_TEMP/bun/bun-linux-x64.zip" -d "$RUNNER_TEMP/bun"
+          mkdir -p "$HOME/.bun/bin"
+          mv "$RUNNER_TEMP/bun/bun-linux-x64/bun" "$HOME/.bun/bin/bun"
+        fi
+        test "$("$HOME/.bun/bin/bun" --version)" = "$BUN_VERSION"
+        echo "$HOME/.bun/bin" >> "$GITHUB_PATH"

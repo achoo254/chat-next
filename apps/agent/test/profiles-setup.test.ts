@@ -105,19 +105,6 @@ describe("profile removal", () => {
     expect(readFileSync(join(claudeHome, "history.jsonl"), "utf8")).toBe('{"display":"first"}\n');
   });
 
-  it.skipIf(process.platform !== "win32")("removes a junction without touching what it points to (Windows)", () => {
-    const { root } = machine();
-    const target = join(root, "target");
-    mkdirSync(target);
-    writeFileSync(join(target, "keep.txt"), "keep");
-    const dir = join(root, "profile");
-    mkdirSync(dir);
-    symlinkSync(target, join(dir, "projects"), "junction");
-    removeTreeSafely(dir);
-    expect(existsSync(dir)).toBe(false);
-    expect(readFileSync(join(target, "keep.txt"), "utf8")).toBe("keep");
-  });
-
   it("is fine with a folder that is already gone", () => {
     expect(() => removeTreeSafely(join(tempDir(), "missing"))).not.toThrow();
   });
