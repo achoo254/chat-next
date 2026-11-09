@@ -40,6 +40,7 @@ import type {
 } from "../providers/types.ts";
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
 import { gitBranch } from "../safety/dirs.ts";
+import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 import type { SessionMcpLease } from "../mcp/session-tickets.ts";
 
@@ -131,6 +132,10 @@ type Thread = {
   limitSeen: boolean;
   /** Another profile with room, offered after this session's profile ran out. */
   suggestion?: ProfileSuggestion;
+  /** One line of the last user or AI text (ThreadSummary.preview). */
+  preview: string;
+  /** The tool call running now, for "Running: <tool>". */
+  runningTool?: { toolId: string; name: string };
 };
 
 /** Another AI account profile with usage left (see ThreadInfo.profile_suggestion). */
@@ -276,6 +281,7 @@ export class AgentCore {
             });
           }
         }
+        t.preview = lastPreview(journal.all());
         this.threads.set(id, t);
       } catch {
         // unreadable thread folder: skip it rather than fail the agent
@@ -1047,6 +1053,7 @@ export class AgentCore {
     }
     t.running = false;
     delete t.turnItem;
+    delete t.runningTool;
     // A turn that went through: the profile has room again.
     if (state === TurnState.COMPLETED && t.suggestion && !t.limitSeen) {
       delete t.suggestion;
@@ -1131,6 +1138,7 @@ export class AgentCore {
       clientMsgIds: new Set(),
       modeUnseen: false,
       limitSeen: false,
+      preview: "",
       info: (meta.info ??= {}),
     };
   }
@@ -1150,12 +1158,41 @@ export class AgentCore {
   private put(t: Thread, id: string, body: ItemBody): Item {
     const item = t.journal.put(id, body, { provider: t.meta.provider, model: t.meta.model, now: this.now() });
     for (const fn of this.listeners) fn(t.meta.id, [item]);
+    this.notePreview(t, item);
     return item;
   }
 
   private update(t: Thread, id: string, change: (b: Item["body"]) => void): void {
     const item = t.journal.update(id, change);
-    if (item) for (const fn of this.listeners) fn(t.meta.id, [item]);
+    if (!item) return;
+    for (const fn of this.listeners) fn(t.meta.id, [item]);
+    this.notePreview(t, item);
+  }
+
+  /**
+   * Keeps the thread's preview line and running tool. Devices hear of it with
+   * the thread list event when a tool starts or ends and when a text is
+   * complete (not on every streamed piece); the turn's end tells the rest.
+   */
+  private notePreview(t: Thread, item: Item): void {
+    const b = item.body;
+    if (b.case === "text") {
+      const line = previewOf(item);
+      if (line !== undefined) t.preview = line;
+      if (!b.value.partial && b.value.role === Role.ASSISTANT) this.announce(t);
+    } else if (b.case === "toolCall" && t.running) {
+      t.runningTool = { toolId: b.value.toolId, name: b.value.name };
+      this.announce(t);
+    } else if (b.case === "toolResult" && t.runningTool?.toolId === b.value.toolId) {
+      delete t.runningTool;
+      this.announce(t);
+    }
+  }
+
+  /** The thread list event, without counting as activity (no new updated_at). */
+  private announce(t: Thread): void {
+    const s = this.summary(t);
+    for (const fn of this.statusListeners) fn(s);
   }
 
   private saveMeta(t: Thread): void {
@@ -1188,6 +1225,26 @@ export class AgentCore {
       pending: t.pending.size,
       updatedAt: BigInt(t.meta.updatedAt),
       open: this.isOpen(t),
+      preview: t.preview,
+      previewTool: t.running ? (t.runningTool?.name ?? "") : "",
     });
   }
+}
+
+/** The preview line of a user or AI text item; undefined for anything else (thinking, empty text). */
+function previewOf(item: Item): string | undefined {
+  const b = item.body;
+  if (b.case !== "text" || (b.value.role !== Role.USER && b.value.role !== Role.ASSISTANT)) return undefined;
+  const line = previewLine(b.value.text);
+  return line === "" ? undefined : line;
+}
+
+/** The preview of a loaded thread: its last user or AI text. */
+function lastPreview(items: Item[]): string {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    const line = item ? previewOf(item) : undefined;
+    if (line !== undefined) return line;
+  }
+  return "";
 }
