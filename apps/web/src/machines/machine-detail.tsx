@@ -156,7 +156,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</Link>
 					))}
 				</section>
-				{online && hasClaude && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, "claude")} />}
+				{online && hasClaude && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, "claude")} announced={state.machineProfile} />}
 				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>

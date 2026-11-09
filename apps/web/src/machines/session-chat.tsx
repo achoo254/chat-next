@@ -16,19 +16,21 @@ import { DiffCard } from "./cards/diff.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import { TodoCard } from "./cards/todo.tsx";
 import { ToolRunCard } from "./cards/tool-run.tsx";
+import { AccountMenu, profileName } from "./account-menu.tsx";
 import { ChangesPanel } from "./changes-panel.tsx";
 import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import type { LinkState } from "./link/machine-link.ts";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
 import { PageHead } from "./page-head.tsx";
 import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
-import { aiName, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -76,6 +78,12 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const machineName = entry?.name ?? "";
 	const missing = online && state.listed && thread === null && items.length === 0;
 	const modern = versionAtLeast(state.info?.agentVersion ?? "", AGENT_2_0_1);
+	const profiles = useProfiles(link, state.machineProfile, online);
+	const profileId = sessionProfileId(state.machineProfile, threadId, threadInfo, profiles.list);
+	const pending = switchPending(state.machineProfile, threadId, threadInfo);
+	const nextProfile = profileById(profiles.list, profiles.list?.selectedId ?? "");
+	const switchingTo = !pending ? "" : threadInfo?.nextAccount?.email || nextProfile?.email || t.agent.account.defaultName;
+	const suggestion = pending ? undefined : threadInfo?.profileSuggestion;
 
 	const fetchFull = async (itemId: string): Promise<void> => {
 		await link.request({ case: "threadFetchFull", value: { threadId, itemId } });
@@ -160,6 +168,15 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 					) : (
 						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0} fetchFull={fetchFull} />
 					)}
+					{suggestion !== undefined && (
+						<LimitBar
+							from={profileName(t, profileById(profiles.list, profileId), threadInfo?.account?.email ?? "")}
+							to={suggestion.email}
+							left={suggestion.remaining}
+							onSwitch={() => profiles.request({ case: "profileSelect", value: { id: suggestion.profileId } })}
+							ai={ai}
+						/>
+					)}
 					{prompts.length > 0 && (
 						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
 					)}
@@ -175,6 +192,18 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							link={link}
 							threadId={threadId}
 							online={online}
+							switchingTo={switchingTo}
+							account={
+								<AccountMenu
+									ai={ai}
+									machine={machine}
+									link={link}
+									profiles={profiles}
+									current={profileId}
+									fallbackEmail={threadInfo?.account?.email ?? ""}
+									disabled={!online}
+								/>
+							}
 						/>
 					)}
 					<Composer
@@ -194,6 +223,43 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 				{changesOpen && <ChangesPanel changes={changes} full={state.full} onFetchFull={fetchFull} onClose={closeChanges} />}
 			</div>
 		</div>
+	);
+}
+
+/**
+ * The session's account ran out of usage and the machine knows one with
+ * some left: one tap switches the whole machine to it.
+ */
+export function LimitBar({ from, to, left, onSwitch, ai }: { from: string; to: string; left: number; onSwitch: () => Promise<void>; ai: string }) {
+	const t = useMachinesCopy();
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	return (
+		<section className="mx-limit" role="alert">
+			<div className="mx-limit-inner">
+				<MachineIcon name="gauge" />
+				<p>{t.agent.limit.text(from, to, left)}</p>
+				<button
+					type="button"
+					className="btn btn-sm btn-primary"
+					disabled={busy}
+					onClick={() => {
+						setBusy(true);
+						setError("");
+						onSwitch().then(
+							() => setBusy(false),
+							(err: unknown) => {
+								setBusy(false);
+								setError(errorText(t, err, ai));
+							},
+						);
+					}}
+				>
+					{t.agent.limit.action(to)}
+				</button>
+				{error !== "" && <p className="mx-error">{error}</p>}
+			</div>
+		</section>
 	);
 }
 

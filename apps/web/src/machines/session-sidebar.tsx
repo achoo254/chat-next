@@ -5,7 +5,7 @@
 // out like the chat list. A machine this device cannot use yet says why and
 // offers the fix (pair) in place.
 import { useState } from "react";
-import { ThreadState, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { countLabel } from "../messaging/data/format.ts";
 import { Link, paths, type MachinesView } from "../router.tsx";
@@ -159,13 +159,19 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 	const folders = byFolder(shown);
 	const pairPath = ref === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(ref);
 	const loading = conn.kind === "on" ? !state.listed : conn.kind === "connecting" || conn.kind === "checking";
+	// The machine's Claude account, as it announces it (tunelo 2.0.2+): it changes for every session at once.
+	const picked = state.machineProfile?.profiles;
+	const account = picked?.profiles.find((p) => p.id === picked.selectedId)?.email ?? "";
 	return (
 		<section className="mx-group" aria-label={entry.name}>
 			<div className="mx-group-head">
 				<Link to={paths.machine(ref)} className="mx-group-name" current={current}>
 					<span className={`dot ${connDot(conn)}`} aria-hidden="true" />
 					<b>{entry.name}</b>
-					<small>{connText(t, conn, now)}</small>
+					<small>
+						{connText(t, conn, now)}
+						{conn.kind === "on" && account !== "" && ` · ${account}`}
+					</small>
 				</Link>
 				<GroupMenu name={entry.name} machine={ref} conn={conn} onNew={() => setCreating(true)} />
 			</div>
@@ -261,26 +267,25 @@ function connTextShort(t: MachinesCopy, conn: Conn): string {
 	return t.agent.hint.connecting;
 }
 
+/**
+ * A session row's second line: what waits for the user first, then the tool
+ * running now, the last message (tunelo 2.0.2+), else the state or model.
+ */
+export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInfo | null): string {
+	const key = stateKey(thread);
+	if (key === "waiting") return t.agent.sub.waiting;
+	if (thread.previewTool !== "") return t.agent.sub.tool(thread.previewTool);
+	if (thread.preview !== "") return thread.preview;
+	if (key === "running" || key === "queued" || key === "error") return t.agent.sub[key];
+	if (!thread.open) return t.agent.sub.parked;
+	const model = thread.model === "" ? aiName(info, thread.provider) : modelName(info, thread.provider, thread.model);
+	return (info?.providers.length ?? 0) > 1 ? `${aiName(info, thread.provider)} · ${model}` : model;
+}
+
 function SessionRow({ machine, thread, now, current }: { machine: MachineView; thread: ThreadSummary; now: number; current: boolean }) {
 	const t = useMachinesCopy();
 	const key = stateKey(thread);
-	const info = machine.state.info;
-	const many = (info?.providers.length ?? 0) > 1;
-	const model = thread.model === "" ? aiName(info, thread.provider) : modelName(info, thread.provider, thread.model);
-	const sub =
-		key === "waiting"
-			? t.agent.sub.waiting
-			: key === "running"
-				? t.agent.sub.running
-				: key === "queued"
-					? t.agent.sub.queued
-					: key === "error"
-						? t.agent.sub.error
-						: !thread.open
-							? t.agent.sub.parked
-							: many
-								? `${aiName(info, thread.provider)} · ${model}`
-								: model;
+	const sub = rowLine(t, thread, machine.state.info);
 	return (
 		<Link to={paths.machineSession(machine.entry.ref, thread.id)} className={`mx-srow ${key}`} current={current}>
 			<span className={`mx-st ${key}`} aria-hidden="true">

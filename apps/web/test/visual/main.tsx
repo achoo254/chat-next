@@ -292,6 +292,7 @@ const SCREENS: Record<string, string> = {
 	// AI Agent with a paired demo machine, an unpaired and an offline one (test/support/remote-machine-demo.ts):
 	// a session, the "Cần bạn" home, an unpaired machine's board, the machines page, a machine's board, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
+	"machine-limit": paths.machineSession("1", "demo-running"),
 	"machine-home": paths.machines(),
 	"machine-need": aiPaths.need,
 	"machine-unpaired": paths.machine("2"),
@@ -409,6 +410,13 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	markdown: async () => {
 		const table = await find(() => document.querySelector(".mx-agent.md .md-table"));
 		table.scrollIntoView({ block: "center" });
+	},
+	// The account menu of the status bar: the machine's Claude profiles.
+	"account-menu": async () => {
+		await find(() => document.querySelector(".mx-status .mx-mode"));
+		const button = await find(() => document.querySelector<HTMLButtonElement>(".mx-account button:not(:disabled)"));
+		button.click();
+		await find(() => document.querySelector(".mx-profiles"));
 	},
 	// The session's "Chi tiết" popover of the status bar.
 	"status-details": async () => {

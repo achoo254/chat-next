@@ -1,4 +1,4 @@
-// Simplified Chinese copy of "My machines"; keys mirror copy-vi.ts.
+// Simplified Chinese copy of AI Agent; keys mirror copy-vi.ts.
 import type { MachinesCopy } from "./copy-vi.ts";
 
 export const zhCNMachines: MachinesCopy = {
@@ -70,6 +70,7 @@ export const zhCNMachines: MachinesCopy = {
 		loading: "正在加载请求…",
 	},
 	newSession: {
+		noProject: "不加载主目录或敏感目录中的 .claude 配置：Claude Code 本身也从不信任那里的配置。",
 		title: (machine) => `在 ${machine} 上新建会话`,
 		model: "模型",
 		ai: "AI",
@@ -284,7 +285,7 @@ export const zhCNMachines: MachinesCopy = {
 		thisDevice: "此设备",
 		revokeThis: "撤销",
 		pairNew: "配对新设备",
-		pairNewHint: "在新设备上打开“我的电脑”，选择这台电脑，然后选择“配对此设备”。",
+		pairNewHint: "在新设备上打开 AI Agent，选择这台电脑，然后选择“配对此设备”。",
 		rename: "重命名",
 		renameTitle: "重命名电脑",
 		name: "电脑名称",
@@ -315,7 +316,7 @@ export const zhCNMachines: MachinesCopy = {
 	},
 	profiles: {
 		title: "Claude 账号",
-		note: "每个账号单独登录，共用这台电脑的项目、历史和配置。新会话使用所选账号。已打开的会话保持自己的账号；已关闭或休眠的会话重新打开时使用当时所选的账号。",
+		note: "每个账号单独登录，共用这台电脑的项目、历史和配置。所选账号属于整台电脑：切换一次，所有会话都会跟随，空闲的立即切换（继续同一对话），运行中的在本轮结束后切换。",
 		defaultName: "电脑默认",
 		notSignedIn: "未登录",
 		needsSignIn: "需要重新登录",
@@ -323,7 +324,7 @@ export const zhCNMachines: MachinesCopy = {
 		loginEnds: (at) => `登录有效至 ${at}`,
 		loginEnded: (at) => `登录已于 ${at} 过期`,
 		selected: "使用中",
-		select: "用于新会话",
+		select: "用于整台电脑",
 		refresh: "刷新用量",
 		remove: "移除",
 		add: "添加账号",
@@ -344,7 +345,7 @@ export const zhCNMachines: MachinesCopy = {
 			submit: "添加",
 			submitting: "正在检查…",
 			cancel: "取消",
-			done: (email) => `已添加 ${email}。选择“用于新会话”即可让新会话使用此账号。`,
+			done: (email) => `已添加 ${email}。选择“用于整台电脑”即可让所有会话使用此账号。`,
 			close: "关闭",
 			retry: "重试",
 			onMachineTitle: "在电脑上登录",
@@ -410,6 +411,25 @@ export const zhCNMachines: MachinesCopy = {
 		badQr: "这不是 tunelo 的配对码。",
 	},
 	agent: {
+		account: {
+			label: (email) => `Claude 账号：${email}`,
+			title: "这台电脑的 Claude 账号",
+			note: "整台电脑切换一次：空闲会话立即切换，运行中的在本轮结束后切换。",
+			switchTo: (email) => `将整台电脑切换到 ${email}`,
+			current: "使用中",
+			defaultName: "电脑默认",
+			notSignedIn: "未登录",
+			needsSignIn: "需要重新登录",
+			unknown: "用量未知",
+			updatedAt: (at) => `更新于 ${at}`,
+			add: "添加 Claude 账号",
+			manage: "在电脑页面管理",
+			pending: (email) => `本轮结束后切换到 ${email}`,
+		},
+		limit: {
+			text: (from, to, left) => (from === "" ? `已达用量上限。${to} 还剩 ${left}%。` : `${from} 已达用量上限。${to} 还剩 ${left}%。`),
+			action: (to) => `将整台电脑切换到 ${to}`,
+		},
 		pairing: {
 			step1: (machine) => `在 ${machine} 上打开终端（macOS）或 PowerShell（Windows），运行：`,
 			step2: "它会显示二维码和 6 位数字，10 分钟内有效。扫描二维码或输入 6 位数字：",
@@ -452,6 +472,7 @@ export const zhCNMachines: MachinesCopy = {
 		noMachinesBody: "添加一台装有 Claude Code 的电脑，即可与其上的 AI 对话。",
 		addMachine: "添加电脑",
 		sub: {
+			tool: (name) => `正在运行：${name}`,
 			waiting: "等待你批准",
 			running: "正在工作…",
 			queued: "等待空位",

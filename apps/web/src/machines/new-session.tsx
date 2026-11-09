@@ -6,7 +6,9 @@
 // the folder until the user edits it or picks another one. A sensitive
 // folder needs an explicit "I agree", which the machine logs; it is never
 // blocked. Project settings in a folder the machine does not trust yet ask
-// for "Trust this folder" right here (the machine logs that too). Warns which
+// for "Trust this folder" right here (the machine logs that too); in the
+// home folder or a sensitive one they are off and locked, as Claude Code
+// never trusts a .claude there either. Warns which
 // idle session will be parked when the machine is full.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ErrorCode, LoginState, ThreadState, type DirListResult } from "@achoo254/chat-proto/remote/remote";
@@ -90,6 +92,8 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 	}, [link, ready, startDir]);
 
 	const sensitive = listing !== null && listing.path === path && listing.sensitive;
+	const noProject = sensitive || isHome(path, state.info?.home ?? "");
+	const loadProject = projectSettings && !noProject;
 	const pinned = state.info?.pinnedDirs ?? [];
 	const suggestions = [...new Set([...recent, ...pinned])];
 	const message = hint !== null ? hintPrompt(t.newSession, hint, path) : text;
@@ -115,7 +119,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 		link
 			.request({
 				case: "threadCreate",
-				value: { provider, model, dir, text: first, consent: { sensitive: consent, projectSettings, trustProject: projectSettings && trust } },
+				value: { provider, model, dir, text: first, consent: { sensitive: consent, projectSettings: loadProject, trustProject: loadProject && trust } },
 			})
 			.then(
 				(frame) => {
@@ -266,7 +270,7 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 						</div>
 					</div>
 				)}
-				{askTrust !== "" && askTrust === path.trim() && projectSettings && (
+				{askTrust !== "" && askTrust === path.trim() && loadProject && (
 					<div className="mx-warn" role="alert">
 						<b>{t.newSession.trustTitle(askTrust)}</b>
 						<span>{t.newSession.trustBody(ai, name)}</span>
@@ -300,9 +304,12 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 						</select>
 					</label>
 				)}
-				<label className="mx-check">
-					<input type="checkbox" checked={projectSettings} onChange={(event) => setProjectSettings(event.target.checked)} />
-					<span>{t.newSession.projectSettings}</span>
+				<label className={noProject ? "mx-check locked" : "mx-check"}>
+					<input type="checkbox" checked={loadProject} disabled={noProject} onChange={(event) => setProjectSettings(event.target.checked)} />
+					<span>
+						{t.newSession.projectSettings}
+						{noProject && <small>{t.newSession.noProject}</small>}
+					</span>
 				</label>
 				<div className="mx-quick" role="group" aria-label={t.newSession.hints}>
 					<em>{t.newSession.hints}</em>
@@ -339,4 +346,13 @@ export function NewSession({ machine, name, link, state, onClose }: NewSessionPr
 			</form>
 		</Modal>
 	);
+}
+
+/** `path` is the machine's home folder (trailing separators and, on Windows, letter case aside). */
+export function isHome(path: string, home: string): boolean {
+	if (home === "" || path.trim() === "") return false;
+	const clean = (p: string) => p.trim().replace(/[\\/]+$/, "");
+	const a = clean(path);
+	const b = clean(home);
+	return a === b || (/^[A-Za-z]:/.test(b) && a.toLowerCase() === b.toLowerCase()) || a === "~";
 }

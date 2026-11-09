@@ -4,7 +4,9 @@
 // commands, an answered and a pending permission prompt, a grouped run, a
 // markdown answer (list, tasks, table, a code block wider than a phone),
 // diffs of two files, and the statusline data (ThreadInfo) with commands and
-// skills; a running and a parked session in two folders; and beside it a
+// skills; the machine's Claude profiles announced unasked, the session
+// switching account after its turn, a running session out of usage with a
+// suggestion; previews; a running and a parked session in two folders; and beside it a
 // machine this browser has not paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
@@ -124,17 +126,47 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		pending: 1,
 		updatedAt: BigInt(now),
 		open: true,
+		preview: "Mình xoá thư mục build cũ rồi chạy lại.",
+		previewTool: "",
 	};
 	const others = [
-		{ id: "demo-running", title: "Viết test cho bảng Cần bạn", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "sonnet", state: ThreadState.RUNNING, pending: 0, updatedAt: BigInt(now - 60_000), open: true },
-		{ id: "demo-idle", title: "Rà soát quyền MCP của tunelo", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 3 * 3_600_000), open: false },
+		{ id: "demo-running", title: "Viết test cho bảng Cần bạn", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "sonnet", state: ThreadState.RUNNING, pending: 0, updatedAt: BigInt(now - 60_000), open: true, preview: "", previewTool: "Bash" },
+		{ id: "demo-idle", title: "Rà soát quyền MCP của tunelo", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 3 * 3_600_000), open: false, preview: "Đã rà 12 tool MCP: tool ghi đều hỏi lại, tool đọc chạy thẳng.", previewTool: "" },
 	];
 	// A machine this browser has not paired with, and one that went offline.
 	machines.add({ name: "Mac mini", os: "darwin", arch: "arm64", tunnelUrl: `wss://other.tunnel.${brand.domain}`, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
 	machines.add({ name: "Máy nhà", os: "linux", arch: "x64", tunnelUrl: "", lastSeenAt: BigInt(Math.floor(now / 1000) - 2 * 3600), agentVersion: "2.0.1" });
+	const usage = (five: number, week: number) => ({ fiveHour: { utilization: five, resetsAt: BigInt(now + 3_600_000) }, sevenDay: { utilization: week, resetsAt: BigInt(now + 3 * 86_400_000) } });
+	const profiles = {
+		selectedId: "p2",
+		profiles: [
+			{ id: "", email: "dieuvy@inet.vn", organization: "iNET", plan: "team", signedIn: true, lastUsage: usage(100, 64), usageUpdatedAt: BigInt(now - 120_000) },
+			{ id: "p2", email: "dieuvy.max@gmail.com", plan: "max", signedIn: true, lastUsage: usage(4, 80), usageUpdatedAt: BigInt(now - 60_000) },
+			{ id: "p3", email: "dieuvy.pro@gmail.com", plan: "pro", signedIn: false },
+		],
+	};
 	machine.handler = (frame, socket) => {
 		switch (frame.body.case) {
+			case "profileList":
+			case "profileSelect":
+				return [{ case: "profileListResult", value: profiles }];
 			case "machineInfoRequest":
+				// The machine announces its profiles unasked (id "") to every device.
+				setTimeout(
+					() =>
+						machine.send(socket, {
+							case: "machineProfile",
+							value: {
+								profiles,
+								sessions: [
+									{ threadId: DEMO_THREAD, profileId: "", switchPending: true },
+									{ threadId: "demo-running", profileId: "", switchPending: false },
+									{ threadId: "demo-idle", profileId: "p2", switchPending: false },
+								],
+							},
+						}),
+					0,
+				);
 				return [
 					{
 						case: "machineInfo",
@@ -162,13 +194,20 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							case: "threadInfo",
 							value: {
 								threadId,
+								profileId: "",
+								machineProfileId: "p2",
+								account: { email: "dieuvy@inet.vn", organization: "iNET", plan: "team" },
+								profileSwitchPending: threadId === DEMO_THREAD,
+								...(threadId === DEMO_THREAD ? { nextAccount: { email: "dieuvy.max@gmail.com", plan: "max" } } : {}),
+								...(threadId === "demo-running" ? { profileSuggestion: { profileId: "p2", email: "dieuvy.max@gmail.com", remaining: 20 } } : {}),
 								permissionMode: "acceptEdits",
 								gitBranch: "main",
 								linesAdded: 22,
 								linesRemoved: 27,
 								rateLimits: {
-									fiveHour: { utilization: 4, resetsAt: BigInt(now + (4 * 60 + 31) * 60_000) },
-									sevenDay: { utilization: 80, resetsAt: BigInt(now + 2 * 86_400_000 + 3_600_000) },
+									// The session's account (the team one) ran out of its 5 hours.
+									fiveHour: { utilization: 100, resetsAt: BigInt(now + (4 * 60 + 31) * 60_000) },
+									sevenDay: { utilization: 64, resetsAt: BigInt(now + 2 * 86_400_000 + 3_600_000) },
 								},
 								commands: [
 									{ name: "review", description: "Review the current changes", builtin: true },

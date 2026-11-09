@@ -45,14 +45,14 @@ const LIST: Body = {
 describe("Claude accounts of a machine", () => {
 	it("lists the accounts with the one in use and their last usage, and picks another", async () => {
 		const { link, sent } = fakeLink(() => LIST);
-		wrap(<ClaudeProfiles link={link} online ai="Claude Code" />);
+		wrap(<ClaudeProfiles link={link} online ai="Claude Code" announced={null} />);
 		const owner = await screen.findByText("owner@example.com");
 		const row = owner.closest("li") as HTMLElement;
 		expect(within(row).getByText("Đang dùng")).toBeTruthy();
 		expect(within(row).getByText(/5 giờ 30% · tuần 55%/)).toBeTruthy();
 		const second = screen.getByText("second@example.com").closest("li") as HTMLElement;
 		expect(within(second).getByText("Chưa rõ hạn mức")).toBeTruthy();
-		await userEvent.click(within(second).getByRole("button", { name: "Dùng cho phiên mới" }));
+		await userEvent.click(within(second).getByRole("button", { name: "Dùng cho cả máy" }));
 		await waitFor(() => expect(sent.at(-1)).toEqual(expect.objectContaining({ case: "profileSelect", value: expect.objectContaining({ id: "p2" }) })));
 		await userEvent.click(within(row).getByRole("button", { name: "Làm mới hạn mức" }));
 		await waitFor(() => expect(sent.at(-1)?.case).toBe("usageRefresh"));
@@ -71,11 +71,11 @@ describe("Claude accounts of a machine", () => {
 				],
 			},
 		}));
-		wrap(<ClaudeProfiles link={link} online ai="Claude Code" />);
+		wrap(<ClaudeProfiles link={link} online ai="Claude Code" announced={null} />);
 		const second = (await screen.findByText("second@example.com")).closest("li") as HTMLElement;
 		expect(within(second).getByText("Cần đăng nhập lại")).toBeTruthy();
 		expect(within(second).getByText(/đăng nhập đã hết hạn lúc/)).toBeTruthy();
-		expect((within(second).getByRole("button", { name: "Dùng cho phiên mới" }) as HTMLButtonElement).disabled).toBe(true);
+		expect((within(second).getByRole("button", { name: "Dùng cho cả máy" }) as HTMLButtonElement).disabled).toBe(true);
 		expect((within(second).getByRole("button", { name: "Làm mới hạn mức" }) as HTMLButtonElement).disabled).toBe(false);
 		const third = screen.getByText("third@example.com").closest("li") as HTMLElement;
 		expect(within(third).queryByText("Cần đăng nhập lại")).toBeNull();
@@ -85,7 +85,7 @@ describe("Claude accounts of a machine", () => {
 
 	it("removes an added account after confirming, never the default one", async () => {
 		const { link, sent } = fakeLink(() => LIST);
-		wrap(<ClaudeProfiles link={link} online ai="Claude Code" />);
+		wrap(<ClaudeProfiles link={link} online ai="Claude Code" announced={null} />);
 		const owner = (await screen.findByText("owner@example.com")).closest("li") as HTMLElement;
 		expect(within(owner).queryByRole("button", { name: "Xoá" })).toBeNull();
 		const second = screen.getByText("second@example.com").closest("li") as HTMLElement;

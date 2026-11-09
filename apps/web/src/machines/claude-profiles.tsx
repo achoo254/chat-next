@@ -1,13 +1,14 @@
 // The Claude accounts of a machine, on the machine's page: who each profile
-// is signed in as, its last plan usage and when that was read, which one new
-// sessions use, and picking, refreshing usage, adding (sign-in-code-dialog)
-// and removing one. Everything goes to the machine over the encrypted link;
+// is signed in as, its last plan usage and when that was read, which one the
+// whole machine uses (realtime, as the machine announces it), and picking,
+// refreshing usage, adding (sign-in-code-dialog) and removing one. Everything goes to the machine over the encrypted link;
 // the machine never sends a credential, only what claude reports.
-import { useCallback, useEffect, useState } from "react";
-import type { ClaudeProfile, Frame, ProfileListResult } from "@achoo254/chat-proto/remote/remote";
+import { useCallback, useState } from "react";
+import type { ClaudeProfile, MachineProfile } from "@achoo254/chat-proto/remote/remote";
 import { useI18n } from "../i18n/i18n.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
+import { useProfiles } from "./machine-profile.ts";
 import { SignInCodeDialog } from "./sign-in-code-dialog.tsx";
 import { planName, usageOf } from "./status-line.ts";
 import { errorText, useNow } from "./use-machines.ts";
@@ -17,19 +18,18 @@ interface ClaudeProfilesProps {
 	link: MachineLink;
 	online: boolean;
 	ai: string;
+	/** What the machine announced last (tunelo 2.0.2+); null makes the list asked once. */
+	announced: MachineProfile | null;
 }
 
 type FrameBody = Parameters<MachineLink["request"]>[0];
 
-function listOf(frame: Frame): ProfileListResult | null {
-	return frame.body.case === "profileListResult" ? frame.body.value : null;
-}
-
-export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
+export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesProps) {
 	const t = useMachinesCopy();
 	const p = t.profiles;
 	const { locale } = useI18n();
-	const [list, setList] = useState<ProfileListResult | null>(null);
+	const profiles = useProfiles(link, announced, online);
+	const list = profiles.list;
 	/** What is running: "select:<id>", "usage:<id>", "remove:<id>"; "" when idle. */
 	const [busy, setBusy] = useState("");
 	const [error, setError] = useState("");
@@ -40,11 +40,9 @@ export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
 		(what: string, body: FrameBody) => {
 			setBusy(what);
 			setError("");
-			return link.request(body).then(
-				(frame) => {
+			return profiles.request(body).then(
+				() => {
 					setBusy("");
-					const next = listOf(frame);
-					if (next !== null) setList(next);
 					return true;
 				},
 				(err: unknown) => {
@@ -54,25 +52,8 @@ export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
 				},
 			);
 		},
-		[link, t, ai],
+		[profiles, t, ai],
 	);
-
-	useEffect(() => {
-		if (!online) return;
-		let active = true;
-		link.request({ case: "profileList", value: {} }).then(
-			(frame) => {
-				const next = listOf(frame);
-				if (active && next !== null) setList(next);
-			},
-			(err: unknown) => {
-				if (active) setError(errorText(t, err, ai));
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [link, online, t, ai]);
 
 	const now = useNow(60_000);
 	const at = (ms: number) => new Date(ms).toLocaleString(locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -160,7 +141,7 @@ export function ClaudeProfiles({ link, online, ai }: ClaudeProfilesProps) {
 				<SignInCodeDialog
 					link={link}
 					ai={ai}
-					onAdded={() => void run("load", { case: "profileList", value: {} })}
+					onAdded={profiles.reload}
 					onClose={() => setAdding(false)}
 				/>
 			)}

@@ -1,4 +1,4 @@
-// Vietnamese copy of "Máy của tôi" (plans …/mock-ui.html): the machine list,
+// Vietnamese copy of AI Agent (plans …/mock-ui.html): the machine list,
 // adding and pairing, the sessions of a machine and the remote chat. The AI
 // is named from what the machine reports (`ai` below), never hard-coded, and
 // the app's name comes from the brand. copy-en.ts and copy-zh-CN.ts provide
@@ -72,6 +72,7 @@ export const viMachines = {
 		loading: "Đang tải yêu cầu…",
 	},
 	newSession: {
+		noProject: "Không nạp .claude ở thư mục home hay thư mục nhạy cảm: Claude Code cũng không bao giờ tin cấu hình ở đó.",
 		title: (machine: string) => `Phiên mới trên ${machine}`,
 		model: "Model",
 		ai: "AI",
@@ -291,7 +292,7 @@ export const viMachines = {
 		thisDevice: "Thiết bị này",
 		revokeThis: "Thu hồi",
 		pairNew: "Ghép thiết bị mới",
-		pairNewHint: "Trên thiết bị mới, mở Máy của tôi, chọn máy này rồi “Ghép thiết bị này”.",
+		pairNewHint: "Trên thiết bị mới, mở AI Agent, chọn máy này rồi “Ghép thiết bị này”.",
 		rename: "Đổi tên",
 		renameTitle: "Đổi tên máy",
 		name: "Tên máy",
@@ -322,7 +323,7 @@ export const viMachines = {
 	},
 	profiles: {
 		title: "Tài khoản Claude",
-		note: "Mỗi tài khoản đăng nhập riêng, dùng chung dự án, lịch sử và cấu hình của máy. Phiên mới dùng tài khoản đang chọn. Phiên đang mở giữ tài khoản của nó; phiên đã đóng hoặc đang nghỉ khi mở lại sẽ chạy bằng tài khoản đang chọn lúc đó.",
+		note: "Mỗi tài khoản đăng nhập riêng, dùng chung dự án, lịch sử và cấu hình của máy. Tài khoản đang chọn là của cả máy: đổi một lần thì mọi phiên chuyển theo, phiên rảnh chuyển ngay (tiếp tục đúng hội thoại), phiên đang chạy chuyển sau lượt hiện tại.",
 		defaultName: "Mặc định của máy",
 		notSignedIn: "Chưa đăng nhập",
 		needsSignIn: "Cần đăng nhập lại",
@@ -330,7 +331,7 @@ export const viMachines = {
 		loginEnds: (at: string) => `đăng nhập tới ${at}`,
 		loginEnded: (at: string) => `đăng nhập đã hết hạn lúc ${at}`,
 		selected: "Đang dùng",
-		select: "Dùng cho phiên mới",
+		select: "Dùng cho cả máy",
 		refresh: "Làm mới hạn mức",
 		remove: "Xoá",
 		add: "Thêm tài khoản",
@@ -351,7 +352,7 @@ export const viMachines = {
 			submit: "Thêm",
 			submitting: "Đang kiểm…",
 			cancel: "Huỷ",
-			done: (email: string) => `Đã thêm ${email}. Chọn “Dùng cho phiên mới” để phiên mới chạy bằng tài khoản này.`,
+			done: (email: string) => `Đã thêm ${email}. Chọn “Dùng cho cả máy” để mọi phiên chạy bằng tài khoản này.`,
 			close: "Đóng",
 			retry: "Thử lại",
 			onMachineTitle: "Đăng nhập ngay trên máy",
@@ -418,6 +419,25 @@ export const viMachines = {
 		badQr: "Đây không phải mã ghép của tunelo.",
 	},
 	agent: {
+		account: {
+			label: (email: string) => `Tài khoản Claude: ${email}`,
+			title: "Tài khoản Claude của máy",
+			note: "Đổi một lần cho cả máy: phiên rảnh chuyển ngay, phiên đang chạy chuyển sau lượt.",
+			switchTo: (email: string) => `Chuyển cả máy sang ${email}`,
+			current: "Đang dùng",
+			defaultName: "Mặc định của máy",
+			notSignedIn: "Chưa đăng nhập",
+			needsSignIn: "Cần đăng nhập lại",
+			unknown: "Chưa rõ hạn mức",
+			updatedAt: (at: string) => `cập nhật ${at}`,
+			add: "Thêm tài khoản Claude",
+			manage: "Quản lý ở trang máy",
+			pending: (email: string) => `Sẽ chuyển sang ${email} sau lượt này`,
+		},
+		limit: {
+			text: (from: string, to: string, left: number) => (from === "" ? `Hết hạn mức. Còn ${to} (${left}%).` : `Hết hạn mức của ${from}. Còn ${to} (${left}%).`),
+			action: (to: string) => `Chuyển cả máy sang ${to}`,
+		},
 		pairing: {
 			step1: (machine: string) => `Trên ${machine}, mở Terminal (macOS) hoặc PowerShell (Windows) và chạy:`,
 			step2: "Lệnh in mã QR và 6 số, dùng được trong 10 phút. Quét mã hoặc gõ 6 số:",
@@ -460,6 +480,7 @@ export const viMachines = {
 		noMachinesBody: "Thêm máy tính có Claude Code để chat với AI trên máy đó.",
 		addMachine: "Thêm máy",
 		sub: {
+			tool: (name: string) => `Đang chạy: ${name}`,
 			waiting: "Chờ bạn duyệt",
 			running: "Đang làm…",
 			queued: "Chờ chỗ trống",

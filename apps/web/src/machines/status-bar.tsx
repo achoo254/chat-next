@@ -5,7 +5,7 @@
 // (folder, branch, effort, context used, account, both usage windows with
 // their reset, lines changed) sits in "Chi tiết", labelled. One line on
 // phones. Whatever is not known yet is left out.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { MachineInfo, ThreadInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -36,6 +36,10 @@ interface StatusBarProps {
 	link: MachineLink;
 	threadId: string;
 	online: boolean;
+	/** The account item (account-menu.tsx); absent when the AI reports no account. */
+	account?: ReactNode;
+	/** The account the session moves to after this turn; "" when it stays. */
+	switchingTo?: string;
 }
 
 function countdown(t: MachinesCopy, left: Countdown | null): string {
@@ -50,7 +54,7 @@ function Bar({ pct }: { pct: number }) {
 	);
 }
 
-export function StatusBar({ ai, dir, machine, provider, model, context, info, link, threadId, online }: StatusBarProps) {
+export function StatusBar({ ai, dir, machine, provider, model, context, info, link, threadId, online, account, switchingTo = "" }: StatusBarProps) {
 	const t = useMachinesCopy();
 	const now = useNow(30_000);
 	const five = usageOf(info?.rateLimits?.fiveHour, now);
@@ -58,9 +62,16 @@ export function StatusBar({ ai, dir, machine, provider, model, context, info, li
 	const mode = info === undefined || info.permissionMode === "" ? null : info.permissionMode;
 	return (
 		<div className="mx-status" role="group" aria-label={t.statusBar.label}>
+			{switchingTo !== "" && (
+				<p className="mx-status-note" role="status">
+					<MachineIcon name="user" small />
+					{t.agent.account.pending(switchingTo)}
+				</p>
+			)}
 			<div className="mx-status-row">
 				<ModelMenu link={link} info={machine} threadId={threadId} provider={provider} model={model} effort={info?.effort ?? ""} disabled={!online} />
 				{mode !== null && <ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} link={link} threadId={threadId} disabled={!online} />}
+				{account}
 				{five !== null && (
 					<span
 						className={five.pct >= USAGE_WARN ? "mx-st-item mx-usage warn" : "mx-st-item mx-usage"}

@@ -8,7 +8,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
-import { NewSession } from "../../src/machines/new-session.tsx";
+import { isHome, NewSession } from "../../src/machines/new-session.tsx";
 import { folderName, recentFolders } from "../../src/machines/new-session-hints.ts";
 
 const HOME = "/Users/me";
@@ -165,5 +165,32 @@ describe("new session", () => {
 			</I18nProvider>,
 		);
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+	});
+});
+
+describe("project settings in the home folder", () => {
+	it("are off and locked in the home or a sensitive folder, with the reason, and free in a project", async () => {
+		const { link, sent } = fakeLink();
+		open(link, { ...stateWith([]), info: { home: HOME, providers: [], recentDirs: [], pinnedDirs: [] } } as unknown as LinkState);
+		await waitFor(() => expect(folderInput().value).toBe(HOME));
+		const box = screen.getByRole("checkbox", { name: /Nạp cấu hình .claude/ }) as HTMLInputElement;
+		expect(box.disabled).toBe(true);
+		expect(box.checked).toBe(false);
+		expect(screen.getByText(/Claude Code cũng không bao giờ tin cấu hình ở đó/)).toBeTruthy();
+		fireEvent.change(folderInput(), { target: { value: `${HOME}/code/app` } });
+		expect(box.disabled).toBe(false);
+		fireEvent.click(box);
+		expect(box.checked).toBe(true);
+		// Back home: the box shows off again and nothing asks the machine to load or trust it.
+		fireEvent.change(folderInput(), { target: { value: `${HOME}/` } });
+		expect(box.checked).toBe(false);
+		expect(sent.filter((r) => r.case === "threadCreate")).toEqual([]);
+	});
+
+	it("knows the home folder whatever its trailing slash or, on Windows, its case", () => {
+		expect(isHome("/Users/me/", "/Users/me")).toBe(true);
+		expect(isHome("c:\\users\\me", "C:\\Users\\me")).toBe(true);
+		expect(isHome("/Users/me/code", "/Users/me")).toBe(false);
+		expect(isHome("", "/Users/me")).toBe(false);
 	});
 });
