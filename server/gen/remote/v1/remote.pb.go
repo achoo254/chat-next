@@ -4741,7 +4741,15 @@ type ThreadSummary struct {
 	// Unix milliseconds.
 	UpdatedAt int64 `protobuf:"varint,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	// The session is open (counts against the limit) or parked.
-	Open          bool `protobuf:"varint,9,opt,name=open,proto3" json:"open,omitempty"`
+	Open bool `protobuf:"varint,9,opt,name=open,proto3" json:"open,omitempty"`
+	// One line of the thread's last message, for a chat-style session list: the
+	// last text of the AI or the user (markdown dropped, at most 140
+	// characters, cut with "…"). Never thinking, never more than the thread
+	// itself shows. Empty before the first message and from tunelo before 2.0.2.
+	Preview string `protobuf:"bytes,10,opt,name=preview,proto3" json:"preview,omitempty"`
+	// The tool running right now (its name, e.g. "Bash"); a device shows
+	// "Running: <tool>" instead of preview. Empty when none runs.
+	PreviewTool   string `protobuf:"bytes,11,opt,name=preview_tool,json=previewTool,proto3" json:"preview_tool,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4837,6 +4845,20 @@ func (x *ThreadSummary) GetOpen() bool {
 		return x.Open
 	}
 	return false
+}
+
+func (x *ThreadSummary) GetPreview() string {
+	if x != nil {
+		return x.Preview
+	}
+	return ""
+}
+
+func (x *ThreadSummary) GetPreviewTool() string {
+	if x != nil {
+		return x.PreviewTool
+	}
+	return ""
 }
 
 type ThreadListResult struct {
@@ -7749,7 +7771,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\asubject\x18\x04 \x01(\tR\asubject\"0\n" +
 	"\x06Cursor\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\x04R\x05epoch\x12\x10\n" +
-	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xf4\x01\n" +
+	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xb1\x02\n" +
 	"\rThreadSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x10\n" +
@@ -7760,7 +7782,10 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\apending\x18\a \x01(\rR\apending\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\b \x01(\x03R\tupdatedAt\x12\x12\n" +
-	"\x04open\x18\t \x01(\bR\x04open\"\x8e\x01\n" +
+	"\x04open\x18\t \x01(\bR\x04open\x12\x18\n" +
+	"\apreview\x18\n" +
+	" \x01(\tR\apreview\x12!\n" +
+	"\fpreview_tool\x18\v \x01(\tR\vpreviewTool\"\x8e\x01\n" +
 	"\x10ThreadListResult\x122\n" +
 	"\athreads\x18\x01 \x03(\v2\x18.remote.v1.ThreadSummaryR\athreads\x12#\n" +
 	"\ropen_sessions\x18\x02 \x01(\rR\fopenSessions\x12!\n" +

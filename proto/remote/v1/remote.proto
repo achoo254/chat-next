@@ -619,6 +619,14 @@ message ThreadSummary {
   int64 updated_at = 8;
   // The session is open (counts against the limit) or parked.
   bool open = 9;
+  // One line of the thread's last message, for a chat-style session list: the
+  // last text of the AI or the user (markdown dropped, at most 140
+  // characters, cut with "…"). Never thinking, never more than the thread
+  // itself shows. Empty before the first message and from tunelo before 2.0.2.
+  string preview = 10;
+  // The tool running right now (its name, e.g. "Bash"); a device shows
+  // "Running: <tool>" instead of preview. Empty when none runs.
+  string preview_tool = 11;
 }
 
 enum ThreadState {
