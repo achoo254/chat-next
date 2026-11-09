@@ -189,11 +189,27 @@ export const writeApprovalHook: HookCallback = async (input) => {
   };
 };
 
-/** request_secret asks the user on the device itself: no approval card before it. */
+/** Tools whose own card on the device is the question to the user: no approval card before them. */
+const ASKS_ON_DEVICE = new Set(["request_secret", "request_takeover"].map((tool) => `mcp__${SESSION_MCP_SERVER}__${tool}`));
+
+/** request_secret and request_takeover ask the user on the device itself: no approval card before them. */
 export const secretRequestHook: HookCallback = async (input) => {
-  if (input.hook_event_name !== "PreToolUse" || input.tool_name !== `mcp__${SESSION_MCP_SERVER}__request_secret`) return {};
+  if (input.hook_event_name !== "PreToolUse" || !ASKS_ON_DEVICE.has(input.tool_name)) return {};
   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
 };
+
+/**
+ * After every tool: what happened in the tunelo browser that Claude should
+ * know (a page asked for a passkey nobody at the machine can give), once.
+ */
+export function browserNoticeHook(take: () => string[]): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PostToolUse" && input.hook_event_name !== "PostToolUseFailure") return {};
+    const notices = take();
+    if (notices.length === 0) return {};
+    return { hookSpecificOutput: { hookEventName: input.hook_event_name, additionalContext: notices.join("\n") } };
+  };
+}
 
 const commandOf = (input: unknown): string => {
   const command = (input as { command?: unknown } | null)?.command;
@@ -287,6 +303,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   // No sign-in secret value goes to the devices or the journal.
   const emit = (e: ProviderEvent) => events.push(redactDeep(e));
   const secrets = policy.sessionMcp?.secrets;
+  const browserNotices = policy.sessionMcp?.browserNotices;
+  const notices = browserNotices ? [browserNoticeHook(browserNotices)] : [];
   let interrupted = false;
   let turnStart = 0;
   let turnOpen = false;
@@ -366,8 +384,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook] },
         ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
       ],
-      PostToolUse: [{ hooks: [secretOutputHook(secrets)] }],
-      PostToolUseFailure: [{ hooks: [secretOutputHook(secrets)] }],
+      PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
+      PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
     },
     // Without a mode picked on a device, the session follows the machine's own
     // Claude settings (permissions.defaultMode and allow/deny rules).

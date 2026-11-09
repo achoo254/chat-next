@@ -18,12 +18,11 @@ import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import WebSocket from "ws";
+import { CdpConnection } from "../remote-browser/cdp-connection.ts";
 import { originOf } from "./secret-names.ts";
 
 const run = promisify(execFile);
 const HTTP_TIMEOUT_MS = 2_000;
-const CDP_TIMEOUT_MS = 10_000;
 
 export class FillError extends Error {}
 
@@ -151,63 +150,6 @@ interface FillAnswer {
 	field?: string;
 }
 
-/** Sends CDP commands on one page's WebSocket, in order. */
-function cdpSession(wsUrl: string): Promise<{ send(method: string, params: object): Promise<unknown>; close(): void }> {
-	return new Promise((resolve, reject) => {
-		const ws = new WebSocket(wsUrl, { perMessageDeflate: false, handshakeTimeout: HTTP_TIMEOUT_MS });
-		const waiting = new Map<number, { resolve(v: unknown): void; reject(e: Error): void }>();
-		let next = 0;
-		ws.on("message", (data) => {
-			let msg: { id?: number; result?: unknown; error?: { message?: string } };
-			try {
-				msg = JSON.parse(String(data)) as typeof msg;
-			} catch {
-				return;
-			}
-			if (typeof msg.id !== "number") return;
-			const w = waiting.get(msg.id);
-			if (!w) return;
-			waiting.delete(msg.id);
-			if (msg.error) w.reject(new Error(msg.error.message ?? "the browser refused"));
-			else w.resolve(msg.result);
-		});
-		const fail = (err: Error) => {
-			for (const w of waiting.values()) w.reject(err);
-			waiting.clear();
-		};
-		ws.on("close", () => fail(new Error("the browser closed the connection")));
-		ws.on("error", (err) => {
-			fail(err);
-			reject(err);
-		});
-		ws.on("open", () =>
-			resolve({
-				send(method, params) {
-					const id = ++next;
-					return new Promise((res, rej) => {
-						const timer = setTimeout(() => {
-							waiting.delete(id);
-							rej(new Error("the browser did not answer in time"));
-						}, CDP_TIMEOUT_MS);
-						waiting.set(id, {
-							resolve: (v) => {
-								clearTimeout(timer);
-								res(v);
-							},
-							reject: (e) => {
-								clearTimeout(timer);
-								rej(e);
-							},
-						});
-						ws.send(JSON.stringify({ id, method, params }));
-					});
-				},
-				close: () => ws.close(),
-			}),
-		);
-	});
-}
-
 const WHY: Record<string, string> = {
 	selector: "the selector is not valid CSS",
 	none: "no field to fill: give a selector, or focus the field first",
@@ -217,9 +159,9 @@ const WHY: Record<string, string> = {
 
 /** Fills `value` into the page; throws FillError saying why not. */
 export async function fillPage(page: PageTarget, origin: string, value: string, selector: string | undefined): Promise<{ field: string }> {
-	let session: Awaited<ReturnType<typeof cdpSession>>;
+	let session: CdpConnection;
 	try {
-		session = await cdpSession(page.webSocketDebuggerUrl);
+		session = await CdpConnection.open(page.webSocketDebuggerUrl);
 	} catch (err) {
 		throw new FillError(`could not attach to the page (${err instanceof Error ? err.message : String(err)})`);
 	}

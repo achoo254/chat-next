@@ -16,7 +16,9 @@
  * outcome; never its arguments). Nothing leaves without redact().
  *
  * A session with a ticket also has the sign-in secret tools (request_secret,
- * fill_secret; sign-in-secrets/secret-tools.ts), bound to that ticket and its thread.
+ * fill_secret; sign-in-secrets/secret-tools.ts) and the tunelo browser tools
+ * (open_browser, request_takeover, virtual_authenticator;
+ * remote-browser/browser-tools.ts), bound to that ticket and its thread.
  */
 import { randomUUID } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/server";
@@ -43,15 +45,20 @@ import { SessionTickets } from "./session-tickets.js";
 import { WriteApprovals } from "./write-approvals.js";
 import { SECRETS_GROUP, SECRET_TOOLS, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 import type { SecretService } from "../sign-in-secrets/secret-service.ts";
+import { BROWSER_GROUP, BROWSER_TOOLS, registerBrowserTools } from "../remote-browser/browser-tools.ts";
+import type { RemoteBrowser } from "../remote-browser/remote-browser.ts";
 
 interface Entry {
 	session: McpSession;
 	tables: Map<GroupName, ToolTable>;
 	/** The ticket the client presented, if any. */
 	ticket?: string;
-	/** request_secret and fill_secret, for a session with a ticket. */
-	secrets?: ToolTable;
+	/** The tools only a session with a ticket has, by group (secrets, browser). */
+	ticketTools?: Map<string, ToolTable>;
 }
+
+/** The groups of tools only a session tunelo opened has, and their tools. */
+const TICKET_GROUPS: Readonly<Record<string, readonly string[]>> = { [SECRETS_GROUP]: SECRET_TOOLS, [BROWSER_GROUP]: BROWSER_TOOLS };
 
 const NO_SESSION =
 	"This MCP session ended (tunelo restarted); reconnect the MCP client.";
@@ -75,6 +82,8 @@ export interface McpHostOptions {
 	localWrites?: () => boolean;
 	/** The machine's sign-in secrets; without them a session has no secret tools. */
 	secrets?: () => SecretService | undefined;
+	/** The tunelo browser; without it a session has no browser tools. */
+	browser?: () => RemoteBrowser | undefined;
 	log?: (line: string) => void;
 }
 
@@ -127,17 +136,28 @@ export class McpHost {
 		const id = randomUUID();
 		const context = createMcpContext(serverUrl, this.dir);
 		const session: McpSession = { context, tunnels: new LocalTunnels(context) };
-		this.sessions.set(id, { session, tables: toolTables(session), ...(ticket ? { ticket, ...this.secretTools(ticket) } : {}) });
+		this.sessions.set(id, { session, tables: toolTables(session), ...(ticket ? { ticket, ticketTools: this.ticketTools(ticket) } : {}) });
 		return id;
 	}
 
-	private secretTools(ticket: string): { secrets?: ToolTable } {
-		const service = this.options.secrets?.();
+	private ticketTools(ticket: string): Map<string, ToolTable> {
+		const tables = new Map<string, ToolTable>();
 		const threadId = this.tickets.owner(ticket);
-		if (!service || !threadId) return {};
-		const table = new ToolTable();
-		registerSecretTools(table, { service, session: { key: ticket, threadId } });
-		return { secrets: table };
+		if (!threadId) return tables;
+		const session = { key: ticket, threadId };
+		const service = this.options.secrets?.();
+		if (service) {
+			const table = new ToolTable();
+			registerSecretTools(table, { service, session });
+			tables.set(SECRETS_GROUP, table);
+		}
+		const browser = this.options.browser?.();
+		if (browser) {
+			const table = new ToolTable();
+			registerBrowserTools(table, { browser, session });
+			tables.set(BROWSER_GROUP, table);
+		}
+		return tables;
 	}
 
 	async call(
@@ -150,7 +170,7 @@ export class McpHost {
 		if (!entry) return failure(new Error(NO_SESSION));
 		const who = entry.ticket ? this.tickets.owner(entry.ticket) : "local";
 		if (!who) return failure(new Error(TICKET_ENDED));
-		if (groupName === SECRETS_GROUP) return this.callSecrets(entry, who, tool, args);
+		if (Object.hasOwn(TICKET_GROUPS, groupName)) return this.callTicketTool(entry, who, groupName, tool, args);
 		const group = toolGroup(groupName);
 		if (!group || !this.enabled(group.name)) {
 			return failure(new Error(`The ${groupName} tools are off on this machine`));
@@ -169,12 +189,13 @@ export class McpHost {
 		return this.clean(group, tool, result);
 	}
 
-	/** A sign-in secret tool: only for a session tunelo opened; its result never holds a value (redact). */
-	private async callSecrets(entry: Entry, who: string, tool: string, args: Record<string, unknown>): Promise<CallToolResult> {
-		if (!(SECRET_TOOLS as readonly string[]).includes(tool)) return failure(new Error(`${tool} is not a tool tunelo offers`));
-		if (!entry.secrets) return failure(new Error("Sign-in secrets are only offered in a session tunelo opened."));
-		const result = await entry.secrets.call(tool, args);
-		this.log(redactMessage(`mcp ${who}: ${SECRETS_GROUP} ${tool} ${result.isError ? "failed" : "ok"}`));
+	/** A sign-in secret or browser tool: only for a session tunelo opened; its result never holds a secret value (redact). */
+	private async callTicketTool(entry: Entry, who: string, group: string, tool: string, args: Record<string, unknown>): Promise<CallToolResult> {
+		if (!TICKET_GROUPS[group]?.includes(tool)) return failure(new Error(`${tool} is not a tool tunelo offers`));
+		const table = entry.ticketTools?.get(group);
+		if (!table) return failure(new Error(`The ${group} tools are only offered in a session tunelo opened.`));
+		const result = await table.call(tool, args);
+		this.log(redactMessage(`mcp ${who}: ${group} ${tool} ${result.isError ? "failed" : "ok"}`));
 		return { ...result, content: result.content.map((item) => (item.type === "text" ? { ...item, text: redact(item.text) } : item)) };
 	}
 
@@ -208,6 +229,7 @@ export class McpHost {
 		this.tickets.revoke(ticket);
 		this.approvals.forget(ticket);
 		this.options.secrets?.()?.endSession(ticket);
+		this.options.browser?.()?.endSession(ticket);
 	}
 
 	/**

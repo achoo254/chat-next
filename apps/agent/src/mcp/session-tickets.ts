@@ -18,6 +18,8 @@ export interface SessionMcp {
 	describeWrite(claudeName: string, input: Record<string, unknown>): Promise<string | undefined>;
 	/** The session's sign-in secrets in its commands; absent when the machine keeps none. */
 	secrets?: SessionSecretHooks;
+	/** What happened in the tunelo browser that Claude hears with its next tool result, taken once. */
+	browserNotices?: () => string[];
 }
 
 /** A session's MCP, with the end of its ticket (when the session ends). */

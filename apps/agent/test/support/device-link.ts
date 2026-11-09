@@ -11,6 +11,7 @@ import type { ClaudeProfiles } from "../../src/profiles/service.ts";
 import type { AuditLog } from "../../src/safety/audit-log.ts";
 import type { LocalForward } from "../../src/tunnels/forward.ts";
 import type { SecretService } from "../../src/sign-in-secrets/secret-service.ts";
+import type { RemoteBrowser } from "../../src/remote-browser/remote-browser.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -19,6 +20,8 @@ export type DeviceLink = {
   request(id: string, body: Body): Promise<Frame>;
   /** Every frame the device received so far. */
   received: Frame[];
+  /** The device's link closes. */
+  close(): void;
 };
 
 export async function pairedDevice(ctx: {
@@ -28,6 +31,7 @@ export async function pairedDevice(ctx: {
   profiles?: ClaudeProfiles;
   localForward?: LocalForward;
   secrets?: SecretService;
+  browser?: RemoteBrowser;
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -50,6 +54,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.profiles ? { profiles: ctx.profiles } : {}),
       ...(ctx.localForward ? { localForward: ctx.localForward } : {}),
       ...(ctx.secrets ? { secrets: ctx.secrets } : {}),
+      ...(ctx.browser ? { browser: ctx.browser } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
       pairing: () => undefined,
       machineInfo:
@@ -83,6 +88,7 @@ export async function pairedDevice(ctx: {
   })();
   return {
     received,
+    close: () => conn.close(),
     request: (id, body) =>
       new Promise((resolve) => {
         waiting.set(id, resolve);

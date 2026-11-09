@@ -42,6 +42,7 @@ import { attachmentLimitsBody } from "./attachments/uploads.ts";
 import { Projects } from "./projects/projects.ts";
 import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
 import { SecretService } from "./sign-in-secrets/secret-service.ts";
+import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -67,6 +68,8 @@ export type MachineOptions = {
   mcp?: McpHost;
   /** Sign-in secrets; built from the config folder when not given. */
   secrets?: SecretService;
+  /** The tunelo browser; built from the config folder when not given. */
+  browser?: RemoteBrowser;
 };
 
 export class Machine {
@@ -77,6 +80,7 @@ export class Machine {
   readonly profiles: ClaudeProfiles;
   readonly projects: Projects;
   readonly secrets: SecretService;
+  readonly browser: RemoteBrowser;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
@@ -100,6 +104,7 @@ export class Machine {
     this.isSensitive = createSensitiveCheck({ configDir: dir });
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
     this.secrets = opts.secrets ?? new SecretService({ configDir: dir, audit: this.audit });
+    this.browser = opts.browser ?? new RemoteBrowser({ configDir: dir, audit: this.audit, log: this.log });
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
     this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
     const c = this.config.get();
@@ -147,7 +152,7 @@ export class Machine {
       suggestProfile: (id) => this.profiles.suggestion(id),
       onSessionProfile: () => this.announceProfiles(),
       onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
-      ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets) } : {}),
+      ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
     });
     this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
     this.projects = new Projects({
@@ -165,15 +170,25 @@ export class Machine {
       },
     });
     this.projects.onChange(() => this.announceProjects());
-    // A session waiting for a secret shows as waiting for the user, like a prompt in its transcript.
-    this.secrets.onEvent((event) => {
-      const threadId = event.type === "prompt" ? event.prompt.threadId : event.threadId;
-      this.core.setOutsidePrompts(threadId, this.secrets.openPrompts().filter((p) => p.threadId === threadId).length);
+    // A session waiting for a secret or for the user on the browser shows as waiting for the user,
+    // like a prompt in its transcript.
+    this.secrets.onEvent((event) => this.outsidePrompts(event.type === "prompt" ? event.prompt.threadId : event.threadId));
+    this.browser.onEvent((event) => {
+      if (event.type === "takeover") this.outsidePrompts(event.takeover.threadId);
+      else if (event.type === "ended") this.outsidePrompts(event.threadId);
+      // Devices show "Xem trình duyệt của máy" only while it runs.
+      else if (event.type === "running") void this.announceInfo();
     });
     // A turn that ends may have changed files: the project's git status is read again.
     this.core.onStatus((s) => {
       if (s.state === ThreadState.IDLE && this.projects.invalidate(s.dir)) this.announceProjects();
     });
+  }
+
+  private outsidePrompts(threadId: string): void {
+    if (!threadId) return;
+    const secrets = this.secrets.openPrompts().filter((p) => p.threadId === threadId).length;
+    this.core.setOutsidePrompts(threadId, secrets + this.browser.waitingIn(threadId));
   }
 
   /** Every connected device gets the projects again; changes that come together go out as one. */
@@ -198,6 +213,7 @@ export class Machine {
     // Saved values are hidden from every output from the start, not only once used.
     void this.secrets.store.loadForRedaction().catch((err: unknown) => this.log(`secrets: ${(err as Error).message}`));
     void this.profiles.cleanLeftovers();
+    this.browser.start();
     const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
     this.wss = wss;
     wss.on("connection", (ws) => this.accept(ws));
@@ -233,6 +249,7 @@ export class Machine {
 
   async stop(): Promise<void> {
     this.secrets.close();
+    await this.browser.close();
     this.diskWatch.stop();
     this.stopRotation?.();
     clearTimeout(this.announcing);
@@ -286,7 +303,7 @@ export class Machine {
       return;
     }
     const conn = new Connection(
-      { send: (d) => ws.send(d), close: (code, reason) => ws.close(code, reason) },
+      { send: (d) => ws.send(d), close: (code, reason) => ws.close(code, reason), buffered: () => ws.bufferedAmount },
       {
         core: this.core,
         config: this.config,
@@ -299,6 +316,7 @@ export class Machine {
         projects: this.projects,
         localForward: this.localForward,
         secrets: this.secrets,
+        browser: this.browser,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
@@ -380,6 +398,7 @@ export class Machine {
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
       secrets: true,
       gitChanges: true,
+      browser: { available: this.browser.available(), running: this.browser.running() },
     });
   }
 
@@ -459,9 +478,15 @@ export class Machine {
 /**
  * A new session's MCP: a ticket of `mcp` for the thread, ended with the
  * session; none when the machine turned tunelo's MCP off (`sessionMcp: false`).
- * With `secrets`, the session's commands can read the secrets it was given.
+ * With `secrets`, the session's commands can read the secrets it was given;
+ * with `browser`, it hears what happened in the tunelo browser.
  */
-export function sessionMcpFor(mcp: McpHost, config: ConfigStore, secrets?: SecretService): (threadId: string) => SessionMcpLease | undefined {
+export function sessionMcpFor(
+  mcp: McpHost,
+  config: ConfigStore,
+  secrets?: SecretService,
+  browser?: RemoteBrowser,
+): (threadId: string) => SessionMcpLease | undefined {
   return (threadId) => {
     if (config.get().sessionMcp === false) return undefined;
     const ticket = mcp.tickets.issue(threadId);
@@ -479,6 +504,7 @@ export function sessionMcpFor(mcp: McpHost, config: ConfigStore, secrets?: Secre
       approveWrite: (claudeName, input) => mcp.approve(ticket, claudeName, input),
       describeWrite: (claudeName, input) => mcp.describeWrite(claudeName, input),
       ...(env ? { secrets: env } : {}),
+      ...(browser ? { browserNotices: () => browser.takeNotices(ticket) } : {}),
       release: () => {
         env?.dispose();
         mcp.release(ticket);

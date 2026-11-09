@@ -22,7 +22,9 @@ export type AuditAction =
   | "mcp_local_writes"
   | "secret_add"
   | "secret_use"
-  | "secret_remove";
+  | "secret_remove"
+  | "browser_control"
+  | "browser_clear";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

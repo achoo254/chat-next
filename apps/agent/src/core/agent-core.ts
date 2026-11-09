@@ -1300,7 +1300,7 @@ export class AgentCore {
     };
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
-    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, ...(lease.secrets ? { secrets: lease.secrets } : {}) } } : policy;
+    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, ...(lease.secrets ? { secrets: lease.secrets } : {}), ...(lease.browserNotices ? { browserNotices: lease.browserNotices } : {}) } } : policy;
     t.modeUnseen = true;
     t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {

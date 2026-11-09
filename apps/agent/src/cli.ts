@@ -16,6 +16,7 @@ import { registerMcpLocalWritesCommand } from "./commands/mcp-local-writes.ts";
 import { registerInstallCommand } from "./commands/install.ts";
 import { registerProfilesCommand } from "./commands/profiles.ts";
 import { registerSecretsCommand } from "./commands/secrets.ts";
+import { registerBrowserCommand } from "./commands/browser.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
@@ -48,6 +49,7 @@ import { TunnelService } from "./tunnels/tunnel-service.ts";
 import { checkForUpdate, update } from "./update.ts";
 import { AGENT_VERSION } from "./version.ts";
 import type { SecretService } from "./sign-in-secrets/secret-service.ts";
+import type { RemoteBrowser } from "./remote-browser/remote-browser.ts";
 
 const log = (line: string) => console.log(line);
 
@@ -84,14 +86,17 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   // A session's writes need the device's approval, except in bypassPermissions (set on the machine only).
   let sessionMode: (threadId: string) => string | undefined = () => undefined;
   let secrets: () => SecretService | undefined = () => undefined;
+  let browser: () => RemoteBrowser | undefined = () => undefined;
   const mcp = new McpHost(dir, {
     log,
     enabledGroups: () => config.get().mcpGroups,
     sessionMode: (threadId) => sessionMode(threadId),
     secrets: () => secrets(),
+    browser: () => browser(),
   });
   const machine = new Machine({ config, mcp });
   secrets = () => machine.secrets;
+  browser = () => machine.browser;
   sessionMode = (threadId) => machine.core.permissionMode(threadId);
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;
@@ -328,6 +333,7 @@ function buildProgram(): Command {
   program.command("trusted").description("list trusted folders").action(exits(() => printJson("/trust")));
   registerProfilesCommand(program, exits);
   registerSecretsCommand(program, exits);
+  registerBrowserCommand(program, exits);
   // The running service asks a new copy of itself whether macOS granted Full Disk Access.
   program
     .command("disk-access", { hidden: true })

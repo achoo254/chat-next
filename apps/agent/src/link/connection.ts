@@ -36,11 +36,16 @@ import { SecretInputError } from "../sign-in-secrets/secret-names.ts";
 import type { SavedSecretInfo } from "../sign-in-secrets/secret-store.ts";
 import { type SecretEvent, SecretNotFound, SecretPromptGone, type SecretService } from "../sign-in-secrets/secret-service.ts";
 import type { GitChangesResult, GitFileChange } from "../threads/git-changes.ts";
+import { InputError } from "../remote-browser/browser-input.ts";
+import { BrowserNotRunning, BrowserToolError, BrowserUnavailable, type RemoteBrowser, TakeoverGone } from "../remote-browser/remote-browser.ts";
+import { type BrowserFrame, BrowserLink } from "./browser-link.ts";
 import { wireItem } from "./wire.ts";
 
 export type Socket = {
   send(data: Uint8Array): void;
   close(code?: number, reason?: string): void;
+  /** Bytes queued and not yet sent (a busy device skips browser pictures). */
+  buffered?(): number;
 };
 
 export type LinkContext = {
@@ -63,6 +68,8 @@ export type LinkContext = {
   localForward?: LocalForward;
   /** Sign-in secrets Claude asks the user for; absent where the machine has none (tests). */
   secrets?: SecretService;
+  /** The tunelo browser the user may take over; absent where the machine has none (tests). */
+  browser?: RemoteBrowser;
   /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
   openDiskAccessSettings?: () => boolean;
 };
@@ -86,6 +93,10 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   if (err instanceof SecretPromptGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SECRET_PROMPT_GONE, subject: "" };
   if (err instanceof SecretNotFound) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SECRET_NOT_FOUND, subject: "" };
   if (err instanceof SecretInputError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.SECRET_INVALID, subject: "" };
+  if (err instanceof TakeoverGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.TAKEOVER_GONE, subject: "" };
+  if (err instanceof BrowserNotRunning) return { code: ErrorCode.INVALID, message, reason: ErrorReason.BROWSER_NOT_RUNNING, subject: "" };
+  if (err instanceof BrowserUnavailable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.BROWSER_UNAVAILABLE, subject: "" };
+  if (err instanceof InputError || err instanceof BrowserToolError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
   if (isFsError(err)) {
     const fsCode = (err as { code: string }).code;
     const reason =
@@ -186,6 +197,7 @@ export class Connection {
   private subscribed = new Set<string>();
   private unsubscribe: (() => void)[] = [];
   private queue: Promise<void> = Promise.resolve();
+  private browserLink: BrowserLink | undefined;
   readonly opened = Date.now();
 
   constructor(
@@ -211,6 +223,7 @@ export class Connection {
     if (this.state === "closed") return;
     this.state = "closed";
     for (const u of this.unsubscribe) u();
+    this.browserLink?.close();
     this.socket.close(code, reason);
   }
 
@@ -294,6 +307,17 @@ export class Connection {
     if (secrets) {
       this.unsubscribe.push(secrets.onEvent((event) => this.secretEvent(event)));
       for (const prompt of secrets.openPrompts()) this.secretEvent({ type: "prompt", prompt });
+    }
+    const browser = this.ctx.browser;
+    if (browser) {
+      this.browserLink = new BrowserLink(
+        browser,
+        (id, body) => this.send(id, body),
+        (id, err) => this.sendError(id, err),
+        () => this.socket.buffered?.() ?? 0,
+        () => this.device,
+      );
+      this.unsubscribe.push(this.browserLink.subscribe());
     }
   }
 
@@ -624,6 +648,11 @@ export class Connection {
           // Sealing waits on the key store: answered later, by id.
           void this.secretFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
+        case "browserControl":
+        case "browserView":
+        case "browserInput":
+        case "browserTakeoverEnd":
+          return this.browserFrame(id, b);
         case "projectList":
         case "projectAdd":
         case "projectCreate":
@@ -640,6 +669,12 @@ export class Connection {
     } catch (err) {
       this.sendError(id, err);
     }
+  }
+
+  /** The tunelo browser: answered later, by id; input in order. */
+  private browserFrame(id: string, b: BrowserFrame): void {
+    if (!this.browserLink) return this.send(id, { case: "error", value: refusal("this machine has no tunelo browser", ErrorReason.UNSUPPORTED_REQUEST) });
+    this.browserLink.handle(id, b);
   }
 
   /** A thread opened for this device: it is followed from now on and gets its statusline and every item. */
