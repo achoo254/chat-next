@@ -7,7 +7,7 @@
 // bot. A bot with a main Mini App gets "Mở app" in the composer of its
 // private chat. Loaded with the first bot chat or group opened, with its own
 // styles.
-import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@achoo254/chat-core";
 import { cryptoRandomId } from "@achoo254/chat-platform";
 import { Icon } from "../../components/icon.tsx";
@@ -266,7 +266,7 @@ export interface BotActions {
 	toggleKeyboard(): void;
 	openApp(): void;
 	/** Asked first on every key in the text box; true when the menu used the key. */
-	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
+	onKey(event: KeyboardEvent): boolean;
 }
 
 export interface BotLayerProps {
@@ -297,7 +297,7 @@ interface CommandMenuState {
 	readonly index: number;
 	fill(entry: MenuEntry): void;
 	toggleMenu(): void;
-	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
+	onKey(event: KeyboardEvent): boolean;
 }
 
 /** The command menu's state and keys: typing "/" filters, ↑ ↓ select, Tab fills, Enter sends, Esc closes. */
@@ -323,7 +323,7 @@ function useCommandMenu(
 		setManual(false);
 		focus();
 	};
-	const onKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+	const onKey = (event: KeyboardEvent): boolean => {
 		if (!open || matches.length === 0) return false;
 		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 			event.preventDefault();
@@ -337,7 +337,7 @@ function useCommandMenu(
 			fill(picked);
 			return true;
 		}
-		if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+		if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
 			event.preventDefault();
 			setText("");
 			setManual(false);
@@ -375,7 +375,7 @@ function CommandMenu({ chatId, menu, head, owners }: { chatId: number; menu: Com
 			</div>
 			<ul role="listbox" id={BOT_MENU_ID(chatId)} aria-label={t.menu.button}>
 				{menu.matches.map((entry, position) => (
-					// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the composer's textarea handles the arrow keys, Tab and Enter for this listbox (onKey)
+					// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the composer's text box handles the arrow keys, Tab and Enter for this listbox (onKey)
 					<li
 						key={entry.key}
 						role="option"

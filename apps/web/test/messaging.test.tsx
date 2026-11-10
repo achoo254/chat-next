@@ -10,6 +10,7 @@ import { ChatFixture } from "./support/fake-chat.ts";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 import { newChatDialog } from "./support/new-chat-dialog.ts";
+import { boxValue, getBoxByPlaceholder } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -158,7 +159,7 @@ describe("composer", () => {
 			const last = [...log.querySelectorAll(".msg.mine")].at(-1);
 			expect(last?.querySelector('[aria-label="Đã gửi"], [aria-label="Đã xem"]')).not.toBeNull();
 		}, LONG);
-		expect((box as HTMLTextAreaElement).value).toBe("");
+		expect(boxValue(box)).toBe("");
 	});
 
 	it("shows a refused message as failed and resends it", async () => {
@@ -198,16 +199,16 @@ describe("composer", () => {
 		fireEvent.contextMenu(own);
 		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin của bạn" })).getByRole("menuitem", { name: "Sửa" }));
 
-		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / }) as HTMLTextAreaElement;
-		await waitFor(() => expect(box.value).toBe("Mục 3 ổn, extension đã lên bản mới."));
+		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / });
+		await waitFor(() => expect(boxValue(box)).toBe("Mục 3 ổn, extension đã lên bản mới."));
 		expect(await screen.findByText("Sửa tin")).toBeTruthy();
 		await userEvent.keyboard("{Escape}");
 		expect(screen.queryByText("Sửa tin")).toBeNull();
-		expect(box.value).toBe("");
+		expect(boxValue(box)).toBe("");
 
 		fireEvent.contextMenu(own);
 		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin của bạn" })).getByRole("menuitem", { name: "Sửa" }));
-		await waitFor(() => expect(box.value).toBe("Mục 3 ổn, extension đã lên bản mới."));
+		await waitFor(() => expect(boxValue(box)).toBe("Mục 3 ổn, extension đã lên bản mới."));
 		await userEvent.clear(box);
 		await userEvent.type(box, "Mục 3 ổn, extension đã lên 1.4.{Enter}");
 		expect(await within(log).findByText("Mục 3 ổn, extension đã lên 1.4.", {}, LONG)).toBeTruthy();
@@ -282,16 +283,27 @@ describe("topics", () => {
 		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
 		expect(await within(log).findByText("Ổn, API trả đủ trường cho màn này rồi.", {}, LONG)).toBeTruthy();
 		expect(within(log).queryByText("PR phân trang lịch sử đã merge")).toBeNull();
-		expect(screen.getByPlaceholderText("Nhập @ để nhắc tên, tin nhắn tới Thiết kế")).toBeTruthy();
+		expect(getBoxByPlaceholder("Nhập @ để nhắc tên, tin nhắn tới Thiết kế")).toBeTruthy();
 		const info = await screen.findByRole("complementary", { name: "Thông tin chủ đề" }, LONG);
 		expect(within(info).getByRole("heading", { name: "Thiết kế" })).toBeTruthy();
 		expect(within(info).getByTitle(`chat.example.test/c/${demo.ids.forum}/t/12`)).toBeTruthy();
 	});
 
+	it("breaks the line on Shift+Enter, sends both lines on Enter and empties the box", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, `/c/${demo.ids.forum}/t/4`);
+		const box = await waitFor(() => getBoxByPlaceholder("Nhập @ để nhắc tên, tin nhắn tới Backend API"), LONG);
+		await userEvent.type(box, "dòng một{Shift>}{Enter}{/Shift}dòng hai");
+		expect(demo.fixture.sent).toEqual([]);
+		await userEvent.keyboard("{Enter}");
+		await waitFor(() => expect(demo.fixture.sent).toContainEqual({ chatId: demo.ids.forum, topicId: 4, text: "dòng một\ndòng hai", replyToSeq: 0 }));
+		expect(boxValue(box)).toBe("");
+	});
+
 	it("sends into the open topic and lets admins close a topic from its menu", async () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture, `/c/${demo.ids.forum}/t/4`);
-		const box = await screen.findByPlaceholderText("Nhập @ để nhắc tên, tin nhắn tới Backend API", {}, LONG);
+		const box = await waitFor(() => getBoxByPlaceholder("Nhập @ để nhắc tên, tin nhắn tới Backend API"), LONG);
 		await userEvent.type(box, "Mình review PR này{Enter}");
 		await waitFor(() => expect(demo.fixture.sent).toContainEqual({ chatId: demo.ids.forum, topicId: 4, text: "Mình review PR này", replyToSeq: 0 }));
 		const log = screen.getByRole("log", { name: "Tin nhắn" });

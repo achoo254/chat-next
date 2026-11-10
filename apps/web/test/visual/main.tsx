@@ -431,14 +431,17 @@ async function dropFiles(files: File[]): Promise<void> {
 	chat.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
 }
 
+/** Types into a message box (an editor, not a textarea) as the keyboard would, the caret at the end. */
+function typeInto(field: HTMLElement, text: string): void {
+	field.focus();
+	document.execCommand("insertText", false, text);
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
 	// The composer's "/" picker of the demo session's commands and skills.
 	slash: async () => {
 		await find(() => document.querySelector(".mx-status .mx-mode"));
-		const field = await find(() => document.querySelector<HTMLTextAreaElement>(".mx-field"));
-		Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, "/");
-		field.dispatchEvent(new Event("input", { bubbles: true }));
-		field.focus();
+		typeInto(await find(() => document.querySelector<HTMLElement>(".mx-field[data-composer]")), "/");
 		await find(() => document.querySelector(".mx-slash"));
 	},
 	// "Phiên mới" on the demo machine's page (?at=machine-sessions): opened in the session's folder, with the first message suggested.
@@ -620,11 +623,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	// "@" in the composer: the session folder's files.
 	mention: async () => {
 		await find(() => document.querySelector(".mx-status .mx-mode"));
-		const field = await find(() => document.querySelector<HTMLTextAreaElement>(".mx-field[data-composer]"));
-		Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, "xem @machines");
-		field.setSelectionRange(13, 13);
-		field.dispatchEvent(new Event("input", { bubbles: true }));
-		field.focus();
+		typeInto(await find(() => document.querySelector<HTMLElement>(".mx-field[data-composer]")), "xem @machines");
 		await find(() => document.querySelector(".mx-slash .file"));
 	},
 	// The one-time URL after creating a webhook (#hook-created).

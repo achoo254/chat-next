@@ -8,10 +8,10 @@
 // Files (tunelo 2.0.5+) come by the attach button, by pasting or by dropping
 // them on the session; they upload at once and go with the next message,
 // which may then have no text.
-import { useEffect, useId, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
-import { NO_AUTOFILL } from "../components/no-autofill.ts";
+import { PlainTextBox, type PlainTextBoxHandle } from "../components/plain-text-box.tsx";
 import { AttachButton, AttachTray } from "./attachment-tray.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import type { ShownAttachment } from "./transcript/tool-fold.ts";
@@ -74,7 +74,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	/** The text the picker was closed at (Esc); it opens again once the text changes. */
 	const [closedAt, setClosedAt] = useState<string | null>(null);
 	const [found, setFound] = useState<Found | null>(null);
-	const field = useRef<HTMLTextAreaElement>(null);
+	const field = useRef<PlainTextBoxHandle>(null);
 	const listId = useId();
 	const at = listFiles === undefined || closedAt === text ? null : mentionAt(text, caret);
 	const query = at === null ? slashQuery(text) : null;
@@ -126,23 +126,24 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		setCaret(nextCaret);
 		setActive(0);
 	};
-	const place = (pos: number) =>
-		queueMicrotask(() => {
-			field.current?.focus();
-			field.current?.setSelectionRange(pos, pos);
-		});
+	/** Puts text in place of [start, end) as typed, so the caret lands after it and undo takes it back. */
+	const replace = (start: number, end: number, inserted: string) => {
+		const box = field.current;
+		if (box === null) {
+			edit(text.slice(0, start) + inserted + text.slice(end), start + inserted.length);
+			return;
+		}
+		box.focus();
+		box.setSelection(start, end);
+		box.insertText(inserted);
+	};
 	const pick = (option: Option) => {
 		if (option.kind === "command") {
-			edit(`/${option.command.name} `);
-			place(option.command.name.length + 2);
+			replace(0, text.length, `/${option.command.name} `);
 			return;
 		}
 		if (at === null) return;
-		const inserted = option.dir ? `@${option.path}` : `@${option.path} `;
-		const next = text.slice(0, at.start) + inserted + text.slice(caret);
-		const pos = at.start + inserted.length;
-		edit(next, pos);
-		place(pos);
+		replace(at.start, caret, option.dir ? `@${option.path}` : `@${option.path} `);
 	};
 	const send = () => {
 		const message = text.trim();
@@ -161,10 +162,11 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		);
 		field.current?.focus();
 	};
-	const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-		const pasted = [...event.clipboardData.files];
+	const onPaste = (event: ClipboardEvent) => {
+		const clipboard = event.clipboardData;
+		const pasted = [...(clipboard?.files ?? [])];
 		// Copied text that also carries a file (a cell, a rich document): the text goes in as usual.
-		if (pasted.length === 0 || event.clipboardData.getData("text/plain") !== "" || attach === undefined) return;
+		if (pasted.length === 0 || clipboard?.getData("text/plain") !== "" || attach === undefined) return;
 		event.preventDefault();
 		attach.add(pasted);
 	};
@@ -175,8 +177,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 			.catch(() => setError(t.errors.offline))
 			.finally(() => setStopping(false));
 	};
-	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-		if (event.nativeEvent.isComposing) return;
+	const onKeyDown = (event: KeyboardEvent) => {
 		if (open) {
 			const picked = options[index];
 			if ((event.key === "ArrowDown" || event.key === "ArrowUp") && options.length > 0) {
@@ -212,7 +213,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		if (option.kind !== "command") return null;
 		const command = option.command;
 		return (
-			// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the textarea handles the arrow keys, Tab, Enter and Esc for this listbox
+			// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the text box handles the arrow keys, Tab, Enter and Esc for this listbox
 			<li
 				key={command.name}
 				id={optionId(i)}
@@ -271,7 +272,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 						)}
 						{options.map((option, i) =>
 							option.kind === "file" ? (
-								// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the textarea handles the keys for this listbox
+								// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the text box handles the keys for this listbox
 								<li
 									key={option.path}
 									id={optionId(i)}
@@ -296,21 +297,20 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 						)}
 					</ul>
 				)}
-				<textarea
+				<PlainTextBox
 					ref={field}
-					rows={1}
 					className="mx-field"
 					data-composer=""
-					{...NO_AUTOFILL}
-					aria-label={t.chat.message}
+					ariaLabel={t.chat.message}
 					aria-autocomplete="list"
 					aria-controls={open ? listId : undefined}
 					aria-activedescendant={open && options.length > 0 ? optionId(index) : undefined}
+					enterKeyHint="send"
 					placeholder={t.chat.placeholder(ai, machine)}
 					value={text}
 					disabled={!online}
-					onChange={(event) => edit(event.target.value, event.target.selectionStart)}
-					onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+					onValueChange={(value, selection) => edit(value, selection.start)}
+					onSelectionChange={(selection) => setCaret(selection.start)}
 					onKeyDown={onKeyDown}
 					onPaste={onPaste}
 				/>

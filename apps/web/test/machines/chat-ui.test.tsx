@@ -28,6 +28,7 @@ import type { MachineLink } from "../../src/machines/link/machine-link.ts";
 import { StatusBar } from "../../src/machines/status-bar.tsx";
 import { permissionMode, resetIn, usageOf } from "../../src/machines/status-line.ts";
 import type { ToolRun } from "../../src/machines/transcript/tool-fold.ts";
+import { boxValue } from "../support/plain-text-box.ts";
 
 const wrap = (node: ReactNode) => render(<I18nProvider>{node}</I18nProvider>);
 
@@ -191,14 +192,17 @@ describe("slash commands", () => {
 	const composer = (list = commands) => {
 		const onSend = vi.fn(() => Promise.resolve());
 		wrap(<Composer ai="Claude Code" machine="Mac" online running={false} prompting={false} commands={list} onSend={onSend} onStop={() => Promise.resolve()} />);
-		return { onSend, field: screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement };
+		return { onSend, field: screen.getByRole("textbox", { name: "Tin nhắn" }) };
 	};
 
-	it("is a message box that browsers and password managers leave alone", () => {
+	it("is an editor rather than a form field, which password managers leave alone", () => {
 		const { field } = composer();
+		expect(field.tagName).toBe("DIV");
+		expect(field.getAttribute("contenteditable")).toBe("true");
+		expect(field.getAttribute("aria-multiline")).toBe("true");
 		expect(field.getAttribute("autocomplete")).toBe("off");
-		for (const flag of ["data-1p-ignore", "data-lpignore", "data-bwignore"]) expect(field.hasAttribute(flag), flag).toBe(true);
-		expect(field.getAttribute("data-form-type")).toBe("other");
+		expect(field.getAttribute("enterkeyhint")).toBe("send");
+		expect(document.querySelector("textarea")).toBeNull();
 	});
 
 	it("picks with the arrow keys and Enter, keeping the focus, and sends the command as text", async () => {
@@ -215,7 +219,7 @@ describe("slash commands", () => {
 		expect(second?.getAttribute("aria-selected")).toBe("true");
 		expect(field.getAttribute("aria-activedescendant")).toBe(second?.id);
 		await user.keyboard("{Enter}");
-		expect(field.value).toBe("/ak-review ");
+		expect(boxValue(field)).toBe("/ak-review ");
 		expect(document.activeElement).toBe(field);
 		expect(screen.queryByRole("listbox")).toBeNull();
 		expect(onSend).not.toHaveBeenCalled();
@@ -228,7 +232,7 @@ describe("slash commands", () => {
 		const { field } = composer();
 		await user.type(field, "/dep");
 		await user.keyboard("{Tab}");
-		expect(field.value).toBe("/deploy ");
+		expect(boxValue(field)).toBe("/deploy ");
 		await user.clear(field);
 		await user.type(field, "/");
 		await user.keyboard("{Escape}");
@@ -237,7 +241,7 @@ describe("slash commands", () => {
 		const option = screen.getByRole("option", { name: /compact/ });
 		fireEvent.pointerDown(option);
 		await user.click(option);
-		expect(field.value).toBe("/compact ");
+		expect(boxValue(field)).toBe("/compact ");
 	});
 
 	it("shows nothing while no commands are known", async () => {
@@ -246,6 +250,18 @@ describe("slash commands", () => {
 		await user.type(field, "/help{Enter}");
 		expect(screen.queryByRole("listbox")).toBeNull();
 		expect(onSend).toHaveBeenCalledWith("/help", []);
+	});
+
+	it("breaks the line on Shift+Enter, sends the lines on Enter and empties the box", async () => {
+		const user = userEvent.setup();
+		const { onSend, field } = composer();
+		await user.type(field, "dòng một{Shift>}{Enter}{/Shift}dòng hai");
+		expect(onSend).not.toHaveBeenCalled();
+		expect(boxValue(field)).toBe("dòng một\ndòng hai");
+		await user.keyboard("{Enter}");
+		expect(onSend).toHaveBeenCalledWith("dòng một\ndòng hai", []);
+		expect(boxValue(field)).toBe("");
+		expect(document.activeElement).toBe(field);
 	});
 });
 

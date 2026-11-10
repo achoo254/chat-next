@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { entity, seedDemo } from "./support/demo-data.ts";
 import { ChatFixture } from "./support/fake-chat.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { boxValue } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -281,14 +282,14 @@ describe("composer", () => {
 
 	it("inserts emoji found by a name without accents and keeps the panel open", async () => {
 		await openOps();
-		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / }) as HTMLTextAreaElement;
+		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / });
 		await userEvent.type(box, "Ổn rồi ");
 		await userEvent.click(screen.getByRole("button", { name: "Emoji" }));
 		const panel = await screen.findByRole("group", { name: "Chèn emoji" }, LONG);
 		await userEvent.type(within(panel).getByRole("searchbox", { name: "Tìm emoji" }), "cuoi");
 		const results = within(panel).getByRole("group", { name: "Kết quả cho “cuoi”" });
 		await userEvent.click(within(results).getByRole("button", { name: "Mỉm cười" }));
-		expect(box.value).toBe("Ổn rồi 🙂");
+		expect(boxValue(box)).toBe("Ổn rồi 🙂");
 		expect(screen.getByRole("group", { name: "Chèn emoji" })).toBeTruthy();
 		await userEvent.keyboard("{Escape}");
 		await waitFor(() => expect(screen.queryByRole("group", { name: "Chèn emoji" })).toBeNull());

@@ -316,7 +316,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					dragDepth.current = 0;
 					setDragging(null);
 					addAttachments(chatId, effectiveTopic, [...event.dataTransfer.files]);
-					document.querySelector<HTMLTextAreaElement>(".convo .composer textarea")?.focus();
+					document.querySelector<HTMLElement>(".convo .composer .composer-field")?.focus();
 				},
 			}
 		: {};

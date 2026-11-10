@@ -3,6 +3,7 @@ import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { resetMediaState } from "../src/messaging/media/media-state.ts";
 import { inviteLinks } from "../src/messaging/ui/members.ts";
+import { preloadPlainTextEditor } from "../src/components/plain-text-box.tsx";
 
 // jsdom has no object URLs; media screens make them for downloaded files.
 if (typeof URL.createObjectURL !== "function") {
@@ -10,6 +11,20 @@ if (typeof URL.createObjectURL !== "function") {
 	URL.createObjectURL = () => `blob:test/${++next}`;
 	URL.revokeObjectURL = () => undefined;
 }
+
+// jsdom has no layout. The message boxes run ProseMirror, which measures the
+// caret to keep it in view: every box is empty and at the origin here.
+const noRects = (): DOMRectList => Object.assign([], { item: () => null }) as unknown as DOMRectList;
+const zeroRect = (): DOMRect => new DOMRect(0, 0, 0, 0);
+for (const proto of [Range.prototype, Text.prototype] as { getClientRects?: () => DOMRectList; getBoundingClientRect?: () => DOMRect }[]) {
+	proto.getClientRects ??= noRects;
+	proto.getBoundingClientRect ??= zeroRect;
+}
+document.elementFromPoint ??= () => null;
+
+// The message boxes' editor loads apart from the screens; here it is in
+// before any test, so a box is ready to type in as soon as it renders.
+await preloadPlainTextEditor();
 
 // The idle prefetch of secondary screens' code (components/preload.ts) only
 // warms a cache; in tests it would load modules at a random point of a test

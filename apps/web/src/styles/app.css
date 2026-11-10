@@ -30,6 +30,19 @@ button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-xs); }
 [hidden] { display: none !important; }
+/* Message boxes (components/plain-text-box.tsx, TipTap): ProseMirror's own rules, which TipTap would inject.
+   Each composer gives the look (padding, fill, height); the box grows with its lines and scrolls past its max-height. */
+.plain-text-box { position: relative; min-width: 0; overflow-y: auto; white-space: pre-wrap; white-space: break-spaces; overflow-wrap: anywhere; font-variant-ligatures: none; font-feature-settings: "liga" 0; cursor: text; }
+.plain-text-box[contenteditable="false"] { cursor: default; }
+.plain-text-box p { position: relative; margin: 0; }
+.plain-text-box img.ProseMirror-separator { display: inline; border: 0; margin: 0; }
+/* The placeholder never wraps: one line, cut with "…", as a textarea's did. */
+.plain-text-box p.is-editor-empty:first-child::before {
+	content: attr(data-placeholder); position: absolute; inset: 0 0 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+	color: var(--c-text-muted); pointer-events: none;
+}
+/* While the editor loads, the box shows its placeholder the same way. */
+.plain-text-box[aria-busy="true"]:empty::before { content: attr(aria-placeholder); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }
 .icon { width: 20px; height: 20px; flex: none; stroke: currentColor; stroke-width: var(--icon-stroke); fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .icon-sm { width: 16px; height: 16px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -297,7 +310,7 @@ textarea.input { padding: var(--space-2) var(--space-3); min-height: 88px; resiz
 @media (max-width: 760px), (pointer: coarse) {
 	.btn-sm { min-height: 44px; }
 	/* 16px text keeps iOS Safari from zooming the page when a field takes focus. */
-	input, textarea, select, .affix .input { font-size: 1rem; }
+	input, textarea, select, .affix .input, .plain-text-box { font-size: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {
 	* { transition: none !important; }

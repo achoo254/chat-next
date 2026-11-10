@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { entity, seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 import { newChatDialog } from "./support/new-chat-dialog.ts";
+import { boxPlaceholder, boxValue } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -188,8 +189,8 @@ describe("composer", () => {
 	it("says where the message goes, names the keys only in the send button's tooltip and edits the last message with ↑", async () => {
 		const demo = seedDemo();
 		const { log } = await openChat(`/c/${demo.ids.lanAnh}`, "Mình gửi file thiết kế rồi nhé", demo);
-		const box = screen.getByRole("textbox", { name: "Tin nhắn tới Lan Anh" }) as HTMLTextAreaElement;
-		expect(box.placeholder).toBe("Nhập tin nhắn tới Lan Anh");
+		const box = screen.getByRole("textbox", { name: "Tin nhắn tới Lan Anh" });
+		expect(boxPlaceholder(box)).toBe("Nhập tin nhắn tới Lan Anh");
 		// No line of key hints under the field: the keys are the send button's tooltip.
 		expect(screen.queryByText("Enter gửi · Shift+Enter xuống dòng")).toBeNull();
 		await userEvent.type(box, "Mình");
@@ -201,14 +202,14 @@ describe("composer", () => {
 		box.focus();
 		await userEvent.keyboard("{ArrowUp}");
 		expect(await screen.findByText("Sửa tin")).toBeTruthy();
-		await waitFor(() => expect(box.value).toBe("Mình nhận rồi"));
+		await waitFor(() => expect(boxValue(box)).toBe("Mình nhận rồi"));
 	});
 
 	it("asks groups for @ mentions in the placeholder and counts who is online", async () => {
 		const demo = seedDemo();
 		demo.fixture.onlineCounts.set(demo.ids.ops, 3);
 		await openChat(`/c/${demo.ids.ops}`, "Dashboard ổn định.", demo);
-		expect((screen.getByRole("textbox", { name: "Tin nhắn tới Vận hành hệ thống" }) as HTMLTextAreaElement).placeholder).toBe(
+		expect(boxPlaceholder(screen.getByRole("textbox", { name: "Tin nhắn tới Vận hành hệ thống" }))).toBe(
 			"Nhập @ để nhắc tên, tin nhắn tới Vận hành hệ thống",
 		);
 		const head = document.querySelector(".convo-head .title");

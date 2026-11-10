@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { boxValue } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 5000 };
 
@@ -40,7 +41,7 @@ describe("inline mode", () => {
 		const bubble = sent.closest(".bubble");
 		if (bubble === null) throw new Error("no bubble");
 		await waitFor(() => expect(within(bubble as HTMLElement).getByText("@lich_chieu_bot")).toBeTruthy(), LONG);
-		expect((box as HTMLTextAreaElement).value).toBe("");
+		expect(boxValue(box)).toBe("");
 		expect(screen.queryByRole("region", { name: /Kết quả từ/ })).toBeNull();
 	});
 

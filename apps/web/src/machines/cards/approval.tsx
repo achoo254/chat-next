@@ -115,7 +115,7 @@ export function freeForHotkey(event: KeyboardEvent): boolean {
 	if (document.querySelector("dialog[open]") !== null) return false;
 	const target = event.target;
 	if (!(target instanceof HTMLElement)) return true;
-	if (target instanceof HTMLTextAreaElement && target.dataset.composer !== undefined) return target.value === "";
+	if (target.dataset.composer !== undefined) return (target.textContent ?? "") === "";
 	return !(target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement);
 }
 

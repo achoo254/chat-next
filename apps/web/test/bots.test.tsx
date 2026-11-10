@@ -17,6 +17,7 @@ import { inAppBotLink } from "../src/messaging/ui/rich-text.tsx";
 import { matchRoute, navigate, returnPathFor } from "../src/router.tsx";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { boxValue, getBoxByPlaceholder } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -543,7 +544,7 @@ describe("bots in chats", () => {
 		});
 		renderMessaging(f, `/c/${demo.ids.bot}`);
 		const pad = await screen.findByRole("group", { name: "Bàn phím của Deploy Bot" }, LONG);
-		expect(screen.getByPlaceholderText("Chọn môi trường")).toBeTruthy();
+		expect(getBoxByPlaceholder("Chọn môi trường")).toBeTruthy();
 		const toggle = screen.getByRole("button", { name: "Ẩn bàn phím của bot" });
 		expect(toggle.getAttribute("aria-pressed")).toBe("true");
 		await userEvent.click(within(pad).getByRole("button", { name: "staging" }));
@@ -577,12 +578,12 @@ describe("bots in chats", () => {
 		expect(within(list).getAllByRole("option").map((o) => o.textContent)).toEqual(["/deployĐẩy một bản lên môi trường"]);
 		await userEvent.keyboard("{Enter}");
 		await waitFor(() => expect(f.sent.map((s) => s.text)).toContain("/deploy"));
-		expect((box as HTMLTextAreaElement).value).toBe("");
+		expect(boxValue(box)).toBe("");
 		// The menu button opens every command.
 		await userEvent.click(screen.getByRole("button", { name: "Lệnh của bot" }));
 		expect(within(await screen.findByRole("listbox", { name: "Lệnh của bot" })).getAllByRole("option")).toHaveLength(2);
 		await userEvent.click(screen.getByRole("option", { name: /\/status/ }));
-		expect((box as HTMLTextAreaElement).value).toBe("/status ");
+		expect(boxValue(box)).toBe("/status ");
 	});
 
 	it("gives up on a press the server leaves unanswered for 15 seconds, and opens this app's links from an answer in place", async () => {
@@ -703,7 +704,7 @@ describe("bots in chats", () => {
 		await waitFor(() => expect(f.sent.map((s) => s.text)).toContain("/ca@oncall_bot"));
 		await userEvent.click(button);
 		await userEvent.click(within(await screen.findByRole("listbox", { name: "Lệnh của bot" })).getByRole("option", { name: /\/status/ }));
-		expect((box as HTMLTextAreaElement).value).toBe("/status@deploy_bot ");
+		expect(boxValue(box)).toBe("/status@deploy_bot ");
 	});
 
 	it("shows no command menu in a group whose bots have no commands", async () => {

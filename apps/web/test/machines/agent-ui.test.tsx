@@ -23,6 +23,7 @@ import { byFolder, matches } from "../../src/machines/session-sidebar.tsx";
 import { sessionChanges } from "../../src/machines/transcript/changes.ts";
 import { canonicalAiPath } from "../../src/machines/ai-paths.ts";
 import { matchRoute, paths } from "../../src/router.tsx";
+import { boxValue } from "../support/plain-text-box.ts";
 
 /** The copy buttons announce through the app's toasts. */
 const services = { toasts: { show: () => undefined } } as unknown as Services;
@@ -251,7 +252,7 @@ describe("composer", () => {
 				onStop={onStop}
 			/>,
 		);
-		return { onSend, onStop, field: screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement };
+		return { onSend, onStop, field: screen.getByRole("textbox", { name: "Tin nhắn" }) };
 	};
 
 	it("shows no key hints under the field; the send button's tooltip names the keys", async () => {
@@ -310,7 +311,7 @@ describe("composer", () => {
 			expect(listFiles).toHaveBeenLastCalledWith("ma");
 			expect(within(list).getAllByRole("option").map((o) => o.textContent)).toEqual(["src/maa.ts", "src/lib/"]);
 			await user.keyboard("{Enter}");
-			expect(field.value).toBe("xem @src/maa.ts ");
+			expect(boxValue(field)).toBe("xem @src/maa.ts ");
 		} finally {
 			vi.useRealTimers();
 		}

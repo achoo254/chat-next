@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { entity } from "./support/demo-data.ts";
 import { ChatFixture, type FixtureFile } from "./support/fake-chat.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { boxPlaceholder } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 8000 };
 
@@ -83,7 +84,7 @@ describe("attaching", () => {
 		expect(within(tray).getByText("bao-cao-q3.pdf")).toBeTruthy();
 		expect(within(tray).getByText("1 file")).toBeTruthy();
 		const box = screen.getByRole("textbox", { name: /Tin nhắn tới/ });
-		expect(box.getAttribute("placeholder")).toBe("Thêm chú thích…");
+		expect(boxPlaceholder(box)).toBe("Thêm chú thích…");
 		await userEvent.type(box, "Báo cáo quý 3{Enter}");
 		expect(screen.queryByRole("group", { name: "File sắp gửi" })).toBeNull();
 		// Confirmed: a file card with the size and type, and the caption.

@@ -102,7 +102,7 @@ function Session({ link, limits, images = true, onSend }: { link: UploadLink; li
 	);
 }
 
-const field = () => screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement;
+const field = () => screen.getByRole("textbox", { name: "Tin nhắn" });
 const paste = (files: File[], text = "") =>
 	fireEvent.paste(field(), { clipboardData: { files, getData: (type: string) => (type === "text/plain" ? text : "") } });
 

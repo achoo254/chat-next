@@ -13,21 +13,10 @@
 // a bot the bot layer (bots/bot-chat.tsx, loaded with the first bot chat)
 // adds the command menu and the bot's reply keyboard; in a group it adds the
 // command menu of the group's bots.
-import {
-	Suspense,
-	lazy,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-	type ChangeEvent,
-	type ClipboardEvent,
-	type FormEvent,
-	type KeyboardEvent,
-} from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
-import { NO_AUTOFILL } from "../../components/no-autofill.ts";
+import { PlainTextBox, type PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
@@ -64,7 +53,7 @@ interface BotActions {
 	toggleMenu(): void;
 	toggleKeyboard(): void;
 	openApp(): void;
-	onKey(event: KeyboardEvent<HTMLTextAreaElement>): boolean;
+	onKey(event: KeyboardEvent): boolean;
 }
 
 /** Whether this browser can record a voice message (MediaRecorder and a microphone API). */
@@ -79,7 +68,6 @@ export function sizeLimitLabel(bytes: number, locale: string): string {
 	return `${Math.round(bytes / 2 ** 20)} MB`;
 }
 
-const MAX_HEIGHT_PX = 160;
 const PREVIEW_DELAY_MS = 400;
 const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
 interface ComposerProps {
@@ -123,8 +111,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	const [dismissed, setDismissed] = useState("");
 	const [error, setError] = useState("");
 	const [editingSeq, setEditingSeq] = useState(0);
-	const area = useRef<HTMLTextAreaElement>(null);
-	const caret = useRef<number | null>(null);
+	const area = useRef<PlainTextBoxHandle>(null);
 	// The bot layer: its buttons' state, and its key handling (command menu) asked before the composer's own.
 	const [botBar, setBotBar] = useState<BotBar>(NO_BOT_BAR);
 	const botActions = useRef<BotActions | null>(null);
@@ -141,17 +128,6 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	useEffect(() => {
 		if (intent !== null) area.current?.focus();
 	}, [intent]);
-
-	useLayoutEffect(() => {
-		const element = area.current;
-		if (element === null) return;
-		element.style.height = "auto";
-		element.style.height = `${Math.min(element.scrollHeight, MAX_HEIGHT_PX)}px`;
-		if (caret.current !== null) {
-			element.setSelectionRange(caret.current, caret.current);
-			caret.current = null;
-		}
-	}, [text]);
 
 	const url = backend.features.has("linkPreview") ? (URL_IN_TEXT.exec(text)?.[0] ?? "") : "";
 	useEffect(() => {
@@ -296,10 +272,12 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	};
 
 	// A pasted image (screenshot) or file joins the tray; pasted text stays text.
-	const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+	const onPaste = (event: ClipboardEvent) => {
 		if (!mediaOn || intent?.mode === "edit") return;
-		const pasted = [...event.clipboardData.files];
-		if (pasted.length === 0 || event.clipboardData.getData("text/plain") !== "") return;
+		const clipboard = event.clipboardData;
+		if (clipboard === null) return;
+		const pasted = [...clipboard.files];
+		if (pasted.length === 0 || clipboard.getData("text/plain") !== "") return;
 		event.preventDefault();
 		addAttachments(chatId, topicId, pasted);
 	};
@@ -317,7 +295,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 		input?.click();
 	};
 
-	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+	const onKeyDown = (event: KeyboardEvent) => {
 		if (botActions.current?.onKey(event) === true) return;
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
@@ -329,19 +307,17 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 			editLast();
 			return;
 		}
-		if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+		if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
 			event.preventDefault();
 			void submit();
 		}
 	};
 
-	// The picker stays open to pick more; each emoji goes in at the caret.
+	// The picker stays open to pick more (the focus stays in it); each emoji goes in at the caret.
 	const insertEmoji = (emoji: string) => {
-		const element = area.current;
-		const start = element?.selectionStart ?? text.length;
-		const end = element?.selectionEnd ?? text.length;
-		caret.current = start + emoji.length;
-		update(text.slice(0, start) + emoji + text.slice(end));
+		const box = area.current;
+		if (box === null) update(text + emoji);
+		else box.insertText(emoji);
 	};
 	const emojiButton = useRef<HTMLButtonElement>(null);
 	const closePicker = () => {
@@ -470,18 +446,16 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						<input ref={pickFiles} type="file" multiple hidden tabIndex={-1} aria-hidden="true" onChange={onPicked} data-testid="pick-files" />
 					</div>
 				)}
-				<label className="sr-only" htmlFor={`draft-${chatId}-${topicId}`}>
-					{label}
-				</label>
-				<textarea
+				<PlainTextBox
 					ref={area}
 					id={`draft-${chatId}-${topicId}`}
-					{...NO_AUTOFILL}
-					rows={1}
+					className="composer-field"
+					ariaLabel={label}
+					enterKeyHint="send"
 					placeholder={botBar.placeholder ?? shownPlaceholder}
 					value={text}
 					disabled={disabled}
-					onChange={(event: ChangeEvent<HTMLTextAreaElement>) => update(event.target.value)}
+					onValueChange={update}
 					onKeyDown={onKeyDown}
 					onPaste={onPaste}
 					aria-invalid={error !== ""}
@@ -538,10 +512,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						chatId={chatId}
 						botId={botId}
 						text={text}
-						setText={(value) => {
-							caret.current = value.length;
-							update(value);
-						}}
+						setText={update}
 						send={sendBotText}
 						focus={() => area.current?.focus()}
 						onBar={setBotBar}
@@ -554,10 +525,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					<GroupBotLayer
 						chatId={chatId}
 						text={text}
-						setText={(value) => {
-							caret.current = value.length;
-							update(value);
-						}}
+						setText={update}
 						send={sendBotText}
 						focus={() => area.current?.focus()}
 						onBar={setBotBar}

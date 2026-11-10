@@ -102,7 +102,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 	const attach = useAttachments(link, threadId, limits, caps?.images ?? false, ai);
 	const drop = useFileDrop(online && !missing, (files) => {
 		attach.add(files);
-		document.querySelector<HTMLTextAreaElement>(".mx-chat [data-composer]")?.focus();
+		document.querySelector<HTMLElement>(".mx-chat [data-composer]")?.focus();
 	});
 
 	const fetchFull = async (itemId: string): Promise<void> => {

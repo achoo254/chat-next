@@ -10,6 +10,7 @@ import { ChatType } from "@achoo254/chat-proto/chats";
 import { pillContent } from "../src/messaging/ui/reaction-pill.ts";
 import { seedDemo } from "./support/demo-data.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
+import { getBoxByPlaceholder } from "./support/plain-text-box.ts";
 
 const LONG = { timeout: 8000 };
 const THUMB = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
@@ -46,7 +47,7 @@ describe("Cloud của tôi", () => {
 		await waitFor(() => expect(within(log).queryByText("Link tài liệu onboarding")).toBeNull(), LONG);
 		const list = screen.getByRole("list", { name: "Danh sách chat" });
 		expect(within(list).getByRole("link", { name: /Cloud của tôi/ })).toBeTruthy();
-		expect(screen.getByPlaceholderText("Ghi chú vào Cloud của tôi")).toBeTruthy();
+		expect(getBoxByPlaceholder("Ghi chú vào Cloud của tôi")).toBeTruthy();
 	});
 
 	it("names the clear action the same way in the chat list menu", async () => {
@@ -62,7 +63,7 @@ describe("Cloud của tôi", () => {
 	it("asks for a note in the composer", async () => {
 		const { f, cloud } = seedCloud();
 		renderMessaging(f, `/c/${cloud}`);
-		expect(await screen.findByPlaceholderText("Ghi chú vào Cloud của tôi", {}, LONG)).toBeTruthy();
+		expect(await waitFor(() => getBoxByPlaceholder("Ghi chú vào Cloud của tôi"), LONG)).toBeTruthy();
 	});
 
 	it("shows reactions as emoji and count, without your own face", async () => {
