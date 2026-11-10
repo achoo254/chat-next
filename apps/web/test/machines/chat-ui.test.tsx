@@ -194,6 +194,13 @@ describe("slash commands", () => {
 		return { onSend, field: screen.getByRole("textbox", { name: "Tin nhắn" }) as HTMLTextAreaElement };
 	};
 
+	it("is a message box that browsers and password managers leave alone", () => {
+		const { field } = composer();
+		expect(field.getAttribute("autocomplete")).toBe("off");
+		for (const flag of ["data-1p-ignore", "data-lpignore", "data-bwignore"]) expect(field.hasAttribute(flag), flag).toBe(true);
+		expect(field.getAttribute("data-form-type")).toBe("other");
+	});
+
 	it("picks with the arrow keys and Enter, keeping the focus, and sends the command as text", async () => {
 		const user = userEvent.setup();
 		const { onSend, field } = composer();

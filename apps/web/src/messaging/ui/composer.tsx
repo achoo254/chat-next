@@ -27,6 +27,7 @@ import {
 } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
+import { NO_AUTOFILL } from "../../components/no-autofill.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
@@ -475,6 +476,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 				<textarea
 					ref={area}
 					id={`draft-${chatId}-${topicId}`}
+					{...NO_AUTOFILL}
 					rows={1}
 					placeholder={botBar.placeholder ?? shownPlaceholder}
 					value={text}

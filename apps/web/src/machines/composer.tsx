@@ -11,6 +11,7 @@
 import { useEffect, useId, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
+import { NO_AUTOFILL } from "../components/no-autofill.ts";
 import { AttachButton, AttachTray } from "./attachment-tray.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import type { ShownAttachment } from "./transcript/tool-fold.ts";
@@ -300,6 +301,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					rows={1}
 					className="mx-field"
 					data-composer=""
+					{...NO_AUTOFILL}
 					aria-label={t.chat.message}
 					aria-autocomplete="list"
 					aria-controls={open ? listId : undefined}
