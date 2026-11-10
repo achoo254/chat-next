@@ -118,6 +118,29 @@ describe("device key store", () => {
 		await expect(store.pin("12", new Uint8Array(31))).rejects.toThrow();
 	});
 
+	it("does not replace a stored device key it cannot read", async () => {
+		const idb = new FakeIndexedDb();
+		const make = vi.fn(() => generateKeyPair(false));
+		await deviceKeyStore(asFactory(idb), make).device();
+		const stores = idb.databases.get(DEVICE_KEYS_DATABASE);
+		const keys = stores?.get("keys");
+		keys?.set("device", { publicKey: new Uint8Array(3), privateKey: null });
+		await expect(deviceKeyStore(asFactory(idb), make).device()).rejects.toThrow(/unreadable/);
+		expect(make).toHaveBeenCalledTimes(1);
+		expect(keys?.get("device")).toEqual({ publicKey: new Uint8Array(3), privateKey: null });
+	});
+
+	it("asks the browser to keep the storage before making a key", async () => {
+		const persist = vi.fn(() => Promise.resolve(true));
+		vi.stubGlobal("navigator", { storage: { persisted: () => Promise.resolve(false), persist } });
+		try {
+			await deviceKeyStore(asFactory(new FakeIndexedDb())).device();
+			expect(persist).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("lets sign-out delete the database and starts over after it", async () => {
 		const idb = new FakeIndexedDb();
 		const store = deviceKeyStore(asFactory(idb));

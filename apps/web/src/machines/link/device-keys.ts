@@ -49,6 +49,22 @@ function storedDevice(value: unknown): KeyPair | null {
 	return { publicKey, privateKey: privateKey as CryptoKey };
 }
 
+/**
+ * Asks the browser not to evict this origin's storage under pressure (iOS
+ * home-screen apps otherwise can lose the device key and need pairing again).
+ * Best effort: a refusal or a browser without the call changes nothing.
+ */
+async function requestPersistentStorage(): Promise<void> {
+	try {
+		const storage = typeof navigator === "undefined" ? undefined : navigator.storage;
+		if (storage === undefined || typeof storage.persist !== "function") return;
+		if (await storage.persisted?.()) return;
+		await storage.persist();
+	} catch {
+		// Not allowed here: keep going with best-effort storage.
+	}
+}
+
 /** `factory` is the browser's indexedDB; tests pass a fake. */
 export function deviceKeyStore(factory: IDBFactory = indexedDB, makeKey: () => Promise<KeyPair> = () => generateKeyPair(false)): DeviceKeyStore {
 	let db: Promise<IDBDatabase> | null = null;
@@ -94,8 +110,15 @@ export function deviceKeyStore(factory: IDBFactory = indexedDB, makeKey: () => P
 	};
 
 	const loadDevice = async (): Promise<KeyPair> => {
-		const stored = storedDevice(await read(DEVICE));
+		await requestPersistentStorage();
+		const existing = await read(DEVICE);
+		const stored = storedDevice(existing);
 		if (stored !== null) return stored;
+		// A record that is there but unreadable is not "no key yet": making a new
+		// key over it would silently turn this browser into an unknown device for
+		// every machine it is paired with. Fail instead, so the link retries.
+		if (existing !== undefined && existing !== null) throw new Error("the stored device key is unreadable");
+		console.info("machines: made a new device key (none was stored)");
 		const pair = await makeKey();
 		if (pair.privateKey.extractable) throw new Error("the device key must not be extractable");
 		const record: StoredDevice = { publicKey: pair.publicKey, privateKey: pair.privateKey };
