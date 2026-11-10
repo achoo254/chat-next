@@ -16,7 +16,14 @@ const LONG = { timeout: 8000 };
 
 afterEach(() => {
 	window.localStorage.clear();
+	Reflect.deleteProperty(window, "matchMedia");
 });
+
+/** What a computer (a mouse and a keyboard) or a phone (a finger) answers to `matchMedia`. */
+function usePointer(fine: boolean): void {
+	const answer = (query: string) => ({ matches: fine && query.includes("pointer: fine"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined });
+	Object.defineProperty(window, "matchMedia", { configurable: true, writable: true, value: answer });
+}
 
 function chatList(): HTMLElement {
 	return screen.getByRole("list", { name: "Danh sách chat" });
@@ -212,6 +219,20 @@ describe("composer", () => {
 		await userEvent.clear(box);
 		await userEvent.type(box, "Mục 3 ổn, extension đã lên 1.4.{Enter}");
 		expect(await within(log).findByText("Mục 3 ổn, extension đã lên 1.4.", {}, LONG)).toBeTruthy();
+	});
+
+	it("opens a chat with the caret in its box on a computer, and leaves a phone's keyboard alone", async () => {
+		usePointer(true);
+		await openOps();
+		await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: /^Tin nhắn tới / })), LONG);
+	});
+
+	it("does not raise a phone's keyboard when a chat opens", async () => {
+		usePointer(false);
+		await openOps();
+		const box = screen.getByRole("textbox", { name: /^Tin nhắn tới / });
+		await waitFor(() => expect(box.getAttribute("contenteditable")).toBe("true"), LONG);
+		expect(document.activeElement).not.toBe(box);
 	});
 
 	it("keeps a draft per chat and shows it in the list", async () => {

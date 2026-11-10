@@ -16,6 +16,7 @@
 import { Suspense, lazy, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
+import { hasFinePointer } from "../../components/fine-pointer.ts";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger } from "../../components/plain-text-box.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -128,6 +129,11 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	useEffect(() => {
 		if (intent !== null) area.current?.focus();
 	}, [intent]);
+
+	// A chat opens with the caret in its box (the composer is keyed by chat and topic, so this runs on every open).
+	useEffect(() => {
+		if (hasFinePointer()) area.current?.focus();
+	}, []);
 
 	const url = backend.features.has("linkPreview") ? (URL_IN_TEXT.exec(text)?.[0] ?? "") : "";
 	useEffect(() => {

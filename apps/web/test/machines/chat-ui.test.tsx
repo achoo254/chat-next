@@ -15,7 +15,7 @@ import {
 	type ToolCallItem,
 	type ToolResultItem,
 } from "@achoo254/chat-proto/remote/remote";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -205,6 +205,23 @@ describe("slash commands", () => {
 		expect(field.getAttribute("autocomplete")).toBe("off");
 		expect(field.getAttribute("enterkeyhint")).toBe("send");
 		expect(document.querySelector("textarea")).toBeNull();
+	});
+
+	it("takes the focus when a session opens on a computer, not on a phone", async () => {
+		const pointer = (fine: boolean) =>
+			Object.defineProperty(window, "matchMedia", { configurable: true, writable: true, value: (query: string) => ({ matches: fine && query.includes("pointer: fine"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }) });
+		try {
+			pointer(true);
+			const computer = composer();
+			await waitFor(() => expect(document.activeElement).toBe(computer.field));
+			cleanup();
+			pointer(false);
+			const phone = composer();
+			await waitFor(() => expect(phone.field.getAttribute("contenteditable")).toBe("true"));
+			expect(document.activeElement).not.toBe(phone.field);
+		} finally {
+			Reflect.deleteProperty(window, "matchMedia");
+		}
 	});
 
 	it("picks with the arrow keys and Enter, keeping the focus, and sends the command as text", async () => {

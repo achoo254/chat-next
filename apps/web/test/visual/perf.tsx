@@ -118,6 +118,10 @@ function watchLongTasks(): () => number[] {
  * before the scenarios run. In production that work runs in the client worker.
  */
 function settle(quietMs: number): Promise<void> {
+	// A focused text field makes the browser draw its blinking caret, which keeps cutting the idle
+	// periods short even though no script runs (a bare contenteditable or textarea does the same in
+	// headless Chromium). Opening a chat focuses its message box, so drop that focus before waiting.
+	if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 	return new Promise((resolve, reject) => {
 		const started = performance.now();
 		let idleSince = started;

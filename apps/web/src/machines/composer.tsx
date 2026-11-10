@@ -11,6 +11,7 @@
 // which may then have no text.
 import { useEffect, useId, useRef, useState } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
+import { hasFinePointer } from "../components/fine-pointer.ts";
 import { Icon } from "../components/screen-icons.tsx";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger, type TokenMatch } from "../components/plain-text-box.tsx";
 import { AttachButton, AttachTray } from "./attachment-tray.tsx";
@@ -42,6 +43,8 @@ interface ComposerProps {
 	listFiles?: ListFiles | undefined;
 	/** Files waiting for the next message; absent where the session takes none. */
 	attach?: Attachments | undefined;
+	/** Changes when another session opens in this box: the caret goes into it. */
+	focusKey?: string | undefined;
 	onSend: (text: string, files: readonly ShownAttachment[]) => Promise<void>;
 	onStop: () => Promise<void>;
 }
@@ -65,7 +68,7 @@ interface Found {
 	readonly listing: FileListing;
 }
 
-export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, onSend, onStop }: ComposerProps) {
+export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, focusKey, onSend, onStop }: ComposerProps) {
 	const t = useMachinesCopy();
 	const [text, setText] = useState("");
 	const [error, setError] = useState("");
@@ -97,6 +100,11 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	useEffect(() => {
 		if (open) document.getElementById(`${listId}-${index}`)?.scrollIntoView?.({ block: "nearest" });
 	}, [open, index, listId]);
+
+	// Opening a session (a new `focusKey`) puts the caret in the box.
+	useEffect(() => {
+		if (hasFinePointer()) field.current?.focus();
+	}, [focusKey]);
 
 	// "@…": ask the machine for matching files, a moment after the typing stops.
 	const mentionQuery = at?.query ?? null;

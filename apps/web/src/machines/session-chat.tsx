@@ -260,6 +260,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						commands={threadInfo?.commands ?? []}
 						listFiles={modern ? listFiles : undefined}
 						attach={attach}
+						focusKey={threadId}
 						onSend={async (text, files) => {
 							// `/clear` opens a new, empty session in this folder: go to it.
 							const opened = await link.send(threadId, text, files);
