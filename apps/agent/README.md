@@ -65,6 +65,9 @@ Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thê
 trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
 nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
 
+`/clear` trong Chat (tunelo 2.0.15 trở lên) mở một phiên mới, trống, cùng thư mục và cài đặt, rồi chuyển sang đó; phiên cũ giữ lại làm
+lịch sử. Máy chạy bản cũ vẫn gửi `/clear` cho Claude như trước, nên lịch sử cũ còn hiện trên màn hình: chạy `tunelo update`.
+
 Lối thoát: `hda` 0.2.x chỉ đọc 20 release mới nhất. Khi `agent-v0.3.0` trôi khỏi đó, `hda update` báo không có bản mới. Chạy lại
 script cài ở trên. Script thấy `hda` thì chạy `tunelo migrate-from-hda`, thấy gói npm `tunelo` 1.x thì nhắc
 `npm uninstall -g tunelo` (không tự gỡ).
