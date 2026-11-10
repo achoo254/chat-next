@@ -5,7 +5,7 @@
 // composer's single send/stop button and "@" files.
 import { create } from "@bufbuild/protobuf";
 import { Decision, ItemSchema, PromptState, ThreadState, ToolKind, type ApprovalItem, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -223,9 +223,18 @@ describe("prompt card above the composer", () => {
 		wrap(<ApprovalCard hotkeys approval={approval} ai="Claude Code" sessionAllow={false} onDecide={onDecide} />);
 		expect(screen.queryByRole("button", { name: /Cho phép cả phiên/ })).toBeNull();
 		await user.keyboard("3");
-		const field = await screen.findByPlaceholderText("Bảo Claude nên làm gì thay vào đó");
-		await user.type(field, "chỉ xoá dist/cache{Enter}");
-		expect(onDecide).toHaveBeenCalledWith(Decision.DENY, "chỉ xoá dist/cache");
+		const field = await screen.findByRole("textbox", { name: "Lời nhắn cho Claude" });
+		expect(field.tagName).toBe("DIV");
+		await waitFor(() => expect(document.activeElement).toBe(field));
+		expect(field.getAttribute("aria-placeholder")).toBe("Bảo Claude nên làm gì thay vào đó");
+		// Esc closes the message without denying; 3 opens it again.
+		await user.keyboard("{Escape}");
+		expect(screen.queryByRole("textbox", { name: "Lời nhắn cho Claude" })).toBeNull();
+		expect(onDecide).not.toHaveBeenCalled();
+		await user.keyboard("3");
+		const again = await screen.findByRole("textbox", { name: "Lời nhắn cho Claude" });
+		await user.type(again, "chỉ xoá{Shift>}{Enter}{/Shift}dist/cache{Enter}");
+		expect(onDecide).toHaveBeenCalledWith(Decision.DENY, "chỉ xoá\ndist/cache");
 	});
 
 	it("shows what the user told the AI on the answered prompt", () => {
@@ -291,8 +300,11 @@ describe("composer", () => {
 	});
 
 	it("finds the '@' being typed before the caret", () => {
-		expect(mentionAt("xem @src/ma", 11)).toEqual({ start: 4, query: "src/ma" });
-		expect(mentionAt("@", 1)).toEqual({ start: 0, query: "" });
+		expect(mentionAt("xem @src/ma", 11)).toEqual({ start: 4, end: 11, query: "src/ma" });
+		expect(mentionAt("@", 1)).toEqual({ start: 0, end: 1, query: "" });
+		// The caret in the middle: the token ends there.
+		expect(mentionAt("xem @src/ma rồi", 9)).toEqual({ start: 4, end: 9, query: "src/" });
+		expect(mentionAt("dòng một\n@a", 11)).toEqual({ start: 9, end: 11, query: "a" });
 		expect(mentionAt("me@example.com", 14)).toBeNull();
 		expect(mentionAt("xem @a b", 8)).toBeNull();
 	});

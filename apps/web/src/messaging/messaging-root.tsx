@@ -40,7 +40,6 @@ import { MachineIcon } from "../machines/machine-icons.tsx";
 import { messageExtrasPreloads } from "./ui/message-item.tsx";
 import { ChatAvatar, Toast } from "./ui/parts.tsx";
 import { forgetSelf } from "../api/offline-self.ts";
-import { preloadPlainTextEditor } from "../components/plain-text-box.tsx";
 
 // Settings, the console and moderation load when opened, keeping the first
 // chat screen small; once the app is idle their code is fetched ahead.
@@ -74,7 +73,6 @@ const IDLE_PREFETCH = [
 	loadRemoteClient,
 	loadBotsClient,
 	loadIntegrationsClient,
-	preloadPlainTextEditor,
 ];
 
 /**

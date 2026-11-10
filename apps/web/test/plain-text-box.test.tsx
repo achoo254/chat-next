@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { PlainTextBox, type PlainTextBoxHandle, type TextSelection } from "../src/components/plain-text-box.tsx";
+import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type TextSelection } from "../src/components/plain-text-box.tsx";
+import { mentionAt } from "../src/machines/composer.tsx";
 import { boxPlaceholder, boxValue } from "./support/plain-text-box.ts";
 
 interface HostProps {
@@ -216,5 +217,177 @@ describe("the plain text message box", () => {
 		expect(box.hasAttribute("aria-disabled")).toBe(false);
 		expect(boxValue(box)).toBe("nháp cũ");
 		expect(onValueChange).not.toHaveBeenCalled();
+	});
+
+	it("stops typing at maxLength and cuts a paste to fit, as a textarea does", async () => {
+		const user = userEvent.setup();
+		function Limited() {
+			const [value, setValue] = useState("");
+			return <PlainTextBox ariaLabel="Ngắn" maxLength={5} value={value} onValueChange={setValue} />;
+		}
+		render(<Limited />);
+		const box = screen.getByRole("textbox", { name: "Ngắn" });
+		await user.type(box, "abc");
+		paste(box, { "text/plain": "xyz" });
+		expect(boxValue(box)).toBe("abcxy");
+		await user.type(box, "q");
+		expect(boxValue(box)).toBe("abcxy");
+	});
+});
+
+/** A composer in miniature with two triggers: "/" as the whole message, "@" at the start or after a space. */
+function Suggesting({ onComposerKey }: { onComposerKey?: (event: KeyboardEvent) => void }) {
+	const [value, setValue] = useState("");
+	const [slash, setSlash] = useState<OpenToken | null>(null);
+	const [at, setAt] = useState<OpenToken | null>(null);
+	const box = useRef<PlainTextBoxHandle>(null);
+	/** Enter picks, Esc closes; other keys go on to the composer. */
+	const listKeys = (token: OpenToken | null, pick: string) => (event: KeyboardEvent) => {
+		if (event.key === "Escape") return true;
+		if (event.key !== "Enter" || event.shiftKey || token === null) return false;
+		event.preventDefault();
+		token.replace(pick);
+		return true;
+	};
+	const shown = (token: OpenToken | null) => (token === null ? "closed" : `${token.query} [${token.range.start},${token.range.end}]`);
+	return (
+		<>
+			<PlainTextBox
+				ref={box}
+				ariaLabel="Soạn"
+				value={value}
+				onValueChange={setValue}
+				onKeyDown={onComposerKey}
+				suggestions={[
+					{ char: "/", find: (text) => commandToken(text), onChange: setSlash, onKeyDown: listKeys(slash, "/review ") },
+					{ char: "@", find: mentionAt, onChange: setAt, onKeyDown: listKeys(at, "@src/app.ts") },
+				]}
+			/>
+			<output data-testid="value">{value}</output>
+			<output data-testid="slash">{shown(slash)}</output>
+			<output data-testid="at">{shown(at)}</output>
+			{/* Moves the caret as a composer does, the focus kept in the box. */}
+			<button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => box.current?.setSelection(5)}>
+				caret after five
+			</button>
+			<button type="button">elsewhere</button>
+			{/* Picks with the mouse, the focus kept in the box as the composers' lists do. */}
+			<button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => at?.replace("@lib/")}>
+				pick lib
+			</button>
+		</>
+	);
+}
+
+describe("suggestions in the message box", () => {
+	const soan = (): HTMLElement => screen.getByRole("textbox", { name: "Soạn" });
+	const out = (id: string): string => screen.getByTestId(id).textContent ?? "";
+
+	it("opens a token at its trigger, follows its query and closes when the rule no longer finds it", async () => {
+		const user = userEvent.setup();
+		render(<Suggesting />);
+		await user.type(soan(), "/re");
+		expect(out("slash")).toBe("re [0,3]");
+		expect(out("at")).toBe("closed");
+		await user.type(soan(), "v");
+		expect(out("slash")).toBe("rev [0,4]");
+		await user.type(soan(), " ");
+		expect(out("slash")).toBe("closed");
+	});
+
+	it("watches both triggers in one box: '/' as the whole message, '@' after a space or a line break", async () => {
+		const user = userEvent.setup();
+		render(<Suggesting />);
+		await user.type(soan(), "/a @sr");
+		expect(out("slash")).toBe("closed");
+		expect(out("at")).toBe("sr [3,6]");
+		await user.keyboard("{Shift>}{Enter}{/Shift}@x");
+		expect(out("at")).toBe("x [7,9]");
+		// "/" on a later line is not a command.
+		await user.keyboard("{Shift>}{Enter}{/Shift}/re");
+		expect(out("slash")).toBe("closed");
+		expect(out("at")).toBe("closed");
+	});
+
+	it("never opens '@' inside an e-mail address, as the rule says", async () => {
+		const user = userEvent.setup();
+		render(<Suggesting />);
+		await user.type(soan(), "abc@x.com");
+		expect(out("at")).toBe("closed");
+		await user.type(soan(), " @");
+		expect(out("at")).toBe(" [10,11]");
+	});
+
+	it("picks with Enter in place of the token in the middle of the text, the caret after it, undo taking it back", async () => {
+		const onComposerKey = vi.fn();
+		const user = userEvent.setup();
+		render(<Suggesting onComposerKey={onComposerKey} />);
+		await user.type(soan(), "hello world");
+		await user.click(screen.getByRole("button", { name: "caret after five" }));
+		await user.keyboard(" @ap");
+		expect(out("value")).toBe("hello @ap world");
+		expect(out("at")).toBe("ap [6,9]");
+		await user.keyboard("{Enter}");
+		expect(out("value")).toBe("hello @src/app.ts world");
+		// The list took Enter: the composer never saw it (it would have sent).
+		expect(onComposerKey).not.toHaveBeenCalledWith(expect.objectContaining({ key: "Enter" }));
+		await user.keyboard("!");
+		expect(out("value")).toBe("hello @src/app.ts! world");
+		// The pick is its own undo step: undo brings back what was typed.
+		await user.keyboard("{Control>}z{/Control}");
+		expect(out("value")).toBe("hello @ap world");
+	});
+
+	it("picks with the mouse, the focus staying in the box", async () => {
+		const user = userEvent.setup();
+		render(<Suggesting />);
+		await user.type(soan(), "xem @li");
+		await user.click(screen.getByRole("button", { name: "pick lib" }));
+		expect(out("value")).toBe("xem @lib/");
+		expect(document.activeElement).toBe(soan());
+		// A folder picked keeps the token open on its path.
+		expect(out("at")).toBe("lib/ [4,9]");
+	});
+
+	it("closes on Esc, the text kept, and opens again once the text changes", async () => {
+		const onComposerKey = vi.fn();
+		const user = userEvent.setup();
+		render(<Suggesting onComposerKey={onComposerKey} />);
+		await user.type(soan(), "@ab");
+		await user.keyboard("{Escape}");
+		expect(out("at")).toBe("closed");
+		expect(out("value")).toBe("@ab");
+		expect(onComposerKey).not.toHaveBeenCalledWith(expect.objectContaining({ key: "Escape" }));
+		await user.keyboard("c");
+		expect(out("at")).toBe("abc [0,4]");
+	});
+
+	it("closes when the box loses the focus and opens again when it comes back", async () => {
+		const user = userEvent.setup();
+		render(<Suggesting />);
+		await user.type(soan(), "/rev");
+		expect(out("slash")).toBe("rev [0,4]");
+		await user.click(screen.getByRole("button", { name: "elsewhere" }));
+		expect(out("slash")).toBe("closed");
+		act(() => soan().focus());
+		await waitFor(() => expect(out("slash")).toBe("rev [0,4]"));
+	});
+
+	it("opens nothing while an IME composes, and hands it no keys", async () => {
+		const onComposerKey = vi.fn();
+		const user = userEvent.setup();
+		render(<Suggesting onComposerKey={onComposerKey} />);
+		const box = soan();
+		act(() => box.focus());
+		fireEvent.compositionStart(box);
+		await user.keyboard("@a");
+		expect(out("value")).toBe("@a");
+		expect(out("at")).toBe("closed");
+		fireEvent.keyDown(box, { key: "Enter", isComposing: true });
+		expect(out("value")).toBe("@a");
+		fireEvent.compositionEnd(box);
+		await user.keyboard("b");
+		expect(out("at")).toBe("ab [0,3]");
+		expect(onComposerKey).not.toHaveBeenCalledWith(expect.objectContaining({ key: "Enter" }));
 	});
 });

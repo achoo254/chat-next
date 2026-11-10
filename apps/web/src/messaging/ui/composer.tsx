@@ -16,12 +16,13 @@
 import { Suspense, lazy, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
-import { PlainTextBox, type PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
+import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger } from "../../components/plain-text-box.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
+import { sizeLimitLabel } from "../media/size-limit-label.ts";
 import { useCell, useIntent, useUi } from "./ui-context.tsx";
 
 const AttachMenu = lazy(() => import("./attach-menu.tsx"));
@@ -59,13 +60,6 @@ interface BotActions {
 /** Whether this browser can record a voice message (MediaRecorder and a microphone API). */
 function canRecord(): boolean {
 	return typeof MediaRecorder !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function";
-}
-
-/** "2 GB", "512 MB": the per-file limit next to "File" in the attach menu. */
-export function sizeLimitLabel(bytes: number, locale: string): string {
-	const gb = bytes / 2 ** 30;
-	if (gb >= 1) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(gb)} GB`;
-	return `${Math.round(bytes / 2 ** 20)} MB`;
 }
 
 const PREVIEW_DELAY_MS = 400;
@@ -115,6 +109,12 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	// The bot layer: its buttons' state, and its key handling (command menu) asked before the composer's own.
 	const [botBar, setBotBar] = useState<BotBar>(NO_BOT_BAR);
 	const botActions = useRef<BotActions | null>(null);
+	// "/command" typed as the whole message, which the bot layer's command menu follows.
+	const [command, setCommand] = useState<OpenToken | null>(null);
+	const withBots = botId !== 0 || (group && !disabled);
+	const suggestions: readonly SuggestionTrigger[] = [
+		{ char: "/", find: (value) => (withBots ? commandToken(value) : null), onChange: setCommand, onKeyDown: (event) => botActions.current?.onKey(event) ?? false },
+	];
 
 	// Starting an edit loads the message text; leaving it brings the draft back.
 	if (intent?.mode === "edit" && editTarget != null && editingSeq !== intent.seq) {
@@ -296,7 +296,6 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	};
 
 	const onKeyDown = (event: KeyboardEvent) => {
-		if (botActions.current?.onKey(event) === true) return;
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
 			cancelByUser();
@@ -403,6 +402,8 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						aria-pressed={botBar.menu}
 						aria-expanded={botBar.menu}
 						aria-controls={`bot-cmds-${chatId}`}
+						// The focus stays in the text box, whose "/" token the menu follows.
+						onMouseDown={(event) => event.preventDefault()}
 						onClick={() => botActions.current?.toggleMenu()}
 					>
 						<Icon name="command" />
@@ -455,6 +456,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					placeholder={botBar.placeholder ?? shownPlaceholder}
 					value={text}
 					disabled={disabled}
+					suggestions={suggestions}
 					onValueChange={update}
 					onKeyDown={onKeyDown}
 					onPaste={onPaste}
@@ -512,9 +514,11 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						chatId={chatId}
 						botId={botId}
 						text={text}
+						token={command}
 						setText={update}
 						send={sendBotText}
 						focus={() => area.current?.focus()}
+						box={area}
 						onBar={setBotBar}
 						actionsRef={botActions}
 					/>
@@ -525,9 +529,11 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					<GroupBotLayer
 						chatId={chatId}
 						text={text}
+						token={command}
 						setText={update}
 						send={sendBotText}
 						focus={() => area.current?.focus()}
+						box={area}
 						onBar={setBotBar}
 						actionsRef={botActions}
 					/>

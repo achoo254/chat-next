@@ -14,6 +14,7 @@
 // Desktop); it loads only when picked.
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { ErrorCode, LoginState, ThreadState, type DirListResult, type Project } from "@achoo254/chat-proto/remote/remote";
+import { PlainTextBox } from "../components/plain-text-box.tsx";
 import { navigate, paths } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
@@ -458,14 +459,14 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 							</button>
 						))}
 					</div>
-					<textarea
-						className="input"
-						aria-label={t.newSession.first}
+					<PlainTextBox
+						className="input mx-first"
+						ariaLabel={t.newSession.first}
 						placeholder={t.newSession.firstPlaceholder(ai)}
 						value={message}
-						onChange={(event) => {
+						onValueChange={(value) => {
 							setHint(null);
-							setText(event.target.value);
+							setText(value);
 						}}
 					/>
 					{full && <p className="note mx-hint">{victim !== undefined ? t.newSession.park(victim.title) : t.newSession.queue}</p>}

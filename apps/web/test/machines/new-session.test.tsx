@@ -5,11 +5,13 @@
 import { create } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
 import { isHome, NewSession } from "../../src/machines/new-session.tsx";
 import { folderName, inDiskAccessFolder, pathCrumbs, recentFolders } from "../../src/machines/new-session-hints.ts";
+import { boxValue } from "../support/plain-text-box.ts";
 
 const HOME = "/Users/me";
 const thread = (id: string, dir: string, updatedAt: number): ThreadSummary =>
@@ -65,7 +67,9 @@ const open = (link: MachineLink, state: LinkState) =>
 		</I18nProvider>,
 	);
 const folderInput = () => screen.getByLabelText("Thư mục") as HTMLInputElement;
-const message = () => screen.getByLabelText("Câu đầu tiên") as HTMLTextAreaElement;
+/** The first message's box (a message box like the composer's, not a textarea). */
+const message = () => screen.getByRole("textbox", { name: "Câu đầu tiên" });
+const messageText = () => boxValue(message());
 
 describe("recent folders", () => {
 	it("lists session folders newest first, then the machine's own, without repeats", () => {
@@ -82,19 +86,21 @@ describe("new session", () => {
 		open(link, stateWith([thread("a", "/w/older", 1), thread("b", "/w/chat-next", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
 		expect(sent[0]).toEqual({ case: "dirList", value: { path: "/w/chat-next", showHidden: false } });
-		expect(message().value).toContain("chat-next");
+		expect(messageText()).toContain("chat-next");
 		expect(screen.getByRole("button", { name: "chat-next" }).getAttribute("aria-pressed")).toBe("true");
 
 		fireEvent.click(screen.getByRole("button", { name: "older" }));
 		await waitFor(() => expect(folderInput().value).toBe("/w/older"));
-		expect(message().value).toContain("older");
+		expect(messageText()).toContain("older");
 	});
 
 	it("starts at once with the suggestion, and uses the default when the message is emptied", async () => {
 		const { link, sent } = fakeLink();
 		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
-		fireEvent.change(message(), { target: { value: "   " } });
+		await userEvent.click(message());
+		await userEvent.keyboard("{Control>}a{/Control}   ");
+		expect(messageText()).toBe("   ");
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
 		await waitFor(() => expect(sent.some((r) => r.case === "threadCreate")).toBe(true));
 		const created = sent.find((r) => r.case === "threadCreate");
@@ -110,9 +116,9 @@ describe("new session", () => {
 		const chip = screen.getByRole("button", { name: "Chạy test và sửa lỗi" });
 		fireEvent.click(chip);
 		expect(chip.getAttribute("aria-pressed")).toBe("true");
-		expect(message().value).toMatch(/test/);
+		expect(messageText()).toMatch(/test/);
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
-		await waitFor(() => expect(sent.find((r) => r.case === "threadCreate")?.value.text).toBe(message().value));
+		await waitFor(() => expect(sent.find((r) => r.case === "threadCreate")?.value.text).toBe(messageText()));
 	});
 
 	it("keeps the home folder when the machine has no sessions, and falls back to it when the recent folder is gone", async () => {

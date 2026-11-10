@@ -10,9 +10,9 @@
 // outside only when it differs from what is shown.
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } from "react";
 import type { Editor } from "@tiptap/core";
-import type { EditorProps, Live, TextSelection } from "./plain-text-editor.ts";
+import type { EditorProps, Live, TextSelection, TokenMatch } from "./plain-text-editor.ts";
 
-export type { TextSelection } from "./plain-text-editor.ts";
+export type { OpenToken, SuggestionTrigger, TextSelection, TokenMatch } from "./plain-text-editor.ts";
 
 /** What a composer can do with the box beyond its value. */
 export interface PlainTextBoxHandle {
@@ -24,6 +24,10 @@ export interface PlainTextBoxHandle {
 	setSelection(start: number, end?: number): void;
 	/** Replaces the selection with text, as typing would (undo takes it back); the focus stays where it is. */
 	insertText(text: string): void;
+	/** Closes the open suggestion token (its list); it opens again once the text changes. */
+	closeSuggestions(): void;
+	/** Opens again a suggestion token that was closed, where the caret is. */
+	reopenSuggestions(): void;
 }
 
 /** aria-* and data-* attributes go on the editable element as they are. */
@@ -101,6 +105,12 @@ function showWaiting(element: HTMLElement, attributes: Record<string, string>, v
 }
 
 const atEnd = (value: string): TextSelection => ({ start: value.length, end: value.length });
+
+/** "/name" being typed as the whole message (no space yet), the rule of the composers' command lists; wherever the caret is in it. */
+export function commandToken(value: string): TokenMatch | null {
+	if (!value.startsWith("/") || /\s/.test(value)) return null;
+	return { start: 0, end: value.length, query: value.slice(1) };
+}
 
 export function PlainTextBox(props: PlainTextBoxProps) {
 	const { ref, disabled = false } = props;
@@ -185,9 +195,7 @@ export function PlainTextBox(props: PlainTextBoxProps) {
 			},
 			getSelection: () => {
 				const loaded = editorRef.current;
-				if (loaded === null) return live.current.pending ?? atEnd(live.current.props.value);
-				const { from, to } = loaded.editor.state.selection;
-				return loaded.code.valueSelection(loaded.editor.state.doc, from, to);
+				return loaded === null ? (live.current.pending ?? atEnd(live.current.props.value)) : loaded.code.selectionOf(loaded.editor);
 			},
 			setSelection: (start: number, end: number = start) => {
 				live.current.pending = { start, end };
@@ -196,19 +204,24 @@ export function PlainTextBox(props: PlainTextBoxProps) {
 			},
 			insertText: (text: string) => {
 				const loaded = editorRef.current;
-				if (loaded === null) {
-					// Before the editor: put it in the value at the asked caret, as the editor would.
-					const value = live.current.props.value;
-					const at = live.current.pending ?? atEnd(value);
-					const caret = at.start + text.length;
-					live.current.pending = { start: caret, end: caret };
-					live.current.props.onValueChange(value.slice(0, at.start) + text + value.slice(at.end), { start: caret, end: caret });
+				if (loaded !== null) {
+					loaded.code.insertText(loaded.editor, live.current, text);
 					return;
 				}
-				const { editor } = loaded;
-				if (editor.isDestroyed || !editor.isEditable || live.current.composing) return;
-				live.current.pending = null;
-				loaded.code.insertPlain(editor.view, text);
+				// Before the editor: put it in the value at the asked caret, as the editor would.
+				const value = live.current.props.value;
+				const at = live.current.pending ?? atEnd(value);
+				const caret = at.start + text.length;
+				live.current.pending = { start: caret, end: caret };
+				live.current.props.onValueChange(value.slice(0, at.start) + text + value.slice(at.end), { start: caret, end: caret });
+			},
+			closeSuggestions: () => {
+				const loaded = editorRef.current;
+				if (loaded !== null) loaded.code.closeTokens(loaded.editor);
+			},
+			reopenSuggestions: () => {
+				const loaded = editorRef.current;
+				if (loaded !== null) loaded.code.reopenTokens(loaded.editor);
 			},
 		}),
 		[],

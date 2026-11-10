@@ -4,19 +4,20 @@
 // it too (unless a prompt above waits for an answer: Esc answers that).
 // Typing "/" first opens a picker of the AI's commands and skills in this
 // folder (ThreadInfo); typing "@" opens the files of the session's folder
-// (FileList, tunelo 2.0.1+), and the pick goes in as "@path ".
+// (FileList, tunelo 2.0.1+), and the pick goes in as "@path ". The box finds
+// both tokens (@tiptap/suggestion, with the rules here) and this list follows.
 // Files (tunelo 2.0.5+) come by the attach button, by pasting or by dropping
 // them on the session; they upload at once and go with the next message,
 // which may then have no text.
 import { useEffect, useId, useRef, useState } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
-import { PlainTextBox, type PlainTextBoxHandle } from "../components/plain-text-box.tsx";
+import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger, type TokenMatch } from "../components/plain-text-box.tsx";
 import { AttachButton, AttachTray } from "./attachment-tray.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import type { ShownAttachment } from "./transcript/tool-fold.ts";
 import type { Attachments } from "./use-attachments.ts";
-import { filterCommands, flatCommands, slashQuery } from "./slash-commands.ts";
+import { filterCommands, flatCommands } from "./slash-commands.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 /** Files of the session's folder matching a prefix; null when the machine cannot list them. */
@@ -47,13 +48,13 @@ interface ComposerProps {
 
 const MENTION_DELAY_MS = 150;
 
-/** The "@…" being typed right before the caret: its start and what follows the "@"; null when none. */
-export function mentionAt(text: string, caret: number): { start: number; query: string } | null {
+/** The "@…" being typed right before the caret, at the start or after a space (not in an e-mail address); null when none. */
+export function mentionAt(text: string, caret: number): TokenMatch | null {
 	const before = text.slice(0, caret);
 	const match = /(?:^|\s)@([^\s@]*)$/.exec(before);
 	if (match === null) return null;
 	const query = match[1] ?? "";
-	return { start: caret - query.length - 1, query };
+	return { start: caret - query.length - 1, end: caret, query };
 }
 
 type Option = { kind: "command"; command: SlashCommand } | { kind: "file"; path: string; dir: boolean };
@@ -67,18 +68,16 @@ interface Found {
 export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, onSend, onStop }: ComposerProps) {
 	const t = useMachinesCopy();
 	const [text, setText] = useState("");
-	const [caret, setCaret] = useState(0);
 	const [error, setError] = useState("");
 	const [stopping, setStopping] = useState(false);
 	const [active, setActive] = useState(0);
-	/** The text the picker was closed at (Esc); it opens again once the text changes. */
-	const [closedAt, setClosedAt] = useState<string | null>(null);
+	/** The "/" and "@" tokens the box has open (only one at a time: "/" needs the whole message). */
+	const [slash, setSlash] = useState<OpenToken | null>(null);
+	const [at, setAt] = useState<OpenToken | null>(null);
 	const [found, setFound] = useState<Found | null>(null);
 	const field = useRef<PlainTextBoxHandle>(null);
 	const listId = useId();
-	const at = listFiles === undefined || closedAt === text ? null : mentionAt(text, caret);
-	const query = at === null ? slashQuery(text) : null;
-	const groups = query === null || closedAt === text ? null : filterCommands(commands, query);
+	const groups = slash === null || at !== null ? null : filterCommands(commands, slash.query);
 	const files = at !== null && found !== null && found.query === at.query ? found.listing : null;
 	const searching = at !== null && files === null;
 	const options: Option[] =
@@ -121,29 +120,19 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		};
 	}, [mentionQuery, listFiles]);
 
-	const edit = (value: string, nextCaret = value.length) => {
+	const edit = (value: string) => {
 		setText(value);
-		setCaret(nextCaret);
 		setActive(0);
 	};
-	/** Puts text in place of [start, end) as typed, so the caret lands after it and undo takes it back. */
-	const replace = (start: number, end: number, inserted: string) => {
-		const box = field.current;
-		if (box === null) {
-			edit(text.slice(0, start) + inserted + text.slice(end), start + inserted.length);
-			return;
-		}
-		box.focus();
-		box.setSelection(start, end);
-		box.insertText(inserted);
+	/** A token opened, changed or closed: the list starts again at its first option. */
+	const follow = (set: (token: OpenToken | null) => void) => (token: OpenToken | null) => {
+		set(token);
+		setActive(0);
 	};
+	// The picked option goes in place of the token as typed: the caret after it, undo takes it back.
 	const pick = (option: Option) => {
-		if (option.kind === "command") {
-			replace(0, text.length, `/${option.command.name} `);
-			return;
-		}
-		if (at === null) return;
-		replace(at.start, caret, option.dir ? `@${option.path}` : `@${option.path} `);
+		if (option.kind === "command") slash?.replace(`/${option.command.name} `);
+		else at?.replace(option.dir ? `@${option.path}` : `@${option.path} `);
 	};
 	const send = () => {
 		const message = text.trim();
@@ -177,27 +166,29 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 			.catch(() => setError(t.errors.offline))
 			.finally(() => setStopping(false));
 	};
-	const onKeyDown = (event: KeyboardEvent) => {
-		if (open) {
-			const picked = options[index];
-			if ((event.key === "ArrowDown" || event.key === "ArrowUp") && options.length > 0) {
-				event.preventDefault();
-				const step = event.key === "ArrowDown" ? 1 : -1;
-				setActive((index + step + options.length) % options.length);
-				return;
-			}
-			if (((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && !event.shiftKey)) && picked !== undefined) {
-				event.preventDefault();
-				pick(picked);
-				return;
-			}
-			if (event.key === "Escape") {
-				event.preventDefault();
-				event.stopPropagation();
-				setClosedAt(text);
-				return;
-			}
+	/** Keys while a token is open, before the composer's own: true when the list took the key (Esc closes it). */
+	const listKeys = (event: KeyboardEvent): boolean => {
+		if (!open) return false;
+		const picked = options[index];
+		if ((event.key === "ArrowDown" || event.key === "ArrowUp") && options.length > 0) {
+			const step = event.key === "ArrowDown" ? 1 : -1;
+			setActive((index + step + options.length) % options.length);
+		} else if (((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && !event.shiftKey)) && picked !== undefined) {
+			pick(picked);
+		} else if (event.key === "Escape") {
+			// Not the Esc that stops the turn or answers a prompt.
+			event.stopPropagation();
+		} else {
+			return false;
 		}
+		event.preventDefault();
+		return true;
+	};
+	const suggestions: readonly SuggestionTrigger[] = [
+		{ char: "/", find: (value) => commandToken(value), onChange: follow(setSlash), onKeyDown: listKeys },
+		{ char: "@", find: (value, caret) => (listFiles === undefined ? null : mentionAt(value, caret)), onChange: follow(setAt), onKeyDown: listKeys },
+	];
+	const onKeyDown = (event: KeyboardEvent) => {
 		if (event.key === "Escape" && running && !prompting && online) {
 			event.preventDefault();
 			stop();
@@ -309,8 +300,8 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					placeholder={t.chat.placeholder(ai, machine)}
 					value={text}
 					disabled={!online}
-					onValueChange={(value, selection) => edit(value, selection.start)}
-					onSelectionChange={(selection) => setCaret(selection.start)}
+					suggestions={suggestions}
+					onValueChange={edit}
 					onKeyDown={onKeyDown}
 					onPaste={onPaste}
 				/>

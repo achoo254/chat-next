@@ -23,7 +23,8 @@ import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { ToolRunCard } from "../../src/machines/cards/tool-run.tsx";
 import { Composer } from "../../src/machines/composer.tsx";
 import { PairedDevices, revokePairedDevice } from "../../src/machines/paired-devices.tsx";
-import { filterCommands, flatCommands, slashQuery } from "../../src/machines/slash-commands.ts";
+import { filterCommands, flatCommands } from "../../src/machines/slash-commands.ts";
+import { commandToken } from "../../src/components/plain-text-box.tsx";
 import type { MachineLink } from "../../src/machines/link/machine-link.ts";
 import { StatusBar } from "../../src/machines/status-bar.tsx";
 import { permissionMode, resetIn, usageOf } from "../../src/machines/status-line.ts";
@@ -175,10 +176,11 @@ const commands = [
 
 describe("slash commands", () => {
 	it("opens only while a command name is typed at the start", () => {
-		expect(slashQuery("/rev")).toBe("rev");
-		expect(slashQuery("/")).toBe("");
-		expect(slashQuery("/review now")).toBeNull();
-		expect(slashQuery("hi /review")).toBeNull();
+		expect(commandToken("/rev")).toEqual({ start: 0, end: 4, query: "rev" });
+		expect(commandToken("/")?.query).toBe("");
+		expect(commandToken("/review now")).toBeNull();
+		expect(commandToken("hi /review")).toBeNull();
+		expect(commandToken("hi\n/review")).toBeNull();
 	});
 
 	it("filters by name, names starting with the text first, the AI's own commands apart", () => {

@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@achoo254/chat-core";
 import { cryptoRandomId } from "@achoo254/chat-platform";
 import { Icon } from "../../components/icon.tsx";
+import type { OpenToken, PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices, useUser } from "../data/services.tsx";
@@ -238,11 +239,9 @@ function useBotKeyboard(chatId: number, botId: number): { seq: number; keyboard:
 	return message !== null && keyboard?.kind === "keyboard" ? { seq: message.seq, keyboard } : null;
 }
 
-/** Commands matching what is typed: "/de" keeps /deploy; anything but a bare command shows none. */
-export function matchCommands<C extends BotCommand>(commands: readonly C[], text: string, manual: boolean): C[] {
-	if (text === "") return manual ? [...commands] : [];
-	if (!text.startsWith("/") || /\s/.test(text)) return [];
-	const typed = text.slice(1).split("@")[0]?.toLowerCase() ?? "";
+/** Commands matching the "/" token's query: "de" keeps /deploy, "deploy@deploy_bot" too. */
+export function matchCommands<C extends BotCommand>(commands: readonly C[], query: string): C[] {
+	const typed = query.split("@")[0]?.toLowerCase() ?? "";
 	return commands.filter((command) => command.command.startsWith(typed));
 }
 
@@ -273,10 +272,14 @@ export interface BotLayerProps {
 	chatId: number;
 	botId: number;
 	text: string;
+	/** The "/command" being typed as the whole message (the text box finds it); null when none. */
+	token: OpenToken | null;
 	setText: (text: string) => void;
 	/** Sends `text` as the user's own message. */
 	send: (text: string) => void;
 	focus: () => void;
+	/** The text box, to close its "/" token or open it again (the menu button). */
+	box: { readonly current: Pick<PlainTextBoxHandle, "closeSuggestions" | "reopenSuggestions"> | null };
 	/** The layer's current state for the composer's buttons (called when it changes). */
 	onBar: (bar: BotBar) => void;
 	actionsRef: { current: BotActions | null };
@@ -300,65 +303,46 @@ interface CommandMenuState {
 	onKey(event: KeyboardEvent): boolean;
 }
 
-/** The command menu's state and keys: typing "/" filters, ↑ ↓ select, Tab fills, Enter sends, Esc closes. */
+/** The command menu's state and keys: the "/" token filters, ↑ ↓ select, Tab fills, Enter sends, Esc closes. */
 function useCommandMenu(
 	entries: readonly MenuEntry[],
-	text: string,
-	setText: (text: string) => void,
-	send: (text: string) => void,
-	focus: () => void,
+	{ text, token, setText, send, focus, box }: Pick<BotLayerProps, "text" | "token" | "setText" | "send" | "focus" | "box">,
 ): CommandMenuState {
-	const [manual, setManual] = useState(false);
-	const [closedFor, setClosedFor] = useState<string | null>(null);
 	const [selected, setSelected] = useState(0);
-	const matches = closedFor === text ? [] : matchCommands(entries, text, manual);
-	const open = matches.length > 0 || (manual && entries.length > 0 && text.startsWith("/") && !/\s/.test(text));
+	const matches = token === null ? [] : matchCommands(entries, token.query);
+	const open = matches.length > 0;
 	const index = Math.min(selected, Math.max(0, matches.length - 1));
-	const close = () => {
-		setManual(false);
-		setClosedFor(text);
-	};
 	const fill = (entry: MenuEntry) => {
-		setText(`${entry.insert} `);
-		setManual(false);
+		// In place of the token as typed, so undo takes it back.
+		if (token !== null) token.replace(`${entry.insert} `);
+		else setText(`${entry.insert} `);
 		focus();
 	};
 	const onKey = (event: KeyboardEvent): boolean => {
-		if (!open || matches.length === 0) return false;
-		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-			event.preventDefault();
-			setSelected((index + (event.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length);
-			return true;
-		}
+		if (!open) return false;
 		const picked = matches[index];
-		if (picked === undefined) return false;
-		if (event.key === "Tab") {
-			event.preventDefault();
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			setSelected((index + (event.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length);
+		} else if (event.key === "Tab" && picked !== undefined) {
 			fill(picked);
-			return true;
-		}
-		if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-			event.preventDefault();
+		} else if (event.key === "Enter" && !event.shiftKey && picked !== undefined) {
 			setText("");
-			setManual(false);
 			send(picked.insert);
-			return true;
+		} else if (event.key !== "Escape") {
+			return false;
 		}
-		if (event.key === "Escape") {
-			event.preventDefault();
-			close();
-			return true;
-		}
-		return false;
+		event.preventDefault();
+		return true;
 	};
 	const toggleMenu = () => {
-		if (open) close();
-		else {
-			setClosedFor(null);
-			setManual(true);
-			if (text === "") setText("/");
-			focus();
+		if (open) {
+			box.current?.closeSuggestions();
+			return;
 		}
+		// An empty message gets "/", which opens the whole menu; a "/command" closed by Esc opens again.
+		if (text === "") setText("/");
+		else box.current?.reopenSuggestions();
+		focus();
 	};
 	return { open, matches, index, fill, toggleMenu, onKey };
 }
@@ -409,7 +393,8 @@ function CommandMenu({ chatId, menu, head, owners }: { chatId: number; menu: Com
 }
 
 /** Command menu and reply keyboard around the composer of a private chat with a bot. */
-export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, actionsRef }: BotLayerProps) {
+export function BotLayer(props: BotLayerProps) {
+	const { chatId, botId, send, onBar, actionsRef } = props;
 	const t = useBotsCopy();
 	const { bots, source, toasts } = useServices();
 	const ui = useUi();
@@ -425,7 +410,7 @@ export function BotLayer({ chatId, botId, text, setText, send, focus, onBar, act
 		botName: name,
 		insert: `/${command.command}`,
 	}));
-	const menu = useCommandMenu(entries, text, setText, send, focus);
+	const menu = useCommandMenu(entries, props);
 
 	// Hidden on this device is kept in the local database (survives a reload).
 	const padShown = active !== null && !active.keyboard.hidden;
@@ -504,7 +489,8 @@ export function groupEntries(menus: ChatMenus): MenuEntry[] {
 export type GroupBotLayerProps = Omit<BotLayerProps, "botId">;
 
 /** The command menu of a group's bots above its composer; nothing when no bot has commands there. */
-export function GroupBotLayer({ chatId, text, setText, send, focus, onBar, actionsRef }: GroupBotLayerProps) {
+export function GroupBotLayer(props: GroupBotLayerProps) {
+	const { chatId, onBar, actionsRef } = props;
 	const t = useBotsCopy();
 	const { bots } = useServices();
 	const [loaded, setLoaded] = useState<{ chatId: number; entries: MenuEntry[] } | null>(null);
@@ -524,7 +510,7 @@ export function GroupBotLayer({ chatId, text, setText, send, focus, onBar, actio
 		};
 	}, [bots, chatId]);
 	const entries = loaded !== null && loaded.chatId === chatId ? loaded.entries : NO_ENTRIES;
-	const menu = useCommandMenu(entries, text, setText, send, focus);
+	const menu = useCommandMenu(entries, props);
 	useLayoutEffect(() => {
 		actionsRef.current = { toggleMenu: menu.toggleMenu, toggleKeyboard: () => {}, openApp: () => {}, onKey: menu.onKey };
 		return () => {

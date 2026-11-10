@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { BotCommandScope } from "@achoo254/chat-proto/bot_admin";
 import { ChatType } from "@achoo254/chat-proto/chats";
 import { groupEntries, matchCommands } from "../src/messaging/bots/bot-chat.tsx";
+import { commandToken } from "../src/components/plain-text-box.tsx";
 import { startCommand } from "../src/messaging/bots/bot-link-dialog.tsx";
 import { normalizeUsername, usernameFromName, usernameSuggestions } from "../src/messaging/bots/console.tsx";
 import { reauthUrl } from "../src/messaging/bots/dialogs.tsx";
@@ -78,12 +79,14 @@ describe("bot routes and helpers", () => {
 			{ command: "status", description: "Trạng thái" },
 			{ command: "deploy", description: "Đẩy bản" },
 		];
-		expect(matchCommands(commands, "/", false).map((c) => c.command)).toEqual(["status", "deploy"]);
-		expect(matchCommands(commands, "/de", false).map((c) => c.command)).toEqual(["deploy"]);
-		expect(matchCommands(commands, "/deploy@deploy_bot", false).map((c) => c.command)).toEqual(["deploy"]);
-		expect(matchCommands(commands, "/deploy now", false)).toEqual([]);
-		expect(matchCommands(commands, "hi", false)).toEqual([]);
-		expect(matchCommands(commands, "", true)).toHaveLength(2);
+		expect(matchCommands(commands, "").map((c) => c.command)).toEqual(["status", "deploy"]);
+		expect(matchCommands(commands, "de").map((c) => c.command)).toEqual(["deploy"]);
+		expect(matchCommands(commands, "deploy@deploy_bot").map((c) => c.command)).toEqual(["deploy"]);
+		expect(matchCommands(commands, "x")).toEqual([]);
+		// The token itself: only "/name" typed as the whole message.
+		expect(commandToken("/de")).toEqual({ start: 0, end: 3, query: "de" });
+		expect(commandToken("/deploy now")).toBeNull();
+		expect(commandToken("hi")).toBeNull();
 	});
 
 	it("tags group commands with the bot's username only when the group has several bots", () => {

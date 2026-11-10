@@ -12,9 +12,8 @@ import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
 import { useChat, useConnection, useDialog, useListEntry, useMediaLimits, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
 import { addAttachments, dragHasFiles, viewer } from "../media/media-state.ts";
-import { sizeLimitLabel } from "./composer.tsx";
+import { sizeLimitLabel } from "../media/size-limit-label.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { Composer } from "./composer.tsx";
 import { useOnlineCount } from "./online-count.ts";
 import { useIncomingSound } from "./incoming-sound.ts";
 import { MessageList } from "./message-list.tsx";
@@ -25,6 +24,67 @@ import { TopicIco } from "./topic-ico.tsx";
 import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
+// The composer and its editor load apart from the startup code (fetched when
+// the browser is idle, or with the first chat opened), as Telegram Web loads
+// its message input; until then the chat shows the box waiting. No Suspense:
+// once fetched, the composer renders at once in every chat.
+type ComposerCode = typeof import("./composer.tsx");
+let composerCode: ComposerCode | null = null;
+let composerFetch: Promise<ComposerCode> | null = null;
+
+function loadComposer(): Promise<ComposerCode> {
+	composerFetch ??= import("./composer.tsx").then(
+		(code) => {
+			composerCode = code;
+			return code;
+		},
+		(error: unknown) => {
+			// A failed fetch (offline, a new deployment) is tried again by the next chat.
+			composerFetch = null;
+			throw error;
+		},
+	);
+	return composerFetch;
+}
+
+/** Fetches the composer and its editor ahead of the first chat opened. */
+export async function preloadComposer(): Promise<void> {
+	await loadComposer();
+	const { preloadPlainTextEditor } = await import("../../components/plain-text-box.tsx");
+	await preloadPlainTextEditor();
+}
+
+/** The composer's code: there at once when fetched before, else fetched now (null until it is in). */
+function useComposerCode(): ComposerCode | null {
+	const [code, setCode] = useState(composerCode);
+	useEffect(() => {
+		if (code !== null) return;
+		let active = true;
+		loadComposer().then(
+			(loaded) => {
+				if (active) setCode(loaded);
+			},
+			(error: unknown) => console.warn("composer failed to load", error),
+		);
+		return () => {
+			active = false;
+		};
+	}, [code]);
+	return code;
+}
+
+/** The composer, or while its code loads its text box, busy, with its placeholder. */
+function ChatComposer(props: Parameters<ComposerCode["Composer"]>[0]) {
+	const code = useComposerCode();
+	if (code !== null) return <code.Composer {...props} />;
+	return (
+		<div className="composer-wrap">
+			<div className="composer">
+				<div className="plain-text-box composer-field" role="textbox" aria-label={props.label} aria-placeholder={props.placeholder} aria-multiline="true" aria-busy="true" aria-disabled="true" />
+			</div>
+		</div>
+	);
+}
 const MediaViewer = lazy(() => import("../media/viewer.tsx"));
 // A bot's profile and "Bắt đầu" load with the first bot chat opened before it was started.
 const botChat = () => import("../bots/bot-chat.tsx");
@@ -419,7 +479,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					<BotStartBar botId={botId} />
 				</Suspense>
 			) : sendable ? (
-				<Composer
+				<ChatComposer
 					key={`${chatId}:${effectiveTopic}`}
 					chatId={chatId}
 					topicId={effectiveTopic}

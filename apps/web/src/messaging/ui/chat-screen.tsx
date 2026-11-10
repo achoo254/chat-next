@@ -17,7 +17,7 @@ import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
 import { hookData, hooksData } from "../data/screen-data.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatListColumn } from "./chat-list.tsx";
-import { Conversation, EmptyConversation } from "./conversation.tsx";
+import { Conversation, EmptyConversation, preloadComposer } from "./conversation.tsx";
 import { DialogHost, dialogPreload } from "./dialog-host.tsx";
 import { FolderRail } from "./folder-rail.tsx";
 import { ListResizer } from "./list-resizer.tsx";
@@ -51,7 +51,7 @@ const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.
 const BotLinkDialog = lazy(() => import("../bots/bot-link-dialog.tsx"));
 
 /** Panes (and the dialog switch) whose code is fetched when the browser is idle after startup (messaging-root.tsx). */
-export const chatPanePreloads: readonly (() => Promise<void>)[] = [integrationsCode.preload, contactsCode.preload, dialogPreload];
+export const chatPanePreloads: readonly (() => Promise<void>)[] = [preloadComposer, integrationsCode.preload, contactsCode.preload, dialogPreload];
 
 /** The admin column's box around a loader (before the page itself renders one). */
 function adminFrame(loader: ReactNode): ReactNode {

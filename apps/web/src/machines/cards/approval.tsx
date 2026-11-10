@@ -6,6 +6,7 @@
 // answered blindly. An answered prompt shows in its tool's row
 // (tool-run.tsx); one without a shown tool stays as a short line.
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { PlainTextBox, type PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
 import { Decision, PromptState, ToolKind, type ApprovalItem, type ApprovalSecret } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon, type MachineIconName } from "../machine-icons.tsx";
@@ -125,7 +126,7 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 	const [error, setError] = useState("");
 	const [telling, setTelling] = useState(false);
 	const [message, setMessage] = useState("");
-	const field = useRef<HTMLTextAreaElement>(null);
+	const field = useRef<PlainTextBoxHandle>(null);
 	const pending = approval.state === PromptState.PENDING;
 	const sites = secretSites(approval);
 	const secrets = sites.length > 0 ? sites.map((s) => s.name) : secretsInCommand(approval);
@@ -208,21 +209,18 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 			)}
 			{telling ? (
 				<div className="mx-tell">
-					<label className="sr-only" htmlFor={`tell-${approval.toolId}`}>
-						{t.agent.dock.tellLabel}
-					</label>
-					<textarea
+					<PlainTextBox
 						id={`tell-${approval.toolId}`}
 						ref={field}
-						rows={2}
 						className="mx-field"
+						ariaLabel={t.agent.dock.tellLabel}
 						maxLength={DENY_MESSAGE_MAX}
 						placeholder={t.agent.dock.tellPlaceholder}
 						value={message}
 						disabled={busy}
-						onChange={(event) => setMessage(event.target.value)}
+						onValueChange={setMessage}
 						onKeyDown={(event) => {
-							if (event.nativeEvent.isComposing) return;
+							// The box never hands over keys an IME is composing with.
 							if (event.key === "Escape") {
 								event.preventDefault();
 								event.stopPropagation();

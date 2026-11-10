@@ -3,7 +3,6 @@ import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { resetMediaState } from "../src/messaging/media/media-state.ts";
 import { inviteLinks } from "../src/messaging/ui/members.ts";
-import { preloadPlainTextEditor } from "../src/components/plain-text-box.tsx";
 
 // jsdom has no object URLs; media screens make them for downloaded files.
 if (typeof URL.createObjectURL !== "function") {
@@ -22,9 +21,12 @@ for (const proto of [Range.prototype, Text.prototype] as { getClientRects?: () =
 }
 document.elementFromPoint ??= () => null;
 
-// The message boxes' editor loads apart from the screens; here it is in
-// before any test, so a box is ready to type in as soon as it renders.
-await preloadPlainTextEditor();
+// The chat's composer and the message boxes' editor load apart from the
+// screens; here they are in before any test, so a chat shows its composer
+// and a box is ready to type in as soon as it renders.
+// Imported here, after the stand-ins above, which the chat's modules may read as they load.
+const { preloadComposer } = await import("../src/messaging/ui/conversation.tsx");
+await preloadComposer();
 
 // The idle prefetch of secondary screens' code (components/preload.ts) only
 // warms a cache; in tests it would load modules at a random point of a test

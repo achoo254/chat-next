@@ -505,7 +505,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 /* New session */
 .modal.mx-sheet { width: min(640px, calc(100vw - 32px)); }
 .mx-new { display: grid; gap: var(--space-3); }
-.mx-new textarea { min-height: 88px; }
+/* The first message: a message box (plain-text-box.tsx) the size the textarea had, growing with its lines. */
+.mx-new .mx-first { min-height: 88px; max-height: 40vh; padding: var(--space-2) var(--space-3); }
 .mx-new-foot { margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-4)); }
 .mx-ai-pick { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
 .mx-ai-pick legend { margin-bottom: var(--space-1); font-size: 0.8125rem; font-weight: 600; }
