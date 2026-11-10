@@ -119,6 +119,8 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 			};
 			const r = new Rfb(el, channel, { shared: true, ...(credentials ? { credentials } : {}) });
 			r.scaleViewport = true;
+			// macOS sends no (or an empty) pointer image when no mouse is attached; without this noVNC hides the pointer.
+			r.showDotCursor = true;
 			r.qualityLevel = 6;
 			r.compressionLevel = 2;
 			r.addEventListener("connect", () => setPhase({ kind: "live", exposed }));

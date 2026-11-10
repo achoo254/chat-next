@@ -298,6 +298,18 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
+	it("answers /clear with the new thread and does not keep the command on screen", async () => {
+		machine.handler = (frame) =>
+			frame.body.case === "threadSend" ? [{ case: "threadCreated", value: { thread: { id: "t2", dir: "/work", provider: "claude" } } }] : undefined;
+		const l = link();
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+		const opened = await l.send("t1", "/clear");
+		expect(opened?.id).toBe("t2");
+		expect(l.snapshot().pending.get("t1")).toBeUndefined();
+		l.stop();
+	});
+
 	it("reconnects when a frame cannot be opened", async () => {
 		const l = link();
 		l.start();

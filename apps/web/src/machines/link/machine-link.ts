@@ -321,17 +321,23 @@ export class MachineLink {
 	 * Sends a message, with files uploaded for it before (their upload ids);
 	 * it shows at once and stays until the machine echoes it.
 	 */
-	async send(threadId: string, text: string, attachments: readonly ShownAttachment[] = []): Promise<void> {
+	async send(threadId: string, text: string, attachments: readonly ShownAttachment[] = []): Promise<ThreadSummary | undefined> {
 		const clientMsgId = this.newId();
 		const list = this.current.pending.get(threadId) ?? [];
 		this.setPending(threadId, [...list, { clientMsgId, text, ...(attachments.length > 0 ? { attachments } : {}) }]);
-		try {
-			await this.request({ case: "threadSend", value: { threadId, text, clientMsgId, attachmentIds: attachments.map((a) => a.id) } });
-		} catch (err) {
+		const settle = () =>
 			this.setPending(
 				threadId,
 				(this.current.pending.get(threadId) ?? []).filter((p) => p.clientMsgId !== clientMsgId),
 			);
+		try {
+			const frame = await this.request({ case: "threadSend", value: { threadId, text, clientMsgId, attachmentIds: attachments.map((a) => a.id) } });
+			// `/clear` is answered with the thread that replaces this one: nothing was typed here.
+			if (frame.body.case !== "threadCreated") return undefined;
+			settle();
+			return frame.body.value.thread;
+		} catch (err) {
+			settle();
 			throw err;
 		}
 	}

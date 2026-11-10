@@ -260,7 +260,11 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						commands={threadInfo?.commands ?? []}
 						listFiles={modern ? listFiles : undefined}
 						attach={attach}
-						onSend={(text, files) => link.send(threadId, text, files)}
+						onSend={async (text, files) => {
+							// `/clear` opens a new, empty session in this folder: go to it.
+							const opened = await link.send(threadId, text, files);
+							if (opened !== undefined) navigate(paths.machineSession(machine, opened.id));
+						}}
 						onStop={async () => {
 							await link.request({ case: "threadInterrupt", value: { threadId } });
 						}}

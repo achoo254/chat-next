@@ -567,6 +567,10 @@ export class Connection {
           return this.sendItems(threadId, r.items, id);
         }
         case "threadSend":
+          // `/clear` alone starts a fresh thread, answered like ThreadCreate: the device moves to it.
+          if (b.value.text.trim() === "/clear" && b.value.attachmentIds.length === 0) {
+            return this.openedThread(id, await core.clear(b.value.threadId));
+          }
           await core.send(b.value.threadId, b.value.text, b.value.clientMsgId, b.value.attachmentIds);
           return ack();
         case "attachmentUpload": {

@@ -13,6 +13,7 @@ declare module "@novnc/novnc" {
 		dragViewport: boolean;
 		resizeSession: boolean;
 		focusOnClick: boolean;
+		showDotCursor: boolean;
 		viewOnly: boolean;
 		qualityLevel: number;
 		compressionLevel: number;

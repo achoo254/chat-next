@@ -176,6 +176,16 @@ describe("connection", () => {
     seal("11", { body: { case: "attachmentCancel", value: { uploadId: "never-sent-1" } } });
     expect((await frames(session, link.next, (f) => f.id === "11")).at(-1)?.body.case).toBe("ack");
 
+    // `/clear` opens an empty thread in the same folder on the same AI; the old one keeps its history and never gets the command.
+    seal("11b", { body: { case: "threadSend", value: { threadId: id, text: " /clear ", clientMsgId: "c11b", attachmentIds: [] } } });
+    const cleared = await frames(session, link.next, (f) => f.id === "11b" && f.body.case === "threadCreated");
+    const fresh = cleared.find((f) => f.id === "11b")?.body;
+    const freshThread = fresh?.case === "threadCreated" ? fresh.value.thread : undefined;
+    expect(freshThread && [freshThread.id !== id, freshThread.dir, freshThread.provider, freshThread.title]).toEqual([true, m.work, "fake", ""]);
+    const oldTexts = m.core.snapshot(id).flatMap((i) => (i.body.case === "text" ? [i.body.value.text] : []));
+    expect(oldTexts.some((text) => text.includes("/clear"))).toBe(false);
+    expect(m.core.snapshot(freshThread?.id ?? "")).toEqual([]);
+
     // Archive, then delete: every device hears the thread is gone.
     seal("12", { body: { case: "threadSetArchived", value: { threadId: id, archived: true } } });
     const archived = await frames(session, link.next, (f) => f.id === "12");

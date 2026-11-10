@@ -668,6 +668,30 @@ export class AgentCore {
   }
 
   /**
+   * `/clear`: the AI forgets the conversation, so the thread must not keep
+   * showing it as if it were still in context. Another thread opens in the
+   * same folder on the same AI, model, effort, permission mode and project
+   * settings, with an empty journal; the old thread stays as history. Nothing
+   * is typed into the old session, and an idle one is parked.
+   */
+  async clear(threadId: string): Promise<ThreadSummary> {
+    const old = this.thread(threadId);
+    const next = this.addThread({
+      title: "",
+      dir: old.meta.dir,
+      provider: old.meta.provider,
+      model: old.meta.model,
+      projectSettings: old.meta.projectSettings,
+    });
+    if (old.meta.effort) next.meta.effort = old.meta.effort;
+    if (old.meta.permissionMode) next.meta.permissionMode = old.meta.permissionMode;
+    this.saveMeta(next);
+    if (!old.running) await this.park(old);
+    this.touch(old);
+    return this.summary(next);
+  }
+
+  /**
    * The checks every session opening in `dir` goes through, in this order:
    * the sensitive folder's consent, the AI installed and signed in, then the
    * project settings' trust (trusted now when the device asked to). Logs
