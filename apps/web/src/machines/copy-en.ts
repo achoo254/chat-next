@@ -572,6 +572,9 @@ export const enMachines: MachinesCopy = {
 		osTabs: "Operating system",
 		macos: "macOS",
 		windows: "Windows",
+		linux: "Linux",
+		linuxNote:
+			"Linux: a glibc distribution with systemd (Ubuntu, Debian, Fedora…), x86_64 or aarch64. tunelo runs in the background as a systemd user service. If the command tells you to run sudo loginctl enable-linger, run it once so tunelo also runs after you log out or the machine restarts.",
 		make: "Create the install command",
 		making: "Creating…",
 		command: "Install command",
@@ -650,7 +653,7 @@ export const enMachines: MachinesCopy = {
 		welcome: {
 			title: "Control Claude Code on your own computer",
 			body: "AI Agent lets you chat with, approve and follow Claude Code running on your computer from your phone or another computer, end-to-end encrypted.",
-			needs: "You need: a macOS or Windows computer with Claude Code installed and signed in.",
+			needs: "You need: a macOS, Windows or Linux computer with Claude Code installed and signed in.",
 			guide: "How to install Claude Code",
 			onPhone: "You are on a phone: open this page on the computer you want to control and run the install command there.",
 			start: "Connect your first computer",

@@ -4,19 +4,20 @@ Tiến trình máy của hệ sinh thái hoandat: tunnel tới `localhost` (CLI 
 thiết bị khác, mã hoá đầu-cuối), Localman gọi `localhost` của máy, MCP `tunelo` cho claude. Thiết kế:
 [ADR 0013](../../docs/adr/0013-remote-machines.md), [ADR 0014](../../docs/adr/0014-tunelo-machine-agent.md).
 
-Chạy trên macOS (arm64, x64) và Windows x64. Một file chạy do Bun build, ký minisign, phát hành ở GitHub Releases của repo này
+Chạy trên macOS (arm64, x64), Windows x64 và Linux x64, arm64 (glibc, có systemd; từ 2.2.0). Một file chạy do Bun build, ký minisign, phát hành ở GitHub Releases của repo này
 (tag `tunelo-v<version>`). Không có gói npm. Từ 2.0.3, bản macOS còn được ký Developer ID (team `AM5C55N339`, identifier
 `com.hoandat.tunelo`, hardened runtime) và notarize trong `agent-release.yml`.
 
 ## Cài
 
 AI Agent › Máy › Thêm máy trong Chat hiện lệnh một dòng kèm khoá của thiết bị. Lệnh đó cài `tunelo`, hỏi mã ghép (dán vào, chữ
-không hiện), rồi chạy `tunelo install`: đăng nhập trên trình duyệt, máy tự vào danh sách, không cần mã cài.
+không hiện), rồi chạy `tunelo install`: đăng nhập trên trình duyệt, máy tự vào danh sách, không cần mã cài. Trang nhận ra Linux từ
+trình duyệt và đưa lệnh Linux kèm ghi chú Linux (không có bước Full Disk Access).
 
 Chỉ cài file chạy và đăng nhập (cũng là cách cập nhật khi `tunelo update` không dùng được):
 
 ```sh
-# macOS
+# macOS và Linux (x86_64/amd64, aarch64/arm64)
 curl -fsSL https://chat.hoandat.com/agent/install.sh | sh
 ```
 
@@ -26,8 +27,9 @@ curl -fsSL https://chat.hoandat.com/agent/install.sh | sh
 ```
 
 Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký nếu máy có `minisign`. File chạy nằm ở `~/.local/bin/tunelo`
-(macOS) hoặc `%LOCALAPPDATA%\tunelo\tunelo.exe` (Windows). Thư mục cấu hình là `~/.config/tunelo` hoặc `%APPDATA%\tunelo`
-(biến `TUNELO_HOME` đổi được).
+(macOS, Linux) hoặc `%LOCALAPPDATA%\tunelo\tunelo.exe` (Windows). Thư mục cấu hình là `~/.config/tunelo` (hoặc
+`$XDG_CONFIG_HOME/tunelo` khi có biến này) hoặc `%APPDATA%\tunelo` (biến `TUNELO_HOME` đổi được). Trên Linux script ghi PATH vào
+`~/.profile`, `~/.bashrc` (nếu có) và `~/.zshrc` (nếu shell là zsh); Alpine và bản musl khác bị từ chối.
 
 ## Lệnh chính
 
@@ -127,7 +129,7 @@ chiếu** (`secret://…`), không bao giờ nhận giá trị.
   đăng nhập" phía trên ô nhập, **ngoài transcript** (không vào lịch sử phiên, không vào journal), phiên hiện "Cần bạn" và có thể
   đẩy thông báo. Người dùng nhập ở một thiết bị; giá trị đi một khung E2E tới máy, trình duyệt xoá khỏi ô nhập ngay khi gửi. Chờ tối
   đa 5 phút; từ chối/hết hạn/phiên dừng thì Claude nhận lỗi nói rõ.
-- "Lưu cho lần sau" (mặc định bật): niêm phong bằng khoá trong Keychain/DPAPI, cùng origin và tên (chuyển sang trang khác thì không
+- "Lưu cho lần sau" (mặc định bật): niêm phong bằng khoá trong Keychain/DPAPI (Linux: tệp 0600, xem mục Linux), cùng origin và tên (chuyển sang trang khác thì không
   mở được), ghi vào `secrets.json` (0600) trong thư mục cấu hình. Bỏ chọn: chỉ giữ trong bộ nhớ cho phiên đó.
 - `fill_secret(ref, selector?, cdp_url?)`: tunelo điền vào ô của một trang **cùng origin** trong trình duyệt Claude điều khiển, qua
   Chrome DevTools Protocol (trình duyệt mở bằng `--remote-debugging-port`; tunelo tự tìm cổng từ tiến trình đang chạy và
@@ -175,7 +177,7 @@ Phiên tunelo mở có thêm 3 tool MCP. Không tool nào trả hình của tran
 
 ## Màn hình của máy qua Chia sẻ màn hình của macOS (2.0.13)
 
-Cho các hộp thoại của hệ điều hành mà trình duyệt không thấy (sheet passkey, hộp mật khẩu Keychain).
+Chỉ có trên macOS. Cho các hộp thoại của hệ điều hành mà trình duyệt không thấy (sheet passkey, hộp mật khẩu Keychain).
 
 - tunelo **không bao giờ** bật hay đổi cài đặt hệ thống. Thiết bị hỏi trạng thái (`ScreenShareStatusRequest`): có dịch vụ VNC trả lời
   trên `127.0.0.1:5900` không (đọc lời chào `RFB `), có nghe ngoài loopback không (`netstat -an -p tcp`), tường lửa có bật và chặn
@@ -220,7 +222,7 @@ Menu ⋮ của phiên (và của dòng phiên ở cột trái: rê chuột, nh�
   `<thư mục Claude>/projects/<thư mục>/<session id>.jsonl` và thư mục `<session id>/` bên cạnh của mọi phiên AI thread đó đã chạy,
   cùng đúng các tệp mà tin nhắn của thread đã lưu trong `.tunelo-attachments/` (tệp thường, không link, không nhạy cảm). Sau đó
   xoá journal của tunelo, ghi nhật ký đồng ý (`delete_session`) và báo mọi thiết bị. macOS dùng `trashItemAtURL` (như Finder),
-  Windows dùng Recycle Bin, Linux `gio trash`; Thùng rác từ chối thì không xoá gì. Phiên đang chạy một lượt: web hỏi "Dừng và
+  Windows dùng Recycle Bin, Linux `gio trash` (máy thiếu `gio` thì báo lỗi rõ); Thùng rác từ chối thì không xoá gì. Phiên đang chạy một lượt: web hỏi "Dừng và
   xoá". Phiên có vẻ đang mở ở nơi khác (đổi sau lần cuối tunelo ghi): web cảnh báo trước khi xoá. Máy cũ hơn 2.0.6: web ẩn mục.
 
 ## Ảnh và tệp đính kèm (2.0.5)
@@ -256,13 +258,37 @@ hộp thoại trên máy mà không ai bấm nên phiên treo. Chỉ chủ máy 
 - Nhờ chữ ký Developer ID, quyền đã cấp giữ qua các lần `tunelo update`. Bản 2.0.2 trở về trước ký ad-hoc nên phải cấp lại một lần
   sau khi lên 2.0.3.
 
+## Linux: dịch vụ systemd của người dùng (2.2.0)
+
+Cần Linux dùng glibc (Ubuntu, Debian, Fedora…; Alpine/musl chưa hỗ trợ) chạy systemd, có `systemctl`. Mã:
+[`src/systemd-service.ts`](src/systemd-service.ts).
+
+- Bản chạy nền là **user unit** `~/.config/systemd/user/tunelo.service` (chạy `tunelo run`, `Restart=always`, `RestartSec=10`,
+  luôn đặt `TUNELO_HOME`, PATH là `%h/.local/bin:/usr/local/bin:/usr/bin:/bin` cộng các thư mục PATH lúc cài, log ghi tiếp vào
+  `agent.log`). Không cần root, tunelo không bao giờ tự gọi `sudo`. `tunelo update` thay file chạy rồi để `Restart=always` chạy lại.
+- `tunelo install` kiểm máy chạy được dịch vụ **trước khi** đăng nhập. Không có systemd (container, WSL không bật systemd) hoặc
+  không tới được phiên systemd của người dùng (shell SSH/`su`/`sudo` thiếu `XDG_RUNTIME_DIR`) thì báo lỗi kèm cách xử lý.
+- User unit chỉ chạy khi người dùng đang đăng nhập, trừ khi bật **linger**. tunelo thử `loginctl enable-linger` không cần mật khẩu;
+  không được thì vẫn cài và chạy, rồi in lệnh để chủ máy chạy một lần: `sudo loginctl enable-linger <user>`.
+- `tunelo stop` / `start` / `uninstall` dừng, bật, gỡ unit thật (máy chưa cài thì `stop`/`start` báo lỗi rõ).
+- Kiểm: `tunelo status`, `systemctl --user status tunelo`, `journalctl --user -u tunelo` (sự kiện của systemd), log của tunelo ở
+  `agent.log` (`tunelo logs -f`).
+- `claude` phải cài cho **chính người dùng chạy tunelo** (thường ở `~/.local/bin`, đã có trong PATH của unit). `claude` cài riêng cho
+  root (link `/usr/local/bin/claude` trỏ vào `/root/.local`) thì người dùng khác không chạy được, tunelo không thấy provider.
+- Kho khoá: Linux không có Keychain/DPAPI, nên khoá máy và khoá niêm phong là tệp 0600 trong thư mục cấu hình (không dùng
+  libsecret/secret-service), như bí mật Authenticator trong `config.json`. Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy,
+  mở được token và bí mật đã lưu, và lấy được bí mật Authenticator của máy.
+- Khác macOS: không có Chia sẻ màn hình của máy, không có Full Disk Access (trạng thái dịch vụ ghi `fullDiskAccess: not-applicable`).
+  Trình duyệt của máy tìm Chrome/Chromium như hệ khác. Thùng rác dùng `gio trash`. Cổng đang nghe (cho chuyển tiếp `localhost` của
+  Localman) đọc bằng `lsof`, máy thiếu `lsof` thì dùng `ss -Hltnp`.
+
 ## Gỡ
 
 1. Xoá máy ở AI Agent › Máy trong Chat (thu hồi máy và thiết bị đã ghép).
 2. `tunelo logout`: thu hồi đăng nhập của máy trên IdP.
-3. `tunelo uninstall`: dừng dịch vụ và bỏ khởi động lúc đăng nhập.
+3. `tunelo uninstall`: dừng dịch vụ và bỏ khởi động lúc đăng nhập (Linux: xoá cả user unit).
 4. Xoá file chạy (`~/.local/bin/tunelo` hoặc `%LOCALAPPDATA%\tunelo`) và thư mục cấu hình (`~/.config/tunelo` hoặc
-   `%APPDATA%\tunelo`; trên Windows khoá DPAPI nằm trong đó).
+   `%APPDATA%\tunelo`; trên Windows khoá DPAPI, trên Linux tệp khoá nằm trong đó).
 5. macOS: xoá khoá Keychain:
    `security delete-generic-password -s com.hoandat.tunelo -a machine-key` và
    `security delete-generic-password -s com.hoandat.tunelo -a session-key`.
@@ -282,7 +308,8 @@ Thử tay luôn đặt cả `HOME` và `TUNELO_HOME` tạm (thêm `TUNELO_KEYSTO
 thôi thì tunelo vẫn đọc và chuyển phiên của CLI 1.x ở `~/.tunelo` thật.
 
 Test cần Bun (`test/tunnels/forward-under-bun.test.ts`, `test/stream-holders.test.ts`) chạy khi có `bun` trên PATH hoặc
-`TUNELO_TEST_BUN`; CI dùng đúng Bun của bản phát hành (`.github/actions/setup-bun`). Phần chỉ có trên hệ thật (DPAPI, junction,
+`TUNELO_TEST_BUN`; CI dùng đúng Bun của bản phát hành (`.github/actions/setup-bun`). Job `typescript` chạy toàn bộ test agent trên Linux, gồm
+`test/systemd-service.test.ts` (dịch vụ systemd qua host giả, không chạm systemd thật). Phần chỉ có trên hệ thật (DPAPI, junction,
 `netstat`/`lsof`) ở `test/os-integration.test.ts`, CI chạy trên `windows-latest`.
 
 Phát hành: xem đầu [`agent-release.yml`](../../.github/workflows/agent-release.yml) và

@@ -63,7 +63,7 @@ Phiên claude do `tunelo` mở có sẵn MCP `tunelo`, với các tool sau:
 
 Token do tiến trình nền gắn, claude không bao giờ thấy, và mọi chuỗi trả về đều được che token. Gửi tin hay gửi request luôn hiện thẻ duyệt trên thiết bị, ghi người nhận hoặc URL. Tiến trình nền chỉ chạy lệnh gửi sau khi chính thẻ đó được duyệt, nên Bash trong phiên cũng không gửi thay được. Client MCP ngoài phiên của tunelo (`claude mcp add tunelo -- tunelo mcp`) mặc định chỉ được đọc; chủ máy bật quyền ghi cho chúng bằng `tunelo config mcp-local-writes on`, lệnh chỉ chạy trong terminal và hỏi xác nhận. Ngoại lệ là khi máy tự đặt phiên ở `bypassPermissions`: khi đó nội dung độc trong tin nhắn hay response có thể dụ claude gửi đi mà không ai duyệt (prompt injection). Chi tiết, các đường còn hở và cách tắt: ADR 0013, mục "MCP của tunelo trong phiên claude".
 
-Cài hoặc cập nhật bằng script, không cần mã cài: `curl -fsSL https://chat.hoandat.com/agent/install.sh | sh` (macOS) hoặc `& ([scriptblock]::Create((irm https://chat.hoandat.com/agent/install.ps1)))` (Windows); script nhắc gỡ gói npm `tunelo` 1.x nếu còn. Trang thêm máy cũng hiện lệnh này.
+Cài hoặc cập nhật bằng script, không cần mã cài: `curl -fsSL https://chat.hoandat.com/agent/install.sh | sh` (macOS; Linux x64/arm64 dùng glibc và có systemd, từ `tunelo` 2.2.0, xem [`apps/agent/README.md`](apps/agent/README.md)) hoặc `& ([scriptblock]::Create((irm https://chat.hoandat.com/agent/install.ps1)))` (Windows); script nhắc gỡ gói npm `tunelo` 1.x nếu còn. Trang thêm máy cũng hiện lệnh này.
 
 ## Production
 

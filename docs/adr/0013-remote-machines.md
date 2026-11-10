@@ -6,7 +6,7 @@
 
 ## Bối cảnh
 
-Người dùng muốn chat với Claude Code đang chạy trên máy của chính họ (máy B: Mac, Windows) từ một thiết bị khác (máy A: web, PWA, điện thoại): xem chữ chạy, thẻ tool, diff, bấm cho phép/từ chối, dừng, mở lại phiên. Chat không có app desktop (desktop = PWA), nên phía máy B cần một tiến trình nền nhỏ.
+Người dùng muốn chat với Claude Code đang chạy trên máy của chính họ (máy B: Mac, Windows, Linux) từ một thiết bị khác (máy A: web, PWA, điện thoại): xem chữ chạy, thẻ tool, diff, bấm cho phép/từ chối, dừng, mở lại phiên. Chat không có app desktop (desktop = PWA), nên phía máy B cần một tiến trình nền nhỏ.
 
 ## Quyết định
 
@@ -67,6 +67,12 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 - Phát hành: tag `tunelo-v<semver>`, file `tunelo-*`, chú thích ký `tunelo <version> <file>`.
 - `install.sh`/`install.ps1` thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
 - Rủi ro macOS: LaunchAgent và Keychain cần phiên đăng nhập GUI (`gui/<uid>`). Mac headless tắt tự đăng nhập không chạy được tiến trình nền; cài qua SSH thì `launchctl bootstrap` hỏng. Nghiệm thu trên Mac làm khi có phiên GUI.
+- Linux (từ `tunelo` 2.2.0, chốt 10/11/2026):
+  - Bản `tunelo-linux-x64` và `tunelo-linux-arm64`, dùng glibc (Alpine/musl chưa hỗ trợ, `install.sh` từ chối), cùng chữ ký minisign và `SHA256SUMS` như các bản khác.
+  - Dịch vụ là systemd **user unit** `~/.config/systemd/user/tunelo.service` (`Restart=always`), không cần root; tunelo không bao giờ tự gọi `sudo`.
+  - Chạy khi chưa đăng nhập cần `loginctl enable-linger`: tunelo thử không cần mật khẩu; không được thì vẫn cài và chạy, rồi in `sudo loginctl enable-linger <user>` để chủ máy chạy một lần.
+  - Kho khoá là tệp 0600 trong thư mục cấu hình, giống bí mật Authenticator; không dùng libsecret/secret-service. Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy và bí mật Authenticator.
+  - Chia sẻ màn hình của máy chỉ có trên macOS.
 
 ## MCP của tunelo trong phiên claude (09/11/2026)
 
@@ -139,6 +145,12 @@ Ghi nhận cho tiến trình nền:
 - Lỗi đăng nhập trả về như một câu trả lời bình thường ("Failed to authenticate") với chi phí 0; adapter phải nhận ra để báo "cần đăng nhập".
 - Gọi `interrupt()` sau khi phiên đã đóng ném lỗi chưa bắt; mọi lệnh điều khiển phải kiểm phiên còn mở.
 - Bun compile chạy được Agent SDK, không cần Node SEA hay tarball.
+
+## Kiểm trên Linux (10/11/2026)
+
+Binary dựng bằng Bun 1.3.14, cùng một chương trình thử gọi đúng mã dịch vụ của tunelo trên systemd thật, người dùng thường, Ubuntu 22.04 (glibc 2.35, CPU có AVX2) và Ubuntu 24.04 (glibc 2.39): binary báo 2.2.0; chưa có phiên systemd của người dùng thì lỗi nêu đúng tên người dùng và cách xử lý; sau `loginctl enable-linger` cài dịch vụ được, `kill -9` thì có PID mới trong khoảng 13 giây; stop, start, cài lại khi đang chạy, gỡ (gỡ lần hai và dừng khi chưa cài báo lỗi rõ) đều đúng; tunelo thật chạy dưới dịch vụ, `status` nhận provider `claude` khi có ở `~/.local/bin` (rỗng khi máy không có `claude`), `fullDiskAccess: not-applicable`. Bẫy gặp: `claude` cài riêng cho root thì người dùng khác không chạy được, nên tunelo không thấy provider.
+
+Chưa kiểm: bản arm64 chạy thật, đăng ký máy vào Chat và chạy phiên Claude Code trên Linux, `curl … | sh` thật trên Linux (cần bản 2.2.0 đã phát hành và ghim), `tunelo update` trên Linux, Alpine/musl, CPU không có AVX2 (bản x64 mặc định có thể cần AVX2).
 
 ## Hệ quả
 

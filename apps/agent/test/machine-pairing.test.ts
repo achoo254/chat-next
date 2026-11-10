@@ -142,6 +142,8 @@ function installDeps(): InstallDeps {
     stopService: async () => undefined,
     startService: async () => undefined,
     installService: async () => "launchd",
+    checkService: async () => undefined,
+    keepRunningLoggedOut: async () => null,
     ensureMachineKey: async () => undefined,
     serviceDiskAccess: async () => "not-applicable",
     openDiskAccessSettings: () => undefined,

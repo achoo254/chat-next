@@ -25,7 +25,8 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 
 - `tunelo login` dùng device flow của client `tunelo-agent` trên auth-next. Grant có ba tài nguyên: tunnel, Chat
   (`https://chat.<miền>/mcp`), Localman. Mọi request tới token endpoint, kể cả lúc poll, mang `resource`.
-- Chỉ một refresh token, niêm phong bằng khoá trong Keychain (macOS) hoặc DPAPI (Windows) (`keystore.ts`). Chỉ dịch vụ làm mới
+- Chỉ một refresh token, niêm phong bằng khoá trong Keychain (macOS), DPAPI (Windows) hoặc tệp 0600 trong thư mục cấu hình
+  (Linux, nên chỉ quyền thư mục bảo vệ nó; ADR 0013) (`keystore.ts`). Chỉ dịch vụ làm mới
   token, dưới khoá file, và đọc lại sau khi giữ khoá. Access token ngắn hạn, theo từng tài nguyên.
 - Không route nào (socket điều khiển, HTTP cục bộ, MCP) trả token thô. Dịch vụ tự gắn Bearer.
 - `tunelo whoami` hiện trạng thái từng app. Lỗi của Chat hay Localman chỉ đổi dòng của app đó, không làm hỏng tunnel.
@@ -129,3 +130,5 @@ Chi tiết ở ADR 0013, mục "MCP của tunelo trong phiên claude". Tóm tắ
   không file nào của tunelo chứa token Claude, code đăng nhập hay JWT (`test/no-secret-leak.test.ts`).
 - Dọn sau nghiệm thu và ít nhất 14 ngày: bỏ `CreateInstallCode` và bảng mã cài, nâng `MinAgentVersion` lên `2.0.0`.
 - CI chạy test agent dưới Bun của bản phát hành và phần chỉ có trên Windows (DPAPI, junction, `netstat`) trên `windows-latest`.
+  Job `typescript` chạy toàn bộ test agent trên Linux của CI, gồm test dịch vụ systemd bằng host giả; systemd thật được kiểm trên máy
+  lab (ADR 0013, "Kiểm trên Linux").

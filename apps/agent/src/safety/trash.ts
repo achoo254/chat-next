@@ -54,6 +54,10 @@ export function systemTrash(platform: NodeJS.Platform = process.platform): Trash
       });
       return;
     }
-    await run("gio", ["trash", "--", ...paths], { timeout: TIMEOUT_MS });
+    await run("gio", ["trash", "--", ...paths], { timeout: TIMEOUT_MS }).catch((err: { code?: unknown }) => {
+      // Servers often lack GLib's tools: say so rather than a bare spawn error.
+      if (err.code === "ENOENT") throw new Error("moving to the trash needs `gio` (GLib, e.g. the libglib2.0-bin package), which this machine lacks", { cause: err });
+      throw err;
+    });
   };
 }

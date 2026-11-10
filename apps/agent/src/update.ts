@@ -51,7 +51,11 @@ const RELEASE_TAG = /^tunelo-v(\d+\.\d+\.\d+)$/;
 export function assetName(os = platform(), cpu = arch()): string {
   if (os === "darwin") return `tunelo-darwin-${cpu === "arm64" ? "arm64" : "x64"}`;
   if (os === "win32") return "tunelo-windows-x64.exe";
-  throw new Error("no tunelo build for this OS");
+  if (os === "linux") {
+    if (cpu === "x64" || cpu === "arm64") return `tunelo-linux-${cpu}`;
+    throw new Error(`no tunelo build for Linux on ${cpu}; there are builds for x64 and arm64`);
+  }
+  throw new Error(`no tunelo build for ${os}`);
 }
 
 /** The trusted comment a release signs into each file's signature. */

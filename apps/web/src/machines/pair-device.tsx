@@ -203,9 +203,20 @@ function NotConnected({ name, machineOs }: { name: string; machineOs: string }):
 	);
 }
 
-/** The machine's system as the directory knows it: "darwin", "win32", or unknown. */
+const OS_NAME: Readonly<Record<Os, string>> = { mac: "macOS", windows: "Windows", linux: "Linux" };
+
+/** The machine's system as the directory knows it: "darwin", "win32", "linux", or unknown. */
 function osOf(machineOs: string): Os | null {
-	return machineOs === "win32" ? "windows" : machineOs === "darwin" ? "mac" : null;
+	switch (machineOs) {
+		case "darwin":
+			return "mac";
+		case "win32":
+			return "windows";
+		case "linux":
+			return "linux";
+		default:
+			return null;
+	}
 }
 
 /** "Máy chưa có tunelo?": the one command that installs it, for the machine's system (chosen here when unknown). */
@@ -224,9 +235,9 @@ export function QuickInstall({ machineOs }: { machineOs: string }): ReactElement
 			</p>
 			{known === null && (
 				<div className="mx-new-tabs" role="group" aria-label={q.systemLabel}>
-					{(["mac", "windows"] as const).map((o) => (
+					{(["mac", "windows", "linux"] as const).map((o) => (
 						<button key={o} type="button" className={`btn btn-sm${o === os ? " btn-primary" : ""}`} aria-pressed={o === os} onClick={() => setPicked(o)}>
-							{o === "mac" ? "macOS" : "Windows"}
+							{OS_NAME[o]}
 						</button>
 					))}
 				</div>

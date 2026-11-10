@@ -566,6 +566,9 @@ export const zhCNMachines: MachinesCopy = {
 		osTabs: "操作系统",
 		macos: "macOS",
 		windows: "Windows",
+		linux: "Linux",
+		linuxNote:
+			"Linux：需要使用 glibc 并带有 systemd 的发行版（Ubuntu、Debian、Fedora…），x86_64 或 aarch64。tunelo 作为 systemd 用户服务在后台运行。如果命令提示运行 sudo loginctl enable-linger，请运行一次，这样注销或重启后 tunelo 也会继续运行。",
 		make: "生成安装命令",
 		making: "正在生成…",
 		command: "安装命令",
@@ -644,7 +647,7 @@ export const zhCNMachines: MachinesCopy = {
 		welcome: {
 			title: "在你自己的电脑上控制 Claude Code",
 			body: "AI Agent 让你在手机或另一台电脑上与电脑上运行的 Claude Code 对话、审批并跟进进度，端到端加密。",
-			needs: "需要：一台已安装并登录 Claude Code 的 macOS 或 Windows 电脑。",
+			needs: "需要：一台已安装并登录 Claude Code 的 macOS、Windows 或 Linux 电脑。",
 			guide: "Claude Code 安装指南",
 			onPhone: "你正在使用手机：请在要控制的电脑上打开此页面，并在那里运行安装命令。",
 			start: "连接第一台电脑",

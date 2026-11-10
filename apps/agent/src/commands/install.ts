@@ -8,14 +8,15 @@
 //
 // Nothing changes until the sign-in succeeded: an abandoned or refused
 // sign-in leaves the machine, its config and its running service as they
-// were. Should installing the service fail after that, the previous config
+// were. A machine that cannot run the service at all (Linux without a
+// systemd user session) is told so before the sign-in. Should installing the service fail after that, the previous config
 // comes back and the service is started again.
 import type { Command } from "commander";
 import { type AgentConfig, ConfigStore, configDir } from "../config.ts";
 import { callControl } from "../control-socket.ts";
 import { machineKey } from "../keystore.ts";
 import { type DiskAccess, diskAccessSteps, openDiskAccessSettings } from "../safety/disk-access.ts";
-import { installService, startService, stopService } from "../service.ts";
+import { checkServiceSupport, installService, keepRunningLoggedOut, startService, stopService } from "../service.ts";
 import { TUNNEL_SERVER } from "../tunnel.ts";
 import { signInForServer } from "../tunnels/cli-login-command.js";
 
@@ -40,6 +41,10 @@ export interface InstallDeps {
   stopService: (dir: string) => Promise<void>;
   startService: (dir: string) => Promise<void>;
   installService: (dir: string) => Promise<string>;
+  /** Throws when this machine cannot run the background service. */
+  checkService: () => Promise<void>;
+  /** Linux: the command still needed so the service runs while nobody is logged in, or null. */
+  keepRunningLoggedOut: () => Promise<string | null>;
   ensureMachineKey: (dir: string) => Promise<unknown>;
   /** What macOS lets the started service open; "not-applicable" off macOS or when it does not answer. */
   serviceDiskAccess: (dir: string) => Promise<DiskAccess>;
@@ -71,6 +76,8 @@ const defaultDeps: InstallDeps = {
   stopService,
   startService,
   installService,
+  checkService: checkServiceSupport,
+  keepRunningLoggedOut,
   ensureMachineKey: machineKey,
   serviceDiskAccess: askServiceDiskAccess,
   openDiskAccessSettings,
@@ -82,6 +89,9 @@ export async function install(dir: string, options: { trust?: string }, deps: In
   if (!KEY_RE.test(trust)) throw new Error("usage: tunelo install --trust <device key> (pairing secret on stdin)");
   const secret = (await deps.readSecret()).trim();
   if (!KEY_RE.test(secret)) throw new Error("the pairing secret must come on stdin");
+
+  // A machine that cannot run the service fails here, not after a sign-in.
+  await deps.checkService();
 
   // First the sign-in, while everything else stays as it is.
   await deps.signIn();
@@ -120,10 +130,15 @@ export async function install(dir: string, options: { trust?: string }, deps: In
     if (wasRunning) await deps.startService(dir).catch(() => undefined);
     throw err;
   }
-  // The machine is installed; Full Disk Access is the owner's to grant, so a
-  // missing one only shows the way to it.
-  // install.sh shows this step itself, in the page's language.
+  // The machine is installed. Running while logged out (Linux linger) and
+  // Full Disk Access (macOS) are the owner's to grant, so a missing one only
+  // shows the way to it. install.sh shows these steps itself, in the page's
+  // language.
+  const lingerCommand = await deps.keepRunningLoggedOut().catch(() => null);
   if (process.env.TUNELO_DISK_ACCESS_HINT === "script") return;
+  if (lingerCommand !== null) {
+    deps.log(`tunelo runs while you are logged in. To keep it running after you log out or the machine restarts, run once: ${lingerCommand}`);
+  }
   if ((await deps.serviceDiskAccess(dir)) === "needed") {
     deps.openDiskAccessSettings(process.execPath);
     for (const line of diskAccessSteps(process.execPath, true)) deps.log(line);

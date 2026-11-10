@@ -29,14 +29,17 @@ const WAIT_MS = 15 * 60_000;
 /** Official install guide of the AI CLI the first adapter drives. */
 export const CLI_GUIDE = "https://code.claude.com/docs/en/setup";
 
-export type Os = "mac" | "windows";
+export type Os = "mac" | "windows" | "linux";
 
+/** Windows first, then Mac, then desktop Linux; ChromeOS ("CrOS") and anything else fall back to Mac. */
 export function detectOs(userAgent: string): Os | "phone" {
 	if (/iPhone|iPad|Android/.test(userAgent)) return "phone";
-	return /Windows/.test(userAgent) ? "windows" : "mac";
+	if (/Windows/.test(userAgent)) return "windows";
+	if (/Macintosh|Mac OS X/.test(userAgent)) return "mac";
+	return /Linux/.test(userAgent) && !/CrOS/.test(userAgent) ? "linux" : "mac";
 }
 
-/** The one command the page shows; the one-time pairing secret rides in it, so nothing is pasted later. */
+/** The one command the page shows (macOS and Linux share install.sh); the one-time pairing secret rides in it, so nothing is pasted later. */
 export function installCommand(os: Os, origin: string, deviceKey: string, secret: string, locale: string): string {
 	return os === "windows"
 		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${deviceKey} ${secret} ${locale}`
@@ -189,6 +192,9 @@ export function AddMachine() {
 									<button type="button" aria-pressed={os === "windows"} onClick={() => setOs("windows")}>
 										{t.addMachine.windows}
 									</button>
+									<button type="button" aria-pressed={os === "linux"} onClick={() => setOs("linux")}>
+										{t.addMachine.linux}
+									</button>
 								</div>
 								{waiting === null && step.kind !== "confirming" && !done && (
 									<button
@@ -202,6 +208,11 @@ export function AddMachine() {
 									</button>
 								)}
 							</div>
+							{os === "linux" && (
+								<p className="note" data-id="add-machine-linux-note">
+									{t.addMachine.linuxNote}
+								</p>
+							)}
 							{waiting !== null && (
 								<>
 									<div className="mx-cmd">

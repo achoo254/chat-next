@@ -35,6 +35,8 @@ function deps(over: Partial<InstallDeps> = {}) {
       running = true;
     }),
     installService: vi.fn(async () => "launchd"),
+    checkService: vi.fn(async () => undefined),
+    keepRunningLoggedOut: vi.fn(async (): Promise<string | null> => null),
     ensureMachineKey: vi.fn(async () => undefined),
     serviceDiskAccess: vi.fn(async (): Promise<DiskAccess> => "granted"),
     openDiskAccessSettings: vi.fn(),
@@ -92,6 +94,29 @@ describe("tunelo install", () => {
       await install(dir, { trust: KEY }, d);
       expect(d.openDiskAccessSettings).not.toHaveBeenCalled();
     }
+  });
+
+  test("a machine that cannot run the service is told before the sign-in, and nothing changes", async () => {
+    const d = deps({ checkService: vi.fn(async () => Promise.reject(new Error("tunelo needs systemd to run in the background on Linux"))) });
+    await expect(install(dir, { trust: KEY }, d)).rejects.toThrow(/needs systemd/);
+    expect(d.signIn).not.toHaveBeenCalled();
+    expect(d.stopService).not.toHaveBeenCalled();
+    expect(d.installService).not.toHaveBeenCalled();
+    expect(new ConfigStore(dir).get()).toMatchObject({ machineId: "5", claimed: true });
+  });
+
+  test("linger not granted: installed anyway, and the one sudo command is shown", async () => {
+    const d = deps({ keepRunningLoggedOut: vi.fn(async (): Promise<string | null> => "sudo loginctl enable-linger dat") });
+    await install(dir, { trust: KEY }, d);
+    expect(d.installService).toHaveBeenCalledTimes(1);
+    expect(new ConfigStore(dir).get().install).toEqual({ deviceKey: KEY, secret: SECRET });
+    expect(vi.mocked(d.log).mock.calls.flat().join("\n")).toContain("run once: sudo loginctl enable-linger dat");
+  });
+
+  test("linger on (or off Linux): no extra step is shown", async () => {
+    const d = deps();
+    await install(dir, { trust: KEY }, d);
+    expect(vi.mocked(d.log).mock.calls.flat().join("\n")).not.toMatch(/loginctl/);
   });
 
   test("refuses a malformed key or secret before signing in", async () => {

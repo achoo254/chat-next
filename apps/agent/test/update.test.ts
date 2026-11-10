@@ -30,7 +30,10 @@ describe("minisign", () => {
     expect(assetName("darwin", "arm64")).toBe("tunelo-darwin-arm64");
     expect(assetName("darwin", "x64")).toBe("tunelo-darwin-x64");
     expect(assetName("win32", "x64")).toBe("tunelo-windows-x64.exe");
-    expect(() => assetName("linux", "x64")).toThrow(/no tunelo build/);
+    expect(assetName("linux", "x64")).toBe("tunelo-linux-x64");
+    expect(assetName("linux", "arm64")).toBe("tunelo-linux-arm64");
+    expect(() => assetName("linux", "ia32")).toThrow(/no tunelo build for Linux on ia32/);
+    expect(() => assetName("freebsd", "x64")).toThrow(/no tunelo build for freebsd/);
   });
 });
 

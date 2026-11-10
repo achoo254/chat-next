@@ -1,6 +1,7 @@
 #!/bin/sh
 # Installs tunelo, the background process of "My machines" (ADR 0013) and
-# the Tunelo CLI, on macOS. "Add this machine" in Chat shows:
+# the Tunelo CLI, on macOS and Linux (x86_64, aarch64; glibc, systemd). "Add
+# this machine" in Chat shows:
 #
 #   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- <device key> <pairing secret> [vi|en|zh-CN]
 #
@@ -26,6 +27,8 @@ set -eu
 TUNELO_VERSION="2.1.0"
 SHA256_DARWIN_ARM64="54e9a619e55a435ed6d8f1ab42bbb5844db2ef266d6702ef625d8d718680b72e"
 SHA256_DARWIN_X64="74614c608ec6c89af38af606fe959a5463208cf7bc5a33919f85969a4023b194"
+SHA256_LINUX_X64=""
+SHA256_LINUX_ARM64=""
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
@@ -51,6 +54,48 @@ sha256_of() {
 	else
 		sha256sum "$1" | cut -d ' ' -f 1
 	fi
+}
+
+# Sets asset and sha for this system: pick_asset <uname -s> <uname -m>.
+pick_asset() {
+	case "${1}/${2}" in
+	Darwin/arm64) asset="tunelo-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
+	Darwin/x86_64) asset="tunelo-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
+	Linux/x86_64 | Linux/amd64) asset="tunelo-linux-x64" sha="$SHA256_LINUX_X64" ;;
+	Linux/aarch64 | Linux/arm64) asset="tunelo-linux-arm64" sha="$SHA256_LINUX_ARM64" ;;
+	Darwin/* | Linux/*)
+		die "tunelo chưa có bản cho bộ xử lý ${2} (có: macOS arm64, x86_64; Linux x86_64, aarch64)." \
+			"tunelo has no build for the ${2} processor (there are: macOS arm64, x86_64; Linux x86_64, aarch64)." \
+			"tunelo 没有适用于 ${2} 处理器的版本（支持：macOS arm64、x86_64；Linux x86_64、aarch64）。"
+		;;
+	*)
+		die "tunelo có cho macOS, Linux và Windows; máy này chạy ${1}." \
+			"tunelo is available for macOS, Linux and Windows; this machine runs ${1}." \
+			"tunelo 支持 macOS、Linux 和 Windows；此机器运行的是 ${1}。"
+		;;
+	esac
+	[ -n "$sha" ] || die "bản tunelo ${TUNELO_VERSION} chưa có cho ${1}; thử lại khi có bản mới." \
+		"tunelo ${TUNELO_VERSION} has no ${1} build yet; try again once a newer release is out." \
+		"tunelo ${TUNELO_VERSION} 尚无 ${1} 版本；请在新版本发布后重试。"
+}
+
+# Linux needs glibc (the build is not for musl) and, to run in the background, systemd.
+check_linux() {
+	if ldd --version 2>&1 | grep -qi musl; then
+		die "tunelo cần Linux dùng glibc (Ubuntu, Debian, Fedora…); bản musl như Alpine chưa được hỗ trợ." \
+			"tunelo needs a glibc Linux (Ubuntu, Debian, Fedora…); musl systems such as Alpine are not supported." \
+			"tunelo 需要使用 glibc 的 Linux（Ubuntu、Debian、Fedora…）；暂不支持 Alpine 等 musl 系统。"
+	fi
+	[ -z "$device_key" ] || command -v systemctl >/dev/null 2>&1 ||
+		die "tunelo cần systemd để chạy nền nhưng máy này không có systemctl (container, WSL chưa bật systemd?)." \
+			"tunelo needs systemd to run in the background, and this machine has no systemctl (a container, or WSL without systemd?)." \
+			"tunelo 需要 systemd 才能在后台运行，但此机器没有 systemctl（容器，或未启用 systemd 的 WSL？）。"
+}
+
+# add_path_line <rc file> always|if-present: appends $line once.
+add_path_line() {
+	[ "$2" = "always" ] || [ -f "$1" ] || return 0
+	grep -Fqs "$line" "$1" || printf '\n%s\n' "$line" >> "$1"
 }
 
 is_key() {
@@ -88,13 +133,9 @@ main() {
 	__*) die "chưa có bản phát hành tunelo." "no tunelo release is available yet." "tunelo 尚未发布。" ;;
 	esac
 
-	[ "$(uname -s)" = "Darwin" ] || die "tunelo hiện chỉ có cho macOS và Windows." \
-		"tunelo is only available for macOS and Windows." "tunelo 目前仅支持 macOS 和 Windows。"
-	case "$(uname -m)" in
-	arm64) asset="tunelo-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
-	x86_64) asset="tunelo-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
-	*) die "kiến trúc máy không được hỗ trợ." "this processor is not supported." "不支持此处理器。" ;;
-	esac
+	os="$(uname -s)"
+	pick_asset "$os" "$(uname -m)"
+	[ "$os" != "Linux" ] || check_linux
 
 	tmp="$(mktemp -d)"
 	trap 'rm -rf "$tmp"' EXIT
@@ -118,15 +159,20 @@ main() {
 	mv -f "$tmp/$asset" "$bin.new"
 	mv -f "$bin.new" "$bin"
 
-	# Put tunelo on PATH for new terminals (zsh is the macOS default shell).
+	# Put tunelo on PATH for new terminals: zsh is the macOS default shell;
+	# Linux login shells read ~/.profile, interactive bash ~/.bashrc.
 	case ":$PATH:" in
 	*":$bin_dir:"*) ;;
 	*)
 		line='export PATH="$HOME/.local/bin:$PATH"'
-		for rc in "$HOME/.zprofile" "$HOME/.bash_profile"; do
-			case "$rc" in *bash_profile) [ -f "$rc" ] || continue ;; esac
-			grep -Fqs "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
-		done
+		if [ "$os" = "Darwin" ]; then
+			add_path_line "$HOME/.zprofile" always
+			add_path_line "$HOME/.bash_profile" if-present
+		else
+			add_path_line "$HOME/.profile" always
+			add_path_line "$HOME/.bashrc" if-present
+			case "${SHELL:-}" in */zsh) add_path_line "$HOME/.zshrc" always ;; esac
+		fi
 		say "Đã thêm $bin_dir vào PATH; mở terminal mới để gõ tunelo." "Added $bin_dir to your PATH; open a new terminal to use tunelo." "已将 $bin_dir 加入 PATH；打开新终端即可使用 tunelo。"
 		;;
 	esac
@@ -171,7 +217,22 @@ main() {
 	# printf is a shell builtin: the secret reaches tunelo on stdin only.
 	# The script shows the Full Disk Access step itself, in the page's language.
 	printf '%s\n' "$secret" | TUNELO_DISK_ACCESS_HINT=script "$bin" install --trust "$device_key"
+	linger_hint
 	disk_access_hint
+}
+
+# Linux: the systemd user service runs while the owner is logged in. `tunelo
+# install` turns on "linger" when it can without a password; otherwise only
+# the owner can, once, with sudo, so the service also runs after logout and
+# reboot. `tunelo install` leaves saying so to this script.
+linger_hint() {
+	[ "$os" = "Linux" ] || return 0
+	user="$(id -un)"
+	[ "$(loginctl show-user "$user" --property=Linger --value 2>/dev/null)" != "yes" ] || return 0
+	say "Lưu ý: tunelo chạy khi bạn đang đăng nhập. Để nó chạy cả khi đã đăng xuất hoặc sau khi máy khởi động lại, chạy một lần:" \
+		"Note: tunelo runs while you are logged in. To keep it running after you log out or the machine restarts, run once:" \
+		"注意：tunelo 在你登录期间运行。若要在注销或重启后也保持运行，请运行一次："
+	printf '  sudo loginctl enable-linger %s\n' "$user"
 }
 
 # The background service lacks Full Disk Access: its sessions cannot work in
@@ -180,6 +241,7 @@ main() {
 # window with tunelo selected, and say what to do; tunelo notices by itself.
 # `tunelo install` leaves it to this script (TUNELO_DISK_ACCESS_HINT=script).
 disk_access_hint() {
+	[ "$os" = "Darwin" ] || return 0
 	# The service may still be starting: give it a few seconds to answer.
 	tries=0
 	until status="$("$bin" status --json 2>/dev/null)"; do

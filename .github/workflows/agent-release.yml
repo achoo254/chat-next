@@ -1,5 +1,6 @@
 # Releases tunelo, the background agent (apps/agent), on a tag tunelo-v<semver>: tests, single-file
-# builds for macOS (arm64, x64) and Windows x64, cross-compiled by Bun on Linux,
+# builds for macOS (arm64, x64), Windows x64 and Linux (x64, arm64; glibc),
+# cross-compiled by Bun on Linux,
 # the macOS files signed with the Developer ID (hardened runtime, identifier
 # com.hoandat.tunelo) and notarized on a macOS runner, so macOS keeps the
 # Full Disk Access granted to tunelo across updates; then SHA256SUMS and
@@ -58,6 +59,8 @@ jobs:
           - { target: bun-darwin-arm64, suffix: darwin-arm64 }
           - { target: bun-darwin-x64, suffix: darwin-x64 }
           - { target: bun-windows-x64, suffix: windows-x64.exe }
+          - { target: bun-linux-x64, suffix: linux-x64 }
+          - { target: bun-linux-arm64, suffix: linux-arm64 }
     runs-on: ubuntu-latest
     env:
       ASSET: ${{ needs.test.outputs.prefix }}-${{ matrix.suffix }}
@@ -185,7 +188,7 @@ jobs:
           # The signed comment names the program, version and file (update.ts checks it).
           for f in "$PREFIX"-*; do minisign -S -s ../minisign.key -m "$f" -t "$PREFIX $VERSION $f" < /dev/null; done
           rm -f ../minisign.key
-          sha256sum "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" > SHA256SUMS
+          sha256sum "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" "$PREFIX-linux-x64" "$PREFIX-linux-arm64" > SHA256SUMS
           cat SHA256SUMS
       - name: GitHub Release
         env:

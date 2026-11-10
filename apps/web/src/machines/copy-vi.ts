@@ -577,6 +577,9 @@ export const viMachines = {
 		osTabs: "Hệ điều hành",
 		macos: "macOS",
 		windows: "Windows",
+		linux: "Linux",
+		linuxNote:
+			"Linux: cần bản dùng glibc có systemd (Ubuntu, Debian, Fedora…), x86_64 hoặc aarch64. tunelo chạy nền bằng dịch vụ systemd của người dùng. Nếu lệnh dặn chạy sudo loginctl enable-linger, chạy nó một lần để tunelo chạy cả khi bạn đã đăng xuất hoặc máy khởi động lại.",
 		make: "Tạo lệnh cài",
 		making: "Đang tạo…",
 		command: "Lệnh cài",
@@ -655,7 +658,7 @@ export const viMachines = {
 		welcome: {
 			title: "Điều khiển Claude Code trên máy của bạn",
 			body: "AI Agent cho bạn chat, duyệt và theo dõi Claude Code đang chạy trên máy tính của mình từ điện thoại hay máy khác, mã hoá đầu cuối.",
-			needs: "Cần: máy tính macOS hoặc Windows đã cài và đăng nhập Claude Code.",
+			needs: "Cần: máy tính macOS, Windows hoặc Linux đã cài và đăng nhập Claude Code.",
 			guide: "Hướng dẫn cài Claude Code",
 			onPhone: "Bạn đang dùng điện thoại: mở trang này trên máy tính bạn muốn điều khiển rồi chạy lệnh cài ở đó.",
 			start: "Kết nối máy đầu tiên",

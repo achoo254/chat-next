@@ -1,4 +1,4 @@
-// What listens on 127.0.0.1, read from sample lsof / netstat / tasklist / ps
+// What listens on 127.0.0.1, read from sample lsof / ss / netstat / tasklist / ps
 // output, and the ports the machine refuses beyond the shared list: debug
 // flags on command lines, Claude Code IDE locks, tunelo's own processes.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { FALLBACK_DEBUG_PORTS, ForwardDenyList, debugPortsOf, idePorts, randomDebugPort } from "../../src/tunnels/forward-deny-ports.ts";
-import { parseLsof, parseNetstat, parseProcessLines, parseTasklist } from "../../src/tunnels/listening-ports.ts";
+import { parseLsof, parseNetstat, parseProcessLines, parseSs, parseTasklist } from "../../src/tunnels/listening-ports.ts";
 
 const LSOF = [
   "p501",
@@ -76,6 +76,25 @@ describe("parsers", () => {
       { port: 445, pid: 4, name: "" },
       { port: 5173, pid: 4567, name: "node.exe" },
       { port: 5174, pid: 4567, name: "node.exe" },
+    ]);
+  });
+
+  test("ss (Linux without lsof): loopback-reachable sockets, the process when it is the user's own", () => {
+    const ss = [
+      'LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=605,fd=14))',
+      'LISTEN 0      511          0.0.0.0:3000       0.0.0.0:*    users:(("node",pid=1234,fd=20))',
+      "LISTEN 0      128             [::]:22            [::]:*",
+      'LISTEN 0      511                *:8080             *:*    users:(("java",pid=77,fd=3))',
+      'LISTEN 0      100     192.168.1.20:5432       0.0.0.0:*    users:(("postgres",pid=9,fd=5))',
+      'LISTEN 0      100            [::1]:5173          [::]:*    users:(("vite",pid=1234,fd=21))',
+      "",
+    ].join("\n");
+    expect(parseSs(ss)).toEqual([
+      { port: 22, pid: 0, name: "" },
+      { port: 53, pid: 605, name: "systemd-resolve" },
+      { port: 3000, pid: 1234, name: "node" },
+      { port: 5173, pid: 1234, name: "vite" },
+      { port: 8080, pid: 77, name: "java" },
     ]);
   });
 

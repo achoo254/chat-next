@@ -1,6 +1,6 @@
 // The TCP ports listening on this machine that 127.0.0.1 reaches, with the
-// process behind each: macOS and Linux ask lsof, Windows asks netstat (the
-// names come from tasklist). Also the command lines of running processes,
+// process behind each: macOS and Linux ask lsof (Linux without lsof: ss),
+// Windows asks netstat (the names come from tasklist). Also the command lines of running processes,
 // for the debug ports they were started with (forward-deny-ports.ts).
 //
 // Parsers are separate from the commands so tests feed them sample output.
@@ -79,6 +79,23 @@ export function parseLsof(output: string): ListeningPort[] {
 }
 
 /**
+ * `ss -Hltnp` (Linux): `LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:(("node",pid=1234,fd=20))`.
+ * The process shows only for this user's own sockets; a link-local host may carry `%<interface>`.
+ */
+export function parseSs(output: string): ListeningPort[] {
+  const out = new Map<number, ListeningPort>();
+  for (const line of output.split(/\r?\n/)) {
+    const cols = line.trim().split(/\s+/);
+    if (cols.length < 5 || cols[0] !== "LISTEN") continue;
+    const address = splitAddress(cols[3] ?? "");
+    if (!address || !reachableOnLoopback(address.host.replace(/%[^%]*$/, ""))) continue;
+    const owner = /users:\(\("([^"]*)",pid=(\d+)/.exec(line);
+    addPort(out, address.port, Number(owner?.[2] ?? 0), owner?.[1] ?? "");
+  }
+  return [...out.values()].sort((a, b) => a.port - b.port);
+}
+
+/**
  * `netstat -ano -p TCP` and `-p TCPv6`: listening sockets are the rows whose
  * foreign address is `0.0.0.0:0` or `[::]:0` (the state column is
  * translated on some Windows languages).
@@ -131,9 +148,12 @@ export async function listeningPorts(platform: NodeJS.Platform = process.platfor
   // lsof exits 1 when nothing matches: no listening port.
   const output = await run("lsof", ["+c", "0", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpcn"]).catch((err: { code?: unknown; stdout?: unknown }) => {
     if (err.code === 1) return typeof err.stdout === "string" ? err.stdout : "";
+    // A minimal Linux has no lsof, but iproute2's ss.
+    if (err.code === "ENOENT" && platform === "linux") return null;
     throw err;
   });
-  return parseLsof(output);
+  if (output !== null) return parseLsof(output);
+  return parseSs(await run("ss", ["-Hltnp"]));
 }
 
 const WINDOWS_PROCESSES =

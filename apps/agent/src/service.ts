@@ -1,6 +1,7 @@
 // Runs `tunelo run` at login and keeps it alive: a LaunchAgent on macOS,
 // on Windows a value under HKCU\...\Run (no admin needed) that starts a
-// hidden loop script restarting the agent if it exits. `tunelo start` and
+// hidden loop script restarting the agent if it exits, on Linux a systemd
+// user unit (systemd-service.ts). `tunelo start` and
 // `tunelo stop` drive the same supervisor, so closing a terminal never stops it.
 // The macOS LaunchAgent lives in the user's GUI session (gui/<uid>): a Mac
 // nobody is logged in to cannot bootstrap it.
@@ -11,6 +12,15 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { defaultConfigDir } from "./config.ts";
 import { callControl, controlPid } from "./control-socket.ts";
+import {
+  checkSystemd,
+  enableLinger,
+  installSystemdService,
+  startSystemdService,
+  stopSystemdService,
+  systemdHost,
+  uninstallSystemdService,
+} from "./systemd-service.ts";
 
 const run = promisify(execFile);
 const LABEL = "com.hoandat.tunelo";
@@ -23,12 +33,12 @@ export function isCompiled(): boolean {
   return !script || /^\/\$bunfs\/|[\\/]~BUN[\\/]/.test(script);
 }
 
-/** tunelo itself with `args`: the compiled file, or bun + script in development. */
 /** True in the agent launchd started from tunelo's own LaunchAgent (it starts it again when it exits). */
 export function underLaunchAgent(): boolean {
   return process.platform === "darwin" && process.env.XPC_SERVICE_NAME === LABEL;
 }
 
+/** tunelo itself with `args`: the compiled file, or bun + script in development. */
 export function selfCommand(...args: string[]): string[] {
   const exe = process.execPath;
   const script = process.argv[1];
@@ -111,6 +121,23 @@ async function launchDetached(vbs: string): Promise<void> {
   }
 }
 
+const UNSUPPORTED = "tunelo runs in the background on macOS, Windows and Linux (systemd) only; run `tunelo run` yourself";
+
+/** Throws a clear error, before anything changes, when this machine cannot run the background service. */
+export async function checkServiceSupport(): Promise<void> {
+  if (process.platform === "darwin" || process.platform === "win32") return;
+  if (process.platform === "linux") return checkSystemd(systemdHost());
+  throw new Error(UNSUPPORTED);
+}
+
+/**
+ * Linux: lets the service run while nobody is logged in, without a password.
+ * Returns the command the owner still has to run for it, or null (also off Linux).
+ */
+export async function keepRunningLoggedOut(): Promise<string | null> {
+  return process.platform === "linux" ? enableLinger(systemdHost()) : null;
+}
+
 /** Registers the supervisor and starts it; `cmd` is the agent command line (default: this binary, `run`). */
 export async function installService(configDir: string, cmd = command()): Promise<string> {
   if (process.platform === "darwin") {
@@ -128,7 +155,8 @@ export async function installService(configDir: string, cmd = command()): Promis
     await launchDetached(vbs);
     return RUN_KEY;
   }
-  throw new Error("only macOS and Windows are supported; run `tunelo run` yourself");
+  if (process.platform === "linux") return installSystemdService(systemdHost(), configDir, cmd);
+  throw new Error(UNSUPPORTED);
 }
 
 /** Starts the background agent now (it already starts at login). */
@@ -144,7 +172,8 @@ export async function startService(configDir: string, cmd = command()): Promise<
     await launchDetached(writeWindowsLoop(configDir, cmd));
     return;
   }
-  throw new Error("only macOS and Windows are supported; run `tunelo run` yourself");
+  if (process.platform === "linux") return startSystemdService(systemdHost());
+  throw new Error(UNSUPPORTED);
 }
 
 /** Stops the background agent until `tunelo start` or the next login. */
@@ -159,10 +188,16 @@ export async function stopService(configDir: string): Promise<void> {
     await callControl(configDir, "POST", "/restart").catch(async () => {
       if (pid) await run("taskkill", ["/F", "/PID", String(pid)]).catch(() => undefined);
     });
+  } else if (process.platform === "linux") {
+    await stopSystemdService(systemdHost());
+  } else {
+    throw new Error(UNSUPPORTED);
   }
 }
 
 export async function uninstallService(configDir: string): Promise<void> {
+  // systemd stops, disables and removes in one go, and has nothing to do when no unit is installed.
+  if (process.platform === "linux") return uninstallSystemdService(systemdHost());
   await stopService(configDir);
   if (process.platform === "darwin") {
     rmSync(plistFile(), { force: true });
