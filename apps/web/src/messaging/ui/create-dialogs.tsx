@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { fold, type DialogView } from "@achoo254/chat-core";
 import { brand } from "../../brand.ts";
 import { Icon } from "../../components/screen-icons.tsx";
+import { PlainTextBox } from "../../components/plain-text-box.tsx";
 import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -630,14 +631,17 @@ export function ForwardDialog({ chatId, seq, seqs, onClose }: CloseProps & { cha
 					</div>
 				)}
 				<div className="field">
-					<label htmlFor={`${id}-comment`}>{copy.forward.comment}</label>
-					<textarea
-						id={`${id}-comment`}
+					{/* Sent with the forward as a message: the shared message box (Enter breaks the line), named by this label. */}
+					<span className="label" id={`${id}-comment`}>
+						{copy.forward.comment}
+					</span>
+					<PlainTextBox
 						className="input"
-						rows={2}
+						ariaLabel={copy.forward.comment}
+						aria-labelledby={`${id}-comment`}
 						placeholder={copy.forward.commentPlaceholder}
 						value={comment}
-						onChange={(event) => setComment(event.target.value)}
+						onValueChange={setComment}
 					/>
 				</div>
 			</div>

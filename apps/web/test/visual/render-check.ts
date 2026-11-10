@@ -32,6 +32,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// Bubble grouping, in-bubble time, own bubbles on the solid fill: runs, a reply, a link, code, a day break.
 	bubbles: "?at=cafe",
 	lan: "?at=lan",
+	// Forwarding with a comment: the dialog's message box (plain-text-box.tsx) with two lines.
+	forward: "?at=ops&open=forward",
 	media: "?at=media",
 	"media-info": "?at=media&open=info",
 	"media-shared": "?at=media&open=shared-media",

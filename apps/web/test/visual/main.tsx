@@ -730,6 +730,18 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click("[role=menuitem]", "Trả lời");
 		await find(() => document.querySelector(".compose-bar"));
 	},
+	// "Chuyển tiếp": a chat picked and a two-line comment typed in the dialog's message box.
+	forward: async () => {
+		await contextMenu(".messages .msg", "Dashboard ổn định.");
+		await click("[role=menuitem]", "Chuyển tiếp");
+		await click("dialog .pick", /Team Mobile/);
+		const box = await find(() => document.querySelector<HTMLElement>("dialog .field .plain-text-box[contenteditable=true]"));
+		typeInto(box, "Xem giúp mình");
+		// Enter breaks the line in this box, as the keyboard would, once the editor has read the typed text.
+		await find(() => (box.textContent === "Xem giúp mình" ? box : null));
+		box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+		typeInto(box, "dòng hai");
+	},
 	edit: async () => {
 		await contextMenu(".messages .msg.mine", "Mục 3 ổn");
 		await click("[role=menuitem]", "Sửa");

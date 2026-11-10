@@ -393,6 +393,31 @@ describe("dialogs", () => {
 		await userEvent.click(within(dialog).getByRole("checkbox", { name: /Team Mobile/ }));
 		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi tới 1 chat" }));
 		await waitFor(() => expect(demo.fixture.forwards).toEqual([{ from: demo.ids.ops, seqs: [expect.any(Number)], to: demo.ids.mobile }]));
+		expect(demo.fixture.sent.filter((sent) => sent.chatId === demo.ids.mobile)).toEqual([]);
+	});
+
+	it("forwards with a comment typed in the message box, Enter breaking its line", async () => {
+		const { demo, log } = await openOps();
+		const target = within(log).getByText("Dashboard ổn định.").closest<HTMLElement>(".msg");
+		if (target === null) throw new Error("message not found");
+		fireEvent.contextMenu(target);
+		await userEvent.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Chuyển tiếp" }));
+
+		const dialog = await screen.findByRole("dialog", { name: "Chuyển tiếp tới" });
+		const box = within(dialog).getByRole("textbox", { name: "Lời nhắn kèm theo" });
+		expect(box.tagName).toBe("DIV");
+		expect(box.getAttribute("aria-placeholder")).toBe("Không bắt buộc");
+		expect(dialog.querySelector("textarea")).toBeNull();
+		await userEvent.type(box, "Xem giúp mình{Enter}dòng hai");
+		expect(boxValue(box)).toBe("Xem giúp mình\ndòng hai");
+		// Enter only broke the line: nothing went out, the dialog stays.
+		expect(demo.fixture.forwards).toEqual([]);
+		expect(screen.getByRole("dialog", { name: "Chuyển tiếp tới" })).toBe(dialog);
+
+		await userEvent.click(within(dialog).getByRole("checkbox", { name: /Team Mobile/ }));
+		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi tới 1 chat" }));
+		await waitFor(() => expect(demo.fixture.forwards).toEqual([{ from: demo.ids.ops, seqs: [expect.any(Number)], to: demo.ids.mobile }]));
+		await waitFor(() => expect(demo.fixture.sent.filter((sent) => sent.chatId === demo.ids.mobile).map((sent) => sent.text)).toEqual(["Xem giúp mình\ndòng hai"]));
 	});
 
 	it("reports a message with a reason and blocks the sender", async () => {
