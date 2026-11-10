@@ -3,7 +3,8 @@
 // the consent log kept on the machine (opening
 // sensitive folders, loading project settings, approving sensitive tools,
 // pairing and revoking devices), what it runs, the devices paired with it
-// (any of them can be revoked from here), and renaming or removing the
+// (any of them can be revoked from here), turning on or replacing pairing
+// with an Authenticator code (totp-setup.tsx), and renaming or removing the
 // machine. Removing it or revoking a device takes effect at the machine's
 // next heartbeat (about a minute); revoking this device also forgets the
 // machine's key here and opens the pairing page.
@@ -14,12 +15,14 @@ import { useI18n } from "../i18n/i18n.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { Link, navigate, paths } from "../router.tsx";
+import { AuditEntryText } from "./audit-entry-text.tsx";
 import { ClaudeProfiles } from "./claude-profiles.tsx";
 import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
+import { TotpSetting } from "./totp-setup.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
 import { PageHead } from "./page-head.tsx";
@@ -178,14 +181,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 										{new Date(Number(e.at)).toLocaleString(locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
 									</time>
 									<span>
-										{e.device} {t.detail.auditActions[e.action] ?? e.action}
-										{e.path !== "" && (
-											<>
-												{" "}
-												<span className="mono">{e.path}</span>
-											</>
-										)}
-										{(e.action === "approve_sensitive" || e.action === "browser_control" || e.action === "local_forward" || e.action === "mcp_local_writes" || e.action.startsWith("profile_")) && e.detail !== "" && <span className="mono"> · {e.detail}</span>}
+										<AuditEntryText entry={e} copy={t.detail} />
 									</span>
 								</li>
 							))}
@@ -234,6 +230,14 @@ export function MachineDetail({ machine }: { machine: string }) {
 							<PairedDevices devices={devices} myKey={myKey} revoked={revoked} canRevoke={!local} onRevoke={askRevoke} />
 							<span className="note">{t.detail.pairNewHint}</span>
 						</dd>
+						{online && state.info !== null && (
+							<>
+								<dt>{t.totp.label}</dt>
+								<dd>
+									<TotpSetting link={link} machine={name} enabled={state.info.totpEnabled} online={online} />
+								</dd>
+							</>
+						)}
 					</dl>
 					<div className="acts">
 						{!local && (

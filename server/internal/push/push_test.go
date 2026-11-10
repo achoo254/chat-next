@@ -713,6 +713,9 @@ func TestNotifyUserMachine(t *testing.T) {
 		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你批准"},
 		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你回答"},
 		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 2}, LocaleZhCN, "PC 上的 Claude 有 2 个请求等你处理"},
+		{MachineNotice{MachineName: "PC", Kind: MachineDevicePaired, Pending: 1}, LocaleVI, "Một thiết bị mới vừa ghép với PC"},
+		{MachineNotice{MachineName: "PC", Kind: MachineDevicePaired, Pending: 1}, LocaleEN, "A new device was just paired with PC"},
+		{MachineNotice{MachineName: "PC", Kind: MachineDevicePaired, Pending: 1}, LocaleZhCN, "有新设备刚刚与 PC 配对"},
 	} {
 		var p Payload
 		if err := json.Unmarshal(e.svc.machineNotification(c.notice, c.locale).Payload, &p); err != nil {
@@ -721,6 +724,20 @@ func TestNotifyUserMachine(t *testing.T) {
 		if p.Body != c.body || p.URL != "/machines/0" {
 			t.Errorf("%s %+v: %+v", c.locale, c.notice, p)
 		}
+	}
+
+	// A newly paired device: its own tag and topic, so it never replaces a
+	// "needs you" push, and only the machine's name.
+	paired := e.svc.machineNotification(MachineNotice{MachineID: 42, MachineName: "Mac mini", Kind: MachineDevicePaired,
+		Pending: 1, SessionID: "t_9", At: time.UnixMilli(1000)}, LocaleEN)
+	var pp Payload
+	if err := json.Unmarshal(paired.Payload, &pp); err != nil {
+		t.Fatal(err)
+	}
+	wantPaired := Payload{Kind: KindMachine, MachineID: 42, Title: appName, Body: "A new device was just paired with Mac mini",
+		Tag: "machine-paired:42", URL: "/machines/42", Timestamp: 1000}
+	if pp != wantPaired || paired.Topic != "machinepaired42" || paired.TTL != devicePairedTTL || paired.Urgency != webpush.UrgencyHigh {
+		t.Fatalf("device paired push %+v %+v", pp, paired)
 	}
 
 	off, err := New(e.Store.Pool(), e.Chat, e.presence, Config{TenantID: bottest.TenantID, AppName: appName,

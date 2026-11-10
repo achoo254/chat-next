@@ -53,11 +53,11 @@ export function createSensitiveCheck(opts: SensitiveOptions = {}) {
   if (process.platform === "win32") {
     const win = process.env.SystemRoot ?? "C:\\Windows";
     inside.push(win, process.env.ProgramFiles ?? "C:\\Program Files", process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)");
-    // The agent's config under its current and earlier name (machine key, tunnel sign-in).
-    if (process.env.APPDATA) inside.push(join(process.env.APPDATA, "tunelo"), join(process.env.APPDATA, "chat-agent"));
+    // The agent's config (machine key, tunnel sign-in).
+    if (process.env.APPDATA) inside.push(join(process.env.APPDATA, "tunelo"));
   } else {
     inside.push("/etc", "/System", "/usr", "/bin", "/sbin", "/var", "/private/etc", "/Library");
-    inside.push(join(home, ".config", "tunelo"), join(home, ".config", "chat-agent"));
+    inside.push(join(home, ".config", "tunelo"));
   }
   inside.push(...(opts.extra ?? []));
   const dirs = inside.map(norm);
@@ -77,10 +77,10 @@ export function mentionsSensitive(
   opts: { home?: string; cwd?: string } = {},
 ): boolean {
   const home = opts.home ?? homedir();
-  // The agent's own commands (current and earlier name) hand out pairing
-  // secrets, sign in or out, or change trust, Claude profiles, local forwarding,
+  // The agent's own commands revoke devices, install with a pairing secret,
+  // sign in or out, or change trust, Claude profiles, local forwarding,
   // MCP writes from outside tunelo's sessions, and the tunelo browser's profile.
-  if (/\b(tunelo|hda)(\.exe)?\s+(pair|devices|trust|untrust|install|login|logout|browser|claude\s+profiles|config\s+(local-forward|mcp-local-writes))\b/i.test(text)) return true;
+  if (/\btunelo(\.exe)?\s+(devices|trust|untrust|install|login|logout|browser|claude\s+profiles|config\s+(local-forward|mcp-local-writes))\b/i.test(text)) return true;
   // JSON inputs escape Windows backslashes; undo that before splitting.
   const unescaped = text
     .replaceAll("\\\\", "\\")

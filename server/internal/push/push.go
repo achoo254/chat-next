@@ -222,7 +222,7 @@ func (s *Service) allowLocal() bool {
 // NotifyUser queues the push of a machine's notice to every device of the
 // user whose session is still usable (the conditions of chat.PushTargets:
 // not revoked, idle less than SessionIdleTimeout, younger than
-// SessionMaxAge), whether or not the user has the app open: chat-agent asks
+// SessionMaxAge), whether or not the user has the app open: tunelo asks
 // only when no device answered. Delivery, retries and dropping gone
 // subscriptions are the consumer's (deliver.go). It returns how many pushes
 // were queued; none when Web Push is off.

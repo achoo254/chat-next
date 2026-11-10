@@ -1,5 +1,5 @@
 -- My machines (ADR 0013): the directory of the computers where a user runs
--- chat-agent (MachinesService, MachineAgentService). The server lists them,
+-- tunelo (MachinesService, MachineAgentService). The server lists them,
 -- hands out install codes and pushes "needs you" notices; it never holds a
 -- pairing secret and is never a root of trust for a machine's key.
 --

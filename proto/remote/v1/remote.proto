@@ -36,9 +36,8 @@ message Hello {
   bytes static_key = 4;
   // 32 random bytes.
   bytes nonce = 5;
-  // QR pairing only: HMAC-SHA256(pairing secret, "qr" ‖ A static ‖ B static).
-  // B adds A to its paired devices when the proof checks out.
-  bytes pair_proof = 6;
+  reserved 6;
+  reserved "pair_proof";
   // Shown on B's device list; at most 64 characters.
   string device_name = 7;
 }
@@ -58,9 +57,12 @@ message Ready {
   bytes confirm = 7;
 }
 
-// Pairing with the 6-digit code shown by `chat-agent pair` (CPace on
-// ristretto255): a wrong guess costs one online attempt and reveals nothing
-// that allows an offline search.
+// Pairing a new device with the machine's authenticator code (TOTP, RFC
+// 6238, set from an already paired device with TotpSet). The 6-digit code is
+// the password of CPace on ristretto255: a wrong guess costs one online
+// attempt and reveals nothing that allows an offline search. B counts every
+// PakeStart as an attempt and locks pairing for 15 minutes after 5 that did
+// not pair; the device reconnects with a normal Hello once paired.
 message PakeStart {
   bytes share = 1;
   bytes static_key = 2;
@@ -69,15 +71,26 @@ message PakeStart {
   bytes sid = 4;
 }
 
+// B does not know which 30-second step the device's code belongs to, so it
+// answers with one candidate per step it accepts (previous, current, next),
+// each a CPace run of its own keyed by that step's code. A uses the one whose
+// tag checks; none checking means the code was wrong.
 message PakeReply {
-  bytes share = 1;
+  reserved 1, 3;
+  reserved "share", "tag";
   bytes static_key = 2;
-  // HMAC-SHA256(ISK, "B" ‖ transcript).
-  bytes tag = 3;
+  repeated PakeCandidate candidates = 4;
+}
+
+message PakeCandidate {
+  bytes share = 1;
+  // HMAC-SHA256(ISK, "B" ‖ transcript) of this candidate.
+  bytes tag = 2;
 }
 
 message PakeFinish {
-  // HMAC-SHA256(ISK, "A" ‖ transcript).
+  // HMAC-SHA256(ISK, "A" ‖ transcript) of the candidate A used; B tries every
+  // candidate it sent and answers nothing that tells them apart.
   bytes tag = 1;
 }
 
@@ -94,11 +107,16 @@ enum HandshakeErrorCode {
   HANDSHAKE_ERROR_CODE_UNKNOWN_DEVICE = 1;
   HANDSHAKE_ERROR_CODE_VERSION_UNSUPPORTED = 2;
   HANDSHAKE_ERROR_CODE_BAD_PROOF = 3;
-  HANDSHAKE_ERROR_CODE_PAIRING_EXPIRED = 4;
+  reserved 4;
+  reserved "HANDSHAKE_ERROR_CODE_PAIRING_EXPIRED";
+  // Pairing is locked after 5 attempts that did not pair, for 15 minutes.
   HANDSHAKE_ERROR_CODE_TOO_MANY_ATTEMPTS = 5;
   HANDSHAKE_ERROR_CODE_REVOKED = 6;
   HANDSHAKE_ERROR_CODE_BUSY = 7;
   HANDSHAKE_ERROR_CODE_MALFORMED = 8;
+  // PakeStart to a machine without an authenticator secret: a paired device
+  // sets one first (TotpSet). Not counted as an attempt.
+  HANDSHAKE_ERROR_CODE_TOTP_NOT_SET = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +215,9 @@ message Frame {
     ScreenShareClose screen_share_close = 97;
     // Deletes the tunelo browser's profile (as `tunelo browser clear`). Answered with MachineInfo.
     BrowserClear browser_clear = 98;
+    // Pairing by authenticator code; see "pairing by authenticator" below.
+    TotpSet totp_set = 102;
+    TotpStatusRequest totp_status_request = 103;
 
     // B → A, continued
     SecretPrompt secret_prompt = 63;
@@ -214,6 +235,7 @@ message Frame {
     ScreenShareStatus screen_share_status = 99;
     ScreenShareOpened screen_share_opened = 100;
     ScreenShareClosed screen_share_closed = 101;
+    TotpStatus totp_status = 104;
   }
 }
 
@@ -1048,6 +1070,8 @@ enum ErrorReason {
   ERROR_REASON_SCREEN_SHARE_BUSY = 50;
   // ScreenShareData or ScreenShareClose names a session that is no longer open.
   ERROR_REASON_SCREEN_SHARE_GONE = 51;
+  // TotpSet with a secret that is not 20 bytes.
+  ERROR_REASON_TOTP_SECRET_INVALID = 52;
 }
 
 enum ErrorCode {
@@ -1455,6 +1479,9 @@ message MachineInfo {
   // (ScreenShareStatusRequest, ScreenShareOpen); false before tunelo 2.0.13
   // and on other systems.
   bool screen_share = 20;
+  // The machine has an authenticator secret: new devices can pair with its
+  // code (see TotpSet).
+  bool totp_enabled = 21;
 }
 
 message RemoteBrowserInfo {
@@ -1522,7 +1549,7 @@ message AuditEntry {
   int64 at = 1;
   string device = 2;
   // open_sensitive, project_settings (detail "trust" when a device trusted
-  // the folder), approve_sensitive, pair, revoke,
+  // the folder), approve_sensitive, pair (detail: "install" or "totp"), revoke,
   // permission_mode, profile_add, profile_select, profile_remove,
   // delete_session (path: the folder; detail: the session ids),
   // project_add (a sensitive folder added as a project),
@@ -1532,7 +1559,8 @@ message AuditEntry {
   // browser_control (a device gave the tunelo browser back or closed it;
   // path: the site it showed; detail: "claude" or "user"),
   // browser_clear (the tunelo browser's profile was deleted),
-  // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed)
+  // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
+  // totp_set (a device set or replaced the authenticator secret; never the secret)
   string action = 3;
   string path = 4;
   string detail = 5;
@@ -1872,3 +1900,25 @@ message ScreenShareClosed {
 
 // A → B: delete the tunelo browser's profile. Answered with MachineInfo.
 message BrowserClear {}
+
+// --- pairing by authenticator ---------------------------------------------------
+// The machine keeps a TOTP secret (RFC 6238: HMAC-SHA1, 6 digits, 30-second
+// steps) that new devices pair with (PakeStart). A paired device makes the
+// secret, shows it once as an otpauth:// QR for the user's authenticator app,
+// checks the first code the user types, then sends it here; it reaches the
+// machine end-to-end sealed and never the chat server. Sending a new one
+// replaces it. B writes each change to the consent log.
+
+// A → B: set or replace the secret. Answered with TotpStatus;
+// ERROR_REASON_TOTP_SECRET_INVALID when it is not 20 bytes.
+message TotpSet {
+  bytes secret = 1;
+}
+
+// A → B: answered with TotpStatus.
+message TotpStatusRequest {}
+
+message TotpStatus {
+  // The machine has a secret: new devices can pair with its code.
+  bool enabled = 1;
+}

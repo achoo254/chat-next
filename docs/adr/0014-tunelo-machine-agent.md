@@ -6,7 +6,7 @@
 
 ## Bối cảnh
 
-Trên máy người dùng từng có hai chương trình: `hda` (tiến trình nền của Máy của tôi, repo này) và CLI Tunelo 1.x (gói npm của
+Trên máy người dùng từng có hai chương trình: tiến trình nền của Máy của tôi (repo này) và CLI Tunelo 1.x (gói npm của
 localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng. Thêm máy vào Chat cần mã cài, Localman không gọi được
 `localhost` của máy, và claude chỉ dùng được một tài khoản mỗi máy.
 
@@ -14,7 +14,7 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 
 ### Một tiến trình, tên Tunelo
 
-- `hda` đổi tên thành `tunelo` 2.0.0 (`apps/agent`). Nó nhận toàn bộ CLI Tunelo 1.11: `http`, `tcp`, `kill`, `watch`, `link`/`links`,
+- Tiến trình nền của Máy của tôi là `tunelo` 2.0.0 (`apps/agent`). Nó nhận toàn bộ CLI Tunelo 1.11: `http`, `tcp`, `kill`, `watch`, `link`/`links`,
   `mcp`, `config`, `login`/`logout`/`whoami`. Bun single-file, ký minisign, phát hành qua GitHub Releases (không npm).
 - Không còn portal web: `tunelo http` chỉ giữ inspector request trên `127.0.0.1` và `tunelo watch`. Phía web của Tunelo chỉ còn trang
   giới thiệu trên tunelo-server (localman-next).
@@ -41,7 +41,7 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 - Tài khoản chưa từng mở Chat: `RegisterMachine` tạo người dùng tạm với `profile_pending` (tên giữ chỗ, không tìm được theo username
   hay tìm kiếm), theo hạn mức đăng ký web. Lần đăng nhập web đầu tiên điền hồ sơ từ IdP và xoá cờ.
 - Tối đa 20 máy chưa thu hồi mỗi tài khoản, cùng hạn mức với máy Localman.
-- Ghép thiết bị vẫn đầu-cuối như ADR 0013: bí mật ghép đi qua stdin của `tunelo install`, server không bảo lãnh thiết bị.
+- Ghép thiết bị vẫn đầu-cuối như ADR 0013: trình duyệt cài máy được tin qua bí mật đi qua stdin của `tunelo install`, thiết bị khác ghép bằng mã Authenticator; server không bảo lãnh thiết bị và không giữ bí mật ghép nào.
 - Máy tự liên kết với Localman sau `tunelo login` (`POST /api/links/self`). Token liên kết giao cho Localman, tunelo không lưu.
 
 ### Profile Claude
@@ -127,7 +127,5 @@ Chi tiết ở ADR 0013, mục "MCP của tunelo trong phiên claude". Tóm tắ
 
 - Thư mục cấu hình tunelo chỉ có một refresh token hoandat, đã niêm phong. Ngoài `claude-profiles/*/home` (kho riêng của claude),
   không file nào của tunelo chứa token Claude, code đăng nhập hay JWT (`test/no-secret-leak.test.ts`).
-- Máy `hda` 0.2.x chuyển sang tunelo bằng bản cầu nối `agent-v0.3.0` (ADR 0013, "Đổi tên thành tunelo").
-- Dọn sau nghiệm thu và ít nhất 14 ngày: bỏ `CreateInstallCode` và bảng mã cài, nâng `MinAgentVersion` lên `2.0.0`, bỏ nhánh build
-  `agent-v` (release `agent-v0.3.0` giữ nguyên), xoá khoá và thư mục cũ của `hda`.
+- Dọn sau nghiệm thu và ít nhất 14 ngày: bỏ `CreateInstallCode` và bảng mã cài, nâng `MinAgentVersion` lên `2.0.0`.
 - CI chạy test agent dưới Bun của bản phát hành và phần chỉ có trên Windows (DPAPI, junction, `netstat`) trên `windows-latest`.

@@ -2,8 +2,8 @@
  * One-time move of sign-ins and settings written by older installs into
  * tunelo's sealed session (session.ts) and settings (cli-settings.ts):
  *
- * - `<config dir>/tunelo-session.json`: the plain session of tunelo 2.0 and
- *   hda, taken first (the machine was registered with it).
+ * - `<config dir>/tunelo-session.json`: the plain session of tunelo 2.0,
+ *   taken first (the machine was registered with it).
  * - `~/.tunelo/config.json`: settings and session of the Tunelo CLI 1.x.
  *
  * A session is moved, never copied: its rotating refresh token used from two
@@ -44,7 +44,7 @@ async function adopt(dir: string, plain: PlainSession): Promise<boolean> {
 	return identitySession(dir).adopt(plain, resourceOfIssuer(plain.issuer));
 }
 
-/** The plain session of tunelo 2.0 / hda in the config folder. */
+/** The plain session of tunelo 2.0 in the config folder. */
 async function importAgentSession(dir: string): Promise<void> {
 	const file = join(dir, AGENT_SESSION_FILE);
 	if (!existsSync(file)) return;

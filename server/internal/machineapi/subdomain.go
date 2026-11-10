@@ -22,8 +22,7 @@ func MachineSubdomain(ownerSub, deviceID string) string {
 }
 
 // machineDeviceID is the device id tunelo opens its machine tunnel with:
-// "chat-agent." + the machine id (kept from the agent's first name, so a
-// machine keeps its subdomain across renames of the agent).
+// "tunelo." + the machine id.
 func machineDeviceID(machineID int64) string {
-	return "chat-agent." + strconv.FormatInt(machineID, 10)
+	return "tunelo." + strconv.FormatInt(machineID, 10)
 }

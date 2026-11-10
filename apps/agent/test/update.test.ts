@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { HDA_RELEASES, TUNELO_RELEASES, assetName, newestRelease, signedComment, trustedComment, verifyMinisign } from "../src/update.ts";
+import { assetName, newestRelease, signedComment, trustedComment, verifyMinisign } from "../src/update.ts";
 
 const dir = join(import.meta.dirname, "fixtures");
 const file = new Uint8Array(readFileSync(join(dir, "payload.bin")));
@@ -23,7 +23,7 @@ describe("minisign", () => {
   });
 
   it("reads the signed comment", () => {
-    expect(trustedComment(readFileSync(join(dir, "payload.bin.minisig"), "utf8"))).toBe("chat-agent test");
+    expect(trustedComment(readFileSync(join(dir, "payload.bin.minisig"), "utf8"))).toBe("tunelo test");
   });
 
   it("names the right asset per platform", () => {
@@ -34,7 +34,7 @@ describe("minisign", () => {
   });
 });
 
-describe("release lines", () => {
+describe("releases", () => {
   const rel = (tag_name: string, extra: { draft?: boolean; prerelease?: boolean } = {}) => ({ tag_name, draft: false, prerelease: false, ...extra });
   const releases = [
     rel("tunelo-v2.0.0"),
@@ -48,16 +48,11 @@ describe("release lines", () => {
   ];
 
   it("tunelo updates from tunelo-v* only, newest published first", () => {
-    expect(newestRelease(releases, TUNELO_RELEASES)?.version).toBe("2.1.0");
-    expect(newestRelease([rel("agent-v0.3.0")], TUNELO_RELEASES)).toBeNull();
+    expect(newestRelease(releases)?.version).toBe("2.1.0");
+    expect(newestRelease([rel("agent-v0.3.0")])).toBeNull();
   });
 
-  it("the bridge matches what hda 0.2.x looks for: agent-v*, hda-* files, hda comments", () => {
-    expect(newestRelease(releases, HDA_RELEASES)).toMatchObject({ version: "0.3.0", release: { tag_name: "agent-v0.3.0" } });
-    expect(assetName("darwin", "arm64", HDA_RELEASES)).toBe("hda-darwin-arm64");
-    expect(assetName("darwin", "x64", HDA_RELEASES)).toBe("hda-darwin-x64");
-    expect(assetName("win32", "x64", HDA_RELEASES)).toBe("hda-windows-x64.exe");
-    expect(signedComment(HDA_RELEASES, "0.3.0", "hda-windows-x64.exe")).toBe("hda 0.3.0 hda-windows-x64.exe");
-    expect(signedComment(TUNELO_RELEASES, "2.0.0", "tunelo-darwin-arm64")).toBe("tunelo 2.0.0 tunelo-darwin-arm64");
+  it("signs the program, version and file into the trusted comment", () => {
+    expect(signedComment("2.0.0", "tunelo-darwin-arm64")).toBe("tunelo 2.0.0 tunelo-darwin-arm64");
   });
 });

@@ -1,5 +1,5 @@
 // This machine in Localman: after `tunelo login`, once the machine has its
-// tunnel device (`chat-agent.<machineId>`), tunelo asks the tunnel server
+// tunnel device (`tunelo.<machineId>`), tunelo asks the tunnel server
 // for a link token of this machine (`linkMachineToApp`) and hands it to
 // Localman (`POST /tunelo/links/self`, Bearer of the account for Localman).
 // Localman keeps the token and sends requests to localhost here with it.
@@ -256,7 +256,7 @@ export class LocalmanLink {
 
 /** The tunnel device of a machine in Chat. */
 export function deviceIdOf(machineId: string): string {
-  return `chat-agent.${machineId}`;
+  return `tunelo.${machineId}`;
 }
 
 /** How forwarding to localhost stands, for Localman's state line. */

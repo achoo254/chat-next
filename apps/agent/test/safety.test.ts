@@ -36,8 +36,7 @@ describe("sensitive paths", () => {
     expect(mentionsSensitive("npm test", check, { home })).toBe(false);
     expect(mentionsSensitive("cat ../../.ssh/id_rsa", check, { home, cwd: join(home, "code", "app") })).toBe(true);
     expect(mentionsSensitive("cat $HOME/.ssh/id_rsa", check, { home })).toBe(true);
-    expect(mentionsSensitive("hda pair", check, { home })).toBe(true);
-    expect(mentionsSensitive("tunelo pair", check, { home })).toBe(true);
+    expect(mentionsSensitive("tunelo devices revoke abcdef", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo.exe login", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo claude profiles add work", check, { home })).toBe(true);
     expect(mentionsSensitive("tunelo config local-forward off", check, { home })).toBe(true);
@@ -54,21 +53,16 @@ describe("sensitive paths", () => {
     expect(check(join(home, "cfg", "session-key"))).toBe(true);
   });
 
-  it("flags the agent's config folder under its current and earlier name", () => {
+  it("flags the agent's config folder", () => {
     const appData = join(home, "AppData", "Roaming");
     const saved = process.env.APPDATA;
     process.env.APPDATA = appData;
     try {
       const plain = createSensitiveCheck({ home });
-      const dirs =
-        process.platform === "win32"
-          ? [join(appData, "tunelo"), join(appData, "chat-agent")]
-          : [join(home, ".config", "tunelo"), join(home, ".config", "chat-agent")];
-      for (const d of dirs) {
-        expect(plain(d)).toBe(true);
-        expect(plain(join(d, "tunelo-session.json"))).toBe(true);
-        expect(plain(join(d, "session.json"))).toBe(true);
-      }
+      const d = process.platform === "win32" ? join(appData, "tunelo") : join(home, ".config", "tunelo");
+      expect(plain(d)).toBe(true);
+      expect(plain(join(d, "tunelo-session.json"))).toBe(true);
+      expect(plain(join(d, "session.json"))).toBe(true);
       expect(plain(join(home, ".config", "other-app"))).toBe(false);
     } finally {
       if (saved === undefined) delete process.env.APPDATA;

@@ -143,6 +143,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-center { text-align: center; margin: auto; }
 .mx-hint { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); font-size: 0.8125rem; color: var(--c-text-muted); }
 .mx-hint .icon { flex: none; margin-top: 1px; }
+.mx-hint.warn { color: var(--c-warning-text); border-color: color-mix(in srgb, var(--c-warning) 40%, var(--c-border)); background: color-mix(in srgb, var(--c-warning) 8%, var(--c-surface)); }
 .mx-error { margin: 0; color: var(--c-error); font-size: 0.8125rem; }
 .mx-setting { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .mx-wait, .mx-ok { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 0.875rem; }
@@ -198,8 +199,10 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-cmd code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.8125rem; overflow-wrap: anywhere; user-select: all; }
 .mx-otp { display: flex; gap: var(--space-2); width: 100%; max-width: 304px; }
 .mx-otp .input { flex: 1 1 0; min-width: 0; width: auto; height: 52px; padding: 0; text-align: center; font-family: var(--font-mono); font-size: 1.25rem; }
-.mx-scan { display: grid; gap: var(--space-2); justify-items: start; }
-.mx-scan video { width: min(100%, 320px); aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md); background: var(--c-ink, #000); }
+/* A wrapper (data-id) in a stepper, whose items shrink to content: give the boxes the full width to share. */
+.mx-otp-wrap { justify-self: stretch; min-width: 0; }
+/* A QR code stays dark on light in either theme: scanners need that contrast, so no theme colour here. */
+.mx-qr { display: block; width: min(100%, 220px); height: auto; aspect-ratio: 1; border-radius: var(--radius-sm); background: white; color: black; }
 .mx-field-row { display: grid; gap: var(--space-1); font-size: 0.875rem; font-weight: 500; }
 
 /* Machine page */
@@ -212,6 +215,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-kv dt { color: var(--c-text-muted); }
 .mx-kv dd { margin: 0; }
 .mx-devices { display: grid; gap: var(--space-2); min-width: 0; }
+.mx-totp { display: grid; gap: var(--space-2); min-width: 0; justify-items: start; }
 .mx-device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .mx-device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 .mx-device .tx { display: grid; min-width: 0; }

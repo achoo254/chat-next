@@ -158,7 +158,7 @@ func newEnv(t *testing.T) *env {
 	mux.Handle(Prefix, e.svc.Handler())
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	// A plain client, as chat-agent: no Origin, no cookie.
+	// A plain client, as tunelo: no Origin, no cookie.
 	e.client = appv1connect.NewMachineAgentServiceClient(srv.Client(), srv.URL+"/machine-api")
 	return e
 }
@@ -216,7 +216,7 @@ func (e *env) legacy() (int64, string) {
 
 // machineTunnel is the tunnel Tunelo holds for the machine id of sub.
 func machineTunnel(sub string, id int64) string {
-	return "wss://" + MachineSubdomain(sub, "chat-agent."+strconv.FormatInt(id, 10)) + ".tunnel.hoandat.com"
+	return "wss://" + MachineSubdomain(sub, "tunelo."+strconv.FormatInt(id, 10)) + ".tunnel.hoandat.com"
 }
 
 func withSecret[T any](msg *T, secret string) *connect.Request[T] {
@@ -268,18 +268,18 @@ func TestRegisterMachine(t *testing.T) {
 
 	tok := e.token(ownerSub)
 	for name, msg := range map[string]*appv1.RegisterMachineRequest{
-		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "0.1.0", PublicKey: make([]byte, 32)},
-		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "0.1.0", PublicKey: make([]byte, 32)},
-		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "0.1.0", PublicKey: make([]byte, 32)},
+		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: make([]byte, 32)},
+		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: make([]byte, 32)},
+		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "2.1.0", PublicKey: make([]byte, 32)},
 		"bad version": {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "v1", PublicKey: make([]byte, 32)},
-		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "0.1.0", PublicKey: make([]byte, 31)},
+		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: make([]byte, 31)},
 	} {
 		if _, err := e.client.RegisterMachine(ctx, withSecret(msg, tok)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	old := registerRequest()
-	old.AgentVersion = "0.0.9"
+	old.AgentVersion = "2.0.15"
 	if _, err := e.client.RegisterMachine(ctx, withSecret(old, tok)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("old agent: %v", err)
 	}
@@ -491,13 +491,15 @@ func TestRegisteredMachineTunnelIsChecked(t *testing.T) {
 	}
 }
 
-// Pairing stays end to end: the agent's calls carry no device key or
-// pairing secret, so the server can never vouch for a device.
+// Pairing stays end to end: the agent's calls carry no device key, install
+// secret or authenticator (TOTP) secret, so the server can never vouch for a
+// device or compute a pairing code. Any new field fails here first.
 func TestAgentCallsTakeNoDeviceKey(t *testing.T) {
 	for msg, want := range map[proto.Message][]string{
-		&appv1.RegisterMachineRequest{}: {"install_code", "name", "os", "arch", "agent_version", "public_key"},
-		&appv1.HeartbeatRequest{}:       {"tunnel_url", "agent_version", "claude_version"},
-		&appv1.ClaimMachineRequest{}:    {"machine_secret"},
+		&appv1.RegisterMachineRequest{}:  {"install_code", "name", "os", "arch", "agent_version", "public_key"},
+		&appv1.HeartbeatRequest{}:        {"tunnel_url", "agent_version", "claude_version"},
+		&appv1.ClaimMachineRequest{}:     {"machine_secret"},
+		&appv1.NotifyNeedsInputRequest{}: {"kind", "pending_count", "session_id"},
 	} {
 		fields := msg.ProtoReflect().Descriptor().Fields()
 		var got []string
@@ -513,15 +515,15 @@ func TestAgentCallsTakeNoDeviceKey(t *testing.T) {
 func TestMachineSubdomain(t *testing.T) {
 	// Vectors from tunelo-server's machineSubdomain (machine-subdomain.ts).
 	for _, v := range []struct{ sub, device, want string }{
-		{"acc_1", "chat-agent.1", "m-95ce0626bba55c875a2b26de5ce4cf"},
-		{"acc_01HXYZ", "chat-agent.42", "m-ec3a4986e1211d2d0c1dc1c9845af6"},
-		{"acc_tiếng", "chat-agent.123456789", "m-6b099ec43612f6d4715fd9397b93e9"},
+		{"acc_1", "tunelo.1", "m-c0607954f560fd4367b261f2e2bf11"},
+		{"acc_01HXYZ", "tunelo.42", "m-a9c1fa870c0b342929392f97d7b27a"},
+		{"acc_tiếng", "tunelo.123456789", "m-70114275f29d1222434a3e042afe3e"},
 	} {
 		if got := MachineSubdomain(v.sub, v.device); got != v.want {
 			t.Errorf("MachineSubdomain(%q, %q) = %s, want %s", v.sub, v.device, got, v.want)
 		}
 	}
-	if got := machineDeviceID(42); got != "chat-agent.42" {
+	if got := machineDeviceID(42); got != "tunelo.42" {
 		t.Errorf("machineDeviceID(42) = %s", got)
 	}
 }
@@ -530,7 +532,7 @@ func TestHeartbeat(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id, secret := e.legacy()
-	beat := &appv1.HeartbeatRequest{TunnelUrl: "wss://dat-mac.tunnel.hoandat.com/", AgentVersion: "0.1.2", ClaudeVersion: "2.1.319"}
+	beat := &appv1.HeartbeatRequest{TunnelUrl: "wss://dat-mac.tunnel.hoandat.com/", AgentVersion: "2.1.2", ClaudeVersion: "2.1.319"}
 
 	for name, header := range map[string]string{"none": "", "not bearer": "Basic " + secret, "wrong": "Bearer " + wrong(secret)} {
 		req := connect.NewRequest(beat)
@@ -545,11 +547,11 @@ func TestHeartbeat(t *testing.T) {
 		"https://dat.tunnel.hoandat.com", "wss://dat.tunnel.evil.com", "wss://a.b.tunnel.hoandat.com",
 		"wss://DAT.tunnel.hoandat.com", "wss://dat.tunnel.hoandat.com/x", "wss://dat.tunnel.hoandat.com.evil.com",
 	} {
-		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "0.1.0"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "2.1.0"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("tunnel %q: %v", url, err)
 		}
 	}
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "0.0.1"}, secret)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.0.15"}, secret)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("old agent: %v", err)
 	}
 
@@ -561,7 +563,7 @@ func TestHeartbeat(t *testing.T) {
 		t.Fatalf("answer %+v", resp.Msg)
 	}
 	list, _ := e.store.ListMachines(ctx, tenant, e.userID)
-	if list[0].TunnelURL != "wss://dat-mac.tunnel.hoandat.com" || list[0].AgentVersion != "0.1.2" || list[0].ClaudeVersion != "2.1.319" {
+	if list[0].TunnelURL != "wss://dat-mac.tunnel.hoandat.com" || list[0].AgentVersion != "2.1.2" || list[0].ClaudeVersion != "2.1.319" {
 		t.Fatalf("recorded %+v", list[0])
 	}
 
@@ -661,31 +663,98 @@ func TestNotifyNeedsInputMerges(t *testing.T) {
 	}
 }
 
+func TestNotifyDevicePairedGoesOutAtOnce(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	id, secret := e.register()
+	notify := func(kind appv1.NeedsInputKind, pending int32, session string) error {
+		_, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+			Kind: kind, PendingCount: pending, SessionId: session}, secret))
+		return err
+	}
+	for name, err := range map[string]error{
+		"no count":   notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 0, ""),
+		"count":      notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 2, ""),
+		"session":    notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, "t_1"),
+		"bad kind 4": notify(appv1.NeedsInputKind(4), 1, ""),
+	} {
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if sent := e.notifier.take(); len(sent) != 0 {
+		t.Fatalf("pushed on invalid calls: %+v", sent)
+	}
+
+	// A "needs you" push opens the machine's window ...
+	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL, 1, "t_1"); err != nil {
+		t.Fatal(err)
+	}
+	e.notifier.take()
+	e.advance(5 * time.Second)
+	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_QUESTION, 2, "t_2"); err != nil {
+		t.Fatal(err)
+	}
+	// ... but a newly paired device is told at once and keeps the merged one.
+	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	sent := e.notifier.take()
+	want := push.MachineNotice{MachineID: id, MachineName: "Mac mini", Kind: push.MachineDevicePaired, Pending: 1, At: e.now()}
+	if len(sent) != 1 || sent[0] != want {
+		t.Fatalf("device paired push %+v", sent)
+	}
+	timers := e.pending()
+	if len(timers) != 1 {
+		t.Fatalf("merged push lost: %d timers", len(timers))
+	}
+	e.advance(25 * time.Second)
+	timers[0].fire()
+	if sent := e.notifier.take(); len(sent) != 1 || sent[0].Kind != push.MachineQuestion || sent[0].SessionID != "t_2" {
+		t.Fatalf("merged push %+v", sent)
+	}
+	// Not after Close.
+	e.svc.Close()
+	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	if sent := e.notifier.take(); len(sent) != 0 {
+		t.Fatalf("pushed after Close: %+v", sent)
+	}
+}
+
 func TestFailedAuthenticationsAreLimited(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	_, secret := e.register()
 	var last error
 	for range 25 {
-		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "0.1.0"}, wrong(secret)))
+		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.1.0"}, wrong(secret)))
 	}
 	if connect.CodeOf(last) != connect.CodeResourceExhausted {
 		t.Fatalf("after many failures: %v", last)
 	}
 	// A valid secret still passes.
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "0.1.0"}, secret)); err != nil {
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.1.0"}, secret)); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCheckVersion(t *testing.T) {
 	for v, want := range map[string]connect.Code{
-		"0.1.0": 0, "0.1.0-beta.1": 0, "0.2.0": 0, "1.0.0": 0, "0.0.9": connect.CodeFailedPrecondition,
-		"": connect.CodeInvalidArgument, "0.1": connect.CodeInvalidArgument, "01.1.0": connect.CodeInvalidArgument,
-		"0.1.0+build": connect.CodeInvalidArgument,
+		"2.1.0": 0, "2.1.0-beta.1": 0, "2.1.1": 0, "2.2.0": 0, "3.0.0": 0,
+		// Before device link protocol 2: refused with a clear "run tunelo update".
+		"2.0.15": connect.CodeFailedPrecondition, "2.0.99": connect.CodeFailedPrecondition,
+		"1.9.1": connect.CodeFailedPrecondition, "0.1.0": connect.CodeFailedPrecondition,
+		"": connect.CodeInvalidArgument, "2.1": connect.CodeInvalidArgument, "02.1.0": connect.CodeInvalidArgument,
+		"2.1.0+build": connect.CodeInvalidArgument,
 	} {
 		if got := connect.CodeOf(checkVersion(v)); checkVersion(v) == nil && want != 0 || checkVersion(v) != nil && got != want {
 			t.Errorf("checkVersion(%q) = %v, want %v", v, checkVersion(v), want)
 		}
+	}
+	// An older tunelo reads what to do from the message.
+	if err := checkVersion("2.0.15"); err == nil || !strings.Contains(err.Error(), "agent_update_required: tunelo 2.1.0 or newer is required; run tunelo update") {
+		t.Errorf("old agent message: %v", err)
 	}
 }

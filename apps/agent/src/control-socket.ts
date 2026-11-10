@@ -26,7 +26,7 @@ import { isAlive } from "./tunnels/run-registry.js";
 import type { TunnelService } from "./tunnels/tunnel-service.ts";
 
 const controlFile = (configDir: string) => join(configDir, "control.json");
-const TOKEN_HEADER = "x-chat-agent-token";
+const TOKEN_HEADER = "x-tunelo-token";
 const NOT_RUNNING = "tunelo is not running (start it with `tunelo start`)";
 const MAX_BODY_BYTES = 1024 * 1024;
 /** Streams send a line this often, so neither side mistakes a quiet tunnel for a dead one. */
@@ -105,7 +105,6 @@ function machineOf(target: ControlTarget): Machine {
 
 /** Every request/response command of the channel. */
 export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
-  "POST /pair": (t) => machineOf(t).openPairing(),
   "GET /status": async (t) => {
     const tunnels = t.tunnels.list().length + t.mcp.tunnels().length;
     if (!t.machine) return { tunnels };

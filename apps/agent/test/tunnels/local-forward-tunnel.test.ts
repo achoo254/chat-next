@@ -112,7 +112,7 @@ afterEach(async () => {
 /** The machine online through the stand-in, as online.ts wires it. */
 async function online(features: string[] | undefined) {
   server = await standIn(features);
-  vi.stubEnv("CHAT_AGENT_TUNNEL_SERVER", server.url);
+  vi.stubEnv("TUNELO_MACHINE_TUNNEL_SERVER", server.url);
   vi.resetModules();
   const { openTunnel } = await import("../../src/tunnel.ts");
   await identitySession(dir).adopt(
@@ -124,7 +124,7 @@ async function online(features: string[] | undefined) {
   let up: () => void = () => undefined;
   const connected = new Promise<void>((r) => (up = r));
   closeTunnel = openTunnel(
-    { dir, localPort: port, deviceId: "chat-agent.1" },
+    { dir, localPort: port, deviceId: "tunelo.1" },
     {
       onUrl: (url, f) => {
         machine.localForward.tunnelConnected(url, f);
@@ -156,7 +156,7 @@ describe("Localman's requests through the machine tunnel", () => {
     const s = await online(["local-forward"]);
     expect(s.auths).toHaveLength(1);
     // It asks for no name: the relay derives it from the account and the device id.
-    expect(s.auths[0]).toEqual(expect.objectContaining({ kind: "machine", deviceId: "chat-agent.1", subdomain: "" }));
+    expect(s.auths[0]).toEqual(expect.objectContaining({ kind: "machine", deviceId: "tunelo.1", subdomain: "" }));
     expect(s.auths[0]).not.toHaveProperty("localPort");
     // Requests still reach the device link's server.
     const r = await s.send("/.tunelo/forward/", { "tunelo-forward-granted": "1", "tunelo-local-port": String(appPort) });

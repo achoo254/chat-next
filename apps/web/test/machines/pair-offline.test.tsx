@@ -1,15 +1,17 @@
-// Pairing with a machine that is not connected: no code boxes that silently
-// refuse input, but what is wrong and what to run on that machine (for its
-// own system); the boxes open by themselves once the machine is online. The
-// session column tells an online machine waiting to be paired from an
-// offline one.
+// The pairing page: an online machine asks for the 6-digit code of its
+// Authenticator entry (nothing to run on it, so it works from a phone); a
+// machine that is not connected gets no code boxes that silently refuse
+// input, but what is wrong and what to run on it (for its own system), and
+// the boxes open by themselves once it is online. A machine without
+// Authenticator pairing gets the two ways to turn it on. The session column
+// tells an online machine waiting to be paired from an offline one.
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { MachineLinksProvider } from "../../src/machines/link/connection-provider.tsx";
 import { connOf } from "../../src/machines/machine-status.ts";
-import { PairDevice } from "../../src/machines/pair-device.tsx";
+import { PairDevice, PairProblemView } from "../../src/machines/pair-device.tsx";
 import { connDot } from "../../src/machines/session-sidebar.tsx";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 import { FakeMachines } from "../support/fake-machines.ts";
@@ -56,17 +58,48 @@ describe("pairing with a machine", () => {
 		m.tunnelUrl = "wss://m-1.tunnel.hoandat.com";
 		m.lastSeenAt = BigInt(Math.floor(Date.now() / 1000));
 		await waitFor(() => expect(view.container.querySelectorAll("input[inputmode=numeric]")).toHaveLength(6), { timeout: 8_000 });
-		expect(screen.getByText("Trên DIEUVY-LAPTOP, mở PowerShell và chạy:")).toBeTruthy();
-		expect(screen.getByText(/chạy lệnh trên trong PowerShell của chính máy này/)).toBeTruthy();
+		expect(screen.getByRole("group", { name: "Mã 6 số trong app Authenticator của máy này" })).toBeTruthy();
 		expect(screen.queryByText("DIEUVY-LAPTOP chưa kết nối")).toBeNull();
 		for (const box of view.container.querySelectorAll<HTMLInputElement>("input[inputmode=numeric]")) expect(box.disabled).toBe(false);
 	}, 15_000);
 
-	it("an online Mac: the steps say Terminal", async () => {
+	it("an online machine: the Authenticator code, the phone's one-time-code fill, and no command to run", async () => {
 		const machines = new FakeMachines();
 		machines.add({ name: "Mac mini", os: "darwin", tunnelUrl: "wss://m-2.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)) });
-		page(machines);
-		expect(await screen.findByText("Trên Mac mini, mở Terminal và chạy:")).toBeTruthy();
+		const view = page(machines);
+		expect(await screen.findByText("Mở app Authenticator đã thêm Mac mini rồi nhập mã 6 số đang hiện.")).toBeTruthy();
+		expect(screen.getByText(/Sai 5 lần thì máy khoá ghép thiết bị trong 15 phút/)).toBeTruthy();
+		const boxes = view.container.querySelectorAll<HTMLInputElement>("input[inputmode=numeric]");
+		expect(boxes).toHaveLength(6);
+		expect(boxes[0]?.autocomplete).toBe("one-time-code");
+		const text = view.container.textContent ?? "";
+		for (const gone of ["tunelo pair", "QR", "10 phút", "Terminal", "PowerShell"]) expect(text).not.toContain(gone);
+		expect(view.container.querySelector("video")).toBeNull();
+	});
+});
+
+describe("a pairing that failed", () => {
+	it("a machine without Authenticator pairing: how to turn it on, and the install command as the way back", () => {
+		render(
+			<I18nProvider>
+				<PairProblemView problem="notSet" machine="Mac mini" />
+			</I18nProvider>,
+		);
+		const alert = screen.getByRole("alert");
+		expect(alert.getAttribute("data-id")).toBe("pair-not-set");
+		expect(screen.getByText("Mac mini chưa bật ghép bằng Authenticator")).toBeTruthy();
+		expect(screen.getByText(/mở Cài đặt máy rồi chọn “Bật ghép bằng Authenticator”/)).toBeTruthy();
+		expect(screen.getByText(/Chạy lại lệnh cài trên chính máy đó/)).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Lấy lệnh cài" }).getAttribute("href")).toBe("/ai/add");
+	});
+
+	it("a locked machine says for how long", () => {
+		render(
+			<I18nProvider>
+				<PairProblemView problem="tooMany" machine="Mac mini" />
+			</I18nProvider>,
+		);
+		expect(screen.getByRole("alert").textContent).toMatch(/Mac mini đang khoá ghép thiết bị trong 15 phút/);
 	});
 });
 

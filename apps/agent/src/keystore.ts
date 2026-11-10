@@ -1,8 +1,6 @@
 // The machine's private X25519 key lives in the OS key store: the macOS
 // login Keychain, DPAPI (current user) on Windows. Elsewhere, and in tests,
-// a 0600 file in the config folder. The Keychain entry was named after
-// chat-agent before tunelo; that entry is still read while the new one is
-// missing, so a machine never gets a second key.
+// a 0600 file in the config folder.
 //
 // The same store holds a sealing key: seal/unseal encrypt any secret kept on
 // disk (the account's refresh token) with AES-256-GCM under it, so the file
@@ -16,7 +14,6 @@ import { type KeyPair, exportPrivateKey, fromBase64Url, generateKeyPair, importK
 
 const run = promisify(execFile);
 const SERVICE = "com.hoandat.tunelo";
-const LEGACY_SERVICE = "com.hoandat.chat-agent";
 /** Entries of the store: the machine's X25519 key, and the key that seals secrets on disk. */
 type Entry = "machine-key" | "session-key";
 
@@ -34,9 +31,9 @@ export class KeyStoreUnavailableError extends Error {
 /** Exit code of `security find-generic-password` when the item does not exist. */
 const ITEM_NOT_FOUND = 44;
 
-async function readKeychain(service: string, account: Entry = "machine-key"): Promise<string | null> {
+async function readKeychain(account: Entry): Promise<string | null> {
   try {
-    const { stdout } = await run("security", ["find-generic-password", "-s", service, "-a", account, "-w"]);
+    const { stdout } = await run("security", ["find-generic-password", "-s", SERVICE, "-a", account, "-w"]);
     return stdout.trim() || null;
   } catch (err) {
     const code = (err as { code?: unknown }).code;
@@ -45,22 +42,18 @@ async function readKeychain(service: string, account: Entry = "machine-key"): Pr
   }
 }
 
-function writeKeychain(service: string, value: string, account: Entry = "machine-key"): Promise<void> {
+function writeKeychain(account: Entry, value: string): Promise<void> {
   // Through `security -i` on stdin so the key never shows up in argv.
   return new Promise<void>((resolve, reject) => {
     const child = execFile("security", ["-i"], (err) => (err ? reject(err) : resolve()));
-    child.stdin?.end(`add-generic-password -U -s ${service} -a ${account} -w ${value}\n`);
+    child.stdin?.end(`add-generic-password -U -s ${SERVICE} -a ${account} -w ${value}\n`);
   });
 }
 
 function keychain(entry: Entry): Backend {
   return {
-    async read() {
-      const current = await readKeychain(SERVICE, entry);
-      // Only the machine key existed under the old name.
-      return current ?? (entry === "machine-key" ? await readKeychain(LEGACY_SERVICE) : null);
-    },
-    write: (value) => writeKeychain(SERVICE, value, entry),
+    read: () => readKeychain(entry),
+    write: (value) => writeKeychain(entry, value),
   };
 }
 
@@ -109,7 +102,7 @@ function plainFile(dir: string, entry: Entry): Backend {
   };
 }
 
-const fileKeystore = () => (process.env.TUNELO_KEYSTORE || process.env.CHAT_AGENT_KEYSTORE) === "file";
+const fileKeystore = () => process.env.TUNELO_KEYSTORE === "file";
 const usesKeychain = () => process.platform === "darwin" && !fileKeystore();
 
 let warnedPlainFile = false;
@@ -138,25 +131,6 @@ export async function machineKey(dir: string): Promise<KeyPair> {
   const saved = await store.read();
   if (!saved) throw new Error("could not store the machine key");
   return importKeyPair(fromBase64Url(saved));
-}
-
-/**
- * Copies the machine key from the Keychain entry of the old name to the new
- * one and reads it back. The old entry stays, so going back to hda still has
- * the key. The DPAPI and file stores live in the config folder and move with
- * it. Throws rather than letting the machine end up with two keys.
- */
-export async function copyLegacyMachineKey(): Promise<void> {
-  if (!usesKeychain()) return;
-  const legacy = await readKeychain(LEGACY_SERVICE);
-  if (!legacy) return;
-  const current = await readKeychain(SERVICE);
-  if (current) {
-    if (current !== legacy) throw new Error(`the Keychain holds two different machine keys (${SERVICE}, ${LEGACY_SERVICE}); nothing was changed`);
-    return;
-  }
-  await writeKeychain(SERVICE, legacy);
-  if ((await readKeychain(SERVICE)) !== legacy) throw new Error("the machine key did not copy to its new Keychain entry; nothing else was changed");
 }
 
 const SEALED_PREFIX = "v1";

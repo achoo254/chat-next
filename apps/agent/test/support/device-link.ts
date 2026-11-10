@@ -3,7 +3,7 @@
 // waits for the answer with a given id.
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import { type Frame, FrameSchema, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
-import { type Session, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
+import { type Session, TotpPairing, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
 import type { ConfigStore } from "../../src/config.ts";
 import type { AgentCore } from "../../src/core/agent-core.ts";
 import { Connection } from "../../src/link/connection.ts";
@@ -59,7 +59,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.browser ? { browser: ctx.browser } : {}),
       ...(ctx.screenShare ? { screenShare: ctx.screenShare } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
-      pairing: () => undefined,
+      pairing: new TotpPairing(),
       machineInfo:
         ctx.machineInfo ??
         (async () => {

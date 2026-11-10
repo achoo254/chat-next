@@ -193,6 +193,11 @@ describe("machine pushes", () => {
 		expect(parseMachinePayload({ ...machine, session_id: "" })?.path).toBe("/ai/42");
 		expect(parseMachinePayload({ ...machine, session_id: "../../x" })?.path).toBe("/ai/42");
 		expect(parseMachinePayload({ ...machine, tag: "machine:43" })).toBeNull();
+		// A newly paired device: its own tag, and it opens the machine, never a thread.
+		const paired = parseMachinePayload({ ...machine, session_id: "", body: "Một thiết bị mới vừa ghép với Mac mini", tag: "machine-paired:42" });
+		expect(paired).toMatchObject({ tag: "machine-paired:42", path: "/ai/42", body: "Một thiết bị mới vừa ghép với Mac mini" });
+		expect(parseMachinePayload({ ...machine, tag: "machine-paired:42" })?.path).toBe("/ai/42");
+		expect(parseMachinePayload({ ...machine, tag: "machine-paired:43" })).toBeNull();
 		expect(parseMachinePayload({ ...machine, machine_id: 0 })).toBeNull();
 		expect(parseMachinePayload(payload)).toBeNull();
 		// A machine payload is not a message: the chat parser leaves it alone.

@@ -67,6 +67,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-limit": "?at=machine-limit",
 	"machine-secret": "?at=machine-secret&open=secret-card",
 	"machine-info-secrets": "?at=machine-info&open=saved-secrets",
+	// Turning on pairing with Authenticator: the one-time QR code, the key and the first code.
+	"machine-info-totp": "?at=machine-info&open=totp-setup",
 	// The machine's browser: Claude's takeover card, the live view (desktop: over the session; phone: full screen),
 	// a page asking for a passkey, and the view opened from the machine's page.
 	"machine-takeover": "?at=machine-takeover&open=takeover-card",

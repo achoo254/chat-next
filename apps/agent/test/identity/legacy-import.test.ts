@@ -36,7 +36,7 @@ function filesContain(folder: string, text: string): string[] {
 }
 
 describe("moving older sign-ins", () => {
-	test("takes the session of tunelo 2.0 / hda and removes its plain-text file", async () => {
+	test("takes the session of tunelo 2.0 and removes its plain-text file", async () => {
 		writeFileSync(join(dir, "tunelo-session.json"), JSON.stringify({ issuer: "https://auth.hoandat.com", sub: "acc_m", refreshToken: "rt-agent" }));
 		await importLegacySignIns(dir, home);
 		expect(identitySession(dir).info()?.sub).toBe("acc_m");

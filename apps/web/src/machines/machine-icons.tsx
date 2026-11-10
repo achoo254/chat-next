@@ -37,14 +37,6 @@ const PATHS = {
 			<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
 		</>
 	),
-	qr: (
-		<>
-			<rect x="4" y="4" width="6" height="6" rx="1" />
-			<rect x="14" y="4" width="6" height="6" rx="1" />
-			<rect x="4" y="14" width="6" height="6" rx="1" />
-			<path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" />
-		</>
-	),
 	star: <path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z" />,
 	"chevron-right": <path d="M9 6l6 6-6 6" />,
 	"chevron-down": <path d="M6 9l6 6 6-6" />,

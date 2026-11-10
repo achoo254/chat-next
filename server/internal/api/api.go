@@ -3,7 +3,7 @@
 // realtime WebSocket at /ws (the gateway runs inside the api process in
 // stage 1), the incoming webhook endpoint POST /hook/... (in the same
 // process, so a hook message reaches the in-memory gateway right after
-// commit), the Bot API under /bot/v1/, the calls of chat-agent under
+// commit), the Bot API under /bot/v1/, the calls of tunelo under
 // /machine-api/ and, on the media host only, media downloads and proxied
 // upload parts.
 package api
@@ -261,7 +261,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		mux.Handle(route, hookSvc)
 	}
 	mux.Handle(botapi.Prefix, botAPI)
-	// chat-agent sends no Origin and has no user session: its calls are
+	// tunelo sends no Origin and has no user session: its calls are
 	// not under /rpc (ADR 0013).
 	mux.Handle(machineapi.Prefix, machines.Handler())
 	mcpHandler.Register(mux)

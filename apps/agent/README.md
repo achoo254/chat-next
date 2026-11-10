@@ -38,7 +38,6 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo status` | Tunnel đang mở, rồi trạng thái máy, claude, phiên; thoát 1 khi dịch vụ không chạy |
 | `tunelo logs -f` | Xem log liên tục (`agent.log` trong thư mục cấu hình) |
 | `tunelo update` (`--check`) | Cài bản ký mới nhất rồi khởi động lại |
-| `tunelo pair` | Ghép thêm thiết bị bằng QR hoặc mã 6 số |
 | `tunelo devices list` / `revoke <khoá>` | Thiết bị đã ghép |
 | `tunelo claude profiles list` / `add` / `select <profile>` / `remove <profile>` | Các tài khoản Claude của máy; `add` đăng nhập ngay trong terminal; `select` đổi profile cho cả máy: phiên rảnh mở lại ngay dưới profile mới (cùng hội thoại), phiên đang chạy đổi sau lượt hiện tại |
 | `tunelo http <cổng>` / `tcp <cổng>` | Mở tunnel; inspector request ở `127.0.0.1:4040`, `tunelo watch` xem request |
@@ -58,8 +57,7 @@ bị từ chối. `off` luôn chạy được.
 
 ## Cập nhật
 
-`tunelo update` đọc các release `tunelo-v*` của repo. Máy còn `hda` 0.2.x (tên cũ) chạy `hda update`: bản cầu nối `agent-v0.3.0`
-chứa `tunelo` 2.0.0, và dịch vụ cũ tự chuyển sang `tunelo` khi khởi động lại (giữ máy, thiết bị đã ghép, subdomain, phiên).
+`tunelo update` đọc các release `tunelo-v*` của repo.
 
 Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thêm máy") mà Chat thấy không có tunnel, ô mã ghép bị khoá: `tunelo` 2.0.13
 trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
@@ -68,9 +66,29 @@ nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` l�
 `/clear` trong Chat (tunelo 2.0.15 trở lên) mở một phiên mới, trống, cùng thư mục và cài đặt, rồi chuyển sang đó; phiên cũ giữ lại làm
 lịch sử. Máy chạy bản cũ vẫn gửi `/clear` cho Claude như trước, nên lịch sử cũ còn hiện trên màn hình: chạy `tunelo update`.
 
-Lối thoát: `hda` 0.2.x chỉ đọc 20 release mới nhất. Khi `agent-v0.3.0` trôi khỏi đó, `hda update` báo không có bản mới. Chạy lại
-script cài ở trên. Script thấy `hda` thì chạy `tunelo migrate-from-hda`, thấy gói npm `tunelo` 1.x thì nhắc
-`npm uninstall -g tunelo` (không tự gỡ).
+Script cài ở trên thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
+
+## Ghép thêm thiết bị bằng mã Authenticator (2.1.0)
+
+Thiết bị mới (điện thoại, laptop khác) ghép với máy bằng mã 6 số của app Authenticator, không cần chạy lệnh nào trên máy và không cần
+cầm thiết bị đã ghép lúc ghép:
+
+1. Bật một lần từ thiết bị đã ghép (trình duyệt đã cài máy bằng lệnh "Thêm máy"): trong AI Agent, mở máy và bật ghép bằng
+   Authenticator. Trình duyệt tạo bí mật, hiện mã QR một lần để quét vào app Authenticator; nhập đúng mã đầu tiên thì bí mật mới
+   được gửi tới máy qua kênh mã hoá đầu cuối. Tạo lại bí mật cũng bằng đường đó (bí mật cũ hết hiệu lực).
+2. Trên thiết bị mới: chọn máy, nhập mã 6 số đang hiện trong app Authenticator.
+
+Bí mật nằm trong `config.json` của máy (quyền 0600), không bao giờ ghi ra log, nhật ký hoạt động hay gửi lên máy chủ Chat. Mã là
+mật khẩu của bước ghép mã hoá (CPace), nên relay không thử mã offline được. Máy chấp nhận mã của bước 30 giây trước, hiện tại và sau.
+Sai 5 lần (cộng chung mọi thiết bị) thì máy khoá ghép 15 phút; ghép đúng thì xoá đếm. Máy chưa bật thì thiết bị mới được báo cần bật
+từ thiết bị đã ghép. Nhật ký hoạt động ghi thiết bị ghép bằng Authenticator hay bằng lệnh cài, và lần đặt, tạo lại bí mật (không có
+giá trị bí mật). Mỗi lần ghép bằng mã, mọi thiết bị của tài khoản nhận thông báo "Một thiết bị mới vừa ghép với <máy>" (chỉ có tên
+máy, không có tên hay khoá thiết bị); không thấy thiết bị lạ trong "Thiết bị đã ghép" thì thu hồi nó và tạo lại mã Authenticator.
+
+Mất hết thiết bị đã ghép và cả app Authenticator: mở "Thêm máy" trong Chat trên một trình duyệt và chạy lại lệnh đó trên máy.
+`tunelo install --trust` chạy được trên máy đã cài: dừng bản chạy nền, tin trình duyệt mới, cài lại dịch vụ. Máy hiện thành một mục
+mới trong AI Agent (xoá mục cũ); thiết bị đã ghép và bí mật cũ vẫn còn, nên từ trình duyệt mới hãy thu hồi thiết bị bị mất và tạo
+lại mã Authenticator. Từ 2.1.0 máy chủ Chat chỉ nhận tunelo 2.1.0 trở lên (giao thức 2); bản cũ được báo chạy `tunelo update`.
 
 ## Phiên Claude Code hai chiều giữa Chat và máy
 

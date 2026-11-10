@@ -8,7 +8,7 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // always holds a value < 2^53; the server asserts the bound when serializing.
 
 // My machines (ADR 0013): the directory of the computers where the user runs
-// tunelo (formerly chat-agent). The server only lists them (name, OS, public
+// tunelo. The server only lists them (name, OS, public
 // key, tunnel address, last seen) and sends content-free Web Pushes for
 // them; it is never a root of trust for a machine's key and never
 // sees what goes through the tunnel. Served under /rpc with the user's
@@ -26,7 +26,7 @@ service MachinesService {
   // caller's (or is revoked).
   rpc RenameMachine(RenameMachineRequest) returns (RenameMachineResponse);
   // Removes the machine from the directory: its secret stops working for
-  // NotifyNeedsInput, and its next Heartbeat answers revoked, so chat-agent
+  // NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
   // closes its tunnel. not_found as RenameMachine.
   rpc RevokeMachine(RevokeMachineRequest) returns (RevokeMachineResponse);
   // Puts a paired device's public key on the machine's revoked list: the
@@ -208,22 +208,29 @@ message HeartbeatResponse {
   bool tunnel_refused = 5;
 }
 
-// What a waiting session needs from the user.
+// What the machine tells the user about: a waiting session, or a security
+// event of the machine.
 enum NeedsInputKind {
   NEEDS_INPUT_KIND_UNSPECIFIED = 0;
   // A tool waits for allow or deny.
   NEEDS_INPUT_KIND_APPROVAL = 1;
   // The AI asked the user a question.
   NEEDS_INPUT_KIND_QUESTION = 2;
+  // A new device was just paired with the machine using the machine's
+  // Authenticator code. The notice names the machine only, never the device
+  // (its name and key stay between the machine and its devices). Sent at
+  // once, never merged with the "needs you" notices.
+  NEEDS_INPUT_KIND_DEVICE_PAIRED = 3;
 }
 
 message NotifyNeedsInputRequest {
   NeedsInputKind kind = 1;
   // How many approvals and questions wait on the machine in total (at least
-  // 1, at most 1000).
+  // 1, at most 1000). 1 for DEVICE_PAIRED.
   int32 pending_count = 2;
   // The waiting thread, so the notification opens it: up to 64 characters of
-  // [A-Za-z0-9_-]; empty when unknown. An opaque id, never content.
+  // [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
+  // for DEVICE_PAIRED.
   string session_id = 3;
 }
 

@@ -11,6 +11,9 @@
 // - machine pushes (ADR 0013, payload kind "machine"): one per machine (tag
 //   "machine:<id>"), no content, only the machine's name and what it waits
 //   for; a click opens the machine's waiting session (/ai/<id>/s/<thread>).
+//   A device newly paired by the machine's authenticator code comes apart
+//   (tag "machine-paired:<id>", so neither replaces the other), names the
+//   machine only, and opens the machine (/ai/<id>).
 // - pushsubscriptionchange: the browser renewed the subscription; register
 //   the new one for the session (the cookie rides along) over Connect JSON.
 //
@@ -123,7 +126,7 @@ export function parsePayload(raw: unknown): PushPayload | null {
 	};
 }
 
-/** A machine's "needs you" push (server/internal/push Payload with kind "machine"). */
+/** A machine's "needs you" or "new device paired" push (server/internal/push Payload with kind "machine"). */
 export interface MachinePushPayload {
 	readonly machineId: number;
 	/** The waiting thread; "" when the agent did not say. */
@@ -144,8 +147,9 @@ export function parseMachinePayload(raw: unknown): MachinePushPayload | null {
 	const { kind, machine_id: machineId, session_id: sessionId, title, body, tag, ts } = raw as Record<string, unknown>;
 	if (kind !== "machine") return null;
 	if (typeof machineId !== "number" || !Number.isSafeInteger(machineId) || machineId <= 0) return null;
-	if (typeof title !== "string" || typeof body !== "string" || tag !== `machine:${machineId}`) return null;
-	const session = typeof sessionId === "string" && SESSION_ID.test(sessionId) ? sessionId : "";
+	if (typeof title !== "string" || typeof body !== "string") return null;
+	if (tag !== `machine:${machineId}` && tag !== `machine-paired:${machineId}`) return null;
+	const session = tag === `machine:${machineId}` && typeof sessionId === "string" && SESSION_ID.test(sessionId) ? sessionId : "";
 	const path = session === "" ? `/ai/${machineId}` : `/ai/${machineId}/s/${session}`;
 	return {
 		machineId,

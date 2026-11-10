@@ -9,3 +9,9 @@ lint:
 breaking:
   use:
     - FILE
+  # Remote protocol 2 drops the old pairing fields on purpose.
+  ignore_only:
+    FIELD_NO_DELETE:
+      - remote/v1/remote.proto
+    ENUM_VALUE_NO_DELETE:
+      - remote/v1/remote.proto

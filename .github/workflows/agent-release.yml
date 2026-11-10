@@ -6,16 +6,11 @@
 # minisign signatures of the signed files, then a GitHub Release. Afterwards pin the install
 # scripts locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS,
 # commit and push (the web deploy serves them).
-#
-# One exception: agent-v0.3.0, the bridge for machines still on hda (the
-# earlier name). hda 0.2.x updates only from agent-v* tags, files hda-* and
-# signatures commented "hda <version> <file>", so that tag builds the tunelo
-# 2.0.0 sources under those names. Never delete that release.
 name: agent-release
 
 on:
   push:
-    tags: ["tunelo-v*", "agent-v0.3.0"]
+    tags: ["tunelo-v*"]
 
 permissions:
   contents: read
@@ -43,11 +38,6 @@ jobs:
           tunelo-v*)
             prefix=tunelo version="${GITHUB_REF_NAME#tunelo-v}"
             test "$version" = "$have" || { echo "tag $version != AGENT_VERSION $have"; exit 1; }
-            ;;
-          agent-v0.3.0)
-            # The bridge carries tunelo 2.0.0 under the old names.
-            prefix=hda version=0.3.0
-            test "$have" = "2.0.0" || { echo "the bridge agent-v0.3.0 must build AGENT_VERSION 2.0.0, not $have"; exit 1; }
             ;;
           *) echo "not a release tag: $GITHUB_REF_NAME"; exit 1 ;;
           esac

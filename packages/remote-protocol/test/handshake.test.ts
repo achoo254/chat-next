@@ -7,7 +7,6 @@ import {
   HandshakeFailure,
   MIN_PROTOCOL_VERSION,
   PROTOCOL_VERSION,
-  PairingWindow,
   acceptHello,
   decodePlain,
   encodePlain,
@@ -145,42 +144,39 @@ describe("install pairing", () => {
   });
 });
 
-describe("QR pairing", () => {
-  it("pairs with the QR secret and closes the window", async () => {
+describe("new devices", () => {
+  it("refuses an unknown device even while an install is pending for another key", async () => {
+    const machine = await generateKeyPair();
+    const installer = await generateKeyPair();
+    const stranger = await generateKeyPair();
+    const secret = random(32);
+    const a = await startHandshake({ device: stranger, deviceName: "x", trust: { kind: "install", secret } });
+    const b = await acceptHello(a.hello, {
+      machine,
+      deviceStatus: () => "unknown",
+      install: { deviceKey: installer.publicKey, secret },
+    });
+    expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.UNKNOWN_DEVICE);
+  });
+
+  it("does not mark a paired device as newly paired", async () => {
     const machine = await generateKeyPair();
     const device = await generateKeyPair();
-    const window = PairingWindow.open();
-    const trust = { kind: "qr" as const, machineKey: machine.publicKey, secret: window.secret };
-    const a = await startHandshake({ device, deviceName: "phone", trust });
-    const b = await acceptHello(a.hello, { machine, deviceStatus: () => "unknown", pairing: window });
+    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const b = await acceptHello(a.hello, { machine, deviceStatus: () => "paired" });
     if (!b.ok) throw new Error("expected ready");
-    expect(b.pairedBy).toBe("qr");
-    await a.finish(b.reply);
-    expect(window.check(Date.now())).toBe(HandshakeErrorCode.PAIRING_EXPIRED);
+    expect(b.pairedBy).toBeUndefined();
   });
 
-  it("counts a wrong secret and stops after 5", async () => {
-    const machine = await generateKeyPair();
-    const device = await generateKeyPair();
-    const window = PairingWindow.open();
-    const trust = { kind: "qr" as const, machineKey: machine.publicKey, secret: random(32) };
-    for (let i = 0; i < 5; i++) {
-      const a = await startHandshake({ device, deviceName: "x", trust });
-      const b = await acceptHello(a.hello, { machine, deviceStatus: () => "unknown", pairing: window });
-      expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.BAD_PROOF);
-    }
-    const a = await startHandshake({ device, deviceName: "x", trust });
-    const b = await acceptHello(a.hello, { machine, deviceStatus: () => "unknown", pairing: window });
-    expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.TOO_MANY_ATTEMPTS);
-  });
-
-  it("expires after 10 minutes", async () => {
-    const machine = await generateKeyPair();
-    const device = await generateKeyPair();
-    const window = PairingWindow.open(0);
-    const trust = { kind: "qr" as const, machineKey: machine.publicKey, secret: window.secret };
-    const a = await startHandshake({ device, deviceName: "x", trust });
-    const b = await acceptHello(a.hello, { machine, deviceStatus: () => "unknown", pairing: window, now: () => 10 * 60 * 1000 });
-    expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.PAIRING_EXPIRED);
+  it("refuses a peer that only speaks protocol 1", async () => {
+    const { machine, device, deviceStatus } = await setup();
+    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const plain = decodePlain(a.hello);
+    if (plain.body.case !== "hello") throw new Error("expected hello");
+    const old = create(HelloSchema, { ...plain.body.value, protocolVersion: 1, minProtocolVersion: 1 });
+    const b = await acceptHello(encodePlain({ case: "hello", value: old }), { machine, deviceStatus });
+    expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.VERSION_UNSUPPORTED);
+    expect(PROTOCOL_VERSION).toBe(2);
+    expect(MIN_PROTOCOL_VERSION).toBe(2);
   });
 });

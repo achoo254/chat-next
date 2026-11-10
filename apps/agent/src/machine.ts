@@ -1,7 +1,7 @@
 // The running service: config, machine key, core, local server (the
 // devices' WebSocket, and Localman's requests for localhost under
-// `/.tunelo/forward`, tunnels/forward.ts), pairing window and the "needs you"
-// push decision.
+// `/.tunelo/forward`, tunnels/forward.ts), pairing by the authenticator code
+// and the "needs you" push decision.
 import { type IncomingMessage, type Server, createServer } from "node:http";
 import type { Duplex } from "node:stream";
 import { arch, homedir, hostname, platform } from "node:os";
@@ -12,8 +12,7 @@ import {
   type KeyPair,
   type MachineAuth,
   PROTOCOL_VERSION,
-  PairingWindow,
-  encodeQr,
+  TotpPairing,
   fromBase64Url,
   toBase64Url,
 } from "@achoo254/chat-remote-protocol";
@@ -64,6 +63,8 @@ export type MachineOptions = {
   profiles?: ClaudeProfiles;
   /** Sends a content-free "needs you" push through the chat server. */
   notify?: (thread: ThreadSummary, pending: number) => void;
+  /** Tells the account's devices, through the chat server, that a device was paired by the authenticator code. */
+  notifyPaired?: () => void;
   log?: (line: string) => void;
   /** tunelo's MCP for the sessions this machine opens (its tickets); absent in tests. */
   mcp?: McpHost;
@@ -89,7 +90,8 @@ export class Machine {
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
   private key!: KeyPair;
-  private pairing: PairingWindow | undefined;
+  /** Pairing by the authenticator code; its failed-attempt count lives only in memory. */
+  private readonly pairing: TotpPairing;
   private server: Server | undefined;
   private wss: WebSocketServer | undefined;
   private port = 0;
@@ -113,6 +115,8 @@ export class Machine {
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
     this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
     const c = this.config.get();
+    this.pairing = new TotpPairing(this.config.totpSecret());
+    if (c.totpSecret && !this.pairing.enabled) this.log("authenticator secret in config.json is not valid: set it again from a paired device");
     this.profiles =
       opts.profiles ??
       new ClaudeProfiles({
@@ -274,14 +278,13 @@ export class Machine {
     this.opts.notify = fn;
   }
 
-  get publicKey(): Uint8Array {
-    return this.key.publicKey;
+  /** Wired once the machine is registered with the chat server. */
+  setNotifyPaired(fn: () => void): void {
+    this.opts.notifyPaired = fn;
   }
 
-  /** `tunelo pair`: a 10-minute window with a QR payload and a 6-digit code. */
-  openPairing(): { code: string; qr: string; expiresAt: number } {
-    this.pairing = PairingWindow.open();
-    return { code: this.pairing.code, qr: encodeQr(this.key.publicKey, this.pairing.secret), expiresAt: this.pairing.expiresAt };
+  get publicKey(): Uint8Array {
+    return this.key.publicKey;
   }
 
   /** Cuts every live connection of a device that was just revoked. */
@@ -298,7 +301,6 @@ export class Machine {
       machine: this.key,
       deviceStatus: (k) => this.config.deviceStatus(k),
       install: install ? { deviceKey: fromBase64Url(install.deviceKey), secret: fromBase64Url(install.secret) } : undefined,
-      pairing: this.pairing,
     };
   }
 
@@ -315,7 +317,7 @@ export class Machine {
         config: this.config,
         audit: this.audit,
         auth: () => this.auth(),
-        pairing: () => this.pairing,
+        pairing: this.pairing,
         machineInfo: () => this.machineInfo(),
         isSensitive: this.isSensitive,
         profiles: this.profiles,
@@ -328,8 +330,16 @@ export class Machine {
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
           if (via === "install") this.config.update((c) => delete c.install);
-          else this.pairing = undefined;
           this.log(`paired a device (${via})`);
+          // Devices already connected see the new one in the machine's device list.
+          void this.announceInfo();
+          // A device paired from afar by the code: every device of the account
+          // hears of it. Not after an install, which the owner ran on this machine.
+          if (via === "totp") this.opts.notifyPaired?.();
+        },
+        onTotpSet: () => {
+          this.log("authenticator pairing set from a paired device");
+          void this.announceInfo();
         },
       },
     );
@@ -407,6 +417,7 @@ export class Machine {
       gitChanges: true,
       browser: { available: this.browser.available(), running: this.browser.running(), clearable: true },
       screenShare: this.screenShare.supported,
+      totpEnabled: this.pairing.enabled,
     });
   }
 

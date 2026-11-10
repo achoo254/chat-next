@@ -10,7 +10,7 @@ import { KeyStoreUnavailableError, machineKey, seal, unseal } from "../src/keyst
 import { tempDir } from "./harness.ts";
 
 describe.runIf(process.platform === "darwin")("Keychain backend", () => {
-	const saved = { path: process.env.PATH, keystore: process.env.TUNELO_KEYSTORE, legacy: process.env.CHAT_AGENT_KEYSTORE };
+	const saved = { path: process.env.PATH, keystore: process.env.TUNELO_KEYSTORE };
 	let store = "";
 
 	beforeEach(() => {
@@ -30,13 +30,11 @@ describe.runIf(process.platform === "darwin")("Keychain backend", () => {
 		process.env.PATH = `${bin}:${saved.path ?? ""}`;
 		process.env.FAKE_KEYCHAIN = store;
 		delete process.env.TUNELO_KEYSTORE;
-		delete process.env.CHAT_AGENT_KEYSTORE;
 	});
 
 	afterEach(() => {
 		process.env.PATH = saved.path;
 		process.env.TUNELO_KEYSTORE = saved.keystore ?? "";
-		process.env.CHAT_AGENT_KEYSTORE = saved.legacy ?? "";
 	});
 
 	const lock = () => writeFileSync(join(store, "locked"), "");

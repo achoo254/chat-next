@@ -38,7 +38,6 @@ let forwardBlocked: number[] = [];
 /** A machine with just what the commands touch. */
 function fakeMachine(): Machine {
   const fake = {
-    openPairing: () => ({ code: "123456", qr: "qr-payload", expiresAt: 0 }),
     machineInfo: async () => ({ name: "mac", agentVersion: "2.0.0", providers: [], openSessions: 0, maxSessions: 3, memoryMb: 1 }),
     config: {
       get: () => ({ devices: [{ key: "devicekey123456", name: "phone", addedAt: 0 }], trustedDirs: [] }),
@@ -144,7 +143,6 @@ describe("control socket", () => {
         "POST /local-forward/blocked",
         "POST /mcp/call",
         "POST /mcp/tools",
-        "POST /pair",
         "POST /registration/retry",
         "POST /restart",
         "POST /streams/alive",
@@ -254,7 +252,6 @@ describe("control socket", () => {
     const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     try {
       await call("GET", "/status");
-      await call("POST", "/pair");
       await call("GET", "/devices");
       await call("POST", "/devices/revoke", { key: "devicekey" });
       await call("GET", "/trust");

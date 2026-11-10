@@ -17,9 +17,6 @@
 #
 #   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- [vi|en|zh-CN]
 #
-# A Mac that still runs hda (the earlier name of tunelo) is moved to tunelo
-# first either way, keeping the machine, its paired devices and sessions.
-#
 # The release is pinned: version and SHA-256 of every file are written into
 # this script when the web app is built for a tunelo release, and the
 # minisign signature is checked with the embedded public key when minisign
@@ -99,12 +96,6 @@ main() {
 	*) die "kiến trúc máy không được hỗ trợ." "this processor is not supported." "不支持此处理器。" ;;
 	esac
 
-	# hda keeps its config here; the marker means it has already moved to tunelo.
-	hda_dir="${CHAT_AGENT_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/chat-agent}"
-	from_hda=""
-	if [ -f "$hda_dir/config.json" ] && [ ! -f "$hda_dir/migrated-to-tunelo" ]; then
-		from_hda="yes"
-	fi
 	tmp="$(mktemp -d)"
 	trap 'rm -rf "$tmp"' EXIT
 	trap 'exit 130' INT TERM
@@ -147,18 +138,10 @@ main() {
 			"注意：旧的 tunelo 1.x npm 包仍已安装，可能遮住新的 tunelo 命令。请运行 npm uninstall -g tunelo 卸载。"
 	fi
 
-	if [ -n "$from_hda" ]; then
-		say "Tìm thấy hda trên máy; đang chuyển sang tunelo (giữ máy, thiết bị đã ghép và các phiên)…" \
-			"Found hda on this Mac; moving it to tunelo (the machine, paired devices and sessions stay)…" \
-			"在这台 Mac 上找到 hda；正在迁移到 tunelo（保留电脑、已配对设备和会话）…"
-		"$bin" migrate-from-hda || die "chuyển hda sang tunelo không thành công; hda vẫn chạy như cũ." \
-			"moving hda to tunelo failed; hda keeps running as before." "hda 迁移到 tunelo 失败；hda 仍照常运行。"
-	fi
-
 	if [ -z "$device_key" ]; then
 		# A running background service still runs the previous file: restart it
-		# on the new one (moving from hda already started tunelo).
-		if [ -z "$from_hda" ] && "$bin" status --json >/dev/null 2>&1; then
+		# on the new one.
+		if "$bin" status --json >/dev/null 2>&1; then
 			say "Đang khởi động lại tunelo chạy nền với bản mới…" "Restarting the background tunelo on the new version…" "正在用新版本重启后台 tunelo…"
 			"$bin" stop >/dev/null 2>&1 || true
 			"$bin" start || say "Chưa khởi động lại được; chạy tunelo start." "Could not restart it; run tunelo start." "无法重启；请运行 tunelo start。"

@@ -1,7 +1,8 @@
 // Consent log on the machine: append-only JSONL of what a device agreed to
 // (opening a session in a sensitive folder, loading project settings,
-// approving a tool that touches a sensitive path, pairing, revoking,
-// switching the permission mode, adding, picking or removing a Claude profile,
+// approving a tool that touches a sensitive path, pairing (by install or by
+// the authenticator code), setting the authenticator secret (never its value),
+// revoking, switching the permission mode, adding, picking or removing a Claude profile,
 // turning forwarding to localhost on or off, blocking ports for it, giving,
 // using or removing a sign-in secret: never its value).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
@@ -13,6 +14,7 @@ export type AuditAction =
   | "project_settings"
   | "approve_sensitive"
   | "pair"
+  | "totp_set"
   | "revoke"
   | "permission_mode"
   | "profile_add"

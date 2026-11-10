@@ -1,17 +1,28 @@
-// Pairing a new device with a machine.
+// Pairing a new device (A) with a machine (B) by the machine's authenticator
+// code. B keeps a TOTP secret (totp.ts) that a paired device set; the user
+// reads the current 6-digit code from their authenticator app and types it on
+// the new device. Nothing secret goes through the chat server.
 //
-// - One-command install: the browser makes a 32-byte secret and gives it to
-//   `chat-agent install` on stdin; B proves it in the handshake (see
-//   handshake.ts). Nothing secret goes through the chat server.
-// - `chat-agent pair` opens a PairingWindow for 10 minutes and prints a QR
-//   (B's key + a 32-byte secret) and a 6-digit code. The QR path is proven
-//   in the handshake; the code path runs CPace (a balanced PAKE on
-//   ristretto255) first, so a relay that watches the exchange cannot test
-//   codes offline, and each wrong guess costs one of 5 attempts.
+// The code is the password of CPace (a balanced PAKE on ristretto255), so a
+// relay that watches or tampers with the exchange cannot test codes offline:
+// each guess needs a live PakeStart. B cannot tell which 30-second step the
+// device's code came from, so its PakeReply holds one CPace candidate per
+// accepted step (previous, current, next), each with its own share and tag;
+// A keeps the one whose tag checks and B, on PakeFinish, tries every
+// candidate. Wrong codes fail the same way whatever the step.
+//
+// Every PakeStart counts as an attempt before any work is done; 5 attempts
+// that did not pair lock pairing for 15 minutes, and a successful pairing
+// clears the count. Once paired, the device reconnects with a normal Hello.
+//
+// The one-command install (`tunelo install --trust`) is not pairing by code:
+// B proves the install secret in the handshake instead (handshake.ts).
 import { create } from "@bufbuild/protobuf";
 import { ristretto255, ristretto255_hasher } from "@noble/curves/ed25519.js";
 import {
   HandshakeErrorCode,
+  type PakeCandidate,
+  PakeCandidateSchema,
   type PakeFinish,
   PakeFinishSchema,
   type PakeReply,
@@ -19,63 +30,81 @@ import {
   type PakeStart,
   PakeStartSchema,
 } from "@achoo254/chat-proto/remote/remote";
-import { equal, fromBase64Url, lv, random, toBase64Url, utf8 } from "../bytes.ts";
+import { equal, lv, random, utf8 } from "../bytes.ts";
 import { hmac, sha256 } from "./primitives.ts";
+import { isTotpSecret, normalizeTotpCode, totpCandidates } from "./totp.ts";
 
-export const PAIRING_TTL_MS = 10 * 60 * 1000;
 export const PAIRING_MAX_ATTEMPTS = 5;
+export const PAIRING_LOCKOUT_MS = 15 * 60 * 1000;
+export const PAIRING_LOCKOUT_MAX_MS = 24 * 60 * 60 * 1000;
 
-/** B's state while `chat-agent pair` runs. */
-export class PairingWindow {
+/** How pairing a new device was proven, for the audit log. */
+export type PairingMethod = "install" | "totp";
+
+/**
+ * B's long-lived pairing state: the authenticator secret, if one is set, and
+ * the shared count of attempts that did not pair. Kept in memory; the agent
+ * stores the secret itself.
+ */
+export class TotpPairing {
+  private secretBytes: Uint8Array<ArrayBuffer> | undefined;
   private attempts = 0;
-  private used = false;
+  private lockouts = 0;
+  private lockedUntilMs = 0;
 
-  constructor(
-    readonly code: string,
-    readonly secret: Uint8Array<ArrayBuffer>,
-    readonly expiresAt: number,
-  ) {}
-
-  static open(now = Date.now()): PairingWindow {
-    return new PairingWindow(sixDigits(), random(32), now + PAIRING_TTL_MS);
+  constructor(secret?: Uint8Array) {
+    if (secret) this.setSecret(secret);
   }
 
-  /** Null while the window still accepts an attempt. */
+  get enabled(): boolean {
+    return this.secretBytes !== undefined;
+  }
+
+  /** Unix milliseconds until which pairing is locked; 0 when not locked. */
+  get lockedUntil(): number {
+    return this.lockedUntilMs;
+  }
+
+  /** Sets or replaces the secret; a new secret also clears the attempt count. */
+  setSecret(secret: Uint8Array): void {
+    if (!isTotpSecret(secret)) throw new Error("a TOTP secret is 20 bytes");
+    this.secretBytes = new Uint8Array(secret);
+    this.succeed();
+  }
+
+  /** Null while pairing accepts an attempt; otherwise why it does not. */
   check(now: number): HandshakeErrorCode | null {
-    if (this.used || now >= this.expiresAt) return HandshakeErrorCode.PAIRING_EXPIRED;
-    if (this.attempts >= PAIRING_MAX_ATTEMPTS) return HandshakeErrorCode.TOO_MANY_ATTEMPTS;
+    if (!this.secretBytes) return HandshakeErrorCode.TOTP_NOT_SET;
+    if (now < this.lockedUntilMs) return HandshakeErrorCode.TOO_MANY_ATTEMPTS;
     return null;
   }
 
-  fail(): void {
+  /**
+   * Counts one attempt; the fifth locks pairing. The first lock lasts
+   * PAIRING_LOCKOUT_MS and each lock in a row doubles it, up to
+   * PAIRING_LOCKOUT_MAX_MS, so guessing for months stays out of reach.
+   */
+  fail(now: number): void {
     this.attempts += 1;
+    if (this.attempts >= PAIRING_MAX_ATTEMPTS) {
+      this.attempts = 0;
+      const lockMs = Math.min(PAIRING_LOCKOUT_MS * 2 ** this.lockouts, PAIRING_LOCKOUT_MAX_MS);
+      this.lockouts += 1;
+      this.lockedUntilMs = now + lockMs;
+    }
   }
 
-  /** One successful pairing closes the window. */
-  consume(): void {
-    this.used = true;
+  /** A device paired or the secret changed: counts and any lock are cleared. */
+  succeed(): void {
+    this.attempts = 0;
+    this.lockouts = 0;
+    this.lockedUntilMs = 0;
   }
-}
 
-function sixDigits(): string {
-  // Rejection sampling keeps every code equally likely.
-  for (;;) {
-    const n = new DataView(random(4).buffer).getUint32(0);
-    if (n < 4_294_000_000) return String(n % 1_000_000).padStart(6, "0");
+  /** The codes accepted at `now`; empty without a secret. */
+  codes(now: number): string[] {
+    return this.secretBytes ? totpCandidates(this.secretBytes, now) : [];
   }
-}
-
-/** What the QR shows: machine key and secret, base64url, dot-separated. */
-export function encodeQr(machineKey: Uint8Array, secret: Uint8Array): string {
-  return `hrp1.${toBase64Url(machineKey)}.${toBase64Url(secret)}`;
-}
-
-export function decodeQr(text: string): { machineKey: Uint8Array<ArrayBuffer>; secret: Uint8Array<ArrayBuffer> } {
-  const [tag, key, secret] = text.trim().split(".");
-  if (tag !== "hrp1" || !key || !secret) throw new Error("not a pairing code");
-  const out = { machineKey: fromBase64Url(key), secret: fromBase64Url(secret) };
-  if (out.machineKey.length !== 32 || out.secret.length !== 32) throw new Error("not a pairing code");
-  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +116,7 @@ const Point = ristretto255.Point;
 type RPoint = InstanceType<typeof Point>;
 
 function generator(code: string, sid: Uint8Array): RPoint {
-  const msg = lv(DSI, utf8(code), utf8("hoandat-remote-pair"), sid);
+  const msg = lv(DSI, utf8(code), utf8("hoandat-remote-pair-totp"), sid);
   return ristretto255_hasher.hashToCurve(msg, { DST: "CPaceRistretto255_G" }) as RPoint;
 }
 
@@ -121,68 +150,122 @@ async function sessionKey(sid: Uint8Array, k: RPoint, ya: Uint8Array, yb: Uint8A
   return sha256(lv(utf8("CPaceRistretto255_ISK"), sid, k.toBytes(), ya, yb));
 }
 
-function pakeTranscript(start: PakeStart, reply: Pick<PakeReply, "share" | "staticKey">) {
-  return sha256(lv(start.sid, start.share, start.staticKey, utf8(start.deviceName), reply.share, reply.staticKey));
+function pakeTranscript(start: PakeStart, share: Uint8Array, staticKey: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return sha256(lv(start.sid, start.share, start.staticKey, utf8(start.deviceName), share, staticKey));
 }
 
-/** Device side (A): the user typed the code shown on B. */
-export async function pakeStart(opts: { code: string; deviceKey: Uint8Array; deviceName: string }) {
+export type DevicePake = {
+  /** Send as Plain.pakeStart. */
+  start: PakeStart;
+  /**
+   * Checks B's candidates; returns B's key to pin and the PakeFinish to send.
+   * Throws PakeFailure when no candidate matches the code (a wrong code).
+   */
+  finish(reply: PakeReply): Promise<{ machineKey: Uint8Array; finish: PakeFinish }>;
+};
+
+/** Device side (A): the user typed the machine's authenticator code. */
+export async function pakeStart(opts: { code: string; deviceKey: Uint8Array; deviceName: string }): Promise<DevicePake> {
+  const code = normalizeTotpCode(opts.code);
+  if (code === null) throw new Error("the pairing code is 6 digits");
+  if (opts.deviceKey.length !== 32) throw new Error("bad device key");
   const sid = random(16);
-  const g = generator(opts.code, sid);
   const y = randomScalar();
   const start = create(PakeStartSchema, {
-    share: g.multiply(y).toBytes(),
+    share: generator(code, sid).multiply(y).toBytes(),
     staticKey: opts.deviceKey,
     deviceName: opts.deviceName.slice(0, 64),
     sid,
   });
   return {
     start,
-    /** Checks B's tag; returns B's key to pin and the finish message. */
-    async finish(reply: PakeReply): Promise<{ machineKey: Uint8Array; finish: PakeFinish }> {
-      const isk = await sessionKey(sid, decodePoint(reply.share).multiply(y), start.share, reply.share);
-      const t = await pakeTranscript(start, reply);
-      if (!equal(await hmac(isk, utf8("B"), t), reply.tag)) throw new PakeFailure();
+    async finish(reply) {
       if (reply.staticKey.length !== 32) throw new PakeFailure();
-      return {
-        machineKey: reply.staticKey,
-        finish: create(PakeFinishSchema, { tag: await hmac(isk, utf8("A"), t) }),
-      };
+      for (const c of reply.candidates) {
+        let isk: Uint8Array<ArrayBuffer>;
+        try {
+          isk = await sessionKey(sid, decodePoint(c.share).multiply(y), start.share, c.share);
+        } catch {
+          continue;
+        }
+        const t = await pakeTranscript(start, c.share, reply.staticKey);
+        if (!equal(await hmac(isk, utf8("B"), t), c.tag)) continue;
+        return {
+          machineKey: reply.staticKey,
+          finish: create(PakeFinishSchema, { tag: await hmac(isk, utf8("A"), t) }),
+        };
+      }
+      throw new PakeFailure();
     },
   };
 }
 
-/** Machine side (B): answer a PakeStart while the window is open. */
-export async function pakeReply(opts: { window: PairingWindow; machineKey: Uint8Array; start: PakeStart; now?: number }) {
-  const closed = opts.window.check(opts.now ?? Date.now());
-  if (closed) return { ok: false as const, code: closed };
-  const { start } = opts;
-  if (start.sid.length !== 16 || start.staticKey.length !== 32) {
-    return { ok: false as const, code: HandshakeErrorCode.MALFORMED };
+export type MachinePake =
+  | { ok: false; code: HandshakeErrorCode }
+  | {
+      ok: true;
+      /** Send as Plain.pakeReply. */
+      reply: PakeReply;
+      /**
+       * Verifies A's PakeFinish; on success the attempt count is cleared and
+       * the device key can be added to the paired list. Null on a wrong tag.
+       */
+      confirm(finish: PakeFinish): Promise<{ deviceKey: Uint8Array; deviceName: string } | null>;
+    };
+
+/** Machine side (B): answer a PakeStart with one candidate per accepted step. */
+export async function pakeReply(opts: {
+  pairing: TotpPairing;
+  machineKey: Uint8Array;
+  start: PakeStart;
+  now?: number;
+}): Promise<MachinePake> {
+  const now = opts.now ?? Date.now();
+  const { pairing, start } = opts;
+  const closed = pairing.check(now);
+  if (closed !== null) return { ok: false, code: closed };
+  if (start.sid.length !== 16 || start.staticKey.length !== 32 || start.share.length !== 32) {
+    return { ok: false, code: HandshakeErrorCode.MALFORMED };
   }
-  // Counted now: an attacker who never sends PakeFinish still spends a try.
-  opts.window.fail();
-  const g = generator(opts.window.code, start.sid);
-  const y = randomScalar();
-  let isk: Uint8Array<ArrayBuffer>;
-  const share = g.multiply(y).toBytes();
+  let ya: RPoint;
   try {
-    isk = await sessionKey(start.sid, decodePoint(start.share).multiply(y), start.share, share);
+    ya = decodePoint(start.share);
   } catch {
-    return { ok: false as const, code: HandshakeErrorCode.MALFORMED };
+    return { ok: false, code: HandshakeErrorCode.MALFORMED };
   }
-  const t = await pakeTranscript(start, { share, staticKey: opts.machineKey });
-  const reply = create(PakeReplySchema, { share, staticKey: opts.machineKey, tag: await hmac(isk, utf8("B"), t) });
-  const window = opts.window;
+  // Counted before any await: parallel attempts cannot slip past the lock,
+  // and one that never sends PakeFinish still spends its try.
+  pairing.fail(now);
+
+  const keys: { isk: Uint8Array<ArrayBuffer>; t: Uint8Array<ArrayBuffer> }[] = [];
+  const candidates: PakeCandidate[] = [];
+  for (const code of pairing.codes(now)) {
+    const y = randomScalar();
+    const share = generator(code, start.sid).multiply(y).toBytes();
+    let isk: Uint8Array<ArrayBuffer>;
+    try {
+      isk = await sessionKey(start.sid, ya.multiply(y), start.share, share);
+    } catch {
+      return { ok: false, code: HandshakeErrorCode.MALFORMED };
+    }
+    const t = await pakeTranscript(start, share, opts.machineKey);
+    keys.push({ isk, t });
+    candidates.push(create(PakeCandidateSchema, { share, tag: await hmac(isk, utf8("B"), t) }));
+  }
+  const reply = create(PakeReplySchema, { staticKey: opts.machineKey, candidates });
+  let done = false;
   return {
-    ok: true as const,
+    ok: true,
     reply,
-    /** Verifies A's tag; on success the device key can be added to the paired list. */
-    async confirm(finish: PakeFinish): Promise<{ deviceKey: Uint8Array; deviceName: string } | null> {
-      if (!equal(await hmac(isk, utf8("A"), t), finish.tag)) return null;
-      window.consume();
-      return { deviceKey: start.staticKey, deviceName: start.deviceName };
+    async confirm(finish) {
+      if (done) return null;
+      done = true;
+      let ok = false;
+      // Every candidate is checked, so timing does not tell which step matched.
+      for (const k of keys) ok = equal(await hmac(k.isk, utf8("A"), k.t), finish.tag) || ok;
+      if (!ok) return null;
+      pairing.succeed();
+      return { deviceKey: start.staticKey, deviceName: start.deviceName.slice(0, 64) };
     },
   };
 }
-

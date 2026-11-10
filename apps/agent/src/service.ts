@@ -16,9 +16,6 @@ const run = promisify(execFile);
 const LABEL = "com.hoandat.tunelo";
 const RUN_KEY = String.raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`;
 const RUN_VALUE = "tunelo";
-/** Names the supervisor of hda (chat-agent before that) was registered under. */
-const LEGACY_LABEL = "com.hoandat.chat-agent";
-const LEGACY_RUN_VALUE = "chat-agent";
 
 /** True inside a `bun build --compile` file, whose script lives in Bun's virtual FS. */
 export function isCompiled(): boolean {
@@ -68,8 +65,8 @@ function plist(args: string[], logDir: string): string {
 `;
 }
 
-const plistFile = (label = LABEL) => join(homedir(), "Library", "LaunchAgents", `${label}.plist`);
-const launchdTarget = (label = LABEL) => `gui/${process.getuid?.() ?? 0}/${label}`;
+const plistFile = () => join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
+const launchdTarget = () => `gui/${process.getuid?.() ?? 0}/${LABEL}`;
 
 /** Writes the hidden restart loop (Windows) and returns the script that starts it. */
 function writeWindowsLoop(configDir: string, cmd: string[]): string {
@@ -174,29 +171,4 @@ export async function uninstallService(configDir: string): Promise<void> {
     rmSync(join(configDir, "run-agent.cmd"), { force: true });
     rmSync(join(configDir, "run-agent.vbs"), { force: true });
   }
-}
-
-/** Stops the old hda agent, if one still answers: Windows only (on macOS bootoutLegacy stops it). */
-export async function stopLegacyAgent(legacyDir: string): Promise<void> {
-  if (process.platform !== "win32") return;
-  // Its loop ends on the "stop" file the caller wrote; the agent exits cleanly.
-  await callControl(legacyDir, "POST", "/restart").catch(() => undefined);
-}
-
-/** Removes the login entry of hda: the Run value (Windows) or the LaunchAgent file (macOS). */
-export async function removeLegacyAutostart(): Promise<void> {
-  if (process.platform === "darwin") {
-    rmSync(plistFile(LEGACY_LABEL), { force: true });
-  } else if (process.platform === "win32") {
-    await run("reg", ["delete", RUN_KEY, "/v", LEGACY_RUN_VALUE, "/f"]).catch(() => undefined);
-  }
-}
-
-/**
- * Unloads the LaunchAgent of hda. This kills its process, which may be the
- * very process calling it, so it has to be the last step.
- */
-export async function bootoutLegacy(): Promise<void> {
-  if (process.platform !== "darwin") return;
-  await run("launchctl", ["bootout", launchdTarget(LEGACY_LABEL)]).catch(() => undefined);
 }

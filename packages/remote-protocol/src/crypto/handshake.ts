@@ -15,11 +15,11 @@ import {
 } from "@achoo254/chat-proto/remote/remote";
 import { concat, equal, lv, random, u32, utf8 } from "../bytes.ts";
 import { type SessionKeys, Session, openBytes, sealBytes } from "./framing.ts";
-import type { PairingWindow } from "./pairing.ts";
+import type { PairingMethod } from "./pairing.ts";
 import { type KeyPair, dh, generateKeyPair, hkdf, hmac, sha256 } from "./primitives.ts";
 
-export const PROTOCOL_VERSION = 1;
-export const MIN_PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+export const MIN_PROTOCOL_VERSION = 2;
 
 const LABEL = "hoandat-remote-v1";
 const MAX_DEVICE_NAME = 64;
@@ -58,12 +58,12 @@ function versionsCompatible(peer: { protocolVersion: number; minProtocolVersion:
   return peer.protocolVersion >= MIN_PROTOCOL_VERSION && PROTOCOL_VERSION >= peer.minProtocolVersion;
 }
 
-export function installProof(secret: Uint8Array<ArrayBuffer>, deviceKey: Uint8Array, machineKey: Uint8Array) {
+export function installProof(
+  secret: Uint8Array<ArrayBuffer>,
+  deviceKey: Uint8Array,
+  machineKey: Uint8Array,
+): Promise<Uint8Array<ArrayBuffer>> {
   return hmac(secret, utf8("install"), deviceKey, machineKey);
-}
-
-export function qrProof(secret: Uint8Array<ArrayBuffer>, deviceKey: Uint8Array, machineKey: Uint8Array) {
-  return hmac(secret, utf8("qr"), deviceKey, machineKey);
 }
 
 async function transcript(h: Hello, r: Omit<Ready, "confirm">): Promise<Uint8Array<ArrayBuffer>> {
@@ -71,7 +71,7 @@ async function transcript(h: Hello, r: Omit<Ready, "confirm">): Promise<Uint8Arr
     lv(utf8(LABEL)),
     u32(h.protocolVersion),
     u32(h.minProtocolVersion),
-    lv(h.ephemeralKey, h.staticKey, h.nonce, h.pairProof, utf8(h.deviceName)),
+    lv(h.ephemeralKey, h.staticKey, h.nonce, utf8(h.deviceName)),
     u32(r.protocolVersion),
     u32(r.minProtocolVersion),
     lv(r.ephemeralKey, r.staticKey, r.nonce, r.installProof),
@@ -91,9 +91,7 @@ export type DeviceTrust =
   /** B's machine key pinned at pairing. */
   | { kind: "pinned"; machineKey: Uint8Array }
   /** First connection after the one-command install: B proves the secret. */
-  | { kind: "install"; secret: Uint8Array<ArrayBuffer> }
-  /** QR pairing: the QR carried B's key and a secret A proves. */
-  | { kind: "qr"; machineKey: Uint8Array<ArrayBuffer>; secret: Uint8Array<ArrayBuffer> };
+  | { kind: "install"; secret: Uint8Array<ArrayBuffer> };
 
 export type DeviceHandshake = {
   /** Send this first. */
@@ -108,17 +106,12 @@ export async function startHandshake(opts: {
   trust: DeviceTrust;
 }): Promise<DeviceHandshake> {
   const eph = await generateKeyPair();
-  const pairProof =
-    opts.trust.kind === "qr"
-      ? await qrProof(opts.trust.secret, opts.device.publicKey, opts.trust.machineKey)
-      : new Uint8Array();
   const hello = create(HelloSchema, {
     protocolVersion: PROTOCOL_VERSION,
     minProtocolVersion: MIN_PROTOCOL_VERSION,
     ephemeralKey: eph.publicKey,
     staticKey: opts.device.publicKey,
     nonce: random(32),
-    pairProof,
     deviceName: opts.deviceName.slice(0, MAX_DEVICE_NAME),
   });
 
@@ -169,11 +162,8 @@ export type DeviceStatus = "paired" | "revoked" | "unknown";
 export type MachineAuth = {
   machine: KeyPair;
   deviceStatus(deviceKey: Uint8Array): DeviceStatus;
-  /** Set from `chat-agent install --trust`: the installing browser's key and secret. */
+  /** Set from `tunelo install --trust`: the installing browser's key and secret. */
   install?: { deviceKey: Uint8Array; secret: Uint8Array<ArrayBuffer> } | undefined;
-  /** Open while `chat-agent pair` runs. */
-  pairing?: PairingWindow | undefined;
-  now?: () => number;
 };
 
 export type Accepted = {
@@ -182,8 +172,11 @@ export type Accepted = {
   session: Session;
   deviceKey: Uint8Array;
   deviceName: string;
-  /** Set when this handshake paired a new device. */
-  pairedBy?: "install" | "qr";
+  /**
+   * Set when this handshake paired a new device. Pairing by authenticator
+   * code happens before the handshake (pairing.ts), so only "install" here.
+   */
+  pairedBy?: Extract<PairingMethod, "install">;
 };
 
 export type Rejected = { ok: false; reply: Uint8Array; code: HandshakeErrorCode };
@@ -213,16 +206,8 @@ export async function acceptHello(bytes: Uint8Array, auth: MachineAuth): Promise
     proof = await installProof(auth.install.secret, deviceKey, machineKey);
     if (status === "unknown") pairedBy = "install";
   } else if (status === "unknown") {
-    if (hello.pairProof.length === 0 || !auth.pairing) return reject(HandshakeErrorCode.UNKNOWN_DEVICE);
-    const closed = auth.pairing.check(auth.now?.() ?? Date.now());
-    if (closed) return reject(closed);
-    const want = await qrProof(auth.pairing.secret, deviceKey, machineKey);
-    if (!equal(want, hello.pairProof)) {
-      auth.pairing.fail();
-      return reject(HandshakeErrorCode.BAD_PROOF);
-    }
-    auth.pairing.consume();
-    pairedBy = "qr";
+    // A new device pairs by authenticator code first (PakeStart).
+    return reject(HandshakeErrorCode.UNKNOWN_DEVICE);
   }
 
   const eph = await generateKeyPair();

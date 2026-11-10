@@ -21,7 +21,8 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// What a waiting session needs from the user.
+// What the machine tells the user about: a waiting session, or a security
+// event of the machine.
 type NeedsInputKind int32
 
 const (
@@ -30,6 +31,11 @@ const (
 	NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL NeedsInputKind = 1
 	// The AI asked the user a question.
 	NeedsInputKind_NEEDS_INPUT_KIND_QUESTION NeedsInputKind = 2
+	// A new device was just paired with the machine using the machine's
+	// Authenticator code. The notice names the machine only, never the device
+	// (its name and key stay between the machine and its devices). Sent at
+	// once, never merged with the "needs you" notices.
+	NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED NeedsInputKind = 3
 )
 
 // Enum value maps for NeedsInputKind.
@@ -38,11 +44,13 @@ var (
 		0: "NEEDS_INPUT_KIND_UNSPECIFIED",
 		1: "NEEDS_INPUT_KIND_APPROVAL",
 		2: "NEEDS_INPUT_KIND_QUESTION",
+		3: "NEEDS_INPUT_KIND_DEVICE_PAIRED",
 	}
 	NeedsInputKind_value = map[string]int32{
-		"NEEDS_INPUT_KIND_UNSPECIFIED": 0,
-		"NEEDS_INPUT_KIND_APPROVAL":    1,
-		"NEEDS_INPUT_KIND_QUESTION":    2,
+		"NEEDS_INPUT_KIND_UNSPECIFIED":   0,
+		"NEEDS_INPUT_KIND_APPROVAL":      1,
+		"NEEDS_INPUT_KIND_QUESTION":      2,
+		"NEEDS_INPUT_KIND_DEVICE_PAIRED": 3,
 	}
 )
 
@@ -1038,10 +1046,11 @@ type NotifyNeedsInputRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  NeedsInputKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=app.v1.NeedsInputKind" json:"kind,omitempty"`
 	// How many approvals and questions wait on the machine in total (at least
-	// 1, at most 1000).
+	// 1, at most 1000). 1 for DEVICE_PAIRED.
 	PendingCount int32 `protobuf:"varint,2,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
 	// The waiting thread, so the notification opens it: up to 64 characters of
-	// [A-Za-z0-9_-]; empty when unknown. An opaque id, never content.
+	// [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
+	// for DEVICE_PAIRED.
 	SessionId     string `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1212,11 +1221,12 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\rpending_count\x18\x02 \x01(\x05R\fpendingCount\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x03 \x01(\tR\tsessionId\"\x1a\n" +
-	"\x18NotifyNeedsInputResponse*p\n" +
+	"\x18NotifyNeedsInputResponse*\x94\x01\n" +
 	"\x0eNeedsInputKind\x12 \n" +
 	"\x1cNEEDS_INPUT_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19NEEDS_INPUT_KIND_APPROVAL\x10\x01\x12\x1d\n" +
-	"\x19NEEDS_INPUT_KIND_QUESTION\x10\x022\x9d\x03\n" +
+	"\x19NEEDS_INPUT_KIND_QUESTION\x10\x02\x12\"\n" +
+	"\x1eNEEDS_INPUT_KIND_DEVICE_PAIRED\x10\x032\x9d\x03\n" +
 	"\x0fMachinesService\x12X\n" +
 	"\x11CreateInstallCode\x12 .app.v1.CreateInstallCodeRequest\x1a!.app.v1.CreateInstallCodeResponse\x12I\n" +
 	"\fListMachines\x12\x1b.app.v1.ListMachinesRequest\x1a\x1c.app.v1.ListMachinesResponse\x12L\n" +

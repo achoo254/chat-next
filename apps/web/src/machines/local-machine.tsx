@@ -1,12 +1,13 @@
 // Development only: pair with `tunelo run --port N` on this computer
-// (ws://127.0.0.1:N, no server and no tunnel) using the 6-digit code from
-// `tunelo pair`, so every screen can be tried end to end locally. The
+// (ws://127.0.0.1:N, no server and no tunnel) using the machine's 6-digit
+// Authenticator code, so every screen can be tried end to end locally. The
 // route and this page do not exist in production builds (router.tsx).
 import { useState } from "react";
 import { navigate, paths } from "../router.tsx";
 import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
 import { PageHead } from "./page-head.tsx";
-import { CodeInput, pairByCode, pairError } from "./pair-device.tsx";
+import { CodeInput } from "./code-input.tsx";
+import { pairByCode, pairProblem, pairProblemText } from "./pair-device.tsx";
 import { useHub } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -27,7 +28,7 @@ export function LocalMachine() {
 			() => navigate(paths.machine(LOCAL_REF)),
 			(err: unknown) => {
 				setBusy(false);
-				setError(pairError(t, err));
+				setError(pairProblemText(t, pairProblem(err), t.local.name));
 			},
 		);
 	};
@@ -42,7 +43,7 @@ export function LocalMachine() {
 						<input className="input mono" inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value.trim())} />
 					</label>
 					<p className="note">{t.local.code}</p>
-					<CodeInput disabled={busy || !valid} onCode={connect} />
+					<CodeInput label={t.local.code} disabled={busy || !valid} onCode={connect} />
 					{busy && (
 						<div className="mx-wait">
 							<span className="spin" aria-hidden="true" />

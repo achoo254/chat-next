@@ -125,9 +125,9 @@ function controlPort(configDir: string): number | null {
   }
 }
 
-/** Whether a process name is tunelo (or hda, its earlier name). */
+/** Whether a process name is tunelo. */
 function isTuneloName(name: string): boolean {
-  return /^(tunelo|hda)(\.exe)?$/i.test(name);
+  return /^tunelo(\.exe)?$/i.test(name);
 }
 
 export class ForwardDenyList {

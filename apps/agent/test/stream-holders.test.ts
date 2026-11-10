@@ -95,7 +95,7 @@ describe.skipIf(process.platform === "win32").each(runtimes)("service under %s",
 		const control = JSON.parse(readFileSync(join(dir, "control.json"), "utf8")) as { port: number; token: string };
 		const status = await new Promise<number>((done) => {
 			const req = http.request(
-				{ host: "127.0.0.1", port: control.port, method: "POST", path: "/tunnels/open", headers: { "x-chat-agent-token": control.token } },
+				{ host: "127.0.0.1", port: control.port, method: "POST", path: "/tunnels/open", headers: { "x-tunelo-token": control.token } },
 				(res) => {
 					res.resume();
 					done(res.statusCode ?? 0);

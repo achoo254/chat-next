@@ -78,7 +78,7 @@ type MachinesServiceClient interface {
 	// caller's (or is revoked).
 	RenameMachine(context.Context, *connect.Request[v1.RenameMachineRequest]) (*connect.Response[v1.RenameMachineResponse], error)
 	// Removes the machine from the directory: its secret stops working for
-	// NotifyNeedsInput, and its next Heartbeat answers revoked, so chat-agent
+	// NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
 	// closes its tunnel. not_found as RenameMachine.
 	RevokeMachine(context.Context, *connect.Request[v1.RevokeMachineRequest]) (*connect.Response[v1.RevokeMachineResponse], error)
 	// Puts a paired device's public key on the machine's revoked list: the
@@ -179,7 +179,7 @@ type MachinesServiceHandler interface {
 	// caller's (or is revoked).
 	RenameMachine(context.Context, *connect.Request[v1.RenameMachineRequest]) (*connect.Response[v1.RenameMachineResponse], error)
 	// Removes the machine from the directory: its secret stops working for
-	// NotifyNeedsInput, and its next Heartbeat answers revoked, so chat-agent
+	// NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
 	// closes its tunnel. not_found as RenameMachine.
 	RevokeMachine(context.Context, *connect.Request[v1.RevokeMachineRequest]) (*connect.Response[v1.RevokeMachineResponse], error)
 	// Puts a paired device's public key on the machine's revoked list: the

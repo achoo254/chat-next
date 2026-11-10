@@ -1,11 +1,12 @@
 // Machine config, owned by the running service: paired devices, revoked
-// keys, limits, MCP servers, pinned folders. Written atomically (temp file +
+// keys, the authenticator secret for pairing, limits, MCP servers, pinned
+// folders. Written atomically (temp file +
 // rename) with mode 0600; CLI commands go through the control socket so only
 // the service writes it.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { toBase64Url } from "@achoo254/chat-remote-protocol";
+import { fromBase64Url, isTotpSecret, toBase64Url } from "@achoo254/chat-remote-protocol";
 import type { ProjectRecord } from "./projects/projects.ts";
 
 export type PairedDevice = { key: string; name: string; addedAt: number };
@@ -20,6 +21,12 @@ export type AgentConfig = {
   pinnedDirs: string[];
   /** Folders whose own .claude settings may load (set on the machine: tunelo trust). */
   trustedDirs: string[];
+  /**
+   * The authenticator (TOTP) secret new devices pair with, base64url; set from
+   * a paired device over the end-to-end link. Never logged, written to the
+   * consent log or sent to the chat server.
+   */
+  totpSecret?: string;
   /** Set by `tunelo install`; cleared once that browser has connected. */
   install?: { deviceKey: string; secret: string };
   machineId?: string;
@@ -36,8 +43,6 @@ export type AgentConfig = {
   subdomain?: string;
   serverUrl?: string;
   port?: number;
-  /** Tunnel server chosen in the old Tunelo CLI (`~/.tunelo/config.json`), copied when moving from hda. */
-  tunnelServer?: string;
   /**
    * The machine is linked to Localman for this account and tunnel device
    * (localman/self-link.ts). No token: Localman keeps it.
@@ -65,19 +70,9 @@ export function defaultConfigDir(): string {
   return platformDir("tunelo");
 }
 
-/** Where tunelo keeps its config: TUNELO_HOME, else the variable of the old name (CHAT_AGENT_HOME), else the default. */
+/** Where tunelo keeps its config: TUNELO_HOME, else the default. */
 export function configDir(): string {
-  return process.env.TUNELO_HOME || process.env.CHAT_AGENT_HOME || defaultConfigDir();
-}
-
-/** The folder tunelo moves an hda install into: like configDir, without the old variable. */
-export function tuneloConfigDir(): string {
   return process.env.TUNELO_HOME || defaultConfigDir();
-}
-
-/** The config folder of hda, the earlier name of tunelo (chat-agent before that). */
-export function legacyConfigDir(): string {
-  return process.env.CHAT_AGENT_HOME || platformDir("chat-agent");
 }
 
 const DEFAULTS: AgentConfig = {
@@ -129,6 +124,31 @@ export class ConfigStore {
       // Names come from the device: no control characters, at most 64.
       const clean = [...name].filter((ch) => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) !== 127).join("").trim().slice(0, 64) || "device";
       if (!c.devices.some((d) => d.key === k)) c.devices.push({ key: k, name: clean, addedAt: Date.now() });
+    });
+  }
+
+  /**
+   * The stored authenticator secret; undefined when none is set or the stored
+   * value is not a 20-byte secret (pairing then stays off until one is set).
+   */
+  totpSecret(): Uint8Array | undefined {
+    const stored = this.data.totpSecret;
+    if (!stored) return undefined;
+    let secret: Uint8Array;
+    try {
+      secret = fromBase64Url(stored);
+    } catch {
+      return undefined;
+    }
+    return isTotpSecret(secret) ? secret : undefined;
+  }
+
+  /** Stores (or replaces) the authenticator secret; throws when it is not 20 bytes. */
+  setTotpSecret(secret: Uint8Array): void {
+    if (!isTotpSecret(secret)) throw new Error("a TOTP secret is 20 bytes");
+    const stored = toBase64Url(secret);
+    this.update((c) => {
+      c.totpSecret = stored;
     });
   }
 

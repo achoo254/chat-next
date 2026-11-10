@@ -1,22 +1,34 @@
-// A device talking to the machine over in-memory sockets: code pairing,
-// handshake, a thread, an unknown device, a revoked device.
+// A device talking to the machine over in-memory sockets: pairing by the
+// authenticator code (wrong code, lockout, clock drift, no secret yet),
+// setting the secret from a paired device, handshake, a thread, an unknown
+// device, a revoked device.
 import { randomUUID } from "node:crypto";
-import { utimesSync, writeFileSync } from "node:fs";
+import { readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { create } from "@bufbuild/protobuf";
+import { type MessageInitShape, create, toBinary } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, type Frame, FrameSchema, HandshakeErrorCode, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import {
   HandshakeFailure,
-  PairingWindow,
+  type KeyPair,
+  PAIRING_LOCKOUT_MS,
+  PAIRING_MAX_ATTEMPTS,
+  PakeFailure,
+  type PairingMethod,
   type Session,
+  TOTP_PERIOD_MS,
+  TotpPairing,
   decodePlain,
   encodePlain,
   generateKeyPair,
+  generateTotpSecret,
   pakeStart,
   startHandshake,
   toBase64Url,
+  totpCode,
+  totpCodeAt,
+  totpStep,
 } from "@achoo254/chat-remote-protocol";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { Connection } from "../src/link/connection.ts";
 import { LocalSessions } from "../src/providers/claude/local-sessions.ts";
@@ -25,13 +37,15 @@ import { fakeProvider } from "./fake-provider.ts";
 import { Transcript } from "./support/claude-transcript.ts";
 import { makeCore, tempDir } from "./harness.ts";
 
-process.env.CHAT_AGENT_KEYSTORE = "file";
+process.env.TUNELO_KEYSTORE = "file";
 
 async function machine(providers: AgentProvider[] = [fakeProvider()]) {
   const { core, audit, work, home } = makeCore(providers);
   const config = new ConfigStore(join(tempDir(), "cfg"));
   const key = await generateKeyPair(true);
-  let window: PairingWindow | undefined;
+  const pairing = new TotpPairing(config.totpSecret());
+  const paired: PairingMethod[] = [];
+  let totpSets = 0;
   const connect = () => {
     const inbox: Uint8Array[] = [];
     let closed = false;
@@ -51,14 +65,15 @@ async function machine(providers: AgentProvider[] = [fakeProvider()]) {
         core,
         config,
         audit,
-        auth: () => ({ machine: key, deviceStatus: (k) => config.deviceStatus(k), pairing: window }),
-        pairing: () => window,
+        auth: () => ({ machine: key, deviceStatus: (k) => config.deviceStatus(k) }),
+        pairing,
         machineInfo: async () => {
           throw new Error("unused");
         },
         isSensitive: () => false,
         onPing: () => undefined,
-        onPaired: () => (window = undefined),
+        onPaired: (via) => paired.push(via),
+        onTotpSet: () => (totpSets += 1),
       },
     );
     const next = async (): Promise<Uint8Array | null> => {
@@ -71,11 +86,71 @@ async function machine(providers: AgentProvider[] = [fakeProvider()]) {
     };
     return { conn, next, isClosed: () => closed };
   };
-  return { core, config, key, connect, work, home, open: () => (window = PairingWindow.open()) };
+  /** Sets the authenticator secret as a paired device would have. */
+  const enableTotp = (): Uint8Array => {
+    const secret = generateTotpSecret();
+    config.setTotpSecret(secret);
+    pairing.setSecret(secret);
+    return secret;
+  };
+  return { core, config, audit, key, pairing, connect, work, home, paired, enableTotp, totpSets: () => totpSets };
+}
+
+type TestMachine = Awaited<ReturnType<typeof machine>>;
+type PairOutcome = { kind: "paired"; machineKey: Uint8Array } | { kind: "refused"; code: HandshakeErrorCode } | { kind: "wrong-code" };
+
+/** A new device types `code`: the machine pairs it, refuses before any exchange, or the code does not match. */
+async function pairWithCode(m: TestMachine, device: KeyPair, code: string): Promise<PairOutcome> {
+  const c = m.connect();
+  const p = await pakeStart({ code, deviceKey: device.publicKey, deviceName: "phone" });
+  c.conn.receive(encodePlain({ case: "pakeStart", value: p.start }));
+  const reply = decodePlain((await c.next()) ?? new Uint8Array());
+  if (reply.body.case === "error") {
+    expect(await c.next()).toBeNull();
+    return { kind: "refused", code: reply.body.value.code };
+  }
+  if (reply.body.case !== "pakeReply") throw new Error(`unexpected ${reply.body.case}`);
+  let done: { machineKey: Uint8Array; finish: Parameters<typeof encodePlain>[0] };
+  try {
+    const r = await p.finish(reply.body.value);
+    done = { machineKey: r.machineKey, finish: { case: "pakeFinish", value: r.finish } };
+  } catch (err) {
+    if (!(err instanceof PakeFailure)) throw err;
+    // The device gives up, as the web does on a wrong code.
+    c.conn.close();
+    return { kind: "wrong-code" };
+  }
+  c.conn.receive(encodePlain(done.finish));
+  expect(await c.next()).toBeNull();
+  return { kind: "paired", machineKey: done.machineKey };
+}
+
+/** A code no authenticator with `secret` shows within two steps of now. */
+function wrongCode(secret: Uint8Array): string {
+  const step = totpStep(Date.now());
+  const near = new Set([-2, -1, 0, 1, 2].map((d) => totpCodeAt(secret, step + d)));
+  for (let n = 0; ; n++) {
+    const code = String(n).padStart(6, "0");
+    if (!near.has(code)) return code;
+  }
+}
+
+/** A paired device's end-to-end link to the machine. */
+async function link(m: TestMachine, device: KeyPair) {
+  const l = m.connect();
+  const hs = await startHandshake({ device, deviceName: "phone", trust: { kind: "pinned", machineKey: m.key.publicKey } });
+  l.conn.receive(hs.hello);
+  const { session } = await hs.finish((await l.next()) ?? new Uint8Array());
+  const request = async (id: string, body: NonNullable<MessageInitShape<typeof FrameSchema>["body"]>): Promise<Frame["body"] | undefined> => {
+    l.conn.receive(session.seal(create(FrameSchema, { id, body })));
+    return (await frames(session, l.next, (f) => f.id === id)).at(-1)?.body;
+  };
+  return { ...l, session, request };
 }
 
 const cores: { stop(): Promise<void> }[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(cores.splice(0).map((c) => c.stop()));
 });
 
@@ -91,22 +166,18 @@ async function frames(s: Session, next: () => Promise<Uint8Array | null>, until:
 }
 
 describe("connection", () => {
-  it("pairs with the code, then opens a thread over the encrypted link", async () => {
+  it("pairs with the authenticator code, then opens a thread over the encrypted link", async () => {
     const m = await machine();
     cores.push(m.core);
     const device = await generateKeyPair();
-    const { code } = m.open();
+    const secret = m.enableTotp();
 
-    const pairing = m.connect();
-    const p = await pakeStart({ code, deviceKey: device.publicKey, deviceName: "phone" });
-    pairing.conn.receive(encodePlain({ case: "pakeStart", value: p.start }));
-    const reply = decodePlain((await pairing.next()) ?? new Uint8Array());
-    if (reply.body.case !== "pakeReply") throw new Error("expected reply");
-    const { machineKey, finish } = await p.finish(reply.body.value);
-    pairing.conn.receive(encodePlain({ case: "pakeFinish", value: finish }));
-    await pairing.next();
-    expect(pairing.isClosed()).toBe(true);
+    const outcome = await pairWithCode(m, device, totpCode(secret));
+    if (outcome.kind !== "paired") throw new Error(`not paired: ${JSON.stringify(outcome)}`);
+    const machineKey = outcome.machineKey;
     expect(m.config.deviceStatus(device.publicKey)).toBe("paired");
+    expect(m.paired).toEqual(["totp"]);
+    expect(m.audit.list().find((e) => e.action === "pair")).toMatchObject({ detail: "totp", device: expect.stringContaining("phone") });
 
     const link = m.connect();
     const hs = await startHandshake({ device, deviceName: "phone", trust: { kind: "pinned", machineKey } });
@@ -252,5 +323,171 @@ describe("connection", () => {
     const err = await hs2.finish((await c2.next()) ?? new Uint8Array()).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HandshakeFailure);
     expect((err as HandshakeFailure).code).toBe(HandshakeErrorCode.REVOKED);
+  });
+});
+
+describe("pairing by the authenticator code", () => {
+  it("refuses a new device while the machine has no authenticator secret, without counting an attempt", async () => {
+    const m = await machine();
+    cores.push(m.core);
+    const device = await generateKeyPair();
+    for (let i = 0; i < PAIRING_MAX_ATTEMPTS + 1; i++) {
+      expect(await pairWithCode(m, device, "123456")).toEqual({ kind: "refused", code: HandshakeErrorCode.TOTP_NOT_SET });
+    }
+    expect(m.config.deviceStatus(device.publicKey)).toBe("unknown");
+    // Once a secret is set the right code pairs at once: the refusals above were not attempts.
+    const secret = m.enableTotp();
+    expect((await pairWithCode(m, device, totpCode(secret))).kind).toBe("paired");
+  });
+
+  it("does not pair a wrong code and leaves no trace of it but the attempt", async () => {
+    const m = await machine();
+    cores.push(m.core);
+    const device = await generateKeyPair();
+    const secret = m.enableTotp();
+    expect(await pairWithCode(m, device, wrongCode(secret))).toEqual({ kind: "wrong-code" });
+    expect(m.config.deviceStatus(device.publicKey)).toBe("unknown");
+    expect(m.paired).toEqual([]);
+    expect(m.audit.list().some((e) => e.action === "pair")).toBe(false);
+  });
+
+  it("accepts the code of the step before and after, not two steps away", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // The middle of a step, so the steps around it are whole.
+    vi.setSystemTime(1_000 * TOTP_PERIOD_MS + TOTP_PERIOD_MS / 2);
+    const m = await machine();
+    cores.push(m.core);
+    const secret = m.enableTotp();
+    const step = totpStep(Date.now());
+    for (const drift of [-1, 1]) {
+      const device = await generateKeyPair();
+      expect((await pairWithCode(m, device, totpCodeAt(secret, step + drift))).kind).toBe("paired");
+    }
+    const late = await generateKeyPair();
+    expect((await pairWithCode(m, late, totpCodeAt(secret, step - 2))).kind).toBe("wrong-code");
+  });
+
+  it("locks pairing for 15 minutes after 5 attempts that did not pair, even for the right code", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(2_000 * TOTP_PERIOD_MS + TOTP_PERIOD_MS / 2);
+    const m = await machine();
+    cores.push(m.core);
+    const secret = m.enableTotp();
+    const device = await generateKeyPair();
+    for (let i = 0; i < PAIRING_MAX_ATTEMPTS; i++) {
+      expect((await pairWithCode(m, device, wrongCode(secret))).kind).toBe("wrong-code");
+    }
+    expect(await pairWithCode(m, device, totpCode(secret))).toEqual({ kind: "refused", code: HandshakeErrorCode.TOO_MANY_ATTEMPTS });
+    vi.setSystemTime(Date.now() + PAIRING_LOCKOUT_MS - 1_000);
+    expect(await pairWithCode(m, device, totpCode(secret))).toEqual({ kind: "refused", code: HandshakeErrorCode.TOO_MANY_ATTEMPTS });
+    vi.setSystemTime(Date.now() + 2_000);
+    expect((await pairWithCode(m, device, totpCode(secret))).kind).toBe("paired");
+    expect(m.paired).toEqual(["totp"]);
+  });
+
+  it("a right code clears the count of failed attempts", async () => {
+    const m = await machine();
+    cores.push(m.core);
+    const secret = m.enableTotp();
+    for (let i = 0; i < PAIRING_MAX_ATTEMPTS - 1; i++) {
+      expect((await pairWithCode(m, await generateKeyPair(), wrongCode(secret))).kind).toBe("wrong-code");
+    }
+    expect((await pairWithCode(m, await generateKeyPair(), totpCode(secret))).kind).toBe("paired");
+    for (let i = 0; i < PAIRING_MAX_ATTEMPTS - 1; i++) {
+      expect((await pairWithCode(m, await generateKeyPair(), wrongCode(secret))).kind).toBe("wrong-code");
+    }
+    expect((await pairWithCode(m, await generateKeyPair(), totpCode(secret))).kind).toBe("paired");
+  });
+
+  it("a paired device sets, reads and replaces the secret; it is stored but never logged or echoed", async () => {
+    const m = await machine();
+    cores.push(m.core);
+    const phone = await generateKeyPair();
+    m.config.addDevice(phone.publicKey, "phone");
+    const l = await link(m, phone);
+
+    expect(await l.request("1", { case: "totpStatusRequest", value: {} })).toMatchObject({ case: "totpStatus", value: { enabled: false } });
+    const short = await l.request("2", { case: "totpSet", value: { secret: new Uint8Array(19) } });
+    expect(short?.case === "error" && [short.value.code, short.value.reason]).toEqual([ErrorCode.INVALID, ErrorReason.TOTP_SECRET_INVALID]);
+    expect(m.pairing.enabled).toBe(false);
+    expect(m.config.get().totpSecret).toBeUndefined();
+
+    const first = generateTotpSecret();
+    expect(await l.request("3", { case: "totpSet", value: { secret: first } })).toMatchObject({ case: "totpStatus", value: { enabled: true } });
+    expect(m.pairing.enabled).toBe(true);
+    expect(m.config.totpSecret()).toEqual(first);
+    expect(await l.request("4", { case: "totpStatusRequest", value: {} })).toMatchObject({ case: "totpStatus", value: { enabled: true } });
+
+    // A new secret replaces the old one: only its codes pair from now on.
+    const second = generateTotpSecret();
+    expect(await l.request("5", { case: "totpSet", value: { secret: second } })).toMatchObject({ case: "totpStatus", value: { enabled: true } });
+    expect(m.config.totpSecret()).toEqual(second);
+    expect(m.totpSets()).toBe(2);
+    expect(m.audit.list().filter((e) => e.action === "totp_set").map((e) => e.detail)).toEqual(["replaced", "set"]);
+
+    const laptop = await generateKeyPair();
+    const oldCode = totpCode(first);
+    if (!new Set([-1, 0, 1].map((d) => totpCodeAt(second, totpStep(Date.now()) + d))).has(oldCode)) {
+      expect((await pairWithCode(m, laptop, oldCode)).kind).toBe("wrong-code");
+    }
+    expect((await pairWithCode(m, laptop, totpCode(second))).kind).toBe("paired");
+
+    // Kept with the config, nowhere in the consent log.
+    const encodings = (b: Uint8Array) => [toBase64Url(b), Buffer.from(b).toString("base64"), Buffer.from(b).toString("hex")];
+    const auditText = JSON.stringify(m.audit.list(1000));
+    for (const secret of [first, second]) for (const e of encodings(secret)) expect(auditText).not.toContain(e);
+    expect(readFileSync(m.config.file, "utf8")).toContain(toBase64Url(second));
+  });
+
+  it("a stored secret turns pairing on for a machine started later; a damaged one leaves it off", async () => {
+    const dir = join(tempDir(), "cfg");
+    const secret = generateTotpSecret();
+    new ConfigStore(dir).setTotpSecret(secret);
+    const later = new ConfigStore(dir);
+    expect(later.totpSecret()).toEqual(secret);
+    expect(new TotpPairing(later.totpSecret()).enabled).toBe(true);
+    later.update((c) => (c.totpSecret = "not*base64"));
+    expect(later.totpSecret()).toBeUndefined();
+    later.update((c) => (c.totpSecret = toBase64Url(new Uint8Array(10))));
+    expect(later.totpSecret()).toBeUndefined();
+    expect(() => later.setTotpSecret(new Uint8Array(21))).toThrow();
+  });
+
+  it("only a paired device's sealed link reaches totpSet: an unknown device and a device mid-pairing cannot", async () => {
+    const m = await machine();
+    cores.push(m.core);
+    const secret = m.enableTotp();
+    const stranger = await generateKeyPair();
+    const attack = generateTotpSecret();
+
+    // An unknown device's handshake is refused before any frame.
+    const c1 = m.connect();
+    const hs = await startHandshake({ device: stranger, deviceName: "x", trust: { kind: "pinned", machineKey: m.key.publicKey } });
+    c1.conn.receive(hs.hello);
+    await expect(hs.finish((await c1.next()) ?? new Uint8Array())).rejects.toMatchObject({ code: HandshakeErrorCode.UNKNOWN_DEVICE });
+
+    const unsealed = toBinary(FrameSchema, create(FrameSchema, { id: "1", body: { case: "totpSet", value: { secret: attack } } }));
+    const drain = async (c: ReturnType<TestMachine["connect"]>) => {
+      while ((await c.next()) !== null);
+    };
+
+    // A frame sent in the clear, without a session, closes the link.
+    const c2 = m.connect();
+    c2.conn.receive(unsealed);
+    await drain(c2);
+    expect(c2.isClosed()).toBe(true);
+
+    // Mid-pairing (after PakeStart), anything but PakeFinish closes the link.
+    const c3 = m.connect();
+    const p = await pakeStart({ code: wrongCode(secret), deviceKey: stranger.publicKey, deviceName: "x" });
+    c3.conn.receive(encodePlain({ case: "pakeStart", value: p.start }));
+    expect(decodePlain((await c3.next()) ?? new Uint8Array()).body.case).toBe("pakeReply");
+    c3.conn.receive(unsealed);
+    await drain(c3);
+    expect(c3.isClosed()).toBe(true);
+
+    expect(m.config.totpSecret()).toEqual(secret);
+    expect(m.audit.list().some((e) => e.action === "totp_set")).toBe(false);
+    expect(m.totpSets()).toBe(0);
   });
 });

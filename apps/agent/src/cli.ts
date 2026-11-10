@@ -3,13 +3,8 @@
 // localhost (the commands of the Tunelo CLI 1.x: http, tcp, login, whoami,
 // link, watch, mcp…), and, as a background service, lets the user's own
 // devices drive the AI coding CLI installed here, end-to-end encrypted.
-// Started under its earlier name hda (the bridge release replaces the hda
-// file), it moves the install to tunelo instead (migrate-from-hda.ts).
-import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { basename, resolve } from "node:path";
 import { Command } from "commander";
-import { ConfigStore, configDir, legacyConfigDir } from "./config.ts";
+import { ConfigStore, configDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { registerLocalForwardCommand } from "./commands/config.ts";
 import { registerMcpLocalWritesCommand } from "./commands/mcp-local-writes.ts";
@@ -20,20 +15,10 @@ import { registerBrowserCommand } from "./commands/browser.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
-import {
-  finishMigration,
-  hasLegacyInstall,
-  isMigrated,
-  migrateFromHda,
-  migrationPaths,
-  osMigrationSystem,
-  removeLegacyBinaries,
-  runAsHda,
-} from "./migrate-from-hda.ts";
 import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
 import { goOnline } from "./online.ts";
-import { isCompiled, startService, stopService, uninstallService } from "./service.ts";
+import { startService, stopService, uninstallService } from "./service.ts";
 import { diskAccess, diskAccessSteps } from "./safety/disk-access.ts";
 import { dropInheritedMarkers } from "./startup-env.ts";
 import { registerConfigCommand } from "./tunnels/cli-config-command.ts";
@@ -73,14 +58,11 @@ async function waitRunning(dir: string, ms: number): Promise<number | null> {
 
 /**
  * Runs the agent in this process until it is stopped. Refuses while an agent
- * answers in this folder or in the folder of the other name (hda's before the
- * move, tunelo's after it), so one machine never runs two.
+ * answers in this folder, so one machine never runs two.
  */
 async function runAgent(dir: string, args: string[]): Promise<number> {
-  for (const d of new Set([resolve(dir), resolve(configDir()), resolve(legacyConfigDir())])) {
-    const running = await runningPid(d);
-    if (running !== null) throw new Error(`tunelo is already running (pid ${running}, ${d}); \`tunelo stop\` stops it`);
-  }
+  const running = await runningPid(dir);
+  if (running !== null) throw new Error(`tunelo is already running (pid ${running}, ${dir}); \`tunelo stop\` stops it`);
   await importLegacySignIns(dir);
   const config = new ConfigStore(dir);
   // A session's writes need the device's approval, except in bypassPermissions (set on the machine only).
@@ -115,50 +97,6 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   process.on("SIGINT", () => void shutdown());
   process.on("SIGTERM", () => void shutdown());
   return new Promise(() => undefined);
-}
-
-/** `tunelo migrate-from-hda` (the install scripts run it when they find hda). */
-async function migrateCommand(): Promise<number> {
-  if (!isCompiled()) throw new Error("run this from the installed tunelo binary, not from the sources");
-  const paths = migrationPaths();
-  if (!hasLegacyInstall(paths.legacyDir)) {
-    console.log("No hda install found; nothing to move.");
-    return 0;
-  }
-  const sys = osMigrationSystem();
-  if (isMigrated(paths.legacyDir)) await finishMigration(paths, sys, log);
-  else await migrateFromHda(paths, sys, log);
-  const pid = await waitRunning(paths.newDir, 60_000);
-  console.log(pid === null ? "Moved to tunelo; it is starting, check `tunelo status` in a moment." : `Moved to tunelo; it runs in the background (pid ${pid}).`);
-  return 0;
-}
-
-/** The same command through the tunelo binary; its exit code. */
-function forward(exe: string, argv: string[]): number {
-  const r = spawnSync(exe, argv, { stdio: "inherit" });
-  if (r.error) throw r.error;
-  return r.status ?? 1;
-}
-
-/**
- * Started as hda: `run` comes from hda's supervisor and moves the install;
- * once moved, every other command goes to tunelo.
- */
-async function hdaMain(argv: string[]): Promise<number> {
-  const [cmd, ...args] = argv;
-  if (cmd === "--version" || cmd === "version") {
-    console.log(AGENT_VERSION);
-    return 0;
-  }
-  const paths = migrationPaths();
-  if (cmd === "run") return runAsHda(paths, osMigrationSystem(), log, () => runAgent(paths.legacyDir, args));
-  if (isMigrated(paths.legacyDir) && existsSync(paths.newExe)) {
-    console.error(`hda is now called tunelo; running \`tunelo ${argv.join(" ")}\`.`);
-    return forward(paths.newExe, argv);
-  }
-  throw new Error(
-    "hda is being renamed to tunelo. The move finishes when the background process starts again; or run the install command from the Chat page (AI Agent) again.",
-  );
 }
 
 /** Runs a short command and exits with its code. */
@@ -230,7 +168,6 @@ async function start(): Promise<number> {
     const pid = await waitRunning(dir, 30_000);
     console.log(pid === null ? "tunelo is starting; check `tunelo status` in a moment." : `tunelo is running in the background (pid ${pid}). You can close this terminal.`);
   }
-  removeLegacyBinaries(legacyConfigDir());
   return 0;
 }
 
@@ -240,14 +177,6 @@ async function logs(options: { lines: string; follow?: boolean }): Promise<void>
   process.on("SIGINT", () => stop.abort());
   await tailLog(logFile(configDir()), { lines: Number.isFinite(n) ? n : 50, follow: options.follow === true, write: (s) => process.stdout.write(s), signal: stop.signal });
   process.exit(0);
-}
-
-async function pair(): Promise<number> {
-  const p = (await callControl(configDir(), "POST", "/pair")) as { code: string; qr: string; expiresAt: number };
-  console.log(`Pairing code: ${p.code.slice(0, 3)} ${p.code.slice(3)}`);
-  console.log(`QR payload:   ${p.qr}`);
-  console.log(`Valid until ${new Date(p.expiresAt).toLocaleTimeString()}; 5 attempts.`);
-  return 0;
 }
 
 async function setTrust(dir: string | undefined, trusted: boolean): Promise<number> {
@@ -298,7 +227,6 @@ function buildProgram(): Command {
     .action(async (options: { port?: string }) => {
       await runAgent(configDir(), options.port ? ["--port", options.port] : []);
     });
-  program.command("pair").description("show a QR payload and 6-digit code to pair a device").action(exits(pair));
   program
     .command("status")
     .description("show the tunnels of this machine, and machine, AI and session status")
@@ -339,7 +267,6 @@ function buildProgram(): Command {
     .command("disk-access", { hidden: true })
     .description("print whether this process has Full Disk Access (granted, needed, not-applicable)")
     .action(() => console.log(diskAccess()));
-  program.command("migrate-from-hda", { hidden: true }).description("move an install of hda (the earlier name) to tunelo").action(exits(migrateCommand));
   program
     .command("version")
     .description("print the version")
@@ -362,26 +289,14 @@ function buildProgram(): Command {
 
 dropInheritedMarkers();
 
-const asHda = basename(process.execPath).replace(/\.exe$/i, "").toLowerCase() === "hda";
-
-if (asHda) {
-  hdaMain(process.argv.slice(2)).then(
-    (code) => process.exit(code),
-    (err: Error) => {
-      console.error(`hda: ${err.message}`);
-      process.exit(1);
-    },
-  );
-} else {
-  // No command: the help, exit 0 (as before commander).
-  if (process.argv.length <= 2) {
-    buildProgram().outputHelp();
-    process.exit(0);
-  }
-  buildProgram()
-    .parseAsync(process.argv)
-    .catch((err: Error) => {
-      console.error(`tunelo: ${err.message}`);
-      process.exit(1);
-    });
+// No command: the help, exit 0 (as before commander).
+if (process.argv.length <= 2) {
+  buildProgram().outputHelp();
+  process.exit(0);
 }
+buildProgram()
+  .parseAsync(process.argv)
+  .catch((err: Error) => {
+    console.error(`tunelo: ${err.message}`);
+    process.exit(1);
+  });

@@ -17,10 +17,6 @@
 #
 #   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) [vi|en|zh-CN]
 #
-# A computer that still runs hda (the earlier name of tunelo) is moved to
-# tunelo first either way, keeping the machine, its paired devices and
-# sessions.
-#
 # The release is pinned: version and SHA-256 are written into this script
 # when the web app is built for a tunelo release, and the minisign
 # signature is checked with the embedded public key when minisign is
@@ -96,9 +92,6 @@ function Stop-Install([string]$Vi, [string]$En, [string]$Zh) {
 }
 
 function Install-Tunelo {
-	# hda keeps its config here; the marker means it has already moved to tunelo.
-	$hdaDir = if ($env:CHAT_AGENT_HOME) { $env:CHAT_AGENT_HOME } else { Join-Path $env:APPDATA 'chat-agent' }
-	$fromHda = (Test-Path (Join-Path $hdaDir 'config.json')) -and -not (Test-Path (Join-Path $hdaDir 'migrated-to-tunelo'))
 	if ($BadKey) {
 		Stop-Install 'khoá thiết bị không hợp lệ; hãy chép lại lệnh từ trang Chat.' `
 			'the device key is malformed; copy the command from the Chat page again.' `
@@ -173,29 +166,16 @@ function Install-Tunelo {
 		}
 	}
 
-	if ($fromHda) {
-		Write-Host (Get-Text 'Tìm thấy hda trên máy; đang chuyển sang tunelo (giữ máy, thiết bị đã ghép và các phiên)…' `
-			'Found hda on this computer; moving it to tunelo (the machine, paired devices and sessions stay)…' `
-			'在这台电脑上找到 hda；正在迁移到 tunelo（保留电脑、已配对设备和会话）…')
-		& $exe migrate-from-hda
-		if ($LASTEXITCODE -ne 0) {
-			Stop-Install 'chuyển hda sang tunelo không thành công; hda vẫn chạy như cũ.' `
-				'moving hda to tunelo failed; hda keeps running as before.' 'hda 迁移到 tunelo 失败；hda 仍照常运行。'
-		}
-	}
-
 	if (-not $DeviceKey) {
 		# A running background service still runs the previous file: restart it
-		# on the new one (moving from hda already started tunelo).
-		if (-not $fromHda) {
-			if ((Invoke-Quiet $exe @('status', '--json')) -eq 0) {
-				Write-Host (Get-Text 'Đang khởi động lại tunelo chạy nền với bản mới…' `
-					'Restarting the background tunelo on the new version…' '正在用新版本重启后台 tunelo…')
-				Invoke-Quiet $exe @('stop') | Out-Null
-				& $exe start
-				if ($LASTEXITCODE -ne 0) {
-					Write-Host (Get-Text 'Chưa khởi động lại được; chạy tunelo start.' 'Could not restart it; run tunelo start.' '无法重启；请运行 tunelo start。')
-				}
+		# on the new one.
+		if ((Invoke-Quiet $exe @('status', '--json')) -eq 0) {
+			Write-Host (Get-Text 'Đang khởi động lại tunelo chạy nền với bản mới…' `
+				'Restarting the background tunelo on the new version…' '正在用新版本重启后台 tunelo…')
+			Invoke-Quiet $exe @('stop') | Out-Null
+			& $exe start
+			if ($LASTEXITCODE -ne 0) {
+				Write-Host (Get-Text 'Chưa khởi động lại được; chạy tunelo start.' 'Could not restart it; run tunelo start.' '无法重启；请运行 tunelo start。')
 			}
 		}
 		# Binary only: one sign-in for the tunnel, Chat and Localman. A failed or

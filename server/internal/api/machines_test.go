@@ -47,7 +47,7 @@ func TestMachineDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	id, secret := reg.Msg.GetMachineId(), reg.Msg.GetMachineSecret()
-	tunnel := "wss://" + machineapi.MachineSubdomain("acc_test", fmt.Sprintf("chat-agent.%d", id)) + ".tunnel.hoandat.com"
+	tunnel := "wss://" + machineapi.MachineSubdomain("acc_test", fmt.Sprintf("tunelo.%d", id)) + ".tunnel.hoandat.com"
 	heartbeat := func() *appv1.HeartbeatResponse {
 		t.Helper()
 		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0", ClaudeVersion: "2.1.319"})

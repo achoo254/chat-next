@@ -1,5 +1,5 @@
 // Development stand-in for a paired device (machine A) in the terminal.
-//   node src/dev/device.ts pair <ws-url> <6-digit code>
+//   node src/dev/device.ts pair <ws-url> <6-digit authenticator code>
 //   node src/dev/device.ts chat <ws-url> <folder> "<first message>" [--yes] [--model haiku]
 // The device key and the pinned machine key live in $CHAT_DEV_DEVICE
 // (default: ./dev-device.json). Approvals are asked on stdin unless --yes.

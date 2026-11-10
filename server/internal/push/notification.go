@@ -22,6 +22,9 @@ const (
 	// machineTTL is how long a push service keeps a machine's "needs you"
 	// push: a request older than that has likely been answered or expired.
 	machineTTL = time.Hour
+	// devicePairedTTL is how long a push service keeps a "new device
+	// paired" push: the owner should learn of it even a day later.
+	devicePairedTTL = 24 * time.Hour
 )
 
 // copyText is the server-written text of notifications, per locale.
@@ -29,19 +32,19 @@ type copyText struct {
 	hidden, photo, video, audio, voice, file string
 	// Machine pushes (fmt formats): the machine's name, and for
 	// machinePending also the number of waiting requests.
-	machineApproval, machineQuestion, machinePending string
+	machineApproval, machineQuestion, machinePending, devicePaired string
 }
 
 var copies = map[string]copyText{
 	LocaleVI: {hidden: "Bạn có tin nhắn mới", photo: "Ảnh", video: "Video", audio: "Âm thanh", voice: "Tin nhắn thoại", file: "Tệp",
 		machineApproval: "Claude trên %s cần bạn duyệt", machineQuestion: "Claude trên %s cần bạn trả lời",
-		machinePending: "Claude trên %s có %d việc cần bạn"},
+		machinePending: "Claude trên %s có %d việc cần bạn", devicePaired: "Một thiết bị mới vừa ghép với %s"},
 	LocaleEN: {hidden: "You have a new message", photo: "Photo", video: "Video", audio: "Audio", voice: "Voice message", file: "File",
 		machineApproval: "Claude on %s needs your approval", machineQuestion: "Claude on %s needs your answer",
-		machinePending: "Claude on %s has %d requests waiting for you"},
+		machinePending: "Claude on %s has %d requests waiting for you", devicePaired: "A new device was just paired with %s"},
 	LocaleZhCN: {hidden: "你有一条新消息", photo: "照片", video: "视频", audio: "音频", voice: "语音消息", file: "文件",
 		machineApproval: "%s 上的 Claude 需要你批准", machineQuestion: "%s 上的 Claude 需要你回答",
-		machinePending: "%s 上的 Claude 有 %d 个请求等你处理"},
+		machinePending: "%s 上的 Claude 有 %d 个请求等你处理", devicePaired: "有新设备刚刚与 %s 配对"},
 }
 
 // Payload is the JSON the service worker receives (apps/web/src/sw). A
@@ -60,7 +63,9 @@ type Payload struct {
 	Title     string `json:"title"`
 	Body      string `json:"body"`
 	// Tag groups notifications: one per chat, as the in-app ones
-	// ("chat:<id>"), and one per machine ("machine:<id>").
+	// ("chat:<id>"), one per machine ("machine:<id>"), and apart from it
+	// one per machine for a newly paired device ("machine-paired:<id>"), so
+	// neither replaces the other.
 	Tag string `json:"tag"`
 	// URL is the app path the notification opens.
 	URL    string `json:"url"`
@@ -141,14 +146,17 @@ const KindMachine = "machine"
 const (
 	MachineApproval = "approval"
 	MachineQuestion = "question"
+	// MachineDevicePaired: a new device was just paired with the machine.
+	// The notice names the machine only, never the device.
+	MachineDevicePaired = "device_paired"
 )
 
 // MachineNotice is what a machine's push says (ADR 0013): the machine's name
-// and the kind of request, never content.
+// and the kind of request or event, never content.
 type MachineNotice struct {
 	MachineID   int64
 	MachineName string
-	// Kind is MachineApproval or MachineQuestion.
+	// Kind is MachineApproval, MachineQuestion or MachineDevicePaired.
 	Kind string
 	// Pending is how many requests wait on the machine; above 1 the push
 	// gives the count instead of the kind.
@@ -163,6 +171,14 @@ func (s *Service) machineNotification(n MachineNotice, locale string) webpush.Me
 	if !ok {
 		text = copies[LocaleVI]
 	}
+	id := strconv.FormatInt(n.MachineID, 10)
+	if n.Kind == MachineDevicePaired {
+		p := Payload{Kind: KindMachine, MachineID: n.MachineID, Title: s.cfg.AppName,
+			Body: fmt.Sprintf(text.devicePaired, n.MachineName), Tag: "machine-paired:" + id, URL: "/machines/" + id,
+			Timestamp: n.At.UnixMilli()}
+		payload, _ := json.Marshal(p)
+		return webpush.Message{Payload: payload, TTL: devicePairedTTL, Urgency: webpush.UrgencyHigh, Topic: "machinepaired" + id}
+	}
 	var body string
 	switch {
 	case n.Pending > 1:
@@ -172,7 +188,6 @@ func (s *Service) machineNotification(n MachineNotice, locale string) webpush.Me
 	default:
 		body = fmt.Sprintf(text.machineApproval, n.MachineName)
 	}
-	id := strconv.FormatInt(n.MachineID, 10)
 	url := "/machines/" + id
 	if n.SessionID != "" {
 		url += "?session=" + n.SessionID

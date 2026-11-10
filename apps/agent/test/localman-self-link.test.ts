@@ -89,12 +89,12 @@ describe("linking the machine to Localman", () => {
     const s = setup();
     s.link.start();
     await s.settle();
-    expect(s.linked).toEqual([expect.objectContaining({ serverUrl: "https://tunnel.example", accessToken: "access-tunnel", deviceId: "chat-agent.42", clientName: "Localman" })]);
+    expect(s.linked).toEqual([expect.objectContaining({ serverUrl: "https://tunnel.example", accessToken: "access-tunnel", deviceId: "tunelo.42", clientName: "Localman" })]);
     expect(s.posted).toEqual([
       { url: "https://localman.example/tunelo/links/self", auth: "Bearer access-localman", body: { token: LINK_TOKEN, machineId: "42", machineName: "Mac mini" } },
     ]);
     expect(s.link.state()).toEqual({ status: "ok", detail: "linked; localhost forwarding on" });
-    expect(s.config.get().localman).toEqual({ sub: "acc_1", deviceId: "chat-agent.42", linkedAt: 1_000_000 });
+    expect(s.config.get().localman).toEqual({ sub: "acc_1", deviceId: "tunelo.42", linkedAt: 1_000_000 });
     expect(readFileSync(join(dir, "config.json"), "utf8")).not.toContain(LINK_TOKEN);
     expect(s.logs.join("\n")).not.toContain(LINK_TOKEN);
   });
@@ -123,7 +123,7 @@ describe("linking the machine to Localman", () => {
 
   test("another account signed in links again", async () => {
     const s = setup();
-    s.config.update((c) => (c.localman = { sub: "acc_other", deviceId: "chat-agent.42", linkedAt: 1 }));
+    s.config.update((c) => (c.localman = { sub: "acc_other", deviceId: "tunelo.42", linkedAt: 1 }));
     s.link.start();
     await s.settle();
     expect(s.posted).toHaveLength(1);

@@ -1,4 +1,4 @@
-// Package machineapi serves the calls of tunelo (formerly chat-agent), the
+// Package machineapi serves the calls of tunelo, the
 // background process of "My machines" (ADR 0013), under /machine-api/ as the
 // Connect service app.v1.MachineAgentService: RegisterMachine and
 // ClaimMachine (authenticated by an IdP access token of the owner, aud the
@@ -21,7 +21,8 @@
 // limit); nginx also limits the paths, RegisterMachine per address and
 // overall. A machine's "needs you" pushes go out at most once per
 // notifyWindow: calls in between are merged into one push sent when the
-// window ends, carrying the newest pending count.
+// window ends, carrying the newest pending count. A "new device paired"
+// push names the machine only and goes out at once, outside that window.
 package machineapi
 
 import (
@@ -53,8 +54,10 @@ import (
 // /machine-api/app.v1.MachineAgentService/<Method>.
 const Prefix = "/machine-api/"
 
-// MinAgentVersion is the oldest machine agent (tunelo, formerly hda and chat-agent) the server accepts.
-const MinAgentVersion = "0.1.0"
+// MinAgentVersion is the oldest machine agent (tunelo) the server accepts:
+// 2.1.0 speaks device link protocol 2 (pairing by the authenticator code),
+// which devices require; older agents are told to run tunelo update.
+const MinAgentVersion = "2.1.0"
 
 // MachinesScope is the scope an access token needs to register or claim a
 // machine; the IdP grants it to the tunelo-agent client only.
@@ -334,8 +337,18 @@ func (s *Service) NotifyNeedsInput(ctx context.Context, req *connect.Request[app
 		kind = push.MachineApproval
 	case appv1.NeedsInputKind_NEEDS_INPUT_KIND_QUESTION:
 		kind = push.MachineQuestion
+	case appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED:
+		if m.GetPendingCount() != 1 || m.GetSessionId() != "" {
+			return nil, invalid("DEVICE_PAIRED takes pending_count 1 and no session_id")
+		}
+		// A security event: sent at once, apart from the merged "needs you"
+		// pushes, so it neither waits for nor replaces one of them.
+		s.notifyNow(machine.UserID, push.MachineNotice{
+			MachineID: machine.ID, MachineName: machine.Name, Kind: push.MachineDevicePaired, Pending: 1,
+		})
+		return connect.NewResponse(&appv1.NotifyNeedsInputResponse{}), nil
 	default:
-		return nil, invalid("kind must be APPROVAL or QUESTION")
+		return nil, invalid("kind must be APPROVAL, QUESTION or DEVICE_PAIRED")
 	}
 	if m.GetPendingCount() < 1 || m.GetPendingCount() > maxPending {
 		return nil, invalid("pending_count must be 1 to 1000")
@@ -380,6 +393,16 @@ func (s *Service) notify(userID int64, n push.MachineNotice) {
 		st.timer = s.after(st.sent.Add(notifyWindow).Sub(now), func() { s.flush(userID, n.MachineID) })
 	}
 	s.mu.Unlock()
+}
+
+// notifyNow sends n at once, outside the machine's window.
+func (s *Service) notifyNow(userID int64, n push.MachineNotice) {
+	s.mu.Lock()
+	closed := s.closed
+	s.mu.Unlock()
+	if !closed {
+		s.send(context.Background(), userID, n)
+	}
 }
 
 // flush sends the notice kept for the machine when its window ended.
@@ -509,7 +532,7 @@ func bearer(header string) (string, bool) {
 func checkVersion(v string) error {
 	got, ok := parseVersion(v)
 	if !ok {
-		return invalid("agent_version must be a semantic version such as 0.1.0")
+		return invalid("agent_version must be a semantic version such as 2.1.0")
 	}
 	minimum, _ := parseVersion(MinAgentVersion)
 	for i := range got {

@@ -15,14 +15,12 @@ import { tempDir } from "./harness.ts";
 const windows = process.platform === "win32";
 
 describe.runIf(windows)("DPAPI key store (Windows)", () => {
-  const saved = { keystore: process.env.TUNELO_KEYSTORE, legacy: process.env.CHAT_AGENT_KEYSTORE };
+  const saved = { keystore: process.env.TUNELO_KEYSTORE };
   beforeEach(() => {
     delete process.env.TUNELO_KEYSTORE;
-    delete process.env.CHAT_AGENT_KEYSTORE;
   });
   afterEach(() => {
     process.env.TUNELO_KEYSTORE = saved.keystore ?? "";
-    process.env.CHAT_AGENT_KEYSTORE = saved.legacy ?? "";
   });
 
   it("seals a secret with a DPAPI-protected key, never a plain key file", async () => {

@@ -63,6 +63,7 @@ vi.mock("../src/machine-api.ts", async (importOriginal) => {
       throw new Error("Chat is down");
     },
     notifyNeedsInput: async () => ({}),
+    notifyDevicePaired: async () => ({}),
   };
 });
 
@@ -84,6 +85,7 @@ function fakeMachine(config: ConfigStore): Machine {
     config,
     publicKey: new Uint8Array(32),
     setNotify: () => undefined,
+    setNotifyPaired: () => undefined,
     machineInfo: async () => ({ providers: [] }),
     dropDevice: () => undefined,
     audit: { write: () => undefined },
@@ -108,10 +110,10 @@ describe("going online", () => {
     });
     const online = goOnline(fakeMachine(config), 1234, () => undefined);
     await settle();
-    expect(state.opened).toEqual(["chat-agent.5"]);
+    expect(state.opened).toEqual(["tunelo.5"]);
     expect(state.claims).toBe(1);
     expect(online.registration.report().chat.status).toBe("error");
-    expect(state.links).toEqual(["chat-agent.5"]);
+    expect(state.links).toEqual(["tunelo.5"]);
     expect(online.registration.report().localman.status).toBe("waiting");
     online.stop();
   });
@@ -125,8 +127,8 @@ describe("going online", () => {
     state.registerFails = false;
     online.registration.retryNow();
     await settle();
-    expect(state.opened).toEqual(["chat-agent.12"]);
-    expect(state.links).toEqual(["chat-agent.12"]);
+    expect(state.opened).toEqual(["tunelo.12"]);
+    expect(state.links).toEqual(["tunelo.12"]);
     online.stop();
   });
 
@@ -143,7 +145,7 @@ describe("going online", () => {
     });
     const online = goOnline(fakeMachine(config), 1234, () => undefined);
     await settle();
-    expect(state.opened).toEqual(["chat-agent.3"]);
+    expect(state.opened).toEqual(["tunelo.3"]);
     expect(state.openedWith[0]).not.toHaveProperty("subdomain");
     online.stop();
   });

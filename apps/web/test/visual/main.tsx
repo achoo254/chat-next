@@ -529,6 +529,12 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		open.click();
 		await find(() => document.querySelector(".mx-browser-surface img"));
 	},
+	// "Bật ghép bằng Authenticator" on the machine's page: the dialog with the QR code, the key and the code boxes.
+	"totp-setup": async () => {
+		const start = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-totp-start]:not(:disabled)"));
+		start.click();
+		await find(() => document.querySelector("[data-id=totp-setup-qr] svg"));
+	},
 	// "Bí mật đã lưu" on the machine's page, scrolled into view.
 	"saved-secrets": async () => {
 		const list = await find(() => document.querySelector(".mx-secrets-list"));

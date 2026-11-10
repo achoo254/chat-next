@@ -9,7 +9,7 @@ import { type AuthResult, TunnelAuthError, TunnelClient } from "@tunelo/client";
 import { accountKeyFor } from "./identity/credentials.ts";
 import { identitySession } from "./identity/session.ts";
 
-export const TUNNEL_SERVER = process.env.CHAT_AGENT_TUNNEL_SERVER ?? "https://tunnel.hoandat.com";
+export const TUNNEL_SERVER = process.env.TUNELO_MACHINE_TUNNEL_SERVER ?? "https://tunnel.hoandat.com";
 
 export function isSignedIn(dir: string): boolean {
   return identitySession(dir).info() !== undefined;

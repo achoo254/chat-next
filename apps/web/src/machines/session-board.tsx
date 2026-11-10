@@ -130,7 +130,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 			<div className="mx-body">
 				{needsPairing(conn) && (
 					<div className="empty">
-						<MachineIcon name="qr" />
+						<MachineIcon name="shield" />
 						<h2>{t.agent.conn[conn.kind === "unpaired" ? "unpaired" : "repair"]}</h2>
 						<p>{conn.kind === "unpaired" ? t.agent.hint.unpaired : t.agent.hint.repair}</p>
 						<Link to={pairPath} className="btn btn-primary">

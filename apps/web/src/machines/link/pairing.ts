@@ -1,7 +1,7 @@
 // Pairing this device with a machine (ADR 0013). Nothing secret goes through
 // the chat server, and the machine key is pinned only after the machine
-// proved it: the install secret (one-command install), the QR secret, or the
-// 6-digit code through CPace. The caller pins the key it gets back.
+// proved it: the install secret (one-command install) or the 6-digit
+// Authenticator code through CPace. The caller pins the key it gets back.
 import {
 	HandshakeFailure,
 	decodePlain,
@@ -21,7 +21,7 @@ export interface PairTarget {
 	readonly socket: SocketFactory;
 }
 
-/** Runs the handshake once with `trust` (install or QR) and returns the machine key to pin. */
+/** Runs the handshake once with the install secret and returns the machine key to pin. */
 export async function confirmTrust(target: PairTarget, trust: DeviceTrust): Promise<Uint8Array> {
 	const exchange = await openExchange(target.socket, target.url);
 	try {
@@ -34,7 +34,12 @@ export async function confirmTrust(target: PairTarget, trust: DeviceTrust): Prom
 	}
 }
 
-/** Pairs with the 6-digit code `tunelo pair` shows; returns the machine key to pin. */
+/**
+ * Pairs with the 6-digit code the user's Authenticator app shows for the
+ * machine; returns the machine key to pin. A wrong code throws PakeFailure
+ * (the machine sends no error for it); a locked machine or one without
+ * Authenticator pairing throws HandshakeFailure (TOO_MANY_ATTEMPTS, TOTP_NOT_SET).
+ */
 export async function pairWithCode(target: PairTarget, code: string): Promise<Uint8Array> {
 	if (!/^[0-9]{6}$/.test(code)) throw new HandshakeFailure(HandshakeErrorCode.MALFORMED);
 	const exchange = await openExchange(target.socket, target.url);
