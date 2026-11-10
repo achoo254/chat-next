@@ -296,13 +296,14 @@ export function createBotsClient(transport: Transport, onUnauthenticated: () => 
 				if (chat === undefined) throw new BotError("other", "StartBot returned no chat");
 				return assertSafeId(chat.id);
 			}),
-		inlineQuery: (botId, chatId, query) =>
+		inlineQuery: (botId, chatId, query, offset) =>
 			call(async () => {
-				const response = await bots.inlineQuery({ botId: BigInt(botId), chatId: BigInt(chatId), query, offset: "" });
+				const response = await bots.inlineQuery({ botId: BigInt(botId), chatId: BigInt(chatId), query, offset });
 				return {
 					queryId: response.queryId,
 					items: response.results.flatMap((r) => toInlineItem(r) ?? []),
 					gallery: response.gallery,
+					nextOffset: response.nextOffset,
 				};
 			}),
 		sendInlineResult: (chatId, topicId, queryId, resultId, randomId) =>

@@ -143,12 +143,16 @@ export class FakeBots {
 	failInfo = 0;
 	/** The bots in each group, as GetChatBotCommands lists them (none unless set). */
 	readonly chatBots = new Map<number, number[]>();
-	/** Inline mode: a bot's results for a query ("timeout": the bot does not answer). */
+	/**
+	 * Inline mode: a bot's results for a query ("timeout": the bot does not answer). With
+	 * `inlinePageSize` > 0 they come in pages of that size, the offset being the next index.
+	 */
 	readonly inline = new Map<number, (query: string) => readonly FakeInlineResult[] | "timeout">();
+	inlinePageSize = 0;
 	/** Answers given, by query id (SendInlineResult posts from them). */
 	readonly inlineAnswers = new Map<string, (FakeInlineResult & { botId: number })[]>();
-	/** InlineQuery requests: bot and query. */
-	readonly inlineQueries: { botId: number; query: string }[] = [];
+	/** InlineQuery requests: bot, query and offset ("" for the first page). */
+	readonly inlineQueries: { botId: number; query: string; offset: string }[] = [];
 	/** OpenMiniApp requests, in order. */
 	readonly miniAppOpens: { botId: number; chatId: number; seq: number; url: string }[] = [];
 	/** OpenMiniApp fails with unavailable this many more times. */
@@ -426,16 +430,20 @@ export class FakeBots {
 		router.service(BotsService, {
 			inlineQuery: (req) => {
 				const botId = num(req.botId);
-				this.inlineQueries.push({ botId, query: req.query });
+				this.inlineQueries.push({ botId, query: req.query, offset: req.offset });
 				const answer = this.inline.get(botId);
 				if (answer === undefined) throw new ConnectError("inline_off: the bot does not use inline mode", Code.FailedPrecondition);
-				const results = answer(req.query);
-				if (results === "timeout") throw new ConnectError("bot_timeout: the bot did not answer in time", Code.FailedPrecondition);
+				const all = answer(req.query);
+				if (all === "timeout") throw new ConnectError("bot_timeout: the bot did not answer in time", Code.FailedPrecondition);
+				const from = req.offset === "" ? 0 : Number(req.offset);
+				const to = this.inlinePageSize > 0 ? from + this.inlinePageSize : all.length;
+				const results = all.slice(from, to);
 				const queryId = `q${this.inlineAnswers.size + 1}`;
 				this.inlineAnswers.set(queryId, results.map((r) => ({ ...r, botId })));
 				return {
 					queryId,
 					results: results.map((r) => ({ id: r.id, kind: InlineResultKind.ARTICLE, title: r.title, description: r.description })),
+					nextOffset: to < all.length ? String(to) : "",
 				};
 			},
 			getChatBotCommands: (req) => {

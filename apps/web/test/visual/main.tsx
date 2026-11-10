@@ -256,6 +256,15 @@ const pollingBot = f.bots.seed("Báo cáo doanh thu hằng ngày", "report_daily
 	description: "Gửi báo cáo doanh thu mỗi sáng cho nhóm Kinh doanh.",
 });
 
+// Inline mode (mockups/bots.html#inline-mode): a bot listing showtimes, six a page, ten in all.
+const inlineBot = f.bots.seed("Lịch chiếu", "lich_chieu_bot", { owned: false });
+f.setInlinePlaceholder(inlineBot, "Tên phim hoặc rạp…");
+const SHOWTIMES = ["Dune: Phần Hai", "Lật Mặt 7", "Mai", "Đào, Phở và Piano", "Kung Fu Panda 4", "Godzilla x Kong", "Inside Out 2", "Cám", "Làm Giàu Với Ma", "Ma Da"];
+f.bots.inline.set(inlineBot, () =>
+	SHOWTIMES.map((title, n) => ({ id: `s${n}`, title, description: `${19 + (n % 4)}:${n % 2 === 0 ? "15" : "45"} · CGV Vincom Bà Triệu`, text: `${title} lúc 20:15` })),
+);
+f.bots.inlinePageSize = 6;
+
 // ?at= names a screen whose path holds an id the seed assigns.
 const SCREENS: Record<string, string> = {
 	ops: `/c/${demo.ids.ops}`,
@@ -741,6 +750,13 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await find(() => (box.textContent === "Xem giúp mình" ? box : null));
 		box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
 		typeInto(box, "dòng hai");
+	},
+	// Inline mode: "@bot query" typed in the composer, its results attached above it, the second one highlighted.
+	"inline-bot": async () => {
+		const box = await find(() => document.querySelector<HTMLElement>(".composer .plain-text-box[contenteditable=true]"));
+		typeInto(box, "@lich_chieu_bot phim tối nay");
+		await find(() => document.querySelector(".inline-results [role=option]"));
+		box.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
 	},
 	edit: async () => {
 		await contextMenu(".messages .msg.mine", "Mục 3 ổn");

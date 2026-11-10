@@ -307,6 +307,7 @@ export const viBots = {
 		disclosure: (username: string) => `@${username} nhận chữ bạn gõ sau tên bot.`,
 		asking: (username: string) => `Đang hỏi @${username}…`,
 		loading: "Đang tải kết quả",
+		loadingMore: "Đang tải thêm kết quả",
 		empty: (query: string) => `Không có kết quả cho “${query}”`,
 		timeout: "Bot chưa trả lời. Gõ tiếp để thử lại.",
 		failed: "Không lấy được kết quả. Gõ tiếp để thử lại.",

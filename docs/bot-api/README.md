@@ -236,6 +236,7 @@ curl -s ... -d '{
 - Trả lời trong 1 phút; người dùng chờ tối đa 10 giây, quá thì app báo bot chưa trả lời.
 - Tối đa 50 kết quả. `article` gửi `text`; `photo`, `video`, `document` gửi file `file_id` của bot (file bot đã gửi hoặc thấy được) kèm `caption`. Mọi kết quả có thể kèm bàn phím inline chỉ gồm nút link (không có nút callback, vì tin là của người dùng, trong chat bot có thể không tham gia); `thumbnail_file_id` là ảnh nhỏ của bài viết.
 - `cache_time` (mặc định 300 giây, tối đa 3600): câu trả lời được dùng lại cho cùng từ khoá với mọi người, trừ khi `is_personal`. `gallery: true` hiện kết quả dạng lưới.
+- Có thêm kết quả thì trả `next_offset` (tối đa 64 byte): khi người dùng cuộn tới cuối danh sách, app gửi một `inline_query` mới với `offset` là giá trị đó. Trang cuối thì bỏ trống `next_offset`.
 
 ## 11. Mini App
 

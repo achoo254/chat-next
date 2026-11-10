@@ -34,6 +34,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	lan: "?at=lan",
 	// Forwarding with a comment: the dialog's message box (plain-text-box.tsx) with two lines.
 	forward: "?at=ops&open=forward",
+	// Inline mode: a bot's results as a list attached to the composer, one highlighted by the arrows.
+	"inline-bot": "?at=ops&open=inline-bot",
 	media: "?at=media",
 	"media-info": "?at=media&open=info",
 	"media-shared": "?at=media&open=shared-media",

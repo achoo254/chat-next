@@ -299,6 +299,7 @@ export const zhCNBots: BotsCopy = {
 		disclosure: (username) => `@${username} 会收到你在其名称后输入的内容。`,
 		asking: (username) => `正在询问 @${username}…`,
 		loading: "正在加载结果",
+		loadingMore: "正在加载更多结果",
 		empty: (query) => `没有“${query}”的结果`,
 		timeout: "机器人没有响应。继续输入即可重试。",
 		failed: "无法获取结果。继续输入即可重试。",

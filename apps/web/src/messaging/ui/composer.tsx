@@ -12,13 +12,16 @@
 // into the microphone, which records a voice message. In a private chat with
 // a bot the bot layer (bots/bot-chat.tsx, loaded with the first bot chat)
 // adds the command menu and the bot's reply keyboard; in a group it adds the
-// command menu of the group's bots.
+// command menu of the group's bots. A draft "@bot_username query" is inline
+// mode: the box finds it (bots/inline-token.ts) and the bot's results show as
+// a list attached to the box (bots/inline-results.tsx).
 import { Suspense, lazy, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { hasFinePointer } from "../../components/fine-pointer.ts";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger } from "../../components/plain-text-box.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
+import { inlineToken } from "../bots/inline-token.ts";
 import { useCopy } from "../copy/use-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
@@ -36,7 +39,7 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
 const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
 const BotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotLayer })));
-// A draft starting with "@": inline mode when it is "@bot_username query".
+// The draft is "@bot_username query": inline mode of that bot.
 const InlineResults = lazy(() => import("../bots/inline-results.tsx"));
 const GroupBotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.GroupBotLayer })));
 
@@ -113,8 +116,14 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	// "/command" typed as the whole message, which the bot layer's command menu follows.
 	const [command, setCommand] = useState<OpenToken | null>(null);
 	const withBots = botId !== 0 || (group && !disabled);
+	// "@bot_username query" as the whole draft, whose results list keeps the box's keys (bots/inline-results.tsx).
+	const [inline, setInline] = useState<OpenToken | null>(null);
+	const inlineKeys = useRef<((event: KeyboardEvent) => boolean) | null>(null);
+	const [inlineActive, setInlineActive] = useState<string | null>(null);
+	const inlineListId = `inline-results-${chatId}-${topicId}`;
 	const suggestions: readonly SuggestionTrigger[] = [
 		{ char: "/", find: (value) => (withBots ? commandToken(value) : null), onChange: setCommand, onKeyDown: (event) => botActions.current?.onKey(event) ?? false },
+		{ char: "@", find: (value) => inlineToken(value), onChange: setInline, onKeyDown: (event) => inlineKeys.current?.(event) ?? false },
 	];
 
 	// Starting an edit loads the message text; leaving it brings the draft back.
@@ -354,12 +363,15 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	}
 	return (
 		<div className="composer-wrap">
-			{text[0] === "@" && !editing && !withFiles && (
+			{inline !== null && !editing && !withFiles && (
 				<Suspense fallback={null}>
 					<InlineResults
 						chatId={chatId}
 						topicId={topicId}
-						draft={text}
+						draft={`@${inline.query}`}
+						listId={inlineListId}
+						keysRef={inlineKeys}
+						onActive={setInlineActive}
 						onSent={() => {
 							update("");
 							area.current?.focus();
@@ -467,6 +479,9 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					onKeyDown={onKeyDown}
 					onPaste={onPaste}
 					aria-invalid={error !== ""}
+					aria-autocomplete="list"
+					aria-controls={inlineActive === null ? undefined : inlineListId}
+					aria-activedescendant={inlineActive ?? undefined}
 				/>
 				<div className="emoji-anchor">
 					<button

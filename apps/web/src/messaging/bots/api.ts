@@ -179,6 +179,8 @@ export interface InlineAnswer {
 	readonly items: readonly InlineItem[];
 	/** Show the results as a grid of media. */
 	readonly gallery: boolean;
+	/** Asks for the next page of results; "" when there are no more. */
+	readonly nextOffset: string;
 }
 
 /** One bot's command menu in a group (GetChatBotCommands). */
@@ -282,8 +284,11 @@ export interface Bots {
 	 * an answer within 15 seconds (a stalled connection) answers timedOut.
 	 */
 	press(chatId: number, seq: number, callbackData: string): Promise<PressAnswer>;
-	/** BotError "bot_timeout" when the bot did not answer, "inline_off" without inline mode. */
-	inlineQuery(botId: number, chatId: number, query: string): Promise<InlineAnswer>;
+	/**
+	 * One page of results: `offset` "" for the first, else the previous page's nextOffset.
+	 * BotError "bot_timeout" when the bot did not answer, "inline_off" without inline mode.
+	 */
+	inlineQuery(botId: number, chatId: number, query: string, offset: string): Promise<InlineAnswer>;
 	/** Posts the result as the caller's message via the bot. */
 	sendInlineResult(chatId: number, topicId: number, queryId: string, resultId: string, randomId: number): Promise<void>;
 	/**

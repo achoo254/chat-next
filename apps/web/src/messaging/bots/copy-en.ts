@@ -299,6 +299,7 @@ export const enBots: BotsCopy = {
 		disclosure: (username) => `@${username} receives what you type after its name.`,
 		asking: (username) => `Asking @${username}…`,
 		loading: "Loading results",
+		loadingMore: "Loading more results",
 		empty: (query) => `No results for “${query}”`,
 		timeout: "The bot did not answer. Keep typing to try again.",
 		failed: "Could not get results. Keep typing to try again.",
