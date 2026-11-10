@@ -579,6 +579,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx[data-pane="list"] > .mx-main, .mx[data-pane="main"] > .mx-list { display: none; }
 	/* An open session has its own bar with a back button: the app's top bar steps aside, as in an open chat. */
 	.app-frame:has(.mx-chat) > .rail { display: none; }
+	/* With the bar gone the content is the only row: it takes the whole height, so the composer stays at the bottom. */
+	.app-frame:has(.mx-chat) { grid-template-rows: minmax(0, 1fr); }
 	.mx-list { border-right: 0; }
 	.mx-back { display: inline-grid; }
 	.mx-head { padding: var(--space-2) var(--space-2); }
