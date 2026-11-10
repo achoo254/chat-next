@@ -19,6 +19,8 @@ class FakeRequest<T> {
 
 /** Just enough of IndexedDB for device-keys.ts: one database of key-value stores. */
 class FakeIndexedDb {
+	/** WebKit on iOS: a CryptoKey put in a record reads back as null. */
+	constructor(readonly dropCryptoKeys = false) {}
 	readonly databases = new Map<string, Map<string, Map<string, unknown>>>();
 	readonly open_: FakeDb[] = [];
 
@@ -29,7 +31,7 @@ class FakeIndexedDb {
 			const fresh = stores === undefined;
 			stores ??= new Map();
 			this.databases.set(name, stores);
-			const db = new FakeDb(stores);
+			const db = new FakeDb(stores, this.dropCryptoKeys);
 			this.open_.push(db);
 			request.result = db;
 			if (fresh) request.onupgradeneeded?.();
@@ -48,7 +50,10 @@ class FakeIndexedDb {
 class FakeDb {
 	onversionchange: Handler = null;
 	closed = false;
-	constructor(private readonly stores: Map<string, Map<string, unknown>>) {}
+	constructor(
+		private readonly stores: Map<string, Map<string, unknown>>,
+		private readonly dropCryptoKeys: boolean,
+	) {}
 	createObjectStore(name: string): void {
 		this.stores.set(name, new Map());
 	}
@@ -71,7 +76,8 @@ class FakeDb {
 		const api = {
 			get: (key: string) => settle(structuredClone(store.get(key))),
 			put: (value: unknown, key: string) => {
-				store.set(key, value);
+				const holdsCryptoKey = typeof value === "object" && value !== null && (value as { privateKey?: unknown }).privateKey instanceof CryptoKey;
+				store.set(key, this.dropCryptoKeys && holdsCryptoKey ? null : value);
 				return settle(key);
 			},
 			delete: (key: string) => {
@@ -138,6 +144,24 @@ describe("device key store", () => {
 			expect(persist).toHaveBeenCalledTimes(1);
 		} finally {
 			vi.unstubAllGlobals();
+		}
+	});
+
+	it("keeps the key as bytes when the browser reads a CryptoKey back as null", async () => {
+		const idb = new FakeIndexedDb(true);
+		const make = vi.fn((extractable: boolean) => generateKeyPair(extractable));
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		try {
+			const first = await deviceKeyStore(asFactory(idb), make).device();
+			expect(first.privateKey.extractable).toBe(false);
+			// The next page load (a new store object) gets the same identity.
+			const again = await deviceKeyStore(asFactory(idb), make).device();
+			expect(again.publicKey).toEqual(first.publicKey);
+			expect(again.privateKey.extractable).toBe(false);
+			expect(make).toHaveBeenCalledTimes(2);
+			expect(warn).toHaveBeenCalledTimes(1);
+		} finally {
+			warn.mockRestore();
 		}
 	});
 

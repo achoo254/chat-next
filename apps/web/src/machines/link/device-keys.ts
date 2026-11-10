@@ -2,17 +2,21 @@
 // it pinned, in IndexedDB. The private key is a non-extractable WebCrypto
 // X25519 key: IndexedDB stores the CryptoKey object itself (structured
 // clone), so the key material never exists as bytes the page could read or
-// send anywhere. Ending the session deletes the database
+// send anywhere. A browser that cannot keep a CryptoKey there (iOS WebKit
+// reads it back as null) keeps the key as PKCS#8 bytes instead and imports it
+// non-extractable on every load. Ending the session deletes the database
 // (@achoo254/chat-core wipeDeviceKeys); clearing site data does too, after
 // which the device pairs again with the machine's Authenticator code.
 import { DEVICE_KEYS_DATABASE } from "@achoo254/chat-core";
-import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
+import { exportPrivateKey, generateKeyPair, importKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 
 const STORE = "keys";
 const DEVICE = "device";
 const VERSION = 1;
 
 type StoredDevice = { readonly publicKey: Uint8Array<ArrayBuffer>; readonly privateKey: CryptoKey };
+/** The record of a browser that cannot keep a CryptoKey in IndexedDB. */
+type StoredDeviceBytes = { readonly publicKey: Uint8Array<ArrayBuffer>; readonly pkcs8: Uint8Array<ArrayBuffer> };
 
 export interface DeviceKeyStore {
 	/** The device key, made on first use. */
@@ -65,8 +69,18 @@ async function requestPersistentStorage(): Promise<void> {
 	}
 }
 
+function storedDeviceBytes(value: unknown): Uint8Array<ArrayBuffer> | null {
+	if (typeof value !== "object" || value === null) return null;
+	const pkcs8 = (value as Record<string, unknown>).pkcs8;
+	if (!ArrayBuffer.isView(pkcs8) || pkcs8.byteLength === 0) return null;
+	return new Uint8Array(pkcs8.buffer.slice(pkcs8.byteOffset, pkcs8.byteOffset + pkcs8.byteLength)) as Uint8Array<ArrayBuffer>;
+}
+
 /** `factory` is the browser's indexedDB; tests pass a fake. */
-export function deviceKeyStore(factory: IDBFactory = indexedDB, makeKey: () => Promise<KeyPair> = () => generateKeyPair(false)): DeviceKeyStore {
+export function deviceKeyStore(
+	factory: IDBFactory = indexedDB,
+	makeKey: (extractable: boolean) => Promise<KeyPair> = generateKeyPair,
+): DeviceKeyStore {
 	let db: Promise<IDBDatabase> | null = null;
 	let device: Promise<KeyPair> | null = null;
 
@@ -109,21 +123,35 @@ export function deviceKeyStore(factory: IDBFactory = indexedDB, makeKey: () => P
 		await Promise.all([value === undefined ? promised(store.delete(key)) : promised(store.put(value, key)), done]);
 	};
 
+	/** First use: make the key and prove the browser keeps it, else keep it as bytes. */
+	const createDevice = async (): Promise<KeyPair> => {
+		const pair = await makeKey(false);
+		if (pair.privateKey.extractable) throw new Error("the device key must not be extractable");
+		const record: StoredDevice = { publicKey: pair.publicKey, privateKey: pair.privateKey };
+		await write(DEVICE, record);
+		if (storedDevice(await read(DEVICE)) !== null) return pair;
+		console.warn("machines: the browser did not keep the device key object; keeping it as bytes");
+		const exportable = await makeKey(true);
+		const pkcs8 = await exportPrivateKey(exportable.privateKey);
+		const bytes: StoredDeviceBytes = { publicKey: exportable.publicKey, pkcs8 };
+		await write(DEVICE, bytes);
+		if (storedDeviceBytes(await read(DEVICE)) === null) throw new Error("the browser cannot keep the device key");
+		return importKeyPair(pkcs8);
+	};
+
 	const loadDevice = async (): Promise<KeyPair> => {
 		await requestPersistentStorage();
 		const existing = await read(DEVICE);
 		const stored = storedDevice(existing);
 		if (stored !== null) return stored;
+		const bytes = storedDeviceBytes(existing);
+		if (bytes !== null) return importKeyPair(bytes);
 		// A record that is there but unreadable is not "no key yet": making a new
 		// key over it would silently turn this browser into an unknown device for
 		// every machine it is paired with. Fail instead, so the link retries.
 		if (existing !== undefined && existing !== null) throw new Error("the stored device key is unreadable");
 		console.info("machines: made a new device key (none was stored)");
-		const pair = await makeKey();
-		if (pair.privateKey.extractable) throw new Error("the device key must not be extractable");
-		const record: StoredDevice = { publicKey: pair.publicKey, privateKey: pair.privateKey };
-		await write(DEVICE, record);
-		return pair;
+		return createDevice();
 	};
 
 	return {
