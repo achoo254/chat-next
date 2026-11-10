@@ -484,6 +484,8 @@ export const zhCNMachines: MachinesCopy = {
 		zoomFit: "适应窗口",
 		pan: "拖动查看",
 		keyboard: "键盘",
+		minimize: "最小化",
+		restore: "重新打开",
 		typeHere: "向机器输入",
 		close: "关闭",
 		ended: "屏幕控制会话已结束。",

@@ -22,8 +22,6 @@ export class VncChannel {
 	private early: ArrayBuffer[] = [];
 	private streamId = "";
 	private readonly stop: () => void;
-	/** Sends in order: each piece goes once the one before it was taken. */
-	private queue: Promise<unknown> = Promise.resolve();
 	/** The session is over (the machine closed it, or this side did). */
 	onEnd: (byMachine: boolean) => void = () => undefined;
 
@@ -69,12 +67,17 @@ export class VncChannel {
 		});
 	}
 
+	/**
+	 * Sends at once, not after the machine answered the piece before: a pointer
+	 * moves dozens of times a second, and waiting for each answer would put a
+	 * click behind every move still in flight. The link sends in call order and
+	 * the machine handles frames in arrival order, so the bytes stay in order.
+	 */
 	send(data: ArrayBuffer | ArrayBufferView): void {
 		if (this.readyState !== "open") return;
 		// A copy: noVNC reuses its send buffer.
 		const bytes = ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice() : new Uint8Array(data).slice();
-		const streamId = this.streamId;
-		this.queue = this.queue.then(() => this.link.request({ case: "screenShareData", value: { streamId, data: bytes } })).catch(() => this.ended(true));
+		this.link.request({ case: "screenShareData", value: { streamId: this.streamId, data: bytes } }).catch(() => this.ended(true));
 	}
 
 	close(): void {

@@ -25,16 +25,18 @@ import { defaultAnswer, FakeMachine, until } from "./fake-machine.ts";
 const services = { toasts: { show: () => undefined } } as unknown as Services;
 
 /** noVNC needs a real canvas: a stand-in that records what the view asks of it. */
-const made: { credentials?: unknown; sent: unknown[] }[] = [];
+const made: { credentials?: unknown; sent: unknown[]; connect: () => void }[] = [];
+/** How many times the screen was asked to take the keyboard, minus the times it was asked to let go. */
+const focused = { count: 0 };
 vi.mock("@novnc/novnc", () => ({
 	default: class extends EventTarget {
 		scaleViewport = false;
 		qualityLevel = 0;
 		compressionLevel = 0;
-		record: { credentials?: unknown; sent: unknown[] };
+		record: { credentials?: unknown; sent: unknown[]; connect: () => void };
 		constructor(_target: HTMLElement, channel: { onmessage: unknown }, options: { credentials?: unknown }) {
 			super();
-			this.record = { ...(options.credentials ? { credentials: options.credentials } : {}), sent: [] };
+			this.record = { ...(options.credentials ? { credentials: options.credentials } : {}), sent: [], connect: () => this.dispatchEvent(new Event("connect")) };
 			made.push(this.record);
 			channel.onmessage = () => undefined;
 			queueMicrotask(() => this.dispatchEvent(new CustomEvent("credentialsrequired", { detail: { types: ["username", "password"] } })));
@@ -43,6 +45,12 @@ vi.mock("@novnc/novnc", () => ({
 			this.record.sent.push(c);
 		}
 		sendKey() {}
+		focus() {
+			focused.count += 1;
+		}
+		blur() {
+			focused.count -= 1;
+		}
 		disconnect() {}
 	},
 }));
@@ -62,6 +70,7 @@ let status = { supported: true, enabled: true, exposed: false, firewallOn: false
 
 beforeEach(async () => {
 	made.length = 0;
+	focused.count = 0;
 	status = { supported: true, enabled: true, exposed: false, firewallOn: false };
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
@@ -126,6 +135,17 @@ describe("the channel noVNC speaks through", () => {
 		l.stop();
 	});
 
+	it("sends every piece at once, without waiting for the machine to answer the one before", async () => {
+		const l = await openLink();
+		const channel = await VncChannel.open(l);
+		// The machine stays silent on data: a click must not wait behind the pointer moves before it.
+		machine.handler = (frame) => (frame.body.case === "screenShareData" ? [] : undefined);
+		for (const part of ["move", "move", "down", "up"]) channel.send(new TextEncoder().encode(part));
+		await until(() => sent("screenShareData").length === 4, "all four");
+		expect(sent("screenShareData").map((f) => (f.body.case === "screenShareData" ? new TextDecoder().decode(f.body.value.data) : ""))).toEqual(["move", "move", "down", "up"]);
+		l.stop();
+	});
+
 	it("types characters and the phone keyboard's keys as keysyms", () => {
 		expect(keysymOfChar("a")).toBe(0x61);
 		expect(keysymOfChar("é")).toBe(0xe9);
@@ -179,6 +199,63 @@ describe("the screen view", () => {
 		await waitFor(() => expect(made[0]?.sent).toEqual([{ username: "dat", password: "mac-secret!" }]));
 		expect(container.innerHTML).not.toContain("mac-secret!");
 		l.stop();
+	});
+});
+
+describe("the screen view's window and keyboard", () => {
+	it("minimizes to a bar and keeps the session; opening it again shows the screen", async () => {
+		const l = await openLink();
+		const { container } = render(
+			<I18nProvider>
+				<ScreenView link={l} ai="Claude Code" online inSession={false} onClose={() => undefined} />
+			</I18nProvider>,
+		);
+		await until(() => sent("screenShareOpen").length === 1, "open");
+		await screen.findByLabelText("Mật khẩu Mac");
+		const root = container.querySelector(".mx-screen") as HTMLElement;
+		expect(root.classList.contains("min")).toBe(false);
+		await userEvent.click(screen.getByRole("button", { name: "Thu nhỏ" }));
+		expect(root.classList.contains("min")).toBe(true);
+		expect(sent("screenShareClose")).toHaveLength(0);
+		await userEvent.click(screen.getByRole("button", { name: "Mở lại" }));
+		expect(root.classList.contains("min")).toBe(false);
+		expect(sent("screenShareOpen")).toHaveLength(1);
+		l.stop();
+	});
+
+	const live = async (coarse: boolean) => {
+		vi.stubGlobal("matchMedia", () => ({ matches: coarse }));
+		const l = await openLink();
+		render(
+			<I18nProvider>
+				<ScreenView link={l} ai="Claude Code" online inSession={false} onClose={() => undefined} />
+			</I18nProvider>,
+		);
+		await until(() => sent("screenShareOpen").length === 1, "open");
+		await screen.findByLabelText("Mật khẩu Mac");
+		act(() => made[0]?.connect());
+		return l;
+	};
+
+	it("on a computer the keyboard button gives the keys to the screen and takes them back", async () => {
+		const l = await live(false);
+		await userEvent.click(await screen.findByRole("button", { name: "Bàn phím" }));
+		expect(focused.count).toBe(1);
+		l.stop();
+		vi.unstubAllGlobals();
+	});
+
+	it("on a touch screen the keyboard button raises the keyboard and shows it is on", async () => {
+		const l = await live(true);
+		const button = await screen.findByRole("button", { name: "Bàn phím" });
+		expect(button.getAttribute("aria-pressed")).toBe("false");
+		await userEvent.click(button);
+		expect(document.activeElement?.getAttribute("aria-label")).toBe("Gõ vào máy");
+		expect(button.getAttribute("aria-pressed")).toBe("true");
+		await userEvent.click(button);
+		expect(button.getAttribute("aria-pressed")).toBe("false");
+		l.stop();
+		vi.unstubAllGlobals();
 	});
 });
 

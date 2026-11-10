@@ -22,8 +22,13 @@
 .mx-screen-foot .note { flex: 1; min-width: 200px; margin: 0; }
 .mx-screen .mx-browser-typing { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
 
+/* Minimized: a bar in the corner; the surface stays mounted so the session goes on. */
+.mx-screen.min, .mx-screen.in-session.min { position: fixed; inset: auto var(--space-4) var(--space-4) auto; z-index: 41; width: min(320px, calc(100vw - 2 * var(--space-4))); height: auto; }
+.mx-screen.min .mx-screen-head { border-bottom: 0; }
+.mx-screen.min .mx-screen-surface, .mx-screen.min .mx-screen-foot, .mx-screen.min .mx-screen-warn { display: none; }
+
 @media (max-width: 760px) {
-	.mx-screen, .mx-screen.in-session { position: fixed; inset: 0; z-index: 41; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+	.mx-screen:not(.min), .mx-screen.in-session:not(.min) { position: fixed; inset: 0; z-index: 41; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 	.mx-screen-foot .note { flex-basis: 100%; font-size: 0.75rem; }
 }
 .mx-screen-warn { grid-template-columns: auto minmax(0, 1fr); align-items: start; }

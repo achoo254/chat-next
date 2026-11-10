@@ -54,6 +54,10 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 	/** The screen at its own size (cut to the view) instead of fitted; with `pan`, a drag moves the view. */
 	const [zoomed, setZoomed] = useState(false);
 	const [pan, setPan] = useState(false);
+	/** Shrunk to a bar in the corner: the session stays open, the page behind is usable. */
+	const [minimized, setMinimized] = useState(false);
+	/** Keys typed now go to the machine (the screen or the hidden typing field has focus). */
+	const [keys, setKeys] = useState(false);
 	const target = useRef<HTMLDivElement>(null);
 	const typing = useRef<HTMLInputElement>(null);
 	const rfb = useRef<RFB | null>(null);
@@ -183,6 +187,26 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 		onClose();
 	};
 
+	const minimize = (on: boolean) => {
+		if (on) {
+			typing.current?.blur();
+			rfb.current?.blur();
+		}
+		setMinimized(on);
+	};
+
+	// A touch screen raises its keyboard through the typing field; a computer sends its own keys through the screen.
+	// The button keeps focus where it is (onMouseDown), so "on" is still known when it is pressed to turn it off.
+	const toggleKeyboard = () => {
+		if (keys) {
+			typing.current?.blur();
+			rfb.current?.blur();
+			return;
+		}
+		if (window.matchMedia("(pointer: coarse)").matches) typing.current?.focus();
+		else rfb.current?.focus();
+	};
+
 	const typed = () => {
 		const el = typing.current;
 		const r = rfb.current;
@@ -194,12 +218,29 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 
 	const live = phase.kind === "live";
 	return (
-		<div className={`mx-screen${inSession ? " in-session" : ""}`} role="dialog" aria-modal={!inSession} aria-labelledby={`${id}-title`} data-id="screen-view">
+		<div
+			className={`mx-screen${inSession ? " in-session" : ""}${minimized ? " min" : ""}`}
+			role="dialog"
+			aria-modal={!inSession && !minimized}
+			aria-labelledby={`${id}-title`}
+			onFocus={(e) => setKeys(e.target === typing.current || e.target instanceof HTMLCanvasElement)}
+			onBlur={() => setKeys(false)}
+			data-id="screen-view"
+		>
 			<header className="mx-screen-head">
 				<h3 id={`${id}-title`}>
 					<MachineIcon name="monitor" />
 					<span>{s.title}</span>
 				</h3>
+				{minimized ? (
+					<button type="button" className="btn btn-sm" onClick={() => minimize(false)} data-id="screen-view-restore">
+						{s.restore}
+					</button>
+				) : (
+					<button type="button" className="icon-btn" aria-label={s.minimize} title={s.minimize} onClick={() => minimize(true)} data-id="screen-view-minimize">
+						<Icon name="minimize" />
+					</button>
+				)}
 				<button type="button" className="icon-btn" aria-label={s.close} title={s.close} onClick={close} data-id="screen-view-close">
 					<BrowserIcon name="x" />
 				</button>
@@ -299,7 +340,7 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 			</div>
 			{live && (
 				<footer className="mx-screen-foot">
-					<button type="button" className="btn btn-sm" onClick={() => typing.current?.focus()} data-id="screen-view-keyboard">
+					<button type="button" className="btn btn-sm" aria-pressed={keys} onMouseDown={(e) => e.preventDefault()} onClick={toggleKeyboard} data-id="screen-view-keyboard">
 						<BrowserIcon name="keyboard" small />
 						{s.keyboard}
 					</button>

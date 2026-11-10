@@ -493,6 +493,8 @@ export const viMachines = {
 		zoomFit: "Vừa màn hình",
 		pan: "Kéo để xem",
 		keyboard: "Bàn phím",
+		minimize: "Thu nhỏ",
+		restore: "Mở lại",
 		typeHere: "Gõ vào máy",
 		close: "Đóng",
 		ended: "Phiên điều khiển màn hình đã kết thúc.",

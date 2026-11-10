@@ -490,6 +490,8 @@ export const enMachines: MachinesCopy = {
 		zoomFit: "Fit to view",
 		pan: "Drag to look around",
 		keyboard: "Keyboard",
+		minimize: "Minimize",
+		restore: "Open again",
 		typeHere: "Type to the machine",
 		close: "Close",
 		ended: "The screen session has ended.",
