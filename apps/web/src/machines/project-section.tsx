@@ -10,6 +10,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { navigate, paths } from "../router.tsx";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { useCollapsed } from "./use-collapsed.ts";
 import { NewSession } from "./new-session.tsx";
 import { gitLine } from "./projects-view.ts";
 import { aiName, folderName } from "./use-machines.ts";
@@ -42,6 +43,7 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 	const { open, setOpen, ref } = usePopover();
 	const [dialog, setDialog] = useState<Dialog>(null);
 	const [starting, setStarting] = useState(false);
+	const [collapsed, toggleCollapsed] = useCollapsed(`project:${machine}:${project.id}`);
 	const ai = aiName(state.info, "claude");
 	const line = project.missing ? p.missing : gitLine(project, p.changed);
 	const at = order.indexOf(project.id);
@@ -102,8 +104,17 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 	return (
 		<div className="mx-project" data-missing={project.missing ? "" : undefined}>
 			<div className="mx-project-head" ref={ref}>
+				<button
+					type="button"
+					className="icon-btn mx-fold"
+					aria-expanded={!collapsed}
+					aria-label={collapsed ? t.agent.expand(project.name) : t.agent.collapse(project.name)}
+					onClick={toggleCollapsed}
+				>
+					<MachineIcon name={collapsed ? "chevron-right" : "chevron-down"} small />
+				</button>
 				<span className="mx-project-name" title={project.dir}>
-					<MachineIcon name={project.pinned ? "star" : "folder"} small />
+					<MachineIcon name={project.pinned ? "star" : "project"} small />
 					<b>{project.name}</b>
 					{line !== "" && (
 						<small>
@@ -133,7 +144,7 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 					</div>
 				)}
 			</div>
-			{children}
+			{!collapsed && children}
 			{dialog === "custom" && <NewSession machine={machine} name={machineName} link={link} state={state} project={project} onClose={() => setDialog(null)} />}
 			<Suspense fallback={null}>
 				{dialog === "rename" && <RenameProjectDialog link={link} project={project} ai={ai} onClose={() => setDialog(null)} />}

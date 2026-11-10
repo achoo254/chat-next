@@ -670,6 +670,8 @@ export const zhCNMachines: MachinesCopy = {
 		machinesTitle: "管理设备",
 		machinesIntro: "运行 tunelo 和 Claude Code 的电脑。所有电脑的会话都显示在 AI Agent 栏中。",
 		machineMenu: (machine) => `${machine} 的选项`,
+		collapse: (name) => `收起 ${name}`,
+		expand: (name) => `展开 ${name}`,
 		machineBoard: "此设备上的会话",
 		machineBoardOf: (machine: string) => `${machine} 上的会话`,
 		newSession: "新会话",

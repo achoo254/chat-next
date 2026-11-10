@@ -16,6 +16,7 @@ import type { MachinesCopy } from "./copy-vi.ts";
 import { sortForList } from "./link/machine-link.ts";
 import { LOCAL_REF } from "./link/link-hub.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { useCollapsed } from "./use-collapsed.ts";
 import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing, type Conn } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
@@ -160,6 +161,7 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 	const { entry, link, state, conn } = machine;
 	const [creating, setCreating] = useState(false);
 	const ref = entry.ref;
+	const [collapsed, toggleCollapsed] = useCollapsed(`machine:${ref}`);
 	const shown = state.threads.filter((x) => matches(filter, x));
 	// tunelo 2.0.7+: sessions by project, the rest under "Khác".
 	const withProjects = projectsSupported(state.info?.agentVersion);
@@ -179,6 +181,15 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 	return (
 		<section className="mx-group" aria-label={entry.name}>
 			<div className="mx-group-head">
+				<button
+					type="button"
+					className="icon-btn mx-fold"
+					aria-expanded={!collapsed}
+					aria-label={collapsed ? t.agent.expand(entry.name) : t.agent.collapse(entry.name)}
+					onClick={toggleCollapsed}
+				>
+					<MachineIcon name={collapsed ? "chevron-right" : "chevron-down"} small />
+				</button>
 				<Link to={paths.machine(ref)} className="mx-group-name" current={current}>
 					<span className={`dot ${connDot(conn)}`} aria-hidden="true" />
 					<b>{entry.name}</b>
@@ -189,63 +200,67 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 				</Link>
 				<GroupMenu name={entry.name} machine={ref} conn={conn} onNew={() => setCreating(true)} />
 			</div>
-			{needsPairing(conn) && (
-				<div className="mx-group-note">
-					<p>{conn.kind === "unpaired" ? t.agent.hint.unpaired : t.agent.hint.repair}</p>
-					<Link to={pairPath} className="btn btn-sm">
-						{t.agent.pair}
-					</Link>
-				</div>
-			)}
-			{conn.kind === "update" && <p className="mx-group-note muted">{t.agent.hint.update}</p>}
-			{conn.kind === "offline" && state.threads.length === 0 && <p className="mx-group-note muted">{t.agent.hint.offline}</p>}
-			{loading && (
-				<ul className="mx-rows skeleton" aria-hidden="true">
-					<li />
-					<li />
-				</ul>
-			)}
-			{grouped.groups
-				.filter((g) => filter === "all" || g.threads.length > 0)
-				.map((g) => (
-					<ProjectSection key={g.project.id} machine={ref} machineName={entry.name} link={link} state={state} project={g.project} order={order} online={online}>
-						{g.threads.length > 0 && (
-							<ul className="mx-rows">
-								{g.threads.map((thread) => (
-									<li key={thread.id}>
-										<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
-									</li>
-								))}
-							</ul>
-						)}
-					</ProjectSection>
-				))}
-			{withProjects && projectList.length > 0 && folders.length > 0 && <p className="mx-other-head">{t.agent.projects.other}</p>}
-			{folders.map((folder) => (
-				<div key={folder.dir} className="mx-folder">
-					<p className="mx-folder-name" title={folder.dir}>
-						<MachineIcon name="folder" small />
-						{folderName(folder.dir)}
-					</p>
-					<ul className="mx-rows">
-						{folder.threads.map((thread) => (
-							<li key={thread.id}>
-								<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
-							</li>
-						))}
-					</ul>
-				</div>
-			))}
-			{withProjects && online && filter === "all" && state.projects !== null && (
+			{!collapsed && (
 				<>
-					<ProjectSuggestions machine={ref} link={link} suggestions={state.projects.suggestions} />
+				{needsPairing(conn) && (
 					<div className="mx-group-note">
-						<AddProject link={link} state={state} />
+						<p>{conn.kind === "unpaired" ? t.agent.hint.unpaired : t.agent.hint.repair}</p>
+						<Link to={pairPath} className="btn btn-sm">
+							{t.agent.pair}
+						</Link>
 					</div>
+				)}
+				{conn.kind === "update" && <p className="mx-group-note muted">{t.agent.hint.update}</p>}
+				{conn.kind === "offline" && state.threads.length === 0 && <p className="mx-group-note muted">{t.agent.hint.offline}</p>}
+				{loading && (
+					<ul className="mx-rows skeleton" aria-hidden="true">
+						<li />
+						<li />
+					</ul>
+				)}
+				{grouped.groups
+					.filter((g) => filter === "all" || g.threads.length > 0)
+					.map((g) => (
+						<ProjectSection key={g.project.id} machine={ref} machineName={entry.name} link={link} state={state} project={g.project} order={order} online={online}>
+							{g.threads.length > 0 && (
+								<ul className="mx-rows">
+									{g.threads.map((thread) => (
+										<li key={thread.id}>
+											<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
+										</li>
+									))}
+								</ul>
+							)}
+						</ProjectSection>
+					))}
+				{withProjects && projectList.length > 0 && folders.length > 0 && <p className="mx-other-head">{t.agent.projects.other}</p>}
+				{folders.map((folder) => (
+					<div key={folder.dir} className="mx-folder">
+						<p className="mx-folder-name" title={folder.dir}>
+							<MachineIcon name="folder" small />
+							{folderName(folder.dir)}
+						</p>
+						<ul className="mx-rows">
+							{folder.threads.map((thread) => (
+								<li key={thread.id}>
+									<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
+								</li>
+							))}
+						</ul>
+					</div>
+				))}
+				{withProjects && online && filter === "all" && state.projects !== null && (
+					<>
+						<ProjectSuggestions machine={ref} link={link} suggestions={state.projects.suggestions} />
+						<div className="mx-group-note">
+							<AddProject link={link} state={state} />
+						</div>
+					</>
+				)}
+				{conn.kind === "on" && state.listed && shown.length === 0 && projectList.length === 0 && (
+					<p className="mx-group-note muted">{state.threads.length === 0 ? t.agent.noSessions : filter === "archived" ? t.agent.thread.noArchived : t.agent.emptyFilter}</p>
+				)}
 				</>
-			)}
-			{conn.kind === "on" && state.listed && shown.length === 0 && projectList.length === 0 && (
-				<p className="mx-group-note muted">{state.threads.length === 0 ? t.agent.noSessions : filter === "archived" ? t.agent.thread.noArchived : t.agent.emptyFilter}</p>
 			)}
 			{creating && <NewSession machine={ref} name={entry.name} link={link} state={state} onClose={() => setCreating(false)} />}
 		</section>

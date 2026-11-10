@@ -39,6 +39,8 @@
 .mx-groups > .empty { padding: var(--space-6) var(--space-4); }
 .mx-group { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-2) var(--space-1); }
 .mx-group + .mx-group { border-top: 1px solid var(--c-border-subtle); }
+.mx-fold { flex: none; }
+.mx-project-head > .mx-fold { margin-left: calc(-1 * var(--space-1)); }
 .mx-group-head { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 .mx-group-name { flex: 1; display: grid; grid-template-columns: 8px minmax(0, 1fr); align-items: center; column-gap: var(--space-2); min-width: 0; min-height: 44px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); color: inherit; text-decoration: none; }
 .mx-group-name:hover { background: var(--c-hover); }

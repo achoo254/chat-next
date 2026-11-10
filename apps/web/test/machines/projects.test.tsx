@@ -108,6 +108,30 @@ describe("a project row", () => {
 		await waitFor(() => expect(sent.at(-1)).toEqual({ case: "projectRemove", value: { id: "p1" } }));
 	});
 
+	it("folds to hide its sessions and remembers the fold", async () => {
+		window.localStorage.removeItem("ai:collapsed");
+		const { link } = fakeLink();
+		const view = () => (
+			<ProjectSection machine="m1" machineName="Mac" link={link} state={baseState()} project={project()} order={["p1"]} online>
+				<span>a session</span>
+			</ProjectSection>
+		);
+		const first = wrap(view());
+		const fold = screen.getByRole("button", { name: /Thu gọn chat-next/ });
+		expect(fold.getAttribute("aria-expanded")).toBe("true");
+		expect(screen.getByText("a session")).toBeTruthy();
+		await userEvent.click(fold);
+		expect(screen.queryByText("a session")).toBeNull();
+		expect(screen.getByRole("button", { name: /Mở rộng chat-next/ }).getAttribute("aria-expanded")).toBe("false");
+		first.unmount();
+		// A new page load keeps the fold; opening it again shows the sessions.
+		wrap(view());
+		expect(screen.queryByText("a session")).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: /Mở rộng chat-next/ }));
+		expect(screen.getByText("a session")).toBeTruthy();
+		window.localStorage.removeItem("ai:collapsed");
+	});
+
 	it("says when its folder is gone and offers no new session there", () => {
 		const { link } = fakeLink();
 		wrap(

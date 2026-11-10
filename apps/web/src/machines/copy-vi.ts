@@ -681,6 +681,8 @@ export const viMachines = {
 		machinesTitle: "Quản lý máy",
 		machinesIntro: "Máy tính chạy tunelo và Claude Code. Phiên của mọi máy hiện ở cột AI Agent.",
 		machineMenu: (machine: string) => `Tuỳ chọn cho ${machine}`,
+		collapse: (name: string) => `Thu gọn ${name}`,
+		expand: (name: string) => `Mở rộng ${name}`,
 		machineBoard: "Phiên trên máy này",
 		machineBoardOf: (machine: string) => `Phiên trên ${machine}`,
 		newSession: "Phiên mới",

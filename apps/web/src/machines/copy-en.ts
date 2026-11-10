@@ -676,6 +676,8 @@ export const enMachines: MachinesCopy = {
 		machinesTitle: "Manage machines",
 		machinesIntro: "Computers running tunelo and Claude Code. Sessions of every machine show in the AI Agent column.",
 		machineMenu: (machine) => `Options for ${machine}`,
+		collapse: (name) => `Collapse ${name}`,
+		expand: (name) => `Expand ${name}`,
 		machineBoard: "Sessions on this machine",
 		machineBoardOf: (machine: string) => `Sessions on ${machine}`,
 		newSession: "New session",
