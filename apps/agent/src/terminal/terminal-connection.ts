@@ -80,7 +80,10 @@ export class TerminalConnection {
         case "termOpen": {
           const { cols, rows } = b.value;
           if (!validDim(cols) || !validDim(rows)) throw new TerminalError(ErrorCode.INVALID, ErrorReason.UNSPECIFIED, "cols and rows must be 1 to 1000");
-          const session = await this.service.open(cols, rows, openCwd(b.value.cwd));
+          // A thread's AI: the machine picks what runs; the request's folder is not used.
+          const ai = b.value.aiSession;
+          if (ai !== undefined && !ai.threadId) throw new TerminalError(ErrorCode.INVALID, ErrorReason.UNSPECIFIED, "ai_session needs a thread");
+          const session = ai !== undefined ? await this.service.openAi(ai.threadId, cols, rows) : await this.service.open(cols, rows, openCwd(b.value.cwd));
           return this.peer.send(id, { case: "termOpened", value: { session } });
         }
         case "termClose":

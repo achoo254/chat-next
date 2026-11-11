@@ -128,7 +128,17 @@ type ThreadMeta = {
   reask?: string[];
   /** Unix milliseconds when the machine last closed the thread's session (its last writes to the AI's records may follow). */
   closedAt?: number;
+  /**
+   * The thread's AI runs in this session of the terminal process `pid` (its
+   * own CLI, opened from a device): the terminal is the only writer then.
+   * `newSession`: the session id the CLI was started with, undone when it
+   * ended before writing a transcript.
+   */
+  terminal?: { session: number; pid: number; newSession?: string };
 };
+
+/** What the terminal process runs for a thread's AI in its terminal (see TerminalRunner). */
+export type TerminalSpec = { shell: string; args: string[]; cwd: string; env: Record<string, string> };
 
 /** A session kept on the machine, as devices see it (LocalSession in the protocol). */
 export type LocalSessionView = LocalSession & { threadId: string; busyElsewhere: boolean; sensitive: boolean };
@@ -299,6 +309,8 @@ export class AgentCore {
   private elsewhereTimer: ReturnType<typeof setInterval> | undefined;
   /** The look for activity elsewhere under way; one at a time. */
   private looking: Promise<void> | undefined;
+  /** New session ids given to a CLI being started in a terminal, until the terminal names its session. */
+  private pendingTerminalSession = new Map<string, string>();
   /** The latest git changes of each thread's folder (or the read under way), reused for GIT_CHANGES_TTL_MS. */
   private gitReads = new Map<string, { at: number; read: Promise<GitChangesResult> }>();
   /** Plan usage and account of each AI account profile ("" for the default one), shared by its threads. */
@@ -1133,6 +1145,8 @@ export class AgentCore {
   async send(threadId: string, text: string, clientMsgId: string, attachmentIds: readonly string[] = []): Promise<void> {
     const t = this.thread(threadId);
     if (!text.trim() && attachmentIds.length === 0) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
+    // No two views write to one session: while its AI runs in a terminal, that is where to type.
+    if (t.meta.terminal) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
     if (clientMsgId && t.clientMsgIds.has(clientMsgId)) return;
     // Placed before anything else changes: a refused file refuses the whole message.
     const taken = this.uploads.take(threadId, attachmentIds);
@@ -2043,7 +2057,128 @@ export class AgentCore {
       archived: Boolean(t.meta.archived),
       busyElsewhere: elsewhere,
       elsewhereActiveAt: elsewhere ? BigInt(t.elsewhere?.since ?? 0) : 0n,
+      terminalSession: t.meta.terminal?.session ?? 0,
     });
+  }
+
+  // --- the thread's AI in a terminal of the machine ------------------------------
+
+  /**
+   * What the terminal process runs to open the thread's session in its AI's
+   * own CLI: the program and arguments come from the AI's adapter, the folder
+   * and account from the thread and the machine, never from a device. The
+   * machine's own idle session of the thread closes first, so only the
+   * terminal writes to it. Refused while a turn runs here or elsewhere.
+   */
+  async terminalLaunch(threadId: string): Promise<TerminalSpec> {
+    const t = this.thread(threadId);
+    const provider = this.provider(t.meta.provider);
+    if (!provider.terminal) {
+      throw new AgentError(ErrorCode.INVALID, `${provider.name} does not open in a terminal`, { reason: ErrorReason.UNSUPPORTED_REQUEST, subject: provider.name });
+    }
+    if (t.running || t.queued || t.pending.size > 0 || t.starting || t.switching) {
+      throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+    }
+    if (this.busyElsewhere(t)) {
+      throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+    }
+    const dir = t.meta.dir;
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
+    this.assertReady(provider, await provider.detect(this.detectOptions()));
+    let profile: { id: string; accountDir?: string };
+    try {
+      profile = this.opts.profile?.() ?? { id: "" };
+    } catch (err) {
+      const why = (err as Error).message;
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `the Claude account picked on this machine cannot be used: ${why}`.slice(0, 500), {
+        reason: ErrorReason.PROFILE_UNUSABLE,
+        subject: why.slice(0, 300),
+      });
+    }
+    await this.park(t);
+    const seg = t.meta.segments.at(-1);
+    const command = await provider.terminal.command({
+      dir,
+      projectSettings: t.meta.projectSettings,
+      ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}),
+      ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
+      ...(t.meta.model ? { model: t.meta.model } : {}),
+      ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
+    });
+    if (!command) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
+    if (profile.id) t.meta.profileId = profile.id;
+    else delete t.meta.profileId;
+    // The CLI starts the new session with this id: the thread holds it from now on.
+    if (seg && !seg.sessionId && command.sessionId) {
+      seg.sessionId = command.sessionId;
+      this.pendingTerminalSession.set(t.meta.id, command.sessionId);
+    }
+    this.saveMeta(t);
+    return { shell: command.file, args: command.args, cwd: dir, env: command.env };
+  }
+
+  /** The terminal session of terminal process `pid` running the thread's AI; undefined when none. */
+  terminalSession(threadId: string, pid: number): number | undefined {
+    const at = this.threads.get(threadId)?.meta.terminal;
+    return at && at.pid === pid ? at.session : undefined;
+  }
+
+  /** The thread whose AI runs in `session` of terminal process `pid`; "" when none. */
+  terminalThread(session: number, pid: number): string {
+    for (const t of this.threads.values()) if (t.meta.terminal?.session === session && t.meta.terminal.pid === pid) return t.meta.id;
+    return "";
+  }
+
+  /** The thread's AI now runs in `session` of terminal process `pid`. */
+  terminalStarted(threadId: string, session: number, pid: number): void {
+    const t = this.threads.get(threadId);
+    if (!t || t.deleted) return;
+    const newSession = this.pendingTerminalSession.get(threadId);
+    this.pendingTerminalSession.delete(threadId);
+    t.meta.terminal = { session, pid, ...(newSession ? { newSession } : {}) };
+    this.saveMeta(t);
+    this.announce(t);
+  }
+
+  /** `session` of terminal process `pid` ended (its AI exited, or it was closed). */
+  terminalEnded(session: number, pid: number): void {
+    const id = this.terminalThread(session, pid);
+    const t = id ? this.threads.get(id) : undefined;
+    if (t) this.endTerminal(t);
+  }
+
+  /** Only these sessions of terminal process `pid` still run: every other thread's terminal ended (a new process, or ends missed). */
+  terminalAlive(pid: number, sessions: ReadonlySet<number>): void {
+    for (const t of [...this.threads.values()]) {
+      const at = t.meta.terminal;
+      if (at && (at.pid !== pid || !sessions.has(at.session))) this.endTerminal(t);
+    }
+  }
+
+  /** The terminal let go of the thread: chat may write again; what the CLI wrote comes in. */
+  private endTerminal(t: Thread): void {
+    const started = t.meta.terminal?.newSession;
+    delete t.meta.terminal;
+    t.meta.closedAt = this.now();
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    // A new session the CLI never wrote to: there is nothing to resume.
+    if (seg && started && seg.sessionId === started) {
+      let end: number | undefined;
+      try {
+        end = history?.end(started);
+      } catch {
+        end = 0;
+      }
+      if (end === undefined) delete seg.sessionId;
+    }
+    this.saveMeta(t);
+    try {
+      this.syncHistory(t);
+    } catch {
+      // read again on the next look
+    }
+    this.announce(t);
   }
 }
 

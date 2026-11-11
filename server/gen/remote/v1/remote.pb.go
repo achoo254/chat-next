@@ -8513,8 +8513,14 @@ type ThreadSummary struct {
 	BusyElsewhere bool `protobuf:"varint,13,opt,name=busy_elsewhere,json=busyElsewhere,proto3" json:"busy_elsewhere,omitempty"`
 	// With busy_elsewhere: Unix milliseconds of the last activity seen there.
 	ElsewhereActiveAt int64 `protobuf:"varint,14,opt,name=elsewhere_active_at,json=elsewhereActiveAt,proto3" json:"elsewhere_active_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The thread's AI runs in this terminal session of the machine (TermOpen
+	// with ai_session); 0 when none. While it does, the terminal is the only
+	// writer: ThreadSend is refused (ERROR_REASON_SESSION_OPEN_ELSEWHERE) and
+	// devices show the thread read-only, offering the terminal. busy_elsewhere
+	// still tells whether a turn runs there. Unset before ProviderCapabilities.terminal.
+	TerminalSession uint32 `protobuf:"varint,15,opt,name=terminal_session,json=terminalSession,proto3" json:"terminal_session,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ThreadSummary) Reset() {
@@ -8641,6 +8647,13 @@ func (x *ThreadSummary) GetBusyElsewhere() bool {
 func (x *ThreadSummary) GetElsewhereActiveAt() int64 {
 	if x != nil {
 		return x.ElsewhereActiveAt
+	}
+	return 0
+}
+
+func (x *ThreadSummary) GetTerminalSession() uint32 {
+	if x != nil {
+		return x.TerminalSession
 	}
 	return 0
 }
@@ -10679,7 +10692,10 @@ type ProviderCapabilities struct {
 	Images       bool                   `protobuf:"varint,9,opt,name=images,proto3" json:"images,omitempty"`
 	Models       []*ModelOption         `protobuf:"bytes,10,rep,name=models,proto3" json:"models,omitempty"`
 	// Reasoning effort levels the AI accepts, lowest first; empty when it has none.
-	EffortLevels  []string `protobuf:"bytes,11,rep,name=effort_levels,json=effortLevels,proto3" json:"effort_levels,omitempty"`
+	EffortLevels []string `protobuf:"bytes,11,rep,name=effort_levels,json=effortLevels,proto3" json:"effort_levels,omitempty"`
+	// The AI's own CLI opens in the machine's terminal for a thread
+	// (TermOpen.ai_session); needs MachineInfo.terminal AVAILABLE too.
+	Terminal      bool `protobuf:"varint,12,opt,name=terminal,proto3" json:"terminal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10789,6 +10805,13 @@ func (x *ProviderCapabilities) GetEffortLevels() []string {
 		return x.EffortLevels
 	}
 	return nil
+}
+
+func (x *ProviderCapabilities) GetTerminal() bool {
+	if x != nil {
+		return x.Terminal
+	}
+	return false
 }
 
 type ModelOption struct {
@@ -14095,8 +14118,10 @@ type TermSessionInfo struct {
 	// Its program ended; it stays listed until TermClose.
 	Exited bool `protobuf:"varint,7,opt,name=exited,proto3" json:"exited,omitempty"`
 	// With exited: the exit code (-1 when a signal ended it) and the signal (0 when none).
-	ExitCode      int32  `protobuf:"varint,8,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	ExitSignal    uint32 `protobuf:"varint,9,opt,name=exit_signal,json=exitSignal,proto3" json:"exit_signal,omitempty"`
+	ExitCode   int32  `protobuf:"varint,8,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	ExitSignal uint32 `protobuf:"varint,9,opt,name=exit_signal,json=exitSignal,proto3" json:"exit_signal,omitempty"`
+	// The thread whose AI runs in it (TermOpen.ai_session); empty for a shell.
+	ThreadId      string `protobuf:"bytes,10,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -14194,6 +14219,13 @@ func (x *TermSessionInfo) GetExitSignal() uint32 {
 	return 0
 }
 
+func (x *TermSessionInfo) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
 type TermListResult struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Sessions []*TermSessionInfo     `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
@@ -14255,8 +14287,18 @@ type TermOpen struct {
 	// 1 to 1000 each.
 	Cols uint32 `protobuf:"varint,1,opt,name=cols,proto3" json:"cols,omitempty"`
 	Rows uint32 `protobuf:"varint,2,opt,name=rows,proto3" json:"rows,omitempty"`
-	// An absolute folder of the machine; empty for the user's home.
-	Cwd           string `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	// An absolute folder of the machine; empty for the user's home. Ignored
+	// with ai_session.
+	Cwd string `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	// Instead of a shell: the thread's AI in its own CLI (only where
+	// ProviderCapabilities.terminal is set). B picks the program, its
+	// arguments, folder and account from the thread; a device never names a
+	// command. A thread whose AI already runs in a terminal gets that session
+	// again (TermOpened names it). Refused with ERROR_REASON_THREAD_RUNNING
+	// while the machine runs a turn of it, SESSION_OPEN_ELSEWHERE while
+	// something else on the machine does, UNSUPPORTED_REQUEST for an AI
+	// without a terminal CLI, NOT_FOUND for an unknown thread.
+	AiSession     *TermAiSession `protobuf:"bytes,4,opt,name=ai_session,json=aiSession,proto3" json:"ai_session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -14312,6 +14354,58 @@ func (x *TermOpen) GetCwd() string {
 	return ""
 }
 
+func (x *TermOpen) GetAiSession() *TermAiSession {
+	if x != nil {
+		return x.AiSession
+	}
+	return nil
+}
+
+// The thread whose AI opens in the terminal.
+type TermAiSession struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermAiSession) Reset() {
+	*x = TermAiSession{}
+	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermAiSession) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermAiSession) ProtoMessage() {}
+
+func (x *TermAiSession) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermAiSession.ProtoReflect.Descriptor instead.
+func (*TermAiSession) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{166}
+}
+
+func (x *TermAiSession) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
 type TermOpened struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Session       uint32                 `protobuf:"varint,1,opt,name=session,proto3" json:"session,omitempty"`
@@ -14321,7 +14415,7 @@ type TermOpened struct {
 
 func (x *TermOpened) Reset() {
 	*x = TermOpened{}
-	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	mi := &file_remote_v1_remote_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14333,7 +14427,7 @@ func (x *TermOpened) String() string {
 func (*TermOpened) ProtoMessage() {}
 
 func (x *TermOpened) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	mi := &file_remote_v1_remote_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14346,7 +14440,7 @@ func (x *TermOpened) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermOpened.ProtoReflect.Descriptor instead.
 func (*TermOpened) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{166}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *TermOpened) GetSession() uint32 {
@@ -14367,7 +14461,7 @@ type TermClose struct {
 
 func (x *TermClose) Reset() {
 	*x = TermClose{}
-	mi := &file_remote_v1_remote_proto_msgTypes[167]
+	mi := &file_remote_v1_remote_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14379,7 +14473,7 @@ func (x *TermClose) String() string {
 func (*TermClose) ProtoMessage() {}
 
 func (x *TermClose) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[167]
+	mi := &file_remote_v1_remote_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14392,7 +14486,7 @@ func (x *TermClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermClose.ProtoReflect.Descriptor instead.
 func (*TermClose) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{167}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *TermClose) GetSession() uint32 {
@@ -14411,7 +14505,7 @@ type TermClosed struct {
 
 func (x *TermClosed) Reset() {
 	*x = TermClosed{}
-	mi := &file_remote_v1_remote_proto_msgTypes[168]
+	mi := &file_remote_v1_remote_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14423,7 +14517,7 @@ func (x *TermClosed) String() string {
 func (*TermClosed) ProtoMessage() {}
 
 func (x *TermClosed) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[168]
+	mi := &file_remote_v1_remote_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14436,7 +14530,7 @@ func (x *TermClosed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermClosed.ProtoReflect.Descriptor instead.
 func (*TermClosed) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{168}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{169}
 }
 
 func (x *TermClosed) GetSession() uint32 {
@@ -14459,7 +14553,7 @@ type TermResize struct {
 
 func (x *TermResize) Reset() {
 	*x = TermResize{}
-	mi := &file_remote_v1_remote_proto_msgTypes[169]
+	mi := &file_remote_v1_remote_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14471,7 +14565,7 @@ func (x *TermResize) String() string {
 func (*TermResize) ProtoMessage() {}
 
 func (x *TermResize) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[169]
+	mi := &file_remote_v1_remote_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14484,7 +14578,7 @@ func (x *TermResize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermResize.ProtoReflect.Descriptor instead.
 func (*TermResize) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{169}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{170}
 }
 
 func (x *TermResize) GetSession() uint32 {
@@ -14527,7 +14621,7 @@ type TermSignal struct {
 
 func (x *TermSignal) Reset() {
 	*x = TermSignal{}
-	mi := &file_remote_v1_remote_proto_msgTypes[170]
+	mi := &file_remote_v1_remote_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14539,7 +14633,7 @@ func (x *TermSignal) String() string {
 func (*TermSignal) ProtoMessage() {}
 
 func (x *TermSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[170]
+	mi := &file_remote_v1_remote_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14552,7 +14646,7 @@ func (x *TermSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermSignal.ProtoReflect.Descriptor instead.
 func (*TermSignal) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{170}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{171}
 }
 
 func (x *TermSignal) GetLink() uint32 {
@@ -14604,7 +14698,7 @@ type TermData struct {
 
 func (x *TermData) Reset() {
 	*x = TermData{}
-	mi := &file_remote_v1_remote_proto_msgTypes[171]
+	mi := &file_remote_v1_remote_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14616,7 +14710,7 @@ func (x *TermData) String() string {
 func (*TermData) ProtoMessage() {}
 
 func (x *TermData) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[171]
+	mi := &file_remote_v1_remote_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14629,7 +14723,7 @@ func (x *TermData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermData.ProtoReflect.Descriptor instead.
 func (*TermData) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{171}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{172}
 }
 
 func (x *TermData) GetLink() uint32 {
@@ -14663,7 +14757,7 @@ type TermStatus struct {
 
 func (x *TermStatus) Reset() {
 	*x = TermStatus{}
-	mi := &file_remote_v1_remote_proto_msgTypes[172]
+	mi := &file_remote_v1_remote_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14675,7 +14769,7 @@ func (x *TermStatus) String() string {
 func (*TermStatus) ProtoMessage() {}
 
 func (x *TermStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[172]
+	mi := &file_remote_v1_remote_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14688,7 +14782,7 @@ func (x *TermStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermStatus.ProtoReflect.Descriptor instead.
 func (*TermStatus) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{172}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{173}
 }
 
 func (x *TermStatus) GetLink() uint32 {
@@ -15221,7 +15315,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\asubject\x18\x04 \x01(\tR\asubject\"0\n" +
 	"\x06Cursor\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\x04R\x05epoch\x12\x10\n" +
-	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xa4\x03\n" +
+	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xcf\x03\n" +
 	"\rThreadSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x10\n" +
@@ -15238,7 +15332,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\fpreview_tool\x18\v \x01(\tR\vpreviewTool\x12\x1a\n" +
 	"\barchived\x18\f \x01(\bR\barchived\x12%\n" +
 	"\x0ebusy_elsewhere\x18\r \x01(\bR\rbusyElsewhere\x12.\n" +
-	"\x13elsewhere_active_at\x18\x0e \x01(\x03R\x11elsewhereActiveAt\"\xd5\x01\n" +
+	"\x13elsewhere_active_at\x18\x0e \x01(\x03R\x11elsewhereActiveAt\x12)\n" +
+	"\x10terminal_session\x18\x0f \x01(\rR\x0fterminalSession\"\xd5\x01\n" +
 	"\x0eThreadActivity\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12.\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x18.remote.v1.ActivityPhaseR\x05phase\x12\x12\n" +
@@ -15385,7 +15480,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x18\n" +
 	"\asummary\x18\x03 \x01(\tR\asummary\x12#\n" +
-	"\rfiles_changed\x18\x04 \x03(\tR\ffilesChanged\"\xe9\x02\n" +
+	"\rfiles_changed\x18\x04 \x03(\tR\ffilesChanged\"\x85\x03\n" +
 	"\x14ProviderCapabilities\x12\x1c\n" +
 	"\tinterrupt\x18\x01 \x01(\bR\tinterrupt\x12\x16\n" +
 	"\x06resume\x18\x02 \x01(\bR\x06resume\x12#\n" +
@@ -15400,7 +15495,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x06images\x18\t \x01(\bR\x06images\x12.\n" +
 	"\x06models\x18\n" +
 	" \x03(\v2\x16.remote.v1.ModelOptionR\x06models\x12#\n" +
-	"\reffort_levels\x18\v \x03(\tR\feffortLevels\"1\n" +
+	"\reffort_levels\x18\v \x03(\tR\feffortLevels\x12\x1a\n" +
+	"\bterminal\x18\f \x01(\bR\bterminal\"1\n" +
 	"\vModelOption\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\xf4\x01\n" +
@@ -15642,7 +15738,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\breceived\x18\x03 \x01(\x04R\breceived\x12\x14\n" +
 	"\x05total\x18\x04 \x01(\x04R\x05total\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\"\x11\n" +
-	"\x0fTermListRequest\"\xfa\x01\n" +
+	"\x0fTermListRequest\"\x97\x02\n" +
 	"\x0fTermSessionInfo\x12\x18\n" +
 	"\asession\x18\x01 \x01(\rR\asession\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
@@ -15654,14 +15750,20 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x06exited\x18\a \x01(\bR\x06exited\x12\x1b\n" +
 	"\texit_code\x18\b \x01(\x05R\bexitCode\x12\x1f\n" +
 	"\vexit_signal\x18\t \x01(\rR\n" +
-	"exitSignal\"k\n" +
+	"exitSignal\x12\x1b\n" +
+	"\tthread_id\x18\n" +
+	" \x01(\tR\bthreadId\"k\n" +
 	"\x0eTermListResult\x126\n" +
 	"\bsessions\x18\x01 \x03(\v2\x1a.remote.v1.TermSessionInfoR\bsessions\x12!\n" +
-	"\fmax_sessions\x18\x02 \x01(\rR\vmaxSessions\"D\n" +
+	"\fmax_sessions\x18\x02 \x01(\rR\vmaxSessions\"}\n" +
 	"\bTermOpen\x12\x12\n" +
 	"\x04cols\x18\x01 \x01(\rR\x04cols\x12\x12\n" +
 	"\x04rows\x18\x02 \x01(\rR\x04rows\x12\x10\n" +
-	"\x03cwd\x18\x03 \x01(\tR\x03cwd\"&\n" +
+	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x127\n" +
+	"\n" +
+	"ai_session\x18\x04 \x01(\v2\x18.remote.v1.TermAiSessionR\taiSession\",\n" +
+	"\rTermAiSession\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"&\n" +
 	"\n" +
 	"TermOpened\x12\x18\n" +
 	"\asession\x18\x01 \x01(\rR\asession\"%\n" +
@@ -15894,7 +15996,7 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 }
 
 var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 20)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 173)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 174)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),          // 0: remote.v1.HandshakeErrorCode
 	(Decision)(0),                    // 1: remote.v1.Decision
@@ -16082,13 +16184,14 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(*TermSessionInfo)(nil),          // 183: remote.v1.TermSessionInfo
 	(*TermListResult)(nil),           // 184: remote.v1.TermListResult
 	(*TermOpen)(nil),                 // 185: remote.v1.TermOpen
-	(*TermOpened)(nil),               // 186: remote.v1.TermOpened
-	(*TermClose)(nil),                // 187: remote.v1.TermClose
-	(*TermClosed)(nil),               // 188: remote.v1.TermClosed
-	(*TermResize)(nil),               // 189: remote.v1.TermResize
-	(*TermSignal)(nil),               // 190: remote.v1.TermSignal
-	(*TermData)(nil),                 // 191: remote.v1.TermData
-	(*TermStatus)(nil),               // 192: remote.v1.TermStatus
+	(*TermAiSession)(nil),            // 186: remote.v1.TermAiSession
+	(*TermOpened)(nil),               // 187: remote.v1.TermOpened
+	(*TermClose)(nil),                // 188: remote.v1.TermClose
+	(*TermClosed)(nil),               // 189: remote.v1.TermClosed
+	(*TermResize)(nil),               // 190: remote.v1.TermResize
+	(*TermSignal)(nil),               // 191: remote.v1.TermSignal
+	(*TermData)(nil),                 // 192: remote.v1.TermData
+	(*TermStatus)(nil),               // 193: remote.v1.TermStatus
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
 	21,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
@@ -16199,14 +16302,14 @@ var file_remote_v1_remote_proto_depIdxs = []int32{
 	181, // 105: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
 	182, // 106: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
 	185, // 107: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
-	187, // 108: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
-	189, // 109: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
-	190, // 110: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
-	191, // 111: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
+	188, // 108: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
+	190, // 109: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
+	191, // 110: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
+	192, // 111: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
 	184, // 112: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
-	186, // 113: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
-	188, // 114: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
-	192, // 115: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
+	187, // 113: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
+	189, // 114: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
+	193, // 115: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
 	104, // 116: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
 	31,  // 117: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
 	102, // 118: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
@@ -16297,13 +16400,14 @@ var file_remote_v1_remote_proto_depIdxs = []int32{
 	16,  // 203: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
 	17,  // 204: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
 	183, // 205: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
-	18,  // 206: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
-	19,  // 207: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
-	208, // [208:208] is the sub-list for method output_type
-	208, // [208:208] is the sub-list for method input_type
-	208, // [208:208] is the sub-list for extension type_name
-	208, // [208:208] is the sub-list for extension extendee
-	0,   // [0:208] is the sub-list for field type_name
+	186, // 206: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
+	18,  // 207: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
+	19,  // 208: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
+	209, // [209:209] is the sub-list for method output_type
+	209, // [209:209] is the sub-list for method input_type
+	209, // [209:209] is the sub-list for extension type_name
+	209, // [209:209] is the sub-list for extension extendee
+	0,   // [0:209] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -16464,7 +16568,7 @@ func file_remote_v1_remote_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
 			NumEnums:      20,
-			NumMessages:   173,
+			NumMessages:   174,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

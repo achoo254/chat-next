@@ -1162,6 +1162,12 @@ message ThreadSummary {
   bool busy_elsewhere = 13;
   // With busy_elsewhere: Unix milliseconds of the last activity seen there.
   int64 elsewhere_active_at = 14;
+  // The thread's AI runs in this terminal session of the machine (TermOpen
+  // with ai_session); 0 when none. While it does, the terminal is the only
+  // writer: ThreadSend is refused (ERROR_REASON_SESSION_OPEN_ELSEWHERE) and
+  // devices show the thread read-only, offering the terminal. busy_elsewhere
+  // still tells whether a turn runs there. Unset before ProviderCapabilities.terminal.
+  uint32 terminal_session = 15;
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a
@@ -1488,6 +1494,9 @@ message ProviderCapabilities {
   repeated ModelOption models = 10;
   // Reasoning effort levels the AI accepts, lowest first; empty when it has none.
   repeated string effort_levels = 11;
+  // The AI's own CLI opens in the machine's terminal for a thread
+  // (TermOpen.ai_session); needs MachineInfo.terminal AVAILABLE too.
+  bool terminal = 12;
 }
 
 message ModelOption {
@@ -2100,6 +2109,8 @@ message TermSessionInfo {
   // With exited: the exit code (-1 when a signal ended it) and the signal (0 when none).
   int32 exit_code = 8;
   uint32 exit_signal = 9;
+  // The thread whose AI runs in it (TermOpen.ai_session); empty for a shell.
+  string thread_id = 10;
 }
 
 message TermListResult {
@@ -2115,8 +2126,23 @@ message TermOpen {
   // 1 to 1000 each.
   uint32 cols = 1;
   uint32 rows = 2;
-  // An absolute folder of the machine; empty for the user's home.
+  // An absolute folder of the machine; empty for the user's home. Ignored
+  // with ai_session.
   string cwd = 3;
+  // Instead of a shell: the thread's AI in its own CLI (only where
+  // ProviderCapabilities.terminal is set). B picks the program, its
+  // arguments, folder and account from the thread; a device never names a
+  // command. A thread whose AI already runs in a terminal gets that session
+  // again (TermOpened names it). Refused with ERROR_REASON_THREAD_RUNNING
+  // while the machine runs a turn of it, SESSION_OPEN_ELSEWHERE while
+  // something else on the machine does, UNSUPPORTED_REQUEST for an AI
+  // without a terminal CLI, NOT_FOUND for an unknown thread.
+  TermAiSession ai_session = 4;
+}
+
+// The thread whose AI opens in the terminal.
+message TermAiSession {
+  string thread_id = 1;
 }
 
 message TermOpened {

@@ -11,11 +11,13 @@
 // never trusts a .claude there either. Warns which
 // idle session will be parked when the machine is full. A second tab opens
 // a session the machine already keeps (from a terminal, an IDE, Claude
-// Desktop); it loads only when picked.
+// Desktop); it loads only when picked. Where the AI offers it, the session
+// opens in chat or in its own CLI in the machine's terminal (the last choice
+// on the machine comes first); a terminal session needs no first message.
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { ErrorCode, LoginState, ThreadState, type DirListResult, type Project } from "@achoo254/chat-proto/remote/remote";
 import { PlainTextBox } from "../components/plain-text-box.tsx";
-import { navigate, paths } from "../router.tsx";
+import { navigate } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -23,6 +25,7 @@ import { AGENT_PARKED_SESSION, versionAtLeast } from "./agent-version.ts";
 import { PROMPT_HINTS, folderName, hintPrompt, inDiskAccessFolder, isHome, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
 import { aiName, providerOf } from "./use-machines.ts";
+import { lastMode, modePath, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const ExistingSessions = lazy(() => import("./existing-sessions.tsx"));
@@ -80,6 +83,9 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const ai = aiName(state.info, provider);
+	const offered = terminalOffered(state.info, provider);
+	const [picked, setPicked] = useState<SessionMode>(() => lastMode(machine));
+	const openIn: SessionMode = offered ? picked : "chat";
 	const models = providerOf(state.info, provider)?.capabilities?.models ?? [];
 
 	const browse = (dir: string) => {
@@ -146,7 +152,8 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 		if (path.trim() === "") return setError(t.newSession.needFolder);
 		// Machines before tunelo 2.0.9 refuse an empty first message: they get the default idea instead.
 		const parkable = state.info === null || versionAtLeast(state.info.agentVersion, AGENT_PARKED_SESSION);
-		const first = message.trim() === "" && !parkable ? hintPrompt(t.newSession, "summary", path) : message.trim();
+		// The terminal: the user types in the AI's own CLI.
+		const first = openIn === "terminal" ? "" : message.trim() === "" && !parkable ? hintPrompt(t.newSession, "summary", path) : message.trim();
 		if ((sensitive || askConsent) && !consent) {
 			setAskConsent(true);
 			return;
@@ -172,7 +179,8 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 					const thread = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
 					if (thread === undefined) return;
 					onClose();
-					navigate(paths.machineSession(machine, thread.id));
+					if (offered) rememberMode(machine, openIn);
+					navigate(modePath(machine, thread.id, openIn));
 				},
 				(err: unknown) => {
 					setBusy(false);
@@ -245,6 +253,18 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 								);
 							})}
 						</fieldset>
+					)}
+					{offered && (
+						<div className="mx-field-row">
+							<span>{t.terminal.mode.label}</span>
+							<div className="mx-mode" role="group" aria-label={t.terminal.mode.label}>
+								{(["chat", "terminal"] as const).map((m) => (
+									<button key={m} type="button" aria-pressed={openIn === m} onClick={() => setPicked(m)} data-id={`new-session-mode-${m}`}>
+										{t.terminal.mode[m]}
+									</button>
+								))}
+							</div>
+						</div>
 					)}
 					{projects.length > 0 && (
 						<label className="mx-field-row">
@@ -453,6 +473,8 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 							{noProject && <small>{t.newSession.noProject}</small>}
 						</span>
 					</label>
+					{openIn === "chat" && (
+					<>
 					<div className="mx-quick" role="group" aria-label={t.newSession.hints}>
 						<em>{t.newSession.hints}</em>
 						{PROMPT_HINTS.map((id) => (
@@ -475,6 +497,8 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 							setText(value);
 						}}
 					/>
+					</>
+					)}
 					{full && <p className="note mx-hint">{victim !== undefined ? t.newSession.park(victim.title) : t.newSession.queue}</p>}
 					{error !== "" && (
 						<p className="mx-error" role="alert">

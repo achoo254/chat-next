@@ -224,7 +224,7 @@ Agent cũ gặp các thân này trả `Error` với `ERROR_REASON_UNSUPPORTED_RE
 | Số | Thân | Chiều | Trả lời |
 |---|---|---|---|
 | 108 | `TermListRequest {}` | A → B | `TermListResult` |
-| 109 | `TermOpen {cols=1, rows=2, cwd=3}` | A → B | `TermOpened`; lỗi `TERMINAL_SESSION_LIMIT`, `TERMINAL_UNAVAILABLE`, `FOLDER_NOT_FOUND` (subject là thư mục), `INVALID` khi cỡ ngoài 1–1000 |
+| 109 | `TermOpen {cols=1, rows=2, cwd=3, ai_session=4 (TermAiSession)}` | A → B | `TermOpened`; lỗi `TERMINAL_SESSION_LIMIT`, `TERMINAL_UNAVAILABLE`, `FOLDER_NOT_FOUND` (subject là thư mục), `INVALID` khi cỡ ngoài 1–1000; với `ai_session` xem "Phiên AI trong terminal" |
 | 110 | `TermClose {session=1}` | A → B | `TermClosed`; lỗi `TERMINAL_SESSION_NOT_FOUND` |
 | 111 | `TermResize {session=1, cols=2, rows=3}` | A → B | `Ack`; lỗi `TERMINAL_SESSION_NOT_FOUND` |
 | 112 | `TermSignal {link=1, kind=2, sdp=3, candidate=4, reason=5}` | hai chiều | A → B: `Ack` hoặc `Error` theo `id`; B → A không hỏi mà gửi |
@@ -234,11 +234,24 @@ Agent cũ gặp các thân này trả `Error` với `ERROR_REASON_UNSUPPORTED_RE
 | 116 | `TermClosed {session=1}` | B → A | |
 | 117 | `TermStatus {link=1, path=2, rtt_ms=3 (float), reason=4}` | B → A, không hỏi | |
 
-- `TermSessionInfo {session=1 (uint32), title=2, cols=3, rows=4, created_at=5 (int64, ms Unix), attached=6, exited=7, exit_code=8 (int32, -1 khi bị tín hiệu giết), exit_signal=9}`. `max_sessions` hiện là 20.
+- `TermSessionInfo {session=1 (uint32), title=2, cols=3, rows=4, created_at=5 (int64, ms Unix), attached=6, exited=7, exit_code=8 (int32, -1 khi bị tín hiệu giết), exit_signal=9, thread_id=10}`. `thread_id` là luồng mà AI của nó chạy trong phiên này (rỗng với shell). `max_sessions` hiện là 20.
 - `TermSignalKind`: `OFFER=1` (A → B), `ANSWER=2` (B → A), `CANDIDATE=3` (hai chiều, một dòng `candidate:...`), `END=4` (A → B: bỏ peer, relay giữ nguyên; B → A: peer đã kết thúc, `reason` theo mục 6 "Đường thẳng").
 - `TermPath`: `CONNECTING=1`, `DIRECT=2`, `RELAY=3`, `CLOSED=4`. `DIRECT` có thể đến hai lần, lần hai có `rtt_ms` (0 là chưa đo).
 - `MachineInfo.terminal = 23` (`TerminalAvailability`): `UNSPECIFIED=0` (agent cũ), `AVAILABLE=1`, `MISSING=2` (chưa có binary daemon), `INCOMPATIBLE=3` (daemon khác `major` đang chạy, hoặc máy không có trình giám sát; gợi ý chạy lại `tunelo install`). Agent gửi lại `MachineInfo` không hỏi khi giá trị đổi.
 - `ErrorReason`: `TERMINAL_UNAVAILABLE=55`, `TERMINAL_SESSION_LIMIT=56`, `TERMINAL_SESSION_NOT_FOUND=57`. Thiết bị không còn được ghép nhận `ACCESS_DENIED`.
+
+### Phiên AI trong terminal (`TermOpen.ai_session`)
+
+Người dùng mở một phiên AI bằng giao diện terminal thay vì chat: AI chạy bằng chính CLI của nó trong một phiên PTY. Chỉ thêm trường, không đổi gì cũ.
+
+- `TermAiSession {thread_id=1}`. Thiết bị **chỉ nêu luồng**; không có trường nào cho chương trình, tham số hay môi trường. Agent lấy nhà cung cấp, phiên (tiếp tục bằng id phiên của luồng, hoặc phiên mới), thư mục của luồng, tài khoản đang chọn trên máy (`CLAUDE_CONFIG_DIR`), model, chế độ quyền và nguồn cài đặt dự án như phiên chat sẽ dùng, rồi gọi `open` với `shell`, `args`, `cwd`, `env` theo mục 6. `cwd` của yêu cầu bị bỏ qua.
+- Lệnh cụ thể đến từ mặt `terminal` của adapter nhà cung cấp (Claude: `claude --resume <id>` hoặc `claude --session-id <uuid mới>`, kèm `--model`, `--permission-mode` chỉ khi giá trị nằm trong danh sách của chính adapter, `--setting-sources`). Lõi và web không biết tên CLI. Id phiên phải đúng dạng UUID nên không thành được cờ.
+- Chỉ dùng khi `ProviderCapabilities.terminal = 12` của AI là `true` và `MachineInfo.terminal` là `AVAILABLE`. Agent cũ bỏ qua trường lạ và sẽ mở shell thường, nên web không gửi `ai_session` khi thiếu cờ này.
+- Một luồng có nhiều nhất một phiên terminal: yêu cầu lặp lại (thiết bị khác, tải lại trang) nhận lại đúng phiên đó. Agent nhớ `(phiên, pid daemon)` trong meta của luồng; khi daemon chạy lại (pid khác) hay phiên thoát (`session_exit`) hay bị `TermClose`, luồng được thả.
+- Phiên chat của máy với luồng (nếu đang mở, rảnh) đóng trước khi CLI chạy. Trong lúc CLI giữ luồng, `ThreadSummary.terminal_session = 15` khác 0, `ThreadSend` bị từ chối với `SESSION_OPEN_ELSEWHERE`, web hiện luồng chỉ đọc kèm nút mở terminal; `busy_elsewhere` vẫn cho biết đang chạy một lượt. Không có hai giao diện cùng ghi một phiên.
+- Từ chối: `THREAD_NOT_FOUND` (luồng lạ), `INVALID` (`thread_id` rỗng), `THREAD_RUNNING` (máy đang chạy một lượt của luồng), `SESSION_OPEN_ELSEWHERE` (nơi khác trên máy đang chạy), `UNSUPPORTED_REQUEST` (AI không có CLI cho terminal, hoặc agent không bật tính năng), `AI_NOT_INSTALLED`, `AI_NEEDS_LOGIN`, `PROFILE_UNUSABLE`, `FOLDER_NOT_FOUND`.
+- Phiên mới: id phiên đặt ngay vào luồng; transcript xuất hiện khi người dùng gõ tin đầu tiên và được đọc vào luồng như mọi lượt chạy ở nơi khác. CLI thoát mà chưa ghi transcript thì id bị bỏ, lần mở sau lại là phiên mới.
+- Đóng tab trên web chỉ tách ra (phiên vẫn chạy, gắn lại được); "Kết thúc" gửi `TermClose`.
 
 ### Liên kết (link)
 

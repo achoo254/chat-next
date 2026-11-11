@@ -1,56 +1,63 @@
-// The AI Agent column, the same on every AI Agent page: the "Cần bạn" board,
-// the filters (all, needs you, running) shared by every machine, then each
-// machine as a group header (status in words, a menu with a new session,
-// its board, its details, pairing) over its sessions grouped by folder, laid
-// out like the chat list. A machine this device cannot use yet says why and
-// offers the fix (pair) in place. Archived sessions show only under their own
-// filter; a row's menu (hover, or a long press on a phone) archives or
-// deletes it on machines that can (tunelo 2.0.6+).
+// The AI Agent column, the same on every AI Agent page, kept as plain as
+// Orca's: every session lives in a project (a folder on one of the user's
+// machines), and the column is one list of projects, each with its sessions.
+// With several machines each project shows its machine's name; the machine
+// is picked only when adding a project. On top: "Quản lý máy" (machines,
+// their state, overview, settings and plain shells), then one toggle that
+// keeps only what needs the user or runs, and "Thêm dự án". Projects and sessions show a badge when they need
+// the user or run. A machine this device cannot use yet (offline, not
+// paired, too old) says so in one line, with the fix (pair) in place, so it
+// never just disappears. Archived sessions show only behind their own link;
+// a row's menu (hover, or a long press on a phone) opens it in the terminal,
+// archives or deletes it on machines that can (tunelo 2.0.6+). A machine
+// older than projects (tunelo before 2.0.7) still lists its sessions by folder.
 import { useEffect, useState, type MouseEvent } from "react";
 import { ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
-import { countLabel } from "../messaging/data/format.ts";
 import { Link, navigate, paths, type MachinesView } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
-import { terminalGate, type TerminalGate } from "./agent-version.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { sortForList } from "./link/machine-link.ts";
 import { LOCAL_REF } from "./link/link-hub.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { useCollapsed } from "./use-collapsed.ts";
 import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing, type Conn } from "./machine-status.ts";
-import { NewSession } from "./new-session.tsx";
+import type { ProjectHost } from "./project-dialogs.tsx";
 import { aiName, folderName, isRunning, modelName, stateKey, timeAgo, useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
-import { AddProject, ProjectSection, ProjectSuggestions } from "./project-section.tsx";
+import { AddProject, ProjectSection } from "./project-section.tsx";
 import { byProject, projectsSupported } from "./projects-view.ts";
+import { rememberMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 
-export type Filter = "all" | "need" | "running" | "archived";
+/** "attention": only what needs the user or runs. */
+export type Filter = "all" | "need" | "running" | "attention" | "archived";
 
 const FILTER_KEY = "ai:filter";
 
 function savedFilter(): Filter {
 	try {
 		const value = window.sessionStorage.getItem(FILTER_KEY);
-		return value === "need" || value === "running" || value === "archived" ? value : "all";
+		return value === "attention" || value === "archived" ? value : "all";
 	} catch {
 		return "all";
 	}
 }
 
+type Matched = Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere">>;
+
 /** The session matches the filter: "all" leaves archived ones out, "archived" shows only them; what needs the user or runs shows either way. */
-export function matches(filter: Filter, thread: Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere">>): boolean {
+export function matches(filter: Filter, thread: Matched): boolean {
 	if (filter === "need") return thread.state === ThreadState.WAITING;
 	if (filter === "running") return isRunning(thread);
+	if (filter === "attention") return thread.state === ThreadState.WAITING || isRunning(thread);
 	if (filter === "archived") return thread.archived;
 	return !thread.archived;
 }
 
 /** Sessions the "running" filter shows (archived ones too, as the filter does). */
-export function runningCount(threads: readonly (Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere">>)[]): number {
+export function runningCount(threads: readonly Matched[]): number {
 	return threads.filter((x) => matches("running", x)).length;
 }
 
@@ -98,6 +105,13 @@ export function connDot(conn: Conn): "on" | "wait" | "off" | "pair" | "warn" {
 	}
 }
 
+/** Machines a project can be added on now: online, and keeping projects. */
+export function projectHosts(machines: readonly MachineView[]): ProjectHost[] {
+	return machines
+		.filter((m) => m.conn.kind === "on" && projectsSupported(m.state.info?.agentVersion))
+		.map((m) => ({ ref: m.entry.ref, name: m.entry.name, link: m.link, state: m.state }));
+}
+
 export function SessionSidebar({ view }: { view: MachinesView }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
@@ -112,13 +126,13 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 			// Private mode: the filter still applies on this page.
 		}
 	};
-	const archived = machines.some((m) => m.state.threads.some((x) => x.archived));
-	const need = machines.reduce((n, m) => n + m.state.threads.filter((x) => x.state === ThreadState.WAITING).length, 0);
-	const running = machines.reduce((n, m) => n + runningCount(m.state.threads), 0);
+	const threads = machines.flatMap((m) => m.state.threads);
+	const archived = threads.filter((x) => x.archived).length;
+	const attention = threads.filter((x) => matches("attention", x)).length;
 	const directory = hub.directory();
-	const currentThread = view.page === "session" ? view.threadId : null;
-	const terminalOpen = view.page === "terminal" ? view.machine : null;
+	const currentThread = view.page === "session" || view.page === "session-terminal" ? view.threadId : null;
 	const currentMachine = "machine" in view ? view.machine : null;
+	const many = machines.length > 1;
 	return (
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
@@ -129,59 +143,50 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				</Link>
 			</header>
 			<div className="mx-nav-top">
-				<Link to={aiPaths.need} className="mx-inbox" current={view.page === "need"}>
-					<Icon name="inbox" />
-					<span className="grow">{t.agent.inbox}</span>
-					{need > 0 && <span className="badge">{countLabel(need)}</span>}
-				</Link>
-				<div className="tabs mx-filters" role="tablist" aria-label={t.sessions.filters}>
-					{(["all", "need", "running", "archived"] as const)
-						.filter((f) => f !== "archived" || archived || filter === "archived")
-						.map((f) => (
-							<button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}>
-								{f === "all" ? t.sessions.all : f === "need" ? t.sessions.need(need) : f === "running" ? t.sessions.running(running) : t.agent.thread.archived}
-							</button>
-						))}
-				</div>
+				<button
+					type="button"
+					className="mx-attn"
+					aria-pressed={filter === "attention"}
+					onClick={() => setFilter(filter === "attention" ? "all" : "attention")}
+					data-id="sidebar-attention"
+				>
+					<Icon name="inbox" small />
+					<span className="grow">{t.sessions.attentionOnly}</span>
+					{attention > 0 && <span className="badge">{attention}</span>}
+				</button>
+				<AddProject hosts={projectHosts(machines)} compact />
 			</div>
 			<div className="mx-groups" aria-busy={directory.status === "loading"}>
 				{machines.map((m) => (
-					<MachineGroup
-						key={m.entry.ref}
-						machine={m}
-						filter={filter}
-						now={now}
-						currentThread={m.entry.ref === currentMachine ? currentThread : null}
-						current={m.entry.ref === currentMachine && currentThread === null && terminalOpen === null}
-						terminalOpen={m.entry.ref === terminalOpen}
-					/>
+					<MachineProjects key={m.entry.ref} machine={m} filter={filter} now={now} many={many} currentThread={m.entry.ref === currentMachine ? currentThread : null} />
 				))}
 				{directory.status === "ready" && machines.length === 0 && <FirstMachine compact />}
+				{(archived > 0 || filter === "archived") && (
+					<button type="button" className="mx-archived-link" onClick={() => setFilter(filter === "archived" ? "all" : "archived")} aria-pressed={filter === "archived"}>
+						{filter === "archived" ? t.sessions.hideArchived : t.sessions.showArchived(archived)}
+					</button>
+				)}
 			</div>
 		</section>
 	);
 }
 
-interface GroupProps {
+interface ProjectsProps {
 	machine: MachineView;
 	filter: Filter;
 	now: number;
+	/** The user has more than one machine: each project names its own. */
+	many: boolean;
 	/** The open session, when it is one of this machine's. */
 	currentThread: string | null;
-	/** This machine's board or details are open. */
-	current: boolean;
-	/** This machine's terminal is open. */
-	terminalOpen: boolean;
 }
 
-function MachineGroup({ machine, filter, now, currentThread, current, terminalOpen }: GroupProps) {
+/** One machine's projects, without a header of its own; one line when the machine cannot be used now. */
+function MachineProjects({ machine, filter, now, many, currentThread }: ProjectsProps) {
 	const t = useMachinesCopy();
 	const { entry, link, state, conn } = machine;
-	const [creating, setCreating] = useState(false);
 	const ref = entry.ref;
-	const [collapsed, toggleCollapsed] = useCollapsed(`machine:${ref}`);
 	const shown = state.threads.filter((x) => matches(filter, x));
-	// tunelo 2.0.7+: sessions by project, the rest under "Khác".
 	const withProjects = projectsSupported(state.info?.agentVersion);
 	const online = conn.kind === "on";
 	useEffect(() => {
@@ -189,186 +194,76 @@ function MachineGroup({ machine, filter, now, currentThread, current, terminalOp
 	}, [withProjects, online, state.projects, link]);
 	const projectList = withProjects ? (state.projects?.projects ?? []) : [];
 	const grouped = byProject(shown, projectList);
-	const folders = byFolder(withProjects ? grouped.other : shown);
 	const order = projectList.map((x) => x.id);
 	const pairPath = ref === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(ref);
-	const loading = conn.kind === "on" ? !state.listed : conn.kind === "connecting" || conn.kind === "checking";
-	// The machine's Claude account, as it announces it (tunelo 2.0.2+): it changes for every session at once.
-	const terminal = terminalGate(state.info);
-	const picked = state.machineProfile?.profiles;
-	const account = picked?.profiles.find((p) => p.id === picked.selectedId)?.email ?? "";
+	const loading = online ? !state.listed : conn.kind === "connecting" || conn.kind === "checking";
+	const status = connText(t, conn, now);
+	const row = (thread: ThreadSummary) => (
+		<li key={thread.id}>
+			<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
+		</li>
+	);
+	// What the machine needs before its projects show: pairing, an update, or being reachable.
+	const blocked = needsPairing(conn) || conn.kind === "update" || (!online && state.projects === null && !loading);
 	return (
 		<section className="mx-group" aria-label={entry.name}>
-			<div className="mx-group-head">
-				<button
-					type="button"
-					className="icon-btn mx-fold"
-					aria-expanded={!collapsed}
-					aria-label={collapsed ? t.agent.expand(entry.name) : t.agent.collapse(entry.name)}
-					onClick={toggleCollapsed}
-				>
-					<MachineIcon name={collapsed ? "chevron-right" : "chevron-down"} small />
-				</button>
-				<Link to={paths.machine(ref)} className="mx-group-name" current={current}>
+			{blocked && (
+				<div className="mx-host-note" data-id="sidebar-host-note">
 					<span className={`dot ${connDot(conn)}`} aria-hidden="true" />
-					<b>{entry.name}</b>
-					<small>
-						{connText(t, conn, now)}
-						{conn.kind === "on" && account !== "" && ` · ${account}`}
-					</small>
-				</Link>
-				<GroupMenu name={entry.name} machine={ref} conn={conn} terminal={terminal} onNew={() => setCreating(true)} />
-			</div>
-			{!collapsed && (
-				<>
-				{needsPairing(conn) && (
-					<div className="mx-group-note">
-						<p>{conn.kind === "unpaired" ? t.agent.hint.unpaired : t.agent.hint.repair}</p>
+					<span className="grow">
+						<b>{entry.name}</b>
+						<small>{conn.kind === "update" ? t.agent.hint.update : status}</small>
+					</span>
+					{needsPairing(conn) && (
 						<Link to={pairPath} className="btn btn-sm">
 							{t.agent.pair}
-						</Link>
-					</div>
-				)}
-				{conn.kind === "update" && <p className="mx-group-note muted">{t.agent.hint.update}</p>}
-				{terminal === "available" && online && (
-					<ul className="mx-rows">
-						<li>
-							<Link to={paths.machineTerminal(ref)} className="mx-srow" current={terminalOpen}>
-								<span className="mx-st idle" aria-hidden="true">
-									<MachineIcon name="terminal" small />
-								</span>
-								<span className="tx">
-									<span className="line">
-										<span className="name">{t.terminal.entry}</span>
-									</span>
-								</span>
-							</Link>
-						</li>
-					</ul>
-				)}
-				{conn.kind === "offline" && state.threads.length === 0 && <p className="mx-group-note muted">{t.agent.hint.offline}</p>}
-				{loading && (
-					<ul className="mx-rows skeleton" aria-hidden="true">
-						<li />
-						<li />
-					</ul>
-				)}
-				{grouped.groups
-					.filter((g) => filter === "all" || g.threads.length > 0)
-					.map((g) => (
-						<ProjectSection key={g.project.id} machine={ref} machineName={entry.name} link={link} state={state} project={g.project} order={order} online={online}>
-							{g.threads.length > 0 && (
-								<ul className="mx-rows">
-									{g.threads.map((thread) => (
-										<li key={thread.id}>
-											<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
-										</li>
-									))}
-								</ul>
-							)}
-						</ProjectSection>
-					))}
-				{withProjects && projectList.length > 0 && folders.length > 0 && <p className="mx-other-head">{t.agent.projects.other}</p>}
-				{folders.map((folder) => (
-					<div key={folder.dir} className="mx-folder">
-						<p className="mx-folder-name" title={folder.dir}>
-							<MachineIcon name="folder" small />
-							{folderName(folder.dir)}
-						</p>
-						<ul className="mx-rows">
-							{folder.threads.map((thread) => (
-								<li key={thread.id}>
-									<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
-								</li>
-							))}
-						</ul>
-					</div>
-				))}
-				{withProjects && online && filter === "all" && state.projects !== null && (
-					<>
-						<ProjectSuggestions machine={ref} link={link} suggestions={state.projects.suggestions} />
-						<div className="mx-group-note">
-							<AddProject link={link} state={state} />
-						</div>
-					</>
-				)}
-				{conn.kind === "on" && state.listed && shown.length === 0 && projectList.length === 0 && (
-					<p className="mx-group-note muted">{state.threads.length === 0 ? t.agent.noSessions : filter === "archived" ? t.agent.thread.noArchived : t.agent.emptyFilter}</p>
-				)}
-				</>
-			)}
-			{creating && <NewSession machine={ref} name={entry.name} link={link} state={state} onClose={() => setCreating(false)} />}
-		</section>
-	);
-}
-
-function GroupMenu({ name, machine, conn, terminal, onNew }: { name: string; machine: string; conn: Conn; terminal: TerminalGate; onNew: () => void }) {
-	const t = useMachinesCopy();
-	const { open, setOpen, ref } = usePopover();
-	const pairPath = machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine);
-	return (
-		<div className="mx-model" ref={ref}>
-			<button type="button" className="icon-btn" aria-label={t.agent.machineMenu(name)} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-				<Icon name="dots" />
-			</button>
-			{open && (
-				<div className="mx-menu" role="menu" aria-label={t.agent.machineMenu(name)}>
-					<button
-						type="button"
-						role="menuitem"
-						disabled={conn.kind !== "on"}
-						onClick={() => {
-							setOpen(false);
-							onNew();
-						}}
-					>
-						<Icon name="plus" small />
-						<span>
-							{t.agent.newSession}
-							{conn.kind !== "on" && <small>{connTextShort(t, conn)}</small>}
-						</span>
-					</button>
-					<Link to={paths.machine(machine)} className="mx-menu-link">
-						<Icon name="inbox" small />
-						<span>{t.agent.machineBoard}</span>
-					</Link>
-					{terminal === "available" ? (
-						<Link to={paths.machineTerminal(machine)} className="mx-menu-link">
-							<MachineIcon name="terminal" small />
-							<span>{t.terminal.entry}</span>
-						</Link>
-					) : (
-						terminal !== "unknown" && (
-							<button type="button" role="menuitem" disabled>
-								<MachineIcon name="terminal" small />
-								<span>
-									{t.terminal.entry}
-									<small>{t.terminal.hint[terminal]}</small>
-								</span>
-							</button>
-						)
-					)}
-					<Link to={paths.machineInfo(machine)} className="mx-menu-link">
-						<Icon name="info" small />
-						<span>{t.agent.info}</span>
-					</Link>
-					{needsPairing(conn) && (
-						<Link to={pairPath} className="mx-menu-link">
-							<Icon name="link" small />
-							<span>{t.agent.pair}</span>
 						</Link>
 					)}
 				</div>
 			)}
-		</div>
+			{loading && (
+				<ul className="mx-rows skeleton" aria-hidden="true">
+					<li />
+					<li />
+				</ul>
+			)}
+			{grouped.groups
+				.filter((g) => filter === "all" || g.threads.length > 0)
+				.map((g) => (
+						<ProjectSection
+							key={g.project.id}
+							machine={ref}
+							machineName={entry.name}
+							link={link}
+							state={state}
+							project={g.project}
+							order={order}
+							online={online}
+							host={many ? entry.name : undefined}
+							offline={online ? "" : t.agent.projects.hostOffline}
+							need={g.threads.filter((x) => x.state === ThreadState.WAITING).length}
+							running={g.threads.some((x) => isRunning(x))}
+						>
+							{g.threads.length > 0 && <ul className="mx-rows">{g.threads.map(row)}</ul>}
+						</ProjectSection>
+				))}
+			{/* tunelo before projects: its sessions by folder, as before. */}
+			{!withProjects &&
+				byFolder(shown).map((folder) => (
+					<div key={folder.dir} className="mx-folder">
+						<p className="mx-folder-name" title={folder.dir}>
+							<MachineIcon name="folder" small />
+							{folderName(folder.dir)}
+							{many && <span className="mx-host">{entry.name}</span>}
+						</p>
+						<ul className="mx-rows">{folder.threads.map(row)}</ul>
+					</div>
+				))}
+			{online && state.listed && withProjects && state.projects !== null && projectList.length === 0 && filter === "all" && (
+				<p className="mx-group-note muted">{many ? `${entry.name}: ${t.agent.projects.none}` : t.agent.projects.none}</p>
+			)}
+		</section>
 	);
-}
-
-/** Why a machine cannot take a new session right now. */
-function connTextShort(t: MachinesCopy, conn: Conn): string {
-	if (conn.kind === "offline") return t.agent.hint.offline;
-	if (conn.kind === "unpaired" || conn.kind === "repair" || conn.kind === "update") return t.agent.conn[conn.kind];
-	return t.agent.hint.connecting;
 }
 
 /**
@@ -379,6 +274,7 @@ function connTextShort(t: MachinesCopy, conn: Conn): string {
 export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInfo | null): string {
 	const key = stateKey(thread);
 	if (key === "waiting") return t.agent.sub.waiting;
+	if (thread.terminalSession > 0) return t.agent.sub.inTerminal;
 	if (thread.previewTool !== "") return t.agent.sub.tool(thread.previewTool);
 	if (thread.preview !== "") return thread.preview;
 	if (key === "running" || key === "queued" || key === "error") return t.agent.sub[key];
@@ -396,31 +292,34 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 	const { open, setOpen, ref } = usePopover();
 	const [deleting, setDeleting] = useState(false);
 	const online = machine.conn.kind === "on" || current;
+	const ref_ = machine.entry.ref;
+	const inTerminal = terminalOffered(machine.state.info, thread.provider);
+	// A dot only when the session needs the user (amber) or runs (accent).
+	const dot = key === "waiting" ? "need" : isRunning(thread) || thread.terminalSession > 0 ? "run" : "";
 	const content = (
 		<>
-				<span className={`mx-st ${key}`} aria-hidden="true">
-					{key === "running" || key === "elsewhere" ? <span className="spin" /> : <MachineIcon name={key === "waiting" ? "help" : "terminal"} small />}
+			<span className={`mx-sdot ${dot}`} aria-hidden="true" />
+			<span className="tx">
+				<span className="line">
+					<span className="name">{thread.title || t.agent.newSession}</span>
+					{thread.pending > 0 && (
+						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>
+							{thread.pending}
+						</span>
+					)}
 				</span>
-				<span className="tx">
-					<span className="line">
-						<span className="name">{thread.title || t.agent.newSession}</span>
-						<time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
-					</span>
-					<span className="line">
-						<span className="sub">{sub}</span>
-						{thread.pending > 0 && (
-							<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>
-								{thread.pending}
-							</span>
-						)}
+				<span className="line">
+					<span className="sub">
+						{sub} · <time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
 					</span>
 				</span>
+			</span>
 		</>
 	);
 	const row = online ? (
 		<Link
-			to={paths.machineSession(machine.entry.ref, thread.id)}
-			className={`mx-srow ${key}`}
+			to={sessionPath(ref_, thread.id, inTerminal)}
+			className={`mx-srow slim ${key}`}
 			current={current}
 			// A long press on a phone (or a right click) opens the row's menu.
 			{...(manage
@@ -435,7 +334,7 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 			{content}
 		</Link>
 	) : (
-		<div className={`mx-srow ${key} disabled`} aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
+		<div className={`mx-srow slim ${key} disabled`} aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
 			{content}
 		</div>
 	);
@@ -448,6 +347,20 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 			</button>
 			{open && (
 				<div className="mx-menu" role="menu" aria-label={t.agent.thread.rowMenu(thread.title)}>
+					{inTerminal && (
+						<button
+							type="button"
+							role="menuitem"
+							onClick={() => {
+								setOpen(false);
+								rememberMode(ref_, "terminal");
+								navigate(aiPaths.sessionTerminal(ref_, thread.id));
+							}}
+						>
+							<MachineIcon name="terminal" small />
+							<span>{t.terminal.openInTerminal}</span>
+						</button>
+					)}
 					<ThreadMenuItems link={machine.link} thread={thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
 				</div>
 			)}

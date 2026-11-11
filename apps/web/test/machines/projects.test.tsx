@@ -1,17 +1,18 @@
-// Projects in the AI Agent column: sessions grouped by project (the rest
-// under "Khác"), what a project row says and does ("+" with its defaults,
-// pin, remove), "Thêm dự án" from a folder (asking for a sensitive one) or
-// a clone (only https/ssh, with progress and cancel), and machines older than
-// tunelo 2.0.7 keeping the old column.
+// Projects in the AI Agent column: sessions grouped by project, what a
+// project row says and does ("+" with its defaults in the last mode used,
+// the machine's name with several machines, dimmed offline, pin, remove),
+// "Thêm dự án" on a picked machine from a folder (asking for a sensitive
+// one), a recent folder in one tap, or a clone (only https/ssh, with progress
+// and cancel), and machines older than tunelo 2.0.7 keeping the old column.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, ProjectSchema, type Frame, type Project, type ProjectCloneProgress, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, ProjectSchema, TerminalAvailability, type Frame, type Project, type ProjectCloneProgress, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
-import { AddProjectDialog, cloneUrlOk } from "../../src/machines/project-dialogs.tsx";
+import { AddProjectDialog, AddProjectOnHost, cloneUrlOk } from "../../src/machines/project-dialogs.tsx";
 import { ProjectSection } from "../../src/machines/project-section.tsx";
 import { byProject, gitLine, inFolder, projectsSupported } from "../../src/machines/projects-view.ts";
 
@@ -79,7 +80,7 @@ describe("a project row", () => {
 			</ProjectSection>,
 		);
 		expect(screen.getByText("main · 3 thay đổi")).toBeTruthy();
-		await userEvent.click(screen.getByRole("button", { name: "Phiên mới trong chat-next" }));
+		await userEvent.click(screen.getByRole("button", { name: "Phiên mới" }));
 		const req = sent[0];
 		expect(req?.case).toBe("threadCreate");
 		if (req?.case === "threadCreate") {
@@ -140,7 +141,78 @@ describe("a project row", () => {
 			</ProjectSection>,
 		);
 		expect(screen.getByText("Thư mục không còn trên máy")).toBeTruthy();
-		expect((screen.getByRole("button", { name: "Phiên mới trong chat-next" }) as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByRole("button", { name: "Phiên mới" }) as HTMLButtonElement).disabled).toBe(true);
+	});
+});
+
+describe("a project row, project-first", () => {
+	const terminalState = () =>
+		baseState({
+			info: { agentVersion: "2.5.0", home: "/w", terminal: TerminalAvailability.AVAILABLE, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: true } }] },
+		} as unknown as Partial<LinkState>);
+
+	it("+ opens the new session in the mode last used on the machine (the terminal here), with no dialog", async () => {
+		window.localStorage.setItem("ai:mode:m1", "terminal");
+		const { link, sent } = fakeLink(async (req) =>
+			req.case === "threadCreate" ? ({ body: { case: "threadCreated", value: { thread: { id: "t9", provider: "claude" } } } } as unknown as Frame) : ACK,
+		);
+		wrap(
+			<ProjectSection machine="m1" machineName="Mac" link={link} state={terminalState()} project={project()} order={["p1"]} online>
+				<span />
+			</ProjectSection>,
+		);
+		await userEvent.click(screen.getByRole("button", { name: "Phiên mới" }));
+		await waitFor(() => expect(window.location.pathname).toBe("/ai/m1/s/t9/terminal"));
+		expect(sent.map((r) => r.case)).toEqual(["threadCreate"]);
+		expect(document.querySelector("[role=dialog]")).toBeNull();
+		window.localStorage.removeItem("ai:mode:m1");
+	});
+
+	it("names its machine when there are several, says when the machine is offline, and badges what needs the user", () => {
+		const { link } = fakeLink();
+		wrap(
+			<ProjectSection machine="m1" machineName="Mac" link={link} state={baseState()} project={project()} order={["p1"]} online={false} host="Mac mini" offline="Máy ngoại tuyến" need={2}>
+				<span />
+			</ProjectSection>,
+		);
+		expect(screen.getByText("Mac mini")).toBeTruthy();
+		expect(screen.getByText("Máy ngoại tuyến")).toBeTruthy();
+		expect(screen.getByLabelText("2 việc chờ")).toBeTruthy();
+		expect((screen.getByRole("button", { name: "Phiên mới" }) as HTMLButtonElement).disabled).toBe(true);
+	});
+});
+
+describe("Thêm dự án on a machine", () => {
+	const host = (ref: string, name: string, link: MachineLink, suggestions: { dir: string; sessions: number }[] = []) => ({
+		ref,
+		name,
+		link,
+		state: baseState({ status: { kind: "open" }, projects: { projects: [], suggestions } } as unknown as Partial<LinkState>),
+	});
+
+	it("one machine: no picker; a recent folder with sessions is added in one tap", async () => {
+		const { link, sent } = fakeLink();
+		let closed = false;
+		wrap(<AddProjectOnHost hosts={[host("1", "Mac", link, [{ dir: "/w/api", sessions: 3 }])]} onClose={() => (closed = true)} />);
+		expect(screen.queryByRole("radio")).toBeNull();
+		expect(screen.getByText("Thư mục gần đây có phiên AI")).toBeTruthy();
+		expect(screen.getByText("3 phiên")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Chọn thư mục trên máy này" })).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "Thêm api" }));
+		expect(sent[0]).toMatchObject({ case: "projectAdd", value: { dir: "/w/api", name: "" } });
+		await waitFor(() => expect(closed).toBe(true));
+	});
+
+	it("several machines: the project goes to the one picked", async () => {
+		const a = fakeLink();
+		const b = fakeLink();
+		wrap(<AddProjectOnHost hosts={[host("1", "Mac", a.link, [{ dir: "/w/a", sessions: 1 }]), host("2", "Linux", b.link, [{ dir: "/srv/b", sessions: 2 }])]} onClose={() => undefined} />);
+		const radios = screen.getAllByRole("radio");
+		expect(radios).toHaveLength(2);
+		await userEvent.click(screen.getByRole("radio", { name: "Linux" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Thêm b" }));
+		expect(a.sent).toEqual([]);
+		expect(b.sent[0]).toMatchObject({ case: "projectAdd", value: { dir: "/srv/b" } });
 	});
 });
 

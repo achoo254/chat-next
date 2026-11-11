@@ -12,6 +12,8 @@ export interface PaneNode {
 	readonly kind: "pane";
 	readonly id: string;
 	readonly session: number;
+	/** The session's AI runs in it: closing the pane only detaches (the session goes on). */
+	readonly ai?: true;
 }
 
 export interface SplitNode {
@@ -61,6 +63,12 @@ export function panesOf(node: LayoutNode): PaneNode[] {
 	return node.kind === "pane" ? [node] : [...panesOf(node.a), ...panesOf(node.b)];
 }
 
+/** The pane showing the session's AI, if any. */
+export function aiPane(layout: DockLayout): PaneNode | null {
+	for (const tab of layout.tabs) for (const pane of panesOf(tab.root)) if (pane.ai === true) return pane;
+	return null;
+}
+
 /** Every session the layout shows. */
 export function sessionsOf(layout: DockLayout): Set<number> {
 	return new Set(layout.tabs.flatMap((tab) => panesOf(tab.root).map((p) => p.session)));
@@ -71,8 +79,8 @@ export function activeTab(layout: DockLayout): TerminalTab | null {
 }
 
 /** A new tab with one pane showing `session`, made the active one. */
-export function addTab(layout: DockLayout, session: number): DockLayout {
-	const pane: PaneNode = { kind: "pane", id: newId("pane"), session };
+export function addTab(layout: DockLayout, session: number, ai = false): DockLayout {
+	const pane: PaneNode = { kind: "pane", id: newId("pane"), session, ...(ai ? { ai: true as const } : {}) };
 	const tab: TerminalTab = { id: newId("tab"), root: pane, focus: pane.id };
 	return { tabs: [...layout.tabs, tab].slice(-MAX_TABS), active: tab.id };
 }
@@ -199,7 +207,7 @@ function parseNode(value: unknown, depth: number, seen: Set<string>): LayoutNode
 	if (v.kind === "pane") {
 		const session = v.session;
 		if (typeof session !== "number" || !Number.isInteger(session) || session < 1 || session > 0xffffffff) return null;
-		return { kind: "pane", id: v.id, session };
+		return { kind: "pane", id: v.id, session, ...(v.ai === true ? { ai: true as const } : {}) };
 	}
 	if (v.kind !== "split" || (v.dir !== "row" && v.dir !== "column") || typeof v.ratio !== "number" || !Number.isFinite(v.ratio)) return null;
 	const a = parseNode(v.a, depth + 1, seen);

@@ -3,7 +3,11 @@
 // the dock opens a shell on the relay (the fake gives a real browser's offer
 // no direct path) and says so in the pill, typed text reaches the machine
 // and its echo reaches xterm's screen, a split adds a second terminal, and
-// Alt+Shift+T a second tab. The real direct path is checked against the real
+// Alt+Shift+T a second tab. A session opened in its terminal (the
+// "Trò chuyện | Terminal" switch) asks the machine for its AI by the thread
+// alone, shows the path pill in the session header, and every split pane
+// closes on its own; the split icons keep their 14x12 glyph; the column has
+// no Terminal entry. The real direct path is checked against the real
 // terminal process at acceptance. Starts its own Vite dev server of the
 // harness, so it needs no backend:
 //
@@ -67,6 +71,53 @@ test("a terminal on the relay: typing reaches the machine, the echo reaches the 
 	await page.keyboard.press("Alt+Shift+KeyT");
 	await until(page, "a second tab", () => document.querySelectorAll(".tx-tabs [role=tab]").length === 2);
 	assert.match((await pill.textContent()) ?? "", /^Qua relay/);
+	assert.deepEqual(errors, []);
+	await context.close();
+});
+
+test("a session in its terminal: the switch, the pill in the header, a close button on every pane, unstretched split icons", async () => {
+	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 } });
+	const page = await context.newPage();
+	const errors: string[] = [];
+	page.on("pageerror", (err) => errors.push(String(err)));
+	await page.goto(`http://localhost:${PORT}/?at=machine-session-terminal`);
+	await page.locator("[data-id=terminal-dock]").waitFor({ timeout: 30_000 });
+	await page.locator(".tx-pane .xterm").first().waitFor();
+	type Fake = { aiThreads: Map<number, string> };
+	await until(page, "the AI opened by its thread", () => ((window as unknown as { __fakeTerminal?: Fake }).__fakeTerminal?.aiThreads.size ?? 0) === 1);
+
+	const terminalMode = page.locator("[data-id=session-mode-terminal]");
+	assert.equal(await terminalMode.getAttribute("aria-pressed"), "true");
+	const switchBox = await page.locator(".mx-mode").first().boundingBox();
+	assert.equal(Math.round(switchBox?.height ?? 0), 40);
+	await until(page, "the path pill in the header", () => document.querySelector(".mx-head [data-id=terminal-path]") !== null);
+	assert.equal(await page.locator(".tx-head [data-id=terminal-path]").count(), 0);
+
+	for (const cls of ["to-right", "to-below"]) {
+		const box = await page.locator(`.tx-split-ico.${cls}`).boundingBox();
+		assert.deepEqual([Math.round(box?.width ?? 0), Math.round(box?.height ?? 0)], [14, 12], cls);
+	}
+
+	await page.getByRole("button", { name: "Chia sang phải" }).click();
+	await page.locator(".tx-pane .xterm").nth(1).waitFor();
+	const panes = page.locator(".tx-tab-body:not([hidden]) .tx-pane");
+	assert.equal(await panes.count(), 2);
+	assert.equal(await page.locator(".tx-tab-body:not([hidden]) .tx-pane-x").count(), 2);
+	// The hit area is 44px around the glyph.
+	const x = page.locator(".tx-tab-body:not([hidden]) .tx-pane-x").nth(1);
+	await panes.nth(1).hover();
+	const hit = await x.evaluate((el) => {
+		const r = el.getBoundingClientRect();
+		const before = getComputedStyle(el, "::before");
+		return { w: r.width - parseFloat(before.left) - parseFloat(before.right), h: r.height - parseFloat(before.top) - parseFloat(before.bottom) };
+	});
+	assert.deepEqual([Math.round(hit.w), Math.round(hit.h)], [44, 44]);
+	await x.click();
+	await until(page, "one pane left", () => document.querySelectorAll(".tx-tab-body:not([hidden]) .tx-pane").length === 1);
+
+	// No Terminal entry in the column; the one toggle is there.
+	assert.equal(await page.locator(".mx-list a", { hasText: /^Terminal$/ }).count(), 0);
+	assert.equal(await page.locator("[data-id=sidebar-attention]").count(), 1);
 	assert.deepEqual(errors, []);
 	await context.close();
 });

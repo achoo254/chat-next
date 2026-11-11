@@ -264,6 +264,37 @@ export interface SessionHistory {
   liveness?(sessionId: string): Promise<Liveness>;
 }
 
+/** What a thread's session needs to open in the AI's own CLI, as the core knows it. */
+export type TerminalLaunch = {
+  /** Absolute working directory. */
+  dir: string;
+  /** The session to resume; unset starts a new one. */
+  resumeId?: string;
+  /** The AI's config folder of the account picked on the machine; unset for its default. */
+  accountDir?: string;
+  model?: string;
+  /** One of the AI's own permission modes (never one that skips every prompt). */
+  permissionMode?: string;
+  /** Load the project's own agent settings, as the thread agreed to. */
+  projectSettings: boolean;
+};
+
+/** The program the terminal process runs for a TerminalLaunch: argv, never a shell line. */
+export type TerminalCommand = {
+  file: string;
+  args: string[];
+  /** Environment the AI needs (the terminal process accepts CLAUDE_CONFIG_DIR only). */
+  env: Record<string, string>;
+  /** The new session's id, when the CLI lets the caller pick it (so the thread knows it at once). */
+  sessionId?: string;
+};
+
+/** The AI's own CLI in a terminal of the machine, for users who prefer it to the chat view. */
+export interface TerminalRunner {
+  /** The command for `req`; undefined when the CLI is not installed. Throws on a value it refuses. */
+  command(req: TerminalLaunch): Promise<TerminalCommand | undefined>;
+}
+
 export interface AgentProvider {
   readonly id: string;
   readonly name: string;
@@ -272,4 +303,6 @@ export interface AgentProvider {
   start(opts: { policy: SessionPolicy; resumeId?: string; askUser: AskUser }): Promise<ProviderSession>;
   /** Sessions the AI keeps on the machine; absent when it keeps none tunelo can read. */
   readonly history?: SessionHistory;
+  /** Its CLI opens in the machine's terminal; absent when it has none. */
+  readonly terminal?: TerminalRunner;
 }

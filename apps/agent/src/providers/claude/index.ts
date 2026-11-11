@@ -2,6 +2,7 @@
 // logged into, through the Agent SDK. It never reads credentials and never
 // calls the Anthropic API itself.
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -44,6 +45,8 @@ import type {
   ProviderSession,
   Question,
   SessionPolicy,
+  TerminalCommand,
+  TerminalLaunch,
   TurnStats,
 } from "../types.ts";
 import { LocalSessions } from "./local-sessions.ts";
@@ -141,7 +144,39 @@ export function createClaudeProvider(
       if (!bin) throw new Error("claude is not installed");
       return startSession(queryFn, bin, policy, askUser, resumeId);
     },
+
+    terminal: {
+      async command(req) {
+        const bin = await findBinary();
+        return bin ? terminalCommand(bin, req, randomUUID) : undefined;
+      },
+    },
   };
+}
+
+/** Claude's session ids (UUIDs): nothing else becomes an argument. */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * `claude` for a thread in the terminal, with what the chat view would use:
+ * its session (resumed, or a new one with an id picked here), model,
+ * permission mode, setting sources and account. Only values from Claude's
+ * own lists become arguments.
+ */
+export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => string): TerminalCommand {
+  const args: string[] = [];
+  let sessionId: string | undefined;
+  if (req.resumeId !== undefined) {
+    if (!SESSION_ID.test(req.resumeId)) throw new Error("not a Claude session id");
+    args.push("--resume", req.resumeId);
+  } else {
+    sessionId = newId();
+    args.push("--session-id", sessionId);
+  }
+  if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
+  if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
+  args.push("--setting-sources", req.projectSettings ? "user,project,local" : "user");
+  return { file: bin, args, env: req.accountDir ? { CLAUDE_CONFIG_DIR: req.accountDir } : {}, ...(sessionId ? { sessionId } : {}) };
 }
 
 /**

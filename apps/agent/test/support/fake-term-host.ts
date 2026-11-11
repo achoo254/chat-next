@@ -232,6 +232,13 @@ export class FakeTermHost {
     }
   }
 
+  /** The program in `session` exits (it stays listed until closed, as the real one does). */
+  exit(session: number, code = 0): void {
+    const s = this.sessions.find((x) => x.session === session);
+    if (s) Object.assign(s, { exited: { code, signal: 0 } });
+    this.emit({ event: "session_exit", session, code, signal: 0 });
+  }
+
   /** A relay frame from the agent: Hello is answered, Attach is audited, Input comes back as Output. */
   private relayIn(conn: number, frame: Buffer): void {
     const c = this.conns.get(conn);

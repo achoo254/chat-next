@@ -1,9 +1,14 @@
-// The machine's terminals (/ai/:machine/terminal), compact like Orca's dock:
-// tabs on top, each split into panes side by side or stacked, the path pill
-// ("Trực tiếp 12 ms" / "Qua relay 85 ms") in the same row. Sessions live on
-// the machine; this page shows them, and the open tabs and splits come back
-// on the next visit (IndexedDB, best effort). One terminal link per machine
-// carries every pane. On a touch screen the dock covers the visible part of
+// The machine's terminals, compact like Orca's dock: tabs on top, each split
+// into panes side by side or stacked (each pane with its own close button),
+// the path pill ("Trực tiếp 12 ms" / "Qua relay 85 ms") in the same row. Two
+// scopes: a session opened in terminal mode (/ai/:machine/s/:id/terminal),
+// whose first pane is its AI's own CLI and whose other panes are shells in
+// its folder; and the machine's plain shells (/ai/:machine/terminal, where
+// ?new=<folder> opens one more). Closing the AI's pane only detaches: the
+// AI keeps running on the machine until "Kết thúc"; closing a shell's last
+// pane hangs it up. Sessions live on the machine; the open tabs and splits
+// of each scope come back on the next visit (IndexedDB, best effort). One
+// terminal link per machine carries every pane. On a touch screen the dock covers the visible part of
 // the screen above the phone keyboard (visualViewport), typing goes through
 // an input that handles Vietnamese input methods, and a key bar adds Esc,
 // Tab, Ctrl, Alt and the arrows. This module and xterm load only when a
@@ -17,7 +22,8 @@ import { LOCAL_REF } from "../machines/link/link-hub.ts";
 import { RemoteError, type MachineLink } from "../machines/link/machine-link.ts";
 import { errorText, useHub, useLink } from "../machines/use-machines.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
-import { Link, paths } from "../router.tsx";
+import { Icon } from "../components/screen-icons.tsx";
+import { navigate, Link, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
 import { keySequence, MobileKeyBar, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
@@ -26,6 +32,7 @@ import { browserPeers, defaultIceServers, TerminalLink } from "./terminal-link.t
 import {
 	activeTab,
 	addTab,
+	aiPane,
 	closePane,
 	closeSession,
 	cycleFocus,
@@ -105,12 +112,47 @@ function openErrorText(t: MachinesCopy, err: unknown): string {
 
 // --- the page ----------------------------------------------------------------------------
 
-/** The lazily loaded entry: the machine's link and terminal link from the hub. */
-export default function TerminalScreen({ machine }: { machine: string }) {
+/** The session a dock shows in terminal mode: its AI's CLI, and shells in its folder. */
+export interface DockThread {
+	readonly id: string;
+	readonly dir: string;
+	/** Back to the chat view (phones, where the dock covers the session header). */
+	readonly chat: string;
+}
+
+/**
+ * The lazily loaded entry: the machine's link and terminal link from the hub.
+ * `thread`: a session in terminal mode; otherwise the machine's plain shells,
+ * opening one more in `openShellIn` ("" for the home folder) when set.
+ */
+export default function TerminalScreen({ machine, thread, openShellIn }: { machine: string; thread?: DockThread | undefined; openShellIn?: string | undefined }) {
 	const hub = useHub();
 	const [link, state] = useLink(hub, machine);
 	const terminal = terminalLinkFor(hub, machine);
-	return <TerminalDock machine={machine} link={link} online={state.status.kind === "open"} terminal={terminal} back={machine === LOCAL_REF ? paths.machines() : paths.machine(machine)} />;
+	const machinePage = machine === LOCAL_REF ? paths.machines() : paths.machine(machine);
+	return (
+		<TerminalDock
+			machine={machine}
+			link={link}
+			online={state.status.kind === "open"}
+			terminal={terminal}
+			back={thread === undefined ? machinePage : undefined}
+			thread={thread}
+			openShellIn={openShellIn}
+			// The request is done: the address goes back to the plain terminal page.
+			onShellOpened={() => navigate(paths.machineTerminal(machine), { replace: true })}
+		/>
+	);
+}
+
+/** The path pill of the machine's terminal, for a session header in terminal mode. */
+export function DockPill({ machine }: { machine: string }) {
+	const t = useMachinesCopy();
+	const hub = useHub();
+	const [, state] = useLink(hub, machine);
+	const terminal = terminalLinkFor(hub, machine);
+	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
+	return <StatusPill t={t.terminal} status={status} online={state.status.kind === "open"} />;
 }
 
 export interface TerminalDockProps {
@@ -119,12 +161,16 @@ export interface TerminalDockProps {
 	link: MachineLink;
 	online: boolean;
 	terminal: TerminalLink;
-	back: string;
+	/** The back button's target; none in a session (its header has one), except on phones. */
+	back?: string | undefined;
+	thread?: DockThread | undefined;
+	openShellIn?: string | undefined;
+	onShellOpened?: () => void;
 	store?: LayoutStore;
 	touch?: boolean;
 }
 
-export function TerminalDock({ machine, link, online, terminal, back, store = defaultStore(), touch = isTouch() }: TerminalDockProps) {
+export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, onShellOpened, store = defaultStore(), touch = isTouch() }: TerminalDockProps) {
 	const t = useMachinesCopy();
 	const tt = t.terminal;
 	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
@@ -143,6 +189,12 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 	const ime = useRef<HTMLTextAreaElement>(null);
 	const root = useRef<HTMLDivElement>(null);
 	const autoOpened = useRef(false);
+	const shellOpening = useRef(false);
+	/** Each scope keeps its own tabs. */
+	const scope = thread === undefined ? machine : `${machine}/s/${thread.id}`;
+	const threadId = thread?.id;
+	/** Shells start in the session's folder, or the home folder. */
+	const shellDir = thread?.dir ?? "";
 
 	useEffect(() => {
 		terminal.start();
@@ -154,7 +206,7 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 		if (!online || ready) return;
 		let live = true;
 		void (async () => {
-			const stored = await store.load(machine);
+			const stored = await store.load(scope);
 			let list: readonly TermSessionInfo[] | null = null;
 			try {
 				const frame = await link.request({ case: "termListRequest", value: {} });
@@ -171,19 +223,21 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 		return () => {
 			live = false;
 		};
-	}, [online, ready, machine, link, store, t]);
+	}, [online, ready, scope, link, store, t]);
 
 	useEffect(() => {
 		if (!ready) return;
-		const timer = window.setTimeout(() => void store.save(machine, layout), SAVE_DELAY_MS);
+		const timer = window.setTimeout(() => void store.save(scope, layout), SAVE_DELAY_MS);
 		return () => window.clearTimeout(timer);
-	}, [ready, layout, machine, store]);
+	}, [ready, layout, scope, store]);
 
-	const openSession = async (): Promise<number | null> => {
+	/** A shell in `cwd`, or (`ai`) the session's AI: the machine picks what runs for it, this page names only the session. */
+	const openSession = async (cwd = shellDir, ai = false): Promise<number | null> => {
 		setBusy(true);
 		setNotice("");
 		try {
-			const frame = await link.request({ case: "termOpen", value: { cols: 80, rows: 24, cwd: "" } });
+			const value = ai && threadId !== undefined ? { cols: 80, rows: 24, cwd: "", aiSession: { threadId } } : { cols: 80, rows: 24, cwd };
+			const frame = await link.request({ case: "termOpen", value });
 			if (frame.body.case !== "termOpened") throw new Error("the machine did not open a terminal");
 			return frame.body.value.session;
 		} catch (err) {
@@ -198,14 +252,26 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 		link.request({ case: "termClose", value: { session } }).catch(() => undefined);
 	};
 
-	/** Closes panes; a session no pane shows any more is hung up on the machine. */
+	/** Closes panes; a shell no pane shows any more is hung up on the machine, the AI's session only detaches. */
 	const closePanes = (ids: readonly string[]) => {
 		let next = layout;
 		const before = sessionsOf(layout);
+		const ai = new Set(layout.tabs.flatMap((x) => panesOf(x.root).filter((p) => p.ai === true).map((p) => p.session)));
 		for (const id of ids) next = closePane(next, id);
 		const after = sessionsOf(next);
 		setLayout(next);
-		for (const session of before) if (!after.has(session)) closeSessionOnMachine(session);
+		for (const session of before) if (!after.has(session) && !ai.has(session)) closeSessionOnMachine(session);
+	};
+
+	/** The session's AI in a tab of its own (the one already running, if any), shown. */
+	const showAi = async (): Promise<void> => {
+		const shown = aiPane(layout);
+		if (shown !== null) {
+			setLayout((l) => focusPane(l, shown.id));
+			return;
+		}
+		const session = await openSession(shellDir, true);
+		if (session !== null) setLayout((l) => (aiPane(l) === null ? addTab(l, session, true) : l));
 	};
 
 	const run = async (action: DockAction): Promise<void> => {
@@ -238,15 +304,29 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 		}
 	};
 
-	// A machine with no terminal open here starts with one.
+	// A session opens with its AI; a machine with no terminal open here starts with one shell.
 	const openFirst = useEffectEvent(() => {
-		void run({ kind: "new-tab" });
+		if (threadId !== undefined) void showAi();
+		else if (openShellIn === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
 	});
 	useEffect(() => {
-		if (!ready || layout.tabs.length > 0 || autoOpened.current) return;
+		if (!ready || autoOpened.current) return;
 		autoOpened.current = true;
 		openFirst();
-	}, [ready, layout.tabs.length]);
+	}, [ready]);
+
+	// "Terminal mới" from a menu: one more shell in that folder.
+	const openShell = useEffectEvent(async (cwd: string) => {
+		shellOpening.current = true;
+		const session = await openSession(cwd);
+		shellOpening.current = false;
+		if (session !== null) setLayout((l) => addTab(l, session));
+		onShellOpened?.();
+	});
+	useEffect(() => {
+		if (!ready || openShellIn === undefined || shellOpening.current) return;
+		void openShell(openShellIn);
+	}, [ready, openShellIn]);
 
 	// Shortcuts anywhere in the dock (xterm lets them through, see onShortcut below).
 	const onKey = useEffectEvent((event: KeyboardEvent) => {
@@ -284,6 +364,8 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 	const focused = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
 	const shown = sessionsOf(layout);
 	const titleOf = (session: number, index: number) => titles.get(session) || tt.tabTitle(index + 1);
+	// A session's dock lists the shells and its own AI; the machine's lists the shells.
+	const hidden = listed.filter((s) => !shown.has(s.session) && (s.threadId === "" || s.threadId === threadId));
 
 	const send = (text: string) => {
 		if (focused === null || text === "") return;
@@ -303,8 +385,9 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 		setCaret(handles.current.get(pane.id)?.caret() ?? null);
 		ime.current?.focus();
 	};
-	const newShell = async (pane: PaneNode) => {
-		const session = await openSession();
+	/** After its program ended: a new shell in the pane, or the session's AI again. */
+	const restart = async (pane: PaneNode) => {
+		const session = await openSession(shellDir, pane.ai === true);
 		if (session === null) return;
 		closeSessionOnMachine(pane.session);
 		setLayout((l) => setPaneSession(l, pane.id, session));
@@ -313,6 +396,7 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 	const renderPane = (pane: PaneNode): ReactNode => {
 		const isFocused = focused?.id === pane.id;
 		const code = ended.get(pane.session);
+		const closeLabel = pane.ai === true ? tt.closePaneAi : tt.closePane;
 		return (
 			<div className="tx-pane-in" data-focused={isFocused ? "" : undefined} onPointerUp={() => tapPane(pane)}>
 				<TerminalView
@@ -342,12 +426,24 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 						<button type="button" className="btn btn-sm" onClick={() => closePanes([pane.id])}>
 							{tt.closePane}
 						</button>
-						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void newShell(pane)}>
-							{tt.newShell}
+						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void restart(pane)}>
+							{pane.ai === true ? tt.reopenAi : tt.newShell}
 						</button>
 					</div>
 				)}
-				{touch && isFocused && <ImeInput label={tt.typeHere} inputRef={ime} at={caret} onSend={send} appCursor={() => handles.current.get(pane.id)?.appCursor() ?? false} />}
+				{/* After the terminal, so xterm's layers never cover it. */}
+<button
+	type="button"
+	className="tx-pane-x"
+	aria-label={closeLabel}
+	title={closeLabel}
+	// The tap closes the pane; it does not focus it first.
+	onPointerUp={(event) => event.stopPropagation()}
+	onClick={() => closePanes([pane.id])}
+>
+	<Icon name="x" small />
+</button>
+{touch && isFocused && <ImeInput label={tt.typeHere} inputRef={ime} at={caret} onSend={send} appCursor={() => handles.current.get(pane.id)?.appCursor() ?? false} />}
 			</div>
 		);
 	};
@@ -357,24 +453,25 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 		<div className={touch ? "tx-dock touch" : "tx-dock"} ref={root} data-id="terminal-dock">
 			<TerminalTabs
 				t={tt}
-				back={back}
+				back={back ?? (touch ? thread?.chat : undefined)}
 				backLabel={t.back}
 				tabs={layout.tabs.map((x, i) => {
 					const pane = panesOf(x.root).find((p) => p.id === x.focus);
 					return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i) };
 				})}
 				active={tab?.id ?? ""}
-				hidden={listed.filter((s) => !shown.has(s.session))}
+				hidden={hidden}
 				busy={busy || !online}
 				mac={mac}
-				pill={<StatusPill t={tt} status={status} online={online} />}
+				// A session shows the pill in its header.
+				pill={thread === undefined ? <StatusPill t={tt} status={status} online={online} /> : null}
 				onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}
 				onClose={(id) => {
 					const closing = layout.tabs.find((x) => x.id === id);
 					if (closing !== undefined) closePanes(panesOf(closing.root).map((p) => p.id));
 				}}
 				onAction={(action) => void run(action)}
-				onReopen={(session) => setLayout((l) => addTab(l, session))}
+				onReopen={(session) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)))}
 				onMenu={() => {
 					link.request({ case: "termListRequest", value: {} }).then(
 						(frame) => {
@@ -398,10 +495,16 @@ export function TerminalDock({ machine, link, online, terminal, back, store = de
 				{!ready && <p className="tx-empty">{online ? t.terminal.loading : tt.offline}</p>}
 				{ready && layout.tabs.length === 0 && (
 					<div className="tx-empty">
-						<p>{tt.none}</p>
-						<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online} onClick={() => void run({ kind: "new-tab" })}>
-							{tt.newTab}
-						</button>
+						<p>{threadId !== undefined ? tt.detached : tt.none}</p>
+						{threadId !== undefined ? (
+							<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online} onClick={() => void showAi()}>
+								{tt.reopenAi}
+							</button>
+						) : (
+							<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online} onClick={() => void run({ kind: "new-tab" })}>
+								{tt.newTab}
+							</button>
+						)}
 					</div>
 				)}
 				{status.kind === "failed" && (

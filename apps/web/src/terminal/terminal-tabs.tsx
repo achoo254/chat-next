@@ -70,7 +70,8 @@ export interface TabView {
 
 interface TabsProps {
 	t: MachinesCopy["terminal"];
-	back: string;
+	/** None in a session on a wide screen: its header has the way back. */
+	back: string | undefined;
 	backLabel: string;
 	tabs: readonly TabView[];
 	active: string;
@@ -78,7 +79,7 @@ interface TabsProps {
 	hidden: readonly TermSessionInfo[];
 	busy: boolean;
 	mac: boolean;
-	pill: ReactNode;
+	pill: ReactNode | null;
 	onSelect(id: string): void;
 	onClose(id: string): void;
 	onAction(action: DockAction): void;
@@ -92,9 +93,11 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 	const prefix = mac ? "⌥⇧" : "Alt+Shift+";
 	return (
 		<div className="tx-head">
-			<Link to={back} className="icon-btn tx-back" aria-label={backLabel} title={backLabel}>
-				<Icon name="back" />
-			</Link>
+			{back !== undefined && (
+				<Link to={back} className="icon-btn tx-back" aria-label={backLabel} title={backLabel}>
+					<Icon name="back" />
+				</Link>
+			)}
 			<div className="tx-tabs" role="tablist" aria-label={t.tabs}>
 				{tabs.map((tab) => (
 					<div key={tab.id} className="tx-tab" data-active={tab.id === active ? "" : undefined}>

@@ -8,6 +8,10 @@ export const aiPaths = {
 	need: "/ai/need",
 	/** The machines: list, adding, pairing, details. */
 	manage: "/ai/machines",
+	/** A session in its AI's own CLI, in the machine's terminal. */
+	sessionTerminal: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}/terminal`,
+	/** The machine's terminal opening one more plain shell in `cwd` ("" for the home folder). */
+	newShell: (machine: string, cwd: string) => `/ai/${machine}/terminal?new=${encodeURIComponent(cwd)}`,
 } as const;
 
 /** The /ai path for an old /machines one (with its query); null for any other path. */

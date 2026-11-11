@@ -1,8 +1,10 @@
 // The project dialogs (loaded when first opened): "Thêm dự án" with three
 // ways (a folder on the machine, a git clone with its progress and cancel, a
-// new folder with git init), the project's settings (what its new sessions
+// new folder with git init), the machine picked first when there are several
+// (like Orca's host picker), and the folders that already have sessions on it
+// one tap away; the project's settings (what its new sessions
 // start with), renaming and removing (the folder always stays).
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ErrorCode, type DirListResult, type MachineInfo, type Project } from "@achoo254/chat-proto/remote/remote";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
@@ -128,13 +130,68 @@ function FolderPicker({ link, value, onChange, label }: { link: ProjectLink; val
 
 type Tab = "local" | "clone" | "create";
 
-export function AddProjectDialog({ link, state, ai, initialDir = "", onClose }: { link: ProjectLink; state: LinkState; ai: string; initialDir?: string; onClose: () => void }) {
+/** A machine projects can be added on. */
+export interface ProjectHost {
+	readonly ref: string;
+	readonly name: string;
+	readonly link: ProjectLink;
+	readonly state: LinkState;
+}
+
+/** "Thêm dự án" on one of `hosts` (the picker shows only with more than one). */
+export function AddProjectOnHost({ hosts, initialRef, initialDir = "", onClose }: { hosts: readonly ProjectHost[]; initialRef?: string; initialDir?: string; onClose: () => void }) {
+	const t = useMachinesCopy();
+	const [ref, setRef] = useState(initialRef ?? hosts[0]?.ref ?? "");
+	const host = hosts.find((h) => h.ref === ref) ?? hosts[0];
+	if (host === undefined) return null;
+	const picker =
+		hosts.length > 1 ? (
+			<fieldset className="mx-ai-pick mx-host-pick" data-id="add-project-host">
+				<legend>{t.agent.projects.host}</legend>
+				{hosts.map((h) => (
+					<label key={h.ref} className={h.ref === host.ref ? "sel" : undefined}>
+						<input type="radio" name="host" checked={h.ref === host.ref} onChange={() => setRef(h.ref)} />
+						<span className={`dot ${h.state.status.kind === "open" ? "on" : "off"}`} aria-hidden="true" />
+						<b>{h.name}</b>
+					</label>
+				))}
+			</fieldset>
+		) : null;
+	return <AddProjectDialog key={host.ref} link={host.link} state={host.state} ai={providerOf(host.state.info, "claude")?.name || "AI"} initialDir={initialDir} host={picker} onClose={onClose} />;
+}
+
+export function AddProjectDialog({
+	link,
+	state,
+	ai,
+	initialDir = "",
+	host,
+	onClose,
+}: {
+	link: ProjectLink;
+	state: LinkState;
+	ai: string;
+	initialDir?: string;
+	/** The machine picker, above everything else. */
+	host?: ReactNode;
+	onClose: () => void;
+}) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const id = useDomId("add-project");
 	const tabsId = useDomId("add-project-tab");
 	const [tab, setTab] = useState<Tab>("local");
 	const [dir, setDir] = useState(initialDir);
+	const recent = state.projects?.suggestions ?? [];
+	// Choosing a folder by hand; the recent ones come first when there are any.
+	const [browsing, setBrowsing] = useState(initialDir !== "" || recent.length === 0);
+	/** A recent folder in one tap (a sensitive one asks first, like the form). */
+	const addRecent = (folderDir: string, sensitive = false) => {
+		setDir(folderDir);
+		setBusy(true);
+		setError("");
+		link.request({ case: "projectAdd", value: { dir: folderDir, name: "", consent: { sensitive, projectSettings: false } } }).then(onClose, fail);
+	};
 	const [parent, setParent] = useState("");
 	const [name, setName] = useState("");
 	const [folder, setFolder] = useState("");
@@ -197,13 +254,42 @@ export function AddProjectDialog({ link, state, ai, initialDir = "", onClose }: 
 				))}
 			</div>
 			<form className="dlg-body stack mx-add-project" role="tabpanel" aria-labelledby={`${tabsId}-${tab}`} onSubmit={(event) => submit(event)}>
+				{host}
 				{tab === "local" && (
 					<>
-						<FolderPicker link={link} value={initialDir} onChange={setDir} label={p.folder} />
-						<label className="mx-field-row">
-							<span>{p.name}</span>
-							<input className="input" value={name} maxLength={64} placeholder={p.namePlaceholder} onChange={(event) => setName(event.target.value)} />
-						</label>
+						{browsing ? (
+							<>
+								<FolderPicker link={link} value={initialDir} onChange={setDir} label={p.folder} />
+								<label className="mx-field-row">
+									<span>{p.name}</span>
+									<input className="input" value={name} maxLength={64} placeholder={p.namePlaceholder} onChange={(event) => setName(event.target.value)} />
+								</label>
+							</>
+						) : (
+							<button type="button" className="mx-pick-folder" onClick={() => setBrowsing(true)} data-id="add-project-pick">
+								<MachineIcon name="folder" />
+								{p.pickFolder}
+							</button>
+						)}
+						{recent.length > 0 && (
+							<section className="mx-recent-folders" aria-label={p.recent}>
+								<h4>{p.recent}</h4>
+								<ul>
+									{recent.map((r) => (
+										<li key={r.dir}>
+											<MachineIcon name="folder" small />
+											<span className="tx" title={r.dir}>
+												<b>{folderName(r.dir)}</b>
+												<small>{p.sessions(r.sessions)}</small>
+											</span>
+											<button type="button" className="btn btn-sm" aria-label={`${p.addRecent} ${folderName(r.dir)}`} disabled={busy} onClick={() => addRecent(r.dir)}>
+												{p.addRecent}
+											</button>
+										</li>
+									))}
+								</ul>
+							</section>
+						)}
 					</>
 				)}
 				{tab === "clone" && (
@@ -251,7 +337,7 @@ export function AddProjectDialog({ link, state, ai, initialDir = "", onClose }: 
 				{askSensitive && (
 					<div className="mx-warn" role="alert">
 						<p>{p.sensitiveAsk(dir)}</p>
-						<button type="button" className="btn btn-sm" onClick={(event) => submit(event, true)}>
+						<button type="button" className="btn btn-sm" onClick={(event) => (tab === "local" && !browsing ? addRecent(dir, true) : submit(event, true))}>
 							{p.addAnyway}
 						</button>
 					</div>
@@ -271,9 +357,11 @@ export function AddProjectDialog({ link, state, ai, initialDir = "", onClose }: 
 							{t.newSession.cancel}
 						</button>
 					)}
-					<button type="submit" className="btn btn-primary" disabled={busy || cloning || (tab === "local" ? dir === "" : tab === "create" ? folder.trim() === "" || parent === "" : url.trim() === "" || parent === "")}>
-						{tab === "local" ? p.addButton : tab === "clone" ? p.cloneButton : p.createButton}
-					</button>
+					{(tab !== "local" || browsing) && (
+						<button type="submit" className="btn btn-primary" disabled={busy || cloning || (tab === "local" ? dir === "" : tab === "create" ? folder.trim() === "" || parent === "" : url.trim() === "" || parent === "")}>
+							{tab === "local" ? p.addButton : tab === "clone" ? p.cloneButton : p.createButton}
+						</button>
+					)}
 				</div>
 			</form>
 		</Modal>

@@ -319,6 +319,7 @@ const SCREENS: Record<string, string> = {
 	"machine-sessions": paths.machine("1"),
 	// The machine's terminal: the dock with a shell on the relay (the fake machine has no direct path).
 	"machine-terminal": paths.machineTerminal("1"),
+	"machine-session-terminal": `/ai/1/s/${encodeURIComponent(DEMO_THREAD)}/terminal`,
 	"machine-info": paths.machineInfo("1"),
 	"machine-pair": paths.machinePair("2"),
 	// Pairing with the offline machine: why it is not connected and what to run on it.
@@ -477,12 +478,13 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	},
 	// "Thêm dự án": a folder on the machine.
 	"add-project": async () => {
-		await click(".mx-add-project-btn", /Thêm dự án/);
+		await click("[data-id=add-project]", /Thêm dự án/);
+		document.querySelector<HTMLElement>(".modal .mx-pick-folder")?.click();
 		await find(() => document.querySelector(".modal .mx-add-project .mx-dirs button"));
 	},
 	// "Thêm dự án", Clone từ git: a clone receiving its objects.
 	"add-project-clone": async () => {
-		await click(".mx-add-project-btn", /Thêm dự án/);
+		await click("[data-id=add-project]", /Thêm dự án/);
 		await click(".modal .mx-new-tabs button", "Clone từ git");
 		const url = await find(() => document.querySelector<HTMLInputElement>(".modal input.mono"));
 		Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(url, "https://github.com/achoo254/kb-next.git");

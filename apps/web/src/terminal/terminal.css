@@ -11,7 +11,7 @@
 .tx-tab[data-active] { background: var(--tx-bg); color: #e6e8ee; }
 .tx-tab > button[role="tab"] { display: flex; align-items: center; gap: var(--space-1); min-width: 0; min-height: 34px; padding: 0 var(--space-1) 0 var(--space-2); border: 0; background: none; color: inherit; font: inherit; font-size: 0.8125rem; cursor: pointer; }
 .tx-tab > button[role="tab"] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tx-tab-x { display: grid; place-items: center; width: 24px; height: 24px; margin-right: 2px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; cursor: pointer; opacity: 0.7; }
+.tx-tab-x { position: relative; display: grid; place-items: center; width: 24px; height: 24px; margin-right: 2px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; cursor: pointer; opacity: 0.7; }
 .tx-tab-x:hover, .tx-tab-x:focus-visible { opacity: 1; background: rgb(127 127 127 / 0.2); }
 .tx-tab:not([data-active]):hover { background: var(--c-hover); }
 .tx-actions { display: flex; align-items: center; gap: 2px; flex: none; }
@@ -42,6 +42,12 @@
 .tx-panes { position: absolute; inset: 0; }
 .tx-pane { position: absolute; box-sizing: border-box; padding: 2px; }
 .tx-pane-in { position: relative; width: 100%; height: 100%; padding: 4px 0 0 6px; box-sizing: border-box; border: 1px solid transparent; border-radius: 2px; }
+/* Every pane has its own close button: on hover or focus, always on touch. */
+.tx-pane-x { position: absolute; top: 10px; right: 10px; z-index: 10; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm); background: rgb(17 19 24 / 0.8); color: #c9ced8; cursor: pointer; opacity: 0; }
+.tx-pane-in:hover > .tx-pane-x, .tx-pane-in:focus-within > .tx-pane-x, .tx-dock.touch .tx-pane-x { opacity: 1; }
+.tx-pane-x:hover, .tx-pane-x:focus-visible { background: #2a2f3a; color: #fff; }
+/* 24px glyphs, 44px to hit. */
+.tx-tab-x::before, .tx-pane-x::before { content: ""; position: absolute; inset: -10px; }
 .tx-panes:has(.tx-pane + .tx-pane) .tx-pane-in[data-focused] { border-color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
 .tx-term { width: 100%; height: 100%; }
 .tx-term .xterm { height: 100%; }

@@ -36,7 +36,7 @@ import { AuditLog } from "./safety/audit-log.ts";
 import { DiskAccessWatch, diskAccess, diskAccessSteps, freshDiskAccess, openDiskAccessSettings } from "./safety/disk-access.ts";
 import { isCompiled, selfCommand, supervised, termHostUnit, underLaunchAgent } from "./service.ts";
 import type { TermHostUnit } from "./terminal/host-supervisor.ts";
-import { TerminalService } from "./terminal/terminal-service.ts";
+import { TerminalService, aiTerminalsOf } from "./terminal/terminal-service.ts";
 import { AgentUpdater } from "./agent-updater.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
@@ -201,6 +201,7 @@ export class Machine {
       unit: "termHostUnit" in opts ? opts.termHostUnit : termHostUnit(dir),
       // A shell runs `claude` on the machine's selected profile, as Chat's sessions do; the default one needs nothing.
       claudeConfigDir: () => this.profiles.selectedAccountDir(),
+      ai: aiTerminalsOf(this.core),
       log: this.log,
       onAvailability: () => void this.announceInfo(),
       ...(opts.env ? { env: opts.env } : {}),
@@ -471,7 +472,8 @@ export class Machine {
         name: p.name,
         version: d.version ?? "",
         loginState: d.loginState === "ok" ? LoginState.OK : d.loginState === "needs-login" ? LoginState.NEEDS_LOGIN : LoginState.UNKNOWN,
-        capabilities: p.capabilities,
+        // Devices also check MachineInfo.terminal before offering it.
+        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined },
         untestedVersion: Boolean(d.untestedVersion),
       });
     }

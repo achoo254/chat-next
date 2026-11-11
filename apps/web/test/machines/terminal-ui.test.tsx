@@ -37,7 +37,8 @@ import {
 } from "../../src/terminal/terminal-layout.ts";
 import { TerminalLink, type TerminalSink } from "../../src/terminal/terminal-link.ts";
 import { shortcutOf } from "../../src/terminal/terminal-tabs.tsx";
-import { matchRoute, paths } from "../../src/router.tsx";
+import { matchRoute, paths, type MachinesView } from "../../src/router.tsx";
+import { aiPaths } from "../../src/machines/ai-paths.ts";
 import { FakeMachines } from "../support/fake-machines.ts";
 import { routerFetch } from "../support/router-fetch.ts";
 import { defaultAnswer, FakeMachine, until } from "./fake-machine.ts";
@@ -105,7 +106,7 @@ afterEach(() => {
 const sent = (kind: string) => machine.received.filter((f) => f.body.case === kind);
 
 describe("where the terminal shows", () => {
-	function screenAt(view: { page: "terminal"; machine: string }) {
+	function screenAt(view: MachinesView) {
 		const machines = new FakeMachines();
 		machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)) });
 		const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
@@ -120,10 +121,15 @@ describe("where the terminal shows", () => {
 		);
 	}
 
-	it("has its own route under the machine", () => {
+	it("has routes for the machine's shells and for a session in its terminal", () => {
 		expect(paths.machineTerminal("4")).toBe("/ai/4/terminal");
+		expect(aiPaths.newShell("4", "/w/x y")).toBe("/ai/4/terminal?new=%2Fw%2Fx%20y");
+		expect(aiPaths.sessionTerminal("4", "t_1")).toBe("/ai/4/s/t_1/terminal");
 		expect(matchRoute("/ai/4/terminal")).toEqual({ name: "machines", view: { page: "terminal", machine: "4" } });
+		expect(matchRoute("/ai/4/s/t_1/terminal")).toEqual({ name: "machines", view: { page: "session-terminal", machine: "4", threadId: "t_1" } });
+		expect(matchRoute("/ai/4/s/t_1")).toEqual({ name: "machines", view: { page: "session", machine: "4", threadId: "t_1" } });
 		expect(matchRoute("/ai/4/terminal/x")).toBeNull();
+		expect(matchRoute("/ai/4/s/t_1/other")).toBeNull();
 	});
 
 	it("reads the machine's terminal availability", () => {
@@ -134,15 +140,23 @@ describe("where the terminal shows", () => {
 		expect(terminalGate({ terminal: TerminalAvailability.INCOMPATIBLE })).toBe("incompatible");
 	});
 
-	it("an available terminal: an entry under the machine, and the dock with a first terminal on the relay", async () => {
+	it("no Terminal entry in the column; a plain shell is a machine action under Quản lý máy", async () => {
+		screenAt({ page: "machines" });
+		const shell = await screen.findByRole("link", { name: "Terminal mới" });
+		expect(shell.getAttribute("href")).toBe("/ai/1/terminal?new=");
+		expect(screen.getByRole("link", { name: "Tổng quan máy" }).getAttribute("href")).toBe("/ai/1");
+		expect(screen.getByRole("link", { name: "Cài đặt máy" }).getAttribute("href")).toBe("/ai/1/info");
+		const column = document.querySelector<HTMLElement>(".mx-list") ?? document.body;
+		expect(within(column).queryByRole("link", { name: "Terminal" })).toBeNull();
+		expect(sent("termOpen")).toEqual([]);
+	});
+
+	it("the machine's terminal page opens a shell, on the relay, on its own connection", async () => {
 		screenAt({ page: "terminal", machine: "1" });
-		const entry = await screen.findByRole("link", { name: "Terminal" });
-		expect(entry.getAttribute("href")).toBe("/ai/1/terminal");
-		expect(entry.getAttribute("aria-current")).toBe("page");
 		await until(() => sent("termOpen").length === 1, "a first terminal");
 		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
 		await waitFor(() => expect(document.querySelector("[data-id=terminal-path]")?.textContent).toMatch(/^Qua relay/));
-		// The terminal has its own connection to the machine.
+		expect(sent("termOpen")[0]?.body.value).toMatchObject({ cwd: "" });
 		expect(machine.sockets.filter((s) => !s.closed).length).toBe(2);
 	});
 
@@ -150,17 +164,90 @@ describe("where the terminal shows", () => {
 		[TerminalAvailability.MISSING, "Máy chưa có phần terminal. Chạy tunelo update trên máy để dùng."],
 		[TerminalAvailability.INCOMPATIBLE, "Phần terminal trên máy khác phiên bản. Chạy lại tunelo install trên máy."],
 		[TerminalAvailability.UNSPECIFIED, "Cập nhật tunelo trên máy (2.4.0 trở lên) để dùng terminal."],
-	])("terminal %i: no entry and no dock, a hint instead (also in the machine's menu)", async (availability, hint) => {
+	])("terminal %i: no dock and no shell action, a hint instead", async (availability, hint) => {
 		terminal = availability;
-		screenAt({ page: "terminal", machine: "1" });
+		const view = screenAt({ page: "terminal", machine: "1" });
 		expect(await screen.findByText(hint, { selector: "p" })).toBeTruthy();
-		expect(screen.queryByRole("link", { name: "Terminal" })).toBeNull();
 		expect(document.querySelector("[data-id=terminal-dock]")).toBeNull();
-		await userEvent.click(screen.getByRole("button", { name: "Tuỳ chọn cho Mac mini" }));
-		const item = within(screen.getByRole("menu")).getByRole("menuitem", { name: /Terminal/ });
-		expect(item.hasAttribute("disabled")).toBe(true);
-		expect(item.textContent).toContain(hint);
+		view.unmount();
+		screenAt({ page: "machines" });
+		await screen.findByRole("link", { name: "Tổng quan máy" });
+		expect(screen.queryByRole("link", { name: "Terminal mới" })).toBeNull();
 		expect(sent("termOpen")).toEqual([]);
+	});
+});
+
+describe("a session in chat or in its terminal", () => {
+	const THREAD = { id: "t1", title: "Fix login", dir: "/w/app", provider: "claude", state: 1, updatedAt: 1n };
+	let held = 0;
+	let terminalCli = true;
+
+	beforeEach(() => {
+		held = 0;
+		terminalCli = true;
+		window.localStorage.clear();
+		const terminalHandler = machine.handler;
+		machine.handler = (frame, socket) => {
+			if (frame.body.case === "machineInfoRequest") {
+				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", maxSessions: 3, terminal, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: terminalCli } }] } }];
+			}
+			if (frame.body.case === "threadList") return [{ case: "threadListResult", value: { threads: [{ ...THREAD, terminalSession: held }], openSessions: 0, maxSessions: 3 } }];
+			return terminalHandler(frame, socket);
+		};
+	});
+
+	function sessionAt(view: MachinesView) {
+		const machines = new FakeMachines();
+		machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)) });
+		const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
+		return render(
+			<I18nProvider>
+				<ServicesContext value={{ ...services, transport } as unknown as Services}>
+					<MachineLinksProvider>
+						<MachinesScreen view={view} />
+					</MachineLinksProvider>
+				</ServicesContext>
+			</I18nProvider>,
+		);
+	}
+
+	it("terminal mode opens the session's AI: the page names only the thread, never a command", async () => {
+		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
+		await until(() => sent("termOpen").length === 1, "the AI's terminal");
+		const open = sent("termOpen")[0]?.body;
+		expect(open?.case === "termOpen" ? open.value.aiSession : undefined).toMatchObject({ threadId: "t1" });
+		expect(open?.case === "termOpen" ? open.value.cwd : "x").toBe("");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		const group = screen.getByRole("group", { name: "Mở phiên bằng" });
+		expect(within(group).getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe("true");
+		// The path pill sits in the session header.
+		await waitFor(() => expect(document.querySelector(".pg-head [data-id=terminal-path], header [data-id=terminal-path]")).toBeTruthy());
+		await userEvent.click(within(group).getByRole("button", { name: "Trò chuyện" }));
+		expect(window.location.pathname).toBe("/ai/1/s/t1");
+		expect(window.localStorage.getItem("ai:mode:1")).toBe("chat");
+	});
+
+	it("an AI without a terminal CLI: no switch, and the terminal address says so without opening anything", async () => {
+		terminalCli = false;
+		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
+		expect(await screen.findByText("Máy này chưa mở được phiên bằng terminal.")).toBeTruthy();
+		expect(screen.queryByRole("group", { name: "Mở phiên bằng" })).toBeNull();
+		expect(sent("termOpen")).toEqual([]);
+	});
+
+	it("while the terminal holds it, chat is read-only, points to the terminal, and can end it there", async () => {
+		held = 7;
+		sessionAt({ page: "session", machine: "1", threadId: "t1" });
+		const bar = await screen.findByText("Claude Code đang chạy phiên này trong terminal. Ở đây chỉ xem.");
+		const section = bar.closest("section");
+		expect(section).toBeTruthy();
+		expect(document.querySelector(".mx-composer.disabled")).toBeTruthy();
+		await userEvent.click(within(section as HTMLElement).getByRole("button", { name: "Kết thúc" }));
+		await until(() => sent("termClose").length === 1, "end");
+		expect(sent("termClose")[0]?.body.value).toMatchObject({ session: 7 });
+		await userEvent.click(within(section as HTMLElement).getByRole("button", { name: "Mở terminal" }));
+		expect(window.location.pathname).toBe("/ai/1/s/t1/terminal");
+		expect(window.localStorage.getItem("ai:mode:1")).toBe("terminal");
 	});
 });
 
@@ -261,6 +348,70 @@ describe("the dock", () => {
 		await dock(refusing());
 		const alert = await screen.findByRole("alert");
 		expect(alert.textContent).toMatch(/thu hồi quyền|không cho thiết bị này/);
+	});
+
+	it("every pane has its own close button; closing the last pane closes the tab and hangs up the shell", async () => {
+		const { view } = await dock(refusing());
+		await until(() => sent("termOpen").length === 1, "first terminal");
+		await userEvent.click(await screen.findByRole("button", { name: "Chia xuống dưới" }));
+		await waitFor(() => expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(2));
+		const closes = screen.getAllByRole("button", { name: "Đóng ô" });
+		expect(closes).toHaveLength(2);
+		await userEvent.click(closes[0] as HTMLElement);
+		await until(() => sent("termClose").length === 1, "first shell hung up");
+		expect(sent("termClose")[0]?.body.value).toMatchObject({ session: 1 });
+		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(1);
+		await userEvent.click(screen.getByRole("button", { name: "Đóng ô" }));
+		await until(() => sent("termClose").length === 2, "second shell hung up");
+		expect(screen.queryAllByRole("tab")).toHaveLength(0);
+	});
+
+	it("a session's dock: its AI first; shells in its folder; closing the AI's pane only detaches it", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		expect(sent("termOpen")[0]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		// No back button on a wide screen: the session header has it.
+		expect(screen.queryByRole("link", { name: "Quay lại" })).toBeNull();
+		await userEvent.click(await screen.findByRole("button", { name: "Chia sang phải" }));
+		await until(() => sent("termOpen").length === 2, "a shell");
+		expect(sent("termOpen")[1]?.body.value).toMatchObject({ cwd: "/w/app" });
+		expect(sent("termOpen")[1]?.body.value).not.toHaveProperty("aiSession.threadId", "t1");
+		await userEvent.click(screen.getByRole("button", { name: "Đóng ô (phiên vẫn chạy)" }));
+		await waitFor(() => expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(1));
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		expect(sent("termClose")).toEqual([]);
+		// Its AI is listed for coming back to (it still runs), and comes back as the same session.
+		await userEvent.click(screen.getByRole("button", { name: "Phiên đang chạy trên máy" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: /Phiên #1|Terminal/ }));
+		// A tab of its own again (every tab keeps its panes mounted).
+		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
+		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(2);
+		// Still the AI's pane: its close button detaches.
+		expect(screen.getAllByRole("button", { name: "Đóng ô (phiên vẫn chạy)" })).toHaveLength(1);
+		expect(sent("termOpen")).toHaveLength(2);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("Terminal mới in a folder: one more shell there, then the request is done", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		let done = 0;
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} back="/ai/1" openShellIn="/w/proj" onShellOpened={() => (done += 1)} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => done === 1, "shell opened");
+		expect(sent("termOpen").map((f) => f.body.value)).toEqual([expect.objectContaining({ cwd: "/w/proj" })]);
+		parts.terminal.stop();
+		parts.link.stop();
 	});
 
 	it("says when the machine has no room for another terminal", async () => {

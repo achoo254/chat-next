@@ -10,7 +10,7 @@ import { ConfigStore } from "../../src/config.ts";
 import { Connection } from "../../src/link/connection.ts";
 import type { AgentProvider } from "../../src/providers/types.ts";
 import type { TermHostUnit } from "../../src/terminal/host-supervisor.ts";
-import { TerminalService } from "../../src/terminal/terminal-service.ts";
+import { TerminalService, aiTerminalsOf } from "../../src/terminal/terminal-service.ts";
 import { fakeProvider } from "../fake-provider.ts";
 import { makeCore, tempDir } from "../harness.ts";
 
@@ -43,7 +43,7 @@ export async function terminalMachine(opts: {
   /** Grace before the terminal closes connections an earlier agent run left. */
   orphanGraceMs?: number;
 }) {
-  const { core, audit } = makeCore(opts.providers ?? [fakeProvider()]);
+  const { core, audit, work } = makeCore(opts.providers ?? [fakeProvider()]);
   const config = new ConfigStore(opts.configDir ?? join(tempDir("term-"), "cfg"));
   const machineKey = await generateKeyPair(true);
   const logs: string[] = [];
@@ -52,6 +52,7 @@ export async function terminalMachine(opts: {
     config,
     audit,
     unit: opts.unit,
+    ai: aiTerminalsOf(core),
     log: (l) => logs.push(l),
     ...(opts.env ? { env: opts.env } : {}),
     ...(opts.claudeConfigDir ? { claudeConfigDir: opts.claudeConfigDir } : {}),
@@ -155,7 +156,7 @@ export async function terminalMachine(opts: {
     return device;
   };
 
-  return { core, config, audit, terminal, machineKey, connect, pair, logs };
+  return { core, config, audit, terminal, machineKey, connect, pair, logs, work };
 }
 
 type BodyOf<C extends NonNullable<Frame["body"]["case"]>> = Extract<Frame["body"], { case: C }>["value"];

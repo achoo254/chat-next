@@ -17,6 +17,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, TerminalAvailability, type TermListResultSchema } from "@achoo254/chat-proto/remote/remote";
 import { fromBase64Url, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type ConfigStore, deviceLabel } from "../config.ts";
+import { AgentError, type AgentCore, type TerminalSpec } from "../core/agent-core.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { AGENT_VERSION } from "../version.ts";
 import { Grants, TerminalDenied } from "./grants.ts";
@@ -69,6 +70,36 @@ export class TokenBucket {
   }
 }
 
+/**
+ * The threads whose AI a device opens in the terminal (the agent core). The
+ * device names a thread only; what runs comes from `launch`. Sessions are
+ * named with the terminal process's pid, since its ids start again with a
+ * new process.
+ */
+export interface AiTerminals {
+  /** What to run for the thread's AI; throws (an AgentError) when it cannot run there now. */
+  launch(threadId: string): Promise<TerminalSpec>;
+  sessionOf(threadId: string, pid: number): number | undefined;
+  /** "" when no thread's AI runs in it. */
+  threadOf(session: number, pid: number): string;
+  started(threadId: string, session: number, pid: number): void;
+  ended(session: number, pid: number): void;
+  /** Only these sessions still run in terminal process `pid`. */
+  alive(pid: number, sessions: ReadonlySet<number>): void;
+}
+
+/** The core as the terminal sees it. */
+export function aiTerminalsOf(core: AgentCore): AiTerminals {
+  return {
+    launch: (threadId) => core.terminalLaunch(threadId),
+    sessionOf: (threadId, pid) => core.terminalSession(threadId, pid),
+    threadOf: (session, pid) => core.terminalThread(session, pid),
+    started: (threadId, session, pid) => core.terminalStarted(threadId, session, pid),
+    ended: (session, pid) => core.terminalEnded(session, pid),
+    alive: (pid, sessions) => core.terminalAlive(pid, sessions),
+  };
+}
+
 export type TerminalServiceOptions = {
   configDir: string;
   config: ConfigStore;
@@ -76,6 +107,8 @@ export type TerminalServiceOptions = {
   unit: TermHostUnit | undefined;
   /** CLAUDE_CONFIG_DIR of the machine's selected Claude profile; undefined for the default one. */
   claudeConfigDir?: () => string | undefined;
+  /** Threads whose AI opens in the terminal; without it TermOpen.ai_session is refused. */
+  ai?: AiTerminals;
   log: (line: string) => void;
   /** MachineInfo.terminal changed. */
   onAvailability?: () => void;
@@ -105,6 +138,8 @@ export class TerminalService {
   /** Connections listed by the last hello that this run does not hold; closed when the grace ends. */
   private orphans = new Set<number>();
   private orphanTimer: ReturnType<typeof setTimeout> | undefined;
+  /** A thread's AI being opened, so two devices asking at once share one terminal. */
+  private readonly aiOpening = new Map<string, Promise<number>>();
 
   constructor(private readonly opts: TerminalServiceOptions) {
     this.supervisor = new HostSupervisor({
@@ -217,6 +252,7 @@ export class TerminalService {
         exited: s.exited !== undefined,
         exitCode: s.exited?.code ?? 0,
         exitSignal: s.exited?.signal ?? 0,
+        threadId: this.opts.ai?.threadOf(s.session, this.hostPid) ?? "",
       })),
     };
   }
@@ -236,9 +272,41 @@ export class TerminalService {
     return session;
   }
 
+  /**
+   * The thread's AI in its own CLI: the session already running it, or a new
+   * one running what the core picked for the thread (a device never names a
+   * program, its arguments, folder or environment).
+   */
+  async openAi(threadId: string, cols: number, rows: number): Promise<number> {
+    const ai = this.opts.ai;
+    if (!ai) throw new TerminalError(ErrorCode.INVALID, ErrorReason.UNSUPPORTED_REQUEST, "this machine does not open an AI in the terminal");
+    const opening = this.aiOpening.get(threadId);
+    if (opening) return opening;
+    const run = (async () => {
+      await this.ensure();
+      const running = ai.sessionOf(threadId, this.hostPid);
+      if (running !== undefined) return running;
+      const { shell, args, cwd, env: vars } = await ai.launch(threadId);
+      const withVars = Object.keys(vars).length > 0 ? { env: vars } : {};
+      const r = await this.call("open", { cols, rows, shell, args, cwd, ...withVars });
+      const session = (r as { session?: unknown }).session;
+      if (typeof session !== "number") throw new Error("the terminal process did not name the session");
+      ai.started(threadId, session, this.hostPid);
+      return session;
+    })();
+    this.aiOpening.set(threadId, run);
+    try {
+      return await run;
+    } finally {
+      this.aiOpening.delete(threadId);
+    }
+  }
+
   async close(session: number): Promise<void> {
     await this.ensure();
     await this.call("close", { session });
+    // "Kết thúc" of a thread's AI: chat may write again even if no exit event comes.
+    this.opts.ai?.ended(session, this.hostPid);
   }
 
   async resize(session: number, cols: number, rows: number): Promise<void> {
@@ -307,6 +375,7 @@ export class TerminalService {
   errorBody(err: unknown): ErrorBody {
     const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
     if (err instanceof TerminalError) return { code: err.code, message, reason: err.reason, subject: err.subject };
+    if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject };
     if (err instanceof TerminalUnavailable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.TERMINAL_UNAVAILABLE, subject: "" };
     if (err instanceof TerminalDenied) return { code: ErrorCode.INVALID, message, reason: ErrorReason.ACCESS_DENIED, subject: "" };
     if (err instanceof ControlError) {
@@ -379,6 +448,7 @@ export class TerminalService {
   private onReady(hello: HelloResult): void {
     this.hostPid = hello.pid;
     this.opts.log(`terminal: connected (terminal process ${hello.daemonVersion}, ${hello.sessions.length} session(s))`);
+    this.opts.ai?.alive(hello.pid, new Set(hello.sessions.filter((s) => s.exited === undefined).map((s) => s.session)));
     this.audit(hello.pendingAudit);
   }
 
@@ -387,7 +457,9 @@ export class TerminalService {
       case "audit":
         return this.audit([e]);
       case "session_exit":
-        return; // the attached links get the Exit frame
+        // The attached links get the Exit frame; a thread's AI that exited lets chat write again.
+        this.opts.ai?.ended(e.session, this.hostPid);
+        return;
       case "signal":
       case "conn_state": {
         if (e.event === "signal" && e.kind === "end" && e.reason === "dtls_failed") {

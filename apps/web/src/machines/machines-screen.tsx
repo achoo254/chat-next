@@ -7,18 +7,19 @@
 // the same page under /ai. A machine's terminals (xterm and the dock) load
 // only when opened, and only on a machine that offers them. Loaded on demand
 // with its styles.
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Suspense, useEffect, type ReactNode } from "react";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths, usePathname, useSearch, type MachinesView } from "../router.tsx";
 import { AddMachine } from "./add-machine.tsx";
 import { terminalGate } from "./agent-version.ts";
-import { canonicalAiPath } from "./ai-paths.ts";
+import { aiPaths, canonicalAiPath } from "./ai-paths.ts";
 import { LocalMachine } from "./local-machine.tsx";
 import { MachineDetail } from "./machine-detail.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { FirstMachine } from "./first-machine.tsx";
 import { PageHead } from "./page-head.tsx";
 import { PairDevice } from "./pair-device.tsx";
+import { TerminalScreen } from "./terminal-screen.ts";
 import { HomeBoard, MachineBoard } from "./session-board.tsx";
 import { SessionChat } from "./session-chat.tsx";
 import { connDot, connText, SessionSidebar } from "./session-sidebar.tsx";
@@ -26,7 +27,6 @@ import { useHub, useHubPresence, useLink, useMachineViews, useNow } from "./use-
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import "./machines.css";
 
-const TerminalScreen = lazy(() => import("../terminal/terminal-dock.tsx"));
 
 export default function MachinesScreen({ view }: { view: MachinesView }) {
 	const hub = useHub();
@@ -68,10 +68,13 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			main = <MachineBoard key={view.machine} machine={view.machine} />;
 			break;
 		case "session":
-			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} />;
+			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} mode="chat" />;
+			break;
+		case "session-terminal":
+			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} mode="terminal" />;
 			break;
 		case "terminal":
-			main = <TerminalPage key={view.machine} machine={view.machine} />;
+			main = <TerminalPage key={view.machine} machine={view.machine} openShellIn={new URLSearchParams(search).get("new") ?? undefined} />;
 			break;
 	}
 	return (
@@ -82,8 +85,8 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 	);
 }
 
-/** The machine's terminals when it offers them; otherwise what to do on the machine first. */
-function TerminalPage({ machine }: { machine: string }) {
+/** The machine's plain shells when it offers them; otherwise what to do on the machine first. */
+function TerminalPage({ machine, openShellIn }: { machine: string; openShellIn: string | undefined }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const [, state] = useLink(hub, machine);
@@ -91,7 +94,7 @@ function TerminalPage({ machine }: { machine: string }) {
 	if (gate === "available") {
 		return (
 			<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
-				<TerminalScreen machine={machine} />
+				<TerminalScreen machine={machine} openShellIn={openShellIn} />
 			</Suspense>
 		);
 	}
@@ -108,7 +111,11 @@ function TerminalPage({ machine }: { machine: string }) {
 	);
 }
 
-/** "Máy": the user's machines with their state, each opening its details; adding one. */
+/**
+ * "Quản lý máy": the user's machines with their state, each opening its
+ * settings, with what belongs to the machine rather than a project: its
+ * overview and a plain terminal; adding one.
+ */
 function MachinesPage() {
 	const t = useMachinesCopy();
 	const hub = useHub();
@@ -135,7 +142,7 @@ function MachinesPage() {
 			<div className="mx-body">
 				{directory.status === "ready" && machines.length === 0 && <FirstMachine />}
 				<ul className="mx-machines">
-					{machines.map(({ entry, conn }) => (
+					{machines.map(({ entry, conn, state }) => (
 						<li key={entry.ref}>
 							<Link to={paths.machineInfo(entry.ref)} className="mx-row">
 								<span className="mx-ico">
@@ -153,6 +160,22 @@ function MachinesPage() {
 								</span>
 								{entry.os !== "" && <span className="meta">{t.os(entry.os, entry.arch)}</span>}
 							</Link>
+							<div className="mx-machine-acts">
+								<Link to={paths.machine(entry.ref)} className="btn btn-sm">
+									<Icon name="inbox" small />
+									{t.agent.machineBoard}
+								</Link>
+								{conn.kind === "on" && terminalGate(state.info) === "available" && (
+									<Link to={aiPaths.newShell(entry.ref, "")} className="btn btn-sm">
+										<MachineIcon name="terminal" small />
+										{t.terminal.newTab}
+									</Link>
+								)}
+								<Link to={paths.machineInfo(entry.ref)} className="btn btn-sm">
+									<Icon name="info" small />
+									{t.agent.info}
+								</Link>
+							</div>
 						</li>
 					))}
 				</ul>

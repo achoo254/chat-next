@@ -7,7 +7,9 @@
 // The thread is watched on the machine's shared link while this shows, so a
 // reconnect resubscribes from the cursor and a reset reloads the snapshot.
 // Files dragged anywhere over the session go to the composer when dropped.
-import { useCallback, useEffect, useRef, useState } from "react";
+// "Chat | Terminal" in the header opens the same session in its AI's own CLI
+// instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -45,6 +47,10 @@ import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
+import { ModeSwitch, TerminalHeldBar, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
+import { AddProject } from "./project-section.tsx";
+import { inFolder, projectsSupported } from "./projects-view.ts";
 
 export { versionAtLeast };
 
@@ -57,7 +63,7 @@ function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
 }
 
-export function SessionChat({ machine, threadId }: { machine: string; threadId: string }) {
+export function SessionChat({ machine, threadId, mode }: { machine: string; threadId: string; mode: SessionMode }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
@@ -158,6 +164,16 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 
 	const chip = !online ? "offline" : thread === null ? null : stateKey(thread);
 	const dir = thread?.dir ?? "";
+	const offered = terminalOffered(state.info, provider);
+	// The session's AI runs in the machine's terminal: only the terminal writes to it.
+	const held = thread !== null && thread.terminalSession > 0;
+	// Every session lives in a project: one opened by its address in another folder offers to add it.
+	const projects = projectsSupported(state.info?.agentVersion) ? state.projects?.projects : undefined;
+	const notInProject = thread !== null && online && projects !== undefined && !projects.some((x) => inFolder(thread.dir, x.dir));
+	// "project · branch · machine" under the title (the folder when it is in no project).
+	const project = projects?.filter((x) => inFolder(dir, x.dir)).sort((a, b) => b.dir.length - a.dir.length)[0];
+	const branch = project?.git?.git === true ? project.git.branch : "";
+	const endTerminal = held ? () => link.request({ case: "termClose", value: { session: thread.terminalSession } }).then(() => undefined) : undefined;
 	return (
 		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
 			{drop.dragging && <DropZone ai={ai} maxBytes={limits?.fileMaxBytes ?? 0} supported={limits !== null} />}
@@ -168,12 +184,24 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 				subtitle={
 					<>
 						<span className="mono" title={dir}>
-							{folderName(dir)}
+							{project?.name ?? folderName(dir)}
 						</span>
+						{branch !== "" && <span className="hide-narrow">· {branch}</span>}
 						<span className="hide-narrow">· {machineName}</span>
 					</>
 				}
 			>
+				{offered && <ModeSwitch machine={machine} threadId={threadId} mode={mode} />}
+				{mode === "terminal" && offered && (
+					<Suspense fallback={null}>
+						<TerminalPill machine={machine} />
+					</Suspense>
+				)}
+				{mode === "terminal" && endTerminal !== undefined && (
+					<button type="button" className="btn btn-sm" title={t.terminal.endHint} onClick={() => void endTerminal().catch(() => undefined)} data-id="session-terminal-end-btn">
+						{t.terminal.end}
+					</button>
+				)}
 				{chip !== null && (
 					<span className={`chip mx-chip ${chip}`} role="status" aria-label={t.chat.chip[chip]} title={t.chat.chip[chip]}>
 						<span className="hide-narrow" aria-hidden="true">
@@ -181,7 +209,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 						</span>
 					</span>
 				)}
-				{thread !== null && (
+				{thread !== null && mode === "chat" && (
 					<button
 						type="button"
 						className="btn btn-sm mx-changes-btn"
@@ -199,10 +227,31 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 					machineName={machineName}
 					dir={dir}
 					{...(thread !== null && online && threadActionsSupported(state.info) ? { manage: { link, thread, ai } } : {})}
+					{...(endTerminal !== undefined && online ? { endTerminal } : {})}
 				/>
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
+			{notInProject && (
+				<div className="mx-strip" role="note" data-id="session-not-in-project">
+					<MachineIcon name="folder" small />
+					<span className="grow">{t.agent.projects.notInProject(folderName(dir))}</span>
+					<AddProject hosts={[{ ref: machine, name: machineName, link, state }]} initialDir={dir} />
+				</div>
+			)}
 			<DiskAccessBanner link={link} info={state.info} online={online} />
+			{mode === "terminal" ? (
+				<div className="mx-chat-body">
+					{offered && thread !== null ? (
+						<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
+							<TerminalScreen machine={machine} thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId) }} />
+						</Suspense>
+					) : (
+						<p className="note mx-group-note" role="status">
+							{state.info === null || thread === null ? t.terminal.loading : t.terminal.offerFailed}
+						</p>
+					)}
+				</div>
+			) : (
 			<div className="mx-chat-body">
 				<div className="mx-chat-main">
 					{missing ? (
@@ -263,10 +312,11 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							}
 						/>
 					)}
+					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} />}
 					<Composer
 						ai={ai}
 						machine={machineName}
-						online={online && !missing}
+						online={online && !missing && !held}
 						running={running}
 						prompting={prompts.length > 0 || outside > 0}
 						commands={threadInfo?.commands ?? []}
@@ -298,6 +348,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 					/>
 				)}
 			</div>
+			)}
 		</div>
 	);
 }
@@ -345,11 +396,14 @@ function HeadMenu({
 	machineName,
 	dir,
 	manage,
+	endTerminal,
 }: {
 	machine: string;
 	machineName: string;
 	dir: string;
 	manage?: { link: MachineLink; thread: ThreadSummary; ai: string };
+	/** The session's AI runs in the terminal: "Kết thúc" stops it there. */
+	endTerminal?: () => Promise<void>;
 }) {
 	const t = useMachinesCopy();
 	const { open, setOpen, ref } = usePopover();
@@ -364,6 +418,25 @@ function HeadMenu({
 					{manage !== undefined && (
 						<>
 							<ThreadMenuItems link={manage.link} thread={manage.thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
+							<hr />
+						</>
+					)}
+					{endTerminal !== undefined && (
+						<>
+							<button
+								type="button"
+								role="menuitem"
+								className="danger"
+								title={t.terminal.endHint}
+								onClick={() => {
+									setOpen(false);
+									endTerminal().catch(() => undefined);
+								}}
+								data-id="session-terminal-end"
+							>
+								<MachineIcon name="terminal" small />
+								<span>{t.terminal.endHint}</span>
+							</button>
 							<hr />
 						</>
 					)}

@@ -27,27 +27,29 @@
 .mx .dot.warn { background: var(--c-error); }
 .mx .dot.pair { background: var(--c-primary); }
 
-/* The AI Agent column: the "Cần bạn" entry and the filters, then a group per machine. */
+/* The AI Agent column: one toggle for what needs the user or runs, then every project of every machine. */
 .mx-nav-top { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-2) 0; border-bottom: 1px solid var(--c-border-subtle); }
-.mx-inbox { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; padding: 0 var(--space-3); border-radius: var(--radius-sm); color: inherit; text-decoration: none; font-weight: 600; }
-.mx-inbox:hover { background: var(--c-hover); }
-.mx-inbox[aria-current="page"] { background: var(--c-selected); }
-.mx-inbox .grow { flex: 1; }
-.mx-inbox .badge { min-width: 20px; height: 20px; padding: 0 6px; font-size: 0.75rem; }
-.mx-nav-top .mx-filters { padding: 0 var(--space-1); border-bottom: 0; }
 .mx-groups { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-4); }
 .mx-groups > .empty { padding: var(--space-6) var(--space-4); }
-.mx-group { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-2) var(--space-1); }
-.mx-group + .mx-group { border-top: 1px solid var(--c-border-subtle); }
+.mx-group { display: grid; gap: var(--space-1); padding: 0 var(--space-2); }
+.mx-groups { padding-top: var(--space-2); }
+.mx-attn { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 var(--space-3); margin-bottom: var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.mx-attn[aria-pressed="true"] { background: var(--c-selected); border-color: var(--c-primary); }
+.mx-attn .grow, .mx-host-note .grow { flex: 1; min-width: 0; }
+.mx-host-note { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); font-size: 0.8125rem; }
+.mx-host-note .dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); }
+.mx-host-note small { display: block; color: var(--c-text-muted); font-size: 0.75rem; }
+.mx-host { flex: none; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.6875rem; font-weight: 400; color: var(--c-text-muted); }
+.mx-project-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mx-project-title .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
+.mx-run-dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-success); }
+.mx-project[data-offline] .mx-project-name { opacity: 0.6; }
+.mx-archived-link { display: block; margin: var(--space-2) var(--space-3) 0; padding: 0; border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; text-decoration: underline; cursor: pointer; }
+.mx-mode { display: inline-flex; flex: none; box-sizing: border-box; height: 40px; padding: 2px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); }
+.mx-mode button { height: 100%; padding: 0 var(--space-2); border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.mx-mode button[aria-pressed="true"] { background: var(--c-selected); color: var(--c-text); font-weight: 600; }
 .mx-fold { flex: none; }
 .mx-project-head > .mx-fold { margin-left: calc(-1 * var(--space-1)); }
-.mx-group-head { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
-.mx-group-name { flex: 1; display: grid; grid-template-columns: 8px minmax(0, 1fr); align-items: center; column-gap: var(--space-2); min-width: 0; min-height: 44px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); color: inherit; text-decoration: none; }
-.mx-group-name:hover { background: var(--c-hover); }
-.mx-group-name[aria-current="page"] { background: var(--c-selected); }
-.mx-group-name .dot { width: 8px; height: 8px; border-radius: var(--radius-full); }
-.mx-group-name b { font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mx-group-name small { grid-column: 2; font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-group-note { display: grid; gap: var(--space-2); justify-items: start; margin: 0 var(--space-2) var(--space-2); font-size: 0.8125rem; }
 .mx-group-note p { margin: 0; color: var(--c-text-muted); }
 p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 8px + var(--space-2)); }
@@ -58,7 +60,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-srow:hover, .mx-srow-wrap:hover .mx-srow:not([aria-current="page"]) { background: var(--c-hover); }
 .mx-srow.disabled { cursor: not-allowed; opacity: 0.55; }
 .mx-srow.disabled:hover { background: none; }
-/* Projects: a head row (name, git, +, menu) over its sessions; "Khác" for the rest. */
+/* Projects: a head row (name, machine, badge, git, +, menu) over its sessions. */
 .mx-project { margin-top: var(--space-1); }
 .mx-project-head { position: relative; display: flex; align-items: center; gap: 2px; padding: 0 var(--space-1) 0 var(--space-2); }
 .mx-project-name { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: var(--space-2); flex: 1; min-width: 0; padding: var(--space-1) 0; }
@@ -68,15 +70,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-project[data-missing] .mx-project-name small { color: var(--c-error-text); }
 .mx-project-head > .mx-menu { top: 100%; }
 .mx-project .mx-rows { padding-left: var(--space-3); }
-.mx-other-head { margin: var(--space-2) 0 0; padding: 0 var(--space-3); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
 .mx-group > * { min-width: 0; }
-.mx-suggest-projects { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border: 1px dashed var(--c-border); border-radius: var(--radius-md); }
-.mx-suggest-projects .head { display: flex; align-items: center; justify-content: space-between; }
-.mx-suggest-projects p { margin: 0 0 var(--space-1); font-size: 0.8125rem; }
-.mx-suggest-projects ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.mx-suggest-projects li { display: flex; align-items: center; gap: var(--space-2); }
-.mx-suggest-projects li > span { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
-.mx-suggest-projects li small { color: var(--c-text-muted); font-size: 0.75rem; }
 .mx-add-project .mx-dirs { border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); }
 .mx-clone { display: grid; gap: var(--space-1); position: relative; padding-bottom: var(--space-1); font-size: 0.8125rem; }
 .mx-clone .mx-tray-bar { position: static; display: block; }
@@ -124,10 +118,6 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-recent-row.disabled .go { color: var(--c-text-muted); }
 .mx-tile-title { flex: 1; min-width: 0; color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-tile-title:hover { text-decoration: underline; }
-.mx-st { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
-.mx-st.waiting { background: color-mix(in srgb, var(--c-warning) 14%, var(--c-surface)); color: var(--c-warning); }
-.mx-st.running, .mx-st.queued, .mx-st.elsewhere { color: var(--c-primary); }
-.mx-st.error { color: var(--c-error); }
 .mx-pad { padding: var(--space-3) var(--space-4); }
 
 .mx-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--c-bg); container-type: inline-size; }
@@ -693,3 +683,22 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-pair-offline > p { margin: 0; }
 .mx-update { display: grid; gap: var(--space-2); margin-top: var(--space-2); min-width: 0; justify-items: start; }
 .mx-update progress { width: min(16rem, 100%); }
+
+/* Session rows: a dot only when it needs the user (amber) or runs (accent); the state and time below the title. */
+.mx-srow.slim { grid-template-columns: 8px minmax(0, 1fr); min-height: 48px; }
+.mx-sdot { width: 8px; height: 8px; border-radius: var(--radius-full); }
+.mx-sdot.need { background: var(--c-warning); }
+.mx-sdot.run { background: var(--c-primary); }
+/* Thêm dự án: the machine, then a folder by hand or one of the recent ones. */
+.mx-host-pick .dot { width: 8px; height: 8px; border-radius: var(--radius-full); }
+.mx-host-pick .dot.on { background: var(--c-success); }
+.mx-host-pick .dot.off { background: var(--c-border-strong); }
+.mx-pick-folder { display: flex; align-items: center; justify-content: center; gap: var(--space-2); width: 100%; min-height: 64px; border: 1.5px dashed var(--c-border); border-radius: var(--radius-md); background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.mx-pick-folder:hover { background: var(--c-hover); }
+.mx-recent-folders h4 { margin: 0 0 var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+.mx-recent-folders ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.mx-recent-folders li { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; }
+.mx-recent-folders .tx { display: grid; flex: 1; min-width: 0; }
+.mx-recent-folders b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
+.mx-recent-folders small { color: var(--c-text-muted); font-size: 0.75rem; }
+.mx-machine-acts { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: 0 var(--space-3) var(--space-2) calc(var(--space-3) + 40px); }

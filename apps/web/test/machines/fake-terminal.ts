@@ -233,6 +233,8 @@ const FINGERPRINT_SDP = "v=0\r\na=fingerprint:sha-256 AB:CD:EF:01:23:45:67:89\r\
 
 export class FakeTerminalHost {
 	readonly sessions = new Map<number, Session>();
+	/** Sessions running a thread's AI (TermOpen.ai_session), by session. */
+	readonly aiThreads = new Map<number, string>();
 	readonly keystrokes: KeystrokeRecord[] = [];
 	readonly acks: { session: number; offset: number; path: "direct" | "relay" }[] = [];
 	readonly resizes: { session: number; cols: number; rows: number }[] = [];
@@ -278,14 +280,20 @@ export class FakeTerminalHost {
 								exited: s.exited !== null,
 								exitCode: s.exited?.code ?? 0,
 								exitSignal: s.exited?.signal ?? 0,
+								threadId: this.aiThreads.get(s.id) ?? "",
 							})),
 							maxSessions: this.maxSessions,
 						},
 					},
 				];
 			case "termOpen": {
+				// A thread's AI already running in a terminal: that session again, as the agent does.
+				const threadId = b.value.aiSession?.threadId ?? "";
+				const running = [...this.aiThreads].find(([, t]) => t === threadId)?.[0];
+				if (threadId !== "" && running !== undefined && this.sessions.has(running)) return [{ case: "termOpened", value: { session: running } }];
 				if (this.sessions.size >= this.maxSessions) return [{ case: "error", value: { code: ErrorCode.INVALID, message: "limit", reason: ErrorReason.TERMINAL_SESSION_LIMIT } }];
 				const session = this.open(b.value.cols, b.value.rows);
+				if (threadId !== "") this.aiThreads.set(session, threadId);
 				return [{ case: "termOpened", value: { session } }];
 			}
 			case "termClose":

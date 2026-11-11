@@ -430,7 +430,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							terminal: TerminalAvailability.AVAILABLE,
 							maxSessions: 3,
 							openSessions: 1,
-							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
+							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, terminal: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
 							attachments: { fileMaxBytes: 25n * 1024n * 1024n, messageMaxBytes: 50n * 1024n * 1024n, messageMaxFiles: 10, imageMaxBytes: 3_932_160n, pieceMaxBytes: 64 * 1024 },
 							devices: [
 								{ publicKey: device.publicKey, name: "Chrome · Windows", addedAt: BigInt(now - 3 * 86_400_000) },
