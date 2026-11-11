@@ -143,7 +143,7 @@ export async function checkForUpdate(): Promise<string | null> {
 }
 
 /** Returns the installed version, or null when already up to date. */
-export async function update(log: (l: string) => void, onProgress?: DownloadProgress): Promise<string | null> {
+export async function update(log: (l: string) => void, onProgress?: DownloadProgress, onPhase?: (phase: "verifying" | "installing") => void): Promise<string | null> {
   const found = await findUpdate();
   if (!found) return null;
   const { release, version: latest } = found;
@@ -153,11 +153,13 @@ export async function update(log: (l: string) => void, onProgress?: DownloadProg
   if (!file || !sigFile) throw new Error(`tunelo ${latest} has no ${asset} for this computer`);
   log(`downloading tunelo ${latest}…`);
   const [bin, sig] = await Promise.all([fetchBytes(file, onProgress), fetchBytes(sigFile)]);
+  onPhase?.("verifying");
   const sigText = new TextDecoder().decode(sig);
   if (!verifyMinisign(bin, sigText)) throw new Error("signature check failed; the download was not installed");
   // The signed comment names the file and version, so an older signed build
   // cannot be served in place of this one.
   if (trustedComment(sigText) !== signedComment(latest, asset)) throw new Error("the signature is for another file or version; not installed");
+  onPhase?.("installing");
   const exe = process.execPath;
   const next = `${exe}.new`;
   const old = `${exe}.old`;

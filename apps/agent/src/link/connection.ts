@@ -24,6 +24,7 @@ import {
   pakeReply,
 } from "@achoo254/chat-remote-protocol";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
+import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import { type ClaudeProfiles, type ProfileErrorKind, type ProfileList, ProfileError } from "../profiles/service.ts";
@@ -80,6 +81,8 @@ export type LinkContext = {
   screenShare?: ScreenShare;
   /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
   openDiskAccessSettings?: () => boolean;
+  /** Updates tunelo for a device; absent where the machine has none (tests). */
+  updater?: AgentUpdater;
 };
 
 const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
@@ -106,6 +109,8 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   if (err instanceof BrowserUnavailable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.BROWSER_UNAVAILABLE, subject: "" };
   if (err instanceof ScreenSharingOff) return { code: ErrorCode.INVALID, message, reason: ErrorReason.SCREEN_SHARING_OFF, subject: "" };
   if (err instanceof ScreenShareBusy) return { code: ErrorCode.INVALID, message, reason: ErrorReason.SCREEN_SHARE_BUSY, subject: "" };
+  if (err instanceof UpdateUnavailable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UPDATE_UNAVAILABLE, subject: "" };
+  if (err instanceof UpdateBusy) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UPDATE_BUSY, subject: "" };
   if (err instanceof ScreenShareGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SCREEN_SHARE_GONE, subject: "" };
   if (err instanceof InputError || err instanceof BrowserToolError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
   if (isFsError(err)) {
@@ -658,6 +663,19 @@ export class Connection {
           const { threadId, prefix, limit } = b.value;
           const listing = listSessionFiles(core.threadDir(threadId), prefix, { limit, isSensitive: this.ctx.isSensitive });
           return this.send(id, { case: "fileListResult", value: { threadId, ...listing } });
+        }
+        case "agentUpdateCheck": {
+          if (!this.ctx.updater) return this.send(id, { case: "error", value: refusal("this machine cannot update itself", ErrorReason.UNSUPPORTED_REQUEST) });
+          await this.ctx.updater.check();
+          return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
+        }
+        case "agentUpdateStart": {
+          const updater = this.ctx.updater;
+          if (!updater) return this.send(id, { case: "error", value: refusal("this machine cannot update itself", ErrorReason.UNSUPPORTED_REQUEST) });
+          updater.assertCanRun();
+          this.ctx.audit.write({ device: this.device, action: "agent_update", path: "", detail: updater.info().latestVersion });
+          void updater.run();
+          return ack();
         }
         case "totpSet":
           return this.totpSet(id, b.value.secret);

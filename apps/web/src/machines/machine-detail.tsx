@@ -26,6 +26,7 @@ import { TotpSetting } from "./totp-setup.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
 import { PageHead } from "./page-head.tsx";
+import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
 import { aiName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
@@ -220,6 +221,11 @@ export function MachineDetail({ machine }: { machine: string }) {
 							tunelo {state.info?.agentVersion || entry.agentVersion || "—"}{" "}
 							{!entry.claimed && <span className="chip mx-chip warn">{t.status.needsLogin}</span>}
 						</dd>
+						{online && state.info !== null && (
+							<dd>
+								<AgentUpdateSetting link={link} info={state.info} progress={state.agentUpdate} online={online} />
+							</dd>
+						)}
 						{!entry.claimed && (
 							<dd className="note" role="note">
 								{t.status.needsLoginHint}

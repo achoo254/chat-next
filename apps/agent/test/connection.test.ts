@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type MessageInitShape, create, toBinary } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, type Frame, FrameSchema, HandshakeErrorCode, ThreadState } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, type Frame, FrameSchema, HandshakeErrorCode, MachineInfoSchema, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import {
   HandshakeFailure,
   type KeyPair,
@@ -30,7 +30,8 @@ import {
 } from "@achoo254/chat-remote-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigStore } from "../src/config.ts";
-import { Connection } from "../src/link/connection.ts";
+import { AgentUpdater } from "../src/agent-updater.ts";
+import { Connection, type LinkContext } from "../src/link/connection.ts";
 import { LocalSessions } from "../src/providers/claude/local-sessions.ts";
 import type { AgentProvider } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
@@ -39,7 +40,7 @@ import { makeCore, tempDir } from "./harness.ts";
 
 process.env.TUNELO_KEYSTORE = "file";
 
-async function machine(providers: AgentProvider[] = [fakeProvider()]) {
+async function machine(providers: AgentProvider[] = [fakeProvider()], extra: Partial<LinkContext> = {}) {
   const { core, audit, work, home } = makeCore(providers);
   const config = new ConfigStore(join(tempDir(), "cfg"));
   const key = await generateKeyPair(true);
@@ -74,6 +75,7 @@ async function machine(providers: AgentProvider[] = [fakeProvider()]) {
         onPing: () => undefined,
         onPaired: (via) => paired.push(via),
         onTotpSet: () => (totpSets += 1),
+        ...extra,
       },
     );
     const next = async (): Promise<Uint8Array | null> => {
@@ -489,5 +491,38 @@ describe("pairing by the authenticator code", () => {
     expect(m.config.totpSecret()).toEqual(secret);
     expect(m.audit.list().some((e) => e.action === "totp_set")).toBe(false);
     expect(m.totpSets()).toBe(0);
+  });
+
+  it("a paired device updates tunelo: Ack at once, a line in the consent log, an error where it cannot", async () => {
+    let started = 0;
+    const updater = new AgentUpdater({
+      supported: () => true,
+      announce: () => undefined,
+      emit: () => undefined,
+      restart: () => undefined,
+      log: () => undefined,
+      check: () => Promise.resolve("9.9.9"),
+      install: () => {
+        started += 1;
+        return Promise.resolve(null);
+      },
+    });
+    const m = await machine([fakeProvider()], { updater, machineInfo: async () => create(MachineInfoSchema, { agentUpdate: updater.info() }) });
+    cores.push(m.core);
+    const phone = await generateKeyPair();
+    m.config.addDevice(phone.publicKey, "phone");
+    const l = await link(m, phone);
+
+    expect(await l.request("1", { case: "agentUpdateCheck", value: {} })).toMatchObject({ case: "machineInfo", value: { agentUpdate: { latestVersion: "9.9.9" } } });
+    expect((await l.request("2", { case: "agentUpdateStart", value: {} }))?.case).toBe("ack");
+    expect(started).toBe(1);
+    expect(m.audit.list().some((e) => e.action === "agent_update" && e.detail === "9.9.9")).toBe(true);
+
+    const none = await machine([fakeProvider()], { updater: new AgentUpdater({ supported: () => false, announce: () => undefined, emit: () => undefined, restart: () => undefined, log: () => undefined }) });
+    cores.push(none.core);
+    none.config.addDevice(phone.publicKey, "phone");
+    const l2 = await link(none, phone);
+    const refused = await l2.request("1", { case: "agentUpdateStart", value: {} });
+    expect(refused?.case === "error" && refused.value.reason).toBe(ErrorReason.UPDATE_UNAVAILABLE);
   });
 });

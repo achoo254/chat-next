@@ -116,6 +116,10 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.screenShareGone;
 		case ErrorReason.TOTP_SECRET_INVALID:
 			return r.totpSecretInvalid;
+		case ErrorReason.UPDATE_UNAVAILABLE:
+			return r.updateUnavailable;
+		case ErrorReason.UPDATE_BUSY:
+			return r.updateBusy;
 		default:
 			return undefined;
 	}

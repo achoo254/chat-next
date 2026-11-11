@@ -686,3 +686,5 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-pair-offline { display: grid; gap: var(--space-2); }
 .mx-pair-offline h4 { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
 .mx-pair-offline > p { margin: 0; }
+.mx-update { display: grid; gap: var(--space-2); min-width: 0; justify-items: start; }
+.mx-update progress { width: min(16rem, 100%); }

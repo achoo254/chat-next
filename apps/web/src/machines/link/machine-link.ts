@@ -27,6 +27,7 @@ import {
 	type MachineInfo,
 	type MachineProfile,
 	type PasskeyNotice,
+	type AgentUpdateProgress,
 	type ProjectCloneProgress,
 	type ProjectListResult,
 	type SecretPrompt,
@@ -88,6 +89,8 @@ export interface LinkState {
 	readonly projects: ProjectListResult | null;
 	/** Clones this device started, by clone id, as their progress last said. */
 	readonly clones: ReadonlyMap<string, ProjectCloneProgress>;
+	/** The newest step of an update of tunelo the machine reported (tunelo 2.3.0+); null before any. */
+	readonly agentUpdate: AgentUpdateProgress | null;
 	/**
 	 * Sign-in secrets the AI waits for (tunelo 2.0.8+), by request id. They are
 	 * no thread items: never in a journal, and dropped when answered anywhere.
@@ -185,6 +188,7 @@ const INITIAL: LinkState = {
 	machineProfile: null,
 	projects: null,
 	clones: new Map(),
+	agentUpdate: null,
 	secretPrompts: new Map(),
 	gitChanges: new Map(),
 	takeovers: new Map(),
@@ -576,6 +580,9 @@ export class MachineLink {
 				this.set({ clones });
 				break;
 			}
+			case "agentUpdateProgress":
+				this.set({ agentUpdate: b.value });
+				break;
 			case "threadDeleted":
 				this.dropThread(b.value.threadId);
 				break;

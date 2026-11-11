@@ -257,6 +257,11 @@ const (
 	ErrorReason_ERROR_REASON_SCREEN_SHARE_GONE ErrorReason = 51
 	// TotpSet with a secret that is not 20 bytes.
 	ErrorReason_ERROR_REASON_TOTP_SECRET_INVALID ErrorReason = 52
+	// AgentUpdateStart on a machine that cannot replace its own file (tunelo
+	// run from source, or not installed as the single binary).
+	ErrorReason_ERROR_REASON_UPDATE_UNAVAILABLE ErrorReason = 53
+	// AgentUpdateStart while an update is already running.
+	ErrorReason_ERROR_REASON_UPDATE_BUSY ErrorReason = 54
 )
 
 // Enum value maps for ErrorReason.
@@ -315,6 +320,8 @@ var (
 		50: "ERROR_REASON_SCREEN_SHARE_BUSY",
 		51: "ERROR_REASON_SCREEN_SHARE_GONE",
 		52: "ERROR_REASON_TOTP_SECRET_INVALID",
+		53: "ERROR_REASON_UPDATE_UNAVAILABLE",
+		54: "ERROR_REASON_UPDATE_BUSY",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                 0,
@@ -370,6 +377,8 @@ var (
 		"ERROR_REASON_SCREEN_SHARE_BUSY":           50,
 		"ERROR_REASON_SCREEN_SHARE_GONE":           51,
 		"ERROR_REASON_TOTP_SECRET_INVALID":         52,
+		"ERROR_REASON_UPDATE_UNAVAILABLE":          53,
+		"ERROR_REASON_UPDATE_BUSY":                 54,
 	}
 )
 
@@ -1099,6 +1108,70 @@ func (ScreenShareEnd) EnumDescriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{14}
 }
 
+type AgentUpdatePhase int32
+
+const (
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_UNSPECIFIED AgentUpdatePhase = 0
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_DOWNLOADING AgentUpdatePhase = 1
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_VERIFYING   AgentUpdatePhase = 2
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_INSTALLING  AgentUpdatePhase = 3
+	// The new file is in place and B is restarting; the connection ends here.
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_RESTARTING AgentUpdatePhase = 4
+	// Nothing was installed: message says why, in English.
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_FAILED AgentUpdatePhase = 5
+	// Already the newest; nothing to do.
+	AgentUpdatePhase_AGENT_UPDATE_PHASE_UP_TO_DATE AgentUpdatePhase = 6
+)
+
+// Enum value maps for AgentUpdatePhase.
+var (
+	AgentUpdatePhase_name = map[int32]string{
+		0: "AGENT_UPDATE_PHASE_UNSPECIFIED",
+		1: "AGENT_UPDATE_PHASE_DOWNLOADING",
+		2: "AGENT_UPDATE_PHASE_VERIFYING",
+		3: "AGENT_UPDATE_PHASE_INSTALLING",
+		4: "AGENT_UPDATE_PHASE_RESTARTING",
+		5: "AGENT_UPDATE_PHASE_FAILED",
+		6: "AGENT_UPDATE_PHASE_UP_TO_DATE",
+	}
+	AgentUpdatePhase_value = map[string]int32{
+		"AGENT_UPDATE_PHASE_UNSPECIFIED": 0,
+		"AGENT_UPDATE_PHASE_DOWNLOADING": 1,
+		"AGENT_UPDATE_PHASE_VERIFYING":   2,
+		"AGENT_UPDATE_PHASE_INSTALLING":  3,
+		"AGENT_UPDATE_PHASE_RESTARTING":  4,
+		"AGENT_UPDATE_PHASE_FAILED":      5,
+		"AGENT_UPDATE_PHASE_UP_TO_DATE":  6,
+	}
+)
+
+func (x AgentUpdatePhase) Enum() *AgentUpdatePhase {
+	p := new(AgentUpdatePhase)
+	*p = x
+	return p
+}
+
+func (x AgentUpdatePhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AgentUpdatePhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[15].Descriptor()
+}
+
+func (AgentUpdatePhase) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[15]
+}
+
+func (x AgentUpdatePhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AgentUpdatePhase.Descriptor instead.
+func (AgentUpdatePhase) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{15}
+}
+
 type Plain struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Body:
@@ -1808,6 +1881,8 @@ type Frame struct {
 	//	*Frame_BrowserClear
 	//	*Frame_TotpSet
 	//	*Frame_TotpStatusRequest
+	//	*Frame_AgentUpdateCheck
+	//	*Frame_AgentUpdateStart
 	//	*Frame_SecretPrompt
 	//	*Frame_SecretPromptEnded
 	//	*Frame_SecretListResult
@@ -1822,6 +1897,7 @@ type Frame struct {
 	//	*Frame_ScreenShareOpened
 	//	*Frame_ScreenShareClosed
 	//	*Frame_TotpStatus
+	//	*Frame_AgentUpdateProgress
 	Body          isFrame_Body `protobuf_oneof:"body"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2600,6 +2676,24 @@ func (x *Frame) GetTotpStatusRequest() *TotpStatusRequest {
 	return nil
 }
 
+func (x *Frame) GetAgentUpdateCheck() *AgentUpdateCheck {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AgentUpdateCheck); ok {
+			return x.AgentUpdateCheck
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAgentUpdateStart() *AgentUpdateStart {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AgentUpdateStart); ok {
+			return x.AgentUpdateStart
+		}
+	}
+	return nil
+}
+
 func (x *Frame) GetSecretPrompt() *SecretPrompt {
 	if x != nil {
 		if x, ok := x.Body.(*Frame_SecretPrompt); ok {
@@ -2721,6 +2815,15 @@ func (x *Frame) GetTotpStatus() *TotpStatus {
 	if x != nil {
 		if x, ok := x.Body.(*Frame_TotpStatus); ok {
 			return x.TotpStatus
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAgentUpdateProgress() *AgentUpdateProgress {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AgentUpdateProgress); ok {
+			return x.AgentUpdateProgress
 		}
 	}
 	return nil
@@ -3062,6 +3165,15 @@ type Frame_TotpStatusRequest struct {
 	TotpStatusRequest *TotpStatusRequest `protobuf:"bytes,103,opt,name=totp_status_request,json=totpStatusRequest,proto3,oneof"`
 }
 
+type Frame_AgentUpdateCheck struct {
+	// Updating tunelo itself (tunelo 2.3.0+); see "updating tunelo" below.
+	AgentUpdateCheck *AgentUpdateCheck `protobuf:"bytes,105,opt,name=agent_update_check,json=agentUpdateCheck,proto3,oneof"`
+}
+
+type Frame_AgentUpdateStart struct {
+	AgentUpdateStart *AgentUpdateStart `protobuf:"bytes,106,opt,name=agent_update_start,json=agentUpdateStart,proto3,oneof"`
+}
+
 type Frame_SecretPrompt struct {
 	// B → A, continued
 	SecretPrompt *SecretPrompt `protobuf:"bytes,63,opt,name=secret_prompt,json=secretPrompt,proto3,oneof"`
@@ -3119,6 +3231,10 @@ type Frame_ScreenShareClosed struct {
 
 type Frame_TotpStatus struct {
 	TotpStatus *TotpStatus `protobuf:"bytes,104,opt,name=totp_status,json=totpStatus,proto3,oneof"`
+}
+
+type Frame_AgentUpdateProgress struct {
+	AgentUpdateProgress *AgentUpdateProgress `protobuf:"bytes,107,opt,name=agent_update_progress,json=agentUpdateProgress,proto3,oneof"`
 }
 
 func (*Frame_ThreadList) isFrame_Body() {}
@@ -3283,6 +3399,10 @@ func (*Frame_TotpSet) isFrame_Body() {}
 
 func (*Frame_TotpStatusRequest) isFrame_Body() {}
 
+func (*Frame_AgentUpdateCheck) isFrame_Body() {}
+
+func (*Frame_AgentUpdateStart) isFrame_Body() {}
+
 func (*Frame_SecretPrompt) isFrame_Body() {}
 
 func (*Frame_SecretPromptEnded) isFrame_Body() {}
@@ -3310,6 +3430,8 @@ func (*Frame_ScreenShareOpened) isFrame_Body() {}
 func (*Frame_ScreenShareClosed) isFrame_Body() {}
 
 func (*Frame_TotpStatus) isFrame_Body() {}
+
+func (*Frame_AgentUpdateProgress) isFrame_Body() {}
 
 type ThreadList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -10311,7 +10433,9 @@ type MachineInfo struct {
 	ScreenShare bool `protobuf:"varint,20,opt,name=screen_share,json=screenShare,proto3" json:"screen_share,omitempty"`
 	// The machine has an authenticator secret: new devices can pair with its
 	// code (see TotpSet).
-	TotpEnabled   bool `protobuf:"varint,21,opt,name=totp_enabled,json=totpEnabled,proto3" json:"totp_enabled,omitempty"`
+	TotpEnabled bool `protobuf:"varint,21,opt,name=totp_enabled,json=totpEnabled,proto3" json:"totp_enabled,omitempty"`
+	// Unset before tunelo 2.3.0.
+	AgentUpdate   *AgentUpdateInfo `protobuf:"bytes,22,opt,name=agent_update,json=agentUpdate,proto3" json:"agent_update,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10491,6 +10615,13 @@ func (x *MachineInfo) GetTotpEnabled() bool {
 		return x.TotpEnabled
 	}
 	return false
+}
+
+func (x *MachineInfo) GetAgentUpdate() *AgentUpdateInfo {
+	if x != nil {
+		return x.AgentUpdate
+	}
+	return nil
 }
 
 type RemoteBrowserInfo struct {
@@ -13146,6 +13277,226 @@ func (x *TotpStatus) GetEnabled() bool {
 	return false
 }
 
+type AgentUpdateInfo struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// B can replace its own file; false when tunelo runs from source.
+	Supported bool `protobuf:"varint,1,opt,name=supported,proto3" json:"supported,omitempty"`
+	// The newest release when it is newer than this tunelo; empty when this is
+	// the newest or B could not reach the release list.
+	LatestVersion string `protobuf:"bytes,2,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
+	// An update is running now (progress follows as AgentUpdateProgress).
+	Updating      bool `protobuf:"varint,3,opt,name=updating,proto3" json:"updating,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentUpdateInfo) Reset() {
+	*x = AgentUpdateInfo{}
+	mi := &file_remote_v1_remote_proto_msgTypes[157]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentUpdateInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentUpdateInfo) ProtoMessage() {}
+
+func (x *AgentUpdateInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[157]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentUpdateInfo.ProtoReflect.Descriptor instead.
+func (*AgentUpdateInfo) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{157}
+}
+
+func (x *AgentUpdateInfo) GetSupported() bool {
+	if x != nil {
+		return x.Supported
+	}
+	return false
+}
+
+func (x *AgentUpdateInfo) GetLatestVersion() string {
+	if x != nil {
+		return x.LatestVersion
+	}
+	return ""
+}
+
+func (x *AgentUpdateInfo) GetUpdating() bool {
+	if x != nil {
+		return x.Updating
+	}
+	return false
+}
+
+// A → B: look for a newer release now (B also looks every few hours).
+// Answered with MachineInfo.
+type AgentUpdateCheck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentUpdateCheck) Reset() {
+	*x = AgentUpdateCheck{}
+	mi := &file_remote_v1_remote_proto_msgTypes[158]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentUpdateCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentUpdateCheck) ProtoMessage() {}
+
+func (x *AgentUpdateCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[158]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentUpdateCheck.ProtoReflect.Descriptor instead.
+func (*AgentUpdateCheck) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{158}
+}
+
+// A → B: update to the newest release. Answered with Ack at once;
+// AgentUpdateProgress follows, to every connected device.
+// ERROR_REASON_UPDATE_UNAVAILABLE / ERROR_REASON_UPDATE_BUSY.
+type AgentUpdateStart struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentUpdateStart) Reset() {
+	*x = AgentUpdateStart{}
+	mi := &file_remote_v1_remote_proto_msgTypes[159]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentUpdateStart) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentUpdateStart) ProtoMessage() {}
+
+func (x *AgentUpdateStart) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[159]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentUpdateStart.ProtoReflect.Descriptor instead.
+func (*AgentUpdateStart) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{159}
+}
+
+// B → A, unasked, to every connected device.
+type AgentUpdateProgress struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Phase AgentUpdatePhase       `protobuf:"varint,1,opt,name=phase,proto3,enum=remote.v1.AgentUpdatePhase" json:"phase,omitempty"`
+	// The version being installed.
+	Version string `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	// While DOWNLOADING, in bytes; total is 0 when the size is not known.
+	Received      uint64 `protobuf:"varint,3,opt,name=received,proto3" json:"received,omitempty"`
+	Total         uint64 `protobuf:"varint,4,opt,name=total,proto3" json:"total,omitempty"`
+	Message       string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentUpdateProgress) Reset() {
+	*x = AgentUpdateProgress{}
+	mi := &file_remote_v1_remote_proto_msgTypes[160]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentUpdateProgress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentUpdateProgress) ProtoMessage() {}
+
+func (x *AgentUpdateProgress) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[160]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentUpdateProgress.ProtoReflect.Descriptor instead.
+func (*AgentUpdateProgress) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{160}
+}
+
+func (x *AgentUpdateProgress) GetPhase() AgentUpdatePhase {
+	if x != nil {
+		return x.Phase
+	}
+	return AgentUpdatePhase_AGENT_UPDATE_PHASE_UNSPECIFIED
+}
+
+func (x *AgentUpdateProgress) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *AgentUpdateProgress) GetReceived() uint64 {
+	if x != nil {
+		return x.Received
+	}
+	return 0
+}
+
+func (x *AgentUpdateProgress) GetTotal() uint64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *AgentUpdateProgress) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_remote_v1_remote_proto protoreflect.FileDescriptor
 
 const file_remote_v1_remote_proto_rawDesc = "" +
@@ -13203,7 +13554,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0eHandshakeError\x121\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x1d.remote.v1.HandshakeErrorCodeR\x04code\x12)\n" +
 	"\x10protocol_version\x18\x02 \x01(\rR\x0fprotocolVersion\x120\n" +
-	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\xd43\n" +
+	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\xc45\n" +
 	"\x05Frame\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
 	"\vthread_list\x18\n" +
@@ -13293,7 +13644,9 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x12screen_share_close\x18a \x01(\v2\x1b.remote.v1.ScreenShareCloseH\x00R\x10screenShareClose\x12>\n" +
 	"\rbrowser_clear\x18b \x01(\v2\x17.remote.v1.BrowserClearH\x00R\fbrowserClear\x12/\n" +
 	"\btotp_set\x18f \x01(\v2\x12.remote.v1.TotpSetH\x00R\atotpSet\x12N\n" +
-	"\x13totp_status_request\x18g \x01(\v2\x1c.remote.v1.TotpStatusRequestH\x00R\x11totpStatusRequest\x12>\n" +
+	"\x13totp_status_request\x18g \x01(\v2\x1c.remote.v1.TotpStatusRequestH\x00R\x11totpStatusRequest\x12K\n" +
+	"\x12agent_update_check\x18i \x01(\v2\x1b.remote.v1.AgentUpdateCheckH\x00R\x10agentUpdateCheck\x12K\n" +
+	"\x12agent_update_start\x18j \x01(\v2\x1b.remote.v1.AgentUpdateStartH\x00R\x10agentUpdateStart\x12>\n" +
 	"\rsecret_prompt\x18? \x01(\v2\x17.remote.v1.SecretPromptH\x00R\fsecretPrompt\x12N\n" +
 	"\x13secret_prompt_ended\x18@ \x01(\v2\x1c.remote.v1.SecretPromptEndedH\x00R\x11secretPromptEnded\x12K\n" +
 	"\x12secret_list_result\x18A \x01(\v2\x1b.remote.v1.SecretListResultH\x00R\x10secretListResult\x128\n" +
@@ -13309,7 +13662,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x13screen_share_opened\x18d \x01(\v2\x1c.remote.v1.ScreenShareOpenedH\x00R\x11screenShareOpened\x12N\n" +
 	"\x13screen_share_closed\x18e \x01(\v2\x1c.remote.v1.ScreenShareClosedH\x00R\x11screenShareClosed\x128\n" +
 	"\vtotp_status\x18h \x01(\v2\x15.remote.v1.TotpStatusH\x00R\n" +
-	"totpStatusB\x06\n" +
+	"totpStatus\x12T\n" +
+	"\x15agent_update_progress\x18k \x01(\v2\x1e.remote.v1.AgentUpdateProgressH\x00R\x13agentUpdateProgressB\x06\n" +
 	"\x04body\"\f\n" +
 	"\n" +
 	"ThreadList\"\xbd\x01\n" +
@@ -13809,7 +14163,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vlogin_state\x18\x04 \x01(\x0e2\x15.remote.v1.LoginStateR\n" +
 	"loginState\x12C\n" +
 	"\fcapabilities\x18\x05 \x01(\v2\x1f.remote.v1.ProviderCapabilitiesR\fcapabilities\x12)\n" +
-	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\x9f\x06\n" +
+	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\xde\x06\n" +
 	"\vMachineInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x12\n" +
@@ -13835,7 +14189,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"gitChanges\x126\n" +
 	"\abrowser\x18\x13 \x01(\v2\x1c.remote.v1.RemoteBrowserInfoR\abrowser\x12!\n" +
 	"\fscreen_share\x18\x14 \x01(\bR\vscreenShare\x12!\n" +
-	"\ftotp_enabled\x18\x15 \x01(\bR\vtotpEnabled\"i\n" +
+	"\ftotp_enabled\x18\x15 \x01(\bR\vtotpEnabled\x12=\n" +
+	"\fagent_update\x18\x16 \x01(\v2\x1a.remote.v1.AgentUpdateInfoR\vagentUpdate\"i\n" +
 	"\x11RemoteBrowserInfo\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1c\n" +
@@ -14025,7 +14380,19 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x11TotpStatusRequest\"&\n" +
 	"\n" +
 	"TotpStatus\x12\x18\n" +
-	"\aenabled\x18\x01 \x01(\bR\aenabled*\x99\x03\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\"r\n" +
+	"\x0fAgentUpdateInfo\x12\x1c\n" +
+	"\tsupported\x18\x01 \x01(\bR\tsupported\x12%\n" +
+	"\x0elatest_version\x18\x02 \x01(\tR\rlatestVersion\x12\x1a\n" +
+	"\bupdating\x18\x03 \x01(\bR\bupdating\"\x12\n" +
+	"\x10AgentUpdateCheck\"\x12\n" +
+	"\x10AgentUpdateStart\"\xae\x01\n" +
+	"\x13AgentUpdateProgress\x121\n" +
+	"\x05phase\x18\x01 \x01(\x0e2\x1b.remote.v1.AgentUpdatePhaseR\x05phase\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1a\n" +
+	"\breceived\x18\x03 \x01(\x04R\breceived\x12\x14\n" +
+	"\x05total\x18\x04 \x01(\x04R\x05total\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage*\x99\x03\n" +
 	"\x12HandshakeErrorCode\x12$\n" +
 	" HANDSHAKE_ERROR_CODE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#HANDSHAKE_ERROR_CODE_UNKNOWN_DEVICE\x10\x01\x12,\n" +
@@ -14040,7 +14407,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x1a\n" +
 	"\x16DECISION_ALLOW_SESSION\x10\x02\x12\x11\n" +
-	"\rDECISION_DENY\x10\x03*\xea\x0e\n" +
+	"\rDECISION_DENY\x10\x03*\xad\x0f\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -14095,7 +14462,9 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x1fERROR_REASON_SCREEN_SHARING_OFF\x101\x12\"\n" +
 	"\x1eERROR_REASON_SCREEN_SHARE_BUSY\x102\x12\"\n" +
 	"\x1eERROR_REASON_SCREEN_SHARE_GONE\x103\x12$\n" +
-	" ERROR_REASON_TOTP_SECRET_INVALID\x104*\xfe\x01\n" +
+	" ERROR_REASON_TOTP_SECRET_INVALID\x104\x12#\n" +
+	"\x1fERROR_REASON_UPDATE_UNAVAILABLE\x105\x12\x1c\n" +
+	"\x18ERROR_REASON_UPDATE_BUSY\x106*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +
@@ -14178,7 +14547,15 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x17SCREEN_SHARE_END_CLOSED\x10\x01\x12\x19\n" +
 	"\x15SCREEN_SHARE_END_IDLE\x10\x02\x12\x1c\n" +
 	"\x18SCREEN_SHARE_END_SERVICE\x10\x03\x12\x1c\n" +
-	"\x18SCREEN_SHARE_END_STOPPED\x10\x04B)Z'app.local/server/gen/remote/v1;remotev1b\x06proto3"
+	"\x18SCREEN_SHARE_END_STOPPED\x10\x04*\x84\x02\n" +
+	"\x10AgentUpdatePhase\x12\"\n" +
+	"\x1eAGENT_UPDATE_PHASE_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eAGENT_UPDATE_PHASE_DOWNLOADING\x10\x01\x12 \n" +
+	"\x1cAGENT_UPDATE_PHASE_VERIFYING\x10\x02\x12!\n" +
+	"\x1dAGENT_UPDATE_PHASE_INSTALLING\x10\x03\x12!\n" +
+	"\x1dAGENT_UPDATE_PHASE_RESTARTING\x10\x04\x12\x1d\n" +
+	"\x19AGENT_UPDATE_PHASE_FAILED\x10\x05\x12!\n" +
+	"\x1dAGENT_UPDATE_PHASE_UP_TO_DATE\x10\x06B)Z'app.local/server/gen/remote/v1;remotev1b\x06proto3"
 
 var (
 	file_remote_v1_remote_proto_rawDescOnce sync.Once
@@ -14192,8 +14569,8 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 	return file_remote_v1_remote_proto_rawDescData
 }
 
-var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 15)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 157)
+var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 16)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 161)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),          // 0: remote.v1.HandshakeErrorCode
 	(Decision)(0),                    // 1: remote.v1.Decision
@@ -14210,357 +14587,367 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(GitFileState)(0),                // 12: remote.v1.GitFileState
 	(BrowserMouseType)(0),            // 13: remote.v1.BrowserMouseType
 	(ScreenShareEnd)(0),              // 14: remote.v1.ScreenShareEnd
-	(*Plain)(nil),                    // 15: remote.v1.Plain
-	(*Hello)(nil),                    // 16: remote.v1.Hello
-	(*Ready)(nil),                    // 17: remote.v1.Ready
-	(*PakeStart)(nil),                // 18: remote.v1.PakeStart
-	(*PakeReply)(nil),                // 19: remote.v1.PakeReply
-	(*PakeCandidate)(nil),            // 20: remote.v1.PakeCandidate
-	(*PakeFinish)(nil),               // 21: remote.v1.PakeFinish
-	(*HandshakeError)(nil),           // 22: remote.v1.HandshakeError
-	(*Frame)(nil),                    // 23: remote.v1.Frame
-	(*ThreadList)(nil),               // 24: remote.v1.ThreadList
-	(*ThreadCreate)(nil),             // 25: remote.v1.ThreadCreate
-	(*Consent)(nil),                  // 26: remote.v1.Consent
-	(*ThreadSend)(nil),               // 27: remote.v1.ThreadSend
-	(*ThreadSubscribe)(nil),          // 28: remote.v1.ThreadSubscribe
-	(*ThreadRespond)(nil),            // 29: remote.v1.ThreadRespond
-	(*Answers)(nil),                  // 30: remote.v1.Answers
-	(*Answer)(nil),                   // 31: remote.v1.Answer
-	(*ThreadInterrupt)(nil),          // 32: remote.v1.ThreadInterrupt
-	(*ThreadClose)(nil),              // 33: remote.v1.ThreadClose
-	(*ThreadDelete)(nil),             // 34: remote.v1.ThreadDelete
-	(*ThreadSetArchived)(nil),        // 35: remote.v1.ThreadSetArchived
-	(*ThreadSetModel)(nil),           // 36: remote.v1.ThreadSetModel
-	(*ThreadSetPermissionMode)(nil),  // 37: remote.v1.ThreadSetPermissionMode
-	(*ThreadSetEffort)(nil),          // 38: remote.v1.ThreadSetEffort
-	(*ThreadSwitch)(nil),             // 39: remote.v1.ThreadSwitch
-	(*ThreadFetchFull)(nil),          // 40: remote.v1.ThreadFetchFull
-	(*ThreadGitChanges)(nil),         // 41: remote.v1.ThreadGitChanges
-	(*GitFileDiff)(nil),              // 42: remote.v1.GitFileDiff
-	(*MachineInfoRequest)(nil),       // 43: remote.v1.MachineInfoRequest
-	(*Ping)(nil),                     // 44: remote.v1.Ping
-	(*DirList)(nil),                  // 45: remote.v1.DirList
-	(*AuditList)(nil),                // 46: remote.v1.AuditList
-	(*FileList)(nil),                 // 47: remote.v1.FileList
-	(*SessionList)(nil),              // 48: remote.v1.SessionList
-	(*LocalSession)(nil),             // 49: remote.v1.LocalSession
-	(*SessionDir)(nil),               // 50: remote.v1.SessionDir
-	(*SessionListResult)(nil),        // 51: remote.v1.SessionListResult
-	(*SessionOpen)(nil),              // 52: remote.v1.SessionOpen
-	(*AttachmentUpload)(nil),         // 53: remote.v1.AttachmentUpload
-	(*AttachmentCancel)(nil),         // 54: remote.v1.AttachmentCancel
-	(*AttachmentFetch)(nil),          // 55: remote.v1.AttachmentFetch
-	(*AttachmentData)(nil),           // 56: remote.v1.AttachmentData
-	(*Attachment)(nil),               // 57: remote.v1.Attachment
-	(*AttachmentLimits)(nil),         // 58: remote.v1.AttachmentLimits
-	(*ProjectList)(nil),              // 59: remote.v1.ProjectList
-	(*ProjectAdd)(nil),               // 60: remote.v1.ProjectAdd
-	(*ProjectCreate)(nil),            // 61: remote.v1.ProjectCreate
-	(*ProjectClone)(nil),             // 62: remote.v1.ProjectClone
-	(*ProjectCloneCancel)(nil),       // 63: remote.v1.ProjectCloneCancel
-	(*ProjectCloneProgress)(nil),     // 64: remote.v1.ProjectCloneProgress
-	(*ProjectUpdate)(nil),            // 65: remote.v1.ProjectUpdate
-	(*ProjectReorder)(nil),           // 66: remote.v1.ProjectReorder
-	(*ProjectRemove)(nil),            // 67: remote.v1.ProjectRemove
-	(*ProjectDefaults)(nil),          // 68: remote.v1.ProjectDefaults
-	(*GitStatus)(nil),                // 69: remote.v1.GitStatus
-	(*Project)(nil),                  // 70: remote.v1.Project
-	(*ProjectSuggestion)(nil),        // 71: remote.v1.ProjectSuggestion
-	(*ProjectListResult)(nil),        // 72: remote.v1.ProjectListResult
-	(*ProfileList)(nil),              // 73: remote.v1.ProfileList
-	(*ProfileSelect)(nil),            // 74: remote.v1.ProfileSelect
-	(*ProfileSignInBegin)(nil),       // 75: remote.v1.ProfileSignInBegin
-	(*ProfileSignInCode)(nil),        // 76: remote.v1.ProfileSignInCode
-	(*ProfileSignInCancel)(nil),      // 77: remote.v1.ProfileSignInCancel
-	(*ProfileRemove)(nil),            // 78: remote.v1.ProfileRemove
-	(*UsageRefresh)(nil),             // 79: remote.v1.UsageRefresh
-	(*MachineSettingsSet)(nil),       // 80: remote.v1.MachineSettingsSet
-	(*OpenDiskAccessSettings)(nil),   // 81: remote.v1.OpenDiskAccessSettings
-	(*Ack)(nil),                      // 82: remote.v1.Ack
-	(*ThreadInfo)(nil),               // 83: remote.v1.ThreadInfo
-	(*ProfileSuggestion)(nil),        // 84: remote.v1.ProfileSuggestion
-	(*AccountInfo)(nil),              // 85: remote.v1.AccountInfo
-	(*SlashCommand)(nil),             // 86: remote.v1.SlashCommand
-	(*RateLimits)(nil),               // 87: remote.v1.RateLimits
-	(*RateWindow)(nil),               // 88: remote.v1.RateWindow
-	(*ClaudeProfile)(nil),            // 89: remote.v1.ClaudeProfile
-	(*ProfileListResult)(nil),        // 90: remote.v1.ProfileListResult
-	(*MachineProfile)(nil),           // 91: remote.v1.MachineProfile
-	(*SessionProfile)(nil),           // 92: remote.v1.SessionProfile
-	(*ProfileSignInPrompt)(nil),      // 93: remote.v1.ProfileSignInPrompt
-	(*ProfileSignInResult)(nil),      // 94: remote.v1.ProfileSignInResult
-	(*Pong)(nil),                     // 95: remote.v1.Pong
-	(*Error)(nil),                    // 96: remote.v1.Error
-	(*Cursor)(nil),                   // 97: remote.v1.Cursor
-	(*ThreadSummary)(nil),            // 98: remote.v1.ThreadSummary
-	(*ThreadListResult)(nil),         // 99: remote.v1.ThreadListResult
-	(*ThreadCreated)(nil),            // 100: remote.v1.ThreadCreated
-	(*ThreadDeleted)(nil),            // 101: remote.v1.ThreadDeleted
-	(*ThreadStatus)(nil),             // 102: remote.v1.ThreadStatus
-	(*ThreadItems)(nil),              // 103: remote.v1.ThreadItems
-	(*ThreadReset)(nil),              // 104: remote.v1.ThreadReset
-	(*FullItem)(nil),                 // 105: remote.v1.FullItem
-	(*Item)(nil),                     // 106: remote.v1.Item
-	(*TextItem)(nil),                 // 107: remote.v1.TextItem
-	(*ToolCallItem)(nil),             // 108: remote.v1.ToolCallItem
-	(*ToolResultItem)(nil),           // 109: remote.v1.ToolResultItem
-	(*DiffItem)(nil),                 // 110: remote.v1.DiffItem
-	(*TodoItem)(nil),                 // 111: remote.v1.TodoItem
-	(*TodoEntry)(nil),                // 112: remote.v1.TodoEntry
-	(*ApprovalItem)(nil),             // 113: remote.v1.ApprovalItem
-	(*ApprovalSecret)(nil),           // 114: remote.v1.ApprovalSecret
-	(*QuestionItem)(nil),             // 115: remote.v1.QuestionItem
-	(*Question)(nil),                 // 116: remote.v1.Question
-	(*QuestionOption)(nil),           // 117: remote.v1.QuestionOption
-	(*StatusItem)(nil),               // 118: remote.v1.StatusItem
-	(*TurnItem)(nil),                 // 119: remote.v1.TurnItem
-	(*SubagentItem)(nil),             // 120: remote.v1.SubagentItem
-	(*CompactionItem)(nil),           // 121: remote.v1.CompactionItem
-	(*ErrorItem)(nil),                // 122: remote.v1.ErrorItem
-	(*ModelChangeItem)(nil),          // 123: remote.v1.ModelChangeItem
-	(*AgentHandoffItem)(nil),         // 124: remote.v1.AgentHandoffItem
-	(*ProviderCapabilities)(nil),     // 125: remote.v1.ProviderCapabilities
-	(*ModelOption)(nil),              // 126: remote.v1.ModelOption
-	(*ProviderInfo)(nil),             // 127: remote.v1.ProviderInfo
-	(*MachineInfo)(nil),              // 128: remote.v1.MachineInfo
-	(*RemoteBrowserInfo)(nil),        // 129: remote.v1.RemoteBrowserInfo
-	(*MachineSettings)(nil),          // 130: remote.v1.MachineSettings
-	(*PairedDevice)(nil),             // 131: remote.v1.PairedDevice
-	(*DirListResult)(nil),            // 132: remote.v1.DirListResult
-	(*DirEntry)(nil),                 // 133: remote.v1.DirEntry
-	(*FileListResult)(nil),           // 134: remote.v1.FileListResult
-	(*FileEntry)(nil),                // 135: remote.v1.FileEntry
-	(*AuditListResult)(nil),          // 136: remote.v1.AuditListResult
-	(*AuditEntry)(nil),               // 137: remote.v1.AuditEntry
-	(*SecretProvide)(nil),            // 138: remote.v1.SecretProvide
-	(*SecretDecline)(nil),            // 139: remote.v1.SecretDecline
-	(*SecretList)(nil),               // 140: remote.v1.SecretList
-	(*SecretRemove)(nil),             // 141: remote.v1.SecretRemove
-	(*SecretPrompt)(nil),             // 142: remote.v1.SecretPrompt
-	(*SecretPromptEnded)(nil),        // 143: remote.v1.SecretPromptEnded
-	(*SecretListResult)(nil),         // 144: remote.v1.SecretListResult
-	(*SavedSecret)(nil),              // 145: remote.v1.SavedSecret
-	(*GitChanges)(nil),               // 146: remote.v1.GitChanges
-	(*GitFileChange)(nil),            // 147: remote.v1.GitFileChange
-	(*GitFileDiffResult)(nil),        // 148: remote.v1.GitFileDiffResult
-	(*BrowserControl)(nil),           // 149: remote.v1.BrowserControl
-	(*BrowserView)(nil),              // 150: remote.v1.BrowserView
-	(*BrowserInput)(nil),             // 151: remote.v1.BrowserInput
-	(*BrowserMouse)(nil),             // 152: remote.v1.BrowserMouse
-	(*BrowserKey)(nil),               // 153: remote.v1.BrowserKey
-	(*BrowserTakeoverEnd)(nil),       // 154: remote.v1.BrowserTakeoverEnd
-	(*BrowserTakeover)(nil),          // 155: remote.v1.BrowserTakeover
-	(*BrowserTakeoverEnded)(nil),     // 156: remote.v1.BrowserTakeoverEnded
-	(*BrowserFrame)(nil),             // 157: remote.v1.BrowserFrame
-	(*BrowserState)(nil),             // 158: remote.v1.BrowserState
-	(*BrowserTab)(nil),               // 159: remote.v1.BrowserTab
-	(*PasskeyNotice)(nil),            // 160: remote.v1.PasskeyNotice
-	(*ScreenShareStatusRequest)(nil), // 161: remote.v1.ScreenShareStatusRequest
-	(*ScreenShareStatus)(nil),        // 162: remote.v1.ScreenShareStatus
-	(*ScreenShareOpen)(nil),          // 163: remote.v1.ScreenShareOpen
-	(*ScreenShareOpened)(nil),        // 164: remote.v1.ScreenShareOpened
-	(*ScreenShareData)(nil),          // 165: remote.v1.ScreenShareData
-	(*ScreenShareClose)(nil),         // 166: remote.v1.ScreenShareClose
-	(*ScreenShareClosed)(nil),        // 167: remote.v1.ScreenShareClosed
-	(*BrowserClear)(nil),             // 168: remote.v1.BrowserClear
-	(*TotpSet)(nil),                  // 169: remote.v1.TotpSet
-	(*TotpStatusRequest)(nil),        // 170: remote.v1.TotpStatusRequest
-	(*TotpStatus)(nil),               // 171: remote.v1.TotpStatus
+	(AgentUpdatePhase)(0),            // 15: remote.v1.AgentUpdatePhase
+	(*Plain)(nil),                    // 16: remote.v1.Plain
+	(*Hello)(nil),                    // 17: remote.v1.Hello
+	(*Ready)(nil),                    // 18: remote.v1.Ready
+	(*PakeStart)(nil),                // 19: remote.v1.PakeStart
+	(*PakeReply)(nil),                // 20: remote.v1.PakeReply
+	(*PakeCandidate)(nil),            // 21: remote.v1.PakeCandidate
+	(*PakeFinish)(nil),               // 22: remote.v1.PakeFinish
+	(*HandshakeError)(nil),           // 23: remote.v1.HandshakeError
+	(*Frame)(nil),                    // 24: remote.v1.Frame
+	(*ThreadList)(nil),               // 25: remote.v1.ThreadList
+	(*ThreadCreate)(nil),             // 26: remote.v1.ThreadCreate
+	(*Consent)(nil),                  // 27: remote.v1.Consent
+	(*ThreadSend)(nil),               // 28: remote.v1.ThreadSend
+	(*ThreadSubscribe)(nil),          // 29: remote.v1.ThreadSubscribe
+	(*ThreadRespond)(nil),            // 30: remote.v1.ThreadRespond
+	(*Answers)(nil),                  // 31: remote.v1.Answers
+	(*Answer)(nil),                   // 32: remote.v1.Answer
+	(*ThreadInterrupt)(nil),          // 33: remote.v1.ThreadInterrupt
+	(*ThreadClose)(nil),              // 34: remote.v1.ThreadClose
+	(*ThreadDelete)(nil),             // 35: remote.v1.ThreadDelete
+	(*ThreadSetArchived)(nil),        // 36: remote.v1.ThreadSetArchived
+	(*ThreadSetModel)(nil),           // 37: remote.v1.ThreadSetModel
+	(*ThreadSetPermissionMode)(nil),  // 38: remote.v1.ThreadSetPermissionMode
+	(*ThreadSetEffort)(nil),          // 39: remote.v1.ThreadSetEffort
+	(*ThreadSwitch)(nil),             // 40: remote.v1.ThreadSwitch
+	(*ThreadFetchFull)(nil),          // 41: remote.v1.ThreadFetchFull
+	(*ThreadGitChanges)(nil),         // 42: remote.v1.ThreadGitChanges
+	(*GitFileDiff)(nil),              // 43: remote.v1.GitFileDiff
+	(*MachineInfoRequest)(nil),       // 44: remote.v1.MachineInfoRequest
+	(*Ping)(nil),                     // 45: remote.v1.Ping
+	(*DirList)(nil),                  // 46: remote.v1.DirList
+	(*AuditList)(nil),                // 47: remote.v1.AuditList
+	(*FileList)(nil),                 // 48: remote.v1.FileList
+	(*SessionList)(nil),              // 49: remote.v1.SessionList
+	(*LocalSession)(nil),             // 50: remote.v1.LocalSession
+	(*SessionDir)(nil),               // 51: remote.v1.SessionDir
+	(*SessionListResult)(nil),        // 52: remote.v1.SessionListResult
+	(*SessionOpen)(nil),              // 53: remote.v1.SessionOpen
+	(*AttachmentUpload)(nil),         // 54: remote.v1.AttachmentUpload
+	(*AttachmentCancel)(nil),         // 55: remote.v1.AttachmentCancel
+	(*AttachmentFetch)(nil),          // 56: remote.v1.AttachmentFetch
+	(*AttachmentData)(nil),           // 57: remote.v1.AttachmentData
+	(*Attachment)(nil),               // 58: remote.v1.Attachment
+	(*AttachmentLimits)(nil),         // 59: remote.v1.AttachmentLimits
+	(*ProjectList)(nil),              // 60: remote.v1.ProjectList
+	(*ProjectAdd)(nil),               // 61: remote.v1.ProjectAdd
+	(*ProjectCreate)(nil),            // 62: remote.v1.ProjectCreate
+	(*ProjectClone)(nil),             // 63: remote.v1.ProjectClone
+	(*ProjectCloneCancel)(nil),       // 64: remote.v1.ProjectCloneCancel
+	(*ProjectCloneProgress)(nil),     // 65: remote.v1.ProjectCloneProgress
+	(*ProjectUpdate)(nil),            // 66: remote.v1.ProjectUpdate
+	(*ProjectReorder)(nil),           // 67: remote.v1.ProjectReorder
+	(*ProjectRemove)(nil),            // 68: remote.v1.ProjectRemove
+	(*ProjectDefaults)(nil),          // 69: remote.v1.ProjectDefaults
+	(*GitStatus)(nil),                // 70: remote.v1.GitStatus
+	(*Project)(nil),                  // 71: remote.v1.Project
+	(*ProjectSuggestion)(nil),        // 72: remote.v1.ProjectSuggestion
+	(*ProjectListResult)(nil),        // 73: remote.v1.ProjectListResult
+	(*ProfileList)(nil),              // 74: remote.v1.ProfileList
+	(*ProfileSelect)(nil),            // 75: remote.v1.ProfileSelect
+	(*ProfileSignInBegin)(nil),       // 76: remote.v1.ProfileSignInBegin
+	(*ProfileSignInCode)(nil),        // 77: remote.v1.ProfileSignInCode
+	(*ProfileSignInCancel)(nil),      // 78: remote.v1.ProfileSignInCancel
+	(*ProfileRemove)(nil),            // 79: remote.v1.ProfileRemove
+	(*UsageRefresh)(nil),             // 80: remote.v1.UsageRefresh
+	(*MachineSettingsSet)(nil),       // 81: remote.v1.MachineSettingsSet
+	(*OpenDiskAccessSettings)(nil),   // 82: remote.v1.OpenDiskAccessSettings
+	(*Ack)(nil),                      // 83: remote.v1.Ack
+	(*ThreadInfo)(nil),               // 84: remote.v1.ThreadInfo
+	(*ProfileSuggestion)(nil),        // 85: remote.v1.ProfileSuggestion
+	(*AccountInfo)(nil),              // 86: remote.v1.AccountInfo
+	(*SlashCommand)(nil),             // 87: remote.v1.SlashCommand
+	(*RateLimits)(nil),               // 88: remote.v1.RateLimits
+	(*RateWindow)(nil),               // 89: remote.v1.RateWindow
+	(*ClaudeProfile)(nil),            // 90: remote.v1.ClaudeProfile
+	(*ProfileListResult)(nil),        // 91: remote.v1.ProfileListResult
+	(*MachineProfile)(nil),           // 92: remote.v1.MachineProfile
+	(*SessionProfile)(nil),           // 93: remote.v1.SessionProfile
+	(*ProfileSignInPrompt)(nil),      // 94: remote.v1.ProfileSignInPrompt
+	(*ProfileSignInResult)(nil),      // 95: remote.v1.ProfileSignInResult
+	(*Pong)(nil),                     // 96: remote.v1.Pong
+	(*Error)(nil),                    // 97: remote.v1.Error
+	(*Cursor)(nil),                   // 98: remote.v1.Cursor
+	(*ThreadSummary)(nil),            // 99: remote.v1.ThreadSummary
+	(*ThreadListResult)(nil),         // 100: remote.v1.ThreadListResult
+	(*ThreadCreated)(nil),            // 101: remote.v1.ThreadCreated
+	(*ThreadDeleted)(nil),            // 102: remote.v1.ThreadDeleted
+	(*ThreadStatus)(nil),             // 103: remote.v1.ThreadStatus
+	(*ThreadItems)(nil),              // 104: remote.v1.ThreadItems
+	(*ThreadReset)(nil),              // 105: remote.v1.ThreadReset
+	(*FullItem)(nil),                 // 106: remote.v1.FullItem
+	(*Item)(nil),                     // 107: remote.v1.Item
+	(*TextItem)(nil),                 // 108: remote.v1.TextItem
+	(*ToolCallItem)(nil),             // 109: remote.v1.ToolCallItem
+	(*ToolResultItem)(nil),           // 110: remote.v1.ToolResultItem
+	(*DiffItem)(nil),                 // 111: remote.v1.DiffItem
+	(*TodoItem)(nil),                 // 112: remote.v1.TodoItem
+	(*TodoEntry)(nil),                // 113: remote.v1.TodoEntry
+	(*ApprovalItem)(nil),             // 114: remote.v1.ApprovalItem
+	(*ApprovalSecret)(nil),           // 115: remote.v1.ApprovalSecret
+	(*QuestionItem)(nil),             // 116: remote.v1.QuestionItem
+	(*Question)(nil),                 // 117: remote.v1.Question
+	(*QuestionOption)(nil),           // 118: remote.v1.QuestionOption
+	(*StatusItem)(nil),               // 119: remote.v1.StatusItem
+	(*TurnItem)(nil),                 // 120: remote.v1.TurnItem
+	(*SubagentItem)(nil),             // 121: remote.v1.SubagentItem
+	(*CompactionItem)(nil),           // 122: remote.v1.CompactionItem
+	(*ErrorItem)(nil),                // 123: remote.v1.ErrorItem
+	(*ModelChangeItem)(nil),          // 124: remote.v1.ModelChangeItem
+	(*AgentHandoffItem)(nil),         // 125: remote.v1.AgentHandoffItem
+	(*ProviderCapabilities)(nil),     // 126: remote.v1.ProviderCapabilities
+	(*ModelOption)(nil),              // 127: remote.v1.ModelOption
+	(*ProviderInfo)(nil),             // 128: remote.v1.ProviderInfo
+	(*MachineInfo)(nil),              // 129: remote.v1.MachineInfo
+	(*RemoteBrowserInfo)(nil),        // 130: remote.v1.RemoteBrowserInfo
+	(*MachineSettings)(nil),          // 131: remote.v1.MachineSettings
+	(*PairedDevice)(nil),             // 132: remote.v1.PairedDevice
+	(*DirListResult)(nil),            // 133: remote.v1.DirListResult
+	(*DirEntry)(nil),                 // 134: remote.v1.DirEntry
+	(*FileListResult)(nil),           // 135: remote.v1.FileListResult
+	(*FileEntry)(nil),                // 136: remote.v1.FileEntry
+	(*AuditListResult)(nil),          // 137: remote.v1.AuditListResult
+	(*AuditEntry)(nil),               // 138: remote.v1.AuditEntry
+	(*SecretProvide)(nil),            // 139: remote.v1.SecretProvide
+	(*SecretDecline)(nil),            // 140: remote.v1.SecretDecline
+	(*SecretList)(nil),               // 141: remote.v1.SecretList
+	(*SecretRemove)(nil),             // 142: remote.v1.SecretRemove
+	(*SecretPrompt)(nil),             // 143: remote.v1.SecretPrompt
+	(*SecretPromptEnded)(nil),        // 144: remote.v1.SecretPromptEnded
+	(*SecretListResult)(nil),         // 145: remote.v1.SecretListResult
+	(*SavedSecret)(nil),              // 146: remote.v1.SavedSecret
+	(*GitChanges)(nil),               // 147: remote.v1.GitChanges
+	(*GitFileChange)(nil),            // 148: remote.v1.GitFileChange
+	(*GitFileDiffResult)(nil),        // 149: remote.v1.GitFileDiffResult
+	(*BrowserControl)(nil),           // 150: remote.v1.BrowserControl
+	(*BrowserView)(nil),              // 151: remote.v1.BrowserView
+	(*BrowserInput)(nil),             // 152: remote.v1.BrowserInput
+	(*BrowserMouse)(nil),             // 153: remote.v1.BrowserMouse
+	(*BrowserKey)(nil),               // 154: remote.v1.BrowserKey
+	(*BrowserTakeoverEnd)(nil),       // 155: remote.v1.BrowserTakeoverEnd
+	(*BrowserTakeover)(nil),          // 156: remote.v1.BrowserTakeover
+	(*BrowserTakeoverEnded)(nil),     // 157: remote.v1.BrowserTakeoverEnded
+	(*BrowserFrame)(nil),             // 158: remote.v1.BrowserFrame
+	(*BrowserState)(nil),             // 159: remote.v1.BrowserState
+	(*BrowserTab)(nil),               // 160: remote.v1.BrowserTab
+	(*PasskeyNotice)(nil),            // 161: remote.v1.PasskeyNotice
+	(*ScreenShareStatusRequest)(nil), // 162: remote.v1.ScreenShareStatusRequest
+	(*ScreenShareStatus)(nil),        // 163: remote.v1.ScreenShareStatus
+	(*ScreenShareOpen)(nil),          // 164: remote.v1.ScreenShareOpen
+	(*ScreenShareOpened)(nil),        // 165: remote.v1.ScreenShareOpened
+	(*ScreenShareData)(nil),          // 166: remote.v1.ScreenShareData
+	(*ScreenShareClose)(nil),         // 167: remote.v1.ScreenShareClose
+	(*ScreenShareClosed)(nil),        // 168: remote.v1.ScreenShareClosed
+	(*BrowserClear)(nil),             // 169: remote.v1.BrowserClear
+	(*TotpSet)(nil),                  // 170: remote.v1.TotpSet
+	(*TotpStatusRequest)(nil),        // 171: remote.v1.TotpStatusRequest
+	(*TotpStatus)(nil),               // 172: remote.v1.TotpStatus
+	(*AgentUpdateInfo)(nil),          // 173: remote.v1.AgentUpdateInfo
+	(*AgentUpdateCheck)(nil),         // 174: remote.v1.AgentUpdateCheck
+	(*AgentUpdateStart)(nil),         // 175: remote.v1.AgentUpdateStart
+	(*AgentUpdateProgress)(nil),      // 176: remote.v1.AgentUpdateProgress
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
-	16,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
-	17,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
-	18,  // 2: remote.v1.Plain.pake_start:type_name -> remote.v1.PakeStart
-	19,  // 3: remote.v1.Plain.pake_reply:type_name -> remote.v1.PakeReply
-	21,  // 4: remote.v1.Plain.pake_finish:type_name -> remote.v1.PakeFinish
-	22,  // 5: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
-	20,  // 6: remote.v1.PakeReply.candidates:type_name -> remote.v1.PakeCandidate
+	17,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
+	18,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
+	19,  // 2: remote.v1.Plain.pake_start:type_name -> remote.v1.PakeStart
+	20,  // 3: remote.v1.Plain.pake_reply:type_name -> remote.v1.PakeReply
+	22,  // 4: remote.v1.Plain.pake_finish:type_name -> remote.v1.PakeFinish
+	23,  // 5: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
+	21,  // 6: remote.v1.PakeReply.candidates:type_name -> remote.v1.PakeCandidate
 	0,   // 7: remote.v1.HandshakeError.code:type_name -> remote.v1.HandshakeErrorCode
-	24,  // 8: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
-	25,  // 9: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
-	27,  // 10: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
-	28,  // 11: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
-	29,  // 12: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
-	32,  // 13: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
-	36,  // 14: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
-	39,  // 15: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
-	40,  // 16: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
-	43,  // 17: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
-	44,  // 18: remote.v1.Frame.ping:type_name -> remote.v1.Ping
-	45,  // 19: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
-	46,  // 20: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
-	33,  // 21: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
-	37,  // 22: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
-	38,  // 23: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
-	73,  // 24: remote.v1.Frame.profile_list:type_name -> remote.v1.ProfileList
-	74,  // 25: remote.v1.Frame.profile_select:type_name -> remote.v1.ProfileSelect
-	75,  // 26: remote.v1.Frame.profile_sign_in_begin:type_name -> remote.v1.ProfileSignInBegin
-	76,  // 27: remote.v1.Frame.profile_sign_in_code:type_name -> remote.v1.ProfileSignInCode
-	77,  // 28: remote.v1.Frame.profile_sign_in_cancel:type_name -> remote.v1.ProfileSignInCancel
-	78,  // 29: remote.v1.Frame.profile_remove:type_name -> remote.v1.ProfileRemove
-	79,  // 30: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
-	80,  // 31: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
-	47,  // 32: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
-	81,  // 33: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
-	48,  // 34: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
-	52,  // 35: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
-	53,  // 36: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
-	54,  // 37: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
-	99,  // 38: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
-	100, // 39: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
-	103, // 40: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
-	102, // 41: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
-	104, // 42: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
-	105, // 43: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
-	128, // 44: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
-	95,  // 45: remote.v1.Frame.pong:type_name -> remote.v1.Pong
-	132, // 46: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
-	136, // 47: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
-	82,  // 48: remote.v1.Frame.ack:type_name -> remote.v1.Ack
-	96,  // 49: remote.v1.Frame.error:type_name -> remote.v1.Error
-	83,  // 50: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
-	90,  // 51: remote.v1.Frame.profile_list_result:type_name -> remote.v1.ProfileListResult
-	93,  // 52: remote.v1.Frame.profile_sign_in_prompt:type_name -> remote.v1.ProfileSignInPrompt
-	94,  // 53: remote.v1.Frame.profile_sign_in_result:type_name -> remote.v1.ProfileSignInResult
-	134, // 54: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
-	91,  // 55: remote.v1.Frame.machine_profile:type_name -> remote.v1.MachineProfile
-	51,  // 56: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
-	56,  // 57: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
-	101, // 58: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
-	72,  // 59: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
-	64,  // 60: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
-	55,  // 61: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
-	34,  // 62: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
-	35,  // 63: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
-	59,  // 64: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
-	60,  // 65: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
-	61,  // 66: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
-	62,  // 67: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
-	63,  // 68: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
-	65,  // 69: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
-	66,  // 70: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
-	67,  // 71: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
-	138, // 72: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
-	139, // 73: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
-	140, // 74: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
-	141, // 75: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
-	41,  // 76: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
-	42,  // 77: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
-	149, // 78: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
-	150, // 79: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
-	151, // 80: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
-	154, // 81: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
-	161, // 82: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
-	163, // 83: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
-	165, // 84: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
-	166, // 85: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
-	168, // 86: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
-	169, // 87: remote.v1.Frame.totp_set:type_name -> remote.v1.TotpSet
-	170, // 88: remote.v1.Frame.totp_status_request:type_name -> remote.v1.TotpStatusRequest
-	142, // 89: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
-	143, // 90: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
-	144, // 91: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
-	146, // 92: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
-	148, // 93: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
-	155, // 94: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
-	156, // 95: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
-	157, // 96: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
-	158, // 97: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
-	160, // 98: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
-	162, // 99: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
-	164, // 100: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
-	167, // 101: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
-	171, // 102: remote.v1.Frame.totp_status:type_name -> remote.v1.TotpStatus
-	26,  // 103: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
-	97,  // 104: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
-	1,   // 105: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
-	30,  // 106: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
-	31,  // 107: remote.v1.Answers.answers:type_name -> remote.v1.Answer
-	49,  // 108: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
-	50,  // 109: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
-	26,  // 110: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
-	26,  // 111: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
-	2,   // 112: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
-	68,  // 113: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
-	68,  // 114: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
-	69,  // 115: remote.v1.Project.git:type_name -> remote.v1.GitStatus
-	70,  // 116: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
-	71,  // 117: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
-	86,  // 118: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
-	87,  // 119: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
-	85,  // 120: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
-	85,  // 121: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
-	84,  // 122: remote.v1.ThreadInfo.profile_suggestion:type_name -> remote.v1.ProfileSuggestion
-	88,  // 123: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
-	88,  // 124: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
-	87,  // 125: remote.v1.ClaudeProfile.last_usage:type_name -> remote.v1.RateLimits
-	89,  // 126: remote.v1.ProfileListResult.profiles:type_name -> remote.v1.ClaudeProfile
-	90,  // 127: remote.v1.MachineProfile.profiles:type_name -> remote.v1.ProfileListResult
-	92,  // 128: remote.v1.MachineProfile.sessions:type_name -> remote.v1.SessionProfile
-	3,   // 129: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
-	2,   // 130: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
-	4,   // 131: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
-	98,  // 132: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
-	98,  // 133: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
-	98,  // 134: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
-	106, // 135: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
-	97,  // 136: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
-	5,   // 137: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
-	106, // 138: remote.v1.FullItem.item:type_name -> remote.v1.Item
-	107, // 139: remote.v1.Item.text:type_name -> remote.v1.TextItem
-	108, // 140: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
-	109, // 141: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
-	110, // 142: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
-	111, // 143: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
-	115, // 144: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
-	113, // 145: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
-	118, // 146: remote.v1.Item.status:type_name -> remote.v1.StatusItem
-	119, // 147: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
-	120, // 148: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
-	121, // 149: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
-	122, // 150: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
-	123, // 151: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
-	124, // 152: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
-	6,   // 153: remote.v1.TextItem.role:type_name -> remote.v1.Role
-	57,  // 154: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
-	7,   // 155: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
-	112, // 156: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
-	8,   // 157: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
-	7,   // 158: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
-	9,   // 159: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
-	1,   // 160: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
-	114, // 161: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
-	116, // 162: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
-	9,   // 163: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
-	30,  // 164: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
-	117, // 165: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
-	10,  // 166: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
-	126, // 167: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
-	11,  // 168: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
-	125, // 169: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
-	127, // 170: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
-	131, // 171: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
-	130, // 172: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
-	58,  // 173: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
-	129, // 174: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
-	133, // 175: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
-	135, // 176: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
-	137, // 177: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
-	145, // 178: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
-	147, // 179: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
-	12,  // 180: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
-	147, // 181: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
-	152, // 182: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
-	153, // 183: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
-	13,  // 184: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
-	159, // 185: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
-	14,  // 186: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
-	187, // [187:187] is the sub-list for method output_type
-	187, // [187:187] is the sub-list for method input_type
-	187, // [187:187] is the sub-list for extension type_name
-	187, // [187:187] is the sub-list for extension extendee
-	0,   // [0:187] is the sub-list for field type_name
+	25,  // 8: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
+	26,  // 9: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
+	28,  // 10: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
+	29,  // 11: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
+	30,  // 12: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
+	33,  // 13: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
+	37,  // 14: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
+	40,  // 15: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
+	41,  // 16: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
+	44,  // 17: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
+	45,  // 18: remote.v1.Frame.ping:type_name -> remote.v1.Ping
+	46,  // 19: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
+	47,  // 20: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
+	34,  // 21: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
+	38,  // 22: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
+	39,  // 23: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
+	74,  // 24: remote.v1.Frame.profile_list:type_name -> remote.v1.ProfileList
+	75,  // 25: remote.v1.Frame.profile_select:type_name -> remote.v1.ProfileSelect
+	76,  // 26: remote.v1.Frame.profile_sign_in_begin:type_name -> remote.v1.ProfileSignInBegin
+	77,  // 27: remote.v1.Frame.profile_sign_in_code:type_name -> remote.v1.ProfileSignInCode
+	78,  // 28: remote.v1.Frame.profile_sign_in_cancel:type_name -> remote.v1.ProfileSignInCancel
+	79,  // 29: remote.v1.Frame.profile_remove:type_name -> remote.v1.ProfileRemove
+	80,  // 30: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
+	81,  // 31: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
+	48,  // 32: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
+	82,  // 33: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
+	49,  // 34: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
+	53,  // 35: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
+	54,  // 36: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
+	55,  // 37: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
+	100, // 38: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
+	101, // 39: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
+	104, // 40: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
+	103, // 41: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
+	105, // 42: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
+	106, // 43: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
+	129, // 44: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
+	96,  // 45: remote.v1.Frame.pong:type_name -> remote.v1.Pong
+	133, // 46: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
+	137, // 47: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
+	83,  // 48: remote.v1.Frame.ack:type_name -> remote.v1.Ack
+	97,  // 49: remote.v1.Frame.error:type_name -> remote.v1.Error
+	84,  // 50: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
+	91,  // 51: remote.v1.Frame.profile_list_result:type_name -> remote.v1.ProfileListResult
+	94,  // 52: remote.v1.Frame.profile_sign_in_prompt:type_name -> remote.v1.ProfileSignInPrompt
+	95,  // 53: remote.v1.Frame.profile_sign_in_result:type_name -> remote.v1.ProfileSignInResult
+	135, // 54: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
+	92,  // 55: remote.v1.Frame.machine_profile:type_name -> remote.v1.MachineProfile
+	52,  // 56: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
+	57,  // 57: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
+	102, // 58: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
+	73,  // 59: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
+	65,  // 60: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
+	56,  // 61: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
+	35,  // 62: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
+	36,  // 63: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
+	60,  // 64: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
+	61,  // 65: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
+	62,  // 66: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
+	63,  // 67: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
+	64,  // 68: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
+	66,  // 69: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
+	67,  // 70: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
+	68,  // 71: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
+	139, // 72: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
+	140, // 73: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
+	141, // 74: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
+	142, // 75: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
+	42,  // 76: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
+	43,  // 77: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
+	150, // 78: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
+	151, // 79: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
+	152, // 80: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
+	155, // 81: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
+	162, // 82: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
+	164, // 83: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
+	166, // 84: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
+	167, // 85: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
+	169, // 86: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
+	170, // 87: remote.v1.Frame.totp_set:type_name -> remote.v1.TotpSet
+	171, // 88: remote.v1.Frame.totp_status_request:type_name -> remote.v1.TotpStatusRequest
+	174, // 89: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
+	175, // 90: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
+	143, // 91: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
+	144, // 92: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
+	145, // 93: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
+	147, // 94: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
+	149, // 95: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
+	156, // 96: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
+	157, // 97: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
+	158, // 98: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
+	159, // 99: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
+	161, // 100: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
+	163, // 101: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
+	165, // 102: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
+	168, // 103: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
+	172, // 104: remote.v1.Frame.totp_status:type_name -> remote.v1.TotpStatus
+	176, // 105: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
+	27,  // 106: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
+	98,  // 107: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
+	1,   // 108: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
+	31,  // 109: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
+	32,  // 110: remote.v1.Answers.answers:type_name -> remote.v1.Answer
+	50,  // 111: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
+	51,  // 112: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
+	27,  // 113: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
+	27,  // 114: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
+	2,   // 115: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
+	69,  // 116: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
+	69,  // 117: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
+	70,  // 118: remote.v1.Project.git:type_name -> remote.v1.GitStatus
+	71,  // 119: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
+	72,  // 120: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
+	87,  // 121: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
+	88,  // 122: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
+	86,  // 123: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
+	86,  // 124: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
+	85,  // 125: remote.v1.ThreadInfo.profile_suggestion:type_name -> remote.v1.ProfileSuggestion
+	89,  // 126: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
+	89,  // 127: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
+	88,  // 128: remote.v1.ClaudeProfile.last_usage:type_name -> remote.v1.RateLimits
+	90,  // 129: remote.v1.ProfileListResult.profiles:type_name -> remote.v1.ClaudeProfile
+	91,  // 130: remote.v1.MachineProfile.profiles:type_name -> remote.v1.ProfileListResult
+	93,  // 131: remote.v1.MachineProfile.sessions:type_name -> remote.v1.SessionProfile
+	3,   // 132: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
+	2,   // 133: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
+	4,   // 134: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
+	99,  // 135: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
+	99,  // 136: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
+	99,  // 137: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
+	107, // 138: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
+	98,  // 139: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
+	5,   // 140: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
+	107, // 141: remote.v1.FullItem.item:type_name -> remote.v1.Item
+	108, // 142: remote.v1.Item.text:type_name -> remote.v1.TextItem
+	109, // 143: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
+	110, // 144: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
+	111, // 145: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
+	112, // 146: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
+	116, // 147: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
+	114, // 148: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
+	119, // 149: remote.v1.Item.status:type_name -> remote.v1.StatusItem
+	120, // 150: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
+	121, // 151: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
+	122, // 152: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
+	123, // 153: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
+	124, // 154: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
+	125, // 155: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
+	6,   // 156: remote.v1.TextItem.role:type_name -> remote.v1.Role
+	58,  // 157: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
+	7,   // 158: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
+	113, // 159: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
+	8,   // 160: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
+	7,   // 161: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
+	9,   // 162: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
+	1,   // 163: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
+	115, // 164: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
+	117, // 165: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
+	9,   // 166: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
+	31,  // 167: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
+	118, // 168: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
+	10,  // 169: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
+	127, // 170: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
+	11,  // 171: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
+	126, // 172: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
+	128, // 173: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
+	132, // 174: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
+	131, // 175: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
+	59,  // 176: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
+	130, // 177: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
+	173, // 178: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
+	134, // 179: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
+	136, // 180: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
+	138, // 181: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
+	146, // 182: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
+	148, // 183: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
+	12,  // 184: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
+	148, // 185: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
+	153, // 186: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
+	154, // 187: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
+	13,  // 188: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
+	160, // 189: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
+	14,  // 190: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
+	15,  // 191: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
+	192, // [192:192] is the sub-list for method output_type
+	192, // [192:192] is the sub-list for method input_type
+	192, // [192:192] is the sub-list for extension type_name
+	192, // [192:192] is the sub-list for extension extendee
+	0,   // [0:192] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -14658,6 +15045,8 @@ func file_remote_v1_remote_proto_init() {
 		(*Frame_BrowserClear)(nil),
 		(*Frame_TotpSet)(nil),
 		(*Frame_TotpStatusRequest)(nil),
+		(*Frame_AgentUpdateCheck)(nil),
+		(*Frame_AgentUpdateStart)(nil),
 		(*Frame_SecretPrompt)(nil),
 		(*Frame_SecretPromptEnded)(nil),
 		(*Frame_SecretListResult)(nil),
@@ -14672,6 +15061,7 @@ func file_remote_v1_remote_proto_init() {
 		(*Frame_ScreenShareOpened)(nil),
 		(*Frame_ScreenShareClosed)(nil),
 		(*Frame_TotpStatus)(nil),
+		(*Frame_AgentUpdateProgress)(nil),
 	}
 	file_remote_v1_remote_proto_msgTypes[14].OneofWrappers = []any{
 		(*ThreadRespond_Decision)(nil),
@@ -14705,8 +15095,8 @@ func file_remote_v1_remote_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
-			NumEnums:      15,
-			NumMessages:   157,
+			NumEnums:      16,
+			NumMessages:   161,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

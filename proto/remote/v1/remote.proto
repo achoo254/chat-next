@@ -218,6 +218,9 @@ message Frame {
     // Pairing by authenticator code; see "pairing by authenticator" below.
     TotpSet totp_set = 102;
     TotpStatusRequest totp_status_request = 103;
+    // Updating tunelo itself (tunelo 2.3.0+); see "updating tunelo" below.
+    AgentUpdateCheck agent_update_check = 105;
+    AgentUpdateStart agent_update_start = 106;
 
     // B → A, continued
     SecretPrompt secret_prompt = 63;
@@ -236,6 +239,7 @@ message Frame {
     ScreenShareOpened screen_share_opened = 100;
     ScreenShareClosed screen_share_closed = 101;
     TotpStatus totp_status = 104;
+    AgentUpdateProgress agent_update_progress = 107;
   }
 }
 
@@ -1072,6 +1076,11 @@ enum ErrorReason {
   ERROR_REASON_SCREEN_SHARE_GONE = 51;
   // TotpSet with a secret that is not 20 bytes.
   ERROR_REASON_TOTP_SECRET_INVALID = 52;
+  // AgentUpdateStart on a machine that cannot replace its own file (tunelo
+  // run from source, or not installed as the single binary).
+  ERROR_REASON_UPDATE_UNAVAILABLE = 53;
+  // AgentUpdateStart while an update is already running.
+  ERROR_REASON_UPDATE_BUSY = 54;
 }
 
 enum ErrorCode {
@@ -1482,6 +1491,8 @@ message MachineInfo {
   // The machine has an authenticator secret: new devices can pair with its
   // code (see TotpSet).
   bool totp_enabled = 21;
+  // Unset before tunelo 2.3.0.
+  AgentUpdateInfo agent_update = 22;
 }
 
 message RemoteBrowserInfo {
@@ -1560,7 +1571,8 @@ message AuditEntry {
   // path: the site it showed; detail: "claude" or "user"),
   // browser_clear (the tunelo browser's profile was deleted),
   // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
-  // totp_set (a device set or replaced the authenticator secret; never the secret)
+  // totp_set (a device set or replaced the authenticator secret; never the secret),
+  // agent_update (a device started an update of tunelo; detail: the version)
   string action = 3;
   string path = 4;
   string detail = 5;
@@ -1921,4 +1933,54 @@ message TotpStatusRequest {}
 message TotpStatus {
   // The machine has a secret: new devices can pair with its code.
   bool enabled = 1;
+}
+
+// --- updating tunelo ----------------------------------------------------------
+// A device can ask a machine to update itself, as `tunelo update` does at the
+// machine: B fetches the newest tunelo release, checks its minisign signature
+// against the key built into the running binary, replaces its own file and
+// restarts. Devices reconnect to the new version on their own. B writes each
+// update to the consent log.
+
+message AgentUpdateInfo {
+  // B can replace its own file; false when tunelo runs from source.
+  bool supported = 1;
+  // The newest release when it is newer than this tunelo; empty when this is
+  // the newest or B could not reach the release list.
+  string latest_version = 2;
+  // An update is running now (progress follows as AgentUpdateProgress).
+  bool updating = 3;
+}
+
+// A → B: look for a newer release now (B also looks every few hours).
+// Answered with MachineInfo.
+message AgentUpdateCheck {}
+
+// A → B: update to the newest release. Answered with Ack at once;
+// AgentUpdateProgress follows, to every connected device.
+// ERROR_REASON_UPDATE_UNAVAILABLE / ERROR_REASON_UPDATE_BUSY.
+message AgentUpdateStart {}
+
+enum AgentUpdatePhase {
+  AGENT_UPDATE_PHASE_UNSPECIFIED = 0;
+  AGENT_UPDATE_PHASE_DOWNLOADING = 1;
+  AGENT_UPDATE_PHASE_VERIFYING = 2;
+  AGENT_UPDATE_PHASE_INSTALLING = 3;
+  // The new file is in place and B is restarting; the connection ends here.
+  AGENT_UPDATE_PHASE_RESTARTING = 4;
+  // Nothing was installed: message says why, in English.
+  AGENT_UPDATE_PHASE_FAILED = 5;
+  // Already the newest; nothing to do.
+  AGENT_UPDATE_PHASE_UP_TO_DATE = 6;
+}
+
+// B → A, unasked, to every connected device.
+message AgentUpdateProgress {
+  AgentUpdatePhase phase = 1;
+  // The version being installed.
+  string version = 2;
+  // While DOWNLOADING, in bytes; total is 0 when the size is not known.
+  uint64 received = 3;
+  uint64 total = 4;
+  string message = 5;
 }

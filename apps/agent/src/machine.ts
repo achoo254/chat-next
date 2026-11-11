@@ -34,7 +34,8 @@ import type { McpHost } from "./mcp/mcp-host.ts";
 import type { SessionMcpLease } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { DiskAccessWatch, diskAccess, diskAccessSteps, freshDiskAccess, openDiskAccessSettings } from "./safety/disk-access.ts";
-import { isCompiled, selfCommand, underLaunchAgent } from "./service.ts";
+import { isCompiled, selfCommand, supervised, underLaunchAgent } from "./service.ts";
+import { AgentUpdater } from "./agent-updater.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
@@ -92,6 +93,7 @@ export class Machine {
   readonly secrets: SecretService;
   readonly browser: RemoteBrowser;
   readonly screenShare: ScreenShare;
+  private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
@@ -118,6 +120,18 @@ export class Machine {
     this.secrets = opts.secrets ?? new SecretService({ configDir: dir, audit: this.audit });
     this.browser = opts.browser ?? new RemoteBrowser({ configDir: dir, audit: this.audit, log: this.log });
     this.screenShare = opts.screenShare ?? new ScreenShare({ audit: this.audit, log: this.log });
+    this.updater = new AgentUpdater({
+      // Only the installed single file replaces itself, and only where something starts it again.
+      supported: () => isCompiled() && supervised(dir),
+      announce: () => void this.announceInfo(),
+      emit: (p) => {
+        const value = { phase: p.phase, version: p.version, received: BigInt(p.received), total: BigInt(p.total), message: p.message };
+        for (const c of this.connections) if (c.isOpen) c.announce({ case: "agentUpdateProgress", value });
+      },
+      // Lets the last progress frames out, then exits for the supervisor to start the new file.
+      restart: () => setTimeout(() => process.exit(0), 500),
+      log: this.log,
+    });
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
     this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
     const c = this.config.get();
@@ -257,6 +271,7 @@ export class Machine {
     const actual = typeof addr === "object" && addr ? addr.port : port;
     this.port = actual;
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
+    this.updater.start();
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath, false)) this.log(line);
     return actual;
@@ -267,6 +282,7 @@ export class Machine {
     await this.browser.close();
     this.screenShare.stop();
     this.diskWatch.stop();
+    this.updater.stop();
     this.stopRotation?.();
     clearTimeout(this.announcing);
     for (const c of this.connections) c.close(1001, "shutting down");
@@ -352,6 +368,7 @@ export class Machine {
         secrets: this.secrets,
         browser: this.browser,
         screenShare: this.screenShare,
+        updater: this.updater,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
@@ -444,6 +461,7 @@ export class Machine {
       browser: { available: this.browser.available(), running: this.browser.running(), clearable: true },
       screenShare: this.screenShare.supported,
       totpEnabled: this.pairing.enabled,
+      agentUpdate: this.updater.info(),
     });
   }
 

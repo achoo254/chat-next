@@ -15,6 +15,7 @@ export type AuditAction =
   | "approve_sensitive"
   | "pair"
   | "totp_set"
+  | "agent_update"
   | "revoke"
   | "permission_mode"
   | "profile_add"

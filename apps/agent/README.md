@@ -39,7 +39,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo start` / `stop` | Bật, tắt bản chạy nền (tự chạy lúc đăng nhập máy) |
 | `tunelo status` | Tunnel đang mở, rồi trạng thái máy, claude, phiên; thoát 1 khi dịch vụ không chạy |
 | `tunelo logs -f` | Xem log liên tục (`agent.log` trong thư mục cấu hình) |
-| `tunelo update` (`--check`) | Cài bản ký mới nhất rồi khởi động lại |
+| `tunelo update` (`--check`) | Cài bản ký mới nhất rồi khởi động lại; hiện phần trăm khi tải. Từ 2.3.0 cũng làm được từ trang máy trong Chat |
 | `tunelo devices list` / `revoke <khoá>` | Thiết bị đã ghép |
 | `tunelo authenticator` [`--replace`] | Tạo mã Authenticator ngay trên máy và hiện một lần (QR + khoá base32), để ghép thiết bị đầu tiên bằng mã 6 số mà không cần cài lại; máy đã có mã thì cần `--replace` |
 | `tunelo claude profiles list` / `add` / `select <profile>` / `remove <profile>` | Các tài khoản Claude của máy; `add` đăng nhập ngay trong terminal; `select` đổi profile cho cả máy: phiên rảnh mở lại ngay dưới profile mới (cùng hội thoại), phiên đang chạy đổi sau lượt hiện tại |

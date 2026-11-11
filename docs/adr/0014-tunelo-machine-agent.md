@@ -124,6 +124,16 @@ Chi tiết ở ADR 0013, mục "MCP của tunelo trong phiên claude". Tóm tắ
 - Nhật ký: mỗi request một dòng trong `agent.log` (giờ, cổng, method, path không query, status). Không ghi header, thân hay query.
 - Thứ tự deploy: tunelo-server có cửa kiểm `/.tunelo/forward` phải chạy trước khi tunelo nào bật chuyển tiếp.
 
+### Cập nhật tunelo từ trang máy trong Chat
+
+Từ 2.3.0, thiết bị đã ghép cập nhật được tunelo của máy ngay trên trang máy, không cần ngồi trước máy chạy `tunelo update`.
+
+- Máy tự tìm bản `tunelo-v*` mới ngay khi chạy và mỗi 6 giờ, báo qua `MachineInfo.agent_update` (`supported`, `latest_version`, `updating`). Nút "Kiểm tra bản mới" gửi `AgentUpdateCheck`.
+- `AgentUpdateStart` được trả `Ack` ngay; máy tải, kiểm chữ ký minisign với khoá nằm sẵn trong binary đang chạy (đúng đường của `tunelo update`), thay file rồi thoát cho trình giám sát khởi động bản mới. Từng bước gửi tới mọi thiết bị đang nối bằng `AgentUpdateProgress` (đang tải kèm phần trăm, kiểm tra chữ ký, cài, khởi động lại, lỗi kèm lý do). Kết nối rớt khi khởi động lại; thiết bị tự nối lại và thấy bản mới.
+- Chỉ máy có thể tự thay file và có thứ khởi động lại nó mới cập nhật từ xa: file binary đã build, chạy dưới launchd (macOS), systemd (Linux) hoặc vòng lặp `run-agent.cmd` (Windows). Còn lại `supported=false` và trang chỉ chỉ cách chạy `tunelo update` trên máy.
+- Mỗi lần bắt đầu cập nhật ghi một dòng `agent_update` (kèm phiên bản) vào nhật ký đồng ý. Phiên đang chạy trên máy có thể bị ngắt khi khởi động lại; trang hỏi lại trước khi cập nhật nếu máy đang mở phiên.
+- Không đổi `MinAgentVersion`: field mới đều tuỳ chọn, máy cũ không gửi `agent_update` thì trang chỉ nhắc chạy `tunelo update` trên máy một lần để lên 2.3.0.
+
 ## Hệ quả
 
 - Thư mục cấu hình tunelo chỉ có một refresh token hoandat, đã niêm phong. Ngoài `claude-profiles/*/home` (kho riêng của claude),

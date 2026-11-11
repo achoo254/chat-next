@@ -38,6 +38,16 @@ export function underLaunchAgent(): boolean {
   return process.platform === "darwin" && process.env.XPC_SERVICE_NAME === LABEL;
 }
 
+/**
+ * True when something starts the agent again after it exits (launchd, systemd,
+ * the Windows loop), so an update that restarts it leaves it running.
+ */
+export function supervised(configDir: string): boolean {
+  if (process.platform === "darwin") return underLaunchAgent();
+  if (process.platform === "linux") return Boolean(process.env.INVOCATION_ID);
+  return existsSync(join(configDir, "run-agent.cmd"));
+}
+
 /** tunelo itself with `args`: the compiled file, or bun + script in development. */
 export function selfCommand(...args: string[]): string[] {
   const exe = process.execPath;
