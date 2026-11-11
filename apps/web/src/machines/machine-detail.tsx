@@ -220,12 +220,8 @@ export function MachineDetail({ machine }: { machine: string }) {
 						<dd className="mono">
 							tunelo {state.info?.agentVersion || entry.agentVersion || "—"}{" "}
 							{!entry.claimed && <span className="chip mx-chip warn">{t.status.needsLogin}</span>}
+							{online && state.info !== null && <AgentUpdateSetting link={link} info={state.info} progress={state.agentUpdate} online={online} />}
 						</dd>
-						{online && state.info !== null && (
-							<dd>
-								<AgentUpdateSetting link={link} info={state.info} progress={state.agentUpdate} online={online} />
-							</dd>
-						)}
 						{!entry.claimed && (
 							<dd className="note" role="note">
 								{t.status.needsLoginHint}
