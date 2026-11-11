@@ -221,6 +221,9 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 		case "notification_settings":
 			putNotificationSettings(w, body.settings);
 			return;
+		case "agent_projects_changed":
+			w.emit(EventKeys.agentProjects);
+			return;
 		case "unknown":
 			// A kind newer than this build; the next release knows how to apply it.
 			return;

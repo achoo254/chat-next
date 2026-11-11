@@ -481,6 +481,8 @@ export type UpdateBody =
 	| { readonly kind: "dialog_unread_mark"; readonly chatId: number; readonly unread: boolean }
 	/** The user's notification settings after a change. */
 	| { readonly kind: "notification_settings"; readonly settings: NotificationSettings }
+	/** The user's AI Agent projects changed (content-free: list them again). */
+	| { readonly kind: "agent_projects_changed" }
 	/** A kind added to the protocol after this client was built. */
 	| { readonly kind: "unknown" };
 

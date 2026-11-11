@@ -38,6 +38,8 @@ interface NewSessionProps {
 	onClose: () => void;
 	/** Start in this project, with its defaults (tunelo 2.0.7+). */
 	project?: Project | undefined;
+	/** The session started in `dir` (its folder may become a project's workspace). */
+	onStarted?: (dir: string) => void;
 }
 
 /** Folders that start with what was typed: the suggestions, then the folders shown; at most six. */
@@ -52,7 +54,7 @@ function joinPath(dir: string, child: string): string {
 	return dir.endsWith(sep) ? `${dir}${child}` : `${dir}${sep}${child}`;
 }
 
-export function NewSession({ machine, name, link, state, onClose, project }: NewSessionProps) {
+export function NewSession({ machine, name, link, state, onClose, project, onStarted }: NewSessionProps) {
 	const t = useMachinesCopy();
 	const titleId = useDomId("new-session");
 	const tabsId = useDomId("new-session-tab");
@@ -178,6 +180,7 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 					setBusy(false);
 					const thread = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
 					if (thread === undefined) return;
+					onStarted?.(thread.dir);
 					onClose();
 					if (offered) rememberMode(machine, openIn);
 					navigate(modePath(machine, thread.id, openIn));

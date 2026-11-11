@@ -620,11 +620,12 @@ function toBody(update: WireUpdate): UpdateBody {
 				? { kind: "unknown" }
 				: { kind: "notification_settings", settings: toNotificationSettings(settings) };
 		}
-		case "userChanged":
 		case "agentProjectsChanged":
+			// A content-free hint to list the AI Agent projects again; nothing for the chat store.
+			return { kind: "agent_projects_changed" };
+		case "userChanged":
 		case undefined:
 			// userChanged: the changed user comes with the frame's users, which every frame stores.
-			// agentProjectsChanged: a content-free hint to list the AI Agent projects again; nothing for the chat store.
 			return { kind: "unknown" };
 	}
 }

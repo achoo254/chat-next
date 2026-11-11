@@ -20,7 +20,9 @@ import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
 import { PageHead } from "./page-head.tsx";
-import { connText } from "./session-sidebar.tsx";
+import { connText } from "./session-row.tsx";
+import { useAgentProjects } from "./agent-projects-store.ts";
+import { adoptStarted } from "./project-actions.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { aiName, errorText, folderName, providerOf, timeAgo, useHub, useMachineViews, useNow, useWatch, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -87,6 +89,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 	const search = useSearch();
 	const view = useMachineViews(hub, now).find((m) => m.entry.ref === machine);
 	const [creating, setCreating] = useState(false);
+	const [projects] = useAgentProjects();
 	// A push opens /ai/<id>?session=<thread>: go straight to that thread.
 	useEffect(() => {
 		const session = new URLSearchParams(search).get("session");
@@ -144,7 +147,16 @@ export function MachineBoard({ machine }: { machine: string }) {
 				<Recent list={idle.slice(0, RECENT)} showMachine={false} now={now} />
 				{max > 0 && <p className="note">{t.agent.capacity(state.openSessions, max)}</p>}
 			</div>
-			{creating && <NewSession machine={machine} name={entry.name} link={link} state={state} onClose={() => setCreating(false)} />}
+			{creating && (
+				<NewSession
+					machine={machine}
+					name={entry.name}
+					link={link}
+					state={state}
+					onStarted={(dir) => adoptStarted(projects, { id: entry.id, link, state }, dir).catch(() => undefined)}
+					onClose={() => setCreating(false)}
+				/>
+			)}
 		</div>
 	);
 }

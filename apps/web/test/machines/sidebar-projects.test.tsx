@@ -1,14 +1,17 @@
-// The AI Agent column, project-first: sessions show inside projects, and a
-// folder with sessions that was never added shows as one too (offering
-// "Thêm làm dự án"), so a user who had sessions before projects loses
-// nothing; no inbox row or filter tabs but one switch for what needs the user
-// or runs, with "Thêm dự án" on the same row; one empty state for the whole
-// list; the machine's name on each project only with several machines; a
-// machine with nothing to list stays under "Quản lý máy".
+// The AI Agent column as Project > Workspace > sessions, with no machine in
+// it: the folders a machine keeps become projects on first connect (one
+// project per repository across machines), a workspace shows its folder,
+// branch and state dot, and the machine's name only when its project spans
+// two machines; sessions in no workspace wait, folded, in "Chưa phân loại",
+// each folder offering "Tạo dự án" and "Thêm vào dự án…" (another
+// repository's project refused); "Thêm dự án" takes a name and an optional
+// repository; an empty project offers "Thêm workspace"; one switch for what
+// needs the user or runs, with "+" on the same row.
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { type Frame } from "@achoo254/chat-proto/remote/remote";
+import { create } from "@bufbuild/protobuf";
+import { ProjectSchema, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
@@ -24,7 +27,8 @@ let machine: FakeMachine;
 let device: KeyPair;
 type Row = ReturnType<typeof thread>;
 let threads: Row[];
-let projects: { id: string; name: string; dir: string }[];
+let projects: Project[];
+let suggestions: { dir: string; sessions: number; gitRemote: string; branch: string }[];
 
 vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	deviceKeyStore: () => ({
@@ -38,26 +42,32 @@ vi.mock("../../src/machines/link/device-keys.ts", () => ({
 const services = { toasts: { show: () => undefined } } as unknown as Services;
 const NativeWebSocket = window.WebSocket;
 const thread = (id: string, dir: string, state: number) => ({ id, title: id, dir, provider: "claude", state, updatedAt: 1n });
+const own = (id: string, dir: string, gitRemote = "", branch = "main") => create(ProjectSchema, { id, name: dir.split("/").at(-1) ?? dir, dir, gitRemote, git: { git: true, branch } });
+const WAIT = { timeout: 4000 };
 
 beforeEach(async () => {
 	window.sessionStorage.clear();
-	// t1 waits for the user (state 3), t2 is idle, t3 sits in a folder that is no project.
+	window.localStorage.clear();
+	// t1 waits for the user (state 3), t2 is idle, t3 sits in a folder no workspace holds.
 	threads = [thread("t1", "/w/app", 3), thread("t2", "/w/app/src", 1), thread("t3", "/tmp/scratch", 1)];
-	projects = [
-		{ id: "p1", name: "app", dir: "/w/app" },
-		{ id: "p2", name: "docs", dir: "/w/docs" },
-	];
+	projects = [own("p1", "/w/app", "git@github.com:a/app.git", "feature-x"), own("p2", "/w/docs")];
+	suggestions = [{ dir: "/tmp/scratch", sessions: 1, gitRemote: "git@github.com:a/scratch.git", branch: "main" }];
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
 	machine.paired = [device.publicKey];
 	machine.handler = (frame: Frame) => {
 		switch (frame.body.case) {
 			case "machineInfoRequest":
-				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "2.5.0", maxSessions: 3, providers: [{ id: "claude", name: "Claude Code" }] } }];
+				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "2.6.0", maxSessions: 3, providers: [{ id: "claude", name: "Claude Code" }] } }];
 			case "threadList":
 				return [{ case: "threadListResult", value: { threads, openSessions: 0, maxSessions: 3 } }];
+			case "projectAdd": {
+				const dir = frame.body.value.dir;
+				projects = [...projects, own(`p-${dir}`, dir, suggestions.find((s) => s.dir === dir)?.gitRemote ?? "")];
+				return [{ case: "projectListResult", value: { projects, suggestions } }];
+			}
 			case "projectList":
-				return [{ case: "projectListResult", value: { projects, suggestions: [] } }];
+				return [{ case: "projectListResult", value: { projects, suggestions } }];
 			default:
 				return defaultAnswer(frame);
 		}
@@ -86,103 +96,145 @@ function column(hosts: { name: string; online: boolean }[], view: MachinesView =
 			</ServicesContext>
 		</I18nProvider>,
 	);
-	return document.querySelector<HTMLElement>(".mx-list") ?? document.body;
+	return { list: document.querySelector<HTMLElement>(".mx-list") ?? document.body, server: machines.projects };
 }
 
-describe("the project-first column", () => {
-	it("a machine with added projects: sessions inside them; a folder with sessions and no project shows as one too", async () => {
-		const list = column([{ name: "Mac mini", online: true }]);
-		await within(list).findByText("t1");
-		// The projects and the other sessions arrive in their own renders; wait for the last ones before the exact checks.
-		await waitFor(() => {
-			expect(within(list).getByText("docs")).toBeTruthy();
-			expect(within(list).getByText("t3")).toBeTruthy();
-		});
-		expect(within(list).getByText("app")).toBeTruthy();
-		expect(within(list).getByText("t2")).toBeTruthy();
-		expect(within(list).getByText("scratch")).toBeTruthy();
-		expect(within(list).getByText("t3")).toBeTruthy();
-		expect(within(list).getByText("Chưa là dự án")).toBeTruthy();
-		expect(within(list).queryByText("Khác")).toBeNull();
-		expect(within(list).queryByText("Chưa có dự án")).toBeNull();
-		expect(within(list).queryByRole("tab")).toBeNull();
-		expect(list.querySelector(".mx-srow .mx-sdot.need")).toBeTruthy();
-		// One machine: no machine names on projects.
+const projectRow = (list: HTMLElement, name: string) => {
+	const head = within(list)
+		.getAllByRole("button", { expanded: true })
+		.concat(within(list).queryAllByRole("button", { expanded: false }))
+		.find((b) => b.classList.contains("mx-project-toggle") && b.querySelector("b")?.textContent === name);
+	if (head === undefined) throw new Error(`no project ${name}`);
+	return head.closest<HTMLElement>(".mx-project") ?? head;
+};
+
+describe("the project column", () => {
+	it("first connect: the machine's folders become projects, sessions sit in their workspace, no machine anywhere", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs"]), WAIT);
+		await within(list).findByText("t1", undefined, WAIT);
+		const app = projectRow(list, "app");
+		// The project needing the user is open, with its workspace: folder, branch, state dot.
+		expect(within(app).getByText("t1")).toBeTruthy();
+		expect(within(app).getByText("t2")).toBeTruthy();
+		expect(within(app).getByText("feature-x")).toBeTruthy();
+		expect(app.querySelector(".mx-wdot.need")).toBeTruthy();
+		// One machine: no machine label, no machine row.
 		expect(list.querySelector(".mx-host")).toBeNull();
-		// One row: the switch, then "+" for a project.
-		const row = list.querySelector(".mx-nav-top");
-		expect(within(row as HTMLElement).getByRole("switch", { name: /Chỉ hiện cần bạn \/ đang chạy/ })).toBeTruthy();
-		const add = within(row as HTMLElement).getByRole("button", { name: "Thêm dự án" });
-		expect(add.getAttribute("title")).toBe("Thêm dự án");
+		expect(within(list).queryByText("Mac mini")).toBeNull();
+		// "docs" has nothing for the user: folded.
+		expect(projectRow(list, "docs").querySelector(".mx-ws")).toBeNull();
+		// The session outside every workspace waits, folded, in "Chưa phân loại".
+		expect(within(list).getByRole("button", { name: "Chưa phân loại (1)" }).getAttribute("aria-expanded")).toBe("false");
+		expect(within(list).queryByText("t3")).toBeNull();
+		// The top row: the switch, then "+" for a project.
+		const row = list.querySelector<HTMLElement>(".mx-nav-top");
+		if (row === null) throw new Error("no top row");
+		expect(within(row).getByRole("switch", { name: /Chỉ hiện cần bạn \/ đang chạy/ })).toBeTruthy();
+		expect(within(row).getByRole("button", { name: "Thêm dự án" })).toBeTruthy();
 		expect(within(list).getByRole("link", { name: /Quản lý máy/ })).toBeTruthy();
 	});
 
-	it("a machine with sessions but no added project (before projects existed): every folder shows, and is added in one tap", async () => {
-		projects = [];
-		const list = column([{ name: "Mac mini", online: true }]);
-		expect(await within(list).findByText("app")).toBeTruthy();
-		expect(within(list).getByText("src")).toBeTruthy();
-		expect(within(list).getByText("scratch")).toBeTruthy();
-		expect(within(list).getByText("t1")).toBeTruthy();
-		expect(within(list).queryByText("Chưa có dự án")).toBeNull();
-		await userEvent.click(within(list).getByRole("button", { name: "Tuỳ chọn cho dự án scratch" }));
-		await userEvent.click(within(list).getByRole("menuitem", { name: "Thêm làm dự án" }));
-		await waitFor(() => expect(machine.received.some((f) => f.body.case === "projectAdd" && f.body.value.dir === "/tmp/scratch")).toBe(true));
-	});
-
-	it("nothing on any machine: one empty state for the whole list, never one per machine", async () => {
-		projects = [];
-		threads = [];
-		const list = column([
+	it("one repository on two machines: one project, each workspace names its machine", async () => {
+		const { list, server } = column([
 			{ name: "Mac mini", online: true },
 			{ name: "Mac studio", online: true },
 		]);
-		const empty = await within(list).findByText("Chưa có dự án");
-		expect(within(list).getAllByText("Chưa có dự án")).toHaveLength(1);
-		expect(empty.textContent).not.toMatch(/Mac/);
-		const box = empty.closest("[data-id=sidebar-empty]");
-		expect(within(box as HTMLElement).getByRole("button", { name: "Thêm dự án" }).className).toContain("btn-primary");
+		await waitFor(() => expect(server.workspaces).toHaveLength(4), WAIT);
+		expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs", "docs"]);
+		await waitFor(() => expect([...list.querySelectorAll(".mx-host")].map((e) => e.textContent).sort()).toEqual(["Mac mini", "Mac studio"]), WAIT);
+		// Only "app" spans two machines; nothing else names one.
+		for (const label of list.querySelectorAll(".mx-host")) expect(label.closest(".mx-project")?.querySelector(".mx-project-toggle b")?.textContent).toBe("app");
 	});
 
-	it("one toggle keeps only what needs the user or runs", async () => {
-		const list = column([{ name: "Mac mini", online: true }]);
-		await within(list).findByText("t2");
+	it("a folder in 'Chưa phân loại' becomes a project in one tap, named after its repository", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects).toHaveLength(2), WAIT);
+		await userEvent.click(await within(list).findByRole("button", { name: "Chưa phân loại (1)" }, WAIT));
+		expect(within(list).getByText("t3")).toBeTruthy();
+		await userEvent.click(within(list).getByRole("button", { name: "Tuỳ chọn cho workspace scratch" }));
+		await userEvent.click(within(list).getByRole("menuitem", { name: "Tạo dự án" }));
+		await waitFor(() => expect(server.projects.map((p) => [p.name, p.gitRemote])).toContainEqual(["scratch", "github.com/a/scratch"]), WAIT);
+		expect(machine.received.some((f) => f.body.case === "projectAdd" && f.body.value.dir === "/tmp/scratch")).toBe(true);
+		await waitFor(() => expect(within(list).queryByRole("button", { name: /Chưa phân loại/ })).toBeNull(), WAIT);
+	});
+
+	it("'Thêm vào dự án…' refuses a project linking another repository", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects).toHaveLength(2), WAIT);
+		await userEvent.click(await within(list).findByRole("button", { name: "Chưa phân loại (1)" }, WAIT));
+		await userEvent.click(within(list).getByRole("button", { name: "Tuỳ chọn cho workspace scratch" }));
+		await userEvent.click(within(list).getByRole("menuitem", { name: "Thêm vào dự án…" }));
+		const dialog = await screen.findByRole("dialog");
+		const app = within(dialog).getByRole("radio", { name: /app/ });
+		expect((app as HTMLInputElement).disabled).toBe(true);
+		expect(within(dialog).getByText("repo khác")).toBeTruthy();
+		// "docs" links no repository: it takes the folder.
+		await userEvent.click(within(dialog).getByRole("radio", { name: /docs/ }));
+		await userEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+		await waitFor(() => expect(server.workspaces.find((w) => w.dir === "/tmp/scratch")?.projectId).toBe(server.projects.find((p) => p.name === "docs")?.id), WAIT);
+	});
+
+	it("'Thêm dự án': a name and an optional repository (checked), then an empty project offering 'Thêm workspace'", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects).toHaveLength(2), WAIT);
+		await userEvent.click(within(list).getByRole("button", { name: "Thêm dự án" }));
+		const dialog = await screen.findByRole("dialog");
+		const submit = within(dialog).getByRole("button", { name: "Tạo dự án" });
+		expect((submit as HTMLButtonElement).disabled).toBe(true);
+		await userEvent.type(within(dialog).getByRole("textbox", { name: "Tên dự án" }), "Kế hoạch");
+		await userEvent.type(within(dialog).getByRole("textbox", { name: "Repo git (tuỳ chọn)" }), "/local/path");
+		await userEvent.click(submit);
+		expect(await within(dialog).findByText(/Không đọc được địa chỉ repo này/)).toBeTruthy();
+		await userEvent.clear(within(dialog).getByRole("textbox", { name: "Repo git (tuỳ chọn)" }));
+		await userEvent.type(within(dialog).getByRole("textbox", { name: "Repo git (tuỳ chọn)" }), "https://tok:en@github.com/a/plan.git");
+		await userEvent.click(submit);
+		await waitFor(() => expect(server.projects.map((p) => [p.name, p.gitRemote])).toContainEqual(["Kế hoạch", "github.com/a/plan"]), WAIT);
+		// A new, empty project shows open, its next step first.
+		const plan = projectRow(list, "Kế hoạch");
+		expect(within(plan).getByText("Dự án chưa có workspace.")).toBeTruthy();
+		await userEvent.click(within(plan).getByRole("button", { name: "Thêm workspace" }));
+		expect(await screen.findByRole("dialog", { name: "Thêm workspace vào Kế hoạch" })).toBeTruthy();
+	});
+
+	it("the switch keeps only what needs the user or runs", async () => {
+		const { list } = column([{ name: "Mac mini", online: true }]);
+		await within(list).findByText("t2", undefined, WAIT);
 		const toggle = within(list).getByRole("switch", { name: /Chỉ hiện cần bạn \/ đang chạy/ });
 		await userEvent.click(toggle);
 		expect(toggle.getAttribute("aria-checked")).toBe("true");
 		await waitFor(() => expect(within(list).queryByText("t2")).toBeNull());
 		expect(within(list).getByText("t1")).toBeTruthy();
-		// A project with nothing for the user hides too.
 		expect(within(list).queryByText("docs")).toBeNull();
 	});
 
-	it("several machines: each project names its machine; a machine offline with nothing known stays out of the list", async () => {
-		const list = column([
+	it("nothing on any machine: one empty state for the whole list", async () => {
+		projects = [];
+		threads = [];
+		const { list } = column([
 			{ name: "Mac mini", online: true },
-			{ name: "Old PC", online: false },
+			{ name: "Mac studio", online: true },
 		]);
-		await within(list).findByText("t1");
-		expect([...list.querySelectorAll(".mx-host")].map((e) => e.textContent)).toContain("Mac mini");
-		await act(() => new Promise((r) => setTimeout(r, 50)));
-		expect(within(list).queryByText("Old PC")).toBeNull();
-		expect(within(list).queryByRole("link", { name: "Ghép thiết bị này" })).toBeNull();
+		const empty = await within(list).findByText("Chưa có dự án", undefined, WAIT);
+		expect(within(list).getAllByText("Chưa có dự án")).toHaveLength(1);
+		const box = empty.closest<HTMLElement>("[data-id=sidebar-empty]");
+		if (box === null) throw new Error("no empty state");
+		expect(within(box).getByRole("button", { name: "Thêm dự án" }).className).toContain("btn-primary");
 	});
 
-	it("an old address of a session in no project still opens it, offering to add its folder", async () => {
-		column([{ name: "Mac mini", online: true }], { page: "session", machine: "1", threadId: "t3" });
-		const note = await screen.findByText("scratch chưa là dự án nên phiên này không hiện trong danh sách.");
-		const strip = note.closest("[data-id=session-not-in-project]");
-		expect(strip).toBeTruthy();
-		await userEvent.click(within(strip as HTMLElement).getByRole("button", { name: "Thêm dự án" }));
-		// The dialog starts in that folder.
-		expect(await screen.findByRole("dialog")).toBeTruthy();
+	it("an old address of a session still opens it; its header names the project, the folder and the machine", async () => {
+		column([{ name: "Mac mini", online: true }], { page: "session", machine: "1", threadId: "t2" });
+		const head = await screen.findByText("app", { selector: ".mx-head .mono" }, WAIT);
+		expect(head.getAttribute("title")).toBe("/w/app/src");
+		expect(screen.getAllByText(/Mac mini/).length).toBeGreaterThan(0);
+		expect(screen.queryByText(/chưa là dự án/)).toBeNull();
 	});
 
 	it("the machine's settings: the Full Disk Access card sits in the page's column; a session shows its folder's name, the whole path on hover", async () => {
 		const base = machine.handler;
 		machine.handler = (frame, socket) =>
 			frame.body.case === "machineInfoRequest"
-				? [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "2.5.0", maxSessions: 3, needsFullDiskAccess: true, providers: [{ id: "claude", name: "Claude Code" }] } }]
+				? [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "2.6.0", maxSessions: 3, needsFullDiskAccess: true, providers: [{ id: "claude", name: "Claude Code" }] } }]
 				: base(frame, socket);
 		column([{ name: "Mac mini", online: true }], { page: "info", machine: "1" });
 		const card = await screen.findByRole("alert");

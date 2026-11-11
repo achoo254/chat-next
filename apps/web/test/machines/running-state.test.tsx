@@ -16,7 +16,7 @@ import { viMachines } from "../../src/machines/copy-vi.ts";
 import { zhCNMachines } from "../../src/machines/copy-zh-CN.ts";
 import { MachineLink, sortForList, type LinkState } from "../../src/machines/link/machine-link.ts";
 import { Transcript } from "../../src/machines/session-chat.tsx";
-import { matches, rowLine, runningCount } from "../../src/machines/session-sidebar.tsx";
+import { matches, rowLine } from "../../src/machines/session-sidebar.tsx";
 import type { Block } from "../../src/machines/transcript/tool-fold.ts";
 import { isRunning, stateKey } from "../../src/machines/use-machines.ts";
 import { FakeMachine, until } from "./fake-machine.ts";
@@ -62,16 +62,15 @@ function manualSource(): ActivitySource & { set(a: ThreadActivity | undefined): 
 }
 
 describe("a session running elsewhere in the session column", () => {
-	it("is under the running filter, as busy elsewhere; without the field it stays idle as before", () => {
+	it("is under the attention switch, as busy elsewhere; without the field it stays idle as before", () => {
 		const elsewhere = { state: ThreadState.IDLE, archived: false, busyElsewhere: true };
-		expect(matches("running", elsewhere)).toBe(true);
+		expect(matches("attention", elsewhere)).toBe(true);
 		expect(matches("all", elsewhere)).toBe(true);
-		expect(matches("need", elsewhere)).toBe(false);
 		expect(stateKey(elsewhere)).toBe("elsewhere");
 		expect(isRunning(elsewhere)).toBe(true);
 		// An older machine never sends the field.
 		const older = { state: ThreadState.IDLE, archived: false };
-		expect(matches("running", older)).toBe(false);
+		expect(matches("attention", older)).toBe(false);
 		expect(stateKey(older)).toBe("idle");
 		expect(stateKey({ state: ThreadState.RUNNING })).toBe("running");
 		// Waiting for the user wins over anything else.
@@ -87,7 +86,7 @@ describe("a session running elsewhere in the session column", () => {
 			{ state: ThreadState.IDLE, archived: false },
 			{ state: ThreadState.WAITING, archived: false },
 		];
-		expect(runningCount(threads)).toBe(3);
+		expect(threads.filter((x) => isRunning(x)).length).toBe(3);
 		expect(viMachines.sessions.running(3)).toBe("Đang chạy (3)");
 		expect(viMachines.sessions.running(0)).toBe("Đang chạy");
 		expect(enMachines.sessions.running(2)).toBe("Running (2)");

@@ -591,17 +591,6 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						},
 					},
 				];
-			case "projectClone":
-				// The clone runs: about a third of its objects arrived.
-				setTimeout(
-					() =>
-						machine.send(socket, {
-							case: "projectCloneProgress",
-							value: { cloneId: frame.body.case === "projectClone" ? frame.body.value.cloneId : "", phase: "Receiving objects", percent: 37 },
-						}),
-					0,
-				);
-				return [{ case: "ack", value: {} }];
 			case "threadSetArchived":
 				return [{ case: "ack", value: {} }];
 			case "attachmentCancel":

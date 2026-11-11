@@ -49,8 +49,9 @@ import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
 import { ModeSwitch, TerminalHeldBar, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
-import { AddProject } from "./project-section.tsx";
-import { inFolder, projectsSupported } from "./projects-view.ts";
+import { inFolder } from "./projects-view.ts";
+import { useAgentProjects } from "./agent-projects-store.ts";
+import { locate } from "./project-tree.ts";
 
 export { versionAtLeast };
 
@@ -67,6 +68,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
+	const [, projects] = useAgentProjects();
 	const [link, state] = useLink(hub, machine);
 	useWatch(link, threadId);
 	const [changesOpen, setChangesOpen] = useState(false);
@@ -168,12 +170,11 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const offered = terminalOffered(state.info, provider);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
 	const held = thread !== null && thread.terminalSession > 0;
-	// Every session lives in a project: one opened by its address in another folder offers to add it.
-	const projects = projectsSupported(state.info?.agentVersion) ? state.projects?.projects : undefined;
-	const notInProject = thread !== null && online && projects !== undefined && !projects.some((x) => inFolder(thread.dir, x.dir));
-	// "project · branch · machine" under the title (the folder when it is in no project).
-	const project = projects?.filter((x) => inFolder(dir, x.dir)).sort((a, b) => b.dir.length - a.dir.length)[0];
-	const branch = project?.git?.git === true ? project.git.branch : "";
+	// "project · workspace · branch · machine" under the title: the project holding the session's folder, else the folder.
+	const placed = entry === null || dir === "" ? null : locate(projects.projects, entry.id, dir);
+	const own = state.projects?.projects.filter((x) => inFolder(dir, x.dir)).sort((a, b) => b.dir.length - a.dir.length)[0];
+	const branch = own?.git?.git === true ? own.git.branch : (placed?.workspace.branch ?? "");
+	const workspace = placed === null ? folderName(dir) : folderName(placed.workspace.dir);
 	const endTerminal = held ? () => link.request({ case: "termClose", value: { session: thread.terminalSession } }).then(() => undefined) : undefined;
 	return (
 		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
@@ -185,8 +186,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				subtitle={
 					<>
 						<span className="mono" title={dir}>
-							{project?.name ?? folderName(dir)}
+							{placed?.project.name ?? workspace}
 						</span>
+						{placed !== null && placed.project.name !== workspace && <span className="hide-narrow">· {workspace}</span>}
 						{branch !== "" && <span className="hide-narrow">· {branch}</span>}
 						<span className="hide-narrow">· {machineName}</span>
 					</>
@@ -232,13 +234,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				/>
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
-			{notInProject && (
-				<div className="mx-strip slim" role="note" data-id="session-not-in-project">
-					<MachineIcon name="folder" small />
-					<span className="grow">{t.agent.projects.notInProject(folderName(dir))}</span>
-					<AddProject hosts={[{ ref: machine, name: machineName, link, state }]} initialDir={dir} />
-				</div>
-			)}
 			<DiskAccessBanner link={link} info={state.info} online={online} bar />
 			{mode === "terminal" ? (
 				<div className="mx-chat-body">

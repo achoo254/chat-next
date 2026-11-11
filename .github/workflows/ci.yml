@@ -82,8 +82,11 @@ jobs:
       - if: steps.browsers.outputs.cache-hit != 'true'
         run: pnpm --filter @app/web exec playwright install --with-deps --only-shell chromium
       # The cache holds the browser only; its system libraries come from apt.
+      # A stale package index makes apt fail on mirror files the runner image no longer has: refresh it, and try once more if a mirror is still flaky.
       - if: steps.browsers.outputs.cache-hit == 'true'
-        run: pnpm --filter @app/web exec playwright install-deps chromium
+        run: |
+          sudo apt-get update
+          pnpm --filter @app/web exec playwright install-deps chromium || { sleep 20; sudo apt-get update; pnpm --filter @app/web exec playwright install-deps chromium; }
       - run: pnpm perf
 
   proto:

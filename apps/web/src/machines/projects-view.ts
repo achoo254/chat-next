@@ -1,10 +1,10 @@
-// A machine's sessions by project (tunelo 2.0.7+): each project in the
-// machine's order (pinned first) with the sessions in its folder or below
-// it; sessions in no project go to "Khác", grouped by folder as before.
-import type { Project, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+// Paths of a machine's folders, compared the way the machine names them:
+// case-insensitive with either slash on Windows, exact elsewhere, a trailing
+// separator ignored. A session belongs to the folder holding its working
+// directory (the folder itself or one inside it).
 import { AGENT_PROJECTS, versionAtLeast } from "./agent-version.ts";
-import { sortForList } from "./link/machine-link.ts";
 
+/** The machine keeps folders as projects (tunelo 2.0.7+). */
 export function projectsSupported(agentVersion: string | undefined): boolean {
 	return versionAtLeast(agentVersion ?? "", AGENT_PROJECTS);
 }
@@ -16,6 +16,12 @@ function norm(p: string): string {
 	return windowsPath(p) ? trimmed.toLowerCase().replace(/\//g, "\\") : trimmed;
 }
 
+/** The same folder. */
+export function samePath(a: string, b: string): boolean {
+	const x = norm(a);
+	return x !== "" && x === norm(b);
+}
+
 /** `dir` is `parent` or inside it. */
 export function inFolder(dir: string, parent: string): boolean {
 	const d = norm(dir);
@@ -23,32 +29,4 @@ export function inFolder(dir: string, parent: string): boolean {
 	if (p === "") return false;
 	const sep = windowsPath(parent) ? "\\" : "/";
 	return d === p || d.startsWith(p + sep);
-}
-
-export interface ProjectGroup {
-	readonly project: Project;
-	readonly threads: ThreadSummary[];
-}
-
-/** Sessions by project (the deepest project holding the folder), and the rest. */
-export function byProject(threads: readonly ThreadSummary[], projects: readonly Project[]): { groups: ProjectGroup[]; other: ThreadSummary[] } {
-	const groups = projects.map((project) => ({ project, threads: [] as ThreadSummary[] }));
-	const other: ThreadSummary[] = [];
-	for (const thread of sortForList(threads)) {
-		const holders = groups.filter((g) => inFolder(thread.dir, g.project.dir));
-		const deepest = holders.sort((a, b) => b.project.dir.length - a.project.dir.length)[0];
-		if (deepest === undefined) other.push(thread);
-		else deepest.threads.push(thread);
-	}
-	return { groups, other };
-}
-
-/** A project's second line: branch, changed files, ahead/behind. */
-export function gitLine(project: Project, changed: (n: number) => string): string {
-	const git = project.git;
-	if (git === undefined || !git.git) return "";
-	const parts = [git.branch];
-	if (git.changed > 0) parts.push(changed(git.changed));
-	if (git.ahead > 0 || git.behind > 0) parts.push(`↑${git.ahead} ↓${git.behind}`);
-	return parts.filter((p) => p !== "").join(" · ");
 }

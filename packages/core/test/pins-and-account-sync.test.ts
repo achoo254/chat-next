@@ -45,6 +45,9 @@ describe("protocol mapping", () => {
 		expect(toUpdate(create(UpdateSchema, { kind: { case: "notificationSettings", value: {} } })).body).toEqual({
 			kind: "unknown",
 		});
+		// The AI Agent's projects changed on another device: a content-free hint the screens list again on.
+		expect(toUpdate(create(UpdateSchema, { kind: { case: "agentProjectsChanged", value: {} } })).body).toEqual({ kind: "agent_projects_changed" });
+		expect(EventKeys.agentProjects).toBe("agent_projects");
 	});
 
 	it("reads stored settings defensively", () => {

@@ -4,7 +4,7 @@
 // changed files, the prompt card's keys and "deny and tell", and the
 // composer's single send/stop button and "@" files.
 import { create } from "@bufbuild/protobuf";
-import { Decision, ItemSchema, PromptState, ThreadState, ToolKind, type ApprovalItem, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { Decision, ItemSchema, PromptState, ThreadState, ToolKind, type ApprovalItem } from "@achoo254/chat-proto/remote/remote";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -19,7 +19,7 @@ import { connOf, shouldConnect } from "../../src/machines/machine-status.ts";
 import { highlight, languageOfPath } from "../../src/machines/rich/highlight.ts";
 import Markdown, { safeHref } from "../../src/machines/rich/markdown.tsx";
 import { versionAtLeast } from "../../src/machines/session-chat.tsx";
-import { byFolder, matches } from "../../src/machines/session-sidebar.tsx";
+import { matches } from "../../src/machines/session-sidebar.tsx";
 import { sessionChanges } from "../../src/machines/transcript/changes.ts";
 import { canonicalAiPath } from "../../src/machines/ai-paths.ts";
 import { matchRoute, paths } from "../../src/router.tsx";
@@ -59,27 +59,16 @@ describe("machine state", () => {
 });
 
 describe("sessions column", () => {
-	const thread = (id: string, dir: string, state: ThreadState, updatedAt: number): ThreadSummary =>
-		({ id, dir, state, updatedAt: BigInt(updatedAt), title: id, provider: "claude", model: "", pending: 0, open: true }) as unknown as ThreadSummary;
-
-	it("groups by folder, the folder of the most urgent session first", () => {
-		const list = [thread("a", "~/x", ThreadState.IDLE, 3), thread("b", "~/y", ThreadState.WAITING, 1), thread("c", "~/x", ThreadState.RUNNING, 2)];
-		expect(byFolder(list).map((f) => [f.dir, f.threads.map((t) => t.id)])).toEqual([
-			["~/y", ["b"]],
-			["~/x", ["c", "a"]],
-		]);
-	});
-
-	it("filters on what needs the user and what runs, and keeps archived sessions under their own filter", () => {
+	it("the switch keeps what needs the user or runs, and archived sessions show under their own link", () => {
 		const live = { archived: false };
-		expect(matches("need", { ...live, state: ThreadState.WAITING })).toBe(true);
-		expect(matches("need", { ...live, state: ThreadState.RUNNING })).toBe(false);
-		expect(matches("running", { ...live, state: ThreadState.QUEUED })).toBe(true);
+		expect(matches("attention", { ...live, state: ThreadState.WAITING })).toBe(true);
+		expect(matches("attention", { ...live, state: ThreadState.QUEUED })).toBe(true);
+		expect(matches("attention", { ...live, state: ThreadState.IDLE })).toBe(false);
 		expect(matches("all", { ...live, state: ThreadState.IDLE })).toBe(true);
 		expect(matches("all", { archived: true, state: ThreadState.IDLE })).toBe(false);
 		expect(matches("archived", { archived: true, state: ThreadState.IDLE })).toBe(true);
 		expect(matches("archived", { ...live, state: ThreadState.IDLE })).toBe(false);
-		expect(matches("need", { archived: true, state: ThreadState.WAITING })).toBe(true);
+		expect(matches("attention", { archived: true, state: ThreadState.WAITING })).toBe(true);
 	});
 });
 

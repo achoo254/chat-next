@@ -7,7 +7,9 @@
 // "Trò chuyện | Terminal" switch) asks the machine for its AI by the thread
 // alone, shows the path pill in the session header, and every split pane
 // closes on its own; the split icons keep their 14x12 glyph; the column has
-// no Terminal entry. The real direct path is checked against the real
+// no Terminal entry. The column speaks of projects only: the demo machine's
+// folders become projects, a workspace shows its branch and state, no
+// machine's name shows. The real direct path is checked against the real
 // terminal process at acceptance. Starts its own Vite dev server of the
 // harness, so it needs no backend:
 //
@@ -124,6 +126,43 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	// No Terminal entry in the column; the one toggle is there.
 	assert.equal(await page.locator(".mx-list a", { hasText: /^Terminal$/ }).count(), 0);
 	assert.equal(await page.locator("[data-id=sidebar-attention]").count(), 1);
+	assert.deepEqual(errors, []);
+	await context.close();
+});
+
+test("the column speaks of projects only: the machine's folders became projects, workspaces with branch and state, no machine anywhere", async () => {
+	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 } });
+	const page = await context.newPage();
+	const errors: string[] = [];
+	page.on("pageerror", (err) => errors.push(String(err)));
+	await page.goto(`http://localhost:${PORT}/?at=machine-chat`);
+	const list = page.locator(".mx-list");
+	// The demo machine keeps three folders; the column records them as projects on first connect.
+	await until(page, "three projects", () => document.querySelectorAll(".mx-list .mx-project-toggle").length === 3, 30_000);
+	const names = await list.locator(".mx-project-toggle b").allTextContents();
+	assert.deepEqual([...names].sort(), ["auth-next", "chat-next", "localman-next"]);
+	// The open session's project is open: its workspace with folder, branch and the "needs you" dot, the session inside.
+	const chat = list.locator(".mx-project", { has: page.locator(".mx-project-toggle b", { hasText: /^chat-next$/ }) });
+	assert.equal(await chat.locator(".mx-project-toggle").getAttribute("aria-expanded"), "true");
+	assert.equal(await chat.locator(".mx-ws-name b").first().textContent(), "chat-next");
+	assert.equal(await chat.locator(".mx-ws-name small").first().textContent(), "main");
+	assert.equal(await chat.locator(".mx-wdot.need").count(), 1);
+	assert.equal(await chat.locator(".mx-srow", { hasText: "Sửa giao diện Máy của tôi" }).count(), 1);
+	// One machine holds them all: no machine name, label or row in the column.
+	const text = (await list.textContent()) ?? "";
+	for (const machineName of ["DIEUVY-LAPTOP", "Mac mini", "Máy nhà"]) assert.ok(!text.includes(machineName), machineName);
+	assert.equal(await list.locator(".mx-host").count(), 0);
+	// The workspace's "+" and menu are real buttons, 44 px high where the row allows it.
+	const plus = chat.getByRole("button", { name: "Phiên mới trong chat-next" });
+	assert.equal(await plus.count(), 1);
+	const toggleBox = await chat.locator(".mx-project-toggle").boundingBox();
+	assert.ok((toggleBox?.height ?? 0) >= 44, `project row ${toggleBox?.height}`);
+	// "Thêm dự án": a name, an optional repository, or a folder on the machine.
+	await page.locator(".mx-nav-top [data-id=add-project]").click();
+	const dialog = page.getByRole("dialog");
+	await dialog.getByRole("textbox", { name: "Tên dự án" }).waitFor();
+	assert.equal(await dialog.getByRole("textbox", { name: "Repo git (tuỳ chọn)" }).count(), 1);
+	assert.equal(await dialog.getByRole("button", { name: "Chọn thư mục trên máy" }).count(), 1);
 	assert.deepEqual(errors, []);
 	await context.close();
 });
