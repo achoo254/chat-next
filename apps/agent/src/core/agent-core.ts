@@ -275,7 +275,7 @@ export class AgentCore {
   private readonly uploads: Uploads;
 
   constructor(private readonly opts: CoreOptions) {
-    this.maxSessions = opts.maxSessions ?? 3;
+    this.maxSessions = opts.maxSessions ?? 50;
     this.idleMs = opts.idleMs ?? 5 * 60_000;
     this.now = opts.now ?? Date.now;
     mkdirSync(join(opts.dataDir, "threads"), { recursive: true, mode: 0o700 });

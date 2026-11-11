@@ -79,12 +79,14 @@ const DEFAULTS: AgentConfig = {
   machineName: "",
   devices: [],
   revoked: [],
-  maxSessions: 3,
+  maxSessions: 50,
   idleMinutes: 5,
   mcpServers: {},
   pinnedDirs: [],
   trustedDirs: [],
 };
+
+const OLD_DEFAULT_MAX_SESSIONS = 3;
 
 export class ConfigStore {
   readonly file: string;
@@ -96,6 +98,9 @@ export class ConfigStore {
     this.data = existsSync(this.file)
       ? { ...DEFAULTS, ...(JSON.parse(readFileSync(this.file, "utf8")) as Partial<AgentConfig>) }
       : { ...DEFAULTS };
+    // 3 was the old default and update() wrote it back into every config.json:
+    // lift it to the new default so existing machines get the higher limit.
+    if (this.data.maxSessions === OLD_DEFAULT_MAX_SESSIONS) this.data.maxSessions = DEFAULTS.maxSessions;
   }
 
   get(): Readonly<AgentConfig> {
