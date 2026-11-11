@@ -280,6 +280,19 @@ describe("slash commands", () => {
 		expect(boxValue(field)).toBe("/compact ");
 	});
 
+	it("picks an option when a finger lifts from it, once, and not when the pointer was cancelled by a scroll", async () => {
+		const user = userEvent.setup();
+		const { field } = composer();
+		await user.type(field, "/c");
+		const option = screen.getByRole("option", { name: /compact/ });
+		fireEvent.pointerDown(option, { pointerType: "touch" });
+		fireEvent.pointerCancel(option, { pointerType: "touch" });
+		expect(boxValue(field)).toBe("/c");
+		fireEvent.pointerDown(option, { pointerType: "touch" });
+		fireEvent.pointerUp(option, { pointerType: "touch" });
+		expect(boxValue(field)).toBe("/compact ");
+	});
+
 	it("shows nothing while no commands are known", async () => {
 		const user = userEvent.setup();
 		const { onSend, field } = composer([]);

@@ -120,6 +120,9 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
 đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
 
+Phiên đang xem trên một thiết bị theo sát lượt gõ ở terminal (tunelo 2.2.1 trở lên): máy đọc lại nhật ký mỗi 1,5 giây và gửi phần mới, thay vì chỉ
+khi mở phiên hay gửi tin. Máy chạy bản cũ chỉ thấy lượt mới khi mở lại phiên: chạy `tunelo update`.
+
 ## Đăng nhập khi điều khiển từ xa: bí mật (2.0.8)
 
 Trong phiên tunelo mở, Claude xin mật khẩu/token bằng tool MCP `request_secret(name, purpose, origin)`. Claude chỉ nhận **tham

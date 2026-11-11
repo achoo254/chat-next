@@ -9,7 +9,7 @@
 // Files (tunelo 2.0.5+) come by the attach button, by pasting or by dropping
 // them on the session; they upload at once and go with the next message,
 // which may then have no text.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { hasFinePointer } from "../components/fine-pointer.ts";
 import { Icon } from "../components/screen-icons.tsx";
@@ -142,6 +142,27 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		if (option.kind === "command") slash?.replace(`/${option.command.name} `);
 		else at?.replace(option.dir ? `@${option.path}` : `@${option.path} `);
 	};
+	/** A touch pick just went through pointerup: the click after it (when the list is still there) is the same tap. */
+	const tapped = useRef(false);
+	/**
+	 * What an option does on a tap. The focus (and the phone keyboard) stays in
+	 * the field. A touch picks when the finger lifts, as the click of a touch
+	 * does not always reach an option while the keyboard moves the page; a
+	 * scroll of the list cancels the pointer, so it picks nothing.
+	 */
+	const tap = (option: Option) => ({
+		onPointerDown: (event: PointerEvent<HTMLLIElement>) => event.preventDefault(),
+		onPointerUp: (event: PointerEvent<HTMLLIElement>) => {
+			if (event.pointerType === "mouse") return;
+			tapped.current = true;
+			setTimeout(() => (tapped.current = false), 500);
+			pick(option);
+		},
+		onClick: () => {
+			if (tapped.current) tapped.current = false;
+			else pick(option);
+		},
+	});
 	const send = () => {
 		const message = text.trim();
 		if (!canSend) return;
@@ -212,17 +233,14 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		if (option.kind !== "command") return null;
 		const command = option.command;
 		return (
-			// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the text box handles the arrow keys, Tab, Enter and Esc for this listbox
 			<li
 				key={command.name}
 				id={optionId(i)}
 				role="option"
 				aria-selected={i === index}
 				className={i === index ? "active" : undefined}
-				// Keep the focus (and the phone keyboard) in the field.
-				onPointerDown={(event) => event.preventDefault()}
 				onPointerMove={() => i !== index && setActive(i)}
-				onClick={() => pick(option)}
+				{...tap(option)}
 			>
 				<span className="cmd">
 					<b>/{command.name}</b>
@@ -271,16 +289,14 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 						)}
 						{options.map((option, i) =>
 							option.kind === "file" ? (
-								// eslint-disable-next-line jsx-a11y/click-events-have-key-events -- options never take focus: the text box handles the keys for this listbox
 								<li
 									key={option.path}
 									id={optionId(i)}
 									role="option"
 									aria-selected={i === index}
 									className={i === index ? "active file" : "file"}
-									onPointerDown={(event) => event.preventDefault()}
 									onPointerMove={() => i !== index && setActive(i)}
-									onClick={() => pick(option)}
+									{...tap(option)}
 								>
 									<span className="cmd">
 										<MachineIcon name={option.dir ? "folder" : "list"} small />
