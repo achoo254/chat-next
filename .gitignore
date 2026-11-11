@@ -33,3 +33,4 @@ apps/mobile/www/
 
 # Cargo output of the terminal daemon.
 apps/term-host/target/
+apps/stun/target/

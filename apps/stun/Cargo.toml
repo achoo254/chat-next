@@ -1,0 +1,17 @@
+[package]
+name = "stun-responder"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+description = "Minimal STUN Binding responder (RFC 8489): reports the source address, nothing else"
+publish = false
+
+# Standard library only: no crates, so the service has no third-party code.
+[dependencies]
+
+[profile.release]
+opt-level = "s"
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true

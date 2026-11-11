@@ -1,0 +1,45 @@
+[Unit]
+Description=Minimal STUN Binding responder (UDP 3478, stun:tunnel.hoandat.com:3478)
+Documentation=https://github.com/achoo254/chat-next/tree/main/infra/stun
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stun
+Group=stun
+ExecStart=/usr/local/bin/stun-responder --listen 0.0.0.0:3478
+Restart=on-failure
+RestartSec=2
+
+# The service only needs one unprivileged UDP socket.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=077
+MemoryMax=32M
+TasksMax=4
+LimitNOFILE=64
+
+[Install]
+WantedBy=multi-user.target

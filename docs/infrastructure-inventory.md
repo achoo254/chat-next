@@ -50,6 +50,28 @@ Quyết định hiện hành (2026-10-15): server `.65` là nơi lưu trung tâm
 
 Chỉ có một process `chat-api` (`ecosystem.config.cjs`). Ngày 24/10/2026 bỏ đa tenant: đã `pm2 delete chat-api-inetdev`, xoá `/opt/chat/tenants` và `chat.tenants.conf` (backup ở `/root/backup-261024-single-tenant/`, `/root/nginx-bak-261024/`).
 
+### STUN cho terminal từ xa (systemd, cài ngày 2026-11-11)
+
+Dịch vụ `stun-responder` ([`apps/stun`](../apps/stun), script và hướng dẫn ở [`infra/stun/`](../infra/stun/README.md)) trả lời STUN Binding để trình duyệt và
+`tunelo-term-host` lấy ứng viên địa chỉ công khai. Client dùng `stun:tunnel.hoandat.com:3478` (mặc định của term-host).
+
+| Thứ | Chi tiết |
+|---|---|
+| User `stun` | Người dùng hệ thống, không home, shell `nologin`; chỉ chạy dịch vụ này |
+| `/usr/local/bin/stun-responder` | root:root 755, binary Rust tĩnh musl (chỉ thư viện chuẩn), khoảng 350 KB |
+| `/etc/systemd/system/stun-responder.service` | `enabled`, chạy dưới `stun`, nghe `0.0.0.0:3478/udp`; không capability, `ProtectSystem=strict`, `MemoryMax=32M`, `TasksMax=4`. RSS đo được khoảng 270 KB |
+| Log | journald (`journalctl -u stun-responder`): dòng khởi động và tổng kết mỗi giờ |
+
+Hành vi: chỉ Binding, không TURN, không xác thực, không lưu gì; 20 câu trả lời mỗi giây cho mỗi địa chỉ nguồn, gói khác bị bỏ im lặng.
+
+Điều kiện tiên quyết (đã kiểm ngày 2026-11-11, không phải thay đổi gì):
+- `tunnel.hoandat.com` là bản ghi DNS-only trỏ thẳng vào `.65`, nên không thêm bản ghi DNS; IP gốc vốn đã công khai qua tên này.
+- UDP 3478 phải vào được máy: `firewalld` tắt, chính sách INPUT của iptables là ACCEPT, không có luật UDP nào. Script triển khai không đổi tường lửa, chỉ in trạng thái.
+  Nếu sau này khoá INPUT, phải mở UDP 3478.
+- Cổng 443 không được giới hạn về dải Cloudflare: `tunnel.hoandat.com` và `*.tunnel.hoandat.com` đi thẳng vào máy gốc, khoá lại sẽ làm chết relay Tunelo.
+
+Gỡ: `systemctl disable --now stun-responder`, xoá binary và unit, `systemctl daemon-reload` (chi tiết trong [`infra/stun/README.md`](../infra/stun/README.md)).
+
 ### nginx (`/etc/nginx/conf.d/`)
 
 | File | Vai trò |
