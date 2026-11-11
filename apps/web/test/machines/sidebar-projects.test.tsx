@@ -93,8 +93,12 @@ describe("the project-first column", () => {
 	it("a machine with added projects: sessions inside them; a folder with sessions and no project shows as one too", async () => {
 		const list = column([{ name: "Mac mini", online: true }]);
 		await within(list).findByText("t1");
+		// The projects and the other sessions arrive in their own renders; wait for the last ones before the exact checks.
+		await waitFor(() => {
+			expect(within(list).getByText("docs")).toBeTruthy();
+			expect(within(list).getByText("t3")).toBeTruthy();
+		});
 		expect(within(list).getByText("app")).toBeTruthy();
-		expect(within(list).getByText("docs")).toBeTruthy();
 		expect(within(list).getByText("t2")).toBeTruthy();
 		expect(within(list).getByText("scratch")).toBeTruthy();
 		expect(within(list).getByText("t3")).toBeTruthy();
