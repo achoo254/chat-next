@@ -57,7 +57,7 @@ const Prefix = "/machine-api/"
 // MinAgentVersion is the oldest machine agent (tunelo) the server accepts:
 // 2.1.0 speaks device link protocol 2 (pairing by the authenticator code),
 // which devices require; older agents are told to run tunelo update.
-const MinAgentVersion = "2.1.0"
+const MinAgentVersion = "2.2.2"
 
 // MachinesScope is the scope an access token needs to register or claim a
 // machine; the IdP grants it to the tunelo-agent client only.

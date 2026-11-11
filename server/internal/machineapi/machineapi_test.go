@@ -186,7 +186,7 @@ func (e *env) token(sub string, mods ...func(claims map[string]any) string) stri
 
 func registerRequest() *appv1.RegisterMachineRequest {
 	return &appv1.RegisterMachineRequest{Name: " Mac mini ", Os: "darwin", Arch: "arm64",
-		AgentVersion: "2.1.0", PublicKey: bytes.Repeat([]byte{5}, 32)}
+		AgentVersion: "2.2.2", PublicKey: bytes.Repeat([]byte{5}, 32)}
 }
 
 func (e *env) register() (int64, string) {
@@ -268,11 +268,11 @@ func TestRegisterMachine(t *testing.T) {
 
 	tok := e.token(ownerSub)
 	for name, msg := range map[string]*appv1.RegisterMachineRequest{
-		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: make([]byte, 32)},
-		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: make([]byte, 32)},
-		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "2.1.0", PublicKey: make([]byte, 32)},
+		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: make([]byte, 32)},
+		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: make([]byte, 32)},
+		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "2.2.2", PublicKey: make([]byte, 32)},
 		"bad version": {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "v1", PublicKey: make([]byte, 32)},
-		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: make([]byte, 31)},
+		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: make([]byte, 31)},
 	} {
 		if _, err := e.client.RegisterMachine(ctx, withSecret(msg, tok)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
@@ -401,7 +401,7 @@ func TestClaimMachine(t *testing.T) {
 		return err
 	}
 	beat := func(tunnel string) (*appv1.HeartbeatResponse, error) {
-		resp, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0"}, secret))
+		resp, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.2.2"}, secret))
 		if err != nil {
 			return nil, err
 		}
@@ -477,7 +477,7 @@ func TestRegisteredMachineTunnelIsChecked(t *testing.T) {
 	ctx := context.Background()
 	id, secret := e.register()
 	beat := func(tunnel string) (bool, error) {
-		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0"}, secret))
+		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.2.2"}, secret))
 		if err != nil {
 			return false, err
 		}
@@ -532,7 +532,7 @@ func TestHeartbeat(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	id, secret := e.legacy()
-	beat := &appv1.HeartbeatRequest{TunnelUrl: "wss://dat-mac.tunnel.hoandat.com/", AgentVersion: "2.1.2", ClaudeVersion: "2.1.319"}
+	beat := &appv1.HeartbeatRequest{TunnelUrl: "wss://dat-mac.tunnel.hoandat.com/", AgentVersion: "2.2.3", ClaudeVersion: "2.1.319"}
 
 	for name, header := range map[string]string{"none": "", "not bearer": "Basic " + secret, "wrong": "Bearer " + wrong(secret)} {
 		req := connect.NewRequest(beat)
@@ -547,7 +547,7 @@ func TestHeartbeat(t *testing.T) {
 		"https://dat.tunnel.hoandat.com", "wss://dat.tunnel.evil.com", "wss://a.b.tunnel.hoandat.com",
 		"wss://DAT.tunnel.hoandat.com", "wss://dat.tunnel.hoandat.com/x", "wss://dat.tunnel.hoandat.com.evil.com",
 	} {
-		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "2.1.0"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "2.2.2"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("tunnel %q: %v", url, err)
 		}
 	}
@@ -563,7 +563,7 @@ func TestHeartbeat(t *testing.T) {
 		t.Fatalf("answer %+v", resp.Msg)
 	}
 	list, _ := e.store.ListMachines(ctx, tenant, e.userID)
-	if list[0].TunnelURL != "wss://dat-mac.tunnel.hoandat.com" || list[0].AgentVersion != "2.1.2" || list[0].ClaudeVersion != "2.1.319" {
+	if list[0].TunnelURL != "wss://dat-mac.tunnel.hoandat.com" || list[0].AgentVersion != "2.2.3" || list[0].ClaudeVersion != "2.1.319" {
 		t.Fatalf("recorded %+v", list[0])
 	}
 
@@ -729,22 +729,22 @@ func TestFailedAuthenticationsAreLimited(t *testing.T) {
 	_, secret := e.register()
 	var last error
 	for range 25 {
-		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.1.0"}, wrong(secret)))
+		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.2.2"}, wrong(secret)))
 	}
 	if connect.CodeOf(last) != connect.CodeResourceExhausted {
 		t.Fatalf("after many failures: %v", last)
 	}
 	// A valid secret still passes.
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.1.0"}, secret)); err != nil {
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.2.2"}, secret)); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCheckVersion(t *testing.T) {
 	for v, want := range map[string]connect.Code{
-		"2.1.0": 0, "2.1.0-beta.1": 0, "2.1.1": 0, "2.2.0": 0, "3.0.0": 0,
-		// Before device link protocol 2: refused with a clear "run tunelo update".
-		"2.0.15": connect.CodeFailedPrecondition, "2.0.99": connect.CodeFailedPrecondition,
+		"2.2.2": 0, "2.2.3": 0, "2.3.0": 0, "3.0.0": 0,
+		// Older than the minimum: refused with a clear "run tunelo update".
+		"2.2.1": connect.CodeFailedPrecondition, "2.1.0": connect.CodeFailedPrecondition, "2.0.15": connect.CodeFailedPrecondition,
 		"1.9.1": connect.CodeFailedPrecondition, "0.1.0": connect.CodeFailedPrecondition,
 		"": connect.CodeInvalidArgument, "2.1": connect.CodeInvalidArgument, "02.1.0": connect.CodeInvalidArgument,
 		"2.1.0+build": connect.CodeInvalidArgument,
@@ -754,7 +754,7 @@ func TestCheckVersion(t *testing.T) {
 		}
 	}
 	// An older tunelo reads what to do from the message.
-	if err := checkVersion("2.0.15"); err == nil || !strings.Contains(err.Error(), "agent_update_required: tunelo 2.1.0 or newer is required; run tunelo update") {
+	if err := checkVersion("2.0.15"); err == nil || !strings.Contains(err.Error(), "agent_update_required: tunelo 2.2.2 or newer is required; run tunelo update") {
 		t.Errorf("old agent message: %v", err)
 	}
 }

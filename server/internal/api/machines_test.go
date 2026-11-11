@@ -39,7 +39,7 @@ func TestMachineDirectory(t *testing.T) {
 		t.Fatalf("install code: %v", err)
 	}
 	register := connect.NewRequest(&appv1.RegisterMachineRequest{
-		Name: "Mac mini", Os: "darwin", Arch: "arm64", AgentVersion: "2.1.0", PublicKey: bytes.Repeat([]byte{4}, 32),
+		Name: "Mac mini", Os: "darwin", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: bytes.Repeat([]byte{4}, 32),
 	})
 	register.Header().Set("Authorization", "Bearer "+e.mcpToken(t, "chat:read machines:write"))
 	reg, err := agent.RegisterMachine(ctx, register)
@@ -50,7 +50,7 @@ func TestMachineDirectory(t *testing.T) {
 	tunnel := "wss://" + machineapi.MachineSubdomain("acc_test", fmt.Sprintf("tunelo.%d", id)) + ".tunnel.hoandat.com"
 	heartbeat := func() *appv1.HeartbeatResponse {
 		t.Helper()
-		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.1.0", ClaudeVersion: "2.1.319"})
+		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.2.2", ClaudeVersion: "2.1.319"})
 		req.Header().Set("Authorization", "Bearer "+secret)
 		resp, err := agent.Heartbeat(ctx, req)
 		if err != nil {
