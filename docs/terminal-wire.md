@@ -263,6 +263,12 @@ Agent thêm các `reason` của riêng nó: `bad_frame`, `overflow`, `unavailabl
 Khi agent khởi động lại, kết nối E2E của thiết bị đứt; peer thẳng của nó vẫn chạy trên data channel nhưng agent mới không còn biết liên kết đó. Client mở liên kết mới (relay hoặc offer mới) và `Attach` lại theo mục 4.
 Peer cũ ấy bị agent mới đóng sau thời gian chờ (xem "Kết nối mồ côi" bên dưới), để một client im lặng không giữ window của phiên dùng chung (mục 5).
 
+### Ghi chú cho client (rút ra khi viết client web)
+
+- Daemon đóng kết nối khi đường thẳng đứt mà **chưa có đường relay nào mở** (`reason` `transport_closed`). Client mở liên kết relay ngay sau khi mở đường thẳng, không chờ tới lúc đường thẳng đứt.
+- `conn_state direct` có thể đến nhiều hơn hai lần (ví dụ khi ICE chọn lại cặp ứng viên). Client xử lý mỗi lần là idempotent: chỉ cập nhật nhãn và `rttMs`.
+- `Pong` của rào `Ping`/`Pong` khi đổi đường có thể quay về trên đường **kia**, không nhất thiết đường đã gửi `Ping`. Client khớp theo `clientMicros`, bất kể `Pong` đến bằng đường nào.
+
 ### Agent giám sát daemon
 
 - Binary: `TUNELO_TERM_HOST_BIN`, rồi `<thư mục cấu hình>/term-host/bin/current/tunelo-term-host[.exe]`, rồi thư mục chứa binary agent. Bản mới được đặt sẵn ở `term-host/bin/next/` (bước tải của phase phát hành); agent chuyển `next` → `current` chỉ khi không có daemon nào chạy (trước khi khởi động daemon), nên cập nhật không cắt shell đang mở.
