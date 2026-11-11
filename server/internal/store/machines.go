@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -88,13 +86,8 @@ func scanMachine(row pgx.Row) (Machine, error) {
 // characters.
 func CleanMachineName(name string) (string, bool) {
 	name = strings.TrimSpace(name)
-	if name == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > MaxMachineNameLen {
+	if name == "" || !cleanText(name, MaxMachineNameLen) {
 		return "", false
-	}
-	for _, r := range name {
-		if unicode.IsControl(r) {
-			return "", false
-		}
 	}
 	return name, true
 }

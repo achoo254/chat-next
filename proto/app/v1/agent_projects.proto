@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package app.v1;
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+
+// Projects of the AI Agent, kept by the server per user and shared by all of
+// the user's devices. A project has a name and, optionally, the git
+// repository it links (its canonical remote key); its workspaces are folders
+// on the user's machines (a clone, a git worktree or a plain folder). The
+// server keeps only this metadata: never a session, a file or anything that
+// goes through a machine's end-to-end channel, and none of these calls ever
+// reaches a machine. Deleting a project or detaching a workspace only drops
+// the record: the folder and its sessions stay on the machine.
+//
+// A workspace is tied to its machine by the machine's public key, which
+// stays when the machine is removed and added again (tunelo keeps its key),
+// so a machine added again finds its workspaces. Every call is the caller's
+// own: a project or workspace of another user is not_found. Each change is
+// announced to the user's sessions as UpdateAgentProjectsChanged. Served
+// under /rpc with the user's session like every user service.
+service AgentProjectsService {
+  // The caller's projects in the user's order (then oldest first), each
+  // with its workspaces, oldest first.
+  rpc ListAgentProjects(ListAgentProjectsRequest) returns (ListAgentProjectsResponse);
+  // Creates a project, empty or linked to a git repository. Fails with
+  // invalid_argument for a bad name or a git_remote without a canonical key
+  // (a local path, a malformed URL), already_exists "project_remote_exists"
+  // when another project of the caller links the same repository, and
+  // resource_exhausted "too_many_projects" at 200 projects.
+  rpc CreateAgentProject(CreateAgentProjectRequest) returns (CreateAgentProjectResponse);
+  // Renames one of the caller's projects. invalid_argument for a bad name,
+  // not_found for a project that is not the caller's.
+  rpc RenameAgentProject(RenameAgentProjectRequest) returns (RenameAgentProjectResponse);
+  // Deletes one of the caller's projects with its workspace records; no
+  // folder or session on any machine is touched. not_found as
+  // RenameAgentProject.
+  rpc DeleteAgentProject(DeleteAgentProjectRequest) returns (DeleteAgentProjectResponse);
+  // Records a folder of one of the caller's machines as a workspace of one
+  // of the caller's projects. Fails with invalid_argument for a bad dir,
+  // branch or kind, not_found "project_not_found" or "machine_not_found"
+  // (another user's, or a removed machine), already_exists
+  // "workspace_exists" when the folder of that machine is a workspace
+  // already (of any project; MoveAgentWorkspace moves it), and
+  // resource_exhausted "too_many_workspaces" at 1000 workspaces.
+  rpc AttachAgentWorkspace(AttachAgentWorkspaceRequest) returns (AttachAgentWorkspaceResponse);
+  // Drops a workspace record; its folder and sessions stay. not_found for a
+  // workspace that is not the caller's.
+  rpc DetachAgentWorkspace(DetachAgentWorkspaceRequest) returns (DetachAgentWorkspaceResponse);
+  // Moves one of the caller's workspaces to another of the caller's
+  // projects. not_found "workspace_not_found" or "project_not_found".
+  rpc MoveAgentWorkspace(MoveAgentWorkspaceRequest) returns (MoveAgentWorkspaceResponse);
+}
+
+// What a workspace's folder is.
+enum AgentWorkspaceKind {
+  AGENT_WORKSPACE_KIND_UNSPECIFIED = 0;
+  // The main work tree of a git clone.
+  AGENT_WORKSPACE_KIND_CLONE = 1;
+  // A linked work tree (git worktree add).
+  AGENT_WORKSPACE_KIND_WORKTREE = 2;
+  // A folder outside git.
+  AGENT_WORKSPACE_KIND_FOLDER = 3;
+}
+
+message AgentProject {
+  int64 id = 1 [jstype = JS_NUMBER];
+  // 1 to 64 characters.
+  string name = 2;
+  // The canonical key of the linked repository, such as
+  // "github.com/owner/repo" (spec/git-remote); empty when the project links
+  // none. Never a URL as typed: no scheme, user, password or port.
+  string git_remote = 3;
+  // The user's order: lower first.
+  int32 order = 4;
+  // Unix seconds.
+  int64 created_at = 5 [jstype = JS_NUMBER];
+  repeated AgentWorkspace workspaces = 6;
+}
+
+message AgentWorkspace {
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 project_id = 2 [jstype = JS_NUMBER];
+  // Machine.id of the caller's machine that holds the folder; 0 while that
+  // machine is removed (the workspace comes back to it when the machine is
+  // added again with the same key).
+  int64 machine_id = 3 [jstype = JS_NUMBER];
+  // Absolute path of the folder on that machine, as the machine reports it.
+  string dir = 4;
+  // The branch when attached; empty when unknown or detached. Informational:
+  // the machine reports the live branch.
+  string branch = 5;
+  AgentWorkspaceKind kind = 6;
+  // Unix seconds.
+  int64 created_at = 7 [jstype = JS_NUMBER];
+}
+
+message ListAgentProjectsRequest {}
+
+message ListAgentProjectsResponse {
+  repeated AgentProject projects = 1;
+}
+
+message CreateAgentProjectRequest {
+  // Trimmed; 1 to 64 characters, no control characters.
+  string name = 1;
+  // A git remote URL in any form git takes (https, ssh, user@host:path), up
+  // to 2048 bytes; the server keeps only its canonical key. Empty: the
+  // project links no repository.
+  string git_remote = 2;
+}
+
+message CreateAgentProjectResponse {
+  AgentProject project = 1;
+}
+
+message RenameAgentProjectRequest {
+  int64 project_id = 1 [jstype = JS_NUMBER];
+  // As CreateAgentProjectRequest.name.
+  string name = 2;
+}
+
+message RenameAgentProjectResponse {
+  AgentProject project = 1;
+}
+
+message DeleteAgentProjectRequest {
+  int64 project_id = 1 [jstype = JS_NUMBER];
+}
+
+message DeleteAgentProjectResponse {}
+
+message AttachAgentWorkspaceRequest {
+  int64 project_id = 1 [jstype = JS_NUMBER];
+  // Machine.id of one of the caller's machines.
+  int64 machine_id = 2 [jstype = JS_NUMBER];
+  // Absolute ("/…", "C:\…" or "\\server\share…"), up to 1024 characters,
+  // no control characters.
+  string dir = 3;
+  // Up to 255 characters, no control characters; empty when unknown.
+  string branch = 4;
+  AgentWorkspaceKind kind = 5;
+}
+
+message AttachAgentWorkspaceResponse {
+  AgentWorkspace workspace = 1;
+}
+
+message DetachAgentWorkspaceRequest {
+  int64 workspace_id = 1 [jstype = JS_NUMBER];
+}
+
+message DetachAgentWorkspaceResponse {}
+
+message MoveAgentWorkspaceRequest {
+  int64 workspace_id = 1 [jstype = JS_NUMBER];
+  // The project it moves to.
+  int64 project_id = 2 [jstype = JS_NUMBER];
+}
+
+message MoveAgentWorkspaceResponse {
+  AgentWorkspace workspace = 1;
+}

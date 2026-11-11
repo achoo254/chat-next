@@ -200,8 +200,9 @@ export function projectListBody(list: ProjectList) {
       missing: p.missing,
       sensitive: p.sensitive,
       ...(p.git ? { git: p.git } : {}),
+      gitRemote: p.gitRemote ?? "",
     })),
-    suggestions: list.suggestions,
+    suggestions: list.suggestions.map((s) => ({ dir: s.dir, sessions: s.sessions, gitRemote: s.gitRemote ?? "", branch: s.branch ?? "" })),
   };
 }
 

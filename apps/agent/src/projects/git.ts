@@ -76,6 +76,70 @@ export async function gitStatus(dir: string, timeoutMs = 3_000): Promise<GitStat
   }
 }
 
+/** Runs a read-only git command in `dir`; its output, or undefined when git fails, is missing or too slow. */
+async function gitRead(dir: string, args: readonly string[], timeoutMs: number): Promise<string | undefined> {
+  try {
+    const { stdout } = await run("git", [...safeGitArgs(), "-C", dir, ...args], { timeout: timeoutMs, env: gitEnv(), maxBuffer: 64 * 1024, windowsHide: true });
+    return stdout;
+  } catch {
+    return undefined;
+  }
+}
+
+const REMOTE_MAX = 2048;
+const BRANCH_MAX = 255;
+
+/** C0 and C1 control characters and DEL. */
+function hasControl(s: string): boolean {
+  for (const ch of s) {
+    const c = ch.charCodeAt(0);
+    if (c < 0x20 || (c >= 0x7f && c <= 0x9f)) return true;
+  }
+  return false;
+}
+
+/** The first line of git's answer, when it is one clean line of at most `max` characters. */
+function oneLine(out: string, max: number): string | undefined {
+  const line = (out.split(/\r?\n/)[0] ?? "").trim();
+  return line === "" || line.length > max || hasControl(line) ? undefined : line;
+}
+
+const URL_USERINFO = /^([A-Za-z][A-Za-z0-9+.-]*:\/\/)([^@/]*)@(.*)$/;
+
+/**
+ * A remote URL as devices get it: as git has it, but never with a password
+ * (`scheme://user:password@`) and, for http(s), never with a user either,
+ * which is where hosts put access tokens.
+ */
+export function reportableRemote(raw: string): string | undefined {
+  const url = oneLine(raw, REMOTE_MAX);
+  if (url === undefined) return undefined;
+  const m = URL_USERINFO.exec(url);
+  if (!m) return url;
+  const scheme = m[1] ?? "";
+  const userinfo = m[2] ?? "";
+  const rest = m[3] ?? "";
+  if (/^https?:\/\/$/i.test(scheme)) return scheme + rest;
+  const user = userinfo.split(":")[0] ?? "";
+  return user === "" ? scheme + rest : `${scheme}${user}@${rest}`;
+}
+
+/**
+ * The folder's `remote.origin.url`, reportable (reportableRemote); undefined
+ * outside git, without that remote, or when git fails or is slow. Reading
+ * config runs nothing of the repository's.
+ */
+export async function gitOriginUrl(dir: string, timeoutMs = 3_000): Promise<string | undefined> {
+  const out = await gitRead(dir, ["config", "--get", "remote.origin.url"], timeoutMs);
+  return out === undefined ? undefined : reportableRemote(out);
+}
+
+/** The checked-out branch of the folder; undefined outside git, when detached, or when git fails or is slow. */
+export async function gitBranch(dir: string, timeoutMs = 3_000): Promise<string | undefined> {
+  const out = await gitRead(dir, ["symbolic-ref", "--quiet", "--short", "HEAD"], timeoutMs);
+  return out === undefined ? undefined : oneLine(out, BRANCH_MAX);
+}
+
 /**
  * A clone URL tunelo takes: https:// or ssh (ssh://… or user@host:path),
  * without a password, nothing that git could read as an option. Returns the

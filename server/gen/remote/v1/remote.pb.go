@@ -6766,8 +6766,13 @@ type Project struct {
 	// Unset when not read yet (or not readable quickly).
 	Git *GitStatus `protobuf:"bytes,6,opt,name=git,proto3" json:"git,omitempty"`
 	// The folder is not there any more.
-	Missing       bool `protobuf:"varint,7,opt,name=missing,proto3" json:"missing,omitempty"`
-	Sensitive     bool `protobuf:"varint,8,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	Missing   bool `protobuf:"varint,7,opt,name=missing,proto3" json:"missing,omitempty"`
+	Sensitive bool `protobuf:"varint,8,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	// The folder's `remote.origin.url` as git reads it (raw, any form git
+	// takes), without a password; empty outside git, without that remote, or
+	// when not read quickly; tunelo 2.5.0 and before never send it. Devices
+	// and the server derive the repository key from it (spec/git-remote).
+	GitRemote     string `protobuf:"bytes,9,opt,name=git_remote,json=gitRemote,proto3" json:"git_remote,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6858,11 +6863,23 @@ func (x *Project) GetSensitive() bool {
 	return false
 }
 
+func (x *Project) GetGitRemote() string {
+	if x != nil {
+		return x.GitRemote
+	}
+	return ""
+}
+
 // A folder that has sessions but is no project yet.
 type ProjectSuggestion struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Dir           string                 `protobuf:"bytes,1,opt,name=dir,proto3" json:"dir,omitempty"`
-	Sessions      uint32                 `protobuf:"varint,2,opt,name=sessions,proto3" json:"sessions,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Dir      string                 `protobuf:"bytes,1,opt,name=dir,proto3" json:"dir,omitempty"`
+	Sessions uint32                 `protobuf:"varint,2,opt,name=sessions,proto3" json:"sessions,omitempty"`
+	// As Project.git_remote.
+	GitRemote string `protobuf:"bytes,3,opt,name=git_remote,json=gitRemote,proto3" json:"git_remote,omitempty"`
+	// The checked-out branch; empty outside git, when detached or not read
+	// quickly (always from tunelo 2.5.0 and before).
+	Branch        string `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6909,6 +6926,20 @@ func (x *ProjectSuggestion) GetSessions() uint32 {
 		return x.Sessions
 	}
 	return 0
+}
+
+func (x *ProjectSuggestion) GetGitRemote() string {
+	if x != nil {
+		return x.GitRemote
+	}
+	return ""
+}
+
+func (x *ProjectSuggestion) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
 }
 
 type ProjectListResult struct {
@@ -15191,7 +15222,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\achanged\x18\x03 \x01(\rR\achanged\x12\x14\n" +
 	"\x05ahead\x18\x04 \x01(\rR\x05ahead\x12\x16\n" +
 	"\x06behind\x18\x05 \x01(\rR\x06behind\x12\x1a\n" +
-	"\bupstream\x18\x06 \x01(\bR\bupstream\"\xef\x01\n" +
+	"\bupstream\x18\x06 \x01(\bR\bupstream\"\x8e\x02\n" +
 	"\aProject\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
@@ -15200,10 +15231,15 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\bdefaults\x18\x05 \x01(\v2\x1a.remote.v1.ProjectDefaultsR\bdefaults\x12&\n" +
 	"\x03git\x18\x06 \x01(\v2\x14.remote.v1.GitStatusR\x03git\x12\x18\n" +
 	"\amissing\x18\a \x01(\bR\amissing\x12\x1c\n" +
-	"\tsensitive\x18\b \x01(\bR\tsensitive\"A\n" +
+	"\tsensitive\x18\b \x01(\bR\tsensitive\x12\x1d\n" +
+	"\n" +
+	"git_remote\x18\t \x01(\tR\tgitRemote\"x\n" +
 	"\x11ProjectSuggestion\x12\x10\n" +
 	"\x03dir\x18\x01 \x01(\tR\x03dir\x12\x1a\n" +
-	"\bsessions\x18\x02 \x01(\rR\bsessions\"\x83\x01\n" +
+	"\bsessions\x18\x02 \x01(\rR\bsessions\x12\x1d\n" +
+	"\n" +
+	"git_remote\x18\x03 \x01(\tR\tgitRemote\x12\x16\n" +
+	"\x06branch\x18\x04 \x01(\tR\x06branch\"\x83\x01\n" +
 	"\x11ProjectListResult\x12.\n" +
 	"\bprojects\x18\x01 \x03(\v2\x12.remote.v1.ProjectR\bprojects\x12>\n" +
 	"\vsuggestions\x18\x02 \x03(\v2\x1c.remote.v1.ProjectSuggestionR\vsuggestions\"\r\n" +

@@ -738,12 +738,22 @@ message Project {
   // The folder is not there any more.
   bool missing = 7;
   bool sensitive = 8;
+  // The folder's `remote.origin.url` as git reads it (raw, any form git
+  // takes), without a password; empty outside git, without that remote, or
+  // when not read quickly; tunelo 2.5.0 and before never send it. Devices
+  // and the server derive the repository key from it (spec/git-remote).
+  string git_remote = 9;
 }
 
 // A folder that has sessions but is no project yet.
 message ProjectSuggestion {
   string dir = 1;
   uint32 sessions = 2;
+  // As Project.git_remote.
+  string git_remote = 3;
+  // The checked-out branch; empty outside git, when detached or not read
+  // quickly (always from tunelo 2.5.0 and before).
+  string branch = 4;
 }
 
 message ProjectListResult {

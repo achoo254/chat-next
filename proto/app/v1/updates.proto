@@ -77,6 +77,7 @@ message Update {
     UpdateDialogUnreadMark dialog_unread_mark = 28;
     UpdateNotificationSettings notification_settings = 29;
     UpdateUserChanged user_changed = 30;
+    UpdateAgentProjectsChanged agent_projects_changed = 31;
   }
 }
 
@@ -237,6 +238,11 @@ message UpdateDialogUnreadMark {
 message UpdateUserChanged {
   int64 user_id = 1 [jstype = JS_NUMBER];
 }
+
+// The user's AI Agent projects or their workspaces changed on one of their
+// sessions (AgentProjectsService): call ListAgentProjects again. Carries
+// nothing else.
+message UpdateAgentProjectsChanged {}
 
 // The user's notification settings after a change, complete.
 message UpdateNotificationSettings {

@@ -14,7 +14,7 @@ import { AgentError } from "../core/agent-core.ts";
 import type { ConfigStore } from "../config.ts";
 import { safeFileName } from "../attachments/project-files.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
-import { type GitStatus, cloneUrlName, gitEnv, gitStatus, safeGitArgs } from "./git.ts";
+import { type GitStatus, cloneUrlName, gitBranch, gitEnv, gitOriginUrl, gitStatus, safeGitArgs } from "./git.ts";
 
 const run = promisify(execFile);
 
@@ -23,9 +23,13 @@ export type ProjectDefaults = { model: string; permissionMode: string; projectSe
 /** One project as tunelo's config keeps it. */
 export type ProjectRecord = { id: string; name: string; dir: string; pinned: boolean; defaults: ProjectDefaults; createdAt: number };
 
-export type ProjectView = ProjectRecord & { git?: GitStatus; missing: boolean; sensitive: boolean };
+/** `gitRemote`: the folder's origin URL as git has it, without credentials (reportableRemote); unset when there is none. */
+export type ProjectView = ProjectRecord & { git?: GitStatus; gitRemote?: string; missing: boolean; sensitive: boolean };
 
-export type ProjectList = { projects: ProjectView[]; suggestions: { dir: string; sessions: number }[] };
+/** A folder with sessions that is no project yet, with its origin URL and branch when git has them. */
+export type ProjectSuggestion = { dir: string; sessions: number; gitRemote?: string; branch?: string };
+
+export type ProjectList = { projects: ProjectView[]; suggestions: ProjectSuggestion[] };
 
 export type CloneProgress = { cloneId: string; phase: string; percent: number; done: boolean; projectId: string; reason: ErrorReason; message: string };
 
@@ -74,19 +78,31 @@ export type ProjectsOptions = {
   home: string;
   /** Reads a git status (tests replace it). */
   status?: (dir: string) => Promise<GitStatus | undefined>;
+  /** Reads a folder's origin URL, reportable (tests replace it). */
+  remote?: (dir: string) => Promise<string | undefined>;
+  /** Reads a folder's branch (tests replace it). */
+  branch?: (dir: string) => Promise<string | undefined>;
   now?: () => number;
 };
 
+type Cached<T> = Map<string, { at: number; value: T }>;
+
 export class Projects {
-  private readonly cache = new Map<string, { at: number; status: GitStatus | undefined }>();
+  private readonly cache: Cached<GitStatus | undefined> = new Map();
+  private readonly remotes: Cached<string | undefined> = new Map();
+  private readonly branches: Cached<string | undefined> = new Map();
   private readonly clones = new Map<string, { child: ChildProcess; target: string; cancelled: boolean }>();
   private readonly listeners = new Set<() => void>();
   private readonly now: () => number;
   private readonly status: (dir: string) => Promise<GitStatus | undefined>;
+  private readonly remote: (dir: string) => Promise<string | undefined>;
+  private readonly branch: (dir: string) => Promise<string | undefined>;
 
   constructor(private readonly opts: ProjectsOptions) {
     this.now = opts.now ?? Date.now;
     this.status = opts.status ?? ((dir) => gitStatus(dir));
+    this.remote = opts.remote ?? ((dir) => gitOriginUrl(dir));
+    this.branch = opts.branch ?? ((dir) => gitBranch(dir));
   }
 
   /** Called whenever the list changed (every device gets it again). */
@@ -118,8 +134,8 @@ export class Projects {
     const projects = await Promise.all(
       records.map(async (p): Promise<ProjectView> => {
         const missing = !isDir(p.dir);
-        const git = missing ? undefined : await this.cachedStatus(p.dir);
-        return { ...p, missing, sensitive: this.opts.isSensitive(p.dir), ...(git ? { git } : {}) };
+        const [git, gitRemote] = missing ? [undefined, undefined] : await Promise.all([this.cached(this.cache, p.dir, this.status), this.cached(this.remotes, p.dir, this.remote)]);
+        return { ...p, missing, sensitive: this.opts.isSensitive(p.dir), ...(git ? { git } : {}), ...(gitRemote ? { gitRemote } : {}) };
       }),
     );
     let dirs: { dir: string; sessions: number }[] = [];
@@ -128,28 +144,38 @@ export class Projects {
     } catch {
       // no suggestions this time
     }
-    const suggestions = dirs
-      .filter((d) => d.dir !== "" && !records.some((p) => sameDir(p.dir, d.dir)) && !sameDir(d.dir, this.opts.home) && !this.opts.isSensitive(d.dir) && isDir(d.dir))
-      .sort((a, b) => b.sessions - a.sessions)
-      .slice(0, SUGGESTIONS_MAX);
+    const suggestions = await Promise.all(
+      dirs
+        .filter((d) => d.dir !== "" && !records.some((p) => sameDir(p.dir, d.dir)) && !sameDir(d.dir, this.opts.home) && !this.opts.isSensitive(d.dir) && isDir(d.dir))
+        .sort((a, b) => b.sessions - a.sessions)
+        .slice(0, SUGGESTIONS_MAX)
+        .map(async (d): Promise<ProjectSuggestion> => {
+          const [gitRemote, branch] = await Promise.all([this.cached(this.remotes, d.dir, this.remote), this.cached(this.branches, d.dir, this.branch)]);
+          return { dir: d.dir, sessions: d.sessions, ...(gitRemote ? { gitRemote } : {}), ...(branch ? { branch } : {}) };
+        }),
+    );
     return { projects, suggestions };
   }
 
-  /** A session there ended a turn: its status is read again on the next list. */
+  /** A session there ended a turn: its git status (and remote and branch) are read again on the next list. */
   invalidate(dir: string): boolean {
     const p = this.projectOf(dir);
-    if (!p) return false;
-    this.cache.delete(resolve(p.dir));
-    return true;
+    for (const key of p ? [resolve(p.dir), resolve(dir)] : [resolve(dir)]) {
+      this.cache.delete(key);
+      this.remotes.delete(key);
+      this.branches.delete(key);
+    }
+    return p !== undefined;
   }
 
-  private async cachedStatus(dir: string): Promise<GitStatus | undefined> {
+  /** `read(dir)`, kept for a minute. */
+  private async cached<T>(cache: Cached<T>, dir: string, read: (dir: string) => Promise<T>): Promise<T> {
     const key = resolve(dir);
-    const hit = this.cache.get(key);
-    if (hit && this.now() - hit.at < STATUS_MS) return hit.status;
-    const status = await this.status(dir);
-    this.cache.set(key, { at: this.now(), status });
-    return status;
+    const hit = cache.get(key);
+    if (hit && this.now() - hit.at < STATUS_MS) return hit.value;
+    const value = await read(dir);
+    cache.set(key, { at: this.now(), value });
+    return value;
   }
 
   add(req: { dir: string; name: string; sensitive: boolean; device: string }): string {

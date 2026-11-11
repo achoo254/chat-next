@@ -34,6 +34,8 @@ const (
 	kindDialogUnreadMark  = "dialog_unread_mark"
 	kindNotifySettings    = "notification_settings"
 	kindUserChanged       = "user_changed"
+	// kindAgentProjectsChanged: the user's AI Agent projects changed.
+	kindAgentProjectsChanged = "agent_projects_changed"
 	// kindInlineButton: a user pressed a bot's callback button; the row
 	// carries no log entries, the press is in bot_callbacks.
 	kindInlineButton = "inline_button"
