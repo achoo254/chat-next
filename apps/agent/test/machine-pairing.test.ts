@@ -16,6 +16,7 @@ import {
   decodePlain,
   encodePlain,
   generateKeyPair,
+  base32Decode,
   generateTotpSecret,
   pakeStart,
   startHandshake,
@@ -166,6 +167,29 @@ describe("a device paired by the authenticator code", () => {
     expect(await pairByCode(port, device, totpCode(secret))).toBe(true);
     await until(() => paired.length === 1);
     expect(config.deviceStatus(device.publicKey)).toBe("paired");
+  });
+});
+
+describe("`tunelo authenticator` on a machine with no paired device", () => {
+  test("makes the secret on the machine; the first device pairs with the code from it, and a second run needs --replace", async () => {
+    dir = mkdtempSync(join(tmpdir(), "tunelo-enroll-"));
+    const config = new ConfigStore(dir);
+    const { machine, port, paired } = await start(config);
+
+    const made = machine.enrollAuthenticator(false);
+    expect(made.uri).toMatch(/^otpauth:\/\/totp\/AI%20Agent:/);
+    const secret = base32Decode(made.secret);
+    expect(config.totpSecret()).toEqual(secret);
+
+    const device = await generateKeyPair();
+    expect(await pairByCode(port, device, totpCode(secret))).toBe(true);
+    await until(() => paired.length === 1);
+    expect(config.deviceStatus(device.publicKey)).toBe("paired");
+
+    expect(() => machine.enrollAuthenticator(false)).toThrow(/--replace/);
+    expect(config.totpSecret()).toEqual(secret);
+    const replaced = machine.enrollAuthenticator(true);
+    expect(base32Decode(replaced.secret)).not.toEqual(secret);
   });
 });
 

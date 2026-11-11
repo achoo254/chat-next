@@ -605,9 +605,8 @@ export const enMachines: MachinesCopy = {
 		wrong: "Wrong code. The code changes every 30 seconds: wait for a new one in your Authenticator app and type it.",
 		tooMany: (machine) => `Too many wrong codes: ${machine} stops pairing for 15 minutes. Wait, then type a new code.`,
 		notSetTitle: (machine) => `${machine} has not turned on pairing with Authenticator`,
-		notSetHow: "On a device already paired with this machine, open Machine settings and choose “Turn on pairing with Authenticator”.",
-		notSetReinstall: "No paired device left? Run the install command again on that machine: the browser you get the command from is paired, and can turn it on from there.",
-		getInstall: "Get the install command",
+		notSetHow: "Fastest: on this machine itself (at its keyboard or over SSH) run the command below, scan the QR code with your Authenticator app, then type the 6 digits here. No reinstall needed.",
+		notSetFromPaired: "Already have a device paired with this machine? Open Machine settings and choose “Turn on pairing with Authenticator”.",
 		unreachable: "Could not reach the machine. Run tunelo start on it, then try again.",
 	},
 	totp: {

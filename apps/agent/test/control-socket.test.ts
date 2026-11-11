@@ -147,6 +147,7 @@ describe("control socket", () => {
         "POST /restart",
         "POST /streams/alive",
         "POST /trust",
+        "POST /totp/enroll",
         "POST /tunnels/close",
       ].sort(),
     );

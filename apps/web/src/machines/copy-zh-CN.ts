@@ -599,9 +599,8 @@ export const zhCNMachines: MachinesCopy = {
 		wrong: "码不正确。码每 30 秒更换一次：请等身份验证器应用显示新码后再输入。",
 		tooMany: (machine) => `错误次数过多：${machine} 暂停配对 15 分钟。请等待后再输入新码。`,
 		notSetTitle: (machine) => `${machine} 尚未开启身份验证器配对`,
-		notSetHow: "在已与这台电脑配对的设备上，打开设备设置并选择“开启身份验证器配对”。",
-		notSetReinstall: "已经没有配对的设备？请在那台电脑上重新运行安装命令：获取命令的浏览器会完成配对，然后可在该浏览器中开启。",
-		getInstall: "获取安装命令",
+		notSetHow: "最快的方法：在这台电脑上（本机操作或通过 SSH）运行下面的命令，用身份验证器应用扫描二维码，然后在这里输入 6 位数字。无需重新安装。",
+		notSetFromPaired: "已经有设备与这台电脑配对？打开设备设置并选择“开启身份验证器配对”。",
 		unreachable: "无法连接到电脑。请在电脑上运行 tunelo start 后重试。",
 	},
 	totp: {

@@ -23,6 +23,7 @@
     "@tunelo/shared": "github:achoo254/localman-next#tunelo-shared-v0.2.1&path:/packages/tunelo-shared",
     "chalk": "5.6.2",
     "commander": "12.1.0",
+    "uqr": "0.1.3",
     "ws": "8.18.3",
     "zod": "4.6.5"
   },

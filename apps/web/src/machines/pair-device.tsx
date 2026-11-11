@@ -9,7 +9,7 @@ import { HandshakeErrorCode } from "@achoo254/chat-proto/remote/remote";
 import { HandshakeFailure, PakeFailure } from "@achoo254/chat-remote-protocol";
 import { Icon } from "../components/screen-icons.tsx";
 import { CopyButton } from "../messaging/ui/parts.tsx";
-import { Link, navigate, paths } from "../router.tsx";
+import { navigate, paths } from "../router.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { CodeInput } from "./code-input.tsx";
 import { pairWithCode } from "./link/pairing.ts";
@@ -141,7 +141,10 @@ export function PairDevice({ machine }: { machine: string }): ReactElement {
 	);
 }
 
-/** What went wrong; a machine without Authenticator pairing also gets the two ways to turn it on. */
+/** Run on the machine itself: makes the Authenticator secret there and shows it once as a QR code. */
+const AUTHENTICATOR_COMMAND = "tunelo authenticator";
+
+/** What went wrong; a machine without Authenticator pairing also gets the two ways to turn it on: the command on the machine, or a paired device. */
 export function PairProblemView({ problem, machine }: { problem: PairProblem; machine: string }): ReactElement {
 	const t = useMachinesCopy();
 	if (problem !== "notSet") {
@@ -158,12 +161,11 @@ export function PairProblemView({ problem, machine }: { problem: PairProblem; ma
 				{t.pair.notSetTitle(machine)}
 			</h4>
 			<p>{t.pair.notSetHow}</p>
-			<p>{t.pair.notSetReinstall}</p>
-			<div>
-				<Link to={paths.machinesAdd()} className="btn btn-sm" data-id="pair-not-set-install">
-					{t.pair.getInstall}
-				</Link>
+			<div className="mx-cmd" data-id="pair-not-set-command">
+				<code>{AUTHENTICATOR_COMMAND}</code>
+				<CopyButton text={AUTHENTICATOR_COMMAND} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
 			</div>
+			<p>{t.pair.notSetFromPaired}</p>
 		</div>
 	);
 }

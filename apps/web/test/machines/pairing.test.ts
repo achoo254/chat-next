@@ -125,7 +125,7 @@ describe("pairing with the Authenticator code", () => {
 		const err = await pairWithCode({ url: URL, device, deviceName: "x", socket: m.factory }, "123456").catch((e: unknown) => e);
 		expect(err).toMatchObject({ code: HandshakeErrorCode.TOTP_NOT_SET });
 		expect(pairProblem(err)).toBe("notSet");
-		expect(pairProblemText(viMachines, "notSet", "Mac mini")).toMatch(/^Mac mini chưa bật ghép bằng Authenticator\. Trên một thiết bị đã ghép/);
+		expect(pairProblemText(viMachines, "notSet", "Mac mini")).toMatch(/^Mac mini chưa bật ghép bằng Authenticator\. Cách nhanh nhất: trên chính máy này/);
 	});
 
 	it("tells an old machine and an unreachable one apart", () => {

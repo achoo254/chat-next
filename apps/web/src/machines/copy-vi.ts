@@ -610,9 +610,8 @@ export const viMachines = {
 		wrong: "Mã không đúng. Mã đổi mỗi 30 giây: chờ mã mới trong app Authenticator rồi nhập lại.",
 		tooMany: (machine: string) => `Sai quá nhiều lần nên ${machine} đang khoá ghép thiết bị trong 15 phút. Chờ hết thời gian đó rồi nhập mã mới.`,
 		notSetTitle: (machine: string) => `${machine} chưa bật ghép bằng Authenticator`,
-		notSetHow: "Trên một thiết bị đã ghép với máy này, mở Cài đặt máy rồi chọn “Bật ghép bằng Authenticator”.",
-		notSetReinstall: "Không còn thiết bị nào đã ghép? Chạy lại lệnh cài trên chính máy đó: trình duyệt bạn dùng để lấy lệnh sẽ được ghép, rồi bật Authenticator từ trình duyệt đó.",
-		getInstall: "Lấy lệnh cài",
+		notSetHow: "Cách nhanh nhất: trên chính máy này (ngồi trước máy hoặc qua SSH) chạy lệnh dưới đây, quét mã QR bằng app Authenticator rồi nhập mã 6 số tại đây. Không cần cài lại.",
+		notSetFromPaired: "Đã có thiết bị ghép với máy này? Mở Cài đặt máy rồi chọn “Bật ghép bằng Authenticator”.",
 		unreachable: "Không kết nối được tới máy. Trên máy chạy tunelo start rồi thử lại.",
 	},
 	totp: {

@@ -84,6 +84,7 @@ type Stream = (target: ControlTarget, input: unknown, send: (message: unknown) =
 
 const deviceRevoke = z.object({ key: z.string().min(6, "give at least 6 characters of the device key").max(128) });
 const trustInput = z.object({ dir: z.string().min(1).max(4096), trusted: z.enum(["true", "false"]).optional() });
+const totpEnroll = z.object({ replace: z.boolean().optional() });
 const closeInput = z.object({ id: z.string().min(1).max(64) });
 const mcpSession = z.object({ server: z.string().min(1).max(512), ticket: z.string().min(1).max(64).optional() });
 const profileInput = z.object({ id: z.string().max(64) });
@@ -144,6 +145,8 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     m.audit.write({ device: "local", action: "revoke", path: "", detail: key });
     return { revoked: found };
   },
+  /** `tunelo authenticator`: only here (this OS user, on the machine) can the first pairing secret be made. */
+  "POST /totp/enroll": (t, input) => machineOf(t).enrollAuthenticator(totpEnroll.parse(input).replace === true),
   "POST /restart": () => {
     // The supervisor starts the agent again (launchd KeepAlive, task loop).
     setTimeout(() => process.exit(0), 200);

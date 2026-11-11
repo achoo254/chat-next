@@ -79,18 +79,22 @@ describe("pairing with a machine", () => {
 });
 
 describe("a pairing that failed", () => {
-	it("a machine without Authenticator pairing: how to turn it on, and the install command as the way back", () => {
+	it("a machine without Authenticator pairing: the command that turns it on from the machine itself, and the paired-device way", () => {
+		const services = { toasts: { show: () => undefined } } as unknown as Services;
 		render(
 			<I18nProvider>
-				<PairProblemView problem="notSet" machine="Mac mini" />
+				<ServicesContext value={services}>
+					<PairProblemView problem="notSet" machine="Mac mini" />
+				</ServicesContext>
 			</I18nProvider>,
 		);
 		const alert = screen.getByRole("alert");
 		expect(alert.getAttribute("data-id")).toBe("pair-not-set");
 		expect(screen.getByText("Mac mini chưa bật ghép bằng Authenticator")).toBeTruthy();
-		expect(screen.getByText(/mở Cài đặt máy rồi chọn “Bật ghép bằng Authenticator”/)).toBeTruthy();
-		expect(screen.getByText(/Chạy lại lệnh cài trên chính máy đó/)).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Lấy lệnh cài" }).getAttribute("href")).toBe("/ai/add");
+		expect(screen.getByText(/Không cần cài lại/)).toBeTruthy();
+		expect(screen.getByText("tunelo authenticator")).toBeTruthy();
+		expect(screen.getByText(/Mở Cài đặt máy rồi chọn “Bật ghép bằng Authenticator”/)).toBeTruthy();
+		expect(screen.queryByRole("link", { name: "Lấy lệnh cài" })).toBeNull();
 	});
 
 	it("a locked machine says for how long", () => {

@@ -13,8 +13,11 @@ import {
   type MachineAuth,
   PROTOCOL_VERSION,
   TotpPairing,
+  base32Encode,
   fromBase64Url,
+  generateTotpSecret,
   toBase64Url,
+  totpUri,
 } from "@achoo254/chat-remote-protocol";
 import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore } from "./config.ts";
@@ -75,6 +78,9 @@ export type MachineOptions = {
   /** The machine's own Screen Sharing (macOS); built when not given. */
   screenShare?: ScreenShare;
 };
+
+/** What an authenticator app names the entry; the web page uses the product name, this terminal the feature's. */
+export const AUTHENTICATOR_ISSUER = "AI Agent";
 
 export class Machine {
   readonly config: ConfigStore;
@@ -285,6 +291,26 @@ export class Machine {
 
   get publicKey(): Uint8Array {
     return this.key.publicKey;
+  }
+
+  /**
+   * `tunelo authenticator`: makes the authenticator secret here, on this
+   * machine, so the first device can pair without another paired device. The
+   * secret exists only here and in the terminal that asked; the Chat server
+   * never sees it. An existing secret is replaced only when asked.
+   */
+  enrollAuthenticator(replace: boolean): { uri: string; secret: string } {
+    const replaced = this.pairing.enabled;
+    if (replaced && !replace) {
+      throw new Error("this machine already pairs by an authenticator code; run `tunelo authenticator --replace` to make a new one (the old code stops working)");
+    }
+    const secret = generateTotpSecret();
+    this.config.setTotpSecret(secret);
+    this.pairing.setSecret(secret);
+    this.audit.write({ device: "local", action: "totp_set", path: "", detail: replaced ? "replaced" : "set" });
+    this.log("authenticator pairing set from this machine");
+    void this.announceInfo();
+    return { uri: totpUri({ secret, label: this.config.get().machineName || hostname(), issuer: AUTHENTICATOR_ISSUER }), secret: base32Encode(secret) };
   }
 
   /** Cuts every live connection of a device that was just revoked. */

@@ -8,6 +8,7 @@ import { ConfigStore, configDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { registerLocalForwardCommand } from "./commands/config.ts";
 import { registerMcpLocalWritesCommand } from "./commands/mcp-local-writes.ts";
+import { registerAuthenticatorCommand } from "./commands/authenticator.ts";
 import { registerInstallCommand } from "./commands/install.ts";
 import { registerProfilesCommand } from "./commands/profiles.ts";
 import { registerSecretsCommand } from "./commands/secrets.ts";
@@ -260,6 +261,7 @@ function buildProgram(): Command {
     .action(exits((dir: string | undefined) => setTrust(dir, false)));
   program.command("trusted").description("list trusted folders").action(exits(() => printJson("/trust")));
   registerProfilesCommand(program, exits);
+  registerAuthenticatorCommand(program, exits);
   registerSecretsCommand(program, exits);
   registerBrowserCommand(program, exits);
   // The running service asks a new copy of itself whether macOS granted Full Disk Access.
