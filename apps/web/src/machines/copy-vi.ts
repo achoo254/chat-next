@@ -53,6 +53,7 @@ export const viMachines = {
 		version: "Phiên bản tunelo trên máy không hợp với trang này. Hãy cập nhật tunelo hoặc tải lại trang.",
 		pair: "Ghép thiết bị này",
 		retry: "Thử lại",
+		refresh: "Làm mới trạng thái máy",
 	},
 	diskAccess: {
 		title: "Máy cần cấp Full Disk Access cho tunelo",
@@ -737,6 +738,7 @@ export const viMachines = {
 			connecting: "Đang nối tới máy.",
 		},
 		newDisabled: (reason: string) => `Chưa mở được phiên mới: ${reason}`,
+		openDisabled: (reason: string) => `Chưa mở được phiên: ${reason}`,
 		noSessions: "Chưa có phiên nào.",
 		emptyFilter: "Không có phiên nào ở bộ lọc này.",
 		noMachinesTitle: "Chưa có máy nào",

@@ -5,6 +5,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { Link, paths } from "../router.tsx";
 import { LOCAL_REF } from "./link/link-hub.ts";
 import type { LinkStatus } from "./link/machine-link.ts";
+import { RefreshMachine } from "./refresh-machine.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 export function LinkBanner({ machine, name, status }: { machine: string; name: string; status: LinkStatus }) {
@@ -17,19 +18,22 @@ export function LinkBanner({ machine, name, status }: { machine: string; name: s
 			return status.attempt <= 1 ? (
 				<div className="mx-strip" role="status">
 					<span className="spin" aria-hidden="true" />
-					{t.link.connecting}
+					<span className="grow">{t.link.connecting}</span>
+					<RefreshMachine machine={machine} />
 				</div>
 			) : (
 				<div className="mx-strip warn" role="status">
 					<Icon name="wifi-off" small />
-					{t.link.offline(name, status.attempt)}
+					<span className="grow">{t.link.offline(name, status.attempt)}</span>
+					<RefreshMachine machine={machine} />
 				</div>
 			);
 		case "offline":
 			return (
 				<div className="mx-strip warn" role="status">
 					<Icon name="wifi-off" small />
-					{t.link.offline(name, Math.max(1, status.attempt))}
+					<span className="grow">{t.link.offline(name, Math.max(1, status.attempt))}</span>
+					<RefreshMachine machine={machine} />
 				</div>
 			);
 		case "failed": {
@@ -48,6 +52,7 @@ export function LinkBanner({ machine, name, status }: { machine: string; name: s
 				<div className="mx-strip error" role="alert">
 					<Icon name="alert" small />
 					<span className="grow">{text}</span>
+					<RefreshMachine machine={machine} />
 					{pairable && (
 						<Link to={machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine)} className="btn btn-sm">
 							{t.link.pair}

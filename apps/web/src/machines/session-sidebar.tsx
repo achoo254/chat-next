@@ -344,7 +344,29 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 	const manage = threadActionsSupported(machine.state.info) && machine.state.status.kind === "open";
 	const { open, setOpen, ref } = usePopover();
 	const [deleting, setDeleting] = useState(false);
-	const row = (
+	const online = machine.conn.kind === "on" || current;
+	const content = (
+		<>
+				<span className={`mx-st ${key}`} aria-hidden="true">
+					{key === "running" ? <span className="spin" /> : <MachineIcon name={key === "waiting" ? "help" : "terminal"} small />}
+				</span>
+				<span className="tx">
+					<span className="line">
+						<span className="name">{thread.title || t.agent.newSession}</span>
+						<time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
+					</span>
+					<span className="line">
+						<span className="sub">{sub}</span>
+						{thread.pending > 0 && (
+							<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>
+								{thread.pending}
+							</span>
+						)}
+					</span>
+				</span>
+		</>
+	);
+	const row = online ? (
 		<Link
 			to={paths.machineSession(machine.entry.ref, thread.id)}
 			className={`mx-srow ${key}`}
@@ -359,24 +381,12 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 					}
 				: {})}
 		>
-			<span className={`mx-st ${key}`} aria-hidden="true">
-				{key === "running" ? <span className="spin" /> : <MachineIcon name={key === "waiting" ? "help" : "terminal"} small />}
-			</span>
-			<span className="tx">
-				<span className="line">
-					<span className="name">{thread.title || t.agent.newSession}</span>
-					<time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
-				</span>
-				<span className="line">
-					<span className="sub">{sub}</span>
-					{thread.pending > 0 && (
-						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>
-							{thread.pending}
-						</span>
-					)}
-				</span>
-			</span>
+			{content}
 		</Link>
+	) : (
+		<div className={`mx-srow ${key} disabled`} aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
+			{content}
+		</div>
 	);
 	if (!manage) return row;
 	return (

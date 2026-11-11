@@ -137,6 +137,19 @@ export class LinkHub {
 		}
 	}
 
+	/**
+	 * Reads the machine's latest state again: the directory (its address and
+	 * heartbeat), then a fresh link that re-reads this device's pinned key.
+	 * A directory failure leaves the link alone.
+	 */
+	async reload(ref: string): Promise<void> {
+		if (ref !== LOCAL_REF) await this.refresh();
+		const link = this.links.get(ref);
+		if (link === undefined) return;
+		link.stop();
+		link.start();
+	}
+
 	/** Forgets a machine on this device (removed, or paired again). */
 	async forget(ref: string): Promise<void> {
 		this.links.get(ref)?.stop();

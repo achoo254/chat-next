@@ -51,6 +51,7 @@ export const zhCNMachines: MachinesCopy = {
 		version: "电脑上的 tunelo 与此页面不匹配。请更新 tunelo 或重新加载页面。",
 		pair: "配对此设备",
 		retry: "重试",
+		refresh: "刷新电脑状态",
 	},
 	diskAccess: {
 		title: "这台电脑需要为 tunelo 开启“完全磁盘访问权限”",
@@ -726,6 +727,7 @@ export const zhCNMachines: MachinesCopy = {
 			connecting: "正在连接电脑。",
 		},
 		newDisabled: (reason) => `暂时无法新建会话：${reason}`,
+		openDisabled: (reason) => `暂时无法打开会话：${reason}`,
 		noSessions: "还没有会话。",
 		emptyFilter: "没有符合此筛选的会话。",
 		noMachinesTitle: "还没有电脑",

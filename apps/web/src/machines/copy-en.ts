@@ -51,6 +51,7 @@ export const enMachines: MachinesCopy = {
 		version: "The tunelo version on the machine does not match this page. Update tunelo or reload the page.",
 		pair: "Pair this device",
 		retry: "Retry",
+		refresh: "Refresh the machine's status",
 	},
 	diskAccess: {
 		title: "The machine needs to give tunelo Full Disk Access",
@@ -732,6 +733,7 @@ export const enMachines: MachinesCopy = {
 			connecting: "Connecting to the machine.",
 		},
 		newDisabled: (reason) => `Can't start a session yet: ${reason}`,
+		openDisabled: (reason) => `Can't open the session yet: ${reason}`,
 		noSessions: "No sessions yet.",
 		emptyFilter: "No sessions match this filter.",
 		noMachinesTitle: "No machines yet",

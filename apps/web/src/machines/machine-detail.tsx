@@ -26,6 +26,7 @@ import { TotpSetting } from "./totp-setup.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
 import { PageHead } from "./page-head.tsx";
+import { RefreshMachine } from "./refresh-machine.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
@@ -147,7 +148,9 @@ export function MachineDetail({ machine }: { machine: string }) {
 				backLabel={t.sessions.label(name)}
 				title={t.agent.info}
 				subtitle={`${name} · ${entry.os === "" ? entry.tunnelUrl : t.os(entry.os, entry.arch)}`}
-			/>
+			>
+				<RefreshMachine machine={machine} />
+			</PageHead>
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<DiskAccessBanner link={link} info={state.info} online={online} />
 			<div className="mx-body">

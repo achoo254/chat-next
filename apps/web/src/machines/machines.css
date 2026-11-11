@@ -56,6 +56,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-group .mx-rows { flex: none; overflow: visible; padding: 2px 0; }
 .mx-srow { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-2); align-items: center; min-height: 56px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); color: inherit; text-decoration: none; }
 .mx-srow:hover, .mx-srow-wrap:hover .mx-srow:not([aria-current="page"]) { background: var(--c-hover); }
+.mx-srow.disabled { cursor: not-allowed; opacity: 0.55; }
+.mx-srow.disabled:hover { background: none; }
 /* Projects: a head row (name, git, +, menu) over its sessions; "Khác" for the rest. */
 .mx-project { margin-top: var(--space-1); }
 .mx-project-head { position: relative; display: flex; align-items: center; gap: 2px; padding: 0 var(--space-1) 0 var(--space-2); }
@@ -117,6 +119,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-recent-row b { font-weight: 500; }
 .mx-recent-row small { font-size: 0.8125rem; color: var(--c-text-muted); }
 .mx-recent-row .go { font-size: 0.8125rem; color: var(--c-primary); }
+.mx-recent-row.disabled { cursor: not-allowed; opacity: 0.55; }
+.mx-recent-row.disabled:hover { background: none; }
+.mx-recent-row.disabled .go { color: var(--c-text-muted); }
 .mx-tile-title { flex: 1; min-width: 0; color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-tile-title:hover { text-decoration: underline; }
 .mx-st { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-icon-muted); }

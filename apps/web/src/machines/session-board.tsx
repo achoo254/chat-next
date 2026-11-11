@@ -284,9 +284,10 @@ function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachi
 		<>
 			<h3 className="mx-section">{t.agent.home.recent}</h3>
 			<ul className="mx-recent">
-				{list.map(({ machine, thread }) => (
-					<li key={`${machine.entry.ref}/${thread.id}`}>
-						<Link to={paths.machineSession(machine.entry.ref, thread.id)} className="mx-recent-row">
+				{list.map(({ machine, thread }) => {
+					const online = machine.conn.kind === "on";
+					const body = (
+						<>
 							<MachineIcon name="terminal" small />
 							<span className="tx">
 								<b>{thread.title || t.agent.newSession}</b>
@@ -296,9 +297,22 @@ function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachi
 								</small>
 							</span>
 							<span className="go">{t.agent.home.resume}</span>
-						</Link>
-					</li>
-				))}
+						</>
+					);
+					return (
+						<li key={`${machine.entry.ref}/${thread.id}`}>
+							{online ? (
+								<Link to={paths.machineSession(machine.entry.ref, thread.id)} className="mx-recent-row">
+									{body}
+								</Link>
+							) : (
+								<div className="mx-recent-row disabled" aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
+									{body}
+								</div>
+							)}
+						</li>
+					);
+				})}
 			</ul>
 		</>
 	);
