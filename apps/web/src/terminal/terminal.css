@@ -15,7 +15,7 @@
 .tx-tab-x:hover, .tx-tab-x:focus-visible { opacity: 1; background: rgb(127 127 127 / 0.2); }
 .tx-tab:not([data-active]):hover { background: var(--c-hover); }
 .tx-actions { display: flex; align-items: center; gap: 2px; flex: none; }
-.tx-split-ico { display: block; width: 14px; height: 12px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; }
+.tx-split-ico { display: block; align-self: center; justify-self: center; width: 14px; height: 12px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; }
 .tx-split-ico::after { content: ""; position: absolute; background: currentColor; }
 .tx-split-ico.row::after { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
 .tx-split-ico.column::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
@@ -45,6 +45,8 @@
 .tx-panes:has(.tx-pane + .tx-pane) .tx-pane-in[data-focused] { border-color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
 .tx-term { width: 100%; height: 100%; }
 .tx-term .xterm { height: 100%; }
+/* The leftover pixels under the last row show the viewport; xterm leaves it black, so it takes the terminal colour. */
+.tx-term .xterm-viewport { background-color: var(--tx-bg) !important; }
 .tx-divider { position: absolute; z-index: 2; touch-action: none; }
 .tx-divider.row { width: 8px; margin-left: -4px; cursor: col-resize; }
 .tx-divider.column { height: 8px; margin-top: -4px; cursor: row-resize; }
