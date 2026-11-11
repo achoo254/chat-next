@@ -1,0 +1,53 @@
+[package]
+name = "tunelo-term-host"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+description = "Daemon that holds the PTYs of tunelo remote terminals (spec: docs/terminal-wire.md)"
+publish = false
+
+[lib]
+name = "tunelo_term_host"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tunelo-term-host"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+crossbeam-channel = "0.5"
+getrandom = "0.3"
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+vt100 = "0.16"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28", features = ["socket", "user", "signal", "fs", "net"] }
+signal-hook = "0.3"
+# WebRTC (sans-IO). Crypto backend per OS, as measured in the phase 1 spike.
+str0m = { version = "0.25", default-features = false, features = ["aws-lc-rs"] }
+
+[target.'cfg(windows)'.dependencies]
+str0m = { version = "0.25", default-features = false, features = ["wincrypto"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1

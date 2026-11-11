@@ -30,3 +30,6 @@ apps/mobile/www/
 
 # Leftovers of an interrupted `bun build --compile`.
 *.bun-build
+
+# Cargo output of the terminal daemon.
+apps/term-host/target/
