@@ -25,6 +25,8 @@ import {
 
 export interface ToolRun {
 	readonly id: string;
+	/** When the call was made (Unix ms), for how long it has been running. */
+	readonly at: number;
 	readonly call: ToolCallItem | null;
 	readonly result: ToolResultItem | null;
 	readonly subagent: SubagentItem | null;
@@ -132,6 +134,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				const result = results.get(b.value.toolId);
 				runs.push({
 					id: item.id,
+					at: Number(item.at),
 					call: b.value,
 					result: result?.body.case === "toolResult" ? result.body.value : null,
 					subagent: subagents.get(b.value.toolId) ?? null,
@@ -146,7 +149,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				break;
 			case "subagent":
 				if (!calls.has(b.value.toolId)) {
-					runs.push({ id: item.id, call: null, result: null, subagent: b.value, resultId: null, approval: null, subagentFiles: filesOf(b.value.toolId) });
+					runs.push({ id: item.id, at: Number(item.at), call: null, result: null, subagent: b.value, resultId: null, approval: null, subagentFiles: filesOf(b.value.toolId) });
 				}
 				break;
 			case "diff":
@@ -245,6 +248,15 @@ export function currentModel(items: readonly Item[], threadModel: string): strin
 		if (b?.case === "modelChange") return b.value.to;
 	}
 	return "";
+}
+
+/** When the newest turn began (Unix ms) while it still runs; null otherwise. */
+export function turnStartedAt(items: readonly Item[]): number | null {
+	for (let i = items.length - 1; i >= 0; i--) {
+		const item = items[i];
+		if (item?.body.case === "turn") return item.body.value.state === TurnState.RUNNING ? Number(item.at) : null;
+	}
+	return null;
 }
 
 /** The newest turn is still running (the Stop button shows). */

@@ -37,7 +37,8 @@ import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
-import { contextShare, currentModel, foldTranscript, turnRunning, type Block } from "./transcript/tool-fold.ts";
+import { contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
+import { clockText, useNow } from "./transcript/run-time.ts";
 import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -209,7 +210,7 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
-						<Transcript blocks={blocks} state={state} running={running} waiting={prompts.length > 0 || outside > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
+						<Transcript blocks={blocks} state={state} running={running} startedAt={turnStartedAt(items)} waiting={prompts.length > 0 || outside > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
 					)}
 					{suggestion !== undefined && (
 						<LimitBar
@@ -447,6 +448,8 @@ interface TranscriptProps {
 	blocks: readonly Block[];
 	state: LinkState;
 	running: boolean;
+	/** When the running turn began (Unix ms); null when none runs. */
+	startedAt: number | null;
 	/** A prompt waits in the dock. */
 	waiting: boolean;
 	fetchFull: (itemId: string) => Promise<void>;
@@ -457,7 +460,7 @@ interface TranscriptProps {
 /** Within this distance of the bottom, the transcript follows new content. */
 const STICK_PX = 80;
 
-function Transcript({ blocks, state, running, waiting, fetchFull, link, threadId }: TranscriptProps) {
+function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, link, threadId }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -481,6 +484,8 @@ function Transcript({ blocks, state, running, waiting, fetchFull, link, threadId
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, []);
+	const now = useNow(startedAt !== null);
+	const { locale } = useI18n();
 	const typing = running && !waiting && !(last?.kind === "text" && last.partial);
 	const newer = seenAt === null ? 0 : Math.max(0, blocks.length - seenAt);
 	const toBottom = () => {
@@ -513,13 +518,14 @@ function Transcript({ blocks, state, running, waiting, fetchFull, link, threadId
 			>
 				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
 				{blocks.map((block) => (
-					<BlockView key={block.id} block={block} state={state} running={running} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
+					<BlockView key={block.id} block={block} state={state} running={running || (block.kind === "tools" && block === last)} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
 				))}
 				{typing && (
 					<div className="mx-typing" role="status" aria-label={t.chat.typing(aiName(state.info, ""))}>
 						<i />
 						<i />
 						<i />
+						{startedAt !== null && <span className="mx-typing-time">{t.transcript.working(clockText(now - startedAt, t, locale))}</span>}
 					</div>
 				)}
 			</div>

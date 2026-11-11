@@ -216,6 +216,9 @@ export const viMachines = {
 	transcript: {
 		ranTools: (n: number) => `Đã chạy ${n} tool`,
 		runningTool: (name: string) => `Đang chạy ${name}`,
+		runningFor: (time: string) => `Chạy được ${time}`,
+		toolTimeout: (time: string) => `timeout ${time}`,
+		working: (time: string) => `Đang làm việc · ${time}`,
 		failed: "lỗi",
 		truncated: "Đã rút gọn",
 		showFull: "Xem đủ",

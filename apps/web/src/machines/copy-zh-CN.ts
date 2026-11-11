@@ -210,6 +210,9 @@ export const zhCNMachines: MachinesCopy = {
 	transcript: {
 		ranTools: (n) => `已运行 ${n} 个工具`,
 		runningTool: (name) => `正在运行 ${name}`,
+		runningFor: (time) => `已运行 ${time}`,
+		toolTimeout: (time) => `超时 ${time}`,
+		working: (time) => `工作中 · ${time}`,
 		failed: "失败",
 		truncated: "已截短",
 		showFull: "查看全部",

@@ -6,7 +6,9 @@
 // behind "Kết quả".
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Item } from "@achoo254/chat-proto/remote/remote";
+import { useI18n } from "../../i18n/i18n.tsx";
 import { MachineIcon } from "../machine-icons.tsx";
+import { clockText, toolTimeoutMs, useNow } from "../transcript/run-time.ts";
 import type { ToolRun } from "../transcript/tool-fold.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { approvalOutcome, toolIcon } from "./approval.tsx";
@@ -66,6 +68,8 @@ interface RunRowProps {
 
 function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 	const t = useMachinesCopy();
+	const { locale } = useI18n();
+	const now = useNow(running);
 	const [busy, setBusy] = useState(false);
 	const [expanded, setExpanded] = useState(false);
 	const [clamped, setClamped] = useState(false);
@@ -88,6 +92,10 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 	const output = result !== null && (result.output !== "" || result.truncated) ? result : null;
 	const showToggle = clamped || expanded;
 	const edited = run.subagentFiles.length;
+	const timeout = run.call === null ? undefined : toolTimeoutMs(run.call.input);
+	const clock = running
+		? [t.transcript.runningFor(clockText(now - run.at, t, locale)), ...(timeout === undefined ? [] : [t.transcript.toolTimeout(clockText(timeout, t, locale))])].join(" · ")
+		: "";
 	return (
 		<li className="mx-run">
 			<MachineIcon name={run.call === null ? "cpu" : toolIcon(run.call.kind)} small />
@@ -96,13 +104,14 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 					<b className="name">{name}</b>
 					{summary !== "" && <span className="mono"> {summary}</span>}
 				</span>
-				{(showToggle || run.approval !== null || run.call?.sensitive === true || output !== null || edited > 0) && (
+				{(showToggle || clock !== "" || run.approval !== null || run.call?.sensitive === true || output !== null || edited > 0) && (
 					<div className="mx-run-sub">
 						{showToggle && (
 							<button type="button" className="mx-link" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
 								{expanded ? t.transcript.less : t.transcript.more}
 							</button>
 						)}
+						{clock !== "" && <span className="mx-run-clock">{clock}</span>}
 						{run.approval !== null && <span className="mx-run-approval">{approvalOutcome(t, run.approval)}</span>}
 						{edited > 0 && (
 							<span className="mx-run-approval" title={run.subagentFiles.join("\n")}>

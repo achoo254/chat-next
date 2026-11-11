@@ -213,6 +213,9 @@ export const enMachines: MachinesCopy = {
 	transcript: {
 		ranTools: (n) => (n === 1 ? "Ran 1 tool" : `Ran ${n} tools`),
 		runningTool: (name) => `Running ${name}`,
+		runningFor: (time) => `Running for ${time}`,
+		toolTimeout: (time) => `timeout ${time}`,
+		working: (time) => `Working · ${time}`,
 		failed: "failed",
 		truncated: "Shortened",
 		showFull: "Show all",

@@ -47,6 +47,7 @@ const ok = { toolId: "", ok: true, output: "done", truncated: false } as unknown
 const answered = (decision: Decision): ApprovalItem => ({ toolId: "1", state: PromptState.ANSWERED, decision }) as unknown as ApprovalItem;
 const run = (id: string, summary: string, extra: Partial<ToolRun> = {}): ToolRun => ({
 	id,
+	at: Date.now(),
 	call: call(id, summary),
 	result: ok,
 	subagent: null,
@@ -67,6 +68,22 @@ describe("tool rows", () => {
 		const command = row.querySelector(".mx-run-cmd");
 		expect(command?.classList.contains("clamp")).toBe(true);
 		expect(within(row).getByText("Kết quả")).toBeTruthy();
+	});
+
+	it("shows how long a running call has run and the timeout it asked for", () => {
+		const slow = run("1", "sleep 400", { result: null, resultId: null, at: Date.now() - 65_000 });
+		const withTimeout = { ...slow, call: { ...call("1", "sleep 400"), input: '{"command":"sleep 400","timeout":400000}' } as ToolCallItem };
+		wrap(<ToolRunCard runs={[withTimeout]} full={new Map()} onFetchFull={() => Promise.resolve()} live />);
+		expect(screen.getByText(/Chạy được 1 phút 5 giây · timeout 6 phút 40 giây/)).toBeTruthy();
+	});
+
+	it("shows only the running time when the call gave no timeout, and nothing once it ended", () => {
+		const slow = run("1", "make", { result: null, resultId: null, at: Date.now() - 12_000 });
+		const { unmount } = wrap(<ToolRunCard runs={[slow]} full={new Map()} onFetchFull={() => Promise.resolve()} live />);
+		expect(screen.getByText(/Chạy được 12 giây$/)).toBeTruthy();
+		unmount();
+		wrap(<ToolRunCard runs={[run("2", "make")]} full={new Map()} onFetchFull={() => Promise.resolve()} live />);
+		expect(screen.queryByText(/Chạy được/)).toBeNull();
 	});
 
 	it("groups two or more calls under 'Đã chạy N tool'", () => {
