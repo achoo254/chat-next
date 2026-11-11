@@ -234,11 +234,11 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-tile .mx-action { border: 0; padding: 0; background: none; }
 
 /* Chat */
-.mx-chat { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.mx-chat { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; max-width: 100%; overflow-x: clip; }
 .mx-chat-body { position: relative; display: flex; flex: 1; min-height: 0; }
 .mx-chat-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; container-type: inline-size; }
 .mx-messages-wrap { position: relative; display: flex; flex: 1; min-height: 0; }
-.mx-messages { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+.mx-messages { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
 .mx-jump { position: absolute; left: 50%; bottom: var(--space-3); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; padding: 0 var(--space-3); border: 1px solid var(--c-border); border-radius: var(--radius-full); background: var(--c-surface); color: var(--c-text); font-size: 0.8125rem; box-shadow: var(--shadow-md); cursor: pointer; }
 .mx-jump .count, .mx-changes-btn .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--c-bar-track); font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .mx-menu-note { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: var(--space-2); margin: 0; padding: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
