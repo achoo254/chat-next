@@ -13,4 +13,6 @@ interface ImportMetaEnv {
 	readonly VITE_API_ORIGIN?: string;
 	/** Version of the native app, shown in the session list (ExchangeNativeCode). */
 	readonly VITE_APP_VERSION?: string;
+	/** STUN servers of the terminal's direct path, "host:port,host:port" ("" for none); unset: the relay's host. */
+	readonly VITE_TERMINAL_STUN?: string;
 }

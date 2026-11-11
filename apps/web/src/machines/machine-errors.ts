@@ -120,6 +120,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.updateUnavailable;
 		case ErrorReason.UPDATE_BUSY:
 			return r.updateBusy;
+		case ErrorReason.TERMINAL_UNAVAILABLE:
+			return r.terminalUnavailable;
+		case ErrorReason.TERMINAL_SESSION_LIMIT:
+			return r.terminalSessionLimit;
+		case ErrorReason.TERMINAL_SESSION_NOT_FOUND:
+			return r.terminalSessionNotFound;
 		default:
 			return undefined;
 	}

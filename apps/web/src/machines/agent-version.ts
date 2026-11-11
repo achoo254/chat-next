@@ -1,4 +1,5 @@
 // Which tunelo a machine runs, for features a newer one adds.
+import { TerminalAvailability, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 
 /** `version` ("2.0.1", "v2.1.0-beta") is at least `min`; false when unreadable. */
 export function versionAtLeast(version: string, min: readonly number[]): boolean {
@@ -20,3 +21,26 @@ export const AGENT_PROJECTS = [2, 0, 7] as const;
 
 /** The first tunelo that opens a session with no first message (it waits for the first one typed in it). */
 export const AGENT_PARKED_SESSION = [2, 0, 9] as const;
+
+/**
+ * Whether the machine offers a terminal: "available" (tunelo 2.4.0+ with its
+ * terminal process), "missing" (the process is not installed yet: update),
+ * "incompatible" (another major version runs, or nothing supervises it:
+ * install again), "update" (a tunelo before 2.4.0), or "unknown" while the
+ * machine has not described itself.
+ */
+export type TerminalGate = "available" | "missing" | "incompatible" | "update" | "unknown";
+
+export function terminalGate(info: Pick<MachineInfo, "terminal"> | null): TerminalGate {
+	if (info === null) return "unknown";
+	switch (info.terminal) {
+		case TerminalAvailability.AVAILABLE:
+			return "available";
+		case TerminalAvailability.MISSING:
+			return "missing";
+		case TerminalAvailability.INCOMPATIBLE:
+			return "incompatible";
+		default:
+			return "update";
+	}
+}

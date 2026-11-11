@@ -317,6 +317,8 @@ const SCREENS: Record<string, string> = {
 	"machine-unpaired": paths.machine("2"),
 	"machine-list": aiPaths.manage,
 	"machine-sessions": paths.machine("1"),
+	// The machine's terminal: the dock with a shell on the relay (the fake machine has no direct path).
+	"machine-terminal": paths.machineTerminal("1"),
 	"machine-info": paths.machineInfo("1"),
 	"machine-pair": paths.machinePair("2"),
 	// Pairing with the offline machine: why it is not connected and what to run on it.

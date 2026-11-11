@@ -164,6 +164,14 @@ export interface LinkDeps {
 	readonly timers?: Timers;
 	readonly random?: () => number;
 	readonly newId?: () => string;
+	/**
+	 * "terminal": a second connection to the machine that carries only the
+	 * terminal's signaling and relay frames (its own frame counter and queue,
+	 * so a slow chat request never holds a keystroke back). It asks for no
+	 * machine info or threads and pings every 10 s whether or not the user
+	 * looks at the machines screen (the machine closes silent connections).
+	 */
+	readonly purpose?: "chat" | "terminal";
 }
 
 type FrameBody = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
@@ -248,6 +256,11 @@ export class MachineLink {
 
 	// --- lifecycle -----------------------------------------------------------
 
+	/** start() ran and stop() did not since. */
+	get started(): boolean {
+		return !this.stopped;
+	}
+
 	/** Connects (once a key is pinned) and keeps reconnecting until stop(). */
 	start(): void {
 		if (!this.stopped) return;
@@ -285,6 +298,11 @@ export class MachineLink {
 		if (active && this.current.status.kind === "open") this.ping();
 	}
 
+	/** Pings and watches for silence: while the user looks, and always on a terminal connection. */
+	private get pinging(): boolean {
+		return this.active || this.deps.purpose === "terminal";
+	}
+
 	/** Shows a thread: subscribed now and after every reconnect, until the returned function runs. */
 	watch(threadId: string): () => void {
 		const count = this.watched.get(threadId) ?? 0;
@@ -319,6 +337,23 @@ export class MachineLink {
 				reject(err instanceof Error ? err : new Error(String(err)));
 			}
 		});
+	}
+
+	/**
+	 * Sends a frame nobody answers (a terminal frame on the relay path) at
+	 * once, in call order with requests; false when the link is not open or
+	 * the socket refused it.
+	 */
+	post(body: FrameBody): boolean {
+		const session = this.session;
+		const socket = this.socket;
+		if (session === null || socket === null || this.current.status.kind !== "open") return false;
+		try {
+			socket.send(new Uint8Array(session.seal(create(FrameSchema, { id: "", body }))));
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/**
@@ -433,6 +468,7 @@ export class MachineLink {
 		this.set({ status: { kind: "open" }, secretPrompts: new Map(), takeovers: new Map() });
 		this.timers.clearInterval(this.pingTimer);
 		this.pingTimer = this.timers.setInterval(() => this.tick(), PING_MS);
+		if (this.deps.purpose === "terminal") return;
 		this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
 		this.request({ case: "threadList", value: {} }).catch(() => undefined);
 		for (const threadId of this.watched.keys()) this.subscribeThread(threadId);
@@ -449,7 +485,7 @@ export class MachineLink {
 	}
 
 	private tick(): void {
-		if (this.current.status.kind !== "open" || !this.active) return;
+		if (this.current.status.kind !== "open" || !this.pinging) return;
 		if (this.timers.now() - this.lastHeard > SILENCE_MS) {
 			const socket = this.socket;
 			if (socket !== null) this.lost(socket);

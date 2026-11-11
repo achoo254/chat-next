@@ -16,10 +16,11 @@
 // paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { Decision, GitFileState, ItemSchema, PromptState, Role, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { Decision, GitFileState, ItemSchema, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../../src/brand.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
+import { FakeTerminalHost } from "../machines/fake-terminal.ts";
 import { FakeRfb } from "./fake-rfb.ts";
 import type { FakeMachines } from "./fake-machines.ts";
 
@@ -331,6 +332,11 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		url: browserTabs[0]?.url ?? "",
 		expiresAt: BigInt(now + 10 * 60_000),
 	};
+	// The machine's terminal (?at=machine-terminal): shells that echo what is typed, on the relay (a real
+	// browser's offer gets no direct path from the fake). The e2e spec reads it as window.__fakeTerminal.
+	const terminalHost = new FakeTerminalHost(machine);
+	terminalHost.greeting = "dieuvy@laptop ~ % ";
+	(window as unknown as { __fakeTerminal?: FakeTerminalHost }).__fakeTerminal = terminalHost;
 	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
 	const stalled = new Map<string, number>();
 	const thread = {
@@ -421,6 +427,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							gitChanges: true,
 							browser: { available: true, running: true, clearable: true },
 							screenShare: true,
+							terminal: TerminalAvailability.AVAILABLE,
 							maxSessions: 3,
 							openSessions: 1,
 							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
@@ -602,7 +609,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			case "attachmentFetch":
 				return [{ case: "attachmentData", value: { threadId: frame.body.value.threadId, attachmentId: frame.body.value.attachmentId, mimeType: "image/png", data: image } }];
 			default:
-				return defaultAnswer(frame);
+				return terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
 		}
 	};
 	// The link opens `new WebSocket(TUNNEL)`: that one address goes to the fake machine.

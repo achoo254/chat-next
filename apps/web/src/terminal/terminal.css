@@ -1,0 +1,76 @@
+/* The terminal dock (terminal-dock.tsx); loaded with it. The header follows
+   the app's theme; the terminal surface is always dark, as xterm draws it. */
+.tx-dock { --tx-bg: #111318; display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; background: var(--c-surface); }
+.tx-dock.touch { position: fixed; z-index: 30; left: 0; right: 0; top: 0; height: var(--tx-vh, 100dvh); transform: translateY(var(--tx-vt, 0px)); padding-top: env(safe-area-inset-top); }
+
+.tx-head { display: flex; align-items: center; gap: var(--space-1); min-height: 40px; padding: 0 var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
+.tx-back { flex: none; }
+.tx-tabs { display: flex; flex: 1; min-width: 0; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tx-tabs::-webkit-scrollbar { display: none; }
+.tx-tab { display: flex; align-items: center; flex: none; max-width: 200px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; color: var(--c-text-muted); }
+.tx-tab[data-active] { background: var(--tx-bg); color: #e6e8ee; }
+.tx-tab > button[role="tab"] { display: flex; align-items: center; gap: var(--space-1); min-width: 0; min-height: 34px; padding: 0 var(--space-1) 0 var(--space-2); border: 0; background: none; color: inherit; font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.tx-tab > button[role="tab"] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-tab-x { display: grid; place-items: center; width: 24px; height: 24px; margin-right: 2px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; cursor: pointer; opacity: 0.7; }
+.tx-tab-x:hover, .tx-tab-x:focus-visible { opacity: 1; background: rgb(127 127 127 / 0.2); }
+.tx-tab:not([data-active]):hover { background: var(--c-hover); }
+.tx-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.tx-split-ico { display: block; width: 14px; height: 12px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; }
+.tx-split-ico::after { content: ""; position: absolute; background: currentColor; }
+.tx-split-ico.row::after { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
+.tx-split-ico.column::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+.tx-menu { right: 0; left: auto; min-width: 240px; }
+.tx-menu .note { margin: 0; padding: var(--space-2) var(--space-3); font-size: 0.8125rem; color: var(--c-text-muted); }
+.tx-keys-help { display: grid; gap: var(--space-1); margin: 0; padding: var(--space-1) var(--space-3) var(--space-2); font-size: 0.8125rem; }
+.tx-keys-help > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.tx-keys-help dt { display: flex; gap: 2px; }
+.tx-keys-help dd { margin: 0; color: var(--c-text-muted); }
+
+.tx-pill { display: inline-flex; align-items: center; gap: 6px; margin-left: var(--space-1); padding: 2px var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tx-pill .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.tx-pill[data-tone="direct"] .dot { background: var(--c-success); }
+.tx-pill[data-tone="relay"] .dot { background: var(--c-warning); }
+.tx-pill[data-tone="wait"] .dot { background: var(--c-warning); animation: tx-blink 1.2s ease-in-out infinite; }
+@keyframes tx-blink { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tx-pill[data-tone="wait"] .dot { animation: none; } }
+
+.tx-note { margin: 0; padding: var(--space-1) var(--space-3); font-size: 0.75rem; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-subtle); }
+
+.tx-body { position: relative; flex: 1; min-height: 0; background: var(--tx-bg); }
+.tx-tab-body { position: absolute; inset: 0; }
+.tx-tab-body[hidden] { display: none; }
+.tx-panes { position: absolute; inset: 0; }
+.tx-pane { position: absolute; box-sizing: border-box; padding: 2px; }
+.tx-pane-in { position: relative; width: 100%; height: 100%; padding: 4px 0 0 6px; box-sizing: border-box; border: 1px solid transparent; border-radius: 2px; }
+.tx-panes:has(.tx-pane + .tx-pane) .tx-pane-in[data-focused] { border-color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
+.tx-term { width: 100%; height: 100%; }
+.tx-term .xterm { height: 100%; }
+.tx-divider { position: absolute; z-index: 2; touch-action: none; }
+.tx-divider.row { width: 8px; margin-left: -4px; cursor: col-resize; }
+.tx-divider.column { height: 8px; margin-top: -4px; cursor: row-resize; }
+.tx-divider::after { content: ""; position: absolute; background: #2a2f3a; }
+.tx-divider.row::after { left: 3.5px; top: 0; bottom: 0; width: 1px; }
+.tx-divider.column::after { top: 3.5px; left: 0; right: 0; height: 1px; }
+.tx-divider:hover::after, .tx-divider:focus-visible::after { background: var(--c-primary); }
+.tx-divider.row:hover::after, .tx-divider.row:focus-visible::after { width: 2px; left: 3px; }
+.tx-divider.column:hover::after, .tx-divider.column:focus-visible::after { height: 2px; top: 3px; }
+
+.tx-ended { position: absolute; left: var(--space-2); right: var(--space-2); bottom: var(--space-2); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--c-surface); box-shadow: var(--shadow-lg); font-size: 0.8125rem; }
+.tx-ended span { flex: 1; min-width: 160px; }
+.tx-empty, .tx-failed { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-3); padding: var(--space-4); margin: 0; color: #c9ced8; text-align: center; font-size: 0.875rem; }
+.tx-failed { z-index: 3; background: rgb(17 19 24 / 0.92); }
+.tx-failed p { margin: 0; max-width: 420px; }
+
+/* The phone keyboard's input: at the caret, invisible, 16px so iOS does not zoom. */
+.tx-ime { position: absolute; left: 6px; top: 4px; z-index: 1; width: 2px; min-height: 16px; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; opacity: 0; font-size: 16px; color: transparent; background: transparent; caret-color: transparent; }
+
+.tx-keys { display: flex; gap: 4px; padding: 4px var(--space-2) calc(4px + env(safe-area-inset-bottom)); overflow-x: auto; background: var(--c-surface); border-top: 1px solid var(--c-border-subtle); scrollbar-width: none; }
+.tx-keys::-webkit-scrollbar { display: none; }
+.tx-key { flex: none; min-width: 40px; height: 36px; padding: 0 var(--space-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface-subtle); color: var(--c-text); font: inherit; font-size: 0.875rem; touch-action: manipulation; }
+.tx-key.mod[aria-pressed="true"] { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+
+.tx-dock.touch .hide-touch { display: none; }
+@media (max-width: 760px) {
+	.tx-pill { margin-left: 0; }
+	.tx-tab { max-width: 140px; }
+}

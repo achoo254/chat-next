@@ -4,11 +4,14 @@
 // session, or the machine pages (list, adding, pairing, details) reached
 // from "Máy" at the top of the column. Phones show one column at a time:
 // the sessions at /ai, the page itself elsewhere. Old /machines links open
-// the same page under /ai. Loaded on demand with its styles.
-import { useEffect, type ReactNode } from "react";
+// the same page under /ai. A machine's terminals (xterm and the dock) load
+// only when opened, and only on a machine that offers them. Loaded on demand
+// with its styles.
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths, usePathname, useSearch, type MachinesView } from "../router.tsx";
 import { AddMachine } from "./add-machine.tsx";
+import { terminalGate } from "./agent-version.ts";
 import { canonicalAiPath } from "./ai-paths.ts";
 import { LocalMachine } from "./local-machine.tsx";
 import { MachineDetail } from "./machine-detail.tsx";
@@ -19,9 +22,11 @@ import { PairDevice } from "./pair-device.tsx";
 import { HomeBoard, MachineBoard } from "./session-board.tsx";
 import { SessionChat } from "./session-chat.tsx";
 import { connDot, connText, SessionSidebar } from "./session-sidebar.tsx";
-import { useHub, useHubPresence, useMachineViews, useNow } from "./use-machines.ts";
+import { useHub, useHubPresence, useLink, useMachineViews, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import "./machines.css";
+
+const TerminalScreen = lazy(() => import("../terminal/terminal-dock.tsx"));
 
 export default function MachinesScreen({ view }: { view: MachinesView }) {
 	const hub = useHub();
@@ -65,11 +70,40 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 		case "session":
 			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} />;
 			break;
+		case "terminal":
+			main = <TerminalPage key={view.machine} machine={view.machine} />;
+			break;
 	}
 	return (
 		<div className="mx" data-pane={pane}>
 			<SessionSidebar view={view} />
 			<section className="mx-main">{main}</section>
+		</div>
+	);
+}
+
+/** The machine's terminals when it offers them; otherwise what to do on the machine first. */
+function TerminalPage({ machine }: { machine: string }) {
+	const t = useMachinesCopy();
+	const hub = useHub();
+	const [, state] = useLink(hub, machine);
+	const gate = terminalGate(state.info);
+	if (gate === "available") {
+		return (
+			<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
+				<TerminalScreen machine={machine} />
+			</Suspense>
+		);
+	}
+	const text = gate === "unknown" ? (state.status.kind === "open" ? t.terminal.loading : t.terminal.offline) : t.terminal.hint[gate];
+	return (
+		<div className="mx-scroll">
+			<PageHead back={paths.machine(machine)} backLabel={t.back} title={t.terminal.title} />
+			<div className="mx-body">
+				<p className="note" role="status">
+					{text}
+				</p>
+			</div>
 		</div>
 	);
 }

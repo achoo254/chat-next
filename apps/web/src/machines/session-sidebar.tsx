@@ -12,6 +12,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { countLabel } from "../messaging/data/format.ts";
 import { Link, navigate, paths, type MachinesView } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
+import { terminalGate, type TerminalGate } from "./agent-version.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { sortForList } from "./link/machine-link.ts";
 import { LOCAL_REF } from "./link/link-hub.ts";
@@ -110,6 +111,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	const need = machines.reduce((n, m) => n + m.state.threads.filter((x) => x.state === ThreadState.WAITING).length, 0);
 	const directory = hub.directory();
 	const currentThread = view.page === "session" ? view.threadId : null;
+	const terminalOpen = view.page === "terminal" ? view.machine : null;
 	const currentMachine = "machine" in view ? view.machine : null;
 	return (
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
@@ -138,7 +140,15 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 			</div>
 			<div className="mx-groups" aria-busy={directory.status === "loading"}>
 				{machines.map((m) => (
-					<MachineGroup key={m.entry.ref} machine={m} filter={filter} now={now} currentThread={m.entry.ref === currentMachine ? currentThread : null} current={m.entry.ref === currentMachine && currentThread === null} />
+					<MachineGroup
+						key={m.entry.ref}
+						machine={m}
+						filter={filter}
+						now={now}
+						currentThread={m.entry.ref === currentMachine ? currentThread : null}
+						current={m.entry.ref === currentMachine && currentThread === null && terminalOpen === null}
+						terminalOpen={m.entry.ref === terminalOpen}
+					/>
 				))}
 				{directory.status === "ready" && machines.length === 0 && <FirstMachine compact />}
 			</div>
@@ -154,9 +164,11 @@ interface GroupProps {
 	currentThread: string | null;
 	/** This machine's board or details are open. */
 	current: boolean;
+	/** This machine's terminal is open. */
+	terminalOpen: boolean;
 }
 
-function MachineGroup({ machine, filter, now, currentThread, current }: GroupProps) {
+function MachineGroup({ machine, filter, now, currentThread, current, terminalOpen }: GroupProps) {
 	const t = useMachinesCopy();
 	const { entry, link, state, conn } = machine;
 	const [creating, setCreating] = useState(false);
@@ -176,6 +188,7 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 	const pairPath = ref === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(ref);
 	const loading = conn.kind === "on" ? !state.listed : conn.kind === "connecting" || conn.kind === "checking";
 	// The machine's Claude account, as it announces it (tunelo 2.0.2+): it changes for every session at once.
+	const terminal = terminalGate(state.info);
 	const picked = state.machineProfile?.profiles;
 	const account = picked?.profiles.find((p) => p.id === picked.selectedId)?.email ?? "";
 	return (
@@ -198,7 +211,7 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 						{conn.kind === "on" && account !== "" && ` · ${account}`}
 					</small>
 				</Link>
-				<GroupMenu name={entry.name} machine={ref} conn={conn} onNew={() => setCreating(true)} />
+				<GroupMenu name={entry.name} machine={ref} conn={conn} terminal={terminal} onNew={() => setCreating(true)} />
 			</div>
 			{!collapsed && (
 				<>
@@ -211,6 +224,22 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 					</div>
 				)}
 				{conn.kind === "update" && <p className="mx-group-note muted">{t.agent.hint.update}</p>}
+				{terminal === "available" && online && (
+					<ul className="mx-rows">
+						<li>
+							<Link to={paths.machineTerminal(ref)} className="mx-srow" current={terminalOpen}>
+								<span className="mx-st idle" aria-hidden="true">
+									<MachineIcon name="terminal" small />
+								</span>
+								<span className="tx">
+									<span className="line">
+										<span className="name">{t.terminal.entry}</span>
+									</span>
+								</span>
+							</Link>
+						</li>
+					</ul>
+				)}
 				{conn.kind === "offline" && state.threads.length === 0 && <p className="mx-group-note muted">{t.agent.hint.offline}</p>}
 				{loading && (
 					<ul className="mx-rows skeleton" aria-hidden="true">
@@ -267,7 +296,7 @@ function MachineGroup({ machine, filter, now, currentThread, current }: GroupPro
 	);
 }
 
-function GroupMenu({ name, machine, conn, onNew }: { name: string; machine: string; conn: Conn; onNew: () => void }) {
+function GroupMenu({ name, machine, conn, terminal, onNew }: { name: string; machine: string; conn: Conn; terminal: TerminalGate; onNew: () => void }) {
 	const t = useMachinesCopy();
 	const { open, setOpen, ref } = usePopover();
 	const pairPath = machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine);
@@ -297,6 +326,22 @@ function GroupMenu({ name, machine, conn, onNew }: { name: string; machine: stri
 						<Icon name="inbox" small />
 						<span>{t.agent.machineBoard}</span>
 					</Link>
+					{terminal === "available" ? (
+						<Link to={paths.machineTerminal(machine)} className="mx-menu-link">
+							<MachineIcon name="terminal" small />
+							<span>{t.terminal.entry}</span>
+						</Link>
+					) : (
+						terminal !== "unknown" && (
+							<button type="button" role="menuitem" disabled>
+								<MachineIcon name="terminal" small />
+								<span>
+									{t.terminal.entry}
+									<small>{t.terminal.hint[terminal]}</small>
+								</span>
+							</button>
+						)
+					)}
 					<Link to={paths.machineInfo(machine)} className="mx-menu-link">
 						<Icon name="info" small />
 						<span>{t.agent.info}</span>

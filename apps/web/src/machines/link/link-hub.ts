@@ -58,6 +58,8 @@ export class LinkHub {
 	private loading: Promise<readonly MachineEntry[]> | null = null;
 	private readonly listeners = new Set<() => void>();
 	private readonly links = new Map<string, MachineLink>();
+	/** Second connections that carry only a machine's terminal (MachineLink purpose "terminal"). */
+	private readonly carriers = new Map<string, MachineLink>();
 	private active = false;
 
 	constructor(readonly deps: HubDeps) {}
@@ -110,21 +112,44 @@ export class LinkHub {
 	link(ref: string): MachineLink {
 		let link = this.links.get(ref);
 		if (link === undefined) {
-			link = new MachineLink({
-				device: () => this.deps.keys.device(),
-				deviceName: this.deps.deviceName,
-				pinned: () => this.deps.keys.pinned(ref),
-				tunnelUrl: () => this.entry(ref)?.tunnelUrl ?? "",
-				refreshTunnel: async () => {
-					if (ref !== LOCAL_REF) await this.refresh();
-					return this.entry(ref)?.tunnelUrl ?? "";
-				},
-				socket: this.deps.socket,
-			});
+			link = this.makeLink(ref, "chat");
 			link.setActive(this.active);
 			this.links.set(ref, link);
 		}
 		return link;
+	}
+
+	/** The terminal's own connection to `ref`, made (not started) on first use; the terminal starts and stops it. */
+	terminalCarrier(ref: string): MachineLink {
+		let carrier = this.carriers.get(ref);
+		if (carrier === undefined) {
+			carrier = this.makeLink(ref, "terminal");
+			this.carriers.set(ref, carrier);
+		}
+		return carrier;
+	}
+
+	private makeLink(ref: string, purpose: "chat" | "terminal"): MachineLink {
+		return new MachineLink({
+			device: () => this.deps.keys.device(),
+			deviceName: this.deps.deviceName,
+			pinned: () => this.deps.keys.pinned(ref),
+			tunnelUrl: () => this.entry(ref)?.tunnelUrl ?? "",
+			refreshTunnel: async () => {
+				if (ref !== LOCAL_REF) await this.refresh();
+				return this.entry(ref)?.tunnelUrl ?? "";
+			},
+			socket: this.deps.socket,
+			purpose,
+		});
+	}
+
+	/** Restarts the terminal connection of `ref` if it runs (a new key, a new address). */
+	private restartCarrier(ref: string): void {
+		const carrier = this.carriers.get(ref);
+		if (carrier === undefined || !carrier.started) return;
+		carrier.stop();
+		carrier.start();
 	}
 
 	/** Pins a machine key after pairing and restarts its link with it. */
@@ -135,6 +160,7 @@ export class LinkHub {
 			link.stop();
 			link.start();
 		}
+		this.restartCarrier(ref);
 	}
 
 	/**
@@ -144,6 +170,7 @@ export class LinkHub {
 	 */
 	async reload(ref: string): Promise<void> {
 		if (ref !== LOCAL_REF) await this.refresh();
+		this.restartCarrier(ref);
 		const link = this.links.get(ref);
 		if (link === undefined) return;
 		link.stop();
@@ -154,6 +181,7 @@ export class LinkHub {
 	async forget(ref: string): Promise<void> {
 		this.links.get(ref)?.stop();
 		this.links.delete(ref);
+		this.carriers.get(ref)?.stop();
 		await this.deps.keys.forget(ref);
 	}
 
@@ -166,10 +194,12 @@ export class LinkHub {
 	/** Reconnect now (back in the foreground, network back). */
 	wake(): void {
 		for (const link of this.links.values()) link.wake();
+		for (const carrier of this.carriers.values()) carrier.wake();
 	}
 
 	dispose(): void {
 		for (const link of this.links.values()) link.stop();
+		for (const carrier of this.carriers.values()) carrier.stop();
 	}
 }
 
