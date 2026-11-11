@@ -93,12 +93,24 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
       state: "busy",
       since: NOW - 5 * 60_000,
       tool: "Bash",
+      held: true,
       via: "process",
     });
     expect((await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) }).liveness(t.sessionId)).state).toBe("idle");
     // Past the longest a command may run without a word: idle even while held.
     setTime(file, NOW - TOOL_BUSY_MS - 1_000);
     expect((await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) }).liveness(t.sessionId)).state).toBe("idle");
+  });
+
+  test("held open by a running claude while quiet: idle, and told as held once the processes were read", async () => {
+    const { home, t, file } = session("done");
+    setTime(file, NOW - 5 * 60_000);
+    const sessions = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) });
+    await sessions.prime();
+    expect(await sessions.liveness(t.sessionId)).toEqual({ state: "idle", since: NOW - 5 * 60_000, held: true, via: "transcript" });
+    const free = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) });
+    await free.prime();
+    expect(await free.liveness(t.sessionId)).toEqual({ state: "idle", since: NOW - 5 * 60_000, via: "transcript" });
   });
 
   test("quiet for minutes with no tool running: idle without asking for the processes", async () => {

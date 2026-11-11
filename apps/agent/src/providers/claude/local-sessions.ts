@@ -16,7 +16,8 @@
 // Liveness (is a turn running now?) is narrower: the transcript was written
 // in the last minute, or it holds a tool call with no result yet (a long
 // command writes nothing until it ends) for at most ten minutes while a
-// running claude still holds the session.
+// running claude still holds the session. Whether a running claude holds the
+// session at all (busy or idle) is told beside it, from the same reads.
 import { type Dirent, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
@@ -173,7 +174,9 @@ export class LocalSessions implements SessionHistory {
   /**
    * Busy while the transcript was written in the last minute; past that,
    * while a tool call has no result yet (for TOOL_BUSY_MS at most) and a
-   * running claude holds the session. Never fails.
+   * running claude holds the session. `held` tells a running claude holds
+   * it, from the processes as last read (prime() reads them again; only a
+   * tool call with no result makes this read them itself). Never fails.
    */
   async liveness(sessionId: string): Promise<Liveness> {
     let k: Known | undefined;
@@ -185,15 +188,24 @@ export class LocalSessions implements SessionHistory {
     if (!k) return { state: "unknown", via: "transcript" };
     const since = Math.round(k.mtimeMs);
     const quiet = this.now() - k.mtimeMs;
-    if (quiet >= TOOL_BUSY_MS) return { state: "idle", since, via: "transcript" };
-    const tool = this.openTool(k);
-    const withTool = tool ? { tool } : {};
-    if (quiet < BUSY_MS) return { state: "busy", since, ...withTool, via: "transcript" };
-    if (!tool) return { state: "idle", since, via: "transcript" };
-    await this.processes.refresh();
-    this.head(k);
-    const held = this.running([...this.known.values()]).has(k.sessionId);
-    return held ? { state: "busy", since, tool, via: "process" } : { state: "idle", since, via: "process" };
+    const tool = quiet < TOOL_BUSY_MS ? this.openTool(k) : "";
+    if (tool && quiet >= BUSY_MS) await this.processes.refresh();
+    const held = this.held(k);
+    const withHeld = held ? { held } : {};
+    if (quiet >= TOOL_BUSY_MS) return { state: "idle", since, ...withHeld, via: "transcript" };
+    if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, via: "transcript" };
+    if (!tool) return { state: "idle", since, ...withHeld, via: "transcript" };
+    return held ? { state: "busy", since, tool, held, via: "process" } : { state: "idle", since, via: "process" };
+  }
+
+  /** A running claude holds the session (as of the last read of the processes); never fails. */
+  private held(k: Known): boolean {
+    try {
+      this.head(k);
+      return this.running([...this.known.values()]).has(k.sessionId);
+    } catch {
+      return false;
+    }
   }
 
   /**

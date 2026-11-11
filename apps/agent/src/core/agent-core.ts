@@ -1272,9 +1272,12 @@ export class AgentCore {
     const sessions = this.threadSessions(t);
     if (!req.openAnyway) {
       for (const { history, sessionId } of sessions) {
+        await history.prime?.();
         const live = await history.liveness?.(sessionId);
-        // Activity after this thread's own last change came from elsewhere.
-        if (live?.state === "busy" && !this.isOpen(t) && (live.since ?? this.now()) > t.meta.updatedAt + OWN_WRITE_SLACK_MS) {
+        // A turn running, or a process holding the session open even idle (a
+        // terminal would lose its transcript to the trash), after this
+        // thread's own last change is elsewhere.
+        if ((live?.state === "busy" || live?.held === true) && !this.isOpen(t) && (live.since ?? this.now()) > t.meta.updatedAt + OWN_WRITE_SLACK_MS) {
           throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
         }
       }

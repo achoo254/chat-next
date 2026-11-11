@@ -213,9 +213,12 @@ export type SessionQuery = {
  * A session's liveness as its AI can tell it: "busy" while a turn runs,
  * "idle" once it went quiet, "unknown" when it cannot tell (no record).
  * `since`: Unix milliseconds of the last activity seen; `tool`: the tool
- * running now, by its name, when known; `via`: what told it.
+ * running now, by its name, when known; `via`: what told it. `held`: a
+ * running process of the AI holds the session open, busy or idle (a terminal
+ * left open on it); absent when none does or the AI cannot tell. It never
+ * changes `state`: an idle held session is still "idle".
  */
-export type Liveness = { state: "busy" | "idle" | "unknown"; since?: number; tool?: string; via: "transcript" | "process" | "api" };
+export type Liveness = { state: "busy" | "idle" | "unknown"; since?: number; tool?: string; held?: boolean; via: "transcript" | "process" | "api" };
 
 export type SessionPage = { sessions: LocalSession[]; total: number; dirs: { dir: string; sessions: number }[] };
 
@@ -254,7 +257,9 @@ export interface SessionHistory {
   /**
    * Whether the session is running a turn right now, wherever it runs (a
    * terminal, an IDE, another app, or this machine's own session: telling
-   * those apart is the core's job). Each AI tells it its own way; never fails.
+   * those apart is the core's job), and whether a running process of the AI
+   * holds it open (as of the last prime()). Each AI tells it its own way;
+   * never fails.
    */
   liveness?(sessionId: string): Promise<Liveness>;
 }

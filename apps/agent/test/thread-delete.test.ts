@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { ErrorReason, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, ThreadState, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, test } from "vitest";
 import type { AgentCore } from "../src/core/agent-core.ts";
 import { createClaudeProvider } from "../src/providers/claude/index.ts";
@@ -133,6 +133,57 @@ describe("deleting a thread", () => {
     transcriptOf(claudeHome, sessionId, m.work);
     await expect(m.core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "phone" })).rejects.toMatchObject({ reason: ErrorReason.TRASH_UNAVAILABLE });
     expect(m.core.list().some((t) => t.id === thread.id)).toBe(true);
+  });
+});
+
+/**
+ * A terminal session opened as a thread ten minutes ago by the machine's
+ * clock, written to five minutes ago (after the thread's last change) and
+ * quiet since; `held`: a running claude registered it as its session.
+ */
+async function openedTerminalSession(held: boolean) {
+  const sessionId = randomUUID();
+  const claudeHome = tempDir("claude-home-");
+  const provider = createClaudeProvider({ query: fakeQuery(undefined, { sessionId }).fn, findBinary: async () => "claude", homes: () => [claudeHome] });
+  provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+  const trashed: string[][] = [];
+  const m = makeCore([provider], { trash: async (paths) => void trashed.push([...paths]), now: () => Date.now() - 10 * 60_000 });
+  cores.push(m.core);
+  const file = transcriptOf(claudeHome, sessionId, m.work);
+  const thread = await m.core.openLocal({ provider: "claude", sessionId, consent: none, openAnyway: false, device: "phone" });
+  const quietSince = new Date(Date.now() - 5 * 60_000);
+  utimesSync(file, quietSince, quietSince);
+  if (held) {
+    mkdirSync(join(claudeHome, "sessions"), { recursive: true });
+    writeFileSync(join(claudeHome, "sessions", `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId, cwd: m.work, kind: "interactive", entrypoint: "cli" }));
+  }
+  return { ...m, thread, file, trashed };
+}
+
+describe("deleting a thread whose session a terminal may hold", () => {
+  test("held open by a running claude while idle: refused until the user goes on, and not shown as running elsewhere", async () => {
+    const { core, thread, file, trashed } = await openedTerminalSession(true);
+    await core.lookElsewhere();
+    expect(core.list().find((s) => s.id === thread.id)).toMatchObject({ state: ThreadState.IDLE, busyElsewhere: false });
+    await expect(core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "phone" })).rejects.toMatchObject({ reason: ErrorReason.SESSION_OPEN_ELSEWHERE });
+    expect(trashed).toHaveLength(0);
+    await core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: true, device: "phone" });
+    expect(trashed.flat()).toContain(file);
+  });
+
+  test("neither held nor running a turn: deleted at once", async () => {
+    const { core, thread, file, trashed } = await openedTerminalSession(false);
+    await core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "phone" });
+    expect(trashed.flat()).toContain(file);
+    expect(core.list()).toHaveLength(0);
+  });
+
+  test("running a turn there: refused", async () => {
+    const { core, thread, file, trashed } = await openedTerminalSession(false);
+    const now = new Date();
+    utimesSync(file, now, now);
+    await expect(core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "phone" })).rejects.toMatchObject({ reason: ErrorReason.SESSION_OPEN_ELSEWHERE });
+    expect(trashed).toHaveLength(0);
   });
 });
 

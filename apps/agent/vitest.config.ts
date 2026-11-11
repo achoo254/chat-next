@@ -1,14 +1,9 @@
-import { mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { defineConfig } from "vitest/config";
+import { testTempRun } from "./test/support/test-temp-root.ts";
 
-// macOS puts temp folders under /var/folders, and /var is a sensitive path
-// of the agent (safety/sensitive-paths.ts), so a test home made there reads
-// as sensitive. Tests take their temp folders from one folder under
-// /private/tmp instead (reused, so runs leave no new folders); the rule
-// itself stays as it is. Linux (CI) already uses /tmp.
-const tempRoot = process.platform === "darwin" && tmpdir().startsWith("/var/") ? "/private/tmp/tunelo-agent-test" : undefined;
-if (tempRoot) mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
+// Every temp folder of the run goes into one folder of its own, removed once
+// the run ends (test/support/test-temp-root.ts tells where, and how to keep it).
+const tempRun = testTempRun();
 
 export default defineConfig({
   test: {
@@ -16,10 +11,11 @@ export default defineConfig({
     testTimeout: 30_000,
     // Shared 16 GB machine: at most two workers however the suite starts.
     maxWorkers: 2,
+    globalSetup: ["./test/support/test-temp-root.ts"],
     env: {
       // Keys go to a 0600 file in the test's config folder, never the real Keychain or DPAPI.
       TUNELO_KEYSTORE: "file",
-      ...(tempRoot ? { TMPDIR: tempRoot } : {}),
+      TMPDIR: tempRun,
     },
   },
 });
