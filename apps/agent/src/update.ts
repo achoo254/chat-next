@@ -83,22 +83,48 @@ export function newestRelease<R extends Omit<Release, "assets">>(releases: reado
   return best;
 }
 
+/** Called while a file downloads; `total` is 0 when the server did not say how big the file is. */
+export type DownloadProgress = (received: number, total: number) => void;
+
+/** Reads a response body, reporting progress as the chunks arrive. */
+async function readBody(res: Response, onProgress?: DownloadProgress): Promise<Uint8Array> {
+  if (!onProgress || !res.body) return new Uint8Array(await res.arrayBuffer());
+  const total = Number(res.headers.get("content-length")) || 0;
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  const reader = res.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(received, total);
+  }
+  const bytes = new Uint8Array(received);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.length;
+  }
+  return bytes;
+}
+
 /**
  * Downloads a release file. GitHub's public download link sometimes answers
  * 5xx for a while; those are retried, then the same file is fetched through
  * the API. Either way the signature check decides what gets installed.
  */
-async function fetchBytes(asset: Asset, tries = 3): Promise<Uint8Array> {
+async function fetchBytes(asset: Asset, onProgress?: DownloadProgress, tries = 3): Promise<Uint8Array> {
   let status = 0;
   for (let i = 1; i <= tries; i++) {
     const res = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(300_000) });
-    if (res.ok) return new Uint8Array(await res.arrayBuffer());
+    if (res.ok) return readBody(res, onProgress);
     status = res.status;
     if (status < 500) break;
     if (i < tries) await new Promise((r) => setTimeout(r, i * 2000));
   }
   const api = await fetch(asset.url, { headers: { accept: "application/octet-stream" }, signal: AbortSignal.timeout(300_000) });
-  if (api.ok) return new Uint8Array(await api.arrayBuffer());
+  if (api.ok) return readBody(api, onProgress);
   throw new Error(`download failed (${status}, then ${api.status}): ${asset.browser_download_url}`);
 }
 
@@ -117,7 +143,7 @@ export async function checkForUpdate(): Promise<string | null> {
 }
 
 /** Returns the installed version, or null when already up to date. */
-export async function update(log: (l: string) => void): Promise<string | null> {
+export async function update(log: (l: string) => void, onProgress?: DownloadProgress): Promise<string | null> {
   const found = await findUpdate();
   if (!found) return null;
   const { release, version: latest } = found;
@@ -126,7 +152,7 @@ export async function update(log: (l: string) => void): Promise<string | null> {
   const sigFile = release.assets.find((a) => a.name === `${asset}.minisig`);
   if (!file || !sigFile) throw new Error(`tunelo ${latest} has no ${asset} for this computer`);
   log(`downloading tunelo ${latest}…`);
-  const [bin, sig] = await Promise.all([fetchBytes(file), fetchBytes(sigFile)]);
+  const [bin, sig] = await Promise.all([fetchBytes(file, onProgress), fetchBytes(sigFile)]);
   const sigText = new TextDecoder().decode(sig);
   if (!verifyMinisign(bin, sigText)) throw new Error("signature check failed; the download was not installed");
   // The signed comment names the file and version, so an older signed build

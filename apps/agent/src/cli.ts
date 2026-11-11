@@ -142,13 +142,30 @@ async function status(options: { json?: boolean }): Promise<number> {
   return 0;
 }
 
+/** Shows download progress: one rewritten line on a terminal, a line per quarter when output is piped. */
+function downloadProgressPrinter(): (received: number, total: number) => void {
+  const mb = (n: number) => (n / 1_048_576).toFixed(1);
+  const live = process.stdout.isTTY;
+  let lastQuarter = -1;
+  return (received, total) => {
+    const percent = total > 0 ? Math.floor((received / total) * 100) : -1;
+    const text = percent >= 0 ? `  ${percent}% (${mb(received)} / ${mb(total)} MB)` : `  ${mb(received)} MB`;
+    if (live) {
+      process.stdout.write(`\r${text}${total > 0 && received >= total ? "\n" : ""}`);
+    } else if (percent >= 0 && Math.floor(percent / 25) > lastQuarter) {
+      lastQuarter = Math.floor(percent / 25);
+      console.log(text);
+    }
+  };
+}
+
 async function updateCommand(options: { check?: boolean }): Promise<number> {
   if (options.check) {
     const latest = await checkForUpdate();
     console.log(latest ? `Update available: ${AGENT_VERSION} → ${latest}. Run \`tunelo update\` to install it.` : `tunelo ${AGENT_VERSION} is the newest.`);
     return 0;
   }
-  const v = await update((l) => console.log(l));
+  const v = await update((l) => console.log(l), downloadProgressPrinter());
   if (!v) {
     console.log(`tunelo ${AGENT_VERSION} is the newest.`);
     return 0;
