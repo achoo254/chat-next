@@ -18,6 +18,12 @@
 #
 #   curl -fsSL https://<chat host>/agent/install.sh | sh -s -- [vi|en|zh-CN]
 #
+# Two files are installed next to each other: tunelo and tunelo-term-host,
+# the process that keeps the machine's terminals (a release from before the
+# terminal has only tunelo). When `tunelo update` already put a terminal
+# process into the config folder, the new one is also staged there; tunelo
+# switches to it once no terminal is open.
+#
 # The release is pinned: version and SHA-256 of every file are written into
 # this script when the web app is built for a tunelo release, and the
 # minisign signature is checked with the embedded public key when minisign
@@ -29,6 +35,10 @@ SHA256_DARWIN_ARM64="99ca09feec94b535fef34fc47bcc9abf69a44c86945082caa1d75d7593b
 SHA256_DARWIN_X64="a73b649175f60ef804bf3fb227943a3808227fb6ae0b3016cf5a25fad5aa1431"
 SHA256_LINUX_X64="28566116369f6b0c0fff5b21bf99cf8908fabc91aeb423aa5170cd34eefa8716"
 SHA256_LINUX_ARM64="9e2bcc6c56b06a7a88081ab02b7ca7467f0f2b5bcedeb65c7aabcdca876b0553"
+SHA256_TERM_HOST_DARWIN_ARM64=""
+SHA256_TERM_HOST_DARWIN_X64=""
+SHA256_TERM_HOST_LINUX_X64=""
+SHA256_TERM_HOST_LINUX_ARM64=""
 MINISIGN_PUBKEY="RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D"
 RELEASES="https://github.com/achoo254/chat-next/releases/download"
 
@@ -56,13 +66,15 @@ sha256_of() {
 	fi
 }
 
-# Sets asset and sha for this system: pick_asset <uname -s> <uname -m>.
+# Sets asset and sha for this system, and host_asset and host_sha for its
+# terminal process (host_sha is empty for a release from before the
+# terminal): pick_asset <uname -s> <uname -m>.
 pick_asset() {
 	case "${1}/${2}" in
-	Darwin/arm64) asset="tunelo-darwin-arm64" sha="$SHA256_DARWIN_ARM64" ;;
-	Darwin/x86_64) asset="tunelo-darwin-x64" sha="$SHA256_DARWIN_X64" ;;
-	Linux/x86_64 | Linux/amd64) asset="tunelo-linux-x64" sha="$SHA256_LINUX_X64" ;;
-	Linux/aarch64 | Linux/arm64) asset="tunelo-linux-arm64" sha="$SHA256_LINUX_ARM64" ;;
+	Darwin/arm64) asset="tunelo-darwin-arm64" sha="$SHA256_DARWIN_ARM64" host_sha="$SHA256_TERM_HOST_DARWIN_ARM64" ;;
+	Darwin/x86_64) asset="tunelo-darwin-x64" sha="$SHA256_DARWIN_X64" host_sha="$SHA256_TERM_HOST_DARWIN_X64" ;;
+	Linux/x86_64 | Linux/amd64) asset="tunelo-linux-x64" sha="$SHA256_LINUX_X64" host_sha="$SHA256_TERM_HOST_LINUX_X64" ;;
+	Linux/aarch64 | Linux/arm64) asset="tunelo-linux-arm64" sha="$SHA256_LINUX_ARM64" host_sha="$SHA256_TERM_HOST_LINUX_ARM64" ;;
 	Darwin/* | Linux/*)
 		die "tunelo chưa có bản cho bộ xử lý ${2} (có: macOS arm64, x86_64; Linux x86_64, aarch64)." \
 			"tunelo has no build for the ${2} processor (there are: macOS arm64, x86_64; Linux x86_64, aarch64)." \
@@ -77,6 +89,43 @@ pick_asset() {
 	[ -n "$sha" ] || die "bản tunelo ${TUNELO_VERSION} chưa có cho ${1}; thử lại khi có bản mới." \
 		"tunelo ${TUNELO_VERSION} has no ${1} build yet; try again once a newer release is out." \
 		"tunelo ${TUNELO_VERSION} 尚无 ${1} 版本；请在新版本发布后重试。"
+	host_asset="tunelo-term-host-${asset#tunelo-}"
+}
+
+# fetch_verified <file> <sha256>: downloads a file of the pinned release into
+# $tmp and checks its SHA-256, and its signature when minisign is installed.
+fetch_verified() {
+	url="${RELEASES}/tunelo-v${TUNELO_VERSION}/${1}"
+	curl -fsSL --proto '=https' --tlsv1.2 -o "${tmp}/${1}" "$url" || die "không tải được ${url}" "could not download ${url}" "无法下载 ${url}"
+	[ "$(sha256_of "${tmp}/${1}")" = "$2" ] || die "file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt." \
+		"the download does not match the pinned SHA-256; nothing was installed." "下载的文件与固定的 SHA-256 不符；未安装任何内容。"
+	if command -v minisign >/dev/null 2>&1; then
+		fetch_signature "$1"
+		minisign -Vq -P "$MINISIGN_PUBKEY" -m "${tmp}/${1}" -x "${tmp}/${1}.minisig" ||
+			die "chữ ký minisign không hợp lệ; đã huỷ cài đặt." "the minisign signature is invalid; nothing was installed." "minisign 签名无效；未安装任何内容。"
+	fi
+}
+
+# fetch_signature <file>: downloads the file's minisign signature into $tmp.
+fetch_signature() {
+	[ ! -f "${tmp}/${1}.minisig" ] || return 0
+	curl -fsSL --proto '=https' --tlsv1.2 -o "${tmp}/${1}.minisig" "${RELEASES}/tunelo-v${TUNELO_VERSION}/${1}.minisig" ||
+		die "không tải được chữ ký minisign." "could not download the minisign signature." "无法下载 minisign 签名。"
+}
+
+# A terminal process `tunelo update` put into the config folder comes before
+# the one next to tunelo: stage the new one there too (with its signature,
+# which names its version); tunelo switches to it once no terminal is open.
+stage_term_host() {
+	host_bins="${config_dir}/term-host/bin"
+	[ -d "${host_bins}/current" ] || return 0
+	rm -rf "${host_bins}/next.partial"
+	mkdir -p "${host_bins}/next.partial"
+	cp "${tmp}/${host_asset}" "${host_bins}/next.partial/tunelo-term-host"
+	cp "${tmp}/${host_asset}.minisig" "${host_bins}/next.partial/tunelo-term-host.minisig"
+	chmod 0755 "${host_bins}/next.partial/tunelo-term-host"
+	rm -rf "${host_bins}/next"
+	mv "${host_bins}/next.partial" "${host_bins}/next"
 }
 
 # Linux needs glibc (the build is not for musl) and, to run in the background, systemd.
@@ -140,24 +189,32 @@ main() {
 	tmp="$(mktemp -d)"
 	trap 'rm -rf "$tmp"' EXIT
 	trap 'exit 130' INT TERM
-	url="$RELEASES/tunelo-v$TUNELO_VERSION/$asset"
 	say "Đang tải tunelo ${TUNELO_VERSION}…" "Downloading tunelo ${TUNELO_VERSION}…" "正在下载 tunelo ${TUNELO_VERSION}…"
-	curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$asset" "$url" || die "không tải được $url" "could not download $url" "无法下载 $url"
-	[ "$(sha256_of "$tmp/$asset")" = "$sha" ] || die "file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt." \
-		"the download does not match the pinned SHA-256; nothing was installed." "下载的文件与固定的 SHA-256 不符；未安装任何内容。"
-	if command -v minisign >/dev/null 2>&1; then
-		curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$asset.minisig" "$url.minisig" ||
-			die "không tải được chữ ký minisign." "could not download the minisign signature." "无法下载 minisign 签名。"
-		minisign -Vq -P "$MINISIGN_PUBKEY" -m "$tmp/$asset" -x "$tmp/$asset.minisig" ||
-			die "chữ ký minisign không hợp lệ; đã huỷ cài đặt." "the minisign signature is invalid; nothing was installed." "minisign 签名无效；未安装任何内容。"
+	# Both files are checked before either is installed.
+	fetch_verified "$asset" "$sha"
+	if [ -n "$host_sha" ]; then
+		fetch_verified "$host_asset" "$host_sha"
+		# Its signature names its version, which tunelo reads when it switches.
+		fetch_signature "$host_asset"
 	fi
 
 	bin_dir="$HOME/.local/bin"
 	bin="$bin_dir/tunelo"
+	config_dir="${TUNELO_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/tunelo}"
 	mkdir -p "$bin_dir"
+	# tunelo first: if it cannot be put in place, no newer terminal process waits for it.
 	chmod 0755 "$tmp/$asset"
 	mv -f "$tmp/$asset" "$bin.new"
 	mv -f "$bin.new" "$bin"
+	# What `tunelo update --rollback` would put back is not the release before this one any more.
+	rm -f "$bin.old" "${config_dir}/update-rollback.json"
+	if [ -n "$host_sha" ]; then
+		# A running terminal process keeps the file it started from; open shells stay.
+		chmod 0755 "${tmp}/${host_asset}"
+		cp "${tmp}/${host_asset}" "${bin_dir}/tunelo-term-host.new"
+		mv -f "${bin_dir}/tunelo-term-host.new" "${bin_dir}/tunelo-term-host"
+		stage_term_host
+	fi
 
 	# Put tunelo on PATH for new terminals: zsh is the macOS default shell;
 	# Linux login shells read ~/.profile, interactive bash ~/.bashrc.

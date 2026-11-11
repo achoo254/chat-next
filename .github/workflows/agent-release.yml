@@ -1,20 +1,38 @@
-# Releases tunelo, the background agent (apps/agent), on a tag tunelo-v<semver>: tests, single-file
-# builds for macOS (arm64, x64), Windows x64 and Linux (x64, arm64; glibc),
-# cross-compiled by Bun on Linux,
-# the macOS files signed with the Developer ID (hardened runtime, identifier
-# com.hoandat.tunelo) and notarized on a macOS runner, so macOS keeps the
-# Full Disk Access granted to tunelo across updates; then SHA256SUMS and
-# minisign signatures of the signed files, then a GitHub Release. Afterwards pin the install
-# scripts locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS,
-# commit and push (the web deploy serves them).
+# Releases tunelo, the background agent (apps/agent), on a tag tunelo-v<semver>, with
+# tunelo-term-host, the process that keeps the machine's terminals (apps/term-host, Rust):
+# tests; single-file builds of tunelo for macOS (arm64, x64), Windows x64 and
+# Linux (x64, arm64; glibc), cross-compiled by Bun on Linux; native Rust builds
+# of tunelo-term-host for the same five platforms; the macOS files signed with
+# the Developer ID (hardened runtime; identifiers com.hoandat.tunelo and
+# com.hoandat.tunelo.term-host) and notarized on a macOS runner, so macOS keeps
+# the Full Disk Access granted to tunelo across updates; then SHA256SUMS of all
+# ten files and minisign signatures of every file (SHA256SUMS too; update.ts
+# checks them), then a GitHub Release. Afterwards pin the install scripts
+# locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS, commit
+# and push (the web deploy serves them).
+#
+# Dry run: start the workflow by hand (workflow_dispatch) on any branch. It
+# tests and builds the version in apps/agent/src/version.ts and uploads the
+# unsigned files and their SHA256SUMS as artifacts of the run: no Developer ID
+# signature, no notarization, no minisign, no Release, no secret is read.
+#
+# tunelo-v0.x and tunelo-v1.x tags belong to the Tunelo CLI 1.x released from
+# localman-next; this workflow refuses those versions and any tag that exists
+# there.
 name: agent-release
 
 on:
   push:
     tags: ["tunelo-v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' }}
+  # Builds tunelo-term-host; a newer Rust is a deliberate change here.
+  RUST_TOOLCHAIN: "1.96.0"
 
 jobs:
   test:
@@ -34,16 +52,35 @@ jobs:
       - name: Tag matches the agent version
         id: line
         run: |
+          set -euo pipefail
           have=$(sed -n 's/^export const AGENT_VERSION = "\(.*\)";$/\1/p' apps/agent/src/version.ts)
-          case "$GITHUB_REF_NAME" in
-          tunelo-v*)
-            prefix=tunelo version="${GITHUB_REF_NAME#tunelo-v}"
-            test "$version" = "$have" || { echo "tag $version != AGENT_VERSION $have"; exit 1; }
-            ;;
-          *) echo "not a release tag: $GITHUB_REF_NAME"; exit 1 ;;
-          esac
+          if [ "$DRY_RUN" = "true" ]; then
+            prefix=tunelo version="$have"
+          else
+            case "$GITHUB_REF_NAME" in
+            tunelo-v*)
+              prefix=tunelo version="${GITHUB_REF_NAME#tunelo-v}"
+              test "$version" = "$have" || { echo "tag $version != AGENT_VERSION $have"; exit 1; }
+              ;;
+            *) echo "not a release tag: $GITHUB_REF_NAME"; exit 1 ;;
+            esac
+          fi
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "not a version: $version"; exit 1; }
           echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: The version is not one of localman-next's
+        env:
+          VERSION: ${{ steps.line.outputs.version }}
+        run: |
+          set -uo pipefail
+          case "$VERSION" in
+          0.* | 1.*) echo "tunelo $VERSION is a Tunelo CLI 1.x version of localman-next; tunelo starts at 2.0.0"; exit 1 ;;
+          esac
+          # 2: no such tag there. 0: it exists. Anything else: could not ask, so no release.
+          git ls-remote --exit-code --tags https://github.com/achoo254/localman-next "refs/tags/tunelo-v$VERSION" >/dev/null
+          rc=$?
+          if [ "$rc" -eq 0 ]; then echo "tag tunelo-v$VERSION exists in localman-next"; exit 1; fi
+          if [ "$rc" -ne 2 ]; then echo "could not list the tags of localman-next (exit $rc)"; exit 1; fi
       # The tests that need the release's runtime run under the same Bun.
       - uses: ./.github/actions/setup-bun
       - run: pnpm --filter @achoo254/chat-remote-protocol --filter @achoo254/tunelo-agent test
@@ -80,10 +117,77 @@ jobs:
           name: ${{ env.ASSET }}
           path: dist/${{ env.ASSET }}
 
+  # tunelo-term-host, built natively on each platform (ConPTY, the crypto
+  # backends and the C parts of aws-lc need the real toolchain of the OS).
+  build-term-host:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, suffix: darwin-arm64, os: macos-15, test: true }
+          - { target: x86_64-apple-darwin, suffix: darwin-x64, os: macos-15, test: false }
+          - { target: x86_64-pc-windows-msvc, suffix: windows-x64.exe, os: windows-2022, test: false }
+          # The oldest Ubuntu runners: the glibc they link against is the oldest the file runs on.
+          - { target: x86_64-unknown-linux-gnu, suffix: linux-x64, os: ubuntu-22.04, test: true }
+          - { target: aarch64-unknown-linux-gnu, suffix: linux-arm64, os: ubuntu-22.04-arm, test: false }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      ASSET: ${{ needs.test.outputs.prefix }}-term-host-${{ matrix.suffix }}
+      CARGO_TERM_COLOR: never
+      # The same macOS floor for Rust and the C code of aws-lc.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      # No Visual C++ runtime to install on Windows.
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: "-C target-feature=+crt-static"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: apps/term-host
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target "${{ matrix.target }}"
+          rustup override set "$RUST_TOOLCHAIN" --path apps/term-host
+      - name: Test
+        if: matrix.test
+        working-directory: apps/term-host
+        run: cargo test --locked --release --target "${{ matrix.target }}"
+      - name: Build
+        working-directory: apps/term-host
+        run: cargo build --locked --release --target "${{ matrix.target }}" --bin tunelo-term-host
+      - name: Collect
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          ext=""
+          case "${{ matrix.target }}" in *windows*) ext=".exe" ;; esac
+          cp "apps/term-host/target/${{ matrix.target }}/release/tunelo-term-host$ext" "dist/$ASSET"
+          ls -l "dist/$ASSET"
+          case "${{ matrix.target }}" in
+          *linux*)
+            # The newest glibc symbol decides which Linux systems can run it.
+            echo "needs glibc $(objdump -T "dist/$ASSET" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
+            ;;
+          esac
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.ASSET }}
+          path: dist/${{ env.ASSET }}
+
   # A stable signature: macOS ties Full Disk Access to the team and identifier
   # instead of to each build's hash. Signed before the checksums and minisign.
   sign-macos:
-    needs: [test, build]
+    needs: [test, build, build-term-host]
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
     # Apple usually notarizes in minutes, but may hold a submission much longer.
     timeout-minutes: 150
@@ -93,9 +197,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           sparse-checkout: apps/agent/macos
+      # tunelo-darwin-* and tunelo-term-host-darwin-*.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: ${{ needs.test.outputs.prefix }}-darwin-*
+          pattern: ${{ needs.test.outputs.prefix }}-*darwin-*
           path: dist
           merge-multiple: true
       - name: Sign with the Developer ID
@@ -117,12 +222,21 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_password" "$kc" >/dev/null
           # codesign looks the identity up in the search list; the runner's login keychain stays on it.
           security list-keychains -d user -s "$kc" login.keychain-db
-          for f in dist/"$PREFIX"-darwin-*; do
+          # sign <file> <identifier> [codesign options…]
+          sign() {
+            f="$1" id="$2"
+            shift 2
             chmod +x "$f"
-            codesign --force --options runtime --timestamp --identifier com.hoandat.tunelo \
-              --entitlements apps/agent/macos/entitlements.plist --keychain "$kc" --sign "$IDENTITY" "$f"
+            codesign --force --options runtime --timestamp --identifier "$id" "$@" --keychain "$kc" --sign "$IDENTITY" "$f"
             codesign --verify --strict --verbose=2 "$f"
             codesign -dv "$f" 2>&1 | grep -E '^(Identifier|TeamIdentifier|Authority)=|flags='
+          }
+          for f in dist/"$PREFIX"-darwin-*; do
+            sign "$f" com.hoandat.tunelo --entitlements apps/agent/macos/entitlements.plist
+          done
+          # Rust code needs none of Bun's entitlements (no JIT, no unsigned libraries).
+          for f in dist/"$PREFIX"-term-host-darwin-*; do
+            sign "$f" com.hoandat.tunelo.term-host
           done
           # Runs under the hardened runtime (Bun's JIT needs the entitlements).
           "dist/$PREFIX-darwin-arm64" --version
@@ -147,7 +261,7 @@ jobs:
             exit 1
           fi
           # A bare executable cannot be stapled: Gatekeeper finds the ticket online.
-          for f in dist/"$PREFIX"-darwin-*; do spctl -a -vv -t install "$f"; done
+          for f in dist/"$PREFIX"-*darwin-*; do spctl -a -vv -t install "$f"; done
       - name: Remove the signing keychain and key
         if: always()
         run: |
@@ -163,36 +277,76 @@ jobs:
           name: ${{ needs.test.outputs.prefix }}-darwin-x64
           path: dist/${{ needs.test.outputs.prefix }}-darwin-x64
           overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.test.outputs.prefix }}-term-host-darwin-arm64
+          path: dist/${{ needs.test.outputs.prefix }}-term-host-darwin-arm64
+          overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.test.outputs.prefix }}-term-host-darwin-x64
+          path: dist/${{ needs.test.outputs.prefix }}-term-host-darwin-x64
+          overwrite: true
 
   release:
-    needs: [test, build, sign-macos]
+    needs: [test, build, build-term-host, sign-macos]
+    # A dry run skips sign-macos; every other job must have passed.
+    if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+    env:
+      PREFIX: ${{ needs.test.outputs.prefix }}
+      VERSION: ${{ needs.test.outputs.version }}
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: apps/agent/src
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
-      - name: Checksums and signatures
+      - name: Checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          # Every file of the release, by name: a missing build stops the release here.
+          sha256sum \
+            "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" "$PREFIX-linux-x64" "$PREFIX-linux-arm64" \
+            "$PREFIX-term-host-darwin-arm64" "$PREFIX-term-host-darwin-x64" "$PREFIX-term-host-windows-x64.exe" \
+            "$PREFIX-term-host-linux-x64" "$PREFIX-term-host-linux-arm64" > SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Signatures
+        if: env.DRY_RUN != 'true'
+        working-directory: dist
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
-          PREFIX: ${{ needs.test.outputs.prefix }}
-          VERSION: ${{ needs.test.outputs.version }}
         run: |
+          set -euo pipefail
           sudo apt-get install -y minisign >/dev/null
-          cd dist
           umask 077
+          # The key leaves the runner's disk even when signing or checking fails.
+          trap 'rm -f ../minisign.key' EXIT
           printf '%s\n' "$MINISIGN_SECRET_KEY" > ../minisign.key
           # The signed comment names the program, version and file (update.ts checks it).
-          for f in "$PREFIX"-*; do minisign -S -s ../minisign.key -m "$f" -t "$PREFIX $VERSION $f" < /dev/null; done
+          for f in "$PREFIX"-* SHA256SUMS; do minisign -S -s ../minisign.key -m "$f" -t "$PREFIX $VERSION $f" < /dev/null; done
           rm -f ../minisign.key
-          sha256sum "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" "$PREFIX-linux-x64" "$PREFIX-linux-arm64" > SHA256SUMS
-          cat SHA256SUMS
+          # Checked with the public key built into tunelo.
+          pubkey=$(sed -n 's/^export const MINISIGN_PUBKEY = "\(.*\)";$/\1/p' ../apps/agent/src/update.ts)
+          for f in "$PREFIX"-* SHA256SUMS; do
+            case "$f" in *.minisig) continue ;; esac
+            minisign -Vq -P "$pubkey" -m "$f"
+          done
       - name: GitHub Release
+        if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          PREFIX: ${{ needs.test.outputs.prefix }}
-          VERSION: ${{ needs.test.outputs.version }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" --notes "Background agent of My machines. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" --notes "Background agent of My machines and its terminal process. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false
+      - name: Dry run checksums
+        if: env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS

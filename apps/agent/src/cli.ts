@@ -32,7 +32,7 @@ import { registerWatchCommand } from "./tunnels/cli-watch-command.js";
 import { registerWhoamiCommand } from "./tunnels/cli-whoami-command.js";
 import { Display } from "./tunnels/display.js";
 import { TunnelService } from "./tunnels/tunnel-service.ts";
-import { checkForUpdate, update } from "./update.ts";
+import { checkForUpdate, rollback, update } from "./update.ts";
 import { AGENT_VERSION } from "./version.ts";
 import type { SecretService } from "./sign-in-secrets/secret-service.ts";
 import type { RemoteBrowser } from "./remote-browser/remote-browser.ts";
@@ -159,7 +159,17 @@ function downloadProgressPrinter(): (received: number, total: number) => void {
   };
 }
 
-async function updateCommand(options: { check?: boolean }): Promise<number> {
+async function updateCommand(options: { check?: boolean; rollback?: boolean }): Promise<number> {
+  if (options.check && options.rollback) {
+    console.error("tunelo update: use --check or --rollback, not both.");
+    return 1;
+  }
+  if (options.rollback) {
+    const previous = await rollback((l) => console.log(l));
+    await callControl(configDir(), "POST", "/restart").catch(() => undefined);
+    console.log(`Rolled back to ${previous}. Open terminals keep running; new ones use the terminal process of ${previous} once none is open.`);
+    return 0;
+  }
   if (options.check) {
     const latest = await checkForUpdate();
     console.log(latest ? `Update available: ${AGENT_VERSION} → ${latest}. Run \`tunelo update\` to install it.` : `tunelo ${AGENT_VERSION} is the newest.`);
@@ -172,6 +182,11 @@ async function updateCommand(options: { check?: boolean }): Promise<number> {
   }
   // The service supervisor (launchd / logon task loop) starts the new file.
   await callControl(configDir(), "POST", "/restart").catch(() => undefined);
+  if (v === AGENT_VERSION) {
+    // Same version: only its missing terminal process was installed.
+    console.log(`tunelo ${v} is the newest; installed its terminal process.`);
+    return 0;
+  }
   console.log(`Updated to ${v}. Restart any \`tunelo http\` or \`tunelo tcp\` you started yourself to run it.`);
   return 0;
 }
@@ -237,7 +252,12 @@ function buildProgram(): Command {
         return 0;
       }),
     );
-  program.command("update").description("install the newest signed release and restart").option("--check", "Only report whether an update exists").action(exits(updateCommand));
+  program
+    .command("update")
+    .description("install the newest signed release and restart")
+    .option("--check", "Only report whether an update exists")
+    .option("--rollback", "Put back the release the last update replaced (signatures checked again), then restart")
+    .action(exits(updateCommand));
   program
     .command("run")
     .description("run in this terminal only (closing it stops tunelo)")

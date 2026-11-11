@@ -31,6 +31,25 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 `$XDG_CONFIG_HOME/tunelo` khi có biến này) hoặc `%APPDATA%\tunelo` (biến `TUNELO_HOME` đổi được). Trên Linux script ghi PATH vào
 `~/.profile`, `~/.bashrc` (nếu có) và `~/.zshrc` (nếu shell là zsh); Alpine và bản musl khác bị từ chối.
 
+Từ bản có terminal, script cài thêm `tunelo-term-host` (tiến trình Rust giữ terminal, [đặc tả](../../docs/terminal-wire.md)) cạnh
+`tunelo`, ghim SHA-256 riêng cho từng nền tảng; cả hai tệp kiểm xong mới cài tệp nào. Máy đã có bản do `tunelo update` đặt trong
+`<thư mục cấu hình>/term-host/bin/current/` thì bản mới được đặt sẵn ở `term-host/bin/next/`, tunelo chuyển sang khi không còn
+terminal nào mở. Giấy phép các thư viện của nó: [`docs/term-host-licenses.md`](../../docs/term-host-licenses.md).
+
+Windows, tuỳ chọn: terminal nối thẳng cần UDP vào. Không có quy tắc tường lửa thì kết nối thử chiều ra trước, không được thì đi qua
+relay (vẫn dùng được, chậm hơn); Windows có thể hiện hộp thoại tường lửa lần đầu. Muốn mở sẵn, chạy một lần trong PowerShell
+**Run as administrator** của chính tài khoản cài tunelo (tài khoản quản trị khác thì ghi đường dẫn đầy đủ thay cho biến môi trường):
+
+```powershell
+foreach ($p in "$env:LOCALAPPDATA\tunelo\tunelo-term-host.exe", "$env:APPDATA\tunelo\term-host\bin\current\tunelo-term-host.exe") {
+  netsh advfirewall firewall add rule name="tunelo terminal" dir=in action=allow protocol=UDP program="$p" enable=yes profile=private,public
+}
+# Gỡ: netsh advfirewall firewall delete rule name="tunelo terminal"
+```
+
+Binary Windows chưa ký mã (Authenticode), nên SmartScreen hay Defender có thể báo "nhà phát hành không xác định"; ký mã Windows
+nằm ngoài phạm vi hiện tại.
+
 ## Lệnh chính
 
 | Lệnh | Việc |
@@ -39,7 +58,7 @@ Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký
 | `tunelo start` / `stop` | Bật, tắt bản chạy nền (tự chạy lúc đăng nhập máy) |
 | `tunelo status` | Tunnel đang mở, rồi trạng thái máy, claude, phiên; thoát 1 khi dịch vụ không chạy |
 | `tunelo logs -f` | Xem log liên tục (`agent.log` trong thư mục cấu hình) |
-| `tunelo update` (`--check`) | Cài bản ký mới nhất rồi khởi động lại; hiện phần trăm khi tải. Từ 2.3.0 cũng làm được từ trang máy trong Chat |
+| `tunelo update` (`--check`, `--rollback`) | Cài bản ký mới nhất rồi khởi động lại; hiện phần trăm khi tải. Từ 2.3.0 cũng làm được từ trang máy trong Chat. Tải cả `tunelo-term-host`, kiểm chữ ký minisign và SHA-256 của cả hai tệp rồi mới thay. `--rollback` đưa về bản mà lần `update` trước đã thay (kiểm lại chữ ký trước), terminal đang mở giữ nguyên |
 | `tunelo devices list` / `revoke <khoá>` | Thiết bị đã ghép |
 | `tunelo authenticator` [`--replace`] | Tạo mã Authenticator ngay trên máy và hiện một lần (QR + khoá base32), để ghép thiết bị đầu tiên bằng mã 6 số mà không cần cài lại; máy đã có mã thì cần `--replace` |
 | `tunelo claude profiles list` / `add` / `select <profile>` / `remove <profile>` | Các tài khoản Claude của máy; `add` đăng nhập ngay trong terminal; `select` đổi profile cho cả máy: phiên rảnh mở lại ngay dưới profile mới (cùng hội thoại), phiên đang chạy đổi sau lượt hiện tại |
@@ -264,7 +283,7 @@ hộp thoại trên máy mà không ai bấm nên phiên treo. Chỉ chủ máy 
 
 ## Linux: dịch vụ systemd của người dùng (2.2.0)
 
-Cần Linux dùng glibc (Ubuntu, Debian, Fedora…; Alpine/musl chưa hỗ trợ) chạy systemd, có `systemctl`. Mã:
+Cần Linux dùng glibc (Ubuntu, Debian, Fedora…; Alpine/musl chưa hỗ trợ) chạy systemd, có `systemctl`. Tiến trình terminal `tunelo-term-host` build trên Ubuntu 22.04 nên cần glibc 2.35 trở lên (Ubuntu 22.04+, Debian 12+, Fedora gần đây); máy cũ hơn vẫn chạy agent nhưng không có terminal (quyết định 11/11/2026, Jev 0,93). Mã:
 [`src/systemd-service.ts`](src/systemd-service.ts).
 
 - Bản chạy nền là **user unit** `~/.config/systemd/user/tunelo.service` (chạy `tunelo run`, `Restart=always`, `RestartSec=10`,

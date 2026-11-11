@@ -17,6 +17,12 @@
 #
 #   & ([scriptblock]::Create((irm https://<chat host>/agent/install.ps1))) [vi|en|zh-CN]
 #
+# Two files are installed next to each other: tunelo.exe and
+# tunelo-term-host.exe, the process that keeps the machine's terminals (a
+# release from before the terminal has only tunelo). When `tunelo update`
+# already put a terminal process into the config folder, the new one is also
+# staged there; tunelo switches to it once no terminal is open.
+#
 # The release is pinned: version and SHA-256 are written into this script
 # when the web app is built for a tunelo release, and the minisign
 # signature is checked with the embedded public key when minisign is
@@ -32,9 +38,11 @@ $ProgressPreference = 'SilentlyContinue'
 
 $TuneloVersion = '2.3.0'
 $Sha256WindowsX64 = '76f85eb9b8f32df83ec02434a0358c9255af3465cd80c620a4a6e1d6c6cb501a'
+$Sha256TermHostWindowsX64 = ''
 $MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 $Releases = 'https://github.com/achoo254/chat-next/releases/download'
 $Asset = 'tunelo-windows-x64.exe'
+$TermHostAsset = 'tunelo-term-host-windows-x64.exe'
 
 # <device key> [language], an older page's <install code> <device key>
 # [language] (the code is ignored), or only [language].
@@ -91,6 +99,53 @@ function Stop-Install([string]$Vi, [string]$En, [string]$Zh) {
 	throw (Get-Text "Lỗi: $Vi" "Error: $En" "错误：$Zh")
 }
 
+# Downloads a file of the pinned release into $Dir and checks its SHA-256,
+# and its signature when minisign is installed (or always fetches the
+# signature with -WithSignature). Returns the file's path.
+function Get-VerifiedFile([string]$Dir, [string]$Name, [string]$Sha256, [switch]$WithSignature) {
+	$url = "$Releases/tunelo-v$TuneloVersion/$Name"
+	$file = Join-Path $Dir $Name
+	try {
+		Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
+	} catch {
+		Stop-Install "không tải được $url" "could not download $url" "无法下载 $url"
+	}
+	if ((Get-FileHash -Algorithm SHA256 -Path $file).Hash.ToLowerInvariant() -ne $Sha256.ToLowerInvariant()) {
+		Stop-Install 'file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt.' `
+			'the download does not match the pinned SHA-256; nothing was installed.' `
+			'下载的文件与固定的 SHA-256 不符；未安装任何内容。'
+	}
+	$minisign = Get-Command minisign -ErrorAction SilentlyContinue
+	if ($minisign -or $WithSignature) {
+		try {
+			Invoke-WebRequest -UseBasicParsing -Uri "$url.minisig" -OutFile "$file.minisig"
+		} catch {
+			Stop-Install 'không tải được chữ ký minisign.' 'could not download the minisign signature.' '无法下载 minisign 签名。'
+		}
+	}
+	if ($minisign) {
+		& $minisign.Source -Vq -P $MinisignPubKey -m $file -x "$file.minisig" | Out-Null
+		if ($LASTEXITCODE -ne 0) {
+			Stop-Install 'chữ ký minisign không hợp lệ; đã huỷ cài đặt.' `
+				'the minisign signature is invalid; nothing was installed.' 'minisign 签名无效；未安装任何内容。'
+		}
+	}
+	return $file
+}
+
+# Moves a downloaded file into place. A running .exe cannot be overwritten,
+# but it can be renamed: the running one becomes .old (or another free name
+# when an older .old still runs) and keeps running until it exits.
+function Install-File([string]$From, [string]$To) {
+	if (Test-Path $To) {
+		$aside = "$To.old"
+		Remove-Item -Force -Path $aside -ErrorAction SilentlyContinue
+		if (Test-Path $aside) { $aside = "$To.old-" + [Guid]::NewGuid().ToString('N') }
+		Move-Item -Force -Path $To -Destination $aside
+	}
+	Move-Item -Force -Path $From -Destination $To
+}
+
 function Install-Tunelo {
 	if ($BadKey) {
 		Stop-Install 'khoá thiết bị không hợp lệ; hãy chép lại lệnh từ trang Chat.' `
@@ -110,42 +165,40 @@ function Install-Tunelo {
 	$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tunelo-' + [Guid]::NewGuid().ToString('N'))
 	New-Item -ItemType Directory -Path $tmp | Out-Null
 	try {
-		$url = "$Releases/tunelo-v$TuneloVersion/$Asset"
-		$file = Join-Path $tmp $Asset
 		Write-Host (Get-Text "Đang tải tunelo $TuneloVersion…" "Downloading tunelo $TuneloVersion…" "正在下载 tunelo $TuneloVersion…")
-		try {
-			Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
-		} catch {
-			Stop-Install "không tải được $url" "could not download $url" "无法下载 $url"
-		}
-		if ((Get-FileHash -Algorithm SHA256 -Path $file).Hash.ToLowerInvariant() -ne $Sha256WindowsX64.ToLowerInvariant()) {
-			Stop-Install 'file tải về không khớp SHA-256 đã ghim; đã huỷ cài đặt.' `
-				'the download does not match the pinned SHA-256; nothing was installed.' `
-				'下载的文件与固定的 SHA-256 不符；未安装任何内容。'
-		}
-		$minisign = Get-Command minisign -ErrorAction SilentlyContinue
-		if ($minisign) {
-			try {
-				Invoke-WebRequest -UseBasicParsing -Uri "$url.minisig" -OutFile "$file.minisig"
-			} catch {
-				Stop-Install 'không tải được chữ ký minisign.' 'could not download the minisign signature.' '无法下载 minisign 签名。'
-			}
-			& $minisign.Source -Vq -P $MinisignPubKey -m $file -x "$file.minisig"
-			if ($LASTEXITCODE -ne 0) {
-				Stop-Install 'chữ ký minisign không hợp lệ; đã huỷ cài đặt.' `
-					'the minisign signature is invalid; nothing was installed.' 'minisign 签名无效；未安装任何内容。'
-			}
+		# Both files are checked before either is installed.
+		$file = Get-VerifiedFile $tmp $Asset $Sha256WindowsX64
+		$hostFile = ''
+		if ($Sha256TermHostWindowsX64) {
+			# Its signature names its version, which tunelo reads when it switches.
+			$hostFile = Get-VerifiedFile $tmp $TermHostAsset $Sha256TermHostWindowsX64 -WithSignature
 		}
 
 		$dir = Join-Path $env:LOCALAPPDATA 'tunelo'
 		$exe = Join-Path $dir 'tunelo.exe'
 		New-Item -ItemType Directory -Force -Path $dir | Out-Null
-		# A running tunelo.exe cannot be overwritten, but it can be renamed.
-		if (Test-Path $exe) {
-			Remove-Item -Force -Path "$exe.old" -ErrorAction SilentlyContinue
-			Move-Item -Force -Path $exe -Destination "$exe.old"
+		# tunelo first: if it cannot be put in place, no newer terminal process waits for it.
+		Install-File $file $exe
+		# What `tunelo update --rollback` would put back is not the release before this one any more.
+		$config = if ($env:TUNELO_HOME) { $env:TUNELO_HOME } else { Join-Path $env:APPDATA 'tunelo' }
+		Remove-Item -Force -Path (Join-Path $config 'update-rollback.json') -ErrorAction SilentlyContinue
+		if ($hostFile) {
+			# A terminal process `tunelo update` put into the config folder comes
+			# before the one next to tunelo: stage the new one there too.
+			$hostBins = Join-Path $config 'term-host\bin'
+			if (Test-Path (Join-Path $hostBins 'current')) {
+				$partial = Join-Path $hostBins 'next.partial'
+				$next = Join-Path $hostBins 'next'
+				Remove-Item -Recurse -Force -Path $partial -ErrorAction SilentlyContinue
+				New-Item -ItemType Directory -Force -Path $partial | Out-Null
+				Copy-Item -Path $hostFile -Destination (Join-Path $partial 'tunelo-term-host.exe')
+				Copy-Item -Path "$hostFile.minisig" -Destination (Join-Path $partial 'tunelo-term-host.exe.minisig')
+				Remove-Item -Recurse -Force -Path $next -ErrorAction SilentlyContinue
+				Move-Item -Path $partial -Destination $next
+			}
+			# A running terminal process keeps running from its renamed file; open shells stay.
+			Install-File $hostFile (Join-Path $dir 'tunelo-term-host.exe')
 		}
-		Move-Item -Force -Path $file -Destination $exe
 		# Put tunelo on the user's PATH (no admin); new terminals see it.
 		$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 		if (-not (($userPath -split ';') -contains $dir)) {
