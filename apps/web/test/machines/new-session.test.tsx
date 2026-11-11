@@ -1,6 +1,6 @@
 // "Phiên mới" starts without typing: it opens in the newest session's folder,
-// fills in a first message that follows the folder, offers one-tap ideas, and
-// sends the default suggestion when the message is emptied. Project settings
+// leaves the first message empty (optional), offers one-tap ideas that follow
+// the folder, and opens the session waiting when no message is given. Project settings
 // in a folder the machine does not trust yet ask to trust it right there.
 import { create } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
@@ -81,32 +81,55 @@ describe("recent folders", () => {
 });
 
 describe("new session", () => {
-	it("opens in the newest session's folder with a suggestion that follows the folder", async () => {
+	it("opens in the newest session's folder; a picked idea follows the folder", async () => {
 		const { link, sent } = fakeLink();
 		open(link, stateWith([thread("a", "/w/older", 1), thread("b", "/w/chat-next", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
 		expect(sent[0]).toEqual({ case: "dirList", value: { path: "/w/chat-next", showHidden: false } });
-		expect(messageText()).toContain("chat-next");
+		expect(messageText()).toBe("");
 		expect(screen.getByRole("button", { name: "chat-next" }).getAttribute("aria-pressed")).toBe("true");
 
+		fireEvent.click(screen.getByRole("button", { name: "Tóm tắt dự án" }));
+		expect(messageText()).toContain("chat-next");
 		fireEvent.click(screen.getByRole("button", { name: "older" }));
 		await waitFor(() => expect(folderInput().value).toBe("/w/older"));
 		expect(messageText()).toContain("older");
 	});
 
-	it("starts at once with the suggestion, and uses the default when the message is emptied", async () => {
+	it("starts with no first message: the machine opens the session waiting", async () => {
 		const { link, sent } = fakeLink();
 		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
-		await userEvent.click(message());
-		await userEvent.keyboard("{Control>}a{/Control}   ");
-		expect(messageText()).toBe("   ");
+		expect(messageText()).toBe("");
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
 		await waitFor(() => expect(sent.some((r) => r.case === "threadCreate")).toBe(true));
 		const created = sent.find((r) => r.case === "threadCreate");
 		expect(created?.value.dir).toBe("/w/chat-next");
-		expect(created?.value.text).toContain("chat-next");
-		expect(screen.queryByText("Nhập câu đầu tiên")).toBeNull();
+		expect(created?.value.text).toBe("");
+	});
+
+	it("an emptied message is sent empty too, and a picked idea can be unpicked", async () => {
+		const { link, sent } = fakeLink();
+		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
+		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+		const chip = screen.getByRole("button", { name: "Tóm tắt dự án" });
+		fireEvent.click(chip);
+		expect(messageText()).toContain("chat-next");
+		fireEvent.click(chip);
+		expect(chip.getAttribute("aria-pressed")).toBe("false");
+		expect(messageText()).toBe("");
+		await userEvent.click(message());
+		await userEvent.keyboard("   ");
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(sent.find((r) => r.case === "threadCreate")?.value.text).toBe(""));
+	});
+
+	it("a machine before tunelo 2.0.9 refuses an empty message, so it gets the default idea", async () => {
+		const { link, sent } = fakeLink();
+		open(link, stateWith([thread("b", "/w/chat-next", 2)], true, { agentVersion: "2.0.8", providers: [], pinnedDirs: [], recentDirs: [], home: "/Users/x" }));
+		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(sent.find((r) => r.case === "threadCreate")?.value.text).toContain("chat-next"));
 	});
 
 	it("sends the idea picked with one tap", async () => {

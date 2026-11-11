@@ -116,7 +116,7 @@ export const enMachines: MachinesCopy = {
 		skipProjectSettings: "Don't load project settings",
 		projectSettings: "Load the project's .claude settings (hooks, auto-allowed tools) · logged",
 		first: "First message",
-		firstPlaceholder: (ai) => `What should ${ai} do?`,
+		firstPlaceholder: (ai) => `Optional: leave empty to open the session and message ${ai} later.`,
 		park: (title) => `All session slots are in use. The idle session “${title}” will be parked to make room; opening it again resumes it.`,
 		queue: "All session slots are busy: the new session will wait until one frees up.",
 		cancel: "Cancel",

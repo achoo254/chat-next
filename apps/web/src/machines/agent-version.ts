@@ -17,3 +17,6 @@ export const AGENT_THREAD_ACTIONS = [2, 0, 6] as const;
 
 /** The first tunelo that keeps projects (ProjectList and friends). */
 export const AGENT_PROJECTS = [2, 0, 7] as const;
+
+/** The first tunelo that opens a session with no first message (it waits for the first one typed in it). */
+export const AGENT_PARKED_SESSION = [2, 0, 9] as const;

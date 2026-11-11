@@ -19,6 +19,7 @@ import { navigate, paths } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { AGENT_PARKED_SESSION, versionAtLeast } from "./agent-version.ts";
 import { PROMPT_HINTS, folderName, hintPrompt, inDiskAccessFolder, isHome, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
 import { aiName, providerOf } from "./use-machines.ts";
@@ -70,8 +71,8 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 	// The field is being typed in: show matching folders under it.
 	const [typing, setTyping] = useState(false);
 	const [projectSettings, setProjectSettings] = useState(project?.defaults?.projectSettings ?? false);
-	// The first message: a suggestion (it follows the folder) until the user types.
-	const [hint, setHint] = useState<PromptHint | null>("summary");
+	// The first message is optional: empty opens the session waiting for one. An idea picked from the chips follows the folder until the user types.
+	const [hint, setHint] = useState<PromptHint | null>(null);
 	const [text, setText] = useState("");
 	const [askConsent, setAskConsent] = useState(false);
 	// The folder whose .claude settings the machine refused to load untrusted.
@@ -143,8 +144,9 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 	// `consent`: the user agreed to the sensitive folder; `trust`: to trusting its project settings.
 	const start = (consent: boolean, trust = false) => {
 		if (path.trim() === "") return setError(t.newSession.needFolder);
-		// An emptied message falls back to the default suggestion.
-		const first = message.trim() === "" ? hintPrompt(t.newSession, "summary", path) : message.trim();
+		// Machines before tunelo 2.0.9 refuse an empty first message: they get the default idea instead.
+		const parkable = state.info === null || versionAtLeast(state.info.agentVersion, AGENT_PARKED_SESSION);
+		const first = message.trim() === "" && !parkable ? hintPrompt(t.newSession, "summary", path) : message.trim();
 		if ((sensitive || askConsent) && !consent) {
 			setAskConsent(true);
 			return;
@@ -454,7 +456,11 @@ export function NewSession({ machine, name, link, state, onClose, project }: New
 					<div className="mx-quick" role="group" aria-label={t.newSession.hints}>
 						<em>{t.newSession.hints}</em>
 						{PROMPT_HINTS.map((id) => (
-							<button key={id} type="button" className="chip" aria-pressed={hint === id} onClick={() => setHint(id)}>
+							<button key={id} type="button" className="chip" aria-pressed={hint === id} onClick={() => {
+									setHint(hint === id ? null : id);
+									setText("");
+								}}
+							>
 								{t.newSession.hint[id]}
 							</button>
 						))}

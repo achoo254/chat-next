@@ -118,7 +118,7 @@ export const viMachines = {
 		skipProjectSettings: "Không nạp cấu hình dự án",
 		projectSettings: "Nạp cấu hình .claude của dự án (hook, quyền tự cho phép) · có ghi nhật ký",
 		first: "Câu đầu tiên",
-		firstPlaceholder: (ai: string) => `Bạn muốn ${ai} làm gì?`,
+		firstPlaceholder: (ai: string) => `Không bắt buộc: để trống thì phiên mở sẵn, nhắn ${ai} sau.`,
 		park: (title: string) => `Đang mở đủ phiên. Phiên “${title}” đang rảnh sẽ tạm tắt để nhường chỗ; mở lại nó vẫn tiếp tục.`,
 		queue: "Đang mở đủ phiên và phiên nào cũng đang bận: phiên mới sẽ chờ tới khi có chỗ.",
 		cancel: "Huỷ",

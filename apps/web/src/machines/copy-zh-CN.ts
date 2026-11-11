@@ -115,7 +115,7 @@ export const zhCNMachines: MachinesCopy = {
 		skipProjectSettings: "不加载项目配置",
 		projectSettings: "加载项目的 .claude 配置（钩子、自动允许的工具）· 会记录日志",
 		first: "第一条消息",
-		firstPlaceholder: (ai) => `你想让 ${ai} 做什么？`,
+		firstPlaceholder: (ai) => `可不填：留空则先打开会话，稍后再给 ${ai} 发消息。`,
 		park: (title) => `会话已满。空闲的会话“${title}”将暂停以腾出位置；重新打开即可继续。`,
 		queue: "会话已满且都在忙：新会话将等待空位。",
 		cancel: "取消",
