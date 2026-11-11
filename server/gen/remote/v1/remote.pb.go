@@ -11119,7 +11119,8 @@ type AuditEntry struct {
 	// path: the site it showed; detail: "claude" or "user"),
 	// browser_clear (the tunelo browser's profile was deleted),
 	// screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
-	// totp_set (a device set or replaced the authenticator secret; never the secret)
+	// totp_set (a device set or replaced the authenticator secret; never the secret),
+	// agent_update (a device started an update of tunelo; detail: the version)
 	Action        string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
 	Path          string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Detail        string `protobuf:"bytes,5,opt,name=detail,proto3" json:"detail,omitempty"`

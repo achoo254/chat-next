@@ -4850,7 +4850,8 @@ export type AuditEntry = Message<"remote.v1.AuditEntry"> & {
    * path: the site it showed; detail: "claude" or "user"),
    * browser_clear (the tunelo browser's profile was deleted),
    * screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
-   * totp_set (a device set or replaced the authenticator secret; never the secret)
+   * totp_set (a device set or replaced the authenticator secret; never the secret),
+   * agent_update (a device started an update of tunelo; detail: the version)
    *
    * @generated from field: string action = 3;
    */
